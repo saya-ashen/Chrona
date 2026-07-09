@@ -837,6 +837,11 @@ describe("TaskWorkspacePlanSection", () => {
     expect(within(commandCenter).queryByLabelText(/City/)).not.toBeInTheDocument();
     expect(within(commandCenter).queryByRole("region", { name: "Current operation" })).not.toBeInTheDocument();
     expect(within(commandCenter).queryByText("Result summary will appear here after the current node finishes.")).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Execution flow" })).not.toBeInTheDocument();
+    expect(within(commandCenter).getByText("Result ready for review")).toBeInTheDocument();
+    expect(within(commandCenter).getByRole("button", { name: "Accept result" })).toBeInTheDocument();
+    expect(within(commandCenter).getByRole("button", { name: "Request changes" })).toBeInTheDocument();
+    expect(within(commandCenter).queryByRole("button", { name: "Complete task" })).not.toBeInTheDocument();
   });
 
   it("does not open node detail overlay when selecting a graph node", () => {

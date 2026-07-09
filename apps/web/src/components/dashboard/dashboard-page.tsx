@@ -637,8 +637,8 @@ export function DashboardPage({ data, copy, workspaceId = data.workspaceId }: Da
   }, [autoCompleted]);
 
   return (
-    <div className="relative flex h-full min-h-0 min-w-0 flex-col overflow-x-hidden overflow-y-auto rounded-3xl border border-border/60 bg-card/60 p-3 shadow-sm sm:p-4">
-      <div className="mx-auto w-full max-w-7xl space-y-6">
+    <div className="relative flex h-full min-h-0 min-w-0 flex-col overflow-x-hidden overflow-y-auto rounded-[2rem] border border-border bg-surface-soft/80 p-3 sm:p-4">
+      <div className="mx-auto w-full max-w-[1280px] space-y-6">
         <HeadlineBanner
           copy={copy}
           completedToday={completedToday}

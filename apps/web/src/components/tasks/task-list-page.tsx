@@ -475,12 +475,12 @@ export function TaskListPage({ tasks, workspaceId: _workspaceId, copy, total, pa
   }
 
   return (
-    <div className="relative flex h-full min-h-0 min-w-0 flex-col overflow-x-hidden overflow-y-auto rounded-3xl border border-border/60 bg-card/60 p-2 shadow-sm sm:p-3">
-      <div className="flex min-h-0 flex-1 flex-col gap-3 rounded-2xl bg-gradient-to-br from-muted/40 to-primary-soft/30 p-3 sm:p-4">
+    <div className="relative flex h-full min-h-0 min-w-0 flex-col overflow-x-hidden overflow-y-auto rounded-[2rem] border border-border bg-surface-soft/80 p-3 sm:p-4">
+      <div className="flex min-h-0 flex-1 flex-col gap-3 rounded-[1.75rem] bg-card p-3 sm:p-4">
         <TaskListHero title={copy.nav.tasks} copy={taskCopy} activeFilterLabel={activeFilterLabel} counts={counts} />
         <TaskFilterBar filter={filter} counts={counts} copy={taskCopy} onFilterChange={setFilter} />
 
-        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border/70 bg-card px-3 py-2 shadow-xs">
+        <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-border bg-background px-3 py-2">
           <form
             className="relative flex min-w-[12rem] flex-1 items-center"
             onSubmit={(event) => {
@@ -554,7 +554,7 @@ export function TaskListPage({ tasks, workspaceId: _workspaceId, copy, total, pa
           </Button>
         </div>
         {hasSelection || actionMessage ? (
-          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border/70 bg-card px-3 py-2 text-xs shadow-xs">
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-border bg-background px-3 py-2 text-xs">
             <label className="flex items-center gap-2 font-medium text-foreground">
               <Checkbox
                 aria-label={taskCopy.selectVisible}
@@ -592,7 +592,7 @@ export function TaskListPage({ tasks, workspaceId: _workspaceId, copy, total, pa
         ) : null}
 
         {tasks.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-border/70 bg-card/60 p-10 text-center text-sm text-muted-foreground shadow-xs">
+          <div className="rounded-3xl border border-dashed border-border bg-background/70 p-10 text-center text-sm text-muted-foreground">
             {taskCopy.emptyFiltered}
           </div>
         ) : (
@@ -613,7 +613,7 @@ export function TaskListPage({ tasks, workspaceId: _workspaceId, copy, total, pa
         )}
 
         {showPagination ? (
-          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border/70 bg-card px-3 py-2 text-xs shadow-xs">
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-border bg-background px-3 py-2 text-xs">
             <div className="flex items-center gap-3 text-muted-foreground">
               <span>{taskCopy.paginationRange.replace("{start}", String(rangeStart)).replace("{end}", String(rangeEnd)).replace("{total}", String(total))}</span>
               <Select value={String(pageSize)} onValueChange={(value) => setParam("pageSize", value)}>

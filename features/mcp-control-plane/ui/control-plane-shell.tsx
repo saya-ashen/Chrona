@@ -151,10 +151,10 @@ export function ControlPlaneShell({
     <SidebarProvider
       defaultOpen
       className="h-screen min-h-0 bg-canvas text-foreground"
-      style={{ "--sidebar-width": "200px" } as CSSProperties}
+      style={{ "--sidebar-width": "224px" } as CSSProperties}
     >
-      <Sidebar collapsible="none" className="hidden border-r border-border/60 bg-sidebar xl:flex">
-        <SidebarHeader className="border-b border-border/60 px-3.5 py-3.5">
+      <Sidebar collapsible="none" className="hidden border-r border-border bg-sidebar xl:flex">
+        <SidebarHeader className="border-b border-border px-4 py-4">
           <LocalizedLink
             href="/schedule"
             aria-label={t("nav.brandTitle")}
@@ -164,13 +164,13 @@ export function ControlPlaneShell({
               src="/favicon.png"
               alt=""
               aria-hidden="true"
-              className="h-9 w-9 shrink-0 rounded-xl object-cover ring-1 ring-border/60 mix-blend-multiply dark:mix-blend-screen"
+              className="h-10 w-10 shrink-0 rounded-2xl object-cover ring-1 ring-border mix-blend-multiply dark:mix-blend-screen"
             />
             <span className="min-w-0">
-              <span className="block truncate text-[1.3rem] font-semibold tracking-tight leading-none text-foreground">
+              <span className="block truncate text-[1.45rem] font-medium tracking-[-0.04em] leading-none text-foreground">
                 {t("nav.brandTitle")}
               </span>
-              <span className="mt-0.5 block truncate text-[11px] leading-tight text-muted-foreground">
+              <span className="mt-1 block truncate text-[11px] font-semibold uppercase leading-tight tracking-[0.14em] text-muted-foreground">
                 {t("nav.brandTagline")}
               </span>
             </span>
@@ -178,9 +178,9 @@ export function ControlPlaneShell({
         </SidebarHeader>
 
         <SidebarContent>
-          <SidebarGroup className="px-2.5 py-3">
+          <SidebarGroup className="px-3 py-4">
             <SidebarGroupContent>
-              <SidebarMenu aria-label="Primary" className="gap-1">
+              <SidebarMenu aria-label="Primary" className="gap-1.5">
             {navItems.map((item) => {
               const Icon = item.icon;
 
@@ -195,10 +195,10 @@ export function ControlPlaneShell({
                     }
                     isActive={item.active}
                     className={cn(
-                      "h-auto rounded-lg px-3 py-2 text-sm font-medium transition-colors",
+                      "h-auto rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors",
                       item.active
-                        ? "bg-primary-soft text-primary hover:bg-primary-soft hover:text-primary [&_svg]:text-primary"
-                        : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                        ? "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground [&_svg]:text-primary-foreground"
+                        : "text-muted-foreground hover:bg-card hover:text-foreground",
                     )}
                   >
                     <Icon className="size-4" />
@@ -214,8 +214,8 @@ export function ControlPlaneShell({
       </Sidebar>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="relative z-50 border-b border-border/60 bg-background/85 supports-[backdrop-filter]:backdrop-blur-md">
-          <div className="relative flex w-full items-center gap-2 px-4 py-2 sm:gap-3 sm:px-6 xl:px-7">
+        <header className="relative z-50 border-b border-border bg-background/90 supports-[backdrop-filter]:backdrop-blur-md">
+          <div className="relative mx-auto flex h-16 w-full max-w-[1440px] items-center gap-2 px-4 sm:gap-3 sm:px-6 xl:px-8">
             <div className="flex min-w-0 shrink items-center gap-3">
               <LocalizedLink
                 href="/schedule"
@@ -226,14 +226,14 @@ export function ControlPlaneShell({
                   src="/favicon.png"
                   alt=""
                   aria-hidden="true"
-                  className="h-8 w-8 shrink-0 rounded-xl object-cover ring-1 ring-border/60 mix-blend-multiply dark:mix-blend-screen"
+                  className="h-9 w-9 shrink-0 rounded-2xl object-cover ring-1 ring-border mix-blend-multiply dark:mix-blend-screen"
                 />
                 <span className="hidden truncate text-sm font-semibold tracking-tight text-foreground sm:block">
                   {t("nav.brandTitle")}
                 </span>
               </LocalizedLink>
 
-              <p className="hidden min-w-0 truncate text-xs font-medium text-muted-foreground xl:block">
+              <p className="hidden min-w-0 truncate text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground xl:block">
                 {breadcrumb.join(" / ") || t("nav.schedule")}
               </p>
             </div>
@@ -248,7 +248,7 @@ export function ControlPlaneShell({
                 onClick={() => setShowCreateTaskDialog(true)}
                 variant="default"
                 size="sm"
-                className="h-10 gap-1.5 px-3 sm:px-3.5"
+                className="h-11 gap-1.5 rounded-xl px-4 sm:px-5"
               >
                 <Plus className="size-4" />
                 <span className="hidden sm:inline">{t("nav.newTask")}</span>
@@ -257,7 +257,7 @@ export function ControlPlaneShell({
             </div>
           </div>
         </header>
-        <main className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+4.5rem)] sm:px-6 xl:px-7 xl:pb-3">
+        <main className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 py-4 pb-[calc(env(safe-area-inset-bottom)+5rem)] sm:px-6 xl:px-8 xl:pb-4">
           {shouldShowStartWithChrona ? (
             <StartWithChrona
               className="mb-4"
@@ -276,7 +276,7 @@ export function ControlPlaneShell({
 
         <nav
           aria-label="Primary"
-          className="fixed inset-x-0 bottom-0 z-40 border-t border-border/60 bg-background/90 pb-[env(safe-area-inset-bottom)] backdrop-blur-md xl:hidden"
+          className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/92 pb-[env(safe-area-inset-bottom)] backdrop-blur-md xl:hidden"
         >
           <ul className="mx-auto flex max-w-lg items-stretch justify-around">
             {navItems.map((item) => {

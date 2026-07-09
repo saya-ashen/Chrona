@@ -36,9 +36,25 @@ async function loadHeaderTaskView(taskId: string) {
   });
 }
 
-function taskStatusLabel(status: TaskHeaderTaskStatus) {
-  if (status === "approval-needed") return "Approval needed";
-  return status.charAt(0).toUpperCase() + status.slice(1);
+function taskStatusLabel(input: {
+  status: TaskHeaderTaskStatus;
+  executionStatus: PlanExecutionStatus;
+  taskStatus: string;
+}) {
+  if (input.status === "approval-needed") return "Approval needed";
+  if (input.status === "completed") return input.taskStatus === "Done" ? "Task done" : "Result ready";
+  return input.status.charAt(0).toUpperCase() + input.status.slice(1);
+}
+
+function workspaceStateGuidance(input: {
+  status: TaskHeaderTaskStatus;
+  executionStatus: PlanExecutionStatus;
+  taskStatus: string;
+}) {
+  if (input.status === "completed") {
+    return input.taskStatus === "Done" ? "Ask a follow-up or create a next task" : "Accept result or request changes";
+  }
+  return null;
 }
 
 const ACTIVE_EXECUTION_STATUSES = new Set<PlanExecutionStatus>([
@@ -281,8 +297,9 @@ export function resolveTaskHeaderViewModel(input: BuildHeaderSpecInput & { now?:
 
   return {
     title: task.title,
+    workspaceStateGuidance: workspaceStateGuidance({ status, executionStatus: currentExecution.status, taskStatus: scopedTaskStatus }),
     status,
-    statusLabel: taskStatusLabel(status),
+    statusLabel: taskStatusLabel({ status, executionStatus: currentExecution.status, taskStatus: scopedTaskStatus }),
     progressLabel: `${totalSteps} steps · ${completedSteps} accepted · ${progressPercent}%`,
     priorityLabel: task.priority,
     priorityTone: priorityTone(task.priority),

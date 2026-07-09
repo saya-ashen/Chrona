@@ -313,12 +313,12 @@ test.describe("Task create → plan → run → result", () => {
       expect(acceptBody.runId).toBeTruthy();
     });
 
-    // 6. The Work page header badge reflects the completed execution.
-    await test.step("Work page badge shows the completed execution", async () => {
+    // 6. The Work page header badge reflects result review after execution.
+    await test.step("Work page badge shows result review", async () => {
       await page.goto(WORK_URL(task.taskId));
       await dismissTaskEditorIfOpen(page);
       await expect(
-        page.locator('[data-slot="badge"]').filter({ hasText: /^completed$/i }),
+        page.locator('[data-slot="badge"]').filter({ hasText: /^result ready$/i }),
       ).toBeVisible({ timeout: 15_000 });
     });
 

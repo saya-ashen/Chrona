@@ -168,6 +168,8 @@ function getTaskReviewState(task: TaskData) {
 }
 
 function getTaskPrimaryAction(task: TaskData) {
+  if (task.status === "Done") return "Ask a follow-up or create a next task";
+  if (task.status === "Completed" && task.executionSummary?.executionState === "completed") return "Accept result or request changes";
   return task.executionSummary?.primaryAction.label ?? (task.isRunnable ? "Continue task" : "Resolve runnability");
 }
 

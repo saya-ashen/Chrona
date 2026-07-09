@@ -304,4 +304,48 @@ describe("resolveTaskHeaderViewModel — header status follows the selected occu
     // occurrence test used but flip the workBlockId off.
     expect(headerView.status).toBe("waiting");
   });
+  it("labels completed executions as result review instead of no-action completion", () => {
+    const task: HeaderTaskView = {
+      id: "task-1",
+      workspaceId: "ws-1",
+      seriesExternalUid: null,
+      title: "Completed task",
+      status: "Completed",
+      priority: "Medium",
+      dueAt: null,
+      projection: null,
+      workBlocks: [] as unknown as HeaderTaskView["workBlocks"],
+      importedCalendarEvents: [],
+    };
+
+    const headerView = resolveTaskHeaderViewModel({
+      task,
+      recurrenceSeriesTasks: [],
+      currentExecution: {
+        taskId: "task-1",
+        planId: "plan-1",
+        mainSessionId: "session-1",
+        status: "completed",
+        currentNodeId: null,
+        executedNodeIds: ["node-1"],
+        waitingNodeIds: [],
+        blockedNodeIds: [],
+        message: "",
+        checkpoint: null,
+      },
+      savedPlan: {
+        id: "plan-1",
+        status: "accepted",
+        effectivePlan: {
+          nodes: [{ id: "node-1" }],
+          completedNodeIds: ["node-1"],
+        },
+      } as unknown as BuildHeaderSpecInput["savedPlan"],
+      workBlockId: null,
+    });
+
+    expect(headerView.status).toBe("completed");
+    expect(headerView.statusLabel).toBe("Result ready");
+    expect(headerView.workspaceStateGuidance).toBe("Accept result or request changes");
+  });
 });

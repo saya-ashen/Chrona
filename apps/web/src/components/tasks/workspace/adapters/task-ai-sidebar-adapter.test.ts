@@ -97,4 +97,28 @@ describe("createTaskAiSidebarContext", () => {
       tone: "info",
     });
   });
+  it("uses result-review copy for completed tasks waiting on acceptance", () => {
+    const data = createTaskWorkspaceFixturePageData({
+      task: {
+        status: "Completed",
+        executionSummary: createExecutionSummary({
+          executionState: "completed",
+          stateLabel: "Completed",
+          currentNodeId: null,
+          primaryAction: { type: "none", enabled: false, label: "No action available" },
+        }),
+      },
+    });
+
+    const { context } = createTaskAiSidebarContext(data.task);
+
+    expect(context.type).toBe("task");
+    if (context.type !== "task") throw new Error("Expected task context");
+    expect(context.primaryAction).toBe("Accept result or request changes");
+    expect(context.highlights).toContainEqual(expect.objectContaining({
+      label: "Next",
+      value: "Accept result or request changes",
+    }));
+  });
+
 });

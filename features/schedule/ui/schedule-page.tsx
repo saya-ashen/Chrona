@@ -194,7 +194,7 @@ export function SchedulePage({
   }, []);
 
   return (
-    <div className="relative flex h-full flex-col overflow-x-hidden overflow-y-auto rounded-3xl border border-border/60 bg-card/70 p-2 shadow-sm backdrop-blur-sm sm:p-3">
+    <div className="relative flex h-full flex-col overflow-x-hidden overflow-y-auto rounded-[2rem] border border-border bg-surface-soft/80 p-3 sm:p-4">
       <p className="sr-only" aria-live="polite">
         {announcement}
       </p>
@@ -217,7 +217,7 @@ export function SchedulePage({
         </div>
       ) : null}
 
-      <div className="mt-3 grid grid-cols-1 gap-3 overflow-visible rounded-3xl bg-muted/40 p-2 lg:gap-4 lg:p-3 xl:min-h-0 xl:flex-1 xl:grid-cols-[minmax(210px,0.72fr)_minmax(0,1.85fr)_minmax(220px,0.62fr)] xl:overflow-hidden">
+      <div className="mt-3 grid grid-cols-1 gap-3 overflow-visible rounded-[1.75rem] bg-card p-3 lg:gap-4 lg:p-4 xl:min-h-0 xl:flex-1 xl:grid-cols-[minmax(210px,0.72fr)_minmax(0,1.85fr)_minmax(220px,0.62fr)] xl:overflow-hidden">
         <ScheduleLeftSidebar
           copy={copy}
           locale={locale}

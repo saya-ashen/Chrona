@@ -9,5 +9,6 @@ export * from "./model/task-workspace-plan-flow-machine";
 export * from "./model/task-workspace-operation-machine";
 export * from "./model/task-workspace-proposal-flow-machine";
 export * from "./model/workspace-events";
+export * from "./model/task-workspace-interaction";
 export { TaskWorkspacePage } from "./ui/task-workspace-page";
 export { TaskWorkspaceHeaderCard } from "./ui/task-workspace-header-card";
