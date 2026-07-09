@@ -14,6 +14,12 @@ import {
   type ChronaToolName,
   type ChronaToolResult,
 } from "@chrona/contracts/api";
+import {
+  CHRONA_PLAN_GENERATE_INTERNAL_TOOL_NAME,
+  CHRONA_PLAN_GENERATE_TOOL_DESCRIPTION,
+  CHRONA_PLAN_GENERATE_TOOL_NAME,
+  CHRONA_PLAN_GENERATE_TOOL_TITLE,
+} from "@chrona/contracts";
 import { chronaPlanOutputElementSchema } from "@chrona/ui-protocol";
 
 const planOutputPatchPathSchema = z
@@ -133,10 +139,10 @@ const externalTools = {
     description: "Read accepted plan state through AI-visible refs.",
     inputSchema: publicToolSchema(chronaPublicToolPayloadSchemas["chrona.plan.read"]),
   },
-  chrona_plan_generate: {
-    internalName: "chrona.plan.generate",
-    title: "Chrona Plan Generate",
-    description: "Generate a draft plan for the session task from a complete plan blueprint.",
+  [CHRONA_PLAN_GENERATE_TOOL_NAME]: {
+    internalName: CHRONA_PLAN_GENERATE_INTERNAL_TOOL_NAME,
+    title: CHRONA_PLAN_GENERATE_TOOL_TITLE,
+    description: CHRONA_PLAN_GENERATE_TOOL_DESCRIPTION,
     inputSchema: publicToolSchema(chronaPublicToolPayloadSchemas["chrona.plan.generate"]),
   },
   chrona_node_read: {

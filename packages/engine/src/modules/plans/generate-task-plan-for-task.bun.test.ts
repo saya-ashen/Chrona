@@ -43,7 +43,7 @@ const aiGeneratePlanMock = mock(async (request: { title: string; description?: s
   edges: [],
 }));
 
-let streamStyle: "full" | "hermes" | "hermes-no-save" | "text-json-done" | "provider-error-done" = "full";
+let streamStyle: "full" | "hermes" | "hermes-no-save" | "text-json-done" | "provider-error-done" | "wrapped-plan-tool" = "full";
 let planToolName = "chrona_plan_generate";
 
 import { materializeGeneratedTaskPlan } from "./materialize-generated-task-plan";
@@ -60,6 +60,21 @@ async function* aiGeneratePlanStreamMock(request: { title: string; description?:
 
   if (streamStyle === "provider-error-done") {
     yield { type: "done" as const, text: "unexpected status 502 Bad Gateway: upstream unavailable" };
+    return;
+  }
+  if (streamStyle === "wrapped-plan-tool") {
+    yield {
+      type: "tool_call" as const,
+      tool: "chrona_plan_generate",
+      input: {
+        plan: {
+          ...blueprint,
+          extraRoot: "ignored",
+          nodes: blueprint.nodes.map((node) => ({ ...node, unexpected: "ignored" })),
+        },
+      },
+    };
+    yield { type: "tool_result" as const, tool: "chrona_plan_generate", result: "completed" };
     return;
   }
 
@@ -194,6 +209,7 @@ describe("generateTaskPlanForTask", () => {
       `chrona:task:${task.id}:work-block:${workBlock.id}:plan-generation`,
     );
     expect(activityEvents.map((event) => event.eventType)).toEqual([
+
       "plan_generation.started",
       "plan_generation.status",
       "plan_generation.status",
@@ -207,6 +223,35 @@ describe("generateTaskPlanForTask", () => {
       tool: "chrona_plan_generate",
       plan_title: "Plan for Updated task title",
       node_count: 1,
+    });
+  });
+
+  it("rejects wrapped plan tool payloads instead of normalizing them", async () => {
+    streamStyle = "wrapped-plan-tool";
+    const workspace = await db.workspace.create({
+      data: { name: "Wrapped plan payload", status: "Active", defaultRuntime: "hermes" },
+    });
+    const task = await db.task.create({
+      data: {
+        workspaceId: workspace.id,
+        title: "Wrapped SDK task",
+        status: "Ready",
+        priority: "Medium",
+        executionRuntime: "hermes",
+        executionConfig: {},
+      },
+    });
+
+    const result = await generateTaskPlanForTask({ taskId: task.id, forceRefresh: true });
+
+    expect(result).toBeNull();
+    await expect(getLatestTaskPlanReadModel(task.id)).resolves.toBeNull();
+    const failure = await db.event.findFirst({
+      where: { taskId: task.id, eventType: "plan_generation.failed" },
+    });
+    expect(failure?.payload).toMatchObject({
+      code: "INTERNAL_ERROR",
+      message: "chrona_plan_generate completed but no saved plan was found.",
     });
   });
 

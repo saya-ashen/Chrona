@@ -5,22 +5,15 @@ import { ensurePlanGenerationTaskSession, ensureWorkBlockPlanTaskSession, resolv
 import { getLatestTaskPlanReadModel } from "@/modules/plans/task-plan-read-model";
 import { updateLatestCompiledPlanPrompt } from "@/modules/plan-execution/persistence/compiled-plan-store";
 import { materializeGeneratedTaskPlan } from "@/modules/plans/materialize-generated-task-plan";
-import { planBlueprintSchema, type GeneratePlanSSEEvent, type PlanBlueprint, type TaskPlanReadModel } from "@chrona/contracts/ai";
+import { executePlanGenerateTool } from "@/modules/agent-tools/plan-generate-tool";
+import {
+  CHRONA_PLAN_GENERATE_TOOL_NAME,
+  isChronaPlanGenerateToolName,
+  safeParsePlanGenerateToolPayload,
+  type GeneratePlanSSEEvent,
+  type TaskPlanReadModel,
+} from "@chrona/contracts/ai";
 
-const PLAN_GENERATE_TOOL_NAME = "chrona_plan_generate";
-const INTERNAL_PLAN_GENERATE_TOOL_NAME = "chrona.plan.generate";
-const CLAUDE_CODE_PLAN_GENERATE_TOOL_NAME = "mcp__chrona__chrona_plan_generate";
-
-function isPlanGenerateTool(tool: string | undefined): boolean {
-  return tool === PLAN_GENERATE_TOOL_NAME ||
-    tool === INTERNAL_PLAN_GENERATE_TOOL_NAME ||
-    tool === CLAUDE_CODE_PLAN_GENERATE_TOOL_NAME;
-}
-
-function normalizePlanBlueprint(value: unknown): PlanBlueprint | null {
-  const parsed = planBlueprintSchema.safeParse(value);
-  return parsed.success ? parsed.data : null;
-}
 
 function providerFailureFromDoneText(text: string | undefined): string | null {
   const trimmed = text?.trim();
@@ -30,10 +23,8 @@ function providerFailureFromDoneText(text: string | undefined): string | null {
 }
 
 function getToolDisplayName(tool: string | undefined) {
+  if (isChronaPlanGenerateToolName(tool)) return "generating plan structure";
   switch (tool) {
-    case PLAN_GENERATE_TOOL_NAME:
-    case INTERNAL_PLAN_GENERATE_TOOL_NAME:
-      return "generating plan structure";
     case "skill_view":
       return "reading planning skill";
     case undefined:
@@ -356,38 +347,44 @@ export async function* generateTaskPlanManualStream(input: {
         break;
 
       case "tool_call":
-        if (isPlanGenerateTool(event.tool)) {
+        if (isChronaPlanGenerateToolName(event.tool)) {
           hasPlanGenerateToolCall = true;
 
-          const blueprint = normalizePlanBlueprint(event.input);
+          const blueprint = safeParsePlanGenerateToolPayload(event.input);
           if (blueprint) {
             await recordPlanGenerationEvent({ workBlockId: effectiveWorkBlockId,
               type: "tool_called",
               task,
               generationId,
               payload: {
-                tool: PLAN_GENERATE_TOOL_NAME,
+                tool: CHRONA_PLAN_GENERATE_TOOL_NAME,
                 plan_title: blueprint.title,
                 node_count: blueprint.nodes.length,
               },
             });
             if (!persistedPlanId) {
-              const savedPlan = await materializeGeneratedTaskPlan({
-                taskId: task.id,
-                workspaceId: task.workspaceId,
-                workBlockId: effectiveWorkBlockId,
+              const result = await executePlanGenerateTool({
+                context: {
+                  actorId: "hermes",
+                  actorType: "agent",
+                  sessionId: taskSessionKey,
+                  taskId: task.id,
+                  workspaceId: task.workspaceId,
+                },
                 blueprint,
+                materialize: materializeGeneratedTaskPlan,
+                workBlockId: effectiveWorkBlockId,
                 generatedBy: "hermes",
                 userInstruction,
               });
-              materializedPlan = savedPlan;
-              persistedPlanId = savedPlan.id;
+              materializedPlan = result.savedPlan;
+              persistedPlanId = result.savedPlan.id;
               await recordPlanGenerationEvent({ workBlockId: effectiveWorkBlockId,
                 type: "draft_saved",
                 task,
                 generationId,
                 payload: {
-                  plan_id: savedPlan.id,
+                  plan_id: result.savedPlan.id,
                   plan_title: blueprint.title,
                   node_count: blueprint.nodes.length,
                 },
@@ -396,7 +393,7 @@ export async function* generateTaskPlanManualStream(input: {
 
             const toolEvent: GeneratePlanSSEEvent = {
               type: "tool_call",
-              tool: PLAN_GENERATE_TOOL_NAME,
+              tool: CHRONA_PLAN_GENERATE_TOOL_NAME,
               input: blueprint,
             };
             yield toolEvent;
@@ -433,12 +430,12 @@ export async function* generateTaskPlanManualStream(input: {
         break;
 
       case "tool_result":
-        if (isPlanGenerateTool(event.tool)) {
+        if (isChronaPlanGenerateToolName(event.tool)) {
           if (event.error) {
             const errorEvent: GeneratePlanSSEEvent = {
               type: "error",
               code: "PROVIDER_ERROR",
-              message: `${PLAN_GENERATE_TOOL_NAME} failed: ${event.result}`,
+              message: `${CHRONA_PLAN_GENERATE_TOOL_NAME} failed: ${event.result}`,
             };
             await recordPlanGenerationEvent({
               workBlockId: effectiveWorkBlockId,
@@ -477,7 +474,7 @@ export async function* generateTaskPlanManualStream(input: {
             const errorEvent: GeneratePlanSSEEvent = {
               type: "error",
               code: "INTERNAL_ERROR",
-              message: `${PLAN_GENERATE_TOOL_NAME} completed but no saved plan was found.`,
+              message: `${CHRONA_PLAN_GENERATE_TOOL_NAME} completed but no saved plan was found.`,
             };
             await recordPlanGenerationEvent({
               workBlockId: effectiveWorkBlockId,
@@ -574,7 +571,7 @@ export async function* generateTaskPlanManualStream(input: {
 
           const message = hasPlanGenerateToolCall
             ? "Plan generation tool was called but no saved plan was found."
-            : `Provider completed without calling ${PLAN_GENERATE_TOOL_NAME}.`;
+            : `Provider completed without calling ${CHRONA_PLAN_GENERATE_TOOL_NAME}.`;
           const errorEvent: GeneratePlanSSEEvent = {
             type: "error",
             code: hasPlanGenerateToolCall ? "INTERNAL_ERROR" : "INVALID_TOOL_PAYLOAD",

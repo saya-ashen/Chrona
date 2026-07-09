@@ -92,6 +92,31 @@ function failedErrorFromSnapshot(input: {
   return input.summary || `Runtime run ${input.response.runId} failed the node`;
 }
 
+function completionOverrideFromStructured(input: {
+  response: ProviderRunSnapshot;
+  structured: Record<string, unknown> | undefined;
+  summary?: string;
+  evidence: NodeExecutionEvidence;
+}): NodeExecutionResult | null {
+  const completed = recordValue(input.structured, "completed");
+  const status = recordValue(input.structured, "status");
+  if (completed === false || status === "failed" || status === "error") {
+    return {
+      status: "failed",
+      error: failedErrorFromSnapshot(input),
+      evidence: input.evidence,
+    };
+  }
+  if (status === "blocked") {
+    return {
+      status: "blocked",
+      reason: blockedReasonFromSnapshot(input),
+      evidence: input.evidence,
+    };
+  }
+  return null;
+}
+
 function terminalNodeResultFromSnapshot(input: {
   invocation: AiRuntimeInvocation;
   node: EffectivePlanNode;
@@ -125,7 +150,14 @@ function terminalNodeResultFromSnapshot(input: {
         evidence: input.evidence,
       };
     case "chrona_node_complete":
-    case "chrona_wait_complete":
+    case "chrona_wait_complete": {
+      const override = completionOverrideFromStructured({
+        response: input.invocation.response,
+        structured: input.structured,
+        summary: input.summary,
+        evidence: input.evidence,
+      });
+      if (override) return override;
       return {
         status: "done",
         summary:
@@ -133,6 +165,7 @@ function terminalNodeResultFromSnapshot(input: {
           `Runtime run ${input.invocation.runtimeRunRef ?? input.invocation.runId} completed`,
         evidence: input.evidence,
       };
+    }
     case undefined:
       return undefined;
     default:

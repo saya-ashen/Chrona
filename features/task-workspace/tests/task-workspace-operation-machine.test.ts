@@ -149,4 +149,29 @@ describe("resolveTaskWorkspaceOperationState", () => {
     expect(state.action).toBe(action);
     expect(state.title).toBe(title);
   });
+
+  it("uses block detail as the blocked operation description", () => {
+    const node = createTaskWorkspaceFixtureNode({ id: "failed", title: "Fetch trending", status: "failed" });
+    const state = resolveTaskWorkspaceOperationState(baseInput({
+      plan: { status: "accepted", prompt: null, summary: "Accepted summary" },
+      planGenerationStatus: "accepted",
+      pageData: createTaskWorkspaceFixturePageData({
+        task: {
+          status: "Blocked",
+          blockReason: { blockType: "run_failed", scope: "run", actionRequired: "Retry Run", detail: "ACP connection closed" },
+        },
+      }),
+      currentNode: node,
+      graphPlan: createTaskWorkspaceFixtureGraph([node], "failed"),
+      hasGraphExecutionStarted: true,
+      shouldShowCurrentOperation: true,
+      currentOperationSpec: actionSpec,
+    }));
+
+    expect(state).toMatchObject({
+      status: "execution-blocked",
+      title: "Action required",
+      description: "ACP connection closed",
+    });
+  });
 });

@@ -61,6 +61,7 @@ class FakeAcpTransport implements AcpTransport {
       request: async (method: string, params: unknown) => {
         this.requests.push({ method, params });
         if (method === "initialize") return this.init;
+        if (method === "authenticate") return {};
         if (method === "session/load") return { modes: null };
         throw new Error(`unexpected request ${method}`);
       },
@@ -133,6 +134,25 @@ describe("AcpProviderClient", () => {
       reason: "Test ACP ACP agent initialized",
     });
     expect(transport.requests.some((request) => request.method === "session/new")).toBe(false);
+  });
+
+  it("authenticates with advertised agent credentials before opening sessions", async () => {
+    stubMcpTools(["chrona_plan_generate", "chrona_plan_read"]);
+    const transport = new FakeAcpTransport({
+      init: {
+        protocolVersion: 1,
+        agentCapabilities: { loadSession: true, mcpCapabilities: { http: true } },
+        authMethods: [{ id: "agent", name: "Use existing profile" }],
+      },
+    });
+    const client = new AcpProviderClient({
+      config: config({ healthCheck: "session", mcpBaseUrl: "http://chrona.test", mcpRunToken: "run-token" }),
+      transport,
+    });
+
+    await expect(client.checkHealth()).resolves.toMatchObject({ ok: true });
+    expect(transport.requests.map((request) => request.method)).toEqual(["initialize", "authenticate", "session/new"]);
+    expect(transport.requests.find((request) => request.method === "authenticate")?.params).toEqual({ methodId: "agent" });
   });
 
 
@@ -362,6 +382,30 @@ describe("AcpProviderClient", () => {
     expect(promptText).toContain('"ok"');
     expect(promptText).not.toContain("Required Chrona MCP tools for this turn");
     expect(promptText).not.toContain("tool_search");
+  });
+
+  it("tells ACP agents to submit generated plans through chrona_plan_generate", async () => {
+    const transport = new FakeAcpTransport({ updates: [{ kind: "stop", stopReason: "end_turn", response: { stopReason: "end_turn" } }] });
+    const client = new AcpProviderClient({ config: config(), transport });
+    const run = await client.startRun(baseInput({
+      instructions: "You MUST call the chrona_plan_generate tool.",
+      input: { type: "text", text: "Plan this task." },
+      terminalToolName: "chrona_plan_generate",
+      structuredOutputSchema: {
+        name: "chrona_plan_generate",
+        description: "Plan blueprint",
+        schema: { type: "object", properties: { title: { type: "string" } }, required: ["title"] },
+      },
+    }));
+
+    for await (const _event of client.streamRun({ runId: run.runId })) {
+      // drain stream
+    }
+    const promptText = (transport.session.promptBlocks as Array<{ text: string }>)[0]?.text ?? "";
+
+    expect(promptText).toContain("When the plan is ready, call the MCP tool `chrona_plan_generate` with the complete PlanBlueprint object.");
+    expect(promptText).toContain("Do not answer only in text; the plan is not submitted until that MCP tool call succeeds.");
+    expect(promptText).not.toContain("final Chrona node result");
   });
 
   it("does not inject Codex-specific MCP discovery instructions into task prompts", async () => {

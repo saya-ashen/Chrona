@@ -1,6 +1,7 @@
 import { HERMES_EXECUTION_RUNTIME } from "@chrona/hermes";
 import { CHRONA_CLAUDE_CODE_PROVIDER_TYPE } from "@chrona/claude-code";
 import { CHRONA_CODEX_PROVIDER_TYPE } from "@chrona/codex";
+import { CHRONA_OMP_PROVIDER_TYPE } from "@chrona/omp";
 import { CHRONA_DEBUG_PROVIDER_TYPE } from "@chrona/providers-debug";
 import type {
   RuntimeAdapterDefinition,
@@ -26,6 +27,13 @@ const CLAUDE_CODE_TASK_CONFIG_SPEC: RuntimeTaskConfigSpec = {
 
 const CODEX_TASK_CONFIG_SPEC: RuntimeTaskConfigSpec = {
   runtime: CHRONA_CODEX_PROVIDER_TYPE,
+  version: "1",
+  fields: [],
+  runnability: { requiredPaths: [] },
+};
+
+const OMP_TASK_CONFIG_SPEC: RuntimeTaskConfigSpec = {
+  runtime: CHRONA_OMP_PROVIDER_TYPE,
   version: "1",
   fields: [],
   runnability: { requiredPaths: [] },
@@ -67,6 +75,16 @@ const runtimeRegistry = new Map<string, RuntimeAdapterDefinition>([
       getTaskConfigSpec: () => CODEX_TASK_CONFIG_SPEC,
       validateTaskConfig: (input: unknown) =>
         validateTaskConfigAgainstSpec(CODEX_TASK_CONFIG_SPEC, input),
+    },
+  ],
+  [
+    CHRONA_OMP_PROVIDER_TYPE,
+    {
+      key: CHRONA_OMP_PROVIDER_TYPE,
+      inputVersion: OMP_TASK_CONFIG_SPEC.version,
+      getTaskConfigSpec: () => OMP_TASK_CONFIG_SPEC,
+      validateTaskConfig: (input: unknown) =>
+        validateTaskConfigAgainstSpec(OMP_TASK_CONFIG_SPEC, input),
     },
   ],
   [
@@ -138,6 +156,7 @@ export function listExecutionRuntimes() {
     HERMES_EXECUTION_RUNTIME,
     CHRONA_CLAUDE_CODE_PROVIDER_TYPE,
     CHRONA_CODEX_PROVIDER_TYPE,
+    CHRONA_OMP_PROVIDER_TYPE,
     CHRONA_DEBUG_PROVIDER_TYPE,
   ];
 }

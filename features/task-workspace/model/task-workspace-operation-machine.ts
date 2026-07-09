@@ -70,11 +70,15 @@ function planDescription(input: ResolveTaskWorkspaceOperationStateInput) {
 }
 
 function currentOperationDescription(input: ResolveTaskWorkspaceOperationStateInput) {
-  return input.currentNode?.nextAction
-    ?? input.currentNode?.summary
-    ?? input.pageData.task.runnabilitySummary
-    ?? input.pageData.task.blockReason?.actionRequired
-    ?? "Review the current execution state.";
+  const nodeAction = input.currentNode?.nextAction?.trim();
+  const blockDetail = input.pageData.task.blockReason?.detail?.trim();
+
+  return nodeAction
+    || blockDetail
+    || input.currentNode?.summary
+    || input.pageData.task.runnabilitySummary
+    || input.pageData.task.blockReason?.actionRequired
+    || "Review the current execution state.";
 }
 
 function runningDescription(input: ResolveTaskWorkspaceOperationStateInput) {
@@ -165,7 +169,8 @@ export function resolveTaskWorkspaceOperationState(input: ResolveTaskWorkspaceOp
       action: "task-primary-action",
       taskPrimaryAction: input.taskPrimaryAction,
       title: input.taskPrimaryAction.label,
-      description: input.pageData.task.runnabilitySummary
+      description: input.pageData.task.blockReason?.detail
+        || input.pageData.task.runnabilitySummary
         || input.pageData.task.blockReason?.actionRequired
         || "Complete the required task action to continue.",
       statusLabel: input.pageData.task.blockReason?.blockType ?? input.pageData.task.status,

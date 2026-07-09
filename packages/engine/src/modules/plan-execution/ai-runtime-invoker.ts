@@ -90,7 +90,14 @@ class IncompleteRunStreamError extends Error {
   }
 }
 function usesChronaControlPlane(providerName: string) {
-  return providerName === "claude_code" || providerName === "codex";
+  return providerName === "claude_code" || providerName === "codex" || providerName === "omp";
+}
+
+function resolveChronaControlBaseUrl(): string {
+  const configured = process.env.CHRONA_BASE_URL?.trim();
+  if (configured) return configured;
+  const port = process.env.PORT?.trim() || "3101";
+  return `http://127.0.0.1:${port}/api`;
 }
 
 
@@ -325,7 +332,7 @@ export async function runProviderRequest(
     : undefined);
   const control = usesChronaControlPlane(providerClient.provider) && options.controlRunToken
     ? {
-        baseUrl: process.env.CHRONA_BASE_URL ?? "",
+        baseUrl: resolveChronaControlBaseUrl(),
         runToken: options.controlRunToken,
       }
     : undefined;

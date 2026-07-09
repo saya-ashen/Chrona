@@ -566,3 +566,83 @@ describe("runProviderRequest resume threading", () => {
     );
   });
 });
+
+describe("runProviderRequest Chrona control handoff", () => {
+  it("passes run-token control config to the OMP provider", async () => {
+    const previousBaseUrl = process.env.CHRONA_BASE_URL;
+    process.env.CHRONA_BASE_URL = "http://127.0.0.1:3101/api";
+    const startRun = mock(async () => ({ ...runRef(), provider: "omp" }));
+    const streamRun = mock(() =>
+      (async function* () {
+        yield {
+          type: "run_completed",
+          run: { runId: "run-1", nativeRunId: "run-1", sessionId: "sdk-session-1", status: "completed" },
+          outputText: "ok",
+        } as ProviderRunEvent;
+      })(),
+    );
+
+    const client = {
+      provider: "omp",
+      startRun,
+      streamRun,
+    } as unknown as AgentProviderClient;
+
+    try {
+      await runProviderRequest(client, request, { controlRunToken: "run-token-1" });
+    } finally {
+      if (previousBaseUrl === undefined) delete process.env.CHRONA_BASE_URL;
+      else process.env.CHRONA_BASE_URL = previousBaseUrl;
+    }
+
+    expect(startRun).toHaveBeenCalledWith(
+      expect.objectContaining({
+        control: {
+          baseUrl: "http://127.0.0.1:3101/api",
+          runToken: "run-token-1",
+        },
+      }),
+    );
+  });
+
+  it("uses localhost API fallback when CHRONA_BASE_URL is unset", async () => {
+    const previousBaseUrl = process.env.CHRONA_BASE_URL;
+    const previousPort = process.env.PORT;
+    delete process.env.CHRONA_BASE_URL;
+    process.env.PORT = "3199";
+    const startRun = mock(async () => ({ ...runRef(), provider: "omp" }));
+    const streamRun = mock(() =>
+      (async function* () {
+        yield {
+          type: "run_completed",
+          run: { runId: "run-1", nativeRunId: "run-1", sessionId: "sdk-session-1", status: "completed" },
+          outputText: "ok",
+        } as ProviderRunEvent;
+      })(),
+    );
+
+    const client = {
+      provider: "omp",
+      startRun,
+      streamRun,
+    } as unknown as AgentProviderClient;
+
+    try {
+      await runProviderRequest(client, request, { controlRunToken: "run-token-1" });
+    } finally {
+      if (previousBaseUrl === undefined) delete process.env.CHRONA_BASE_URL;
+      else process.env.CHRONA_BASE_URL = previousBaseUrl;
+      if (previousPort === undefined) delete process.env.PORT;
+      else process.env.PORT = previousPort;
+    }
+
+    expect(startRun).toHaveBeenCalledWith(
+      expect.objectContaining({
+        control: {
+          baseUrl: "http://127.0.0.1:3199/api",
+          runToken: "run-token-1",
+        },
+      }),
+    );
+  });
+});

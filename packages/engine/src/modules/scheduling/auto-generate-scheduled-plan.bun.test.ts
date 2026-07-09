@@ -1,6 +1,7 @@
 import { afterAll, beforeEach, describe, expect, it, mock } from "bun:test";
 import { db } from "@/lib/db";
 import { saveCompiledPlan } from "@/modules/plan-execution/persistence/compiled-plan-store";
+import { appendCanonicalEvent } from "@/modules/events";
 
 const generateAndAcceptTaskPlanMock = mock();
 const startAutoPlanMock = mock();
@@ -56,6 +57,23 @@ async function createScheduledBlock(
       scheduledStartAt: overrides.scheduledStartAt ?? new Date(Date.now() - 5 * 60_000),
       scheduledEndAt: overrides.scheduledEndAt ?? new Date(Date.now() + 55 * 60_000),
       trigger: "scheduled",
+    },
+  });
+}
+
+async function recordPlanGenerationFailure(input: { workspaceId: string; taskId: string; workBlockId: string | null }) {
+  await appendCanonicalEvent({
+    workspaceId: input.workspaceId,
+    taskId: input.taskId,
+    workBlockId: input.workBlockId,
+    eventType: "plan_generation.failed",
+    actorType: "system",
+    actorId: "plan-generator",
+    source: "plan_generation",
+    payload: {
+      generation_id: `failed-${input.taskId}`,
+      code: "INVALID_TOOL_PAYLOAD",
+      message: "Provider completed without calling chrona_plan_generate.",
     },
   });
 }
@@ -169,6 +187,21 @@ describe("auto-generate-scheduled-plan", () => {
     expect(startAutoPlanMock).not.toHaveBeenCalled();
   });
 
+  it("does not retry a scheduled task after plan generation fails", async () => {
+    const workspace = await createWorkspace();
+    const task = await createTaskRow(workspace.id, { autoPlanGenerationTiming: "at_start" });
+    const block = await createScheduledBlock(workspace.id, task.id, {
+      scheduledStartAt: new Date(Date.now() - 60_000),
+    });
+    await recordPlanGenerationFailure({ workspaceId: workspace.id, taskId: task.id, workBlockId: block.id });
+
+    const result = await autoGenerateScheduledPlanTasks({ now: new Date() });
+
+    expect(result.triggered).toEqual([]);
+    expect(result.skipped).toContainEqual({ taskId: task.id, workBlockId: block.id, reason: "plan_generation_failed" });
+    expect(generateAndAcceptTaskPlanMock).not.toHaveBeenCalled();
+  });
+
   it("fires no_schedule_fallback for an unscheduled task past the grace window", async () => {
     const workspace = await createWorkspace();
     const task = await createTaskRow(workspace.id, {
@@ -180,6 +213,21 @@ describe("auto-generate-scheduled-plan", () => {
 
     expect(result.triggered).toEqual([{ taskId: task.id, workBlockId: null, reason: "no_schedule_fallback" }]);
     expect(generateAndAcceptTaskPlanMock).toHaveBeenCalledWith({ taskId: task.id, workBlockId: null, accept: false });
+  });
+
+  it("does not retry an unscheduled task after plan generation fails", async () => {
+    const workspace = await createWorkspace();
+    const task = await createTaskRow(workspace.id, {
+      autoPlanGenerationTiming: "at_start",
+      createdAt: new Date(Date.now() - 120_000),
+    });
+    await recordPlanGenerationFailure({ workspaceId: workspace.id, taskId: task.id, workBlockId: null });
+
+    const result = await autoGenerateScheduledPlanTasks({ now: new Date() });
+
+    expect(result.triggered).toEqual([]);
+    expect(result.skipped).toContainEqual({ taskId: task.id, workBlockId: null, reason: "plan_generation_failed" });
+    expect(generateAndAcceptTaskPlanMock).not.toHaveBeenCalled();
   });
 
   it("waits during the grace window before the no-schedule fallback", async () => {

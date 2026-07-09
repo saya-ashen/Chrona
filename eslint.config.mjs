@@ -170,6 +170,7 @@ const eslintConfig = defineConfig([
     "playwright-report/**",
     "agent-test-runs/**",
     ".understand-anything/**",
+    ".tmp/**",
     "packages/db/src/generated/prisma/**",
     ".dependency-cruiser.cjs",
   ]),

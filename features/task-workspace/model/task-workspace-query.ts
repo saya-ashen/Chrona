@@ -293,7 +293,7 @@ function buildAttentionCard(
     return {
       id: "task-block-reason",
       title: copy.blocked,
-      description: blockInstructions ?? pageData.task.blockReason.actionRequired ?? pageData.task.runnabilitySummary,
+      description: blockInstructions ?? pageData.task.blockReason.detail ?? pageData.task.blockReason.actionRequired ?? pageData.task.runnabilitySummary,
       statusLabel: pageData.task.blockReason.blockType,
       tone: "critical",
       actionLabel: actionNodeId ? copy.openActionControls : undefined,

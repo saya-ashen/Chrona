@@ -500,6 +500,34 @@ describe("task workspace execution console view model", () => {
     expect(view.attention).toMatchObject({ actionLabel: "Open action controls", actionNodeId: "failed-node" });
   });
 
+  it("shows run failure detail in the attention card", () => {
+    const view = createTaskWorkspaceExecutionConsoleView({
+      pageData: pageData({
+        task: {
+          ...pageData().task,
+          status: "Blocked",
+          blockReason: {
+            blockType: "run_failed",
+            actionRequired: "Retry Run",
+            detail: "ACP connection closed",
+            scope: "run",
+            nodeId: "failed-node",
+          },
+        },
+      }),
+      graphPlan: graph([
+        node({ id: "failed-node", status: "failed", summary: "Generic node summary" }),
+      ], "failed-node"),
+    });
+
+    expect(view.attention).toMatchObject({
+      title: "Blocked",
+      description: "ACP connection closed",
+      tone: "critical",
+      actionNodeId: "failed-node",
+    });
+  });
+
   it("uses the current checkpoint as the primary status and disables Start", () => {
     const view = createTaskWorkspaceExecutionConsoleView({
       pageData: pageData({

@@ -52,6 +52,8 @@ type ClientFormValues = {
   apiKey: string;
   model: string;
   configDirectory: string;
+  homeDirectory: string;
+  codingAgentDirectory: string;
   profileName: string;
   hermesScope: HermesClientScope;
   debugProfile: DebugProviderProfile;
@@ -186,6 +188,26 @@ function buildCodexConfig(input: {
   };
 }
 
+function buildOmpConfig(input: {
+  timeoutSeconds: string;
+  baseUrl: string;
+  apiKey: string;
+  model: string;
+  homeDirectory: string;
+  configDirectory: string;
+  codingAgentDirectory: string;
+}): Record<string, unknown> {
+  return {
+    model: nonEmptyEnvValue(input.model),
+    apiKey: nonEmptyEnvValue(input.apiKey),
+    baseUrl: nonEmptyEnvValue(input.baseUrl),
+    homeDirectory: nonEmptyEnvValue(input.homeDirectory),
+    configDirectory: nonEmptyEnvValue(input.configDirectory),
+    codingAgentDirectory: nonEmptyEnvValue(input.codingAgentDirectory),
+    timeoutMs: Number(input.timeoutSeconds) * 1000,
+  };
+}
+
 function buildClientPayload(input: {
   name: string;
   type: AiClientType;
@@ -195,6 +217,8 @@ function buildClientPayload(input: {
   apiKey: string;
   model: string;
   configDirectory: string;
+  homeDirectory: string;
+  codingAgentDirectory: string;
   profileName: string;
   hermesScope: HermesClientScope;
   debugProfile: DebugProviderProfile;
@@ -226,6 +250,15 @@ function buildClientPayload(input: {
     };
   }
 
+  if (input.type === "omp") {
+    return {
+      name: input.name,
+      type: input.type,
+      config: buildOmpConfig(input),
+      isDefault: input.isDefault,
+    };
+  }
+
   return {
     name: input.name,
     type: input.type,
@@ -249,8 +282,9 @@ function isDebugProviderVisible() {
 const PROVIDER_SORT_RANK: Record<string, number> = {
   claude_code: 0,
   codex: 1,
-  llm: 2,
-  debug: 3,
+  omp: 2,
+  llm: 3,
+  debug: 4,
   hermes: 99,
 };
 
@@ -638,6 +672,13 @@ function ClientForm({
     configDirectory: (initialConfig as { configDirectory?: string; env?: Record<string, string> } | undefined)?.configDirectory
       ?? (initialConfig as { env?: Record<string, string> } | undefined)?.env?.CLAUDE_CONFIG_DIR
       ?? (initialConfig as { env?: Record<string, string> } | undefined)?.env?.CODEX_HOME
+      ?? (initialConfig as { env?: Record<string, string> } | undefined)?.env?.PI_CONFIG_DIR
+      ?? "",
+    homeDirectory: (initialConfig as { homeDirectory?: string; env?: Record<string, string> } | undefined)?.homeDirectory
+      ?? (initialConfig as { env?: Record<string, string> } | undefined)?.env?.HOME
+      ?? "",
+    codingAgentDirectory: (initialConfig as { codingAgentDirectory?: string; env?: Record<string, string> } | undefined)?.codingAgentDirectory
+      ?? (initialConfig as { env?: Record<string, string> } | undefined)?.env?.PI_CODING_AGENT_DIR
       ?? "",
     profileName: (initialConfig as { profileName?: string } | undefined)?.profileName ?? "",
     hermesScope: (initialConfig as { scope?: HermesClientScope } | undefined)?.scope ?? "local",
@@ -653,6 +694,7 @@ function ClientForm({
   const isHermesClient = values.type === "hermes";
   const isClaudeCodeClient = values.type === "claude_code";
   const isCodexClient = values.type === "codex";
+  const isOmpClient = values.type === "omp";
   const isLocalHermes = isHermesClient && values.hermesScope === "local";
   const availableFeatures = getProviderFeatures(providers, values.type);
   const namePlaceholder = getDefaultClientName(values.type, providers);
@@ -897,7 +939,7 @@ function ClientForm({
               </Card>
             )}
 
-            {!isDebugClient && !isClaudeCodeClient && !isCodexClient && (
+            {!isDebugClient && !isClaudeCodeClient && !isCodexClient && !isOmpClient && (
               <>
                 <Field>
                   <FieldLabel htmlFor="ai-client-base-url">Base URL</FieldLabel>
@@ -1046,6 +1088,80 @@ function ClientForm({
                 <p className="text-xs text-muted-foreground">
                   Uses the Codex provider adapter with scoped MCP control tools
                   passed at runtime.
+                </p>
+              </>
+            )}
+
+            {isOmpClient && (
+              <>
+                <Field>
+                  <FieldLabel htmlFor="ai-client-model">Model</FieldLabel>
+                  <Input
+                    {...form.register("model")}
+                    id="ai-client-model"
+                    placeholder="optional OMP model override"
+                  />
+                </Field>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Field>
+                    <FieldLabel htmlFor="ai-client-base-url">OMP Base URL</FieldLabel>
+                    <Input
+                      {...form.register("baseUrl")}
+                      id="ai-client-base-url"
+                      placeholder="optional OMP provider base URL"
+                    />
+                  </Field>
+                  <Field>
+                    <FieldLabel htmlFor="ai-client-api-key">OMP API Key</FieldLabel>
+                    <Input
+                      {...form.register("apiKey")}
+                      id="ai-client-api-key"
+                      type="password"
+                      placeholder="fallback to OMP credentials if empty"
+                    />
+                  </Field>
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Field>
+                    <FieldLabel htmlFor="ai-client-home-directory">HOME</FieldLabel>
+                    <Input
+                      {...form.register("homeDirectory")}
+                      id="ai-client-home-directory"
+                      placeholder="default process HOME"
+                    />
+                  </Field>
+                  <Field>
+                    <FieldLabel htmlFor="ai-client-config-directory">PI_CONFIG_DIR</FieldLabel>
+                    <Input
+                      {...form.register("configDirectory")}
+                      id="ai-client-config-directory"
+                      placeholder="default .omp under HOME"
+                    />
+                  </Field>
+                </div>
+                <Field>
+                  <FieldLabel htmlFor="ai-client-coding-agent-directory">PI_CODING_AGENT_DIR</FieldLabel>
+                  <Input
+                    {...form.register("codingAgentDirectory")}
+                    id="ai-client-coding-agent-directory"
+                    placeholder="default ~/.omp/agent"
+                  />
+                </Field>
+                <Field data-invalid={Boolean(form.formState.errors.timeoutSeconds)}>
+                  <FieldLabel htmlFor="ai-client-timeout">Timeout (seconds)</FieldLabel>
+                  <Input
+                    {...form.register("timeoutSeconds", {
+                      required: copy.timeoutSeconds,
+                      validate: (value) => Number(value) > 0 || copy.timeoutSeconds,
+                    })}
+                    aria-invalid={Boolean(form.formState.errors.timeoutSeconds)}
+                    id="ai-client-timeout"
+                    type="number"
+                  />
+                  {form.formState.errors.timeoutSeconds ? <FieldError errors={[form.formState.errors.timeoutSeconds]} /> : null}
+                </Field>
+                <p className="text-xs text-muted-foreground">
+                  All OMP runs use the in-process SDK with the configured API key/base URL when present, then fall back to local OMP credentials under ~/.omp.
                 </p>
               </>
             )}

@@ -5,7 +5,7 @@
 import type { PlanBlueprint } from "./ai-plan-blueprint";
 import type { GenerateTaskPlanRequest as RuntimeGenerateTaskPlanRequest } from "./plan-runtime";
 
-export type AiClientType = "llm" | "hermes" | "debug" | "claude_code" | "codex" | (string & {});
+export type AiClientType = "llm" | "hermes" | "debug" | "claude_code" | "codex" | "omp" | (string & {});
 export const AI_FEATURES = [
   "suggest",
   "generate_plan",
@@ -27,7 +27,7 @@ export interface AiClientRecord {
   id: string;
   name: string;
   type: AiClientType;
-  config: AgentProviderClientConfig | LLMClientConfig | HermesClientConfig | DebugClientConfig | ClaudeCodeClientConfig | CodexClientConfig;
+  config: AgentProviderClientConfig | LLMClientConfig | HermesClientConfig | DebugClientConfig | ClaudeCodeClientConfig | CodexClientConfig | OmpClientConfig;
   isDefault: boolean;
   enabled: boolean;
 }
@@ -117,6 +117,31 @@ export interface CodexClientConfig {
   mcpBaseUrl?: string;
   /** Static Bearer token presented to the MCP server at `/api/mcp`. */
   mcpRunToken?: string;
+}
+
+export interface OmpClientConfig {
+  /** Active OMP model override. Omitted means OMP profile default. */
+  model?: string;
+  /** Optional provider id for direct OMP SDK credential/base URL overrides. Defaults to the provider prefix in model, then chrona. */
+  provider?: string;
+  /** Optional direct API key for OMP SDK runs. */
+  apiKey?: string;
+  /** Optional direct provider base URL for OMP SDK runs. */
+  baseUrl?: string;
+  /** Optional OMP wire API for direct base URL runs. Defaults to openai-responses for custom unprefixed models. */
+  api?: "openai-responses" | "openai-completions" | "anthropic-messages" | "openrouter";
+  /** Total run timeout in milliseconds. */
+  timeoutMs?: number;
+  /** Optional HOME override used when resolving ~/.omp. */
+  homeDirectory?: string;
+  /** Optional OMP config root override (PI_CONFIG_DIR). */
+  configDirectory?: string;
+  /** Optional OMP agent data directory override (PI_CODING_AGENT_DIR). */
+  codingAgentDirectory?: string;
+  /** Optional pass-through env vars applied before OMP SDK startup. */
+  env?: Record<string, string>;
+  /** Optional working directory for OMP SDK sessions. */
+  cwd?: string;
 }
 
 export type DebugProviderProfile = "deterministic" | "tool-submit" | "hermes-like";

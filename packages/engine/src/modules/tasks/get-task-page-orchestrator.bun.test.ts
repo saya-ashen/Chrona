@@ -103,6 +103,38 @@ describe("getTaskPage orchestrator read model", () => {
     await resetDb();
   });
 
+  it("returns projected block detail for task page and bootstrap", async () => {
+    const { workspace, task } = await seedTask("Failed run page task");
+    await db.task.update({ where: { id: task.id }, data: { status: "Blocked" } });
+    await db.taskProjection.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        persistedStatus: "Blocked",
+        displayState: "Attention Needed",
+        blockType: "run_failed",
+        actionRequired: "Retry Run",
+        blockScope: "run",
+        blockDetail: "ACP connection closed",
+        currentNodeId: "failed-node",
+        lastActivityAt: new Date("2026-05-21T00:00:00.000Z"),
+        updatedAt: new Date("2026-05-21T00:00:00.000Z"),
+      },
+    });
+
+    const page = await getTaskPage(task.id);
+    const bootstrap = await getTaskBootstrap({ taskId: task.id });
+
+    expect(page.task.blockReason).toMatchObject({
+      blockType: "run_failed",
+      actionRequired: "Retry Run",
+      detail: "ACP connection closed",
+      scope: "run",
+      nodeId: "failed-node",
+    });
+    expect(bootstrap.task.blockReason).toMatchObject({ detail: "ACP connection closed" });
+  });
+
   it("returns requested recurring occurrence schedule", async () => {
     const { workspace, task } = await seedTask("Recurring page task");
     const firstBlock = await db.workBlock.create({

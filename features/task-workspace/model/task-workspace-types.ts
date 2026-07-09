@@ -59,6 +59,7 @@ export type TaskData = {
   blockReason: {
     blockType?: string;
     actionRequired?: string;
+    detail?: string;
     scope?: string;
     nodeId?: string;
     since?: string;

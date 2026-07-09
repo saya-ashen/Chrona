@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { planBlueprintSchema } from "../ai-plan-blueprint";
+import { planGenerateToolPayloadSchema } from "../plan-generate-tool";
 import {
   createTaskBodySchema,
   updateTaskBodySchema,
@@ -153,7 +153,7 @@ export const chronaToolPayloadSchemas = {
   "chrona.task.create": createTaskBodySchema.omit({ workspaceId: true }),
   "chrona.task.update": updateTaskBodySchema.omit({ workspaceId: true }),
   "chrona.plan.read": readPayloadSchema,
-  "chrona.plan.generate": planBlueprintSchema,
+  "chrona.plan.generate": planGenerateToolPayloadSchema,
   "chrona.plan.mutate": planMutationBodySchema,
   "chrona.schedule.read": readPayloadSchema,
   "chrona.schedule.propose": scheduleProposalBodySchema.omit({ workspaceId: true }),
