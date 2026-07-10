@@ -495,6 +495,13 @@ function buildTaskHeaderView(
     workState,
     copy,
   });
+  const headerActions = actions.flatMap((action) => action.id === "more"
+    ? [
+        ...(actions.some((candidate) => candidate.id === "pause") ? [] : [{ id: "pause" as const, label: copy.pause, disabled: true, disabledReason: copy.noRunningExecutionToPause }]),
+        ...(actions.some((candidate) => candidate.id === "stop") ? [] : [{ id: "stop" as const, label: copy.stop, disabled: true, disabledReason: copy.noRunningExecutionToStop }]),
+        action,
+      ]
+    : [action]);
 
   return {
     title: pageData.task.title,
@@ -503,10 +510,10 @@ function buildTaskHeaderView(
     completedSteps: workState.showLiveProgress ? progress.completedSteps : 0,
     totalSteps: workState.showLiveProgress ? progress.totalSteps : 0,
     progressPercent: workState.showLiveProgress ? progress.percentComplete : 0,
-    actions,
-    primaryStateLabel: workState.label,
-    primaryActionLabel: workState.nextActionLabel,
-    currentNodeId: workState.currentNodeId,
+    actions: headerActions,
+    primaryStateLabel: pageData.task.executionSummary?.stateLabel ?? workState.label,
+    primaryActionLabel: pageData.task.executionSummary?.primaryAction.label ?? workState.nextActionLabel,
+    currentNodeId: pageData.task.executionSummary?.currentNodeId ?? workState.currentNodeId,
   };
 }
 

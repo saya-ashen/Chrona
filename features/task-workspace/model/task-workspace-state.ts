@@ -113,6 +113,11 @@ export function stateViewForWorkspaceStatus(input: {
 export function mapTaskWorkspaceStatus(
   status: string,
 ): TaskWorkspaceUserStatus {
+  if (status === "result_ready" || status === "done" || status === "cancelled") return "completed";
+  if (status === "running") return "running";
+  if (status === "waiting_for_approval") return "approval-needed";
+  if (status === "waiting_for_input") return "input-needed";
+  if (status === "blocked" || status === "failed") return "blocked";
   if (status === "degraded") return "blocked";
   const stateView = stateViewForWorkspaceStatus({
     taskStatus: status,
@@ -182,12 +187,11 @@ export function deriveWorkspaceWorkStateView(input: {
   currentNode: PlanNodeDataModel | null;
 }): WorkStateView {
   const planStatus = input.task.savedPlan?.status ?? null;
+  const executionStatus = input.task.executionSummary?.executionState ?? input.currentNode?.status ?? null;
+  const currentNodeIsRunning = input.currentNode?.status === "active" || input.currentNode?.status === "in_progress";
   return deriveWorkStateView({
     taskStatus: input.task.status,
-    executionStatus:
-      input.task.executionSummary?.executionState ??
-      input.currentNode?.status ??
-      null,
+    executionStatus,
     planStatus,
     planGenerationStatus: input.task.aiPlanGenerationStatus ?? null,
     hasPlan: input.progress.totalSteps > 0 || Boolean(input.task.savedPlan),
@@ -197,12 +201,9 @@ export function deriveWorkspaceWorkStateView(input: {
       input.task.runnabilityState === "blocked"
         ? input.task.runnabilitySummary
         : null,
-    currentNodeId:
-      input.currentNode?.id ??
-      input.task.executionSummary?.currentNodeId ??
-      null,
+    currentNodeId: input.currentNode?.id ?? input.task.executionSummary?.currentNodeId ?? null,
     currentNodeLabel: input.currentNode?.title ?? null,
-    blockReason: input.task.blockReason,
+    blockReason: currentNodeIsRunning || executionStatus === "running" ? null : input.task.blockReason,
   });
 }
 
@@ -245,10 +246,10 @@ export function deriveHeaderActions(input: {
       disabledReason: cannotStartReason,
     },
     ...(input.workState.canPause
-      ? [{ id: "pause" as const, label: input.copy.pause }]
+      ? [{ id: "pause" as const, label: input.copy.pause, disabled: false, disabledReason: undefined }]
       : []),
-    ...(input.workState.canStop
-      ? [{ id: "stop" as const, label: input.copy.stop }]
+    ...(input.workState.canStop || input.workState.state === "waiting_for_input" || input.workState.state === "waiting_for_approval"
+      ? [{ id: "stop" as const, label: input.copy.stop, disabled: false, disabledReason: undefined }]
       : []),
     { id: "more", label: input.copy.moreActions },
   ];

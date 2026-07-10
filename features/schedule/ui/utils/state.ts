@@ -185,6 +185,6 @@ export function buildScheduleViewHref(
 export function normalizeScheduleView(view: string | undefined): ScheduleViewMode {
   if (view === "list") return "list";
   if (view === "timeline") return "timeline";
-  return typeof window !== "undefined" && window.matchMedia("(max-width: 767px)").matches ? "list" : "timeline";
+  return typeof window !== "undefined" && typeof window.matchMedia === "function" && window.matchMedia("(max-width: 767px)").matches ? "list" : "timeline";
 }
 
