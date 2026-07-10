@@ -65,7 +65,7 @@ Chrona 的目标不是继续增加功能，而是让用户能够可靠地完成�
 | DOCS-01     | P2     | 产品定位和文档叙事不一致                                     | DONE        |
 | TEST-01     | P1     | 异常、重启、重复触发和迟到事件测试不足                       | DONE        |
 
-总体完成：`15/15` 个问题完整关闭；产品内首次成功路径、可靠性契约、信息架构、结果资产和移动端主路径均已验证。
+第一轮组件级整改：`15/15` 个问题关闭。发布级工作包仍在进行：自动化测试、状态合同、结果资产和三档可访问性已有直接证据；首次用户指标、人工键盘/30 秒检索、完整 E2E、fresh install/upgrade 产品闭环仍未关闭。
 
 ---
 
@@ -943,6 +943,7 @@ fresh start
 - `Result Surface 扁平化完成`：共享 `NodeResultSection` 不再为每个节点结果创建圆角、背景、阴影 Card；改为同一结果 surface 内的 divider section，保留节点标题、结果数、折叠/展开和持久化状态。输出内容仍由验证后的 ui-protocol spec 渲染，不改变 API、运行语义或 artifact 合同。Execution overview focused 21 tests、`bun run check:ui-foundation`、`bun run typecheck` 通过。
 - `RELEASE-UX-02 门禁复核`：完整 `bun run test` 发现并修复共享状态表消费者回归：canonical result/running/waiting/blocked 状态被二次派生丢失、orchestrator stateLabel/primaryAction 未进入 Header、稳定 disabled controls 被移除，以及无 `matchMedia` 环境下 Schedule 默认视图崩溃。全量测试现为 79 Vitest files 通过并完成全部 Bun suites；`bun run typecheck`、`bun run lint`（0 errors，840 warnings）、`bun run check:boundaries`（0 errors，501 warnings）、`bun run check:ui-foundation`、`bun run chrona build linux-x64`、`bun run build:smoke` 均通过。按用户指示跳过完整 E2E 门禁；fresh install/previous-release upgrade 完整 smoke 和人工指标仍未完成，因此 `RELEASE-UX-02` 保持 `IN PROGRESS`。
 - `BASELINE-02 数据兼容证明`：新增直接使用仓库 shipped migrations 的 release-path test。fresh SQLite 从空库应用 `0001_initial` 与当前 release-line migration 后包含 `WorkspaceUserPreference` 且记录 2 个 checksum；previous-release snapshot 先仅应用 `0001_initial`，确认新表不存在，再用当前迁移升级并确认表与 2 个 migration records 完整。`bun test packages/db/src/sqlite-migrations.bun.test.ts` 5 tests passed。UI 三档无横向溢出/axe 与当前 Linux release build 已通过；完整产品闭环 upgrade smoke 因跳过 E2E 未执行，`BASELINE-02` 保持 `IN PROGRESS`。
+- `周期提交与工作树`：本轮自动证据已按日常无障碍、Result Surface、发布状态合同、数据库迁移四个闭环分别提交；当前分支相对 origin ahead 22，工作树 clean。未把人工指标或用户要求跳过的 E2E 标记为通过。
 
 ## 13. Task Workspace 桌面端重构方案（2026-07-10）
 
