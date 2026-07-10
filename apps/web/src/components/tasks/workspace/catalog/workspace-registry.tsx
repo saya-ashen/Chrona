@@ -276,7 +276,7 @@ function CollapsibleBlock({
   const label = title || (copy.resultDetailsLabel ?? "Details");
 
   return (
-    <section className={cn("min-w-0 w-full max-w-full overflow-hidden rounded-xl border text-sm", subtle ? "border-border/50 bg-background/45 px-2.5 py-2" : "border-border/70 bg-background/95 px-3 py-2.5 shadow-sm")}>
+    <section className={cn("min-w-0 w-full max-w-full overflow-hidden text-sm", subtle ? "border-t border-border/60 py-3 first:border-t-0 first:pt-0" : "rounded-xl border border-border/70 bg-background/95 px-3 py-2.5 shadow-sm")}>
       <button
         type="button"
         className="flex w-full min-w-0 max-w-full items-center justify-between gap-2 text-left"
@@ -292,7 +292,7 @@ function CollapsibleBlock({
           {collapsed ? <ChevronDown className="size-3.5" /> : <ChevronUp className="size-3.5" />}
         </span>
       </button>
-      {collapsed ? null : <div className="mt-2 min-w-0 w-full max-w-full overflow-hidden space-y-2">{children}</div>}
+      {collapsed ? null : <div className={cn("min-w-0 w-full max-w-full overflow-hidden space-y-2", subtle ? "mt-3" : "mt-2")}>{children}</div>}
     </section>
   );
 }
