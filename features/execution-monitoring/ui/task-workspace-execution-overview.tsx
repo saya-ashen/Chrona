@@ -25,6 +25,12 @@ import {
   SelectTrigger,
   SelectValue,
 } from "../../../apps/web/src/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "../../../apps/web/src/components/ui/dropdown-menu";
 
 type OverviewAction = (nodeId?: string) => void;
 
@@ -236,13 +242,13 @@ export function TaskWorkspaceExecutionOverview({
 
   const results = (
     <section
-      aria-label={isExecutionRunning ? (ws.liveOutputTitle ?? "Live output") : (ws.executionResultTitle ?? "Execution Result")}
+      aria-label={isExecutionRunning ? (ws.liveOutputTitle ?? "Live output") : (ws.finalResultTitle ?? "Final result")}
       className="min-h-0 flex-1 overflow-y-auto"
     >
       <div className="mb-3 flex flex-wrap items-start justify-between gap-3 border-b border-border/70 pb-3">
         <div className="min-w-0 space-y-1">
           <h3 id="task-workspace-results-heading" className="font-heading text-base font-semibold text-foreground">
-            {isExecutionRunning ? (ws.liveOutputTitle ?? "Live output") : (ws.executionResultTitle ?? "Execution Result")}
+            {isExecutionRunning ? (ws.liveOutputTitle ?? "Live output") : (ws.finalResultTitle ?? "Final result")}
           </h3>
           <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             <Badge variant="outline" className={isExecutionRunning ? "bg-sky-500/10 text-sky-700 dark:text-sky-200" : "bg-violet-500/10 text-violet-700 dark:text-violet-200"}>{isExecutionRunning ? (executionOutputState === "partial" ? (ws.partialOutputBadge ?? "Partial output") : (ws.awaitingOutputBadge ?? "Awaiting output")) : (ws.aiGeneratedBadge ?? "AI generated")}</Badge>
@@ -250,10 +256,6 @@ export function TaskWorkspaceExecutionOverview({
           </div>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
-          <div className="flex items-center gap-1.5">
-            <Button type="button" variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => issueResultCollapseCommand("collapse")}>{ws.collapseAllResults ?? "Collapse all"}</Button>
-            <Button type="button" variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={() => issueResultCollapseCommand("expand")}>{ws.expandAllResults ?? "Expand all"}</Button>
-          </div>
           {nodeOptions.length > 1 ? (
             <Select value={selectedNodeId} onValueChange={(value) => setSelectedNodeId(value as ResultNodeFilter)}>
               <SelectTrigger aria-label={ws.resultNodeFilterLabel ?? "Filter results by node"} size="sm" className="max-w-full bg-background/90 text-xs">
@@ -267,6 +269,15 @@ export function TaskWorkspaceExecutionOverview({
               </SelectContent>
             </Select>
           ) : null}
+          <DropdownMenu>
+            <DropdownMenuTrigger render={<Button type="button" variant="outline" size="sm" className="h-8 px-2.5 text-xs" />}>
+              {ws.resultOptions ?? "Result options"}
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => issueResultCollapseCommand("collapse")}>{ws.collapseAllResults ?? "Collapse all"}</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => issueResultCollapseCommand("expand")}>{ws.expandAllResults ?? "Expand all"}</DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
       <SpecRenderer
@@ -282,7 +293,7 @@ export function TaskWorkspaceExecutionOverview({
     <UiSurfaceFrame
       kind="runtime-control"
       label={copy.trailTab}
-      description="Live execution status and activity."
+      description={isExecutionRunning ? "Live execution status and activity." : ws.completedActivityDescription ?? "Execution events and tool activity for this completed run."}
       className="min-h-0 overflow-y-auto border-l border-l-sky-300/65 pl-2.5"
       bodyClassName="min-w-0"
     >
@@ -297,7 +308,7 @@ export function TaskWorkspaceExecutionOverview({
     <UiSurfaceFrame
       kind="runtime-control"
       label={copy.trailTab}
-      description="Live execution status and activity."
+      description={isExecutionRunning ? "Live execution status and activity." : ws.completedActivityDescription ?? "Execution events and tool activity for this completed run."}
       className="mt-2.5 shrink-0"
       bodyClassName="min-w-0"
     >

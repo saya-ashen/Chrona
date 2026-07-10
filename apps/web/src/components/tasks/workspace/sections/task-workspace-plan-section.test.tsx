@@ -914,19 +914,17 @@ describe("TaskWorkspacePlanSection", () => {
     });
   });
 
-  it("shows task completed for completed nodes without actions", async () => {
+  it("puts result review before the final result and submits explicit change feedback", async () => {
     const node = createTaskWorkspaceFixtureNode({
       id: "weather-script",
       title: "创建一个获取天气的脚本",
       status: "done",
-      nextAction: "请提供创建天气脚本所需的关键信息。",
-      inputFields: { city: "Shanghai" },
-      interactiveFields: [{ key: "city", label: "City", value: "Shanghai", control: "text", required: true }],
+      nextAction: "Result complete",
       availableActions: [],
     });
     const graphPlan = createTaskWorkspaceFixtureGraph([node], "weather-script");
-
     const onAcceptResult = vi.fn().mockResolvedValue(undefined);
+    const onDispatchExecutionAction = vi.fn().mockResolvedValue({ message: "Rerun started" });
 
     renderWithQueryClient(
       <TaskWorkspacePlanSection
@@ -940,31 +938,77 @@ describe("TaskWorkspacePlanSection", () => {
         runtimeEvents={[]}
         onGeneratePlan={vi.fn()}
         onApplyPlan={vi.fn()}
-        onDispatchExecutionAction={vi.fn()}
+        onDispatchExecutionAction={onDispatchExecutionAction}
         onAcceptResult={onAcceptResult}
       />,
     );
 
-    const commandCenter = screen.getByRole("complementary", { name: "Task command center" });
+    const workspace = screen.getByRole("region", { name: "Task execution workspace" });
+    const reviewHeader = screen.getByTestId("result-review-header");
+    const finalResult = screen.getByTestId("final-result-surface");
 
-    // A completed plan reports full progress and exposes no pending action input.
-    expect(screen.getByRole("region", { name: "Task execution workspace" })).toHaveAttribute("data-workspace-layout", "result_focus");
-    expect(within(commandCenter).queryByText("Ready to run")).not.toBeInTheDocument();
-    expect(within(commandCenter).queryByRole("button", { name: "Send input" })).not.toBeInTheDocument();
-    expect(within(commandCenter).queryByLabelText(/City/)).not.toBeInTheDocument();
-    expect(within(commandCenter).queryByRole("region", { name: "Current operation" })).not.toBeInTheDocument();
-    expect(within(commandCenter).queryByText("Result summary will appear here after the current node finishes.")).not.toBeInTheDocument();
+    expect(workspace).toHaveAttribute("data-workspace-layout", "result_focus");
+    expect(reviewHeader).toHaveTextContent("Result ready");
+    expect(reviewHeader.compareDocumentPosition(finalResult) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     expect(screen.queryByRole("region", { name: "Execution flow" })).not.toBeInTheDocument();
-    expect(within(commandCenter).getByText("Result ready for review")).toBeInTheDocument();
-    const acceptResultButton = within(commandCenter).getByRole("button", { name: "Accept result" });
-    const requestChangesButton = within(commandCenter).getByRole("button", { name: "Request changes" });
-    expect(acceptResultButton).toBeInTheDocument();
-    expect(requestChangesButton).toBeInTheDocument();
-    fireEvent.click(acceptResultButton);
+    expect(screen.queryByText("Continue from result")).not.toBeInTheDocument();
+    expect(screen.getByText("Activity").closest("details")).not.toHaveAttribute("open");
+
+    fireEvent.click(within(reviewHeader).getByRole("button", { name: "Accept result" }));
     await waitFor(() => expect(onAcceptResult).toHaveBeenCalledTimes(1));
-    fireEvent.click(requestChangesButton);
-    expect(screen.getByPlaceholderText("Ask a follow-up, request a result update, rerun a step, or create a linked follow-up task.")).toHaveFocus();
-    expect(within(commandCenter).queryByRole("button", { name: "Complete task" })).not.toBeInTheDocument();
+
+    fireEvent.click(within(reviewHeader).getByRole("button", { name: "Request changes" }));
+    const changesRegion = screen.getByRole("region", { name: "Request changes" });
+    const changesInput = within(changesRegion).getByRole("textbox", { name: "What needs to change?" });
+    expect(changesInput).toHaveFocus();
+    expect(within(changesRegion).getByRole("button", { name: "Rerun final step" })).toBeDisabled();
+
+    fireEvent.change(changesInput, { target: { value: "Include source links for every entry." } });
+    const submitChanges = within(changesRegion).getByRole("button", { name: "Rerun final step" });
+    await waitFor(() => expect(submitChanges).toBeEnabled());
+    fireEvent.click(submitChanges);
+    await waitFor(() => expect(onDispatchExecutionAction).toHaveBeenCalledWith({
+      action: "retry_node",
+      nodeId: "weather-script",
+      prompt: "Include source links for every entry.",
+    }));
+  });
+
+  it("renders Done with a top action that moves focus to the continuation composer", () => {
+    const node = createTaskWorkspaceFixtureNode({ id: "weather-script", title: "Result", status: "done", availableActions: [] });
+    const scrollIntoView = vi.fn();
+    Object.defineProperty(Element.prototype, "scrollIntoView", { configurable: true, value: scrollIntoView });
+    renderWithQueryClient(
+      <TaskWorkspacePlanSection
+        label="Plan"
+        graphPlan={createTaskWorkspaceFixtureGraph([node], "weather-script")}
+        isGraphPlanPending={false}
+        pageData={createTaskWorkspaceFixturePageData({ task: { status: "Done" } })}
+        plan={{ id: "plan-1", status: "accepted", revision: 1, updatedAt: "2026-05-18T00:00:00.000Z" } as TaskPlanReadModel}
+        planGenerationStatus="idle"
+        acceptPlanError={null}
+        runtimeEvents={[]}
+        onGeneratePlan={vi.fn()}
+        onApplyPlan={vi.fn()}
+        onDispatchExecutionAction={vi.fn()}
+      />,
+    );
+
+    const reviewHeader = screen.getByTestId("result-review-header");
+    expect(reviewHeader).toHaveTextContent("Result accepted");
+    expect(screen.queryByRole("button", { name: "Accept result" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Request changes" })).not.toBeInTheDocument();
+    const continueButton = within(reviewHeader).getByRole("button", { name: "Continue from result" });
+    const followUpInput = screen.getByPlaceholderText("Ask a follow-up or create a linked follow-up task.");
+    const placeholderSubmit = screen.getByRole("button", { name: "Continue" });
+    expect(placeholderSubmit).toBeDisabled();
+    expect(placeholderSubmit).toHaveAttribute("aria-describedby", "result-follow-up-unavailable");
+    expect(screen.getByText("Continue from result is not available yet.")).toBeInTheDocument();
+
+    fireEvent.click(continueButton);
+
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: "center", behavior: "smooth" });
+    expect(followUpInput).toHaveFocus();
   });
 
   it("does not open node detail overlay when selecting a graph node", () => {

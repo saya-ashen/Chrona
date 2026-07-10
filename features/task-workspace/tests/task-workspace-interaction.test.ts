@@ -181,8 +181,11 @@ describe("task workspace interaction model", () => {
     })).toMatchObject(expected);
   });
 
-  it("keeps Completed and Done distinct in result review stage copy", () => {
-    const completedPage = pageData({ task: { ...pageData().task, status: "Completed" } });
+  it("keeps Completed and Done distinct in result review state", () => {
+    const completedPage = pageData({
+      task: { ...pageData().task, status: "Completed" },
+      artifacts: [{ id: "artifact_1", title: "Report", type: "json" }],
+    });
     const donePage = pageData({ task: { ...pageData().task, status: "Done" } });
 
     expect(deriveTaskWorkspaceStage({ pageData: completedPage, graphPlan: graphPlan(), operationState: operationState({ status: "execution-completed", action: "none" } as unknown as Partial<TaskWorkspaceOperationState>) })).toMatchObject({
@@ -195,8 +198,29 @@ describe("task workspace interaction model", () => {
       statusLabel: "Task done",
       nextActionLabel: "Ask a follow-up or create a next task",
     });
-    expect(deriveResultReview(completedPage)?.actions.map((action) => action.id)).toEqual(["accept_result", "request_changes"]);
-    expect(deriveResultReview(donePage)?.actions.map((action) => action.id)).toEqual(["ask_follow_up", "create_follow_up_task"]);
+    expect(deriveResultReview({ pageData: completedPage, graphPlan: graphPlan() })).toMatchObject({
+      phase: "pending_acceptance",
+      completion: { stepCount: 3, artifactCount: 1 },
+      decision: { primaryAction: "accept_result", canAccept: true, canRequestChanges: true },
+      content: { hasResult: true, hasArtifacts: true, showNodeFilter: true },
+      continuation: { visible: false },
+    });
+    expect(deriveResultReview({ pageData: donePage, graphPlan: graphPlan() })).toMatchObject({
+      phase: "accepted",
+      decision: { primaryAction: "follow_up", canAccept: false, canRequestChanges: false },
+      continuation: { visible: true },
+    });
+  });
+
+  it("disables result acceptance when completion has no result evidence", () => {
+    expect(deriveResultReview({
+      pageData: pageData({ task: { ...pageData().task, status: "Completed" } }),
+      graphPlan: null,
+    })).toMatchObject({
+      phase: "pending_acceptance",
+      decision: { canAccept: false, acceptDisabledReason: "missing_result", canRequestChanges: false },
+      content: { hasResult: false, hasArtifacts: false, showNodeFilter: false, showResultTools: false },
+    });
   });
 
   it("separates required, recommended, and optional planning readiness", () => {
@@ -261,12 +285,16 @@ describe("task workspace interaction model", () => {
       primarySurface: "result",
       primaryAction: "accept_result",
       contextRail: "result_review",
+      collapsedByDefault: ["execution_history", "activity", "diagnostics"],
     });
+    expect(TASK_WORKSPACE_DISPLAY_RULES.completed.panels.followUpComposer).toBe(false);
     expect(TASK_WORKSPACE_DISPLAY_RULES.done).toMatchObject({
       primarySurface: "result",
       primaryAction: "follow_up",
       contextRail: "continuation",
+      collapsedByDefault: ["execution_history", "activity", "diagnostics"],
     });
+    expect(TASK_WORKSPACE_DISPLAY_RULES.done.panels.followUpComposer).toBe(true);
 
     const readyState = deriveTaskWorkspaceDisplayState({
       pageData: pageData(),

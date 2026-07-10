@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState, type Ref } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { ExecutionActionInput, PlanExecutionResult, SubmitCheckpointActionInput } from "@chrona/contracts/ai";
 import type { TaskAction } from "@chrona/contracts";
 import { useI18n } from "@chrona/i18n/react";
@@ -23,7 +23,6 @@ import {
 import {
   deriveTaskWorkspaceDisplayState,
   dispatchInputForPrimaryAction,
-  FOLLOW_UP_INTENTS,
   resolveTaskWorkspaceOperationState,
 } from "../../../../../../../features/task-workspace";
 import type { RunningExecutionView, TaskPageData, TaskPlanGenerationStatus, TaskWorkspaceDisplayState, WorkspaceActivityItem } from "../../../../../../../features/task-workspace";
@@ -468,61 +467,156 @@ function RunLaunchPanel({
 }
 
 
-function ResultReviewCard({
+function formatResultReviewCopy(template: string | undefined, values: Record<string, number>, fallback: string) {
+  return Object.entries(values).reduce(
+    (result, [key, value]) => result.replace(`{${key}}`, String(value)),
+    template ?? fallback,
+  );
+}
+
+function ResultReviewHeader({
   review,
+  copy,
   onAcceptResult,
   onRequestChanges,
+  onContinueFromResult,
   isAcceptingResult = false,
   acceptResultError,
 }: {
   review: NonNullable<TaskWorkspaceDisplayState["resultReview"]>;
+  copy: Record<string, string | undefined>;
   onAcceptResult?: () => Promise<void> | void;
-  onRequestChanges?: () => void;
+  onRequestChanges: () => void;
+  onContinueFromResult: () => void;
   isAcceptingResult?: boolean;
   acceptResultError?: string | null;
 }) {
+  const isAccepted = review.phase === "accepted";
+  const completion = review.completion;
+  const acceptDisabled = isAcceptingResult || !review.decision.canAccept || !onAcceptResult;
+  const disabledReason = !review.decision.canAccept || !onAcceptResult
+    ? copy.acceptResultUnavailable ?? "A completed result is required before it can be accepted."
+    : null;
+
   return (
-    <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-4" data-ui-surface-kind="runtime-control">
+    <header
+      className="sticky top-0 z-20 rounded-2xl border border-primary/25 bg-background/95 px-4 py-4 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/90 sm:px-5"
+      data-ui-surface-kind="runtime-control"
+      data-testid="result-review-header"
+    >
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div className="min-w-0 space-y-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <h3 className="font-heading text-lg font-semibold tracking-[-0.02em] text-foreground">{review.title}</h3>
-            <Badge variant="outline" className="bg-background">Result review</Badge>
+        <div className="min-w-0 space-y-2">
+          <div>
+            <h2 className="font-heading text-xl font-semibold tracking-[-0.025em] text-foreground">
+              {isAccepted ? copy.resultAcceptedTitle ?? "Result accepted" : copy.resultReadyTitle ?? "Result ready"}
+            </h2>
+            <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">
+              {isAccepted
+                ? copy.resultAcceptedDescription ?? "Task closed. Use follow-up when the accepted result needs a new question or next task."
+                : copy.resultReadyDescription ?? "Execution completed. Review the final result, then accept it or request changes."}
+            </p>
           </div>
-          <p className="text-sm text-muted-foreground">{review.description}</p>
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground" aria-label="Result completion summary">
+            {completion.stepCount > 0 ? (
+              <span>{formatResultReviewCopy(copy.resultCompletionSteps, { completed: completion.completedSteps, total: completion.stepCount }, `${completion.completedSteps}/${completion.stepCount} steps completed`)}</span>
+            ) : null}
+            <span>{formatResultReviewCopy(copy.resultCompletionArtifacts, { count: completion.artifactCount }, `${completion.artifactCount} deliverables`)}</span>
+            <span className={completion.hasDiagnostics ? "font-medium text-warning-foreground" : undefined}>
+              {completion.hasDiagnostics ? copy.resultCompletionHasDiagnostics ?? "Diagnostics need review" : copy.resultCompletionNoDiagnostics ?? "No warnings"}
+            </span>
+          </div>
           {acceptResultError ? <p role="alert" className="text-xs font-medium text-destructive">{acceptResultError}</p> : null}
+          {disabledReason && !isAccepted ? <p id="accept-result-disabled-reason" className="text-xs text-muted-foreground">{disabledReason}</p> : null}
         </div>
-        <div className="flex shrink-0 flex-wrap gap-2" aria-label="Result review actions">
-          {review.actions.map((action) => {
-            const isAccept = action.id === "accept_result";
-            const isRequestChanges = action.id === "request_changes";
-            return (
-              <Button
-                key={action.id}
-                type="button"
-                size="sm"
-                variant={action.emphasis === "primary" ? "default" : "outline"}
-                disabled={isAccept ? isAcceptingResult || !onAcceptResult : false}
-                onClick={isAccept ? () => void onAcceptResult?.() : isRequestChanges ? onRequestChanges : undefined}
-              >
-                {isAccept && isAcceptingResult ? "Accepting result..." : action.label}
-              </Button>
-            );
-          })}
-        </div>
+        {isAccepted ? (
+          <Button type="button" size="lg" className="shrink-0" onClick={onContinueFromResult}>
+            {copy.continueFromResult ?? "Continue from result"}
+          </Button>
+        ) : (
+          <div className="flex shrink-0 flex-col-reverse gap-2 sm:flex-row" aria-label={copy.resultReviewActionsLabel ?? "Result review actions"}>
+            <Button type="button" variant="outline" onClick={onRequestChanges} disabled={!review.decision.canRequestChanges}>
+              {copy.requestResultChanges ?? "Request changes"}
+            </Button>
+            <Button
+              type="button"
+              size="lg"
+              onClick={() => void onAcceptResult?.()}
+              disabled={acceptDisabled}
+              aria-describedby={disabledReason ? "accept-result-disabled-reason" : undefined}
+            >
+              {isAcceptingResult ? copy.acceptingResult ?? "Accepting result..." : copy.acceptResult ?? "Accept result"}
+            </Button>
+          </div>
+        )}
       </div>
-    </div>
+    </header>
   );
 }
 
-function FollowUpComposerCard({ textareaRef }: { textareaRef?: Ref<HTMLTextAreaElement> }) {
+function RequestResultChangesCard({
+  copy,
+  instruction,
+  onInstructionChange,
+  onCancel,
+  onSubmit,
+  isSubmitting,
+  error,
+}: {
+  copy: Record<string, string | undefined>;
+  instruction: string;
+  onInstructionChange: (value: string) => void;
+  onCancel: () => void;
+  onSubmit: () => void;
+  isSubmitting: boolean;
+  error: string | null;
+}) {
   return (
-    <Card size="sm" className="border-transparent bg-card py-4" data-ui-surface-kind="product-authored">
-      <CardHeader className="px-4 pb-1"><CardTitle className="font-heading text-xl font-medium tracking-[-0.03em]">Continue from result</CardTitle></CardHeader>
+    <Card className="border-warning/35 bg-warning/10 py-4" role="region" aria-label={copy.requestChangesTitle ?? "Request changes"} data-ui-surface-kind="runtime-control">
+      <CardHeader className="px-4 pb-1">
+        <CardTitle className="font-heading text-lg">{copy.requestChangesTitle ?? "Request changes"}</CardTitle>
+        <p className="text-sm leading-6 text-muted-foreground">{copy.requestChangesDescription ?? "Describe what is incorrect or missing. Chrona will rerun the final completed step with your feedback."}</p>
+      </CardHeader>
+      <CardContent className="space-y-3 px-4">
+        <label htmlFor="result-change-instruction" className="text-sm font-medium text-foreground">{copy.requestChangesLabel ?? "What needs to change?"}</label>
+        <Textarea
+          id="result-change-instruction"
+          autoFocus
+          value={instruction}
+          onChange={(event) => onInstructionChange(event.target.value)}
+          placeholder={copy.requestChangesPlaceholder ?? "Describe the corrections or missing information required in the final result."}
+          className="min-h-28 bg-background"
+        />
+        {error ? <p role="alert" className="text-xs font-medium text-destructive">{error}</p> : null}
+        <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+          <Button type="button" variant="ghost" onClick={onCancel} disabled={isSubmitting}>{copy.requestChangesCancel ?? "Cancel"}</Button>
+          <Button type="button" onClick={onSubmit} disabled={isSubmitting || !instruction.trim()}>
+            {isSubmitting ? copy.requestChangesSubmitting ?? "Starting rerun..." : copy.requestChangesSubmit ?? "Rerun final step"}
+          </Button>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function FollowUpComposerCard({ copy, textareaRef }: { copy: Record<string, string | undefined>; textareaRef: React.RefObject<HTMLTextAreaElement | null> }) {
+  return (
+    <Card id="result-follow-up-composer" size="sm" className="scroll-mt-24 border-transparent bg-card py-4" data-ui-surface-kind="product-authored">
+      <CardHeader className="px-4 pb-1"><CardTitle className="font-heading text-xl font-medium tracking-[-0.03em]">{copy.continueFromResult ?? "Continue from result"}</CardTitle></CardHeader>
       <CardContent className="space-y-3 px-4 text-xs">
-        <Textarea ref={textareaRef} placeholder="Ask a follow-up, request a result update, rerun a step, or create a linked follow-up task." className="min-h-24 rounded-2xl bg-background" />
-        <div className="flex flex-wrap gap-1.5" aria-label="Follow-up intent">
-          {FOLLOW_UP_INTENTS.map((intent) => <Badge key={intent.id} variant="outline" title={intent.description}>{intent.label}</Badge>)}
+        <Textarea ref={textareaRef} placeholder={copy.followUpPlaceholder ?? "Ask a follow-up or create a linked follow-up task."} className="min-h-24 rounded-2xl bg-background" />
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div className="space-y-1.5">
+            <div className="flex flex-wrap gap-1.5" aria-label={copy.followUpIntentLabel ?? "Follow-up intent"}>
+              <Badge variant="outline">{copy.followUpAskOnly ?? "Ask only"}</Badge>
+              <Badge variant="outline">{copy.followUpCreateTask ?? "Create follow-up task"}</Badge>
+            </div>
+            <p id="result-follow-up-unavailable" className="text-xs text-muted-foreground">
+              {copy.followUpUnavailable ?? "Continue from result is not available yet."}
+            </p>
+          </div>
+          <Button type="button" disabled aria-describedby="result-follow-up-unavailable" className="sm:min-w-28">
+            {copy.followUpSubmit ?? "Continue"}
+          </Button>
         </div>
       </CardContent>
     </Card>
@@ -800,6 +894,10 @@ export function TaskWorkspacePlanSection({
   const [regenerationInstruction, setRegenerationInstruction] = useState("");
   const [submittedRevisionInstruction, setSubmittedRevisionInstruction] = useState<string | null>(null);
   const [selectedNode, setSelectedNode] = useState<PlanNodeDataModel | null>(null);
+  const [isRequestingResultChanges, setIsRequestingResultChanges] = useState(false);
+  const [resultChangeInstruction, setResultChangeInstruction] = useState("");
+  const [resultChangeError, setResultChangeError] = useState<string | null>(null);
+  const [isSubmittingResultChanges, setIsSubmittingResultChanges] = useState(false);
   const followUpComposerRef = useRef<HTMLTextAreaElement>(null);
   const [graphMode, setGraphMode] = useState<"full" | "compact">("full");
   const { messages } = useI18n();
@@ -920,6 +1018,30 @@ export function TaskWorkspacePlanSection({
     currentNode: currentOperationNode,
     inspectedNode: selectedNode,
   });
+  const lastCompletedResultNode = [...(graphPlan?.nodes ?? [])].reverse().find((node) => isCompletedGraphNode(node.status)) ?? null;
+  const submitResultChanges = async () => {
+    const instruction = resultChangeInstruction.trim();
+    if (!instruction) {
+      setResultChangeError(copy.requestChangesRequired ?? "Describe the required change before starting the rerun.");
+      return;
+    }
+    if (!lastCompletedResultNode) {
+      setResultChangeError(copy.requestChangesUnavailable ?? "No completed result step is available to rerun.");
+      return;
+    }
+
+    setResultChangeError(null);
+    setIsSubmittingResultChanges(true);
+    try {
+      await onDispatchExecutionAction({ action: "retry_node", nodeId: lastCompletedResultNode.id, prompt: instruction });
+      setIsRequestingResultChanges(false);
+      setResultChangeInstruction("");
+    } catch (error) {
+      setResultChangeError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setIsSubmittingResultChanges(false);
+    }
+  };
   const focusNodeActions = (nodeId?: string) => {
     if (!nodeId) return;
 
@@ -992,27 +1114,56 @@ export function TaskWorkspacePlanSection({
           />
         )
       ) : displayState.layout === "result_focus" ? (
-        <div className="min-h-[560px] flex-1 p-4 xl:min-h-0">
-          <TaskWorkspaceInspector
-            key={commandCenterScopeKey}
-            taskId={pageData.task.id}
-            consoleView={consoleView}
-            commandCenter={isGeneratingPlan ? null : commandCenter ?? null}
-            commandCenterActionHandlers={commandCenterActionHandlers}
-            runtimeEvents={runtimeEvents}
-            liveActivity={liveActivity}
-            currentExecution={currentExecution}
-            showHeader={false}
-            operationPlacement="after"
-            copy={copy}
-            onAction={focusNodeActions}
-            operationPanel={(
-              <div className="space-y-4 border-t border-border/70 pt-4">
-                {displayState.panels.resultReview && displayState.resultReview ? <ResultReviewCard review={displayState.resultReview} onAcceptResult={onAcceptResult} onRequestChanges={() => followUpComposerRef.current?.focus()} isAcceptingResult={isAcceptingResult} acceptResultError={acceptResultError} /> : null}
-                {displayState.panels.followUpComposer ? <FollowUpComposerCard textareaRef={followUpComposerRef} /> : null}
-              </div>
-            )}
-          />
+        <div className="min-h-[560px] flex-1 p-3 xl:min-h-0">
+          <div className="flex min-h-0 flex-col gap-3">
+            {displayState.panels.resultReview && displayState.resultReview ? (
+              <ResultReviewHeader
+                review={displayState.resultReview}
+                copy={copy}
+                onAcceptResult={onAcceptResult}
+                onRequestChanges={() => {
+                  setResultChangeError(null);
+                  setIsRequestingResultChanges(true);
+                }}
+                onContinueFromResult={() => {
+                  document.getElementById("result-follow-up-composer")?.scrollIntoView({ block: "center", behavior: "smooth" });
+                  followUpComposerRef.current?.focus({ preventScroll: true });
+                }}
+                isAcceptingResult={isAcceptingResult}
+                acceptResultError={acceptResultError}
+              />
+            ) : null}
+            {isRequestingResultChanges && displayState.resultReview?.phase === "pending_acceptance" ? (
+              <RequestResultChangesCard
+                copy={copy}
+                instruction={resultChangeInstruction}
+                onInstructionChange={setResultChangeInstruction}
+                onCancel={() => {
+                  setIsRequestingResultChanges(false);
+                  setResultChangeError(null);
+                }}
+                onSubmit={() => void submitResultChanges()}
+                isSubmitting={isSubmittingResultChanges}
+                error={resultChangeError}
+              />
+            ) : null}
+            <div className="min-w-0 rounded-2xl border border-border/70 bg-background p-4" data-ui-surface-kind="ai-authored" data-testid="final-result-surface"> 
+              <TaskWorkspaceInspector
+                key={commandCenterScopeKey}
+                taskId={pageData.task.id}
+                consoleView={consoleView}
+                commandCenter={isGeneratingPlan ? null : commandCenter ?? null}
+                commandCenterActionHandlers={commandCenterActionHandlers}
+                runtimeEvents={runtimeEvents}
+                liveActivity={liveActivity}
+                currentExecution={currentExecution}
+                showHeader={false}
+                copy={copy}
+                onAction={focusNodeActions}
+              />
+            </div>
+            {displayState.panels.followUpComposer ? <FollowUpComposerCard copy={copy} textareaRef={followUpComposerRef} /> : null}
+          </div>
         </div>
       ) : displayState.mode === "reviewing_plan" ? (
         <div className="grid min-h-[560px] flex-1 gap-3 overflow-y-auto p-3 xl:min-h-0 xl:grid-cols-[minmax(0,1fr)_22rem] xl:items-start">
@@ -1178,8 +1329,6 @@ export function TaskWorkspacePlanSection({
                     onTaskPrimaryAction={primaryActionDispatch ? () => void onDispatchExecutionAction(primaryActionDispatch) : undefined}
                   />
                 ) : null}
-                {displayState.panels.resultReview && displayState.resultReview ? <ResultReviewCard review={displayState.resultReview} onAcceptResult={onAcceptResult} onRequestChanges={() => followUpComposerRef.current?.focus()} isAcceptingResult={isAcceptingResult} acceptResultError={acceptResultError} /> : null}
-                {displayState.panels.followUpComposer ? <FollowUpComposerCard textareaRef={followUpComposerRef} /> : null}
               </div>
             )}
           />

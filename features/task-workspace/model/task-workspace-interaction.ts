@@ -92,20 +92,34 @@ export type RunLaunchView = {
 };
 
 export type ResultReview = {
-  title: string;
-  description: string;
-  actions: Array<{ id: "accept_result" | "ask_follow_up" | "request_changes" | "create_follow_up_task"; label: string; emphasis: "primary" | "secondary" }>;
+  phase: "pending_acceptance" | "accepted";
+  completion: {
+    completedSteps: number;
+    stepCount: number;
+    artifactCount: number;
+    hasDiagnostics: boolean;
+  };
+  decision: {
+    primaryAction: "accept_result" | "follow_up";
+    canAccept: boolean;
+    acceptDisabledReason: "missing_result" | null;
+    canRequestChanges: boolean;
+  };
+  content: {
+    hasResult: boolean;
+    hasArtifacts: boolean;
+    showNodeFilter: boolean;
+    showResultTools: boolean;
+  };
+  disclosures: {
+    activity: "collapsed";
+    diagnostics: "collapsed" | "attention";
+    executionHistory: "collapsed";
+  };
+  continuation: {
+    visible: boolean;
+  };
 };
-
-export type FollowUpIntentKind = "ask_only" | "update_result" | "rerun_step" | "revise_plan" | "create_follow_up_task";
-
-export const FOLLOW_UP_INTENTS: Array<{ id: FollowUpIntentKind; label: string; description: string }> = [
-  { id: "ask_only", label: "Ask only", description: "Answer without changing task state." },
-  { id: "update_result", label: "Update result", description: "Prepare a result patch for review." },
-  { id: "rerun_step", label: "Rerun selected step", description: "Start from a chosen node after preview." },
-  { id: "revise_plan", label: "Revise plan", description: "Generate a plan change preview." },
-  { id: "create_follow_up_task", label: "Create follow-up task", description: "Draft a new task linked to this result." },
-];
 
 export type TaskWorkspaceDisplayMode =
   | "briefing"
@@ -251,8 +265,8 @@ export const TASK_WORKSPACE_DISPLAY_RULES: Record<TaskWorkspaceDisplayMode, Task
     primarySurface: "result",
     primaryAction: "accept_result",
     contextRail: "result_review",
-    collapsedByDefault: ["execution_history", "activity"],
-    panels: panels(["stageBar", "resultReview", "followUpComposer"]),
+    collapsedByDefault: ["execution_history", "activity", "diagnostics"],
+    panels: panels(["stageBar", "resultReview"]),
   },
   done: {
     mode: "done",
@@ -261,7 +275,7 @@ export const TASK_WORKSPACE_DISPLAY_RULES: Record<TaskWorkspaceDisplayMode, Task
     primarySurface: "result",
     primaryAction: "follow_up",
     contextRail: "continuation",
-    collapsedByDefault: ["execution_history", "activity"],
+    collapsedByDefault: ["execution_history", "activity", "diagnostics"],
     panels: panels(["stageBar", "resultReview", "followUpComposer"]),
   },
 };
@@ -520,7 +534,7 @@ export function deriveTaskWorkspaceDisplayState(input: {
     readiness: deriveTaskPlanningReadiness(input.pageData),
     planReviewSummary: derivePlanReviewSummary(input.graphPlan),
     runPreview: deriveRunPreview({ pageData: input.pageData, graphPlan: input.graphPlan }),
-    resultReview: deriveResultReview(input.pageData),
+    resultReview: deriveResultReview({ pageData: input.pageData, graphPlan: input.graphPlan }),
     runningExecution: mode === "running" ? deriveRunningExecutionView(input) : null,
   };
 }
@@ -598,24 +612,47 @@ export function deriveRunPreview(input: {
   };
 }
 
-export function deriveResultReview(pageData: TaskPageData): ResultReview | null {
+export function deriveResultReview(input: {
+  pageData: TaskPageData;
+  graphPlan: TaskPlanGraphPlan | null;
+}): ResultReview | null {
+  const { pageData, graphPlan } = input;
   if (!isCompletedStatus(pageData.task.status) && normalized(pageData.latestRunSummary?.status) !== "completed") return null;
-  const isDone = normalized(pageData.task.status) === "done";
+
+  const phase = normalized(pageData.task.status) === "done" ? "accepted" : "pending_acceptance";
+  const completedSteps = graphPlan?.nodes.filter((node) => node.status === "done" || node.status === "completed").length ?? 0;
+  const stepCount = graphPlan?.nodes.length ?? 0;
+  const artifactCount = pageData.artifacts.length;
+  const hasDiagnostics = pageData.reconciliation?.issues.some((issue) => issue.severity === "error" || issue.severity === "warning") ?? false;
+  const hasResult = completedSteps > 0 || artifactCount > 0 || normalized(pageData.latestRunSummary?.status) === "completed";
+
   return {
-    title: isDone ? "Result accepted" : "Result ready for review",
-    description: isDone
-      ? "Task is closed. Use follow-up only when the accepted result needs a new question or next task."
-      : pageData.artifacts.length > 0
-        ? `${pageData.artifacts.length} artifact${pageData.artifacts.length === 1 ? "" : "s"} available. Review output and artifacts, then accept the result or request changes.`
-        : "Execution completed. Review the output and activity trail, then accept the result or request changes.",
-    actions: isDone
-      ? [
-        { id: "ask_follow_up", label: "Ask follow-up", emphasis: "primary" },
-        { id: "create_follow_up_task", label: "Create follow-up task", emphasis: "secondary" },
-      ]
-      : [
-        { id: "accept_result", label: "Accept result", emphasis: "primary" },
-        { id: "request_changes", label: "Request changes", emphasis: "secondary" },
-      ],
+    phase,
+    completion: {
+      completedSteps,
+      stepCount,
+      artifactCount,
+      hasDiagnostics,
+    },
+    decision: {
+      primaryAction: phase === "accepted" ? "follow_up" : "accept_result",
+      canAccept: phase === "pending_acceptance" && hasResult,
+      acceptDisabledReason: phase === "pending_acceptance" && !hasResult ? "missing_result" : null,
+      canRequestChanges: phase === "pending_acceptance" && hasResult,
+    },
+    content: {
+      hasResult,
+      hasArtifacts: artifactCount > 0,
+      showNodeFilter: stepCount > 1,
+      showResultTools: stepCount > 1 || artifactCount > 1,
+    },
+    disclosures: {
+      activity: "collapsed",
+      diagnostics: hasDiagnostics ? "attention" : "collapsed",
+      executionHistory: "collapsed",
+    },
+    continuation: {
+      visible: phase === "accepted",
+    },
   };
 }
