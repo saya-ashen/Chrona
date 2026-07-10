@@ -47,6 +47,7 @@ type StartWithChronaProps = {
   workspaceId?: string;
   isComplete?: boolean;
   onCreateTask?: () => void;
+  onCreateSafeDemo?: () => void;
   onOpenCreatedTask?: (taskId: string) => void;
 };
 
@@ -85,7 +86,7 @@ function stepBadgeClasses(state: OnboardingStep["state"]): string {
   return "bg-muted text-muted-foreground";
 }
 
-export function StartWithChrona({ className = "", createdTaskId = null, workspaceId, isComplete = false, onCreateTask, onOpenCreatedTask }: StartWithChronaProps) {
+export function StartWithChrona({ className = "", createdTaskId = null, workspaceId, isComplete = false, onCreateTask, onCreateSafeDemo, onOpenCreatedTask }: StartWithChronaProps) {
   const { t } = useI18n();
   const locale = useLocale();
   const router = useAppRouter();
@@ -219,6 +220,11 @@ export function StartWithChrona({ className = "", createdTaskId = null, workspac
           <Button type="button" size="default" onClick={handlePrimaryAction}>
             {hasClients ? t(hasCreatedTask ? "components.schedulePage.firstRunOpenCreatedTask" : "components.schedulePage.firstRunCreateTask") : t("components.schedulePage.firstRunConnectAi")}
           </Button>
+          {!hasCreatedTask && onCreateSafeDemo ? (
+            <Button type="button" variant="outline" size="default" onClick={onCreateSafeDemo}>
+              {t("components.schedulePage.firstRunCreateSafeDemo")}
+            </Button>
+          ) : null}
         </div>
       </div>
     </section>
