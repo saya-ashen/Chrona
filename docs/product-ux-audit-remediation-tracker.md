@@ -1034,3 +1034,12 @@ Progressive disclosure
 居中的单一卡片虽然降低了噪声，但在宽屏工作区中造成主区域过小、两侧空置和“表单弹窗”感。Plan Setup 改为占满 Workspace 可用宽度的两区工作台：左侧约三分之二承载任务 Brief 与质量改进，右侧约三分之一作为稳定的 Plan Launch rail，展示 required readiness、生成边界、唯一主操作和后续流程。顶部结论成为工作区 section header，不再包在另一张 Card 中。
 
 桌面结构：`full-width intro → 2-column setup workspace → left brief/improvements + right sticky launch rail`。只保留右侧行动区为强调 surface；左侧用 section、divider 和轻背景组织，避免用一个居中 Card 填充页面。`1440×900` 下内容宽度应使用整个 Workspace，主操作保持首屏可见。
+
+### 13.10 Ready to Run 启动工作区实施记录
+
+- `ready_to_run` 不再复用通用 Execution Inspector。未开始执行时改为专用 Launch Workspace：左侧显示已接受计划和执行路径，右侧 sticky Launch Rail 汇总就绪结论、启动方式、Provider/Runtime、第一步、预计 Input/Approval 暂停和唯一主操作。
+- 新增纯 `RunLaunchView` 派生模型，区分 `ready`、`blocked`、`scheduled` 与 `manual`、`automatic`、`scheduled`；以服务端 `task.isRunnable` 作为能否启动的权威结论，阻塞时保留 `runnabilitySummary` 并切换到修复任务设置动作。
+- 节点点击只表达 inspection。运行起点固定由 Plan 的首个可执行节点派生，不再使用 UI 当前选择节点，避免“查看步骤”被误解为“从此步骤开始”。
+- Plan 接受后不再显示 `Plan review`、空 Execution Result 或 Live Activity；页面明确说明“Plan 已接受、执行尚未开始”，手动任务不会在用户启动前运行，定时自动任务显示本地化启动时间。
+- 已开始但暂停/取消后仍复用现有 Operation Panel，保留 Continue 与 Restart 行为，不改变执行引擎或 API 语义。
+- 英文和中文 Task Workspace 文案同步补齐。聚焦验证：Task Workspace interaction/plan section 共 36 tests passed；`bun run typecheck` 通过。真实浏览器环境因现有本地 SPA 返回空白页面，未取得视觉验收证据，组件行为和布局合同由 DOM 测试覆盖。

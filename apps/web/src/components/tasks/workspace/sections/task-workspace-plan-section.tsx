@@ -371,27 +371,102 @@ function PlanReviewSummaryCard({ summary }: { summary: NonNullable<TaskWorkspace
   );
 }
 
-function RunPreviewCard({ preview }: { preview: NonNullable<TaskWorkspaceDisplayState["runPreview"]> }) {
+function formatLaunchTime(value: string | null, locale: string) {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+  return new Intl.DateTimeFormat(locale, {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(date);
+}
+
+function RunLaunchPanel({
+  launch,
+  onStart,
+  onEditTask,
+}: {
+  launch: NonNullable<TaskWorkspaceDisplayState["runPreview"]>;
+  onStart: () => void;
+  onEditTask?: () => void;
+}) {
+  const { locale, messages } = useI18n();
+  const copy = messages.components.taskWorkspace;
+  const scheduledStart = formatLaunchTime(launch.scheduledStartAt, locale);
+  const scheduledEnd = formatLaunchTime(launch.scheduledEndAt, locale);
+  const isBlocked = launch.readiness === "blocked";
+  const isScheduled = launch.readiness === "scheduled";
+  const title = isBlocked ? copy.launchBlockedTitle : isScheduled ? copy.launchScheduledTitle : copy.launchReadyTitle;
+  const description = isBlocked
+    ? copy.launchBlockedDescription
+    : isScheduled
+      ? copy.launchScheduledDescription
+      : launch.startMode === "automatic"
+        ? copy.launchAutomaticDescription
+        : copy.launchManualDescription;
+
   return (
-    <Card size="sm" className="border-transparent bg-brand-mint/80 py-4" data-ui-surface-kind="runtime-control">
-      <CardHeader className="px-4 pb-1"><CardTitle className="font-heading text-xl font-medium tracking-[-0.03em]">Run contract preview</CardTitle></CardHeader>
-      <CardContent className="grid gap-3 px-4 text-xs sm:grid-cols-2">
-        <NodeDetailRow label="Plan" value={preview.planVersionLabel} />
-        <NodeDetailRow label="Trigger" value={preview.triggerLabel} />
-        <NodeDetailRow label="Provider/runtime" value={preview.providerLabel} />
-        <NodeDetailRow label="Work block" value={preview.scheduleLabel} />
-        <NodeDetailRow label="Automation readiness" value={preview.automationReadinessLabel} />
-        <NodeDetailRow label="Mode" value={preview.modeLabel} />
-        <NodeDetailRow label="Will start at" value={preview.startNodeLabel} />
-        <NodeDetailRow label="Result policy" value={preview.resultPolicyLabel} />
-        <NodeDetailRow label="Previous result" value={preview.previousResultLabel ?? "No previous artifact"} />
-        <SummaryList title="Expected stops" items={preview.expectedStops} empty="No planned stop" />
-        <SummaryList title="Controls" items={preview.capabilityLabels} empty="Cancel and retry" />
-        <SummaryList title="Output destination" items={preview.outputDestinations} empty="Task result" />
-      </CardContent>
-    </Card>
+    <aside className="space-y-3 xl:sticky xl:top-3 xl:self-start" aria-label={copy.launchPanelAria} data-ui-surface-kind="runtime-control">
+      <Card className={isBlocked ? "gap-3 border-destructive/35 bg-destructive/5 py-4 shadow-sm" : "gap-3 border-primary/30 bg-primary/5 py-4 shadow-sm"}>
+        <CardHeader className="gap-2 px-4">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">{copy.launchEyebrow}</p>
+            <Badge variant={isBlocked ? "destructive" : isScheduled ? "secondary" : "default"}>{title}</Badge>
+          </div>
+          <CardTitle className="font-heading text-xl tracking-[-0.025em]">{title}</CardTitle>
+          <p className="text-sm leading-5 text-muted-foreground">{description}</p>
+        </CardHeader>
+        <CardContent className="space-y-4 px-4">
+          {isBlocked && launch.blockerSummary ? (
+            <div className="rounded-xl border border-destructive/25 bg-background/80 px-3 py-2 text-sm text-destructive" role="alert">
+              {launch.blockerSummary}
+            </div>
+          ) : null}
+
+          <dl className="divide-y divide-border/65 border-y border-border/65 text-sm">
+            <div className="grid grid-cols-[7rem_minmax(0,1fr)] gap-3 py-2.5"><dt className="text-muted-foreground">{copy.launchStartsLabel}</dt><dd className="font-medium text-foreground">{isScheduled && scheduledStart ? `${scheduledStart}${scheduledEnd ? ` – ${scheduledEnd}` : ""}` : copy.launchImmediateValue}</dd></div>
+            <div className="grid grid-cols-[7rem_minmax(0,1fr)] gap-3 py-2.5"><dt className="text-muted-foreground">{copy.launchRunsWithLabel}</dt><dd className="font-medium text-foreground">{launch.providerLabel} · {launch.runtimeLabel}</dd></div>
+            <div className="grid grid-cols-[7rem_minmax(0,1fr)] gap-3 py-2.5"><dt className="text-muted-foreground">{copy.launchFirstStepLabel}</dt><dd className="font-medium text-foreground">{launch.firstStepLabel}</dd></div>
+            <div className="grid grid-cols-[7rem_minmax(0,1fr)] gap-3 py-2.5"><dt className="text-muted-foreground">{copy.launchResultLabel}</dt><dd className="font-medium text-foreground">{copy.launchResultValue}</dd></div>
+          </dl>
+
+          <section aria-labelledby="launch-stops-title" className="space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <h3 id="launch-stops-title" className="text-sm font-semibold text-foreground">{copy.launchStopsTitle}</h3>
+              <Badge variant="outline">{launch.expectedStops.length}</Badge>
+            </div>
+            {launch.expectedStops.length > 0 ? (
+              <ul className="space-y-2">
+                {launch.expectedStops.map((stop) => (
+                  <li key={stop.id} className="flex items-start gap-2 text-sm">
+                    <Badge variant="secondary" className="mt-0.5 shrink-0">{stop.kind === "approval" ? copy.launchApprovalStop : copy.launchInputStop}</Badge>
+                    <span className="leading-5 text-foreground">{stop.label}</span>
+                  </li>
+                ))}
+              </ul>
+            ) : <p className="text-sm text-muted-foreground">{copy.launchNoStops}</p>}
+          </section>
+
+          {isBlocked ? (
+            launch.recoveryAction === "connect_provider" ? (
+              <Button type="button" className="w-full" onClick={onEditTask} disabled={!onEditTask}>{copy.launchConnectProvider}</Button>
+            ) : (
+              <Button type="button" className="w-full" onClick={onEditTask} disabled={!onEditTask}>{copy.launchEditTask}</Button>
+            )
+          ) : (
+            <Button type="button" size="lg" className="w-full" onClick={onStart} disabled={!launch.canStartManually}>
+              {isScheduled ? copy.launchStartNow : copy.launchStartRun}
+            </Button>
+          )}
+          <p className="text-xs leading-5 text-muted-foreground">
+            {isBlocked ? copy.launchBlockedBoundary : isScheduled ? copy.launchScheduledBoundary : copy.launchManualBoundary}
+          </p>
+        </CardContent>
+      </Card>
+    </aside>
   );
 }
+
 
 function ResultReviewCard({
   review,
@@ -826,7 +901,7 @@ export function TaskWorkspacePlanSection({
               isGraphPlanPending={isGraphPlanPending}
               plan={plan}
               acceptPlanError={null}
-              isReviewingPlan
+              planWorkbenchMode="review"
               planGenerationStatus={planGenerationStatus}
               graphMode={graphMode}
               onGraphModeChange={setGraphMode}
@@ -835,6 +910,52 @@ export function TaskWorkspacePlanSection({
             />
           </section>
           {planReviewDecisionPanel}
+        </div>
+      ) : displayState.mode === "ready_to_run" && displayState.runPreview && !hasGraphExecutionStarted ? (
+        <div className="grid min-h-[560px] flex-1 gap-4 overflow-y-auto p-4 xl:min-h-0 xl:grid-cols-[minmax(0,1fr)_23rem] xl:items-stretch xl:overflow-hidden">
+          <section aria-label={copy.acceptedPlanAria} className="flex min-h-[520px] min-w-0 flex-col overflow-hidden rounded-[1.5rem] border border-border bg-background/70 xl:h-full xl:min-h-0" data-testid="accepted-plan-surface">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/70 bg-card/70 px-4 py-3">
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h2 className="font-heading text-lg font-semibold text-foreground">{copy.acceptedPlanTitle}</h2>
+                  <Badge variant="secondary">{copy.acceptedPlanBadge}</Badge>
+                  <Badge variant="outline">{displayState.runPreview.planVersionLabel}</Badge>
+                </div>
+                <p className="mt-1 text-sm text-muted-foreground">{copy.acceptedPlanDescription}</p>
+              </div>
+              <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                <span>{displayState.runPreview.stepCount} {copy.stepsUnit}</span>
+                {displayState.runPreview.estimatedMinutes ? <span>· {copy.launchAbout} {displayState.runPreview.estimatedMinutes} {copy.launchMinutes}</span> : null}
+                <span>· {displayState.runPreview.expectedStops.length} {copy.launchStopsShort}</span>
+              </div>
+            </div>
+            <div className="min-h-[32rem] flex-1 xl:min-h-0" data-plan-graph-height-contract="fill">
+              <TaskWorkspacePlanContent
+                label={label}
+                graphPlan={graphPlan}
+                isGraphPlanPending={isGraphPlanPending}
+                plan={plan}
+                acceptPlanError={null}
+                planWorkbenchMode="accepted"
+                planGenerationStatus={planGenerationStatus}
+                graphMode={graphMode}
+                onGraphModeChange={setGraphMode}
+                onGeneratePlan={() => onGeneratePlan()}
+                onSelectedNodeChange={setSelectedNode}
+              />
+            </div>
+            {selectedNode ? (
+              <details className="shrink-0 border-t border-border bg-card/65">
+                <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-foreground">{copy.inspectedNodeLabel}: {selectedNode.title}</summary>
+                <div className="border-t border-border/60 p-3"><PlanNodeDetailCard node={selectedNode} copy={copy} /></div>
+              </details>
+            ) : null}
+          </section>
+          <RunLaunchPanel
+            launch={displayState.runPreview}
+            onStart={() => void onDispatchExecutionAction({ action: "start_manual" })}
+            onEditTask={onEditBrief}
+          />
         </div>
       ) : (
         <div className={graphMode === "compact"
@@ -860,7 +981,6 @@ export function TaskWorkspacePlanSection({
               {displayState.panels.planReviewSummary || displayState.panels.runPreview ? (
                 <div className="space-y-3 border-t border-border bg-card/65 p-3">
                   {displayState.panels.planReviewSummary && displayState.planReviewSummary ? <PlanReviewSummaryCard summary={displayState.planReviewSummary} /> : null}
-                  {displayState.panels.runPreview && displayState.runPreview ? <RunPreviewCard preview={displayState.runPreview} /> : null}
                 </div>
               ) : null}
             </div>
@@ -884,7 +1004,7 @@ export function TaskWorkspacePlanSection({
             onAction={focusNodeActions}
             operationPanel={(
               <div className="space-y-2">
-                {displayState.panels.operationPanel ? (
+                {displayState.panels.operationPanel || hasGraphExecutionStarted ? (
                   <TaskWorkspaceOperationPanel
                     taskId={pageData.task.id}
                     state={operationState}

@@ -77,7 +77,7 @@ function renderWithQueryClient(ui: ReactElement) {
 vi.mock("@chrona/i18n/react", async () => {
   const { fallbackMessages } = await import("@chrona/i18n/messages");
   return {
-    useI18n: () => ({ messages: fallbackMessages, t: (key: string) => key }),
+    useI18n: () => ({ locale: "en", messages: fallbackMessages, t: (key: string) => key }),
     useLocale: () => "en",
   };
 });
@@ -238,10 +238,14 @@ describe("TaskWorkspacePlanSection", () => {
         onDispatchExecutionAction={onDispatchExecutionAction}
       />,
     );
-    expect(within(getOperationPanel()).getByRole("button", { name: "Start plan" })).toBeInTheDocument();
-    fireEvent.click(within(getOperationPanel()).getByRole("button", { name: "Start plan" }));
+    const launchPanel = screen.getByRole("complementary", { name: "Run launch controls" });
+    expect(within(launchPanel).getByText("Plan accepted. Execution has not started, and nothing runs until you start it.")).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Accepted plan" })).toBeInTheDocument();
+    expect(screen.queryByText("No execution result yet.")).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Current operation" })).not.toBeInTheDocument();
+    fireEvent.click(within(launchPanel).getByRole("button", { name: "Start run" }));
     expect(onDispatchExecutionAction).toHaveBeenCalledWith({ action: "start_manual" });
-    expect(getCurrentGraphPanel()).toHaveAttribute("data-graph-mode", "full");
+    expect(screen.getAllByRole("button", { name: /Generated plan node/ }).length).toBeGreaterThan(0);
 
     const stoppedNode = createTaskWorkspaceFixtureNode({
       id: "generate",
@@ -465,8 +469,8 @@ describe("TaskWorkspacePlanSection", () => {
       />,
     );
 
-    const operationPanel = screen.getByRole("region", { name: "Current operation" });
-    fireEvent.click(within(operationPanel).getByRole("button", { name: "Start plan" }));
+    const launchPanel = screen.getByRole("complementary", { name: "Run launch controls" });
+    fireEvent.click(within(launchPanel).getByRole("button", { name: "Start run" }));
 
     expect(onDispatchExecutionAction).toHaveBeenCalledWith({ action: "start_manual" });
   });
@@ -494,8 +498,8 @@ describe("TaskWorkspacePlanSection", () => {
       />,
     );
 
-    const operationPanel = screen.getByRole("region", { name: "Current operation" });
-    fireEvent.click(within(operationPanel).getByRole("button", { name: "Start plan" }));
+    const launchPanel = screen.getByRole("complementary", { name: "Run launch controls" });
+    fireEvent.click(within(launchPanel).getByRole("button", { name: "Start run" }));
 
     expect(onDispatchExecutionAction).toHaveBeenCalledWith({ action: "start_manual" });
   });
@@ -518,14 +522,17 @@ describe("TaskWorkspacePlanSection", () => {
     expect(within(executionFlow).getByText(/Use public sources only\./)).toBeInTheDocument();
     expect(within(executionFlow).getByRole("button", { name: /Collect updates/ })).toBeInTheDocument();
     expect(within(executionFlow).queryByTestId("task-plan-graph-panel")).not.toBeInTheDocument();
+    expect(within(executionFlow).getByRole("button", { name: "Use compact brief" })).toHaveAttribute("aria-pressed", "false");
     fireEvent.click(within(executionFlow).getByRole("button", { name: "Flow" }));
     expect(within(executionFlow).getByTestId("task-plan-graph-panel")).toHaveAttribute("data-fill-height", "false");
-    expect(within(executionFlow).getByRole("region", { name: "Plan brief" })).toBeInTheDocument();
-    expect(within(executionFlow).getByText("Research digest plan")).toBeInTheDocument();
+    expect(within(executionFlow).getByText("Two-step plan ready for review.")).toBeInTheDocument();
+    fireEvent.click(within(executionFlow).getByRole("button", { name: "Use compact brief" }));
+    expect(within(executionFlow).getByRole("button", { name: "Show full brief" })).toHaveAttribute("aria-pressed", "true");
     expect(within(executionFlow).queryByText("Two-step plan ready for review.")).not.toBeInTheDocument();
-    expect(within(executionFlow).getByRole("button", { name: "Collect updates" })).toBeInTheDocument();
     fireEvent.click(within(executionFlow).getByRole("button", { name: "Steps" }));
-    expect(within(executionFlow).getByRole("region", { name: "Plan brief" })).toBeInTheDocument();
+    expect(within(executionFlow).getByRole("button", { name: "Show full brief" })).toBeInTheDocument();
+    fireEvent.click(within(executionFlow).getByRole("button", { name: "Show full brief" }));
+    expect(within(executionFlow).getByText("Two-step plan ready for review.")).toBeInTheDocument();
   });
 
   it("keeps plan acceptance prominent and revision scope explicit", () => {
@@ -587,7 +594,7 @@ describe("TaskWorkspacePlanSection", () => {
     expect(screen.queryByText("Running now")).not.toBeInTheDocument();
   });
 
-  it("shows run contract preview before execution starts", () => {
+  it("shows the launch contract before execution starts", () => {
     const acceptedPlan = {
       id: "plan-1",
       status: "accepted",
@@ -612,11 +619,58 @@ describe("TaskWorkspacePlanSection", () => {
       />,
     );
 
-    expect(screen.getByText("Run contract preview")).toBeInTheDocument();
+    const launchPanel = screen.getByRole("complementary", { name: "Run launch controls" });
+    expect(screen.getByRole("region", { name: "Accepted plan" })).toBeInTheDocument();
+    expect(within(launchPanel).getAllByText("Ready to run").length).toBeGreaterThan(0);
     expect(screen.getByText("Revision 2")).toBeInTheDocument();
-    expect(screen.getByText("Manual start")).toBeInTheDocument();
-    expect(screen.getByText("Result requires explicit user acceptance before task is done")).toBeInTheDocument();
-    expect(screen.getByText("Manual start required; Chrona will not run this task unattended")).toBeInTheDocument();
+    expect(within(launchPanel).getByText("Write report")).toBeInTheDocument();
+    expect(within(launchPanel).getByText("Requires your acceptance before the task is done")).toBeInTheDocument();
+    expect(within(launchPanel).getByText("Plan accepted. Execution has not started, and nothing runs until you start it.")).toBeInTheDocument();
+    const acceptedPlanView = screen.getByRole("group", { name: "Accepted plan view" });
+    expect(within(acceptedPlanView).getByRole("button", { name: "Steps" })).toHaveAttribute("aria-pressed", "true");
+    expect(within(acceptedPlanView).getByRole("button", { name: "Flow" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Write report/ })).toBeInTheDocument();
+    expect(screen.queryByText("Run contract preview")).not.toBeInTheDocument();
+    fireEvent.click(within(acceptedPlanView).getByRole("button", { name: "Flow" }));
+    expect(screen.getByTestId("task-plan-graph-panel")).toHaveAttribute("data-graph-mode", "full");
+    expect(screen.queryByText("Needs review")).not.toBeInTheDocument();
+  });
+
+  it("keeps an explicit height chain for the accepted plan graph", () => {
+    const acceptedPlan = {
+      id: "plan-height",
+      status: "accepted",
+      revision: 3,
+      updatedAt: "2026-05-18T00:00:00.000Z",
+    } as TaskPlanReadModel;
+    const graphPlan = createTaskWorkspaceFixtureGraph([
+      createTaskWorkspaceFixtureNode({ id: "collect", title: "Collect sources", status: "ready" }),
+      createTaskWorkspaceFixtureNode({ id: "write", title: "Write report", status: "pending" }),
+      createTaskWorkspaceFixtureNode({ id: "review", title: "Review result", type: "checkpoint", status: "pending" }),
+      createTaskWorkspaceFixtureNode({ id: "publish", title: "Publish", status: "pending" }),
+    ], "collect");
+
+    renderWithQueryClient(
+      <TaskWorkspacePlanSection
+        label="Plan"
+        graphPlan={graphPlan}
+        isGraphPlanPending={false}
+        pageData={createTaskWorkspaceFixturePageData({ task: { savedPlan: acceptedPlan, aiPlanGenerationStatus: "accepted" } })}
+        plan={acceptedPlan}
+        planGenerationStatus="accepted"
+        acceptPlanError={null}
+        runtimeEvents={[]}
+        onGeneratePlan={vi.fn()}
+        onApplyPlan={vi.fn()}
+        onDispatchExecutionAction={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("accepted-plan-surface")).toHaveClass("xl:h-full");
+    expect(document.querySelector('[data-plan-graph-height-contract="fill"]')).toHaveClass("min-h-[32rem]", "flex-1");
+    const acceptedPlanView = screen.getByRole("group", { name: "Accepted plan view" });
+    fireEvent.click(within(acceptedPlanView).getByRole("button", { name: "Flow" }));
+    expect(screen.getByTestId("task-plan-graph-panel")).toHaveAttribute("data-graph-mode", "full");
   });
 
   it("adds checkpoint controls as the current operation after execution starts", async () => {

@@ -36,19 +36,28 @@ export type PlanReviewSummary = {
   changeSummary: string | null;
 };
 
-export type RunPreview = {
+export type RunLaunchExpectedStop = {
+  id: string;
+  label: string;
+  kind: "input" | "approval";
+};
+
+export type RunLaunchView = {
+  readiness: "ready" | "blocked" | "scheduled";
+  startMode: "manual" | "automatic" | "scheduled";
   providerLabel: string;
+  runtimeLabel: string;
   planVersionLabel: string;
-  triggerLabel: string;
-  scheduleLabel: string;
-  capabilityLabels: string[];
-  resultPolicyLabel: string;
-  modeLabel: string;
-  startNodeLabel: string;
-  expectedStops: string[];
-  outputDestinations: string[];
-  automationReadinessLabel: string;
-  previousResultLabel?: string;
+  scheduledStartAt: string | null;
+  scheduledEndAt: string | null;
+  estimatedMinutes: number | null;
+  stepCount: number;
+  firstStepLabel: string;
+  expectedStops: RunLaunchExpectedStop[];
+  resultRequiresAcceptance: true;
+  blockerSummary: string | null;
+  recoveryAction: "connect_provider" | "edit_task" | null;
+  canStartManually: boolean;
 };
 
 export type ResultReview = {
@@ -120,7 +129,7 @@ export type TaskWorkspaceDisplayState = TaskWorkspaceDisplayRule & {
   workState: WorkStateView;
   readiness: TaskPlanningReadiness;
   planReviewSummary: PlanReviewSummary | null;
-  runPreview: RunPreview | null;
+  runPreview: RunLaunchView | null;
   resultReview: ResultReview | null;
 };
 
@@ -181,7 +190,7 @@ export const TASK_WORKSPACE_DISPLAY_RULES: Record<TaskWorkspaceDisplayMode, Task
     primaryAction: "start_run",
     contextRail: "run_readiness",
     collapsedByDefault: ["activity"],
-    panels: panels(["stageBar", "planReviewSummary", "selectedNodeDetails", "selectedNodeQuickActions", "decisionCards", "runPreview", "operationPanel"]),
+    panels: panels(["stageBar", "selectedNodeDetails", "runPreview"]),
   },
   running: {
     mode: "running",
@@ -402,7 +411,7 @@ export function deriveTaskWorkspaceDisplayState(input: {
     workState,
     readiness: deriveTaskPlanningReadiness(input.pageData),
     planReviewSummary: derivePlanReviewSummary(input.graphPlan),
-    runPreview: deriveRunPreview({ pageData: input.pageData, graphPlan: input.graphPlan, currentNode: input.currentNode }),
+    runPreview: deriveRunPreview({ pageData: input.pageData, graphPlan: input.graphPlan }),
     resultReview: deriveResultReview(input.pageData),
   };
 }
@@ -433,37 +442,50 @@ export function derivePlanReviewSummary(graphPlan: TaskPlanGraphPlan | null): Pl
 export function deriveRunPreview(input: {
   pageData: TaskPageData;
   graphPlan: TaskPlanGraphPlan | null;
-  currentNode: PlanNodeDataModel | null;
-}): RunPreview | null {
+}): RunLaunchView | null {
   if (!input.graphPlan || input.graphPlan.nodes.length === 0) return null;
-  const startNode = input.currentNode ?? firstActionableNode(input.graphPlan);
+
+  const { task } = input.pageData;
+  const firstStep = firstActionableNode(input.graphPlan);
+  const runtimeLabel = task.executionRuntime || input.pageData.defaultExecutionRuntime || "Default runtime";
+  const selectedClient = input.pageData.availableAiClients?.find((client) => client.id === task.aiClientId);
+  const providerLabel = selectedClient?.name ?? task.aiClientId ?? "No AI provider";
+  const providerUnavailable = !selectedClient || !selectedClient.enabled;
+  const scheduled = Boolean(task.scheduledStartAt);
+  const startMode = scheduled ? "scheduled" : task.autoExecute ? "automatic" : "manual";
+  const blocked = task.isRunnable === false;
   const expectedStops = input.graphPlan.nodes
-    .filter((node) => node.requiresHumanInput || nodeType(node) === "checkpoint" || node.status === "waiting_for_approval" || node.status === "waiting_for_user")
-    .map((node) => node.title)
-    .slice(0, 5);
-  const artifactCount = input.pageData.artifacts.length;
-  const checkpointCount = input.graphPlan.nodes.filter((node) => node.requiresHumanInput || nodeType(node) === "checkpoint").length;
-  const runtimeLabel = input.pageData.task.executionRuntime || input.pageData.defaultExecutionRuntime || "Default runtime";
-  const aiClientName = input.pageData.availableAiClients?.find((client) => client.id === input.pageData.task.aiClientId)?.name ?? input.pageData.task.aiClientId ?? null;
-  const providerLabel = aiClientName ? `${aiClientName} via ${runtimeLabel}` : runtimeLabel;
-  const automationReadinessLabel = input.pageData.task.isRunnable === false
-    ? input.pageData.task.runnabilitySummary || "Task is not runnable yet"
-    : input.pageData.task.autoExecute
-      ? "Automatic execution will start when schedule, provider, and accepted plan are ready"
-      : "Manual start required; Chrona will not run this task unattended";
+    .filter((node) => node.requiresHumanInput || nodeType(node) === "checkpoint" || node.intent === "approval" || node.intent === "input")
+    .map((node): RunLaunchExpectedStop => ({
+      id: node.id,
+      label: node.title,
+      kind: node.intent === "approval"
+        || node.interactionType === "approve"
+        || node.status === "waiting_for_approval"
+        ? "approval"
+        : "input",
+    }));
+  const estimatedMinutes = input.graphPlan.nodes.reduce(
+    (sum, node) => sum + (typeof node.estimatedMinutes === "number" ? node.estimatedMinutes : 0),
+    0,
+  );
+
   return {
+    readiness: blocked ? "blocked" : scheduled && task.autoExecute ? "scheduled" : "ready",
+    startMode,
     providerLabel,
-    planVersionLabel: input.pageData.task.savedPlan ? `Revision ${input.pageData.task.savedPlan.revision}` : "Current accepted plan",
-    triggerLabel: input.pageData.task.autoExecute ? "Scheduled or automatic when eligible" : "Manual start",
-    scheduleLabel: input.pageData.task.scheduledStartAt ? `${input.pageData.task.scheduledStartAt}${input.pageData.task.scheduledEndAt ? ` -> ${input.pageData.task.scheduledEndAt}` : ""}` : "No scheduled work block",
-    automationReadinessLabel,
-    modeLabel: expectedStops.length > 0 ? "Manual checkpoints" : "Auto where safe",
-    startNodeLabel: startNode?.title ?? "First available step",
+    runtimeLabel,
+    planVersionLabel: task.savedPlan ? `Revision ${task.savedPlan.revision}` : "Current accepted plan",
+    scheduledStartAt: task.scheduledStartAt,
+    scheduledEndAt: task.scheduledEndAt,
+    estimatedMinutes: estimatedMinutes > 0 ? estimatedMinutes : null,
+    stepCount: input.graphPlan.nodes.length,
+    firstStepLabel: firstStep?.title ?? "First available step",
     expectedStops,
-    capabilityLabels: ["Cancel", "Retry", checkpointCount > 0 ? "Resume after approval" : "Resume"],
-    resultPolicyLabel: "Result requires explicit user acceptance before task is done",
-    outputDestinations: ["Task result", artifactCount > 0 ? `${artifactCount} existing artifacts` : "Artifacts", "Activity trail"],
-    previousResultLabel: input.pageData.artifacts.length > 0 ? `${input.pageData.artifacts.length} artifact${input.pageData.artifacts.length === 1 ? "" : "s"} already exist` : undefined,
+    resultRequiresAcceptance: true,
+    blockerSummary: blocked ? task.runnabilitySummary || "Task setup is incomplete" : null,
+    recoveryAction: blocked ? (task.aiClientId && providerUnavailable ? "connect_provider" : "edit_task") : null,
+    canStartManually: !blocked,
   };
 }
 

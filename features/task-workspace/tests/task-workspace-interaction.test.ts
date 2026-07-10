@@ -134,23 +134,50 @@ describe("task workspace interaction model", () => {
     expect(readiness.checks.find((check) => check.id === "description")?.state).toBe("missing");
   });
 
-  it("summarizes plan review, run preview, and expected human stops", () => {
-    const graph = graphPlan();
+  it("derives a manual launch contract without using the inspected node as the start point", () => {
+    const launch = deriveRunPreview({ pageData: pageData(), graphPlan: graphPlan() });
 
-    expect(derivePlanReviewSummary(graph)).toMatchObject({
+    expect(derivePlanReviewSummary(graphPlan())).toMatchObject({
       stepCount: 3,
       aiStepCount: 1,
       checkpointCount: 1,
       estimatedMinutes: 10,
       needsUser: ["Review draft report"],
     });
-    expect(deriveRunPreview({ pageData: pageData(), graphPlan: graph, currentNode: null })).toMatchObject({
-      providerLabel: "OMP via omp",
-      modeLabel: "Manual checkpoints",
-      startNodeLabel: "Fetch trending projects",
-      automationReadinessLabel: "Manual start required; Chrona will not run this task unattended",
-      expectedStops: ["Review draft report"],
+    expect(launch).toMatchObject({
+      readiness: "ready",
+      startMode: "manual",
+      providerLabel: "OMP",
+      runtimeLabel: "omp",
+      firstStepLabel: "Fetch trending projects",
+      stepCount: 3,
+      estimatedMinutes: 10,
+      canStartManually: true,
+      expectedStops: [{ id: "n2", label: "Review draft report", kind: "approval" }],
     });
+  });
+
+  it.each([
+    {
+      name: "scheduled automatic launch",
+      task: { autoExecute: true, scheduledStartAt: "2026-07-10T14:00:00.000Z", scheduledEndAt: "2026-07-10T14:30:00.000Z" },
+      expected: { readiness: "scheduled", startMode: "scheduled", canStartManually: true },
+    },
+    {
+      name: "blocked launch without a provider",
+      task: { aiClientId: "missing", isRunnable: false, runnabilitySummary: "Connect an AI provider" },
+      expected: { readiness: "blocked", recoveryAction: "connect_provider", canStartManually: false, blockerSummary: "Connect an AI provider" },
+    },
+    {
+      name: "blocked launch with incomplete task setup",
+      task: { isRunnable: false, runnabilitySummary: "Task configuration is incomplete" },
+      expected: { readiness: "blocked", recoveryAction: "edit_task", canStartManually: false, blockerSummary: "Task configuration is incomplete" },
+    },
+  ])("derives $name", ({ task, expected }) => {
+    expect(deriveRunPreview({
+      pageData: pageData({ task: { ...pageData().task, ...task } }),
+      graphPlan: graphPlan(),
+    })).toMatchObject(expected);
   });
 
   it("keeps Completed and Done distinct in result review stage copy", () => {

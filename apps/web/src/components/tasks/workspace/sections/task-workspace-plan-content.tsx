@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { GitBranch, ListChecks, Minimize2, Sparkles } from "lucide-react";
+import { Expand, GitBranch, ListChecks, Minimize2, Sparkles } from "lucide-react";
 import { useI18n } from "@chrona/i18n/react";
 import { TaskPlanGraphPanel } from "@/components/tasks/panels/task-plan-graph-panel";
 import type { TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph/types";
@@ -33,7 +33,7 @@ type TaskWorkspacePlanContentProps = {
   isGraphPlanPending: boolean;
   plan: TaskPlanReadModel | null;
   acceptPlanError: string | null;
-  isReviewingPlan?: boolean;
+  planWorkbenchMode?: "review" | "accepted";
   planGenerationStatus: TaskPlanGenerationStatus;
   graphMode: "full" | "compact";
   onGraphModeChange: (mode: "full" | "compact") => void;
@@ -59,12 +59,14 @@ function TaskWorkspacePlanBrief({
   reviewing,
   copy,
   compact = false,
+  onCompactChange,
 }: {
   plan: TaskPlanReadModel;
   graphPlan: TaskPlanGraphPlan;
   reviewing: boolean;
   copy: Record<string, string | undefined>;
   compact?: boolean;
+  onCompactChange: (compact: boolean) => void;
 }) {
   const brief = plan.blueprint ?? plan.compiledPlan ?? {
     title: "Plan",
@@ -85,14 +87,18 @@ function TaskWorkspacePlanBrief({
           </div>
           <p className="mt-0.5 truncate text-xs text-muted-foreground" title={brief.goal}>{brief.goal}</p>
         </div>
-        <div className="flex shrink-0 flex-wrap gap-1.5 text-xs text-muted-foreground">
+        <div className="flex shrink-0 flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
           <Badge variant="outline">{graphPlan.nodes.length} step{graphPlan.nodes.length === 1 ? "" : "s"}</Badge>
           {estimatedMinutes > 0 ? <Badge variant="outline">About {estimatedMinutes} min</Badge> : null}
           {assumptions.length > 0 ? <Badge variant="outline">{assumptions.length} assumption{assumptions.length === 1 ? "" : "s"}</Badge> : null}
+          <Button type="button" variant="ghost" size="sm" className="h-7 rounded-lg px-2 text-xs" onClick={() => onCompactChange(false)} aria-pressed="true">
+            <Expand className="size-3.5" />Show full brief
+          </Button>
         </div>
       </section>
     );
   }
+
   return (
     <section aria-label="Plan brief" className="space-y-2 rounded-xl border border-border/65 bg-background px-3 py-3 shadow-sm">
       <div className="flex min-w-0 flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
@@ -103,10 +109,13 @@ function TaskWorkspacePlanBrief({
           </div>
           <h2 className="text-lg font-semibold tracking-tight text-foreground">{brief.title}</h2>
         </div>
-        <div className="flex shrink-0 flex-wrap gap-2 text-xs text-muted-foreground">
+        <div className="flex shrink-0 flex-wrap items-center gap-2 text-xs text-muted-foreground">
           <Badge variant="outline">{graphPlan.nodes.length} step{graphPlan.nodes.length === 1 ? "" : "s"}</Badge>
           {estimatedMinutes > 0 ? <Badge variant="outline">About {estimatedMinutes} min</Badge> : null}
           {assumptions.length > 0 ? <Badge variant="outline">{assumptions.length} assumption{assumptions.length === 1 ? "" : "s"}</Badge> : null}
+          <Button type="button" variant="ghost" size="sm" className="h-7 rounded-lg px-2 text-xs" onClick={() => onCompactChange(true)} aria-pressed="false">
+            <Minimize2 className="size-3.5" />Use compact brief
+          </Button>
         </div>
       </div>
       <div className="grid gap-2 border-t border-border/55 pt-2 lg:grid-cols-2">
@@ -114,25 +123,10 @@ function TaskWorkspacePlanBrief({
           <h3 className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{copy.planGoal ?? "Goal"}</h3>
           <p className="text-sm leading-5 text-foreground">{brief.goal}</p>
         </div>
-        {plan.summary ? (
-          <div className="space-y-1.5">
-            <h3 className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{copy.planSummaryLabel ?? "Summary"}</h3>
-            <p className="text-sm leading-5 text-foreground">{plan.summary}</p>
-          </div>
-        ) : null}
+        {plan.summary ? <div className="space-y-1.5"><h3 className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{copy.planSummaryLabel ?? "Summary"}</h3><p className="text-sm leading-5 text-foreground">{plan.summary}</p></div> : null}
       </div>
-      {reviewing && assumptions.length > 0 ? (
-        <div className="rounded-lg border border-warning/30 bg-warning/10 px-3 py-2">
-          <h3 className="text-[10px] font-semibold uppercase tracking-[0.12em] text-warning-foreground">{copy.planAssumptions ?? "Assumptions"}</h3>
-          <p className="mt-1 text-xs leading-5 text-foreground">{assumptions.join(" · ")}</p>
-        </div>
-      ) : null}
-      {!reviewing ? (
-        <div className="flex flex-wrap gap-x-3 gap-y-1 border-t border-border/55 pt-3 text-xs text-muted-foreground">
-          {plan.generatedBy ? <span>Generated by {plan.generatedBy}</span> : null}
-          {updatedAt ? <span>Updated {updatedAt}</span> : null}
-        </div>
-      ) : null}
+      {reviewing && assumptions.length > 0 ? <div className="rounded-lg border border-warning/30 bg-warning/10 px-3 py-2"><h3 className="text-[10px] font-semibold uppercase tracking-[0.12em] text-warning-foreground">{copy.planAssumptions ?? "Assumptions"}</h3><p className="mt-1 text-xs leading-5 text-foreground">{assumptions.join(" · ")}</p></div> : null}
+      {!reviewing ? <div className="flex flex-wrap gap-x-3 gap-y-1 border-t border-border/55 pt-3 text-xs text-muted-foreground">{plan.generatedBy ? <span>Generated by {plan.generatedBy}</span> : null}{updatedAt ? <span>Updated {updatedAt}</span> : null}</div> : null}
     </section>
   );
 }
@@ -143,7 +137,7 @@ export function TaskWorkspacePlanContent({
   isGraphPlanPending,
   plan,
   acceptPlanError,
-  isReviewingPlan = false,
+  planWorkbenchMode,
   planGenerationStatus,
   graphMode,
   onGraphModeChange,
@@ -157,6 +151,9 @@ export function TaskWorkspacePlanContent({
     : null;
   const isGeneratingPlan = planGenerationStatus === "generating";
   const [reviewView, setReviewView] = useState<"steps" | "flow">("steps");
+  const [isBriefCompact, setIsBriefCompact] = useState(false);
+  const usesPlanWorkbench = Boolean(planWorkbenchMode);
+  const isReviewingPlan = planWorkbenchMode === "review";
   const requiresGraph = Boolean(graphPlan && (graphPlan.nodes.length > 3 || graphPlan.nodes.some((node) =>
     ["checkpoint", "condition", "wait", "user_input"].includes(node.type ?? node.kind ?? "task")
       || (node.dependencies?.length ?? 0) > 1,
@@ -213,12 +210,12 @@ export function TaskWorkspacePlanContent({
       {graphPlan && plan ? (
         <>
           <div className="border-b border-border/55 p-3">
-            <TaskWorkspacePlanBrief plan={plan} graphPlan={graphPlan} reviewing={isReviewingPlan} compact={isReviewingPlan && reviewView === "flow"} copy={copy} />
+            <TaskWorkspacePlanBrief plan={plan} graphPlan={graphPlan} reviewing={isReviewingPlan} compact={isBriefCompact} onCompactChange={setIsBriefCompact} copy={copy} />
           </div>
-          {isReviewingPlan ? (
+          {usesPlanWorkbench ? (
             <>
               <div className="flex items-center justify-between gap-3 border-b border-border/55 bg-muted/20 px-3 py-2.5">
-                <div className="flex gap-1" role="group" aria-label="Plan review view">
+                <div className="flex gap-1" role="group" aria-label={isReviewingPlan ? (copy.planReviewViewAria ?? "Plan review view") : (copy.acceptedPlanViewAria ?? "Accepted plan view")}>
                   <Button type="button" size="sm" variant={reviewView === "steps" ? "default" : "ghost"} onClick={() => setReviewView("steps")} aria-pressed={reviewView === "steps"}>
                     <ListChecks className="size-4" />{copy.planStepsView ?? "Steps"}
                   </Button>
@@ -238,7 +235,7 @@ export function TaskWorkspacePlanContent({
                           <button type="button" className="flex w-full gap-3 rounded-xl border border-border/65 bg-background px-4 py-3 text-left transition-colors hover:border-primary/40 hover:bg-primary/5" onClick={() => onSelectedNodeChange?.(node, graphPlan.nodes)}>
                             <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">{index + 1}</span>
                             <span className="min-w-0 flex-1">
-                              <span className="flex flex-wrap items-center gap-2"><span className="font-medium text-foreground">{node.title}</span>{needsUser ? <Badge variant="secondary">Needs review</Badge> : null}</span>
+                              <span className="flex flex-wrap items-center gap-2"><span className="font-medium text-foreground">{node.title}</span>{needsUser ? <Badge variant="secondary">{isReviewingPlan ? (copy.planNeedsReview ?? "Needs review") : (copy.planHumanPause ?? "Human pause")}</Badge> : null}</span>
                               {node.objective ? <span className="mt-1 block text-sm leading-5 text-muted-foreground">{node.objective}</span> : null}
                               <span className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
                                 {node.estimatedMinutes ? <span>About {node.estimatedMinutes} min</span> : null}
@@ -263,8 +260,8 @@ export function TaskWorkspacePlanContent({
                 <div className="min-w-0"><p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">{label}</p>{planSummary ? <p className="mt-0.5 truncate text-xs text-muted-foreground">{planSummary}</p> : null}</div>
                 <div className={requiresGraph ? "" : "opacity-70"}>{graphModeControls}</div>
               </div>
-              <div className={requiresGraph ? "min-h-0 flex-1 p-2" : "min-h-0 flex-1 border-t border-border/40 bg-muted/15 p-2 opacity-75"} aria-label={requiresGraph ? "Execution graph" : "Execution graph diagnostics"}>
-                <TaskPlanGraphPanel label={label} plan={graphPlan} mode={graphMode} summary={planSummary} className={graphMode === "compact" ? "min-h-0 min-w-0 w-full flex-1" : "h-[620px] min-w-0 w-full md:h-[760px] xl:h-full"} fillHeight showOverview={graphMode === "full"} onSelectedNodeChange={onSelectedNodeChange} />
+              <div className={requiresGraph ? "min-h-[30rem] flex-1 p-2 xl:min-h-0" : "min-h-[30rem] flex-1 border-t border-border/40 bg-muted/15 p-2 opacity-75 xl:min-h-0"} aria-label={requiresGraph ? "Execution graph" : "Execution graph diagnostics"}>
+                <TaskPlanGraphPanel label={label} plan={graphPlan} mode={graphMode} summary={planSummary} className={graphMode === "compact" ? "min-h-0 min-w-0 w-full flex-1" : "min-h-[28rem] min-w-0 w-full md:min-h-[36rem] xl:h-full xl:min-h-0"} fillHeight showOverview={graphMode === "full"} onSelectedNodeChange={onSelectedNodeChange} />
               </div>
             </>
           )}
