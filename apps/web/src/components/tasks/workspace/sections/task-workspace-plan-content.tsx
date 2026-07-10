@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ChevronDown, ChevronUp, GitBranch, Minimize2, Sparkles } from "lucide-react";
+import { GitBranch, ListChecks, Minimize2, Sparkles } from "lucide-react";
 import { useI18n } from "@chrona/i18n/react";
 import { TaskPlanGraphPanel } from "@/components/tasks/panels/task-plan-graph-panel";
 import type { TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph/types";
@@ -18,8 +18,14 @@ const DEFAULT_COPY = {
   graphCompactMode: "Focus map",
   graphFullHint: "Dependencies and all paths",
   graphCompactHint: "Current path and blockers",
+  planGoal: "Goal",
+  planSummaryLabel: "Summary",
+  planAssumptions: "Assumptions",
+  planSteps: "Execution steps",
+  planStepsView: "Steps",
+  planFlowView: "Flow",
+  planFlowHint: "Inspect dependencies and branches",
 };
-
 
 type TaskWorkspacePlanContentProps = {
   label: string;
@@ -27,6 +33,7 @@ type TaskWorkspacePlanContentProps = {
   isGraphPlanPending: boolean;
   plan: TaskPlanReadModel | null;
   acceptPlanError: string | null;
+  isReviewingPlan?: boolean;
   planGenerationStatus: TaskPlanGenerationStatus;
   graphMode: "full" | "compact";
   onGraphModeChange: (mode: "full" | "compact") => void;
@@ -49,9 +56,15 @@ function formatPlanUpdatedAt(value: string | null | undefined): string | null {
 function TaskWorkspacePlanBrief({
   plan,
   graphPlan,
+  reviewing,
+  copy,
+  compact = false,
 }: {
   plan: TaskPlanReadModel;
   graphPlan: TaskPlanGraphPlan;
+  reviewing: boolean;
+  copy: Record<string, string | undefined>;
+  compact?: boolean;
 }) {
   const brief = plan.blueprint ?? plan.compiledPlan ?? {
     title: "Plan",
@@ -59,92 +72,67 @@ function TaskWorkspacePlanBrief({
     assumptions: [],
   };
   const assumptions = brief.assumptions ?? [];
-  const [isExpanded, setIsExpanded] = useState(false);
-  const assumptionCountLabel = assumptions.length === 1 ? "1 assumption" : `${assumptions.length} assumptions`;
   const estimatedMinutes = graphPlan.nodes.reduce((sum, node) => sum + (node.estimatedMinutes ?? 0), 0);
-  const requiresGraph = graphPlan.nodes.length > 3 || graphPlan.nodes.some((node) =>
-    ["checkpoint", "condition", "wait", "user_input"].includes(node.type ?? node.kind ?? "task")
-      || (node.dependencies?.length ?? 0) > 1,
-  );
   const updatedAt = formatPlanUpdatedAt(plan.updatedAt);
 
+  if (compact) {
+    return (
+      <section aria-label="Plan brief" className="flex min-w-0 flex-col gap-2 rounded-xl border border-border/65 bg-background px-3 py-2.5 shadow-sm lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
+            <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-primary">Plan brief</span>
+            <span className="truncate text-sm font-semibold text-foreground">{brief.title}</span>
+          </div>
+          <p className="mt-0.5 truncate text-xs text-muted-foreground" title={brief.goal}>{brief.goal}</p>
+        </div>
+        <div className="flex shrink-0 flex-wrap gap-1.5 text-xs text-muted-foreground">
+          <Badge variant="outline">{graphPlan.nodes.length} step{graphPlan.nodes.length === 1 ? "" : "s"}</Badge>
+          {estimatedMinutes > 0 ? <Badge variant="outline">About {estimatedMinutes} min</Badge> : null}
+          {assumptions.length > 0 ? <Badge variant="outline">{assumptions.length} assumption{assumptions.length === 1 ? "" : "s"}</Badge> : null}
+        </div>
+      </section>
+    );
+  }
   return (
-    <section
-      aria-label="Plan brief"
-      className="rounded-xl border border-border/65 bg-background/85 px-3 py-2 shadow-none"
-    >
+    <section aria-label="Plan brief" className="space-y-2 rounded-xl border border-border/65 bg-background px-3 py-3 shadow-sm">
       <div className="flex min-w-0 flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0 space-y-1">
-          <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
             <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-primary">Plan brief</span>
-            <span className="min-w-0 truncate text-sm font-semibold text-foreground" title={brief.title}>{brief.title}</span>
-            <Badge variant="secondary" className="h-4 px-1.5 text-[10px]">{plan.status}</Badge>
+            <Badge variant="secondary" className="h-5 text-[10px]">{plan.status}</Badge>
           </div>
-          <p className="line-clamp-1 text-xs leading-5 text-muted-foreground" title={brief.goal}>Goal: {brief.goal}</p>
-          {plan.summary ? <p className="line-clamp-1 text-xs leading-5 text-foreground/85" title={plan.summary}>Summary: {plan.summary}</p> : null}
+          <h2 className="text-lg font-semibold tracking-tight text-foreground">{brief.title}</h2>
         </div>
-        <div className="flex shrink-0 flex-col items-end gap-1.5 text-xs text-muted-foreground lg:self-stretch lg:justify-between">
-          <div className="flex flex-wrap items-center justify-end gap-1.5">
-            <Badge variant="outline" className="h-4 px-1.5 text-[10px]">{graphPlan.nodes.length} steps</Badge>
-            {estimatedMinutes > 0 ? <Badge variant="outline" className="h-4 px-1.5 text-[10px]">{estimatedMinutes} min</Badge> : null}
-            <Badge variant="outline" className="h-4 px-1.5 text-[10px]">{assumptionCountLabel}</Badge>
-          </div>
-          <Button
-            type="button"
-            variant="secondary"
-            size="sm"
-            className="h-7 rounded-lg px-2.5 text-xs font-medium shadow-sm"
-            aria-expanded={isExpanded}
-            onClick={() => setIsExpanded((value) => !value)}
-          >
-            {isExpanded ? "Hide details" : "Show details"}
-            {isExpanded ? <ChevronUp className="size-3.5" aria-hidden="true" /> : <ChevronDown className="size-3.5" aria-hidden="true" />}
-          </Button>
+        <div className="flex shrink-0 flex-wrap gap-2 text-xs text-muted-foreground">
+          <Badge variant="outline">{graphPlan.nodes.length} step{graphPlan.nodes.length === 1 ? "" : "s"}</Badge>
+          {estimatedMinutes > 0 ? <Badge variant="outline">About {estimatedMinutes} min</Badge> : null}
+          {assumptions.length > 0 ? <Badge variant="outline">{assumptions.length} assumption{assumptions.length === 1 ? "" : "s"}</Badge> : null}
         </div>
       </div>
-      {isExpanded ? (
-        <div className="mt-3 max-h-64 space-y-3 overflow-auto border-t border-border/55 pt-3 text-sm">
-          <div className="space-y-1">
-            <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">Goal</p>
-            <p className="leading-6 text-foreground">{brief.goal}</p>
+      <div className="grid gap-2 border-t border-border/55 pt-2 lg:grid-cols-2">
+        <div className="space-y-1.5">
+          <h3 className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{copy.planGoal ?? "Goal"}</h3>
+          <p className="text-sm leading-5 text-foreground">{brief.goal}</p>
+        </div>
+        {plan.summary ? (
+          <div className="space-y-1.5">
+            <h3 className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{copy.planSummaryLabel ?? "Summary"}</h3>
+            <p className="text-sm leading-5 text-foreground">{plan.summary}</p>
           </div>
-          {plan.summary ? (
-            <div className="space-y-1">
-              <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">Summary</p>
-              <p className="leading-6 text-foreground">{plan.summary}</p>
-            </div>
-          ) : null}
-          {assumptions.length > 0 ? (
-            <div className="space-y-1">
-              <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">Assumptions</p>
-              <ul className="space-y-1 text-muted-foreground">
-                {assumptions.map((assumption) => (
-                  <li key={assumption} className="flex gap-2 leading-6">
-                    <span aria-hidden="true" className="mt-2.5 size-1.5 shrink-0 rounded-full bg-primary/70" />
-                    <span>{assumption}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          ) : null}
-          <div className="space-y-1">
-            <p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">Steps</p>
-            <ol className="space-y-1 text-muted-foreground">
-              {graphPlan.nodes.map((node, index) => (
-                <li key={node.id} className="flex gap-2 leading-6">
-                  <span className="font-medium text-foreground">{index + 1}.</span>
-                  <span>{node.title}{node.objective ? ` — ${node.objective}` : ""}</span>
-                </li>
-              ))}
-            </ol>
-          </div>
-          <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
-            {plan.generatedBy ? <span>Generated by {plan.generatedBy}</span> : null}
-            {updatedAt ? <span>Updated {updatedAt}</span> : null}
-          </div>
+        ) : null}
+      </div>
+      {reviewing && assumptions.length > 0 ? (
+        <div className="rounded-lg border border-warning/30 bg-warning/10 px-3 py-2">
+          <h3 className="text-[10px] font-semibold uppercase tracking-[0.12em] text-warning-foreground">{copy.planAssumptions ?? "Assumptions"}</h3>
+          <p className="mt-1 text-xs leading-5 text-foreground">{assumptions.join(" · ")}</p>
         </div>
       ) : null}
-      {!requiresGraph ? <p className="mt-2 text-xs text-muted-foreground">Simple plan: review the concise steps above. The execution graph remains available in Diagnostics.</p> : null}
+      {!reviewing ? (
+        <div className="flex flex-wrap gap-x-3 gap-y-1 border-t border-border/55 pt-3 text-xs text-muted-foreground">
+          {plan.generatedBy ? <span>Generated by {plan.generatedBy}</span> : null}
+          {updatedAt ? <span>Updated {updatedAt}</span> : null}
+        </div>
+      ) : null}
     </section>
   );
 }
@@ -155,6 +143,7 @@ export function TaskWorkspacePlanContent({
   isGraphPlanPending,
   plan,
   acceptPlanError,
+  isReviewingPlan = false,
   planGenerationStatus,
   graphMode,
   onGraphModeChange,
@@ -162,11 +151,12 @@ export function TaskWorkspacePlanContent({
   onSelectedNodeChange,
 }: TaskWorkspacePlanContentProps) {
   const { messages } = useI18n();
-  const copy = { ...DEFAULT_COPY, ...(messages.components.taskWorkspace) };
+  const copy = { ...DEFAULT_COPY, ...(messages.components.taskWorkspace) } as Record<string, string | undefined> & typeof DEFAULT_COPY;
   const planSummary = graphPlan && plan
-    ? `${plan.status} / ${graphPlan.nodes.length} steps / ${graphPlan.nodes.reduce((sum, node) => sum + (node.estimatedMinutes ?? 0), 0)} min`
+    ? `${plan.status} / ${graphPlan.nodes.length} step${graphPlan.nodes.length === 1 ? "" : "s"} / ${graphPlan.nodes.reduce((sum, node) => sum + (node.estimatedMinutes ?? 0), 0)} min`
     : null;
   const isGeneratingPlan = planGenerationStatus === "generating";
+  const [reviewView, setReviewView] = useState<"steps" | "flow">("steps");
   const requiresGraph = Boolean(graphPlan && (graphPlan.nodes.length > 3 || graphPlan.nodes.some((node) =>
     ["checkpoint", "condition", "wait", "user_input"].includes(node.type ?? node.kind ?? "task")
       || (node.dependencies?.length ?? 0) > 1,
@@ -222,30 +212,62 @@ export function TaskWorkspacePlanContent({
     <div className="flex h-full min-h-0 flex-col">
       {graphPlan && plan ? (
         <>
-          <div className="flex min-w-0 flex-col gap-2 border-b border-border/55 bg-muted/35 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
-            <div className="min-w-0">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">{label}</p>
-              {planSummary ? <p className="mt-0.5 truncate text-xs text-muted-foreground">{planSummary}</p> : null}
-            </div>
-            <div className={requiresGraph ? "" : "opacity-70"}>{graphModeControls}</div>
+          <div className="border-b border-border/55 p-3">
+            <TaskWorkspacePlanBrief plan={plan} graphPlan={graphPlan} reviewing={isReviewingPlan} compact={isReviewingPlan && reviewView === "flow"} copy={copy} />
           </div>
-          <div className="border-b border-border/55 p-2">
-            <TaskWorkspacePlanBrief plan={plan} graphPlan={graphPlan} />
-          </div>
-          <div className={requiresGraph ? "min-h-0 flex-1 p-2" : "min-h-0 flex-1 border-t border-border/40 bg-muted/15 p-2 opacity-75"} aria-label={requiresGraph ? "Execution graph" : "Execution graph diagnostics"}>
-            <TaskPlanGraphPanel
-              label={label}
-              plan={graphPlan}
-              mode={graphMode}
-              summary={planSummary}
-              className={graphMode === "compact"
-                ? "min-h-0 min-w-0 w-full flex-1"
-                : "h-[620px] min-w-0 w-full md:h-[760px] xl:h-full"}
-              fillHeight
-              showOverview={graphMode === "full"}
-              onSelectedNodeChange={onSelectedNodeChange}
-            />
-          </div>
+          {isReviewingPlan ? (
+            <>
+              <div className="flex items-center justify-between gap-3 border-b border-border/55 bg-muted/20 px-3 py-2.5">
+                <div className="flex gap-1" role="group" aria-label="Plan review view">
+                  <Button type="button" size="sm" variant={reviewView === "steps" ? "default" : "ghost"} onClick={() => setReviewView("steps")} aria-pressed={reviewView === "steps"}>
+                    <ListChecks className="size-4" />{copy.planStepsView ?? "Steps"}
+                  </Button>
+                  <Button type="button" size="sm" variant={reviewView === "flow" ? "default" : "ghost"} onClick={() => setReviewView("flow")} aria-pressed={reviewView === "flow"}>
+                    <GitBranch className="size-4" />{copy.planFlowView ?? "Flow"}
+                  </Button>
+                </div>
+                <p className="hidden text-xs text-muted-foreground md:block">{reviewView === "steps" ? `${graphPlan.nodes.length} step${graphPlan.nodes.length === 1 ? "" : "s"} in execution order` : (copy.planFlowHint ?? "Inspect dependencies and branches")}</p>
+              </div>
+              {reviewView === "steps" ? (
+                <div className="min-h-0 flex-1 overflow-y-auto p-3" aria-label={copy.planSteps ?? "Execution steps"}>
+                  <ol className="space-y-2">
+                    {graphPlan.nodes.map((node, index) => {
+                      const needsUser = Boolean(node.requiresHumanInput || node.checkpoint || ["checkpoint", "condition", "wait", "user_input"].includes(node.type ?? node.kind ?? "task"));
+                      return (
+                        <li key={node.id}>
+                          <button type="button" className="flex w-full gap-3 rounded-xl border border-border/65 bg-background px-4 py-3 text-left transition-colors hover:border-primary/40 hover:bg-primary/5" onClick={() => onSelectedNodeChange?.(node, graphPlan.nodes)}>
+                            <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">{index + 1}</span>
+                            <span className="min-w-0 flex-1">
+                              <span className="flex flex-wrap items-center gap-2"><span className="font-medium text-foreground">{node.title}</span>{needsUser ? <Badge variant="secondary">Needs review</Badge> : null}</span>
+                              {node.objective ? <span className="mt-1 block text-sm leading-5 text-muted-foreground">{node.objective}</span> : null}
+                              <span className="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                                {node.estimatedMinutes ? <span>About {node.estimatedMinutes} min</span> : null}
+                                {(node.dependencies?.length ?? 0) > 0 ? <span>After {node.dependencies?.length} step{node.dependencies?.length === 1 ? "" : "s"}</span> : <span>No dependencies</span>}
+                              </span>
+                            </span>
+                          </button>
+                        </li>
+                      );
+                    })}
+                  </ol>
+                </div>
+              ) : (
+                <div className="min-h-0 flex-1 p-2" aria-label="Execution graph">
+                  <TaskPlanGraphPanel label={label} plan={graphPlan} mode="full" summary={planSummary} className="min-h-[520px] min-w-0 w-full" showOverview onSelectedNodeChange={onSelectedNodeChange} />
+                </div>
+              )}
+          </>
+          ) : (
+            <>
+              <div className="flex min-w-0 flex-col gap-2 border-b border-border/55 bg-muted/35 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
+                <div className="min-w-0"><p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">{label}</p>{planSummary ? <p className="mt-0.5 truncate text-xs text-muted-foreground">{planSummary}</p> : null}</div>
+                <div className={requiresGraph ? "" : "opacity-70"}>{graphModeControls}</div>
+              </div>
+              <div className={requiresGraph ? "min-h-0 flex-1 p-2" : "min-h-0 flex-1 border-t border-border/40 bg-muted/15 p-2 opacity-75"} aria-label={requiresGraph ? "Execution graph" : "Execution graph diagnostics"}>
+                <TaskPlanGraphPanel label={label} plan={graphPlan} mode={graphMode} summary={planSummary} className={graphMode === "compact" ? "min-h-0 min-w-0 w-full flex-1" : "h-[620px] min-w-0 w-full md:h-[760px] xl:h-full"} fillHeight showOverview={graphMode === "full"} onSelectedNodeChange={onSelectedNodeChange} />
+              </div>
+            </>
+          )}
           {acceptPlanError ? <p className="border-t border-border/55 px-3 py-2 text-xs text-destructive">{acceptPlanError}</p> : null}
         </>
       ) : (

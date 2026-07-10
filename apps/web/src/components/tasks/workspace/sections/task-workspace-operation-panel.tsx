@@ -21,7 +21,7 @@ type TaskWorkspaceOperationPanelProps = {
   onStartPlan: () => void;
   onRestartPlan?: () => void;
   onTaskPrimaryAction?: () => void;
-  revisionPanel: ReactNode;
+  revisionPanel?: ReactNode;
 };
 
 function operationToneClass(tone: TaskWorkspaceOperationState["tone"]) {

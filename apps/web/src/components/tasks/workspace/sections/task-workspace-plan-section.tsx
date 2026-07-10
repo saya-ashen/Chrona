@@ -150,7 +150,8 @@ function PlanNodeDetailCard({ node, copy }: { node: PlanNodeDataModel | null; co
   );
 }
 
-function StageBarCard({ stage }: { stage: TaskWorkspaceDisplayState["stage"] }) {
+function StageBarCard({ stage, displayMode }: { stage: TaskWorkspaceDisplayState["stage"]; displayMode: TaskWorkspaceDisplayState["mode"] }) {
+  const visibleStage = displayMode === "reviewing_plan" ? "review" : stage.stage;
   const stages: Array<{ id: typeof stage.stage; label: string }> = [
     { id: "brief", label: "Brief" },
     { id: "plan", label: "Plan" },
@@ -158,9 +159,9 @@ function StageBarCard({ stage }: { stage: TaskWorkspaceDisplayState["stage"] }) 
     { id: "run", label: "Run" },
     { id: "result", label: "Result" },
   ];
-  const activeIndex = stages.findIndex((item) => item.id === stage.stage);
+  const activeIndex = stages.findIndex((item) => item.id === visibleStage);
   return (
-    <div className="flex min-w-0 flex-col gap-3 border-b border-border/70 px-4 py-3 lg:flex-row lg:items-center lg:justify-between" data-ui-surface-kind="runtime-control">
+    <div className="flex min-w-0 flex-col gap-2 border-b border-border/70 px-4 py-2 lg:flex-row lg:items-center lg:justify-between" data-ui-surface-kind="runtime-control">
       <ol className="flex min-w-0 items-center gap-1.5 text-xs" aria-label="Task stage">
         {stages.map((item, index) => (
           <li key={item.id} className="flex min-w-0 items-center gap-1.5">
@@ -453,8 +454,10 @@ function FollowUpComposerCard({ textareaRef }: { textareaRef?: Ref<HTMLTextAreaE
   );
 }
 
-function PlanRevisionPanel({
+function PlanReviewDecisionPanel({
   copy,
+  plan,
+  graphPlan,
   canAcceptPlan,
   isGeneratingPlan,
   visibleGenerationInstruction,
@@ -466,6 +469,8 @@ function PlanRevisionPanel({
   onRevisePlan,
 }: {
   copy: WorkspaceCopy;
+  plan: TaskPlanReadModel;
+  graphPlan: TaskPlanGraphPlan;
   canAcceptPlan?: boolean;
   isGeneratingPlan: boolean;
   visibleGenerationInstruction: string | null;
@@ -474,45 +479,73 @@ function PlanRevisionPanel({
   selectedNode: PlanNodeDataModel | null;
   onInstructionChange: (value: string) => void;
   onAcceptPlan: () => void;
-  onRevisePlan: () => void;
+  onRevisePlan: (selectedNodeId: string | null) => void;
 }) {
+  const [isRevising, setIsRevising] = useState(false);
+  const [revisionScope, setRevisionScope] = useState<"plan" | "step">("plan");
+  const humanSteps = graphPlan.nodes.filter((node) => Boolean(node.requiresHumanInput || node.checkpoint || ["checkpoint", "user_input"].includes(node.type ?? node.kind ?? "task"))).length;
+  const estimatedMinutes = graphPlan.nodes.reduce((sum, node) => sum + (node.estimatedMinutes ?? 0), 0);
+
   return (
-    <Card size="sm" className="border-primary/15 bg-background/85 py-3" role="region" aria-label={copy.planRevisionTitle ?? "Plan revision"}>
-      <CardHeader className="gap-1 px-3">
-        <CardTitle className="text-sm">{copy.planRevisionTitle ?? "Revise plan"}</CardTitle>
-        <p className="text-xs text-muted-foreground">
-          {selectedNode
-            ? `Ask Chrona to revise selected step: ${selectedNode.title}`
-            : (copy.planRevisionIntro ?? "Ask Chrona to revise this draft plan.")}
-        </p>
-      </CardHeader>
-      <CardContent className="space-y-3 px-3">
-        {visibleGenerationInstruction ? (
-          <div className="rounded-lg border border-border/60 bg-muted/35 px-2.5 py-2 text-xs">
-            <div className="font-medium text-muted-foreground">{copy.instructionLabel ?? "Last revision request"}</div>
-            <div className="mt-1 text-foreground">{visibleGenerationInstruction}</div>
+    <aside className="space-y-2 xl:sticky xl:top-3 xl:self-start" aria-label="Plan review decision">
+      <Card className="gap-2 border-primary/25 bg-primary/5 py-3 shadow-sm" data-ui-surface-kind="runtime-control">
+        <CardHeader className="gap-1.5 px-3">
+          <div className="flex items-center justify-between gap-2">
+            <Badge variant="secondary">Plan ready for review</Badge>
+            <span className="text-xs text-muted-foreground">Revision {plan.revision}</span>
           </div>
-        ) : null}
-        <label className="block space-y-1.5 text-xs font-medium text-foreground">
-          <span>{copy.instructionAria ?? "Plan revision message"}</span>
-          <Textarea
-            value={revisionInstruction}
-            onChange={(event) => onInstructionChange(event.target.value)}
-            placeholder={copy.instructionPlaceholder ?? "Tell Chrona what to change in this draft plan..."}
-            rows={3}
-          />
-        </label>
-        <div className="flex flex-wrap gap-2">
-          <Button type="button" size="sm" onClick={onAcceptPlan} disabled={!canAcceptPlan}>
-            {copy.acceptPlan ?? copy.accept ?? "Accept plan"}
-          </Button>
-          <Button type="button" size="sm" variant="secondary" onClick={onRevisePlan} disabled={isGeneratingPlan}>
-            {isGeneratingPlan ? (copy.generating ?? "Revising...") : (copy.revisePlanWithAi ?? "Ask AI to revise plan")}
-          </Button>
-        </div>
-        {acceptPlanError ? <p className="text-xs text-destructive">{acceptPlanError}</p> : null}
-      </CardContent>
-    </Card>
+          <CardTitle className="text-base">Review before continuing</CardTitle>
+          <p className="text-xs leading-5 text-muted-foreground">Confirm that the steps, assumptions, and user checkpoints match your intent.</p>
+        </CardHeader>
+        <CardContent className="space-y-2 px-3">
+          <dl className="grid grid-cols-3 gap-2 rounded-lg border border-border/60 bg-background/75 p-2 text-center">
+            <div><dt className="text-[10px] uppercase tracking-wide text-muted-foreground">Steps</dt><dd className="mt-1 font-semibold">{graphPlan.nodes.length}</dd></div>
+            <div><dt className="text-[10px] uppercase tracking-wide text-muted-foreground">Time</dt><dd className="mt-1 font-semibold">{estimatedMinutes > 0 ? `~${estimatedMinutes}m` : "—"}</dd></div>
+            <div><dt className="text-[10px] uppercase tracking-wide text-muted-foreground">Needs you</dt><dd className="mt-1 font-semibold">{humanSteps}</dd></div>
+          </dl>
+          <div className="rounded-lg border border-border/60 bg-background/75 px-3 py-2 text-xs leading-5 text-muted-foreground">
+            <span className="font-semibold text-foreground">What happens next: </span>
+            Accepting saves this plan. Execution does not start until you continue from the next step.
+          </div>
+          <div className="grid gap-2">
+            <Button type="button" className="w-full" onClick={onAcceptPlan} disabled={!canAcceptPlan || isGeneratingPlan}>
+              {copy.acceptPlan ?? copy.accept ?? "Accept plan"}
+            </Button>
+            <Button type="button" className="w-full" variant="outline" onClick={() => setIsRevising((value) => !value)} aria-expanded={isRevising}>
+              {isRevising ? "Cancel changes" : "Request changes"}
+            </Button>
+          </div>
+          {acceptPlanError ? <p className="text-xs text-destructive" role="alert">{acceptPlanError}</p> : null}
+        </CardContent>
+      </Card>
+
+      {selectedNode ? <PlanNodeDetailCard node={selectedNode} copy={copy} /> : null}
+
+      {isRevising ? (
+        <Card size="sm" className="border-border bg-background py-3" role="region" aria-label={copy.planRevisionTitle ?? "Plan revision"}>
+          <CardHeader className="gap-1 px-3">
+            <CardTitle className="text-sm">What should Chrona change?</CardTitle>
+            <p className="text-xs text-muted-foreground">Choose the scope explicitly. Selecting a step for inspection does not change it.</p>
+          </CardHeader>
+          <CardContent className="space-y-3 px-3">
+            {visibleGenerationInstruction ? (
+              <div className="rounded-lg border border-border/60 bg-muted/35 px-2.5 py-2 text-xs"><div className="font-medium text-muted-foreground">{copy.instructionLabel ?? "Last revision request"}</div><div className="mt-1 text-foreground">{visibleGenerationInstruction}</div></div>
+            ) : null}
+            <div className="grid gap-2" role="radiogroup" aria-label="Revision scope">
+              <Button type="button" size="sm" variant={revisionScope === "plan" ? "secondary" : "ghost"} className="justify-start" role="radio" aria-checked={revisionScope === "plan"} onClick={() => setRevisionScope("plan")}>Entire plan</Button>
+              <Button type="button" size="sm" variant={revisionScope === "step" ? "secondary" : "ghost"} className="justify-start" role="radio" aria-checked={revisionScope === "step"} disabled={!selectedNode} onClick={() => setRevisionScope("step")}>{selectedNode ? `Selected step: ${selectedNode.title}` : "Select a step to revise it"}</Button>
+            </div>
+            <label className="block space-y-1.5 text-xs font-medium text-foreground">
+              <span>{copy.instructionAria ?? "Plan revision message"}</span>
+              <Textarea value={revisionInstruction} onChange={(event) => onInstructionChange(event.target.value)} placeholder={copy.instructionPlaceholder ?? "Tell Chrona what to change in this draft plan..."} rows={4} />
+            </label>
+            <Button type="button" className="w-full" onClick={() => onRevisePlan(revisionScope === "step" ? selectedNode?.id ?? null : null)} disabled={isGeneratingPlan || !revisionInstruction.trim()}>
+              {isGeneratingPlan ? (copy.generating ?? "Revising...") : "Generate revised plan"}
+            </Button>
+          </CardContent>
+        </Card>
+      ) : null}
+    </aside>
   );
 }
 
@@ -698,9 +731,11 @@ export function TaskWorkspacePlanSection({
       actionsPanel.scrollIntoView({ block: "nearest", behavior: "smooth" });
     }
   };
-  const revisionPanel = plan ? (
-    <PlanRevisionPanel
+  const planReviewDecisionPanel = plan && graphPlan ? (
+    <PlanReviewDecisionPanel
       copy={copy}
+      plan={plan}
+      graphPlan={graphPlan}
       canAcceptPlan={canAcceptPlan}
       isGeneratingPlan={isGeneratingPlan}
       visibleGenerationInstruction={visibleGenerationInstruction}
@@ -708,14 +743,12 @@ export function TaskWorkspacePlanSection({
       revisionInstruction={regenerationInstruction}
       selectedNode={selectedNode}
       onInstructionChange={setRegenerationInstruction}
-      onAcceptPlan={() => {
-        void onApplyPlan(plan);
-      }}
-      onRevisePlan={() => {
+      onAcceptPlan={() => void onApplyPlan(plan)}
+      onRevisePlan={(selectedNodeId) => {
         const userInstruction = regenerationInstruction.trim();
         setSubmittedRevisionInstruction(userInstruction || null);
         setRegenerationInstruction("");
-        onGeneratePlan({ userInstruction, selectedNodeId: selectedNode?.id ?? null });
+        onGeneratePlan({ userInstruction, selectedNodeId });
       }}
     />
   ) : null;
@@ -749,7 +782,7 @@ export function TaskWorkspacePlanSection({
           ) : null}
         </div>
       ) : null}
-      {displayState.panels.stageBar ? <StageBarCard stage={displayState.stage} /> : null}
+      {displayState.panels.stageBar ? <StageBarCard stage={displayState.stage} displayMode={displayState.mode} /> : null}
       {displayState.layout === "brief_focus" ? (
         displayState.mode === "planning" ? (
           <PlanGenerationProgressPanel />
@@ -783,6 +816,25 @@ export function TaskWorkspacePlanSection({
               </div>
             )}
           />
+        </div>
+      ) : displayState.mode === "reviewing_plan" ? (
+        <div className="grid min-h-[560px] flex-1 gap-3 overflow-y-auto p-3 xl:min-h-0 xl:grid-cols-[minmax(0,1fr)_22rem] xl:items-start">
+          <section aria-label={copy.executionFlow ?? "Execution flow"} className="flex min-h-[520px] min-w-0 flex-col overflow-hidden rounded-[1.5rem] border border-border bg-background/70 xl:min-h-0">
+            <TaskWorkspacePlanContent
+              label={label}
+              graphPlan={graphPlan}
+              isGraphPlanPending={isGraphPlanPending}
+              plan={plan}
+              acceptPlanError={null}
+              isReviewingPlan
+              planGenerationStatus={planGenerationStatus}
+              graphMode={graphMode}
+              onGraphModeChange={setGraphMode}
+              onGeneratePlan={() => onGeneratePlan()}
+              onSelectedNodeChange={setSelectedNode}
+            />
+          </section>
+          {planReviewDecisionPanel}
         </div>
       ) : (
         <div className={graphMode === "compact"
@@ -842,7 +894,6 @@ export function TaskWorkspacePlanSection({
                     onStartPlan={() => void onDispatchExecutionAction({ action: "start_manual" })}
                     onRestartPlan={() => void onDispatchExecutionAction({ action: "restart_from_beginning" })}
                     onTaskPrimaryAction={primaryActionDispatch ? () => void onDispatchExecutionAction(primaryActionDispatch) : undefined}
-                    revisionPanel={revisionPanel}
                   />
                 ) : null}
                 {displayState.panels.resultReview && displayState.resultReview ? <ResultReviewCard review={displayState.resultReview} onAcceptResult={onAcceptResult} onRequestChanges={() => followUpComposerRef.current?.focus()} isAcceptingResult={isAcceptingResult} acceptResultError={acceptResultError} /> : null}

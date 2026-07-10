@@ -13,12 +13,13 @@ vi.mock("elkjs/lib/elk.bundled.js", () => ({
 }));
 
 vi.mock("@/components/tasks/panels/task-plan-graph-panel", () => ({
-  TaskPlanGraphPanel: ({ plan, mode, onSelectedNodeChange }: {
+  TaskPlanGraphPanel: ({ plan, mode, fillHeight, onSelectedNodeChange }: {
     plan: { nodes: Array<{ id: string; title: string; objective?: string; status?: string }> };
     mode?: "full" | "compact";
+    fillHeight?: boolean;
     onSelectedNodeChange?: (node: { id: string; title: string; objective?: string; status?: string }, nodes: Array<{ id: string; title: string; objective?: string; status?: string }>) => void;
   }) => (
-    <div data-testid="task-plan-graph-panel" data-graph-mode={mode ?? "full"}>
+    <div data-testid="task-plan-graph-panel" data-graph-mode={mode ?? "full"} data-fill-height={fillHeight ? "true" : "false"}>
       {plan.nodes.map((node) => (
         <button
           key={node.id}
@@ -215,11 +216,11 @@ describe("TaskWorkspacePlanSection", () => {
         onDispatchExecutionAction={onDispatchExecutionAction}
       />,
     );
-    expect(screen.getByTestId("task-plan-node-generate")).toHaveTextContent("Generated plan node");
-    expect(within(getOperationPanel()).getByRole("button", { name: "Accept" })).toBeInTheDocument();
-    fireEvent.click(screen.getByTestId("task-plan-node-generate"));
+    expect(screen.getByRole("button", { name: /Generated plan node/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Accept" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Generated plan node/ }));
     expect(screen.queryByRole("dialog", { name: "Selected node details" })).not.toBeInTheDocument();
-    fireEvent.click(within(getOperationPanel()).getByRole("button", { name: "Accept" }));
+    fireEvent.click(screen.getByRole("button", { name: "Accept" }));
     await waitFor(() => expect(onApplyPlan).toHaveBeenCalledWith(draftPlan));
 
     const accepted = mount(
@@ -499,137 +500,57 @@ describe("TaskWorkspacePlanSection", () => {
     expect(onDispatchExecutionAction).toHaveBeenCalledWith({ action: "start_manual" });
   });
 
-  it("shows plan brief metadata without exposing the full planning prompt", () => {
+  it("shows a readable review document before accepting a generated plan", () => {
     const plan = {
-      id: "plan-brief",
-      status: "accepted",
-      revision: 2,
-      prompt: "Original long planning prompt that should stay out of the plan graph brief.",
-      summary: "Two-step plan ready for execution.",
-      generatedBy: "Claude",
-      updatedAt: "2026-05-18T00:00:00.000Z",
-      blueprint: {
-        title: "Research digest plan",
-        goal: "Collect and summarize AI research updates.",
-        assumptions: ["Use public sources only.", "Keep findings concise."],
-        nodes: [],
-        edges: [],
-      },
-      compiledPlan: {
-        title: "Research digest plan",
-        goal: "Collect and summarize AI research updates.",
-        assumptions: ["Use public sources only.", "Keep findings concise."],
-      },
-      effectivePlan: {},
+      id: "plan-1", status: "draft", revision: 1, summary: "Two-step plan ready for review.", generatedBy: "Claude", updatedAt: "2026-05-18T00:00:00.000Z",
+      blueprint: { title: "Research digest plan", goal: "Collect and summarize AI research updates.", assumptions: ["Use public sources only.", "Keep findings concise."], nodes: [], edges: [] },
+      compiledPlan: { title: "Research digest plan", goal: "Collect and summarize AI research updates.", assumptions: ["Use public sources only.", "Keep findings concise."] }, effectivePlan: {},
     } as unknown as TaskPlanReadModel;
     const graphPlan = createTaskWorkspaceFixtureGraph([
-      createTaskWorkspaceFixtureNode({ id: "collect", title: "Collect updates", status: "ready", estimatedMinutes: 12 }),
-      createTaskWorkspaceFixtureNode({ id: "summarize", title: "Summarize findings", status: "pending", estimatedMinutes: 8 }),
+      createTaskWorkspaceFixtureNode({ id: "collect", title: "Collect updates", objective: "Gather trusted source links", status: "ready", estimatedMinutes: 12 }),
+      createTaskWorkspaceFixtureNode({ id: "summarize", title: "Summarize findings", objective: "Produce a concise digest", status: "pending", estimatedMinutes: 8 }),
     ], "collect");
-
-    renderWithQueryClient(
-      <TaskWorkspacePlanSection
-        label="Plan"
-        graphPlan={graphPlan}
-        isGraphPlanPending={false}
-        pageData={createTaskWorkspaceFixturePageData({ task: { savedPlan: plan, aiPlanGenerationStatus: "accepted" } })}
-        plan={plan}
-        planGenerationStatus="accepted"
-        acceptPlanError={null}
-        runtimeEvents={[]}
-        onGeneratePlan={vi.fn()}
-        onApplyPlan={vi.fn()}
-        onDispatchExecutionAction={vi.fn()}
-      />,
-    );
-
+    renderWithQueryClient(<TaskWorkspacePlanSection label="Plan" graphPlan={graphPlan} isGraphPlanPending={false} pageData={createTaskWorkspaceFixturePageData({ task: { savedPlan: plan, aiPlanGenerationStatus: "waiting_acceptance" } })} plan={plan} planGenerationStatus="waiting_acceptance" canAcceptPlan acceptPlanError={null} runtimeEvents={[]} onGeneratePlan={vi.fn()} onApplyPlan={vi.fn()} onDispatchExecutionAction={vi.fn()} />);
     const executionFlow = screen.getByRole("region", { name: "Execution flow" });
-    expect(within(executionFlow).getByText("Plan brief")).toBeInTheDocument();
     expect(within(executionFlow).getByText("Research digest plan")).toBeInTheDocument();
-    expect(within(executionFlow).getByText("Goal: Collect and summarize AI research updates.")).toBeInTheDocument();
-    expect(within(executionFlow).getByText("Summary: Two-step plan ready for execution.")).toBeInTheDocument();
-    expect(within(executionFlow).getByText("2 assumptions")).toBeInTheDocument();
-    expect(within(executionFlow).getByText("accepted")).toBeInTheDocument();
-    expect(within(executionFlow).getByText("2 steps")).toBeInTheDocument();
-    expect(within(executionFlow).getByText("20 min")).toBeInTheDocument();
-    expect(within(executionFlow).queryByText("Use public sources only.")).not.toBeInTheDocument();
-    const showDetailsButton = within(executionFlow).getByRole("button", { name: "Show details" });
-    expect(showDetailsButton.querySelector("svg")).toBeInTheDocument();
-    fireEvent.click(showDetailsButton);
-    expect(within(executionFlow).getByText("Goal")).toBeInTheDocument();
     expect(within(executionFlow).getByText("Collect and summarize AI research updates.")).toBeInTheDocument();
-    expect(within(executionFlow).getByText("Summary")).toBeInTheDocument();
-    expect(within(executionFlow).getByText("Two-step plan ready for execution.")).toBeInTheDocument();
-    expect(within(executionFlow).getByText("Assumptions")).toBeInTheDocument();
-    expect(within(executionFlow).getByText("Use public sources only.")).toBeInTheDocument();
-    expect(within(executionFlow).getByText("Keep findings concise.")).toBeInTheDocument();
-    expect(within(executionFlow).getByText("Generated by Claude")).toBeInTheDocument();
-    const hideDetailsButton = within(executionFlow).getByRole("button", { name: "Hide details" });
-    expect(hideDetailsButton).toHaveAttribute("aria-expanded", "true");
-    expect(hideDetailsButton.querySelector("svg")).toBeInTheDocument();
-    expect(within(executionFlow).queryByText("Original long planning prompt that should stay out of the plan graph brief.")).not.toBeInTheDocument();
+    expect(within(executionFlow).getByText("Two-step plan ready for review.")).toBeInTheDocument();
+    expect(within(executionFlow).getByText(/Use public sources only\./)).toBeInTheDocument();
+    expect(within(executionFlow).getByRole("button", { name: /Collect updates/ })).toBeInTheDocument();
+    expect(within(executionFlow).queryByTestId("task-plan-graph-panel")).not.toBeInTheDocument();
+    fireEvent.click(within(executionFlow).getByRole("button", { name: "Flow" }));
+    expect(within(executionFlow).getByTestId("task-plan-graph-panel")).toHaveAttribute("data-fill-height", "false");
+    expect(within(executionFlow).getByRole("region", { name: "Plan brief" })).toBeInTheDocument();
+    expect(within(executionFlow).getByText("Research digest plan")).toBeInTheDocument();
+    expect(within(executionFlow).queryByText("Two-step plan ready for review.")).not.toBeInTheDocument();
+    expect(within(executionFlow).getByRole("button", { name: "Collect updates" })).toBeInTheDocument();
+    fireEvent.click(within(executionFlow).getByRole("button", { name: "Steps" }));
+    expect(within(executionFlow).getByRole("region", { name: "Plan brief" })).toBeInTheDocument();
   });
 
-  it("shows accept and AI revision chat with selected node detail before plan acceptance", () => {
+  it("keeps plan acceptance prominent and revision scope explicit", () => {
     const onApplyPlan = vi.fn().mockResolvedValue(undefined);
     const onGeneratePlan = vi.fn();
-    const draftPlan = {
-      id: "plan-1",
-      status: "draft",
-      revision: 1,
-      prompt: "Prefer a smaller plan and keep the first step manual.",
-      updatedAt: "2026-05-18T00:00:00.000Z",
-    } as TaskPlanReadModel;
+    const draftPlan = { id: "plan-1", status: "draft", revision: 1, prompt: "Prefer a smaller plan.", updatedAt: "2026-05-18T00:00:00.000Z" } as TaskPlanReadModel;
     const readyNode = createTaskWorkspaceFixtureNode({ id: "ready", title: "Collect sources", objective: "Gather source links", status: "ready", nextAction: "Start execution" });
-    const graphPlan = createTaskWorkspaceFixtureGraph([
-      readyNode,
-    ], "ready");
-
-    renderWithQueryClient(
-      <TaskWorkspacePlanSection
-        label="Plan"
-        graphPlan={graphPlan}
-        isGraphPlanPending={false}
-        pageData={createTaskWorkspaceFixturePageData()}
-        plan={draftPlan}
-        planGenerationStatus="waiting_acceptance"
-        canAcceptPlan
-        acceptPlanError={null}
-        runtimeEvents={[]}
-        onGeneratePlan={onGeneratePlan}
-        onApplyPlan={onApplyPlan}
-        onDispatchExecutionAction={vi.fn()}
-      />,
-    );
-
-    const operationPanel = screen.getByRole("region", { name: "Current operation" });
-    const executionFlow = screen.getByRole("region", { name: "Execution flow" });
-
-    expect(within(operationPanel).getByText("Last revision request")).toBeInTheDocument();
-    expect(within(operationPanel).getAllByText("Prefer a smaller plan and keep the first step manual.").length).toBeGreaterThan(0);
-    expect(within(operationPanel).getByText("Ask Chrona to revise this draft plan.")).toBeInTheDocument();
-    expect(within(executionFlow).queryByText("Last revision request")).not.toBeInTheDocument();
-    expect(within(operationPanel).queryByRole("button", { name: "Start plan" })).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByTestId("task-plan-node-ready"));
-    expect(within(executionFlow).getByRole("region", { name: "Selected node details" })).toHaveTextContent("Collect sources");
-    expect(within(executionFlow).getByText("Gather source links")).toBeInTheDocument();
-    expect(within(operationPanel).getByText("Ask Chrona to revise selected step: Collect sources")).toBeInTheDocument();
-
-    const revisionMessage = within(operationPanel).getByRole("textbox", { name: "Plan revision message" });
-    fireEvent.change(revisionMessage, {
-      target: { value: "Add a verification step before accepting the final output." },
-    });
-    fireEvent.click(within(operationPanel).getByRole("button", { name: "Accept" }));
-    fireEvent.click(within(operationPanel).getByRole("button", { name: "Ask AI to revise plan" }));
-    expect(revisionMessage).toHaveValue("");
-    expect(within(operationPanel).getByText("Add a verification step before accepting the final output.")).toBeInTheDocument();
-
+    renderWithQueryClient(<TaskWorkspacePlanSection label="Plan" graphPlan={createTaskWorkspaceFixtureGraph([readyNode], "ready")} isGraphPlanPending={false} pageData={createTaskWorkspaceFixturePageData({ task: { savedPlan: draftPlan, aiPlanGenerationStatus: "waiting_acceptance" } })} plan={draftPlan} planGenerationStatus="waiting_acceptance" canAcceptPlan acceptPlanError={null} runtimeEvents={[]} onGeneratePlan={onGeneratePlan} onApplyPlan={onApplyPlan} onDispatchExecutionAction={vi.fn()} />);
+    const decision = screen.getByRole("complementary", { name: "Plan review decision" });
+    expect(within(decision).getByText("Plan ready for review")).toBeInTheDocument();
+    expect(within(decision).getByText(/Execution does not start/)).toBeInTheDocument();
+    expect(within(decision).getByRole("button", { name: "Accept" })).toBeInTheDocument();
+    expect(within(decision).queryByRole("textbox", { name: "Plan revision message" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Collect sources/ }));
+    fireEvent.click(within(decision).getByRole("button", { name: "Request changes" }));
+    expect(within(decision).getByRole("radio", { name: "Entire plan" })).toHaveAttribute("aria-checked", "true");
+    const selectedScope = within(decision).getByRole("radio", { name: "Selected step: Collect sources" });
+    expect(selectedScope).toHaveAttribute("aria-checked", "false");
+    fireEvent.click(selectedScope);
+    const revisionMessage = within(decision).getByRole("textbox", { name: "Plan revision message" });
+    fireEvent.change(revisionMessage, { target: { value: "Add a verification step." } });
+    fireEvent.click(within(decision).getByRole("button", { name: "Generate revised plan" }));
+    expect(onGeneratePlan).toHaveBeenCalledWith({ userInstruction: "Add a verification step.", selectedNodeId: "ready" });
+    fireEvent.click(within(decision).getByRole("button", { name: "Accept" }));
     expect(onApplyPlan).toHaveBeenCalledWith(draftPlan);
-    expect(onGeneratePlan).toHaveBeenCalledWith({
-      userInstruction: "Add a verification step before accepting the final output.",
-      selectedNodeId: "ready",
-    });
   });
 
   it("shows running spinner in Current operation instead of Results", () => {

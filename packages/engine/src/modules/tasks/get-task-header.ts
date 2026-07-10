@@ -321,7 +321,7 @@ export function resolveTaskHeaderViewModel(input: BuildHeaderSpecInput & { now?:
     workspaceStateGuidance: workStateGuidance,
     status,
     statusLabel: taskStatusLabel({ status, executionStatus: currentExecution.status, taskStatus: scopedTaskStatus }),
-    progressLabel: `${totalSteps} steps · ${completedSteps} accepted · ${progressPercent}%`,
+    progressLabel: `${totalSteps} step${totalSteps === 1 ? "" : "s"} · ${completedSteps} accepted · ${progressPercent}%`,
     priorityLabel: task.priority,
     priorityTone: priorityTone(task.priority),
     occurrenceLabel: occurrenceWindow ? `Occurrence · ${occurrenceWindow}` : null,

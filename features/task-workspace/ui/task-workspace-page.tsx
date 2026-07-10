@@ -35,6 +35,7 @@ type TaskWorkspaceHeaderEditorProps = {
   onGeneratePlan: Parameters<typeof TaskWorkspaceHeaderCard>[0]["onGeneratePlan"];
   onStopPlanGeneration: Parameters<typeof TaskWorkspaceHeaderCard>[0]["onStopPlanGeneration"];
   hideGeneratePlan?: boolean;
+  hideAcceptPlan?: boolean;
   onRecoveryRetry: Parameters<typeof TaskWorkspaceHeaderCard>[0]["onRecoveryRetry"];
   onRecoveryEditInstruction: Parameters<typeof TaskWorkspaceHeaderCard>[0]["onRecoveryEditInstruction"];
   onRecoveryCancel: Parameters<typeof TaskWorkspaceHeaderCard>[0]["onRecoveryCancel"];
@@ -93,6 +94,7 @@ function TaskWorkspaceHeaderEditor({
   onGeneratePlan,
   onStopPlanGeneration,
   hideGeneratePlan,
+  hideAcceptPlan,
   onRecoveryRetry,
   onRecoveryEditInstruction,
   onRecoveryCancel,
@@ -114,6 +116,7 @@ function TaskWorkspaceHeaderEditor({
         onAction={onAction}
         onAcceptPlan={onAcceptPlan}
         onGeneratePlan={onGeneratePlan}
+        hideAcceptPlan={hideAcceptPlan}
         hideGeneratePlan={hideGeneratePlan}
         onStopPlanGeneration={onStopPlanGeneration}
         onEdit={onToggleEditExpanded}
@@ -257,6 +260,7 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
           onGeneratePlan={handleGeneratePlanFromHeader}
           onStopPlanGeneration={handleStopPlanGeneration}
           hideGeneratePlan={planGenerationStatus === "idle" && !plan}
+          hideAcceptPlan={planGenerationStatus === "waiting_acceptance" && Boolean(plan)}
           onAction={async (action) => {
             if (action.id === "start") {
               await dispatchExecutionAction({ action: "start_manual" });
