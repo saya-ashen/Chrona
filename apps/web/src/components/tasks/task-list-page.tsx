@@ -370,11 +370,19 @@ export function TaskListPage({ tasks, workspaceId: _workspaceId, copy, total, pa
   const navigate = useNavigate();
   const view = searchParams.get("view") === "results" ? "results" : "tasks";
   const resultDate = searchParams.get("resultDate") ?? "all";
+  const resultStatus = searchParams.get("resultStatus") ?? "all";
+  const resultSource = searchParams.get("resultSource") ?? "all";
   const resultCutoff = resultDate === "7d" ? Date.now() - 7 * 86400000 : resultDate === "30d" ? Date.now() - 30 * 86400000 : null;
   const resultCandidates = view === "results"
-    ? tasks.filter((task) => task.stateView.state === "result_ready" || task.stateView.state === "done" || Boolean(task.result))
+    ? tasks.filter((task) => (
+        (task.stateView.state === "result_ready" || task.stateView.state === "done" || Boolean(task.result)) &&
+        (resultStatus === "all" || (resultStatus === "needs-review" ? task.stateView.state === "result_ready" : task.stateView.state === "done")) &&
+        (resultSource === "all" || task.id === resultSource)
+      ))
     : tasks;
-  const visibleTasks = resultCutoff === null ? resultCandidates : resultCandidates.filter((task) => new Date(task.updatedAt).getTime() >= resultCutoff);
+  const visibleTasks = resultCutoff === null
+    ? resultCandidates
+    : resultCandidates.filter((task) => new Date(task.result?.executedAt ?? task.updatedAt).getTime() >= resultCutoff);
   const taskCopy = copy.pages.tasks;
 
   const filterParam = searchParams.get("filter");
@@ -503,6 +511,17 @@ export function TaskListPage({ tasks, workspaceId: _workspaceId, copy, total, pa
           <Select value={resultDate} onValueChange={(value) => setParam("resultDate", value === "all" ? "" : value)}>
             <SelectTrigger size="sm" className="w-40" aria-label="Result date"><SelectValue /></SelectTrigger>
             <SelectContent><SelectItem value="all">Any date</SelectItem><SelectItem value="7d">Last 7 days</SelectItem><SelectItem value="30d">Last 30 days</SelectItem></SelectContent>
+          <Select value={resultStatus} onValueChange={(value) => setParam("resultStatus", value === "all" ? "" : value)}>
+            <SelectTrigger size="sm" className="w-40" aria-label="Result status"><SelectValue /></SelectTrigger>
+            <SelectContent><SelectItem value="all">Any status</SelectItem><SelectItem value="accepted">Accepted</SelectItem><SelectItem value="needs-review">Needs review</SelectItem></SelectContent>
+          </Select>
+          <Select value={resultSource} onValueChange={(value) => setParam("resultSource", value === "all" ? "" : value)}>
+            <SelectTrigger size="sm" className="w-48" aria-label="Source task"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Any source task</SelectItem>
+              {tasks.filter((task) => task.result).map((task) => <SelectItem key={task.id} value={task.id}>{task.title}</SelectItem>)}
+            </SelectContent>
+          </Select>
           </Select>
         ) : null}
 
