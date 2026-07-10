@@ -679,4 +679,25 @@ describe("auto-start-scheduled-plan", () => {
     expect(result.started).toEqual([]);
     expect(startMock).not.toHaveBeenCalled();
   });
+  it("claims one occurrence once across duplicate scheduler scans and restart", async () => {
+    const workspace = await createWorkspace();
+    const { task, workBlock } = await createDueTask(workspace.id);
+    startMock.mockResolvedValue({ taskId: task.id, planId: "run-once" });
+    const now = new Date();
+
+    const [first, duplicate] = await Promise.all([
+      autoStartScheduledPlanTasks({ now }),
+      autoStartScheduledPlanTasks({ now }),
+    ]);
+    const afterRestart = await autoStartScheduledPlanTasks({ now: new Date(now.getTime() + 60_000) });
+
+    expect(startMock).toHaveBeenCalledTimes(1);
+    expect([...first.started, ...duplicate.started]).toHaveLength(1);
+    expect(afterRestart.started).toEqual([]);
+    expect(
+      await db.event.count({
+        where: { taskId: task.id, workBlockId: workBlock.id, eventType: "task.auto_start.triggered" },
+      }),
+    ).toBe(1);
+  });
 });

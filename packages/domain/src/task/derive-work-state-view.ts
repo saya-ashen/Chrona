@@ -295,8 +295,8 @@ function deriveState(input: DeriveWorkStateViewInput): WorkStateCanonical {
 
   if (blockerState === "blocked") return "blocked";
   if (
-    isOneOf(input.executionStatus, ["blocked", "degraded"]) ||
-    isOneOf(input.taskStatus, ["blocked", "degraded", "attention_needed"])
+    isOneOf(input.executionStatus, ["blocked"]) ||
+    isOneOf(input.taskStatus, ["blocked", "attention_needed"])
   )
     return "blocked";
   if (
@@ -311,9 +311,9 @@ function deriveState(input: DeriveWorkStateViewInput): WorkStateCanonical {
   )
     return "cancelled";
   if (
-    isOneOf(input.executionStatus, ["running", "started", "in_progress", "active"]) ||
+    isOneOf(input.executionStatus, ["running", "started"]) ||
     isOneOf(input.operationStatus, ["execution_running", "execution_action"]) ||
-    isOneOf(input.taskStatus, ["running", "in_progress", "active"])
+    isOneOf(input.taskStatus, ["running"])
   )
     return "running";
   if (

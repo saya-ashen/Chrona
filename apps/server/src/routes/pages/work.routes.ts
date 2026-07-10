@@ -226,10 +226,14 @@ function planGenerationStateUpdate(event: GeneratePlanSSEEvent): Record<string, 
         "/plan/generation/header-action-disabled": false,
       };
     case "cancelled":
-    case "done":
       return {
         "/plan/status": "idle",
-        "/plan/generation/status": event.type,
+        "/plan/generation/status": "cancelled",
+        "/plan/generation/is-running": false,
+        "/plan/generation/header-action-disabled": false,
+      };
+    case "done":
+      return {
         "/plan/generation/is-running": false,
         "/plan/generation/header-action-disabled": false,
       };

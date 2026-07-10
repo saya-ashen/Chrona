@@ -5,7 +5,7 @@ import {
   type TaskListFilter,
   type TaskListSortField,
 } from "@chrona/contracts/api";
-import { deriveTaskProjectionStateView } from "@chrona/domain";
+import { deriveWorkStateView } from "@chrona/domain";
 
 export type ListTasksInput = {
   workspaceId: string;
@@ -38,7 +38,8 @@ function buildWhere(input: ListTasksInput): Prisma.TaskWhereInput {
   const where: Prisma.TaskWhereInput = { workspaceId: input.workspaceId };
 
   if (statuses) where.status = { in: statuses };
-  if (input.priority) where.priority = input.priority as Prisma.TaskWhereInput["priority"];
+  if (input.priority)
+    where.priority = input.priority as Prisma.TaskWhereInput["priority"];
   if (input.search) {
     where.OR = [
       { title: { contains: input.search } },
@@ -99,6 +100,16 @@ export async function listTasksByWorkspace(input: ListTasksInput) {
       where,
       include: {
         projection: true,
+        runs: {
+          orderBy: { createdAt: "desc" },
+          take: 1,
+          select: { id: true, status: true, runtimeName: true, workBlockId: true, createdAt: true },
+        },
+        artifacts: {
+          orderBy: { createdAt: "desc" },
+          take: 1,
+          select: { id: true, title: true, type: true, uri: true, runId: true, createdAt: true },
+        },
         importedCalendarEvents: {
           take: 1,
           include: {
@@ -119,20 +130,34 @@ export async function listTasksByWorkspace(input: ListTasksInput) {
   // Derive the task source from a linked imported calendar event so the UI can
   // mark externally-synced tasks. Tasks created in Chrona have no linked event
   // and report a null source (fully editable).
-  const tasks = rows.map(({ importedCalendarEvents, ...task }) => {
+  const tasks = rows.map(({ importedCalendarEvents, runs, artifacts, ...task }) => {
     const importedEvent = importedCalendarEvents[0] ?? null;
-    const stateView = deriveTaskProjectionStateView({
-      taskStatus: task.status,
-      persistedStatus: task.projection?.persistedStatus,
-      scheduleStatus: task.projection?.scheduleStatus,
-      displayState: task.projection?.displayState,
-      latestRunStatus: task.projection?.latestRunStatus,
-      isScheduled: Boolean(task.projection?.scheduledStartAt || task.projection?.scheduledEndAt || task.dueAt),
+    const latestRun = runs[0] ?? null;
+    const latestArtifact = artifacts[0] ?? null;
+    const stateView = deriveWorkStateView({
+      taskStatus: task.projection?.persistedStatus ?? task.status,
+      executionStatus:
+        task.projection?.displayState ?? task.projection?.latestRunStatus,
       disabledReason: task.projection?.actionRequired,
     });
     return {
       ...task,
       stateView,
+      result: latestRun ? {
+        runId: latestRun.id,
+        runStatus: latestRun.status,
+        provider: latestRun.runtimeName,
+        occurrenceId: latestRun.workBlockId,
+        executedAt: latestRun.createdAt,
+        artifact: latestArtifact,
+      } : latestArtifact ? {
+        runId: latestArtifact.runId,
+        runStatus: null,
+        provider: null,
+        occurrenceId: null,
+        executedAt: latestArtifact.createdAt,
+        artifact: latestArtifact,
+      } : null,
       source: importedEvent
         ? {
             source: "external_calendar" as const,

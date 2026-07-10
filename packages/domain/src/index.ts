@@ -2,8 +2,6 @@ export * from "./task/derive-task-state";
 export * from "./task/derive-task-execution-state";
 export * from "./task/derive-task-static-state";
 export * from "./task/derive-schedule-state";
-export * from "./task/derive-work-item-state-view";
-export * from "./task/derive-task-projection-state-view";
 export * from "./task/derive-work-state-view";
 export * from "./task/derive-automation-policy-preview";
 export * from "./task/derive-user-facing-failure";

@@ -1,4 +1,5 @@
 import { automationTimingOffsetMs, normalizeAutomationTiming } from "@chrona/contracts";
+import { deriveAutomationPolicyPreview } from "@chrona/domain";
 
 export type AutoStartSkipReason =
   | "not_scheduled"
@@ -9,7 +10,8 @@ export type AutoStartSkipReason =
   | "no_accepted_plan"
   | "requires_human_input"
   | "requires_approval"
-  | "runtime_unsupported";
+  | "runtime_unsupported"
+  | "automation_not_ready";
 
 type AutoStartEligibility =
   | {
@@ -27,6 +29,13 @@ export type TaskLike = {
   executionRuntime?: string | null;
   hasAcceptedPlan?: boolean;
   autoExecuteTiming?: string | null;
+  providerId?: string | null;
+  providerName?: string | null;
+  providerConfigured?: boolean;
+  providerTested?: boolean;
+  providerReachable?: boolean;
+  planningCapable?: boolean;
+  executionCapable?: boolean;
 };
 
 export type WorkBlockLike = {
@@ -51,6 +60,7 @@ const AUTO_START_DISABLED_REASONS: Record<AutoStartSkipReason, string> = {
   requires_human_input: "Automatic execution is paused until the requested input is provided.",
   requires_approval: "Automatic execution is paused until the approval request is resolved.",
   runtime_unsupported: "The selected runtime cannot be started automatically.",
+  automation_not_ready: "Automation is not ready to start.",
 };
 
 function blocked(reason: AutoStartSkipReason): AutoStartEligibility {
@@ -88,6 +98,23 @@ export function deriveAutoStartEligibility(input: {
 
   if (!ALLOWABLE_START_STATUSES.some((s) => s === input.task.status)) {
     return blocked("invalid_task_status");
+  }
+
+  const policy = deriveAutomationPolicyPreview({
+    scheduledStartAt,
+    autoPlanGeneration: true,
+    autoExecute: true,
+    hasAcceptedPlan: input.task.hasAcceptedPlan,
+    providerId: input.task.providerId ?? input.task.executionRuntime,
+    providerName: input.task.providerName ?? input.task.executionRuntime,
+    providerConfigured: input.task.providerConfigured,
+    providerTested: input.task.providerTested,
+    providerReachable: input.task.providerReachable,
+    planningCapable: input.task.planningCapable,
+    executionCapable: input.task.executionCapable,
+  });
+  if (policy.disabledReason && policy.readiness !== "plan_acceptance_required") {
+    return { ok: false, reason: "automation_not_ready", disabledReason: policy.disabledReason };
   }
 
   const activeRun = input.activeRun;

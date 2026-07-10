@@ -5,6 +5,7 @@ import { deriveAutoStartEligibility } from "@/modules/scheduling/derive-auto-sta
 import { appendCanonicalEvent } from "@/modules/events";
 import { publishTaskWorkspaceUpdatedEvent } from "@/modules/projections/task-projection-events";
 import { AUTOMATION_TIMING_PRESETS, automationTimingOffsetMs } from "@chrona/contracts";
+import { automationOccurrenceKey } from "@chrona/domain";
 
 const MAX_AUTOMATION_TIMING_OFFSET_MS = Math.max(
   ...AUTOMATION_TIMING_PRESETS.map((preset) => automationTimingOffsetMs(preset)),
@@ -115,9 +116,30 @@ export async function autoStartScheduledPlanTasks(input?: { now?: Date }): Promi
         continue;
       }
 
-      await db.workBlock.update({
-        where: { id: block.id },
+      const claim = await db.workBlock.updateMany({
+        where: { id: block.id, status: "Scheduled" },
         data: { status: "Active", startedAt: now },
+      });
+      if (claim.count !== 1) {
+        result.skipped.push({ taskId: task.id, workBlockId: block.id, reason: "This occurrence was already claimed." });
+        continue;
+      }
+
+      const occurrenceKey = automationOccurrenceKey({
+        taskId: task.id,
+        workBlockId: block.id,
+        scheduledStartAt: block.scheduledStartAt,
+      });
+      await appendCanonicalEvent({
+        eventType: "task.auto_start.triggered",
+        workspaceId: task.workspaceId,
+        taskId: task.id,
+        workBlockId: block.id,
+        actorType: "system",
+        actorId: "auto-start-scheduler",
+        source: "scheduler",
+        payload: { occurrenceKey, scheduledStartAt: block.scheduledStartAt?.toISOString() ?? null },
+        dedupeKey: `task.auto_start.triggered:${occurrenceKey ?? block.id}`,
       });
 
       const startedRun = await taskPlanExecution.start({ taskId: task.id, trigger: "scheduler", workBlockId: block.id });

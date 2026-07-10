@@ -1,7 +1,7 @@
 import { db } from "@/lib/db";
 import {
   buildPlanningSummary,
-  deriveTaskProjectionStateView,
+  deriveWorkStateView,
   formatDateKey,
   startOfDay,
 } from "@chrona/domain";
@@ -12,7 +12,10 @@ import {
 import type { TaskPlanReadModel } from "@chrona/contracts/ai";
 import { deriveTaskRunnability } from "@chrona/shared";
 import { getAcceptedCompiledPlanForTask } from "@/modules/plan-execution/persistence/execution-scope";
-import { getLatestTaskPlanReadModel, resolveSavedPlanEffectiveGraph } from "@/modules/plans/task-plan-read-model";
+import {
+  getLatestTaskPlanReadModel,
+  resolveSavedPlanEffectiveGraph,
+} from "@/modules/plans/task-plan-read-model";
 import { isTaskPlanGenerationRunning } from "@/modules/plans/task-plan-generation-registry";
 import { deriveAutoStartEligibility } from "@/modules/scheduling/derive-auto-start-eligibility";
 
@@ -25,15 +28,18 @@ function stateViewFor(item: {
   scheduledEndAt: Date | null;
   isRunnable?: boolean;
   actionRequired?: string | null;
-  aiPlanGenerationStatus?: "idle" | "generating" | "waiting_acceptance" | "accepted";
+  aiPlanGenerationStatus?:
+    "idle" | "generating" | "waiting_acceptance" | "accepted";
 }) {
-  return deriveTaskProjectionStateView({
-    persistedStatus: item.persistedStatus,
-    scheduleStatus: item.scheduleStatus,
+  return deriveWorkStateView({
+    taskStatus: item.persistedStatus,
+    executionStatus: item.displayState ?? item.latestRunStatus,
     planStatus: item.aiPlanGenerationStatus,
-    displayState: item.displayState,
-    latestRunStatus: item.latestRunStatus,
-    isScheduled: Boolean(item.scheduledStartAt || item.scheduledEndAt),
+    planGenerationStatus: item.aiPlanGenerationStatus,
+    hasPlan:
+      item.aiPlanGenerationStatus != null &&
+      item.aiPlanGenerationStatus !== "idle",
+    hasAcceptedPlan: item.aiPlanGenerationStatus === "accepted",
     isRunnable: item.isRunnable,
     disabledReason: item.actionRequired,
   });
@@ -100,7 +106,11 @@ function mapProjectionItem(
           sourceName: importedEvent.calendarSource.name,
           sourceColor: importedEvent.calendarSource.color,
           description: importedEvent.description,
-          immutableFields: ["title", "scheduledStartAt", "scheduledEndAt"] as const,
+          immutableFields: [
+            "title",
+            "scheduledStartAt",
+            "scheduledEndAt",
+          ] as const,
         }
       : null,
     ...mapTaskRunnability(item.task),
@@ -142,8 +152,10 @@ function mapWorkBlockItem(
     } | null;
   },
 ) {
-  const importedEvent = block.importedCalendarEvent ?? block.task.importedCalendarEvents[0];
-  const scheduleStatus = block.status === "Completed" ? "Completed" : "Scheduled";
+  const importedEvent =
+    block.importedCalendarEvent ?? block.task.importedCalendarEvents[0];
+  const scheduleStatus =
+    block.status === "Completed" ? "Completed" : "Scheduled";
   return {
     taskId: block.taskId,
     workBlockId: block.id,
@@ -157,7 +169,11 @@ function mapWorkBlockItem(
     actionRequired: null,
     approvalPendingCount: 0,
     scheduleStatus,
-    scheduleSource: importedEvent ? "calendar" : block.trigger === "scheduled" ? "ai" : "human",
+    scheduleSource: importedEvent
+      ? "calendar"
+      : block.trigger === "scheduled"
+        ? "ai"
+        : "human",
     dueAt: block.task.dueAt,
     scheduledStartAt: block.scheduledStartAt,
     scheduledEndAt: block.scheduledEndAt,
@@ -180,7 +196,11 @@ function mapWorkBlockItem(
           sourceName: importedEvent.calendarSource.name,
           sourceColor: importedEvent.calendarSource.color,
           description: importedEvent.description,
-          immutableFields: ["title", "scheduledStartAt", "scheduledEndAt"] as const,
+          immutableFields: [
+            "title",
+            "scheduledStartAt",
+            "scheduledEndAt",
+          ] as const,
         }
       : null,
     ...mapTaskRunnability(block.task),
@@ -192,7 +212,8 @@ function mapTaskRunnability(task: {
   executionRuntime: string;
   executionConfig: unknown;
 }) {
-  const executionRuntime = task.executionRuntime || task.workspace.defaultRuntime;
+  const executionRuntime =
+    task.executionRuntime || task.workspace.defaultRuntime;
   const runnability = deriveTaskRunnability({
     executionRuntime,
     executionConfig: task.executionConfig,
@@ -245,7 +266,9 @@ function getScheduledMinutes(item: {
 }
 
 async function getReadyNodeIds(taskId: string, workBlockId?: string | null) {
-  const acceptedPlan = await getAcceptedCompiledPlanForTask(taskId, { workBlockId });
+  const acceptedPlan = await getAcceptedCompiledPlanForTask(taskId, {
+    workBlockId,
+  });
   if (!acceptedPlan) {
     return [] as string[];
   }
@@ -431,7 +454,9 @@ export async function getSchedulePage(workspaceId: string) {
           include: {
             workspace: { select: { defaultRuntime: true } },
             importedCalendarEvents: {
-              include: { calendarSource: { select: { name: true, color: true } } },
+              include: {
+                calendarSource: { select: { name: true, color: true } },
+              },
               orderBy: { startsAt: "asc" },
             },
           },
@@ -469,7 +494,9 @@ export async function getSchedulePage(workspaceId: string) {
     orderBy: { createdAt: "asc" },
   });
 
-  const listItems = projections.filter(hasTask).map((item) => mapProjectionItem(item));
+  const listItems = projections
+    .filter(hasTask)
+    .map((item) => mapProjectionItem(item));
   const planSnapshots = new Map<
     string,
     NonNullable<ReturnType<typeof mapScheduleTaskPlanSnapshot>>
@@ -518,7 +545,8 @@ export async function getSchedulePage(workspaceId: string) {
   const unscheduled = topLevelItems
     .filter(
       (item) =>
-        item.scheduleStatus === "Unscheduled" && item.persistedStatus !== "Completed",
+        item.scheduleStatus === "Unscheduled" &&
+        item.persistedStatus !== "Completed",
     )
     .map((item) => item);
 
@@ -530,9 +558,9 @@ export async function getSchedulePage(workspaceId: string) {
     )
     .map((item) => item);
 
-  const topLevelProposals = proposals.filter(hasTask).filter(
-    (proposal) => proposal.task.parentTaskId === null,
-  );
+  const topLevelProposals = proposals
+    .filter(hasTask)
+    .filter((proposal) => proposal.task.parentTaskId === null);
 
   const mappedProposals = topLevelProposals.map((proposal) => ({
     proposalId: proposal.id,
@@ -573,7 +601,9 @@ export async function getSchedulePage(workspaceId: string) {
           aiClient: { select: { name: true } },
           parentTaskId: true,
           importedCalendarEvents: {
-            include: { calendarSource: { select: { name: true, color: true } } },
+            include: {
+              calendarSource: { select: { name: true, color: true } },
+            },
             take: 1,
           },
         },
@@ -614,7 +644,9 @@ export async function getSchedulePage(workspaceId: string) {
     ? await db.run.findMany({
         where: {
           taskId: { in: scheduledTaskIds },
-          status: { in: ["Pending", "Running", "WaitingForInput", "WaitingForApproval"] },
+          status: {
+            in: ["Pending", "Running", "WaitingForInput", "WaitingForApproval"],
+          },
         },
         select: { taskId: true, status: true, createdAt: true },
         orderBy: { createdAt: "desc" },
@@ -627,43 +659,64 @@ export async function getSchedulePage(workspaceId: string) {
     }
   }
   const eligibilityNow = new Date();
-  const workBlockScheduledItems = await Promise.all(workBlockScheduledItemsBase.map(async (item) => {
-    const savedPlan = await getLatestTaskPlanReadModel(item.taskId, item.workBlockId);
-    const snapshot = savedPlan ? mapScheduleTaskPlanSnapshot(savedPlan) : null;
-    const aiPlanGenerationStatus = isTaskPlanGenerationRunning({ taskId: item.taskId, workBlockId: item.workBlockId })
-      ? "generating" as const
-      : savedPlan?.status === "accepted"
-        ? "accepted" as const
-        : savedPlan
-          ? "waiting_acceptance" as const
-          : "idle" as const;
-    const eligibility = deriveAutoStartEligibility({
-      task: {
-        status: item.persistedStatus,
-        executionRuntime: item.executionRuntime,
-        hasAcceptedPlan: savedPlan?.status === "accepted",
-        autoExecuteTiming: item.autoExecuteTiming,
-      },
-      workBlock: { scheduledStartAt: item.scheduledStartAt },
-      now: eligibilityNow,
-      activeRun: activeRunByTaskId.get(item.taskId) ?? null,
-    });
-    const withPlanState = {
-      ...item,
-      savedPlan: snapshot,
-      aiPlanGenerationStatus,
-      autoStartEligible: eligibility.ok,
-      autoStartReason: eligibility.ok ? null : eligibility.reason,
-    };
-    return { ...withPlanState, stateView: stateViewFor(withPlanState) };
-  }));
-  const workBlockScheduledKeys = new Set(
-    workBlockScheduledItems.map((item) => `${item.taskId}:${item.scheduledStartAt.getTime()}:${item.scheduledEndAt.getTime()}`),
+  const workBlockScheduledItems = await Promise.all(
+    workBlockScheduledItemsBase.map(async (item) => {
+      const savedPlan = await getLatestTaskPlanReadModel(
+        item.taskId,
+        item.workBlockId,
+      );
+      const snapshot = savedPlan
+        ? mapScheduleTaskPlanSnapshot(savedPlan)
+        : null;
+      const aiPlanGenerationStatus = isTaskPlanGenerationRunning({
+        taskId: item.taskId,
+        workBlockId: item.workBlockId,
+      })
+        ? ("generating" as const)
+        : savedPlan?.status === "accepted"
+          ? ("accepted" as const)
+          : savedPlan
+            ? ("waiting_acceptance" as const)
+            : ("idle" as const);
+      const eligibility = deriveAutoStartEligibility({
+        task: {
+          status: item.persistedStatus,
+          executionRuntime: item.executionRuntime,
+          hasAcceptedPlan: savedPlan?.status === "accepted",
+          autoExecuteTiming: item.autoExecuteTiming,
+        },
+        workBlock: { scheduledStartAt: item.scheduledStartAt },
+        now: eligibilityNow,
+        activeRun: activeRunByTaskId.get(item.taskId) ?? null,
+      });
+      const withPlanState = {
+        ...item,
+        savedPlan: snapshot,
+        aiPlanGenerationStatus,
+        autoStartEligible: eligibility.ok,
+        autoStartReason: eligibility.ok ? null : eligibility.reason,
+      };
+      return { ...withPlanState, stateView: stateViewFor(withPlanState) };
+    }),
   );
-  const allScheduled = [...workBlockScheduledItems, ...scheduled.filter((item) => (
-    !workBlockScheduledKeys.has(`${item.taskId}:${item.scheduledStartAt?.getTime() ?? ""}:${item.scheduledEndAt?.getTime() ?? ""}`)
-  ))].sort(
-    (a, b) => (a.scheduledStartAt?.getTime() ?? 0) - (b.scheduledStartAt?.getTime() ?? 0),
+  const workBlockScheduledKeys = new Set(
+    workBlockScheduledItems.map(
+      (item) =>
+        `${item.taskId}:${item.scheduledStartAt.getTime()}:${item.scheduledEndAt.getTime()}`,
+    ),
+  );
+  const allScheduled = [
+    ...workBlockScheduledItems,
+    ...scheduled.filter(
+      (item) =>
+        !workBlockScheduledKeys.has(
+          `${item.taskId}:${item.scheduledStartAt?.getTime() ?? ""}:${item.scheduledEndAt?.getTime() ?? ""}`,
+        ),
+    ),
+  ].sort(
+    (a, b) =>
+      (a.scheduledStartAt?.getTime() ?? 0) -
+      (b.scheduledStartAt?.getTime() ?? 0),
   );
 
   const planningSummary = buildPlanningSummary({

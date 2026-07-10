@@ -1,6 +1,6 @@
 import { ApprovalStatus, RunStatus, ScheduleProposalStatus, TaskStatus } from "@/generated/prisma/client";
 import type { ActionCenterProjection } from "@chrona/contracts/api";
-import { deriveWorkStateView, hasTerminalAuthoritativeTaskState } from "@chrona/domain";
+import { deriveWorkStateView } from "@chrona/domain";
 import { db } from "@/lib/db";
 
 
@@ -308,11 +308,11 @@ function runWorkState(run: { status: RunStatus; pendingInputPrompt: string | nul
         return null;
       }
 
-      const taskStateIsTerminal = hasTerminalAuthoritativeTaskState({
-        taskStatus: task.status,
-        persistedStatus: task.projection?.persistedStatus,
-        displayState: task.projection?.displayState,
-      });
+      const taskState = deriveWorkStateView({
+        taskStatus: task.projection?.persistedStatus ?? task.status,
+        executionStatus: task.projection?.displayState,
+      }).state;
+      const taskStateIsTerminal = taskState === "done" || taskState === "result_ready" || taskState === "cancelled";
       const isOwnCancellationRecovery = task.status === TaskStatus.Cancelled && run.status === RunStatus.Cancelled;
 
       if (taskStateIsTerminal && !isOwnCancellationRecovery) {
