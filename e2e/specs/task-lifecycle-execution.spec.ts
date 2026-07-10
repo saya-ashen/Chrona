@@ -256,7 +256,9 @@ test.describe("Task create → plan → run → result", () => {
     await page.goto(TASK_URL(task.taskId));
     await dismissTaskEditorIfOpen(page);
     await expect(page.getByRole("heading", { name: new RegExp(`E2E Lifecycle ${viewport}`) })).toBeVisible();
-    await expect(page.getByText("The plan graph will appear here once AI generates a plan.")).toBeVisible();
+    await expect(page.getByTestId("plan-setup-panel")).toBeVisible();
+    await expect(page.getByRole("button", { name: /^Generate plan$/ })).toBeVisible();
+    await expect(page.getByText(/Nothing runs until the plan is reviewed and accepted/i)).toBeVisible();
 
     // Before any plan exists the engine reports exactly `no_plan`.
     expect((await getCurrentExecution(request, task.taskId)).status).toBe("no_plan");

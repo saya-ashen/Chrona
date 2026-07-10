@@ -66,7 +66,7 @@ vi.mock("@/components/tasks/workspace/sections/task-workspace-edit-section", () 
 }));
 
 vi.mock("@/components/tasks/workspace/sections/task-workspace-plan-section", () => ({
-  TaskWorkspacePlanSection: () => null,
+  TaskWorkspacePlanSection: ({ onGeneratePlan }: { onGeneratePlan: () => void }) => <button type="button" onClick={onGeneratePlan}>Generate plan</button>,
 }));
 
 vi.mock("@/lib/rpc-client", () => ({
@@ -217,7 +217,7 @@ describe("TaskWorkspacePage Generate Plan live header action", () => {
       });
     });
 
-    await waitFor(() => expect(screen.getByRole("button", { name: "Generate plan" })).toBeDisabled());
+    await waitFor(() => expect(screen.getByRole("button", { name: "Generate plan" })).toBeEnabled());
     expect(screen.getByRole("button", { name: "Stop generation" })).toBeEnabled();
 
     await act(async () => {

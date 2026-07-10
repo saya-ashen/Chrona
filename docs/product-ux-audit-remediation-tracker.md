@@ -938,6 +938,7 @@ fresh start
 - `TRANSPARENCY-02 完成`：Task Create 的共享 policy preview 现在明确展示本地开始时间与 IANA 时区、AI runtime、计划审批语义、input/approval 暂停、missed-run、失败不自动重试，以及关闭页面/Chrona 进程后的行为；缺少 AI 时继续返回单一修复原因。UI focused 16 tests 与 domain policy 6 tests passed。取消未来 occurrence 与停止当前运行继续使用既有不同控制，不在预演中承诺不存在的新动作。
 - `RELIABILITY-02 完成`：新增真实子进程级 restart integration，在隔离 SQLite 上启动 Server、终止并再次启动，确认 WaitingForInput session/run 保留且 run 数量仍为 1。修复并发 Start 暴露的真实竞态：计划执行 TaskSession 在唯一键冲突后复用既有会话，执行内核按 taskId 串行化动态命令，manual/manual 与 manual/scheduler 同时触发均只创建一个 provider/node attempt。restart recovery 7 tests、duplicate/concurrency 8 tests、scheduler 22 tests、fresh-process 1 test 及 `bun run typecheck` 通过。
 - `RECOVERY-02 完成（自动化范围）`：真实 engine/API 路径验证 input checkpoint 提交后从 waiting_for_user 到 completed、approval approve 后从 WaitingForApproval 到 Completed、失败节点显式 retry 后旧结果 obsolete 且新结果 current、Stop/Pause 后保留已完成结果且迟到回调不推进。Workspace 恢复卡验证用户摘要、保留进度、重试起点、副作用风险、Diagnostics 默认折叠，并由 Retry Run 实际派发 `retry_node`。domain/engine/API 17 tests 与 Workspace 27 tests passed。真人两分钟恢复率继续保留为人工指标，不伪报自动完成。
+- `FIRST-RUN-02 自动化路径完成`：Chromium fresh E2E 从 API 创建安全任务进入 Plan Setup，确认唯一 Generate plan 与“接受前不执行”边界，经 debug AI 配置、生成/接受计划、Input/Approval/Manual gates、结果接受到 Task done 全闭环通过；另有跨页面计划持久化合同。修复 Header 与 Plan Setup 重复 Generate plan，Header 在 briefing 时隐藏该动作。Onboarding/shell/workspace focused 36 tests 与 `bun run typecheck` 通过。5 名真实首次用户、80% 自助率和五分钟中位数仍是人工指标，因此工作包保持 `IN PROGRESS`。
 
 ## 13. Task Workspace 桌面端重构方案（2026-07-10）
 
