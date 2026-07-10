@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { TaskPlanGraphPlan } from "../../../apps/web/src/components/tasks/plan/task-plan-graph/types";
 import type { TaskPageData } from "../model/task-workspace-types";
 import {
+  deriveRunningExecutionView,
   deriveTaskWorkspaceDisplayState,
   derivePlanReviewSummary,
   deriveResultReview,
@@ -352,4 +353,54 @@ describe("task workspace interaction model", () => {
     expect(done.state).toBe("done");
     expect(done.nextActionLabel).toBe("Ask a follow-up or create a next task");
   });
+  it.each([
+    {
+      name: "tracks completed, active, waiting, and remaining nodes",
+      statuses: ["completed", "active", "waiting_for_approval"] as const,
+      expected: { completed: 1, active: 1, waiting: 1, blocked: 0, remaining: 0 },
+    },
+    {
+      name: "tracks blocked work separately from remaining work",
+      statuses: ["done", "failed", "idle"] as const,
+      expected: { completed: 1, active: 0, waiting: 0, blocked: 1, remaining: 1 },
+    },
+  ])("$name", ({ statuses, expected }) => {
+    const baseGraph = graphPlan();
+    const nodes = baseGraph.nodes.map((node, index) => ({ ...node, status: statuses[index] }));
+    const graph = { ...baseGraph, nodes, steps: nodes };
+    const activeNode = nodes.find((node) => node.status === "active") ?? null;
+    const view = deriveRunningExecutionView({
+      pageData: pageData(),
+      graphPlan: graph,
+      operationState: operationState({ status: "execution-running", action: "none", runtimeEvents: [] } as unknown as Partial<TaskWorkspaceOperationState>),
+      currentNode: activeNode,
+    });
+
+    expect(view?.progress).toMatchObject({ ...expected, total: 3 });
+  });
+
+  it("keeps current step, inspected step, and runtime activity distinct", () => {
+    const baseGraph = graphPlan();
+    const nodes = baseGraph.nodes.map((node, index) => ({ ...node, status: index === 0 ? "active" as const : node.status }));
+    const graph = { ...baseGraph, nodes, steps: nodes };
+    const view = deriveRunningExecutionView({
+      pageData: pageData(),
+      graphPlan: graph,
+      operationState: operationState({
+        status: "execution-running",
+        action: "none",
+        runtimeEvents: [
+          { type: "runtime_event", action: "start_manual", runtimeName: "omp", provider: "omp", event: { type: "reasoning_delta", text: "private transient reasoning" } },
+          { type: "runtime_event", action: "start_manual", runtimeName: "omp", provider: "omp", event: { type: "tool_started", toolName: "browser", label: "Reading GitHub Trending" } },
+        ],
+      } as unknown as Partial<TaskWorkspaceOperationState>),
+      currentNode: nodes[0]!,
+      inspectedNode: nodes[2]!,
+    });
+
+    expect(view?.currentStep).toMatchObject({ id: "n1", ordinal: 1, label: "Fetch trending projects" });
+    expect(view?.inspectedStep).toEqual({ id: "n3", label: "Publish result report", isCurrent: false });
+    expect(view?.currentActivity).toEqual({ kind: "tool", label: "Reading GitHub Trending" });
+  });
+
 });

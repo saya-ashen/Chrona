@@ -194,7 +194,6 @@ describe("TaskWorkspacePlanSection", () => {
       />,
     );
     const getOperationPanel = () => screen.getAllByRole("region", { name: "Current operation" }).at(-1)!;
-    const getCurrentGraphPanel = () => screen.getAllByTestId("task-plan-graph-panel").at(-1)!;
     expect(screen.getByTestId("plan-setup-panel")).toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "Execution flow" })).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Generate plan" }));
@@ -316,8 +315,46 @@ describe("TaskWorkspacePlanSection", () => {
       />,
     );
     expect(within(getOperationPanel()).getByLabelText(/Decision/)).toBeInTheDocument();
-    expect(within(getOperationPanel()).getByText("Tool: Starting plan")).toBeInTheDocument();
-    await waitFor(() => expect(getCurrentGraphPanel()).toHaveAttribute("data-graph-mode", "compact"));
+    expect(screen.getByTestId("execution-focus-header")).toHaveTextContent("Review generated output");
+    expect(screen.getByTestId("current-runtime-activity")).toHaveTextContent("Starting plan");
+    expect(screen.getByRole("region", { name: "Live output" })).toHaveTextContent("Awaiting output");
+    expect(screen.getByTestId("execution-navigator")).toHaveTextContent("steps complete");
+    expect(screen.queryByTestId("task-plan-graph-panel")).not.toBeInTheDocument();
+  });
+
+  it("separates the inspected step from the current execution step", () => {
+    const acceptedPlan = {
+      id: "plan-running",
+      status: "accepted",
+      revision: 1,
+      updatedAt: "2026-05-18T00:00:01.000Z",
+    } as TaskPlanReadModel;
+    const currentNode = createTaskWorkspaceFixtureNode({ id: "current", title: "Collect repositories", status: "active", objective: "Read GitHub Trending" });
+    const upcomingNode = createTaskWorkspaceFixtureNode({ id: "next", title: "Rank repositories", status: "idle", objective: "Rank collected repositories" });
+
+    renderWithQueryClient(
+      <TaskWorkspacePlanSection
+        label="Plan"
+        graphPlan={createTaskWorkspaceFixtureGraph([currentNode, upcomingNode], "current")}
+        isGraphPlanPending={false}
+        pageData={createTaskWorkspaceFixturePageData({ task: { savedPlan: acceptedPlan, aiPlanGenerationStatus: "accepted", status: "Running" } })}
+        plan={acceptedPlan}
+        planGenerationStatus="accepted"
+        acceptPlanError={null}
+        runtimeEvents={[]}
+        onGeneratePlan={vi.fn()}
+        onApplyPlan={vi.fn()}
+        onDispatchExecutionAction={vi.fn()}
+      />,
+    );
+
+    const navigator = screen.getByTestId("execution-navigator");
+    fireEvent.click(within(navigator).getByRole("button", { name: /Rank repositories/ }));
+    expect(within(navigator).getAllByText("Rank repositories").length).toBeGreaterThan(0);
+    expect(within(navigator).getAllByText("Collect repositories").length).toBeGreaterThan(0);
+    expect(screen.getByTestId("execution-focus-header")).toHaveTextContent("Collect repositories");
+    fireEvent.click(within(screen.getByTestId("execution-navigator")).getByRole("button", { name: "Return to current step" }));
+    expect(within(screen.getByTestId("execution-navigator")).queryByRole("button", { name: "Return to current step" })).not.toBeInTheDocument();
   });
 
   it("adds generate plan as the current operation when no plan exists", () => {
@@ -560,7 +597,7 @@ describe("TaskWorkspacePlanSection", () => {
     expect(onApplyPlan).toHaveBeenCalledWith(draftPlan);
   });
 
-  it("shows running spinner in Current operation instead of Results", () => {
+  it("shows the active step in the execution focus instead of a duplicate Current operation card", () => {
     const acceptedPlan = {
       id: "plan-1",
       status: "accepted",
@@ -590,7 +627,9 @@ describe("TaskWorkspacePlanSection", () => {
       />,
     );
 
-    expect(within(screen.getByRole("region", { name: "Current operation" })).getByLabelText("Current operation running")).toHaveClass("animate-spin");
+    expect(screen.getByTestId("execution-focus-header")).toHaveTextContent("Write report");
+    expect(screen.getByTestId("current-runtime-activity")).toHaveTextContent("Waiting for the next runtime update");
+    expect(screen.queryByRole("region", { name: "Current operation" })).not.toBeInTheDocument();
     expect(screen.queryByText("Running now")).not.toBeInTheDocument();
   });
 
@@ -817,11 +856,10 @@ describe("TaskWorkspacePlanSection", () => {
       />,
     );
 
-    const operationPanel = screen.getByRole("region", { name: "Current operation" });
-
-    expect(within(operationPanel).queryByText("Current node action")).not.toBeInTheDocument();
-    expect(within(operationPanel).queryByLabelText(/City/)).not.toBeInTheDocument();
-    expect(within(operationPanel).queryByRole("button", { name: "Send Submit input" })).not.toBeInTheDocument();
+    expect(screen.getByTestId("execution-focus-header")).toBeInTheDocument();
+    expect(screen.queryByText("Current node action")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/City/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Send Submit input" })).not.toBeInTheDocument();
   });
 
   it("shows blocked current node action with blocker reason before start plan", async () => {
@@ -954,8 +992,8 @@ describe("TaskWorkspacePlanSection", () => {
       />,
     );
 
-    expect(screen.getByTestId("task-plan-node-review")).toHaveTextContent("Review task output");
-    fireEvent.click(screen.getByTestId("task-plan-node-review"));
+    expect(screen.getByTestId("execution-navigator")).toHaveTextContent("Review task output");
+    fireEvent.click(within(screen.getByTestId("execution-navigator")).getByRole("button", { name: /Review task output/ }));
 
     expect(screen.queryByRole("dialog", { name: "Selected node details" })).not.toBeInTheDocument();
     expect(screen.getByRole("complementary", { name: "Task command center" })).toBeInTheDocument();

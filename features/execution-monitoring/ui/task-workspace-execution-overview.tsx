@@ -118,6 +118,8 @@ export function TaskWorkspaceExecutionOverview({
   copy: copyProp,
   commandCenter,
   activityLayout = "below",
+  isExecutionRunning = false,
+  executionOutputState = "empty",
   onAction,
 }: {
   taskId: string;
@@ -136,6 +138,8 @@ export function TaskWorkspaceExecutionOverview({
   primaryAction?: CommandCenterPrimaryAction | null;
   copy?: Partial<CommandCenterCopy>;
   activityLayout?: ActivityLayout;
+  isExecutionRunning?: boolean;
+  executionOutputState?: "empty" | "partial";
   onAction?: OverviewAction;
   commandCenter?: {
     documents: {
@@ -232,17 +236,17 @@ export function TaskWorkspaceExecutionOverview({
 
   const results = (
     <section
-      aria-label={ws.executionResultTitle ?? "Execution Result"}
+      aria-label={isExecutionRunning ? (ws.liveOutputTitle ?? "Live output") : (ws.executionResultTitle ?? "Execution Result")}
       className="min-h-0 flex-1 overflow-y-auto"
     >
       <div className="mb-3 flex flex-wrap items-start justify-between gap-3 border-b border-border/70 pb-3">
         <div className="min-w-0 space-y-1">
           <h3 id="task-workspace-results-heading" className="font-heading text-base font-semibold text-foreground">
-            {ws.executionResultTitle ?? "Execution Result"}
+            {isExecutionRunning ? (ws.liveOutputTitle ?? "Live output") : (ws.executionResultTitle ?? "Execution Result")}
           </h3>
           <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-            <Badge variant="outline" className="bg-violet-500/10 text-violet-700 dark:text-violet-200">{ws.aiGeneratedBadge ?? "AI generated"}</Badge>
-            <span>{ws.validatedOutputDescription ?? "Validated output from task execution."}</span>
+            <Badge variant="outline" className={isExecutionRunning ? "bg-sky-500/10 text-sky-700 dark:text-sky-200" : "bg-violet-500/10 text-violet-700 dark:text-violet-200"}>{isExecutionRunning ? (executionOutputState === "partial" ? (ws.partialOutputBadge ?? "Partial output") : (ws.awaitingOutputBadge ?? "Awaiting output")) : (ws.aiGeneratedBadge ?? "AI generated")}</Badge>
+            <span>{isExecutionRunning ? (executionOutputState === "partial" ? (ws.partialOutputDescription ?? "Output collected so far. Execution is still running.") : (ws.awaitingOutputDescription ?? "Execution is running. Output will appear when a step produces it.")) : (ws.validatedOutputDescription ?? "Validated output from task execution.")}</span>
           </div>
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">

@@ -26,7 +26,7 @@ import {
   FOLLOW_UP_INTENTS,
   resolveTaskWorkspaceOperationState,
 } from "../../../../../../../features/task-workspace";
-import type { TaskPageData, TaskPlanGenerationStatus, TaskWorkspaceDisplayState, WorkspaceActivityItem } from "../../../../../../../features/task-workspace";
+import type { RunningExecutionView, TaskPageData, TaskPlanGenerationStatus, TaskWorkspaceDisplayState, WorkspaceActivityItem } from "../../../../../../../features/task-workspace";
 import type { TaskPlanReadModel } from "@chrona/contracts/ai";
 
 function isCompletedGraphNode(status: string) {
@@ -653,6 +653,127 @@ type TaskWorkspacePlanSectionProps = {
   onEditBrief?: () => void;
 };
 
+function executionNodeState(node: PlanNodeDataModel, view: RunningExecutionView) {
+  if (node.id === view.currentStep?.id) return "current" as const;
+  if (node.status === "done" || node.status === "completed") return "completed" as const;
+  if (node.status === "blocked" || node.status === "failed") return "blocked" as const;
+  if (node.status === "waiting" || node.status === "waiting_for_user" || node.status === "waiting_for_approval") return "waiting" as const;
+  return "upcoming" as const;
+}
+
+function ExecutionFocusHeader({
+  view,
+  workState,
+  copy,
+}: {
+  view: RunningExecutionView;
+  workState: TaskWorkspaceDisplayState["workState"];
+  copy: WorkspaceCopy;
+}) {
+  const progress = view.progress;
+  const completedPercent = progress.total > 0 ? Math.round((progress.completed / progress.total) * 100) : 0;
+  const needsAttention = workState.state === "waiting_for_input" || workState.state === "waiting_for_approval";
+  return (
+    <section
+      aria-label={copy.executionFocusAria ?? "Current execution focus"}
+      className={needsAttention ? "border-b border-warning/40 bg-warning/10 px-4 py-4" : "border-b border-primary/25 bg-primary-soft/20 px-4 py-4"}
+      data-testid="execution-focus-header"
+      data-current-step-id={view.currentStep?.id ?? ""}
+    >
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0 flex-1 space-y-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant={needsAttention ? "secondary" : "default"}>{workState.label}</Badge>
+            {view.currentStep?.ordinal ? <span className="text-xs font-medium text-muted-foreground">{copy.executionStep ?? "Step"} {view.currentStep.ordinal} {copy.executionOf ?? "of"} {progress.total}</span> : null}
+            {view.currentStep?.executorLabel ? <Badge variant="outline">{view.currentStep.executorLabel}</Badge> : null}
+          </div>
+          <div>
+            <h2 className="font-heading text-xl font-semibold text-foreground">{view.currentStep?.label ?? (copy.executionStarting ?? "Starting execution")}</h2>
+            {view.currentStep?.objective ? <p className="mt-1 max-w-4xl text-sm leading-5 text-muted-foreground">{view.currentStep.objective}</p> : null}
+          </div>
+          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+            <span>{progress.completed} {copy.executionCompletedShort ?? "completed"}</span>
+            {progress.active > 0 ? <span>{progress.active} {copy.executionActiveShort ?? "running"}</span> : null}
+            {progress.waiting > 0 ? <span>{progress.waiting} {copy.executionWaitingShort ?? "waiting"}</span> : null}
+            {progress.blocked > 0 ? <span>{progress.blocked} {copy.executionBlockedShort ?? "blocked"}</span> : null}
+            <span>{progress.remaining} {copy.executionRemainingShort ?? "remaining"}</span>
+            <span>{completedPercent}%</span>
+          </div>
+        </div>
+        <div className="min-w-[15rem] max-w-sm rounded-xl border border-border/70 bg-background/85 px-3 py-2.5 shadow-sm" data-testid="current-runtime-activity">
+          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-primary">{copy.currentActivity ?? "Current activity"}</p>
+          <p className="mt-1 text-sm font-medium text-foreground">{view.currentActivity.label}</p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function ExecutionNavigator({
+  graphPlan,
+  view,
+  inspectedNode,
+  copy,
+  onInspect,
+  onReturnToCurrent,
+}: {
+  graphPlan: TaskPlanGraphPlan;
+  view: RunningExecutionView;
+  inspectedNode: PlanNodeDataModel | null;
+  copy: WorkspaceCopy;
+  onInspect: (node: PlanNodeDataModel) => void;
+  onReturnToCurrent: () => void;
+}) {
+  const inspectingOther = Boolean(inspectedNode && inspectedNode.id !== view.currentStep?.id);
+  return (
+    <section aria-label={copy.executionNavigatorAria ?? "Execution navigator"} className="flex min-h-0 flex-col overflow-hidden rounded-[1.5rem] border border-border bg-background/75" data-testid="execution-navigator">
+      <div className="border-b border-border/70 px-4 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <h3 className="font-heading text-base font-semibold text-foreground">{copy.executionNavigatorTitle ?? "Execution progress"}</h3>
+            <p className="mt-0.5 text-xs text-muted-foreground">{view.progress.completed}/{view.progress.total} {copy.executionStepsComplete ?? "steps complete"}</p>
+          </div>
+          {inspectingOther ? <Button type="button" variant="outline" size="sm" onClick={onReturnToCurrent}>{copy.returnToCurrentStep ?? "Return to current step"}</Button> : null}
+        </div>
+        {inspectingOther ? <p className="mt-2 text-xs text-muted-foreground">{copy.inspectingStep ?? "Inspecting"}: <span className="font-medium text-foreground">{inspectedNode?.title}</span> · {copy.executionCurrentlyOn ?? "Execution is currently on"}: <span className="font-medium text-foreground">{view.currentStep?.label}</span></p> : null}
+      </div>
+      <ol className="min-h-0 flex-1 space-y-1 overflow-y-auto p-2">
+        {graphPlan.nodes.map((node, index) => {
+          const state = executionNodeState(node, view);
+          const isInspected = inspectedNode?.id === node.id;
+          const stateLabel = state === "current"
+            ? (copy.executionCurrentStep ?? "Running")
+            : state === "completed"
+              ? (copy.executionCompletedStep ?? "Completed")
+              : state === "blocked"
+                ? (copy.executionBlockedStep ?? "Blocked")
+                : state === "waiting"
+                  ? (copy.executionWaitingStep ?? "Waiting")
+                  : (copy.executionUpcomingStep ?? "Upcoming");
+          return (
+            <li key={node.id}>
+              <button
+                type="button"
+                className={`flex w-full items-start gap-3 rounded-xl border px-3 py-2.5 text-left transition-colors ${state === "current" ? "border-primary/45 bg-primary/10" : isInspected ? "border-foreground/35 bg-muted/60" : "border-transparent hover:border-border hover:bg-muted/40"}`}
+                onClick={() => onInspect(node)}
+                aria-current={state === "current" ? "step" : undefined}
+                data-execution-node-state={state}
+                data-inspected={isInspected ? "true" : "false"}
+              >
+                <span className={`flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${state === "completed" ? "bg-success/15 text-success" : state === "current" ? "bg-primary text-primary-foreground" : state === "blocked" ? "bg-destructive/15 text-destructive" : "bg-muted text-muted-foreground"}`}>{state === "completed" ? "✓" : index + 1}</span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-medium text-foreground">{node.title}</span>
+                  <span className="mt-0.5 block text-xs text-muted-foreground">{stateLabel}</span>
+                </span>
+              </button>
+            </li>
+          );
+        })}
+      </ol>
+    </section>
+  );
+}
+
 export function TaskWorkspacePlanSection({
   label,
   graphPlan,
@@ -796,7 +917,8 @@ export function TaskWorkspacePlanSection({
     pageData,
     graphPlan,
     operationState,
-    currentNode: currentOperationNode ?? selectedNode,
+    currentNode: currentOperationNode,
+    inspectedNode: selectedNode,
   });
   const focusNodeActions = (nodeId?: string) => {
     if (!nodeId) return;
@@ -956,6 +1078,46 @@ export function TaskWorkspacePlanSection({
             onStart={() => void onDispatchExecutionAction({ action: "start_manual" })}
             onEditTask={onEditBrief}
           />
+        </div>
+      ) : displayState.mode === "running" && displayState.runningExecution && graphPlan ? (
+        <div className="flex min-h-[560px] flex-1 flex-col overflow-hidden">
+          <ExecutionFocusHeader view={displayState.runningExecution} workState={displayState.workState} copy={copy} />
+          <div className="grid min-h-0 flex-1 gap-4 p-4 xl:grid-cols-[minmax(17rem,0.42fr)_minmax(36rem,1.58fr)]">
+            <ExecutionNavigator
+              graphPlan={graphPlan}
+              view={displayState.runningExecution}
+              inspectedNode={selectedNode}
+              copy={copy}
+              onInspect={setSelectedNode}
+              onReturnToCurrent={() => setSelectedNode(null)}
+            />
+            <TaskWorkspaceInspector
+              key={commandCenterScopeKey}
+              taskId={pageData.task.id}
+              consoleView={consoleView}
+              commandCenter={isGeneratingPlan ? null : commandCenter ?? null}
+              commandCenterActionHandlers={commandCenterActionHandlers}
+              runtimeEvents={runtimeEvents}
+              liveActivity={liveActivity}
+              currentExecution={currentExecution}
+              isExecutionRunning
+              executionOutputState={displayState.runningExecution.outputState}
+              copy={copy}
+              onAction={focusNodeActions}
+              operationPanel={operationState.status !== "execution-running" ? (
+                <TaskWorkspaceOperationPanel
+                  taskId={pageData.task.id}
+                  state={operationState}
+                  workState={displayState.workState}
+                  copy={copy}
+                  onGeneratePlan={() => onGeneratePlan()}
+                  onStartPlan={() => void onDispatchExecutionAction({ action: "start_manual" })}
+                  onRestartPlan={() => void onDispatchExecutionAction({ action: "restart_from_beginning" })}
+                  onTaskPrimaryAction={primaryActionDispatch ? () => void onDispatchExecutionAction(primaryActionDispatch) : undefined}
+                />
+              ) : null}
+            />
+          </div>
         </div>
       ) : (
         <div className={graphMode === "compact"

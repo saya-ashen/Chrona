@@ -15,6 +15,37 @@ export type TaskPlanningReadiness = {
   }>;
   primaryAction: "generate_plan" | "complete_brief" | "configure_provider";
 };
+export type RunningExecutionProgress = {
+  completed: number;
+  active: number;
+  waiting: number;
+  blocked: number;
+  remaining: number;
+  total: number;
+};
+
+export type RunningExecutionActivity = {
+  kind: "tool" | "provider" | "transition" | "approval" | "idle";
+  label: string;
+};
+
+export type RunningExecutionView = {
+  progress: RunningExecutionProgress;
+  currentStep: {
+    id: string;
+    label: string;
+    objective: string | null;
+    ordinal: number | null;
+    executorLabel: string | null;
+  } | null;
+  currentActivity: RunningExecutionActivity;
+  outputState: "empty" | "partial";
+  inspectedStep: {
+    id: string;
+    label: string;
+    isCurrent: boolean;
+  } | null;
+};
 
 export type TaskWorkspaceStage = {
   stage: "brief" | "plan" | "review" | "run" | "result";
@@ -131,6 +162,7 @@ export type TaskWorkspaceDisplayState = TaskWorkspaceDisplayRule & {
   planReviewSummary: PlanReviewSummary | null;
   runPreview: RunLaunchView | null;
   resultReview: ResultReview | null;
+  runningExecution: RunningExecutionView | null;
 };
 
 const ALL_PANEL_KEYS: TaskWorkspacePanelKey[] = [
@@ -395,11 +427,87 @@ function displayModeFor(input: { pageData: TaskPageData; operationState: TaskWor
   return "briefing";
 }
 
+function isCompletedNode(node: PlanNodeDataModel) {
+  return node.status === "done" || node.status === "completed";
+}
+
+function isActiveNode(node: PlanNodeDataModel) {
+  return node.active === true || node.status === "active" || node.status === "in_progress";
+}
+
+function isWaitingNode(node: PlanNodeDataModel) {
+  return node.status === "waiting" || node.status === "waiting_for_user" || node.status === "waiting_for_approval";
+}
+
+function currentActivity(operationState: TaskWorkspaceOperationState): RunningExecutionActivity {
+  const event = [...operationState.runtimeEvents].reverse().find(({ event: value }) => value.type !== "reasoning_delta" && value.type !== "assistant_text_delta")?.event;
+  if (!event) {
+    return operationState.runtimeEvents.length > 0
+      ? { kind: "provider", label: "Provider is working" }
+      : { kind: "idle", label: "Waiting for the next runtime update" };
+  }
+  switch (event.type) {
+    case "tool_started":
+      return { kind: "tool", label: event.label };
+    case "tool_completed":
+      return { kind: "transition", label: event.error ? `${event.label} failed` : `${event.label} completed` };
+    case "approval_required":
+      return { kind: "approval", label: "Approval required" };
+    case "run_status":
+      return { kind: "transition", label: event.message ?? event.status };
+    case "raw_event":
+      return { kind: "transition", label: event.message ?? event.rawEventType ?? "Runtime updated" };
+    case "assistant_text_delta":
+    case "reasoning_delta":
+      return { kind: "provider", label: "Provider is working" };
+  }
+}
+
+export function deriveRunningExecutionView(input: {
+  pageData: TaskPageData;
+  graphPlan: TaskPlanGraphPlan | null;
+  operationState: TaskWorkspaceOperationState;
+  currentNode: PlanNodeDataModel | null;
+  inspectedNode?: PlanNodeDataModel | null;
+}): RunningExecutionView | null {
+  if (!input.graphPlan || input.graphPlan.nodes.length === 0) return null;
+  const nodes = input.graphPlan.nodes;
+  const currentNode = input.currentNode && (isWaitingNode(input.currentNode) || input.currentNode.status === "blocked" || input.currentNode.status === "failed")
+    ? input.currentNode
+    : nodes.find(isActiveNode) ?? input.currentNode ?? null;
+  const completed = nodes.filter(isCompletedNode).length;
+  const active = nodes.filter(isActiveNode).length;
+  const waiting = nodes.filter(isWaitingNode).length;
+  const blocked = nodes.filter((node) => node.status === "blocked" || node.status === "failed").length;
+  const remaining = Math.max(0, nodes.length - completed - active - waiting - blocked);
+  const inspectedNode = input.inspectedNode ?? null;
+  const hasOutput = input.pageData.artifacts.length > 0 || nodes.some((node) => Boolean(node.result || node.completionSummary));
+
+  return {
+    progress: { completed, active, waiting, blocked, remaining, total: nodes.length },
+    currentStep: currentNode
+      ? {
+          id: currentNode.id,
+          label: currentNode.title,
+          objective: currentNode.objective?.trim() || null,
+          ordinal: Math.max(0, nodes.findIndex((node) => node.id === currentNode.id)) + 1 || null,
+          executorLabel: currentNode.executor?.trim() || currentNode.executionMode?.trim() || null,
+        }
+      : null,
+    currentActivity: currentActivity(input.operationState),
+    outputState: hasOutput ? "partial" : "empty",
+    inspectedStep: inspectedNode
+      ? { id: inspectedNode.id, label: inspectedNode.title, isCurrent: inspectedNode.id === currentNode?.id }
+      : null,
+  };
+}
+
 export function deriveTaskWorkspaceDisplayState(input: {
   pageData: TaskPageData;
   graphPlan: TaskPlanGraphPlan | null;
   operationState: TaskWorkspaceOperationState;
   currentNode: PlanNodeDataModel | null;
+  inspectedNode?: PlanNodeDataModel | null;
 }): TaskWorkspaceDisplayState {
   const workState = deriveTaskWorkStateView(input);
   const stage = deriveTaskWorkspaceStage(input);
@@ -413,6 +521,7 @@ export function deriveTaskWorkspaceDisplayState(input: {
     planReviewSummary: derivePlanReviewSummary(input.graphPlan),
     runPreview: deriveRunPreview({ pageData: input.pageData, graphPlan: input.graphPlan }),
     resultReview: deriveResultReview(input.pageData),
+    runningExecution: mode === "running" ? deriveRunningExecutionView(input) : null,
   };
 }
 
