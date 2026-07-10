@@ -405,13 +405,36 @@ async function finalizeOutcome(input: {
   });
 }
 
+const taskCommandTails = new Map<string, Promise<void>>();
+
+export async function executeCommand(
+  input: ExecutionCommandEnvelope & PlanExecutionObserver,
+): Promise<PlanExecutionResult> {
+  const previous = taskCommandTails.get(input.taskId) ?? Promise.resolve();
+  let release!: () => void;
+  const current = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const tail = previous.then(() => current);
+  taskCommandTails.set(input.taskId, tail);
+  await previous;
+  try {
+    return await executeCommandUnlocked(input);
+  } finally {
+    release();
+    if (taskCommandTails.get(input.taskId) === tail) {
+      taskCommandTails.delete(input.taskId);
+    }
+  }
+}
+
 /**
  * The single execution entry point. Every state-mutating execution action —
  * start, resume, approve, submit (in-process or out-of-band provider result),
  * block, fail, retry, pause, cancel, mutate — flows through here as one
  * ExecutionCommand, dispatched once and persisted once under an epoch guard.
  */
-export async function executeCommand(
+async function executeCommandUnlocked(
   input: ExecutionCommandEnvelope & PlanExecutionObserver,
 ): Promise<PlanExecutionResult> {
   const { taskId, command } = input;

@@ -336,17 +336,26 @@ export async function ensurePlanExecutionTaskSession(
     return existingSession;
   }
 
-  return db.taskSession.create({
-    data: {
-      taskId: input.taskId,
-      runtimeName: input.runtimeName,
-      sessionKey: expectedSessionKey,
-      label:
-        input.label?.trim() ||
-        `${input.taskTitle.trim() || "Task"} · Plan execution main session`,
-      createdByFramework: true,
-    },
-  });
+  try {
+    return await db.taskSession.create({
+      data: {
+        taskId: input.taskId,
+        runtimeName: input.runtimeName,
+        sessionKey: expectedSessionKey,
+        label:
+          input.label?.trim() ||
+          `${input.taskTitle.trim() || "Task"} · Plan execution main session`,
+        createdByFramework: true,
+      },
+    });
+  } catch (error) {
+    if (!isUniqueConstraintError(error)) throw error;
+    return db.taskSession.findUniqueOrThrow({ where: { sessionKey: expectedSessionKey } });
+  }
+}
+
+function isUniqueConstraintError(error: unknown) {
+  return Boolean(error && typeof error === "object" && "code" in error && error.code === "P2002");
 }
 
 export async function updateTaskSessionStateFromRun(input: {

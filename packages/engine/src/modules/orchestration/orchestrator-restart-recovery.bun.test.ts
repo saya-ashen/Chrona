@@ -315,6 +315,16 @@ describe("runRestartRecoveryWorker", () => {
       const session = await db.executionSession.create({
         data: { workspaceId: workspace.id, taskId: task.id, status: "Active", planId: "plan_wait" },
       });
+      await db.taskPlan.create({
+        data: {
+          workspaceId: workspace.id,
+          taskId: task.id,
+          planId: "plan_wait",
+          revision: 1,
+          status: "Accepted",
+          compiledPlan: {},
+        },
+      });
       await db.taskPlanRun.create({
         data: {
           workspaceId: workspace.id,
