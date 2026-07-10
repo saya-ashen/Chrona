@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { buildTaskHeaderSpec, type TaskHeaderActionInput, type TaskHeaderOccurrenceOptionInput, type TaskHeaderSpecInput, type TaskHeaderTaskStatus } from "@chrona/ui-protocol";
+import { deriveWorkStateView } from "@chrona/domain";
 import type { PlanExecutionStatus } from "@chrona/contracts/ai";
 import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
 import { getCurrentExecution } from "../plan-execution/use-cases/get-current-execution";
@@ -41,8 +42,11 @@ function taskStatusLabel(input: {
   executionStatus: PlanExecutionStatus;
   taskStatus: string;
 }) {
-  if (input.status === "approval-needed") return "Approval needed";
-  if (input.status === "completed") return input.taskStatus === "Done" ? "Task done" : "Result ready";
+  const workState = deriveWorkStateView({
+    taskStatus: input.taskStatus,
+    executionStatus: input.executionStatus,
+  });
+  if (input.status === "approval-needed" || input.status === "blocked" || input.status === "completed") return workState.label;
   return input.status.charAt(0).toUpperCase() + input.status.slice(1);
 }
 
@@ -50,11 +54,18 @@ function workspaceStateGuidance(input: {
   status: TaskHeaderTaskStatus;
   executionStatus: PlanExecutionStatus;
   taskStatus: string;
+  planStatus?: string | null;
+  hasPlan?: boolean;
+  hasAcceptedPlan?: boolean;
 }) {
-  if (input.status === "completed") {
-    return input.taskStatus === "Done" ? "Ask a follow-up or create a next task" : "Accept result or request changes";
-  }
-  return null;
+  const workState = deriveWorkStateView({
+    taskStatus: input.taskStatus,
+    executionStatus: input.executionStatus,
+    planStatus: input.planStatus,
+    hasPlan: input.hasPlan,
+    hasAcceptedPlan: input.hasAcceptedPlan,
+  });
+  return workState.nextActionLabel;
 }
 
 const ACTIVE_EXECUTION_STATUSES = new Set<PlanExecutionStatus>([
@@ -295,9 +306,19 @@ export function resolveTaskHeaderViewModel(input: BuildHeaderSpecInput & { now?:
   });
   actions.push({ id: "edit", label: "Edit" }, { id: "delete", label: "Delete Task" });
 
+  const hasPlan = Boolean(savedPlan);
+  const hasAcceptedPlan = savedPlan?.status === "accepted";
+  const workStateGuidance = workspaceStateGuidance({
+    status,
+    executionStatus: currentExecution.status,
+    taskStatus: scopedTaskStatus,
+    planStatus: savedPlan?.status ?? null,
+    hasPlan,
+    hasAcceptedPlan,
+  });
   return {
     title: task.title,
-    workspaceStateGuidance: workspaceStateGuidance({ status, executionStatus: currentExecution.status, taskStatus: scopedTaskStatus }),
+    workspaceStateGuidance: workStateGuidance,
     status,
     statusLabel: taskStatusLabel({ status, executionStatus: currentExecution.status, taskStatus: scopedTaskStatus }),
     progressLabel: `${totalSteps} steps · ${completedSteps} accepted · ${progressPercent}%`,

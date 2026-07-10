@@ -23,7 +23,7 @@ import { dashboardAiBriefDisabledState, getDashboardAiBriefState, type Dashboard
 
 const ATTENTION_STATES: ReadonlySet<WorkItemStateView["state"]> = new Set(["blocked", "failed", "waiting_for_approval", "waiting_for_input"]);
 const RUNNING_STATES: ReadonlySet<WorkItemStateView["state"]> = new Set(["running"]);
-const TERMINAL_STATES: ReadonlySet<WorkItemStateView["state"]> = new Set(["completed", "cancelled"]);
+const TERMINAL_STATES: ReadonlySet<WorkItemStateView["state"]> = new Set(["result_ready", "done", "cancelled"]);
 
 const PRIORITY_WEIGHT: Record<string, number> = { Urgent: 3, High: 2, Medium: 1, Low: 0 };
 

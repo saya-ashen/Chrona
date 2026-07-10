@@ -80,7 +80,7 @@ export async function autoStartScheduledPlanTasks(input?: { now?: Date }): Promi
         });
 
       if (!eligibility.ok) {
-        result.skipped.push({ taskId: task.id, workBlockId: block.id, reason: eligibility.reason });
+        result.skipped.push({ taskId: task.id, workBlockId: block.id, reason: eligibility.disabledReason });
 
         // `not_due` is the expected steady state for blocks inside the widened
         // look-ahead window; emitting a canonical event every tick would flood
@@ -99,6 +99,7 @@ export async function autoStartScheduledPlanTasks(input?: { now?: Date }): Promi
           source: "scheduler",
             payload: {
               reason: eligibility.reason,
+              disabledReason: eligibility.disabledReason,
               workBlockId: block.id,
               scheduledStartAt: block.scheduledStartAt?.toISOString() ?? null,
             },

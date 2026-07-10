@@ -9,8 +9,8 @@ describe("deriveTaskProjectionStateView", () => {
       latestRunStatus: "Failed",
     });
 
-    expect(view.state).toBe("completed");
-    expect(view.label).toBe("Completed");
+    expect(view.state).toBe("result_ready");
+    expect(view.label).toBe("Result ready");
     expect(view.source.providerStatus).toBe("Failed");
   });
 

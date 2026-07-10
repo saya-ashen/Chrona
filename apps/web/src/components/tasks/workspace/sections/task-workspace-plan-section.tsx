@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type Ref } from "react";
 import type { ExecutionActionInput, PlanExecutionResult, SubmitCheckpointActionInput } from "@chrona/contracts/ai";
 import type { TaskAction } from "@chrona/contracts";
 import { useI18n } from "@chrona/i18n/react";
@@ -268,39 +268,74 @@ function PlanReviewSummaryCard({ summary }: { summary: NonNullable<TaskWorkspace
 function RunPreviewCard({ preview }: { preview: NonNullable<TaskWorkspaceDisplayState["runPreview"]> }) {
   return (
     <Card size="sm" className="border-transparent bg-brand-mint/80 py-4" data-ui-surface-kind="runtime-control">
-      <CardHeader className="px-4 pb-1"><CardTitle className="font-heading text-xl font-medium tracking-[-0.03em]">Run preview</CardTitle></CardHeader>
+      <CardHeader className="px-4 pb-1"><CardTitle className="font-heading text-xl font-medium tracking-[-0.03em]">Run contract preview</CardTitle></CardHeader>
       <CardContent className="grid gap-3 px-4 text-xs sm:grid-cols-2">
-        <NodeDetailRow label="Provider" value={preview.providerLabel} />
+        <NodeDetailRow label="Plan" value={preview.planVersionLabel} />
+        <NodeDetailRow label="Trigger" value={preview.triggerLabel} />
+        <NodeDetailRow label="Provider/runtime" value={preview.providerLabel} />
+        <NodeDetailRow label="Work block" value={preview.scheduleLabel} />
+        <NodeDetailRow label="Automation readiness" value={preview.automationReadinessLabel} />
         <NodeDetailRow label="Mode" value={preview.modeLabel} />
         <NodeDetailRow label="Will start at" value={preview.startNodeLabel} />
+        <NodeDetailRow label="Result policy" value={preview.resultPolicyLabel} />
         <NodeDetailRow label="Previous result" value={preview.previousResultLabel ?? "No previous artifact"} />
         <SummaryList title="Expected stops" items={preview.expectedStops} empty="No planned stop" />
+        <SummaryList title="Controls" items={preview.capabilityLabels} empty="Cancel and retry" />
         <SummaryList title="Output destination" items={preview.outputDestinations} empty="Task result" />
       </CardContent>
     </Card>
   );
 }
 
-function ResultReviewCard({ review }: { review: NonNullable<TaskWorkspaceDisplayState["resultReview"]> }) {
+function ResultReviewCard({
+  review,
+  onAcceptResult,
+  onRequestChanges,
+  isAcceptingResult = false,
+  acceptResultError,
+}: {
+  review: NonNullable<TaskWorkspaceDisplayState["resultReview"]>;
+  onAcceptResult?: () => Promise<void> | void;
+  onRequestChanges?: () => void;
+  isAcceptingResult?: boolean;
+  acceptResultError?: string | null;
+}) {
   return (
     <Card size="sm" className="border-transparent bg-brand-teal py-5 text-white" data-ui-surface-kind="runtime-control">
       <CardHeader className="px-5 pb-1"><CardTitle className="font-heading text-2xl font-medium tracking-[-0.04em] text-white">{review.title}</CardTitle></CardHeader>
       <CardContent className="space-y-4 px-5 text-sm">
         <p className="text-white/78">{review.description}</p>
         <div className="flex flex-wrap gap-2" aria-label="Result review actions">
-          {review.actions.map((action) => <Button key={action.id} type="button" size="sm" variant={action.emphasis === "primary" ? "secondary" : "outline"} className={action.emphasis === "primary" ? "bg-background text-foreground hover:bg-background/90" : "border-white/35 bg-transparent text-white hover:bg-white/10 hover:text-white"}>{action.label}</Button>)}
+          {review.actions.map((action) => {
+            const isAccept = action.id === "accept_result";
+            const isRequestChanges = action.id === "request_changes";
+            return (
+              <Button
+                key={action.id}
+                type="button"
+                size="sm"
+                variant={action.emphasis === "primary" ? "secondary" : "outline"}
+                className={action.emphasis === "primary" ? "bg-background text-foreground hover:bg-background/90" : "border-white/35 bg-transparent text-white hover:bg-white/10 hover:text-white"}
+                disabled={isAccept ? isAcceptingResult || !onAcceptResult : false}
+                onClick={isAccept ? () => void onAcceptResult?.() : isRequestChanges ? onRequestChanges : undefined}
+              >
+                {isAccept && isAcceptingResult ? "Accepting result..." : action.label}
+              </Button>
+            );
+          })}
         </div>
+        {acceptResultError ? <p role="alert" className="text-xs font-medium text-white">{acceptResultError}</p> : null}
       </CardContent>
     </Card>
   );
 }
 
-function FollowUpComposerCard() {
+function FollowUpComposerCard({ textareaRef }: { textareaRef?: Ref<HTMLTextAreaElement> }) {
   return (
     <Card size="sm" className="border-transparent bg-card py-4" data-ui-surface-kind="product-authored">
       <CardHeader className="px-4 pb-1"><CardTitle className="font-heading text-xl font-medium tracking-[-0.03em]">Continue from result</CardTitle></CardHeader>
       <CardContent className="space-y-3 px-4 text-xs">
-        <Textarea placeholder="Ask a follow-up, request a result update, rerun a step, or create a linked follow-up task." className="min-h-24 rounded-2xl bg-background" />
+        <Textarea ref={textareaRef} placeholder="Ask a follow-up, request a result update, rerun a step, or create a linked follow-up task." className="min-h-24 rounded-2xl bg-background" />
         <div className="flex flex-wrap gap-1.5" aria-label="Follow-up intent">
           {FOLLOW_UP_INTENTS.map((intent) => <Badge key={intent.id} variant="outline" title={intent.description}>{intent.label}</Badge>)}
         </div>
@@ -395,6 +430,9 @@ type TaskWorkspacePlanSectionProps = {
   onSubmitCheckpointAction?: (
     action: SubmitCheckpointActionInput,
   ) => Promise<TaskExecutionDispatchResult>;
+  onAcceptResult?: () => Promise<void> | void;
+  isAcceptingResult?: boolean;
+  acceptResultError?: string | null;
 };
 
 export function TaskWorkspacePlanSection({
@@ -415,10 +453,14 @@ export function TaskWorkspacePlanSection({
   onApplyPlan,
   onDispatchExecutionAction,
   onSubmitCheckpointAction,
+  onAcceptResult,
+  isAcceptingResult = false,
+  acceptResultError,
 }: TaskWorkspacePlanSectionProps) {
   const [regenerationInstruction, setRegenerationInstruction] = useState("");
   const [submittedRevisionInstruction, setSubmittedRevisionInstruction] = useState<string | null>(null);
   const [selectedNode, setSelectedNode] = useState<PlanNodeDataModel | null>(null);
+  const followUpComposerRef = useRef<HTMLTextAreaElement>(null);
   const [graphMode, setGraphMode] = useState<"full" | "compact">("full");
   const { messages } = useI18n();
   const copy = messages.components.taskWorkspace;
@@ -632,8 +674,8 @@ export function TaskWorkspacePlanSection({
             onAction={focusNodeActions}
             operationPanel={(
               <div className="space-y-3">
-                {displayState.panels.resultReview && displayState.resultReview ? <ResultReviewCard review={displayState.resultReview} /> : null}
-                {displayState.panels.followUpComposer ? <FollowUpComposerCard /> : null}
+                {displayState.panels.resultReview && displayState.resultReview ? <ResultReviewCard review={displayState.resultReview} onAcceptResult={onAcceptResult} onRequestChanges={() => followUpComposerRef.current?.focus()} isAcceptingResult={isAcceptingResult} acceptResultError={acceptResultError} /> : null}
+                {displayState.panels.followUpComposer ? <FollowUpComposerCard textareaRef={followUpComposerRef} /> : null}
               </div>
             )}
           />
@@ -690,6 +732,7 @@ export function TaskWorkspacePlanSection({
                   <TaskWorkspaceOperationPanel
                     taskId={pageData.task.id}
                     state={operationState}
+                    workState={displayState.workState}
                     copy={copy}
                     onGeneratePlan={() => onGeneratePlan()}
                     onStartPlan={() => void onDispatchExecutionAction({ action: "start_manual" })}
@@ -698,8 +741,8 @@ export function TaskWorkspacePlanSection({
                     revisionPanel={revisionPanel}
                   />
                 ) : null}
-                {displayState.panels.resultReview && displayState.resultReview ? <ResultReviewCard review={displayState.resultReview} /> : null}
-                {displayState.panels.followUpComposer ? <FollowUpComposerCard /> : null}
+                {displayState.panels.resultReview && displayState.resultReview ? <ResultReviewCard review={displayState.resultReview} onAcceptResult={onAcceptResult} onRequestChanges={() => followUpComposerRef.current?.focus()} isAcceptingResult={isAcceptingResult} acceptResultError={acceptResultError} /> : null}
+                {displayState.panels.followUpComposer ? <FollowUpComposerCard textareaRef={followUpComposerRef} /> : null}
               </div>
             )}
           />

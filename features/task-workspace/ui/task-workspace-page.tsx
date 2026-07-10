@@ -182,6 +182,9 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
     acceptPlanById,
     dispatchExecutionAction,
     submitCheckpointAction,
+    handleAcceptResult,
+    isAcceptingResult,
+    acceptResultError,
     handleGeneratePlanFromHeader,
     handleStopPlanGeneration,
   } = useTaskWorkspacePlanState(task, refreshWorkspace, workspaceEvents);
@@ -346,6 +349,9 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
         }}
         onDispatchExecutionAction={dispatchExecutionAction}
         onSubmitCheckpointAction={submitCheckpointAction}
+        onAcceptResult={handleAcceptResult}
+        isAcceptingResult={isAcceptingResult}
+        acceptResultError={acceptResultError}
       />
     </div>
   );

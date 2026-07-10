@@ -65,6 +65,7 @@ function item(overrides: Partial<ScheduleRecord> = {}): ScheduleRecord {
       label: "Waiting for input",
       severity: "warning",
       primaryAction: "provide_input",
+      nextActionLabel: "Provide the requested input so execution can continue",
       secondaryActions: ["open_execution"],
       description: "Execution needs user input before it can continue.",
       disabledReason: "Waiting for input",
@@ -134,10 +135,11 @@ describe("SelectedBlockMainColumn", () => {
       displayState: null,
       latestRunStatus: "Failed",
       stateView: {
-        state: "completed",
-        label: "Completed",
+        state: "result_ready",
+        label: "Result ready",
         severity: "success",
-        primaryAction: "review_result",
+        primaryAction: "accept_result",
+        nextActionLabel: "Accept result or request changes",
         secondaryActions: [],
         description: "Execution completed successfully.",
         source: {
@@ -151,7 +153,7 @@ describe("SelectedBlockMainColumn", () => {
       },
     }));
 
-    expect(screen.getByText("Completed")).toBeInTheDocument();
+    expect(screen.getByText("Result ready")).toBeInTheDocument();
     expect(screen.queryByText("Failed")).not.toBeInTheDocument();
   });
 

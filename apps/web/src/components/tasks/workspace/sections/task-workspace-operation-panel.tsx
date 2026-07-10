@@ -1,5 +1,6 @@
 "use client";
 import type { ReactNode } from "react";
+import type { WorkStateView } from "@chrona/domain";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -14,6 +15,7 @@ type WorkspaceCopy = Record<string, string | undefined>;
 type TaskWorkspaceOperationPanelProps = {
   taskId: string;
   state: TaskWorkspaceOperationState;
+  workState: WorkStateView;
   copy: WorkspaceCopy;
   onGeneratePlan: () => void;
   onStartPlan: () => void;
@@ -76,9 +78,34 @@ function taskActionButtonVariant(state: Extract<TaskWorkspaceOperationState, { s
   return state.tone === "critical" ? "destructive" : "default";
 }
 
+function stateHelpText(workState: WorkStateView) {
+  if (workState.blocker) return `${workState.blocker.reason} · Scope: ${workState.blocker.scope}`;
+  if (workState.currentNodeLabel) return `Current step: ${workState.currentNodeLabel}`;
+  return workState.nextActionLabel;
+}
+
+function DecisionRecoveryCard({ workState }: { workState: WorkStateView }) {
+  if (!["waiting_for_input", "waiting_for_approval", "blocked", "failed", "cancelled"].includes(workState.state)) return null;
+  return (
+    <div className="rounded-2xl border border-foreground/15 bg-background/75 px-3 py-3 text-sm" data-testid="current-operation-decision-card">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 space-y-1">
+          <p className="font-semibold text-foreground">{workState.label}</p>
+          <p className="text-muted-foreground">{stateHelpText(workState)}</p>
+          {workState.currentNodeId ? <p className="text-xs text-muted-foreground">Node: {workState.currentNodeId}</p> : null}
+          <p className="text-xs font-semibold text-foreground">Next: {workState.nextActionLabel}</p>
+          {workState.primaryActionDisabledReason ? <p className="text-xs text-muted-foreground">Blocked: {workState.primaryActionDisabledReason}</p> : null}
+        </div>
+        <Badge variant={workState.tone === "danger" ? "destructive" : "outline"}>{workState.stage}</Badge>
+      </div>
+    </div>
+  );
+}
+
 export function TaskWorkspaceOperationPanel({
   taskId,
   state,
+  workState,
   copy,
   onGeneratePlan,
   onStartPlan,
@@ -125,11 +152,12 @@ export function TaskWorkspaceOperationPanel({
         </div>
       </CardHeader>
       <CardContent className="space-y-3 px-3">
+        <DecisionRecoveryCard workState={workState} />
         <ProviderApprovalBanner taskId={taskId} />
         {state.status === "task-action" ? (
           <div className="flex flex-col gap-2 rounded-xl border border-destructive/25 bg-background/80 px-3 py-2 shadow-sm sm:flex-row sm:items-center sm:justify-between" data-testid="current-operation-primary-action">
             <div className="min-w-0 text-xs">
-              <p className="font-semibold text-destructive">{copy.needsHandling ?? "Needs handling"}</p>
+              <p className="font-semibold text-destructive">{workState.label}</p>
               <p className="mt-0.5 line-clamp-2 text-muted-foreground">{state.description}</p>
             </div>
             <Button

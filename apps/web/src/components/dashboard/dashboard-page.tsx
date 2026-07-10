@@ -256,7 +256,7 @@ function NeedsYouCard({
                     <div className="min-w-0 flex-1 space-y-1">
                       <div className="flex min-w-0 items-center gap-2">
                         <span className="truncate text-sm font-medium">{item.title}</span>
-                        <Badge variant="outline" className="shrink-0">{copy.attention.kind[item.kind]}</Badge>
+                        <Badge variant="outline" className="shrink-0">{item.stateView.label}</Badge>
                       </div>
                       {item.reason ? <p className="line-clamp-2 text-xs text-muted-foreground">{item.reason}</p> : null}
                       {item.latestOutput ? <OutputLink output={item.latestOutput} /> : null}
@@ -266,7 +266,7 @@ function NeedsYouCard({
                     <span className="text-xs tabular-nums text-muted-foreground">{formatRelative(item.updatedAt, copy.time)}</span>
                     <Button asChild size="sm" variant="default" className="shrink-0 shadow-sm">
                       <LocalizedLink href={`/tasks/${item.taskId}`}>
-                        {copy.nextStep[item.nextStep]}
+                        {item.stateView.nextActionLabel}
                         <ArrowRight className="size-4" aria-hidden />
                       </LocalizedLink>
                     </Button>
@@ -473,9 +473,7 @@ function InProgressCard({
                 <div className="flex min-w-0 items-center gap-2.5">
                   <Loader2 className="size-4 shrink-0 animate-spin text-sky-500" aria-hidden />
                   <span className="truncate text-sm font-medium">{item.title}</span>
-                  {item.stage ? (
-                    <span className="truncate text-xs text-muted-foreground">{item.stage}</span>
-                  ) : null}
+                  <span className="truncate text-xs text-muted-foreground">{item.stateView.label}{item.stage ? ` · ${item.stage}` : ""}</span>
                 </div>
                 <Button asChild size="sm" variant="ghost" className="shrink-0">
                   <LocalizedLink href={`/tasks/${item.taskId}`}>{copy.openTask}</LocalizedLink>

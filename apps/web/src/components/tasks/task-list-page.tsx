@@ -170,11 +170,11 @@ function canStartTask(task: TaskItem): boolean {
 }
 
 function canCompleteTask(task: TaskItem): boolean {
-  return !["completed", "cancelled"].includes(task.stateView.state);
+  return !["result_ready", "done", "cancelled"].includes(task.stateView.state);
 }
 
 function canReopenTask(task: TaskItem): boolean {
-  return ["completed", "cancelled"].includes(task.stateView.state);
+  return ["done", "cancelled"].includes(task.stateView.state);
 }
 
 function TaskListHero({ title, copy, activeFilterLabel, counts }: { title: string; copy: TaskListCopy; activeFilterLabel: string; counts: TaskCounts }) {
@@ -321,9 +321,7 @@ function TaskRow({
                 {task.source.sourceName}
               </Badge>
             )}
-            {task.projection?.runStatus && task.projection.runStatus !== "idle" && (
-              <Badge variant="secondary">{task.projection.runStatus}</Badge>
-            )}
+            <Badge variant="outline">{task.stateView.nextActionLabel}</Badge>
           </div>
           {task.description && <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">{toPreviewText(task.description)}</p>}
           <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">

@@ -421,7 +421,9 @@ describe("TaskWorkspacePlanSection", () => {
     const primaryAction = within(operationPanel).getByTestId("current-operation-primary-action");
     expect(primaryAction).toBeInTheDocument();
     expect(primaryAction).toHaveClass("sm:flex-row");
-    expect(primaryAction).toHaveTextContent("Needs handling");
+    expect(primaryAction).toHaveTextContent("Failed");
+    expect(screen.queryByText("Needs handling")).not.toBeInTheDocument();
+    expect(within(operationPanel).getByTestId("current-operation-decision-card")).toHaveTextContent("Retry Run");
     expect(within(primaryAction).getByRole("button", { name: "Retry Run" })).toHaveClass("shrink-0");
     expect(within(primaryAction).getByRole("button", { name: "Retry Run" })).not.toHaveClass("w-full");
     fireEvent.click(within(operationPanel).getByRole("button", { name: "Retry Run" }));
@@ -664,6 +666,38 @@ describe("TaskWorkspacePlanSection", () => {
     expect(screen.queryByText("Running now")).not.toBeInTheDocument();
   });
 
+  it("shows run contract preview before execution starts", () => {
+    const acceptedPlan = {
+      id: "plan-1",
+      status: "accepted",
+      revision: 2,
+      updatedAt: "2026-05-18T00:00:00.000Z",
+    } as TaskPlanReadModel;
+    const readyNode = createTaskWorkspaceFixtureNode({ id: "execute", title: "Write report", status: "ready" });
+
+    renderWithQueryClient(
+      <TaskWorkspacePlanSection
+        label="Plan"
+        graphPlan={createTaskWorkspaceFixtureGraph([readyNode], "execute")}
+        isGraphPlanPending={false}
+        pageData={createTaskWorkspaceFixturePageData({ task: { savedPlan: acceptedPlan, aiPlanGenerationStatus: "accepted" } })}
+        plan={acceptedPlan}
+        planGenerationStatus="accepted"
+        acceptPlanError={null}
+        runtimeEvents={[]}
+        onGeneratePlan={vi.fn()}
+        onApplyPlan={vi.fn()}
+        onDispatchExecutionAction={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByText("Run contract preview")).toBeInTheDocument();
+    expect(screen.getByText("Revision 2")).toBeInTheDocument();
+    expect(screen.getByText("Manual start")).toBeInTheDocument();
+    expect(screen.getByText("Result requires explicit user acceptance before task is done")).toBeInTheDocument();
+    expect(screen.getByText("Manual start required; Chrona will not run this task unattended")).toBeInTheDocument();
+  });
+
   it("adds checkpoint controls as the current operation after execution starts", async () => {
     const onDispatchExecutionAction = vi.fn().mockResolvedValue({ message: "Input sent" });
     const onSubmitCheckpointAction = vi.fn().mockResolvedValue({ message: "Input sent" });
@@ -712,6 +746,73 @@ describe("TaskWorkspacePlanSection", () => {
     });
   });
 
+
+  it("shows distinct input and approval recovery cards in current operation", () => {
+    const acceptedPlan = { id: "plan-1", status: "accepted", revision: 1, updatedAt: "2026-05-18T00:00:00.000Z" } as TaskPlanReadModel;
+    const inputNode = createTaskWorkspaceFixtureNode({
+      id: "input-node",
+      title: "Collect missing city",
+      status: "waiting_for_user",
+      nextAction: "Provide checkpoint input",
+      checkpoint: { ...checkpoint, id: "run-1:input-node:input", nodeId: "input-node", kind: "user_input" },
+      availableActions: [{ id: "submit_input", label: "Submit input", kind: "input", emphasis: "primary", checkpointId: "run-1:input-node:input", checkpointAction: "submit_input" }],
+      interactiveFields: [{ key: "city", label: "City", value: "", control: "text", required: true }],
+    });
+    const approvalNode = createTaskWorkspaceFixtureNode({
+      id: "approval-node",
+      title: "Approve deploy",
+      status: "waiting_for_approval",
+      nextAction: "Approve deploy request",
+      checkpoint: { ...checkpoint, id: "run-1:approval-node:approval", nodeId: "approval-node", kind: "approval" },
+      availableActions: [{ id: "approve", label: "Approve", kind: "approve", emphasis: "primary", checkpointId: "run-1:approval-node:approval", checkpointAction: "approve_result" }],
+    });
+
+    const { rerender } = renderWithQueryClient(
+      <TaskWorkspacePlanSection
+        label="Plan"
+        graphPlan={createTaskWorkspaceFixtureGraph([inputNode], "input-node")}
+        isGraphPlanPending={false}
+        pageData={createTaskWorkspaceFixturePageData({ task: { savedPlan: acceptedPlan, status: "Running" } })}
+        plan={acceptedPlan}
+        planGenerationStatus="accepted"
+        acceptPlanError={null}
+        runtimeEvents={[]}
+        onGeneratePlan={vi.fn()}
+        onApplyPlan={vi.fn()}
+        onDispatchExecutionAction={vi.fn()}
+        onSubmitCheckpointAction={vi.fn()}
+      />,
+    );
+
+    let operationPanel = screen.getByRole("region", { name: "Current operation" });
+    expect(within(operationPanel).getByTestId("current-operation-decision-card")).toHaveTextContent("Input needed");
+    expect(within(operationPanel).getByTestId("current-operation-decision-card")).toHaveTextContent("Next: Provide the requested input so execution can continue");
+    expect(within(operationPanel).queryByText("Needs handling")).not.toBeInTheDocument();
+
+    rerender(
+      <QueryClientProvider client={new QueryClient()}>
+        <TaskWorkspacePlanSection
+          label="Plan"
+          graphPlan={createTaskWorkspaceFixtureGraph([approvalNode], "approval-node")}
+          isGraphPlanPending={false}
+          pageData={createTaskWorkspaceFixturePageData({ task: { savedPlan: acceptedPlan, status: "Running" } })}
+          plan={acceptedPlan}
+          planGenerationStatus="accepted"
+          acceptPlanError={null}
+          runtimeEvents={[]}
+          onGeneratePlan={vi.fn()}
+          onApplyPlan={vi.fn()}
+          onDispatchExecutionAction={vi.fn()}
+          onSubmitCheckpointAction={vi.fn()}
+        />
+      </QueryClientProvider>,
+    );
+
+    operationPanel = screen.getByRole("region", { name: "Current operation" });
+    expect(within(operationPanel).getByTestId("current-operation-decision-card")).toHaveTextContent("Approval needed");
+    expect(within(operationPanel).getByTestId("current-operation-decision-card")).toHaveTextContent("Next: Review the request, then approve, reject, or request changes");
+    expect(within(operationPanel).queryByText("Needs handling")).not.toBeInTheDocument();
+  });
   it("does not expose locally-derived actions without a backend checkpoint", () => {
     const node = createTaskWorkspaceFixtureNode({
       id: "checkpoint",
@@ -800,7 +901,7 @@ describe("TaskWorkspacePlanSection", () => {
     });
   });
 
-  it("shows task completed for completed nodes without actions", () => {
+  it("shows task completed for completed nodes without actions", async () => {
     const node = createTaskWorkspaceFixtureNode({
       id: "weather-script",
       title: "创建一个获取天气的脚本",
@@ -811,6 +912,8 @@ describe("TaskWorkspacePlanSection", () => {
       availableActions: [],
     });
     const graphPlan = createTaskWorkspaceFixtureGraph([node], "weather-script");
+
+    const onAcceptResult = vi.fn().mockResolvedValue(undefined);
 
     renderWithQueryClient(
       <TaskWorkspacePlanSection
@@ -825,6 +928,7 @@ describe("TaskWorkspacePlanSection", () => {
         onGeneratePlan={vi.fn()}
         onApplyPlan={vi.fn()}
         onDispatchExecutionAction={vi.fn()}
+        onAcceptResult={onAcceptResult}
       />,
     );
 
@@ -839,8 +943,14 @@ describe("TaskWorkspacePlanSection", () => {
     expect(within(commandCenter).queryByText("Result summary will appear here after the current node finishes.")).not.toBeInTheDocument();
     expect(screen.queryByRole("region", { name: "Execution flow" })).not.toBeInTheDocument();
     expect(within(commandCenter).getByText("Result ready for review")).toBeInTheDocument();
-    expect(within(commandCenter).getByRole("button", { name: "Accept result" })).toBeInTheDocument();
-    expect(within(commandCenter).getByRole("button", { name: "Request changes" })).toBeInTheDocument();
+    const acceptResultButton = within(commandCenter).getByRole("button", { name: "Accept result" });
+    const requestChangesButton = within(commandCenter).getByRole("button", { name: "Request changes" });
+    expect(acceptResultButton).toBeInTheDocument();
+    expect(requestChangesButton).toBeInTheDocument();
+    fireEvent.click(acceptResultButton);
+    await waitFor(() => expect(onAcceptResult).toHaveBeenCalledTimes(1));
+    fireEvent.click(requestChangesButton);
+    expect(screen.getByPlaceholderText("Ask a follow-up, request a result update, rerun a step, or create a linked follow-up task.")).toHaveFocus();
     expect(within(commandCenter).queryByRole("button", { name: "Complete task" })).not.toBeInTheDocument();
   });
 

@@ -4,6 +4,7 @@ export * from "./task/derive-task-static-state";
 export * from "./task/derive-schedule-state";
 export * from "./task/derive-work-item-state-view";
 export * from "./task/derive-task-projection-state-view";
+export * from "./task/derive-work-state-view";
 export * from "./task/validate-schedule-window";
 export * from "./plan";
 export * from "./ai-sidebar/proposal-state";

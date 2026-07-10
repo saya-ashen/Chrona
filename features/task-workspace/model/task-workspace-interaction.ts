@@ -1,3 +1,4 @@
+import { deriveWorkStateView, type WorkStateView } from "@chrona/domain";
 import type { PlanNodeDataModel, TaskPlanGraphPlan } from "../../../apps/web/src/components/tasks/plan/task-plan-graph/types";
 import type { TaskPageData } from "./task-workspace-types";
 import type { TaskWorkspaceOperationState } from "./task-workspace-operation-machine";
@@ -35,10 +36,16 @@ export type PlanReviewSummary = {
 
 export type RunPreview = {
   providerLabel: string;
+  planVersionLabel: string;
+  triggerLabel: string;
+  scheduleLabel: string;
+  capabilityLabels: string[];
+  resultPolicyLabel: string;
   modeLabel: string;
   startNodeLabel: string;
   expectedStops: string[];
   outputDestinations: string[];
+  automationReadinessLabel: string;
   previousResultLabel?: string;
 };
 
@@ -90,6 +97,7 @@ export type TaskWorkspaceDisplayRule = {
 
 export type TaskWorkspaceDisplayState = TaskWorkspaceDisplayRule & {
   stage: TaskWorkspaceStage;
+  workState: WorkStateView;
   readiness: TaskPlanningReadiness;
   planReviewSummary: PlanReviewSummary | null;
   runPreview: RunPreview | null;
@@ -257,58 +265,48 @@ export function deriveTaskPlanningReadiness(pageData: Pick<TaskPageData, "task" 
   };
 }
 
+function toneFromWorkState(tone: WorkStateView["tone"]): TaskWorkspaceStage["tone"] {
+  return tone === "danger" ? "critical" : tone;
+}
+
+export function deriveTaskWorkStateView(input: {
+  pageData: TaskPageData;
+  graphPlan: TaskPlanGraphPlan | null;
+  operationState: TaskWorkspaceOperationState;
+  currentNode?: PlanNodeDataModel | null;
+}): WorkStateView {
+  const planStatus = input.pageData.task.savedPlan?.status ?? null;
+  const hasPlan = Boolean(input.pageData.task.savedPlan ?? input.graphPlan);
+  const hasAcceptedPlan = planStatus === "accepted" || input.operationState.status === "plan-ready-to-run";
+  const currentNode = input.currentNode ?? input.operationState.currentNode ?? firstActionableNode(input.graphPlan);
+  return deriveWorkStateView({
+    taskStatus: input.pageData.task.status,
+    executionStatus: input.pageData.latestRunSummary?.executionState ?? input.pageData.latestRunSummary?.status ?? input.pageData.task.executionSummary?.executionState ?? currentNode?.status ?? null,
+    planStatus,
+    planGenerationStatus: input.pageData.task.aiPlanGenerationStatus ?? null,
+    hasPlan,
+    hasAcceptedPlan,
+    isRunnable: input.pageData.task.isRunnable,
+    disabledReason: input.pageData.task.runnabilityState === "blocked" ? input.pageData.task.runnabilitySummary : null,
+    currentNodeId: currentNode?.id ?? input.pageData.task.executionSummary?.currentNodeId ?? input.pageData.task.blockReason?.nodeId ?? null,
+    currentNodeLabel: currentNode?.title ?? null,
+    blockReason: input.pageData.task.blockReason,
+  });
+}
+
 export function deriveTaskWorkspaceStage(input: {
   pageData: TaskPageData;
   graphPlan: TaskPlanGraphPlan | null;
   operationState: TaskWorkspaceOperationState;
 }): TaskWorkspaceStage {
-  const { pageData, graphPlan, operationState } = input;
-  const currentNode = operationState.currentNode ?? firstActionableNode(graphPlan);
-  if (operationState.status === "execution-completed" || isCompletedStatus(pageData.task.status)) {
-    const isDone = normalized(pageData.task.status) === "done";
-    return {
-      stage: "result",
-      statusLabel: isDone ? "Task done" : "Result ready",
-      nextActionLabel: isDone ? "Ask a follow-up or create a next task" : "Accept result or request changes",
-      primaryActionId: isDone ? "ask_follow_up" : "accept_result",
-      tone: isDone ? "success" : "info",
-    };
-  }
-  if (operationState.status === "execution-running" || operationState.status === "execution-action" || operationState.status === "execution-blocked" || operationState.status === "task-action") {
-    return {
-      stage: "run",
-      statusLabel: operationState.statusLabel ?? pageData.task.status,
-      currentNodeLabel: currentNode?.title,
-      nextActionLabel: operationState.description,
-      primaryActionId: operationState.action,
-      tone: operationState.tone,
-    };
-  }
-  if (operationState.status === "plan-review") {
-    return {
-      stage: "review",
-      statusLabel: operationState.statusLabel ?? "Plan review",
-      nextActionLabel: operationState.canAcceptPlan ? "Review the summary, then accept the plan" : "Resolve plan review issue",
-      primaryActionId: "accept_plan",
-      tone: operationState.tone,
-    };
-  }
-  if (operationState.status === "plan-ready-to-run") {
-    return {
-      stage: "run",
-      statusLabel: operationState.statusLabel ?? "Ready to run",
-      currentNodeLabel: currentNode?.title,
-      nextActionLabel: "Review run preview, then start execution",
-      primaryActionId: "start_run",
-      tone: operationState.tone,
-    };
-  }
+  const workState = deriveTaskWorkStateView(input);
   return {
-    stage: "brief",
-    statusLabel: operationState.statusLabel ?? pageData.task.status,
-    nextActionLabel: operationState.status === "plan-generating" ? "Wait for Chrona to finish drafting the plan" : "Generate a plan",
-    primaryActionId: operationState.action,
-    tone: operationState.tone,
+    stage: workState.stage,
+    statusLabel: workState.label,
+    currentNodeLabel: workState.currentNodeLabel ?? undefined,
+    nextActionLabel: workState.nextActionLabel,
+    primaryActionId: workState.primaryActionId ?? "none",
+    tone: toneFromWorkState(workState.tone),
   };
 }
 
@@ -330,12 +328,14 @@ export function deriveTaskWorkspaceDisplayState(input: {
   operationState: TaskWorkspaceOperationState;
   currentNode: PlanNodeDataModel | null;
 }): TaskWorkspaceDisplayState {
+  const workState = deriveTaskWorkStateView(input);
   const stage = deriveTaskWorkspaceStage(input);
   const mode = displayModeFor({ pageData: input.pageData, operationState: input.operationState, stage });
   const rule = TASK_WORKSPACE_DISPLAY_RULES[mode];
   return {
     ...rule,
     stage,
+    workState,
     readiness: deriveTaskPlanningReadiness(input.pageData),
     planReviewSummary: derivePlanReviewSummary(input.graphPlan),
     runPreview: deriveRunPreview({ pageData: input.pageData, graphPlan: input.graphPlan, currentNode: input.currentNode }),
@@ -378,11 +378,26 @@ export function deriveRunPreview(input: {
     .map((node) => node.title)
     .slice(0, 5);
   const artifactCount = input.pageData.artifacts.length;
+  const checkpointCount = input.graphPlan.nodes.filter((node) => node.requiresHumanInput || nodeType(node) === "checkpoint").length;
+  const runtimeLabel = input.pageData.task.executionRuntime || input.pageData.defaultExecutionRuntime || "Default runtime";
+  const aiClientName = input.pageData.availableAiClients?.find((client) => client.id === input.pageData.task.aiClientId)?.name ?? input.pageData.task.aiClientId ?? null;
+  const providerLabel = aiClientName ? `${aiClientName} via ${runtimeLabel}` : runtimeLabel;
+  const automationReadinessLabel = input.pageData.task.isRunnable === false
+    ? input.pageData.task.runnabilitySummary || "Task is not runnable yet"
+    : input.pageData.task.autoExecute
+      ? "Automatic execution will start when schedule, provider, and accepted plan are ready"
+      : "Manual start required; Chrona will not run this task unattended";
   return {
-    providerLabel: input.pageData.task.executionRuntime || input.pageData.defaultExecutionRuntime || "Default provider",
+    providerLabel,
+    planVersionLabel: input.pageData.task.savedPlan ? `Revision ${input.pageData.task.savedPlan.revision}` : "Current accepted plan",
+    triggerLabel: input.pageData.task.autoExecute ? "Scheduled or automatic when eligible" : "Manual start",
+    scheduleLabel: input.pageData.task.scheduledStartAt ? `${input.pageData.task.scheduledStartAt}${input.pageData.task.scheduledEndAt ? ` -> ${input.pageData.task.scheduledEndAt}` : ""}` : "No scheduled work block",
+    automationReadinessLabel,
     modeLabel: expectedStops.length > 0 ? "Manual checkpoints" : "Auto where safe",
     startNodeLabel: startNode?.title ?? "First available step",
     expectedStops,
+    capabilityLabels: ["Cancel", "Retry", checkpointCount > 0 ? "Resume after approval" : "Resume"],
+    resultPolicyLabel: "Result requires explicit user acceptance before task is done",
     outputDestinations: ["Task result", artifactCount > 0 ? `${artifactCount} existing artifacts` : "Artifacts", "Activity trail"],
     previousResultLabel: input.pageData.artifacts.length > 0 ? `${input.pageData.artifacts.length} artifact${input.pageData.artifacts.length === 1 ? "" : "s"} already exist` : undefined,
   };

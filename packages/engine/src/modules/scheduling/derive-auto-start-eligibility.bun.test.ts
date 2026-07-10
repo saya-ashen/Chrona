@@ -21,10 +21,7 @@ function startAt(offsetMs: number): Date {
 
 describe("deriveAutoStartEligibility reasons", () => {
   it("reports not_scheduled without a work block", () => {
-    expect(deriveAutoStartEligibility({ task: task(), workBlock: null, now: NOW })).toEqual({
-      ok: false,
-      reason: "not_scheduled",
-    });
+    expect(deriveAutoStartEligibility({ task: task(), workBlock: null, now: NOW })).toMatchObject({ ok: false, reason: "not_scheduled" });
   });
 
   it("reports already_running for active execution states", () => {
@@ -36,7 +33,7 @@ describe("deriveAutoStartEligibility reasons", () => {
           now: NOW,
           activeRun: { status },
         }),
-      ).toEqual({ ok: false, reason: "already_running" });
+      ).toMatchObject({ ok: false, reason: "already_running" });
     }
   });
 
@@ -47,7 +44,7 @@ describe("deriveAutoStartEligibility reasons", () => {
         workBlock: { scheduledStartAt: startAt(-MINUTE) },
         now: NOW,
       }),
-    ).toEqual({ ok: false, reason: "invalid_task_status" });
+    ).toMatchObject({ ok: false, reason: "invalid_task_status" });
   });
 
   it("reports no_runtime_config before accepted plan checks", () => {
@@ -57,7 +54,7 @@ describe("deriveAutoStartEligibility reasons", () => {
         workBlock: { scheduledStartAt: startAt(-MINUTE) },
         now: NOW,
       }),
-    ).toEqual({ ok: false, reason: "no_runtime_config" });
+    ).toMatchObject({ ok: false, reason: "no_runtime_config" });
   });
 
   it("reports no_accepted_plan when runtime is configured", () => {
@@ -67,7 +64,21 @@ describe("deriveAutoStartEligibility reasons", () => {
         workBlock: { scheduledStartAt: startAt(-MINUTE) },
         now: NOW,
       }),
-    ).toEqual({ ok: false, reason: "no_accepted_plan" });
+    ).toMatchObject({ ok: false, reason: "no_accepted_plan" });
+  });
+
+  it("returns user-facing disabled reasons for readiness failures", () => {
+    expect(
+      deriveAutoStartEligibility({
+        task: task({ executionRuntime: null }),
+        workBlock: { scheduledStartAt: startAt(-MINUTE) },
+        now: NOW,
+      }),
+    ).toMatchObject({
+      ok: false,
+      reason: "no_runtime_config",
+      disabledReason: "Choose an execution runtime before automatic execution can start.",
+    });
   });
 });
 describe("deriveAutoStartEligibility timing offsets", () => {
@@ -77,7 +88,7 @@ describe("deriveAutoStartEligibility timing offsets", () => {
       workBlock: { scheduledStartAt: startAt(5 * MINUTE) },
       now: NOW,
     });
-    expect(result).toEqual({ ok: false, reason: "not_due" });
+    expect(result).toMatchObject({ ok: false, reason: "not_due" });
   });
 
   it("at_start: eligible once start has passed", () => {
@@ -95,7 +106,7 @@ describe("deriveAutoStartEligibility timing offsets", () => {
       workBlock: { scheduledStartAt: startAt(90 * MINUTE) },
       now: NOW,
     });
-    expect(result).toEqual({ ok: false, reason: "not_due" });
+    expect(result).toMatchObject({ ok: false, reason: "not_due" });
   });
 
   it("before_1h: eligible once within 1h of start (fires early)", () => {
@@ -122,6 +133,6 @@ describe("deriveAutoStartEligibility timing offsets", () => {
       workBlock: { scheduledStartAt: startAt(5 * MINUTE) },
       now: NOW,
     });
-    expect(result).toEqual({ ok: false, reason: "not_due" });
+    expect(result).toMatchObject({ ok: false, reason: "not_due" });
   });
 });

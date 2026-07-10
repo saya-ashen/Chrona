@@ -404,7 +404,7 @@ describe("DashboardPage", () => {
     );
     expect(screen.getByText("Blocked task")).toBeTruthy();
     expect(screen.getByText("Waiting on confirmation")).toBeTruthy();
-    expect(screen.getByRole("link", { name: /Resolve/ })).toHaveAttribute("href", "/en/tasks/s1");
+    expect(screen.getByRole("link", { name: /Resolve the blocker/ })).toHaveAttribute("href", "/en/tasks/s1");
     expect(screen.queryByText("Task stream")).not.toBeInTheDocument();
     expect(screen.getAllByText("Recent completions").length).toBeGreaterThan(0);
   });

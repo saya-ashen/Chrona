@@ -8,6 +8,7 @@ import {
   deriveRunPreview,
   deriveTaskPlanningReadiness,
   deriveTaskWorkspaceStage,
+  deriveTaskWorkStateView,
   TASK_WORKSPACE_DISPLAY_RULES,
 } from "../model/task-workspace-interaction";
 import type { TaskWorkspaceOperationState } from "../model/task-workspace-operation-machine";
@@ -144,9 +145,10 @@ describe("task workspace interaction model", () => {
       needsUser: ["Review draft report"],
     });
     expect(deriveRunPreview({ pageData: pageData(), graphPlan: graph, currentNode: null })).toMatchObject({
-      providerLabel: "omp",
+      providerLabel: "OMP via omp",
       modeLabel: "Manual checkpoints",
       startNodeLabel: "Fetch trending projects",
+      automationReadinessLabel: "Manual start required; Chrona will not run this task unattended",
       expectedStops: ["Review draft report"],
     });
   });
@@ -214,5 +216,53 @@ describe("task workspace interaction model", () => {
     expect(completedState.panels.operationPanel).toBe(false);
     expect(completedState.panels.selectedNodeDetails).toBe(false);
     expect(completedState.panels.resultReview).toBe(true);
+  });
+
+  it("routes workspace state through the shared canonical work-state model", () => {
+    const inputWait = deriveTaskWorkStateView({
+      pageData: pageData({
+        latestRunSummary: {
+          id: "run_1",
+          status: "waiting_for_user",
+          executionState: "waiting_for_user",
+          startedAt: "2026-07-09T00:00:00.000Z",
+          syncStatus: "synced",
+        },
+      }),
+      graphPlan: graphPlan(),
+      operationState: operationState({ status: "execution-action", action: "execution-action" } as unknown as Partial<TaskWorkspaceOperationState>),
+    });
+    const approvalWait = deriveTaskWorkStateView({
+      pageData: pageData({
+        latestRunSummary: {
+          id: "run_1",
+          status: "waiting_for_approval",
+          executionState: "waiting_for_approval",
+          startedAt: "2026-07-09T00:00:00.000Z",
+          syncStatus: "synced",
+        },
+      }),
+      graphPlan: graphPlan(),
+      operationState: operationState({ status: "execution-action", action: "execution-action" } as unknown as Partial<TaskWorkspaceOperationState>),
+    });
+    const resultReady = deriveTaskWorkStateView({
+      pageData: pageData({ task: { ...pageData().task, status: "Completed" } }),
+      graphPlan: graphPlan(),
+      operationState: operationState({ status: "execution-completed", action: "none" } as unknown as Partial<TaskWorkspaceOperationState>),
+    });
+    const done = deriveTaskWorkStateView({
+      pageData: pageData({ task: { ...pageData().task, status: "Done" } }),
+      graphPlan: graphPlan(),
+      operationState: operationState({ status: "execution-completed", action: "none" } as unknown as Partial<TaskWorkspaceOperationState>),
+    });
+
+    expect(inputWait.state).toBe("waiting_for_input");
+    expect(inputWait.label).toBe("Input needed");
+    expect(approvalWait.state).toBe("waiting_for_approval");
+    expect(approvalWait.label).toBe("Approval needed");
+    expect(resultReady.state).toBe("result_ready");
+    expect(resultReady.nextActionLabel).toBe("Accept result or request changes");
+    expect(done.state).toBe("done");
+    expect(done.nextActionLabel).toBe("Ask a follow-up or create a next task");
   });
 });

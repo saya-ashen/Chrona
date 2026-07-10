@@ -38,6 +38,12 @@ export type TaskWorkspaceCommandAck = {
   message: string;
 };
 export type TaskExecutionDispatchResult = TaskWorkspaceCommandAck;
+export type TaskResultAcceptResult = {
+  taskId: string;
+  workspaceId: string;
+  runId: string;
+};
+
 export type TaskCheckpointActionDispatchResult = TaskWorkspaceCommandAck;
 
 export type TaskPlanState = {
@@ -580,4 +586,8 @@ export async function submitTaskCheckpointAction(
 
   const ack = await response.json() as unknown as Omit<TaskWorkspaceCommandAck, "message">;
   return { ...ack, message: "Command accepted. Workspace will update shortly." };
+}
+
+export async function acceptTaskResult(taskId: string): Promise<TaskResultAcceptResult> {
+  return apiJson<TaskResultAcceptResult>(`/api/tasks/${encodeURIComponent(taskId)}/result/accept`, { method: "POST" });
 }

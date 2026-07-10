@@ -1,3 +1,4 @@
+import { deriveWorkStateView } from "@chrona/domain";
 import type { AiSidebarPageContextSummary, AiSidebarQuickAction } from "@chrona/contracts";
 import type { TaskData } from "../../../../../../../features/task-workspace";
 
@@ -129,7 +130,7 @@ function createTaskFingerprint({ task, activeNodeId, activeNodeStatus, blockReas
   ].join(":");
 }
 
-function createTaskContext({ task, activeNodeId, activeNodeStatus, blockReason, reviewState, primaryAction, latestActivitySummary }: {
+function createTaskContext({ task, activeNodeId, activeNodeStatus, blockReason, reviewState, primaryAction, latestActivitySummary, workStateLabel }: {
   task: TaskData;
   activeNodeId: string | null;
   activeNodeStatus: string | null;
@@ -137,6 +138,7 @@ function createTaskContext({ task, activeNodeId, activeNodeStatus, blockReason, 
   reviewState: string | null;
   primaryAction: string;
   latestActivitySummary?: string | null;
+  workStateLabel: string;
 }): AiSidebarPageContextSummary {
   const activeNodeTitle = getPlanNodeTitle(task, activeNodeId);
   const nodeLabel = activeNodeTitle ?? activeNodeId;
@@ -150,7 +152,7 @@ function createTaskContext({ task, activeNodeId, activeNodeStatus, blockReason, 
     taskTitle: task.title,
     activeNodeId,
     activeNodeTitle: nodeLabel,
-    nodeState: activeNodeStatus ?? task.status,
+    nodeState: activeNodeStatus ?? workStateLabel,
     blockReason,
     reviewState,
     primaryAction,
@@ -168,9 +170,24 @@ function getTaskReviewState(task: TaskData) {
 }
 
 function getTaskPrimaryAction(task: TaskData) {
-  if (task.status === "Done") return "Ask a follow-up or create a next task";
-  if (task.status === "Completed" && task.executionSummary?.executionState === "completed") return "Accept result or request changes";
-  return task.executionSummary?.primaryAction.label ?? (task.isRunnable ? "Continue task" : "Resolve runnability");
+  return deriveTaskWorkStateView(task).nextActionLabel;
+}
+
+function deriveTaskWorkStateView(task: TaskData) {
+  const savedPlanStatus = task.savedPlan?.status ?? null;
+  return deriveWorkStateView({
+    taskStatus: task.status,
+    executionStatus: task.executionSummary?.executionState ?? null,
+    planStatus: savedPlanStatus,
+    planGenerationStatus: task.aiPlanGenerationStatus ?? null,
+    hasPlan: Boolean(task.savedPlan),
+    hasAcceptedPlan: savedPlanStatus === "accepted",
+    isRunnable: task.isRunnable,
+    disabledReason: task.runnabilityState === "blocked" ? task.runnabilitySummary : null,
+    currentNodeId: task.executionSummary?.currentNodeId ?? task.blockReason?.nodeId ?? null,
+    currentNodeLabel: getPlanNodeTitle(task, task.executionSummary?.currentNodeId ?? null),
+    blockReason: task.blockReason,
+  });
 }
 
 export function createTaskAiSidebarContext(task: TaskData, options: { latestActivitySummary?: string | null } = {}): {
@@ -178,22 +195,14 @@ export function createTaskAiSidebarContext(task: TaskData, options: { latestActi
   actions: AiSidebarQuickAction[];
 } {
   const activeNode = findActiveNode(task);
+  const activeNodeId = activeNode?.id ?? null;
+  const activeNodeStatus = activeNode?.status ?? null;
   const blockReason = getTaskBlockReason(task);
   const reviewState = getTaskReviewState(task);
   const primaryAction = getTaskPrimaryAction(task);
-  const activeNodeId = activeNode?.id ?? null;
-  const activeNodeStatus = activeNode?.status ?? null;
-
+  const workState = deriveTaskWorkStateView(task);
   return {
-    context: createTaskContext({
-      task,
-      activeNodeId,
-      activeNodeStatus,
-      blockReason,
-      reviewState,
-      primaryAction,
-      latestActivitySummary: options.latestActivitySummary,
-    }),
+    context: createTaskContext({ task, activeNodeId, activeNodeStatus, blockReason, reviewState, primaryAction, latestActivitySummary: options.latestActivitySummary, workStateLabel: workState.label }),
     actions: createTaskActions({ hasPlan: Boolean(task.savedPlan), hasActiveNode: Boolean(activeNode), blockReason }),
   };
 }

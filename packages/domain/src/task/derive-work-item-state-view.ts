@@ -8,7 +8,8 @@ export type WorkItemUserState =
   | "waiting_for_approval"
   | "blocked"
   | "failed"
-  | "completed"
+  | "result_ready"
+  | "done"
   | "cancelled";
 
 export type WorkItemAction =
@@ -21,8 +22,10 @@ export type WorkItemAction =
   | "review_approval"
   | "resolve_blocker"
   | "retry"
+  | "accept_result"
   | "review_result"
-  | "reopen";
+  | "reopen"
+  | "ask_follow_up";
 
 export type WorkItemStateSeverity = "neutral" | "info" | "warning" | "danger" | "success";
 
@@ -32,6 +35,7 @@ export type WorkItemStateView = {
   description: string;
   severity: WorkItemStateSeverity;
   primaryAction: WorkItemAction | null;
+  nextActionLabel: string;
   secondaryActions: WorkItemAction[];
   disabledReason?: string;
   source: {
@@ -89,8 +93,8 @@ const NORMALIZED: Partial<Record<string, WorkItemUserState>> = {
   no_plan: "ready_to_plan",
   scheduled: "scheduled",
   unscheduled: "unscheduled",
-  completed: "completed",
-  done: "completed",
+  completed: "result_ready",
+  done: "done",
   cancelled: "cancelled",
   canceled: "cancelled",
 };
@@ -106,10 +110,10 @@ const PRIORITY: WorkItemUserState[] = [
   "scheduled",
   "unscheduled",
   "cancelled",
-  "completed",
+  "result_ready",
+  "done",
 ];
-
-const TERMINAL_WORK_ITEM_STATES = new Set<WorkItemUserState>(["completed", "cancelled"]);
+const TERMINAL_WORK_ITEM_STATES = new Set<WorkItemUserState>(["result_ready", "done", "cancelled"]);
 
 const PRESENTATION: Record<WorkItemUserState, Omit<WorkItemStateView, "source" | "disabledReason">> = {
   unscheduled: {
@@ -118,6 +122,7 @@ const PRESENTATION: Record<WorkItemUserState, Omit<WorkItemStateView, "source" |
     description: "Needs a planned time window.",
     severity: "neutral",
     primaryAction: "schedule",
+    nextActionLabel: "Schedule this task",
     secondaryActions: ["generate_plan"],
   },
   scheduled: {
@@ -126,6 +131,7 @@ const PRESENTATION: Record<WorkItemUserState, Omit<WorkItemStateView, "source" |
     description: "Scheduled but not ready to execute yet.",
     severity: "info",
     primaryAction: "generate_plan",
+    nextActionLabel: "Generate or accept a plan",
     secondaryActions: [],
   },
   ready_to_plan: {
@@ -134,6 +140,7 @@ const PRESENTATION: Record<WorkItemUserState, Omit<WorkItemStateView, "source" |
     description: "Needs a generated or accepted plan before execution.",
     severity: "info",
     primaryAction: "generate_plan",
+    nextActionLabel: "Generate a plan",
     secondaryActions: ["schedule"],
   },
   ready_to_execute: {
@@ -142,6 +149,7 @@ const PRESENTATION: Record<WorkItemUserState, Omit<WorkItemStateView, "source" |
     description: "Accepted plan is ready to run.",
     severity: "info",
     primaryAction: "start_execution",
+    nextActionLabel: "Start execution",
     secondaryActions: [],
   },
   running: {
@@ -150,6 +158,7 @@ const PRESENTATION: Record<WorkItemUserState, Omit<WorkItemStateView, "source" |
     description: "Execution is in progress.",
     severity: "info",
     primaryAction: "open_execution",
+    nextActionLabel: "Open execution",
     secondaryActions: [],
   },
   waiting_for_input: {
@@ -158,6 +167,7 @@ const PRESENTATION: Record<WorkItemUserState, Omit<WorkItemStateView, "source" |
     description: "Execution needs user input before it can continue.",
     severity: "warning",
     primaryAction: "provide_input",
+    nextActionLabel: "Provide the requested input so execution can continue",
     secondaryActions: ["open_execution"],
   },
   waiting_for_approval: {
@@ -166,6 +176,7 @@ const PRESENTATION: Record<WorkItemUserState, Omit<WorkItemStateView, "source" |
     description: "Execution needs user approval before it can continue.",
     severity: "warning",
     primaryAction: "review_approval",
+    nextActionLabel: "Review the request, then approve, reject, or request changes",
     secondaryActions: ["open_execution"],
   },
   blocked: {
@@ -174,6 +185,7 @@ const PRESENTATION: Record<WorkItemUserState, Omit<WorkItemStateView, "source" |
     description: "Execution is blocked and needs recovery.",
     severity: "danger",
     primaryAction: "resolve_blocker",
+    nextActionLabel: "Resolve the blocker before execution can continue",
     secondaryActions: ["retry"],
   },
   failed: {
@@ -182,15 +194,26 @@ const PRESENTATION: Record<WorkItemUserState, Omit<WorkItemStateView, "source" |
     description: "Execution failed and needs recovery.",
     severity: "danger",
     primaryAction: "retry",
+    nextActionLabel: "Review the failure reason, then retry or stop",
     secondaryActions: ["review_result"],
   },
-  completed: {
-    state: "completed",
-    label: "Completed",
-    description: "Work completed successfully.",
+  result_ready: {
+    state: "result_ready",
+    label: "Result ready",
+    description: "Execution completed and the result is ready for review.",
     severity: "success",
-    primaryAction: "review_result",
-    secondaryActions: ["reopen"],
+    primaryAction: "accept_result",
+    nextActionLabel: "Accept result or request changes",
+    secondaryActions: ["review_result"],
+  },
+  done: {
+    state: "done",
+    label: "Task done",
+    description: "Accepted result is closed; follow-up work can start from it.",
+    severity: "success",
+    primaryAction: "ask_follow_up",
+    nextActionLabel: "Ask a follow-up or create a next task",
+    secondaryActions: ["review_result"],
   },
   cancelled: {
     state: "cancelled",
@@ -198,6 +221,7 @@ const PRESENTATION: Record<WorkItemUserState, Omit<WorkItemStateView, "source" |
     description: "Work was cancelled before completion.",
     severity: "neutral",
     primaryAction: "review_result",
+    nextActionLabel: "Inspect the audit trail or reopen the task",
     secondaryActions: ["reopen"],
   },
 };
@@ -213,7 +237,7 @@ function pickState(input: DeriveWorkItemStateViewInput): WorkItemUserState {
   const nodeState = normalizeState(input.nodeStatus);
   const executionState = normalizeState(input.executionStatus);
   const taskState = normalizeState(input.taskStatus);
-  const terminalState = [executionState, taskState]
+  const terminalState = [taskState, executionState]
     .find((state) => state ? TERMINAL_WORK_ITEM_STATES.has(state) : false) ?? null;
   if (terminalState) return terminalState;
   const providerState = normalizeState(input.providerStatus);

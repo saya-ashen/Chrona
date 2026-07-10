@@ -17,7 +17,8 @@ const stateCases: Array<{
   { name: "waiting for approval", input: { nodeStatus: "waiting_for_approval", executionStatus: "Running" }, state: "waiting_for_approval", primaryAction: "review_approval" },
   { name: "blocked", input: { taskStatus: "Blocked", executionStatus: "Running" }, state: "blocked", primaryAction: "resolve_blocker" },
   { name: "failed", input: { providerStatus: "failed", taskStatus: "Running" }, state: "failed", primaryAction: "retry" },
-  { name: "completed", input: { taskStatus: "Completed", executionStatus: "Completed" }, state: "completed", primaryAction: "review_result" },
+  { name: "result ready", input: { taskStatus: "Completed", executionStatus: "Completed" }, state: "result_ready", primaryAction: "accept_result" },
+  { name: "done", input: { taskStatus: "Done", executionStatus: "Completed" }, state: "done", primaryAction: "ask_follow_up" },
   { name: "cancelled", input: { taskStatus: "Cancelled", executionStatus: "Cancelled" }, state: "cancelled", primaryAction: "review_result" },
 ];
 
@@ -35,12 +36,14 @@ describe("deriveWorkItemStateView", () => {
     expect(deriveWorkItemStateView({ taskStatus: "WaitingForApproval" }).state).toBe("waiting_for_approval");
   });
 
-  it("does not collapse cancelled into completed", () => {
+  it("does not collapse cancelled, result-ready, and done", () => {
     const cancelled = deriveWorkItemStateView({ taskStatus: "Cancelled" });
-    const completed = deriveWorkItemStateView({ taskStatus: "Completed" });
+    const resultReady = deriveWorkItemStateView({ taskStatus: "Completed" });
+    const done = deriveWorkItemStateView({ taskStatus: "Done" });
 
     expect(cancelled.state).toBe("cancelled");
-    expect(cancelled.label).not.toBe(completed.label);
+    expect(resultReady.label).toBe("Result ready");
+    expect(done.label).toBe("Task done");
   });
 
   it("prioritizes failed and blocked over running", () => {
@@ -48,9 +51,10 @@ describe("deriveWorkItemStateView", () => {
     expect(deriveWorkItemStateView({ taskStatus: "Running", nodeStatus: "blocked" }).state).toBe("blocked");
   });
 
-  it("treats failed provider status as diagnostic after completed task state", () => {
-    expect(deriveWorkItemStateView({ taskStatus: "Completed", providerStatus: "Failed" }).state).toBe("completed");
-    expect(deriveWorkItemStateView({ executionStatus: "Completed", providerStatus: "Failed" }).state).toBe("completed");
+  it("treats failed provider status as diagnostic after completed or done task state", () => {
+    expect(deriveWorkItemStateView({ taskStatus: "Completed", providerStatus: "Failed" }).state).toBe("result_ready");
+    expect(deriveWorkItemStateView({ taskStatus: "Done", providerStatus: "Failed" }).state).toBe("done");
+    expect(deriveWorkItemStateView({ executionStatus: "Completed", providerStatus: "Failed" }).state).toBe("result_ready");
   });
 
   it("removes primary action when disabled reason exists", () => {

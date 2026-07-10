@@ -297,28 +297,34 @@ test.describe("Task create → plan → run → result", () => {
         .toBe("Completed");
     });
 
-    // 5. Accept the result. The Work page exposes acceptance through the
-    //    REST contract the UI's `acceptResult` action also calls
-    //    (`POST /api/tasks/:taskId/result/accept`); there is no standalone
-    //    "Accept result" button in the current passive-hero surface. Assert
-    //    the engine projection before and after acceptance so the state
-    //    transition is pinned exactly.
-    await test.step("Accept the result and confirm the projection flips", async () => {
+    // 5. The Work page shows result-review state and exposes explicit product-owned
+    //    result acceptance. Accept via the same UI path users see, then assert the
+    //    projection flips to done.
+    await test.step("Accept the result through the workspace UI", async () => {
       const beforeBody = await getCurrentExecution(request, task.taskId);
       expect(beforeBody.status).toBe("completed");
-      const acceptRes = await request.post(`/api/tasks/${task.taskId}/result/accept`);
-      expect(acceptRes.ok()).toBeTruthy();
-      const acceptBody = (await acceptRes.json()) as { taskId?: string; runId?: string };
-      expect(acceptBody.taskId).toBe(task.taskId);
-      expect(acceptBody.runId).toBeTruthy();
-    });
 
-    // 6. The Work page header badge reflects result review after execution.
-    await test.step("Work page badge shows result review", async () => {
       await page.goto(WORK_URL(task.taskId));
       await dismissTaskEditorIfOpen(page);
       await expect(
         page.locator('[data-slot="badge"]').filter({ hasText: /^result ready$/i }),
+      ).toBeVisible({ timeout: 15_000 });
+      await expect(page.getByRole("button", { name: /^Accept result$/ })).toBeVisible();
+
+      const acceptResponse = page.waitForResponse((response) => (
+        response.url().includes(`/api/tasks/${task.taskId}/result/accept`) && response.request().method() === "POST"
+      ));
+      await page.getByRole("button", { name: /^Accept result$/ }).click();
+      const response = await acceptResponse;
+      expect(response.ok()).toBeTruthy();
+      const acceptBody = (await response.json()) as { taskId?: string; runId?: string };
+      expect(acceptBody.taskId).toBe(task.taskId);
+      expect(acceptBody.runId).toBeTruthy();
+
+      await page.goto(WORK_URL(task.taskId));
+      await dismissTaskEditorIfOpen(page);
+      await expect(
+        page.locator('[data-slot="badge"]').filter({ hasText: /^task done$/i }),
       ).toBeVisible({ timeout: 15_000 });
     });
 

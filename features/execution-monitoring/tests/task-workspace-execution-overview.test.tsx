@@ -132,6 +132,26 @@ describe("TaskWorkspaceExecutionOverview", () => {
     expect(screen.queryByText("0 shown · 0 live · 0 saved")).not.toBeInTheDocument();
   });
 
+  it("groups activity trail into audit categories", () => {
+    const trail = buildCommandCenterTrailTabSpec({
+      activity: [
+        { id: "tool", kind: "tool_completed", title: "Tool completed", summary: "Read plan", description: "Read plan", tone: "success" },
+        { id: "approval", kind: "approval", title: "Approval requested", summary: "Review deploy", description: "Review deploy", tone: "warning" },
+        { id: "artifact", kind: "artifact", title: "Report artifact", summary: "report.md", description: "report.md", tone: "info" },
+        { id: "failure", kind: "task", title: "Run failed", summary: "Provider failed", description: "Provider failed", tone: "danger" },
+      ],
+      runtimeEvents: [],
+      copy: { activityTitle: "Activity" },
+      toolLabels: { tool: "Tool", input: "Input", preview: "Preview", duration: "Duration", error: "Error" },
+    });
+
+    expect(trail.elements.groups?.props?.text).toContain("provider/tool activity: 1");
+    expect(trail.elements.groups?.props?.text).toContain("approvals: 1");
+    expect(trail.elements.groups?.props?.text).toContain("artifacts/results: 1");
+    expect(trail.elements.groups?.props?.text).toContain("failures/retries: 1");
+    validateChronaSpec(trail);
+  });
+
   it("keeps running status out of Results while activity stream stays live", () => {
     const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.running);
     const liveEvent = {

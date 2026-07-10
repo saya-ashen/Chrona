@@ -10,9 +10,9 @@ import { resetTestDb, seedTask, seedWorkspace } from "../bun-test-helpers";
 //
 // - throws if there is no latest run
 // - throws if the latest run is not Completed
-// - on success: emits a task.result_accepted event with the accepted
-//   run id and timestamp
-// - the engine publishes a workspace-updated event for projection
+// - on success: closes the task to Done, clears task blockers, emits a
+//   task.result_accepted event with the accepted run id and timestamp,
+//   rebuilds projections, and publishes a workspace-updated event for
 //   consumers (engine-level pub/sub only — the actual subscriber
 //   behavior is covered by the projection integration tests)
 
@@ -39,7 +39,7 @@ describe("acceptTaskResult (engine)", () => {
     await resetTestDb();
   });
 
-  it("emits a task.result_accepted event with the latest run id", async () => {
+  it("closes the task and emits a task.result_accepted event with the latest run id", async () => {
     const { workspaceId } = await seedWorkspace("Accept result basic");
     const taskId = await seedTaskWithRun(workspaceId, "Accept me", "Completed");
     const run = await db.run.findFirstOrThrow({ where: { taskId } });
@@ -48,6 +48,10 @@ describe("acceptTaskResult (engine)", () => {
     expect(result.taskId).toBe(taskId);
     expect(result.workspaceId).toBe(workspaceId);
     expect(result.runId).toBe(run.id);
+
+    const acceptedTask = await db.task.findUniqueOrThrow({ where: { id: taskId } });
+    expect(acceptedTask.status).toBe("Done");
+    expect(acceptedTask.completedAt).toEqual(run.endedAt);
 
     const events = await db.event.findMany({
       where: { taskId, eventType: "task.result_accepted" },

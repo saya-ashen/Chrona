@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { TaskContextLinks } from "@/components/tasks/shared/task-context-links";
 import { useI18n, useLocale } from "@chrona/i18n/react";
+import { deriveTaskProjectionStateView } from "@chrona/domain";
 
 export type ScheduleTaskListItem = {
   taskId: string;
@@ -141,42 +142,31 @@ function getRunnabilityTone(isRunnable: boolean) {
   return isRunnable ? ("secondary" as const) : ("destructive" as const);
 }
 
-function getTaskDisplayState(item: ScheduleTaskListItem) {
-  if (item.displayState) {
-    return item.displayState;
-  }
-
-  if (item.latestRunStatus) {
-    return item.latestRunStatus;
-  }
-
-  if (item.scheduleStatus && item.scheduleStatus !== "Unscheduled") {
-    return item.scheduleStatus;
-  }
-
-  if (item.isRunnable) {
-    return item.runnabilitySummary;
-  }
-
-  return item.persistedStatus;
+function getTaskStateView(item: ScheduleTaskListItem) {
+  return deriveTaskProjectionStateView({
+    persistedStatus: item.scheduleStatus === "Scheduled" && item.persistedStatus === "Draft" ? null : item.persistedStatus,
+    scheduleStatus: item.scheduleStatus,
+    displayState: item.displayState,
+    latestRunStatus: item.latestRunStatus,
+    isScheduled: Boolean(item.scheduledStartAt || item.scheduledEndAt || item.scheduleStatus === "Scheduled"),
+    disabledReason: item.isRunnable ? null : item.runnabilitySummary,
+  });
 }
 
+
 function matchesFilter(item: ScheduleTaskListItem, filter: ListFilterKey) {
+  const state = getTaskStateView(item).state;
   switch (filter) {
     case "all":
       return true;
     case "running":
-      return item.persistedStatus === "Running" || item.latestRunStatus === "Running" || item.latestRunStatus === "Pending";
+      return state === "running";
     case "waitingForApproval":
-      return item.latestRunStatus === "WaitingForApproval" || item.displayState === "WaitingForApproval";
+      return state === "waiting_for_approval";
     case "blocked":
-      return (
-        item.persistedStatus === "Blocked" &&
-        item.latestRunStatus !== "WaitingForApproval" &&
-        item.latestRunStatus !== "Failed"
-      );
+      return state === "blocked";
     case "failed":
-      return item.latestRunStatus === "Failed";
+      return state === "failed";
     case "unscheduled":
       return item.scheduleStatus === "Unscheduled";
     case "overdue":
@@ -316,6 +306,7 @@ export function ScheduleTaskList({
         ) : (
           filteredItems.map((item) => {
             const isExpanded = expandedTaskId === item.taskId;
+            const stateView = getTaskStateView(item);
 
             return (
               <Card key={item.taskId} className="overflow-visible rounded-2xl border border-border/70">
@@ -330,15 +321,13 @@ export function ScheduleTaskList({
                           {item.title}
                         </LocalizedLink>
                         <Badge variant={getPriorityTone(item.priority)}>{item.priority}</Badge>
-                        <Badge variant={getRunnabilityTone(item.isRunnable)}>{item.runnabilitySummary}</Badge>
+                        <Badge variant={getRunnabilityTone(item.isRunnable)}>{stateView.nextActionLabel}</Badge>
                         <Badge variant={getScheduleTone(item.scheduleStatus)}>
                           {item.scheduleStatus ?? copy.noSchedule}
                         </Badge>
-                        {item.latestRunStatus ? (
-                          <Badge variant={getRunTone(item.latestRunStatus)}>
-                            {copy.runPrefix}: {item.latestRunStatus}
-                          </Badge>
-                        ) : null}
+                        <Badge variant={getRunTone(item.latestRunStatus)}>
+                          {stateView.label}
+                        </Badge>
                       </div>
                       <p className="text-sm text-muted-foreground">
                         {item.sourceManaged
@@ -350,7 +339,7 @@ export function ScheduleTaskList({
                     <dl className="grid gap-2 text-sm text-muted-foreground sm:grid-cols-2 xl:grid-cols-3">
                       <div className="rounded-2xl border border-border/60 bg-background/70 px-3 py-2">
                         <dt className="text-xs uppercase tracking-[0.16em]">{copy.state}</dt>
-                        <dd className="mt-1 text-foreground">{getTaskDisplayState(item)}</dd>
+                        <dd className="mt-1 text-foreground">{stateView.label}</dd>
                       </div>
                       <div className="rounded-2xl border border-border/60 bg-background/70 px-3 py-2">
                         <dt className="text-xs uppercase tracking-[0.16em]">{copy.due}</dt>
@@ -367,7 +356,7 @@ export function ScheduleTaskList({
                     </dl>
 
                     <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-                      {item.actionRequired ? <Badge variant="secondary">{item.actionRequired}</Badge> : null}
+                      {stateView.disabledReason ? <Badge variant="secondary">{stateView.disabledReason}</Badge> : item.actionRequired ? <Badge variant="secondary">{item.actionRequired}</Badge> : null}
                       {item.approvalPendingCount > 0 ? (
                         <Badge variant="secondary">{copy.approvals}: {item.approvalPendingCount}</Badge>
                       ) : null}
