@@ -1,8 +1,9 @@
 import { expect, test } from "@playwright/test";
-import { getPrimaryTaskWorkspaceAction, setTaskWorkspaceViewport } from "./task-workspace-test-helpers";
+import { formatAccessibilityViolations, scanPageAccessibility } from "./accessibility-test-helpers";
+import { createTaskWorkspaceTask, getPrimaryTaskWorkspaceAction, setTaskWorkspaceViewport } from "./task-workspace-test-helpers";
 
 test.describe("Task workspace accessibility", () => {
-  test("reaches primary schedule actions by keyboard and accessible names", async ({ page }) => {
+  test("reaches primary schedule actions by keyboard and restores dialog focus", async ({ page }) => {
     await setTaskWorkspaceViewport(page, "desktop");
     await page.goto("/en/schedule");
 
@@ -13,5 +14,36 @@ test.describe("Task workspace accessibility", () => {
     await page.keyboard.press("Enter");
     await expect(page.getByPlaceholder("Add title")).toBeVisible();
     await expect(page.getByRole("button", { name: "Save" })).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.getByPlaceholder("Add title")).not.toBeVisible();
+    await expect.poll(async () => page.evaluate(() => document.activeElement?.textContent?.includes("New Task") ?? false)).toBe(true);
+  });
+
+  test("keeps the task workspace primary action keyboard-operable and axe-clean", async ({ page, request }, testInfo) => {
+    const viewport = testInfo.project.name === "chromium" ? "desktop" : testInfo.project.name as "tablet" | "mobile";
+    await setTaskWorkspaceViewport(page, viewport);
+    const task = await createTaskWorkspaceTask(request, {
+      title: `Accessible workspace ${viewport} ${Date.now()}`,
+      description: "Verify keyboard access, focus, and accessible structure.",
+    });
+
+    await page.goto(`/en/tasks/${task.taskId}`);
+    const generatePlan = page.getByRole("button", { name: /^Generate plan$/ });
+    await expect(generatePlan).toHaveCount(1);
+    await generatePlan.focus();
+    await expect(generatePlan).toBeFocused();
+
+    const editTask = page.getByRole("complementary", { name: "Plan creation action" }).getByRole("button", { name: /^Edit task brief$/ });
+    await editTask.focus();
+    await page.keyboard.press("Enter");
+    await expect(page.getByRole("dialog")).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("dialog")).not.toBeVisible();
+    await expect(editTask).toBeFocused();
+
+    const { violations } = await scanPageAccessibility(page);
+    const blocking = violations.filter((violation) => violation.impact === "critical" || violation.impact === "serious");
+    expect(formatAccessibilityViolations(blocking)).toEqual([]);
+    await expect.poll(async () => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
   });
 });

@@ -249,6 +249,7 @@ export function ControlPlaneShell({
                 onClick={() => setShowCreateTaskDialog(true)}
                 variant="default"
                 size="sm"
+                aria-label={t("nav.newTask")}
                 className="h-11 gap-1.5 rounded-xl px-4 sm:px-5"
               >
                 <Plus className="size-4" />
