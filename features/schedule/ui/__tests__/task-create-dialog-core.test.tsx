@@ -257,6 +257,11 @@ describe("TaskCreateDialog – Core functionality", () => {
     expect(preview).toHaveTextContent("If Chrona is not running at the scheduled time");
     expect(preview).toHaveTextContent("does not automatically retry");
     expect(preview).toHaveTextContent("Closing this page does not stop scheduled work");
+    expect(preview).toHaveTextContent("Plan approval");
+    expect(preview).toHaveTextContent("Chrona will generate and accept a valid plan before the scheduled start");
+    expect(preview).toHaveTextContent("Pauses");
+    expect(preview).toHaveTextContent("Execution pauses when input or approval is required");
+    expect(preview).toHaveTextContent("Closing Chrona");
   });
 
   it("shows the single missing-AI reason before saving automation", async () => {

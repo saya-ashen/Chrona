@@ -814,7 +814,7 @@ execution_started + provider_started + projection_updated
 
 #### TRANSPARENCY-02 — 完成自动化策略预演
 
-- 状态：`IN PROGRESS`
+- 状态：`DONE`
 - Task Create 和 Schedule 保存前共用 `AutomationPolicyPreview`，不在组件内重建规则。
 - 预演固定展示：开始时间和时区、AI runtime、readiness、是否需要计划批准、输入/审批暂停规则、失败重试规则、missed-run 行为、关闭页面和关闭 Chrona 进程后的行为。
 - 明确区分“取消未来 occurrence”和“停止当前运行”；只展示后端确实支持的动作。
@@ -935,6 +935,7 @@ fresh start
 - `2026-07-10 续查`：第 12 节七个工作包此前均仍写为 `TODO`，与 12.6 的实际执行记录冲突，现统一校正为 `IN PROGRESS`；第 11 节仍有 22 个未关闭 checkbox，不能使用第 3 节 `15/15` 推断发布验收完成。
 - 已修复两组过期测试期望：scheduler skip reason 现在断言共享 automation policy 的用户可见原因；input/approval recovery 使用 `arrayContaining` 验证推荐动作，同时允许 Diagnostics 安全动作。相关 domain/engine 35 tests passed。
 - `RELIABILITY-02 续查`：restart recovery 新增 WaitingForInput / WaitingForApproval 持久状态合同，确认重启扫描不将其 Abandon 且不创建第二个 run；duplicate execution 新增并发 manual Start，以及 manual Start 与 scheduler Start 同时竞争的测试，均确认只创建一个 provider attempt 和一个首节点 attempt。重启、调度与并发启动 focused tests 通过；`bun run typecheck` 通过。剩余发布缺口是启动真实独立进程后的 restart E2E。
+- `TRANSPARENCY-02 完成`：Task Create 的共享 policy preview 现在明确展示本地开始时间与 IANA 时区、AI runtime、计划审批语义、input/approval 暂停、missed-run、失败不自动重试，以及关闭页面/Chrona 进程后的行为；缺少 AI 时继续返回单一修复原因。UI focused 16 tests 与 domain policy 6 tests passed。取消未来 occurrence 与停止当前运行继续使用既有不同控制，不在预演中承诺不存在的新动作。
 
 ## 13. Task Workspace 桌面端重构方案（2026-07-10）
 

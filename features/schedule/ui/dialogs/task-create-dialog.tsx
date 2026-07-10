@@ -692,9 +692,11 @@ export function TaskCreateDialog({
                       </div>
                       <dl className="grid gap-2 sm:grid-cols-2">
                         <div><dt className="font-medium text-muted-foreground">{dialogCopy.automationProvider}</dt><dd>{policyPreview.providerName ?? dialogCopy.defaultProviderSummary}</dd></div>
-                        <div><dt className="font-medium text-muted-foreground">{dialogCopy.automationExecution}</dt><dd>{policyPreview.nextOccurrenceAt ? new Date(policyPreview.nextOccurrenceAt).toLocaleString() : policyPreview.disabledReason}</dd></div>
+                        <div><dt className="font-medium text-muted-foreground">{dialogCopy.automationExecution}</dt><dd>{policyPreview.nextOccurrenceAt ? `${new Date(policyPreview.nextOccurrenceAt).toLocaleString()} (${Intl.DateTimeFormat().resolvedOptions().timeZone})` : policyPreview.disabledReason}</dd></div>
+                        <div><dt className="font-medium text-muted-foreground">Plan approval</dt><dd>{policyPreview.requiresPlanAcceptance ? "You must review and accept the plan before execution." : "Chrona will generate and accept a valid plan before the scheduled start."}</dd></div>
+                        <div><dt className="font-medium text-muted-foreground">Pauses</dt><dd>{policyPreview.pauseConditions.join(" ") || "Execution starts only when you choose to run it."}</dd></div>
                         <div><dt className="font-medium text-muted-foreground">{dialogCopy.automationRecovery}</dt><dd>{policyPreview.missedRunPolicy} {policyPreview.retryPolicy}</dd></div>
-                        <div><dd>{policyPreview.processRequirement}</dd></div>
+                        <div><dt className="font-medium text-muted-foreground">Closing Chrona</dt><dd>{policyPreview.processRequirement}</dd></div>
                       </dl>
                     </div>
                   </div>
