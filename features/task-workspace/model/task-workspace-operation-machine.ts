@@ -1,8 +1,14 @@
 import type { UiDocument } from "@chrona/ui-protocol";
 import type { TaskAction } from "@chrona/contracts";
-import type { PlanNodeDataModel, TaskPlanGraphPlan } from "../../../apps/web/src/components/tasks/plan/task-plan-graph/types";
+import type {
+  PlanNodeDataModel,
+  TaskPlanGraphPlan,
+} from "../../../apps/web/src/components/tasks/plan/task-plan-graph/types";
 import type { WorkspaceRuntimeEvent } from "../../execution-monitoring";
-import type { TaskPageData, TaskPlanGenerationStatus } from "./task-workspace-types";
+import type {
+  TaskPageData,
+  TaskPlanGenerationStatus,
+} from "./task-workspace-types";
 
 export type TaskWorkspaceOperationStatus =
   | "plan-empty"
@@ -16,7 +22,9 @@ export type TaskWorkspaceOperationStatus =
   | "execution-completed";
 
 type OperationTone = "neutral" | "info" | "success" | "warning" | "critical";
-type OperationHandler = (params: Record<string, unknown>) => Promise<unknown> | unknown;
+type OperationHandler = (
+  params: Record<string, unknown>,
+) => Promise<unknown> | unknown;
 
 type BaseOperationState = {
   status: TaskWorkspaceOperationStatus;
@@ -30,18 +38,60 @@ type BaseOperationState = {
 };
 
 export type TaskWorkspaceOperationState =
-  | (BaseOperationState & { status: "plan-empty"; action: "generate-plan"; isGeneratingPlan: false })
-  | (BaseOperationState & { status: "plan-generating"; action: "none"; isGeneratingPlan: true })
-  | (BaseOperationState & { status: "plan-review"; action: "review-plan"; canAcceptPlan: boolean; acceptPlanError: string | null; visibleGenerationInstruction: string | null })
-  | (BaseOperationState & { status: "plan-ready-to-run"; action: "start-plan"; hasGraphExecutionStarted: boolean })
-  | (BaseOperationState & { status: "task-action"; action: "task-primary-action"; taskPrimaryAction: TaskAction })
-  | (BaseOperationState & { status: "execution-action"; action: "current-operation"; operationSpec: UiDocument | null; actionHandlers: Record<string, OperationHandler>; onActionStateChange?: (changes: Array<{ path: string; value: unknown }>) => void })
-  | (BaseOperationState & { status: "execution-blocked"; action: "current-operation"; operationSpec: UiDocument | null; actionHandlers: Record<string, OperationHandler>; onActionStateChange?: (changes: Array<{ path: string; value: unknown }>) => void })
+  | (BaseOperationState & {
+      status: "plan-empty";
+      action: "generate-plan";
+      isGeneratingPlan: false;
+    })
+  | (BaseOperationState & {
+      status: "plan-generating";
+      action: "none";
+      isGeneratingPlan: true;
+    })
+  | (BaseOperationState & {
+      status: "plan-review";
+      action: "review-plan";
+      canAcceptPlan: boolean;
+      acceptPlanError: string | null;
+      visibleGenerationInstruction: string | null;
+    })
+  | (BaseOperationState & {
+      status: "plan-ready-to-run";
+      action: "start-plan";
+      hasGraphExecutionStarted: boolean;
+    })
+  | (BaseOperationState & {
+      status: "task-action";
+      action: "task-primary-action";
+      taskPrimaryAction: TaskAction;
+    })
+  | (BaseOperationState & {
+      status: "execution-action";
+      action: "current-operation";
+      operationSpec: UiDocument | null;
+      actionHandlers: Record<string, OperationHandler>;
+      onActionStateChange?: (
+        changes: Array<{ path: string; value: unknown }>,
+      ) => void;
+    })
+  | (BaseOperationState & {
+      status: "execution-blocked";
+      action: "current-operation";
+      operationSpec: UiDocument | null;
+      actionHandlers: Record<string, OperationHandler>;
+      onActionStateChange?: (
+        changes: Array<{ path: string; value: unknown }>,
+      ) => void;
+    })
   | (BaseOperationState & { status: "execution-running"; action: "none" })
   | (BaseOperationState & { status: "execution-completed"; action: "none" });
 
 export type ResolveTaskWorkspaceOperationStateInput = {
-  plan: { status: string; prompt?: string | null; summary?: string | null } | null;
+  plan: {
+    status: string;
+    prompt?: string | null;
+    summary?: string | null;
+  } | null;
   planGenerationStatus: TaskPlanGenerationStatus;
   canAcceptPlan?: boolean;
   acceptPlanError: string | null;
@@ -56,29 +106,37 @@ export type ResolveTaskWorkspaceOperationStateInput = {
   shouldShowCurrentOperation: boolean;
   currentOperationSpec: UiDocument | null;
   currentOperationHandlers: Record<string, OperationHandler>;
-  onCurrentOperationStateChange?: (changes: Array<{ path: string; value: unknown }>) => void;
+  onCurrentOperationStateChange?: (
+    changes: Array<{ path: string; value: unknown }>,
+  ) => void;
   shouldUseTaskPrimaryAction: boolean;
   taskPrimaryAction: TaskAction | null;
   runtimeEvents: WorkspaceRuntimeEvent[];
 };
 
 function planDescription(input: ResolveTaskWorkspaceOperationStateInput) {
-  return input.plan?.summary?.trim()
-    || input.plan?.prompt?.trim()
-    || input.generationUserInstruction?.trim()
-    || "Review the draft plan before execution.";
+  return (
+    input.plan?.summary?.trim() ||
+    input.plan?.prompt?.trim() ||
+    input.generationUserInstruction?.trim() ||
+    "Review the draft plan before execution."
+  );
 }
 
-function currentOperationDescription(input: ResolveTaskWorkspaceOperationStateInput) {
+function currentOperationDescription(
+  input: ResolveTaskWorkspaceOperationStateInput,
+) {
   const nodeAction = input.currentNode?.nextAction?.trim();
   const blockDetail = input.pageData.task.blockReason?.detail?.trim();
 
-  return nodeAction
-    || blockDetail
-    || input.currentNode?.summary
-    || input.pageData.task.runnabilitySummary
-    || input.pageData.task.blockReason?.actionRequired
-    || "Review the current execution state.";
+  return (
+    nodeAction ||
+    blockDetail ||
+    input.currentNode?.summary ||
+    input.pageData.task.runnabilitySummary ||
+    input.pageData.task.blockReason?.actionRequired ||
+    "Review the current execution state."
+  );
 }
 
 function runningDescription(input: ResolveTaskWorkspaceOperationStateInput) {
@@ -91,7 +149,9 @@ function runningDescription(input: ResolveTaskWorkspaceOperationStateInput) {
     case "tool_started":
       return latestRuntime.label;
     case "tool_completed":
-      return latestRuntime.error ? `${latestRuntime.label} failed` : `${latestRuntime.label} completed`;
+      return latestRuntime.error
+        ? `${latestRuntime.label} failed`
+        : `${latestRuntime.label} completed`;
     case "approval_required":
       return "Approval required.";
     case "run_status":
@@ -101,28 +161,45 @@ function runningDescription(input: ResolveTaskWorkspaceOperationStateInput) {
   }
 }
 
-export function resolveTaskWorkspaceOperationState(input: ResolveTaskWorkspaceOperationStateInput): TaskWorkspaceOperationState {
+export function resolveTaskWorkspaceOperationState(
+  input: ResolveTaskWorkspaceOperationStateInput,
+): TaskWorkspaceOperationState {
   const base = {
     selectedNode: input.selectedNode,
     currentNode: input.currentNode,
     runtimeEvents: input.runtimeEvents,
   };
+  if (input.hasTaskCompleted) {
+    return {
+      ...base,
+      status: "execution-completed",
+      action: "none",
+      title: "Execution completed",
+      description: "Review the latest result, artifacts, and activity.",
+      statusLabel: null,
+      tone: "success",
+    };
+  }
+
   const isGeneratingPlan = input.planGenerationStatus === "generating";
   const isPlanAccepted = input.plan?.status === "accepted";
 
+  if (isGeneratingPlan) {
+    return {
+      ...base,
+      status: "plan-generating",
+      action: "none",
+      isGeneratingPlan: true,
+      title: "Generating plan…",
+      description:
+        input.generationUserInstruction?.trim() ||
+        "Chrona is generating, validating, and saving the plan before review.",
+      statusLabel: "Generating",
+      tone: "info",
+    };
+  }
+
   if (!input.plan) {
-    if (isGeneratingPlan) {
-      return {
-        ...base,
-        status: "plan-generating",
-        action: "none",
-        isGeneratingPlan: true,
-        title: "Generating plan…",
-        description: input.generationUserInstruction?.trim() || "Chrona is drafting an execution plan.",
-        statusLabel: "Generating",
-        tone: "info",
-      };
-    }
     return {
       ...base,
       status: "plan-empty",
@@ -140,25 +217,20 @@ export function resolveTaskWorkspaceOperationState(input: ResolveTaskWorkspaceOp
       ...base,
       status: "plan-review",
       action: "review-plan",
-      title: input.acceptPlanError ? "Plan review needs attention" : "Plan ready for review",
+      title: input.acceptPlanError
+        ? "Plan review needs attention"
+        : "Plan ready for review",
       description: planDescription(input),
-      statusLabel: input.acceptPlanError ? "Review needed" : (input.planGenerationStatus || input.plan.status),
+      statusLabel: input.acceptPlanError
+        ? "Review needed"
+        : input.planGenerationStatus || input.plan.status,
       tone: input.acceptPlanError ? "warning" : "info",
       canAcceptPlan: Boolean(input.canAcceptPlan),
       acceptPlanError: input.acceptPlanError,
-      visibleGenerationInstruction: input.plan.prompt?.trim() || input.generationUserInstruction?.trim() || null,
-    };
-  }
-
-  if (input.hasTaskCompleted) {
-    return {
-      ...base,
-      status: "execution-completed",
-      action: "none",
-      title: "Execution completed",
-      description: "Review the latest result, artifacts, and activity.",
-      statusLabel: null,
-      tone: "success",
+      visibleGenerationInstruction:
+        input.plan.prompt?.trim() ||
+        input.generationUserInstruction?.trim() ||
+        null,
     };
   }
 
@@ -169,24 +241,36 @@ export function resolveTaskWorkspaceOperationState(input: ResolveTaskWorkspaceOp
       action: "task-primary-action",
       taskPrimaryAction: input.taskPrimaryAction,
       title: input.taskPrimaryAction.label,
-      description: input.pageData.task.blockReason?.detail
-        || input.pageData.task.runnabilitySummary
-        || input.pageData.task.blockReason?.actionRequired
-        || "Complete the required task action to continue.",
-      statusLabel: input.pageData.task.blockReason?.blockType ?? input.pageData.task.status,
-      tone: input.taskPrimaryAction.type === "retry_sync" || input.taskPrimaryAction.type === "cancel" || input.taskPrimaryAction.type === "cancel_execution"
-        ? "critical"
-        : "warning",
+      description:
+        input.pageData.task.blockReason?.detail ||
+        input.pageData.task.runnabilitySummary ||
+        input.pageData.task.blockReason?.actionRequired ||
+        "Complete the required task action to continue.",
+      statusLabel:
+        input.pageData.task.blockReason?.blockType ??
+        input.pageData.task.status,
+      tone:
+        input.taskPrimaryAction.type === "retry_sync" ||
+        input.taskPrimaryAction.type === "cancel" ||
+        input.taskPrimaryAction.type === "cancel_execution"
+          ? "critical"
+          : "warning",
     };
   }
 
-  if (!input.hasGraphExecutionStarted || (input.taskPrimaryAction?.type === "start" && input.taskPrimaryAction.enabled)) {
+  if (
+    !input.hasGraphExecutionStarted ||
+    (input.taskPrimaryAction?.type === "start" &&
+      input.taskPrimaryAction.enabled)
+  ) {
     return {
       ...base,
       status: "plan-ready-to-run",
       action: "start-plan",
       title: "Plan accepted",
-      description: input.hasGraphExecutionStarted ? "Continue the accepted plan from the current state." : "Start the accepted plan when ready.",
+      description: input.hasGraphExecutionStarted
+        ? "Continue the accepted plan from the current state."
+        : "Start the accepted plan when ready.",
       statusLabel: input.plan.status,
       hasGraphExecutionStarted: input.hasGraphExecutionStarted,
       tone: "success",
@@ -194,12 +278,16 @@ export function resolveTaskWorkspaceOperationState(input: ResolveTaskWorkspaceOp
   }
 
   if (input.shouldShowCurrentOperation && input.currentNode) {
-    const blocked = input.currentNode.status === "blocked" || Boolean(input.pageData.task.blockReason);
+    const blocked =
+      input.currentNode.status === "blocked" ||
+      Boolean(input.pageData.task.blockReason);
     return {
       ...base,
       status: blocked ? "execution-blocked" : "execution-action",
       action: "current-operation",
-      title: blocked ? "Action required" : (input.currentNode.title || "Current operation"),
+      title: blocked
+        ? "Action required"
+        : input.currentNode.title || "Current operation",
       description: currentOperationDescription(input),
       statusLabel: input.currentNode.statusLabel ?? input.currentNode.status,
       tone: blocked ? "warning" : "info",

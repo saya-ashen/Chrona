@@ -150,6 +150,21 @@ describe("resolveTaskWorkspaceOperationState", () => {
     expect(state.title).toBe(title);
   });
 
+  it("does not expose plan review while a draft is still generating or validating", () => {
+    const state = resolveTaskWorkspaceOperationState(baseInput({
+      plan: { status: "draft", prompt: null, summary: "Unpersisted draft" },
+      planGenerationStatus: "generating",
+      canAcceptPlan: true,
+    }));
+
+    expect(state).toMatchObject({
+      status: "plan-generating",
+      action: "none",
+      isGeneratingPlan: true,
+      title: "Generating plan…",
+    });
+  });
+
   it("uses block detail as the blocked operation description", () => {
     const node = createTaskWorkspaceFixtureNode({ id: "failed", title: "Fetch trending", status: "failed" });
     const state = resolveTaskWorkspaceOperationState(baseInput({
