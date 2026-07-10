@@ -1,7 +1,7 @@
 {
   "name": "@chrona-org/cli",
   "version": "0.2.0",
-  "description": "Chrona — AI-native task control plane for planning, scheduling, and observing runtime-powered work",
+  "description": "Chrona — local AI work executor for governed planning, scheduling, recovery, and results",
   "license": "MIT",
   "type": "module",
   "repository": {

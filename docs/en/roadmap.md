@@ -2,7 +2,7 @@
 
 Current version: 0.2.0
 
-Chrona is an open-source AI schedule app. Its job is not to compete with models at raw planning, summarization, or tool choice. Those capabilities will keep moving into the model layer. Chrona should compound around what stronger AI makes more important: time-bound execution, human control, provider governance, observable state, recoverable failures, and trusted results.
+Chrona is a local AI work executor. Users decide what should happen, when it may run, and which boundaries must not be crossed; Chrona plans, schedules, pauses for decisions, preserves evidence, and delivers results. It does not compete with models at raw planning, summarization, or tool choice. Those capabilities will keep moving into the model layer. Chrona should compound around what stronger AI makes more important: time-bound execution, human control, provider governance, observable state, recoverable failures, and trusted results.
 
 The product loop is:
 
