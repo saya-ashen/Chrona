@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { useI18n } from "@chrona/i18n/react";
 import { providerCapabilityMatrix, type ProviderCapabilityMatrixEntry, type ProviderCapabilityName } from "@chrona/providers-foundation/capability-matrix";
+import { deriveAutomationReadiness } from "@chrona/domain";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -85,7 +86,7 @@ type TestResult = {
 type ReadinessState = "ready" | "limited" | "warning" | "pending";
 
 type ReadinessItem = {
-  key: "configured" | "reachable" | "execution" | "recovery";
+  key: "overall" | "configured" | "reachable" | "execution" | "recovery";
   label: string;
   state: ReadinessState;
   detail: string;
@@ -441,12 +442,31 @@ function readinessItems(input: {
   enabled: boolean;
   testStatus: TestStatus;
   testReason: string | null;
+  bindings: string[];
 }): ReadinessItem[] {
   const matrix = providerMatrixEntry(input.type);
   const missingExecution = matrix
     ? EXECUTION_CAPABILITY_CHECKS.filter((capability) => !matrix.capabilities[capability])
     : [];
+  const canonical = deriveAutomationReadiness({
+    providerId: input.configured ? input.type : null,
+    providerConfigured: input.configured && input.enabled,
+    providerTested: input.testStatus !== "idle",
+    providerReachable: input.testStatus === "available",
+    planningCapable: input.bindings.some((binding) => binding === "generate_plan" || binding === "generatePlan" || binding === "task.plan"),
+    executionCapable: input.bindings.some((binding) => binding === "task.execution" || binding === "execute"),
+    requiresPlanning: true,
+    autoExecute: true,
+    hasAcceptedPlan: true,
+    scheduledStartAt: new Date(0),
+  });
   return [
+    {
+      key: "overall",
+      label: canonical.readiness === "ready" ? input.copy.ready : input.copy.needsAttention,
+      state: canonical.readiness === "ready" ? "ready" : "pending",
+      detail: canonical.disabledReason ?? input.copy.readinessCapabilityDetail,
+    },
     {
       key: "configured",
       label: input.copy.readinessConfigured,
@@ -608,6 +628,8 @@ const DEFAULTS: Record<string, string> = {
   unavailable: "Unavailable",
   statusUnknown: "Not tested",
   reasonUnknown: "No details yet",
+  ready: "Ready",
+  needsAttention: "Needs attention",
   readinessConfigured: "Configured",
   readinessReachable: "Reachable",
   readinessCapability: "Can run tasks",
@@ -623,6 +645,8 @@ const DEFAULTS: Record<string, string> = {
   recoverySnapshotOnly: "Can sync run state; live progress is not replayed after disconnect.",
   recoverySessionHistory: "Session context is saved; if execution is interrupted, retry this step to continue.",
   recoveryUnavailable: "Interrupted runs cannot be recovered automatically.",
+  advancedSettings: "Advanced settings",
+  advancedSettingsHelp: "Provider endpoints, model overrides, directories, timeouts, and capability assignment.",
 };
 
 function getCopy(messages: Record<string, unknown>): Record<string, string> {
@@ -716,6 +740,7 @@ function ClientForm({
     enabled: true,
     testStatus,
     testReason,
+    bindings: values.bindings,
   });
 
 
@@ -939,6 +964,10 @@ function ClientForm({
               </Card>
             )}
 
+            <details className="rounded-lg border border-border/70 bg-muted/15 p-3">
+              <summary className="cursor-pointer font-medium text-foreground">{copy.advancedSettings}</summary>
+              <p className="mt-1 text-xs text-muted-foreground">{copy.advancedSettingsHelp}</p>
+              <div className="mt-4 grid gap-4">
             {!isDebugClient && !isClaudeCodeClient && !isCodexClient && !isOmpClient && (
               <>
                 <Field>
@@ -1225,6 +1254,8 @@ function ClientForm({
                 </div>
               </Field>
             )}
+              </div>
+            </details>
 
 
             <ReadinessChecklist items={formReadiness} />
@@ -1435,6 +1466,7 @@ export function AiClientsManager() {
           enabled: client.enabled,
           testStatus: cardTestState.status,
           testReason: cardTestState.reason,
+          bindings: client.bindings,
         });
 
 

@@ -88,7 +88,7 @@ export async function loadTaskListData({ params, request }: LoaderFunctionArgs):
 
   const requestUrl = new URL(request.url);
   const query = new URLSearchParams({ workspaceId });
-  for (const key of ["filter", "priority", "search", "sort", "order", "page", "pageSize"] as const) {
+  for (const key of ["filter", "priority", "search", "sort", "order", "page", "pageSize", "view", "resultDate"] as const) {
     const value = requestUrl.searchParams.get(key);
     if (value) query.set(key, value);
   }

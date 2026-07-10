@@ -49,7 +49,7 @@ import type { DashboardData } from "@/components/dashboard/dashboard-types";
 import { apiJson } from "@/api";
 import type { Dictionary } from "@/pages";
 import type { UiDocument } from "@chrona/ui-protocol";
-import { deriveWorkItemStateView } from "@chrona/domain";
+import { deriveWorkStateView } from "@chrona/domain";
 
 const COPY = {
   title: "Chrona Dashboard",
@@ -175,8 +175,8 @@ function completed(overrides: Partial<DashboardData["autoCompleted"][number]> = 
     ...overrides,
   } as DashboardData["autoCompleted"][number];
 }
-function stateView(status: string) {
-  return deriveWorkItemStateView({ taskStatus: status });
+function stateView(taskStatus: string, executionStatus?: string) {
+  return deriveWorkStateView({ taskStatus, executionStatus });
 }
 
 
@@ -259,11 +259,9 @@ describe("DashboardPage", () => {
             {
               taskId: "t2",
               title: "Stuck task",
-              status: "Blocked",
               priority: "High",
               kind: "blocked",
               reason: "Waiting",
-              nextStep: "resolve_block",
               stateView: stateView("Blocked"),
               latestOutput: null,
               updatedAt: null,
@@ -285,11 +283,9 @@ describe("DashboardPage", () => {
             {
               taskId: "t2",
               title: "Stuck task",
-              status: "WaitingForApproval",
               priority: "High",
               kind: "approval",
               reason: "Allow deleting the old branch?",
-              nextStep: "approve_or_edit",
               stateView: stateView("WaitingForApproval"),
               latestOutput: null,
               updatedAt: null,
@@ -300,7 +296,7 @@ describe("DashboardPage", () => {
       />,
     );
     expect(screen.getByText("1 pending")).toBeTruthy();
-    expect(screen.getByText("Waiting for approval")).toBeTruthy();
+    expect(screen.getByText("Approval needed")).toBeTruthy();
   });
 
   it("shows the AI summary placeholder until a generated spec exists", () => {
@@ -387,11 +383,9 @@ describe("DashboardPage", () => {
             {
               taskId: "s1",
               title: "Blocked task",
-              status: "Blocked",
               priority: "High",
               kind: "blocked",
               reason: "Waiting on confirmation",
-              nextStep: "resolve_block",
               stateView: stateView("Blocked"),
               latestOutput: null,
               updatedAt: null,

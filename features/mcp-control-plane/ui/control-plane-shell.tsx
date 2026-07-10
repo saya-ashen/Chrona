@@ -64,6 +64,7 @@ export function ControlPlaneShell({
   const [showCreateTaskDialog, setShowCreateTaskDialog] = useState(false);
   const [isCreatingTask, setIsCreatingTask] = useState(false);
   const [createdOnboardingTaskId, setCreatedOnboardingTaskId] = useState<string | null>(null);
+  const [useSafeDemoDefaults, setUseSafeDemoDefaults] = useState(false);
   const [startWithChronaCompletedAt, setStartWithChronaCompletedAt] = useState<string | null | undefined>(undefined);
   const taskDialogDefaults = useMemo(() => {
     const initialStartAt = new Date();
@@ -265,6 +266,10 @@ export function ControlPlaneShell({
               workspaceId={_defaultWorkspace.id}
               isComplete={false}
               onCreateTask={() => setShowCreateTaskDialog(true)}
+              onCreateSafeDemo={() => {
+                setUseSafeDemoDefaults(true);
+                setShowCreateTaskDialog(true);
+              }}
               onOpenCreatedTask={(taskId) => {
                 void completeStartWithChrona();
                 router.push(localizeHref(locale, `/tasks/${taskId}`));
@@ -303,11 +308,18 @@ export function ControlPlaneShell({
         </nav>
       </div>
       <TaskCreateDialog
+        initialTitle={useSafeDemoDefaults ? t("components.schedulePage.firstRunSafeDemoTitle") : ""}
+        initialDescription={useSafeDemoDefaults ? t("components.schedulePage.firstRunSafeDemoDescription") : ""}
+        initialAutoPlanGenerationEnabled={useSafeDemoDefaults ? true : undefined}
+        initialAutoExecute={useSafeDemoDefaults ? false : undefined}
         isOpen={showCreateTaskDialog}
         initialStartAt={taskDialogDefaults.initialStartAt}
         initialEndAt={taskDialogDefaults.initialEndAt}
         isPending={isCreatingTask}
-        onClose={() => setShowCreateTaskDialog(false)}
+        onClose={() => {
+          setShowCreateTaskDialog(false);
+          setUseSafeDemoDefaults(false);
+        }}
         onSubmit={async (input) => {
           try {
             setIsCreatingTask(true);

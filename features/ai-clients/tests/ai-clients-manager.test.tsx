@@ -124,6 +124,7 @@ describe("AiClientsManager", () => {
 
     await screen.findByText("No AI client is connected yet. Connect one to unlock planning, suggestions, and execution previews.");
     fireEvent.click(screen.getByRole("button", { name: "+ Add Client" }));
+    fireEvent.click(screen.getByText("Advanced settings"));
 
     fireEvent.change(screen.getByPlaceholderText("My Claude Code Client"), {
       target: { value: "Hermes Client" },
@@ -161,6 +162,7 @@ describe("AiClientsManager", () => {
 
     await screen.findByText("No AI client is connected yet. Connect one to unlock planning, suggestions, and execution previews.");
     fireEvent.click(screen.getByRole("button", { name: "+ Add Client" }));
+    fireEvent.click(screen.getByText("Advanced settings"));
 
     fireEvent.change(screen.getByPlaceholderText("My Claude Code Client"), {
       target: { value: "Local Hermes" },
@@ -235,6 +237,7 @@ describe("AiClientsManager", () => {
 
     await screen.findByText("No AI client is connected yet. Connect one to unlock planning, suggestions, and execution previews.");
     fireEvent.click(screen.getByRole("button", { name: "+ Add Client" }));
+    fireEvent.click(screen.getByText("Advanced settings"));
 
     fireEvent.change(screen.getByPlaceholderText("My Claude Code Client"), {
       target: { value: "Claude Code via 9router" },
@@ -302,6 +305,7 @@ describe("AiClientsManager", () => {
 
     await screen.findByText("No AI client is connected yet. Connect one to unlock planning, suggestions, and execution previews.");
     fireEvent.click(screen.getByRole("button", { name: "+ Add Client" }));
+    fireEvent.click(screen.getByText("Advanced settings"));
 
     fireEvent.change(screen.getByPlaceholderText("My Claude Code Client"), {
       target: { value: "Codex" },
@@ -370,6 +374,7 @@ describe("AiClientsManager", () => {
 
     await screen.findByText("No AI client is connected yet. Connect one to unlock planning, suggestions, and execution previews.");
     fireEvent.click(screen.getByRole("button", { name: "+ Add Client" }));
+    fireEvent.click(screen.getByText("Advanced settings"));
 
     fireEvent.change(screen.getByPlaceholderText("My Claude Code Client"), {
       target: { value: "Local OMP" },

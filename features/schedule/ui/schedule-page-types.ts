@@ -1,4 +1,4 @@
-import type { WorkItemStateView } from "@chrona/domain";
+import type { WorkStateView } from "@chrona/domain";
 import type { ScheduleTaskListItem } from "./schedule-task-list";
 import type { TaskConfigAiClient, TaskConfigExecutionRuntime } from "./forms/task-config-form";
 import type { TaskPlanReadModel } from "@chrona/contracts/ai";
@@ -109,7 +109,7 @@ export type ScheduleRecord = {
   aiPlanGenerationStatus?: ScheduleAiPlanGenerationStatus;
   autoStartEligible?: boolean;
   autoStartReason?: string | null;
-  stateView?: WorkItemStateView;
+  stateView?: WorkStateView;
 } & ScheduleRuntimeFields;
 
 type ScheduleProposal = {

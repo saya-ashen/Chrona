@@ -9,10 +9,15 @@ import {
 } from "./forms/task-config-form";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { TaskContextLinks } from "@/components/tasks/shared/task-context-links";
 import { useI18n, useLocale } from "@chrona/i18n/react";
-import { deriveTaskProjectionStateView } from "@chrona/domain";
+import { deriveWorkStateView, type WorkStateTone } from "@chrona/domain";
 
 export type ScheduleTaskListItem = {
   taskId: string;
@@ -58,9 +63,14 @@ type ScheduleTaskListProps = {
   items: ScheduleTaskListItem[];
   executionRuntimes: TaskConfigExecutionRuntime[];
   defaultExecutionRuntime: string;
-  availableAiClients?: Parameters<typeof TaskConfigForm>[0]["availableAiClients"];
+  availableAiClients?: Parameters<
+    typeof TaskConfigForm
+  >[0]["availableAiClients"];
   isPending: boolean;
-  onSaveTaskConfigAction: (taskId: string, input: TaskConfigFormInput) => Promise<void>;
+  onSaveTaskConfigAction: (
+    taskId: string,
+    input: TaskConfigFormInput,
+  ) => Promise<void>;
 };
 
 type ListFilterKey =
@@ -119,40 +129,34 @@ function getScheduleTone(status: string | null | undefined) {
   }
 }
 
-function getRunTone(status: string | null | undefined) {
-  if (!status) {
-    return "outline" as const;
-  }
-
-  switch (status.toLowerCase()) {
-    case "completed":
-      return "secondary" as const;
-    case "waitingforapproval":
-    case "waitingforinput":
-      return "secondary" as const;
-    case "failed":
-    case "cancelled":
+function getWorkStateTone(tone: WorkStateTone) {
+  switch (tone) {
+    case "danger":
       return "destructive" as const;
-    default:
+    case "info":
+    case "success":
+    case "warning":
+      return "secondary" as const;
+    case "neutral":
       return "outline" as const;
   }
 }
 
-function getRunnabilityTone(isRunnable: boolean) {
-  return isRunnable ? ("secondary" as const) : ("destructive" as const);
-}
-
 function getTaskStateView(item: ScheduleTaskListItem) {
-  return deriveTaskProjectionStateView({
-    persistedStatus: item.scheduleStatus === "Scheduled" && item.persistedStatus === "Draft" ? null : item.persistedStatus,
-    scheduleStatus: item.scheduleStatus,
-    displayState: item.displayState,
-    latestRunStatus: item.latestRunStatus,
-    isScheduled: Boolean(item.scheduledStartAt || item.scheduledEndAt || item.scheduleStatus === "Scheduled"),
+  return deriveWorkStateView({
+    taskStatus:
+      item.scheduleStatus === "Scheduled" && item.persistedStatus === "Draft"
+        ? null
+        : item.persistedStatus,
+    executionStatus: item.displayState ?? item.latestRunStatus,
+    isRunnable: item.isRunnable,
     disabledReason: item.isRunnable ? null : item.runnabilitySummary,
+    blockReason:
+      item.approvalPendingCount > 0
+        ? { blockType: "approval_pending", actionRequired: item.actionRequired }
+        : null,
   });
 }
-
 
 function matchesFilter(item: ScheduleTaskListItem, filter: ListFilterKey) {
   const state = getTaskStateView(item).state;
@@ -230,22 +234,46 @@ export function ScheduleTaskList({
     chronaNotesEmpty: t("components.taskConfigForm.chronaNotesEmpty"),
   };
 
-  const listFilters: Array<{ key: ListFilterKey; label: string; emptyMessage: string }> = [
-    { key: "all", label: t("components.scheduleTaskList.all"), emptyMessage: t("components.scheduleTaskList.emptyAll") },
-    { key: "running", label: t("components.scheduleTaskList.running"), emptyMessage: t("components.scheduleTaskList.emptyRunning") },
+  const listFilters: Array<{
+    key: ListFilterKey;
+    label: string;
+    emptyMessage: string;
+  }> = [
+    {
+      key: "all",
+      label: t("components.scheduleTaskList.all"),
+      emptyMessage: t("components.scheduleTaskList.emptyAll"),
+    },
+    {
+      key: "running",
+      label: t("components.scheduleTaskList.running"),
+      emptyMessage: t("components.scheduleTaskList.emptyRunning"),
+    },
     {
       key: "waitingForApproval",
       label: t("components.scheduleTaskList.waitingForApproval"),
       emptyMessage: t("components.scheduleTaskList.emptyWaitingForApproval"),
     },
-    { key: "blocked", label: t("components.scheduleTaskList.blocked"), emptyMessage: t("components.scheduleTaskList.emptyBlocked") },
-    { key: "failed", label: t("components.scheduleTaskList.failed"), emptyMessage: t("components.scheduleTaskList.emptyFailed") },
+    {
+      key: "blocked",
+      label: t("components.scheduleTaskList.blocked"),
+      emptyMessage: t("components.scheduleTaskList.emptyBlocked"),
+    },
+    {
+      key: "failed",
+      label: t("components.scheduleTaskList.failed"),
+      emptyMessage: t("components.scheduleTaskList.emptyFailed"),
+    },
     {
       key: "unscheduled",
       label: t("components.scheduleTaskList.unscheduled"),
       emptyMessage: t("components.scheduleTaskList.emptyUnscheduled"),
     },
-    { key: "overdue", label: t("components.scheduleTaskList.overdue"), emptyMessage: t("components.scheduleTaskList.emptyOverdue") },
+    {
+      key: "overdue",
+      label: t("components.scheduleTaskList.overdue"),
+      emptyMessage: t("components.scheduleTaskList.emptyOverdue"),
+    },
     {
       key: "notRunnable",
       label: t("components.scheduleTaskList.notRunnable"),
@@ -256,13 +284,20 @@ export function ScheduleTaskList({
   const counts = useMemo(
     () =>
       Object.fromEntries(
-        listFilters.map((filter) => [filter.key, items.filter((item) => matchesFilter(item, filter.key)).length]),
+        listFilters.map((filter) => [
+          filter.key,
+          items.filter((item) => matchesFilter(item, filter.key)).length,
+        ]),
       ) as Record<ListFilterKey, number>,
     [items, listFilters],
   );
 
-  const activeFilterConfig = listFilters.find((filter) => filter.key === activeFilter) ?? listFilters[0];
-  const filteredItems = useMemo(() => items.filter((item) => matchesFilter(item, activeFilter)), [activeFilter, items]);
+  const activeFilterConfig =
+    listFilters.find((filter) => filter.key === activeFilter) ?? listFilters[0];
+  const filteredItems = useMemo(
+    () => items.filter((item) => matchesFilter(item, activeFilter)),
+    [activeFilter, items],
+  );
 
   return (
     <Card className="space-y-4">
@@ -288,14 +323,20 @@ export function ScheduleTaskList({
               className="gap-2"
             >
               <span>{filter.label}</span>
-              <Badge variant={isActive ? "secondary" : "outline"}>{counts[filter.key]}</Badge>
+              <Badge variant={isActive ? "secondary" : "outline"}>
+                {counts[filter.key]}
+              </Badge>
             </Button>
           );
         })}
       </div>
 
       <p className="text-sm text-muted-foreground">
-        {copy.showingPrefix} <span className="font-medium text-foreground">{activeFilterConfig.label}</span> {copy.showingSuffix}
+        {copy.showingPrefix}{" "}
+        <span className="font-medium text-foreground">
+          {activeFilterConfig.label}
+        </span>{" "}
+        {copy.showingSuffix}
       </p>
 
       <div className="space-y-3">
@@ -309,44 +350,67 @@ export function ScheduleTaskList({
             const stateView = getTaskStateView(item);
 
             return (
-              <Card key={item.taskId} className="overflow-visible rounded-2xl border border-border/70">
+              <Card
+                key={item.taskId}
+                className="overflow-visible rounded-2xl border border-border/70"
+              >
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                   <div className="min-w-0 flex-1 space-y-3">
                     <div className="space-y-1">
                       <div className="flex flex-wrap items-center gap-2">
                         <LocalizedLink
-                          href={item.workBlockId ? `/tasks/${item.taskId}?workBlockId=${encodeURIComponent(item.workBlockId)}` : `/tasks/${item.taskId}`}
+                          href={
+                            item.workBlockId
+                              ? `/tasks/${item.taskId}?workBlockId=${encodeURIComponent(item.workBlockId)}`
+                              : `/tasks/${item.taskId}`
+                          }
                           className="text-base font-semibold text-foreground transition-colors hover:text-primary"
                         >
                           {item.title}
                         </LocalizedLink>
-                        <Badge variant={getPriorityTone(item.priority)}>{item.priority}</Badge>
-                        <Badge variant={getRunnabilityTone(item.isRunnable)}>{stateView.nextActionLabel}</Badge>
+                        <Badge variant={getPriorityTone(item.priority)}>
+                          {item.priority}
+                        </Badge>
+                        <Badge variant={getWorkStateTone(stateView.tone)}>
+                          {stateView.nextActionLabel}
+                        </Badge>
                         <Badge variant={getScheduleTone(item.scheduleStatus)}>
                           {item.scheduleStatus ?? copy.noSchedule}
                         </Badge>
-                        <Badge variant={getRunTone(item.latestRunStatus)}>
+                        <Badge variant={getWorkStateTone(stateView.tone)}>
                           {stateView.label}
                         </Badge>
                       </div>
                       <p className="text-sm text-muted-foreground">
                         {item.sourceManaged
-                          ? item.description || item.sourceManaged.description || copy.chronaNotesEmpty
-                          : item.description ?? copy.noDescription}
+                          ? item.description ||
+                            item.sourceManaged.description ||
+                            copy.chronaNotesEmpty
+                          : (item.description ?? copy.noDescription)}
                       </p>
                     </div>
 
                     <dl className="grid gap-2 text-sm text-muted-foreground sm:grid-cols-2 xl:grid-cols-3">
                       <div className="rounded-2xl border border-border/60 bg-background/70 px-3 py-2">
-                        <dt className="text-xs uppercase tracking-[0.16em]">{copy.state}</dt>
-                        <dd className="mt-1 text-foreground">{stateView.label}</dd>
+                        <dt className="text-xs uppercase tracking-[0.16em]">
+                          {copy.state}
+                        </dt>
+                        <dd className="mt-1 text-foreground">
+                          {stateView.label}
+                        </dd>
                       </div>
                       <div className="rounded-2xl border border-border/60 bg-background/70 px-3 py-2">
-                        <dt className="text-xs uppercase tracking-[0.16em]">{copy.due}</dt>
-                        <dd className="mt-1 text-foreground">{formatDateTime(locale, item.dueAt)}</dd>
+                        <dt className="text-xs uppercase tracking-[0.16em]">
+                          {copy.due}
+                        </dt>
+                        <dd className="mt-1 text-foreground">
+                          {formatDateTime(locale, item.dueAt)}
+                        </dd>
                       </div>
                       <div className="rounded-2xl border border-border/60 bg-background/70 px-3 py-2">
-                        <dt className="text-xs uppercase tracking-[0.16em]">{copy.scheduled}</dt>
+                        <dt className="text-xs uppercase tracking-[0.16em]">
+                          {copy.scheduled}
+                        </dt>
                         <dd className="mt-1 text-foreground">
                           {item.scheduledStartAt
                             ? `${formatDateTime(locale, item.scheduledStartAt)} → ${formatDateTime(locale, item.scheduledEndAt)}`
@@ -356,12 +420,22 @@ export function ScheduleTaskList({
                     </dl>
 
                     <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
-                      {stateView.disabledReason ? <Badge variant="secondary">{stateView.disabledReason}</Badge> : item.actionRequired ? <Badge variant="secondary">{item.actionRequired}</Badge> : null}
+                      {stateView.primaryActionDisabledReason ? (
+                        <Badge variant="secondary">
+                          {stateView.primaryActionDisabledReason}
+                        </Badge>
+                      ) : item.actionRequired ? (
+                        <Badge variant="secondary">{item.actionRequired}</Badge>
+                      ) : null}
                       {item.approvalPendingCount > 0 ? (
-                        <Badge variant="secondary">{copy.approvals}: {item.approvalPendingCount}</Badge>
+                        <Badge variant="secondary">
+                          {copy.approvals}: {item.approvalPendingCount}
+                        </Badge>
                       ) : null}
                       {item.scheduleProposalCount > 0 ? (
-                        <Badge variant="secondary">{copy.proposals}: {item.scheduleProposalCount}</Badge>
+                        <Badge variant="secondary">
+                          {copy.proposals}: {item.scheduleProposalCount}
+                        </Badge>
                       ) : null}
                       <Badge>{item.executionRuntime || copy.noModel}</Badge>
                     </div>
@@ -372,7 +446,9 @@ export function ScheduleTaskList({
                     <Button
                       type="button"
                       disabled={isPending}
-                      onClick={() => setExpandedTaskId(isExpanded ? null : item.taskId)}
+                      onClick={() =>
+                        setExpandedTaskId(isExpanded ? null : item.taskId)
+                      }
                       variant="outline"
                       size="sm"
                     >
@@ -383,16 +459,26 @@ export function ScheduleTaskList({
 
                 {isExpanded ? (
                   <div className="mt-4 rounded-2xl border border-border/60 bg-background/75 p-4">
-                      <TaskConfigForm
+                    <TaskConfigForm
                       executionRuntimes={executionRuntimes}
                       defaultExecutionRuntime={defaultExecutionRuntime}
                       initialValues={toTaskConfigInitialValues(item)}
                       availableAiClients={availableAiClients}
                       isPending={isPending}
                       lockedFields={item.sourceManaged?.immutableFields}
-                      lockedFieldsHint={item.sourceManaged ? `Synced from ${item.sourceManaged.sourceName}. Title and time are managed by the calendar source.` : undefined}
-                      sourceDescription={item.sourceManaged?.description ?? null}
-                      sourceDescriptionLabel={item.sourceManaged ? `${copy.calendarDescription} · ${item.sourceManaged.sourceName}` : undefined}
+                      lockedFieldsHint={
+                        item.sourceManaged
+                          ? `Synced from ${item.sourceManaged.sourceName}. Title and time are managed by the calendar source.`
+                          : undefined
+                      }
+                      sourceDescription={
+                        item.sourceManaged?.description ?? null
+                      }
+                      sourceDescriptionLabel={
+                        item.sourceManaged
+                          ? `${copy.calendarDescription} · ${item.sourceManaged.sourceName}`
+                          : undefined
+                      }
                       submitLabel={copy.saveTaskConfig}
                       pendingLabel={copy.saving}
                       onSubmitAction={async (input) => {

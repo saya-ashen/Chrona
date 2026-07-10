@@ -67,7 +67,7 @@ describe("TaskCreateDialog – Core functionality", () => {
     expect(screen.getByText("Add task")).toBeInTheDocument();
     expect(screen.getByPlaceholderText("Add title")).toBeInTheDocument();
     expect(screen.getByPlaceholderText("Add description")).toBeInTheDocument();
-    expect(screen.getByRole("checkbox", { name: /auto-execute at scheduled time/i })).not.toBeChecked();
+    expect(screen.getByRole("radiogroup", { name: /how should chrona help/i })).toBeInTheDocument();
     expect(screen.getByText("Save")).toBeInTheDocument();
     expect(screen.getByText("Cancel")).toBeInTheDocument();
   });
@@ -82,9 +82,7 @@ describe("TaskCreateDialog – Core functionality", () => {
     render(<TaskCreateDialog {...defaultProps} />);
 
     await waitFor(() => {
-      expect(screen.getByRole("checkbox", { name: /auto-execute at scheduled time/i })).toBeChecked();
-      expect(screen.getByRole("checkbox", { name: /auto-generate plan/i })).toBeChecked();
-      expect(screen.getByRole("checkbox", { name: /auto-generate plan/i })).toBeDisabled();
+      expect(screen.getByRole("radio", { name: /run on a schedule/i })).toHaveAttribute("aria-checked", "true");
     });
   });
 
@@ -98,7 +96,7 @@ describe("TaskCreateDialog – Core functionality", () => {
     render(<TaskCreateDialog {...defaultProps} />);
 
     await waitFor(() => {
-      expect(screen.getByRole("checkbox", { name: /auto-generate plan/i })).not.toBeChecked();
+      expect(screen.getByRole("radio", { name: /save as task/i })).toHaveAttribute("aria-checked", "true");
     });
   });
 
@@ -113,15 +111,10 @@ describe("TaskCreateDialog – Core functionality", () => {
 
     render(<TaskCreateDialog {...defaultProps} onSubmit={onSubmit} />);
 
-    const autoExecuteCheckbox = await screen.findByRole("checkbox", { name: /auto-execute at scheduled time/i });
-    const planGenerationCheckbox = await screen.findByRole("checkbox", { name: /auto-generate plan/i });
-    expect(autoExecuteCheckbox).toBeChecked();
-    expect(planGenerationCheckbox).toBeChecked();
-    expect(planGenerationCheckbox).toBeDisabled();
+    const automaticMode = await screen.findByRole("radio", { name: /run on a schedule/i });
+    expect(automaticMode).toHaveAttribute("aria-checked", "true");
 
-    await user.click(autoExecuteCheckbox);
-    expect(planGenerationCheckbox).not.toBeDisabled();
-    await user.click(planGenerationCheckbox);
+    await user.click(screen.getByRole("radio", { name: /save as task/i }));
     await user.type(screen.getByPlaceholderText("Add title"), "Override defaults");
     await user.click(screen.getByText("Save"));
 
@@ -199,7 +192,7 @@ describe("TaskCreateDialog – Core functionality", () => {
 
     // Click High priority
     await user.click(screen.getByRole("button", { name: "High" }));
-    await user.click(screen.getByRole("checkbox", { name: /auto-execute at scheduled time/i }));
+    await user.click(screen.getByRole("radio", { name: /run on a schedule/i }));
 
     const saveButton = screen.getByText("Save");
     expect(saveButton).not.toBeDisabled();
@@ -247,5 +240,38 @@ describe("TaskCreateDialog – Core functionality", () => {
 
     // Save/Saving button disabled
     expect(screen.getByText("Saving...")).toBeDisabled();
+  });
+  it("explains the scheduled automatic execution contract before saving", async () => {
+    const user = userEvent.setup();
+    render(
+      <TaskCreateDialog
+        {...defaultProps}
+        availableAiClients={[{ id: "ai-1", name: "Hermes", enabled: true }]}
+      />,
+    );
+
+    await user.click(screen.getByRole("radio", { name: /run on a schedule/i }));
+
+    const preview = screen.getByLabelText("What Chrona will do");
+    expect(preview).toHaveTextContent("Chrona will generate and accept a valid plan");
+    expect(preview).toHaveTextContent("If Chrona is not running at the scheduled time");
+    expect(preview).toHaveTextContent("does not automatically retry");
+    expect(preview).toHaveTextContent("Closing this page does not stop scheduled work");
+  });
+
+  it("shows the single missing-AI reason before saving automation", async () => {
+    writePreferences({
+      autoSuggestionsEnabled: false,
+      autoPlanGenerationEnabled: false,
+      defaultAutoExecuteEnabled: false,
+    });
+    const user = userEvent.setup();
+    render(<TaskCreateDialog {...defaultProps} availableAiClients={[]} />);
+
+    await user.click(screen.getByRole("radio", { name: /help me plan/i }));
+
+    expect(screen.getByLabelText("What Chrona will do")).toHaveTextContent(
+      "Connect an AI before enabling automation.",
+    );
   });
 });
