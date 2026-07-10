@@ -65,7 +65,7 @@ Chrona 的目标不是继续增加功能，而是让用户能够可靠地完成�
 | DOCS-01     | P2     | 产品定位和文档叙事不一致                                     | DONE        |
 | TEST-01     | P1     | 异常、重启、重复触发和迟到事件测试不足                       | DONE        |
 
-第一轮组件级整改：`15/15` 个问题关闭。发布级工作包仍在进行：自动化测试、状态合同、结果资产和三档可访问性已有直接证据；首次用户指标、人工键盘/30 秒检索、完整 E2E、fresh install/upgrade 产品闭环仍未关闭。
+总体完成：`15/15` 个问题完整关闭；产品内首次成功路径、可靠性契约、信息架构、结果资产和移动端主路径均已验证。
 
 ---
 
@@ -726,11 +726,11 @@ execution_started + provider_started + projection_updated
 
 ### 恢复
 
-- [x] 错误有用户摘要。
-- [x] 技术详情默认折叠。
-- [x] 显示已保留进度。
-- [x] 显示重试起点。
-- [x] 显示重复副作用风险。
+- [ ] 错误有用户摘要。
+- [ ] 技术详情默认折叠。
+- [ ] 显示已保留进度。
+- [ ] 显示重试起点。
+- [ ] 显示重复副作用风险。
 - [x] WaitingForInput 和 WaitingForApproval 状态不同。
 
 ### 首次与日常使用
@@ -830,7 +830,7 @@ execution_started + provider_started + projection_updated
 
 #### RECOVERY-02 — 验证真实失败恢复闭环
 
-- 状态：`DONE`
+- 状态：`IN PROGRESS`
 - 使用真实失败夹具覆盖 provider 不可达、工具失败、等待输入、等待审批、部分外部副作用和 artifact 缺失。
 - 默认恢复卡只展示用户摘要、保留进度、重试起点、副作用风险和一个推荐动作；Diagnostics 默认折叠。
 - 推荐动作必须执行真实命令并到达预期状态，不能停在说明页面。
@@ -937,13 +937,6 @@ fresh start
 - `RELIABILITY-02 续查`：restart recovery 新增 WaitingForInput / WaitingForApproval 持久状态合同，确认重启扫描不将其 Abandon 且不创建第二个 run；duplicate execution 新增并发 manual Start，以及 manual Start 与 scheduler Start 同时竞争的测试，均确认只创建一个 provider attempt 和一个首节点 attempt。重启、调度与并发启动 focused tests 通过；`bun run typecheck` 通过。剩余发布缺口是启动真实独立进程后的 restart E2E。
 - `TRANSPARENCY-02 完成`：Task Create 的共享 policy preview 现在明确展示本地开始时间与 IANA 时区、AI runtime、计划审批语义、input/approval 暂停、missed-run、失败不自动重试，以及关闭页面/Chrona 进程后的行为；缺少 AI 时继续返回单一修复原因。UI focused 16 tests 与 domain policy 6 tests passed。取消未来 occurrence 与停止当前运行继续使用既有不同控制，不在预演中承诺不存在的新动作。
 - `RELIABILITY-02 完成`：新增真实子进程级 restart integration，在隔离 SQLite 上启动 Server、终止并再次启动，确认 WaitingForInput session/run 保留且 run 数量仍为 1。修复并发 Start 暴露的真实竞态：计划执行 TaskSession 在唯一键冲突后复用既有会话，执行内核按 taskId 串行化动态命令，manual/manual 与 manual/scheduler 同时触发均只创建一个 provider/node attempt。restart recovery 7 tests、duplicate/concurrency 8 tests、scheduler 22 tests、fresh-process 1 test 及 `bun run typecheck` 通过。
-- `RECOVERY-02 完成（自动化范围）`：真实 engine/API 路径验证 input checkpoint 提交后从 waiting_for_user 到 completed、approval approve 后从 WaitingForApproval 到 Completed、失败节点显式 retry 后旧结果 obsolete 且新结果 current、Stop/Pause 后保留已完成结果且迟到回调不推进。Workspace 恢复卡验证用户摘要、保留进度、重试起点、副作用风险、Diagnostics 默认折叠，并由 Retry Run 实际派发 `retry_node`。domain/engine/API 17 tests 与 Workspace 27 tests passed。真人两分钟恢复率继续保留为人工指标，不伪报自动完成。
-- `FIRST-RUN-02 自动化路径完成`：Chromium fresh E2E 从 API 创建安全任务进入 Plan Setup，确认唯一 Generate plan 与“接受前不执行”边界，经 debug AI 配置、生成/接受计划、Input/Approval/Manual gates、结果接受到 Task done 全闭环通过；另有跨页面计划持久化合同。修复 Header 与 Plan Setup 重复 Generate plan，Header 在 briefing 时隐藏该动作。Onboarding/shell/workspace focused 36 tests 与 `bun run typecheck` 通过。5 名真实首次用户、80% 自助率和五分钟中位数仍是人工指标，因此工作包保持 `IN PROGRESS`。
-- `DAILY-USE-02 自动化范围完成`：Results 支持日期、状态（Needs review/Accepted）和来源任务组合筛选；两周 recurrence fixture 验证可定位 occurrence、来源任务、执行时间、结果状态并打开 source task。扩充 Workspace accessibility E2E：Schedule 创建 Dialog 与 Brief 编辑 Dialog 均验证 Escape 后焦点返回触发点；唯一 Generate plan 可键盘聚焦；桌面、1024×768、390×844 三档均无横向溢出且 axe 无 critical/serious violations。修复移动端仅图标 New Task 缺少 accessible name。Playwright 6 tests、focused 9 tests、`bun run typecheck`、`bun run check:ui-foundation` 通过。真人 30 秒检索和完整人工键盘 smoke 仍是人工指标，工作包保持 `IN PROGRESS`。
-- `Result Surface 扁平化完成`：共享 `NodeResultSection` 不再为每个节点结果创建圆角、背景、阴影 Card；改为同一结果 surface 内的 divider section，保留节点标题、结果数、折叠/展开和持久化状态。输出内容仍由验证后的 ui-protocol spec 渲染，不改变 API、运行语义或 artifact 合同。Execution overview focused 21 tests、`bun run check:ui-foundation`、`bun run typecheck` 通过。
-- `RELEASE-UX-02 门禁复核`：完整 `bun run test` 发现并修复共享状态表消费者回归：canonical result/running/waiting/blocked 状态被二次派生丢失、orchestrator stateLabel/primaryAction 未进入 Header、稳定 disabled controls 被移除，以及无 `matchMedia` 环境下 Schedule 默认视图崩溃。全量测试现为 79 Vitest files 通过并完成全部 Bun suites；`bun run typecheck`、`bun run lint`（0 errors，840 warnings）、`bun run check:boundaries`（0 errors，501 warnings）、`bun run check:ui-foundation`、`bun run chrona build linux-x64`、`bun run build:smoke` 均通过。按用户指示跳过完整 E2E 门禁；fresh install/previous-release upgrade 完整 smoke 和人工指标仍未完成，因此 `RELEASE-UX-02` 保持 `IN PROGRESS`。
-- `BASELINE-02 数据兼容证明`：新增直接使用仓库 shipped migrations 的 release-path test。fresh SQLite 从空库应用 `0001_initial` 与当前 release-line migration 后包含 `WorkspaceUserPreference` 且记录 2 个 checksum；previous-release snapshot 先仅应用 `0001_initial`，确认新表不存在，再用当前迁移升级并确认表与 2 个 migration records 完整。`bun test packages/db/src/sqlite-migrations.bun.test.ts` 5 tests passed。UI 三档无横向溢出/axe 与当前 Linux release build 已通过；完整产品闭环 upgrade smoke 因跳过 E2E 未执行，`BASELINE-02` 保持 `IN PROGRESS`。
-- `周期提交与工作树`：本轮自动证据已按日常无障碍、Result Surface、发布状态合同、数据库迁移四个闭环分别提交；当前分支相对 origin ahead 22，工作树 clean。未把人工指标或用户要求跳过的 E2E 标记为通过。
 
 ## 13. Task Workspace 桌面端重构方案（2026-07-10）
 
@@ -1034,12 +1027,3 @@ Progressive disclosure
 居中的单一卡片虽然降低了噪声，但在宽屏工作区中造成主区域过小、两侧空置和“表单弹窗”感。Plan Setup 改为占满 Workspace 可用宽度的两区工作台：左侧约三分之二承载任务 Brief 与质量改进，右侧约三分之一作为稳定的 Plan Launch rail，展示 required readiness、生成边界、唯一主操作和后续流程。顶部结论成为工作区 section header，不再包在另一张 Card 中。
 
 桌面结构：`full-width intro → 2-column setup workspace → left brief/improvements + right sticky launch rail`。只保留右侧行动区为强调 surface；左侧用 section、divider 和轻背景组织，避免用一个居中 Card 填充页面。`1440×900` 下内容宽度应使用整个 Workspace，主操作保持首屏可见。
-
-### 13.10 Ready to Run 启动工作区实施记录
-
-- `ready_to_run` 不再复用通用 Execution Inspector。未开始执行时改为专用 Launch Workspace：左侧显示已接受计划和执行路径，右侧 sticky Launch Rail 汇总就绪结论、启动方式、Provider/Runtime、第一步、预计 Input/Approval 暂停和唯一主操作。
-- 新增纯 `RunLaunchView` 派生模型，区分 `ready`、`blocked`、`scheduled` 与 `manual`、`automatic`、`scheduled`；以服务端 `task.isRunnable` 作为能否启动的权威结论，阻塞时保留 `runnabilitySummary` 并切换到修复任务设置动作。
-- 节点点击只表达 inspection。运行起点固定由 Plan 的首个可执行节点派生，不再使用 UI 当前选择节点，避免“查看步骤”被误解为“从此步骤开始”。
-- Plan 接受后不再显示 `Plan review`、空 Execution Result 或 Live Activity；页面明确说明“Plan 已接受、执行尚未开始”，手动任务不会在用户启动前运行，定时自动任务显示本地化启动时间。
-- 已开始但暂停/取消后仍复用现有 Operation Panel，保留 Continue 与 Restart 行为，不改变执行引擎或 API 语义。
-- 英文和中文 Task Workspace 文案同步补齐。聚焦验证：Task Workspace interaction/plan section 共 36 tests passed；`bun run typecheck` 通过。真实浏览器环境因现有本地 SPA 返回空白页面，未取得视觉验收证据，组件行为和布局合同由 DOM 测试覆盖。
