@@ -11,7 +11,6 @@ import {
   FileText,
   Loader2,
   MessageSquare,
-  Plus,
   Sparkles,
   type LucideProps,
 } from "lucide-react";
@@ -178,7 +177,7 @@ function MetricPill({
         >
           {value}
         </p>
-        <p className="truncate text-xs text-muted-foreground">{label}</p>
+        <p className="text-xs leading-tight text-muted-foreground">{label}</p>
       </div>
     </div>
   );
@@ -201,15 +200,30 @@ function HeadlineBanner({
   if (completedToday > 0 && attentionCount > 0) {
     sentence = fillTemplate(copy.headline.both, {
       completed: completedToday,
-      attention: attentionCount,
+      completedTaskLabel:
+        completedToday === 1
+          ? copy.headline.completedTask
+          : copy.headline.completedTasks,
+      attentionSubject:
+        attentionCount === 1
+          ? copy.headline.attentionTask
+          : copy.headline.attentionTasks,
     });
   } else if (completedToday > 0) {
     sentence = fillTemplate(copy.headline.completedOnly, {
       completed: completedToday,
+      completedTaskLabel:
+        completedToday === 1
+          ? copy.headline.completedTask
+          : copy.headline.completedTasks,
     });
   } else if (attentionCount > 0) {
     sentence = fillTemplate(copy.headline.attentionOnly, {
       attention: attentionCount,
+      attentionSubject:
+        attentionCount === 1
+          ? copy.headline.attentionTask
+          : copy.headline.attentionTasks,
     });
   } else {
     sentence = copy.headline.idle;
@@ -232,22 +246,6 @@ function HeadlineBanner({
                 {sentence}
               </p>
             </div>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <Button asChild size="sm">
-              <LocalizedLink href="/tasks">
-                <Plus className="size-4" aria-hidden />
-                {copy.newTask}
-              </LocalizedLink>
-            </Button>
-            <Button
-              asChild
-              size="sm"
-              variant="outline"
-              className="bg-background/70"
-            >
-              <LocalizedLink href="/tasks">{copy.viewAllTasks}</LocalizedLink>
-            </Button>
           </div>
         </div>
         <div className="grid gap-3 sm:grid-cols-2">

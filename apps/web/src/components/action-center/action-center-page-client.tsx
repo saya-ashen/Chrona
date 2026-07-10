@@ -1,10 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import type {
-  ActionCenterItem,
-  ActionCenterProjection,
-} from "@chrona/contracts/api";
+import type { ActionCenterItem } from "@chrona/contracts/api";
 import type { WorkStateView } from "@chrona/domain";
 
 import { LocalizedLink } from "@/components/i18n/localized-link";

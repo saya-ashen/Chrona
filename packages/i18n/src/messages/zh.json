@@ -1433,9 +1433,13 @@
       "newTask": "新建任务",
       "openTask": "打开任务",
       "headline": {
-        "both": "今天 Chrona 已自动完成 {completed} 个任务，{attention} 个任务需要你处理。",
-        "completedOnly": "今天 Chrona 已自动完成 {completed} 个任务。现在没有任务需要你处理。",
-        "attentionOnly": "今天还没有自动完成的任务。{attention} 个任务需要你处理。",
+        "both": "今天 Chrona 已自动完成 {completed}{completedTaskLabel}，{attentionSubject}。",
+        "completedOnly": "今天 Chrona 已自动完成 {completed}{completedTaskLabel}。现在没有任务需要你处理。",
+        "attentionOnly": "今天还没有自动完成的任务。{attentionSubject}。",
+        "completedTask": "项任务",
+        "completedTasks": "项任务",
+        "attentionTask": "1 项任务需要你处理",
+        "attentionTasks": "{attention} 项任务需要你处理",
         "idle": "Chrona 已就绪。你可以新建任务、启动工作，或在这里查看最近动态。"
       },
       "summary": {

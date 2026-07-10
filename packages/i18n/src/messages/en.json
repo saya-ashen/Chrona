@@ -1433,9 +1433,13 @@
       "newTask": "New task",
       "openTask": "Open",
       "headline": {
-        "both": "Today Chrona auto-completed {completed} tasks, and {attention} need you.",
-        "completedOnly": "Today Chrona auto-completed {completed} tasks. No task needs you right now.",
-        "attentionOnly": "Nothing auto-completed yet today. {attention} tasks need you.",
+        "both": "Today Chrona auto-completed {completed} {completedTaskLabel}, and {attentionSubject}.",
+        "completedOnly": "Today Chrona auto-completed {completed} {completedTaskLabel}. No task needs you right now.",
+        "attentionOnly": "Nothing auto-completed yet today. {attentionSubject}.",
+        "completedTask": "task",
+        "completedTasks": "tasks",
+        "attentionTask": "1 task needs you",
+        "attentionTasks": "{attention} tasks need you",
         "idle": "Chrona is ready. Add a task, start work, or review recent activity here."
       },
       "summary": {

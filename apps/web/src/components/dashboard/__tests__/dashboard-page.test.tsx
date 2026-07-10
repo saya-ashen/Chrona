@@ -58,9 +58,13 @@ const COPY = {
   newTask: "New task",
   openTask: "Open",
   headline: {
-    both: "Today Chrona auto-completed {completed} tasks, and {attention} need you.",
-    completedOnly: "Today Chrona auto-completed {completed} tasks. No task needs you right now.",
-    attentionOnly: "Nothing auto-completed yet today. {attention} tasks need you.",
+    both: "Today Chrona auto-completed {completed} {completedTaskLabel}, and {attentionSubject}.",
+    completedOnly: "Today Chrona auto-completed {completed} {completedTaskLabel}. No task needs you right now.",
+    attentionOnly: "Nothing auto-completed yet today. {attentionSubject}.",
+    completedTask: "task",
+    completedTasks: "tasks",
+    attentionTask: "1 task needs you",
+    attentionTasks: "{attention} tasks need you",
     idle: "Chrona is ready. Add a task, start work, or review recent activity here.",
   },
   summary: { title: "Needs you", pending: "{n} pending", none: "All clear" },
@@ -271,7 +275,35 @@ describe("DashboardPage", () => {
         copy={COPY}
       />,
     );
-    expect(screen.getByText("Today Chrona auto-completed 2 tasks, and 1 need you.")).toBeTruthy();
+    expect(screen.getByText("Today Chrona auto-completed 2 tasks, and 1 task needs you.")).toBeTruthy();
+  });
+
+  it("uses singular task grammar and leaves task creation to the global action", () => {
+    render(
+      <DashboardPage
+        data={makeData({
+          autoCompleted: [
+            {
+              taskId: "done-1",
+              title: "Done",
+              completedAt: new Date().toISOString(),
+              summary: null,
+              category: "report",
+              output: null,
+            },
+          ],
+          needsAttention: [],
+        })}
+        copy={COPY}
+      />,
+    );
+
+    expect(
+      screen.getByText(
+        "Today Chrona auto-completed 1 task. No task needs you right now.",
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByRole("link", { name: "New task" })).toBeNull();
   });
 
 

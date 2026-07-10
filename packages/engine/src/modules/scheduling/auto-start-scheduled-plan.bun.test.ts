@@ -134,7 +134,7 @@ describe("auto-start-scheduled-plan", () => {
     expect(result.skipped).toHaveLength(1);
     expect(result.skipped[0]).toMatchObject({
       taskId: task.id,
-      reason: "no_accepted_plan",
+      reason: "Accept a plan before automatic execution can start.",
     });
     expect(startMock).not.toHaveBeenCalled();
   });
@@ -149,7 +149,7 @@ describe("auto-start-scheduled-plan", () => {
     expect(result.skipped).toHaveLength(1);
     expect(result.skipped[0]).toMatchObject({
       taskId: task.id,
-      reason: "no_runtime_config",
+      reason: "Connect an AI before enabling automation.",
     });
     expect(startMock).not.toHaveBeenCalled();
   });
@@ -169,7 +169,7 @@ describe("auto-start-scheduled-plan", () => {
     expect(result.skipped).toHaveLength(1);
     expect(result.skipped[0]).toMatchObject({
       taskId: task.id,
-      reason: "not_due",
+      reason: "Automatic execution will start at the configured schedule time.",
     });
     expect(startMock).not.toHaveBeenCalled();
   });
@@ -419,7 +419,7 @@ describe("auto-start-scheduled-plan", () => {
     expect(result.started).toEqual([]);
     expect(result.skipped.length).toBe(1);
     expect(result.skipped[0]?.taskId).toBe(task.id);
-    expect(result.skipped[0]?.reason).toBe("already_running");
+    expect(result.skipped[0]?.reason).toBe("A run is already active for this task.");
     expect(startMock).not.toHaveBeenCalled();
   });
 

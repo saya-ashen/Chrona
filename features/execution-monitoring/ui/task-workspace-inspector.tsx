@@ -25,6 +25,8 @@ export function TaskWorkspaceInspector({
   operationPanel,
   onAction,
   isPlanCompact = false,
+  operationPlacement = "before",
+  showHeader = true,
 }: {
   taskId: string;
   consoleView: ConsoleView;
@@ -37,27 +39,33 @@ export function TaskWorkspaceInspector({
   copy: WorkspaceCopy;
   isPlanCompact?: boolean;
   operationPanel?: ReactNode;
+  operationPlacement?: "before" | "after";
+  showHeader?: boolean;
   onAction: (nodeId?: string) => void;
 }) {
   return (
     <aside
-      className="relative flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-border/60 bg-background/60"
+      className={showHeader
+        ? "relative flex h-full min-h-0 flex-col overflow-hidden rounded-2xl border border-border/60 bg-background/60"
+        : "relative flex min-h-0 flex-col bg-transparent"}
       aria-label={copy.commandCenterAria ?? "Task command center"}
     >
-      <div className="flex min-w-0 items-center justify-between gap-2 border-b border-border/50 bg-muted/25 px-2.5 py-2">
-        <div className="min-w-0">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-primary">
-            {copy.commandCenter ?? "Task Execution"}
-          </p>
-          {consoleView.progress.totalSteps > 0 ? (
-            <p className="mt-0.5 text-[11px] text-muted-foreground">
-              {consoleView.progress.completedSteps}/{consoleView.progress.totalSteps} steps
+      {showHeader ? (
+        <div className="flex min-w-0 items-center justify-between gap-2 border-b border-border/50 px-4 py-3">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold text-foreground">
+              {copy.commandCenter ?? "Task execution"}
             </p>
-          ) : null}
+            {consoleView.progress.totalSteps > 0 ? (
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                {consoleView.progress.completedSteps}/{consoleView.progress.totalSteps} steps
+              </p>
+            ) : null}
+          </div>
         </div>
-      </div>
-      <div className="flex min-h-0 flex-1 flex-col gap-2.5 p-2.5">
-        {operationPanel}
+      ) : null}
+      <div className={showHeader ? "flex min-h-0 flex-1 flex-col gap-4 p-4" : "flex min-h-0 flex-col gap-4"}>
+        {operationPlacement === "before" ? operationPanel : null}
         <TaskWorkspaceExecutionOverview
           taskId={taskId}
           progress={consoleView.progress}
@@ -78,6 +86,7 @@ export function TaskWorkspaceInspector({
           activityLayout={isPlanCompact ? "side" : "below"}
           onAction={onAction}
         />
+        {operationPlacement === "after" ? operationPanel : null}
       </div>
     </aside>
   );

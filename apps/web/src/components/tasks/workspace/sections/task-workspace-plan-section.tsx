@@ -12,6 +12,7 @@ import { Textarea } from "@/components/ui/textarea";
 import type { CommandCenterCopy } from "../../../../../../../features/execution-monitoring/ui/task-workspace-execution-overview";
 import { useActionSpecRenderConfig } from "../../../../../../../features/execution-monitoring/ui/action-tab";
 import { TaskWorkspaceInspector } from "../../../../../../../features/execution-monitoring/ui/task-workspace-inspector";
+import { LocalizedLink } from "@/components/i18n/localized-link";
 import { TaskWorkspacePlanContent } from "./task-workspace-plan-content";
 import { TaskWorkspaceOperationPanel } from "./task-workspace-operation-panel";
 import type { PlanGenerationRequest, WorkspaceRuntimeEvent } from "../hooks/use-task-workspace-plan-state";
@@ -159,69 +160,156 @@ function StageBarCard({ stage }: { stage: TaskWorkspaceDisplayState["stage"] }) 
   ];
   const activeIndex = stages.findIndex((item) => item.id === stage.stage);
   return (
-    <Card size="sm" className="border-border bg-card py-4 text-foreground" data-ui-surface-kind="runtime-control">
-      <CardContent className="space-y-3 px-4">
-        <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.14em]" aria-label="Task stage">
-          {stages.map((item, index) => (
+    <div className="flex min-w-0 flex-col gap-3 border-b border-border/70 px-4 py-3 lg:flex-row lg:items-center lg:justify-between" data-ui-surface-kind="runtime-control">
+      <ol className="flex min-w-0 items-center gap-1.5 text-xs" aria-label="Task stage">
+        {stages.map((item, index) => (
+          <li key={item.id} className="flex min-w-0 items-center gap-1.5">
             <span
-              key={item.id}
-              className={index === activeIndex ? "rounded-full bg-brand-lavender px-2.5 py-1 text-foreground" : index < activeIndex ? "rounded-full bg-background px-2.5 py-1 text-foreground" : "text-muted-foreground"}
+              aria-current={index === activeIndex ? "step" : undefined}
+              className={index === activeIndex
+                ? "rounded-full bg-primary px-3 py-1.5 font-semibold text-primary-foreground"
+                : index < activeIndex
+                  ? "rounded-full bg-primary/10 px-3 py-1.5 font-medium text-foreground"
+                  : "px-2 py-1.5 text-muted-foreground"}
             >
-              {item.label}{index < stages.length - 1 ? " →" : ""}
+              {item.label}
             </span>
-          ))}
-        </div>
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-          <div className="min-w-0">
-            <p className="font-heading text-xl font-medium leading-tight tracking-[-0.04em] text-foreground">{stage.statusLabel}</p>
-            <p className="line-clamp-2 text-sm text-muted-foreground">Next: {stage.nextActionLabel}</p>
-          </div>
-          {stage.currentNodeLabel ? (
-            <Badge variant={stage.tone === "critical" ? "destructive" : stage.tone === "success" ? "secondary" : "outline"} className="bg-background/75">
-              {stage.currentNodeLabel}
-            </Badge>
-          ) : null}
-        </div>
-      </CardContent>
-    </Card>
+            {index < stages.length - 1 ? <span className="text-border" aria-hidden>—</span> : null}
+          </li>
+        ))}
+      </ol>
+      <div className="flex min-w-0 items-center gap-2 text-xs">
+        <span className="shrink-0 font-semibold text-foreground">{stage.statusLabel}</span>
+        <span className="truncate text-muted-foreground">{stage.nextActionLabel}</span>
+        {stage.currentNodeLabel ? <Badge variant="outline" className="hidden max-w-52 truncate bg-background xl:inline-flex">{stage.currentNodeLabel}</Badge> : null}
+      </div>
+    </div>
   );
 }
 
-function ReadinessPanel({ readiness, onGeneratePlan }: { readiness: TaskWorkspaceDisplayState["readiness"]; onGeneratePlan: () => void }) {
+export function PlanSetupPanel({
+  readiness,
+  pageData,
+  onGeneratePlan,
+  onEditBrief,
+}: {
+  readiness: TaskWorkspaceDisplayState["readiness"];
+  pageData: TaskPageData;
+  onGeneratePlan: () => void;
+  onEditBrief: () => void;
+}) {
+  const requiredReady = readiness.checks.filter((check) => check.level === "required" && check.state === "passed").length;
+  const requiredTotal = readiness.checks.filter((check) => check.level === "required").length;
+  const improvements = readiness.checks.filter((check) => check.level === "recommended" && check.state !== "passed");
+  const provider = pageData.availableAiClients?.find((client) => client.id === pageData.task.aiClientId)
+    ?? pageData.availableAiClients?.[0];
+  const isBlocked = readiness.status === "blocked";
+  const title = isBlocked
+    ? "Connect an AI provider to create a plan"
+    : readiness.status === "ready"
+      ? "Ready to create a plan"
+      : "You can create a plan now";
+  const description = isBlocked
+    ? "Your task brief is saved. Connect an AI provider, then return here to create a draft plan."
+    : improvements.length > 0
+      ? "Chrona has enough information for a draft. Adding the details below will make the plan easier to review."
+      : "Chrona has enough information to propose reviewable steps for this task.";
+
   return (
-    <Card size="sm" className="border-transparent bg-brand-ochre/80 py-4 text-foreground" data-ui-surface-kind="product-authored">
-      <CardHeader className="px-4 pb-1">
-        <div className="flex items-center justify-between gap-2">
-          <CardTitle className="font-heading text-xl font-medium tracking-[-0.03em]">Ready to plan?</CardTitle>
-          <Badge variant={readiness.status === "blocked" ? "destructive" : readiness.status === "ready" ? "secondary" : "outline"} className="bg-background/80">{readiness.status}</Badge>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4 px-4">
-        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
-          {readiness.checks.map((check) => (
-            <div key={check.id} className="rounded-2xl border border-background/70 bg-background/55 px-3 py-2">
-              <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
-                <span aria-hidden>{check.state === "passed" ? "✓" : check.state === "blocked" ? "×" : "!"}</span>
-                <span>{check.label}</span>
-              </div>
-              {check.state !== "passed" && check.helperText ? <p className="mt-0.5 text-[11px] text-foreground/70">{check.helperText}</p> : null}
-            </div>
-          ))}
-        </div>
-        <div className="rounded-2xl border border-dashed border-foreground/25 bg-background/45 p-3">
-          <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-foreground/65">Plan intent presets</p>
-          <div className="mt-2 flex flex-wrap gap-1.5">
-            {["Research", "Build", "Review", "Monitor", "Write report"].map((preset) => <Badge key={preset} variant="outline" className="bg-background/70">{preset}</Badge>)}
+    <div className="flex min-h-0 flex-1 flex-col" data-testid="plan-setup-panel" data-plan-setup-layout="full-width">
+      <header className="border-b border-border/70 px-5 py-5 lg:px-7 lg:py-6">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="max-w-3xl space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">Plan setup</p>
+            <h2 className="font-heading text-2xl font-semibold tracking-[-0.03em] text-foreground lg:text-3xl">{title}</h2>
+            <p className="text-sm leading-6 text-muted-foreground lg:text-base">{description}</p>
           </div>
+          <Badge variant={isBlocked ? "destructive" : readiness.status === "ready" ? "secondary" : "outline"}>
+            {isBlocked ? "Action required" : readiness.status === "ready" ? "Ready" : "Optional details"}
+          </Badge>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button type="button" size="sm" onClick={onGeneratePlan} disabled={readiness.primaryAction === "configure_provider"}>
-            {readiness.primaryAction === "configure_provider" ? "Configure provider" : "Generate plan"}
-          </Button>
-          <Button type="button" size="sm" variant="outline" className="bg-background/70">Improve task brief</Button>
+      </header>
+
+      <div className="grid min-h-0 flex-1 gap-0 xl:grid-cols-[minmax(0,1.7fr)_minmax(20rem,0.75fr)]">
+        <div className="min-w-0 space-y-7 px-5 py-6 lg:px-7 lg:py-7 xl:border-r xl:border-border/70">
+            <section aria-labelledby="plan-setup-brief-heading">
+              <div className="flex items-center justify-between gap-3">
+                <h3 id="plan-setup-brief-heading" className="text-sm font-semibold text-foreground">Task brief</h3>
+                <Button type="button" size="sm" variant="ghost" onClick={onEditBrief}>Edit task brief</Button>
+              </div>
+              <dl className="mt-3 grid overflow-hidden rounded-xl border border-border/70 bg-background/60 lg:grid-cols-2">
+                <div className="border-b border-border/60 px-4 py-4 lg:col-span-2">
+                  <dt className="text-xs font-medium text-muted-foreground">Goal</dt>
+                  <dd className="mt-1 text-base font-medium text-foreground">{pageData.task.title}</dd>
+                </div>
+                <div className="border-b border-border/60 px-4 py-4 lg:border-b-0 lg:border-r">
+                  <dt className="text-xs font-medium text-muted-foreground">Description</dt>
+                  <dd className="mt-1 line-clamp-4 text-sm leading-6 text-foreground">{pageData.task.description?.trim() || "Not added yet"}</dd>
+                </div>
+                <div className="px-4 py-4">
+                  <dt className="text-xs font-medium text-muted-foreground">AI provider</dt>
+                  <dd className="mt-1 text-sm font-medium text-foreground">{provider?.name ?? pageData.task.executionRuntime ?? "Not connected"}</dd>
+                </div>
+              </dl>
+            </section>
+
+            {improvements.length > 0 ? (
+              <section aria-labelledby="plan-quality-heading">
+                <h3 id="plan-quality-heading" className="text-sm font-semibold text-foreground">Improve plan quality</h3>
+                <div className="mt-3 grid gap-3 lg:grid-cols-2">
+                  {improvements.map((check) => (
+                    <div key={check.id} className="flex min-h-28 flex-col justify-between gap-4 rounded-xl border border-border/70 bg-background/50 p-4">
+                      <div>
+                        <p className="text-sm font-medium text-foreground">{check.label}</p>
+                        <p className="mt-1 text-xs leading-5 text-muted-foreground">{check.helperText}</p>
+                      </div>
+                      <Button type="button" size="sm" variant="outline" className="self-start" onClick={onEditBrief}>Add detail</Button>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            ) : null}
+          </div>
+
+        <aside className="bg-muted/30 px-5 py-6 lg:px-7 lg:py-7" aria-label="Plan creation action">
+          <div className="sticky top-4 space-y-6 rounded-2xl border border-primary/20 bg-card p-5 shadow-sm">
+            <div className="space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-primary">Create draft plan</p>
+              <p className="text-lg font-semibold text-foreground">{requiredReady}/{requiredTotal} required checks ready</p>
+              <p className="text-sm leading-6 text-muted-foreground">Creating a plan only prepares a draft. Nothing runs until the plan is reviewed and accepted.</p>
+            </div>
+            <div className="space-y-2">
+              {readiness.primaryAction === "configure_provider" ? (
+                <Button asChild size="lg" className="w-full">
+                  <LocalizedLink href="/settings?panel=ai-clients">Connect AI provider</LocalizedLink>
+                </Button>
+              ) : (
+                <Button type="button" size="lg" className="w-full" onClick={onGeneratePlan}>Generate plan</Button>
+              )}
+              <Button type="button" variant="outline" className="w-full" onClick={onEditBrief}>Edit task brief</Button>
+            </div>
+            <div className="border-t border-border/70 pt-4">
+              <p className="text-sm font-medium text-foreground">You stay in control</p>
+              <ul className="mt-2 space-y-2 text-xs leading-5 text-muted-foreground">
+                <li>Review every proposed step.</li>
+                <li>Check human stops and expected output.</li>
+                <li>Accept the plan before execution can begin.</li>
+              </ul>
+            </div>
+          </div>
+        </aside>
         </div>
-      </CardContent>
-    </Card>
+
+      <details className="border-t border-border/70 px-5 py-4 lg:px-7">
+        <summary className="cursor-pointer text-sm font-medium text-foreground">What happens next</summary>
+        <ol className="mt-3 grid gap-2 text-sm text-muted-foreground sm:grid-cols-2 xl:grid-cols-4">
+          <li>1. Chrona creates a draft plan.</li>
+          <li>2. You review steps and checkpoints.</li>
+          <li>3. Nothing runs before plan acceptance.</li>
+          <li>4. Execution follows the task automation settings.</li>
+        </ol>
+      </details>
+    </div>
   );
 }
 
@@ -301,11 +389,17 @@ function ResultReviewCard({
   acceptResultError?: string | null;
 }) {
   return (
-    <Card size="sm" className="border-transparent bg-brand-teal py-5 text-white" data-ui-surface-kind="runtime-control">
-      <CardHeader className="px-5 pb-1"><CardTitle className="font-heading text-2xl font-medium tracking-[-0.04em] text-white">{review.title}</CardTitle></CardHeader>
-      <CardContent className="space-y-4 px-5 text-sm">
-        <p className="text-white/78">{review.description}</p>
-        <div className="flex flex-wrap gap-2" aria-label="Result review actions">
+    <div className="rounded-xl border border-primary/20 bg-primary/5 px-4 py-4" data-ui-surface-kind="runtime-control">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="min-w-0 space-y-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h3 className="font-heading text-lg font-semibold tracking-[-0.02em] text-foreground">{review.title}</h3>
+            <Badge variant="outline" className="bg-background">Result review</Badge>
+          </div>
+          <p className="text-sm text-muted-foreground">{review.description}</p>
+          {acceptResultError ? <p role="alert" className="text-xs font-medium text-destructive">{acceptResultError}</p> : null}
+        </div>
+        <div className="flex shrink-0 flex-wrap gap-2" aria-label="Result review actions">
           {review.actions.map((action) => {
             const isAccept = action.id === "accept_result";
             const isRequestChanges = action.id === "request_changes";
@@ -314,8 +408,7 @@ function ResultReviewCard({
                 key={action.id}
                 type="button"
                 size="sm"
-                variant={action.emphasis === "primary" ? "secondary" : "outline"}
-                className={action.emphasis === "primary" ? "bg-background text-foreground hover:bg-background/90" : "border-white/35 bg-transparent text-white hover:bg-white/10 hover:text-white"}
+                variant={action.emphasis === "primary" ? "default" : "outline"}
                 disabled={isAccept ? isAcceptingResult || !onAcceptResult : false}
                 onClick={isAccept ? () => void onAcceptResult?.() : isRequestChanges ? onRequestChanges : undefined}
               >
@@ -324,9 +417,8 @@ function ResultReviewCard({
             );
           })}
         </div>
-        {acceptResultError ? <p role="alert" className="text-xs font-medium text-white">{acceptResultError}</p> : null}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   );
 }
 
@@ -433,6 +525,7 @@ type TaskWorkspacePlanSectionProps = {
   onAcceptResult?: () => Promise<void> | void;
   isAcceptingResult?: boolean;
   acceptResultError?: string | null;
+  onEditBrief?: () => void;
 };
 
 export function TaskWorkspacePlanSection({
@@ -456,6 +549,7 @@ export function TaskWorkspacePlanSection({
   onAcceptResult,
   isAcceptingResult = false,
   acceptResultError,
+  onEditBrief,
 }: TaskWorkspacePlanSectionProps) {
   const [regenerationInstruction, setRegenerationInstruction] = useState("");
   const [submittedRevisionInstruction, setSubmittedRevisionInstruction] = useState<string | null>(null);
@@ -609,40 +703,29 @@ export function TaskWorkspacePlanSection({
     />
   ) : null;
 
-
   return (
     <section
       aria-label={copy.executionWorkspaceAria ?? "Task execution workspace"}
-      className="relative flex flex-col overflow-visible rounded-[2rem] border border-border bg-surface-soft/80 p-3 xl:min-h-0 xl:flex-1 xl:overflow-hidden"
+      className={displayState.layout === "result_focus"
+        ? "relative flex flex-col overflow-visible rounded-3xl border border-border/80 bg-background/70 xl:min-h-0 xl:flex-1 xl:overflow-y-auto"
+        : "relative flex flex-col overflow-visible rounded-3xl border border-border/80 bg-background/70 xl:min-h-0 xl:flex-1 xl:overflow-hidden"}
+      data-workspace-layout={displayState.layout}
+      data-workspace-primary-surface={displayState.primarySurface}
+      data-workspace-primary-action={displayState.primaryAction}
     >
       {stateMessage ? (
-        <div
-          className="relative mb-3 rounded-2xl border border-warning/40 bg-warning/20 px-4 py-3 text-sm text-warning-foreground"
-          role="status"
-        >
+        <div className="mx-4 mt-4 rounded-xl border border-warning/40 bg-warning/15 px-4 py-3 text-sm text-warning-foreground" role="status">
           {stateMessage}
         </div>
       ) : null}
-
       {recoveryIssue ? (
-        <div
-          className="relative mb-3 rounded-2xl border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive"
-          role="alert"
-        >
+        <div className="mx-4 mt-4 rounded-xl border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive" role="alert">
           <div className="font-semibold">{copy.recoveryNeeded ?? "Recovery needed"}</div>
           <div className="mt-0.5">{recoveryIssue.message}</div>
           {recoveryActions.length > 0 ? (
-            <div className="mt-2 flex flex-wrap gap-2">
+            <div className="mt-3 flex flex-wrap gap-2">
               {recoveryActions.map((action) => (
-                <Button
-                  key={action.type}
-                  type="button"
-                  size="sm"
-                  variant={recoveryActionButtonVariant(action.type)}
-                  className="h-7 rounded-lg px-2.5 text-xs"
-                  disabled={!action.enabled}
-                  onClick={() => focusNodeActions(recoveryCurrentNodeId)}
-                >
+                <Button key={action.type} type="button" size="sm" variant={recoveryActionButtonVariant(action.type)} disabled={!action.enabled} onClick={() => focusNodeActions(recoveryCurrentNodeId)}>
                   {action.label}
                 </Button>
               ))}
@@ -650,16 +733,16 @@ export function TaskWorkspacePlanSection({
           ) : null}
         </div>
       ) : null}
-
-      {displayState.panels.stageBar || displayState.panels.readiness ? (
-        <div className="mb-3 grid gap-3 xl:grid-cols-[minmax(0,0.9fr)_minmax(22rem,0.6fr)]">
-          {displayState.panels.stageBar ? <StageBarCard stage={displayState.stage} /> : null}
-          {displayState.panels.readiness ? <ReadinessPanel readiness={displayState.readiness} onGeneratePlan={() => onGeneratePlan()} /> : null}
-        </div>
-      ) : null}
-
-      {displayState.layout === "result_focus" ? (
-        <div className="grid min-h-[560px] flex-1 gap-3 xl:min-h-0">
+      {displayState.panels.stageBar ? <StageBarCard stage={displayState.stage} /> : null}
+      {displayState.layout === "brief_focus" ? (
+        <PlanSetupPanel
+          readiness={displayState.readiness}
+          pageData={pageData}
+          onGeneratePlan={() => onGeneratePlan()}
+          onEditBrief={() => onEditBrief?.()}
+        />
+      ) : displayState.layout === "result_focus" ? (
+        <div className="min-h-[560px] flex-1 p-4 xl:min-h-0">
           <TaskWorkspaceInspector
             key={commandCenterScopeKey}
             taskId={pageData.task.id}
@@ -669,11 +752,12 @@ export function TaskWorkspacePlanSection({
             runtimeEvents={runtimeEvents}
             liveActivity={liveActivity}
             currentExecution={currentExecution}
-            isPlanCompact
+            showHeader={false}
+            operationPlacement="after"
             copy={copy}
             onAction={focusNodeActions}
             operationPanel={(
-              <div className="space-y-3">
+              <div className="space-y-4 border-t border-border/70 pt-4">
                 {displayState.panels.resultReview && displayState.resultReview ? <ResultReviewCard review={displayState.resultReview} onAcceptResult={onAcceptResult} onRequestChanges={() => followUpComposerRef.current?.focus()} isAcceptingResult={isAcceptingResult} acceptResultError={acceptResultError} /> : null}
                 {displayState.panels.followUpComposer ? <FollowUpComposerCard textareaRef={followUpComposerRef} /> : null}
               </div>
@@ -682,8 +766,8 @@ export function TaskWorkspacePlanSection({
         </div>
       ) : (
         <div className={graphMode === "compact"
-          ? "grid min-h-[560px] flex-1 gap-3 xl:min-h-0 xl:grid-cols-[minmax(0,0.42fr)_minmax(36rem,1.58fr)]"
-          : "grid min-h-[560px] flex-1 gap-3 xl:min-h-0 xl:grid-cols-[minmax(0,1.08fr)_minmax(24rem,0.92fr)]"}>
+          ? "grid min-h-[560px] flex-1 gap-4 p-4 xl:min-h-0 xl:grid-cols-[minmax(0,0.42fr)_minmax(36rem,1.58fr)]"
+          : "grid min-h-[560px] flex-1 gap-4 p-4 xl:min-h-0 xl:grid-cols-[minmax(0,1.12fr)_minmax(22rem,0.68fr)]"}>
           <section
             aria-label={copy.executionFlow ?? "Execution flow"}
             className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[1.75rem] border border-border bg-background/70"

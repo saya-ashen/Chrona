@@ -104,6 +104,15 @@ function groupForItem(item: ActionCenterPresentationItem): ActionGroupKey {
     case "done":
     case "cancelled":
       return "resolved";
+    case "no_plan":
+    case "planning":
+    case "plan_review":
+    case "ready_to_run":
+    case "queued":
+    case "running":
+    case undefined:
+      break;
+
   }
 
   if (["recovery", "blocked", "approval"].includes(item.kind))

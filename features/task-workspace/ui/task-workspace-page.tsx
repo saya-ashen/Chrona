@@ -337,6 +337,7 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
         planGenerationStatus={planGenerationStatus}
         canAcceptPlan={canAcceptPlan}
         acceptPlanError={acceptPlanError}
+        onEditBrief={toggleEditExpanded}
         generationUserInstruction={generationUserInstruction}
         runtimeEvents={runtimeEvents}
         liveActivity={liveActivity}

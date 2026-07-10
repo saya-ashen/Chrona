@@ -171,6 +171,39 @@ describe("task workspace interaction model", () => {
     expect(deriveResultReview(donePage)?.actions.map((action) => action.id)).toEqual(["ask_follow_up", "create_follow_up_task"]);
   });
 
+  it("separates required, recommended, and optional planning readiness", () => {
+    const readiness = deriveTaskPlanningReadiness(pageData({
+      task: {
+        ...pageData().task,
+        description: "Do the work",
+        dueAt: null,
+        scheduledStartAt: null,
+        currentWorkBlock: null,
+      },
+    }));
+
+    expect(readiness.status).toBe("warning");
+    expect(readiness.primaryAction).toBe("generate_plan");
+    expect(readiness.checks.find((check) => check.id === "success_criteria")).toMatchObject({ level: "recommended", state: "missing", action: "edit_brief" });
+    expect(readiness.checks.find((check) => check.id === "schedule")).toMatchObject({ level: "optional", state: "missing" });
+    expect(readiness.checks.find((check) => check.id === "provider")).toMatchObject({ level: "required", state: "passed" });
+  });
+
+  it("blocks planning with an actionable provider setup route state", () => {
+    const input = pageData({
+      availableAiClients: [],
+      task: {
+        ...pageData().task,
+        aiClientId: null,
+        executionRuntime: "",
+      },
+    });
+    const readiness = deriveTaskPlanningReadiness(input);
+
+    expect(readiness.status).toBe("blocked");
+    expect(readiness.primaryAction).toBe("configure_provider");
+    expect(readiness.checks.find((check) => check.id === "provider")).toMatchObject({ level: "required", state: "blocked", action: "configure_provider" });
+  });
   it("uses one display rule table for fixed panel visibility by mode", () => {
     expect(TASK_WORKSPACE_DISPLAY_RULES.ready_to_run.panels.runPreview).toBe(true);
     expect(TASK_WORKSPACE_DISPLAY_RULES.ready_to_run.panels.planDiffReview).toBe(false);
@@ -179,6 +212,33 @@ describe("task workspace interaction model", () => {
     expect(TASK_WORKSPACE_DISPLAY_RULES.completed.panels.resultReview).toBe(true);
     expect(TASK_WORKSPACE_DISPLAY_RULES.completed.panels.selectedNodeDetails).toBe(false);
     expect(TASK_WORKSPACE_DISPLAY_RULES.completed.panels.operationPanel).toBe(false);
+    expect(TASK_WORKSPACE_DISPLAY_RULES.reviewing_plan).toMatchObject({
+      primarySurface: "plan",
+      primaryAction: "accept_plan",
+      contextRail: "plan_review",
+      collapsedByDefault: ["activity"],
+    });
+    expect(TASK_WORKSPACE_DISPLAY_RULES.running).toMatchObject({
+      primarySurface: "execution",
+      primaryAction: "runtime_action",
+      contextRail: "current_operation",
+    });
+    expect(TASK_WORKSPACE_DISPLAY_RULES.blocked).toMatchObject({
+      primarySurface: "decision",
+      primaryAction: "recover",
+      contextRail: "recovery",
+      collapsedByDefault: ["diagnostics"],
+    });
+    expect(TASK_WORKSPACE_DISPLAY_RULES.completed).toMatchObject({
+      primarySurface: "result",
+      primaryAction: "accept_result",
+      contextRail: "result_review",
+    });
+    expect(TASK_WORKSPACE_DISPLAY_RULES.done).toMatchObject({
+      primarySurface: "result",
+      primaryAction: "follow_up",
+      contextRail: "continuation",
+    });
 
     const readyState = deriveTaskWorkspaceDisplayState({
       pageData: pageData(),

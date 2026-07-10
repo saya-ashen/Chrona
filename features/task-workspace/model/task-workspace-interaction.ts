@@ -8,8 +8,10 @@ export type TaskPlanningReadiness = {
   checks: Array<{
     id: string;
     label: string;
-    state: "passed" | "missing" | "warning" | "blocked";
+    level: "required" | "recommended" | "optional";
+    state: "passed" | "missing" | "blocked";
     helperText?: string;
+    action?: "edit_brief" | "configure_provider";
   }>;
   primaryAction: "generate_plan" | "complete_brief" | "configure_provider";
 };
@@ -88,10 +90,28 @@ export type TaskWorkspacePanelKey =
   | "resultReview"
   | "followUpComposer";
 
+export type TaskWorkspacePrimarySurface = "brief" | "plan" | "execution" | "decision" | "result";
+
+export type TaskWorkspacePrimaryAction =
+  | "generate_plan"
+  | "cancel_generation"
+  | "accept_plan"
+  | "start_run"
+  | "runtime_action"
+  | "recover"
+  | "accept_result"
+  | "follow_up";
+
+export type TaskWorkspaceContextRail = "readiness" | "plan_review" | "run_readiness" | "current_operation" | "recovery" | "result_review" | "continuation";
+
 export type TaskWorkspaceDisplayRule = {
   mode: TaskWorkspaceDisplayMode;
   description: string;
-  layout: "workspace" | "result_focus";
+  layout: "brief_focus" | "plan_workbench" | "execution_focus" | "decision_focus" | "result_focus";
+  primarySurface: TaskWorkspacePrimarySurface;
+  primaryAction: TaskWorkspacePrimaryAction;
+  contextRail: TaskWorkspaceContextRail;
+  collapsedByDefault: Array<"activity" | "diagnostics" | "execution_history">;
   panels: Record<TaskWorkspacePanelKey, boolean>;
 };
 
@@ -126,49 +146,81 @@ export const TASK_WORKSPACE_DISPLAY_RULES: Record<TaskWorkspaceDisplayMode, Task
   briefing: {
     mode: "briefing",
     description: "Task has no usable plan yet. Show brief quality, intent presets, and plan generation only.",
-    layout: "workspace",
+    layout: "brief_focus",
+    primarySurface: "brief",
+    primaryAction: "generate_plan",
+    contextRail: "readiness",
+    collapsedByDefault: ["activity", "diagnostics"],
     panels: panels(["stageBar", "readiness", "operationPanel"]),
   },
   planning: {
     mode: "planning",
     description: "Plan generation is active. Keep stage visible, hide review/run/result affordances.",
-    layout: "workspace",
+    layout: "brief_focus",
+    primarySurface: "brief",
+    primaryAction: "cancel_generation",
+    contextRail: "readiness",
+    collapsedByDefault: ["activity", "diagnostics"],
     panels: panels(["stageBar", "readiness", "operationPanel"]),
   },
   reviewing_plan: {
     mode: "reviewing_plan",
     description: "Draft plan needs user review. Show plan summary, diff, selected-node context, and revision controls.",
-    layout: "workspace",
+    layout: "plan_workbench",
+    primarySurface: "plan",
+    primaryAction: "accept_plan",
+    contextRail: "plan_review",
+    collapsedByDefault: ["activity"],
     panels: panels(["stageBar", "readiness", "planReviewSummary", "planDiffReview", "selectedNodeDetails", "selectedNodeQuickActions", "decisionCards", "operationPanel"]),
   },
   ready_to_run: {
     mode: "ready_to_run",
     description: "Accepted plan is ready. Show run preview and selected-node context before start.",
-    layout: "workspace",
+    layout: "plan_workbench",
+    primarySurface: "plan",
+    primaryAction: "start_run",
+    contextRail: "run_readiness",
+    collapsedByDefault: ["activity"],
     panels: panels(["stageBar", "planReviewSummary", "selectedNodeDetails", "selectedNodeQuickActions", "decisionCards", "runPreview", "operationPanel"]),
   },
   running: {
     mode: "running",
     description: "Execution is in progress. Prioritize current operation and selected-node context.",
-    layout: "workspace",
+    layout: "execution_focus",
+    primarySurface: "execution",
+    primaryAction: "runtime_action",
+    contextRail: "current_operation",
+    collapsedByDefault: ["activity", "diagnostics"],
     panels: panels(["stageBar", "selectedNodeDetails", "selectedNodeQuickActions", "decisionCards", "operationPanel"]),
   },
   blocked: {
     mode: "blocked",
     description: "Execution needs handling. Keep blocker resolution, decision cards, and follow-up composer visible.",
-    layout: "workspace",
+    layout: "decision_focus",
+    primarySurface: "decision",
+    primaryAction: "recover",
+    contextRail: "recovery",
+    collapsedByDefault: ["diagnostics"],
     panels: panels(["stageBar", "selectedNodeDetails", "selectedNodeQuickActions", "decisionCards", "operationPanel", "followUpComposer"]),
   },
   completed: {
     mode: "completed",
     description: "Run completed but task result is not accepted as Done. Hide plan workbench and focus result review.",
     layout: "result_focus",
+    primarySurface: "result",
+    primaryAction: "accept_result",
+    contextRail: "result_review",
+    collapsedByDefault: ["execution_history", "activity"],
     panels: panels(["stageBar", "resultReview", "followUpComposer"]),
   },
   done: {
     mode: "done",
     description: "Task is closed. Hide plan workbench and show accepted result with lightweight follow-up only.",
     layout: "result_focus",
+    primarySurface: "result",
+    primaryAction: "follow_up",
+    contextRail: "continuation",
+    collapsedByDefault: ["execution_history", "activity"],
     panels: panels(["stageBar", "resultReview", "followUpComposer"]),
   },
 };
@@ -221,43 +273,55 @@ export function deriveTaskPlanningReadiness(pageData: Pick<TaskPageData, "task" 
   const checks: TaskPlanningReadiness["checks"] = [
     {
       id: "title",
-      label: "Title exists",
+      label: "Task title",
+      level: "required",
       state: task.title.trim() ? "passed" : "blocked",
       helperText: task.title.trim() ? undefined : "Add a title before planning.",
+      action: task.title.trim() ? undefined : "edit_brief",
     },
     {
       id: "description",
-      label: "Description exists",
+      label: "Task description",
+      level: "recommended",
       state: task.description?.trim() ? "passed" : "missing",
-      helperText: task.description?.trim() ? undefined : "Describe the expected work so plan nodes are grounded.",
+      helperText: task.description?.trim() ? undefined : "Describe the expected work so plan steps are grounded.",
+      action: task.description?.trim() ? undefined : "edit_brief",
     },
     {
       id: "success_criteria",
-      label: "Success criteria present",
-      state: /success|done when|acceptance|验收|成功|完成标准/i.test(`${task.description ?? ""} ${task.runnabilitySummary ?? ""}`) ? "passed" : "warning",
-      helperText: "Planning can continue, but explicit success criteria make review safer.",
+      label: "Success criteria",
+      level: "recommended",
+      state: /success|done when|acceptance|验收|成功|完成标准/i.test(`${task.description ?? ""} ${task.runnabilitySummary ?? ""}`) ? "passed" : "missing",
+      helperText: "Explain how Chrona should decide that the result is complete.",
+      action: "edit_brief",
     },
     {
       id: "output_format",
-      label: "Output format specified",
-      state: /report|summary|checklist|file|table|patch|pr|文档|报告|表格|清单/i.test(task.description ?? "") ? "passed" : "warning",
-      helperText: "Tell Chrona whether the result should be a report, checklist, patch, file, or summary.",
+      label: "Output format",
+      level: "recommended",
+      state: /report|summary|checklist|file|table|patch|pr|文档|报告|表格|清单/i.test(task.description ?? "") ? "passed" : "missing",
+      helperText: "Choose a report, checklist, patch, file, table, or summary.",
+      action: "edit_brief",
     },
     {
       id: "schedule",
-      label: "Schedule or due date set",
-      state: task.dueAt || task.scheduledStartAt || task.currentWorkBlock ? "passed" : "warning",
-      helperText: "Optional. Add a due date when timing matters.",
+      label: "Schedule or due date",
+      level: "optional",
+      state: task.dueAt || task.scheduledStartAt || task.currentWorkBlock ? "passed" : "missing",
+      helperText: "Optional. Timing can be configured before execution.",
+      action: "edit_brief",
     },
     {
       id: "provider",
-      label: "Provider configured",
+      label: "AI provider",
+      level: "required",
       state: hasProvider ? "passed" : "blocked",
-      helperText: hasProvider ? undefined : "Configure an AI provider before generating a plan.",
+      helperText: hasProvider ? undefined : "Connect an AI provider before generating a plan.",
+      action: hasProvider ? undefined : "configure_provider",
     },
   ];
   const hasBlocked = checks.some((check) => check.state === "blocked");
-  const hasWarnings = checks.some((check) => check.state === "warning" || check.state === "missing");
+  const hasWarnings = checks.some((check) => check.level === "recommended" && check.state === "missing");
   return {
     status: hasBlocked ? "blocked" : hasWarnings ? "warning" : "ready",
     checks,
