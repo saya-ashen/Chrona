@@ -313,6 +313,23 @@ export function PlanSetupPanel({
   );
 }
 
+function PlanGenerationProgressPanel() {
+  return (
+    <div className="flex min-h-0 flex-1 items-center justify-center px-5 py-10" data-testid="plan-generation-progress">
+      <div className="w-full max-w-3xl space-y-5 rounded-2xl border border-border/70 bg-card p-6 shadow-sm">
+        <div className="flex items-start gap-4">
+          <span className="mt-1 size-5 shrink-0 animate-spin rounded-full border-2 border-primary/20 border-t-primary" aria-label="Plan generation running" />
+          <div className="space-y-2">
+            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">Creating draft plan</p>
+            <h2 className="font-heading text-2xl font-semibold text-foreground">Chrona is preparing a reviewable plan</h2>
+            <p className="text-sm leading-6 text-muted-foreground">The draft will replace this progress view after validation and persistence. Nothing executes during plan generation.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function SummaryList({ title, items, empty }: { title: string; items: string[]; empty: string }) {
   return (
     <div>
@@ -720,8 +737,7 @@ export function TaskWorkspacePlanSection({
       ) : null}
       {recoveryIssue ? (
         <div className="mx-4 mt-4 rounded-xl border border-destructive/40 bg-destructive/10 px-4 py-3 text-sm text-destructive" role="alert">
-          <div className="font-semibold">{copy.recoveryNeeded ?? "Recovery needed"}</div>
-          <div className="mt-0.5">{recoveryIssue.message}</div>
+          <p className="font-semibold">{recoveryIssue.message}</p>
           {recoveryActions.length > 0 ? (
             <div className="mt-3 flex flex-wrap gap-2">
               {recoveryActions.map((action) => (
@@ -735,12 +751,16 @@ export function TaskWorkspacePlanSection({
       ) : null}
       {displayState.panels.stageBar ? <StageBarCard stage={displayState.stage} /> : null}
       {displayState.layout === "brief_focus" ? (
-        <PlanSetupPanel
-          readiness={displayState.readiness}
-          pageData={pageData}
-          onGeneratePlan={() => onGeneratePlan()}
-          onEditBrief={() => onEditBrief?.()}
-        />
+        displayState.mode === "planning" ? (
+          <PlanGenerationProgressPanel />
+        ) : (
+          <PlanSetupPanel
+            readiness={displayState.readiness}
+            pageData={pageData}
+            onGeneratePlan={() => onGeneratePlan()}
+            onEditBrief={() => onEditBrief?.()}
+          />
+        )
       ) : displayState.layout === "result_focus" ? (
         <div className="min-h-[560px] flex-1 p-4 xl:min-h-0">
           <TaskWorkspaceInspector

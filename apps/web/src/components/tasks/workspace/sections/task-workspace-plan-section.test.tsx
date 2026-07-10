@@ -194,9 +194,9 @@ describe("TaskWorkspacePlanSection", () => {
     );
     const getOperationPanel = () => screen.getAllByRole("region", { name: "Current operation" }).at(-1)!;
     const getCurrentGraphPanel = () => screen.getAllByTestId("task-plan-graph-panel").at(-1)!;
-    expect(screen.getByRole("region", { name: "Execution flow" })).toBeInTheDocument();
-    expect(within(getOperationPanel()).getByRole("button", { name: "Generate plan" })).toBeInTheDocument();
-    fireEvent.click(within(getOperationPanel()).getByRole("button", { name: "Generate plan" }));
+    expect(screen.getByTestId("plan-setup-panel")).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Execution flow" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Generate plan" }));
     expect(onGeneratePlan).toHaveBeenCalledTimes(1);
 
     initial.rerender(
@@ -334,8 +334,8 @@ describe("TaskWorkspacePlanSection", () => {
       />,
     );
 
-    const operationPanel = screen.getByRole("region", { name: "Current operation" });
-    fireEvent.click(within(operationPanel).getByRole("button", { name: "Generate plan" }));
+    const setup = screen.getByTestId("plan-setup-panel");
+    fireEvent.click(within(setup).getByRole("button", { name: "Generate plan" }));
 
     expect(onGeneratePlan).toHaveBeenCalledTimes(1);
   });
@@ -359,9 +359,9 @@ describe("TaskWorkspacePlanSection", () => {
       />,
     );
 
-    const operationPanel = screen.getByRole("region", { name: "Current operation" });
-    expect(within(operationPanel).queryByRole("button", { name: "Generate plan" })).not.toBeInTheDocument();
-    expect(within(operationPanel).queryByRole("button", { name: "Stop generation" })).not.toBeInTheDocument();
+    expect(screen.getByTestId("plan-generation-progress")).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Current operation" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Stop generation" })).not.toBeInTheDocument();
     expect(onGeneratePlan).not.toHaveBeenCalled();
   });
 
@@ -935,7 +935,7 @@ describe("TaskWorkspacePlanSection", () => {
     const commandCenter = screen.getByRole("complementary", { name: "Task command center" });
 
     // A completed plan reports full progress and exposes no pending action input.
-    expect(within(commandCenter).getByText((_content, element) => element?.textContent === "1/1 steps")).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Task execution workspace" })).toHaveAttribute("data-workspace-layout", "result_focus");
     expect(within(commandCenter).queryByText("Ready to run")).not.toBeInTheDocument();
     expect(within(commandCenter).queryByRole("button", { name: "Send input" })).not.toBeInTheDocument();
     expect(within(commandCenter).queryByLabelText(/City/)).not.toBeInTheDocument();
