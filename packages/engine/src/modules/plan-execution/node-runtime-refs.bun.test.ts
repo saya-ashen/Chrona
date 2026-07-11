@@ -159,6 +159,53 @@ describe("node runtime refs", () => {
     expect(input.branchOptions).toBeUndefined();
   });
 
+  it("includes plan brief and only explicit initial run context", () => {
+    const current = node({
+      id: "task-real-456",
+      title: "Write script spec",
+      type: "task",
+    });
+    const plan = graph([current]);
+
+    const firstInput = buildNodeRuntimeInput({
+      plan,
+      node: current,
+      planContext: {
+        title: "Weather agent plan",
+        goal: "Create a weather automation agent.",
+        assumptions: ["Use available public weather APIs."],
+        summary: "Build and verify the agent.",
+      },
+      runContext: {
+        planningPrompt: "Original user planning request",
+        startPrompt: "Start now",
+      },
+    });
+    const nextInput = buildNodeRuntimeInput({
+      plan,
+      node: current,
+      planContext: {
+        title: "Weather agent plan",
+        goal: "Create a weather automation agent.",
+        assumptions: ["Use available public weather APIs."],
+        summary: "Build and verify the agent.",
+      },
+    });
+
+    expect(firstInput.context.plan).toEqual({
+      title: "Weather agent plan",
+      goal: "Create a weather automation agent.",
+      assumptions: ["Use available public weather APIs."],
+      summary: "Build and verify the agent.",
+    });
+    expect(firstInput.context.run).toEqual({
+      planningPrompt: "Original user planning request",
+      startPrompt: "Start now",
+    });
+    expect(nextInput.context.plan.goal).toBe("Create a weather automation agent.");
+    expect(nextInput.context.run).toBeUndefined();
+  });
+
   it("resolves only exact branch refs scoped to the current condition node", () => {
     const condition = node({
       id: "condition-real-123",

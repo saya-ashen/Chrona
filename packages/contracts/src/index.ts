@@ -213,6 +213,21 @@ export {
   planPatchSchema,
   upgradeBlueprintToEditable,
 } from "./ai-plan-blueprint";
+export type { PlanGenerateToolPayload } from "./plan-generate-tool";
+
+export {
+  CHRONA_PLAN_GENERATE_CLAUDE_CODE_TOOL_NAME,
+  CHRONA_PLAN_GENERATE_INTERNAL_TOOL_NAME,
+  CHRONA_PLAN_GENERATE_TOOL_DESCRIPTION,
+  CHRONA_PLAN_GENERATE_TOOL_NAME,
+  CHRONA_PLAN_GENERATE_TOOL_TITLE,
+  acceptedPlanGenerateToolResult,
+  isChronaPlanGenerateToolName,
+  parsePlanGenerateToolPayload,
+  planGenerateToolPayloadSchema,
+  safeParsePlanGenerateToolPayload,
+} from "./plan-generate-tool";
+
 
 // Runtime / compiled types
 export type {
@@ -337,6 +352,7 @@ export type {
   DebugClientConfig,
   ClaudeCodeClientConfig,
   CodexClientConfig,
+  OmpClientConfig,
   LLMClientConfig,
   AgentProviderClientConfig,
   SmartSuggestRequest,

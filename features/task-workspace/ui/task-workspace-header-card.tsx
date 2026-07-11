@@ -14,6 +14,20 @@ import { UI_ACTION, type UiDocument } from "@chrona/ui-protocol";
 import { SpecRenderer } from "@/components/tasks/workspace/catalog/spec-renderer";
 import type { TaskData, TaskHeaderAction } from "..";
 
+function hideHeaderActions(spec: UiDocument, input: { generatePlan?: boolean; acceptPlan?: boolean }): UiDocument {
+  const generateAction = spec.elements["action:generate-plan"];
+  const acceptAction = spec.elements["action:accept-plan"];
+  if ((!input.generatePlan || !generateAction) && (!input.acceptPlan || !acceptAction)) return spec;
+  return {
+    ...spec,
+    elements: {
+      ...spec.elements,
+      ...(input.generatePlan && generateAction ? { "action:generate-plan": { ...generateAction, visible: false } } : {}),
+      ...(input.acceptPlan && acceptAction ? { "action:accept-plan": { ...acceptAction, visible: false } } : {}),
+    },
+  };
+}
+
 type HeaderActionId = TaskHeaderAction["id"];
 
 type TaskWorkspaceHeaderCardProps = {
@@ -21,6 +35,8 @@ type TaskWorkspaceHeaderCardProps = {
   spec: UiDocument;
   store: StateStore;
   onAction: (action: TaskHeaderAction) => void | Promise<void>;
+  hideGeneratePlan?: boolean;
+  hideAcceptPlan?: boolean;
   onAcceptPlan: () => void | Promise<void>;
   onGeneratePlan: () => void | Promise<void>;
   onStopPlanGeneration: () => void | Promise<void>;
@@ -47,6 +63,8 @@ export function TaskWorkspaceHeaderCard({
   spec,
   store,
   onAction,
+  hideGeneratePlan,
+  hideAcceptPlan,
   onAcceptPlan,
   onGeneratePlan,
   onStopPlanGeneration,
@@ -158,7 +176,7 @@ export function TaskWorkspaceHeaderCard({
 
   return (
     <>
-      <SpecRenderer spec={spec} handlers={handlers} store={store} />
+      <SpecRenderer spec={hideHeaderActions(spec, { generatePlan: hideGeneratePlan, acceptPlan: hideAcceptPlan })} handlers={handlers} store={store} />
       <p className="sr-only" role="status" aria-live="polite">
         {actionStatus ?? ""}
       </p>

@@ -8,6 +8,18 @@ import type {
 } from "@chrona/contracts/ai";
 import type { ProviderRunEvent } from "@chrona/providers-foundation";
 
+export type NodeExecutionPlanContext = {
+  title: string;
+  goal: string;
+  assumptions: string[];
+  summary?: string;
+};
+
+export type NodeExecutionRunContext = {
+  planningPrompt?: string;
+  startPrompt?: string;
+};
+
 type NodeExecutionEvidence = {
   sessionId?: string;
   runId?: string;
@@ -81,6 +93,8 @@ export interface NodeExecutorInput {
   };
   node: EffectivePlanNode;
   plan: EffectivePlanGraph;
+  planContext?: NodeExecutionPlanContext;
+  runContext?: NodeExecutionRunContext;
   attempt: NodeAttempt;
   planOutput?: PlanOutputState;
   trigger: "manual" | "scheduler" | "system" | "auto";

@@ -221,17 +221,17 @@ export function buildTaskHeaderSpec(input: TaskHeaderSpecInput): UiDocument {
 
   elements.root = {
     type: "Card",
-    props: { className: "relative z-30 min-w-0 overflow-visible rounded-[0.9rem] border-border/70 bg-card/90 p-2 shadow-sm backdrop-blur" },
+    props: { className: "relative z-30 min-w-0 overflow-visible rounded-[1.5rem] border-border bg-card p-4" },
     children: ["layout", "error-region"],
   };
   elements.layout = {
     type: "Stack",
-    props: { direction: "horizontal", gap: "md", align: "center", justify: "between", className: "min-w-0 flex-wrap" },
+    props: { direction: "horizontal", gap: "lg", align: "center", justify: "between", className: "min-w-0 flex-wrap" },
     children: ["identity", "actions"],
   };
   elements.identity = { type: "Stack", props: { gap: "sm", className: "min-w-0 flex-1" }, children: ["title-row", "meta-row"] };
   elements["title-row"] = { type: "Stack", props: { direction: "horizontal", gap: "sm", align: "center", className: "min-w-0 flex-wrap" }, children: ["title", ...statusChildren] };
-  elements.title = { type: "Heading", props: { text: input.title, level: "h1", className: "min-w-0 break-words text-base font-semibold leading-tight tracking-tight text-foreground lg:max-w-[42vw]" } };
+  elements.title = { type: "Heading", props: { text: input.title, level: "h1", className: "min-w-0 break-words font-heading text-[2rem] font-medium leading-none tracking-[-0.05em] text-foreground lg:max-w-[46vw]" } };
   elements["meta-row"] = { type: "Stack", props: { direction: "horizontal", gap: "sm", align: "center", className: "min-w-0 flex-wrap" }, children: [...metaChildren] };
   elements.actions = { type: "Stack", props: { direction: "horizontal", gap: "sm", align: "center", justify: "end", className: "w-full flex-wrap sm:w-auto" }, children: actionChildren };
 

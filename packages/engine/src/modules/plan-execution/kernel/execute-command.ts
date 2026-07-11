@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { db } from "@/lib/db";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
 import {
@@ -23,9 +24,10 @@ import {
   executionTransition,
   graphStatusForExecutionStatus,
 } from "../execution-state-machine";
-import { ensureNativePlanRun, derivePlanRunFromRuntime, syncNormalizedRuntimeState } from "../persistence/plan-runtime-store";
-import { savePlanRunGuarded } from "../persistence/plan-run-store";
+import { ensureNativePlanRun, createPlanRunFromCompiledPlan, derivePlanRunFromRuntime, syncNormalizedRuntimeState } from "../persistence/plan-runtime-store";
+import { createEmptyPlanOutput, createPlanGraphFromCompiledPlan, savePlanRunGuarded } from "../persistence/plan-run-store";
 import {
+  abandonActiveExecutionSessions,
   ensureExecutionSession,
   getActiveExecutionWorkBlockId,
   setExecutionSessionState,
@@ -73,6 +75,7 @@ function eventCommandType(command: ExecutionCommand): string {
     case "resume_with_approval":
     case "resume_after_unblock":
     case "retry_node":
+    case "restart_from_beginning":
     case "start":
     case "apply_mutation":
     default:
@@ -222,6 +225,7 @@ function buildGraphCommand(input: {
 
   switch (command.type) {
     case "start":
+    case "restart_from_beginning":
       return { type: "start", ...base };
     case "resume_with_input": {
       const nodeId =
@@ -402,22 +406,54 @@ async function finalizeOutcome(input: {
   });
 }
 
+const activeTaskCommands = new AsyncLocalStorage<ReadonlySet<string>>();
+
+const taskCommandTails = new Map<string, Promise<void>>();
+
+export async function executeCommand(
+  input: ExecutionCommandEnvelope & PlanExecutionObserver,
+): Promise<PlanExecutionResult> {
+  const activeTaskIds = activeTaskCommands.getStore();
+  if (activeTaskIds?.has(input.taskId)) {
+    return executeCommandUnlocked(input);
+  }
+
+  const previous = taskCommandTails.get(input.taskId) ?? Promise.resolve();
+  let release!: () => void;
+  const current = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  const tail = previous.then(() => current);
+  taskCommandTails.set(input.taskId, tail);
+  await previous;
+  try {
+    const nextActiveTaskIds = new Set(activeTaskIds);
+    nextActiveTaskIds.add(input.taskId);
+    return await activeTaskCommands.run(nextActiveTaskIds, () => executeCommandUnlocked(input));
+  } finally {
+    release();
+    if (taskCommandTails.get(input.taskId) === tail) {
+      taskCommandTails.delete(input.taskId);
+    }
+  }
+}
+
 /**
  * The single execution entry point. Every state-mutating execution action —
  * start, resume, approve, submit (in-process or out-of-band provider result),
  * block, fail, retry, pause, cancel, mutate — flows through here as one
  * ExecutionCommand, dispatched once and persisted once under an epoch guard.
  */
-export async function executeCommand(
+async function executeCommandUnlocked(
   input: ExecutionCommandEnvelope & PlanExecutionObserver,
 ): Promise<PlanExecutionResult> {
   const { taskId, command } = input;
   const context: ExecutionCommandContext = input.context ?? {};
   const trigger: ExecutionTrigger =
-    context.trigger ?? (command.type === "start" ? command.trigger : "manual");
+    context.trigger ?? (command.type === "start" || command.type === "restart_from_beginning" ? command.trigger : "manual");
 
   const requestedWorkBlockId =
-    command.type === "start"
+    command.type === "start" || command.type === "restart_from_beginning"
       ? context.workBlockId ?? null
       : context.workBlockId ?? (await getActiveExecutionWorkBlockId(taskId));
 
@@ -433,13 +469,20 @@ export async function executeCommand(
       })
     : null;
 
+  if (command.type === "restart_from_beginning") {
+    await abandonActiveExecutionSessions({
+      taskId,
+      reason: "Plan restarted from beginning",
+    });
+  }
+
   const session = await ensureExecutionSession({
     workspaceId: runtime.workspaceId,
     taskId,
     planId: runtime.planId,
     trigger,
     workBlockId,
-    sessionId: existingContextSession?.id,
+    sessionId: command.type === "restart_from_beginning" ? undefined : existingContextSession?.id,
   });
   const mainSession = await ensurePlanMainSession({
     taskId,
@@ -447,7 +490,7 @@ export async function executeCommand(
   });
   const runtimeName = await getRuntimeName(taskId);
 
-  if (command.type === "start") {
+  if (command.type === "start" || command.type === "restart_from_beginning") {
     await activateWorkBlock(taskId, session.workBlockId);
     await appendMainSessionEvent({
       taskId,
@@ -456,6 +499,54 @@ export async function executeCommand(
       workBlockId: session.workBlockId,
       eventType: "execution_started",
       payload: { trigger, prompt: command.prompt },
+    });
+  }
+
+  if (command.type === "restart_from_beginning") {
+    await cancelActiveRunsForTask(taskId, "Plan restarted from beginning");
+    const resetGraph = createPlanGraphFromCompiledPlan({
+      taskId,
+      compiledPlan: runtime.compiledPlan,
+      now: new Date().toISOString(),
+    });
+    const committed = await savePlanRunGuarded({
+      workspaceId: runtime.workspaceId,
+      taskId,
+      planId: runtime.planId,
+      workBlockId: session.workBlockId,
+      expectedEpoch: runtime.persisted.executionEpoch,
+      run: createPlanRunFromCompiledPlan(runtime.compiledPlan),
+      compiledPlan: runtime.compiledPlan,
+      graph: resetGraph,
+      attempts: [],
+      results: [],
+      executionContextSnapshots: [],
+      planOutput: createEmptyPlanOutput(),
+    });
+    if (!committed.committed) {
+      return getCurrentExecution({ taskId, workBlockId: session.workBlockId });
+    }
+    await db.taskPlanProviderRun.updateMany({
+      where: { taskId, planId: runtime.planId, status: { in: ["running", "waiting_for_approval"] } },
+      data: { status: "cancelled", finishedAt: new Date() },
+    });
+    runtime.persisted = {
+      ...runtime.persisted,
+      planRun: committed.planRun,
+      graph: resetGraph,
+      attempts: [],
+      results: [],
+      executionContextSnapshots: [],
+      planOutput: createEmptyPlanOutput(),
+      executionEpoch: runtime.persisted.executionEpoch + 1,
+    };
+    await setExecutionSessionState({
+      sessionId: session.id,
+      status: "Active",
+      currentNodeId: null,
+      currentNodeAttemptId: null,
+      pauseReason: null,
+      completedNodeIds: [],
     });
   }
 
@@ -512,6 +603,13 @@ export async function executeCommand(
       planId: runtime.planId,
       compiledPlan: runtime.compiledPlan,
       persisted: runtime.persisted,
+      planSummary: runtime.planSummary,
+      initialRunContext: command.type === "start" || command.type === "restart_from_beginning"
+        ? {
+            ...(runtime.planPrompt ? { planningPrompt: runtime.planPrompt } : {}),
+            ...(command.prompt ? { startPrompt: command.prompt } : {}),
+          }
+        : undefined,
       updateSessionProjection: !(existingContextSession && contextSessionId !== session.id),
       onGraphEvent: input.onGraphEvent,
       onRuntimeEvent: input.onRuntimeEvent,

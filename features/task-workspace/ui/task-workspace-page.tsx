@@ -34,6 +34,8 @@ type TaskWorkspaceHeaderEditorProps = {
   onAcceptPlan: Parameters<typeof TaskWorkspaceHeaderCard>[0]["onAcceptPlan"];
   onGeneratePlan: Parameters<typeof TaskWorkspaceHeaderCard>[0]["onGeneratePlan"];
   onStopPlanGeneration: Parameters<typeof TaskWorkspaceHeaderCard>[0]["onStopPlanGeneration"];
+  hideGeneratePlan?: boolean;
+  hideAcceptPlan?: boolean;
   onRecoveryRetry: Parameters<typeof TaskWorkspaceHeaderCard>[0]["onRecoveryRetry"];
   onRecoveryEditInstruction: Parameters<typeof TaskWorkspaceHeaderCard>[0]["onRecoveryEditInstruction"];
   onRecoveryCancel: Parameters<typeof TaskWorkspaceHeaderCard>[0]["onRecoveryCancel"];
@@ -91,6 +93,8 @@ function TaskWorkspaceHeaderEditor({
   onAcceptPlan,
   onGeneratePlan,
   onStopPlanGeneration,
+  hideGeneratePlan,
+  hideAcceptPlan,
   onRecoveryRetry,
   onRecoveryEditInstruction,
   onRecoveryCancel,
@@ -112,6 +116,8 @@ function TaskWorkspaceHeaderEditor({
         onAction={onAction}
         onAcceptPlan={onAcceptPlan}
         onGeneratePlan={onGeneratePlan}
+        hideAcceptPlan={hideAcceptPlan}
+        hideGeneratePlan={hideGeneratePlan}
         onStopPlanGeneration={onStopPlanGeneration}
         onEdit={onToggleEditExpanded}
         showDeleteConfirm={showDeleteConfirm}
@@ -182,6 +188,9 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
     acceptPlanById,
     dispatchExecutionAction,
     submitCheckpointAction,
+    handleAcceptResult,
+    isAcceptingResult,
+    acceptResultError,
     handleGeneratePlanFromHeader,
     handleStopPlanGeneration,
   } = useTaskWorkspacePlanState(task, refreshWorkspace, workspaceEvents);
@@ -250,6 +259,8 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
           onAcceptPlan={() => acceptHeaderPlan({ plan, canAcceptPlan, setAcceptPlanError, acceptPlanById })}
           onGeneratePlan={handleGeneratePlanFromHeader}
           onStopPlanGeneration={handleStopPlanGeneration}
+          hideGeneratePlan={planGenerationStatus === "idle" && !plan}
+          hideAcceptPlan={planGenerationStatus === "waiting_acceptance" && Boolean(plan)}
           onAction={async (action) => {
             if (action.id === "start") {
               await dispatchExecutionAction({ action: "start_manual" });
@@ -334,6 +345,7 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
         planGenerationStatus={planGenerationStatus}
         canAcceptPlan={canAcceptPlan}
         acceptPlanError={acceptPlanError}
+        onEditBrief={toggleEditExpanded}
         generationUserInstruction={generationUserInstruction}
         runtimeEvents={runtimeEvents}
         liveActivity={liveActivity}
@@ -346,6 +358,9 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
         }}
         onDispatchExecutionAction={dispatchExecutionAction}
         onSubmitCheckpointAction={submitCheckpointAction}
+        onAcceptResult={handleAcceptResult}
+        isAcceptingResult={isAcceptingResult}
+        acceptResultError={acceptResultError}
       />
     </div>
   );

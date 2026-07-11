@@ -8,7 +8,7 @@ import {
   type PreparedAiFeatureSpec,
 } from "@chrona/contracts/ai";
 import type { AiRuntimeInvocation, AiRuntimeInvoker } from "../ai-runtime-invoker";
-import type { NodeExecutionResult } from "../node-executors/types";
+import type { NodeExecutionPlanContext, NodeExecutionResult, NodeExecutionRunContext } from "../node-executors/types";
 import type { ProviderRunEvent, ProviderRunSnapshot } from "@chrona/providers-foundation";
 import { buildNodeRuntimePrompt, NODE_RUNTIME_TERMINAL_TOOLS } from "./node-runtime-prompts";
 import { branchBindingForRef } from "./node-runtime-refs";
@@ -28,6 +28,8 @@ export type NodeAiCapabilityInput = {
   };
   node: EffectivePlanNode;
   plan: EffectivePlanGraph;
+  planContext?: NodeExecutionPlanContext;
+  runContext?: NodeExecutionRunContext;
   attempt: NodeAttempt;
   planOutput?: PlanOutputState;
   runtimeName: string;
@@ -90,6 +92,31 @@ function failedErrorFromSnapshot(input: {
   return input.summary || `Runtime run ${input.response.runId} failed the node`;
 }
 
+function completionOverrideFromStructured(input: {
+  response: ProviderRunSnapshot;
+  structured: Record<string, unknown> | undefined;
+  summary?: string;
+  evidence: NodeExecutionEvidence;
+}): NodeExecutionResult | null {
+  const completed = recordValue(input.structured, "completed");
+  const status = recordValue(input.structured, "status");
+  if (completed === false || status === "failed" || status === "error") {
+    return {
+      status: "failed",
+      error: failedErrorFromSnapshot(input),
+      evidence: input.evidence,
+    };
+  }
+  if (status === "blocked") {
+    return {
+      status: "blocked",
+      reason: blockedReasonFromSnapshot(input),
+      evidence: input.evidence,
+    };
+  }
+  return null;
+}
+
 function terminalNodeResultFromSnapshot(input: {
   invocation: AiRuntimeInvocation;
   node: EffectivePlanNode;
@@ -123,7 +150,14 @@ function terminalNodeResultFromSnapshot(input: {
         evidence: input.evidence,
       };
     case "chrona_node_complete":
-    case "chrona_wait_complete":
+    case "chrona_wait_complete": {
+      const override = completionOverrideFromStructured({
+        response: input.invocation.response,
+        structured: input.structured,
+        summary: input.summary,
+        evidence: input.evidence,
+      });
+      if (override) return override;
       return {
         status: "done",
         summary:
@@ -131,6 +165,7 @@ function terminalNodeResultFromSnapshot(input: {
           `Runtime run ${input.invocation.runtimeRunRef ?? input.invocation.runId} completed`,
         evidence: input.evidence,
       };
+    }
     case undefined:
       return undefined;
     default:
@@ -442,7 +477,13 @@ function defaultTerminalToolName(nodeType: EffectivePlanNode["type"]): string {
 export async function executeTaskNodeCapability(
   input: NodeAiCapabilityInput,
 ): Promise<NodeExecutionResult> {
-  const runtime = buildNodeRuntimePrompt(input);
+  const runtime = buildNodeRuntimePrompt({
+    plan: input.plan,
+    node: input.node,
+    planOutput: input.planOutput,
+    planContext: input.planContext,
+    runContext: input.runContext,
+  });
   const featureSpec: PreparedAiFeatureSpec = {
     feature: input.node.type === "condition"
       ? "evaluate_condition_node"

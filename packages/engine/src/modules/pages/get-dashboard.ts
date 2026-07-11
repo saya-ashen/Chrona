@@ -1,8 +1,12 @@
 import { db } from "@/lib/db";
 import type { Prisma } from "@chrona/db";
-import { deriveTaskProjectionStateView, type WorkItemStateView } from "@chrona/domain";
+import { deriveWorkStateView, type WorkStateView } from "@chrona/domain";
 import { isDashboardAiSummaryEnabled } from "@chrona/shared/runtime-config";
-import { dashboardAiBriefDisabledState, getDashboardAiBriefState, type DashboardAiBriefState } from "./dashboard-ai-surface";
+import {
+  dashboardAiBriefDisabledState,
+  getDashboardAiBriefState,
+  type DashboardAiBriefState,
+} from "./dashboard-ai-surface";
 
 /**
  * Dashboard "task news homepage" projection.
@@ -21,11 +25,27 @@ import { dashboardAiBriefDisabledState, getDashboardAiBriefState, type Dashboard
  * one all-time figure the client cannot derive from a capped list.
  */
 
-const ATTENTION_STATES: ReadonlySet<WorkItemStateView["state"]> = new Set(["blocked", "failed", "waiting_for_approval", "waiting_for_input"]);
-const RUNNING_STATES: ReadonlySet<WorkItemStateView["state"]> = new Set(["running"]);
-const TERMINAL_STATES: ReadonlySet<WorkItemStateView["state"]> = new Set(["completed", "cancelled"]);
+const ATTENTION_STATES: ReadonlySet<WorkStateView["state"]> = new Set([
+  "blocked",
+  "failed",
+  "waiting_for_approval",
+  "waiting_for_input",
+]);
+const RUNNING_STATES: ReadonlySet<WorkStateView["state"]> = new Set([
+  "running",
+]);
+const TERMINAL_STATES: ReadonlySet<WorkStateView["state"]> = new Set([
+  "result_ready",
+  "done",
+  "cancelled",
+]);
 
-const PRIORITY_WEIGHT: Record<string, number> = { Urgent: 3, High: 2, Medium: 1, Low: 0 };
+const PRIORITY_WEIGHT: Record<string, number> = {
+  Urgent: 3,
+  High: 2,
+  Medium: 1,
+  Low: 0,
+};
 
 export type DashboardNextStep =
   | "approve_or_edit"
@@ -37,11 +57,7 @@ export type DashboardNextStep =
   | "review_result";
 
 export type DashboardAttentionKind =
-  | "approval"
-  | "input"
-  | "blocked"
-  | "failed"
-  | "schedule_risk";
+  "approval" | "input" | "blocked" | "failed" | "schedule_risk";
 
 /**
  * Editorial buckets for the "auto-completed" digest. Derived from the task's
@@ -49,9 +65,15 @@ export type DashboardAttentionKind =
  * Chrona produced (reports, research, code, plan/automation) without the client
  * needing to know the persistence-level `ArtifactType` enum.
  */
-export type DashboardCompletionCategory = "report" | "research" | "code" | "automation";
+export type DashboardCompletionCategory =
+  "report" | "research" | "code" | "automation";
 
-export type DashboardOutput = { id: string; title: string; type: string; taskId: string };
+export type DashboardOutput = {
+  id: string;
+  title: string;
+  type: string;
+  taskId: string;
+};
 
 type OutputRef = DashboardOutput | null;
 
@@ -59,7 +81,7 @@ export interface DashboardTaskItem {
   taskId: string;
   title: string;
   status: string;
-  stateView: WorkItemStateView;
+  stateView: WorkStateView;
   priority: string;
   scheduleStatus: string | null;
   scheduledStartAt: string | null;
@@ -76,7 +98,7 @@ export interface DashboardAttentionItem {
   taskId: string;
   title: string;
   status: string;
-  stateView: WorkItemStateView;
+  stateView: WorkStateView;
   priority: string;
   kind: DashboardAttentionKind;
   reason: string | null;
@@ -89,7 +111,7 @@ export interface DashboardInProgressItem {
   taskId: string;
   title: string;
   status: string;
-  stateView: WorkItemStateView;
+  stateView: WorkStateView;
   latestRunStatus: string | null;
   stage: string | null;
   nextStep: DashboardNextStep;
@@ -144,7 +166,20 @@ function completionCategory(output: OutputRef): DashboardCompletionCategory {
   }
 }
 
-type ProjectionWithTask = Prisma.TaskProjectionGetPayload<{ include: { task: { select: { title: true; priority: true; status: true; completedAt: true; createdAt: true; blockReason: true } } } }>;
+type ProjectionWithTask = Prisma.TaskProjectionGetPayload<{
+  include: {
+    task: {
+      select: {
+        title: true;
+        priority: true;
+        status: true;
+        completedAt: true;
+        createdAt: true;
+        blockReason: true;
+      };
+    };
+  };
+}>;
 
 function loadProjections(workspaceId: string) {
   return db.taskProjection.findMany({
@@ -170,7 +205,10 @@ function readString(value: unknown): string | null {
 }
 
 function reasonFor(item: ProjectionWithTask): string | null {
-  const blockReason = item.task.blockReason as { detail?: unknown; actionRequired?: unknown } | null;
+  const blockReason = item.task.blockReason as {
+    detail?: unknown;
+    actionRequired?: unknown;
+  } | null;
   return (
     item.blockDetail ??
     readString(blockReason?.detail) ??
@@ -179,18 +217,17 @@ function reasonFor(item: ProjectionWithTask): string | null {
   );
 }
 
-function stateViewFor(item: ProjectionWithTask): WorkItemStateView {
-  return deriveTaskProjectionStateView({
-    persistedStatus: item.persistedStatus,
-    scheduleStatus: item.scheduleStatus,
-    displayState: item.displayState,
-    latestRunStatus: item.latestRunStatus,
-    isScheduled: Boolean(item.scheduledStartAt || item.scheduledEndAt),
+function stateViewFor(item: ProjectionWithTask): WorkStateView {
+  return deriveWorkStateView({
+    taskStatus: item.persistedStatus,
+    executionStatus: item.displayState ?? item.latestRunStatus,
     isRunnable: item.actionRequired ? false : undefined,
   });
 }
 
-function attentionKind(stateView: WorkItemStateView): DashboardAttentionKind | null {
+function attentionKind(
+  stateView: WorkStateView,
+): DashboardAttentionKind | null {
   if (stateView.state === "failed") return "failed";
   if (stateView.state === "waiting_for_approval") return "approval";
   if (stateView.state === "waiting_for_input") return "input";
@@ -198,7 +235,9 @@ function attentionKind(stateView: WorkItemStateView): DashboardAttentionKind | n
   return null;
 }
 
-function nextStepFor(kind: DashboardAttentionKind | "running" | "ready"): DashboardNextStep {
+function nextStepFor(
+  kind: DashboardAttentionKind | "running" | "ready",
+): DashboardNextStep {
   switch (kind) {
     case "approval":
       return "approve_or_edit";
@@ -233,17 +272,24 @@ function focusScore(item: ProjectionWithTask, now: number): number {
   if (TERMINAL_STATES.has(stateView.state)) return -1;
   let score = PRIORITY_WEIGHT[item.task.priority] ?? 0;
   const kind = attentionKind(stateView);
-  if (kind === "failed" || kind === "blocked" || kind === "approval") score += 100;
+  if (kind === "failed" || kind === "blocked" || kind === "approval")
+    score += 100;
   else if (kind === "input") score += 90;
   if (stateView.state === "failed") score += 60;
   else if (stateView.state === "blocked") score += 40;
-  if (item.dueAt && item.dueAt.getTime() - now < 24 * 60 * 60 * 1000) score += 30;
+  if (item.dueAt && item.dueAt.getTime() - now < 24 * 60 * 60 * 1000)
+    score += 30;
   if (stateView.state === "running") score += 20;
   return score;
 }
 
 function isUpcomingToday(item: ProjectionWithTask, now: number): boolean {
-  if (isAttention(item) || isInProgress(item) || TERMINAL_STATES.has(stateViewFor(item).state)) return false;
+  if (
+    isAttention(item) ||
+    isInProgress(item) ||
+    TERMINAL_STATES.has(stateViewFor(item).state)
+  )
+    return false;
   const start = item.scheduledStartAt ?? item.dueAt;
   if (!start) return false;
   const todayEnd = new Date(now);
@@ -251,7 +297,10 @@ function isUpcomingToday(item: ProjectionWithTask, now: number): boolean {
   return start.getTime() >= now && start.getTime() <= todayEnd.getTime();
 }
 
-function mapDashboardTask(item: ProjectionWithTask, outputs: Map<string, OutputRef>) {
+function mapDashboardTask(
+  item: ProjectionWithTask,
+  outputs: Map<string, OutputRef>,
+) {
   const stateView = stateViewFor(item);
   const kind = attentionKind(stateView);
   const step = kind ?? (stateView.state === "running" ? "running" : "ready");
@@ -265,7 +314,7 @@ function mapDashboardTask(item: ProjectionWithTask, outputs: Map<string, OutputR
     scheduledStartAt: toIso(item.scheduledStartAt),
     scheduledEndAt: toIso(item.scheduledEndAt),
     dueAt: toIso(item.dueAt),
-    reason: reasonFor(item) ?? stateView.disabledReason ?? stateView.description,
+    reason: reasonFor(item) ?? stateView.primaryActionDisabledReason ?? stateView.nextActionLabel,
     stage: item.currentNodeTitle,
     nextStep: nextStepFor(step),
     latestOutput: outputs.get(item.taskId) ?? null,
@@ -274,13 +323,17 @@ function mapDashboardTask(item: ProjectionWithTask, outputs: Map<string, OutputR
 }
 
 function planOutputTitle(planRun: unknown): string | null {
-  const record = planRun as { mutableGraph?: { planOutput?: { history?: Array<{ summary?: unknown }> } } } | null;
+  const record = planRun as {
+    mutableGraph?: { planOutput?: { history?: Array<{ summary?: unknown }> } };
+  } | null;
   const history = record?.mutableGraph?.planOutput?.history;
   if (!Array.isArray(history) || history.length === 0) return null;
   return readString(history.at(-1)?.summary) ?? "Plan output";
 }
 
-async function loadLatestOutputs(workspaceId: string): Promise<Map<string, OutputRef>> {
+async function loadLatestOutputs(
+  workspaceId: string,
+): Promise<Map<string, OutputRef>> {
   const recent = await db.taskPlanRun.findMany({
     where: { workspaceId },
     orderBy: { updatedAt: "desc" },
@@ -292,7 +345,12 @@ async function loadLatestOutputs(workspaceId: string): Promise<Map<string, Outpu
     if (byTask.has(run.taskId)) continue;
     const title = planOutputTitle(run.planRun);
     if (!title) continue;
-    byTask.set(run.taskId, { id: run.id, title, type: "plan_output", taskId: run.taskId });
+    byTask.set(run.taskId, {
+      id: run.id,
+      title,
+      type: "plan_output",
+      taskId: run.taskId,
+    });
   }
   return byTask;
 }
@@ -323,7 +381,11 @@ const FEED_CATEGORY: Record<string, string> = {
 
 async function loadRecentEvents(workspaceId: string) {
   const events = await db.event.findMany({
-    where: { workspaceId, eventType: { in: Object.keys(FEED_CATEGORY) }, taskId: { not: null } },
+    where: {
+      workspaceId,
+      eventType: { in: Object.keys(FEED_CATEGORY) },
+      taskId: { not: null },
+    },
     orderBy: { ingestSequence: "desc" },
     take: 40,
     select: {
@@ -347,7 +409,10 @@ async function loadRecentEvents(workspaceId: string) {
       summary: readString(event.summary),
     }))
     .filter((event) => event.taskTitle.length > 0)
-    .sort((left, right) => new Date(right.at).getTime() - new Date(left.at).getTime())
+    .sort(
+      (left, right) =>
+        new Date(right.at).getTime() - new Date(left.at).getTime(),
+    )
     .slice(0, 12);
 }
 
@@ -372,16 +437,17 @@ function buildFocusTask(
 
 export async function getDashboard(workspaceId: string) {
   const now = Date.now();
-  const [projections, outputs, recentEvents, completedTotalGroups] = await Promise.all([
-    loadProjections(workspaceId),
-    loadLatestOutputs(workspaceId),
-    loadRecentEvents(workspaceId),
-    db.task.groupBy({
-      by: ["status"],
-      where: { workspaceId, status: { in: ["Completed", "Done"] } },
-      _count: { _all: true },
-    }),
-  ]);
+  const [projections, outputs, recentEvents, completedTotalGroups] =
+    await Promise.all([
+      loadProjections(workspaceId),
+      loadLatestOutputs(workspaceId),
+      loadRecentEvents(workspaceId),
+      db.task.groupBy({
+        by: ["status"],
+        where: { workspaceId, status: { in: ["Completed", "Done"] } },
+        _count: { _all: true },
+      }),
+    ]);
 
   const needsAttention = projections
     .filter(isAttention)
@@ -396,7 +462,7 @@ export async function getDashboard(workspaceId: string) {
         stateView,
         priority: item.task.priority,
         kind,
-        reason: reasonFor(item) ?? stateView.disabledReason ?? stateView.description,
+        reason: reasonFor(item) ?? stateView.primaryActionDisabledReason ?? stateView.nextActionLabel,
         nextStep: nextStepFor(kind),
         latestOutput: outputs.get(item.taskId) ?? null,
         updatedAt: toIso(item.lastActivityAt),
@@ -423,19 +489,30 @@ export async function getDashboard(workspaceId: string) {
 
   const upcomingToday = projections
     .filter((item) => isUpcomingToday(item, now))
-    .sort((left, right) =>
-      (left.scheduledStartAt ?? left.dueAt ?? left.updatedAt).getTime() -
-      (right.scheduledStartAt ?? right.dueAt ?? right.updatedAt).getTime(),
+    .sort(
+      (left, right) =>
+        (left.scheduledStartAt ?? left.dueAt ?? left.updatedAt).getTime() -
+        (right.scheduledStartAt ?? right.dueAt ?? right.updatedAt).getTime(),
     )
     .slice(0, 8)
     .map((item) => mapDashboardTask(item, outputs));
 
   const autoCompleted = projections
-    .filter((item) => item.task.status === "Completed" || item.task.status === "Done")
+    .filter(
+      (item) => item.task.status === "Completed" || item.task.status === "Done",
+    )
     .sort(
       (left, right) =>
-        (right.task.completedAt ?? right.lastActivityAt ?? right.updatedAt).getTime() -
-        (left.task.completedAt ?? left.lastActivityAt ?? left.updatedAt).getTime(),
+        (
+          right.task.completedAt ??
+          right.lastActivityAt ??
+          right.updatedAt
+        ).getTime() -
+        (
+          left.task.completedAt ??
+          left.lastActivityAt ??
+          left.updatedAt
+        ).getTime(),
     )
     .slice(0, 50)
     .map((item) => {
@@ -443,14 +520,19 @@ export async function getDashboard(workspaceId: string) {
       return {
         taskId: item.taskId,
         title: item.task.title,
-        completedAt: toIso(item.task.completedAt ?? item.lastActivityAt ?? item.updatedAt),
+        completedAt: toIso(
+          item.task.completedAt ?? item.lastActivityAt ?? item.updatedAt,
+        ),
         summary: output?.title ?? item.latestArtifactTitle ?? null,
         category: completionCategory(output),
         output,
       };
     });
 
-  const totalAutoCompleted = completedTotalGroups.reduce((sum, group) => sum + group._count._all, 0);
+  const totalAutoCompleted = completedTotalGroups.reduce(
+    (sum, group) => sum + group._count._all,
+    0,
+  );
 
   const fingerprintInput = {
     needsAttention,

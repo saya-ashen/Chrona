@@ -519,6 +519,9 @@ describe("POST /work/:taskId/commands plan.generate — state.update alongside p
       expect(resultUpdate!["/execution/show-accept-plan"]).toBe(true);
       expect(resultUpdate!["/execution/show-generate-plan"]).toBe(false);
       expect(resultUpdate!["/execution/can-start"]).toBe(false);
+      const doneUpdate = stateUpdates.at(-1);
+      expect(doneUpdate?.["/plan/status"]).toBeUndefined();
+      expect(doneUpdate?.["/plan/generation/is-running"]).toBe(false);
     } finally {
       trigger?.unsubscribe();
     }

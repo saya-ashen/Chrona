@@ -20,6 +20,25 @@ const NO_SCHEDULE_GRACE_MS = 60_000;
 const PLAN_GENERATION_TASK_STATUSES = ["Draft", "Ready", "Scheduled", "Queued"] as const;
 const ACTIVE_PLAN_STATUSES = [TaskPlanStatus.Draft, TaskPlanStatus.Accepted] as const;
 
+const PLAN_GENERATION_BLOCKING_TERMINAL_EVENTS = ["plan_generation.completed", "plan_generation.failed"] as const;
+
+async function latestPlanGenerationTerminalEvent(input: { taskId: string; workBlockId: string | null }) {
+  return db.event.findFirst({
+    where: {
+      taskId: input.taskId,
+      workBlockId: input.workBlockId,
+      eventType: { in: [...PLAN_GENERATION_BLOCKING_TERMINAL_EVENTS] },
+    },
+    orderBy: [{ ingestedAt: "desc" }, { ingestSequence: "desc" }],
+    select: { eventType: true },
+  });
+}
+
+async function hasUnresolvedPlanGenerationFailure(input: { taskId: string; workBlockId: string | null }) {
+  const terminalEvent = await latestPlanGenerationTerminalEvent(input);
+  return terminalEvent?.eventType === "plan_generation.failed";
+}
+
 export type AutoGenerateScheduledPlanResult = {
   triggered: Array<{ taskId: string; workBlockId: string | null; reason: "scheduled" | "no_schedule_fallback" }>;
   skipped: Array<{ taskId: string; workBlockId: string | null; reason: string }>;
@@ -111,6 +130,10 @@ async function runScheduledPass({ now, result, fired }: PassContext): Promise<vo
       result.skipped.push({ taskId: task.id, workBlockId: block.id, reason: "generation_in_flight" });
       continue;
     }
+    if (await hasUnresolvedPlanGenerationFailure({ taskId: task.id, workBlockId: block.id })) {
+      result.skipped.push({ taskId: task.id, workBlockId: block.id, reason: "plan_generation_failed" });
+      continue;
+    }
     await generateAndAcceptTaskPlan({ taskId: task.id, workBlockId: block.id, accept: task.autoExecute });
     fired.add(firedKey);
     result.triggered.push({ taskId: task.id, workBlockId: block.id, reason: "scheduled" });
@@ -153,6 +176,10 @@ async function runNoScheduleFallbackPass({ now, result, fired }: PassContext): P
     // the in-flight stream finishes.
     if (isTaskPlanGenerationRunning({ taskId: task.id, workBlockId: null })) {
       result.skipped.push({ taskId: task.id, workBlockId: null, reason: "generation_in_flight" });
+      continue;
+    }
+    if (await hasUnresolvedPlanGenerationFailure({ taskId: task.id, workBlockId: null })) {
+      result.skipped.push({ taskId: task.id, workBlockId: null, reason: "plan_generation_failed" });
       continue;
     }
     await generateAndAcceptTaskPlan({ taskId: task.id, workBlockId: null, accept: task.autoExecute });

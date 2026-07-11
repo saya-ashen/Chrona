@@ -1,6 +1,9 @@
 import type { TaskAction } from "@chrona/contracts";
 import type { ExecutionActionInput } from "@chrona/contracts/ai";
-import type { ExecutionOverviewTone, TaskPlanGenerationStatus } from "./task-workspace-types";
+import type {
+  ExecutionOverviewTone,
+  TaskPlanGenerationStatus,
+} from "./task-workspace-types";
 
 export type CommandCenterPrimaryActionKind =
   | "generate"
@@ -93,6 +96,18 @@ export type CommandCenterPrimaryActionInput = {
 export function resolveCommandCenterPrimaryAction(
   input: CommandCenterPrimaryActionInput,
 ): CommandCenterPrimaryActionDescriptor {
+  if (input.hasTaskCompleted) {
+    return {
+      kind: "task-completed",
+      label: "Task completed",
+      description:
+        "Execution has finished. Review the result, artifacts, or activity history if needed.",
+      statusLabel: input.primaryStateLabel ?? input.taskStatus,
+      tone: "success",
+      suppressAttentionCard: true,
+    };
+  }
+
   if (!input.hasPlan) {
     return {
       kind: "generate",
@@ -111,22 +126,13 @@ export function resolveCommandCenterPrimaryAction(
     return {
       kind: "accept-or-regenerate",
       label: "Accept or regenerate plan",
-      description: "Review this draft plan. Accept it to enable execution, or regenerate it with user instructions.",
-      statusLabel: input.planGenerationStatus === "waiting_acceptance"
-        ? input.planGenerationStatus
-        : input.planStatus ?? undefined,
+      description:
+        "Review this draft plan. Accept it to enable execution, or regenerate it with user instructions.",
+      statusLabel:
+        input.planGenerationStatus === "waiting_acceptance"
+          ? input.planGenerationStatus
+          : (input.planStatus ?? undefined),
       tone: "info",
-    };
-  }
-
-  if (input.hasTaskCompleted) {
-    return {
-      kind: "task-completed",
-      label: "Task completed",
-      description: "Execution has finished. Review the result, artifacts, or activity history if needed.",
-      statusLabel: input.primaryStateLabel ?? input.taskStatus,
-      tone: "success",
-      suppressAttentionCard: true,
     };
   }
 
@@ -134,17 +140,28 @@ export function resolveCommandCenterPrimaryAction(
     return {
       kind: "task-primary-action",
       label: input.taskPrimaryAction.label,
-      description: input.runnabilitySummary || input.blockActionRequired || "Complete the required execution action to continue the accepted plan.",
-      statusLabel: input.blockType ?? input.primaryStateLabel ?? input.taskStatus,
+      description:
+        input.runnabilitySummary ||
+        input.blockActionRequired ||
+        "Complete the required execution action to continue the accepted plan.",
+      statusLabel:
+        input.blockType ?? input.primaryStateLabel ?? input.taskStatus,
       tone: primaryActionTone(input.taskPrimaryAction),
     };
   }
 
-  if (!input.hasGraphExecutionStarted) {
+  if (
+    !input.hasGraphExecutionStarted ||
+    (input.taskPrimaryAction?.type === "start" &&
+      input.taskPrimaryAction.enabled)
+  ) {
+    const hasStarted = input.hasGraphExecutionStarted;
     return {
       kind: "start-plan",
-      label: "Start plan",
-      description: "Run the accepted plan and move into the first executable step.",
+      label: hasStarted ? "Continue plan" : "Start plan",
+      description: hasStarted
+        ? "Continue the accepted plan from its persisted execution state."
+        : "Run the accepted plan and move into the first executable step.",
       statusLabel: input.planStatus ?? undefined,
       tone: "success",
     };
@@ -154,7 +171,9 @@ export function resolveCommandCenterPrimaryAction(
     return {
       kind: "current-operation",
       label: "Current node action",
-      description: input.currentOperationDescription ?? "Complete the current node action to continue.",
+      description:
+        input.currentOperationDescription ??
+        "Complete the current node action to continue.",
       statusLabel: input.currentOperationStatusLabel ?? undefined,
       tone: input.currentOperationTone,
     };
@@ -163,7 +182,8 @@ export function resolveCommandCenterPrimaryAction(
   return {
     kind: "no-operation",
     label: "No current operation",
-    description: "The accepted plan is running, but the engine has not returned an actionable checkpoint yet.",
+    description:
+      "The accepted plan is running, but the engine has not returned an actionable checkpoint yet.",
     statusLabel: input.primaryStateLabel ?? input.taskStatus,
     tone: "neutral",
     suppressAttentionCard: true,

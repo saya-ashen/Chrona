@@ -1,6 +1,8 @@
 import { describe, expect, it } from "bun:test";
 
 import {
+  headerExecutionStateToStatePaths,
+  resolveHeaderExecutionState,
   resolveTaskHeaderViewModel,
   taskHeaderStatus,
   type BuildHeaderSpecInput,
@@ -183,6 +185,35 @@ describe("taskHeaderStatus", () => {
   });
 });
 
+describe("resolveHeaderExecutionState", () => {
+  it.each(["blocked", "failed"] as const)("does not expose Stop or Start for %s executions", (executionStatus) => {
+    const state = resolveHeaderExecutionState({
+      executionStatus,
+      hasPlan: true,
+      hasAcceptedPlan: true,
+      isRunnable: true,
+    });
+
+    expect(state.canStop).toBe(false);
+    expect(state.canStart).toBe(false);
+    expect(headerExecutionStateToStatePaths(state)["/execution/can-stop"]).toBe(false);
+    expect(headerExecutionStateToStatePaths(state)["/execution/can-start"]).toBe(false);
+  });
+
+  it("keeps Stop available for active cancellable executions", () => {
+    const state = resolveHeaderExecutionState({
+      executionStatus: "running",
+      hasPlan: true,
+      hasAcceptedPlan: true,
+      isRunnable: true,
+    });
+
+    expect(state.canStop).toBe(true);
+    expect(state.canPause).toBe(true);
+    expect(headerExecutionStateToStatePaths(state)["/execution/can-stop"]).toBe(true);
+  });
+});
+
 describe("resolveTaskHeaderViewModel — header status follows the selected occurrence", () => {
   it("uses the selected work block's status instead of the shared task row status", () => {
     // Regression: when the user navigates from a "Blocked" task row to
@@ -272,5 +303,49 @@ describe("resolveTaskHeaderViewModel — header status follows the selected occu
     // selected, so we exercise the same taskStatus the previous
     // occurrence test used but flip the workBlockId off.
     expect(headerView.status).toBe("waiting");
+  });
+  it("labels completed executions as result review instead of no-action completion", () => {
+    const task: HeaderTaskView = {
+      id: "task-1",
+      workspaceId: "ws-1",
+      seriesExternalUid: null,
+      title: "Completed task",
+      status: "Completed",
+      priority: "Medium",
+      dueAt: null,
+      projection: null,
+      workBlocks: [] as unknown as HeaderTaskView["workBlocks"],
+      importedCalendarEvents: [],
+    };
+
+    const headerView = resolveTaskHeaderViewModel({
+      task,
+      recurrenceSeriesTasks: [],
+      currentExecution: {
+        taskId: "task-1",
+        planId: "plan-1",
+        mainSessionId: "session-1",
+        status: "completed",
+        currentNodeId: null,
+        executedNodeIds: ["node-1"],
+        waitingNodeIds: [],
+        blockedNodeIds: [],
+        message: "",
+        checkpoint: null,
+      },
+      savedPlan: {
+        id: "plan-1",
+        status: "accepted",
+        effectivePlan: {
+          nodes: [{ id: "node-1" }],
+          completedNodeIds: ["node-1"],
+        },
+      } as unknown as BuildHeaderSpecInput["savedPlan"],
+      workBlockId: null,
+    });
+
+    expect(headerView.status).toBe("completed");
+    expect(headerView.statusLabel).toBe("Result ready");
+    expect(headerView.workspaceStateGuidance).toBe("Accept result or request changes");
   });
 });

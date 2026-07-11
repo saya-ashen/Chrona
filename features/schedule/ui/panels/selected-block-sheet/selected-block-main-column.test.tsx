@@ -1,6 +1,7 @@
 import "@testing-library/jest-dom/vitest";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { deriveWorkStateView } from "@chrona/domain";
 import { DEFAULT_SCHEDULE_PAGE_COPY } from "../../schedule-page-copy";
 import type { ScheduleRecord } from "../../schedule-page-types";
 import type { TaskConfigExecutionRuntime } from "../../forms/task-config-form";
@@ -60,23 +61,11 @@ function item(overrides: Partial<ScheduleRecord> = {}): ScheduleRecord {
     isRunnable: false,
     runnabilityState: "blocked",
     runnabilitySummary: "Waiting for input",
-    stateView: {
-      state: "waiting_for_input",
-      label: "Waiting for input",
-      severity: "warning",
-      primaryAction: "provide_input",
-      secondaryActions: ["open_execution"],
-      description: "Execution needs user input before it can continue.",
+    stateView: deriveWorkStateView({
+      taskStatus: "WaitingForInput",
+      executionStatus: "WaitingForInput",
       disabledReason: "Waiting for input",
-      source: {
-        taskStatus: "WaitingForInput",
-        scheduleStatus: "Scheduled",
-        planStatus: null,
-        executionStatus: "WaitingForInput",
-        providerStatus: "WaitingForInput",
-        nodeStatus: null,
-      },
-    },
+    }),
     ...overrides,
   };
 }
@@ -123,7 +112,7 @@ describe("SelectedBlockMainColumn", () => {
     expect(screen.getByText("Auto-plan")).toBeInTheDocument();
     expect(screen.getByText("Local Hermes")).toBeInTheDocument();
     expect(screen.getByText("Hermes runtime")).toBeInTheDocument();
-    expect(screen.getByText("Waiting for input")).toBeInTheDocument();
+    expect(screen.getByText("Input needed")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Open task workspace to recover this run." }))
       .toHaveAttribute("href", "/tasks/task-1?workBlockId=block-1");
   });
@@ -133,25 +122,13 @@ describe("SelectedBlockMainColumn", () => {
       persistedStatus: "Completed",
       displayState: null,
       latestRunStatus: "Failed",
-      stateView: {
-        state: "completed",
-        label: "Completed",
-        severity: "success",
-        primaryAction: "review_result",
-        secondaryActions: [],
-        description: "Execution completed successfully.",
-        source: {
-          taskStatus: "Completed",
-          scheduleStatus: "Scheduled",
-          planStatus: null,
-          executionStatus: null,
-          providerStatus: "Failed",
-          nodeStatus: null,
-        },
-      },
+      stateView: deriveWorkStateView({
+        taskStatus: "Completed",
+        executionStatus: "completed",
+      }),
     }));
 
-    expect(screen.getByText("Completed")).toBeInTheDocument();
+    expect(screen.getByText("Result ready")).toBeInTheDocument();
     expect(screen.queryByText("Failed")).not.toBeInTheDocument();
   });
 

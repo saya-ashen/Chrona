@@ -49,7 +49,7 @@ import type { DashboardData } from "@/components/dashboard/dashboard-types";
 import { apiJson } from "@/api";
 import type { Dictionary } from "@/pages";
 import type { UiDocument } from "@chrona/ui-protocol";
-import { deriveWorkItemStateView } from "@chrona/domain";
+import { deriveWorkStateView } from "@chrona/domain";
 
 const COPY = {
   title: "Chrona Dashboard",
@@ -58,9 +58,13 @@ const COPY = {
   newTask: "New task",
   openTask: "Open",
   headline: {
-    both: "Today Chrona auto-completed {completed} tasks, and {attention} need you.",
-    completedOnly: "Today Chrona auto-completed {completed} tasks. No task needs you right now.",
-    attentionOnly: "Nothing auto-completed yet today. {attention} tasks need you.",
+    both: "Today Chrona auto-completed {completed} {completedTaskLabel}, and {attentionSubject}.",
+    completedOnly: "Today Chrona auto-completed {completed} {completedTaskLabel}. No task needs you right now.",
+    attentionOnly: "Nothing auto-completed yet today. {attentionSubject}.",
+    completedTask: "task",
+    completedTasks: "tasks",
+    attentionTask: "1 task needs you",
+    attentionTasks: "{attention} tasks need you",
     idle: "Chrona is ready. Add a task, start work, or review recent activity here.",
   },
   summary: { title: "Needs you", pending: "{n} pending", none: "All clear" },
@@ -175,8 +179,8 @@ function completed(overrides: Partial<DashboardData["autoCompleted"][number]> = 
     ...overrides,
   } as DashboardData["autoCompleted"][number];
 }
-function stateView(status: string) {
-  return deriveWorkItemStateView({ taskStatus: status });
+function stateView(taskStatus: string, executionStatus?: string) {
+  return deriveWorkStateView({ taskStatus, executionStatus });
 }
 
 
@@ -259,11 +263,9 @@ describe("DashboardPage", () => {
             {
               taskId: "t2",
               title: "Stuck task",
-              status: "Blocked",
               priority: "High",
               kind: "blocked",
               reason: "Waiting",
-              nextStep: "resolve_block",
               stateView: stateView("Blocked"),
               latestOutput: null,
               updatedAt: null,
@@ -273,7 +275,35 @@ describe("DashboardPage", () => {
         copy={COPY}
       />,
     );
-    expect(screen.getByText("Today Chrona auto-completed 2 tasks, and 1 need you.")).toBeTruthy();
+    expect(screen.getByText("Today Chrona auto-completed 2 tasks, and 1 task needs you.")).toBeTruthy();
+  });
+
+  it("uses singular task grammar and leaves task creation to the global action", () => {
+    render(
+      <DashboardPage
+        data={makeData({
+          autoCompleted: [
+            {
+              taskId: "done-1",
+              title: "Done",
+              completedAt: new Date().toISOString(),
+              summary: null,
+              category: "report",
+              output: null,
+            },
+          ],
+          needsAttention: [],
+        })}
+        copy={COPY}
+      />,
+    );
+
+    expect(
+      screen.getByText(
+        "Today Chrona auto-completed 1 task. No task needs you right now.",
+      ),
+    ).toBeTruthy();
+    expect(screen.queryByRole("link", { name: "New task" })).toBeNull();
   });
 
 
@@ -285,11 +315,9 @@ describe("DashboardPage", () => {
             {
               taskId: "t2",
               title: "Stuck task",
-              status: "WaitingForApproval",
               priority: "High",
               kind: "approval",
               reason: "Allow deleting the old branch?",
-              nextStep: "approve_or_edit",
               stateView: stateView("WaitingForApproval"),
               latestOutput: null,
               updatedAt: null,
@@ -300,7 +328,7 @@ describe("DashboardPage", () => {
       />,
     );
     expect(screen.getByText("1 pending")).toBeTruthy();
-    expect(screen.getByText("Waiting for approval")).toBeTruthy();
+    expect(screen.getByText("Approval needed")).toBeTruthy();
   });
 
   it("shows the AI summary placeholder until a generated spec exists", () => {
@@ -387,11 +415,9 @@ describe("DashboardPage", () => {
             {
               taskId: "s1",
               title: "Blocked task",
-              status: "Blocked",
               priority: "High",
               kind: "blocked",
               reason: "Waiting on confirmation",
-              nextStep: "resolve_block",
               stateView: stateView("Blocked"),
               latestOutput: null,
               updatedAt: null,
@@ -404,7 +430,7 @@ describe("DashboardPage", () => {
     );
     expect(screen.getByText("Blocked task")).toBeTruthy();
     expect(screen.getByText("Waiting on confirmation")).toBeTruthy();
-    expect(screen.getByRole("link", { name: /Resolve/ })).toHaveAttribute("href", "/en/tasks/s1");
+    expect(screen.getByRole("link", { name: /Resolve the blocker/ })).toHaveAttribute("href", "/en/tasks/s1");
     expect(screen.queryByText("Task stream")).not.toBeInTheDocument();
     expect(screen.getAllByText("Recent completions").length).toBeGreaterThan(0);
   });

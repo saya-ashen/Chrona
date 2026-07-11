@@ -73,6 +73,19 @@ describe("resolveTaskWorkspaceOperationState", () => {
       title: "Plan accepted",
     },
     {
+      name: "accepted plan ready to continue",
+      input: baseInput({
+        plan: { status: "accepted", prompt: null, summary: "Accepted summary" },
+        planGenerationStatus: "accepted",
+        taskPrimaryAction: { type: "start", enabled: true, label: "Start" },
+        graphPlan: createTaskWorkspaceFixtureGraph([createTaskWorkspaceFixtureNode({ id: "started", status: "cancelled" })], "started"),
+        hasGraphExecutionStarted: true,
+      }),
+      status: "plan-ready-to-run",
+      action: "start-plan",
+      title: "Plan accepted",
+    },
+    {
       name: "current checkpoint needs action",
       input: (() => {
         const node = createTaskWorkspaceFixtureNode({
@@ -135,5 +148,45 @@ describe("resolveTaskWorkspaceOperationState", () => {
     expect(state.status).toBe(status);
     expect(state.action).toBe(action);
     expect(state.title).toBe(title);
+  });
+
+  it("does not expose plan review while a draft is still generating or validating", () => {
+    const state = resolveTaskWorkspaceOperationState(baseInput({
+      plan: { status: "draft", prompt: null, summary: "Unpersisted draft" },
+      planGenerationStatus: "generating",
+      canAcceptPlan: true,
+    }));
+
+    expect(state).toMatchObject({
+      status: "plan-generating",
+      action: "none",
+      isGeneratingPlan: true,
+      title: "Generating plan…",
+    });
+  });
+
+  it("uses block detail as the blocked operation description", () => {
+    const node = createTaskWorkspaceFixtureNode({ id: "failed", title: "Fetch trending", status: "failed" });
+    const state = resolveTaskWorkspaceOperationState(baseInput({
+      plan: { status: "accepted", prompt: null, summary: "Accepted summary" },
+      planGenerationStatus: "accepted",
+      pageData: createTaskWorkspaceFixturePageData({
+        task: {
+          status: "Blocked",
+          blockReason: { blockType: "run_failed", scope: "run", actionRequired: "Retry Run", detail: "ACP connection closed" },
+        },
+      }),
+      currentNode: node,
+      graphPlan: createTaskWorkspaceFixtureGraph([node], "failed"),
+      hasGraphExecutionStarted: true,
+      shouldShowCurrentOperation: true,
+      currentOperationSpec: actionSpec,
+    }));
+
+    expect(state).toMatchObject({
+      status: "execution-blocked",
+      title: "Action required",
+      description: "ACP connection closed",
+    });
   });
 });

@@ -160,5 +160,8 @@ describe("POST /api/tasks/:taskId/result/accept", () => {
     const body = await json<{ taskId: string; workspaceId: string; runId: string }>(res);
     expect(body.taskId).toBe(taskId);
     expect(body.runId).toBe(run.id);
+
+    const acceptedTask = await db.task.findUniqueOrThrow({ where: { id: taskId } });
+    expect(acceptedTask.status).toBe(TaskStatus.Done);
   });
 });

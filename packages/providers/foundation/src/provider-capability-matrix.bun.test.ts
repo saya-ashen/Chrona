@@ -20,6 +20,25 @@ describe("providerCapabilityMatrix", () => {
     });
   });
 
+  it("models Oh My Pi as an ACP session-history provider", () => {
+    const omp = providerCapabilityMatrix.find((entry) => entry.provider === "omp");
+
+    expect(omp?.label).toBe("Oh My Pi");
+    expect(omp?.execution).toMatchObject({
+      startRun: true,
+      streamEvents: true,
+      cancelActiveRun: true,
+      approvalBridge: true,
+    });
+    expect(omp?.recovery).toMatchObject({
+      sessionResume: true,
+      historyReplay: true,
+      activeRunLookup: false,
+      streamReconnect: false,
+      mode: "session_history",
+    });
+  });
+
   it("summarizes provider recovery independently from run lookup", () => {
     expect(summarizeProviderCapabilities({
       supportsSessions: true,

@@ -1,12 +1,21 @@
 import "@testing-library/jest-dom/vitest";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { buildCommandCenterTrailSpec, validateChronaSpec, type UiDocument } from "@chrona/ui-protocol";
 import { createTaskWorkspaceExecutionConsoleView } from "../../task-workspace";
 import { taskWorkspaceStateFixtures } from "../../../apps/web/src/components/tasks/workspace/test-support/task-workspace-test-fixtures";
 import { TaskWorkspaceExecutionOverview } from "../ui/task-workspace-execution-overview";
 import { buildCommandCenterOutputTabSpec, buildCommandCenterTrailTabSpec } from "../ui/build-execution-overview-spec";
+
+vi.mock("elkjs/lib/elk.bundled.js", () => ({
+  default: class ELKMock {
+    layout(graph: unknown) {
+      return Promise.resolve(graph);
+    }
+  },
+}));
 
 function renderOverview(
   view: ReturnType<typeof createTaskWorkspaceExecutionConsoleView>,
@@ -20,6 +29,7 @@ function renderOverview(
       readiness={view.readiness}
       latestResult={view.latestResult}
       attention={view.attention}
+      nodes={view.graphPlan?.nodes ?? []}
       latestCompletedNode={view.latestCompletedNode}
       artifacts={view.artifacts}
       activity={view.activity}
@@ -57,6 +67,7 @@ function nowDocument(title = "Current operation"): UiDocument {
 describe("TaskWorkspaceExecutionOverview", () => {
   afterEach(() => {
     cleanup();
+    window.localStorage.clear();
   });
 
   it("renders Results as primary content and keeps Activity secondary", () => {
@@ -67,7 +78,7 @@ describe("TaskWorkspaceExecutionOverview", () => {
     expect(screen.queryByRole("tab", { name: "Now" })).not.toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: "Results" })).not.toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: "Activity" })).not.toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Results" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Final result" })).toBeInTheDocument();
     expect(screen.getByText("Activity")).toBeInTheDocument();
     expect(screen.getByText("Output")).toBeInTheDocument();
     expect(screen.getByText("AI generated")).toBeInTheDocument();
@@ -119,6 +130,26 @@ describe("TaskWorkspaceExecutionOverview", () => {
     expect(screen.getByText("Requesting AI provider...")).toBeInTheDocument();
     expect(screen.getAllByText("1 shown · 0 live · 1 saved")).toHaveLength(1);
     expect(screen.queryByText("0 shown · 0 live · 0 saved")).not.toBeInTheDocument();
+  });
+
+  it("groups activity trail into audit categories", () => {
+    const trail = buildCommandCenterTrailTabSpec({
+      activity: [
+        { id: "tool", kind: "tool_completed", title: "Tool completed", summary: "Read plan", description: "Read plan", tone: "success" },
+        { id: "approval", kind: "approval", title: "Approval requested", summary: "Review deploy", description: "Review deploy", tone: "warning" },
+        { id: "artifact", kind: "artifact", title: "Report artifact", summary: "report.md", description: "report.md", tone: "info" },
+        { id: "failure", kind: "task", title: "Run failed", summary: "Provider failed", description: "Provider failed", tone: "danger" },
+      ],
+      runtimeEvents: [],
+      copy: { activityTitle: "Activity" },
+      toolLabels: { tool: "Tool", input: "Input", preview: "Preview", duration: "Duration", error: "Error" },
+    });
+
+    expect(trail.elements.groups?.props?.text).toContain("provider/tool activity: 1");
+    expect(trail.elements.groups?.props?.text).toContain("approvals: 1");
+    expect(trail.elements.groups?.props?.text).toContain("artifacts/results: 1");
+    expect(trail.elements.groups?.props?.text).toContain("failures/retries: 1");
+    validateChronaSpec(trail);
   });
 
   it("keeps running status out of Results while activity stream stays live", () => {
@@ -250,7 +281,7 @@ describe("TaskWorkspaceExecutionOverview", () => {
 
     renderOverview(view, { commandCenter: { documents: { now: nowDocument("Execution running"), output: nowDocument("Plan output"), trail: nowDocument("Trail") } } });
 
-    expect(screen.getByRole("heading", { name: "Results" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Final result" })).toBeInTheDocument();
     expect(screen.getByText("Plan output")).toBeInTheDocument();
     expect(screen.queryByText("summary")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Locate source node" })).not.toBeInTheDocument();
@@ -283,7 +314,7 @@ describe("TaskWorkspaceExecutionOverview", () => {
 
     renderOverview(view);
 
-    expect(screen.getByRole("heading", { name: "Results" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Final result" })).toBeInTheDocument();
     expect(screen.getByText("No execution result yet.")).toBeInTheDocument();
   });
 
@@ -307,6 +338,242 @@ describe("TaskWorkspaceExecutionOverview", () => {
     expect(screen.queryByText("Current operation")).not.toBeInTheDocument();
     expect(screen.queryByText("No current operation")).not.toBeInTheDocument();
   });
+  it("filters output and artifacts by selected result node", async () => {
+    const user = userEvent.setup();
+    const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.completed);
+    const commandCenter = {
+      documents: {
+        now: nowDocument("Execution completed"),
+        trail: buildCommandCenterTrailSpec({ activity: [], savedCount: 0, toolLabels: { tool: "Tool", input: "Input", preview: "Preview", duration: "Duration", error: "Error" } }),
+        output: {
+          root: "root",
+          elements: {
+            root: { type: "Stack", props: { gap: "sm" }, children: ["node-a-output", "node-b-output"] },
+            "node-a-output": { type: "Markdown", props: { content: "Alpha result", xChronaSourceNodeId: "node-a" }, children: [] },
+            "node-b-output": { type: "Markdown", props: { content: "Beta result", xChronaSourceNodeId: "node-b" }, children: [] },
+          },
+        } satisfies UiDocument,
+      },
+    };
+
+    renderOverview(view, {
+      nodes: [
+        { id: "node-a", title: "Alpha node", objective: "Alpha", phase: "One", status: "done" },
+        { id: "node-b", title: "Beta node", objective: "Beta", phase: "Two", status: "done" },
+      ],
+      commandCenter,
+      artifacts: [
+        { id: "artifact-a", title: "Alpha artifact", type: "file", uri: "file://alpha", sourceNodeId: "node-a" },
+        { id: "artifact-b", title: "Beta artifact", type: "file", uri: "file://beta", sourceNodeId: "node-b" },
+      ],
+    });
+
+    expect(screen.getByText("Alpha result")).toBeInTheDocument();
+    expect(screen.getByText("Beta result")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("combobox", { name: "Filter results by node" }));
+    await user.click(screen.getByRole("option", { name: "Beta node" }));
+
+    expect(screen.queryByText("Alpha result")).not.toBeInTheDocument();
+    expect(screen.getByText("Beta result")).toBeInTheDocument();
+    expect(screen.queryByText("Alpha artifact")).not.toBeInTheDocument();
+    expect(screen.getByText("Beta artifact")).toBeInTheDocument();
+  });
+
+  it("builds host-owned node result sections around node-scoped output", () => {
+    const outputSpec = buildCommandCenterOutputTabSpec({
+      latestCompletedNode: null,
+      resultSpec: {
+        root: "root",
+        elements: {
+          root: { type: "Stack", props: { gap: "sm" }, children: ["intro", "alpha", "beta"] },
+          intro: { type: "Markdown", props: { content: "Shared overview" }, children: [] },
+          alpha: { type: "Markdown", props: { content: "Alpha result", xChronaSourceNodeId: "node-a" }, children: [] },
+          beta: { type: "Markdown", props: { content: "Beta result", xChronaSourceNodeId: "node-b" }, children: [] },
+        },
+      },
+      artifacts: [],
+      copy: { noResultYet: "No output yet." },
+      selectedNodeId: "all",
+      nodeOptions: [
+        { id: "node-a", title: "Alpha node", status: "done" },
+        { id: "node-b", title: "Beta node", status: "done" },
+      ],
+    });
+
+    const rootChildren = outputSpec.elements.root.children ?? [];
+    const sections = rootChildren.filter((key) => outputSpec.elements[key]?.type === "NodeResultSection");
+    expect(sections).toHaveLength(2);
+    expect(outputSpec.elements[sections[0]]?.props).toMatchObject({ nodeId: "node-a", nodeTitle: "Alpha node", defaultCollapsed: false });
+    expect(outputSpec.elements[sections[0]]?.children).toEqual(["output:alpha"]);
+    expect(outputSpec.elements[sections[1]]?.props).toMatchObject({ nodeId: "node-b", nodeTitle: "Beta node", defaultCollapsed: false });
+    expect(outputSpec.elements["output:alpha"]?.props).toMatchObject({ defaultCollapsed: false });
+    expect(outputSpec.elements["output:beta"]?.props).toMatchObject({ defaultCollapsed: false });
+    expect(validateChronaSpec(outputSpec)).toMatchObject({ ok: true });
+  });
+
+  it("wraps unscoped single-node output in a host-owned node section", () => {
+    const outputSpec = buildCommandCenterOutputTabSpec({
+      latestCompletedNode: null,
+      resultSpec: {
+        root: "root",
+        elements: {
+          root: { type: "Stack", props: { gap: "sm" }, children: ["summary", "positions"] },
+          summary: { type: "ResultSummary", props: { text: "Collected PhD positions" }, children: [] },
+          positions: { type: "Card", props: { title: "岗位清单", defaultCollapsed: false }, children: ["table"] },
+          table: { type: "Markdown", props: { content: "| Role | Deadline |\n| --- | --- |" }, children: [] },
+        },
+      },
+      artifacts: [],
+      copy: { noResultYet: "No output yet." },
+      selectedNodeId: "all",
+      nodeOptions: [{ id: "node-1", title: "搜集并整理AI方向PhD岗位", status: "done" }],
+      outputOwnerNodeId: "node-1",
+    });
+
+    const rootChildren = outputSpec.elements.root.children ?? [];
+    expect(rootChildren).toHaveLength(1);
+    const section = outputSpec.elements[rootChildren[0]!];
+    expect(section?.type).toBe("NodeResultSection");
+    expect(section?.props).toMatchObject({ nodeId: "node-1", nodeTitle: "搜集并整理AI方向PhD岗位", defaultCollapsed: false, itemCount: 2 });
+    expect(section?.children).toEqual(["output:summary", "output:positions"]);
+    expect(outputSpec.elements["output:positions"]?.props).toMatchObject({ defaultCollapsed: false });
+    expect(validateChronaSpec(outputSpec)).toMatchObject({ ok: true });
+  });
+
+  it("accepts Card defaultCollapsed as presentation metadata", () => {
+    expect(validateChronaSpec({
+      root: "root",
+      elements: {
+        root: { type: "Card", props: { title: "Details", defaultCollapsed: true }, children: ["body"] },
+        body: { type: "Text", props: { text: "Hidden until expanded" } },
+      },
+    })).toMatchObject({ ok: true });
+  });
+
+  it("lets AI-authored Card defaultCollapsed drive Chrona-owned collapse chrome", async () => {
+    const user = userEvent.setup();
+    const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.completed);
+    const { container } = renderOverview(view, {
+      commandCenter: {
+        documents: {
+          now: nowDocument("Execution completed"),
+          trail: buildCommandCenterTrailSpec({ activity: [], savedCount: 0, toolLabels: { tool: "Tool", input: "Input", preview: "Preview", duration: "Duration", error: "Error" } }),
+          output: {
+            root: "root",
+            elements: {
+              root: { type: "Stack", props: { gap: "sm" }, children: ["details", "open"] },
+              details: { type: "Card", props: { title: "Secondary evidence", defaultCollapsed: true }, children: ["body"] },
+              body: { type: "Markdown", props: { content: "Evidence details" }, children: [] },
+              open: { type: "Card", props: { title: "Primary details", defaultCollapsed: false }, children: ["open-body"] },
+              "open-body": { type: "Markdown", props: { content: "Visible details" }, children: [] },
+            },
+          },
+        },
+      },
+    });
+
+    expect(screen.getByRole("button", { name: /Secondary evidence/ })).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("Evidence details")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Primary details/ })).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("button", { name: /Secondary evidence/ }).closest("section")).toHaveClass("w-full");
+    expect(container.querySelector('[data-slot="card"]')).not.toBeInTheDocument();
+    expect(screen.getByText("Visible details")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /Secondary evidence/ }));
+
+    expect(screen.getByText("Evidence details")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Result options" }));
+    await user.click(await screen.findByText("Collapse all"));
+
+    expect(screen.queryByRole("button", { name: /Secondary evidence/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Primary details/ })).not.toBeInTheDocument();
+    expect(screen.queryByText("Evidence details")).not.toBeInTheDocument();
+    expect(screen.queryByText("Visible details")).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Result options" }));
+    await user.click(await screen.findByText("Expand all"));
+
+    expect(screen.getByRole("button", { name: /Secondary evidence/ })).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("button", { name: /Primary details/ })).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText("Evidence details")).toBeInTheDocument();
+    expect(screen.getByText("Visible details")).toBeInTheDocument();
+  });
+
+  it("remembers result collapse state across workspace remounts", async () => {
+    const user = userEvent.setup();
+    const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.completed);
+    const commandCenter = {
+      documents: {
+        now: nowDocument("Execution completed"),
+        trail: buildCommandCenterTrailSpec({ activity: [], savedCount: 0, toolLabels: { tool: "Tool", input: "Input", preview: "Preview", duration: "Duration", error: "Error" } }),
+        output: {
+          root: "root",
+          elements: {
+            root: { type: "Stack", props: { gap: "sm" }, children: ["details"] },
+            details: { type: "Card", props: { title: "Persistent details", defaultCollapsed: false }, children: ["body"] },
+            body: { type: "Markdown", props: { content: "Remembered body" }, children: [] },
+          },
+        },
+      },
+    };
+
+    const first = renderOverview(view, { commandCenter });
+    expect(screen.getByRole("button", { name: /Persistent details/ })).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText("Remembered body")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /Persistent details/ }));
+    expect(screen.getByRole("button", { name: /Persistent details/ })).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("Remembered body")).not.toBeInTheDocument();
+
+    first.unmount();
+    renderOverview(view, { commandCenter });
+
+    expect(screen.getByRole("button", { name: /Persistent details/ })).toHaveAttribute("aria-expanded", "false");
+    expect(screen.queryByText("Remembered body")).not.toBeInTheDocument();
+  });
+
+  it("collapses the whole FileRef block separately from file preview expansion", async () => {
+    const user = userEvent.setup();
+    const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.completed);
+    renderOverview(view, {
+      commandCenter: {
+        documents: {
+          now: nowDocument("Execution completed"),
+          trail: buildCommandCenterTrailSpec({ activity: [], savedCount: 0, toolLabels: { tool: "Tool", input: "Input", preview: "Preview", duration: "Duration", error: "Error" } }),
+          output: {
+            root: "root",
+            elements: {
+              root: { type: "Stack", props: { gap: "sm" }, children: ["file"] },
+              file: {
+                type: "FileRef",
+                props: {
+                  path: ".chrona/outputs/node-1/log.txt",
+                  title: "Raw log",
+                  contentKind: "text",
+                  contentPreview: `${"line\n".repeat(350)}`,
+                  contentTruncated: true,
+                  defaultCollapsed: true,
+                },
+                children: [],
+              },
+            },
+          },
+        },
+      },
+    });
+
+    expect(screen.getByText("Raw log")).toBeInTheDocument();
+    expect(screen.queryByText(".chrona/outputs/node-1/log.txt")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Preview/ })).not.toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: /Raw log/ }));
+
+    expect(screen.getByText(".chrona/outputs/node-1/log.txt")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Preview/ })).toBeInTheDocument();
+  });
+
 
 
   it("builds valid output and trail fallback specs", () => {

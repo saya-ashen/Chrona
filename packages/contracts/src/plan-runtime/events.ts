@@ -79,7 +79,9 @@ export type PlanExecutionRuntimeDisplayEvent =
   | {
       type: "raw_event";
       rawEventType?: string;
+      message?: string;
     };
+
 
 export type PlanExecutionSSEEvent =
   | {

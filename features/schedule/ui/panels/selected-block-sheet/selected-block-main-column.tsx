@@ -115,7 +115,7 @@ export function SelectedBlockMainColumn({
             </div>
             <div>
               <dt className="text-muted-foreground">{copy.nextAction}</dt>
-              <dd className="mt-1 font-medium text-foreground">{item.stateView?.primaryAction ?? copy.stayOnPlan}</dd>
+              <dd className="mt-1 font-medium text-foreground">{item.stateView?.nextActionLabel ?? copy.stayOnPlan}</dd>
             </div>
           </dl>
           {item.autoStartReason ? (

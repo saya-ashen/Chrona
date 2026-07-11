@@ -64,6 +64,7 @@ export type SubmittedNodeResult =
 
 export type ExecutionCommand =
   | { type: "start"; trigger: ExecutionTrigger; prompt?: string }
+  | { type: "restart_from_beginning"; trigger: ExecutionTrigger; prompt?: string }
   | { type: "resume_with_input"; nodeId?: string; inputFields: Record<string, string> }
   | { type: "resume_with_approval"; nodeId?: string; approved: boolean; feedback?: string }
   | { type: "resume_after_unblock"; nodeId?: string; note?: string }

@@ -1,6 +1,7 @@
 import { HermesProviderClient } from "@chrona/hermes";
 import { CHRONA_CLAUDE_CODE_PROVIDER_TYPE, ClaudeCodeProviderClient } from "@chrona/claude-code";
 import { CHRONA_CODEX_PROVIDER_TYPE, CodexProviderClient } from "@chrona/codex";
+import { CHRONA_OMP_PROVIDER_TYPE, OmpProviderClient } from "@chrona/omp";
 import { CHRONA_DEBUG_PROVIDER_TYPE, normalizeDebugProviderProfile } from "@chrona/providers-debug";
 import type {
   ProviderRunInput,
@@ -13,6 +14,7 @@ import type {
   AiFeature,
   ClaudeCodeClientConfig,
   CodexClientConfig,
+  OmpClientConfig,
   HermesClientConfig,
   LLMClientConfig,
   PreparedAiFeatureSpec,
@@ -161,6 +163,21 @@ async function checkClientHealth(
       return {
         available: true,
         reason: health.reason ?? health.message ?? "Codex connectivity check passed",
+      };
+    }
+
+    if (client.type === CHRONA_OMP_PROVIDER_TYPE) {
+      const config = client.config as OmpClientConfig;
+      const health = await new OmpProviderClient({ config }).checkHealth();
+      if (!health.ok) {
+        return {
+          available: false,
+          reason: health.reason ?? health.message ?? "Oh My Pi health check failed",
+        };
+      }
+      return {
+        available: true,
+        reason: health.reason ?? health.message ?? "Oh My Pi connectivity check passed",
       };
     }
 

@@ -176,7 +176,7 @@ describe("ScheduleTaskList", () => {
     expect(screen.getByText("Missing config")).toBeInTheDocument();
   });
 
-  it("shows scheduled display state instead of stale Draft persistence state", () => {
+  it("keeps schedule timing separate from canonical work state", () => {
     render(
       <ScheduleTaskList
         {...defaultProps}
@@ -193,7 +193,8 @@ describe("ScheduleTaskList", () => {
       />,
     );
 
-    expect(screen.getAllByText("Scheduled").length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByText("Scheduled")).toBeInTheDocument();
+    expect(screen.getAllByText("Needs plan").length).toBeGreaterThan(0);
     expect(screen.queryByText("Draft")).not.toBeInTheDocument();
   });
 
@@ -239,4 +240,22 @@ describe("ScheduleTaskList", () => {
     expect(screen.queryByText("Failed Task")).not.toBeInTheDocument();
     expect(screen.queryByText("Unscheduled Task")).not.toBeInTheDocument();
   });
+  it.each([
+    ["running", { persistedStatus: "Running", latestRunStatus: "Running" }, "Running", "Monitor the current step and next runtime event"],
+    ["input", { displayState: "WaitingForInput" }, "Input needed", "Provide the requested input so execution can continue"],
+    ["approval", { approvalPendingCount: 1, actionRequired: "Review approval" }, "Approval needed", "Review the request, then approve, reject, or request changes"],
+    ["blocked", { displayState: "Blocked" }, "Blocked", "Resolve the blocker before execution can continue"],
+    ["failed", { latestRunStatus: "Failed" }, "Failed", "Review the failure reason, then retry or stop"],
+    ["result", { latestRunStatus: "Completed" }, "Result ready", "Accept result or request changes"],
+    ["done", { persistedStatus: "Done", latestRunStatus: "Running" }, "Task done", "Ask a follow-up or create a next task"],
+    ["cancelled", { latestRunStatus: "Cancelled" }, "Cancelled", "Inspect the audit trail or reopen the task"],
+  ])("renders canonical %s status and next action", (_name, overrides, label, nextAction) => {
+    const item = makeItem({ taskId: `t-${_name}`, title: `${_name} task`, ...overrides });
+    render(<ScheduleTaskList {...defaultProps} items={[item]} />);
+
+    expect(screen.getAllByText(label).length).toBeGreaterThan(0);
+    expect(screen.getByText(nextAction)).toBeInTheDocument();
+    expect(screen.getByText("components.scheduleTaskList.quickEdit")).toBeEnabled();
+  });
+
 });

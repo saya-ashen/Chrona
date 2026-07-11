@@ -33,15 +33,15 @@ English | [中文](./README.zh.md)
 <p align="center">
   <img src="docs/assets/generated/task-workspace.png" width="85%" alt="Chrona task workspace showing an executable AI plan graph" />
   <br />
-  <em>Create a task, review the AI plan, run it through an AI provider, and inspect checkpoints, approvals, branches, and outputs.</em>
+  <em>Decide what should happen, when it may run, and which boundaries must hold; Chrona plans, executes, pauses for decisions, and preserves the result.</em>
 </p>
 
 ---
 
-Chrona is a local-first AI task manager for work that should become more than a
-reminder. Create a task, schedule it, review the AI-generated plan, run it
-manually or automatically, and inspect every checkpoint, approval, failure,
-tool action, and saved output.
+Chrona is a local AI work executor. You decide what should happen, when it may
+run, and which boundaries must not be crossed. Chrona creates a reviewable plan,
+runs it manually or on a schedule, pauses when your input or approval is needed,
+and preserves evidence and results with the task.
 
 Chrona connects four loops that usually live in separate tools:
 
@@ -212,10 +212,10 @@ Chrona is designed to start local and explicit.
 > Chrona is alpha software: local-first, Bun-only, and under active development.
 
 Chrona is usable for local development and product exploration, but it is not
-stable software yet. The current codebase includes task, plan, schedule,
-execution, dashboard, settings, external calendar, and AI-client flows. The next
-major focus is making the schedule-to-auto-execution loop reliable enough for
-daily use.
+stable software yet. Task, plan, schedule, execution, recovery, result review,
+and AI-client flows work locally. Provider replay/resume, complete cross-run
+result history, production authentication, and operational hardening remain
+experimental or incomplete.
 
 ## Roadmap
 

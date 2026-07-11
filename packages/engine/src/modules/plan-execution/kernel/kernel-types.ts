@@ -4,6 +4,7 @@ import type { EffectivePlanGraph } from "@chrona/contracts/ai";
 
 import type { CompiledPlan } from "@chrona/contracts/ai";
 import type { PersistedPlanRun } from "../persistence/plan-runtime-store";
+import type { NodeExecutionRunContext } from "../node-executors/types";
 
 export type EngineRuntimeContext = {
   taskId: string;
@@ -23,6 +24,8 @@ export type KernelCallbacksInput = {
   planId: string;
   compiledPlan: CompiledPlan;
   persisted: PersistedPlanRun;
+  planSummary?: string | null;
+  initialRunContext?: NodeExecutionRunContext;
   updateSessionProjection?: boolean;
 };
 

@@ -168,7 +168,7 @@ describe("getActionCenter (engine)", () => {
     const inputItem = result.find((i) => i.kind === "input");
     expect(inputItem).toBeDefined();
     const item = inputItem!;
-    expect(item.actionType).toBe("Input requested");
+    expect(item.actionType).toBe("Input needed");
     expect(item.riskLevel).toBe("medium");
     expect(item.detail).toBe("Operator reply required");
     expect(item.summary).toBe("Need clarification on the API contract");
@@ -187,7 +187,7 @@ describe("getActionCenter (engine)", () => {
     expect(item.kind).toBe("recovery");
     expect(item.riskLevel).toBe("critical");
     expect(item.detail).toBe("Latest run Failed");
-    expect(item.summary).toMatch(/recovery prompt/i);
+    expect(item.summary).toBe("The latest run failed.");
   });
 
   it("does not surface recovery for completed tasks with failed latest provider run", async () => {

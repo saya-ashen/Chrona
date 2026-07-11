@@ -1,11 +1,11 @@
-import type { ChronaToolOperation, PlanBlueprint } from "@chrona/contracts";
+import { parsePlanGenerateToolPayload, type ChronaToolOperation } from "@chrona/contracts";
 import { validateDashboardSummarySpec } from "@chrona/ui-protocol";
 import { db } from "@/lib/db";
-import { resolveScopeWorkBlockId } from "@/modules/plan-execution/persistence/execution-scope";
 import type { AgentToolOperationsDeps, ToolAuditContext } from "./types";
 import { requireTaskId, requireWorkspaceId } from "./input-guards";
 import { readAiExecutionView } from "./ai-execution-view";
 import { submitNodeResultActionFromTool } from "./node-result-action";
+import { executePlanGenerateTool } from "./plan-generate-tool";
 
 export function toolCommandContext(operation: ChronaToolOperation, audit?: ToolAuditContext | null) {
   return {
@@ -166,21 +166,10 @@ async function generatePlanForTool(
   input: ChronaToolOperation["input"],
   payload: unknown,
 ) {
-  const taskId = requireTaskId(input);
-  const workspaceId = requireWorkspaceId(input);
-  // Pin the generated plan to the same work block reads/execution resolve to, so
-  // an agent regenerating mid-session does not create a null-scoped draft that
-  // shadows the work-block-scoped accepted plan.
-  const workBlockId = await resolveScopeWorkBlockId(taskId, { sessionId: input.sessionId });
-  const savedPlan = await deps.plan.materialize({
-    taskId,
-    workspaceId,
-    workBlockId,
-    blueprint: payload as PlanBlueprint,
-    generatedBy: input.actorId ?? "hermes",
+  const blueprint = parsePlanGenerateToolPayload(payload);
+  return executePlanGenerateTool({
+    context: input,
+    blueprint,
+    materialize: deps.plan.materialize,
   });
-  return {
-    taskId,
-    savedPlan,
-  };
 }

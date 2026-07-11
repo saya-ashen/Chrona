@@ -25,6 +25,13 @@ export function createKernelGraphCallbacks(
 ): Partial<GraphExecutionCallbacks<EngineRuntimeContext>> {
   const { taskId, sessionId, runtimeName, mainSession, workspaceId, workBlockId, planId, compiledPlan, persisted } = input;
 
+  const planContext = {
+    title: compiledPlan.title,
+    goal: compiledPlan.goal,
+    assumptions: compiledPlan.assumptions,
+    ...(input.planSummary ? { summary: input.planSummary } : {}),
+  };
+  let initialRunContext = input.initialRunContext;
   return {
     onEvent: async (event) => {
       if (event.type === "node_started" && input.updateSessionProjection !== false) {
@@ -79,6 +86,10 @@ export function createKernelGraphCallbacks(
       );
       if (!executor) return null;
       const latest = await getPlanRun(taskId, planId, workBlockId);
+      const runContext = initialRunContext && Object.keys(initialRunContext).length > 0
+        ? initialRunContext
+        : undefined;
+      initialRunContext = undefined;
       return executor.execute({
         taskId,
         workBlockId,
@@ -86,6 +97,8 @@ export function createKernelGraphCallbacks(
         node: executorInput.node,
         plan: executorInput.plan,
         attempt: executorInput.attempt,
+        planContext,
+        ...(runContext ? { runContext } : {}),
         planOutput: latest?.planOutput ?? persisted.planOutput,
         trigger: executorInput.trigger,
         runtimeName,

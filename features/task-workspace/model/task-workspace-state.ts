@@ -1,35 +1,62 @@
-import { deriveTaskProjectionStateView, type WorkItemStateView } from "@chrona/domain";
-import type { PlanNodeDataModel, TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph/types";
-import type { ExecutionOverviewTone, ProgressSummary, TaskData, TaskHeaderAction, TaskWorkspaceUserStatus } from "./task-workspace-types";
+import { deriveWorkStateView, type WorkStateView } from "@chrona/domain";
+import type {
+  PlanNodeDataModel,
+  TaskPlanGraphPlan,
+} from "@/components/tasks/plan/task-plan-graph/types";
+import type {
+  ExecutionOverviewTone,
+  ProgressSummary,
+  TaskData,
+  TaskHeaderAction,
+  TaskWorkspaceUserStatus,
+} from "./task-workspace-types";
 
 export function isDoneStatus(status: PlanNodeDataModel["status"]) {
-  return status === "done" || status === "completed" || status === "skipped" || status === "cancelled" || status === "invalidated";
+  return (
+    status === "done" ||
+    status === "completed" ||
+    status === "skipped" ||
+    status === "cancelled" ||
+    status === "invalidated"
+  );
 }
 
 export function isAttentionStatus(status: PlanNodeDataModel["status"]) {
-  return status === "waiting"
-    || status === "waiting_for_user"
-    || status === "waiting_for_approval"
-    || status === "blocked"
-    || status === "failed"
-    || status === "degraded";
+  return (
+    status === "waiting" ||
+    status === "waiting_for_user" ||
+    status === "waiting_for_approval" ||
+    status === "blocked" ||
+    status === "failed" ||
+    status === "degraded"
+  );
 }
 
 export function isCheckpointStatus(status: PlanNodeDataModel["status"]) {
-  return status === "waiting" || status === "waiting_for_user" || status === "waiting_for_approval";
+  return (
+    status === "waiting" ||
+    status === "waiting_for_user" ||
+    status === "waiting_for_approval"
+  );
 }
 
 export function deriveTaskStatusFromGraph(
   task: TaskData,
   graphPlan: TaskPlanGraphPlan | null,
 ) {
-  const taskStatus = task.currentWorkBlock?.status && task.currentWorkBlock.status !== "Completed"
-    ? task.currentWorkBlock.status
-    : task.status;
+  const taskStatus =
+    task.currentWorkBlock?.status &&
+    task.currentWorkBlock.status !== "Completed"
+      ? task.currentWorkBlock.status
+      : task.status;
   const nodes = graphPlan?.nodes ?? [];
   if (nodes.length === 0) return taskStatus;
 
-  if (nodes.some((node) => node.status === "active" || node.status === "in_progress")) {
+  if (
+    nodes.some(
+      (node) => node.status === "active" || node.status === "in_progress",
+    )
+  ) {
     return "Running";
   }
 
@@ -41,11 +68,21 @@ export function deriveTaskStatusFromGraph(
     return "WaitingForInput";
   }
 
-  if (nodes.some((node) => node.status === "blocked" || node.status === "failed" || node.status === "degraded")) {
+  if (
+    nodes.some(
+      (node) =>
+        node.status === "blocked" ||
+        node.status === "failed" ||
+        node.status === "degraded",
+    )
+  ) {
     return "Blocked";
   }
 
-  if (taskStatus === task.status && nodes.every((node) => isDoneStatus(node.status))) {
+  if (
+    taskStatus === task.status &&
+    nodes.every((node) => isDoneStatus(node.status))
+  ) {
     return "Completed";
   }
 
@@ -54,37 +91,70 @@ export function deriveTaskStatusFromGraph(
 
 export function stateViewForWorkspaceStatus(input: {
   taskStatus?: string | null;
-  persistedStatus?: string | null;
-  scheduleStatus?: string | null;
+  executionStatus?: string | null;
+  operationStatus?: string | null;
   planStatus?: string | null;
-  displayState?: string | null;
-  latestRunStatus?: string | null;
-  nodeStatus?: string | null;
-  isScheduled?: boolean;
+  planGenerationStatus?: string | null;
+  currentNodeId?: string | null;
+  currentNodeLabel?: string | null;
   hasPlan?: boolean;
+  hasAcceptedPlan?: boolean;
   isRunnable?: boolean;
   disabledReason?: string | null;
-}): WorkItemStateView {
-  return deriveTaskProjectionStateView(input);
+  scheduleStatus?: string | null;
+  nodeStatus?: string | null;
+}): WorkStateView {
+  return deriveWorkStateView({
+    ...input,
+    executionStatus: input.executionStatus ?? input.nodeStatus ?? null,
+  });
 }
 
-export function mapTaskWorkspaceStatus(status: string): TaskWorkspaceUserStatus {
+export function mapTaskWorkspaceStatus(
+  status: string,
+): TaskWorkspaceUserStatus {
+  if (status === "result_ready" || status === "done" || status === "cancelled") return "completed";
+  if (status === "running") return "running";
+  if (status === "waiting_for_approval") return "approval-needed";
+  if (status === "waiting_for_input") return "input-needed";
+  if (status === "blocked" || status === "failed") return "blocked";
   if (status === "degraded") return "blocked";
-  const stateView = stateViewForWorkspaceStatus({ taskStatus: status, nodeStatus: status });
-  if (stateView.state === "completed" || stateView.state === "cancelled") return "completed";
+  const stateView = stateViewForWorkspaceStatus({
+    taskStatus: status,
+    nodeStatus: status,
+  });
+  if (
+    stateView.state === "result_ready" ||
+    stateView.state === "done" ||
+    stateView.state === "cancelled"
+  )
+    return "completed";
   if (stateView.state === "running") return "running";
   if (stateView.state === "waiting_for_approval") return "approval-needed";
   if (stateView.state === "waiting_for_input") return "input-needed";
-  if (stateView.state === "blocked" || stateView.state === "failed") return "blocked";
+  if (stateView.state === "blocked" || stateView.state === "failed")
+    return "blocked";
   return "waiting";
 }
 
-export function overviewToneForNode(node: PlanNodeDataModel | null): ExecutionOverviewTone {
+export function overviewToneForNode(
+  node: PlanNodeDataModel | null,
+): ExecutionOverviewTone {
   if (!node) return "neutral";
-  if (node.status === "blocked" || node.status === "failed" || node.status === "degraded") return "critical";
+  if (
+    node.status === "blocked" ||
+    node.status === "failed" ||
+    node.status === "degraded"
+  )
+    return "critical";
   if (isAttentionStatus(node.status)) return "warning";
   if (isDoneStatus(node.status)) return "success";
-  if (node.status === "active" || node.status === "in_progress" || node.status === "ready") return "info";
+  if (
+    node.status === "active" ||
+    node.status === "in_progress" ||
+    node.status === "ready"
+  )
+    return "info";
   return "neutral";
 }
 
@@ -108,50 +178,79 @@ export function deriveWorkspacePresentationState(input: {
   progress: ProgressSummary;
   currentNode: PlanNodeDataModel | null;
 }): TaskWorkspaceUserStatus {
-  const allNodesDone = input.progress.totalSteps > 0 && input.progress.completedSteps === input.progress.totalSteps;
-  const currentNodeStatus = !allNodesDone && input.currentNode && (isAttentionStatus(input.currentNode.status) || input.currentNode.status === "active" || input.currentNode.status === "in_progress")
-    ? mapTaskWorkspaceStatus(input.currentNode.status)
-    : null;
+  return mapTaskWorkspaceStatus(deriveWorkspaceWorkStateView(input).state);
+}
 
-  return currentNodeStatus ?? (input.task.executionSummary
-    ? mapTaskWorkspaceStatus(input.task.executionSummary.executionState)
-    : mapTaskWorkspaceStatus(input.task.status));
+export function deriveWorkspaceWorkStateView(input: {
+  task: TaskData;
+  progress: ProgressSummary;
+  currentNode: PlanNodeDataModel | null;
+}): WorkStateView {
+  const planStatus = input.task.savedPlan?.status ?? null;
+  const executionStatus = input.task.executionSummary?.executionState ?? input.currentNode?.status ?? null;
+  const currentNodeIsRunning = input.currentNode?.status === "active" || input.currentNode?.status === "in_progress";
+  return deriveWorkStateView({
+    taskStatus: input.task.status,
+    executionStatus,
+    planStatus,
+    planGenerationStatus: input.task.aiPlanGenerationStatus ?? null,
+    hasPlan: input.progress.totalSteps > 0 || Boolean(input.task.savedPlan),
+    hasAcceptedPlan: planStatus === "accepted",
+    isRunnable: input.task.isRunnable,
+    disabledReason:
+      input.task.runnabilityState === "blocked"
+        ? input.task.runnabilitySummary
+        : null,
+    currentNodeId: input.currentNode?.id ?? input.task.executionSummary?.currentNodeId ?? null,
+    currentNodeLabel: input.currentNode?.title ?? null,
+    blockReason: currentNodeIsRunning || executionStatus === "running" ? null : input.task.blockReason,
+  });
 }
 
 export function deriveHeaderActions(input: {
   task: TaskData;
   progress: ProgressSummary;
-  workspaceStatus: TaskWorkspaceUserStatus;
+  workState: WorkStateView;
   copy: HeaderActionCopy;
 }): TaskHeaderAction[] {
-  const hasPlan = input.progress.totalSteps > 0 || Boolean(input.task.savedPlan);
-  const hasUnacceptedSavedPlan = Boolean(input.task.savedPlan && input.task.savedPlan.status !== "accepted");
+  const hasPlan =
+    input.progress.totalSteps > 0 || Boolean(input.task.savedPlan);
+  const hasUnacceptedSavedPlan = Boolean(
+    input.task.savedPlan && input.task.savedPlan.status !== "accepted",
+  );
   const cannotStartReason = !hasPlan
     ? input.copy.generateAndAcceptPlanBeforeStart
     : hasUnacceptedSavedPlan
       ? input.copy.acceptGeneratedPlanBeforeStart
-    : !input.task.isRunnable
-      ? input.task.runnabilitySummary
-    : input.workspaceStatus === "running"
-        ? input.copy.taskAlreadyRunning
-        : input.workspaceStatus === "approval-needed" || input.workspaceStatus === "input-needed"
-          ? input.copy.taskWaitingForCheckpointInput
-        : input.workspaceStatus === "blocked"
-          ? input.copy.resolveBlockerBeforeStart
-        : input.workspaceStatus === "completed"
-          ? input.copy.taskCompleted
-          : undefined;
-  const cannotStopReason = input.workspaceStatus === "running" || input.workspaceStatus === "approval-needed" || input.workspaceStatus === "input-needed"
-    ? undefined
-    : input.copy.noRunningExecutionToStop;
-  const cannotPauseReason = input.workspaceStatus === "running"
-    ? undefined
-    : input.copy.noRunningExecutionToPause;
+      : !input.task.isRunnable
+        ? input.task.runnabilitySummary
+        : input.workState.state === "running"
+          ? input.copy.taskAlreadyRunning
+          : input.workState.state === "waiting_for_approval" ||
+              input.workState.state === "waiting_for_input"
+            ? input.copy.taskWaitingForCheckpointInput
+            : input.workState.state === "blocked" ||
+                input.workState.state === "failed"
+              ? input.copy.resolveBlockerBeforeStart
+              : input.workState.state === "result_ready" ||
+                  input.workState.state === "done" ||
+                  input.workState.state === "cancelled"
+                ? input.copy.taskCompleted
+                : undefined;
 
   return [
-    { id: "start", label: input.copy.start, disabled: Boolean(cannotStartReason), disabledReason: cannotStartReason },
-    { id: "pause", label: input.copy.pause, disabled: Boolean(cannotPauseReason), disabledReason: cannotPauseReason },
-    { id: "stop", label: input.copy.stop, disabled: Boolean(cannotStopReason), disabledReason: cannotStopReason },
+    {
+      id: "start",
+      label: input.copy.start,
+      disabled: Boolean(cannotStartReason),
+      disabledReason: cannotStartReason,
+    },
+    ...(input.workState.canPause
+      ? [{ id: "pause" as const, label: input.copy.pause, disabled: false, disabledReason: undefined }]
+      : []),
+    ...(input.workState.canStop || input.workState.state === "waiting_for_input" || input.workState.state === "waiting_for_approval"
+      ? [{ id: "stop" as const, label: input.copy.stop, disabled: false, disabledReason: undefined }]
+      : []),
     { id: "more", label: input.copy.moreActions },
   ];
 }

@@ -4,6 +4,7 @@ import {
   ClaudeCodeProviderClient,
 } from "@chrona/claude-code";
 import { CHRONA_CODEX_PROVIDER_TYPE, CodexProviderClient } from "@chrona/codex";
+import { CHRONA_OMP_PROVIDER_TYPE, OmpProviderClient } from "@chrona/omp";
 import {
   CHRONA_DEBUG_PROVIDER_TYPE,
   ChronaDebugProviderClient,
@@ -18,6 +19,7 @@ import type {
   AiClientType,
   ClaudeCodeClientConfig,
   CodexClientConfig,
+  OmpClientConfig,
   HermesClientConfig,
   LLMClientConfig,
   DebugClientConfig,
@@ -70,6 +72,11 @@ export type EngineClaudeCodeClient = EngineAiClient & {
 
 export type EngineCodexClient = EngineAiClient & {
   record: AiClientRecord & { type: "codex"; config: CodexClientConfig };
+  providerClient: AgentProviderClient;
+};
+
+export type EngineOmpClient = EngineAiClient & {
+  record: AiClientRecord & { type: "omp"; config: OmpClientConfig };
   providerClient: AgentProviderClient;
 };
 
@@ -156,6 +163,11 @@ function createProviderClient(
         mcpBaseUrl: engineBaseUrl(),
       },
     });
+  }
+
+  if (record.type === CHRONA_OMP_PROVIDER_TYPE) {
+    const config = record.config as OmpClientConfig;
+    return new OmpProviderClient({ config });
   }
 
   if (record.type === CHRONA_DEBUG_PROVIDER_TYPE) {

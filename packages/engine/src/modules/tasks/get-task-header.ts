@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { buildTaskHeaderSpec, type TaskHeaderActionInput, type TaskHeaderOccurrenceOptionInput, type TaskHeaderSpecInput, type TaskHeaderTaskStatus } from "@chrona/ui-protocol";
+import { deriveWorkStateView } from "@chrona/domain";
 import type { PlanExecutionStatus } from "@chrona/contracts/ai";
 import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
 import { getCurrentExecution } from "../plan-execution/use-cases/get-current-execution";
@@ -36,9 +37,35 @@ async function loadHeaderTaskView(taskId: string) {
   });
 }
 
-function taskStatusLabel(status: TaskHeaderTaskStatus) {
-  if (status === "approval-needed") return "Approval needed";
-  return status.charAt(0).toUpperCase() + status.slice(1);
+function taskStatusLabel(input: {
+  status: TaskHeaderTaskStatus;
+  executionStatus: PlanExecutionStatus;
+  taskStatus: string;
+}) {
+  const workState = deriveWorkStateView({
+    taskStatus: input.taskStatus,
+    executionStatus: input.executionStatus,
+  });
+  if (input.status === "approval-needed" || input.status === "blocked" || input.status === "completed") return workState.label;
+  return input.status.charAt(0).toUpperCase() + input.status.slice(1);
+}
+
+function workspaceStateGuidance(input: {
+  status: TaskHeaderTaskStatus;
+  executionStatus: PlanExecutionStatus;
+  taskStatus: string;
+  planStatus?: string | null;
+  hasPlan?: boolean;
+  hasAcceptedPlan?: boolean;
+}) {
+  const workState = deriveWorkStateView({
+    taskStatus: input.taskStatus,
+    executionStatus: input.executionStatus,
+    planStatus: input.planStatus,
+    hasPlan: input.hasPlan,
+    hasAcceptedPlan: input.hasAcceptedPlan,
+  });
+  return workState.nextActionLabel;
 }
 
 const ACTIVE_EXECUTION_STATUSES = new Set<PlanExecutionStatus>([
@@ -145,12 +172,11 @@ export function resolveHeaderExecutionState(input: {
 }): HeaderExecutionState {
   const terminal = input.executionStatus === "completed" || input.executionStatus === "cancelled";
   const running = input.executionStatus === "running";
+  const blockedOrFailed = input.executionStatus === "blocked" || input.executionStatus === "failed";
   const stoppable = running
     || input.executionStatus === "waiting_for_user"
-    || input.executionStatus === "waiting_for_approval"
-    || input.executionStatus === "blocked"
-    || input.executionStatus === "failed";
-  const showStart = !terminal && !running && !stoppable && input.hasAcceptedPlan;
+    || input.executionStatus === "waiting_for_approval";
+  const showStart = !terminal && !running && !stoppable && !blockedOrFailed && input.hasAcceptedPlan;
   return {
     hasPlan: input.hasPlan,
     hasAcceptedPlan: input.hasAcceptedPlan,
@@ -198,7 +224,8 @@ function headerActions(input: { executionStatus: string; hasPlan: boolean; hasAc
     { id: "pause", label: "Pause" },
     { id: "stop", label: "Stop" },
   ];
-  if (["waiting_for_user", "waiting_for_approval", "blocked", "failed"].includes(input.executionStatus)) return [{ id: "stop", label: "Stop" }];
+  if (["waiting_for_user", "waiting_for_approval"].includes(input.executionStatus)) return [{ id: "stop", label: "Stop" }];
+  if (["blocked", "failed"].includes(input.executionStatus)) return [];
   return [{ id: "start", label: "Start", disabled: !input.isRunnable, disabledReason: input.isRunnable ? undefined : "Task is not runnable." }];
 }
 export type BuildHeaderSpecInput = {
@@ -279,11 +306,22 @@ export function resolveTaskHeaderViewModel(input: BuildHeaderSpecInput & { now?:
   });
   actions.push({ id: "edit", label: "Edit" }, { id: "delete", label: "Delete Task" });
 
+  const hasPlan = Boolean(savedPlan);
+  const hasAcceptedPlan = savedPlan?.status === "accepted";
+  const workStateGuidance = workspaceStateGuidance({
+    status,
+    executionStatus: currentExecution.status,
+    taskStatus: scopedTaskStatus,
+    planStatus: savedPlan?.status ?? null,
+    hasPlan,
+    hasAcceptedPlan,
+  });
   return {
     title: task.title,
+    workspaceStateGuidance: workStateGuidance,
     status,
-    statusLabel: taskStatusLabel(status),
-    progressLabel: `${totalSteps} steps · ${completedSteps} accepted · ${progressPercent}%`,
+    statusLabel: taskStatusLabel({ status, executionStatus: currentExecution.status, taskStatus: scopedTaskStatus }),
+    progressLabel: `${totalSteps} step${totalSteps === 1 ? "" : "s"} · ${completedSteps} accepted · ${progressPercent}%`,
     priorityLabel: task.priority,
     priorityTone: priorityTone(task.priority),
     occurrenceLabel: occurrenceWindow ? `Occurrence · ${occurrenceWindow}` : null,

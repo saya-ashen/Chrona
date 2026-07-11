@@ -18,6 +18,8 @@ vi.mock("@chrona/i18n/react", () => ({
         "components.schedulePage.firstRunStepReviewPlan": "Chrona previews AI suggestions first; you decide what to accept or run.",
         "components.schedulePage.firstRunConnectAi": "Connect AI",
         "components.schedulePage.firstRunCreateTask": "Create first task",
+        "components.schedulePage.firstRunCreateSafeDemo": "Use safe demo",
+        "components.schedulePage.firstRunSafeDemoTitle": "Summarize this text into three points",
         "components.schedulePage.firstRunOpenCreatedTask": "Open created task",
       })[key] ?? key,
   }),
@@ -191,6 +193,16 @@ describe("StartWithChrona", () => {
 
     expect(onOpenCreatedTask).toHaveBeenCalledWith("existing-task");
     expect(push).not.toHaveBeenCalled();
+  });
+  it("offers a safe demo without external side effects", async () => {
+    const onCreateSafeDemo = vi.fn();
+    mockClients([{ id: "client-1", enabled: true }]);
+
+    renderStartWithChrona({ onCreateSafeDemo });
+
+    await userEvent.click(await screen.findByRole("button", { name: "Use safe demo" }));
+
+    expect(onCreateSafeDemo).toHaveBeenCalledOnce();
   });
   it("hides onboarding after the created task is opened", async () => {
     mockClients([{ id: "client-1", enabled: true }]);

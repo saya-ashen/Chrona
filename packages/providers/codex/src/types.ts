@@ -92,7 +92,19 @@ function codexAcpBinaryPath(): string {
 }
 
 function buildDefaultAuthRequest(config: CodexProviderConfig, apiKey?: string): Record<string, unknown> | null {
-  if (config.baseUrl?.trim()) return null;
+  const baseUrl = config.baseUrl?.trim();
+  if (baseUrl) {
+    return {
+      methodId: "gateway",
+      _meta: {
+        gateway: {
+          baseUrl,
+          headers: apiKey ? { Authorization: `Bearer ${apiKey}` } : {},
+          providerName: "Chrona Codex Gateway",
+        },
+      },
+    };
+  }
   if (!apiKey) return null;
   return {
     methodId: "api-key",

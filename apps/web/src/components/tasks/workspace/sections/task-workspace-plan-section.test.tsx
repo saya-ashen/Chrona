@@ -13,12 +13,13 @@ vi.mock("elkjs/lib/elk.bundled.js", () => ({
 }));
 
 vi.mock("@/components/tasks/panels/task-plan-graph-panel", () => ({
-  TaskPlanGraphPanel: ({ plan, mode, onSelectedNodeChange }: {
+  TaskPlanGraphPanel: ({ plan, mode, fillHeight, onSelectedNodeChange }: {
     plan: { nodes: Array<{ id: string; title: string; objective?: string; status?: string }> };
     mode?: "full" | "compact";
+    fillHeight?: boolean;
     onSelectedNodeChange?: (node: { id: string; title: string; objective?: string; status?: string }, nodes: Array<{ id: string; title: string; objective?: string; status?: string }>) => void;
   }) => (
-    <div data-testid="task-plan-graph-panel" data-graph-mode={mode ?? "full"}>
+    <div data-testid="task-plan-graph-panel" data-graph-mode={mode ?? "full"} data-fill-height={fillHeight ? "true" : "false"}>
       {plan.nodes.map((node) => (
         <button
           key={node.id}
@@ -76,7 +77,7 @@ function renderWithQueryClient(ui: ReactElement) {
 vi.mock("@chrona/i18n/react", async () => {
   const { fallbackMessages } = await import("@chrona/i18n/messages");
   return {
-    useI18n: () => ({ messages: fallbackMessages, t: (key: string) => key }),
+    useI18n: () => ({ locale: "en", messages: fallbackMessages, t: (key: string) => key }),
     useLocale: () => "en",
   };
 });
@@ -193,10 +194,9 @@ describe("TaskWorkspacePlanSection", () => {
       />,
     );
     const getOperationPanel = () => screen.getAllByRole("region", { name: "Current operation" }).at(-1)!;
-    const getCurrentGraphPanel = () => screen.getAllByTestId("task-plan-graph-panel").at(-1)!;
-    expect(screen.getByRole("region", { name: "Execution flow" })).toBeInTheDocument();
-    expect(within(getOperationPanel()).getByRole("button", { name: "Generate plan" })).toBeInTheDocument();
-    fireEvent.click(within(getOperationPanel()).getByRole("button", { name: "Generate plan" }));
+    expect(screen.getByTestId("plan-setup-panel")).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Execution flow" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Generate plan" }));
     expect(onGeneratePlan).toHaveBeenCalledTimes(1);
 
     initial.rerender(
@@ -215,11 +215,11 @@ describe("TaskWorkspacePlanSection", () => {
         onDispatchExecutionAction={onDispatchExecutionAction}
       />,
     );
-    expect(screen.getByTestId("task-plan-node-generate")).toHaveTextContent("Generated plan node");
-    expect(within(getOperationPanel()).getByRole("button", { name: "Accept" })).toBeInTheDocument();
-    fireEvent.click(screen.getByTestId("task-plan-node-generate"));
+    expect(screen.getByRole("button", { name: /Generated plan node/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Accept" })).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Generated plan node/ }));
     expect(screen.queryByRole("dialog", { name: "Selected node details" })).not.toBeInTheDocument();
-    fireEvent.click(within(getOperationPanel()).getByRole("button", { name: "Accept" }));
+    fireEvent.click(screen.getByRole("button", { name: "Accept" }));
     await waitFor(() => expect(onApplyPlan).toHaveBeenCalledWith(draftPlan));
 
     const accepted = mount(
@@ -237,10 +237,60 @@ describe("TaskWorkspacePlanSection", () => {
         onDispatchExecutionAction={onDispatchExecutionAction}
       />,
     );
-    expect(within(getOperationPanel()).getByRole("button", { name: "Start plan" })).toBeInTheDocument();
-    fireEvent.click(within(getOperationPanel()).getByRole("button", { name: "Start plan" }));
+    const launchPanel = screen.getByRole("complementary", { name: "Run launch controls" });
+    expect(within(launchPanel).getByText("Plan accepted. Execution has not started, and nothing runs until you start it.")).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Accepted plan" })).toBeInTheDocument();
+    expect(screen.queryByText("No execution result yet.")).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Current operation" })).not.toBeInTheDocument();
+    fireEvent.click(within(launchPanel).getByRole("button", { name: "Start run" }));
     expect(onDispatchExecutionAction).toHaveBeenCalledWith({ action: "start_manual" });
-    expect(getCurrentGraphPanel()).toHaveAttribute("data-graph-mode", "full");
+    expect(screen.getAllByRole("button", { name: /Generated plan node/ }).length).toBeGreaterThan(0);
+
+    const stoppedNode = createTaskWorkspaceFixtureNode({
+      id: "generate",
+      title: "Generated plan node",
+      status: "cancelled",
+      nextAction: "Continue execution",
+    });
+    accepted.rerender(
+      <TaskWorkspacePlanSection
+        label="Plan"
+        graphPlan={createTaskWorkspaceFixtureGraph([stoppedNode], "generate")}
+        isGraphPlanPending={false}
+        pageData={createTaskWorkspaceFixturePageData({
+          task: {
+            savedPlan: acceptedPlan,
+            aiPlanGenerationStatus: "accepted",
+            executionSummary: {
+              taskId: "task-1",
+              executionState: "cancelled",
+              stateLabel: "Waiting",
+              stateReason: null,
+              graphVersion: 1,
+              currentNodeId: "generate",
+              primaryAction: { type: "start", enabled: true, label: "Start" },
+              progress: { completed: 0, total: 1, percent: 0 },
+              readiness: { runnable: true, reason: null },
+              degraded: null,
+              blocking: null,
+              waiting: null,
+              recoveryActions: [],
+            },
+          },
+        })}
+        plan={acceptedPlan}
+        planGenerationStatus="accepted"
+        acceptPlanError={null}
+        runtimeEvents={[]}
+        onGeneratePlan={onGeneratePlan}
+        onApplyPlan={onApplyPlan}
+        onDispatchExecutionAction={onDispatchExecutionAction}
+      />,
+    );
+    expect(within(getOperationPanel()).getByRole("button", { name: "Continue plan" })).toBeInTheDocument();
+    expect(within(getOperationPanel()).getByRole("button", { name: "Restart from beginning" })).toBeInTheDocument();
+    fireEvent.click(within(getOperationPanel()).getByRole("button", { name: "Restart from beginning" }));
+    expect(onDispatchExecutionAction).toHaveBeenCalledWith({ action: "restart_from_beginning" });
 
     accepted.rerender(
       <TaskWorkspacePlanSection
@@ -265,8 +315,46 @@ describe("TaskWorkspacePlanSection", () => {
       />,
     );
     expect(within(getOperationPanel()).getByLabelText(/Decision/)).toBeInTheDocument();
-    expect(within(getOperationPanel()).getByText("Tool: Starting plan")).toBeInTheDocument();
-    await waitFor(() => expect(getCurrentGraphPanel()).toHaveAttribute("data-graph-mode", "compact"));
+    expect(screen.getByTestId("execution-focus-header")).toHaveTextContent("Review generated output");
+    expect(screen.getByTestId("current-runtime-activity")).toHaveTextContent("Starting plan");
+    expect(screen.getByRole("region", { name: "Live output" })).toHaveTextContent("Awaiting output");
+    expect(screen.getByTestId("execution-navigator")).toHaveTextContent("steps complete");
+    expect(screen.queryByTestId("task-plan-graph-panel")).not.toBeInTheDocument();
+  });
+
+  it("separates the inspected step from the current execution step", () => {
+    const acceptedPlan = {
+      id: "plan-running",
+      status: "accepted",
+      revision: 1,
+      updatedAt: "2026-05-18T00:00:01.000Z",
+    } as TaskPlanReadModel;
+    const currentNode = createTaskWorkspaceFixtureNode({ id: "current", title: "Collect repositories", status: "active", objective: "Read GitHub Trending" });
+    const upcomingNode = createTaskWorkspaceFixtureNode({ id: "next", title: "Rank repositories", status: "idle", objective: "Rank collected repositories" });
+
+    renderWithQueryClient(
+      <TaskWorkspacePlanSection
+        label="Plan"
+        graphPlan={createTaskWorkspaceFixtureGraph([currentNode, upcomingNode], "current")}
+        isGraphPlanPending={false}
+        pageData={createTaskWorkspaceFixturePageData({ task: { savedPlan: acceptedPlan, aiPlanGenerationStatus: "accepted", status: "Running" } })}
+        plan={acceptedPlan}
+        planGenerationStatus="accepted"
+        acceptPlanError={null}
+        runtimeEvents={[]}
+        onGeneratePlan={vi.fn()}
+        onApplyPlan={vi.fn()}
+        onDispatchExecutionAction={vi.fn()}
+      />,
+    );
+
+    const navigator = screen.getByTestId("execution-navigator");
+    fireEvent.click(within(navigator).getByRole("button", { name: /Rank repositories/ }));
+    expect(within(navigator).getAllByText("Rank repositories").length).toBeGreaterThan(0);
+    expect(within(navigator).getAllByText("Collect repositories").length).toBeGreaterThan(0);
+    expect(screen.getByTestId("execution-focus-header")).toHaveTextContent("Collect repositories");
+    fireEvent.click(within(screen.getByTestId("execution-navigator")).getByRole("button", { name: "Return to current step" }));
+    expect(within(screen.getByTestId("execution-navigator")).queryByRole("button", { name: "Return to current step" })).not.toBeInTheDocument();
   });
 
   it("adds generate plan as the current operation when no plan exists", () => {
@@ -288,8 +376,8 @@ describe("TaskWorkspacePlanSection", () => {
       />,
     );
 
-    const operationPanel = screen.getByRole("region", { name: "Current operation" });
-    fireEvent.click(within(operationPanel).getByRole("button", { name: "Generate plan" }));
+    const setup = screen.getByTestId("plan-setup-panel");
+    fireEvent.click(within(setup).getByRole("button", { name: "Generate plan" }));
 
     expect(onGeneratePlan).toHaveBeenCalledTimes(1);
   });
@@ -313,9 +401,9 @@ describe("TaskWorkspacePlanSection", () => {
       />,
     );
 
-    const operationPanel = screen.getByRole("region", { name: "Current operation" });
-    expect(within(operationPanel).queryByRole("button", { name: "Generate plan" })).not.toBeInTheDocument();
-    expect(within(operationPanel).queryByRole("button", { name: "Stop generation" })).not.toBeInTheDocument();
+    expect(screen.getByTestId("plan-generation-progress")).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Current operation" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Stop generation" })).not.toBeInTheDocument();
     expect(onGeneratePlan).not.toHaveBeenCalled();
   });
 
@@ -372,6 +460,14 @@ describe("TaskWorkspacePlanSection", () => {
     );
 
     const operationPanel = screen.getByRole("region", { name: "Current operation" });
+    const primaryAction = within(operationPanel).getByTestId("current-operation-primary-action");
+    expect(primaryAction).toBeInTheDocument();
+    expect(primaryAction).toHaveClass("sm:flex-row");
+    expect(primaryAction).toHaveTextContent("Failed");
+    expect(screen.queryByText("Needs handling")).not.toBeInTheDocument();
+    expect(within(operationPanel).getByTestId("current-operation-decision-card")).toHaveTextContent("Retry Run");
+    expect(within(primaryAction).getByRole("button", { name: "Retry Run" })).toHaveClass("shrink-0");
+    expect(within(primaryAction).getByRole("button", { name: "Retry Run" })).not.toHaveClass("w-full");
     fireEvent.click(within(operationPanel).getByRole("button", { name: "Retry Run" }));
 
     expect(onDispatchExecutionAction).toHaveBeenCalledWith({ action: "retry_node", nodeId: "node-failed" });
@@ -410,8 +506,8 @@ describe("TaskWorkspacePlanSection", () => {
       />,
     );
 
-    const operationPanel = screen.getByRole("region", { name: "Current operation" });
-    fireEvent.click(within(operationPanel).getByRole("button", { name: "Start plan" }));
+    const launchPanel = screen.getByRole("complementary", { name: "Run launch controls" });
+    fireEvent.click(within(launchPanel).getByRole("button", { name: "Start run" }));
 
     expect(onDispatchExecutionAction).toHaveBeenCalledWith({ action: "start_manual" });
   });
@@ -439,75 +535,69 @@ describe("TaskWorkspacePlanSection", () => {
       />,
     );
 
-    const operationPanel = screen.getByRole("region", { name: "Current operation" });
-    fireEvent.click(within(operationPanel).getByRole("button", { name: "Start plan" }));
+    const launchPanel = screen.getByRole("complementary", { name: "Run launch controls" });
+    fireEvent.click(within(launchPanel).getByRole("button", { name: "Start run" }));
 
     expect(onDispatchExecutionAction).toHaveBeenCalledWith({ action: "start_manual" });
   });
 
-  it("shows accept and AI revision chat with selected node detail before plan acceptance", () => {
-    const onApplyPlan = vi.fn().mockResolvedValue(undefined);
-    const onGeneratePlan = vi.fn();
-    const draftPlan = {
-      id: "plan-1",
-      status: "draft",
-      revision: 1,
-      prompt: "Prefer a smaller plan and keep the first step manual.",
-      updatedAt: "2026-05-18T00:00:00.000Z",
-    } as TaskPlanReadModel;
-    const readyNode = createTaskWorkspaceFixtureNode({ id: "ready", title: "Collect sources", objective: "Gather source links", status: "ready", nextAction: "Start execution" });
+  it("shows a readable review document before accepting a generated plan", () => {
+    const plan = {
+      id: "plan-1", status: "draft", revision: 1, summary: "Two-step plan ready for review.", generatedBy: "Claude", updatedAt: "2026-05-18T00:00:00.000Z",
+      blueprint: { title: "Research digest plan", goal: "Collect and summarize AI research updates.", assumptions: ["Use public sources only.", "Keep findings concise."], nodes: [], edges: [] },
+      compiledPlan: { title: "Research digest plan", goal: "Collect and summarize AI research updates.", assumptions: ["Use public sources only.", "Keep findings concise."] }, effectivePlan: {},
+    } as unknown as TaskPlanReadModel;
     const graphPlan = createTaskWorkspaceFixtureGraph([
-      readyNode,
-    ], "ready");
-
-    renderWithQueryClient(
-      <TaskWorkspacePlanSection
-        label="Plan"
-        graphPlan={graphPlan}
-        isGraphPlanPending={false}
-        pageData={createTaskWorkspaceFixturePageData()}
-        plan={draftPlan}
-        planGenerationStatus="waiting_acceptance"
-        canAcceptPlan
-        acceptPlanError={null}
-        runtimeEvents={[]}
-        onGeneratePlan={onGeneratePlan}
-        onApplyPlan={onApplyPlan}
-        onDispatchExecutionAction={vi.fn()}
-      />,
-    );
-
-    const operationPanel = screen.getByRole("region", { name: "Current operation" });
+      createTaskWorkspaceFixtureNode({ id: "collect", title: "Collect updates", objective: "Gather trusted source links", status: "ready", estimatedMinutes: 12 }),
+      createTaskWorkspaceFixtureNode({ id: "summarize", title: "Summarize findings", objective: "Produce a concise digest", status: "pending", estimatedMinutes: 8 }),
+    ], "collect");
+    renderWithQueryClient(<TaskWorkspacePlanSection label="Plan" graphPlan={graphPlan} isGraphPlanPending={false} pageData={createTaskWorkspaceFixturePageData({ task: { savedPlan: plan, aiPlanGenerationStatus: "waiting_acceptance" } })} plan={plan} planGenerationStatus="waiting_acceptance" canAcceptPlan acceptPlanError={null} runtimeEvents={[]} onGeneratePlan={vi.fn()} onApplyPlan={vi.fn()} onDispatchExecutionAction={vi.fn()} />);
     const executionFlow = screen.getByRole("region", { name: "Execution flow" });
-
-    expect(within(operationPanel).getByText("Last revision request")).toBeInTheDocument();
-    expect(within(operationPanel).getAllByText("Prefer a smaller plan and keep the first step manual.").length).toBeGreaterThan(0);
-    expect(within(operationPanel).getByText("Ask Chrona to revise this draft plan.")).toBeInTheDocument();
-    expect(within(executionFlow).queryByText("Last revision request")).not.toBeInTheDocument();
-    expect(within(operationPanel).queryByRole("button", { name: "Start plan" })).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByTestId("task-plan-node-ready"));
-    expect(within(executionFlow).getByRole("region", { name: "Selected node details" })).toHaveTextContent("Collect sources");
-    expect(within(executionFlow).getByText("Gather source links")).toBeInTheDocument();
-    expect(within(operationPanel).getByText("Ask Chrona to revise selected step: Collect sources")).toBeInTheDocument();
-
-    const revisionMessage = within(operationPanel).getByRole("textbox", { name: "Plan revision message" });
-    fireEvent.change(revisionMessage, {
-      target: { value: "Add a verification step before accepting the final output." },
-    });
-    fireEvent.click(within(operationPanel).getByRole("button", { name: "Accept" }));
-    fireEvent.click(within(operationPanel).getByRole("button", { name: "Ask AI to revise plan" }));
-    expect(revisionMessage).toHaveValue("");
-    expect(within(operationPanel).getByText("Add a verification step before accepting the final output.")).toBeInTheDocument();
-
-    expect(onApplyPlan).toHaveBeenCalledWith(draftPlan);
-    expect(onGeneratePlan).toHaveBeenCalledWith({
-      userInstruction: "Add a verification step before accepting the final output.",
-      selectedNodeId: "ready",
-    });
+    expect(within(executionFlow).getByText("Research digest plan")).toBeInTheDocument();
+    expect(within(executionFlow).getByText("Collect and summarize AI research updates.")).toBeInTheDocument();
+    expect(within(executionFlow).getByText("Two-step plan ready for review.")).toBeInTheDocument();
+    expect(within(executionFlow).getByText(/Use public sources only\./)).toBeInTheDocument();
+    expect(within(executionFlow).getByRole("button", { name: /Collect updates/ })).toBeInTheDocument();
+    expect(within(executionFlow).queryByTestId("task-plan-graph-panel")).not.toBeInTheDocument();
+    expect(within(executionFlow).getByRole("button", { name: "Use compact brief" })).toHaveAttribute("aria-pressed", "false");
+    fireEvent.click(within(executionFlow).getByRole("button", { name: "Flow" }));
+    expect(within(executionFlow).getByTestId("task-plan-graph-panel")).toHaveAttribute("data-fill-height", "false");
+    expect(within(executionFlow).getByText("Two-step plan ready for review.")).toBeInTheDocument();
+    fireEvent.click(within(executionFlow).getByRole("button", { name: "Use compact brief" }));
+    expect(within(executionFlow).getByRole("button", { name: "Show full brief" })).toHaveAttribute("aria-pressed", "true");
+    expect(within(executionFlow).queryByText("Two-step plan ready for review.")).not.toBeInTheDocument();
+    fireEvent.click(within(executionFlow).getByRole("button", { name: "Steps" }));
+    expect(within(executionFlow).getByRole("button", { name: "Show full brief" })).toBeInTheDocument();
+    fireEvent.click(within(executionFlow).getByRole("button", { name: "Show full brief" }));
+    expect(within(executionFlow).getByText("Two-step plan ready for review.")).toBeInTheDocument();
   });
 
-  it("shows running spinner in Current operation instead of Results", () => {
+  it("keeps plan acceptance prominent and revision scope explicit", () => {
+    const onApplyPlan = vi.fn().mockResolvedValue(undefined);
+    const onGeneratePlan = vi.fn();
+    const draftPlan = { id: "plan-1", status: "draft", revision: 1, prompt: "Prefer a smaller plan.", updatedAt: "2026-05-18T00:00:00.000Z" } as TaskPlanReadModel;
+    const readyNode = createTaskWorkspaceFixtureNode({ id: "ready", title: "Collect sources", objective: "Gather source links", status: "ready", nextAction: "Start execution" });
+    renderWithQueryClient(<TaskWorkspacePlanSection label="Plan" graphPlan={createTaskWorkspaceFixtureGraph([readyNode], "ready")} isGraphPlanPending={false} pageData={createTaskWorkspaceFixturePageData({ task: { savedPlan: draftPlan, aiPlanGenerationStatus: "waiting_acceptance" } })} plan={draftPlan} planGenerationStatus="waiting_acceptance" canAcceptPlan acceptPlanError={null} runtimeEvents={[]} onGeneratePlan={onGeneratePlan} onApplyPlan={onApplyPlan} onDispatchExecutionAction={vi.fn()} />);
+    const decision = screen.getByRole("complementary", { name: "Plan review decision" });
+    expect(within(decision).getByText("Plan ready for review")).toBeInTheDocument();
+    expect(within(decision).getByText(/Execution does not start/)).toBeInTheDocument();
+    expect(within(decision).getByRole("button", { name: "Accept" })).toBeInTheDocument();
+    expect(within(decision).queryByRole("textbox", { name: "Plan revision message" })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /Collect sources/ }));
+    fireEvent.click(within(decision).getByRole("button", { name: "Request changes" }));
+    expect(within(decision).getByRole("radio", { name: "Entire plan" })).toHaveAttribute("aria-checked", "true");
+    const selectedScope = within(decision).getByRole("radio", { name: "Selected step: Collect sources" });
+    expect(selectedScope).toHaveAttribute("aria-checked", "false");
+    fireEvent.click(selectedScope);
+    const revisionMessage = within(decision).getByRole("textbox", { name: "Plan revision message" });
+    fireEvent.change(revisionMessage, { target: { value: "Add a verification step." } });
+    fireEvent.click(within(decision).getByRole("button", { name: "Generate revised plan" }));
+    expect(onGeneratePlan).toHaveBeenCalledWith({ userInstruction: "Add a verification step.", selectedNodeId: "ready" });
+    fireEvent.click(within(decision).getByRole("button", { name: "Accept" }));
+    expect(onApplyPlan).toHaveBeenCalledWith(draftPlan);
+  });
+
+  it("shows the active step in the execution focus instead of a duplicate Current operation card", () => {
     const acceptedPlan = {
       id: "plan-1",
       status: "accepted",
@@ -537,8 +627,89 @@ describe("TaskWorkspacePlanSection", () => {
       />,
     );
 
-    expect(within(screen.getByRole("region", { name: "Current operation" })).getByLabelText("Current operation running")).toHaveClass("animate-spin");
+    expect(screen.getByTestId("execution-focus-header")).toHaveTextContent("Write report");
+    expect(screen.getByTestId("current-runtime-activity")).toHaveTextContent("Waiting for the next runtime update");
+    expect(screen.queryByRole("region", { name: "Current operation" })).not.toBeInTheDocument();
     expect(screen.queryByText("Running now")).not.toBeInTheDocument();
+  });
+
+  it("shows the launch contract before execution starts", () => {
+    const acceptedPlan = {
+      id: "plan-1",
+      status: "accepted",
+      revision: 2,
+      updatedAt: "2026-05-18T00:00:00.000Z",
+    } as TaskPlanReadModel;
+    const readyNode = createTaskWorkspaceFixtureNode({ id: "execute", title: "Write report", status: "ready" });
+
+    renderWithQueryClient(
+      <TaskWorkspacePlanSection
+        label="Plan"
+        graphPlan={createTaskWorkspaceFixtureGraph([readyNode], "execute")}
+        isGraphPlanPending={false}
+        pageData={createTaskWorkspaceFixturePageData({ task: { savedPlan: acceptedPlan, aiPlanGenerationStatus: "accepted" } })}
+        plan={acceptedPlan}
+        planGenerationStatus="accepted"
+        acceptPlanError={null}
+        runtimeEvents={[]}
+        onGeneratePlan={vi.fn()}
+        onApplyPlan={vi.fn()}
+        onDispatchExecutionAction={vi.fn()}
+      />,
+    );
+
+    const launchPanel = screen.getByRole("complementary", { name: "Run launch controls" });
+    expect(screen.getByRole("region", { name: "Accepted plan" })).toBeInTheDocument();
+    expect(within(launchPanel).getAllByText("Ready to run").length).toBeGreaterThan(0);
+    expect(screen.getByText("Revision 2")).toBeInTheDocument();
+    expect(within(launchPanel).getByText("Write report")).toBeInTheDocument();
+    expect(within(launchPanel).getByText("Requires your acceptance before the task is done")).toBeInTheDocument();
+    expect(within(launchPanel).getByText("Plan accepted. Execution has not started, and nothing runs until you start it.")).toBeInTheDocument();
+    const acceptedPlanView = screen.getByRole("group", { name: "Accepted plan view" });
+    expect(within(acceptedPlanView).getByRole("button", { name: "Steps" })).toHaveAttribute("aria-pressed", "true");
+    expect(within(acceptedPlanView).getByRole("button", { name: "Flow" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Write report/ })).toBeInTheDocument();
+    expect(screen.queryByText("Run contract preview")).not.toBeInTheDocument();
+    fireEvent.click(within(acceptedPlanView).getByRole("button", { name: "Flow" }));
+    expect(screen.getByTestId("task-plan-graph-panel")).toHaveAttribute("data-graph-mode", "full");
+    expect(screen.queryByText("Needs review")).not.toBeInTheDocument();
+  });
+
+  it("keeps an explicit height chain for the accepted plan graph", () => {
+    const acceptedPlan = {
+      id: "plan-height",
+      status: "accepted",
+      revision: 3,
+      updatedAt: "2026-05-18T00:00:00.000Z",
+    } as TaskPlanReadModel;
+    const graphPlan = createTaskWorkspaceFixtureGraph([
+      createTaskWorkspaceFixtureNode({ id: "collect", title: "Collect sources", status: "ready" }),
+      createTaskWorkspaceFixtureNode({ id: "write", title: "Write report", status: "pending" }),
+      createTaskWorkspaceFixtureNode({ id: "review", title: "Review result", type: "checkpoint", status: "pending" }),
+      createTaskWorkspaceFixtureNode({ id: "publish", title: "Publish", status: "pending" }),
+    ], "collect");
+
+    renderWithQueryClient(
+      <TaskWorkspacePlanSection
+        label="Plan"
+        graphPlan={graphPlan}
+        isGraphPlanPending={false}
+        pageData={createTaskWorkspaceFixturePageData({ task: { savedPlan: acceptedPlan, aiPlanGenerationStatus: "accepted" } })}
+        plan={acceptedPlan}
+        planGenerationStatus="accepted"
+        acceptPlanError={null}
+        runtimeEvents={[]}
+        onGeneratePlan={vi.fn()}
+        onApplyPlan={vi.fn()}
+        onDispatchExecutionAction={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByTestId("accepted-plan-surface")).toHaveClass("xl:h-full");
+    expect(document.querySelector('[data-plan-graph-height-contract="fill"]')).toHaveClass("min-h-[32rem]", "flex-1");
+    const acceptedPlanView = screen.getByRole("group", { name: "Accepted plan view" });
+    fireEvent.click(within(acceptedPlanView).getByRole("button", { name: "Flow" }));
+    expect(screen.getByTestId("task-plan-graph-panel")).toHaveAttribute("data-graph-mode", "full");
   });
 
   it("adds checkpoint controls as the current operation after execution starts", async () => {
@@ -589,6 +760,73 @@ describe("TaskWorkspacePlanSection", () => {
     });
   });
 
+
+  it("shows distinct input and approval recovery cards in current operation", () => {
+    const acceptedPlan = { id: "plan-1", status: "accepted", revision: 1, updatedAt: "2026-05-18T00:00:00.000Z" } as TaskPlanReadModel;
+    const inputNode = createTaskWorkspaceFixtureNode({
+      id: "input-node",
+      title: "Collect missing city",
+      status: "waiting_for_user",
+      nextAction: "Provide checkpoint input",
+      checkpoint: { ...checkpoint, id: "run-1:input-node:input", nodeId: "input-node", kind: "user_input" },
+      availableActions: [{ id: "submit_input", label: "Submit input", kind: "input", emphasis: "primary", checkpointId: "run-1:input-node:input", checkpointAction: "submit_input" }],
+      interactiveFields: [{ key: "city", label: "City", value: "", control: "text", required: true }],
+    });
+    const approvalNode = createTaskWorkspaceFixtureNode({
+      id: "approval-node",
+      title: "Approve deploy",
+      status: "waiting_for_approval",
+      nextAction: "Approve deploy request",
+      checkpoint: { ...checkpoint, id: "run-1:approval-node:approval", nodeId: "approval-node", kind: "approval" },
+      availableActions: [{ id: "approve", label: "Approve", kind: "approve", emphasis: "primary", checkpointId: "run-1:approval-node:approval", checkpointAction: "approve_result" }],
+    });
+
+    const { rerender } = renderWithQueryClient(
+      <TaskWorkspacePlanSection
+        label="Plan"
+        graphPlan={createTaskWorkspaceFixtureGraph([inputNode], "input-node")}
+        isGraphPlanPending={false}
+        pageData={createTaskWorkspaceFixturePageData({ task: { savedPlan: acceptedPlan, status: "Running" } })}
+        plan={acceptedPlan}
+        planGenerationStatus="accepted"
+        acceptPlanError={null}
+        runtimeEvents={[]}
+        onGeneratePlan={vi.fn()}
+        onApplyPlan={vi.fn()}
+        onDispatchExecutionAction={vi.fn()}
+        onSubmitCheckpointAction={vi.fn()}
+      />,
+    );
+
+    let operationPanel = screen.getByRole("region", { name: "Current operation" });
+    expect(within(operationPanel).getByTestId("current-operation-decision-card")).toHaveTextContent("Input needed");
+    expect(within(operationPanel).getByTestId("current-operation-decision-card")).toHaveTextContent("Next: Provide the requested input so execution can continue");
+    expect(within(operationPanel).queryByText("Needs handling")).not.toBeInTheDocument();
+
+    rerender(
+      <QueryClientProvider client={new QueryClient()}>
+        <TaskWorkspacePlanSection
+          label="Plan"
+          graphPlan={createTaskWorkspaceFixtureGraph([approvalNode], "approval-node")}
+          isGraphPlanPending={false}
+          pageData={createTaskWorkspaceFixturePageData({ task: { savedPlan: acceptedPlan, status: "Running" } })}
+          plan={acceptedPlan}
+          planGenerationStatus="accepted"
+          acceptPlanError={null}
+          runtimeEvents={[]}
+          onGeneratePlan={vi.fn()}
+          onApplyPlan={vi.fn()}
+          onDispatchExecutionAction={vi.fn()}
+          onSubmitCheckpointAction={vi.fn()}
+        />
+      </QueryClientProvider>,
+    );
+
+    operationPanel = screen.getByRole("region", { name: "Current operation" });
+    expect(within(operationPanel).getByTestId("current-operation-decision-card")).toHaveTextContent("Approval needed");
+    expect(within(operationPanel).getByTestId("current-operation-decision-card")).toHaveTextContent("Next: Review the request, then approve, reject, or request changes");
+    expect(within(operationPanel).queryByText("Needs handling")).not.toBeInTheDocument();
+  });
   it("does not expose locally-derived actions without a backend checkpoint", () => {
     const node = createTaskWorkspaceFixtureNode({
       id: "checkpoint",
@@ -618,11 +856,10 @@ describe("TaskWorkspacePlanSection", () => {
       />,
     );
 
-    const operationPanel = screen.getByRole("region", { name: "Current operation" });
-
-    expect(within(operationPanel).queryByText("Current node action")).not.toBeInTheDocument();
-    expect(within(operationPanel).queryByLabelText(/City/)).not.toBeInTheDocument();
-    expect(within(operationPanel).queryByRole("button", { name: "Send Submit input" })).not.toBeInTheDocument();
+    expect(screen.getByTestId("execution-focus-header")).toBeInTheDocument();
+    expect(screen.queryByText("Current node action")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText(/City/)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Send Submit input" })).not.toBeInTheDocument();
   });
 
   it("shows blocked current node action with blocker reason before start plan", async () => {
@@ -677,17 +914,17 @@ describe("TaskWorkspacePlanSection", () => {
     });
   });
 
-  it("shows task completed for completed nodes without actions", () => {
+  it("puts result review before the final result and submits explicit change feedback", async () => {
     const node = createTaskWorkspaceFixtureNode({
       id: "weather-script",
       title: "创建一个获取天气的脚本",
       status: "done",
-      nextAction: "请提供创建天气脚本所需的关键信息。",
-      inputFields: { city: "Shanghai" },
-      interactiveFields: [{ key: "city", label: "City", value: "Shanghai", control: "text", required: true }],
+      nextAction: "Result complete",
       availableActions: [],
     });
     const graphPlan = createTaskWorkspaceFixtureGraph([node], "weather-script");
+    const onAcceptResult = vi.fn().mockResolvedValue(undefined);
+    const onDispatchExecutionAction = vi.fn().mockResolvedValue({ message: "Rerun started" });
 
     renderWithQueryClient(
       <TaskWorkspacePlanSection
@@ -701,19 +938,77 @@ describe("TaskWorkspacePlanSection", () => {
         runtimeEvents={[]}
         onGeneratePlan={vi.fn()}
         onApplyPlan={vi.fn()}
+        onDispatchExecutionAction={onDispatchExecutionAction}
+        onAcceptResult={onAcceptResult}
+      />,
+    );
+
+    const workspace = screen.getByRole("region", { name: "Task execution workspace" });
+    const reviewHeader = screen.getByTestId("result-review-header");
+    const finalResult = screen.getByTestId("final-result-surface");
+
+    expect(workspace).toHaveAttribute("data-workspace-layout", "result_focus");
+    expect(reviewHeader).toHaveTextContent("Result ready");
+    expect(reviewHeader.compareDocumentPosition(finalResult) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.queryByRole("region", { name: "Execution flow" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Continue from result")).not.toBeInTheDocument();
+    expect(screen.getByText("Activity").closest("details")).not.toHaveAttribute("open");
+
+    fireEvent.click(within(reviewHeader).getByRole("button", { name: "Accept result" }));
+    await waitFor(() => expect(onAcceptResult).toHaveBeenCalledTimes(1));
+
+    fireEvent.click(within(reviewHeader).getByRole("button", { name: "Request changes" }));
+    const changesRegion = screen.getByRole("region", { name: "Request changes" });
+    const changesInput = within(changesRegion).getByRole("textbox", { name: "What needs to change?" });
+    expect(changesInput).toHaveFocus();
+    expect(within(changesRegion).getByRole("button", { name: "Rerun final step" })).toBeDisabled();
+
+    fireEvent.change(changesInput, { target: { value: "Include source links for every entry." } });
+    const submitChanges = within(changesRegion).getByRole("button", { name: "Rerun final step" });
+    await waitFor(() => expect(submitChanges).toBeEnabled());
+    fireEvent.click(submitChanges);
+    await waitFor(() => expect(onDispatchExecutionAction).toHaveBeenCalledWith({
+      action: "retry_node",
+      nodeId: "weather-script",
+      prompt: "Include source links for every entry.",
+    }));
+  });
+
+  it("renders Done with a top action that moves focus to the continuation composer", () => {
+    const node = createTaskWorkspaceFixtureNode({ id: "weather-script", title: "Result", status: "done", availableActions: [] });
+    const scrollIntoView = vi.fn();
+    Object.defineProperty(Element.prototype, "scrollIntoView", { configurable: true, value: scrollIntoView });
+    renderWithQueryClient(
+      <TaskWorkspacePlanSection
+        label="Plan"
+        graphPlan={createTaskWorkspaceFixtureGraph([node], "weather-script")}
+        isGraphPlanPending={false}
+        pageData={createTaskWorkspaceFixturePageData({ task: { status: "Done" } })}
+        plan={{ id: "plan-1", status: "accepted", revision: 1, updatedAt: "2026-05-18T00:00:00.000Z" } as TaskPlanReadModel}
+        planGenerationStatus="idle"
+        acceptPlanError={null}
+        runtimeEvents={[]}
+        onGeneratePlan={vi.fn()}
+        onApplyPlan={vi.fn()}
         onDispatchExecutionAction={vi.fn()}
       />,
     );
 
-    const commandCenter = screen.getByRole("complementary", { name: "Task command center" });
+    const reviewHeader = screen.getByTestId("result-review-header");
+    expect(reviewHeader).toHaveTextContent("Result accepted");
+    expect(screen.queryByRole("button", { name: "Accept result" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Request changes" })).not.toBeInTheDocument();
+    const continueButton = within(reviewHeader).getByRole("button", { name: "Continue from result" });
+    const followUpInput = screen.getByPlaceholderText("Ask a follow-up or create a linked follow-up task.");
+    const placeholderSubmit = screen.getByRole("button", { name: "Continue" });
+    expect(placeholderSubmit).toBeDisabled();
+    expect(placeholderSubmit).toHaveAttribute("aria-describedby", "result-follow-up-unavailable");
+    expect(screen.getByText("Continue from result is not available yet.")).toBeInTheDocument();
 
-    // A completed plan reports full progress and exposes no pending action input.
-    expect(within(commandCenter).getByText((_content, element) => element?.textContent === "1/1 steps")).toBeInTheDocument();
-    expect(within(commandCenter).queryByText("Ready to run")).not.toBeInTheDocument();
-    expect(within(commandCenter).queryByRole("button", { name: "Send input" })).not.toBeInTheDocument();
-    expect(within(commandCenter).queryByLabelText(/City/)).not.toBeInTheDocument();
-    expect(within(commandCenter).queryByRole("region", { name: "Current operation" })).not.toBeInTheDocument();
-    expect(within(commandCenter).queryByText("Result summary will appear here after the current node finishes.")).not.toBeInTheDocument();
+    fireEvent.click(continueButton);
+
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: "center", behavior: "smooth" });
+    expect(followUpInput).toHaveFocus();
   });
 
   it("does not open node detail overlay when selecting a graph node", () => {
@@ -741,8 +1036,8 @@ describe("TaskWorkspacePlanSection", () => {
       />,
     );
 
-    expect(screen.getByTestId("task-plan-node-review")).toHaveTextContent("Review task output");
-    fireEvent.click(screen.getByTestId("task-plan-node-review"));
+    expect(screen.getByTestId("execution-navigator")).toHaveTextContent("Review task output");
+    fireEvent.click(within(screen.getByTestId("execution-navigator")).getByRole("button", { name: /Review task output/ }));
 
     expect(screen.queryByRole("dialog", { name: "Selected node details" })).not.toBeInTheDocument();
     expect(screen.getByRole("complementary", { name: "Task command center" })).toBeInTheDocument();

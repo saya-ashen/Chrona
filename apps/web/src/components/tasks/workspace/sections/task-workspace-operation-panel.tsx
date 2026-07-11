@@ -1,5 +1,6 @@
 "use client";
 import type { ReactNode } from "react";
+import { deriveUserFacingFailure, type WorkStateView } from "@chrona/domain";
 
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -14,11 +15,13 @@ type WorkspaceCopy = Record<string, string | undefined>;
 type TaskWorkspaceOperationPanelProps = {
   taskId: string;
   state: TaskWorkspaceOperationState;
+  workState: WorkStateView;
   copy: WorkspaceCopy;
   onGeneratePlan: () => void;
   onStartPlan: () => void;
+  onRestartPlan?: () => void;
   onTaskPrimaryAction?: () => void;
-  revisionPanel: ReactNode;
+  revisionPanel?: ReactNode;
 };
 
 function operationToneClass(tone: TaskWorkspaceOperationState["tone"]) {
@@ -53,7 +56,7 @@ function formatRuntimeEvent(event: TaskWorkspaceOperationState["runtimeEvents"][
     case "run_status":
       return `Status: ${value.message ?? value.status}`;
     case "raw_event":
-      return `Event: ${value.rawEventType ?? "Runtime event"}`;
+      return value.message ? `Progress: ${value.message}` : `Event: ${value.rawEventType ?? "Runtime event"}`;
   }
 }
 
@@ -67,12 +70,66 @@ function SelectedNodeCue({ node, copy }: { node: PlanNodeDataModel | null; copy:
   );
 }
 
+function taskActionButtonLabel(state: Extract<TaskWorkspaceOperationState, { status: "task-action" }>) {
+  return state.taskPrimaryAction.label;
+}
+
+function taskActionButtonVariant(state: Extract<TaskWorkspaceOperationState, { status: "task-action" }>) {
+  return state.tone === "critical" ? "destructive" : "default";
+}
+
+function stateHelpText(workState: WorkStateView) {
+  if (workState.state === "waiting_for_input" || workState.state === "waiting_for_approval") return `Next: ${workState.nextActionLabel}`;
+  if (workState.blocker) return `${workState.blocker.reason} · Scope: ${workState.blocker.scope}`;
+  if (workState.currentNodeLabel) return `Current step: ${workState.currentNodeLabel}`;
+  return workState.nextActionLabel;
+}
+
+function DecisionRecoveryCard({ workState }: { workState: WorkStateView }) {
+  if (!["waiting_for_input", "waiting_for_approval", "blocked", "failed", "cancelled"].includes(workState.state)) return null;
+  const failure = deriveUserFacingFailure({
+    state: workState.state as "waiting_for_input" | "waiting_for_approval" | "blocked" | "failed" | "cancelled",
+    reason: workState.blocker?.reason ?? null,
+    scope: workState.blocker?.scope ?? null,
+    currentNodeId: workState.currentNodeId,
+    currentNodeLabel: workState.currentNodeLabel,
+    diagnosticRef: workState.currentNodeId,
+  });
+  return (
+    <div className="rounded-2xl border border-foreground/15 bg-background/75 px-3 py-3 text-sm" data-testid="current-operation-decision-card">
+      <div className="flex flex-wrap items-start justify-between gap-3">
+        <div className="min-w-0 space-y-1">
+          <p className="font-semibold text-foreground">{workState.label}</p>
+          <p className="text-muted-foreground">{failure.summary}</p>
+          <p className="text-muted-foreground">{stateHelpText(workState)}</p>
+        </div>
+        <Badge variant={failure.category === "approval" || failure.category === "input" ? "secondary" : "destructive"}>{failure.category}</Badge>
+      </div>
+      <dl className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
+        <div><dt className="font-medium text-muted-foreground">Retained</dt><dd>{failure.retainedProgress.join(" ")}</dd></div>
+        <div><dt className="font-medium text-muted-foreground">Retry from</dt><dd>{failure.retryFrom ?? "Current execution"}</dd></div>
+        {failure.duplicateSideEffectRisk ? <div className="sm:col-span-2"><dt className="font-medium text-muted-foreground">Before retrying</dt><dd>{failure.duplicateSideEffectRisk}</dd></div> : null}
+      </dl>
+      {failure.technicalDetail ? (
+        <details className="mt-3">
+          <summary className="cursor-pointer text-xs font-medium text-muted-foreground">Diagnostics</summary>
+          <div className="mt-2 rounded-lg bg-muted/60 p-2 font-mono text-xs text-muted-foreground">
+            {failure.technicalDetail}{failure.diagnosticRef ? ` · ${failure.diagnosticRef}` : ""}
+          </div>
+        </details>
+      ) : null}
+    </div>
+  );
+}
+
 export function TaskWorkspaceOperationPanel({
   taskId,
   state,
+  workState,
   copy,
   onGeneratePlan,
   onStartPlan,
+  onRestartPlan,
   onTaskPrimaryAction,
   revisionPanel,
 }: TaskWorkspaceOperationPanelProps) {
@@ -105,17 +162,36 @@ export function TaskWorkspaceOperationPanel({
             <Button type="button" disabled>{copy.generating ?? "Generating..."}</Button>
           ) : null}
           {state.status === "plan-ready-to-run" ? (
-            <Button type="button" onClick={onStartPlan}>{copy.startPlanAction ?? "Start plan"}</Button>
-          ) : null}
-          {state.status === "task-action" ? (
-            <Button type="button" variant={state.tone === "critical" ? "destructive" : "default"} onClick={onTaskPrimaryAction} disabled={!onTaskPrimaryAction}>
-              {state.taskPrimaryAction.label}
-            </Button>
+            <>
+              {state.hasGraphExecutionStarted ? (
+                <Button type="button" variant="outline" onClick={onRestartPlan} disabled={!onRestartPlan}>{copy.restartPlanAction ?? "Restart from beginning"}</Button>
+              ) : null}
+              <Button type="button" onClick={onStartPlan}>{state.hasGraphExecutionStarted ? (copy.continuePlanAction ?? "Continue plan") : (copy.startPlanAction ?? "Start plan")}</Button>
+            </>
           ) : null}
         </div>
       </CardHeader>
       <CardContent className="space-y-3 px-3">
+        <DecisionRecoveryCard workState={workState} />
         <ProviderApprovalBanner taskId={taskId} />
+        {state.status === "task-action" ? (
+          <div className="flex flex-col gap-2 rounded-xl border border-destructive/25 bg-background/80 px-3 py-2 shadow-sm sm:flex-row sm:items-center sm:justify-between" data-testid="current-operation-primary-action">
+            <div className="min-w-0 text-xs">
+              <p className="font-semibold text-destructive">{workState.state === "failed" || state.statusLabel === "run_failed" ? "Failed" : workState.label}</p>
+              <p className="mt-0.5 line-clamp-2 text-muted-foreground">{state.description}</p>
+            </div>
+            <Button
+              type="button"
+              variant={taskActionButtonVariant(state)}
+              size="sm"
+              className="shrink-0 self-start rounded-xl px-4 shadow-sm sm:self-center"
+              onClick={onTaskPrimaryAction}
+              disabled={!onTaskPrimaryAction}
+            >
+              {taskActionButtonLabel(state)}
+            </Button>
+          </div>
+        ) : null}
         {state.status === "plan-review" ? revisionPanel : null}
         {state.status === "execution-action" || state.status === "execution-blocked" ? (
           <SpecRenderer spec={state.operationSpec} handlers={state.actionHandlers} onStateChange={state.onActionStateChange} />

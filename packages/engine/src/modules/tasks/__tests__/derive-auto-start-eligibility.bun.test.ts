@@ -102,7 +102,7 @@ describe("deriveAutoStartEligibility", () => {
         now,
         activeRun: null,
       });
-      expect(result).toEqual({ ok: false, reason: "not_scheduled" });
+      expect(result).toMatchObject({ ok: false, reason: "not_scheduled" });
     });
 
     it("rejects tasks with a work block that has no start time", () => {
@@ -112,7 +112,7 @@ describe("deriveAutoStartEligibility", () => {
         now,
         activeRun: null,
       });
-      expect(result).toEqual({ ok: false, reason: "not_due" });
+      expect(result).toMatchObject({ ok: false, reason: "not_due" });
     });
   });
 
@@ -124,7 +124,7 @@ describe("deriveAutoStartEligibility", () => {
         now,
         activeRun: null,
       });
-      expect(result).toEqual({ ok: false, reason: "not_due" });
+      expect(result).toMatchObject({ ok: false, reason: "not_due" });
     });
 
     it("rejects tasks with future scheduledStartAt", () => {
@@ -134,7 +134,7 @@ describe("deriveAutoStartEligibility", () => {
         now,
         activeRun: null,
       });
-      expect(result).toEqual({ ok: false, reason: "not_due" });
+      expect(result).toMatchObject({ ok: false, reason: "not_due" });
     });
   });
 
@@ -146,7 +146,7 @@ describe("deriveAutoStartEligibility", () => {
         now,
         activeRun: makeRun({ status: "Pending" }),
       });
-      expect(result).toEqual({ ok: false, reason: "already_running" });
+      expect(result).toMatchObject({ ok: false, reason: "already_running" });
     });
 
     it("rejects tasks with an active Running run", () => {
@@ -156,7 +156,7 @@ describe("deriveAutoStartEligibility", () => {
         now,
         activeRun: makeRun({ status: "Running" }),
       });
-      expect(result).toEqual({ ok: false, reason: "already_running" });
+      expect(result).toMatchObject({ ok: false, reason: "already_running" });
     });
 
     it("rejects tasks with an active WaitingForInput run", () => {
@@ -166,7 +166,7 @@ describe("deriveAutoStartEligibility", () => {
         now,
         activeRun: makeRun({ status: "WaitingForInput" }),
       });
-      expect(result).toEqual({ ok: false, reason: "already_running" });
+      expect(result).toMatchObject({ ok: false, reason: "already_running" });
     });
 
     it("rejects tasks with an active WaitingForApproval run", () => {
@@ -176,7 +176,7 @@ describe("deriveAutoStartEligibility", () => {
         now,
         activeRun: makeRun({ status: "WaitingForApproval" }),
       });
-      expect(result).toEqual({ ok: false, reason: "already_running" });
+      expect(result).toMatchObject({ ok: false, reason: "already_running" });
     });
   });
 
@@ -188,7 +188,7 @@ describe("deriveAutoStartEligibility", () => {
         now,
         activeRun: null,
       });
-      expect(result).toEqual({ ok: false, reason: "invalid_task_status" });
+      expect(result).toMatchObject({ ok: false, reason: "invalid_task_status" });
     });
 
     it("rejects tasks with Blocked status", () => {
@@ -198,7 +198,7 @@ describe("deriveAutoStartEligibility", () => {
         now,
         activeRun: null,
       });
-      expect(result).toEqual({ ok: false, reason: "invalid_task_status" });
+      expect(result).toMatchObject({ ok: false, reason: "invalid_task_status" });
     });
   });
 
@@ -210,7 +210,7 @@ describe("deriveAutoStartEligibility", () => {
         now,
         activeRun: null,
       });
-      expect(result).toEqual({ ok: false, reason: "no_runtime_config" });
+      expect(result).toMatchObject({ ok: false, reason: "no_runtime_config" });
     });
   });
 
@@ -222,7 +222,7 @@ describe("deriveAutoStartEligibility", () => {
         now,
         activeRun: null,
       });
-      expect(result).toEqual({ ok: false, reason: "no_accepted_plan" });
+      expect(result).toMatchObject({ ok: false, reason: "no_accepted_plan" });
     });
   });
 });

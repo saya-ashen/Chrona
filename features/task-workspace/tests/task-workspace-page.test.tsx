@@ -579,6 +579,27 @@ describe("TaskWorkspacePage", () => {
     expect(screen.getByText("primary-action:Start")).toBeInTheDocument();
   });
 
+  it("does not expose Stop as the header primary action for blocked failed executions", () => {
+    const fixture = createTaskWorkspaceUiFixture("failed");
+    mocks.plan = { id: "plan-failed", status: "accepted" };
+    mocks.graphPlan = fixture.graphPlan;
+    mocks.executionState = {
+      "/execution/can-start": false,
+      "/execution/can-pause": false,
+      "/execution/can-stop": false,
+      "/execution/show-accept-plan": false,
+      "/execution/show-generate-plan": false,
+      "/execution/start-disabled": false,
+      "/execution/start-disabled-reason": null,
+      "/execution/status": "failed",
+    };
+
+    render(<TaskWorkspacePage data={fixture.pageData} />);
+
+    expect(screen.getByText("primary-action:none")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Stop" })).not.toBeInTheDocument();
+  });
+
   it("keeps long mobile fixture content visible without dropping workspace regions", () => {
     const fixture = taskWorkspaceStateFixtures.longContentMobile;
     mocks.plan = { id: "plan-1", status: "accepted" };

@@ -1,33 +1,25 @@
-import type { WorkItemStateView } from "@chrona/domain";
+import type { WorkStateView } from "@chrona/domain";
 import type { DashboardAiBriefState } from "@chrona/engine";
 
-export type DashboardNextStep =
-  | "approve_or_edit"
-  | "resolve_block"
-  | "provide_input"
-  | "await_completion"
-  | "start_execution"
-  | "reschedule"
-  | "review_result";
-
 export type DashboardAttentionKind =
-  | "approval"
-  | "input"
-  | "blocked"
-  | "failed"
-  | "schedule_risk";
+  "approval" | "input" | "blocked" | "failed" | "schedule_risk";
 
-export type DashboardCompletionCategory = "report" | "research" | "code" | "automation";
+export type DashboardCompletionCategory =
+  "report" | "research" | "code" | "automation";
 
-export type DashboardOutput = { id: string; title: string; type: string; taskId: string };
+export type DashboardOutput = {
+  id: string;
+  title: string;
+  type: string;
+  taskId: string;
+};
 
 type OutputRef = DashboardOutput | null;
 
 export interface DashboardTaskItem {
   taskId: string;
   title: string;
-  status: string;
-  stateView: WorkItemStateView;
+  stateView: WorkStateView;
   priority: string;
   scheduleStatus: string | null;
   scheduledStartAt: string | null;
@@ -35,7 +27,6 @@ export interface DashboardTaskItem {
   dueAt: string | null;
   reason: string | null;
   stage: string | null;
-  nextStep: DashboardNextStep;
   latestOutput: OutputRef;
   updatedAt: string | null;
 }
@@ -45,12 +36,10 @@ export type DashboardFocusTask = DashboardTaskItem;
 export interface DashboardAttentionItem {
   taskId: string;
   title: string;
-  status: string;
-  stateView: WorkItemStateView;
+  stateView: WorkStateView;
   priority: string;
   kind: DashboardAttentionKind;
   reason: string | null;
-  nextStep: DashboardNextStep;
   latestOutput: OutputRef;
   updatedAt: string | null;
 }
@@ -58,11 +47,9 @@ export interface DashboardAttentionItem {
 export interface DashboardInProgressItem {
   taskId: string;
   title: string;
-  status: string;
-  stateView: WorkItemStateView;
+  stateView: WorkStateView;
   latestRunStatus: string | null;
   stage: string | null;
-  nextStep: DashboardNextStep;
   latestOutput: OutputRef;
   updatedAt: string | null;
 }

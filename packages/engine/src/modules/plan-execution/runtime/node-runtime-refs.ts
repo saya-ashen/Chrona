@@ -12,6 +12,17 @@ import type {
 } from "@chrona/contracts/ai";
 import { ENGINE_ERROR_CODES, EngineError } from "../../../errors";
 
+export type NodeRuntimePlanContext = NodeRuntimeInput["context"]["plan"];
+export type NodeRuntimeRunContext = NonNullable<NodeRuntimeInput["context"]["run"]>;
+
+function defaultPlanContext(): NodeRuntimePlanContext {
+  return {
+    title: "Untitled plan",
+    goal: "Execute the accepted plan.",
+    assumptions: [],
+  };
+}
+
 const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
 function dateToken(input: string | undefined): string {
@@ -141,6 +152,8 @@ function compactPreviousResults(input: {
   history: SemanticRefHistory;
   node: EffectivePlanNode;
   planOutput?: PlanOutputState | RuntimeVisiblePlanOutput;
+  planContext?: NodeRuntimePlanContext;
+  runContext?: NodeRuntimeRunContext;
 }): NodeRuntimeInput["context"] {
   const directDependencyIds = dependencyIds(input.node);
   const completed = input.plan.nodes.filter((node) => node.status === "completed" || node.status === "skipped");
@@ -160,6 +173,8 @@ function compactPreviousResults(input: {
     .filter((item) => item.trim().length > 0);
 
   return {
+    plan: input.planContext ?? defaultPlanContext(),
+    ...(input.runContext ? { run: input.runContext } : {}),
     relevantPreviousResults: directDependencies,
     ...(globalItems.length > 0
       ? { globalSummary: globalItems.slice(0, 3).join("; ") + (globalItems.length > 3 ? `; +${globalItems.length - 3} more` : "") }
@@ -270,6 +285,8 @@ export function buildNodeRuntimeInput(input: {
   plan: EffectivePlanGraph;
   node: EffectivePlanNode;
   planOutput?: PlanOutputState | RuntimeVisiblePlanOutput;
+  planContext?: NodeRuntimePlanContext;
+  runContext?: NodeRuntimeRunContext;
 }): NodeRuntimeInput {
   const history = buildSemanticRefHistory(input.plan);
   const currentRef = refForNode(history, input.node.id);
@@ -285,7 +302,7 @@ export function buildNodeRuntimeInput(input: {
 
   return {
     node: runtimeNode(input.node, currentRef.ref),
-    context: compactPreviousResults({ plan: input.plan, history, node: input.node, planOutput: input.planOutput }),
+    context: compactPreviousResults({ plan: input.plan, history, node: input.node, planOutput: input.planOutput, planContext: input.planContext, runContext: input.runContext }),
     branchOptions,
   };
 }

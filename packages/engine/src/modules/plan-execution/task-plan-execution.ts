@@ -125,6 +125,11 @@ function commandForExecutionAction(
         command: { type: "start", trigger: "manual", prompt: action.prompt },
         context: { ...context, trigger: "manual" },
       };
+    case "restart_from_beginning":
+      return {
+        command: { type: "restart_from_beginning", trigger: "manual", prompt: action.prompt },
+        context: { ...context, trigger: "manual" },
+      };
     case "start_scheduled":
       return {
         command: { type: "start", trigger: "scheduler" },

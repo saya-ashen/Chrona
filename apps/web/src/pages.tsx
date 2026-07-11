@@ -15,7 +15,7 @@ import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from "@/comp
 import { Separator } from "@/components/ui/separator";
 import type { getDictionary, Locale } from "@chrona/i18n";
 import { localizeHref, resolveLocale } from "@chrona/i18n";
-import type { WorkItemStateView } from "@chrona/domain";
+import type { WorkStateView } from "@chrona/domain";
 
 import type { TaskPageData } from "../../../features/task-workspace";
 export type Dictionary = Awaited<ReturnType<typeof getDictionary>>;
@@ -65,8 +65,18 @@ export type TaskListRouteData = {
     projection: {
       runStatus: string | null;
       isRunnable: boolean;
+      latestArtifactTitle?: string | null;
+      latestRunStatus?: string | null;
     } | null;
-    stateView: WorkItemStateView;
+    result?: {
+      runId: string | null;
+      runStatus: string | null;
+      provider: string | null;
+      occurrenceId: string | null;
+      executedAt: string | null;
+      artifact: { id: string; title: string; type: string; uri: string; runId: string; createdAt: string } | null;
+    } | null;
+    stateView: WorkStateView;
     source: {
       source: "external_calendar";
       sourceName: string;

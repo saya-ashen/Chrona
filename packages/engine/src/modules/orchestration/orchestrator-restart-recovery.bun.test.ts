@@ -297,6 +297,71 @@ describe("runRestartRecoveryWorker", () => {
     expect(guarded.status).toBe("Active");
   });
 
+  for (const liveStatus of ["WaitingForInput", "WaitingForApproval"] as const) {
+    it(`preserves ${liveStatus} across restart recovery`, async () => {
+      const workspace = await db.workspace.create({
+        data: { name: `Restart ${liveStatus}`, status: "Active", defaultRuntime: "hermes" },
+      });
+      const task = await db.task.create({
+        data: {
+          workspaceId: workspace.id,
+          title: `Task ${liveStatus}`,
+          status: "Running",
+          priority: "High",
+          executionRuntime: "hermes",
+          executionConfig: { prompt: "Wait" },
+        },
+      });
+      const session = await db.executionSession.create({
+        data: { workspaceId: workspace.id, taskId: task.id, status: "Active", planId: "plan_wait" },
+      });
+      await db.taskPlan.create({
+        data: {
+          workspaceId: workspace.id,
+          taskId: task.id,
+          planId: "plan_wait",
+          revision: 1,
+          status: "Accepted",
+          compiledPlan: {},
+        },
+      });
+      await db.taskPlanRun.create({
+        data: {
+          workspaceId: workspace.id,
+          taskId: task.id,
+          planId: "plan_wait",
+          planRun: {},
+          executionOwnerId: "previous-process",
+          executionEpoch: 1,
+        },
+      });
+      await db.run.create({
+        data: {
+          taskId: task.id,
+          runtimeName: "hermes",
+          runtimeRunRef: `runtime_${liveStatus}`,
+          status: liveStatus,
+          triggeredBy: "scheduler",
+          syncStatus: "synced",
+          retryable: false,
+        },
+      });
+
+      const result = await runRestartRecoveryWorker({
+        deps: {
+          reconcileStaleRuntimeRuns: async () => ({ checked: 0, synced: 0, leftRunning: 0, skipped: 0 }),
+        },
+      });
+
+      expect(result.abandonedSessionCount).toBe(0);
+      expect(await db.executionSession.findUniqueOrThrow({ where: { id: session.id } })).toMatchObject({
+        status: "Active",
+        pauseReason: null,
+      });
+      expect(await db.run.count({ where: { taskId: task.id } })).toBe(1);
+    });
+  }
+
   it("skips recovery records whose task was deleted", async () => {
     const workspace = await db.workspace.create({
       data: { name: "Orphaned Recovery Worker", status: "Active", defaultRuntime: "hermes" },

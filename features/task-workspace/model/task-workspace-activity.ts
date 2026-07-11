@@ -345,6 +345,17 @@ export function runtimeEventToWorkspaceActivity(event: WorkspaceRuntimeEvent, in
     };
   }
 
+  if (value.type === "raw_event" && value.message) {
+    return {
+      ...base,
+      kind: "provider_run",
+      title: "Task progress",
+      summary: value.message,
+      description: value.message,
+      tone: "info",
+    };
+  }
+
   if (value.type === "raw_event" && (event.provider || event.runtimeName || event.nodeTitle)) {
     return null;
   }

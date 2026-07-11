@@ -36,7 +36,7 @@ import {
 import { TaskActionsMenu, type TaskActionsMenuItem } from "@/components/tasks/shared";
 import { deleteTask, markTaskDone, reopenTask, startExecution } from "@/lib/task-actions-client";
 import type { Dictionary } from "@/pages";
-import type { WorkItemStateView } from "@chrona/domain";
+import type { WorkStateView } from "@chrona/domain";
 
 type TaskItem = {
   id: string;
@@ -54,8 +54,18 @@ type TaskItem = {
   projection: {
     runStatus: string | null;
     isRunnable: boolean;
+    latestArtifactTitle?: string | null;
+    latestRunStatus?: string | null;
   } | null;
-  stateView: WorkItemStateView;
+  result?: {
+    runId: string | null;
+    runStatus: string | null;
+    provider: string | null;
+    occurrenceId: string | null;
+    executedAt: string | null;
+    artifact: { id: string; title: string; type: string; uri: string; runId: string; createdAt: string } | null;
+  } | null;
+  stateView: WorkStateView;
   source: {
     source: "external_calendar";
     sourceName: string;
@@ -104,11 +114,11 @@ function isFilterKey(value: string | null): value is FilterKey {
   return value !== null && FILTERS.some((f) => f.key === value);
 }
 
-function statusTone(stateView: WorkItemStateView) {
-  if (stateView.severity === "success") return "success" as const;
-  if (stateView.severity === "info") return "info" as const;
-  if (stateView.severity === "warning") return "warning" as const;
-  if (stateView.severity === "danger") return "destructive" as const;
+function statusTone(stateView: WorkStateView) {
+  if (stateView.tone === "success") return "success" as const;
+  if (stateView.tone === "info") return "info" as const;
+  if (stateView.tone === "warning") return "warning" as const;
+  if (stateView.tone === "danger") return "destructive" as const;
   return "outline" as const;
 }
 
@@ -139,10 +149,10 @@ function toPreviewText(value: string): string {
 }
 
 function taskAccentClass(task: TaskItem): string {
-  if (task.stateView.severity === "danger") return "from-destructive to-destructive/60";
-  if (task.stateView.severity === "warning") return "from-warning to-warning/60";
-  if (task.stateView.state === "running") return "from-info to-info/60";
-  if (task.stateView.severity === "success") return "from-success to-success/60";
+  if (task.stateView.tone === "danger") return "from-destructive to-destructive/60";
+  if (task.stateView.tone === "warning") return "from-warning to-warning/60";
+  if (task.stateView.tone === "info") return "from-info to-info/60";
+  if (task.stateView.tone === "success") return "from-success to-success/60";
   return "from-primary to-primary/60";
 }
 
@@ -166,15 +176,15 @@ function filterLabel(filter: FilterKey, copy: TaskListCopy): string {
 }
 
 function canStartTask(task: TaskItem): boolean {
-  return task.stateView.primaryAction === "start_execution";
+  return task.stateView.primaryActionId === "start_execution";
 }
 
 function canCompleteTask(task: TaskItem): boolean {
-  return !["completed", "cancelled"].includes(task.stateView.state);
+  return !["result_ready", "done", "cancelled"].includes(task.stateView.state);
 }
 
 function canReopenTask(task: TaskItem): boolean {
-  return ["completed", "cancelled"].includes(task.stateView.state);
+  return ["done", "cancelled"].includes(task.stateView.state);
 }
 
 function TaskListHero({ title, copy, activeFilterLabel, counts }: { title: string; copy: TaskListCopy; activeFilterLabel: string; counts: TaskCounts }) {
@@ -194,6 +204,7 @@ function TaskListHero({ title, copy, activeFilterLabel, counts }: { title: strin
         <TaskStat label={copy.statNeeds} value={counts.needsMe} className="text-warning-foreground" />
         <TaskStat label={copy.statReady} value={counts.ready} className="text-info" />
       </div>
+      <p className="basis-full text-[11px] text-muted-foreground">Needs you: input, approval, or review required · Ready: can start now · Running: active execution · Failed: execution stopped and needs recovery</p>
     </div>
   );
 }
@@ -321,9 +332,7 @@ function TaskRow({
                 {task.source.sourceName}
               </Badge>
             )}
-            {task.projection?.runStatus && task.projection.runStatus !== "idle" && (
-              <Badge variant="secondary">{task.projection.runStatus}</Badge>
-            )}
+            <Badge variant="outline">{task.stateView.nextActionLabel}</Badge>
           </div>
           {task.description && <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">{toPreviewText(task.description)}</p>}
           <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
@@ -359,6 +368,21 @@ export function TaskListPage({ tasks, workspaceId: _workspaceId, copy, total, pa
   const [isPending, setIsPending] = useState(false);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
   const navigate = useNavigate();
+  const view = searchParams.get("view") === "results" ? "results" : "tasks";
+  const resultDate = searchParams.get("resultDate") ?? "all";
+  const resultStatus = searchParams.get("resultStatus") ?? "all";
+  const resultSource = searchParams.get("resultSource") ?? "all";
+  const resultCutoff = resultDate === "7d" ? Date.now() - 7 * 86400000 : resultDate === "30d" ? Date.now() - 30 * 86400000 : null;
+  const resultCandidates = view === "results"
+    ? tasks.filter((task) => (
+        (task.stateView.state === "result_ready" || task.stateView.state === "done" || Boolean(task.result)) &&
+        (resultStatus === "all" || (resultStatus === "needs-review" ? task.stateView.state === "result_ready" : task.stateView.state === "done")) &&
+        (resultSource === "all" || task.id === resultSource)
+      ))
+    : tasks;
+  const visibleTasks = resultCutoff === null
+    ? resultCandidates
+    : resultCandidates.filter((task) => new Date(task.result?.executedAt ?? task.updatedAt).getTime() >= resultCutoff);
   const taskCopy = copy.pages.tasks;
 
   const filterParam = searchParams.get("filter");
@@ -475,12 +499,33 @@ export function TaskListPage({ tasks, workspaceId: _workspaceId, copy, total, pa
   }
 
   return (
-    <div className="relative flex h-full min-h-0 min-w-0 flex-col overflow-x-hidden overflow-y-auto rounded-3xl border border-border/60 bg-card/60 p-2 shadow-sm sm:p-3">
-      <div className="flex min-h-0 flex-1 flex-col gap-3 rounded-2xl bg-gradient-to-br from-muted/40 to-primary-soft/30 p-3 sm:p-4">
+    <div className="relative flex h-full min-h-0 min-w-0 flex-col overflow-x-hidden overflow-y-auto rounded-[2rem] border border-border bg-surface-soft/80 p-3 sm:p-4">
+      <div className="flex min-h-0 flex-1 flex-col gap-3 rounded-[1.75rem] bg-card p-3 sm:p-4">
         <TaskListHero title={copy.nav.tasks} copy={taskCopy} activeFilterLabel={activeFilterLabel} counts={counts} />
         <TaskFilterBar filter={filter} counts={counts} copy={taskCopy} onFilterChange={setFilter} />
+        <div className="flex w-fit gap-1 rounded-xl border border-border/70 bg-background p-1" role="group" aria-label="Tasks view">
+          <Button type="button" size="sm" variant={view === "tasks" ? "default" : "ghost"} onClick={() => setParam("view", "")}>Work</Button>
+          <Button type="button" size="sm" variant={view === "results" ? "default" : "ghost"} onClick={() => setParam("view", "results")}>Results</Button>
+        </div>
+        {view === "results" ? (
+          <Select value={resultDate} onValueChange={(value) => setParam("resultDate", value === "all" ? "" : value)}>
+            <SelectTrigger size="sm" className="w-40" aria-label="Result date"><SelectValue /></SelectTrigger>
+            <SelectContent><SelectItem value="all">Any date</SelectItem><SelectItem value="7d">Last 7 days</SelectItem><SelectItem value="30d">Last 30 days</SelectItem></SelectContent>
+          <Select value={resultStatus} onValueChange={(value) => setParam("resultStatus", value === "all" ? "" : value)}>
+            <SelectTrigger size="sm" className="w-40" aria-label="Result status"><SelectValue /></SelectTrigger>
+            <SelectContent><SelectItem value="all">Any status</SelectItem><SelectItem value="accepted">Accepted</SelectItem><SelectItem value="needs-review">Needs review</SelectItem></SelectContent>
+          </Select>
+          <Select value={resultSource} onValueChange={(value) => setParam("resultSource", value === "all" ? "" : value)}>
+            <SelectTrigger size="sm" className="w-48" aria-label="Source task"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Any source task</SelectItem>
+              {tasks.filter((task) => task.result).map((task) => <SelectItem key={task.id} value={task.id}>{task.title}</SelectItem>)}
+            </SelectContent>
+          </Select>
+          </Select>
+        ) : null}
 
-        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-border/70 bg-card px-3 py-2 shadow-xs">
+        <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-border bg-background px-3 py-2">
           <form
             className="relative flex min-w-[12rem] flex-1 items-center"
             onSubmit={(event) => {
@@ -554,7 +599,7 @@ export function TaskListPage({ tasks, workspaceId: _workspaceId, copy, total, pa
           </Button>
         </div>
         {hasSelection || actionMessage ? (
-          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border/70 bg-card px-3 py-2 text-xs shadow-xs">
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-border bg-background px-3 py-2 text-xs">
             <label className="flex items-center gap-2 font-medium text-foreground">
               <Checkbox
                 aria-label={taskCopy.selectVisible}
@@ -591,29 +636,36 @@ export function TaskListPage({ tasks, workspaceId: _workspaceId, copy, total, pa
           </div>
         ) : null}
 
-        {tasks.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-border/70 bg-card/60 p-10 text-center text-sm text-muted-foreground shadow-xs">
+        {visibleTasks.length === 0 ? (
+          <div className="rounded-3xl border border-dashed border-border bg-background/70 p-10 text-center text-sm text-muted-foreground">
             {taskCopy.emptyFiltered}
           </div>
         ) : (
           <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
-            {tasks.map((task) => (
-              <TaskRow
-                key={task.id}
-                task={task}
-                copy={taskCopy}
-                checked={selectedIds.has(task.id)}
-                isPending={isPending}
-                onToggleSelected={updateSelection}
-                onAction={(action, actionTask) => void runTaskAction(action, actionTask)}
-                onDelete={(deleteTaskItem) => setPendingDelete({ kind: "single", task: deleteTaskItem })}
-              />
+            {visibleTasks.map((task) => view === "results" ? (
+              <div key={task.id} className="rounded-2xl border border-border/70 bg-card p-4 shadow-xs">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0 space-y-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="font-semibold text-foreground">{task.result?.artifact?.title ?? task.title}</h3>
+                      <Badge variant={task.stateView.state === "result_ready" ? "warning" : "success"}>{task.stateView.state === "result_ready" ? "Needs review" : "Accepted"}</Badge>
+                      {task.result?.artifact ? <Badge variant="outline">{task.result.artifact.type}</Badge> : null}
+                      {task.result?.occurrenceId ? <Badge variant="outline">Occurrence {task.result.occurrenceId}</Badge> : null}
+                    </div>
+                    <p className="text-xs text-muted-foreground">Source task: {task.title}{task.result?.executedAt ? ` · Executed ${new Date(task.result.executedAt).toLocaleString()}` : ` · Updated ${formatRelativeTime(task.updatedAt, taskCopy)}`}{task.result?.provider ? ` · AI ${task.result.provider}` : ""}{task.result?.runId ? ` · Run ${task.result.runId}` : ""}</p>
+                    {!task.result?.artifact ? <p className="text-xs text-warning-foreground">The run has no saved artifact. Open the task to inspect its output and recovery options.</p> : null}
+                  </div>
+                  <Button asChild size="sm"><LocalizedLink href={`/tasks/${task.id}`}>Open result</LocalizedLink></Button>
+                </div>
+              </div>
+            ) : (
+              <TaskRow key={task.id} task={task} copy={taskCopy} checked={selectedIds.has(task.id)} isPending={isPending} onToggleSelected={updateSelection} onAction={(action, actionTask) => void runTaskAction(action, actionTask)} onDelete={(deleteTaskItem) => setPendingDelete({ kind: "single", task: deleteTaskItem })} />
             ))}
           </div>
         )}
 
         {showPagination ? (
-          <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border/70 bg-card px-3 py-2 text-xs shadow-xs">
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-border bg-background px-3 py-2 text-xs">
             <div className="flex items-center gap-3 text-muted-foreground">
               <span>{taskCopy.paginationRange.replace("{start}", String(rangeStart)).replace("{end}", String(rangeEnd)).replace("{total}", String(total))}</span>
               <Select value={String(pageSize)} onValueChange={(value) => setParam("pageSize", value)}>

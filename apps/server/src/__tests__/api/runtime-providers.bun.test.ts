@@ -39,6 +39,15 @@ describe("GET /api/runtime/providers", () => {
     expect(codex?.label).toBe("Codex");
   });
 
+  it("exposes Oh My Pi runtime with a human label", async () => {
+    const res = await app().request("http://local/api/runtime/providers");
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as { providers: Array<{ key: string; label: string }> };
+    const omp = body.providers.find((p) => p.key === "omp");
+    expect(omp).toBeDefined();
+    expect(omp?.label).toBe("Oh My Pi");
+  });
+
   it("hides the debug provider when no env flag is set", async () => {
     const previous = process.env.CHRONA_ENABLE_DEBUG_PROVIDER;
     delete process.env.CHRONA_ENABLE_DEBUG_PROVIDER;

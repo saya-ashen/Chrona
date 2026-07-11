@@ -1,6 +1,6 @@
 import { ApprovalStatus, RunStatus, ScheduleProposalStatus, TaskStatus } from "@/generated/prisma/client";
 import type { ActionCenterProjection } from "@chrona/contracts/api";
-import { hasTerminalAuthoritativeTaskState } from "@chrona/domain";
+import { deriveWorkStateView } from "@chrona/domain";
 import { db } from "@/lib/db";
 
 
@@ -283,6 +283,23 @@ export async function getActionCenter(workspaceId: string): Promise<ActionCenter
     sortAt: proposal.createdAt,
   }));
 
+function runWorkState(run: { status: RunStatus; pendingInputPrompt: string | null; retryable: boolean }, task: { status: TaskStatus; title: string }) {
+  const executionStatus = run.status === RunStatus.WaitingForInput
+    ? "waiting_for_user"
+    : run.status === RunStatus.Failed
+      ? "failed"
+      : run.status === RunStatus.Cancelled
+        ? "cancelled"
+        : String(run.status).toLowerCase();
+  return deriveWorkStateView({
+    taskStatus: task.status,
+    executionStatus,
+    blockReason: run.status === RunStatus.Failed
+      ? { blockType: "run_failed", detail: run.pendingInputPrompt ?? "The latest run failed.", scope: "run" }
+      : null,
+  });
+}
+
   const runItems = latestRuns
     .map((run) => {
       const task = taskByLatestRunId.get(run.id);
@@ -291,30 +308,31 @@ export async function getActionCenter(workspaceId: string): Promise<ActionCenter
         return null;
       }
 
-      const taskStateIsTerminal = hasTerminalAuthoritativeTaskState({
-        taskStatus: task.status,
-        persistedStatus: task.projection?.persistedStatus,
-        displayState: task.projection?.displayState,
-      });
+      const taskState = deriveWorkStateView({
+        taskStatus: task.projection?.persistedStatus ?? task.status,
+        executionStatus: task.projection?.displayState,
+      }).state;
+      const taskStateIsTerminal = taskState === "done" || taskState === "result_ready" || taskState === "cancelled";
       const isOwnCancellationRecovery = task.status === TaskStatus.Cancelled && run.status === RunStatus.Cancelled;
 
       if (taskStateIsTerminal && !isOwnCancellationRecovery) {
         return null;
       }
 
+      const workState = runWorkState(run, task);
       if (run.status === RunStatus.WaitingForInput) {
         return {
           id: run.id,
           kind: "input" as const,
-          actionType: "Input requested",
+          actionType: workState.label,
           riskLevel: "medium",
           sourceTaskTitle: task.title,
           sourceTaskId: task.id,
           workspaceId: task.workspaceId,
           currentRunLabel: run.runtimeRunRef ?? run.id,
           detail: "Operator reply required",
-          summary: run.pendingInputPrompt ?? "The agent is waiting for guidance before it can continue.",
-          consequence: "Execution stays paused until an operator replies from the workbench.",
+          summary: run.pendingInputPrompt ?? workState.nextActionLabel,
+          consequence: workState.nextActionLabel,
           sortAt: run.updatedAt,
         };
       }
@@ -322,18 +340,15 @@ export async function getActionCenter(workspaceId: string): Promise<ActionCenter
       return {
         id: run.id,
         kind: "recovery" as const,
-        actionType: "Recovery needed",
+        actionType: workState.label,
         riskLevel: run.status === RunStatus.Failed ? "critical" : run.retryable ? "high" : "medium",
         sourceTaskTitle: task.title,
         sourceTaskId: task.id,
         workspaceId: task.workspaceId,
         currentRunLabel: run.runtimeRunRef ?? run.id,
         detail: `Latest run ${run.status}`,
-        summary:
-          run.status === RunStatus.Failed
-            ? "The latest run stopped before finishing and needs an operator recovery prompt."
-            : "The latest run was cancelled and needs operator review before restarting.",
-        consequence: "Execution will not resume until someone restarts or recovers the run from the workbench.",
+        summary: workState.blocker?.reason ?? (run.status === RunStatus.Failed ? "The latest run stopped before finishing." : "The latest run was cancelled."),
+        consequence: workState.nextActionLabel,
         sortAt: run.updatedAt,
       };
     })

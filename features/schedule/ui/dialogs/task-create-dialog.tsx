@@ -2,6 +2,7 @@
 
 import { CalendarIcon, Check, Loader2, Sparkles, Wrench, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -17,7 +18,6 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import {
   Select,
   SelectContent,
-  SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -29,6 +29,7 @@ import { useI18n } from "@chrona/i18n/react";
 import { useScheduleAiPreferences } from "@/lib/schedule-ai-preferences";
 import { AUTOMATION_TIMING_PRESETS, normalizeAutomationTiming } from "@chrona/contracts";
 import type { AutomationTimingPreset } from "@chrona/contracts";
+import { deriveAutomationPolicyPreview } from "@chrona/domain";
 import {
   TaskConfigSection,
   TaskConfigField,
@@ -57,6 +58,13 @@ const DEFAULT_DIALOG_COPY = {
   titleLabel: "Title",
   aiSuggestions: "AI Suggestions",
   generatingSuggestions: "Generating suggestions...",
+  mode: "How should Chrona help?",
+  modeTodo: "Save as task",
+  modeTodoDescription: "Capture it now. Plan and run manually later.",
+  modePlan: "Help me plan",
+  modePlanDescription: "Generate a plan, then wait for your approval.",
+  modeAutomatic: "Run on a schedule",
+  modeAutomaticDescription: "Generate, approve, and run at the scheduled time.",
   date: "Date",
   startTime: "Start time",
   endTime: "End time",
@@ -86,6 +94,16 @@ const DEFAULT_DIALOG_COPY = {
   aiProvider: "AI provider",
   defaultAiProvider: "Default provider",
   aiProviderHint: "Override provider for this task.",
+  automationPreview: "What Chrona will do",
+  automationReady: "Ready",
+  automationPlan: "Plan",
+  automationExecution: "Execution",
+  automationProvider: "AI",
+  automationRecovery: "Reliability",
+  manualPlanSummary: "You will create and approve the plan manually.",
+  automaticPlanSummary: "Chrona will generate a plan automatically, then wait for your approval.",
+  automaticExecutionSummary: "Chrona will generate and accept a valid plan, then execute it at the scheduled time.",
+  defaultProviderSummary: "Use the workspace default AI",
   description: "Description (optional)",
   descriptionPlaceholder: "Add description",
   priority: "Priority",
@@ -103,6 +121,9 @@ const DEFAULT_DIALOG_COPY = {
 type TaskCreateDialogProps = {
   isOpen: boolean;
   initialTitle?: string;
+  initialDescription?: string;
+  initialAutoPlanGenerationEnabled?: boolean;
+  initialAutoExecute?: boolean;
   initialStartAt: Date;
   initialEndAt: Date;
   isPending: boolean;
@@ -130,6 +151,9 @@ type TaskCreateDialogProps = {
 export function TaskCreateDialog({
   isOpen,
   initialTitle = "",
+  initialDescription = "",
+  initialAutoPlanGenerationEnabled,
+  initialAutoExecute,
   initialStartAt,
   initialEndAt,
   isPending,
@@ -153,10 +177,12 @@ export function TaskCreateDialog({
       ...localizedDialogCopy?.priorities,
     },
   };
-  const [description, setDescription] = useState("");
+  const resolvedInitialAutoExecute = initialAutoExecute ?? defaultAutoExecuteEnabled;
+  const resolvedInitialAutoPlanGeneration = initialAutoPlanGenerationEnabled ?? defaultAutoPlanGenerationEnabled;
+  const [description, setDescription] = useState(initialDescription);
   const [priority, setPriority] = useState<"Low" | "Medium" | "High" | "Urgent">("Medium");
-  const [autoExecute, setAutoExecute] = useState(defaultAutoExecuteEnabled);
-  const [autoPlanGenerationEnabled, setAutoPlanGenerationEnabled] = useState(defaultAutoPlanGenerationEnabled);
+  const [autoExecute, setAutoExecute] = useState(resolvedInitialAutoExecute);
+  const [autoPlanGenerationEnabled, setAutoPlanGenerationEnabled] = useState(resolvedInitialAutoPlanGeneration);
   const [autoPlanGenerationTiming, setAutoPlanGenerationTiming] = useState<AutomationTimingPreset>("at_start");
   const [autoExecuteTiming, setAutoExecuteTiming] = useState<AutomationTimingPreset>("at_start");
   const [startDate, setStartDate] = useState("");
@@ -218,10 +244,10 @@ export function TaskCreateDialog({
       setStartTime(formatTime(initialStartAt));
       setEndTime(formatTime(initialEndAt));
       setTitle(initialTitle);
-      setDescription("");
+      setDescription(initialDescription);
       setPriority("Medium");
-      setAutoExecute(defaultAutoExecuteEnabled);
-      setAutoPlanGenerationEnabled(defaultAutoPlanGenerationEnabled);
+      setAutoExecute(resolvedInitialAutoExecute);
+      setAutoPlanGenerationEnabled(resolvedInitialAutoPlanGeneration);
       setAutoPlanGenerationTiming("at_start");
       setAutoExecuteTiming("at_start");
       setRecurrenceMode("daily");
@@ -231,7 +257,7 @@ export function TaskCreateDialog({
       setShowAutoComplete(false);
       suppressRef.current = false;
     }
-  }, [isOpen, initialStartAt, initialEndAt, initialTitle, defaultAutoExecuteEnabled, defaultAutoPlanGenerationEnabled]);
+  }, [isOpen, initialStartAt, initialEndAt, initialTitle, initialDescription, resolvedInitialAutoExecute, resolvedInitialAutoPlanGeneration]);
 
   async function handleSubmit() {
     if (!title.trim()) return;
@@ -296,7 +322,23 @@ export function TaskCreateDialog({
 
   const selectedDate = parseLocalDateInput(startDate);
   const effectiveAutoPlan = autoExecute || autoPlanGenerationEnabled;
+  const creationMode = autoExecute ? "automatic" : autoPlanGenerationEnabled ? "plan" : "todo";
+  function setCreationMode(mode: "todo" | "plan" | "automatic") {
+    setAutoExecute(mode === "automatic");
+    setAutoPlanGenerationEnabled(mode !== "todo");
+  }
 
+  const selectedAiClient = availableAiClients.find((client) => client.id === aiClientId) ?? null;
+  const policyPreview = deriveAutomationPolicyPreview({
+    scheduledStartAt: selectedDate ? new Date(`${startDate}T${startTime || "00:00"}:00`) : null,
+    autoPlanGeneration: effectiveAutoPlan,
+    autoExecute,
+    autoPlanGenerationTiming,
+    autoExecuteTiming,
+    providerId: aiClientId || (availableAiClients.length > 0 ? "workspace-default" : null),
+    providerName: selectedAiClient?.name ?? (availableAiClients.length > 0 ? dialogCopy.defaultAiProvider : null),
+    providerConfigured: selectedAiClient ? selectedAiClient.enabled : availableAiClients.length > 0,
+  });
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent
@@ -453,6 +495,30 @@ export function TaskCreateDialog({
 
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px] xl:items-start">
             <div className="flex flex-col gap-4">
+              <TaskConfigSection title={dialogCopy.mode}>
+                <div className="grid gap-2 sm:grid-cols-3" role="radiogroup" aria-label={dialogCopy.mode}>
+                  {([
+                    ["todo", dialogCopy.modeTodo, dialogCopy.modeTodoDescription],
+                    ["plan", dialogCopy.modePlan, dialogCopy.modePlanDescription],
+                    ["automatic", dialogCopy.modeAutomatic, dialogCopy.modeAutomaticDescription],
+                  ] as const).map(([mode, label, detail]) => (
+                    <Button
+                      key={mode}
+                      type="button"
+                      variant={creationMode === mode ? "default" : "outline"}
+                      className="h-auto min-h-20 flex-col items-start justify-start whitespace-normal p-3 text-left"
+                      role="radio"
+                      aria-checked={creationMode === mode}
+                      disabled={isPending}
+                      onClick={() => setCreationMode(mode)}
+                    >
+                      <span>{label}</span>
+                      <span className={cn("text-xs font-normal", creationMode === mode ? "text-primary-foreground/80" : "text-muted-foreground")}>{detail}</span>
+                    </Button>
+                  ))}
+                </div>
+              </TaskConfigSection>
+
               <TaskConfigSection title={dialogCopy.description}>
                 <Textarea
                   value={description}
@@ -464,6 +530,7 @@ export function TaskCreateDialog({
                 />
               </TaskConfigSection>
 
+              {autoExecute ? (
               <TaskConfigSection title={dialogCopy.date}>
                 <div className="grid gap-3">
                   <Popover>
@@ -509,6 +576,7 @@ export function TaskCreateDialog({
                   </div>
                 </div>
               </TaskConfigSection>
+              ) : null}
             </div>
 
             <div className="flex flex-col gap-4">
@@ -532,6 +600,8 @@ export function TaskCreateDialog({
                 </div>
               </TaskConfigSection>
 
+              {autoExecute ? (
+              <>
               <TaskConfigSection title={dialogCopy.recurrence}>
                 <label className="flex items-start gap-3 cursor-pointer">
                   <Checkbox
@@ -593,90 +663,45 @@ export function TaskCreateDialog({
                   </TaskConfigField>
                 </TaskConfigSection>
               ) : null}
+              </>
+              ) : null}
+              {!autoExecute && autoPlanGenerationEnabled ? (
+                <TaskConfigSection title={dialogCopy.automationPreview}>
+                  <div aria-label={dialogCopy.automationPreview} className="rounded-lg border border-border/70 bg-muted/30 p-3 text-xs leading-5">
+                    <p className="font-semibold text-foreground">{dialogCopy.automaticPlanSummary}</p>
+                    {policyPreview.disabledReason ? <p className="mt-1 text-muted-foreground">{policyPreview.disabledReason}</p> : null}
+                  </div>
+                </TaskConfigSection>
+              ) : null}
 
-              <TaskConfigSection title={dialogCopy.autoPlanGeneration}>
-                <div className="grid gap-3">
-                  <label className="flex items-start gap-3 cursor-pointer">
-                    <Checkbox
-                      checked={effectiveAutoPlan}
-                      disabled={isPending || autoExecute}
-                      onCheckedChange={(checked) => setAutoPlanGenerationEnabled(checked === true)}
-                      className="mt-0.5"
-                    />
-                    <div className="min-w-0 space-y-1">
-                      <span className="text-sm font-medium">{dialogCopy.autoPlanGeneration}</span>
-                      <p className="text-xs leading-5 text-muted-foreground">
-                        {dialogCopy.autoPlanGenerationDescription}
-                      </p>
-                    </div>
-                  </label>
-
-                  {effectiveAutoPlan && (
-                    <div className="ml-9 grid gap-1.5">
+              {autoExecute ? (
+                <TaskConfigSection title={dialogCopy.automationPreview}>
+                  <div className="grid gap-3">
+                    <p className="text-xs leading-5 text-muted-foreground">{dialogCopy.autoExecuteDescription}</p>
+                    <div className="grid gap-1.5">
                       <span className="text-xs font-medium text-muted-foreground">{dialogCopy.automationTimingLabel}</span>
-                      <Select
-                        value={autoPlanGenerationTiming}
-                        disabled={isPending}
-                        onValueChange={(v) => setAutoPlanGenerationTiming(normalizeAutomationTiming(v))}
-                      >
-                        <SelectTrigger className="w-full">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent className="z-[160]">
-                          <SelectGroup>
-                            {timingOptions.map((opt) => (
-                              <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                            ))}
-                          </SelectGroup>
-                        </SelectContent>
+                      <Select value={autoExecuteTiming} disabled={isPending} onValueChange={(value) => setAutoExecuteTiming(normalizeAutomationTiming(value))}>
+                        <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
+                        <SelectContent>{timingOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent>
                       </Select>
                     </div>
-                  )}
-
-                  <div className="border-t border-border/30 pt-3">
-                    <label className="flex items-start gap-3 cursor-pointer">
-                      <Checkbox
-                        checked={autoExecute}
-                        disabled={isPending}
-                        onCheckedChange={(checked) => {
-                          const c = checked === true;
-                          setAutoExecute(c);
-                          if (c) setAutoPlanGenerationEnabled(true);
-                        }}
-                        className="mt-0.5"
-                      />
-                      <div className="min-w-0 space-y-1">
-                        <span className="text-sm font-medium">{dialogCopy.autoExecute}</span>
-                        <p className="text-xs leading-5 text-muted-foreground">
-                          {dialogCopy.autoExecuteDescription}
-                        </p>
+                    <div aria-label={dialogCopy.automationPreview} className="rounded-lg border border-border/70 bg-muted/30 p-3 text-xs leading-5">
+                      <div className="mb-2 flex items-center gap-2">
+                        <span className="font-semibold text-foreground">{dialogCopy.automaticExecutionSummary}</span>
+                        <Badge variant={policyPreview.readiness === "ready" ? "default" : "secondary"}>{policyPreview.readiness === "ready" ? dialogCopy.automationReady : policyPreview.readiness}</Badge>
                       </div>
-                    </label>
-
-                    {autoExecute && (
-                      <div className="ml-9 mt-3 grid gap-1.5">
-                        <span className="text-xs font-medium text-muted-foreground">{dialogCopy.automationTimingLabel}</span>
-                        <Select
-                          value={autoExecuteTiming}
-                          disabled={isPending}
-                          onValueChange={(v) => setAutoExecuteTiming(normalizeAutomationTiming(v))}
-                        >
-                          <SelectTrigger className="w-full">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent className="z-[160]">
-                            <SelectGroup>
-                              {timingOptions.map((opt) => (
-                                <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
-                              ))}
-                            </SelectGroup>
-                          </SelectContent>
-                        </Select>
-                      </div>
-                    )}
+                      <dl className="grid gap-2 sm:grid-cols-2">
+                        <div><dt className="font-medium text-muted-foreground">{dialogCopy.automationProvider}</dt><dd>{policyPreview.providerName ?? dialogCopy.defaultProviderSummary}</dd></div>
+                        <div><dt className="font-medium text-muted-foreground">{dialogCopy.automationExecution}</dt><dd>{policyPreview.nextOccurrenceAt ? `${new Date(policyPreview.nextOccurrenceAt).toLocaleString()} (${Intl.DateTimeFormat().resolvedOptions().timeZone})` : policyPreview.disabledReason}</dd></div>
+                        <div><dt className="font-medium text-muted-foreground">Plan approval</dt><dd>{policyPreview.requiresPlanAcceptance ? "You must review and accept the plan before execution." : "Chrona will generate and accept a valid plan before the scheduled start."}</dd></div>
+                        <div><dt className="font-medium text-muted-foreground">Pauses</dt><dd>{policyPreview.pauseConditions.join(" ") || "Execution starts only when you choose to run it."}</dd></div>
+                        <div><dt className="font-medium text-muted-foreground">{dialogCopy.automationRecovery}</dt><dd>{policyPreview.missedRunPolicy} {policyPreview.retryPolicy}</dd></div>
+                        <div><dt className="font-medium text-muted-foreground">Closing Chrona</dt><dd>{policyPreview.processRequirement}</dd></div>
+                      </dl>
+                    </div>
                   </div>
-                </div>
-              </TaskConfigSection>
+                </TaskConfigSection>
+              ) : null}
             </div>
           </div>
         </div>

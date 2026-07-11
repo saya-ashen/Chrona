@@ -34,6 +34,7 @@ function readBlockReason(task: {
       blockScope: string | null;
       blockSince: Date | null;
       currentNodeId: string | null;
+      blockDetail: string | null;
     } | null;
   }) {
   if (task.status === "Completed" || task.status === "Done") return null;
@@ -41,14 +42,16 @@ function readBlockReason(task: {
   const storedBlockReason = task.blockReason as {
     blockType?: string;
     actionRequired?: string;
+    detail?: string;
     scope?: string;
     nodeId?: string;
     since?: string;
   } | null;
-  const projectedBlockReason = task.projection && (task.projection.blockType || task.projection.actionRequired)
+  const projectedBlockReason = task.projection && (task.projection.blockType || task.projection.actionRequired || task.projection.blockDetail)
     ? {
         blockType: task.projection.blockType ?? undefined,
         actionRequired: task.projection.actionRequired ?? undefined,
+        detail: task.projection.blockDetail ?? undefined,
         scope: task.projection.blockScope ?? undefined,
         nodeId: task.projection.currentNodeId ?? undefined,
         since: task.projection.blockSince?.toISOString(),
@@ -60,6 +63,7 @@ function readBlockReason(task: {
       ...storedBlockReason,
       nodeId: storedBlockReason.nodeId ?? projectedBlockReason?.nodeId,
       since: storedBlockReason.since ?? projectedBlockReason?.since,
+      detail: storedBlockReason.detail ?? projectedBlockReason?.detail,
     };
   }
 

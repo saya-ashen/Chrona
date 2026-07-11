@@ -6,7 +6,7 @@ import {
   mapTaskWorkspaceStatus,
   pickWorkspaceCurrentNode,
 } from "./task-workspace-model";
-import { deriveHeaderActions, deriveWorkspacePresentationState } from "./task-workspace-model";
+import { deriveHeaderActions, deriveWorkspacePresentationState, deriveWorkspaceWorkStateView } from "./task-workspace-model";
 import type { TaskPageData } from "./task-workspace-model";
 import { taskWorkspaceStateFixtures } from "@/components/tasks/workspace/test-support/task-workspace-test-fixtures";
 
@@ -500,6 +500,34 @@ describe("task workspace execution console view model", () => {
     expect(view.attention).toMatchObject({ actionLabel: "Open action controls", actionNodeId: "failed-node" });
   });
 
+  it("shows run failure detail in the attention card", () => {
+    const view = createTaskWorkspaceExecutionConsoleView({
+      pageData: pageData({
+        task: {
+          ...pageData().task,
+          status: "Blocked",
+          blockReason: {
+            blockType: "run_failed",
+            actionRequired: "Retry Run",
+            detail: "ACP connection closed",
+            scope: "run",
+            nodeId: "failed-node",
+          },
+        },
+      }),
+      graphPlan: graph([
+        node({ id: "failed-node", status: "failed", summary: "Generic node summary" }),
+      ], "failed-node"),
+    });
+
+    expect(view.attention).toMatchObject({
+      title: "Blocked",
+      description: "ACP connection closed",
+      tone: "critical",
+      actionNodeId: "failed-node",
+    });
+  });
+
   it("uses the current checkpoint as the primary status and disables Start", () => {
     const view = createTaskWorkspaceExecutionConsoleView({
       pageData: pageData({
@@ -930,11 +958,13 @@ describe("task workspace execution console view model", () => {
     },
   ])("derives header state and actions for $name", ({ task, progress, currentNode, status, startDisabledReason, pauseDisabledReason, stopDisabledReason }) => {
     const workspaceStatus = deriveWorkspacePresentationState({ task, progress, currentNode });
-    const actions = deriveHeaderActions({ task, progress, workspaceStatus, copy: HEADER_ACTION_COPY });
-
+    const workState = deriveWorkspaceWorkStateView({ task, progress, currentNode });
+    const actions = deriveHeaderActions({ task, progress, workState, copy: HEADER_ACTION_COPY });
     expect(workspaceStatus).toBe(status);
     expect(actions.find((action) => action.id === "start")).toMatchObject({ disabled: Boolean(startDisabledReason), disabledReason: startDisabledReason });
-    expect(actions.find((action) => action.id === "pause")).toMatchObject({ disabled: Boolean(pauseDisabledReason), disabledReason: pauseDisabledReason });
-    expect(actions.find((action) => action.id === "stop")).toMatchObject({ disabled: Boolean(stopDisabledReason), disabledReason: stopDisabledReason });
+    if (pauseDisabledReason) expect(actions.find((action) => action.id === "pause")).toBeUndefined();
+    else expect(actions.find((action) => action.id === "pause")).toMatchObject({ disabled: false });
+    if (stopDisabledReason) expect(actions.find((action) => action.id === "stop")).toBeUndefined();
+    else expect(actions.find((action) => action.id === "stop")).toMatchObject({ disabled: false });
   });
 });

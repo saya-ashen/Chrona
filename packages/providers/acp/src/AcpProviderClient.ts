@@ -346,8 +346,14 @@ function renderProviderInput(input: ProviderRunInput): string {
 
 function terminalToolInstruction(input: StartRunInput): string | undefined {
   if (!input.terminalToolName) return undefined;
+  if (input.terminalToolName === "chrona_plan_generate") {
+    return [
+      "When the plan is ready, call the MCP tool `chrona_plan_generate` with the complete PlanBlueprint object.",
+      "Do not answer only in text; the plan is not submitted until that MCP tool call succeeds.",
+    ].join("\n");
+  }
   return [
-    `When finished, call the MCP tool \`${input.terminalToolName}\` to submit the final Chrona node result.`,
+    `When finished, call the MCP tool \`${input.terminalToolName}\` with the final structured payload required by the current Chrona instructions.`,
     "Do not treat this instruction itself as evidence that the tool has run.",
   ].join("\n");
 }
@@ -617,16 +623,34 @@ async function checkAcpSessionHealth(config: AcpProviderConfig, context: ClientC
 }
 
 
-async function initialize(context: ClientContext, signal?: AbortSignal): Promise<InitializeResponse> {
+async function initialize(config: AcpProviderConfig, context: ClientContext, signal?: AbortSignal): Promise<InitializeResponse> {
   return context.request(
     acp.methods.agent.initialize,
     {
       protocolVersion: acp.PROTOCOL_VERSION,
-      clientCapabilities: {},
+      clientCapabilities: { auth: { terminal: config.auth?.terminal === true } },
       clientInfo: { name: "chrona", title: "Chrona", version: "0.1.0" },
     },
     { cancellationSignal: signal },
   );
+}
+
+type AdvertisedAuthMethod = { id?: unknown; type?: unknown; name?: unknown };
+
+function chooseAuthMethod(config: AcpProviderConfig, init: InitializeResponse): string | null {
+  const methods = (init.authMethods ?? []) as AdvertisedAuthMethod[];
+  if (methods.length === 0) return null;
+  const configured = config.auth?.methodId?.trim();
+  if (configured) return methods.some((method) => method.id === configured) ? configured : null;
+  const preferred = config.auth?.prefer ?? "agent";
+  const match = methods.find((method) => (method.type ?? "agent") === preferred) ?? methods.find((method) => (method.type ?? "agent") === "agent");
+  return typeof match?.id === "string" && match.id.trim().length > 0 ? match.id : null;
+}
+
+async function authenticate(config: AcpProviderConfig, context: ClientContext, init: InitializeResponse, signal?: AbortSignal) {
+  const methodId = chooseAuthMethod(config, init);
+  if (!methodId) return;
+  await context.request(acp.methods.agent.authenticate, { methodId }, { cancellationSignal: signal });
 }
 
 
@@ -728,7 +752,8 @@ export class AcpProviderClient implements AgentProviderClient {
     const checkedAt = now();
     try {
       await this.transport.connect(this.config, handlers(), async (connection) => {
-        const init = await initialize(connection.context, input.signal);
+        const init = await initialize(this.config, connection.context, input.signal);
+        await authenticate(this.config, connection.context, init, input.signal);
         assertHttpMcp(this.config, init);
         if (this.config.healthCheck === "session") await checkAcpSessionHealth(this.config, connection.context, input.signal);
       });
@@ -876,7 +901,8 @@ export class AcpProviderClient implements AgentProviderClient {
     handle.prompt = this.transport.connect(this.config, handlers((params) => this.requestPermission(handle, params)), async (connection) => {
       try {
         handle.connection = connection;
-        const init = await initialize(connection.context, abort.signal);
+        const init = await initialize(this.config, connection.context, abort.signal);
+        await authenticate(this.config, connection.context, init, abort.signal);
         assertHttpMcp(this.config, init);
 
         const session = await startAcpSession({

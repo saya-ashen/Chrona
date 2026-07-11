@@ -85,6 +85,11 @@ const providersResponse = {
       features: ["generatePlan", "chat", "task.plan", "task.execution"],
     },
     {
+      key: "omp",
+      label: "Oh My Pi",
+      features: ["generatePlan", "chat", "task.plan", "task.execution"],
+    },
+    {
       key: "debug",
       label: "Debug Provider",
       features: ["suggest", "generatePlan", "chat", "dashboard.brief", "task.plan", "task.execution"],
@@ -119,6 +124,7 @@ describe("AiClientsManager", () => {
 
     await screen.findByText("No AI client is connected yet. Connect one to unlock planning, suggestions, and execution previews.");
     fireEvent.click(screen.getByRole("button", { name: "+ Add Client" }));
+    fireEvent.click(screen.getByText("Advanced settings"));
 
     fireEvent.change(screen.getByPlaceholderText("My Claude Code Client"), {
       target: { value: "Hermes Client" },
@@ -156,6 +162,7 @@ describe("AiClientsManager", () => {
 
     await screen.findByText("No AI client is connected yet. Connect one to unlock planning, suggestions, and execution previews.");
     fireEvent.click(screen.getByRole("button", { name: "+ Add Client" }));
+    fireEvent.click(screen.getByText("Advanced settings"));
 
     fireEvent.change(screen.getByPlaceholderText("My Claude Code Client"), {
       target: { value: "Local Hermes" },
@@ -230,6 +237,7 @@ describe("AiClientsManager", () => {
 
     await screen.findByText("No AI client is connected yet. Connect one to unlock planning, suggestions, and execution previews.");
     fireEvent.click(screen.getByRole("button", { name: "+ Add Client" }));
+    fireEvent.click(screen.getByText("Advanced settings"));
 
     fireEvent.change(screen.getByPlaceholderText("My Claude Code Client"), {
       target: { value: "Claude Code via 9router" },
@@ -297,6 +305,7 @@ describe("AiClientsManager", () => {
 
     await screen.findByText("No AI client is connected yet. Connect one to unlock planning, suggestions, and execution previews.");
     fireEvent.click(screen.getByRole("button", { name: "+ Add Client" }));
+    fireEvent.click(screen.getByText("Advanced settings"));
 
     fireEvent.change(screen.getByPlaceholderText("My Claude Code Client"), {
       target: { value: "Codex" },
@@ -350,6 +359,84 @@ describe("AiClientsManager", () => {
 
     const bindingsCall = fetchMock.mock.calls.find((call) => call[0] === "/api/ai/clients/client_codex/bindings" && call[1]?.method === "PUT");
     expect(JSON.parse(bindingsCall?.[1]?.body as string)).toEqual({ features: ["task.plan", "task.execution"] });
+  });
+
+
+  it("creates an Oh My Pi client with local profile directory overrides", async () => {
+    const user = userEvent.setup();
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ clients: [] }),
+    });
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => providersResponse });
+
+    render(<AiClientsManager />);
+
+    await screen.findByText("No AI client is connected yet. Connect one to unlock planning, suggestions, and execution previews.");
+    fireEvent.click(screen.getByRole("button", { name: "+ Add Client" }));
+    fireEvent.click(screen.getByText("Advanced settings"));
+
+    fireEvent.change(screen.getByPlaceholderText("My Claude Code Client"), {
+      target: { value: "Local OMP" },
+    });
+    await user.click(screen.getByRole("combobox", { name: "Type" }));
+    await user.click(within(screen.getByRole("listbox")).getByText("Oh My Pi"));
+    fireEvent.change(screen.getByLabelText("Model"), {
+      target: { value: "openai/gpt-5.3-codex" },
+    });
+    fireEvent.change(screen.getByLabelText("OMP Base URL"), {
+      target: { value: "https://llm.internal/v1" },
+    });
+    fireEvent.change(screen.getByLabelText("OMP API Key"), {
+      target: { value: "sk-omp" },
+    });
+    fireEvent.change(screen.getByLabelText("HOME"), {
+      target: { value: "/home/chrona-omp" },
+    });
+    fireEvent.change(screen.getByLabelText("PI_CONFIG_DIR"), {
+      target: { value: ".omp-test" },
+    });
+    fireEvent.change(screen.getByLabelText("PI_CODING_AGENT_DIR"), {
+      target: { value: "/tmp/chrona-omp-agent" },
+    });
+
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ client: { id: "client_omp" } }),
+    });
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ bindings: [] }),
+    });
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ clients: [] }),
+    });
+    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => providersResponse });
+
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenCalledWith(
+        "/api/ai/clients",
+        expect.objectContaining({ method: "POST" }),
+      );
+    });
+
+    const createCall = fetchMock.mock.calls.find((call) => call[0] === "/api/ai/clients" && call[1]?.method === "POST");
+    expect(JSON.parse(createCall?.[1]?.body as string)).toMatchObject({
+      name: "Local OMP",
+      type: "omp",
+      config: {
+        model: "openai/gpt-5.3-codex",
+        apiKey: "sk-omp",
+        baseUrl: "https://llm.internal/v1",
+        homeDirectory: "/home/chrona-omp",
+        configDirectory: ".omp-test",
+        codingAgentDirectory: "/tmp/chrona-omp-agent",
+        timeoutMs: 1800000,
+      },
+    });
   });
 
   it("creates a debug client with the deterministic profile by default", async () => {

@@ -65,4 +65,34 @@ describe("summarizeRuntimeEvent", () => {
     expect(stamped).toBeGreaterThanOrEqual(before);
     expect(stamped).toBeLessThanOrEqual(after);
   });
+  it("summarizes provider task progress raw events", () => {
+    const event = summarizeRuntimeEvent("start_manual", {
+      nodeId: "node-a",
+      nodeTitle: "Search jobs",
+      runtimeName: "hermes",
+      event: {
+        type: "raw_event",
+        provider: "claude_code",
+        rawEventType: "system",
+        raw: {
+          type: "system",
+          subtype: "task_progress",
+          description: "Search: AI PhD jobs",
+          usage: { tool_uses: 84 },
+          workflow_progress: [
+            { lastToolName: "WebSearch", lastToolSummary: "euraxess funded AI" },
+          ],
+        },
+      },
+    } satisfies PlanExecutionRuntimeEvent);
+
+    expect(event).toMatchObject({
+      event: {
+        type: "raw_event",
+        rawEventType: "system",
+        message: "Search: AI PhD jobs · WebSearch: euraxess funded AI · 84 tool uses",
+      },
+    });
+  });
+
 });

@@ -122,6 +122,12 @@ export const executionActionBodySchema = z.discriminatedUnion("action", [
     idempotencyKey: idempotencyKeySchema.optional(),
   }),
   z.object({
+    action: z.literal("restart_from_beginning"),
+    prompt: z.string().optional(),
+    workBlockId: workBlockIdSchema.optional(),
+    idempotencyKey: idempotencyKeySchema.optional(),
+  }),
+  z.object({
     action: z.literal("start_scheduled"),
     workBlockId: workBlockIdSchema.optional(),
     idempotencyKey: idempotencyKeySchema.optional(),

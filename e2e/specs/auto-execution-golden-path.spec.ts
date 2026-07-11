@@ -321,7 +321,6 @@ test.describe("Auto-execution golden path (§1.3)", () => {
 
       // ── 2. Bind debug AI client ─────────────────────────────────────────────
       await setupDebugAiClient(request, taskId);
-
       // ── 3. Enable autoExecute + autoPlanGeneration + executionRuntime=debug ─
       await enableAutoExecution(request, taskId);
 
@@ -395,14 +394,17 @@ test.describe("Auto-execution golden path (§1.3)", () => {
           .toBe("Completed");
       });
 
-      // ── 12. Work page Badge renders "completed" ─────────────────────────────
-      // Badge uses data-slot="badge" (shadcn Badge component), not role="status".
-      await test.step("Work page Badge shows 'completed'", async () => {
+      // ── 12. Work page Badge renders result-review state ───────────────────
+      // Completed executions stay in result review until the user chooses the
+      // next result action; the header badge should not imply there is no next
+      // action available.
+      await test.step("Work page Badge shows result review", async () => {
         await page.goto(`/en/tasks/${taskId}`);
         await expect(
-          page.locator('[data-slot="badge"]').filter({ hasText: /^completed$/i }),
+          page.locator('[data-slot="badge"]').filter({ hasText: /^result ready$/i }),
         ).toBeVisible({ timeout: 15_000 });
       });
+
     },
   );
 

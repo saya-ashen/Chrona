@@ -16,6 +16,7 @@ export type RuntimeCommand =
 export type ExecutionActionType =
   | "start_manual"
   | "start_scheduled"
+  | "restart_from_beginning"
   | "resume_with_input"
   | "resume_with_approval"
   | "resume_after_unblock"
@@ -30,6 +31,12 @@ export type ExecutionActionType =
 export type ExecutionActionInput =
   | {
       action: "start_manual";
+      prompt?: string;
+      workBlockId?: string;
+      idempotencyKey?: string;
+    }
+  | {
+      action: "restart_from_beginning";
       prompt?: string;
       workBlockId?: string;
       idempotencyKey?: string;

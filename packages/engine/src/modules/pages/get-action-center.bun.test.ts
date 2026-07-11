@@ -118,16 +118,22 @@ describe("getActionCenter actionable states", () => {
     expect(inputItems).toHaveLength(1);
     expect(inputItems[0]?.kind).toBe("input");
     expect(inputItems[0]?.summary).toBe("Which environment should I target?");
+    expect(inputItems[0]?.actionType).toBe("Input needed");
+    expect(inputItems[0]?.consequence).toBe("Provide the requested input so execution can continue");
 
     const failedItems = byTask(failedTask.id);
     expect(failedItems).toHaveLength(1);
     expect(failedItems[0]?.kind).toBe("recovery");
     expect(failedItems[0]?.summary).toBeTruthy();
+    expect(failedItems[0]?.actionType).toBe("Failed");
+    expect(failedItems[0]?.consequence).toBe("Review the failure reason, then retry or stop");
 
     const cancelledItems = byTask(cancelledTask.id);
     expect(cancelledItems).toHaveLength(1);
     expect(cancelledItems[0]?.kind).toBe("recovery");
     expect(cancelledItems[0]?.summary).toBeTruthy();
+    expect(cancelledItems[0]?.actionType).toBe("Cancelled");
+    expect(cancelledItems[0]?.consequence).toBe("Inspect the audit trail or reopen the task");
 
     const blockedItems = byTask(blockedTask.id);
     expect(blockedItems).toHaveLength(1);

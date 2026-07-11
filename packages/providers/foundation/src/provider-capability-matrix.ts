@@ -20,7 +20,7 @@ export type ProviderCapabilityName = ProviderExecutionCapabilityName | ProviderR
 export type ProviderRecoveryMode = "authoritative_run_lookup" | "session_history" | "local_stream_only";
 
 export type ProviderCapabilityMatrixEntry = {
-  provider: "hermes" | "claude_code" | "codex";
+  provider: "hermes" | "claude_code" | "codex" | "omp";
   label: string;
   execution: Record<ProviderExecutionCapabilityName, boolean>;
   recovery: Record<ProviderRecoveryCapabilityName, boolean> & { mode: ProviderRecoveryMode };
@@ -100,6 +100,26 @@ export const providerCapabilityMatrix = [
   matrixEntry({
     provider: "codex",
     label: "Codex",
+    execution: {
+      healthCheck: true,
+      startRun: true,
+      streamEvents: true,
+      cancelActiveRun: true,
+      approvalBridge: true,
+      toolTraces: true,
+      structuredOutput: true,
+    },
+    recovery: {
+      sessionResume: true,
+      historyReplay: true,
+      activeRunLookup: false,
+      streamReconnect: false,
+      mode: "session_history",
+    },
+  }),
+  matrixEntry({
+    provider: "omp",
+    label: "Oh My Pi",
     execution: {
       healthCheck: true,
       startRun: true,

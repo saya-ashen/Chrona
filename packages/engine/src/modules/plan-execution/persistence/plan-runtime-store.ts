@@ -153,6 +153,8 @@ export async function ensureNativePlanRun(taskId: string, workBlockId?: string |
     planId,
     compiledPlan,
     persisted,
+    planPrompt: savedCompiled.prompt,
+    planSummary: savedCompiled.summary,
   };
 }
 

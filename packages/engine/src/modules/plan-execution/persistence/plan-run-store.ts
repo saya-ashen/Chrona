@@ -26,7 +26,7 @@ function asJsonValue(value: unknown): Prisma.InputJsonValue {
   return value as Prisma.InputJsonValue;
 }
 
-function createEmptyPlanOutput(): PlanOutputState {
+export function createEmptyPlanOutput(): PlanOutputState {
   return {
     spec: null,
     revision: 0,

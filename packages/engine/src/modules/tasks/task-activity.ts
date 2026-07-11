@@ -156,6 +156,33 @@ function optionalStringEventValue(event: Record<string, unknown>, key: string) {
 function optionalNumberEventValue(event: Record<string, unknown>, key: string) {
   return typeof event[key] === "number" ? event[key] as number : undefined;
 }
+function latestWorkflowProgress(raw: Record<string, unknown>) {
+  const progress = arrayPayloadValue(raw, "workflow_progress") ?? [];
+  for (const item of [...progress].reverse()) {
+    const record = payloadRecord(item);
+    if (record) return record;
+  }
+  return null;
+}
+
+function providerTaskProgressSummary(event: Record<string, unknown>) {
+  const raw = payloadRecord(event.raw);
+  if (!raw || raw.type !== "system" || raw.subtype !== "task_progress") return null;
+
+  const progress = latestWorkflowProgress(raw);
+  const usage = payloadRecord(raw.usage);
+  const toolName = optionalStringEventValue(progress ?? {}, "lastToolName")
+    ?? optionalStringEventValue(raw, "last_tool_name");
+  const toolSummary = optionalStringEventValue(progress ?? {}, "lastToolSummary");
+  const toolUses = usage ? optionalNumberEventValue(usage, "tool_uses") : undefined;
+
+  return compactParts([
+    optionalStringEventValue(raw, "description"),
+    toolSummary ? `${toolName ?? "Tool"}: ${toolSummary}` : undefined,
+    toolUses !== undefined ? `${toolUses} tool uses` : undefined,
+  ]) || optionalStringEventValue(raw, "summary") || "Provider task progress.";
+}
+
 
 function providerActivityText(event: Record<string, unknown>) {
   return typeof event.text === "string" ? event.text : null;
@@ -191,7 +218,7 @@ function isMergeableProviderTextEvent(eventType: string) {
   return eventType === "text_delta" || eventType === "reasoning_delta";
 }
 
-function isDisplayableProviderEvent(eventType: string) {
+function isDisplayableProviderEvent(eventType: string, payloadEvent?: Record<string, unknown> | null) {
   return eventType === "run_started"
     || eventType === "text_delta"
     || eventType === "reasoning_delta"
@@ -202,8 +229,10 @@ function isDisplayableProviderEvent(eventType: string) {
     || eventType === "approval_required"
     || eventType === "run_completed"
     || eventType === "run_failed"
-    || eventType === "run_cancelled";
+    || eventType === "run_cancelled"
+    || (eventType === "raw_event" && Boolean(payloadEvent && providerTaskProgressSummary(payloadEvent)));
 }
+
 
 function mapProviderEventToActivity(event: TaskActivityEvent): WorkspaceActivityTimelineItem {
   const payloadEvent = runtimePayloadEvent(event.payload);
@@ -215,7 +244,8 @@ function mapProviderEventToActivity(event: TaskActivityEvent): WorkspaceActivity
   const eventType = providerActivityEventType(event, payloadEvent);
   const timestamp = (event.occurredAt ?? event.createdAt).toISOString();
   const payloadRecordValue = payloadEvent ?? payloadRecord(event.payload) ?? {};
-  const rawEventType = optionalStringEventValue(payloadRecordValue, "rawEventType") ?? eventType;
+  const progressSummary = providerTaskProgressSummary(payloadRecordValue);
+  const rawEventType = progressSummary ? "task_progress" : optionalStringEventValue(payloadRecordValue, "rawEventType") ?? eventType;
   const withBase = (item: WorkspaceActivityTimelineItem): WorkspaceActivityTimelineItem => ({
     ...item,
     provider,
@@ -249,6 +279,12 @@ function mapProviderEventToActivity(event: TaskActivityEvent): WorkspaceActivity
       return withBase({ id: event.id, kind: "approval", title: "Approval required", summary: provider, description: provider, tone: "warning", timestamp });
     case "run_completed":
       return withBase({ id: event.id, kind: "provider_run", title: "Provider run completed", summary: provider, description: provider, tone: "success", timestamp });
+    case "raw_event":
+      if (progressSummary) {
+        return withBase({ id: event.id, kind: "provider_run", title: "Task progress", summary: progressSummary, description: progressSummary, tone: "info", timestamp });
+      }
+      return withBase({ id: event.id, kind: "raw", title: "Provider event", summary: providerActivityDescription(payloadRecordValue, rawEventType), description: providerActivityDescription(payloadRecordValue, rawEventType), tone: "neutral", timestamp });
+
     case "run_failed":
       return withBase({ id: event.id, kind: "provider_run", title: "Provider run failed", summary: providerActivityDescription(payloadRecordValue, provider), description: providerActivityDescription(payloadRecordValue, provider), tone: "danger", timestamp });
     case "run_cancelled":
@@ -376,7 +412,7 @@ export function buildActivityTimeline(events: TaskActivityEvent[]) {
     const payloadEvent = runtimePayloadEvent(event.payload);
     const eventType = providerActivityEventType(event, payloadEvent);
 
-    if (event.source === "provider" && !isDisplayableProviderEvent(eventType)) {
+    if (event.source === "provider" && !isDisplayableProviderEvent(eventType, payloadEvent)) {
       currentTextSegment = null;
       continue;
     }

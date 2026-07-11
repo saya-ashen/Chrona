@@ -70,6 +70,47 @@ export function checkpointActionToExecutionAction(action: CheckpointActionKind):
   }
 }
 
+function recordValue(value: unknown) {
+  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
+}
+
+function stringValue(record: Record<string, unknown> | null, key: string) {
+  const value = record?.[key];
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+function numberValue(record: Record<string, unknown> | null, key: string) {
+  const value = record?.[key];
+  return typeof value === "number" ? value : undefined;
+}
+
+function latestWorkflowProgress(raw: Record<string, unknown>) {
+  const progress = Array.isArray(raw.workflow_progress) ? raw.workflow_progress : [];
+  for (const item of [...progress].reverse()) {
+    const record = recordValue(item);
+    if (record) return record;
+  }
+  return null;
+}
+
+function taskProgressMessage(raw: unknown) {
+  const record = recordValue(raw);
+  if (!record || record.type !== "system" || record.subtype !== "task_progress") return undefined;
+
+  const progress = latestWorkflowProgress(record);
+  const usage = recordValue(record.usage);
+  const toolName = stringValue(progress, "lastToolName") ?? stringValue(record, "last_tool_name");
+  const toolSummary = stringValue(progress, "lastToolSummary");
+  const toolUses = numberValue(usage, "tool_uses");
+  const parts = [
+    stringValue(record, "description"),
+    toolSummary ? `${toolName ?? "Tool"}: ${toolSummary}` : undefined,
+    toolUses !== undefined ? `${toolUses} tool uses` : undefined,
+  ].filter((part): part is string => Boolean(part));
+
+  return parts.join(" · ") || stringValue(record, "summary");
+}
+
 function summarizeProviderRuntimePayload(
   providerEvent: PlanExecutionRuntimeEvent["event"],
 ): Extract<PlanExecutionSSEEvent, { type: "runtime_event" }>["event"] {
@@ -123,6 +164,7 @@ function summarizeProviderRuntimePayload(
     case "run_cancelled":
       return { type: "run_status", status: "cancelled", message: "Provider run cancelled." };
     case "raw_event":
-      return { type: "raw_event", rawEventType: providerEvent.rawEventType };
+      return { type: "raw_event", rawEventType: providerEvent.rawEventType, message: taskProgressMessage(providerEvent.raw) };
+
   }
 }

@@ -44,6 +44,8 @@
       "@chrona/acp-provider/*": ["./packages/providers/acp/src/*"],
       "@chrona/codex": ["./packages/providers/codex/src/index.ts"],
       "@chrona/codex/*": ["./packages/providers/codex/src/*"],
+      "@chrona/omp": ["./packages/providers/omp/src/index.ts"],
+      "@chrona/omp/*": ["./packages/providers/omp/src/*"],
       "@chrona/graph-runtime": ["./packages/graph-runtime/src/index.ts"],
       "@chrona/graph-runtime/*": ["./packages/graph-runtime/src/*"],
       "@chrona/domain": ["./packages/domain/src/index.ts"],

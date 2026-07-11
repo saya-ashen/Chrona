@@ -3,7 +3,7 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "@/lib/rpc-client";
 import { taskPlanReadModelToGraphPlan } from "@/components/tasks/plan/task-plan-view-model";
 import type { TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph/types";
-import { dispatchTaskExecutionAction, fetchCurrentTaskExecution, fetchTaskPlanState, submitTaskCheckpointAction, taskWorkspaceQueryKeys, type TaskPlanState } from "../../../../../../../features/task-workspace";
+import { acceptTaskResult, dispatchTaskExecutionAction, fetchCurrentTaskExecution, fetchTaskPlanState, submitTaskCheckpointAction, taskWorkspaceQueryKeys, type TaskPlanState } from "../../../../../../../features/task-workspace";
 import { stopTaskPlanGenerationSession, useTaskPlanGenerationSession, type TaskPlanSessionState } from "@/hooks/ai/task-plan-generation-session-store";
 import {
   canAcceptPlanFromFlow,
@@ -51,7 +51,7 @@ function getRuntimeActivity(event: WorkspaceRuntimeEvent | undefined) {
     case "run_status":
       return compactActivityText(value.message ?? value.status);
     case "raw_event":
-      return compactActivityText(value.rawEventType ?? "Runtime event");
+      return compactActivityText(value.message ?? value.rawEventType ?? "Runtime event");
   }
 }
 
@@ -371,6 +371,9 @@ export function useTaskWorkspacePlanState(
   const selectedWorkBlockKey = selectedWorkBlockId ?? "__task__";
   const previousWorkBlockKeyRef = useRef(selectedWorkBlockKey);
   const lastWorkspaceEventSequenceRef = useRef(0);
+  const [acceptResultError, setAcceptResultError] = useState<string | null>(null);
+  const [isAcceptingResult, setIsAcceptingResult] = useState(false);
+
   const planStateQuery = useQuery({
     queryKey: taskWorkspaceQueryKeys.planState(task.id, selectedWorkBlockId),
     queryFn: () => fetchTaskPlanState(task.id, selectedWorkBlockId),
@@ -608,6 +611,20 @@ export function useTaskWorkspacePlanState(
     return result;
   }, [refreshExecutionQueries, selectedWorkBlockId, task.id]);
 
+  const handleAcceptResult = useCallback(async () => {
+    setAcceptResultError(null);
+    setIsAcceptingResult(true);
+    try {
+      await acceptTaskResult(task.id);
+      await refreshExecutionQueries();
+    } catch (cause) {
+      setAcceptResultError(cause instanceof Error ? cause.message : "Failed to accept task result");
+    } finally {
+      setIsAcceptingResult(false);
+    }
+  }, [refreshExecutionQueries, task.id]);
+
+
   const assistantBuildCurrentPlan = useCallback(() => {
     if (!plan?.compiledPlan) return null;
     const compiledPlan = plan.compiledPlan;
@@ -676,6 +693,9 @@ export function useTaskWorkspacePlanState(
     handleAcceptPlan,
     dispatchExecutionAction,
     submitCheckpointAction,
+    handleAcceptResult,
+    isAcceptingResult,
+    acceptResultError,
     handleGeneratePlanFromHeader,
     handleStopPlanGeneration,
     assistantBuildCurrentPlan,

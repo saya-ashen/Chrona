@@ -512,6 +512,93 @@ describe("runTaskNodeFeature", () => {
       summary: "Task complete",
     });
   });
+
+  it("does not treat chrona_node_complete with failed structured status as success", async () => {
+    const workspace = await db.workspace.create({
+      data: {
+        name: "Node AI false complete workspace",
+        status: "Active",
+        defaultRuntime: "hermes",
+      },
+    });
+    const task = await db.task.create({
+      data: {
+        id: "task-false-complete",
+        workspaceId: workspace.id,
+        title: "Node AI false complete task",
+        status: TaskStatus.Running,
+        priority: "Medium",
+        executionRuntime: "hermes",
+        executionConfig: {},
+      },
+    });
+    await db.run.create({
+      data: {
+        id: "local-run-false-complete",
+        taskId: task.id,
+        runtimeName: "hermes",
+        status: "Running",
+        triggeredBy: "system",
+        startedAt: new Date(),
+        syncStatus: "healthy",
+      },
+    });
+
+    const node = makeTaskNode();
+    const aiRuntimeInvoker = {
+      invoke: async () => ({
+        runId: "local-run-false-complete",
+        runtimeRunRef: "runtime-false-complete",
+        runtimeSessionKey: "main-session",
+        conversationEntryIds: ["conversation-entry-false-complete"],
+        controlRunToken: null,
+        providerName: "omp",
+        response: {
+          provider: "hermes",
+          runId: "runtime-false-complete",
+          nativeRunId: "runtime-false-complete",
+          sessionId: "main-session",
+          status: "completed" as const,
+          outputText: "Could not fetch GitHub Trending.",
+          structuredPayload: {
+            completed: false,
+            status: "failed",
+            error: "Missing network/browser capability.",
+          },
+          raw: { terminalToolName: "chrona_node_complete" },
+          error: null,
+        },
+      }),
+    } satisfies Pick<AiRuntimeInvoker, "invoke">;
+
+    const plan = makePlan(node);
+    const result = await runTaskNodeFeature({
+      taskId: task.id,
+      mainSession: {
+        id: "main-session",
+        taskId: task.id,
+        sessionKey: "chrona:task:task-false-complete:plan-1",
+      },
+      node,
+      plan,
+      attempt: makeAttempt({ taskId: task.id, graphId: plan.graphId, nodeId: node.id }),
+      runtimeName: "hermes",
+      aiRuntimeInvoker: aiRuntimeInvoker as AiRuntimeInvoker,
+      featureSpec: {
+        feature: "execute_task_node",
+        instructions: "Execute the current task node.",
+        inputText: "{}",
+        terminalToolName: "chrona_node_complete",
+        structuredOutputSchema: undefined,
+      },
+      providerInput: {},
+    });
+
+    expect(result).toMatchObject({
+      status: "failed",
+      error: "Missing network/browser capability.",
+    });
+  });
   it("fails provider branchRef structured payload without condition terminal tool", async () => {
     const workspace = await db.workspace.create({
       data: {

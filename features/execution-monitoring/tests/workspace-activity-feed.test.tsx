@@ -54,6 +54,7 @@ describe("WorkspaceActivityFeed", () => {
     render(<WorkspaceActivityFeed activity={[
       activity({ id: "reasoning", kind: "reasoning", title: "Reasoning", summary: "Hidden thought", assistant: { text: "Hidden thought", isReasoning: true } }),
     ]} />);
+    fireEvent.click(screen.getByText("Diagnostics (1)"));
 
     expect(screen.getByText("Hidden thought")).toBeInTheDocument();
   });
@@ -66,7 +67,7 @@ describe("WorkspaceActivityFeed", () => {
       activity({ id: "done", kind: "provider_run", title: "Plan generated", summary: "获取今天的 GitHub Trending", tone: "success", timestamp: "2026-05-21T00:01:02.000Z", rawEventType: "plan_generation.completed" }),
     ]} />);
 
-    expect(screen.getByText("Planning phase")).toBeInTheDocument();
+    expect(screen.getAllByText("Planning phase").length).toBeGreaterThan(0);
     expect(screen.getByText("3 events · 2.0s")).toBeInTheDocument();
     expect(screen.getByText("Loading task context...")).toBeInTheDocument();
     expect(screen.getByText("AI is thinking...")).toBeInTheDocument();
@@ -312,5 +313,18 @@ describe("WorkspaceActivityFeed", () => {
 
     const rendered = [screen.getByText("Write output"), screen.getByText("Persisted duplicate"), screen.getByText("Persisted older")].map((node) => node.textContent);
     expect(rendered).toEqual(["Write output", "Persisted duplicate", "Persisted older"]);
+  });
+  it("keeps raw and reasoning events out of the primary activity stream", () => {
+    render(<WorkspaceActivityFeed activity={[
+      activity({ id: "progress", kind: "node", title: "AI started working", summary: "Preparing the result" }),
+      activity({ id: "raw", kind: "raw", title: "projection.updated", summary: "internal projection" }),
+      activity({ id: "reasoning", kind: "reasoning", title: "Reasoning", summary: "private trace" }),
+    ]} />);
+
+    expect(screen.getByText("AI started working")).toBeInTheDocument();
+    expect(screen.queryByText("projection.updated")).not.toBeInTheDocument();
+    expect(screen.getByText("Diagnostics (2)")).toBeInTheDocument();
+    fireEvent.click(screen.getByText("Diagnostics (2)"));
+    expect(screen.getByText("projection.updated")).toBeInTheDocument();
   });
 });

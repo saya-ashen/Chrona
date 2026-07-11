@@ -1,7 +1,7 @@
-import type { ReactNode } from "react";
+import { useMemo, type ReactNode } from "react";
 import { JSONUIProvider, Renderer, type StateStore } from "@json-render/react";
 import { CATALOG_VERSION, isCatalogCompatible, type UiDocument } from "@chrona/ui-protocol";
-import { workspaceRegistry } from "./workspace-registry";
+import { ResultCollapseProvider, workspaceRegistry, type ResultCollapseCommand } from "./workspace-registry";
 
 /**
  * Renders a json-render {@link UiDocument} with the Chrona workspace registry.
@@ -18,6 +18,8 @@ export function SpecRenderer({
   handlers,
   onStateChange,
   store,
+  resultCollapseCommand,
+  resultCollapseStorageKey,
 }: {
   spec: UiDocument | null | undefined;
   catalogVersion?: string;
@@ -28,14 +30,31 @@ export function SpecRenderer({
   /** State-change notifications from JSONUIProvider (path/value pairs). */
   onStateChange?: (changes: Array<{ path: string; value: unknown }>) => void;
   store?: StateStore;
+  resultCollapseCommand?: ResultCollapseCommand | null;
+  resultCollapseStorageKey?: string | null;
 }) {
+  const keyedSpec = useMemo(() => {
+    if (!spec?.elements) return spec;
+    return {
+      ...spec,
+      elements: Object.fromEntries(Object.entries(spec.elements).map(([key, element]) => [
+        key,
+        { ...element, props: { ...element.props, __chronaCollapseStorageId: key } },
+      ])),
+    };
+  }, [spec]);
+
   if (!spec || !isCatalogCompatible(catalogVersion)) {
     return <>{fallback}</>;
   }
 
+  const renderSpec = keyedSpec ?? spec;
+
   return (
-    <JSONUIProvider registry={workspaceRegistry} store={store} initialState={spec.state} handlers={handlers} onStateChange={onStateChange}>
-      <Renderer spec={spec} registry={workspaceRegistry} loading={loading} />
-    </JSONUIProvider>
+    <ResultCollapseProvider command={resultCollapseCommand} storageKey={resultCollapseStorageKey}>
+      <JSONUIProvider registry={workspaceRegistry} store={store} initialState={renderSpec.state} handlers={handlers} onStateChange={onStateChange}>
+        <Renderer spec={renderSpec} registry={workspaceRegistry} loading={loading} />
+      </JSONUIProvider>
+    </ResultCollapseProvider>
   );
 }

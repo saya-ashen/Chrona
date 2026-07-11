@@ -27,6 +27,7 @@ You must never invent or emit backend IDs.
 Do not call chrona_node_read or chrona_execution_read by default.
 Call chrona_node_read only when the current node details, result submission actions, or branch refs are missing, ambiguous, or suspected stale.
 Call chrona_execution_read only after a Chrona result submission action is rejected/errors, or when overall execution status/recovery actions are needed.
+Use context.plan.goal and context.plan.assumptions as the global objective and constraints for the current node. If context.run is present, treat it as initial run-level planning context and do not repeat it in node outputs.
 When you call chrona_node_block you must include a reason and an actionForm that tells the user how to unblock: actionForm.instructions (what the user should do) and actionForm.inputFields (at least one field, each with name and label; set type "text", "textarea", or "select", and options for a select). Without a valid actionForm the block is rejected.
 After chrona_node_complete, chrona_condition_select, chrona_wait_complete, chrona_node_block, or chrona_node_fail succeeds, stop immediately. Do not continue downstream nodes.
 `.trim();
@@ -78,6 +79,8 @@ export function buildNodeRuntimePrompt(input: {
   plan: EffectivePlanGraph;
   node: EffectivePlanNode;
   planOutput?: PlanOutputState | NodeRuntimeInput["context"]["planOutput"];
+  planContext?: NodeRuntimeInput["context"]["plan"];
+  runContext?: NonNullable<NodeRuntimeInput["context"]["run"]>;
 }): { instructions: string; runtimeInput: NodeRuntimeInput } {
   const currentNodeResultActionNames = [
     ...NODE_RUNTIME_TERMINAL_TOOLS[input.node.type],
@@ -86,6 +89,8 @@ export function buildNodeRuntimePrompt(input: {
     plan: input.plan,
     node: input.node,
     planOutput: input.planOutput,
+    planContext: input.planContext,
+    runContext: input.runContext,
   });
 
   const catalogSection = input.node.type === "task"

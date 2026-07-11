@@ -75,6 +75,16 @@ describe("task workspace primary action", () => {
     });
 
     expect(resolveCommandCenterPrimaryAction(input({
+      hasGraphExecutionStarted: true,
+      taskPrimaryAction: action("start", { label: "Start" }),
+    }))).toMatchObject({
+      kind: "start-plan",
+      label: "Continue plan",
+      tone: "success",
+      statusLabel: "accepted",
+    });
+
+    expect(resolveCommandCenterPrimaryAction(input({
       hasTaskCompleted: true,
       primaryStateLabel: "Completed",
       taskStatus: "Completed",

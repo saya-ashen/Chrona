@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { useI18n } from "@chrona/i18n/react";
 import { providerCapabilityMatrix, type ProviderCapabilityMatrixEntry, type ProviderCapabilityName } from "@chrona/providers-foundation/capability-matrix";
+import { deriveAutomationReadiness } from "@chrona/domain";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -52,6 +53,8 @@ type ClientFormValues = {
   apiKey: string;
   model: string;
   configDirectory: string;
+  homeDirectory: string;
+  codingAgentDirectory: string;
   profileName: string;
   hermesScope: HermesClientScope;
   debugProfile: DebugProviderProfile;
@@ -83,7 +86,7 @@ type TestResult = {
 type ReadinessState = "ready" | "limited" | "warning" | "pending";
 
 type ReadinessItem = {
-  key: "configured" | "reachable" | "execution" | "recovery";
+  key: "overall" | "configured" | "reachable" | "execution" | "recovery";
   label: string;
   state: ReadinessState;
   detail: string;
@@ -186,6 +189,26 @@ function buildCodexConfig(input: {
   };
 }
 
+function buildOmpConfig(input: {
+  timeoutSeconds: string;
+  baseUrl: string;
+  apiKey: string;
+  model: string;
+  homeDirectory: string;
+  configDirectory: string;
+  codingAgentDirectory: string;
+}): Record<string, unknown> {
+  return {
+    model: nonEmptyEnvValue(input.model),
+    apiKey: nonEmptyEnvValue(input.apiKey),
+    baseUrl: nonEmptyEnvValue(input.baseUrl),
+    homeDirectory: nonEmptyEnvValue(input.homeDirectory),
+    configDirectory: nonEmptyEnvValue(input.configDirectory),
+    codingAgentDirectory: nonEmptyEnvValue(input.codingAgentDirectory),
+    timeoutMs: Number(input.timeoutSeconds) * 1000,
+  };
+}
+
 function buildClientPayload(input: {
   name: string;
   type: AiClientType;
@@ -195,6 +218,8 @@ function buildClientPayload(input: {
   apiKey: string;
   model: string;
   configDirectory: string;
+  homeDirectory: string;
+  codingAgentDirectory: string;
   profileName: string;
   hermesScope: HermesClientScope;
   debugProfile: DebugProviderProfile;
@@ -226,6 +251,15 @@ function buildClientPayload(input: {
     };
   }
 
+  if (input.type === "omp") {
+    return {
+      name: input.name,
+      type: input.type,
+      config: buildOmpConfig(input),
+      isDefault: input.isDefault,
+    };
+  }
+
   return {
     name: input.name,
     type: input.type,
@@ -249,8 +283,9 @@ function isDebugProviderVisible() {
 const PROVIDER_SORT_RANK: Record<string, number> = {
   claude_code: 0,
   codex: 1,
-  llm: 2,
-  debug: 3,
+  omp: 2,
+  llm: 3,
+  debug: 4,
   hermes: 99,
 };
 
@@ -407,12 +442,31 @@ function readinessItems(input: {
   enabled: boolean;
   testStatus: TestStatus;
   testReason: string | null;
+  bindings: string[];
 }): ReadinessItem[] {
   const matrix = providerMatrixEntry(input.type);
   const missingExecution = matrix
     ? EXECUTION_CAPABILITY_CHECKS.filter((capability) => !matrix.capabilities[capability])
     : [];
+  const canonical = deriveAutomationReadiness({
+    providerId: input.configured ? input.type : null,
+    providerConfigured: input.configured && input.enabled,
+    providerTested: input.testStatus !== "idle",
+    providerReachable: input.testStatus === "available",
+    planningCapable: input.bindings.some((binding) => binding === "generate_plan" || binding === "generatePlan" || binding === "task.plan"),
+    executionCapable: input.bindings.some((binding) => binding === "task.execution" || binding === "execute"),
+    requiresPlanning: true,
+    autoExecute: true,
+    hasAcceptedPlan: true,
+    scheduledStartAt: new Date(0),
+  });
   return [
+    {
+      key: "overall",
+      label: canonical.readiness === "ready" ? input.copy.ready : input.copy.needsAttention,
+      state: canonical.readiness === "ready" ? "ready" : "pending",
+      detail: canonical.disabledReason ?? input.copy.readinessCapabilityDetail,
+    },
     {
       key: "configured",
       label: input.copy.readinessConfigured,
@@ -574,6 +628,8 @@ const DEFAULTS: Record<string, string> = {
   unavailable: "Unavailable",
   statusUnknown: "Not tested",
   reasonUnknown: "No details yet",
+  ready: "Ready",
+  needsAttention: "Needs attention",
   readinessConfigured: "Configured",
   readinessReachable: "Reachable",
   readinessCapability: "Can run tasks",
@@ -589,6 +645,8 @@ const DEFAULTS: Record<string, string> = {
   recoverySnapshotOnly: "Can sync run state; live progress is not replayed after disconnect.",
   recoverySessionHistory: "Session context is saved; if execution is interrupted, retry this step to continue.",
   recoveryUnavailable: "Interrupted runs cannot be recovered automatically.",
+  advancedSettings: "Advanced settings",
+  advancedSettingsHelp: "Provider endpoints, model overrides, directories, timeouts, and capability assignment.",
 };
 
 function getCopy(messages: Record<string, unknown>): Record<string, string> {
@@ -638,6 +696,13 @@ function ClientForm({
     configDirectory: (initialConfig as { configDirectory?: string; env?: Record<string, string> } | undefined)?.configDirectory
       ?? (initialConfig as { env?: Record<string, string> } | undefined)?.env?.CLAUDE_CONFIG_DIR
       ?? (initialConfig as { env?: Record<string, string> } | undefined)?.env?.CODEX_HOME
+      ?? (initialConfig as { env?: Record<string, string> } | undefined)?.env?.PI_CONFIG_DIR
+      ?? "",
+    homeDirectory: (initialConfig as { homeDirectory?: string; env?: Record<string, string> } | undefined)?.homeDirectory
+      ?? (initialConfig as { env?: Record<string, string> } | undefined)?.env?.HOME
+      ?? "",
+    codingAgentDirectory: (initialConfig as { codingAgentDirectory?: string; env?: Record<string, string> } | undefined)?.codingAgentDirectory
+      ?? (initialConfig as { env?: Record<string, string> } | undefined)?.env?.PI_CODING_AGENT_DIR
       ?? "",
     profileName: (initialConfig as { profileName?: string } | undefined)?.profileName ?? "",
     hermesScope: (initialConfig as { scope?: HermesClientScope } | undefined)?.scope ?? "local",
@@ -653,6 +718,7 @@ function ClientForm({
   const isHermesClient = values.type === "hermes";
   const isClaudeCodeClient = values.type === "claude_code";
   const isCodexClient = values.type === "codex";
+  const isOmpClient = values.type === "omp";
   const isLocalHermes = isHermesClient && values.hermesScope === "local";
   const availableFeatures = getProviderFeatures(providers, values.type);
   const namePlaceholder = getDefaultClientName(values.type, providers);
@@ -674,6 +740,7 @@ function ClientForm({
     enabled: true,
     testStatus,
     testReason,
+    bindings: values.bindings,
   });
 
 
@@ -897,7 +964,11 @@ function ClientForm({
               </Card>
             )}
 
-            {!isDebugClient && !isClaudeCodeClient && !isCodexClient && (
+            <details className="rounded-lg border border-border/70 bg-muted/15 p-3">
+              <summary className="cursor-pointer font-medium text-foreground">{copy.advancedSettings}</summary>
+              <p className="mt-1 text-xs text-muted-foreground">{copy.advancedSettingsHelp}</p>
+              <div className="mt-4 grid gap-4">
+            {!isDebugClient && !isClaudeCodeClient && !isCodexClient && !isOmpClient && (
               <>
                 <Field>
                   <FieldLabel htmlFor="ai-client-base-url">Base URL</FieldLabel>
@@ -1050,6 +1121,80 @@ function ClientForm({
               </>
             )}
 
+            {isOmpClient && (
+              <>
+                <Field>
+                  <FieldLabel htmlFor="ai-client-model">Model</FieldLabel>
+                  <Input
+                    {...form.register("model")}
+                    id="ai-client-model"
+                    placeholder="optional OMP model override"
+                  />
+                </Field>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Field>
+                    <FieldLabel htmlFor="ai-client-base-url">OMP Base URL</FieldLabel>
+                    <Input
+                      {...form.register("baseUrl")}
+                      id="ai-client-base-url"
+                      placeholder="optional OMP provider base URL"
+                    />
+                  </Field>
+                  <Field>
+                    <FieldLabel htmlFor="ai-client-api-key">OMP API Key</FieldLabel>
+                    <Input
+                      {...form.register("apiKey")}
+                      id="ai-client-api-key"
+                      type="password"
+                      placeholder="fallback to OMP credentials if empty"
+                    />
+                  </Field>
+                </div>
+                <div className="grid gap-4 md:grid-cols-2">
+                  <Field>
+                    <FieldLabel htmlFor="ai-client-home-directory">HOME</FieldLabel>
+                    <Input
+                      {...form.register("homeDirectory")}
+                      id="ai-client-home-directory"
+                      placeholder="default process HOME"
+                    />
+                  </Field>
+                  <Field>
+                    <FieldLabel htmlFor="ai-client-config-directory">PI_CONFIG_DIR</FieldLabel>
+                    <Input
+                      {...form.register("configDirectory")}
+                      id="ai-client-config-directory"
+                      placeholder="default .omp under HOME"
+                    />
+                  </Field>
+                </div>
+                <Field>
+                  <FieldLabel htmlFor="ai-client-coding-agent-directory">PI_CODING_AGENT_DIR</FieldLabel>
+                  <Input
+                    {...form.register("codingAgentDirectory")}
+                    id="ai-client-coding-agent-directory"
+                    placeholder="default ~/.omp/agent"
+                  />
+                </Field>
+                <Field data-invalid={Boolean(form.formState.errors.timeoutSeconds)}>
+                  <FieldLabel htmlFor="ai-client-timeout">Timeout (seconds)</FieldLabel>
+                  <Input
+                    {...form.register("timeoutSeconds", {
+                      required: copy.timeoutSeconds,
+                      validate: (value) => Number(value) > 0 || copy.timeoutSeconds,
+                    })}
+                    aria-invalid={Boolean(form.formState.errors.timeoutSeconds)}
+                    id="ai-client-timeout"
+                    type="number"
+                  />
+                  {form.formState.errors.timeoutSeconds ? <FieldError errors={[form.formState.errors.timeoutSeconds]} /> : null}
+                </Field>
+                <p className="text-xs text-muted-foreground">
+                  All OMP runs use the in-process SDK with the configured API key/base URL when present, then fall back to local OMP credentials under ~/.omp.
+                </p>
+              </>
+            )}
+
             {isDebugClient && (
               <Field>
                 <FieldLabel>{copy.debugProfileLabel}</FieldLabel>
@@ -1109,6 +1254,8 @@ function ClientForm({
                 </div>
               </Field>
             )}
+              </div>
+            </details>
 
 
             <ReadinessChecklist items={formReadiness} />
@@ -1319,6 +1466,7 @@ export function AiClientsManager() {
           enabled: client.enabled,
           testStatus: cardTestState.status,
           testReason: cardTestState.reason,
+          bindings: client.bindings,
         });
 
 

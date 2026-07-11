@@ -269,7 +269,7 @@ export function TaskPlanGraphFrame({
           data-wheel-zoom="modifier-or-pinch"
           onWheelCapture={handleWheelCapture}
           ref={viewportRef}
-          style={fillHeight ? undefined : { height: `${layout.viewportHeight}px` }}
+          style={fillHeight ? undefined : { height: `${Math.max(layout.viewportHeight, 280)}px` }}
         >
           <div
             className="min-w-full"
