@@ -100,6 +100,19 @@ export function deriveAutoStartEligibility(input: {
     return blocked("invalid_task_status");
   }
 
+  const activeRun = input.activeRun;
+  if (activeRun && ACTIVE_RUN_STATUSES.some((s) => s === activeRun.status)) {
+    return blocked("already_running");
+  }
+
+  if (!input.task.executionRuntime) {
+    return blocked("no_runtime_config");
+  }
+
+  if (!input.task.hasAcceptedPlan) {
+    return blocked("no_accepted_plan");
+  }
+
   const policy = deriveAutomationPolicyPreview({
     scheduledStartAt,
     autoPlanGeneration: true,
@@ -115,19 +128,6 @@ export function deriveAutoStartEligibility(input: {
   });
   if (policy.disabledReason && policy.readiness !== "plan_acceptance_required") {
     return { ok: false, reason: "automation_not_ready", disabledReason: policy.disabledReason };
-  }
-
-  const activeRun = input.activeRun;
-  if (activeRun && ACTIVE_RUN_STATUSES.some((s) => s === activeRun.status)) {
-    return blocked("already_running");
-  }
-
-  if (!input.task.executionRuntime) {
-    return blocked("no_runtime_config");
-  }
-
-  if (!input.task.hasAcceptedPlan) {
-    return blocked("no_accepted_plan");
   }
 
   return { ok: true, mode: "start_task" };
