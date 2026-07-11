@@ -1172,7 +1172,31 @@
         "before_1h": "提前1小时",
         "before_2h": "提前2小时",
         "before_1d": "提前1天"
-      }
+      },
+      "mode": "Chrona 应如何协助？",
+      "modeTodo": "保存为任务",
+      "modeTodoDescription": "先记录任务，之后再手动规划和执行。",
+      "modePlan": "协助规划",
+      "modePlanDescription": "自动生成计划，然后等待你确认。",
+      "modeAutomatic": "按日程自动运行",
+      "modeAutomaticDescription": "在预定时间自动生成、接受并执行计划。",
+      "aiProvider": "AI Provider",
+      "defaultAiProvider": "默认 Provider",
+      "aiProviderHint": "为此任务指定不同的 Provider。",
+      "automationPreview": "Chrona 将执行什么",
+      "automaticPlanSummary": "Chrona 将自动生成计划，然后等待你确认。",
+      "defaultProviderSummary": "使用工作区默认 AI",
+      "automaticRunTitle": "自动运行",
+      "automaticRunSummary": "Chrona 将准备有效计划，并在预定时间自动执行任务。",
+      "automaticRunReady": "已就绪",
+      "automaticRunActionRequired": "需要处理",
+      "automaticRunProvider": "AI Provider",
+      "automaticRunTime": "运行时间",
+      "automaticRunDetails": "自动运行机制",
+      "automaticRunPause": "任务需要输入或审批时，Chrona 会暂停执行。",
+      "automaticRunRetry": "执行失败后不会自动重试。",
+      "automaticRunMissed": "如果预定时间 Chrona 未运行，Chrona 恢复运行后会启动该任务。",
+      "automaticRunPage": "关闭此页面不会取消已安排的运行。"
     },
     "scheduleCommandBar": {
       "generatingSuggestions": "正在生成建议..."

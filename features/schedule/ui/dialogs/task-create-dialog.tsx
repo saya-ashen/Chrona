@@ -1,6 +1,6 @@
 "use client";
 
-import { CalendarIcon, Check, Loader2, Sparkles, Wrench, X } from "lucide-react";
+import { CalendarIcon, Check, ChevronDown, Loader2, Sparkles, Wrench, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -25,7 +25,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import { useAutoComplete } from "@/hooks/use-ai";
-import { useI18n } from "@chrona/i18n/react";
+import { useI18n, useLocale } from "@chrona/i18n/react";
 import { useScheduleAiPreferences } from "@/lib/schedule-ai-preferences";
 import { AUTOMATION_TIMING_PRESETS, normalizeAutomationTiming } from "@chrona/contracts";
 import type { AutomationTimingPreset } from "@chrona/contracts";
@@ -104,6 +104,17 @@ const DEFAULT_DIALOG_COPY = {
   automaticPlanSummary: "Chrona will generate a plan automatically, then wait for your approval.",
   automaticExecutionSummary: "Chrona will generate and accept a valid plan, then execute it at the scheduled time.",
   defaultProviderSummary: "Use the workspace default AI",
+  automaticRunTitle: "Automatic run",
+  automaticRunSummary: "Chrona will prepare a valid plan and run this task automatically.",
+  automaticRunReady: "Ready",
+  automaticRunActionRequired: "Action required",
+  automaticRunProvider: "AI provider",
+  automaticRunTime: "Run time",
+  automaticRunDetails: "How automatic runs work",
+  automaticRunPause: "Chrona pauses when the task needs your input or approval.",
+  automaticRunRetry: "Failed runs are not retried automatically.",
+  automaticRunMissed: "If Chrona is unavailable at the scheduled time, the task starts when Chrona is running again.",
+  automaticRunPage: "Closing this page does not cancel the scheduled run.",
   description: "Description (optional)",
   descriptionPlaceholder: "Add description",
   priority: "Priority",
@@ -168,6 +179,8 @@ export function TaskCreateDialog({
   const defaultAutoPlanGenerationEnabled = aiPreferences.autoPlanGenerationEnabled;
   const [title, setTitle] = useState(initialTitle);
   const { messages } = useI18n();
+  const locale = useLocale();
+  const [showAutomationDetails, setShowAutomationDetails] = useState(false);
   const localizedDialogCopy = (messages.components as { taskCreateDialog?: Partial<typeof DEFAULT_DIALOG_COPY> } | undefined)?.taskCreateDialog;
   const dialogCopy = {
     ...DEFAULT_DIALOG_COPY,
@@ -339,6 +352,9 @@ export function TaskCreateDialog({
     providerName: selectedAiClient?.name ?? (availableAiClients.length > 0 ? dialogCopy.defaultAiProvider : null),
     providerConfigured: selectedAiClient ? selectedAiClient.enabled : availableAiClients.length > 0,
   });
+  const automationBlocked =
+    policyPreview.readiness !== "ready" &&
+    policyPreview.readiness !== "plan_acceptance_required";
   return (
     <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
       <DialogContent
@@ -676,30 +692,104 @@ export function TaskCreateDialog({
 
               {autoExecute ? (
                 <TaskConfigSection title={dialogCopy.automationPreview}>
-                  <div className="grid gap-3">
-                    <p className="text-xs leading-5 text-muted-foreground">{dialogCopy.autoExecuteDescription}</p>
-                    <div className="grid gap-1.5">
-                      <span className="text-xs font-medium text-muted-foreground">{dialogCopy.automationTimingLabel}</span>
-                      <Select value={autoExecuteTiming} disabled={isPending} onValueChange={(value) => setAutoExecuteTiming(normalizeAutomationTiming(value))}>
-                        <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-                        <SelectContent>{timingOptions.map((option) => <SelectItem key={option.value} value={option.value}>{option.label}</SelectItem>)}</SelectContent>
-                      </Select>
-                    </div>
-                    <div aria-label={dialogCopy.automationPreview} className="rounded-lg border border-border/70 bg-muted/30 p-3 text-xs leading-5">
-                      <div className="mb-2 flex items-center gap-2">
-                        <span className="font-semibold text-foreground">{dialogCopy.automaticExecutionSummary}</span>
-                        <Badge variant={policyPreview.readiness === "ready" ? "default" : "secondary"}>{policyPreview.readiness === "ready" ? dialogCopy.automationReady : policyPreview.readiness}</Badge>
-                      </div>
-                      <dl className="grid gap-2 sm:grid-cols-2">
-                        <div><dt className="font-medium text-muted-foreground">{dialogCopy.automationProvider}</dt><dd>{policyPreview.providerName ?? dialogCopy.defaultProviderSummary}</dd></div>
-                        <div><dt className="font-medium text-muted-foreground">{dialogCopy.automationExecution}</dt><dd>{policyPreview.nextOccurrenceAt ? `${new Date(policyPreview.nextOccurrenceAt).toLocaleString()} (${Intl.DateTimeFormat().resolvedOptions().timeZone})` : policyPreview.disabledReason}</dd></div>
-                        <div><dt className="font-medium text-muted-foreground">Plan approval</dt><dd>{policyPreview.requiresPlanAcceptance ? "You must review and accept the plan before execution." : "Chrona will generate and accept a valid plan before the scheduled start."}</dd></div>
-                        <div><dt className="font-medium text-muted-foreground">Pauses</dt><dd>{policyPreview.pauseConditions.join(" ") || "Execution starts only when you choose to run it."}</dd></div>
-                        <div><dt className="font-medium text-muted-foreground">{dialogCopy.automationRecovery}</dt><dd>{policyPreview.missedRunPolicy} {policyPreview.retryPolicy}</dd></div>
-                        <div><dt className="font-medium text-muted-foreground">Closing Chrona</dt><dd>{policyPreview.processRequirement}</dd></div>
-                      </dl>
-                    </div>
+                  <div className="mb-3 grid gap-1.5">
+                    <span className="text-xs font-medium text-muted-foreground">
+                      {dialogCopy.automationTimingLabel}
+                    </span>
+                    <Select
+                      value={autoExecuteTiming}
+                      disabled={isPending}
+                      onValueChange={(value) =>
+                        setAutoExecuteTiming(normalizeAutomationTiming(value))
+                      }
+                    >
+                      <SelectTrigger className="w-full">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {timingOptions.map((option) => (
+                          <SelectItem key={option.value} value={option.value}>
+                            {option.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
+                    <div
+                      aria-label={dialogCopy.automationPreview}
+                      className="rounded-xl border border-border/70 bg-muted/30 p-3"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="font-semibold text-foreground">
+                            {dialogCopy.automaticRunTitle}
+                          </p>
+                          <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                            {dialogCopy.automaticRunSummary}
+                          </p>
+                        </div>
+                        <Badge
+                          variant={automationBlocked ? "destructive" : "default"}
+                        >
+                          {automationBlocked
+                            ? dialogCopy.automaticRunActionRequired
+                            : dialogCopy.automaticRunReady}
+                        </Badge>
+                      </div>
+                      {automationBlocked && policyPreview.disabledReason ? (
+                        <p className="mt-3 rounded-lg bg-destructive/10 px-3 py-2 text-xs leading-5 text-destructive">
+                          {policyPreview.disabledReason}
+                        </p>
+                      ) : null}
+
+                      <dl className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
+                        <div>
+                          <dt className="font-medium text-muted-foreground">
+                            {dialogCopy.automaticRunTime}
+                          </dt>
+                          <dd className="mt-0.5 text-foreground">
+                            {policyPreview.nextOccurrenceAt
+                              ? new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en", {
+                                  dateStyle: "medium",
+                                  timeStyle: "short",
+                                }).format(new Date(policyPreview.nextOccurrenceAt))
+                              : "—"}
+                          </dd>
+                        </div>
+                        <div>
+                          <dt className="font-medium text-muted-foreground">
+                            {dialogCopy.automaticRunProvider}
+                          </dt>
+                          <dd className="mt-0.5 text-foreground">
+                            {policyPreview.providerName ?? dialogCopy.defaultProviderSummary}
+                          </dd>
+                        </div>
+                      </dl>
+
+                      <button
+                        type="button"
+                        className="mt-3 flex w-full items-center justify-between border-t border-border/60 pt-3 text-left text-xs font-medium text-foreground"
+                        aria-expanded={showAutomationDetails}
+                        onClick={() => setShowAutomationDetails((current) => !current)}
+                      >
+                        {dialogCopy.automaticRunDetails}
+                        <ChevronDown
+                          className={cn(
+                            "size-4 transition-transform",
+                            showAutomationDetails && "rotate-180",
+                          )}
+                          aria-hidden="true"
+                        />
+                      </button>
+                      {showAutomationDetails ? (
+                        <ul className="mt-2 space-y-1.5 text-xs leading-5 text-muted-foreground">
+                          <li>• {dialogCopy.automaticRunPause}</li>
+                          <li>• {dialogCopy.automaticRunRetry}</li>
+                          <li>• {dialogCopy.automaticRunMissed}</li>
+                          <li>• {dialogCopy.automaticRunPage}</li>
+                        </ul>
+                      ) : null}
+                    </div>
                 </TaskConfigSection>
               ) : null}
             </div>
