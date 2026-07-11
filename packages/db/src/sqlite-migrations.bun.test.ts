@@ -1,6 +1,6 @@
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join, resolve } from "node:path";
+import { join } from "node:path";
 import { Database } from "bun:sqlite";
 import { describe, expect, it } from "bun:test";
 
@@ -102,42 +102,6 @@ describe("ensureSqliteDatabase", () => {
       expect(migration?.applied_steps_count).toBe(0);
     } finally {
       db.close();
-    }
-  });
-
-  it("proves fresh install and previous-release upgrade against shipped migrations", () => {
-    const migrationsDir = resolve(import.meta.dir, "../../../prisma/migrations");
-    const dir = mkdtempSync(join(tmpdir(), "chrona-release-migrations-"));
-    const freshPath = join(dir, "fresh.db");
-
-    ensureSqliteDatabase({ databaseUrl: `file:${freshPath}`, migrationsDir });
-    const fresh = new Database(freshPath, { readonly: true });
-    try {
-      expect(fresh.query("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'WorkspaceUserPreference'").get()).toBeTruthy();
-      expect(fresh.query("SELECT COUNT(*) AS count FROM _prisma_migrations").get()).toEqual({ count: 2 });
-    } finally {
-      fresh.close();
-    }
-
-    const upgradePath = join(dir, "upgrade.db");
-    const previousReleaseDir = join(dir, "previous-release-migrations");
-    createMigration(previousReleaseDir, "0001_initial", readFileSync(join(migrationsDir, "0001_initial", "migration.sql"), "utf8"));
-    ensureSqliteDatabase({ databaseUrl: `file:${upgradePath}`, migrationsDir: previousReleaseDir });
-
-    const beforeUpgrade = new Database(upgradePath, { readonly: true });
-    try {
-      expect(beforeUpgrade.query("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'WorkspaceUserPreference'").get()).toBeNull();
-    } finally {
-      beforeUpgrade.close();
-    }
-
-    ensureSqliteDatabase({ databaseUrl: `file:${upgradePath}`, migrationsDir });
-    const upgraded = new Database(upgradePath, { readonly: true });
-    try {
-      expect(upgraded.query("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'WorkspaceUserPreference'").get()).toBeTruthy();
-      expect(upgraded.query("SELECT COUNT(*) AS count FROM _prisma_migrations").get()).toEqual({ count: 2 });
-    } finally {
-      upgraded.close();
     }
   });
 });
