@@ -269,9 +269,9 @@ test.describe("Task create → plan → run → result", () => {
       await generateAndAcceptPlan(request, task.taskId);
     });
 
-    // 3. The plan graph appears; engine moves to the pre-start `started`
-    //    state (accepted plan, no execution session yet).
-    await expect(page.getByTestId("task-plan-graph").first()).toBeVisible({ timeout: 20_000 });
+    // 3. The accepted-plan workspace appears; engine moves to the pre-start
+    //    `started` state (accepted plan, no execution session yet).
+    await expect(page.getByTestId("accepted-plan-surface")).toBeVisible({ timeout: 20_000 });
     await expect
       .poll(async () => (await getCurrentExecution(request, task.taskId)).status, { timeout: 10_000 })
       .toBe("started");
@@ -344,24 +344,25 @@ test.describe("Task create → plan → run → result", () => {
     });
     await generateDebugTaskWorkspacePlan(request, task.taskId);
 
-    // First navigation — confirm graph renders and plan is accepted server-side.
+    // First navigation — confirm the accepted-plan workspace renders and the
+    // plan is accepted server-side.
     await page.goto(TASK_URL(task.taskId));
     await dismissTaskEditorIfOpen(page);
-    await expect(page.getByTestId("task-plan-graph").first()).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByTestId("accepted-plan-surface")).toBeVisible({ timeout: 20_000 });
     const firstResponse = await request.get(`/api/tasks/${task.taskId}/plan`);
     expect(firstResponse.ok()).toBeTruthy();
     const firstBody = (await firstResponse.json()) as { savedPlan?: { id?: string; status?: string } | null };
     expect(firstBody.savedPlan?.id).toBeTruthy();
     expect(firstBody.savedPlan?.status).toBe("accepted");
 
-    // Navigate away to the task list, then back. The plan must still
+    // Navigate away to the task list, then back. The accepted plan must still
     // render — proves the workspace re-hydrates from the REST snapshot
     // when the SSE connection is severed and re-established.
     await page.goto("/en/tasks");
     await expect(page.getByRole("heading", { name: /tasks/i }).first()).toBeVisible();
     await page.goto(TASK_URL(task.taskId));
     await dismissTaskEditorIfOpen(page);
-    await expect(page.getByTestId("task-plan-graph").first()).toBeVisible({ timeout: 20_000 });
+    await expect(page.getByTestId("accepted-plan-surface")).toBeVisible({ timeout: 20_000 });
 
     const secondResponse = await request.get(`/api/tasks/${task.taskId}/plan`);
     expect(secondResponse.ok()).toBeTruthy();

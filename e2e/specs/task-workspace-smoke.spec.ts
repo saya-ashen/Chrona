@@ -13,8 +13,8 @@ test.describe("Task workspace smoke", () => {
 
     await expect(page.getByRole("heading", { name: "Workspace smoke task" })).toBeVisible();
     await expect(page.getByRole("region", { name: "Task execution workspace" })).toBeVisible();
-    await expect(page.getByRole("region", { name: "Execution flow" })).toBeVisible();
-    await expect(page.getByRole("complementary", { name: "Task command center" })).toBeVisible();
-    await expect(page.getByText("Activity").first()).toBeVisible();
+    await expect(page.getByRole("heading", { name: "You can create a plan now" })).toBeVisible();
+    await expect(page.getByRole("complementary", { name: "Plan creation action" })).toBeVisible();
+    await expect(page.getByRole("region", { name: "Task brief" })).toBeVisible();
   });
 });
