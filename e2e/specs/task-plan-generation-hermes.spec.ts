@@ -1,7 +1,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import { expect, test, type APIRequestContext } from "@playwright/test";
 
-const CHRONA_BASE_URL = `http://127.0.0.1:${process.env.CHRONA_E2E_API_PORT ?? "3101"}`;
+const CHRONA_BASE_URL = `http://127.0.0.1:${process.env.CHRONA_E2E_API_PORT ?? "43101"}`;
 
 type CreatedTask = {
   taskId: string;
