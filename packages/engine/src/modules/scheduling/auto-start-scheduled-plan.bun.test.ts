@@ -149,7 +149,7 @@ describe("auto-start-scheduled-plan", () => {
     expect(result.skipped).toHaveLength(1);
     expect(result.skipped[0]).toMatchObject({
       taskId: task.id,
-      reason: "Connect an AI before enabling automation.",
+      reason: "Choose an execution runtime before automatic execution can start.",
     });
     expect(startMock).not.toHaveBeenCalled();
   });
