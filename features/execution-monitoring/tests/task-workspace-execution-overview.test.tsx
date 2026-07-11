@@ -78,7 +78,7 @@ describe("TaskWorkspaceExecutionOverview", () => {
     expect(screen.queryByRole("tab", { name: "Now" })).not.toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: "Results" })).not.toBeInTheDocument();
     expect(screen.queryByRole("tab", { name: "Activity" })).not.toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Execution Result" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Final result" })).toBeInTheDocument();
     expect(screen.getByText("Activity")).toBeInTheDocument();
     expect(screen.getByText("Output")).toBeInTheDocument();
     expect(screen.getByText("AI generated")).toBeInTheDocument();
@@ -281,7 +281,7 @@ describe("TaskWorkspaceExecutionOverview", () => {
 
     renderOverview(view, { commandCenter: { documents: { now: nowDocument("Execution running"), output: nowDocument("Plan output"), trail: nowDocument("Trail") } } });
 
-    expect(screen.getByRole("heading", { name: "Execution Result" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Final result" })).toBeInTheDocument();
     expect(screen.getByText("Plan output")).toBeInTheDocument();
     expect(screen.queryByText("summary")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Locate source node" })).not.toBeInTheDocument();
@@ -314,7 +314,7 @@ describe("TaskWorkspaceExecutionOverview", () => {
 
     renderOverview(view);
 
-    expect(screen.getByRole("heading", { name: "Execution Result" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Final result" })).toBeInTheDocument();
     expect(screen.getByText("No execution result yet.")).toBeInTheDocument();
   });
 
@@ -484,14 +484,16 @@ describe("TaskWorkspaceExecutionOverview", () => {
 
     expect(screen.getByText("Evidence details")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Collapse all" }));
+    await user.click(screen.getByRole("button", { name: "Result options" }));
+    await user.click(await screen.findByText("Collapse all"));
 
     expect(screen.queryByRole("button", { name: /Secondary evidence/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Primary details/ })).not.toBeInTheDocument();
     expect(screen.queryByText("Evidence details")).not.toBeInTheDocument();
     expect(screen.queryByText("Visible details")).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: "Expand all" }));
+    await user.click(screen.getByRole("button", { name: "Result options" }));
+    await user.click(await screen.findByText("Expand all"));
 
     expect(screen.getByRole("button", { name: /Secondary evidence/ })).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByRole("button", { name: /Primary details/ })).toHaveAttribute("aria-expanded", "true");

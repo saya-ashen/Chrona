@@ -66,7 +66,14 @@ vi.mock("@/components/tasks/workspace/sections/task-workspace-edit-section", () 
 }));
 
 vi.mock("@/components/tasks/workspace/sections/task-workspace-plan-section", () => ({
-  TaskWorkspacePlanSection: ({ onGeneratePlan }: { onGeneratePlan: () => void }) => <button type="button" onClick={onGeneratePlan}>Generate plan</button>,
+  TaskWorkspacePlanSection: ({ onGeneratePlan, onApplyPlan, plan, canAcceptPlan }: {
+    onGeneratePlan: () => void;
+    onApplyPlan: (plan: TaskPlanReadModel) => void;
+    plan: TaskPlanReadModel | null;
+    canAcceptPlan: boolean;
+  }) => canAcceptPlan && plan
+    ? <button type="button" onClick={() => onApplyPlan(plan)}>Accept plan</button>
+    : <button type="button" onClick={onGeneratePlan}>Generate plan</button>,
 }));
 
 vi.mock("@/lib/rpc-client", () => ({
@@ -250,7 +257,7 @@ describe("TaskWorkspacePage Generate Plan live header action", () => {
 describe("TaskWorkspacePage Accept Plan live header action", () => {
 
   it("updates Accept Plan to Start from real click plus workspace state.update", async () => {
-    renderWorkspace({ savedPlan: draftPlan(), planStatus: "waiting_acceptance", executionStatus: "started" });
+    renderWorkspace({ savedPlan: draftPlan(), planStatus: "waiting_acceptance", executionStatus: "idle" });
     await waitFor(() => expect(mocks.streamOpened).toBe(true));
 
     await act(async () => {
@@ -259,12 +266,20 @@ describe("TaskWorkspacePage Accept Plan live header action", () => {
         state: {
           "/execution/show-generate-plan": false,
           "/execution/show-accept-plan": true,
+          "/plan/saved/id": "plan-1",
+          "/plan/saved/status": "draft",
+          "/plan/saved/revision": 1,
+          "/plan/generation/status": "completed",
+          "/execution/has-plan": true,
+          "/execution/has-accepted-plan": false,
+          "/plan/generation/is-running": false,
+          "/plan/generation/header-action-disabled": false,
           "/execution/can-start": false,
           "/execution/can-pause": false,
           "/execution/can-stop": false,
           "/execution/start-disabled": true,
           "/execution/start-disabled-reason": "Accept the generated plan before starting execution.",
-          "/execution/status": "started",
+          "/execution/status": "idle",
         },
       });
     });
