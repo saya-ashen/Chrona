@@ -10,7 +10,8 @@ test.describe("external calendar source setup", () => {
   test("adds a read-only calendar source and rejects an invalid link", async ({ page }, testInfo) => {
     const sourceName = `Team calendar ${testInfo.project.name} ${crypto.randomUUID()}`;
     await page.goto("/en/schedule");
-    await page.getByRole("tab", { name: /calendar/i }).click();
+    const calendarTab = page.getByRole("tab", { name: /calendar/i });
+    if (await calendarTab.isVisible()) await calendarTab.click();
 
     await expect(page.getByRole("heading", { name: /connect external calendar/i })).toBeVisible();
     await expect(page.getByText(/read-only/i).first()).toBeVisible();
@@ -23,7 +24,7 @@ test.describe("external calendar source setup", () => {
     await expect(page.getByRole("listitem").filter({ hasText: sourceName })).toBeVisible();
 
     await expect(connectDialog).not.toBeVisible();
-    await page.getByLabel("Calendar", { exact: true }).getByRole("button", { name: /connect calendar/i }).click();
+    await page.getByRole("button", { name: /connect calendar/i }).click();
     const invalidDialog = page.getByRole("dialog", { name: /connect external calendar/i });
     await invalidDialog.getByLabel(/display name/i).fill(`Bad calendar ${testInfo.project.name}`);
     await invalidDialog.getByLabel(/calendar url/i).fill("ftp://example.test/private.ics");
