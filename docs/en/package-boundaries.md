@@ -48,12 +48,19 @@ Chrona is migrating toward Bun-first feature slices while legacy `apps/` and
 | `shared/ui` | Generic UI primitives only |
 | `shared/test` | Cross-feature test helpers |
 
+Only `index.ts` and the private/public boundary are mandatory. Add
+`contract.ts`, `routes.ts`, `service.ts`, `repository.ts`, `model/`, `ui/`, or
+`tests/` only when the capability needs that layer. Empty layers and pass-through
+wrappers are not architecture.
+
 Feature-internal imports should be relative paths inside the same feature.
-Sibling features must not import `features/<other>/model/*`, `service.ts`,
-`repository.ts`, `routes.ts`, or `ui/*` directly; add a public export to
-`features/<other>/index.ts` instead. `shared/` must stay infrastructure-only:
-no task, plan, execution, schedule, external-calendar, or AI-client product
-workflow logic.
+Sibling features may import only `features/<other>/index.ts`; secondary barrels
+such as `ui.ts` or `server.ts` are not public feature APIs. Never import
+`features/<other>/model/*`, `service.ts`, `repository.ts`, `routes.ts`, or
+`ui/*` directly. Export the required contract from `features/<other>/index.ts`
+instead.
+`shared/` must stay infrastructure-only: no task, plan, execution, schedule,
+external-calendar, or AI-client product workflow logic.
 
 Feature-local checks:
 
@@ -358,27 +365,37 @@ These boundaries are enforced, not just documented. Two gates run in
 | `no-cross-package-prisma-generated` | error | importing `packages/db/src/generated/*` from another package — use the `@chrona/db` barrel |
 | `engine-sink-modules-via-barrel` | error | runtime (value) imports into an engine *capability* module's internals (`events`/`ai`/`execution-runtime`/`workspaces`) — use its `modules/<name>/index.ts` barrel. Type-only imports exempt. The co-recursive core modules are deliberately not covered (see [Internal module structure](#internal-module-structure)) |
 | `no-deep-import-engine-internals-tests` | warn | test files reaching into engine internals (debt; prefer the barrel) |
-| `engine-sink-modules-via-barrel-tests` | warn | test files reaching into capability-module internals (debt; prefer the barrel) |
-| `feature-<name>-internals-are-private` | error | sibling features importing another feature internals instead of `features/<name>/index.ts` |
-| `features-do-not-import-apps-or-packages-internals` | warn | production `features/*` importing app files or package internals instead of public barrels/shared primitives (temporary migration debt) |
+| `engine-sink-modules-via-barrel-tests` | warn | tests reaching into capability-module internals (debt; prefer the barrel) |
+| `feature-<name>-internals-are-private` | error | sibling features importing anything except `features/<name>/index.ts` |
+| `features-do-not-import-apps-or-packages-internals` | warn | production features importing app files or package internals during migration |
 | `shared-owns-no-feature-or-app-code` | error | production `shared/*` importing features, apps, or product package internals |
-| `features-and-shared-never-import-apps-tests` | warn | feature/shared tests importing app internals (debt; prefer feature-local helpers) |
-| `no-circular` | warn | circular dependencies (remaining ones are intra-package type-only debt) |
+| `features-and-shared-never-import-apps-tests` | warn | feature/shared tests importing app internals |
+| `no-circular` | warn | circular dependencies |
 
-### Known violations (debt)
+### Exceptions and existing debt
 
-`.dependency-cruiser-known-violations.json` freezes pre-existing `error`-level
-violations so the gate can run green while still catching new ones. It is
-currently empty (`[]`) — there are no frozen `error`-level violations, and
-`check:boundaries` is green.
+`.dependency-cruiser-known-violations.json` is the single exception registry.
+It is currently empty (`[]`). Keep it empty by fixing imports rather than
+weakening rules.
 
-The former engine→web debt (an engine page-reader importing
-`schedule-page-utils.ts` from `apps/web/src/components/schedule/`) has been
-resolved: those helpers are now consumed only within `apps/web`, so no package
-reaches back into an app. Keep it that way — if you need scheduling helpers
-outside the web app, move them into `packages/domain`/`packages/shared` rather
-than importing across the boundary.
+An exceptional entry must be path-specific and include an owner, reason, and
+removal condition in the approving change. Wildcards, source-local disables,
+and exemptions without a deletion condition are prohibited. Released debt may
+be captured only by an explicit architecture review; new work may not regenerate
+the baseline to make CI green.
 
-Do not add entries to the baseline to work around a rule — fix the import
-instead. Regenerate the baseline only when intentionally re-snapshotting debt:
-`bunx dependency-cruiser --config .dependency-cruiser.cjs --output-type baseline apps packages features shared`, then keep only the `error`-severity entries.
+The former engine-to-web scheduling debt is resolved. If scheduling helpers are
+needed outside the web app, move pure rules into `packages/domain` or reusable
+infrastructure into an appropriate package; never import back into an app.
+
+### Verification
+
+Run:
+
+```bash
+bun run check:boundaries
+bun run typecheck
+bun test scripts/dependency-boundaries.bun.test.ts
+```
+
+CI runs `bun run check:boundaries` explicitly before the test suite.

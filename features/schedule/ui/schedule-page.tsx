@@ -15,7 +15,7 @@ import { buildSchedulePageViewModel } from "./schedule-page-view-model";
 import { SchedulePageHeader } from "./schedule-page-main-panel";
 import { SchedulePageMainPanel } from "./schedule-page-main-panel";
 import { SchedulePageDialogs } from "./dialogs/schedule-page-dialogs";
-import { CalendarSourceSetup, listExternalCalendarEvents } from "../../external-calendar/ui";
+import { CalendarSourceSetup, listExternalCalendarEvents } from "../../external-calendar";
 import { SelectedBlockSheet } from "./panels/schedule-page-panels";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 

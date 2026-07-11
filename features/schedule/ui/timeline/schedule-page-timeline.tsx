@@ -25,7 +25,7 @@ import { TaskCreateDialog } from "../dialogs/task-create-dialog";
 import { DayTimelineSummary } from "../panels/schedule-page-panels";
 import { TimelinePlacementCard } from "./schedule-timeline-primitives";
 import { ScheduleGhostBlockLayer } from "@/components/global-ai-sidebar/schedule-ghost-block-layer";
-import { ExternalCalendarEventBlock } from "../../../external-calendar/ui";
+import { ExternalCalendarEventBlock } from "../../../external-calendar";
 import type { ScheduleGhostBlockPreview } from "@chrona/contracts";
 import type { PlanningBusyBlock } from "@chrona/domain";
 import type {

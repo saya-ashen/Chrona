@@ -12,3 +12,5 @@ export { decideScheduleProposal } from "../../packages/engine/src/modules/schedu
 export { getSchedulePage } from "../../packages/engine/src/modules/pages/get-schedule-page";
 export { deriveAutoStartEligibility } from "../../packages/engine/src/modules/scheduling/derive-auto-start-eligibility";
 export type { TaskConfigAiClient, TaskConfigExecutionRuntime, TaskConfigFormInput } from "./ui/forms/task-config-form";
+export type { SchedulePageData } from "./ui/schedule-page-types";
+export { TaskCreateDialog } from "./ui/dialogs/task-create-dialog";
