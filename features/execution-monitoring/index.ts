@@ -13,16 +13,13 @@ export {
 } from "@chrona/contracts/ai";
 
 export {
-  getCurrentExecution,
-} from "../../packages/engine/src/modules/plan-execution/use-cases/get-current-execution";
-
-export {
   executionStatusFromGraphOutcome,
   executionStatusFromWaitKind,
   executionTransition,
-  planRunStatusForExecutionStatus,
+  getCurrentExecution,
   graphStatusForExecutionStatus,
-} from "../../packages/engine/src/modules/plan-execution/execution-state-machine";
+  planRunStatusForExecutionStatus,
+} from "@chrona/engine";
 
 export { TaskWorkspaceActionRail } from "./ui/action-rail";
 export { ActivityTimeline } from "./ui/activity-timeline";

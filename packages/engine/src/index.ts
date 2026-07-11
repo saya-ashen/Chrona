@@ -10,6 +10,13 @@ export {
 } from "./modules/projections";
 export { resolveHeaderExecutionState, headerExecutionStateToStatePaths } from "./modules/tasks/get-task-header";
 export { getCurrentExecution } from "./modules/plan-execution/use-cases/get-current-execution";
+export {
+  executionStatusFromGraphOutcome,
+  executionStatusFromWaitKind,
+  executionTransition,
+  graphStatusForExecutionStatus,
+  planRunStatusForExecutionStatus,
+} from "./modules/plan-execution/execution-state-machine";
 export { getLatestTaskPlanReadModel } from "./modules/plans/task-plan-read-model";
 export { startAutoPlanGenerationForTask } from "./modules/plans/auto-generate-task-plan";
 export {
