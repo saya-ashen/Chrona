@@ -61,9 +61,6 @@ function attentionDescriptor(item: DashboardAttentionItem) {
   });
 }
 
-function attentionTone(item: DashboardAttentionItem) {
-  return attentionDescriptor(item).tone;
-}
 
 function attentionIcon(
   item: DashboardAttentionItem,

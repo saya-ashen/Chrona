@@ -5,8 +5,7 @@ import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from
 import { AssistantSurfaceHeaderDrawerButton } from "@/components/assistant-surface/assistant-surface-header-drawer-button";
 import { StartWithChrona } from "@/components/start-with-chrona";
 import { LocalizedLink } from "@/components/i18n/localized-link";
-import { TaskCreateDialog } from "../../schedule/ui";
-import type { SchedulePageData } from "../../schedule/ui/schedule-page-types";
+import { TaskCreateDialog, type SchedulePageData } from "../../schedule/ui";
 import { createScheduledTask } from "@/lib/task-actions-client";
 import { apiJson } from "@/api";
 import { useAppPathname, useAppRouter } from "@/lib/router";

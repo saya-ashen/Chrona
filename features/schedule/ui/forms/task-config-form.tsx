@@ -818,31 +818,6 @@ function buildTaskConfigFormInput(
   };
 }
 
-function applyRuntimeAdapterChange(
-  current: TaskConfigFormState,
-  runtime: TaskConfigExecutionRuntime,
-): TaskConfigFormState {
-  const remappedRuntimeInput: RuntimeInput = {};
-
-  for (const field of runtime.spec.fields) {
-    const value = getValueAtPath(current.fieldExecutionConfig, field.path);
-
-    if (value !== undefined) {
-      setValueAtPath(remappedRuntimeInput, field.path, structuredClone(value));
-    }
-  }
-
-  const normalizedRuntimeInput = validateTaskConfigAgainstSpec(runtime.spec, remappedRuntimeInput, {
-    applyDefaults: false,
-  });
-
-  return {
-    ...current,
-    executionRuntime: runtime.key,
-    fieldExecutionConfig: pickSpecFieldRuntimeInput(runtime.spec, normalizedRuntimeInput),
-    extraExecutionConfig: "",
-  };
-}
 
 function applyPresetValues(
   current: TaskConfigFormState,

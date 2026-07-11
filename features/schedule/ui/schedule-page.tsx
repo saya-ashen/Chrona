@@ -264,6 +264,9 @@ export function SchedulePage({
               <CalendarSourceSetup workspaceId={workspaceId} />
             </TabsContent>
           </Tabs>
+          <div className="mt-4 hidden xl:block">
+            <CalendarSourceSetup workspaceId={workspaceId} />
+          </div>
         </div>
 
       </div>

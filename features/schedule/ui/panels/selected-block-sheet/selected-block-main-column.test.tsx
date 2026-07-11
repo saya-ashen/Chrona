@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom/vitest";
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { deriveWorkStateView } from "@chrona/domain";
 import { DEFAULT_SCHEDULE_PAGE_COPY } from "../../schedule-page-copy";
