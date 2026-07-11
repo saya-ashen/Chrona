@@ -520,12 +520,11 @@ describe("SchedulePage data display", () => {
     );
 
     expect(screen.getByTestId("planning-header")).toHaveTextContent(/ready to schedule/);
-    expect(screen.getByTestId("planning-header")).toHaveTextContent(/need attention/);
+    expect(screen.getByTestId("planning-header")).toHaveTextContent(/needing attention/);
     expect(screen.getByRole("button", { name: "Schedule task" })).toBeInTheDocument();
   });
 
-  it("shows a clear empty-day action when the selected date has no blocks", async () => {
-    const user = userEvent.setup();
+  it("keeps the timeline visible when the selected date has no blocks", () => {
     const data = createData();
     data.scheduled = [];
     data.summary.scheduledCount = 0;
@@ -539,15 +538,10 @@ describe("SchedulePage data display", () => {
       />,
     );
 
+    expect(screen.getByTestId("day-timeline")).toBeInTheDocument();
     expect(
-      screen.getByRole("heading", { name: "Nothing scheduled for this day" }),
-    ).toBeInTheDocument();
-    const emptyStateAction = screen.getAllByRole("button", {
-      name: "Schedule task",
-    })[1];
-    expect(emptyStateAction).toBeDefined();
-    await user.click(emptyStateAction!);
-    expect(screen.getByTestId("task-create-dialog")).toBeInTheDocument();
+      screen.queryByRole("heading", { name: "Nothing scheduled for this day" }),
+    ).not.toBeInTheDocument();
   });
 
   it("keeps provider setup out of the day header", () => {

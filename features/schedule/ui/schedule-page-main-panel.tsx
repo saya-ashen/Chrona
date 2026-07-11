@@ -270,7 +270,7 @@ export function SchedulePageMainPanel({
 
         <div className="mt-3 flex min-h-0 flex-1 flex-col overflow-hidden rounded-[20px] border border-border/45 bg-background/65">
           {activeView === "timeline" ? (
-            activeGroup && activeGroup.items.length > 0 ? (
+            activeGroup ? (
               <DayTimeline
                 items={activeGroup.items}
                 dayDate={activeGroup.date}
@@ -291,11 +291,7 @@ export function SchedulePageMainPanel({
                 onSelectTask={onSelectTask}
               />
             ) : (
-              <DayEmptyState
-                copy={copy}
-                readyCount={readyCount}
-                onScheduleTask={onScheduleTask}
-              />
+              <EmptyState>{copy.noTimelineDay}</EmptyState>
             )
           ) : activeGroup && activeGroup.items.length > 0 ? (
             <div className="min-h-0 flex-1 overflow-y-auto">
