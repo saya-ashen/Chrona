@@ -5,12 +5,12 @@ describe("deriveUserFacingFailure", () => {
   test("keeps input and approval recovery distinct", () => {
     expect(deriveUserFacingFailure({ state: "waiting_for_input" })).toMatchObject({
       category: "input",
-      safeActions: expect.arrayContaining([{ id: "provide_input", label: "Provide input" }]),
+      safeActions: [{ id: "provide_input", label: "Provide input" }],
       duplicateSideEffectRisk: null,
     });
     expect(deriveUserFacingFailure({ state: "waiting_for_approval" })).toMatchObject({
       category: "approval",
-      safeActions: expect.arrayContaining([{ id: "review_approval", label: "Review approval" }]),
+      safeActions: [{ id: "review_approval", label: "Review approval" }],
       duplicateSideEffectRisk: null,
     });
   });
