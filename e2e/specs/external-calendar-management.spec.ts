@@ -12,7 +12,8 @@ test.describe("external calendar source management", () => {
     const renamedSourceName = `Renamed calendar ${testInfo.project.name} ${crypto.randomUUID()}`;
     const eventTitle = `Managed standup ${testInfo.project.name}`;
     await page.goto(`/en/schedule?day=${EVENT_DAY}`);
-    await page.getByRole("tab", { name: /calendar/i }).click();
+    const calendarTab = page.getByRole("tab", { name: /calendar/i });
+    if (await calendarTab.isVisible()) await calendarTab.click();
     await page.getByRole("button", { name: /connect calendar/i }).click();
 
     await page.getByLabel(/display name/i).first().fill(sourceName);

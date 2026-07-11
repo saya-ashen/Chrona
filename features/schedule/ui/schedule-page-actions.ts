@@ -1,6 +1,6 @@
 import {
   applySchedule,
-  createTaskFromSchedule,
+  createScheduledTask,
   moveWorkBlock,
   updateTaskConfigFromSchedule,
 } from "@/lib/task-actions-client";
@@ -377,7 +377,7 @@ export async function handleCreateTaskBlockAction({
     setIsPending(true);
     setErrorMessage(null);
 
-    const created = (await createTaskFromSchedule({
+    const created = await createScheduledTask({
       workspaceId,
       title: input.title,
       description: input.description || null,
@@ -389,24 +389,19 @@ export async function handleCreateTaskBlockAction({
       executionRuntime: input.executionRuntime,
       executionConfig: input.executionConfig,
       aiClientId: input.aiClientId,
+      dueAt: input.dueAt,
+      scheduledStartAt: input.scheduledStartAt,
+      scheduledEndAt: input.scheduledEndAt,
       recurrenceRule: input.recurrenceRule ?? null,
       recurrenceAnchorStartAt: input.recurrenceAnchorStartAt ?? null,
       recurrenceAnchorEndAt: input.recurrenceAnchorEndAt ?? null,
-    })) as { taskId: string };
+    });
 
     const createdItem = createScheduledItemFromCreateInput(
       created.taskId,
       workspaceId,
       input,
     );
-
-    await applySchedule({
-      taskId: created.taskId,
-      dueAt: input.dueAt,
-      scheduledStartAt: input.scheduledStartAt,
-      scheduledEndAt: input.scheduledEndAt,
-      scheduleSource: "human",
-    });
 
     applyOptimisticViewData((current) => ({
       ...current,

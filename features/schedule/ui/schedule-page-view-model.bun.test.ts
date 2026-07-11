@@ -2,7 +2,10 @@ import { describe, expect, it } from "bun:test";
 
 import { DEFAULT_SCHEDULE_PAGE_COPY } from "./schedule-page-copy";
 import type { SchedulePageData } from "./schedule-page-types";
-import { buildSchedulePageViewModel } from "./schedule-page-view-model";
+import {
+  buildSchedulePageViewModel,
+  deriveScheduleDisplayState,
+} from "./schedule-page-view-model";
 
 function formatDateKey(value: Date) {
   return `${value.getFullYear()}-${String(value.getMonth() + 1).padStart(2, "0")}-${String(value.getDate()).padStart(2, "0")}`;
@@ -132,5 +135,67 @@ describe("buildSchedulePageViewModel", () => {
     });
 
     expect(viewModel.selectedItem?.title).toBe("Second occurrence");
+  });
+});
+
+describe("deriveScheduleDisplayState", () => {
+  const cases = [
+    {
+      name: "empty day with ready work",
+      readyCount: 4,
+      attentionCount: 0,
+      expectedAction: "schedule_task",
+      expectedTab: "queue",
+    },
+    {
+      name: "empty day requiring attention",
+      readyCount: 4,
+      attentionCount: 2,
+      expectedAction: "review_attention",
+      expectedTab: "attention",
+    },
+    {
+      name: "clear day without work",
+      readyCount: 0,
+      attentionCount: 0,
+      expectedAction: "create_task",
+      expectedTab: "queue",
+    },
+  ] as const;
+
+  for (const testCase of cases) {
+    it(testCase.name, () => {
+      const display = deriveScheduleDisplayState({
+        activeGroup: null,
+        activeView: "timeline",
+        readyCount: testCase.readyCount,
+        attentionCount: testCase.attentionCount,
+      });
+
+      expect(display.day.phase).toBe("empty");
+      expect(display.primaryAction).toBe(testCase.expectedAction);
+      expect(display.planningDrawer.defaultTab).toBe(testCase.expectedTab);
+    });
+  }
+
+  it("keeps agenda and timeline on the selected day's scheduled items", () => {
+    const scheduledStartAt = new Date("2026-06-04T09:00:00");
+    const data = createData(scheduledStartAt);
+    const model = buildSchedulePageViewModel({
+      viewData: data,
+      selectedDay: "2026-06-04",
+      activeView: "list",
+      secondaryView: "queue",
+      locale: "en",
+      copy: DEFAULT_SCHEDULE_PAGE_COPY,
+    });
+
+    expect(model.display.primarySurface).toBe("agenda");
+    expect(model.display.day.phase).toBe("scheduled");
+    expect(model.display.day.scheduledCount).toBe(1);
+    expect(model.display.day.scheduledMinutes).toBe(60);
+    expect(model.activeGroup?.items.map((item) => item.taskId)).toEqual([
+      "task-1",
+    ]);
   });
 });

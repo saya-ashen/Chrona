@@ -1,7 +1,9 @@
 import { PlanningHeader } from "./panels/planning-header";
 import { Card } from "@/components/ui/card";
 import { DayTimeline } from "./timeline/schedule-page-timeline";
-import { ScheduleTaskList } from "./schedule-task-list";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { CalendarDays, Clock } from "lucide-react";
 import type {
   ScheduleGhostBlockPreview,
 } from "@chrona/contracts";
@@ -14,40 +16,64 @@ import type {
 import type { PlanningBusyBlock } from "@chrona/domain";
 import type { SchedulePageCopy } from "./schedule-page-copy";
 import type { SchedulePageViewModel } from "./schedule-page-view-model";
-import type { TaskConfigFormInput } from "./forms/task-config-form";
+import type { Locale } from "@chrona/i18n";
 import { EmptyState } from "./panels/schedule-panel-primitives";
 
 export function SchedulePageHeader({
   copy,
   locale,
   activeView,
-  viewData,
   viewModel,
   onNavigate,
   localizeHref,
   buildScheduleViewHref,
+  onScheduleTask,
 }: {
   copy: SchedulePageCopy;
-  locale: string;
+  locale: Locale;
   activeView: ScheduleViewMode;
   viewData: SchedulePageData;
   viewModel: SchedulePageViewModel;
   onNavigate: (href: string) => void;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  localizeHref: (locale: any, href: string) => string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  buildScheduleViewHref: (...args: any[]) => string;
+  localizeHref: (locale: Locale | undefined, href: string) => string;
+  buildScheduleViewHref: (
+    day: string,
+    view: ScheduleViewMode,
+    taskId?: string,
+  ) => string;
+  onScheduleTask: () => void;
 }) {
+  const previousDay = new Date(viewModel.activeDayDate);
+  previousDay.setDate(previousDay.getDate() - 1);
+  const nextDay = new Date(viewModel.activeDayDate);
+  nextDay.setDate(nextDay.getDate() + 1);
+  const toDayKey = (date: Date) =>
+    `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+  const summary = copy.dayPlanningSummaryTemplate
+    .replace("{queue}", String(viewModel.display.planningDrawer.readyCount))
+    .replace(
+      "{risks}",
+      String(viewModel.display.planningDrawer.attentionCount),
+    );
+
   return (
     <PlanningHeader
       ariaLabel={copy.pageTitle}
       title={copy.pageTitle}
       activeDayLabel={viewModel.activeGroup?.label ?? viewModel.activeDay}
-      summary={viewModel.cockpitSummary}
-      dateSwitcherLabel={copy.dateSwitcher}
+      summary={summary}
       dayLinks={[
         {
+          label: copy.previousDay,
+          kind: "previous",
+          href: localizeHref(
+            locale,
+            buildScheduleViewHref(toDayKey(previousDay), activeView),
+          ),
+        },
+        {
           label: copy.today,
+          kind: "today",
           href: localizeHref(
             locale,
             buildScheduleViewHref(viewModel.todayKey, activeView),
@@ -55,14 +81,23 @@ export function SchedulePageHeader({
           current: viewModel.activeDay === viewModel.todayKey,
         },
         {
-          label: copy.tomorrow,
+          label: copy.nextDay,
+          kind: "next",
           href: localizeHref(
             locale,
-            buildScheduleViewHref(viewModel.tomorrowKey, activeView),
+            buildScheduleViewHref(toDayKey(nextDay), activeView),
           ),
-          current: viewModel.activeDay === viewModel.tomorrowKey,
         },
       ]}
+      selectedDate={viewModel.activeDayDate}
+      onSelectDate={(date) =>
+        onNavigate(
+          localizeHref(
+            locale,
+            buildScheduleViewHref(toDayKey(date), activeView),
+          ),
+        )
+      }
       activeView={activeView}
       timelineHref={localizeHref(
         locale,
@@ -81,86 +116,136 @@ export function SchedulePageHeader({
         ),
       )}
       timelineLabel={copy.timeline}
-      listLabel={copy.list}
-      metrics={[
-        {
-          label: copy.cockpitTodayLoad,
-          value: `${viewData.planningSummary.todayLoadMinutes}m`,
-          hint: copy.cockpitTodayLoadHint,
-        },
-        {
-          label: copy.queueMetric,
-          value: String(viewData.planningSummary.readyToScheduleCount),
-          hint: copy.cockpitQueueHint,
-          tone: viewData.planningSummary.readyToScheduleCount > 0 ? "info" : undefined,
-        },
-        {
-          label: copy.risksMetric,
-          value: String(viewData.summary.riskCount),
-          hint: copy.cockpitRisksHint,
-          tone: viewData.summary.riskCount > 0 ? "critical" : undefined,
-        },
-        {
-          label: copy.cockpitSuggestions,
-          value: String(
-            viewData.summary.proposalCount +
-              viewData.automationCandidates.length,
-          ),
-          hint: copy.cockpitSuggestionsHint,
-          tone:
-            viewData.summary.proposalCount > 0 ||
-            viewData.automationCandidates.length > 0
-              ? "info"
-              : undefined,
-        },
-      ]}
-      actions={[
-        {
-
-          label: copy.cockpitConnectAi,
-          href: localizeHref(locale, "/settings?panel=ai-clients"),
-          description: copy.cockpitConnectAiHint,
-        },
-
-      ]}
+      listLabel={copy.agenda}
+      primaryAction={{
+        label: copy.scheduleTaskAction,
+        onClick: onScheduleTask,
+      }}
       onNavigate={onNavigate}
     />
   );
 }
+function DayEmptyState({
+  copy,
+  readyCount,
+  onScheduleTask,
+}: {
+  copy: SchedulePageCopy;
+  readyCount: number;
+  onScheduleTask: () => void;
+}) {
+  return (
+    <div className="flex min-h-72 flex-col items-center justify-center px-6 py-12 text-center">
+      <div className="flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary">
+        <CalendarDays className="size-6" aria-hidden="true" />
+      </div>
+      <h3 className="mt-4 text-lg font-semibold text-foreground">
+        {copy.dayEmptyTitle}
+      </h3>
+      <p className="mt-1 max-w-md text-sm text-muted-foreground">
+        {readyCount > 0
+          ? copy.dayEmptyWithQueueDescription
+          : copy.dayEmptyDescription}
+      </p>
+      <Button type="button" className="mt-4" onClick={onScheduleTask}>
+        {copy.scheduleTaskAction}
+      </Button>
+    </div>
+  );
+}
+
+function SelectedDayAgenda({
+  copy,
+  items,
+  locale,
+  onSelectTask,
+}: {
+  copy: SchedulePageCopy;
+  items: NonNullable<SchedulePageViewModel["activeGroup"]>["items"];
+  locale: Locale;
+  onSelectTask: (taskId: string) => void;
+}) {
+  if (items.length === 0) {
+    return <EmptyState>{copy.noAgendaItems}</EmptyState>;
+  }
+
+  return (
+    <section aria-label={copy.selectedDayAgenda} className="space-y-2 p-3">
+      {items.map((item) => (
+        <Card
+          key={item.workBlockId ?? item.taskId}
+          size="sm"
+          className="flex-row items-center gap-3 rounded-xl p-3"
+        >
+          <div className="flex w-28 shrink-0 items-center gap-1.5 text-sm font-medium text-foreground">
+            <Clock className="size-4 text-muted-foreground" aria-hidden="true" />
+            {item.scheduledStartAt
+              ? new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                }).format(item.scheduledStartAt)
+              : copy.timeNotSet}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate font-medium text-foreground">{item.title}</p>
+            <div className="mt-1 flex flex-wrap gap-1.5">
+              <Badge variant="outline">{item.priority}</Badge>
+              {item.actionRequired ? (
+                <Badge variant="destructive">{item.actionRequired}</Badge>
+              ) : null}
+            </div>
+          </div>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => onSelectTask(item.workBlockId ?? item.taskId)}
+          >
+            {copy.openTask}
+          </Button>
+        </Card>
+      ))}
+    </section>
+  );
+}
+
 
 export function SchedulePageMainPanel({
   copy,
   activeView,
+  locale,
   draggedItem,
   activeGroup,
   activeSelectedTaskId,
   conflictTaskIds,
-  listItems,
   ghostPreview,
   externalEvents,
   executionRuntimes,
   defaultExecutionRuntime,
   availableAiClients,
+  readyCount,
+  onScheduleTask,
   isPending,
   onScheduleDrop,
   onCreateTaskBlock,
   onScheduledDragStart,
   onDragEnd,
   onSelectTask,
-  onSaveTaskConfigAction,
 }: {
   copy: SchedulePageCopy;
   activeView: ScheduleViewMode;
+  locale: Locale;
   draggedItem: TimelineDragItem | null;
   activeGroup: SchedulePageViewModel["activeGroup"];
   activeSelectedTaskId: string | undefined;
   conflictTaskIds: Set<string>;
-  listItems: SchedulePageData["listItems"];
   ghostPreview: ScheduleGhostBlockPreview | null;
   externalEvents: PlanningBusyBlock[];
   executionRuntimes: SchedulePageData["executionRuntimes"];
   defaultExecutionRuntime: string;
   availableAiClients?: SchedulePageData["availableAiClients"];
+  readyCount: number;
+  onScheduleTask: () => void;
   isPending: boolean;
   onScheduleDrop: (
     item: TimelineDragItem,
@@ -171,10 +256,6 @@ export function SchedulePageMainPanel({
   onScheduledDragStart: (item: SchedulePageData["scheduled"][number]) => void;
   onDragEnd: () => void;
   onSelectTask: (taskId: string) => void;
-  onSaveTaskConfigAction: (
-    taskId: string,
-    input: TaskConfigFormInput,
-  ) => Promise<void>;
 }) {
   return (
     <div className="flex min-w-0 flex-1 flex-col overflow-hidden xl:min-h-0">
@@ -182,7 +263,9 @@ export function SchedulePageMainPanel({
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="text-base font-semibold text-foreground">
-              {copy.scheduledTimeline}
+              {activeView === "timeline"
+                ? copy.dayWorkspaceTitle
+                : copy.selectedDayAgenda}
             </h2>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -219,17 +302,21 @@ export function SchedulePageMainPanel({
             ) : (
               <EmptyState>{copy.noTimelineDay}</EmptyState>
             )
-          ) : (
+          ) : activeGroup && activeGroup.items.length > 0 ? (
             <div className="min-h-0 flex-1 overflow-y-auto">
-              <ScheduleTaskList
-                items={listItems}
-                executionRuntimes={executionRuntimes}
-                defaultExecutionRuntime={defaultExecutionRuntime}
-                availableAiClients={availableAiClients}
-                onSaveTaskConfigAction={onSaveTaskConfigAction}
-                isPending={isPending}
+              <SelectedDayAgenda
+                copy={copy}
+                items={activeGroup.items}
+                locale={locale}
+                onSelectTask={onSelectTask}
               />
             </div>
+          ) : (
+            <DayEmptyState
+              copy={copy}
+              readyCount={readyCount}
+              onScheduleTask={onScheduleTask}
+            />
           )}
         </div>
       </Card>

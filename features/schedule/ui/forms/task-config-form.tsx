@@ -101,6 +101,8 @@ type TaskConfigFormProps = {
   executionRuntimes: TaskConfigExecutionRuntime[];
   defaultExecutionRuntime: string;
   compact?: boolean;
+  formId?: string;
+  hideFooter?: boolean;
   initialValues?: {
     title?: string;
     description?: string | null;
@@ -816,31 +818,6 @@ function buildTaskConfigFormInput(
   };
 }
 
-function applyRuntimeAdapterChange(
-  current: TaskConfigFormState,
-  runtime: TaskConfigExecutionRuntime,
-): TaskConfigFormState {
-  const remappedRuntimeInput: RuntimeInput = {};
-
-  for (const field of runtime.spec.fields) {
-    const value = getValueAtPath(current.fieldExecutionConfig, field.path);
-
-    if (value !== undefined) {
-      setValueAtPath(remappedRuntimeInput, field.path, structuredClone(value));
-    }
-  }
-
-  const normalizedRuntimeInput = validateTaskConfigAgainstSpec(runtime.spec, remappedRuntimeInput, {
-    applyDefaults: false,
-  });
-
-  return {
-    ...current,
-    executionRuntime: runtime.key,
-    fieldExecutionConfig: pickSpecFieldRuntimeInput(runtime.spec, normalizedRuntimeInput),
-    extraExecutionConfig: "",
-  };
-}
 
 function applyPresetValues(
   current: TaskConfigFormState,
@@ -973,6 +950,8 @@ export function TaskConfigForm({
   isPending = false,
   presets,
   footerActions,
+  formId,
+  hideFooter = false,
   onDraftStateChange,
   onSubmitAction,
 }: TaskConfigFormProps) {
@@ -1188,7 +1167,7 @@ export function TaskConfigForm({
         </div>
       ) : null}
 
-      <form onSubmit={(event) => void handleSubmit(submitForm)(event)}>
+      <form id={formId} onSubmit={(event) => void handleSubmit(submitForm)(event)}>
         <FieldGroup className="gap-3">
           <TaskConfigSection title={copy.basics} info={isTitleLocked ? lockedFieldsHint : undefined}>
             <div className={compact ? "grid gap-3" : "grid gap-3 lg:grid-cols-[minmax(0,1fr)_180px]"}>
@@ -1477,23 +1456,6 @@ export function TaskConfigForm({
 
             <FieldGroup className="mt-3 gap-3">
               <>
-                {executionRuntimes.length > 1 ? (
-                  <TaskConfigField label={copy.adapter} className="text-xs text-foreground">
-                    <TaskConfigSelect
-                      name="executionRuntime"
-                      value={formState.executionRuntime}
-                      options={executionRuntimes.map((runtime) => ({ value: runtime.key, label: runtime.label }))}
-                      onValueChange={(value) =>
-                        replaceFormState(
-                          applyRuntimeAdapterChange(
-                            getValues(),
-                            resolveExecutionRuntime(executionRuntimes, value, defaultExecutionRuntime),
-                          ),
-                        )
-                      }
-                    />
-                  </TaskConfigField>
-                ) : null}
 
                 <TaskConfigSection title={descriptionLabel} compact>
                   {hasSourceDescription ? (
@@ -1644,12 +1606,14 @@ export function TaskConfigForm({
           </details>
         ) : null}
 
-        <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-3">
-          <div className="flex flex-wrap items-center gap-2">{footerActions}</div>
-          <Button type="submit" disabled={isPending} variant="default" size="default">
-            {isPending ? pendingLabel : submitLabel}
-          </Button>
-        </div>
+        {!hideFooter ? (
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-3">
+            <div className="flex flex-wrap items-center gap-2">{footerActions}</div>
+            <Button type="submit" disabled={isPending} variant="default" size="default">
+              {isPending ? pendingLabel : submitLabel}
+            </Button>
+          </div>
+        ) : footerActions ? <div className="border-t border-border/60 pt-3">{footerActions}</div> : null}
         </FieldGroup>
       </form>
     </div>

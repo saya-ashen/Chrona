@@ -19,7 +19,7 @@ import { CalendarSourceSetup, listExternalCalendarEvents } from "../../external-
 import { SelectedBlockSheet } from "./panels/schedule-page-panels";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
-import { ScheduleLeftSidebar, ScheduleRightSidebar } from "./panels/schedule-page-sidebar";
+import { ScheduleRightSidebar } from "./panels/schedule-page-sidebar";
 import { getSchedulePageCopy } from "./schedule-page-copy";
 import { useI18n, useLocale } from "@chrona/i18n/react";
 import { localizeHref } from "@chrona/i18n";
@@ -208,6 +208,7 @@ export function SchedulePage({
         onNavigate={(href) => router.push(href)}
         localizeHref={localizeHref}
         buildScheduleViewHref={buildScheduleViewHref}
+        onScheduleTask={() => setShowNewTaskDialog(true)}
       />
 
 
@@ -216,29 +217,22 @@ export function SchedulePage({
           {copy.errorPrefix}: {errorMessage}
         </div>
       ) : null}
-
-      <div className="mt-3 grid grid-cols-1 gap-3 overflow-visible rounded-[1.75rem] bg-card p-3 lg:gap-4 lg:p-4 xl:min-h-0 xl:flex-1 xl:grid-cols-[minmax(210px,0.72fr)_minmax(0,1.85fr)_minmax(220px,0.62fr)] xl:overflow-hidden">
-        <ScheduleLeftSidebar
-          copy={copy}
-          locale={locale}
-          activeView={activeView}
-          viewModel={viewModel}
-          localizeHref={localizeHref}
-          buildScheduleViewHref={buildScheduleViewHref}
-        />
+      <div className="mt-3 grid grid-cols-1 gap-3 overflow-visible rounded-[1.75rem] bg-card p-3 lg:gap-4 lg:p-4 xl:min-h-0 xl:flex-1 xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.42fr)] xl:overflow-hidden">
 
         <SchedulePageMainPanel
+          locale={locale}
           copy={copy}
           activeView={activeView}
           draggedItem={draggedItem}
           activeGroup={viewModel.activeGroup}
           activeSelectedTaskId={viewModel.activeSelectedTaskId}
           conflictTaskIds={viewModel.conflictTaskIds}
-          listItems={viewData.listItems}
           ghostPreview={pendingProposal?.kind === "schedule" ? pendingProposal.schedulePreview ?? null : null}
           externalEvents={externalEvents}
           executionRuntimes={data.executionRuntimes}
           defaultExecutionRuntime={data.defaultExecutionRuntime}
+          readyCount={viewModel.display.planningDrawer.readyCount}
+          onScheduleTask={() => setShowNewTaskDialog(true)}
           availableAiClients={data.availableAiClients}
           isPending={isPending}
           onScheduleDrop={handleScheduleDrop}
@@ -246,16 +240,15 @@ export function SchedulePage({
           onScheduledDragStart={handleScheduledDragStart}
           onDragEnd={handleQueueDragEnd}
           onSelectTask={setLocalSelectedTaskId}
-          onSaveTaskConfigAction={handleTaskConfigSave}
         />
 
-        <div className="min-h-0 overflow-visible xl:overflow-hidden xl:pl-1">
-          <Tabs defaultValue="queue" className="h-full min-h-0">
-            <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="queue">{copy.queueTab}</TabsTrigger>
+        <div className="min-h-0 overflow-visible xl:overflow-hidden">
+          <Tabs defaultValue="planning" className="h-full min-h-0">
+            <TabsList className="grid w-full grid-cols-2 xl:hidden">
+              <TabsTrigger value="planning">{copy.readyToSchedule}</TabsTrigger>
               <TabsTrigger value="calendar">{copy.calendarTab}</TabsTrigger>
             </TabsList>
-            <TabsContent value="queue" className="min-h-0 overflow-visible xl:overflow-y-auto">
+            <TabsContent value="planning" className="min-h-0 overflow-visible xl:mt-0 xl:overflow-y-auto">
               <ScheduleRightSidebar
                 copy={copy}
                 viewData={viewData}
@@ -264,13 +257,18 @@ export function SchedulePage({
                 handleQueueDragStart={handleQueueDragStart}
                 handleQueueDragEnd={handleQueueDragEnd}
                 onOpenTaskDetails={setLocalSelectedTaskId}
+                onScheduleTask={setLocalSelectedTaskId}
               />
             </TabsContent>
-            <TabsContent value="calendar" className="min-h-0 overflow-visible xl:overflow-y-auto">
+            <TabsContent value="calendar" className="min-h-0 overflow-visible xl:hidden">
               <CalendarSourceSetup workspaceId={workspaceId} />
             </TabsContent>
           </Tabs>
+          <div className="mt-4 hidden xl:block">
+            <CalendarSourceSetup workspaceId={workspaceId} />
+          </div>
         </div>
+
       </div>
 
       {viewModel.selectedItem && viewModel.activeDay ? (

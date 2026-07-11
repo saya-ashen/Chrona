@@ -5,8 +5,8 @@ import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from
 import { AssistantSurfaceHeaderDrawerButton } from "@/components/assistant-surface/assistant-surface-header-drawer-button";
 import { StartWithChrona } from "@/components/start-with-chrona";
 import { LocalizedLink } from "@/components/i18n/localized-link";
-import { TaskCreateDialog } from "../../schedule/ui";
-import { createTaskFromSchedule } from "@/lib/task-actions-client";
+import { TaskCreateDialog, type SchedulePageData } from "../../schedule/ui";
+import { createScheduledTask } from "@/lib/task-actions-client";
 import { apiJson } from "@/api";
 import { useAppPathname, useAppRouter } from "@/lib/router";
 import { LocaleSwitcher } from "@/components/i18n/locale-switcher";
@@ -63,6 +63,9 @@ export function ControlPlaneShell({
   const pathname = useAppPathname();
   const [showCreateTaskDialog, setShowCreateTaskDialog] = useState(false);
   const [isCreatingTask, setIsCreatingTask] = useState(false);
+  const [taskCreateConfig, setTaskCreateConfig] = useState<
+    Pick<SchedulePageData, "availableAiClients" | "defaultExecutionRuntime"> | null
+  >(null);
   const [createdOnboardingTaskId, setCreatedOnboardingTaskId] = useState<string | null>(null);
   const [useSafeDemoDefaults, setUseSafeDemoDefaults] = useState(false);
   const [startWithChronaCompletedAt, setStartWithChronaCompletedAt] = useState<string | null | undefined>(undefined);
@@ -91,6 +94,24 @@ export function ControlPlaneShell({
       cancelled = true;
     };
   }, [_defaultWorkspace.id]);
+  useEffect(() => {
+    if (!showCreateTaskDialog) return;
+    let cancelled = false;
+
+    apiJson<Pick<SchedulePageData, "availableAiClients" | "defaultExecutionRuntime">>(
+      `/api/schedule?workspaceId=${encodeURIComponent(_defaultWorkspace.id)}`,
+    )
+      .then((payload) => {
+        if (!cancelled) setTaskCreateConfig(payload);
+      })
+      .catch(() => {
+        if (!cancelled) setTaskCreateConfig(null);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [_defaultWorkspace.id, showCreateTaskDialog]);
 
   const completeStartWithChrona = async () => {
     const completedAt = new Date().toISOString();
@@ -317,6 +338,7 @@ export function ControlPlaneShell({
         initialStartAt={taskDialogDefaults.initialStartAt}
         initialEndAt={taskDialogDefaults.initialEndAt}
         isPending={isCreatingTask}
+        availableAiClients={taskCreateConfig?.availableAiClients}
         onClose={() => {
           setShowCreateTaskDialog(false);
           setUseSafeDemoDefaults(false);
@@ -324,7 +346,7 @@ export function ControlPlaneShell({
         onSubmit={async (input) => {
           try {
             setIsCreatingTask(true);
-            const created = await createTaskFromSchedule({
+            const created = await createScheduledTask({
               workspaceId: _defaultWorkspace.id,
               title: input.title,
               description: input.description || null,
@@ -333,7 +355,16 @@ export function ControlPlaneShell({
               autoExecute: input.autoExecute,
               autoPlanGenerationTiming: input.autoPlanGenerationTiming,
               autoExecuteTiming: input.autoExecuteTiming,
-            }) as { taskId?: unknown };
+              executionRuntime: taskCreateConfig?.defaultExecutionRuntime,
+              executionConfig: {},
+              aiClientId: input.aiClientId,
+              dueAt: input.dueAt,
+              scheduledStartAt: input.scheduledStartAt,
+              scheduledEndAt: input.scheduledEndAt,
+              recurrenceRule: input.recurrenceRule,
+              recurrenceAnchorStartAt: input.recurrenceAnchorStartAt,
+              recurrenceAnchorEndAt: input.recurrenceAnchorEndAt,
+            });
             if (typeof created.taskId === "string") {
               setCreatedOnboardingTaskId(created.taskId);
             }

@@ -241,7 +241,7 @@ describe("TaskCreateDialog – Core functionality", () => {
     // Save/Saving button disabled
     expect(screen.getByText("Saving...")).toBeDisabled();
   });
-  it("explains the scheduled automatic execution contract before saving", async () => {
+  it("shows a concise automatic-run summary and progressively reveals reliability details", async () => {
     const user = userEvent.setup();
     render(
       <TaskCreateDialog
@@ -253,15 +253,18 @@ describe("TaskCreateDialog – Core functionality", () => {
     await user.click(screen.getByRole("radio", { name: /run on a schedule/i }));
 
     const preview = screen.getByLabelText("What Chrona will do");
-    expect(preview).toHaveTextContent("Chrona will generate and accept a valid plan");
-    expect(preview).toHaveTextContent("If Chrona is not running at the scheduled time");
-    expect(preview).toHaveTextContent("does not automatically retry");
-    expect(preview).toHaveTextContent("Closing this page does not stop scheduled work");
-    expect(preview).toHaveTextContent("Plan approval");
-    expect(preview).toHaveTextContent("Chrona will generate and accept a valid plan before the scheduled start");
-    expect(preview).toHaveTextContent("Pauses");
-    expect(preview).toHaveTextContent("Execution pauses when input or approval is required");
-    expect(preview).toHaveTextContent("Closing Chrona");
+    expect(preview).toHaveTextContent("Automatic run");
+    expect(preview).toHaveTextContent("Chrona will prepare a valid plan");
+    expect(preview).toHaveTextContent("Ready");
+    expect(preview).toHaveTextContent("Default provider");
+    expect(preview).not.toHaveTextContent("plan_acceptance_required");
+    expect(preview).not.toHaveTextContent("Failed runs are not retried automatically");
+
+    await user.click(screen.getByRole("button", { name: "How automatic runs work" }));
+
+    expect(preview).toHaveTextContent("Chrona pauses when the task needs your input or approval");
+    expect(preview).toHaveTextContent("Failed runs are not retried automatically");
+    expect(preview).toHaveTextContent("Closing this page does not cancel the scheduled run");
   });
 
   it("shows the single missing-AI reason before saving automation", async () => {

@@ -1,18 +1,16 @@
-import { Calendar, LayoutList, Clock } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { useState } from "react";
+import { CalendarDays, LayoutList, Clock, ChevronLeft, ChevronRight } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 type PlanningDayLink = {
   label: string;
   href: string;
+  kind: "previous" | "today" | "next";
   current?: boolean;
 };
 
-type ScheduleCockpitMetric = {
-  label: string;
-  value: string;
-  hint: string;
-  tone?: "outline" | "info" | "critical";
-};
 
 export function PlanningHeader({
   ariaLabel,
@@ -20,8 +18,9 @@ export function PlanningHeader({
   activeDayLabel,
   summary,
   dayLinks,
-  metrics,
-  actions,
+  selectedDate,
+  onSelectDate,
+  primaryAction,
   activeView,
   timelineHref,
   listHref,
@@ -33,146 +32,132 @@ export function PlanningHeader({
   title: string;
   activeDayLabel: string;
   summary: string;
-  dateSwitcherLabel: string;
   dayLinks: PlanningDayLink[];
-  metrics: ScheduleCockpitMetric[];
-  actions: { label: string; href?: string; onClick?: () => void; description?: string; disabled?: boolean }[];
+  selectedDate: Date;
+  onSelectDate: (date: Date) => void;
+  primaryAction: { label: string; onClick: () => void };
   activeView: "timeline" | "list";
   timelineHref: string;
   listHref: string;
   timelineLabel: string;
   listLabel: string;
-  onNewTask?: () => void;
-  newTaskLabel?: string;
   onNavigate?: (href: string) => void;
 }) {
-  // Only show queue + risk metrics (first two)
-  const keyMetrics = metrics.slice(0, 2);
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
+  const previousDay = dayLinks.find((link) => link.kind === "previous");
+  const today = dayLinks.find((link) => link.kind === "today");
+  const nextDay = dayLinks.find((link) => link.kind === "next");
 
   return (
     <header
+      data-testid="planning-header"
       aria-label={ariaLabel}
-      className="flex flex-col gap-3 rounded-3xl border border-border/60 bg-card/92 px-4 py-3 shadow-sm lg:flex-row lg:items-center lg:px-5"
+      className="rounded-3xl border border-border/60 bg-card/95 px-4 py-4 shadow-sm lg:px-5"
     >
-      {/* Title + Date */}
-      <div className="flex min-w-0 flex-wrap items-center gap-3 lg:min-w-[15rem]">
-        <div className="flex items-center gap-2">
-          <Calendar className="size-4 text-muted-foreground" />
-          <h1 className="text-base font-semibold tracking-tight text-foreground">{title}</h1>
-        </div>
-        <span className="text-sm text-muted-foreground">
-          {activeDayLabel}
-        </span>
-      </div>
-
-      {/* Day switcher */}
-      <div className="flex w-full gap-0.5 rounded-xl border border-border/55 bg-background/75 p-0.5 sm:w-auto">
-        {dayLinks.map((link) => (
-          <button
-            key={link.label}
-            type="button"
-            onClick={() => onNavigate?.(link.href)}
-            aria-current={link.current ? "date" : undefined}
-            className={cn(
-              "flex-1 rounded-md px-2.5 py-1 text-xs font-medium transition-colors sm:flex-none",
-              link.current
-                ? "bg-background text-foreground shadow-sm"
-                : "text-muted-foreground hover:text-foreground",
-            )}
-          >
-            {link.label}
-          </button>
-        ))}
-      </div>
-
-      {/* View toggle */}
-      <div className="flex w-full gap-0.5 rounded-xl border border-border/55 bg-background/75 p-0.5 sm:w-auto">
-        <button
-          type="button"
-          onClick={() => onNavigate?.(timelineHref)}
-          aria-current={activeView === "timeline" ? "page" : undefined}
-          className={cn(
-            "flex flex-1 items-center justify-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition-colors sm:flex-none",
-            activeView === "timeline"
-              ? "bg-background text-foreground shadow-sm"
-              : "text-muted-foreground hover:text-foreground",
-          )}
-        >
-          <Clock className="size-3" />
-          {timelineLabel}
-        </button>
-        <button
-          type="button"
-          onClick={() => onNavigate?.(listHref)}
-          aria-current={activeView === "list" ? "page" : undefined}
-          className={cn(
-            "flex flex-1 items-center justify-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition-colors sm:flex-none",
-            activeView === "list"
-              ? "bg-background text-foreground shadow-sm"
-              : "text-muted-foreground hover:text-foreground",
-          )}
-        >
-          <LayoutList className="size-3" />
-          {listLabel}
-        </button>
-      </div>
-
-      <div className="hidden min-w-[13rem] flex-1 lg:block">
-        <p className="truncate rounded-xl border border-border/50 bg-background/70 px-3 py-1.5 text-xs text-muted-foreground">
-          {summary}
-        </p>
-      </div>
-
-      {/* Key metrics — compact pills */}
-      <div className="flex w-full flex-wrap items-center gap-1.5 lg:w-auto">
-        {keyMetrics.map((m) => (
-          <div
-            key={m.label}
-            title={m.hint}
-            className="flex items-center gap-1 rounded-full border border-border/50 bg-background/80 px-2 py-0.5"
-          >
-            <span className="text-[10px] text-muted-foreground">{m.label}</span>
-            <span
-              className={cn(
-                "text-xs font-semibold",
-                m.tone === "critical" ? "text-destructive" : m.tone === "info" ? "text-primary" : "text-foreground",
-              )}
-            >
-              {m.value}
+      <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 text-muted-foreground">
+            <CalendarDays className="size-4" aria-hidden="true" />
+            <span className="text-xs font-semibold uppercase tracking-[0.16em]">
+              {title}
             </span>
           </div>
-        ))}
-      </div>
-
-      {actions.length > 0 ? (
-        <div className="flex w-full flex-wrap items-center gap-1.5 lg:w-auto">
-          {actions.map((action, index) => (
-            <button
-              key={`${action.label}-${index}`}
-              type="button"
-              disabled={action.disabled}
-              title={action.description}
-              onClick={() => {
-                if (action.disabled) return;
-                if (action.onClick) {
-                  action.onClick();
-                  return;
-                }
-                if (action.href) onNavigate?.(action.href);
-              }}
-              className={cn(
-                "rounded-full border px-4 py-1.5 text-sm font-semibold transition-colors",
-                index === 0
-                  ? "border-primary bg-primary text-primary-foreground hover:bg-primary/90"
-                  : "border-border/60 bg-background/85 text-foreground hover:bg-muted",
-                action.disabled && "cursor-not-allowed opacity-50",
-              )}
-            >
-              {action.label}
-            </button>
-          ))}
+          <div className="mt-1 flex min-w-0 items-center gap-1">
+            {previousDay ? (
+              <Button
+                type="button"
+                size="icon-sm"
+                variant="ghost"
+                aria-label={previousDay.label}
+                onClick={() => onNavigate?.(previousDay.href)}
+              >
+                <ChevronLeft />
+              </Button>
+            ) : null}
+            <h1 className="truncate text-xl font-semibold tracking-tight text-foreground">
+              {activeDayLabel}
+            </h1>
+            <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  type="button"
+                  size="icon-sm"
+                  variant="ghost"
+                  aria-label={activeDayLabel}
+                >
+                  <CalendarDays aria-hidden="true" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="start" className="z-50 w-auto border bg-popover p-0 text-popover-foreground shadow-lg">
+                <Calendar
+                  mode="single"
+                  selected={selectedDate}
+                  defaultMonth={selectedDate}
+                  onSelect={(date) => {
+                    if (!date) return;
+                    setDatePickerOpen(false);
+                    onSelectDate(date);
+                  }}
+                />
+              </PopoverContent>
+            </Popover>
+            {nextDay ? (
+              <Button
+                type="button"
+                size="icon-sm"
+                variant="ghost"
+                aria-label={nextDay.label}
+                onClick={() => onNavigate?.(nextDay.href)}
+              >
+                <ChevronRight />
+              </Button>
+            ) : null}
+            {today ? (
+              <Button
+                type="button"
+                size="sm"
+                variant={today.current ? "secondary" : "outline"}
+                aria-current={today.current ? "date" : undefined}
+                onClick={() => onNavigate?.(today.href)}
+              >
+                {today.label}
+              </Button>
+            ) : null}
+          </div>
+          <p className="mt-1 max-w-3xl text-sm text-muted-foreground">{summary}</p>
         </div>
-      ) : null}
+
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <div
+            className="grid grid-cols-2 rounded-xl border border-border/55 bg-background/75 p-0.5"
+            aria-label={ariaLabel}
+          >
+            <Button
+              type="button"
+              size="sm"
+              variant={activeView === "timeline" ? "secondary" : "ghost"}
+              aria-current={activeView === "timeline" ? "page" : undefined}
+              onClick={() => onNavigate?.(timelineHref)}
+            >
+              <Clock />
+              {timelineLabel}
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant={activeView === "list" ? "secondary" : "ghost"}
+              aria-current={activeView === "list" ? "page" : undefined}
+              onClick={() => onNavigate?.(listHref)}
+            >
+              <LayoutList />
+              {listLabel}
+            </Button>
+          </div>
+          <Button type="button" onClick={primaryAction.onClick}>
+            {primaryAction.label}
+          </Button>
+        </div>
+      </div>
     </header>
   );
 }

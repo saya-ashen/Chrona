@@ -409,7 +409,7 @@ test.describe("Auto-execution golden path (§1.3)", () => {
   );
 
   test(
-    "negative: autoExecute=true + NO accepted plan → tick → execution NOT started → schedule shows 'No accepted plan'",
+    "negative: autoExecute=true + NO accepted plan → tick → execution NOT started → schedule explains plan approval requirement",
     async ({ page, request }) => {
       test.setTimeout(90_000);
       // ── 1. Create task ──────────────────────────────────────────────────────
@@ -453,7 +453,7 @@ test.describe("Auto-execution golden path (§1.3)", () => {
       expect(execBody.status).toBe("no_plan");
 
       // ── 6. Schedule read model and UI show the specific skip reason AFTER tick
-      await test.step("Schedule shows 'No accepted plan' after the rejected auto-start tick", async () => {
+      await test.step("Schedule explains the plan approval requirement after the rejected auto-start tick", async () => {
         await expect
           .poll(async () => {
             const item = await getScheduleItem(request, workspaceId, taskId);
@@ -471,7 +471,7 @@ test.describe("Auto-execution golden path (§1.3)", () => {
 
         const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
         await page.goto(`/en/schedule?day=${today}`, { waitUntil: "domcontentloaded" });
-        await expect(page.getByRole("tab", { name: "Queue" })).toBeVisible({ timeout: 30_000 });
+        await expect(page.getByText("Review and approve a plan", { exact: true }).first()).toBeVisible({ timeout: 30_000 });
 
       });
     },

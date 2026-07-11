@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const push = vi.fn();
 const refresh = vi.fn();
 const fetchScheduleProjection = vi.fn();
-const createTaskFromSchedule = vi.fn().mockResolvedValue({ taskId: "created-task", workspaceId: "workspace-1" });
+const createScheduledTask = vi.fn().mockResolvedValue({ taskId: "created-task", workspaceId: "workspace-1" });
 const applySchedule = vi.fn().mockResolvedValue({ taskId: "created-task", workspaceId: "workspace-1" });
 const updateTaskConfigFromSchedule = vi.fn();
 const startTaskPlanGenerationSession = vi.fn();
@@ -35,7 +35,7 @@ vi.mock("@chrona/i18n", async (importOriginal) => ({
 }));
 
 vi.mock("@/lib/task-actions-client", () => ({
-  createTaskFromSchedule: (...args: unknown[]) => createTaskFromSchedule(...args),
+  createScheduledTask: (...args: unknown[]) => createScheduledTask(...args),
   applySchedule: (...args: unknown[]) => applySchedule(...args),
   updateTaskConfigFromSchedule: (...args: unknown[]) => updateTaskConfigFromSchedule(...args),
 }));
@@ -46,24 +46,17 @@ vi.mock("@/hooks/ai/task-plan-generation-session-store", () => ({
 
 vi.mock("./panels/planning-header", () => ({
   PlanningHeader: ({
-    actions,
-    metrics,
+    summary,
+    primaryAction,
   }: {
-    actions?: Array<{ label: string; onClick?: () => void }>;
-    metrics?: Array<{ label: string; value: string }>;
+    summary: string;
+    primaryAction: { label: string; onClick: () => void };
   }) => (
     <div data-testid="planning-header">
-      {metrics?.map((metric) => (
-        <div key={metric.label} data-testid={`metric-${metric.label}`}>
-          <span>{metric.label}</span>
-          <span>{metric.value}</span>
-        </div>
-      ))}
-      {actions?.map((action) => (
-        <button key={action.label} type="button" onClick={action.onClick}>
-          {action.label}
-        </button>
-      ))}
+      <span>{summary}</span>
+      <button type="button" onClick={primaryAction.onClick}>
+        {primaryAction.label}
+      </button>
     </div>
   ),
 }));
@@ -76,7 +69,20 @@ vi.mock("./panels/schedule-page-panels", () => ({
       {proposal.summary ? <span>{proposal.summary}</span> : null}
     </div>
   ),
-  QueueCard: () => <div data-testid="queue-card" />,
+  QueueCard: ({
+    item,
+    onScheduleTask,
+  }: {
+    item: { taskId: string; title: string };
+    onScheduleTask: (taskId: string) => void;
+  }) => (
+    <div data-testid="queue-card">
+      <span>{item.title}</span>
+      <button type="button" onClick={() => onScheduleTask(item.taskId)}>
+        Schedule
+      </button>
+    </div>
+  ),
   RiskCard: ({ item }: { item: { title: string; runnabilitySummary?: string | null } }) => (
     <div data-testid="risk-card">
       <span>{item.title}</span>
@@ -164,6 +170,7 @@ vi.mock("./dialogs/task-create-dialog", () => ({
       dueAt: Date | null;
       autoExecute?: boolean;
       autoPlanGenerationEnabled?: boolean;
+      aiClientId?: string | null;
     }) => void;
   }) =>
     isOpen ? (
@@ -178,6 +185,7 @@ vi.mock("./dialogs/task-create-dialog", () => ({
               priority: "High",
               autoExecute: mockTaskDialogAutoExecute,
               autoPlanGenerationEnabled: mockTaskDialogAutoPlanGenerationEnabled,
+              aiClientId: "client-1",
               dueAt: null,
             })
           }
@@ -400,7 +408,7 @@ describe("SchedulePage quick create", () => {
     expect(screen.getByTestId("planning-header")).toBeInTheDocument();
   });
 
-  it("creates a queue task from the side-rail quick-create without scheduling it", async () => {
+  it("creates and schedules a task from the schedule dialog", async () => {
     const user = userEvent.setup();
 
     render(
@@ -416,7 +424,7 @@ describe("SchedulePage quick create", () => {
     await user.click(screen.getByRole("button", { name: /add to queue/i }));
 
     await waitFor(() => {
-      expect(createTaskFromSchedule).toHaveBeenCalledWith(
+      expect(createScheduledTask).toHaveBeenCalledWith(
         expect.objectContaining({
           workspaceId: "workspace-1",
           title: "Action Center triage",
@@ -425,17 +433,24 @@ describe("SchedulePage quick create", () => {
       );
     });
 
-    expect(createTaskFromSchedule).toHaveBeenCalledWith(
+    expect(createScheduledTask).toHaveBeenCalledWith(
       expect.objectContaining({
         autoPlanGeneration: true,
         autoExecute: true,
       }),
     );
-    expect(applySchedule).toHaveBeenCalled();
+    expect(createScheduledTask).toHaveBeenCalledWith(
+      expect.objectContaining({
+        dueAt: null,
+        scheduledStartAt: expect.any(Date),
+        scheduledEndAt: expect.any(Date),
+        aiClientId: "client-1",
+      }),
+    );
     expect(startTaskPlanGenerationSession).not.toHaveBeenCalled();
   });
 
-  it("does not auto-generate a draft plan after quick-create when the task-level plan switch is disabled", async () => {
+  it("preserves task automation choices in scheduled creation", async () => {
     const user = userEvent.setup();
     mockTaskDialogAutoPlanGenerationEnabled = false;
 
@@ -452,26 +467,25 @@ describe("SchedulePage quick create", () => {
     await user.click(screen.getByRole("button", { name: /add to queue/i }));
 
     await waitFor(() => {
-      expect(createTaskFromSchedule).toHaveBeenCalledWith(
+      expect(createScheduledTask).toHaveBeenCalledWith(
         expect.objectContaining({
           title: "Action Center triage",
         }),
       );
     });
 
-    expect(createTaskFromSchedule).toHaveBeenCalledWith(
+    expect(createScheduledTask).toHaveBeenCalledWith(
       expect.objectContaining({
         autoPlanGeneration: true,
         autoExecute: true,
       }),
     );
-    expect(applySchedule).toHaveBeenCalled();
     expect(startTaskPlanGenerationSession).not.toHaveBeenCalled();
   });
 });
 
 describe("SchedulePage view modes", () => {
-  it("renders list view when selectedView is list", () => {
+  it("renders an agenda scoped to the selected day", () => {
     render(
       <SchedulePage
         workspaceId="workspace-1"
@@ -481,7 +495,8 @@ describe("SchedulePage view modes", () => {
       />,
     );
 
-    expect(screen.getByTestId("schedule-task-list")).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Selected day agenda" })).toBeInTheDocument();
+    expect(screen.getByText("Existing block")).toBeInTheDocument();
     expect(screen.queryByTestId("day-timeline")).not.toBeInTheDocument();
   });
 
@@ -499,18 +514,9 @@ describe("SchedulePage view modes", () => {
 });
 
 describe("SchedulePage data display", () => {
-  it("renders automation candidates in the suggestions metric", () => {
+  it("summarizes ready work and attention in the selected-day header", () => {
     const data = createData();
-    data.automationCandidates = [
-      {
-        taskId: "task-1",
-        kind: "auto_run",
-        reason: "Scheduled task is ready to run automatically.",
-        priority: "high",
-        sessionStrategy: "per_subtask",
-        readyNodeIds: ["node-1"],
-      },
-    ];
+    data.summary.riskCount = 1;
 
     render(
       <SchedulePage
@@ -521,29 +527,15 @@ describe("SchedulePage data display", () => {
       />,
     );
 
-    expect(screen.getByTestId("metric-AI suggestions")).toHaveTextContent("AI suggestions");
-    expect(screen.getByTestId("metric-AI suggestions")).toHaveTextContent("1");
+    expect(screen.getByTestId("planning-header")).toHaveTextContent(/ready to schedule/);
+    expect(screen.getByTestId("planning-header")).toHaveTextContent(/needing attention/);
+    expect(screen.getByRole("button", { name: "Schedule task" })).toBeInTheDocument();
   });
 
-  it("renders proposals in the suggestions metric", () => {
+  it("keeps the timeline visible when the selected date has no blocks", () => {
     const data = createData();
-    data.proposals = [
-      {
-        proposalId: "prop-1",
-        taskId: "task-2",
-        workspaceId: "workspace-1",
-        title: "Proposal task",
-        priority: "High",
-        source: "ai",
-        proposedBy: "system",
-        summary: "AI suggests scheduling",
-        dueAt: null,
-        scheduledStartAt: new Date(2026, 3, 15, 14, 0),
-        scheduledEndAt: new Date(2026, 3, 15, 15, 0),
-      },
-    ];
-    data.summary.proposalCount = 1;
-    data.planningSummary.proposalCount = 1;
+    data.scheduled = [];
+    data.summary.scheduledCount = 0;
 
     render(
       <SchedulePage
@@ -554,8 +546,23 @@ describe("SchedulePage data display", () => {
       />,
     );
 
-    expect(screen.getByTestId("metric-AI suggestions")).toHaveTextContent("AI suggestions");
-    expect(screen.getByTestId("metric-AI suggestions")).toHaveTextContent("2");
+    expect(screen.getByTestId("day-timeline")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "Nothing scheduled for this day" }),
+    ).not.toBeInTheDocument();
+  });
+
+  it("keeps provider setup out of the day header", () => {
+    render(
+      <SchedulePage
+        workspaceId="workspace-1"
+        data={createData()}
+        selectedDay="2026-04-15"
+        selectedView="timeline"
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: "Connect AI" })).not.toBeInTheDocument();
   });
 
   it("renders risks in the risk metric", () => {
@@ -603,8 +610,11 @@ describe("SchedulePage data display", () => {
       />,
     );
 
-    expect(screen.getByTestId("metric-Risks")).toHaveTextContent("Risks");
-    expect(screen.getByTestId("metric-Risks")).toHaveTextContent("1");
+    expect(screen.getByRole("tab", { name: /Needs attention/ })).toHaveAttribute(
+      "data-state",
+      "active",
+    );
+    expect(screen.getByText("At-risk task")).toBeInTheDocument();
   });
 
   it("renders queue cards in action rail for unscheduled items", () => {
@@ -651,15 +661,15 @@ describe("SchedulePage data display", () => {
       />,
     );
 
-    // Default activeTab is "queue", so the queue section body (with QueueCard) should render
     expect(screen.getByTestId("queue-card")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Schedule" })).toBeInTheDocument();
   });
 });
 
 describe("SchedulePage error handling", () => {
-  it("shows error when createTaskFromSchedule fails", async () => {
+  it("shows error when createScheduledTask fails", async () => {
     const user = userEvent.setup();
-    createTaskFromSchedule.mockRejectedValueOnce(new Error("Server error"));
+    createScheduledTask.mockRejectedValueOnce(new Error("Server error"));
 
     render(
       <SchedulePage
@@ -674,7 +684,7 @@ describe("SchedulePage error handling", () => {
     await user.click(screen.getByRole("button", { name: /add to queue/i }));
 
     await waitFor(() => {
-      expect(createTaskFromSchedule).toHaveBeenCalled();
+      expect(createScheduledTask).toHaveBeenCalled();
     });
 
     await waitFor(() => {

@@ -1,8 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { CheckCircle2, Clock3, Loader2, Sparkles, WandSparkles } from "lucide-react";
 import { TaskPlanGenerationPanel } from "@/components/tasks/ai/task-plan-generation-panel";
+import { TaskPlanGraphPanel } from "@/components/tasks/panels/task-plan-graph-panel";
+import { taskPlanReadModelToGraphPlan } from "@/components/tasks/plan/task-plan-view-model";
 import type { TaskConfigFormDraft } from "../../../../../../features/schedule/ui/forms/task-config-form";
 import type { TaskPlanReadModel } from "@chrona/contracts/ai";
 import { Button } from "@/components/ui/button";
@@ -19,6 +21,7 @@ type TaskAiPlanPanelProps = {
   onPlanLoaded: (savedPlan: TaskPlanReadModel | null) => void;
   onApplyPlan: (result: TaskPlanReadModel) => Promise<void>;
   onSaveConfigBeforeRegenerate: () => Promise<void>;
+  previewOnly?: boolean;
 };
 
 export function TaskAiPlanPanel({
@@ -32,6 +35,7 @@ export function TaskAiPlanPanel({
   onPlanLoaded,
   onApplyPlan,
   onSaveConfigBeforeRegenerate,
+  previewOnly = false,
 }: TaskAiPlanPanelProps) {
   const [requestGenerationKey, setRequestGenerationKey] = useState(0);
   const statusConfig = generationStatus === "generating"
@@ -58,7 +62,28 @@ export function TaskAiPlanPanel({
             className: "border-border/70 bg-muted/35 text-muted-foreground",
           };
   const actionLabel = savedPlan ? "Regenerate plan" : "Generate plan";
+  const previewGraph = useMemo(() => taskPlanReadModelToGraphPlan(savedPlan), [savedPlan]);
 
+  if (previewOnly) {
+    if (!previewGraph) {
+      return (
+        <div className="flex min-h-40 items-center justify-center rounded-xl border border-dashed border-border/60 bg-muted/15 px-4 text-center text-sm text-muted-foreground">
+          No plan available to preview.
+        </div>
+      );
+    }
+
+    return (
+      <div className="min-h-64 overflow-hidden rounded-xl border border-border/60 bg-background">
+        <TaskPlanGraphPanel
+          label="Plan preview"
+          plan={previewGraph}
+          mode="compact"
+          className="min-h-64 w-full"
+        />
+      </div>
+    );
+  }
   return (
     <Card
      

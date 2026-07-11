@@ -9,7 +9,10 @@ import type { ScheduleViewMode } from "../schedule-page-types";
 import type { SchedulePageCopy } from "../schedule-page-copy";
 import type { SchedulePageViewModel } from "../schedule-page-view-model";
 
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { EmptyState } from "./schedule-panel-primitives";
 
 /**
@@ -90,6 +93,7 @@ export function ScheduleRightSidebar({
   handleQueueDragStart,
   handleQueueDragEnd,
   onOpenTaskDetails,
+  onScheduleTask,
 }: {
   copy: SchedulePageCopy;
   viewData: SchedulePageData;
@@ -101,37 +105,95 @@ export function ScheduleRightSidebar({
   ) => void;
   handleQueueDragEnd: () => void;
   onOpenTaskDetails: (taskId: string) => void;
+  onScheduleTask: (taskId: string) => void;
 }) {
   return (
-    <aside className="min-h-0 overflow-visible xl:overflow-y-auto xl:pl-1">
-      <Card className="xl:sticky xl:top-0">
-        <CardHeader>
-          <CardTitle>{copy.unscheduledQueue}</CardTitle>
-          <CardDescription>{copy.unscheduledQueueDescription}</CardDescription>
-        </CardHeader>
-        <CardContent className="overflow-visible pr-0 xl:max-h-[calc(100vh-19rem)] xl:overflow-y-auto xl:pr-3">
-          {viewData.unscheduled.length === 0 ? (
-            <EmptyState>{copy.noUnscheduledWork}</EmptyState>
-          ) : (
-            <div className="flex flex-col gap-2">
-              {viewData.unscheduled.map((item) => (
-                <QueueCard
-                  key={item.taskId}
-                  item={item}
-                  isPending={isPending}
-                  isDragging={
-                    draggedTask?.kind === "queue" &&
-                    draggedTask.taskId === item.taskId
-                  }
-                  onDragStart={handleQueueDragStart}
-                  onDragEnd={handleQueueDragEnd}
-                  onOpenTaskDetails={onOpenTaskDetails}
-                />
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+    <aside
+      aria-label={copy.planningDrawerLabel}
+      className="min-h-0 overflow-visible xl:overflow-y-auto xl:pl-1"
+    >
+      <Tabs
+        defaultValue={viewData.summary.riskCount > 0 ? "attention" : "queue"}
+        className="h-full min-h-0"
+      >
+        <TabsList className="grid w-full grid-cols-2">
+          <TabsTrigger value="queue">
+            {copy.readyToSchedule}
+            <Badge variant="secondary">{viewData.unscheduled.length}</Badge>
+          </TabsTrigger>
+          <TabsTrigger value="attention">
+            {copy.needsAttentionTab}
+            <Badge variant={viewData.risks.length > 0 ? "destructive" : "secondary"}>
+              {viewData.risks.length}
+            </Badge>
+          </TabsTrigger>
+        </TabsList>
+
+        <TabsContent value="queue" className="min-h-0">
+          <Card className="mt-2 xl:sticky xl:top-0">
+            <CardHeader>
+              <CardTitle>{copy.readyToSchedule}</CardTitle>
+              <CardDescription>{copy.readyToScheduleDescription}</CardDescription>
+            </CardHeader>
+            <CardContent className="overflow-visible pr-0 xl:max-h-[calc(100vh-19rem)] xl:overflow-y-auto xl:pr-3">
+              {viewData.unscheduled.length === 0 ? (
+                <EmptyState>{copy.noUnscheduledWork}</EmptyState>
+              ) : (
+                <div className="flex flex-col gap-2">
+                  {viewData.unscheduled.map((item) => (
+                    <QueueCard
+                      key={item.taskId}
+                      item={item}
+                      isPending={isPending}
+                      isDragging={
+                        draggedTask?.kind === "queue" &&
+                        draggedTask.taskId === item.taskId
+                      }
+                      onDragStart={handleQueueDragStart}
+                      onDragEnd={handleQueueDragEnd}
+                      onScheduleTask={onScheduleTask}
+                      onOpenTaskDetails={onOpenTaskDetails}
+                    />
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="attention" className="min-h-0">
+          <Card className="mt-2">
+            <CardHeader>
+              <CardTitle>{copy.needsAttentionTab}</CardTitle>
+              <CardDescription>{copy.attentionDescription}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-2">
+              {viewData.risks.length === 0 ? (
+                <EmptyState>{copy.noAttentionItems}</EmptyState>
+              ) : (
+                viewData.risks.map((item) => (
+                  <Card key={item.taskId} size="sm" className="gap-2 p-3">
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-medium">{item.title}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {item.actionRequired ?? item.runnabilitySummary}
+                      </p>
+                    </div>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => onOpenTaskDetails(item.taskId)}
+                    >
+                      {copy.openTask}
+                    </Button>
+                  </Card>
+                ))
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </aside>
   );
 }

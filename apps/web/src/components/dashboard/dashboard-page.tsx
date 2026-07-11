@@ -14,6 +14,7 @@ import {
   Sparkles,
   type LucideProps,
 } from "lucide-react";
+import { deriveAttentionDescriptor } from "@chrona/domain";
 
 import type { Dictionary } from "@/pages";
 import { useRevalidator } from "react-router-dom";
@@ -52,9 +53,14 @@ type DashboardPageProps = {
   workspaceId?: string;
 };
 
-function attentionTone(item: DashboardAttentionItem) {
-  return item.kind === "schedule_risk" ? "warning" : item.stateView.tone;
+function attentionDescriptor(item: DashboardAttentionItem) {
+  return deriveAttentionDescriptor({
+    stateView: item.stateView,
+    itemKind: item.kind === "schedule_risk" ? "task_due_soon" : item.kind,
+    riskLevel: item.kind === "schedule_risk" ? "medium" : undefined,
+  });
 }
+
 
 function attentionIcon(
   item: DashboardAttentionItem,
@@ -66,7 +72,7 @@ function attentionIcon(
 }
 
 function isDashboardAttention(item: DashboardAttentionItem): boolean {
-  return item.kind === "schedule_risk" || item.stateView.attentionRequired;
+  return attentionDescriptor(item).attentionRequired;
 }
 
 function stateToneClass(
@@ -333,7 +339,8 @@ function NeedsYouCard({
           <ul className="divide-y">
             {visibleItems.map((item) => {
               const Icon = attentionIcon(item);
-              const tone = attentionTone(item);
+              const descriptor = attentionDescriptor(item);
+              const tone = descriptor.tone;
               return (
                 <li key={item.taskId} className="flex flex-col gap-2 py-3">
                   <div className="flex min-w-0 items-start gap-2.5">
@@ -350,7 +357,7 @@ function NeedsYouCard({
                           {item.title}
                         </span>
                         <Badge variant="outline" className="shrink-0">
-                          {item.stateView.label}
+                          {descriptor.label}
                         </Badge>
                       </div>
                       {item.reason ? (
@@ -374,7 +381,7 @@ function NeedsYouCard({
                       className="shrink-0 shadow-sm"
                     >
                       <LocalizedLink href={`/tasks/${item.taskId}`}>
-                        {item.stateView.nextActionLabel}
+                        {descriptor.nextActionLabel}
                         <ArrowRight className="size-4" aria-hidden />
                       </LocalizedLink>
                     </Button>
