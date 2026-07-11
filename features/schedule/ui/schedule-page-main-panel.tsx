@@ -89,6 +89,15 @@ export function SchedulePageHeader({
           ),
         },
       ]}
+      selectedDate={viewModel.activeDayDate}
+      onSelectDate={(date) =>
+        onNavigate(
+          localizeHref(
+            locale,
+            buildScheduleViewHref(toDayKey(date), activeView),
+          ),
+        )
+      }
       activeView={activeView}
       timelineHref={localizeHref(
         locale,

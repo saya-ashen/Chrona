@@ -1,5 +1,5 @@
 import "@testing-library/jest-dom/vitest";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { deriveWorkStateView } from "@chrona/domain";
 import { DEFAULT_SCHEDULE_PAGE_COPY } from "../../schedule-page-copy";
@@ -73,6 +73,7 @@ function item(overrides: Partial<ScheduleRecord> = {}): ScheduleRecord {
 function renderMainColumn(record: ScheduleRecord) {
   return render(
     <SelectedBlockMainColumn
+      initialTab="execution"
       item={record}
       copy={DEFAULT_SCHEDULE_PAGE_COPY}
       executionRuntimes={runtimes}
@@ -104,14 +105,14 @@ function renderMainColumn(record: ScheduleRecord) {
 afterEach(() => cleanup());
 
 describe("SelectedBlockMainColumn", () => {
-  it("shows provider, runtime, execution status, automation, and recovery link", () => {
+  it("shows provider, execution status, automation, and recovery without runtime adapter", () => {
     renderMainColumn(item());
 
     expect(screen.getByRole("region", { name: "Block overview" })).toBeInTheDocument();
     expect(screen.getByText("AI scheduled")).toBeInTheDocument();
     expect(screen.getByText("Auto-plan")).toBeInTheDocument();
     expect(screen.getByText("Local Hermes")).toBeInTheDocument();
-    expect(screen.getByText("Hermes runtime")).toBeInTheDocument();
+    expect(screen.queryByText("Hermes runtime")).not.toBeInTheDocument();
     expect(screen.getByText("Input needed")).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Open task workspace to recover this run." }))
       .toHaveAttribute("href", "/tasks/task-1?workBlockId=block-1");
@@ -150,4 +151,11 @@ describe("SelectedBlockMainColumn", () => {
     expect(screen.getByText("Read-only calendar block")).toBeInTheDocument();
     expect(screen.getByText("Manual")).toBeInTheDocument();
   });
+  it("shows an explicit default provider state instead of Model", () => {
+    renderMainColumn(item({ aiClientId: null, aiClientName: null }));
+
+    expect(screen.getByText("Use default AI provider")).toBeInTheDocument();
+    expect(screen.queryByText("Model")).not.toBeInTheDocument();
+  });
+
 });

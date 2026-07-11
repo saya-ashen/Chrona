@@ -347,6 +347,8 @@
       "selectedBlockAutomationExecute": "自动执行",
       "selectedBlockProvider": "提供商",
       "selectedBlockRuntime": "运行时",
+      "selectedBlockDefaultProvider": "使用默认 AI Provider",
+      "selectedBlockProviderUnconfigured": "未配置 AI Provider",
       "selectedBlockExecutionStatus": "执行状态",
       "selectedBlockRecovery": "恢复",
       "selectedBlockOpenWorkspace": "打开任务工作区处理这次运行。",

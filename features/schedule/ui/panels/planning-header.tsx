@@ -1,5 +1,8 @@
-import { Calendar, LayoutList, Clock, ChevronLeft, ChevronRight } from "lucide-react";
+import { useState } from "react";
+import { CalendarDays, LayoutList, Clock, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Calendar } from "@/components/ui/calendar";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 type PlanningDayLink = {
   label: string;
@@ -15,6 +18,8 @@ export function PlanningHeader({
   activeDayLabel,
   summary,
   dayLinks,
+  selectedDate,
+  onSelectDate,
   primaryAction,
   activeView,
   timelineHref,
@@ -28,6 +33,8 @@ export function PlanningHeader({
   activeDayLabel: string;
   summary: string;
   dayLinks: PlanningDayLink[];
+  selectedDate: Date;
+  onSelectDate: (date: Date) => void;
   primaryAction: { label: string; onClick: () => void };
   activeView: "timeline" | "list";
   timelineHref: string;
@@ -36,6 +43,7 @@ export function PlanningHeader({
   listLabel: string;
   onNavigate?: (href: string) => void;
 }) {
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
   const previousDay = dayLinks.find((link) => link.kind === "previous");
   const today = dayLinks.find((link) => link.kind === "today");
   const nextDay = dayLinks.find((link) => link.kind === "next");
@@ -49,7 +57,7 @@ export function PlanningHeader({
       <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
         <div className="min-w-0">
           <div className="flex items-center gap-2 text-muted-foreground">
-            <Calendar className="size-4" aria-hidden="true" />
+            <CalendarDays className="size-4" aria-hidden="true" />
             <span className="text-xs font-semibold uppercase tracking-[0.16em]">
               {title}
             </span>
@@ -69,6 +77,30 @@ export function PlanningHeader({
             <h1 className="truncate text-xl font-semibold tracking-tight text-foreground">
               {activeDayLabel}
             </h1>
+            <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
+              <PopoverTrigger asChild>
+                <Button
+                  type="button"
+                  size="icon-sm"
+                  variant="ghost"
+                  aria-label={activeDayLabel}
+                >
+                  <CalendarDays aria-hidden="true" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent align="start" className="z-50 w-auto border bg-popover p-0 text-popover-foreground shadow-lg">
+                <Calendar
+                  mode="single"
+                  selected={selectedDate}
+                  defaultMonth={selectedDate}
+                  onSelect={(date) => {
+                    if (!date) return;
+                    setDatePickerOpen(false);
+                    onSelectDate(date);
+                  }}
+                />
+              </PopoverContent>
+            </Popover>
             {nextDay ? (
               <Button
                 type="button"

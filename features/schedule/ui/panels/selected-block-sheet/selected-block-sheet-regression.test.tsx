@@ -150,7 +150,7 @@ describe("SelectedBlockSheet regressions", () => {
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Selected scheduled task" })).toBeInTheDocument();
     fireEvent.change(screen.getByLabelText("Title"), { target: { value: "Updated scheduled task" } });
-    fireEvent.click(screen.getByRole("button", { name: "Save task config" }));
+    fireEvent.click(screen.getAllByRole("button", { name: "Save task config" })[0]);
 
     expect(onSaveTaskConfigAction).toHaveBeenCalledWith("task-1", expect.objectContaining({
       title: "Updated scheduled task",

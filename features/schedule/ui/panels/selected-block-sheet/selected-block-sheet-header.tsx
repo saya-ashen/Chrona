@@ -5,6 +5,7 @@ import type { ScheduleRecord } from "../../schedule-page-types";
 import { formatDateTime, formatTimeRange } from "../../schedule-page-utils";
 import { TaskContextLinks } from "@/components/tasks/shared/task-context-links";
 import { Button } from "@/components/ui/button";
+import { X } from "lucide-react";
 
 export function SelectedBlockSheetHeader({
   item,
@@ -26,7 +27,7 @@ export function SelectedBlockSheetHeader({
   const dueLabel = formatDateTime(item.dueAt, locale);
 
   return (
-    <div className="border-b border-border/70 bg-muted/[0.1] px-5 py-3 md:px-6">
+    <div className="border-b border-border/60 px-4 py-3 sm:px-6 sm:py-4">
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0 space-y-1">
           <h2
@@ -41,7 +42,7 @@ export function SelectedBlockSheetHeader({
             <span>{item.priority}</span>
           </div>
         </div>
-        <div className="flex flex-wrap items-center justify-end gap-2">
+        <div className="flex items-center gap-2">
           <TaskContextLinks
             taskId={item.taskId}
             workBlockId={item.workBlockId ?? null}
@@ -50,9 +51,12 @@ export function SelectedBlockSheetHeader({
           <Button
             type="button"
             onClick={onClose}
-            variant="outline" size="sm"
+            variant="ghost"
+            size="icon-sm"
+            className="size-8 rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+            aria-label={copy.close}
           >
-            {copy.close}
+            <X />
           </Button>
         </div>
       </div>

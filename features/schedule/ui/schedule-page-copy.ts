@@ -233,6 +233,8 @@ export const DEFAULT_SCHEDULE_PAGE_COPY = {
   selectedBlockAutomationExecute: "Auto-execute",
   selectedBlockProvider: "Provider",
   selectedBlockRuntime: "Runtime",
+  selectedBlockDefaultProvider: "Use default AI provider",
+  selectedBlockProviderUnconfigured: "AI provider not configured",
   selectedBlockExecutionStatus: "Execution status",
   selectedBlockRecovery: "Recovery",
   selectedBlockOpenWorkspace: "Open task workspace to recover this run.",
