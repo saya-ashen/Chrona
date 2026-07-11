@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from "node:async_hooks";
 import { db } from "@/lib/db";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
 import {
@@ -405,11 +406,18 @@ async function finalizeOutcome(input: {
   });
 }
 
+const activeTaskCommands = new AsyncLocalStorage<ReadonlySet<string>>();
+
 const taskCommandTails = new Map<string, Promise<void>>();
 
 export async function executeCommand(
   input: ExecutionCommandEnvelope & PlanExecutionObserver,
 ): Promise<PlanExecutionResult> {
+  const activeTaskIds = activeTaskCommands.getStore();
+  if (activeTaskIds?.has(input.taskId)) {
+    return executeCommandUnlocked(input);
+  }
+
   const previous = taskCommandTails.get(input.taskId) ?? Promise.resolve();
   let release!: () => void;
   const current = new Promise<void>((resolve) => {
@@ -419,7 +427,9 @@ export async function executeCommand(
   taskCommandTails.set(input.taskId, tail);
   await previous;
   try {
-    return await executeCommandUnlocked(input);
+    const nextActiveTaskIds = new Set(activeTaskIds);
+    nextActiveTaskIds.add(input.taskId);
+    return await activeTaskCommands.run(nextActiveTaskIds, () => executeCommandUnlocked(input));
   } finally {
     release();
     if (taskCommandTails.get(input.taskId) === tail) {

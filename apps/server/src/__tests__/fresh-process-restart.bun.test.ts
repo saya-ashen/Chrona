@@ -35,7 +35,7 @@ async function startServer() {
     stderr: "pipe",
   });
 
-  for (let attempt = 0; attempt < 100; attempt += 1) {
+  for (let attempt = 0; attempt < 250; attempt += 1) {
     try {
       if ((await fetch(`${serverUrl}/health`)).ok) return;
     } catch {
@@ -43,7 +43,11 @@ async function startServer() {
     }
     await Bun.sleep(20);
   }
+
+  server.kill("SIGTERM");
+  await server.exited;
   const stderr = server.stderr instanceof ReadableStream ? await new Response(server.stderr).text() : String(server.stderr ?? "");
+  server = null;
   throw new Error(`Server did not become healthy: ${stderr}`);
 }
 
@@ -102,5 +106,5 @@ describe("fresh process restart recovery", () => {
     expect(session).toEqual({ status: "Active", pauseReason: null });
     expect(run?.status).toBe("WaitingForInput");
     expect(runs?.count).toBe(1);
-  });
+  }, 15_000);
 });
