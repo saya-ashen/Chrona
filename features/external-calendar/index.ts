@@ -1,9 +1,5 @@
 export * from "./contract";
-export * from "./repository";
-export * from "./service";
-export * from "./routes";
-export * from "./ui/client";
-export * from "./ui/calendar-source-setup";
-export * from "./ui/calendar-source-list";
-export * from "./ui/calendar-source-actions";
-export * from "./ui/external-calendar-event-block";
+export { createCalendarSourceRoutes, type CalendarSourceRouteOptions } from "./routes";
+export { listExternalCalendarEvents } from "./ui/client";
+export { CalendarSourceSetup } from "./ui/calendar-source-setup";
+export { ExternalCalendarEventBlock } from "./ui/external-calendar-event-block";

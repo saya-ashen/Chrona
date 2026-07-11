@@ -5,8 +5,8 @@ import { createChronaEngine } from "@chrona/engine";
 import { db } from "@chrona/db";
 import type { CalendarFeedTransport } from "@chrona/integrations";
 
-import { createApiRouter } from "@chrona/server/routes";
-import { json, resetTestDb, seedWorkspace } from "@server/__tests__/bun-test-helpers";
+import { createApiRouter } from "../../routes/api";
+import { json, resetTestDb, seedWorkspace } from "../bun-test-helpers";
 
 const FIXTURE_NOW = new Date("2026-05-01T00:00:00.000Z");
 
@@ -21,7 +21,7 @@ function fixtureUrl(name: string) {
 }
 
 async function fixture(name: string) {
-  return await readFile(new URL(`../../../packages/integrations/src/calendar/fixtures/${name}`, import.meta.url), "utf8");
+  return await readFile(new URL(`../../../../../packages/integrations/src/calendar/fixtures/${name}`, import.meta.url), "utf8");
 }
 
 const fixtureTransport: CalendarFeedTransport = async (url) => {

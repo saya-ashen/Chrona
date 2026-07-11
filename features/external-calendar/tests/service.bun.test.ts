@@ -1,8 +1,21 @@
 import { beforeEach, describe, expect, it } from "bun:test";
 import { db } from "@chrona/db";
 
-import { resetTestDb, seedWorkspace } from "@server/__tests__/bun-test-helpers";
-import { createExternalCalendarService } from "..";
+import { createExternalCalendarService } from "../service";
+
+async function resetExternalCalendarFixture() {
+  await db.importedCalendarEvent.deleteMany();
+  await db.calendarSource.deleteMany();
+  await db.workBlock.deleteMany();
+  await db.taskProjection.deleteMany();
+  await db.task.deleteMany();
+  await db.workspace.deleteMany();
+}
+
+async function seedWorkspace(name: string) {
+  const workspace = await db.workspace.create({ data: { name, status: "Active", defaultRuntime: "hermes" } });
+  return { workspaceId: workspace.id };
+}
 
 const googleFeed = `BEGIN:VCALENDAR
 VERSION:2.0
@@ -18,7 +31,7 @@ END:VCALENDAR`;
 
 describe("External calendar service sync policies", () => {
   beforeEach(async () => {
-    await resetTestDb();
+    await resetExternalCalendarFixture();
   });
 
   it("defaults Google calendar subscriptions to completing past events", async () => {
