@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { ActionCenterItem } from "@chrona/contracts/api";
-import type { WorkStateView } from "@chrona/domain";
+import { deriveUserFacingFailure, type WorkStateView } from "@chrona/domain";
 
 import { LocalizedLink } from "@/components/i18n/localized-link";
 import { Button } from "@/components/ui/button";
@@ -48,7 +48,8 @@ type ActionCenterPageItem = ActionCenterItem & { stateView?: WorkStateView };
 type ActionCenterPageProjection = ActionCenterPageItem[];
 
 function getActionError(error: unknown) {
-  return error instanceof Error ? error.message : String(error);
+  const reason = error instanceof Error ? error.message : String(error);
+  return deriveUserFacingFailure({ state: "failed", reason }).summary;
 }
 
 function taskHref(item: ActionCenterPageItem) {

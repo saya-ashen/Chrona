@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
 import type { ActionCenterItem } from "@chrona/contracts/api";
-import type { WorkStateView } from "@chrona/domain";
+import { deriveAttentionDescriptor, type WorkStateView } from "@chrona/domain";
 import {
   AlertTriangle,
   CheckCircle2,
@@ -88,39 +88,11 @@ const GROUP_ORDER: ActionGroupKey[] = [
 ];
 
 function groupForItem(item: ActionCenterPresentationItem): ActionGroupKey {
-  if (item.kind === "schedule_proposal") return "waiting";
-  if (["task_overdue", "task_due_now"].includes(item.kind)) return "critical";
-  if (item.kind === "task_due_soon") return "review";
-
-  switch (item.stateView?.state) {
-    case "failed":
-    case "blocked":
-    case "waiting_for_approval":
-      return "critical";
-    case "waiting_for_input":
-      return "waiting";
-    case "result_ready":
-      return "review";
-    case "done":
-    case "cancelled":
-      return "resolved";
-    case "no_plan":
-    case "planning":
-    case "plan_review":
-    case "ready_to_run":
-    case "queued":
-    case "running":
-    case undefined:
-      break;
-
-  }
-
-  if (["recovery", "blocked", "approval"].includes(item.kind))
-    return "critical";
-  if (item.kind === "input") return "waiting";
-  if (["execution_completed", "auto_execution_skipped"].includes(item.kind))
-    return "review";
-  return "resolved";
+  return deriveAttentionDescriptor({
+    stateView: item.stateView,
+    itemKind: item.kind,
+    riskLevel: item.riskLevel,
+  }).group;
 }
 
 function priorityScore(item: ActionCenterItem) {

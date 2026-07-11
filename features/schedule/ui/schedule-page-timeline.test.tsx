@@ -306,13 +306,13 @@ describe("DayTimeline", () => {
   });
 
   const autoStartReasonCases: Array<{ reason: string; copy: RegExp }> = [
-    { reason: "no_accepted_plan", copy: /No accepted plan/i },
-    { reason: "no_runtime_config", copy: /No execution runtime configured/i },
-    { reason: "invalid_task_status", copy: /Task status can't auto-start/i },
+    { reason: "no_accepted_plan", copy: /Review and approve a plan/i },
+    { reason: "no_runtime_config", copy: /Connect an execution runtime/i },
+    { reason: "invalid_task_status", copy: /Prepare this task before it can start/i },
     { reason: "already_running", copy: /Already running/i },
-    { reason: "requires_human_input", copy: /Waiting for your input/i },
-    { reason: "requires_approval", copy: /Waiting for approval/i },
-    { reason: "runtime_unsupported", copy: /Runtime doesn't support auto-start/i },
+    { reason: "requires_human_input", copy: /Input needed before this can start/i },
+    { reason: "requires_approval", copy: /Approval needed before this can start/i },
+    { reason: "runtime_unsupported", copy: /Choose a runtime that supports automatic start/i },
     { reason: "not_scheduled", copy: /Not on a schedule block yet/i },
   ];
 
