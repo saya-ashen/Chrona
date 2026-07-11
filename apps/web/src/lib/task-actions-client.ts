@@ -19,7 +19,7 @@ async function parseActionResponse(response: {
 // Task CRUD
 // ═══════════════════════════════════════════════════════════════
 
-export function createTaskFromSchedule(input: {
+export type CreateTaskFromScheduleInput = {
   workspaceId: string;
   title: string;
   description?: string | null;
@@ -35,7 +35,9 @@ export function createTaskFromSchedule(input: {
   recurrenceRule?: string | null;
   recurrenceAnchorStartAt?: string | null;
   recurrenceAnchorEndAt?: string | null;
-}) {
+};
+
+export function createTaskFromSchedule(input: CreateTaskFromScheduleInput) {
   return api.tasks
     .$post({
       json: {
@@ -62,6 +64,22 @@ export function createTaskFromSchedule(input: {
       },
     })
     .then(parseActionResponse);
+}
+
+export async function createScheduledTask(input: CreateTaskFromScheduleInput & {
+  dueAt: Date | null;
+  scheduledStartAt: Date;
+  scheduledEndAt: Date;
+}) {
+  const created = (await createTaskFromSchedule(input)) as { taskId: string };
+  await applySchedule({
+    taskId: created.taskId,
+    dueAt: input.dueAt,
+    scheduledStartAt: input.scheduledStartAt,
+    scheduledEndAt: input.scheduledEndAt,
+    scheduleSource: "human",
+  });
+  return created;
 }
 
 export function updateTaskConfigFromSchedule(input: {

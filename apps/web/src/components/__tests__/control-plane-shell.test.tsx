@@ -7,6 +7,7 @@ let mockTaskDialogAutoPlanGenerationEnabled = true;
 let mockAiClients = [{ id: "client-1", enabled: true }];
 let mockTaskList = { tasks: [] as Array<{ id: string }>, total: 0 };
 let mockStartWithChronaCompletedAt: string | null = null;
+let mockDialogAvailableAiClients: Array<{ id: string; enabled: boolean }> | undefined;
 
 
 vi.mock("@/components/i18n/localized-link", () => ({
@@ -32,7 +33,32 @@ vi.mock("@/components/ui/button", () => ({
 }));
 
 vi.mock("../../../../../features/schedule/ui", () => ({
-  TaskCreateDialog: ({ isOpen, onSubmit }: { isOpen: boolean; onSubmit: (input: any) => Promise<void> }) => isOpen ? (
+  TaskCreateDialog: ({
+    isOpen,
+    onSubmit,
+    availableAiClients,
+  }: {
+    isOpen: boolean;
+    onSubmit: (input: {
+      title: string;
+      description: string;
+      priority: "High";
+      autoExecute: boolean;
+      autoPlanGenerationEnabled: boolean;
+      autoPlanGenerationTiming: "on_schedule";
+      autoExecuteTiming: "on_schedule";
+      dueAt: Date | null;
+      scheduledStartAt: Date;
+      scheduledEndAt: Date;
+      recurrenceRule: string | null;
+      recurrenceAnchorStartAt: string | null;
+      recurrenceAnchorEndAt: string | null;
+      aiClientId: string | null;
+    }) => Promise<void>;
+    availableAiClients?: Array<{ id: string; enabled: boolean }>;
+  }) => {
+    mockDialogAvailableAiClients = availableAiClients;
+    return isOpen ? (
     <div role="dialog">
       <span>Create task dialog</span>
       <button
@@ -43,24 +69,37 @@ vi.mock("../../../../../features/schedule/ui", () => ({
           priority: "High",
           autoExecute: mockTaskDialogAutoExecute,
           autoPlanGenerationEnabled: mockTaskDialogAutoPlanGenerationEnabled,
+          autoPlanGenerationTiming: "on_schedule",
+          autoExecuteTiming: "on_schedule",
           dueAt: null,
           scheduledStartAt: new Date(2026, 3, 15, 9, 0, 0, 0),
           scheduledEndAt: new Date(2026, 3, 15, 10, 0, 0, 0),
+          recurrenceRule: "FREQ=WEEKLY",
+          recurrenceAnchorStartAt: "2026-04-15T09:00:00.000Z",
+          recurrenceAnchorEndAt: "2026-04-15T10:00:00.000Z",
+          aiClientId: "client-1",
         })}
       >
         Submit task
       </button>
     </div>
-  ) : null,
+    ) : null;
+  },
 }));
 
 vi.mock("@/lib/task-actions-client", () => ({
-  createTaskFromSchedule: vi.fn(),
+  createScheduledTask: vi.fn(),
 }));
 
 vi.mock("@/api", () => ({
   apiJson: vi.fn((path: string, init?: RequestInit) => {
     if (path === "/api/ai/clients") return Promise.resolve({ clients: mockAiClients });
+    if (path === "/api/schedule?workspaceId=ws-1") {
+      return Promise.resolve({
+        availableAiClients: mockAiClients,
+        defaultExecutionRuntime: "local",
+      });
+    }
     if (path.startsWith("/api/tasks?")) return Promise.resolve(mockTaskList);
     if (path === "/api/workspaces/ws-1/preferences/start-with-chrona") {
       if (init?.method === "PATCH") {
@@ -137,15 +176,15 @@ import {
   SCHEDULE_AI_PREFERENCES_STORAGE_KEY,
   type ScheduleAiPreferences,
 } from "@/lib/schedule-ai-preferences";
-import { createTaskFromSchedule } from "@/lib/task-actions-client";
+import { createScheduledTask } from "@/lib/task-actions-client";
 import { startTaskPlanGenerationSession } from "@/hooks/ai/task-plan-generation-session-store";
 import { apiJson } from "@/api";
 import { ControlPlaneShell } from "@/components/control-plane-shell";
 
 const defaultWorkspace = { id: "ws-1", name: "Default" };
-const mockCreateTaskFromSchedule = createTaskFromSchedule as ReturnType<typeof vi.fn>;
-const mockStartTaskPlanGenerationSession = startTaskPlanGenerationSession as ReturnType<typeof vi.fn>;
-const mockApiJson = apiJson as ReturnType<typeof vi.fn>;
+const mockCreateScheduledTask = vi.mocked(createScheduledTask);
+const mockStartTaskPlanGenerationSession = vi.mocked(startTaskPlanGenerationSession);
+const mockApiJson = vi.mocked(apiJson);
 
 function writePreferences(preferences: ScheduleAiPreferences) {
   window.localStorage.setItem(
@@ -169,6 +208,7 @@ afterEach(() => {
   mockAiClients = [{ id: "client-1", enabled: true }];
   mockTaskList = { tasks: [], total: 0 };
   mockStartWithChronaCompletedAt = null;
+  mockDialogAvailableAiClients = undefined;
 });
 
 describe("ControlPlaneShell", () => {
@@ -239,7 +279,7 @@ describe("ControlPlaneShell", () => {
       autoPlanGenerationEnabled: false,
       defaultAutoExecuteEnabled: false,
     });
-    mockCreateTaskFromSchedule.mockResolvedValueOnce({ taskId: "created-task" });
+    mockCreateScheduledTask.mockResolvedValueOnce({ taskId: "created-task" });
 
     render(
       <ControlPlaneShell defaultWorkspace={defaultWorkspace}>
@@ -248,10 +288,13 @@ describe("ControlPlaneShell", () => {
     );
 
     await user.click(screen.getByRole("button", { name: "New Task" }));
+    await waitFor(() => {
+      expect(mockDialogAvailableAiClients).toEqual(mockAiClients);
+    });
     await user.click(screen.getByRole("button", { name: "Submit task" }));
 
     await waitFor(() => {
-      expect(mockCreateTaskFromSchedule).toHaveBeenCalledWith(
+      expect(mockCreateScheduledTask).toHaveBeenCalledWith(
         expect.objectContaining({
           workspaceId: "ws-1",
           title: "Created from shell",
@@ -259,6 +302,15 @@ describe("ControlPlaneShell", () => {
           priority: "High",
           autoPlanGeneration: true,
           autoExecute: true,
+          executionRuntime: "local",
+          executionConfig: {},
+          aiClientId: "client-1",
+          dueAt: null,
+          scheduledStartAt: new Date(2026, 3, 15, 9, 0, 0, 0),
+          scheduledEndAt: new Date(2026, 3, 15, 10, 0, 0, 0),
+          recurrenceRule: "FREQ=WEEKLY",
+          recurrenceAnchorStartAt: "2026-04-15T09:00:00.000Z",
+          recurrenceAnchorEndAt: "2026-04-15T10:00:00.000Z",
         }),
       );
     });
@@ -267,7 +319,7 @@ describe("ControlPlaneShell", () => {
 
   it("advances onboarding to plan review after creating a task", async () => {
     const user = userEvent.setup();
-    mockCreateTaskFromSchedule.mockResolvedValueOnce({ taskId: "created-task" });
+    mockCreateScheduledTask.mockResolvedValueOnce({ taskId: "created-task" });
 
     render(
       <ControlPlaneShell defaultWorkspace={defaultWorkspace}>
@@ -280,7 +332,7 @@ describe("ControlPlaneShell", () => {
     await user.click(screen.getByRole("button", { name: "Submit task" }));
 
     await waitFor(() => {
-      expect(mockCreateTaskFromSchedule).toHaveBeenCalledWith(expect.objectContaining({ title: "Created from shell" }));
+      expect(mockCreateScheduledTask).toHaveBeenCalledWith(expect.objectContaining({ title: "Created from shell" }));
     });
     expect(screen.getByRole("listitem", { current: "step" })).toHaveTextContent("Review the plan");
     expect(screen.getByRole("button", { name: "Open created task" })).toBeInTheDocument();
@@ -321,14 +373,14 @@ describe("ControlPlaneShell", () => {
     });
     expect(screen.queryByText("Start with Chrona in three steps")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Open created task" })).not.toBeInTheDocument();
-    expect(mockCreateTaskFromSchedule).not.toHaveBeenCalled();
+    expect(mockCreateScheduledTask).not.toHaveBeenCalled();
   });
 
   it("forces plan generation when auto-execute is enabled", async () => {
     const user = userEvent.setup();
     mockTaskDialogAutoExecute = true;
     mockTaskDialogAutoPlanGenerationEnabled = false;
-    mockCreateTaskFromSchedule.mockResolvedValueOnce({ taskId: "created-task" });
+    mockCreateScheduledTask.mockResolvedValueOnce({ taskId: "created-task" });
 
     render(
       <ControlPlaneShell defaultWorkspace={defaultWorkspace}>
@@ -340,7 +392,7 @@ describe("ControlPlaneShell", () => {
     await user.click(screen.getByRole("button", { name: "Submit task" }));
 
     await waitFor(() => {
-      expect(mockCreateTaskFromSchedule).toHaveBeenCalledWith(
+      expect(mockCreateScheduledTask).toHaveBeenCalledWith(
         expect.objectContaining({
           autoPlanGeneration: true,
           autoExecute: true,
@@ -359,7 +411,7 @@ describe("ControlPlaneShell", () => {
       autoPlanGenerationEnabled: true,
       defaultAutoExecuteEnabled: false,
     });
-    mockCreateTaskFromSchedule.mockResolvedValueOnce({ taskId: "created-task" });
+    mockCreateScheduledTask.mockResolvedValueOnce({ taskId: "created-task" });
 
     render(
       <ControlPlaneShell defaultWorkspace={defaultWorkspace}>
@@ -371,7 +423,7 @@ describe("ControlPlaneShell", () => {
     await user.click(screen.getByRole("button", { name: "Submit task" }));
 
     await waitFor(() => {
-      expect(mockCreateTaskFromSchedule).toHaveBeenCalledWith(
+      expect(mockCreateScheduledTask).toHaveBeenCalledWith(
         expect.objectContaining({
           title: "Created from shell",
           autoPlanGeneration: false,

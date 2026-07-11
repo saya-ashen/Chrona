@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const push = vi.fn();
 const refresh = vi.fn();
 const fetchScheduleProjection = vi.fn();
-const createTaskFromSchedule = vi.fn().mockResolvedValue({ taskId: "created-task", workspaceId: "workspace-1" });
+const createScheduledTask = vi.fn().mockResolvedValue({ taskId: "created-task", workspaceId: "workspace-1" });
 const applySchedule = vi.fn().mockResolvedValue({ taskId: "created-task", workspaceId: "workspace-1" });
 const updateTaskConfigFromSchedule = vi.fn();
 const startTaskPlanGenerationSession = vi.fn();
@@ -35,7 +35,7 @@ vi.mock("@chrona/i18n", async (importOriginal) => ({
 }));
 
 vi.mock("@/lib/task-actions-client", () => ({
-  createTaskFromSchedule: (...args: unknown[]) => createTaskFromSchedule(...args),
+  createScheduledTask: (...args: unknown[]) => createScheduledTask(...args),
   applySchedule: (...args: unknown[]) => applySchedule(...args),
   updateTaskConfigFromSchedule: (...args: unknown[]) => updateTaskConfigFromSchedule(...args),
 }));
@@ -170,6 +170,7 @@ vi.mock("./dialogs/task-create-dialog", () => ({
       dueAt: Date | null;
       autoExecute?: boolean;
       autoPlanGenerationEnabled?: boolean;
+      aiClientId?: string | null;
     }) => void;
   }) =>
     isOpen ? (
@@ -184,6 +185,7 @@ vi.mock("./dialogs/task-create-dialog", () => ({
               priority: "High",
               autoExecute: mockTaskDialogAutoExecute,
               autoPlanGenerationEnabled: mockTaskDialogAutoPlanGenerationEnabled,
+              aiClientId: "client-1",
               dueAt: null,
             })
           }
@@ -406,7 +408,7 @@ describe("SchedulePage quick create", () => {
     expect(screen.getByTestId("planning-header")).toBeInTheDocument();
   });
 
-  it("creates a queue task from the side-rail quick-create without scheduling it", async () => {
+  it("creates and schedules a task from the schedule dialog", async () => {
     const user = userEvent.setup();
 
     render(
@@ -422,7 +424,7 @@ describe("SchedulePage quick create", () => {
     await user.click(screen.getByRole("button", { name: /add to queue/i }));
 
     await waitFor(() => {
-      expect(createTaskFromSchedule).toHaveBeenCalledWith(
+      expect(createScheduledTask).toHaveBeenCalledWith(
         expect.objectContaining({
           workspaceId: "workspace-1",
           title: "Action Center triage",
@@ -431,17 +433,24 @@ describe("SchedulePage quick create", () => {
       );
     });
 
-    expect(createTaskFromSchedule).toHaveBeenCalledWith(
+    expect(createScheduledTask).toHaveBeenCalledWith(
       expect.objectContaining({
         autoPlanGeneration: true,
         autoExecute: true,
       }),
     );
-    expect(applySchedule).toHaveBeenCalled();
+    expect(createScheduledTask).toHaveBeenCalledWith(
+      expect.objectContaining({
+        dueAt: null,
+        scheduledStartAt: expect.any(Date),
+        scheduledEndAt: expect.any(Date),
+        aiClientId: "client-1",
+      }),
+    );
     expect(startTaskPlanGenerationSession).not.toHaveBeenCalled();
   });
 
-  it("does not auto-generate a draft plan after quick-create when the task-level plan switch is disabled", async () => {
+  it("preserves task automation choices in scheduled creation", async () => {
     const user = userEvent.setup();
     mockTaskDialogAutoPlanGenerationEnabled = false;
 
@@ -458,20 +467,19 @@ describe("SchedulePage quick create", () => {
     await user.click(screen.getByRole("button", { name: /add to queue/i }));
 
     await waitFor(() => {
-      expect(createTaskFromSchedule).toHaveBeenCalledWith(
+      expect(createScheduledTask).toHaveBeenCalledWith(
         expect.objectContaining({
           title: "Action Center triage",
         }),
       );
     });
 
-    expect(createTaskFromSchedule).toHaveBeenCalledWith(
+    expect(createScheduledTask).toHaveBeenCalledWith(
       expect.objectContaining({
         autoPlanGeneration: true,
         autoExecute: true,
       }),
     );
-    expect(applySchedule).toHaveBeenCalled();
     expect(startTaskPlanGenerationSession).not.toHaveBeenCalled();
   });
 });
@@ -659,9 +667,9 @@ describe("SchedulePage data display", () => {
 });
 
 describe("SchedulePage error handling", () => {
-  it("shows error when createTaskFromSchedule fails", async () => {
+  it("shows error when createScheduledTask fails", async () => {
     const user = userEvent.setup();
-    createTaskFromSchedule.mockRejectedValueOnce(new Error("Server error"));
+    createScheduledTask.mockRejectedValueOnce(new Error("Server error"));
 
     render(
       <SchedulePage
@@ -676,7 +684,7 @@ describe("SchedulePage error handling", () => {
     await user.click(screen.getByRole("button", { name: /add to queue/i }));
 
     await waitFor(() => {
-      expect(createTaskFromSchedule).toHaveBeenCalled();
+      expect(createScheduledTask).toHaveBeenCalled();
     });
 
     await waitFor(() => {
