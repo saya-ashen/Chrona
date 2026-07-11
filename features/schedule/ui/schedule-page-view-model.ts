@@ -30,6 +30,67 @@ type ScheduleCalendarDay = {
   scheduledCount: number;
   riskCount: number;
 };
+export type ScheduleDisplayState = {
+  day: {
+    phase: "empty" | "scheduled";
+    scheduledCount: number;
+    scheduledMinutes: number;
+    riskCount: number;
+  };
+  primaryAction: "schedule_task" | "create_task" | "review_attention";
+  primarySurface: "timeline" | "agenda";
+  planningDrawer: {
+    readyCount: number;
+    attentionCount: number;
+    defaultTab: "queue" | "attention";
+  };
+};
+
+function getScheduledMinutes(
+  items: NonNullable<SchedulePageViewModel["activeGroup"]>["items"],
+) {
+  return items.reduce((total, item) => {
+    if (!item.scheduledStartAt || !item.scheduledEndAt) return total;
+    return total + Math.max(
+      0,
+      Math.round(
+        (item.scheduledEndAt.getTime() - item.scheduledStartAt.getTime()) /
+          60_000,
+      ),
+    );
+  }, 0);
+}
+
+export function deriveScheduleDisplayState(input: {
+  activeGroup: SchedulePageViewModel["activeGroup"];
+  activeView: ScheduleViewMode;
+  readyCount: number;
+  attentionCount: number;
+}): ScheduleDisplayState {
+  const scheduledCount = input.activeGroup?.items.length ?? 0;
+  const riskCount = input.activeGroup?.riskCount ?? input.attentionCount;
+
+  return {
+    day: {
+      phase: scheduledCount > 0 ? "scheduled" : "empty",
+      scheduledCount,
+      scheduledMinutes: getScheduledMinutes(input.activeGroup?.items ?? []),
+      riskCount,
+    },
+    primaryAction:
+      riskCount > 0
+        ? "review_attention"
+        : input.readyCount > 0
+          ? "schedule_task"
+          : "create_task",
+    primarySurface: input.activeView === "list" ? "agenda" : "timeline",
+    planningDrawer: {
+      readyCount: input.readyCount,
+      attentionCount: input.attentionCount,
+      defaultTab: input.attentionCount > 0 ? "attention" : "queue",
+    },
+  };
+}
 
 export type SchedulePageViewModel = {
   scheduledGroups: ReturnType<typeof buildWeekGroups>;
@@ -46,6 +107,7 @@ export type SchedulePageViewModel = {
   cockpitSummary: string;
   activeRailLabel: string;
   conflictTaskIds: Set<string>;
+  display: ScheduleDisplayState;
 };
 
 export function buildSchedulePageViewModel({
@@ -148,6 +210,13 @@ export function buildSchedulePageViewModel({
 
   void activeView;
 
+  const display = deriveScheduleDisplayState({
+    activeGroup,
+    activeView,
+    readyCount: viewData.planningSummary.readyToScheduleCount,
+    attentionCount: viewData.summary.riskCount,
+  });
+
   return {
     scheduledGroups,
     todayKey,
@@ -163,5 +232,6 @@ export function buildSchedulePageViewModel({
     cockpitSummary,
     activeRailLabel,
     conflictTaskIds,
+    display,
   };
 }

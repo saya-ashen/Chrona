@@ -1,7 +1,7 @@
 "use client";
 
-import { Calendar, GripVertical, PanelRightOpen } from "lucide-react";
-import { type DragEvent, useState } from "react";
+import { GripVertical, PanelRightOpen } from "lucide-react";
+import type { DragEvent } from "react";
 import { getSchedulePageCopy } from "../schedule-page-copy";
 import type { UnscheduledItem } from "../schedule-page-types";
 import {
@@ -9,35 +9,21 @@ import {
   getPriorityAccent,
   getPriorityTone,
 } from "../schedule-page-utils";
-import { TimeslotSuggestionPanel } from "./timeslot-suggestion-panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import type { ScheduleSlot } from "@chrona/contracts/ai";
+import { Card, CardHeader } from "@/components/ui/card";
 import { useI18n, useLocale } from "@chrona/i18n/react";
 import { cn } from "@/lib/utils";
 
 export { DayTimelineSummary } from "./schedule-panel-primitives";
 export { SelectedBlockSheet } from "./selected-block-sheet";
 
-function getQueueSuggestedDuration(item: UnscheduledItem) {
-  const value = (
-    item.executionConfig as { suggestedDurationMinutes?: unknown } | null
-  )?.suggestedDurationMinutes;
-
-  if (typeof value !== "number" || !Number.isFinite(value)) {
-    return null;
-  }
-
-  return Math.max(15, Math.round(value / 15) * 15);
-}
 
 export function QueueCard({
   item,
   isDragging,
   isPending,
-  currentSchedule,
-  onScheduleSlot,
+  onScheduleTask,
   onOpenTaskDetails,
   onDragStart,
   onDragEnd,
@@ -45,8 +31,7 @@ export function QueueCard({
   item: UnscheduledItem;
   isDragging: boolean;
   isPending: boolean;
-  currentSchedule?: ScheduleSlot[];
-  onScheduleSlot?: (taskId: string, startAt: Date, endAt: Date) => void;
+  onScheduleTask: (taskId: string) => void;
   onOpenTaskDetails: (taskId: string) => void;
   onDragStart: (item: UnscheduledItem, event: DragEvent<HTMLElement>) => void;
   onDragEnd: () => void;
@@ -54,8 +39,6 @@ export function QueueCard({
   const locale = useLocale();
   const { messages } = useI18n();
   const copy = getSchedulePageCopy(messages.components.schedulePage);
-  const suggestedDurationMinutes = getQueueSuggestedDuration(item);
-  const [showTimeslots, setShowTimeslots] = useState(false);
   const accent = getPriorityAccent(item.priority);
 
   return (
@@ -68,7 +51,7 @@ export function QueueCard({
     >
       <CardHeader
         draggable={!isPending}
-        aria-label={`Drag ${item.title} to the timeline`}
+        aria-label={`${copy.scheduleTaskAction}: ${item.title}`}
         onDragStart={(event) => onDragStart(item, event)}
         onDragEnd={onDragEnd}
         className={cn(
@@ -98,24 +81,18 @@ export function QueueCard({
         </div>
 
         <div className="flex shrink-0 items-center gap-1">
-          {suggestedDurationMinutes ? (
-            <Button
-              type="button"
-              variant={showTimeslots ? "secondary" : "ghost"}
-              size="icon-sm"
-              onClick={(e) => {
-                e.stopPropagation();
-                setShowTimeslots((v) => !v);
-              }}
-              title="Suggest time slot"
-            >
-              <Calendar />
-              <span className="sr-only">Suggest time slot</span>
-            </Button>
-          ) : null}
           <Button
             type="button"
-            variant="outline"
+            variant="default"
+            size="sm"
+            disabled={isPending}
+            onClick={() => onScheduleTask(item.taskId)}
+          >
+            {copy.scheduleAction}
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
             size="icon-sm"
             onClick={() => onOpenTaskDetails(item.taskId)}
             title={copy.taskDetails}
@@ -126,23 +103,6 @@ export function QueueCard({
         </div>
       </CardHeader>
 
-      {showTimeslots ? (
-        <CardContent className="border-t border-border/60 px-3 py-3">
-          <TimeslotSuggestionPanel
-            taskId={item.taskId}
-            title={item.title}
-            priority={item.priority}
-            estimatedMinutes={suggestedDurationMinutes ?? 60}
-            dueAt={item.dueAt}
-            currentSchedule={currentSchedule ?? []}
-            onSchedule={
-              onScheduleSlot
-                ? (startAt, endAt) => onScheduleSlot(item.taskId, startAt, endAt)
-                : undefined
-              }
-          />
-        </CardContent>
-      ) : null}
     </Card>
   );
 }

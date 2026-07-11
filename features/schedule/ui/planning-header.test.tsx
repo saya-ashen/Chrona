@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import { PlanningHeader } from "./panels/planning-header";
 
 describe("PlanningHeader", () => {
-  it("renders cockpit summary metrics and action affordances", () => {
+  it("centers the selected day and exposes one scheduling action", () => {
     const onNavigate = vi.fn();
 
     render(
@@ -12,36 +12,27 @@ describe("PlanningHeader", () => {
         title="Schedule"
         activeDayLabel="Today · Wednesday"
         summary="2h scheduled · 3 tasks waiting · 1 risk needs review"
-        dateSwitcherLabel="Date"
         dayLinks={[
-          { label: "Today", href: "/schedule?day=today", current: true },
-          { label: "Tomorrow", href: "/schedule?day=tomorrow" },
+          { label: "Previous day", href: "/schedule?day=previous", kind: "previous" },
+          { label: "Today", href: "/schedule?day=today", kind: "today", current: true },
+          { label: "Next day", href: "/schedule?day=next", kind: "next" },
         ]}
-        metrics={[
-          { label: "Today load", value: "2h", hint: "Committed work on the active day." },
-          { label: "Queue", value: "3", hint: "Tasks waiting to be placed.", tone: "info" },
-          { label: "Risks", value: "1", hint: "Items that need attention.", tone: "critical" },
-          { label: "AI suggestions", value: "2", hint: "Suggested next moves." },
-        ]}
-        actions={[
-          { label: "Review suggestions", href: "#schedule-cockpit-sidebar", description: "Open the cockpit sidebar." },
-          { label: "Auto arrange", description: "Coming soon", disabled: true },
-        ]}
+        primaryAction={{ label: "Schedule task", onClick: vi.fn() }}
         activeView="timeline"
         timelineHref="/schedule?view=timeline"
         listHref="/schedule?view=list"
         timelineLabel="Timeline"
-        listLabel="List"
+        listLabel="Agenda"
         onNavigate={onNavigate}
       />,
     );
 
-    expect(screen.getByText("Today · Wednesday")).toBeInTheDocument();
-    expect(screen.getByText("Today load")).toBeInTheDocument();
-    expect(screen.getByText("2h")).toBeInTheDocument();
-    expect(screen.getByText("Queue")).toBeInTheDocument();
-    expect(screen.getByText("3")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /review suggestions/i })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /auto arrange/i })).toBeDisabled();
+    expect(screen.getByRole("heading", { name: "Today · Wednesday" })).toBeInTheDocument();
+    expect(screen.getByText("2h scheduled · 3 tasks waiting · 1 risk needs review")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Previous day" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Next day" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Timeline" })).toHaveAttribute("aria-current", "page");
+    expect(screen.getByRole("button", { name: "Agenda" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Schedule task" })).toBeInTheDocument();
   });
 });

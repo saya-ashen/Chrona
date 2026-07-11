@@ -46,24 +46,17 @@ vi.mock("@/hooks/ai/task-plan-generation-session-store", () => ({
 
 vi.mock("./panels/planning-header", () => ({
   PlanningHeader: ({
-    actions,
-    metrics,
+    summary,
+    primaryAction,
   }: {
-    actions?: Array<{ label: string; onClick?: () => void }>;
-    metrics?: Array<{ label: string; value: string }>;
+    summary: string;
+    primaryAction: { label: string; onClick: () => void };
   }) => (
     <div data-testid="planning-header">
-      {metrics?.map((metric) => (
-        <div key={metric.label} data-testid={`metric-${metric.label}`}>
-          <span>{metric.label}</span>
-          <span>{metric.value}</span>
-        </div>
-      ))}
-      {actions?.map((action) => (
-        <button key={action.label} type="button" onClick={action.onClick}>
-          {action.label}
-        </button>
-      ))}
+      <span>{summary}</span>
+      <button type="button" onClick={primaryAction.onClick}>
+        {primaryAction.label}
+      </button>
     </div>
   ),
 }));
@@ -76,7 +69,20 @@ vi.mock("./panels/schedule-page-panels", () => ({
       {proposal.summary ? <span>{proposal.summary}</span> : null}
     </div>
   ),
-  QueueCard: () => <div data-testid="queue-card" />,
+  QueueCard: ({
+    item,
+    onScheduleTask,
+  }: {
+    item: { taskId: string; title: string };
+    onScheduleTask: (taskId: string) => void;
+  }) => (
+    <div data-testid="queue-card">
+      <span>{item.title}</span>
+      <button type="button" onClick={() => onScheduleTask(item.taskId)}>
+        Schedule
+      </button>
+    </div>
+  ),
   RiskCard: ({ item }: { item: { title: string; runnabilitySummary?: string | null } }) => (
     <div data-testid="risk-card">
       <span>{item.title}</span>
@@ -471,7 +477,7 @@ describe("SchedulePage quick create", () => {
 });
 
 describe("SchedulePage view modes", () => {
-  it("renders list view when selectedView is list", () => {
+  it("renders an agenda scoped to the selected day", () => {
     render(
       <SchedulePage
         workspaceId="workspace-1"
@@ -481,7 +487,8 @@ describe("SchedulePage view modes", () => {
       />,
     );
 
-    expect(screen.getByTestId("schedule-task-list")).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Selected day agenda" })).toBeInTheDocument();
+    expect(screen.getByText("Existing block")).toBeInTheDocument();
     expect(screen.queryByTestId("day-timeline")).not.toBeInTheDocument();
   });
 
@@ -499,18 +506,9 @@ describe("SchedulePage view modes", () => {
 });
 
 describe("SchedulePage data display", () => {
-  it("renders automation candidates in the suggestions metric", () => {
+  it("summarizes ready work and attention in the selected-day header", () => {
     const data = createData();
-    data.automationCandidates = [
-      {
-        taskId: "task-1",
-        kind: "auto_run",
-        reason: "Scheduled task is ready to run automatically.",
-        priority: "high",
-        sessionStrategy: "per_subtask",
-        readyNodeIds: ["node-1"],
-      },
-    ];
+    data.summary.riskCount = 1;
 
     render(
       <SchedulePage
@@ -521,29 +519,16 @@ describe("SchedulePage data display", () => {
       />,
     );
 
-    expect(screen.getByTestId("metric-AI suggestions")).toHaveTextContent("AI suggestions");
-    expect(screen.getByTestId("metric-AI suggestions")).toHaveTextContent("1");
+    expect(screen.getByTestId("planning-header")).toHaveTextContent(/ready to schedule/);
+    expect(screen.getByTestId("planning-header")).toHaveTextContent(/need attention/);
+    expect(screen.getByRole("button", { name: "Schedule task" })).toBeInTheDocument();
   });
 
-  it("renders proposals in the suggestions metric", () => {
+  it("shows a clear empty-day action when the selected date has no blocks", async () => {
+    const user = userEvent.setup();
     const data = createData();
-    data.proposals = [
-      {
-        proposalId: "prop-1",
-        taskId: "task-2",
-        workspaceId: "workspace-1",
-        title: "Proposal task",
-        priority: "High",
-        source: "ai",
-        proposedBy: "system",
-        summary: "AI suggests scheduling",
-        dueAt: null,
-        scheduledStartAt: new Date(2026, 3, 15, 14, 0),
-        scheduledEndAt: new Date(2026, 3, 15, 15, 0),
-      },
-    ];
-    data.summary.proposalCount = 1;
-    data.planningSummary.proposalCount = 1;
+    data.scheduled = [];
+    data.summary.scheduledCount = 0;
 
     render(
       <SchedulePage
@@ -554,8 +539,28 @@ describe("SchedulePage data display", () => {
       />,
     );
 
-    expect(screen.getByTestId("metric-AI suggestions")).toHaveTextContent("AI suggestions");
-    expect(screen.getByTestId("metric-AI suggestions")).toHaveTextContent("2");
+    expect(
+      screen.getByRole("heading", { name: "Nothing scheduled for this day" }),
+    ).toBeInTheDocument();
+    const emptyStateAction = screen.getAllByRole("button", {
+      name: "Schedule task",
+    })[1];
+    expect(emptyStateAction).toBeDefined();
+    await user.click(emptyStateAction!);
+    expect(screen.getByTestId("task-create-dialog")).toBeInTheDocument();
+  });
+
+  it("keeps provider setup out of the day header", () => {
+    render(
+      <SchedulePage
+        workspaceId="workspace-1"
+        data={createData()}
+        selectedDay="2026-04-15"
+        selectedView="timeline"
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: "Connect AI" })).not.toBeInTheDocument();
   });
 
   it("renders risks in the risk metric", () => {
@@ -603,8 +608,11 @@ describe("SchedulePage data display", () => {
       />,
     );
 
-    expect(screen.getByTestId("metric-Risks")).toHaveTextContent("Risks");
-    expect(screen.getByTestId("metric-Risks")).toHaveTextContent("1");
+    expect(screen.getByRole("tab", { name: /Needs attention/ })).toHaveAttribute(
+      "data-state",
+      "active",
+    );
+    expect(screen.getByText("At-risk task")).toBeInTheDocument();
   });
 
   it("renders queue cards in action rail for unscheduled items", () => {
@@ -651,8 +659,8 @@ describe("SchedulePage data display", () => {
       />,
     );
 
-    // Default activeTab is "queue", so the queue section body (with QueueCard) should render
     expect(screen.getByTestId("queue-card")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Schedule" })).toBeInTheDocument();
   });
 });
 
