@@ -102,15 +102,38 @@ function writeHermesEvent(res: ServerResponse, event: Record<string, unknown>) {
 }
 
 async function callChronaPlanGenerate(sessionId: string, blueprint: PlanBlueprint) {
-  const response = await fetch(`${CHRONA_BASE_URL}/api/mcp`, {
+  const headers = {
+    "content-type": "application/json",
+    accept: "application/json, text/event-stream",
+  };
+  const initializeResponse = await fetch(`${CHRONA_BASE_URL}/api/mcp`, {
     method: "POST",
-    headers: {
-      "content-type": "application/json",
-      accept: "application/json, text/event-stream",
-    },
+    headers,
     body: JSON.stringify({
       jsonrpc: "2.0",
       id: 1,
+      method: "initialize",
+      params: {
+        protocolVersion: "2025-03-26",
+        capabilities: {},
+        clientInfo: { name: "chrona-e2e-hermes", version: "1.0.0" },
+      },
+    }),
+  });
+  if (!initializeResponse.ok) {
+    throw new Error(`chrona MCP initialize failed: HTTP ${initializeResponse.status}`);
+  }
+  const mcpSessionId = initializeResponse.headers.get("mcp-session-id");
+
+  const response = await fetch(`${CHRONA_BASE_URL}/api/mcp`, {
+    method: "POST",
+    headers: {
+      ...headers,
+      ...(mcpSessionId ? { "mcp-session-id": mcpSessionId } : {}),
+    },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: 2,
       method: "tools/call",
       params: {
         name: "chrona_plan_generate",
@@ -258,7 +281,9 @@ async function createHermesPlanClient(request: APIRequestContext, baseUrl: strin
       isDefault: true,
     },
   });
-  expect(createResponse.ok()).toBeTruthy();
+  if (!createResponse.ok()) {
+    throw new Error(`Hermes client creation failed (${createResponse.status()}): ${await createResponse.text()}`);
+  }
 
   const created = await createResponse.json() as { client: { id: string } };
   expect(created.client.id).toBeTruthy();
@@ -319,7 +344,7 @@ test.describe("Task Plan Generation via Hermes", () => {
           await taskEditor.getByRole("button", { name: "Close task editor" }).click();
           await expect(taskEditor).not.toBeVisible();
         }
-        await expect(page.getByText("The plan graph will appear here once AI generates a plan.")).toBeVisible();
+        await expect(page.getByRole("heading", { name: "You can create a plan now" })).toBeVisible();
       });
 
       await test.step("3. Generate a draft plan through Hermes", async () => {
@@ -327,7 +352,7 @@ test.describe("Task Plan Generation via Hermes", () => {
         await page.getByRole("button", { name: "Generate plan" }).first().click();
         await commandRequest;
 
-        await expect(page.getByTestId("task-plan-graph").first()).toBeVisible({ timeout: 20_000 });
+        await expect(page.getByRole("region", { name: "Execution flow" })).toBeVisible({ timeout: 20_000 });
         await expect(page.getByText("Collect task context").first()).toBeVisible();
         await expect(page.getByText("Implement solution").first()).toBeVisible();
         await expect(page.getByText("Review before done").first()).toBeVisible();

@@ -1,10 +1,21 @@
 import { expect, test } from "@playwright/test";
+import type { Page } from "@playwright/test";
 
 const SETTINGS_URL = "/en/settings?panel=ai-clients";
 
-async function selectHermesProvider(page: import("@playwright/test").Page) {
+async function selectHermesProvider(page: Page) {
   await page.getByRole("combobox", { name: "Type" }).click();
   await page.getByRole("option", { name: "Hermes" }).click();
+}
+
+async function fillAdvancedConnectionSettings(
+  page: Page,
+  baseUrl: string,
+  apiKey: string,
+) {
+  await page.getByText("Advanced settings", { exact: true }).click();
+  await page.getByRole("textbox", { name: "Base URL", exact: true }).fill(baseUrl);
+  await page.getByRole("textbox", { name: "API Key", exact: true }).fill(apiKey);
 }
 
 test.describe("AI Client Settings", () => {
@@ -31,8 +42,11 @@ test.describe("AI Client Settings", () => {
       await page.getByRole("button", { name: /add client/i }).click();
       await selectHermesProvider(page);
       await page.getByPlaceholder("My Hermes Client").fill("E2E Settings Client");
-      await page.getByPlaceholder("http://127.0.0.1:8642").fill("https://api.mock.ai/v1");
-      await page.getByPlaceholder("optional for localhost").fill("sk-test-e2e-settings");
+      await fillAdvancedConnectionSettings(
+        page,
+        "https://api.mock.ai/v1",
+        "sk-test-e2e-settings",
+      );
 
       const createResp = page.waitForResponse(
         (res) =>
@@ -119,8 +133,7 @@ test.describe("AI Client Settings", () => {
     await page.getByRole("button", { name: /add client/i }).click();
     await selectHermesProvider(page);
     await page.getByPlaceholder("My Hermes Client").fill("Default Client A");
-    await page.getByPlaceholder("http://127.0.0.1:8642").fill("https://a.mock.ai/v1");
-    await page.getByPlaceholder("optional for localhost").fill("sk-a");
+    await fillAdvancedConnectionSettings(page, "https://a.mock.ai/v1", "sk-a");
 
     const respA = page.waitForResponse(
       (res) =>
@@ -134,8 +147,7 @@ test.describe("AI Client Settings", () => {
     await page.getByRole("button", { name: /add client/i }).click();
     await selectHermesProvider(page);
     await page.getByPlaceholder("My Hermes Client").fill("Default Client B");
-    await page.getByPlaceholder("http://127.0.0.1:8642").fill("https://b.mock.ai/v1");
-    await page.getByPlaceholder("optional for localhost").fill("sk-b");
+    await fillAdvancedConnectionSettings(page, "https://b.mock.ai/v1", "sk-b");
     await page.getByRole("checkbox", { name: "Use as default AI client" }).click();
 
     const respB = page.waitForResponse(
@@ -177,8 +189,7 @@ test.describe("AI Client Settings", () => {
     await selectHermesProvider(page);
 
     // Leave name empty, save should be blocked by frontend or show error
-    await page.getByPlaceholder("http://127.0.0.1:8642").fill("https://mock.ai/v1");
-    await page.getByPlaceholder("optional for localhost").fill("sk-test");
+    await fillAdvancedConnectionSettings(page, "https://mock.ai/v1", "sk-test");
 
     const saveBtn = page.getByRole("button", { name: /^save$/i });
     await saveBtn.click();

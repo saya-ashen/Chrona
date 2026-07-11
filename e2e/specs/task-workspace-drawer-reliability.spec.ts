@@ -16,7 +16,7 @@ async function expectNoHorizontalScroll(page: Page) {
 async function clickPlanNode(page: Page) {
   const node = page.getByRole("button", { name: /Collect boundary context/ });
   await expect(node).toBeVisible();
-  await node.click({ force: true });
+  await node.click();
 }
 
 test.describe("Task workspace node drawer reliability", () => {
@@ -32,15 +32,15 @@ test.describe("Task workspace node drawer reliability", () => {
     await page.goto(`/en/tasks/${task.taskId}`);
 
     await expect(page.getByRole("heading", { name: `E2E Drawer Reliability ${viewport}` })).toBeVisible();
-    await expect(page.getByTestId("task-plan-graph")).toBeVisible();
+    await expect(page.getByTestId("accepted-plan-surface")).toBeVisible();
 
     await clickPlanNode(page);
-    await expect(page.getByRole("dialog", { name: "Selected node details" })).not.toBeVisible();
-    await expect(page.getByRole("complementary", { name: "Task command center" })).toBeVisible();
+    await expect(page.getByText("Inspecting step: Collect boundary context", { exact: true })).toBeVisible();
+    await expect(page.getByTestId("accepted-plan-surface")).toBeVisible();
 
     await clickPlanNode(page);
-    await expect(page.getByRole("dialog", { name: "Selected node details" })).not.toBeVisible();
-    await expect(page.getByRole("complementary", { name: "Task command center" })).toBeVisible();
+    await expect(page.getByText("Inspecting step: Collect boundary context", { exact: true })).toBeVisible();
+    await expect(page.getByTestId("accepted-plan-surface")).toBeVisible();
 
     if (viewport === "mobile") {
       await expectNoHorizontalScroll(page);
