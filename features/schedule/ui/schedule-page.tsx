@@ -1,11 +1,12 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { projectPlanningBusyBlocks, type PlanningBusyBlock } from "@chrona/domain";
+import {
+  projectPlanningBusyBlocks,
+  type PlanningBusyBlock,
+} from "@chrona/domain";
 import { useAssistantSurface } from "@/components/assistant-surface/assistant-surface-provider";
-import type {
-  SchedulePageProps,
-} from "./schedule-page-types";
+import type { SchedulePageProps } from "./schedule-page-types";
 import {
   buildScheduleHref,
   buildScheduleViewHref,
@@ -15,9 +16,13 @@ import { buildSchedulePageViewModel } from "./schedule-page-view-model";
 import { SchedulePageHeader } from "./schedule-page-main-panel";
 import { SchedulePageMainPanel } from "./schedule-page-main-panel";
 import { SchedulePageDialogs } from "./dialogs/schedule-page-dialogs";
-import { CalendarSourceSetup, listExternalCalendarEvents } from "../../external-calendar/ui";
+import {
+  CalendarSourceSetup,
+  listExternalCalendarEvents,
+} from "../../external-calendar";
 import { SelectedBlockSheet } from "./panels/schedule-page-panels";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { PageFrame } from "shared/ui/page-frame";
 
 import { ScheduleRightSidebar } from "./panels/schedule-page-sidebar";
 import { getSchedulePageCopy } from "./schedule-page-copy";
@@ -42,7 +47,8 @@ export function SchedulePage({
   selectedView,
   showNewTask,
 }: SchedulePageRouteProps) {
-  const { pendingProposal, registerHandlers, setPageContext } = useAssistantSurface();
+  const { pendingProposal, registerHandlers, setPageContext } =
+    useAssistantSurface();
   const router = useAppRouter();
   const locale = useLocale();
   const { messages } = useI18n();
@@ -53,7 +59,8 @@ export function SchedulePage({
   const [externalEvents, setExternalEvents] = useState<PlanningBusyBlock[]>([]);
   const [externalEventsRefreshKey, setExternalEventsRefreshKey] = useState(0);
 
-  const actionFailedMessage = messages.components.scheduleEditorForm.actionFailed;
+  const actionFailedMessage =
+    messages.components.scheduleEditorForm.actionFailed;
   const {
     hydratedData,
     viewData,
@@ -151,7 +158,15 @@ export function SchedulePage({
     return registerHandlers({
       onConfirmProposal: refreshProjection,
     });
-  }, [activeView, refreshProjection, registerHandlers, setPageContext, viewData, viewModel.activeDay, workspaceId]);
+  }, [
+    activeView,
+    refreshProjection,
+    registerHandlers,
+    setPageContext,
+    viewData,
+    viewModel.activeDay,
+    workspaceId,
+  ]);
 
   useEffect(() => {
     let cancelled = false;
@@ -159,19 +174,25 @@ export function SchedulePage({
     const end = new Date(start);
     end.setDate(end.getDate() + 1);
 
-    listExternalCalendarEvents(workspaceId, start.toISOString(), end.toISOString())
+    listExternalCalendarEvents(
+      workspaceId,
+      start.toISOString(),
+      end.toISOString(),
+    )
       .then(({ events }) => {
         if (cancelled) return;
-        setExternalEvents(projectPlanningBusyBlocks({
-          events,
-          scheduledBlocks: (viewModel.activeGroup?.items ?? [])
-            .filter((item) => item.scheduledStartAt && item.scheduledEndAt)
-            .map((item) => ({
-              id: item.taskId,
-              startsAt: item.scheduledStartAt as Date,
-              endsAt: item.scheduledEndAt as Date,
-            })),
-        }));
+        setExternalEvents(
+          projectPlanningBusyBlocks({
+            events,
+            scheduledBlocks: (viewModel.activeGroup?.items ?? [])
+              .filter((item) => item.scheduledStartAt && item.scheduledEndAt)
+              .map((item) => ({
+                id: item.taskId,
+                startsAt: item.scheduledStartAt as Date,
+                endsAt: item.scheduledEndAt as Date,
+              })),
+          }),
+        );
       })
       .catch(() => {
         if (!cancelled) setExternalEvents([]);
@@ -180,21 +201,32 @@ export function SchedulePage({
     return () => {
       cancelled = true;
     };
-  }, [externalEventsRefreshKey, viewModel.activeDay, viewModel.activeGroup?.items, workspaceId]);
+  }, [
+    externalEventsRefreshKey,
+    viewModel.activeDay,
+    viewModel.activeGroup?.items,
+    workspaceId,
+  ]);
 
   useEffect(() => {
     function refreshExternalEvents() {
       setExternalEventsRefreshKey((key) => key + 1);
     }
 
-    window.addEventListener("chrona:external-calendar-source-created", refreshExternalEvents);
+    window.addEventListener(
+      "chrona:external-calendar-source-created",
+      refreshExternalEvents,
+    );
     return () => {
-      window.removeEventListener("chrona:external-calendar-source-created", refreshExternalEvents);
+      window.removeEventListener(
+        "chrona:external-calendar-source-created",
+        refreshExternalEvents,
+      );
     };
   }, []);
 
   return (
-    <div className="relative flex h-full flex-col overflow-x-hidden overflow-y-auto rounded-[2rem] border border-border bg-surface-soft/80 p-3 sm:p-4">
+    <PageFrame mode="workspace">
       <p className="sr-only" aria-live="polite">
         {announcement}
       </p>
@@ -211,14 +243,12 @@ export function SchedulePage({
         onScheduleTask={() => setShowNewTaskDialog(true)}
       />
 
-
       {errorMessage ? (
-        <div className="mx-2 mt-3 rounded-2xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive shadow-sm">
+        <div className="mx-1 mt-3 rounded-lg border border-destructive/35 bg-destructive/10 px-3 py-2 text-sm text-destructive">
           {copy.errorPrefix}: {errorMessage}
         </div>
       ) : null}
-      <div className="mt-3 grid grid-cols-1 gap-3 overflow-visible rounded-[1.75rem] bg-card p-3 lg:gap-4 lg:p-4 xl:min-h-0 xl:flex-1 xl:grid-cols-[minmax(0,1fr)_minmax(320px,0.42fr)] xl:overflow-hidden">
-
+      <div className="mt-3 grid grid-cols-1 gap-3 overflow-visible lg:gap-4 xl:min-h-0 xl:flex-1 xl:grid-cols-[minmax(0,1fr)_22rem] xl:overflow-hidden">
         <SchedulePageMainPanel
           locale={locale}
           copy={copy}
@@ -227,7 +257,11 @@ export function SchedulePage({
           activeGroup={viewModel.activeGroup}
           activeSelectedTaskId={viewModel.activeSelectedTaskId}
           conflictTaskIds={viewModel.conflictTaskIds}
-          ghostPreview={pendingProposal?.kind === "schedule" ? pendingProposal.schedulePreview ?? null : null}
+          ghostPreview={
+            pendingProposal?.kind === "schedule"
+              ? (pendingProposal.schedulePreview ?? null)
+              : null
+          }
           externalEvents={externalEvents}
           executionRuntimes={data.executionRuntimes}
           defaultExecutionRuntime={data.defaultExecutionRuntime}
@@ -242,13 +276,16 @@ export function SchedulePage({
           onSelectTask={setLocalSelectedTaskId}
         />
 
-        <div className="min-h-0 overflow-visible xl:overflow-hidden">
+        <aside className="min-h-0 overflow-visible border-t border-border pt-3 xl:overflow-hidden xl:border-l xl:border-t-0 xl:pl-4 xl:pt-0">
           <Tabs defaultValue="planning" className="h-full min-h-0">
-            <TabsList className="grid w-full grid-cols-2 xl:hidden">
+            <TabsList className="grid w-full grid-cols-2 rounded-md">
               <TabsTrigger value="planning">{copy.readyToSchedule}</TabsTrigger>
               <TabsTrigger value="calendar">{copy.calendarTab}</TabsTrigger>
             </TabsList>
-            <TabsContent value="planning" className="min-h-0 overflow-visible xl:mt-0 xl:overflow-y-auto">
+            <TabsContent
+              value="planning"
+              className="min-h-0 overflow-visible xl:mt-0 xl:overflow-y-auto"
+            >
               <ScheduleRightSidebar
                 copy={copy}
                 viewData={viewData}
@@ -260,15 +297,14 @@ export function SchedulePage({
                 onScheduleTask={setLocalSelectedTaskId}
               />
             </TabsContent>
-            <TabsContent value="calendar" className="min-h-0 overflow-visible xl:hidden">
+            <TabsContent
+              value="calendar"
+              className="min-h-0 overflow-visible xl:overflow-y-auto"
+            >
               <CalendarSourceSetup workspaceId={workspaceId} />
             </TabsContent>
           </Tabs>
-          <div className="mt-4 hidden xl:block">
-            <CalendarSourceSetup workspaceId={workspaceId} />
-          </div>
-        </div>
-
+        </aside>
       </div>
 
       {viewModel.selectedItem && viewModel.activeDay ? (
@@ -312,6 +348,6 @@ export function SchedulePage({
         handleCreateTaskBlock={handleCreateTaskBlock}
         availableAiClients={data.availableAiClients}
       />
-    </div>
+    </PageFrame>
   );
 }

@@ -1,7 +1,7 @@
-import type { PlanNodeDataModel, TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph/types";
+import type { PlanNodeDataModel, TaskPlanGraphPlan } from "../contract";
 import { buildTaskHeaderSpec, type TaskHeaderActionInput, type UiDocument } from "@chrona/ui-protocol";
 import type { TaskPlanReadModel } from "@chrona/contracts/ai";
-import type { TaskPageData } from "../../../../../../../features/task-workspace/model/task-workspace-types";
+import type { TaskPageData } from "../model/task-workspace-types";
 
 type TaskWorkspaceFixturePageOverrides = Omit<Partial<TaskPageData>, "task"> & {
   task?: Partial<TaskPageData["task"]>;

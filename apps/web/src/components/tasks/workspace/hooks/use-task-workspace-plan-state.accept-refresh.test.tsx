@@ -5,7 +5,7 @@ import type { PropsWithChildren } from "react";
 
 import { useTaskWorkspacePlanState } from "./use-task-workspace-plan-state";
 import { useTaskWorkspacePageState } from "./use-task-workspace-page-state";
-import { taskWorkspaceStateFixtures } from "../test-support/task-workspace-test-fixtures";
+import { taskWorkspaceStateFixtures } from "../../../../../../../features/task-workspace/test-support/task-workspace-test-fixtures";
 import type { TaskPageData } from "../../../../../../../features/task-workspace";
 
 const mocks = vi.hoisted(() => ({

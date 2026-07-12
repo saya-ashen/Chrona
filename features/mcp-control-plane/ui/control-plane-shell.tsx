@@ -1,16 +1,29 @@
 "use client";
 
-import { Bell, CalendarDays, ClipboardList, LayoutDashboard, Plus, Settings } from "lucide-react";
-import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import {
+  Bell,
+  CalendarDays,
+  ClipboardList,
+  LayoutDashboard,
+  Plus,
+  Settings,
+} from "lucide-react";
+import {
+  useEffect,
+  useMemo,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
 import { AssistantSurfaceHeaderDrawerButton } from "@/components/assistant-surface/assistant-surface-header-drawer-button";
 import { StartWithChrona } from "@/components/start-with-chrona";
 import { LocalizedLink } from "@/components/i18n/localized-link";
-import { TaskCreateDialog, type SchedulePageData } from "../../schedule/ui";
+import { TaskCreateDialog, type SchedulePageData } from "../../schedule";
 import { createScheduledTask } from "@/lib/task-actions-client";
-import { apiJson } from "@/api";
+import { apiJson } from "shared/http/api-client";
 import { useAppPathname, useAppRouter } from "@/lib/router";
 import { LocaleSwitcher } from "@/components/i18n/locale-switcher";
-import { Button } from "@/components/ui/button";
+import { Button } from "shared/ui/button";
 import {
   Sidebar,
   SidebarContent,
@@ -49,8 +62,12 @@ function startWithChronaPreferencePath(workspaceId: string) {
   return `/api/workspaces/${encodeURIComponent(workspaceId)}/preferences/start-with-chrona`;
 }
 
-function completedAtFromPreference(payload: StartWithChronaPreferenceResponse): string | null {
-  return typeof payload.completedAt === "string" && payload.completedAt.trim() ? payload.completedAt : null;
+function completedAtFromPreference(
+  payload: StartWithChronaPreferenceResponse,
+): string | null {
+  return typeof payload.completedAt === "string" && payload.completedAt.trim()
+    ? payload.completedAt
+    : null;
 }
 
 export function ControlPlaneShell({
@@ -63,12 +80,17 @@ export function ControlPlaneShell({
   const pathname = useAppPathname();
   const [showCreateTaskDialog, setShowCreateTaskDialog] = useState(false);
   const [isCreatingTask, setIsCreatingTask] = useState(false);
-  const [taskCreateConfig, setTaskCreateConfig] = useState<
-    Pick<SchedulePageData, "availableAiClients" | "defaultExecutionRuntime"> | null
+  const [taskCreateConfig, setTaskCreateConfig] = useState<Pick<
+    SchedulePageData,
+    "availableAiClients" | "defaultExecutionRuntime"
+  > | null>(null);
+  const [createdOnboardingTaskId, setCreatedOnboardingTaskId] = useState<
+    string | null
   >(null);
-  const [createdOnboardingTaskId, setCreatedOnboardingTaskId] = useState<string | null>(null);
   const [useSafeDemoDefaults, setUseSafeDemoDefaults] = useState(false);
-  const [startWithChronaCompletedAt, setStartWithChronaCompletedAt] = useState<string | null | undefined>(undefined);
+  const [startWithChronaCompletedAt, setStartWithChronaCompletedAt] = useState<
+    string | null | undefined
+  >(undefined);
   const taskDialogDefaults = useMemo(() => {
     const initialStartAt = new Date();
     initialStartAt.setHours(9, 0, 0, 0);
@@ -84,7 +106,8 @@ export function ControlPlaneShell({
 
     apiJson<StartWithChronaPreferenceResponse>(path)
       .then((payload) => {
-        if (!cancelled) setStartWithChronaCompletedAt(completedAtFromPreference(payload));
+        if (!cancelled)
+          setStartWithChronaCompletedAt(completedAtFromPreference(payload));
       })
       .catch(() => {
         if (!cancelled) setStartWithChronaCompletedAt(null);
@@ -98,9 +121,9 @@ export function ControlPlaneShell({
     if (!showCreateTaskDialog) return;
     let cancelled = false;
 
-    apiJson<Pick<SchedulePageData, "availableAiClients" | "defaultExecutionRuntime">>(
-      `/api/schedule?workspaceId=${encodeURIComponent(_defaultWorkspace.id)}`,
-    )
+    apiJson<
+      Pick<SchedulePageData, "availableAiClients" | "defaultExecutionRuntime">
+    >(`/api/schedule?workspaceId=${encodeURIComponent(_defaultWorkspace.id)}`)
       .then((payload) => {
         if (!cancelled) setTaskCreateConfig(payload);
       })
@@ -116,10 +139,13 @@ export function ControlPlaneShell({
   const completeStartWithChrona = async () => {
     const completedAt = new Date().toISOString();
     setStartWithChronaCompletedAt(completedAt);
-    await apiJson<StartWithChronaPreferenceResponse>(startWithChronaPreferencePath(_defaultWorkspace.id), {
-      method: "PATCH",
-      body: JSON.stringify({ completedAt }),
-    });
+    await apiJson<StartWithChronaPreferenceResponse>(
+      startWithChronaPreferencePath(_defaultWorkspace.id),
+      {
+        method: "PATCH",
+        body: JSON.stringify({ completedAt }),
+      },
+    );
   };
   const breadcrumb = pathname
     .split("/")
@@ -167,7 +193,14 @@ export function ControlPlaneShell({
       active: pathname.startsWith("/settings"),
     },
   ];
-  const shouldShowStartWithChrona = ["/dashboard", "/schedule", "/tasks", "/action-center", "/settings"].includes(pathname) && startWithChronaCompletedAt === null;
+  const shouldShowStartWithChrona =
+    [
+      "/dashboard",
+      "/schedule",
+      "/tasks",
+      "/action-center",
+      "/settings",
+    ].includes(pathname) && startWithChronaCompletedAt === null;
 
   return (
     <SidebarProvider
@@ -175,7 +208,10 @@ export function ControlPlaneShell({
       className="h-screen min-h-0 bg-canvas text-foreground"
       style={{ "--sidebar-width": "224px" } as CSSProperties}
     >
-      <Sidebar collapsible="none" className="hidden border-r border-border bg-sidebar xl:flex">
+      <Sidebar
+        collapsible="none"
+        className="hidden border-r border-border bg-sidebar xl:flex"
+      >
         <SidebarHeader className="border-b border-border px-4 py-4">
           <LocalizedLink
             href="/schedule"
@@ -203,32 +239,32 @@ export function ControlPlaneShell({
           <SidebarGroup className="px-3 py-4">
             <SidebarGroupContent>
               <SidebarMenu aria-label="Primary" className="gap-1.5">
-            {navItems.map((item) => {
-              const Icon = item.icon;
+                {navItems.map((item) => {
+                  const Icon = item.icon;
 
-              return (
-                <SidebarMenuItem key={`${item.href}-${item.label}`}>
-                  <SidebarMenuButton
-                    render={
-                      <LocalizedLink
-                        href={item.href}
-                        aria-current={item.active ? "page" : undefined}
-                      />
-                    }
-                    isActive={item.active}
-                    className={cn(
-                      "h-auto rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors",
-                      item.active
-                        ? "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground [&_svg]:text-primary-foreground"
-                        : "text-muted-foreground hover:bg-card hover:text-foreground",
-                    )}
-                  >
-                    <Icon className="size-4" />
-                    <span>{item.label}</span>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              );
-            })}
+                  return (
+                    <SidebarMenuItem key={`${item.href}-${item.label}`}>
+                      <SidebarMenuButton
+                        render={
+                          <LocalizedLink
+                            href={item.href}
+                            aria-current={item.active ? "page" : undefined}
+                          />
+                        }
+                        isActive={item.active}
+                        className={cn(
+                          "h-auto rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors",
+                          item.active
+                            ? "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground [&_svg]:text-primary-foreground"
+                            : "text-muted-foreground hover:bg-card hover:text-foreground",
+                        )}
+                      >
+                        <Icon className="size-4" />
+                        <span>{item.label}</span>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  );
+                })}
               </SidebarMenu>
             </SidebarGroupContent>
           </SidebarGroup>
@@ -237,7 +273,7 @@ export function ControlPlaneShell({
 
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="relative z-50 border-b border-border bg-background/90 supports-[backdrop-filter]:backdrop-blur-md">
-          <div className="relative mx-auto flex h-16 w-full max-w-[1440px] items-center gap-2 px-4 sm:gap-3 sm:px-6 xl:px-8">
+          <div className="relative mx-auto flex h-16 w-full max-w-[1600px] items-center gap-2 px-4 sm:gap-3 sm:px-6 xl:px-8">
             <div className="flex min-w-0 shrink items-center gap-3">
               <LocalizedLink
                 href="/schedule"
@@ -280,7 +316,7 @@ export function ControlPlaneShell({
             </div>
           </div>
         </header>
-        <main className="flex min-h-0 flex-1 flex-col overflow-y-auto px-4 py-4 pb-[calc(env(safe-area-inset-bottom)+5rem)] sm:px-6 xl:px-8 xl:pb-4">
+        <main className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-background px-4 py-4 pb-[calc(env(safe-area-inset-bottom)+5rem)] sm:px-6 xl:px-8 xl:pb-4">
           {shouldShowStartWithChrona ? (
             <StartWithChrona
               className="mb-4"
@@ -330,9 +366,19 @@ export function ControlPlaneShell({
         </nav>
       </div>
       <TaskCreateDialog
-        initialTitle={useSafeDemoDefaults ? t("components.schedulePage.firstRunSafeDemoTitle") : ""}
-        initialDescription={useSafeDemoDefaults ? t("components.schedulePage.firstRunSafeDemoDescription") : ""}
-        initialAutoPlanGenerationEnabled={useSafeDemoDefaults ? true : undefined}
+        initialTitle={
+          useSafeDemoDefaults
+            ? t("components.schedulePage.firstRunSafeDemoTitle")
+            : ""
+        }
+        initialDescription={
+          useSafeDemoDefaults
+            ? t("components.schedulePage.firstRunSafeDemoDescription")
+            : ""
+        }
+        initialAutoPlanGenerationEnabled={
+          useSafeDemoDefaults ? true : undefined
+        }
         initialAutoExecute={useSafeDemoDefaults ? false : undefined}
         isOpen={showCreateTaskDialog}
         initialStartAt={taskDialogDefaults.initialStartAt}
@@ -351,7 +397,8 @@ export function ControlPlaneShell({
               title: input.title,
               description: input.description || null,
               priority: input.priority,
-              autoPlanGeneration: input.autoPlanGenerationEnabled || input.autoExecute,
+              autoPlanGeneration:
+                input.autoPlanGenerationEnabled || input.autoExecute,
               autoExecute: input.autoExecute,
               autoPlanGenerationTiming: input.autoPlanGenerationTiming,
               autoExecuteTiming: input.autoExecuteTiming,

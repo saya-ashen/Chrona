@@ -1,6 +1,6 @@
 import { AlertTriangle, Check, RotateCcw } from "lucide-react";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "shared/ui/button";
 import { TaskPlanGraph } from "@/components/tasks/plan/task-plan-graph";
 import type { TaskPlanReadModel } from "@chrona/contracts/ai";
 

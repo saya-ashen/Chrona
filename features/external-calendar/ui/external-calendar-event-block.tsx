@@ -1,8 +1,8 @@
 import type { PlanningBusyBlock } from "@chrona/domain";
 
-import { Badge } from "@/components/ui/badge";
-import { externalCalendarMessages } from "@/lib/i18n/messages";
-import { cn } from "@/lib/utils";
+import { Badge } from "shared/ui/badge";
+import { externalCalendarMessages } from "@chrona/i18n/external-calendar"
+import { cn } from "@/lib/utils"
 
 export function ExternalCalendarEventBlock({
   event,

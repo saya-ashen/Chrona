@@ -14,7 +14,7 @@ import {
 } from "../../forms/task-config-form";
 import { TaskAiPlanPanel } from "@/components/tasks/panels/task-ai-plan-panel";
 import { TaskEditPanel } from "@/components/tasks/panels/task-edit-panel";
-import { Button } from "@/components/ui/button";
+import { Button } from "shared/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import type { TaskPlanReadModel } from "@chrona/contracts/ai";
 import type { SavedTaskPlan } from "./use-selected-block-plan-state";

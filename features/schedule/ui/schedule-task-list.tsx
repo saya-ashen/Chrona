@@ -7,14 +7,14 @@ import {
   type TaskConfigFormInput,
   type TaskConfigExecutionRuntime,
 } from "./forms/task-config-form";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
+import { Button } from "shared/ui/button";
+import { Badge } from "shared/ui/badge";
 import {
   Card,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
+} from "shared/ui/card";
 import { TaskContextLinks } from "@/components/tasks/shared/task-context-links";
 import { useI18n, useLocale } from "@chrona/i18n/react";
 import { deriveWorkStateView, type WorkStateTone } from "@chrona/domain";

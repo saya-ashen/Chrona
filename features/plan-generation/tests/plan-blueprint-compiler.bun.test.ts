@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test";
 
 import { PlanCompileError } from "@chrona/contracts/ai";
 
-import { compilePlanBlueprint } from "../model/plan-blueprint-compiler";
+import { compilePlanBlueprint } from "../index";
 
 describe("compilePlanBlueprint", () => {
   it("compiles a blueprint, derives graph metadata, and preserves local ids", () => {
@@ -76,6 +76,44 @@ describe("compilePlanBlueprint", () => {
       );
     }
   });
+
+  for (const invalidCase of [
+    {
+      name: "non-snake-case node ids",
+      nodes: [{ id: "StartHere", type: "task" as const, title: "Start" }],
+      expectedPath: "nodes.0.id",
+    },
+    {
+      name: "duplicate node ids",
+      nodes: [
+        { id: "start_here", type: "task" as const, title: "First" },
+        { id: "start_here", type: "task" as const, title: "Second" },
+      ],
+      expectedPath: "nodes.1.id",
+    },
+  ]) {
+    it(`reports ${invalidCase.name} at the contract path`, () => {
+      try {
+        compilePlanBlueprint({
+          taskId: "task-1",
+          blueprint: {
+            title: "Invalid identifiers",
+            goal: "Reject ambiguous graph identities",
+            nodes: invalidCase.nodes,
+            edges: [],
+          },
+        });
+        throw new Error("Expected blueprint compilation to fail");
+      } catch (error) {
+        expect(error).toBeInstanceOf(PlanCompileError);
+        expect((error as PlanCompileError).issues).toEqual(
+          expect.arrayContaining([
+            expect.objectContaining({ path: invalidCase.expectedPath }),
+          ]),
+        );
+      }
+    });
+  }
 
   it("fails on invalid condition branch references", () => {
     expect(() => compilePlanBlueprint({

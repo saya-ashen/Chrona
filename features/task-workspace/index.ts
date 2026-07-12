@@ -1,3 +1,4 @@
+export * from "./model/plan-node-view-model";
 export * from "./model/task-workspace-types";
 export * from "./model/task-workspace-state";
 export * from "./model/task-workspace-actions";
@@ -12,3 +13,5 @@ export * from "./model/workspace-events";
 export * from "./model/task-workspace-interaction";
 export { TaskWorkspacePage } from "./ui/task-workspace-page";
 export { TaskWorkspaceHeaderCard } from "./ui/task-workspace-header-card";
+export { SpecRenderer } from "./ui/catalog/spec-renderer";
+export { ActivityTimeline } from "./ui/activity-timeline";

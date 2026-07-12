@@ -11,7 +11,7 @@ import { createAssistantSurfaceRoutes } from "./assistant-surface.routes";
 import { createMcpRoutes, createAgentControlRoutes } from "../../../../features/mcp-control-plane/server";
 import { createRuntimeRoutes } from "./runtime.routes";
 import { createHermesIntegrationRoutes } from "./integrations/hermes.routes";
-import { createCalendarSourceRoutes, type CalendarSourceRouteOptions } from "../../../../features/external-calendar";
+import { createCalendarSourceRoutes, type CalendarSourceRouteOptions } from "../../../../features/external-calendar/routes";
 import { areE2eTestRoutesEnabled, createTestSupportRoutes } from "./test-support.routes";
 
 export type ApiRouterOptions = {

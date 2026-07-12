@@ -10,6 +10,20 @@ export {
 } from "./modules/projections";
 export { resolveHeaderExecutionState, headerExecutionStateToStatePaths } from "./modules/tasks/get-task-header";
 export { getCurrentExecution } from "./modules/plan-execution/use-cases/get-current-execution";
+export {
+  executionStatusFromGraphOutcome,
+  executionStatusFromWaitKind,
+  executionTransition,
+  graphStatusForExecutionStatus,
+  planRunStatusForExecutionStatus,
+} from "./modules/plan-execution/execution-state-machine";
+export { applySchedule } from "./modules/scheduling/apply-schedule";
+export { clearSchedule } from "./modules/scheduling/clear-schedule";
+export { decideScheduleProposal } from "./modules/scheduling/decide-schedule-proposal";
+export { deriveAutoStartEligibility } from "./modules/scheduling/derive-auto-start-eligibility";
+export { proposeSchedule } from "./modules/scheduling/propose-schedule";
+export { TaskScheduling, taskScheduling } from "./modules/scheduling/task-scheduling";
+export { getSchedulePage } from "./modules/pages/get-schedule-page";
 export { getLatestTaskPlanReadModel } from "./modules/plans/task-plan-read-model";
 export { startAutoPlanGenerationForTask } from "./modules/plans/auto-generate-task-plan";
 export {

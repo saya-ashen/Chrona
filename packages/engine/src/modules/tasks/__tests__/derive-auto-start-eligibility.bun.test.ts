@@ -203,9 +203,30 @@ describe("deriveAutoStartEligibility", () => {
   });
 
   describe("not eligible — no_runtime_config", () => {
-    it("rejects tasks without an execution runtime", () => {
+    it("prioritizes a missing execution runtime over provider readiness", () => {
       const result = deriveAutoStartEligibility({
         task: makeTask({ executionRuntime: null }),
+        workBlock: makeWorkBlock(),
+        now,
+        activeRun: null,
+      });
+      expect(result).toMatchObject({
+        ok: false,
+        reason: "no_runtime_config",
+        disabledReason: "Choose an execution runtime before automatic execution can start.",
+      });
+    });
+  });
+
+
+  describe("not eligible — no_runtime_config", () => {
+    it("rejects tasks without an execution runtime after provider readiness succeeds", () => {
+      const result = deriveAutoStartEligibility({
+        task: makeTask({
+          executionRuntime: null,
+          providerId: "provider-1",
+          providerName: "Hermes",
+        }),
         workBlock: makeWorkBlock(),
         now,
         activeRun: null,

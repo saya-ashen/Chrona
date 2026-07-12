@@ -60,7 +60,7 @@ test.describe("Task Workspace Assistant Surface", () => {
     const trigger = page.getByRole("button", { name: "Open Chrona AI dropdown" });
     await expect(trigger).toBeVisible();
     await expect(trigger).toBeDisabled();
-    await expect(page.getByText("Generate a plan before execution can start", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText("Needs plan", { exact: true }).first()).toBeVisible();
     await expect(page.getByRole("button", { name: "Generate plan" }).first()).toBeVisible();
     await expect(page.getByRole("dialog", { name: "Task context" })).toHaveCount(0);
   });

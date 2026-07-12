@@ -1,4 +1,7 @@
-import { automationTimingOffsetMs, normalizeAutomationTiming } from "@chrona/contracts";
+import {
+  automationTimingOffsetMs,
+  normalizeAutomationTiming,
+} from "@chrona/contracts";
 import { deriveAutomationPolicyPreview } from "@chrona/domain";
 
 export type AutoStartSkipReason =
@@ -12,6 +15,19 @@ export type AutoStartSkipReason =
   | "requires_approval"
   | "runtime_unsupported"
   | "automation_not_ready";
+
+const NON_ACTIONABLE_AUTO_START_SKIP_REASONS: Partial<
+  Record<AutoStartSkipReason, true>
+> = {
+  not_due: true,
+  already_running: true,
+};
+
+export function isActionableAutoStartSkipReason(
+  reason: AutoStartSkipReason,
+): boolean {
+  return NON_ACTIONABLE_AUTO_START_SKIP_REASONS[reason] !== true;
+}
 
 type AutoStartEligibility =
   | {
@@ -46,25 +62,43 @@ export type RunLike = {
   status: string;
 };
 
-const ALLOWABLE_START_STATUSES = ["Draft", "Ready", "Scheduled", "Queued"] as const;
+const ALLOWABLE_START_STATUSES = [
+  "Draft",
+  "Ready",
+  "Scheduled",
+  "Queued",
+] as const;
 
-const ACTIVE_RUN_STATUSES = ["Pending", "Running", "WaitingForInput", "WaitingForApproval"] as const;
+const ACTIVE_RUN_STATUSES = [
+  "Pending",
+  "Running",
+  "WaitingForInput",
+  "WaitingForApproval",
+] as const;
 
 const AUTO_START_DISABLED_REASONS: Record<AutoStartSkipReason, string> = {
   not_scheduled: "Schedule this task before automatic execution can start.",
   not_due: "Automatic execution will start at the configured schedule time.",
   already_running: "A run is already active for this task.",
-  invalid_task_status: "Only draft, ready, scheduled, or queued tasks can auto-start.",
-  no_runtime_config: "Choose an execution runtime before automatic execution can start.",
+  invalid_task_status:
+    "Only draft, ready, scheduled, or queued tasks can auto-start.",
+  no_runtime_config:
+    "Choose an execution runtime before automatic execution can start.",
   no_accepted_plan: "Accept a plan before automatic execution can start.",
-  requires_human_input: "Automatic execution is paused until the requested input is provided.",
-  requires_approval: "Automatic execution is paused until the approval request is resolved.",
+  requires_human_input:
+    "Automatic execution is paused until the requested input is provided.",
+  requires_approval:
+    "Automatic execution is paused until the approval request is resolved.",
   runtime_unsupported: "The selected runtime cannot be started automatically.",
   automation_not_ready: "Automation is not ready to start.",
 };
 
 function blocked(reason: AutoStartSkipReason): AutoStartEligibility {
-  return { ok: false, reason, disabledReason: AUTO_START_DISABLED_REASONS[reason] };
+  return {
+    ok: false,
+    reason,
+    disabledReason: AUTO_START_DISABLED_REASONS[reason],
+  };
 }
 
 export function autoStartDisabledReason(reason: AutoStartSkipReason): string {
@@ -86,7 +120,10 @@ export function deriveAutoStartEligibility(input: {
     return blocked("not_due");
   }
 
-  const startTime = typeof scheduledStartAt === "string" ? new Date(scheduledStartAt) : scheduledStartAt;
+  const startTime =
+    typeof scheduledStartAt === "string"
+      ? new Date(scheduledStartAt)
+      : scheduledStartAt;
   const timing = normalizeAutomationTiming(input.task.autoExecuteTiming);
   const triggerTime =
     timing === "immediate"
@@ -126,8 +163,15 @@ export function deriveAutoStartEligibility(input: {
     planningCapable: input.task.planningCapable,
     executionCapable: input.task.executionCapable,
   });
-  if (policy.disabledReason && policy.readiness !== "plan_acceptance_required") {
-    return { ok: false, reason: "automation_not_ready", disabledReason: policy.disabledReason };
+  if (
+    policy.disabledReason &&
+    policy.readiness !== "plan_acceptance_required"
+  ) {
+    return {
+      ok: false,
+      reason: "automation_not_ready",
+      disabledReason: policy.disabledReason,
+    };
   }
 
   return { ok: true, mode: "start_task" };

@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import type { CalendarSourceSummary, CalendarSyncStatus } from "../contract";
 
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Badge } from "shared/ui/badge";
+import { Button } from "shared/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { FieldError } from "@/components/ui/field";
 import { listExternalCalendarSources } from "./client";
-import { externalCalendarMessages } from "@/lib/i18n/messages";
+import { externalCalendarMessages } from "@chrona/i18n/external-calendar"
 import { CalendarSourceActions } from "./calendar-source-actions";
 
 type CalendarSourceRecord = {

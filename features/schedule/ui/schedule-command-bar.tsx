@@ -5,9 +5,9 @@ import { useMemo, useRef, useState } from "react";
 import { DEFAULT_SCHEDULE_PAGE_COPY, getSchedulePageCopy } from "./schedule-page-copy";
 import type { QuickCreateDraft } from "./schedule-page-types";
 import { buildQuickCreateDraft, toDateForDay } from "./schedule-page-utils";
-import { Button } from "@/components/ui/button";
+import { Button } from "shared/ui/button";
 import { useI18n } from "@chrona/i18n/react";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils"
 import { useScheduleAiPreferences } from "@/lib/schedule-ai-preferences";
 import { useAutoComplete, type StructuredSuggestion } from "@/hooks/use-ai";
 import { createLogger, summarizeText } from "@/lib/logger";

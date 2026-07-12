@@ -13,7 +13,7 @@ async function fillAdvancedConnectionSettings(
   baseUrl: string,
   apiKey: string,
 ) {
-  await page.getByText("Advanced settings", { exact: true }).click();
+  await page.getByRole("button", { name: "Advanced settings" }).click();
   await page.getByRole("textbox", { name: "Base URL", exact: true }).fill(baseUrl);
   await page.getByRole("textbox", { name: "API Key", exact: true }).fill(apiKey);
 }

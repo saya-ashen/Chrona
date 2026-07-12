@@ -8,7 +8,7 @@ import type {
   TaskPlanReadModel,
 } from "@chrona/contracts/ai";
 import { getByPath } from "@json-render/core";
-import { buildAccessKeyHeaders, handleUnauthorizedResponse } from "@/lib/access-key";
+import { buildAccessKeyHeaders, handleUnauthorizedResponse } from "shared/http/access-key";
 import { fetchJsonEventSource } from "@/lib/fetch-json-event-source";
 
 type StreamToolCall = {

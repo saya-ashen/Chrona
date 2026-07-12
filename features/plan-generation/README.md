@@ -1,21 +1,24 @@
 # plan-generation
 
-## Entry points
-- Contract: contract.ts
-- Compiler model: model/plan-blueprint-compiler.ts
-- Read-model bridge: index.ts
-- Tests: tests/
+## Entry point
 
-## State source
-- Blueprint contracts live in packages/contracts/src/ai-plan-blueprint.ts and are re-exported here.
-- Runtime generation events/state remain in @chrona/contracts/ai plan-runtime.
-- Persistence/materialization and execution semantics remain in packages/engine.
+- `index.ts` is the only public entry point for consumers.
+- `contract.ts` re-exports the feature-owned blueprint contract.
+- `model/plan-blueprint-compiler.ts` contains pure graph validation and compilation orchestration.
+- `tests/` defends the public feature contract.
+
+## Ownership
+
+- Blueprint schemas live in `packages/contracts` and are re-exported by this feature.
+- Blueprint validation and compilation enter through `compilePlanBlueprint`.
+- Persistence, materialization, read models, and execution semantics remain private to `packages/engine`.
+- Consumers must import from `@features/plan-generation`, never this feature's internal files.
 
 ## Commands
 - bun run test:feature plan-generation
 
-## Public exports
-- index.ts
+## Reference-slice rules
 
-## Legacy mappings
-- API, engine materialization, web generation session, and workspace refresh tests stay mapped in scripts/test-feature.ts.
+- Add layers only when this capability needs them; no empty route, service, repository, or UI layer.
+- Tests exercise the public `index.ts` entry point.
+- Legacy API, materialization, generation-session, and workspace-refresh tests remain mapped in `scripts/test-feature.ts` until those callers migrate.

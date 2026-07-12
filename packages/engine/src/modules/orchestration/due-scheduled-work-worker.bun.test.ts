@@ -59,8 +59,18 @@ describe("runDueScheduledWorkWorker", () => {
   it("records scheduler start, skip, and failure events from due work results", async () => {
     const { task } = await createTask();
     const startDueWork = mock(async () => ({
-      started: [{ taskId: task.id, workBlockId: "block_started", runId: "plan_1" }],
-      skipped: [{ taskId: task.id, workBlockId: "block_skipped", reason: "already_running" }],
+      started: [
+        { taskId: task.id, workBlockId: "block_started", runId: "plan_1" },
+      ],
+      skipped: [
+        {
+          taskId: task.id,
+          workBlockId: "block_skipped",
+          reasonCode: "no_accepted_plan" as const,
+          reason: "Accept a plan before automatic execution can start.",
+          actionable: true,
+        },
+      ],
       failed: [{ taskId: task.id, workBlockId: "block_failed", error: "boom" }],
       now: "2026-05-17T00:00:00.000Z",
     }));
@@ -68,13 +78,53 @@ describe("runDueScheduledWorkWorker", () => {
     const result = await runDueScheduledWorkWorker({ deps: { startDueWork } });
 
     expect(result.started).toHaveLength(1);
-    const events = await db.schedulerEvent.findMany({ where: { taskId: task.id }, orderBy: { createdAt: "asc" } });
+    const events = await db.schedulerEvent.findMany({
+      where: { taskId: task.id },
+      orderBy: { createdAt: "asc" },
+    });
     expect(events.map((event) => event.eventType)).toEqual([
       "scheduler.start",
       "scheduler.skip",
       "scheduler.fail",
     ]);
-    expect(events.map((event) => event.reason)).toEqual([null, "already_running", "boom"]);
+    expect(events.map((event) => event.reason)).toEqual([
+      null,
+      "Accept a plan before automatic execution can start.",
+      "boom",
+    ]);
+    expect(events[1]?.payload).toMatchObject({
+      actionable: true,
+      reasonCode: "no_accepted_plan",
+      workBlockId: "block_skipped",
+    });
+  });
+
+  it("does not persist non-actionable scheduler skips", async () => {
+    const { task } = await createTask();
+    const startDueWork = mock(async () => ({
+      started: [],
+      skipped: [
+        {
+          taskId: task.id,
+          workBlockId: "block_waiting",
+          reasonCode: "not_due" as const,
+          reason:
+            "Automatic execution will start at the configured schedule time.",
+          actionable: false,
+        },
+      ],
+      failed: [],
+      now: "2026-05-17T00:00:00.000Z",
+    }));
+    const recordEvent = mock(recordOrchestratorEvent);
+
+    const result = await runDueScheduledWorkWorker({
+      deps: { recordEvent, startDueWork },
+    });
+
+    expect(result.skipped).toHaveLength(1);
+    expect(recordEvent).not.toHaveBeenCalled();
+    expect(await db.schedulerEvent.count()).toBe(0);
   });
 
   it("does not record events when no scheduled work is due", async () => {
@@ -86,7 +136,9 @@ describe("runDueScheduledWorkWorker", () => {
     }));
     const recordEvent = mock(recordOrchestratorEvent);
 
-    const result = await runDueScheduledWorkWorker({ deps: { recordEvent, startDueWork } });
+    const result = await runDueScheduledWorkWorker({
+      deps: { recordEvent, startDueWork },
+    });
 
     expect(result.started).toEqual([]);
     expect(result.skipped).toEqual([]);
@@ -97,14 +149,32 @@ describe("runDueScheduledWorkWorker", () => {
 
   it("ignores due work results for tasks that no longer exist", async () => {
     const startDueWork = mock(async () => ({
-      started: [{ taskId: "missing-task", workBlockId: "block_started", runId: "plan_1" }],
-      skipped: [{ taskId: "missing-task", workBlockId: "block_skipped", reason: "already_running" }],
-      failed: [{ taskId: "missing-task", workBlockId: "block_failed", error: "boom" }],
+      started: [
+        {
+          taskId: "missing-task",
+          workBlockId: "block_started",
+          runId: "plan_1",
+        },
+      ],
+      skipped: [
+        {
+          taskId: "missing-task",
+          workBlockId: "block_skipped",
+          reasonCode: "no_accepted_plan" as const,
+          reason: "Accept a plan before automatic execution can start.",
+          actionable: true,
+        },
+      ],
+      failed: [
+        { taskId: "missing-task", workBlockId: "block_failed", error: "boom" },
+      ],
       now: "2026-05-17T00:00:00.000Z",
     }));
     const recordEvent = mock(recordOrchestratorEvent);
 
-    const result = await runDueScheduledWorkWorker({ deps: { recordEvent, startDueWork } });
+    const result = await runDueScheduledWorkWorker({
+      deps: { recordEvent, startDueWork },
+    });
 
     expect(result.started).toHaveLength(1);
     expect(recordEvent).not.toHaveBeenCalled();

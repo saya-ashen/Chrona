@@ -1,4 +1,4 @@
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils"
 import { getNodeTone, TONE_STYLES } from "./logic";
 import type { CompactFocusItem, CompactStage, GraphCopy, TaskPlanGraphPlan } from "./types";
 

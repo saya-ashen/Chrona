@@ -5,7 +5,7 @@ import type { ActionCenterItem } from "@chrona/contracts/api";
 import { deriveUserFacingFailure, type WorkStateView } from "@chrona/domain";
 
 import { LocalizedLink } from "@/components/i18n/localized-link";
-import { Button } from "@/components/ui/button";
+import { Button } from "shared/ui/button";
 import { ActionCenterList } from "@/components/action-center/action-center-list";
 import {
   decideScheduleProposal,

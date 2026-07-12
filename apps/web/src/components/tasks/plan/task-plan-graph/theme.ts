@@ -1,4 +1,4 @@
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils"
 import type { CSSProperties } from "react";
 import type { NodeShape, NodeTone, PlanNodeDataModel } from "./types";
 

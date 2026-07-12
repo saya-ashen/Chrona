@@ -1,5 +1,15 @@
 import type { WorkStateView } from "@chrona/domain";
-import type { DashboardAiBriefState } from "@chrona/engine";
+export type DashboardAiBriefStatus = "ready" | "dirty" | "generating" | "failed" | "unconfigured" | "disabled";
+
+export type DashboardAiBriefState = {
+  status: DashboardAiBriefStatus;
+  spec: unknown | null;
+  generatedAt: string | null;
+  providerClientId: string | null;
+  canGenerate: boolean;
+  errorMessage: string | null;
+  inputFingerprint: string;
+};
 
 export type DashboardAttentionKind =
   "approval" | "input" | "blocked" | "failed" | "schedule_risk";

@@ -1,17 +1,20 @@
 import { ScheduleMiniCalendar } from "../schedule-mini-calendar";
 import { QueueCard } from "./schedule-page-panels";
-import type {
-  SchedulePageData,
-  UnscheduledItem,
-} from "../schedule-page-types";
+import type { SchedulePageData, UnscheduledItem } from "../schedule-page-types";
 import type { Locale } from "@chrona/i18n";
 import type { ScheduleViewMode } from "../schedule-page-types";
 import type { SchedulePageCopy } from "../schedule-page-copy";
 import type { SchedulePageViewModel } from "../schedule-page-view-model";
 
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "shared/ui/badge";
+import { Button } from "shared/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "shared/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { EmptyState } from "./schedule-panel-primitives";
 
@@ -69,15 +72,23 @@ export function ScheduleLeftSidebar({
         <div className="space-y-2 text-sm">
           <div className="rounded-2xl border border-border/60 bg-background/80 p-3">
             <p className="text-xs text-muted-foreground">{copy.selectedDay}</p>
-            <p className="mt-1 font-medium text-foreground">{selectedDay?.label ?? "-"}</p>
+            <p className="mt-1 font-medium text-foreground">
+              {selectedDay?.label ?? "-"}
+            </p>
           </div>
           <div className="rounded-2xl border border-border/60 bg-background/80 p-3">
-            <p className="text-xs text-muted-foreground">{copy.scheduledItems}</p>
-            <p className="mt-1 text-lg font-semibold text-foreground">{selectedDay?.scheduledCount ?? 0}</p>
+            <p className="text-xs text-muted-foreground">
+              {copy.scheduledItems}
+            </p>
+            <p className="mt-1 text-lg font-semibold text-foreground">
+              {selectedDay?.scheduledCount ?? 0}
+            </p>
           </div>
           <div className="rounded-2xl border border-border/60 bg-background/80 p-3">
             <p className="text-xs text-muted-foreground">{copy.riskItems}</p>
-            <p className="mt-1 text-lg font-semibold text-destructive">{selectedDay?.riskCount ?? 0}</p>
+            <p className="mt-1 text-lg font-semibold text-destructive">
+              {selectedDay?.riskCount ?? 0}
+            </p>
           </div>
         </div>
       </Card>
@@ -110,20 +121,25 @@ export function ScheduleRightSidebar({
   return (
     <aside
       aria-label={copy.planningDrawerLabel}
-      className="min-h-0 overflow-visible xl:overflow-y-auto xl:pl-1"
+      className="min-h-0 overflow-visible xl:overflow-y-auto"
     >
       <Tabs
         defaultValue={viewData.summary.riskCount > 0 ? "attention" : "queue"}
         className="h-full min-h-0"
       >
-        <TabsList className="grid w-full grid-cols-2">
-          <TabsTrigger value="queue">
-            {copy.readyToSchedule}
-            <Badge variant="secondary">{viewData.unscheduled.length}</Badge>
+        <TabsList className="grid h-auto w-full grid-cols-2 rounded-md p-1">
+          <TabsTrigger value="queue" className="min-w-0 gap-1 px-2 text-xs">
+            <span className="truncate">{copy.readyToSchedule}</span>
+            <Badge variant="secondary" className="shrink-0">
+              {viewData.unscheduled.length}
+            </Badge>
           </TabsTrigger>
-          <TabsTrigger value="attention">
-            {copy.needsAttentionTab}
-            <Badge variant={viewData.risks.length > 0 ? "destructive" : "secondary"}>
+          <TabsTrigger value="attention" className="min-w-0 gap-1 px-2 text-xs">
+            <span className="truncate">{copy.needsAttentionTab}</span>
+            <Badge
+              variant={viewData.risks.length > 0 ? "destructive" : "secondary"}
+              className="shrink-0"
+            >
               {viewData.risks.length}
             </Badge>
           </TabsTrigger>
@@ -133,7 +149,9 @@ export function ScheduleRightSidebar({
           <Card className="mt-2 xl:sticky xl:top-0">
             <CardHeader>
               <CardTitle>{copy.readyToSchedule}</CardTitle>
-              <CardDescription>{copy.readyToScheduleDescription}</CardDescription>
+              <CardDescription>
+                {copy.readyToScheduleDescription}
+              </CardDescription>
             </CardHeader>
             <CardContent className="overflow-visible pr-0 xl:max-h-[calc(100vh-19rem)] xl:overflow-y-auto xl:pr-3">
               {viewData.unscheduled.length === 0 ? (
@@ -162,7 +180,7 @@ export function ScheduleRightSidebar({
         </TabsContent>
 
         <TabsContent value="attention" className="min-h-0">
-          <Card className="mt-2">
+          <Card className="mt-2 border-destructive/25">
             <CardHeader>
               <CardTitle>{copy.needsAttentionTab}</CardTitle>
               <CardDescription>{copy.attentionDescription}</CardDescription>
@@ -172,9 +190,15 @@ export function ScheduleRightSidebar({
                 <EmptyState>{copy.noAttentionItems}</EmptyState>
               ) : (
                 viewData.risks.map((item) => (
-                  <Card key={item.taskId} size="sm" className="gap-2 p-3">
+                  <Card
+                    key={item.taskId}
+                    size="sm"
+                    className="gap-2 border-destructive/25 bg-destructive/5 p-3"
+                  >
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">{item.title}</p>
+                      <p className="line-clamp-2 text-sm font-medium">
+                        {item.title}
+                      </p>
                       <p className="mt-1 text-xs text-muted-foreground">
                         {item.actionRequired ?? item.runnabilitySummary}
                       </p>
@@ -182,7 +206,7 @@ export function ScheduleRightSidebar({
                     <Button
                       type="button"
                       size="sm"
-                      variant="outline"
+                      variant="default"
                       onClick={() => onOpenTaskDetails(item.taskId)}
                     >
                       {copy.openTask}

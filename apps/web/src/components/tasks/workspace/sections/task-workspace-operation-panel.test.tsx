@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from "vitest";
 import { deriveWorkStateView } from "@chrona/domain";
 import { TaskWorkspaceOperationPanel } from "./task-workspace-operation-panel";
 
-vi.mock("@/components/tasks/workspace/catalog/spec-renderer", () => ({
+vi.mock("@features/task-workspace/ui/catalog/spec-renderer", () => ({
   SpecRenderer: () => null,
 }));
 vi.mock("../../../../../../../features/execution-monitoring/ui/provider-approval-banner", () => ({

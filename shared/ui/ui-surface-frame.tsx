@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Activity, Bot, ShieldCheck, Sparkles } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn } from "./utils";
 
 export type UiSurfaceKind = "product-authored" | "ai-authored" | "ai-editable" | "runtime-control";
 

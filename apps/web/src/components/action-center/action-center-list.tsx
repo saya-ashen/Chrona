@@ -10,9 +10,9 @@ import {
   Inbox,
   Search,
 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "shared/ui/badge";
+import { Button } from "shared/ui/button";
+import { Card, CardContent } from "shared/ui/card";
 import { Input } from "@/components/ui/input";
 import { LocalizedLink } from "@/components/i18n/localized-link";
 import {
@@ -21,7 +21,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "shared/ui/select";
 import { cn } from "@/lib/utils";
 
 type ActionCenterPresentationItem = ActionCenterItem & {
@@ -36,8 +36,7 @@ type ActionCenterListProps = {
 };
 
 type ActionGroupKey = "critical" | "review" | "waiting" | "resolved";
-type QueueFilter =
-  "all" | "critical" | "review" | "waiting" | "recovery" | "low";
+type QueueFilter = "all" | "input" | "approval" | "review" | "recovery";
 type QueueSort = "newest" | "priority";
 
 type QueueItem = ActionCenterPresentationItem;
@@ -58,25 +57,25 @@ const DEFAULT_COPY = {
   queueDescription:
     "What needs attention, why it matters, and the next button to press.",
   needsAction: "Needs action",
-  waitingInput: "Waiting input",
-  reviewResults: "Review results",
+  waitingInput: "Provide input",
+  reviewResults: "Review",
   resolvedToday: "Resolved today",
   allFilter: "All",
-  criticalFilter: "Critical",
-  reviewFilter: "Review results",
-  waitingFilter: "Waiting input",
-  recoveryFilter: "Recovery",
-  lowRiskFilter: "Low risk",
-  searchPlaceholder: "Search tasks, runs, or agents...",
+  inputFilter: "Provide input",
+  approvalFilter: "Approvals",
+  reviewFilter: "Review",
+  recoveryFilter: "Recover",
+  searchPlaceholder: "Search tasks or runs...",
   sortLabel: "Sort",
   newestFirst: "Newest first",
-  priorityFirst: "Priority first",
-  criticalPriority: "Critical priority",
-  reviewAndFollowUp: "Review and follow-up",
-  waitingForInput: "Waiting for input",
-  resolvedLowPriority: "Resolved / Low priority",
+  priorityFirst: "Highest priority",
+  criticalPriority: "Recover now",
+  reviewAndFollowUp: "Review",
+  waitingForInput: "Input and approval",
+  resolvedLowPriority: "Resolved",
   noFilteredItemsTitle: "No matching action items",
-  noFilteredItemsDescription: "Try a different filter or search term.",
+  noFilteredItemsDescription: "No items need this action right now.",
+  clearFilters: "Clear filters",
   status: "Status",
 };
 
@@ -161,28 +160,23 @@ function toneForItem(
   }
 }
 
-function riskBadgeVariant(riskLevel: string) {
-  const risk = riskLevel.toLowerCase();
-  if (risk === "critical" || risk === "high") return "destructive" as const;
-  if (risk === "medium") return "warning" as const;
-  return "outline" as const;
-}
-
 function statusForItem(item: ActionCenterPresentationItem) {
   if (item.stateView) return item.stateView.label;
   switch (item.kind) {
     case "recovery":
-      return "Failed";
+      return item.summary.toLowerCase().includes("cancel")
+        ? "Cancelled"
+        : "Failed";
     case "blocked":
       return "Blocked";
     case "approval":
-      return "Approval";
+      return "Approval needed";
     case "input":
-      return "Waiting input";
+      return "Input needed";
     case "schedule_proposal":
-      return "Proposal";
+      return "Review proposal";
     case "execution_completed":
-      return "Completed";
+      return "Result ready";
     case "task_overdue":
       return "Overdue";
     case "task_due_now":
@@ -194,19 +188,21 @@ function statusForItem(item: ActionCenterPresentationItem) {
   }
 }
 
-function matchesFilter(item: ActionCenterItem, filter: QueueFilter) {
-  const group = groupForItem(item);
+function matchesFilter(
+  item: ActionCenterPresentationItem,
+  filter: QueueFilter,
+) {
   switch (filter) {
-    case "critical":
-      return group === "critical";
+    case "input":
+      return item.kind === "input";
+    case "approval":
+      return item.kind === "approval" || item.kind === "schedule_proposal";
     case "review":
-      return group === "review";
-    case "waiting":
-      return group === "waiting";
+      return (
+        groupForItem(item) === "review" || item.kind === "execution_completed"
+      );
     case "recovery":
       return item.kind === "recovery" || item.kind === "blocked";
-    case "low":
-      return item.riskLevel.toLowerCase() === "low" || group === "resolved";
     default:
       return true;
   }
@@ -243,8 +239,8 @@ function StatCard({
   return (
     <div
       className={cn(
-        "rounded-xl border bg-card px-3 py-2 shadow-sm",
-        emphasis ? "border-primary/30 bg-primary-soft/45" : "border-border/70",
+        "flex min-w-0 items-baseline justify-between gap-2 border-b border-border/60 px-1 py-2 sm:rounded-lg sm:border sm:bg-card sm:px-3 sm:shadow-sm",
+        emphasis && "border-primary/30 sm:bg-primary-soft/45",
       )}
     >
       <p className="text-[11px] font-medium text-muted-foreground">{label}</p>
@@ -352,28 +348,27 @@ export function ActionCenterList({
           <StatCard label={copy.reviewResults} value={stats.reviewResults} />
           <StatCard label={copy.resolvedToday} value={stats.resolvedToday} />
         </div>
-        <div className="flex flex-col gap-2 rounded-xl border border-border/70 bg-card p-2 shadow-sm">
+        <div className="flex flex-col gap-2 border-y border-border/70 bg-card py-2 sm:rounded-xl sm:border sm:p-2 sm:shadow-sm">
           <div
-            className="flex flex-wrap gap-1.5"
+            className="flex gap-1.5 overflow-x-auto px-1 pb-1 sm:flex-wrap sm:overflow-visible sm:px-0 sm:pb-0"
             role="tablist"
             aria-label={copy.queueDescription}
           >
             {(
               [
                 ["all", copy.allFilter],
-                ["critical", copy.criticalFilter],
+                ["input", copy.inputFilter],
+                ["approval", copy.approvalFilter],
                 ["review", copy.reviewFilter],
-                ["waiting", copy.waitingFilter],
                 ["recovery", copy.recoveryFilter],
-                ["low", copy.lowRiskFilter],
               ] as const
             ).map(([value, label]) => (
               <Button
                 key={value}
                 type="button"
-                variant={filter === value ? "secondary" : "outline"}
+                variant={filter === value ? "secondary" : "ghost"}
                 size="sm"
-                className="h-7 rounded-full px-2.5 text-xs"
+                className="h-10 shrink-0 rounded-md px-3 text-xs sm:h-9"
                 onClick={() => setFilter(value)}
                 aria-pressed={filter === value}
               >
@@ -417,6 +412,18 @@ export function ActionCenterList({
         <EmptyState
           title={copy.noFilteredItemsTitle}
           description={copy.noFilteredItemsDescription}
+          action={
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setFilter("all");
+                setQuery("");
+              }}
+            >
+              {copy.clearFilters}
+            </Button>
+          }
         />
       ) : (
         <div className="space-y-4">
@@ -439,7 +446,7 @@ export function ActionCenterList({
               >
                 <h2
                   id={`action-center-${group}`}
-                  className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground"
+                  className="text-xs font-semibold uppercase text-muted-foreground"
                 >
                   {title}
                 </h2>
@@ -459,56 +466,54 @@ export function ActionCenterList({
                           )}
                           aria-hidden
                         />
-                        <CardContent className="p-3 pl-4">
-                          <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
-                            <div className="min-w-0 space-y-2">
-                              <div className="flex flex-wrap items-start justify-between gap-2">
-                                <div className="flex min-w-0 items-start gap-2.5">
-                                  <span
-                                    className={cn(
-                                      "mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full",
-                                      tone.icon,
-                                    )}
-                                  >
-                                    <Icon className="size-3.5" aria-hidden />
-                                  </span>
-                                  <div className="min-w-0">
-                                    <h3 className="line-clamp-1 break-words text-sm font-semibold leading-tight text-foreground">
-                                      {item.actionType}
-                                    </h3>
-                                    <p className="line-clamp-1 break-words text-sm font-medium text-foreground/90">
-                                      {item.sourceTaskTitle}
-                                    </p>
-                                  </div>
-                                </div>
-                                <div className="flex shrink-0 flex-wrap justify-end gap-1">
-                                  <Badge
-                                    variant={riskBadgeVariant(item.riskLevel)}
-                                  >
-                                    {copy.risk}: {item.riskLevel}
-                                  </Badge>
+                        <CardContent className="p-4 pl-5">
+                          <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-center">
+                            <div className="flex min-w-0 items-start gap-3">
+                              <span
+                                className={cn(
+                                  "flex size-8 shrink-0 items-center justify-center rounded-md",
+                                  tone.icon,
+                                )}
+                              >
+                                <Icon className="size-4" aria-hidden />
+                              </span>
+                              <div className="min-w-0 space-y-1.5">
+                                <div className="flex flex-wrap items-center gap-2">
                                   <Badge variant={tone.badge}>
-                                    {copy.status}: {statusForItem(item)}
+                                    {statusForItem(item)}
                                   </Badge>
+                                  <span className="text-xs text-muted-foreground">
+                                    {copy.risk}: {item.riskLevel}
+                                  </span>
                                 </div>
-                              </div>
-                              <p className="line-clamp-2 max-w-3xl break-words text-[13px] leading-5 text-muted-foreground">
-                                {item.consequence || item.summary}
-                              </p>
-                              <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
-                                {item.currentRunLabel ? (
-                                  <span className="break-all">
-                                    {copy.run}: {item.currentRunLabel}
-                                  </span>
+                                <h3 className="break-words text-sm font-semibold text-foreground">
+                                  {item.sourceTaskTitle}
+                                </h3>
+                                <p className="break-words text-[13px] leading-5 text-muted-foreground">
+                                  {item.kind === "auto_execution_skipped"
+                                    ? item.summary
+                                    : item.consequence || item.summary}
+                                </p>
+                                {item.kind === "auto_execution_skipped" && item.consequence ? (
+                                  <p className="break-words text-xs text-muted-foreground">
+                                    {item.consequence}
+                                  </p>
                                 ) : null}
-                                {item.detail ? (
-                                  <span className="line-clamp-1 break-words">
-                                    {item.detail}
-                                  </span>
-                                ) : null}
+                                <div className="flex flex-wrap gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                                  {item.currentRunLabel ? (
+                                    <span className="break-all">
+                                      {copy.run}: {item.currentRunLabel}
+                                    </span>
+                                  ) : null}
+                                  {item.detail ? (
+                                    <span className="break-words">
+                                      {item.detail}
+                                    </span>
+                                  ) : null}
+                                </div>
                               </div>
                             </div>
-                            <div className="flex flex-wrap gap-1.5 lg:justify-end [&_[data-slot=button]]:h-7 [&_[data-slot=button]]:px-2 [&_a[data-slot=button]]:h-7 [&_a[data-slot=button]]:px-2">
+                            <div className="grid grid-cols-1 gap-2 sm:flex sm:flex-wrap md:justify-end [&_[data-slot=button]]:h-10 [&_a[data-slot=button]]:h-10">
                               {item.primaryAction}
                               {item.secondaryActions}
                             </div>

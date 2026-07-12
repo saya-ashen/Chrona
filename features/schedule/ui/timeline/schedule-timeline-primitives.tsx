@@ -13,7 +13,7 @@ import {
   getPriorityAccent,
   getPriorityTone,
 } from "../schedule-page-utils";
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "shared/ui/badge";
 import { useI18n, useLocale } from "@chrona/i18n/react";
 import { cn } from "@/lib/utils";
 
@@ -41,7 +41,7 @@ export function TimelinePlacementCard({
   return (
     <div
       className={cn(
-        "pointer-events-none absolute left-2 right-2 z-20 rounded-2xl border-2 p-3 shadow-lg ring-2 ring-background/80",
+        "pointer-events-none absolute left-2 right-2 z-20 rounded-lg border-2 p-3 shadow-lg ring-2 ring-background/80",
         preview.hasConflict
           ? "border-destructive/50 bg-destructive/10"
           : "border-dashed border-primary/80 bg-primary/18",
@@ -60,7 +60,9 @@ export function TimelinePlacementCard({
           )}
         />
         <div className="min-w-0 space-y-1">
-          <p className="line-clamp-1 text-sm font-medium text-foreground">{title}</p>
+          <p className="line-clamp-1 text-sm font-medium text-foreground">
+            {title}
+          </p>
           <p className="inline-flex rounded-full bg-background/90 px-2 py-0.5 text-xs font-semibold text-foreground shadow-sm">
             {formatTimeRange(preview.startAt, preview.endAt, locale, copy)}
           </p>
@@ -72,7 +74,9 @@ export function TimelinePlacementCard({
                 : copy.dropToMoveBlock}
           </p>
           {preview.hasConflict ? (
-            <p className="text-xs font-medium text-destructive">{copy.conflictPreviewLabel}</p>
+            <p className="text-xs font-medium text-destructive">
+              {copy.conflictPreviewLabel}
+            </p>
           ) : null}
         </div>
       </div>
@@ -144,18 +148,22 @@ export function ScheduledTimelineBlock({
         }
 
         event.preventDefault();
-        void onKeyboardAdjust(item, event.key, event.shiftKey ? "resize" : "move");
+        void onKeyboardAdjust(
+          item,
+          event.key,
+          event.shiftKey ? "resize" : "move",
+        );
       }}
       aria-label={item.title}
       className={cn(
-        "absolute left-2 right-2 rounded-2xl border bg-card/98 p-2.5 shadow-md transition-all hover:-translate-y-0.5 hover:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 sm:left-3 sm:right-3 sm:p-3",
+        "absolute left-2 right-2 rounded-lg border bg-card p-2 shadow-sm transition-[border-color,background-color,box-shadow] hover:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/40 sm:left-3 sm:right-3 sm:p-2.5",
         hasConflict
           ? "border-destructive/50 bg-destructive/10 ring-1 ring-destructive/30"
           : isCurrent
-            ? "border-primary bg-primary-soft/85 ring-2 ring-primary/20 shadow-lg"
-          : isSelected
-            ? "border-primary ring-1 ring-primary/30 shadow-md"
-            : "border-border",
+            ? "border-primary bg-primary-soft ring-1 ring-primary/20"
+            : isSelected
+              ? "border-primary ring-1 ring-primary/30"
+              : "border-border",
         isPast && !isSelected && !isCurrent && "opacity-70",
         isHidden && "opacity-40",
       )}
@@ -165,13 +173,26 @@ export function ScheduledTimelineBlock({
         height: `${height}px`,
       }}
     >
-      <div className="flex h-full gap-3 overflow-hidden">
-        <div className={cn("w-1 shrink-0 rounded-full", isCurrent ? "bg-primary" : accent)} />
+      <div className="flex h-full gap-2 overflow-hidden">
+        <div
+          className={cn(
+            "w-1 shrink-0 rounded-full",
+            isCurrent ? "bg-primary" : accent,
+          )}
+        />
         <div className="min-w-0 flex-1 space-y-1">
-          <div className="flex flex-wrap items-start justify-between gap-2">
-            <div className="flex min-w-0 items-center gap-2">
-              <Move className={cn("size-3.5 shrink-0", isCurrent ? "text-primary" : "text-muted-foreground")} aria-hidden="true" />
-              <p className="line-clamp-1 text-sm font-medium text-foreground">{item.title}</p>
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex min-w-0 flex-1 items-start gap-1.5">
+              <Move
+                className={cn(
+                  "mt-0.5 size-3.5 shrink-0",
+                  isCurrent ? "text-primary" : "text-muted-foreground",
+                )}
+                aria-hidden="true"
+              />
+              <p className="line-clamp-2 text-sm font-medium leading-5 text-foreground">
+                {item.title}
+              </p>
             </div>
             <div className="flex items-center gap-1">
               {isCurrent ? (
@@ -180,23 +201,37 @@ export function ScheduledTimelineBlock({
                 </span>
               ) : null}
               {hasConflict ? (
-                <span className="flex items-center gap-1 rounded-full bg-destructive/12 px-2 py-0.5 text-[11px] font-medium text-destructive" title={copy.conflictPreviewLabel}>
+                <span
+                  className="flex items-center gap-1 rounded-full bg-destructive/12 px-2 py-0.5 text-[11px] font-medium text-destructive"
+                  title={copy.conflictPreviewLabel}
+                >
                   <AlertTriangle className="size-3" aria-hidden="true" />
                   {copy.conflictPreviewLabel}
                 </span>
               ) : null}
-              <Badge variant={getPriorityTone(item.priority)} className="px-2 py-0.5 text-[11px]">
+              <Badge
+                variant={getPriorityTone(item.priority)}
+                className="px-2 py-0.5 text-[11px]"
+              >
                 {item.priority}
               </Badge>
             </div>
           </div>
           <p className="text-xs text-muted-foreground">
-            {formatTimeRange(item.scheduledStartAt, item.scheduledEndAt, locale, copy)}
+            {formatTimeRange(
+              item.scheduledStartAt,
+              item.scheduledEndAt,
+              locale,
+              copy,
+            )}
           </p>
           {item.scheduleStatus === "Overdue" || item.approvalPendingCount ? (
             <div className="flex flex-wrap gap-1 pt-1 text-[11px] text-muted-foreground">
               {item.scheduleStatus === "Overdue" ? (
-                <Badge variant="destructive" className="px-2 py-0.5 text-[11px]">
+                <Badge
+                  variant="destructive"
+                  className="px-2 py-0.5 text-[11px]"
+                >
                   {copy.overdue}
                 </Badge>
               ) : null}

@@ -271,6 +271,7 @@ test.describe("Task create → plan → run → result", () => {
 
     // 3. The accepted-plan workspace appears; engine moves to the pre-start
     //    `started` state (accepted plan, no execution session yet).
+    await page.reload();
     await expect(page.getByTestId("accepted-plan-surface")).toBeVisible({ timeout: 20_000 });
     await expect
       .poll(async () => (await getCurrentExecution(request, task.taskId)).status, { timeout: 10_000 })

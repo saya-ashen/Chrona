@@ -4,7 +4,7 @@ import {
   type FetchEventSourceInit,
 } from "@microsoft/fetch-event-source";
 
-import { buildAccessKeyHeaderRecord, handleUnauthorizedResponse } from "@/lib/access-key";
+import { buildAccessKeyHeaderRecord, handleUnauthorizedResponse } from "../../../../shared/http/access-key";
 
 type JsonEventSourcePayload = Record<string, unknown>;
 

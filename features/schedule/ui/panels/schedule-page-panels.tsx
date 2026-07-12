@@ -8,10 +8,10 @@ import {
   formatDateTime,
   getPriorityAccent,
 } from "../schedule-page-utils";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Button } from "shared/ui/button";
+import { Card } from "shared/ui/card";
 import { useI18n, useLocale } from "@chrona/i18n/react";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils"
 
 export { DayTimelineSummary } from "./schedule-panel-primitives";
 export { SelectedBlockSheet } from "./selected-block-sheet";

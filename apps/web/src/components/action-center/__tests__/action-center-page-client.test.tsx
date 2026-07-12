@@ -6,21 +6,28 @@ const decideScheduleProposal = vi.fn().mockResolvedValue({ ok: true });
 const dispatchExecutionAction = vi.fn().mockResolvedValue({ ok: true });
 
 vi.mock("@/components/i18n/localized-link", () => ({
-  LocalizedLink: ({ children, href, ...props }: any) => <a href={`/en${href}`} {...props}>{children}</a>,
+  LocalizedLink: ({ children, href, ...props }: any) => (
+    <a href={`/en${href}`} {...props}>
+      {children}
+    </a>
+  ),
 }));
 
 vi.mock("@/lib/task-actions-client", () => ({
-  decideScheduleProposal: (...args: unknown[]) => decideScheduleProposal(...args),
-  dispatchExecutionAction: (...args: unknown[]) => dispatchExecutionAction(...args),
+  decideScheduleProposal: (...args: unknown[]) =>
+    decideScheduleProposal(...args),
+  dispatchExecutionAction: (...args: unknown[]) =>
+    dispatchExecutionAction(...args),
 }));
 
 vi.mock("@chrona/i18n/react", () => ({
   useI18n: () => ({
-    t: (key: string) => ({
-      "common.openTask": "Open Task",
-      "common.openWork": "Open Work",
-      "common.startWork": "Start Work",
-    }[key] ?? key),
+    t: (key: string) =>
+      ({
+        "common.openTask": "Open Task",
+        "common.openWork": "Open Work",
+        "common.startWork": "Start Work",
+      })[key] ?? key,
   }),
 }));
 
@@ -102,11 +109,15 @@ describe("ActionCenterPageClient", () => {
 
     await user.click(screen.getByRole("button", { name: "Approve" }));
 
-    await waitFor(() => expect(dispatchExecutionAction).toHaveBeenCalledWith({
-      taskId: "task_1",
-      action: { action: "resume_with_approval", decision: "approve" },
-    }));
-    expect(screen.queryByText("Approve the file patch")).not.toBeInTheDocument();
+    await waitFor(() =>
+      expect(dispatchExecutionAction).toHaveBeenCalledWith({
+        taskId: "task_1",
+        action: { action: "resume_with_approval", decision: "approve" },
+      }),
+    );
+    expect(
+      screen.queryByText("Approve the file patch"),
+    ).not.toBeInTheDocument();
   });
 
   it("accepts and rejects schedule proposals without leaving action center", async () => {
@@ -128,7 +139,8 @@ describe("ActionCenterPageClient", () => {
             currentRunLabel: null,
             detail: "ai via planner",
             summary: "Move launch prep to tomorrow",
-            consequence: "The plan stays unchanged until this proposal is accepted or rejected.",
+            consequence:
+              "The plan stays unchanged until this proposal is accepted or rejected.",
           },
         ]}
       />,
@@ -136,52 +148,87 @@ describe("ActionCenterPageClient", () => {
 
     await user.click(screen.getByRole("button", { name: "Accept Proposal" }));
 
-    await waitFor(() => expect(decideScheduleProposal).toHaveBeenCalledWith({
-      proposalId: "proposal_1",
-      decision: "Accepted",
-    }));
+    await waitFor(() =>
+      expect(decideScheduleProposal).toHaveBeenCalledWith({
+        proposalId: "proposal_1",
+        decision: "Accepted",
+      }),
+    );
+  });
+
+  it("shows the concrete auto-execution skip reason before generic consequence copy", () => {
+    renderSingleItem({
+      id: "scheduler_skip",
+      kind: "auto_execution_skipped",
+      actionType: "Auto execution skipped",
+      riskLevel: "medium",
+      sourceTaskTitle: "Generate report",
+      sourceTaskId: "task_skip",
+      currentRunLabel: null,
+      summary: "Accept a plan before automatic execution can start.",
+    });
+
+    const reason = screen.getByText(
+      "Accept a plan before automatic execution can start.",
+    );
+    const consequence = screen.getByText(
+      "Execution stays paused until resolved.",
+    );
+    expect(reason.compareDocumentPosition(consequence)).toBe(
+      Node.DOCUMENT_POSITION_FOLLOWING,
+    );
   });
 
   it("retries a failed recovery item via start_manual", async () => {
     const user = userEvent.setup();
-    renderSingleItem({
-      id: "run_failed",
-      kind: "recovery",
-      actionType: "Recovery needed",
-      riskLevel: "critical",
-      sourceTaskTitle: "Build site",
-      sourceTaskId: "task_3",
-      currentRunLabel: "run_failed",
-      summary: "The latest run stopped before finishing.",
-    }, { retry: "Retry" });
+    renderSingleItem(
+      {
+        id: "run_failed",
+        kind: "recovery",
+        actionType: "Recovery needed",
+        riskLevel: "critical",
+        sourceTaskTitle: "Build site",
+        sourceTaskId: "task_3",
+        currentRunLabel: "run_failed",
+        summary: "The latest run stopped before finishing.",
+      },
+      { retry: "Retry" },
+    );
 
     await user.click(screen.getByRole("button", { name: "Retry" }));
 
-    await waitFor(() => expect(dispatchExecutionAction).toHaveBeenCalledWith({
-      taskId: "task_3",
-      action: { action: "start_manual" },
-    }));
+    await waitFor(() =>
+      expect(dispatchExecutionAction).toHaveBeenCalledWith({
+        taskId: "task_3",
+        action: { action: "start_manual" },
+      }),
+    );
   });
 
   it("resumes a blocked item via resume_after_unblock", async () => {
     const user = userEvent.setup();
-    renderSingleItem({
-      id: "task_4",
-      kind: "blocked",
-      actionType: "Blocked",
-      riskLevel: "high",
-      sourceTaskTitle: "Deploy service",
-      sourceTaskId: "task_4",
-      currentRunLabel: null,
-      summary: "Provider hermes is offline.",
-    }, { resume: "Resume" });
+    renderSingleItem(
+      {
+        id: "task_4",
+        kind: "blocked",
+        actionType: "Blocked",
+        riskLevel: "high",
+        sourceTaskTitle: "Deploy service",
+        sourceTaskId: "task_4",
+        currentRunLabel: null,
+        summary: "Provider hermes is offline.",
+      },
+      { resume: "Resume" },
+    );
 
     await user.click(screen.getByRole("button", { name: "Resume" }));
 
-    await waitFor(() => expect(dispatchExecutionAction).toHaveBeenCalledWith({
-      taskId: "task_4",
-      action: { action: "resume_after_unblock" },
-    }));
+    await waitFor(() =>
+      expect(dispatchExecutionAction).toHaveBeenCalledWith({
+        taskId: "task_4",
+        action: { action: "resume_after_unblock" },
+      }),
+    );
   });
 
   it("offers an Open Task recovery link for a WaitingForInput item", async () => {
@@ -207,22 +254,28 @@ describe("ActionCenterPageClient", () => {
 
   it("retries a cancelled recovery item via start_manual", async () => {
     const user = userEvent.setup();
-    renderSingleItem({
-      id: "run_cancelled",
-      kind: "recovery",
-      actionType: "Recovery needed",
-      riskLevel: "medium",
-      sourceTaskTitle: "Generate report",
-      sourceTaskId: "task_6",
-      currentRunLabel: "run_cancelled",
-      summary: "The latest run was cancelled and needs operator review before restarting.",
-    }, { retry: "Retry" });
+    renderSingleItem(
+      {
+        id: "run_cancelled",
+        kind: "recovery",
+        actionType: "Recovery needed",
+        riskLevel: "medium",
+        sourceTaskTitle: "Generate report",
+        sourceTaskId: "task_6",
+        currentRunLabel: "run_cancelled",
+        summary:
+          "The latest run was cancelled and needs operator review before restarting.",
+      },
+      { retry: "Retry" },
+    );
 
     await user.click(screen.getByRole("button", { name: "Retry" }));
 
-    await waitFor(() => expect(dispatchExecutionAction).toHaveBeenCalledWith({
-      taskId: "task_6",
-      action: { action: "start_manual" },
-    }));
+    await waitFor(() =>
+      expect(dispatchExecutionAction).toHaveBeenCalledWith({
+        taskId: "task_6",
+        action: { action: "start_manual" },
+      }),
+    );
   });
 });

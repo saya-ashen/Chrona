@@ -260,7 +260,7 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
           onGeneratePlan={handleGeneratePlanFromHeader}
           onStopPlanGeneration={handleStopPlanGeneration}
           hideGeneratePlan={planGenerationStatus === "idle" && !plan}
-          hideAcceptPlan={planGenerationStatus === "waiting_acceptance" && Boolean(plan)}
+          hideAcceptPlan={false}
           onAction={async (action) => {
             if (action.id === "start") {
               await dispatchExecutionAction({ action: "start_manual" });

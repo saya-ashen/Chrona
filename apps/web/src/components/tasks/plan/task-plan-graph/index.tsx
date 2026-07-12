@@ -27,7 +27,7 @@ import {
   AUTO_FULL_MODE_MIN_WIDTH,
   DEFAULT_GRAPH_COPY,
 } from "./constants";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils"
 import {
   buildCompactViewModel,
   CompactFocusStack,

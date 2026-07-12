@@ -9,7 +9,7 @@ import {
 } from "../../../../../../../features/schedule/ui/forms/task-config-form";
 import { TaskWorkspaceDiffPreview } from "../assistant/task-workspace-diff-preview";
 import type { CurrentProposalState, TaskData } from "../../../../../../../features/task-workspace";
-import { Button } from "@/components/ui/button";
+import { Button } from "shared/ui/button";
 import {
   Dialog,
   DialogClose,

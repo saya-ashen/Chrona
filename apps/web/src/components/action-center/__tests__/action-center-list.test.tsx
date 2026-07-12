@@ -76,12 +76,11 @@ describe("ActionCenterList", () => {
     render(<ActionCenterList items={[completedItem, recoveryItem]} />);
 
     expect(screen.getByText("Needs action")).toBeInTheDocument();
-    expect(screen.getByText("Critical priority")).toBeInTheDocument();
-    expect(screen.getByText("Review and follow-up")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Recovery needed" })).toBeInTheDocument();
-    expect(screen.getByText("Collect PhD positions")).toBeInTheDocument();
-    expect(screen.getByText(/Risk: critical/i)).toBeInTheDocument();
-    expect(screen.getByText(/Status: Failed/i)).toBeInTheDocument();
+    expect(screen.getByText("Recover now")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Review", level: 2 })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Collect PhD positions" })).toBeInTheDocument();
+    expect(screen.getByText("Risk: critical")).toBeInTheDocument();
+    expect(screen.getByText("Failed")).toBeInTheDocument();
     expect(screen.getByText("The last run failed before completion and needs operator recovery.")).toBeInTheDocument();
     expect(screen.queryByTestId("action-center-message")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Recover run" })).toBeInTheDocument();
@@ -92,15 +91,18 @@ describe("ActionCenterList", () => {
     const user = userEvent.setup();
     render(<ActionCenterList items={[completedItem, recoveryItem]} />);
 
-    await user.click(screen.getByRole("button", { name: "Critical" }));
+    await user.click(screen.getByRole("button", { name: "Recover" }));
 
-    expect(screen.getByText("Recovery needed")).toBeInTheDocument();
-    expect(screen.queryByText("Execution completed")).not.toBeInTheDocument();
+    expect(screen.getByText("Collect PhD positions")).toBeInTheDocument();
+    expect(screen.queryByText("Draft report")).not.toBeInTheDocument();
 
-    await user.clear(screen.getByPlaceholderText("Search tasks, runs, or agents..."));
-    await user.type(screen.getByPlaceholderText("Search tasks, runs, or agents..."), "missing");
+    await user.clear(screen.getByPlaceholderText("Search tasks or runs..."));
+    await user.type(screen.getByPlaceholderText("Search tasks or runs..."), "missing");
 
     expect(screen.getByText("No matching action items")).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Clear filters" }));
+    expect(screen.getByText("Draft report")).toBeInTheDocument();
   });
 
   it("renders an empty action queue state", () => {

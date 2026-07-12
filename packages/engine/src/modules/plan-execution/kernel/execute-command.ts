@@ -406,9 +406,9 @@ async function finalizeOutcome(input: {
   });
 }
 
-const activeTaskCommands = new AsyncLocalStorage<ReadonlySet<string>>();
 
 const taskCommandTails = new Map<string, Promise<void>>();
+const activeTaskCommands = new AsyncLocalStorage<ReadonlySet<string>>();
 
 export async function executeCommand(
   input: ExecutionCommandEnvelope & PlanExecutionObserver,

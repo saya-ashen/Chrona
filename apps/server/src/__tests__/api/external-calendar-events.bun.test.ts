@@ -3,8 +3,8 @@ import { Hono } from "hono";
 import { createChronaEngine } from "@chrona/engine";
 import { db } from "@chrona/db";
 
-import { createApiRouter } from "@chrona/server/routes";
-import { json, resetTestDb, seedTask, seedWorkspace } from "@server/__tests__/bun-test-helpers";
+import { createApiRouter } from "../../routes/api";
+import { json, resetTestDb, seedTask, seedWorkspace } from "../bun-test-helpers";
 
 function app() {
   const server = new Hono();

@@ -1,7 +1,7 @@
 import { LocalizedLink } from "@/components/i18n/localized-link";
 import { Calendar } from "@/components/ui/calendar";
-import { Card } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
+import { Card } from "shared/ui/card";
+import { cn } from "@/lib/utils"
 import { useEffect, useState, type ComponentProps } from "react";
 import type { DayButton } from "react-day-picker";
 

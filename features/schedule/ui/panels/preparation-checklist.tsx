@@ -2,8 +2,8 @@
 
 import { CheckCircle2, Circle, FileText } from "lucide-react";
 import { useState } from "react";
-import { Card } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
+import { Card } from "shared/ui/card";
+import { cn } from "@/lib/utils"
 
 export type PreparationStep = {
   id: string;

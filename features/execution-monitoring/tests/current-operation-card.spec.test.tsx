@@ -14,7 +14,7 @@ import { describe, expect, it } from "vitest";
 
 import { buildCommandCenterNowSpec } from "../ui/build-execution-overview-spec";
 import { resolveCurrentOperationCardSpec } from "../ui/build-execution-overview-spec";
-import { taskWorkspacePlanStateFixtures } from "../../../apps/web/src/components/tasks/workspace/test-support/task-workspace-test-fixtures";
+import { executionMonitoringPlanFixtures } from "./execution-monitoring-test-fixtures";
 import type { TaskWorkspacePlanFlowState } from "../../task-workspace";
 
 /**
@@ -213,9 +213,9 @@ describe("buildCommandCenterNowSpec — plan-state variants land in WorkspaceSum
   });
 
   it("planWaitingAcceptance: 'Plan ready for review' with sparkles + info + summary", () => {
-    const { planWaitingAcceptance } = taskWorkspacePlanStateFixtures;
-    const summary = planWaitingAcceptance.pageData.task.savedPlan?.summary ?? null;
-    const flow: TaskWorkspacePlanFlowState = { status: "waiting_acceptance", savedPlan: null };
+    const { waitingAcceptance } = executionMonitoringPlanFixtures;
+    const summary = waitingAcceptance.pageData.task.savedPlan?.summary ?? null;
+    const flow = waitingAcceptance.flow;
     const spec = buildCommandCenterNowSpec({
       readiness: dummyReadiness,
       attention: dummyAttention,

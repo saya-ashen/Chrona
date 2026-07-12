@@ -1581,6 +1581,7 @@
         "attentionOnly": "Nothing auto-completed yet today. {attentionSubject}.",
         "completedTask": "task",
         "completedTasks": "tasks",
+        "completedToday": "Completed today",
         "attentionTask": "1 task needs you",
         "attentionTasks": "{attention} tasks need you",
         "idle": "Chrona is ready. Add a task, start work, or review recent activity here."

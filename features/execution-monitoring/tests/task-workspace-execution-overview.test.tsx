@@ -3,11 +3,18 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { buildCommandCenterTrailSpec, validateChronaSpec, type UiDocument } from "@chrona/ui-protocol";
+import {
+  buildCommandCenterTrailSpec,
+  validateChronaSpec,
+  type UiDocument,
+} from "@chrona/ui-protocol";
 import { createTaskWorkspaceExecutionConsoleView } from "../../task-workspace";
-import { taskWorkspaceStateFixtures } from "../../../apps/web/src/components/tasks/workspace/test-support/task-workspace-test-fixtures";
+import { executionMonitoringWorkspaceFixtures } from "./execution-monitoring-test-fixtures";
 import { TaskWorkspaceExecutionOverview } from "../ui/task-workspace-execution-overview";
-import { buildCommandCenterOutputTabSpec, buildCommandCenterTrailTabSpec } from "../ui/build-execution-overview-spec";
+import {
+  buildCommandCenterOutputTabSpec,
+  buildCommandCenterTrailTabSpec,
+} from "../ui/build-execution-overview-spec";
 
 vi.mock("elkjs/lib/elk.bundled.js", () => ({
   default: class ELKMock {
@@ -19,9 +26,13 @@ vi.mock("elkjs/lib/elk.bundled.js", () => ({
 
 function renderOverview(
   view: ReturnType<typeof createTaskWorkspaceExecutionConsoleView>,
-  extra: Partial<React.ComponentProps<typeof TaskWorkspaceExecutionOverview>> = {},
+  extra: Partial<
+    React.ComponentProps<typeof TaskWorkspaceExecutionOverview>
+  > = {},
 ) {
-  const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
   return render(
     <TaskWorkspaceExecutionOverview
       taskId="task-1"
@@ -37,7 +48,9 @@ function renderOverview(
     />,
     {
       wrapper: ({ children }: { children: React.ReactNode }) => (
-        <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+        <QueryClientProvider client={queryClient}>
+          {children}
+        </QueryClientProvider>
       ),
     },
   );
@@ -63,7 +76,6 @@ function nowDocument(title = "Current operation"): UiDocument {
   };
 }
 
-
 describe("TaskWorkspaceExecutionOverview", () => {
   afterEach(() => {
     cleanup();
@@ -71,26 +83,79 @@ describe("TaskWorkspaceExecutionOverview", () => {
   });
 
   it("renders Results as primary content and keeps Activity secondary", () => {
-    const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.approvalNeeded);
-    renderOverview(view, { commandCenter: { documents: { now: nowDocument(), output: nowDocument("Output"), trail: nowDocument("Trail") } } });
+    const view = createTaskWorkspaceExecutionConsoleView(
+      executionMonitoringWorkspaceFixtures.approvalNeeded,
+    );
+    renderOverview(view, {
+      commandCenter: {
+        documents: {
+          now: nowDocument(),
+          output: nowDocument("Output"),
+          trail: nowDocument("Trail"),
+        },
+      },
+    });
 
-    expect(screen.getAllByLabelText("Execution overview").length).toBeGreaterThan(0);
+    expect(
+      screen.getAllByLabelText("Execution overview").length,
+    ).toBeGreaterThan(0);
     expect(screen.queryByRole("tab", { name: "Now" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("tab", { name: "Results" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("tab", { name: "Activity" })).not.toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Final result" })).toBeInTheDocument();
+    expect(
+      screen.queryByRole("tab", { name: "Results" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("tab", { name: "Activity" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Final result" }),
+    ).toBeInTheDocument();
     expect(screen.getByText("Activity")).toBeInTheDocument();
     expect(screen.getByText("Output")).toBeInTheDocument();
     expect(screen.getByText("AI generated")).toBeInTheDocument();
-    expect(screen.getAllByText("Runtime state").length).toBeGreaterThan(0);
-    expect(screen.queryByRole("region", { name: "Execution progress" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Runtime state")).not.toBeInTheDocument();
+    expect(screen.getByText("Activity")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("region", { name: "Execution progress" }),
+    ).not.toBeInTheDocument();
   });
 
   it("renders Activity as a side timeline in compact plan mode", () => {
-    const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.running);
+    const view = createTaskWorkspaceExecutionConsoleView(
+      executionMonitoringWorkspaceFixtures.running,
+    );
     renderOverview(view, {
       activityLayout: "side",
-      commandCenter: { documents: { now: nowDocument(), output: nowDocument("Output"), trail: buildCommandCenterTrailSpec({ activity: [{ id: "tool", kind: "tool_completed", title: "Tool completed", summary: "Read plan", description: "Read plan", tone: "success", tool: { label: "Read plan", state: "completed", durationMs: 128 } }], savedCount: 1, toolLabels: { tool: "Tool", input: "Input", preview: "Preview", duration: "Duration", error: "Error" } }) } },
+      commandCenter: {
+        documents: {
+          now: nowDocument(),
+          output: nowDocument("Output"),
+          trail: buildCommandCenterTrailSpec({
+            activity: [
+              {
+                id: "tool",
+                kind: "tool_completed",
+                title: "Tool completed",
+                summary: "Read plan",
+                description: "Read plan",
+                tone: "success",
+                tool: {
+                  label: "Read plan",
+                  state: "completed",
+                  durationMs: 128,
+                },
+              },
+            ],
+            savedCount: 1,
+            toolLabels: {
+              tool: "Tool",
+              input: "Input",
+              preview: "Preview",
+              duration: "Duration",
+              error: "Error",
+            },
+          }),
+        },
+      },
     });
 
     const activity = screen.getByRole("region", { name: "Activity" });
@@ -98,27 +163,37 @@ describe("TaskWorkspaceExecutionOverview", () => {
     expect(screen.getByText("done · 128ms")).toBeInTheDocument();
     expect(screen.queryByText("▸ Activity")).not.toBeInTheDocument();
     expect(screen.getByText("Output")).toBeInTheDocument();
+    expect(screen.getByText("Runtime state")).toBeInTheDocument();
   });
 
-
   it("renders persisted server-driven Trail items once", () => {
-    const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.running);
+    const view = createTaskWorkspaceExecutionConsoleView(
+      executionMonitoringWorkspaceFixtures.running,
+    );
     const commandCenter = {
       documents: {
         now: nowDocument("Execution running"),
         output: nowDocument("Output"),
         trail: buildCommandCenterTrailSpec({
-          activity: [{
-            id: "persisted-plan-status",
-            kind: "task",
-            title: "Plan generation update",
-            summary: "Requesting AI provider...",
-            description: "Requesting AI provider...",
-            tone: "info",
-            timestamp: "2026-05-12T10:00:00.000Z",
-          }],
+          activity: [
+            {
+              id: "persisted-plan-status",
+              kind: "task",
+              title: "Plan generation update",
+              summary: "Requesting AI provider...",
+              description: "Requesting AI provider...",
+              tone: "info",
+              timestamp: "2026-05-12T10:00:00.000Z",
+            },
+          ],
           savedCount: 1,
-          toolLabels: { tool: "Tool", input: "Input", preview: "Preview", duration: "Duration", error: "Error" },
+          toolLabels: {
+            tool: "Tool",
+            input: "Input",
+            preview: "Preview",
+            duration: "Duration",
+            error: "Error",
+          },
         }),
       },
     };
@@ -129,31 +204,73 @@ describe("TaskWorkspaceExecutionOverview", () => {
     expect(screen.getByText("Plan generation update")).toBeInTheDocument();
     expect(screen.getByText("Requesting AI provider...")).toBeInTheDocument();
     expect(screen.getAllByText("1 shown · 0 live · 1 saved")).toHaveLength(1);
-    expect(screen.queryByText("0 shown · 0 live · 0 saved")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("0 shown · 0 live · 0 saved"),
+    ).not.toBeInTheDocument();
   });
 
   it("groups activity trail into audit categories", () => {
     const trail = buildCommandCenterTrailTabSpec({
       activity: [
-        { id: "tool", kind: "tool_completed", title: "Tool completed", summary: "Read plan", description: "Read plan", tone: "success" },
-        { id: "approval", kind: "approval", title: "Approval requested", summary: "Review deploy", description: "Review deploy", tone: "warning" },
-        { id: "artifact", kind: "artifact", title: "Report artifact", summary: "report.md", description: "report.md", tone: "info" },
-        { id: "failure", kind: "task", title: "Run failed", summary: "Provider failed", description: "Provider failed", tone: "danger" },
+        {
+          id: "tool",
+          kind: "tool_completed",
+          title: "Tool completed",
+          summary: "Read plan",
+          description: "Read plan",
+          tone: "success",
+        },
+        {
+          id: "approval",
+          kind: "approval",
+          title: "Approval requested",
+          summary: "Review deploy",
+          description: "Review deploy",
+          tone: "warning",
+        },
+        {
+          id: "artifact",
+          kind: "artifact",
+          title: "Report artifact",
+          summary: "report.md",
+          description: "report.md",
+          tone: "info",
+        },
+        {
+          id: "failure",
+          kind: "task",
+          title: "Run failed",
+          summary: "Provider failed",
+          description: "Provider failed",
+          tone: "danger",
+        },
       ],
       runtimeEvents: [],
       copy: { activityTitle: "Activity" },
-      toolLabels: { tool: "Tool", input: "Input", preview: "Preview", duration: "Duration", error: "Error" },
+      toolLabels: {
+        tool: "Tool",
+        input: "Input",
+        preview: "Preview",
+        duration: "Duration",
+        error: "Error",
+      },
     });
 
-    expect(trail.elements.groups?.props?.text).toContain("provider/tool activity: 1");
+    expect(trail.elements.groups?.props?.text).toContain(
+      "provider/tool activity: 1",
+    );
     expect(trail.elements.groups?.props?.text).toContain("approvals: 1");
-    expect(trail.elements.groups?.props?.text).toContain("artifacts/results: 1");
+    expect(trail.elements.groups?.props?.text).toContain(
+      "artifacts/results: 1",
+    );
     expect(trail.elements.groups?.props?.text).toContain("failures/retries: 1");
     validateChronaSpec(trail);
   });
 
   it("keeps running status out of Results while activity stream stays live", () => {
-    const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.running);
+    const view = createTaskWorkspaceExecutionConsoleView(
+      executionMonitoringWorkspaceFixtures.running,
+    );
     const liveEvent = {
       type: "runtime_event" as const,
       action: "start_manual" as const,
@@ -164,11 +281,31 @@ describe("TaskWorkspaceExecutionOverview", () => {
       runId: "run-1",
       sequence: 1,
       timestamp: "2026-05-12T10:01:00.000Z",
-      event: { type: "tool_started" as const, toolName: "chrona_report_write", label: "Writing report" },
+      event: {
+        type: "tool_started" as const,
+        toolName: "chrona_report_write",
+        label: "Writing report",
+      },
     };
 
     renderOverview(view, {
-      commandCenter: { documents: { now: nowDocument("Execution running"), output: nowDocument("Output"), trail: buildCommandCenterTrailSpec({ activity: [], savedCount: 0, toolLabels: { tool: "Tool", input: "Input", preview: "Preview", duration: "Duration", error: "Error" } }) } },
+      commandCenter: {
+        documents: {
+          now: nowDocument("Execution running"),
+          output: nowDocument("Output"),
+          trail: buildCommandCenterTrailSpec({
+            activity: [],
+            savedCount: 0,
+            toolLabels: {
+              tool: "Tool",
+              input: "Input",
+              preview: "Preview",
+              duration: "Duration",
+              error: "Error",
+            },
+          }),
+        },
+      },
       runtimeEvents: [liveEvent],
       currentExecution: { status: "running" },
     });
@@ -179,10 +316,28 @@ describe("TaskWorkspaceExecutionOverview", () => {
   });
 
   it("hides live status strip before execution has active runtime activity", () => {
-    const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.running);
+    const view = createTaskWorkspaceExecutionConsoleView(
+      executionMonitoringWorkspaceFixtures.running,
+    );
 
     renderOverview(view, {
-      commandCenter: { documents: { now: nowDocument("Execution ready"), output: nowDocument("Output"), trail: buildCommandCenterTrailSpec({ activity: [], savedCount: 0, toolLabels: { tool: "Tool", input: "Input", preview: "Preview", duration: "Duration", error: "Error" } }) } },
+      commandCenter: {
+        documents: {
+          now: nowDocument("Execution ready"),
+          output: nowDocument("Output"),
+          trail: buildCommandCenterTrailSpec({
+            activity: [],
+            savedCount: 0,
+            toolLabels: {
+              tool: "Tool",
+              input: "Input",
+              preview: "Preview",
+              duration: "Duration",
+              error: "Error",
+            },
+          }),
+        },
+      },
       currentExecution: { status: "started" },
     });
 
@@ -190,9 +345,10 @@ describe("TaskWorkspaceExecutionOverview", () => {
     expect(screen.queryByText("Running now")).not.toBeInTheDocument();
   });
 
-
   it("hides live status strip after completion even when stale activity looks active", () => {
-    const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.completed);
+    const view = createTaskWorkspaceExecutionConsoleView(
+      executionMonitoringWorkspaceFixtures.completed,
+    );
     const staleStarted = {
       id: "stale-tool-started",
       kind: "tool_started" as const,
@@ -201,21 +357,61 @@ describe("TaskWorkspaceExecutionOverview", () => {
       description: "Writing report",
       tone: "info" as const,
       timestamp: "2026-05-12T10:01:00.000Z",
-      tool: { name: "chrona_report_write", label: "Writing report", state: "started" as const },
+      tool: {
+        name: "chrona_report_write",
+        label: "Writing report",
+        state: "started" as const,
+      },
     };
 
     renderOverview(view, {
-      commandCenter: { documents: { now: nowDocument("Execution completed"), output: nowDocument("Output"), trail: buildCommandCenterTrailSpec({ activity: [staleStarted], savedCount: 1, toolLabels: { tool: "Tool", input: "Input", preview: "Preview", duration: "Duration", error: "Error" } }) } },
+      commandCenter: {
+        documents: {
+          now: nowDocument("Execution completed"),
+          output: nowDocument("Output"),
+          trail: buildCommandCenterTrailSpec({
+            activity: [staleStarted],
+            savedCount: 1,
+            toolLabels: {
+              tool: "Tool",
+              input: "Input",
+              preview: "Preview",
+              duration: "Duration",
+              error: "Error",
+            },
+          }),
+        },
+      },
       currentExecution: { status: "completed" },
       activity: [staleStarted],
     });
 
     expect(screen.queryByText("Running now")).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Latest activity running")).not.toBeInTheDocument();
+    expect(
+      screen.queryByLabelText("Latest activity running"),
+    ).not.toBeInTheDocument();
   });
   it("streams live runtime events into a server-driven Trail document", () => {
-    const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.running);
-    const commandCenter = { documents: { now: nowDocument("Execution running"), output: nowDocument("Output"), trail: buildCommandCenterTrailSpec({ activity: [], savedCount: 0, toolLabels: { tool: "Tool", input: "Input", preview: "Preview", duration: "Duration", error: "Error" } }) } };
+    const view = createTaskWorkspaceExecutionConsoleView(
+      executionMonitoringWorkspaceFixtures.running,
+    );
+    const commandCenter = {
+      documents: {
+        now: nowDocument("Execution running"),
+        output: nowDocument("Output"),
+        trail: buildCommandCenterTrailSpec({
+          activity: [],
+          savedCount: 0,
+          toolLabels: {
+            tool: "Tool",
+            input: "Input",
+            preview: "Preview",
+            duration: "Duration",
+            error: "Error",
+          },
+        }),
+      },
+    };
     const liveEvent = {
       type: "runtime_event" as const,
       action: "start_manual" as const,
@@ -226,10 +422,18 @@ describe("TaskWorkspaceExecutionOverview", () => {
       runId: "run-1",
       sequence: 1,
       timestamp: "2026-05-12T10:01:00.000Z",
-      event: { type: "tool_started" as const, toolName: "chrona_plan_read", label: "正在读取计划" },
+      event: {
+        type: "tool_started" as const,
+        toolName: "chrona_plan_read",
+        label: "正在读取计划",
+      },
     };
 
-    const { rerender } = renderOverview(view, { commandCenter, runtimeEvents: [], currentExecution: { status: "running" } });
+    const { rerender } = renderOverview(view, {
+      commandCenter,
+      runtimeEvents: [],
+      currentExecution: { status: "running" },
+    });
     expect(screen.getByText("Activity")).toBeInTheDocument();
     expect(screen.queryByText("正在读取计划")).not.toBeInTheDocument();
 
@@ -250,24 +454,46 @@ describe("TaskWorkspaceExecutionOverview", () => {
     );
     expect(screen.getByText("Activity")).toBeInTheDocument();
 
-    return waitFor(() => expect(screen.getAllByText("正在读取计划").length).toBeGreaterThan(0));
+    return waitFor(() =>
+      expect(screen.getAllByText("正在读取计划").length).toBeGreaterThan(0),
+    );
   });
 
   it("streams live workspace events into a server-driven Trail document", () => {
-    const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.running);
-    const commandCenter = { documents: { now: nowDocument("Execution running"), output: nowDocument("Output"), trail: buildCommandCenterTrailSpec({ activity: [], savedCount: 0, toolLabels: { tool: "Tool", input: "Input", preview: "Preview", duration: "Duration", error: "Error" } }) } };
+    const view = createTaskWorkspaceExecutionConsoleView(
+      executionMonitoringWorkspaceFixtures.running,
+    );
+    const commandCenter = {
+      documents: {
+        now: nowDocument("Execution running"),
+        output: nowDocument("Output"),
+        trail: buildCommandCenterTrailSpec({
+          activity: [],
+          savedCount: 0,
+          toolLabels: {
+            tool: "Tool",
+            input: "Input",
+            preview: "Preview",
+            duration: "Duration",
+            error: "Error",
+          },
+        }),
+      },
+    };
 
     renderOverview(view, {
       commandCenter,
-      liveActivity: [{
-        id: "event-plan-status-1",
-        kind: "task",
-        title: "Plan generation update",
-        summary: "Requesting AI provider...",
-        description: "Requesting AI provider...",
-        tone: "info",
-        timestamp: "2026-05-12T10:00:00.000Z",
-      }],
+      liveActivity: [
+        {
+          id: "event-plan-status-1",
+          kind: "task",
+          title: "Plan generation update",
+          summary: "Requesting AI provider...",
+          description: "Requesting AI provider...",
+          tone: "info",
+          timestamp: "2026-05-12T10:00:00.000Z",
+        },
+      ],
     });
     expect(screen.getByText("Activity")).toBeInTheDocument();
 
@@ -275,25 +501,46 @@ describe("TaskWorkspaceExecutionOverview", () => {
     expect(screen.getByText("Requesting AI provider...")).toBeInTheDocument();
   });
 
-
   it("renders shared plan output and artifacts as primary results content", () => {
-    const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.artifactPresent);
+    const view = createTaskWorkspaceExecutionConsoleView(
+      executionMonitoringWorkspaceFixtures.artifactPresent,
+    );
 
-    renderOverview(view, { commandCenter: { documents: { now: nowDocument("Execution running"), output: nowDocument("Plan output"), trail: nowDocument("Trail") } } });
+    renderOverview(view, {
+      commandCenter: {
+        documents: {
+          now: nowDocument("Execution running"),
+          output: nowDocument("Plan output"),
+          trail: nowDocument("Trail"),
+        },
+      },
+    });
 
-    expect(screen.getByRole("heading", { name: "Final result" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Final result" }),
+    ).toBeInTheDocument();
     expect(screen.getByText("Plan output")).toBeInTheDocument();
     expect(screen.queryByText("summary")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Locate source node" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Locate source node" }),
+    ).not.toBeInTheDocument();
     expect(screen.getByText("Report")).toBeInTheDocument();
     expect(screen.getByText("file://report.md")).toBeInTheDocument();
   });
 
   it("does not render command center primary actions inside the execution panel", () => {
-    const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.empty);
+    const view = createTaskWorkspaceExecutionConsoleView(
+      executionMonitoringWorkspaceFixtures.empty,
+    );
     const onClick = vi.fn();
     renderOverview(view, {
-      commandCenter: { documents: { now: nowDocument("Execution running"), output: nowDocument("Output"), trail: nowDocument("Trail") } },
+      commandCenter: {
+        documents: {
+          now: nowDocument("Execution running"),
+          output: nowDocument("Output"),
+          trail: nowDocument("Trail"),
+        },
+      },
       primaryAction: {
         kind: "generate",
         label: "Generate plan",
@@ -305,21 +552,29 @@ describe("TaskWorkspaceExecutionOverview", () => {
     });
 
     expect(screen.queryByText("Execution running")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Generate plan" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Generate plan" }),
+    ).not.toBeInTheDocument();
     expect(onClick).not.toHaveBeenCalled();
   });
 
   it("renders an empty output state when no node has completed", () => {
-    const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.empty);
+    const view = createTaskWorkspaceExecutionConsoleView(
+      executionMonitoringWorkspaceFixtures.empty,
+    );
 
     renderOverview(view);
 
-    expect(screen.getByRole("heading", { name: "Final result" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Final result" }),
+    ).toBeInTheDocument();
     expect(screen.getByText("No execution result yet.")).toBeInTheDocument();
   });
 
   it("hides the current operation card when there is nothing to act on", () => {
-    const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.completed);
+    const view = createTaskWorkspaceExecutionConsoleView(
+      executionMonitoringWorkspaceFixtures.completed,
+    );
 
     // No server now document, no attention, and a passive primary action
     // (suppressAttentionCard, no onClick/actionSpec) → the rail collapses.
@@ -329,7 +584,8 @@ describe("TaskWorkspaceExecutionOverview", () => {
       primaryAction: {
         kind: "no-operation",
         label: "No current operation",
-        description: "The accepted plan is running, but the engine has not returned an actionable checkpoint yet.",
+        description:
+          "The accepted plan is running, but the engine has not returned an actionable checkpoint yet.",
         tone: "neutral",
         suppressAttentionCard: true,
       },
@@ -340,17 +596,41 @@ describe("TaskWorkspaceExecutionOverview", () => {
   });
   it("filters output and artifacts by selected result node", async () => {
     const user = userEvent.setup();
-    const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.completed);
+    const view = createTaskWorkspaceExecutionConsoleView(
+      executionMonitoringWorkspaceFixtures.completed,
+    );
     const commandCenter = {
       documents: {
         now: nowDocument("Execution completed"),
-        trail: buildCommandCenterTrailSpec({ activity: [], savedCount: 0, toolLabels: { tool: "Tool", input: "Input", preview: "Preview", duration: "Duration", error: "Error" } }),
+        trail: buildCommandCenterTrailSpec({
+          activity: [],
+          savedCount: 0,
+          toolLabels: {
+            tool: "Tool",
+            input: "Input",
+            preview: "Preview",
+            duration: "Duration",
+            error: "Error",
+          },
+        }),
         output: {
           root: "root",
           elements: {
-            root: { type: "Stack", props: { gap: "sm" }, children: ["node-a-output", "node-b-output"] },
-            "node-a-output": { type: "Markdown", props: { content: "Alpha result", xChronaSourceNodeId: "node-a" }, children: [] },
-            "node-b-output": { type: "Markdown", props: { content: "Beta result", xChronaSourceNodeId: "node-b" }, children: [] },
+            root: {
+              type: "Stack",
+              props: { gap: "sm" },
+              children: ["node-a-output", "node-b-output"],
+            },
+            "node-a-output": {
+              type: "Markdown",
+              props: { content: "Alpha result", xChronaSourceNodeId: "node-a" },
+              children: [],
+            },
+            "node-b-output": {
+              type: "Markdown",
+              props: { content: "Beta result", xChronaSourceNodeId: "node-b" },
+              children: [],
+            },
           },
         } satisfies UiDocument,
       },
@@ -358,20 +638,46 @@ describe("TaskWorkspaceExecutionOverview", () => {
 
     renderOverview(view, {
       nodes: [
-        { id: "node-a", title: "Alpha node", objective: "Alpha", phase: "One", status: "done" },
-        { id: "node-b", title: "Beta node", objective: "Beta", phase: "Two", status: "done" },
+        {
+          id: "node-a",
+          title: "Alpha node",
+          objective: "Alpha",
+          phase: "One",
+          status: "done",
+        },
+        {
+          id: "node-b",
+          title: "Beta node",
+          objective: "Beta",
+          phase: "Two",
+          status: "done",
+        },
       ],
       commandCenter,
       artifacts: [
-        { id: "artifact-a", title: "Alpha artifact", type: "file", uri: "file://alpha", sourceNodeId: "node-a" },
-        { id: "artifact-b", title: "Beta artifact", type: "file", uri: "file://beta", sourceNodeId: "node-b" },
+        {
+          id: "artifact-a",
+          title: "Alpha artifact",
+          type: "file",
+          uri: "file://alpha",
+          sourceNodeId: "node-a",
+        },
+        {
+          id: "artifact-b",
+          title: "Beta artifact",
+          type: "file",
+          uri: "file://beta",
+          sourceNodeId: "node-b",
+        },
       ],
     });
 
     expect(screen.getByText("Alpha result")).toBeInTheDocument();
     expect(screen.getByText("Beta result")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("combobox", { name: "Filter results by node" }));
+    await user.click(
+      screen.getByRole("combobox", { name: "Filter results by node" }),
+    );
     await user.click(screen.getByRole("option", { name: "Beta node" }));
 
     expect(screen.queryByText("Alpha result")).not.toBeInTheDocument();
@@ -386,10 +692,26 @@ describe("TaskWorkspaceExecutionOverview", () => {
       resultSpec: {
         root: "root",
         elements: {
-          root: { type: "Stack", props: { gap: "sm" }, children: ["intro", "alpha", "beta"] },
-          intro: { type: "Markdown", props: { content: "Shared overview" }, children: [] },
-          alpha: { type: "Markdown", props: { content: "Alpha result", xChronaSourceNodeId: "node-a" }, children: [] },
-          beta: { type: "Markdown", props: { content: "Beta result", xChronaSourceNodeId: "node-b" }, children: [] },
+          root: {
+            type: "Stack",
+            props: { gap: "sm" },
+            children: ["intro", "alpha", "beta"],
+          },
+          intro: {
+            type: "Markdown",
+            props: { content: "Shared overview" },
+            children: [],
+          },
+          alpha: {
+            type: "Markdown",
+            props: { content: "Alpha result", xChronaSourceNodeId: "node-a" },
+            children: [],
+          },
+          beta: {
+            type: "Markdown",
+            props: { content: "Beta result", xChronaSourceNodeId: "node-b" },
+            children: [],
+          },
         },
       },
       artifacts: [],
@@ -402,13 +724,29 @@ describe("TaskWorkspaceExecutionOverview", () => {
     });
 
     const rootChildren = outputSpec.elements.root.children ?? [];
-    const sections = rootChildren.filter((key) => outputSpec.elements[key]?.type === "NodeResultSection");
+    const sections = rootChildren.filter(
+      (key) => outputSpec.elements[key]?.type === "NodeResultSection",
+    );
     expect(sections).toHaveLength(2);
-    expect(outputSpec.elements[sections[0]]?.props).toMatchObject({ nodeId: "node-a", nodeTitle: "Alpha node", defaultCollapsed: false });
-    expect(outputSpec.elements[sections[0]]?.children).toEqual(["output:alpha"]);
-    expect(outputSpec.elements[sections[1]]?.props).toMatchObject({ nodeId: "node-b", nodeTitle: "Beta node", defaultCollapsed: false });
-    expect(outputSpec.elements["output:alpha"]?.props).toMatchObject({ defaultCollapsed: false });
-    expect(outputSpec.elements["output:beta"]?.props).toMatchObject({ defaultCollapsed: false });
+    expect(outputSpec.elements[sections[0]]?.props).toMatchObject({
+      nodeId: "node-a",
+      nodeTitle: "Alpha node",
+      defaultCollapsed: false,
+    });
+    expect(outputSpec.elements[sections[0]]?.children).toEqual([
+      "output:alpha",
+    ]);
+    expect(outputSpec.elements[sections[1]]?.props).toMatchObject({
+      nodeId: "node-b",
+      nodeTitle: "Beta node",
+      defaultCollapsed: false,
+    });
+    expect(outputSpec.elements["output:alpha"]?.props).toMatchObject({
+      defaultCollapsed: false,
+    });
+    expect(outputSpec.elements["output:beta"]?.props).toMatchObject({
+      defaultCollapsed: false,
+    });
     expect(validateChronaSpec(outputSpec)).toMatchObject({ ok: true });
   });
 
@@ -418,16 +756,34 @@ describe("TaskWorkspaceExecutionOverview", () => {
       resultSpec: {
         root: "root",
         elements: {
-          root: { type: "Stack", props: { gap: "sm" }, children: ["summary", "positions"] },
-          summary: { type: "ResultSummary", props: { text: "Collected PhD positions" }, children: [] },
-          positions: { type: "Card", props: { title: "岗位清单", defaultCollapsed: false }, children: ["table"] },
-          table: { type: "Markdown", props: { content: "| Role | Deadline |\n| --- | --- |" }, children: [] },
+          root: {
+            type: "Stack",
+            props: { gap: "sm" },
+            children: ["summary", "positions"],
+          },
+          summary: {
+            type: "ResultSummary",
+            props: { text: "Collected PhD positions" },
+            children: [],
+          },
+          positions: {
+            type: "Card",
+            props: { title: "岗位清单", defaultCollapsed: false },
+            children: ["table"],
+          },
+          table: {
+            type: "Markdown",
+            props: { content: "| Role | Deadline |\n| --- | --- |" },
+            children: [],
+          },
         },
       },
       artifacts: [],
       copy: { noResultYet: "No output yet." },
       selectedNodeId: "all",
-      nodeOptions: [{ id: "node-1", title: "搜集并整理AI方向PhD岗位", status: "done" }],
+      nodeOptions: [
+        { id: "node-1", title: "搜集并整理AI方向PhD岗位", status: "done" },
+      ],
       outputOwnerNodeId: "node-1",
     });
 
@@ -435,113 +791,222 @@ describe("TaskWorkspaceExecutionOverview", () => {
     expect(rootChildren).toHaveLength(1);
     const section = outputSpec.elements[rootChildren[0]!];
     expect(section?.type).toBe("NodeResultSection");
-    expect(section?.props).toMatchObject({ nodeId: "node-1", nodeTitle: "搜集并整理AI方向PhD岗位", defaultCollapsed: false, itemCount: 2 });
+    expect(section?.props).toMatchObject({
+      nodeId: "node-1",
+      nodeTitle: "搜集并整理AI方向PhD岗位",
+      defaultCollapsed: false,
+      itemCount: 2,
+    });
     expect(section?.children).toEqual(["output:summary", "output:positions"]);
-    expect(outputSpec.elements["output:positions"]?.props).toMatchObject({ defaultCollapsed: false });
+    expect(outputSpec.elements["output:positions"]?.props).toMatchObject({
+      defaultCollapsed: false,
+    });
     expect(validateChronaSpec(outputSpec)).toMatchObject({ ok: true });
   });
 
   it("accepts Card defaultCollapsed as presentation metadata", () => {
-    expect(validateChronaSpec({
-      root: "root",
-      elements: {
-        root: { type: "Card", props: { title: "Details", defaultCollapsed: true }, children: ["body"] },
-        body: { type: "Text", props: { text: "Hidden until expanded" } },
-      },
-    })).toMatchObject({ ok: true });
+    expect(
+      validateChronaSpec({
+        root: "root",
+        elements: {
+          root: {
+            type: "Card",
+            props: { title: "Details", defaultCollapsed: true },
+            children: ["body"],
+          },
+          body: { type: "Text", props: { text: "Hidden until expanded" } },
+        },
+      }),
+    ).toMatchObject({ ok: true });
   });
 
   it("lets AI-authored Card defaultCollapsed drive Chrona-owned collapse chrome", async () => {
     const user = userEvent.setup();
-    const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.completed);
+    const view = createTaskWorkspaceExecutionConsoleView(
+      executionMonitoringWorkspaceFixtures.completed,
+    );
     const { container } = renderOverview(view, {
       commandCenter: {
         documents: {
           now: nowDocument("Execution completed"),
-          trail: buildCommandCenterTrailSpec({ activity: [], savedCount: 0, toolLabels: { tool: "Tool", input: "Input", preview: "Preview", duration: "Duration", error: "Error" } }),
+          trail: buildCommandCenterTrailSpec({
+            activity: [],
+            savedCount: 0,
+            toolLabels: {
+              tool: "Tool",
+              input: "Input",
+              preview: "Preview",
+              duration: "Duration",
+              error: "Error",
+            },
+          }),
           output: {
             root: "root",
             elements: {
-              root: { type: "Stack", props: { gap: "sm" }, children: ["details", "open"] },
-              details: { type: "Card", props: { title: "Secondary evidence", defaultCollapsed: true }, children: ["body"] },
-              body: { type: "Markdown", props: { content: "Evidence details" }, children: [] },
-              open: { type: "Card", props: { title: "Primary details", defaultCollapsed: false }, children: ["open-body"] },
-              "open-body": { type: "Markdown", props: { content: "Visible details" }, children: [] },
+              root: {
+                type: "Stack",
+                props: { gap: "sm" },
+                children: ["details", "open"],
+              },
+              details: {
+                type: "Card",
+                props: { title: "Secondary evidence", defaultCollapsed: true },
+                children: ["body"],
+              },
+              body: {
+                type: "Markdown",
+                props: { content: "Evidence details" },
+                children: [],
+              },
+              open: {
+                type: "Card",
+                props: { title: "Primary details", defaultCollapsed: false },
+                children: ["open-body"],
+              },
+              "open-body": {
+                type: "Markdown",
+                props: { content: "Visible details" },
+                children: [],
+              },
             },
           },
         },
       },
     });
 
-    expect(screen.getByRole("button", { name: /Secondary evidence/ })).toHaveAttribute("aria-expanded", "false");
+    expect(
+      screen.getByRole("button", { name: /Secondary evidence/ }),
+    ).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByText("Evidence details")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Primary details/ })).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByRole("button", { name: /Secondary evidence/ }).closest("section")).toHaveClass("w-full");
-    expect(container.querySelector('[data-slot="card"]')).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Primary details/ }),
+    ).toHaveAttribute("aria-expanded", "true");
+    expect(
+      screen
+        .getByRole("button", { name: /Secondary evidence/ })
+        .closest("section"),
+    ).toHaveClass("w-full");
+    expect(
+      container.querySelector('[data-slot="card"]'),
+    ).not.toBeInTheDocument();
     expect(screen.getByText("Visible details")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: /Secondary evidence/ }));
+    await user.click(
+      screen.getByRole("button", { name: /Secondary evidence/ }),
+    );
 
     expect(screen.getByText("Evidence details")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Result options" }));
     await user.click(await screen.findByText("Collapse all"));
 
-    expect(screen.queryByRole("button", { name: /Secondary evidence/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Primary details/ })).not.toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Deliver launch brief/ }),
+    ).toHaveAttribute("aria-expanded", "false");
+    expect(
+      screen.queryByRole("button", { name: /Secondary evidence/ }),
+    ).not.toBeInTheDocument();
     expect(screen.queryByText("Evidence details")).not.toBeInTheDocument();
     expect(screen.queryByText("Visible details")).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Result options" }));
     await user.click(await screen.findByText("Expand all"));
 
-    expect(screen.getByRole("button", { name: /Secondary evidence/ })).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByRole("button", { name: /Primary details/ })).toHaveAttribute("aria-expanded", "true");
+    expect(
+      screen.getByRole("button", { name: /Secondary evidence/ }),
+    ).toHaveAttribute("aria-expanded", "true");
+    expect(
+      screen.getByRole("button", { name: /Primary details/ }),
+    ).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByText("Evidence details")).toBeInTheDocument();
     expect(screen.getByText("Visible details")).toBeInTheDocument();
   });
 
   it("remembers result collapse state across workspace remounts", async () => {
     const user = userEvent.setup();
-    const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.completed);
+    const view = createTaskWorkspaceExecutionConsoleView(
+      executionMonitoringWorkspaceFixtures.completed,
+    );
     const commandCenter = {
       documents: {
         now: nowDocument("Execution completed"),
-        trail: buildCommandCenterTrailSpec({ activity: [], savedCount: 0, toolLabels: { tool: "Tool", input: "Input", preview: "Preview", duration: "Duration", error: "Error" } }),
+        trail: buildCommandCenterTrailSpec({
+          activity: [],
+          savedCount: 0,
+          toolLabels: {
+            tool: "Tool",
+            input: "Input",
+            preview: "Preview",
+            duration: "Duration",
+            error: "Error",
+          },
+        }),
         output: {
           root: "root",
           elements: {
-            root: { type: "Stack", props: { gap: "sm" }, children: ["details"] },
-            details: { type: "Card", props: { title: "Persistent details", defaultCollapsed: false }, children: ["body"] },
-            body: { type: "Markdown", props: { content: "Remembered body" }, children: [] },
+            root: {
+              type: "Stack",
+              props: { gap: "sm" },
+              children: ["details"],
+            },
+            details: {
+              type: "Card",
+              props: { title: "Persistent details", defaultCollapsed: false },
+              children: ["body"],
+            },
+            body: {
+              type: "Markdown",
+              props: { content: "Remembered body" },
+              children: [],
+            },
           },
         },
       },
     };
 
     const first = renderOverview(view, { commandCenter });
-    expect(screen.getByRole("button", { name: /Persistent details/ })).toHaveAttribute("aria-expanded", "true");
+    expect(
+      screen.getByRole("button", { name: /Persistent details/ }),
+    ).toHaveAttribute("aria-expanded", "true");
     expect(screen.getByText("Remembered body")).toBeInTheDocument();
 
-    await user.click(screen.getByRole("button", { name: /Persistent details/ }));
-    expect(screen.getByRole("button", { name: /Persistent details/ })).toHaveAttribute("aria-expanded", "false");
+    await user.click(
+      screen.getByRole("button", { name: /Persistent details/ }),
+    );
+    expect(
+      screen.getByRole("button", { name: /Persistent details/ }),
+    ).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByText("Remembered body")).not.toBeInTheDocument();
 
     first.unmount();
     renderOverview(view, { commandCenter });
 
-    expect(screen.getByRole("button", { name: /Persistent details/ })).toHaveAttribute("aria-expanded", "false");
+    expect(
+      screen.getByRole("button", { name: /Persistent details/ }),
+    ).toHaveAttribute("aria-expanded", "false");
     expect(screen.queryByText("Remembered body")).not.toBeInTheDocument();
   });
 
   it("collapses the whole FileRef block separately from file preview expansion", async () => {
     const user = userEvent.setup();
-    const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.completed);
+    const view = createTaskWorkspaceExecutionConsoleView(
+      executionMonitoringWorkspaceFixtures.completed,
+    );
     renderOverview(view, {
       commandCenter: {
         documents: {
           now: nowDocument("Execution completed"),
-          trail: buildCommandCenterTrailSpec({ activity: [], savedCount: 0, toolLabels: { tool: "Tool", input: "Input", preview: "Preview", duration: "Duration", error: "Error" } }),
+          trail: buildCommandCenterTrailSpec({
+            activity: [],
+            savedCount: 0,
+            toolLabels: {
+              tool: "Tool",
+              input: "Input",
+              preview: "Preview",
+              duration: "Duration",
+              error: "Error",
+            },
+          }),
           output: {
             root: "root",
             elements: {
@@ -565,30 +1030,50 @@ describe("TaskWorkspaceExecutionOverview", () => {
     });
 
     expect(screen.getByText("Raw log")).toBeInTheDocument();
-    expect(screen.queryByText(".chrona/outputs/node-1/log.txt")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Preview/ })).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(".chrona/outputs/node-1/log.txt"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /Preview/ }),
+    ).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: /Raw log/ }));
 
-    expect(screen.getByText(".chrona/outputs/node-1/log.txt")).toBeInTheDocument();
+    expect(
+      screen.getByText(".chrona/outputs/node-1/log.txt"),
+    ).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /Preview/ })).toBeInTheDocument();
   });
 
-
-
   it("builds valid output and trail fallback specs", () => {
-    const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.artifactPresent);
+    const view = createTaskWorkspaceExecutionConsoleView(
+      executionMonitoringWorkspaceFixtures.artifactPresent,
+    );
     const outputSpec = buildCommandCenterOutputTabSpec({
       latestCompletedNode: view.latestCompletedNode,
       resultSpec: nowDocument("Result fallback"),
       artifacts: view.artifacts,
-      copy: { noResultYet: "No output yet.", noArtifacts: "No artifacts yet.", locateSourceNode: "Locate source node" },
+      copy: {
+        noResultYet: "No output yet.",
+        noArtifacts: "No artifacts yet.",
+        locateSourceNode: "Locate source node",
+      },
     });
     const trailSpec = buildCommandCenterTrailTabSpec({
       activity: view.activity,
       runtimeEvents: [],
-      copy: { activityTitle: "Execution activity", activityEmpty: "Activity will appear after planning or execution starts." },
-      toolLabels: { tool: "Tool", input: "Input", preview: "Preview", duration: "Duration", error: "Error" },
+      copy: {
+        activityTitle: "Execution activity",
+        activityEmpty:
+          "Activity will appear after planning or execution starts.",
+      },
+      toolLabels: {
+        tool: "Tool",
+        input: "Input",
+        preview: "Preview",
+        duration: "Duration",
+        error: "Error",
+      },
     });
 
     const outputResult = validateChronaSpec(outputSpec);

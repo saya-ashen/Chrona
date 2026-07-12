@@ -2,8 +2,8 @@
 
 import { CalendarIcon, Check, ChevronDown, Loader2, Sparkles, Wrench, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Badge } from "shared/ui/badge";
+import { Button } from "shared/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
@@ -21,9 +21,9 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "shared/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils"
 import { useAutoComplete } from "@/hooks/use-ai";
 import { useI18n, useLocale } from "@chrona/i18n/react";
 import { useScheduleAiPreferences } from "@/lib/schedule-ai-preferences";

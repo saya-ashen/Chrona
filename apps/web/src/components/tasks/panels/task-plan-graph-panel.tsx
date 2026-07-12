@@ -1,7 +1,7 @@
 "use client";
 
 import { TaskPlanGraph } from "@/components/tasks/plan/task-plan-graph";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils"
 import type { ReactNode } from "react";
 
 type TaskPlanGraphPanelProps = {

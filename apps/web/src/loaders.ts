@@ -2,7 +2,7 @@ import type { LoaderFunctionArgs, Params } from "react-router-dom";
 
 import { getDictionary, resolveLocale, type Locale } from "@chrona/i18n";
 
-import { apiJson } from "./api";
+import { apiJson } from "../../../shared/http/api-client";
 import type {
   AppBootData,
   ActionCenterRouteData,

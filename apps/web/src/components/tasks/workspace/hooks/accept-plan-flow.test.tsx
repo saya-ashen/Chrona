@@ -24,7 +24,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { PropsWithChildren } from "react";
 import type { TaskPageData } from "../../../../../../../features/task-workspace";
 import { useTaskWorkspacePlanState } from "./use-task-workspace-plan-state";
-import { taskWorkspacePlanStateFixtures } from "../test-support/task-workspace-test-fixtures";
+import { taskWorkspacePlanStateFixtures } from "../../../../../../../features/task-workspace/test-support/task-workspace-test-fixtures";
 
 const mocks = vi.hoisted(() => ({
   // Per-test plan fetch response. Tests mutate this to simulate SSE-driven

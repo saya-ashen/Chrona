@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { PlanNodeDataModel, TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph/types";
+import type { PlanNodeDataModel, TaskPlanGraphPlan } from "../model/plan-node-view-model";
 import {
   buildProgressSummary,
   createTaskWorkspaceExecutionConsoleView,
@@ -8,7 +8,7 @@ import {
 } from "./task-workspace-model";
 import { deriveHeaderActions, deriveWorkspacePresentationState, deriveWorkspaceWorkStateView } from "./task-workspace-model";
 import type { TaskPageData } from "./task-workspace-model";
-import { taskWorkspaceStateFixtures } from "@/components/tasks/workspace/test-support/task-workspace-test-fixtures";
+import { taskWorkspaceStateFixtures } from "@features/task-workspace/test-support/task-workspace-test-fixtures";
 
 function node(input: Partial<PlanNodeDataModel> & { id: string; status: PlanNodeDataModel["status"] }): PlanNodeDataModel {
   return {

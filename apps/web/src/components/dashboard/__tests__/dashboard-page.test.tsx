@@ -32,7 +32,7 @@ vi.mock("@/components/ui/card", () => ({
   CardTitle: ({ children, ...props }: { children?: ReactNode } & ComponentPropsWithoutRef<"div">) => <div {...props}>{children}</div>,
 }));
 
-vi.mock("@/components/tasks/workspace/catalog/spec-renderer", () => ({
+vi.mock("@features/task-workspace/ui/catalog/spec-renderer", () => ({
   SpecRenderer: ({ spec }: { spec: unknown }) => <div>{spec ? "AI brief spec rendered" : null}</div>,
 }));
 
@@ -41,12 +41,12 @@ vi.mock("react-router-dom", () => ({
   useRevalidator: () => ({ revalidate: vi.fn() }),
 }));
 
-vi.mock("@/api", () => ({
+vi.mock("shared/http/api-client", () => ({
   apiJson: vi.fn(),
 }));
 import { DashboardPage } from "@/components/dashboard/dashboard-page";
 import type { DashboardData } from "@/components/dashboard/dashboard-types";
-import { apiJson } from "@/api";
+import { apiJson } from "shared/http/api-client";
 import type { Dictionary } from "@/pages";
 import type { UiDocument } from "@chrona/ui-protocol";
 import { deriveWorkStateView } from "@chrona/domain";
@@ -63,6 +63,7 @@ const COPY = {
     attentionOnly: "Nothing auto-completed yet today. {attentionSubject}.",
     completedTask: "task",
     completedTasks: "tasks",
+    completedToday: "Completed today",
     attentionTask: "1 task needs you",
     attentionTasks: "{attention} tasks need you",
     idle: "Chrona is ready. Add a task, start work, or review recent activity here.",
@@ -430,7 +431,7 @@ describe("DashboardPage", () => {
     );
     expect(screen.getByText("Blocked task")).toBeTruthy();
     expect(screen.getByText("Waiting on confirmation")).toBeTruthy();
-    expect(screen.getByRole("link", { name: /Resolve the blocker/ })).toHaveAttribute("href", "/en/tasks/s1");
+    expect(screen.getByRole("link", { name: /Resolve/ })).toHaveAttribute("href", "/en/tasks/s1");
     expect(screen.queryByText("Task stream")).not.toBeInTheDocument();
     expect(screen.getAllByText("Recent completions").length).toBeGreaterThan(0);
   });

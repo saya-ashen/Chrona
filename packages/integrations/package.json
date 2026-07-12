@@ -13,6 +13,7 @@
     "./calendar/parse-feed": "./src/calendar/parse-feed.ts",
     "./calendar/recurrence": "./src/calendar/recurrence.ts",
     "./calendar/source-url": "./src/calendar/source-url.ts",
+    "./calendar/test-fixtures": "./src/calendar/test-fixtures.ts",
     "./hermes": "./src/hermes/index.ts"
   }
 }

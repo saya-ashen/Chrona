@@ -32,7 +32,7 @@ vi.mock("@/components/ui/button", () => ({
   },
 }));
 
-vi.mock("../../../../../features/schedule/ui", () => ({
+vi.mock("../../../../../features/schedule/index.ts", () => ({
   TaskCreateDialog: ({
     isOpen,
     onSubmit,
@@ -87,11 +87,12 @@ vi.mock("../../../../../features/schedule/ui", () => ({
   },
 }));
 
+
 vi.mock("@/lib/task-actions-client", () => ({
   createScheduledTask: vi.fn(),
 }));
 
-vi.mock("@/api", () => ({
+vi.mock("shared/http/api-client", () => ({
   apiJson: vi.fn((path: string, init?: RequestInit) => {
     if (path === "/api/ai/clients") return Promise.resolve({ clients: mockAiClients });
     if (path === "/api/schedule?workspaceId=ws-1") {
@@ -143,6 +144,7 @@ vi.mock("@/components/assistant-surface/assistant-surface-provider", () => ({
 
 vi.mock("@chrona/i18n/react", () => ({
   useI18n: () => ({
+    messages: { components: { schedulePage: {} } },
     t: (key: string) => {
       const map: Record<string, string> = {
         "nav.brandTitle": "Chrona",
@@ -153,8 +155,7 @@ vi.mock("@chrona/i18n/react", () => ({
         "nav.settings": "Settings",
         "nav.newTask": "New Task",
         "components.schedulePage.firstRunTitle": "Start with Chrona in three steps",
-        "components.schedulePage.firstRunDescription":
-          "Connect AI, capture a real task, then review the plan before anything runs.",
+        "components.schedulePage.firstRunDescription": "Connect AI, capture a real task, then review the plan before anything runs.",
         "components.schedulePage.firstRunStepConnectAiTitle": "Connect AI",
         "components.schedulePage.firstRunStepConnectAi": "Add Claude Code or Codex as the AI client Chrona will use.",
         "components.schedulePage.firstRunStepConnectAiDone": "AI client connected. Next, create a real task.",
@@ -178,7 +179,7 @@ import {
 } from "@/lib/schedule-ai-preferences";
 import { createScheduledTask } from "@/lib/task-actions-client";
 import { startTaskPlanGenerationSession } from "@/hooks/ai/task-plan-generation-session-store";
-import { apiJson } from "@/api";
+import { apiJson } from "shared/http/api-client";
 import { ControlPlaneShell } from "@/components/control-plane-shell";
 
 const defaultWorkspace = { id: "ws-1", name: "Default" };

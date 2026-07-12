@@ -29,23 +29,23 @@ flowchart TB
 
 ## Main layers
 
-| Layer | Path | Responsibility |
-| --- | --- | --- |
-| Web app | `apps/web` | Browser UX for Dashboard, Schedule, Tasks, task workspace, Settings, assistant surfaces, and hidden/internal projections |
-| Server | `apps/server` | HTTP routing, validation glue, SSE streaming, auth/bind safety, static app serving |
-| Engine | `packages/engine` | Application use cases: tasks, plans, execution, scheduling, projections, AI clients |
-| Domain | `packages/domain` | Pure, IO-free business rules and state/status derivation |
-| Contracts | `packages/contracts` | Shared schemas and DTOs for API, AI features, plan runtime, SSE, and MCP tools |
-| Graph runtime | `packages/graph-runtime` | Plan graph build, resolve, transition, and command primitives |
-| Providers | `packages/providers/*` | Protocol adapters for configured external runtime backends |
-| UI protocol | `packages/ui-protocol` | Declarative UI document schema + builders (json-render) shared by server and web |
-| Integrations | `packages/integrations/*` | User-approved local/remote setup, diagnosis, external plugin install, and restart helpers |
-| Database | `packages/db` + `prisma` | Prisma 7 + SQLite bootstrap, repositories, schema, migrations, seed |
-| Runtime core | `packages/runtime-core` | Backend-agnostic runtime support types/utilities shared by engine/providers |
-| i18n | `packages/i18n` | Shared localization messages and helpers |
-| Shared | `packages/shared` | Small cross-cutting utilities (not domain or application logic) |
-| CLI | `packages/cli` | Packaged entry point for starting Chrona |
-| External plugins | `external-plugins/hermes` | Hermes Agent integration and Chrona MCP tool exposure |
+| Layer            | Path                      | Responsibility                                                                                                           |
+| ---------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| Web app          | `apps/web`                | Browser UX for Dashboard, Schedule, Tasks, task workspace, Settings, assistant surfaces, and hidden/internal projections |
+| Server           | `apps/server`             | HTTP routing, validation glue, SSE streaming, auth/bind safety, static app serving                                       |
+| Engine           | `packages/engine`         | Application use cases: tasks, plans, execution, scheduling, projections, AI clients                                      |
+| Domain           | `packages/domain`         | Pure, IO-free business rules and state/status derivation                                                                 |
+| Contracts        | `packages/contracts`      | Shared schemas and DTOs for API, AI features, plan runtime, SSE, and MCP tools                                           |
+| Graph runtime    | `packages/graph-runtime`  | Plan graph build, resolve, transition, and command primitives                                                            |
+| Providers        | `packages/providers/*`    | Protocol adapters for configured external runtime backends                                                               |
+| UI protocol      | `packages/ui-protocol`    | Declarative UI document schema + builders (json-render) shared by server and web                                         |
+| Integrations     | `packages/integrations/*` | User-approved local/remote setup, diagnosis, external plugin install, and restart helpers                                |
+| Database         | `packages/db` + `prisma`  | Prisma 7 + SQLite bootstrap, repositories, schema, migrations, seed                                                      |
+| Runtime core     | `packages/runtime-core`   | Backend-agnostic runtime support types/utilities shared by engine/providers                                              |
+| i18n             | `packages/i18n`           | Shared localization messages and helpers                                                                                 |
+| Shared           | `packages/shared`         | Small cross-cutting utilities (not domain or application logic)                                                          |
+| CLI              | `packages/cli`            | Packaged entry point for starting Chrona                                                                                 |
+| External plugins | `external-plugins/hermes` | Hermes Agent integration and Chrona MCP tool exposure                                                                    |
 
 See [Package Boundaries](./package-boundaries.md) for the authoritative
 per-package "put here / don't put here" rules, dependency direction, and enforcement.
@@ -66,7 +66,14 @@ The schedule page shows task/time-block projections, conflicts, suggestions, and
 
 ### Action Center projection
 
-Action Center aggregates attention items: approvals, schedule proposals, waiting inputs, failed runs, cancelled runs, and other events that need operator review. Its HTTP wire path remains `/api/inbox` for API stability.
+Action Center aggregates current, actionable attention items: approvals,
+schedule proposals, waiting inputs, failed runs, cancelled runs, and automation
+blocks that require operator review. It is not a scheduler audit log. Normal
+steady states such as waiting for a configured start time and idempotency guards
+such as an already-active run remain in Schedule/Activity and MUST NOT create
+Action Center items. Repeated scheduler blocks are represented by the latest
+item for the same task, occurrence, and reason. Its HTTP wire path remains
+`/api/inbox` for API stability.
 
 ### Settings / AI Clients
 
@@ -155,16 +162,16 @@ Chrona stores canonical task, plan, run, session, work block, AI client, and eve
 
 ## Development entrypoints
 
-| Need | Command |
-| --- | --- |
-| Install deps | `bun install` |
+| Need                | Command                                                                                                                                            |
+| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Install deps        | `bun install`                                                                                                                                      |
 | Initial local setup | `bun run setup` (run after schema/dependency changes; NixOS may require Prisma engine configuration or `PRISMA_ENGINES_CHECKSUM_IGNORE_MISSING=1`) |
-| Full dev mode | `bun run dev` |
-| Server only | `bun run server:start` |
-| Web dev only | `bun run dev:web` |
-| Typecheck | `bun run typecheck` |
-| Lint | `bun run lint` |
-| Tests | `bun run test`, `bun run test:bun`, `bun run test:api` |
+| Full dev mode       | `bun run dev`                                                                                                                                      |
+| Server only         | `bun run server:start`                                                                                                                             |
+| Web dev only        | `bun run dev:web`                                                                                                                                  |
+| Typecheck           | `bun run typecheck`                                                                                                                                |
+| Lint                | `bun run lint`                                                                                                                                     |
+| Tests               | `bun run test`, `bun run test:bun`, `bun run test:api`                                                                                             |
 
 ## Architecture rules
 

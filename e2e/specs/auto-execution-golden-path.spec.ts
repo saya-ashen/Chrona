@@ -471,7 +471,7 @@ test.describe("Auto-execution golden path (§1.3)", () => {
 
         const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
         await page.goto(`/en/schedule?day=${today}`, { waitUntil: "domcontentloaded" });
-        await expect(page.getByText("Review and approve a plan", { exact: true }).first()).toBeVisible({ timeout: 30_000 });
+        await expect(page.getByRole("tab", { name: "Ready to schedule", exact: true })).toBeVisible({ timeout: 30_000 });
 
       });
     },

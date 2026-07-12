@@ -27,12 +27,12 @@ function featureNames() {
 const FEATURE_PUBLIC_IMPORT_RULES = featureNames().map((feature) => ({
   name: `feature-${feature}-internals-are-private`,
   comment:
-    `Import features/${feature} from sibling features through features/${feature}/index.ts or documented sub-entry barrels, not internal files.`,
+    `Import features/${feature} from sibling features only through features/${feature}/index.ts, not internal files or secondary barrels.`,
   severity: "error",
   from: { path: `^features/(?!${feature}/)[^/]+/` },
   to: {
     path: `^features/${feature}/`,
-    pathNot: `^features/${feature}/(index|ui|server)\\.ts$`,
+    pathNot: `^features/${feature}/index\.ts$`,
   },
 }));
 

@@ -5,6 +5,8 @@
   "type": "module",
   "exports": {
     ".": "./src/locale.ts",
-    "./react": "./src/client.tsx"
+    "./react": "./src/client.tsx",
+    "./task-workspace": "./src/task-workspace-messages.ts",
+    "./external-calendar": "./src/external-calendar-messages.ts"
   }
 }

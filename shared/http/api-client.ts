@@ -1,4 +1,4 @@
-import { buildAccessKeyHeaders, handleUnauthorizedResponse } from "@/lib/access-key";
+import { buildAccessKeyHeaders, handleUnauthorizedResponse } from "./access-key";
 
 class ApiError extends Error {
   constructor(

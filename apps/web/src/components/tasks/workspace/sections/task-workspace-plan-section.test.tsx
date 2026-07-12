@@ -40,7 +40,7 @@ import {
   createTaskWorkspaceFixtureGraph,
   createTaskWorkspaceFixtureNode,
   createTaskWorkspaceFixturePageData,
-} from "../test-support/task-workspace-test-fixtures";
+} from "../../../../../../../features/task-workspace/test-support/task-workspace-test-fixtures";
 
 const checkpoint = {
   id: "run-1:checkpoint:user_input",
@@ -950,6 +950,9 @@ describe("TaskWorkspacePlanSection", () => {
     expect(workspace).toHaveAttribute("data-workspace-layout", "result_focus");
     expect(reviewHeader).toHaveTextContent("Result ready");
     expect(reviewHeader.compareDocumentPosition(finalResult) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(workspace).toHaveClass("bg-muted/45");
+    expect(reviewHeader).toHaveClass("bg-card");
+    expect(finalResult).toHaveClass("bg-card");
     expect(screen.queryByRole("region", { name: "Execution flow" })).not.toBeInTheDocument();
     expect(screen.queryByText("Continue from result")).not.toBeInTheDocument();
     expect(screen.getByText("Activity").closest("details")).not.toHaveAttribute("open");

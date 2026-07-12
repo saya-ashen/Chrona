@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import type { PlanNodeDataModel } from "@/components/tasks/plan/task-plan-graph/types";
+import type { PlanNodeDataModel } from "../model/plan-node-view-model";
 import {
   buildDefaultWorkspaceActionFields,
   buildWorkspaceStateTreatment,

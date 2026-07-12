@@ -19,7 +19,7 @@ vi.mock("@/components/ui/button", () => ({
     return <button {...props}>{children}</button>;
   },
 }));
-vi.mock("@/components/ui/badge", () => ({
+vi.mock("shared/ui/badge", () => ({
   Badge: ({ children }: any) => <span data-testid="status-badge">{children}</span>,
 }));
 vi.mock("@/components/ui/card", () => ({

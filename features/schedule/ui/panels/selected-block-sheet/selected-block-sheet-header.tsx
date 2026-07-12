@@ -4,7 +4,7 @@ import type { SchedulePageCopy } from "../../schedule-page-copy";
 import type { ScheduleRecord } from "../../schedule-page-types";
 import { formatDateTime, formatTimeRange } from "../../schedule-page-utils";
 import { TaskContextLinks } from "@/components/tasks/shared/task-context-links";
-import { Button } from "@/components/ui/button";
+import { Button } from "shared/ui/button";
 import { X } from "lucide-react";
 
 export function SelectedBlockSheetHeader({

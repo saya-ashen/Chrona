@@ -3,8 +3,8 @@ import { Expand, GitBranch, ListChecks, Minimize2, Sparkles } from "lucide-react
 import { useI18n } from "@chrona/i18n/react";
 import { TaskPlanGraphPanel } from "@/components/tasks/panels/task-plan-graph-panel";
 import type { TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph/types";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Badge } from "shared/ui/badge";
+import { Button } from "shared/ui/button";
 import type { TaskPlanReadModel } from "@chrona/contracts/ai";
 import type { TaskPlanGenerationStatus } from "../../../../../../../features/task-workspace";
 const DEFAULT_COPY = {

@@ -65,6 +65,7 @@ describe("kernel executeCommand (single-writer)", () => {
     ]);
   });
 
+
   it("serially advances to the next ready node when the first completes in-process", async () => {
     executeTaskNodeCapabilityMock
       .mockResolvedValueOnce({

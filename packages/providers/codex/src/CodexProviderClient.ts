@@ -1,10 +1,17 @@
 import { existsSync } from "node:fs";
+import { createRequire } from "node:module";
 import { homedir } from "node:os";
 import { join } from "node:path";
-import { Database } from "bun:sqlite";
 import { AcpProviderClient, type AcpDiagnostics, type AcpProviderOptions } from "@chrona/acp-provider";
 import type { AgentProviderClient, CancelRunInput, CreateSessionInput, GetRunInput, HealthCheckInput, StartRunInput, StreamRunInput } from "@chrona/providers-foundation";
 import { codexAcpConfig, type CodexProviderConfig } from "./types";
+type SQLiteDatabase = {
+  query<T>(sql: string): { all(): T[] };
+  close(): void;
+};
+
+const require = createRequire(import.meta.url);
+const bunSqliteModule = "bun" + ":sqlite";
 
 export type CodexProviderOptions = {
   config?: CodexProviderConfig;
@@ -63,10 +70,13 @@ class CodexLogDiagnostics implements AcpDiagnostics {
   details(): string {
     const dbPath = this.logsPath();
     if (!existsSync(dbPath)) return "";
-    let db: Database | undefined;
+    let db: SQLiteDatabase | undefined;
     try {
+      const { Database } = require(bunSqliteModule) as {
+        Database: new (path: string, options: { readonly: boolean }) => SQLiteDatabase;
+      };
       db = new Database(dbPath, { readonly: true });
-      const rows = db.query<{ body: string }, []>(`
+      const rows = db.query<{ body: string }>(`
         SELECT feedback_log_body AS body
         FROM logs
         WHERE feedback_log_body LIKE '%Request completed method=POST url=% status=%'

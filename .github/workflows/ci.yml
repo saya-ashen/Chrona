@@ -33,6 +33,8 @@ jobs:
 
       - run: bun run lint
 
+      - run: bun run check:boundaries
+
       - name: Run CI tests
         run: bun run test:ci
         env:

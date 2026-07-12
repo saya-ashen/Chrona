@@ -1,14 +1,14 @@
 import type { LucideIcon } from "lucide-react";
 import { Ellipsis } from "lucide-react";
 import { LocalizedLink } from "@/components/i18n/localized-link";
-import { Button } from "@/components/ui/button";
+import { Button } from "shared/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuGroup,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+} from "shared/ui/dropdown-menu";
 
 export type TaskActionsMenuItem = {
   id: string;
