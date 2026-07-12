@@ -1,4 +1,4 @@
-import { buildAccessKeyHeaders, handleUnauthorizedResponse } from "@/lib/access-key";
+import { buildAccessKeyHeaders, handleUnauthorizedResponse } from "../../../../shared/http/access-key";
 
 class HttpError extends Error {
   status: number;

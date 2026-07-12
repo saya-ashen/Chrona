@@ -15,6 +15,8 @@ export default defineConfig({
       "@features": resolve(import.meta.dirname, "features"),
       "@shared/ui": resolve(import.meta.dirname, "shared/ui/index.ts"),
       "shared/ui": resolve(import.meta.dirname, "shared/ui"),
+      "@shared/http": resolve(import.meta.dirname, "shared/http/index.ts"),
+      "shared/http": resolve(import.meta.dirname, "shared/http"),
     },
   },
 

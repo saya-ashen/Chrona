@@ -13,7 +13,7 @@
 import { hc } from "hono/client";
 import type { ApiType } from "@chrona/server/routes";
 
-import { buildAccessKeyHeaders, handleUnauthorizedResponse } from "@/lib/access-key";
+import { buildAccessKeyHeaders, handleUnauthorizedResponse } from "../../../../shared/http/access-key";
 
 export const api = hc<ApiType>("/api", {
   fetch: async (input: RequestInfo | URL, init?: RequestInit) => {
