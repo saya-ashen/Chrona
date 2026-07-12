@@ -4,9 +4,7 @@ import { DayTimeline } from "./timeline/schedule-page-timeline";
 import { Badge } from "shared/ui/badge";
 import { Button } from "shared/ui/button";
 import { CalendarDays, Clock } from "lucide-react";
-import type {
-  ScheduleGhostBlockPreview,
-} from "@chrona/contracts";
+import type { ScheduleGhostBlockPreview } from "@chrona/contracts";
 import type {
   SchedulePageData,
   ScheduleViewMode,
@@ -178,7 +176,10 @@ function SelectedDayAgenda({
           className="flex-row items-center gap-3 rounded-xl p-3"
         >
           <div className="flex w-28 shrink-0 items-center gap-1.5 text-sm font-medium text-foreground">
-            <Clock className="size-4 text-muted-foreground" aria-hidden="true" />
+            <Clock
+              className="size-4 text-muted-foreground"
+              aria-hidden="true"
+            />
             {item.scheduledStartAt
               ? new Intl.DateTimeFormat(locale === "zh" ? "zh-CN" : "en", {
                   hour: "2-digit",
@@ -208,7 +209,6 @@ function SelectedDayAgenda({
     </section>
   );
 }
-
 
 export function SchedulePageMainPanel({
   copy,
@@ -259,25 +259,21 @@ export function SchedulePageMainPanel({
 }) {
   return (
     <div className="flex min-w-0 flex-1 flex-col overflow-hidden xl:min-h-0">
-      <Card className="flex min-h-[28rem] flex-1 flex-col rounded-[24px] p-3 xl:min-h-0">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="text-base font-semibold text-foreground">
-              {activeView === "timeline"
-                ? copy.dayWorkspaceTitle
-                : copy.selectedDayAgenda}
-            </h2>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            {draggedItem ? (
-              <span className="rounded-full bg-primary-soft px-2.5 py-0.5 text-xs font-medium text-primary">
-                {copy.dropMode}
-              </span>
-            ) : null}
-          </div>
+      <Card className="flex min-h-[28rem] flex-1 flex-col overflow-hidden rounded-lg border-border bg-canvas p-0 shadow-none xl:min-h-0">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border px-3 py-2.5 sm:px-4">
+          <h2 className="text-base font-semibold text-foreground">
+            {activeView === "timeline"
+              ? copy.dayWorkspaceTitle
+              : copy.selectedDayAgenda}
+          </h2>
+          {draggedItem ? (
+            <span className="rounded-full bg-primary-soft px-2.5 py-0.5 text-xs font-medium text-primary">
+              {copy.dropMode}
+            </span>
+          ) : null}
         </div>
 
-        <div className="mt-3 flex min-h-0 flex-1 flex-col overflow-hidden rounded-[20px] border border-border/45 bg-background/65">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden bg-canvas">
           {activeView === "timeline" ? (
             activeGroup ? (
               <DayTimeline

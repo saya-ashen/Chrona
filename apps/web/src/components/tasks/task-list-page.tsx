@@ -16,6 +16,7 @@ import { useNavigate, useSearchParams } from "react-router";
 import { LocalizedLink } from "@/components/i18n/localized-link";
 import { Badge } from "shared/ui/badge";
 import { Button } from "shared/ui/button";
+import { PageFrame } from "shared/ui/page-frame";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
@@ -33,8 +34,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "shared/ui/select";
-import { TaskActionsMenu, type TaskActionsMenuItem } from "@/components/tasks/shared";
-import { deleteTask, markTaskDone, reopenTask, startExecution } from "@/lib/task-actions-client";
+import {
+  TaskActionsMenu,
+  type TaskActionsMenuItem,
+} from "@/components/tasks/shared";
+import {
+  deleteTask,
+  markTaskDone,
+  reopenTask,
+  startExecution,
+} from "@/lib/task-actions-client";
 import type { Dictionary } from "@/pages";
 import type { WorkStateView } from "@chrona/domain";
 
@@ -63,7 +72,14 @@ type TaskItem = {
     provider: string | null;
     occurrenceId: string | null;
     executedAt: string | null;
-    artifact: { id: string; title: string; type: string; uri: string; runId: string; createdAt: string } | null;
+    artifact: {
+      id: string;
+      title: string;
+      type: string;
+      uri: string;
+      runId: string;
+      createdAt: string;
+    } | null;
   } | null;
   stateView: WorkStateView;
   source: {
@@ -128,8 +144,10 @@ function priorityTone(priority: string) {
   return "outline" as const;
 }
 
-
-export function taskAutomationLabel(task: Pick<TaskItem, "autoPlanGeneration" | "autoExecute">, copy: TaskListCopy) {
+export function taskAutomationLabel(
+  task: Pick<TaskItem, "autoPlanGeneration" | "autoExecute">,
+  copy: TaskListCopy,
+) {
   if (task.autoExecute) return copy.automationAutoComplete;
   if (task.autoPlanGeneration) return copy.automationAutoPlan;
   return copy.automationManual;
@@ -149,7 +167,8 @@ function toPreviewText(value: string): string {
 }
 
 function taskAccentClass(task: TaskItem): string {
-  if (task.stateView.tone === "danger") return "from-destructive to-destructive/60";
+  if (task.stateView.tone === "danger")
+    return "from-destructive to-destructive/60";
   if (task.stateView.tone === "warning") return "from-warning to-warning/60";
   if (task.stateView.tone === "info") return "from-info to-info/60";
   if (task.stateView.tone === "success") return "from-success to-success/60";
@@ -162,11 +181,14 @@ function formatRelativeTime(dateStr: string, copy: TaskListCopy): string {
   const diffMs = now.getTime() - date.getTime();
   const diffMins = Math.floor(diffMs / 60000);
   if (diffMins < 1) return copy.relativeJustNow;
-  if (diffMins < 60) return copy.relativeMinutesAgo.replace("{count}", String(diffMins));
+  if (diffMins < 60)
+    return copy.relativeMinutesAgo.replace("{count}", String(diffMins));
   const diffHrs = Math.floor(diffMins / 60);
-  if (diffHrs < 24) return copy.relativeHoursAgo.replace("{count}", String(diffHrs));
+  if (diffHrs < 24)
+    return copy.relativeHoursAgo.replace("{count}", String(diffHrs));
   const diffDays = Math.floor(diffHrs / 24);
-  if (diffDays < 7) return copy.relativeDaysAgo.replace("{count}", String(diffDays));
+  if (diffDays < 7)
+    return copy.relativeDaysAgo.replace("{count}", String(diffDays));
   return date.toLocaleDateString();
 }
 
@@ -187,7 +209,17 @@ function canReopenTask(task: TaskItem): boolean {
   return ["done", "cancelled"].includes(task.stateView.state);
 }
 
-function TaskListHero({ title, copy, activeFilterLabel, counts }: { title: string; copy: TaskListCopy; activeFilterLabel: string; counts: TaskCounts }) {
+function TaskListHero({
+  title,
+  copy,
+  activeFilterLabel,
+  counts,
+}: {
+  title: string;
+  copy: TaskListCopy;
+  activeFilterLabel: string;
+  counts: TaskCounts;
+}) {
   return (
     <div className="flex flex-wrap items-center justify-between gap-2 px-1 py-0.5">
       <div className="min-w-0">
@@ -197,27 +229,61 @@ function TaskListHero({ title, copy, activeFilterLabel, counts }: { title: strin
             {activeFilterLabel}
           </span>
         </div>
-        <p className="mt-0.5 text-xs text-muted-foreground">{copy.listDescription}</p>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          {copy.listDescription}
+        </p>
       </div>
       <div className="flex shrink-0 flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
         <TaskStat label={copy.statTotal} value={counts.all} />
-        <TaskStat label={copy.statNeeds} value={counts.needsMe} className="text-warning-foreground" />
-        <TaskStat label={copy.statReady} value={counts.ready} className="text-info" />
+        <TaskStat
+          label={copy.statNeeds}
+          value={counts.needsMe}
+          className="text-warning-foreground"
+        />
+        <TaskStat
+          label={copy.statReady}
+          value={counts.ready}
+          className="text-info"
+        />
       </div>
-      <p className="basis-full text-[11px] text-muted-foreground">Needs you: input, approval, or review required · Ready: can start now · Running: active execution · Failed: execution stopped and needs recovery</p>
+      <p className="basis-full text-[11px] text-muted-foreground">
+        Needs you: input, approval, or review required · Ready: can start now ·
+        Running: active execution · Failed: execution stopped and needs recovery
+      </p>
     </div>
   );
 }
 
-function TaskStat({ label, value, className = "" }: { label: string; value: number; className?: string }) {
+function TaskStat({
+  label,
+  value,
+  className = "",
+}: {
+  label: string;
+  value: number;
+  className?: string;
+}) {
   return (
     <span className="rounded-full border border-border/70 bg-card px-2 py-1 shadow-xs">
-      {label} <strong className={`font-semibold text-foreground ${className}`}>{value}</strong>
+      {label}{" "}
+      <strong className={`font-semibold text-foreground ${className}`}>
+        {value}
+      </strong>
     </span>
   );
 }
 
-function TaskFilterBar({ filter, counts, copy, onFilterChange }: { filter: FilterKey; counts: TaskCounts; copy: TaskListCopy; onFilterChange: (filter: FilterKey) => void }) {
+function TaskFilterBar({
+  filter,
+  counts,
+  copy,
+  onFilterChange,
+}: {
+  filter: FilterKey;
+  counts: TaskCounts;
+  copy: TaskListCopy;
+  onFilterChange: (filter: FilterKey) => void;
+}) {
   return (
     <div className="flex flex-wrap items-center gap-1.5 rounded-2xl border border-border/70 bg-card p-1.5 shadow-xs">
       {FILTERS.map((f) => (
@@ -227,10 +293,16 @@ function TaskFilterBar({ filter, counts, copy, onFilterChange }: { filter: Filte
           onClick={() => onFilterChange(f.key)}
           variant={filter === f.key ? "default" : "ghost"}
           size="sm"
-          className={filter === f.key ? "rounded-xl" : "rounded-xl text-muted-foreground hover:bg-muted"}
+          className={
+            filter === f.key
+              ? "rounded-xl"
+              : "rounded-xl text-muted-foreground hover:bg-muted"
+          }
         >
           {filterLabel(f.key, copy)}
-          <span className="ml-1.5 text-[11px] opacity-60">{counts[filterKeyToCountKey(f.key)]}</span>
+          <span className="ml-1.5 text-[11px] opacity-60">
+            {counts[filterKeyToCountKey(f.key)]}
+          </span>
         </Button>
       ))}
     </div>
@@ -274,20 +346,24 @@ function TaskRow({
       onSelect: () => onAction("start", task),
     },
     ...(canReopenTask(task)
-      ? [{
-          id: "reopen",
-          label: copy.actionReopen,
-          icon: RotateCcw,
-          disabled: isPending,
-          onSelect: () => onAction("reopen", task),
-        }]
-      : [{
-          id: "complete",
-          label: copy.actionComplete,
-          icon: RotateCcw,
-          disabled: !canCompleteTask(task) || isPending,
-          onSelect: () => onAction("complete", task),
-        }]),
+      ? [
+          {
+            id: "reopen",
+            label: copy.actionReopen,
+            icon: RotateCcw,
+            disabled: isPending,
+            onSelect: () => onAction("reopen", task),
+          },
+        ]
+      : [
+          {
+            id: "complete",
+            label: copy.actionComplete,
+            icon: RotateCcw,
+            disabled: !canCompleteTask(task) || isPending,
+            onSelect: () => onAction("complete", task),
+          },
+        ]),
     {
       id: "delete",
       label: copy.actionDelete,
@@ -300,7 +376,10 @@ function TaskRow({
 
   return (
     <div className="group relative overflow-hidden rounded-2xl border border-border/70 bg-card p-4 shadow-xs transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-md">
-      <div className={`absolute inset-y-3 left-3 w-1 rounded-full bg-gradient-to-b ${taskAccentClass(task)}`} aria-hidden="true" />
+      <div
+        className={`absolute inset-y-3 left-3 w-1 rounded-full bg-gradient-to-b ${taskAccentClass(task)}`}
+        aria-hidden="true"
+      />
       <div className="flex flex-wrap items-center justify-between gap-3 pl-4">
         <Checkbox
           aria-label={copy.selectTask.replace("{title}", task.title)}
@@ -311,17 +390,32 @@ function TaskRow({
         />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="truncate text-sm font-semibold text-foreground">{task.title}</h3>
-            <Badge variant={statusTone(task.stateView)}>{task.stateView.label}</Badge>
+            <h3 className="truncate text-sm font-semibold text-foreground">
+              {task.title}
+            </h3>
+            <Badge variant={statusTone(task.stateView)}>
+              {task.stateView.label}
+            </Badge>
             <Badge variant={priorityTone(task.priority)}>{task.priority}</Badge>
-            <Badge variant={task.autoExecute ? "info" : task.autoPlanGeneration ? "secondary" : "outline"}>
+            <Badge
+              variant={
+                task.autoExecute
+                  ? "info"
+                  : task.autoPlanGeneration
+                    ? "secondary"
+                    : "outline"
+              }
+            >
               {taskAutomationLabel(task, copy)}
             </Badge>
             {task.source?.source === "external_calendar" && (
               <Badge
                 variant="outline"
                 className="gap-1"
-                title={copy.externalSourceTitle.replace("{source}", task.source.sourceName)}
+                title={copy.externalSourceTitle.replace(
+                  "{source}",
+                  task.source.sourceName,
+                )}
               >
                 <span
                   className="size-2 rounded-full"
@@ -334,20 +428,38 @@ function TaskRow({
             )}
             <Badge variant="outline">{task.stateView.nextActionLabel}</Badge>
           </div>
-          {task.description && <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">{toPreviewText(task.description)}</p>}
+          {task.description && (
+            <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
+              {toPreviewText(task.description)}
+            </p>
+          )}
           <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
-            {task.dueAt && <span>{copy.duePrefix}: {new Date(task.dueAt).toLocaleDateString()}</span>}
-            <span>{copy.updatedPrefix}: {formatRelativeTime(task.updatedAt, copy)}</span>
+            {task.dueAt && (
+              <span>
+                {copy.duePrefix}: {new Date(task.dueAt).toLocaleDateString()}
+              </span>
+            )}
+            <span>
+              {copy.updatedPrefix}: {formatRelativeTime(task.updatedAt, copy)}
+            </span>
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2">
-          <Button asChild variant="default" size="sm" className="rounded-xl shadow-sm">
+          <Button
+            asChild
+            variant="default"
+            size="sm"
+            className="rounded-xl shadow-sm"
+          >
             <LocalizedLink href={`/tasks/${task.id}`}>
               <ExternalLink className="size-3.5" />
               <span>{copy.viewDetails}</span>
             </LocalizedLink>
           </Button>
-          <TaskActionsMenu label={copy.moreActions.replace("{title}", task.title)} items={actionItems} />
+          <TaskActionsMenu
+            label={copy.moreActions.replace("{title}", task.title)}
+            items={actionItems}
+          />
         </div>
       </div>
     </div>
@@ -361,7 +473,16 @@ type PendingDelete =
   | { kind: "bulk"; tasks: TaskItem[] }
   | null;
 
-export function TaskListPage({ tasks, workspaceId: _workspaceId, copy, total, page, pageSize, pageCount, counts }: Props) {
+export function TaskListPage({
+  tasks,
+  workspaceId: _workspaceId,
+  copy,
+  total,
+  page,
+  pageSize,
+  pageCount,
+  counts,
+}: Props) {
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedIds, setSelectedIds] = useState<Set<string>>(() => new Set());
   const [pendingDelete, setPendingDelete] = useState<PendingDelete>(null);
@@ -372,31 +493,56 @@ export function TaskListPage({ tasks, workspaceId: _workspaceId, copy, total, pa
   const resultDate = searchParams.get("resultDate") ?? "all";
   const resultStatus = searchParams.get("resultStatus") ?? "all";
   const resultSource = searchParams.get("resultSource") ?? "all";
-  const resultCutoff = resultDate === "7d" ? Date.now() - 7 * 86400000 : resultDate === "30d" ? Date.now() - 30 * 86400000 : null;
-  const resultCandidates = view === "results"
-    ? tasks.filter((task) => (
-        (task.stateView.state === "result_ready" || task.stateView.state === "done" || Boolean(task.result)) &&
-        (resultStatus === "all" || (resultStatus === "needs-review" ? task.stateView.state === "result_ready" : task.stateView.state === "done")) &&
-        (resultSource === "all" || task.id === resultSource)
-      ))
-    : tasks;
-  const visibleTasks = resultCutoff === null
-    ? resultCandidates
-    : resultCandidates.filter((task) => new Date(task.result?.executedAt ?? task.updatedAt).getTime() >= resultCutoff);
+  const resultCutoff =
+    resultDate === "7d"
+      ? Date.now() - 7 * 86400000
+      : resultDate === "30d"
+        ? Date.now() - 30 * 86400000
+        : null;
+  const resultCandidates =
+    view === "results"
+      ? tasks.filter(
+          (task) =>
+            (task.stateView.state === "result_ready" ||
+              task.stateView.state === "done" ||
+              Boolean(task.result)) &&
+            (resultStatus === "all" ||
+              (resultStatus === "needs-review"
+                ? task.stateView.state === "result_ready"
+                : task.stateView.state === "done")) &&
+            (resultSource === "all" || task.id === resultSource),
+        )
+      : tasks;
+  const visibleTasks =
+    resultCutoff === null
+      ? resultCandidates
+      : resultCandidates.filter(
+          (task) =>
+            new Date(task.result?.executedAt ?? task.updatedAt).getTime() >=
+            resultCutoff,
+        );
   const taskCopy = copy.pages.tasks;
 
   const filterParam = searchParams.get("filter");
   const filter: FilterKey = isFilterKey(filterParam) ? filterParam : "all";
   const priority = searchParams.get("priority") ?? "";
-  const sort: SortOption = (SORT_OPTIONS as readonly string[]).includes(searchParams.get("sort") ?? "")
+  const sort: SortOption = (SORT_OPTIONS as readonly string[]).includes(
+    searchParams.get("sort") ?? "",
+  )
     ? (searchParams.get("sort") as SortOption)
     : "updatedAt";
-  const order: "asc" | "desc" = searchParams.get("order") === "asc" ? "asc" : "desc";
-  const [searchDraft, setSearchDraft] = useState(() => searchParams.get("search") ?? "");
+  const order: "asc" | "desc" =
+    searchParams.get("order") === "asc" ? "asc" : "desc";
+  const [searchDraft, setSearchDraft] = useState(
+    () => searchParams.get("search") ?? "",
+  );
 
   const selectedTasks = tasks.filter((task) => selectedIds.has(task.id));
-  const visibleSelectedCount = tasks.filter((task) => selectedIds.has(task.id)).length;
-  const allVisibleSelected = tasks.length > 0 && visibleSelectedCount === tasks.length;
+  const visibleSelectedCount = tasks.filter((task) =>
+    selectedIds.has(task.id),
+  ).length;
+  const allVisibleSelected =
+    tasks.length > 0 && visibleSelectedCount === tasks.length;
 
   const activeFilterLabel = filterLabel(filter, taskCopy);
   const rangeStart = total === 0 ? 0 : (page - 1) * pageSize + 1;
@@ -404,7 +550,10 @@ export function TaskListPage({ tasks, workspaceId: _workspaceId, copy, total, pa
   const hasSelection = selectedIds.size > 0;
   const showPagination = total > pageSize || pageCount > 1;
 
-  function updateParams(mutate: (params: URLSearchParams) => void, resetPage = true) {
+  function updateParams(
+    mutate: (params: URLSearchParams) => void,
+    resetPage = true,
+  ) {
     const next = new URLSearchParams(searchParams);
     mutate(next);
     if (resetPage) next.delete("page");
@@ -468,7 +617,9 @@ export function TaskListPage({ tasks, workspaceId: _workspaceId, copy, total, pa
       if (action === "reopen") await reopenTask({ taskId: task.id });
       refreshTasks();
     } catch (error) {
-      setActionMessage(error instanceof Error ? error.message : taskCopy.actionFailed);
+      setActionMessage(
+        error instanceof Error ? error.message : taskCopy.actionFailed,
+      );
     } finally {
       setIsPending(false);
     }
@@ -476,9 +627,10 @@ export function TaskListPage({ tasks, workspaceId: _workspaceId, copy, total, pa
 
   async function confirmDelete() {
     if (!pendingDelete) return;
-    const deleteIds = pendingDelete.kind === "single"
-      ? [pendingDelete.task.id]
-      : pendingDelete.tasks.map((task) => task.id);
+    const deleteIds =
+      pendingDelete.kind === "single"
+        ? [pendingDelete.task.id]
+        : pendingDelete.tasks.map((task) => task.id);
 
     setIsPending(true);
     setActionMessage(null);
@@ -492,36 +644,109 @@ export function TaskListPage({ tasks, workspaceId: _workspaceId, copy, total, pa
       setPendingDelete(null);
       refreshTasks();
     } catch (error) {
-      setActionMessage(error instanceof Error ? error.message : taskCopy.actionFailed);
+      setActionMessage(
+        error instanceof Error ? error.message : taskCopy.actionFailed,
+      );
     } finally {
       setIsPending(false);
     }
   }
 
   return (
-    <div className="relative flex h-full min-h-0 min-w-0 flex-col overflow-x-hidden overflow-y-auto rounded-[2rem] border border-border bg-surface-soft/80 p-3 sm:p-4">
-      <div className="flex min-h-0 flex-1 flex-col gap-3 rounded-[1.75rem] bg-card p-3 sm:p-4">
-        <TaskListHero title={copy.nav.tasks} copy={taskCopy} activeFilterLabel={activeFilterLabel} counts={counts} />
-        <TaskFilterBar filter={filter} counts={counts} copy={taskCopy} onFilterChange={setFilter} />
-        <div className="flex w-fit gap-1 rounded-xl border border-border/70 bg-background p-1" role="group" aria-label="Tasks view">
-          <Button type="button" size="sm" variant={view === "tasks" ? "default" : "ghost"} onClick={() => setParam("view", "")}>Work</Button>
-          <Button type="button" size="sm" variant={view === "results" ? "default" : "ghost"} onClick={() => setParam("view", "results")}>Results</Button>
+    <PageFrame mode="workspace">
+      <div className="flex min-h-0 flex-1 flex-col gap-3 bg-card p-3 sm:p-4">
+        <TaskListHero
+          title={copy.nav.tasks}
+          copy={taskCopy}
+          activeFilterLabel={activeFilterLabel}
+          counts={counts}
+        />
+        <TaskFilterBar
+          filter={filter}
+          counts={counts}
+          copy={taskCopy}
+          onFilterChange={setFilter}
+        />
+        <div
+          className="flex w-fit gap-1 rounded-xl border border-border/70 bg-background p-1"
+          role="group"
+          aria-label="Tasks view"
+        >
+          <Button
+            type="button"
+            size="sm"
+            variant={view === "tasks" ? "default" : "ghost"}
+            onClick={() => setParam("view", "")}
+          >
+            Work
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={view === "results" ? "default" : "ghost"}
+            onClick={() => setParam("view", "results")}
+          >
+            Results
+          </Button>
         </div>
         {view === "results" ? (
-          <Select value={resultDate} onValueChange={(value) => setParam("resultDate", value === "all" ? "" : value)}>
-            <SelectTrigger size="sm" className="w-40" aria-label="Result date"><SelectValue /></SelectTrigger>
-            <SelectContent><SelectItem value="all">Any date</SelectItem><SelectItem value="7d">Last 7 days</SelectItem><SelectItem value="30d">Last 30 days</SelectItem></SelectContent>
-          <Select value={resultStatus} onValueChange={(value) => setParam("resultStatus", value === "all" ? "" : value)}>
-            <SelectTrigger size="sm" className="w-40" aria-label="Result status"><SelectValue /></SelectTrigger>
-            <SelectContent><SelectItem value="all">Any status</SelectItem><SelectItem value="accepted">Accepted</SelectItem><SelectItem value="needs-review">Needs review</SelectItem></SelectContent>
-          </Select>
-          <Select value={resultSource} onValueChange={(value) => setParam("resultSource", value === "all" ? "" : value)}>
-            <SelectTrigger size="sm" className="w-48" aria-label="Source task"><SelectValue /></SelectTrigger>
+          <Select
+            value={resultDate}
+            onValueChange={(value) =>
+              setParam("resultDate", value === "all" ? "" : value)
+            }
+          >
+            <SelectTrigger size="sm" className="w-40" aria-label="Result date">
+              <SelectValue />
+            </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Any source task</SelectItem>
-              {tasks.filter((task) => task.result).map((task) => <SelectItem key={task.id} value={task.id}>{task.title}</SelectItem>)}
+              <SelectItem value="all">Any date</SelectItem>
+              <SelectItem value="7d">Last 7 days</SelectItem>
+              <SelectItem value="30d">Last 30 days</SelectItem>
             </SelectContent>
-          </Select>
+            <Select
+              value={resultStatus}
+              onValueChange={(value) =>
+                setParam("resultStatus", value === "all" ? "" : value)
+              }
+            >
+              <SelectTrigger
+                size="sm"
+                className="w-40"
+                aria-label="Result status"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Any status</SelectItem>
+                <SelectItem value="accepted">Accepted</SelectItem>
+                <SelectItem value="needs-review">Needs review</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select
+              value={resultSource}
+              onValueChange={(value) =>
+                setParam("resultSource", value === "all" ? "" : value)
+              }
+            >
+              <SelectTrigger
+                size="sm"
+                className="w-48"
+                aria-label="Source task"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Any source task</SelectItem>
+                {tasks
+                  .filter((task) => task.result)
+                  .map((task) => (
+                    <SelectItem key={task.id} value={task.id}>
+                      {task.title}
+                    </SelectItem>
+                  ))}
+              </SelectContent>
+            </Select>
           </Select>
         ) : null}
 
@@ -561,9 +786,15 @@ export function TaskListPage({ tasks, workspaceId: _workspaceId, copy, total, pa
           </form>
           <Select
             value={priority || "all"}
-            onValueChange={(value) => setParam("priority", value === "all" ? "" : value)}
+            onValueChange={(value) =>
+              setParam("priority", value === "all" ? "" : value)
+            }
           >
-            <SelectTrigger size="sm" className="h-8 w-[8.5rem] rounded-lg text-xs" aria-label={taskCopy.priorityLabel}>
+            <SelectTrigger
+              size="sm"
+              className="h-8 w-[8.5rem] rounded-lg text-xs"
+              aria-label={taskCopy.priorityLabel}
+            >
               <SelectValue placeholder={taskCopy.priorityAll} />
             </SelectTrigger>
             <SelectContent>
@@ -575,8 +806,15 @@ export function TaskListPage({ tasks, workspaceId: _workspaceId, copy, total, pa
               ))}
             </SelectContent>
           </Select>
-          <Select value={sort} onValueChange={(value) => setParam("sort", value)}>
-            <SelectTrigger size="sm" className="h-8 w-[9rem] rounded-lg text-xs" aria-label={taskCopy.sortLabel}>
+          <Select
+            value={sort}
+            onValueChange={(value) => setParam("sort", value)}
+          >
+            <SelectTrigger
+              size="sm"
+              className="h-8 w-[9rem] rounded-lg text-xs"
+              aria-label={taskCopy.sortLabel}
+            >
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -592,7 +830,9 @@ export function TaskListPage({ tasks, workspaceId: _workspaceId, copy, total, pa
             variant="outline"
             size="sm"
             className="h-8 rounded-lg text-xs"
-            aria-label={order === "asc" ? taskCopy.sortAscending : taskCopy.sortDescending}
+            aria-label={
+              order === "asc" ? taskCopy.sortAscending : taskCopy.sortDescending
+            }
             onClick={() => setParam("order", order === "asc" ? "desc" : "asc")}
           >
             {order === "asc" ? taskCopy.sortAscending : taskCopy.sortDescending}
@@ -605,12 +845,21 @@ export function TaskListPage({ tasks, workspaceId: _workspaceId, copy, total, pa
                 aria-label={taskCopy.selectVisible}
                 checked={allVisibleSelected}
                 disabled={tasks.length === 0 || isPending}
-                onCheckedChange={(value) => toggleVisibleSelection(value === true)}
+                onCheckedChange={(value) =>
+                  toggleVisibleSelection(value === true)
+                }
               />
-              {taskCopy.selectedCount.replace("{count}", String(selectedIds.size))}
+              {taskCopy.selectedCount.replace(
+                "{count}",
+                String(selectedIds.size),
+              )}
             </label>
             <div className="flex flex-wrap items-center gap-2">
-              {actionMessage ? <span className="text-destructive" role="status">{actionMessage}</span> : null}
+              {actionMessage ? (
+                <span className="text-destructive" role="status">
+                  {actionMessage}
+                </span>
+              ) : null}
               <Button
                 type="button"
                 variant="outline"
@@ -626,7 +875,9 @@ export function TaskListPage({ tasks, workspaceId: _workspaceId, copy, total, pa
                 variant="destructive"
                 size="sm"
                 disabled={selectedTasks.length === 0 || isPending}
-                onClick={() => setPendingDelete({ kind: "bulk", tasks: selectedTasks })}
+                onClick={() =>
+                  setPendingDelete({ kind: "bulk", tasks: selectedTasks })
+                }
                 className="rounded-xl"
               >
                 <Trash2 className="size-3.5" />
@@ -642,40 +893,113 @@ export function TaskListPage({ tasks, workspaceId: _workspaceId, copy, total, pa
           </div>
         ) : (
           <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
-            {visibleTasks.map((task) => view === "results" ? (
-              <div key={task.id} className="rounded-2xl border border-border/70 bg-card p-4 shadow-xs">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0 space-y-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="font-semibold text-foreground">{task.result?.artifact?.title ?? task.title}</h3>
-                      <Badge variant={task.stateView.state === "result_ready" ? "warning" : "success"}>{task.stateView.state === "result_ready" ? "Needs review" : "Accepted"}</Badge>
-                      {task.result?.artifact ? <Badge variant="outline">{task.result.artifact.type}</Badge> : null}
-                      {task.result?.occurrenceId ? <Badge variant="outline">Occurrence {task.result.occurrenceId}</Badge> : null}
+            {visibleTasks.map((task) =>
+              view === "results" ? (
+                <div
+                  key={task.id}
+                  className="rounded-2xl border border-border/70 bg-card p-4 shadow-xs"
+                >
+                  <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0 space-y-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="font-semibold text-foreground">
+                          {task.result?.artifact?.title ?? task.title}
+                        </h3>
+                        <Badge
+                          variant={
+                            task.stateView.state === "result_ready"
+                              ? "warning"
+                              : "success"
+                          }
+                        >
+                          {task.stateView.state === "result_ready"
+                            ? "Needs review"
+                            : "Accepted"}
+                        </Badge>
+                        {task.result?.artifact ? (
+                          <Badge variant="outline">
+                            {task.result.artifact.type}
+                          </Badge>
+                        ) : null}
+                        {task.result?.occurrenceId ? (
+                          <Badge variant="outline">
+                            Occurrence {task.result.occurrenceId}
+                          </Badge>
+                        ) : null}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Source task: {task.title}
+                        {task.result?.executedAt
+                          ? ` · Executed ${new Date(task.result.executedAt).toLocaleString()}`
+                          : ` · Updated ${formatRelativeTime(task.updatedAt, taskCopy)}`}
+                        {task.result?.provider
+                          ? ` · AI ${task.result.provider}`
+                          : ""}
+                        {task.result?.runId
+                          ? ` · Run ${task.result.runId}`
+                          : ""}
+                      </p>
+                      {!task.result?.artifact ? (
+                        <p className="text-xs text-warning-foreground">
+                          The run has no saved artifact. Open the task to
+                          inspect its output and recovery options.
+                        </p>
+                      ) : null}
                     </div>
-                    <p className="text-xs text-muted-foreground">Source task: {task.title}{task.result?.executedAt ? ` · Executed ${new Date(task.result.executedAt).toLocaleString()}` : ` · Updated ${formatRelativeTime(task.updatedAt, taskCopy)}`}{task.result?.provider ? ` · AI ${task.result.provider}` : ""}{task.result?.runId ? ` · Run ${task.result.runId}` : ""}</p>
-                    {!task.result?.artifact ? <p className="text-xs text-warning-foreground">The run has no saved artifact. Open the task to inspect its output and recovery options.</p> : null}
+                    <Button asChild size="sm">
+                      <LocalizedLink href={`/tasks/${task.id}`}>
+                        Open result
+                      </LocalizedLink>
+                    </Button>
                   </div>
-                  <Button asChild size="sm"><LocalizedLink href={`/tasks/${task.id}`}>Open result</LocalizedLink></Button>
                 </div>
-              </div>
-            ) : (
-              <TaskRow key={task.id} task={task} copy={taskCopy} checked={selectedIds.has(task.id)} isPending={isPending} onToggleSelected={updateSelection} onAction={(action, actionTask) => void runTaskAction(action, actionTask)} onDelete={(deleteTaskItem) => setPendingDelete({ kind: "single", task: deleteTaskItem })} />
-            ))}
+              ) : (
+                <TaskRow
+                  key={task.id}
+                  task={task}
+                  copy={taskCopy}
+                  checked={selectedIds.has(task.id)}
+                  isPending={isPending}
+                  onToggleSelected={updateSelection}
+                  onAction={(action, actionTask) =>
+                    void runTaskAction(action, actionTask)
+                  }
+                  onDelete={(deleteTaskItem) =>
+                    setPendingDelete({ kind: "single", task: deleteTaskItem })
+                  }
+                />
+              ),
+            )}
           </div>
         )}
 
         {showPagination ? (
           <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-border bg-background px-3 py-2 text-xs">
             <div className="flex items-center gap-3 text-muted-foreground">
-              <span>{taskCopy.paginationRange.replace("{start}", String(rangeStart)).replace("{end}", String(rangeEnd)).replace("{total}", String(total))}</span>
-              <Select value={String(pageSize)} onValueChange={(value) => setParam("pageSize", value)}>
-                <SelectTrigger size="sm" className="h-7 w-[6.5rem] rounded-lg text-xs" aria-label={taskCopy.pageSizeLabel}>
+              <span>
+                {taskCopy.paginationRange
+                  .replace("{start}", String(rangeStart))
+                  .replace("{end}", String(rangeEnd))
+                  .replace("{total}", String(total))}
+              </span>
+              <Select
+                value={String(pageSize)}
+                onValueChange={(value) => setParam("pageSize", value)}
+              >
+                <SelectTrigger
+                  size="sm"
+                  className="h-7 w-[6.5rem] rounded-lg text-xs"
+                  aria-label={taskCopy.pageSizeLabel}
+                >
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   {PAGE_SIZE_OPTIONS.map((value) => (
                     <SelectItem key={value} value={String(value)}>
-                      {taskCopy.pageSizeOption.replace("{count}", String(value))}
+                      {taskCopy.pageSizeOption.replace(
+                        "{count}",
+                        String(value),
+                      )}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -683,7 +1007,9 @@ export function TaskListPage({ tasks, workspaceId: _workspaceId, copy, total, pa
             </div>
             <div className="flex items-center gap-2">
               <span className="text-muted-foreground">
-                {taskCopy.paginationPage.replace("{page}", String(page)).replace("{pageCount}", String(pageCount))}
+                {taskCopy.paginationPage
+                  .replace("{page}", String(page))
+                  .replace("{pageCount}", String(pageCount))}
               </span>
               <Button
                 type="button"
@@ -711,26 +1037,47 @@ export function TaskListPage({ tasks, workspaceId: _workspaceId, copy, total, pa
           </div>
         ) : null}
       </div>
-      <Dialog open={Boolean(pendingDelete)} onOpenChange={(open) => { if (!open) setPendingDelete(null); }}>
+      <Dialog
+        open={Boolean(pendingDelete)}
+        onOpenChange={(open) => {
+          if (!open) setPendingDelete(null);
+        }}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>
               {pendingDelete?.kind === "single"
-                ? taskCopy.deleteTitle.replace("{title}", pendingDelete.task.title)
-                : taskCopy.bulkDeleteTitle.replace("{count}", String(pendingDelete?.tasks.length ?? 0))}
+                ? taskCopy.deleteTitle.replace(
+                    "{title}",
+                    pendingDelete.task.title,
+                  )
+                : taskCopy.bulkDeleteTitle.replace(
+                    "{count}",
+                    String(pendingDelete?.tasks.length ?? 0),
+                  )}
             </DialogTitle>
             <DialogDescription>{taskCopy.deleteDescription}</DialogDescription>
           </DialogHeader>
           <DialogFooter>
-            <Button type="button" variant="outline" disabled={isPending} onClick={() => setPendingDelete(null)}>
+            <Button
+              type="button"
+              variant="outline"
+              disabled={isPending}
+              onClick={() => setPendingDelete(null)}
+            >
               {taskCopy.cancel}
             </Button>
-            <Button type="button" variant="destructive" disabled={isPending} onClick={() => void confirmDelete()}>
+            <Button
+              type="button"
+              variant="destructive"
+              disabled={isPending}
+              onClick={() => void confirmDelete()}
+            >
               {isPending ? taskCopy.deleting : taskCopy.actionDelete}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>
+    </PageFrame>
   );
 }

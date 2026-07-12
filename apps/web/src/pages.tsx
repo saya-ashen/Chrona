@@ -1,4 +1,10 @@
-import { Navigate, useLoaderData, useOutletContext, useParams, useSearchParams } from "react-router-dom";
+import {
+  Navigate,
+  useLoaderData,
+  useOutletContext,
+  useParams,
+  useSearchParams,
+} from "react-router-dom";
 
 import { DashboardPage } from "@/components/dashboard/dashboard-page";
 import { SchedulePage } from "../../../features/schedule/ui";
@@ -11,7 +17,14 @@ import type { ActionCenterProjection } from "@chrona/contracts/api";
 import { LocalizedLink } from "@/components/i18n/localized-link";
 import { Badge } from "shared/ui/badge";
 import { Button } from "shared/ui/button";
-import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from "shared/ui/card";
+import {
+  Card,
+  CardDescription,
+  CardFooter,
+  CardHeader,
+  CardTitle,
+} from "shared/ui/card";
+import { PageFrame } from "shared/ui/page-frame";
 import { Separator } from "@/components/ui/separator";
 import type { getDictionary, Locale } from "@chrona/i18n";
 import { localizeHref, resolveLocale } from "@chrona/i18n";
@@ -32,7 +45,6 @@ export type ScheduleRouteData = {
   schedule: SchedulePageData;
 };
 
-
 export type DashboardRouteData = {
   dashboard: DashboardData;
 };
@@ -40,7 +52,6 @@ export type DashboardRouteData = {
 export type ActionCenterRouteData = {
   actionCenter: ActionCenterProjection;
 };
-
 
 export type TaskPageRouteData = {
   locale: Locale;
@@ -76,7 +87,14 @@ export type TaskListRouteData = {
       provider: string | null;
       occurrenceId: string | null;
       executedAt: string | null;
-      artifact: { id: string; title: string; type: string; uri: string; runId: string; createdAt: string } | null;
+      artifact: {
+        id: string;
+        title: string;
+        type: string;
+        uri: string;
+        runId: string;
+        createdAt: string;
+      } | null;
     } | null;
     stateView: WorkStateView;
     source: {
@@ -100,10 +118,14 @@ export type TaskListRouteData = {
   };
 };
 
-
 export function LocaleLandingPage() {
   const params = useParams();
-  return <Navigate to={localizeHref(resolveLocale(params.lang), "/dashboard")} replace />;
+  return (
+    <Navigate
+      to={localizeHref(resolveLocale(params.lang), "/dashboard")}
+      replace
+    />
+  );
 }
 
 function useAppBootOutletData() {
@@ -127,34 +149,45 @@ export function ScheduleRoutePage() {
   );
 }
 
-
 export function DashboardRoutePage() {
   const { dictionary } = useAppBootOutletData();
   const { dashboard } = useLoaderData() as DashboardRouteData;
 
-  return <DashboardPage data={dashboard} copy={dictionary.pages.dashboard} workspaceId={dashboard.workspaceId} />;
+  return (
+    <DashboardPage
+      data={dashboard}
+      copy={dictionary.pages.dashboard}
+      workspaceId={dashboard.workspaceId}
+    />
+  );
 }
-
 
 export function ActionCenterRoutePage() {
   const { defaultWorkspace, dictionary } = useAppBootOutletData();
   const { actionCenter } = useLoaderData() as ActionCenterRouteData;
 
   return (
-    <div className="flex h-full min-h-0 min-w-0 flex-col overflow-x-hidden overflow-y-auto rounded-3xl bg-background p-3 sm:p-4">
-      <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-4">
+    <PageFrame mode="overview">
+      <div className="flex w-full flex-1 flex-col gap-4">
         <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-semibold tracking-tight">{dictionary.pages.actionCenter.title}</h1>
-          <p className="text-sm text-muted-foreground">{dictionary.pages.actionCenter.subtitle}</p>
+          <h1 className="text-2xl font-semibold tracking-tight">
+            {dictionary.pages.actionCenter.title}
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            {dictionary.pages.actionCenter.subtitle}
+          </p>
         </div>
         <Separator />
         <ActionCenterPageClient
           workspaceId={defaultWorkspace.id}
           initialData={actionCenter}
-          copy={{ ...dictionary.components.actionCenterList, ...dictionary.pages.actionCenter }}
+          copy={{
+            ...dictionary.components.actionCenterList,
+            ...dictionary.pages.actionCenter,
+          }}
         />
       </div>
-    </div>
+    </PageFrame>
   );
 }
 
@@ -166,12 +199,14 @@ export function SettingsRoutePage() {
 
   return (
     <>
-      <div className="flex h-full min-h-0 min-w-0 flex-col overflow-x-hidden overflow-y-auto rounded-3xl bg-background p-3 sm:p-4">
-        <div className="mx-auto flex w-full max-w-5xl flex-1 flex-col gap-4">
+      <PageFrame mode="focused">
+        <div className="flex w-full flex-1 flex-col gap-4">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div className="flex min-w-0 flex-col gap-1">
               <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-2xl font-semibold tracking-tight">{t.title}</h1>
+                <h1 className="text-2xl font-semibold tracking-tight">
+                  {t.title}
+                </h1>
                 <Badge variant="secondary">{t.controlCenter}</Badge>
               </div>
               <p className="text-sm text-muted-foreground">{t.subtitle}</p>
@@ -180,8 +215,7 @@ export function SettingsRoutePage() {
 
           <Separator />
 
-
-          <div className="grid min-h-0 flex-1 gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+          <div className="grid min-h-0 flex-1 items-start gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
             <Card className="self-start">
               <CardHeader>
                 <CardTitle>{t.aiClientsTitle}</CardTitle>
@@ -190,7 +224,7 @@ export function SettingsRoutePage() {
               <CardFooter>
                 <Button asChild>
                   <LocalizedLink href="/settings?panel=ai-clients">
-                  {t.manageAiClients}
+                    {t.manageAiClients}
                   </LocalizedLink>
                 </Button>
               </CardFooter>
@@ -202,15 +236,26 @@ export function SettingsRoutePage() {
             />
           </div>
         </div>
-      </div>
-      <AiClientsDialog isOpen={panel === "ai-clients"} closeHref={`/${locale}/settings`} />
+      </PageFrame>
+      <AiClientsDialog
+        isOpen={panel === "ai-clients"}
+        closeHref={`/${locale}/settings`}
+      />
     </>
   );
 }
 
 export function TaskListRoutePage() {
-  const { tasks, workspaceId, dictionary, total, page, pageSize, pageCount, counts } =
-    useLoaderData() as TaskListRouteData;
+  const {
+    tasks,
+    workspaceId,
+    dictionary,
+    total,
+    page,
+    pageSize,
+    pageCount,
+    counts,
+  } = useLoaderData() as TaskListRouteData;
   return (
     <TaskListPage
       tasks={tasks}
@@ -228,6 +273,7 @@ export function TaskListRoutePage() {
 export function TaskDetailRoutePage() {
   const { task, dictionary } = useLoaderData() as TaskPageRouteData;
 
-  return <TaskWorkspacePage data={task} copy={dictionary.components.taskPage} />;
+  return (
+    <TaskWorkspacePage data={task} copy={dictionary.components.taskPage} />
+  );
 }
-

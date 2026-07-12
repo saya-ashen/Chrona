@@ -29,10 +29,11 @@ import {
   CardHeader,
   CardTitle,
 } from "shared/ui/card";
+import { PageFrame } from "shared/ui/page-frame";
 import { UiSurfaceFrame } from "shared/ui/ui-surface-frame";
 import { SpecRenderer } from "@features/task-workspace/ui/catalog/spec-renderer";
 import type { UiDocument } from "@chrona/ui-protocol";
-import { cn } from "@/lib/utils"
+import { cn } from "@/lib/utils";
 import type {
   DashboardAttentionItem,
   DashboardCompletedItem,
@@ -60,7 +61,6 @@ function attentionDescriptor(item: DashboardAttentionItem) {
     riskLevel: item.kind === "schedule_risk" ? "medium" : undefined,
   });
 }
-
 
 function attentionIcon(
   item: DashboardAttentionItem,
@@ -907,8 +907,8 @@ export function DashboardPage({
   }, [autoCompleted]);
 
   return (
-    <div className="relative flex h-full min-h-0 min-w-0 flex-col overflow-x-hidden overflow-y-auto rounded-[2rem] border border-border bg-surface-soft/80 p-3 sm:p-4">
-      <div className="mx-auto w-full max-w-[1280px] space-y-6">
+    <PageFrame mode="overview">
+      <div className="w-full space-y-6">
         <HeadlineBanner
           copy={copy}
           completedToday={completedToday}
@@ -938,6 +938,6 @@ export function DashboardPage({
           </aside>
         </div>
       </div>
-    </div>
+    </PageFrame>
   );
 }
