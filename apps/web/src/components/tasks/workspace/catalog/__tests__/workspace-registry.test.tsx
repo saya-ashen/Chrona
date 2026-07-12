@@ -3,7 +3,7 @@ import { fireEvent, render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
 import type { UiDocument } from "@chrona/ui-protocol";
-import { SpecRenderer } from "../spec-renderer";
+import { SpecRenderer } from "../../../../../../../../features/task-workspace/ui/catalog/spec-renderer";
 
 describe("workspace result registry", () => {
   it("renders JsonView with title and card surface", () => {

@@ -5,7 +5,7 @@ import { deriveUserFacingFailure, type WorkStateView } from "@chrona/domain";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { SpecRenderer } from "@/components/tasks/workspace/catalog/spec-renderer";
+import { SpecRenderer } from "@features/task-workspace/ui/catalog/spec-renderer";
 import type { PlanNodeDataModel } from "@/components/tasks/plan/task-plan-graph/types";
 import { ProviderApprovalBanner } from "../../../../../../../features/execution-monitoring/ui/provider-approval-banner";
 import type { TaskWorkspaceOperationState } from "../../../../../../../features/task-workspace";

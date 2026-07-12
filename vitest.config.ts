@@ -12,6 +12,7 @@ export default defineConfig({
       "@chrona/db": resolve(import.meta.dirname, "apps/web/src/test/chrona-db.ts"),
       "@chrona/codex": resolve(import.meta.dirname, "apps/web/src/test/codex-provider.ts"),
       "@chrona/omp": resolve(import.meta.dirname, "apps/web/src/test/omp-provider.ts"),
+      "@features": resolve(import.meta.dirname, "features"),
     },
   },
 

@@ -30,7 +30,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { UiSurfaceFrame } from "@/components/ai-surface/ui-surface-frame";
-import { SpecRenderer } from "@/components/tasks/workspace/catalog/spec-renderer";
+import { SpecRenderer } from "@features/task-workspace/ui/catalog/spec-renderer";
 import type { UiDocument } from "@chrona/ui-protocol";
 import { cn } from "@/lib/utils";
 import type {

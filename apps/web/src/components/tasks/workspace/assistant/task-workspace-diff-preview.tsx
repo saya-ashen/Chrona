@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { TaskWorkspaceUpdateProposal } from "@chrona/contracts/ai";
-import { SpecRenderer } from "../catalog/spec-renderer";
+import { SpecRenderer } from "../../../../../../../features/task-workspace/ui/catalog/spec-renderer";
 import { buildTaskWorkspaceDiffPreviewSpec } from "./build-task-workspace-diff-preview-spec";
 
 type EditableTask = {

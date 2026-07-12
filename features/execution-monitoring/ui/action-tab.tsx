@@ -5,10 +5,10 @@ import {
   actionKindForNode,
   buildWorkspaceCheckpointActionInput,
   getWorkspaceActionDisabledReason,
+  SpecRenderer,
   type PlanNodeDataModel,
   type TaskExecutionDispatchResult,
 } from "../../task-workspace";
-import { SpecRenderer } from "../../../apps/web/src/components/tasks/workspace/catalog/spec-renderer";
 
 function isTerminalStatus(status: PlanNodeDataModel["status"]) {
   return status === "done" || status === "skipped";

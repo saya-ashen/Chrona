@@ -32,7 +32,7 @@ vi.mock("@/components/ui/card", () => ({
   CardTitle: ({ children, ...props }: { children?: ReactNode } & ComponentPropsWithoutRef<"div">) => <div {...props}>{children}</div>,
 }));
 
-vi.mock("@/components/tasks/workspace/catalog/spec-renderer", () => ({
+vi.mock("@features/task-workspace/ui/catalog/spec-renderer", () => ({
   SpecRenderer: ({ spec }: { spec: unknown }) => <div>{spec ? "AI brief spec rendered" : null}</div>,
 }));
 

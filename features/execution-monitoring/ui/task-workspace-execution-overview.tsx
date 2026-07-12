@@ -12,7 +12,7 @@ import type {
   WorkspaceArtifactItem,
   PlanNodeDataModel,
 } from "../../task-workspace";
-import { SpecRenderer } from "../../../apps/web/src/components/tasks/workspace/catalog/spec-renderer";
+import { SpecRenderer } from "../../task-workspace";
 import { buildCommandCenterOutputTabSpec, buildCommandCenterTrailTabSpec, type ResultNodeFilter, type ResultNodeOption } from "./build-execution-overview-spec";
 import { mergeWorkspaceActivity, runtimeEventsToWorkspaceActivity } from "../../task-workspace";
 import { UiSurfaceFrame } from "./ui-surface-frame";
