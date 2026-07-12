@@ -1,6 +1,5 @@
 import { buildActivitySpec, UI_ACTION, type ToolDetailLabels, type UiDocument } from "@chrona/ui-protocol";
-import type { PlanNodeDataModel } from "../../../apps/web/src/components/tasks/plan/task-plan-graph/types";
-import { mergeWorkspaceActivity, runtimeEventsToWorkspaceActivity } from "../../task-workspace";
+import { mergeWorkspaceActivity, runtimeEventsToWorkspaceActivity, type PlanNodeDataModel } from "../../task-workspace";
 import type { WorkspaceRuntimeEvent } from "../model/workspace-runtime-events";
 import type { TaskWorkspacePlanFlowState } from "../../task-workspace";
 import type { ExecutionOverviewCard, WorkspaceActivityItem, WorkspaceArtifactItem } from "../../task-workspace";

@@ -1,3 +1,4 @@
+export * from "./model/plan-node-view-model";
 export * from "./model/task-workspace-types";
 export * from "./model/task-workspace-state";
 export * from "./model/task-workspace-actions";

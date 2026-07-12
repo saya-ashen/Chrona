@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { TaskPlanGraphPlan } from "../../../apps/web/src/components/tasks/plan/task-plan-graph/types";
+import type { TaskPlanGraphPlan } from "../model/plan-node-view-model";
 import type { TaskPageData } from "../model/task-workspace-types";
 import {
   deriveRunningExecutionView,

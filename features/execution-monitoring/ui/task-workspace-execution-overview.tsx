@@ -3,7 +3,6 @@ import { useI18n } from "@chrona/i18n/react";
 import { createStateStore } from "@json-render/react";
 import { buildResultSpec, type UiDocument } from "@chrona/ui-protocol";
 import type { PlanExecutionResult } from "@chrona/contracts/ai";
-import type { PlanNodeDataModel } from "../../../apps/web/src/components/tasks/plan/task-plan-graph/types";
 import { taskWorkspaceActivityMessages } from "../../../apps/web/src/lib/i18n/messages";
 import type { WorkspaceRuntimeEvent } from "../model/workspace-runtime-events";
 import type {
@@ -11,6 +10,7 @@ import type {
   ProgressSummary,
   WorkspaceActivityItem,
   WorkspaceArtifactItem,
+  PlanNodeDataModel,
 } from "../../task-workspace";
 import { SpecRenderer } from "../../../apps/web/src/components/tasks/workspace/catalog/spec-renderer";
 import { buildCommandCenterOutputTabSpec, buildCommandCenterTrailTabSpec, type ResultNodeFilter, type ResultNodeOption } from "./build-execution-overview-spec";

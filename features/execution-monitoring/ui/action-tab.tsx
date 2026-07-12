@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ExecutionActionInput, SubmitCheckpointActionInput } from "@chrona/contracts/ai";
 import { buildActionSpec, type ActionItemInput } from "@chrona/ui-protocol";
-import type { PlanNodeDataModel } from "../../../apps/web/src/components/tasks/plan/task-plan-graph/types";
 import {
   actionKindForNode,
   buildWorkspaceCheckpointActionInput,
   getWorkspaceActionDisabledReason,
+  type PlanNodeDataModel,
   type TaskExecutionDispatchResult,
 } from "../../task-workspace";
 import { SpecRenderer } from "../../../apps/web/src/components/tasks/workspace/catalog/spec-renderer";
