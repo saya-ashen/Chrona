@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Archive, Bot, Check, ChevronDown, ChevronUp, Circle, Copy, FileText, Sparkles, TriangleAlert, Wrench } from "lucide-react";
-import { ActivityTimeline } from "../../../execution-monitoring";
+import { ActivityTimeline } from "../activity-timeline";
 import type { WorkspaceActivityItem } from "../..";
 import { defineRegistry } from "@json-render/react";
 import { shadcnComponents } from "@json-render/shadcn";

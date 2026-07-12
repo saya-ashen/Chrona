@@ -14,3 +14,4 @@ export * from "./model/task-workspace-interaction";
 export { TaskWorkspacePage } from "./ui/task-workspace-page";
 export { TaskWorkspaceHeaderCard } from "./ui/task-workspace-header-card";
 export { SpecRenderer } from "./ui/catalog/spec-renderer";
+export { ActivityTimeline } from "./ui/activity-timeline";

@@ -1,11 +1,13 @@
+import type { PlanExecutionSSEEvent } from "@chrona/contracts/ai";
 import type { UiDocument } from "@chrona/ui-protocol";
 import type { TaskAction } from "@chrona/contracts";
 import type { PlanNodeDataModel, TaskPlanGraphPlan } from "./plan-node-view-model";
-import type { WorkspaceRuntimeEvent } from "../../execution-monitoring";
 import type {
   TaskPageData,
   TaskPlanGenerationStatus,
 } from "./task-workspace-types";
+
+type WorkspaceRuntimeEvent = Extract<PlanExecutionSSEEvent, { type: "runtime_event" }>;
 
 export type TaskWorkspaceOperationStatus =
   | "plan-empty"

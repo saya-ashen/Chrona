@@ -22,7 +22,6 @@ export {
 } from "@chrona/engine";
 
 export { TaskWorkspaceActionRail } from "./ui/action-rail";
-export { ActivityTimeline } from "./ui/activity-timeline";
 export {
   buildCommandCenterNowSpec,
   buildCommandCenterOutputTabSpec,
