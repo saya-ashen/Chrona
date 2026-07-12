@@ -39,3 +39,4 @@ export {
   SelectValue,
 } from "./select";
 export { cn } from "./utils";
+export { UiSurfaceFrame, type UiSurfaceKind } from "./ui-surface-frame";

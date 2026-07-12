@@ -15,7 +15,6 @@ import type {
 import { SpecRenderer } from "../../task-workspace";
 import { buildCommandCenterOutputTabSpec, buildCommandCenterTrailTabSpec, type ResultNodeFilter, type ResultNodeOption } from "./build-execution-overview-spec";
 import { mergeWorkspaceActivity, runtimeEventsToWorkspaceActivity } from "../../task-workspace";
-import { UiSurfaceFrame } from "./ui-surface-frame";
 import {
   Badge,
   Button,
@@ -28,6 +27,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  UiSurfaceFrame,
 } from "@shared/ui";
 
 type OverviewAction = (nodeId?: string) => void;

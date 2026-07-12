@@ -19,20 +19,20 @@ import { deriveAttentionDescriptor } from "@chrona/domain";
 import type { Dictionary } from "@/pages";
 import { useRevalidator } from "react-router-dom";
 import { LocalizedLink } from "@/components/i18n/localized-link";
-import { apiJson } from "@/api";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { apiJson } from "shared/http/api-client";
+import { Badge } from "shared/ui/badge";
+import { Button } from "shared/ui/button";
 import {
   Card,
   CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "@/components/ui/card";
-import { UiSurfaceFrame } from "@/components/ai-surface/ui-surface-frame";
+} from "shared/ui/card";
+import { UiSurfaceFrame } from "shared/ui/ui-surface-frame";
 import { SpecRenderer } from "@features/task-workspace/ui/catalog/spec-renderer";
 import type { UiDocument } from "@chrona/ui-protocol";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils"
 import type {
   DashboardAttentionItem,
   DashboardCompletedItem,
