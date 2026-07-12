@@ -269,7 +269,19 @@ Schedule is Chrona's highest-frequency page. Its timeline is a work canvas, not 
 - Mobile task events may use two lines. Do not truncate the only identifying text to a few characters.
 - Mobile removes low-value instructions before truncating dates or task names.
 
-## 9. Page frame and width modes
+## 9. Dashboard rules
+
+Dashboard is Chrona's operational home, not an executive report or event log.
+
+- Current actionable work appears before summaries, AI-authored content, and history.
+- When attention is required, the task identity, concise reason, state, and next action remain above the fold at every breakpoint.
+- Running work and the next scheduled work follow attention; completed work and recent activity are secondary.
+- The page header stays compact. Status counts may summarize the page but must not repeat the same state across multiple large cards.
+- AI summaries supplement deterministic state and never outrank blocked, failed, waiting, running, or upcoming work.
+- Recent activity aggregates or flattens routine events. It must not resemble a second audit log inside the dashboard.
+- Below `xl`, content order remains operational: attention, running, upcoming, completed, then history and AI summary.
+
+## 10. Page frame and width modes
 
 Every primary route uses one shared page coordinate system. The application shell owns the full-bleed page background and safe-area padding; the page frame owns content width, centering, vertical scrolling, and stable page-header alignment.
 
@@ -289,7 +301,7 @@ Rules:
 - PageFrame is visually transparent and shares one scroll contract across modes. Width differences must be explained only by content mode.
 - At mobile widths all modes become full width and preserve the same safe-area padding.
 
-## 10. Responsive behavior
+## 11. Responsive behavior
 
 Validate at 1440×900, 1024×768, and 390×844.
 
@@ -314,7 +326,7 @@ Validate at 1440×900, 1024×768, and 390×844.
 - Hide redundant labels and instructions first.
 - Preserve current task, blocked/review state, and next action.
 
-## 11. Accessibility
+## 12. Accessibility
 
 - Body and essential secondary text target WCAG AA contrast.
 - Muted text is not used for required instructions, timestamps needed for decisions, or error recovery.
@@ -323,7 +335,7 @@ Validate at 1440×900, 1024×768, and 390×844.
 - Touch targets are at least 40×40px; primary mobile actions target 44px height.
 - Reduced-motion preferences disable decorative transforms and animated graph movement.
 
-## 12. Implementation rules
+## 13. Implementation rules
 
 - `DESIGN.md` is the source of truth for project-wide visual decisions.
 - Global theme values are implemented through semantic CSS variables in `apps/web/src/styles/globals.css`.
@@ -333,7 +345,7 @@ Validate at 1440×900, 1024×768, and 390×844.
 - Do not introduce a second radius, shadow, color, or spacing convention beside this system.
 - When a page needs an exception, document the product reason here before adding a new global token.
 
-## 13. Review checklist
+## 14. Review checklist
 
 Before accepting a visual change, verify:
 

@@ -1581,6 +1581,7 @@
         "attentionOnly": "今天还没有自动完成的任务。{attentionSubject}。",
         "completedTask": "项任务",
         "completedTasks": "项任务",
+        "completedToday": "今日完成",
         "attentionTask": "1 项任务需要你处理",
         "attentionTasks": "{attention} 项任务需要你处理",
         "idle": "Chrona 已就绪。你可以新建任务、启动工作，或在这里查看最近动态。"

@@ -63,6 +63,7 @@ const COPY = {
     attentionOnly: "Nothing auto-completed yet today. {attentionSubject}.",
     completedTask: "task",
     completedTasks: "tasks",
+    completedToday: "Completed today",
     attentionTask: "1 task needs you",
     attentionTasks: "{attention} tasks need you",
     idle: "Chrona is ready. Add a task, start work, or review recent activity here.",
@@ -430,7 +431,7 @@ describe("DashboardPage", () => {
     );
     expect(screen.getByText("Blocked task")).toBeTruthy();
     expect(screen.getByText("Waiting on confirmation")).toBeTruthy();
-    expect(screen.getByRole("link", { name: /Resolve the blocker/ })).toHaveAttribute("href", "/en/tasks/s1");
+    expect(screen.getByRole("link", { name: /Resolve/ })).toHaveAttribute("href", "/en/tasks/s1");
     expect(screen.queryByText("Task stream")).not.toBeInTheDocument();
     expect(screen.getAllByText("Recent completions").length).toBeGreaterThan(0);
   });

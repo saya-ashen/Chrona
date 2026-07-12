@@ -62,6 +62,7 @@ function attentionDescriptor(item: DashboardAttentionItem) {
   });
 }
 
+
 function attentionIcon(
   item: DashboardAttentionItem,
 ): ComponentType<LucideProps> {
@@ -152,13 +153,13 @@ function MetricPill({
   return (
     <div
       className={cn(
-        "flex min-w-0 items-center gap-3 rounded-2xl border bg-background/80 px-4 py-3 backdrop-blur transition-colors",
-        value === 0 ? "shadow-none opacity-70" : "shadow-sm",
+        "flex min-w-0 items-center gap-2 border-r border-border/70 px-3 py-1.5 last:border-r-0 sm:px-4",
+        value === 0 && "opacity-60",
       )}
     >
       <span
         className={cn(
-          "flex size-10 shrink-0 items-center justify-center rounded-full",
+          "flex size-7 shrink-0 items-center justify-center rounded-md",
           value === 0 && "bg-muted text-muted-foreground",
           value > 0 && tone === "primary" && "bg-primary/10 text-primary",
           value > 0 &&
@@ -194,13 +195,11 @@ function HeadlineBanner({
   completedToday,
   attentionCount,
   inProgressCount,
-  totalAutoCompleted,
 }: {
   copy: DashboardCopy;
   completedToday: number;
   attentionCount: number;
   inProgressCount: number;
-  totalAutoCompleted: number;
 }) {
   let sentence: string;
   if (completedToday > 0 && attentionCount > 0) {
@@ -236,25 +235,18 @@ function HeadlineBanner({
   }
 
   return (
-    <section className="overflow-hidden rounded-3xl border bg-gradient-to-br from-primary/[0.12] via-background to-background shadow-sm">
-      <div className="grid gap-6 p-5 sm:p-6 lg:grid-cols-[minmax(0,1fr)_minmax(360px,0.8fr)] lg:p-8">
-        <div className="flex min-w-0 flex-col justify-between gap-6">
-          <div className="space-y-4">
-            <span className="inline-flex items-center gap-2 rounded-full border bg-background/70 px-3 py-1 text-xs font-medium text-primary shadow-sm backdrop-blur">
-              <Sparkles className="size-3.5" aria-hidden />
-              {copy.subtitle}
-            </span>
-            <div className="space-y-2">
-              <h1 className="max-w-3xl text-3xl font-semibold tracking-tight sm:text-4xl">
-                {copy.title}
-              </h1>
-              <p className="max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
-                {sentence}
-              </p>
-            </div>
-          </div>
+    <header className="border-b border-border/70 pb-4 pt-1 sm:pb-5">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+        <div className="min-w-0 space-y-1.5">
+          <p className="text-xs font-medium text-muted-foreground">
+            {copy.subtitle}
+          </p>
+          <h1 className="text-2xl font-semibold sm:text-3xl">{copy.title}</h1>
+          <p className="max-w-3xl text-sm leading-5 text-muted-foreground">
+            {sentence}
+          </p>
         </div>
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid shrink-0 grid-cols-3 overflow-hidden rounded-lg border bg-background py-1">
           <MetricPill
             icon={AlertTriangle}
             label={copy.summary.title}
@@ -269,19 +261,13 @@ function HeadlineBanner({
           />
           <MetricPill
             icon={CheckCircle2}
-            label={copy.digest.rangeToday}
+            label={copy.headline.completedToday}
             value={completedToday}
             tone="success"
           />
-          <MetricPill
-            icon={Sparkles}
-            label={copy.completed.title}
-            value={totalAutoCompleted}
-            tone="primary"
-          />
         </div>
       </div>
-    </section>
+    </header>
   );
 }
 
@@ -298,7 +284,6 @@ function NeedsYouCard({
   return (
     <Card
       className={cn(
-        "shadow-sm",
         hasItems ? "border-amber-500/40 bg-amber-500/[0.04]" : "bg-background",
       )}
     >
@@ -338,11 +323,19 @@ function NeedsYouCard({
         ) : (
           <ul className="divide-y">
             {visibleItems.map((item) => {
+              const actionLabel =
+                item.kind === "approval"
+                  ? copy.nextStep.approve_or_edit
+                  : item.kind === "input"
+                    ? copy.nextStep.provide_input
+                    : item.kind === "blocked" || item.kind === "failed"
+                      ? copy.nextStep.resolve_block
+                      : copy.openTask
               const Icon = attentionIcon(item);
               const descriptor = attentionDescriptor(item);
               const tone = descriptor.tone;
               return (
-                <li key={item.taskId} className="flex flex-col gap-2 py-3">
+                <li key={item.taskId} className="grid gap-3 py-3 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
                   <div className="flex min-w-0 items-start gap-2.5">
                     <Icon
                       className={cn(
@@ -352,8 +345,8 @@ function NeedsYouCard({
                       aria-hidden
                     />
                     <div className="min-w-0 flex-1 space-y-1">
-                      <div className="flex min-w-0 items-center gap-2">
-                        <span className="truncate text-sm font-medium">
+                      <div className="flex min-w-0 flex-wrap items-center gap-2">
+                        <span className="min-w-0 text-sm font-medium">
                           {item.title}
                         </span>
                         <Badge variant="outline" className="shrink-0">
@@ -361,7 +354,7 @@ function NeedsYouCard({
                         </Badge>
                       </div>
                       {item.reason ? (
-                        <p className="line-clamp-2 text-xs text-muted-foreground">
+                        <p className="line-clamp-2 max-w-3xl break-words text-sm leading-5 text-muted-foreground">
                           {item.reason}
                         </p>
                       ) : null}
@@ -370,19 +363,14 @@ function NeedsYouCard({
                       ) : null}
                     </div>
                   </div>
-                  <div className="flex items-center justify-between gap-2 pl-6">
+                  <div className="flex min-w-0 items-center justify-between gap-3 pl-6 sm:flex-col sm:items-end sm:justify-center sm:pl-0">
                     <span className="text-xs tabular-nums text-muted-foreground">
                       {formatRelative(item.updatedAt, copy.time)}
                     </span>
-                    <Button
-                      asChild
-                      size="sm"
-                      variant="default"
-                      className="shrink-0 shadow-sm"
-                    >
+                    <Button asChild size="sm" variant="default" className="min-h-10 shrink-0">
                       <LocalizedLink href={`/tasks/${item.taskId}`}>
-                        {descriptor.nextActionLabel}
-                        <ArrowRight className="size-4" aria-hidden />
+                        {actionLabel}
+                        <ArrowRight className="size-4 shrink-0" aria-hidden />
                       </LocalizedLink>
                     </Button>
                   </div>
@@ -829,45 +817,39 @@ function RecentActivitySection({
   const visibleEvents = events.slice(0, 8);
 
   return (
-    <Card className="shadow-sm">
+    <Card>
       <CardHeader className="pb-3">
         <CardTitle className="text-lg">{copy.feed.title}</CardTitle>
         <CardDescription>{copy.feed.description}</CardDescription>
       </CardHeader>
       <CardContent>
         {visibleEvents.length === 0 ? (
-          <div className="rounded-2xl border bg-muted/20 px-4 py-3 text-sm text-muted-foreground">
+          <div className="border-t px-1 py-3 text-sm text-muted-foreground">
             {copy.feed.empty}
           </div>
         ) : (
-          <ol className="relative space-y-3 before:absolute before:bottom-3 before:left-2 before:top-3 before:w-px before:bg-border">
+          <ol className="divide-y border-t">
             {visibleEvents.map((event) => (
-              <li key={event.id} className="relative flex gap-3 pl-6">
-                <span
-                  className="absolute left-0 top-1.5 size-4 rounded-full border-2 border-background bg-primary"
-                  aria-hidden
-                />
-                <div className="min-w-0 flex-1 rounded-2xl border bg-background px-3 py-2">
-                  <div className="flex min-w-0 flex-wrap items-center gap-2">
-                    <Badge variant="outline">
-                      {feedCategoryLabel(copy, event.category)}
-                    </Badge>
-                    <LocalizedLink
-                      href={`/tasks/${event.taskId}`}
-                      className="min-w-0 truncate text-sm font-medium hover:text-primary"
-                    >
-                      {event.taskTitle}
-                    </LocalizedLink>
-                    <span className="text-xs tabular-nums text-muted-foreground">
-                      {formatRelative(event.at, copy.time)}
-                    </span>
-                  </div>
+              <li key={event.id} className="grid gap-1 py-3 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-start sm:gap-3">
+                <Badge variant="outline" className="w-fit">
+                  {feedCategoryLabel(copy, event.category)}
+                </Badge>
+                <div className="min-w-0">
+                  <LocalizedLink
+                    href={`/tasks/${event.taskId}`}
+                    className="block min-w-0 truncate text-sm font-medium hover:text-primary"
+                  >
+                    {event.taskTitle}
+                  </LocalizedLink>
                   {event.summary ? (
-                    <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
+                    <p className="mt-0.5 line-clamp-1 text-sm text-muted-foreground">
                       {event.summary}
                     </p>
                   ) : null}
                 </div>
+                <span className="text-xs tabular-nums text-muted-foreground">
+                  {formatRelative(event.at, copy.time)}
+                </span>
               </li>
             ))}
           </ol>
@@ -883,8 +865,7 @@ export function DashboardPage({
   copy,
   workspaceId = data.workspaceId,
 }: DashboardPageProps) {
-  const { upcomingToday, autoCompleted, recentEvents, totalAutoCompleted } =
-    data;
+  const { upcomingToday, autoCompleted, recentEvents } = data;
   const needsAttention = useMemo(
     () => data.needsAttention.filter(isDashboardAttention),
     [data.needsAttention],
@@ -908,34 +889,34 @@ export function DashboardPage({
 
   return (
     <PageFrame mode="overview">
-      <div className="w-full space-y-6">
+      <div className="w-full space-y-4 sm:space-y-5">
         <HeadlineBanner
           copy={copy}
           completedToday={completedToday}
           attentionCount={needsAttention.length}
           inProgressCount={inProgress.length}
-          totalAutoCompleted={totalAutoCompleted}
         />
 
-        <div className="grid grid-cols-1 gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.65fr)]">
-          <div className="min-w-0 space-y-5">
-            {data.aiBrief?.status !== "disabled" ? (
-              <DigestModule
-                copy={copy}
-                aiBrief={data.aiBrief}
-                onRegenerate={regenerate}
-                isGenerating={isGenerating}
-              />
-            ) : null}
-            <RecentActivitySection copy={copy} events={recentEvents} />
-          </div>
+        {needsAttention.length > 0 ? (
+          <NeedsYouCard copy={copy} items={needsAttention} />
+        ) : null}
 
-          <aside className="min-w-0 space-y-5 xl:sticky xl:top-6 xl:self-start">
-            <NeedsYouCard copy={copy} items={needsAttention} />
-            <UpcomingTodayCard copy={copy} items={upcomingToday} />
-            <InProgressCard copy={copy} items={inProgress} />
-            <RecentCompletionsCard copy={copy} items={autoCompleted} />
-          </aside>
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <InProgressCard copy={copy} items={inProgress} />
+          <UpcomingTodayCard copy={copy} items={upcomingToday} />
+          <RecentCompletionsCard copy={copy} items={autoCompleted} />
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)]">
+          <RecentActivitySection copy={copy} events={recentEvents} />
+          {data.aiBrief?.status !== "disabled" ? (
+            <DigestModule
+              copy={copy}
+              aiBrief={data.aiBrief}
+              onRegenerate={regenerate}
+              isGenerating={isGenerating}
+            />
+          ) : null}
         </div>
       </div>
     </PageFrame>
