@@ -917,7 +917,7 @@ function ResultReviewHeader({
 
   return (
     <header
-      className="sticky top-0 z-20 rounded-2xl border border-primary/25 bg-background/95 px-4 py-4 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/90 sm:px-5"
+      className="sticky top-0 z-20 rounded-2xl border border-primary/25 bg-card px-4 py-4 shadow-sm sm:px-5"
       data-ui-surface-kind="runtime-control"
       data-testid="result-review-header"
     >
@@ -1911,8 +1911,8 @@ export function TaskWorkspacePlanSection({
       aria-label={copy.executionWorkspaceAria ?? "Task execution workspace"}
       className={
         displayState.layout === "result_focus"
-          ? "relative flex flex-col overflow-visible rounded-3xl border border-border/80 bg-background/70 xl:min-h-0 xl:flex-1 xl:overflow-y-auto"
-          : "relative flex flex-col overflow-visible rounded-3xl border border-border/80 bg-background/70 xl:min-h-0 xl:flex-1 xl:overflow-hidden"
+          ? "relative flex flex-col overflow-visible rounded-3xl border border-border/80 bg-muted/45 xl:min-h-0 xl:flex-1 xl:overflow-y-auto"
+          : "relative flex flex-col overflow-visible rounded-3xl border border-border/80 bg-muted/35 xl:min-h-0 xl:flex-1 xl:overflow-hidden"
       }
       data-workspace-layout={displayState.layout}
       data-workspace-primary-surface={displayState.primarySurface}
@@ -2005,7 +2005,7 @@ export function TaskWorkspacePlanSection({
               />
             ) : null}
             <div
-              className="min-w-0 rounded-2xl border border-border/70 bg-background p-4"
+              className="min-w-0 rounded-2xl border border-border/70 bg-card p-4 shadow-sm"
               data-ui-surface-kind="ai-authored"
               data-testid="final-result-surface"
             >

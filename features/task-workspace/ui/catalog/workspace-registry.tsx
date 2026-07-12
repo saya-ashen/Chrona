@@ -276,7 +276,7 @@ function CollapsibleBlock({
   const label = title || (copy.resultDetailsLabel ?? "Details");
 
   return (
-    <section className={cn("min-w-0 w-full max-w-full overflow-hidden text-sm", subtle ? "border-t border-border/60 py-3 first:border-t-0 first:pt-0" : "rounded-xl border border-border/70 bg-background/95 px-3 py-2.5 shadow-sm")}>
+    <section className={cn("min-w-0 w-full max-w-full overflow-hidden text-sm", subtle ? "border-t border-border/60 py-3 first:border-t-0 first:pt-0" : "rounded-xl border border-border/70 bg-muted/45 px-3 py-2.5")}>
       <button
         type="button"
         className="flex w-full min-w-0 max-w-full items-center justify-between gap-2 text-left"
@@ -658,7 +658,7 @@ function WorkspaceTable({ props }: { props: WorkspaceTableProps }) {
   const error = filePreviewErrorMessage(props.previewError, copy);
 
   const contentNode = (
-    <section className="min-w-0 w-full max-w-full space-y-2 overflow-hidden rounded-md border border-border bg-background/95 p-2 text-sm shadow-sm">
+    <section className="min-w-0 w-full max-w-full space-y-2 overflow-hidden text-sm">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
           {props.title ? <p className="font-medium text-foreground">{props.title}</p> : null}
@@ -676,9 +676,9 @@ function WorkspaceTable({ props }: { props: WorkspaceTableProps }) {
       {!error && !parsed.parseError && parsed.rows.length === 0 ? <p className="rounded-md bg-muted/60 px-2 py-1.5 text-xs text-muted-foreground">No table rows in preview.</p> : null}
       {parsed.rows.length > 0 && tableColumns.length > 0 ? (
         <>
-          <div className="min-w-0 w-full max-w-full overflow-hidden rounded-md border border-border">
+          <div className="min-w-0 w-full max-w-full overflow-hidden rounded-md border border-border/80 bg-background">
             <table className="w-full table-fixed caption-bottom text-sm">
-              <thead className="[&_tr]:border-b">
+              <thead className="bg-muted/55 [&_tr]:border-b">
                 {table.getHeaderGroups().map((headerGroup) => (
                   <tr key={headerGroup.id} className="border-b transition-colors hover:bg-muted/50">
                     {headerGroup.headers.map((header) => {
@@ -787,7 +787,7 @@ export const { registry: workspaceRegistry } = defineRegistry(chronaCatalog, {
     Markdown: ({ props }) => {
       const content = typeof props.content === "string" ? props.content : "";
       const contentNode = (
-        <article className="min-w-0 w-full max-w-full overflow-hidden rounded-xl border border-border/70 bg-background/95 px-3 py-2.5 text-sm leading-6 text-foreground shadow-sm">
+        <article className="min-w-0 w-full max-w-full overflow-hidden px-0.5 py-1 text-sm leading-6 text-foreground">
           <div className="max-w-none space-y-2 break-words [overflow-wrap:anywhere] [&_a]:font-medium [&_a]:text-primary [&_a]:underline-offset-4 hover:[&_a]:underline [&_blockquote]:rounded-lg [&_blockquote]:border-l-2 [&_blockquote]:border-primary/40 [&_blockquote]:bg-primary-soft/45 [&_blockquote]:px-3 [&_blockquote]:py-2 [&_blockquote]:text-foreground/80 [&_code]:rounded-md [&_code]:bg-muted [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-[0.82em] [&_code]:text-foreground [&_h1]:font-heading [&_h1]:text-base [&_h1]:font-semibold [&_h1]:leading-tight [&_h2]:font-heading [&_h2]:text-sm [&_h2]:font-semibold [&_h2]:leading-tight [&_h3]:text-sm [&_h3]:font-semibold [&_hr]:border-border [&_li]:pl-1 [&_ol]:list-decimal [&_ol]:space-y-1 [&_ol]:pl-5 [&_p]:text-foreground/88 [&_pre]:max-w-full [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:bg-muted/70 [&_pre]:p-3 [&_pre]:text-xs [&_strong]:text-foreground [&_table]:w-full [&_table]:table-fixed [&_table]:border-collapse [&_td]:border [&_td]:border-border [&_td]:p-1.5 [&_td]:break-words [&_th]:border [&_th]:border-border [&_th]:bg-muted/70 [&_th]:p-1.5 [&_th]:text-left [&_th]:break-words [&_ul]:list-disc [&_ul]:space-y-1 [&_ul]:pl-5">
             <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
           </div>
@@ -798,7 +798,7 @@ export const { registry: workspaceRegistry } = defineRegistry(chronaCatalog, {
     JsonView: ({ props }) => {
       const jsonText = typeof props.value === "string" ? props.value : JSON.stringify(props.value, null, 2);
       const contentNode = (
-        <section className="min-w-0 w-full max-w-full overflow-hidden rounded-xl border border-border/70 bg-background/95 px-3 py-2.5 text-sm text-foreground shadow-sm">
+        <section className="min-w-0 w-full max-w-full overflow-hidden px-0.5 py-1 text-sm text-foreground">
           {props.title ? <p className="mb-2 truncate text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">{props.title}</p> : null}
           <pre className="max-h-96 max-w-full overflow-x-auto rounded-lg bg-muted/60 p-2 text-xs leading-5 text-foreground/80">
             {jsonText}

@@ -6,7 +6,7 @@ import type { UiDocument } from "@chrona/ui-protocol";
 import { SpecRenderer } from "../../../../../../../../features/task-workspace/ui/catalog/spec-renderer";
 
 describe("workspace result registry", () => {
-  it("renders JsonView with title and card surface", () => {
+  it("renders JsonView as flat result content", () => {
     const spec: UiDocument = {
       root: "root",
       elements: {
@@ -22,7 +22,7 @@ describe("workspace result registry", () => {
 
     expect(screen.getByText("Report evidence")).toBeInTheDocument();
     const surface = screen.getByText("Report evidence").closest("section");
-    expect(surface).toHaveClass("bg-background/95");
+    expect(surface).not.toHaveClass("bg-card");
     expect(screen.getByText(/"status": "ok"/)).toBeInTheDocument();
   });
 
@@ -106,6 +106,8 @@ describe("workspace result registry", () => {
     expect(table).toHaveClass("table-fixed");
     expect(table.parentElement).toHaveClass("w-full");
     expect(table.parentElement).not.toHaveClass("overflow-x-auto");
+    expect(table.parentElement).toHaveClass("bg-background");
+    expect(table.closest("section")).not.toHaveClass("bg-card");
     expect(screen.getByText("Trending repos")).toBeInTheDocument();
     expect(screen.getByText(".chrona/outputs/N20260706-01/trending.json")).toBeInTheDocument();
     const repositoryHeader = screen.getByRole("button", { name: "Sort by Repository" });
