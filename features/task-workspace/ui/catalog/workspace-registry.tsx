@@ -10,12 +10,12 @@ import { shadcnComponents } from "@json-render/shadcn";
 import { useI18n, useLocale } from "@chrona/i18n/react";
 import { flexRender, getCoreRowModel, getPaginationRowModel, getSortedRowModel, useReactTable, type ColumnDef, type SortingState } from "@tanstack/react-table";
 import { chronaCatalog } from "@chrona/ui-protocol";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Badge } from "shared/ui/badge";
+import { Button } from "shared/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { taskWorkspaceActivityMessages } from "@/lib/i18n/messages";
-import { cn } from "@/lib/utils";
+import { taskWorkspaceActivityMessages } from "@chrona/i18n/task-workspace";
+import { cn } from "@/lib/utils"
 
 type OccurrenceOption = {
   value: string;

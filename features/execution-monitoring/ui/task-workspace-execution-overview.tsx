@@ -3,7 +3,7 @@ import { useI18n } from "@chrona/i18n/react";
 import { createStateStore } from "@json-render/react";
 import { buildResultSpec, type UiDocument } from "@chrona/ui-protocol";
 import type { PlanExecutionResult } from "@chrona/contracts/ai";
-import { taskWorkspaceActivityMessages } from "../../../apps/web/src/lib/i18n/messages";
+import { taskWorkspaceActivityMessages } from "@chrona/i18n/task-workspace";
 import type { WorkspaceRuntimeEvent } from "../model/workspace-runtime-events";
 import type {
   ExecutionOverviewCard,
