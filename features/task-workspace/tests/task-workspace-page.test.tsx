@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { TaskWorkspacePage } from "../ui/task-workspace-page";
 import type { TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph";
-import { createHeaderSpecFixture, taskWorkspaceStateFixtures } from "@/components/tasks/workspace/test-support/task-workspace-test-fixtures";
+import { createHeaderSpecFixture, taskWorkspaceStateFixtures } from "@features/task-workspace/test-support/task-workspace-test-fixtures";
 import { createTaskWorkspaceUiFixture } from "@/components/tasks/workspace/test/task-workspace-ui-fixtures";
 import type { UiDocument } from "@chrona/ui-protocol";
 import type { TaskPageData, TaskPlanGenerationStatus } from "./task-workspace-model";

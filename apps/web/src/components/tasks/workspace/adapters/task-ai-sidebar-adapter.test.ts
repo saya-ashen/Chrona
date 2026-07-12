@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { createTaskWorkspaceFixturePageData } from "../test-support/task-workspace-test-fixtures";
+import { createTaskWorkspaceFixturePageData } from "../../../../../../../features/task-workspace/test-support/task-workspace-test-fixtures";
 import { createTaskAiSidebarContext } from "./task-ai-sidebar-adapter";
 
 function createExecutionSummary(overrides: Partial<NonNullable<ReturnType<typeof createTaskWorkspaceFixturePageData>["task"]["executionSummary"]>> = {}) {

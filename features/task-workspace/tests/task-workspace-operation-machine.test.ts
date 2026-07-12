@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { UiDocument } from "@chrona/ui-protocol";
 import { resolveTaskWorkspaceOperationState, type ResolveTaskWorkspaceOperationStateInput } from "../model/task-workspace-operation-machine";
-import { createTaskWorkspaceFixtureGraph, createTaskWorkspaceFixtureNode, createTaskWorkspaceFixturePageData } from "../../../apps/web/src/components/tasks/workspace/test-support/task-workspace-test-fixtures";
+import { createTaskWorkspaceFixtureGraph, createTaskWorkspaceFixtureNode, createTaskWorkspaceFixturePageData } from "../test-support/task-workspace-test-fixtures";
 
 const actionSpec: UiDocument = {
   root: "root",

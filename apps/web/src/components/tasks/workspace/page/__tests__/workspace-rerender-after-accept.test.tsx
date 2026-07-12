@@ -5,7 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { PropsWithChildren } from "react";
 import { useTaskWorkspacePlanState } from "../../hooks/use-task-workspace-plan-state";
 import { buildCommandCenterNowSpec } from "../../../../../../../../features/execution-monitoring/ui/build-execution-overview-spec";
-import { taskWorkspacePlanStateFixtures } from "../../test-support/task-workspace-test-fixtures";
+import { taskWorkspacePlanStateFixtures } from "../../../../../../../../features/task-workspace/test-support/task-workspace-test-fixtures";
 import type { TaskPageData } from "../../../../../../../../features/task-workspace";
 import type { TaskWorkspacePlanFlowState } from "../../../../../../../../features/task-workspace";
 

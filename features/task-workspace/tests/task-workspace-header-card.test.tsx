@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import type React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createStateStore } from "@json-render/core";
-import { createHeaderSpecFixture } from "@/components/tasks/workspace/test-support/task-workspace-test-fixtures";
+import { createHeaderSpecFixture } from "@features/task-workspace/test-support/task-workspace-test-fixtures";
 import { TaskWorkspaceHeaderCard } from "../ui/task-workspace-header-card";
 import type { TaskData } from "./task-workspace-model";
 type ChildrenProps = { children?: React.ReactNode };

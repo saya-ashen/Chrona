@@ -4,7 +4,7 @@ import {
   createTaskWorkspaceFixtureGraph,
   createTaskWorkspaceFixtureNode,
   createTaskWorkspaceFixturePageData,
-} from "../test-support/task-workspace-test-fixtures";
+} from "../../../../../../../features/task-workspace/test-support/task-workspace-test-fixtures";
 
 export const taskWorkspaceUiScenarios = {
   loading: { label: "Loading task workspace", status: "loading" },

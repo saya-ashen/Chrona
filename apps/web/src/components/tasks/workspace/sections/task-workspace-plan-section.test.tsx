@@ -40,7 +40,7 @@ import {
   createTaskWorkspaceFixtureGraph,
   createTaskWorkspaceFixtureNode,
   createTaskWorkspaceFixturePageData,
-} from "../test-support/task-workspace-test-fixtures";
+} from "../../../../../../../features/task-workspace/test-support/task-workspace-test-fixtures";
 
 const checkpoint = {
   id: "run-1:checkpoint:user_input",

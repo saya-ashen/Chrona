@@ -6,7 +6,7 @@ import type { PropsWithChildren } from "react";
 import type { TaskPlanReadModel } from "@chrona/contracts/ai";
 
 import { TaskWorkspacePage } from "../ui/task-workspace-page";
-import { createTaskWorkspaceFixturePageData } from "@/components/tasks/workspace/test-support/task-workspace-test-fixtures";
+import { createTaskWorkspaceFixturePageData } from "@features/task-workspace/test-support/task-workspace-test-fixtures";
 import type { TaskPageData } from "./task-workspace-model";
 
 type JsonEventHandler = (event: { event: string; data: Record<string, unknown>; message: unknown }) => void;
@@ -259,11 +259,33 @@ describe("TaskWorkspacePage Accept Plan live header action", () => {
   it("updates Accept Plan to Start from real click plus workspace state.update", async () => {
     renderWorkspace({ savedPlan: draftPlan(), planStatus: "waiting_acceptance", executionStatus: "idle" });
     await waitFor(() => expect(mocks.streamOpened).toBe(true));
-
     await act(async () => {
       pushEvent("state.snapshot", {
         type: "state.snapshot",
         state: {
+          "/execution/show-generate-plan": false,
+          "/execution/show-accept-plan": false,
+          "/execution/can-start": false,
+          "/execution/can-pause": false,
+          "/execution/can-stop": false,
+          "/execution/start-disabled": true,
+          "/execution/status": "no_plan",
+        },
+      });
+    });
+
+    await act(async () => {
+      pushEvent("state.update", {
+        type: "state.update",
+        updates: {
+          "/plan/saved/id": "plan-1",
+          "/plan/saved/status": "draft",
+          "/plan/saved/revision": 1,
+          "/plan/generation/status": "completed",
+          "/execution/has-plan": true,
+          "/execution/has-accepted-plan": false,
+          "/plan/generation/is-running": false,
+          "/plan/generation/header-action-disabled": false,
           "/execution/show-generate-plan": false,
           "/execution/show-accept-plan": true,
           "/plan/saved/id": "plan-1",
