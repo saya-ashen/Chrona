@@ -4,7 +4,7 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { TaskWorkspacePage } from "../ui/task-workspace-page";
 import type { TaskPlanGraphPlan } from "../contract";
 import { createHeaderSpecFixture, taskWorkspaceStateFixtures } from "@features/task-workspace/test-support/task-workspace-test-fixtures";
-import { createTaskWorkspaceUiFixture } from "@/components/tasks/workspace/test/task-workspace-ui-fixtures";
+import { createTaskWorkspaceUiFixture } from "@features/task-workspace/test-support/task-workspace-ui-fixtures";
 import type { UiDocument } from "@chrona/ui-protocol";
 import type { TaskPageData, TaskPlanGenerationStatus } from "./task-workspace-model";
 
