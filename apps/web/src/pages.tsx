@@ -274,6 +274,8 @@ export function TaskDetailRoutePage() {
   const { task, dictionary } = useLoaderData() as TaskPageRouteData;
 
   return (
-    <TaskWorkspacePage data={task} copy={dictionary.components.taskPage} />
+    <PageFrame mode="workspace">
+      <TaskWorkspacePage data={task} copy={dictionary.components.taskPage} />
+    </PageFrame>
   );
 }
