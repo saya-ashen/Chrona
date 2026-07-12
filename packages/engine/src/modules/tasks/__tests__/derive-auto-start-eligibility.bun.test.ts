@@ -202,8 +202,8 @@ describe("deriveAutoStartEligibility", () => {
     });
   });
 
-  describe("not eligible — automation_not_ready", () => {
-    it("prioritizes missing provider readiness over a missing execution runtime", () => {
+  describe("not eligible — no_runtime_config", () => {
+    it("prioritizes a missing execution runtime over provider readiness", () => {
       const result = deriveAutoStartEligibility({
         task: makeTask({ executionRuntime: null }),
         workBlock: makeWorkBlock(),
@@ -212,11 +212,12 @@ describe("deriveAutoStartEligibility", () => {
       });
       expect(result).toMatchObject({
         ok: false,
-        reason: "automation_not_ready",
-        disabledReason: "Connect an AI before enabling automation.",
+        reason: "no_runtime_config",
+        disabledReason: "Choose an execution runtime before automatic execution can start.",
       });
     });
   });
+
 
   describe("not eligible — no_runtime_config", () => {
     it("rejects tasks without an execution runtime after provider readiness succeeds", () => {

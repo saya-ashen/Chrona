@@ -47,7 +47,7 @@ describe("deriveAutoStartEligibility reasons", () => {
     ).toMatchObject({ ok: false, reason: "invalid_task_status" });
   });
 
-  it("reports automation_not_ready before runtime and accepted plan checks when no provider is configured", () => {
+  it("reports no_runtime_config before provider and accepted plan checks", () => {
     expect(
       deriveAutoStartEligibility({
         task: task({ executionRuntime: null, hasAcceptedPlan: false }),
@@ -56,9 +56,10 @@ describe("deriveAutoStartEligibility reasons", () => {
       }),
     ).toMatchObject({
       ok: false,
-      reason: "automation_not_ready",
-      disabledReason: "Connect an AI before enabling automation.",
+      reason: "no_runtime_config",
+      disabledReason: "Choose an execution runtime before automatic execution can start.",
     });
+
   });
 
   it("reports no_accepted_plan when runtime is configured", () => {
