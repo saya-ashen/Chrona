@@ -65,6 +65,12 @@ describe("TaskListPage results filters", () => {
     const user = userEvent.setup();
     renderResults();
 
+    const resultFilters = screen.getByRole("group", { name: "Result filters" });
+    expect(within(resultFilters).getAllByRole("combobox")).toHaveLength(3);
+    expect(within(resultFilters).getByRole("combobox", { name: "Result date" })).toBeInTheDocument();
+    expect(within(resultFilters).getByRole("combobox", { name: "Result status" })).toBeInTheDocument();
+    expect(within(resultFilters).getByRole("combobox", { name: "Source task" })).toBeInTheDocument();
+
     expect(screen.getByText("Weekly report report")).toBeInTheDocument();
     expect(screen.getByText("Daily report report")).toBeInTheDocument();
 

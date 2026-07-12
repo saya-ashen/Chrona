@@ -690,31 +690,33 @@ export function TaskListPage({
           </Button>
         </div>
         {view === "results" ? (
-          <Select
-            value={resultDate}
-            onValueChange={(value) =>
-              setParam("resultDate", value === "all" ? "" : value)
-            }
+          <div
+            className="flex items-center gap-2 overflow-x-auto pb-1"
+            role="group"
+            aria-label="Result filters"
           >
-            <SelectTrigger size="sm" className="w-40" aria-label="Result date">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Any date</SelectItem>
-              <SelectItem value="7d">Last 7 days</SelectItem>
-              <SelectItem value="30d">Last 30 days</SelectItem>
-            </SelectContent>
+            <Select
+              value={resultDate}
+              onValueChange={(value) =>
+                setParam("resultDate", value === "all" ? "" : value)
+              }
+            >
+              <SelectTrigger size="sm" className="w-40 shrink-0" aria-label="Result date">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Any date</SelectItem>
+                <SelectItem value="7d">Last 7 days</SelectItem>
+                <SelectItem value="30d">Last 30 days</SelectItem>
+              </SelectContent>
+            </Select>
             <Select
               value={resultStatus}
               onValueChange={(value) =>
                 setParam("resultStatus", value === "all" ? "" : value)
               }
             >
-              <SelectTrigger
-                size="sm"
-                className="w-40"
-                aria-label="Result status"
-              >
+              <SelectTrigger size="sm" className="w-40 shrink-0" aria-label="Result status">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -729,11 +731,7 @@ export function TaskListPage({
                 setParam("resultSource", value === "all" ? "" : value)
               }
             >
-              <SelectTrigger
-                size="sm"
-                className="w-48"
-                aria-label="Source task"
-              >
+              <SelectTrigger size="sm" className="w-48 shrink-0" aria-label="Source task">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -747,7 +745,7 @@ export function TaskListPage({
                   ))}
               </SelectContent>
             </Select>
-          </Select>
+          </div>
         ) : null}
 
         <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-border bg-background px-3 py-2">
