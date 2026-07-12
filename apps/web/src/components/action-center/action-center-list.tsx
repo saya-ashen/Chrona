@@ -22,7 +22,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "shared/ui/select";
-import { cn } from "@/lib/utils"
+import { cn } from "@/lib/utils";
 
 type ActionCenterPresentationItem = ActionCenterItem & {
   stateView?: WorkStateView;
@@ -493,8 +493,16 @@ export function ActionCenterList({
                                 </div>
                               </div>
                               <p className="line-clamp-2 max-w-3xl break-words text-[13px] leading-5 text-muted-foreground">
-                                {item.consequence || item.summary}
+                                {item.kind === "auto_execution_skipped"
+                                  ? item.summary
+                                  : item.consequence || item.summary}
                               </p>
+                              {item.kind === "auto_execution_skipped" &&
+                              item.consequence ? (
+                                <p className="line-clamp-1 text-xs text-muted-foreground">
+                                  {item.consequence}
+                                </p>
+                              ) : null}
                               <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-muted-foreground">
                                 {item.currentRunLabel ? (
                                   <span className="break-all">

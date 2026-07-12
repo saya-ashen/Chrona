@@ -15,7 +15,8 @@ mock.module("@/modules/plan-execution", () => ({
   },
 }));
 
-const { autoStartScheduledPlanTasks } = await import("@/modules/scheduling/auto-start-scheduled-plan");
+const { autoStartScheduledPlanTasks } =
+  await import("@/modules/scheduling/auto-start-scheduled-plan");
 
 async function resetDb() {
   await db.scheduleProposal.deleteMany();
@@ -46,7 +47,10 @@ async function createWorkspace() {
   });
 }
 
-async function createDueTask(workspaceId: string, overrides: Record<string, unknown> = {}) {
+async function createDueTask(
+  workspaceId: string,
+  overrides: Record<string, unknown> = {},
+) {
   const {
     scheduledStartAt,
     scheduledEndAt,
@@ -141,7 +145,9 @@ describe("auto-start-scheduled-plan", () => {
 
   it("skips due auto-execute tasks without runtime config", async () => {
     const workspace = await createWorkspace();
-    const { task } = await createDueTask(workspace.id, { executionRuntime: "" });
+    const { task } = await createDueTask(workspace.id, {
+      executionRuntime: "",
+    });
 
     const result = await autoStartScheduledPlanTasks({ now: new Date() });
 
@@ -177,7 +183,9 @@ describe("auto-start-scheduled-plan", () => {
   it("starts due scheduled parent task and materializes automatic child-task nodes into separate sessions", async () => {
     const workspace = await createWorkspace();
 
-    const { task: parentTask, workBlock } = await createDueTask(workspace.id, { title: "Ship weekly plan" });
+    const { task: parentTask, workBlock } = await createDueTask(workspace.id, {
+      title: "Ship weekly plan",
+    });
 
     await db.taskProjection.create({
       data: {
@@ -211,7 +219,9 @@ describe("auto-start-scheduled-plan", () => {
             localId: "node-auto-1",
             type: "task",
             title: "Collect evidence",
-            config: { expectedOutput: "Collect evidence" } as import("@chrona/contracts/ai").NodeConfig,
+            config: {
+              expectedOutput: "Collect evidence",
+            } as import("@chrona/contracts/ai").NodeConfig,
             dependencies: [],
             dependents: [],
             mode: "auto",
@@ -329,6 +339,12 @@ describe("auto-start-scheduled-plan", () => {
 
     expect(result.started).toEqual([]);
     expect(startMock).not.toHaveBeenCalled();
+    expect(result.skipped).toEqual([
+      expect.objectContaining({
+        reasonCode: "not_due",
+        actionable: false,
+      }),
+    ]);
   });
 
   it("starts tasks whose scheduled start exactly matches now", async () => {
@@ -386,8 +402,14 @@ describe("auto-start-scheduled-plan", () => {
 
     const result = await autoStartScheduledPlanTasks({ now });
 
-    expect(result.started.map((started) => started.taskId)).toEqual([olderTask.id, newerTask.id]);
-    expect(startMock.mock.calls.map((call) => call[0]?.taskId)).toEqual([olderTask.id, newerTask.id]);
+    expect(result.started.map((started) => started.taskId)).toEqual([
+      olderTask.id,
+      newerTask.id,
+    ]);
+    expect(startMock.mock.calls.map((call) => call[0]?.taskId)).toEqual([
+      olderTask.id,
+      newerTask.id,
+    ]);
   });
 
   it("ignores due scheduled tasks that did not opt in to auto execution", async () => {
@@ -419,7 +441,9 @@ describe("auto-start-scheduled-plan", () => {
     expect(result.started).toEqual([]);
     expect(result.skipped.length).toBe(1);
     expect(result.skipped[0]?.taskId).toBe(task.id);
-    expect(result.skipped[0]?.reason).toBe("A run is already active for this task.");
+    expect(result.skipped[0]?.reason).toBe(
+      "A run is already active for this task.",
+    );
     expect(startMock).not.toHaveBeenCalled();
   });
 
@@ -459,14 +483,19 @@ describe("auto-start-scheduled-plan", () => {
     expect(skipEvents[0]?.actorType).toBe("system");
     expect(skipEvents[0]?.actorId).toBe("auto-start-scheduler");
     expect(skipEvents[0]?.source).toBe("scheduler");
-    const payload = skipEvents[0]?.payload as Record<string, unknown> | undefined;
+    const payload = skipEvents[0]?.payload as
+      Record<string, unknown> | undefined;
     expect(payload?.reason).toBe("already_running");
   });
 
   it("does not let one task failure block other due tasks", async () => {
     const workspace = await createWorkspace();
-    const { task: task1 } = await createDueTask(workspace.id, { title: "Task 1" });
-    const { task: task2 } = await createDueTask(workspace.id, { title: "Task 2" });
+    const { task: task1 } = await createDueTask(workspace.id, {
+      title: "Task 1",
+    });
+    const { task: task2 } = await createDueTask(workspace.id, {
+      title: "Task 2",
+    });
 
     let callCount = 0;
     startMock.mockImplementation(async (input: { taskId: string }) => {
@@ -555,7 +584,9 @@ describe("auto-start-scheduled-plan", () => {
     expect(result.started[0].taskId).toBe(task.id);
     expect(result.started[0].workBlockId).toBeString();
 
-    const updatedBlock = await db.workBlock.findFirst({ where: { taskId: task.id } });
+    const updatedBlock = await db.workBlock.findFirst({
+      where: { taskId: task.id },
+    });
     expect(updatedBlock?.status).toBe("Active");
     expect(updatedBlock?.startedAt).not.toBeNull();
   });
@@ -579,7 +610,9 @@ describe("auto-start-scheduled-plan", () => {
       scheduledEndAt: new Date(now.getTime() + 30 * 60_000),
       scheduleSource: "human",
     });
-    const createdTask = await db.task.findUniqueOrThrow({ where: { id: created.taskId } });
+    const createdTask = await db.task.findUniqueOrThrow({
+      where: { id: created.taskId },
+    });
     await saveCompiledPlan({
       workspaceId: workspace.id,
       taskId: created.taskId,
@@ -625,7 +658,9 @@ describe("auto-start-scheduled-plan", () => {
       trigger: "scheduler",
     });
 
-    const block = await db.workBlock.findFirst({ where: { taskId: created.taskId } });
+    const block = await db.workBlock.findFirst({
+      where: { taskId: created.taskId },
+    });
     expect(block?.status).toBe("Active");
     expect(block?.startedAt).not.toBeNull();
   });
@@ -689,14 +724,20 @@ describe("auto-start-scheduled-plan", () => {
       autoStartScheduledPlanTasks({ now }),
       autoStartScheduledPlanTasks({ now }),
     ]);
-    const afterRestart = await autoStartScheduledPlanTasks({ now: new Date(now.getTime() + 60_000) });
+    const afterRestart = await autoStartScheduledPlanTasks({
+      now: new Date(now.getTime() + 60_000),
+    });
 
     expect(startMock).toHaveBeenCalledTimes(1);
     expect([...first.started, ...duplicate.started]).toHaveLength(1);
     expect(afterRestart.started).toEqual([]);
     expect(
       await db.event.count({
-        where: { taskId: task.id, workBlockId: workBlock.id, eventType: "task.auto_start.triggered" },
+        where: {
+          taskId: task.id,
+          workBlockId: workBlock.id,
+          eventType: "task.auto_start.triggered",
+        },
       }),
     ).toBe(1);
   });

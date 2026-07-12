@@ -1,20 +1,32 @@
-import { ApprovalStatus, RunStatus, ScheduleProposalStatus, TaskStatus } from "@/generated/prisma/client";
+import {
+  ApprovalStatus,
+  RunStatus,
+  ScheduleProposalStatus,
+  TaskStatus,
+} from "@/generated/prisma/client";
 import type { ActionCenterProjection } from "@chrona/contracts/api";
 import { deriveWorkStateView } from "@chrona/domain";
 import { db } from "@/lib/db";
-
 
 const DUE_NOW_WINDOW_MS = 15 * 60 * 1000;
 const DUE_SOON_WINDOW_MS = 24 * 60 * 60 * 1000;
 const OVERDUE_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 const RECENT_NOTIFICATION_WINDOW_MS = 24 * 60 * 60 * 1000;
 
-const CLOSED_DUE_STATUSES = [TaskStatus.Completed, TaskStatus.Done, TaskStatus.Cancelled];
+const CLOSED_DUE_STATUSES = [
+  TaskStatus.Completed,
+  TaskStatus.Done,
+  TaskStatus.Cancelled,
+];
 
+type SortableActionCenterItem = ActionCenterProjection[number] & {
+  sortAt: Date;
+};
 
-type SortableActionCenterItem = ActionCenterProjection[number] & { sortAt: Date };
-
-function buildDueItem(task: { id: string; title: string; workspaceId: string; dueAt: Date }, now: Date): SortableActionCenterItem {
+function buildDueItem(
+  task: { id: string; title: string; workspaceId: string; dueAt: Date },
+  now: Date,
+): SortableActionCenterItem {
   const dueNowStartsAt = new Date(now.getTime() - DUE_NOW_WINDOW_MS);
   const dueNowEndsAt = new Date(now.getTime() + DUE_NOW_WINDOW_MS);
 
@@ -63,7 +75,8 @@ function buildDueItem(task: { id: string; title: string; workspaceId: string; du
     currentRunLabel: null,
     detail: `Due at ${task.dueAt.toISOString()}`,
     summary: "Task is due soon.",
-    consequence: "Open the task to prepare or reschedule before it becomes overdue.",
+    consequence:
+      "Open the task to prepare or reschedule before it becomes overdue.",
     sortAt: task.dueAt,
   };
 }
@@ -81,7 +94,8 @@ function riskLevelForTimelineSeverity(severity: string | null) {
 
 const BLOCK_REASON_SUMMARIES: Record<string, string> = {
   capability_unavailable: "A required capability or provider is unavailable.",
-  external_dependency: "Execution is waiting on an external dependency to resolve.",
+  external_dependency:
+    "Execution is waiting on an external dependency to resolve.",
   node_blocked: "A step in the plan is blocked and needs operator review.",
   run_failed: "The latest run failed and the task is blocked.",
   sync_stale: "The task state is out of sync and needs a refresh.",
@@ -90,11 +104,87 @@ const BLOCK_REASON_SUMMARIES: Record<string, string> = {
 function readString(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
+const LEGACY_NON_ACTIONABLE_SCHEDULER_REASONS: Record<string, true> = {
+  "Automatic execution will start at the configured schedule time.": true,
+  "A run is already active for this task.": true,
+  not_due: true,
+  already_running: true,
+};
 
-function readBlockedReason(blockReason: unknown): { summary: string; actionRequired: string } {
+function readSchedulerPayload(payload: unknown): {
+  actionable?: boolean;
+  reasonCode?: string;
+  workBlockId?: string;
+} {
+  if (!payload || typeof payload !== "object" || Array.isArray(payload)) {
+    return {};
+  }
+
+  const value = payload as Record<string, unknown>;
+  return {
+    actionable:
+      typeof value.actionable === "boolean" ? value.actionable : undefined,
+    reasonCode: readString(value.reasonCode) ?? undefined,
+    workBlockId: readString(value.workBlockId) ?? undefined,
+  };
+}
+
+function isActionableSchedulerSkip(event: {
+  reason: string | null;
+  payload: unknown;
+}): boolean {
+  const payload = readSchedulerPayload(event.payload);
+  if (payload.actionable !== undefined) return payload.actionable;
+  if (
+    payload.reasonCode &&
+    LEGACY_NON_ACTIONABLE_SCHEDULER_REASONS[payload.reasonCode]
+  ) {
+    return false;
+  }
+  return (
+    !event.reason || !LEGACY_NON_ACTIONABLE_SCHEDULER_REASONS[event.reason]
+  );
+}
+
+function latestSchedulerEvents<
+  T extends {
+    eventType: string;
+    taskId: string;
+    reason: string | null;
+    payload: unknown;
+  },
+>(events: T[]): T[] {
+  const latestByKey = new Map<string, T>();
+  for (const event of events) {
+    if (
+      event.eventType === "scheduler.skip" &&
+      !isActionableSchedulerSkip(event)
+    ) {
+      continue;
+    }
+    const payload = readSchedulerPayload(event.payload);
+    const key = [
+      event.eventType,
+      event.taskId,
+      payload.workBlockId ?? "task",
+      payload.reasonCode ?? event.reason ?? "none",
+    ].join(":");
+    if (!latestByKey.has(key)) latestByKey.set(key, event);
+  }
+  return Array.from(latestByKey.values());
+}
+
+function readBlockedReason(blockReason: unknown): {
+  summary: string;
+  actionRequired: string;
+} {
   const reason =
     blockReason && typeof blockReason === "object"
-      ? (blockReason as { detail?: unknown; blockType?: unknown; actionRequired?: unknown })
+      ? (blockReason as {
+          detail?: unknown;
+          blockType?: unknown;
+          actionRequired?: unknown;
+        })
       : null;
 
   const detail = readString(reason?.detail);
@@ -108,17 +198,31 @@ function readBlockedReason(blockReason: unknown): { summary: string; actionRequi
 
   return {
     summary,
-    actionRequired: actionRequired ?? "Resume the task once the blocker is cleared.",
+    actionRequired:
+      actionRequired ?? "Resume the task once the blocker is cleared.",
   };
 }
 
-export async function getActionCenter(workspaceId: string): Promise<ActionCenterProjection> {
+export async function getActionCenter(
+  workspaceId: string,
+): Promise<ActionCenterProjection> {
   const now = new Date();
   const dueWindowStartsAt = new Date(now.getTime() - OVERDUE_WINDOW_MS);
   const dueWindowEndsAt = new Date(now.getTime() + DUE_SOON_WINDOW_MS);
-  const recentWindowStartsAt = new Date(now.getTime() - RECENT_NOTIFICATION_WINDOW_MS);
+  const recentWindowStartsAt = new Date(
+    now.getTime() - RECENT_NOTIFICATION_WINDOW_MS,
+  );
 
-  const [approvals, proposals, tasksWithLatestRuns, blockedTasks, dueTasks, schedulerEvents, completedRuns, infoNotifications] = await Promise.all([
+  const [
+    approvals,
+    proposals,
+    tasksWithLatestRuns,
+    blockedTasks,
+    dueTasks,
+    schedulerEvents,
+    completedRuns,
+    infoNotifications,
+  ] = await Promise.all([
     db.approval.findMany({
       where: {
         workspaceId,
@@ -216,7 +320,13 @@ export async function getActionCenter(workspaceId: string): Promise<ActionCenter
     ? await db.run.findMany({
         where: {
           id: { in: latestRunIds },
-          status: { in: [RunStatus.WaitingForInput, RunStatus.Failed, RunStatus.Cancelled] },
+          status: {
+            in: [
+              RunStatus.WaitingForInput,
+              RunStatus.Failed,
+              RunStatus.Cancelled,
+            ],
+          },
         },
         select: {
           id: true,
@@ -232,7 +342,9 @@ export async function getActionCenter(workspaceId: string): Promise<ActionCenter
 
   const taskByLatestRunId = new Map(
     tasksWithLatestRuns
-      .filter((task): task is typeof task & { latestRunId: string } => Boolean(task.latestRunId))
+      .filter((task): task is typeof task & { latestRunId: string } =>
+        Boolean(task.latestRunId),
+      )
       .map((task) => [task.latestRunId, task]),
   );
 
@@ -247,10 +359,14 @@ export async function getActionCenter(workspaceId: string): Promise<ActionCenter
       })
     : [];
 
-  const runLabelByRunId = new Map(blockedRunLabels.map((run) => [run.id, run.runtimeRunRef ?? run.id]));
+  const runLabelByRunId = new Map(
+    blockedRunLabels.map((run) => [run.id, run.runtimeRunRef ?? run.id]),
+  );
 
   const approvalItems = approvals.map((approval) => {
-    const payload = (approval.payload as { consequence?: string; ask?: string } | null) ?? null;
+    const payload =
+      (approval.payload as { consequence?: string; ask?: string } | null) ??
+      null;
 
     return {
       id: approval.id,
@@ -263,7 +379,10 @@ export async function getActionCenter(workspaceId: string): Promise<ActionCenter
       currentRunLabel: approval.run.runtimeRunRef ?? approval.run.id,
       detail: approval.type,
       summary: approval.summary,
-      consequence: payload?.consequence ?? payload?.ask ?? "Task remains blocked until resolved.",
+      consequence:
+        payload?.consequence ??
+        payload?.ask ??
+        "Task remains blocked until resolved.",
       sortAt: approval.requestedAt,
     };
   });
@@ -279,26 +398,40 @@ export async function getActionCenter(workspaceId: string): Promise<ActionCenter
     currentRunLabel: null,
     detail: `${proposal.source} via ${proposal.proposedBy}`,
     summary: proposal.summary,
-    consequence: "The plan stays unchanged until this proposal is accepted or rejected.",
+    consequence:
+      "The plan stays unchanged until this proposal is accepted or rejected.",
     sortAt: proposal.createdAt,
   }));
 
-function runWorkState(run: { status: RunStatus; pendingInputPrompt: string | null; retryable: boolean }, task: { status: TaskStatus; title: string }) {
-  const executionStatus = run.status === RunStatus.WaitingForInput
-    ? "waiting_for_user"
-    : run.status === RunStatus.Failed
-      ? "failed"
-      : run.status === RunStatus.Cancelled
-        ? "cancelled"
-        : String(run.status).toLowerCase();
-  return deriveWorkStateView({
-    taskStatus: task.status,
-    executionStatus,
-    blockReason: run.status === RunStatus.Failed
-      ? { blockType: "run_failed", detail: run.pendingInputPrompt ?? "The latest run failed.", scope: "run" }
-      : null,
-  });
-}
+  function runWorkState(
+    run: {
+      status: RunStatus;
+      pendingInputPrompt: string | null;
+      retryable: boolean;
+    },
+    task: { status: TaskStatus; title: string },
+  ) {
+    const executionStatus =
+      run.status === RunStatus.WaitingForInput
+        ? "waiting_for_user"
+        : run.status === RunStatus.Failed
+          ? "failed"
+          : run.status === RunStatus.Cancelled
+            ? "cancelled"
+            : String(run.status).toLowerCase();
+    return deriveWorkStateView({
+      taskStatus: task.status,
+      executionStatus,
+      blockReason:
+        run.status === RunStatus.Failed
+          ? {
+              blockType: "run_failed",
+              detail: run.pendingInputPrompt ?? "The latest run failed.",
+              scope: "run",
+            }
+          : null,
+    });
+  }
 
   const runItems = latestRuns
     .map((run) => {
@@ -312,8 +445,13 @@ function runWorkState(run: { status: RunStatus; pendingInputPrompt: string | nul
         taskStatus: task.projection?.persistedStatus ?? task.status,
         executionStatus: task.projection?.displayState,
       }).state;
-      const taskStateIsTerminal = taskState === "done" || taskState === "result_ready" || taskState === "cancelled";
-      const isOwnCancellationRecovery = task.status === TaskStatus.Cancelled && run.status === RunStatus.Cancelled;
+      const taskStateIsTerminal =
+        taskState === "done" ||
+        taskState === "result_ready" ||
+        taskState === "cancelled";
+      const isOwnCancellationRecovery =
+        task.status === TaskStatus.Cancelled &&
+        run.status === RunStatus.Cancelled;
 
       if (taskStateIsTerminal && !isOwnCancellationRecovery) {
         return null;
@@ -341,13 +479,22 @@ function runWorkState(run: { status: RunStatus; pendingInputPrompt: string | nul
         id: run.id,
         kind: "recovery" as const,
         actionType: workState.label,
-        riskLevel: run.status === RunStatus.Failed ? "critical" : run.retryable ? "high" : "medium",
+        riskLevel:
+          run.status === RunStatus.Failed
+            ? "critical"
+            : run.retryable
+              ? "high"
+              : "medium",
         sourceTaskTitle: task.title,
         sourceTaskId: task.id,
         workspaceId: task.workspaceId,
         currentRunLabel: run.runtimeRunRef ?? run.id,
         detail: `Latest run ${run.status}`,
-        summary: workState.blocker?.reason ?? (run.status === RunStatus.Failed ? "The latest run stopped before finishing." : "The latest run was cancelled."),
+        summary:
+          workState.blocker?.reason ??
+          (run.status === RunStatus.Failed
+            ? "The latest run stopped before finishing."
+            : "The latest run was cancelled."),
         consequence: workState.nextActionLabel,
         sortAt: run.updatedAt,
       };
@@ -355,48 +502,63 @@ function runWorkState(run: { status: RunStatus; pendingInputPrompt: string | nul
     .filter((item): item is NonNullable<typeof item> => Boolean(item));
 
   const dueItems = dueTasks
-    .filter((task): task is typeof task & { dueAt: Date } => Boolean(task.dueAt))
+    .filter((task): task is typeof task & { dueAt: Date } =>
+      Boolean(task.dueAt),
+    )
     .map((task) => buildDueItem(task, now));
 
-  const schedulerItems = schedulerEvents.map((event) => {
+  const schedulerItems = latestSchedulerEvents(schedulerEvents).map((event) => {
     const isStart = event.eventType === "scheduler.start";
 
     return {
       id: `${isStart ? "auto-execution-started" : "auto-execution-skipped"}:${event.id}`,
-      kind: isStart ? "auto_execution_started" as const : "auto_execution_skipped" as const,
+      kind: isStart
+        ? ("auto_execution_started" as const)
+        : ("auto_execution_skipped" as const),
       actionType: isStart ? "Auto execution started" : "Auto execution skipped",
       riskLevel: isStart ? "low" : "medium",
       sourceTaskTitle: event.task.title,
       sourceTaskId: event.taskId,
       workspaceId: event.workspaceId,
       currentRunLabel: null,
-      detail: event.reason,
-      summary: isStart ? "Scheduled automation started this task." : `Scheduled automation skipped this task${event.reason ? `: ${event.reason}` : "."}`,
-      consequence: isStart ? "Open the task to monitor progress." : "Open the task to adjust schedule or automation settings.",
+      detail: readSchedulerPayload(event.payload).reasonCode ?? null,
+      summary: isStart
+        ? "Scheduled automation started this task."
+        : (event.reason ?? "Scheduled automation could not start this task."),
+      consequence: isStart
+        ? "Open the task to monitor progress."
+        : "Automatic execution remains paused until this reason is resolved.",
       sortAt: event.createdAt,
     };
   });
 
-  const latestCompletedRunByTask = new Map<string, (typeof completedRuns)[number]>();
+  const latestCompletedRunByTask = new Map<
+    string,
+    (typeof completedRuns)[number]
+  >();
   for (const run of completedRuns) {
     if (run.task.latestRunId !== run.id) continue;
-    if (!latestCompletedRunByTask.has(run.taskId)) latestCompletedRunByTask.set(run.taskId, run);
+    if (!latestCompletedRunByTask.has(run.taskId))
+      latestCompletedRunByTask.set(run.taskId, run);
   }
 
-  const completedItems = Array.from(latestCompletedRunByTask.values()).map((run) => ({
-    id: `execution-completed:${run.id}`,
-    kind: "execution_completed" as const,
-    actionType: "Execution completed",
-    riskLevel: "low",
-    sourceTaskTitle: run.task.title,
-    sourceTaskId: run.taskId,
-    workspaceId: run.task.workspaceId,
-    currentRunLabel: run.runtimeRunRef ?? run.id,
-    detail: "Latest execution completed",
-    summary: "Task execution completed recently.",
-    consequence: "Open the task to review results or mark follow-up complete.",
-    sortAt: run.endedAt ?? run.updatedAt,
-  }));
+  const completedItems = Array.from(latestCompletedRunByTask.values()).map(
+    (run) => ({
+      id: `execution-completed:${run.id}`,
+      kind: "execution_completed" as const,
+      actionType: "Execution completed",
+      riskLevel: "low",
+      sourceTaskTitle: run.task.title,
+      sourceTaskId: run.taskId,
+      workspaceId: run.task.workspaceId,
+      currentRunLabel: run.runtimeRunRef ?? run.id,
+      detail: "Latest execution completed",
+      summary: "Task execution completed recently.",
+      consequence:
+        "Open the task to review results or mark follow-up complete.",
+      sortAt: run.endedAt ?? run.updatedAt,
+    }),
+  );
 
   const infoItems = infoNotifications.map((notification) => ({
     id: `notification-info:${notification.id}`,
@@ -435,15 +597,27 @@ function runWorkState(run: { status: RunStatus; pendingInputPrompt: string | nul
         sourceTaskTitle: task.title,
         sourceTaskId: task.id,
         workspaceId: task.workspaceId,
-        currentRunLabel: task.latestRunId ? runLabelByRunId.get(task.latestRunId) ?? task.latestRunId : null,
+        currentRunLabel: task.latestRunId
+          ? (runLabelByRunId.get(task.latestRunId) ?? task.latestRunId)
+          : null,
         detail: actionRequired,
         summary,
-        consequence: "Execution stays blocked until an operator resolves the cause and resumes the task.",
+        consequence:
+          "Execution stays blocked until an operator resolves the cause and resumes the task.",
         sortAt: task.updatedAt,
       };
     });
 
-  return [...approvalItems, ...proposalItems, ...runItems, ...dueItems, ...schedulerItems, ...completedItems, ...infoItems, ...blockedItems]
+  return [
+    ...approvalItems,
+    ...proposalItems,
+    ...runItems,
+    ...dueItems,
+    ...schedulerItems,
+    ...completedItems,
+    ...infoItems,
+    ...blockedItems,
+  ]
     .sort((left, right) => right.sortAt.getTime() - left.sortAt.getTime())
     .map(({ sortAt: _sortAt, ...item }) => item);
 }
