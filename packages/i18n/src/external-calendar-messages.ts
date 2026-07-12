@@ -1,4 +1,3 @@
-
 export const externalCalendarMessages = {
   setupTitle: "Connect external calendar",
   setupDescription: "Add a read-only subscription link. Chrona imports busy time but never edits the calendar.",

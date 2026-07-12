@@ -48,10 +48,10 @@ import {
 } from "../schedule-page-utils";
 import { type TaskConfigAiClient, type TaskConfigExecutionRuntime } from "../forms/task-config-form";
 import { CalendarDays } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "shared/ui/badge";
 import { useI18n, useLocale } from "@chrona/i18n/react";
-import { externalCalendarMessages } from "@/lib/i18n/messages";
-import { cn } from "@/lib/utils";
+import { externalCalendarMessages } from "@chrona/i18n/external-calendar"
+import { cn } from "@/lib/utils"
 
 const TIMELINE_HOUR_HEIGHT = 56;
 const WORKDAY_START_HOUR = 8;
