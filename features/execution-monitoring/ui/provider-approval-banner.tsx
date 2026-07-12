@@ -1,7 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiJson } from "../../../apps/web/src/api";
-import { Button } from "../../../apps/web/src/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "../../../apps/web/src/components/ui/card";
+import { Button, Card, CardContent, CardHeader, CardTitle } from "@shared/ui";
 
 type ProviderApprovalChoice = "approve_once" | "approve_session" | "approve_always" | "deny";
 

@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { CalendarClock, Radio } from "lucide-react";
-import { Button } from "../../../apps/web/src/components/ui/button";
+import { Button } from "@shared/ui";
 import { taskWorkspaceActivityMessages } from "../../../apps/web/src/lib/i18n/messages";
 import { mergeWorkspaceActivity, runtimeEventsToWorkspaceActivity } from "../../task-workspace";
 import type { WorkspaceRuntimeEvent } from "../model/workspace-runtime-events";

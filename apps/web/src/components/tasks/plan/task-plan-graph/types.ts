@@ -1,9 +1,5 @@
 import type { Edge, Node } from "@xyflow/react";
 import type {
-  PlanEdgeDataModel,
-  PlanEdgeEmphasis,
-  PlanEdgeKind,
-  PlanGraphAnalytics,
   PlanNodeDataModel,
   TaskPlanGraphPlan,
 } from "@features/task-workspace/contract";

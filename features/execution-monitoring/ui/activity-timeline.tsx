@@ -1,7 +1,6 @@
 import { useState, type ReactNode } from "react";
 import { Bot, Check, ChevronDown, ChevronUp, Circle, FileText, GitBranch, ListTree, Sparkles, TriangleAlert, Wrench } from "lucide-react";
-import { Button } from "../../../apps/web/src/components/ui/button";
-import { cn } from "../../../apps/web/src/lib/utils";
+import { Button, cn } from "@shared/ui";
 import type { WorkspaceActivityItem, WorkspaceActivityTone } from "../../task-workspace";
 
 // ─── Data model ───────────────────────────────────────────────────────────────

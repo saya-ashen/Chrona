@@ -13,6 +13,8 @@ export default defineConfig({
       "@chrona/codex": resolve(import.meta.dirname, "apps/web/src/test/codex-provider.ts"),
       "@chrona/omp": resolve(import.meta.dirname, "apps/web/src/test/omp-provider.ts"),
       "@features": resolve(import.meta.dirname, "features"),
+      "@shared/ui": resolve(import.meta.dirname, "shared/ui/index.ts"),
+      "shared/ui": resolve(import.meta.dirname, "shared/ui"),
     },
   },
 

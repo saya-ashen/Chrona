@@ -16,21 +16,19 @@ import { SpecRenderer } from "../../task-workspace";
 import { buildCommandCenterOutputTabSpec, buildCommandCenterTrailTabSpec, type ResultNodeFilter, type ResultNodeOption } from "./build-execution-overview-spec";
 import { mergeWorkspaceActivity, runtimeEventsToWorkspaceActivity } from "../../task-workspace";
 import { UiSurfaceFrame } from "./ui-surface-frame";
-import { Button } from "../../../apps/web/src/components/ui/button";
-import { Badge } from "../../../apps/web/src/components/ui/badge";
 import {
+  Badge,
+  Button,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "../../../apps/web/src/components/ui/select";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "../../../apps/web/src/components/ui/dropdown-menu";
+} from "@shared/ui";
 
 type OverviewAction = (nodeId?: string) => void;
 
