@@ -66,13 +66,12 @@ vi.mock("@/components/tasks/workspace/sections/task-workspace-edit-section", () 
 }));
 
 vi.mock("@/components/tasks/workspace/sections/task-workspace-plan-section", () => ({
-  TaskWorkspacePlanSection: ({ onGeneratePlan, onApplyPlan, plan, canAcceptPlan }: {
+  TaskWorkspacePlanSection: ({ onGeneratePlan, plan, canAcceptPlan }: {
     onGeneratePlan: () => void;
-    onApplyPlan: (plan: TaskPlanReadModel) => void;
     plan: TaskPlanReadModel | null;
     canAcceptPlan: boolean;
   }) => canAcceptPlan && plan
-    ? <button type="button" onClick={() => onApplyPlan(plan)}>Accept plan</button>
+    ? null
     : <button type="button" onClick={onGeneratePlan}>Generate plan</button>,
 }));
 

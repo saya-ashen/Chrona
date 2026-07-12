@@ -901,13 +901,13 @@ describe("TaskWorkspaceExecutionOverview", () => {
     await user.click(await screen.findByText("Collapse all"));
 
     expect(
-      screen.getByRole("button", { name: /Secondary evidence/ }),
-    ).toHaveAttribute("aria-expanded", "true");
+      screen.getByRole("button", { name: /Deliver launch brief/ }),
+    ).toHaveAttribute("aria-expanded", "false");
     expect(
-      screen.getByRole("button", { name: /Primary details/ }),
-    ).toHaveAttribute("aria-expanded", "true");
-    expect(screen.getByText("Evidence details")).toBeInTheDocument();
-    expect(screen.getByText("Visible details")).toBeInTheDocument();
+      screen.queryByRole("button", { name: /Secondary evidence/ }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByText("Evidence details")).not.toBeInTheDocument();
+    expect(screen.queryByText("Visible details")).not.toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Result options" }));
     await user.click(await screen.findByText("Expand all"));
