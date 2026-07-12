@@ -104,8 +104,6 @@ describe("ensureSqliteDatabase", () => {
       db.close();
     }
   });
-<<<<<<< HEAD
-=======
 
   it("proves fresh install and previous-release upgrade against shipped migrations", () => {
     const migrationsDir = resolve(import.meta.dir, "../../../prisma/migrations");
@@ -150,5 +148,4 @@ describe("ensureSqliteDatabase", () => {
       upgraded.close();
     }
   });
->>>>>>> db8871ce (refactor(web): migrate feature boundaries and shared UI)
 });
