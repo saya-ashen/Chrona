@@ -1,6 +1,5 @@
 import type {
   CheckpointActionKind,
-  
   ExecutionActionInput,
   ExecutionCheckpoint,
   NodeResult,

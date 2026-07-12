@@ -6,7 +6,7 @@ import type {
   PlanGraphAnalytics,
   PlanNodeDataModel,
   TaskPlanGraphPlan,
-} from "@features/task-workspace";
+} from "@features/task-workspace/contract";
 
 export type {
   PlanEdgeDataModel,
@@ -22,7 +22,7 @@ export type {
   PlanNodeKind,
   PlanNodeStatus,
   TaskPlanGraphPlan,
-} from "@features/task-workspace";
+} from "@features/task-workspace/contract";
 
 
 export type TaskPlanGraphMode = "full" | "compact" | "auto";
