@@ -244,7 +244,7 @@ export function SchedulePage({
 
         <div className="min-h-0 overflow-visible xl:overflow-hidden">
           <Tabs defaultValue="planning" className="h-full min-h-0">
-            <TabsList className="grid w-full grid-cols-2 xl:hidden">
+            <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="planning">{copy.readyToSchedule}</TabsTrigger>
               <TabsTrigger value="calendar">{copy.calendarTab}</TabsTrigger>
             </TabsList>
@@ -260,7 +260,7 @@ export function SchedulePage({
                 onScheduleTask={setLocalSelectedTaskId}
               />
             </TabsContent>
-            <TabsContent value="calendar" className="min-h-0 overflow-visible xl:hidden">
+            <TabsContent value="calendar" className="min-h-0 overflow-visible xl:overflow-y-auto">
               <CalendarSourceSetup workspaceId={workspaceId} />
             </TabsContent>
           </Tabs>

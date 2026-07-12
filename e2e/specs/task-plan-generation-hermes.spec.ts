@@ -101,12 +101,8 @@ function writeHermesEvent(res: ServerResponse, event: Record<string, unknown>) {
   res.write(`data: ${JSON.stringify(event)}\n\n`);
 }
 
-async function callChronaPlanGenerate(sessionId: string, blueprint: PlanBlueprint) {
-  const headers = {
-    "content-type": "application/json",
-    accept: "application/json, text/event-stream",
-  };
-  const initializeResponse = await fetch(`${CHRONA_BASE_URL}/api/mcp`, {
+async function initializeChronaMcp() {
+  const response = await fetch(`${CHRONA_BASE_URL}/api/mcp`, {
     method: "POST",
     headers,
     body: JSON.stringify({
@@ -114,26 +110,28 @@ async function callChronaPlanGenerate(sessionId: string, blueprint: PlanBlueprin
       id: 1,
       method: "initialize",
       params: {
-        protocolVersion: "2025-03-26",
+        protocolVersion: "2025-06-18",
         capabilities: {},
-        clientInfo: { name: "chrona-e2e-hermes", version: "1.0.0" },
+        clientInfo: { name: "chrona-hermes-e2e", version: "1.0.0" },
       },
     }),
   });
-  if (!initializeResponse.ok) {
-    throw new Error(`chrona MCP initialize failed: HTTP ${initializeResponse.status}`);
-  }
-  const mcpSessionId = initializeResponse.headers.get("mcp-session-id");
+  if (!response.ok) throw new Error(`Chrona MCP initialize failed: HTTP ${response.status}`);
+  return response.headers.get("mcp-session-id");
+}
 
+async function callChronaPlanGenerate(sessionId: string, blueprint: PlanBlueprint) {
+  const mcpSessionId = await initializeChronaMcp();
   const response = await fetch(`${CHRONA_BASE_URL}/api/mcp`, {
     method: "POST",
     headers: {
-      ...headers,
+      "content-type": "application/json",
+      accept: "application/json, text/event-stream",
       ...(mcpSessionId ? { "mcp-session-id": mcpSessionId } : {}),
     },
     body: JSON.stringify({
       jsonrpc: "2.0",
-      id: 2,
+      id: 1,
       method: "tools/call",
       params: {
         name: "chrona_plan_generate",
@@ -344,7 +342,7 @@ test.describe("Task Plan Generation via Hermes", () => {
           await taskEditor.getByRole("button", { name: "Close task editor" }).click();
           await expect(taskEditor).not.toBeVisible();
         }
-        await expect(page.getByRole("heading", { name: "You can create a plan now" })).toBeVisible();
+        await expect(page.getByTestId("plan-setup-panel")).toBeVisible();
       });
 
       await test.step("3. Generate a draft plan through Hermes", async () => {
