@@ -4,10 +4,7 @@ import {
   appendTaskPrimaryNodeAction,
   graphNodeIdForTaskAction,
 } from "@/components/tasks/plan/task-action-node-action";
-import type {
-  PlanNodeDataModel,
-  TaskPlanGraphPlan,
-} from "@/components/tasks/plan/task-plan-graph/types";
+import type { PlanNodeDataModel, TaskPlanGraphPlan } from "./plan-node-view-model";
 import type {
   ExecutionActionInput,
   PlanExecutionResult,

@@ -1,8 +1,5 @@
 import { deriveWorkStateView, type WorkStateView } from "@chrona/domain";
-import type {
-  PlanNodeDataModel,
-  TaskPlanGraphPlan,
-} from "@/components/tasks/plan/task-plan-graph/types";
+import type { PlanNodeDataModel, TaskPlanGraphPlan } from "./plan-node-view-model";
 import type {
   ExecutionOverviewTone,
   ProgressSummary,

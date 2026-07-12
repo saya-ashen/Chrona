@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import type { PlanNodeDataModel, TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph/types";
+import type { PlanNodeDataModel, TaskPlanGraphPlan } from "../model/plan-node-view-model";
 import {
   buildProgressSummary,
   createTaskWorkspaceExecutionConsoleView,

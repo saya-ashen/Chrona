@@ -1,10 +1,6 @@
 import type { CheckpointActionKind, SubmitCheckpointActionInput } from "@chrona/contracts/ai";
 import { api } from "@/lib/rpc-client";
-import type {
-  PlanNodeAction,
-  PlanNodeDataModel,
-  PlanNodeField,
-} from "@/components/tasks/plan/task-plan-graph/types";
+import type { PlanNodeAction, PlanNodeDataModel, PlanNodeField } from "./plan-node-view-model";
 import type { WorkspaceActivityPage, WorkspaceStateTreatment } from "./task-workspace-types";
 
 export type LoadWorkspaceActivityPageInput = {

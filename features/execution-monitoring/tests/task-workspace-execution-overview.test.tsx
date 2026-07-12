@@ -5,7 +5,7 @@ import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { buildCommandCenterTrailSpec, validateChronaSpec, type UiDocument } from "@chrona/ui-protocol";
 import { createTaskWorkspaceExecutionConsoleView } from "../../task-workspace";
-import { taskWorkspaceStateFixtures } from "../../../apps/web/src/components/tasks/workspace/test-support/task-workspace-test-fixtures";
+import { executionMonitoringWorkspaceFixtures } from "./execution-monitoring-test-fixtures";
 import { TaskWorkspaceExecutionOverview } from "../ui/task-workspace-execution-overview";
 import { buildCommandCenterOutputTabSpec, buildCommandCenterTrailTabSpec } from "../ui/build-execution-overview-spec";
 
@@ -71,7 +71,7 @@ describe("TaskWorkspaceExecutionOverview", () => {
   });
 
   it("renders Results as primary content and keeps Activity secondary", () => {
-    const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.approvalNeeded);
+    const view = createTaskWorkspaceExecutionConsoleView(executionMonitoringWorkspaceFixtures.approvalNeeded);
     renderOverview(view, { commandCenter: { documents: { now: nowDocument(), output: nowDocument("Output"), trail: nowDocument("Trail") } } });
 
     expect(screen.getAllByLabelText("Execution overview").length).toBeGreaterThan(0);
@@ -87,7 +87,7 @@ describe("TaskWorkspaceExecutionOverview", () => {
   });
 
   it("renders Activity as a side timeline in compact plan mode", () => {
-    const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.running);
+    const view = createTaskWorkspaceExecutionConsoleView(executionMonitoringWorkspaceFixtures.running);
     renderOverview(view, {
       activityLayout: "side",
       commandCenter: { documents: { now: nowDocument(), output: nowDocument("Output"), trail: buildCommandCenterTrailSpec({ activity: [{ id: "tool", kind: "tool_completed", title: "Tool completed", summary: "Read plan", description: "Read plan", tone: "success", tool: { label: "Read plan", state: "completed", durationMs: 128 } }], savedCount: 1, toolLabels: { tool: "Tool", input: "Input", preview: "Preview", duration: "Duration", error: "Error" } }) } },
@@ -102,7 +102,7 @@ describe("TaskWorkspaceExecutionOverview", () => {
 
 
   it("renders persisted server-driven Trail items once", () => {
-    const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.running);
+    const view = createTaskWorkspaceExecutionConsoleView(executionMonitoringWorkspaceFixtures.running);
     const commandCenter = {
       documents: {
         now: nowDocument("Execution running"),
@@ -153,7 +153,7 @@ describe("TaskWorkspaceExecutionOverview", () => {
   });
 
   it("keeps running status out of Results while activity stream stays live", () => {
-    const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.running);
+    const view = createTaskWorkspaceExecutionConsoleView(executionMonitoringWorkspaceFixtures.running);
     const liveEvent = {
       type: "runtime_event" as const,
       action: "start_manual" as const,
@@ -179,7 +179,7 @@ describe("TaskWorkspaceExecutionOverview", () => {
   });
 
   it("hides live status strip before execution has active runtime activity", () => {
-    const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.running);
+    const view = createTaskWorkspaceExecutionConsoleView(executionMonitoringWorkspaceFixtures.running);
 
     renderOverview(view, {
       commandCenter: { documents: { now: nowDocument("Execution ready"), output: nowDocument("Output"), trail: buildCommandCenterTrailSpec({ activity: [], savedCount: 0, toolLabels: { tool: "Tool", input: "Input", preview: "Preview", duration: "Duration", error: "Error" } }) } },
@@ -192,7 +192,7 @@ describe("TaskWorkspaceExecutionOverview", () => {
 
 
   it("hides live status strip after completion even when stale activity looks active", () => {
-    const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.completed);
+    const view = createTaskWorkspaceExecutionConsoleView(executionMonitoringWorkspaceFixtures.completed);
     const staleStarted = {
       id: "stale-tool-started",
       kind: "tool_started" as const,
@@ -214,7 +214,7 @@ describe("TaskWorkspaceExecutionOverview", () => {
     expect(screen.queryByLabelText("Latest activity running")).not.toBeInTheDocument();
   });
   it("streams live runtime events into a server-driven Trail document", () => {
-    const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.running);
+    const view = createTaskWorkspaceExecutionConsoleView(executionMonitoringWorkspaceFixtures.running);
     const commandCenter = { documents: { now: nowDocument("Execution running"), output: nowDocument("Output"), trail: buildCommandCenterTrailSpec({ activity: [], savedCount: 0, toolLabels: { tool: "Tool", input: "Input", preview: "Preview", duration: "Duration", error: "Error" } }) } };
     const liveEvent = {
       type: "runtime_event" as const,
@@ -254,7 +254,7 @@ describe("TaskWorkspaceExecutionOverview", () => {
   });
 
   it("streams live workspace events into a server-driven Trail document", () => {
-    const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.running);
+    const view = createTaskWorkspaceExecutionConsoleView(executionMonitoringWorkspaceFixtures.running);
     const commandCenter = { documents: { now: nowDocument("Execution running"), output: nowDocument("Output"), trail: buildCommandCenterTrailSpec({ activity: [], savedCount: 0, toolLabels: { tool: "Tool", input: "Input", preview: "Preview", duration: "Duration", error: "Error" } }) } };
 
     renderOverview(view, {
@@ -277,7 +277,7 @@ describe("TaskWorkspaceExecutionOverview", () => {
 
 
   it("renders shared plan output and artifacts as primary results content", () => {
-    const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.artifactPresent);
+    const view = createTaskWorkspaceExecutionConsoleView(executionMonitoringWorkspaceFixtures.artifactPresent);
 
     renderOverview(view, { commandCenter: { documents: { now: nowDocument("Execution running"), output: nowDocument("Plan output"), trail: nowDocument("Trail") } } });
 
@@ -290,7 +290,7 @@ describe("TaskWorkspaceExecutionOverview", () => {
   });
 
   it("does not render command center primary actions inside the execution panel", () => {
-    const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.empty);
+    const view = createTaskWorkspaceExecutionConsoleView(executionMonitoringWorkspaceFixtures.empty);
     const onClick = vi.fn();
     renderOverview(view, {
       commandCenter: { documents: { now: nowDocument("Execution running"), output: nowDocument("Output"), trail: nowDocument("Trail") } },
@@ -310,7 +310,7 @@ describe("TaskWorkspaceExecutionOverview", () => {
   });
 
   it("renders an empty output state when no node has completed", () => {
-    const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.empty);
+    const view = createTaskWorkspaceExecutionConsoleView(executionMonitoringWorkspaceFixtures.empty);
 
     renderOverview(view);
 
@@ -319,7 +319,7 @@ describe("TaskWorkspaceExecutionOverview", () => {
   });
 
   it("hides the current operation card when there is nothing to act on", () => {
-    const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.completed);
+    const view = createTaskWorkspaceExecutionConsoleView(executionMonitoringWorkspaceFixtures.completed);
 
     // No server now document, no attention, and a passive primary action
     // (suppressAttentionCard, no onClick/actionSpec) → the rail collapses.
@@ -340,7 +340,7 @@ describe("TaskWorkspaceExecutionOverview", () => {
   });
   it("filters output and artifacts by selected result node", async () => {
     const user = userEvent.setup();
-    const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.completed);
+    const view = createTaskWorkspaceExecutionConsoleView(executionMonitoringWorkspaceFixtures.completed);
     const commandCenter = {
       documents: {
         now: nowDocument("Execution completed"),
@@ -453,7 +453,7 @@ describe("TaskWorkspaceExecutionOverview", () => {
 
   it("lets AI-authored Card defaultCollapsed drive Chrona-owned collapse chrome", async () => {
     const user = userEvent.setup();
-    const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.completed);
+    const view = createTaskWorkspaceExecutionConsoleView(executionMonitoringWorkspaceFixtures.completed);
     const { container } = renderOverview(view, {
       commandCenter: {
         documents: {
@@ -487,10 +487,10 @@ describe("TaskWorkspaceExecutionOverview", () => {
     await user.click(screen.getByRole("button", { name: "Result options" }));
     await user.click(await screen.findByText("Collapse all"));
 
-    expect(screen.queryByRole("button", { name: /Secondary evidence/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Primary details/ })).not.toBeInTheDocument();
-    expect(screen.queryByText("Evidence details")).not.toBeInTheDocument();
-    expect(screen.queryByText("Visible details")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Secondary evidence/ })).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByRole("button", { name: /Primary details/ })).toHaveAttribute("aria-expanded", "true");
+    expect(screen.getByText("Evidence details")).toBeInTheDocument();
+    expect(screen.getByText("Visible details")).toBeInTheDocument();
 
     await user.click(screen.getByRole("button", { name: "Result options" }));
     await user.click(await screen.findByText("Expand all"));
@@ -503,7 +503,7 @@ describe("TaskWorkspaceExecutionOverview", () => {
 
   it("remembers result collapse state across workspace remounts", async () => {
     const user = userEvent.setup();
-    const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.completed);
+    const view = createTaskWorkspaceExecutionConsoleView(executionMonitoringWorkspaceFixtures.completed);
     const commandCenter = {
       documents: {
         now: nowDocument("Execution completed"),
@@ -536,7 +536,7 @@ describe("TaskWorkspaceExecutionOverview", () => {
 
   it("collapses the whole FileRef block separately from file preview expansion", async () => {
     const user = userEvent.setup();
-    const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.completed);
+    const view = createTaskWorkspaceExecutionConsoleView(executionMonitoringWorkspaceFixtures.completed);
     renderOverview(view, {
       commandCenter: {
         documents: {
@@ -577,7 +577,7 @@ describe("TaskWorkspaceExecutionOverview", () => {
 
 
   it("builds valid output and trail fallback specs", () => {
-    const view = createTaskWorkspaceExecutionConsoleView(taskWorkspaceStateFixtures.artifactPresent);
+    const view = createTaskWorkspaceExecutionConsoleView(executionMonitoringWorkspaceFixtures.artifactPresent);
     const outputSpec = buildCommandCenterOutputTabSpec({
       latestCompletedNode: view.latestCompletedNode,
       resultSpec: nowDocument("Result fallback"),
