@@ -2,8 +2,8 @@ import type {
   ScheduleConflict,
   ScheduleSuggestion,
 } from "../schedule-page-types";
-import { Card } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Card } from "shared/ui/card";
+import { Badge } from "shared/ui/badge";
 import { useI18n } from "@chrona/i18n/react";
 
 type ConflictCardProps = {

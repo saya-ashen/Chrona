@@ -1,5 +1,5 @@
 import { buildEdgeLegend, buildNodeLegend, getShapeStyle, shapeChipClassName } from "./logic";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils"
 import type { EdgeLegendItem, GraphCopy, NodeLegendItem, NodeShape, NodeTone } from "./types";
 
 function ShapeChip({ shape, tone }: { shape: NodeShape; tone: NodeTone }) {

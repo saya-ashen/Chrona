@@ -41,12 +41,12 @@ vi.mock("react-router-dom", () => ({
   useRevalidator: () => ({ revalidate: vi.fn() }),
 }));
 
-vi.mock("@/api", () => ({
+vi.mock("shared/http/api-client", () => ({
   apiJson: vi.fn(),
 }));
 import { DashboardPage } from "@/components/dashboard/dashboard-page";
 import type { DashboardData } from "@/components/dashboard/dashboard-types";
-import { apiJson } from "@/api";
+import { apiJson } from "shared/http/api-client";
 import type { Dictionary } from "@/pages";
 import type { UiDocument } from "@chrona/ui-protocol";
 import { deriveWorkStateView } from "@chrona/domain";

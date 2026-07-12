@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode, type WheelEvent } from "react";
 import { Maximize2, Minus, Plus, Scan, LocateFixed } from "lucide-react";
 import { PanOnScrollMode, ReactFlow, type NodeMouseHandler, type ReactFlowInstance } from "@xyflow/react";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import { Button } from "shared/ui/button";
+import { cn } from "@/lib/utils"
 import { edgeTypes } from "./edge";
 import { EdgeLegend } from "./legend";
 import { nodeTypes } from "./node-card";

@@ -2,7 +2,7 @@
 
 import { X } from "lucide-react";
 import { useI18n } from "@chrona/i18n/react";
-import { Button } from "@/components/ui/button";
+import { Button } from "shared/ui/button";
 import {
   Sheet,
   SheetClose,

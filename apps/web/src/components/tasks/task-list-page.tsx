@@ -14,8 +14,8 @@ import {
 } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router";
 import { LocalizedLink } from "@/components/i18n/localized-link";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Badge } from "shared/ui/badge";
+import { Button } from "shared/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
@@ -32,7 +32,7 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from "shared/ui/select";
 import { TaskActionsMenu, type TaskActionsMenuItem } from "@/components/tasks/shared";
 import { deleteTask, markTaskDone, reopenTask, startExecution } from "@/lib/task-actions-client";
 import type { Dictionary } from "@/pages";

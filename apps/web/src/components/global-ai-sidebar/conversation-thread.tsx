@@ -3,10 +3,10 @@
 import { useForm } from "react-hook-form";
 import type { AiSidebarMessage } from "@chrona/contracts";
 import { useI18n } from "@chrona/i18n/react";
-import { Button } from "@/components/ui/button";
+import { Button } from "shared/ui/button";
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils"
 
 type ConversationFormValues = {
   message: string;

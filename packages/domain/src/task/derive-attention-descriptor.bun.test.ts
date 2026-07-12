@@ -4,12 +4,21 @@ import { deriveAttentionDescriptor } from "./derive-attention-descriptor";
 import { deriveWorkStateView } from "./derive-work-state-view";
 
 const stateCases = [
+<<<<<<< HEAD
   ["waiting_for_approval", { taskStatus: "waiting_for_approval" }, "approval_required", "critical", "review_approval"],
   ["waiting_for_input", { taskStatus: "waiting_for_input" }, "input_required", "waiting", "provide_input"],
   ["blocked", { taskStatus: "blocked" }, "execution_blocked", "critical", "resolve_blocker"],
   ["failed", { taskStatus: "failed" }, "execution_failed", "critical", "retry"],
   ["result_ready", { executionStatus: "completed" }, "result_review", "review", "accept_result"],
   ["done", { taskStatus: "done" }, "informational", "resolved", "ask_follow_up"],
+=======
+  ["waiting_for_approval", "approval_required", "critical", "review_approval"],
+  ["waiting_for_input", "input_required", "waiting", "provide_input"],
+  ["blocked", "execution_blocked", "critical", "resolve_blocker"],
+  ["failed", "execution_failed", "critical", "retry"],
+  ["Completed", "result_review", "review", "accept_result"],
+  ["done", "informational", "resolved", "ask_follow_up"],
+>>>>>>> db8871ce (refactor(web): migrate feature boundaries and shared UI)
 ] as const;
 
 describe("attention descriptor", () => {

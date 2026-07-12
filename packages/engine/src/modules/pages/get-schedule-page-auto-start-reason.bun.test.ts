@@ -128,7 +128,7 @@ describe("getSchedulePage auto-start eligibility reason", () => {
     expect(block?.autoStartReason).toBe("no_accepted_plan");
   });
 
-  it("reports no_runtime_config when the task has no execution runtime", async () => {
+  it("reports automation_not_ready when the task has no runtime or provider configuration", async () => {
     const workspace = await db.workspace.create({
       data: { name: "ws", status: "Active", defaultRuntime: "" },
     });
@@ -141,7 +141,7 @@ describe("getSchedulePage auto-start eligibility reason", () => {
     const page = await getSchedulePage(workspace.id);
     const block = findBlock(page, task.id);
     expect(block?.autoStartEligible).toBe(false);
-    expect(block?.autoStartReason).toBe("no_runtime_config");
+    expect(block?.autoStartReason).toBe("automation_not_ready");
   });
 
   it("reports already_running when the task has an active run", async () => {

@@ -1,8 +1,8 @@
 "use client";
 
 import { AlertTriangle, Check, X } from "lucide-react";
-import { Card } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+import { Card } from "shared/ui/card";
+import { Button } from "shared/ui/button";
 import { cn } from "@/lib/utils";
 import type { TaskWorkspaceUpdateProposal } from "@chrona/contracts/ai";
 import { SpecRenderer } from "../../../../../../../features/task-workspace/ui/catalog/spec-renderer";

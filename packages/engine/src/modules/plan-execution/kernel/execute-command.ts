@@ -409,12 +409,18 @@ async function finalizeOutcome(input: {
 const activeTaskCommands = new AsyncLocalStorage<ReadonlySet<string>>();
 
 const taskCommandTails = new Map<string, Promise<void>>();
+const activeTaskCommands = new AsyncLocalStorage<ReadonlySet<string>>();
 
 export async function executeCommand(
   input: ExecutionCommandEnvelope & PlanExecutionObserver,
 ): Promise<PlanExecutionResult> {
+<<<<<<< HEAD
   const activeTaskIds = activeTaskCommands.getStore();
   if (activeTaskIds?.has(input.taskId)) {
+=======
+  const activeTasks = activeTaskCommands.getStore();
+  if (activeTasks?.has(input.taskId)) {
+>>>>>>> db8871ce (refactor(web): migrate feature boundaries and shared UI)
     return executeCommandUnlocked(input);
   }
 
@@ -427,9 +433,16 @@ export async function executeCommand(
   taskCommandTails.set(input.taskId, tail);
   await previous;
   try {
+<<<<<<< HEAD
     const nextActiveTaskIds = new Set(activeTaskIds);
     nextActiveTaskIds.add(input.taskId);
     return await activeTaskCommands.run(nextActiveTaskIds, () => executeCommandUnlocked(input));
+=======
+    return await activeTaskCommands.run(
+      new Set([...(activeTasks ?? []), input.taskId]),
+      () => executeCommandUnlocked(input),
+    );
+>>>>>>> db8871ce (refactor(web): migrate feature boundaries and shared UI)
   } finally {
     release();
     if (taskCommandTails.get(input.taskId) === tail) {

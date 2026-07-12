@@ -13,7 +13,7 @@ import {
 import type { SelectedBlockSheetProps } from "./types";
 import { useSelectedBlockConfigState } from "./use-selected-block-config-state";
 import { useSelectedBlockPlanState } from "./use-selected-block-plan-state";
-import { Button } from "@/components/ui/button";
+import { Button } from "shared/ui/button";
 
 export function SelectedBlockSheet({
   item,

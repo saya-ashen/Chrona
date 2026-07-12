@@ -13,9 +13,9 @@ import {
   getPriorityAccent,
   getPriorityTone,
 } from "../schedule-page-utils";
-import { Badge } from "@/components/ui/badge";
+import { Badge } from "shared/ui/badge";
 import { useI18n, useLocale } from "@chrona/i18n/react";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils"
 
 const DRAG_EMPTY_IMAGE = typeof Image !== "undefined" ? new Image() : null;
 if (DRAG_EMPTY_IMAGE) {

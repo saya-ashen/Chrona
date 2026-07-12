@@ -5,9 +5,9 @@ import type { ExecutionActionInput, PlanExecutionResult, SubmitCheckpointActionI
 import type { TaskAction } from "@chrona/contracts";
 import { useI18n } from "@chrona/i18n/react";
 import type { PlanNodeDataModel, TaskPlanGraphPlan } from "@/components/tasks/plan/task-plan-graph/types";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "shared/ui/button";
+import { Badge } from "shared/ui/badge";
+import { Card, CardContent, CardHeader, CardTitle } from "shared/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import type { CommandCenterCopy } from "../../../../../../../features/execution-monitoring/ui/task-workspace-execution-overview";
 import { useActionSpecRenderConfig } from "../../../../../../../features/execution-monitoring/ui/action-tab";

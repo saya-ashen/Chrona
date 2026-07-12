@@ -202,10 +202,30 @@ describe("deriveAutoStartEligibility", () => {
     });
   });
 
-  describe("not eligible — no_runtime_config", () => {
-    it("rejects tasks without an execution runtime", () => {
+  describe("not eligible — automation_not_ready", () => {
+    it("prioritizes missing provider readiness over a missing execution runtime", () => {
       const result = deriveAutoStartEligibility({
         task: makeTask({ executionRuntime: null }),
+        workBlock: makeWorkBlock(),
+        now,
+        activeRun: null,
+      });
+      expect(result).toMatchObject({
+        ok: false,
+        reason: "automation_not_ready",
+        disabledReason: "Connect an AI before enabling automation.",
+      });
+    });
+  });
+
+  describe("not eligible — no_runtime_config", () => {
+    it("rejects tasks without an execution runtime after provider readiness succeeds", () => {
+      const result = deriveAutoStartEligibility({
+        task: makeTask({
+          executionRuntime: null,
+          providerId: "provider-1",
+          providerName: "Hermes",
+        }),
         workBlock: makeWorkBlock(),
         now,
         activeRun: null,

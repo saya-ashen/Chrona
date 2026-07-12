@@ -47,14 +47,18 @@ describe("deriveAutoStartEligibility reasons", () => {
     ).toMatchObject({ ok: false, reason: "invalid_task_status" });
   });
 
-  it("reports no_runtime_config before accepted plan checks", () => {
+  it("reports automation_not_ready before runtime and accepted plan checks when no provider is configured", () => {
     expect(
       deriveAutoStartEligibility({
         task: task({ executionRuntime: null, hasAcceptedPlan: false }),
         workBlock: { scheduledStartAt: startAt(-MINUTE) },
         now: NOW,
       }),
-    ).toMatchObject({ ok: false, reason: "no_runtime_config" });
+    ).toMatchObject({
+      ok: false,
+      reason: "automation_not_ready",
+      disabledReason: "Connect an AI before enabling automation.",
+    });
   });
 
   it("reports no_accepted_plan when runtime is configured", () => {
@@ -67,10 +71,14 @@ describe("deriveAutoStartEligibility reasons", () => {
     ).toMatchObject({ ok: false, reason: "no_accepted_plan" });
   });
 
-  it("returns user-facing disabled reasons for readiness failures", () => {
+  it("reports no_runtime_config after provider readiness succeeds", () => {
     expect(
       deriveAutoStartEligibility({
-        task: task({ executionRuntime: null }),
+        task: task({
+          executionRuntime: null,
+          providerId: "provider-1",
+          providerName: "Hermes",
+        }),
         workBlock: { scheduledStartAt: startAt(-MINUTE) },
         now: NOW,
       }),

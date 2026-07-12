@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from "react";
 import { type StateStore } from "@json-render/react";
 import { useI18n } from "@chrona/i18n/react";
-import { Button } from "@/components/ui/button";
+import { Button } from "shared/ui/button";
 import {
   Dialog,
   DialogContent,

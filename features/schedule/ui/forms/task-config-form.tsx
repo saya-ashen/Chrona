@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
-import { Button } from "@/components/ui/button";
+import { Button } from "shared/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
@@ -15,9 +15,9 @@ import {
   SelectGroup,
   SelectItem,
   SelectTrigger,
-} from "@/components/ui/select";
+} from "shared/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils"
 import { useI18n } from "@chrona/i18n/react";
 import { CalendarIcon, Info } from "lucide-react";
 import {

@@ -1,5 +1,5 @@
 import { api } from "@/lib/rpc-client";
-import { apiJson } from "@/api";
+import { apiJson } from "shared/http/api-client";
 import {
   appendTaskPrimaryNodeAction,
   graphNodeIdForTaskAction,

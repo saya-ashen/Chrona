@@ -2,7 +2,17 @@
 
 import { MemoryConsole } from "@/components/memory/memory-console";
 
-type MemoryConsoleData = Awaited<ReturnType<typeof import("@chrona/engine/modules/pages/get-memory-console").getMemoryConsole>>;
+type MemoryConsoleData = Array<{
+  id: string;
+  content: string;
+  sourceType: string;
+  scope: string;
+  status: string;
+  workspaceId: string;
+  taskId: string | null;
+  taskTitle: string | null;
+  runLabel: string | null;
+}>;
 
 type MemoryPageClientProps = {
   workspaceId: string;

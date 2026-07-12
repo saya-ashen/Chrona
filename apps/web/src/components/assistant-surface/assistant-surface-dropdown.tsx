@@ -4,7 +4,7 @@ import { Activity, Sparkles } from "lucide-react";
 import { useForm } from "react-hook-form";
 import { LocalizedLink } from "@/components/i18n/localized-link";
 import { useI18n } from "@chrona/i18n/react";
-import { Button } from "@/components/ui/button";
+import { Button } from "shared/ui/button";
 import {
   Drawer,
   DrawerContent,
@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/drawer";
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils"
 import { useAssistantSurface } from "./assistant-surface-provider";
 
 const severityClass = {

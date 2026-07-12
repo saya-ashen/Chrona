@@ -7,10 +7,10 @@ import { StartWithChrona } from "@/components/start-with-chrona";
 import { LocalizedLink } from "@/components/i18n/localized-link";
 import { TaskCreateDialog, type SchedulePageData } from "../../schedule";
 import { createScheduledTask } from "@/lib/task-actions-client";
-import { apiJson } from "@/api";
+import { apiJson } from "shared/http/api-client";
 import { useAppPathname, useAppRouter } from "@/lib/router";
 import { LocaleSwitcher } from "@/components/i18n/locale-switcher";
-import { Button } from "@/components/ui/button";
+import { Button } from "shared/ui/button";
 import {
   Sidebar,
   SidebarContent,
@@ -22,7 +22,7 @@ import {
   SidebarMenuItem,
   SidebarProvider,
 } from "@/components/ui/sidebar";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils"
 import { localizeHref } from "@chrona/i18n";
 import { useI18n, useLocale } from "@chrona/i18n/react";
 

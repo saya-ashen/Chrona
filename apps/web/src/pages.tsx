@@ -9,13 +9,15 @@ import { TaskWorkspacePage } from "@/components/tasks/task-workspace-page";
 import { ActionCenterPageClient } from "@/components/action-center/action-center-page-client";
 import type { ActionCenterProjection } from "@chrona/contracts/api";
 import { LocalizedLink } from "@/components/i18n/localized-link";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "shared/ui/badge";
+import { Button } from "shared/ui/button";
+import { Card, CardDescription, CardFooter, CardHeader, CardTitle } from "shared/ui/card";
 import { Separator } from "@/components/ui/separator";
 import type { getDictionary, Locale } from "@chrona/i18n";
 import { localizeHref, resolveLocale } from "@chrona/i18n";
 import type { WorkStateView } from "@chrona/domain";
+import type { DashboardData } from "@/components/dashboard/dashboard-types";
+import type { SchedulePageData } from "@features/schedule/ui/schedule-page-types";
 
 import type { TaskPageData } from "../../../features/task-workspace";
 export type Dictionary = Awaited<ReturnType<typeof getDictionary>>;
@@ -23,16 +25,16 @@ export type Dictionary = Awaited<ReturnType<typeof getDictionary>>;
 export type AppBootData = {
   locale: Locale;
   dictionary: Dictionary;
-  defaultWorkspace: Awaited<ReturnType<typeof import("@chrona/engine/modules/workspaces/get-default-workspace").getDefaultWorkspace>>;
+  defaultWorkspace: { id: string; name: string };
 };
 
 export type ScheduleRouteData = {
-  schedule: Awaited<ReturnType<typeof import("@chrona/engine/modules/pages/get-schedule-page").getSchedulePage>>;
+  schedule: SchedulePageData;
 };
 
 
 export type DashboardRouteData = {
-  dashboard: Awaited<ReturnType<typeof import("@chrona/engine/modules/pages/get-dashboard").getDashboard>>;
+  dashboard: DashboardData;
 };
 
 export type ActionCenterRouteData = {

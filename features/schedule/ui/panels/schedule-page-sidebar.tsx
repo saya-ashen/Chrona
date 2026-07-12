@@ -9,9 +9,9 @@ import type { ScheduleViewMode } from "../schedule-page-types";
 import type { SchedulePageCopy } from "../schedule-page-copy";
 import type { SchedulePageViewModel } from "../schedule-page-view-model";
 
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "shared/ui/badge";
+import { Button } from "shared/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "shared/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { EmptyState } from "./schedule-panel-primitives";
 

@@ -1,7 +1,7 @@
 "use client";
 
-import { Card } from "@/components/ui/card";
-import { cn } from "@/lib/utils";
+import { Card } from "shared/ui/card";
+import { cn } from "@/lib/utils"
 import type { ReactNode } from "react";
 
 type TaskEditPanelProps = {

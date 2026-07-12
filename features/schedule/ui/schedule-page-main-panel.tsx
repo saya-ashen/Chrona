@@ -1,8 +1,8 @@
 import { PlanningHeader } from "./panels/planning-header";
-import { Card } from "@/components/ui/card";
+import { Card } from "shared/ui/card";
 import { DayTimeline } from "./timeline/schedule-page-timeline";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
+import { Badge } from "shared/ui/badge";
+import { Button } from "shared/ui/button";
 import { CalendarDays, Clock } from "lucide-react";
 import type {
   ScheduleGhostBlockPreview,

@@ -104,4 +104,51 @@ describe("ensureSqliteDatabase", () => {
       db.close();
     }
   });
+<<<<<<< HEAD
+=======
+
+  it("proves fresh install and previous-release upgrade against shipped migrations", () => {
+    const migrationsDir = resolve(import.meta.dir, "../../../prisma/migrations");
+    const dir = mkdtempSync(join(tmpdir(), "chrona-release-migrations-"));
+    const freshPath = join(dir, "fresh.db");
+
+    ensureSqliteDatabase({ databaseUrl: `file:${freshPath}`, migrationsDir });
+    const fresh = new Database(freshPath, { readonly: true });
+    try {
+      expect(fresh.query("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'WorkspaceUserPreference'").get()).toBeTruthy();
+      expect(fresh.query("SELECT COUNT(*) AS count FROM _prisma_migrations").get()).toEqual({ count: 2 });
+    } finally {
+      fresh.close();
+    }
+
+    const upgradePath = join(dir, "upgrade.db");
+    const previousReleaseDir = join(dir, "previous-release-migrations");
+    createMigration(previousReleaseDir, "0001_initial", readFileSync(join(migrationsDir, "0001_initial", "migration.sql"), "utf8"));
+    ensureSqliteDatabase({ databaseUrl: `file:${upgradePath}`, migrationsDir: previousReleaseDir });
+
+    const beforeUpgrade = new Database(upgradePath, { readonly: true });
+    try {
+      // The current initial release already includes preferences. The follow-up
+      // migration is retained for databases created from an earlier fixture and
+      // is baselined when its schema objects are present.
+      expect(beforeUpgrade.query("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'WorkspaceUserPreference'").get()).toBeTruthy();
+      expect(beforeUpgrade.query("SELECT COUNT(*) AS count FROM _prisma_migrations").get()).toEqual({ count: 1 });
+    } finally {
+      beforeUpgrade.close();
+    }
+
+    ensureSqliteDatabase({ databaseUrl: `file:${upgradePath}`, migrationsDir });
+    const upgraded = new Database(upgradePath, { readonly: true });
+    try {
+      expect(upgraded.query("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'WorkspaceUserPreference'").get()).toBeTruthy();
+      expect(upgraded.query("SELECT COUNT(*) AS count FROM _prisma_migrations").get()).toEqual({ count: 2 });
+      expect(
+        upgraded.query("SELECT applied_steps_count FROM _prisma_migrations WHERE migration_name = ?")
+          .get("20260707000000_add_workspace_user_preferences"),
+      ).toEqual({ applied_steps_count: 0 });
+    } finally {
+      upgraded.close();
+    }
+  });
+>>>>>>> db8871ce (refactor(web): migrate feature boundaries and shared UI)
 });

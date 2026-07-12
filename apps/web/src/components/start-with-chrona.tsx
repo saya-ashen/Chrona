@@ -3,8 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useI18n, useLocale } from "@chrona/i18n/react";
 import { localizeHref } from "@chrona/i18n";
-import { Button } from "@/components/ui/button";
-import { apiJson } from "@/api";
+import { Button } from "shared/ui/button";
+import { apiJson } from "shared/http/api-client";
 import { useAppRouter } from "@/lib/router";
 import { listenAiClientsChanged } from "@/lib/ai-client-events";
 

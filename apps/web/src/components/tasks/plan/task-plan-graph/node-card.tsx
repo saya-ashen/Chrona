@@ -1,7 +1,7 @@
 import type { MouseEvent } from "react";
 import { Handle, Position, type NodeProps, type NodeTypes } from "@xyflow/react";
 import { Check, Circle, Clock3, ClipboardCheck, GitBranch, Hammer, Hand, Minus, MoreHorizontal, TriangleAlert, X } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils"
 import { NODE_WIDTH } from "./constants";
 import { getShapeStyle, nodeKindLabel, TONE_STYLES } from "./logic";
 import {

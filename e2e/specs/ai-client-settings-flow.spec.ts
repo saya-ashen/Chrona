@@ -13,7 +13,11 @@ async function fillAdvancedConnectionSettings(
   baseUrl: string,
   apiKey: string,
 ) {
+<<<<<<< HEAD
   await page.getByText("Advanced settings", { exact: true }).click();
+=======
+  await page.getByRole("button", { name: "Advanced settings" }).click();
+>>>>>>> db8871ce (refactor(web): migrate feature boundaries and shared UI)
   await page.getByRole("textbox", { name: "Base URL", exact: true }).fill(baseUrl);
   await page.getByRole("textbox", { name: "API Key", exact: true }).fill(apiKey);
 }

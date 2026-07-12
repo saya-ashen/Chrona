@@ -3,7 +3,7 @@
 import { useEffect } from "react";
 import { ChevronDown, PanelTopOpen } from "lucide-react";
 import { useI18n } from "@chrona/i18n/react";
-import { cn } from "@/lib/utils";
+import { cn } from "@/lib/utils"
 import { useAssistantSurface } from "./assistant-surface-provider";
 
 type AssistantSurfaceHeaderDrawerButtonProps = {

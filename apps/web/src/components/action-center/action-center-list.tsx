@@ -10,9 +10,9 @@ import {
   Inbox,
   Search,
 } from "lucide-react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "shared/ui/badge";
+import { Button } from "shared/ui/button";
+import { Card, CardContent } from "shared/ui/card";
 import { Input } from "@/components/ui/input";
 import { LocalizedLink } from "@/components/i18n/localized-link";
 import {
@@ -21,8 +21,8 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { cn } from "@/lib/utils";
+} from "shared/ui/select";
+import { cn } from "@/lib/utils"
 
 type ActionCenterPresentationItem = ActionCenterItem & {
   stateView?: WorkStateView;

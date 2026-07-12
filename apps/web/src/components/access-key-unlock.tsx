@@ -2,7 +2,7 @@ import { Controller, useForm } from "react-hook-form";
 import { LockKeyhole } from "lucide-react";
 import { useI18n } from "@chrona/i18n/react";
 
-import { Button } from "@/components/ui/button";
+import { Button } from "shared/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Field, FieldContent, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";

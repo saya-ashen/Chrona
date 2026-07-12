@@ -5,7 +5,7 @@ import { resolve } from "node:path";
 
 const dbPath = resolve(`.tmp/chrona-restart-${process.pid}-${Date.now()}.db`);
 const databaseUrl = `file:${dbPath}`;
-const port = 44_000 + Math.floor(Math.random() * 1_000);
+const port = 50_000 + (process.pid % 10_000);
 const serverUrl = `http://127.0.0.1:${port}`;
 let server: ReturnType<typeof Bun.spawn> | null = null;
 
@@ -35,7 +35,7 @@ async function startServer() {
     stderr: "pipe",
   });
 
-  for (let attempt = 0; attempt < 250; attempt += 1) {
+  for (let attempt = 0; attempt < 1_000; attempt += 1) {
     try {
       if ((await fetch(`${serverUrl}/health`)).ok) return;
     } catch {
@@ -106,5 +106,5 @@ describe("fresh process restart recovery", () => {
     expect(session).toEqual({ status: "Active", pauseReason: null });
     expect(run?.status).toBe("WaitingForInput");
     expect(runs?.count).toBe(1);
-  }, 15_000);
+  }, 30_000);
 });

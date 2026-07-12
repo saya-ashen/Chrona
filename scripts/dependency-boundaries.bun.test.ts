@@ -36,15 +36,25 @@ async function cruise(entry: string) {
 
 beforeAll(async () => {
   fixtureRoot = await mkdtemp(join(tmpdir(), "chrona-boundaries-"));
-  await writeFixture("features/orders/index.ts", "export const orderContract = 'public';\n");
-  await writeFixture("features/orders/model/private.ts", "export const privateOrderState = 'private';\n");
+  await writeFixture(
+    "tsconfig.json",
+    JSON.stringify({
+      compilerOptions: {
+        baseUrl: root,
+        module: "esnext",
+        moduleResolution: "bundler",
+      },
+    }),
+  );
+  await writeFixture("features/task-workspace/index.ts", "export const taskWorkspaceContract = 'public';\n");
+  await writeFixture("features/task-workspace/model/private.ts", "export const privateTaskWorkspaceState = 'private';\n");
   await writeFixture(
     "features/consumer/legal.ts",
-    "import { orderContract } from '../orders/index';\nexport const legal = orderContract;\n",
+    "import { taskWorkspaceContract } from '../task-workspace/index.ts';\nexport const legal = taskWorkspaceContract;\n",
   );
   await writeFixture(
     "features/consumer/illegal.ts",
-    "import { privateOrderState } from '../orders/model/private';\nexport const illegal = privateOrderState;\n",
+    "import { privateTaskWorkspaceState } from '../task-workspace/model/private.ts';\nexport const illegal = privateTaskWorkspaceState;\n",
   );
 });
 
@@ -61,6 +71,6 @@ describe("architecture boundary behavior", () => {
   test("rejects sibling feature private imports", async () => {
     const result = await cruise("features/consumer/illegal.ts");
     expect(result.exitCode).toBe(1);
-    expect(result.output).toContain("feature-orders-internals-are-private");
+    expect(result.output).toContain("feature-task-workspace-internals-are-private");
   });
 });

@@ -2,7 +2,7 @@
 
 import { X } from "lucide-react";
 import { AiClientsManager } from "./ai-clients-manager";
-import { Button } from "@/components/ui/button";
+import { Button } from "shared/ui/button";
 import {
   Dialog,
   DialogClose,

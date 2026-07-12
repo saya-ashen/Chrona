@@ -7,8 +7,8 @@ import { TaskPlanGraphPanel } from "@/components/tasks/panels/task-plan-graph-pa
 import { taskPlanReadModelToGraphPlan } from "@/components/tasks/plan/task-plan-view-model";
 import type { TaskConfigFormDraft } from "../../../../../../features/schedule/ui/forms/task-config-form";
 import type { TaskPlanReadModel } from "@chrona/contracts/ai";
-import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
+import { Button } from "shared/ui/button";
+import { Card } from "shared/ui/card";
 
 type TaskAiPlanPanelProps = {
   taskId: string;

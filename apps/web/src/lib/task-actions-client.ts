@@ -1,5 +1,5 @@
 import { api } from "./rpc-client";
-import { buildAccessKeyHeaders, handleUnauthorizedResponse } from "./access-key";
+import { buildAccessKeyHeaders, handleUnauthorizedResponse } from "../../../../shared/http/access-key";
 import type { ExecutionActionInput } from "@chrona/contracts/ai";
 import type { AutomationTimingPreset } from "@chrona/contracts";
 
