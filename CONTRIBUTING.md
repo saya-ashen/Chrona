@@ -76,13 +76,16 @@ See [docs/en/architecture.md](./docs/en/architecture.md) for full design details
 2. **Write tests** for new features (Vitest for unit, Playwright for E2E)
 3. **Run checks** before committing:
 ```bash
-bun run lint
-bun run typecheck
-bun run test              # Vitest unit tests
-bun run test:bun           # Bun-native tests
-bun run test:watch        # Watch mode
-bun run test:e2e          # Playwright E2E tests (CI-stable, no AI dependency)
+bun run check             # TypeScript (app + E2E), ESLint ratchet, boundaries, UI foundation
+bun run test:unit         # Vitest unit tests
+bun run test:bun          # Bun-native tests
+bun run test:e2e:desktop  # CI desktop Playwright suite
+bun run test              # Full local suite: unit, Bun, API, and all Playwright projects
 ```
+
+The ESLint warning count is ratcheted in `package.json`. New warnings fail the
+check; lower the baseline whenever existing warnings are removed.
+
 4. **Commit** with conventional messages:
    - `feat:` — New feature
    - `fix:` — Bug fix

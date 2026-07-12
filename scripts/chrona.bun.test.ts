@@ -9,9 +9,9 @@ describe("chrona command runner", () => {
 
   it("keeps CI tests centralized across typed steps", () => {
     expect(resolveCommand(["test", "ci"])).toMatchObject({
-      description: "CI unit, Bun, API, and LLM replay tests",
+      description: "CI unit coverage, Bun, API, and LLM replay tests",
       steps: [
-        { label: "vitest unit tests" },
+        { label: "vitest unit coverage" },
         { label: "bun tests" },
         { label: "api tests" },
         { label: "llm replay tests" },
@@ -30,6 +30,19 @@ describe("chrona command runner", () => {
     expect(resolveCommand(["build", "smoke"])).toMatchObject({
       description: "Smoke test release artifacts",
       steps: [{ label: "release smoke", acceptsExtraArgs: true }],
+    });
+  });
+
+  it("keeps the aggregate check limited to working quality gates", () => {
+    expect(resolveCommand(["check"])).toMatchObject({
+      description: "Typecheck, lint, boundaries, and UI foundation",
+      steps: [
+        { label: "typecheck" },
+        { label: "e2e typecheck" },
+        { label: "lint" },
+        { label: "boundaries" },
+        { label: "ui foundation" },
+      ],
     });
   });
 

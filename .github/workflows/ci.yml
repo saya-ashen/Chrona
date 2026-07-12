@@ -9,31 +9,30 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
 jobs:
   check:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
 
-      - name: Setup Node 22
-        uses: actions/setup-node@v4
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
         with:
-          node-version: "22"
-
-      - name: Setup Bun
-        run: npm install --global bun@1.3.11
+          bun-version: 1.3.11
 
       - run: bun install --frozen-lockfile
 
       - run: bunx prisma generate
 
       - run: bunx prisma db push
+        env:
+          DATABASE_URL: "file:./prisma/dev.db"
 
-      - run: bun run typecheck
-
-      - run: bun run lint
-
-      - run: bun run check:boundaries
+      - run: bun run check
 
       - name: Run CI tests
         run: bun run test:ci
@@ -43,32 +42,21 @@ jobs:
           OPENCLAW_MODE: "mock"
 
   e2e:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
     needs: check
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5
 
-      - name: Setup Node 22
-        uses: actions/setup-node@v4
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6
         with:
-          node-version: "22"
-
-      - name: Setup Bun
-        run: npm install --global bun@1.3.11
+          bun-version: 1.3.11
 
       - run: bun install --frozen-lockfile
 
       - run: bunx prisma generate
 
-      - name: Cache Playwright Browsers
-        id: playwright-cache
-        uses: actions/cache@v4
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ hashFiles('bun.lock') }}
-
-      - name: Install Playwright Browsers
-        if: steps.playwright-cache.outputs.cache-hit != 'true'
+      - name: Install Playwright Chromium
         run: bunx playwright install --with-deps chromium
 
       - name: Run Playwright E2E (chromium)
@@ -81,8 +69,9 @@ jobs:
 
       - name: Upload Playwright report on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: playwright-report
           path: playwright-report
+          if-no-files-found: ignore
           retention-days: 7

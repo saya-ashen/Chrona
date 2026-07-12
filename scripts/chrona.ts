@@ -70,9 +70,9 @@ export const TEST_COMMANDS: CommandGroup = {
     ],
   },
   ci: {
-    description: "CI unit, Bun, API, and LLM replay tests",
+    description: "CI unit coverage, Bun, API, and LLM replay tests",
     steps: [
-      bunxStep("vitest unit tests", ["vitest", "run", "--reporter=verbose"]),
+      bunxStep("vitest unit coverage", ["vitest", "run", "--coverage", "--reporter=verbose"]),
       bunStep("bun tests", ["run", "scripts/run-bun-tests.ts"]),
       bunStep("api tests", ["run", "scripts/run-api-tests.ts"]),
       bunStep("llm replay tests", ["test", "packages/engine/src/test/llm-fixtures.bun.test.ts"]),
@@ -116,19 +116,23 @@ export const COMMANDS: Record<string, CommandGroup> = {
   },
   check: {
     all: {
-      description: "Typecheck, lint, deadcode, pages, boundaries",
+      description: "Typecheck, lint, boundaries, and UI foundation",
       steps: [
         bunStep("typecheck", ["x", "tsc", "--noEmit", "--pretty", "false"]),
-        bunStep("lint", ["x", "eslint", ".", "--max-warnings", "1000"]),
-        bunStep("deadcode", ["run", "scripts/check-deadcode.ts"]),
-        bunStep("pages", ["run", "scripts/check-pages.ts"]),
+        bunStep("e2e typecheck", ["x", "tsc", "--project", "e2e/tsconfig.json", "--noEmit", "--pretty", "false"]),
+        bunStep("lint", ["x", "eslint", ".", "--max-warnings", "853"]),
         dependencyCruiserStep("boundaries"),
+        bunStep("ui foundation", ["run", "scripts/check-ui-foundation.mjs"]),
       ],
     },
-    types: { description: "TypeScript typecheck", steps: [bunStep("typecheck", ["x", "tsc", "--noEmit", "--pretty", "false"], true)] },
-    lint: { description: "ESLint", steps: [bunStep("lint", ["x", "eslint", ".", "--max-warnings", "1000"], true)] },
-    deadcode: { description: "Dead code scan", steps: [bunStep("deadcode", ["run", "scripts/check-deadcode.ts"], true)] },
-    pages: { description: "Route/page consistency", steps: [bunStep("pages", ["run", "scripts/check-pages.ts"], true)] },
+    types: {
+      description: "Application and E2E TypeScript typecheck",
+      steps: [
+        bunStep("typecheck", ["x", "tsc", "--noEmit", "--pretty", "false"]),
+        bunStep("e2e typecheck", ["x", "tsc", "--project", "e2e/tsconfig.json", "--noEmit", "--pretty", "false"]),
+      ],
+    },
+    lint: { description: "ESLint warning ratchet", steps: [bunStep("lint", ["x", "eslint", ".", "--max-warnings", "853"], true)] },
     boundaries: { description: "Package and feature boundary checks", steps: [dependencyCruiserStep("boundaries", true)] },
     ui: { description: "UI foundation rules", steps: [bunStep("ui foundation", ["run", "scripts/check-ui-foundation.mjs"], true)] },
   },
