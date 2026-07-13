@@ -8,8 +8,7 @@ import type {
 } from "../../schedule-page-types";
 import type { TaskPlanReadModel } from "@chrona/contracts"
 import { useTaskPlanGenerationSession } from "@features/task-workspace";
-import { apiJson } from "@shared/http";
-import { createLogger } from "@chrona/logging";
+import { apiJson, createLogger } from "@shared/http";
 
 const logger = createLogger("schedule.selected-block-plan-state");
 

@@ -9,7 +9,7 @@ import { Button, cn } from "@shared/ui";
 import { useScheduleAiPreferences } from "./schedule-ai-preferences";
 import { useAutoComplete, type StructuredSuggestion } from "./use-auto-complete";
 import { useI18n } from "@chrona/i18n"
-import { createLogger, summarizeText } from "@chrona/logging";
+import { createLogger, summarizeText } from "@shared/http";
 
 const logger = createLogger("schedule.command-bar");
 

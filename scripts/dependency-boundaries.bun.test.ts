@@ -52,6 +52,7 @@ beforeAll(async () => {
   await writeFixture("features/task-workspace/test.ts", "export const taskWorkspaceTestSupport = 'test-only';\n");
   await writeFixture("features/task-workspace/model/private.ts", "export const privateTaskWorkspaceState = 'private';\n");
   await writeFixture("packages/engine/src/index.ts", "export const engine = 'server-only';\n");
+  await writeFixture("packages/logging/src/index.ts", "export const nodeLogger = 'server-only';\n");
   await writeFixture(
     "features/consumer/legal.ts",
     "import { taskWorkspaceContract } from '../task-workspace/index.ts';\nexport const legal = taskWorkspaceContract;\n",
@@ -71,6 +72,10 @@ beforeAll(async () => {
   await writeFixture(
     "apps/web/src/illegal-engine.ts",
     "import { engine } from '../../../packages/engine/src/index.ts';\nexport const illegal = engine;\n",
+  );
+  await writeFixture(
+    "apps/web/src/illegal-logger.ts",
+    "import { nodeLogger } from '../../../packages/logging/src/index.ts';\nexport const illegal = nodeLogger;\n",
   );
   await writeFixture(
     "packages/consumer/src/illegal-feature.ts",
@@ -115,6 +120,11 @@ describe("architecture boundary behavior", () => {
 
   test("rejects server dependencies in browser paths", async () => {
     const result = await cruise("apps/web/src/illegal-engine.ts");
+    expect(result.exitCode).toBe(1);
+    expect(result.output).toContain("browser-paths-stay-server-free");
+  });
+  test("rejects Node-oriented logging in browser paths", async () => {
+    const result = await cruise("apps/web/src/illegal-logger.ts");
     expect(result.exitCode).toBe(1);
     expect(result.output).toContain("browser-paths-stay-server-free");
   });

@@ -3,8 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 export type { StructuredSuggestion } from "@chrona/contracts";
 import type { StructuredSuggestion } from "@chrona/contracts";
-import { createLogger, summarizeText } from "@chrona/logging";
-import { fetchJsonEventSource } from "@shared/http";
+import { createLogger, fetchJsonEventSource, summarizeText } from "@shared/http";
 
 export type AutoCompleteSuggestion = {
   title: string;

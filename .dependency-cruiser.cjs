@@ -44,7 +44,7 @@ const TEST = "(__tests__/|(?:^|/)test\\.ts$|\\.test\\.|\\.bun\\.test\\.|\\.spec\
 const BROWSER_PATH =
   "^(apps/web/src/|features/[^/]+/(index|ui|browser-api)\\.ts$|features/[^/]+/ui/|shared/ui/)";
 const BROWSER_FORBIDDEN_DEPENDENCIES =
-  "^(packages/(engine|db|providers)/|apps/server/|shared/http/server\\.ts$|node:)";
+  "^(packages/(engine|db|logging|providers)/|apps/server/|shared/http/server\\.ts$|node:)";
 
 /** A package's public entry points (barrels). Importing anything else in the
  *  package from the outside is a boundary violation. */
@@ -285,7 +285,7 @@ module.exports = {
     {
       name: "browser-paths-stay-server-free",
       comment:
-        "Browser-reachable app, feature UI, and shared UI code must not depend on engine, db, providers, server code, shared HTTP server code, or Node builtins.",
+        "Browser-reachable app, feature UI, and shared UI code must not depend on engine, db, Node-oriented logging, providers, server code, shared HTTP server code, or Node builtins.",
       severity: "error",
       from: { path: BROWSER_PATH, pathNot: TEST },
       to: { path: BROWSER_FORBIDDEN_DEPENDENCIES },
