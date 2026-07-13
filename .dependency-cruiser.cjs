@@ -299,7 +299,10 @@ module.exports = {
         "Browser-reachable app, feature UI, and shared UI code must not depend on engine, db, Node-oriented logging, providers, server code, shared HTTP server code, or Node builtins.",
       severity: "error",
       from: { path: BROWSER_PATH, pathNot: TEST },
-      to: { path: BROWSER_FORBIDDEN_DEPENDENCIES },
+      to: {
+        path: BROWSER_FORBIDDEN_DEPENDENCIES,
+        dependencyTypesNot: ["type-only"],
+      },
     },
 
     // --- package production code never reaches into root feature slices -----

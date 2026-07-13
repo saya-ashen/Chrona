@@ -27,12 +27,10 @@ const mocks = vi.hoisted(() => ({
   richPageData: null as TaskPageData | null,
 }));
 
-vi.mock("@/lib/fetch-json-event-source", () => ({
-  fetchJsonEventSource: (_input: string, options: FetchEventSourceOptions) => {
-    mocks.eventHandler = options.onEvent;
-    return new Promise<void>(() => undefined);
-  },
-}));
+vi.mock("@shared/http", async (importOriginal) => ({ ...(await importOriginal<typeof import("@shared/http")>()), fetchJsonEventSource: (_input: string, options: FetchEventSourceOptions) => {
+  mocks.eventHandler = options.onEvent;
+  return new Promise<void>(() => undefined);
+}, }));
 
 vi.mock("@/lib/rpc-client", () => ({
   api: {

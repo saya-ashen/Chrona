@@ -2,6 +2,8 @@ import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { ScheduleTaskList, type ScheduleTaskListItem } from "../schedule-task-list";
+import { MemoryRouter } from "react-router-dom";
+import type { ComponentProps } from "react";
 
 vi.mock("@chrona/i18n/react", () => ({
   useI18n: () => ({ t: (key: string) => key, messages: {} }),
@@ -93,6 +95,14 @@ const defaultProps = {
   onSaveTaskConfigAction: vi.fn().mockResolvedValue(undefined),
 };
 
+function renderScheduleTaskList(props: ComponentProps<typeof ScheduleTaskList>) {
+  return render(
+    <MemoryRouter>
+      <ScheduleTaskList {...props} />
+    </MemoryRouter>,
+  );
+}
+
 describe("ScheduleTaskList", () => {
   afterEach(() => {
     cleanup();
@@ -108,7 +118,7 @@ describe("ScheduleTaskList", () => {
   }
 
   it("renders all filter buttons with counts", () => {
-    render(<ScheduleTaskList {...defaultProps} />);
+    renderScheduleTaskList(defaultProps);
     const filterKeys = [
       "all", "running", "waitingForApproval", "blocked", "failed", "unscheduled", "overdue", "notRunnable",
     ];
@@ -123,14 +133,14 @@ describe("ScheduleTaskList", () => {
   });
 
   it("default 'all' filter shows all items", () => {
-    render(<ScheduleTaskList {...defaultProps} />);
+    renderScheduleTaskList(defaultProps);
     expect(screen.getByText("Failed Task")).toBeInTheDocument();
     expect(screen.getByText("Unscheduled Task")).toBeInTheDocument();
     expect(screen.getByText("Running Task")).toBeInTheDocument();
   });
 
   it("clicking 'failed' filter shows only failed items", async () => {
-    render(<ScheduleTaskList {...defaultProps} />);
+    renderScheduleTaskList(defaultProps);
     await clickFilter("components.scheduleTaskList.failed");
     expect(screen.getByText("Failed Task")).toBeInTheDocument();
     expect(screen.queryByText("Unscheduled Task")).not.toBeInTheDocument();
@@ -138,7 +148,7 @@ describe("ScheduleTaskList", () => {
   });
 
   it("clicking 'unscheduled' filter shows only unscheduled items", async () => {
-    render(<ScheduleTaskList {...defaultProps} />);
+    renderScheduleTaskList(defaultProps);
     await clickFilter("components.scheduleTaskList.unscheduled");
     expect(screen.getByText("Unscheduled Task")).toBeInTheDocument();
     expect(screen.queryByText("Failed Task")).not.toBeInTheDocument();
@@ -146,39 +156,37 @@ describe("ScheduleTaskList", () => {
   });
 
   it("shows empty message when no items match filter", async () => {
-    render(<ScheduleTaskList {...defaultProps} />);
+    renderScheduleTaskList(defaultProps);
     await clickFilter("components.scheduleTaskList.blocked");
     expect(screen.getByText("components.scheduleTaskList.emptyBlocked")).toBeInTheDocument();
   });
 
   it("renders task title as link", () => {
-    render(<ScheduleTaskList {...defaultProps} />);
+    renderScheduleTaskList(defaultProps);
     const link = screen.getByText("Failed Task").closest("a");
     expect(link).toHaveAttribute("href", "/tasks/t-failed");
   });
 
   it("shows task priority and runnability badges", () => {
-    render(<ScheduleTaskList {...defaultProps} />);
+    renderScheduleTaskList(defaultProps);
     expect(screen.getByText("High")).toBeInTheDocument();
     expect(screen.getByText("Missing config")).toBeInTheDocument();
   });
 
   it("keeps schedule timing separate from canonical work state", () => {
-    render(
-      <ScheduleTaskList
-        {...defaultProps}
-        items={[
-          makeItem({
-            taskId: "t-draft-scheduled",
-            title: "Scheduled task",
-            persistedStatus: "Draft",
-            scheduleStatus: "Scheduled",
-            isRunnable: true,
-            runnabilitySummary: "Ready to run",
-          }),
-        ]}
-      />,
-    );
+    renderScheduleTaskList({
+      ...defaultProps,
+      items: [
+        makeItem({
+          taskId: "t-draft-scheduled",
+          title: "Scheduled task",
+          persistedStatus: "Draft",
+          scheduleStatus: "Scheduled",
+          isRunnable: true,
+          runnabilitySummary: "Ready to run",
+        }),
+      ],
+    });
 
     expect(screen.getByText("Scheduled")).toBeInTheDocument();
     expect(screen.getAllByText("Needs plan").length).toBeGreaterThan(0);
@@ -187,7 +195,7 @@ describe("ScheduleTaskList", () => {
 
   it("clicking quick edit button expands task config form", async () => {
     const user = userEvent.setup();
-    render(<ScheduleTaskList {...defaultProps} />);
+    renderScheduleTaskList(defaultProps);
     expect(screen.queryByTestId("task-config-form")).not.toBeInTheDocument();
     const editButtons = screen.getAllByText("components.scheduleTaskList.quickEdit");
     await user.click(editButtons[0]);
@@ -196,7 +204,7 @@ describe("ScheduleTaskList", () => {
 
   it("clicking quick edit again collapses it", async () => {
     const user = userEvent.setup();
-    render(<ScheduleTaskList {...defaultProps} />);
+    renderScheduleTaskList(defaultProps);
     const editButtons = screen.getAllByText("components.scheduleTaskList.quickEdit");
     await user.click(editButtons[0]);
     expect(screen.getByTestId("task-config-form")).toBeInTheDocument();
@@ -205,7 +213,7 @@ describe("ScheduleTaskList", () => {
   });
 
   it("items matching 'running' filter shows running items", async () => {
-    render(<ScheduleTaskList {...defaultProps} />);
+    renderScheduleTaskList(defaultProps);
     await clickFilter("components.scheduleTaskList.running");
     expect(screen.getByText("Running Task")).toBeInTheDocument();
     expect(screen.queryByText("Failed Task")).not.toBeInTheDocument();
@@ -213,7 +221,7 @@ describe("ScheduleTaskList", () => {
   });
 
   it("items matching 'notRunnable' filter shows not-runnable items", async () => {
-    render(<ScheduleTaskList {...defaultProps} />);
+    renderScheduleTaskList(defaultProps);
     await clickFilter("components.scheduleTaskList.notRunnable");
     expect(screen.getByText("Unscheduled Task")).toBeInTheDocument();
     expect(screen.queryByText("Failed Task")).not.toBeInTheDocument();
@@ -221,7 +229,7 @@ describe("ScheduleTaskList", () => {
   });
 
   it("items matching 'overdue' filter shows overdue items", async () => {
-    render(<ScheduleTaskList {...defaultProps} />);
+    renderScheduleTaskList(defaultProps);
     await clickFilter("components.scheduleTaskList.overdue");
     expect(screen.getByText("Running Task")).toBeInTheDocument();
     expect(screen.queryByText("Failed Task")).not.toBeInTheDocument();
@@ -238,7 +246,7 @@ describe("ScheduleTaskList", () => {
     ["cancelled", { latestRunStatus: "Cancelled" }, "Cancelled", "Inspect the audit trail or reopen the task"],
   ])("renders canonical %s status and next action", (_name, overrides, label, nextAction) => {
     const item = makeItem({ taskId: `t-${_name}`, title: `${_name} task`, ...overrides });
-    render(<ScheduleTaskList {...defaultProps} items={[item]} />);
+    renderScheduleTaskList({ ...defaultProps, items: [item] });
 
     expect(screen.getAllByText(label).length).toBeGreaterThan(0);
     expect(screen.getByText(nextAction)).toBeInTheDocument();

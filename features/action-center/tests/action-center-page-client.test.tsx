@@ -5,8 +5,15 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 const decideScheduleProposal = vi.fn().mockResolvedValue({ ok: true });
 const dispatchExecutionAction = vi.fn().mockResolvedValue({ ok: true });
 
-vi.mock("@/components/i18n/localized-link", () => ({
-  LocalizedLink: ({ children, href, ...props }: any) => (
+vi.mock("../ui/localized-link", () => ({
+  LocalizedLink: ({
+    children,
+    href,
+    ...props
+  }: {
+    children?: React.ReactNode;
+    href: string;
+  } & Omit<React.ComponentPropsWithoutRef<"a">, "href">) => (
     <a href={`/en${href}`} {...props}>
       {children}
     </a>
@@ -23,15 +30,9 @@ vi.mock("@features/task-workspace", () => ({
     dispatchExecutionAction(...args),
 }));
 
-vi.mock("@chrona/i18n/react", () => ({
-  useI18n: () => ({
-    t: (key: string) =>
-      ({
-        "common.openTask": "Open Task",
-        "common.openWork": "Open Work",
-        "common.startWork": "Start Work",
-      })[key] ?? key,
-  }),
+vi.mock("@chrona/i18n", () => ({
+  localizeHref: (locale: string, href: string) => `/${locale}${href}`,
+  useLocale: () => "en",
 }));
 
 import { ActionCenterPageClient } from "@features/action-center";

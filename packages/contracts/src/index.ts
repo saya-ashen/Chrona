@@ -178,6 +178,13 @@ export {
   scheduleProjectionQuerySchema,
 } from "./api/projections.schema";
 export {
+  actionCenterItemSchema,
+  actionCenterProjectionSchema,
+  workCommandBodySchema,
+  type ActionCenterItem,
+  type ActionCenterProjection,
+} from "./api/projections.schema";
+export {
   clearScheduleParamSchema,
   scheduleBodySchema,
   scheduleParamSchema,
@@ -453,3 +460,4 @@ export {
   taskStatusForRuntimeProgress,
   webPlanNodeStatusForRuntimeStatus,
 } from "./plan-runtime";
+export * from "./provider-capability-matrix";

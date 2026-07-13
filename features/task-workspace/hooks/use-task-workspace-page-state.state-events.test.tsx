@@ -22,13 +22,11 @@ const mocks = vi.hoisted(() => ({
   fetchUrls: [] as string[],
 }));
 
-vi.mock("@/lib/fetch-json-event-source", () => ({
-  fetchJsonEventSource: (_input: string, options: FetchEventSourceOptions) => {
-    mocks.streamOpened = true;
-    mocks.eventHandler = options.onEvent;
-    return new Promise<void>(() => undefined);
-  },
-}));
+vi.mock("@shared/http", async (importOriginal) => ({ ...(await importOriginal<typeof import("@shared/http")>()), fetchJsonEventSource: (_input: string, options: FetchEventSourceOptions) => {
+  mocks.streamOpened = true;
+  mocks.eventHandler = options.onEvent;
+  return new Promise<void>(() => undefined);
+}, }));
 
 vi.mock("@/lib/rpc-client", () => ({
   api: {

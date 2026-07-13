@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { useMemo, useState } from "react";
-import type { ActionCenterItem } from "@chrona/contracts/api";
+import type { ActionCenterItem } from "@chrona/contracts";
 import { deriveAttentionDescriptor, type WorkStateView } from "@chrona/domain";
 import {
   AlertTriangle,
@@ -14,7 +14,7 @@ import { Badge } from "@shared/ui"
 import { Button } from "@shared/ui"
 import { Card, CardContent } from "@shared/ui"
 import { Input } from "@shared/ui"
-import { LocalizedLink } from "@/components/i18n/localized-link";
+import { LocalizedLink } from "./localized-link";
 import { Select,
 SelectContent,
 SelectItem,

@@ -3,6 +3,7 @@ import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vite
 import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement, ReactNode } from "react";
+import en from "@chrona/i18n/messages/en.json";
 
 vi.mock("elkjs/lib/elk.bundled.js", () => ({
   default: class ELKMock {
@@ -74,10 +75,14 @@ function renderWithQueryClient(ui: ReactElement) {
   });
 }
 
-vi.mock("@chrona/i18n/react", () => ({
-  useI18n: () => ({ locale: "en", messages: { components: { taskWorkspace: {} } }, t: (key: string) => key }),
+vi.mock("@chrona/i18n", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@chrona/i18n")>();
+  return {
+    ...actual,
+    useI18n: () => ({ locale: "en", messages: en, t: (key: string) => key }),
   useLocale: () => "en",
-}));
+  };
+});
 
 beforeAll(async () => {
   ({ TaskWorkspacePlanSection, derivePreferredGraphMode, recoveryActionButtonVariant } = await import("./task-workspace-plan-section"));

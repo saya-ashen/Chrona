@@ -1,10 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import type { ActionCenterItem } from "@chrona/contracts/api";
+import type { ActionCenterItem } from "@chrona/contracts";
 import { deriveUserFacingFailure, type WorkStateView } from "@chrona/domain";
 
-import { LocalizedLink } from "@/components/i18n/localized-link";
+import { LocalizedLink } from "./localized-link";
 import { Button } from "@shared/ui"
 import { ActionCenterList } from "./action-center-list";
 import { decideScheduleProposal } from "@features/schedule";

@@ -2,6 +2,8 @@ import { act, renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import type * as SharedHttp from "@shared/http";
+import type * as TaskPlanGenerationSessionStore from "./task-plan-generation-session-store";
 import type { PlanExecutionResult, TaskPlanReadModel } from "@chrona/contracts"
 import { useTaskWorkspacePageState, type TaskWorkspaceSseEvent } from "./use-task-workspace-page-state";
 import { useTaskWorkspacePlanState } from "./use-task-workspace-plan-state";
@@ -52,87 +54,71 @@ const mocks = vi.hoisted(() => ({
   },
 }));
 
-vi.mock("@/lib/fetch-json-event-source", () => ({
+vi.mock("@shared/http", async (importOriginal) => ({
+  ...(await importOriginal<typeof SharedHttp>()),
+  apiJson: vi.fn(async (path: string, init?: RequestInit) => {
+    const method = init?.method ?? "GET";
+    mocks.fetchCalls.push({ input: path, init });
+
+    if (/^\/api\/tasks\/[^/]+(?:\?[^/]*)?$/.test(path)
+      || /\/runtime-context(?:\?|$)/.test(path)
+      || /\/review-context(?:\?|$)/.test(path)) {
+      mocks.pageFetchCount += 1;
+      if (mocks.pageResponseCarry === null) {
+        mocks.pageResponseCarry = mocks.pageResponses.shift() ?? mocks.lastPageResponse;
+      }
+      const response = mocks.pageResponseCarry;
+      if (response) mocks.lastPageResponse = response;
+      if (mocks.pageFetchCount % 3 === 0) mocks.pageResponseCarry = null;
+      return response;
+    }
+    if (/\/command-center(?:\?|$)/.test(path)) {
+      mocks.headerFetchCount += 1;
+      return mocks.headerResponses.shift() ?? {
+        spec: { root: "root", elements: { root: { type: "Card", props: {}, children: [] } } },
+      };
+    }
+    if (/\/plan(?:\?|$)/.test(path) && !path.includes("/generations")) {
+      return mocks.planResponses.shift();
+    }
+    if (/\/execution\/current(?:\?|$)/.test(path)) return mocks.currentExecutionResponse;
+    if (/\/commands(?:\?|$)/.test(path) && method === "POST") {
+      const parsedBody: unknown = JSON.parse(String(init?.body ?? "{}"));
+      if (!parsedBody || typeof parsedBody !== "object" || Array.isArray(parsedBody)) {
+        throw new Error("Expected command request body to be an object");
+      }
+      mocks.commandCalls.push({ taskId: "task-1", json: parsedBody as Record<string, unknown> });
+      return mocks.commandResponses.shift() ?? {
+        commandId: "command-1",
+        taskId: "task-1",
+        acceptedAt: "2026-05-17T00:00:00.000Z",
+      };
+    }
+    throw new Error(`Unhandled API request: ${method} ${path}`);
+  }),
   fetchJsonEventSource: (input: string, options: FetchEventSourceOptions) => {
     if (input.includes("/execution/checkpoint/") || input.endsWith("/execution/actions")) {
-      return new Promise<void>((resolve, reject) => {
-        mocks.eventHandlers.set(input, (event) => {
-          try {
-            options.onEvent(event);
-            if (event.event === "done") resolve();
-          } catch (cause) {
-            reject(cause);
-          }
-        });
+      const { promise, reject, resolve } = Promise.withResolvers<void>();
+      mocks.eventHandlers.set(input, (event) => {
+        try {
+          options.onEvent(event);
+          if (event.event === "done") resolve();
+        } catch (cause) {
+          reject(cause);
+        }
       });
+      return promise;
     }
 
     mocks.eventHandlers.set(input, options.onEvent);
-    if (input.endsWith("/events")) {
-      mocks.eventStreamAttempts += 1;
-    }
-    if (mocks.eventStreamMode === "reject") {
-      return Promise.reject(new Error("event stream closed"));
-    }
-
-    return new Promise(() => undefined);
+    if (input.endsWith("/events")) mocks.eventStreamAttempts += 1;
+    if (mocks.eventStreamMode === "reject") return Promise.reject(new Error("event stream closed"));
+    return Promise.withResolvers<void>().promise;
   },
 }));
 
-vi.mock("@/lib/rpc-client", () => ({
-  api: {
-    tasks: {
-      ":taskId": {
-        $get: vi.fn(async () => ({
-          ok: true,
-          json: async () => {
-            mocks.pageFetchCount += 1;
-            return mocks.pageResponses.shift();
-          },
-        })),
-        plan: {
-          $get: vi.fn(async () => ({
-            ok: true,
-            json: async () => mocks.planResponses.shift(),
-          })),
-          accept: {
-            $post: vi.fn(async () => ({
-              ok: true,
-              json: async () => mocks.acceptResponse,
-            })),
-          },
-        },
-        execution: {
-          current: {
-            $get: vi.fn(async () => ({
-              ok: true,
-              json: async () => mocks.currentExecutionResponse,
-            })),
-          },
-        },
-      },
-    },
-    work: {
-      ":taskId": {
-        commands: {
-          $post: vi.fn(async (args: { param: { taskId: string }; json: Record<string, unknown> }) => {
-            mocks.commandCalls.push({ taskId: args.param.taskId, json: args.json });
-            return {
-              ok: true,
-              json: async () => mocks.commandResponses.shift() ?? {
-                commandId: "command-1",
-                taskId: "task-1",
-                acceptedAt: "2026-05-17T00:00:00.000Z",
-              },
-            };
-          }),
-        },
-      },
-    },
-  },
-}));
-
-vi.mock("@/hooks/ai/task-plan-generation-session-store", () => ({
+vi.mock("./task-plan-generation-session-store", async (importOriginal) => ({
+  ...(await importOriginal<typeof TaskPlanGenerationSessionStore>()),
   useTaskPlanGenerationSession: () => mocks.generationSession,
   bindTaskPlanSessionToStateStore: () => () => undefined,
 }));
@@ -326,78 +312,6 @@ function nextWorkspaceEvent(input: TaskWorkspaceSseEvent) {
   } satisfies TaskWorkspaceSseEvent;
 }
 
-beforeEach(() => {
-  vi.stubGlobal("fetch", vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
-    const url = input instanceof Request ? input.url : String(input);
-    mocks.fetchCalls.push({ input: url, init });
-
-    if (url.includes("/api/tasks/") && url.includes("/workspace/header")) {
-      mocks.headerFetchCount += 1;
-      return new Response(JSON.stringify(mocks.headerResponses.shift() ?? {
-        spec: { root: "root", elements: { root: { type: "Card", props: {}, children: [] } } },
-      }), { status: 200, headers: { "content-type": "application/json" } });
-    }
-
-    if (url.includes("/api/tasks/") && !url.includes("/plan") && !url.includes("/execution") && !url.includes("/workspace/header") && !url.includes("/command-center")) {
-      mocks.pageFetchCount += 1;
-      // The page query fans out to three parallel fetches (bootstrap,
-      // runtime-context, review-context); consume one queued response per
-      // group of three so the merge produces the intended snapshot. If
-      // no further response is queued, fall back to the most recent
-      // page snapshot (a sticky carry) so subsequent visibility / SSE
-      // refetches do not produce an empty TaskPageData shape.
-      if (mocks.pageResponseCarry === null) {
-        const next = mocks.pageResponses.shift();
-        if (next) {
-          mocks.pageResponseCarry = next;
-        } else {
-          mocks.pageResponseCarry = mocks.lastPageResponse;
-        }
-      }
-      const carry = mocks.pageResponseCarry;
-      if (carry) mocks.lastPageResponse = carry;
-      // After three calls (bootstrap, runtime-context, review-context),
-      // reset the carry so the next refetch consumes the next queued response.
-      if (mocks.pageFetchCount % 3 === 0) {
-        mocks.pageResponseCarry = null;
-      }
-      return new Response(JSON.stringify(carry), {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      });
-    }
-
-    if (url.includes("/api/tasks/") && url.includes("/plan") && !url.includes("/generations")) {
-      return new Response(JSON.stringify(mocks.planResponses.shift()), {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      });
-    }
-
-    if (url.endsWith("/execution/current")) {
-      return new Response(JSON.stringify(mocks.currentExecutionResponse), {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      });
-    }
-
-    if (url.endsWith("/commands")) {
-      return new Response(JSON.stringify(mocks.commandResponses.shift() ?? {
-        commandId: "command-1",
-        taskId: "task-1",
-        acceptedAt: "2026-05-17T00:00:00.000Z",
-      }), {
-        status: 200,
-        headers: { "content-type": "application/json" },
-      });
-    }
-
-    return new Response("{}", {
-      status: 200,
-      headers: { "content-type": "application/json" },
-    });
-  }));
-});
 
 afterEach(() => {
   vi.unstubAllGlobals();

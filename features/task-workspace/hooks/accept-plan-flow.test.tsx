@@ -22,6 +22,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { PropsWithChildren } from "react";
+import type * as SharedHttp from "@shared/http";
 import type { TaskPageData } from "@features/task-workspace"
 import { useTaskWorkspacePlanState } from "./use-task-workspace-plan-state";
 import { taskWorkspacePlanStateFixtures } from "@features/task-workspace/test";
@@ -66,65 +67,44 @@ const mocks = vi.hoisted(() => ({
   delayResolve: null as (() => void) | null,
 }));
 
-vi.mock("@/lib/rpc-client", () => ({
-  api: {
-    tasks: {
-      ":taskId": {
-        $get: vi.fn(async () => ({ ok: true, json: async () => taskWorkspacePlanStateFixtures.planWaitingAcceptance.pageData })),
-        plan: {
-          $get: vi.fn(async () => ({ ok: true, json: async () => mocks.planStateResponse })),
-        },
-        execution: {
-          current: {
-            $get: vi.fn(async () => ({ ok: true, json: async () => ({}) })),
-          },
-        },
-      },
-    },
-    work: {
-      ":taskId": {
-        commands: {
-          $post: vi.fn(async (args: { param: { taskId: string }; json: Record<string, unknown> }) => {
-            mocks.commandCalls.push({ taskId: args.param.taskId, body: args.json });
-            if (mocks.delayNext) {
-              await new Promise<void>((resolve) => {
-                mocks.delayResolve = resolve;
-              });
-            }
-            const next = mocks.nextResponse;
-            if (!next) {
-              return { ok: true, json: async () => ({ commandId: "c-default", taskId: args.param.taskId, acceptedAt: "2026-06-10T00:00:00.000Z" }) };
-            }
-            if (next.kind === "throw") throw next.error;
-            if (next.kind === "4xx" || next.kind === "5xx") {
-              return { ok: false, status: next.status, json: async () => next.body };
-            }
-            // On successful accept: simulate the post-accept plan-state
-            // refetch that the real server performs. The next call to
-            // `api.tasks[":taskId"].plan.$get` will see `accepted`.
-            // Mutate the existing object in place — the hoisted mock
-            // closure captures the object reference, not a snapshot.
-            if (args.json && (args.json as { type?: string }).type === "plan.accept" && mocks.planStateResponse.savedPlan) {
-              mocks.planStateResponse.aiPlanGenerationStatus = "accepted";
-              mocks.planStateResponse.savedPlan.status = "accepted";
-            }
-            return { ok: true, json: async () => next.body };
-          }),
-        },
-      },
-    },
-  },
+vi.mock("@shared/http", async (importOriginal) => ({
+  ...(await importOriginal<typeof SharedHttp>()),
+  apiJson: vi.fn(async (path: string, init?: RequestInit) => {
+    const method = init?.method ?? "GET";
+    if (path === "/api/tasks/task-1/plan/generations/active") {
+      return { generationSession: null };
+    }
+    if (path === "/api/tasks/task-1/plan") return mocks.planStateResponse;
+    if (path === "/api/tasks/task-1/execution/current") return {};
+    if (path === "/api/work/task-1/commands" && method === "POST") {
+      const parsedBody: unknown = JSON.parse(String(init?.body ?? "{}"));
+      if (!parsedBody || typeof parsedBody !== "object" || Array.isArray(parsedBody)) {
+        throw new Error("Expected command request body to be an object");
+      }
+      const body = parsedBody as Record<string, unknown>;
+      mocks.commandCalls.push({ taskId: "task-1", body });
+      if (mocks.delayNext) {
+        await new Promise<void>((resolve) => {
+          mocks.delayResolve = resolve;
+        });
+      }
+      const next = mocks.nextResponse;
+      if (!next) {
+        return { commandId: "c-default", taskId: "task-1", acceptedAt: "2026-06-10T00:00:00.000Z" };
+      }
+      if (next.kind === "throw") throw next.error;
+      if (next.kind === "4xx" || next.kind === "5xx") throw new Error(next.body.error);
+      if (body.type === "plan.accept" && mocks.planStateResponse.savedPlan) {
+        mocks.planStateResponse.aiPlanGenerationStatus = "accepted";
+        mocks.planStateResponse.savedPlan.status = "accepted";
+      }
+      return next.body;
+    }
+    throw new Error(`Unhandled API request: ${method} ${path}`);
+  }),
+  fetchJsonEventSource: vi.fn(async () => undefined),
 }));
 
-/**
- * After a successful accept, the real server's `/api/tasks/:id/plan`
- * returns the plan in `accepted` status (see the post-accept refetch in
- * `engine.tasks.plan.accept`). We mirror that in the plan-state query
- * mock so the hook's reconciliation effect lands at `accepted` instead
- * of bouncing back to `waiting_acceptance`. The mock mutates
- * `mocks.planStateResponse` in place (see the `$post` handler above);
- * no separate setter is needed.
- */
 
 function wrapper({ children }: PropsWithChildren) {
   const queryClient = new QueryClient({
@@ -132,25 +112,6 @@ function wrapper({ children }: PropsWithChildren) {
   });
   return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
 }
-
-/**
- * Stub the global `fetch` so the `useTaskPlanGenerationSession` store
- * (loaded by `useTaskWorkspacePlanState`) can hydrate without trying to
- * hit a real `/api/...` endpoint — there is no server in this test.
- * The store is only used for plan-generation activity; we don't assert on
- * it, so a 200 with `generationSession: null` is enough.
- */
-const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
-  const url = typeof input === "string" ? input : input.toString();
-  if (url.includes("/plan/generations/active")) {
-    return new Response(JSON.stringify({ generationSession: null }), {
-      status: 200,
-      headers: { "Content-Type": "application/json" },
-    });
-  }
-  return new Response("{}", { status: 200, headers: { "Content-Type": "application/json" } });
-});
-vi.stubGlobal("fetch", fetchMock);
 
 beforeEach(() => {
   mocks.commandCalls = [];

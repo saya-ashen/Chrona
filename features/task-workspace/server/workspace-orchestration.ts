@@ -7,9 +7,12 @@ import {
   resolveHeaderExecutionState,
   type ChronaEngine,
 } from "@chrona/engine";
-import { workCommandBodySchema } from "@chrona/contracts/api";
-import type { GeneratePlanSSEEvent } from "@chrona/contracts";
-import type { ExecutionActionInput, SubmitCheckpointActionInput } from "@chrona/contracts/ai";
+import {
+  workCommandBodySchema,
+  type ExecutionActionInput,
+  type GeneratePlanSSEEvent,
+  type SubmitCheckpointActionInput,
+} from "@chrona/contracts";
 import { toHttpError } from "@shared/http/server";
 import { checkpointActionToExecutionAction, summarizeRuntimeEvent } from "@features/execution-monitoring/server";
 

@@ -26,8 +26,12 @@ import {
   SelectValue,
   Skeleton,
 } from "@shared/ui";
-import { providerCapabilityMatrix, type ProviderCapabilityMatrixEntry, type ProviderCapabilityName } from "@chrona/providers-foundation/capability-matrix";
 import { deriveAutomationReadiness } from "@chrona/domain";
+import {
+  providerCapabilityMatrix,
+  type ProviderCapabilityMatrixEntry,
+  type ProviderCapabilityName,
+} from "@chrona/contracts";
 import { aiClientsApi } from "../browser-api";
 import { notifyAiClientsChanged } from "../events";
 

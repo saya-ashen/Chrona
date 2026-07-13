@@ -82,7 +82,7 @@ describe("TaskListPage results filters", () => {
     await user.click(screen.getByRole("option", { name: "Weekly report" }));
 
     const resultLink = screen.getByRole("link", { name: "Open result" });
-    expect(resultLink).toHaveAttribute("href", "/tasks/older");
+    expect(resultLink).toHaveAttribute("href", "/en/tasks/older");
     expect(within(resultLink.parentElement!.parentElement!).getByText("Occurrence occurrence-older")).toBeInTheDocument();
     expect(screen.queryByText("Daily report report")).not.toBeInTheDocument();
   });

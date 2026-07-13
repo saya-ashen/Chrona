@@ -86,13 +86,30 @@ bun run test              # Full local suite: unit, Bun, API, and all Playwright
 The ESLint warning count is ratcheted in `package.json`. New warnings fail the
 check; lower the baseline whenever existing warnings are removed.
 
-4. **Commit** with conventional messages:
+4. **Push through the repository hook.** `bun install` installs the Lefthook
+   `pre-push` hook for local Git checkouts. It runs `bun run ci:local` with an
+   isolated SQLite database and blocks the push unless checks, CI tests, and
+   desktop E2E pass. Run `bun run hooks:install` if hooks were removed. Use
+   `git push --no-verify` only for an explicitly documented emergency; remote
+   branch protection still applies.
+
+5. **Commit** with conventional messages:
+
    - `feat:` — New feature
    - `fix:` — Bug fix
-   - `refactor:` — Code restructuring
    - `docs:` — Documentation
-   - `test:` — Test changes
+   - `refactor:` — Code restructuring
+   - `test:` — Tests
    - `chore:` — Tooling/config changes
+
+The local CI equivalent can also be run directly:
+
+```bash
+bun run ci:local
+```
+
+It uses a temporary database and removes it after the run.
+
 
 ## Boundary Discipline
 

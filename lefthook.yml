@@ -1,0 +1,4 @@
+pre-push:
+  commands:
+    local-ci:
+      run: bun run ci:local
