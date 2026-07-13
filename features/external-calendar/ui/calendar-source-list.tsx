@@ -3,19 +3,19 @@
 import { useEffect, useState } from "react";
 import type { CalendarSourceSummary, CalendarSyncStatus } from "../contract";
 
-import { Badge } from "shared/ui/badge";
-import { Button } from "shared/ui/button";
 import {
+  Badge,
+  Button,
   Dialog,
   DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { FieldError } from "@/components/ui/field";
+  FieldError,
+} from "@shared/ui";
 import { listExternalCalendarSources } from "./client";
-import { externalCalendarMessages } from "@chrona/i18n/external-calendar"
+import { externalCalendarMessages } from "@chrona/i18n";
 import { CalendarSourceActions } from "./calendar-source-actions";
 
 type CalendarSourceRecord = {

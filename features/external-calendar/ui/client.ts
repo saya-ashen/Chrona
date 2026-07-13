@@ -8,8 +8,8 @@ import type {
   ValidateCalendarSourceResponse,
 } from "../contract";
 
-import { apiJson } from "shared/http/api-client";
-import { externalCalendarMessages } from "@chrona/i18n/external-calendar"
+import { apiJson } from "@shared/http";
+import { externalCalendarMessages } from "@chrona/i18n";
 
 const base = (workspaceId: string) => `/api/workspaces/${encodeURIComponent(workspaceId)}`;
 

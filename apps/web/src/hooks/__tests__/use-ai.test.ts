@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { renderHook, act } from "@testing-library/react";
-import { useAutoComplete } from "../use-ai";
-import type { AutoCompleteSuggestion } from "../use-ai";
+import { useAutoComplete } from "@features/schedule/ui/use-auto-complete";
+import type { AutoCompleteSuggestion } from "@features/schedule/ui/use-auto-complete";
 
 // ---------- Helpers ----------
 

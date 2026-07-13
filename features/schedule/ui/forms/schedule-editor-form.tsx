@@ -2,11 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
-import { applySchedule, clearSchedule } from "@/lib/task-actions-client";
-import { Button } from "shared/ui/button";
-import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
-import { useI18n } from "@chrona/i18n/react";
+import { applySchedule, clearSchedule } from "../schedule-actions";
+import { Button, Field, FieldError, FieldGroup, FieldLabel, Input } from "@shared/ui";
+import { useI18n } from "@chrona/i18n"
 
 type ScheduleEditorFormProps = {
   taskId: string;

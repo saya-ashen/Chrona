@@ -2,19 +2,19 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { StateStore } from "@json-render/react";
-import { useI18n } from "@chrona/i18n/react";
-import { useAssistantSurface } from "@/components/assistant-surface/assistant-surface-provider";
-import { TaskWorkspacePlanSection } from "@/components/tasks/workspace/sections/task-workspace-plan-section";
-import { TaskWorkspaceEditSection } from "@/components/tasks/workspace/sections/task-workspace-edit-section";
+import { useI18n } from "@chrona/i18n"
+import { useAssistantSurface } from "@features/assistant-surface";
+import { TaskWorkspacePlanSection } from "./task-workspace-plan-section";
+import { TaskWorkspaceEditSection } from "./task-workspace-edit-section";
 import { TaskWorkspaceHeaderCard } from "./task-workspace-header-card";
-import type { TaskPageData } from "..";
-import { createTaskWorkspaceExecutionConsoleView } from "..";
-import { useTaskWorkspaceDeleteFlow } from "@/components/tasks/workspace/hooks/use-task-workspace-delete-flow";
-import { useTaskWorkspaceEditorState } from "@/components/tasks/workspace/hooks/use-task-workspace-editor-state";
-import { useTaskWorkspacePageState } from "@/components/tasks/workspace/hooks/use-task-workspace-page-state";
-import { useTaskWorkspacePlanState } from "@/components/tasks/workspace/hooks/use-task-workspace-plan-state";
-import { useTaskWorkspaceProposalFlow } from "@/components/tasks/workspace/hooks/use-task-workspace-proposal-flow";
-import { createTaskAiSidebarContext } from "@/components/tasks/workspace/adapters/task-ai-sidebar-adapter";
+import type { TaskPageData } from "../model/task-workspace-types";
+import { createTaskWorkspaceExecutionConsoleView } from "../model/task-workspace-query";
+import { useTaskWorkspaceDeleteFlow } from "../hooks/use-task-workspace-delete-flow";
+import { useTaskWorkspaceEditorState } from "../hooks/use-task-workspace-editor-state";
+import { useTaskWorkspacePageState } from "../hooks/use-task-workspace-page-state";
+import { useTaskWorkspacePlanState } from "../hooks/use-task-workspace-plan-state";
+import { useTaskWorkspaceProposalFlow } from "../hooks/use-task-workspace-proposal-flow";
+import { createTaskAiSidebarContext } from "../adapters/task-ai-sidebar-adapter";
 
 function getLatestPersistedActivitySummary(pageData: TaskPageData) {
   const latestActivity = pageData.activityTimeline?.at(-1);

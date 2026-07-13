@@ -1,4 +1,4 @@
-import { db } from "@chrona/db/db";
+import { db } from "@chrona/db";
 import type {
   CalendarAutomationPolicy,
   CalendarSource as PrismaCalendarSource,
@@ -9,7 +9,7 @@ import type {
   Prisma,
   TaskStatus,
   WorkBlockStatus,
-} from "@chrona/db/generated/prisma/client";
+} from "@chrona/db";
 
 type TransactionClient = Parameters<Parameters<typeof db.$transaction>[0]>[0];
 export type CalendarSource = PrismaCalendarSource;

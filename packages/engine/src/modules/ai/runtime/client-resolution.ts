@@ -1,6 +1,6 @@
-import { aiClientRegistry } from "../../../../../../features/ai-clients";
+import { aiClientRegistry } from "../../../../../../features/ai-clients/server";
 import { db } from "@/lib/db";
-import type { AiFeature, EngineAiClient } from "../../../../../../features/ai-clients";
+import type { AiFeature, EngineAiClient } from "../../../../../../features/ai-clients/server";
 
 export async function getAiClient(
   clientId?: string | null,

@@ -1,5 +1,5 @@
 import type { AiSidebarPageContextSummary } from "@chrona/contracts";
-import { cn } from "@/lib/utils"
+import { cn } from "@shared/ui"
 
 export function ContextSummaryCard({ context }: { context: AiSidebarPageContextSummary }) {
   return (

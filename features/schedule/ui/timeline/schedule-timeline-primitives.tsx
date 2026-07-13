@@ -1,7 +1,8 @@
 "use client";
 
 import { AlertTriangle, Move } from "lucide-react";
-import { LocalizedLink } from "@/components/i18n/localized-link";
+import { Link } from "react-router-dom";
+import { localizeHref } from "@chrona/i18n";
 import { getSchedulePageCopy } from "../schedule-page-copy";
 import type {
   ScheduledItem,
@@ -13,9 +14,9 @@ import {
   getPriorityAccent,
   getPriorityTone,
 } from "../schedule-page-utils";
-import { Badge } from "shared/ui/badge";
-import { useI18n, useLocale } from "@chrona/i18n/react";
-import { cn } from "@/lib/utils";
+import { Badge } from "@shared/ui"
+import { useI18n, useLocale } from "@chrona/i18n"
+import { cn } from "@shared/ui";
 
 const DRAG_EMPTY_IMAGE = typeof Image !== "undefined" ? new Image() : null;
 if (DRAG_EMPTY_IMAGE) {
@@ -125,9 +126,9 @@ export function ScheduledTimelineBlock({
   const accent = getPriorityAccent(item.priority);
 
   return (
-    <LocalizedLink
+    <Link
       data-timeline-block
-      href={buildScheduleHref(selectedDay, item.taskId, item.workBlockId)}
+      to={localizeHref(locale, buildScheduleHref(selectedDay, item.taskId, item.workBlockId))}
       draggable={!isPending}
       onDragStart={(event) => {
         event.dataTransfer.effectAllowed = "move";
@@ -256,6 +257,6 @@ export function ScheduledTimelineBlock({
       >
         {copy.resizeHandleLabel}
       </button>
-    </LocalizedLink>
+    </Link>
   );
 }

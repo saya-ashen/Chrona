@@ -1,15 +1,13 @@
 "use client";
 
 import { X } from "lucide-react";
-import { Button } from "shared/ui/button";
-import {
-  Dialog,
-  DialogClose,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { Button } from "@shared/ui"
+import { Dialog,
+DialogClose,
+DialogContent,
+DialogDescription,
+DialogHeader,
+DialogTitle, } from "@shared/ui"
 import { useI18n } from "@chrona/i18n/react";
 import { useAppRouter } from "@/lib/router";
 

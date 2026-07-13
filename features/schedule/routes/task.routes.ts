@@ -2,18 +2,16 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import type { ChronaEngine } from "@chrona/engine";
 import type { ScheduleSource } from "@chrona/db/generated/prisma/client";
-import {
-  clearScheduleParamSchema,
-  scheduleBodySchema,
-  scheduleParamSchema,
-  scheduleProposalParamSchema,
-  scheduleProposalBodySchema,
-  scheduleProposalDecisionBodySchema,
-  workBlockScheduleParamSchema,
-  workBlockScheduleBodySchema,
-} from "@chrona/contracts/api";
+import { clearScheduleParamSchema,
+scheduleBodySchema,
+scheduleParamSchema,
+scheduleProposalParamSchema,
+scheduleProposalBodySchema,
+scheduleProposalDecisionBodySchema,
+workBlockScheduleParamSchema,
+workBlockScheduleBodySchema, } from "@chrona/contracts"
 
-import { error, internalServerError, json, toHttpError } from "../../../apps/server/src/lib/http";
+import { error, internalServerError, json, toHttpError } from "@shared/http/server";
 
 export function createTaskScheduleRoutes(engine: ChronaEngine) {
   return new Hono()

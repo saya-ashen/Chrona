@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { ScheduleAiSettingsPanel } from "@/components/settings/schedule-ai-settings-panel";
-import { SCHEDULE_AI_PREFERENCES_STORAGE_KEY } from "@/lib/schedule-ai-preferences";
+import { SCHEDULE_AI_PREFERENCES_STORAGE_KEY } from "@features/schedule";
 
 describe("ScheduleAiSettingsPanel", () => {
   beforeEach(() => {

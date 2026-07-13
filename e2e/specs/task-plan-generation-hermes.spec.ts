@@ -104,7 +104,10 @@ function writeHermesEvent(res: ServerResponse, event: Record<string, unknown>) {
 async function initializeChronaMcp() {
   const response = await fetch(`${CHRONA_BASE_URL}/api/mcp`, {
     method: "POST",
-    headers,
+    headers: {
+      "content-type": "application/json",
+      accept: "application/json, text/event-stream",
+    },
     body: JSON.stringify({
       jsonrpc: "2.0",
       id: 1,

@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
-import { Button } from "shared/ui/button";
-import { Badge } from "shared/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "shared/ui/card";
-import { TaskContextLinks } from "@/components/tasks/shared/task-context-links";
+import { Button } from "@shared/ui"
+import { Badge } from "@shared/ui"
+import { Card, CardContent, CardHeader, CardTitle } from "@shared/ui"
+import { TaskContextLinks } from "@features/task-workspace";
 import { Brain } from "lucide-react";
 
 type MemoryConsoleProps = {

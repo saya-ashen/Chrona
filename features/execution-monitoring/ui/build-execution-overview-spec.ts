@@ -1,8 +1,14 @@
 import { buildActivitySpec, UI_ACTION, type ToolDetailLabels, type UiDocument } from "@chrona/ui-protocol";
-import { mergeWorkspaceActivity, runtimeEventsToWorkspaceActivity, type PlanNodeDataModel } from "../../task-workspace";
+import {
+  mergeWorkspaceActivity,
+  runtimeEventsToWorkspaceActivity,
+  type ExecutionOverviewCard,
+  type PlanNodeDataModel,
+  type TaskWorkspacePlanFlowState,
+  type WorkspaceActivityItem,
+  type WorkspaceArtifactItem,
+} from "@features/task-workspace";
 import type { WorkspaceRuntimeEvent } from "../model/workspace-runtime-events";
-import type { TaskWorkspacePlanFlowState } from "../../task-workspace";
-import type { ExecutionOverviewCard, WorkspaceActivityItem, WorkspaceArtifactItem } from "../../task-workspace";
 import type { CommandCenterPrimaryAction } from "./task-workspace-execution-overview";
 
 type WorkspaceCopy = Record<string, string | undefined>;

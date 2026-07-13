@@ -14,36 +14,30 @@ import {
 } from "lucide-react";
 import { useNavigate, useSearchParams } from "react-router";
 import { LocalizedLink } from "@/components/i18n/localized-link";
-import { Badge } from "shared/ui/badge";
-import { Button } from "shared/ui/button";
-import { PageFrame } from "shared/ui/page-frame";
-import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "shared/ui/select";
+import { Badge } from "@shared/ui"
+import { Button } from "@shared/ui"
+import { PageFrame } from "@shared/ui"
+import { Checkbox } from "@shared/ui"
+import { Dialog,
+DialogContent,
+DialogDescription,
+DialogFooter,
+DialogHeader,
+DialogTitle, } from "@shared/ui"
+import { Input } from "@shared/ui"
+import { Select,
+SelectContent,
+SelectItem,
+SelectTrigger,
+SelectValue, } from "@shared/ui"
 import {
   TaskActionsMenu,
   type TaskActionsMenuItem,
-} from "@/components/tasks/shared";
-import {
   deleteTask,
   markTaskDone,
   reopenTask,
   startExecution,
-} from "@/lib/task-actions-client";
+} from "@features/task-workspace";
 import type { Dictionary } from "@/pages";
 import type { WorkStateView } from "@chrona/domain";
 

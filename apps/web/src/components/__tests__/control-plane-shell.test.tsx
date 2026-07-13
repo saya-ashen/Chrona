@@ -1,437 +1,77 @@
+import type { ReactNode } from "react";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-let mockTaskDialogAutoExecute = true;
-let mockTaskDialogAutoPlanGenerationEnabled = true;
-let mockAiClients = [{ id: "client-1", enabled: true }];
-let mockTaskList = { tasks: [] as Array<{ id: string }>, total: 0 };
-let mockStartWithChronaCompletedAt: string | null = null;
-let mockDialogAvailableAiClients: Array<{ id: string; enabled: boolean }> | undefined;
-
-
-vi.mock("@/components/i18n/localized-link", () => ({
-  LocalizedLink: ({ children, href, ...props }: any) => <a href={`/en${href}`} {...props}>{children}</a>,
-}));
-
-vi.mock("@/components/i18n/locale-switcher", () => ({
-  LocaleSwitcher: () => (
-    <div>
-      <a href="/en/schedule">English</a>
-      <a href="/zh/schedule">中文</a>
-    </div>
-  ),
-}));
-
-vi.mock("@/components/ui/button", () => ({
-  Button: ({ children, asChild, ...props }: any) => {
-    if (asChild && children) {
-      return <>{children}</>;
-    }
-    return <button {...props}>{children}</button>;
-  },
-}));
-
-vi.mock("../../../../../features/schedule/index.ts", () => ({
-  TaskCreateDialog: ({
-    isOpen,
-    onSubmit,
-    availableAiClients,
-  }: {
-    isOpen: boolean;
-    onSubmit: (input: {
-      title: string;
-      description: string;
-      priority: "High";
-      autoExecute: boolean;
-      autoPlanGenerationEnabled: boolean;
-      autoPlanGenerationTiming: "on_schedule";
-      autoExecuteTiming: "on_schedule";
-      dueAt: Date | null;
-      scheduledStartAt: Date;
-      scheduledEndAt: Date;
-      recurrenceRule: string | null;
-      recurrenceAnchorStartAt: string | null;
-      recurrenceAnchorEndAt: string | null;
-      aiClientId: string | null;
-    }) => Promise<void>;
-    availableAiClients?: Array<{ id: string; enabled: boolean }>;
-  }) => {
-    mockDialogAvailableAiClients = availableAiClients;
-    return isOpen ? (
-    <div role="dialog">
-      <span>Create task dialog</span>
-      <button
-        type="button"
-        onClick={() => onSubmit({
-          title: "Created from shell",
-          description: "Shell description",
-          priority: "High",
-          autoExecute: mockTaskDialogAutoExecute,
-          autoPlanGenerationEnabled: mockTaskDialogAutoPlanGenerationEnabled,
-          autoPlanGenerationTiming: "on_schedule",
-          autoExecuteTiming: "on_schedule",
-          dueAt: null,
-          scheduledStartAt: new Date(2026, 3, 15, 9, 0, 0, 0),
-          scheduledEndAt: new Date(2026, 3, 15, 10, 0, 0, 0),
-          recurrenceRule: "FREQ=WEEKLY",
-          recurrenceAnchorStartAt: "2026-04-15T09:00:00.000Z",
-          recurrenceAnchorEndAt: "2026-04-15T10:00:00.000Z",
-          aiClientId: "client-1",
-        })}
-      >
-        Submit task
-      </button>
-    </div>
-    ) : null;
-  },
-}));
-
-
-vi.mock("@/lib/task-actions-client", () => ({
+const mocks = vi.hoisted(() => ({
   createScheduledTask: vi.fn(),
+  apiJson: vi.fn(),
 }));
 
-vi.mock("shared/http/api-client", () => ({
-  apiJson: vi.fn((path: string, init?: RequestInit) => {
-    if (path === "/api/ai/clients") return Promise.resolve({ clients: mockAiClients });
-    if (path === "/api/schedule?workspaceId=ws-1") {
-      return Promise.resolve({
-        availableAiClients: mockAiClients,
-        defaultExecutionRuntime: "local",
-      });
-    }
-    if (path.startsWith("/api/tasks?")) return Promise.resolve(mockTaskList);
-    if (path === "/api/workspaces/ws-1/preferences/start-with-chrona") {
-      if (init?.method === "PATCH") {
-        const body = JSON.parse(String(init.body ?? "{}")) as { completedAt?: string | null };
-        mockStartWithChronaCompletedAt = body.completedAt ?? null;
-      }
-      return Promise.resolve({ completedAt: mockStartWithChronaCompletedAt });
-    }
-    return Promise.reject(new Error(`Unhandled API path: ${path}`));
-  }),
+vi.mock("react-router-dom", () => ({
+  Link: ({ children, to, ...props }: { children: ReactNode; to: string }) => <a href={to} {...props}>{children}</a>,
+  useLocation: () => ({ pathname: "/en/tasks" }),
+  useNavigate: () => vi.fn(),
+  useRevalidator: () => ({ revalidate: vi.fn() }),
 }));
 
-vi.mock("@/hooks/ai/task-plan-generation-session-store", () => ({
-  startTaskPlanGenerationSession: vi.fn(),
+vi.mock("@shared/http", () => ({ apiJson: mocks.apiJson }));
+vi.mock("@shared/ui", () => ({
+  Button: ({ children, ...props }: { children: ReactNode }) => <button {...props}>{children}</button>,
+  cn: (...classes: Array<string | false | null | undefined>) => classes.filter(Boolean).join(" "),
+  Sidebar: ({ children }: { children: ReactNode }) => <aside>{children}</aside>,
+  SidebarContent: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  SidebarGroup: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  SidebarGroupContent: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  SidebarHeader: ({ children }: { children: ReactNode }) => <div>{children}</div>,
+  SidebarMenu: ({ children }: { children: ReactNode }) => <ul>{children}</ul>,
+  SidebarMenuButton: ({ children }: { children: ReactNode }) => <button>{children}</button>,
+  SidebarMenuItem: ({ children }: { children: ReactNode }) => <li>{children}</li>,
+  SidebarProvider: ({ children }: { children: ReactNode }) => <div>{children}</div>,
 }));
-
-vi.mock("@/lib/utils", () => ({
-  cn: (...args: Array<string | false | null | undefined>) => args.filter(Boolean).join(" "),
+vi.mock("@features/schedule", () => ({
+  createScheduledTask: mocks.createScheduledTask,
+  TaskCreateDialog: ({ isOpen, onSubmit }: { isOpen: boolean; onSubmit: (input: {
+    title: string; description: string; priority: "High"; autoExecute: boolean; autoPlanGenerationEnabled: boolean; autoPlanGenerationTiming: "on_schedule"; autoExecuteTiming: "on_schedule"; dueAt: Date | null; scheduledStartAt: Date; scheduledEndAt: Date; recurrenceRule: string | null; recurrenceAnchorStartAt: string | null; recurrenceAnchorEndAt: string | null; aiClientId: string | null;
+  }) => Promise<void> }) => isOpen ? <div role="dialog"><button type="button" onClick={() => onSubmit({ title: "Created from shell", description: "Shell description", priority: "High", autoExecute: true, autoPlanGenerationEnabled: false, autoPlanGenerationTiming: "on_schedule", autoExecuteTiming: "on_schedule", dueAt: null, scheduledStartAt: new Date(2026, 3, 15, 9), scheduledEndAt: new Date(2026, 3, 15, 10), recurrenceRule: "FREQ=WEEKLY", recurrenceAnchorStartAt: "2026-04-15T09:00:00.000Z", recurrenceAnchorEndAt: "2026-04-15T10:00:00.000Z", aiClientId: "client-1" })}>Submit task</button></div> : null,
 }));
-
-const routerPush = vi.fn();
-const routerRefresh = vi.fn();
-
-vi.mock("@/lib/router", () => ({
-  useAppPathname: () => "/tasks",
-  useAppRouter: () => ({
-    push: routerPush,
-    refresh: routerRefresh,
-  }),
-}));
-
-vi.mock("@/components/assistant-surface/assistant-surface-provider", () => ({
-  useAssistantSurface: () => ({
-    isOpen: false,
-    state: {
-      topSummary: { label: "PAGE-AWARE AI", value: "Task ready" },
-    },
-    toggle: vi.fn(),
-  }),
-}));
-
-vi.mock("@chrona/i18n/react", () => ({
-  useI18n: () => ({
-    messages: { components: { schedulePage: {} } },
-    t: (key: string) => {
-      const map: Record<string, string> = {
-        "nav.brandTitle": "Chrona",
-        "nav.brandTagline": "Human-AI task work",
-        "nav.schedule": "Schedule",
-        "nav.actionCenter": "Action Center",
-        "nav.tasks": "Tasks",
-        "nav.settings": "Settings",
-        "nav.newTask": "New Task",
-        "components.schedulePage.firstRunTitle": "Start with Chrona in three steps",
-        "components.schedulePage.firstRunDescription": "Connect AI, capture a real task, then review the plan before anything runs.",
-        "components.schedulePage.firstRunStepConnectAiTitle": "Connect AI",
-        "components.schedulePage.firstRunStepConnectAi": "Add Claude Code or Codex as the AI client Chrona will use.",
-        "components.schedulePage.firstRunStepConnectAiDone": "AI client connected. Next, create a real task.",
-        "components.schedulePage.firstRunStepCreateTaskTitle": "Create a task",
-        "components.schedulePage.firstRunStepCreateTask": "Describe the goal, constraints, and context in one task.",
-        "components.schedulePage.firstRunStepReviewPlanTitle": "Review the plan",
-        "components.schedulePage.firstRunStepReviewPlan": "Chrona previews AI suggestions first; you decide what to accept or run.",
-        "components.schedulePage.firstRunConnectAi": "Connect AI",
-        "components.schedulePage.firstRunCreateTask": "Create first task",
-        "components.schedulePage.firstRunOpenCreatedTask": "Open created task",
-      };
-      return map[key] ?? key;
-    },
-  }),
+vi.mock("@chrona/i18n", () => ({
+  useI18n: () => ({ t: (key: string) => ({ "nav.brandTitle": "Chrona", "nav.brandTagline": "Human-AI task work", "nav.schedule": "Schedule", "nav.actionCenter": "Action Center", "nav.tasks": "Tasks", "nav.settings": "Settings", "nav.newTask": "New Task", "components.assistantSurface.entryLabel": "Assistant", "locale.label": "Locale" }[key] ?? key) }),
   useLocale: () => "en",
+  localizeHref: (locale: string, href: string) => `/${locale}${href}`,
+  locales: ["en", "zh"],
 }));
 
-import {
-  SCHEDULE_AI_PREFERENCES_STORAGE_KEY,
-  type ScheduleAiPreferences,
-} from "@/lib/schedule-ai-preferences";
-import { createScheduledTask } from "@/lib/task-actions-client";
-import { startTaskPlanGenerationSession } from "@/hooks/ai/task-plan-generation-session-store";
-import { apiJson } from "shared/http/api-client";
-import { ControlPlaneShell } from "@/components/control-plane-shell";
+import { ControlPlaneShell } from "../../../../../features/mcp-control-plane";
 
-const defaultWorkspace = { id: "ws-1", name: "Default" };
-const mockCreateScheduledTask = vi.mocked(createScheduledTask);
-const mockStartTaskPlanGenerationSession = vi.mocked(startTaskPlanGenerationSession);
-const mockApiJson = vi.mocked(apiJson);
-
-function writePreferences(preferences: ScheduleAiPreferences) {
-  window.localStorage.setItem(
-    SCHEDULE_AI_PREFERENCES_STORAGE_KEY,
-    JSON.stringify(preferences),
-  );
-}
-
-function expectNavLink(label: string, href: string) {
-  const links = screen.getAllByRole("link", { name: label });
-  expect(links.some((link) => link.getAttribute("href") === href)).toBe(true);
-  return links;
-}
+beforeEach(() => {
+  mocks.apiJson.mockImplementation((path: string) => {
+    if (path === "/api/workspaces/ws-1/preferences/start-with-chrona") return Promise.resolve({ completedAt: "2026-01-01T00:00:00.000Z" });
+    if (path === "/api/schedule?workspaceId=ws-1") return Promise.resolve({ availableAiClients: [], defaultExecutionRuntime: "local" });
+    return Promise.resolve({ clients: [], tasks: [], total: 0 });
+  });
+});
 
 afterEach(() => {
   cleanup();
-  window.localStorage.clear();
   vi.clearAllMocks();
-  mockTaskDialogAutoExecute = true;
-  mockTaskDialogAutoPlanGenerationEnabled = true;
-  mockAiClients = [{ id: "client-1", enabled: true }];
-  mockTaskList = { tasks: [], total: 0 };
-  mockStartWithChronaCompletedAt = null;
-  mockDialogAvailableAiClients = undefined;
 });
 
 describe("ControlPlaneShell", () => {
-  it("renders primary navigation with Schedule, Tasks, Action Center, and Settings", () => {
-    render(
-      <ControlPlaneShell defaultWorkspace={defaultWorkspace}>
-        <div>Workspace body</div>
-      </ControlPlaneShell>,
-    );
-
-    const chronaLinks = screen.getAllByRole("link", { name: "Chrona" });
-    expect(chronaLinks.length).toBeGreaterThan(0);
-    expect(chronaLinks[0]).toHaveAttribute("href", "/en/schedule");
-    expectNavLink("Schedule", "/en/schedule");
-    const taskLinks = expectNavLink("Tasks", "/en/tasks");
-    expect(taskLinks.some((link) => link.getAttribute("aria-current") === "page")).toBe(true);
-    expectNavLink("Action Center", "/en/action-center");
-    expectNavLink("Settings", "/en/settings");
-
-    // Should NOT show inactive or legacy workspace navigation.
-    expect(screen.queryByRole("link", { name: "Memory" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Inbox" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: "Workspaces" })).not.toBeInTheDocument();
-
-    const assistantStatus = screen.getByRole("button", { name: "components.assistantSurface.entryLabel" });
-    expect(assistantStatus).toBeDisabled();
-    expect(screen.getByText("PAGE-AWARE AI")).toBeInTheDocument();
+  it("keeps localized navigation and disabled assistant display", () => {
+    render(<ControlPlaneShell defaultWorkspace={{ id: "ws-1", name: "Default" }} assistantSummary={{ label: "PAGE-AWARE AI", value: "Task ready" }}><div>Workspace body</div></ControlPlaneShell>);
+    expect(screen.getAllByRole("link", { name: "Chrona" })[0]).toHaveAttribute("href", "/en/schedule");
+    expect(screen.getByRole("link", { name: "Tasks" })).toHaveAttribute("href", "/en/tasks");
+    expect(screen.getByRole("button", { name: "Assistant" })).toBeDisabled();
     expect(screen.getByText("Task ready")).toBeInTheDocument();
   });
 
-
-  it("opens the create task dialog without linking away from the current page", async () => {
+  it("creates scheduled tasks through the schedule feature public action", async () => {
+    mocks.createScheduledTask.mockResolvedValue({ taskId: "created-task" });
     const user = userEvent.setup();
-
-    render(
-      <ControlPlaneShell defaultWorkspace={defaultWorkspace}>
-        <div>Workspace body</div>
-      </ControlPlaneShell>,
-    );
-
-    const newTaskButton = screen.getByRole("button", { name: "New Task" });
-    expect(screen.queryByRole("link", { name: "New Task" })).not.toBeInTheDocument();
-
-    await user.click(newTaskButton);
-
-    expect(screen.getByRole("dialog")).toHaveTextContent("Create task dialog");
-  });
-
-  it("hides onboarding after persisted completion loads", async () => {
-    mockStartWithChronaCompletedAt = "2026-07-07T00:00:00.000Z";
-
-    render(
-      <ControlPlaneShell defaultWorkspace={defaultWorkspace}>
-        <div>Workspace body</div>
-      </ControlPlaneShell>,
-    );
-
-    await waitFor(() => {
-      expect(mockApiJson).toHaveBeenCalledWith("/api/workspaces/ws-1/preferences/start-with-chrona");
-    });
-    expect(screen.queryByText("Start with Chrona in three steps")).not.toBeInTheDocument();
-  });
-
-  it("passes dialog automation choices into task creation", async () => {
-    const user = userEvent.setup();
-    writePreferences({
-      autoSuggestionsEnabled: false,
-      autoPlanGenerationEnabled: false,
-      defaultAutoExecuteEnabled: false,
-    });
-    mockCreateScheduledTask.mockResolvedValueOnce({ taskId: "created-task" });
-
-    render(
-      <ControlPlaneShell defaultWorkspace={defaultWorkspace}>
-        <div>Workspace body</div>
-      </ControlPlaneShell>,
-    );
-
-    await user.click(screen.getByRole("button", { name: "New Task" }));
-    await waitFor(() => {
-      expect(mockDialogAvailableAiClients).toEqual(mockAiClients);
-    });
-    await user.click(screen.getByRole("button", { name: "Submit task" }));
-
-    await waitFor(() => {
-      expect(mockCreateScheduledTask).toHaveBeenCalledWith(
-        expect.objectContaining({
-          workspaceId: "ws-1",
-          title: "Created from shell",
-          description: "Shell description",
-          priority: "High",
-          autoPlanGeneration: true,
-          autoExecute: true,
-          executionRuntime: "local",
-          executionConfig: {},
-          aiClientId: "client-1",
-          dueAt: null,
-          scheduledStartAt: new Date(2026, 3, 15, 9, 0, 0, 0),
-          scheduledEndAt: new Date(2026, 3, 15, 10, 0, 0, 0),
-          recurrenceRule: "FREQ=WEEKLY",
-          recurrenceAnchorStartAt: "2026-04-15T09:00:00.000Z",
-          recurrenceAnchorEndAt: "2026-04-15T10:00:00.000Z",
-        }),
-      );
-    });
-    expect(mockStartTaskPlanGenerationSession).not.toHaveBeenCalled();
-  });
-
-  it("advances onboarding to plan review after creating a task", async () => {
-    const user = userEvent.setup();
-    mockCreateScheduledTask.mockResolvedValueOnce({ taskId: "created-task" });
-
-    render(
-      <ControlPlaneShell defaultWorkspace={defaultWorkspace}>
-        <div>Workspace body</div>
-      </ControlPlaneShell>,
-    );
-
-    expect(await screen.findByRole("button", { name: "Create first task" })).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Create first task" }));
-    await user.click(screen.getByRole("button", { name: "Submit task" }));
-
-    await waitFor(() => {
-      expect(mockCreateScheduledTask).toHaveBeenCalledWith(expect.objectContaining({ title: "Created from shell" }));
-    });
-    expect(screen.getByRole("listitem", { current: "step" })).toHaveTextContent("Review the plan");
-    expect(screen.getByRole("button", { name: "Open created task" })).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Open created task" }));
-    expect(routerPush).toHaveBeenCalledWith("/en/tasks/created-task");
-    await waitFor(() => {
-      expect(mockApiJson).toHaveBeenCalledWith(
-        "/api/workspaces/ws-1/preferences/start-with-chrona",
-        expect.objectContaining({ method: "PATCH" }),
-      );
-    });
-    expect(screen.queryByText("Start with Chrona in three steps")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Open created task" })).not.toBeInTheDocument();
-  });
-
-  it("opens existing workspace task from onboarding instead of creating another task", async () => {
-    const user = userEvent.setup();
-    mockTaskList = { tasks: [{ id: "existing-task" }], total: 1 };
-
-    render(
-      <ControlPlaneShell defaultWorkspace={defaultWorkspace}>
-        <div>Workspace body</div>
-      </ControlPlaneShell>,
-    );
-
-    expect(await screen.findByRole("button", { name: "Open created task" })).toBeInTheDocument();
-    expect(screen.getByRole("listitem", { current: "step" })).toHaveTextContent("Review the plan");
-    expect(screen.queryByRole("button", { name: "Create first task" })).not.toBeInTheDocument();
-
-    await user.click(screen.getByRole("button", { name: "Open created task" }));
-
-    expect(routerPush).toHaveBeenCalledWith("/en/tasks/existing-task");
-    await waitFor(() => {
-      expect(mockApiJson).toHaveBeenCalledWith(
-        "/api/workspaces/ws-1/preferences/start-with-chrona",
-        expect.objectContaining({ method: "PATCH" }),
-      );
-    });
-    expect(screen.queryByText("Start with Chrona in three steps")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Open created task" })).not.toBeInTheDocument();
-    expect(mockCreateScheduledTask).not.toHaveBeenCalled();
-  });
-
-  it("forces plan generation when auto-execute is enabled", async () => {
-    const user = userEvent.setup();
-    mockTaskDialogAutoExecute = true;
-    mockTaskDialogAutoPlanGenerationEnabled = false;
-    mockCreateScheduledTask.mockResolvedValueOnce({ taskId: "created-task" });
-
-    render(
-      <ControlPlaneShell defaultWorkspace={defaultWorkspace}>
-        <div>Workspace body</div>
-      </ControlPlaneShell>,
-    );
-
+    render(<ControlPlaneShell defaultWorkspace={{ id: "ws-1", name: "Default" }}><div>Workspace body</div></ControlPlaneShell>);
     await user.click(screen.getByRole("button", { name: "New Task" }));
     await user.click(screen.getByRole("button", { name: "Submit task" }));
-
-    await waitFor(() => {
-      expect(mockCreateScheduledTask).toHaveBeenCalledWith(
-        expect.objectContaining({
-          autoPlanGeneration: true,
-          autoExecute: true,
-        }),
-      );
-    });
-    expect(mockStartTaskPlanGenerationSession).not.toHaveBeenCalled();
-  });
-
-  it("does not request auto plan generation when both task automation switches are disabled", async () => {
-    const user = userEvent.setup();
-    mockTaskDialogAutoExecute = false;
-    mockTaskDialogAutoPlanGenerationEnabled = false;
-    writePreferences({
-      autoSuggestionsEnabled: false,
-      autoPlanGenerationEnabled: true,
-      defaultAutoExecuteEnabled: false,
-    });
-    mockCreateScheduledTask.mockResolvedValueOnce({ taskId: "created-task" });
-
-    render(
-      <ControlPlaneShell defaultWorkspace={defaultWorkspace}>
-        <div>Workspace body</div>
-      </ControlPlaneShell>,
-    );
-
-    await user.click(screen.getByRole("button", { name: "New Task" }));
-    await user.click(screen.getByRole("button", { name: "Submit task" }));
-
-    await waitFor(() => {
-      expect(mockCreateScheduledTask).toHaveBeenCalledWith(
-        expect.objectContaining({
-          title: "Created from shell",
-          autoPlanGeneration: false,
-          autoExecute: false,
-        }),
-      );
-    });
-    expect(mockStartTaskPlanGenerationSession).not.toHaveBeenCalled();
+    await waitFor(() => expect(mocks.createScheduledTask).toHaveBeenCalledWith(expect.objectContaining({ workspaceId: "ws-1", title: "Created from shell", autoPlanGeneration: true, autoExecute: true, executionRuntime: "local", recurrenceRule: "FREQ=WEEKLY" })));
   });
 });

@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { PropsWithChildren } from "react";
-import type { TaskPlanReadModel } from "@chrona/contracts/ai";
+import type { TaskPlanReadModel } from "@chrona/contracts"
 
 import { TaskWorkspacePage } from "../ui/task-workspace-page";
 import { createTaskWorkspaceFixturePageData } from "@features/task-workspace/test-support/task-workspace-test-fixtures";
@@ -41,7 +41,8 @@ vi.mock("elkjs/lib/elk.bundled.js", () => ({
   },
 }));
 
-vi.mock("@/lib/fetch-json-event-source", () => ({
+vi.mock("@shared/http", async (importOriginal) => ({
+  ...(await importOriginal()),
   fetchJsonEventSource: (_input: string, options: FetchEventSourceOptions) => {
     mocks.streamOpened = true;
     mocks.eventHandler = options.onEvent;
@@ -49,7 +50,7 @@ vi.mock("@/lib/fetch-json-event-source", () => ({
   },
 }));
 
-vi.mock("@/components/assistant-surface/assistant-surface-provider", () => ({
+vi.mock("@features/assistant-surface", () => ({
   useAssistantSurface: () => ({
     registerHandlers: vi.fn(() => vi.fn()),
     setPageContext: mocks.setPageContext,
@@ -61,11 +62,11 @@ vi.mock("@chrona/i18n/react", () => ({
 }));
 
 
-vi.mock("@/components/tasks/workspace/sections/task-workspace-edit-section", () => ({
+vi.mock("../ui/task-workspace-edit-section", () => ({
   TaskWorkspaceEditSection: () => null,
 }));
 
-vi.mock("@/components/tasks/workspace/sections/task-workspace-plan-section", () => ({
+vi.mock("../ui/task-workspace-plan-section", () => ({
   TaskWorkspacePlanSection: ({ onGeneratePlan, plan, canAcceptPlan }: {
     onGeneratePlan: () => void;
     plan: TaskPlanReadModel | null;
@@ -75,23 +76,6 @@ vi.mock("@/components/tasks/workspace/sections/task-workspace-plan-section", () 
     : <button type="button" onClick={onGeneratePlan}>Generate plan</button>,
 }));
 
-vi.mock("@/lib/rpc-client", () => ({
-  api: {
-    work: {
-      ":taskId": {
-        commands: {
-          $post: vi.fn(async (args: { param: { taskId: string }; json: Record<string, unknown> }) => {
-            mocks.commandCalls.push({ taskId: args.param.taskId, body: args.json });
-            return {
-              ok: true,
-              json: async () => ({ commandId: `cmd-${mocks.commandCalls.length}`, taskId: args.param.taskId, acceptedAt: "2026-06-13T00:00:00.000Z" }),
-            };
-          }),
-        },
-      },
-    },
-  },
-}));
 
 const fetchRoutes: Array<[RegExp | string, () => unknown]> = [
   ["/plan/generations/active", () => ({ generationSession: null })],
@@ -103,8 +87,24 @@ const fetchRoutes: Array<[RegExp | string, () => unknown]> = [
   [/\/api\/tasks\/[^/]+(\?|$)/, () => mocks.pageData ?? createTaskWorkspaceFixturePageData()],
 ];
 
-const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
   const url = typeof input === "string" ? input : input.toString();
+  if (url.match(/\/api\/work\/[^/]+\/commands$/)) {
+    mocks.commandCalls.push({
+      taskId: url.split("/")[3] ?? "",
+      body: init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : {},
+    });
+    return new Response(JSON.stringify({ commandId: "c-1", acceptedAt: "2026-06-10T00:00:00.000Z" }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+  }
+  if (url.includes("/execution/actions")) {
+    mocks.commandCalls.push({
+      taskId: url.split("/")[3] ?? "",
+      body: init?.body ? JSON.parse(String(init.body)) as Record<string, unknown> : {},
+    });
+  }
   const route = fetchRoutes.find(([matcher]) => typeof matcher === "string" ? url.includes(matcher) : matcher.test(url));
   return jsonResponse(route?.[1]() ?? {});
 });

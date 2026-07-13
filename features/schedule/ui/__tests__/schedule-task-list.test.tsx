@@ -11,31 +11,18 @@ vi.mock("@chrona/i18n", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@chrona/i18n")>()),
   localizeHref: (_: string, href: string) => href,
 }));
-vi.mock("@/components/ui/button", () => ({
-  Button: ({ children, asChild, ...props }: any) => {
-    if (asChild && children) {
-      return <>{children}</>;
-    }
-    return <button {...props}>{children}</button>;
-  },
+vi.mock("@shared/ui", () => ({
+  Badge: ({ children }: { children: React.ReactNode }) => <span data-testid="status-badge">{children}</span>,
+  Button: ({ children, asChild, ...props }: React.PropsWithChildren<{ asChild?: boolean }>) => asChild ? <>{children}</> : <button {...props}>{children}</button>,
+  Card: ({ children }: React.PropsWithChildren) => <div>{children}</div>,
+  CardDescription: ({ children }: React.PropsWithChildren) => <p>{children}</p>,
+  CardHeader: ({ children }: React.PropsWithChildren) => <div>{children}</div>,
+  CardTitle: ({ children }: React.PropsWithChildren) => <h3>{children}</h3>,
 }));
-vi.mock("shared/ui/badge", () => ({
-  Badge: ({ children }: any) => <span data-testid="status-badge">{children}</span>,
-}));
-vi.mock("@/components/ui/card", () => ({
-  Card: ({ children }: any) => <div>{children}</div>,
-  CardDescription: ({ children }: any) => <p>{children}</p>,
-  CardHeader: ({ children }: any) => <div>{children}</div>,
-  CardTitle: ({ children }: any) => <h3>{children}</h3>,
-}));
-vi.mock("@/components/tasks/shared/task-context-links", () => ({ TaskContextLinks: () => null }));
-vi.mock("@/components/i18n/localized-link", () => ({
-  LocalizedLink: ({ children, ...props }: any) => <a {...props}>{children}</a>,
-}));
+vi.mock("@features/task-workspace", () => ({ TaskContextLinks: () => null }));
 vi.mock("../forms/task-config-form", () => ({
   TaskConfigForm: () => <div data-testid="task-config-form" />,
 }));
-vi.mock("@/lib/utils", () => ({ cn: (...args: any[]) => args.filter(Boolean).join(" ") }));
 
 function makeItem(overrides: Partial<ScheduleTaskListItem> & { taskId: string; title: string }): ScheduleTaskListItem {
   return {

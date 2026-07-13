@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { PlanCompileError } from "@chrona/contracts/ai";
+import { PlanCompileError } from "@chrona/contracts";
 
 import { compilePlanBlueprint } from "../index";
 

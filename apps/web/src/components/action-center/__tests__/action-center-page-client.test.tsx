@@ -13,9 +13,12 @@ vi.mock("@/components/i18n/localized-link", () => ({
   ),
 }));
 
-vi.mock("@/lib/task-actions-client", () => ({
+vi.mock("@features/schedule", () => ({
   decideScheduleProposal: (...args: unknown[]) =>
     decideScheduleProposal(...args),
+}));
+
+vi.mock("@features/task-workspace", () => ({
   dispatchExecutionAction: (...args: unknown[]) =>
     dispatchExecutionAction(...args),
 }));

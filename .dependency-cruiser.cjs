@@ -235,8 +235,8 @@ module.exports = {
     {
       name: "features-do-not-import-apps-or-packages-internals",
       comment:
-        "Feature slices should use package barrels where practical. Existing migration slices still bridge legacy app/package internals until moved.",
-      severity: "warn",
+        "Feature slices must use public package barrels and must not import app or package internals.",
+      severity: "error",
       from: { path: "^features/", pathNot: TEST },
       to: {
         path: "^(apps/|packages/[^/]+/src/)",

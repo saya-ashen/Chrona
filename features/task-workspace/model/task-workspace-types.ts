@@ -1,6 +1,6 @@
 import type { TaskConfigAiClient, TaskConfigExecutionRuntime } from "@features/schedule";
 import type { PlanNodeDataModel, TaskPlanGraphPlan } from "./plan-node-view-model";
-import type { TaskPlanReadModel, TaskWorkspaceUpdateProposal } from "@chrona/contracts/ai";
+import type { TaskPlanReadModel, TaskWorkspaceUpdateProposal } from "@chrona/contracts"
 import type { GraphNodeState, ReconciliationResult, TaskExecutionSummary } from "@chrona/contracts";
 import type { UiDocument } from "@chrona/ui-protocol";
 

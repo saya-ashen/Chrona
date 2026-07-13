@@ -2,13 +2,13 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AiClientsDialog } from "../ui/ai-clients-dialog";
 
-const push = vi.fn();
+const navigate = vi.fn();
 
-vi.mock("@/lib/router", () => ({
-  useAppRouter: () => ({ push }),
+vi.mock("react-router-dom", () => ({
+  useNavigate: () => navigate,
 }));
 
-vi.mock("@chrona/i18n/react", () => ({
+vi.mock("@chrona/i18n", () => ({
   useI18n: () => ({
     t: (key: string) => {
       const map: Record<string, string> = {
@@ -27,7 +27,7 @@ vi.mock("../ui/ai-clients-manager", () => ({
 }));
 
 beforeEach(() => {
-  push.mockClear();
+  navigate.mockClear();
 });
 
 afterEach(() => {
@@ -47,6 +47,6 @@ describe("AiClientsDialog", () => {
     render(<AiClientsDialog isOpen closeHref="/en/settings" />);
 
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
-    expect(push).toHaveBeenCalledWith("/en/settings");
+    expect(navigate).toHaveBeenCalledWith("/en/settings");
   });
 });

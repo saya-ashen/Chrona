@@ -11,7 +11,7 @@ import type { ExecutionActionInput, SubmitCheckpointActionInput } from "@chrona/
 
 import { error, internalServerError, json, toHttpError } from "../../lib/http";
 import { heartbeatDelayMs } from "../../lib/sse-heartbeat";
-import { checkpointActionToExecutionAction, summarizeRuntimeEvent } from "../../../../../features/execution-monitoring/server/runtime-event-summary";
+import { checkpointActionToExecutionAction, summarizeRuntimeEvent } from "@features/execution-monitoring/server";
 
 const logger = createLogger("apps.server.work");
 

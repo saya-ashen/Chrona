@@ -1,6 +1,7 @@
+import type { ReactNode } from "react";
 import { Outlet, useLoaderData } from "react-router-dom";
 
-import { AssistantSurfaceProvider } from "@/components/assistant-surface/assistant-surface-provider";
+import { AssistantSurfaceProvider, useAssistantSurface } from "@features/assistant-surface";
 import { AccessKeyGate } from "@/components/access-key-gate";
 import { ControlPlaneShell } from "../../../features/mcp-control-plane";
 import { I18nProvider } from "@chrona/i18n/react";
@@ -15,11 +16,30 @@ export function AppShell() {
     <I18nProvider locale={locale} messages={dictionary}>
       <AccessKeyGate>
         <AssistantSurfaceProvider>
-          <ControlPlaneShell defaultWorkspace={data.defaultWorkspace}>
+          <ControlPlaneShellWithAssistantSummary defaultWorkspace={data.defaultWorkspace}>
             <Outlet context={data} />
-          </ControlPlaneShell>
+          </ControlPlaneShellWithAssistantSummary>
         </AssistantSurfaceProvider>
       </AccessKeyGate>
     </I18nProvider>
+  );
+}
+
+function ControlPlaneShellWithAssistantSummary({
+  children,
+  defaultWorkspace,
+}: {
+  children: ReactNode;
+  defaultWorkspace: AppBootData["defaultWorkspace"];
+}) {
+  const assistant = useAssistantSurface();
+
+  return (
+    <ControlPlaneShell
+      defaultWorkspace={defaultWorkspace}
+      assistantSummary={assistant.state.topSummary}
+    >
+      {children}
+    </ControlPlaneShell>
   );
 }

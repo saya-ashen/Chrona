@@ -26,7 +26,7 @@ mock.module("../providers", () => ({
   providerCall: providerCallMock,
 }));
 
-mock.module("../../../../../../features/ai-clients", () => ({
+mock.module("../../../../../../features/ai-clients/server", () => ({
   aiClientRegistry: {
     requireProviderClient: (client: EngineAiClient) => client,
   },
@@ -35,7 +35,7 @@ mock.module("../../../../../../features/ai-clients", () => ({
 import { generatePlanStream } from "../features/generate-plan";
 import { dispatchStream } from "../streaming";
 import type { AgentProviderClient } from "@chrona/providers-foundation";
-import type { EngineAiClient } from "../../../../../../features/ai-clients";
+import type { EngineAiClient } from "../../../../../../features/ai-clients/server";
 
 describe("generatePlanStream", () => {
   it("does not fall back to blocking provider calls when streaming generate_plan fails", async () => {

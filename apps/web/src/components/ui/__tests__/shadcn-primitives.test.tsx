@@ -1,28 +1,28 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 
-import { Badge } from "shared/ui/badge";
-import { Button } from "shared/ui/button";
 import {
+  Badge,
+  Button,
   Card,
   CardContent,
   CardDescription,
   CardFooter,
   CardHeader,
   CardTitle,
-} from "shared/ui/card";
-import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
+  Field,
+  FieldDescription,
+  FieldLabel,
+  Input,
+  Label,
   Select,
   SelectContent,
   SelectGroup,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "shared/ui/select";
-import { Textarea } from "@/components/ui/textarea";
+  Textarea,
+} from "@shared/ui";
 
 describe("shadcn UI primitives", () => {
   it("renders button and badge primitives without legacy wrapper APIs", () => {

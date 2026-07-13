@@ -1,5 +1,3 @@
-import { readFileSync } from "node:fs";
-import { resolve } from "node:path";
 import { Hono } from "hono";
 import { z } from "zod";
 import { zValidator } from "@hono/zod-validator";
@@ -12,7 +10,7 @@ import {
   validateCalendarSourceRequestSchema,
 } from "./contract";
 
-import { error, internalServerError, json } from "@server/lib/http";
+import { error, internalServerError, json } from "@shared/http/server";
 import { createExternalCalendarService } from "./service";
 
 export type CalendarSourceRouteOptions = {
@@ -34,15 +32,30 @@ function parseDate(value: string) {
   return parsed;
 }
 
+const E2E_CALENDAR_FIXTURE = `BEGIN:VCALENDAR
+VERSION:2.0
+PRODID:-//Chrona//External Calendar Fixtures//EN
+CALSCALE:GREGORIAN
+BEGIN:VEVENT
+UID:valid-standup@example.test
+DTSTAMP:20260501T080000Z
+DTSTART:20260504T090000Z
+DTEND:20260504T093000Z
+SUMMARY:External standup
+DESCRIPTION:Discuss sync blockers and handoff notes.
+END:VEVENT
+END:VCALENDAR
+`;
+
 function createE2eCalendarFixtureTransport(): CalendarFeedTransport {
-  const fixture = readFileSync(resolve("packages/integrations/src/calendar/fixtures/valid.ics"), "utf8");
+  const fixture = E2E_CALENDAR_FIXTURE;
   return async (url) => {
     const parsed = new URL(url);
     if (parsed.hostname !== "calendar-fixtures.test") return { status: 404, text: "" };
 
     const title = parsed.searchParams.get("title");
     const day = parsed.searchParams.get("day");
-    let text = title ? fixture.replace("SUMMARY:External standup", `SUMMARY:${title}`) : fixture;
+    let text = fixture.replace("SUMMARY:External standup", `SUMMARY:${title ?? "External standup"}`);
     if (day && /^\d{4}-\d{2}-\d{2}$/.test(day)) {
       const compactDay = day.replaceAll("-", "");
       text = text

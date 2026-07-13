@@ -5,12 +5,10 @@ import type { ActionCenterItem } from "@chrona/contracts/api";
 import { deriveUserFacingFailure, type WorkStateView } from "@chrona/domain";
 
 import { LocalizedLink } from "@/components/i18n/localized-link";
-import { Button } from "shared/ui/button";
+import { Button } from "@shared/ui"
 import { ActionCenterList } from "@/components/action-center/action-center-list";
-import {
-  decideScheduleProposal,
-  dispatchExecutionAction,
-} from "@/lib/task-actions-client";
+import { decideScheduleProposal } from "@features/schedule";
+import { dispatchExecutionAction } from "@features/task-workspace";
 
 type ActionCenterCopy = Partial<
   Record<

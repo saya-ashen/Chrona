@@ -21,27 +21,30 @@ vi.mock("@/lib/router", () => ({
   useAppRouter: () => ({ push, refresh }),
 }));
 
-vi.mock("@chrona/i18n/react", async () => {
-  const { fallbackMessages } = await import("@chrona/i18n/messages");
+vi.mock("@chrona/i18n", async (importOriginal) => {
+  const original = await importOriginal<typeof import("@chrona/i18n")>();
   return {
-    useI18n: () => ({ messages: fallbackMessages, t: (key: string) => key }),
+    ...original,
+    useI18n: () => ({ messages: original.fallbackMessages, t: (key: string) => key }),
     useLocale: () => "en",
+    localizeHref: (_locale: string, href: string) => href,
   };
 });
 
-vi.mock("@chrona/i18n", async (importOriginal) => ({
-  ...(await importOriginal<typeof import("@chrona/i18n")>()),
-  localizeHref: (_locale: string, href: string) => href,
+vi.mock("react-router-dom", () => ({
+  Link: ({ children, to, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement> & { to: string }) => <a href={to} {...props}>{children}</a>,
+  useNavigate: () => push,
+  useRevalidator: () => ({ revalidate: refresh }),
 }));
 
-vi.mock("@/lib/task-actions-client", () => ({
+vi.mock("./schedule-actions", () => ({
   createScheduledTask: (...args: unknown[]) => createScheduledTask(...args),
   applySchedule: (...args: unknown[]) => applySchedule(...args),
   updateTaskConfigFromSchedule: (...args: unknown[]) => updateTaskConfigFromSchedule(...args),
 }));
 
-vi.mock("@/hooks/ai/task-plan-generation-session-store", () => ({
-  startTaskPlanGenerationSession: (...args: unknown[]) => startTaskPlanGenerationSession(...args),
+vi.mock("@features/task-workspace", () => ({
+  useTaskPlanGenerationSession: (...args: unknown[]) => startTaskPlanGenerationSession(...args),
 }));
 
 vi.mock("./panels/planning-header", () => ({

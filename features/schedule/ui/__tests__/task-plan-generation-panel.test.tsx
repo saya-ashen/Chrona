@@ -12,6 +12,7 @@ beforeAll(() => {
   vi.stubGlobal("ResizeObserver", ResizeObserverMock);
 });
 
+
 vi.mock("@chrona/i18n/react", async () => {
   const { fallbackMessages } = await import("@chrona/i18n/messages");
   return {
@@ -20,8 +21,9 @@ vi.mock("@chrona/i18n/react", async () => {
   };
 });
 
-import { TaskPlanGenerationPanel } from "@/components/tasks/ai/task-plan-generation-panel";
-import type { TaskPlanReadModel } from "@chrona/contracts/ai";
+
+import { TaskPlanGenerationPanel } from "@features/task-workspace";
+import type { TaskPlanReadModel } from "@chrona/contracts"
 
 const defaultProps = {
   taskId: "task_1",

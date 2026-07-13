@@ -1,4 +1,4 @@
-import type { TaskWorkspaceUpdateProposal } from "@chrona/contracts/ai";
+import type { TaskWorkspaceUpdateProposal } from "@chrona/contracts"
 import type { CurrentProposalState, EditableTask } from "./task-workspace-types";
 
 export type ProposalFlowState =

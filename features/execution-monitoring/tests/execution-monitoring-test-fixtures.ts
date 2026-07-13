@@ -1,4 +1,4 @@
-import type { TaskPlanReadModel } from "@chrona/contracts/ai";
+import type { TaskPlanReadModel } from "@chrona/contracts";
 import type {
   PlanNodeDataModel,
   TaskPageData,

@@ -1,6 +1,5 @@
 import type { ReactNode } from "react";
-import { Card, CardDescription, CardHeader, CardTitle } from "shared/ui/card";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Card, CardDescription, CardHeader, CardTitle, Tabs, TabsContent, TabsList, TabsTrigger } from "@shared/ui";
 
 type ActionRailTab = "queue" | "risks" | "proposals" | "conflicts";
 

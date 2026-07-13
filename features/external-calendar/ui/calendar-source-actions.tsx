@@ -3,11 +3,21 @@
 import { useState } from "react";
 import type { CalendarAutomationPolicy, CalendarSourceSummary, CalendarSourceSyncPolicy, CalendarSyncStatus } from "../contract";
 
-import { Badge } from "shared/ui/badge";
-import { Button } from "shared/ui/button";
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "shared/ui/select";
+import {
+  Badge,
+  Button,
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  Input,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@shared/ui";
 import {
   deleteExternalCalendarSource,
   getExternalCalendarErrorMessage,
@@ -15,7 +25,7 @@ import {
   refreshExternalCalendarSource,
   updateExternalCalendarSource,
 } from "./client";
-import { externalCalendarMessages } from "@chrona/i18n/external-calendar"
+import { externalCalendarMessages } from "@chrona/i18n";
 
 type CalendarSourceActionsProps = {
   workspaceId: string;

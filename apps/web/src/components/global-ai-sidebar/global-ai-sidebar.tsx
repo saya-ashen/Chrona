@@ -2,15 +2,13 @@
 
 import { X } from "lucide-react";
 import { useI18n } from "@chrona/i18n/react";
-import { Button } from "shared/ui/button";
-import {
-  Sheet,
-  SheetClose,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-} from "@/components/ui/sheet";
+import { Button } from "@shared/ui"
+import { Sheet,
+SheetClose,
+SheetContent,
+SheetDescription,
+SheetHeader,
+SheetTitle, } from "@shared/ui"
 import { ContextSummaryCard } from "./context-summary-card";
 import { ConversationThread } from "./conversation-thread";
 import { ProposalPreviewCard } from "./proposal-preview-card";

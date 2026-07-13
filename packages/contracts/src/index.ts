@@ -148,9 +148,11 @@ export type {
 } from "./api/mcp-task-tools.schema";
 
 export {
+  CHRONA_PLAN_OUTPUT_TOOL_DESCRIPTION,
   agentControlActionBodySchema,
   agentControlActionKindSchema,
   agentControlActionPayloadSchemas,
+  chronaPublicToolPayloadSchemas,
   chronaToolAffectedSchema,
   chronaToolContextSchema,
   chronaToolExpectedStateSchema,
@@ -172,6 +174,23 @@ export {
   parseChronaToolPayload,
 } from "./api/mcp-task-tools.schema";
 
+export {
+  scheduleProjectionQuerySchema,
+} from "./api/projections.schema";
+export {
+  clearScheduleParamSchema,
+  scheduleBodySchema,
+  scheduleParamSchema,
+  scheduleProposalBodySchema,
+  scheduleProposalDecisionBodySchema,
+  scheduleProposalParamSchema,
+  workBlockScheduleBodySchema,
+  workBlockScheduleParamSchema,
+} from "./api/execution.schema";
+export type { AutomationSuggestion, ScheduleSlot } from "./ai-shared-types";
+export type { ExecutionCheckpoint } from "./plan-runtime/_leaf";
+export type { NodeConfig } from "./plan-runtime/node";
+
 export type {
   EditablePlan,
   EditableNode,
@@ -189,6 +208,8 @@ export type {
   TaskExecutor,
   TaskMode,
   CheckpointType,
+  InputFieldType,
+  GeneratePlanBlueprintToolPayload,
   ConditionEvaluator,
   WaitTimeoutAction,
   PlanCompileIssue,
@@ -204,11 +225,24 @@ export type {
 } from "./ai-plan-blueprint";
 
 export {
+  AI_PLAN_NODE_TYPES,
+  AI_TASK_EXECUTORS,
+  AI_TASK_MODES,
+  AI_CHECKPOINT_TYPES,
+  AI_INPUT_FIELD_TYPES,
+  AI_CONDITION_EVALUATORS,
+  AI_WAIT_TIMEOUT_ACTIONS,
   PlanCompileError,
   editableEdgeSchema,
   editableNodeSchema,
   editablePlanSchema,
   planBlueprintSchema,
+  planBlueprintTaskNodeSchema,
+  planBlueprintCheckpointNodeSchema,
+  planBlueprintConditionNodeSchema,
+  planBlueprintWaitNodeSchema,
+  planBlueprintNodeSchema,
+  planBlueprintEdgeSchema,
   planPatchOperationSchema,
   planPatchSchema,
   upgradeBlueprintToEditable,
@@ -261,6 +295,8 @@ export type {
   WebPlanNodeStatus,
   NodeExecutionAttempt,
   CheckpointResponse,
+  CheckpointActionKind,
+  SubmitCheckpointActionInput,
   ArtifactRef,
   NodeResultEvidence,
   PlanOutputPatch,

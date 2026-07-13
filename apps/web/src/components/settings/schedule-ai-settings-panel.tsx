@@ -1,16 +1,26 @@
 "use client";
 
 import { useState } from "react";
-import { Badge } from "shared/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "shared/ui/card";
-import { Field, FieldContent, FieldDescription, FieldGroup, FieldLabel } from "@/components/ui/field";
-import { Switch } from "@/components/ui/switch";
 import {
   DEFAULT_SCHEDULE_AI_PREFERENCES,
   type ScheduleAiPreferences,
   useScheduleAiPreferences,
   writeScheduleAiPreferences,
-} from "@/lib/schedule-ai-preferences";
+} from "@features/schedule";
+import {
+  Badge,
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  Field,
+  FieldContent,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+  Switch,
+} from "@shared/ui";
 
 type ScheduleAiSettingsPanelProps = {
   title?: string;

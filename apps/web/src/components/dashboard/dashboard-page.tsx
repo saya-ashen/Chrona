@@ -19,21 +19,19 @@ import { deriveAttentionDescriptor } from "@chrona/domain";
 import type { Dictionary } from "@/pages";
 import { useRevalidator } from "react-router-dom";
 import { LocalizedLink } from "@/components/i18n/localized-link";
-import { apiJson } from "shared/http/api-client";
-import { Badge } from "shared/ui/badge";
-import { Button } from "shared/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "shared/ui/card";
-import { PageFrame } from "shared/ui/page-frame";
-import { UiSurfaceFrame } from "shared/ui/ui-surface-frame";
+import { apiJson } from "@shared/http"
+import { Badge } from "@shared/ui"
+import { Button } from "@shared/ui"
+import { Card,
+CardContent,
+CardDescription,
+CardHeader,
+CardTitle, } from "@shared/ui"
+import { PageFrame } from "@shared/ui"
+import { UiSurfaceFrame } from "@shared/ui"
 import { SpecRenderer } from "@features/task-workspace/ui/catalog/spec-renderer";
 import type { UiDocument } from "@chrona/ui-protocol";
-import { cn } from "@/lib/utils";
+import { cn } from "@shared/ui"
 import type {
   DashboardAttentionItem,
   DashboardCompletedItem,

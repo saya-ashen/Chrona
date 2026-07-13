@@ -1,4 +1,4 @@
-import { db } from "@/lib/db";
+import { db } from "@chrona/db";
 import { ensureEnabledAiClientDefault } from "./default-ai-client";
 
 export async function deleteAiClient(clientId: string) {

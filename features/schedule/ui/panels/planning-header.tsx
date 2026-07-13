@@ -6,13 +6,13 @@ import {
   ChevronLeft,
   ChevronRight,
 } from "lucide-react";
-import { Button } from "shared/ui/button";
-import { Calendar } from "@/components/ui/calendar";
 import {
+  Button,
+  Calendar,
   Popover,
   PopoverContent,
   PopoverTrigger,
-} from "@/components/ui/popover";
+} from "@shared/ui";
 
 type PlanningDayLink = {
   label: string;

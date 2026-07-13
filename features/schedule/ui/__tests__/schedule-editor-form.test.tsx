@@ -1,9 +1,9 @@
 import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { ScheduleEditorForm } from "../forms/schedule-editor-form";
-import { applySchedule, clearSchedule } from "@/lib/task-actions-client";
+import { applySchedule, clearSchedule } from "../schedule-actions";
 
-vi.mock("@/lib/task-actions-client", () => ({
+vi.mock("../schedule-actions", () => ({
   applySchedule: vi.fn().mockResolvedValue({}),
   clearSchedule: vi.fn().mockResolvedValue({}),
 }));

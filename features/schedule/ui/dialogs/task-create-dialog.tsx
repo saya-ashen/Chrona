@@ -2,31 +2,31 @@
 
 import { CalendarIcon, Check, ChevronDown, Loader2, Sparkles, Wrench, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { Badge } from "shared/ui/badge";
-import { Button } from "shared/ui/button";
-import { Calendar } from "@/components/ui/calendar";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
+  Badge,
+  Button,
+  Calendar,
+  Checkbox,
   Dialog,
   DialogClose,
   DialogContent,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import {
+  Input,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "shared/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { cn } from "@/lib/utils"
-import { useAutoComplete } from "@/hooks/use-ai";
-import { useI18n, useLocale } from "@chrona/i18n/react";
-import { useScheduleAiPreferences } from "@/lib/schedule-ai-preferences";
+  Textarea,
+  cn,
+} from "@shared/ui";
+import { useAutoComplete } from "../use-auto-complete";
+import { useI18n, useLocale } from "@chrona/i18n"
+import { useScheduleAiPreferences } from "../schedule-ai-preferences";
 import { AUTOMATION_TIMING_PRESETS, normalizeAutomationTiming } from "@chrona/contracts";
 import type { AutomationTimingPreset } from "@chrona/contracts";
 import { deriveAutomationPolicyPreview } from "@chrona/domain";
@@ -37,7 +37,7 @@ import {
   type TaskConfigAiClient,
 } from "../forms/task-config-form";
 
-import { RECURRENCE_PRESETS, recurrenceRuleFromState, type RecurrencePreset } from "@/lib/recurrence-presets";
+import { RECURRENCE_PRESETS, recurrenceRuleFromState, type RecurrencePreset } from "../recurrence-presets";
 
 const RECURRENCE_UI_PRESETS = RECURRENCE_PRESETS.filter((p) => p !== "none");
 

@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { db } from "@/lib/db";
-import type { Prisma } from "@/generated/prisma/client";
+import { db, type Prisma } from "@chrona/db";
 import type { AiClientType } from "@chrona/contracts";
 import { ensureEnabledAiClientDefault } from "./default-ai-client";
 

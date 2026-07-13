@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "bun:test";
 
-import { db } from "@/lib/db";
+import { db } from "@chrona/db";
 import { createAiClient } from "./create-ai-client";
 import { deleteAiClient } from "./delete-ai-client";
 import { updateAiClient } from "./update-ai-client";

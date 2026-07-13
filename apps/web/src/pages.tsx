@@ -15,17 +15,15 @@ import { TaskWorkspacePage } from "@/components/tasks/task-workspace-page";
 import { ActionCenterPageClient } from "@/components/action-center/action-center-page-client";
 import type { ActionCenterProjection } from "@chrona/contracts/api";
 import { LocalizedLink } from "@/components/i18n/localized-link";
-import { Badge } from "shared/ui/badge";
-import { Button } from "shared/ui/button";
-import {
-  Card,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from "shared/ui/card";
-import { PageFrame } from "shared/ui/page-frame";
-import { Separator } from "@/components/ui/separator";
+import { Badge } from "@shared/ui"
+import { Button } from "@shared/ui"
+import { Card,
+CardDescription,
+CardFooter,
+CardHeader,
+CardTitle, } from "@shared/ui"
+import { PageFrame } from "@shared/ui"
+import { Separator } from "@shared/ui";
 import type { getDictionary, Locale } from "@chrona/i18n";
 import { localizeHref, resolveLocale } from "@chrona/i18n";
 import type { WorkStateView } from "@chrona/domain";

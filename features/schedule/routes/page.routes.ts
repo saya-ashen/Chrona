@@ -1,14 +1,14 @@
 import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import type { ChronaEngine } from "@chrona/engine";
-import { scheduleProjectionQuerySchema } from "@chrona/contracts/api";
+import { scheduleProjectionQuerySchema } from "@chrona/contracts"
 
 import {
   error,
   internalServerError,
   json,
   toHttpError,
-} from "../../../apps/server/src/lib/http";
+} from "@shared/http/server";
 
 export function createScheduleRoutes(engine: ChronaEngine) {
   return new Hono()

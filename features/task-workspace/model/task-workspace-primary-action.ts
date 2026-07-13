@@ -1,5 +1,5 @@
 import type { TaskAction } from "@chrona/contracts";
-import type { ExecutionActionInput } from "@chrona/contracts/ai";
+import type { ExecutionActionInput } from "@chrona/contracts"
 import type {
   ExecutionOverviewTone,
   TaskPlanGenerationStatus,

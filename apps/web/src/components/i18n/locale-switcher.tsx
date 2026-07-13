@@ -1,8 +1,8 @@
 "use client";
 
 import { LocalizedLink } from "@/components/i18n/localized-link";
-import { Button } from "shared/ui/button";
-import { cn } from "@/lib/utils"
+import { Button } from "@shared/ui"
+import { cn } from "@shared/ui"
 import { useI18n } from "@chrona/i18n/react";
 import { locales } from "@chrona/i18n";
 import { localizeHref } from "@chrona/i18n";

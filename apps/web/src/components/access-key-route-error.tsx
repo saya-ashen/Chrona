@@ -4,7 +4,7 @@ import { I18nProvider } from "@chrona/i18n/react";
 import { fallbackMessages } from "@chrona/i18n/messages";
 
 import { AccessKeyUnlock } from "@/components/access-key-unlock";
-import { setAccessKey } from "shared/http/access-key";
+import { setAccessKey } from "@shared/http"
 
 function getErrorStatus(error: unknown) {
   if (error instanceof Response) return error.status;

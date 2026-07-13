@@ -10,7 +10,7 @@ import {
   ChronaDebugProviderClient,
   normalizeDebugProviderProfile,
 } from "@chrona/providers-debug";
-import { db } from "@/lib/db";
+import { db } from "@chrona/db";
 import type { AgentProviderClient } from "@chrona/providers-foundation";
 import type {
   AgentProviderClientConfig,

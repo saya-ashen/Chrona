@@ -1,7 +1,7 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
-import { PageFrame, type PageFrameMode } from "shared/ui/page-frame";
+import { PageFrame, type PageFrameMode } from "@shared/ui"
 afterEach(cleanup);
 
 const expectedWidth: Record<PageFrameMode, string> = {

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { ExecutionActionInput, SubmitCheckpointActionInput } from "@chrona/contracts/ai";
+import type { ExecutionActionInput, SubmitCheckpointActionInput } from "@chrona/contracts";
 import { buildActionSpec, type ActionItemInput } from "@chrona/ui-protocol";
 import {
   actionKindForNode,
@@ -8,7 +8,7 @@ import {
   SpecRenderer,
   type PlanNodeDataModel,
   type TaskExecutionDispatchResult,
-} from "../../task-workspace";
+} from "@features/task-workspace";
 
 function isTerminalStatus(status: PlanNodeDataModel["status"]) {
   return status === "done" || status === "skipped";

@@ -1,19 +1,19 @@
 "use client";
 
 import { getSchedulePageCopy } from "../../schedule-page-copy";
-import { useI18n, useLocale } from "@chrona/i18n/react";
+import { useI18n, useLocale } from "@chrona/i18n"
+import type { SelectedBlockSheetProps } from "./types";
+import { useSelectedBlockConfigState } from "./use-selected-block-config-state";
+import { useSelectedBlockPlanState } from "./use-selected-block-plan-state";
 import { SelectedBlockMainColumn } from "./selected-block-main-column";
 import { SelectedBlockSheetHeader } from "./selected-block-sheet-header";
 import {
+  Button,
   Dialog,
   DialogContent,
   DialogDescription,
   DialogTitle,
-} from "@/components/ui/dialog";
-import type { SelectedBlockSheetProps } from "./types";
-import { useSelectedBlockConfigState } from "./use-selected-block-config-state";
-import { useSelectedBlockPlanState } from "./use-selected-block-plan-state";
-import { Button } from "shared/ui/button";
+} from "@shared/ui";
 
 export function SelectedBlockSheet({
   item,

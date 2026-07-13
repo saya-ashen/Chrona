@@ -10,9 +10,8 @@ vi.mock("@chrona/i18n/react", () => ({
 const mockUseAutoComplete = vi.fn<(...args: unknown[]) => { suggestions: string[]; isLoading: boolean; phase: string; statusMessage: string | null; toolCalls: unknown[] }>(() => ({ suggestions: [], isLoading: false, phase: "idle", statusMessage: null, toolCalls: [] }));
 const mockUseSmartAutomation = vi.fn<(...args: unknown[]) => { suggestion: unknown; isLoading: boolean }>(() => ({ suggestion: null, isLoading: false }));
 
-vi.mock("@/hooks/use-ai", () => ({
+vi.mock("../use-auto-complete", () => ({
   useAutoComplete: (...args: unknown[]) => mockUseAutoComplete(args[0]),
-  useSmartAutomation: () => mockUseSmartAutomation(),
 }));
 
 vi.mock("../panels/automation-suggestion-panel", () => ({
@@ -22,7 +21,7 @@ vi.mock("../panels/automation-suggestion-panel", () => ({
 import {
   SCHEDULE_AI_PREFERENCES_STORAGE_KEY,
   type ScheduleAiPreferences,
-} from "@/lib/schedule-ai-preferences";
+} from "../schedule-ai-preferences";
 import { TaskCreateDialog } from "../dialogs/task-create-dialog";
 
 const defaultProps = {

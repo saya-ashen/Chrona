@@ -11,7 +11,7 @@ vi.mock("@chrona/i18n/react", async () => {
 });
 
 const mockUseAutoComplete = vi.fn();
-vi.mock("@/hooks/use-ai", () => ({
+vi.mock("./use-auto-complete", () => ({
   useAutoComplete: (...args: unknown[]) => mockUseAutoComplete(...args),
 }));
 

@@ -5,11 +5,11 @@ import type {
   LayerSource,
   PlanBlueprint,
   PlanBlueprintEdge,
-} from "@chrona/contracts/ai";
+} from "@chrona/contracts";
 import {
   PlanCompileError,
   upgradeBlueprintToEditable,
-} from "@chrona/contracts/ai";
+} from "@chrona/contracts";
 import { compileEditablePlan } from "@chrona/domain";
 import { createLogger } from "@chrona/logging";
 

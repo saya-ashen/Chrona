@@ -1,5 +1,5 @@
-import type { CheckpointActionKind, SubmitCheckpointActionInput } from "@chrona/contracts/ai";
-import { api } from "@/lib/rpc-client";
+import { buildAccessKeyHeaders, handleUnauthorizedResponse } from "@shared/http";
+import type { CheckpointActionKind, SubmitCheckpointActionInput } from "@chrona/contracts"
 import type { PlanNodeAction, PlanNodeDataModel, PlanNodeField } from "./plan-node-view-model";
 import type { WorkspaceActivityPage, WorkspaceStateTreatment } from "./task-workspace-types";
 
@@ -13,37 +13,27 @@ export type LoadNodeWorkspaceActivityPageInput = LoadWorkspaceActivityPageInput 
   nodeId: string;
 };
 
-async function readWorkspaceActivityResponse(response: Response, fallbackMessage: string): Promise<WorkspaceActivityPage> {
-  const body = await response.json().catch(() => ({ error: fallbackMessage })) as unknown;
-  if (!response.ok) {
-    throw new Error((body as { error?: string }).error ?? fallbackMessage);
-  }
-
-  return body as WorkspaceActivityPage;
+function activityQuery(input: LoadWorkspaceActivityPageInput) {
+  const query = new URLSearchParams();
+  if (input.cursor) query.set("cursor", input.cursor);
+  if (input.limit !== undefined) query.set("limit", String(input.limit));
+  return query.size ? `?${query}` : "";
 }
 
-export async function loadWorkspaceActivityPage(input: LoadWorkspaceActivityPageInput): Promise<WorkspaceActivityPage> {
-  const response = await api.tasks[":taskId"].activity.$get({
-    param: { taskId: input.taskId },
-    query: {
-      ...(input.cursor ? { cursor: input.cursor } : {}),
-      ...(input.limit !== undefined ? { limit: String(input.limit) } : {}),
-    },
-  });
-
-  return readWorkspaceActivityResponse(response as unknown as Response, "Failed to load activity history");
+async function loadActivityPage(path: string): Promise<WorkspaceActivityPage> {
+  const response = await fetch(path, { headers: buildAccessKeyHeaders() });
+  handleUnauthorizedResponse(response);
+  const body = await response.json().catch(() => ({})) as { error?: string } & WorkspaceActivityPage;
+  if (!response.ok) throw new Error(body.error ?? "Failed to load activity history");
+  return body;
 }
 
-export async function loadNodeWorkspaceActivityPage(input: LoadNodeWorkspaceActivityPageInput): Promise<WorkspaceActivityPage> {
-  const response = await api.tasks[":taskId"].nodes[":nodeId"].activity.$get({
-    param: { taskId: input.taskId, nodeId: input.nodeId },
-    query: {
-      ...(input.cursor ? { cursor: input.cursor } : {}),
-      ...(input.limit !== undefined ? { limit: String(input.limit) } : {}),
-    },
-  });
+export function loadWorkspaceActivityPage(input: LoadWorkspaceActivityPageInput): Promise<WorkspaceActivityPage> {
+  return loadActivityPage(`/api/tasks/${encodeURIComponent(input.taskId)}/activity${activityQuery(input)}`);
+}
 
-  return readWorkspaceActivityResponse(response as unknown as Response, "Failed to load node activity history");
+export function loadNodeWorkspaceActivityPage(input: LoadNodeWorkspaceActivityPageInput): Promise<WorkspaceActivityPage> {
+  return loadActivityPage(`/api/tasks/${encodeURIComponent(input.taskId)}/nodes/${encodeURIComponent(input.nodeId)}/activity${activityQuery(input)}`);
 }
 
 type WorkspacePresentationInput = {

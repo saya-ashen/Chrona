@@ -5,11 +5,11 @@ export type {
   EngineLlmClient,
   EngineHermesClient,
   EngineDebugClient,
-} from "../../../../../features/ai-clients";
-export { getProviderBaseUrl, AiClientRegistry, aiClientRegistry } from "../../../../../features/ai-clients";
+} from "../../../../../features/ai-clients/server";
+export { getProviderBaseUrl, AiClientRegistry, aiClientRegistry } from "../../../../../features/ai-clients/server";
 export { getAiClient, getAiClientForFeature, getAiClientForTask, requireAiClient } from "./runtime/client-resolution";
 export { aiChat, aiGeneratePlanStream } from "./runtime/ai-service";
-export { AiClientManagement, aiClientManagement } from "../../../../../features/ai-clients";
+export { AiClientManagement, aiClientManagement } from "../../../../../features/ai-clients/server";
 export type { ProviderFeatureRequest } from "./providers";
 export {
   testAiClientAvailability,

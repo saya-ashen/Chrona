@@ -12,8 +12,7 @@ vi.mock("@chrona/i18n/react", async () => {
     useLocale: () => "en",
   };
 });
-
-vi.mock("@/components/tasks/shared/task-context-links", () => ({
+vi.mock("@features/task-workspace", () => ({
   TaskContextLinks: ({ taskId }: { taskId: string }) => <a href={`/en/tasks/${taskId}`}>Open task workspace</a>,
 }));
 
@@ -143,7 +142,7 @@ describe("SelectedBlockSheet regressions", () => {
         onClose={onClose}
         onSaveTaskConfigAction={onSaveTaskConfigAction}
         onMutatedAction={vi.fn().mockResolvedValue(undefined)}
-        buildScheduleHref={(day, taskId) => `/en/schedule?day=${day}${taskId ? `&task=${taskId}` : ""}`}
+        buildScheduleHref={(day: string, taskId?: string) => `/en/schedule?day=${day}${taskId ? `&task=${taskId}` : ""}`}
       />,
     );
 

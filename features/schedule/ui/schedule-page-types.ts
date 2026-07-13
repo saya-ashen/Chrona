@@ -1,7 +1,7 @@
 import type { WorkStateView } from "@chrona/domain";
 import type { ScheduleTaskListItem } from "./schedule-task-list";
 import type { TaskConfigAiClient, TaskConfigExecutionRuntime } from "./forms/task-config-form";
-import type { TaskPlanReadModel } from "@chrona/contracts/ai";
+import type { TaskPlanReadModel } from "@chrona/contracts"
 import type { AutomationTimingPreset } from "@chrona/contracts";
 
 type SchedulePageSummary = {

@@ -6,30 +6,21 @@ vi.mock("@/components/i18n/localized-link", () => ({
   LocalizedLink: ({ children, href, ...props }: { children: ReactNode; href: string } & Omit<ComponentPropsWithoutRef<"a">, "href">) => <a href={`/en${href}`} {...props}>{children}</a>,
 }));
 
-vi.mock("@/components/ui/button", () => ({
+vi.mock("@shared/ui", () => ({
   Button: ({ children, asChild, ...props }: { children?: ReactNode; asChild?: boolean } & ComponentPropsWithoutRef<"button">) => (asChild && children ? <>{children}</> : <button {...props}>{children}</button>),
-}));
-
-vi.mock("@/components/ui/badge", () => ({
   Badge: ({ children }: { children?: ReactNode }) => <span>{children}</span>,
-}));
-
-vi.mock("@/components/ui/separator", () => ({
   Separator: (props: ComponentPropsWithoutRef<"hr">) => <hr {...props} />,
-}));
-
-vi.mock("@/components/ui/tabs", () => ({
   Tabs: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
   TabsList: ({ children }: { children?: ReactNode }) => <div>{children}</div>,
   TabsTrigger: ({ children, value }: { children?: ReactNode; value: string } & ComponentPropsWithoutRef<"button">) => <button data-value={value}>{children}</button>,
-}));
-
-vi.mock("@/components/ui/card", () => ({
   Card: ({ children, ...props }: { children?: ReactNode } & ComponentPropsWithoutRef<"div">) => <div {...props}>{children}</div>,
   CardContent: ({ children, ...props }: { children?: ReactNode } & ComponentPropsWithoutRef<"div">) => <div {...props}>{children}</div>,
   CardDescription: ({ children, ...props }: { children?: ReactNode } & ComponentPropsWithoutRef<"div">) => <div {...props}>{children}</div>,
   CardHeader: ({ children, ...props }: { children?: ReactNode } & ComponentPropsWithoutRef<"div">) => <div {...props}>{children}</div>,
   CardTitle: ({ children, ...props }: { children?: ReactNode } & ComponentPropsWithoutRef<"div">) => <div {...props}>{children}</div>,
+  PageFrame: ({ children, ...props }: { children?: ReactNode } & ComponentPropsWithoutRef<"div">) => <div {...props}>{children}</div>,
+  UiSurfaceFrame: ({ kind, label, children, ...props }: { kind: string; label: string; children?: ReactNode } & ComponentPropsWithoutRef<"section">) => <section aria-label={label} data-ui-surface-kind={kind} {...props}>{children}<span>{kind === "ai-authored" ? "AI generated" : ""}</span></section>,
+  cn: (...values: Array<string | undefined | false>) => values.filter(Boolean).join(" "),
 }));
 
 vi.mock("@features/task-workspace/ui/catalog/spec-renderer", () => ({
@@ -46,7 +37,7 @@ vi.mock("shared/http/api-client", () => ({
 }));
 import { DashboardPage } from "@/components/dashboard/dashboard-page";
 import type { DashboardData } from "@/components/dashboard/dashboard-types";
-import { apiJson } from "shared/http/api-client";
+import { apiJson } from "@shared/http"
 import type { Dictionary } from "@/pages";
 import type { UiDocument } from "@chrona/ui-protocol";
 import { deriveWorkStateView } from "@chrona/domain";

@@ -2,9 +2,7 @@
 
 import { ChevronDown, ChevronRight, Plus } from "lucide-react";
 import { useState } from "react";
-import { Button } from "shared/ui/button";
-import { Card } from "shared/ui/card";
-import { cn } from "@/lib/utils"
+import { Button, Card, cn } from "@shared/ui";
 
 export function ScheduleInlineQuickCreate({
   mode,

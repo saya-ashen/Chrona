@@ -6,32 +6,21 @@ vi.mock("@/components/i18n/localized-link", () => ({
   LocalizedLink: ({ children, href, ...props }: any) => <a href={`/en${href}`} {...props}>{children}</a>,
 }));
 
-vi.mock("@/components/ui/button", () => ({
-  Button: ({ children, asChild, ...props }: any) => {
+vi.mock("@shared/ui", () => ({
+  Button: ({ children, asChild, ...props }: { children?: React.ReactNode; asChild?: boolean } & React.ComponentPropsWithoutRef<"button">) => {
     if (asChild && children) return <>{children}</>;
     return <button {...props}>{children}</button>;
   },
-}));
-
-vi.mock("@/components/ui/badge", () => ({
-  Badge: ({ children }: any) => <span>{children}</span>,
-}));
-
-vi.mock("@/components/ui/card", () => ({
-  Card: ({ children, ...props }: any) => <div {...props}>{children}</div>,
-  CardContent: ({ children, ...props }: any) => <div {...props}>{children}</div>,
-}));
-
-vi.mock("@/components/ui/input", () => ({
-  Input: (props: any) => <input {...props} />,
-}));
-
-vi.mock("@/components/ui/select", () => ({
-  Select: ({ children }: any) => <div>{children}</div>,
-  SelectContent: ({ children }: any) => <div>{children}</div>,
-  SelectItem: ({ children, value }: any) => <div data-value={value}>{children}</div>,
-  SelectTrigger: ({ children, ...props }: any) => <button type="button" {...props}>{children}</button>,
+  Badge: ({ children }: { children?: React.ReactNode }) => <span>{children}</span>,
+  Card: ({ children, ...props }: React.ComponentPropsWithoutRef<"div">) => <div {...props}>{children}</div>,
+  CardContent: ({ children, ...props }: React.ComponentPropsWithoutRef<"div">) => <div {...props}>{children}</div>,
+  Input: (props: React.ComponentPropsWithoutRef<"input">) => <input {...props} />,
+  Select: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+  SelectContent: ({ children }: { children?: React.ReactNode }) => <div>{children}</div>,
+  SelectItem: ({ children, value }: { children?: React.ReactNode; value: string }) => <div data-value={value}>{children}</div>,
+  SelectTrigger: ({ children, ...props }: { children?: React.ReactNode } & React.ComponentPropsWithoutRef<"button">) => <button type="button" {...props}>{children}</button>,
   SelectValue: () => <span />,
+  cn: (...values: Array<string | undefined | false>) => values.filter(Boolean).join(" "),
 }));
 
 import { ActionCenterList } from "@/components/action-center/action-center-list";

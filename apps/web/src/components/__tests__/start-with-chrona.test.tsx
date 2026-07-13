@@ -26,8 +26,8 @@ vi.mock("@chrona/i18n/react", () => ({
   useLocale: () => "en",
 }));
 
-import { StartWithChrona } from "../start-with-chrona";
-import { notifyAiClientsChanged } from "@/lib/ai-client-events";
+import { StartWithChrona } from "@features/mcp-control-plane/ui/start-with-chrona";
+import { notifyAiClientsChanged } from "../../../../../features/ai-clients";
 
 const push = vi.fn();
 

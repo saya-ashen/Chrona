@@ -1,8 +1,5 @@
 import { PlanningHeader } from "./panels/planning-header";
-import { Card } from "shared/ui/card";
-import { DayTimeline } from "./timeline/schedule-page-timeline";
-import { Badge } from "shared/ui/badge";
-import { Button } from "shared/ui/button";
+import { Badge, Button, Card } from "@shared/ui";
 import { CalendarDays, Clock } from "lucide-react";
 import type { ScheduleGhostBlockPreview } from "@chrona/contracts";
 import type {
@@ -16,6 +13,7 @@ import type { SchedulePageCopy } from "./schedule-page-copy";
 import type { SchedulePageViewModel } from "./schedule-page-view-model";
 import type { Locale } from "@chrona/i18n";
 import { EmptyState } from "./panels/schedule-panel-primitives";
+import { DayTimeline } from "./timeline/schedule-page-timeline";
 
 export function SchedulePageHeader({
   copy,

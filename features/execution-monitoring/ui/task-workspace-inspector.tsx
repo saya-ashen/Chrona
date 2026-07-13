@@ -1,9 +1,11 @@
 import type { ReactNode } from "react";
 import type { UiDocument } from "@chrona/ui-protocol";
-import type { PlanExecutionResult } from "@chrona/contracts/ai";
-import type { WorkspaceActivityItem } from "../../task-workspace";
+import type { PlanExecutionResult } from "@chrona/contracts";
+import type {
+  WorkspaceActivityItem,
+  createTaskWorkspaceExecutionConsoleView,
+} from "@features/task-workspace";
 import type { WorkspaceRuntimeEvent } from "../model/workspace-runtime-events";
-import type { createTaskWorkspaceExecutionConsoleView } from "../../task-workspace";
 import {
   TaskWorkspaceExecutionOverview,
   type CommandCenterCopy,

@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AiClientsManager } from "../ui/ai-clients-manager";
-import { AI_CLIENTS_CHANGED_EVENT } from "@/lib/ai-client-events";
+import { AI_CLIENTS_CHANGED_EVENT } from "../events";
 
 const messages = {
   pages: {
@@ -96,8 +96,7 @@ const providersResponse = {
     },
   ],
 };
-
-vi.mock("@chrona/i18n/react", () => ({
+vi.mock("@chrona/i18n", () => ({
   useI18n: () => ({ messages }),
 }));
 
@@ -107,6 +106,11 @@ describe("AiClientsManager", () => {
   beforeEach(() => {
     fetchMock.mockReset();
     vi.stubGlobal("fetch", fetchMock);
+    fetchMock.mockImplementation(async () => ({
+      ok: true,
+      headers: new Headers({ "content-type": "application/json" }),
+      json: async () => ({}),
+    }));
   });
 
   afterEach(() => {
@@ -114,11 +118,8 @@ describe("AiClientsManager", () => {
   });
 
   it("shows a test availability action in the create form and updates status after probing", async () => {
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ clients: [] }),
-    });
-    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => providersResponse });
+    fetchMock.mockResolvedValueOnce({ ok: true, headers: new Headers({ "content-type": "application/json" }), json: async () => ({ clients: [] }) });
+    fetchMock.mockResolvedValueOnce({ ok: true, headers: new Headers({ "content-type": "application/json" }), json: async () => providersResponse });
 
     render(<AiClientsManager />);
 
@@ -134,10 +135,7 @@ describe("AiClientsManager", () => {
     expect(screen.getByText("Not tested")).toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: "Type" })).toHaveTextContent("Claude Code");
 
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ ok: true, available: true }),
-    });
+    fetchMock.mockResolvedValueOnce({ ok: true, headers: new Headers({ "content-type": "application/json" }), json: async () => ({ ok: true, available: true }) });
 
     fireEvent.click(testButton);
 
@@ -152,11 +150,8 @@ describe("AiClientsManager", () => {
 
   it("creates a Hermes client with Hermes-specific config", async () => {
     const user = userEvent.setup();
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ clients: [] }),
-    });
-    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => providersResponse });
+    fetchMock.mockResolvedValueOnce({ ok: true, headers: new Headers({ "content-type": "application/json" }), json: async () => ({ clients: [] }) });
+    fetchMock.mockResolvedValueOnce({ ok: true, headers: new Headers({ "content-type": "application/json" }), json: async () => providersResponse });
 
     render(<AiClientsManager />);
 
@@ -181,19 +176,10 @@ describe("AiClientsManager", () => {
 
     expect(screen.getByRole("checkbox", { name: "Use as default AI client" })).toBeChecked();
     expect(screen.getByText("Chrona uses the default client for planning, execution, and summaries unless a feature has its own client.")).toBeInTheDocument();
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ client: { id: "client_hermes" } }),
-    });
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ bindings: [] }),
-    });
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ clients: [] }),
-    });
-    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => providersResponse });
+    fetchMock.mockResolvedValueOnce({ ok: true, headers: new Headers({ "content-type": "application/json" }), json: async () => ({ client: { id: "client_hermes" } }) });
+    fetchMock.mockResolvedValueOnce({ ok: true, headers: new Headers({ "content-type": "application/json" }), json: async () => ({ bindings: [] }) });
+    fetchMock.mockResolvedValueOnce({ ok: true, headers: new Headers({ "content-type": "application/json" }), json: async () => ({ clients: [] }) });
+    fetchMock.mockResolvedValueOnce({ ok: true, headers: new Headers({ "content-type": "application/json" }), json: async () => providersResponse });
     const clientsChanged = vi.fn();
     window.addEventListener(AI_CLIENTS_CHANGED_EVENT, clientsChanged, { once: true });
 
@@ -227,11 +213,8 @@ describe("AiClientsManager", () => {
 
   it("creates a Claude Code client with Anthropic environment variables", async () => {
     const user = userEvent.setup();
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ clients: [] }),
-    });
-    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => providersResponse });
+    fetchMock.mockResolvedValueOnce({ ok: true, headers: new Headers({ "content-type": "application/json" }), json: async () => ({ clients: [] }) });
+    fetchMock.mockResolvedValueOnce({ ok: true, headers: new Headers({ "content-type": "application/json" }), json: async () => providersResponse });
 
     render(<AiClientsManager />);
 
@@ -254,19 +237,10 @@ describe("AiClientsManager", () => {
       target: { value: "sk-aaa" },
     });
 
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ client: { id: "client_claude_code" } }),
-    });
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ bindings: [] }),
-    });
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ clients: [] }),
-    });
-    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => providersResponse });
+    fetchMock.mockResolvedValueOnce({ ok: true, headers: new Headers({ "content-type": "application/json" }), json: async () => ({ client: { id: "client_claude_code" } }) });
+    fetchMock.mockResolvedValueOnce({ ok: true, headers: new Headers({ "content-type": "application/json" }), json: async () => ({ bindings: [] }) });
+    fetchMock.mockResolvedValueOnce({ ok: true, headers: new Headers({ "content-type": "application/json" }), json: async () => ({ clients: [] }) });
+    fetchMock.mockResolvedValueOnce({ ok: true, headers: new Headers({ "content-type": "application/json" }), json: async () => providersResponse });
 
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
@@ -295,11 +269,8 @@ describe("AiClientsManager", () => {
 
   it("creates a Codex client without path configuration", async () => {
     const user = userEvent.setup();
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ clients: [] }),
-    });
-    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => providersResponse });
+    fetchMock.mockResolvedValueOnce({ ok: true, headers: new Headers({ "content-type": "application/json" }), json: async () => ({ clients: [] }) });
+    fetchMock.mockResolvedValueOnce({ ok: true, headers: new Headers({ "content-type": "application/json" }), json: async () => providersResponse });
 
     render(<AiClientsManager />);
 
@@ -321,19 +292,10 @@ describe("AiClientsManager", () => {
       target: { value: "sk-codex" },
     });
 
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ client: { id: "client_codex" } }),
-    });
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ bindings: [] }),
-    });
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ clients: [] }),
-    });
-    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => providersResponse });
+    fetchMock.mockResolvedValueOnce({ ok: true, headers: new Headers({ "content-type": "application/json" }), json: async () => ({ client: { id: "client_codex" } }) });
+    fetchMock.mockResolvedValueOnce({ ok: true, headers: new Headers({ "content-type": "application/json" }), json: async () => ({ bindings: [] }) });
+    fetchMock.mockResolvedValueOnce({ ok: true, headers: new Headers({ "content-type": "application/json" }), json: async () => ({ clients: [] }) });
+    fetchMock.mockResolvedValueOnce({ ok: true, headers: new Headers({ "content-type": "application/json" }), json: async () => providersResponse });
 
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
@@ -364,11 +326,8 @@ describe("AiClientsManager", () => {
 
   it("creates an Oh My Pi client with local profile directory overrides", async () => {
     const user = userEvent.setup();
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ clients: [] }),
-    });
-    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => providersResponse });
+    fetchMock.mockResolvedValueOnce({ ok: true, headers: new Headers({ "content-type": "application/json" }), json: async () => ({ clients: [] }) });
+    fetchMock.mockResolvedValueOnce({ ok: true, headers: new Headers({ "content-type": "application/json" }), json: async () => providersResponse });
 
     render(<AiClientsManager />);
 
@@ -400,19 +359,10 @@ describe("AiClientsManager", () => {
       target: { value: "/tmp/chrona-omp-agent" },
     });
 
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ client: { id: "client_omp" } }),
-    });
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ bindings: [] }),
-    });
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ clients: [] }),
-    });
-    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => providersResponse });
+    fetchMock.mockResolvedValueOnce({ ok: true, headers: new Headers({ "content-type": "application/json" }), json: async () => ({ client: { id: "client_omp" } }) });
+    fetchMock.mockResolvedValueOnce({ ok: true, headers: new Headers({ "content-type": "application/json" }), json: async () => ({ bindings: [] }) });
+    fetchMock.mockResolvedValueOnce({ ok: true, headers: new Headers({ "content-type": "application/json" }), json: async () => ({ clients: [] }) });
+    fetchMock.mockResolvedValueOnce({ ok: true, headers: new Headers({ "content-type": "application/json" }), json: async () => providersResponse });
 
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
@@ -441,11 +391,8 @@ describe("AiClientsManager", () => {
 
   it("creates a debug client with the deterministic profile by default", async () => {
     const user = userEvent.setup();
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ clients: [] }),
-    });
-    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => providersResponse });
+    fetchMock.mockResolvedValueOnce({ ok: true, headers: new Headers({ "content-type": "application/json" }), json: async () => ({ clients: [] }) });
+    fetchMock.mockResolvedValueOnce({ ok: true, headers: new Headers({ "content-type": "application/json" }), json: async () => providersResponse });
 
     render(<AiClientsManager />);
 
@@ -462,19 +409,10 @@ describe("AiClientsManager", () => {
     expect(screen.queryByPlaceholderText("optional for localhost")).not.toBeInTheDocument();
     expect(screen.getByRole("combobox", { name: "Debug profile" })).toHaveTextContent("Deterministic");
 
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ client: { id: "client_debug" } }),
-    });
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ bindings: [] }),
-    });
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ clients: [] }),
-    });
-    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => providersResponse });
+    fetchMock.mockResolvedValueOnce({ ok: true, headers: new Headers({ "content-type": "application/json" }), json: async () => ({ client: { id: "client_debug" } }) });
+    fetchMock.mockResolvedValueOnce({ ok: true, headers: new Headers({ "content-type": "application/json" }), json: async () => ({ bindings: [] }) });
+    fetchMock.mockResolvedValueOnce({ ok: true, headers: new Headers({ "content-type": "application/json" }), json: async () => ({ clients: [] }) });
+    fetchMock.mockResolvedValueOnce({ ok: true, headers: new Headers({ "content-type": "application/json" }), json: async () => providersResponse });
 
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
@@ -495,11 +433,8 @@ describe("AiClientsManager", () => {
 
   it("creates a debug client with a selected simulation profile", async () => {
     const user = userEvent.setup();
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ clients: [] }),
-    });
-    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => providersResponse });
+    fetchMock.mockResolvedValueOnce({ ok: true, headers: new Headers({ "content-type": "application/json" }), json: async () => ({ clients: [] }) });
+    fetchMock.mockResolvedValueOnce({ ok: true, headers: new Headers({ "content-type": "application/json" }), json: async () => providersResponse });
 
     render(<AiClientsManager />);
 
@@ -514,19 +449,10 @@ describe("AiClientsManager", () => {
     await user.click(screen.getByRole("combobox", { name: "Debug profile" }));
     await user.click(within(screen.getByRole("listbox")).getByText("Hermes-like"));
 
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ client: { id: "client_debug" } }),
-    });
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ bindings: [] }),
-    });
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ clients: [] }),
-    });
-    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => providersResponse });
+    fetchMock.mockResolvedValueOnce({ ok: true, headers: new Headers({ "content-type": "application/json" }), json: async () => ({ client: { id: "client_debug" } }) });
+    fetchMock.mockResolvedValueOnce({ ok: true, headers: new Headers({ "content-type": "application/json" }), json: async () => ({ bindings: [] }) });
+    fetchMock.mockResolvedValueOnce({ ok: true, headers: new Headers({ "content-type": "application/json" }), json: async () => ({ clients: [] }) });
+    fetchMock.mockResolvedValueOnce({ ok: true, headers: new Headers({ "content-type": "application/json" }), json: async () => providersResponse });
 
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
@@ -547,24 +473,21 @@ describe("AiClientsManager", () => {
 
   it("updates an existing Hermes client to Hermes", async () => {
     const user = userEvent.setup();
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        clients: [
-          {
-            id: "client_hermes",
-            name: "Runtime Client",
-            type: "hermes",
-            config: { bridgeUrl: "http://localhost:7677", bridgeToken: "secret-token" },
-            isDefault: true,
-            enabled: true,
-            bindings: ["dashboard.brief"],
-            createdAt: new Date().toISOString(),
-          },
-        ],
-      }),
-    });
-    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => providersResponse });
+    fetchMock.mockResolvedValueOnce({ ok: true, headers: new Headers({ "content-type": "application/json" }), json: async () => ({
+      clients: [
+        {
+          id: "client_hermes",
+          name: "Runtime Client",
+          type: "hermes",
+          config: { bridgeUrl: "http://localhost:7677", bridgeToken: "secret-token" },
+          isDefault: true,
+          enabled: true,
+          bindings: ["dashboard.brief"],
+          createdAt: new Date().toISOString(),
+        },
+      ],
+    }) });
+    fetchMock.mockResolvedValueOnce({ ok: true, headers: new Headers({ "content-type": "application/json" }), json: async () => providersResponse });
 
     render(<AiClientsManager />);
 
@@ -577,19 +500,10 @@ describe("AiClientsManager", () => {
     });
     expect(screen.getByText("Dashboard Brief")).toBeInTheDocument();
 
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ client: { id: "client_hermes", type: "hermes" } }),
-    });
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ bindings: ["dashboard.brief"] }),
-    });
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ clients: [] }),
-    });
-    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => providersResponse });
+    fetchMock.mockResolvedValueOnce({ ok: true, headers: new Headers({ "content-type": "application/json" }), json: async () => ({ client: { id: "client_hermes", type: "hermes" } }) });
+    fetchMock.mockResolvedValueOnce({ ok: true, headers: new Headers({ "content-type": "application/json" }), json: async () => ({ bindings: ["dashboard.brief"] }) });
+    fetchMock.mockResolvedValueOnce({ ok: true, headers: new Headers({ "content-type": "application/json" }), json: async () => ({ clients: [] }) });
+    fetchMock.mockResolvedValueOnce({ ok: true, headers: new Headers({ "content-type": "application/json" }), json: async () => providersResponse });
 
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
@@ -617,8 +531,8 @@ describe("AiClientsManager", () => {
 
   it("shows remote Hermes guidance without local auto-configuration", async () => {
     const user = userEvent.setup();
-    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ clients: [] }) });
-    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => providersResponse });
+    fetchMock.mockResolvedValueOnce({ ok: true, headers: new Headers({ "content-type": "application/json" }), json: async () => ({ clients: [] }) });
+    fetchMock.mockResolvedValueOnce({ ok: true, headers: new Headers({ "content-type": "application/json" }), json: async () => providersResponse });
 
     render(<AiClientsManager />);
 
@@ -634,8 +548,8 @@ describe("AiClientsManager", () => {
   });
 
   it("auto-configures local Hermes and writes the returned API key into the client payload", async () => {
-    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ clients: [] }) });
-    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => providersResponse });
+    fetchMock.mockResolvedValueOnce({ ok: true, headers: new Headers({ "content-type": "application/json" }), json: async () => ({ clients: [] }) });
+    fetchMock.mockResolvedValueOnce({ ok: true, headers: new Headers({ "content-type": "application/json" }), json: async () => providersResponse });
 
     render(<AiClientsManager />);
 
@@ -647,29 +561,26 @@ describe("AiClientsManager", () => {
     await userEvent.click(screen.getByRole("combobox", { name: "Type" }));
     await userEvent.click(within(screen.getByRole("listbox")).getByText("Hermes"));
 
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        apiKey: "chrona-generated-token",
-        maskedApiKey: "chrona-...oken",
-        changed: ["env:/home/user/.hermes/.env"],
-        diagnostics: {
-          mode: "local",
-          restartRequired: true,
-          checks: [{ key: "hermesEnvFile", status: "warning", message: "Hermes .env updated" }],
-        },
-        plan: { summary: "Restart Hermes.", canRunAutomatically: false, actions: [] },
-      }),
-    });
+    fetchMock.mockResolvedValueOnce({ ok: true, headers: new Headers({ "content-type": "application/json" }), json: async () => ({
+      apiKey: "chrona-generated-token",
+      maskedApiKey: "chrona-...oken",
+      changed: ["env:/home/user/.hermes/.env"],
+      diagnostics: {
+        mode: "local",
+        restartRequired: true,
+        checks: [{ key: "hermesEnvFile", status: "warning", message: "Hermes .env updated" }],
+      },
+      plan: { summary: "Restart Hermes.", canRunAutomatically: false, actions: [] },
+    }) });
 
     fireEvent.click(screen.getByRole("button", { name: "Auto-configure local Hermes" }));
 
     await screen.findByText("Restart Hermes.");
 
-    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ client: { id: "client_hermes" } }) });
-    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ bindings: [] }) });
-    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ clients: [] }) });
-    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => providersResponse });
+    fetchMock.mockResolvedValueOnce({ ok: true, headers: new Headers({ "content-type": "application/json" }), json: async () => ({ client: { id: "client_hermes" } }) });
+    fetchMock.mockResolvedValueOnce({ ok: true, headers: new Headers({ "content-type": "application/json" }), json: async () => ({ bindings: [] }) });
+    fetchMock.mockResolvedValueOnce({ ok: true, headers: new Headers({ "content-type": "application/json" }), json: async () => ({ clients: [] }) });
+    fetchMock.mockResolvedValueOnce({ ok: true, headers: new Headers({ "content-type": "application/json" }), json: async () => providersResponse });
 
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
@@ -692,8 +603,8 @@ describe("AiClientsManager", () => {
   });
 
   it("lets local Hermes clients request a gateway restart", async () => {
-    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ clients: [] }) });
-    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => providersResponse });
+    fetchMock.mockResolvedValueOnce({ ok: true, headers: new Headers({ "content-type": "application/json" }), json: async () => ({ clients: [] }) });
+    fetchMock.mockResolvedValueOnce({ ok: true, headers: new Headers({ "content-type": "application/json" }), json: async () => providersResponse });
 
     render(<AiClientsManager />);
 
@@ -704,10 +615,7 @@ describe("AiClientsManager", () => {
 
     expect(screen.getByText(/Chrona can run hermes gateway restart/)).toBeInTheDocument();
 
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ ok: true, exitCode: null, message: "Hermes gateway restart command started in the background." }),
-    });
+    fetchMock.mockResolvedValueOnce({ ok: true, headers: new Headers({ "content-type": "application/json" }), json: async () => ({ ok: true, exitCode: null, message: "Hermes gateway restart command started in the background." }) });
 
     fireEvent.click(screen.getByRole("button", { name: "Restart Hermes gateway" }));
 
@@ -719,33 +627,27 @@ describe("AiClientsManager", () => {
   });
 
   it("allows testing an existing client card and shows the returned failure reason", async () => {
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        clients: [
-          {
-             id: "client_1",
-             name: "Broken Bridge",
-             type: "hermes",
-             config: { bridgeUrl: "http://localhost:7677", bridgeToken: "secret-token" },
-             isDefault: false,
-             enabled: true,
-            bindings: ["suggest"],
-            createdAt: new Date().toISOString(),
-          },
-        ],
-      }),
-    });
-    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => providersResponse });
+    fetchMock.mockResolvedValueOnce({ ok: true, headers: new Headers({ "content-type": "application/json" }), json: async () => ({
+      clients: [
+        {
+           id: "client_1",
+           name: "Broken Bridge",
+           type: "hermes",
+           config: { bridgeUrl: "http://localhost:7677", bridgeToken: "secret-token" },
+           isDefault: false,
+           enabled: true,
+          bindings: ["suggest"],
+          createdAt: new Date().toISOString(),
+        },
+      ],
+    }) });
+    fetchMock.mockResolvedValueOnce({ ok: true, headers: new Headers({ "content-type": "application/json" }), json: async () => providersResponse });
 
     render(<AiClientsManager />);
 
     await screen.findByText("Broken Bridge");
 
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ ok: true, available: false, reason: "Bridge health endpoint returned 503" }),
-    });
+    fetchMock.mockResolvedValueOnce({ ok: true, headers: new Headers({ "content-type": "application/json" }), json: async () => ({ ok: true, available: false, reason: "Bridge health endpoint returned 503" }) });
 
     fireEvent.click(screen.getAllByRole("button", { name: "Test availability" })[0]);
 
@@ -754,48 +656,42 @@ describe("AiClientsManager", () => {
   });
 
   it("lets users make an enabled non-default client the default", async () => {
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        clients: [
-          {
-            id: "client_codex",
-            name: "Codex Local",
-            type: "codex",
-            config: {},
-            isDefault: false,
-            enabled: true,
-            bindings: [],
-            createdAt: new Date().toISOString(),
-          },
-        ],
-      }),
-    });
-    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => providersResponse });
+    fetchMock.mockResolvedValueOnce({ ok: true, headers: new Headers({ "content-type": "application/json" }), json: async () => ({
+      clients: [
+        {
+          id: "client_codex",
+          name: "Codex Local",
+          type: "codex",
+          config: {},
+          isDefault: false,
+          enabled: true,
+          bindings: [],
+          createdAt: new Date().toISOString(),
+        },
+      ],
+    }) });
+    fetchMock.mockResolvedValueOnce({ ok: true, headers: new Headers({ "content-type": "application/json" }), json: async () => providersResponse });
 
     render(<AiClientsManager />);
 
     await screen.findByText("Codex Local");
 
-    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => ({ client: { id: "client_codex", isDefault: true } }) });
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        clients: [
-          {
-            id: "client_codex",
-            name: "Codex Local",
-            type: "codex",
-            config: {},
-            isDefault: true,
-            enabled: true,
-            bindings: [],
-            createdAt: new Date().toISOString(),
-          },
-        ],
-      }),
-    });
-    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => providersResponse });
+    fetchMock.mockResolvedValueOnce({ ok: true, headers: new Headers({ "content-type": "application/json" }), json: async () => ({ client: { id: "client_codex", isDefault: true } }) });
+    fetchMock.mockResolvedValueOnce({ ok: true, headers: new Headers({ "content-type": "application/json" }), json: async () => ({
+      clients: [
+        {
+          id: "client_codex",
+          name: "Codex Local",
+          type: "codex",
+          config: {},
+          isDefault: true,
+          enabled: true,
+          bindings: [],
+          createdAt: new Date().toISOString(),
+        },
+      ],
+    }) });
+    fetchMock.mockResolvedValueOnce({ ok: true, headers: new Headers({ "content-type": "application/json" }), json: async () => providersResponse });
 
     fireEvent.click(screen.getByRole("button", { name: "Make default" }));
 
@@ -810,24 +706,21 @@ describe("AiClientsManager", () => {
   });
 
   it("shows execution and recovery readiness for providers", async () => {
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        clients: [
-          {
-            id: "client_codex",
-            name: "Codex Local",
-            type: "codex",
-            config: {},
-            isDefault: true,
-            enabled: true,
-            bindings: ["task.execution"],
-            createdAt: new Date().toISOString(),
-          },
-        ],
-      }),
-    });
-    fetchMock.mockResolvedValueOnce({ ok: true, json: async () => providersResponse });
+    fetchMock.mockResolvedValueOnce({ ok: true, headers: new Headers({ "content-type": "application/json" }), json: async () => ({
+      clients: [
+        {
+          id: "client_codex",
+          name: "Codex Local",
+          type: "codex",
+          config: {},
+          isDefault: true,
+          enabled: true,
+          bindings: ["task.execution"],
+          createdAt: new Date().toISOString(),
+        },
+      ],
+    }) });
+    fetchMock.mockResolvedValueOnce({ ok: true, headers: new Headers({ "content-type": "application/json" }), json: async () => providersResponse });
 
     render(<AiClientsManager />);
 
@@ -842,10 +735,7 @@ describe("AiClientsManager", () => {
     expect(screen.queryByText(/Provider lacks critical capabilities/)).not.toBeInTheDocument();
     expect(screen.queryByText(/session_history|active run lookup|stream reconnect/)).not.toBeInTheDocument();
 
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({ ok: true, available: true, reason: "Codex provider is reachable" }),
-    });
+    fetchMock.mockResolvedValueOnce({ ok: true, headers: new Headers({ "content-type": "application/json" }), json: async () => ({ ok: true, available: true, reason: "Codex provider is reachable" }) });
 
     fireEvent.click(screen.getAllByRole("button", { name: "Test availability" })[0]);
 

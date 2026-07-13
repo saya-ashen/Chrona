@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { summarizeRuntimeEvent } from "../server/runtime-event-summary";
+import { summarizeRuntimeEvent } from "@features/execution-monitoring/server";
 import type { PlanExecutionRuntimeEvent } from "@chrona/engine/modules/plan-execution";
 
 describe("summarizeRuntimeEvent", () => {

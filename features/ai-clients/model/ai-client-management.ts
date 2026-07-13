@@ -1,5 +1,5 @@
 import { aiClientRegistry } from "../runtime/client-registry";
-import { testAiClientAvailability } from "../../../packages/engine/src/modules/ai/providers";
+import { testAiClientAvailability } from "@chrona/engine";
 import { createAiClient } from "./create-ai-client";
 import { deleteAiClient } from "./delete-ai-client";
 import { listAiClients } from "./list-ai-clients";

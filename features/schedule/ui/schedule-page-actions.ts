@@ -3,7 +3,7 @@ import {
   createScheduledTask,
   moveWorkBlock,
   updateTaskConfigFromSchedule,
-} from "@/lib/task-actions-client";
+} from "./schedule-actions";
 import {
   DEFAULT_SCHEDULE_BLOCK_MINUTES,
   type SchedulePageCopy,
@@ -28,7 +28,7 @@ import {
   hydrateSchedulePageData,
   sortScheduledItems,
 } from "./schedule-page-utils";
-import { api } from "@/lib/rpc-client";
+import { apiJson } from "@shared/http";
 import type { TaskConfigFormInput } from "./forms/task-config-form";
 
 export function getQuickCreateDefaults(data: SchedulePageData) {
@@ -170,14 +170,12 @@ export async function refreshScheduleProjection({
   const requestId = ++requestIdRef.current;
 
   try {
-    const response = await api.schedule.$get({
-      query: { workspaceId },
-    });
-
-
     const next = hydrateSchedulePageData(
-      (await response.json()) as unknown as SchedulePageData,
+      await apiJson<SchedulePageData>(
+        `/api/schedule?${new URLSearchParams({ workspaceId })}`,
+      ),
     );
+
 
     if (requestId !== requestIdRef.current) {
       return;

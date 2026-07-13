@@ -1,5 +1,5 @@
 import type { UiDocument } from "@chrona/ui-protocol";
-import { SpecRenderer, type ExecutionOverviewCard } from "../../task-workspace";
+import { SpecRenderer, type ExecutionOverviewCard } from "@features/task-workspace";
 import type { WorkspaceRuntimeEvent } from "../model/workspace-runtime-events";
 import { buildCommandCenterNowSpec } from "./build-execution-overview-spec";
 import { ProviderApprovalBanner } from "./provider-approval-banner";

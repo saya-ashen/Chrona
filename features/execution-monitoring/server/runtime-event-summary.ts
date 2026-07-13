@@ -1,6 +1,5 @@
 import type { PlanExecutionSSEEvent } from "@chrona/contracts";
-import type { ExecutionActionType } from "@chrona/contracts/ai";
-import type { CheckpointActionKind } from "@chrona/contracts/ai";
+import type { CheckpointActionKind, ExecutionActionType } from "@chrona/contracts";
 import type { PlanExecutionRuntimeEvent } from "@chrona/engine";
 
 type RuntimeSummaryBase = Omit<Extract<PlanExecutionSSEEvent, { type: "runtime_event" }>, "event">;
