@@ -7,7 +7,8 @@ vi.mock("@/components/ui/card", () => ({
   Card: ({ children, ...props }: any) => <div {...props}>{children}</div>,
 }));
 vi.mock("@/lib/utils", () => ({ cn: (...args: any[]) => args.filter(Boolean).join(" ") }));
-vi.mock("lucide-react", () => ({
+vi.mock("lucide-react", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("lucide-react")>()),
   CheckCircle2: (props: any) => <span data-testid="check-icon" {...props} />,
   Circle: (props: any) => <span data-testid="circle-icon" {...props} />,
   FileText: (props: any) => <span data-testid="file-icon" {...props} />,

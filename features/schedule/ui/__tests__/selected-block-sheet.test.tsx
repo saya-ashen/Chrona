@@ -18,7 +18,8 @@ vi.mock("@chrona/i18n", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@chrona/i18n")>()),
   localizeHref: (_locale: string, href: string) => href,
 }));
-vi.mock("@shared/http", () => ({
+vi.mock("@shared/http", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@shared/http")>()),
   apiJson: (input: RequestInfo | URL, init?: RequestInit) => fetch(input, init).then((response) => response.json()),
 }));
 
