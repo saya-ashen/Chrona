@@ -19,6 +19,44 @@ async function fillAdvancedConnectionSettings(
 }
 
 test.describe("AI Client Settings", () => {
+  test("keeps settings controls visible and the client dialog centered", async ({
+    page,
+  }) => {
+    const viewports = [
+      { width: 1440, height: 900 },
+      { width: 1024, height: 768 },
+      { width: 390, height: 844 },
+    ];
+
+    for (const viewport of viewports) {
+      await page.setViewportSize(viewport);
+      await page.goto("/en/settings");
+
+      for (const name of [
+        "Auto-generate plan after saving",
+        "Default task auto-execution",
+      ]) {
+        const toggle = page.getByRole("switch", { name });
+        await expect(toggle).toBeVisible();
+        const toggleBox = await toggle.boundingBox();
+        expect(toggleBox?.width).toBeGreaterThanOrEqual(24);
+        expect(toggleBox?.height).toBeGreaterThanOrEqual(14);
+      }
+
+      await page.getByRole("link", { name: "Manage AI clients" }).click();
+      const dialog = page.getByRole("dialog");
+      await expect(dialog).toBeVisible();
+      const dialogBox = await dialog.boundingBox();
+      expect(dialogBox).not.toBeNull();
+      expect(
+        Math.abs(dialogBox!.x - (viewport.width - dialogBox!.width) / 2),
+      ).toBeLessThanOrEqual(1);
+      expect(
+        await page.evaluate(() => document.documentElement.scrollWidth),
+      ).toBeLessThanOrEqual(viewport.width);
+    }
+  });
+
   test("create, edit, delete, and duplicate an AI client through the UI", async ({
     page,
   }) => {
