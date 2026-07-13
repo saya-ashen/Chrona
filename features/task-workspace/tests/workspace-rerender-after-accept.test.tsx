@@ -4,8 +4,9 @@ import { act, cleanup, renderHook } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { PropsWithChildren } from "react";
 import { useTaskWorkspacePlanState } from "../hooks/use-task-workspace-plan-state";
+import type { TaskPlanReadModel } from "@chrona/contracts";
 import { buildCommandCenterNowSpec } from "@features/execution-monitoring";
-import { taskWorkspacePlanStateFixtures } from "@features/task-workspace/test-support/task-workspace-test-fixtures"
+import { taskWorkspacePlanStateFixtures } from "@features/task-workspace/test";
 import type { TaskPageData } from "@features/task-workspace"
 import type { TaskWorkspacePlanFlowState } from "@features/task-workspace"
 
@@ -79,7 +80,7 @@ const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => 
 vi.stubGlobal("fetch", fetchMock);
 
 function derivePlanFlow(planFlowStatus: string, plan: { id: string; status: string } | null): TaskWorkspacePlanFlowState | null {
-  const savedPlan = plan as unknown as import("@chrona/contracts/ai").TaskPlanReadModel | null;
+  const savedPlan = plan as unknown as TaskPlanReadModel | null;
   switch (planFlowStatus) {
     case "idle":
       return { status: "idle", savedPlan: null };

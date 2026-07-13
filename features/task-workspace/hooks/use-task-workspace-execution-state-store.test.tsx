@@ -6,7 +6,7 @@ import { buildTaskHeaderSpec } from "@chrona/ui-protocol";
 import type { UiDocument } from "@chrona/ui-protocol";
 
 import { useTaskWorkspacePageState } from "./use-task-workspace-page-state";
-import { taskWorkspaceStateFixtures } from "@features/task-workspace/test-support/task-workspace-test-fixtures"
+import { taskWorkspaceStateFixtures } from "@features/task-workspace/test";
 import type { TaskPageData } from "@features/task-workspace"
 
 type JsonEventHandler = (event: { event: string; data: Record<string, unknown>; message: unknown }) => void;

@@ -1,4 +1,7 @@
 export * from "./contract";
+export { suggestTimeslots } from "./model/timeslot-suggester";
+export { SchedulePage } from "./ui/schedule-page";
+export { useAutoComplete, type AutoCompleteSuggestion } from "./ui/use-auto-complete";
 export {
   TaskConfigForm,
   type TaskConfigAiClient,

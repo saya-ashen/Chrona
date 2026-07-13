@@ -6,7 +6,7 @@ import { createExecutionRoutes } from "./execution.routes";
 import { createTaskLifecycleRoutes } from "./lifecycle.routes";
 import { createPlansRoutes } from "./plan.routes";
 import { createTaskResultRoutes } from "./result.routes";
-import { createTaskScheduleRoutes } from "../../../../../features/schedule/routes/task.routes";
+import { createTaskScheduleRoutes } from "../../../../../features/schedule/server";
 
 export function createTaskRoutes(engine: ChronaEngine) {
   return new Hono()

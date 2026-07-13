@@ -74,13 +74,10 @@ function renderWithQueryClient(ui: ReactElement) {
   });
 }
 
-vi.mock("@chrona/i18n/react", async () => {
-  const { fallbackMessages } = await import("@chrona/i18n/messages");
-  return {
-    useI18n: () => ({ locale: "en", messages: fallbackMessages, t: (key: string) => key }),
-    useLocale: () => "en",
-  };
-});
+vi.mock("@chrona/i18n/react", () => ({
+  useI18n: () => ({ locale: "en", messages: { components: { taskWorkspace: {} } }, t: (key: string) => key }),
+  useLocale: () => "en",
+}));
 
 beforeAll(async () => {
   ({ TaskWorkspacePlanSection, derivePreferredGraphMode, recoveryActionButtonVariant } = await import("./task-workspace-plan-section"));

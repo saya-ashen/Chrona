@@ -1678,7 +1678,6 @@ export function TaskWorkspacePlanSection({
     useState(false);
   const followUpComposerRef = useRef<HTMLTextAreaElement>(null);
   const [graphMode, setGraphMode] = useState<"full" | "compact">("full");
-  const locale = useLocale();
   const { messages } = useI18n();
   const copy = messages.components.taskWorkspace;
   const consoleView = useMemo(

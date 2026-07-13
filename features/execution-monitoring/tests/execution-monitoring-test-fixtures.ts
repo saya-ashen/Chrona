@@ -4,7 +4,7 @@ import type {
   TaskPageData,
   TaskPlanGraphPlan,
   TaskWorkspacePlanFlowState,
-} from "../../task-workspace";
+} from "@features/task-workspace";
 
 function node(
   id: string,

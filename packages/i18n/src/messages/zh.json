@@ -28,28 +28,6 @@
     "description": "Chrona 帮你把任务排进日程，并借助 AI 持续推进执行。"
   },
   "components": {
-    "globalAiSidebar": {
-      "entryLabel": "打开 Chrona AI 侧边栏",
-      "entry": "询问 Chrona",
-      "quickActions": "快捷操作",
-      "previewRequired": "需预览",
-      "infoOnly": "仅信息",
-      "conversation": "对话",
-      "emptyConversation": "询问上下文、阻塞点，或生成安全建议。",
-      "followUpPlaceholder": "询问 Chrona 下一步该做什么...",
-      "send": "发送",
-      "preview": "预览",
-      "noPreview": "选择快捷操作生成预览，确认前不会更改任何内容。",
-      "staleWarning": "页面上下文已变化，此预览已过期。请先细化再确认。",
-      "panelLabel": "Chrona AI 侧边栏",
-      "eyebrow": "上下文感知 AI",
-      "title": "询问 Chrona",
-      "close": "关闭 AI 侧边栏",
-      "applying": "正在应用...",
-      "confirm": "确认",
-      "dismiss": "忽略",
-      "refine": "细化"
-    },
     "assistantSurface": {
       "entryLabel": "打开 Chrona AI 下拉菜单",
       "entry": "Chrona AI",
@@ -230,13 +208,6 @@
       "noFilteredItemsTitle": "没有匹配的待办项",
       "noFilteredItemsDescription": "尝试更换筛选条件或搜索词。",
       "status": "状态"
-    },
-    "memoryConsole": {
-      "source": "来源",
-      "task": "任务",
-      "run": "运行",
-      "openWork": "打开执行页",
-      "invalidate": "失效"
     },
     "taskConfigForm": {
       "starterPresets": "起手模板",
@@ -1903,10 +1874,6 @@
       "recoverySnapshotOnly": "可同步运行状态；实时进度断线后不会回放。",
       "recoverySessionHistory": "会话上下文会保存；执行中断后需要重试该步骤继续。",
       "recoveryUnavailable": "执行中断后无法自动恢复。"
-    },
-    "advancedSettings": {
-      "title": "高级设置",
-      "subtitle": "保留内部控制能力，但不让它们变成默认工作流。"
     }
   }
 }

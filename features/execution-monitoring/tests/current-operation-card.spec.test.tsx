@@ -15,7 +15,7 @@ import { describe, expect, it } from "vitest";
 import { buildCommandCenterNowSpec } from "../ui/build-execution-overview-spec";
 import { resolveCurrentOperationCardSpec } from "../ui/build-execution-overview-spec";
 import { executionMonitoringPlanFixtures } from "./execution-monitoring-test-fixtures";
-import type { TaskWorkspacePlanFlowState } from "../../task-workspace";
+import type { TaskWorkspacePlanFlowState } from "@features/task-workspace";
 
 /**
  * Build a minimal `TaskWorkspacePlanFlowState` literal for a given status.

@@ -6,7 +6,7 @@ import type { PropsWithChildren } from "react";
 import type { TaskPlanReadModel } from "@chrona/contracts"
 
 import { TaskWorkspacePage } from "../ui/task-workspace-page";
-import { createTaskWorkspaceFixturePageData } from "@features/task-workspace/test-support/task-workspace-test-fixtures";
+import { createTaskWorkspaceFixturePageData } from "@features/task-workspace/test";
 import type { TaskPageData } from "./task-workspace-model";
 
 type JsonEventHandler = (event: { event: string; data: Record<string, unknown>; message: unknown }) => void;

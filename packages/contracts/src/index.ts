@@ -363,6 +363,9 @@ export type {
 
 export type {
   ConflictAnalysisResult,
+  TimeslotOptions,
+  TimeslotSuggestion,
+  TimeslotSuggestionInput,
   TimeslotSuggestionResult,
 } from "./ai-shared-types";
 

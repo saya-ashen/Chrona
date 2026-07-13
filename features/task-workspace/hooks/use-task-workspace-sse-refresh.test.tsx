@@ -5,7 +5,7 @@ import type { PropsWithChildren } from "react";
 
 import { useTaskWorkspacePageState } from "./use-task-workspace-page-state";
 import { useTaskWorkspacePlanState } from "./use-task-workspace-plan-state";
-import { taskWorkspaceStateFixtures } from "@features/task-workspace/test-support/task-workspace-test-fixtures"
+import { taskWorkspaceStateFixtures } from "@features/task-workspace/test";
 import type { TaskPageData } from "@features/task-workspace"
 
 type JsonEventHandler = (event: { event: string; data: Record<string, unknown>; message: unknown }) => void;

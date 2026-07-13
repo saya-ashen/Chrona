@@ -4,7 +4,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { PropsWithChildren } from "react";
 
 import { useTaskWorkspacePlanState } from "./use-task-workspace-plan-state";
-import { taskWorkspaceStateFixtures } from "@features/task-workspace/test-support/task-workspace-test-fixtures"
+import { taskWorkspaceStateFixtures } from "@features/task-workspace/test";
 import type { TaskWorkspaceSseEvent } from "./use-task-workspace-page-state";
 import type { TaskData } from "@features/task-workspace"
 

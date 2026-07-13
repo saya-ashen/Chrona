@@ -1,1 +1,1 @@
-export { AiClientManagement, aiClientManagement } from "../../../../../../features/ai-clients/server";
+export { AiClientManagement, aiClientManagement } from "./ai-client-management";

@@ -42,7 +42,7 @@ vi.mock("@chrona/i18n", () => ({
   locales: ["en", "zh"],
 }));
 
-import { ControlPlaneShell } from "../../../../../features/mcp-control-plane";
+import { ControlPlaneShell } from "@features/mcp-control-plane";
 
 beforeEach(() => {
   mocks.apiJson.mockImplementation((path: string) => {

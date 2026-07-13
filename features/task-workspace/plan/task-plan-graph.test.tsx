@@ -43,12 +43,9 @@ function expectNoNodeOverlap(
   }
 }
 
-vi.mock("@chrona/i18n/react", async () => {
-  const { fallbackMessages } = await import("@chrona/i18n/messages");
-  return {
-    useI18n: () => ({ messages: fallbackMessages, t: (key: string) => key }),
-  };
-});
+vi.mock("@chrona/i18n/react", () => ({
+  useI18n: () => ({ messages: { components: { taskWorkspace: {} } }, t: (key: string) => key }),
+}));
 
 beforeAll(() => {
   class ResizeObserverMock {

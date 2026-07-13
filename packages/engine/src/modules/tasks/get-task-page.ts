@@ -6,8 +6,11 @@ import {
   getRuntimeTaskConfigSpec,
   listExecutionRuntimes,
 } from "@/modules/execution-runtime";
-import { deriveTaskRunnability } from "@chrona/shared";
-import { deriveTaskExecutionState, taskExecutionStateToRunStatus } from "@chrona/domain";
+import {
+  deriveTaskExecutionState,
+  deriveTaskRunnability,
+  taskExecutionStateToRunStatus,
+} from "@chrona/domain";
 import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
 import {
   buildActivityTimeline,

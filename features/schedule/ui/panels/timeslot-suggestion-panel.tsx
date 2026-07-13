@@ -1,4 +1,4 @@
-import { suggestTimeslots } from "@chrona/shared";
+import { suggestTimeslots } from "../../model/timeslot-suggester";
 import type { ScheduleSlot } from "@chrona/contracts"
 
 type TimeslotSuggestionPanelProps = {

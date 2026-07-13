@@ -18,6 +18,9 @@ vi.mock("@chrona/i18n", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@chrona/i18n")>()),
   localizeHref: (_locale: string, href: string) => href,
 }));
+vi.mock("@shared/http", () => ({
+  apiJson: (input: RequestInfo | URL, init?: RequestInit) => fetch(input, init).then((response) => response.json()),
+}));
 
 vi.mock("@/components/i18n/localized-link", () => ({
   LocalizedLink: ({ children, href, ...props }: { href: string; children?: React.ReactNode }) => (
@@ -184,6 +187,12 @@ vi.mock("@features/task-workspace", () => ({
     );
   },
   TaskContextLinks: () => <div data-testid="task-context-links" />,
+  useTaskPlanGenerationSession: () => ({
+    activeAcceptedPlanId: null,
+    result: null,
+    sessionStatus: "idle",
+    start: vi.fn(),
+  }),
 }));
 
 // Mock fetch for subtasks

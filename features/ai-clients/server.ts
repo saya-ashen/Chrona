@@ -1,5 +1,4 @@
 export type { AiFeature } from "@chrona/contracts";
-
 export type {
   DebugProfiledProviderClient,
   EngineAiClient,
@@ -10,10 +9,11 @@ export type {
   EngineClaudeCodeClient,
   EngineCodexClient,
   EngineOmpClient,
-} from "./runtime/client-registry";
+} from "@chrona/engine";
 export {
   getProviderBaseUrl,
   AiClientRegistry,
   aiClientRegistry,
-} from "./runtime/client-registry";
-export { AiClientManagement, aiClientManagement } from "./model/ai-client-management";
+  AiClientManagement,
+  aiClientManagement,
+} from "@chrona/engine";

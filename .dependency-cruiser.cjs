@@ -1,7 +1,7 @@
 // Architectural boundary rules for the Chrona monorepo.
 //
-// These encode the package boundaries documented in docs/package-boundaries.md
-// and docs/provider-boundary.md and turn them from convention into a CI gate.
+// These encode the package boundaries documented in docs/en/package-boundaries.md
+// and docs/en/provider-boundary.md and turn them from convention into a CI gate.
 //
 // Severity policy:
 //   error — boundaries that production (non-test) code already satisfies. A new
@@ -24,20 +24,27 @@ function featureNames() {
     .map((entry) => entry.name);
 }
 
+const FEATURE_PUBLIC_ENTRYPOINT = "^features/[^/]+/(index|ui|server|test)\\.ts$";
+const FEATURE_BROWSER_ENTRYPOINT = "^features/[^/]+/(index|ui)\\.ts$";
+const FEATURE_SERVER_ENTRYPOINT = "^features/[^/]+/(index|server)\\.ts$";
 const FEATURE_PUBLIC_IMPORT_RULES = featureNames().map((feature) => ({
   name: `feature-${feature}-internals-are-private`,
   comment:
-    `Import features/${feature} from sibling features only through features/${feature}/index.ts, not internal files or secondary barrels.`,
+    `Import features/${feature} from sibling features only through its index.ts, ui.ts, server.ts, or test.ts public entrypoint, not internal files or secondary barrels.`,
   severity: "error",
   from: { path: `^features/(?!${feature}/)[^/]+/` },
   to: {
     path: `^features/${feature}/`,
-    pathNot: `^features/${feature}/index\.ts$`,
+    pathNot: `^features/${feature}/(index|ui|server|test)\\.ts$`,
   },
 }));
 
 const FEATURE_OR_SHARED = "^(features|shared)/";
-const TEST = "(__tests__/|\\.test\\.|\\.bun\\.test\\.|\\.spec\\.)";
+const TEST = "(__tests__/|(?:^|/)test\\.ts$|\\.test\\.|\\.bun\\.test\\.|\\.spec\\.)";
+const BROWSER_PATH =
+  "^(apps/web/src/|features/[^/]+/(index|ui|browser-api)\\.ts$|features/[^/]+/ui/|shared/ui/)";
+const BROWSER_FORBIDDEN_DEPENDENCIES =
+  "^(packages/(engine|db|providers)/|apps/server/|shared/http/server\\.ts$|node:)";
 
 /** A package's public entry points (barrels). Importing anything else in the
  *  package from the outside is a boundary violation. */
@@ -59,7 +66,7 @@ module.exports = {
     {
       name: "domain-stays-pure",
       comment:
-        "packages/domain is pure business derivation: no Prisma, db, React, providers, engine, or app code. See docs/package-boundaries.md.",
+        "packages/domain is pure business derivation: no Prisma, db, React, providers, engine, or app code. See docs/en/package-boundaries.md.",
       severity: "error",
       from: { path: "^packages/domain/src/" },
       to: {
@@ -83,7 +90,7 @@ module.exports = {
     {
       name: "providers-own-no-business",
       comment:
-        "Provider packages adapt external protocols. Task lifecycle, plan progression, and projection logic live in packages/engine. See docs/provider-boundary.md.",
+        "Provider packages adapt external protocols. Task lifecycle, plan progression, and projection logic live in packages/engine. See docs/en/provider-boundary.md.",
       severity: "error",
       from: { path: "^packages/providers/", pathNot: TEST },
       to: { path: "^(packages/engine/|packages/domain/|packages/db/|apps/)" },
@@ -117,7 +124,7 @@ module.exports = {
       severity: "error",
       from: {
         path: "^packages/",
-        // The CLI's sole job is to boot the server (docs/architecture.md). Its
+        // The CLI's sole job is to boot the server (docs/en/architecture.md). Its
         // launcher entry may import the server entrypoint; nothing else may.
         // Test files that boot app surfaces end-to-end are handled by the
         // `-tests` warn variant below.
@@ -227,6 +234,81 @@ module.exports = {
       to: {
         path: "^packages/engine/src/modules/(events|ai|execution-runtime|workspaces)/",
         pathNot: "^packages/engine/src/modules/(events|ai|execution-runtime|workspaces)/index\\.ts$",
+      },
+    },
+
+    // --- app consumers use feature public entrypoints only ------------------
+    {
+      name: "apps-use-feature-public-entrypoints",
+      comment:
+        "Apps may import a feature only through its index.ts, ui.ts, server.ts, or test.ts public entrypoint; feature internals remain private.",
+      severity: "error",
+      from: { path: "^apps/" },
+      to: {
+        path: "^features/",
+        pathNot: FEATURE_PUBLIC_ENTRYPOINT,
+      },
+    },
+    {
+      name: "feature-test-entrypoints-are-test-only",
+      comment:
+        "Feature test.ts entrypoints expose test support only; production app, package, feature, and shared code must not import them.",
+      severity: "error",
+      from: {
+        path: "^(apps|packages|features|shared)/",
+        pathNot: TEST,
+      },
+      to: { path: "^features/[^/]+/test\\.ts$" },
+    },
+    {
+      name: "web-uses-browser-safe-feature-entrypoints",
+      comment:
+        "The browser app may consume feature index.ts or ui.ts entrypoints only; server.ts and test.ts are not browser dependencies.",
+      severity: "error",
+      from: { path: "^apps/web/src/", pathNot: TEST },
+      to: {
+        path: "^features/",
+        pathNot: FEATURE_BROWSER_ENTRYPOINT,
+      },
+    },
+    {
+      name: "server-uses-server-safe-feature-entrypoints",
+      comment:
+        "The server app may consume feature index.ts or server.ts entrypoints only; UI and test entrypoints are not server dependencies.",
+      severity: "error",
+      from: { path: "^apps/server/src/", pathNot: TEST },
+      to: {
+        path: "^features/",
+        pathNot: FEATURE_SERVER_ENTRYPOINT,
+      },
+    },
+    {
+      name: "browser-paths-stay-server-free",
+      comment:
+        "Browser-reachable app, feature UI, and shared UI code must not depend on engine, db, providers, server code, shared HTTP server code, or Node builtins.",
+      severity: "error",
+      from: { path: BROWSER_PATH, pathNot: TEST },
+      to: { path: BROWSER_FORBIDDEN_DEPENDENCIES },
+    },
+
+    // --- package production code never reaches into root feature slices -----
+    {
+      name: "packages-production-never-import-root-features",
+      comment:
+        "Packages are reusable infrastructure; production package code must not depend on root feature slices. Tests may use a feature's test.ts entrypoint only.",
+      severity: "error",
+      from: { path: "^packages/", pathNot: TEST },
+      to: { path: "^features/" },
+    },
+    {
+      name: "package-tests-use-feature-test-entrypoint-only",
+      comment:
+        "Package tests that need feature integration may import only the feature test.ts entrypoint, keeping test-only reach-through explicit and controlled.",
+      severity: "error",
+      from: { path: `^packages/.*${TEST}` },
+      to: {
+        path: "^features/",
+        pathNot: "^features/[^/]+/test\\.ts$",
       },
     },
     ...FEATURE_PUBLIC_IMPORT_RULES,

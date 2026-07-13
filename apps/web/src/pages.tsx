@@ -6,15 +6,15 @@ import {
   useSearchParams,
 } from "react-router-dom";
 
-import { DashboardPage } from "@/components/dashboard/dashboard-page";
-import { SchedulePage } from "../../../features/schedule/ui";
-import { TaskListPage } from "@/components/tasks/task-list-page";
-import { AiClientsDialog } from "../../../features/ai-clients/ui";
-import { ScheduleAiSettingsPanel } from "@/components/settings/schedule-ai-settings-panel";
-import { TaskWorkspacePage } from "@/components/tasks/task-workspace-page";
-import { ActionCenterPageClient } from "@/components/action-center/action-center-page-client";
+import { DashboardPage, type DashboardData } from "@features/dashboard";
+import { SchedulePage } from "@features/schedule";
+import { TaskListPage } from "@features/task-management";
+import { AiClientsDialog } from "@features/ai-clients/ui";
+import { TaskWorkspacePage, type TaskPageData } from "@features/task-workspace";
+import { ActionCenterPageClient } from "@features/action-center";
 import type { ActionCenterProjection } from "@chrona/contracts/api";
 import { LocalizedLink } from "@/components/i18n/localized-link";
+import { ScheduleAiSettingsPanel } from "@/components/settings/schedule-ai-settings-panel";
 import { Badge } from "@shared/ui"
 import { Button } from "@shared/ui"
 import { Card,
@@ -27,10 +27,8 @@ import { Separator } from "@shared/ui";
 import type { getDictionary, Locale } from "@chrona/i18n";
 import { localizeHref, resolveLocale } from "@chrona/i18n";
 import type { WorkStateView } from "@chrona/domain";
-import type { DashboardData } from "@/components/dashboard/dashboard-types";
-import type { SchedulePageData } from "@features/schedule/ui/schedule-page-types";
+import type { SchedulePageData } from "@features/schedule";
 
-import type { TaskPageData } from "../../../features/task-workspace";
 export type Dictionary = Awaited<ReturnType<typeof getDictionary>>;
 
 export type AppBootData = {

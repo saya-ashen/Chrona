@@ -2,7 +2,7 @@ import { db } from "@/lib/db";
 import { isTaskPlanGenerationRunning } from "@/modules/plans/task-plan-generation-registry";
 import { getLatestTaskPlanReadModel } from "@/modules/plans/task-plan-read-model";
 import { reconcileTaskState } from "@/modules/orchestration/reconcile-task-state";
-import { deriveTaskRunnability } from "@chrona/shared";
+import { deriveTaskRunnability } from "@chrona/domain";
 import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
 
 type TaskPlanGenerationStatus = "idle" | "generating" | "waiting_acceptance" | "accepted";

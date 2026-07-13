@@ -1,7 +1,7 @@
 import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { TimeslotSuggestionPanel } from "../panels/timeslot-suggestion-panel";
-import { suggestTimeslots } from "@chrona/shared";
+import { suggestTimeslots } from "../../model/timeslot-suggester";
 
 const makeSuggestions = () => [
   {
@@ -20,7 +20,7 @@ const makeSuggestions = () => [
   },
 ];
 
-vi.mock("@chrona/shared", () => ({
+vi.mock("../../model/timeslot-suggester", () => ({
   suggestTimeslots: vi.fn(),
 }));
 
