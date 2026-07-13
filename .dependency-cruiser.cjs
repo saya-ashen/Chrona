@@ -141,6 +141,17 @@ module.exports = {
       to: { path: "^apps/" },
     },
 
+    {
+      name: "domain-stays-runtime-agnostic",
+      comment:
+        "Domain modules are shared by browser and server code; keep them free of Node builtins and runtime infrastructure such as logging, engine, db, providers, and apps.",
+      severity: "error",
+      from: { path: "^packages/domain/src/", pathNot: TEST },
+      to: {
+        path: "^(node:|packages/(logging|engine|db|providers)/|apps/)",
+      },
+    },
+
     // --- engine internals are private; consumers use the barrel --------------
     {
       name: "no-deep-import-engine-internals",

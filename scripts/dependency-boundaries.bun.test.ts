@@ -78,6 +78,10 @@ beforeAll(async () => {
     "import { nodeLogger } from '../../../packages/logging/src/index.ts';\nexport const illegal = nodeLogger;\n",
   );
   await writeFixture(
+    "packages/domain/src/illegal-logger.ts",
+    "import { nodeLogger } from '../../logging/src/index.ts';\nexport const illegal = nodeLogger;\n",
+  );
+  await writeFixture(
     "packages/consumer/src/illegal-feature.ts",
     "import { taskWorkspaceContract } from '../../../features/task-workspace/index.ts';\nexport const illegal = taskWorkspaceContract;\n",
   );
@@ -127,6 +131,11 @@ describe("architecture boundary behavior", () => {
     const result = await cruise("apps/web/src/illegal-logger.ts");
     expect(result.exitCode).toBe(1);
     expect(result.output).toContain("browser-paths-stay-server-free");
+  });
+  test("rejects runtime logging from shared domain modules", async () => {
+    const result = await cruise("packages/domain/src/illegal-logger.ts");
+    expect(result.exitCode).toBe(1);
+    expect(result.output).toContain("domain-stays-runtime-agnostic");
   });
 
   test("rejects test support entrypoints from browser production code", async () => {

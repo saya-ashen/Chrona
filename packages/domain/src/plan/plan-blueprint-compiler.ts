@@ -1,5 +1,3 @@
-import { randomUUID } from "node:crypto";
-
 import type {
   CompiledPlan,
   LayerSource,
@@ -10,10 +8,8 @@ import {
   PlanCompileError,
   upgradeBlueprintToEditable,
 } from "@chrona/contracts";
-import { createLogger } from "@chrona/logging";
 import { compileEditablePlan } from "./compile";
 
-const logger = createLogger("domain.plan.blueprint-compiler");
 
 const STABLE_NODE_ID = /^[a-z][a-z0-9_]*$/;
 
@@ -133,7 +129,6 @@ function validateBlueprint(input: { blueprint: PlanBlueprint }) {
   if (issues.length === 0 && !assertDag(nodeIds, allEdges)) {
     issues.push(compileIssue("edges", "Plan graph must be a DAG"));
   }
-  logger.debug("blueprint.validation_completed", { issueCount: issues.length, issues });
 
   if (issues.length > 0) {
     throw new PlanCompileError("Plan blueprint compilation failed", issues);
@@ -152,7 +147,7 @@ export function compilePlanBlueprint(input: {
 }): { compiledPlan: CompiledPlan; planId: string } {
   validateBlueprint({ blueprint: input.blueprint });
 
-  const planId = input.planId ?? randomUUID().replaceAll("-", "").slice(0, 12);
+  const planId = input.planId ?? crypto.randomUUID().replaceAll("-", "").slice(0, 12);
   const editable = upgradeBlueprintToEditable(input.blueprint, planId, 1);
   const compiledPlan = compileEditablePlan(editable);
 
