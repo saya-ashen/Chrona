@@ -1,9 +1,9 @@
-import { LocalizedLink } from "@/components/i18n/localized-link";
-import { Calendar } from "@/components/ui/calendar";
-import { Card } from "shared/ui/card";
-import { cn } from "@/lib/utils"
+import { Link } from "react-router-dom";
+import { Calendar, Card, cn } from "@shared/ui";
 import { useEffect, useState, type ComponentProps } from "react";
 import type { DayButton } from "react-day-picker";
+import { localizeHref } from "@chrona/i18n";
+import { useLocale } from "@chrona/i18n"
 
 type ScheduleMiniCalendarDay = {
   key: string;
@@ -72,10 +72,11 @@ function ScheduleMiniCalendarDayButton({
   const calendarDay = daysByKey.get(dayKey);
   const isSelected = Boolean(calendarDay?.isSelected);
   const activityDot = getCalendarDayActivityDot(calendarDay, isSelected);
+  const locale = useLocale();
 
   return (
-    <LocalizedLink
-      href={calendarDay?.href ?? `/schedule?day=${encodeURIComponent(dayKey)}`}
+    <Link
+      to={localizeHref(locale, calendarDay?.href ?? `/schedule?day=${encodeURIComponent(dayKey)}`)}
       aria-current={isSelected ? "date" : undefined}
       aria-label={calendarDay?.label ?? day.date.toDateString()}
       className={cn(
@@ -88,7 +89,7 @@ function ScheduleMiniCalendarDayButton({
     >
       <span>{day.date.getDate()}</span>
       {activityDot}
-    </LocalizedLink>
+    </Link>
   );
 }
 

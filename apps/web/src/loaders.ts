@@ -17,7 +17,7 @@ import type {
   TaskWorkspaceHeaderData,
   TaskWorkspaceReviewContextData,
   TaskWorkspaceRuntimeContextData,
-} from "../../../features/task-workspace";
+} from "@features/task-workspace";
 
 async function resolveRouteLocale(params: Params<string>): Promise<Locale> {
   return resolveLocale(params.lang);

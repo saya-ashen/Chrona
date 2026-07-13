@@ -7,7 +7,7 @@ vi.mock("@microsoft/fetch-event-source", () => ({
     init.onmessage?.({ event: "done", data: "{}" });
   },
 }));
-import { startTaskPlanGenerationSession, stopTaskPlanGenerationSession } from "./task-plan-generation-session-store";
+import { startTaskPlanGenerationSession, stopTaskPlanGenerationSession } from "@features/task-workspace";
 
 function sse(events: Array<{ event: string; data: unknown }>) {
   const encoder = new TextEncoder();

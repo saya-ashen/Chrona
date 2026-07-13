@@ -159,7 +159,6 @@ const eslintConfig = defineConfig([
     "**/.next/**",
     "**/node_modules/**",
     "**/out/**",
-    "**/build/**",
     "**/dist/**",
     "**/coverage/**",
     "**/*.min.js",

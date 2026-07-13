@@ -1,6 +1,7 @@
-import { aiClientRegistry } from "../../../../../../features/ai-clients";
-import { db } from "@/lib/db";
-import type { AiFeature, EngineAiClient } from "../../../../../../features/ai-clients";
+import { aiClientRegistry } from "./client-registry";
+import { db } from "@chrona/db";
+import type { AiFeature } from "@chrona/contracts";
+import type { EngineAiClient } from "./client-registry";
 
 export async function getAiClient(
   clientId?: string | null,

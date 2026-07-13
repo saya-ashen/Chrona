@@ -1,16 +1,13 @@
-import { api } from "@/lib/rpc-client";
-import { apiJson } from "shared/http/api-client";
+import { apiJson } from "@shared/http";
 import {
   appendTaskPrimaryNodeAction,
   graphNodeIdForTaskAction,
-} from "@/components/tasks/plan/task-action-node-action";
+} from "../plan/task-action-node-action";
 import type { PlanNodeDataModel, TaskPlanGraphPlan } from "./plan-node-view-model";
-import type {
-  ExecutionActionInput,
-  PlanExecutionResult,
-  SubmitCheckpointActionInput,
-  TaskPlanGenerationSessionReadModel,
-} from "@chrona/contracts/ai";
+import type { ExecutionActionInput,
+PlanExecutionResult,
+SubmitCheckpointActionInput,
+TaskPlanGenerationSessionReadModel, } from "@chrona/contracts"
 import type {
   ExecutionOverviewCard,
   ProgressSummary,
@@ -26,6 +23,7 @@ import type {
   WorkspaceActivityItem,
   WorkspaceArtifactItem,
 } from "./task-workspace-types";
+
 import {
   deriveHeaderActions,
   deriveTaskStatusFromGraph,
@@ -654,60 +652,27 @@ export async function fetchTaskPlanState(
   taskId: string,
   workBlockId?: string | null,
 ): Promise<TaskPlanState> {
-  const query = workBlockId
-    ? `?workBlockId=${encodeURIComponent(workBlockId)}`
-    : "";
-  const response = await fetch(
-    `/api/tasks/${encodeURIComponent(taskId)}/plan${query}`,
-  );
-
-  if (!response.ok) {
-    const err = await response
-      .json()
-      .catch(() => ({ error: "Failed to load task plan state" }));
-    throw new Error(
-      (err as { error?: string }).error ?? "Failed to load task plan state",
-    );
-  }
-
-  const payload = (await response.json()) as {
+  const payload = await apiJson<{
     taskId: string;
     aiPlanGenerationStatus?: string;
     savedPlan?: TaskData["savedPlan"] | null;
     generationSession?: TaskPlanGenerationSessionReadModel | null;
-  };
-
+  }>(`/api/tasks/${encodeURIComponent(taskId)}/plan${taskScopedQuery(workBlockId)}`);
   return {
     taskId: payload.taskId,
-    aiPlanGenerationStatus: (payload.aiPlanGenerationStatus ??
-      "idle") as TaskPlanState["aiPlanGenerationStatus"],
+    aiPlanGenerationStatus: (payload.aiPlanGenerationStatus ?? "idle") as TaskPlanState["aiPlanGenerationStatus"],
     savedPlan: payload.savedPlan ?? null,
     generationSession: payload.generationSession ?? null,
   };
 }
 
-export async function fetchCurrentTaskExecution(
+export function fetchCurrentTaskExecution(
   taskId: string,
   workBlockId?: string | null,
 ): Promise<PlanExecutionResult> {
-  const query = workBlockId
-    ? `?workBlockId=${encodeURIComponent(workBlockId)}`
-    : "";
-  const response = await fetch(
-    `/api/tasks/${encodeURIComponent(taskId)}/execution/current${query}`,
+  return apiJson<PlanExecutionResult>(
+    `/api/tasks/${encodeURIComponent(taskId)}/execution/current${taskScopedQuery(workBlockId)}`,
   );
-
-  if (!response.ok) {
-    const err = await response
-      .json()
-      .catch(() => ({ error: "Failed to load current execution state" }));
-    throw new Error(
-      (err as { error?: string }).error ??
-        "Failed to load current execution state",
-    );
-  }
-
-  return (await response.json()) as unknown as PlanExecutionResult;
 }
 
 export async function dispatchTaskExecutionAction(
@@ -716,19 +681,11 @@ export async function dispatchTaskExecutionAction(
   workBlockId?: string | null,
 ): Promise<TaskWorkspaceCommandAck> {
   const scopedAction = workBlockId ? { ...action, workBlockId } : action;
-  const response = await api.work[":taskId"].commands.$post({
-    param: { taskId },
-    json: { type: "execution.action", ...scopedAction },
-  });
-
-  const ack = (await response.json()) as unknown as Omit<
-    TaskWorkspaceCommandAck,
-    "message"
-  >;
-  return {
-    ...ack,
-    message: "Command accepted. Workspace will update shortly.",
-  };
+  const ack = await apiJson<Omit<TaskWorkspaceCommandAck, "message">>(
+    `/api/work/${encodeURIComponent(taskId)}/commands`,
+    { method: "POST", body: JSON.stringify({ type: "execution.action", ...scopedAction }) },
+  );
+  return { ...ack, message: "Command accepted. Workspace will update shortly." };
 }
 
 export async function submitTaskCheckpointAction(
@@ -737,26 +694,21 @@ export async function submitTaskCheckpointAction(
   workBlockId?: string | null,
 ): Promise<TaskWorkspaceCommandAck> {
   const scopedAction = workBlockId ? { ...action, workBlockId } : action;
-  const response = await api.work[":taskId"].commands.$post({
-    param: { taskId },
-    json: {
-      type: "checkpoint.action",
-      checkpointId: scopedAction.checkpointId,
-      action: scopedAction.action,
-      payload: scopedAction.payload as Record<string, unknown> | undefined,
-      workBlockId: scopedAction.workBlockId ?? undefined,
-      idempotencyKey: scopedAction.idempotencyKey,
+  const ack = await apiJson<Omit<TaskWorkspaceCommandAck, "message">>(
+    `/api/work/${encodeURIComponent(taskId)}/commands`,
+    {
+      method: "POST",
+      body: JSON.stringify({
+        type: "checkpoint.action",
+        checkpointId: scopedAction.checkpointId,
+        action: scopedAction.action,
+        payload: scopedAction.payload as Record<string, unknown> | undefined,
+        workBlockId: scopedAction.workBlockId ?? undefined,
+        idempotencyKey: scopedAction.idempotencyKey,
+      }),
     },
-  });
-
-  const ack = (await response.json()) as unknown as Omit<
-    TaskWorkspaceCommandAck,
-    "message"
-  >;
-  return {
-    ...ack,
-    message: "Command accepted. Workspace will update shortly.",
-  };
+  );
+  return { ...ack, message: "Command accepted. Workspace will update shortly." };
 }
 
 export async function acceptTaskResult(

@@ -6,12 +6,11 @@ import type {
   ScheduleAiPlanGenerationStatus,
   ScheduleTaskPlanSnapshot,
 } from "../../schedule-page-types";
-import type { TaskPlanReadModel } from "@chrona/contracts/ai";
-import { useTaskPlanGenerationSession } from "@/hooks/ai/task-plan-generation-session-store";
-import { api } from "@/lib/rpc-client";
-import { createLogger } from "@/lib/logger";
+import type { TaskPlanReadModel } from "@chrona/contracts"
+import { useTaskPlanGenerationSession } from "@features/task-workspace";
+import { apiJson, createLogger } from "@shared/http";
 
-const logger = createLogger("web.schedule.selected-block-plan-state");
+const logger = createLogger("schedule.selected-block-plan-state");
 
 /** Subset of TaskPlanReadModel used as the accepted-plan shape in UI state. */
 export type SavedTaskPlan = TaskPlanReadModel;
@@ -195,11 +194,13 @@ export function useSelectedBlockPlanState({
     if (!result.id) return;
     setIsApplying(true);
     try {
-      const res = await api.tasks[":taskId"].plan.accept.$post({
-        param: { taskId: item.taskId },
-        json: { planId: result.id, workBlockId: item.workBlockId ?? null },
-      });
-      const payload = await res.json() as { savedPlan?: TaskPlanReadModel | null };
+      const payload = await apiJson<{ savedPlan?: TaskPlanReadModel | null }>(
+        `/api/tasks/${item.taskId}/plan/accept`,
+        {
+          method: "POST",
+          body: JSON.stringify({ planId: result.id, workBlockId: item.workBlockId ?? null }),
+        },
+      );
       const accepted = payload.savedPlan ?? { ...result, status: "accepted" as const };
       setAcceptedPlan(accepted);
       setDisplayedSavedPlan(accepted);

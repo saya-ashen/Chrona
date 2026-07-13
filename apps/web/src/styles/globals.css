@@ -5,6 +5,7 @@
 @import "@fontsource-variable/inter";
 @import "@fontsource-variable/noto-sans-sc";
 @source "../../../../features";
+@source "../../../../shared/ui";
 
 @plugin "@tailwindcss/typography";
 

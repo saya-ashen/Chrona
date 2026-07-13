@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, mock } from "bun:test";
-import { buildProviderFeatureRequest, testAiClientAvailability } from "../../../packages/engine/src/modules/ai/providers";
+import { buildProviderFeatureRequest, testAiClientAvailability } from "@chrona/engine";
 
 const originalClaudeRecordDir = process.env.CHRONA_CLAUDE_CODE_RECORD_DIR;
 

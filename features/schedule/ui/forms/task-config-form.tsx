@@ -3,22 +3,28 @@
 import type { ReactNode } from "react";
 import { useEffect, useMemo, useState } from "react";
 import { Controller, useForm, useWatch } from "react-hook-form";
-import { Button } from "shared/ui/button";
-import { Calendar } from "@/components/ui/calendar";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
+  Button,
+  Calendar,
+  Checkbox,
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  Input,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
   Select,
   SelectContent,
   SelectGroup,
   SelectItem,
   SelectTrigger,
-} from "shared/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { cn } from "@/lib/utils"
-import { useI18n } from "@chrona/i18n/react";
+  Textarea,
+  cn,
+} from "@shared/ui";
+import { useI18n } from "@chrona/i18n"
 import { CalendarIcon, Info } from "lucide-react";
 import {
   deleteValueAtPath,
@@ -33,7 +39,7 @@ import {
 } from "@chrona/contracts";
 import type { AutomationTimingPreset, AiClientRecord } from "@chrona/contracts";
 
-import { RECURRENCE_PRESETS, recurrencePresetFromRule, recurrenceRuleFromState, type RecurrencePreset } from "@/lib/recurrence-presets";
+import { RECURRENCE_PRESETS, recurrencePresetFromRule, recurrenceRuleFromState, type RecurrencePreset } from "../recurrence-presets";
 
 export type TaskConfigFormDraft = {
   title: string;

@@ -31,8 +31,9 @@ flowchart TB
 
 | Layer            | Path                      | Responsibility                                                                                                           |
 | ---------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| Web app          | `apps/web`                | Browser UX for Dashboard, Schedule, Tasks, task workspace, Settings, assistant surfaces, and hidden/internal projections |
-| Server           | `apps/server`             | HTTP routing, validation glue, SSE streaming, auth/bind safety, static app serving                                       |
+| Web composition  | `apps/web`                | Browser bootstrap, router, app shell, shared browser infrastructure, and composition of feature public entrypoints     |
+| Server transport | `apps/server`             | HTTP routing, validation glue, SSE streaming, auth/bind safety, static app serving, and composition of server entrypoints |
+| Features         | `features/*`              | Vertical product slices; each exposes its supported browser/server/contract surface through `index.ts`                  |
 | Engine           | `packages/engine`         | Application use cases: tasks, plans, execution, scheduling, projections, AI clients                                      |
 | Domain           | `packages/domain`         | Pure, IO-free business rules and state/status derivation                                                                 |
 | Contracts        | `packages/contracts`      | Shared schemas and DTOs for API, AI features, plan runtime, SSE, and MCP tools                                           |
@@ -43,12 +44,22 @@ flowchart TB
 | Database         | `packages/db` + `prisma`  | Prisma 7 + SQLite bootstrap, repositories, schema, migrations, seed                                                      |
 | Runtime core     | `packages/runtime-core`   | Backend-agnostic runtime support types/utilities shared by engine/providers                                              |
 | i18n             | `packages/i18n`           | Shared localization messages and helpers                                                                                 |
-| Shared           | `packages/shared`         | Small cross-cutting utilities (not domain or application logic)                                                          |
+| Shared browser/transport | `shared/http`, `shared/ui` | Generic browser/HTTP infrastructure and UI primitives; never product workflow logic                                  |
 | CLI              | `packages/cli`            | Packaged entry point for starting Chrona                                                                                 |
 | External plugins | `external-plugins/hermes` | Hermes Agent integration and Chrona MCP tool exposure                                                                    |
 
 See [Package Boundaries](./package-boundaries.md) for the authoritative
 per-package "put here / don't put here" rules, dependency direction, and enforcement.
+
+### Feature slices
+
+Product ownership lives in root `features/`, not in `apps/web/src/components` or
+`apps/server` internals. The active slices are `dashboard`, `action-center`,
+`task-management`, `task-workspace`, `schedule`, `plan-generation`,
+`execution-monitoring`, `ai-clients`, `assistant-surface`, `external-calendar`,
+and `mcp-control-plane`. A feature's public API is its `index.ts`; apps compose
+those public entrypoints, while sibling features do not reach into another
+feature's internals.
 
 ## Product surfaces
 

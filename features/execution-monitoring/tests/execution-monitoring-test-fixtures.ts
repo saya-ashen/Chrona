@@ -1,10 +1,10 @@
-import type { TaskPlanReadModel } from "@chrona/contracts/ai";
+import type { TaskPlanReadModel } from "@chrona/contracts";
 import type {
   PlanNodeDataModel,
   TaskPageData,
   TaskPlanGraphPlan,
   TaskWorkspacePlanFlowState,
-} from "../../task-workspace";
+} from "@features/task-workspace";
 
 function node(
   id: string,

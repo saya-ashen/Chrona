@@ -14,8 +14,10 @@ vi.mock("@chrona/i18n/react", () => ({
 const mockUseAutoComplete = vi.fn();
 const mockUseSmartAutomation = vi.fn();
 
-vi.mock("@/hooks/use-ai", () => ({
+vi.mock("../use-auto-complete", () => ({
   useAutoComplete: (...args: unknown[]) => mockUseAutoComplete(...args),
+}));
+vi.mock("../panels/automation-suggestion-panel", () => ({
   useSmartAutomation: (...args: unknown[]) => mockUseSmartAutomation(...args),
 }));
 

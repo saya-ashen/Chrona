@@ -5,8 +5,8 @@ import {
   executeTaskNodeCapability,
   reviewCheckpointNodeCapability,
 } from "@chrona/engine/modules/plan-execution";
-import { aiClientRegistry } from "../../../../../features/ai-clients";
-import type { EngineAiClient } from "../../../../../features/ai-clients";
+import { aiClientRegistry } from "../../../../../features/ai-clients/server";
+import type { EngineAiClient } from "../../../../../features/ai-clients/server";
 import { db } from "@chrona/db";
 import {
   MemoryScope,

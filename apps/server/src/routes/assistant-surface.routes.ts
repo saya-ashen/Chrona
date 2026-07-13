@@ -4,7 +4,7 @@ import type { AssistantActionRequest, AssistantSurfacePageType } from "@chrona/c
 import { getPreferredLocale } from "@chrona/i18n";
 
 import { json } from "../lib/http";
-import { getAssistantSurfaceState, requestAssistantAction } from "../services/assistant-surface.service";
+import { getAssistantSurfaceState, requestAssistantAction } from "../../../../features/assistant-surface/server";
 
 function parsePageType(value: string | undefined): AssistantSurfacePageType {
   if (value === "schedule" || value === "task" || value === "workbench") return value;

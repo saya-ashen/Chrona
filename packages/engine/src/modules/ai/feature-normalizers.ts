@@ -13,8 +13,8 @@ import type {
 } from "@chrona/contracts";
 import { AiClientError } from "@chrona/contracts";
 import { dispatch, extractJSON } from "./providers";
-import type { EngineAiClient } from "../../../../../features/ai-clients";
-import { aiClientRegistry } from "../../../../../features/ai-clients";
+import type { EngineAiClient } from "./runtime/client-registry";
+import { aiClientRegistry } from "./runtime/client-registry";
 
 function trimTrailingSlashes(value: string) {
   let end = value.length;

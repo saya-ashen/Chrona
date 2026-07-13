@@ -12,8 +12,7 @@
 import { describe, expect, test } from "bun:test";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { Hono } from "hono";
-import { createMcpRoutes } from "../../../../features/mcp-control-plane/server";
+import { createMcpTestServer } from "./mcp-test-server";
 
 import { terminalSnapshotFromEvents } from "@chrona/providers-foundation";
 
@@ -44,14 +43,8 @@ async function collect<T>(iter: AsyncIterable<T>): Promise<T[]> {
 }
 
 describe("ClaudeCodeProviderClient — MCP preflight", () => {
-  test("probeMcpServer sees Chrona tools from server route", async () => {
-    const engine = {
-      agentTools: {
-        registry: () => ({ tools: [], execute: async () => ({ status: "accepted", message: "ok" }) }),
-      },
-    };
-    const mcpApp = new Hono().route("/api", createMcpRoutes(engine as never));
-    const server = Bun.serve({ port: 0, fetch: mcpApp.fetch });
+  test("probeMcpServer accepts a Streamable HTTP MCP peer with registered tools", async () => {
+    const server = Bun.serve({ port: 0, fetch: createMcpTestServer() });
 
     try {
       const result = await probeMcpServer({
@@ -60,9 +53,7 @@ describe("ClaudeCodeProviderClient — MCP preflight", () => {
         runId: "probe-test",
       });
 
-      expect(result.toolNames).toContain("chrona_plan_output");
-      expect(result.toolNames).toContain("chrona_node_complete");
-      expect(result.toolNames.length).toBeGreaterThan(0);
+      expect(result.toolNames).toEqual(["chrona_plan_output", "chrona_node_complete"]);
     } finally {
       server.stop(true);
     }

@@ -11,11 +11,8 @@ vi.mock("../../forms/task-config-form", () => ({
   TaskConfigForm: () => <form aria-label="Task config" />,
 }));
 
-vi.mock("@/components/tasks/panels/task-ai-plan-panel", () => ({
+vi.mock("@features/task-workspace", () => ({
   TaskAiPlanPanel: () => <section aria-label="Task plan" />,
-}));
-
-vi.mock("@/components/tasks/panels/task-edit-panel", () => ({
   TaskEditPanel: ({ children }: { children: React.ReactNode }) => <section aria-label="Task edit">{children}</section>,
 }));
 

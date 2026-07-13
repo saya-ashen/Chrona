@@ -2,7 +2,10 @@ import type { ComponentProps, ComponentPropsWithoutRef, ReactNode } from "react"
 import { act, cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
-vi.mock("@chrona/i18n/react", () => ({
+vi.mock("@chrona/i18n", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@chrona/i18n")>();
+  return {
+    ...actual,
   useI18n: () => ({
     t: (key: string) =>
       ({
@@ -24,18 +27,19 @@ vi.mock("@chrona/i18n/react", () => ({
       })[key] ?? key,
   }),
   useLocale: () => "en",
-}));
+  };
+});
 
-import { StartWithChrona } from "../start-with-chrona";
-import { notifyAiClientsChanged } from "@/lib/ai-client-events";
+import { StartWithChrona } from "@features/mcp-control-plane";
+import { notifyAiClientsChanged } from "@features/ai-clients";
 
 const push = vi.fn();
 
-vi.mock("@/lib/router", () => ({
-  useAppRouter: () => ({ push }),
+vi.mock("react-router-dom", () => ({
+  useNavigate: () => push,
 }));
 
-vi.mock("@/components/ui/button", () => ({
+vi.mock("@shared/ui", () => ({
   Button: ({ children, ...props }: { children?: ReactNode } & ComponentPropsWithoutRef<"button">) => (
     <button {...props}>{children}</button>
   ),

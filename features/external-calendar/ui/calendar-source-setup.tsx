@@ -10,26 +10,34 @@ import type {
   ValidateCalendarSourceResponse,
 } from "../contract";
 
-import { Badge } from "shared/ui/badge";
-import { Button } from "shared/ui/button";
 import {
+  Badge,
+  Button,
   Dialog,
   DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "shared/ui/select";
+  Field,
+  FieldDescription,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  Input,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@shared/ui";
 import {
   createExternalCalendarSource,
   getExternalCalendarErrorMessage,
   isBlockedNetworkCalendarError,
   validateCalendarSource,
 } from "./client";
-import { externalCalendarMessages } from "@chrona/i18n/external-calendar"
+import { externalCalendarMessages } from "@chrona/i18n";
 import { CalendarSourceList } from "./calendar-source-list";
 
 type ConnectedSource = {

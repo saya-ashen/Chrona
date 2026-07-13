@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test";
 
 import { PlanCompileError } from "@chrona/contracts/ai";
 
-import { compilePlanBlueprint } from "@features/plan-generation";
+import { compilePlanBlueprint } from "@chrona/domain";
 
 describe("compilePlanBlueprint", () => {
   it("compiles a blueprint, derives graph metadata, and preserves local ids", () => {

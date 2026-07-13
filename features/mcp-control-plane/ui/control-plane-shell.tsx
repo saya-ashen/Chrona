@@ -15,16 +15,12 @@ import {
   type CSSProperties,
   type ReactNode,
 } from "react";
-import { AssistantSurfaceHeaderDrawerButton } from "@/components/assistant-surface/assistant-surface-header-drawer-button";
-import { StartWithChrona } from "@/components/start-with-chrona";
-import { LocalizedLink } from "@/components/i18n/localized-link";
-import { TaskCreateDialog, type SchedulePageData } from "../../schedule";
-import { createScheduledTask } from "@/lib/task-actions-client";
-import { apiJson } from "shared/http/api-client";
-import { useAppPathname, useAppRouter } from "@/lib/router";
-import { LocaleSwitcher } from "@/components/i18n/locale-switcher";
-import { Button } from "shared/ui/button";
+import { useLocation, useNavigate, useRevalidator } from "react-router-dom";
+import { createScheduledTask, TaskCreateDialog, type SchedulePageData } from "@features/schedule";
+import { apiJson } from "@shared/http";
 import {
+  Button,
+  cn,
   Sidebar,
   SidebarContent,
   SidebarGroup,
@@ -34,16 +30,21 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarProvider,
-} from "@/components/ui/sidebar";
-import { cn } from "@/lib/utils";
-import { localizeHref } from "@chrona/i18n";
-import { useI18n, useLocale } from "@chrona/i18n/react";
+} from "@shared/ui";
+import { localizeHref, useI18n, useLocale } from "@chrona/i18n";
+import { LocalizedLink } from "./localized-link";
+import { LocaleSwitcher } from "./locale-switcher";
+import { StartWithChrona } from "./start-with-chrona";
 
 export type ControlPlaneShellProps = {
   children: ReactNode;
   defaultWorkspace: {
     id: string;
     name: string;
+  };
+  assistantSummary?: {
+    label: string;
+    value: string;
   };
 };
 
@@ -73,11 +74,13 @@ function completedAtFromPreference(
 export function ControlPlaneShell({
   children,
   defaultWorkspace: _defaultWorkspace,
+  assistantSummary = { label: "PAGE-AWARE AI", value: "" },
 }: ControlPlaneShellProps) {
   const { t } = useI18n();
   const locale = useLocale();
-  const router = useAppRouter();
-  const pathname = useAppPathname();
+  const navigate = useNavigate();
+  const { revalidate } = useRevalidator();
+  const pathname = useLocation().pathname.replace(/^\/(?:en|zh)(?=\/|$)/, "") || "/";
   const [showCreateTaskDialog, setShowCreateTaskDialog] = useState(false);
   const [isCreatingTask, setIsCreatingTask] = useState(false);
   const [taskCreateConfig, setTaskCreateConfig] = useState<Pick<
@@ -297,7 +300,19 @@ export function ControlPlaneShell({
             </div>
 
             <div className="flex min-w-0 flex-1 items-center justify-center">
-              <AssistantSurfaceHeaderDrawerButton disabled />
+              <button
+                type="button"
+                data-assistant-surface-header-drawer-button="true"
+                disabled
+                aria-disabled
+                aria-label={t("components.assistantSurface.entryLabel")}
+                className="group inline-flex h-9 max-w-[2.25rem] scroll-mb-24 items-center gap-2 overflow-hidden rounded-full border border-border/60 bg-muted/40 px-2 text-sm text-muted-foreground md:max-w-[520px] md:px-2.5"
+              >
+                <span className="hidden min-w-0 flex-1 items-center gap-1.5 md:flex">
+                  <span className="shrink-0 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{assistantSummary.label}</span>
+                  <span className="min-w-0 max-w-[220px] truncate text-xs font-semibold text-primary lg:max-w-[360px]">{assistantSummary.value}</span>
+                </span>
+              </button>
             </div>
 
             <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
@@ -330,7 +345,7 @@ export function ControlPlaneShell({
               }}
               onOpenCreatedTask={(taskId) => {
                 void completeStartWithChrona();
-                router.push(localizeHref(locale, `/tasks/${taskId}`));
+                void navigate(localizeHref(locale, `/tasks/${taskId}`));
               }}
             />
           ) : null}
@@ -415,7 +430,7 @@ export function ControlPlaneShell({
             if (typeof created.taskId === "string") {
               setCreatedOnboardingTaskId(created.taskId);
             }
-            router.refresh();
+            revalidate();
           } finally {
             setIsCreatingTask(false);
           }

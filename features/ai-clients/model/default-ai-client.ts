@@ -1,4 +1,4 @@
-import { db } from "@/lib/db";
+import { db } from "@chrona/db";
 
 type AiClientStore = Pick<typeof db, "aiClient">;
 

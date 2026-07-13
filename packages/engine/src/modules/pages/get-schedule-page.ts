@@ -1,16 +1,15 @@
 import { db } from "@/lib/db";
+import type { TaskPlanReadModel } from "@chrona/contracts";
+import { getRuntimeTaskConfigSpec, listExecutionRuntimes } from "@/modules/execution-runtime";
+import {
+  deriveTaskRunnability,
+} from "@chrona/domain";
 import {
   buildPlanningSummary,
   deriveWorkStateView,
   formatDateKey,
   startOfDay,
 } from "@chrona/domain";
-import {
-  getRuntimeTaskConfigSpec,
-  listExecutionRuntimes,
-} from "@/modules/execution-runtime";
-import type { TaskPlanReadModel } from "@chrona/contracts/ai";
-import { deriveTaskRunnability } from "@chrona/shared";
 import { getAcceptedCompiledPlanForTask } from "@/modules/plan-execution/persistence/execution-scope";
 import {
   getLatestTaskPlanReadModel,

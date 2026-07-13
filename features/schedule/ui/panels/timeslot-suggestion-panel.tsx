@@ -1,5 +1,5 @@
-import { suggestTimeslots } from "@chrona/shared";
-import type { ScheduleSlot } from "@chrona/contracts/ai";
+import { suggestTimeslots } from "../../model/timeslot-suggester";
+import type { ScheduleSlot } from "@chrona/contracts"
 
 type TimeslotSuggestionPanelProps = {
   taskId: string;

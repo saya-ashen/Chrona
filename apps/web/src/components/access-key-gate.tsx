@@ -2,7 +2,7 @@ import { useSyncExternalStore, type ReactNode } from "react";
 import { useRevalidator } from "react-router-dom";
 
 import { AccessKeyUnlock } from "@/components/access-key-unlock";
-import { isAccessLocked, setAccessKey, subscribeAccessKey } from "shared/http/access-key";
+import { isAccessLocked, setAccessKey, subscribeAccessKey } from "@shared/http"
 
 type AccessKeyGateProps = {
   children: ReactNode;

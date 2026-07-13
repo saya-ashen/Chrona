@@ -11,8 +11,7 @@
 
 import { describe, expect, test } from "bun:test";
 import { LLMock } from "@copilotkit/aimock";
-import { Hono } from "hono";
-import { createMcpRoutes } from "../../../../features/mcp-control-plane/server";
+import { createMcpTestServer } from "./mcp-test-server";
 import { ClaudeCodeProviderClient } from "./ClaudeCodeProviderClient";
 
 const liveTest = process.env.CHRONA_CLAUDE_CODE_SDK_AIMOCK_TEST === "1" ? test : test.skip;
@@ -22,80 +21,25 @@ function debugAimockOutput(label: string, value: unknown) {
   console.info(label, JSON.stringify(value, null, 2));
 }
 
-function tinySpec() {
-  return {
-    root: "root",
-    elements: {
-      root: {
-        type: "Stack",
-        props: { direction: "vertical" },
-        children: ["title", "body"],
-      },
-      title: {
-        type: "Heading",
-        props: { text: "Fake LLM output", level: "h3" },
-        children: [],
-      },
-      body: {
-        type: "Text",
-        props: { text: "Submitted by aimock through Claude Code SDK." },
-        children: [],
-      },
-    },
-    state: {},
-  };
-}
-
-function tinyPatches() {
-  const spec = tinySpec();
-  return [
-    { op: "add", path: "/root", value: spec.root },
-    { op: "add", path: "/elements", value: spec.elements },
-  ];
-}
 
 describe("ClaudeCodeProviderClient — aimock SDK submit-plan-output repro", () => {
   liveTest("fake LLM can drive chrona_plan_output then chrona_node_complete through the real SDK", async () => {
     const llm = new LLMock({ port: 0, strict: true });
-    const toolCalls: Array<{ name: string; args: unknown }> = [];
-    const engine = {
-      agentTools: {
-        resolveInputContext: async (input: unknown) => ({
-          ...(input as Record<string, unknown>),
-          workspaceId: "workspace-aimock",
-          taskId: "task-aimock",
-        }),
-        execute: async (operation: unknown) => {
-          const op = operation as { toolName: string; input: { payload?: unknown } };
-          toolCalls.push({ name: op.toolName, args: op.input.payload });
-          return {
-            operationId: `op-${toolCalls.length}`,
-            toolName: op.toolName,
-            status: "accepted",
-            reasonCode: null,
-            message: op.toolName === "chrona.plan.output" ? "Output accepted" : "Node completed",
-            affected: { taskId: "task-aimock" },
-            state: { taskStatus: "Running" },
-            idempotency: "not_applicable",
-            auditRef: null,
-            recovery: null,
-            completedAt: new Date().toISOString(),
-          };
-        },
-      },
-    };
-    const mcpApp = new Hono().route("/api", createMcpRoutes(engine as never));
-    const mcpServer = Bun.serve({ port: 0, fetch: mcpApp.fetch });
+    const toolCalls: Array<{ name: string }> = [];
+    const mcpServer = Bun.serve({
+      port: 0,
+      fetch: createMcpTestServer({ onToolCall: (call) => { toolCalls.push(call); } }),
+    });
 
     llm.on(
-      { userMessage: "Submit tiny Chrona output through the SDK.", turnIndex: 0 },
+      { userMessage: "Submit test output through the SDK.", turnIndex: 0 },
       {
         content: "Submitting plan output now.",
         toolCalls: [
           {
             id: "toolu_node_output",
             name: "mcp__chrona__chrona_plan_output",
-            arguments: JSON.stringify({ patches: tinyPatches(), summary: "Tiny fake output" }),
+            arguments: JSON.stringify({ providerTestPayload: "tiny output" }),
           },
         ],
       },
@@ -154,8 +98,8 @@ describe("ClaudeCodeProviderClient — aimock SDK submit-plan-output repro", () 
 
       const ref = await client.startRun({
         sessionId: "chrona-session-aimock-submit:execute",
-        instructions: "Call chrona_plan_output with the tiny json-render Spec, then call chrona_node_complete.",
-        input: { type: "text", text: "Submit tiny Chrona output through the SDK." },
+        instructions: "Call chrona_plan_output, then call chrona_node_complete.",
+        input: { type: "text", text: "Submit test output through the SDK." },
       });
       const events = [];
       for await (const event of client.streamRun({ runId: ref.runId })) {
@@ -169,7 +113,7 @@ describe("ClaudeCodeProviderClient — aimock SDK submit-plan-output repro", () 
       expect(events.some((event) => event.type === "tool_call" && event.tool === "mcp__chrona__chrona_plan_output")).toBe(true);
       expect(events.some((event) => event.type === "tool_result" && event.tool === "mcp__chrona__chrona_plan_output")).toBe(true);
       expect(events.at(-1)?.type).toBe("run_completed");
-      expect(toolCalls.map((call) => call.name)).toEqual(["chrona.plan.output", "chrona.node.complete"]);
+      expect(toolCalls.map((call) => call.name)).toEqual(["chrona_plan_output", "chrona_node_complete"]);
     } finally {
       if (previousBaseUrl === undefined) delete process.env.ANTHROPIC_BASE_URL;
       else process.env.ANTHROPIC_BASE_URL = previousBaseUrl;
@@ -184,45 +128,21 @@ describe("ClaudeCodeProviderClient — aimock SDK submit-plan-output repro", () 
 
   liveTest("fake LLM stream abort after chrona_plan_output is reported as SDK terminal-result failure", async () => {
     const llm = new LLMock({ port: 0, strict: true });
-    const toolCalls: Array<{ name: string; args: unknown }> = [];
-    const engine = {
-      agentTools: {
-        resolveInputContext: async (input: unknown) => ({
-          ...(input as Record<string, unknown>),
-          workspaceId: "workspace-aimock",
-          taskId: "task-aimock",
-        }),
-        execute: async (operation: unknown) => {
-          const op = operation as { toolName: string; input: { payload?: unknown } };
-          toolCalls.push({ name: op.toolName, args: op.input.payload });
-          return {
-            operationId: `op-${toolCalls.length}`,
-            toolName: op.toolName,
-            status: "accepted",
-            reasonCode: null,
-            message: "Output accepted",
-            affected: { taskId: "task-aimock" },
-            state: { taskStatus: "Running" },
-            idempotency: "not_applicable",
-            auditRef: null,
-            recovery: null,
-            completedAt: new Date().toISOString(),
-          };
-        },
-      },
-    };
-    const mcpApp = new Hono().route("/api", createMcpRoutes(engine as never));
-    const mcpServer = Bun.serve({ port: 0, fetch: mcpApp.fetch });
+    const toolCalls: Array<{ name: string }> = [];
+    const mcpServer = Bun.serve({
+      port: 0,
+      fetch: createMcpTestServer({ onToolCall: (call) => { toolCalls.push(call); } }),
+    });
 
     llm.on(
-      { userMessage: "Submit tiny Chrona output then lose the model stream.", turnIndex: 0 },
+      { userMessage: "Submit test output then lose the model stream.", turnIndex: 0 },
       {
         content: "Submitting plan output now.",
         toolCalls: [
           {
             id: "toolu_abort_node_output",
             name: "mcp__chrona__chrona_plan_output",
-            arguments: JSON.stringify({ patches: tinyPatches(), summary: "Tiny fake output" }),
+            arguments: JSON.stringify({ providerTestPayload: "tiny output" }),
           },
         ],
       },
@@ -268,8 +188,8 @@ describe("ClaudeCodeProviderClient — aimock SDK submit-plan-output repro", () 
 
       const ref = await client.startRun({
         sessionId: "chrona-session-aimock-abort:execute",
-        instructions: "Call chrona_plan_output with the tiny json-render Spec, then continue so the model stream aborts before completion.",
-        input: { type: "text", text: "Submit tiny Chrona output then lose the model stream." },
+        instructions: "Call chrona_plan_output, then continue so the model stream aborts before completion.",
+        input: { type: "text", text: "Submit test output then lose the model stream." },
       });
       const events = [];
       for await (const event of client.streamRun({ runId: ref.runId })) {
@@ -280,7 +200,7 @@ describe("ClaudeCodeProviderClient — aimock SDK submit-plan-output repro", () 
       debugAimockOutput("abort mcp tool calls", toolCalls);
       debugAimockOutput("abort provider events", events);
 
-      expect(toolCalls.map((call) => call.name)).toEqual(["chrona.plan.output"]);
+      expect(toolCalls.map((call) => call.name)).toEqual(["chrona_plan_output"]);
       expect(events.some((event) => event.type === "tool_result" && event.tool === "mcp__chrona__chrona_plan_output")).toBe(true);
       const terminalEvent = events.at(-1);
       expect(terminalEvent?.type).toBe("run_failed");

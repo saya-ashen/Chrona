@@ -29,7 +29,6 @@ const bootData: AppBootData = {
     },
     components: {
       actionCenterList: {},
-      memoryConsole: {},
       taskPage: {},
     },
   } as unknown) as AppBootData["dictionary"],

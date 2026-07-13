@@ -1,6 +1,6 @@
 "use client";
 
-import type { AutomationSuggestion } from "@chrona/contracts/ai";
+import type { AutomationSuggestion } from "@chrona/contracts"
 
 export function AutomationSuggestionPanel(_props: {
   suggestion: AutomationSuggestion | null;

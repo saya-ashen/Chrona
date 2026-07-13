@@ -22,7 +22,7 @@ import type {
 
 import { error, toHttpError } from "../../lib/http";
 import { startSseHeartbeat } from "../../lib/sse-heartbeat";
-import { checkpointActionToExecutionAction, summarizeRuntimeEvent } from "../../../../../features/execution-monitoring/server/runtime-event-summary";
+import { checkpointActionToExecutionAction, summarizeRuntimeEvent } from "@features/execution-monitoring/server";
 
 type SseStream = Parameters<typeof streamSSE>[1] extends (stream: infer T) => Promise<unknown> ? T : never;
 const HERMES_DEFAULT_APPROVAL_TIMEOUT_MS = 60_000;

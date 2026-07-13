@@ -5,7 +5,7 @@ import {
   projectPlanningBusyBlocks,
   type PlanningBusyBlock,
 } from "@chrona/domain";
-import { useAssistantSurface } from "@/components/assistant-surface/assistant-surface-provider";
+import { useAssistantSurface } from "@features/assistant-surface";
 import type { SchedulePageProps } from "./schedule-page-types";
 import {
   buildScheduleHref,
@@ -21,14 +21,13 @@ import {
   listExternalCalendarEvents,
 } from "../../external-calendar";
 import { SelectedBlockSheet } from "./panels/schedule-page-panels";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { PageFrame } from "shared/ui/page-frame";
+import { PageFrame, Tabs, TabsContent, TabsList, TabsTrigger } from "@shared/ui";
 
 import { ScheduleRightSidebar } from "./panels/schedule-page-sidebar";
 import { getSchedulePageCopy } from "./schedule-page-copy";
-import { useI18n, useLocale } from "@chrona/i18n/react";
+import { useI18n, useLocale } from "@chrona/i18n"
 import { localizeHref } from "@chrona/i18n";
-import { useAppRouter } from "@/lib/router";
+import { useNavigate, useRevalidator } from "react-router-dom";
 import { useSchedulePageActions } from "./use-schedule-page-actions";
 import { useSchedulePageState } from "./use-schedule-page-state";
 import { createScheduleAiSidebarContext } from "./adapters/schedule-ai-sidebar-adapter";
@@ -49,7 +48,8 @@ export function SchedulePage({
 }: SchedulePageRouteProps) {
   const { pendingProposal, registerHandlers, setPageContext } =
     useAssistantSurface();
-  const router = useAppRouter();
+  const navigate = useNavigate();
+  const revalidator = useRevalidator();
   const locale = useLocale();
   const { messages } = useI18n();
   const copy = useMemo(
@@ -87,7 +87,7 @@ export function SchedulePage({
     selectedView,
     showNewTask,
     actionFailedMessage,
-    routerRefresh: router.refresh,
+    routerRefresh: revalidator.revalidate,
   });
 
   const viewModel = useMemo(
@@ -138,7 +138,7 @@ export function SchedulePage({
     setAnnouncement,
     setIsPending,
     refreshProjection,
-    pushRoute: router.push,
+    pushRoute: (href) => void navigate(href),
     localizeHref,
     actionFailedMessage,
     isPending,
@@ -237,7 +237,7 @@ export function SchedulePage({
         activeView={activeView}
         viewData={viewData}
         viewModel={viewModel}
-        onNavigate={(href) => router.push(href)}
+        onNavigate={(href) => void navigate(href)}
         localizeHref={localizeHref}
         buildScheduleViewHref={buildScheduleViewHref}
         onScheduleTask={() => setShowNewTaskDialog(true)}
@@ -317,7 +317,7 @@ export function SchedulePage({
           isPending={isPending}
           onClose={() => {
             setLocalSelectedTaskId(undefined);
-            router.push(
+            void navigate(
               localizeHref(
                 locale,
                 buildScheduleViewHref(viewModel.activeDay, activeView),
@@ -339,7 +339,7 @@ export function SchedulePage({
         viewModel={viewModel}
         activeView={activeView}
         workspaceId={workspaceId}
-        routerPush={router.push}
+        routerPush={(href) => void navigate(href)}
         locale={locale}
         localizeHref={localizeHref}
         buildScheduleViewHref={buildScheduleViewHref}

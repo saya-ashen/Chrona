@@ -3,8 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { TaskWorkspacePage } from "../ui/task-workspace-page";
 import type { TaskPlanGraphPlan } from "../contract";
-import { createHeaderSpecFixture, taskWorkspaceStateFixtures } from "@features/task-workspace/test-support/task-workspace-test-fixtures";
-import { createTaskWorkspaceUiFixture } from "@features/task-workspace/test-support/task-workspace-ui-fixtures";
+import { createHeaderSpecFixture, createTaskWorkspaceUiFixture, taskWorkspaceStateFixtures } from "@features/task-workspace/test";
 import type { UiDocument } from "@chrona/ui-protocol";
 import type { TaskPageData, TaskPlanGenerationStatus } from "./task-workspace-model";
 
@@ -25,15 +24,14 @@ vi.mock("react-router-dom", () => ({
   useNavigate: () => mocks.navigate,
 }));
 
-vi.mock("@/components/assistant-surface/assistant-surface-provider", () => ({
+vi.mock("@features/assistant-surface", () => ({
   useAssistantSurface: () => ({
     registerHandlers: vi.fn(() => vi.fn()),
     setPageContext: mocks.setPageContext,
   }),
 }));
 
-
-vi.mock("@/components/tasks/workspace/hooks/use-task-workspace-editor-state", () => ({
+vi.mock("../hooks/use-task-workspace-editor-state", () => ({
   useTaskWorkspaceEditorState: (task: TaskPageData["task"]) => {
     mocks.editorTask = mocks.editorTask ?? task;
     return {
@@ -58,7 +56,7 @@ vi.mock("@/components/tasks/workspace/hooks/use-task-workspace-editor-state", ()
   },
 }));
 
-vi.mock("@/components/tasks/workspace/hooks/use-task-workspace-page-state", () => ({
+vi.mock("../hooks/use-task-workspace-page-state", () => ({
   useTaskWorkspacePageState: (data: TaskPageData) => ({
     pageData: data,
     commandCenter: data.commandCenter,
@@ -83,7 +81,7 @@ vi.mock("@/components/tasks/workspace/hooks/use-task-workspace-page-state", () =
   }),
 }));
 
-vi.mock("@/components/tasks/workspace/hooks/use-task-workspace-plan-state", () => ({
+vi.mock("../hooks/use-task-workspace-plan-state", () => ({
   useTaskWorkspacePlanState: () => ({
     plan: mocks.plan,
     setPlan: vi.fn(),
@@ -105,7 +103,7 @@ vi.mock("@/components/tasks/workspace/hooks/use-task-workspace-plan-state", () =
   }),
 }));
 
-vi.mock("@/components/tasks/workspace/hooks/use-task-workspace-proposal-flow", () => ({
+vi.mock("../hooks/use-task-workspace-proposal-flow", () => ({
   useTaskWorkspaceProposalFlow: () => ({
     currentProposal: null,
     setCurrentProposal: vi.fn(),
@@ -116,7 +114,7 @@ vi.mock("@/components/tasks/workspace/hooks/use-task-workspace-proposal-flow", (
   }),
 }));
 
-vi.mock("@/components/tasks/workspace/hooks/use-task-workspace-delete-flow", () => ({
+vi.mock("../hooks/use-task-workspace-delete-flow", () => ({
   useTaskWorkspaceDeleteFlow: () => ({
     showDeleteConfirm: false,
     setShowDeleteConfirm: vi.fn(),
@@ -168,13 +166,13 @@ vi.mock("../ui/task-workspace-header-card", () => ({
   },
 }));
 
-vi.mock("@/components/tasks/workspace/sections/task-workspace-edit-section", () => ({
+vi.mock("../ui/task-workspace-edit-section", () => ({
   TaskWorkspaceEditSection: () => <section>Edit section</section>,
 }));
 
-vi.mock("@/components/tasks/workspace/sections/task-workspace-plan-section", async () => {
+vi.mock("../ui/task-workspace-plan-section", async () => {
   const React = await import("react");
-  const { createTaskWorkspaceExecutionConsoleView } = await import("./task-workspace-model");
+  const { createTaskWorkspaceExecutionConsoleView } = await import("../model/task-workspace-query");
 
   return {
     TaskWorkspacePlanSection: ({ pageData, plan, planGenerationStatus, canAcceptPlan, graphPlan, onApplyPlan }: { pageData: TaskPageData; plan: { id?: string; status?: string } | null; planGenerationStatus: TaskPlanGenerationStatus; canAcceptPlan: boolean; graphPlan: TaskPlanGraphPlan | null; onApplyPlan?: (plan: { id?: string; status?: string }) => void }) => {

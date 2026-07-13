@@ -6,8 +6,8 @@ This document explains where code belongs in Chrona's monorepo.
 
 | Path | Responsibility |
 | --- | --- |
-| `apps/web` | Browser UI, routing, page composition, frontend hooks/components |
-| `apps/server` | Hono HTTP entrypoints, validation, route wiring, SSE streaming, response shape |
+| `apps/web` | Browser bootstrap, router, app shell, shared browser infrastructure, and composition of browser-safe feature public entrypoints |
+| `apps/server` | HTTP transport: Hono entrypoints, validation, route/SSE wiring, response shaping, and composition of feature server entrypoints |
 | `packages/cli` | Packaged Chrona launcher and start/build/check/test command entrypoint |
 | `packages/agent-cli` | Agent-facing CLI helpers kept outside the product engine |
 | `packages/contracts` | Shared API schemas, AI feature specs, plan/runtime event types, MCP tool schemas |
@@ -21,58 +21,47 @@ This document explains where code belongs in Chrona's monorepo.
 | `packages/runtime-core` | Runtime support types/utilities shared by engine/providers |
 | `packages/i18n` | Shared localization message infrastructure |
 | `packages/logging` | Shared logging setup and logger utilities |
-| `packages/shared` | Small cross-cutting utilities that are not domain/application logic |
+| `shared/http`, `shared/ui` | The only root shared directories: generic HTTP/browser infrastructure and UI primitives, never product workflow logic |
 | `packages/skills` | Chrona skill packages used by agent/runtime integrations |
 | `external-plugins/*` | Integration plugins outside the core app package graph |
 
 
-## Target vertical-slice roots
+## Feature slices
 
-Chrona is migrating toward Bun-first feature slices while legacy `apps/` and
-`packages/` remain live. New or moved product code should prefer:
+Root `features/` is the active product architecture. `apps/web` and
+`apps/server` are composition/transport layers: they select routes and compose
+browser-safe or server feature public APIs, but do not own feature UI or product
+workflows. The current slices are `dashboard`, `action-center`,
+`task-management`, `task-workspace`, `schedule`, `plan-generation`,
+`execution-monitoring`, `ai-clients`, `assistant-surface`, `external-calendar`,
+and `mcp-control-plane`.
 
 | Path | Responsibility |
 | --- | --- |
-| `features/<feature>/index.ts` | Public feature entry point; sibling features import only this file |
-| `features/<feature>/contract.ts` | Feature-owned schemas and public types |
-| `features/<feature>/routes.ts` | Feature route mount/wiring |
-| `features/<feature>/service.ts` | Feature use-case orchestration |
-| `features/<feature>/repository.ts` | Feature persistence wrapper over shared db primitives |
-| `features/<feature>/model/` | Pure projections, derived state, view models |
-| `features/<feature>/ui/` | Product-specific feature UI |
+| `features/<feature>/index.ts` | The sole public feature entrypoint for sibling features and app composition |
+| `features/<feature>/server.ts` | Optional server-only entrypoint, composed by `apps/server`; it MUST NOT enter the Vite browser graph |
+| `features/<feature>/ui.ts` | Optional browser-safe convenience entrypoint for app composition; it MUST NOT export server-only code |
+| `features/<feature>/test.ts` | Optional feature test entrypoint for its supported test surface |
+| `features/<feature>/contract.ts` | Optional feature-owned schemas and public types |
+| `features/<feature>/routes/` | Optional route handlers/wiring owned by the feature |
+| `features/<feature>/model/` | Pure projections, derived state, and view models |
+| `features/<feature>/ui/` | Product-specific, browser-safe feature UI |
 | `features/<feature>/tests/` | Feature-local Bun and Playwright specs |
-| `shared/db` | Prisma client, migrations, and db helpers |
-| `shared/http` | Hono/auth/CORS/error helpers |
-| `shared/i18n` | Localization primitives |
-| `shared/logging` | Logging primitives |
+| `shared/http` | Generic HTTP/browser infrastructure such as clients, SSE support, auth helpers, and server transport helpers |
 | `shared/ui` | Generic UI primitives only |
-| `shared/test` | Cross-feature test helpers |
 
-Only `index.ts` and the private/public boundary are mandatory. Add
-`contract.ts`, `routes.ts`, `service.ts`, `repository.ts`, `model/`, `ui/`, or
-`tests/` only when the capability needs that layer. Empty layers and pass-through
-wrappers are not architecture.
+Only `index.ts` and its private/public boundary are mandatory. Add `server.ts`,
+`ui.ts`, `test.ts`, `contract.ts`, `routes/`, `model/`, `ui/`, or `tests/` only
+when the capability needs that layer. Empty layers and pass-through wrappers are
+not architecture.
 
 Feature-internal imports should be relative paths inside the same feature.
-Sibling features may import only `features/<other>/index.ts`; secondary barrels
-such as `ui.ts` or `server.ts` are not public feature APIs. Never import
-`features/<other>/model/*`, `service.ts`, `repository.ts`, `routes.ts`, or
-`ui/*` directly. Export the required contract from `features/<other>/index.ts`
-instead.
-`shared/` must stay infrastructure-only: no task, plan, execution, schedule,
-external-calendar, or AI-client product workflow logic.
-
-Feature-local checks:
-
-```bash
-bun run test:feature <feature>
-bun run e2e:feature <feature>
-```
-
-These commands discover `features/<feature>/tests/*.bun.test.ts`,
-`features/<feature>/model/*.test.ts`, `features/<feature>/ui/*.test.tsx`, and
-`features/<feature>/tests/e2e.spec.ts`, then merge explicit legacy-path
-mappings while slices migrate.
+Sibling features may import only `features/<other>/index.ts`; never import
+another feature's `server.ts`, `ui.ts`, `test.ts`, `model/*`, route files, or UI
+internals. Apps compose only browser-safe feature exports into `apps/web` and
+server-only exports into `apps/server`. `shared/` is infrastructure-only: it
+contains only `shared/http` and `shared/ui` and cannot own product workflows or
+depend on features, apps, or package internals.
 
 ## Dependency direction
 
@@ -80,32 +69,32 @@ Prefer this direction:
 
 ```text
 apps/web ─┐
-apps/server ─┬─> packages/engine ─┬─> packages/domain
-packages/cli ┘                    ├─> packages/db
-                                   ├─> packages/contracts
-                                   ├─> packages/graph-runtime
-                                   └─> packages/providers/*
+          ├─> features/<feature>/index.ts ─┬─> packages/engine ─┬─> packages/domain
+apps/server┤                               │                    ├─> packages/db
+packages/cli┘                               │                    ├─> packages/contracts
+                                              │                    ├─> packages/graph-runtime
+                                              │                    └─> packages/providers/*
+                                              └─> shared/http or shared/ui
 ```
 
 Rules:
 
-- Apps may depend on packages.
+- Apps compose feature public entrypoints and shared infrastructure.
+- Feature internals are private; sibling features use only another feature's `index.ts`.
+- Browser composition may import browser-safe feature exports only; server entrypoints must not enter the Vite graph.
 - Packages should not depend on apps.
 - Contracts may be imported broadly, but should stay schema/type focused.
 - Domain should stay pure and IO-free.
 - Engine coordinates use cases and may call db/providers/graph runtime.
 - Providers adapt external protocols; they do not decide Chrona workflow semantics.
-- Web components should not call Prisma, engine internals, or provider internals directly.
+- Web composition must not call Prisma, engine internals, or provider internals directly.
 
 ## `apps/web`
 
-Put here:
-
-- route components and page shells
-- Dashboard, Schedule, Tasks, task workspace, Settings, hidden/internal projections, and assistant UI
-- frontend hooks for API/page projections
-- client-side formatting and presentation helpers
-- i18n usage and UI composition
+- application bootstrap, route tree, locale shell, and page composition
+- shared browser infrastructure and hooks that span features
+- composition of browser-safe feature public APIs and generic UI primitives
+- i18n provider setup and app-wide presentation helpers
 
 Do not put here:
 
@@ -119,12 +108,10 @@ Do not put here:
 
 Put here:
 
-- Hono route definitions
-- param/body validation glue
-- API key/bind-safety checks
-- response helpers
-- SSE route wiring
-- mapping HTTP requests to engine calls
+- Hono route definitions and static-app transport
+- param/body validation and API key/bind-safety glue
+- response/SSE wiring and mapping requests to feature or engine public APIs
+- composition of server-only feature entrypoints
 
 Do not put here:
 
@@ -166,16 +153,12 @@ into two kinds with different import rules:
 
 - **Capability ("sink") modules** — `events`, `ai`, `execution-runtime`,
   `workspaces`. These have *zero* outbound dependencies on other engine
-  modules. Each exposes a public `index.ts` barrel, and everything outside the
-  module MUST import through that barrel, never its internal files. Because a
-  sink has no cross-module dependencies, routing through its barrel can never
-  create an import cycle, and its internal files stay free to move. This is
-  intended to be enforced by the `engine-sink-modules-via-barrel`
-  dependency-cruiser rule (type-only imports are exempt, mirroring the
-  package-level policy). **⚠️ Drift:** that rule's path still names the
-  pre-rename `task-execution`, which no longer exists, so the runtime sink
-  (`execution-runtime`) is not actually barrel-enforced until the rule is
-  updated — see [Known violations](#known-violations-debt).
+  modules. Each exposes a public `index.ts` barrel, and runtime imports from
+  outside the module MUST use that barrel rather than internal files;
+  type-only imports are exempt. The `engine-sink-modules-via-barrel`
+  dependency-cruiser rule enforces this rule for every listed sink module.
+  Because a sink has no cross-module dependencies, routing through its barrel
+  cannot create an import cycle and its internal files remain movable.
 - **Co-recursive / consumer core modules** — `plan-execution`, `plans`,
   `tasks`, `scheduling`, `orchestration`, `projections`, plus the page-readers
   (`pages`) and agent tool use cases (`agent-tools`). These are mutually recursive by
@@ -317,9 +300,12 @@ Put here:
 
 The CLI is a server launcher, not a second API client surface or shared helper bucket.
 
-## `packages/i18n` and `packages/shared`
+## `packages/i18n` and root `shared/`
 
-`packages/i18n` owns localization messages and helpers. `packages/shared` is for small cross-cutting utilities, not a place to hide domain logic or application orchestration.
+`packages/i18n` owns localization messages and helpers. Root `shared/` has only
+`shared/http` and `shared/ui`: generic transport/browser infrastructure and UI
+primitives, respectively. It is not a third product layer and must not hide
+domain logic or application orchestration.
 
 ## `external-plugins/*`
 
@@ -329,15 +315,17 @@ External plugins bridge Chrona to other hosts such as Hermes Agent. They should 
 
 Ask these questions before adding a file:
 
-1. Is it UI or browser state? `apps/web`.
-2. Is it HTTP parsing/routing/SSE glue? `apps/server`.
-3. Is it a product use case or workflow decision? `packages/engine`.
-4. Is it canonical cross-layer shape? `packages/contracts`.
-5. Is it pure IO-free business derivation? `packages/domain`.
-6. Is it persistence access? `packages/db`.
-7. Is it graph mechanics independent of Chrona product policy? `packages/graph-runtime`.
-8. Is it external provider protocol behavior? `packages/providers/*`.
-9. Is it a terminal client feature? `packages/cli`.
+1. Is it product UI, browser state, feature route behavior, or a feature-local contract? `features/<feature>/`.
+2. Is it app bootstrap, locale routing, app shell, or composition of browser-safe features? `apps/web`.
+3. Is it HTTP parsing/routing/SSE transport glue or composition of server feature APIs? `apps/server`.
+4. Is it generic HTTP/browser infrastructure or a generic UI primitive? `shared/http` or `shared/ui`.
+5. Is it a product use case or workflow decision outside a feature's local boundary? `packages/engine`.
+6. Is it canonical cross-layer shape? `packages/contracts`.
+7. Is it pure IO-free business derivation? `packages/domain`.
+8. Is it persistence access? `packages/db`.
+9. Is it graph mechanics independent of Chrona product policy? `packages/graph-runtime`.
+10. Is it external provider protocol behavior? `packages/providers/*`.
+11. Is it a terminal client feature? `packages/cli`.
 
 ## Enforcement
 
@@ -368,7 +356,7 @@ These boundaries are enforced, not just documented. Two gates run in
 | `engine-sink-modules-via-barrel-tests` | warn | tests reaching into capability-module internals (debt; prefer the barrel) |
 | `feature-<name>-internals-are-private` | error | sibling features importing anything except `features/<name>/index.ts` |
 | `features-do-not-import-apps-or-packages-internals` | warn | production features importing app files or package internals during migration |
-| `shared-owns-no-feature-or-app-code` | error | production `shared/*` importing features, apps, or product package internals |
+| `shared-owns-no-feature-or-app-code` | error | production `shared/http` or `shared/ui` importing features, apps, or product package internals |
 | `features-and-shared-never-import-apps-tests` | warn | feature/shared tests importing app internals |
 | `no-circular` | warn | circular dependencies |
 

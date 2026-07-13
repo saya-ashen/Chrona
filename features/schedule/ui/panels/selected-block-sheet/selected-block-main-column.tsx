@@ -12,11 +12,12 @@ import {
   type TaskConfigExecutionRuntime,
   type TaskConfigFormInput,
 } from "../../forms/task-config-form";
-import { TaskAiPlanPanel } from "@/components/tasks/panels/task-ai-plan-panel";
-import { TaskEditPanel } from "@/components/tasks/panels/task-edit-panel";
-import { Button } from "shared/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import type { TaskPlanReadModel } from "@chrona/contracts/ai";
+import {
+  TaskAiPlanPanel,
+  TaskEditPanel,
+} from "@features/task-workspace";
+import { Button, Tabs, TabsContent, TabsList, TabsTrigger } from "@shared/ui";
+import type { TaskPlanReadModel } from "@chrona/contracts"
 import type { SavedTaskPlan } from "./use-selected-block-plan-state";
 
 function sourceLabel(item: ScheduleRecord, copy: SchedulePageCopy) {

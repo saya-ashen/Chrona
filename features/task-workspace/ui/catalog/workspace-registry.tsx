@@ -4,18 +4,14 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { Archive, Bot, Check, ChevronDown, ChevronUp, Circle, Copy, FileText, Sparkles, TriangleAlert, Wrench } from "lucide-react";
 import { ActivityTimeline } from "../activity-timeline";
-import type { WorkspaceActivityItem } from "../..";
+import type { WorkspaceActivityItem } from "../../model/task-workspace-types";
 import { defineRegistry } from "@json-render/react";
 import { shadcnComponents } from "@json-render/shadcn";
-import { useI18n, useLocale } from "@chrona/i18n/react";
+import { useI18n, useLocale } from "@chrona/i18n"
 import { flexRender, getCoreRowModel, getPaginationRowModel, getSortedRowModel, useReactTable, type ColumnDef, type SortingState } from "@tanstack/react-table";
 import { chronaCatalog } from "@chrona/ui-protocol";
-import { Badge } from "shared/ui/badge";
-import { Button } from "shared/ui/button";
-import { Calendar } from "@/components/ui/calendar";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { taskWorkspaceActivityMessages } from "@chrona/i18n/task-workspace";
-import { cn } from "@/lib/utils"
+import { Badge, Button, Calendar, cn, Popover, PopoverContent, PopoverTrigger } from "@shared/ui";
+import { taskWorkspaceActivityMessages } from "@chrona/i18n"
 
 type OccurrenceOption = {
   value: string;

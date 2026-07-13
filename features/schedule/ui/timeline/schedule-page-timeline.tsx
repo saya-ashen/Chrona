@@ -24,7 +24,7 @@ import {
 import { TaskCreateDialog } from "../dialogs/task-create-dialog";
 import { DayTimelineSummary } from "../panels/schedule-page-panels";
 import { TimelinePlacementCard } from "./schedule-timeline-primitives";
-import { ScheduleGhostBlockLayer } from "@/components/global-ai-sidebar/schedule-ghost-block-layer";
+import { ScheduleGhostBlockLayer } from "./schedule-ghost-block-layer";
 import { ExternalCalendarEventBlock } from "../../../external-calendar";
 import type { ScheduleGhostBlockPreview } from "@chrona/contracts";
 import type { PlanningBusyBlock } from "@chrona/domain";
@@ -48,10 +48,10 @@ import {
 } from "../schedule-page-utils";
 import { type TaskConfigAiClient, type TaskConfigExecutionRuntime } from "../forms/task-config-form";
 import { CalendarDays } from "lucide-react";
-import { Badge } from "shared/ui/badge";
-import { useI18n, useLocale } from "@chrona/i18n/react";
-import { externalCalendarMessages } from "@chrona/i18n/external-calendar"
-import { cn } from "@/lib/utils"
+import { Badge } from "@shared/ui"
+import { useI18n, useLocale } from "@chrona/i18n"
+import { externalCalendarMessages } from "@chrona/i18n"
+import { cn } from "@shared/ui";
 
 const TIMELINE_HOUR_HEIGHT = 56;
 const WORKDAY_START_HOUR = 8;

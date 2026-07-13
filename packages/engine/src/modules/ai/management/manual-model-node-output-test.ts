@@ -6,7 +6,7 @@ import type { CompiledPlan, NodeResult } from "@chrona/contracts/ai";
 import { describeChronaPlanOutputPublicTool, parseChronaToolPayload } from "@chrona/contracts";
 import { validateChronaSpec } from "@chrona/ui-protocol";
 
-import { aiClientRegistry } from "../../../../../../features/ai-clients";
+import { aiClientRegistry } from "../runtime/client-registry";
 import { saveCompiledPlan } from "../../plan-execution/persistence/compiled-plan-store";
 import { getPlanRun, savePlanRun } from "../../plan-execution/persistence/plan-run-store";
 import { taskPlanExecution } from "../../plan-execution";

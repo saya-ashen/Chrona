@@ -52,12 +52,15 @@ export const buildTargets = {
   },
 } as const;
 
+const PLATFORM_TARGETS: Partial<Record<NodeJS.Platform, Partial<Record<string, BuildTargetName>>>> = {
+  linux: { x64: "linux-x64", arm64: "linux-arm64" },
+  darwin: { x64: "darwin-x64", arm64: "darwin-arm64" },
+  win32: { x64: "windows-x64" },
+};
+
 export function currentBuildTarget(platform = process.platform, arch = process.arch): BuildTargetName {
-  if (platform === "linux" && arch === "x64") return "linux-x64";
-  if (platform === "linux" && arch === "arm64") return "linux-arm64";
-  if (platform === "darwin" && arch === "x64") return "darwin-x64";
-  if (platform === "darwin" && arch === "arm64") return "darwin-arm64";
-  if (platform === "win32" && arch === "x64") return "windows-x64";
+  const target = PLATFORM_TARGETS[platform]?.[arch];
+  if (target) return target;
   throw new Error(`Cannot auto-detect target for ${platform}-${arch}. Pass --target <target>`);
 }
 

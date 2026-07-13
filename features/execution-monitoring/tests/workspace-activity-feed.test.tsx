@@ -2,7 +2,7 @@ import "@testing-library/jest-dom/vitest";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { WorkspaceActivityFeed } from "../ui/workspace-activity-feed";
-import type { WorkspaceActivityItem } from "../../task-workspace";
+import type { WorkspaceActivityItem } from "@features/task-workspace";
 
 function activity(overrides: Partial<WorkspaceActivityItem> & Pick<WorkspaceActivityItem, "id" | "kind">): WorkspaceActivityItem {
   return {

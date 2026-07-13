@@ -22,8 +22,8 @@ import type {
   DebugClientConfig,
 } from "@chrona/contracts";
 import { AiClientError, validatePreparedFeaturePayload } from "@chrona/contracts";
-import type { EngineAiClient } from "../../../../../features/ai-clients";
-import { aiClientRegistry } from "../../../../../features/ai-clients";
+import type { EngineAiClient } from "./runtime/client-registry";
+import { aiClientRegistry } from "./runtime/client-registry";
 
 function trimTrailingSlashes(value: string) {
   let end = value.length;

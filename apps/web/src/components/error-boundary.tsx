@@ -1,5 +1,5 @@
 import { Component, type ErrorInfo, type ReactNode } from "react";
-import { createLogger } from "@/lib/logger";
+import { createLogger } from "@shared/http"
 
 const logger = createLogger("web.error-boundary");
 

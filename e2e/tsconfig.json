@@ -1,0 +1,9 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "incremental": false,
+    "types": ["bun", "node", "@playwright/test"]
+  },
+  "include": ["./**/*.ts"],
+  "exclude": ["../node_modules", "../.worktrees", "../test-results", "../playwright-report"]
+}

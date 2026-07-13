@@ -1,28 +1,23 @@
 import { useEffect, useMemo, useState } from "react";
-import { useI18n } from "@chrona/i18n/react";
 import { createStateStore } from "@json-render/react";
 import { buildResultSpec, type UiDocument } from "@chrona/ui-protocol";
-import type { PlanExecutionResult } from "@chrona/contracts/ai";
-import { taskWorkspaceActivityMessages } from "@chrona/i18n/task-workspace";
+import type { PlanExecutionResult } from "@chrona/contracts";
+import { taskWorkspaceActivityMessages, useI18n } from "@chrona/i18n";
 import type { WorkspaceRuntimeEvent } from "../model/workspace-runtime-events";
 import type {
   ExecutionOverviewCard,
+  PlanNodeDataModel,
   ProgressSummary,
   WorkspaceActivityItem,
   WorkspaceArtifactItem,
-  PlanNodeDataModel,
-} from "../../task-workspace";
-import { SpecRenderer } from "../../task-workspace";
+} from "@features/task-workspace";
+import { mergeWorkspaceActivity, runtimeEventsToWorkspaceActivity, SpecRenderer } from "@features/task-workspace";
 import {
   buildCommandCenterOutputTabSpec,
   buildCommandCenterTrailTabSpec,
   type ResultNodeFilter,
   type ResultNodeOption,
 } from "./build-execution-overview-spec";
-import {
-  mergeWorkspaceActivity,
-  runtimeEventsToWorkspaceActivity,
-} from "../../task-workspace";
 import {
   Badge,
   Button,

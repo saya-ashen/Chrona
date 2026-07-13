@@ -1,22 +1,23 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { LocalizedLink } from "@/components/i18n/localized-link";
+import { Link } from "react-router-dom";
 import {
   TaskConfigForm,
   type TaskConfigFormInput,
   type TaskConfigExecutionRuntime,
 } from "./forms/task-config-form";
-import { Button } from "shared/ui/button";
-import { Badge } from "shared/ui/badge";
 import {
+  Badge,
+  Button,
   Card,
   CardDescription,
   CardHeader,
   CardTitle,
-} from "shared/ui/card";
-import { TaskContextLinks } from "@/components/tasks/shared/task-context-links";
-import { useI18n, useLocale } from "@chrona/i18n/react";
+} from "@shared/ui";
+import { TaskContextLinks } from "@features/task-workspace";
+import { localizeHref } from "@chrona/i18n";
+import { useI18n, useLocale } from "@chrona/i18n"
 import { deriveWorkStateView, type WorkStateTone } from "@chrona/domain";
 
 export type ScheduleTaskListItem = {
@@ -358,16 +359,17 @@ export function ScheduleTaskList({
                   <div className="min-w-0 flex-1 space-y-3">
                     <div className="space-y-1">
                       <div className="flex flex-wrap items-center gap-2">
-                        <LocalizedLink
-                          href={
+                        <Link
+                          to={localizeHref(
+                            locale,
                             item.workBlockId
                               ? `/tasks/${item.taskId}?workBlockId=${encodeURIComponent(item.workBlockId)}`
-                              : `/tasks/${item.taskId}`
-                          }
+                              : `/tasks/${item.taskId}`,
+                          )}
                           className="text-base font-semibold text-foreground transition-colors hover:text-primary"
                         >
                           {item.title}
-                        </LocalizedLink>
+                        </Link>
                         <Badge variant={getPriorityTone(item.priority)}>
                           {item.priority}
                         </Badge>

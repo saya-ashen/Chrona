@@ -76,20 +76,40 @@ See [docs/en/architecture.md](./docs/en/architecture.md) for full design details
 2. **Write tests** for new features (Vitest for unit, Playwright for E2E)
 3. **Run checks** before committing:
 ```bash
-bun run lint
-bun run typecheck
-bun run test              # Vitest unit tests
-bun run test:bun           # Bun-native tests
-bun run test:watch        # Watch mode
-bun run test:e2e          # Playwright E2E tests (CI-stable, no AI dependency)
+bun run check             # TypeScript (app + E2E), ESLint ratchet, boundaries, UI foundation
+bun run test:unit         # Vitest unit tests
+bun run test:bun          # Bun-native tests
+bun run test:e2e:desktop  # CI desktop Playwright suite
+bun run test              # Full local suite: unit, Bun, API, and all Playwright projects
 ```
-4. **Commit** with conventional messages:
+
+The ESLint warning count is ratcheted in `package.json`. New warnings fail the
+check; lower the baseline whenever existing warnings are removed.
+
+4. **Push through the repository hook.** `bun install` installs the Lefthook
+   `pre-push` hook for local Git checkouts. It runs `bun run ci:local` with an
+   isolated SQLite database and blocks the push unless checks, CI tests, and
+   desktop E2E pass. Run `bun run hooks:install` if hooks were removed. Use
+   `git push --no-verify` only for an explicitly documented emergency; remote
+   branch protection still applies.
+
+5. **Commit** with conventional messages:
+
    - `feat:` — New feature
    - `fix:` — Bug fix
-   - `refactor:` — Code restructuring
    - `docs:` — Documentation
-   - `test:` — Test changes
+   - `refactor:` — Code restructuring
+   - `test:` — Tests
    - `chore:` — Tooling/config changes
+
+The local CI equivalent can also be run directly:
+
+```bash
+bun run ci:local
+```
+
+It uses a temporary database and removes it after the run.
+
 
 ## Boundary Discipline
 

@@ -1,6 +1,6 @@
 import { randomUUID } from "node:crypto";
 
-import { db } from "@/lib/db";
+import { db } from "@chrona/db";
 
 interface UpdateBindingsInput {
   clientId: string;

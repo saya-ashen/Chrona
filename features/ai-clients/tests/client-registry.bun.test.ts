@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { getProviderBaseUrl } from "../runtime/client-registry";
+import { getProviderBaseUrl } from "@chrona/engine";
 
 describe("AI client registry", () => {
   it("normalizes provider base URLs", () => {

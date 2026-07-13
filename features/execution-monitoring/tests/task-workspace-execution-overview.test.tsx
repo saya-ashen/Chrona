@@ -8,7 +8,7 @@ import {
   validateChronaSpec,
   type UiDocument,
 } from "@chrona/ui-protocol";
-import { createTaskWorkspaceExecutionConsoleView } from "../../task-workspace";
+import { createTaskWorkspaceExecutionConsoleView } from "@features/task-workspace";
 import { executionMonitoringWorkspaceFixtures } from "./execution-monitoring-test-fixtures";
 import { TaskWorkspaceExecutionOverview } from "../ui/task-workspace-execution-overview";
 import {

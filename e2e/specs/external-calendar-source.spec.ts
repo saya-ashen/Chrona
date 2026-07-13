@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-const EVENT_DAY = "2026-06-12";
+const EVENT_DAY = "2026-12-12";
 
 function fixtureUrl(eventTitle: string, key: string) {
   return `https://calendar-fixtures.test/valid.ics?title=${encodeURIComponent(eventTitle)}&key=${encodeURIComponent(key)}&day=${EVENT_DAY}`;
@@ -10,8 +10,7 @@ test.describe("external calendar source setup", () => {
   test("adds a read-only calendar source and rejects an invalid link", async ({ page }, testInfo) => {
     const sourceName = `Team calendar ${testInfo.project.name} ${crypto.randomUUID()}`;
     await page.goto("/en/schedule");
-    const calendarTab = page.getByRole("tab", { name: /calendar/i });
-    if (await calendarTab.isVisible()) await calendarTab.click();
+    await page.getByRole("tab", { name: /calendar/i }).click();
 
     await expect(page.getByRole("heading", { name: /connect external calendar/i })).toBeVisible();
     await expect(page.getByText(/read-only/i).first()).toBeVisible();

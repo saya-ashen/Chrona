@@ -1,4 +1,4 @@
-import type { PlanExecutionSSEEvent } from "@chrona/contracts/ai";
+import type { PlanExecutionSSEEvent } from "@chrona/contracts"
 
 export type TaskWorkspaceSseEvent = {
   type: string;

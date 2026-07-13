@@ -1,18 +1,18 @@
 import { useMemo, useRef, useState } from "react";
 import { type StateStore } from "@json-render/react";
-import { useI18n } from "@chrona/i18n/react";
-import { Button } from "shared/ui/button";
+import { useI18n } from "@chrona/i18n"
 import {
+  Button,
   Dialog,
   DialogContent,
   DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
+} from "@shared/ui";
 import { UI_ACTION, type UiDocument } from "@chrona/ui-protocol";
 import { SpecRenderer } from "./catalog/spec-renderer";
-import type { TaskData, TaskHeaderAction } from "..";
+import type { TaskData, TaskHeaderAction } from "../model/task-workspace-types";
 
 function hideHeaderActions(spec: UiDocument, input: { generatePlan?: boolean; acceptPlan?: boolean }): UiDocument {
   const generateAction = spec.elements["action:generate-plan"];

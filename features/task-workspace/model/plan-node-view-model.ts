@@ -1,10 +1,8 @@
-import type {
-  CheckpointActionKind,
-  ExecutionActionInput,
-  ExecutionCheckpoint,
-  NodeResult,
-  NodeResultEvidence,
-} from "@chrona/contracts/ai";
+import type { CheckpointActionKind,
+ExecutionActionInput,
+ExecutionCheckpoint,
+NodeResult,
+NodeResultEvidence, } from "@chrona/contracts"
 
 export type PlanNodeKind = "task" | "checkpoint" | "condition" | "wait" | "step" | "user_input";
 

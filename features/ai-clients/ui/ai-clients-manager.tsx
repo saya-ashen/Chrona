@@ -2,19 +2,38 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
-import { useI18n } from "@chrona/i18n/react";
-import { providerCapabilityMatrix, type ProviderCapabilityMatrixEntry, type ProviderCapabilityName } from "@chrona/providers-foundation/capability-matrix";
+import { useI18n } from "@chrona/i18n";
+import {
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+  Checkbox,
+  Field,
+  FieldContent,
+  FieldError,
+  FieldGroup,
+  FieldLabel,
+  Input,
+  Select,
+  SelectContent,
+  SelectGroup,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  Skeleton,
+} from "@shared/ui";
 import { deriveAutomationReadiness } from "@chrona/domain";
-import { Badge } from "shared/ui/badge";
-import { Button } from "shared/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "shared/ui/card";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Field, FieldContent, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
-import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectGroup, SelectItem, SelectTrigger, SelectValue } from "shared/ui/select";
-import { Skeleton } from "@/components/ui/skeleton";
-import { api } from "@/lib/rpc-client";
-import { notifyAiClientsChanged } from "@/lib/ai-client-events";
+import {
+  providerCapabilityMatrix,
+  type ProviderCapabilityMatrixEntry,
+  type ProviderCapabilityName,
+} from "@chrona/contracts";
+import { aiClientsApi } from "../browser-api";
+import { notifyAiClientsChanged } from "../events";
 
 const DEFAULT_PROVIDER_RUN_TIMEOUT_MS = 30 * 60 * 1000;
 
@@ -309,9 +328,7 @@ function normalizeRuntimeProviders(input: unknown): RuntimeProviderOption[] {
 }
 
 async function testClientAvailability(payload: ClientFormPayload): Promise<TestResult> {
-  const res = await api.ai.clients.test.$post({ json: payload });
-
-  const data = (await res.json()) as { available?: boolean; reason?: string; error?: string };
+  const data = await aiClientsApi.test(payload);
   return {
     status: data.available ? "available" : "unavailable",
     reason: data.reason ?? null,
@@ -319,33 +336,23 @@ async function testClientAvailability(payload: ClientFormPayload): Promise<TestR
 }
 
 async function diagnoseHermes(values: ClientFormValues): Promise<HermesIntegrationResult> {
-  const res = await api.integrations.hermes.diagnose.$post({
-    json: {
-      baseUrl: values.baseUrl,
-      apiKey: values.apiKey || undefined,
-      timeoutMs: Number(values.timeoutSeconds) * 1000,
-    },
+  return aiClientsApi.diagnoseHermes({
+    baseUrl: values.baseUrl,
+    apiKey: values.apiKey || undefined,
+    timeoutMs: Number(values.timeoutSeconds) * 1000,
   });
-  const data = (await res.json()) as HermesIntegrationResult & { error?: string };
-  return data;
 }
 
 async function setupLocalHermes(values: ClientFormValues): Promise<HermesIntegrationResult> {
-  const res = await api.integrations.hermes["setup-local"].$post({
-    json: {
-      baseUrl: values.baseUrl,
-      apiKey: values.apiKey || undefined,
-      timeoutMs: Number(values.timeoutSeconds) * 1000,
-    },
+  return aiClientsApi.setupLocalHermes({
+    baseUrl: values.baseUrl,
+    apiKey: values.apiKey || undefined,
+    timeoutMs: Number(values.timeoutSeconds) * 1000,
   });
-  const data = (await res.json()) as HermesIntegrationResult & { error?: string };
-  return data;
 }
 
 async function restartLocalHermes(): Promise<{ ok: boolean; message: string; exitCode: number | null }> {
-  const res = await api.integrations.hermes["restart-local"].$post();
-  const data = (await res.json()) as { ok: boolean; message: string; exitCode: number | null; error?: string };
-  return data;
+  return aiClientsApi.restartLocalHermes();
 }
 
 function getStatusLabel(copy: Record<string, string>, status: TestStatus) {
@@ -572,12 +579,7 @@ function getDefaultClientName(type: AiClientType, providers: RuntimeProviderOpti
 }
 
 async function updateClientBindings(clientId: string, features: string[]) {
-  const res = await api.ai.clients[":clientId"].bindings.$put({
-    param: { clientId },
-    json: { features },
-  });
-  const data = (await res.json()) as { bindings?: string[] };
-  return data.bindings ?? features;
+  return aiClientsApi.updateBindings(clientId, features);
 }
 const DEFAULTS: Record<string, string> = {
   title: "AI Clients",
@@ -1329,22 +1331,18 @@ export function AiClientsManager() {
   };
 
   const fetchClients = useCallback(async () => {
-    const [clientsRes, providersRes] = await Promise.all([
-      api.ai.clients.$get(),
-      api.runtime.providers.$get(),
+    const [clientsData, providersData] = await Promise.all([
+      aiClientsApi.list(),
+      aiClientsApi.listRuntimeProviders(),
     ]);
-    const clientsData = await clientsRes.json();
-    const providersData = await providersRes.json();
     const availableProviders = normalizeRuntimeProviders(providersData).filter(
       (provider) => provider.key !== "debug" || isDebugProviderVisible(),
     );
     setProviders(availableProviders);
     setClients(
-      "clients" in clientsData
-        ? (clientsData.clients as AiClientInfo[]).filter((client) =>
-            availableProviders.some((provider) => provider.key === client.type),
-          )
-        : [],
+      (clientsData.clients ?? []).filter((client) =>
+        availableProviders.some((provider) => provider.key === client.type),
+      ),
     );
     setLoading(false);
   }, []);
@@ -1354,8 +1352,7 @@ export function AiClientsManager() {
   }, [fetchClients]);
 
   const handleCreate = async (data: { payload: ClientFormPayload; bindings: string[] }) => {
-    const res = await api.ai.clients.$post({ json: data.payload });
-    const result = (await res.json()) as { client?: { id?: string } };
+    const result = await aiClientsApi.create(data.payload);
     if (result.client?.id) {
       await updateClientBindings(result.client.id, data.bindings);
     }
@@ -1364,33 +1361,24 @@ export function AiClientsManager() {
   };
 
   const handleUpdate = async (id: string, data: { payload: ClientFormPayload; bindings: string[] }) => {
-    await api.ai.clients[":clientId"].$patch({
-      param: { clientId: id },
-      json: data.payload,
-    });
+    await aiClientsApi.update(id, data.payload);
     await updateClientBindings(id, data.bindings);
     setEditingId(null);
     refreshAfterMutation();
   };
 
   const handleDelete = async (id: string) => {
-    await api.ai.clients[":clientId"].$delete({ param: { clientId: id } });
+    await aiClientsApi.delete(id);
     refreshAfterMutation();
   };
 
   const handleMakeDefault = async (id: string) => {
-    await api.ai.clients[":clientId"].$patch({
-      param: { clientId: id },
-      json: { isDefault: true },
-    });
+    await aiClientsApi.update(id, { isDefault: true });
     refreshAfterMutation();
   };
 
   const handleToggleEnabled = async (id: string, enabled: boolean) => {
-    await api.ai.clients[":clientId"].$patch({
-      param: { clientId: id },
-      json: { enabled },
-    });
+    await aiClientsApi.update(id, { enabled });
     refreshAfterMutation();
   };
 

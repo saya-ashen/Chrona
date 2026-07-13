@@ -29,7 +29,7 @@ export type {
   ValidationResult,
   ValidationWarning,
   WaitTimeoutAction,
-} from "@chrona/contracts/ai";
+} from "@chrona/contracts";
 
 export {
   AI_CHECKPOINT_TYPES,
@@ -53,4 +53,4 @@ export {
   planPatchOperationSchema,
   planPatchSchema,
   upgradeBlueprintToEditable,
-} from "@chrona/contracts/ai";
+} from "@chrona/contracts";

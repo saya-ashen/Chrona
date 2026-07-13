@@ -1,10 +1,14 @@
 import { useState } from "react";
 import { CalendarClock, Radio } from "lucide-react";
 import { Button } from "@shared/ui";
-import { taskWorkspaceActivityMessages } from "@chrona/i18n/task-workspace";
-import { ActivityTimeline, mergeWorkspaceActivity, runtimeEventsToWorkspaceActivity } from "../../task-workspace";
+import { taskWorkspaceActivityMessages } from "@chrona/i18n";
+import {
+  ActivityTimeline,
+  mergeWorkspaceActivity,
+  runtimeEventsToWorkspaceActivity,
+  type WorkspaceActivityItem,
+} from "@features/task-workspace";
 import type { WorkspaceRuntimeEvent } from "../model/workspace-runtime-events";
-import type { WorkspaceActivityItem } from "../../task-workspace";
 type ActivityLayer = "Progress" | "Decisions" | "Results" | "Tools" | "Diagnostics";
 
 function activityLayer(item: WorkspaceActivityItem): ActivityLayer {

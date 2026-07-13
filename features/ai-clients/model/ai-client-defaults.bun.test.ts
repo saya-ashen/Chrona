@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it } from "bun:test";
 
-import { db } from "@/lib/db";
+import { db } from "@chrona/db";
 import { createAiClient } from "./create-ai-client";
 import { deleteAiClient } from "./delete-ai-client";
 import { updateAiClient } from "./update-ai-client";
-import { aiClientRegistry } from "../runtime/client-registry";
+import { aiClientRegistry } from "@chrona/engine";
 import { resetTestDb, seedWorkspace } from "../../../apps/server/src/__tests__/bun-test-helpers";
 
 async function listDefaults() {

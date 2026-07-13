@@ -4,13 +4,13 @@ export type {
   PlanExecutionSSEEvent,
   ExecutionActionInput,
   SubmitCheckpointActionInput,
-} from "@chrona/contracts/ai";
+} from "@chrona/contracts";
 export type { WorkspaceRuntimeEvent } from "./model/workspace-runtime-events";
 
 export {
   executionSessionStatusForRuntimeProgress,
   planGraphStatusForRuntimeProgress,
-} from "@chrona/contracts/ai";
+} from "@chrona/contracts";
 
 
 export { TaskWorkspaceActionRail } from "./ui/action-rail";

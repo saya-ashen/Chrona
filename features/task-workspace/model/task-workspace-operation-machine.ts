@@ -1,4 +1,4 @@
-import type { PlanExecutionSSEEvent } from "@chrona/contracts/ai";
+import type { PlanExecutionSSEEvent } from "@chrona/contracts"
 import type { UiDocument } from "@chrona/ui-protocol";
 import type { TaskAction } from "@chrona/contracts";
 import type { PlanNodeDataModel, TaskPlanGraphPlan } from "./plan-node-view-model";

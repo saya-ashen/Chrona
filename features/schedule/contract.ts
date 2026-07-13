@@ -8,4 +8,4 @@ export {
   scheduleProjectionQuerySchema,
   workBlockScheduleBodySchema,
   workBlockScheduleParamSchema,
-} from "@chrona/contracts/api";
+} from "@chrona/contracts";

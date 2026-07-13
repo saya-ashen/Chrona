@@ -1,9 +1,10 @@
 import { render, screen, fireEvent, waitFor, cleanup } from "@testing-library/react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import type { ComponentProps, PropsWithChildren } from "react";
 import { ScheduleEditorForm } from "../forms/schedule-editor-form";
-import { applySchedule, clearSchedule } from "@/lib/task-actions-client";
+import { applySchedule, clearSchedule } from "../schedule-actions";
 
-vi.mock("@/lib/task-actions-client", () => ({
+vi.mock("../schedule-actions", () => ({
   applySchedule: vi.fn().mockResolvedValue({}),
   clearSchedule: vi.fn().mockResolvedValue({}),
 }));
@@ -12,19 +13,19 @@ vi.mock("@chrona/i18n/react", async () => {
   const { fallbackMessages } = await import("@chrona/i18n/messages");
   return { useI18n: () => ({ messages: fallbackMessages, t: (key: string) => key }) };
 });
-vi.mock("@/components/ui/button", () => ({
-  Button: ({ children, asChild, ...props }: any) => {
-    if (asChild && children) {
-      return <>{children}</>;
-    }
-    return <button {...props}>{children}</button>;
-  },
-}));
-vi.mock("@/components/ui/field", () => ({
-  Field: ({ children }: any) => <div>{children}</div>,
-  FieldError: ({ errors }: any) => <div>{errors?.map((error: any) => error?.message).filter(Boolean).join(", ")}</div>,
-  FieldGroup: ({ children }: any) => <div>{children}</div>,
-  FieldLabel: ({ children }: any) => <span data-testid={`label-${children}`}>{children}</span>,
+vi.mock("@shared/ui", () => ({
+  Button: ({ children, asChild: _asChild, ...props }: PropsWithChildren<ComponentProps<"button"> & { asChild?: boolean }>) => (
+    <button {...props}>{children}</button>
+  ),
+  Field: ({ children, ...props }: PropsWithChildren<ComponentProps<"div">>) => <div {...props}>{children}</div>,
+  FieldError: ({ children, errors, ...props }: PropsWithChildren<ComponentProps<"div"> & { errors?: Array<{ message?: string } | undefined> }>) => (
+    <div {...props}>{children ?? errors?.map((error) => error?.message).filter(Boolean).join(", ")}</div>
+  ),
+  FieldGroup: ({ children, ...props }: PropsWithChildren<ComponentProps<"div">>) => <div {...props}>{children}</div>,
+  FieldLabel: ({ children, ...props }: PropsWithChildren<ComponentProps<"label">>) => (
+    <label data-testid={`label-${String(children)}`} {...props}>{children}</label>
+  ),
+  Input: (props: ComponentProps<"input">) => <input {...props} />,
 }));
 
 const mockedApply = vi.mocked(applySchedule);

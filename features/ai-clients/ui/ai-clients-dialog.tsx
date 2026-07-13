@@ -2,17 +2,17 @@
 
 import { X } from "lucide-react";
 import { AiClientsManager } from "./ai-clients-manager";
-import { Button } from "shared/ui/button";
 import {
+  Button,
   Dialog,
   DialogClose,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { useI18n } from "@chrona/i18n/react";
-import { useAppRouter } from "@/lib/router";
+} from "@shared/ui";
+import { useI18n } from "@chrona/i18n";
+import { useNavigate } from "react-router-dom";
 
 type AiClientsDialogProps = {
   isOpen: boolean;
@@ -21,10 +21,10 @@ type AiClientsDialogProps = {
 
 export function AiClientsDialog({ isOpen, closeHref }: AiClientsDialogProps) {
   const { t } = useI18n();
-  const router = useAppRouter();
+  const navigate = useNavigate();
 
   const handleClose = () => {
-    router.push(closeHref);
+    void navigate(closeHref);
   };
 
   return (

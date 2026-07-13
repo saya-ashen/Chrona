@@ -1,10 +1,10 @@
 "use client";
 
 import { Sparkles } from "lucide-react";
-import { TaskPlanGenerationPanel } from "@/components/tasks/ai/task-plan-generation-panel";
-import type { TaskPlanReadModel } from "@chrona/contracts/ai";
+import { TaskPlanGenerationPanel } from "@features/task-workspace";
+import type { TaskPlanReadModel } from "@chrona/contracts"
 import type { ScheduledItem } from "../schedule-page-types";
-import { Card } from "shared/ui/card";
+import { Card } from "@shared/ui";
 
 function toCompactPlan(planResult: TaskPlanReadModel | null) {
   const nodes = planResult?.compiledPlan.nodes;

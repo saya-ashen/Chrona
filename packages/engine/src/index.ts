@@ -57,3 +57,23 @@ export {
   DuplicateTerminalActionError,
 } from "./modules/plan-execution/runtime/agent-control-store";
 export type { RunTokenScope, RecordedTerminalAction } from "./modules/plan-execution/runtime/agent-control-store";
+export {
+  AiClientManagement,
+  AiClientRegistry,
+  aiClientManagement,
+  aiClientRegistry,
+  buildProviderFeatureRequest,
+  getProviderBaseUrl,
+  testAiClientAvailability,
+} from "./modules/ai";
+export type {
+  DebugProfiledProviderClient,
+  EngineAiClient,
+  EngineClaudeCodeClient,
+  EngineCodexClient,
+  EngineDebugClient,
+  EngineHermesClient,
+  EngineLlmClient,
+  EngineOmpClient,
+  EngineProviderClient,
+} from "./modules/ai";

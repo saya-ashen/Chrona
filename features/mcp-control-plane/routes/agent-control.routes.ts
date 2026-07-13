@@ -1,8 +1,8 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { handleControlAction, ControlRouteError, validateRunToken } from "@chrona/engine";
-import { agentControlActionBodySchema } from "@chrona/contracts/api";
-import { error, internalServerError, json } from "../../../apps/server/src/lib/http";
+import { agentControlActionBodySchema } from "@chrona/contracts";
+import { error, internalServerError, json } from "@shared/http/server";
 
 const controlRequestSchema = z.object({
   body: agentControlActionBodySchema,

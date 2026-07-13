@@ -18,6 +18,10 @@ vi.mock("@chrona/i18n", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@chrona/i18n")>()),
   localizeHref: (_locale: string, href: string) => href,
 }));
+vi.mock("@shared/http", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@shared/http")>()),
+  apiJson: (input: RequestInfo | URL, init?: RequestInit) => fetch(input, init).then((response) => response.json()),
+}));
 
 vi.mock("@/components/i18n/localized-link", () => ({
   LocalizedLink: ({ children, href, ...props }: { href: string; children?: React.ReactNode }) => (
@@ -159,14 +163,16 @@ vi.mock("../panels/selected-block-sheet/selected-block-sheet-header", () => ({
   ),
 }));
 
-// Mock the task planning panel
-vi.mock("@/components/tasks/ai/task-plan-generation-panel", () => ({
+vi.mock("@features/task-workspace", () => ({
   TaskPlanGenerationPanel: (props: {
     activeAcceptedPlanId?: string | null;
     title?: string;
     description?: string | null;
     priority?: string;
     dueAt?: Date | null;
+    hasUnsavedConfigChanges?: boolean;
+    savedPlan?: { id?: string } | null;
+    generationStatus?: string | null;
   }) => {
     taskDecompositionPanelProps(props);
     return (
@@ -175,17 +181,19 @@ vi.mock("@/components/tasks/ai/task-plan-generation-panel", () => ({
         data-active-accepted-plan-id={props.activeAcceptedPlanId ?? ""}
         data-title={props.title ?? ""}
         data-description={props.description ?? ""}
-        data-draft-dirty={String(Boolean((props as { hasUnsavedConfigChanges?: boolean }).hasUnsavedConfigChanges))}
-        data-saved-plan-id={(props as { savedPlan?: { id?: string } | null }).savedPlan?.id ?? ""}
-        data-generation-status={(props as { generationStatus?: string }).generationStatus ?? ""}
+        data-draft-dirty={String(Boolean(props.hasUnsavedConfigChanges))}
+        data-saved-plan-id={props.savedPlan?.id ?? ""}
+        data-generation-status={props.generationStatus ?? ""}
       />
     );
   },
-}));
-
-// Mock the task context links
-vi.mock("@/components/tasks/shared/task-context-links", () => ({
   TaskContextLinks: () => <div data-testid="task-context-links" />,
+  useTaskPlanGenerationSession: () => ({
+    activeAcceptedPlanId: null,
+    result: null,
+    sessionStatus: "idle",
+    start: vi.fn(),
+  }),
 }));
 
 // Mock fetch for subtasks
