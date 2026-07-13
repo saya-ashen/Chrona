@@ -1,7 +1,7 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import type * as SharedHttp from "@shared/http";
 import type * as TaskPlanGenerationSessionStore from "./task-plan-generation-session-store";
 import type { PlanExecutionResult, TaskPlanReadModel } from "@chrona/contracts"
