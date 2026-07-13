@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-const EVENT_DAY = "2026-06-12";
+const EVENT_DAY = "2026-12-12";
 
 function fixtureUrl(eventTitle: string, key: string) {
   return `https://calendar-fixtures.test/valid.ics?title=${encodeURIComponent(eventTitle)}&key=${encodeURIComponent(key)}&day=${EVENT_DAY}`;
@@ -11,8 +11,7 @@ test.describe("external calendar events on schedule", () => {
     const sourceName = `Planning calendar ${testInfo.project.name} ${crypto.randomUUID()}`;
     const eventTitle = `External standup ${testInfo.project.name}`;
     await page.goto(`/en/schedule?day=${EVENT_DAY}`);
-    const calendarTab = page.getByRole("tab", { name: /calendar/i });
-    if (await calendarTab.isVisible()) await calendarTab.click();
+    await page.getByRole("tab", { name: /calendar/i }).click();
     await page.getByRole("button", { name: /connect calendar/i }).click();
 
     await page.getByLabel(/display name/i).first().fill(sourceName);
