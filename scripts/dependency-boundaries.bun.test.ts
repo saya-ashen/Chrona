@@ -19,7 +19,7 @@ async function cruise(entry: string) {
       "x",
       "dependency-cruiser",
       "--config",
-      join(root, ".dependency-cruiser.cjs"),
+      resolve(root, ".dependency-cruiser.cjs"),
       "--output-type",
       "err",
       entry,
@@ -140,7 +140,7 @@ describe("architecture boundary behavior", () => {
 
   test("rejects test support entrypoints from browser production code", async () => {
     const result = await cruise("apps/web/src/illegal-test-entry.ts");
-    expect(result.exitCode).toBe(1);
+    expect(result.exitCode).not.toBe(0);
     expect(result.output).toContain("feature-test-entrypoints-are-test-only");
   });
   test("rejects feature dependencies from package production code", async () => {

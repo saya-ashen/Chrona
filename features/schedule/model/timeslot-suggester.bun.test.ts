@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { suggestTimeslots } from "@features/schedule";
+import { suggestTimeslots } from "./timeslot-suggester";
 import type { TimeslotSuggestionInput } from "@chrona/contracts";
 
 /**
