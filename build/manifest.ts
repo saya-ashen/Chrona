@@ -25,30 +25,35 @@ export const buildTargets = {
     releaseName: "chrona-linux-x64",
     binaryName: "chrona",
     executable: true,
+    nativePackage: "@oh-my-pi/pi-natives-linux-x64",
   },
   "linux-arm64": {
     bunTarget: "bun-linux-arm64",
     releaseName: "chrona-linux-arm64",
     binaryName: "chrona",
     executable: true,
+    nativePackage: "@oh-my-pi/pi-natives-linux-arm64",
   },
   "darwin-x64": {
     bunTarget: "bun-darwin-x64",
     releaseName: "chrona-darwin-x64",
     binaryName: "chrona",
     executable: true,
+    nativePackage: "@oh-my-pi/pi-natives-darwin-x64",
   },
   "darwin-arm64": {
     bunTarget: "bun-darwin-arm64",
     releaseName: "chrona-darwin-arm64",
     binaryName: "chrona",
     executable: true,
+    nativePackage: "@oh-my-pi/pi-natives-darwin-arm64",
   },
   "windows-x64": {
     bunTarget: "bun-windows-x64",
     releaseName: "chrona-windows-x64",
     binaryName: "Chrona.exe",
     executable: false,
+    nativePackage: "@oh-my-pi/pi-natives-win32-x64",
   },
 } as const;
 

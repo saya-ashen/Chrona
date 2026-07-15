@@ -36,12 +36,28 @@ cd chrona-windows-x64
 
 The packaged command starts the local Chrona server, normally at `http://localhost:3101`, and serves the web app from the same origin.
 
+Before the first start or after changing data/network settings, inspect the local setup:
+
+```bash
+chrona doctor
+```
+
+The command checks the database path and integrity plus localhost/API-key safety. A missing database before first start is expected; `chrona start` creates it.
+
 Chrona stores local data under platform-specific application directories. You can override them when needed:
 
 ```bash
 CHRONA_DATA_DIR=/custom/path/data chrona start
 CHRONA_CONFIG_DIR=/custom/path/config chrona start
 ```
+
+Back up local data before upgrading:
+
+```bash
+chrona backup ./chrona-before-upgrade.db
+```
+
+See [Backup, Restore, and Local Operations](./operations.md) for recovery and safe local deployment.
 
 ## Option B: repository development
 
@@ -135,6 +151,18 @@ The task workspace is the main execution surface for a task. It combines:
 - task metadata and schedule status
 - conversation and command center context
 - checkpoints, inputs, approvals, blocks, and failure recovery actions
+
+## Backup and recovery
+
+Packaged Chrona provides consistent SQLite backup and restore commands:
+
+```bash
+chrona backup ./chrona-backup.db
+# Stop Chrona before restoring.
+chrona restore ./chrona-backup.db --force
+```
+
+Backups contain sensitive task, provider, and execution data. Store them securely. See [Local Operations](./operations.md) for platform data paths and the upgrade procedure.
 
 ## Troubleshooting
 

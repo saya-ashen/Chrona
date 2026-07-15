@@ -1,8 +1,8 @@
 #!/usr/bin/env bun
 
 import { $ } from "bun";
-import { chmod, cp, mkdir, rm, stat } from "node:fs/promises";
-import { dirname, resolve } from "node:path";
+import { chmod, cp, mkdir, readdir, rm, stat } from "node:fs/promises";
+import { basename, dirname, resolve } from "node:path";
 
 import { buildArtifacts, buildTargets, parseBuildTarget, type BuildTargetName, type ReleaseResource } from "../build/manifest";
 
@@ -35,6 +35,27 @@ async function copyResource(resource: ReleaseResource, releaseDir: string) {
   await mkdir(dirname(dst), { recursive: true });
   await cp(src, dst, { recursive: true });
   log("copy", `${resource.from} → ${resource.to}`);
+}
+
+async function copyNativeAddons(target: BuildTargetName, releaseDir: string) {
+  const nativePackage = buildTargets[target].nativePackage;
+  const packageDir = resolve(ROOT, "node_modules", ...nativePackage.split("/"));
+  if (!(await exists(packageDir))) {
+    throw new Error(
+      `Native release dependency missing for ${target}: ${nativePackage}. `
+      + "Install dependencies on the target platform before building.",
+    );
+  }
+
+  const addonNames = (await readdir(packageDir)).filter((name) => name.endsWith(".node"));
+  if (addonNames.length === 0) {
+    throw new Error(`Native release dependency has no .node addon: ${nativePackage}`);
+  }
+
+  for (const addonName of addonNames) {
+    await cp(resolve(packageDir, addonName), resolve(releaseDir, basename(addonName)));
+    log("copy", `${nativePackage}/${addonName} → ${addonName}`);
+  }
 }
 
 async function createTarGz(sourceDir: string, outFile: string) {
@@ -92,6 +113,9 @@ export async function buildBinary(target: BuildTargetName) {
   for (const resource of buildArtifacts.resources) {
     await copyResource(resource, releaseDir);
   }
+
+  log("copy", "Copying target native addons...");
+  await copyNativeAddons(target, releaseDir);
 
   console.log("");
   const tarPath = resolve(ROOT, "dist", "releases", `${manifestTarget.releaseName}.tar.gz`);

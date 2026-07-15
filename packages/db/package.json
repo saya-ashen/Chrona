@@ -8,6 +8,7 @@
     "./db": "./src/db.ts",
     "./generated/prisma/client": "./src/generated/prisma/client.ts",
     "./sqlite-url": "./src/sqlite-url.ts",
-    "./sqlite-migrations": "./src/sqlite-migrations.ts"
+    "./sqlite-migrations": "./src/sqlite-migrations.ts",
+    "./sqlite-backup": "./src/sqlite-backup.ts"
   }
 }
