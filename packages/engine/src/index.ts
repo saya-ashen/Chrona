@@ -54,7 +54,7 @@ export {
   recordTerminalAction,
   latestRecordedTerminalAction,
   findRecordedTerminalAction,
-  DuplicateTerminalActionError,
+  ConflictingTerminalActionError,
 } from "./modules/plan-execution/runtime/agent-control-store";
 export type { RunTokenScope, RecordedTerminalAction } from "./modules/plan-execution/runtime/agent-control-store";
 export {

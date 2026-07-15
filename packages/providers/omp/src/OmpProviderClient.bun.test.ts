@@ -114,6 +114,14 @@ describe("OmpSdkProviderClient node runtime tools", () => {
     ]);
     expect("toolNames" in options).toBe(false);
   });
+  it("surfaces the concrete SDK tool error text", () => {
+    expect(__ompSdkProviderTestHooks.sdkToolErrorMessage({
+      content: [{ type: "text", text: "Chrona control request timed out" }],
+      isError: true,
+    })).toBe("Chrona control request timed out");
+    expect(__ompSdkProviderTestHooks.sdkToolErrorMessage({ details: {} })).toBe("Oh My Pi SDK tool call failed");
+  });
+
 });
 describe("OmpProviderClient SDK delegation", () => {
   it("uses the SDK for plan-generation terminal tool calls", async () => {

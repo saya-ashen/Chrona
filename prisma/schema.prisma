@@ -1224,5 +1224,5 @@ model TaskPlanTerminalAction {
   @@index([runId, recordedAt])
   @@index([nodeAttemptId, recordedAt])
   @@index([taskId, kind])
-  @@unique([nodeAttemptId, kind])
+  @@unique([nodeAttemptId])
 }

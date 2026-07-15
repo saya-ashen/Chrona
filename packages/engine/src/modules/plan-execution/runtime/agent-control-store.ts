@@ -29,11 +29,14 @@ export type RecordedTerminalAction = {
   recordedAt: Date;
 };
 
-export class DuplicateTerminalActionError extends Error {
-  readonly code = "duplicate_terminal_action";
-  constructor(public readonly kind: AgentControlActionKind) {
-    super(`Terminal action '${kind}' was already recorded for this node attempt`);
-    this.name = "DuplicateTerminalActionError";
+export class ConflictingTerminalActionError extends Error {
+  readonly code = "conflicting_terminal_action";
+  constructor(
+    public readonly existingKind: AgentControlActionKind,
+    public readonly requestedKind: AgentControlActionKind,
+  ) {
+    super(`Terminal action '${existingKind}' was already recorded for this node attempt; cannot record '${requestedKind}'`);
+    this.name = "ConflictingTerminalActionError";
   }
 }
 
@@ -117,17 +120,18 @@ export async function recordTerminalAction(input: {
   kind: AgentControlActionKind;
   payload: unknown;
   workspaceId: string;
-}): Promise<RecordedTerminalAction> {
+}): Promise<{ action: RecordedTerminalAction; recorded: boolean }> {
   const { workspaceId } = input;
   if (input.scope.nodeAttemptId) {
     const existing = await db.taskPlanTerminalAction.findFirst({
-      where: { nodeAttemptId: input.scope.nodeAttemptId, kind: input.kind },
-      select: { id: true },
-    });
-    if (existing) throw new DuplicateTerminalActionError(input.kind);
+      where: { nodeAttemptId: input.scope.nodeAttemptId },
+      orderBy: { recordedAt: "asc" },
+    }) as RecordedTerminalAction | null;
+    if (existing?.kind === input.kind) return { action: existing, recorded: false };
+    if (existing) throw new ConflictingTerminalActionError(existing.kind, input.kind);
   }
-  const created = await db.taskPlanTerminalAction
-    .create({
+  try {
+    const created = await db.taskPlanTerminalAction.create({
       data: {
         workspaceId,
         taskId: input.scope.taskId,
@@ -139,19 +143,26 @@ export async function recordTerminalAction(input: {
         kind: input.kind,
         payload: input.payload as never,
       },
-    })
-    .catch((error: unknown) => {
-      if (
-        typeof error === "object" &&
-        error !== null &&
-        "code" in error &&
-        (error as { code: string }).code === "P2002"
-      ) {
-        throw new DuplicateTerminalActionError(input.kind);
-      }
+    }) as RecordedTerminalAction;
+    return { action: created, recorded: true };
+  } catch (error) {
+    if (
+      typeof error !== "object"
+      || error === null
+      || !("code" in error)
+      || error.code !== "P2002"
+      || !input.scope.nodeAttemptId
+    ) {
       throw error;
-    });
-  return created as RecordedTerminalAction;
+    }
+    const existing = await db.taskPlanTerminalAction.findFirst({
+      where: { nodeAttemptId: input.scope.nodeAttemptId },
+      orderBy: { recordedAt: "asc" },
+    }) as RecordedTerminalAction | null;
+    if (existing?.kind === input.kind) return { action: existing, recorded: false };
+    if (existing) throw new ConflictingTerminalActionError(existing.kind, input.kind);
+    throw error;
+  }
 }
 
 export async function latestRecordedTerminalAction(input: {

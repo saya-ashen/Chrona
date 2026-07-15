@@ -139,6 +139,42 @@ describe("kernel executeCommand (single-writer)", () => {
     ]);
   });
 
+  it("ignores late node results without creating an empty active session", async () => {
+    executeTaskNodeCapabilityMock
+      .mockResolvedValueOnce({
+        status: "done",
+        summary: "First task finished",
+        evidence: { sessionId: "main-session", runId: "run-first" },
+      })
+      .mockResolvedValueOnce({
+        status: "done",
+        summary: "Second task finished",
+        evidence: { sessionId: "main-session", runId: "run-second" },
+      });
+
+    const { workspace, task } = await seedWorkspaceAndTask("Kernel ignores late result");
+    const compiledPlan = makeTwoTaskPlan("graph_kernel_late_result");
+    await seedAcceptedCompiledPlan(workspace.id, task.id, compiledPlan);
+
+    const completed = await executeCommand({ taskId: task.id, command: { type: "start", trigger: "manual" } });
+    expect(completed.status).toBe("completed");
+    const sessionsBefore = await db.executionSession.count({ where: { taskId: task.id } });
+
+    const late = await executeCommand({
+      taskId: task.id,
+      command: {
+        type: "submit_node_result",
+        nodeId: "second_task",
+        result: { kind: "done", summary: "Late duplicate" },
+      },
+    });
+
+    expect(late.status).toBe("completed");
+    expect(late.message).toBe("Execution already completed; node result ignored.");
+    expect(await db.executionSession.count({ where: { taskId: task.id } })).toBe(sessionsBefore);
+    expect(await db.executionSession.count({ where: { taskId: task.id, status: "Active" } })).toBe(0);
+  });
+
   it("restarts an accepted plan from the first node with fresh runtime state", async () => {
     executeTaskNodeCapabilityMock
       .mockResolvedValueOnce({

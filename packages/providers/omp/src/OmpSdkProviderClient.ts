@@ -429,6 +429,7 @@ function sdkToolOptionsForTerminal(terminalToolName: string | undefined, control
 export const __ompSdkProviderTestHooks = {
   sdkToolNamesForTerminal,
   sdkToolOptionsForTerminal,
+  sdkToolErrorMessage,
 };
 
 function applySdkEnvironment(config: OmpProviderConfig, runId = "health"): SdkEnvironment {
@@ -453,6 +454,18 @@ function applySdkEnvironment(config: OmpProviderConfig, runId = "health"): SdkEn
     apiKeyEnvName,
     baseUrlEnvName,
   };
+}
+
+function sdkToolErrorMessage(result: unknown): string {
+  if (!result || typeof result !== "object" || !("content" in result) || !Array.isArray(result.content)) {
+    return "Oh My Pi SDK tool call failed";
+  }
+  const messages = result.content.flatMap((item) => {
+    if (!item || typeof item !== "object" || !("text" in item) || typeof item.text !== "string") return [];
+    const text = item.text.replace(/\s+/g, " ").trim();
+    return text ? [text] : [];
+  });
+  return messages.join(" ").slice(0, 500) || "Oh My Pi SDK tool call failed";
 }
 
 export class OmpSdkProviderClient implements AgentProviderClient {
@@ -655,6 +668,7 @@ export class OmpSdkProviderClient implements AgentProviderClient {
     }
   }
 
+
   private onSessionEvent(handle: SdkRunHandle, queue: AsyncEventQueue, event: AgentSessionEvent) {
     if (handle.done) return;
     switch (event.type) {
@@ -686,7 +700,7 @@ export class OmpSdkProviderClient implements AgentProviderClient {
           type: "tool_completed",
           toolName: event.toolName,
           error: event.isError
-            ? { message: "Oh My Pi SDK tool call failed", raw: event.result }
+            ? { message: sdkToolErrorMessage(event.result), raw: event.result }
             : undefined,
           raw: event.result,
         });
