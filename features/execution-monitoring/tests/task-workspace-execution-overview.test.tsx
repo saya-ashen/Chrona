@@ -310,12 +310,11 @@ describe("TaskWorkspaceExecutionOverview", () => {
       currentExecution: { status: "running" },
     });
 
-    expect(screen.queryByRole("status")).not.toBeInTheDocument();
     expect(screen.queryByText("Running now")).not.toBeInTheDocument();
     expect(screen.getByText("Writing report")).toBeInTheDocument();
   });
 
-  it("hides live status strip before execution has active runtime activity", () => {
+  it("keeps live feedback visible before execution has runtime activity", () => {
     const view = createTaskWorkspaceExecutionConsoleView(
       executionMonitoringWorkspaceFixtures.running,
     );
@@ -339,10 +338,14 @@ describe("TaskWorkspaceExecutionOverview", () => {
         },
       },
       currentExecution: { status: "started" },
+      isExecutionRunning: true,
+      executionOutputState: "empty",
     });
 
-    expect(screen.queryByRole("status")).not.toBeInTheDocument();
-    expect(screen.queryByText("Running now")).not.toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Live output" })).toHaveTextContent("Awaiting output");
+    expect(screen.getByRole("status", { name: "Execution is producing output" })).toBeInTheDocument();
+    expect(screen.getByText("AI is working")).toBeInTheDocument();
+    expect(screen.getByText("Working on the current step")).toBeInTheDocument();
   });
 
   it("hides live status strip after completion even when stale activity looks active", () => {

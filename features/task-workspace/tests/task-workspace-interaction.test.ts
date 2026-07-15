@@ -407,6 +407,55 @@ describe("task workspace interaction model", () => {
     expect(view?.progress).toMatchObject({ ...expected, total: 3 });
   });
 
+  it("keeps execution visibly active before the first runtime event", () => {
+    const baseGraph = graphPlan();
+    const nodes = baseGraph.nodes.map((node, index) => ({ ...node, status: index === 0 ? "active" as const : node.status }));
+    const graph = { ...baseGraph, nodes, steps: nodes };
+    const view = deriveRunningExecutionView({
+      pageData: pageData(),
+      graphPlan: graph,
+      operationState: operationState({ status: "execution-running", action: "none", runtimeEvents: [] } as unknown as Partial<TaskWorkspaceOperationState>),
+      currentNode: nodes[0]!,
+    });
+
+    expect(view?.currentActivity).toEqual({
+      phase: "starting",
+      label: "AI is starting the current step",
+      providerLabel: null,
+      updatedAt: null,
+    });
+  });
+
+  it("keeps provider reasoning user-facing and visibly active", () => {
+    const baseGraph = graphPlan();
+    const nodes = baseGraph.nodes.map((node, index) => ({ ...node, status: index === 0 ? "active" as const : node.status }));
+    const graph = { ...baseGraph, nodes, steps: nodes };
+    const view = deriveRunningExecutionView({
+      pageData: pageData(),
+      graphPlan: graph,
+      operationState: operationState({
+        status: "execution-running",
+        action: "none",
+        runtimeEvents: [{
+          type: "runtime_event",
+          action: "start_manual",
+          runtimeName: "omp",
+          provider: "omp",
+          timestamp: "2026-05-17T00:00:01.000Z",
+          event: { type: "reasoning_delta", text: "private transient reasoning" },
+        }],
+      } as unknown as Partial<TaskWorkspaceOperationState>),
+      currentNode: nodes[0]!,
+    });
+
+    expect(view?.currentActivity).toEqual({
+      phase: "working",
+      label: "AI is working on the current step",
+      providerLabel: "omp",
+      updatedAt: "2026-05-17T00:00:01.000Z",
+    });
+  });
+
   it("keeps current step, inspected step, and runtime activity distinct", () => {
     const baseGraph = graphPlan();
     const nodes = baseGraph.nodes.map((node, index) => ({ ...node, status: index === 0 ? "active" as const : node.status }));
@@ -428,7 +477,12 @@ describe("task workspace interaction model", () => {
 
     expect(view?.currentStep).toMatchObject({ id: "n1", ordinal: 1, label: "Fetch trending projects" });
     expect(view?.inspectedStep).toEqual({ id: "n3", label: "Publish result report", isCurrent: false });
-    expect(view?.currentActivity).toEqual({ kind: "tool", label: "Reading GitHub Trending" });
+    expect(view?.currentActivity).toEqual({
+      phase: "tool_running",
+      label: "Reading GitHub Trending",
+      providerLabel: "omp",
+      updatedAt: null,
+    });
   });
 
 });

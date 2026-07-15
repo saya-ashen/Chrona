@@ -631,9 +631,11 @@ describe("TaskWorkspacePlanSection", () => {
     );
 
     expect(screen.getByTestId("execution-focus-header")).toHaveTextContent("Write report");
-    expect(screen.getByTestId("current-runtime-activity")).toHaveTextContent("Waiting for the next runtime update");
+    expect(screen.getByLabelText("Execution running")).toHaveClass("relative");
+    expect(screen.getByRole("status", { name: "Current activity running" })).toHaveTextContent("AI is starting the current step");
+    expect(within(screen.getByTestId("execution-navigator")).getByLabelText("Step running")).toHaveClass("animate-spin");
     expect(screen.queryByRole("region", { name: "Current operation" })).not.toBeInTheDocument();
-    expect(screen.queryByText("Running now")).not.toBeInTheDocument();
+    expect(screen.queryByText("Waiting for the next runtime update")).not.toBeInTheDocument();
   });
 
   it("shows the launch contract before execution starts", () => {

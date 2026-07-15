@@ -221,12 +221,39 @@ export function TaskWorkspaceExecutionOverview({
   const activeActivity = mergedActivity.find((item) =>
     isRunningActivity(item, mergedActivity),
   );
-  const showLiveStatus =
-    currentExecution?.status === "running" && Boolean(activeActivity);
+  const executionIsActive = isExecutionRunning
+    || currentExecution?.status === "running"
+    || currentExecution?.status === "started";
+  const activityHeartbeat = useMemo<WorkspaceActivityItem | null>(() => {
+    if (!executionIsActive || activeActivity) return null;
+    const latestRuntime = runtimeEvents.at(-1);
+    return {
+      id: "execution-live-heartbeat",
+      kind: "provider_run",
+      title: "AI is working",
+      summary: latestRuntime?.nodeTitle
+        ? `Working on ${latestRuntime.nodeTitle}`
+        : "Working on the current step",
+      description: "Execution is active. Waiting for the provider's next progress update.",
+      tone: "info",
+      timestamp: latestRuntime?.timestamp ?? null,
+      sourceNodeId: latestRuntime?.nodeId,
+      sourceNodeTitle: latestRuntime?.nodeTitle,
+      provider: latestRuntime?.provider,
+      runtimeName: latestRuntime?.runtimeName,
+    };
+  }, [activeActivity, executionIsActive, runtimeEvents]);
+  const displayedActivity = useMemo(
+    () => activityHeartbeat
+      ? mergeWorkspaceActivity([activityHeartbeat, ...mergedActivity], TRAIL_ACTIVITY_LIMIT)
+      : mergedActivity,
+    [activityHeartbeat, mergedActivity],
+  );
+  const showLiveStatus = executionIsActive;
 
   useEffect(() => {
     if (!trailStore) return;
-    trailStore.set("/trail/items", mergedActivity);
+    trailStore.set("/trail/items", displayedActivity);
     trailStore.set(
       "/trail/liveCount",
       liveActivity.length + runtimeEvents.length,
@@ -234,8 +261,8 @@ export function TaskWorkspaceExecutionOverview({
     trailStore.set("/trail/savedCount", savedTrailActivity.length);
     trailStore.set("/trail/provider", runtimeEvents.at(-1)?.provider ?? null);
   }, [
+    displayedActivity,
     liveActivity.length,
-    mergedActivity,
     runtimeEvents,
     savedTrailActivity.length,
     trailStore,
@@ -336,7 +363,7 @@ export function TaskWorkspaceExecutionOverview({
   const results = (
     <section
       aria-label={
-        isExecutionRunning
+        executionIsActive
           ? (ws.liveOutputTitle ?? "Live output")
           : (ws.finalResultTitle ?? "Final result")
       }
@@ -348,7 +375,7 @@ export function TaskWorkspaceExecutionOverview({
             id="task-workspace-results-heading"
             className="font-heading text-base font-semibold text-foreground"
           >
-            {isExecutionRunning
+            {executionIsActive
               ? (ws.liveOutputTitle ?? "Live output")
               : (ws.finalResultTitle ?? "Final result")}
           </h3>
@@ -356,19 +383,19 @@ export function TaskWorkspaceExecutionOverview({
             <Badge
               variant="outline"
               className={
-                isExecutionRunning
+                executionIsActive
                   ? "bg-sky-500/10 text-sky-700 dark:text-sky-200"
                   : "bg-violet-500/10 text-violet-700 dark:text-violet-200"
               }
             >
-              {isExecutionRunning
+              {executionIsActive
                 ? executionOutputState === "partial"
                   ? (ws.partialOutputBadge ?? "Partial output")
                   : (ws.awaitingOutputBadge ?? "Awaiting output")
                 : (ws.aiGeneratedBadge ?? "AI generated")}
             </Badge>
             <span>
-              {isExecutionRunning
+              {executionIsActive
                 ? executionOutputState === "partial"
                   ? (ws.partialOutputDescription ??
                     "Output collected so far. Execution is still running.")
@@ -378,6 +405,15 @@ export function TaskWorkspaceExecutionOverview({
                   "Validated output from task execution.")}
             </span>
           </div>
+      {executionIsActive && executionOutputState === "empty" ? (
+        <div className="mt-3 flex items-center gap-3 rounded-xl border border-primary/20 bg-primary/5 px-3 py-3" role="status" aria-label="Execution is producing output">
+          <span className="size-4 shrink-0 animate-spin rounded-full border-2 border-primary/20 border-t-primary motion-reduce:animate-none" aria-hidden="true" />
+          <div className="min-w-0 flex-1 space-y-1.5">
+            <div className="h-2 w-2/3 animate-pulse rounded-full bg-primary/20 motion-reduce:animate-none" />
+            <div className="h-2 w-2/5 animate-pulse rounded-full bg-primary/10 motion-reduce:animate-none" />
+          </div>
+        </div>
+      ) : null}
         </div>
         <div className="flex flex-wrap items-center justify-end gap-2">
           {nodeOptions.length > 1 ? (
@@ -452,7 +488,7 @@ export function TaskWorkspaceExecutionOverview({
       kind="runtime-control"
       label={copy.trailTab}
       description={
-        isExecutionRunning
+        executionIsActive
           ? "Live execution status and activity."
           : (ws.completedActivityDescription ??
             "Execution events and tool activity for this completed run.")

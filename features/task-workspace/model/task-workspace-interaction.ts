@@ -25,8 +25,10 @@ export type RunningExecutionProgress = {
 };
 
 export type RunningExecutionActivity = {
-  kind: "tool" | "provider" | "transition" | "approval" | "idle";
+  phase: "starting" | "working" | "tool_running" | "transition";
   label: string;
+  providerLabel: string | null;
+  updatedAt: string | null;
 };
 
 export type RunningExecutionView = {
@@ -454,26 +456,54 @@ function isWaitingNode(node: PlanNodeDataModel) {
 }
 
 function currentActivity(operationState: TaskWorkspaceOperationState): RunningExecutionActivity {
-  const event = [...operationState.runtimeEvents].reverse().find(({ event: value }) => value.type !== "reasoning_delta" && value.type !== "assistant_text_delta")?.event;
-  if (!event) {
-    return operationState.runtimeEvents.length > 0
-      ? { kind: "provider", label: "Provider is working" }
-      : { kind: "idle", label: "Waiting for the next runtime update" };
+  const latestEvent = operationState.runtimeEvents.at(-1);
+  if (!latestEvent) {
+    return {
+      phase: "starting",
+      label: "AI is starting the current step",
+      providerLabel: null,
+      updatedAt: null,
+    };
   }
-  switch (event.type) {
+
+  const providerLabel = latestEvent.provider || latestEvent.runtimeName || null;
+  const updatedAt = latestEvent.timestamp ?? null;
+  switch (latestEvent.event.type) {
     case "tool_started":
-      return { kind: "tool", label: event.label };
+      return { phase: "tool_running", label: latestEvent.event.label, providerLabel, updatedAt };
     case "tool_completed":
-      return { kind: "transition", label: event.error ? `${event.label} failed` : `${event.label} completed` };
+      return {
+        phase: "transition",
+        label: latestEvent.event.error
+          ? `${latestEvent.event.label} failed`
+          : `${latestEvent.event.label} completed; AI is continuing`,
+        providerLabel,
+        updatedAt,
+      };
     case "approval_required":
-      return { kind: "approval", label: "Approval required" };
+      return { phase: "transition", label: "Preparing an approval request", providerLabel, updatedAt };
     case "run_status":
-      return { kind: "transition", label: event.message ?? event.status };
+      return {
+        phase: "transition",
+        label: latestEvent.event.message ?? latestEvent.event.status,
+        providerLabel,
+        updatedAt,
+      };
     case "raw_event":
-      return { kind: "transition", label: event.message ?? event.rawEventType ?? "Runtime updated" };
+      return {
+        phase: "working",
+        label: latestEvent.event.message ?? "AI is working on the current step",
+        providerLabel,
+        updatedAt,
+      };
     case "assistant_text_delta":
     case "reasoning_delta":
-      return { kind: "provider", label: "Provider is working" };
+      return {
+        phase: "working",
+        label: "AI is working on the current step",
+        providerLabel,
+        updatedAt,
+      };
   }
 }
 

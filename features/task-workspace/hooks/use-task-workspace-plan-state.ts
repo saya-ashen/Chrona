@@ -149,6 +149,7 @@ function derivePlanStatus(savedPlan: TaskData["savedPlan"] | null, isGenerationR
   return savedPlan ? "waiting_acceptance" as const : "idle" as const;
 }
 
+
 function comparePlanUpdatedAt(
   pagePlan: NonNullable<TaskData["savedPlan"]>,
   planStatePlan: NonNullable<TaskData["savedPlan"]>,
@@ -402,8 +403,16 @@ export function useTaskWorkspacePlanState(
   // honour it on the very first render after the refresh, before the SSE
   // snapshot or session-store hydrate has a chance to fire.
   const generationSession = useTaskPlanGenerationSession(task.id, selectedWorkBlockId);
+  const hasTerminalGenerationSession = generationSession.sessionStatus === "completed"
+    || generationSession.sessionStatus === "failed"
+    || generationSession.sessionStatus === "cancelled";
   const isGeneratingPlan = generationSession.sessionStatus === "running"
-    || planState?.aiPlanGenerationStatus === "generating";
+    || (!hasTerminalGenerationSession && planState?.aiPlanGenerationStatus === "generating");
+
+  useEffect(() => {
+    if (!hasTerminalGenerationSession) return;
+    void planStateQuery.refetch();
+  }, [hasTerminalGenerationSession, planStateQuery.refetch]);
   const generationActivitySummary = isGeneratingPlan
     ? (generationSession.statusMessage ?? activitySummaryFromPhase(generationSession.phase))
     : null;

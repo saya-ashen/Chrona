@@ -876,6 +876,41 @@ describe("task workspace page synchronization", () => {
     expect(result.current.plan.planGenerationStatus).toBe("accepted");
   });
 
+  it("leaves generating state and refreshes the saved plan when the generation session completes", async () => {
+    const initialPlan = planReadModel({ id: "plan-1", status: "ready", title: "Old plan" });
+    const generatedPlan = planReadModel({ id: "plan-2", status: "draft", title: "Generated plan" });
+    const initialPage = pageData({ taskStatus: "Ready", plan: initialPlan, aiPlanGenerationStatus: "generating" });
+    mocks.generationSession = {
+      ...mocks.generationSession,
+      sessionStatus: "running",
+      isLoading: true,
+      phase: "saving",
+    };
+    mocks.planResponses = [
+      { taskId: "task-1", aiPlanGenerationStatus: "waiting_acceptance", savedPlan: generatedPlan },
+    ];
+
+    const { result, rerender } = renderHook(() => {
+      const workspace = useTaskWorkspacePageState(initialPage);
+      const plan = useTaskWorkspacePlanState(workspace.pageData.task, workspace.refreshWorkspace, workspace.workspaceEvents);
+      return { workspace, plan };
+    }, { wrapper: createQueryWrapper() });
+
+    expect(result.current.plan.planGenerationStatus).toBe("generating");
+
+    mocks.generationSession = {
+      ...mocks.generationSession,
+      sessionStatus: "completed",
+      result: generatedPlan,
+      isLoading: false,
+      phase: "done",
+    };
+    rerender();
+
+    await waitFor(() => expect(result.current.plan.planGenerationStatus).toBe("waiting_acceptance"));
+    await waitFor(() => expect(result.current.plan.graphPlan?.nodes[0]?.title).toBe("Generated plan"));
+  });
+
   it("refreshes workspace execution queries after accepting a draft", async () => {
     const draftPlan = planReadModel({ id: "plan-1", status: "draft", title: "Draft plan" });
     const acceptedPlan = planReadModel({ id: "plan-1", status: "accepted", title: "Accepted plan" });
@@ -969,9 +1004,6 @@ describe("task workspace page synchronization", () => {
       phase: "completed",
     };
     rerender();
-    await act(async () => {
-      await result.current.fetchPlan();
-    });
 
     await waitFor(() => expect(result.current.graphPlan?.nodes[0]?.title).toBe("Generated launch plan"));
 
