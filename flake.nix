@@ -1,18 +1,42 @@
 {
-  description = "Chrona development shell";
+  description = "Chrona packages and modules";
 
   inputs = {
     nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
 
     flake-utils.url = "github:numtide/flake-utils";
+
+    home-manager = {
+      url = "github:nix-community/home-manager/release-26.05";
+      inputs.nixpkgs.follows = "nixpkgs";
+    };
   };
 
   outputs = {
     self,
     nixpkgs,
     flake-utils,
-  }:
-    flake-utils.lib.eachDefaultSystem (system: let
+    home-manager,
+  }: let
+    version = (builtins.fromJSON (builtins.readFile ./package.json)).version;
+    nixosModule = import ./nix/modules/nixos.nix {inherit self;};
+    homeManagerModule = import ./nix/modules/home-manager.nix {inherit self;};
+  in {
+    overlays.default = final: _prev: {
+      chrona = self.packages.${final.stdenv.hostPlatform.system}.chrona;
+    };
+
+    nixosModules = {
+      default = nixosModule;
+      chrona = nixosModule;
+    };
+
+    homeManagerModules = {
+      default = homeManagerModule;
+      chrona = homeManagerModule;
+    };
+  }
+  // flake-utils.lib.eachDefaultSystem (system: let
       pkgs = import nixpkgs {inherit system;};
       playwrightLibs = with pkgs; [
         glib
@@ -51,14 +75,22 @@
         sqlite
         prisma-engines
       ];
+      source = pkgs.lib.cleanSourceWith {
+        src = self;
+        filter = path: type:
+          let
+            name = baseNameOf path;
+          in
+            !(builtins.elem name [".codegraph" "node_modules" "dist" "result"]);
+      };
 
       chronaNodeModules = pkgs.stdenv.mkDerivation {
         name = "chrona-node-modules";
-        src = self;
+        src = source;
         nativeBuildInputs = [pkgs.bun];
         outputHashMode = "recursive";
         outputHashAlgo = "sha256";
-        outputHash = "sha256-SYKc1Hu5MHi2QUC/ZTtfSmudZI3ja5M9MXseFzFk2Ek=";
+        outputHash = "sha256-6Gsc4Fh13T6G01tUcy/hhtsiVLCeekrTl6PMQfkb6Sc=";
         dontCheckForBrokenSymlinks = true;
         dontPatchShebangs = true;
         dontFixup = true;
@@ -71,37 +103,80 @@
           cp -r node_modules $out/
         '';
       };
-    in {
-      packages.chrona = pkgs.stdenv.mkDerivation {
-        name = "chrona-0.1.3";
-        src = self;
+    in let
+      chrona = pkgs.stdenv.mkDerivation {
+        pname = "chrona";
+        inherit version;
+        src = source;
         nativeBuildInputs = with pkgs; [
           bun
           nodejs_22
           makeWrapper
         ];
         PRISMA_SCHEMA_ENGINE_BINARY = "${pkgs.prisma-engines}/bin/schema-engine";
+        # Bun appends the compiled application payload to the ELF file. Nix's
+        # generic ELF rewriting invalidates that payload and turns the result
+        # back into a bare Bun executable.
+        dontPatchELF = true;
+        dontStrip = true;
 
         buildPhase = ''
+          runHook preBuild
+
           export HOME=$TMPDIR
           rm -rf node_modules
           cp -r ${chronaNodeModules}/node_modules node_modules
           chmod -R u+w node_modules
+          patchShebangs node_modules
 
           mkdir -p .local/bin
           ln -sf ${pkgs.nodejs_22}/bin/node .local/bin/node
           export PATH="$PWD/.local/bin:$PATH"
 
           bun run build
+
+          runHook postBuild
         '';
 
         installPhase = ''
+          runHook preInstall
+
           release_dir="$(find dist/releases -mindepth 1 -maxdepth 1 -type d | head -n 1)"
+          test -n "$release_dir"
           mkdir -p $out/bin
           cp -r "$release_dir/resources" $out/bin/resources
-          cp "$release_dir/chrona" $out/bin/chrona
-          chmod +x $out/bin/chrona
+          install -Dm755 "$release_dir/chrona" $out/bin/chrona
+          for addon in "$release_dir"/*.node; do
+            test -e "$addon" || continue
+            cp "$addon" $out/bin/
+          done
+
+          runHook postInstall
         '';
+
+        meta = {
+          description = "Local AI work executor for governed planning, scheduling, recovery, and results";
+          homepage = "https://github.com/saya-ashen/Chrona";
+          license = pkgs.lib.licenses.mit;
+          mainProgram = "chrona";
+          platforms = pkgs.lib.platforms.unix;
+        };
+      };
+    in {
+      packages = {
+        inherit chrona;
+        default = chrona;
+      };
+
+      apps = {
+        default = {
+          type = "app";
+          program = pkgs.lib.getExe chrona;
+        };
+        chrona = {
+          type = "app";
+          program = pkgs.lib.getExe chrona;
+        };
       };
 
       apps.binary-smoke = {
@@ -153,10 +228,41 @@
           fi
 
           test -f "$TMP/config/.env"
-          test -f "$TMP/data/dev.db"
+          test -f "$TMP/data/chrona.db"
 
           echo "binary smoke test passed"
         '');
+      };
+      checks = {
+        package = chrona;
+      }
+      // pkgs.lib.optionalAttrs pkgs.stdenv.isLinux {
+        nixos-module = pkgs.runCommand "chrona-nixos-module-check" {} ''
+          test ${pkgs.lib.escapeShellArg ((nixpkgs.lib.nixosSystem {
+            inherit system;
+            modules = [
+              self.nixosModules.default
+              {
+                services.chrona.enable = true;
+              }
+            ];
+          }).config.systemd.services.chrona.serviceConfig.User)} = chrona
+          touch $out
+        '';
+        home-manager-module = (home-manager.lib.homeManagerConfiguration {
+          inherit pkgs;
+          modules = [
+            self.homeManagerModules.default
+            {
+              home = {
+                username = "chrona";
+                homeDirectory = "/tmp/chrona-home";
+                stateVersion = "26.05";
+              };
+              services.chrona.enable = true;
+            }
+          ];
+        }).activationPackage;
       };
 
       devShells.default = pkgs.mkShell {
@@ -181,5 +287,6 @@
           export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath playwrightLibs}:''${LD_LIBRARY_PATH:-}"
         '';
       };
+
     });
 }
