@@ -4,6 +4,11 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-li
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement, ReactNode } from "react";
 import en from "@chrona/i18n/messages/en.json";
+import {
+  derivePreferredGraphMode,
+  recoveryActionButtonVariant,
+  TaskWorkspacePlanSection,
+} from "./task-workspace-plan-section";
 
 vi.mock("elkjs/lib/elk.bundled.js", () => ({
   default: class ELKMock {
@@ -57,9 +62,6 @@ const checkpoint = {
   createdAt: "2026-05-21T00:00:00.000Z",
 };
 
-let TaskWorkspacePlanSection: typeof import("./task-workspace-plan-section").TaskWorkspacePlanSection;
-let derivePreferredGraphMode: typeof import("./task-workspace-plan-section").derivePreferredGraphMode;
-let recoveryActionButtonVariant: typeof import("./task-workspace-plan-section").recoveryActionButtonVariant;
 
 function renderWithQueryClient(ui: ReactElement) {
   const queryClient = new QueryClient({
@@ -84,8 +86,7 @@ vi.mock("@chrona/i18n", async (importOriginal) => {
   };
 });
 
-beforeAll(async () => {
-  ({ TaskWorkspacePlanSection, derivePreferredGraphMode, recoveryActionButtonVariant } = await import("./task-workspace-plan-section"));
+beforeAll(() => {
 
   class ResizeObserverMock {
     observe(target?: Element) {

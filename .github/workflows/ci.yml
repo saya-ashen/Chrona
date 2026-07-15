@@ -41,6 +41,9 @@ jobs:
           CHRONA_LLM_FIXTURE_MODE: "replay"
           OPENCLAW_MODE: "mock"
 
+      - name: Verify fresh install and previous-release migration paths
+        run: bun test packages/db/src/sqlite-migrations.bun.test.ts
+
   e2e:
     runs-on: ubuntu-24.04
     timeout-minutes: 30

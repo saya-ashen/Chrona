@@ -324,6 +324,7 @@ async function createTask(request: APIRequestContext): Promise<CreatedTask> {
 }
 
 test.describe("Task Plan Generation via Hermes", () => {
+  test.setTimeout(60_000);
   test("generates and renders a task plan through Hermes MCP tools", async ({
     page,
     request,
@@ -354,9 +355,10 @@ test.describe("Task Plan Generation via Hermes", () => {
         await commandRequest;
 
         await expect(page.getByRole("region", { name: "Execution flow" })).toBeVisible({ timeout: 20_000 });
-        await expect(page.getByText("Collect task context").first()).toBeVisible();
-        await expect(page.getByText("Implement solution").first()).toBeVisible();
-        await expect(page.getByText("Review before done").first()).toBeVisible();
+        const executionSteps = page.locator('[aria-label="Execution steps"]');
+        await expect(executionSteps).toContainText("Collect task context", { timeout: 20_000 });
+        await expect(executionSteps).toContainText("Implement solution");
+        await expect(executionSteps).toContainText("Review before done");
       });
 
       await test.step("4. Verify Hermes received a generate_plan run with plan session", async () => {

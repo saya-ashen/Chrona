@@ -15,8 +15,18 @@ describe("build manifest", () => {
   });
 
   it("maps supported release targets", () => {
-    expect(buildTargets["linux-x64"]).toMatchObject({ bunTarget: "bun-linux-x64", releaseName: "chrona-linux-x64", binaryName: "chrona" });
-    expect(buildTargets["windows-x64"]).toMatchObject({ bunTarget: "bun-windows-x64", releaseName: "chrona-windows-x64", binaryName: "Chrona.exe" });
+    expect(buildTargets["linux-x64"]).toMatchObject({
+      bunTarget: "bun-linux-x64",
+      releaseName: "chrona-linux-x64",
+      binaryName: "chrona",
+      nativePackage: "@oh-my-pi/pi-natives-linux-x64",
+    });
+    expect(buildTargets["windows-x64"]).toMatchObject({
+      bunTarget: "bun-windows-x64",
+      releaseName: "chrona-windows-x64",
+      binaryName: "Chrona.exe",
+      nativePackage: "@oh-my-pi/pi-natives-win32-x64",
+    });
   });
 
   it("parses explicit target before platform auto-detection", () => {

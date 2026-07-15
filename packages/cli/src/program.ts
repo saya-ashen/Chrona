@@ -1,5 +1,9 @@
 import { Command } from "commander";
 import { buildControlPayload, sendControlAction, UsageError, ConfigError } from "@chrona-org/agent-cli";
+import { join, resolve } from "node:path";
+import { backupSqliteDatabase, restoreSqliteDatabase } from "@chrona/db/sqlite-backup";
+import { getChronaDataDir } from "./start-server.js";
+import { inspectLocalChrona } from "./doctor.js";
 import { installHermesPlugin, type InstallHermesPluginOptions } from "./hermes-plugin.js";
 import {
   detectHermesEnvironment,
@@ -111,6 +115,42 @@ export function createProgram(options: CreateProgramOptions = {}): Command {
         throw new Error("chrona start is only available in packaged Chrona binaries.");
       }
       await options.startServer(startOptions);
+    });
+
+  program
+    .command("backup")
+    .description("Create a consistent backup of the Chrona SQLite database")
+    .argument("<output>", "Backup database path")
+    .action((output: string) => {
+      const databaseUrl = process.env.DATABASE_URL ?? `file:${join(getChronaDataDir(), "chrona.db")}`;
+      const result = backupSqliteDatabase(databaseUrl, resolve(output));
+      console.log(`Chrona backup created: ${result.backupPath}`);
+    });
+
+  program
+    .command("restore")
+    .description("Restore a Chrona SQLite database backup while the server is stopped")
+    .argument("<input>", "Backup database path")
+    .option("--force", "Replace the current Chrona database", false)
+    .action((input: string, restoreOptions: { force?: boolean }) => {
+      const databaseUrl = process.env.DATABASE_URL ?? `file:${join(getChronaDataDir(), "chrona.db")}`;
+      const result = restoreSqliteDatabase(databaseUrl, resolve(input), {
+        force: restoreOptions.force,
+      });
+      console.log(`Chrona database restored: ${result.backupPath}`);
+    });
+
+  program
+    .command("doctor")
+    .description("Inspect local database and network safety before starting Chrona")
+    .action(() => {
+      const checks = inspectLocalChrona();
+      for (const check of checks) {
+        console.log(`[${check.status}] ${check.key}: ${check.message}`);
+      }
+      if (checks.some((check) => check.status === "error")) {
+        process.exitCode = 1;
+      }
     });
 
   const hermes = program

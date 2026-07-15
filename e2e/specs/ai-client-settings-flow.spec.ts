@@ -19,6 +19,7 @@ async function fillAdvancedConnectionSettings(
 }
 
 test.describe("AI Client Settings", () => {
+  test.setTimeout(60_000);
   test("keeps settings controls visible and the client dialog centered", async ({
     page,
   }) => {

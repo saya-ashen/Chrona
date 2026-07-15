@@ -40,7 +40,7 @@ function getHome(): string {
   return process.env.HOME ?? process.env.USERPROFILE ?? homedir() ?? "/tmp";
 }
 
-function getDataDir(): string {
+export function getChronaDataDir(): string {
   if (process.env.CHRONA_DATA_DIR) return process.env.CHRONA_DATA_DIR;
   const home = getHome();
   if (process.platform === "darwin") return join(home, "Library", "Application Support", "chrona");
@@ -61,7 +61,7 @@ function getConfigDir(): string {
 }
 
 function ensureDirs() {
-  mkdirSync(getDataDir(), { recursive: true });
+  mkdirSync(getChronaDataDir(), { recursive: true });
   mkdirSync(getConfigDir(), { recursive: true });
 }
 
@@ -117,11 +117,11 @@ export async function startChronaServer(bootServer: BootChronaServer, options: C
 
   process.env.CHRONA_WEB_DIST ??= join(resourceDir, "apps/web/dist");
   process.env.CHRONA_MIGRATIONS_DIR ??= migrationsDir;
-  process.env.DATABASE_URL ??= `file:${join(getDataDir(), "chrona.db")}`;
+  process.env.DATABASE_URL ??= `file:${join(getChronaDataDir(), "chrona.db")}`;
 
   banner();
 
-  const dataDir = getDataDir();
+  const dataDir = getChronaDataDir();
   const configDir = getConfigDir();
   console.log(`  Data:  ${dataDir}`);
   console.log(`  Config: ${configDir}`);

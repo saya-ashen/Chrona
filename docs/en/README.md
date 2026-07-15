@@ -18,6 +18,7 @@ Chrona is a local-first AI schedule app. It helps you turn tasks into editable p
 | Goal | Document |
 | --- | --- |
 | Install and run Chrona | [Quick Start](./quick-start.md) |
+| Back up, restore, and operate locally | [Local Operations](./operations.md) |
 | See current product direction | [Roadmap](./roadmap.md) |
 | Integrate over HTTP or MCP | [API Reference](./api-reference.md) |
 | Understand the architecture | [Architecture](./architecture.md) |

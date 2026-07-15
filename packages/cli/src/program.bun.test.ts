@@ -1,5 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { dispatchNodeCommand } from "./program";
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { Database } from "bun:sqlite";
+import { createProgram, dispatchNodeCommand } from "./program";
 
 const ORIGINAL_ENV = { ...process.env };
 
@@ -99,5 +103,35 @@ describe("chrona CLI: `chrona node <verb>` skill-mode dispatcher", () => {
     expect(planResult.code).toBe(0);
     expect(JSON.parse(captured[0]!)).toEqual({ kind: "task_read", payload: {} });
     expect(JSON.parse(captured[1]!)).toEqual({ kind: "plan_read", payload: {} });
+  });
+});
+
+describe("chrona CLI database recovery commands", () => {
+  it("backs up and restores the configured SQLite database", async () => {
+    const directory = mkdtempSync(join(tmpdir(), "chrona-cli-recovery-"));
+    const databasePath = join(directory, "chrona.db");
+    const backupPath = join(directory, "backup.db");
+    process.env.DATABASE_URL = `file:${databasePath}`;
+
+    try {
+      const db = new Database(databasePath);
+      db.run('CREATE TABLE "Example" ("value" TEXT NOT NULL)');
+      db.run('INSERT INTO "Example" ("value") VALUES (\'before\')');
+      db.close();
+
+      await createProgram().parseAsync(["node", "chrona", "backup", backupPath]);
+
+      const changed = new Database(databasePath);
+      changed.run('UPDATE "Example" SET "value" = \'after\'');
+      changed.close();
+
+      await createProgram().parseAsync(["node", "chrona", "restore", backupPath, "--force"]);
+
+      const restored = new Database(databasePath, { readonly: true });
+      expect(restored.query('SELECT "value" FROM "Example"').get()).toEqual({ value: "before" });
+      restored.close();
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
   });
 });

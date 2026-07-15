@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { mkdtemp, mkdir, rm, stat } from "node:fs/promises";
+import { mkdtemp, mkdir, readdir, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -142,6 +142,17 @@ export async function smokeRelease(target: BuildTargetName, options: SmokeReleas
   await assertExists(resolve(releaseDir, buildArtifacts.resourcesRoot, buildArtifacts.webDist, "index.html"), "Web index");
   await assertExists(resolve(releaseDir, buildArtifacts.resourcesRoot, "prisma/schema.prisma"), "Prisma schema");
   await assertExists(resolve(releaseDir, buildArtifacts.resourcesRoot, "prisma/migrations"), "Prisma migrations");
+
+  const nativePackageDir = resolve(ROOT, "node_modules", ...manifestTarget.nativePackage.split("/"));
+  if (await pathExists(nativePackageDir)) {
+    const nativeAddonNames = (await readdir(nativePackageDir)).filter((name) => name.endsWith(".node"));
+    if (nativeAddonNames.length === 0) {
+      throw new Error(`Native package contains no addon: ${manifestTarget.nativePackage}`);
+    }
+    for (const nativeAddonName of nativeAddonNames) {
+      await assertExists(resolve(releaseDir, nativeAddonName), `Native addon ${nativeAddonName}`);
+    }
+  }
 
   const pluginSource = resolve(ROOT, options.pluginSource ?? "external-plugins/hermes");
   const pluginRelease = resolve(releaseDir, buildArtifacts.resourcesRoot, "external-plugins/hermes");
