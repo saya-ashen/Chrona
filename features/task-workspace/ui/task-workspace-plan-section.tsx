@@ -27,7 +27,14 @@ import {
   CardTitle,
   Textarea,
 } from "@shared/ui";
-import { CheckCircle2, ChevronRight, ExternalLink } from "lucide-react";
+import {
+  Check,
+  CheckCircle2,
+  ChevronRight,
+  ExternalLink,
+  ListPlus,
+  MessageCircle,
+} from "lucide-react";
 import {
   TaskWorkspaceInspector,
   type CommandCenterCopy,
@@ -1118,57 +1125,66 @@ function ResultLifecyclePanel({
 
         {isAccepted ? (
           <div className="space-y-3 border-t border-border/70 pt-4">
-            <div
-              className="grid gap-2 sm:grid-cols-2"
-              role="radiogroup"
-              aria-label={copy.followUpIntentLabel ?? "Follow-up intent"}
-            >
-              <Button
-                type="button"
-                variant={intent === "create_task" ? "secondary" : "outline"}
-                className="h-auto justify-start whitespace-normal px-3 py-2 text-left"
-                role="radio"
-                aria-checked={intent === "create_task"}
-                disabled={submissionState === "submitting"}
-                onClick={() => {
-                  setIntent("create_task");
-                  setSubmissionError(null);
-                  textareaRef.current?.focus();
-                }}
+            <div className="space-y-1.5">
+              <div
+                className="inline-flex w-full items-center gap-1 rounded-lg border border-border/80 bg-muted/70 p-1 sm:w-auto"
+                role="radiogroup"
+                aria-label={copy.followUpIntentLabel ?? "Follow-up intent"}
               >
-                <span>
-                  <span className="block font-medium">
-                    {copy.followUpCreateTask ?? "Create next task"}
-                  </span>
-                  <span className="block text-xs font-normal text-muted-foreground">
-                    {copy.followUpCreateTaskDescription ??
-                      "Carry this accepted result into a linked task draft."}
-                  </span>
-                </span>
-              </Button>
-              <Button
-                type="button"
-                variant={intent === "ask" ? "secondary" : "outline"}
-                className="h-auto justify-start whitespace-normal px-3 py-2 text-left"
-                role="radio"
-                aria-checked={intent === "ask"}
-                disabled={submissionState === "submitting"}
-                onClick={() => {
-                  setIntent("ask");
-                  setSubmissionError(null);
-                  textareaRef.current?.focus();
-                }}
-              >
-                <span>
-                  <span className="block font-medium">
-                    {copy.followUpAskOnly ?? "Ask a follow-up"}
-                  </span>
-                  <span className="block text-xs font-normal text-muted-foreground">
-                    {copy.followUpAskDescription ??
-                      "Get an answer grounded in the accepted result."}
-                  </span>
-                </span>
-              </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={intent === "create_task" ? "default" : "ghost"}
+                  className="h-8 flex-1 gap-1.5 rounded-md px-3 text-xs shadow-none sm:flex-none"
+                  role="radio"
+                  aria-checked={intent === "create_task"}
+                  data-state={
+                    intent === "create_task" ? "checked" : "unchecked"
+                  }
+                  disabled={submissionState === "submitting"}
+                  onClick={() => {
+                    setIntent("create_task");
+                    setSubmissionError(null);
+                    textareaRef.current?.focus();
+                  }}
+                >
+                  {intent === "create_task" ? (
+                    <Check className="size-3.5" aria-hidden />
+                  ) : (
+                    <ListPlus className="size-3.5" aria-hidden />
+                  )}
+                  {copy.followUpCreateTask ?? "Create next task"}
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={intent === "ask" ? "default" : "ghost"}
+                  className="h-8 flex-1 gap-1.5 rounded-md px-3 text-xs shadow-none sm:flex-none"
+                  role="radio"
+                  aria-checked={intent === "ask"}
+                  data-state={intent === "ask" ? "checked" : "unchecked"}
+                  disabled={submissionState === "submitting"}
+                  onClick={() => {
+                    setIntent("ask");
+                    setSubmissionError(null);
+                    textareaRef.current?.focus();
+                  }}
+                >
+                  {intent === "ask" ? (
+                    <Check className="size-3.5" aria-hidden />
+                  ) : (
+                    <MessageCircle className="size-3.5" aria-hidden />
+                  )}
+                  {copy.followUpAskOnly ?? "Ask a follow-up"}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground" aria-live="polite">
+                {intent === "create_task"
+                  ? (copy.followUpCreateTaskDescription ??
+                    "Carry this accepted result into a linked task draft.")
+                  : (copy.followUpAskDescription ??
+                    "Get an answer grounded in the accepted result.")}
+              </p>
             </div>
 
             {intent === "ask" && messages.length > 0 ? (

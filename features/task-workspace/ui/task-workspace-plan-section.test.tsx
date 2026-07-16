@@ -1742,9 +1742,17 @@ describe("TaskWorkspacePlanSection", () => {
     expect(
       screen.queryByText("Continue from result is not available yet."),
     ).not.toBeInTheDocument();
+    const createTaskMode = within(lifecyclePanel).getByRole("radio", {
+      name: /Create next task/,
+    });
+    expect(createTaskMode).toHaveAttribute("aria-checked", "true");
+    expect(createTaskMode).toHaveAttribute("data-state", "checked");
+    expect(createTaskMode).toHaveClass("h-8");
     expect(
-      within(lifecyclePanel).getByRole("radio", { name: /Create next task/ }),
-    ).toHaveAttribute("aria-checked", "true");
+      within(lifecyclePanel).getByText(
+        "Carry this accepted result into a linked task draft.",
+      ),
+    ).toBeInTheDocument();
 
     const input = within(lifecyclePanel).getByRole("textbox", {
       name: "Follow-up request",
@@ -1813,6 +1821,21 @@ describe("TaskWorkspacePlanSection", () => {
     fireEvent.click(
       within(lifecyclePanel).getByRole("radio", { name: /Ask a follow-up/ }),
     );
+    const createTaskMode = within(lifecyclePanel).getByRole("radio", {
+      name: /Create next task/,
+    });
+    const askMode = within(lifecyclePanel).getByRole("radio", {
+      name: /Ask a follow-up/,
+    });
+    expect(createTaskMode).toHaveAttribute("aria-checked", "false");
+    expect(createTaskMode).toHaveAttribute("data-state", "unchecked");
+    expect(askMode).toHaveAttribute("aria-checked", "true");
+    expect(askMode).toHaveAttribute("data-state", "checked");
+    expect(
+      within(lifecyclePanel).getByText(
+        "Get an answer grounded in the accepted result.",
+      ),
+    ).toBeInTheDocument();
     const input = within(lifecyclePanel).getByRole("textbox", {
       name: "Follow-up request",
     });
