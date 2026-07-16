@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useReducer } from "react";
+import { v4 as uuidv4 } from "uuid";
 import {
   continueFromTaskResult,
   getTaskResultFollowUpState,
@@ -8,6 +9,7 @@ import {
   reduceTaskResultFollowUpState,
   type ResultFollowUpMode,
 } from "../model/task-result-follow-up-state";
+
 
 export function useTaskResultFollowUp(taskId: string, enabled: boolean) {
   const [state, dispatch] = useReducer(
@@ -55,7 +57,7 @@ export function useTaskResultFollowUp(taskId: string, enabled: boolean) {
     try {
       const entry = await continueFromTaskResult({
         taskId,
-        requestId: crypto.randomUUID(),
+        requestId: uuidv4(),
         intent: state.mode,
         instruction,
         ...(state.mode === "create_task"
