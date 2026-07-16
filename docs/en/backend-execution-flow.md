@@ -155,6 +155,17 @@ External agents use `POST /api/mcp` tools. Chrona injects hidden context such as
 
 Important rule: agents must not invent backend IDs. They should call read tools only when state is missing or stale, and submit final node outcomes with the appropriate Chrona tool.
 
+## Generated file references and controlled reads
+
+Task nodes that create files receive a node-scoped output directory under Chrona's data directory: `generated-files/<task-ref>/<plan-ref>/<node-ref>`. The runtime input exposes this directory as `context.run.generatedFiles`; result artifacts should reference the returned file path instead of embedding large contents in the terminal payload.
+
+Result previews follow two paths:
+
+- Files inside the node-scoped generated-files root are previewed directly after canonical-path and symlink containment checks.
+- Other local files are never read implicitly. The result surface first requests metadata, shows the canonical path and size, and requires an explicit one-time approval before the server reads a bounded preview.
+
+The access grant is task-bound, path-bound, short-lived, single-use, and kept in process memory. Requests reject directories, device files, sockets, unsafe special files, missing files, and files above the configured size limit. Preview reads remain bounded after approval.
+
 ## Completion
 
 When no ready nodes remain, the runner transitions the `ExecutionSession` to

@@ -304,10 +304,14 @@ describe("node runtime refs", () => {
       elementIds: [],
       updatedAt: null,
     });
-    expect(runtime.instructions).toContain("current working directory as the workspace root");
-    expect(runtime.instructions).toContain(".chrona/outputs/N20260516-01/");
+    expect(runtime.runtimeInput.context.run?.generatedFiles).toEqual({
+      directory: expect.stringContaining("/generated/"),
+      referenceBase: "generated://20260716/N20260516-01/",
+    });
+    expect(runtime.instructions).toContain("absolute output directory");
+    expect(runtime.instructions).toContain("generated://20260716/N20260516-01/");
     expect(runtime.instructions).toContain("FileView or FileRef");
-    expect(runtime.instructions).toContain("Do not use absolute paths, .. segments");
+    expect(runtime.instructions).toContain("Do not use file:// URLs");
   });
 
   it("includes Results design guidance for task-node outputs", () => {

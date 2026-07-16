@@ -1,5 +1,10 @@
 import { db } from "@/lib/db";
-import { buildCommandCenterArtifactsSpec, buildCommandCenterNowSpec, buildCommandCenterTrailSpec, type UiDocument } from "@chrona/ui-protocol";
+import {
+  buildCommandCenterArtifactsSpec,
+  buildCommandCenterNowSpec,
+  buildCommandCenterTrailSpec,
+  type UiDocument,
+} from "@chrona/ui-protocol";
 import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
 import {
   buildActivityTimeline,
@@ -36,24 +41,41 @@ function nowTitle(status: string) {
  * (`getTaskHeaderSpec`) so it can be cached, mutated, and invalidated
  * independently of the command-center bundle.
  */
-export async function getTaskCommandCenter(input: { taskId: string; workBlockId?: string | null }) {
+export async function getTaskCommandCenter(input: {
+  taskId: string;
+  workBlockId?: string | null;
+}) {
   const selectedWorkBlockId = input.workBlockId ?? null;
-  const currentExecution = await getCurrentExecution({ taskId: input.taskId, workBlockId: selectedWorkBlockId });
-  const scopedEventWhere = selectedWorkBlockId !== null
-    ? {
-        OR: [
-          { workBlockId: selectedWorkBlockId },
-          ...(currentExecution.mainSessionId ? [{ workBlockId: null, taskSessionId: currentExecution.mainSessionId }] : []),
-        ],
-      }
-    : {};
+  const currentExecution = await getCurrentExecution({
+    taskId: input.taskId,
+    workBlockId: selectedWorkBlockId,
+  });
+  const scopedEventWhere =
+    selectedWorkBlockId !== null
+      ? {
+          OR: [
+            { workBlockId: selectedWorkBlockId },
+            ...(currentExecution.mainSessionId
+              ? [
+                  {
+                    workBlockId: null,
+                    taskSessionId: currentExecution.mainSessionId,
+                  },
+                ]
+              : []),
+          ],
+        }
+      : {};
   const task = await db.task.findUnique({
     where: { id: input.taskId },
     select: {
       id: true,
       artifacts: { orderBy: { createdAt: "desc" }, take: 5 },
       timelineItems: {
-        where: selectedWorkBlockId !== null ? { workBlockId: selectedWorkBlockId } : {},
+        where:
+          selectedWorkBlockId !== null
+            ? { workBlockId: selectedWorkBlockId }
+            : {},
         orderBy: [{ sortTime: "desc" }, { createdAt: "desc" }],
         take: 100,
       },
@@ -67,19 +89,22 @@ export async function getTaskCommandCenter(input: { taskId: string; workBlockId?
   if (!task) {
     throw new EngineError(ENGINE_ERROR_CODES.TASK_NOT_FOUND, "Task not found");
   }
-  const artifacts = await Promise.all(task.artifacts.map(async (artifact) => ({
-    id: artifact.id,
-    title: artifact.title,
-    type: artifact.type,
-    uri: artifact.uri,
-    ...(await resolveFilePreview(artifact.uri)),
-  })));
-  const activityTimeline = task.timelineItems.length > 0
-    ? orderActivityNewestFirst([
-        ...task.timelineItems.map(mapTimelineItemToActivity),
-        ...buildActivityTimeline([...task.events].reverse()),
-      ]).slice(0, 100)
-    : buildActivityTimeline([...task.events].reverse());
+  const artifacts = await Promise.all(
+    task.artifacts.map(async (artifact) => ({
+      id: artifact.id,
+      title: artifact.title,
+      type: artifact.type,
+      uri: artifact.uri,
+      ...(await resolveFilePreview(artifact.uri, { taskId: input.taskId })),
+    })),
+  );
+  const activityTimeline =
+    task.timelineItems.length > 0
+      ? orderActivityNewestFirst([
+          ...task.timelineItems.map(mapTimelineItemToActivity),
+          ...buildActivityTimeline([...task.events].reverse()),
+        ]).slice(0, 100)
+      : buildActivityTimeline([...task.events].reverse());
 
   return {
     documents: {
@@ -90,7 +115,11 @@ export async function getTaskCommandCenter(input: { taskId: string; workBlockId?
         tone: nowTone(currentExecution.status),
         currentOperationSpec: currentExecution.ui?.currentOperationSpec ?? null,
       }),
-      output: await hydrateFilePreviewSpec((currentExecution.planOutput?.spec as UiDocument | null | undefined) ?? buildCommandCenterArtifactsSpec({ artifacts })),
+      output: await hydrateFilePreviewSpec(
+        (currentExecution.planOutput?.spec as UiDocument | null | undefined) ??
+          buildCommandCenterArtifactsSpec({ artifacts }),
+        { taskId: input.taskId },
+      ),
       trail: buildCommandCenterTrailSpec({
         activity: activityTimeline,
         savedCount: activityTimeline.length,

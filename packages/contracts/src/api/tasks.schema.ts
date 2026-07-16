@@ -15,12 +15,9 @@ function executionRuntimeSchema(supportedRuntimes?: readonly string[]) {
     return schema;
   }
 
-  return schema.refine(
-    (runtime) => supportedRuntimes.includes(runtime),
-    {
-      message: `Unsupported executionRuntime. Supported runtimes: ${supportedRuntimes.join(", ")}`,
-    },
-  );
+  return schema.refine((runtime) => supportedRuntimes.includes(runtime), {
+    message: `Unsupported executionRuntime. Supported runtimes: ${supportedRuntimes.join(", ")}`,
+  });
 }
 
 export function createTaskBodySchemaForSupportedRuntimes(
@@ -91,7 +88,8 @@ const pageSizeParam = z
   .transform((v) => {
     if (!v) return 20;
     const n = Number.parseInt(v, 10);
-    if (!Number.isFinite(n)) throw new Error("pageSize must be a valid integer");
+    if (!Number.isFinite(n))
+      throw new Error("pageSize must be a valid integer");
     return Math.min(Math.max(n, 1), 100);
   });
 
@@ -128,9 +126,25 @@ export const createTaskBodySchema = z.object({
   executionConfig: z.record(z.string(), z.unknown()).optional(),
   aiClientId: z.string().trim().min(1).nullable().optional(),
   parentTaskId: z.string().nullable().optional(),
-  recurrenceRule: z.string().trim().min(1).max(TASK_RECURRENCE_RULE_MAX).nullable().optional(),
+  recurrenceRule: z
+    .string()
+    .trim()
+    .min(1)
+    .max(TASK_RECURRENCE_RULE_MAX)
+    .nullable()
+    .optional(),
   recurrenceAnchorStartAt: z.string().datetime().nullable().optional(),
   recurrenceAnchorEndAt: z.string().datetime().nullable().optional(),
+});
+
+export const resultFileAccessParamSchema = z.object({ taskId: taskIdParam });
+
+export const resultFileAccessRequestBodySchema = z.object({
+  path: z.string().trim().min(1).max(4_096),
+});
+
+export const resultFileAccessApproveBodySchema = z.object({
+  requestId: z.string().uuid(),
 });
 
 /** Recurrence requires both schedule anchors so we can materialize occurrences. */
@@ -144,7 +158,8 @@ export function refineRecurrenceAnchors<
   return schema.refine(
     (body) =>
       !body.recurrenceRule ||
-      (Boolean(body.recurrenceAnchorStartAt) && Boolean(body.recurrenceAnchorEndAt)),
+      (Boolean(body.recurrenceAnchorStartAt) &&
+        Boolean(body.recurrenceAnchorEndAt)),
     {
       message:
         "recurrenceAnchorStartAt and recurrenceAnchorEndAt are required when recurrenceRule is set",
@@ -170,7 +185,13 @@ export const updateTaskBodySchema = z.object({
   executionRuntime: executionRuntimeSchema().optional(),
   executionConfig: z.record(z.string(), z.unknown()).optional(),
   aiClientId: z.string().trim().min(1).nullable().optional(),
-  recurrenceRule: z.string().trim().min(1).max(TASK_RECURRENCE_RULE_MAX).nullable().optional(),
+  recurrenceRule: z
+    .string()
+    .trim()
+    .min(1)
+    .max(TASK_RECURRENCE_RULE_MAX)
+    .nullable()
+    .optional(),
   recurrenceAnchorStartAt: z.string().datetime().nullable().optional(),
   recurrenceAnchorEndAt: z.string().datetime().nullable().optional(),
 });
@@ -199,7 +220,13 @@ export const workspaceActivityKindSchema = z.enum([
   "raw",
 ]);
 
-export const workspaceActivityToneSchema = z.enum(["neutral", "info", "success", "warning", "danger"]);
+export const workspaceActivityToneSchema = z.enum([
+  "neutral",
+  "info",
+  "success",
+  "warning",
+  "danger",
+]);
 
 export const workspaceToolActivitySchema = z.object({
   name: z.string().optional(),
@@ -246,7 +273,8 @@ export const workspaceActivityPageQuerySchema = z.object({
     .transform((value) => {
       if (!value) return 100;
       const limit = Number.parseInt(value, 10);
-      if (!Number.isFinite(limit)) throw new Error("limit must be a valid integer");
+      if (!Number.isFinite(limit))
+        throw new Error("limit must be a valid integer");
       return Math.min(Math.max(limit, 1), 3000);
     }),
 });

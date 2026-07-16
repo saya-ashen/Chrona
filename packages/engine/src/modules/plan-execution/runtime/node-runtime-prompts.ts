@@ -7,9 +7,17 @@ import type {
 import { chronaPlanOutputCatalogPrompt } from "@chrona/ui-protocol";
 
 import { buildNodeRuntimeInput } from "./node-runtime-refs";
+import { mkdirSync } from "node:fs";
+import { join } from "node:path";
+import { getChronaGeneratedFilesDir } from "@chrona/shared/data-paths";
 
 export const NODE_RUNTIME_TERMINAL_TOOLS = {
-  task: ["chrona_plan_output", "chrona_node_complete", "chrona_node_block", "chrona_node_fail"],
+  task: [
+    "chrona_plan_output",
+    "chrona_node_complete",
+    "chrona_node_block",
+    "chrona_node_fail",
+  ],
   condition: [
     "chrona_condition_select",
     "chrona_node_block",
@@ -43,12 +51,21 @@ For Tables, choose columns that best explain the data for the user's goal. Prefe
 Keep Results rich enough to be useful, but avoid duplicating the same information across summaries, tables, and files.
 `.trim();
 
-
 function resultArtifactGuidance(runtimeInput: NodeRuntimeInput): string {
-  const outputDir = `.chrona/outputs/${runtimeInput.node.ref}/`;
-  return `For generated result artifacts not explicitly requested as repo/code changes, treat the current working directory as the workspace root and write only under ${outputDir}. For long Markdown reports or large evidence, prefer writing a .md/.txt/.json/.csv file there, then reference it from plan output with FileView or FileRef using the same repo-relative path. Keep ResultSummary/Card/Markdown/Table as the readable summary; do not dump long report bodies directly into chrona_plan_output patches. Do not use absolute paths, .. segments, secrets/tokens/credentials/key paths, or backend IDs in file paths.`;
+  const generatedFiles = runtimeInput.context.run?.generatedFiles;
+  if (!generatedFiles) return "";
+  return `For generated result artifacts not explicitly requested as repo/code changes, write only under the absolute output directory ${generatedFiles.directory}. Reference those files from plan output with FileView or FileRef using ${generatedFiles.referenceBase}<filename>, not the absolute path. For long Markdown reports or large evidence, prefer a .md/.txt/.json/.csv file there. Keep ResultSummary/Card/Markdown/Table as the readable summary; do not dump long report bodies directly into chrona_plan_output patches. Do not use .. segments, secrets/tokens/credentials/key paths, backend IDs, or paths outside the assigned output directory for generated deliverables.`;
 }
 
+function generatedFilesContext(nodeRef: string) {
+  const scope = new Date().toISOString().slice(0, 10).replaceAll("-", "");
+  const directory = join(getChronaGeneratedFilesDir(), scope, nodeRef);
+  mkdirSync(directory, { recursive: true, mode: 0o700 });
+  return {
+    directory,
+    referenceBase: `generated://${scope}/${nodeRef}/`,
+  };
+}
 
 function nodeTypeInstructions(node: EffectivePlanNode): string {
   switch (node.type) {
@@ -61,7 +78,7 @@ function nodeTypeInstructions(node: EffectivePlanNode): string {
 
       Final Spec after applying patches must be valid and closed: root must reference an existing element id, every child id referenced in any children array must exist as an element id, every element id must be unique, and no element may be omitted as a placeholder unless that element is also declared in elements. For existing plan output, satisfy these rules by preserving the current root and adding/appending elements; do not rebuild the whole Spec.
 
-      Spec hard rules, all enforced by validation: (1) root MUST equal one element id. (2) Leaf elements use children: []. (3) children contains child element-id strings only. (4) Every child id MUST exist in elements. (5) No element may include itself or create a cycle. (6) Component type MUST be from CATALOG_UI_SPEC. (7) props MUST match that component schema exactly. (8) visible is an element-level field, not a prop. (9) The plan-output catalog is intentionally small: use Stack/Card/Heading/Text/Markdown/Table/Badge/Alert/FileRef/JsonView/ResultSummary/CollapsibleText/Separator only.`
+      Spec hard rules, all enforced by validation: (1) root MUST equal one element id. (2) Leaf elements use children: []. (3) children contains child element-id strings only. (4) Every child id MUST exist in elements. (5) No element may include itself or create a cycle. (6) Component type MUST be from CATALOG_UI_SPEC. (7) props MUST match that component schema exactly. (8) visible is an element-level field, not a prop. (9) The plan-output catalog is intentionally small: use Stack/Card/Heading/Text/Markdown/Table/Badge/Alert/FileRef/JsonView/ResultSummary/CollapsibleText/Separator only.`;
     case "condition":
       return `Evaluate exactly one listed branch and call chrona_condition_select with branchRef. Do not use labels, nextNodeId, default branches, natural-language conclusions, or incomplete JSON as routing authority. If no explicit branchRef is safe, call chrona_node_block.`;
     case "checkpoint":
@@ -85,17 +102,34 @@ export function buildNodeRuntimePrompt(input: {
   const currentNodeResultActionNames = [
     ...NODE_RUNTIME_TERMINAL_TOOLS[input.node.type],
   ];
-  const runtimeInput = buildNodeRuntimeInput({
+  const baseRuntimeInput = buildNodeRuntimeInput({
     plan: input.plan,
     node: input.node,
     planOutput: input.planOutput,
     planContext: input.planContext,
     runContext: input.runContext,
   });
+  const runtimeInput: NodeRuntimeInput = input.node.type === "task"
+    ? {
+        ...baseRuntimeInput,
+        context: {
+          ...baseRuntimeInput.context,
+          run: {
+            ...baseRuntimeInput.context.run,
+            generatedFiles: generatedFilesContext(baseRuntimeInput.node.ref),
+          },
+        },
+      }
+    : baseRuntimeInput;
 
-  const catalogSection = input.node.type === "task"
-    ? [RESULTS_DESIGN_BRIEF, resultArtifactGuidance(runtimeInput), PLAN_OUTPUT_CATALOG_PROMPT]
-    : [];
+  const catalogSection =
+    input.node.type === "task"
+      ? [
+          RESULTS_DESIGN_BRIEF,
+          resultArtifactGuidance(runtimeInput),
+          PLAN_OUTPUT_CATALOG_PROMPT,
+        ]
+      : [];
 
   const instructions = [
     NODE_RUNTIME_PROTOCOL,

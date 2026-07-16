@@ -13,7 +13,9 @@ export interface CommandCenterArtifactInput {
   contentPreview?: string;
   contentTruncated?: boolean;
   contentBytes?: number;
-  previewError?: "unsafe_path" | "not_found" | "unsupported_type" | "read_failed";
+  previewError?: "permission_required" | "unsafe_path" | "not_found" | "unsupported_type" | "read_failed";
+  accessTaskId?: string;
+  accessRequestedPath?: string;
 }
 
 export interface CommandCenterCopyInput {
@@ -237,6 +239,8 @@ export function buildCommandCenterArtifactsSpec(input: {
         contentTruncated: artifact.contentTruncated,
         contentBytes: artifact.contentBytes,
         previewError: artifact.previewError,
+        accessTaskId: artifact.accessTaskId,
+        accessRequestedPath: artifact.accessRequestedPath,
         locateLabel: input.copy?.locateSourceNode ?? "Locate source node",
       },
       ...(artifact.sourceNodeId

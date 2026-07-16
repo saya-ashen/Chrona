@@ -279,3 +279,47 @@ export function continueFromTaskResult(input: {
     },
   );
 }
+
+export type ResultFileAccessRequest = {
+  status: "permission_required" | "already_allowed";
+  requestId?: string;
+  requestedPath: string;
+  canonicalPath: string;
+  filename?: string;
+  extension?: string;
+  size?: number;
+  expiresAt?: string;
+};
+
+export type ResultFileAccessApproval = {
+  requestedPath: string;
+  canonicalPath: string;
+  preview: {
+    displayPath?: string;
+    contentKind?: "markdown" | "json" | "text" | "csv";
+    contentPreview?: string;
+    contentTruncated?: boolean;
+    contentBytes?: number;
+    previewError?: string;
+  };
+};
+
+export function requestResultFileAccess(input: {
+  taskId: string;
+  path: string;
+}) {
+  return apiJson<ResultFileAccessRequest>(
+    `/api/tasks/${encodeURIComponent(input.taskId)}/result-files/access-requests`,
+    { method: "POST", body: JSON.stringify({ path: input.path }) },
+  );
+}
+
+export function approveResultFileAccess(input: {
+  taskId: string;
+  requestId: string;
+}) {
+  return apiJson<ResultFileAccessApproval>(
+    `/api/tasks/${encodeURIComponent(input.taskId)}/result-files/access-requests/approve`,
+    { method: "POST", body: JSON.stringify({ requestId: input.requestId }) },
+  );
+}

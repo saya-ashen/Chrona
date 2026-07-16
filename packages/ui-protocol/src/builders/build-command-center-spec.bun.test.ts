@@ -69,6 +69,29 @@ describe("buildCommandCenterArtifactsSpec", () => {
       },
     });
   });
+
+  it("passes permission-gated file context to artifact items", () => {
+    const spec = buildCommandCenterArtifactsSpec({
+      artifacts: [{
+        id: "artifact-2",
+        title: "External report",
+        type: "markdown",
+        uri: "/tmp/report.md",
+        previewError: "permission_required",
+        accessTaskId: "task-1",
+        accessRequestedPath: "/tmp/report.md",
+      }],
+    });
+
+    expect(spec.elements["artifact:artifact-2"]).toMatchObject({
+      type: "WorkspaceArtifactItem",
+      props: {
+        previewError: "permission_required",
+        accessTaskId: "task-1",
+        accessRequestedPath: "/tmp/report.md",
+      },
+    });
+  });
 });
 
 describe("buildCommandCenterCheckpointSpec", () => {

@@ -1,10 +1,91 @@
 import "@testing-library/jest-dom/vitest";
-import { fireEvent, render, screen, within } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { UiDocument } from "@chrona/ui-protocol";
-import { SpecRenderer } from "./spec-renderer"
+import { SpecRenderer } from "./spec-renderer";
 
+const requestResultFileAccessMock = vi.fn();
+const approveResultFileAccessMock = vi.fn();
+
+vi.mock("../../model/task-actions-client", () => ({
+  requestResultFileAccess: (...args: unknown[]) =>
+    requestResultFileAccessMock(...args),
+  approveResultFileAccess: (...args: unknown[]) =>
+    approveResultFileAccessMock(...args),
+}));
+
+beforeEach(() => {
+  requestResultFileAccessMock.mockReset();
+  approveResultFileAccessMock.mockReset();
+});
+
+it("requests and approves external file access inside FileRef", async () => {
+  requestResultFileAccessMock.mockResolvedValueOnce({
+    status: "permission_required",
+    requestId: "request-1",
+    requestedPath: "/tmp/report.md",
+    canonicalPath: "/tmp/report.md",
+    filename: "report.md",
+    extension: ".md",
+    size: 14,
+  });
+  approveResultFileAccessMock.mockResolvedValueOnce({
+    requestedPath: "/tmp/report.md",
+    canonicalPath: "/tmp/report.md",
+    preview: {
+      displayPath: "/tmp/report.md",
+      contentKind: "markdown",
+      contentPreview: "# Approved report",
+      contentBytes: 17,
+    },
+  });
+  const spec: UiDocument = {
+    root: "file",
+    elements: {
+      file: {
+        type: "FileRef",
+        props: {
+          path: "/tmp/report.md",
+          displayPath: "/tmp/report.md",
+          previewError: "permission_required",
+          accessTaskId: "task-1",
+          accessRequestedPath: "/tmp/report.md",
+        },
+      },
+    },
+  };
+
+  render(<SpecRenderer spec={spec} />);
+  expect(
+    screen.getByText(/outside Chrona's generated-file directory/i),
+  ).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("button", { name: "Request access" }));
+  expect(
+    await screen.findByRole("group", { name: "File access review" }),
+  ).toHaveTextContent("/tmp/report.md");
+  expect(requestResultFileAccessMock).toHaveBeenCalledWith({
+    taskId: "task-1",
+    path: "/tmp/report.md",
+  });
+
+  fireEvent.click(screen.getByRole("button", { name: "Allow once" }));
+  await waitFor(() =>
+    expect(approveResultFileAccessMock).toHaveBeenCalledWith({
+      taskId: "task-1",
+      requestId: "request-1",
+    }),
+  );
+  expect(
+    await screen.findByRole("heading", { name: "Approved report" }),
+  ).toBeInTheDocument();
+});
 describe("workspace result registry", () => {
   it("renders JsonView as flat result content", () => {
     const spec: UiDocument = {
@@ -32,7 +113,10 @@ describe("workspace result registry", () => {
       elements: {
         root: {
           type: "ResultSummary",
-          props: { text: "Trending report ready.", copyText: "Copyable report summary." },
+          props: {
+            text: "Trending report ready.",
+            copyText: "Copyable report summary.",
+          },
           children: [],
         },
       },
@@ -44,7 +128,9 @@ describe("workspace result registry", () => {
     expect(summary).toHaveClass("border-b");
     expect(screen.getByText("Result summary")).toBeInTheDocument();
     expect(screen.getByText("Trending report ready.")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /copy summary/i })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /copy summary/i }),
+    ).toBeInTheDocument();
   });
 
   it("renders generated Card outputs at result region width", () => {
@@ -66,7 +152,9 @@ describe("workspace result registry", () => {
 
     render(<SpecRenderer spec={spec} />);
 
-    const card = screen.getByText("Generated result").closest("[data-slot='card']");
+    const card = screen
+      .getByText("Generated result")
+      .closest("[data-slot='card']");
     expect(card).toHaveClass("w-full");
     expect(card).toHaveClass("max-w-none");
     expect(card).not.toHaveClass("max-w-sm");
@@ -82,10 +170,22 @@ describe("workspace result registry", () => {
             title: "Trending repos",
             path: ".chrona/outputs/N20260706-01/trending.json",
             contentKind: "json",
-            contentPreview: JSON.stringify({ rows: [
-              { repo: "zeta/project", description: "Later row", url: "https://github.com/zeta/project", starsToday: 20 },
-              { repo: "alpha/project", description: "Earlier row", url: "https://github.com/alpha/project", starsToday: 10 },
-            ] }),
+            contentPreview: JSON.stringify({
+              rows: [
+                {
+                  repo: "zeta/project",
+                  description: "Later row",
+                  url: "https://github.com/zeta/project",
+                  starsToday: 20,
+                },
+                {
+                  repo: "alpha/project",
+                  description: "Earlier row",
+                  url: "https://github.com/alpha/project",
+                  starsToday: 10,
+                },
+              ],
+            }),
             columns: [
               { key: "repo", label: "Repository" },
               { key: "description", label: "Description" },
@@ -109,8 +209,12 @@ describe("workspace result registry", () => {
     expect(table.parentElement).toHaveClass("bg-background");
     expect(table.closest("section")).not.toHaveClass("bg-card");
     expect(screen.getByText("Trending repos")).toBeInTheDocument();
-    expect(screen.getByText(".chrona/outputs/N20260706-01/trending.json")).toBeInTheDocument();
-    const repositoryHeader = screen.getByRole("button", { name: "Sort by Repository" });
+    expect(
+      screen.getByText(".chrona/outputs/N20260706-01/trending.json"),
+    ).toBeInTheDocument();
+    const repositoryHeader = screen.getByRole("button", {
+      name: "Sort by Repository",
+    });
     expect(repositoryHeader).toHaveTextContent("Repository↕");
     expect(repositoryHeader.closest("th")).toHaveAttribute("aria-sort", "none");
     const starsHeader = screen.getByRole("button", { name: "Sort by Stars" });
@@ -119,13 +223,23 @@ describe("workspace result registry", () => {
     expect(starsHeader.closest("th")).toHaveAttribute("aria-sort", "none");
     expect(screen.getByText("Later row")).toHaveClass("whitespace-normal");
     expect(screen.getByText("Later row")).toHaveClass("break-words");
-    expect(screen.getByText("Later row")).toHaveClass("[overflow-wrap:anywhere]");
-    expect(screen.getByRole("link", { name: "zeta/project" })).toHaveAttribute("href", "https://github.com/zeta/project");
+    expect(screen.getByText("Later row")).toHaveClass(
+      "[overflow-wrap:anywhere]",
+    );
+    expect(screen.getByRole("link", { name: "zeta/project" })).toHaveAttribute(
+      "href",
+      "https://github.com/zeta/project",
+    );
     expect(screen.getByText("2 rows · page 1 of 2")).toBeInTheDocument();
     fireEvent.click(repositoryHeader);
     expect(repositoryHeader).toHaveTextContent("Repository↑");
-    expect(repositoryHeader.closest("th")).toHaveAttribute("aria-sort", "ascending");
-    expect(within(screen.getAllByRole("row")[1]!).getAllByText("alpha/project")).toHaveLength(2);
+    expect(repositoryHeader.closest("th")).toHaveAttribute(
+      "aria-sort",
+      "ascending",
+    );
+    expect(
+      within(screen.getAllByRole("row")[1]!).getAllByText("alpha/project"),
+    ).toHaveLength(2);
     expect(screen.getByRole("button", { name: "Previous" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Next" })).toBeEnabled();
   });

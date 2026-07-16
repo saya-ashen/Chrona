@@ -11,6 +11,7 @@
   },
   "exports": {
     ".": "./src/index.ts",
+    "./data-paths": "./src/data-paths.ts",
     "./runtime-config": "./src/runtime-config.ts"
   }
 }

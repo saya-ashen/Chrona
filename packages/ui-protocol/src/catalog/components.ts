@@ -63,12 +63,14 @@ const paragraphSchema = z.object({
   variant: z.string().optional(),
 });
 
-const tableColumnSchema = z.object({
-  key: z.string(),
-  label: z.string().optional(),
-  type: z.enum(["text", "number", "link"]).optional(),
-  hrefKey: z.string().optional(),
-}).strict();
+const tableColumnSchema = z
+  .object({
+    key: z.string(),
+    label: z.string().optional(),
+    type: z.enum(["text", "number", "link"]).optional(),
+    hrefKey: z.string().optional(),
+  })
+  .strict();
 
 const collapsiblePresentationProps = {
   collapsible: z.boolean().optional(),
@@ -92,7 +94,6 @@ const cardComponentDefinition = {
   description: `${shadcn.Card.description} Host-rendered Chrona result cards may set defaultCollapsed to request an open or closed collapsible shell; do not emit CollapsibleBlock for ordinary cards.`,
 };
 
-
 const markdownPropsSchema = z.object({
   content: z.string(),
   title: z.string().optional(),
@@ -106,26 +107,33 @@ const jsonViewPropsSchema = z.object({
 });
 
 const tableComponentDefinition = {
-  props: z.object({
-    title: z.string().optional(),
-    description: z.string().optional(),
-    uri: z.string().optional(),
-    path: z.string().optional(),
-    displayPath: z.string().optional(),
-    columns: z.array(z.union([z.string(), tableColumnSchema])).optional(),
-    pageSize: z.number().int().positive().max(100).optional(),
-    contentKind: z.enum(["json", "csv", "text", "markdown"]).optional(),
-    contentPreview: z.string().optional(),
-    contentTruncated: z.boolean().optional(),
-    contentBytes: z.number().optional(),
-    previewError: z.enum(["unsafe_path", "not_found", "unsupported_type", "read_failed"]).optional(),
-    ...resultPresentationProps,
-  }).strict(),
+  props: z
+    .object({
+      title: z.string().optional(),
+      description: z.string().optional(),
+      uri: z.string().optional(),
+      path: z.string().optional(),
+      displayPath: z.string().optional(),
+      columns: z.array(z.union([z.string(), tableColumnSchema])).optional(),
+      pageSize: z.number().int().positive().max(100).optional(),
+      contentKind: z.enum(["json", "csv", "text", "markdown"]).optional(),
+      contentPreview: z.string().optional(),
+      contentTruncated: z.boolean().optional(),
+      contentBytes: z.number().optional(),
+      previewError: z
+        .enum(["unsafe_path", "not_found", "unsupported_type", "read_failed"])
+        .optional(),
+      ...resultPresentationProps,
+    })
+    .strict(),
   description:
     'File-backed data table. Reference a safe repo-relative JSON or CSV file with path or uri; do not inline rows. Optional columns may be strings or { key, label, type, hrefKey }. Use type: "link" or hrefKey for link cells. Prefer pageSize 10 for workspace readability; do not set pageSize equal to total rows merely to show everything. Use larger pageSize only for dense datasets or explicit user requests. Example: { path: ".chrona/outputs/N20260706-01/trending.json", columns: [{ key: "repo", label: "Repo" }, { key: "url", label: "URL", type: "link" }], pageSize: 10 }.',
   example: {
     path: ".chrona/outputs/N20260706-01/trending.json",
-    columns: [{ key: "repo", label: "Repo" }, { key: "url", label: "URL", type: "link" }],
+    columns: [
+      { key: "repo", label: "Repo" },
+      { key: "url", label: "URL", type: "link" },
+    ],
     pageSize: 10,
   },
 };
@@ -138,25 +146,33 @@ const collapsibleTextComponentDefinition = {
 };
 
 const collapsibleBlockComponentDefinition = {
-  props: z.object({
-    title: z.string().optional(),
-    summary: z.string().optional(),
-    defaultCollapsed: z.boolean().optional(),
-  }).strict(),
+  props: z
+    .object({
+      title: z.string().optional(),
+      summary: z.string().optional(),
+      defaultCollapsed: z.boolean().optional(),
+    })
+    .strict(),
   slots: ["default"],
   description:
     "Component-level collapsible wrapper for an entire result block. Use for long logs, raw JSON, large file previews, secondary evidence, or diagnostics; do not wrap the primary result summary.",
-  example: { title: "Raw details", summary: "Long diagnostic output", defaultCollapsed: true },
+  example: {
+    title: "Raw details",
+    summary: "Long diagnostic output",
+    defaultCollapsed: true,
+  },
 };
 
 const nodeResultSectionComponentDefinition = {
-  props: z.object({
-    nodeId: z.string(),
-    nodeTitle: z.string(),
-    status: z.string().optional(),
-    defaultCollapsed: z.boolean().optional(),
-    itemCount: z.number().int().nonnegative().optional(),
-  }).strict(),
+  props: z
+    .object({
+      nodeId: z.string(),
+      nodeTitle: z.string(),
+      status: z.string().optional(),
+      defaultCollapsed: z.boolean().optional(),
+      itemCount: z.number().int().nonnegative().optional(),
+    })
+    .strict(),
   slots: ["default"],
   description:
     "Host-generated lightweight section wrapper for output owned by one execution node. AI-authored plan output should not emit this component.",
@@ -182,6 +198,7 @@ const filePreviewErrorSchema = z.enum([
   "not_found",
   "unsupported_type",
   "read_failed",
+  "permission_required",
 ]);
 
 const fileViewPropsSchema = z.object({
@@ -194,6 +211,8 @@ const fileViewPropsSchema = z.object({
   contentTruncated: z.boolean().optional(),
   contentBytes: z.number().optional(),
   previewError: filePreviewErrorSchema.optional(),
+  accessTaskId: z.string().optional(),
+  accessRequestedPath: z.string().optional(),
   description: z.string().optional(),
   language: z.string().optional(),
   ...resultPresentationProps,
@@ -272,11 +291,13 @@ export const chronaCatalog = defineCatalog(chronaSchema, {
     },
     FileRef: {
       props: fileViewPropsSchema,
-      description: "Reference to a produced file artifact, optionally hydrated with a safe server-side preview.",
+      description:
+        "Reference to a produced file artifact, optionally hydrated with a safe server-side preview.",
     },
     FileView: {
       props: fileViewPropsSchema,
-      description: "Produced file artifact preview hydrated server-side before browser rendering.",
+      description:
+        "Produced file artifact preview hydrated server-side before browser rendering.",
     },
     ResultSummary: {
       props: z.object({
@@ -356,7 +377,8 @@ export const chronaCatalog = defineCatalog(chronaSchema, {
         type: z.string(),
         locateLabel: z.string().optional(),
       }),
-      description: "One workspace artifact row with an optional locate action and server-hydrated preview.",
+      description:
+        "One workspace artifact row with an optional locate action and server-hydrated preview.",
     },
     WorkspaceActionGroup: {
       props: z.object({
@@ -468,7 +490,11 @@ export const chronaPlanOutputCatalog = defineCatalog(chronaSchema, {
       props: jsonViewPropsSchema,
       description:
         "Pretty-printed JSON result value. Use only for diagnostics, API payloads, machine-readable evidence, or debugging details; prefer Markdown/Table/Card for user-facing reports and summaries. Set defaultCollapsed true for large or secondary payloads.",
-      example: { title: "Diagnostic payload", value: { status: "ok" }, defaultCollapsed: true },
+      example: {
+        title: "Diagnostic payload",
+        value: { status: "ok" },
+        defaultCollapsed: true,
+      },
     },
     FileRef: {
       props: z.object({
@@ -479,11 +505,11 @@ export const chronaPlanOutputCatalog = defineCatalog(chronaSchema, {
         ...resultPresentationProps,
       }),
       description:
-        "Reference to a produced or changed file artifact. path must be repo-relative; generated result artifacts should use .chrona/outputs/<node-ref>/ when not explicit repo/code changes.",
+        "Reference to a produced or changed file artifact. Generated result files must use the generated:// referenceBase supplied in runtime context; explicit repository/code changes may use repo-relative paths.",
       example: {
-        path: "packages/ui-protocol/src/catalog/components.ts",
-        title: "Updated catalog",
-        language: "ts",
+        path: "generated://20260716/N20260716-01/report.json",
+        title: "Generated report",
+        language: "json",
       },
     },
     ResultSummary: {
@@ -505,11 +531,9 @@ const planOutputComponentEntries = Object.entries(
   chronaPlanOutputCatalog.data.components,
 );
 
-
-const planOutputComponentNames = planOutputComponentEntries.map(([name]) => name) as [
-  string,
-  ...string[],
-];
+const planOutputComponentNames = planOutputComponentEntries.map(
+  ([name]) => name,
+) as [string, ...string[]];
 
 export const chronaPlanOutputElementSchema = z
   .object({
@@ -521,8 +545,14 @@ export const chronaPlanOutputElementSchema = z
   .strict();
 
 function schemaVariants(schema: z.core.JSONSchema.JSONSchema) {
-  if (schema && typeof schema === "object" && !Array.isArray(schema) && "anyOf" in schema) {
-    const variants = (schema as { anyOf?: z.core.JSONSchema.JSONSchema[] }).anyOf;
+  if (
+    schema &&
+    typeof schema === "object" &&
+    !Array.isArray(schema) &&
+    "anyOf" in schema
+  ) {
+    const variants = (schema as { anyOf?: z.core.JSONSchema.JSONSchema[] })
+      .anyOf;
     if (Array.isArray(variants)) return variants;
   }
   return [schema];
@@ -532,8 +562,15 @@ function mergeJsonSchemas(
   left: z.core.JSONSchema.JSONSchema | undefined,
   right: z.core.JSONSchema.JSONSchema,
 ): z.core.JSONSchema.JSONSchema {
-  const variants = [...(left ? schemaVariants(left) : []), ...schemaVariants(right)];
-  const unique = Array.from(new Map(variants.map((variant) => [JSON.stringify(variant), variant])).values());
+  const variants = [
+    ...(left ? schemaVariants(left) : []),
+    ...schemaVariants(right),
+  ];
+  const unique = Array.from(
+    new Map(
+      variants.map((variant) => [JSON.stringify(variant), variant]),
+    ).values(),
+  );
   return unique.length === 1 ? unique[0]! : { anyOf: unique };
 }
 
@@ -637,14 +674,18 @@ export function chronaPlanOutputPatchJsonSchema(): z.core.JSONSchema.JSONSchema 
   };
   const from: z.core.JSONSchema.JSONSchema = {
     ...path,
-    description: "Source JSON Pointer. Required for move/copy; omit for add/replace/remove/test.",
+    description:
+      "Source JSON Pointer. Required for move/copy; omit for add/replace/remove/test.",
   };
   const value = chronaPlanOutputPatchValueJsonSchema();
 
   return {
     type: "object",
     properties: {
-      op: { type: "string", enum: ["add", "replace", "remove", "move", "copy", "test"] },
+      op: {
+        type: "string",
+        enum: ["add", "replace", "remove", "move", "copy", "test"],
+      },
       path,
       from,
       value,
@@ -671,7 +712,8 @@ export function chronaPlanOutputToolInputJsonSchema(): z.core.JSONSchema.JSONSch
   };
 }
 
-export const chronaPlanOutputSpecJsonSchema = chronaPlanOutputSpecJsonSchemaFromCatalog();
+export const chronaPlanOutputSpecJsonSchema =
+  chronaPlanOutputSpecJsonSchemaFromCatalog();
 export const chronaPlanOutputSpecSchema = chronaPlanOutputCatalog.zodSchema();
 
 export type ChronaPlanOutputCatalog = typeof chronaPlanOutputCatalog;

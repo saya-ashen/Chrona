@@ -10,6 +10,11 @@ import { getTaskRuntimeContext } from "./get-task-runtime-context";
 import { listTasksByWorkspace } from "./list-tasks";
 import { acceptTaskResult } from "./accept-task-result";
 import { continueFromTaskResult } from "./continue-from-task-result";
+import {
+  approveResultFileAccess,
+  requestResultFileAccess,
+} from "./result-file-access";
+import { resolveFilePreview } from "./file-preview";
 import { markTaskDone } from "./mark-task-done";
 import { reopenTask } from "./reopen-task";
 import { ensureTaskInWorkspace } from "./task-by-id";
@@ -83,6 +88,24 @@ export class Tasks {
 
   continueFromResult(input: Parameters<typeof continueFromTaskResult>[0]) {
     return continueFromTaskResult(input);
+  }
+
+  requestResultFileAccess(
+    input: Parameters<typeof requestResultFileAccess>[0],
+  ) {
+    return requestResultFileAccess(input);
+  }
+
+  approveResultFileAccess(
+    input: Parameters<typeof approveResultFileAccess>[0],
+  ) {
+    return approveResultFileAccess(input);
+  }
+
+  previewResultFile(input: { path: string; canonicalPath: string }) {
+    return resolveFilePreview(input.path, {
+      allowedAbsolutePath: input.canonicalPath,
+    });
   }
 }
 
