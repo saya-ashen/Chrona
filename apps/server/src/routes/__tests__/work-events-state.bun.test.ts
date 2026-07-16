@@ -116,8 +116,41 @@ function makeFakeEngine(): ChronaEngine {
         stopGeneration: () => ({ stopped: false }),
       },
       execution: {
-        dispatch: async (input: { taskId?: string; action?: { action?: string } }) => {
+        dispatch: async (input: {
+          taskId?: string;
+          action?: { action?: string };
+          onGraphEvent?: (event: { type: string }) => void;
+          onRuntimeEvent?: (event: {
+            nodeId: string;
+            nodeTitle: string;
+            runtimeName: string;
+            event: {
+              type: "tool_started";
+              provider: string;
+              runId: string;
+              sequence: number;
+              timestamp: string;
+              toolName: string;
+            };
+          }) => void;
+          onStateChange?: () => void;
+        }) => {
           state.dispatchedActions.push(input);
+          input.onGraphEvent?.({ type: "node_started" });
+          input.onRuntimeEvent?.({
+            nodeId: "node-1",
+            nodeTitle: "Execute launch",
+            runtimeName: "default",
+            event: {
+              type: "tool_started",
+              provider: "omp",
+              runId: "provider-run-1",
+              sequence: 1,
+              timestamp: "2026-05-17T00:00:02.000Z",
+              toolName: "browser",
+            },
+          });
+          input.onStateChange?.();
           const statusByAction: Record<string, string> = {
             start_manual: "running",
             pause_session: "waiting_for_user",
@@ -261,7 +294,7 @@ describe("POST /work/:taskId/commands — action refresh events", () => {
     expect(events.findIndex((event) => event.type === "state.update")).toBeLessThan(events.findIndex((event) => event.type === "task_workspace_updated"));
   });
 
-  it("emits header state.update before execution.result after starting execution", async () => {
+  it("emits scoped live runtime events and refresh state while execution runs", async () => {
     const taskId = "task-1";
     state.planState = {
       taskId,
@@ -272,8 +305,11 @@ describe("POST /work/:taskId/commands — action refresh events", () => {
 
     const received = waitForEventsMatching(
       taskId,
-      (events) => events.some((event) => event.type === "state.update")
-        && events.some((event) => event.type === "execution.result"),
+      (events) =>
+        events.some((event) => event.type === "state.update") &&
+        events.filter((event) => event.type === "execution.runtime_event")
+          .length >= 2 &&
+        events.some((event) => event.type === "execution.result"),
     );
 
     const response = await postCommand(taskId, {
@@ -290,14 +326,22 @@ describe("POST /work/:taskId/commands — action refresh events", () => {
       action: expect.objectContaining({ action: "start_manual" }),
     });
 
-    const stateUpdateIndex = events.findIndex((event) => event.type === "state.update");
-    const resultIndex = events.findIndex((event) => event.type === "execution.result");
+    const stateUpdateIndex = events.findIndex(
+      (event) => event.type === "state.update",
+    );
+    const resultIndex = events.findIndex(
+      (event) => event.type === "execution.result",
+    );
     expect(stateUpdateIndex).toBeGreaterThanOrEqual(0);
     expect(resultIndex).toBeGreaterThanOrEqual(0);
-    expect(events.filter((event) => event.type === "state.update")).toHaveLength(2);
+    expect(
+      events.filter((event) => event.type === "state.update"),
+    ).toHaveLength(2);
     expect(stateUpdateIndex).toBeLessThan(resultIndex);
 
-    const stateUpdate = events[stateUpdateIndex] as TaskProjectionEvent & { updates?: Record<string, unknown> };
+    const stateUpdate = events[stateUpdateIndex] as TaskProjectionEvent & {
+      updates?: Record<string, unknown>;
+    };
     expect(stateUpdate.updates).toMatchObject({
       "/execution/status": "running",
       "/execution/can-start": false,
@@ -306,8 +350,37 @@ describe("POST /work/:taskId/commands — action refresh events", () => {
       "/execution/has-plan": true,
       "/execution/has-accepted-plan": true,
     });
-    const result = events[resultIndex] as TaskProjectionEvent & { eventKind?: string };
-    expect(result.eventKind).toBe("running");
+
+    const runtimeEvents = events.filter(
+      (event) => event.type === "execution.runtime_event",
+    );
+    expect(runtimeEvents).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          workBlockId: null,
+          eventKind: "node_started",
+        }),
+        expect.objectContaining({
+          workBlockId: null,
+          eventKind: "tool_started",
+          provider: "omp",
+          runtimeName: "default",
+          event: expect.objectContaining({
+            type: "tool_started",
+            label: "browser",
+          }),
+        }),
+      ]),
+    );
+
+    const result = events[resultIndex] as TaskProjectionEvent & {
+      eventKind?: string;
+      workBlockId?: string | null;
+    };
+    expect(result).toMatchObject({
+      eventKind: "running",
+      workBlockId: null,
+    });
   });
 
   it("emits pause-session header state with Stop visible and Start hidden", async () => {

@@ -30,6 +30,7 @@ const mocks = vi.hoisted(() => ({
   commandCalls: [] as Array<{ taskId: string; json: Record<string, unknown> }>,
   fetchCalls: [] as Array<{ input: string; init?: RequestInit }>,
   currentExecutionResponse: null as PlanExecutionResult | null,
+  currentExecutionFetchCount: 0,
   eventHandlers: new Map<string, JsonEventHandler>(),
   eventStreamAttempts: 0,
   eventStreamMode: "open" as "open" | "reject",
@@ -81,7 +82,10 @@ vi.mock("@shared/http", async (importOriginal) => ({
     if (/\/plan(?:\?|$)/.test(path) && !path.includes("/generations")) {
       return mocks.planResponses.shift();
     }
-    if (/\/execution\/current(?:\?|$)/.test(path)) return mocks.currentExecutionResponse;
+    if (/\/execution\/current(?:\?|$)/.test(path)) {
+      mocks.currentExecutionFetchCount += 1;
+      return mocks.currentExecutionResponse;
+    }
     if (/\/result\/accept(?:\?|$)/.test(path) && method === "POST") {
       return { taskId: "task-1", workspaceId: "workspace-1", runId: "run-1" };
     }
@@ -329,6 +333,7 @@ afterEach(() => {
   mocks.commandCalls = [];
   mocks.fetchCalls = [];
   mocks.currentExecutionResponse = null;
+  mocks.currentExecutionFetchCount = 0;
   mocks.eventHandlers.clear();
   mocks.eventStreamAttempts = 0;
   mocks.eventStreamMode = "open";
@@ -498,10 +503,101 @@ describe("task workspace page synchronization", () => {
     await act(async () => {
       rerender();
     });
-
     await waitFor(() => expect(result.current.pageData.task.title).toBe("First occurrence fresh"));
     expect(result.current.pageData.task.status).toBe("Running");
   });
+
+  it("refreshes the execution snapshot for every live runtime event", async () => {
+    const acceptedPlan = planReadModel({
+      id: "plan-1",
+      status: "accepted",
+      title: "Execute launch",
+    });
+    const initialPage = pageData({
+      taskStatus: "Running",
+      plan: acceptedPlan,
+      runStatus: "Running",
+    });
+    mocks.planResponses = [
+      {
+        taskId: "task-1",
+        aiPlanGenerationStatus: "accepted",
+        savedPlan: acceptedPlan,
+      },
+      {
+        taskId: "task-1",
+        aiPlanGenerationStatus: "accepted",
+        savedPlan: acceptedPlan,
+      },
+    ];
+    mocks.currentExecutionResponse = {
+      taskId: "task-1",
+      planId: "plan-1",
+      mainSessionId: "session-1",
+      status: "running",
+      currentNodeId: "node-1",
+      executedNodeIds: [],
+      waitingNodeIds: [],
+      blockedNodeIds: [],
+      checkpoint: null,
+      planOutput: {
+        spec: null,
+        revision: 0,
+        updatedAt: null,
+        updatedByNodeId: null,
+      },
+      message: "Running",
+    };
+
+    const { result } = renderHook(() => {
+      const workspace = useTaskWorkspacePageState(initialPage);
+      const plan = useTaskWorkspacePlanState(
+        workspace.pageData.task,
+        workspace.refreshWorkspace,
+        workspace.workspaceEvents,
+      );
+      return { workspace, plan };
+    }, { wrapper: createQueryWrapper() });
+
+    await waitFor(() => expect(mocks.eventHandlers.size).toBeGreaterThan(0));
+    const initialFetchCount = mocks.currentExecutionFetchCount;
+    const handler = [...mocks.eventHandlers.values()][0]!;
+    await act(async () => {
+      handler({
+        event: "execution.runtime_event",
+        message: null,
+        data: {
+          type: "execution.runtime_event",
+          taskId: "task-1",
+          workBlockId: null,
+          sequence: 1,
+          eventKind: "tool_started",
+          action: "start_manual",
+          nodeId: "node-1",
+          nodeTitle: "Execute launch",
+          runtimeName: "default",
+          provider: "omp",
+          runId: "run-1",
+          timestamp: "2026-05-17T00:00:02.000Z",
+          event: {
+            type: "tool_started",
+            toolName: "browser",
+            label: "browser",
+          },
+        },
+      });
+    });
+
+    await waitFor(() => {
+      expect(mocks.currentExecutionFetchCount).toBeGreaterThan(initialFetchCount);
+      expect(result.current.plan.runtimeEvents.at(-1)?.event).toMatchObject({
+        type: "tool_started",
+        label: "browser",
+      });
+    });
+  });
+
+
 
   it("updates the rendered plan graph when a projection event refetches the full workspace page", async () => {
     const initialPlan = planReadModel({ id: "plan-1", status: "ready", title: "Prepare launch" });

@@ -503,11 +503,17 @@ export function useTaskWorkspacePlanState(
         return;
       }
 
-      if (event.type === "execution.runtime_event" && isFullRuntimeSseEvent(event)) {
-        const runtimeEvent: WorkspaceRuntimeEvent = { ...event, type: "runtime_event" };
-        setRuntimeEvents((current) => appendRuntimeEvent(current, runtimeEvent));
+      if (event.type === "execution.runtime_event") {
+        if (isFullRuntimeSseEvent(event)) {
+          const runtimeEvent: WorkspaceRuntimeEvent = {
+            ...event,
+            type: "runtime_event",
+          };
+          setRuntimeEvents((current) => appendRuntimeEvent(current, runtimeEvent));
+        }
+        void currentExecutionQuery.refetch();
+        continue;
       }
-
 
       if (shouldRefreshExecutionSnapshot(event)) {
         void currentExecutionQuery.refetch();
