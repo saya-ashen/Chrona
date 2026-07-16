@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { getCurrentExecution } from "@/modules/plan-execution/use-cases/get-current-execution";
+import { hydrateFilePreviewSpec } from "./file-preview";
 import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
 
 const RESULT_CONTEXT_LIMIT = 12_000;
@@ -49,20 +50,39 @@ function recordValue(value: unknown): Record<string, unknown> | null {
     : null;
 }
 
+function parsedTableRows(content: string): unknown[] {
+  try {
+    const parsed = JSON.parse(content) as unknown;
+    if (Array.isArray(parsed)) return parsed;
+    const record = recordValue(parsed);
+    const rows = record?.rows ?? record?.items ?? record?.data;
+    return Array.isArray(rows) ? rows : [];
+  } catch {
+    return [];
+  }
+}
+
 function tableText(props: Record<string, unknown>) {
   const columns = Array.isArray(props.columns) ? props.columns : [];
-  const rows = Array.isArray(props.rows) ? props.rows.slice(0, TABLE_ROW_LIMIT) : [];
+  const rowsSource = Array.isArray(props.rows)
+    ? props.rows
+    : typeof props.contentPreview === "string"
+      ? parsedTableRows(props.contentPreview)
+      : [];
+  const rows = rowsSource.slice(0, TABLE_ROW_LIMIT);
   const labels = columns
     .map((column) => {
       const record = recordValue(column);
       return record ? textValue(record.label ?? record.header ?? record.key) : "";
     })
     .filter(Boolean);
-  const body = rows.map((row) => {
-    const record = recordValue(row);
-    if (!record) return "";
-    return Object.values(record).map(textValue).filter(Boolean).join(" | ");
-  }).filter(Boolean);
+  const body = rows
+    .map((row) => {
+      const record = recordValue(row);
+      if (!record) return "";
+      return Object.values(record).map(textValue).filter(Boolean).join(" | ");
+    })
+    .filter(Boolean);
   return [labels.join(" | "), ...body].filter(Boolean).join("\n");
 }
 
@@ -81,7 +101,14 @@ export function extractAcceptedResultText(spec: unknown) {
     let text = "";
     switch (type) {
       case "ResultSummary":
-        text = [props.title, props.summary, props.description, props.outcome]
+        text = [
+          props.text,
+          props.copyText,
+          props.title,
+          props.summary,
+          props.description,
+          props.outcome,
+        ]
           .map(textValue)
           .filter(Boolean)
           .join("\n");
@@ -102,14 +129,26 @@ export function extractAcceptedResultText(spec: unknown) {
           .join("\n");
         break;
       case "Table":
-        text = tableText(props);
+        text = [
+          props.title,
+          props.description,
+          tableText(props),
+        ]
+          .map(textValue)
+          .filter(Boolean)
+          .join("\n");
         break;
       case "FileRef":
       case "FileView":
-        text = [props.title, props.displayPath ?? props.uri ?? props.path]
+        text = [
+          props.title,
+          props.description,
+          props.displayPath ?? props.uri ?? props.path,
+          props.contentPreview,
+        ]
           .map(textValue)
           .filter(Boolean)
-          .join(": ");
+          .join("\n");
         break;
       case "JsonView":
         text = bounded(textValue(props.content ?? props.value), 1_000);
@@ -195,7 +234,10 @@ export async function getAcceptedResultContext(
     );
   }
   const execution = await getCurrentExecution({ taskId });
-  const spec = execution.planOutput?.spec ?? execution.planOutput;
+  const hydratedSpec = execution.planOutput?.spec
+    ? await hydrateFilePreviewSpec(execution.planOutput.spec, { taskId })
+    : null;
+  const spec = hydratedSpec ?? execution.planOutput?.spec ?? execution.planOutput;
 
   return {
     task: {

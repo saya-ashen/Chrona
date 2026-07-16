@@ -5,6 +5,7 @@ import type {
   StartRunInput,
   StreamRunInput,
 } from "@chrona/providers-foundation";
+import type { ProviderConversationTurnInput } from "@chrona/providers-foundation";
 import { OmpProviderClient } from "./OmpProviderClient";
 import { OmpSdkProviderClient, __ompSdkProviderTestHooks } from "./OmpSdkProviderClient";
 
@@ -12,6 +13,9 @@ class RecordingProvider implements AgentProviderClient {
   readonly provider = "omp";
   calls: string[] = [];
 
+  getConversationCapabilities?: AgentProviderClient["getConversationCapabilities"];
+  inspectConversation?: AgentProviderClient["inspectConversation"];
+  runConversationTurn?: AgentProviderClient["runConversationTurn"];
   constructor(private readonly runId: string) {}
 
   getCapabilities() {
@@ -153,5 +157,36 @@ describe("OmpProviderClient SDK delegation", () => {
     await client.checkHealth();
 
     expect(sdk.calls).toEqual(["checkHealth"]);
+  });
+
+  it("delegates conversation inspection and follow-up turns to the SDK client", async () => {
+    const sdk = new RecordingProvider("sdk-run");
+    sdk.getConversationCapabilities = () => ({
+      resume: true,
+      fork: true,
+      compact: true,
+      handoff: "native",
+      contextUsage: "detailed",
+    });
+    sdk.inspectConversation = async (sessionRef: string) => ({
+      available: true,
+      sessionRef,
+      compacted: false,
+    });
+    sdk.runConversationTurn = async (input: ProviderConversationTurnInput) => ({
+      sessionRef: input.sessionRef,
+      outputText: "continued",
+    });
+    const client = new OmpProviderClient({ sdkClient: sdk });
+
+    expect(client.getConversationCapabilities()?.resume).toBe(true);
+    await expect(client.inspectConversation("/tmp/session.jsonl")).resolves.toMatchObject({
+      available: true,
+    });
+    await expect(client.runConversationTurn({
+      sessionRef: "/tmp/session.jsonl",
+      prompt: "follow up",
+      mode: "resume",
+    })).resolves.toMatchObject({ outputText: "continued" });
   });
 });

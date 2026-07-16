@@ -7,6 +7,9 @@ import type {
   StartRunInput,
   StreamRunInput,
 } from "@chrona/providers-foundation";
+import type {
+  ProviderConversationTurnInput,
+} from "@chrona/providers-foundation";
 import { OmpSdkProviderClient } from "./OmpSdkProviderClient";
 import type { OmpProviderConfig } from "./types";
 
@@ -25,6 +28,30 @@ export class OmpProviderClient implements AgentProviderClient {
 
   getCapabilities() {
     return this.sdk.getCapabilities();
+  }
+
+  getConversationCapabilities() {
+    return this.sdk.getConversationCapabilities?.() ?? {
+      resume: false,
+      fork: false,
+      compact: false,
+      handoff: "unsupported" as const,
+      contextUsage: "none" as const,
+    };
+  }
+
+  inspectConversation(sessionRef: string) {
+    if (!this.sdk.inspectConversation) {
+      return Promise.resolve({ available: false, sessionRef, compacted: false });
+    }
+    return this.sdk.inspectConversation(sessionRef);
+  }
+
+  runConversationTurn(input: ProviderConversationTurnInput) {
+    if (!this.sdk.runConversationTurn) {
+      return Promise.reject(new Error("OMP conversation continuation is unavailable"));
+    }
+    return this.sdk.runConversationTurn(input);
   }
 
   checkHealth(input?: HealthCheckInput) {
