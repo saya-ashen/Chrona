@@ -1,4 +1,4 @@
-import { useState, type KeyboardEvent } from "react";
+import { useEffect, useState, type KeyboardEvent } from "react";
 import { localizeHref, useLocale } from "@chrona/i18n";
 import { Badge, Button, Card, CardContent, Textarea } from "@shared/ui";
 import { ExternalLink, ListPlus, MessageCircle } from "lucide-react";
@@ -9,15 +9,21 @@ import { TaskMarkdown } from "./task-markdown";
 export function TaskResultFollowUpPanel({
   taskId,
   copy,
+  initialMode = "ask",
 }: {
   taskId: string;
   copy: Record<string, string | undefined>;
+  initialMode?: "ask" | "create_task";
 }) {
   const locale = useLocale();
   const { state, setMode, setDraft, submit } = useTaskResultFollowUp(taskId, true);
   const [sessionStrategy, setSessionStrategy] = useState<
     "fork_source_session" | "fresh_with_result"
   >("fork_source_session");
+
+  useEffect(() => {
+    setMode(initialMode);
+  }, [initialMode, setMode]);
   const draft = state.mode === "ask" ? state.askDraft : state.createTaskDraft;
   const submitting = state.status === "submitting";
   const sourceSession = state.state?.sourceSession;

@@ -21,7 +21,7 @@ import {
   CardTitle,
   Textarea,
 } from "@shared/ui";
-import { CheckCircle2, ChevronDown, ChevronRight, ChevronUp } from "lucide-react";
+import { CheckCircle2, ChevronRight, ChevronUp, ListPlus, MessageCircle } from "lucide-react";
 import {
   TaskWorkspaceInspector,
   type CommandCenterCopy,
@@ -917,6 +917,9 @@ function ResultLifecyclePanel({
 }) {
   const isAccepted = review.phase === "accepted";
   const [isAcceptedExpanded, setIsAcceptedExpanded] = useState(false);
+  const [acceptedFollowUpMode, setAcceptedFollowUpMode] = useState<
+    "ask" | "create_task"
+  >("ask");
   const completion = review.completion;
   const acceptDisabled =
     isAcceptingResult || !review.decision.canAccept || !onAcceptResult;
@@ -927,6 +930,10 @@ function ResultLifecyclePanel({
       : null;
 
 
+  const openAcceptedFollowUp = (mode: "ask" | "create_task") => {
+    setAcceptedFollowUpMode(mode);
+    setIsAcceptedExpanded(true);
+  };
 
   return (
     <header
@@ -1021,24 +1028,45 @@ function ResultLifecyclePanel({
             ) : null}
           </div>
           {isAccepted ? (
-            <Button
-              type="button"
-              variant="ghost"
-              size="sm"
-              className="shrink-0"
-              aria-expanded={isAcceptedExpanded}
-              aria-controls="accepted-result-follow-up"
-              onClick={() => setIsAcceptedExpanded((expanded) => !expanded)}
+            <div
+              className="flex shrink-0 flex-wrap items-center gap-1.5"
+              role="group"
+              aria-label={
+                copy.acceptedResultActionsLabel ?? "Accepted result actions"
+              }
             >
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => openAcceptedFollowUp("ask")}
+              >
+                <MessageCircle className="size-4" aria-hidden />
+                {copy.followUpAskOnly ?? "Ask a follow-up"}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => openAcceptedFollowUp("create_task")}
+              >
+                <ListPlus className="size-4" aria-hidden />
+                {copy.followUpCreateTask ?? "Create next task"}
+              </Button>
               {isAcceptedExpanded ? (
-                <ChevronUp className="size-4" aria-hidden />
-              ) : (
-                <ChevronDown className="size-4" aria-hidden />
-              )}
-              {isAcceptedExpanded
-                ? (copy.collapseAcceptedResult ?? "Collapse")
-                : (copy.expandAcceptedResult ?? "Expand")}
-            </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  aria-expanded="true"
+                  aria-controls="accepted-result-follow-up"
+                  onClick={() => setIsAcceptedExpanded(false)}
+                >
+                  <ChevronUp className="size-4" aria-hidden />
+                  {copy.collapseAcceptedResult ?? "Collapse"}
+                </Button>
+              ) : null}
+            </div>
           ) : (
             <div
               className="flex shrink-0 flex-col-reverse gap-2 sm:flex-row"
@@ -1073,7 +1101,11 @@ function ResultLifecyclePanel({
 
         {isAccepted && isAcceptedExpanded ? (
           <div id="accepted-result-follow-up">
-            <TaskResultFollowUpPanel taskId={taskId} copy={copy} />
+            <TaskResultFollowUpPanel
+              taskId={taskId}
+              copy={copy}
+              initialMode={acceptedFollowUpMode}
+            />
           </div>
         ) : null}
       </div>

@@ -1765,10 +1765,17 @@ describe("TaskWorkspacePlanSection", () => {
     expect(
       screen.queryByText("Continue from result is not available yet."),
     ).not.toBeInTheDocument();
-    const expandAcceptedResult = within(lifecyclePanel).getByRole("button", {
-      name: "Expand",
+    const acceptedActions = within(lifecyclePanel).getByRole("group", {
+      name: "Accepted result actions",
     });
-    expect(expandAcceptedResult).toHaveAttribute("aria-expanded", "false");
+    const askFollowUp = within(acceptedActions).getByRole("button", {
+      name: "Ask a follow-up",
+    });
+    const createNextTask = within(acceptedActions).getByRole("button", {
+      name: "Create next task",
+    });
+    expect(askFollowUp).toBeVisible();
+    expect(createNextTask).toBeVisible();
     expect(
       within(lifecyclePanel).queryByRole("tab", { name: /Create next task/ }),
     ).not.toBeInTheDocument();
@@ -1777,14 +1784,13 @@ describe("TaskWorkspacePlanSection", () => {
         "Task closed. Ask about this result or create the next task without losing context.",
       ),
     ).not.toBeInTheDocument();
-    fireEvent.click(expandAcceptedResult);
+    fireEvent.click(createNextTask);
     expect(
       within(lifecyclePanel).getByRole("button", { name: "Collapse" }),
     ).toHaveAttribute("aria-expanded", "true");
     const createTaskMode = await within(lifecyclePanel).findByRole("tab", {
       name: /Create next task/,
     });
-    fireEvent.click(createTaskMode);
     expect(createTaskMode).toHaveAttribute("aria-selected", "true");
     expect(createTaskMode).toHaveClass("h-8");
 
@@ -1862,11 +1868,9 @@ describe("TaskWorkspacePlanSection", () => {
 
     const lifecyclePanel = screen.getByTestId("result-lifecycle-panel");
     fireEvent.click(
-      within(lifecyclePanel).getByRole("button", { name: "Expand" }),
+      within(lifecyclePanel).getByRole("button", { name: "Ask a follow-up" }),
     );
-    fireEvent.click(
-      await within(lifecyclePanel).findByRole("tab", { name: /Ask a follow-up/ }),
-    );
+    await within(lifecyclePanel).findByRole("tab", { name: /Ask a follow-up/ });
     const createTaskMode = within(lifecyclePanel).getByRole("tab", {
       name: /Create next task/,
     });

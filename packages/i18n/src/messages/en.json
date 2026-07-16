@@ -1433,7 +1433,7 @@
       "resultReadyDescription": "Execution completed. Review the final result, then accept it or request changes.",
       "resultAcceptedTitle": "Result accepted",
       "resultAcceptedDescription": "Task closed. Ask about this result or create the next task without losing context.",
-      "expandAcceptedResult": "Expand",
+      "acceptedResultActionsLabel": "Accepted result actions",
       "collapseAcceptedResult": "Collapse",
       "resultReviewActionsLabel": "Result review actions",
       "resultCompletionSummaryLabel": "Result completion summary",
