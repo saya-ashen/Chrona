@@ -1,10 +1,12 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
 import { db } from "@chrona/db";
+import { appendCanonicalEvent } from "../events";
 import {
   resetTestDb,
   seedTask,
   seedWorkspace,
 } from "../../../../../apps/server/src/__tests__/bun-test-helpers";
+import { createTask } from "./create-task";
 import type { ContinueFromTaskResultDeps } from "./continue-from-task-result";
 
 const chatRequests: Array<{
@@ -26,23 +28,46 @@ const getAiClientForTaskMock = mock(async () => ({
   record: { type: "hermes" },
   providerClient: {},
 }));
-const getCurrentExecutionMock = mock(async () => ({
-  planOutput: {
-    spec: {
-      root: "root",
-      elements: {
-        root: { type: "Text", props: { text: "Accepted result summary" } },
-      },
+const acceptedContextMock = mock(async (taskId: string) => {
+  const task = await db.task.findUniqueOrThrow({ where: { id: taskId } });
+  if (task.status !== "Done") {
+    throw new Error("Accept the completed task result before continuing from it");
+  }
+  const run = await db.run.findFirstOrThrow({ where: { taskId, status: "Completed" } });
+  const artifacts = await db.artifact.findMany({ where: { taskId, runId: run.id } });
+  return {
+    task: {
+      id: task.id,
+      workspaceId: task.workspaceId,
+      title: task.title,
+      priority: task.priority,
+      executionRuntime: task.executionRuntime,
+      executionConfig: task.executionConfig as Record<string, unknown>,
+      aiClientId: task.aiClientId,
     },
-  },
-}));
+    acceptance: {
+      runId: run.id,
+      acceptedAt: new Date().toISOString(),
+      taskSessionId: run.taskSessionId,
+      providerSessionRef: run.runtimeSessionRef,
+    },
+    summary: "Accepted result summary",
+    artifacts: artifacts.map((artifact) => ({
+      id: artifact.id,
+      title: artifact.title,
+      type: artifact.type,
+      uri: artifact.uri,
+    })),
+  };
+});
 
 import { continueFromTaskResult } from "./continue-from-task-result";
 
 const deps = {
   chat: chatMock,
   getAiClientForTask: getAiClientForTaskMock,
-  getCurrentExecution: getCurrentExecutionMock,
+  getAcceptedResultContext: acceptedContextMock,
+  createTask,
 } as unknown as ContinueFromTaskResultDeps;
 
 async function seedAcceptedTask(title = "Accepted source task") {
@@ -71,6 +96,15 @@ async function seedAcceptedTask(title = "Accepted source task") {
       runId: run.id,
     },
   });
+  await appendCanonicalEvent({
+    eventType: "task.result_accepted",
+    workspaceId,
+    taskId,
+    runId: run.id,
+    actorType: "user",
+    source: "test",
+    payload: { accepted_run_id: run.id },
+  });
   return { workspaceId, taskId, runId: run.id };
 }
 
@@ -80,7 +114,7 @@ describe("continueFromTaskResult", () => {
     chatMock.mockClear();
     chatRequests.length = 0;
     getAiClientForTaskMock.mockClear();
-    getCurrentExecutionMock.mockClear();
+    acceptedContextMock.mockClear();
   });
 
   it("creates a linked draft that carries accepted result context", async () => {
@@ -97,11 +131,13 @@ describe("continueFromTaskResult", () => {
 
     expect(result).toMatchObject({
       intent: "create_task",
-      parentTaskId: source.taskId,
-      title: "Compare the top projects and recommend one.",
+      status: "completed",
+      createdTask: {
+        title: "Compare the top projects and recommend one.",
+      },
     });
     const followUp = await db.task.findUniqueOrThrow({
-      where: { id: result.taskId },
+      where: { id: result.createdTask!.id },
       include: { dependencies: true },
     });
     expect(followUp.status).toBe("Draft");
@@ -126,15 +162,16 @@ describe("continueFromTaskResult", () => {
         taskId: source.taskId,
         intent: "ask",
         instruction: "Which projects are relevant?",
-        history: [],
       },
       deps,
     );
 
-    expect(result).toEqual({
+    expect(result).toMatchObject({
       intent: "ask",
+      status: "completed",
       answer: "The accepted result supports three relevant projects.",
-      source: "test",
+      answerSource: "test",
+      contextSource: "accepted_result_fallback",
     });
     expect(getAiClientForTaskMock).toHaveBeenCalledWith({
       taskId: source.taskId,
@@ -148,24 +185,17 @@ describe("continueFromTaskResult", () => {
       content: "Which projects are relevant?",
     });
 
-    const messages = await db.taskAssistantMessage.findMany({
+    const messages = await db.taskResultContinuation.findMany({
       where: { taskId: source.taskId },
-      orderBy: { sequence: "asc" },
+      orderBy: { createdAt: "asc" },
     });
-    expect(
-      messages.map(({ role, content, sequence }) => ({
-        role,
-        content,
-        sequence,
-      })),
-    ).toEqual([
-      { role: "user", content: "Which projects are relevant?", sequence: 1 },
-      {
-        role: "assistant",
-        content: "The accepted result supports three relevant projects.",
-        sequence: 2,
-      },
-    ]);
+    expect(messages).toHaveLength(1);
+    expect(messages[0]).toMatchObject({
+      intent: "ask",
+      status: "completed",
+      instruction: "Which projects are relevant?",
+      answer: "The accepted result supports three relevant projects.",
+    });
   });
 
   it("rejects continuation before result acceptance", async () => {

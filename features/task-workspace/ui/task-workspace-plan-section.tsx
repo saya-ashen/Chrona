@@ -1,19 +1,13 @@
 "use client";
 
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type KeyboardEvent,
-} from "react";
+import { useEffect, useMemo, useState } from "react";
 import type {
   ExecutionActionInput,
   PlanExecutionResult,
   SubmitCheckpointActionInput,
 } from "@chrona/contracts";
 import type { TaskAction } from "@chrona/contracts";
-import { localizeHref, useI18n, useLocale } from "@chrona/i18n";
+import { useI18n, useLocale } from "@chrona/i18n";
 import type {
   PlanNodeDataModel,
   TaskPlanGraphPlan,
@@ -27,23 +21,16 @@ import {
   CardTitle,
   Textarea,
 } from "@shared/ui";
-import {
-  Check,
-  CheckCircle2,
-  ChevronRight,
-  ExternalLink,
-  ListPlus,
-  MessageCircle,
-} from "lucide-react";
+import { CheckCircle2, ChevronRight } from "lucide-react";
 import {
   TaskWorkspaceInspector,
   type CommandCenterCopy,
   useActionSpecRenderConfig,
 } from "@features/execution-monitoring";
 import { Link } from "react-router-dom";
-import { continueFromTaskResult } from "../model/task-actions-client";
 import { TaskWorkspacePlanContent } from "./task-workspace-plan-content";
 import { TaskWorkspaceOperationPanel } from "./task-workspace-operation-panel";
+import { TaskResultFollowUpPanel } from "./task-result-follow-up-panel";
 import type {
   PlanGenerationRequest,
   WorkspaceRuntimeEvent,
@@ -910,12 +897,6 @@ function formatResultReviewCopy(
   );
 }
 
-type ResultContinuationIntent = "create_task" | "ask";
-
-type ResultContinuationMessage = {
-  role: "user" | "assistant";
-  content: string;
-};
 
 function ResultLifecyclePanel({
   taskId,
@@ -934,21 +915,8 @@ function ResultLifecyclePanel({
   isAcceptingResult?: boolean;
   acceptResultError?: string | null;
 }) {
-  const locale = useLocale();
   const isAccepted = review.phase === "accepted";
   const completion = review.completion;
-  const [intent, setIntent] = useState<ResultContinuationIntent>("create_task");
-  const [instruction, setInstruction] = useState("");
-  const [messages, setMessages] = useState<ResultContinuationMessage[]>([]);
-  const [createdTask, setCreatedTask] = useState<{
-    taskId: string;
-    title: string;
-  } | null>(null);
-  const [submissionState, setSubmissionState] = useState<
-    "idle" | "submitting" | "success" | "error"
-  >("idle");
-  const [submissionError, setSubmissionError] = useState<string | null>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
   const acceptDisabled =
     isAcceptingResult || !review.decision.canAccept || !onAcceptResult;
   const disabledReason =
@@ -957,51 +925,7 @@ function ResultLifecyclePanel({
         "A completed result is required before it can be accepted.")
       : null;
 
-  useEffect(() => {
-    if (isAccepted) textareaRef.current?.focus({ preventScroll: true });
-  }, [isAccepted]);
 
-  const submitContinuation = async () => {
-    const nextInstruction = instruction.trim();
-    if (!nextInstruction || submissionState === "submitting") return;
-
-    setSubmissionState("submitting");
-    setSubmissionError(null);
-    setCreatedTask(null);
-    try {
-      const response = await continueFromTaskResult({
-        taskId,
-        intent,
-        instruction: nextInstruction,
-        history: intent === "ask" ? messages : undefined,
-      });
-      if (response.intent === "create_task") {
-        setCreatedTask({ taskId: response.taskId, title: response.title });
-      } else {
-        setMessages((current) => [
-          ...current,
-          { role: "user", content: nextInstruction },
-          { role: "assistant", content: response.answer },
-        ]);
-      }
-      setInstruction("");
-      setSubmissionState("success");
-    } catch (cause) {
-      setSubmissionState("error");
-      setSubmissionError(
-        cause instanceof Error
-          ? cause.message
-          : (copy.followUpFailed ?? "Failed to continue from this result."),
-      );
-    }
-  };
-
-  const handleComposerKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
-    if ((event.metaKey || event.ctrlKey) && event.key === "Enter") {
-      event.preventDefault();
-      void submitContinuation();
-    }
-  };
 
   return (
     <header
@@ -1011,7 +935,7 @@ function ResultLifecyclePanel({
       data-testid="result-lifecycle-panel"
       data-state={
         isAccepted
-          ? submissionState
+          ? "accepted"
           : isAcceptingResult
             ? "loading"
             : acceptResultError
@@ -1123,159 +1047,7 @@ function ResultLifecyclePanel({
           ) : null}
         </div>
 
-        {isAccepted ? (
-          <div className="space-y-3 border-t border-border/70 pt-4">
-            <div className="space-y-1.5">
-              <div
-                className="inline-flex w-full items-center gap-1 rounded-lg border border-border/80 bg-muted/70 p-1 sm:w-auto"
-                role="radiogroup"
-                aria-label={copy.followUpIntentLabel ?? "Follow-up intent"}
-              >
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={intent === "create_task" ? "default" : "ghost"}
-                  className="h-8 flex-1 gap-1.5 rounded-md px-3 text-xs shadow-none sm:flex-none"
-                  role="radio"
-                  aria-checked={intent === "create_task"}
-                  data-state={
-                    intent === "create_task" ? "checked" : "unchecked"
-                  }
-                  disabled={submissionState === "submitting"}
-                  onClick={() => {
-                    setIntent("create_task");
-                    setSubmissionError(null);
-                    textareaRef.current?.focus();
-                  }}
-                >
-                  {intent === "create_task" ? (
-                    <Check className="size-3.5" aria-hidden />
-                  ) : (
-                    <ListPlus className="size-3.5" aria-hidden />
-                  )}
-                  {copy.followUpCreateTask ?? "Create next task"}
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={intent === "ask" ? "default" : "ghost"}
-                  className="h-8 flex-1 gap-1.5 rounded-md px-3 text-xs shadow-none sm:flex-none"
-                  role="radio"
-                  aria-checked={intent === "ask"}
-                  data-state={intent === "ask" ? "checked" : "unchecked"}
-                  disabled={submissionState === "submitting"}
-                  onClick={() => {
-                    setIntent("ask");
-                    setSubmissionError(null);
-                    textareaRef.current?.focus();
-                  }}
-                >
-                  {intent === "ask" ? (
-                    <Check className="size-3.5" aria-hidden />
-                  ) : (
-                    <MessageCircle className="size-3.5" aria-hidden />
-                  )}
-                  {copy.followUpAskOnly ?? "Ask a follow-up"}
-                </Button>
-              </div>
-              <p className="text-xs text-muted-foreground" aria-live="polite">
-                {intent === "create_task"
-                  ? (copy.followUpCreateTaskDescription ??
-                    "Carry this accepted result into a linked task draft.")
-                  : (copy.followUpAskDescription ??
-                    "Get an answer grounded in the accepted result.")}
-              </p>
-            </div>
-
-            {intent === "ask" && messages.length > 0 ? (
-              <div
-                className="max-h-48 space-y-2 overflow-y-auto rounded-xl bg-muted/55 p-3 text-sm"
-                aria-live="polite"
-              >
-                {messages.map((message, index) => (
-                  <div key={`${message.role}-${index}`}>
-                    <p className="text-xs font-medium text-muted-foreground">
-                      {message.role === "user"
-                        ? (copy.followUpYouLabel ?? "You")
-                        : (copy.followUpChronaLabel ?? "Chrona")}
-                    </p>
-                    <p className="whitespace-pre-wrap leading-6 text-foreground">
-                      {message.content}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            ) : null}
-
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
-              <Textarea
-                ref={textareaRef}
-                value={instruction}
-                onChange={(event) => {
-                  setInstruction(event.target.value);
-                  if (submissionState !== "submitting")
-                    setSubmissionState("idle");
-                  setSubmissionError(null);
-                }}
-                onKeyDown={handleComposerKeyDown}
-                placeholder={
-                  intent === "create_task"
-                    ? (copy.followUpCreateTaskPlaceholder ??
-                      "Describe what should happen next…")
-                    : (copy.followUpAskPlaceholder ??
-                      "Ask a question about the accepted result…")
-                }
-                className="min-h-20 flex-1 rounded-xl bg-background sm:min-h-16"
-                aria-label={copy.followUpInputLabel ?? "Follow-up request"}
-                disabled={submissionState === "submitting"}
-              />
-              <Button
-                type="button"
-                size="lg"
-                className="shrink-0 sm:min-w-32"
-                disabled={
-                  !instruction.trim() || submissionState === "submitting"
-                }
-                onClick={() => void submitContinuation()}
-              >
-                {submissionState === "submitting"
-                  ? (copy.followUpSubmitting ?? "Working...")
-                  : intent === "create_task"
-                    ? (copy.followUpCreateTaskSubmit ?? "Create task")
-                    : (copy.followUpAskSubmit ?? "Ask Chrona")}
-              </Button>
-            </div>
-            <p className="text-xs text-muted-foreground">
-              {copy.followUpContextNote ??
-                "The accepted result and deliverables will be included as context. Press Ctrl/⌘ + Enter to submit."}
-            </p>
-
-            {submissionError ? (
-              <p role="alert" className="text-sm font-medium text-destructive">
-                {submissionError}
-              </p>
-            ) : null}
-            {createdTask ? (
-              <div
-                className="flex flex-col gap-2 rounded-xl border border-success/35 bg-success/10 px-3 py-2 text-sm sm:flex-row sm:items-center sm:justify-between"
-                role="status"
-              >
-                <span>
-                  {copy.followUpTaskCreated ?? "Follow-up task created"}:{" "}
-                  {createdTask.title}
-                </span>
-                <Button asChild type="button" size="sm" variant="outline">
-                  <Link
-                    to={localizeHref(locale, `/tasks/${createdTask.taskId}`)}
-                  >
-                    {copy.followUpOpenTask ?? "Open task"}
-                    <ExternalLink className="size-3.5" aria-hidden />
-                  </Link>
-                </Button>
-              </div>
-            ) : null}
-          </div>
-        ) : null}
+        {isAccepted ? <TaskResultFollowUpPanel taskId={taskId} copy={copy} /> : null}
       </div>
     </header>
   );

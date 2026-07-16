@@ -155,6 +155,17 @@ External agents use `POST /api/mcp` tools. Chrona injects hidden context such as
 
 Important rule: agents must not invent backend IDs. They should call read tools only when state is missing or stale, and submit final node outcomes with the appropriate Chrona tool.
 
+## Accepted-result continuation
+
+Accepting a result freezes the task's accepted Run, result spec, artifacts, plan, and execution state, but the provider conversation can continue for result questions. `GET /api/tasks/:taskId/result/follow-up` restores persisted continuation history and reports whether the accepted Run's provider session is available.
+
+`POST /api/tasks/:taskId/result/follow-up` supports two intents:
+
+- `ask` resumes the accepted Run's provider conversation with mutation and execution tools disabled. Chrona records the answer, context source, provider session ref, and reported cache usage. A missing source session falls back to a bounded accepted-result context and server-owned history.
+- `create_task` creates a linked Draft child task. The default `fork_source_session` strategy creates an independent provider-session branch; `fresh_with_result` starts clean and carries only the bounded accepted result and artifact references.
+
+Every request carries a UUID `requestId`; `(taskId, requestId)` is unique so browser retries do not duplicate answers or child tasks. Continuations are scoped to the canonical `task.result_accepted` event's `accepted_run_id`, not merely the task's latest completed Run.
+
 ## Generated file references and controlled reads
 
 Task nodes that create files receive a node-scoped output directory under Chrona's data directory: `generated-files/<task-ref>/<plan-ref>/<node-ref>`. The runtime input exposes this directory as `context.run.generatedFiles`; result artifacts should reference the returned file path instead of embedding large contents in the terminal payload.

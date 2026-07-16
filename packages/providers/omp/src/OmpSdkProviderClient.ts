@@ -30,6 +30,10 @@ import type {
   GetRunInput,
   HealthCheckInput,
   ProviderCapabilities,
+  ProviderConversationCapabilities,
+  ProviderConversationState,
+  ProviderConversationTurnInput,
+  ProviderConversationTurnResult,
   ProviderRunEvent,
   ProviderRunInput,
   ProviderRunRef,
@@ -518,6 +522,105 @@ export class OmpSdkProviderClient implements AgentProviderClient {
     }
   }
 
+  getConversationCapabilities(): ProviderConversationCapabilities {
+    return {
+      resume: true,
+      fork: true,
+      compact: true,
+      handoff: "native",
+      contextUsage: "detailed",
+    };
+  }
+
+  async inspectConversation(
+    sessionRef: string,
+  ): Promise<ProviderConversationState> {
+    try {
+      const manager = await SessionManager.open(sessionRef, undefined, undefined, {
+        initialCwd: nonEmpty(this.config.cwd) ?? process.cwd(),
+        suppressBreadcrumb: true,
+      });
+      const { session } = await this.createConversationSession(manager);
+      const usage = session.getContextUsage();
+      await session.dispose();
+      return {
+        available: true,
+        sessionRef,
+        compacted: manager.getEntries().some((entry) => entry.type === "compaction"),
+        contextTokens: usage?.tokens,
+        contextWindow: usage?.contextWindow,
+      };
+    } catch {
+      return { available: false, sessionRef, compacted: false };
+    }
+  }
+
+  async runConversationTurn(
+    input: ProviderConversationTurnInput,
+  ): Promise<ProviderConversationTurnResult> {
+    const cwd = nonEmpty(this.config.cwd) ?? process.cwd();
+    const manager = input.mode === "fork"
+      ? await SessionManager.forkFrom(input.sessionRef, cwd)
+      : await SessionManager.open(input.sessionRef, undefined, undefined, {
+          initialCwd: cwd,
+          suppressBreadcrumb: true,
+        });
+    const { session } = await this.createConversationSession(manager);
+    const chunks: string[] = [];
+    let compacted = manager.getEntries().some((entry) => entry.type === "compaction");
+    const unsubscribe = session.subscribe((event) => {
+      if (
+        event.type === "message_update" &&
+        event.assistantMessageEvent.type === "text_delta"
+      ) {
+        chunks.push(event.assistantMessageEvent.delta);
+      }
+      if (event.type === "auto_compaction_end" && !event.aborted) compacted = true;
+    });
+    const abort = () => session.abort();
+    input.signal?.addEventListener("abort", abort, { once: true });
+    try {
+      await session.prompt(input.prompt, { expandPromptTemplates: false });
+      const usage = session.getContextUsage();
+      return {
+        sessionRef: manager.getSessionFile() ?? input.sessionRef,
+        outputText: chunks.join("") || session.getLastAssistantText() || "",
+        usage: usage
+          ? {
+              inputTokens: usage.tokens,
+              totalTokens: usage.tokens,
+              contextWindow: usage.contextWindow,
+            }
+          : null,
+        compacted,
+      };
+    } finally {
+      input.signal?.removeEventListener("abort", abort);
+      unsubscribe();
+      await session.dispose();
+    }
+  }
+
+  private async createConversationSession(sessionManager: SessionManager) {
+    const environment = applySdkEnvironment(this.config);
+    const cwd = nonEmpty(this.config.cwd) ?? process.cwd();
+    const agentDir = nonEmpty(this.config.codingAgentDirectory) ?? nonEmpty(this.config.configDirectory);
+    const setup = await createSdkModelSetup(this.config, environment);
+    return createAgentSession({
+      cwd,
+      agentDir,
+      modelPattern: setup.modelPattern,
+      ...(setup.authStorage ? { authStorage: setup.authStorage } : {}),
+      ...(setup.modelRegistry ? { modelRegistry: setup.modelRegistry } : {}),
+      sessionManager,
+      skipPythonPreflight: true,
+      hasUI: false,
+      enableMCP: false,
+      enableLsp: false,
+      toolNames: [],
+    });
+  }
+
   async createSession(input?: CreateSessionInput): Promise<ProviderSessionRef> {
     const sessionId = input?.sessionKey ?? `${SDK_RUN_PREFIX}-session-${randomUUID()}`;
     return {
@@ -625,11 +728,20 @@ export class OmpSdkProviderClient implements AgentProviderClient {
       ...(setup.modelRegistry ? { modelRegistry: setup.modelRegistry } : {}),
       deadline: this.config.timeoutMs ? Date.now() + this.config.timeoutMs : undefined,
       ...sdkToolOptionsForTerminal(terminalToolName, handle.input.control),
-      sessionManager: SessionManager.inMemory(cwd),
+      sessionManager: SessionManager.create(cwd),
       skipPythonPreflight: true,
       hasUI: false,
     });
     handle.session = session;
+    const persistedSessionRef = session.sessionManager.getSessionFile();
+    if (persistedSessionRef) {
+      handle.sessionId = persistedSessionRef;
+      handle.ref = {
+        ...handle.ref,
+        sessionId: persistedSessionRef,
+        providerRunId: handle.ref.providerRunId ?? handle.ref.runId,
+      };
+    }
     handle.unsubscribe = session.subscribe((event) => this.onSessionEvent(handle, queue, event));
     if (handle.input.signal) {
       const abort = () => {

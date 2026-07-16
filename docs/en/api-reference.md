@@ -84,6 +84,20 @@ Reopens a completed task.
 
 Accepts the current task result.
 
+### GET /api/tasks/:taskId/result/follow-up
+
+Returns the continuation state for the latest accepted result: the accepted Run, source-session availability and health, and persisted follow-up questions or linked next tasks.
+
+### POST /api/tasks/:taskId/result/follow-up
+
+Continues from an accepted result. Requests are idempotent by `requestId`.
+
+- `intent: "ask"` resumes the original provider conversation when available. If the source session is missing, Chrona falls back to the accepted result plus persisted follow-up history.
+- `intent: "create_task"` creates a linked Draft task. `sessionStrategy` may be `fork_source_session` (default) or `fresh_with_result`.
+
+The source task's accepted Run, result, artifacts, plan, and execution state remain immutable. Result follow-up turns run without execution or mutation tools.
+
+
 ## Task plan
 
 ### GET /api/tasks/:taskId/plan

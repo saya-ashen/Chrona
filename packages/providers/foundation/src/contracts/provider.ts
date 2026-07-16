@@ -50,6 +50,9 @@ export const providerUsageSchema = z
     inputTokens: z.number().int().nonnegative().optional(),
     outputTokens: z.number().int().nonnegative().optional(),
     totalTokens: z.number().int().nonnegative().optional(),
+    cacheReadInputTokens: z.number().int().nonnegative().optional(),
+    cacheCreationInputTokens: z.number().int().nonnegative().optional(),
+    contextWindow: z.number().int().positive().optional(),
   })
   .strict();
 
@@ -542,6 +545,37 @@ export type GetRunInput = z.infer<typeof getRunInputSchema>;
 export type ProviderRunSnapshot = z.infer<typeof providerRunSnapshotSchema>;
 export type CancelRunInput = z.infer<typeof cancelRunInputSchema>;
 
+export type ProviderConversationCapabilities = {
+  resume: boolean;
+  fork: boolean;
+  compact: boolean;
+  handoff: "native" | "application" | "unsupported";
+  contextUsage: "detailed" | "aggregate" | "none";
+};
+
+export type ProviderConversationTurnInput = {
+  sessionRef: string;
+  prompt: string;
+  mode?: "resume" | "fork";
+  toolPolicy?: "result_follow_up" | "full";
+  signal?: AbortSignal;
+};
+
+export type ProviderConversationTurnResult = {
+  sessionRef: string;
+  outputText: string;
+  usage?: ProviderUsage | null;
+  compacted?: boolean;
+};
+
+export type ProviderConversationState = {
+  available: boolean;
+  sessionRef: string;
+  compacted: boolean;
+  contextTokens?: number;
+  contextWindow?: number;
+};
+
 export type ProviderConfig = {
   gatewayUrl: string;
   gatewayToken?: string;
@@ -565,6 +599,16 @@ export interface AgentProviderClient {
   getRun(input: GetRunInput): Promise<ProviderRunSnapshot>;
 
   cancelRun(input: CancelRunInput): Promise<ProviderRunSnapshot>;
+
+  getConversationCapabilities?(): ProviderConversationCapabilities;
+
+  inspectConversation?(
+    sessionRef: string,
+  ): Promise<ProviderConversationState>;
+
+  runConversationTurn?(
+    input: ProviderConversationTurnInput,
+  ): Promise<ProviderConversationTurnResult>;
 
   resolveApproval?(
     input: ResolveProviderApprovalInput,

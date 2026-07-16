@@ -9,7 +9,7 @@ import { getTaskActivityPage } from "./task-activity";
 import { getTaskRuntimeContext } from "./get-task-runtime-context";
 import { listTasksByWorkspace } from "./list-tasks";
 import { acceptTaskResult } from "./accept-task-result";
-import { continueFromTaskResult } from "./continue-from-task-result";
+import { continueFromTaskResult, getTaskResultFollowUpState } from "./continue-from-task-result";
 import {
   approveResultFileAccess,
   requestResultFileAccess,
@@ -88,6 +88,10 @@ export class Tasks {
 
   continueFromResult(input: Parameters<typeof continueFromTaskResult>[0]) {
     return continueFromTaskResult(input);
+  }
+
+  getResultFollowUpState(input: { taskId: string }) {
+    return getTaskResultFollowUpState(input.taskId);
   }
 
   requestResultFileAccess(

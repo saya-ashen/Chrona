@@ -426,25 +426,68 @@ export const taskResultAcceptParamSchema = z.object({ taskId: taskIdParam });
 
 export const taskResultFollowUpParamSchema = z.object({ taskId: taskIdParam });
 
+const taskResultContinuationRequestIdSchema = z.string().uuid();
+
 export const taskResultFollowUpBodySchema = z.discriminatedUnion("intent", [
   z.object({
+    requestId: taskResultContinuationRequestIdSchema,
     intent: z.literal("create_task"),
     instruction: z.string().trim().min(1).max(10_000),
-  }),
+    sessionStrategy: z
+      .enum(["fork_source_session", "fresh_with_result"])
+      .default("fork_source_session"),
+  }).strict(),
   z.object({
+    requestId: taskResultContinuationRequestIdSchema,
     intent: z.literal("ask"),
     instruction: z.string().trim().min(1).max(10_000),
-    history: z
-      .array(
-        z.object({
-          role: z.enum(["user", "assistant"]),
-          content: z.string().trim().min(1).max(10_000),
-        }),
-      )
-      .max(20)
-      .optional(),
-  }),
+  }).strict(),
 ]);
+
+export const taskResultFollowUpEntrySchema = z.object({
+  id: z.string(),
+  requestId: z.string(),
+  acceptedRunId: z.string(),
+  intent: z.enum(["ask", "create_task"]),
+  status: z.enum(["pending", "completed", "failed"]),
+  instruction: z.string(),
+  answer: z.string().nullable().optional(),
+  answerSource: z.string().nullable().optional(),
+  contextSource: z
+    .enum(["source_session", "accepted_result_fallback"])
+    .nullable()
+    .optional(),
+  sessionStrategy: z
+    .enum(["fork_source_session", "fresh_with_result"])
+    .nullable()
+    .optional(),
+  createdTask: z
+    .object({ id: z.string(), title: z.string() })
+    .nullable()
+    .optional(),
+  cache: z
+    .object({
+      readInputTokens: z.number().int().nonnegative().nullable(),
+      creationInputTokens: z.number().int().nonnegative().nullable(),
+    })
+    .optional(),
+  error: z.string().nullable().optional(),
+  createdAt: z.string().datetime(),
+  completedAt: z.string().datetime().nullable(),
+}).strict();
+
+export const taskResultFollowUpStateSchema = z.object({
+  acceptedRunId: z.string(),
+  acceptedAt: z.string().datetime(),
+  sourceSession: z.object({
+    available: z.boolean(),
+    provider: z.string(),
+    health: z.enum(["fresh", "moderate", "high", "compacted", "unavailable", "unknown"]),
+    supportsFork: z.boolean(),
+    supportsResume: z.boolean(),
+  }).strict(),
+  entries: z.array(taskResultFollowUpEntrySchema),
+}).strict();
 
 // ── PUT /tasks/:taskId/schedule ──
 export const scheduleParamSchema = z.object({ taskId: taskIdParam });

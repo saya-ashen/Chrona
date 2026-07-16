@@ -18,6 +18,10 @@ import {
   type GetRunInput,
   type HealthCheckInput,
   type ProviderCapabilities,
+  type ProviderConversationCapabilities,
+  type ProviderConversationState,
+  type ProviderConversationTurnInput,
+  type ProviderConversationTurnResult,
   type ProviderHealth,
   type ProviderRunEvent,
   type ProviderRunRef,
@@ -30,6 +34,7 @@ import {
 import {
   createClaudeCodeRunner,
   probeClaudeCodeSdk,
+  runClaudeConversationTurn,
   type ClaudeCodeRunHandle,
   type ClaudeCodeRunner,
   type ClaudeCodeRunnerConfig,
@@ -234,6 +239,43 @@ export class ClaudeCodeProviderClient implements AgentProviderClient {
         mode: "authoritative_run_lookup",
       },
     };
+  }
+
+  getConversationCapabilities(): ProviderConversationCapabilities {
+    return {
+      resume: true,
+      fork: true,
+      compact: true,
+      handoff: "application",
+      contextUsage: "aggregate",
+    };
+  }
+
+  async inspectConversation(
+    sessionRef: string,
+  ): Promise<ProviderConversationState> {
+    return {
+      available: Boolean(sessionRef.trim()),
+      sessionRef,
+      compacted: false,
+    };
+  }
+
+  async runConversationTurn(
+    input: ProviderConversationTurnInput,
+  ): Promise<ProviderConversationTurnResult> {
+    if (!this.ownsRunner) {
+      throw new ClaudeCodeProviderError(
+        "Conversation continuation is unavailable for replay runners",
+      );
+    }
+    return runClaudeConversationTurn({
+      sessionRef: input.sessionRef,
+      prompt: input.prompt,
+      fork: input.mode === "fork",
+      config: await this.buildRunnerConfig(),
+      signal: input.signal,
+    });
   }
 
   async checkHealth(input: HealthCheckInput = {}): Promise<ProviderHealth> {

@@ -242,39 +242,42 @@ export function acceptTaskActionResult(input: { taskId: string }) {
   );
 }
 
-export type TaskResultFollowUpHistoryMessage = {
-  role: "user" | "assistant";
-  content: string;
-};
+export type {
+  ResultFollowUpEntry as TaskResultFollowUpResponse,
+  ResultFollowUpStateResponse as TaskResultFollowUpState,
+} from "./task-result-follow-up-state";
+import type {
+  ResultFollowUpEntry,
+  ResultFollowUpStateResponse,
+} from "./task-result-follow-up-state";
 
-export type TaskResultFollowUpResponse =
-  | {
-      intent: "create_task";
-      taskId: string;
-      workspaceId: string;
-      parentTaskId: string;
-      title: string;
-    }
-  | {
-      intent: "ask";
-      answer: string;
-      source: string;
-    };
+export function getTaskResultFollowUpState(input: { taskId: string }) {
+  return apiJson<ResultFollowUpStateResponse>(
+    `/api/tasks/${encodeURIComponent(input.taskId)}/result/follow-up`,
+  );
+}
 
 export function continueFromTaskResult(input: {
   taskId: string;
+  requestId: string;
   intent: "ask" | "create_task";
   instruction: string;
-  history?: TaskResultFollowUpHistoryMessage[];
+  sessionStrategy?: "fork_source_session" | "fresh_with_result";
 }) {
-  return apiJson<TaskResultFollowUpResponse>(
+  return apiJson<ResultFollowUpEntry>(
     `/api/tasks/${encodeURIComponent(input.taskId)}/result/follow-up`,
     {
       method: "POST",
       body: JSON.stringify({
+        requestId: input.requestId,
         intent: input.intent,
         instruction: input.instruction,
-        ...(input.intent === "ask" ? { history: input.history } : {}),
+        ...(input.intent === "create_task"
+          ? {
+              sessionStrategy:
+                input.sessionStrategy ?? "fork_source_session",
+            }
+          : {}),
       }),
     },
   );

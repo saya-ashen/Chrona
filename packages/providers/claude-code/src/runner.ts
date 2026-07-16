@@ -717,6 +717,93 @@ export function extractSdkSessionId(raw: unknown): string | undefined {
     : undefined;
 }
 
+export async function runClaudeConversationTurn(input: {
+  sessionRef: string;
+  prompt: string;
+  fork: boolean;
+  config: ClaudeCodeRunnerConfig;
+  signal?: AbortSignal;
+}) {
+  const abortController = new AbortController();
+  const abort = () => abortController.abort();
+  input.signal?.addEventListener("abort", abort, { once: true });
+  let sessionRef = input.sessionRef;
+  let outputText = "";
+  let usage: {
+    inputTokens?: number;
+    outputTokens?: number;
+    cacheReadInputTokens?: number;
+    cacheCreationInputTokens?: number;
+    contextWindow?: number;
+  } | null = null;
+  let compacted = false;
+  try {
+    const query = sdkQuery({
+      prompt: input.prompt,
+      options: {
+        ...(input.config.sdkOptions ?? {}),
+        model: input.config.model ?? DEFAULT_MODEL,
+        cwd: input.config.cwd,
+        env: claudeRunEnv(input.config),
+        abortController,
+        resume: input.sessionRef,
+        ...(input.fork ? { forkSession: true } : {}),
+        persistSession: true,
+        permissionMode: "dontAsk",
+        allowedTools: [],
+        disallowedTools: [
+          "Bash",
+          "Edit",
+          "Write",
+          "NotebookEdit",
+          "WebFetch",
+          "WebSearch",
+          "Task",
+          "Agent",
+        ],
+        mcpServers: {},
+        ...binaryOption(input.config),
+      },
+    });
+    for await (const message of query) {
+      const record = message as unknown as Record<string, unknown>;
+      const nextSessionRef = extractSdkSessionId(message);
+      if (nextSessionRef) sessionRef = nextSessionRef;
+      if (record.type === "system" && record.subtype === "compact_boundary") {
+        compacted = true;
+      }
+      if (record.type === "result") {
+        if (typeof record.result === "string") outputText = record.result;
+        const resultUsage = record.usage as Record<string, unknown> | undefined;
+        const modelUsage = record.modelUsage as Record<string, Record<string, unknown>> | undefined;
+        const firstModelUsage = modelUsage ? Object.values(modelUsage)[0] : undefined;
+        usage = {
+          inputTokens: numberField(resultUsage, "input_tokens"),
+          outputTokens: numberField(resultUsage, "output_tokens"),
+          cacheReadInputTokens:
+            numberField(resultUsage, "cache_read_input_tokens") ??
+            numberField(firstModelUsage, "cacheReadInputTokens"),
+          cacheCreationInputTokens:
+            numberField(resultUsage, "cache_creation_input_tokens") ??
+            numberField(firstModelUsage, "cacheCreationInputTokens"),
+          contextWindow: numberField(firstModelUsage, "contextWindow"),
+        };
+      }
+    }
+  } finally {
+    input.signal?.removeEventListener("abort", abort);
+  }
+  return { sessionRef, outputText, usage, compacted };
+}
+
+function numberField(
+  record: Record<string, unknown> | undefined,
+  key: string,
+) {
+  const value = record?.[key];
+  return typeof value === "number" && Number.isFinite(value) ? value : undefined;
+}
+
 export function validClaudeCodeResumeSessionRef(value: string | undefined): string | undefined {
   const ref = value?.trim();
   if (!ref) return undefined;

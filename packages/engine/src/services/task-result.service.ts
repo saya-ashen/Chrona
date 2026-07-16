@@ -27,5 +27,18 @@ export function createTaskResultService() {
         );
       }
     },
+    async getFollowUpState(
+      input: Parameters<typeof tasks.getResultFollowUpState>[0],
+    ) {
+      try {
+        return await tasks.getResultFollowUpState(input);
+      } catch (cause) {
+        throw engineErrorFromUnknown(
+          cause,
+          ENGINE_ERROR_CODES.INVALID_TASK_STATE,
+          "Failed to get task result follow-up state",
+        );
+      }
+    },
   };
 }
