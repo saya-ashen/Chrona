@@ -1037,8 +1037,9 @@ function ResultLifecyclePanel({
             >
               <Button
                 type="button"
-                variant="outline"
+                variant="default"
                 size="sm"
+                className="shadow-sm"
                 onClick={() => openAcceptedFollowUp("ask")}
               >
                 <MessageCircle className="size-4" aria-hidden />
@@ -1046,8 +1047,9 @@ function ResultLifecyclePanel({
               </Button>
               <Button
                 type="button"
-                variant="outline"
+                variant="secondary"
                 size="sm"
+                className="border border-primary/20 bg-primary/10 text-primary shadow-sm hover:bg-primary/15"
                 onClick={() => openAcceptedFollowUp("create_task")}
               >
                 <ListPlus className="size-4" aria-hidden />
