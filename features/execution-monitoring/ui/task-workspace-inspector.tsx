@@ -28,7 +28,7 @@ export function TaskWorkspaceInspector({
   onAction,
   isPlanCompact = false,
   isExecutionRunning = false,
-  executionOutputState = "empty",
+  executionResultState = "waiting",
   operationPlacement = "before",
   showHeader = true,
 }: {
@@ -43,7 +43,7 @@ export function TaskWorkspaceInspector({
   copy: WorkspaceCopy;
   isPlanCompact?: boolean;
   isExecutionRunning?: boolean;
-  executionOutputState?: "empty" | "partial";
+  executionResultState?: "waiting" | "available";
   operationPanel?: ReactNode;
   operationPlacement?: "before" | "after";
   showHeader?: boolean;
@@ -88,7 +88,7 @@ export function TaskWorkspaceInspector({
           liveActivity={liveActivity}
           currentExecution={currentExecution}
           isExecutionRunning={isExecutionRunning}
-          executionOutputState={executionOutputState}
+          executionResultState={executionResultState}
           primaryAction={null}
           copy={commandCenterCopy}
           activityLayout={isPlanCompact ? "side" : "below"}

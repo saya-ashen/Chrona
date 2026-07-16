@@ -84,11 +84,26 @@ function commandCenterTrailItems(
     : [];
 }
 
+function hasCommandCenterOutput(document: UiDocument | null | undefined) {
+  if (!document?.root) return false;
+  const root = document.elements[document.root];
+  const children = root?.children ?? [];
+  if (children.length !== 1) return children.length > 0;
+  const onlyChild = document.elements[children[0]!];
+  return onlyChild?.type !== "WorkspaceArtifactList"
+    || (onlyChild.children?.length ?? 0) > 0;
+}
+
 function buildNodeResultContentSpec(
-  _node: PlanNodeDataModel | null,
+  node: PlanNodeDataModel | null,
   emptyMessage: string,
 ) {
-  return buildResultSpec([], { emptyMessage });
+  const summary = node?.result?.outputSummary?.trim()
+    || node?.completionSummary?.trim();
+  if (!summary) return buildResultSpec([], { emptyMessage });
+  return buildResultSpec([
+    { kind: "markdown", title: node?.title, content: summary },
+  ]);
 }
 
 function withActivityStreamProps(
@@ -154,7 +169,7 @@ export function TaskWorkspaceExecutionOverview({
   commandCenter,
   activityLayout = "below",
   isExecutionRunning = false,
-  executionOutputState = "empty",
+  executionResultState = "waiting",
   onAction,
 }: {
   taskId: string;
@@ -174,7 +189,7 @@ export function TaskWorkspaceExecutionOverview({
   copy?: Partial<CommandCenterCopy>;
   activityLayout?: ActivityLayout;
   isExecutionRunning?: boolean;
-  executionOutputState?: "empty" | "partial";
+  executionResultState?: "waiting" | "available";
   onAction?: OverviewAction;
   commandCenter?: {
     documents: {
@@ -327,7 +342,9 @@ export function TaskWorkspaceExecutionOverview({
         resultSpec,
         artifacts,
         copy: ws,
-        apiArtifactsSpec: commandCenter?.documents.output ?? null,
+        apiArtifactsSpec: hasCommandCenterOutput(commandCenter?.documents.output)
+          ? (commandCenter?.documents.output ?? null)
+          : null,
         selectedNodeId,
         nodeOptions,
         outputOwnerNodeId:
@@ -364,7 +381,7 @@ export function TaskWorkspaceExecutionOverview({
     <section
       aria-label={
         executionIsActive
-          ? (ws.liveOutputTitle ?? "Live output")
+          ? (ws.stageResultsTitle ?? "Stage results")
           : (ws.finalResultTitle ?? "Final result")
       }
       className="min-h-0 flex-1 overflow-y-auto"
@@ -376,7 +393,7 @@ export function TaskWorkspaceExecutionOverview({
             className="font-heading text-base font-semibold text-foreground"
           >
             {executionIsActive
-              ? (ws.liveOutputTitle ?? "Live output")
+              ? (ws.stageResultsTitle ?? "Stage results")
               : (ws.finalResultTitle ?? "Final result")}
           </h3>
           <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
@@ -389,29 +406,30 @@ export function TaskWorkspaceExecutionOverview({
               }
             >
               {executionIsActive
-                ? executionOutputState === "partial"
-                  ? (ws.partialOutputBadge ?? "Partial output")
-                  : (ws.awaitingOutputBadge ?? "Awaiting output")
+                ? executionResultState === "available"
+                  ? (ws.resultsAvailableBadge ?? "Results available")
+                  : (ws.resultsPendingBadge ?? "No result yet")
                 : (ws.aiGeneratedBadge ?? "AI generated")}
             </Badge>
             <span>
               {executionIsActive
-                ? executionOutputState === "partial"
-                  ? (ws.partialOutputDescription ??
-                    "Output collected so far. Execution is still running.")
-                  : (ws.awaitingOutputDescription ??
-                    "Execution is running. Output will appear when a step produces it.")
+                ? executionResultState === "available"
+                  ? (ws.resultsAvailableDescription ??
+                    "Completed step results collected during this run.")
+                  : (ws.resultsPendingDescription ??
+                    "The current step has not produced a viewable result yet. Follow execution activity for live progress.")
                 : (ws.validatedOutputDescription ??
                   "Validated output from task execution.")}
             </span>
           </div>
-      {executionIsActive && executionOutputState === "empty" ? (
-        <div className="mt-3 flex items-center gap-3 rounded-xl border border-primary/20 bg-primary/5 px-3 py-3" role="status" aria-label="Execution is producing output">
-          <span className="size-4 shrink-0 animate-spin rounded-full border-2 border-primary/20 border-t-primary motion-reduce:animate-none" aria-hidden="true" />
-          <div className="min-w-0 flex-1 space-y-1.5">
-            <div className="h-2 w-2/3 animate-pulse rounded-full bg-primary/20 motion-reduce:animate-none" />
-            <div className="h-2 w-2/5 animate-pulse rounded-full bg-primary/10 motion-reduce:animate-none" />
-          </div>
+      {executionIsActive && executionResultState === "waiting" ? (
+        <div
+          className="mt-3 rounded-xl border border-border/70 bg-muted/35 px-3 py-3 text-sm text-muted-foreground"
+          role="note"
+          aria-label={ws.resultsPendingAria ?? "Current step result pending"}
+        >
+          {ws.resultsPendingMessage ??
+            "This area shows completed step results, not live activity. The result will appear when the current step finishes."}
         </div>
       ) : null}
         </div>

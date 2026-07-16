@@ -27,12 +27,6 @@ export type RunningExecutionProgress = {
   total: number;
 };
 
-export type RunningExecutionActivity = {
-  phase: "starting" | "working" | "tool_running" | "transition";
-  label: string;
-  providerLabel: string | null;
-  updatedAt: string | null;
-};
 
 export type RunningExecutionView = {
   progress: RunningExecutionProgress;
@@ -43,8 +37,7 @@ export type RunningExecutionView = {
     ordinal: number | null;
     executorLabel: string | null;
   } | null;
-  currentActivity: RunningExecutionActivity;
-  outputState: "empty" | "partial";
+  resultState: "waiting" | "available";
   inspectedStep: {
     id: string;
     label: string;
@@ -640,69 +633,6 @@ function isWaitingNode(node: PlanNodeDataModel) {
   );
 }
 
-function currentActivity(
-  operationState: TaskWorkspaceOperationState,
-): RunningExecutionActivity {
-  const latestEvent = operationState.runtimeEvents.at(-1);
-  if (!latestEvent) {
-    return {
-      phase: "starting",
-      label: "AI is starting the current step",
-      providerLabel: null,
-      updatedAt: null,
-    };
-  }
-
-  const providerLabel = latestEvent.provider || latestEvent.runtimeName || null;
-  const updatedAt = latestEvent.timestamp ?? null;
-  switch (latestEvent.event.type) {
-    case "tool_started":
-      return {
-        phase: "tool_running",
-        label: latestEvent.event.label,
-        providerLabel,
-        updatedAt,
-      };
-    case "tool_completed":
-      return {
-        phase: "transition",
-        label: latestEvent.event.error
-          ? `${latestEvent.event.label} failed`
-          : `${latestEvent.event.label} completed; AI is continuing`,
-        providerLabel,
-        updatedAt,
-      };
-    case "approval_required":
-      return {
-        phase: "transition",
-        label: "Preparing an approval request",
-        providerLabel,
-        updatedAt,
-      };
-    case "run_status":
-      return {
-        phase: "transition",
-        label: latestEvent.event.message ?? latestEvent.event.status,
-        providerLabel,
-        updatedAt,
-      };
-    case "raw_event":
-      return {
-        phase: "working",
-        label: latestEvent.event.message ?? "AI is working on the current step",
-        providerLabel,
-        updatedAt,
-      };
-    case "assistant_text_delta":
-    case "reasoning_delta":
-      return {
-        phase: "working",
-        label: "AI is working on the current step",
-        providerLabel,
-        updatedAt,
-      };
-  }
-}
 
 export function deriveRunningExecutionView(input: {
   pageData: TaskPageData;
@@ -760,8 +690,7 @@ export function deriveRunningExecutionView(input: {
             null,
         }
       : null,
-    currentActivity: currentActivity(input.operationState),
-    outputState: hasOutput ? "partial" : "empty",
+    resultState: hasOutput ? "available" : "waiting",
     inspectedStep: inspectedNode
       ? {
           id: inspectedNode.id,

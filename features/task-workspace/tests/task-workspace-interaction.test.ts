@@ -562,7 +562,7 @@ describe("task workspace interaction model", () => {
     expect(view?.progress).toMatchObject({ ...expected, total: 3 });
   });
 
-  it("keeps execution visibly active before the first runtime event", () => {
+  it("reports that no persisted step result is available while execution starts", () => {
     const baseGraph = graphPlan();
     const nodes = baseGraph.nodes.map((node, index) => ({
       ...node,
@@ -580,53 +580,32 @@ describe("task workspace interaction model", () => {
       currentNode: nodes[0]!,
     });
 
-    expect(view?.currentActivity).toEqual({
-      phase: "starting",
-      label: "AI is starting the current step",
-      providerLabel: null,
-      updatedAt: null,
-    });
+    expect(view?.resultState).toBe("waiting");
   });
 
-  it("keeps provider reasoning user-facing and visibly active", () => {
+  it("reports completed node output as an available stage result", () => {
     const baseGraph = graphPlan();
-    const nodes = baseGraph.nodes.map((node, index) => ({
-      ...node,
-      status: index === 0 ? ("active" as const) : node.status,
-    }));
-    const graph = { ...baseGraph, nodes, steps: nodes };
+    const nodes = baseGraph.nodes.map((node, index) =>
+      index === 0
+        ? { ...node, status: "done" as const, completionSummary: "Trending report ready" }
+        : { ...node, status: index === 1 ? ("active" as const) : node.status },
+    );
     const view = deriveRunningExecutionView({
       pageData: pageData(),
-      graphPlan: graph,
+      graphPlan: { ...baseGraph, nodes, steps: nodes },
       operationState: operationState({
         status: "execution-running",
         action: "none",
-        runtimeEvents: [
-          {
-            type: "runtime_event",
-            action: "start_manual",
-            runtimeName: "omp",
-            provider: "omp",
-            timestamp: "2026-05-17T00:00:01.000Z",
-            event: {
-              type: "reasoning_delta",
-              text: "private transient reasoning",
-            },
-          },
-        ],
+        runtimeEvents: [],
       } as unknown as Partial<TaskWorkspaceOperationState>),
-      currentNode: nodes[0]!,
+      currentNode: nodes[1]!,
     });
 
-    expect(view?.currentActivity).toEqual({
-      phase: "working",
-      label: "AI is working on the current step",
-      providerLabel: "omp",
-      updatedAt: "2026-05-17T00:00:01.000Z",
-    });
+    expect(view?.resultState).toBe("available");
   });
 
-  it("keeps current step, inspected step, and runtime activity distinct", () => {
+
+  it("keeps current step and inspected step distinct", () => {
     const baseGraph = graphPlan();
     const nodes = baseGraph.nodes.map((node, index) => ({
       ...node,
@@ -676,12 +655,6 @@ describe("task workspace interaction model", () => {
       id: "n3",
       label: "Publish result report",
       isCurrent: false,
-    });
-    expect(view?.currentActivity).toEqual({
-      phase: "tool_running",
-      label: "Reading GitHub Trending",
-      providerLabel: "omp",
-      updatedAt: null,
     });
   });
 });

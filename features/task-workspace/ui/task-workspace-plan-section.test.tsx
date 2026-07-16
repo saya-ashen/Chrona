@@ -502,12 +502,10 @@ describe("TaskWorkspacePlanSection", () => {
     expect(screen.getByTestId("execution-focus-header")).toHaveTextContent(
       "Review generated output",
     );
-    expect(screen.getByTestId("current-runtime-activity")).toHaveTextContent(
-      "Starting plan",
-    );
+    expect(screen.queryByTestId("current-runtime-activity")).not.toBeInTheDocument();
     expect(
-      screen.getByRole("region", { name: "Live output" }),
-    ).toHaveTextContent("Awaiting output");
+      screen.getByRole("region", { name: "Stage results" }),
+    ).toHaveTextContent("No result yet");
     expect(screen.getByTestId("execution-navigator")).toHaveTextContent(
       "steps complete",
     );
@@ -1085,8 +1083,8 @@ describe("TaskWorkspacePlanSection", () => {
     );
     expect(screen.getByLabelText("Execution running")).toHaveClass("relative");
     expect(
-      screen.getByRole("status", { name: "Current activity running" }),
-    ).toHaveTextContent("AI is starting the current step");
+      screen.queryByRole("status", { name: "Current activity running" }),
+    ).not.toBeInTheDocument();
     expect(
       within(screen.getByTestId("execution-navigator")).getByLabelText(
         "Step running",

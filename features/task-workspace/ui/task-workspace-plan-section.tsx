@@ -1485,8 +1485,7 @@ function ExecutionFocusHeader({
       data-testid="execution-focus-header"
       data-current-step-id={view.currentStep?.id ?? ""}
     >
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0 flex-1 space-y-2">
+      <div className="min-w-0 space-y-2">
           <div className="flex flex-wrap items-center gap-2">
             {needsAttention ? null : (
               <span
@@ -1547,32 +1546,6 @@ function ExecutionFocusHeader({
             <span>{completedPercent}%</span>
           </div>
         </div>
-        <div
-          className="min-w-[15rem] max-w-sm rounded-xl border border-primary/25 bg-background/90 px-3 py-2.5 shadow-sm"
-          data-testid="current-runtime-activity"
-          role="status"
-          aria-live="polite"
-          aria-label="Current activity running"
-        >
-          <div className="flex items-center gap-2">
-            <span
-              className="size-3 shrink-0 animate-spin rounded-full border-2 border-primary/20 border-t-primary motion-reduce:animate-none"
-              aria-hidden="true"
-            />
-            <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-primary">
-              {copy.currentActivity ?? "Current activity"}
-            </p>
-          </div>
-          <p className="mt-1.5 text-sm font-medium text-foreground">
-            {view.currentActivity.label}
-          </p>
-          {view.currentActivity.providerLabel ? (
-            <p className="mt-1 text-xs text-muted-foreground">
-              {view.currentActivity.providerLabel}
-            </p>
-          ) : null}
-        </div>
-      </div>
     </section>
   );
 }
@@ -2211,7 +2184,7 @@ export function TaskWorkspacePlanSection({
               liveActivity={liveActivity}
               currentExecution={currentExecution}
               isExecutionRunning
-              executionOutputState={displayState.runningExecution.outputState}
+              executionResultState={displayState.runningExecution.resultState}
               copy={copy}
               onAction={focusNodeActions}
               operationPanel={

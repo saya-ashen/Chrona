@@ -314,7 +314,7 @@ describe("TaskWorkspaceExecutionOverview", () => {
     expect(screen.getByText("Writing report")).toBeInTheDocument();
   });
 
-  it("keeps live feedback visible before execution has runtime activity", () => {
+  it("explains that stage results are pending while activity stays live", () => {
     const view = createTaskWorkspaceExecutionConsoleView(
       executionMonitoringWorkspaceFixtures.running,
     );
@@ -339,11 +339,14 @@ describe("TaskWorkspaceExecutionOverview", () => {
       },
       currentExecution: { status: "started" },
       isExecutionRunning: true,
-      executionOutputState: "empty",
+      executionResultState: "waiting",
     });
 
-    expect(screen.getByRole("region", { name: "Live output" })).toHaveTextContent("Awaiting output");
-    expect(screen.getByRole("status", { name: "Execution is producing output" })).toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Stage results" })).toHaveTextContent("No result yet");
+    expect(screen.getByRole("note", { name: "Current step result pending" })).toHaveTextContent(
+      "This area shows completed step results, not live activity.",
+    );
+    expect(screen.queryByRole("status", { name: "Execution is producing output" })).not.toBeInTheDocument();
     expect(screen.getByText("AI is working")).toBeInTheDocument();
     expect(screen.getByText("Working on the current step")).toBeInTheDocument();
   });
@@ -530,6 +533,34 @@ describe("TaskWorkspaceExecutionOverview", () => {
     expect(screen.getByText("Report")).toBeInTheDocument();
     expect(screen.getByText("file://report.md")).toBeInTheDocument();
   });
+
+  it("renders a completed node summary when persisted plan output is absent", () => {
+    const view = createTaskWorkspaceExecutionConsoleView(
+      executionMonitoringWorkspaceFixtures.running,
+    );
+
+    renderOverview(view, {
+      latestCompletedNode: {
+        id: "research",
+        title: "Research target user",
+        objective: "Complete workspace step",
+        phase: "Execution",
+        status: "done",
+        completionSummary: "Research complete",
+      },
+      commandCenter: null,
+      currentExecution: { status: "running" },
+      isExecutionRunning: true,
+      executionResultState: "available",
+    });
+
+    expect(screen.getByRole("region", { name: "Stage results" })).toHaveTextContent(
+      "Research complete",
+    );
+    expect(screen.getByText("Results available")).toBeInTheDocument();
+    expect(screen.queryByRole("note", { name: "Current step result pending" })).not.toBeInTheDocument();
+  });
+
 
   it("does not render command center primary actions inside the execution panel", () => {
     const view = createTaskWorkspaceExecutionConsoleView(
