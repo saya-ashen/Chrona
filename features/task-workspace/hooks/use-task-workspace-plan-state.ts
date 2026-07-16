@@ -24,7 +24,7 @@ import {
   startPlanAccept,
 } from "../model/task-workspace-plan-flow-machine";
 import { mergeWorkspaceActivity, workspaceEventToWorkspaceActivity } from "../model/task-workspace-activity";
-import type { TaskData, WorkspaceActivityItem } from "../model/task-workspace-types";
+import type { TaskData, TaskPageData, WorkspaceActivityItem } from "../model/task-workspace-types";
 import { stopTaskPlanGenerationSession, useTaskPlanGenerationSession, type TaskPlanSessionState } from "./task-plan-generation-session-store";
 import type { TaskWorkspaceSseEvent } from "./use-task-workspace-page-state";
 import type { ExecutionActionInput, ExecutionCheckpoint, PlanExecutionResult, PlanExecutionSSEEvent, SubmitCheckpointActionInput } from "@chrona/contracts"
@@ -624,14 +624,29 @@ export function useTaskWorkspacePlanState(
     setAcceptResultError(null);
     setIsAcceptingResult(true);
     try {
-      await acceptTaskResult(task.id);
+      const accepted = await acceptTaskResult(task.id);
+      queryClient.setQueryData(
+        taskWorkspaceQueryKeys.page(task.id, selectedWorkBlockId),
+        (current: TaskPageData | undefined) => current
+          ? {
+              ...current,
+              task: {
+                ...current.task,
+                status: "Done",
+              },
+              latestRunSummary: current.latestRunSummary
+                ? { ...current.latestRunSummary, id: accepted.runId, status: "Completed" }
+                : current.latestRunSummary,
+            }
+          : current,
+      );
       await refreshExecutionQueries();
     } catch (cause) {
       setAcceptResultError(cause instanceof Error ? cause.message : "Failed to accept task result");
     } finally {
       setIsAcceptingResult(false);
     }
-  }, [refreshExecutionQueries, task.id]);
+  }, [queryClient, refreshExecutionQueries, selectedWorkBlockId, task.id]);
 
 
   const assistantBuildCurrentPlan = useCallback(() => {

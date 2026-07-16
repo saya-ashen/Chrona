@@ -82,6 +82,9 @@ vi.mock("@shared/http", async (importOriginal) => ({
       return mocks.planResponses.shift();
     }
     if (/\/execution\/current(?:\?|$)/.test(path)) return mocks.currentExecutionResponse;
+    if (/\/result\/accept(?:\?|$)/.test(path) && method === "POST") {
+      return { taskId: "task-1", workspaceId: "workspace-1", runId: "run-1" };
+    }
     if (/\/commands(?:\?|$)/.test(path) && method === "POST") {
       const parsedBody: unknown = JSON.parse(String(init?.body ?? "{}"));
       if (!parsedBody || typeof parsedBody !== "object" || Array.isArray(parsedBody)) {
@@ -1106,4 +1109,32 @@ describe("task workspace page synchronization", () => {
     expect(result.current.currentExecution?.status).toBe("completed");
     expect(refreshWorkspace).toHaveBeenCalledTimes(3);
   });
+  it("moves a completed result to the accepted state immediately after the POST succeeds", async () => {
+    const acceptedPlan = planReadModel({ id: "plan-1", status: "accepted", title: "Completed plan" });
+    const initialPage = pageData({ taskStatus: "Completed", plan: acceptedPlan, runStatus: "Completed" });
+    mocks.pageResponses = [pageData({ taskStatus: "Done", plan: acceptedPlan, runStatus: "Completed" })];
+    mocks.planResponses = [
+      { taskId: "task-1", aiPlanGenerationStatus: "accepted", savedPlan: acceptedPlan },
+    ];
+
+    const { result } = renderHook(() => {
+      const workspace = useTaskWorkspacePageState(initialPage);
+      const plan = useTaskWorkspacePlanState(workspace.pageData.task, workspace.refreshWorkspace, workspace.workspaceEvents);
+      return { workspace, plan };
+    }, { wrapper: createQueryWrapper() });
+
+    expect(result.current.workspace.pageData.task.status).toBe("Completed");
+    await act(async () => {
+      await result.current.plan.handleAcceptResult();
+    });
+
+    expect(mocks.fetchCalls).toContainEqual(expect.objectContaining({
+      input: "/api/tasks/task-1/result/accept",
+      init: expect.objectContaining({ method: "POST" }),
+    }));
+    expect(result.current.workspace.pageData.task.status).toBe("Done");
+    expect(result.current.plan.acceptResultError).toBeNull();
+    expect(result.current.plan.isAcceptingResult).toBe(false);
+  });
+
 });

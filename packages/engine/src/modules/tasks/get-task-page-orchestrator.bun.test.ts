@@ -503,6 +503,31 @@ describe("getTaskPage orchestrator read model", () => {
     }));
   });
 
+  it("keeps an accepted Done task authoritative over its completed work block", async () => {
+    const { task } = await seedTask("Accepted scheduled task");
+    const workBlock = await db.workBlock.create({
+      data: {
+        workspaceId: task.workspaceId,
+        taskId: task.id,
+        title: "Accepted occurrence",
+        scheduledStartAt: new Date("2026-07-15T01:00:00.000Z"),
+        scheduledEndAt: new Date("2026-07-15T02:00:00.000Z"),
+        status: "Completed",
+        trigger: "manual",
+      },
+    });
+    await db.task.update({
+      where: { id: task.id },
+      data: { status: "Done", completedAt: new Date("2026-07-15T03:00:00.000Z") },
+    });
+
+    const page = await getTaskBootstrap({ taskId: task.id, workBlockId: workBlock.id });
+
+    expect(page.task.status).toBe("Done");
+    expect(page.task.currentWorkBlock?.status).toBe("Completed");
+    expect(page.task.scheduleStatus).toBe("Completed");
+  });
+
   it("ignores stale stored block reasons for completed tasks", async () => {
     const { workspace, task } = await seedTask("Completed stale blocker task");
     const compiledPlan = makeCompiledPlan();

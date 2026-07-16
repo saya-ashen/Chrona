@@ -9,6 +9,7 @@ import { getTaskActivityPage } from "./task-activity";
 import { getTaskRuntimeContext } from "./get-task-runtime-context";
 import { listTasksByWorkspace } from "./list-tasks";
 import { acceptTaskResult } from "./accept-task-result";
+import { continueFromTaskResult } from "./continue-from-task-result";
 import { markTaskDone } from "./mark-task-done";
 import { reopenTask } from "./reopen-task";
 import { ensureTaskInWorkspace } from "./task-by-id";
@@ -18,7 +19,9 @@ export class Tasks {
     return createTask(input);
   }
 
-  async update(input: Parameters<typeof updateTask>[0] & { workspaceId?: string }) {
+  async update(
+    input: Parameters<typeof updateTask>[0] & { workspaceId?: string },
+  ) {
     if (input.workspaceId) {
       await ensureTaskInWorkspace(input.taskId, input.workspaceId);
     }
@@ -76,6 +79,10 @@ export class Tasks {
 
   acceptResult(input: Parameters<typeof acceptTaskResult>[0]) {
     return acceptTaskResult(input);
+  }
+
+  continueFromResult(input: Parameters<typeof continueFromTaskResult>[0]) {
+    return continueFromTaskResult(input);
   }
 }
 
