@@ -86,6 +86,35 @@ it("requests and approves external file access inside FileRef", async () => {
     await screen.findByRole("heading", { name: "Approved report" }),
   ).toBeInTheDocument();
 });
+it("renders generated FileRef downloads through the task-scoped API", () => {
+  const downloadHref =
+    "/api/tasks/task-1/result-files/download?path=generated%3A%2F%2Fscope%2Freport.md";
+  const spec: UiDocument = {
+    root: "file",
+    elements: {
+      file: {
+        type: "FileRef",
+        props: {
+          title: "中文功能分析报告",
+          path: "generated://scope/report.md",
+          downloadHref,
+        },
+      },
+    },
+  };
+
+  render(<SpecRenderer spec={spec} />);
+
+  expect(screen.getByRole("link", { name: "Download" })).toHaveAttribute(
+    "href",
+    downloadHref,
+  );
+  expect(screen.getByRole("link", { name: "Download" })).not.toHaveAttribute(
+    "href",
+    "generated://scope/report.md",
+  );
+});
+
 describe("workspace result registry", () => {
   it("renders JsonView as flat result content", () => {
     const spec: UiDocument = {

@@ -157,6 +157,10 @@ function fileUriFromProps(props: unknown) {
       : undefined;
 }
 
+function resultFileDownloadHref(taskId: string, uri: string) {
+  return `/api/tasks/${encodeURIComponent(taskId)}/result-files/download?path=${encodeURIComponent(uri)}`;
+}
+
 export async function hydrateFilePreviewSpec(
   spec: UiDocument,
   options: FilePreviewOptions = {},
@@ -174,15 +178,19 @@ export async function hydrateFilePreviewSpec(
       fileUriFromProps(element.props),
       options,
     );
+    const uri = fileUriFromProps(element.props);
     elements[key] = {
       ...element,
       props: {
         ...element.props,
         ...preview,
+        ...(uri?.startsWith("generated://") && options.taskId
+          ? { downloadHref: resultFileDownloadHref(options.taskId, uri) }
+          : {}),
         ...(preview.previewError === "permission_required" && options.taskId
           ? {
               accessTaskId: options.taskId,
-              accessRequestedPath: fileUriFromProps(element.props),
+              accessRequestedPath: uri,
             }
           : {}),
       },

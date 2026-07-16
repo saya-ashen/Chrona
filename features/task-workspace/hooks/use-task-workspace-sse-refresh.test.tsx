@@ -173,7 +173,7 @@ describe("SSE-driven refetch of dependent queries", () => {
 
     mocks.commandCenterResponses.push({
       taskId: "task-1",
-      now: { root: "now", elements: { now: { type: "Markdown", props: { content: "running" } } } },
+      now: { root: "now", elements: { now: { type: "RichMarkdown", props: { content: "running" } } } },
       output: null,
       trail: [],
     });

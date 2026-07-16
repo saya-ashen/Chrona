@@ -23,7 +23,7 @@ export interface BuildResultSpecOptions {
  * empty/error fallback tabs and non-generated result summaries. Pure and cheap.
  *
  * Mapping:
- * - `"markdown"` → `Markdown` (content + optional title)
+ * - `"markdown"` → `RichMarkdown` (content + optional title)
  * - `"json"` → `JsonView` (value + optional title)
  * - `"file"` → `FileRef` (path + language + description)
  * - `"link"` → `Link` (href + label=title)
@@ -62,7 +62,7 @@ export function buildResultSpec(outputs: ResultOutputItemInput[], options?: Buil
     switch (output.kind) {
       case "markdown":
         elements[key] = {
-          type: "Markdown",
+          type: "RichMarkdown",
           props: {
             content: output.content,
             ...(output.title ? { title: output.title } : {}),

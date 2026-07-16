@@ -15,6 +15,7 @@ import {
   requestResultFileAccess,
 } from "./result-file-access";
 import { resolveFilePreview } from "./file-preview";
+import { openTaskResultFile } from "./open-task-result-file";
 import { markTaskDone } from "./mark-task-done";
 import { reopenTask } from "./reopen-task";
 import { ensureTaskInWorkspace } from "./task-by-id";
@@ -104,6 +105,10 @@ export class Tasks {
     input: Parameters<typeof approveResultFileAccess>[0],
   ) {
     return approveResultFileAccess(input);
+  }
+
+  openResultFile(input: Parameters<typeof openTaskResultFile>[0]) {
+    return openTaskResultFile(input);
   }
 
   previewResultFile(input: { path: string; canonicalPath: string }) {

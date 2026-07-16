@@ -83,6 +83,9 @@ export function createTasksService() {
     ) {
       return tasks.approveResultFileAccess(input);
     },
+    async openResultFile(input: Parameters<typeof tasks.openResultFile>[0]) {
+      return tasks.openResultFile(input);
+    },
     async previewResultFile(
       input: Parameters<typeof tasks.previewResultFile>[0],
     ) {

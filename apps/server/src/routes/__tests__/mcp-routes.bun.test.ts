@@ -50,11 +50,8 @@ const planOutputPublicSpec = {
     {
       op: "add",
       path: "/elements/root",
-      value: {
-        type: "Markdown",
-        props: { content: "Result" },
-        children: [],
-      },
+      value: { type: "RichMarkdown", props: { content: "Result" },
+      children: [], },
     },
   ],
 };
@@ -241,9 +238,9 @@ describe("MCP routes", () => {
     });
 
     expect((planOutput.inputSchema as any).safeParse({ patches: [{ op: "update", path: "/root", value: "root" }] }).success).toBe(false);
-    expect((planOutput.inputSchema as any).safeParse({ patches: [{ op: "add", path: "/elements/root", value: { type: "Markdown", props: { content: "done" }, children: [] } }] }).success).toBe(true);
+    expect((planOutput.inputSchema as any).safeParse({ patches: [{ op: "add", path: "/elements/root", value: { type: "RichMarkdown", props: { content: "done" }, children: [] } }] }).success).toBe(true);
     expect((planOutput.inputSchema as any).safeParse({ patches: [{ op: "add", path: "/elements/root", value: { type: "Nope", props: {}, children: [] } }] }).success).toBe(false);
-    expect((planOutput.inputSchema as any).safeParse({ patches: [{ op: "add", path: "/elements/root", value: { type: "Markdown", props: { title: "missing content allowed by generic schema" }, children: [] } }] }).success).toBe(true);
+    expect((planOutput.inputSchema as any).safeParse({ patches: [{ op: "add", path: "/elements/root", value: { type: "RichMarkdown", props: { title: "missing content allowed by generic schema" }, children: [] } }] }).success).toBe(true);
     expect((planOutput.inputSchema as any).safeParse({ patches: [{ op: "replace", path: "/elements/root/props/content", value: "updated" }] }).success).toBe(true);
 
     const patchJsonSchema = chronaPlanOutputPatchJsonSchema() as any;

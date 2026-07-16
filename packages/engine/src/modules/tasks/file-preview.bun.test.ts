@@ -149,6 +149,30 @@ describe("hydrateFilePreviewSpec", () => {
     });
   });
 
+  it("adds a task-scoped download URL for generated FileRef results", async () => {
+    const spec = await hydrateFilePreviewSpec(
+      {
+        root: "root",
+        elements: {
+          root: { type: "Stack", props: { gap: "sm" }, children: ["file"] },
+          file: {
+            type: "FileRef",
+            props: {
+              title: "中文功能分析报告",
+              path: "generated://20260716/N20260716-01/deeptutor-analysis-zh.md",
+            },
+          },
+        },
+      },
+      { taskId: "task-1" },
+    );
+
+    expect(spec.elements.file.props).toMatchObject({
+      downloadHref:
+        "/api/tasks/task-1/result-files/download?path=generated%3A%2F%2F20260716%2FN20260716-01%2Fdeeptutor-analysis-zh.md",
+    });
+  });
+
   it("hydrates Table props from JSON artifacts", async () => {
     await withTempDir(async (dir) => {
       await Bun.write(

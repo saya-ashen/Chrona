@@ -205,6 +205,7 @@ const fileViewPropsSchema = z.object({
   title: z.string().optional(),
   uri: z.string().optional(),
   path: z.string().optional(),
+  downloadHref: z.string().optional(),
   displayPath: z.string().optional(),
   contentKind: filePreviewKindSchema.optional(),
   contentPreview: z.string().optional(),
@@ -281,9 +282,9 @@ export const chronaCatalog = defineCatalog(chronaSchema, {
       description:
         "Compact occurrence calendar picker for recurring task workspace header.",
     },
-    Markdown: {
+    RichMarkdown: {
       props: markdownPropsSchema,
-      description: "Rendered markdown result content.",
+      description: "Rich Markdown result content rendered with CommonMark and GFM support.",
     },
     JsonView: {
       props: jsonViewPropsSchema,
@@ -477,10 +478,10 @@ export const chronaPlanOutputCatalog = defineCatalog(chronaSchema, {
     Badge: shadcn.Badge,
     Alert: shadcn.Alert,
     Table: tableComponentDefinition,
-    Markdown: {
+    RichMarkdown: {
       props: markdownPropsSchema,
       description:
-        "Rendered markdown result content. Use for prose, bullets, checklists, command summaries, and compact technical reports. Optional collapsible/defaultCollapsed controls collapse the whole component, not text inside it.",
+        "Rich Markdown result content rendered with CommonMark and GFM support. Use for prose, bullets, checklists, command summaries, and compact technical reports. Use FileRef for generated files and downloads instead of Markdown links. Optional collapsible/defaultCollapsed controls collapse the whole component, not text inside it.",
       example: {
         title: "Summary",
         content: "- Completed implementation\n- Ran focused tests",
@@ -489,7 +490,7 @@ export const chronaPlanOutputCatalog = defineCatalog(chronaSchema, {
     JsonView: {
       props: jsonViewPropsSchema,
       description:
-        "Pretty-printed JSON result value. Use only for diagnostics, API payloads, machine-readable evidence, or debugging details; prefer Markdown/Table/Card for user-facing reports and summaries. Set defaultCollapsed true for large or secondary payloads.",
+        "Pretty-printed JSON result value. Use only for diagnostics, API payloads, machine-readable evidence, or debugging details; prefer RichMarkdown/Table/Card for user-facing reports and summaries. Set defaultCollapsed true for large or secondary payloads.",
       example: {
         title: "Diagnostic payload",
         value: { status: "ok" },
@@ -603,10 +604,10 @@ export function chronaPlanOutputCatalogPrompt() {
       "Bootstrap /root only when Current Node Context JSON.context.planOutput.hasSpec is false. In that first call only, add /root and all referenced /elements/<id> entries together.",
       "When planOutput.hasSpec is true, never patch /root, /elements, or the existing root element as a replacement. Preserve the current root id from context.planOutput.root.",
       "For later updates, add node-specific sections under stable /elements/<id> paths, then append/reorder those ids inside an existing children array such as /elements/<currentRootId>/children/-. Use context.planOutput.rootChildren and context.planOutput.elementIds to avoid duplicate ids and preserve prior sections unless the user explicitly asks to remove them.",
-      "User-facing reports should compose clear sections with Card containers around Markdown/Table/ResultSummary content so each major block has a visible background.",
-      "Use component-level defaultCollapsed on Card, Markdown, Table, JsonView, or FileRef when a block should have a Chrona-owned collapsible shell; do not emit CollapsibleBlock for ordinary user-facing sections. Set defaultCollapsed true for long logs, raw JSON, large file references, secondary evidence, and diagnostics. Set defaultCollapsed false for major sections that should remain open but user-collapsible. Do not collapse the primary ResultSummary or the main user-requested answer.",
+      "User-facing reports should compose clear sections with Card containers around RichMarkdown/Table/ResultSummary content so each major block has a visible background.",
+      "Use component-level defaultCollapsed on Card, RichMarkdown, Table, JsonView, or FileRef when a block should have a Chrona-owned collapsible shell; do not emit CollapsibleBlock for ordinary user-facing sections. Set defaultCollapsed true for long logs, raw JSON, large file references, secondary evidence, and diagnostics. Set defaultCollapsed false for major sections that should remain open but user-collapsible. Do not collapse the primary ResultSummary or the main user-requested answer.",
       "FileRef preview expansion is separate from component-level collapse: FileRef collapsible/defaultCollapsed hides the whole file result block, while preview expansion only changes the visible preview height.",
-      "Use JsonView sparingly: only for diagnostics, API payloads, machine-readable evidence, or debugging details. Do not show source data or report rationale as raw JSON when Markdown or Table would be readable.",
+      "Use JsonView sparingly: only for diagnostics, API payloads, machine-readable evidence, or debugging details. Do not show source data or report rationale as raw JSON when RichMarkdown or Table would be readable.",
       "Do not submit legacy spec/mode fields, markdown-only text, backend IDs, node-local outputs, NodeResultSection wrappers, or complete replacement Specs after bootstrap.",
     ],
   });

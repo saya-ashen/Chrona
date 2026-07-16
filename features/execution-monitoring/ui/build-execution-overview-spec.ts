@@ -92,7 +92,7 @@ function groupRootChildrenByNode(document: UiDocument, rootChildren: string[], n
   }));
 }
 
-const HOST_COLLAPSIBLE_RESULT_TYPES = new Set(["Card", "Markdown", "Table", "JsonView", "FileRef"]);
+const HOST_COLLAPSIBLE_RESULT_TYPES = new Set(["Card", "RichMarkdown", "Table", "JsonView", "FileRef"]);
 
 function makeOpenCollapsibleResultElement(target: MutableElements, key: string) {
   const element = target[key];

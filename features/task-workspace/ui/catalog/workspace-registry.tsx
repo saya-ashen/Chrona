@@ -24,7 +24,7 @@ import {
 } from "lucide-react";
 import { ActivityTimeline } from "../activity-timeline";
 import type { WorkspaceActivityItem } from "../../model/task-workspace-types";
-import { TaskMarkdown } from "../task-markdown";
+import { TaskMarkdownContent } from "../task-markdown";
 import { defineRegistry } from "@json-render/react";
 import { shadcnComponents } from "@json-render/shadcn";
 import { useI18n, useLocale } from "@chrona/i18n";
@@ -740,14 +740,14 @@ function FileView({ props }: { props: Record<string, unknown> }) {
                 : (copy.fileAccessRequest ?? "Request access")}
             </Button>
           ) : null}
-          {typeof props.uri === "string" ? (
+          {typeof props.downloadHref === "string" ? (
             <Button
               asChild
               variant="ghost"
               size="sm"
               className="h-7 rounded-full px-2 text-[11px]"
             >
-              <a href={props.uri} download>
+              <a href={props.downloadHref} download>
                 {copy.downloadArtifact ?? "Download"}
               </a>
             </Button>
@@ -842,7 +842,7 @@ function FileView({ props }: { props: Record<string, unknown> }) {
               previewHeightClassName,
             )}
           >
-            <TaskMarkdown className="py-0">{visibleContent}</TaskMarkdown>
+            <TaskMarkdownContent className="py-0">{visibleContent}</TaskMarkdownContent>
           </div>
         ) : (
           <pre
@@ -1398,7 +1398,7 @@ function WorkspaceTable({ props }: { props: WorkspaceTableProps }) {
 /**
  * The Chrona workspace registry: standard primitives render with the prebuilt
  * `@json-render/shadcn` components (they inherit Chrona's Tailwind CSS-variable
- * theme); domain components (`Markdown`, `JsonView`, `FileRef`, `ResultSummary`,
+ * theme); domain components (`RichMarkdown`, `JsonView`, `FileRef`, `ResultSummary`,
  * `ActivityRow`, `ToolDetails`, `CollapsibleText`) render with Chrona JSX.
  *
  * Actions are declared required by the catalog but are only exercised by the
@@ -1506,15 +1506,15 @@ export const { registry: workspaceRegistry } = defineRegistry(chronaCatalog, {
       </WorkspaceActionCard>
     ),
     // domain components (Chrona)
-    Markdown: ({ props }) => {
+    RichMarkdown: ({ props }) => {
       const content = typeof props.content === "string" ? props.content : "";
-      const contentNode = <TaskMarkdown>{content}</TaskMarkdown>;
+      const contentNode = <TaskMarkdownContent>{content}</TaskMarkdownContent>;
       return (
         <MaybeCollapsible
           props={props}
           fallbackCollapsed={content.length > AUTO_COLLAPSE_MARKDOWN_LENGTH}
           fallbackTitle={
-            typeof props.title === "string" ? props.title : "Markdown"
+            typeof props.title === "string" ? props.title : "Rich text"
           }
         >
           {contentNode}

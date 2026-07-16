@@ -75,7 +75,7 @@ describe("kernel executeCommand (single-writer)", () => {
         output: {
           root: "root",
           elements: {
-            root: { type: "Markdown", props: { content: "first output" } },
+            root: { type: "RichMarkdown", props: { content: "first output" } },
           },
         },
       })
@@ -112,7 +112,7 @@ describe("kernel executeCommand (single-writer)", () => {
         status: "done",
         summary: "First task finished",
         evidence: { sessionId: "main-session", runId: "run-first" },
-        output: { root: "root", elements: { root: { type: "Markdown", props: { content: "first output" } } } },
+        output: { root: "root", elements: { root: { type: "RichMarkdown", props: { content: "first output" } } } },
       })
       .mockResolvedValueOnce({
         status: "started",
@@ -181,7 +181,7 @@ describe("kernel executeCommand (single-writer)", () => {
         status: "done",
         summary: "First task finished",
         evidence: { sessionId: "main-session", runId: "run-first" },
-        output: { root: "root", elements: { root: { type: "Markdown", props: { content: "first output" } } } },
+        output: { root: "root", elements: { root: { type: "RichMarkdown", props: { content: "first output" } } } },
       })
       .mockResolvedValueOnce({
         status: "started",

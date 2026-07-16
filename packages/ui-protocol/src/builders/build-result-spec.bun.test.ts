@@ -47,10 +47,10 @@ describe("buildResultSpec", () => {
     expect(doc.elements.root.children).toHaveLength(1);
   });
 
-  it("maps a markdown output to a Markdown element", () => {
+  it("maps a markdown output to a RichMarkdown element", () => {
     const doc = buildResultSpec([{ kind: "markdown", content: "# Hello", title: "Summary" }]);
     const key = Object.keys(doc.elements).find((k) => k.startsWith("out:0:markdown"))!;
-    expect(doc.elements[key].type).toBe("Markdown");
+    expect(doc.elements[key].type).toBe("RichMarkdown");
     expect((doc.elements[key].props as Record<string, unknown>).content).toBe("# Hello");
     expect((doc.elements[key].props as Record<string, unknown>).title).toBe("Summary");
     const result = validateChronaSpec(doc);
@@ -110,7 +110,7 @@ describe("buildResultSpec", () => {
     ]);
     const rootChildren = doc.elements.root.children ?? [];
     expect(rootChildren).toHaveLength(3);
-    expect(doc.elements[rootChildren[0]].type).toBe("Markdown");
+    expect(doc.elements[rootChildren[0]].type).toBe("RichMarkdown");
     expect(doc.elements[rootChildren[1]].type).toBe("FileRef");
     expect(doc.elements[rootChildren[2]].type).toBe("Link");
     const result = validateChronaSpec(doc);

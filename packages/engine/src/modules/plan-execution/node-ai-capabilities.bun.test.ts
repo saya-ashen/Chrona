@@ -363,7 +363,7 @@ describe("runTaskNodeFeature", () => {
         root: "existingRoot",
         elements: {
           existingRoot: { type: "Stack", props: { gap: "sm" }, children: ["firstSection"] },
-          firstSection: { type: "Markdown", props: { content: "First section" }, children: [] },
+          firstSection: { type: "RichMarkdown", props: { content: "First section" }, children: [] },
         },
       },
       updatedAt: "2026-05-22T00:01:00.000Z",

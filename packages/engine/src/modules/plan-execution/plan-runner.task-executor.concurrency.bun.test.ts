@@ -171,10 +171,7 @@ describe("plan-runner task executor concurrency", () => {
         output: {
           root: "root",
           elements: {
-            root: {
-              type: "Markdown",
-              props: { content: "Chrona 节点结果提交失败：taskId is required. 节点工作本身已完成。" },
-            },
+            root: { type: "RichMarkdown", props: { content: "Chrona 节点结果提交失败：taskId is required. 节点工作本身已完成。" }, },
           },
         },
       })

@@ -219,6 +219,35 @@ export function createTasksRoutes(engine: ChronaEngine) {
           }),
         ),
     )
+    .get(
+      "/tasks/:taskId/result-files/download",
+      zValidator("param", resultFileAccessParamSchema),
+      zValidator("query", resultFileAccessRequestBodySchema),
+      async (c) => {
+        try {
+          const result = await engine.tasks.openResultFile({
+            taskId: c.req.valid("param").taskId,
+            requestedPath: c.req.valid("query").path,
+          });
+          return new Response(result.file, {
+            headers: {
+              "Content-Type": result.file.type || "application/octet-stream",
+              "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(result.filename)}`,
+              "X-Content-Type-Options": "nosniff",
+            },
+          });
+        } catch (cause) {
+          const httpError = toHttpError(cause);
+          if (httpError) return error(c, httpError.message, httpError.status);
+          return internalServerError(
+            c,
+            "GET /api/tasks/:taskId/result-files/download",
+            cause,
+            "Failed to download task result file",
+          );
+        }
+      },
+    )
     .post(
       "/tasks/:taskId/result-files/access-requests",
       zValidator("param", resultFileAccessParamSchema),

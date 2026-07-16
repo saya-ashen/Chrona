@@ -22,7 +22,7 @@ describe("plan-runner task executor continuation", () => {
         status: "done",
         summary: "Specification task complete",
         evidence: { sessionId: "main-session", runId: "run_spec" },
-        output: { root: "root", elements: { root: { type: "Markdown", props: { content: "Specification task complete" } } } },
+        output: { root: "root", elements: { root: { type: "RichMarkdown", props: { content: "Specification task complete" } } } },
     });
 
     const { workspace, task } = await seedWorkspaceAndTask("Runner checkpoint input handoff");

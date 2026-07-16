@@ -17,7 +17,7 @@ describe("validateChronaSpec", () => {
       elements: {
         root: { type: "Stack", props: { gap: "md" }, children: ["title", "md"] },
         title: { type: "Text", props: { text: "Result", variant: "muted" }, children: [] },
-        md: { type: "Markdown", props: { content: "# hello" }, children: [] },
+        md: { type: "RichMarkdown", props: { content: "# hello" }, children: [] },
       },
     };
     expect(validateChronaSpec(spec).ok).toBe(true);
