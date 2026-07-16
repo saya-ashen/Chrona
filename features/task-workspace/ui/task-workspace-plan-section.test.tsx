@@ -35,10 +35,13 @@ vi.mock("elkjs/lib/elk.bundled.js", () => ({
 }));
 
 const continueFromTaskResultMock = vi.fn();
+const getTaskResultFollowUpStateMock = vi.fn();
 
 vi.mock("../model/task-actions-client", () => ({
   continueFromTaskResult: (...args: unknown[]) =>
     continueFromTaskResultMock(...args),
+  getTaskResultFollowUpState: (...args: unknown[]) =>
+    getTaskResultFollowUpStateMock(...args),
 }));
 
 vi.mock("../panels/task-plan-graph-panel", () => ({
@@ -155,6 +158,19 @@ beforeAll(() => {
 
 beforeEach(() => {
   continueFromTaskResultMock.mockReset();
+  getTaskResultFollowUpStateMock.mockReset();
+  getTaskResultFollowUpStateMock.mockResolvedValue({
+    acceptedRunId: "run-1",
+    acceptedAt: "2026-05-18T00:00:00.000Z",
+    sourceSession: {
+      available: false,
+      provider: "test",
+      health: "unavailable",
+      supportsFork: false,
+      supportsResume: false,
+    },
+    entries: [],
+  });
   vi.spyOn(globalThis, "fetch").mockResolvedValue(
     new Response(JSON.stringify({ generationSession: null }), {
       status: 404,
@@ -1699,11 +1715,18 @@ describe("TaskWorkspacePlanSection", () => {
       availableActions: [],
     });
     continueFromTaskResultMock.mockResolvedValueOnce({
+      id: "follow-up-entry-1",
+      requestId: "request-1",
+      acceptedRunId: "run-1",
       intent: "create_task",
-      taskId: "follow-up-1",
-      workspaceId: "workspace-1",
-      parentTaskId: "task-1",
-      title: "Compare the top projects",
+      status: "completed",
+      instruction: "Compare the top projects",
+      createdTask: {
+        id: "follow-up-1",
+        title: "Compare the top projects",
+      },
+      createdAt: "2026-05-18T00:01:00.000Z",
+      completedAt: "2026-05-18T00:01:01.000Z",
     });
 
     renderWithQueryClient(
@@ -1742,34 +1765,47 @@ describe("TaskWorkspacePlanSection", () => {
     expect(
       screen.queryByText("Continue from result is not available yet."),
     ).not.toBeInTheDocument();
-    const createTaskMode = within(lifecyclePanel).getByRole("radio", {
+    const expandAcceptedResult = within(lifecyclePanel).getByRole("button", {
+      name: "Expand",
+    });
+    expect(expandAcceptedResult).toHaveAttribute("aria-expanded", "false");
+    expect(
+      within(lifecyclePanel).queryByRole("tab", { name: /Create next task/ }),
+    ).not.toBeInTheDocument();
+    expect(
+      within(lifecyclePanel).queryByText(
+        "Task closed. Ask about this result or create the next task without losing context.",
+      ),
+    ).not.toBeInTheDocument();
+    fireEvent.click(expandAcceptedResult);
+    expect(
+      within(lifecyclePanel).getByRole("button", { name: "Collapse" }),
+    ).toHaveAttribute("aria-expanded", "true");
+    const createTaskMode = await within(lifecyclePanel).findByRole("tab", {
       name: /Create next task/,
     });
-    expect(createTaskMode).toHaveAttribute("aria-checked", "true");
-    expect(createTaskMode).toHaveAttribute("data-state", "checked");
+    fireEvent.click(createTaskMode);
+    expect(createTaskMode).toHaveAttribute("aria-selected", "true");
     expect(createTaskMode).toHaveClass("h-8");
-    expect(
-      within(lifecyclePanel).getByText(
-        "Carry this accepted result into a linked task draft.",
-      ),
-    ).toBeInTheDocument();
 
     const input = within(lifecyclePanel).getByRole("textbox", {
       name: "Follow-up request",
     });
-    expect(input).toHaveFocus();
     fireEvent.change(input, { target: { value: "Compare the top projects" } });
     fireEvent.click(
       within(lifecyclePanel).getByRole("button", { name: "Create task" }),
     );
 
     await waitFor(() =>
-      expect(continueFromTaskResultMock).toHaveBeenCalledWith({
-        taskId: "task-1",
-        intent: "create_task",
-        instruction: "Compare the top projects",
-        history: undefined,
-      }),
+      expect(continueFromTaskResultMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          taskId: "task-1",
+          intent: "create_task",
+          instruction: "Compare the top projects",
+          sessionStrategy: "fork_source_session",
+          requestId: expect.any(String),
+        }),
+      ),
     );
     expect(
       await within(lifecyclePanel).findByText(/Follow-up task created/),
@@ -1787,9 +1823,16 @@ describe("TaskWorkspacePlanSection", () => {
       availableActions: [],
     });
     continueFromTaskResultMock.mockResolvedValueOnce({
+      id: "follow-up-entry-2",
+      requestId: "request-2",
+      acceptedRunId: "run-1",
       intent: "ask",
+      status: "completed",
+      instruction: "Which projects are relevant?",
       answer: "The result contains three relevant projects.",
-      source: "test",
+      contextSource: "accepted_result_fallback",
+      createdAt: "2026-05-18T00:01:00.000Z",
+      completedAt: "2026-05-18T00:01:01.000Z",
     });
 
     renderWithQueryClient(
@@ -1819,23 +1862,20 @@ describe("TaskWorkspacePlanSection", () => {
 
     const lifecyclePanel = screen.getByTestId("result-lifecycle-panel");
     fireEvent.click(
-      within(lifecyclePanel).getByRole("radio", { name: /Ask a follow-up/ }),
+      within(lifecyclePanel).getByRole("button", { name: "Expand" }),
     );
-    const createTaskMode = within(lifecyclePanel).getByRole("radio", {
+    fireEvent.click(
+      await within(lifecyclePanel).findByRole("tab", { name: /Ask a follow-up/ }),
+    );
+    const createTaskMode = within(lifecyclePanel).getByRole("tab", {
       name: /Create next task/,
     });
-    const askMode = within(lifecyclePanel).getByRole("radio", {
+    const askMode = within(lifecyclePanel).getByRole("tab", {
       name: /Ask a follow-up/,
     });
-    expect(createTaskMode).toHaveAttribute("aria-checked", "false");
-    expect(createTaskMode).toHaveAttribute("data-state", "unchecked");
-    expect(askMode).toHaveAttribute("aria-checked", "true");
-    expect(askMode).toHaveAttribute("data-state", "checked");
-    expect(
-      within(lifecyclePanel).getByText(
-        "Get an answer grounded in the accepted result.",
-      ),
-    ).toBeInTheDocument();
+    expect(createTaskMode).toHaveAttribute("aria-selected", "false");
+    expect(askMode).toHaveAttribute("aria-selected", "true");
+    expect(askMode).toHaveClass("h-8");
     const input = within(lifecyclePanel).getByRole("textbox", {
       name: "Follow-up request",
     });
@@ -1845,12 +1885,14 @@ describe("TaskWorkspacePlanSection", () => {
     fireEvent.keyDown(input, { key: "Enter", ctrlKey: true });
 
     await waitFor(() =>
-      expect(continueFromTaskResultMock).toHaveBeenCalledWith({
-        taskId: "task-1",
-        intent: "ask",
-        instruction: "Which projects are relevant?",
-        history: [],
-      }),
+      expect(continueFromTaskResultMock).toHaveBeenCalledWith(
+        expect.objectContaining({
+          taskId: "task-1",
+          intent: "ask",
+          instruction: "Which projects are relevant?",
+          requestId: expect.any(String),
+        }),
+      ),
     );
     expect(
       await within(lifecyclePanel).findByText(

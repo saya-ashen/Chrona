@@ -21,7 +21,7 @@ import {
   CardTitle,
   Textarea,
 } from "@shared/ui";
-import { CheckCircle2, ChevronRight } from "lucide-react";
+import { CheckCircle2, ChevronDown, ChevronRight, ChevronUp } from "lucide-react";
 import {
   TaskWorkspaceInspector,
   type CommandCenterCopy,
@@ -916,6 +916,7 @@ function ResultLifecyclePanel({
   acceptResultError?: string | null;
 }) {
   const isAccepted = review.phase === "accepted";
+  const [isAcceptedExpanded, setIsAcceptedExpanded] = useState(false);
   const completion = review.completion;
   const acceptDisabled =
     isAcceptingResult || !review.decision.canAccept || !onAcceptResult;
@@ -930,7 +931,7 @@ function ResultLifecyclePanel({
   return (
     <header
       id="result-follow-up-composer"
-      className="sticky top-0 z-20 scroll-mt-24 rounded-2xl border border-primary/25 bg-card px-4 py-4 shadow-sm sm:px-5"
+      className={`sticky top-0 z-20 scroll-mt-24 rounded-2xl border border-primary/25 bg-card px-4 shadow-sm sm:px-5 ${isAccepted && !isAcceptedExpanded ? "py-3" : "py-4"}`}
       data-ui-surface-kind="runtime-control"
       data-testid="result-lifecycle-panel"
       data-state={
@@ -943,7 +944,7 @@ function ResultLifecyclePanel({
               : "default"
       }
     >
-      <div className="flex flex-col gap-4">
+      <div className={isAccepted && !isAcceptedExpanded ? "flex flex-col gap-2" : "flex flex-col gap-4"}>
         <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="min-w-0 space-y-2">
             <div>
@@ -955,14 +956,17 @@ function ResultLifecyclePanel({
                   ? (copy.resultAcceptedTitle ?? "Result accepted")
                   : (copy.resultReadyTitle ?? "Result ready")}
               </h2>
-              <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">
-                {isAccepted
-                  ? (copy.resultAcceptedDescription ??
-                    "Task closed. Ask about this result or create the next task without losing context.")
-                  : (copy.resultReadyDescription ??
-                    "Execution completed. Review the final result, then accept it or request changes.")}
-              </p>
+              {!isAccepted || isAcceptedExpanded ? (
+                <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">
+                  {isAccepted
+                    ? (copy.resultAcceptedDescription ??
+                      "Task closed. Ask about this result or create the next task without losing context.")
+                    : (copy.resultReadyDescription ??
+                      "Execution completed. Review the final result, then accept it or request changes.")}
+                </p>
+              ) : null}
             </div>
+            {!isAccepted || isAcceptedExpanded ? (
             <div
               className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground"
               aria-label={
@@ -1001,6 +1005,7 @@ function ResultLifecyclePanel({
                   : (copy.resultCompletionNoDiagnostics ?? "No warnings")}
               </span>
             </div>
+            ) : null}
             {acceptResultError ? (
               <p role="alert" className="text-xs font-medium text-destructive">
                 {acceptResultError}
@@ -1015,7 +1020,26 @@ function ResultLifecyclePanel({
               </p>
             ) : null}
           </div>
-          {!isAccepted ? (
+          {isAccepted ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="shrink-0"
+              aria-expanded={isAcceptedExpanded}
+              aria-controls="accepted-result-follow-up"
+              onClick={() => setIsAcceptedExpanded((expanded) => !expanded)}
+            >
+              {isAcceptedExpanded ? (
+                <ChevronUp className="size-4" aria-hidden />
+              ) : (
+                <ChevronDown className="size-4" aria-hidden />
+              )}
+              {isAcceptedExpanded
+                ? (copy.collapseAcceptedResult ?? "Collapse")
+                : (copy.expandAcceptedResult ?? "Expand")}
+            </Button>
+          ) : (
             <div
               className="flex shrink-0 flex-col-reverse gap-2 sm:flex-row"
               aria-label={
@@ -1044,10 +1068,14 @@ function ResultLifecyclePanel({
                   : (copy.acceptResult ?? "Accept result")}
               </Button>
             </div>
-          ) : null}
+          )}
         </div>
 
-        {isAccepted ? <TaskResultFollowUpPanel taskId={taskId} copy={copy} /> : null}
+        {isAccepted && isAcceptedExpanded ? (
+          <div id="accepted-result-follow-up">
+            <TaskResultFollowUpPanel taskId={taskId} copy={copy} />
+          </div>
+        ) : null}
       </div>
     </header>
   );
