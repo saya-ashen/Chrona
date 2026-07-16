@@ -24,9 +24,22 @@ const chatMock = mock(
     };
   },
 );
+const handoffConversationMock = mock(async () => ({
+  sessionRef: "provider-session-new",
+  handoffText: "Compacted handoff",
+}));
 const getAiClientForTaskMock = mock(async () => ({
   record: { type: "hermes" },
-  providerClient: {},
+  providerClient: {
+    getConversationCapabilities: () => ({
+      resume: true,
+      fork: true,
+      compact: true,
+      handoff: "native" as const,
+      contextUsage: "detailed" as const,
+    }),
+    handoffConversation: handoffConversationMock,
+  },
 }));
 const acceptedContextMock = mock(async (taskId: string) => {
   const task = await db.task.findUniqueOrThrow({ where: { id: taskId } });
@@ -115,10 +128,15 @@ describe("continueFromTaskResult", () => {
     chatRequests.length = 0;
     getAiClientForTaskMock.mockClear();
     acceptedContextMock.mockClear();
+    handoffConversationMock.mockClear();
   });
 
   it("creates a linked draft that carries accepted result context", async () => {
     const source = await seedAcceptedTask();
+    await db.run.update({
+      where: { id: source.runId },
+      data: { runtimeSessionRef: "provider-session-source" },
+    });
 
     const result = await continueFromTaskResult(
       {
@@ -136,6 +154,10 @@ describe("continueFromTaskResult", () => {
         title: "Compare the top projects and recommend one.",
       },
     });
+    expect(handoffConversationMock).toHaveBeenCalledWith({
+      sessionRef: "provider-session-source",
+      instructions: expect.stringContaining("Compare the top projects and recommend one."),
+    });
     const followUp = await db.task.findUniqueOrThrow({
       where: { id: result.createdTask!.id },
       include: { dependencies: true },
@@ -146,12 +168,76 @@ describe("continueFromTaskResult", () => {
     expect(followUp.autoExecute).toBe(false);
     expect(followUp.description).toContain("Accepted result summary");
     expect(followUp.description).toContain("Accepted report (file)");
+    const followUpSession = await db.taskSession.findFirstOrThrow({
+      where: { taskId: followUp.id },
+      orderBy: { createdAt: "asc" },
+    });
+    expect(followUpSession.providerSessionRef).toBe("provider-session-new");
     expect(followUp.dependencies).toContainEqual(
       expect.objectContaining({
         dependsOnTaskId: source.taskId,
         dependencyType: "child_of",
       }),
     );
+  });
+
+  it("creates a clean linked draft without invoking provider handoff", async () => {
+    const source = await seedAcceptedTask();
+
+    const result = await continueFromTaskResult(
+      {
+        taskId: source.taskId,
+        intent: "create_task",
+        instruction: "Summarize the accepted deliverables.",
+        sessionStrategy: "fresh_with_result",
+      },
+      deps,
+    );
+
+    expect(result).toMatchObject({ intent: "create_task", status: "completed" });
+    expect(handoffConversationMock).not.toHaveBeenCalled();
+    const followUpSession = await db.taskSession.findFirstOrThrow({
+      where: { taskId: result.createdTask!.id },
+      orderBy: { createdAt: "asc" },
+    });
+    expect(followUpSession.providerSessionRef).toBeNull();
+  });
+
+  it("rejects handoff without creating a child when the provider cannot hand off", async () => {
+    const source = await seedAcceptedTask();
+    await db.run.update({
+      where: { id: source.runId },
+      data: { runtimeSessionRef: "provider-session-source" },
+    });
+    const unsupportedDeps = {
+      ...deps,
+      getAiClientForTask: mock(async () => ({
+        record: { type: "unsupported" },
+        providerClient: {
+          getConversationCapabilities: () => ({
+            resume: true,
+            fork: false,
+            compact: false,
+            handoff: "unsupported" as const,
+            contextUsage: "none" as const,
+          }),
+        },
+      })),
+    } as unknown as ContinueFromTaskResultDeps;
+
+    await expect(
+      continueFromTaskResult(
+        {
+          taskId: source.taskId,
+          intent: "create_task",
+          instruction: "Start the next task",
+        },
+        unsupportedDeps,
+      ),
+    ).rejects.toThrow(/does not support compact handoff/i);
+    expect(
+      await db.task.count({ where: { parentTaskId: source.taskId } }),
+    ).toBe(0);
   });
 
   it("answers from accepted result context and stores the conversation", async () => {

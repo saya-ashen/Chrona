@@ -8,6 +8,7 @@ import type {
   StreamRunInput,
 } from "@chrona/providers-foundation";
 import type {
+  ProviderConversationHandoffInput,
   ProviderConversationTurnInput,
 } from "@chrona/providers-foundation";
 import { OmpSdkProviderClient } from "./OmpSdkProviderClient";
@@ -45,6 +46,13 @@ export class OmpProviderClient implements AgentProviderClient {
       return Promise.resolve({ available: false, sessionRef, compacted: false });
     }
     return this.sdk.inspectConversation(sessionRef);
+  }
+
+  handoffConversation(input: ProviderConversationHandoffInput) {
+    if (!this.sdk.handoffConversation) {
+      return Promise.reject(new Error("OMP conversation handoff is unavailable"));
+    }
+    return this.sdk.handoffConversation(input);
   }
 
   runConversationTurn(input: ProviderConversationTurnInput) {

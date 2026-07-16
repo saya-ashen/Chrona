@@ -1,7 +1,6 @@
 import { randomUUID } from "node:crypto";
 import { db } from "@/lib/db";
-import { chat } from "@/modules/ai/feature-normalizers";
-import { getAiClientForTask } from "@/modules/ai/runtime/client-resolution";
+import { chat, getAiClientForTask } from "@/modules/ai";
 import type { ChatMessage } from "@chrona/contracts";
 import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
 import { createTask } from "./create-task";
@@ -15,7 +14,7 @@ type ContinueFromTaskResultInput = {
   requestId?: string;
   instruction: string;
   intent: "ask" | "create_task";
-  sessionStrategy?: "fork_source_session" | "fresh_with_result";
+  sessionStrategy?: "handoff_compact" | "fresh_with_result";
 };
 
 export type ContinueFromTaskResultDeps = {
@@ -147,7 +146,7 @@ function continuationResponse(entry: {
       | "accepted_result_fallback"
       | null,
     sessionStrategy: entry.sessionStrategy as
-      | "fork_source_session"
+      | "handoff_compact"
       | "fresh_with_result"
       | null,
     createdTask: createdTask ?? null,
@@ -242,9 +241,57 @@ async function answerFollowUp(input: {
 async function createNextTask(input: {
   context: AcceptedResultContext;
   instruction: string;
-  sessionStrategy: "fork_source_session" | "fresh_with_result";
+  sessionStrategy: "handoff_compact" | "fresh_with_result";
   deps: ContinueFromTaskResultDeps;
 }) {
+  let providerSessionRef: string | null = null;
+
+  if (input.sessionStrategy === "handoff_compact") {
+    const sourceSessionRef = input.context.acceptance.providerSessionRef;
+    if (!sourceSessionRef) {
+      throw new EngineError(
+        ENGINE_ERROR_CODES.INVALID_TASK_STATE,
+        "The accepted result has no provider session available for handoff",
+      );
+    }
+    const client = await input.deps.getAiClientForTask({
+      taskId: input.context.task.id,
+      purpose: "task.plan",
+    });
+    const capabilities = client?.providerClient?.getConversationCapabilities?.();
+    if (
+      !client?.providerClient?.handoffConversation ||
+      !capabilities ||
+      capabilities.handoff === "unsupported" ||
+      !capabilities.compact
+    ) {
+      throw new EngineError(
+        ENGINE_ERROR_CODES.INVALID_TASK_STATE,
+        "The selected coding agent does not support compact handoff to a new session",
+      );
+    }
+    try {
+      const handoff = await client.providerClient.handoffConversation({
+        sessionRef: sourceSessionRef,
+        instructions: [
+          `Prepare context for the next Chrona task: ${input.instruction}`,
+          "Carry forward relevant decisions, constraints, source locations, and deliverables from the accepted task.",
+          "The destination must be a new independent session. Do not execute the next task yet.",
+        ].join("\n"),
+      });
+      providerSessionRef = handoff.sessionRef;
+    } catch (cause) {
+      if (isSessionUnavailable(cause)) {
+        throw new EngineError(
+          ENGINE_ERROR_CODES.INVALID_TASK_STATE,
+          "The accepted result provider session is unavailable for handoff",
+          { cause },
+        );
+      }
+      throw cause;
+    }
+  }
+
   const created = await input.deps.createTask({
     workspaceId: input.context.task.workspaceId,
     title: followUpTitle(input.instruction),
@@ -271,34 +318,6 @@ async function createNextTask(input: {
     autoPlanGeneration: false,
     autoExecute: false,
   });
-
-  let providerSessionRef: string | null = null;
-  if (
-    input.sessionStrategy === "fork_source_session" &&
-    input.context.acceptance.providerSessionRef
-  ) {
-    const client = await input.deps.getAiClientForTask({
-      taskId: input.context.task.id,
-      purpose: "task.plan",
-    });
-    if (client?.providerClient?.runConversationTurn) {
-      try {
-        const fork = await client.providerClient.runConversationTurn({
-          sessionRef: input.context.acceptance.providerSessionRef,
-          mode: "fork",
-          toolPolicy: "result_follow_up",
-          prompt: [
-            "This conversation is now the context branch for a new Chrona task.",
-            "Do not perform the task yet. Retain the source context and wait for the new task plan/execution prompt.",
-            `New task: ${input.instruction}`,
-          ].join("\n"),
-        });
-        providerSessionRef = fork.sessionRef;
-      } catch (cause) {
-        if (!isSessionUnavailable(cause)) throw cause;
-      }
-    }
-  }
 
   const targetSession = await db.taskSession.findFirst({
     where: { taskId: created.taskId },
@@ -339,7 +358,7 @@ export async function continueFromTaskResult(
   const context = await deps.getAcceptedResultContext(input.taskId);
   const sessionStrategy =
     input.intent === "create_task"
-      ? input.sessionStrategy ?? "fork_source_session"
+      ? input.sessionStrategy ?? "handoff_compact"
       : null;
   const pending = await db.taskResultContinuation.create({
     data: {
@@ -360,7 +379,7 @@ export async function continueFromTaskResult(
       const result = await createNextTask({
         context,
         instruction,
-        sessionStrategy: sessionStrategy ?? "fork_source_session",
+        sessionStrategy: sessionStrategy ?? "handoff_compact",
         deps,
       });
       const completed = await db.taskResultContinuation.update({
@@ -458,6 +477,12 @@ export async function getTaskResultFollowUpState(taskId: string) {
       provider: client?.record.type ?? context.task.executionRuntime,
       health,
       supportsFork: Boolean(available && capabilities?.fork),
+      supportsHandoff: Boolean(
+        available &&
+          capabilities?.compact &&
+          capabilities.handoff !== "unsupported" &&
+          client?.providerClient?.handoffConversation,
+      ),
       supportsResume: Boolean(available && capabilities?.resume),
     },
     entries: entries.map((entry) =>

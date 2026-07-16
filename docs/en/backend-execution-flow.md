@@ -162,7 +162,7 @@ Accepting a result freezes the task's accepted Run, result spec, artifacts, plan
 `POST /api/tasks/:taskId/result/follow-up` supports two intents:
 
 - `ask` resumes the accepted Run's provider conversation with mutation and execution tools disabled. Chrona records the answer, context source, provider session ref, and reported cache usage. A missing source session falls back to a bounded accepted-result context and server-owned history.
-- `create_task` creates a linked Draft child task. The default `fork_source_session` strategy creates an independent provider-session branch; `fresh_with_result` starts clean and carries only the bounded accepted result and artifact references.
+- `create_task` creates a linked Draft child task. The default `handoff_compact` strategy compacts the accepted Run's provider conversation and seeds a new independent provider session with that handoff; `fresh_with_result` starts clean and carries only the bounded accepted result and artifact references.
 
 Every request carries a UUID `requestId`; `(taskId, requestId)` is unique so browser retries do not duplicate answers or child tasks. Continuations are scoped to the canonical `task.result_accepted` event's `accepted_run_id`, not merely the task's latest completed Run.
 

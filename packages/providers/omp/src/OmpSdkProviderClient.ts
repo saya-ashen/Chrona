@@ -32,6 +32,8 @@ import type {
   ProviderCapabilities,
   ProviderConversationCapabilities,
   ProviderConversationState,
+  ProviderConversationHandoffInput,
+  ProviderConversationHandoffResult,
   ProviderConversationTurnInput,
   ProviderConversationTurnResult,
   ProviderRunEvent,
@@ -552,6 +554,37 @@ export class OmpSdkProviderClient implements AgentProviderClient {
       };
     } catch {
       return { available: false, sessionRef, compacted: false };
+    }
+  }
+
+  async handoffConversation(
+    input: ProviderConversationHandoffInput,
+  ): Promise<ProviderConversationHandoffResult> {
+    const cwd = nonEmpty(this.config.cwd) ?? process.cwd();
+    const manager = await SessionManager.open(
+      input.sessionRef,
+      undefined,
+      undefined,
+      {
+        initialCwd: cwd,
+        suppressBreadcrumb: true,
+      },
+    );
+    const { session } = await this.createConversationSession(manager);
+    try {
+      const result = await session.handoff(input.instructions, {
+        signal: input.signal,
+      });
+      const sessionRef = manager.getSessionFile();
+      if (!result || !sessionRef) {
+        throw new Error("OMP handoff did not create a new session");
+      }
+      return {
+        sessionRef,
+        handoffText: result.document,
+      };
+    } finally {
+      await session.dispose();
     }
   }
 

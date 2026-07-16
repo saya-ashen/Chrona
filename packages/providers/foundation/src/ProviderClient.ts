@@ -25,6 +25,8 @@ export type {
   ProviderSessionRef,
   ProviderConversationCapabilities,
   ProviderConversationState,
+  ProviderConversationHandoffInput,
+  ProviderConversationHandoffResult,
   ProviderConversationTurnInput,
   ProviderConversationTurnResult,
   ProviderStructuredOutputSchema,

@@ -93,7 +93,7 @@ Returns the continuation state for the latest accepted result: the accepted Run,
 Continues from an accepted result. Requests are idempotent by `requestId`.
 
 - `intent: "ask"` resumes the original provider conversation when available. If the source session is missing, Chrona falls back to the accepted result plus persisted follow-up history.
-- `intent: "create_task"` creates a linked Draft task. `sessionStrategy` may be `fork_source_session` (default) or `fresh_with_result`.
+- `intent: "create_task"` creates a linked Draft task. `sessionStrategy` may be `handoff_compact` (default, compact handoff into a new independent provider session) or `fresh_with_result` (accepted result and deliverables only).
 
 The source task's accepted Run, result, artifacts, plan, and execution state remain immutable. Result follow-up turns run without execution or mutation tools.
 

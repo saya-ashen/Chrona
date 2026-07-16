@@ -262,7 +262,7 @@ export function continueFromTaskResult(input: {
   requestId: string;
   intent: "ask" | "create_task";
   instruction: string;
-  sessionStrategy?: "fork_source_session" | "fresh_with_result";
+  sessionStrategy?: "handoff_compact" | "fresh_with_result";
 }) {
   return apiJson<ResultFollowUpEntry>(
     `/api/tasks/${encodeURIComponent(input.taskId)}/result/follow-up`,
@@ -275,7 +275,7 @@ export function continueFromTaskResult(input: {
         ...(input.intent === "create_task"
           ? {
               sessionStrategy:
-                input.sessionStrategy ?? "fork_source_session",
+                input.sessionStrategy ?? "handoff_compact",
             }
           : {}),
       }),

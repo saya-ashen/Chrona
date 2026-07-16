@@ -15,7 +15,7 @@ export type ResultFollowUpEntry = {
   answer?: string | null;
   answerSource?: string | null;
   contextSource?: "source_session" | "accepted_result_fallback" | null;
-  sessionStrategy?: "fork_source_session" | "fresh_with_result" | null;
+  sessionStrategy?: "handoff_compact" | "fresh_with_result" | null;
   createdTask?: { id: string; title: string } | null;
   cache?: {
     readInputTokens: number | null;
@@ -41,6 +41,7 @@ export type ResultFollowUpStateResponse = {
       | "unknown";
     supportsFork: boolean;
     supportsResume: boolean;
+    supportsHandoff: boolean;
   };
   entries: ResultFollowUpEntry[];
 };

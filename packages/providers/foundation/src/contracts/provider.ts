@@ -568,6 +568,17 @@ export type ProviderConversationTurnResult = {
   compacted?: boolean;
 };
 
+export type ProviderConversationHandoffInput = {
+  sessionRef: string;
+  instructions: string;
+  signal?: AbortSignal;
+};
+
+export type ProviderConversationHandoffResult = {
+  sessionRef: string;
+  handoffText?: string;
+};
+
 export type ProviderConversationState = {
   available: boolean;
   sessionRef: string;
@@ -605,6 +616,10 @@ export interface AgentProviderClient {
   inspectConversation?(
     sessionRef: string,
   ): Promise<ProviderConversationState>;
+
+  handoffConversation?(
+    input: ProviderConversationHandoffInput,
+  ): Promise<ProviderConversationHandoffResult>;
 
   runConversationTurn?(
     input: ProviderConversationTurnInput,

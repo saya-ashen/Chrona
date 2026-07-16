@@ -14,6 +14,7 @@ const loadedState: ResultFollowUpStateResponse = {
     health: "fresh",
     supportsFork: true,
     supportsResume: true,
+    supportsHandoff: true,
   },
   entries: [],
 };

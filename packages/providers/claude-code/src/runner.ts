@@ -718,7 +718,7 @@ export function extractSdkSessionId(raw: unknown): string | undefined {
 }
 
 export async function runClaudeConversationTurn(input: {
-  sessionRef: string;
+  sessionRef?: string;
   prompt: string;
   fork: boolean;
   config: ClaudeCodeRunnerConfig;
@@ -727,7 +727,7 @@ export async function runClaudeConversationTurn(input: {
   const abortController = new AbortController();
   const abort = () => abortController.abort();
   input.signal?.addEventListener("abort", abort, { once: true });
-  let sessionRef = input.sessionRef;
+  let sessionRef = input.sessionRef ?? "";
   let outputText = "";
   let usage: {
     inputTokens?: number;
@@ -746,8 +746,8 @@ export async function runClaudeConversationTurn(input: {
         cwd: input.config.cwd,
         env: claudeRunEnv(input.config),
         abortController,
-        resume: input.sessionRef,
-        ...(input.fork ? { forkSession: true } : {}),
+        ...(input.sessionRef ? { resume: input.sessionRef } : {}),
+        ...(input.fork && input.sessionRef ? { forkSession: true } : {}),
         persistSession: true,
         permissionMode: "dontAsk",
         allowedTools: [],

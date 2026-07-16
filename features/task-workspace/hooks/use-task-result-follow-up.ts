@@ -46,7 +46,7 @@ export function useTaskResultFollowUp(taskId: string, enabled: boolean) {
   }, []);
 
   const submit = useCallback(async (options?: {
-    sessionStrategy?: "fork_source_session" | "fresh_with_result";
+    sessionStrategy?: "handoff_compact" | "fresh_with_result";
   }) => {
     if (state.status === "submitting") return;
     const instruction = (
@@ -63,7 +63,7 @@ export function useTaskResultFollowUp(taskId: string, enabled: boolean) {
         ...(state.mode === "create_task"
           ? {
               sessionStrategy:
-                options?.sessionStrategy ?? "fork_source_session",
+                options?.sessionStrategy ?? "handoff_compact",
             }
           : {}),
       });

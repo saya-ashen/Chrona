@@ -163,11 +163,12 @@ beforeEach(() => {
     acceptedRunId: "run-1",
     acceptedAt: "2026-05-18T00:00:00.000Z",
     sourceSession: {
-      available: false,
+      available: true,
       provider: "test",
-      health: "unavailable",
-      supportsFork: false,
-      supportsResume: false,
+      health: "fresh",
+      supportsFork: true,
+      supportsResume: true,
+      supportsHandoff: true,
     },
     entries: [],
   });
@@ -1793,6 +1794,16 @@ describe("TaskWorkspacePlanSection", () => {
     });
     expect(createTaskMode).toHaveAttribute("aria-selected", "true");
     expect(createTaskMode).toHaveClass("h-8");
+    expect(
+      within(lifecyclePanel).getByRole("radio", {
+        name: /Handoff to a new session/,
+      }),
+    ).toBeChecked();
+    expect(
+      within(lifecyclePanel).getByText(
+        "Compact the source conversation into a focused handoff for a new independent session.",
+      ),
+    ).toBeInTheDocument();
 
     const input = within(lifecyclePanel).getByRole("textbox", {
       name: "Follow-up request",
@@ -1808,7 +1819,7 @@ describe("TaskWorkspacePlanSection", () => {
           taskId: "task-1",
           intent: "create_task",
           instruction: "Compare the top projects",
-          sessionStrategy: "fork_source_session",
+          sessionStrategy: "handoff_compact",
           requestId: expect.any(String),
         }),
       ),

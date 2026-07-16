@@ -15,6 +15,7 @@ class RecordingProvider implements AgentProviderClient {
 
   getConversationCapabilities?: AgentProviderClient["getConversationCapabilities"];
   inspectConversation?: AgentProviderClient["inspectConversation"];
+  handoffConversation?: AgentProviderClient["handoffConversation"];
   runConversationTurn?: AgentProviderClient["runConversationTurn"];
   constructor(private readonly runId: string) {}
 
@@ -173,6 +174,10 @@ describe("OmpProviderClient SDK delegation", () => {
       sessionRef,
       compacted: false,
     });
+    sdk.handoffConversation = async (input) => ({
+      sessionRef: `${input.sessionRef}.handoff`,
+      handoffText: "compacted context",
+    });
     sdk.runConversationTurn = async (input: ProviderConversationTurnInput) => ({
       sessionRef: input.sessionRef,
       outputText: "continued",
@@ -188,5 +193,12 @@ describe("OmpProviderClient SDK delegation", () => {
       prompt: "follow up",
       mode: "resume",
     })).resolves.toMatchObject({ outputText: "continued" });
+    await expect(client.handoffConversation({
+      sessionRef: "/tmp/session.jsonl",
+      instructions: "Prepare next task",
+    })).resolves.toMatchObject({
+      sessionRef: "/tmp/session.jsonl.handoff",
+      handoffText: "compacted context",
+    });
   });
 });

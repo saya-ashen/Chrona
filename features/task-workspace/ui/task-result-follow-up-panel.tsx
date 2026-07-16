@@ -18,15 +18,22 @@ export function TaskResultFollowUpPanel({
   const locale = useLocale();
   const { state, setMode, setDraft, submit } = useTaskResultFollowUp(taskId, true);
   const [sessionStrategy, setSessionStrategy] = useState<
-    "fork_source_session" | "fresh_with_result"
-  >("fork_source_session");
+    "handoff_compact" | "fresh_with_result"
+  >("handoff_compact");
 
   useEffect(() => {
     setMode(initialMode);
   }, [initialMode, setMode]);
+
   const draft = state.mode === "ask" ? state.askDraft : state.createTaskDraft;
   const submitting = state.status === "submitting";
   const sourceSession = state.state?.sourceSession;
+
+  useEffect(() => {
+    if (sourceSession && !sourceSession.supportsHandoff) {
+      setSessionStrategy("fresh_with_result");
+    }
+  }, [sourceSession]);
   const sessionHealth = sourceSession?.health ?? "unknown";
   const sessionLabel = !sourceSession?.available
     ? copy.followUpSessionUnavailable ?? "Original session unavailable — answers use the accepted result."
@@ -77,22 +84,33 @@ export function TaskResultFollowUpPanel({
         </Badge>
       </div>
 
-      {state.mode === "create_task" && sourceSession?.supportsFork ? (
+      {state.mode === "create_task" ? (
         <fieldset className="grid gap-2 rounded-xl border border-border/70 bg-muted/35 p-3 text-sm sm:grid-cols-2">
           <legend className="px-1 text-xs font-medium text-muted-foreground">
             {copy.followUpSessionStrategyLabel ?? "Context strategy"}
           </legend>
-          <label className="flex cursor-pointer gap-2 rounded-lg border border-border/60 bg-background p-2.5">
+          <label
+            className={`flex gap-2 rounded-lg border bg-background p-2.5 ${sourceSession?.supportsHandoff ? "cursor-pointer border-border/60" : "cursor-not-allowed border-border/40 opacity-60"}`}
+          >
             <input
               type="radio"
               name="result-session-strategy"
-              value="fork_source_session"
-              checked={sessionStrategy === "fork_source_session"}
-              onChange={() => setSessionStrategy("fork_source_session")}
+              value="handoff_compact"
+              checked={sessionStrategy === "handoff_compact"}
+              disabled={!sourceSession?.supportsHandoff}
+              onChange={() => setSessionStrategy("handoff_compact")}
             />
             <span>
-              <span className="block font-medium">{copy.followUpForkSession ?? "Inherit original context"}</span>
-              <span className="text-xs text-muted-foreground">{copy.followUpForkSessionDescription ?? "Create an independent branch from the execution conversation."}</span>
+              <span className="block font-medium">
+                {copy.followUpHandoffSession ?? "Handoff to a new session"}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                {sourceSession?.supportsHandoff
+                  ? (copy.followUpHandoffSessionDescription ??
+                    "Compact the source conversation into a focused handoff for a new independent session.")
+                  : (copy.followUpHandoffUnavailable ??
+                    "The selected coding agent cannot hand off this source session.")}
+              </span>
             </span>
           </label>
           <label className="flex cursor-pointer gap-2 rounded-lg border border-border/60 bg-background p-2.5">

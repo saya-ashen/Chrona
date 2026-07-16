@@ -434,8 +434,8 @@ export const taskResultFollowUpBodySchema = z.discriminatedUnion("intent", [
     intent: z.literal("create_task"),
     instruction: z.string().trim().min(1).max(10_000),
     sessionStrategy: z
-      .enum(["fork_source_session", "fresh_with_result"])
-      .default("fork_source_session"),
+      .enum(["handoff_compact", "fresh_with_result"])
+      .default("handoff_compact"),
   }).strict(),
   z.object({
     requestId: taskResultContinuationRequestIdSchema,
@@ -458,7 +458,7 @@ export const taskResultFollowUpEntrySchema = z.object({
     .nullable()
     .optional(),
   sessionStrategy: z
-    .enum(["fork_source_session", "fresh_with_result"])
+    .enum(["handoff_compact", "fresh_with_result"])
     .nullable()
     .optional(),
   createdTask: z
@@ -485,6 +485,7 @@ export const taskResultFollowUpStateSchema = z.object({
     health: z.enum(["fresh", "moderate", "high", "compacted", "unavailable", "unknown"]),
     supportsFork: z.boolean(),
     supportsResume: z.boolean(),
+    supportsHandoff: z.boolean(),
   }).strict(),
   entries: z.array(taskResultFollowUpEntrySchema),
 }).strict();
