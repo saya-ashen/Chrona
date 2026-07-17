@@ -250,6 +250,19 @@ function compactJsonValue(value: unknown, maxLength = 4_000) {
     : serialized;
 }
 
+function redactActivityRaw(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(redactActivityRaw);
+  if (!value || typeof value !== "object") return value;
+  return Object.fromEntries(
+    Object.entries(value).map(([key, nested]) => [
+      key,
+      /token|secret|credential|password|api.?key|authorization|cookie/i.test(key)
+        ? "[redacted]"
+        : redactActivityRaw(nested),
+    ]),
+  );
+}
+
 function providerToolInputSummary(event: Record<string, unknown>) {
   return (
     optionalStringEventValue(event, "inputSummary") ??
@@ -406,7 +419,7 @@ function mapProviderEventToActivity(
     nativeRunId,
     sequence,
     rawEventType,
-    raw: payloadEvent ?? event.payload,
+    raw: redactActivityRaw(payloadEvent ?? event.payload),
     ...(event.nodeId ? { sourceNodeId: event.nodeId } : {}),
     ...(event.nodeTitle ? { sourceNodeTitle: event.nodeTitle } : {}),
   });
@@ -549,6 +562,22 @@ function mapProviderEventToActivity(
         },
       });
     }
+    case "approval_required":
+      return withBase({
+        id: event.id,
+        kind: "approval",
+        title: "Approval required",
+        summary: providerActivityDescription(
+          payloadRecordValue,
+          "Provider approval required.",
+        ),
+        description: providerActivityDescription(
+          payloadRecordValue,
+          "Provider approval required.",
+        ),
+        tone: "warning",
+        timestamp,
+      });
     case "raw_event": {
       const rawMessage = providerRawMessage(payloadRecordValue);
       if (progressSummary || rawMessage) {

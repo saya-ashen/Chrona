@@ -55,7 +55,10 @@ export async function openTaskResultFile(input: {
     );
   }
 
-  const access = await requestResultFileAccess(input);
+  const access = await requestResultFileAccess({
+    taskId: input.taskId,
+    requestedPath: generatedPath,
+  });
   if (access.status !== "already_allowed") {
     throw new EngineError(
       ENGINE_ERROR_CODES.VALIDATION_FAILED,

@@ -1,4 +1,5 @@
 import { mkdir, rm } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it } from "bun:test";
 import { db } from "@/lib/db";
@@ -14,9 +15,11 @@ describe("openTaskResultFile", () => {
   it("downloads only generated files referenced by the same task result", async () => {
     const { workspaceId } = await seedWorkspace("Result download");
     const { taskId } = await seedTask(workspaceId, { title: "Create report" });
-    const reference = "generated://download-test/node/report.md";
-    const filePath = join(generatedFilesRoot(), "download-test", "node", "report.md");
-    await mkdir(join(generatedFilesRoot(), "download-test", "node"), { recursive: true });
+    const fixtureScope = `download-test-${randomUUID()}`;
+    const reference = `generated://${fixtureScope}/node/report.md`;
+    const fixtureRoot = join(generatedFilesRoot(), fixtureScope);
+    const filePath = join(fixtureRoot, "node", "report.md");
+    await mkdir(join(fixtureRoot, "node"), { recursive: true });
     await Bun.write(filePath, "# Report");
 
     await db.taskPlan.create({
@@ -58,11 +61,11 @@ describe("openTaskResultFile", () => {
       await expect(
         openTaskResultFile({
           taskId,
-          requestedPath: "generated://download-test/node/unreferenced.md",
+          requestedPath: `generated://${fixtureScope}/node/unreferenced.md`,
         }),
       ).rejects.toThrow(/not referenced by the task result/i);
     } finally {
-      await rm(join(generatedFilesRoot(), "download-test"), {
+      await rm(fixtureRoot, {
         recursive: true,
         force: true,
       });

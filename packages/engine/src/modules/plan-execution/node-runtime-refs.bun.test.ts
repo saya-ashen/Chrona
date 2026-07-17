@@ -309,11 +309,15 @@ describe("node runtime refs", () => {
       updatedAt: null,
     });
     expect(runtime.runtimeInput.context.run?.generatedFiles).toEqual({
-      directory: expect.stringContaining("/generated/"),
-      referenceBase: "generated://20260716/N20260516-01/",
+      directory: expect.stringMatching(/\/generated\/\d{8}\/N20260516-01$/),
+      referenceBase: expect.stringMatching(
+        /^generated:\/\/\d{8}\/N20260516-01\/$/,
+      ),
     });
     expect(runtime.instructions).toContain("absolute output directory");
-    expect(runtime.instructions).toContain("generated://20260716/N20260516-01/");
+    const generatedReference = runtime.runtimeInput.context.run?.generatedFiles?.referenceBase;
+    expect(generatedReference).toBeDefined();
+    expect(runtime.instructions).toContain(generatedReference!);
     expect(runtime.instructions).toContain("FileView or FileRef");
     expect(runtime.instructions).toContain("Do not use file:// URLs");
   });
