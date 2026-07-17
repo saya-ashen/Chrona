@@ -507,7 +507,7 @@ describe("TaskWorkspacePlanSection", () => {
     expect(screen.queryByTestId("current-runtime-activity")).not.toBeInTheDocument();
     expect(
       screen.getByRole("region", { name: "Stage results" }),
-    ).toHaveTextContent("No result yet");
+    ).toHaveTextContent("Starting plan");
     expect(screen.getByTestId("execution-navigator")).toHaveTextContent(
       "steps complete",
     );
@@ -1674,9 +1674,9 @@ describe("TaskWorkspacePlanSection", () => {
       screen.queryByRole("region", { name: "Execution flow" }),
     ).not.toBeInTheDocument();
     expect(screen.queryByText("Continue from result")).not.toBeInTheDocument();
-    expect(screen.getByText("Activity").closest("details")).not.toHaveAttribute(
-      "open",
-    );
+    expect(
+      screen.getByRole("button", { name: /Open Agent transcript/ }),
+    ).toHaveAttribute("aria-expanded", "false");
 
     fireEvent.click(
       within(reviewHeader).getByRole("button", { name: "Accept result" }),
