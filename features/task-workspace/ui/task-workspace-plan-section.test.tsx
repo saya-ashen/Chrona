@@ -112,6 +112,7 @@ const checkpoint = {
   createdAt: "2026-05-21T00:00:00.000Z",
 };
 
+
 function renderWithQueryClient(ui: ReactElement) {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -140,6 +141,7 @@ vi.mock("@chrona/i18n", async (importOriginal) => {
 });
 
 beforeAll(() => {
+
   class ResizeObserverMock {
     observe(target?: Element) {
       if (target) {
