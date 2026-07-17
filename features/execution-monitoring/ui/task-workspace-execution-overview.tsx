@@ -106,6 +106,26 @@ function buildNodeResultContentSpec(
   ]);
 }
 
+function isAssistantTextEvent(
+  runtimeEvent: WorkspaceRuntimeEvent,
+): runtimeEvent is WorkspaceRuntimeEvent & {
+  event: Extract<WorkspaceRuntimeEvent["event"], { type: "assistant_text_delta" }>;
+} {
+  return runtimeEvent.event.type === "assistant_text_delta";
+}
+
+function buildLiveResultContentSpec(runtimeEvents: WorkspaceRuntimeEvent[], title: string) {
+  const text = runtimeEvents
+    .filter(isAssistantTextEvent)
+    .map((runtimeEvent) => runtimeEvent.event.text)
+    .join("")
+    .trim();
+  if (!text) return null;
+  return buildResultSpec([
+    { kind: "markdown", title, content: text },
+  ]);
+}
+
 function withActivityStreamProps(
   spec: UiDocument,
   props: { density?: "rail"; active?: boolean },
@@ -330,6 +350,15 @@ export function TaskWorkspaceExecutionOverview({
       if (nodeId) onAction?.(nodeId);
     },
   };
+  const latestLiveResultEvent = [...runtimeEvents]
+    .reverse()
+    .find((runtimeEvent) => runtimeEvent.event.type === "assistant_text_delta");
+  const liveResultSpec = executionIsActive
+    ? buildLiveResultContentSpec(
+      runtimeEvents,
+      ws.currentStepOutputTitle ?? "Current step output",
+    )
+    : null;
   const resultSpec = buildNodeResultContentSpec(
     latestCompletedNode,
     ws.noResultYet,
@@ -342,6 +371,8 @@ export function TaskWorkspaceExecutionOverview({
         resultSpec,
         artifacts,
         copy: ws,
+        liveResultSpec,
+        liveResultOwnerNodeId: latestLiveResultEvent?.nodeId ?? null,
         apiArtifactsSpec: hasCommandCenterOutput(commandCenter?.documents.output)
           ? (commandCenter?.documents.output ?? null)
           : null,
@@ -354,6 +385,8 @@ export function TaskWorkspaceExecutionOverview({
       artifacts,
       commandCenter?.documents.output,
       currentExecution?.planOutput?.updatedByNodeId,
+      latestLiveResultEvent?.nodeId,
+      liveResultSpec,
       latestCompletedNode,
       nodeOptions,
       resultSpec,
@@ -406,23 +439,23 @@ export function TaskWorkspaceExecutionOverview({
               }
             >
               {executionIsActive
-                ? executionResultState === "available"
+                ? liveResultSpec || executionResultState === "available"
                   ? (ws.resultsAvailableBadge ?? "Results available")
                   : (ws.resultsPendingBadge ?? "No result yet")
                 : (ws.aiGeneratedBadge ?? "AI generated")}
             </Badge>
             <span>
               {executionIsActive
-                ? executionResultState === "available"
+                ? liveResultSpec || executionResultState === "available"
                   ? (ws.resultsAvailableDescription ??
-                    "Completed step results collected during this run.")
+                    "Current output and completed step results collected during this run.")
                   : (ws.resultsPendingDescription ??
-                    "The current step has not produced a viewable result yet. Follow execution activity for live progress.")
+                    "The current step has not produced viewable output yet. Follow execution activity for live progress.")
                 : (ws.validatedOutputDescription ??
                   "Validated output from task execution.")}
             </span>
           </div>
-      {executionIsActive && executionResultState === "waiting" ? (
+      {executionIsActive && executionResultState === "waiting" && !liveResultSpec ? (
         <div
           className="mt-3 rounded-xl border border-border/70 bg-muted/35 px-3 py-3 text-sm text-muted-foreground"
           role="note"

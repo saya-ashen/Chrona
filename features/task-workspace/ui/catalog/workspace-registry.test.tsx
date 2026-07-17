@@ -115,6 +115,27 @@ it("renders generated FileRef downloads through the task-scoped API", () => {
   );
 });
 
+it("renders collapsible FileRef title once", () => {
+  const spec: UiDocument = {
+    root: "file",
+    elements: {
+      file: {
+        type: "FileRef",
+        props: {
+          title: "Readable change report",
+          path: "generated://scope/report.md",
+          collapsible: true,
+          defaultCollapsed: false,
+        },
+      },
+    },
+  };
+
+  render(<SpecRenderer spec={spec} />);
+
+  expect(screen.getAllByText("Readable change report")).toHaveLength(1);
+});
+
 describe("workspace result registry", () => {
   it("renders JsonView as flat result content", () => {
     const spec: UiDocument = {
@@ -272,4 +293,29 @@ describe("workspace result registry", () => {
     expect(screen.getByRole("button", { name: "Previous" })).toBeDisabled();
     expect(screen.getByRole("button", { name: "Next" })).toBeEnabled();
   });
+  it("renders collapsible Table title once", () => {
+    const spec: UiDocument = {
+      root: "table",
+      elements: {
+        table: {
+          type: "Table",
+          props: {
+            title: "GitHub Trending full list",
+            contentKind: "json",
+            contentPreview: JSON.stringify([{ repository: "chrona" }]),
+            columns: [{ key: "repository", label: "Repository" }],
+            collapsible: true,
+            defaultCollapsed: false,
+          },
+          children: [],
+        },
+      },
+    };
+
+    render(<SpecRenderer spec={spec} />);
+
+    expect(screen.getAllByText("GitHub Trending full list")).toHaveLength(1);
+    expect(screen.getAllByRole("table").length).toBeGreaterThan(0);
+  });
+
 });

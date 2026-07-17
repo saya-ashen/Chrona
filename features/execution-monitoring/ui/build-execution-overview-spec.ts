@@ -450,6 +450,8 @@ export function buildCommandCenterOutputTabSpec(input: {
   latestCompletedNode: PlanNodeDataModel | null;
   resultSpec: UiDocument;
   artifacts: WorkspaceArtifactItem[];
+  liveResultSpec?: UiDocument | null;
+  liveResultOwnerNodeId?: string | null;
   copy: WorkspaceCopy;
   apiArtifactsSpec?: UiDocument | null;
   selectedNodeId?: ResultNodeFilter;
@@ -466,6 +468,15 @@ export function buildCommandCenterOutputTabSpec(input: {
     groupByNode: true,
     fallbackNodeId: input.nodeOptions && input.nodeOptions.length <= 1 ? input.outputOwnerNodeId ?? input.latestCompletedNode?.id ?? null : null,
   });
+
+  if (input.liveResultSpec) {
+    appendDocument(elements, children, "live-output", input.liveResultSpec, {
+      selectedNodeId: input.selectedNodeId,
+      nodeOptions: input.nodeOptions,
+      groupByNode: true,
+      fallbackNodeId: input.liveResultOwnerNodeId ?? null,
+    });
+  }
 
   if (input.artifacts.length > 0) {
     const filteredArtifacts = !input.selectedNodeId || input.selectedNodeId === "all"

@@ -314,6 +314,66 @@ describe("TaskWorkspaceExecutionOverview", () => {
     expect(screen.getByText("Writing report")).toBeInTheDocument();
   });
 
+  it("updates stage results from assistant output while execution is running", () => {
+    const view = createTaskWorkspaceExecutionConsoleView(
+      executionMonitoringWorkspaceFixtures.running,
+    );
+
+    renderOverview(view, {
+      commandCenter: {
+        documents: {
+          now: nowDocument("Execution running"),
+          output: nowDocument("Output"),
+          trail: buildCommandCenterTrailSpec({
+            activity: [],
+            savedCount: 0,
+            toolLabels: {
+              tool: "Tool",
+              input: "Input",
+              preview: "Preview",
+              duration: "Duration",
+              error: "Error",
+            },
+          }),
+        },
+      },
+      runtimeEvents: [
+        {
+          type: "runtime_event",
+          action: "start_manual",
+          nodeId: "execute",
+          nodeTitle: "Generate report",
+          runtimeName: "hermes",
+          provider: "hermes",
+          runId: "run-1",
+          sequence: 1,
+          timestamp: "2026-05-12T10:01:00.000Z",
+          event: { type: "assistant_text_delta", text: "First paragraph. " },
+        },
+        {
+          type: "runtime_event",
+          action: "start_manual",
+          nodeId: "execute",
+          nodeTitle: "Generate report",
+          runtimeName: "hermes",
+          provider: "hermes",
+          runId: "run-1",
+          sequence: 2,
+          timestamp: "2026-05-12T10:01:01.000Z",
+          event: { type: "assistant_text_delta", text: "Second paragraph." },
+        },
+      ],
+      currentExecution: { status: "running" },
+      isExecutionRunning: true,
+      executionResultState: "waiting",
+    });
+
+    const results = screen.getByRole("region", { name: "Stage results" });
+    expect(results).toHaveTextContent("First paragraph. Second paragraph.");
+    expect(results).toHaveTextContent("Results available");
+    expect(screen.queryByRole("note", { name: "Current step result pending" })).not.toBeInTheDocument();
+  });
+
   it("explains that stage results are pending while activity stays live", () => {
     const view = createTaskWorkspaceExecutionConsoleView(
       executionMonitoringWorkspaceFixtures.running,
@@ -342,9 +402,9 @@ describe("TaskWorkspaceExecutionOverview", () => {
       executionResultState: "waiting",
     });
 
-    expect(screen.getByRole("region", { name: "Stage results" })).toHaveTextContent("No result yet");
-    expect(screen.getByRole("note", { name: "Current step result pending" })).toHaveTextContent(
-      "This area shows completed step results, not live activity.",
+    expect(screen.getByRole("region", { name: "Stage results" })).toHaveTextContent("Waiting for output");
+    expect(screen.getByRole("note", { name: "Current step output pending" })).toHaveTextContent(
+      "Output from the current step will appear here as soon as the runtime provides it.",
     );
     expect(screen.queryByRole("status", { name: "Execution is producing output" })).not.toBeInTheDocument();
     expect(screen.getByText("AI is working")).toBeInTheDocument();

@@ -487,6 +487,15 @@ function shouldWrapCollapsible(
   );
 }
 
+function contentPropsWithoutTitle(
+  props: Record<string, unknown>,
+  fallbackCollapsed?: boolean,
+): Record<string, unknown> {
+  if (!shouldWrapCollapsible(props, fallbackCollapsed)) return props;
+  const { title: _title, ...contentProps } = props;
+  return contentProps;
+}
+
 function MaybeCollapsible({
   props,
   fallbackCollapsed,
@@ -1229,15 +1238,25 @@ function WorkspaceTable({ props }: { props: WorkspaceTableProps }) {
   const size = formatFileSize(props.contentBytes);
   const error = filePreviewErrorMessage(props.previewError, copy);
 
+  const fallbackCollapsed =
+    props.contentTruncated === true || parsed.rows.length > 25;
+  const collapsibleProps = props as unknown as Record<string, unknown>;
+  const tableContent = contentPropsWithoutTitle(
+    collapsibleProps,
+    fallbackCollapsed,
+  ) as WorkspaceTableProps;
+
   const contentNode = (
     <section className="min-w-0 w-full max-w-full space-y-2 overflow-hidden text-sm">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
-          {props.title ? (
-            <p className="font-medium text-foreground">{props.title}</p>
+          {tableContent.title ? (
+            <p className="font-medium text-foreground">{tableContent.title}</p>
           ) : null}
-          {props.description ? (
-            <p className="text-xs text-muted-foreground">{props.description}</p>
+          {tableContent.description ? (
+            <p className="text-xs text-muted-foreground">
+              {tableContent.description}
+            </p>
           ) : null}
           {path ? (
             <p className="break-all text-xs text-muted-foreground">{path}</p>
@@ -1384,10 +1403,8 @@ function WorkspaceTable({ props }: { props: WorkspaceTableProps }) {
   );
   return (
     <MaybeCollapsible
-      props={props as unknown as Record<string, unknown>}
-      fallbackCollapsed={
-        props.contentTruncated === true || parsed.rows.length > 25
-      }
+      props={collapsibleProps}
+      fallbackCollapsed={fallbackCollapsed}
       fallbackTitle={props.title ?? "Table"}
     >
       {contentNode}
@@ -1526,11 +1543,13 @@ export const { registry: workspaceRegistry } = defineRegistry(chronaCatalog, {
         typeof props.value === "string"
           ? props.value
           : JSON.stringify(props.value, null, 2);
+      const fallbackCollapsed = jsonText.length > AUTO_COLLAPSE_JSON_LENGTH;
+      const contentProps = contentPropsWithoutTitle(props, fallbackCollapsed);
       const contentNode = (
         <section className="min-w-0 w-full max-w-full overflow-hidden px-0.5 py-1 text-sm text-foreground">
-          {props.title ? (
+          {typeof contentProps.title === "string" ? (
             <p className="mb-2 truncate text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-              {props.title}
+              {contentProps.title}
             </p>
           ) : null}
           <pre className="max-h-96 max-w-full overflow-x-auto rounded-lg bg-muted/60 p-2 text-xs leading-5 text-foreground/80">
@@ -1541,7 +1560,7 @@ export const { registry: workspaceRegistry } = defineRegistry(chronaCatalog, {
       return (
         <MaybeCollapsible
           props={props}
-          fallbackCollapsed={jsonText.length > AUTO_COLLAPSE_JSON_LENGTH}
+          fallbackCollapsed={fallbackCollapsed}
           fallbackTitle={typeof props.title === "string" ? props.title : "JSON"}
         >
           {contentNode}
@@ -1558,7 +1577,14 @@ export const { registry: workspaceRegistry } = defineRegistry(chronaCatalog, {
         }
         fallbackTitle={typeof props.title === "string" ? props.title : "File"}
       >
-        <FileView props={props} />
+        <FileView
+          props={contentPropsWithoutTitle(
+            props,
+            props.contentTruncated === true ||
+              (typeof props.contentBytes === "number" &&
+                props.contentBytes > AUTO_COLLAPSE_FILE_BYTES),
+          )}
+        />
       </MaybeCollapsible>
     ),
     FileView: ({ props }) => (
@@ -1571,7 +1597,14 @@ export const { registry: workspaceRegistry } = defineRegistry(chronaCatalog, {
         }
         fallbackTitle={typeof props.title === "string" ? props.title : "File"}
       >
-        <FileView props={props} />
+        <FileView
+          props={contentPropsWithoutTitle(
+            props,
+            props.contentTruncated === true ||
+              (typeof props.contentBytes === "number" &&
+                props.contentBytes > AUTO_COLLAPSE_FILE_BYTES),
+          )}
+        />
       </MaybeCollapsible>
     ),
     ResultSummary: ({ props }) => <ResultSummary props={props} />,
