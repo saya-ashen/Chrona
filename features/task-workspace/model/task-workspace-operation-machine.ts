@@ -147,6 +147,8 @@ function runningDescription(input: ResolveTaskWorkspaceOperationStateInput) {
       return latestRuntime.text.trim() || currentOperationDescription(input);
     case "tool_started":
       return latestRuntime.label;
+    case "tool_progress":
+      return latestRuntime.preview ?? latestRuntime.label;
     case "tool_completed":
       return latestRuntime.error
         ? `${latestRuntime.label} failed`

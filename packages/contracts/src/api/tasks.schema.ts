@@ -231,11 +231,13 @@ export const workspaceActivityToneSchema = z.enum([
 export const workspaceToolActivitySchema = z.object({
   name: z.string().optional(),
   label: z.string().optional(),
+  callId: z.string().optional(),
+  resultPreview: z.string().optional(),
   preview: z.string().optional(),
   inputSummary: z.string().optional(),
   durationMs: z.number().nonnegative().optional(),
   error: z.string().optional(),
-  state: z.enum(["started", "completed", "failed"]),
+  state: z.enum(["started", "progress", "completed", "failed"]),
 });
 
 export const workspaceAssistantActivitySchema = z.object({

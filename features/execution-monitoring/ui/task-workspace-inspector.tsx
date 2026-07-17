@@ -26,7 +26,7 @@ export function TaskWorkspaceInspector({
   copy,
   operationPanel,
   onAction,
-  isPlanCompact = false,
+  isPlanCompact: _isPlanCompact = false,
   isExecutionRunning = false,
   executionResultState = "waiting",
   operationPlacement = "before",
@@ -91,7 +91,7 @@ export function TaskWorkspaceInspector({
           executionResultState={executionResultState}
           primaryAction={null}
           copy={commandCenterCopy}
-          activityLayout={isPlanCompact ? "side" : "below"}
+          activityLayout="side"
           onAction={onAction}
         />
         {operationPlacement === "after" ? operationPanel : null}

@@ -285,8 +285,7 @@ export function buildCommandCenterTrailSpec(input: {
       },
     },
     elements: {
-      root: { type: "Stack", props: { gap: "sm" }, children: ["title", "provider", "activity"] },
-      title: { type: "Heading", props: { text: input.copy?.activityTitle ?? "Execution activity", level: 3 } },
+      root: { type: "Stack", props: { gap: "sm" }, children: ["provider", "activity"] },
       stats: {
         type: "Text",
         props: { text: `${activity.length} shown · ${input.liveCount ?? 0} live · ${savedCount} saved`, variant: "caption" },

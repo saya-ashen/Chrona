@@ -8,6 +8,7 @@ import {
 import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
 import {
   buildActivityTimeline,
+  deduplicateProjectedActivity,
   mapTimelineItemToActivity,
   orderActivityNewestFirst,
 } from "./task-activity";
@@ -98,13 +99,14 @@ export async function getTaskCommandCenter(input: {
       ...(await resolveFilePreview(artifact.uri, { taskId: input.taskId })),
     })),
   );
-  const activityTimeline =
+  const activityTimeline = orderActivityNewestFirst(deduplicateProjectedActivity(
     task.timelineItems.length > 0
-      ? orderActivityNewestFirst([
+      ? [
           ...task.timelineItems.map(mapTimelineItemToActivity),
           ...buildActivityTimeline([...task.events].reverse()),
-        ]).slice(0, 100)
-      : buildActivityTimeline([...task.events].reverse());
+        ]
+      : buildActivityTimeline([...task.events].reverse()),
+  )).slice(0, 100);
 
   return {
     documents: {

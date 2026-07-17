@@ -127,6 +127,72 @@ describe("OmpSdkProviderClient node runtime tools", () => {
     expect(__ompSdkProviderTestHooks.sdkToolErrorMessage({ details: {} })).toBe("Oh My Pi SDK tool call failed");
   });
 
+  it("classifies aborted agent endings as failures", () => {
+    expect(__ompSdkProviderTestHooks.agentEndFailure({
+      type: "agent_end",
+      messages: [{
+        role: "assistant",
+        content: [],
+        api: "openai-completions",
+        provider: "test",
+        model: "test",
+        usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
+        stopReason: "aborted",
+        errorMessage: "Deadline exceeded",
+        timestamp: 0,
+      }],
+    })).toBe("Deadline exceeded");
+  });
+
+  it("accepts successful agent endings", () => {
+    expect(__ompSdkProviderTestHooks.agentEndFailure({
+      type: "agent_end",
+      messages: [{
+        role: "assistant",
+        content: [],
+        api: "openai-completions",
+        provider: "test",
+        model: "test",
+        usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
+        stopReason: "stop",
+        timestamp: 0,
+      }],
+    })).toBeNull();
+  });
+
+  it("preserves OMP tool intent as the live activity preview", () => {
+    expect(__ompSdkProviderTestHooks.toolCallPreview({
+      type: "tool_execution_start",
+      toolCallId: "call-1",
+      toolName: "mcp__codegraph_explore",
+      args: { i: "Mapping architectural risk" },
+      intent: "Mapping architectural risk",
+    })).toBe("Mapping architectural risk");
+  });
+
+  it("extracts bounded text from OMP tool progress updates", () => {
+    expect(__ompSdkProviderTestHooks.textContentPreview({
+      content: [{ type: "text", text: "Scout is reading execution flow" }],
+    })).toBe("Scout is reading execution flow");
+  });
+
+  it("summarizes OMP lifecycle events without exposing raw session payloads", () => {
+    expect(__ompSdkProviderTestHooks.sdkLifecycleSummary({
+      type: "auto_retry_start",
+      attempt: 2,
+      maxAttempts: 3,
+      delayMs: 500,
+      errorMessage: "provider unavailable",
+    })).toBe("Retry 2/3 scheduled after provider error.");
+    expect(__ompSdkProviderTestHooks.sdkLifecycleSummary({
+      type: "auto_compaction_end",
+      action: "context-full",
+      result: undefined,
+      aborted: false,
+      willRetry: false,
+    })).toBe("Context compaction completed (context-full).");
+  });
+
 });
 describe("OmpProviderClient SDK delegation", () => {
   it("uses the SDK for plan-generation terminal tool calls", async () => {

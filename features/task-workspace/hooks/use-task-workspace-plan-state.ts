@@ -51,6 +51,8 @@ function getRuntimeActivity(event: WorkspaceRuntimeEvent | undefined) {
       return compactActivityText(value.text);
     case "tool_started":
       return compactActivityText(`Running ${value.label}`);
+    case "tool_progress":
+      return compactActivityText(value.preview ?? `Running ${value.label}`);
     case "tool_completed":
       return compactActivityText(value.error ? `${value.label} failed` : `${value.label} completed`);
     case "approval_required":

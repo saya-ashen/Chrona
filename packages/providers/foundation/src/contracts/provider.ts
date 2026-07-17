@@ -363,6 +363,7 @@ export const providerRunEventSchema = z.discriminatedUnion("type", [
       callId: z.string().min(1),
       input: unknownRecordSchema,
       status: z.enum(["pending", "completed", "error"]),
+      preview: z.unknown().optional(),
     })
     .strict(),
   z
@@ -372,6 +373,16 @@ export const providerRunEventSchema = z.discriminatedUnion("type", [
       toolName: z.string().min(1),
       preview: z.unknown().optional(),
       input: z.unknown().optional(),
+      raw: z.unknown().optional(),
+    })
+    .strict(),
+  z
+    .object({
+      ...providerRunEventMetadataShape,
+      type: z.literal("tool_progress"),
+      toolName: z.string().min(1),
+      callId: z.string().min(1),
+      preview: z.string().optional(),
       raw: z.unknown().optional(),
     })
     .strict(),

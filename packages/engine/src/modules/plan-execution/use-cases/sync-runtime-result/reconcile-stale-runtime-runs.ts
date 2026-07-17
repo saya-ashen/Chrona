@@ -5,6 +5,7 @@ import type { ProviderRunSnapshot } from "@chrona/providers-foundation";
 import { syncPlanRunRuntimeResult } from "../../kernel/sync-runtime-result";
 
 type ReconcileOutcome = "synced" | "left_running" | "skipped";
+const TERMINAL_FINALIZATION_GRACE_MS = 60_000;
 
 export type ReconcileStaleRuntimeRunsResult = {
   checked: number;
@@ -38,13 +39,25 @@ export async function reconcileStaleRuntimeRuns(input: {
 }
 
 async function findRunningProviderRuns(input: { taskId?: string; limit?: number }) {
+  const finalizationCutoff = new Date(Date.now() - TERMINAL_FINALIZATION_GRACE_MS);
   return db.taskPlanProviderRun.findMany({
     where: {
-      status: "running",
       providerRunRef: { not: null },
       taskId: input.taskId,
-      nodeAttempt: { status: "running" },
-      task: { runs: { some: { status: RunStatus.Running } } },
+      nodeAttempt: {
+        status: "running",
+        terminalActions: { none: {} },
+      },
+      OR: [
+        {
+          status: "running",
+          task: { runs: { some: { status: RunStatus.Running } } },
+        },
+        {
+          status: { in: ["completed", "failed", "cancelled"] },
+          finishedAt: { lte: finalizationCutoff },
+        },
+      ],
     },
     include: {
       task: { select: { executionRuntime: true, defaultSessionId: true } },
@@ -60,8 +73,11 @@ async function reconcileProviderRun(providerRun: RunningProviderRun): Promise<Re
   if (!runtimeRunRef) return "skipped";
 
   const run = await db.run.findUnique({ where: { runtimeRunRef } });
-  if (!run || run.status !== RunStatus.Running) return "skipped";
-
+  if (!run) return "skipped";
+  if (providerRun.status !== "running") {
+    return reconcileTerminalProviderRecord({ providerRun, runId: run.id, runtimeRunRef });
+  }
+  if (run.status !== RunStatus.Running) return "skipped";
   const runtimeName = providerRun.runtimeName ?? run.runtimeName;
   const client = await providerClientForRuntime(runtimeName);
   if (!client) {
@@ -101,6 +117,44 @@ async function reconcileProviderRun(providerRun: RunningProviderRun): Promise<Re
     });
     return "synced";
   }
+}
+
+async function reconcileTerminalProviderRecord(input: {
+  providerRun: RunningProviderRun;
+  runId: string;
+  runtimeRunRef: string;
+}): Promise<ReconcileOutcome> {
+  if (input.providerRun.status === "cancelled") {
+    await db.run.update({
+      where: { id: input.runId },
+      data: {
+        status: RunStatus.Cancelled,
+        endedAt: new Date(),
+        errorSummary: null,
+        syncStatus: "healthy",
+        lastSyncedAt: new Date(),
+      },
+    });
+    await syncPlanRunRuntimeResult({
+      taskId: input.providerRun.taskId,
+      runtimeRunRef: input.runtimeRunRef,
+      status: "Cancelled",
+      summary: "Provider run was cancelled before recording a Chrona terminal result action",
+    });
+    return "synced";
+  }
+
+  const reason = input.providerRun.status === "completed"
+    ? "Provider run completed without recording a Chrona terminal result action"
+    : "Provider run failed before recording a Chrona terminal result action";
+  await markRunFailed({ runId: input.runId, reason });
+  await syncPlanRunRuntimeResult({
+    taskId: input.providerRun.taskId,
+    runtimeRunRef: input.runtimeRunRef,
+    status: "Failed",
+    error: reason,
+  });
+  return "synced";
 }
 
 async function providerClientForRuntime(runtimeName: string) {

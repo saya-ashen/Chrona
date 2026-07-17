@@ -26,7 +26,7 @@ const activityToolSchema = z.object({
   inputSummary: z.string().optional(),
   durationMs: z.number().optional(),
   error: z.string().optional(),
-  state: z.enum(["started", "completed", "failed"]),
+  state: z.enum(["started", "progress", "completed", "failed"]),
 });
 
 const activityGroupSchema = z.object({

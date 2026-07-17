@@ -1513,6 +1513,8 @@
       "resultsPendingDescription": "The current step has not produced viewable output yet. Follow execution activity for progress.",
       "resultsPendingAria": "Current step output pending",
       "resultsPendingMessage": "Output from the current step will appear here as soon as the runtime provides it.",
+      "executionProducingOutputAria": "Execution is producing output",
+      "executionWorkingFallback": "AI is working",
       "artifactPreview": "Preview",
       "artifactHidePreview": "Hide preview",
       "copyArtifactPath": "Copy path",

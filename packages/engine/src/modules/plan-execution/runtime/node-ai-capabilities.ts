@@ -10,7 +10,7 @@ import {
   type PreparedAiFeatureSpec,
 } from "@chrona/contracts/ai";
 import { agentControlActionBodySchema } from "@chrona/contracts/api";
-import type { AiRuntimeInvocation, AiRuntimeInvoker } from "../ai-runtime-invoker";
+import { usesChronaControlPlane, type AiRuntimeInvocation, type AiRuntimeInvoker } from "../ai-runtime-invoker";
 import type { NodeExecutionPlanContext, NodeExecutionResult, NodeExecutionRunContext } from "../node-executors/types";
 import type { ProviderRunEvent, ProviderRunSnapshot } from "@chrona/providers-foundation";
 import { buildNodeRuntimePrompt, NODE_RUNTIME_TERMINAL_TOOLS } from "./node-runtime-prompts";
@@ -413,7 +413,7 @@ export async function runTaskNodeFeature(
       return failedResult;
     }
 
-    const requiresTerminalAction = invocation.providerName === "claude_code";
+    const requiresTerminalAction = usesChronaControlPlane(invocation.providerName);
     const terminalNodeResult = invocation.response.status === "completed"
       ? await resolveTerminalNodeResult({
           invocation,
@@ -475,7 +475,7 @@ async function updateInvocationRunFromNodeResult(
     where: { id: invocation.runId },
     data: {
       status,
-      endedAt: status === RunStatus.Completed || status === RunStatus.Cancelled ? new Date() : null,
+      endedAt: status === RunStatus.Completed || status === RunStatus.Cancelled || status === RunStatus.Failed ? new Date() : null,
       errorSummary: errorSummaryFromNodeResult(result),
     },
     select: { taskId: true, taskSessionId: true, runtimeRunRef: true },

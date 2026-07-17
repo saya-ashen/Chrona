@@ -294,6 +294,8 @@ function describeRuntimeEvent(event: WorkspaceRuntimeEvent): { label: string; de
       return { label: "Reasoning", detail: compactRuntimeText(value.text) };
     case "tool_started":
       return { label: "Tool", detail: compactRuntimeText(value.label) };
+    case "tool_progress":
+      return { label: "Tool", detail: compactRuntimeText(value.preview ?? value.label) };
     case "tool_completed":
       return { label: "Tool", detail: compactRuntimeText(value.error ? `${value.label} failed` : `${value.label} completed`) };
     case "approval_required":
@@ -495,23 +497,6 @@ export function buildCommandCenterOutputTabSpec(input: {
 }
 
 
-
-function activityAuditCategory(item: WorkspaceActivityItem): string {
-  if (item.kind === "artifact") return "artifacts/results";
-  if (item.kind === "tool_started" || item.kind === "tool_completed") return "provider/tool activity";
-  if (item.kind === "approval" || item.rawEventType?.includes("approval")) return "approvals";
-  if (item.tone === "danger" || item.rawEventType?.includes("fail") || item.title.toLowerCase().includes("fail")) return "failures/retries";
-  if (item.activityGroup?.kind === "plan_generation") return "plan generation";
-  if (item.activityGroup?.kind === "execution_node" || item.sourceNodeId) return "node attempts";
-  return "run lifecycle";
-}
-
-function activityAuditSummary(items: WorkspaceActivityItem[]) {
-  const counts = new Map<string, number>();
-  for (const item of items) counts.set(activityAuditCategory(item), (counts.get(activityAuditCategory(item)) ?? 0) + 1);
-  return Array.from(counts.entries()).map(([category, count]) => `${category}: ${count}`);
-}
-
 export function buildCommandCenterTrailTabSpec(input: {
   activity: WorkspaceActivityItem[];
   runtimeEvents: WorkspaceRuntimeEvent[];
@@ -519,22 +504,12 @@ export function buildCommandCenterTrailTabSpec(input: {
   toolLabels: ToolDetailLabels;
   limit?: number;
 }): UiDocument {
-  const limit = input.limit ?? 30;
+  const limit = input.limit ?? 300;
   const items = mergeWorkspaceActivity([...runtimeEventsToWorkspaceActivity(input.runtimeEvents, limit), ...input.activity], limit);
   const latestProvider = input.runtimeEvents.at(-1)?.provider;
   const elements: MutableElements = {};
   const children: string[] = [];
   elements.root = { type: "Stack", props: { gap: "sm" }, children };
-  elements.title = { type: "Heading", props: { text: input.copy.activityTitle ?? "Execution activity", level: "h3" } };
-  elements.stats = {
-    type: "Text",
-    props: { text: `${items.length} shown · ${input.runtimeEvents.length} live · ${input.activity.length} saved`, variant: "caption" },
-  };
-  elements.groups = {
-    type: "Text",
-    props: { text: `Audit groups · ${activityAuditSummary(items).join(" · ") || "none yet"}`, variant: "caption" },
-  };
-  children.push("title", "stats", "groups");
   if (latestProvider) {
     elements.provider = { type: "Badge", props: { label: latestProvider, variant: "secondary" } };
     children.push("provider");

@@ -1513,6 +1513,8 @@
       "resultsPendingDescription": "当前步骤尚未产生可查看的输出，可在执行动态中查看进展。",
       "resultsPendingAria": "等待当前步骤输出",
       "resultsPendingMessage": "运行时开始返回当前步骤的输出后，内容会立即显示在这里。",
+      "executionProducingOutputAria": "执行正在产生输出",
+      "executionWorkingFallback": "AI 正在处理",
       "artifactPreview": "预览",
       "artifactHidePreview": "收起预览",
       "copyArtifactPath": "复制路径",

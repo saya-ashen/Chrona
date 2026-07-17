@@ -432,10 +432,72 @@ function sdkToolOptionsForTerminal(terminalToolName: string | undefined, control
   };
 }
 
+function toolCallPreview(
+  event: Extract<AgentSessionEvent, { type: "tool_execution_start" }>,
+): string | undefined {
+  return event.intent?.trim() || undefined;
+}
+
+function textContentPreview(value: unknown): string | undefined {
+  if (!value || typeof value !== "object" || !("content" in value) || !Array.isArray(value.content)) {
+    return undefined;
+  }
+  const text = value.content.flatMap((item) =>
+    item && typeof item === "object" && "text" in item && typeof item.text === "string"
+      ? [item.text]
+      : []
+  ).join("\n").trim();
+  if (!text) return undefined;
+  return text.length > 2_000 ? `${text.slice(0, 1_997)}...` : text;
+}
+
+function sdkLifecycleSummary(event: AgentSessionEvent): string | undefined {
+  switch (event.type) {
+    case "turn_start":
+      return "Agent turn started.";
+    case "turn_end":
+      return "Agent turn completed.";
+    case "auto_compaction_start":
+      return `Context compaction started (${event.action}).`;
+    case "auto_compaction_end":
+      return event.aborted ? "Context compaction was aborted." : `Context compaction completed (${event.action}).`;
+    case "auto_retry_start":
+      return `Retry ${event.attempt}/${event.maxAttempts} scheduled after provider error.`;
+    case "auto_retry_end":
+      return event.success ? `Retry ${event.attempt} succeeded.` : `Retry ${event.attempt} failed.`;
+    case "retry_fallback_applied":
+      return `Model fallback applied: ${event.from} → ${event.to}.`;
+    case "retry_fallback_succeeded":
+      return `Model fallback succeeded with ${event.model}.`;
+    case "notice":
+      return event.message;
+    case "todo_reminder":
+      return `Agent todo reminder (${event.todos.length} open items).`;
+    case "todo_auto_clear":
+      return "Agent todo list completed.";
+    case "thinking_level_changed":
+      return `Thinking level changed to ${event.resolved ?? event.thinkingLevel ?? "default"}.`;
+    default:
+      return undefined;
+  }
+}
+
+function agentEndFailure(event: Extract<AgentSessionEvent, { type: "agent_end" }>): string | null {
+  const message = event.messages.findLast((entry) => entry.role === "assistant");
+  if (!message) return "Oh My Pi SDK ended without an assistant result";
+  if (message.stopReason !== "error" && message.stopReason !== "aborted") return null;
+  return message.errorMessage?.trim()
+    || (message.stopReason === "aborted" ? "Oh My Pi SDK run was aborted" : "Oh My Pi SDK run failed");
+}
+
 export const __ompSdkProviderTestHooks = {
   sdkToolNamesForTerminal,
   sdkToolOptionsForTerminal,
   sdkToolErrorMessage,
+  agentEndFailure,
+  toolCallPreview,
+  textContentPreview,
+  sdkLifecycleSummary,
 };
 
 function applySdkEnvironment(config: OmpProviderConfig, runId = "health"): SdkEnvironment {
@@ -778,9 +840,12 @@ export class OmpSdkProviderClient implements AgentProviderClient {
     handle.unsubscribe = session.subscribe((event) => this.onSessionEvent(handle, queue, event));
     if (handle.input.signal) {
       const abort = () => {
+        if (handle.status !== "running") return;
         handle.status = "cancelled";
         handle.abort.abort();
         session.abort();
+        queue.push({ ...eventBase(handle, "cancelled"), type: "run_cancelled", run: runRef(handle, "cancelled") });
+        this.finish(handle, queue);
       };
       handle.inputAbortListener = abort;
       handle.input.signal.addEventListener("abort", abort, { once: true });
@@ -837,6 +902,16 @@ export class OmpSdkProviderClient implements AgentProviderClient {
           callId: event.toolCallId,
           input: asRecord(event.args),
           status: "pending",
+          preview: toolCallPreview(event),
+        });
+        break;
+      case "tool_execution_update":
+        queue.push({
+          ...eventBase(handle, event.type),
+          type: "tool_progress",
+          toolName: event.toolName,
+          callId: event.toolCallId,
+          preview: textContentPreview(event.partialResult),
         });
         break;
       case "tool_execution_end":
@@ -857,22 +932,52 @@ export class OmpSdkProviderClient implements AgentProviderClient {
           result: event.result,
         });
         break;
-      case "agent_end":
-        if (handle.status === "running") {
-          handle.status = "completed";
+      case "turn_start":
+      case "turn_end":
+      case "auto_compaction_start":
+      case "auto_compaction_end":
+      case "auto_retry_start":
+      case "auto_retry_end":
+      case "retry_fallback_applied":
+      case "retry_fallback_succeeded":
+      case "notice":
+      case "todo_reminder":
+      case "todo_auto_clear":
+      case "thinking_level_changed": {
+        const message = sdkLifecycleSummary(event);
+        if (message) queue.push({ ...eventBase(handle, event.type), type: "raw_event", raw: { message } });
+        break;
+      }
+      case "agent_end": {
+        if (handle.status !== "running") break;
+        const error = agentEndFailure(event);
+        if (error) {
+          handle.error = error;
+          handle.status = "failed";
           queue.push({
             ...eventBase(handle, event.type),
-            type: "run_completed",
-            run: runRef(handle, "completed"),
-            outputText: handle.outputText,
-            output: { text: handle.outputText },
-            structuredPayload: parseStructuredPayload(handle.outputText),
-            usage: null,
+            type: "run_failed",
+            run: runRef(handle, "failed"),
+            error,
             raw: event,
           });
           this.finish(handle, queue);
+          break;
         }
+        handle.status = "completed";
+        queue.push({
+          ...eventBase(handle, event.type),
+          type: "run_completed",
+          run: runRef(handle, "completed"),
+          outputText: handle.outputText,
+          output: { text: handle.outputText },
+          structuredPayload: parseStructuredPayload(handle.outputText),
+          usage: null,
+          raw: event,
+        });
+        this.finish(handle, queue);
         break;
+      }
       default:
         break;
     }

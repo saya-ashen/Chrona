@@ -232,6 +232,7 @@ export type WorkspaceActivityKind =
   | "assistant_message"
   | "reasoning"
   | "tool_started"
+  | "tool_progress"
   | "tool_completed"
   | "provider_run"
   | "approval"
@@ -246,11 +247,13 @@ export type WorkspaceActivityTone = "neutral" | "info" | "success" | "warning" |
 export type WorkspaceToolActivity = {
   name?: string;
   label?: string;
+  callId?: string;
+  resultPreview?: string;
   preview?: string;
   inputSummary?: string;
   durationMs?: number;
   error?: string;
-  state: "started" | "completed" | "failed";
+  state: "started" | "progress" | "completed" | "failed";
 };
 
 export type WorkspaceAssistantActivity = {
