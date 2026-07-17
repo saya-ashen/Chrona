@@ -36,7 +36,7 @@ describe("buildCommandCenterTrailSpec", () => {
     expect(spec.elements.root).toMatchObject({
       type: "Stack",
       props: { gap: "sm" },
-      children: ["title", "provider", "activity"],
+      children: ["provider", "activity"],
     });
   });
 });

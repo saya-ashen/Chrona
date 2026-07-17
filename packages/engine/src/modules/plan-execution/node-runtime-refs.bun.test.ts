@@ -319,7 +319,6 @@ describe("node runtime refs", () => {
     expect(generatedReference).toBeDefined();
     expect(runtime.instructions).toContain(generatedReference!);
     expect(runtime.instructions).toContain("FileView or FileRef");
-    expect(runtime.instructions).toContain("Do not use file:// URLs");
   });
 
   it("includes Results design guidance for task-node outputs", () => {

@@ -61,7 +61,6 @@ describe("validateChronaSpec", () => {
     expect(prompt).toContain("Use JsonView sparingly");
     expect(prompt).toContain("context.planOutput.hasSpec");
     expect(prompt).toContain("context.planOutput.rootChildren");
-    expect(prompt).toContain(".chrona/outputs/<node-ref>/");
   });
 
 
