@@ -294,6 +294,10 @@ describe("node runtime refs", () => {
     expect(runtime.instructions).toContain("Current Node Context JSON.context.planOutput");
     expect(runtime.instructions).toContain("context.planOutput.hasSpec is false");
     expect(runtime.instructions).toContain("root MUST equal one element id");
+    expect(runtime.instructions).toContain("RichMarkdown multiline content must contain actual newline characters");
+    expect(runtime.instructions).toContain('"type": "RichMarkdown"');
+    expect(runtime.instructions).not.toContain('"type": "Markdown"');
+    expect(runtime.instructions.match(/pre-escaped literal/g)).toHaveLength(1);
     expect(runtime.instructions).not.toContain("SCHEMA LAB OVERRIDE:");
     expect(runtime.instructions).not.toContain("Submit the complete Spec as the chrona_plan_output tool argument");
     expect(runtime.runtimeInput.context.planOutput).toEqual({
