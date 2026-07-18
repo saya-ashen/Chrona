@@ -18,6 +18,7 @@ type ReconcileTaskStateInput = {
   taskStatus?: string | null;
   blockReason?: TaskBlockReason | null;
   now?: Date;
+  hasActiveRun?: boolean;
 };
 
 type TaskBlockReason = {
@@ -37,7 +38,7 @@ const noAction: TaskAction = { type: "none", enabled: false, label: "No action a
 
 export function reconcileTaskState(input: ReconcileTaskStateInput): ReconciledTaskState {
   const currentNode = pickCurrentNode(input.graph, input.blockReason);
-  const executionState = deriveExecutionState(input.graph, input.blockReason, input.taskStatus);
+  const executionState = deriveExecutionState(input.graph, input.blockReason, input.taskStatus, input.hasActiveRun);
   const progress = deriveProgress(input.graph);
   const primaryAction = derivePrimaryAction({
     state: executionState,
@@ -88,8 +89,9 @@ function deriveExecutionState(
   graph: EffectivePlanGraph,
   blockReason?: TaskBlockReason | null,
   taskStatus?: string | null,
+  hasActiveRun?: boolean,
 ): TaskExecutionState {
-  return deriveTaskExecutionState({ graph, blockReason, taskStatus });
+  return deriveTaskExecutionState({ graph, blockReason, taskStatus, hasActiveRun });
 }
 
 function pickCurrentNode(graph: EffectivePlanGraph, blockReason?: TaskBlockReason | null) {

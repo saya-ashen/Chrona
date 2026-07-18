@@ -4,6 +4,7 @@ import { executionStatusFromEffectiveGraph } from "./execution-state-machine";
 import { deriveExecutionCheckpoint } from "./execution-checkpoint";
 import { resolveCheckpointAction } from "./execution-actions";
 import type {
+  CheckpointInputFields,
   EffectivePlanGraph,
   ExecutionCommand,
   ExecutionCommandContext,
@@ -66,7 +67,7 @@ export async function continuePlanExecution(
     taskId: string;
     reason: string;
     userInput?: string;
-    inputFields?: Record<string, string>;
+    inputFields?: CheckpointInputFields;
     sessionId?: string;
     nodeId?: string;
     resumeReadyNode?: boolean;

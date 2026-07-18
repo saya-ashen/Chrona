@@ -59,6 +59,9 @@ export interface NodeRuntimeState {
 
 // ─── Checkpoint shared types (originally from checkpoints.ts) ───────
 
+export type CheckpointFieldValue = string | boolean | string[];
+export type CheckpointInputFields = Record<string, CheckpointFieldValue>;
+
 export interface CheckpointResponse {
   id: string;
   planRunId: string;

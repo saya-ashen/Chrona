@@ -1,4 +1,5 @@
 import type { PlanPatch } from "../ai-plan-blueprint";
+import type { CheckpointInputFields } from "./checkpoints";
 import type { GraphMutationOperation } from "./graph";
 import type { NodeActionForm } from "./node";
 import type { NodeResult, PlanOutputPatch } from "./node-result";
@@ -50,7 +51,7 @@ export type ExecutionActionInput =
       action: "resume_with_input";
       sessionId?: string;
       nodeId?: string;
-      inputFields: Record<string, string>;
+      inputFields: CheckpointInputFields;
       workBlockId?: string;
       idempotencyKey?: string;
     }

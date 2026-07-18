@@ -4,6 +4,7 @@
 
 import type { GraphNodeExecutionEvidence } from "../evidence";
 import type { GraphExecutionStatus } from "../status";
+import type { CheckpointInputFields } from "@chrona/contracts/ai";
 import type {
   EffectivePlanGraph,
   EffectivePlanNode,
@@ -29,7 +30,7 @@ export type GraphNodeExecutionResult =
       summary: string;
       evidence: GraphNodeExecutionEvidence;
       output?: unknown;
-      inputFields?: Record<string, string>;
+      inputFields?: CheckpointInputFields;
       selectedBranch?: NodeResult["selectedBranch"];
     }
   | {
@@ -107,7 +108,7 @@ export type GraphNodeExecutorInput<TContext = unknown> = {
   trigger: GraphExecutionTrigger;
   runtimeName: string;
   userInput?: string;
-  inputFields?: Record<string, string>;
+  inputFields?: CheckpointInputFields;
   context: TContext;
   signal?: AbortSignal;
 };
@@ -158,7 +159,7 @@ export type RunGraphExecutionInput<TContext = unknown> = {
   maxSteps?: number;
   forcedNodeId?: string;
   userInput?: string;
-  inputFields?: Record<string, string>;
+  inputFields?: CheckpointInputFields;
   forcedReplaceStatus?: NonNullable<NodeResult["status"]>;
   maxConcurrency?: number;
   control?: GraphExecutionControl;

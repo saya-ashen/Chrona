@@ -31,6 +31,17 @@ describe("currentExecutionStatusFromEffectiveGraph", () => {
       hasActiveRun: true,
     })).toBe("running");
   });
+  it("lets an active provider run override stale failed graph evidence", () => {
+    expect(currentExecutionStatusFromEffectiveGraph({
+      effective: effectiveGraph({
+        nodes: [{ id: "node-1", status: "failed", reachable: true } as never],
+        failedNodeIds: ["node-1"],
+      }),
+      hasActiveExecutionSession: true,
+      hasActiveRun: true,
+    })).toBe("running");
+  });
+
 
   it("preserves failed evidence after the active execution session closes", () => {
     expect(currentExecutionStatusFromEffectiveGraph({

@@ -14,8 +14,17 @@ function isTerminalStatus(status: PlanNodeDataModel["status"]) {
   return status === "done" || status === "skipped";
 }
 
-function hasSubmittedInputFields(inputFields: Record<string, string> | undefined) {
-  return Boolean(inputFields && Object.values(inputFields).some((value) => value.trim()));
+function stringInputFields(inputFields: PlanNodeDataModel["inputFields"]): Record<string, string> | undefined {
+  if (!inputFields) return undefined;
+  return Object.fromEntries(
+    Object.entries(inputFields).filter((entry): entry is [string, string] => typeof entry[1] === "string"),
+  );
+}
+
+function hasSubmittedInputFields(inputFields: PlanNodeDataModel["inputFields"]) {
+  return Boolean(inputFields && Object.values(inputFields).some((value) =>
+    Array.isArray(value) ? value.length > 0 : typeof value === "boolean" ? true : value.trim().length > 0,
+  ));
 }
 
 export function useActionSpecRenderConfig({
@@ -100,7 +109,7 @@ export function useActionSpecRenderConfig({
       options: f.options,
     })),
     actions: normalizedActions,
-    submittedValues: node.inputFields,
+    submittedValues: stringInputFields(node.inputFields),
     isReadOnly,
     nodeNextAction: node.nextAction,
     disabledReason: actionDisabledReason ?? undefined,

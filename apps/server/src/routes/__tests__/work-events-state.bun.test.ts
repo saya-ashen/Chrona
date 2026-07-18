@@ -382,6 +382,43 @@ describe("POST /work/:taskId/commands — action refresh events", () => {
       workBlockId: null,
     });
   });
+  it("emits running header state immediately when retrying a node", async () => {
+    const taskId = "task-1";
+    state.planState = {
+      taskId,
+      aiPlanGenerationStatus: "accepted",
+      savedPlan: { id: "plan-1", status: "accepted", revision: 1 },
+      generationSession: null,
+    };
+
+    const received = waitForEventsMatching(
+      taskId,
+      (events) => events.some((event) => event.type === "execution.result"),
+    );
+    const response = await postCommand(taskId, {
+      type: "execution.action",
+      action: "retry_node",
+      nodeId: "node-1",
+      idempotencyKey: "retry-test",
+    });
+
+    expect(response.status).toBe(202);
+    const events = await received;
+    const stateUpdates = events.filter((event) => event.type === "state.update") as Array<
+      TaskProjectionEvent & { updates?: Record<string, unknown> }
+    >;
+    expect(stateUpdates[0]?.updates).toMatchObject({
+      "/execution/status": "running",
+      "/execution/can-start": false,
+      "/execution/can-pause": true,
+      "/execution/can-stop": true,
+    });
+    expect(state.dispatchedActions.at(-1)?.action).toMatchObject({
+      action: "retry_node",
+      nodeId: "node-1",
+    });
+  });
+
 
   it("emits pause-session header state with Stop visible and Start hidden", async () => {
     const taskId = "task-1";

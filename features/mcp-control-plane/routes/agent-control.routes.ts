@@ -2,7 +2,7 @@ import { Hono } from "hono";
 import { z } from "zod";
 import { handleControlAction, ControlRouteError, validateRunToken } from "@chrona/engine";
 import { agentControlActionBodySchema } from "@chrona/contracts";
-import { error, internalServerError, json } from "@shared/http/server";
+import { error, internalServerError, json, toHttpError } from "@shared/http/server";
 
 const controlRequestSchema = z.object({
   body: agentControlActionBodySchema,
@@ -48,6 +48,10 @@ export function createAgentControlRoutes() {
     } catch (cause) {
       if (cause instanceof ControlRouteError) {
         return error(c, cause.message, cause.status);
+      }
+      const httpError = toHttpError(cause);
+      if (httpError) {
+        return error(c, httpError.message, httpError.status);
       }
       return internalServerError(c, "POST /agent/control", cause, "Failed to handle agent control action");
     }

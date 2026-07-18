@@ -1,4 +1,4 @@
-import type { CheckpointResponse } from "./checkpoints";
+import type { CheckpointInputFields, CheckpointResponse } from "./checkpoints";
 import type { NodeActionForm, WaitKind } from "./node";
 import type { Spec } from "@chrona/ui-protocol";
 
@@ -58,7 +58,7 @@ export interface NodeResult {
   attemptId?: string;
   status?: "current" | "stale" | "obsolete" | "invalidated" | "rejected";
   outputSummary?: string;
-  inputFields?: Record<string, string>;
+  inputFields?: CheckpointInputFields;
   evidence?: NodeResultEvidence;
   artifactRefs?: ArtifactRef[];
   checkpointResponse?: CheckpointResponse["response"];

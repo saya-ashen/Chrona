@@ -13,6 +13,7 @@ import type {
 import type { GraphMutationOperation, NodeResult } from "../types";
 import type { GraphExecutionControl } from "../types/dispatch";
 import type { GraphExecutionEvent, GraphExecutionOutcome } from "../execution/types";
+import type { CheckpointInputFields } from "@chrona/contracts/ai";
 
 export type GraphRuntimeCommand =
   | {
@@ -29,7 +30,7 @@ export type GraphRuntimeCommand =
       input: {
         nodeId: string;
         value: string;
-        fields: Record<string, string>;
+        fields: CheckpointInputFields;
         replaceStatus?: NonNullable<NodeResult["status"]>;
       };
     }

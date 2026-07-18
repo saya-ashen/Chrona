@@ -79,9 +79,9 @@ function hasNodeActionPayload(node: PlanNodeDataModel | null) {
   if (!node) return false;
   if ((node.availableActions?.length ?? 0) > 0) return true;
   if ((node.interactiveFields?.length ?? 0) === 0) return false;
-  const submittedInput =
-    node.inputFields &&
-    Object.values(node.inputFields).some((value) => value.trim());
+  const submittedInput = node.inputFields && Object.values(node.inputFields).some((value) =>
+    Array.isArray(value) ? value.length > 0 : typeof value === "boolean" ? true : value.trim().length > 0,
+  );
   return (
     !(node.status === "done" || node.status === "skipped") || !submittedInput
   );
@@ -1875,11 +1875,13 @@ export function TaskWorkspacePlanSection({
       ? currentOperationAction.spec
       : apiCurrentOperationSpec ?? currentOperationAction.spec;
   const currentOperationHandlers = useMemo(
-    () => ({
-      ...commandCenterActionHandlers,
-      ...currentOperationAction.handlers,
-    }),
-    [commandCenterActionHandlers, currentOperationAction.handlers],
+    () => currentExecution?.checkpoint && apiCurrentOperationSpec
+      ? commandCenterActionHandlers
+      : {
+          ...commandCenterActionHandlers,
+          ...currentOperationAction.handlers,
+        },
+    [apiCurrentOperationSpec, commandCenterActionHandlers, currentExecution?.checkpoint, currentOperationAction.handlers],
   );
   const operationState = resolveTaskWorkspaceOperationState({
     plan,
@@ -2260,7 +2262,7 @@ export function TaskWorkspacePlanSection({
         <div
           className={
             graphMode === "compact"
-              ? "grid min-h-[560px] flex-1 gap-4 p-4 xl:min-h-0 xl:grid-cols-[minmax(0,0.42fr)_minmax(36rem,1.58fr)]"
+              ? "grid min-h-[560px] flex-1 gap-4 p-4 xl:min-h-0 xl:grid-cols-[minmax(20rem,0.58fr)_minmax(36rem,1.42fr)]"
               : "grid min-h-[560px] flex-1 gap-4 p-4 xl:min-h-0 xl:grid-cols-[minmax(0,1.12fr)_minmax(22rem,0.68fr)]"
           }
         >
@@ -2268,7 +2270,7 @@ export function TaskWorkspacePlanSection({
             aria-label={copy.executionFlow ?? "Execution flow"}
             className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[1.75rem] border border-border bg-background/70"
           >
-            <div className="min-h-0 flex-1">
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
               <TaskWorkspacePlanContent
                 label={label}
                 graphPlan={graphPlan}

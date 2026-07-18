@@ -10,6 +10,8 @@ import {
   type GraphSubmittedNodeResult,
 } from "@chrona/graph-runtime";
 import type {
+  CheckpointFieldValue,
+  CheckpointInputFields,
   EffectivePlanGraph,
   ExecutionCommand,
   ExecutionCommandContext,
@@ -100,9 +102,14 @@ function noPlanResponse(taskId: string, sessionId?: string | null): PlanExecutio
   };
 }
 
-function formatInputFields(fields: Record<string, string>) {
+function formatInputFieldValue(value: CheckpointFieldValue): string {
+  if (Array.isArray(value)) return value.join(", ");
+  return String(value);
+}
+
+function formatInputFields(fields: CheckpointInputFields) {
   return Object.entries(fields)
-    .map(([key, value]) => `${key}: ${value}`)
+    .map(([key, value]) => `${key}: ${formatInputFieldValue(value)}`)
     .join("\n");
 }
 
@@ -460,6 +467,20 @@ async function executeCommandUnlocked(
   const runtime = await ensureNativePlanRun(taskId, requestedWorkBlockId);
   if (!runtime) return noPlanResponse(taskId, context.sessionId);
   const workBlockId = requestedWorkBlockId ?? runtime.workBlockId ?? null;
+  if (command.type === "retry_node") {
+    const activeProviderRun = await db.taskPlanProviderRun.findFirst({
+      where: {
+        taskId,
+        planId: runtime.planId,
+        status: { in: ["running", "waiting_for_approval"] },
+        nodeAttempt: { nodeId: command.nodeId },
+      },
+      select: { id: true },
+    });
+    if (activeProviderRun) {
+      return getCurrentExecution({ taskId, workBlockId });
+    }
+  }
 
   const contextSessionId = context.sessionId ?? undefined;
   const existingContextSession = contextSessionId

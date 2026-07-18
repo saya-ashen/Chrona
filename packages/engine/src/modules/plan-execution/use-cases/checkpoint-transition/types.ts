@@ -1,4 +1,5 @@
 import type {
+  CheckpointInputFields,
   EffectivePlanGraph,
   ExecutionCheckpoint,
   PlanExecutionResult,
@@ -16,7 +17,7 @@ export type ContinuePlanExecution = (input: {
   taskId: string;
   reason: string;
   userInput?: string;
-  inputFields?: Record<string, string>;
+  inputFields?: CheckpointInputFields;
   sessionId?: string;
   nodeId?: string;
   workBlockId?: string | null;

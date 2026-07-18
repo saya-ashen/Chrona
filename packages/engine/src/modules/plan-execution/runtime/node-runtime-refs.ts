@@ -163,6 +163,7 @@ function compactPreviousResults(input: {
       nodeRef: refForNode(input.history, node.id).ref,
       title: node.title,
       summary: outputSummary(node),
+      ...(node.result?.inputFields ? { inputFields: node.result.inputFields } : {}),
     }));
   const globalItems = completed
     .filter((node) => !matchesDependency(node, directDependencyIds))

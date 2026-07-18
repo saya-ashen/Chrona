@@ -37,10 +37,16 @@ import {
   type ColumnDef,
   type SortingState,
 } from "@tanstack/react-table";
+import { useBoundProp } from "@json-render/react";
 import { chronaCatalog } from "@chrona/ui-protocol";
 import {
   Badge,
   Button,
+  Checkbox,
+  Field,
+  FieldDescription,
+  FieldLabel,
+  Label,
   Calendar,
   cn,
   Popover,
@@ -1412,17 +1418,74 @@ function WorkspaceTable({ props }: { props: WorkspaceTableProps }) {
   );
 }
 
+
 /**
  * The Chrona workspace registry: standard primitives render with the prebuilt
  * `@json-render/shadcn` components (they inherit Chrona's Tailwind CSS-variable
  * theme); domain components (`RichMarkdown`, `JsonView`, `FileRef`, `ResultSummary`,
  * `ActivityRow`, `ToolDetails`, `CollapsibleText`) render with Chrona JSX.
- *
  * Actions are declared required by the catalog but are only exercised by the
- * Node-action panel (Phase 3), which wires real dispatch via providers; until
- * then the handlers throw loudly if ever invoked (activity/result specs emit no
- * actions).
+ * Node-action panel, which wires real dispatch via providers.
  */
+function CheckpointChoiceField({
+  props,
+  bindings,
+}: {
+  props: {
+    label: string;
+    name: string;
+    description?: string;
+    selection: "single" | "multiple";
+    options: Array<{
+      value: string;
+      label: string;
+      description?: string;
+      recommended?: boolean;
+    }>;
+    value?: string | string[] | { $bindState: string };
+    required?: boolean;
+  };
+  bindings?: Record<string, string>;
+}) {
+  const propValue = typeof props.value === "object" && !Array.isArray(props.value) ? undefined : props.value;
+  const [value, setValue] = useBoundProp<string | string[]>(propValue, bindings?.value);
+  const selected = Array.isArray(value) ? value : value ? [value] : [];
+  const selectOption = (optionValue: string, checked: boolean) => {
+    if (props.selection === "single") {
+      setValue(checked ? optionValue : "");
+      return;
+    }
+    setValue(checked
+      ? [...new Set([...selected, optionValue])]
+      : selected.filter((entry) => entry !== optionValue));
+  };
+
+  return (
+    <Field className="min-w-0 gap-2">
+      <FieldLabel>{props.label}{props.required ? <span aria-hidden="true"> *</span> : null}</FieldLabel>
+      {props.description ? <FieldDescription>{props.description}</FieldDescription> : null}
+      <div className="grid min-w-0 gap-2 sm:grid-cols-2">
+        {props.options.map((option) => (
+          <Label key={option.value} className="flex min-w-0 items-start gap-2 rounded-lg border border-border/60 p-2.5 font-normal">
+            <Checkbox
+              checked={selected.includes(option.value)}
+              onCheckedChange={(next) => selectOption(option.value, next === true)}
+              aria-label={option.label}
+            />
+            <span className="min-w-0 space-y-0.5">
+              <span className="flex flex-wrap items-center gap-1 text-sm font-medium leading-5">
+                {option.label}
+                {option.recommended ? <Badge variant="secondary">Recommended</Badge> : null}
+              </span>
+              {option.description ? <span className="block text-xs leading-4 text-muted-foreground">{option.description}</span> : null}
+            </span>
+          </Label>
+        ))}
+      </div>
+    </Field>
+  );
+}
+
 export const { registry: workspaceRegistry } = defineRegistry(chronaCatalog, {
   components: {
     // standard primitives (shadcn)
@@ -1470,6 +1533,7 @@ export const { registry: workspaceRegistry } = defineRegistry(chronaCatalog, {
     Badge: shadcnComponents.Badge,
     Alert: shadcnComponents.Alert,
     Button: shadcnComponents.Button,
+    CheckpointChoiceField,
     Link: shadcnComponents.Link,
     Input: shadcnComponents.Input,
     Textarea: shadcnComponents.Textarea,

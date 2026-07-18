@@ -111,6 +111,10 @@ describe("node runtime refs", () => {
         nodeId: "dependency-real-123",
         status: "completed",
         outputSummary: "Weather script requirements confirmed.",
+        inputFields: {
+          channels: ["official", "euraxess"],
+          includeRolling: true,
+        },
       } as unknown as EffectivePlanNode["result"],
     });
     const unrelated = node({
@@ -151,6 +155,10 @@ describe("node runtime refs", () => {
         nodeRef: "N20260516-01",
         title: "Confirm requirements",
         summary: "Weather script requirements confirmed.",
+        inputFields: {
+          channels: ["official", "euraxess"],
+          includeRolling: true,
+        },
       },
     ]);
     expect(input.context.globalSummary).toBe(
@@ -294,10 +302,13 @@ describe("node runtime refs", () => {
     expect(runtime.instructions).toContain("Current Node Context JSON.context.planOutput");
     expect(runtime.instructions).toContain("context.planOutput.hasSpec is false");
     expect(runtime.instructions).toContain("root MUST equal one element id");
-    expect(runtime.instructions).toContain("RichMarkdown multiline content must contain actual newline characters");
     expect(runtime.instructions).toContain('"type": "RichMarkdown"');
+    expect(runtime.instructions).toContain("RichMarkdown.content is an ordinary Markdown string");
+    expect(runtime.instructions).toContain(
+      '"content": "## Key findings\\n\\n- Finding one\\n- Finding two"',
+    );
+    expect(runtime.instructions).not.toContain("## Key findings\n\n- Finding one\n- Finding two");
     expect(runtime.instructions).not.toContain('"type": "Markdown"');
-    expect(runtime.instructions.match(/pre-escaped literal/g)).toHaveLength(1);
     expect(runtime.instructions).not.toContain("SCHEMA LAB OVERRIDE:");
     expect(runtime.instructions).not.toContain("Submit the complete Spec as the chrona_plan_output tool argument");
     expect(runtime.runtimeInput.context.planOutput).toEqual({

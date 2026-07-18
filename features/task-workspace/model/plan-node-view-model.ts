@@ -1,8 +1,11 @@
-import type { CheckpointActionKind,
-ExecutionActionInput,
-ExecutionCheckpoint,
-NodeResult,
-NodeResultEvidence, } from "@chrona/contracts"
+import type {
+  CheckpointActionKind,
+  CheckpointInputFields,
+  ExecutionActionInput,
+  ExecutionCheckpoint,
+  NodeResult,
+  NodeResultEvidence,
+} from "@chrona/contracts";
 
 export type PlanNodeKind = "task" | "checkpoint" | "condition" | "wait" | "step" | "user_input";
 
@@ -89,7 +92,7 @@ export type PlanNodeDataModel = {
   nextAction?: string | null;
   completionSummary?: string | null;
   result?: NodeResult | null;
-  inputFields?: Record<string, string>;
+  inputFields?: CheckpointInputFields;
   resultEvidence?: NodeResultEvidence | null;
   branchLabels?: string[];
   options?: string[];

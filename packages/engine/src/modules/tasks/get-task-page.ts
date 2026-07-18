@@ -228,11 +228,15 @@ export async function getTaskPage(input: { taskId: string; workBlockId?: string 
         readinessReason: runnability.summary,
         taskStatus: task.status,
         blockReason: readBlockReason(task),
+        hasActiveRun: latestRun?.status === "Pending" || latestRun?.status === "Running",
       })
     : null;
-  const taskExecutionState = orchestratorState?.summary.executionState ?? deriveTaskExecutionState({
+  const taskExecutionState = deriveTaskExecutionState({
+    graph: savedPlan?.effectivePlan ?? null,
     taskStatus: task.status,
     runStatus: latestRun?.status ?? null,
+    hasActiveRun: latestRun?.status === "Pending" || latestRun?.status === "Running",
+    blockReason: readBlockReason(task),
   });
   const latestRunPresentationStatus = taskExecutionStateToRunStatus(taskExecutionState);
 

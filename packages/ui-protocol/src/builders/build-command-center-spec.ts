@@ -145,15 +145,16 @@ export function buildCommandCenterCheckpointSpec(input: {
       const statePath = `/${field.name}`;
       const required = "required" in field && field.required;
       if ("kind" in field && field.kind === "choice") {
-        const options = field.options.map((option) => ({ label: option.label, value: option.value }));
         elements[fieldKey] = {
-          type: field.selection === "multiple" ? "Checkbox" : "Radio",
+          type: "CheckpointChoiceField",
           props: {
             label: field.label,
             name: field.name,
-            options,
+            description: field.description,
+            selection: field.selection,
+            options: field.options,
             value: { $bindState: statePath },
-            ...(required ? { checks: [{ type: "required" }], validateOn: "change" } : {}),
+            required,
           },
         };
       } else if ("kind" in field && field.kind === "boolean") {
@@ -181,7 +182,7 @@ export function buildCommandCenterCheckpointSpec(input: {
     const actionKey = `action:${action.id}`;
     const stateKey = `payload_${action.id}`;
 
-    if (action.requiresPayload) {
+    if (action.requiresPayload && !checkpoint.form) {
       const fieldKey = `field:${action.id}`;
       elements[fieldKey] = {
         type: "Textarea",

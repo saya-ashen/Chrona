@@ -40,6 +40,18 @@ describe("deriveTaskExecutionState", () => {
       runStatus: "Completed",
     })).toBe("failed");
   });
+  it("lets an active run override stale failed graph evidence", () => {
+    expect(deriveTaskExecutionState({
+      graph: graph({
+        nodes: [{ status: "failed" }],
+        failedNodeIds: ["node-1"],
+      }),
+      taskStatus: "Running",
+      runStatus: "Running",
+      hasActiveRun: true,
+    })).toBe("running");
+  });
+
 
   it("keeps terminal task completion ahead of a late failed provider run", () => {
     expect(deriveTaskExecutionState({

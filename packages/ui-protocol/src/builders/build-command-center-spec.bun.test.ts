@@ -145,11 +145,18 @@ describe("buildCommandCenterCheckpointSpec", () => {
       },
     });
 
-    expect(spec.elements["field:channels"]?.type).toBe("Checkbox");
+    expect(spec.elements["field:channels"]).toMatchObject({
+      type: "CheckpointChoiceField",
+      props: {
+        selection: "multiple",
+        options: [{ value: "eu", label: "Europe" }],
+      },
+    });
     expect(spec.elements["field:excludeSelfFunded"]?.type).toBe("Checkbox");
     expect(spec.elements["field:notes"]?.type).toBe("Textarea");
     expect(spec.elements["submit:submit_input"]).toMatchObject({
       on: { press: { action: "submit-checkpoint", params: { values: { $state: "/" } } } },
     });
+    expect(spec.elements["field:submit_input"]).toBeUndefined();
   });
 });

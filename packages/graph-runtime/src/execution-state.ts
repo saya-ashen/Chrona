@@ -1,3 +1,4 @@
+import type { CheckpointInputFields } from "@chrona/contracts/ai";
 import type {
   EffectivePlanGraph,
   ExecutionContextSnapshot,
@@ -100,7 +101,7 @@ export function createExecutionContextSnapshot(input: {
   graphVersion: number;
   runtimeName: string;
   userInput?: string;
-  inputFields?: Record<string, string>;
+  inputFields?: CheckpointInputFields;
   now?: number;
 }): ExecutionContextSnapshot {
   const now = input.now ?? Date.now();

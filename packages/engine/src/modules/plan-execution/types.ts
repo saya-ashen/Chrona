@@ -1,6 +1,7 @@
 import type { GraphExecutionEvent } from "@chrona/graph-runtime";
 import type { ProviderRunEvent } from "@chrona/providers-foundation";
 import type {
+  CheckpointInputFields,
   EffectivePlanGraph,
   ExecutionActionInput,
   NodeActionForm,
@@ -101,7 +102,7 @@ export type AdvanceRuntimeCommand =
       type: "resume_with_input";
       nodeId: string;
       value: string;
-      fields: Record<string, string>;
+      fields: CheckpointInputFields;
       replaceStatus?: NonNullable<NodeResult["status"]>;
     }
   | { type: "resume_after_unblock"; nodeId?: string }

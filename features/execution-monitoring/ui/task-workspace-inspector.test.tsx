@@ -60,4 +60,21 @@ describe("TaskWorkspaceInspector layout", () => {
     const results = screen.getByTestId("execution-results");
     expect(operation.compareDocumentPosition(results) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
+  it("switches between checkpoint input and previous results", async () => {
+    const { user } = await import("@testing-library/user-event").then(({ default: userEvent }) => ({ user: userEvent.setup() }));
+    render(
+      <TaskWorkspaceInspector
+        {...commonProps}
+        currentExecution={{ status: "waiting_for_user", checkpoint: { id: "checkpoint-1" } } as never}
+        operationPanel={<div data-testid="checkpoint-form">Checkpoint form</div>}
+        commandCenterCopy={{ outputTab: "Results" }}
+      />,
+    );
+
+    expect(screen.getByTestId("checkpoint-form")).toBeVisible();
+    expect(screen.queryByTestId("execution-results")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("tab", { name: "Results" }));
+    expect(screen.getByTestId("execution-results")).toBeVisible();
+    expect(screen.queryByTestId("checkpoint-form")).not.toBeInTheDocument();
+  });
 });

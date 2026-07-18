@@ -93,12 +93,25 @@ export function derivePlanRunFromRuntime(input: {
     ]),
   );
 
+  const checkpointResponses = effective.nodes.flatMap((node) => {
+    if (node.type !== "checkpoint" || !node.result?.inputFields) return [];
+    const attempt = input.attempts.findLast((candidate) => candidate.id === node.result?.attemptId);
+    return [{
+      id: `checkpoint_response_${input.compiledPlan.id}_${node.id}_${node.result.attemptId ?? "current"}`,
+      planRunId: existingRun.id,
+      nodeId: node.id,
+      response: node.result.inputFields,
+      submittedAt: attempt?.finishedAt ?? attempt?.startedAt ?? now,
+    }];
+  });
+
   return {
     ...existingRun,
     status: input.status
       ? planRunStatusForExecutionStatus(input.status)
       : existingRun.status,
     nodeStates,
+    checkpointResponses,
     attempts: input.attempts.map(toLegacyNodeExecutionAttempt),
     startedAt:
       existingRun.startedAt ??

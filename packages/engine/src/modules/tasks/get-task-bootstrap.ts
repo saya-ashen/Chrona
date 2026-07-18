@@ -106,6 +106,11 @@ export async function getTaskBootstrap(input: { taskId: string; workBlockId?: st
     where: { id: input.taskId },
     include: {
       projection: true,
+      runs: {
+        where: selectedWorkBlockId === null ? {} : { workBlockId: selectedWorkBlockId },
+        orderBy: { createdAt: "desc" },
+        take: 1,
+      },
       workspace: { select: { defaultRuntime: true } },
       workBlocks: {
         where: { status: { in: ["Scheduled", "Active", "Completed"] } },
@@ -169,6 +174,7 @@ export async function getTaskBootstrap(input: { taskId: string; workBlockId?: st
         immutableFields: ["title", "scheduledStartAt", "scheduledEndAt"] as const,
       }
     : null;
+  const latestRun = task.runs[0] ?? null;
   const recurrenceOccurrences = [
     { id: task.id, title: task.title, status: task.status, workBlocks: task.workBlocks },
     ...recurrenceSeriesTasks,
@@ -194,6 +200,7 @@ export async function getTaskBootstrap(input: { taskId: string; workBlockId?: st
         readinessReason: runnability.summary,
         taskStatus: task.status,
         blockReason: readBlockReason(task),
+        hasActiveRun: latestRun?.status === "Pending" || latestRun?.status === "Running",
       })
     : null;
 

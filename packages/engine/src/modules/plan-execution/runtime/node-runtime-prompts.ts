@@ -68,6 +68,35 @@ function generatedFilesContext(nodeRef: string) {
   };
 }
 
+const PLAN_OUTPUT_UPDATE_EXAMPLE = JSON.stringify({
+  patches: [
+    {
+      op: "add",
+      path: "/elements/marketSummary",
+      value: {
+        type: "Card",
+        props: { title: "Market summary" },
+        children: ["marketSummaryBody"],
+      },
+    },
+    {
+      op: "add",
+      path: "/elements/marketSummaryBody",
+      value: {
+        type: "RichMarkdown",
+        props: { content: "## Key findings\n\n- Finding one\n- Finding two" },
+        children: [],
+      },
+    },
+    {
+      op: "add",
+      path: "/elements/<currentRootId>/children/-",
+      value: "marketSummary",
+    },
+  ],
+  summary: "Added market summary section",
+}, null, 2);
+
 function nodeTypeInstructions(node: EffectivePlanNode): string {
   switch (node.type) {
     case "task":
@@ -75,7 +104,7 @@ function nodeTypeInstructions(node: EffectivePlanNode): string {
 
       Read Current Node Context JSON.context.planOutput before patching. If context.planOutput.hasSpec is false, bootstrap once with /root and every required /elements/<id> entry in the same chrona_plan_output call. If context.planOutput.hasSpec is true, NEVER patch /root, /elements, or replace the existing root element; preserve context.planOutput.root and append node-specific sections under that existing layout. Existing element ids are summarized in context.planOutput.elementIds; existing root children are summarized in context.planOutput.rootChildren.
 
-      For later user-visible deliverables, pass "patches" as incremental JSON Patch operations. Example later update call: { patches: [{ "op": "add", "path": "/elements/marketSummary", "value": { "type": "Card", "props": { "title": "Market summary" }, "children": ["marketSummaryBody"] } }, { "op": "add", "path": "/elements/marketSummaryBody", "value": { "type": "RichMarkdown", "props": { "content": "**Key findings**\n\n- Finding one\n- Finding two" }, "children": [] } }, { "op": "add", "path": "/elements/<currentRootId>/children/-", "value": "marketSummary" }], summary: "Added market summary section" }. RichMarkdown multiline content must contain actual newline characters; the tool SDK handles JSON serialization, so never submit pre-escaped literal \\n text.
+      For later user-visible deliverables, pass "patches" as incremental JSON Patch operations. RichMarkdown.content is an ordinary Markdown string. Follow this valid JSON argument example:\n${PLAN_OUTPUT_UPDATE_EXAMPLE}
 
       Final Spec after applying patches must be valid and closed: root must reference an existing element id, every child id referenced in any children array must exist as an element id, every element id must be unique, and no element may be omitted as a placeholder unless that element is also declared in elements. For existing plan output, satisfy these rules by preserving the current root and adding/appending elements; do not rebuild the whole Spec.
 

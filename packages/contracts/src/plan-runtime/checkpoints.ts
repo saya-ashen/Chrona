@@ -3,6 +3,8 @@ import type { CheckpointActionKind } from "./_leaf";
 
 export type {
   CheckpointResponse,
+  CheckpointFieldValue,
+  CheckpointInputFields,
   ExecutionCheckpointKind,
   CheckpointActionKind,
   CheckpointFormField,

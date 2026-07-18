@@ -27,6 +27,7 @@ export type TaskExecutionStateInput = {
   taskStatus?: string | null;
   runStatus?: string | null;
   executionSessionStatus?: string | null;
+  hasActiveRun?: boolean;
 };
 
 const TERMINAL_TASK_STATUSES = new Set(["Completed", "Done", "Cancelled"]);
@@ -105,6 +106,10 @@ function firstGraphExecutionState(graph: TaskExecutionGraphInput): TaskExecution
 export function deriveTaskExecutionState(input: TaskExecutionStateInput): TaskExecutionState {
   const graph = input.graph ?? null;
   const taskStatus = input.taskStatus ?? null;
+
+  if (taskStatus === "Cancelled") return "cancelled";
+  if (input.hasActiveRun) return "running";
+
   const graphState = graph ? firstGraphExecutionState(graph) : null;
   if (graphState) return graphState;
 
@@ -115,7 +120,6 @@ export function deriveTaskExecutionState(input: TaskExecutionStateInput): TaskEx
   if (blockState) return blockState;
 
   if (taskStatus && TERMINAL_TASK_STATUSES.has(taskStatus)) {
-    if (taskStatus === "Cancelled") return "cancelled";
     return "completed";
   }
 

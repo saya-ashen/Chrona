@@ -3,6 +3,7 @@ import type {
   TaskExecutor,
   TaskMode,
 } from "../ai-plan-blueprint";
+import type { CheckpointInputFields } from "./_leaf";
 
 export type TaskPriority = "Low" | "Medium" | "High" | "Urgent";
 
@@ -204,6 +205,7 @@ export interface NodeRuntimeInput {
       nodeRef: string;
       title: string;
       summary?: string;
+      inputFields?: CheckpointInputFields;
     }>;
     globalSummary?: string;
     planOutput: {

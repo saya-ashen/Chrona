@@ -306,6 +306,8 @@ export type {
   WebPlanNodeStatus,
   NodeExecutionAttempt,
   CheckpointResponse,
+  CheckpointFieldValue,
+  CheckpointInputFields,
   CheckpointActionKind,
   SubmitCheckpointActionInput,
   ArtifactRef,

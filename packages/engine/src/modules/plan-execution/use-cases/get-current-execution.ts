@@ -35,6 +35,8 @@ export function currentExecutionStatusFromEffectiveGraph(input: {
   taskStatus?: string;
 }) {
   if (input.taskStatus === "Cancelled") return "cancelled";
+  if (input.hasActiveRun) return "running";
+  if (input.hasActiveExecutionSession && input.effective.runningNodeIds.length > 0) return "running";
   return input.hasActiveExecutionSession || input.hasActiveRun || hasExecutionEvidence(input.effective)
     ? executionStatusFromEffectiveGraph(input.effective)
     : "started";

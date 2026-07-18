@@ -526,9 +526,10 @@ export function useTaskWorkspacePlanState(
       if (shouldRefreshExecutionSnapshot(event)) {
         void currentExecutionQuery.refetch();
         void planStateQuery.refetch();
+        void refreshWorkspace();
       }
     }
-  }, [currentExecutionQuery, planStateQuery, selectedWorkBlockId, workspaceEvents]);
+  }, [currentExecutionQuery, planStateQuery, refreshWorkspace, selectedWorkBlockId, workspaceEvents]);
 
   useEffect(() => {
     if (!plan) {
@@ -623,18 +624,14 @@ export function useTaskWorkspacePlanState(
   const dispatchExecutionAction = useCallback(async (action: ExecutionActionInput) => {
     setRuntimeEvents([]);
     const result = await dispatchTaskExecutionAction(task.id, action, selectedWorkBlockId);
-    if (action.action === "cancel_session" || action.action === "pause_session" || action.action === "restart_from_beginning") {
-      await refreshExecutionQueries();
-    } else {
-      void refreshExecutionQueries();
-    }
+    await refreshExecutionQueries();
     return result;
   }, [refreshExecutionQueries, selectedWorkBlockId, task.id]);
 
   const submitCheckpointAction = useCallback(async (action: SubmitCheckpointActionInput) => {
     setRuntimeEvents([]);
     const result = await submitTaskCheckpointAction(task.id, action, selectedWorkBlockId);
-    void refreshExecutionQueries();
+    await refreshExecutionQueries();
     return result;
   }, [refreshExecutionQueries, selectedWorkBlockId, task.id]);
 

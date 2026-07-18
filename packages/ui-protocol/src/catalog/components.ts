@@ -226,6 +226,21 @@ const bindableStringSchema = z
   .union([z.string(), stateBindingSchema])
   .optional();
 
+const checkpointChoiceFieldPropsSchema = z.object({
+  label: z.string(),
+  name: z.string(),
+  description: z.string().optional(),
+  selection: z.enum(["single", "multiple"]),
+  options: z.array(z.object({
+    value: z.string(),
+    label: z.string(),
+    description: z.string().optional(),
+    recommended: z.boolean().optional(),
+  })),
+  value: z.union([z.string(), z.array(z.string()), stateBindingSchema]).optional(),
+  required: z.boolean().optional(),
+});
+
 /**
  * The Chrona workspace catalog: the single trust boundary shared by document
  * producers (AI for Node result; backend builders for Node action + Activity)
@@ -257,6 +272,10 @@ export const chronaCatalog = defineCatalog(chronaSchema, {
     Select: shadcn.Select,
     Checkbox: shadcn.Checkbox,
     Radio: shadcn.Radio,
+    CheckpointChoiceField: {
+      props: checkpointChoiceFieldPropsSchema,
+      description: "Runtime-owned single or multiple choice field for structured checkpoint input.",
+    },
     Tabs: shadcn.Tabs,
     Table: tableComponentDefinition,
 

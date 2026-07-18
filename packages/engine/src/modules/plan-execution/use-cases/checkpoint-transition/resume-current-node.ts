@@ -1,11 +1,16 @@
+import type { CheckpointInputFields, CheckpointFieldValue, SubmitCheckpointActionResult } from "@chrona/contracts/ai";
 import { checkpointPayloadFields } from "../../execution-actions";
-import type { SubmitCheckpointActionResult } from "@chrona/contracts/ai";
 import { observerCallbacks } from "./observer";
 import type { CheckpointTransitionInput } from "./types";
 
-function formatInputFields(inputFields: Record<string, string>) {
+function formatFieldValue(value: CheckpointFieldValue): string {
+  if (Array.isArray(value)) return value.join(", ");
+  return String(value);
+}
+
+function formatInputFields(inputFields: CheckpointInputFields) {
   return Object.entries(inputFields)
-    .map(([key, value]) => `${key}: ${value}`)
+    .map(([key, value]) => `${key}: ${formatFieldValue(value)}`)
     .join("\n");
 }
 
