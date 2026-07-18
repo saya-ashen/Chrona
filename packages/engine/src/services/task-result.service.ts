@@ -7,7 +7,37 @@ export function createTaskResultService() {
       try {
         return await tasks.acceptResult(input);
       } catch (cause) {
-        throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.INVALID_TASK_STATE, "Failed to accept task result");
+        throw engineErrorFromUnknown(
+          cause,
+          ENGINE_ERROR_CODES.INVALID_TASK_STATE,
+          "Failed to accept task result",
+        );
+      }
+    },
+    async continueFromResult(
+      input: Parameters<typeof tasks.continueFromResult>[0],
+    ) {
+      try {
+        return await tasks.continueFromResult(input);
+      } catch (cause) {
+        throw engineErrorFromUnknown(
+          cause,
+          ENGINE_ERROR_CODES.INVALID_TASK_STATE,
+          "Failed to continue from task result",
+        );
+      }
+    },
+    async getFollowUpState(
+      input: Parameters<typeof tasks.getResultFollowUpState>[0],
+    ) {
+      try {
+        return await tasks.getResultFollowUpState(input);
+      } catch (cause) {
+        throw engineErrorFromUnknown(
+          cause,
+          ENGINE_ERROR_CODES.INVALID_TASK_STATE,
+          "Failed to get task result follow-up state",
+        );
       }
     },
   };

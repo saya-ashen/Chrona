@@ -9,6 +9,13 @@ import { getTaskActivityPage } from "./task-activity";
 import { getTaskRuntimeContext } from "./get-task-runtime-context";
 import { listTasksByWorkspace } from "./list-tasks";
 import { acceptTaskResult } from "./accept-task-result";
+import { continueFromTaskResult, getTaskResultFollowUpState } from "./continue-from-task-result";
+import {
+  approveResultFileAccess,
+  requestResultFileAccess,
+} from "./result-file-access";
+import { resolveFilePreview } from "./file-preview";
+import { openTaskResultFile } from "./open-task-result-file";
 import { markTaskDone } from "./mark-task-done";
 import { reopenTask } from "./reopen-task";
 import { ensureTaskInWorkspace } from "./task-by-id";
@@ -18,7 +25,9 @@ export class Tasks {
     return createTask(input);
   }
 
-  async update(input: Parameters<typeof updateTask>[0] & { workspaceId?: string }) {
+  async update(
+    input: Parameters<typeof updateTask>[0] & { workspaceId?: string },
+  ) {
     if (input.workspaceId) {
       await ensureTaskInWorkspace(input.taskId, input.workspaceId);
     }
@@ -76,6 +85,36 @@ export class Tasks {
 
   acceptResult(input: Parameters<typeof acceptTaskResult>[0]) {
     return acceptTaskResult(input);
+  }
+
+  continueFromResult(input: Parameters<typeof continueFromTaskResult>[0]) {
+    return continueFromTaskResult(input);
+  }
+
+  getResultFollowUpState(input: { taskId: string }) {
+    return getTaskResultFollowUpState(input.taskId);
+  }
+
+  requestResultFileAccess(
+    input: Parameters<typeof requestResultFileAccess>[0],
+  ) {
+    return requestResultFileAccess(input);
+  }
+
+  approveResultFileAccess(
+    input: Parameters<typeof approveResultFileAccess>[0],
+  ) {
+    return approveResultFileAccess(input);
+  }
+
+  openResultFile(input: Parameters<typeof openTaskResultFile>[0]) {
+    return openTaskResultFile(input);
+  }
+
+  previewResultFile(input: { path: string; canonicalPath: string }) {
+    return resolveFilePreview(input.path, {
+      allowedAbsolutePath: input.canonicalPath,
+    });
   }
 }
 

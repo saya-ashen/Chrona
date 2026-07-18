@@ -1,6 +1,6 @@
 import "@testing-library/jest-dom/vitest";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
@@ -82,7 +82,8 @@ describe("TaskWorkspaceExecutionOverview", () => {
     window.localStorage.clear();
   });
 
-  it("renders Results as primary content and keeps Activity secondary", () => {
+  it("keeps completed transcript prominent without competing with the result", async () => {
+    const user = userEvent.setup();
     const view = createTaskWorkspaceExecutionConsoleView(
       executionMonitoringWorkspaceFixtures.approvalNeeded,
     );
@@ -100,26 +101,75 @@ describe("TaskWorkspaceExecutionOverview", () => {
       screen.getAllByLabelText("Execution overview").length,
     ).toBeGreaterThan(0);
     expect(screen.queryByRole("tab", { name: "Now" })).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("tab", { name: "Results" }),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByRole("tab", { name: "Activity" }),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Results" })).not.toBeInTheDocument();
     expect(
       screen.getByRole("heading", { name: "Final result" }),
     ).toBeInTheDocument();
-    expect(screen.getByText("Activity")).toBeInTheDocument();
+    const transcriptButton = screen.getByRole("button", { name: /Open Agent transcript/ });
+    expect(transcriptButton).toHaveAccessibleName(new RegExp(`${view.activity.length} events`));
+    expect(transcriptButton).toHaveClass("fixed", "right-0");
+    await user.click(transcriptButton);
+    expect(screen.getByRole("dialog", { name: "Agent transcript" })).toBeInTheDocument();
+    expect(screen.getByText(/Intent, tool calls, results/)).toBeInTheDocument();
     expect(screen.getByText("Output")).toBeInTheDocument();
     expect(screen.getByText("AI generated")).toBeInTheDocument();
-    expect(screen.queryByText("Runtime state")).not.toBeInTheDocument();
-    expect(screen.getByText("Activity")).toBeInTheDocument();
     expect(
       screen.queryByRole("region", { name: "Execution progress" }),
     ).not.toBeInTheDocument();
   });
 
-  it("renders Activity as a side timeline in compact plan mode", () => {
+  it("shows tool input, intent, progress, and result in the completed transcript", async () => {
+    const user = userEvent.setup();
+    const view = createTaskWorkspaceExecutionConsoleView(
+      executionMonitoringWorkspaceFixtures.approvalNeeded,
+    );
+    renderOverview(view, {
+      runtimeEvents: [
+        {
+          type: "runtime_event",
+          action: "start_manual",
+          runtimeName: "omp",
+          provider: "omp",
+          runId: "run-1",
+          sequence: 1,
+          timestamp: "2026-05-12T10:00:00.000Z",
+          event: { type: "tool_started", toolName: "read", callId: "call-1", label: "Read", inputSummary: '{\n  "path": "src/app.ts"\n}', preview: "Inspect application source" },
+        },
+        {
+          type: "runtime_event",
+          action: "start_manual",
+          runtimeName: "omp",
+          provider: "omp",
+          runId: "run-1",
+          sequence: 2,
+          timestamp: "2026-05-12T10:00:01.000Z",
+          event: { type: "tool_progress", toolName: "read", callId: "call-1", label: "Read", preview: "Loaded 42 lines" },
+        },
+        {
+          type: "runtime_event",
+          action: "start_manual",
+          runtimeName: "omp",
+          provider: "omp",
+          runId: "run-1",
+          sequence: 3,
+          timestamp: "2026-05-12T10:00:02.000Z",
+          event: { type: "tool_completed", toolName: "read", callId: "call-1", label: "Read", preview: "export const ready = true;" },
+        },
+      ],
+    });
+
+    await user.click(screen.getByRole("button", { name: /Open Agent transcript/ }));
+    const dialog = screen.getByRole("dialog", { name: "Agent transcript" });
+    expect(within(dialog).getByText(/src\/app\.ts/)).toBeInTheDocument();
+    expect(within(dialog).getByText("Inspect application source")).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "View all technical details" })).toBeInTheDocument();
+    await user.click(within(dialog).getByRole("button", { name: "View all technical details" }));
+    expect(within(dialog).getByText("Loaded 42 lines")).toBeInTheDocument();
+    expect(within(dialog).getAllByText("export const ready = true;").length).toBeGreaterThan(0);
+    expect(within(dialog).getByRole("button", { name: "Show less" })).toBeInTheDocument();
+  });
+
+  it("makes running Activity primary with responsive tabs and a desktop timeline", () => {
     const view = createTaskWorkspaceExecutionConsoleView(
       executionMonitoringWorkspaceFixtures.running,
     );
@@ -156,14 +206,15 @@ describe("TaskWorkspaceExecutionOverview", () => {
           }),
         },
       },
+      currentExecution: { status: "running" },
+      isExecutionRunning: true,
     });
 
-    const activity = screen.getByRole("region", { name: "Activity" });
-    expect(activity).toHaveClass("border-l");
-    expect(screen.getByText("done · 128ms")).toBeInTheDocument();
-    expect(screen.queryByText("▸ Activity")).not.toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Activity" })).toHaveAttribute("data-state", "active");
+    expect(screen.getAllByText(/events · live/).length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Read plan").length).toBeGreaterThan(0);
     expect(screen.getByText("Output")).toBeInTheDocument();
-    expect(screen.getByText("Runtime state")).toBeInTheDocument();
+    expect(screen.getAllByText("Agent transcript").length).toBeGreaterThan(0);
   });
 
   it("renders persisted server-driven Trail items once", () => {
@@ -198,53 +249,27 @@ describe("TaskWorkspaceExecutionOverview", () => {
       },
     };
 
-    renderOverview(view, { commandCenter });
+    renderOverview(view, {
+      commandCenter,
+      currentExecution: { status: "running" },
+      isExecutionRunning: true,
+    });
 
-    expect(screen.getByText("Activity")).toBeInTheDocument();
-    expect(screen.getByText("Plan generation update")).toBeInTheDocument();
-    expect(screen.getByText("Requesting AI provider...")).toBeInTheDocument();
-    expect(screen.getAllByText("1 shown · 0 live · 1 saved")).toHaveLength(1);
-    expect(
-      screen.queryByText("0 shown · 0 live · 0 saved"),
-    ).not.toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Activity" })).toHaveAttribute("data-state", "active");
+    expect(screen.getAllByText("Plan generation update").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Requesting AI provider...").length).toBeGreaterThan(0);
   });
 
-  it("groups activity trail into audit categories", () => {
+  it("omits implementation statistics and audit-group chrome from Activity specs", () => {
     const trail = buildCommandCenterTrailTabSpec({
-      activity: [
-        {
-          id: "tool",
-          kind: "tool_completed",
-          title: "Tool completed",
-          summary: "Read plan",
-          description: "Read plan",
-          tone: "success",
-        },
-        {
-          id: "approval",
-          kind: "approval",
-          title: "Approval requested",
-          summary: "Review deploy",
-          description: "Review deploy",
-          tone: "warning",
-        },
-        {
-          id: "artifact",
-          kind: "artifact",
-          title: "Report artifact",
-          summary: "report.md",
-          description: "report.md",
-          tone: "info",
-        },
-        {
-          id: "failure",
-          kind: "task",
-          title: "Run failed",
-          summary: "Provider failed",
-          description: "Provider failed",
-          tone: "danger",
-        },
-      ],
+      activity: [{
+        id: "tool",
+        kind: "tool_completed",
+        title: "Tool completed",
+        summary: "Read plan",
+        description: "Read plan",
+        tone: "success",
+      }],
       runtimeEvents: [],
       copy: { activityTitle: "Activity" },
       toolLabels: {
@@ -256,14 +281,9 @@ describe("TaskWorkspaceExecutionOverview", () => {
       },
     });
 
-    expect(trail.elements.groups?.props?.text).toContain(
-      "provider/tool activity: 1",
-    );
-    expect(trail.elements.groups?.props?.text).toContain("approvals: 1");
-    expect(trail.elements.groups?.props?.text).toContain(
-      "artifacts/results: 1",
-    );
-    expect(trail.elements.groups?.props?.text).toContain("failures/retries: 1");
+    expect(trail.elements.groups).toBeUndefined();
+    expect(trail.elements.stats).toBeUndefined();
+    expect(trail.elements.title).toBeUndefined();
     validateChronaSpec(trail);
   });
 
@@ -285,6 +305,8 @@ describe("TaskWorkspaceExecutionOverview", () => {
         type: "tool_started" as const,
         toolName: "chrona_report_write",
         label: "Writing report",
+        preview: "Generating report sections",
+        inputSummary: '{"section":"architecture"}',
       },
     };
 
@@ -310,12 +332,126 @@ describe("TaskWorkspaceExecutionOverview", () => {
       currentExecution: { status: "running" },
     });
 
-    expect(screen.queryByRole("status")).not.toBeInTheDocument();
-    expect(screen.queryByText("Running now")).not.toBeInTheDocument();
-    expect(screen.getByText("Writing report")).toBeInTheDocument();
+    const currentActivity = screen.getByRole("status", { name: "Execution is producing output" });
+    expect(currentActivity).toHaveTextContent("Writing report");
+    expect(currentActivity).toHaveTextContent("Generating report sections");
+    expect(currentActivity).toHaveTextContent('{"section":"architecture"}');
+    expect(currentActivity).not.toHaveTextContent("Step: Generate report");
   });
 
-  it("hides live status strip before execution has active runtime activity", () => {
+  it("renders the complete live tool process in Activity", () => {
+    const view = createTaskWorkspaceExecutionConsoleView(
+      executionMonitoringWorkspaceFixtures.running,
+    );
+    renderOverview(view, {
+      runtimeEvents: [
+        {
+          type: "runtime_event",
+          action: "start_manual",
+          nodeId: "execute",
+          nodeTitle: "Review architecture",
+          runtimeName: "hermes",
+          provider: "omp",
+          runId: "run-1",
+          sequence: 1,
+          timestamp: "2026-05-12T10:01:00.000Z",
+          event: { type: "tool_started", toolName: "task", label: "task", preview: "Parallelizing audit tracks" },
+        },
+        {
+          type: "runtime_event",
+          action: "start_manual",
+          nodeId: "execute",
+          nodeTitle: "Review architecture",
+          runtimeName: "hermes",
+          provider: "omp",
+          runId: "run-1",
+          sequence: 2,
+          timestamp: "2026-05-12T10:01:01.000Z",
+          event: { type: "tool_progress", toolName: "task", label: "task", preview: "Reviewer is inspecting persistence boundaries" },
+        },
+        {
+          type: "runtime_event",
+          action: "start_manual",
+          nodeId: "execute",
+          nodeTitle: "Review architecture",
+          runtimeName: "omp",
+          provider: "omp",
+          runId: "run-1",
+          sequence: 3,
+          timestamp: "2026-05-12T10:01:02.000Z",
+          event: { type: "raw_event", rawEventType: "turn_start", message: "Agent turn started." },
+        },
+      ],
+      currentExecution: { status: "running" },
+      isExecutionRunning: true,
+    });
+
+    expect(screen.getAllByText("Reviewer is inspecting persistence boundaries").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Agent turn started.")).not.toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Activity" })).toHaveAttribute("data-state", "active");
+  });
+
+  it("updates stage results from assistant output while execution is running", () => {
+    const view = createTaskWorkspaceExecutionConsoleView(
+      executionMonitoringWorkspaceFixtures.running,
+    );
+
+    renderOverview(view, {
+      commandCenter: {
+        documents: {
+          now: nowDocument("Execution running"),
+          output: nowDocument("Output"),
+          trail: buildCommandCenterTrailSpec({
+            activity: [],
+            savedCount: 0,
+            toolLabels: {
+              tool: "Tool",
+              input: "Input",
+              preview: "Preview",
+              duration: "Duration",
+              error: "Error",
+            },
+          }),
+        },
+      },
+      runtimeEvents: [
+        {
+          type: "runtime_event",
+          action: "start_manual",
+          nodeId: "execute",
+          nodeTitle: "Generate report",
+          runtimeName: "hermes",
+          provider: "hermes",
+          runId: "run-1",
+          sequence: 1,
+          timestamp: "2026-05-12T10:01:00.000Z",
+          event: { type: "assistant_text_delta", text: "First paragraph. " },
+        },
+        {
+          type: "runtime_event",
+          action: "start_manual",
+          nodeId: "execute",
+          nodeTitle: "Generate report",
+          runtimeName: "hermes",
+          provider: "hermes",
+          runId: "run-1",
+          sequence: 2,
+          timestamp: "2026-05-12T10:01:01.000Z",
+          event: { type: "assistant_text_delta", text: "Second paragraph." },
+        },
+      ],
+      currentExecution: { status: "running" },
+      isExecutionRunning: true,
+      executionResultState: "waiting",
+    });
+
+    const results = screen.getByRole("region", { name: "Stage results" });
+    expect(results).toHaveTextContent("First paragraph. Second paragraph.");
+    expect(results).toHaveTextContent("Results available");
+    expect(screen.queryByRole("note", { name: "Current step result pending" })).not.toBeInTheDocument();
+  });
+
+  it("explains that stage results are pending while activity stays live", () => {
     const view = createTaskWorkspaceExecutionConsoleView(
       executionMonitoringWorkspaceFixtures.running,
     );
@@ -339,10 +475,15 @@ describe("TaskWorkspaceExecutionOverview", () => {
         },
       },
       currentExecution: { status: "started" },
+      isExecutionRunning: true,
+      executionResultState: "waiting",
     });
 
-    expect(screen.queryByRole("status")).not.toBeInTheDocument();
-    expect(screen.queryByText("Running now")).not.toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Stage results" })).toHaveTextContent("Waiting for output");
+    const liveStatus = screen.getByRole("status", { name: "Execution is producing output" });
+    expect(liveStatus).toHaveTextContent("AI is working");
+    expect(liveStatus).toHaveTextContent("Working on the current step");
+    expect(liveStatus.querySelector(".animate-spin")).toBeInTheDocument();
   });
 
   it("hides live status strip after completion even when stale activity looks active", () => {
@@ -434,7 +575,7 @@ describe("TaskWorkspaceExecutionOverview", () => {
       runtimeEvents: [],
       currentExecution: { status: "running" },
     });
-    expect(screen.getByText("Activity")).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Activity" })).toBeInTheDocument();
     expect(screen.queryByText("正在读取计划")).not.toBeInTheDocument();
 
     rerender(
@@ -452,7 +593,7 @@ describe("TaskWorkspaceExecutionOverview", () => {
         runtimeEvents={[liveEvent]}
       />,
     );
-    expect(screen.getByText("Activity")).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Activity" })).toBeInTheDocument();
 
     return waitFor(() =>
       expect(screen.getAllByText("正在读取计划").length).toBeGreaterThan(0),
@@ -494,11 +635,13 @@ describe("TaskWorkspaceExecutionOverview", () => {
           timestamp: "2026-05-12T10:00:00.000Z",
         },
       ],
+      currentExecution: { status: "running" },
+      isExecutionRunning: true,
     });
-    expect(screen.getByText("Activity")).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "Activity" })).toBeInTheDocument();
 
-    expect(screen.getByText("Plan generation update")).toBeInTheDocument();
-    expect(screen.getByText("Requesting AI provider...")).toBeInTheDocument();
+    expect(screen.getAllByText("Plan generation update").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Requesting AI provider...").length).toBeGreaterThan(0);
   });
 
   it("renders shared plan output and artifacts as primary results content", () => {
@@ -527,6 +670,34 @@ describe("TaskWorkspaceExecutionOverview", () => {
     expect(screen.getByText("Report")).toBeInTheDocument();
     expect(screen.getByText("file://report.md")).toBeInTheDocument();
   });
+
+  it("renders a completed node summary when persisted plan output is absent", () => {
+    const view = createTaskWorkspaceExecutionConsoleView(
+      executionMonitoringWorkspaceFixtures.running,
+    );
+
+    renderOverview(view, {
+      latestCompletedNode: {
+        id: "research",
+        title: "Research target user",
+        objective: "Complete workspace step",
+        phase: "Execution",
+        status: "done",
+        completionSummary: "Research complete",
+      },
+      commandCenter: null,
+      currentExecution: { status: "running" },
+      isExecutionRunning: true,
+      executionResultState: "available",
+    });
+
+    expect(screen.getByRole("region", { name: "Stage results" })).toHaveTextContent(
+      "Research complete",
+    );
+    expect(screen.getByText("Results available")).toBeInTheDocument();
+    expect(screen.queryByRole("note", { name: "Current step result pending" })).not.toBeInTheDocument();
+  });
+
 
   it("does not render command center primary actions inside the execution panel", () => {
     const view = createTaskWorkspaceExecutionConsoleView(
@@ -621,16 +792,10 @@ describe("TaskWorkspaceExecutionOverview", () => {
               props: { gap: "sm" },
               children: ["node-a-output", "node-b-output"],
             },
-            "node-a-output": {
-              type: "Markdown",
-              props: { content: "Alpha result", xChronaSourceNodeId: "node-a" },
-              children: [],
-            },
-            "node-b-output": {
-              type: "Markdown",
-              props: { content: "Beta result", xChronaSourceNodeId: "node-b" },
-              children: [],
-            },
+            "node-a-output": { type: "RichMarkdown", props: { content: "Alpha result", xChronaSourceNodeId: "node-a" },
+            children: [], },
+            "node-b-output": { type: "RichMarkdown", props: { content: "Beta result", xChronaSourceNodeId: "node-b" },
+            children: [], },
           },
         } satisfies UiDocument,
       },
@@ -697,21 +862,12 @@ describe("TaskWorkspaceExecutionOverview", () => {
             props: { gap: "sm" },
             children: ["intro", "alpha", "beta"],
           },
-          intro: {
-            type: "Markdown",
-            props: { content: "Shared overview" },
-            children: [],
-          },
-          alpha: {
-            type: "Markdown",
-            props: { content: "Alpha result", xChronaSourceNodeId: "node-a" },
-            children: [],
-          },
-          beta: {
-            type: "Markdown",
-            props: { content: "Beta result", xChronaSourceNodeId: "node-b" },
-            children: [],
-          },
+          intro: { type: "RichMarkdown", props: { content: "Shared overview" },
+          children: [], },
+          alpha: { type: "RichMarkdown", props: { content: "Alpha result", xChronaSourceNodeId: "node-a" },
+          children: [], },
+          beta: { type: "RichMarkdown", props: { content: "Beta result", xChronaSourceNodeId: "node-b" },
+          children: [], },
         },
       },
       artifacts: [],
@@ -771,11 +927,8 @@ describe("TaskWorkspaceExecutionOverview", () => {
             props: { title: "岗位清单", defaultCollapsed: false },
             children: ["table"],
           },
-          table: {
-            type: "Markdown",
-            props: { content: "| Role | Deadline |\n| --- | --- |" },
-            children: [],
-          },
+          table: { type: "RichMarkdown", props: { content: "| Role | Deadline |\n| --- | --- |" },
+          children: [], },
         },
       },
       artifacts: [],
@@ -853,21 +1006,15 @@ describe("TaskWorkspaceExecutionOverview", () => {
                 props: { title: "Secondary evidence", defaultCollapsed: true },
                 children: ["body"],
               },
-              body: {
-                type: "Markdown",
-                props: { content: "Evidence details" },
-                children: [],
-              },
+              body: { type: "RichMarkdown", props: { content: "Evidence details" },
+              children: [], },
               open: {
                 type: "Card",
                 props: { title: "Primary details", defaultCollapsed: false },
                 children: ["open-body"],
               },
-              "open-body": {
-                type: "Markdown",
-                props: { content: "Visible details" },
-                children: [],
-              },
+              "open-body": { type: "RichMarkdown", props: { content: "Visible details" },
+              children: [], },
             },
           },
         },
@@ -954,11 +1101,8 @@ describe("TaskWorkspaceExecutionOverview", () => {
               props: { title: "Persistent details", defaultCollapsed: false },
               children: ["body"],
             },
-            body: {
-              type: "Markdown",
-              props: { content: "Remembered body" },
-              children: [],
-            },
+            body: { type: "RichMarkdown", props: { content: "Remembered body" },
+            children: [], },
           },
         },
       },
@@ -1040,8 +1184,8 @@ describe("TaskWorkspaceExecutionOverview", () => {
     await user.click(screen.getByRole("button", { name: /Raw log/ }));
 
     expect(
-      screen.getByText(".chrona/outputs/node-1/log.txt"),
-    ).toBeInTheDocument();
+      screen.getAllByText(".chrona/outputs/node-1/log.txt").length,
+    ).toBeGreaterThan(0);
     expect(screen.getByRole("button", { name: /Preview/ })).toBeInTheDocument();
   });
 

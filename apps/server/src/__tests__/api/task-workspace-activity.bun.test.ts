@@ -160,12 +160,13 @@ describe("task workspace activity endpoint", () => {
     });
 
     const res = await app().request(`/api/tasks/${taskId}/activity?limit=10`);
-    const body = await json<{ items: Array<{ tool?: { label?: string; preview?: string } }> }>(res);
+    const body = await json<{ items: Array<{ tool?: { label?: string; resultPreview?: string; state?: string } }> }>(res);
 
     expect(res.status).toBe(200);
     expect(body.items[0]?.tool).toMatchObject({
       label: "bash: python3 -c fetch trending",
-      preview: "python3 -c fetch trending",
+      resultPreview: "python3 -c fetch trending",
+      state: "completed",
     });
   });
 

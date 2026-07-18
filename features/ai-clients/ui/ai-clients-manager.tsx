@@ -35,7 +35,7 @@ import {
 import { aiClientsApi } from "../browser-api";
 import { notifyAiClientsChanged } from "../events";
 
-const DEFAULT_PROVIDER_RUN_TIMEOUT_MS = 30 * 60 * 1000;
+const DEFAULT_PROVIDER_RUN_TIMEOUT_MS = 60 * 60 * 1000;
 
 type AiClientType = "llm" | "hermes" | "debug" | "claude_code" | "codex" | (string & {});
 

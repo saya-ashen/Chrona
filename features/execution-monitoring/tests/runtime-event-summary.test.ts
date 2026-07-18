@@ -39,8 +39,101 @@ describe("summarizeRuntimeEvent", () => {
         toolName: "chrona_task_read",
         label: "Reading task",
         preview: "Read task",
-        input: "task id",
+        inputSummary: '"task id"',
       },
+    });
+  });
+
+  it("keeps tool-call intent visible as live activity preview", () => {
+    const event = summarizeRuntimeEvent("start_manual", {
+      nodeId: "node-a",
+      nodeTitle: "Review architecture",
+      runtimeName: "hermes",
+      event: {
+        type: "tool_call",
+        provider: "omp",
+        runId: "run-1",
+        callId: "call-1",
+        tool: "mcp__codegraph_explore",
+        input: {},
+        status: "pending",
+        preview: "Mapping architectural risk",
+      },
+    } satisfies PlanExecutionRuntimeEvent);
+
+    expect(event.event).toMatchObject({
+      type: "tool_started",
+      label: "mcp__codegraph_explore",
+      callId: "call-1",
+      inputSummary: "{}",
+      preview: "Mapping architectural risk",
+    });
+  });
+
+  it("keeps incremental tool progress visible", () => {
+    const event = summarizeRuntimeEvent("start_manual", {
+      nodeId: "node-a",
+      nodeTitle: "Review architecture",
+      runtimeName: "hermes",
+      event: {
+        type: "tool_progress",
+        provider: "omp",
+        runId: "run-1",
+        callId: "call-1",
+        toolName: "task",
+        preview: "Reviewer is inspecting persistence boundaries",
+      },
+    } satisfies PlanExecutionRuntimeEvent);
+
+    expect(event.event).toEqual({
+      type: "tool_progress",
+      toolName: "task",
+      callId: "call-1",
+      label: "task",
+      preview: "Reviewer is inspecting persistence boundaries",
+    });
+  });
+
+  it("redacts secrets and exposes tool results for the transcript", () => {
+    const started = summarizeRuntimeEvent("start_manual", {
+      nodeId: "node-a",
+      nodeTitle: "Inspect repository",
+      runtimeName: "omp",
+      event: {
+        type: "tool_call",
+        provider: "omp",
+        runId: "run-1",
+        callId: "call-1",
+        tool: "read",
+        input: { path: "src/app.ts", apiKey: "secret-value", nested: { authorization: "Bearer secret" } },
+        status: "pending",
+      },
+    } satisfies PlanExecutionRuntimeEvent);
+    const completed = summarizeRuntimeEvent("start_manual", {
+      nodeId: "node-a",
+      nodeTitle: "Inspect repository",
+      runtimeName: "omp",
+      event: {
+        type: "tool_result",
+        provider: "omp",
+        runId: "run-1",
+        callId: "call-1",
+        tool: "read",
+        result: { content: [{ type: "text", text: "export const ready = true;" }] },
+      },
+    } satisfies PlanExecutionRuntimeEvent);
+
+    expect(started.event).toMatchObject({
+      type: "tool_started",
+      callId: "call-1",
+      inputSummary: expect.stringContaining('"apiKey": "[redacted]"'),
+    });
+    expect(JSON.stringify(started.event)).not.toContain("secret-value");
+    expect(JSON.stringify(started.event)).not.toContain("Bearer secret");
+    expect(completed.event).toMatchObject({
+      type: "tool_completed",
+      callId: "call-1",
+      preview: "export const ready = true;",
     });
   });
 

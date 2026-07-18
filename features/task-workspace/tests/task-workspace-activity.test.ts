@@ -78,7 +78,7 @@ describe("workspace activity helpers", () => {
         toolName: "chrona_plan_read",
         label: "Read plan",
         preview: "Loaded two nodes",
-        input: "taskId=task-1",
+        inputSummary: "taskId=task-1",
       },
     }))).toMatchObject({
       kind: "tool_started",
@@ -93,6 +93,25 @@ describe("workspace activity helpers", () => {
         state: "started",
       },
     });
+  });
+
+  it("keeps tool call identity, input, progress, and result content", () => {
+    const started = runtimeEventToWorkspaceActivity(runtimeEvent({
+      sequence: 1,
+      event: { type: "tool_started", toolName: "read", callId: "call-7", label: "Read", inputSummary: '{\n  "path": "src/app.ts"\n}', preview: "Inspect source" },
+    }));
+    const progress = runtimeEventToWorkspaceActivity(runtimeEvent({
+      sequence: 2,
+      event: { type: "tool_progress", toolName: "read", callId: "call-7", label: "Read", preview: "Loaded 42 lines" },
+    }));
+    const completed = runtimeEventToWorkspaceActivity(runtimeEvent({
+      sequence: 3,
+      event: { type: "tool_completed", toolName: "read", callId: "call-7", label: "Read", preview: "export const ready = true;" },
+    }));
+
+    expect(started?.tool).toMatchObject({ callId: "call-7", inputSummary: expect.stringContaining("src/app.ts"), preview: "Inspect source" });
+    expect(progress?.tool).toMatchObject({ callId: "call-7", preview: "Loaded 42 lines", state: "progress" });
+    expect(completed?.tool).toMatchObject({ callId: "call-7", resultPreview: "export const ready = true;", state: "completed" });
   });
 
   it("keeps assistant deltas separate across provider run boundaries", () => {
@@ -203,6 +222,29 @@ describe("workspace activity helpers", () => {
       summary: "Search: AI PhD jobs · WebSearch: euraxess funded AI · 84 tool uses",
       tone: "info",
     });
+  });
+
+  it("drops routine OMP turn boundaries from live activity", () => {
+    expect(runtimeEventToWorkspaceActivity(runtimeEvent({
+      provider: "omp",
+      runtimeName: "omp",
+      rawEventType: "turn_start",
+      event: {
+        type: "raw_event",
+        rawEventType: "turn_start",
+        message: "Agent turn started.",
+      },
+    }))).toBeNull();
+    expect(runtimeEventToWorkspaceActivity(runtimeEvent({
+      provider: "omp",
+      runtimeName: "omp",
+      rawEventType: "turn_end",
+      event: {
+        type: "raw_event",
+        rawEventType: "turn_end",
+        message: "Agent turn completed.",
+      },
+    }))).toBeNull();
   });
 
   it("drops generic live provider events from activity", () => {

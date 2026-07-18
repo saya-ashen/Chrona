@@ -503,6 +503,31 @@ describe("getTaskPage orchestrator read model", () => {
     }));
   });
 
+  it("keeps an accepted Done task authoritative over its completed work block", async () => {
+    const { task } = await seedTask("Accepted scheduled task");
+    const workBlock = await db.workBlock.create({
+      data: {
+        workspaceId: task.workspaceId,
+        taskId: task.id,
+        title: "Accepted occurrence",
+        scheduledStartAt: new Date("2026-07-15T01:00:00.000Z"),
+        scheduledEndAt: new Date("2026-07-15T02:00:00.000Z"),
+        status: "Completed",
+        trigger: "manual",
+      },
+    });
+    await db.task.update({
+      where: { id: task.id },
+      data: { status: "Done", completedAt: new Date("2026-07-15T03:00:00.000Z") },
+    });
+
+    const page = await getTaskBootstrap({ taskId: task.id, workBlockId: workBlock.id });
+
+    expect(page.task.status).toBe("Done");
+    expect(page.task.currentWorkBlock?.status).toBe("Completed");
+    expect(page.task.scheduleStatus).toBe("Completed");
+  });
+
   it("ignores stale stored block reasons for completed tasks", async () => {
     const { workspace, task } = await seedTask("Completed stale blocker task");
     const compiledPlan = makeCompiledPlan();
@@ -747,7 +772,7 @@ describe("getTaskPage orchestrator read model", () => {
         actorType: "runtime",
         actorId: "hermes",
         source: "provider",
-        payload: { runtimeName: "hermes", provider: "anthropic", runId: "run-1", event: { type: "tool_started", toolName: "chrona_plan_read", label: "Read plan", inputSummary: "taskId=task-1", preview: "Loading graph" } },
+        payload: { runtimeName: "omp", provider: "omp", runId: "run-1", event: { type: "tool_started", toolName: "read", callId: "call-1", label: "Read source", input: { path: "src/app.ts", apiKey: "secret-value" }, preview: "Inspect application source" } },
         dedupeKey: "tool-started-details",
         occurredAt: new Date("2026-05-21T00:01:00.000Z"),
         ingestSequence: 1,
@@ -759,7 +784,7 @@ describe("getTaskPage orchestrator read model", () => {
         actorType: "runtime",
         actorId: "hermes",
         source: "provider",
-        payload: { runtimeName: "hermes", provider: "anthropic", runId: "run-1", event: { type: "tool_completed", toolName: "chrona_plan_read", durationMs: 42, error: "Provider timeout" } },
+        payload: { runtimeName: "omp", provider: "omp", runId: "run-1", event: { type: "tool_completed", toolName: "read", callId: "call-1", durationMs: 42, result: { content: [{ type: "text", text: "export const ready = true;" }] } } },
         dedupeKey: "tool-completed-details",
         occurredAt: new Date("2026-05-21T00:01:01.000Z"),
         ingestSequence: 2,
@@ -770,13 +795,14 @@ describe("getTaskPage orchestrator read model", () => {
 
     expect(page.activityTimeline).toContainEqual(expect.objectContaining({
       kind: "tool_started",
-      tool: expect.objectContaining({ label: "Read plan", inputSummary: "taskId=task-1", preview: "Loading graph", state: "started" }),
+      tool: expect.objectContaining({ label: "Read source", callId: "call-1", inputSummary: expect.stringContaining("src/app.ts"), preview: "Inspect application source", state: "started" }),
     }));
     expect(page.activityTimeline).toContainEqual(expect.objectContaining({
       kind: "tool_completed",
-      tone: "danger",
-      tool: expect.objectContaining({ name: "chrona_plan_read", durationMs: 42, error: "Provider timeout", state: "failed" }),
+      tone: "success",
+      tool: expect.objectContaining({ name: "read", callId: "call-1", durationMs: 42, resultPreview: expect.stringContaining("export const ready = true;"), state: "completed" }),
     }));
+    expect(JSON.stringify(page.activityTimeline)).not.toContain("secret-value");
   });
 
   it("filters paged node activity only by explicit source node", async () => {

@@ -1,6 +1,8 @@
 import { realpath } from "node:fs/promises";
 import { extname, isAbsolute, resolve, sep } from "node:path";
+import { getChronaGeneratedFilesDir } from "@chrona/shared/data-paths";
 import type { UiDocument } from "@chrona/ui-protocol";
+import { resolveGeneratedFileReference } from "./result-file-access";
 
 const DEFAULT_PREVIEW_BYTES = 64 * 1024;
 const ALLOWED_EXTENSIONS: ReadonlyMap<string, FilePreviewKind> = new Map([
@@ -10,9 +12,15 @@ const ALLOWED_EXTENSIONS: ReadonlyMap<string, FilePreviewKind> = new Map([
   [".json", "json"],
   [".csv", "csv"],
 ]);
-const DENIED_SEGMENT_PATTERN = /(^\.env$|secret|secrets|token|tokens|credential|credentials|keychain)/i;
+const DENIED_SEGMENT_PATTERN =
+  /(^\.env$|secret|secrets|token|tokens|credential|credentials|keychain)/i;
 
-export type FilePreviewError = "unsafe_path" | "not_found" | "unsupported_type" | "read_failed";
+export type FilePreviewError =
+  | "permission_required"
+  | "unsafe_path"
+  | "not_found"
+  | "unsupported_type"
+  | "read_failed";
 export type FilePreviewKind = "markdown" | "json" | "text" | "csv";
 
 export type FilePreview = {
@@ -24,9 +32,11 @@ export type FilePreview = {
   previewError?: FilePreviewError;
 };
 
-type FilePreviewOptions = {
+export type FilePreviewOptions = {
   rootDir?: string;
   maxPreviewBytes?: number;
+  allowedAbsolutePath?: string;
+  taskId?: string;
 };
 
 function normalizeDisplayPath(uri: string) {
@@ -34,11 +44,19 @@ function normalizeDisplayPath(uri: string) {
 }
 
 function isDeniedPath(uri: string) {
-  return normalizeDisplayPath(uri).split("/").some((segment) => DENIED_SEGMENT_PATTERN.test(segment));
+  return normalizeDisplayPath(uri)
+    .split("/")
+    .some((segment) => DENIED_SEGMENT_PATTERN.test(segment));
 }
 
 function safeRelativePath(uri: string) {
-  if (!uri.trim() || isAbsolute(uri) || uri.includes("://") || isDeniedPath(uri)) return null;
+  if (
+    !uri.trim() ||
+    isAbsolute(uri) ||
+    uri.includes("://") ||
+    isDeniedPath(uri)
+  )
+    return null;
   const normalized = normalizeDisplayPath(uri);
   if (normalized.split("/").includes("..")) return null;
   return normalized;
@@ -61,40 +79,71 @@ async function formatPreviewText(kind: FilePreviewKind, text: string) {
   }
 }
 
-export async function resolveFilePreview(uri: string | undefined, options: FilePreviewOptions = {}): Promise<FilePreview> {
+export async function resolveFilePreview(
+  uri: string | undefined,
+  options: FilePreviewOptions = {},
+): Promise<FilePreview> {
   if (!uri) return { previewError: "unsafe_path" };
+  const generatedPath = resolveGeneratedFileReference(uri);
+  const allowedAbsolutePath = options.allowedAbsolutePath
+    ? resolve(options.allowedAbsolutePath)
+    : null;
   const relativePath = safeRelativePath(uri);
-  if (!relativePath) return { displayPath: uri, previewError: "unsafe_path" };
+  const explicitRoot = options.rootDir ? resolve(options.rootDir) : null;
+  const rootDir = explicitRoot ?? resolve(getChronaGeneratedFilesDir());
+  const resolvedPath =
+    generatedPath ??
+    (allowedAbsolutePath &&
+    isAbsolute(uri) &&
+    resolve(uri) === allowedAbsolutePath
+      ? allowedAbsolutePath
+      : explicitRoot && relativePath
+        ? resolve(explicitRoot, relativePath)
+        : null);
+  const displayPath =
+    generatedPath ?? allowedAbsolutePath ?? relativePath ?? uri;
+  if (!resolvedPath) {
+    return {
+      displayPath: uri,
+      previewError: isDeniedPath(uri) ? "unsafe_path" : "permission_required",
+    };
+  }
+  if (
+    !generatedPath &&
+    !allowedAbsolutePath &&
+    !isWithinRoot(rootDir, resolvedPath)
+  ) {
+    return { displayPath, previewError: "permission_required" };
+  }
 
-  const kind = previewKindForPath(relativePath);
-  if (!kind) return { displayPath: relativePath, previewError: "unsupported_type" };
-
-  const rootDir = resolve(options.rootDir ?? process.cwd());
-  const resolvedPath = resolve(rootDir, relativePath);
-  if (!isWithinRoot(rootDir, resolvedPath)) return { displayPath: relativePath, previewError: "unsafe_path" };
+  const kind = previewKindForPath(resolvedPath);
+  if (!kind) return { displayPath, previewError: "unsupported_type" };
 
   const file = Bun.file(resolvedPath);
-  if (!(await file.exists())) return { displayPath: relativePath, contentKind: kind, previewError: "not_found" };
+  if (!(await file.exists()))
+    return { displayPath, contentKind: kind, previewError: "not_found" };
 
   try {
-    const realRoot = await realpath(rootDir);
     const realFile = await realpath(resolvedPath);
-    if (!isWithinRoot(realRoot, realFile)) return { displayPath: relativePath, previewError: "unsafe_path" };
-
+    if (!allowedAbsolutePath) {
+      const realRoot = await realpath(rootDir);
+      if (!isWithinRoot(realRoot, realFile))
+        return { displayPath, previewError: "unsafe_path" };
+    }
     const contentBytes = file.size;
     const maxPreviewBytes = options.maxPreviewBytes ?? DEFAULT_PREVIEW_BYTES;
     const contentTruncated = contentBytes > maxPreviewBytes;
     const blob = contentTruncated ? file.slice(0, maxPreviewBytes) : file;
     const rawPreview = await blob.text();
     return {
-      displayPath: relativePath,
+      displayPath,
       contentKind: kind,
       contentPreview: await formatPreviewText(kind, rawPreview),
       contentBytes,
       contentTruncated,
     };
   } catch {
-    return { displayPath: relativePath, contentKind: kind, previewError: "read_failed" };
+    return { displayPath, contentKind: kind, previewError: "read_failed" };
   }
 }
 
@@ -108,16 +157,42 @@ function fileUriFromProps(props: unknown) {
       : undefined;
 }
 
-export async function hydrateFilePreviewSpec(spec: UiDocument, options: FilePreviewOptions = {}): Promise<UiDocument> {
+function resultFileDownloadHref(taskId: string, uri: string) {
+  return `/api/tasks/${encodeURIComponent(taskId)}/result-files/download?path=${encodeURIComponent(uri)}`;
+}
+
+export async function hydrateFilePreviewSpec(
+  spec: UiDocument,
+  options: FilePreviewOptions = {},
+): Promise<UiDocument> {
   const elements = { ...spec.elements };
   for (const [key, element] of Object.entries(spec.elements)) {
-    if (element.type !== "FileView" && element.type !== "FileRef" && element.type !== "WorkspaceArtifactItem" && element.type !== "Table") continue;
-    const preview = await resolveFilePreview(fileUriFromProps(element.props), options);
+    if (
+      element.type !== "FileView" &&
+      element.type !== "FileRef" &&
+      element.type !== "WorkspaceArtifactItem" &&
+      element.type !== "Table"
+    )
+      continue;
+    const preview = await resolveFilePreview(
+      fileUriFromProps(element.props),
+      options,
+    );
+    const uri = fileUriFromProps(element.props);
     elements[key] = {
       ...element,
       props: {
         ...element.props,
         ...preview,
+        ...(uri?.startsWith("generated://") && options.taskId
+          ? { downloadHref: resultFileDownloadHref(options.taskId, uri) }
+          : {}),
+        ...(preview.previewError === "permission_required" && options.taskId
+          ? {
+              accessTaskId: options.taskId,
+              accessRequestedPath: uri,
+            }
+          : {}),
       },
     };
   }

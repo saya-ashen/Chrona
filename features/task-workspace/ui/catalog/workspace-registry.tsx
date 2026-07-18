@@ -1,17 +1,58 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 import { useNavigate } from "react-router-dom";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
-import { Archive, Bot, Check, ChevronDown, ChevronUp, Circle, Copy, FileText, Sparkles, TriangleAlert, Wrench } from "lucide-react";
+import {
+  Archive,
+  Bot,
+  Check,
+  ChevronDown,
+  ChevronUp,
+  Circle,
+  Copy,
+  FileText,
+  LockKeyhole,
+  Sparkles,
+  TriangleAlert,
+  Wrench,
+} from "lucide-react";
 import { ActivityTimeline } from "../activity-timeline";
 import type { WorkspaceActivityItem } from "../../model/task-workspace-types";
+import { TaskMarkdownContent } from "../task-markdown";
 import { defineRegistry } from "@json-render/react";
 import { shadcnComponents } from "@json-render/shadcn";
-import { useI18n, useLocale } from "@chrona/i18n"
-import { flexRender, getCoreRowModel, getPaginationRowModel, getSortedRowModel, useReactTable, type ColumnDef, type SortingState } from "@tanstack/react-table";
+import { useI18n, useLocale } from "@chrona/i18n";
+import {
+  flexRender,
+  getCoreRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  useReactTable,
+  type ColumnDef,
+  type SortingState,
+} from "@tanstack/react-table";
 import { chronaCatalog } from "@chrona/ui-protocol";
-import { Badge, Button, Calendar, cn, Popover, PopoverContent, PopoverTrigger } from "@shared/ui";
-import { taskWorkspaceActivityMessages } from "@chrona/i18n"
+import {
+  Badge,
+  Button,
+  Calendar,
+  cn,
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@shared/ui";
+import { taskWorkspaceActivityMessages } from "@chrona/i18n";
+import {
+  approveResultFileAccess,
+  requestResultFileAccess,
+  type ResultFileAccessRequest,
+} from "../../model/task-actions-client";
 
 type OccurrenceOption = {
   value: string;
@@ -22,13 +63,17 @@ type OccurrenceOption = {
 };
 
 function isOccurrenceOption(value: unknown): value is OccurrenceOption {
-  return Boolean(value)
-    && typeof value === "object"
-    && typeof (value as { value?: unknown }).value === "string"
-    && typeof (value as { label?: unknown }).label === "string"
-    && typeof (value as { taskId?: unknown }).taskId === "string"
-    && (typeof (value as { date?: unknown }).date === "string" || (value as { date?: unknown }).date === null)
-    && (typeof (value as { workBlockId?: unknown }).workBlockId === "string" || (value as { workBlockId?: unknown }).workBlockId === null);
+  return (
+    Boolean(value) &&
+    typeof value === "object" &&
+    typeof (value as { value?: unknown }).value === "string" &&
+    typeof (value as { label?: unknown }).label === "string" &&
+    typeof (value as { taskId?: unknown }).taskId === "string" &&
+    (typeof (value as { date?: unknown }).date === "string" ||
+      (value as { date?: unknown }).date === null) &&
+    (typeof (value as { workBlockId?: unknown }).workBlockId === "string" ||
+      (value as { workBlockId?: unknown }).workBlockId === null)
+  );
 }
 
 function dateFromKey(date: string) {
@@ -42,24 +87,45 @@ function dateKey(date: Date) {
   return `${year}-${month}-${day}`;
 }
 
-function WorkspaceOccurrenceCalendar({ label, value, options }: { label: string; value: string; options: OccurrenceOption[] }) {
+function WorkspaceOccurrenceCalendar({
+  label,
+  value,
+  options,
+}: {
+  label: string;
+  value: string;
+  options: OccurrenceOption[];
+}) {
   const [open, setOpen] = useState(false);
   const locale = useLocale();
   const navigate = useNavigate();
-  const current = options.find((option) => option.value === value) ?? options[0];
-  const availableDates = new Set(options.flatMap((option) => option.date ? [option.date] : []));
+  const current =
+    options.find((option) => option.value === value) ?? options[0];
+  const availableDates = new Set(
+    options.flatMap((option) => (option.date ? [option.date] : [])),
+  );
   const selectedDate = current.date ? dateFromKey(current.date) : undefined;
 
   const navigateTo = (occurrence: OccurrenceOption) => {
-    const search = occurrence.workBlockId ? `?workBlockId=${encodeURIComponent(occurrence.workBlockId)}` : "";
-    void navigate({ pathname: `/${locale}/tasks/${occurrence.taskId}`, search });
+    const search = occurrence.workBlockId
+      ? `?workBlockId=${encodeURIComponent(occurrence.workBlockId)}`
+      : "";
+    void navigate({
+      pathname: `/${locale}/tasks/${occurrence.taskId}`,
+      search,
+    });
     setOpen(false);
   };
 
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button type="button" variant="outline" size="sm" className="h-7 max-w-[20rem] rounded-full bg-background/80 px-2.5 text-xs font-medium">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          className="h-7 max-w-[20rem] rounded-full bg-background/80 px-2.5 text-xs font-medium"
+        >
           <span className="text-muted-foreground">{label}</span>
           <span className="min-w-0 truncate">{current.label}</span>
         </Button>
@@ -70,20 +136,37 @@ function WorkspaceOccurrenceCalendar({ label, value, options }: { label: string;
           selected={selectedDate}
           defaultMonth={selectedDate}
           disabled={(date) => !availableDates.has(dateKey(date))}
-          modifiers={{ occurrence: (date) => availableDates.has(dateKey(date)) }}
+          modifiers={{
+            occurrence: (date) => availableDates.has(dateKey(date)),
+          }}
           modifiersClassNames={{ occurrence: "font-semibold text-primary" }}
           onSelect={(date) => {
             if (!date) return;
-            const matches = options.filter((option) => option.date === dateKey(date));
+            const matches = options.filter(
+              (option) => option.date === dateKey(date),
+            );
             if (matches.length === 1) navigateTo(matches[0]);
           }}
         />
         <div className="max-h-40 space-y-1 overflow-y-auto border-t border-border/70 p-2">
-          {options.filter((option) => option.date === (selectedDate ? dateKey(selectedDate) : current.date)).map((option) => (
-            <Button key={option.value} type="button" variant={option.value === value ? "secondary" : "ghost"} size="sm" className="h-7 w-full justify-start rounded-md px-2 text-xs" onClick={() => navigateTo(option)}>
-              {option.label}
-            </Button>
-          ))}
+          {options
+            .filter(
+              (option) =>
+                option.date ===
+                (selectedDate ? dateKey(selectedDate) : current.date),
+            )
+            .map((option) => (
+              <Button
+                key={option.value}
+                type="button"
+                variant={option.value === value ? "secondary" : "ghost"}
+                size="sm"
+                className="h-7 w-full justify-start rounded-md px-2 text-xs"
+                onClick={() => navigateTo(option)}
+              >
+                {option.label}
+              </Button>
+            ))}
         </div>
       </PopoverContent>
     </Popover>
@@ -123,26 +206,49 @@ function activityIcon(kind: string | undefined, tone: Tone) {
 }
 
 function activityIconClassName(tone: Tone) {
-  if (tone === "danger") return "bg-destructive text-destructive-foreground ring-destructive/20";
-  if (tone === "warning") return "bg-warning text-warning-foreground ring-warning/20";
-  if (tone === "success") return "bg-success text-success-foreground ring-success/20";
-  if (tone === "info") return "bg-primary text-primary-foreground ring-primary/20";
+  if (tone === "danger")
+    return "bg-destructive text-destructive-foreground ring-destructive/20";
+  if (tone === "warning")
+    return "bg-warning text-warning-foreground ring-warning/20";
+  if (tone === "success")
+    return "bg-success text-success-foreground ring-success/20";
+  if (tone === "info")
+    return "bg-primary text-primary-foreground ring-primary/20";
   return "bg-muted-foreground/80 text-background ring-muted-foreground/20";
 }
 
 const COLLAPSE_THRESHOLD = 360;
 const PREVIEW_LENGTH = 280;
 
-function CollapsibleText({ text, threshold = COLLAPSE_THRESHOLD }: { text: string; threshold?: number }) {
+function CollapsibleText({
+  text,
+  threshold = COLLAPSE_THRESHOLD,
+}: {
+  text: string;
+  threshold?: number;
+}) {
   const [expanded, setExpanded] = useState(false);
   const shouldCollapse = text.length > threshold;
-  const visible = shouldCollapse && !expanded ? `${text.slice(0, PREVIEW_LENGTH).trimEnd()}...` : text;
+  const visible =
+    shouldCollapse && !expanded
+      ? `${text.slice(0, PREVIEW_LENGTH).trimEnd()}...`
+      : text;
   return (
     <div className="text-xs leading-[1.35] text-muted-foreground">
       <p className="whitespace-pre-wrap break-words">{visible}</p>
       {shouldCollapse ? (
-        <Button type="button" variant="ghost" size="sm" className="mt-1 h-6 rounded-full px-2 text-[11px]" onClick={() => setExpanded((v) => !v)}>
-          {expanded ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          className="mt-1 h-6 rounded-full px-2 text-[11px]"
+          onClick={() => setExpanded((v) => !v)}
+        >
+          {expanded ? (
+            <ChevronUp className="size-3.5" />
+          ) : (
+            <ChevronDown className="size-3.5" />
+          )}
           {expanded ? "Hide" : "Show more"}
         </Button>
       ) : null}
@@ -156,11 +262,21 @@ function formatFileSize(bytes: unknown) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function filePreviewErrorMessage(error: unknown, copy: Record<string, string | undefined>) {
-  if (error === "unsafe_path") return copy.filePreviewUnsafePath ?? "File path is not allowed.";
-  if (error === "not_found") return copy.filePreviewNotFound ?? "File was not found.";
-  if (error === "unsupported_type") return copy.filePreviewUnsupportedType ?? "File type is not supported for preview.";
-  if (error === "read_failed") return copy.filePreviewReadFailed ?? "File preview could not be loaded.";
+function filePreviewErrorMessage(
+  error: unknown,
+  copy: Record<string, string | undefined>,
+) {
+  if (error === "unsafe_path")
+    return copy.filePreviewUnsafePath ?? "File path is not allowed.";
+  if (error === "not_found")
+    return copy.filePreviewNotFound ?? "File was not found.";
+  if (error === "unsupported_type")
+    return (
+      copy.filePreviewUnsupportedType ??
+      "File type is not supported for preview."
+    );
+  if (error === "read_failed")
+    return copy.filePreviewReadFailed ?? "File preview could not be loaded.";
   return null;
 }
 const EXPANDABLE_FILE_PREVIEW_MIN_LENGTH = 1200;
@@ -182,7 +298,6 @@ function boolProp(value: unknown) {
   return typeof value === "boolean" ? value : undefined;
 }
 
-
 export type ResultCollapseCommand = {
   mode: "collapse" | "expand";
   revision: number;
@@ -193,7 +308,10 @@ type ResultCollapseContextValue = {
   storageKey: string | null;
 };
 
-const ResultCollapseContext = createContext<ResultCollapseContextValue>({ command: null, storageKey: null });
+const ResultCollapseContext = createContext<ResultCollapseContextValue>({
+  command: null,
+  storageKey: null,
+});
 
 const RESULT_COLLAPSE_STORAGE_PREFIX = "chrona.resultCollapse";
 
@@ -201,8 +319,12 @@ function collapseStorageKey(storageKey: string) {
   return `${RESULT_COLLAPSE_STORAGE_PREFIX}:${storageKey}`;
 }
 
-function readStoredCollapseState(storageKey: string | null, storageId: string | undefined) {
-  if (!storageKey || !storageId || typeof window === "undefined") return undefined;
+function readStoredCollapseState(
+  storageKey: string | null,
+  storageId: string | undefined,
+) {
+  if (!storageKey || !storageId || typeof window === "undefined")
+    return undefined;
   try {
     const raw = window.localStorage.getItem(collapseStorageKey(storageKey));
     if (!raw) return undefined;
@@ -214,28 +336,53 @@ function readStoredCollapseState(storageKey: string | null, storageId: string | 
   }
 }
 
-function writeStoredCollapseState(storageKey: string | null, storageId: string | undefined, collapsed: boolean) {
+function writeStoredCollapseState(
+  storageKey: string | null,
+  storageId: string | undefined,
+  collapsed: boolean,
+) {
   if (!storageKey || !storageId || typeof window === "undefined") return;
   try {
     const key = collapseStorageKey(storageKey);
     const raw = window.localStorage.getItem(key);
-    const parsed = raw ? JSON.parse(raw) as Record<string, unknown> : {};
-    window.localStorage.setItem(key, JSON.stringify({ ...parsed, [storageId]: collapsed }));
+    const parsed = raw ? (JSON.parse(raw) as Record<string, unknown>) : {};
+    window.localStorage.setItem(
+      key,
+      JSON.stringify({ ...parsed, [storageId]: collapsed }),
+    );
   } catch {
     // Storage is best-effort; the in-memory collapsed state still updates.
   }
 }
 
-export function ResultCollapseProvider({ command, storageKey, children }: { command?: ResultCollapseCommand | null; storageKey?: string | null; children: ReactNode }) {
-  const value = useMemo(() => ({ command: command ?? null, storageKey: storageKey ?? null }), [command, storageKey]);
-  return <ResultCollapseContext.Provider value={value}>{children}</ResultCollapseContext.Provider>;
+export function ResultCollapseProvider({
+  command,
+  storageKey,
+  children,
+}: {
+  command?: ResultCollapseCommand | null;
+  storageKey?: string | null;
+  children: ReactNode;
+}) {
+  const value = useMemo(
+    () => ({ command: command ?? null, storageKey: storageKey ?? null }),
+    [command, storageKey],
+  );
+  return (
+    <ResultCollapseContext.Provider value={value}>
+      {children}
+    </ResultCollapseContext.Provider>
+  );
 }
 
 function collapseStorageIdFromProps(props: Record<string, unknown>) {
   return stringProp(props.__chronaCollapseStorageId);
 }
 
-function shouldCollapseByDefault(props: Record<string, unknown>, fallback: boolean) {
+function shouldCollapseByDefault(
+  props: Record<string, unknown>,
+  fallback: boolean,
+) {
   return boolProp(props.defaultCollapsed) ?? fallback;
 }
 function CollapsibleBlock({
@@ -254,16 +401,23 @@ function CollapsibleBlock({
   const copy = messages.components.taskWorkspace;
   const { command, storageKey } = useContext(ResultCollapseContext);
   const defaultState = Boolean(defaultCollapsed);
-  const [collapsed, setCollapsedState] = useState(() => readStoredCollapseState(storageKey, storageId) ?? defaultState);
-  const setCollapsed = useCallback((next: boolean | ((current: boolean) => boolean)) => {
-    setCollapsedState((current) => {
-      const resolved = typeof next === "function" ? next(current) : next;
-      writeStoredCollapseState(storageKey, storageId, resolved);
-      return resolved;
-    });
-  }, [storageKey, storageId]);
+  const [collapsed, setCollapsedState] = useState(
+    () => readStoredCollapseState(storageKey, storageId) ?? defaultState,
+  );
+  const setCollapsed = useCallback(
+    (next: boolean | ((current: boolean) => boolean)) => {
+      setCollapsedState((current) => {
+        const resolved = typeof next === "function" ? next(current) : next;
+        writeStoredCollapseState(storageKey, storageId, resolved);
+        return resolved;
+      });
+    },
+    [storageKey, storageId],
+  );
   useEffect(() => {
-    setCollapsedState(readStoredCollapseState(storageKey, storageId) ?? defaultState);
+    setCollapsedState(
+      readStoredCollapseState(storageKey, storageId) ?? defaultState,
+    );
   }, [storageKey, storageId, defaultState]);
   useEffect(() => {
     if (!command) return;
@@ -272,7 +426,14 @@ function CollapsibleBlock({
   const label = title || (copy.resultDetailsLabel ?? "Details");
 
   return (
-    <section className={cn("min-w-0 w-full max-w-full overflow-hidden text-sm", subtle ? "border-t border-border/60 py-3 first:border-t-0 first:pt-0" : "rounded-xl border border-border/70 bg-muted/45 px-3 py-2.5")}>
+    <section
+      className={cn(
+        "min-w-0 w-full max-w-full overflow-hidden text-sm",
+        subtle
+          ? "border-t border-border/60 py-3 first:border-t-0 first:pt-0"
+          : "rounded-xl border border-border/70 bg-muted/45 px-3 py-2.5",
+      )}
+    >
       <button
         type="button"
         className="flex w-full min-w-0 max-w-full items-center justify-between gap-2 text-left"
@@ -280,51 +441,123 @@ function CollapsibleBlock({
         aria-expanded={!collapsed}
       >
         <span className="min-w-0 flex-1">
-          <span className="block truncate font-medium text-foreground">{label}</span>
-          {summary ? <span className="mt-0.5 block truncate text-xs text-muted-foreground">{summary}</span> : null}
+          <span className="block truncate font-medium text-foreground">
+            {label}
+          </span>
+          {summary ? (
+            <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+              {summary}
+            </span>
+          ) : null}
         </span>
         <span className="flex shrink-0 items-center gap-1 text-[11px] font-semibold text-muted-foreground">
-          {collapsed ? (copy.showResultDetails ?? "Show") : (copy.hideResultDetails ?? "Hide")}
-          {collapsed ? <ChevronDown className="size-3.5" /> : <ChevronUp className="size-3.5" />}
+          {collapsed
+            ? (copy.showResultDetails ?? "Show")
+            : (copy.hideResultDetails ?? "Hide")}
+          {collapsed ? (
+            <ChevronDown className="size-3.5" />
+          ) : (
+            <ChevronUp className="size-3.5" />
+          )}
         </span>
       </button>
-      {collapsed ? null : <div className={cn("min-w-0 w-full max-w-full overflow-hidden space-y-2", subtle ? "mt-3" : "mt-2")}>{children}</div>}
+      {collapsed ? null : (
+        <div
+          className={cn(
+            "min-w-0 w-full max-w-full overflow-hidden space-y-2",
+            subtle ? "mt-3" : "mt-2",
+          )}
+        >
+          {children}
+        </div>
+      )}
     </section>
   );
 }
 
-function shouldWrapCollapsible(props: Record<string, unknown>, fallbackCollapsed?: boolean) {
+function shouldWrapCollapsible(
+  props: Record<string, unknown>,
+  fallbackCollapsed?: boolean,
+) {
   const explicit = boolProp(props.collapsible);
-  const hasDefaultCollapsedPreference = props.defaultCollapsed === true || props.defaultCollapsed === false;
-  return explicit ?? Boolean(fallbackCollapsed || hasDefaultCollapsedPreference);
+  const hasDefaultCollapsedPreference =
+    props.defaultCollapsed === true || props.defaultCollapsed === false;
+  return (
+    explicit ?? Boolean(fallbackCollapsed || hasDefaultCollapsedPreference)
+  );
 }
 
-function MaybeCollapsible({ props, fallbackCollapsed, fallbackTitle, children }: { props: Record<string, unknown>; fallbackCollapsed?: boolean; fallbackTitle?: string; children: ReactNode }) {
+function contentPropsWithoutTitle(
+  props: Record<string, unknown>,
+  fallbackCollapsed?: boolean,
+): Record<string, unknown> {
+  if (!shouldWrapCollapsible(props, fallbackCollapsed)) return props;
+  const { title: _title, ...contentProps } = props;
+  return contentProps;
+}
+
+function MaybeCollapsible({
+  props,
+  fallbackCollapsed,
+  fallbackTitle,
+  children,
+}: {
+  props: Record<string, unknown>;
+  fallbackCollapsed?: boolean;
+  fallbackTitle?: string;
+  children: ReactNode;
+}) {
   if (!shouldWrapCollapsible(props, fallbackCollapsed)) return <>{children}</>;
-  const title = stringProp(props.collapseTitle) ?? stringProp(props.title) ?? fallbackTitle;
+  const title =
+    stringProp(props.collapseTitle) ?? stringProp(props.title) ?? fallbackTitle;
   const summary = stringProp(props.collapsedSummary);
-  return <CollapsibleBlock title={title} summary={summary} defaultCollapsed={shouldCollapseByDefault(props, Boolean(fallbackCollapsed))} storageId={collapseStorageIdFromProps(props)}>{children}</CollapsibleBlock>;
+  return (
+    <CollapsibleBlock
+      title={title}
+      summary={summary}
+      defaultCollapsed={shouldCollapseByDefault(
+        props,
+        Boolean(fallbackCollapsed),
+      )}
+      storageId={collapseStorageIdFromProps(props)}
+    >
+      {children}
+    </CollapsibleBlock>
+  );
 }
 
-
-function ResultSummary({ props }: { props: { text?: string | null; copyText?: string | null } }) {
+function ResultSummary({
+  props,
+}: {
+  props: { text?: string | null; copyText?: string | null };
+}) {
   const { messages } = useI18n();
   const copy = messages.components.taskWorkspace;
   const [copied, setCopied] = useState(false);
   const text = typeof props.text === "string" ? props.text.trim() : "";
-  const copyText = typeof props.copyText === "string" && props.copyText.trim() ? props.copyText : text;
+  const copyText =
+    typeof props.copyText === "string" && props.copyText.trim()
+      ? props.copyText
+      : text;
   if (!text) return null;
 
-  const copyLabel = copied ? (copy.resultSummaryCopied ?? "Copied") : (copy.copyResultSummary ?? "Copy summary");
+  const copyLabel = copied
+    ? (copy.resultSummaryCopied ?? "Copied")
+    : (copy.copyResultSummary ?? "Copy summary");
 
   return (
-    <section aria-label={copy.resultSummaryLabel ?? "Result summary"} className="space-y-2.5 border-b border-border/70 pb-3.5 text-foreground">
+    <section
+      aria-label={copy.resultSummaryLabel ?? "Result summary"}
+      className="space-y-2.5 border-b border-border/70 pb-3.5 text-foreground"
+    >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div className="flex min-w-0 items-center gap-2.5">
           <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary-soft text-primary ring-1 ring-primary/20">
             <Check className="size-3.5" aria-hidden="true" />
           </span>
-          <h2 className="font-heading text-[1.05rem] font-semibold leading-none tracking-[-0.01em] text-foreground sm:text-lg">{copy.resultSummaryLabel ?? "Result summary"}</h2>
+          <h2 className="font-heading text-[1.05rem] font-semibold leading-none tracking-[-0.01em] text-foreground sm:text-lg">
+            {copy.resultSummaryLabel ?? "Result summary"}
+          </h2>
         </div>
         {copyText ? (
           <Button
@@ -344,80 +577,291 @@ function ResultSummary({ props }: { props: { text?: string | null; copyText?: st
           </Button>
         ) : null}
       </div>
-      <p className="max-w-3xl text-[15px] font-normal leading-7 text-foreground/80 tracking-[-0.005em]">{text}</p>
+      <p className="max-w-3xl text-[15px] font-normal leading-7 text-foreground/80 tracking-[-0.005em]">
+        {text}
+      </p>
     </section>
   );
 }
-
 
 function FileView({ props }: { props: Record<string, unknown> }) {
   const { messages } = useI18n();
   const copy = messages.components.taskWorkspace;
   const title = typeof props.title === "string" ? props.title : undefined;
-  const path = typeof props.displayPath === "string"
-    ? props.displayPath
-    : typeof props.uri === "string"
-      ? props.uri
-      : typeof props.path === "string"
-        ? props.path
-        : undefined;
-  const content = typeof props.contentPreview === "string" ? props.contentPreview : undefined;
-  const contentKind = typeof props.contentKind === "string" ? props.contentKind : undefined;
-  const size = formatFileSize(props.contentBytes);
+  const path =
+    typeof props.displayPath === "string"
+      ? props.displayPath
+      : typeof props.uri === "string"
+        ? props.uri
+        : typeof props.path === "string"
+          ? props.path
+          : undefined;
+  const content =
+    typeof props.contentPreview === "string" ? props.contentPreview : undefined;
+  const contentKind =
+    typeof props.contentKind === "string" ? props.contentKind : undefined;
   const error = filePreviewErrorMessage(props.previewError, copy);
-  const canExpand = Boolean(content && (content.length > EXPANDABLE_FILE_PREVIEW_MIN_LENGTH || props.contentTruncated));
   const [previewOpen, setPreviewOpen] = useState(false);
   const [copied, setCopied] = useState(false);
-  const previewHeightClassName = canExpand && previewOpen ? "max-h-[70vh]" : "max-h-80";
-  const previewLabel = previewOpen ? (copy.artifactHidePreview ?? "Hide preview") : (copy.artifactPreview ?? "Preview");
-  const copyPathLabel = copied ? (copy.artifactPathCopied ?? "Copied") : (copy.copyArtifactPath ?? "Copy path");
+  const accessTaskId =
+    typeof props.accessTaskId === "string" ? props.accessTaskId : null;
+  const accessRequestedPath =
+    typeof props.accessRequestedPath === "string"
+      ? props.accessRequestedPath
+      : null;
+  const [accessRequest, setAccessRequest] =
+    useState<ResultFileAccessRequest | null>(null);
+  const [accessState, setAccessState] = useState<
+    "idle" | "requesting" | "approving" | "granted" | "error"
+  >("idle");
+  const [accessError, setAccessError] = useState<string | null>(null);
+  const [authorizedPreview, setAuthorizedPreview] = useState<{
+    displayPath?: string;
+    contentKind?: "markdown" | "json" | "text" | "csv";
+    contentPreview?: string;
+    contentTruncated?: boolean;
+    contentBytes?: number;
+    previewError?: string;
+  } | null>(null);
+  const visibleContent = authorizedPreview?.contentPreview ?? content;
+  const visibleContentKind = authorizedPreview?.contentKind ?? contentKind;
+  const visibleSize = formatFileSize(
+    authorizedPreview?.contentBytes ?? props.contentBytes,
+  );
+  const visibleError = authorizedPreview
+    ? filePreviewErrorMessage(authorizedPreview.previewError, copy)
+    : error;
+  const requestAccess = async () => {
+    if (!accessTaskId || !accessRequestedPath) return;
+    setAccessState("requesting");
+    setAccessError(null);
+    try {
+      const request = await requestResultFileAccess({
+        taskId: accessTaskId,
+        path: accessRequestedPath,
+      });
+      setAccessRequest(request);
+      setAccessState(request.status === "already_allowed" ? "granted" : "idle");
+    } catch (cause) {
+      setAccessState("error");
+      setAccessError(
+        cause instanceof Error
+          ? cause.message
+          : (copy.fileAccessRequestFailed ?? "Failed to request file access."),
+      );
+    }
+  };
+  const approveAccess = async () => {
+    if (!accessTaskId || !accessRequest?.requestId) return;
+    setAccessState("approving");
+    setAccessError(null);
+    try {
+      const result = await approveResultFileAccess({
+        taskId: accessTaskId,
+        requestId: accessRequest.requestId,
+      });
+      setAuthorizedPreview(result.preview);
+      setAccessState("granted");
+      setPreviewOpen(true);
+    } catch (cause) {
+      setAccessState("error");
+      setAccessError(
+        cause instanceof Error
+          ? cause.message
+          : (copy.fileAccessApprovalFailed ??
+              "Failed to read the approved file."),
+      );
+    }
+  };
+  const canExpand = Boolean(
+    visibleContent &&
+    (visibleContent.length > EXPANDABLE_FILE_PREVIEW_MIN_LENGTH ||
+      authorizedPreview?.contentTruncated ||
+      props.contentTruncated),
+  );
+  const previewHeightClassName =
+    canExpand && previewOpen ? "max-h-[70vh]" : "max-h-80";
+  const previewLabel = previewOpen
+    ? (copy.artifactHidePreview ?? "Hide preview")
+    : (copy.artifactPreview ?? "Preview");
+  const copyPathLabel = copied
+    ? (copy.artifactPathCopied ?? "Copied")
+    : (copy.copyArtifactPath ?? "Copy path");
 
   return (
     <article className="min-w-0 w-full max-w-full border-t border-border/60 py-2 text-sm first:border-t-0">
       <div className="flex min-w-0 flex-wrap items-start justify-between gap-2">
         <div className="min-w-0 flex-1">
-          <p className="break-words font-medium text-foreground">{title ?? path ?? "File"}</p>
-          {path ? <p className="mt-0.5 break-all font-mono text-[11px] text-muted-foreground">{path}</p> : null}
+          <p className="break-words font-medium text-foreground">
+            {title ?? path ?? "File"}
+          </p>
+          {path ? (
+            <p className="mt-0.5 break-all font-mono text-[11px] text-muted-foreground">
+              {path}
+            </p>
+          ) : null}
           <div className="mt-1 flex flex-wrap gap-1.5 text-[10px] text-muted-foreground">
-            {contentKind ? <Badge variant="outline" className="px-1.5 py-0 text-[10px]">{contentKind}</Badge> : null}
-            {size ? <span>{size}</span> : null}
-            {props.contentTruncated ? <span>{copy.filePreviewTruncated ?? "Preview truncated"}</span> : null}
+            {visibleContentKind ? (
+              <Badge variant="outline" className="px-1.5 py-0 text-[10px]">
+                {visibleContentKind}
+              </Badge>
+            ) : null}
+            {visibleSize ? <span>{visibleSize}</span> : null}
+            {props.contentTruncated ? (
+              <span>{copy.filePreviewTruncated ?? "Preview truncated"}</span>
+            ) : null}
           </div>
         </div>
         <div className="flex shrink-0 flex-wrap justify-end gap-1.5">
-          {content ? (
-            <Button type="button" variant="ghost" size="sm" className="h-7 rounded-full px-2 text-[11px]" onClick={() => setPreviewOpen((current) => !current)} aria-expanded={previewOpen}>
-              {previewOpen ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
+          {visibleContent ? (
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 rounded-full px-2 text-[11px]"
+              onClick={() => setPreviewOpen((current) => !current)}
+              aria-expanded={previewOpen}
+            >
+              {previewOpen ? (
+                <ChevronUp className="size-3.5" />
+              ) : (
+                <ChevronDown className="size-3.5" />
+              )}
               {previewLabel}
             </Button>
           ) : null}
-          {typeof props.uri === "string" ? (
-            <Button asChild variant="ghost" size="sm" className="h-7 rounded-full px-2 text-[11px]">
-              <a href={props.uri} download>{copy.downloadArtifact ?? "Download"}</a>
+          {props.previewError === "permission_required" &&
+          accessTaskId &&
+          accessRequestedPath ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="h-7 rounded-full px-2 text-[11px]"
+              disabled={
+                accessState === "requesting" || accessState === "approving"
+              }
+              onClick={() => void requestAccess()}
+            >
+              <LockKeyhole className="size-3.5" aria-hidden />
+              {accessState === "requesting"
+                ? (copy.fileAccessChecking ?? "Checking...")
+                : (copy.fileAccessRequest ?? "Request access")}
+            </Button>
+          ) : null}
+          {typeof props.downloadHref === "string" ? (
+            <Button
+              asChild
+              variant="ghost"
+              size="sm"
+              className="h-7 rounded-full px-2 text-[11px]"
+            >
+              <a href={props.downloadHref} download>
+                {copy.downloadArtifact ?? "Download"}
+              </a>
             </Button>
           ) : null}
           {path ? (
-            <Button type="button" variant="ghost" size="sm" className="h-7 rounded-full px-2 text-[11px]" onClick={() => {
-              void navigator.clipboard?.writeText(path).then(() => {
-                setCopied(true);
-                window.setTimeout(() => setCopied(false), 1400);
-              });
-            }}>
+            <Button
+              type="button"
+              variant="ghost"
+              size="sm"
+              className="h-7 rounded-full px-2 text-[11px]"
+              onClick={() => {
+                void navigator.clipboard?.writeText(path).then(() => {
+                  setCopied(true);
+                  window.setTimeout(() => setCopied(false), 1400);
+                });
+              }}
+            >
               {copyPathLabel}
             </Button>
           ) : null}
         </div>
       </div>
-      {error ? <p className="mt-2 rounded-md bg-muted/60 px-2 py-1.5 text-xs text-muted-foreground">{error}</p> : null}
-      {content && previewOpen ? (
-        contentKind === "markdown" ? (
-          <div className={cn("mt-2 min-w-0 max-w-full overflow-auto rounded-lg bg-muted/25 px-3 py-2 text-sm leading-6 text-foreground", previewHeightClassName)}>
-            <div className="max-w-none space-y-2 break-words [overflow-wrap:anywhere] [&_a]:font-medium [&_a]:text-primary [&_a]:underline-offset-4 hover:[&_a]:underline [&_code]:rounded-md [&_code]:bg-muted [&_code]:px-1.5 [&_code]:py-0.5 [&_pre]:max-w-full [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:bg-muted/70 [&_pre]:p-3 [&_table]:w-full [&_table]:table-fixed [&_td]:break-words [&_th]:break-words">
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
-            </div>
+      {visibleError && props.previewError !== "permission_required" ? (
+        <p className="mt-2 rounded-md bg-muted/60 px-2 py-1.5 text-xs text-muted-foreground">
+          {visibleError}
+        </p>
+      ) : null}
+      {props.previewError === "permission_required" && !accessRequest ? (
+        <p className="mt-2 rounded-md border border-warning/30 bg-warning/10 px-2 py-1.5 text-xs text-warning-foreground">
+          {copy.fileAccessRequired ??
+            "This file is outside Chrona's generated-file directory. Review the path before allowing a one-time read."}
+        </p>
+      ) : null}
+      {accessRequest?.status === "permission_required" &&
+      accessState !== "granted" ? (
+        <div
+          className="mt-2 space-y-2 rounded-lg border border-warning/35 bg-warning/10 p-3 text-xs"
+          role="group"
+          aria-label={copy.fileAccessReviewLabel ?? "File access review"}
+        >
+          <p className="font-medium text-foreground">
+            {copy.fileAccessReviewTitle ??
+              "Allow Chrona to read this file once?"}
+          </p>
+          <p className="break-all font-mono text-[11px] text-muted-foreground">
+            {accessRequest.canonicalPath}
+          </p>
+          <div className="flex flex-wrap gap-2 text-muted-foreground">
+            {accessRequest.extension ? (
+              <span>{accessRequest.extension}</span>
+            ) : null}
+            {typeof accessRequest.size === "number" ? (
+              <span>{formatFileSize(accessRequest.size)}</span>
+            ) : null}
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              size="sm"
+              disabled={accessState === "approving"}
+              onClick={() => void approveAccess()}
+            >
+              {accessState === "approving"
+                ? (copy.fileAccessReading ?? "Reading...")
+                : (copy.fileAccessAllowOnce ?? "Allow once")}
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              disabled={accessState === "approving"}
+              onClick={() => {
+                setAccessRequest(null);
+                setAccessState("idle");
+              }}
+            >
+              {copy.fileAccessCancel ?? "Cancel"}
+            </Button>
+          </div>
+        </div>
+      ) : null}
+      {accessError ? (
+        <p className="mt-2 text-xs font-medium text-destructive" role="alert">
+          {accessError}
+        </p>
+      ) : null}
+      {visibleContent && previewOpen ? (
+        visibleContentKind === "markdown" ? (
+          <div
+            className={cn(
+              "mt-2 min-w-0 max-w-full overflow-auto rounded-lg bg-muted/25 px-3 py-2 text-sm leading-6 text-foreground",
+              previewHeightClassName,
+            )}
+          >
+            <TaskMarkdownContent className="py-0">{visibleContent}</TaskMarkdownContent>
           </div>
         ) : (
-          <pre className={cn("mt-2 min-w-0 max-w-full overflow-auto whitespace-pre-wrap break-words rounded-lg bg-muted/35 p-2 text-xs leading-5 text-foreground/80", previewHeightClassName)}>{content}</pre>
+          <pre
+            className={cn(
+              "mt-2 min-w-0 max-w-full overflow-auto whitespace-pre-wrap break-words rounded-lg bg-muted/35 p-2 text-xs leading-5 text-foreground/80",
+              previewHeightClassName,
+            )}
+          >
+            {visibleContent}
+          </pre>
         )
       ) : null}
     </article>
@@ -443,34 +887,80 @@ function WorkspaceArtifactList({
   const visibleArtifacts = showAll ? items : items.slice(0, maxCollapsed);
 
   if (items.length === 0) {
-    return <p className="mt-1.5 text-[13px] text-muted-foreground">{emptyLabel}</p>;
+    return (
+      <p className="mt-1.5 text-[13px] text-muted-foreground">{emptyLabel}</p>
+    );
   }
 
   return (
     <div className="mt-2 space-y-1.5">
-      {visibleArtifacts.map((artifact, index) => <div key={index}>{artifact}</div>)}
+      {visibleArtifacts.map((artifact, index) => (
+        <div key={index}>{artifact}</div>
+      ))}
       {hasOverflow ? (
-        <button type="button" className="mt-1 text-xs font-semibold text-primary hover:text-primary/80" onClick={() => setShowAll((current) => !current)} aria-expanded={showAll}>
-          {showAll ? (showFewerLabel ?? "Show fewer") : (showAllLabel ?? `Show all (${items.length})`)}
+        <button
+          type="button"
+          className="mt-1 text-xs font-semibold text-primary hover:text-primary/80"
+          onClick={() => setShowAll((current) => !current)}
+          aria-expanded={showAll}
+        >
+          {showAll
+            ? (showFewerLabel ?? "Show fewer")
+            : (showAllLabel ?? `Show all (${items.length})`)}
         </button>
       ) : null}
     </div>
   );
 }
-function WorkspaceActionGroup({ label, layout = "inline", children }: { label?: string; layout?: "inline" | "stack"; children?: ReactNode }) {
+function WorkspaceActionGroup({
+  label,
+  layout = "inline",
+  children,
+}: {
+  label?: string;
+  layout?: "inline" | "stack";
+  children?: ReactNode;
+}) {
   return (
     <section className="rounded-xl border border-border/60 bg-background/70 p-2.5 shadow-sm">
-      {label ? <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">{label}</p> : null}
-      <div className={cn(layout === "inline" ? "flex flex-wrap gap-2" : "space-y-2")}>{children}</div>
+      {label ? (
+        <p className="mb-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+          {label}
+        </p>
+      ) : null}
+      <div
+        className={cn(
+          layout === "inline" ? "flex flex-wrap gap-2" : "space-y-2",
+        )}
+      >
+        {children}
+      </div>
     </section>
   );
 }
 
-function WorkspaceActionCard({ title, tone, children }: { title?: string; tone?: Tone; children?: ReactNode }) {
+function WorkspaceActionCard({
+  title,
+  tone,
+  children,
+}: {
+  title?: string;
+  tone?: Tone;
+  children?: ReactNode;
+}) {
   return (
-    <div className={cn("min-w-0 rounded-lg border bg-card/80 p-2.5 shadow-xs", panelToneClassName(tone))}>
-      {title ? <p className="mb-2 text-xs font-semibold text-foreground">{title}</p> : null}
-      <div className="space-y-2 [&_button]:h-8 [&_button]:rounded-lg [&_button]:px-3 [&_textarea]:min-h-20 [&_textarea]:text-sm">{children}</div>
+    <div
+      className={cn(
+        "min-w-0 rounded-lg border bg-card/80 p-2.5 shadow-xs",
+        panelToneClassName(tone),
+      )}
+    >
+      {title ? (
+        <p className="mb-2 text-xs font-semibold text-foreground">{title}</p>
+      ) : null}
+      <div className="space-y-2 [&_button]:h-8 [&_button]:rounded-lg [&_button]:px-3 [&_textarea]:min-h-20 [&_textarea]:text-sm">
+        {children}
+      </div>
     </div>
   );
 }
@@ -490,7 +980,10 @@ type WorkspaceTableProps = {
   uri?: string | null;
   path?: string | null;
   displayPath?: string | null;
-  columns?: Array<string | { key?: unknown; label?: unknown; type?: unknown; hrefKey?: unknown }> | null;
+  columns?: Array<
+    | string
+    | { key?: unknown; label?: unknown; type?: unknown; hrefKey?: unknown }
+  > | null;
   pageSize?: number | null;
   contentKind?: string | null;
   contentPreview?: string | null;
@@ -506,7 +999,8 @@ type WorkspaceTableProps = {
 function tableCellText(value: unknown) {
   if (value === null || value === undefined) return "";
   if (typeof value === "string") return value;
-  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  if (typeof value === "number" || typeof value === "boolean")
+    return String(value);
   try {
     return JSON.stringify(value);
   } catch {
@@ -517,7 +1011,11 @@ function tableCellText(value: unknown) {
 function safeExternalHref(value: string) {
   try {
     const url = new URL(value);
-    return url.protocol === "http:" || url.protocol === "https:" || url.protocol === "mailto:" ? url.href : null;
+    return url.protocol === "http:" ||
+      url.protocol === "https:" ||
+      url.protocol === "mailto:"
+      ? url.href
+      : null;
   } catch {
     return null;
   }
@@ -560,9 +1058,18 @@ function csvRows(content: string) {
 }
 
 function recordsFromRows(matrix: unknown[][]) {
-  if (matrix.length === 0) return { rows: [] as WorkspaceTableRow[], inferredColumns: [] as string[] };
-  const inferredColumns = matrix[0]!.map((value, index) => tableCellText(value).trim() || `Column ${index + 1}`);
-  const rows = matrix.slice(1).map((values) => Object.fromEntries(inferredColumns.map((key, index) => [key, values[index] ?? ""])));
+  if (matrix.length === 0)
+    return { rows: [] as WorkspaceTableRow[], inferredColumns: [] as string[] };
+  const inferredColumns = matrix[0]!.map(
+    (value, index) => tableCellText(value).trim() || `Column ${index + 1}`,
+  );
+  const rows = matrix
+    .slice(1)
+    .map((values) =>
+      Object.fromEntries(
+        inferredColumns.map((key, index) => [key, values[index] ?? ""]),
+      ),
+    );
   return { rows, inferredColumns };
 }
 
@@ -589,13 +1096,30 @@ function tableSourceRows(value: unknown): unknown[] {
   return [];
 }
 
-function parseTablePreview(kind: string | null | undefined, preview: string | null | undefined) {
-  if (!preview) return { rows: [] as WorkspaceTableRow[], inferredColumns: [] as string[], parseError: false };
+function parseTablePreview(
+  kind: string | null | undefined,
+  preview: string | null | undefined,
+) {
+  if (!preview)
+    return {
+      rows: [] as WorkspaceTableRow[],
+      inferredColumns: [] as string[],
+      parseError: false,
+    };
   try {
-    const rawRows = kind === "csv" ? csvRows(preview) : tableSourceRows(JSON.parse(preview));
-    if (rawRows.every(Array.isArray)) return { ...recordsFromRows(rawRows as unknown[][]), parseError: false };
-    if (rawRows.every((row) => row && typeof row === "object" && !Array.isArray(row))) {
-      return { ...recordsFromObjects(rawRows as Array<Record<string, unknown>>), parseError: false };
+    const rawRows =
+      kind === "csv" ? csvRows(preview) : tableSourceRows(JSON.parse(preview));
+    if (rawRows.every(Array.isArray))
+      return { ...recordsFromRows(rawRows as unknown[][]), parseError: false };
+    if (
+      rawRows.every(
+        (row) => row && typeof row === "object" && !Array.isArray(row),
+      )
+    ) {
+      return {
+        ...recordsFromObjects(rawRows as Array<Record<string, unknown>>),
+        parseError: false,
+      };
     }
   } catch {
     return { rows: [], inferredColumns: [], parseError: true };
@@ -603,42 +1127,103 @@ function parseTablePreview(kind: string | null | undefined, preview: string | nu
   return { rows: [], inferredColumns: [], parseError: true };
 }
 
-function normalizeTableColumns(propsColumns: WorkspaceTableProps["columns"], inferredColumns: string[]): WorkspaceTableColumn[] {
-  const columns = propsColumns?.flatMap<WorkspaceTableColumn>((column) => {
-    if (typeof column === "string") return [{ key: column, label: column }];
-    if (!column || typeof column !== "object" || typeof column.key !== "string") return [];
-    return [{
-      key: column.key,
-      label: typeof column.label === "string" ? column.label : column.key,
-      type: column.type === "number" || column.type === "link" ? column.type : "text",
-      hrefKey: typeof column.hrefKey === "string" ? column.hrefKey : undefined,
-    }];
-  }) ?? [];
-  return columns.length > 0 ? columns : inferredColumns.map((key) => ({ key, label: key }));
+function normalizeTableColumns(
+  propsColumns: WorkspaceTableProps["columns"],
+  inferredColumns: string[],
+): WorkspaceTableColumn[] {
+  const columns =
+    propsColumns?.flatMap<WorkspaceTableColumn>((column) => {
+      if (typeof column === "string") return [{ key: column, label: column }];
+      if (
+        !column ||
+        typeof column !== "object" ||
+        typeof column.key !== "string"
+      )
+        return [];
+      return [
+        {
+          key: column.key,
+          label: typeof column.label === "string" ? column.label : column.key,
+          type:
+            column.type === "number" || column.type === "link"
+              ? column.type
+              : "text",
+          hrefKey:
+            typeof column.hrefKey === "string" ? column.hrefKey : undefined,
+        },
+      ];
+    }) ?? [];
+  return columns.length > 0
+    ? columns
+    : inferredColumns.map((key) => ({ key, label: key }));
 }
 
-function WorkspaceTableCell({ column, row, value }: { column: WorkspaceTableColumn; row: WorkspaceTableRow; value: unknown }) {
+function WorkspaceTableCell({
+  column,
+  row,
+  value,
+}: {
+  column: WorkspaceTableColumn;
+  row: WorkspaceTableRow;
+  value: unknown;
+}) {
   const text = tableCellText(value);
-  const href = column.hrefKey ? safeExternalHref(tableCellText(row[column.hrefKey])) : column.type === "link" ? safeExternalHref(text) : null;
+  const href = column.hrefKey
+    ? safeExternalHref(tableCellText(row[column.hrefKey]))
+    : column.type === "link"
+      ? safeExternalHref(text)
+      : null;
   if (href) {
-    return <a href={href} target="_blank" rel="noreferrer" className="block min-w-0 whitespace-normal break-words font-medium text-primary underline-offset-4 [overflow-wrap:anywhere] hover:underline">{text}</a>;
+    return (
+      <a
+        href={href}
+        target="_blank"
+        rel="noreferrer"
+        className="block min-w-0 whitespace-normal break-words font-medium text-primary underline-offset-4 [overflow-wrap:anywhere] hover:underline"
+      >
+        {text}
+      </a>
+    );
   }
-  return <span className="block min-w-0 whitespace-normal break-words [overflow-wrap:anywhere] leading-5">{text}</span>;
+  return (
+    <span className="block min-w-0 whitespace-normal break-words [overflow-wrap:anywhere] leading-5">
+      {text}
+    </span>
+  );
 }
 
 function WorkspaceTable({ props }: { props: WorkspaceTableProps }) {
   const { messages } = useI18n();
   const copy = messages.components.taskWorkspace;
   const [sorting, setSorting] = useState<SortingState>([]);
-  const parsed = useMemo(() => parseTablePreview(props.contentKind, props.contentPreview), [props.contentKind, props.contentPreview]);
-  const tableColumns = useMemo(() => normalizeTableColumns(props.columns, parsed.inferredColumns), [props.columns, parsed.inferredColumns]);
-  const pageSize = typeof props.pageSize === "number" && Number.isFinite(props.pageSize) ? Math.max(1, Math.min(100, Math.floor(props.pageSize))) : 10;
-  const columnDefs = useMemo<ColumnDef<WorkspaceTableRow>[]>(() => tableColumns.map((column, index) => ({
-    id: `${column.key}:${index}`,
-    accessorFn: (row) => row[column.key],
-    header: column.label,
-    cell: ({ getValue, row }) => <WorkspaceTableCell column={column} row={row.original} value={getValue()} />,
-  })), [tableColumns]);
+  const parsed = useMemo(
+    () => parseTablePreview(props.contentKind, props.contentPreview),
+    [props.contentKind, props.contentPreview],
+  );
+  const tableColumns = useMemo(
+    () => normalizeTableColumns(props.columns, parsed.inferredColumns),
+    [props.columns, parsed.inferredColumns],
+  );
+  const pageSize =
+    typeof props.pageSize === "number" && Number.isFinite(props.pageSize)
+      ? Math.max(1, Math.min(100, Math.floor(props.pageSize)))
+      : 10;
+  const columnDefs = useMemo<ColumnDef<WorkspaceTableRow>[]>(
+    () =>
+      tableColumns.map((column, index) => ({
+        id: `${column.key}:${index}`,
+        accessorFn: (row) => row[column.key],
+        header: column.label,
+        cell: ({ getValue, row }) => (
+          <WorkspaceTableCell
+            column={column}
+            row={row.original}
+            value={getValue()}
+          />
+        ),
+      })),
+    [tableColumns],
+  );
   const table = useReactTable({
     data: parsed.rows,
     columns: columnDefs,
@@ -653,36 +1238,104 @@ function WorkspaceTable({ props }: { props: WorkspaceTableProps }) {
   const size = formatFileSize(props.contentBytes);
   const error = filePreviewErrorMessage(props.previewError, copy);
 
+  const fallbackCollapsed =
+    props.contentTruncated === true || parsed.rows.length > 25;
+  const collapsibleProps = props as unknown as Record<string, unknown>;
+  const tableContent = contentPropsWithoutTitle(
+    collapsibleProps,
+    fallbackCollapsed,
+  ) as WorkspaceTableProps;
+
   const contentNode = (
     <section className="min-w-0 w-full max-w-full space-y-2 overflow-hidden text-sm">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
-          {props.title ? <p className="font-medium text-foreground">{props.title}</p> : null}
-          {props.description ? <p className="text-xs text-muted-foreground">{props.description}</p> : null}
-          {path ? <p className="break-all text-xs text-muted-foreground">{path}</p> : null}
+          {tableContent.title ? (
+            <p className="font-medium text-foreground">{tableContent.title}</p>
+          ) : null}
+          {tableContent.description ? (
+            <p className="text-xs text-muted-foreground">
+              {tableContent.description}
+            </p>
+          ) : null}
+          {path ? (
+            <p className="break-all text-xs text-muted-foreground">{path}</p>
+          ) : null}
         </div>
         <div className="flex shrink-0 flex-wrap gap-1.5 text-[10px] text-muted-foreground">
-          {props.contentKind ? <Badge variant="outline" className="px-1.5 py-0 text-[10px]">{props.contentKind}</Badge> : null}
+          {props.contentKind ? (
+            <Badge variant="outline" className="px-1.5 py-0 text-[10px]">
+              {props.contentKind}
+            </Badge>
+          ) : null}
           {size ? <span>{size}</span> : null}
-          {props.contentTruncated ? <span>{copy.filePreviewTruncated ?? "Preview truncated"}</span> : null}
+          {props.contentTruncated ? (
+            <span>{copy.filePreviewTruncated ?? "Preview truncated"}</span>
+          ) : null}
         </div>
       </div>
-      {error ? <p className="rounded-md bg-muted/60 px-2 py-1.5 text-xs text-muted-foreground">{error}</p> : null}
-      {parsed.parseError ? <p className="rounded-md bg-muted/60 px-2 py-1.5 text-xs text-muted-foreground">Table preview could not be parsed.</p> : null}
-      {!error && !parsed.parseError && parsed.rows.length === 0 ? <p className="rounded-md bg-muted/60 px-2 py-1.5 text-xs text-muted-foreground">No table rows in preview.</p> : null}
+      {error ? (
+        <p className="rounded-md bg-muted/60 px-2 py-1.5 text-xs text-muted-foreground">
+          {error}
+        </p>
+      ) : null}
+      {parsed.parseError ? (
+        <p className="rounded-md bg-muted/60 px-2 py-1.5 text-xs text-muted-foreground">
+          Table preview could not be parsed.
+        </p>
+      ) : null}
+      {!error && !parsed.parseError && parsed.rows.length === 0 ? (
+        <p className="rounded-md bg-muted/60 px-2 py-1.5 text-xs text-muted-foreground">
+          No table rows in preview.
+        </p>
+      ) : null}
       {parsed.rows.length > 0 && tableColumns.length > 0 ? (
         <>
           <div className="min-w-0 w-full max-w-full overflow-hidden rounded-md border border-border/80 bg-background">
             <table className="w-full table-fixed caption-bottom text-sm">
               <thead className="bg-muted/55 [&_tr]:border-b">
                 {table.getHeaderGroups().map((headerGroup) => (
-                  <tr key={headerGroup.id} className="border-b transition-colors hover:bg-muted/50">
+                  <tr
+                    key={headerGroup.id}
+                    className="border-b transition-colors hover:bg-muted/50"
+                  >
                     {headerGroup.headers.map((header) => {
                       const sorted = header.column.getIsSorted();
                       return (
-                        <th key={header.id} aria-sort={sorted === "asc" ? "ascending" : sorted === "desc" ? "descending" : "none"} className={`h-10 min-w-0 px-1 align-middle font-medium text-foreground ${tableColumns[header.index]?.type === "number" ? "text-right" : "text-left"}`}>
-                          <button type="button" title="Click to sort" aria-label={`Sort by ${tableColumns[header.index]?.label ?? "column"}`} className={`flex w-full cursor-pointer items-center gap-1 rounded-sm px-1.5 py-1 text-left leading-snug transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${tableColumns[header.index]?.type === "number" ? "justify-end text-right" : "justify-start"}`} onClick={header.column.getToggleSortingHandler()}>
-                            <span className="min-w-0 whitespace-normal break-words [overflow-wrap:anywhere]">{flexRender(header.column.columnDef.header, header.getContext())}</span><span aria-hidden="true" className="shrink-0 text-muted-foreground">{sorted === "asc" ? "↑" : sorted === "desc" ? "↓" : "↕"}</span>
+                        <th
+                          key={header.id}
+                          aria-sort={
+                            sorted === "asc"
+                              ? "ascending"
+                              : sorted === "desc"
+                                ? "descending"
+                                : "none"
+                          }
+                          className={`h-10 min-w-0 px-1 align-middle font-medium text-foreground ${tableColumns[header.index]?.type === "number" ? "text-right" : "text-left"}`}
+                        >
+                          <button
+                            type="button"
+                            title="Click to sort"
+                            aria-label={`Sort by ${tableColumns[header.index]?.label ?? "column"}`}
+                            className={`flex w-full cursor-pointer items-center gap-1 rounded-sm px-1.5 py-1 text-left leading-snug transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${tableColumns[header.index]?.type === "number" ? "justify-end text-right" : "justify-start"}`}
+                            onClick={header.column.getToggleSortingHandler()}
+                          >
+                            <span className="min-w-0 whitespace-normal break-words [overflow-wrap:anywhere]">
+                              {flexRender(
+                                header.column.columnDef.header,
+                                header.getContext(),
+                              )}
+                            </span>
+                            <span
+                              aria-hidden="true"
+                              className="shrink-0 text-muted-foreground"
+                            >
+                              {sorted === "asc"
+                                ? "↑"
+                                : sorted === "desc"
+                                  ? "↓"
+                                  : "↕"}
+                            </span>
                           </button>
                         </th>
                       );
@@ -692,9 +1345,20 @@ function WorkspaceTable({ props }: { props: WorkspaceTableProps }) {
               </thead>
               <tbody className="[&_tr:last-child]:border-0">
                 {table.getRowModel().rows.map((row) => (
-                  <tr key={row.id} className="border-b transition-colors hover:bg-muted/50">
+                  <tr
+                    key={row.id}
+                    className="border-b transition-colors hover:bg-muted/50"
+                  >
                     {row.getVisibleCells().map((cell) => (
-                      <td key={cell.id} className={`min-w-0 p-2 align-top text-foreground/80 ${tableColumns[cell.column.getIndex()]?.type === "number" ? "text-right tabular-nums" : ""}`}>{flexRender(cell.column.columnDef.cell, cell.getContext())}</td>
+                      <td
+                        key={cell.id}
+                        className={`min-w-0 p-2 align-top text-foreground/80 ${tableColumns[cell.column.getIndex()]?.type === "number" ? "text-right tabular-nums" : ""}`}
+                      >
+                        {flexRender(
+                          cell.column.columnDef.cell,
+                          cell.getContext(),
+                        )}
+                      </td>
                     ))}
                   </tr>
                 ))}
@@ -702,11 +1366,34 @@ function WorkspaceTable({ props }: { props: WorkspaceTableProps }) {
             </table>
           </div>
           <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
-            <span>{parsed.rows.length} rows · {table.getPageCount() > 1 ? `page ${table.getState().pagination.pageIndex + 1} of ${table.getPageCount()}` : "1 page"}</span>
+            <span>
+              {parsed.rows.length} rows ·{" "}
+              {table.getPageCount() > 1
+                ? `page ${table.getState().pagination.pageIndex + 1} of ${table.getPageCount()}`
+                : "1 page"}
+            </span>
             {table.getPageCount() > 1 ? (
               <div className="flex gap-1.5">
-                <Button type="button" variant="outline" size="sm" className="h-7 px-2 text-xs" disabled={!table.getCanPreviousPage()} onClick={() => table.previousPage()}>Previous</Button>
-                <Button type="button" variant="outline" size="sm" className="h-7 px-2 text-xs" disabled={!table.getCanNextPage()} onClick={() => table.nextPage()}>Next</Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 px-2 text-xs"
+                  disabled={!table.getCanPreviousPage()}
+                  onClick={() => table.previousPage()}
+                >
+                  Previous
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  className="h-7 px-2 text-xs"
+                  disabled={!table.getCanNextPage()}
+                  onClick={() => table.nextPage()}
+                >
+                  Next
+                </Button>
               </div>
             ) : null}
           </div>
@@ -714,15 +1401,21 @@ function WorkspaceTable({ props }: { props: WorkspaceTableProps }) {
       ) : null}
     </section>
   );
-  return <MaybeCollapsible props={props as unknown as Record<string, unknown>} fallbackCollapsed={props.contentTruncated === true || parsed.rows.length > 25} fallbackTitle={props.title ?? "Table"}>{contentNode}</MaybeCollapsible>;
+  return (
+    <MaybeCollapsible
+      props={collapsibleProps}
+      fallbackCollapsed={fallbackCollapsed}
+      fallbackTitle={props.title ?? "Table"}
+    >
+      {contentNode}
+    </MaybeCollapsible>
+  );
 }
-
-
 
 /**
  * The Chrona workspace registry: standard primitives render with the prebuilt
  * `@json-render/shadcn` components (they inherit Chrona's Tailwind CSS-variable
- * theme); domain components (`Markdown`, `JsonView`, `FileRef`, `ResultSummary`,
+ * theme); domain components (`RichMarkdown`, `JsonView`, `FileRef`, `ResultSummary`,
  * `ActivityRow`, `ToolDetails`, `CollapsibleText`) render with Chrona JSX.
  *
  * Actions are declared required by the catalog but are only exercised by the
@@ -734,19 +1427,43 @@ export const { registry: workspaceRegistry } = defineRegistry(chronaCatalog, {
   components: {
     // standard primitives (shadcn)
     Card: (input) => {
-      const props = { ...input.props, className: cn(input.props.className, "min-w-0 w-full max-w-none") };
+      const props = {
+        ...input.props,
+        className: cn(input.props.className, "min-w-0 w-full max-w-none"),
+      };
       if (shouldWrapCollapsible(input.props)) {
-        const title = stringProp(input.props.collapseTitle) ?? stringProp(input.props.title) ?? "Result";
-        const summary = stringProp(input.props.collapsedSummary) ?? stringProp(input.props.description);
+        const title =
+          stringProp(input.props.collapseTitle) ??
+          stringProp(input.props.title) ??
+          "Result";
+        const summary =
+          stringProp(input.props.collapsedSummary) ??
+          stringProp(input.props.description);
         return (
-          <CollapsibleBlock title={title} summary={summary} defaultCollapsed={shouldCollapseByDefault(input.props, false)} storageId={collapseStorageIdFromProps(input.props)}>
+          <CollapsibleBlock
+            title={title}
+            summary={summary}
+            defaultCollapsed={shouldCollapseByDefault(input.props, false)}
+            storageId={collapseStorageIdFromProps(input.props)}
+          >
             {input.children}
           </CollapsibleBlock>
         );
       }
       return shadcnComponents.Card({ ...input, props });
     },
-    Stack: (input) => shadcnComponents.Stack({ ...input, props: { ...input.props, className: cn(input.props.className, "min-w-0 w-full max-w-full", !input.props.align && "items-stretch") } }),
+    Stack: (input) =>
+      shadcnComponents.Stack({
+        ...input,
+        props: {
+          ...input.props,
+          className: cn(
+            input.props.className,
+            "min-w-0 w-full max-w-full",
+            !input.props.align && "items-stretch",
+          ),
+        },
+      }),
     Separator: shadcnComponents.Separator,
     Text: shadcnComponents.Text,
     Heading: shadcnComponents.Heading,
@@ -761,11 +1478,19 @@ export const { registry: workspaceRegistry } = defineRegistry(chronaCatalog, {
     Table: WorkspaceTable,
     heading: shadcnComponents.Heading,
     DropdownMenu: shadcnComponents.DropdownMenu,
-    paragraph: ({ props }) => <p className="text-sm leading-6 text-foreground/85">{props.text ?? props.content}</p>,
+    paragraph: ({ props }) => (
+      <p className="text-sm leading-6 text-foreground/85">
+        {props.text ?? props.content}
+      </p>
+    ),
     table: WorkspaceTable,
     section: ({ props, children }) => (
       <section className="min-w-0 w-full max-w-full space-y-2 overflow-hidden rounded-xl border border-border/60 bg-background/70 p-3">
-        {props.title ? <h3 className="font-heading text-sm font-semibold text-foreground">{props.title}</h3> : null}
+        {props.title ? (
+          <h3 className="font-heading text-sm font-semibold text-foreground">
+            {props.title}
+          </h3>
+        ) : null}
         {children}
       </section>
     ),
@@ -774,40 +1499,140 @@ export const { registry: workspaceRegistry } = defineRegistry(chronaCatalog, {
       const rawOptions = Array.isArray(props.options) ? props.options : [];
       const options = rawOptions.filter(isOccurrenceOption);
       if (options.length <= 1) return null;
-      return <WorkspaceOccurrenceCalendar label={typeof props.label === "string" ? props.label : "Occurrence"} value={typeof props.value === "string" ? props.value : options[0]?.value ?? ""} options={options} />;
+      return (
+        <WorkspaceOccurrenceCalendar
+          label={typeof props.label === "string" ? props.label : "Occurrence"}
+          value={
+            typeof props.value === "string"
+              ? props.value
+              : (options[0]?.value ?? "")
+          }
+          options={options}
+        />
+      );
     },
 
-    WorkspaceActionGroup: ({ props, children }) => <WorkspaceActionGroup label={props.label} layout={props.layout}>{children}</WorkspaceActionGroup>,
-    WorkspaceActionCard: ({ props, children }) => <WorkspaceActionCard title={props.title} tone={props.tone as Tone}>{children}</WorkspaceActionCard>,
+    WorkspaceActionGroup: ({ props, children }) => (
+      <WorkspaceActionGroup label={props.label} layout={props.layout}>
+        {children}
+      </WorkspaceActionGroup>
+    ),
+    WorkspaceActionCard: ({ props, children }) => (
+      <WorkspaceActionCard title={props.title} tone={props.tone as Tone}>
+        {children}
+      </WorkspaceActionCard>
+    ),
     // domain components (Chrona)
-    Markdown: ({ props }) => {
+    RichMarkdown: ({ props }) => {
       const content = typeof props.content === "string" ? props.content : "";
-      const contentNode = (
-        <article className="min-w-0 w-full max-w-full overflow-hidden px-0.5 py-1 text-sm leading-6 text-foreground">
-          <div className="max-w-none space-y-2 break-words [overflow-wrap:anywhere] [&_a]:font-medium [&_a]:text-primary [&_a]:underline-offset-4 hover:[&_a]:underline [&_blockquote]:rounded-lg [&_blockquote]:border-l-2 [&_blockquote]:border-primary/40 [&_blockquote]:bg-primary-soft/45 [&_blockquote]:px-3 [&_blockquote]:py-2 [&_blockquote]:text-foreground/80 [&_code]:rounded-md [&_code]:bg-muted [&_code]:px-1.5 [&_code]:py-0.5 [&_code]:font-mono [&_code]:text-[0.82em] [&_code]:text-foreground [&_h1]:font-heading [&_h1]:text-base [&_h1]:font-semibold [&_h1]:leading-tight [&_h2]:font-heading [&_h2]:text-sm [&_h2]:font-semibold [&_h2]:leading-tight [&_h3]:text-sm [&_h3]:font-semibold [&_hr]:border-border [&_li]:pl-1 [&_ol]:list-decimal [&_ol]:space-y-1 [&_ol]:pl-5 [&_p]:text-foreground/88 [&_pre]:max-w-full [&_pre]:overflow-x-auto [&_pre]:rounded-lg [&_pre]:bg-muted/70 [&_pre]:p-3 [&_pre]:text-xs [&_strong]:text-foreground [&_table]:w-full [&_table]:table-fixed [&_table]:border-collapse [&_td]:border [&_td]:border-border [&_td]:p-1.5 [&_td]:break-words [&_th]:border [&_th]:border-border [&_th]:bg-muted/70 [&_th]:p-1.5 [&_th]:text-left [&_th]:break-words [&_ul]:list-disc [&_ul]:space-y-1 [&_ul]:pl-5">
-            <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
-          </div>
-        </article>
+      const contentNode = <TaskMarkdownContent>{content}</TaskMarkdownContent>;
+      return (
+        <MaybeCollapsible
+          props={props}
+          fallbackCollapsed={content.length > AUTO_COLLAPSE_MARKDOWN_LENGTH}
+          fallbackTitle={
+            typeof props.title === "string" ? props.title : "Rich text"
+          }
+        >
+          {contentNode}
+        </MaybeCollapsible>
       );
-      return <MaybeCollapsible props={props} fallbackCollapsed={content.length > AUTO_COLLAPSE_MARKDOWN_LENGTH} fallbackTitle={typeof props.title === "string" ? props.title : "Markdown"}>{contentNode}</MaybeCollapsible>;
     },
     JsonView: ({ props }) => {
-      const jsonText = typeof props.value === "string" ? props.value : JSON.stringify(props.value, null, 2);
+      const jsonText =
+        typeof props.value === "string"
+          ? props.value
+          : JSON.stringify(props.value, null, 2);
+      const fallbackCollapsed = jsonText.length > AUTO_COLLAPSE_JSON_LENGTH;
+      const contentProps = contentPropsWithoutTitle(props, fallbackCollapsed);
       const contentNode = (
         <section className="min-w-0 w-full max-w-full overflow-hidden px-0.5 py-1 text-sm text-foreground">
-          {props.title ? <p className="mb-2 truncate text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">{props.title}</p> : null}
+          {typeof contentProps.title === "string" ? (
+            <p className="mb-2 truncate text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+              {contentProps.title}
+            </p>
+          ) : null}
           <pre className="max-h-96 max-w-full overflow-x-auto rounded-lg bg-muted/60 p-2 text-xs leading-5 text-foreground/80">
             {jsonText}
           </pre>
         </section>
       );
-      return <MaybeCollapsible props={props} fallbackCollapsed={jsonText.length > AUTO_COLLAPSE_JSON_LENGTH} fallbackTitle={typeof props.title === "string" ? props.title : "JSON"}>{contentNode}</MaybeCollapsible>;
+      return (
+        <MaybeCollapsible
+          props={props}
+          fallbackCollapsed={fallbackCollapsed}
+          fallbackTitle={typeof props.title === "string" ? props.title : "JSON"}
+        >
+          {contentNode}
+        </MaybeCollapsible>
+      );
     },
-    FileRef: ({ props }) => <MaybeCollapsible props={props} fallbackCollapsed={props.contentTruncated === true || (typeof props.contentBytes === "number" && props.contentBytes > AUTO_COLLAPSE_FILE_BYTES)} fallbackTitle={typeof props.title === "string" ? props.title : "File"}><FileView props={props} /></MaybeCollapsible>,
-    FileView: ({ props }) => <MaybeCollapsible props={props} fallbackCollapsed={props.contentTruncated === true || (typeof props.contentBytes === "number" && props.contentBytes > AUTO_COLLAPSE_FILE_BYTES)} fallbackTitle={typeof props.title === "string" ? props.title : "File"}><FileView props={props} /></MaybeCollapsible>,
+    FileRef: ({ props }) => (
+      <MaybeCollapsible
+        props={props}
+        fallbackCollapsed={
+          props.contentTruncated === true ||
+          (typeof props.contentBytes === "number" &&
+            props.contentBytes > AUTO_COLLAPSE_FILE_BYTES)
+        }
+        fallbackTitle={typeof props.title === "string" ? props.title : "File"}
+      >
+        <FileView
+          props={contentPropsWithoutTitle(
+            props,
+            props.contentTruncated === true ||
+              (typeof props.contentBytes === "number" &&
+                props.contentBytes > AUTO_COLLAPSE_FILE_BYTES),
+          )}
+        />
+      </MaybeCollapsible>
+    ),
+    FileView: ({ props }) => (
+      <MaybeCollapsible
+        props={props}
+        fallbackCollapsed={
+          props.contentTruncated === true ||
+          (typeof props.contentBytes === "number" &&
+            props.contentBytes > AUTO_COLLAPSE_FILE_BYTES)
+        }
+        fallbackTitle={typeof props.title === "string" ? props.title : "File"}
+      >
+        <FileView
+          props={contentPropsWithoutTitle(
+            props,
+            props.contentTruncated === true ||
+              (typeof props.contentBytes === "number" &&
+                props.contentBytes > AUTO_COLLAPSE_FILE_BYTES),
+          )}
+        />
+      </MaybeCollapsible>
+    ),
     ResultSummary: ({ props }) => <ResultSummary props={props} />,
-    CollapsibleBlock: ({ props, children }) => <CollapsibleBlock title={stringProp(props.title)} summary={stringProp(props.summary)} defaultCollapsed={boolProp(props.defaultCollapsed)} storageId={collapseStorageIdFromProps(props)}>{children}</CollapsibleBlock>,
-    NodeResultSection: ({ props, children }) => <CollapsibleBlock title={stringProp(props.nodeTitle)} summary={typeof props.itemCount === "number" ? `${props.itemCount} result${props.itemCount === 1 ? "" : "s"}` : stringProp(props.status)} defaultCollapsed={boolProp(props.defaultCollapsed)} storageId={collapseStorageIdFromProps(props)} subtle>{children}</CollapsibleBlock>,
+    CollapsibleBlock: ({ props, children }) => (
+      <CollapsibleBlock
+        title={stringProp(props.title)}
+        summary={stringProp(props.summary)}
+        defaultCollapsed={boolProp(props.defaultCollapsed)}
+        storageId={collapseStorageIdFromProps(props)}
+      >
+        {children}
+      </CollapsibleBlock>
+    ),
+    NodeResultSection: ({ props, children }) => (
+      <CollapsibleBlock
+        title={stringProp(props.nodeTitle)}
+        summary={
+          typeof props.itemCount === "number"
+            ? `${props.itemCount} result${props.itemCount === 1 ? "" : "s"}`
+            : stringProp(props.status)
+        }
+        defaultCollapsed={boolProp(props.defaultCollapsed)}
+        storageId={collapseStorageIdFromProps(props)}
+        subtle
+      >
+        {children}
+      </CollapsibleBlock>
+    ),
     ActivityRow: ({ props, children }) => {
       const tone = props.tone as Tone;
       const Icon = activityIcon(props.kind, tone);
@@ -816,32 +1641,71 @@ export const { registry: workspaceRegistry } = defineRegistry(chronaCatalog, {
         <article className="group relative grid grid-cols-[2rem_minmax(0,1fr)] gap-x-3">
           <div className="relative flex justify-center">
             <span className="absolute -bottom-3 top-8 mx-auto w-px bg-border/50 group-last:hidden" />
-            <span className={cn("relative z-10 mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full ring-4 ring-background shadow-sm", activityIconClassName(tone))}>
+            <span
+              className={cn(
+                "relative z-10 mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full ring-4 ring-background shadow-sm",
+                activityIconClassName(tone),
+              )}
+            >
               <Icon className="size-3.5" />
             </span>
           </div>
           <div className="min-w-0 pb-4 pt-0.5">
             <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-              {props.time ? <time className="shrink-0 font-mono text-[10px] tabular-nums text-muted-foreground/50">{props.time}</time> : null}
-              <p className="min-w-0 break-words text-sm font-semibold leading-snug text-foreground">{props.title}</p>
-              {props.toolState ? <Badge variant={toneBadgeVariant(tone)} className="gap-1 text-[10px]"><Wrench className="size-3" />{props.toolState}</Badge> : null}
+              {props.time ? (
+                <time className="shrink-0 font-mono text-[10px] tabular-nums text-muted-foreground/50">
+                  {props.time}
+                </time>
+              ) : null}
+              <p className="min-w-0 break-words text-sm font-semibold leading-snug text-foreground">
+                {props.title}
+              </p>
+              {props.toolState ? (
+                <Badge
+                  variant={toneBadgeVariant(tone)}
+                  className="gap-1 text-[10px]"
+                >
+                  <Wrench className="size-3" />
+                  {props.toolState}
+                </Badge>
+              ) : null}
             </div>
-            {(props.sourceNodeTitle || props.provider) ? (
+            {props.sourceNodeTitle || props.provider ? (
               <div className="mt-1 flex flex-wrap items-center gap-1.5">
-                {props.sourceNodeTitle ? <Badge variant="outline" className="max-w-full truncate bg-background/80 text-[10px]">{props.sourceNodeTitle}</Badge> : null}
-                {props.provider ? <span className="rounded-full bg-primary-soft px-2 py-0.5 text-[10px] font-medium text-primary">{props.provider}</span> : null}
+                {props.sourceNodeTitle ? (
+                  <Badge
+                    variant="outline"
+                    className="max-w-full truncate bg-background/80 text-[10px]"
+                  >
+                    {props.sourceNodeTitle}
+                  </Badge>
+                ) : null}
+                {props.provider ? (
+                  <span className="rounded-full bg-primary-soft px-2 py-0.5 text-[10px] font-medium text-primary">
+                    {props.provider}
+                  </span>
+                ) : null}
               </div>
             ) : null}
-            {props.text ? <CollapsibleText text={props.text} threshold={compact ? 220 : undefined} /> : null}
+            {props.text ? (
+              <CollapsibleText
+                text={props.text}
+                threshold={compact ? 220 : undefined}
+              />
+            ) : null}
             {children ? <div className="mt-1.5">{children}</div> : null}
           </div>
         </article>
       );
     },
     ActivityStream: ({ props }) => {
-      const items = Array.isArray(props.items) ? props.items as WorkspaceActivityItem[] : [];
-      const liveCount = typeof props.liveCount === "number" ? props.liveCount : 0;
-      const savedCount = typeof props.savedCount === "number" ? props.savedCount : items.length;
+      const items = Array.isArray(props.items)
+        ? (props.items as WorkspaceActivityItem[])
+        : [];
+      const liveCount =
+        typeof props.liveCount === "number" ? props.liveCount : 0;
+      const savedCount =
+        typeof props.savedCount === "number" ? props.savedCount : items.length;
       return (
         <section>
           <div className="mb-3 text-xs text-muted-foreground">
@@ -849,12 +1713,20 @@ export const { registry: workspaceRegistry } = defineRegistry(chronaCatalog, {
           </div>
           {items.length === 0 ? (
             <div className="mt-3 rounded-2xl border border-dashed border-border/70 bg-background/70 px-3 py-4 text-center">
-              <p className="text-sm font-medium text-foreground">{props.emptyMessage}</p>
-              <p className="mt-1 text-xs text-muted-foreground">{taskWorkspaceActivityMessages.emptyHint}</p>
+              <p className="text-sm font-medium text-foreground">
+                {props.emptyMessage}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {taskWorkspaceActivityMessages.emptyHint}
+              </p>
             </div>
           ) : (
             <div className={props.density === "rail" ? "mt-3" : "mt-4 pl-1"}>
-              <ActivityTimeline items={items} density={props.density === "rail" ? "rail" : undefined} active={props.active === true} />
+              <ActivityTimeline
+                items={items}
+                density={props.density === "rail" ? "rail" : undefined}
+                active={props.active === true}
+              />
             </div>
           )}
         </section>
@@ -863,38 +1735,73 @@ export const { registry: workspaceRegistry } = defineRegistry(chronaCatalog, {
     ToolDetails: ({ props }) => (
       <dl className="space-y-1.5 rounded-xl border border-border/50 bg-muted/35 p-2 text-xs">
         {props.rows.map((row) => (
-          <div key={row.label} className="grid gap-1 sm:grid-cols-[72px_minmax(0,1fr)]">
+          <div
+            key={row.label}
+            className="grid gap-1 sm:grid-cols-[72px_minmax(0,1fr)]"
+          >
             <dt className="font-semibold text-muted-foreground">{row.label}</dt>
-            <dd className="min-w-0 break-words text-foreground/80">{row.value}</dd>
+            <dd className="min-w-0 break-words text-foreground/80">
+              {row.value}
+            </dd>
           </div>
         ))}
       </dl>
     ),
-    CollapsibleText: ({ props }) => <CollapsibleText text={props.text} threshold={props.threshold} />,
+    CollapsibleText: ({ props }) => (
+      <CollapsibleText text={props.text} threshold={props.threshold} />
+    ),
     WorkspaceSummaryCard: ({ props, children }) => {
       const Icon = workspaceIcon(props.icon);
       return (
-        <section className={cn("rounded-[1rem] border p-3 shadow-sm", panelToneClassName(props.tone as Tone))}>
+        <section
+          className={cn(
+            "rounded-[1rem] border p-3 shadow-sm",
+            panelToneClassName(props.tone as Tone),
+          )}
+        >
           <div className="flex items-start justify-between gap-3">
             <div className="flex min-w-0 items-center gap-2">
               <span className="flex size-7 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
                 <Icon className="size-3.5" />
               </span>
               <div className="min-w-0">
-                {props.eyebrow ? <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">{props.eyebrow}</p> : null}
-                <p className="break-words text-sm font-semibold text-foreground">{props.title}</p>
+                {props.eyebrow ? (
+                  <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">
+                    {props.eyebrow}
+                  </p>
+                ) : null}
+                <p className="break-words text-sm font-semibold text-foreground">
+                  {props.title}
+                </p>
               </div>
             </div>
-            {props.statusLabel ? <span className="shrink-0 rounded-full bg-background/85 px-2 py-0.5 text-xs font-medium text-muted-foreground">{props.statusLabel}</span> : null}
+            {props.statusLabel ? (
+              <span className="shrink-0 rounded-full bg-background/85 px-2 py-0.5 text-xs font-medium text-muted-foreground">
+                {props.statusLabel}
+              </span>
+            ) : null}
           </div>
-          {props.sourceLabel ? <p className="mt-2 text-xs font-medium text-muted-foreground">{props.sourceLabel}</p> : null}
-          {props.description ? <div className="mt-2 line-clamp-3 break-words rounded-xl bg-muted/50 px-2.5 py-2 text-[13px] leading-[1.45] text-foreground/80">{props.description}</div> : null}
+          {props.sourceLabel ? (
+            <p className="mt-2 text-xs font-medium text-muted-foreground">
+              {props.sourceLabel}
+            </p>
+          ) : null}
+          {props.description ? (
+            <div className="mt-2 line-clamp-3 break-words rounded-xl bg-muted/50 px-2.5 py-2 text-[13px] leading-[1.45] text-foreground/80">
+              {props.description}
+            </div>
+          ) : null}
           {children ? <div className="mt-2">{children}</div> : null}
         </section>
       );
     },
     WorkspaceArtifactList: ({ props, children }) => (
-      <WorkspaceArtifactList emptyLabel={props.emptyLabel} maxCollapsed={props.maxCollapsed} showAllLabel={props.showAllLabel} showFewerLabel={props.showFewerLabel}>
+      <WorkspaceArtifactList
+        emptyLabel={props.emptyLabel}
+        maxCollapsed={props.maxCollapsed}
+        showAllLabel={props.showAllLabel}
+        showFewerLabel={props.showFewerLabel}
+      >
         {children}
       </WorkspaceArtifactList>
     ),
@@ -905,7 +1812,11 @@ export const { registry: workspaceRegistry } = defineRegistry(chronaCatalog, {
           <FileView props={props} />
           {locate.bound ? (
             <div className="mt-0.5 text-xs">
-              <button type="button" className="font-semibold text-primary" onClick={() => emit("locate")}>
+              <button
+                type="button"
+                className="font-semibold text-primary"
+                onClick={() => emit("locate")}
+              >
                 {props.locateLabel}
               </button>
             </div>
@@ -917,19 +1828,29 @@ export const { registry: workspaceRegistry } = defineRegistry(chronaCatalog, {
       <div className="space-y-4">
         <div className="flex items-center justify-between gap-2">
           <div>
-            <h3 className="text-base font-semibold text-foreground">Proposed Changes</h3>
-            <p className="mt-1 text-sm text-muted-foreground">{props.summary}</p>
+            <h3 className="text-base font-semibold text-foreground">
+              Proposed Changes
+            </h3>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {props.summary}
+            </p>
           </div>
-          <Badge variant={props.confidence === "low" ? "outline" : "secondary"}>{props.confidence} confidence</Badge>
+          <Badge variant={props.confidence === "low" ? "outline" : "secondary"}>
+            {props.confidence} confidence
+          </Badge>
         </div>
         {props.risks.length > 0 ? (
           <div className="rounded-2xl border border-warning/30 bg-warning/15 px-4 py-3">
             <div className="flex items-start gap-2">
               <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warning-foreground" />
               <div>
-                <p className="text-sm font-medium text-warning-foreground">High Risk Changes</p>
+                <p className="text-sm font-medium text-warning-foreground">
+                  High Risk Changes
+                </p>
                 <ul className="mt-1 list-disc space-y-0.5 pl-4 text-xs text-warning-foreground/90">
-                  {props.risks.map((risk, index) => <li key={`${risk}:${index}`}>{risk}</li>)}
+                  {props.risks.map((risk, index) => (
+                    <li key={`${risk}:${index}`}>{risk}</li>
+                  ))}
                 </ul>
               </div>
             </div>
@@ -938,7 +1859,10 @@ export const { registry: workspaceRegistry } = defineRegistry(chronaCatalog, {
         {props.warnings.length > 0 ? (
           <div className="space-y-1.5 rounded-2xl border border-border/60 bg-muted/20 px-4 py-3 text-xs text-muted-foreground">
             {props.warnings.map((warning, index) => (
-              <div key={`${warning}:${index}`} className="flex items-start gap-1.5">
+              <div
+                key={`${warning}:${index}`}
+                className="flex items-start gap-1.5"
+              >
                 <TriangleAlert className="mt-0.5 size-3 shrink-0 text-warning-foreground" />
                 <span>{warning}</span>
               </div>
@@ -947,15 +1871,34 @@ export const { registry: workspaceRegistry } = defineRegistry(chronaCatalog, {
         ) : null}
         {props.taskDiffs.length > 0 ? (
           <div className="space-y-2">
-            <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">Task Changes ({props.taskDiffs.length})</p>
+            <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
+              Task Changes ({props.taskDiffs.length})
+            </p>
             <div className="rounded-2xl border border-border/60 bg-background/80 p-3">
               {props.taskDiffs.map((diff) => {
                 const changed = diff.original !== diff.proposed;
                 return (
-                  <div key={diff.key} className={cn("grid grid-cols-1 gap-2 border-b border-border/30 py-1.5 text-xs last:border-b-0 sm:grid-cols-[120px_minmax(0,1fr)_minmax(0,1fr)]", changed && "-mx-2 bg-warning/10 px-2")}>
-                    <span className="font-medium text-muted-foreground">{diff.label}</span>
-                    <span className={cn("text-muted-foreground/70 line-through", changed && "text-destructive/60")}>{diff.original || <em>empty</em>}</span>
-                    <span className={cn(changed && "font-medium text-success")}>{diff.proposed || <em>empty</em>}</span>
+                  <div
+                    key={diff.key}
+                    className={cn(
+                      "grid grid-cols-1 gap-2 border-b border-border/30 py-1.5 text-xs last:border-b-0 sm:grid-cols-[120px_minmax(0,1fr)_minmax(0,1fr)]",
+                      changed && "-mx-2 bg-warning/10 px-2",
+                    )}
+                  >
+                    <span className="font-medium text-muted-foreground">
+                      {diff.label}
+                    </span>
+                    <span
+                      className={cn(
+                        "text-muted-foreground/70 line-through",
+                        changed && "text-destructive/60",
+                      )}
+                    >
+                      {diff.original || <em>empty</em>}
+                    </span>
+                    <span className={cn(changed && "font-medium text-success")}>
+                      {diff.proposed || <em>empty</em>}
+                    </span>
                   </div>
                 );
               })}
@@ -964,19 +1907,32 @@ export const { registry: workspaceRegistry } = defineRegistry(chronaCatalog, {
         ) : null}
         {props.planSummary.length > 0 ? (
           <div className="space-y-2">
-            <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">Plan Changes</p>
+            <p className="text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
+              Plan Changes
+            </p>
             <div className="space-y-2 rounded-2xl border border-border/60 bg-background/80 p-4">
               <Badge variant="secondary">plan patch</Badge>
               <ul className="list-disc space-y-1 pl-4 text-sm text-muted-foreground">
-                {props.planSummary.map((point, index) => <li key={`${point}:${index}`}>{point}</li>)}
+                {props.planSummary.map((point, index) => (
+                  <li key={`${point}:${index}`}>{point}</li>
+                ))}
               </ul>
               {props.addedNodes.length > 0 ? (
                 <div className="mt-2 space-y-1">
                   <p className="text-xs font-medium text-foreground">Nodes:</p>
                   {props.addedNodes.map((node, index) => (
-                    <div key={`${node.title}:${index}`} className="rounded-lg border border-border/40 bg-muted/20 px-3 py-1.5 text-xs">
-                      <span className="font-medium text-foreground">{node.title}</span>
-                      {node.estimatedMinutes ? <span className="ml-2 text-muted-foreground">({node.estimatedMinutes}m)</span> : null}
+                    <div
+                      key={`${node.title}:${index}`}
+                      className="rounded-lg border border-border/40 bg-muted/20 px-3 py-1.5 text-xs"
+                    >
+                      <span className="font-medium text-foreground">
+                        {node.title}
+                      </span>
+                      {node.estimatedMinutes ? (
+                        <span className="ml-2 text-muted-foreground">
+                          ({node.estimatedMinutes}m)
+                        </span>
+                      ) : null}
                     </div>
                   ))}
                 </div>
@@ -995,31 +1951,49 @@ export const { registry: workspaceRegistry } = defineRegistry(chronaCatalog, {
   },
   actions: {
     "command-center-primary": async () => {
-      throw new Error('[ui-protocol] action "command-center-primary" requires a host handler.');
+      throw new Error(
+        '[ui-protocol] action "command-center-primary" requires a host handler.',
+      );
     },
     "accept-plan": async () => {
-      throw new Error('[ui-protocol] action "accept-plan" requires a host handler.');
+      throw new Error(
+        '[ui-protocol] action "accept-plan" requires a host handler.',
+      );
     },
     "generate-plan": async () => {
-      throw new Error('[ui-protocol] action "generate-plan" requires a host handler.');
+      throw new Error(
+        '[ui-protocol] action "generate-plan" requires a host handler.',
+      );
     },
     "dispatch-execution": async () => {
-      throw new Error('[ui-protocol] action "dispatch-execution" is wired in Phase 3 (Node action).');
+      throw new Error(
+        '[ui-protocol] action "dispatch-execution" is wired in Phase 3 (Node action).',
+      );
     },
     "submit-checkpoint": async () => {
-      throw new Error('[ui-protocol] action "submit-checkpoint" is wired in Phase 3 (Node action).');
+      throw new Error(
+        '[ui-protocol] action "submit-checkpoint" is wired in Phase 3 (Node action).',
+      );
     },
     "locate-workspace-node": async () => {
-      throw new Error('[ui-protocol] action "locate-workspace-node" requires a host handler.');
+      throw new Error(
+        '[ui-protocol] action "locate-workspace-node" requires a host handler.',
+      );
     },
     "recovery-retry": async () => {
-      throw new Error('[ui-protocol] action "recovery-retry" requires a host handler.');
+      throw new Error(
+        '[ui-protocol] action "recovery-retry" requires a host handler.',
+      );
     },
     "recovery-edit-instruction": async () => {
-      throw new Error('[ui-protocol] action "recovery-edit-instruction" requires a host handler.');
+      throw new Error(
+        '[ui-protocol] action "recovery-edit-instruction" requires a host handler.',
+      );
     },
     "recovery-cancel": async () => {
-      throw new Error('[ui-protocol] action "recovery-cancel" requires a host handler.');
+      throw new Error(
+        '[ui-protocol] action "recovery-cancel" requires a host handler.',
+      );
     },
   },
 });

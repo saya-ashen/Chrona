@@ -23,7 +23,8 @@ function pageData(overrides: Partial<TaskPageData> = {}): TaskPageData {
       id: "task_1",
       workspaceId: "workspace_1",
       title: "Collect GitHub trending",
-      description: "Return a summary report. Success means top projects are listed with links.",
+      description:
+        "Return a summary report. Success means top projects are listed with links.",
       executionRuntime: "omp",
       executionConfig: null,
       aiClientId: "ai_1",
@@ -106,7 +107,9 @@ function graphPlan(): TaskPlanGraphPlan {
   };
 }
 
-function operationState(overrides: Partial<TaskWorkspaceOperationState> = {}): TaskWorkspaceOperationState {
+function operationState(
+  overrides: Partial<TaskWorkspaceOperationState> = {},
+): TaskWorkspaceOperationState {
   return {
     status: "plan-ready-to-run",
     title: "Ready to run",
@@ -123,20 +126,27 @@ function operationState(overrides: Partial<TaskWorkspaceOperationState> = {}): T
 
 describe("task workspace interaction model", () => {
   it("derives planning readiness without mutating task state", () => {
-    const readiness = deriveTaskPlanningReadiness(pageData({
-      task: {
-        ...pageData().task,
-        description: null,
-      },
-    }));
+    const readiness = deriveTaskPlanningReadiness(
+      pageData({
+        task: {
+          ...pageData().task,
+          description: null,
+        },
+      }),
+    );
 
     expect(readiness.status).toBe("warning");
     expect(readiness.primaryAction).toBe("generate_plan");
-    expect(readiness.checks.find((check) => check.id === "description")?.state).toBe("missing");
+    expect(
+      readiness.checks.find((check) => check.id === "description")?.state,
+    ).toBe("missing");
   });
 
   it("derives a manual launch contract without using the inspected node as the start point", () => {
-    const launch = deriveRunPreview({ pageData: pageData(), graphPlan: graphPlan() });
+    const launch = deriveRunPreview({
+      pageData: pageData(),
+      graphPlan: graphPlan(),
+    });
 
     expect(derivePlanReviewSummary(graphPlan())).toMatchObject({
       stepCount: 3,
@@ -154,31 +164,60 @@ describe("task workspace interaction model", () => {
       stepCount: 3,
       estimatedMinutes: 10,
       canStartManually: true,
-      expectedStops: [{ id: "n2", label: "Review draft report", kind: "approval" }],
+      expectedStops: [
+        { id: "n2", label: "Review draft report", kind: "approval" },
+      ],
     });
   });
 
   it.each([
     {
       name: "scheduled automatic launch",
-      task: { autoExecute: true, scheduledStartAt: "2026-07-10T14:00:00.000Z", scheduledEndAt: "2026-07-10T14:30:00.000Z" },
-      expected: { readiness: "scheduled", startMode: "scheduled", canStartManually: true },
+      task: {
+        autoExecute: true,
+        scheduledStartAt: "2026-07-10T14:00:00.000Z",
+        scheduledEndAt: "2026-07-10T14:30:00.000Z",
+      },
+      expected: {
+        readiness: "scheduled",
+        startMode: "scheduled",
+        canStartManually: true,
+      },
     },
     {
       name: "blocked launch without a provider",
-      task: { aiClientId: "missing", isRunnable: false, runnabilitySummary: "Connect an AI provider" },
-      expected: { readiness: "blocked", recoveryAction: "connect_provider", canStartManually: false, blockerSummary: "Connect an AI provider" },
+      task: {
+        aiClientId: "missing",
+        isRunnable: false,
+        runnabilitySummary: "Connect an AI provider",
+      },
+      expected: {
+        readiness: "blocked",
+        recoveryAction: "connect_provider",
+        canStartManually: false,
+        blockerSummary: "Connect an AI provider",
+      },
     },
     {
       name: "blocked launch with incomplete task setup",
-      task: { isRunnable: false, runnabilitySummary: "Task configuration is incomplete" },
-      expected: { readiness: "blocked", recoveryAction: "edit_task", canStartManually: false, blockerSummary: "Task configuration is incomplete" },
+      task: {
+        isRunnable: false,
+        runnabilitySummary: "Task configuration is incomplete",
+      },
+      expected: {
+        readiness: "blocked",
+        recoveryAction: "edit_task",
+        canStartManually: false,
+        blockerSummary: "Task configuration is incomplete",
+      },
     },
   ])("derives $name", ({ task, expected }) => {
-    expect(deriveRunPreview({
-      pageData: pageData({ task: { ...pageData().task, ...task } }),
-      graphPlan: graphPlan(),
-    })).toMatchObject(expected);
+    expect(
+      deriveRunPreview({
+        pageData: pageData({ task: { ...pageData().task, ...task } }),
+        graphPlan: graphPlan(),
+      }),
+    ).toMatchObject(expected);
   });
 
   it("keeps Completed and Done distinct in result review state", () => {
@@ -188,57 +227,112 @@ describe("task workspace interaction model", () => {
     });
     const donePage = pageData({ task: { ...pageData().task, status: "Done" } });
 
-    expect(deriveTaskWorkspaceStage({ pageData: completedPage, graphPlan: graphPlan(), operationState: operationState({ status: "execution-completed", action: "none" } as unknown as Partial<TaskWorkspaceOperationState>) })).toMatchObject({
+    expect(
+      deriveTaskWorkspaceStage({
+        pageData: completedPage,
+        graphPlan: graphPlan(),
+        operationState: operationState({
+          status: "execution-completed",
+          action: "none",
+        } as unknown as Partial<TaskWorkspaceOperationState>),
+      }),
+    ).toMatchObject({
       stage: "result",
       statusLabel: "Result ready",
       nextActionLabel: "Accept result or request changes",
     });
-    expect(deriveTaskWorkspaceStage({ pageData: donePage, graphPlan: graphPlan(), operationState: operationState({ status: "execution-completed", action: "none" } as unknown as Partial<TaskWorkspaceOperationState>) })).toMatchObject({
+    expect(
+      deriveTaskWorkspaceStage({
+        pageData: donePage,
+        graphPlan: graphPlan(),
+        operationState: operationState({
+          status: "execution-completed",
+          action: "none",
+        } as unknown as Partial<TaskWorkspaceOperationState>),
+      }),
+    ).toMatchObject({
       stage: "result",
       statusLabel: "Task done",
       nextActionLabel: "Ask a follow-up or create a next task",
     });
-    expect(deriveResultReview({ pageData: completedPage, graphPlan: graphPlan() })).toMatchObject({
+    expect(
+      deriveResultReview({ pageData: completedPage, graphPlan: graphPlan() }),
+    ).toMatchObject({
       phase: "pending_acceptance",
       completion: { stepCount: 3, artifactCount: 1 },
-      decision: { primaryAction: "accept_result", canAccept: true, canRequestChanges: true },
+      decision: {
+        primaryAction: "accept_result",
+        canAccept: true,
+        canRequestChanges: true,
+      },
       content: { hasResult: true, hasArtifacts: true, showNodeFilter: true },
       continuation: { visible: false },
     });
-    expect(deriveResultReview({ pageData: donePage, graphPlan: graphPlan() })).toMatchObject({
+    expect(
+      deriveResultReview({ pageData: donePage, graphPlan: graphPlan() }),
+    ).toMatchObject({
       phase: "accepted",
-      decision: { primaryAction: "follow_up", canAccept: false, canRequestChanges: false },
+      decision: {
+        primaryAction: "follow_up",
+        canAccept: false,
+        canRequestChanges: false,
+      },
       continuation: { visible: true },
     });
   });
 
   it("disables result acceptance when completion has no result evidence", () => {
-    expect(deriveResultReview({
-      pageData: pageData({ task: { ...pageData().task, status: "Completed" } }),
-      graphPlan: null,
-    })).toMatchObject({
+    expect(
+      deriveResultReview({
+        pageData: pageData({
+          task: { ...pageData().task, status: "Completed" },
+        }),
+        graphPlan: null,
+      }),
+    ).toMatchObject({
       phase: "pending_acceptance",
-      decision: { canAccept: false, acceptDisabledReason: "missing_result", canRequestChanges: false },
-      content: { hasResult: false, hasArtifacts: false, showNodeFilter: false, showResultTools: false },
+      decision: {
+        canAccept: false,
+        acceptDisabledReason: "missing_result",
+        canRequestChanges: false,
+      },
+      content: {
+        hasResult: false,
+        hasArtifacts: false,
+        showNodeFilter: false,
+        showResultTools: false,
+      },
     });
   });
 
   it("separates required, recommended, and optional planning readiness", () => {
-    const readiness = deriveTaskPlanningReadiness(pageData({
-      task: {
-        ...pageData().task,
-        description: "Do the work",
-        dueAt: null,
-        scheduledStartAt: null,
-        currentWorkBlock: null,
-      },
-    }));
+    const readiness = deriveTaskPlanningReadiness(
+      pageData({
+        task: {
+          ...pageData().task,
+          description: "Do the work",
+          dueAt: null,
+          scheduledStartAt: null,
+          currentWorkBlock: null,
+        },
+      }),
+    );
 
     expect(readiness.status).toBe("warning");
     expect(readiness.primaryAction).toBe("generate_plan");
-    expect(readiness.checks.find((check) => check.id === "success_criteria")).toMatchObject({ level: "recommended", state: "missing", action: "edit_brief" });
-    expect(readiness.checks.find((check) => check.id === "schedule")).toMatchObject({ level: "optional", state: "missing" });
-    expect(readiness.checks.find((check) => check.id === "provider")).toMatchObject({ level: "required", state: "passed" });
+    expect(
+      readiness.checks.find((check) => check.id === "success_criteria"),
+    ).toMatchObject({
+      level: "recommended",
+      state: "missing",
+      action: "edit_brief",
+    });
+    expect(
+      readiness.checks.find((check) => check.id === "schedule"),
+    ).toMatchObject({ level: "optional", state: "missing" });
+    expect(
+      readiness.checks.find((check) => check.id === "provider"),
+    ).toMatchObject({ level: "required", state: "passed" });
   });
 
   it("blocks planning with an actionable provider setup route state", () => {
@@ -254,16 +348,34 @@ describe("task workspace interaction model", () => {
 
     expect(readiness.status).toBe("blocked");
     expect(readiness.primaryAction).toBe("configure_provider");
-    expect(readiness.checks.find((check) => check.id === "provider")).toMatchObject({ level: "required", state: "blocked", action: "configure_provider" });
+    expect(
+      readiness.checks.find((check) => check.id === "provider"),
+    ).toMatchObject({
+      level: "required",
+      state: "blocked",
+      action: "configure_provider",
+    });
   });
   it("uses one display rule table for fixed panel visibility by mode", () => {
-    expect(TASK_WORKSPACE_DISPLAY_RULES.ready_to_run.panels.runPreview).toBe(true);
-    expect(TASK_WORKSPACE_DISPLAY_RULES.ready_to_run.panels.planDiffReview).toBe(false);
-    expect(TASK_WORKSPACE_DISPLAY_RULES.ready_to_run.panels.readiness).toBe(false);
+    expect(TASK_WORKSPACE_DISPLAY_RULES.ready_to_run.panels.runPreview).toBe(
+      true,
+    );
+    expect(
+      TASK_WORKSPACE_DISPLAY_RULES.ready_to_run.panels.planDiffReview,
+    ).toBe(false);
+    expect(TASK_WORKSPACE_DISPLAY_RULES.ready_to_run.panels.readiness).toBe(
+      false,
+    );
     expect(TASK_WORKSPACE_DISPLAY_RULES.completed.layout).toBe("result_focus");
-    expect(TASK_WORKSPACE_DISPLAY_RULES.completed.panels.resultReview).toBe(true);
-    expect(TASK_WORKSPACE_DISPLAY_RULES.completed.panels.selectedNodeDetails).toBe(false);
-    expect(TASK_WORKSPACE_DISPLAY_RULES.completed.panels.operationPanel).toBe(false);
+    expect(TASK_WORKSPACE_DISPLAY_RULES.completed.panels.resultLifecycle).toBe(
+      true,
+    );
+    expect(
+      TASK_WORKSPACE_DISPLAY_RULES.completed.panels.selectedNodeDetails,
+    ).toBe(false);
+    expect(TASK_WORKSPACE_DISPLAY_RULES.completed.panels.operationPanel).toBe(
+      false,
+    );
     expect(TASK_WORKSPACE_DISPLAY_RULES.reviewing_plan).toMatchObject({
       primarySurface: "plan",
       primaryAction: "accept_plan",
@@ -287,14 +399,16 @@ describe("task workspace interaction model", () => {
       contextRail: "result_review",
       collapsedByDefault: ["execution_history", "activity", "diagnostics"],
     });
-    expect(TASK_WORKSPACE_DISPLAY_RULES.completed.panels.followUpComposer).toBe(false);
+    expect(TASK_WORKSPACE_DISPLAY_RULES.completed.panels.resultLifecycle).toBe(
+      true,
+    );
     expect(TASK_WORKSPACE_DISPLAY_RULES.done).toMatchObject({
       primarySurface: "result",
       primaryAction: "follow_up",
       contextRail: "continuation",
       collapsedByDefault: ["execution_history", "activity", "diagnostics"],
     });
-    expect(TASK_WORKSPACE_DISPLAY_RULES.done.panels.followUpComposer).toBe(true);
+    expect(TASK_WORKSPACE_DISPLAY_RULES.done.panels.resultLifecycle).toBe(true);
 
     const readyState = deriveTaskWorkspaceDisplayState({
       pageData: pageData(),
@@ -304,7 +418,9 @@ describe("task workspace interaction model", () => {
     });
 
     expect(readyState.mode).toBe("ready_to_run");
-    expect(readyState.panels).toBe(TASK_WORKSPACE_DISPLAY_RULES.ready_to_run.panels);
+    expect(readyState.panels).toBe(
+      TASK_WORKSPACE_DISPLAY_RULES.ready_to_run.panels,
+    );
     expect(readyState.panels.runPreview).toBe(true);
     expect(readyState.panels.readiness).toBe(false);
   });
@@ -313,13 +429,19 @@ describe("task workspace interaction model", () => {
     const blockedState = deriveTaskWorkspaceDisplayState({
       pageData: pageData({ task: { ...pageData().task, status: "Blocked" } }),
       graphPlan: graphPlan(),
-      operationState: operationState({ status: "execution-blocked", action: "none" } as unknown as Partial<TaskWorkspaceOperationState>),
+      operationState: operationState({
+        status: "execution-blocked",
+        action: "none",
+      } as unknown as Partial<TaskWorkspaceOperationState>),
       currentNode: null,
     });
     const completedState = deriveTaskWorkspaceDisplayState({
       pageData: pageData({ task: { ...pageData().task, status: "Completed" } }),
       graphPlan: graphPlan(),
-      operationState: operationState({ status: "execution-completed", action: "none" } as unknown as Partial<TaskWorkspaceOperationState>),
+      operationState: operationState({
+        status: "execution-completed",
+        action: "none",
+      } as unknown as Partial<TaskWorkspaceOperationState>),
       currentNode: null,
     });
 
@@ -331,7 +453,7 @@ describe("task workspace interaction model", () => {
     expect(completedState.layout).toBe("result_focus");
     expect(completedState.panels.operationPanel).toBe(false);
     expect(completedState.panels.selectedNodeDetails).toBe(false);
-    expect(completedState.panels.resultReview).toBe(true);
+    expect(completedState.panels.resultLifecycle).toBe(true);
   });
 
   it("routes workspace state through the shared canonical work-state model", () => {
@@ -346,7 +468,10 @@ describe("task workspace interaction model", () => {
         },
       }),
       graphPlan: graphPlan(),
-      operationState: operationState({ status: "execution-action", action: "execution-action" } as unknown as Partial<TaskWorkspaceOperationState>),
+      operationState: operationState({
+        status: "execution-action",
+        action: "execution-action",
+      } as unknown as Partial<TaskWorkspaceOperationState>),
     });
     const approvalWait = deriveTaskWorkStateView({
       pageData: pageData({
@@ -359,17 +484,26 @@ describe("task workspace interaction model", () => {
         },
       }),
       graphPlan: graphPlan(),
-      operationState: operationState({ status: "execution-action", action: "execution-action" } as unknown as Partial<TaskWorkspaceOperationState>),
+      operationState: operationState({
+        status: "execution-action",
+        action: "execution-action",
+      } as unknown as Partial<TaskWorkspaceOperationState>),
     });
     const resultReady = deriveTaskWorkStateView({
       pageData: pageData({ task: { ...pageData().task, status: "Completed" } }),
       graphPlan: graphPlan(),
-      operationState: operationState({ status: "execution-completed", action: "none" } as unknown as Partial<TaskWorkspaceOperationState>),
+      operationState: operationState({
+        status: "execution-completed",
+        action: "none",
+      } as unknown as Partial<TaskWorkspaceOperationState>),
     });
     const done = deriveTaskWorkStateView({
       pageData: pageData({ task: { ...pageData().task, status: "Done" } }),
       graphPlan: graphPlan(),
-      operationState: operationState({ status: "execution-completed", action: "none" } as unknown as Partial<TaskWorkspaceOperationState>),
+      operationState: operationState({
+        status: "execution-completed",
+        action: "none",
+      } as unknown as Partial<TaskWorkspaceOperationState>),
     });
 
     expect(inputWait.state).toBe("waiting_for_input");
@@ -377,7 +511,9 @@ describe("task workspace interaction model", () => {
     expect(approvalWait.state).toBe("waiting_for_approval");
     expect(approvalWait.label).toBe("Approval needed");
     expect(resultReady.state).toBe("result_ready");
-    expect(resultReady.nextActionLabel).toBe("Accept result or request changes");
+    expect(resultReady.nextActionLabel).toBe(
+      "Accept result or request changes",
+    );
     expect(done.state).toBe("done");
     expect(done.nextActionLabel).toBe("Ask a follow-up or create a next task");
   });
@@ -385,31 +521,96 @@ describe("task workspace interaction model", () => {
     {
       name: "tracks completed, active, waiting, and remaining nodes",
       statuses: ["completed", "active", "waiting_for_approval"] as const,
-      expected: { completed: 1, active: 1, waiting: 1, blocked: 0, remaining: 0 },
+      expected: {
+        completed: 1,
+        active: 1,
+        waiting: 1,
+        blocked: 0,
+        remaining: 0,
+      },
     },
     {
       name: "tracks blocked work separately from remaining work",
       statuses: ["done", "failed", "idle"] as const,
-      expected: { completed: 1, active: 0, waiting: 0, blocked: 1, remaining: 1 },
+      expected: {
+        completed: 1,
+        active: 0,
+        waiting: 0,
+        blocked: 1,
+        remaining: 1,
+      },
     },
   ])("$name", ({ statuses, expected }) => {
     const baseGraph = graphPlan();
-    const nodes = baseGraph.nodes.map((node, index) => ({ ...node, status: statuses[index] }));
+    const nodes = baseGraph.nodes.map((node, index) => ({
+      ...node,
+      status: statuses[index],
+    }));
     const graph = { ...baseGraph, nodes, steps: nodes };
     const activeNode = nodes.find((node) => node.status === "active") ?? null;
     const view = deriveRunningExecutionView({
       pageData: pageData(),
       graphPlan: graph,
-      operationState: operationState({ status: "execution-running", action: "none", runtimeEvents: [] } as unknown as Partial<TaskWorkspaceOperationState>),
+      operationState: operationState({
+        status: "execution-running",
+        action: "none",
+        runtimeEvents: [],
+      } as unknown as Partial<TaskWorkspaceOperationState>),
       currentNode: activeNode,
     });
 
     expect(view?.progress).toMatchObject({ ...expected, total: 3 });
   });
 
-  it("keeps current step, inspected step, and runtime activity distinct", () => {
+  it("reports that no persisted step result is available while execution starts", () => {
     const baseGraph = graphPlan();
-    const nodes = baseGraph.nodes.map((node, index) => ({ ...node, status: index === 0 ? "active" as const : node.status }));
+    const nodes = baseGraph.nodes.map((node, index) => ({
+      ...node,
+      status: index === 0 ? ("active" as const) : node.status,
+    }));
+    const graph = { ...baseGraph, nodes, steps: nodes };
+    const view = deriveRunningExecutionView({
+      pageData: pageData(),
+      graphPlan: graph,
+      operationState: operationState({
+        status: "execution-running",
+        action: "none",
+        runtimeEvents: [],
+      } as unknown as Partial<TaskWorkspaceOperationState>),
+      currentNode: nodes[0]!,
+    });
+
+    expect(view?.resultState).toBe("waiting");
+  });
+
+  it("reports completed node output as an available stage result", () => {
+    const baseGraph = graphPlan();
+    const nodes = baseGraph.nodes.map((node, index) =>
+      index === 0
+        ? { ...node, status: "done" as const, completionSummary: "Trending report ready" }
+        : { ...node, status: index === 1 ? ("active" as const) : node.status },
+    );
+    const view = deriveRunningExecutionView({
+      pageData: pageData(),
+      graphPlan: { ...baseGraph, nodes, steps: nodes },
+      operationState: operationState({
+        status: "execution-running",
+        action: "none",
+        runtimeEvents: [],
+      } as unknown as Partial<TaskWorkspaceOperationState>),
+      currentNode: nodes[1]!,
+    });
+
+    expect(view?.resultState).toBe("available");
+  });
+
+
+  it("keeps current step and inspected step distinct", () => {
+    const baseGraph = graphPlan();
+    const nodes = baseGraph.nodes.map((node, index) => ({
+      ...node,
+      status: index === 0 ? ("active" as const) : node.status,
+    }));
     const graph = { ...baseGraph, nodes, steps: nodes };
     const view = deriveRunningExecutionView({
       pageData: pageData(),
@@ -418,17 +619,42 @@ describe("task workspace interaction model", () => {
         status: "execution-running",
         action: "none",
         runtimeEvents: [
-          { type: "runtime_event", action: "start_manual", runtimeName: "omp", provider: "omp", event: { type: "reasoning_delta", text: "private transient reasoning" } },
-          { type: "runtime_event", action: "start_manual", runtimeName: "omp", provider: "omp", event: { type: "tool_started", toolName: "browser", label: "Reading GitHub Trending" } },
+          {
+            type: "runtime_event",
+            action: "start_manual",
+            runtimeName: "omp",
+            provider: "omp",
+            event: {
+              type: "reasoning_delta",
+              text: "private transient reasoning",
+            },
+          },
+          {
+            type: "runtime_event",
+            action: "start_manual",
+            runtimeName: "omp",
+            provider: "omp",
+            event: {
+              type: "tool_started",
+              toolName: "browser",
+              label: "Reading GitHub Trending",
+            },
+          },
         ],
       } as unknown as Partial<TaskWorkspaceOperationState>),
       currentNode: nodes[0]!,
       inspectedNode: nodes[2]!,
     });
 
-    expect(view?.currentStep).toMatchObject({ id: "n1", ordinal: 1, label: "Fetch trending projects" });
-    expect(view?.inspectedStep).toEqual({ id: "n3", label: "Publish result report", isCurrent: false });
-    expect(view?.currentActivity).toEqual({ kind: "tool", label: "Reading GitHub Trending" });
+    expect(view?.currentStep).toMatchObject({
+      id: "n1",
+      ordinal: 1,
+      label: "Fetch trending projects",
+    });
+    expect(view?.inspectedStep).toEqual({
+      id: "n3",
+      label: "Publish result report",
+      isCurrent: false,
+    });
   });
-
 });

@@ -1,8 +1,14 @@
 import { HermesProviderClient } from "@chrona/hermes";
-import { CHRONA_CLAUDE_CODE_PROVIDER_TYPE, ClaudeCodeProviderClient } from "@chrona/claude-code";
+import {
+  CHRONA_CLAUDE_CODE_PROVIDER_TYPE,
+  ClaudeCodeProviderClient,
+} from "@chrona/claude-code";
 import { CHRONA_CODEX_PROVIDER_TYPE, CodexProviderClient } from "@chrona/codex";
 import { CHRONA_OMP_PROVIDER_TYPE, OmpProviderClient } from "@chrona/omp";
-import { CHRONA_DEBUG_PROVIDER_TYPE, normalizeDebugProviderProfile } from "@chrona/providers-debug";
+import {
+  CHRONA_DEBUG_PROVIDER_TYPE,
+  normalizeDebugProviderProfile,
+} from "@chrona/providers-debug";
 import type {
   ProviderRunInput,
   ProviderRunEvent,
@@ -21,7 +27,10 @@ import type {
   StructuredDebugInfo,
   DebugClientConfig,
 } from "@chrona/contracts";
-import { AiClientError, validatePreparedFeaturePayload } from "@chrona/contracts";
+import {
+  AiClientError,
+  validatePreparedFeaturePayload,
+} from "@chrona/contracts";
 import type { EngineAiClient } from "./runtime/client-registry";
 import { aiClientRegistry } from "./runtime/client-registry";
 
@@ -37,7 +46,10 @@ const HERMES_API_SERVER_DOCS_URL =
 const HERMES_REQUIRED_CAPABILITIES = [
   { key: "run_submission", label: "run submission (/v1/runs)" },
   { key: "run_status", label: "run status (/v1/runs/{run_id})" },
-  { key: "run_events_sse", label: "run event streaming (/v1/runs/{run_id}/events)" },
+  {
+    key: "run_events_sse",
+    label: "run event streaming (/v1/runs/{run_id}/events)",
+  },
   { key: "run_stop", label: "run cancellation (/v1/runs/{run_id}/stop)" },
 ] as const;
 
@@ -118,7 +130,8 @@ async function checkClientHealth(
       if (!health.ok) {
         return {
           available: false,
-          reason: health.reason ?? health.message ?? "Hermes health check failed",
+          reason:
+            health.reason ?? health.message ?? "Hermes health check failed",
         };
       }
 
@@ -138,16 +151,24 @@ async function checkClientHealth(
 
     if (client.type === CHRONA_CLAUDE_CODE_PROVIDER_TYPE) {
       const config = client.config as ClaudeCodeClientConfig;
-      const health = await new ClaudeCodeProviderClient({ config }).checkHealth();
+      const health = await new ClaudeCodeProviderClient({
+        config,
+      }).checkHealth();
       if (!health.ok) {
         return {
           available: false,
-          reason: health.reason ?? health.message ?? "Claude Code health check failed",
+          reason:
+            health.reason ??
+            health.message ??
+            "Claude Code health check failed",
         };
       }
       return {
         available: true,
-        reason: health.reason ?? health.message ?? "Claude Code connectivity check passed",
+        reason:
+          health.reason ??
+          health.message ??
+          "Claude Code connectivity check passed",
       };
     }
 
@@ -157,12 +178,14 @@ async function checkClientHealth(
       if (!health.ok) {
         return {
           available: false,
-          reason: health.reason ?? health.message ?? "Codex health check failed",
+          reason:
+            health.reason ?? health.message ?? "Codex health check failed",
         };
       }
       return {
         available: true,
-        reason: health.reason ?? health.message ?? "Codex connectivity check passed",
+        reason:
+          health.reason ?? health.message ?? "Codex connectivity check passed",
       };
     }
 
@@ -172,12 +195,16 @@ async function checkClientHealth(
       if (!health.ok) {
         return {
           available: false,
-          reason: health.reason ?? health.message ?? "Oh My Pi health check failed",
+          reason:
+            health.reason ?? health.message ?? "Oh My Pi health check failed",
         };
       }
       return {
         available: true,
-        reason: health.reason ?? health.message ?? "Oh My Pi connectivity check passed",
+        reason:
+          health.reason ??
+          health.message ??
+          "Oh My Pi connectivity check passed",
       };
     }
 
@@ -222,10 +249,17 @@ export function extractJSON(text: string): Record<string, unknown> | null {
   }
 
   const fencedStart = trimmed.indexOf("```");
-  const fencedEnd = fencedStart >= 0 ? trimmed.indexOf("```", fencedStart + 3) : -1;
-  const candidate = fencedStart >= 0 && fencedEnd > fencedStart
-    ? trimmed.slice(fencedStart + 3, fencedEnd).replace(/^json\s*/i, "").trim()
-    : trimmed.slice(trimmed.indexOf("{"), trimmed.lastIndexOf("}") + 1).trim();
+  const fencedEnd =
+    fencedStart >= 0 ? trimmed.indexOf("```", fencedStart + 3) : -1;
+  const candidate =
+    fencedStart >= 0 && fencedEnd > fencedStart
+      ? trimmed
+          .slice(fencedStart + 3, fencedEnd)
+          .replace(/^json\s*/i, "")
+          .trim()
+      : trimmed
+          .slice(trimmed.indexOf("{"), trimmed.lastIndexOf("}") + 1)
+          .trim();
   if (!candidate) return null;
   try {
     const parsed = JSON.parse(candidate);
@@ -254,7 +288,8 @@ async function providerFeaturePayload(
   client: EngineAiClient,
   request: ProviderFeatureRequest,
 ): Promise<string> {
-  const providerClient = aiClientRegistry.requireProviderClient(client).providerClient;
+  const providerClient =
+    aiClientRegistry.requireProviderClient(client).providerClient;
   const result = await runProviderRequest(providerClient, request);
   if (result.error) {
     throw new AiClientError(result.error, client.record.type, "internal");
@@ -278,21 +313,29 @@ function toStartRunInput(request: ProviderFeatureRequest): StartRunInput {
   };
 }
 
-async function runProviderRequest(
+export async function runProviderRequest(
   providerClient: NonNullable<EngineAiClient["providerClient"]>,
   request: ProviderFeatureRequest,
 ): Promise<ProviderRunSnapshot> {
+  const run = await providerClient.startRun(toStartRunInput(request));
   let finalSnapshot: ProviderRunSnapshot | null = null;
   try {
     for await (const event of providerClient.streamRun({
-      ...toStartRunInput(request),
-      stream: true,
+      runId: run.runId,
+      sessionId: run.sessionId,
     })) {
       if (event.type === "run_completed") {
-        finalSnapshot = providerRunCompletedSnapshot(providerClient.provider, event);
+        finalSnapshot = providerRunCompletedSnapshot(
+          providerClient.provider,
+          event,
+        );
       }
       if (event.type === "run_failed") {
-        finalSnapshot = providerRunFailedSnapshot(providerClient.provider, request, event);
+        finalSnapshot = providerRunFailedSnapshot(
+          providerClient.provider,
+          request,
+          event,
+        );
       }
     }
   } catch (error) {
@@ -449,7 +492,9 @@ export function buildProviderFeatureRequest(input: {
 }): ProviderFeatureRequest {
   const fallbackInstructions =
     input.instructions ??
-    (typeof input.input === "string" ? input.input : JSON.stringify(input.input));
+    (typeof input.input === "string"
+      ? input.input
+      : JSON.stringify(input.input));
 
   const providerInput = input.featureSpec?.inputText
     ? { type: "text" as const, text: input.featureSpec.inputText }
@@ -461,7 +506,8 @@ export function buildProviderFeatureRequest(input: {
     instructions: input.featureSpec?.instructions ?? fallbackInstructions,
     input: providerInput,
     structuredOutputSchema: input.featureSpec?.structuredOutputSchema,
-    terminalToolName: input.terminalToolName ?? input.featureSpec?.terminalToolName,
+    terminalToolName:
+      input.terminalToolName ?? input.featureSpec?.terminalToolName,
     stream: input.stream,
     maxOutputTokens: input.maxOutputTokens,
     timeoutSeconds: input.timeoutSeconds,
@@ -484,7 +530,8 @@ async function providerFeaturePayloadFull<T>(
   request: ProviderFeatureRequest,
   featureSpec?: PreparedAiFeatureSpec,
 ): Promise<FeaturePayloadResult<T>> {
-  const providerClient = aiClientRegistry.requireProviderClient(client).providerClient;
+  const providerClient =
+    aiClientRegistry.requireProviderClient(client).providerClient;
   const result = await runProviderRequest(providerClient, request);
 
   if (result.error) {
@@ -521,16 +568,28 @@ async function providerFeaturePayloadFull<T>(
     parsed: rawPayload as T,
     rawText: result.outputText ?? "",
     debug: {
-      rawOutput: getStructuredString(result.structuredPayload, "rawOutput") ?? result.outputText,
-      error: getStructuredString(result.structuredPayload, "error") ?? result.error,
-      source: getStructuredString(result.structuredPayload, "source") as StructuredDebugInfo["source"],
-      feature: getStructuredString(result.structuredPayload, "feature") ?? featureSpec?.feature ?? null,
+      rawOutput:
+        getStructuredString(result.structuredPayload, "rawOutput") ??
+        result.outputText,
+      error:
+        getStructuredString(result.structuredPayload, "error") ?? result.error,
+      source: getStructuredString(
+        result.structuredPayload,
+        "source",
+      ) as StructuredDebugInfo["source"],
+      feature:
+        getStructuredString(result.structuredPayload, "feature") ??
+        featureSpec?.feature ??
+        null,
       toolName:
         getStructuredString(result.structuredPayload, "toolName") ??
         featureSpec?.structuredOutputSchema?.name ??
         null,
-      sessionId: getStructuredString(result.structuredPayload, "sessionId") ?? result.sessionId,
-      runId: getStructuredString(result.structuredPayload, "runId") ?? result.runId,
+      sessionId:
+        getStructuredString(result.structuredPayload, "sessionId") ??
+        result.sessionId,
+      runId:
+        getStructuredString(result.structuredPayload, "runId") ?? result.runId,
       validationIssues: getStructuredValidationIssues(result.structuredPayload),
     },
   };
@@ -542,7 +601,10 @@ function getStructuredField(payload: unknown, field: string): unknown {
     : undefined;
 }
 
-function getStructuredString(payload: unknown, field: string): string | undefined {
+function getStructuredString(
+  payload: unknown,
+  field: string,
+): string | undefined {
   const value = getStructuredField(payload, field);
   return typeof value === "string" ? value : undefined;
 }
@@ -574,12 +636,9 @@ export async function dispatch(
   }
   const llmClient = aiClientRegistry.requireLlmClient(client);
   const userMessage = typeof input === "string" ? input : JSON.stringify(input);
-  return llmCall(
-    llmClient.record.config,
-    `Feature: ${feature}`,
-    userMessage,
-    { jsonMode: feature !== "chat" },
-  );
+  return llmCall(llmClient.record.config, `Feature: ${feature}`, userMessage, {
+    jsonMode: feature !== "chat",
+  });
 }
 
 export async function dispatchFeaturePayload<T = unknown>(

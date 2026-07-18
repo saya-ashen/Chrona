@@ -199,7 +199,7 @@ describe("runTaskNodeFeature", () => {
         runtimeSessionKey: "main-session",
         conversationEntryIds: ["conversation-entry-1"],
         controlRunToken: null,
-        providerName: "claude_code",
+        providerName: "omp",
         response: {
           provider: "hermes",
           runId: "runtime-first-entry",
@@ -242,7 +242,7 @@ describe("runTaskNodeFeature", () => {
         sessionId: "main-session",
         runId: "local-run-1",
         runtimeName: "hermes",
-        provider: "claude_code",
+        provider: "omp",
         runtimeRunRef: "runtime-first-entry",
         conversationEntryIds: ["conversation-entry-1"],
       },
@@ -253,6 +253,7 @@ describe("runTaskNodeFeature", () => {
       status: "Failed",
       errorSummary: "Runtime run runtime-first-entry completed without a Chrona terminal result action for node first_entry: Chrona 节点结果提交失败：taskId is required. 节点工作本身已完成。",
     });
+    expect(run.endedAt).not.toBeNull();
   });
 
   it("marks provider-cancelled task snapshots terminal instead of started", async () => {
@@ -363,7 +364,7 @@ describe("runTaskNodeFeature", () => {
         root: "existingRoot",
         elements: {
           existingRoot: { type: "Stack", props: { gap: "sm" }, children: ["firstSection"] },
-          firstSection: { type: "Markdown", props: { content: "First section" }, children: [] },
+          firstSection: { type: "RichMarkdown", props: { content: "First section" }, children: [] },
         },
       },
       updatedAt: "2026-05-22T00:01:00.000Z",

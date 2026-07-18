@@ -146,7 +146,7 @@ describe("plan-runner task executor external results", () => {
           patches: [
             { op: "add", path: "/root", value: "root" },
             { op: "add", path: "/elements/root", value: { type: "Stack", props: { gap: "sm" }, children: ["partial"] } },
-            { op: "add", path: "/elements/partial", value: { type: "Markdown", props: { content: "Partial output" }, children: [] } },
+            { op: "add", path: "/elements/partial", value: { type: "RichMarkdown", props: { content: "Partial output" }, children: [] } },
           ],
           summary: "Partial output",
         },
@@ -161,7 +161,7 @@ describe("plan-runner task executor external results", () => {
           patches: [
             { op: "replace", path: "/elements/root/children", value: ["summary"] },
             { op: "remove", path: "/elements/partial" },
-            { op: "add", path: "/elements/summary", value: { type: "Markdown", props: { content: "Final UI output" }, children: [] } },
+            { op: "add", path: "/elements/summary", value: { type: "RichMarkdown", props: { content: "Final UI output" }, children: [] } },
           ],
           summary: "Final output",
         },
@@ -209,7 +209,7 @@ describe("plan-runner task executor external results", () => {
         root: "root",
         elements: {
           root: { type: "Stack", props: { gap: "sm", xChronaSourceNodeId: "task_node" }, children: ["summary"] },
-          summary: { type: "Markdown", props: { content: "Final UI output", xChronaSourceNodeId: "task_node" }, children: [] },
+          summary: { type: "RichMarkdown", props: { content: "Final UI output", xChronaSourceNodeId: "task_node" }, children: [] },
         },
       },
     });
@@ -226,7 +226,7 @@ describe("plan-runner task executor external results", () => {
             patches: [
               { op: "add", path: "/root", value: "existingRoot" },
               { op: "add", path: "/elements/existingRoot", value: { type: "Stack", props: { gap: "sm" }, children: ["firstSection"] } },
-              { op: "add", path: "/elements/firstSection", value: { type: "Markdown", props: { content: "First section" }, children: [] } },
+              { op: "add", path: "/elements/firstSection", value: { type: "RichMarkdown", props: { content: "First section" }, children: [] } },
             ],
             summary: "First visible section",
           },
@@ -255,7 +255,7 @@ describe("plan-runner task executor external results", () => {
             root: "existingRoot",
             elements: {
               existingRoot: { type: "Stack", props: { gap: "sm" }, children: ["firstSection"] },
-              firstSection: { type: "Markdown", props: { content: "First section" }, children: [] },
+              firstSection: { type: "RichMarkdown", props: { content: "First section" }, children: [] },
             },
           },
         });

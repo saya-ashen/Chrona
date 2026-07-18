@@ -212,7 +212,7 @@ export async function getTaskBootstrap(input: { taskId: string; workBlockId?: st
       autoPlanGenerationTiming: task.autoPlanGenerationTiming,
       autoExecuteTiming: task.autoExecuteTiming,
       recurrenceRule: task.recurrenceRule,
-      status: currentWorkBlock?.status ?? task.status,
+      status: task.status === "Done" ? task.status : currentWorkBlock?.status ?? task.status,
       priority: task.priority,
       dueAt: task.dueAt?.toISOString() ?? null,
       scheduledStartAt: currentWorkBlock?.scheduledStartAt.toISOString() ?? task.projection?.scheduledStartAt?.toISOString() ?? null,

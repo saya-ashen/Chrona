@@ -17,7 +17,7 @@ describe("validateChronaSpec", () => {
       elements: {
         root: { type: "Stack", props: { gap: "md" }, children: ["title", "md"] },
         title: { type: "Text", props: { text: "Result", variant: "muted" }, children: [] },
-        md: { type: "Markdown", props: { content: "# hello" }, children: [] },
+        md: { type: "RichMarkdown", props: { content: "# hello" }, children: [] },
       },
     };
     expect(validateChronaSpec(spec).ok).toBe(true);
@@ -61,7 +61,6 @@ describe("validateChronaSpec", () => {
     expect(prompt).toContain("Use JsonView sparingly");
     expect(prompt).toContain("context.planOutput.hasSpec");
     expect(prompt).toContain("context.planOutput.rootChildren");
-    expect(prompt).toContain(".chrona/outputs/<node-ref>/");
   });
 
 

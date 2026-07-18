@@ -18,6 +18,12 @@ import {
   type GetRunInput,
   type HealthCheckInput,
   type ProviderCapabilities,
+  type ProviderConversationCapabilities,
+  type ProviderConversationState,
+  type ProviderConversationHandoffInput,
+  type ProviderConversationHandoffResult,
+  type ProviderConversationTurnInput,
+  type ProviderConversationTurnResult,
   type ProviderHealth,
   type ProviderRunEvent,
   type ProviderRunRef,
@@ -30,6 +36,7 @@ import {
 import {
   createClaudeCodeRunner,
   probeClaudeCodeSdk,
+  runClaudeConversationTurn,
   type ClaudeCodeRunHandle,
   type ClaudeCodeRunner,
   type ClaudeCodeRunnerConfig,
@@ -234,6 +241,85 @@ export class ClaudeCodeProviderClient implements AgentProviderClient {
         mode: "authoritative_run_lookup",
       },
     };
+  }
+
+  getConversationCapabilities(): ProviderConversationCapabilities {
+    return {
+      resume: true,
+      fork: true,
+      compact: true,
+      handoff: "application",
+      contextUsage: "aggregate",
+    };
+  }
+
+  async inspectConversation(
+    sessionRef: string,
+  ): Promise<ProviderConversationState> {
+    return {
+      available: Boolean(sessionRef.trim()),
+      sessionRef,
+      compacted: false,
+    };
+  }
+
+  async handoffConversation(
+    input: ProviderConversationHandoffInput,
+  ): Promise<ProviderConversationHandoffResult> {
+    if (!this.ownsRunner) {
+      throw new ClaudeCodeProviderError(
+        "Conversation handoff is unavailable for replay runners",
+      );
+    }
+    const config = await this.buildRunnerConfig();
+    const summaryTurn = await runClaudeConversationTurn({
+      sessionRef: input.sessionRef,
+      prompt: [
+        "Create a compact handoff for a new independent coding-agent session.",
+        "Preserve decisions, constraints, relevant implementation context, and unfinished work.",
+        "Do not execute the next task. Return only the handoff context for the new session.",
+        "",
+        input.instructions,
+      ].join("\n"),
+      fork: true,
+      config,
+      signal: input.signal,
+    });
+    const newSession = await runClaudeConversationTurn({
+      prompt: [
+        "The following is a handoff from a completed Chrona task.",
+        "Keep it as context for the next task. Do not execute work yet; wait for the plan or execution prompt.",
+        "",
+        summaryTurn.outputText,
+      ].join("\n"),
+      fork: false,
+      config,
+      signal: input.signal,
+    });
+    if (!newSession.sessionRef) {
+      throw new ClaudeCodeProviderError("Conversation handoff did not create a new session");
+    }
+    return {
+      sessionRef: newSession.sessionRef,
+      handoffText: summaryTurn.outputText,
+    };
+  }
+
+  async runConversationTurn(
+    input: ProviderConversationTurnInput,
+  ): Promise<ProviderConversationTurnResult> {
+    if (!this.ownsRunner) {
+      throw new ClaudeCodeProviderError(
+        "Conversation continuation is unavailable for replay runners",
+      );
+    }
+    return runClaudeConversationTurn({
+      sessionRef: input.sessionRef,
+      prompt: input.prompt,
+      fork: input.mode === "fork",
+      config: await this.buildRunnerConfig(),
+      signal: input.signal,
+    });
   }
 
   async checkHealth(input: HealthCheckInput = {}): Promise<ProviderHealth> {

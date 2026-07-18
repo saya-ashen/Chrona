@@ -1,4 +1,6 @@
 import { RunStatus } from "@/generated/prisma/client";
+import { latestRecordedTerminalAction } from "./agent-control-store";
+import { submitNodeResultActionFromControl } from "@/modules/agent-tools/node-result-action";
 import { db } from "@/lib/db";
 import {
   type EffectivePlanGraph,
@@ -7,7 +9,8 @@ import {
   type PlanOutputState,
   type PreparedAiFeatureSpec,
 } from "@chrona/contracts/ai";
-import type { AiRuntimeInvocation, AiRuntimeInvoker } from "../ai-runtime-invoker";
+import { agentControlActionBodySchema } from "@chrona/contracts/api";
+import { usesChronaControlPlane, type AiRuntimeInvocation, type AiRuntimeInvoker } from "../ai-runtime-invoker";
 import type { NodeExecutionPlanContext, NodeExecutionResult, NodeExecutionRunContext } from "../node-executors/types";
 import type { ProviderRunEvent, ProviderRunSnapshot } from "@chrona/providers-foundation";
 import { buildNodeRuntimePrompt, NODE_RUNTIME_TERMINAL_TOOLS } from "./node-runtime-prompts";
@@ -314,6 +317,55 @@ export async function runTaskNodeFeature(
       conversationEntryIds: invocation.conversationEntryIds,
     };
 
+    const recordedTerminalAction = await latestRecordedTerminalAction({
+      runId: invocation.runId,
+      nodeAttemptId: input.attempt.id,
+    });
+    if (recordedTerminalAction) {
+      const parsedAction = agentControlActionBodySchema.parse({
+        kind: recordedTerminalAction.kind,
+        payload: recordedTerminalAction.payload,
+      });
+      const recordedAction = submitNodeResultActionFromControl({
+        body: parsedAction,
+        sessionId: input.mainSession.id,
+      });
+      if (recordedAction?.action === "complete_manual_node") {
+        const selectedBranch = recordedAction.branchRef
+          ? branchBindingForRef({ plan: input.plan, node: input.node, branchRef: recordedAction.branchRef })
+          : null;
+        const completedResult: NodeExecutionResult = {
+          status: "done",
+          summary: recordedAction.summary ?? "Node completed",
+          evidence,
+          output: recordedAction.output,
+          selectedBranch: selectedBranch
+            ? { label: selectedBranch.label, nextNodeId: selectedBranch.nextNodeId!, source: "ai" }
+            : undefined,
+        };
+        await updateInvocationRunFromNodeResult(invocation, completedResult);
+        return completedResult;
+      }
+      if (recordedAction?.action === "block_current_node") {
+        const blockedResult: NodeExecutionResult = {
+          status: "blocked",
+          reason: recordedAction.reason,
+          evidence,
+        };
+        await updateInvocationRunFromNodeResult(invocation, blockedResult);
+        return blockedResult;
+      }
+      if (recordedAction?.action === "fail_current_node") {
+        const failedResult: NodeExecutionResult = {
+          status: "failed",
+          error: recordedAction.error,
+          evidence,
+        };
+        await updateInvocationRunFromNodeResult(invocation, failedResult);
+        return failedResult;
+      }
+    }
+
     const structured = structuredPayload(invocation);
     const output = {
       runtimeName: input.runtimeName,
@@ -361,7 +413,7 @@ export async function runTaskNodeFeature(
       return failedResult;
     }
 
-    const requiresTerminalAction = invocation.providerName === "claude_code";
+    const requiresTerminalAction = usesChronaControlPlane(invocation.providerName);
     const terminalNodeResult = invocation.response.status === "completed"
       ? await resolveTerminalNodeResult({
           invocation,
@@ -423,7 +475,7 @@ async function updateInvocationRunFromNodeResult(
     where: { id: invocation.runId },
     data: {
       status,
-      endedAt: status === RunStatus.Completed || status === RunStatus.Cancelled ? new Date() : null,
+      endedAt: status === RunStatus.Completed || status === RunStatus.Cancelled || status === RunStatus.Failed ? new Date() : null,
       errorSummary: errorSummaryFromNodeResult(result),
     },
     select: { taskId: true, taskSessionId: true, runtimeRunRef: true },

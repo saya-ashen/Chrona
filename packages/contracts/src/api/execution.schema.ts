@@ -1,36 +1,67 @@
 import { z } from "zod";
-import {
-  isoDateOrNull,
-  taskIdParam,
-  taskPriorityEnum,
-} from "./common";
+import { isoDateOrNull, taskIdParam, taskPriorityEnum } from "./common";
 
 const nodeIdSchema = z.string().min(1, "nodeId is required");
 const sessionIdSchema = z.string().min(1, "sessionId is required");
 const workBlockIdSchema = z.string().min(1, "workBlockId is required");
 const idempotencyKeySchema = z.string().min(1, "idempotencyKey is required");
-const nodeActionFormFieldSchema = z.object({
-  name: z.string().min(1, "field name is required"),
-  label: z.string().min(1, "field label is required"),
-  type: z.enum(["text", "textarea", "select"]).optional(),
-  required: z.boolean().optional(),
-  options: z.array(z.string().min(1)).optional(),
-}).strict();
-const nodeActionFormSchema = z.object({
-  instructions: z.string().min(1, "instructions are required"),
-  submitLabel: z.string().min(1).optional(),
-  inputFields: z.array(nodeActionFormFieldSchema).min(1, "at least one input field is required"),
-}).strict();
+const nodeActionFormFieldSchema = z
+  .object({
+    name: z.string().min(1, "field name is required"),
+    label: z.string().min(1, "field label is required"),
+    type: z.enum(["text", "textarea", "select"]).optional(),
+    required: z.boolean().optional(),
+    options: z.array(z.string().min(1)).optional(),
+  })
+  .strict();
+const nodeActionFormSchema = z
+  .object({
+    instructions: z.string().min(1, "instructions are required"),
+    submitLabel: z.string().min(1).optional(),
+    inputFields: z
+      .array(nodeActionFormFieldSchema)
+      .min(1, "at least one input field is required"),
+  })
+  .strict();
 
 const planOutputPatchSchema = z.discriminatedUnion("op", [
-  z.object({ op: z.literal("add"), path: z.string().min(1), value: z.unknown() }).strict(),
+  z
+    .object({
+      op: z.literal("add"),
+      path: z.string().min(1),
+      value: z.unknown(),
+    })
+    .strict(),
   z.object({ op: z.literal("remove"), path: z.string().min(1) }).strict(),
-  z.object({ op: z.literal("replace"), path: z.string().min(1), value: z.unknown() }).strict(),
-  z.object({ op: z.literal("move"), path: z.string().min(1), from: z.string().min(1) }).strict(),
-  z.object({ op: z.literal("copy"), path: z.string().min(1), from: z.string().min(1) }).strict(),
-  z.object({ op: z.literal("test"), path: z.string().min(1), value: z.unknown() }).strict(),
+  z
+    .object({
+      op: z.literal("replace"),
+      path: z.string().min(1),
+      value: z.unknown(),
+    })
+    .strict(),
+  z
+    .object({
+      op: z.literal("move"),
+      path: z.string().min(1),
+      from: z.string().min(1),
+    })
+    .strict(),
+  z
+    .object({
+      op: z.literal("copy"),
+      path: z.string().min(1),
+      from: z.string().min(1),
+    })
+    .strict(),
+  z
+    .object({
+      op: z.literal("test"),
+      path: z.string().min(1),
+      value: z.unknown(),
+    })
+    .strict(),
 ]);
-
 
 export const providerApprovalChoiceSchema = z.enum([
   "approve_once",
@@ -78,7 +109,17 @@ export const providerApprovalReadModelSchema = z
 
 export const providerApprovalListQuerySchema = z
   .object({
-    status: z.enum(["pending", "approved", "denied", "expired", "superseded", "failed", "all"]).optional(),
+    status: z
+      .enum([
+        "pending",
+        "approved",
+        "denied",
+        "expired",
+        "superseded",
+        "failed",
+        "all",
+      ])
+      .optional(),
   })
   .strict();
 
@@ -136,10 +177,12 @@ export const executionActionBodySchema = z.discriminatedUnion("action", [
     action: z.literal("resume_with_input"),
     sessionId: sessionIdSchema.optional(),
     nodeId: nodeIdSchema.optional(),
-    inputFields: z.record(z.string(), z.string()).refine(
-      (value) => Object.values(value).some((item) => item.trim()),
-      "inputFields must include at least one value",
-    ),
+    inputFields: z
+      .record(z.string(), z.string())
+      .refine(
+        (value) => Object.values(value).some((item) => item.trim()),
+        "inputFields must include at least one value",
+      ),
     idempotencyKey: idempotencyKeySchema.optional(),
   }),
   z.object({
@@ -172,16 +215,22 @@ export const executionActionBodySchema = z.discriminatedUnion("action", [
     nodeId: nodeIdSchema.optional(),
     summary: z.string().optional(),
     output: z.unknown().optional(),
-    terminalKind: z.enum(["task", "condition", "checkpoint", "wait"]).optional(),
+    terminalKind: z
+      .enum(["task", "condition", "checkpoint", "wait"])
+      .optional(),
     branchRef: z.string().min(1).optional(),
-    decision: z.enum(["approved", "rejected", "needs_input", "completed"]).optional(),
+    decision: z
+      .enum(["approved", "rejected", "needs_input", "completed"])
+      .optional(),
     feedback: z.string().optional(),
     prompt: z.string().optional(),
-    selectedBranch: z.object({
-      label: z.string().min(1),
-      nextNodeId: z.string().min(1),
-      source: z.enum(["user", "ai", "system", "default"]),
-    }).optional(),
+    selectedBranch: z
+      .object({
+        label: z.string().min(1),
+        nextNodeId: z.string().min(1),
+        source: z.enum(["user", "ai", "system", "default"]),
+      })
+      .optional(),
     idempotencyKey: idempotencyKeySchema.optional(),
   }),
   z.object({
@@ -241,11 +290,13 @@ export const checkpointActionKindSchema = z.enum([
   "fail_task",
 ]);
 
-export const checkpointActionBodySchema = z.object({
-  action: checkpointActionKindSchema,
-  payload: z.unknown().optional(),
-  idempotencyKey: idempotencyKeySchema.optional(),
-}).strict();
+export const checkpointActionBodySchema = z
+  .object({
+    action: checkpointActionKindSchema,
+    payload: z.unknown().optional(),
+    idempotencyKey: idempotencyKeySchema.optional(),
+  })
+  .strict();
 
 const planEdgeTypeSchema = z.enum([
   "hard_dependency",
@@ -321,7 +372,9 @@ const graphMutationOperationSchema = z.discriminatedUnion("type", [
     type: z.literal("add_node"),
     nodeId: nodeIdSchema,
     semanticKey: z.string().min(1, "semanticKey is required"),
-    definitionLayer: nodeLayerSchema.and(z.object({ type: z.literal("definition") })),
+    definitionLayer: nodeLayerSchema.and(
+      z.object({ type: z.literal("definition") }),
+    ),
   }),
   z.object({
     type: z.literal("push_node_layer"),
@@ -357,7 +410,9 @@ export const planMutationBodySchema = z.object({
   expectedRevision: z.number().int().nonnegative().optional(),
   reason: z.string().min(1, "reason is required"),
   scope: z.enum(["future_only", "from_node", "entire_graph"]).optional(),
-  operations: z.array(graphMutationOperationSchema).min(1, "operations are required"),
+  operations: z
+    .array(graphMutationOperationSchema)
+    .min(1, "operations are required"),
 });
 
 // ── POST /tasks/:taskId/complete ──
@@ -369,13 +424,82 @@ export const taskReopenParamSchema = z.object({ taskId: taskIdParam });
 // ── POST /tasks/:taskId/result/accept ──
 export const taskResultAcceptParamSchema = z.object({ taskId: taskIdParam });
 
+export const taskResultFollowUpParamSchema = z.object({ taskId: taskIdParam });
+
+const taskResultContinuationRequestIdSchema = z.string().uuid();
+
+export const taskResultFollowUpBodySchema = z.discriminatedUnion("intent", [
+  z.object({
+    requestId: taskResultContinuationRequestIdSchema,
+    intent: z.literal("create_task"),
+    instruction: z.string().trim().min(1).max(10_000),
+    sessionStrategy: z
+      .enum(["handoff_compact", "fresh_with_result"])
+      .default("handoff_compact"),
+  }).strict(),
+  z.object({
+    requestId: taskResultContinuationRequestIdSchema,
+    intent: z.literal("ask"),
+    instruction: z.string().trim().min(1).max(10_000),
+  }).strict(),
+]);
+
+export const taskResultFollowUpEntrySchema = z.object({
+  id: z.string(),
+  requestId: z.string(),
+  acceptedRunId: z.string(),
+  intent: z.enum(["ask", "create_task"]),
+  status: z.enum(["pending", "completed", "failed"]),
+  instruction: z.string(),
+  answer: z.string().nullable().optional(),
+  answerSource: z.string().nullable().optional(),
+  contextSource: z
+    .enum(["source_session", "accepted_result_fallback"])
+    .nullable()
+    .optional(),
+  sessionStrategy: z
+    .enum(["handoff_compact", "fresh_with_result"])
+    .nullable()
+    .optional(),
+  createdTask: z
+    .object({ id: z.string(), title: z.string() })
+    .nullable()
+    .optional(),
+  cache: z
+    .object({
+      readInputTokens: z.number().int().nonnegative().nullable(),
+      creationInputTokens: z.number().int().nonnegative().nullable(),
+    })
+    .optional(),
+  error: z.string().nullable().optional(),
+  createdAt: z.string().datetime(),
+  completedAt: z.string().datetime().nullable(),
+}).strict();
+
+export const taskResultFollowUpStateSchema = z.object({
+  acceptedRunId: z.string(),
+  acceptedAt: z.string().datetime(),
+  sourceSession: z.object({
+    available: z.boolean(),
+    provider: z.string(),
+    health: z.enum(["fresh", "moderate", "high", "compacted", "unavailable", "unknown"]),
+    supportsFork: z.boolean(),
+    supportsResume: z.boolean(),
+    supportsHandoff: z.boolean(),
+  }).strict(),
+  entries: z.array(taskResultFollowUpEntrySchema),
+}).strict();
+
 // ── PUT /tasks/:taskId/schedule ──
 export const scheduleParamSchema = z.object({ taskId: taskIdParam });
 export const scheduleBodySchema = z.object({
   scheduledStartAt: z.string().min(1, "scheduledStartAt is required"),
   scheduledEndAt: z.string().min(1, "scheduledEndAt is required"),
   dueAt: z.string().nullable().optional(),
-  scheduleSource: z.enum(["human", "ai", "system"]).optional().default("system"),
+  scheduleSource: z
+    .enum(["human", "ai", "system"])
+    .optional()
+    .default("system"),
 });
 
 // ── DELETE /tasks/:taskId/schedule ──
@@ -411,7 +535,9 @@ export const scheduleProposalDecisionBodySchema = z.object({
 });
 
 // ── POST /approvals/:approvalId/resolve ──
-export const resolveApprovalParamSchema = z.object({ approvalId: z.string().min(1) });
+export const resolveApprovalParamSchema = z.object({
+  approvalId: z.string().min(1),
+});
 export const resolveApprovalBodySchema = z.object({
   decision: z.string().min(1, "decision is required"),
   resolutionNote: z.string().optional(),
@@ -419,10 +545,14 @@ export const resolveApprovalBodySchema = z.object({
 });
 
 // ── POST /memories/:memoryId/invalidate ──
-export const invalidateMemoryParamSchema = z.object({ memoryId: z.string().min(1) });
+export const invalidateMemoryParamSchema = z.object({
+  memoryId: z.string().min(1),
+});
 
 // ── POST /tasks/:taskId/assistant/messages ──
-export const createAssistantMessageParamSchema = z.object({ taskId: taskIdParam });
+export const createAssistantMessageParamSchema = z.object({
+  taskId: taskIdParam,
+});
 export const createAssistantMessageBodySchema = z.object({
   role: z.enum(["user", "assistant"]),
   content: z.string().min(1, "content is required"),
@@ -430,7 +560,9 @@ export const createAssistantMessageBodySchema = z.object({
 });
 
 // ── GET /tasks/:taskId/assistant/messages ──
-export const getAssistantMessagesParamSchema = z.object({ taskId: taskIdParam });
+export const getAssistantMessagesParamSchema = z.object({
+  taskId: taskIdParam,
+});
 
 // ── PATCH /tasks/:taskId/assistant/messages/:messageId/apply ──
 export const applyAssistantMessageParamSchema = z.object({

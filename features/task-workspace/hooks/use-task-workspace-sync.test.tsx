@@ -30,6 +30,7 @@ const mocks = vi.hoisted(() => ({
   commandCalls: [] as Array<{ taskId: string; json: Record<string, unknown> }>,
   fetchCalls: [] as Array<{ input: string; init?: RequestInit }>,
   currentExecutionResponse: null as PlanExecutionResult | null,
+  currentExecutionFetchCount: 0,
   eventHandlers: new Map<string, JsonEventHandler>(),
   eventStreamAttempts: 0,
   eventStreamMode: "open" as "open" | "reject",
@@ -81,7 +82,13 @@ vi.mock("@shared/http", async (importOriginal) => ({
     if (/\/plan(?:\?|$)/.test(path) && !path.includes("/generations")) {
       return mocks.planResponses.shift();
     }
-    if (/\/execution\/current(?:\?|$)/.test(path)) return mocks.currentExecutionResponse;
+    if (/\/execution\/current(?:\?|$)/.test(path)) {
+      mocks.currentExecutionFetchCount += 1;
+      return mocks.currentExecutionResponse;
+    }
+    if (/\/result\/accept(?:\?|$)/.test(path) && method === "POST") {
+      return { taskId: "task-1", workspaceId: "workspace-1", runId: "run-1" };
+    }
     if (/\/commands(?:\?|$)/.test(path) && method === "POST") {
       const parsedBody: unknown = JSON.parse(String(init?.body ?? "{}"));
       if (!parsedBody || typeof parsedBody !== "object" || Array.isArray(parsedBody)) {
@@ -326,6 +333,7 @@ afterEach(() => {
   mocks.commandCalls = [];
   mocks.fetchCalls = [];
   mocks.currentExecutionResponse = null;
+  mocks.currentExecutionFetchCount = 0;
   mocks.eventHandlers.clear();
   mocks.eventStreamAttempts = 0;
   mocks.eventStreamMode = "open";
@@ -495,10 +503,101 @@ describe("task workspace page synchronization", () => {
     await act(async () => {
       rerender();
     });
-
     await waitFor(() => expect(result.current.pageData.task.title).toBe("First occurrence fresh"));
     expect(result.current.pageData.task.status).toBe("Running");
   });
+
+  it("refreshes the execution snapshot for every live runtime event", async () => {
+    const acceptedPlan = planReadModel({
+      id: "plan-1",
+      status: "accepted",
+      title: "Execute launch",
+    });
+    const initialPage = pageData({
+      taskStatus: "Running",
+      plan: acceptedPlan,
+      runStatus: "Running",
+    });
+    mocks.planResponses = [
+      {
+        taskId: "task-1",
+        aiPlanGenerationStatus: "accepted",
+        savedPlan: acceptedPlan,
+      },
+      {
+        taskId: "task-1",
+        aiPlanGenerationStatus: "accepted",
+        savedPlan: acceptedPlan,
+      },
+    ];
+    mocks.currentExecutionResponse = {
+      taskId: "task-1",
+      planId: "plan-1",
+      mainSessionId: "session-1",
+      status: "running",
+      currentNodeId: "node-1",
+      executedNodeIds: [],
+      waitingNodeIds: [],
+      blockedNodeIds: [],
+      checkpoint: null,
+      planOutput: {
+        spec: null,
+        revision: 0,
+        updatedAt: null,
+        updatedByNodeId: null,
+      },
+      message: "Running",
+    };
+
+    const { result } = renderHook(() => {
+      const workspace = useTaskWorkspacePageState(initialPage);
+      const plan = useTaskWorkspacePlanState(
+        workspace.pageData.task,
+        workspace.refreshWorkspace,
+        workspace.workspaceEvents,
+      );
+      return { workspace, plan };
+    }, { wrapper: createQueryWrapper() });
+
+    await waitFor(() => expect(mocks.eventHandlers.size).toBeGreaterThan(0));
+    const initialFetchCount = mocks.currentExecutionFetchCount;
+    const handler = [...mocks.eventHandlers.values()][0]!;
+    await act(async () => {
+      handler({
+        event: "execution.runtime_event",
+        message: null,
+        data: {
+          type: "execution.runtime_event",
+          taskId: "task-1",
+          workBlockId: null,
+          sequence: 1,
+          eventKind: "tool_started",
+          action: "start_manual",
+          nodeId: "node-1",
+          nodeTitle: "Execute launch",
+          runtimeName: "default",
+          provider: "omp",
+          runId: "run-1",
+          timestamp: "2026-05-17T00:00:02.000Z",
+          event: {
+            type: "tool_started",
+            toolName: "browser",
+            label: "browser",
+          },
+        },
+      });
+    });
+
+    await waitFor(() => {
+      expect(mocks.currentExecutionFetchCount).toBeGreaterThan(initialFetchCount);
+      expect(result.current.plan.runtimeEvents.at(-1)?.event).toMatchObject({
+        type: "tool_started",
+        label: "browser",
+      });
+    });
+  });
+
+
 
   it("updates the rendered plan graph when a projection event refetches the full workspace page", async () => {
     const initialPlan = planReadModel({ id: "plan-1", status: "ready", title: "Prepare launch" });
@@ -876,6 +975,41 @@ describe("task workspace page synchronization", () => {
     expect(result.current.plan.planGenerationStatus).toBe("accepted");
   });
 
+  it("leaves generating state and refreshes the saved plan when the generation session completes", async () => {
+    const initialPlan = planReadModel({ id: "plan-1", status: "ready", title: "Old plan" });
+    const generatedPlan = planReadModel({ id: "plan-2", status: "draft", title: "Generated plan" });
+    const initialPage = pageData({ taskStatus: "Ready", plan: initialPlan, aiPlanGenerationStatus: "generating" });
+    mocks.generationSession = {
+      ...mocks.generationSession,
+      sessionStatus: "running",
+      isLoading: true,
+      phase: "saving",
+    };
+    mocks.planResponses = [
+      { taskId: "task-1", aiPlanGenerationStatus: "waiting_acceptance", savedPlan: generatedPlan },
+    ];
+
+    const { result, rerender } = renderHook(() => {
+      const workspace = useTaskWorkspacePageState(initialPage);
+      const plan = useTaskWorkspacePlanState(workspace.pageData.task, workspace.refreshWorkspace, workspace.workspaceEvents);
+      return { workspace, plan };
+    }, { wrapper: createQueryWrapper() });
+
+    expect(result.current.plan.planGenerationStatus).toBe("generating");
+
+    mocks.generationSession = {
+      ...mocks.generationSession,
+      sessionStatus: "completed",
+      result: generatedPlan,
+      isLoading: false,
+      phase: "done",
+    };
+    rerender();
+
+    await waitFor(() => expect(result.current.plan.planGenerationStatus).toBe("waiting_acceptance"));
+    await waitFor(() => expect(result.current.plan.graphPlan?.nodes[0]?.title).toBe("Generated plan"));
+  });
+
   it("refreshes workspace execution queries after accepting a draft", async () => {
     const draftPlan = planReadModel({ id: "plan-1", status: "draft", title: "Draft plan" });
     const acceptedPlan = planReadModel({ id: "plan-1", status: "accepted", title: "Accepted plan" });
@@ -969,9 +1103,6 @@ describe("task workspace page synchronization", () => {
       phase: "completed",
     };
     rerender();
-    await act(async () => {
-      await result.current.fetchPlan();
-    });
 
     await waitFor(() => expect(result.current.graphPlan?.nodes[0]?.title).toBe("Generated launch plan"));
 
@@ -1074,4 +1205,32 @@ describe("task workspace page synchronization", () => {
     expect(result.current.currentExecution?.status).toBe("completed");
     expect(refreshWorkspace).toHaveBeenCalledTimes(3);
   });
+  it("moves a completed result to the accepted state immediately after the POST succeeds", async () => {
+    const acceptedPlan = planReadModel({ id: "plan-1", status: "accepted", title: "Completed plan" });
+    const initialPage = pageData({ taskStatus: "Completed", plan: acceptedPlan, runStatus: "Completed" });
+    mocks.pageResponses = [pageData({ taskStatus: "Done", plan: acceptedPlan, runStatus: "Completed" })];
+    mocks.planResponses = [
+      { taskId: "task-1", aiPlanGenerationStatus: "accepted", savedPlan: acceptedPlan },
+    ];
+
+    const { result } = renderHook(() => {
+      const workspace = useTaskWorkspacePageState(initialPage);
+      const plan = useTaskWorkspacePlanState(workspace.pageData.task, workspace.refreshWorkspace, workspace.workspaceEvents);
+      return { workspace, plan };
+    }, { wrapper: createQueryWrapper() });
+
+    expect(result.current.workspace.pageData.task.status).toBe("Completed");
+    await act(async () => {
+      await result.current.plan.handleAcceptResult();
+    });
+
+    expect(mocks.fetchCalls).toContainEqual(expect.objectContaining({
+      input: "/api/tasks/task-1/result/accept",
+      init: expect.objectContaining({ method: "POST" }),
+    }));
+    expect(result.current.workspace.pageData.task.status).toBe("Done");
+    expect(result.current.plan.acceptResultError).toBeNull();
+    expect(result.current.plan.isAcceptingResult).toBe(false);
+  });
+
 });

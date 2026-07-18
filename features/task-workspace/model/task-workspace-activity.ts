@@ -1,8 +1,20 @@
 import type { TaskWorkspaceSseEvent, WorkspaceRuntimeEvent } from "./workspace-events";
 import type { WorkspaceActivityItem } from "./task-workspace-types";
 
-const DEFAULT_LIMIT = 30;
+const DEFAULT_LIMIT = 300;
 const PREVIEW_LIMIT = 240;
+const AGENT_LIFECYCLE_EVENT_TYPES: Record<string, true> = {
+  auto_compaction_start: true,
+  auto_compaction_end: true,
+  auto_retry_start: true,
+  auto_retry_end: true,
+  retry_fallback_applied: true,
+  retry_fallback_succeeded: true,
+  notice: true,
+  todo_reminder: true,
+  todo_auto_clear: true,
+  thinking_level_changed: true,
+};
 
 function normalizeText(value: string) {
   return value.replace(/\s+/g, " ").trim();
@@ -281,8 +293,8 @@ export function runtimeEventToWorkspaceActivity(event: WorkspaceRuntimeEvent, in
 
   if (value.type === "tool_started") {
     const preview = stringValue(value.preview);
-    const inputSummary = stringValue(value.input);
-    const summary = preview ? `${value.label}: ${preview}` : value.label;
+    const inputSummary = value.inputSummary;
+    const summary = preview ?? value.label;
     return {
       ...base,
       kind: "tool_started",
@@ -293,9 +305,29 @@ export function runtimeEventToWorkspaceActivity(event: WorkspaceRuntimeEvent, in
       tool: {
         name: value.toolName,
         label: value.label,
+        callId: value.callId,
         preview: truncateText(preview),
         inputSummary: truncateText(inputSummary),
         state: "started",
+      },
+    };
+  }
+
+  if (value.type === "tool_progress") {
+    const preview = truncateText(value.preview, 2_000);
+    return {
+      ...base,
+      kind: "tool_progress",
+      title: value.label,
+      summary: preview ?? value.label,
+      description: preview ?? value.label,
+      tone: "info",
+      tool: {
+        name: value.toolName,
+        label: value.label,
+        callId: value.callId,
+        preview,
+        state: "progress",
       },
     };
   }
@@ -314,6 +346,8 @@ export function runtimeEventToWorkspaceActivity(event: WorkspaceRuntimeEvent, in
       tool: {
         name: value.toolName,
         label: value.label,
+        callId: value.callId,
+        resultPreview: truncateText(value.preview, 4_000),
         preview: truncateText(preview),
         durationMs: value.durationMs,
         error: truncateText(error),
@@ -345,11 +379,14 @@ export function runtimeEventToWorkspaceActivity(event: WorkspaceRuntimeEvent, in
     };
   }
 
+  if (value.type === "raw_event" && (value.rawEventType === "turn_start" || value.rawEventType === "turn_end")) {
+    return null;
+  }
   if (value.type === "raw_event" && value.message) {
     return {
       ...base,
       kind: "provider_run",
-      title: "Task progress",
+      title: AGENT_LIFECYCLE_EVENT_TYPES[value.rawEventType ?? ""] ? "Agent lifecycle" : "Task progress",
       summary: value.message,
       description: value.message,
       tone: "info",

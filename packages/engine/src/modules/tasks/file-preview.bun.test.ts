@@ -33,22 +33,61 @@ describe("resolveFilePreview", () => {
 
   it("rejects traversal and secret-like paths before reading", async () => {
     await withTempDir(async (dir) => {
-      expect(await resolveFilePreview("../secret.md", { rootDir: dir })).toMatchObject({ previewError: "unsafe_path" });
-      expect(await resolveFilePreview(".env", { rootDir: dir })).toMatchObject({ previewError: "unsafe_path" });
+      expect(
+        await resolveFilePreview("../secret.md", { rootDir: dir }),
+      ).toMatchObject({ previewError: "unsafe_path" });
+      expect(await resolveFilePreview(".env", { rootDir: dir })).toMatchObject({
+        previewError: "unsafe_path",
+      });
     });
   });
 
   it("rejects symlink escapes", async () => {
     await withTempDir(async (dir) => {
-      const outside = await mkdtemp(join(tmpdir(), "chrona-file-preview-outside-"));
+      const outside = await mkdtemp(
+        join(tmpdir(), "chrona-file-preview-outside-"),
+      );
       try {
         await Bun.write(join(outside, "outside.md"), "outside");
         await symlink(join(outside, "outside.md"), join(dir, "link.md"));
 
-        expect(await resolveFilePreview("link.md", { rootDir: dir })).toMatchObject({ previewError: "unsafe_path" });
+        expect(
+          await resolveFilePreview("link.md", { rootDir: dir }),
+        ).toMatchObject({ previewError: "unsafe_path" });
       } finally {
         await rm(outside, { recursive: true, force: true });
       }
+    });
+  });
+
+  it("requires permission for paths outside the generated-file root", async () => {
+    await withTempDir(async (dir) => {
+      const path = join(dir, "external.md");
+      await Bun.write(path, "# External");
+
+      expect(await resolveFilePreview(path)).toMatchObject({
+        displayPath: path,
+        previewError: "permission_required",
+      });
+      expect(await resolveFilePreview("relative.md")).toMatchObject({
+        displayPath: "relative.md",
+        previewError: "permission_required",
+      });
+    });
+  });
+
+  it("reads only the exact absolute file supplied by an approved grant", async () => {
+    await withTempDir(async (dir) => {
+      const path = join(dir, "approved.md");
+      await Bun.write(path, "# Approved");
+
+      expect(
+        await resolveFilePreview(path, { allowedAbsolutePath: path }),
+      ).toMatchObject({
+        displayPath: path,
+        contentKind: "markdown",
+        contentPreview: "# Approved",
+      });
     });
   });
 
@@ -56,7 +95,10 @@ describe("resolveFilePreview", () => {
     await withTempDir(async (dir) => {
       await Bun.write(join(dir, "large.txt"), "abcdef");
 
-      const preview = await resolveFilePreview("large.txt", { rootDir: dir, maxPreviewBytes: 3 });
+      const preview = await resolveFilePreview("large.txt", {
+        rootDir: dir,
+        maxPreviewBytes: 3,
+      });
 
       expect(preview).toMatchObject({
         contentKind: "text",
@@ -73,7 +115,7 @@ describe("resolveFilePreview", () => {
 
       const preview = await resolveFilePreview("result.json", { rootDir: dir });
 
-      expect(preview.contentPreview).toBe("{\n  \"ok\": true\n}");
+      expect(preview.contentPreview).toBe('{\n  "ok": true\n}');
     });
   });
 });
@@ -83,13 +125,19 @@ describe("hydrateFilePreviewSpec", () => {
     await withTempDir(async (dir) => {
       await Bun.write(join(dir, "report.md"), "# Hydrated");
 
-      const spec = await hydrateFilePreviewSpec({
-        root: "root",
-        elements: {
-          root: { type: "Stack", props: { gap: "sm" }, children: ["file"] },
-          file: { type: "FileView", props: { title: "Report", uri: "report.md" } },
+      const spec = await hydrateFilePreviewSpec(
+        {
+          root: "root",
+          elements: {
+            root: { type: "Stack", props: { gap: "sm" }, children: ["file"] },
+            file: {
+              type: "FileView",
+              props: { title: "Report", uri: "report.md" },
+            },
+          },
         },
-      }, { rootDir: dir });
+        { rootDir: dir },
+      );
 
       expect(spec.elements.file.props).toMatchObject({
         title: "Report",
@@ -101,24 +149,58 @@ describe("hydrateFilePreviewSpec", () => {
     });
   });
 
-  it("hydrates Table props from JSON artifacts", async () => {
-    await withTempDir(async (dir) => {
-      await Bun.write(join(dir, "rows.json"), JSON.stringify({ rows: [{ repo: "chrona" }] }));
-
-      const spec = await hydrateFilePreviewSpec({
+  it("adds a task-scoped download URL for generated FileRef results", async () => {
+    const spec = await hydrateFilePreviewSpec(
+      {
         root: "root",
         elements: {
-          root: { type: "Stack", props: { gap: "sm" }, children: ["table"] },
-          table: { type: "Table", props: { title: "Rows", path: "rows.json" } },
+          root: { type: "Stack", props: { gap: "sm" }, children: ["file"] },
+          file: {
+            type: "FileRef",
+            props: {
+              title: "中文功能分析报告",
+              path: "generated://20260716/N20260716-01/deeptutor-analysis-zh.md",
+            },
+          },
         },
-      }, { rootDir: dir });
+      },
+      { taskId: "task-1" },
+    );
+
+    expect(spec.elements.file.props).toMatchObject({
+      downloadHref:
+        "/api/tasks/task-1/result-files/download?path=generated%3A%2F%2F20260716%2FN20260716-01%2Fdeeptutor-analysis-zh.md",
+    });
+  });
+
+  it("hydrates Table props from JSON artifacts", async () => {
+    await withTempDir(async (dir) => {
+      await Bun.write(
+        join(dir, "rows.json"),
+        JSON.stringify({ rows: [{ repo: "chrona" }] }),
+      );
+
+      const spec = await hydrateFilePreviewSpec(
+        {
+          root: "root",
+          elements: {
+            root: { type: "Stack", props: { gap: "sm" }, children: ["table"] },
+            table: {
+              type: "Table",
+              props: { title: "Rows", path: "rows.json" },
+            },
+          },
+        },
+        { rootDir: dir },
+      );
 
       expect(spec.elements.table.props).toMatchObject({
         title: "Rows",
         path: "rows.json",
         displayPath: "rows.json",
         contentKind: "json",
-        contentPreview: "{\n  \"rows\": [\n    {\n      \"repo\": \"chrona\"\n    }\n  ]\n}",
+        contentPreview:
+          '{\n  "rows": [\n    {\n      "repo": "chrona"\n    }\n  ]\n}',
       });
     });
   });

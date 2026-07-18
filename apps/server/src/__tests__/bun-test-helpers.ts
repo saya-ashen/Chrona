@@ -24,6 +24,7 @@ export async function resetTestDb() {
     await db.aiClient.deleteMany();
     await db.importedCalendarEvent.deleteMany();
     await db.calendarSource.deleteMany();
+    await db.taskResultContinuation.deleteMany();
     await db.taskAssistantMessage.deleteMany();
     await db.taskPlanProviderApproval.deleteMany();
     await db.taskPlanProviderRun.deleteMany();

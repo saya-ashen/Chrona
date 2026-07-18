@@ -21,7 +21,7 @@ describe("serial branch result regressions", () => {
         output: {
           root: "root",
           elements: {
-            root: { type: "Markdown", props: { content: "first branch output" } },
+            root: { type: "RichMarkdown", props: { content: "first branch output" } },
           },
         },
       })

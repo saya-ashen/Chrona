@@ -89,7 +89,7 @@ class IncompleteRunStreamError extends Error {
     this.name = "IncompleteRunStreamError";
   }
 }
-function usesChronaControlPlane(providerName: string) {
+export function usesChronaControlPlane(providerName: string) {
   return providerName === "claude_code" || providerName === "codex" || providerName === "omp";
 }
 
@@ -253,7 +253,7 @@ export class AiRuntimeInvoker {
       const message = error instanceof Error ? error.message : "Unknown error";
       await db.run.update({
         where: { id: run.id },
-        data: { status: RunStatus.Failed, errorSummary: message },
+        data: { status: RunStatus.Failed, endedAt: new Date(), errorSummary: message },
       });
       await syncTaskRunState({
         taskId: input.taskId,

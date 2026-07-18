@@ -300,6 +300,7 @@ model Task {
   dependentTasks       TaskDependency[]       @relation("TaskDependents")
   scheduleProposals    ScheduleProposal[]
   assistantMessages    TaskAssistantMessage[]
+  resultContinuations  TaskResultContinuation[]
   workBlocks           WorkBlock[]
   executionSessions    ExecutionSession[]
   taskPlans            TaskPlan[]
@@ -1114,6 +1115,34 @@ model TaskAssistantMessage {
   @@index([taskId, sequence])
 }
 
+model TaskResultContinuation {
+  id                       String    @id @default(cuid())
+  taskId                   String
+  acceptedRunId            String
+  requestId                String
+  intent                   String
+  status                   String
+  instruction              String
+  answer                   String?
+  answerSource             String?
+  contextSource            String?
+  sourceTaskSessionId      String?
+  providerSessionRef       String?
+  sessionStrategy          String?
+  cacheReadInputTokens     Int?
+  cacheCreationInputTokens Int?
+  createdTaskId            String?
+  errorCode                String?
+  errorMessage             String?
+  createdAt                DateTime  @default(now())
+  completedAt              DateTime?
+  task                     Task      @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@unique([taskId, requestId])
+  @@index([taskId, acceptedRunId, createdAt])
+  @@index([createdTaskId])
+}
+
 // ────────────────────────────────────────────────────────────────────
 // Execution Layer Models
 // ────────────────────────────────────────────────────────────────────
@@ -1224,5 +1253,5 @@ model TaskPlanTerminalAction {
   @@index([runId, recordedAt])
   @@index([nodeAttemptId, recordedAt])
   @@index([taskId, kind])
-  @@unique([nodeAttemptId, kind])
+  @@unique([nodeAttemptId])
 }

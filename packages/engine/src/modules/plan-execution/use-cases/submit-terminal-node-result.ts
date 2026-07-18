@@ -25,6 +25,25 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
+function malformedRichMarkdownContent(value: unknown) {
+  if (typeof value !== "string" || value.includes("\n")) return false;
+  const literalBreaks = value.match(/\\n/g)?.length ?? 0;
+  return literalBreaks >= 2
+    && /\\n(?:[-*] |\d+[.)] |#{1,6} |> |```)/.test(value);
+}
+
+export function malformedPlanOutputMarkdownPath(spec: unknown): string | null {
+  if (!isRecord(spec) || !isRecord(spec.elements)) return null;
+  for (const [elementId, element] of Object.entries(spec.elements)) {
+    if (!isRecord(element) || element.type !== "RichMarkdown") continue;
+    const props = isRecord(element.props) ? element.props : null;
+    if (props && malformedRichMarkdownContent(props.content)) {
+      return `/elements/${elementId}/props/content`;
+    }
+  }
+  return null;
+}
+
 function patchedElementKey(path: string) {
   const parts = decodePointer(path);
   return parts.length === 2 && parts[0] === "elements" && parts[1] ? parts[1] : null;
@@ -169,6 +188,13 @@ async function updatePlanOutput(input: {
   });
   const node = outputNodeFromEffective({ effective, nodeId: input.action.nodeId });
   const nextSpec = applyPlanOutputPatches(persisted.planOutput.spec, input.action.patches, node.id);
+  const malformedMarkdownPath = malformedPlanOutputMarkdownPath(nextSpec);
+  if (malformedMarkdownPath) {
+    throw new EngineError(
+      ENGINE_ERROR_CODES.VALIDATION_FAILED,
+      `Invalid chrona_plan_output RichMarkdown at ${malformedMarkdownPath}: use actual newline characters instead of pre-escaped literal \\n text.`,
+    );
+  }
   const validation = validateChronaSpec(nextSpec);
   if (!validation.ok) {
     throw new EngineError(

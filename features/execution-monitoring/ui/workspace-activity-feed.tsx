@@ -94,7 +94,7 @@ export function WorkspaceActivityFeed({
   runtimeEvents = [],
   title = taskWorkspaceActivityMessages.taskTitle,
   emptyMessage = taskWorkspaceActivityMessages.taskEmpty,
-  limit = 30,
+  limit = 300,
   hasOlderActivity = false,
   isLoadingOlder = false,
   onLoadOlder,

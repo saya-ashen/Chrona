@@ -42,7 +42,7 @@ describe("WorkspaceActivityFeed", () => {
     );
 
     expect(screen.getByText("Execution activity")).toBeInTheDocument();
-    expect(screen.getAllByText("anthropic")).toHaveLength(2);
+    expect(screen.getAllByText("anthropic")).toHaveLength(1);
     expect(screen.queryByText("hermes")).not.toBeInTheDocument();
     expect(screen.getByText("Live answer")).toBeInTheDocument();
     expect(screen.getByText("Answer user")).toBeInTheDocument();
@@ -77,7 +77,7 @@ describe("WorkspaceActivityFeed", () => {
     fireEvent.click(screen.getByRole("button", { name: /Planning phase/i }));
 
     expect(screen.queryByText("Loading task context...")).not.toBeInTheDocument();
-    expect(screen.getByText("Planning phase completed · 3 events · 2.0s")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Planning phase.*completed.*3 events.*2\.0s/i })).toHaveAttribute("aria-expanded", "false");
   });
 
   it("groups plan generation events by activity group across interleaved activity", () => {
@@ -103,7 +103,7 @@ describe("WorkspaceActivityFeed", () => {
       activity({ id: "failed", kind: "tool_completed", title: "Tool failed", summary: "Fetch failed", tone: "danger", timestamp: "2026-05-21T00:00:00.000Z", tool: { name: "chrona_fetch", label: "Fetch", error: "Timeout", state: "failed" } }),
     ]} />);
 
-    expect(screen.getByText("started")).toBeInTheDocument();
+    expect(screen.getByText("running")).toBeInTheDocument();
     expect(screen.getByText("completed")).toBeInTheDocument();
     expect(screen.getByText("failed")).toBeInTheDocument();
 
@@ -203,7 +203,7 @@ describe("WorkspaceActivityFeed", () => {
     />);
 
     expect(screen.getByLabelText("Latest activity running")).toHaveClass("animate-spin");
-    expect(screen.getByText("running")).toBeInTheDocument();
+    expect(screen.getByLabelText("Latest activity running").closest("article")).toHaveTextContent("Read plan");
   });
 
   it("keeps the rail spinner on the newest running event, not older info history", () => {
@@ -217,7 +217,7 @@ describe("WorkspaceActivityFeed", () => {
     />);
 
     const spinnerRow = screen.getByLabelText("Latest activity running").closest("article");
-    expect(spinnerRow).toHaveTextContent("Tool started");
+    expect(spinnerRow).toHaveTextContent("Read plan");
     expect(spinnerRow).not.toHaveTextContent("Task created");
   });
 
@@ -246,7 +246,7 @@ describe("WorkspaceActivityFeed", () => {
     />);
 
     expect(screen.queryByLabelText("Latest activity running")).not.toBeInTheDocument();
-    expect(screen.getByText("running")).toBeInTheDocument();
+    expect(screen.getByText("Read plan")).toBeInTheDocument();
   });
 
   it("pairs non-adjacent tool completion before choosing active rail event", () => {
@@ -311,8 +311,15 @@ describe("WorkspaceActivityFeed", () => {
       ]}
     />);
 
-    const rendered = [screen.getByText("Write output"), screen.getByText("Persisted duplicate"), screen.getByText("Persisted older")].map((node) => node.textContent);
-    expect(rendered).toEqual(["Write output", "Persisted duplicate", "Persisted older"]);
+    const [writeLabel] = screen.getAllByText("Write output");
+    const writeRow = writeLabel?.closest("article");
+    const duplicateRow = screen.getByText("Persisted duplicate").closest("article");
+    const olderRow = screen.getByText("Persisted older").closest("article");
+    expect(writeRow).not.toBeNull();
+    expect(duplicateRow).not.toBeNull();
+    expect(olderRow).not.toBeNull();
+    expect(writeRow!.compareDocumentPosition(duplicateRow!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(duplicateRow!.compareDocumentPosition(olderRow!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
   it("keeps raw and reasoning events out of the primary activity stream", () => {
     render(<WorkspaceActivityFeed activity={[

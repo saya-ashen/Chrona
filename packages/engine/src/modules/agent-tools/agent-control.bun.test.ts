@@ -2,12 +2,13 @@ import { describe, expect, it, beforeAll } from "bun:test";
 import { createHash } from "node:crypto";
 import { db } from "@/lib/db";
 import {
-  DuplicateTerminalActionError,
+  ConflictingTerminalActionError,
   mintRunToken,
   recordTerminalAction,
   validateRunToken,
   revokeRunToken,
 } from "@/modules/plan-execution/runtime/agent-control-store";
+import { handleControlAction, ControlRouteError } from "./control-route";
 import {
   isTerminalControlKind,
   submitNodeResultActionFromControl,
@@ -122,7 +123,7 @@ describe("run token mint/validate round-trip", () => {
 });
 
 describe("terminal action recording", () => {
-  it("records a terminal action and rejects duplicate kind for same node attempt", async () => {
+  it("records one terminal action, accepts same-kind retries, and rejects conflicting kinds", async () => {
     const workspace = await db.workspace.create({ data: { name: "ws-rec", defaultRuntime: "claude_code", status: "Active" } });
     const task = await db.task.create({
       data: {
@@ -185,10 +186,37 @@ describe("terminal action recording", () => {
       nodeId: attempt.nodeId,
       nodeAttemptId: attempt.id,
     };
-    await recordTerminalAction({ scope, kind: "complete", payload: { summary: "ok" }, workspaceId: workspace.id });
+    const first = await recordTerminalAction({ scope, kind: "complete", payload: { summary: "ok" }, workspaceId: workspace.id });
+    const retry = await recordTerminalAction({ scope, kind: "complete", payload: { summary: "again" }, workspaceId: workspace.id });
+    expect(first.recorded).toBe(true);
+    expect(retry.recorded).toBe(false);
+    expect(retry.action.id).toBe(first.action.id);
     await expect(
-      recordTerminalAction({ scope, kind: "complete", payload: { summary: "again" }, workspaceId: workspace.id }),
-    ).rejects.toBeInstanceOf(DuplicateTerminalActionError);
+      recordTerminalAction({ scope, kind: "fail", payload: { error: "conflict" }, workspaceId: workspace.id }),
+    ).rejects.toBeInstanceOf(ConflictingTerminalActionError);
+
+    const token = await mintRunToken({ ...scope });
+    const acknowledged = await handleControlAction({
+      token,
+      workspaceId: workspace.id,
+      body: { kind: "complete", payload: { summary: "retry through route" } },
+    });
+    expect(acknowledged).toMatchObject({
+      ok: true,
+      kind: "complete",
+      recorded: false,
+      alreadyAccepted: true,
+      result: null,
+    });
+    await expect(handleControlAction({
+      token,
+      workspaceId: workspace.id,
+      body: { kind: "fail", payload: { error: "conflicting outcome" } },
+    })).rejects.toMatchObject({
+      code: "conflicting_terminal_action",
+      status: 409,
+    } satisfies Partial<ControlRouteError>);
+    await db.runToken.deleteMany({ where: { runId: run.id } });
 
     await db.taskPlanTerminalAction.deleteMany({ where: { runId: run.id } });
     await db.run.delete({ where: { id: run.id } });

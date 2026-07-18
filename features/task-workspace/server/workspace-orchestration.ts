@@ -331,19 +331,20 @@ export async function dispatchTaskWorkspaceCommand(engine: ChronaEngine, input: 
 
     if (command.type === "execution.action") {
       const action = { ...command, action: command.action } as ExecutionActionInput;
+      const workBlockId = commandWorkBlockId(command);
       const optimisticStatus = optimisticExecutionStatusForAction(action.action);
       if (optimisticStatus) {
         const optimisticHeaderState = await buildHeaderExecutionStateUpdate({
           engine,
           taskId,
-          workBlockId: commandWorkBlockId(command),
+          workBlockId,
           executionStatus: optimisticStatus,
         });
         if (optimisticHeaderState) {
           publishTaskStateUpdate({
             taskId,
             workspaceId,
-            workBlockId: commandWorkBlockId(command),
+            workBlockId,
             updates: optimisticHeaderState,
           });
         }
@@ -352,7 +353,14 @@ export async function dispatchTaskWorkspaceCommand(engine: ChronaEngine, input: 
         taskId,
         action,
         onGraphEvent(event) {
-          publishWorkspaceTrigger({ taskId, workspaceId, commandId, type: "execution.runtime_event", eventKind: event.type });
+          publishWorkspaceTrigger({
+            taskId,
+            workspaceId,
+            workBlockId,
+            commandId,
+            type: "execution.runtime_event",
+            eventKind: event.type,
+          });
         },
         onRuntimeEvent(event) {
           const { type: _runtimeType, ...runtimePayload } = summarizeRuntimeEvent(action.action, event);
@@ -360,50 +368,74 @@ export async function dispatchTaskWorkspaceCommand(engine: ChronaEngine, input: 
             taskId,
             workspaceId,
             commandId,
+            workBlockId,
             type: "execution.runtime_event",
             eventKind: event.event.type,
             ...runtimePayload,
           });
         },
         onStateChange() {
-          publishWorkspaceTrigger({ taskId, workspaceId, commandId, type: "execution.state.updated", eventKind: "state" });
+          publishWorkspaceTrigger({
+            taskId,
+            workspaceId,
+            workBlockId,
+            commandId,
+            type: "execution.state.updated",
+            eventKind: "state",
+          });
         },
       });
       const headerStateUpdate = await buildHeaderExecutionStateUpdate({
         engine,
         taskId,
-        workBlockId: commandWorkBlockId(command),
+        workBlockId,
         executionStatus: result.status,
       });
       if (headerStateUpdate) {
         publishTaskStateUpdate({
           taskId,
           workspaceId,
-          workBlockId: commandWorkBlockId(command),
+          workBlockId,
           updates: headerStateUpdate,
         });
       }
-      publishWorkspaceTrigger({ taskId, workspaceId, commandId, type: "execution.result", eventKind: result.status });
+      publishWorkspaceTrigger({
+        taskId,
+        workspaceId,
+        workBlockId,
+        commandId,
+        type: "execution.result",
+        eventKind: result.status,
+      });
       return;
     }
 
+    const workBlockId = commandWorkBlockId(command);
     const result = await engine.tasks.execution.submitCheckpointAction({
       taskId,
       action: {
         checkpointId: command.checkpointId,
         action: command.action,
         payload: command.payload,
-        workBlockId: command.workBlockId ?? null,
+        workBlockId,
         idempotencyKey: command.idempotencyKey,
       } as SubmitCheckpointActionInput,
       onGraphEvent(event) {
-        publishWorkspaceTrigger({ taskId, workspaceId, commandId, type: "execution.runtime_event", eventKind: event.type });
+        publishWorkspaceTrigger({
+          taskId,
+          workspaceId,
+          workBlockId,
+          commandId,
+          type: "execution.runtime_event",
+          eventKind: event.type,
+        });
       },
       onRuntimeEvent(event) {
         const { type: _runtimeType, ...runtimePayload } = summarizeRuntimeEvent(checkpointActionToExecutionAction(command.action), event);
         publishWorkspaceTrigger({
           taskId,
           workspaceId,
+          workBlockId,
           commandId,
           type: "execution.runtime_event",
           eventKind: event.event.type,
@@ -411,24 +443,38 @@ export async function dispatchTaskWorkspaceCommand(engine: ChronaEngine, input: 
         });
       },
       onStateChange() {
-        publishWorkspaceTrigger({ taskId, workspaceId, commandId, type: "execution.state.updated", eventKind: "state" });
+        publishWorkspaceTrigger({
+          taskId,
+          workspaceId,
+          workBlockId,
+          commandId,
+          type: "execution.state.updated",
+          eventKind: "state",
+        });
       },
     });
     const headerStateUpdate = await buildHeaderExecutionStateUpdate({
       engine,
       taskId,
-      workBlockId: commandWorkBlockId(command),
+      workBlockId,
       executionStatus: result.execution.status,
     });
     if (headerStateUpdate) {
       publishTaskStateUpdate({
         taskId,
         workspaceId,
-        workBlockId: commandWorkBlockId(command),
+        workBlockId,
         updates: headerStateUpdate,
       });
     }
-    publishWorkspaceTrigger({ taskId, workspaceId, commandId, type: "checkpoint.result", eventKind: result.execution.status });
+    publishWorkspaceTrigger({
+      taskId,
+      workspaceId,
+      workBlockId,
+      commandId,
+      type: "checkpoint.result",
+      eventKind: result.execution.status,
+    });
   } catch (cause) {
     const httpError = toHttpError(cause);
     const workBlockId = commandWorkBlockId(command);

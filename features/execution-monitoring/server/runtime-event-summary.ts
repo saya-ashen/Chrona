@@ -92,6 +92,11 @@ function latestWorkflowProgress(raw: Record<string, unknown>) {
   return null;
 }
 
+function directRawMessage(raw: unknown) {
+  const record = recordValue(raw);
+  return stringValue(record, "message");
+}
+
 function taskProgressMessage(raw: unknown) {
   const record = recordValue(raw);
   if (!record || record.type !== "system" || record.subtype !== "task_progress") return undefined;
@@ -110,6 +115,32 @@ function taskProgressMessage(raw: unknown) {
   return parts.join(" · ") || stringValue(record, "summary");
 }
 
+function compactJson(value: unknown, maxLength = 4_000) {
+  if (value === undefined) return undefined;
+  const seen = new WeakSet<object>();
+  const serialized = JSON.stringify(value, (key, nested) => {
+    if (/token|secret|credential|password|api.?key|authorization|cookie/i.test(key)) return "[redacted]";
+    if (nested && typeof nested === "object") {
+      if (seen.has(nested)) return "[circular]";
+      seen.add(nested);
+    }
+    return nested;
+  }, 2);
+  if (!serialized) return undefined;
+  return serialized.length > maxLength ? `${serialized.slice(0, maxLength - 3)}...` : serialized;
+}
+
+function toolResultPreview(value: unknown) {
+  if (value && typeof value === "object" && !Array.isArray(value) && "content" in value) {
+    const content = (value as { content?: unknown }).content;
+    if (Array.isArray(content)) {
+      const text = content.flatMap((item) => item && typeof item === "object" && "text" in item && typeof item.text === "string" ? [item.text] : []).join("\n").trim();
+      if (text) return text.length > 4_000 ? `${text.slice(0, 3_997)}...` : text;
+    }
+  }
+  return compactJson(value);
+}
+
 function summarizeProviderRuntimePayload(
   providerEvent: PlanExecutionRuntimeEvent["event"],
 ): Extract<PlanExecutionSSEEvent, { type: "runtime_event" }>["event"] {
@@ -122,28 +153,41 @@ function summarizeProviderRuntimePayload(
       return {
         type: "tool_started",
         toolName: providerEvent.tool,
+        callId: providerEvent.callId,
         label: toolLabel(providerEvent.tool),
-        input: providerEvent.input,
+        inputSummary: compactJson(providerEvent.input),
+        preview: typeof providerEvent.preview === "string" ? providerEvent.preview : compactJson(providerEvent.preview),
+      };
+    case "tool_progress":
+      return {
+        type: "tool_progress",
+        toolName: providerEvent.toolName,
+        callId: providerEvent.callId,
+        label: toolLabel(providerEvent.toolName),
+        preview: providerEvent.preview,
       };
     case "tool_started":
       return {
         type: "tool_started",
         toolName: providerEvent.toolName,
         label: toolLabel(providerEvent.toolName),
-        preview: providerEvent.preview,
-        input: providerEvent.input,
+        preview: typeof providerEvent.preview === "string" ? providerEvent.preview : compactJson(providerEvent.preview),
+        inputSummary: compactJson(providerEvent.input),
       };
     case "tool_result":
       return {
         type: "tool_completed",
         toolName: providerEvent.tool,
+        callId: providerEvent.callId,
         label: toolLabel(providerEvent.tool),
+        preview: toolResultPreview(providerEvent.result),
       };
     case "tool_completed":
       return {
         type: "tool_completed",
         toolName: providerEvent.toolName,
         label: toolLabel(providerEvent.toolName),
+        preview: providerEvent.error ? undefined : toolResultPreview(providerEvent.raw),
         durationMs: providerEvent.durationMs,
         error: providerEvent.error
           ? {
@@ -163,7 +207,7 @@ function summarizeProviderRuntimePayload(
     case "run_cancelled":
       return { type: "run_status", status: "cancelled", message: "Provider run cancelled." };
     case "raw_event":
-      return { type: "raw_event", rawEventType: providerEvent.rawEventType, message: taskProgressMessage(providerEvent.raw) };
+      return { type: "raw_event", rawEventType: providerEvent.rawEventType, message: directRawMessage(providerEvent.raw) ?? taskProgressMessage(providerEvent.raw) };
 
   }
 }

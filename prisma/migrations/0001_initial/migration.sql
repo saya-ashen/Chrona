@@ -741,6 +741,31 @@ CREATE TABLE "TaskAssistantMessage" (
 );
 
 -- CreateTable
+CREATE TABLE "TaskResultContinuation" (
+    "id" TEXT NOT NULL PRIMARY KEY,
+    "taskId" TEXT NOT NULL,
+    "acceptedRunId" TEXT NOT NULL,
+    "requestId" TEXT NOT NULL,
+    "intent" TEXT NOT NULL,
+    "status" TEXT NOT NULL,
+    "instruction" TEXT NOT NULL,
+    "answer" TEXT,
+    "answerSource" TEXT,
+    "contextSource" TEXT,
+    "sourceTaskSessionId" TEXT,
+    "providerSessionRef" TEXT,
+    "sessionStrategy" TEXT,
+    "cacheReadInputTokens" INTEGER,
+    "cacheCreationInputTokens" INTEGER,
+    "createdTaskId" TEXT,
+    "errorCode" TEXT,
+    "errorMessage" TEXT,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "completedAt" DATETIME,
+    CONSTRAINT "TaskResultContinuation_taskId_fkey" FOREIGN KEY ("taskId") REFERENCES "Task" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+
+-- CreateTable
 CREATE TABLE "WorkBlock" (
     "id" TEXT NOT NULL PRIMARY KEY,
     "workspaceId" TEXT NOT NULL,
@@ -1122,6 +1147,15 @@ CREATE UNIQUE INDEX "AiFeatureBinding_feature_key" ON "AiFeatureBinding"("featur
 
 -- CreateIndex
 CREATE INDEX "TaskAssistantMessage_taskId_sequence_idx" ON "TaskAssistantMessage"("taskId", "sequence");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "TaskResultContinuation_taskId_requestId_key" ON "TaskResultContinuation"("taskId", "requestId");
+
+-- CreateIndex
+CREATE INDEX "TaskResultContinuation_taskId_acceptedRunId_createdAt_idx" ON "TaskResultContinuation"("taskId", "acceptedRunId", "createdAt");
+
+-- CreateIndex
+CREATE INDEX "TaskResultContinuation_createdTaskId_idx" ON "TaskResultContinuation"("createdTaskId");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "WorkBlock_sessionId_key" ON "WorkBlock"("sessionId");

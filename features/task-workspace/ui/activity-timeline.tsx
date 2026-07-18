@@ -10,17 +10,17 @@ type Tone = WorkspaceActivityTone | undefined;
 type RenderEntry =
   | { type: "node_header"; key: string; nodeTitle: string }
   | { type: "single"; key: string; item: WorkspaceActivityItem }
-  | { type: "tool_pair"; key: string; started: WorkspaceActivityItem; completed?: WorkspaceActivityItem }
-  | { type: "plan_phase"; key: string; items: WorkspaceActivityItem[] };
+  | { type: "tool_pair"; key: string; started: WorkspaceActivityItem; progress: WorkspaceActivityItem[]; completed?: WorkspaceActivityItem }
+  | { type: "plan_phase"; key: string; items: WorkspaceActivityItem[] }
+  | { type: "execution_header"; key: string };
 
 function isPlanGenerationEvent(item: WorkspaceActivityItem) {
   return item.rawEventType?.startsWith("plan_generation.") || item.id.includes("plan_generation.");
 }
 
-
 function planGenerationGroupKey(item: WorkspaceActivityItem) {
   if (!isPlanGenerationEvent(item)) return undefined;
-  return item.activityGroup?.kind === "plan_generation" ? item.activityGroup.id : "legacy-plan-generation";
+  return "plan-generation";
 }
 function isPlanGenerationMilestone(item: WorkspaceActivityItem) {
   const text = `${item.rawEventType ?? ""} ${item.title} ${item.summary}`.toLowerCase();
@@ -48,6 +48,9 @@ function collectPlanGenerationGroup(items: WorkspaceActivityItem[], startIndex: 
 }
 
 function isSameToolActivity(left: WorkspaceActivityItem, right: WorkspaceActivityItem) {
+  const leftCallId = left.tool?.callId;
+  const rightCallId = right.tool?.callId;
+  if (leftCallId && rightCallId) return leftCallId === rightCallId;
   const sameName = left.tool?.name === right.tool?.name || !left.tool?.name;
   return left.sourceNodeId === right.sourceNodeId
     && left.runId === right.runId
@@ -62,37 +65,67 @@ function getToolPair(items: WorkspaceActivityItem[], item: WorkspaceActivityItem
   return items.find((candidate) => candidate.kind === "tool_completed" && isSameToolActivity(item, candidate));
 }
 
+function getToolProgress(items: WorkspaceActivityItem[], started: WorkspaceActivityItem) {
+  return items.filter((candidate) =>
+    candidate.kind === "tool_progress" && isSameToolActivity(started, candidate)
+  );
+}
+
+const TRANSCRIPT_HIDDEN_EVENTS = new Set([
+  "plan_generation.status",
+  "plan_execution.executable_path_computed",
+  "plan_execution.plan_output_updated",
+  "turn_start",
+  "turn_end",
+]);
+
 /**
- * Flattens items into a render list:
- * - Inserts a synthetic node_header row when sourceNodeId changes (unless the
- *   item is already a "node" kind event, which serves as its own header).
- * - Merges consecutive tool_started + tool_completed pairs for the same tool.
+ * Flattens items into a render list, grouping plan and tool lifecycles.
  */
-function buildRenderList(items: WorkspaceActivityItem[]): RenderEntry[] {
+function buildRenderList(items: WorkspaceActivityItem[], transcript = false): RenderEntry[] {
+  const visibleItems = transcript
+    ? items.filter((item) => !TRANSCRIPT_HIDDEN_EVENTS.has(item.rawEventType ?? ""))
+    : items;
   const result: RenderEntry[] = [];
   let lastNodeId: string | undefined = undefined;
   const groupedPlanGenerationKeys = new Set<string>();
+  let executionHeaderAdded = false;
 
-  for (let i = 0; i < items.length; i++) {
-    const item = items[i];
+  for (let i = 0; i < visibleItems.length; i++) {
+    const item = visibleItems[i];
     lastNodeId = pushNodeHeader(result, item, lastNodeId);
 
     const planGroupKey = planGenerationGroupKey(item);
     if (planGroupKey) {
       if (groupedPlanGenerationKeys.has(planGroupKey)) continue;
-      const group = collectPlanGenerationGroup(items, i, planGroupKey);
+      const group = collectPlanGenerationGroup(visibleItems, i, planGroupKey);
       groupedPlanGenerationKeys.add(planGroupKey);
       result.push({ type: "plan_phase", key: `plan:${planGroupKey}:${group[0]?.id ?? item.id}:${group.length}`, items: group });
       continue;
     }
 
-    const completedTool = getToolPair(items, item, i);
-    if (completedTool) {
-      result.push({ type: "tool_pair", key: item.id, started: item, completed: completedTool });
-      i++;
+    if (transcript && !executionHeaderAdded) {
+      result.push({ type: "execution_header", key: "execution-phase" });
+      executionHeaderAdded = true;
+    }
+    const completedTool = getToolPair(visibleItems, item, i);
+    if (item.kind === "tool_started") {
+      result.push({
+        type: "tool_pair",
+        key: item.id,
+        started: item,
+        progress: getToolProgress(visibleItems, item),
+        completed: completedTool,
+      });
       continue;
     }
 
+    if (item.kind === "tool_progress" && visibleItems.some((candidate) =>
+      candidate.kind === "tool_started" && isSameToolActivity(candidate, item)
+    )) continue;
+    if (item.kind === "tool_completed" && visibleItems.some((candidate) =>
+      candidate.kind === "tool_started" && isSameToolActivity(candidate, item)
+    )) continue;
     result.push({ type: "single", key: item.id, item });
   }
 
@@ -193,12 +226,12 @@ function SpineIcon({
 
 function NodeHeaderRow({ nodeTitle, isLast }: { nodeTitle: string; isLast: boolean }) {
   return (
-    <div className="relative grid grid-cols-[2rem_minmax(0,1fr)] gap-x-3">
+    <div className="relative grid grid-cols-[1.5rem_minmax(0,1fr)] gap-x-2">
       <SpineIcon tone="info" shape="rounded-md" isLast={isLast}>
-        <GitBranch className="size-3.5" />
+        <GitBranch className="size-3" />
       </SpineIcon>
-      <div className="flex min-w-0 items-center pb-3 pt-1">
-        <span className="min-w-0 truncate rounded-full bg-primary/10 px-2.5 py-0.5 text-[11px] font-semibold text-primary">
+      <div className="flex min-w-0 items-center pb-2 pt-1">
+        <span className="min-w-0 truncate text-[11px] font-semibold text-primary">
           {nodeTitle}
         </span>
       </div>
@@ -212,7 +245,9 @@ function SingleEventRow({ item, isLast, compact }: { item: WorkspaceActivityItem
   const tone = item.tone as Tone;
   const Icon = entryIcon(item.kind, tone);
   const time = fmtTime(item.timestamp);
-  const text = item.assistant?.text ?? (item.summary && item.summary !== item.title ? item.summary : undefined);
+  const text = item.kind === "provider_run" && item.summary === item.provider
+    ? undefined
+    : item.assistant?.text ?? (item.summary && item.summary !== item.title ? item.summary : undefined);
   const isNodeEvent = item.kind === "node";
   const iconTone: Tone = isNodeEvent ? "info" : tone;
   const tool = item.tool;
@@ -220,14 +255,14 @@ function SingleEventRow({ item, isLast, compact }: { item: WorkspaceActivityItem
   const hasToolDetails = !compact && !!(tool?.inputSummary || tool?.preview || tool?.error);
 
   return (
-    <article className="relative grid grid-cols-[2rem_minmax(0,1fr)] gap-x-3">
+    <article className="relative grid grid-cols-[1.5rem_minmax(0,1fr)] gap-x-2">
       <SpineIcon tone={iconTone} shape={isNodeEvent ? "rounded-md" : "rounded-full"} isLast={isLast}>
-        <Icon className="size-3.5" />
+        <Icon className="size-3" />
       </SpineIcon>
-      <div className="min-w-0 pb-4 pt-0.5">
+      <div className="min-w-0 pb-2.5 pt-0.5">
         <div className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
           {time && <time className="shrink-0 font-mono text-[10px] tabular-nums text-muted-foreground/50">{time}</time>}
-          <p className="min-w-0 break-words text-sm font-semibold leading-snug text-foreground">{item.title}</p>
+          <p className="min-w-0 break-words text-xs font-medium leading-snug text-foreground">{item.title}</p>
           {toolState && (
             <span className={cn(
               "shrink-0 rounded-full px-2 py-0.5 text-[10px] font-medium",
@@ -244,12 +279,10 @@ function SingleEventRow({ item, isLast, compact }: { item: WorkspaceActivityItem
             </span>
           )}
         </div>
-        {item.provider && (
-          <div className="mt-1 flex flex-wrap items-center gap-1.5">
-            <span className="rounded-full bg-primary-soft px-2 py-0.5 text-[10px] font-medium text-primary">{item.provider}</span>
-          </div>
-        )}
-        {text && <CollapsibleText text={text} compact={compact} />}
+        {item.provider && item.kind === "provider_run" ? (
+          <p className="mt-0.5 text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">{item.provider}</p>
+        ) : null}
+        {text && <CollapsibleText text={text} compact={compact || (item.kind !== "assistant_message" && item.kind !== "reasoning")} />}
         {hasToolDetails && (
           <dl className="mt-1.5 space-y-1.5 rounded-xl border border-border/50 bg-muted/35 p-2 text-xs">
             {tool?.inputSummary && (
@@ -281,33 +314,42 @@ function SingleEventRow({ item, isLast, compact }: { item: WorkspaceActivityItem
 
 function ToolPairRow({
   started,
+  progress,
   completed,
   isLast,
   compact,
 }: {
   started: WorkspaceActivityItem;
+  progress: WorkspaceActivityItem[];
   completed?: WorkspaceActivityItem;
   isLast: boolean;
   compact: boolean;
 }) {
-  const [detailsOpen, setDetailsOpen] = useState(false);
   const tool = completed?.tool ?? started.tool;
   const failed = completed?.tone === "danger" || tool?.state === "failed";
+  const [detailsOpen, setDetailsOpen] = useState(failed);
   const done = !!completed;
   const duration = fmtDuration(tool?.durationMs);
   const time = fmtTime(started.timestamp);
   const iconTone: Tone = failed ? "danger" : done ? "success" : "neutral";
-  const hasDetails = !compact && !!(tool?.inputSummary || tool?.preview || tool?.error);
+  const latestUpdate = progress.findLast((item) => item.tool?.preview)?.tool?.preview;
+  const detailPreviews = [
+    { label: "Intent", value: started.tool?.preview },
+    { label: "Input", value: started.tool?.inputSummary },
+    { label: "Update", value: latestUpdate },
+    { label: failed ? "Error" : "Result", value: tool?.error ?? tool?.resultPreview },
+  ].filter((detail): detail is { label: string; value: string } => !!detail.value).slice(0, 2);
+  const hasDetails = !compact && detailPreviews.length > 0;
 
   return (
-    <article className="relative grid grid-cols-[2rem_minmax(0,1fr)] gap-x-3">
+    <article className="relative grid grid-cols-[1.5rem_minmax(0,1fr)] gap-x-2">
       <SpineIcon tone={iconTone} isLast={isLast}>
-        <Wrench className="size-3.5" />
+        <Wrench className="size-3" />
       </SpineIcon>
-      <div className="min-w-0 pb-4 pt-0.5">
+      <div className="min-w-0 pb-2.5 pt-0.5">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
           {time && <time className="shrink-0 font-mono text-[10px] tabular-nums text-muted-foreground/50">{time}</time>}
-          <p className="min-w-0 flex-1 break-words text-sm font-semibold leading-snug text-foreground">
+          <p className="min-w-0 flex-1 break-words text-xs font-medium leading-snug text-foreground">
             {tool?.label ?? tool?.name ?? started.title}
           </p>
           {done && !failed && (
@@ -321,35 +363,53 @@ function ToolPairRow({
             </span>
           )}
           {!done && (
-            <span className="shrink-0 animate-pulse rounded-full bg-muted px-2 py-0.5 text-[10px] text-muted-foreground">
-              running…
+            <span className="shrink-0 rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
+              running
             </span>
           )}
         </div>
+        {!done && (progress.at(-1)?.summary || started.summary) ? (
+          <p className="mt-1 line-clamp-2 text-[11px] leading-snug text-muted-foreground">
+            {progress.at(-1)?.summary ?? started.summary}
+          </p>
+        ) : null}
         {hasDetails && (
-          <div className="mt-1.5">
-            <button
-              type="button"
-              className="flex items-center gap-0.5 text-[10px] text-muted-foreground/55 transition-colors hover:text-muted-foreground"
-              onClick={() => setDetailsOpen((v) => !v)}
-            >
-              {detailsOpen ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />}
-              details
-            </button>
-            {detailsOpen && (
-              <dl className="mt-1.5 space-y-1.5 rounded-xl border border-border/50 bg-muted/35 p-2 text-xs">
-                {tool?.inputSummary && (
+          <div className="mt-2 rounded-xl border border-border/50 bg-muted/25 p-2">
+            {!detailsOpen ? (
+              <dl className="space-y-1 text-[11px]">
+                {detailPreviews.map((detail) => (
+                  <div key={detail.label} className="grid gap-1 sm:grid-cols-[4rem_minmax(0,1fr)]">
+                    <dt className="font-semibold text-muted-foreground">{detail.label}</dt>
+                    <dd className="min-w-0 truncate font-mono text-foreground/75">{detail.value}</dd>
+                  </div>
+                ))}
+              </dl>
+            ) : (
+              <dl className="space-y-1.5 text-xs">
+                {started.tool?.inputSummary && (
                   <div className="grid gap-1 sm:grid-cols-[4rem_minmax(0,1fr)]">
                     <dt className="font-semibold text-muted-foreground">Input</dt>
-                    <dd className="min-w-0 break-words text-foreground/80">{tool.inputSummary}</dd>
+                    <dd className="min-w-0 whitespace-pre-wrap break-words font-mono text-[11px] text-foreground/80">{started.tool.inputSummary}</dd>
                   </div>
                 )}
-                {tool?.preview && (
+                {tool?.resultPreview && (
                   <div className="grid gap-1 sm:grid-cols-[4rem_minmax(0,1fr)]">
-                    <dt className="font-semibold text-muted-foreground">Preview</dt>
-                    <dd className="min-w-0 break-words text-foreground/80">{tool.preview}</dd>
+                    <dt className="font-semibold text-muted-foreground">Result</dt>
+                    <dd className="min-w-0 whitespace-pre-wrap break-words font-mono text-[11px] text-foreground/80">{tool.resultPreview}</dd>
                   </div>
                 )}
+                {started.tool?.preview && (
+                  <div className="grid gap-1 sm:grid-cols-[4rem_minmax(0,1fr)]">
+                    <dt className="font-semibold text-muted-foreground">Intent</dt>
+                    <dd className="min-w-0 break-words text-foreground/80">{started.tool.preview}</dd>
+                  </div>
+                )}
+                {progress.map((item) => item.tool?.preview ? (
+                  <div key={item.id} className="grid gap-1 sm:grid-cols-[4rem_minmax(0,1fr)]">
+                    <dt className="font-semibold text-muted-foreground">Update</dt>
+                    <dd className="min-w-0 whitespace-pre-wrap break-words text-foreground/80">{item.tool.preview}</dd>
+                  </div>
+                ) : null)}
                 {tool?.error && (
                   <div className="grid gap-1 sm:grid-cols-[4rem_minmax(0,1fr)]">
                     <dt className="font-semibold text-destructive/70">Error</dt>
@@ -358,6 +418,15 @@ function ToolPairRow({
                 )}
               </dl>
             )}
+            <button
+              type="button"
+              className="mt-1.5 flex min-h-7 items-center gap-1 rounded-md px-1 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              onClick={() => setDetailsOpen((value) => !value)}
+              aria-expanded={detailsOpen}
+            >
+              {detailsOpen ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />}
+              {detailsOpen ? "Show less" : "View all technical details"}
+            </button>
           </div>
         )}
       </div>
@@ -409,12 +478,14 @@ function PlanGenerationPhaseRow({
   items,
   isLast,
   compact,
+  transcript = false,
 }: {
   items: WorkspaceActivityItem[];
   isLast: boolean;
   compact: boolean;
+  transcript?: boolean;
 }) {
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(transcript ? summarizePlanPhase(items) !== "completed" : true);
   const status = summarizePlanPhase(items);
   const duration = formatPhaseDuration(items);
   const statusTone: Tone = status === "failed" ? "danger" : status === "completed" ? "success" : "info";
@@ -456,11 +527,6 @@ function PlanGenerationPhaseRow({
               {expanded ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
             </span>
           </button>
-          {!expanded && (
-            <p className="mt-2 text-xs text-muted-foreground">
-              Planning phase {status} · {eventLabel}{duration ? ` · ${duration}` : ""}
-            </p>
-          )}
           {expanded && (
             <div className="mt-3 space-y-2 border-l border-primary/25 pl-3">
               {items.map((item) => <PlanPhaseEvent key={item.id} item={item} compact={compact} />)}
@@ -472,6 +538,16 @@ function PlanGenerationPhaseRow({
   );
 }
 
+function ExecutionHeaderRow() {
+  return (
+    <div className="mb-2 mt-1 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+      <span className="h-px flex-1 bg-border" />
+      Execution
+      <span className="h-px flex-1 bg-border" />
+    </div>
+  );
+}
+
 function railTitle(entry: RenderEntry) {
   switch (entry.type) {
     case "node_header":
@@ -480,6 +556,8 @@ function railTitle(entry: RenderEntry) {
       return entry.completed?.tool?.label ?? entry.started.tool?.label ?? entry.completed?.tool?.name ?? entry.started.tool?.name ?? entry.started.title;
     case "plan_phase":
       return "Planning phase";
+    case "execution_header":
+      return "Execution";
     case "single":
       return entry.item.title;
   }
@@ -494,13 +572,15 @@ function railDetail(entry: RenderEntry) {
       const duration = fmtDuration(tool?.durationMs);
       if (entry.completed?.tone === "danger" || tool?.state === "failed") return "failed";
       if (entry.completed) return duration ? `done · ${duration}` : "done";
-      return "running";
+      return entry.progress.at(-1)?.summary ?? entry.started.summary ?? "running";
     }
     case "plan_phase": {
       const duration = formatPhaseDuration(entry.items);
       const status = summarizePlanPhase(entry.items);
       return duration ? `${status} · ${duration}` : status;
     }
+    case "execution_header":
+      return "Stage";
     case "single": {
       const item = entry.item;
       if (item.tool?.state === "failed") return "failed";
@@ -508,7 +588,7 @@ function railDetail(entry: RenderEntry) {
         const duration = fmtDuration(item.tool.durationMs);
         return duration ? `done · ${duration}` : "done";
       }
-      if (item.tool?.state === "started") return "running";
+      if (item.tool?.state === "started" || item.tool?.state === "progress") return item.summary || "running";
       return item.assistant?.text ?? (item.summary && item.summary !== item.title ? item.summary : item.provider ?? fmtTime(item.timestamp));
     }
   }
@@ -527,11 +607,14 @@ function railTone(entry: RenderEntry): Tone {
       const status = summarizePlanPhase(entry.items);
       return status === "failed" ? "danger" : status === "completed" ? "success" : "info";
     }
+    case "execution_header":
+      return "neutral";
     case "single":
       if (entry.item.kind === "node") return "info";
       if (entry.item.tool?.state === "failed") return "danger";
       if (entry.item.tool?.state === "completed") return "success";
       if (entry.item.tool?.state === "started") return "info";
+      if (entry.item.tool?.state === "progress") return "info";
       return entry.item.tone;
   }
 }
@@ -546,7 +629,7 @@ function railDotClass(tone: Tone) {
 function isConcreteRunningEntry(entry: RenderEntry) {
   if (entry.type === "tool_pair") return !entry.completed;
   if (entry.type === "plan_phase") return summarizePlanPhase(entry.items) === "running";
-  if (entry.type === "single") return entry.item.tool?.state === "started";
+  if (entry.type === "single") return entry.item.tool?.state === "started" || entry.item.tool?.state === "progress";
   return false;
 }
 
@@ -604,12 +687,14 @@ export function ActivityTimeline({
   items,
   density = "detailed",
   active = false,
+  transcript = false,
 }: {
   items: WorkspaceActivityItem[];
   density?: "compact" | "detailed" | "rail";
   active?: boolean;
+  transcript?: boolean;
 }) {
-  const renderList = buildRenderList(items);
+  const renderList = buildRenderList(items, transcript);
   const rail = density === "rail";
   const compact = density === "compact";
   if (rail) return <ActivityRailTimeline entries={renderList} active={active} />;
@@ -623,9 +708,11 @@ export function ActivityTimeline({
           case "node_header":
             return <NodeHeaderRow key={entry.key} nodeTitle={entry.nodeTitle} isLast={isLast} />;
           case "tool_pair":
-            return <ToolPairRow key={entry.key} started={entry.started} completed={entry.completed} isLast={isLast} compact={compact} />;
+            return <ToolPairRow key={entry.key} started={entry.started} progress={entry.progress} completed={entry.completed} isLast={isLast} compact={compact} />;
           case "plan_phase":
-            return <PlanGenerationPhaseRow key={entry.key} items={entry.items} isLast={isLast} compact={compact} />;
+            return <PlanGenerationPhaseRow key={entry.key} items={entry.items} isLast={isLast} compact={compact} transcript={transcript} />;
+          case "execution_header":
+            return <ExecutionHeaderRow key={entry.key} />;
           case "single":
             return <SingleEventRow key={entry.key} item={entry.item} isLast={isLast} compact={compact} />;
         }

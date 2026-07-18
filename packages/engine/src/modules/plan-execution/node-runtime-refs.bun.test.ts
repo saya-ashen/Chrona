@@ -294,6 +294,10 @@ describe("node runtime refs", () => {
     expect(runtime.instructions).toContain("Current Node Context JSON.context.planOutput");
     expect(runtime.instructions).toContain("context.planOutput.hasSpec is false");
     expect(runtime.instructions).toContain("root MUST equal one element id");
+    expect(runtime.instructions).toContain("RichMarkdown multiline content must contain actual newline characters");
+    expect(runtime.instructions).toContain('"type": "RichMarkdown"');
+    expect(runtime.instructions).not.toContain('"type": "Markdown"');
+    expect(runtime.instructions.match(/pre-escaped literal/g)).toHaveLength(1);
     expect(runtime.instructions).not.toContain("SCHEMA LAB OVERRIDE:");
     expect(runtime.instructions).not.toContain("Submit the complete Spec as the chrona_plan_output tool argument");
     expect(runtime.runtimeInput.context.planOutput).toEqual({
@@ -304,10 +308,17 @@ describe("node runtime refs", () => {
       elementIds: [],
       updatedAt: null,
     });
-    expect(runtime.instructions).toContain("current working directory as the workspace root");
-    expect(runtime.instructions).toContain(".chrona/outputs/N20260516-01/");
+    expect(runtime.runtimeInput.context.run?.generatedFiles).toEqual({
+      directory: expect.stringMatching(/\/generated\/\d{8}\/N20260516-01$/),
+      referenceBase: expect.stringMatching(
+        /^generated:\/\/\d{8}\/N20260516-01\/$/,
+      ),
+    });
+    expect(runtime.instructions).toContain("absolute output directory");
+    const generatedReference = runtime.runtimeInput.context.run?.generatedFiles?.referenceBase;
+    expect(generatedReference).toBeDefined();
+    expect(runtime.instructions).toContain(generatedReference!);
     expect(runtime.instructions).toContain("FileView or FileRef");
-    expect(runtime.instructions).toContain("Do not use absolute paths, .. segments");
   });
 
   it("includes Results design guidance for task-node outputs", () => {
@@ -366,7 +377,7 @@ describe("node runtime refs", () => {
         root: "existingRoot",
         elements: {
           existingRoot: { type: "Stack", props: { gap: "sm" }, children: ["firstSection"] },
-          firstSection: { type: "Markdown", props: { content: "First section" }, children: [] },
+          firstSection: { type: "RichMarkdown", props: { content: "First section" }, children: [] },
         },
       },
       updatedAt: "2026-05-16T00:01:00.000Z",

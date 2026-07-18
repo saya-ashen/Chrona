@@ -65,7 +65,7 @@ export async function chat(
   client: EngineAiClient,
   request: ChatRequest,
 ): Promise<ChatResponse> {
-  if (client.record.type === "hermes") {
+  if (client.providerClient) {
     if (request.jsonMode) {
       const content = await dispatch(client, "chat", request, "chat");
       return {

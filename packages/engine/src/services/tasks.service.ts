@@ -73,6 +73,24 @@ export function createTasksService() {
         throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.TASK_NOT_FOUND, "Failed to get task activity");
       }
     },
+    async requestResultFileAccess(
+      input: Parameters<typeof tasks.requestResultFileAccess>[0],
+    ) {
+      return tasks.requestResultFileAccess(input);
+    },
+    async approveResultFileAccess(
+      input: Parameters<typeof tasks.approveResultFileAccess>[0],
+    ) {
+      return tasks.approveResultFileAccess(input);
+    },
+    async openResultFile(input: Parameters<typeof tasks.openResultFile>[0]) {
+      return tasks.openResultFile(input);
+    },
+    async previewResultFile(
+      input: Parameters<typeof tasks.previewResultFile>[0],
+    ) {
+      return tasks.previewResultFile(input);
+    },
     async list(input: Parameters<typeof tasks.list>[0]) {
       try {
         return await tasks.list(input);

@@ -1,4 +1,8 @@
-import type { ConditionEvaluator, TaskExecutor, TaskMode } from "../ai-plan-blueprint";
+import type {
+  ConditionEvaluator,
+  TaskExecutor,
+  TaskMode,
+} from "../ai-plan-blueprint";
 
 export type TaskPriority = "Low" | "Medium" | "High" | "Urgent";
 
@@ -53,7 +57,8 @@ export interface WaitConfig {
   };
 }
 
-export type NodeConfig = TaskConfig | CheckpointConfig | ConditionConfig | WaitConfig;
+export type NodeConfig =
+  TaskConfig | CheckpointConfig | ConditionConfig | WaitConfig;
 
 export type NodeLayerType = "definition" | "invalidation" | "cancellation";
 
@@ -143,6 +148,10 @@ export interface NodeRuntimeInput {
     run?: {
       planningPrompt?: string;
       startPrompt?: string;
+      generatedFiles?: {
+        directory: string;
+        referenceBase: string;
+      };
     };
     relevantPreviousResults: Array<{
       nodeRef: string;

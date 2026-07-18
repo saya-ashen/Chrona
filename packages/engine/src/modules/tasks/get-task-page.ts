@@ -14,6 +14,7 @@ import {
 import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
 import {
   buildActivityTimeline,
+  deduplicateProjectedActivity,
   mapTimelineItemToActivity,
   orderActivityNewestFirst,
 } from "./task-activity";
@@ -235,12 +236,14 @@ export async function getTaskPage(input: { taskId: string; workBlockId?: string 
   });
   const latestRunPresentationStatus = taskExecutionStateToRunStatus(taskExecutionState);
 
-  const activityTimeline = task.timelineItems.length > 0
-    ? orderActivityNewestFirst([
-        ...task.timelineItems.map(mapTimelineItemToActivity),
-        ...buildActivityTimeline([...task.events].reverse()),
-      ]).slice(0, 100)
-    : buildActivityTimeline([...task.events].reverse());
+  const activityTimeline = orderActivityNewestFirst(deduplicateProjectedActivity(
+    task.timelineItems.length > 0
+      ? [
+          ...task.timelineItems.map(mapTimelineItemToActivity),
+          ...buildActivityTimeline([...task.events].reverse()),
+        ]
+      : buildActivityTimeline([...task.events].reverse()),
+  )).slice(0, 100);
   const artifacts = task.artifacts.map((artifact) => ({
     id: artifact.id,
     title: artifact.title,

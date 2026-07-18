@@ -2,6 +2,7 @@
 
 import { AlertCircle, CheckCircle2, Loader2, Sparkles, Wrench } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
+import { v4 as uuidv4 } from "uuid";
 import { DEFAULT_SCHEDULE_PAGE_COPY, getSchedulePageCopy } from "./schedule-page-copy";
 import type { QuickCreateDraft } from "./schedule-page-types";
 import { buildQuickCreateDraft, toDateForDay } from "./schedule-page-utils";
@@ -39,7 +40,7 @@ type ProcessTrace = {
 
 function newTrace(input: { rawInput: string; normalizedInput: string; source: "suggestion" | "direct_submit"; suggestionId?: string; suggestionTitle?: string }): ProcessTrace {
   return {
-    requestId: crypto.randomUUID(),
+    requestId: uuidv4(),
     rawInput: input.rawInput,
     normalizedInput: input.normalizedInput,
     finalSubmittedTitle: null,

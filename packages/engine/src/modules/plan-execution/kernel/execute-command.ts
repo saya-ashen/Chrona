@@ -476,6 +476,17 @@ async function executeCommandUnlocked(
     });
   }
 
+  if (command.type === "submit_node_result") {
+    const current = await getCurrentExecution({ taskId, workBlockId });
+    if (current.status === "completed" || current.status === "cancelled") {
+      return {
+        ...current,
+        message: "Execution already completed; node result ignored.",
+      };
+    }
+  }
+
+
   const session = await ensureExecutionSession({
     workspaceId: runtime.workspaceId,
     taskId,

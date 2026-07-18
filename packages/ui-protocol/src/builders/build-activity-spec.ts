@@ -10,7 +10,7 @@ export interface ActivityToolInput {
   inputSummary?: string;
   durationMs?: number;
   error?: string;
-  state: "started" | "completed" | "failed";
+  state: "started" | "progress" | "completed" | "failed";
 }
 
 /**

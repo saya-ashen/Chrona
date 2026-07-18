@@ -56,14 +56,24 @@ export type PlanExecutionRuntimeDisplayEvent =
   | {
       type: "tool_started";
       toolName: string;
+      callId?: string;
       label: string;
-      preview?: unknown;
-      input?: unknown;
+      preview?: string;
+      inputSummary?: string;
+    }
+  | {
+      type: "tool_progress";
+      toolName: string;
+      callId?: string;
+      label: string;
+      preview?: string;
     }
   | {
       type: "tool_completed";
       toolName?: string;
+      callId?: string;
       label: string;
+      preview?: string;
       durationMs?: number;
       error?: { message: string; code?: string };
     }

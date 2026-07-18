@@ -42,7 +42,8 @@ export function createAgentControlRoutes() {
         ok: true,
         kind: outcome.kind,
         recorded: outcome.recorded,
-        result: outcome.result,
+        alreadyAccepted: outcome.alreadyAccepted,
+        ...(outcome.result ? { result: outcome.result } : {}),
       });
     } catch (cause) {
       if (cause instanceof ControlRouteError) {

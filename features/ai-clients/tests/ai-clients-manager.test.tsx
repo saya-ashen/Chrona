@@ -170,7 +170,7 @@ describe("AiClientsManager", () => {
     fireEvent.change(screen.getByPlaceholderText("optional for localhost"), {
       target: { value: "hermes-token" },
     });
-    fireEvent.change(screen.getByDisplayValue("1800"), {
+    fireEvent.change(screen.getByDisplayValue("3600"), {
       target: { value: "45" },
     });
 
@@ -257,7 +257,7 @@ describe("AiClientsManager", () => {
       type: "claude_code",
       config: {
         model: "cx/gpt-5.5",
-        timeoutMs: 1800000,
+        timeoutMs: 3600000,
         env: {
           ANTHROPIC_MODEL: "cx/gpt-5.5",
           ANTHROPIC_BASE_URL: "https://9router.saya.love/v1",
@@ -314,7 +314,7 @@ describe("AiClientsManager", () => {
       config: {
         model: "gpt-5-codex",
         apiKey: "sk-codex",
-        timeoutMs: 1800000,
+        timeoutMs: 3600000,
       },
     });
     expect(payload.config).not.toHaveProperty("binaryPath");
@@ -384,7 +384,7 @@ describe("AiClientsManager", () => {
         homeDirectory: "/home/chrona-omp",
         configDirectory: ".omp-test",
         codingAgentDirectory: "/tmp/chrona-omp-agent",
-        timeoutMs: 1800000,
+        timeoutMs: 3600000,
       },
     });
   });
@@ -521,7 +521,7 @@ describe("AiClientsManager", () => {
       config: {
         baseUrl: "http://localhost:8642",
         scope: "local",
-        timeoutMs: 1800000,
+        timeoutMs: 3600000,
       },
     });
 

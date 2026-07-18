@@ -24,7 +24,7 @@ import {
   startPlanAccept,
 } from "../model/task-workspace-plan-flow-machine";
 import { mergeWorkspaceActivity, workspaceEventToWorkspaceActivity } from "../model/task-workspace-activity";
-import type { TaskData, WorkspaceActivityItem } from "../model/task-workspace-types";
+import type { TaskData, TaskPageData, WorkspaceActivityItem } from "../model/task-workspace-types";
 import { stopTaskPlanGenerationSession, useTaskPlanGenerationSession, type TaskPlanSessionState } from "./task-plan-generation-session-store";
 import type { TaskWorkspaceSseEvent } from "./use-task-workspace-page-state";
 import type { ExecutionActionInput, ExecutionCheckpoint, PlanExecutionResult, PlanExecutionSSEEvent, SubmitCheckpointActionInput } from "@chrona/contracts"
@@ -51,6 +51,8 @@ function getRuntimeActivity(event: WorkspaceRuntimeEvent | undefined) {
       return compactActivityText(value.text);
     case "tool_started":
       return compactActivityText(`Running ${value.label}`);
+    case "tool_progress":
+      return compactActivityText(value.preview ?? `Running ${value.label}`);
     case "tool_completed":
       return compactActivityText(value.error ? `${value.label} failed` : `${value.label} completed`);
     case "approval_required":
@@ -148,6 +150,7 @@ function derivePlanStatus(savedPlan: TaskData["savedPlan"] | null, isGenerationR
 
   return savedPlan ? "waiting_acceptance" as const : "idle" as const;
 }
+
 
 function comparePlanUpdatedAt(
   pagePlan: NonNullable<TaskData["savedPlan"]>,
@@ -402,8 +405,16 @@ export function useTaskWorkspacePlanState(
   // honour it on the very first render after the refresh, before the SSE
   // snapshot or session-store hydrate has a chance to fire.
   const generationSession = useTaskPlanGenerationSession(task.id, selectedWorkBlockId);
+  const hasTerminalGenerationSession = generationSession.sessionStatus === "completed"
+    || generationSession.sessionStatus === "failed"
+    || generationSession.sessionStatus === "cancelled";
   const isGeneratingPlan = generationSession.sessionStatus === "running"
-    || planState?.aiPlanGenerationStatus === "generating";
+    || (!hasTerminalGenerationSession && planState?.aiPlanGenerationStatus === "generating");
+
+  useEffect(() => {
+    if (!hasTerminalGenerationSession) return;
+    void planStateQuery.refetch();
+  }, [hasTerminalGenerationSession, planStateQuery.refetch]);
   const generationActivitySummary = isGeneratingPlan
     ? (generationSession.statusMessage ?? activitySummaryFromPhase(generationSession.phase))
     : null;
@@ -494,11 +505,17 @@ export function useTaskWorkspacePlanState(
         return;
       }
 
-      if (event.type === "execution.runtime_event" && isFullRuntimeSseEvent(event)) {
-        const runtimeEvent: WorkspaceRuntimeEvent = { ...event, type: "runtime_event" };
-        setRuntimeEvents((current) => appendRuntimeEvent(current, runtimeEvent));
+      if (event.type === "execution.runtime_event") {
+        if (isFullRuntimeSseEvent(event)) {
+          const runtimeEvent: WorkspaceRuntimeEvent = {
+            ...event,
+            type: "runtime_event",
+          };
+          setRuntimeEvents((current) => appendRuntimeEvent(current, runtimeEvent));
+        }
+        void currentExecutionQuery.refetch();
+        continue;
       }
-
 
       if (shouldRefreshExecutionSnapshot(event)) {
         void currentExecutionQuery.refetch();
@@ -615,14 +632,29 @@ export function useTaskWorkspacePlanState(
     setAcceptResultError(null);
     setIsAcceptingResult(true);
     try {
-      await acceptTaskResult(task.id);
+      const accepted = await acceptTaskResult(task.id);
+      queryClient.setQueryData(
+        taskWorkspaceQueryKeys.page(task.id, selectedWorkBlockId),
+        (current: TaskPageData | undefined) => current
+          ? {
+              ...current,
+              task: {
+                ...current.task,
+                status: "Done",
+              },
+              latestRunSummary: current.latestRunSummary
+                ? { ...current.latestRunSummary, id: accepted.runId, status: "Completed" }
+                : current.latestRunSummary,
+            }
+          : current,
+      );
       await refreshExecutionQueries();
     } catch (cause) {
       setAcceptResultError(cause instanceof Error ? cause.message : "Failed to accept task result");
     } finally {
       setIsAcceptingResult(false);
     }
-  }, [refreshExecutionQueries, task.id]);
+  }, [queryClient, refreshExecutionQueries, selectedWorkBlockId, task.id]);
 
 
   const assistantBuildCurrentPlan = useCallback(() => {

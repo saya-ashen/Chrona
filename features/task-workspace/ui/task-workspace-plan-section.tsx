@@ -1,26 +1,36 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import type { ExecutionActionInput,
-PlanExecutionResult,
-SubmitCheckpointActionInput, } from "@chrona/contracts"
+import { useEffect, useMemo, useState } from "react";
+import type {
+  ExecutionActionInput,
+  PlanExecutionResult,
+  SubmitCheckpointActionInput,
+} from "@chrona/contracts";
 import type { TaskAction } from "@chrona/contracts";
-import { useI18n } from "@chrona/i18n"
+import { useI18n, useLocale } from "@chrona/i18n";
 import type {
   PlanNodeDataModel,
   TaskPlanGraphPlan,
 } from "../plan/task-plan-graph/types";
-import { Badge, Button, Card, CardContent, CardHeader, CardTitle, Textarea } from "@shared/ui";
-import { ChevronRight } from "lucide-react";
+import {
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  Textarea,
+} from "@shared/ui";
+import { CheckCircle2, ChevronRight, ChevronUp, ListPlus, MessageCircle } from "lucide-react";
 import {
   TaskWorkspaceInspector,
   type CommandCenterCopy,
   useActionSpecRenderConfig,
 } from "@features/execution-monitoring";
 import { Link } from "react-router-dom";
-import { useLocale } from "@chrona/i18n"
 import { TaskWorkspacePlanContent } from "./task-workspace-plan-content";
 import { TaskWorkspaceOperationPanel } from "./task-workspace-operation-panel";
+import { TaskResultFollowUpPanel } from "./task-result-follow-up-panel";
 import type {
   PlanGenerationRequest,
   WorkspaceRuntimeEvent,
@@ -30,9 +40,7 @@ import {
   type TaskExecutionDispatchResult,
 } from "../model/task-workspace-query";
 import { deriveTaskWorkspaceDisplayState } from "../model/task-workspace-interaction";
-import {
-  dispatchInputForPrimaryAction,
-} from "../model/task-workspace-primary-action";
+import { dispatchInputForPrimaryAction } from "../model/task-workspace-primary-action";
 import { resolveTaskWorkspaceOperationState } from "../model/task-workspace-operation-machine";
 import type {
   TaskPageData,
@@ -43,7 +51,7 @@ import type {
   RunningExecutionView,
   TaskWorkspaceDisplayState,
 } from "../model/task-workspace-interaction";
-import type { TaskPlanReadModel } from "@chrona/contracts"
+import type { TaskPlanReadModel } from "@chrona/contracts";
 
 function isCompletedGraphNode(status: string) {
   return status === "done" || status === "completed" || status === "skipped";
@@ -889,24 +897,29 @@ function formatResultReviewCopy(
   );
 }
 
-function ResultReviewHeader({
+
+function ResultLifecyclePanel({
+  taskId,
   review,
   copy,
   onAcceptResult,
   onRequestChanges,
-  onContinueFromResult,
   isAcceptingResult = false,
   acceptResultError,
 }: {
+  taskId: string;
   review: NonNullable<TaskWorkspaceDisplayState["resultReview"]>;
   copy: Record<string, string | undefined>;
   onAcceptResult?: () => Promise<void> | void;
   onRequestChanges: () => void;
-  onContinueFromResult: () => void;
   isAcceptingResult?: boolean;
   acceptResultError?: string | null;
 }) {
   const isAccepted = review.phase === "accepted";
+  const [isAcceptedExpanded, setIsAcceptedExpanded] = useState(false);
+  const [acceptedFollowUpMode, setAcceptedFollowUpMode] = useState<
+    "ask" | "create_task"
+  >("ask");
   const completion = review.completion;
   const acceptDisabled =
     isAcceptingResult || !review.decision.canAccept || !onAcceptResult;
@@ -916,117 +929,187 @@ function ResultReviewHeader({
         "A completed result is required before it can be accepted.")
       : null;
 
+
+  const openAcceptedFollowUp = (mode: "ask" | "create_task") => {
+    setAcceptedFollowUpMode(mode);
+    setIsAcceptedExpanded(true);
+  };
+
   return (
     <header
-      className="sticky top-0 z-20 rounded-2xl border border-primary/25 bg-card px-4 py-4 shadow-sm sm:px-5"
+      id="result-follow-up-composer"
+      className={`sticky top-0 z-20 scroll-mt-24 rounded-2xl border border-primary/25 bg-card px-4 shadow-sm sm:px-5 ${isAccepted && !isAcceptedExpanded ? "py-3" : "py-4"}`}
       data-ui-surface-kind="runtime-control"
-      data-testid="result-review-header"
+      data-testid="result-lifecycle-panel"
+      data-state={
+        isAccepted
+          ? "accepted"
+          : isAcceptingResult
+            ? "loading"
+            : acceptResultError
+              ? "error"
+              : "default"
+      }
     >
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-        <div className="min-w-0 space-y-2">
-          <div>
-            <h2 className="font-heading text-xl font-semibold tracking-[-0.025em] text-foreground">
-              {isAccepted
-                ? (copy.resultAcceptedTitle ?? "Result accepted")
-                : (copy.resultReadyTitle ?? "Result ready")}
-            </h2>
-            <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">
-              {isAccepted
-                ? (copy.resultAcceptedDescription ??
-                  "Task closed. Use follow-up when the accepted result needs a new question or next task.")
-                : (copy.resultReadyDescription ??
-                  "Execution completed. Review the final result, then accept it or request changes.")}
-            </p>
-          </div>
-          <div
-            className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground"
-            aria-label="Result completion summary"
-          >
-            {completion.stepCount > 0 ? (
+      <div className={isAccepted && !isAcceptedExpanded ? "flex flex-col gap-2" : "flex flex-col gap-4"}>
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+          <div className="min-w-0 space-y-2">
+            <div>
+              <h2 className="flex items-center gap-2 font-heading text-xl font-semibold tracking-[-0.025em] text-foreground">
+                {isAccepted ? (
+                  <CheckCircle2 className="size-5 text-success" aria-hidden />
+                ) : null}
+                {isAccepted
+                  ? (copy.resultAcceptedTitle ?? "Result accepted")
+                  : (copy.resultReadyTitle ?? "Result ready")}
+              </h2>
+              {!isAccepted || isAcceptedExpanded ? (
+                <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">
+                  {isAccepted
+                    ? (copy.resultAcceptedDescription ??
+                      "Task closed. Ask about this result or create the next task without losing context.")
+                    : (copy.resultReadyDescription ??
+                      "Execution completed. Review the final result, then accept it or request changes.")}
+                </p>
+              ) : null}
+            </div>
+            {!isAccepted || isAcceptedExpanded ? (
+            <div
+              className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground"
+              aria-label={
+                copy.resultCompletionSummaryLabel ?? "Result completion summary"
+              }
+            >
+              {completion.stepCount > 0 ? (
+                <span>
+                  {formatResultReviewCopy(
+                    copy.resultCompletionSteps,
+                    {
+                      completed: completion.completedSteps,
+                      total: completion.stepCount,
+                    },
+                    `${completion.completedSteps}/${completion.stepCount} steps completed`,
+                  )}
+                </span>
+              ) : null}
               <span>
                 {formatResultReviewCopy(
-                  copy.resultCompletionSteps,
-                  {
-                    completed: completion.completedSteps,
-                    total: completion.stepCount,
-                  },
-                  `${completion.completedSteps}/${completion.stepCount} steps completed`,
+                  copy.resultCompletionArtifacts,
+                  { count: completion.artifactCount },
+                  `${completion.artifactCount} deliverables`,
                 )}
               </span>
+              <span
+                className={
+                  completion.hasDiagnostics
+                    ? "font-medium text-warning-foreground"
+                    : undefined
+                }
+              >
+                {completion.hasDiagnostics
+                  ? (copy.resultCompletionHasDiagnostics ??
+                    "Diagnostics need review")
+                  : (copy.resultCompletionNoDiagnostics ?? "No warnings")}
+              </span>
+            </div>
             ) : null}
-            <span>
-              {formatResultReviewCopy(
-                copy.resultCompletionArtifacts,
-                { count: completion.artifactCount },
-                `${completion.artifactCount} deliverables`,
-              )}
-            </span>
-            <span
-              className={
-                completion.hasDiagnostics
-                  ? "font-medium text-warning-foreground"
-                  : undefined
+            {acceptResultError ? (
+              <p role="alert" className="text-xs font-medium text-destructive">
+                {acceptResultError}
+              </p>
+            ) : null}
+            {disabledReason && !isAccepted ? (
+              <p
+                id="accept-result-disabled-reason"
+                className="text-xs text-muted-foreground"
+              >
+                {disabledReason}
+              </p>
+            ) : null}
+          </div>
+          {isAccepted ? (
+            <div
+              className="flex shrink-0 flex-wrap items-center gap-1.5"
+              role="group"
+              aria-label={
+                copy.acceptedResultActionsLabel ?? "Accepted result actions"
               }
             >
-              {completion.hasDiagnostics
-                ? (copy.resultCompletionHasDiagnostics ??
-                  "Diagnostics need review")
-                : (copy.resultCompletionNoDiagnostics ?? "No warnings")}
-            </span>
-          </div>
-          {acceptResultError ? (
-            <p role="alert" className="text-xs font-medium text-destructive">
-              {acceptResultError}
-            </p>
-          ) : null}
-          {disabledReason && !isAccepted ? (
-            <p
-              id="accept-result-disabled-reason"
-              className="text-xs text-muted-foreground"
+              <Button
+                type="button"
+                variant="default"
+                size="sm"
+                className="shadow-sm"
+                onClick={() => openAcceptedFollowUp("ask")}
+              >
+                <MessageCircle className="size-4" aria-hidden />
+                {copy.followUpAskOnly ?? "Ask a follow-up"}
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                className="border border-primary/20 bg-primary/10 text-primary shadow-sm hover:bg-primary/15"
+                onClick={() => openAcceptedFollowUp("create_task")}
+              >
+                <ListPlus className="size-4" aria-hidden />
+                {copy.followUpCreateTask ?? "Create next task"}
+              </Button>
+              {isAcceptedExpanded ? (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  aria-expanded="true"
+                  aria-controls="accepted-result-follow-up"
+                  onClick={() => setIsAcceptedExpanded(false)}
+                >
+                  <ChevronUp className="size-4" aria-hidden />
+                  {copy.collapseAcceptedResult ?? "Collapse"}
+                </Button>
+              ) : null}
+            </div>
+          ) : (
+            <div
+              className="flex shrink-0 flex-col-reverse gap-2 sm:flex-row"
+              aria-label={
+                copy.resultReviewActionsLabel ?? "Result review actions"
+              }
             >
-              {disabledReason}
-            </p>
-          ) : null}
+              <Button
+                type="button"
+                variant="outline"
+                onClick={onRequestChanges}
+                disabled={!review.decision.canRequestChanges}
+              >
+                {copy.requestResultChanges ?? "Request changes"}
+              </Button>
+              <Button
+                type="button"
+                size="lg"
+                onClick={() => void onAcceptResult?.()}
+                disabled={acceptDisabled}
+                aria-describedby={
+                  disabledReason ? "accept-result-disabled-reason" : undefined
+                }
+              >
+                {isAcceptingResult
+                  ? (copy.acceptingResult ?? "Accepting result...")
+                  : (copy.acceptResult ?? "Accept result")}
+              </Button>
+            </div>
+          )}
         </div>
-        {isAccepted ? (
-          <Button
-            type="button"
-            size="lg"
-            className="shrink-0"
-            onClick={onContinueFromResult}
-          >
-            {copy.continueFromResult ?? "Continue from result"}
-          </Button>
-        ) : (
-          <div
-            className="flex shrink-0 flex-col-reverse gap-2 sm:flex-row"
-            aria-label={
-              copy.resultReviewActionsLabel ?? "Result review actions"
-            }
-          >
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onRequestChanges}
-              disabled={!review.decision.canRequestChanges}
-            >
-              {copy.requestResultChanges ?? "Request changes"}
-            </Button>
-            <Button
-              type="button"
-              size="lg"
-              onClick={() => void onAcceptResult?.()}
-              disabled={acceptDisabled}
-              aria-describedby={
-                disabledReason ? "accept-result-disabled-reason" : undefined
-              }
-            >
-              {isAcceptingResult
-                ? (copy.acceptingResult ?? "Accepting result...")
-                : (copy.acceptResult ?? "Accept result")}
-            </Button>
+
+        {isAccepted && isAcceptedExpanded ? (
+          <div id="accepted-result-follow-up">
+            <TaskResultFollowUpPanel
+              taskId={taskId}
+              copy={copy}
+              initialMode={acceptedFollowUpMode}
+            />
           </div>
-        )}
+        ) : null}
       </div>
     </header>
   );
@@ -1105,69 +1188,6 @@ function RequestResultChangesCard({
             {isSubmitting
               ? (copy.requestChangesSubmitting ?? "Starting rerun...")
               : (copy.requestChangesSubmit ?? "Rerun final step")}
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
-
-function FollowUpComposerCard({
-  copy,
-  textareaRef,
-}: {
-  copy: Record<string, string | undefined>;
-  textareaRef: React.RefObject<HTMLTextAreaElement | null>;
-}) {
-  return (
-    <Card
-      id="result-follow-up-composer"
-      size="sm"
-      className="scroll-mt-24 border-transparent bg-card py-4"
-      data-ui-surface-kind="product-authored"
-    >
-      <CardHeader className="px-4 pb-1">
-        <CardTitle className="font-heading text-xl font-medium tracking-[-0.03em]">
-          {copy.continueFromResult ?? "Continue from result"}
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3 px-4 text-xs">
-        <Textarea
-          ref={textareaRef}
-          placeholder={
-            copy.followUpPlaceholder ??
-            "Ask a follow-up or create a linked follow-up task."
-          }
-          className="min-h-24 rounded-2xl bg-background"
-        />
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div className="space-y-1.5">
-            <div
-              className="flex flex-wrap gap-1.5"
-              aria-label={copy.followUpIntentLabel ?? "Follow-up intent"}
-            >
-              <Badge variant="outline">
-                {copy.followUpAskOnly ?? "Ask only"}
-              </Badge>
-              <Badge variant="outline">
-                {copy.followUpCreateTask ?? "Create follow-up task"}
-              </Badge>
-            </div>
-            <p
-              id="result-follow-up-unavailable"
-              className="text-xs text-muted-foreground"
-            >
-              {copy.followUpUnavailable ??
-                "Continue from result is not available yet."}
-            </p>
-          </div>
-          <Button
-            type="button"
-            disabled
-            aria-describedby="result-follow-up-unavailable"
-            className="sm:min-w-28"
-          >
-            {copy.followUpSubmit ?? "Continue"}
           </Button>
         </div>
       </CardContent>
@@ -1465,9 +1485,17 @@ function ExecutionFocusHeader({
       data-testid="execution-focus-header"
       data-current-step-id={view.currentStep?.id ?? ""}
     >
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="min-w-0 flex-1 space-y-2">
+      <div className="min-w-0 space-y-2">
           <div className="flex flex-wrap items-center gap-2">
+            {needsAttention ? null : (
+              <span
+                className="relative flex size-3"
+                aria-label="Execution running"
+              >
+                <span className="absolute inline-flex size-full animate-ping rounded-full bg-primary/45 motion-reduce:animate-none" />
+                <span className="relative inline-flex size-3 rounded-full bg-primary" />
+              </span>
+            )}
             <Badge variant={needsAttention ? "secondary" : "default"}>
               {workState.label}
             </Badge>
@@ -1518,18 +1546,6 @@ function ExecutionFocusHeader({
             <span>{completedPercent}%</span>
           </div>
         </div>
-        <div
-          className="min-w-[15rem] max-w-sm rounded-xl border border-border/70 bg-background/85 px-3 py-2.5 shadow-sm"
-          data-testid="current-runtime-activity"
-        >
-          <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-primary">
-            {copy.currentActivity ?? "Current activity"}
-          </p>
-          <p className="mt-1 text-sm font-medium text-foreground">
-            {view.currentActivity.label}
-          </p>
-        </div>
-      </div>
     </section>
   );
 }
@@ -1611,22 +1627,39 @@ function ExecutionNavigator({
             <li key={node.id}>
               <button
                 type="button"
-                className={`flex w-full items-start gap-3 rounded-xl border px-3 py-2.5 text-left transition-colors ${state === "current" ? "border-primary/45 bg-primary/10" : isInspected ? "border-foreground/35 bg-muted/60" : "border-transparent hover:border-border hover:bg-muted/40"}`}
+                className={`relative flex w-full items-start gap-3 overflow-hidden rounded-xl border px-3 py-2.5 text-left transition-colors ${state === "current" ? "border-primary/45 bg-primary/10 shadow-sm" : isInspected ? "border-foreground/35 bg-muted/60" : "border-transparent hover:border-border hover:bg-muted/40"}`}
                 onClick={() => onInspect(node)}
                 aria-current={state === "current" ? "step" : undefined}
                 data-execution-node-state={state}
                 data-inspected={isInspected ? "true" : "false"}
               >
+                {state === "current" ? (
+                  <span
+                    className="absolute inset-y-0 left-0 w-0.5 animate-pulse bg-primary motion-reduce:animate-none"
+                    aria-hidden="true"
+                  />
+                ) : null}
                 <span
-                  className={`flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${state === "completed" ? "bg-success/15 text-success" : state === "current" ? "bg-primary text-primary-foreground" : state === "blocked" ? "bg-destructive/15 text-destructive" : "bg-muted text-muted-foreground"}`}
+                  className={`relative flex size-7 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${state === "completed" ? "bg-success/15 text-success" : state === "current" ? "bg-primary text-primary-foreground" : state === "blocked" ? "bg-destructive/15 text-destructive" : "bg-muted text-muted-foreground"}`}
                 >
-                  {state === "completed" ? "✓" : index + 1}
+                  {state === "current" ? (
+                    <span
+                      className="size-3 animate-spin rounded-full border-2 border-primary-foreground/35 border-t-primary-foreground motion-reduce:animate-none"
+                      aria-label="Step running"
+                    />
+                  ) : state === "completed" ? (
+                    "✓"
+                  ) : (
+                    index + 1
+                  )}
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm font-medium text-foreground">
                     {node.title}
                   </span>
-                  <span className="mt-0.5 block text-xs text-muted-foreground">
+                  <span
+                    className={`mt-0.5 block text-xs ${state === "current" ? "font-medium text-primary" : "text-muted-foreground"}`}
+                  >
                     {stateLabel}
                   </span>
                 </span>
@@ -1676,7 +1709,6 @@ export function TaskWorkspacePlanSection({
   );
   const [isSubmittingResultChanges, setIsSubmittingResultChanges] =
     useState(false);
-  const followUpComposerRef = useRef<HTMLTextAreaElement>(null);
   const [graphMode, setGraphMode] = useState<"full" | "compact">("full");
   const { messages } = useI18n();
   const copy = messages.components.taskWorkspace;
@@ -1971,20 +2003,16 @@ export function TaskWorkspacePlanSection({
       ) : displayState.layout === "result_focus" ? (
         <div className="min-h-[560px] flex-1 p-3 xl:min-h-0">
           <div className="flex min-h-0 flex-col gap-3">
-            {displayState.panels.resultReview && displayState.resultReview ? (
-              <ResultReviewHeader
+            {displayState.panels.resultLifecycle &&
+            displayState.resultReview ? (
+              <ResultLifecyclePanel
+                taskId={pageData.task.id}
                 review={displayState.resultReview}
                 copy={copy}
                 onAcceptResult={onAcceptResult}
                 onRequestChanges={() => {
                   setResultChangeError(null);
                   setIsRequestingResultChanges(true);
-                }}
-                onContinueFromResult={() => {
-                  document
-                    .getElementById("result-follow-up-composer")
-                    ?.scrollIntoView({ block: "center", behavior: "smooth" });
-                  followUpComposerRef.current?.focus({ preventScroll: true });
                 }}
                 isAcceptingResult={isAcceptingResult}
                 acceptResultError={acceptResultError}
@@ -2026,12 +2054,6 @@ export function TaskWorkspacePlanSection({
                 onAction={focusNodeActions}
               />
             </div>
-            {displayState.panels.followUpComposer ? (
-              <FollowUpComposerCard
-                copy={copy}
-                textareaRef={followUpComposerRef}
-              />
-            ) : null}
           </div>
         </div>
       ) : displayState.mode === "reviewing_plan" ? (
@@ -2162,7 +2184,7 @@ export function TaskWorkspacePlanSection({
               liveActivity={liveActivity}
               currentExecution={currentExecution}
               isExecutionRunning
-              executionOutputState={displayState.runningExecution.outputState}
+              executionResultState={displayState.runningExecution.resultState}
               copy={copy}
               onAction={focusNodeActions}
               operationPanel={

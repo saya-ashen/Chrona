@@ -1,7 +1,7 @@
 import type { AgentControlActionBody, PlanExecutionResult } from "@chrona/contracts";
 import { submitTerminalNodeResult } from "@/modules/plan-execution/use-cases/submit-terminal-node-result";
 import {
-  DuplicateTerminalActionError,
+  ConflictingTerminalActionError,
   recordTerminalAction,
   validateRunToken,
   type RunTokenScope,
@@ -29,9 +29,10 @@ export type HandleControlActionInput = {
 
 export type HandleControlActionResult = {
   ok: true;
-  result: PlanExecutionResult;
+  result: PlanExecutionResult | null;
   kind: AgentControlActionBody["kind"];
   recorded: boolean;
+  alreadyAccepted: boolean;
 };
 
 export async function handleControlAction(input: HandleControlActionInput): Promise<HandleControlActionResult> {
@@ -58,25 +59,39 @@ export async function handleControlAction(input: HandleControlActionInput): Prom
     );
   }
 
-  const recorded = isTerminalControlKind(input.body.kind) && !!scope.nodeAttemptId;
-  if (recorded) {
+  const isRecordedTerminal = isTerminalControlKind(input.body.kind) && Boolean(scope.nodeAttemptId);
+  let recorded = false;
+  let alreadyAccepted = false;
+  if (isRecordedTerminal) {
     try {
-      await recordTerminalAction({
+      const terminalRecord = await recordTerminalAction({
         scope: omitToken(scope),
         kind: input.body.kind,
         payload: input.body.payload ?? {},
         workspaceId: input.workspaceId,
       });
+      recorded = terminalRecord.recorded;
+      alreadyAccepted = !terminalRecord.recorded;
     } catch (error) {
-      if (error instanceof DuplicateTerminalActionError) {
+      if (error instanceof ConflictingTerminalActionError) {
         throw new ControlRouteError(
-          "duplicate_terminal_action",
+          "conflicting_terminal_action",
           409,
-          `Terminal action '${error.kind}' was already recorded for this node attempt`,
+          error.message,
         );
       }
       throw error;
     }
+  }
+
+  if (isRecordedTerminal) {
+    return {
+      ok: true,
+      result: null,
+      kind: input.body.kind,
+      recorded,
+      alreadyAccepted,
+    };
   }
 
   const result = await submitTerminalNodeResult({
@@ -88,7 +103,8 @@ export async function handleControlAction(input: HandleControlActionInput): Prom
     ok: true,
     result,
     kind: input.body.kind,
-    recorded,
+    recorded: false,
+    alreadyAccepted: false,
   };
 }
 
