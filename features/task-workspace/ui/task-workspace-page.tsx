@@ -34,6 +34,7 @@ type TaskWorkspaceHeaderEditorProps = {
   onAcceptPlan: Parameters<typeof TaskWorkspaceHeaderCard>[0]["onAcceptPlan"];
   onGeneratePlan: Parameters<typeof TaskWorkspaceHeaderCard>[0]["onGeneratePlan"];
   onStopPlanGeneration: Parameters<typeof TaskWorkspaceHeaderCard>[0]["onStopPlanGeneration"];
+  onRestartPlan: Parameters<typeof TaskWorkspaceHeaderCard>[0]["onRestartPlan"];
   hideGeneratePlan?: boolean;
   hideAcceptPlan?: boolean;
   onRecoveryRetry: Parameters<typeof TaskWorkspaceHeaderCard>[0]["onRecoveryRetry"];
@@ -93,6 +94,7 @@ function TaskWorkspaceHeaderEditor({
   onAcceptPlan,
   onGeneratePlan,
   onStopPlanGeneration,
+  onRestartPlan,
   hideGeneratePlan,
   hideAcceptPlan,
   onRecoveryRetry,
@@ -119,6 +121,7 @@ function TaskWorkspaceHeaderEditor({
         hideAcceptPlan={hideAcceptPlan}
         hideGeneratePlan={hideGeneratePlan}
         onStopPlanGeneration={onStopPlanGeneration}
+        onRestartPlan={onRestartPlan}
         onEdit={onToggleEditExpanded}
         showDeleteConfirm={showDeleteConfirm}
         isDeleting={isDeleting}
@@ -261,6 +264,9 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
           onStopPlanGeneration={handleStopPlanGeneration}
           hideGeneratePlan={planGenerationStatus === "idle" && !plan}
           hideAcceptPlan={false}
+          onRestartPlan={async () => {
+            await dispatchExecutionAction({ action: "restart_from_beginning", prompt: "Restarted from task workspace" });
+          }}
           onAction={async (action) => {
             if (action.id === "start") {
               await dispatchExecutionAction({ action: "start_manual" });

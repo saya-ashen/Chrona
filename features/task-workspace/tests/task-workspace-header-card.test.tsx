@@ -70,6 +70,7 @@ function renderHeader(
       onAcceptPlan={vi.fn()}
       onGeneratePlan={vi.fn()}
       onStopPlanGeneration={onStopPlanGeneration}
+      onRestartPlan={vi.fn()}
       onEdit={vi.fn()}
       showDeleteConfirm={false}
       isDeleting={false}

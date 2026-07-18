@@ -32,7 +32,9 @@ export function currentExecutionStatusFromEffectiveGraph(input: {
   effective: EffectivePlanGraph;
   hasActiveExecutionSession: boolean;
   hasActiveRun?: boolean;
+  taskStatus?: string;
 }) {
+  if (input.taskStatus === "Cancelled") return "cancelled";
   return input.hasActiveExecutionSession || input.hasActiveRun || hasExecutionEvidence(input.effective)
     ? executionStatusFromEffectiveGraph(input.effective)
     : "started";
@@ -66,7 +68,7 @@ export async function getCurrentExecution(input: { taskId: string; workBlockId?:
   });
   const latestRunPointer = await db.task.findUniqueOrThrow({
     where: { id: input.taskId },
-    select: { latestRunId: true },
+    select: { latestRunId: true, status: true },
   });
   const activeRun = latestRunPointer.latestRunId
     ? await db.run.findFirst({
@@ -93,6 +95,7 @@ export async function getCurrentExecution(input: { taskId: string; workBlockId?:
     effective,
     hasActiveExecutionSession,
     hasActiveRun,
+    taskStatus: latestRunPointer.status,
   });
   const currentNodeId = currentNodeFromEffective(effective)?.id
     ?? (!hasActiveExecutionSession && status === "started" ? effective.readyNodeIds[0] : null)

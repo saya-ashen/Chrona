@@ -15,6 +15,7 @@ export const NODE_RUNTIME_TERMINAL_TOOLS = {
   task: [
     "chrona_plan_output",
     "chrona_node_complete",
+    "chrona_node_request_input",
     "chrona_node_block",
     "chrona_node_fail",
   ],
@@ -23,7 +24,7 @@ export const NODE_RUNTIME_TERMINAL_TOOLS = {
     "chrona_node_block",
     "chrona_node_fail",
   ],
-  checkpoint: ["chrona_node_block", "chrona_node_fail"],
+  checkpoint: ["chrona_node_request_input", "chrona_node_block", "chrona_node_fail"],
   wait: ["chrona_wait_complete", "chrona_node_block", "chrona_node_fail"],
 } as const;
 
@@ -36,8 +37,8 @@ Do not call chrona_node_read or chrona_execution_read by default.
 Call chrona_node_read only when the current node details, result submission actions, or branch refs are missing, ambiguous, or suspected stale.
 Call chrona_execution_read only after a Chrona result submission action is rejected/errors, or when overall execution status/recovery actions are needed.
 Use context.plan.goal and context.plan.assumptions as the global objective and constraints for the current node. If context.run is present, treat it as initial run-level planning context and do not repeat it in node outputs.
-When you call chrona_node_block you must include a reason and an actionForm that tells the user how to unblock: actionForm.instructions (what the user should do) and actionForm.inputFields (at least one field, each with name and label; set type "text", "textarea", or "select", and options for a select). Without a valid actionForm the block is rejected.
-After chrona_node_complete, chrona_condition_select, chrona_wait_complete, chrona_node_block, or chrona_node_fail succeeds, stop immediately. Do not continue downstream nodes.
+Call chrona_node_request_input when normal execution needs structured user input. Keep chrona_node_block for exceptional external blockers such as missing access or unavailable capability. A request-input form uses only text, choice, and boolean field kinds; choice.selection distinguishes single from multiple selection.
+After chrona_node_complete, chrona_condition_select, chrona_wait_complete, chrona_node_request_input, chrona_node_block, or chrona_node_fail succeeds, stop immediately. Do not continue downstream nodes.
 `.trim();
 
 const PLAN_OUTPUT_CATALOG_PROMPT = chronaPlanOutputCatalogPrompt();
@@ -81,8 +82,13 @@ function nodeTypeInstructions(node: EffectivePlanNode): string {
       Spec hard rules, all enforced by validation: (1) root MUST equal one element id. (2) Leaf elements use children: []. (3) children contains child element-id strings only. (4) Every child id MUST exist in elements. (5) No element may include itself or create a cycle. (6) Component type MUST be from CATALOG_UI_SPEC. (7) props MUST match that component schema exactly. (8) visible is an element-level field, not a prop. (9) The plan-output catalog is intentionally small: use Stack/Card/Heading/Text/RichMarkdown/Table/Badge/Alert/FileRef/JsonView/ResultSummary/CollapsibleText/Separator only.`;
     case "condition":
       return `Evaluate exactly one listed branch and call chrona_condition_select with branchRef. Do not use labels, nextNodeId, default branches, natural-language conclusions, or incomplete JSON as routing authority. If no explicit branchRef is safe, call chrona_node_block.`;
-    case "checkpoint":
-      return `Review only the current checkpoint context. Do not submit checkpoint decisions: Checkpoint submission is performed by the user in the frontend. Call chrona_node_block when waiting for user input or approval, and chrona_node_fail only for unrecoverable errors.`;
+    case "checkpoint": {
+      const config = node.config as { required?: boolean; interaction?: { schemaSource?: string; instruction?: string } };
+      if (config.interaction?.schemaSource === "ai") {
+        return `This is a required AI-defined human interaction gate. Use prior execution context and results to decide the concrete question, field kinds, choices, recommendations, and defaults. You MUST call chrona_node_request_input with a concise validated form; do not call chrona_node_complete and do not substitute chrona_node_block. Planning instruction: ${config.interaction.instruction ?? node.title}`;
+      }
+      return `Review only the current checkpoint context. Do not submit checkpoint decisions: Checkpoint submission is performed by the user in the frontend. Call chrona_node_request_input when structured user input is required, chrona_node_block only for an exceptional external blocker, and chrona_node_fail only for unrecoverable errors.`;
+    }
     case "wait":
       return `Complete only when the wait condition is satisfied by explicit evidence. Otherwise block or fail with a concise reason.`;
   }

@@ -37,6 +37,7 @@ import type {
 } from "../hooks/use-task-workspace-plan-state";
 import {
   createTaskWorkspaceExecutionConsoleView,
+  pickWorkspaceCurrentNode,
   type TaskExecutionDispatchResult,
 } from "../model/task-workspace-query";
 import { deriveTaskWorkspaceDisplayState } from "../model/task-workspace-interaction";
@@ -198,6 +199,12 @@ function PlanNodeDetailCard({
         <NodeDetailRow label="Objective" value={node.objective} />
         <NodeDetailRow label="Summary" value={node.summary} />
         <NodeDetailRow label="Next action" value={node.nextAction} />
+        {node.userInteractionExpectation === "possible" ? (
+          <NodeDetailRow
+            label={copy.possibleUserInputReason ?? "Why input may be needed"}
+            value={node.userInteractionReason}
+          />
+        ) : null}
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
           <NodeDetailRow
             label="Mode"
@@ -1710,8 +1717,33 @@ export function TaskWorkspacePlanSection({
   const [isSubmittingResultChanges, setIsSubmittingResultChanges] =
     useState(false);
   const [graphMode, setGraphMode] = useState<"full" | "compact">("full");
+  const [recoveryError, setRecoveryError] = useState<string | null>(null);
   const { messages } = useI18n();
   const copy = messages.components.taskWorkspace;
+  const restartPlanFromBeginning = async (prompt?: string) => {
+    setRecoveryError(null);
+    try {
+      await onDispatchExecutionAction({
+        action: "restart_from_beginning",
+        ...(prompt ? { prompt } : {}),
+      });
+    } catch (cause) {
+      setRecoveryError(cause instanceof Error ? cause.message : "Failed to restart plan");
+      throw cause;
+    }
+  };
+  const regeneratePlanForRecovery = async (instruction?: string) => {
+    setRecoveryError(null);
+    try {
+      onGeneratePlan({
+        userInstruction: instruction ?? null,
+        replaceActiveExecution: true,
+      });
+    } catch (cause) {
+      setRecoveryError(cause instanceof Error ? cause.message : "Failed to regenerate plan");
+      throw cause;
+    }
+  };
   const consoleView = useMemo(
     () =>
       createTaskWorkspaceExecutionConsoleView({
@@ -1760,7 +1792,10 @@ export function TaskWorkspacePlanSection({
   useEffect(() => {
     setSubmittedRevisionInstruction(null);
   }, [plan?.id, plan?.revision]);
-  const currentOperationNode = consoleView.nodeDetail.currentNode;
+  const graphCurrentOperationNode = pickWorkspaceCurrentNode(graphPlan);
+  const currentOperationNode = graphCurrentOperationNode && currentExecution?.checkpoint?.nodeId === graphCurrentOperationNode.id
+    ? { ...graphCurrentOperationNode, checkpoint: currentExecution.checkpoint, actionable: true }
+    : graphCurrentOperationNode;
   const taskPrimaryAction =
     pageData.task.executionSummary?.primaryAction ?? null;
   const primaryActionNodeId = graphNodeIdForAction(
@@ -1778,10 +1813,12 @@ export function TaskWorkspacePlanSection({
     taskPrimaryAction.type !== "none" &&
     taskPrimaryAction.type !== "start",
   );
-  const hasCurrentOperationControls =
-    Boolean(currentOperationNode?.checkpoint) &&
-    hasNodeActionPayload(currentOperationNode) &&
-    !consoleView.nodeDetail.disabledActionReason;
+  const hasCurrentOperationControls = Boolean(
+    currentExecution?.checkpoint ||
+    (currentOperationNode?.checkpoint &&
+      hasNodeActionPayload(currentOperationNode) &&
+      !consoleView.nodeDetail.disabledActionReason),
+  );
   const shouldShowCurrentOperation = Boolean(
     currentOperationNode &&
     (hasCurrentOperationControls || currentOperationNode.status === "blocked"),
@@ -1817,22 +1854,26 @@ export function TaskWorkspacePlanSection({
           throw new Error("Checkpoint action payload is incomplete.");
         const rawValues = (params.values ?? {}) as Record<string, unknown>;
         const values = Object.fromEntries(
-          Object.entries(rawValues).filter(
-            ([, value]) => typeof value === "string" && value.trim().length > 0,
+          Object.entries(rawValues).filter(([, value]) =>
+            typeof value === "boolean" ||
+            (typeof value === "string" && value.trim().length > 0) ||
+            (Array.isArray(value) && value.every((entry) => typeof entry === "string")),
           ),
-        ) as Record<string, string>;
-        const payloadValue = Object.values(values)[0];
+        );
         return onSubmitCheckpointAction({
           checkpointId,
           action: actionId as SubmitCheckpointActionInput["action"],
-          ...(payloadValue ? { payload: payloadValue } : {}),
+          ...(Object.keys(values).length > 0 ? { payload: values } : {}),
         });
       },
     }),
     [currentExecution?.checkpoint?.id, onSubmitCheckpointAction],
   );
-  const currentOperationSpec =
-    apiCurrentOperationSpec ?? currentOperationAction.spec;
+  const currentOperationSpec = currentExecution?.checkpoint && apiCurrentOperationSpec
+    ? apiCurrentOperationSpec
+    : hasCurrentOperationControls
+      ? currentOperationAction.spec
+      : apiCurrentOperationSpec ?? currentOperationAction.spec;
   const currentOperationHandlers = useMemo(
     () => ({
       ...commandCenterActionHandlers,
@@ -1858,7 +1899,7 @@ export function TaskWorkspacePlanSection({
     currentOperationSpec,
     currentOperationHandlers,
     onCurrentOperationStateChange: currentOperationAction.onStateChange,
-    shouldUseTaskPrimaryAction,
+    shouldUseTaskPrimaryAction: shouldUseTaskPrimaryAction && !currentExecution?.checkpoint,
     taskPrimaryAction,
     runtimeEvents,
   });
@@ -2198,11 +2239,9 @@ export function TaskWorkspacePlanSection({
                     onStartPlan={() =>
                       void onDispatchExecutionAction({ action: "start_manual" })
                     }
-                    onRestartPlan={() =>
-                      void onDispatchExecutionAction({
-                        action: "restart_from_beginning",
-                      })
-                    }
+                    onRestartPlan={restartPlanFromBeginning}
+                    onRegeneratePlan={regeneratePlanForRecovery}
+                    hasAcceptedPlan={isPlanAccepted}
                     onTaskPrimaryAction={
                       primaryActionDispatch
                         ? () =>
@@ -2285,11 +2324,9 @@ export function TaskWorkspacePlanSection({
                     onStartPlan={() =>
                       void onDispatchExecutionAction({ action: "start_manual" })
                     }
-                    onRestartPlan={() =>
-                      void onDispatchExecutionAction({
-                        action: "restart_from_beginning",
-                      })
-                    }
+                    onRestartPlan={restartPlanFromBeginning}
+                    onRegeneratePlan={regeneratePlanForRecovery}
+                    hasAcceptedPlan={isPlanAccepted}
                     onTaskPrimaryAction={
                       primaryActionDispatch
                         ? () =>
@@ -2299,6 +2336,9 @@ export function TaskWorkspacePlanSection({
                         : undefined
                     }
                   />
+                ) : null}
+                {recoveryError ? (
+                  <p role="alert" className="text-xs text-destructive">{recoveryError}</p>
                 ) : null}
               </div>
             }

@@ -245,6 +245,21 @@ export async function dispatchTaskWorkspaceCommand(engine: ChronaEngine, input: 
 
   try {
     if (command.type === "plan.generate") {
+      if (command.replaceActiveExecution) {
+        const current = await engine.tasks.execution.current({
+          taskId,
+          workBlockId: command.workBlockId ?? null,
+        });
+        if (!["completed", "cancelled", "failed"].includes(current.status)) {
+          await engine.tasks.execution.dispatch({
+            taskId,
+            action: {
+              action: "cancel_session",
+              sessionId: current.mainSessionId ?? undefined,
+            },
+          });
+        }
+      }
       const workBlockId = commandWorkBlockId(command);
       publishTaskStateUpdate({
         taskId,

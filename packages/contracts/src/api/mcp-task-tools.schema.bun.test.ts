@@ -206,6 +206,34 @@ describe("MCP task tool contracts", () => {
         inputFields: [{ name: "apiKey", label: "API key", type: "text", required: true }],
       },
     });
+    expect(parseChronaToolPayload("chrona.node.request_input", {
+      title: "Confirm channels",
+      instructions: "Choose channels for the next stage.",
+      fields: [
+        {
+          kind: "choice",
+          name: "channels",
+          label: "Channels",
+          selection: "multiple",
+          options: [
+            { value: "europe", label: "Europe", recommended: true },
+            { value: "germany", label: "Germany" },
+          ],
+          required: true,
+        },
+        { kind: "boolean", name: "excludeSelfFunded", label: "Exclude self-funded", defaultValue: true },
+        { kind: "text", name: "notes", label: "Notes", multiline: true },
+      ],
+      submitLabel: "Confirm and continue",
+    })).toMatchObject({
+      title: "Confirm channels",
+      fields: [{ kind: "choice", selection: "multiple" }, { kind: "boolean" }, { kind: "text" }],
+    });
+    expect(() => parseChronaToolPayload("chrona.node.request_input", {
+      title: "Invalid",
+      instructions: "Invalid concrete component",
+      fields: [{ kind: "checkboxGroup", name: "channels", label: "Channels" }],
+    })).toThrow();
     expect(parseChronaToolPayload("chrona.node.fail", { error: "Command failed" })).toEqual({ error: "Command failed" });
     expect(parseChronaToolPayload("chrona.node.wait_complete", { summary: "Event observed" })).toEqual({ summary: "Event observed" });
     expect(() => parseChronaToolPayload("chrona.node.complete", { nodeId: "node-1", summary: "Done" })).toThrow();

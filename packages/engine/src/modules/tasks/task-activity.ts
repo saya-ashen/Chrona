@@ -34,6 +34,9 @@ export type WorkspaceActivityTimelineItem = {
   nativeRunId?: string;
   sequence?: number;
   rawEventType?: string;
+  executionSessionId?: string;
+  executionEpoch?: number;
+  executionTrigger?: "initial" | "restart";
   activityGroup?: WorkspaceActivityGroup;
   tool?: {
     name?: string;
@@ -152,6 +155,23 @@ function numberPayloadValue(payload: unknown, key: string) {
 function planGenerationActivityGroup(payload: unknown) {
   const id = stringPayloadValue(payload, "generation_id");
   return id ? { kind: "plan_generation" as const, id } : undefined;
+}
+
+function executionActivityMetadata(payload: unknown) {
+  const record = payloadRecord(payload);
+  const correlation = payloadRecord(record?.correlation);
+  const executionSessionId = typeof correlation?.executionSessionId === "string"
+    ? correlation.executionSessionId
+    : undefined;
+  const executionEpoch = typeof record?.executionEpoch === "number"
+    ? record.executionEpoch
+    : undefined;
+  const executionTrigger = record?.command === "restart_from_beginning"
+    ? "restart" as const
+    : executionSessionId
+      ? "initial" as const
+      : undefined;
+  return { executionSessionId, executionEpoch, executionTrigger };
 }
 
 function compactParts(parts: Array<string | null | undefined>) {
@@ -420,6 +440,7 @@ function mapProviderEventToActivity(
     sequence,
     rawEventType,
     raw: redactActivityRaw(payloadEvent ?? event.payload),
+    ...executionActivityMetadata(event.payload),
     ...(event.nodeId ? { sourceNodeId: event.nodeId } : {}),
     ...(event.nodeTitle ? { sourceNodeTitle: event.nodeTitle } : {}),
   });
@@ -906,6 +927,7 @@ function mapTaskEventToActivity(
           sourceNodeId: event.nodeId ?? undefined,
           sourceNodeTitle: event.nodeTitle ?? undefined,
           rawEventType: event.eventType,
+          ...executionActivityMetadata(payload),
         });
       }
       return taskActivityItem({

@@ -221,6 +221,7 @@ export type GraphCopy = {
   statusWaiting: string;
   statusBlocked: string;
   statusDone: string;
+  possibleUserInputLabel: string;
   statusSkipped: string;
   edgeSequential: string;
   edgeDependency: string;

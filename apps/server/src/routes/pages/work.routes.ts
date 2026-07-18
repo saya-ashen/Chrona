@@ -32,7 +32,11 @@ export function createWorkRoutes(engine: ChronaEngine) {
           const commandId = command.idempotencyKey ?? randomUUID();
           const workspaceId = await getTaskWorkspaceId(engine, taskId);
 
-          void dispatchTaskWorkspaceCommand(engine, { taskId, workspaceId, commandId, command });
+          if (command.type === "execution.action") {
+            await dispatchTaskWorkspaceCommand(engine, { taskId, workspaceId, commandId, command });
+          } else {
+            void dispatchTaskWorkspaceCommand(engine, { taskId, workspaceId, commandId, command });
+          }
 
           return json(c, {
             commandId,

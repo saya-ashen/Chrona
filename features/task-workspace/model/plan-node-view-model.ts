@@ -82,6 +82,8 @@ export type PlanNodeDataModel = {
   readiness?: "ready" | "blocked" | "waiting";
   reachable?: boolean;
   requiresHumanInput?: boolean;
+  userInteractionExpectation?: "not_expected" | "possible";
+  userInteractionReason?: string | null;
   dependencies?: string[];
   requiredInfo?: string[];
   nextAction?: string | null;

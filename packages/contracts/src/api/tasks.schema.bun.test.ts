@@ -152,13 +152,23 @@ describe("task API schemas", () => {
       nativeRunId: "native-1",
       sequence: 7,
       rawEventType: "tool_completed",
+      executionSessionId: "execution-session-2",
+      executionEpoch: 2,
+      executionTrigger: "restart",
       tool: {
         name: "chrona_plan_read",
         label: "Read plan",
         durationMs: 24,
         state: "completed",
       },
-    })).toMatchObject({ kind: "tool_completed", tone: "success", tool: { state: "completed" } });
+    })).toMatchObject({
+      kind: "tool_completed",
+      tone: "success",
+      executionSessionId: "execution-session-2",
+      executionEpoch: 2,
+      executionTrigger: "restart",
+      tool: { state: "completed" },
+    });
 
     expect(() => workspaceActivityItemSchema.parse({
       id: "event-2",

@@ -30,6 +30,7 @@ export const chronaToolNames = [
   "chrona.node.complete",
   "chrona.node.condition_select",
   "chrona.node.block",
+  "chrona.node.request_input",
   "chrona.node.fail",
   "chrona.node.wait_complete",
 ] as const;
@@ -133,6 +134,60 @@ export const taskCompletePayloadSchema = z.object({ summary: z.string().min(1).o
 
 export const conditionSelectPayloadSchema = z.object({ nodeId: z.string().min(1), branchRef: z.string().min(1), summary: z.string().min(1), evidence: nodeEvidencePayloadSchema }).strict();
 
+const interactionOptionSchema = z.object({
+  value: z.string().min(1),
+  label: z.string().min(1),
+  description: z.string().min(1).optional(),
+  recommended: z.boolean().optional(),
+}).strict();
+
+const textInteractionFieldSchema = z.object({
+  kind: z.literal("text"),
+  name: z.string().min(1),
+  label: z.string().min(1),
+  description: z.string().min(1).optional(),
+  multiline: z.boolean().optional(),
+  required: z.boolean().optional(),
+  placeholder: z.string().optional(),
+  defaultValue: z.string().optional(),
+}).strict();
+
+const choiceInteractionFieldSchema = z.object({
+  kind: z.literal("choice"),
+  name: z.string().min(1),
+  label: z.string().min(1),
+  description: z.string().min(1).optional(),
+  selection: z.enum(["single", "multiple"]),
+  options: z.array(interactionOptionSchema).min(1),
+  required: z.boolean().optional(),
+  defaultValue: z.union([z.string(), z.array(z.string())]).optional(),
+  minSelections: z.number().int().nonnegative().optional(),
+  maxSelections: z.number().int().positive().optional(),
+}).strict();
+
+const booleanInteractionFieldSchema = z.object({
+  kind: z.literal("boolean"),
+  name: z.string().min(1),
+  label: z.string().min(1),
+  description: z.string().min(1).optional(),
+  defaultValue: z.boolean().optional(),
+}).strict();
+
+export const interactionFieldSchema = z.discriminatedUnion("kind", [
+  textInteractionFieldSchema,
+  choiceInteractionFieldSchema,
+  booleanInteractionFieldSchema,
+]);
+
+export const requestInputPayloadSchema = z.object({
+  title: z.string().min(1),
+  instructions: z.string().min(1),
+  fields: z.array(interactionFieldSchema).min(1),
+  submitLabel: z.string().min(1).optional(),
+  relatedOutputElementIds: z.array(z.string().min(1)).optional(),
+  evidence: nodeEvidencePayloadSchema,
+}).strict();
+
 const blockActionFormFieldSchema = z.object({ name: z.string().min(1), label: z.string().min(1), type: z.enum(["text", "textarea", "select"]).optional(), required: z.boolean().optional(), options: z.array(z.string().min(1)).optional() }).strict();
 
 const blockActionFormSchema = z.object({ instructions: z.string().min(1), submitLabel: z.string().min(1).optional(), inputFields: z.array(blockActionFormFieldSchema).min(1) }).strict();
@@ -167,6 +222,7 @@ export const chronaToolPayloadSchemas = {
   "chrona.node.complete": taskCompletePayloadSchema,
   "chrona.node.condition_select": conditionSelectPayloadSchema,
   "chrona.node.block": blockPayloadSchema,
+  "chrona.node.request_input": requestInputPayloadSchema,
   "chrona.node.fail": failPayloadSchema,
   "chrona.node.wait_complete": waitCompletePayloadSchema,
 } as const;
@@ -183,6 +239,7 @@ export const chronaPublicToolPayloadSchemas = {
   "chrona.node.complete": taskCompletePayloadSchema.omit({ evidence: true }).strict(),
   "chrona.node.condition_select": conditionSelectPayloadSchema.omit({ evidence: true }).strict(),
   "chrona.node.block": blockPayloadSchema.omit({ evidence: true }).strict(),
+  "chrona.node.request_input": requestInputPayloadSchema.omit({ evidence: true }).strict(),
   "chrona.node.fail": failPayloadSchema.omit({ evidence: true }).strict(),
   "chrona.node.wait_complete": waitCompletePayloadSchema.omit({ evidence: true }).strict(),
 } as const;
@@ -195,6 +252,7 @@ export const agentControlActionKindSchema = z.enum([
   "condition_select",
   "wait_complete",
   "block",
+  "request_input",
   "fail",
 ]);
 
@@ -206,6 +264,7 @@ export const agentControlActionPayloadSchemas = {
   condition_select: chronaPublicToolPayloadSchemas["chrona.node.condition_select"],
   wait_complete: chronaPublicToolPayloadSchemas["chrona.node.wait_complete"],
   block: chronaPublicToolPayloadSchemas["chrona.node.block"],
+  request_input: chronaPublicToolPayloadSchemas["chrona.node.request_input"],
   fail: chronaPublicToolPayloadSchemas["chrona.node.fail"],
 } as const;
 
@@ -217,6 +276,7 @@ export const agentControlActionBodySchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("condition_select"), payload: agentControlActionPayloadSchemas.condition_select }).strict(),
   z.object({ kind: z.literal("wait_complete"), payload: agentControlActionPayloadSchemas.wait_complete }).strict(),
   z.object({ kind: z.literal("block"), payload: agentControlActionPayloadSchemas.block }).strict(),
+  z.object({ kind: z.literal("request_input"), payload: agentControlActionPayloadSchemas.request_input }).strict(),
   z.object({ kind: z.literal("fail"), payload: agentControlActionPayloadSchemas.fail }).strict(),
 ]);
 

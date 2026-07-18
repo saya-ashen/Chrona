@@ -176,7 +176,7 @@ export type WorkspaceStateTreatment = {
 };
 
 export type TaskHeaderAction = {
-  id: "start" | "pause" | "stop" | "more";
+  id: "start" | "pause" | "stop" | "restart" | "more";
   label: string;
   disabled?: boolean;
   disabledReason?: string;
@@ -283,6 +283,9 @@ export type WorkspaceActivityItem = {
   nativeRunId?: string;
   sequence?: number;
   rawEventType?: string;
+  executionSessionId?: string;
+  executionEpoch?: number;
+  executionTrigger?: "initial" | "restart";
   activityGroup?: WorkspaceActivityGroup;
   tool?: WorkspaceToolActivity;
   assistant?: WorkspaceAssistantActivity;

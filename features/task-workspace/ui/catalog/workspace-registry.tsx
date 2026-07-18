@@ -1474,6 +1474,8 @@ export const { registry: workspaceRegistry } = defineRegistry(chronaCatalog, {
     Input: shadcnComponents.Input,
     Textarea: shadcnComponents.Textarea,
     Select: shadcnComponents.Select,
+    Checkbox: shadcnComponents.Checkbox,
+    Radio: shadcnComponents.Radio,
     Tabs: shadcnComponents.Tabs,
     Table: WorkspaceTable,
     heading: shadcnComponents.Heading,

@@ -57,4 +57,25 @@ describe("buildTaskHeaderSpec", () => {
       disabled: { $state: "/plan/generation/header-action-disabled" },
     });
   });
+  it("places run-from-beginning in the overflow menu", () => {
+    const spec = buildTaskHeaderSpec({
+      title: "Launch task",
+      status: "running",
+      statusLabel: "Running",
+      progressLabel: "1 of 3",
+      actions: [
+        { id: "restart", label: "Run plan from beginning" },
+        { id: "edit", label: "Edit" },
+        { id: "delete", label: "Delete Task" },
+      ],
+    });
+
+    expect(spec.elements["header-overflow"]?.props).toMatchObject({
+      items: [
+        { label: "Run plan from beginning", value: "restart" },
+        { label: "Edit", value: "edit" },
+        { label: "Delete Task", value: "delete" },
+      ],
+    });
+  });
 });

@@ -1,10 +1,10 @@
-import type { CheckpointConfig, EffectivePlanNode, NodeActionForm, NodeActionFormField } from "@chrona/contracts/ai";
+import type { CheckpointConfig, EffectivePlanNode, NodeActionForm } from "@chrona/contracts/ai";
 import type { NodeExecutor, NodeExecutorInput, NodeExecutionResult } from "./types";
 import { decideNodeExecutionSession } from "../session-policy";
 import { reviewCheckpointNodeCapability } from "../runtime/node-ai-capabilities";
 import type { AiRuntimeInvoker } from "../ai-runtime-invoker";
 
-function normalizeInputFieldType(type: string | undefined): NodeActionFormField["type"] {
+function normalizeInputFieldType(type: string | undefined): "text" | "textarea" | "select" {
   if (type === "choice") return "select";
   if (type === "text" || type === "textarea" || type === "select") return type;
   return "text";
@@ -40,6 +40,38 @@ function actionFormForCheckpoint(input: {
         options: input.config.options,
       }],
     };
+  }
+
+  if (input.config.checkpointType === "edit") {
+    const configuredFields = input.config.inputFields?.map((field) => ({
+      name: field.name,
+      label: field.label,
+      type: normalizeInputFieldType(field.type),
+      required: field.required,
+      options: field.options,
+    }));
+    if (configuredFields?.length) {
+      return {
+        instructions: input.config.prompt || `Please edit: ${input.title}`,
+        submitLabel: "Submit edits",
+        inputFields: configuredFields,
+      };
+    }
+    // Legacy edit checkpoints did not declare a schema source. Preserve their
+    // persisted behavior without allowing new explicit static checkpoints to
+    // silently degrade into an unhelpful blank textarea.
+    if (!input.config.interaction) {
+      return {
+        instructions: input.config.prompt || `Please edit: ${input.title}`,
+        submitLabel: "Submit edits",
+        inputFields: [{
+          name: "editedContent",
+          label: input.title,
+          type: "textarea",
+          required: input.config.required,
+        }],
+      };
+    }
   }
 
   return undefined;
@@ -97,6 +129,20 @@ export class CheckpointNodeExecutor implements NodeExecutor {
       };
     }
 
+    if (config.interaction?.schemaSource === "ai") {
+      return reviewCheckpointNodeCapability({
+        ...input,
+        node: {
+          ...input.node,
+          config: {
+            ...config,
+            prompt: config.interaction.instruction,
+          },
+        },
+        aiRuntimeInvoker: this.aiRuntimeInvoker,
+      });
+    }
+
     switch (sessionDecision.kind) {
       case "wait_for_approval":
         return {
@@ -120,7 +166,7 @@ export class CheckpointNodeExecutor implements NodeExecutor {
           evidence: { sessionId: input.mainSession.id },
         };
       case "main_session":
-        if (config.checkpointType === "input" || config.checkpointType === "choose") {
+        if (config.checkpointType === "input" || config.checkpointType === "choose" || config.checkpointType === "edit") {
           return {
             status: "waiting_for_user",
             prompt: config.prompt,

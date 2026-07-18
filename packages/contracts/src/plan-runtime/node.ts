@@ -6,9 +6,18 @@ import type {
 
 export type TaskPriority = "Low" | "Medium" | "High" | "Urgent";
 
+export type TaskUserInteractionExpectation =
+  | { level: "not_expected" }
+  | { level: "possible"; reason: string };
+
+export type CheckpointInteraction =
+  | { schemaSource: "static" }
+  | { schemaSource: "ai"; instruction: string };
+
 export interface TaskConfig {
   expectedOutput?: string;
   completionCriteria?: string;
+  userInteraction?: TaskUserInteractionExpectation;
 }
 
 export interface CheckpointConfig {
@@ -23,15 +32,53 @@ export interface CheckpointConfig {
     required?: boolean;
     options?: string[];
   }>;
+  interaction?: CheckpointInteraction;
 }
 
-export interface NodeActionFormField {
-  name: string;
+export type NodeActionFormOption = {
+  value: string;
   label: string;
-  type?: "text" | "textarea" | "select";
-  required?: boolean;
-  options?: string[];
-}
+  description?: string;
+  recommended?: boolean;
+};
+
+export type NodeActionFormField =
+  | {
+      kind: "text";
+      name: string;
+      label: string;
+      description?: string;
+      multiline?: boolean;
+      required?: boolean;
+      placeholder?: string;
+      defaultValue?: string;
+    }
+  | {
+      kind: "choice";
+      name: string;
+      label: string;
+      description?: string;
+      selection: "single" | "multiple";
+      options: NodeActionFormOption[];
+      required?: boolean;
+      defaultValue?: string | string[];
+      minSelections?: number;
+      maxSelections?: number;
+    }
+  | {
+      kind: "boolean";
+      name: string;
+      label: string;
+      description?: string;
+      defaultValue?: boolean;
+    }
+  | {
+      name: string;
+      label: string;
+      type?: "text" | "textarea" | "select";
+      required?: boolean;
+      options?: string[];
+    };
 
 export interface NodeActionForm {
   instructions: string;

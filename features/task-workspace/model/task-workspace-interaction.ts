@@ -594,18 +594,15 @@ function displayModeFor(input: {
 }): TaskWorkspaceDisplayMode {
   const taskStatus = normalized(input.pageData.task.status);
   if (taskStatus === "done") return "done";
-  if (input.stage.stage === "result") return "completed";
   if (
     input.operationState.status === "execution-blocked" ||
-    taskStatus === "blocked"
+    input.operationState.status === "execution-action" ||
+    input.operationState.status === "task-action" ||
+    ["waiting_for_input", "waitingforinput", "waiting_for_approval", "waitingforapproval", "blocked"].includes(taskStatus)
   )
     return "blocked";
-  if (
-    input.operationState.status === "execution-running" ||
-    input.operationState.status === "execution-action" ||
-    input.operationState.status === "task-action"
-  )
-    return "running";
+  if (input.operationState.status === "execution-running") return "running";
+  if (input.stage.stage === "result") return "completed";
   if (input.operationState.status === "plan-ready-to-run")
     return "ready_to_run";
   if (input.operationState.status === "plan-review") return "reviewing_plan";

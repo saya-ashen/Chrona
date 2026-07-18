@@ -44,6 +44,7 @@ const toolDescriptions: Record<ChronaToolName, string> = {
   "chrona.node.complete": "Complete the current task node.",
   "chrona.node.condition_select": "Select the current condition node branch.",
   "chrona.node.block": "Block the current execution node.",
+  "chrona.node.request_input": "Request structured user input for the current execution node.",
   "chrona.node.fail": "Fail the current execution node.",
   "chrona.node.wait_complete": "Complete the current wait node.",
 };

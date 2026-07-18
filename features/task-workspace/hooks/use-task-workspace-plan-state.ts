@@ -35,7 +35,7 @@ const STARTING_NODE_NEXT_ACTION = "Starting execution...";
 export type WorkspaceRuntimeEvent = Extract<PlanExecutionSSEEvent, { type: "runtime_event" }>;
 type WorkspaceRuntimeTextEvent = WorkspaceRuntimeEvent & { event: Extract<WorkspaceRuntimeEvent["event"], { type: "assistant_text_delta" | "reasoning_delta" }> };
 type WorkspaceExecutionRuntimeSseEvent = TaskWorkspaceSseEvent & Omit<WorkspaceRuntimeEvent, "type"> & { type: "execution.runtime_event" };
-export type PlanGenerationRequest = { userInstruction?: string | null; selectedNodeId?: string | null };
+export type PlanGenerationRequest = { userInstruction?: string | null; selectedNodeId?: string | null; replaceActiveExecution?: boolean };
 
 function compactActivityText(value: string) {
   return value.replace(/\s+/g, " ").trim().slice(0, 96);
@@ -218,14 +218,20 @@ function checkpointActionKind(actionId: ExecutionCheckpoint["availableActions"][
 }
 
 function checkpointFormFields(checkpoint: ExecutionCheckpoint) {
-  return checkpoint.form?.inputFields.map((field) => ({
-    key: field.name,
-    label: field.label,
-    value: field.value ?? "",
-    control: field.type === "select" ? "select" as const : field.type === "text" ? "text" as const : "textarea" as const,
-    required: field.required,
-    options: field.options,
-  })) ?? [];
+  return checkpoint.form?.inputFields.map((field) => {
+    const legacy = !("kind" in field);
+    const control = legacy
+      ? field.type === "select" ? "select" as const : field.type === "text" ? "text" as const : "textarea" as const
+      : field.kind === "text" && field.multiline ? "textarea" as const : field.kind === "choice" ? "select" as const : "text" as const;
+    return {
+      key: field.name,
+      label: field.label,
+      value: field.value ?? "",
+      control,
+      required: "required" in field ? field.required : false,
+      options: legacy ? field.options : field.kind === "choice" ? field.options.map((option) => option.value) : undefined,
+    };
+  }) ?? [];
 }
 
 function withCanonicalExecutionActions(graphPlan: TaskPlanGraphPlan | null, checkpoint: ExecutionCheckpoint | null) {
@@ -606,7 +612,7 @@ export function useTaskWorkspacePlanState(
     const userInstruction = request?.userInstruction?.trim() || null;
     const selectedNodeId = request?.selectedNodeId?.trim() || null;
     setGenerationUserInstruction(userInstruction);
-    void dispatchWorkspaceCommand(task.id, { type: "plan.generate", forceRefresh: true, workBlockId: selectedWorkBlockId, userInstruction, selectedNodeId });
+    void dispatchWorkspaceCommand(task.id, { type: "plan.generate", forceRefresh: true, workBlockId: selectedWorkBlockId, userInstruction, selectedNodeId, replaceActiveExecution: request?.replaceActiveExecution ?? false });
   }, [isGeneratingPlan, selectedWorkBlockId, task.id]);
 
   const handleStopPlanGeneration = useCallback(async () => {
@@ -617,7 +623,11 @@ export function useTaskWorkspacePlanState(
   const dispatchExecutionAction = useCallback(async (action: ExecutionActionInput) => {
     setRuntimeEvents([]);
     const result = await dispatchTaskExecutionAction(task.id, action, selectedWorkBlockId);
-    void refreshExecutionQueries();
+    if (action.action === "cancel_session" || action.action === "pause_session" || action.action === "restart_from_beginning") {
+      await refreshExecutionQueries();
+    } else {
+      void refreshExecutionQueries();
+    }
     return result;
   }, [refreshExecutionQueries, selectedWorkBlockId, task.id]);
 

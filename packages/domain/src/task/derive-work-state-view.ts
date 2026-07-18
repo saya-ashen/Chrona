@@ -263,19 +263,11 @@ function stateFromBlocker(
 }
 
 function deriveState(input: DeriveWorkStateViewInput): WorkStateCanonical {
-  // Authoritative result decisions always win over stale runtime, node, or
-  // generation facts. Once the user accepts a result, the task is done; an
-  // unaccepted completed execution remains result-ready.
+  // A task-level decision is authoritative. Runtime summaries can lag behind
+  // the current checkpoint, so normal human waits must outrank stale completed
+  // execution metadata until the task itself is accepted as Done.
   if (isOneOf(input.taskStatus, ["done"])) return "done";
-  if (
-    isOneOf(input.executionStatus, ["completed"]) ||
-    isOneOf(input.taskStatus, ["completed", "complete"])
-  )
-    return "result_ready";
 
-  // Human waits outrank generic blocked/failed metadata because they carry a
-  // specific, recoverable next action. Block reasons are checked before stale
-  // terminal/run fields for the same reason.
   const blockerState = stateFromBlocker(input);
   if (
     blockerState === "waiting_for_approval" ||
@@ -283,15 +275,21 @@ function deriveState(input: DeriveWorkStateViewInput): WorkStateCanonical {
   )
     return blockerState;
   if (
-    isOneOf(input.executionStatus, ["waiting_for_approval"]) ||
-    isOneOf(input.taskStatus, ["waiting_for_approval", "waitingforapproval"])
+    isOneOf(input.taskStatus, ["waiting_for_approval", "waitingforapproval"]) ||
+    isOneOf(input.executionStatus, ["waiting_for_approval"])
   )
     return "waiting_for_approval";
   if (
-    isOneOf(input.executionStatus, ["waiting_for_user", "waiting_for_input"]) ||
-    isOneOf(input.taskStatus, ["waiting_for_input", "waitingforinput"])
+    isOneOf(input.taskStatus, ["waiting_for_input", "waitingforinput"]) ||
+    isOneOf(input.executionStatus, ["waiting_for_user", "waiting_for_input"])
   )
     return "waiting_for_input";
+
+  if (
+    isOneOf(input.executionStatus, ["completed"]) ||
+    isOneOf(input.taskStatus, ["completed", "complete"])
+  )
+    return "result_ready";
 
   if (blockerState === "blocked") return "blocked";
   if (

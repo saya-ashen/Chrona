@@ -61,4 +61,15 @@ describe("currentExecutionStatusFromEffectiveGraph", () => {
       hasActiveExecutionSession: false,
     })).toBe("waiting_for_user");
   });
+
+  it("lets cancelled task lifecycle override stale waiting graph evidence", () => {
+    expect(currentExecutionStatusFromEffectiveGraph({
+      effective: effectiveGraph({
+        nodes: [{ id: "node-1", status: "waiting_for_user", reachable: true } as never],
+        waitingNodeIds: ["node-1"],
+      }),
+      hasActiveExecutionSession: false,
+      taskStatus: "Cancelled",
+    })).toBe("cancelled");
+  });
 });

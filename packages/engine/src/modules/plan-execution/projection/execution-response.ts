@@ -26,11 +26,11 @@ export function buildExecutionResponse(input: {
   planOutput?: Pick<PlanOutputState, "spec" | "revision" | "updatedAt" | "updatedByNodeId">;
 }): PlanExecutionResult {
   const checkpoint = input.checkpoint ?? (
-    input.executionSessionId && input.planRunId
+    input.planRunId || input.effective.waitingNodeIds.length > 0
       ? deriveExecutionCheckpoint({
           taskId: input.taskId,
-          sessionId: input.executionSessionId,
-          planRunId: input.planRunId,
+          sessionId: input.executionSessionId ?? input.mainSessionId,
+          planRunId: input.planRunId ?? input.planId,
           status: input.status,
           effective: input.effective,
           currentNodeId: input.currentNodeId,

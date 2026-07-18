@@ -509,7 +509,11 @@ async function executeCommandUnlocked(
       sessionId: mainSession.id,
       workBlockId: session.workBlockId,
       eventType: "execution_started",
-      payload: { trigger, prompt: command.prompt },
+      payload: {
+        trigger,
+        prompt: command.prompt,
+        executionEpoch: runtime.persisted.executionEpoch + (command.type === "restart_from_beginning" ? 1 : 0),
+      },
     });
   }
 

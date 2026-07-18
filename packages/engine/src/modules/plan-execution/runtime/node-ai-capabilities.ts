@@ -70,6 +70,12 @@ function asRecord(value: unknown): Record<string, unknown> | undefined {
     ? value as Record<string, unknown>
     : undefined;
 }
+function requiresAiDefinedInput(node: EffectivePlanNode) {
+  if (node.type !== "checkpoint") return false;
+  const config = node.config as { required?: boolean; interaction?: { schemaSource?: string } };
+  return config.required !== false && config.interaction?.schemaSource === "ai";
+}
+
 
 function blockedReasonFromSnapshot(input: {
   response: ProviderRunSnapshot;
@@ -161,6 +167,13 @@ function terminalNodeResultFromSnapshot(input: {
         evidence: input.evidence,
       });
       if (override) return override;
+      if (requiresAiDefinedInput(input.node)) {
+        return {
+          status: "failed",
+          error: `Required AI-defined checkpoint ${input.node.id} completed without chrona_node_request_input`,
+          evidence: input.evidence,
+        };
+      }
       return {
         status: "done",
         summary:
@@ -334,6 +347,15 @@ export async function runTaskNodeFeature(
         const selectedBranch = recordedAction.branchRef
           ? branchBindingForRef({ plan: input.plan, node: input.node, branchRef: recordedAction.branchRef })
           : null;
+        if (requiresAiDefinedInput(input.node)) {
+          const protocolFailure: NodeExecutionResult = {
+            status: "failed",
+            error: `Required AI-defined checkpoint ${input.node.id} completed without chrona_node_request_input`,
+            evidence,
+          };
+          await updateInvocationRunFromNodeResult(invocation, protocolFailure);
+          return protocolFailure;
+        }
         const completedResult: NodeExecutionResult = {
           status: "done",
           summary: recordedAction.summary ?? "Node completed",
@@ -345,6 +367,17 @@ export async function runTaskNodeFeature(
         };
         await updateInvocationRunFromNodeResult(invocation, completedResult);
         return completedResult;
+      }
+      if (parsedAction.kind === "request_input" && recordedAction?.action === "block_current_node") {
+        const waitingResult: NodeExecutionResult = {
+          status: "waiting_for_user",
+          prompt: parsedAction.payload.title,
+          reason: parsedAction.payload.instructions,
+          evidence,
+          actionForm: recordedAction.actionForm,
+        };
+        await updateInvocationRunFromNodeResult(invocation, waitingResult);
+        return waitingResult;
       }
       if (recordedAction?.action === "block_current_node") {
         const blockedResult: NodeExecutionResult = {

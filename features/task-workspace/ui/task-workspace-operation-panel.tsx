@@ -1,8 +1,22 @@
 "use client";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { deriveUserFacingFailure, type WorkStateView } from "@chrona/domain";
 
-import { Badge, Button, Card, CardContent, CardHeader, CardTitle } from "@shared/ui";
+import {
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  CardHeader,
+  CardTitle,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  Textarea,
+} from "@shared/ui";
 import { SpecRenderer } from "./catalog/spec-renderer";
 import type { PlanNodeDataModel } from "../plan/task-plan-graph/types";
 import { ProviderApprovalBanner } from "@features/execution-monitoring";
@@ -17,9 +31,11 @@ type TaskWorkspaceOperationPanelProps = {
   copy: WorkspaceCopy;
   onGeneratePlan: () => void;
   onStartPlan: () => void;
-  onRestartPlan?: () => void;
+  onRestartPlan?: (prompt?: string) => Promise<void> | void;
+  onRegeneratePlan?: (instruction?: string) => Promise<void> | void;
   onTaskPrimaryAction?: () => void;
   revisionPanel?: ReactNode;
+  hasAcceptedPlan?: boolean;
 };
 
 function operationToneClass(tone: TaskWorkspaceOperationState["tone"]) {
@@ -128,11 +144,38 @@ export function TaskWorkspaceOperationPanel({
   onGeneratePlan,
   onStartPlan,
   onRestartPlan,
+  onRegeneratePlan,
   onTaskPrimaryAction,
   revisionPanel,
+  hasAcceptedPlan = false,
 }: TaskWorkspaceOperationPanelProps) {
   const latestEvents = state.runtimeEvents.slice(-4).map(formatRuntimeEvent);
   const isRunning = state.status === "execution-running";
+  const [recoveryOpen, setRecoveryOpen] = useState(false);
+  const [recoveryInstruction, setRecoveryInstruction] = useState("");
+  const [recoveryAction, setRecoveryAction] = useState<"restart" | "regenerate">("restart");
+  const [isRecovering, setIsRecovering] = useState(false);
+  const canRecoverExecution = hasAcceptedPlan && Boolean(onRestartPlan);
+  const showRecoveryOptions = canRecoverExecution && ["failed", "blocked", "cancelled"].includes(workState.state);
+
+  async function submitRecovery() {
+    setIsRecovering(true);
+    try {
+      const instruction = recoveryInstruction.trim() || undefined;
+      if (recoveryAction === "restart") await onRestartPlan?.(instruction);
+      else await onRegeneratePlan?.(instruction);
+      setRecoveryOpen(false);
+      setRecoveryInstruction("");
+    } finally {
+      setIsRecovering(false);
+    }
+  }
+
+  function openRecovery(action: "restart" | "regenerate" = "restart") {
+    setRecoveryAction(action);
+    setRecoveryOpen(true);
+  }
+
   return (
     <Card
       role="region"
@@ -162,7 +205,7 @@ export function TaskWorkspaceOperationPanel({
           {state.status === "plan-ready-to-run" ? (
             <>
               {state.hasGraphExecutionStarted ? (
-                <Button type="button" variant="outline" onClick={onRestartPlan} disabled={!onRestartPlan}>{copy.restartPlanAction ?? "Restart from beginning"}</Button>
+                <Button type="button" variant="outline" onClick={() => openRecovery("restart")} disabled={!onRestartPlan}>{copy.runPlanFromBeginning ?? "Run plan from beginning"}</Button>
               ) : null}
               <Button type="button" onClick={onStartPlan}>{state.hasGraphExecutionStarted ? (copy.continuePlanAction ?? "Continue plan") : (copy.startPlanAction ?? "Start plan")}</Button>
             </>
@@ -173,20 +216,35 @@ export function TaskWorkspaceOperationPanel({
         <DecisionRecoveryCard workState={workState} />
         <ProviderApprovalBanner taskId={taskId} />
         {state.status === "task-action" ? (
-          <div className="flex flex-col gap-2 rounded-xl border border-destructive/25 bg-background/80 px-3 py-2 shadow-sm sm:flex-row sm:items-center sm:justify-between" data-testid="current-operation-primary-action">
-            <div className="min-w-0 text-xs">
-              <p className="font-semibold text-destructive">{workState.state === "failed" || state.statusLabel === "run_failed" ? "Failed" : workState.label}</p>
-              <p className="mt-0.5 line-clamp-2 text-muted-foreground">{state.description}</p>
+          <div className="space-y-2">
+            <div className="flex flex-col gap-2 rounded-xl border border-destructive/25 bg-background/80 px-3 py-2 shadow-sm sm:flex-row sm:items-center sm:justify-between" data-testid="current-operation-primary-action">
+              <div className="min-w-0 text-xs">
+                <p className="font-semibold text-destructive">{workState.state === "failed" || state.statusLabel === "run_failed" ? "Failed" : workState.label}</p>
+                <p className="mt-0.5 line-clamp-2 text-muted-foreground">{state.description}</p>
+              </div>
+              <Button
+                type="button"
+                variant={taskActionButtonVariant(state)}
+                size="sm"
+                className="shrink-0 self-start rounded-xl px-4 shadow-sm sm:self-center"
+                onClick={onTaskPrimaryAction}
+                disabled={!onTaskPrimaryAction}
+              >
+                {taskActionButtonLabel(state)}
+              </Button>
             </div>
-            <Button
-              type="button"
-              variant={taskActionButtonVariant(state)}
-              size="sm"
-              className="shrink-0 self-start rounded-xl px-4 shadow-sm sm:self-center"
-              onClick={onTaskPrimaryAction}
-              disabled={!onTaskPrimaryAction}
-            >
-              {taskActionButtonLabel(state)}
+            {showRecoveryOptions ? (
+              <div className="flex justify-end">
+                <Button type="button" variant="outline" size="sm" onClick={() => openRecovery()}>
+                  {copy.recoveryOptions ?? "Recovery options"}
+                </Button>
+              </div>
+            ) : null}
+          </div>
+        ) : showRecoveryOptions ? (
+          <div className="flex justify-end">
+            <Button type="button" variant="outline" size="sm" onClick={() => openRecovery()}>
+              {copy.recoveryOptions ?? "Recovery options"}
             </Button>
           </div>
         ) : null}
@@ -207,6 +265,37 @@ export function TaskWorkspaceOperationPanel({
           <p className="text-xs text-muted-foreground">{copy.resultPlaceholder ?? "Result summary will appear here after the current node finishes."}</p>
         ) : null}
       </CardContent>
+      <Dialog open={recoveryOpen} onOpenChange={(open) => { if (!isRecovering) setRecoveryOpen(open); }}>
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{copy.recoveryDialogTitle ?? "Choose how to recover this task"}</DialogTitle>
+            <DialogDescription>{copy.recoveryDialogDescription ?? "Keep the current plan and run it again, or replace it with a newly generated draft."}</DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <Button type="button" variant={recoveryAction === "restart" ? "default" : "outline"} className="h-auto min-h-20 whitespace-normal p-3 text-left" onClick={() => setRecoveryAction("restart")}>
+              <span><strong className="block">{copy.runPlanFromBeginning ?? "Run plan from beginning"}</strong><span className="mt-1 block text-xs opacity-80">{copy.runPlanFromBeginningDescription ?? "Keep the accepted plan. Reset execution progress and start at its first step."}</span></span>
+            </Button>
+            <Button type="button" variant={recoveryAction === "regenerate" ? "default" : "outline"} className="h-auto min-h-20 whitespace-normal p-3 text-left" onClick={() => setRecoveryAction("regenerate")} disabled={!onRegeneratePlan}>
+              <span><strong className="block">{copy.generateNewPlan ?? "Generate a new plan"}</strong><span className="mt-1 block text-xs opacity-80">{copy.generateNewPlanDescription ?? "Stop this execution and create a new draft for review before running."}</span></span>
+            </Button>
+          </div>
+          <div className="rounded-xl border bg-muted/35 p-3 text-xs text-muted-foreground">
+            <p className="font-medium text-foreground">{recoveryAction === "restart" ? (copy.recoveryKeepsPlan ?? "Keeps the task, accepted plan, history, and artifacts.") : (copy.recoveryKeepsHistory ?? "Keeps the task, previous plan, history, and artifacts.")}</p>
+            <p className="mt-1">{recoveryAction === "restart" ? (copy.recoveryResetsExecution ?? "Resets current node progress, execution context, pending checkpoints, and plan output.") : (copy.recoveryRequiresReview ?? "The new plan remains a draft until you review and accept it.")}</p>
+            <p className="mt-1 font-medium text-warning-foreground">{copy.recoverySideEffectWarning ?? "Completed steps may already have changed external systems. Running again can repeat those actions."}</p>
+          </div>
+          <label className="space-y-1.5 text-sm font-medium">
+            <span>{recoveryAction === "restart" ? (copy.restartInstructionLabel ?? "Instructions for the new run (optional)") : (copy.replanInstructionLabel ?? "What should the new plan change? (optional)")}</span>
+            <Textarea value={recoveryInstruction} onChange={(event) => setRecoveryInstruction(event.target.value)} rows={3} placeholder={recoveryAction === "restart" ? (copy.restartInstructionPlaceholder ?? "For example: collect fresh data and do not reuse earlier search results.") : (copy.replanInstructionPlaceholder ?? "For example: use a different approach and remove the unreliable step.")} />
+          </label>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setRecoveryOpen(false)} disabled={isRecovering}>{copy.cancel ?? "Cancel"}</Button>
+            <Button type="button" onClick={() => void submitRecovery()} disabled={isRecovering || (recoveryAction === "regenerate" && !onRegeneratePlan)}>
+              {isRecovering ? (copy.recoveryStarting ?? "Starting...") : recoveryAction === "restart" ? (copy.runPlanFromBeginning ?? "Run plan from beginning") : (copy.generateNewPlan ?? "Generate a new plan")}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

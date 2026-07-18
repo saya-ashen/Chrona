@@ -255,6 +255,8 @@ export const chronaCatalog = defineCatalog(chronaSchema, {
     Input: shadcn.Input,
     Textarea: shadcn.Textarea,
     Select: shadcn.Select,
+    Checkbox: shadcn.Checkbox,
+    Radio: shadcn.Radio,
     Tabs: shadcn.Tabs,
     Table: tableComponentDefinition,
 

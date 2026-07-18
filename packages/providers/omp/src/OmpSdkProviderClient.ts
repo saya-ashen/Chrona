@@ -306,13 +306,15 @@ type NodeRuntimeToolName =
   | "chrona_node_complete"
   | "chrona_condition_select"
   | "chrona_wait_complete"
+  | "chrona_node_request_input"
   | "chrona_node_block"
   | "chrona_node_fail";
 
 const NODE_RUNTIME_TOOL_SET_BY_TERMINAL: Record<string, readonly NodeRuntimeToolName[]> = {
-  chrona_node_complete: ["chrona_plan_output", "chrona_node_complete", "chrona_node_block", "chrona_node_fail"],
+  chrona_node_complete: ["chrona_plan_output", "chrona_node_complete", "chrona_node_request_input", "chrona_node_block", "chrona_node_fail"],
   chrona_condition_select: ["chrona_condition_select", "chrona_node_block", "chrona_node_fail"],
   chrona_wait_complete: ["chrona_wait_complete", "chrona_node_block", "chrona_node_fail"],
+  chrona_node_request_input: ["chrona_node_request_input", "chrona_node_block", "chrona_node_fail"],
   chrona_node_block: ["chrona_node_block", "chrona_node_fail"],
   chrona_node_fail: ["chrona_node_block", "chrona_node_fail"],
 };
@@ -344,9 +346,14 @@ const NODE_RUNTIME_TOOL_DEFINITIONS: Partial<Record<string, NodeRuntimeToolDefin
     description: "Mark the current Chrona wait node complete when the wait condition is satisfied by evidence.",
     parameters: agentControlActionPayloadSchemas.wait_complete,
   },
+  chrona_node_request_input: {
+    kind: "request_input",
+    description: "Pause the current Chrona node for normal structured user input. Use semantic text, choice, or boolean fields; choice.selection selects single or multiple values.",
+    parameters: agentControlActionPayloadSchemas.request_input,
+  },
   chrona_node_block: {
     kind: "block",
-    description: "Block the current Chrona node when required user input, approval, or unavailable capability prevents safe completion.",
+    description: "Block the current Chrona node only when an exceptional external blocker such as missing access or unavailable capability prevents safe completion.",
     parameters: agentControlActionPayloadSchemas.block,
   },
   chrona_node_fail: {

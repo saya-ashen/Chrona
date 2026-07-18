@@ -204,6 +204,7 @@ describe("kernel executeCommand (single-writer)", () => {
     const beforeRestartSession = await db.executionSession.findFirstOrThrow({
       where: { taskId: task.id, status: "Active" },
     });
+    const beforeRestart = await getPlanRun(task.id, compiledPlan.editablePlanId);
 
     const restarted = await executeCommand({ taskId: task.id, command: { type: "restart_from_beginning", trigger: "manual" } });
 
@@ -219,6 +220,7 @@ describe("kernel executeCommand (single-writer)", () => {
     expect(persisted?.attempts.map((a) => [a.nodeId, a.status])).toEqual([
       ["first_task", "running"],
     ]);
+    expect(persisted?.executionEpoch).toBeGreaterThan(beforeRestart?.executionEpoch ?? 0);
 
     const abandonedSession = await db.executionSession.findUniqueOrThrow({
       where: { id: beforeRestartSession.id },

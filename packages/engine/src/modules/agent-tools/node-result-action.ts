@@ -47,6 +47,24 @@ export function submitNodeResultActionFromTool(input: {
         prompt: body.prompt,
       };
     }
+    case "chrona.node.request_input": {
+      const body = input.payload as {
+        title: string;
+        instructions: string;
+        fields: NonNullable<Extract<SubmitNodeResultAction, { action: "block_current_node" }>["actionForm"]>["inputFields"];
+        submitLabel?: string;
+      };
+      return {
+        action: "block_current_node",
+        sessionId: input.sessionId,
+        reason: body.instructions,
+        actionForm: {
+          instructions: body.instructions,
+          submitLabel: body.submitLabel,
+          inputFields: body.fields,
+        },
+      };
+    }
     case "chrona.node.block": {
       const body = input.payload as {
         reason: string;
@@ -84,6 +102,8 @@ export function toolNameFromControlKind(kind: AgentControlActionBody["kind"]): C
       return "chrona.node.wait_complete";
     case "block":
       return "chrona.node.block";
+    case "request_input":
+      return "chrona.node.request_input";
     case "fail":
       return "chrona.node.fail";
     case "task_read":
@@ -120,6 +140,8 @@ export function controlKindFromToolName(toolName: ChronaToolName): AgentControlA
       return "wait_complete";
     case "chrona.node.block":
       return "block";
+    case "chrona.node.request_input":
+      return "request_input";
     case "chrona.node.fail":
       return "fail";
     case "chrona.task.read":
@@ -132,7 +154,7 @@ export function controlKindFromToolName(toolName: ChronaToolName): AgentControlA
 }
 
 export function isTerminalControlKind(kind: AgentControlActionBody["kind"]): boolean {
-  return kind === "complete" || kind === "condition_select" || kind === "wait_complete" || kind === "block" || kind === "fail";
+  return kind === "complete" || kind === "condition_select" || kind === "wait_complete" || kind === "request_input" || kind === "block" || kind === "fail";
 }
 
 export type NodeResultToolOperation = Pick<ChronaToolOperation, "toolName" | "input">;

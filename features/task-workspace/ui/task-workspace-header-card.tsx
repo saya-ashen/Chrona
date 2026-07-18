@@ -40,6 +40,7 @@ type TaskWorkspaceHeaderCardProps = {
   onAcceptPlan: () => void | Promise<void>;
   onGeneratePlan: () => void | Promise<void>;
   onStopPlanGeneration: () => void | Promise<void>;
+  onRestartPlan: () => void | Promise<void>;
   onEdit: () => void;
   showDeleteConfirm: boolean;
   isDeleting: boolean;
@@ -68,6 +69,7 @@ export function TaskWorkspaceHeaderCard({
   onAcceptPlan,
   onGeneratePlan,
   onStopPlanGeneration,
+  onRestartPlan,
   onEdit,
   showDeleteConfirm,
   isDeleting,
@@ -82,6 +84,7 @@ export function TaskWorkspaceHeaderCard({
   const copy = messages.components.taskWorkspace;
   const [pendingActionId, setPendingActionId] = useState<HeaderActionId | null>(null);
   const [actionStatus, setActionStatus] = useState<string | null>(null);
+  const [restartConfirmOpen, setRestartConfirmOpen] = useState(false);
 
   // Refs so that the handlers object (passed to ActionProvider which stores it in
   // useState on mount and never re-syncs prop updates) always reads the current
@@ -90,6 +93,7 @@ export function TaskWorkspaceHeaderCard({
     onAcceptPlan,
     onGeneratePlan,
     onStopPlanGeneration,
+    onRestartPlan,
     onEdit,
     onStartDeleteConfirm,
     onAction,
@@ -105,6 +109,7 @@ export function TaskWorkspaceHeaderCard({
     onAcceptPlan,
     onGeneratePlan,
     onStopPlanGeneration,
+    onRestartPlan,
     onEdit,
     onStartDeleteConfirm,
     onAction,
@@ -127,6 +132,11 @@ export function TaskWorkspaceHeaderCard({
     },
     "header-overflow-action": (params: Record<string, unknown>) => {
       const actionId = params.actionId;
+      if (actionId === "restart") {
+        ref.current.store.set("/headerOverflowAction", "");
+        setRestartConfirmOpen(true);
+        return;
+      }
       if (actionId === "edit") {
         ref.current.onEdit();
         ref.current.store.set("/headerOverflowAction", "");
@@ -180,6 +190,36 @@ export function TaskWorkspaceHeaderCard({
       <p className="sr-only" role="status" aria-live="polite">
         {actionStatus ?? ""}
       </p>
+      <Dialog open={restartConfirmOpen} onOpenChange={setRestartConfirmOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{copy.runPlanFromBeginning ?? "Run plan from beginning"}</DialogTitle>
+            <DialogDescription>
+              {copy.runPlanFromBeginningDescription ?? "Keep the accepted plan, reset execution progress, and start at its first step."}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="rounded-xl border bg-muted/35 p-3 text-sm text-muted-foreground">
+            <p>{copy.recoveryKeepsPlan ?? "Keeps the task, accepted plan, history, and artifacts."}</p>
+            <p className="mt-2 font-medium text-warning-foreground">
+              {copy.recoverySideEffectWarning ?? "Completed steps may already have changed external systems. Running again can repeat those actions."}
+            </p>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setRestartConfirmOpen(false)}>
+              {copy.cancel ?? "Cancel"}
+            </Button>
+            <Button
+              type="button"
+              onClick={async () => {
+                await Promise.resolve(ref.current.onRestartPlan());
+                setRestartConfirmOpen(false);
+              }}
+            >
+              {copy.runPlanFromBeginning ?? "Run plan from beginning"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
       <Dialog
         open={showDeleteConfirm}
         onOpenChange={(open) => {

@@ -63,12 +63,17 @@ Only include fields that belong to the chosen node type. Do NOT copy task-only f
 The core execution unit. Describes WHAT to do, not HOW to do it.
 - executor: "ai" (AI/runtime can execute), "user" (human must do it), "system" (deterministic software automation)
 - mode: "auto" (fully automatic), "assist" (AI helps but user active), "manual" (user does it)
+- Every task node must set userInteraction to either {level:"not_expected"} or {level:"possible",reason:"..."}.
+- Use "possible" only when execution can start autonomously but may reveal a meaningful ambiguity, missing preference, or tradeoff that needs user input. The reason must name that concrete trigger. Do not predefine fields because runtime context determines the request.
+- "not_expected" is an expectation, not a restriction: runtime AI may still request input if an unanticipated information gap appears.
 - Do NOT specify tool calls, API calls, integrations, or AI actions inside the node — those are runtime concerns. A step that calls a tool (create calendar, send email, read context) is still a single task node.
 
 ### checkpoint
-Interaction gate for human confirmation, input, choice, edit, or approval.
+Mandatory human interaction gate. Use only when execution must pause for the user regardless of what runtime work discovers.
+- interaction.schemaSource: "static" when the complete form is known now; use checkpointType/options/inputFields to define it.
+- interaction.schemaSource: "ai" when participation is mandatory but the concrete question, choices, recommendations, or defaults depend on prior execution; include interaction.instruction and do not invent placeholder fields.
 - checkpointType: "confirm" (yes/no), "choose" (pick from options), "input" (fill fields), "edit" (modify something), "approve" (sign-off gate)
-- prompt: what to show the user; options: for "choose"; inputFields: for "input"; required: whether it can be skipped
+- prompt: user-facing purpose of the gate; required: whether it can be skipped. For ai-defined checkpoints, Runtime AI constructs the actual request later.
 
 ### condition
 Branching gate that evaluates a condition and routes to different paths.
@@ -94,7 +99,7 @@ Pause execution for a duration or external event.
 
 - Do not interrupt the user unless correctness, safety, or a genuine user decision requires it.
 - Do not add checkpoints for low-risk internal progress reviews, status updates, summaries, or "verify before continuing" steps.
-- When user input is needed, use the least-effort checkpoint: "confirm" for yes/no, "choose" when options are known, "input" only for truly free-form fields, "edit" only when the user must modify generated content. Prefer bounded choices over free-form input. Always express user input/choice/confirmation as a checkpoint — never invent separate user_input or decision nodes.
+- If participation is only possible, keep the work in a task node and mark userInteraction.level "possible". Use a checkpoint only when participation is mandatory. For static checkpoints, prefer the least-effort form: confirm for yes/no, choose when options are already known, input for truly free-form fields, and edit only when the user must modify known content. Never use a generic placeholder textarea when the real form depends on runtime results.
 
 ## Delivering the result
 

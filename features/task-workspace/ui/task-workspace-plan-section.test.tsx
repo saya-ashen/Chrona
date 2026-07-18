@@ -449,17 +449,31 @@ describe("TaskWorkspacePlanSection", () => {
     ).toBeInTheDocument();
     expect(
       within(getOperationPanel()).getByRole("button", {
-        name: "Restart from beginning",
+        name: "Run plan from beginning",
       }),
     ).toBeInTheDocument();
     fireEvent.click(
       within(getOperationPanel()).getByRole("button", {
-        name: "Restart from beginning",
+        name: "Run plan from beginning",
       }),
     );
-    expect(onDispatchExecutionAction).toHaveBeenCalledWith({
+    expect(screen.getByRole("dialog", { name: "Choose how to recover this task" })).toBeInTheDocument();
+    expect(screen.getByText("Completed steps may already have changed external systems. Running again can repeat those actions.")).toBeInTheDocument();
+    fireEvent.change(screen.getByPlaceholderText("For example: collect fresh data and do not reuse earlier search results."), { target: { value: "Use fresh sources" } });
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Run plan from beginning" }));
+    await waitFor(() => expect(onDispatchExecutionAction).toHaveBeenCalledWith({
       action: "restart_from_beginning",
-    });
+      prompt: "Use fresh sources",
+    }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    fireEvent.click(within(getOperationPanel()).getByRole("button", { name: "Run plan from beginning" }));
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: /^Generate a new plan/ }));
+    fireEvent.change(screen.getByPlaceholderText("For example: use a different approach and remove the unreliable step."), { target: { value: "Remove the unreliable step" } });
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Generate a new plan" }));
+    await waitFor(() => expect(onGeneratePlan).toHaveBeenCalledWith({
+      userInstruction: "Remove the unreliable step",
+      replaceActiveExecution: true,
+    }));
 
     accepted.rerender(
       <TaskWorkspacePlanSection

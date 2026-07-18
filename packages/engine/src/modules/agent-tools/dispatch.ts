@@ -113,6 +113,7 @@ export async function executeValidatedTool(
     case "chrona.node.complete":
     case "chrona.node.condition_select":
     case "chrona.node.wait_complete":
+    case "chrona.node.request_input":
     case "chrona.node.block":
     case "chrona.node.fail": {
       const action = submitNodeResultActionFromTool({

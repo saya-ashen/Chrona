@@ -38,6 +38,7 @@ const aiGeneratePlanMock = mock(async (request: { title: string; description?: s
       type: "task" as const,
       title: `Handle ${request.title}`,
       expectedOutput: request.description ?? request.title,
+      userInteraction: { level: "not_expected" },
     },
   ],
   edges: [],
