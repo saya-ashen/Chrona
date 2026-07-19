@@ -162,6 +162,9 @@ describe("POST /api/tasks/:taskId/result/accept", () => {
     expect(body.runId).toBe(run.id);
 
     const acceptedTask = await db.task.findUniqueOrThrow({ where: { id: taskId } });
-    expect(acceptedTask.status).toBe(TaskStatus.Done);
+    expect(acceptedTask.status).toBe(TaskStatus.Completed);
+    expect(await db.event.count({
+      where: { taskId, runId: run.id, eventType: "task.result_accepted" },
+    })).toBe(1);
   });
 });
