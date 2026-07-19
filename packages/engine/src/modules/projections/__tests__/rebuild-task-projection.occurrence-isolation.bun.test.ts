@@ -303,7 +303,7 @@ describe("rebuildTaskProjection occurrence isolation", () => {
 
     const projection = await db.taskProjection.findUniqueOrThrow({ where: { taskId: task.id } });
     expect(projection.persistedStatus).toBe("Running");
-    expect(projection.displayState).toBeNull();
+    expect(projection.displayState).toBe("ExecutionActive");
     expect(projection.blockType).toBeNull();
     expect(projection.actionRequired).toBeNull();
     expect(projection.latestRunStatus).toBe("Running");

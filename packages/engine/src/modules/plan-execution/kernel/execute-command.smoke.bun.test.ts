@@ -257,7 +257,7 @@ describe("kernel executeCommand (single-writer)", () => {
       command: { type: "start", trigger: "manual" },
     });
     expect(completed.status).toBe("completed");
-    await expect(db.task.findUniqueOrThrow({ where: { id: task.id } })).resolves.toMatchObject({
+    expect(await db.task.findUniqueOrThrow({ where: { id: task.id } })).toMatchObject({
       status: "Completed",
       completedAt: expect.any(Date),
     });
@@ -269,11 +269,11 @@ describe("kernel executeCommand (single-writer)", () => {
 
     expect(restarted.status).toBe("running");
     expect(restarted.currentNodeId).toBe("first_task");
-    await expect(db.task.findUniqueOrThrow({ where: { id: task.id } })).resolves.toMatchObject({
+    expect(await db.task.findUniqueOrThrow({ where: { id: task.id } })).toMatchObject({
       status: "Running",
       completedAt: null,
     });
-    await expect(db.taskProjection.findUniqueOrThrow({ where: { taskId: task.id } })).resolves.toMatchObject({
+    expect(await db.taskProjection.findUniqueOrThrow({ where: { taskId: task.id } })).toMatchObject({
       persistedStatus: "Running",
       displayState: "ExecutionActive",
       currentNodeId: "first_task",

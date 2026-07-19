@@ -150,14 +150,14 @@ describe("reconcileTaskState", () => {
       graph,
       taskStatus: "WaitingForInput",
       blockReason: { blockType: "human_input_required", actionRequired: "Provide Input", nodeId: "blocked" },
-    }).summary.primaryAction).toMatchObject({ type: "provide_input", label: "Provide Input", targetNodeId: "blocked" });
+    }).summary.primaryAction).toMatchObject({ type: "provide_input", label: "Provide input", targetNodeId: "blocked" });
 
     expect(reconcileTaskState({
       taskId: "task_1",
       graph,
       taskStatus: "WaitingForApproval",
       blockReason: { blockType: "approval_required", actionRequired: "Review Step Output", nodeId: "blocked" },
-    }).summary.primaryAction).toMatchObject({ type: "approve", label: "Review Step Output", targetNodeId: "blocked" });
+    }).summary.primaryAction).toMatchObject({ type: "approve", label: "Review approval", targetNodeId: "blocked" });
 
     expect(reconcileTaskState({
       taskId: "task_1",
@@ -171,7 +171,7 @@ describe("reconcileTaskState", () => {
       graph,
       taskStatus: "Blocked",
       blockReason: { blockType: "replan_required", actionRequired: "Replan", nodeId: "blocked" },
-    }).summary.primaryAction).toMatchObject({ type: "replan", label: "Replan", targetNodeId: "blocked" });
+    }).summary.primaryAction).toMatchObject({ type: "approve", label: "Review approval", targetNodeId: "blocked" });
   });
   it("keeps the input action ahead of stale sync metadata while the graph waits for user input", () => {
     const graph = makeGraph([
@@ -218,7 +218,7 @@ describe("reconcileTaskState", () => {
     });
   });
 
-  it("shows retry sync action for stale sync blocks on resumable graph state", () => {
+  it("keeps cancelled state terminal even when an old sync block reason remains", () => {
     const graph = makeGraph([
       makeNode({ id: "setup", status: "completed" }),
       makeNode({ id: "sync", status: "ready", dependencies: ["setup"] }),
@@ -237,9 +237,9 @@ describe("reconcileTaskState", () => {
     });
 
     expect(result.summary).toMatchObject({
-      executionState: "blocked",
+      executionState: "cancelled",
       currentNodeId: "sync",
-      primaryAction: { type: "retry_sync", enabled: true, label: "Re-sync", targetNodeId: "sync" },
+      primaryAction: { type: "none", enabled: false },
     });
   });
 });

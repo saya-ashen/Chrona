@@ -320,7 +320,7 @@ describe("runProviderRequest runtime ref persistence", () => {
         status: "running",
       }),
     );
-    await expect(db.run.findUniqueOrThrow({ where: { id: second.id } })).resolves.toMatchObject({
+    expect(await db.run.findUniqueOrThrow({ where: { id: second.id } })).toMatchObject({
       status: RunStatus.Running,
       runtimeSessionRef: "provider-session-started",
     });
