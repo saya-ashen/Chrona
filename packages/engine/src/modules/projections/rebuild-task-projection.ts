@@ -165,7 +165,9 @@ export async function rebuildTaskProjection(taskId: string) {
   const shouldClearBlockReason = !derived.blockReason && task.blockReason !== null;
   const updateData: Record<string, unknown> = {
     status: derived.persistedStatus,
-    completedAt: derived.persistedStatus === "Completed" ? task.completedAt ?? now : null,
+    completedAt: ["Completed", "Done"].includes(derived.persistedStatus)
+      ? task.completedAt ?? now
+      : null,
     latestEventId: latestEvent?.id ?? task.latestEventId ?? null,
     latestRawEventId: latestEvent?.rawEventId ?? task.latestRawEventId ?? null,
     blockedByEventId: derived.blockReason ? task.blockedByEventId : null,
