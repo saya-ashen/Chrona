@@ -1749,6 +1749,17 @@ describe("TaskWorkspacePlanSection", () => {
         isGraphPlanPending={false}
         pageData={createTaskWorkspaceFixturePageData({
           task: { status: "Done" },
+          latestRunSummary: {
+            id: "run-1",
+            status: "Completed",
+            startedAt: "2026-05-18T00:00:00.000Z",
+            syncStatus: "healthy",
+          },
+          resultReview: {
+            status: "accepted",
+            runId: "run-1",
+            acceptedAt: "2026-05-18T00:00:00.000Z",
+          },
         })}
         plan={
           {
@@ -1871,6 +1882,17 @@ describe("TaskWorkspacePlanSection", () => {
         isGraphPlanPending={false}
         pageData={createTaskWorkspaceFixturePageData({
           task: { status: "Done" },
+          latestRunSummary: {
+            id: "run-1",
+            status: "Completed",
+            startedAt: "2026-05-18T00:00:00.000Z",
+            syncStatus: "healthy",
+          },
+          resultReview: {
+            status: "accepted",
+            runId: "run-1",
+            acceptedAt: "2026-05-18T00:00:00.000Z",
+          },
         })}
         plan={
           {

@@ -223,6 +223,12 @@ describe("task workspace interaction model", () => {
   it("keeps execution completion and result acceptance distinct", () => {
     const completedPage = pageData({
       task: { ...pageData().task, status: "Completed" },
+      latestRunSummary: {
+        id: "run-1",
+        status: "Completed",
+        startedAt: "2026-05-18T00:00:00.000Z",
+        syncStatus: "healthy",
+      },
       artifacts: [{ id: "artifact_1", title: "Report", type: "json" }],
     });
 
