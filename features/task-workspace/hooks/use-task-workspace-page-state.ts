@@ -180,6 +180,7 @@ function collectPointerPaths(node: unknown, prefix: string): string[] {
 function useTaskWorkspaceEventStream(
   taskId: string,
   refreshQueries: () => Promise<void>,
+  refreshPersistedActivity: () => Promise<void>,
   onWorkspaceEvent: (event: TaskWorkspaceSseEvent) => void,
   applyStateEvent: (event: TaskWorkspaceSseEvent) => void,
   workBlockId?: string | null,
@@ -235,6 +236,10 @@ function useTaskWorkspaceEventStream(
       headers: { Accept: "text/event-stream" },
       onEvent({ event, data }) {
         markStreamHealthy();
+        if (event === "ready") {
+          void refreshPersistedActivity();
+          return;
+        }
         if (STREAM_NOOP_EVENTS.has(event)) return;
         const envelope = { type: event, ...data } as TaskWorkspaceSseEvent;
         if (isWorkspaceStateEvent(envelope)) {
@@ -269,7 +274,7 @@ function useTaskWorkspaceEventStream(
         reconnectTimerRef.current = null;
       }
     };
-  }, [applyStateEvent, clearStaleTimer, markStreamHealthy, onWorkspaceEvent, refreshQueries, scheduleStreamReconnect, streamRetryKey, taskId, workBlockId]);
+  }, [applyStateEvent, clearStaleTimer, markStreamHealthy, onWorkspaceEvent, refreshPersistedActivity, refreshQueries, scheduleStreamReconnect, streamRetryKey, taskId, workBlockId]);
 
   return isStreamHealthy;
 }
@@ -340,6 +345,9 @@ export function useTaskWorkspacePageState(initialData: TaskPageData) {
       queryClient.invalidateQueries({ queryKey: taskWorkspaceQueryKeys.currentExecution(taskId, selectedWorkBlockId) }),
     ]);
   }, [commandCenterQueryKey, pageQueryKey, queryClient, selectedWorkBlockId, taskId]);
+  const refreshPersistedActivity = useCallback(async () => {
+    await commandCenterQuery.refetch();
+  }, [commandCenterQuery.refetch]);
 
   const setTask = useCallback((value: React.SetStateAction<TaskData>) => {
     queryClient.setQueryData(pageQueryKey, (current: TaskPageData | undefined) => {
@@ -368,7 +376,7 @@ export function useTaskWorkspacePageState(initialData: TaskPageData) {
     if (!isWorkspaceStateEvent(event)) return;
     applyStateEventToStore(headerStore, event);
   }, [headerStore]);
-  const isStreamHealthy = useTaskWorkspaceEventStream(taskId, refreshWorkspace, handleWorkspaceEvent, applyStateEvent, selectedWorkBlockId);
+  const isStreamHealthy = useTaskWorkspaceEventStream(taskId, refreshWorkspace, refreshPersistedActivity, handleWorkspaceEvent, applyStateEvent, selectedWorkBlockId);
 
 
   useEffect(() => {

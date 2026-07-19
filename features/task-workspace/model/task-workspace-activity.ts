@@ -218,6 +218,18 @@ function canMergeAssistantActivity(left: WorkspaceActivityItem, right: Workspace
     && left.sourceNodeId === right.sourceNodeId;
 }
 
+function canReplaceToolProgress(left: WorkspaceActivityItem, right: WorkspaceActivityItem) {
+  return left.kind === "tool_progress"
+    && right.kind === "tool_progress"
+    && left.provider === right.provider
+    && left.runtimeName === right.runtimeName
+    && left.runId === right.runId
+    && left.nativeRunId === right.nativeRunId
+    && left.sourceNodeId === right.sourceNodeId
+    && left.tool?.callId === right.tool?.callId
+    && left.tool?.name === right.tool?.name;
+}
+
 function mergeAssistantActivity(left: WorkspaceActivityItem, right: WorkspaceActivityItem): WorkspaceActivityItem {
   const text = `${left.assistant?.text ?? left.summary}${right.assistant?.text ?? right.summary}`;
   return {
@@ -245,6 +257,12 @@ export function mergeWorkspaceActivity(items: WorkspaceActivityItem[], limit = D
     if (seen.has(identity)) continue;
 
     const previous = merged.at(-1);
+    if (previous && canReplaceToolProgress(previous, item)) {
+      merged[merged.length - 1] = item;
+      seen.add(identity);
+      continue;
+    }
+
     if (previous && canMergeAssistantActivity(previous, item)) {
       merged[merged.length - 1] = mergeAssistantActivity(previous, item);
       seen.add(identity);

@@ -140,6 +140,7 @@ beforeEach(() => {
   mocks.commandCenterResponses.length = 0;
   mocks.planStateResponses.length = 0;
   mocks.executionResponses.length = 0;
+  vi.stubGlobal("fetch", fetchMock);
 });
 
 afterEach(() => {
@@ -206,5 +207,22 @@ describe("SSE-driven refetch of dependent queries", () => {
     await waitFor(() => {
       expect(fetchCallCount(/\/api\/tasks\/task-1(\?|$)/)).toBeGreaterThan(pageBeforePhase2);
     });
+  });
+
+  it("refetches persisted activity when an SSE connection becomes ready", async () => {
+    const pageData = buildPageData("block-A");
+
+    renderHook(() => useTaskWorkspacePageState(pageData), { wrapper });
+
+    await waitFor(() => expect(mocks.eventHandler).not.toBeNull());
+    const commandCenterBefore = fetchCallCount(/\/api\/tasks\/task-1\/command-center(\?|$)/);
+    const pageBefore = fetchCallCount(/\/api\/tasks\/task-1(\?|$)/);
+
+    await pushEvent("ready");
+
+    await waitFor(() => {
+      expect(fetchCallCount(/\/api\/tasks\/task-1\/command-center(\?|$)/)).toBeGreaterThan(commandCenterBefore);
+    });
+    expect(fetchCallCount(/\/api\/tasks\/task-1(\?|$)/)).toBe(pageBefore);
   });
 });

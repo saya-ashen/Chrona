@@ -79,8 +79,9 @@ export async function rebuildTaskProjection(taskId: string) {
     },
   });
 
-  const syncStale = task.runs.some(
-    (run) => run.lastSyncedAt && Date.now() - run.lastSyncedAt.getTime() > SYNC_STALE_MS,
+  const latestRun = task.runs.find((run) => run.id === task.latestRunId) ?? task.runs[0] ?? null;
+  const syncStale = Boolean(
+    latestRun?.lastSyncedAt && Date.now() - latestRun.lastSyncedAt.getTime() > SYNC_STALE_MS,
   );
 
   const now = new Date();
@@ -136,7 +137,6 @@ export async function rebuildTaskProjection(taskId: string) {
       : null,
   });
 
-  const latestRun = task.runs[0] ?? null;
   const schedule = deriveScheduleState({
     task: {
       dueAt: task.dueAt,

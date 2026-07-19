@@ -1162,7 +1162,8 @@ describe("task workspace page synchronization", () => {
     expect(result.current.graphPlan?.nodes[0]?.title).toBe("Waiting for user input");
     expect(result.current.currentExecution?.status).toBe("waiting_for_user");
     expect(result.current.currentExecution?.checkpoint?.id).toBe(checkpoint.id);
-    expect(refreshWorkspace).toHaveBeenCalledTimes(2);
+    expect(refreshWorkspace.mock.calls.length).toBeGreaterThanOrEqual(2);
+    const refreshCountAfterInput = refreshWorkspace.mock.calls.length;
 
     mocks.planResponses = [
       { taskId: "task-1", aiPlanGenerationStatus: "accepted", savedPlan: completedPlan },
@@ -1203,7 +1204,7 @@ describe("task workspace page synchronization", () => {
     await waitFor(() => expect(result.current.graphPlan?.nodes[0]?.title).toBe("Completed launch plan"));
     expect(result.current.graphPlan?.nodes[0]?.status).toBe("done");
     expect(result.current.currentExecution?.status).toBe("completed");
-    expect(refreshWorkspace).toHaveBeenCalledTimes(3);
+    expect(refreshWorkspace.mock.calls.length).toBeGreaterThan(refreshCountAfterInput);
   });
   it("moves a completed result to the accepted state immediately after the POST succeeds", async () => {
     const acceptedPlan = planReadModel({ id: "plan-1", status: "accepted", title: "Completed plan" });

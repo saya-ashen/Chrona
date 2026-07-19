@@ -419,10 +419,11 @@ describe("node runtime refs", () => {
     expect(runtime.instructions).toContain('"root": "existingRoot"');
     expect(runtime.instructions).toContain('"rootChildren": [');
     expect(runtime.instructions).toContain('"lastSummary": "First section"');
-    expect(runtime.instructions).not.toContain('"spec":');
-    expect(runtime.instructions).not.toContain('"revision": 0');
-    expect(runtime.instructions).not.toContain('"history":');
-    expect(runtime.instructions).not.toContain('"patches":');
+    const runtimeContext = runtime.instructions.split("Current Node Context JSON:").at(-1) ?? "";
+    expect(runtimeContext).not.toContain('"spec":');
+    expect(runtimeContext).not.toContain('"revision": 0');
+    expect(runtimeContext).not.toContain('"history":');
+    expect(runtimeContext).not.toContain('"patches":');
   });
   it("spells out file-backed table props for json-render outputs", () => {
     const current = node({

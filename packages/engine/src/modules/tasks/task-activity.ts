@@ -941,8 +941,20 @@ function mapTaskEventToActivity(
   }
 }
 
+function providerToolProgressMergeKey(
+  event: TaskActivityEvent,
+  payloadEvent: Record<string, unknown>,
+) {
+  return [
+    providerActivityMergeKey(event, "tool_progress"),
+    optionalStringEventValue(payloadEvent, "callId") ?? "call",
+    optionalStringEventValue(payloadEvent, "toolName") ?? "tool",
+  ].join(":");
+}
+
 export function buildActivityTimeline(events: TaskActivityEvent[]) {
   const items: WorkspaceActivityTimelineItem[] = [];
+  const toolProgressIndexes = new Map<string, number>();
   let currentTextSegment: {
     key: string;
     item: WorkspaceActivityTimelineItem;
@@ -957,6 +969,20 @@ export function buildActivityTimeline(events: TaskActivityEvent[]) {
       !isDisplayableProviderEvent(eventType, payloadEvent)
     ) {
       currentTextSegment = null;
+      continue;
+    }
+
+    if (event.source === "provider" && payloadEvent && eventType === "tool_progress") {
+      currentTextSegment = null;
+      const progressItem = mapProviderEventToActivity(event);
+      const progressKey = providerToolProgressMergeKey(event, payloadEvent);
+      const existingIndex = toolProgressIndexes.get(progressKey);
+      if (existingIndex !== undefined) {
+        items[existingIndex] = progressItem;
+      } else {
+        toolProgressIndexes.set(progressKey, items.length);
+        items.push(progressItem);
+      }
       continue;
     }
 

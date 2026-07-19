@@ -28,18 +28,28 @@ describe("currentExecutionStatusFromEffectiveGraph", () => {
     expect(currentExecutionStatusFromEffectiveGraph({
       effective: effectiveGraph({ readyNodeIds: ["node-1"] }),
       hasActiveExecutionSession: false,
-      hasActiveRun: true,
+      activeRunStatus: "Running",
     })).toBe("running");
   });
-  it("lets an active provider run override stale failed graph evidence", () => {
+  it("lets terminal graph evidence override a stale running Run", () => {
     expect(currentExecutionStatusFromEffectiveGraph({
       effective: effectiveGraph({
         nodes: [{ id: "node-1", status: "failed", reachable: true } as never],
         failedNodeIds: ["node-1"],
       }),
       hasActiveExecutionSession: true,
-      hasActiveRun: true,
-    })).toBe("running");
+      activeRunStatus: "Running",
+    })).toBe("failed");
+  });
+  it("preserves waiting-for-user when the active run is waiting for input", () => {
+    expect(currentExecutionStatusFromEffectiveGraph({
+      effective: effectiveGraph({
+        nodes: [{ id: "node-1", status: "waiting_for_user", reachable: true } as never],
+        waitingNodeIds: ["node-1"],
+      }),
+      hasActiveExecutionSession: true,
+      activeRunStatus: "WaitingForInput",
+    })).toBe("waiting_for_user");
   });
 
 

@@ -515,19 +515,11 @@ describe("TaskWorkspacePlanSection", () => {
     expect(
       within(getOperationPanel()).getByLabelText(/Decision/),
     ).toBeInTheDocument();
-    expect(screen.getByTestId("execution-focus-header")).toHaveTextContent(
-      "Review generated output",
-    );
+    expect(screen.queryByTestId("execution-focus-header")).not.toBeInTheDocument();
+    expect(getOperationPanel()).toHaveTextContent("Review generated output");
     expect(screen.queryByTestId("current-runtime-activity")).not.toBeInTheDocument();
-    expect(
-      screen.getByRole("region", { name: "Stage results" }),
-    ).toHaveTextContent("Starting plan");
-    expect(screen.getByTestId("execution-navigator")).toHaveTextContent(
-      "steps complete",
-    );
-    expect(
-      screen.queryByTestId("task-plan-graph-panel"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Stage results" })).not.toBeInTheDocument();
+    expect(screen.getByTestId("task-plan-graph-panel")).toBeInTheDocument();
   });
 
   it("separates the inspected step from the current execution step", () => {

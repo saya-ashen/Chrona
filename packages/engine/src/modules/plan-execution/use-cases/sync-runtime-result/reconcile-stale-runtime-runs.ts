@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { aiClientRegistry } from "@/modules/ai";
 import type { ProviderRunSnapshot } from "@chrona/providers-foundation";
 import { syncPlanRunRuntimeResult } from "../../kernel/sync-runtime-result";
+import { syncTaskRunState } from "../../persistence/task-execution-store";
 
 type ReconcileOutcome = "synced" | "left_running" | "skipped";
 const TERMINAL_FINALIZATION_GRACE_MS = 60_000;
@@ -15,6 +16,8 @@ export type ReconcileStaleRuntimeRunsResult = {
 };
 
 type RunningProviderRun = Awaited<ReturnType<typeof findRunningProviderRuns>>[number];
+type CanonicalRun = NonNullable<Awaited<ReturnType<typeof db.run.findUnique>>>;
+type TerminalRunStatus = "Completed" | "Failed" | "Cancelled";
 
 export async function reconcileStaleRuntimeRuns(input: {
   taskId?: string;
@@ -44,13 +47,11 @@ async function findRunningProviderRuns(input: { taskId?: string; limit?: number 
     where: {
       providerRunRef: { not: null },
       taskId: input.taskId,
-      nodeAttempt: {
-        status: "running",
-        terminalActions: { none: {} },
-      },
+      nodeAttempt: { terminalActions: { none: {} } },
       OR: [
         {
           status: "running",
+          nodeAttempt: { status: "running" },
           task: { runs: { some: { status: RunStatus.Running } } },
         },
         {
@@ -60,12 +61,26 @@ async function findRunningProviderRuns(input: { taskId?: string; limit?: number 
       ],
     },
     include: {
-      task: { select: { executionRuntime: true, defaultSessionId: true } },
+      task: { select: { executionRuntime: true, defaultSessionId: true, latestRunId: true, status: true } },
       nodeAttempt: { select: { nodeId: true } },
     },
     orderBy: { updatedAt: "asc" },
     take: input.limit ?? 25,
   });
+}
+
+export function shouldReconcileTerminalProviderRun(input: {
+  providerStatus: string;
+  runStatus: RunStatus;
+  runId: string;
+  latestRunId: string | null;
+  taskStatus: string;
+}) {
+  if (input.runStatus === RunStatus.Pending || input.runStatus === RunStatus.Running) return true;
+  return input.providerStatus === "cancelled"
+    && input.runStatus === RunStatus.Cancelled
+    && input.latestRunId === input.runId
+    && input.taskStatus !== "Cancelled";
 }
 
 async function reconcileProviderRun(providerRun: RunningProviderRun): Promise<ReconcileOutcome> {
@@ -75,7 +90,14 @@ async function reconcileProviderRun(providerRun: RunningProviderRun): Promise<Re
   const run = await db.run.findUnique({ where: { runtimeRunRef } });
   if (!run) return "skipped";
   if (providerRun.status !== "running") {
-    return reconcileTerminalProviderRecord({ providerRun, runId: run.id, runtimeRunRef });
+    if (!shouldReconcileTerminalProviderRun({
+      providerStatus: providerRun.status,
+      runStatus: run.status,
+      runId: run.id,
+      latestRunId: providerRun.task.latestRunId,
+      taskStatus: providerRun.task.status,
+    })) return "skipped";
+    return reconcileTerminalProviderRecord({ providerRun, run, runtimeRunRef });
   }
   if (run.status !== RunStatus.Running) return "skipped";
   const runtimeName = providerRun.runtimeName ?? run.runtimeName;
@@ -87,13 +109,14 @@ async function reconcileProviderRun(providerRun: RunningProviderRun): Promise<Re
   const capabilities = typeof client.getCapabilities === "function" ? await client.getCapabilities() : undefined;
   if (capabilities?.recovery?.activeRunLookup === false) {
     const reason = `Runtime run ${runtimeRunRef} was interrupted. Provider recovery mode ${capabilities.recovery.mode} cannot query active run snapshots; retry can resume from saved provider session history.`;
-    await markRunFailed({ runId: run.id, reason, retryable: true });
+    await markRunFailed({ run, reason, retryable: true });
     await syncPlanRunRuntimeResult({
       taskId: providerRun.taskId,
       runtimeRunRef,
       status: "Failed",
       error: reason,
     });
+    await syncCanonicalRunProjection(run, RunStatus.Failed);
     return "synced";
   }
 
@@ -103,57 +126,57 @@ async function reconcileProviderRun(providerRun: RunningProviderRun): Promise<Re
       runId: runtimeRunRef,
       sessionId: run.runtimeSessionRef ?? undefined,
     });
-    return reconcileSnapshot({ providerRun, runId: run.id, runtimeRunRef, snapshot });
+    return reconcileSnapshot({ providerRun, run, runtimeRunRef, snapshot });
   } catch (error) {
     if (!isTerminalMissingRun(error)) return "left_running";
 
     const reason = await missingRunReason({ providerRun, runtimeName, runtimeRunRef, error });
-    await markRunFailed({ runId: run.id, reason });
+    await markRunFailed({ run, reason });
     await syncPlanRunRuntimeResult({
       taskId: providerRun.taskId,
       runtimeRunRef,
       status: "Failed",
       error: reason,
     });
+    await syncCanonicalRunProjection(run, RunStatus.Failed);
     return "synced";
   }
 }
 
 async function reconcileTerminalProviderRecord(input: {
   providerRun: RunningProviderRun;
-  runId: string;
+  run: CanonicalRun;
   runtimeRunRef: string;
 }): Promise<ReconcileOutcome> {
   if (input.providerRun.status === "cancelled") {
-    await db.run.update({
-      where: { id: input.runId },
-      data: {
-        status: RunStatus.Cancelled,
-        endedAt: new Date(),
-        errorSummary: null,
-        syncStatus: "healthy",
-        lastSyncedAt: new Date(),
-      },
+    const reason = "Provider run was cancelled before recording a Chrona terminal result action";
+    await persistCanonicalRunTerminalState({
+      run: input.run,
+      status: RunStatus.Failed,
+      errorSummary: reason,
+      syncStatus: "degraded",
     });
     await syncPlanRunRuntimeResult({
       taskId: input.providerRun.taskId,
       runtimeRunRef: input.runtimeRunRef,
-      status: "Cancelled",
-      summary: "Provider run was cancelled before recording a Chrona terminal result action",
+      status: "Failed",
+      error: reason,
     });
+    await syncCanonicalRunProjection(input.run, RunStatus.Failed);
     return "synced";
   }
 
   const reason = input.providerRun.status === "completed"
     ? "Provider run completed without recording a Chrona terminal result action"
     : "Provider run failed before recording a Chrona terminal result action";
-  await markRunFailed({ runId: input.runId, reason });
+  await markRunFailed({ run: input.run, reason });
   await syncPlanRunRuntimeResult({
     taskId: input.providerRun.taskId,
     runtimeRunRef: input.runtimeRunRef,
     status: "Failed",
     error: reason,
   });
+  await syncCanonicalRunProjection(input.run, RunStatus.Failed);
   return "synced";
 }
 
@@ -173,7 +196,7 @@ async function providerClientForRuntime(runtimeName: string) {
 
 async function reconcileSnapshot(input: {
   providerRun: RunningProviderRun;
-  runId: string;
+  run: CanonicalRun;
   runtimeRunRef: string;
   snapshot: ProviderRunSnapshot;
 }): Promise<ReconcileOutcome> {
@@ -182,15 +205,11 @@ async function reconcileSnapshot(input: {
   }
 
   if (input.snapshot.status === "completed") {
-    await db.run.update({
-      where: { id: input.runId },
-      data: {
-        status: RunStatus.Completed,
-        endedAt: new Date(),
-        errorSummary: null,
-        syncStatus: "healthy",
-        lastSyncedAt: new Date(),
-      },
+    await persistCanonicalRunTerminalState({
+      run: input.run,
+      status: RunStatus.Completed,
+      errorSummary: null,
+      syncStatus: "healthy",
     });
     await syncPlanRunRuntimeResult({
       taskId: input.providerRun.taskId,
@@ -199,29 +218,31 @@ async function reconcileSnapshot(input: {
       summary: input.snapshot.outputText,
       output: input.snapshot.structuredPayload ?? input.snapshot.output ?? input.snapshot.raw,
     });
+    await syncCanonicalRunProjection(input.run, RunStatus.Completed);
     return "synced";
   }
 
-  const status = input.snapshot.status === "cancelled" ? "Cancelled" : "Failed";
-  const reason = input.snapshot.error ?? `Runtime run ${input.runtimeRunRef} ${input.snapshot.status}`;
-  await db.run.update({
-    where: { id: input.runId },
-    data: {
-      status: status === "Cancelled" ? RunStatus.Cancelled : RunStatus.Failed,
-      endedAt: new Date(),
-      errorSummary: status === "Cancelled" ? null : reason,
-      syncStatus: "healthy",
-      lastSyncedAt: new Date(),
-    },
+  const providerCancelled = input.snapshot.status === "cancelled";
+  const status = RunStatus.Failed;
+  const reason = input.snapshot.error
+    ?? (providerCancelled
+      ? "Provider run was cancelled before recording a Chrona terminal result action"
+      : `Runtime run ${input.runtimeRunRef} ${input.snapshot.status}`);
+  await persistCanonicalRunTerminalState({
+    run: input.run,
+    status,
+    errorSummary: reason,
+    syncStatus: providerCancelled ? "degraded" : "healthy",
   });
   await syncPlanRunRuntimeResult({
     taskId: input.providerRun.taskId,
     runtimeRunRef: input.runtimeRunRef,
-    status,
-    error: status === "Failed" ? reason : undefined,
+    status: "Failed",
+    error: reason,
     summary: input.snapshot.outputText,
     output: input.snapshot.structuredPayload ?? input.snapshot.output ?? input.snapshot.raw,
   });
+  await syncCanonicalRunProjection(input.run, status);
   return "synced";
 }
 
@@ -248,17 +269,51 @@ async function missingRunReason(input: {
   return `Runtime run ${input.runtimeRunRef} is no longer available from provider ${input.runtimeName} (HTTP ${status ?? "unknown"}).${lastEvent} Marking the node failed so execution does not remain running.`;
 }
 
-async function markRunFailed(input: { runId: string; reason: string; retryable?: boolean }) {
+async function markRunFailed(input: {
+  run: CanonicalRun;
+  reason: string;
+  retryable?: boolean;
+}) {
+  await persistCanonicalRunTerminalState({
+    run: input.run,
+    status: RunStatus.Failed,
+    errorSummary: input.reason,
+    syncStatus: "degraded",
+    retryable: input.retryable,
+  });
+}
+
+async function persistCanonicalRunTerminalState(input: {
+  run: CanonicalRun;
+  status: TerminalRunStatus;
+  errorSummary: string | null;
+  syncStatus: "healthy" | "degraded";
+  retryable?: boolean;
+}) {
   await db.run.update({
-    where: { id: input.runId },
+    where: { id: input.run.id },
     data: {
-      status: RunStatus.Failed,
+      status: input.status,
       endedAt: new Date(),
-      errorSummary: input.reason,
-      syncStatus: "degraded",
+      errorSummary: input.errorSummary,
+      syncStatus: input.syncStatus,
       lastSyncedAt: new Date(),
       retryable: input.retryable ?? false,
+      pendingInputPrompt: null,
     },
+  });
+}
+
+async function syncCanonicalRunProjection(
+  run: CanonicalRun,
+  status: RunStatus,
+) {
+  await syncTaskRunState({
+    taskId: run.taskId,
+    taskSessionId: run.taskSessionId,
+    runId: run.id,
+    runStatus: status,
+    runtimeRunRef: run.runtimeRunRef,
   });
 }
 

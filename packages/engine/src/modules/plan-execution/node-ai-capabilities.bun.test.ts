@@ -256,7 +256,7 @@ describe("runTaskNodeFeature", () => {
     expect(run.endedAt).not.toBeNull();
   });
 
-  it("marks provider-cancelled task snapshots terminal instead of started", async () => {
+  it("marks unexpected provider cancellation as a failed Run", async () => {
     const workspace = await db.workspace.create({
       data: { name: "Node AI cancelled workspace", status: "Active", defaultRuntime: "hermes" },
     });
@@ -328,8 +328,9 @@ describe("runTaskNodeFeature", () => {
       error: "Provider cancelled runtime run runtime-cancelled",
     });
     const run = await db.run.findUniqueOrThrow({ where: { id: "local-run-cancelled" } });
-    expect(run.status).toBe("Cancelled");
+    expect(run.status).toBe("Failed");
     expect(run.endedAt).toBeInstanceOf(Date);
+    expect(run.errorSummary).toBe("Provider cancelled runtime run runtime-cancelled");
   });
 
   it("sends non-null accumulated plan output to the runtime invoker", async () => {

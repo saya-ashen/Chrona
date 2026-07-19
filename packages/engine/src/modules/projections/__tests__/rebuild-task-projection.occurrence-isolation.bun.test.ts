@@ -201,6 +201,114 @@ describe("rebuildTaskProjection occurrence isolation", () => {
     expect(projection.blockNodeId).toBeNull();
   });
 
+  it("projects the task latestRun pointer instead of a later-updated historical run", async () => {
+    const { workspace, task } = await seedRecurringTask();
+    const block = await db.workBlock.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        title: "Current occurrence",
+        status: "Active",
+        scheduledStartAt: new Date("2026-06-08T09:00:00.000Z"),
+        scheduledEndAt: new Date("2026-06-08T10:00:00.000Z"),
+        trigger: "manual",
+      },
+    });
+    const currentRun = await db.run.create({
+      data: {
+        taskId: task.id,
+        workBlockId: block.id,
+        runtimeName: "hermes",
+        status: "WaitingForInput",
+        triggeredBy: "system",
+      },
+    });
+    const historicalRun = await db.run.create({
+      data: {
+        taskId: task.id,
+        workBlockId: block.id,
+        runtimeName: "hermes",
+        status: "Cancelled",
+        triggeredBy: "system",
+      },
+    });
+    await db.task.update({ where: { id: task.id }, data: { latestRunId: currentRun.id } });
+    await db.executionSession.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        workBlockId: block.id,
+        planId: "plan-current",
+        status: "Paused",
+        currentNodeId: "input-node",
+        pauseReason: "user_input",
+        completedNodeIds: "[]",
+      },
+    });
+    await db.run.update({ where: { id: historicalRun.id }, data: { errorSummary: "updated later" } });
+
+    await rebuildTaskProjection(task.id);
+
+    const projection = await db.taskProjection.findUniqueOrThrow({ where: { taskId: task.id } });
+    expect(projection.latestRunStatus).toBe("WaitingForInput");
+    expect(projection.blockType).toBe("waiting_for_input");
+  });
+
+  it("does not let a stale historical run override the canonical running run", async () => {
+    const { workspace, task } = await seedRecurringTask();
+    const block = await db.workBlock.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        title: "Current occurrence",
+        status: "Active",
+        scheduledStartAt: new Date("2026-06-08T09:00:00.000Z"),
+        scheduledEndAt: new Date("2026-06-08T10:00:00.000Z"),
+        trigger: "manual",
+      },
+    });
+    const currentRun = await db.run.create({
+      data: {
+        taskId: task.id,
+        workBlockId: block.id,
+        runtimeName: "hermes",
+        status: "Running",
+        triggeredBy: "system",
+      },
+    });
+    await db.run.create({
+      data: {
+        taskId: task.id,
+        workBlockId: block.id,
+        runtimeName: "hermes",
+        status: "Cancelled",
+        triggeredBy: "system",
+        lastSyncedAt: new Date("2020-01-01T00:00:00.000Z"),
+      },
+    });
+    await db.task.update({ where: { id: task.id }, data: { latestRunId: currentRun.id } });
+    await db.executionSession.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        workBlockId: block.id,
+        planId: "plan-current",
+        status: "Active",
+        currentNodeId: "running-node",
+        completedNodeIds: "[]",
+      },
+    });
+
+    await rebuildTaskProjection(task.id);
+
+    const projection = await db.taskProjection.findUniqueOrThrow({ where: { taskId: task.id } });
+    expect(projection.persistedStatus).toBe("Running");
+    expect(projection.displayState).toBeNull();
+    expect(projection.blockType).toBeNull();
+    expect(projection.actionRequired).toBeNull();
+    expect(projection.latestRunStatus).toBe("Running");
+  });
+
   it("projects pending provider approvals even when no legacy run approval exists", async () => {
     const { workspace, task } = await seedRecurringTask();
     const plan = await db.taskPlan.create({

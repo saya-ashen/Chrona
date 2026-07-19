@@ -82,6 +82,30 @@ describe("TaskWorkspaceExecutionOverview", () => {
     window.localStorage.clear();
   });
 
+  it("shows a persisted node error even when Activity has no danger event", () => {
+    const view = createTaskWorkspaceExecutionConsoleView(
+      executionMonitoringWorkspaceFixtures.running,
+    );
+    renderOverview(view, {
+      activity: [],
+      nodes: [{
+        id: "search-jobs",
+        title: "Find matching PhD roles",
+        objective: "Find matching roles",
+        phase: "Execution",
+        status: "failed",
+        metadata: {
+          error: "Provider run was cancelled before recording a Chrona terminal result action",
+        },
+      }],
+    });
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Run had a failure");
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Provider run was cancelled before recording a Chrona terminal result action",
+    );
+  });
+
   it("keeps completed transcript prominent without competing with the result", async () => {
     const user = userEvent.setup();
     const view = createTaskWorkspaceExecutionConsoleView(

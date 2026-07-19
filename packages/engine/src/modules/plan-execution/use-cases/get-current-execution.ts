@@ -31,13 +31,15 @@ export function hasExecutionEvidence(effective: EffectivePlanGraph) {
 export function currentExecutionStatusFromEffectiveGraph(input: {
   effective: EffectivePlanGraph;
   hasActiveExecutionSession: boolean;
-  hasActiveRun?: boolean;
+  activeRunStatus?: RunStatus;
   taskStatus?: string;
 }) {
   if (input.taskStatus === "Cancelled") return "cancelled";
-  if (input.hasActiveRun) return "running";
-  if (input.hasActiveExecutionSession && input.effective.runningNodeIds.length > 0) return "running";
-  return input.hasActiveExecutionSession || input.hasActiveRun || hasExecutionEvidence(input.effective)
+  if (hasExecutionEvidence(input.effective)) {
+    return executionStatusFromEffectiveGraph(input.effective);
+  }
+  if (input.activeRunStatus === RunStatus.Pending || input.activeRunStatus === RunStatus.Running) return "running";
+  return input.hasActiveExecutionSession || input.activeRunStatus !== undefined
     ? executionStatusFromEffectiveGraph(input.effective)
     : "started";
 }
@@ -92,11 +94,10 @@ export async function getCurrentExecution(input: { taskId: string; workBlockId?:
     results: runtime.persisted.results,
   }) as unknown as EffectivePlanGraph;
   const hasActiveExecutionSession = Boolean(executionSession);
-  const hasActiveRun = Boolean(activeRun);
   const status = currentExecutionStatusFromEffectiveGraph({
     effective,
     hasActiveExecutionSession,
-    hasActiveRun,
+    activeRunStatus: activeRun?.status,
     taskStatus: latestRunPointer.status,
   });
   const currentNodeId = currentNodeFromEffective(effective)?.id

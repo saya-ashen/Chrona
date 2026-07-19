@@ -173,6 +173,22 @@ describe("reconcileTaskState", () => {
       blockReason: { blockType: "replan_required", actionRequired: "Replan", nodeId: "blocked" },
     }).summary.primaryAction).toMatchObject({ type: "replan", label: "Replan", targetNodeId: "blocked" });
   });
+  it("keeps the input action ahead of stale sync metadata while the graph waits for user input", () => {
+    const graph = makeGraph([
+      makeNode({ id: "input", status: "waiting_for_user", blockedReason: "Confirm matching criteria" }),
+    ]);
+
+    expect(reconcileTaskState({
+      taskId: "task_1",
+      graph,
+      taskStatus: "Running",
+      blockReason: { blockType: "sync_stale", actionRequired: "Re-sync", nodeId: "input" },
+    }).summary.primaryAction).toMatchObject({
+      type: "provide_input",
+      label: "Provide input",
+      targetNodeId: "input",
+    });
+  });
 
   it("ignores stale task block reasons for completed tasks", () => {
     const graph = makeGraph([

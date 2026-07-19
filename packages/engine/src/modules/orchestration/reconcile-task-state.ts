@@ -116,19 +116,17 @@ function derivePrimaryAction(input: {
   targetNodeId?: string | null;
 }): TaskAction {
   if (input.state === "completed" || input.state === "cancelled") return noAction;
-  const blockAction = derivePrimaryActionFromTaskBlock(input.blockReason, input.targetNodeId);
-  if (blockAction) return input.runnable ? blockAction : { ...blockAction, enabled: false, label: "Not runnable" };
   const { state, runnable } = input;
   if (!runnable) return { type: "none", enabled: false, label: "Not runnable" };
+  if (state === "waiting_for_user") return { type: "provide_input", enabled: true, label: "Provide input", targetNodeId: input.targetNodeId };
+  if (state === "waiting_for_approval") return { type: "approve", enabled: true, label: "Review approval", targetNodeId: input.targetNodeId };
+  const blockAction = derivePrimaryActionFromTaskBlock(input.blockReason, input.targetNodeId);
+  if (blockAction) return blockAction;
   switch (state) {
     case "not_started":
     case "scheduled":
     case "queued":
       return { type: "start", enabled: true, label: "Start task" };
-    case "waiting_for_user":
-      return { type: "provide_input", enabled: true, label: "Provide input" };
-    case "waiting_for_approval":
-      return { type: "approve", enabled: true, label: "Review approval" };
     case "failed":
     case "degraded":
       return { type: "retry_sync", enabled: true, label: "Retry sync" };

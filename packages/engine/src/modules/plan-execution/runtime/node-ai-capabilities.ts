@@ -503,7 +503,7 @@ async function updateInvocationRunFromNodeResult(
   invocation: AiRuntimeInvocation,
   result: NodeExecutionResult,
 ) {
-  const status = invocation.response.status === "cancelled" ? RunStatus.Cancelled : runStatusFromNodeResult(result);
+  const status = runStatusFromNodeResult(result);
   const run = await db.run.update({
     where: { id: invocation.runId },
     data: {

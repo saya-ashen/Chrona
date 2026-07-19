@@ -114,6 +114,30 @@ describe("workspace activity helpers", () => {
     expect(completed?.tool).toMatchObject({ callId: "call-7", resultPreview: "export const ready = true;", state: "completed" });
   });
 
+  it("keeps only the latest live progress update for one tool call", () => {
+    const progress = (id: string, sequence: number, timestamp: string) => activity({
+      id,
+      kind: "tool_progress",
+      provider: "omp",
+      runtimeName: "omp",
+      runId: "run-1",
+      sourceNodeId: "node-1",
+      rawEventType: "tool_progress",
+      sequence,
+      timestamp,
+      tool: { name: "job", label: "Job", callId: "job-call-1", state: "progress" },
+    });
+
+    const merged = mergeWorkspaceActivity([
+      progress("progress-1", 10, "2026-07-19T03:40:10.000Z"),
+      progress("progress-2", 11, "2026-07-19T03:40:11.000Z"),
+      progress("progress-3", 12, "2026-07-19T03:40:12.000Z"),
+    ]);
+
+    expect(merged).toHaveLength(1);
+    expect(merged[0]).toMatchObject({ id: "progress-3", sequence: 12 });
+  });
+
   it("keeps assistant deltas separate across provider run boundaries", () => {
     const merged = mergeWorkspaceActivity([
       activity({ id: "a1", kind: "assistant_message", summary: "Before ", assistant: { text: "Before ", isReasoning: false }, runId: "run-1", sequence: 1 }),

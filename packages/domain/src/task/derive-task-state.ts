@@ -77,18 +77,6 @@ export function deriveTaskState(input: DeriveTaskStateInput): DeriveTaskStateRes
       .filter((approval) => approval.status === "Pending")
       .sort((left, right) => right.requestedAt.getTime() - left.requestedAt.getTime()).at(0) ?? null;
 
-  if (input.sync.stale) {
-    return {
-      persistedStatus: input.task.status,
-      displayState: "Sync Stale",
-      blockReason: {
-        blockType: "sync_stale",
-        scope: "run",
-        actionRequired: "Re-sync",
-      },
-      blockSince: activeRun?.updatedAt ?? null,
-    };
-  }
 
   if (activeRun?.status === "WaitingForApproval") {
     return {
@@ -116,14 +104,7 @@ export function deriveTaskState(input: DeriveTaskStateInput): DeriveTaskStateRes
     };
   }
 
-  if (activeRun?.status === "Running" || activeRun?.status === "Pending") {
-    return {
-      persistedStatus: "Running",
-      displayState: null,
-      blockReason: null,
-      blockSince: null,
-    };
-  }
+
 
   if (
     activeRun?.status === "Failed" &&
@@ -247,6 +228,17 @@ export function deriveTaskState(input: DeriveTaskStateInput): DeriveTaskStateRes
     };
   }
 
+  // A live provider Run is the fallback execution fact only when the plan
+  // session has not already reached a durable paused/terminal transition.
+  if (activeRun?.status === "Running" || activeRun?.status === "Pending") {
+    return {
+      persistedStatus: "Running",
+      displayState: null,
+      blockReason: null,
+      blockSince: null,
+    };
+  }
+
   // A completed execution session is the authoritative record of a finished
   // run; a completed run is the same signal from the provider side. Either
   // means the task is done. (The run may be absent — e.g. occurrence-scoped or
@@ -264,6 +256,19 @@ export function deriveTaskState(input: DeriveTaskStateInput): DeriveTaskStateRes
       displayState: null,
       blockReason: null,
       blockSince: null,
+    };
+  }
+
+  if (input.sync.stale) {
+    return {
+      persistedStatus: input.task.status,
+      displayState: "Sync Stale",
+      blockReason: {
+        blockType: "sync_stale",
+        scope: "run",
+        actionRequired: "Re-sync",
+      },
+      blockSince: activeRun?.updatedAt ?? null,
     };
   }
 
