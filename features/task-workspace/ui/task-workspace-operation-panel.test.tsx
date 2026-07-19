@@ -1,8 +1,9 @@
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { deriveWorkStateView } from "@chrona/domain";
 import { TaskWorkspaceOperationPanel } from "./task-workspace-operation-panel";
+import type { TaskWorkspaceOperationState } from "../model/task-workspace-operation-machine";
 
 vi.mock("@features/task-workspace", () => ({
   SpecRenderer: () => null,
@@ -11,7 +12,9 @@ vi.mock("@features/execution-monitoring", () => ({
   ProviderApprovalBanner: () => null,
 }));
 
-const operationState = {
+afterEach(() => cleanup());
+
+const operationStateBase = {
   status: "execution-failed",
   tone: "critical",
   title: "Execution failed",
@@ -20,7 +23,10 @@ const operationState = {
   runtimeEvents: [],
   action: null,
   currentOperation: null,
-} as never;
+  selectedNode: null,
+  currentNode: null,
+};
+const operationState = operationStateBase as unknown as TaskWorkspaceOperationState;
 
 const commonProps = {
   taskId: "task-1",
@@ -29,6 +35,7 @@ const commonProps = {
   onGeneratePlan: vi.fn(),
   onStartPlan: vi.fn(),
   revisionPanel: null,
+  hasAcceptedPlan: false,
 };
 
 describe("TaskWorkspaceOperationPanel recovery", () => {
@@ -77,5 +84,54 @@ describe("TaskWorkspaceOperationPanel recovery", () => {
       />,
     );
     expect(screen.getByText("approval")).toBeInTheDocument();
+  });
+
+  it("offers a new draft after a completed task instead of only rerunning the accepted plan", async () => {
+    const onRegeneratePlan = vi.fn();
+    render(
+      <TaskWorkspaceOperationPanel
+        {...commonProps}
+        state={{
+          ...operationStateBase,
+          status: "execution-completed",
+          tone: "success",
+          title: "Execution completed",
+        } as never}
+        workState={deriveWorkStateView({
+          taskStatus: "Completed",
+          executionStatus: "Completed",
+        })}
+        hasAcceptedPlan
+        onRestartPlan={vi.fn()}
+        onRegeneratePlan={onRegeneratePlan}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Generate a new plan" }));
+    expect(screen.getByRole("dialog", { name: "Choose how to recover this task" })).toBeInTheDocument();
+    const generateButtons = screen.getAllByRole("button", { name: /Generate a new plan/ });
+    fireEvent.click(generateButtons[generateButtons.length - 1]!);
+    await waitFor(() => expect(onRegeneratePlan).toHaveBeenCalledWith(undefined));
+  });
+
+  it("offers plan regeneration before the accepted plan has started", () => {
+    render(
+      <TaskWorkspaceOperationPanel
+        {...commonProps}
+        state={{
+          ...operationStateBase,
+          status: "plan-ready-to-run",
+          tone: "neutral",
+          title: "Plan ready",
+          hasGraphExecutionStarted: false,
+        } as never}
+        workState={deriveWorkStateView({ taskStatus: "Planned" })}
+        hasAcceptedPlan
+        onRestartPlan={vi.fn()}
+        onRegeneratePlan={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Generate a new plan" })).toBeInTheDocument();
   });
 });

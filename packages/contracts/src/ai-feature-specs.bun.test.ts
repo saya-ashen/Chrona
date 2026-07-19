@@ -24,12 +24,15 @@ describe("generate_plan feature spec", () => {
     expect(spec.terminalToolName).toBe("chrona_plan_generate");
     expect(GENERATE_PLAN_BLUEPRINT_TOOL_NAME).toBe("chrona_plan_generate");
     expect(spec.instructions).toContain("You MUST call the chrona_plan_generate tool.");
-    expect(spec.instructions).toContain("A simple task may be a SINGLE task node that both does the work and delivers the result.");
+    expect(spec.instructions).toContain("A simple task may be one task node");
+    expect(spec.instructions).toContain("Choose the graph structure from execution dependencies, not a target node count.");
+    expect(spec.instructions).toContain("Personalized, factual, submission-ready, identity-dependent, or user-specific deliverables require a checkpoint");
+    expect(spec.instructions).toContain("A generic template, placeholders, assumptions about the user, or a list of missing information does NOT satisfy");
     expect(spec.instructions).toContain("A plan must NOT end on a checkpoint, approval, confirmation, review, condition, wait, or routing node");
-    expect(spec.inputText).toContain("Title: 制作一个汉堡");
-    expect(spec.inputText).toContain("Estimated duration: 60 minutes");
-    expect(spec.inputText).toContain("Default to one task node for simple information requests");
-    expect(spec.inputText).not.toContain("most tasks use 3-7 nodes");
+    expect(spec.inputText).toContain("Choose nodes from real execution work and state transitions");
+    expect(spec.inputText).toContain("never omit required human input merely to make the plan shorter");
+    expect(spec.inputText).not.toContain("Use the fewest nodes possible");
+    expect(spec.inputText).not.toContain("use more than two only");
   });
 
 

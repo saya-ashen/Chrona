@@ -64,7 +64,7 @@ The core execution unit. Describes WHAT to do, not HOW to do it.
 - executor: "ai" (AI/runtime can execute), "user" (human must do it), "system" (deterministic software automation)
 - mode: "auto" (fully automatic), "assist" (AI helps but user active), "manual" (user does it)
 - Every task node must set userInteraction to either {level:"not_expected"} or {level:"possible",reason:"..."}.
-- Use "possible" only when execution can start autonomously but may reveal a meaningful ambiguity, missing preference, or tradeoff that needs user input. The reason must name that concrete trigger. Do not predefine fields because runtime context determines the request.
+- Use "possible" when the task can still produce a correct, useful result without user input, but runtime discoveries may reveal an ambiguity, preference, or tradeoff worth asking about. The reason must name that concrete trigger. Do not predefine fields because runtime context determines the request.
 - "not_expected" is an expectation, not a restriction: runtime AI may still request input if an unanticipated information gap appears.
 - Do NOT specify tool calls, API calls, integrations, or AI actions inside the node — those are runtime concerns. A step that calls a tool (create calendar, send email, read context) is still a single task node.
 
@@ -87,19 +87,21 @@ Pause execution for a duration or external event.
 - waitFor: what is being waited for
 - timeout: optional {minutes, onTimeout}; onTimeout: "continue" | "pause" | "fail" | "notify_user"
 
-## Sizing — match structure to the task, never pad it
+## Plan shape — model every necessary state transition
 
-- Use the fewest nodes the task genuinely needs. For simple fetch/summarize/report tasks, prefer 1-3 nodes total. A simple task may be a SINGLE task node that both does the work and delivers the result.
-- Typical tasks use 3-5 nodes. Use 6-8 only for real branching, user checkpoints, external waits, or clearly independent parallel work. Use more than 8 only for complex multi-phase work.
-- Do not split one coherent action into micro-nodes; keep tightly coupled work in one task node.
-- Prefer a mostly linear graph. Use multiple entry nodes only for real parallel work where each entry feeds the same final deliverable.
-- Add a node only if it changes execution state, gathers required user input, waits for an external event, branches the flow, gates real risk, or performs necessary work toward the final deliverable. Otherwise remove or merge it.
+- Choose the graph structure from execution dependencies, not a target node count. A simple task may be one task node; a complex task may use as many nodes as its real work, decisions, required user input, waits, and branches need.
+- Keep coherent work together, but never merge across a state boundary: required user participation, approval, an external wait, a branch decision, or independently executable work deserves its own node.
+- Prefer a readable graph with meaningful nodes. Remove nodes that only restate, narrate, summarize, or hand off work already owned by another node.
+- Add every node needed for correctness even when that makes the plan longer. Do not omit a checkpoint, wait, condition, dependency, or final consuming task merely to keep the graph compact.
 
-## Minimize user friction
+## User participation — distinguish optional help from required facts
 
-- Do not interrupt the user unless correctness, safety, or a genuine user decision requires it.
-- Do not add checkpoints for low-risk internal progress reviews, status updates, summaries, or "verify before continuing" steps.
-- If participation is only possible, keep the work in a task node and mark userInteraction.level "possible". Use a checkpoint only when participation is mandatory. For static checkpoints, prefer the least-effort form: confirm for yes/no, choose when options are already known, input for truly free-form fields, and edit only when the user must modify known content. Never use a generic placeholder textarea when the real form depends on runtime results.
+- Do not interrupt the user for low-risk progress reviews, status updates, internal implementation choices, or information the runtime can reliably obtain itself.
+- Use task userInteraction.level "possible" only when execution can produce a correct and useful result without the user response. It may improve or personalize the result, but it must not be a hidden prerequisite for completion.
+- Use a required checkpoint when correctness or the requested deliverable depends on user-only facts, preferences, authorization, approval, or a genuine decision that is absent from the provided context.
+- Personalized, factual, submission-ready, identity-dependent, or user-specific deliverables require a checkpoint before the task that consumes missing user facts. A generic template, placeholders, assumptions about the user, or a list of missing information does NOT satisfy such completion criteria unless the user explicitly requested a template or draft with placeholders.
+- Prefer one focused checkpoint that collects the related required input together. Use interaction.schemaSource "ai" when prior execution determines the concrete questions, choices, recommendations, or defaults; use "static" only when the complete form is already known.
+- For static checkpoints, use the least-effort accurate form: confirm for yes/no, choose for known options, input for truly free-form fields, and edit when the user must modify known content. Never use a generic placeholder textarea when runtime results should determine the form.
 
 ## Delivering the result
 
@@ -205,11 +207,11 @@ export function buildGeneratePlanFeatureInputText(
   const parts: string[] = [
     input.revisionContext
       ? "Revise the current draft plan instead of starting from a blank plan. Preserve unchanged good parts. Apply the user request to the selected node when selectedNodeId is set; otherwise apply it to the whole plan. Return the full revised plan blueprint."
-      : "Create a concise plan blueprint for the task below.",
-    "Do not ask follow-up questions.",
-    "Make reasonable assumptions if the task is underspecified.",
-    "Use the fewest nodes possible. Default to one task node for simple information requests; use two nodes only when gather and summarize/deliver must be distinct; use more than two only when the task explicitly requires branching, waiting, or independent dependencies.",
-    "Prefer automatic execution nodes when no human approval/input is truly required.",
+      : "Create an execution plan blueprint for the task below.",
+    "Do not ask follow-up questions during planning; represent mandatory participation as a checkpoint in the plan.",
+    "Make only assumptions that do not invent user-specific facts or weaken the requested deliverable.",
+    "Choose nodes from real execution work and state transitions. A simple task can be one node, while required input, approvals, waits, branches, or independent dependencies require explicit nodes.",
+    "Prefer automatic execution where it remains correct; never omit required human input merely to make the plan shorter or more automatic.",
     "",
     "Task to plan",
   ];

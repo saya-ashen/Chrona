@@ -157,6 +157,8 @@ export function TaskWorkspaceOperationPanel({
   const [isRecovering, setIsRecovering] = useState(false);
   const canRecoverExecution = hasAcceptedPlan && Boolean(onRestartPlan);
   const showRecoveryOptions = canRecoverExecution && ["failed", "blocked", "cancelled"].includes(workState.state);
+  const showPlanActions = hasAcceptedPlan && Boolean(onRestartPlan || onRegeneratePlan) &&
+    ["plan-ready-to-run", "execution-completed"].includes(state.status);
 
   async function submitRecovery() {
     setIsRecovering(true);
@@ -209,6 +211,11 @@ export function TaskWorkspaceOperationPanel({
               ) : null}
               <Button type="button" onClick={onStartPlan}>{state.hasGraphExecutionStarted ? (copy.continuePlanAction ?? "Continue plan") : (copy.startPlanAction ?? "Start plan")}</Button>
             </>
+          ) : null}
+          {showPlanActions ? (
+            <Button type="button" variant="outline" onClick={() => openRecovery("regenerate")} disabled={!onRegeneratePlan}>
+              {copy.generateNewPlan ?? "Generate a new plan"}
+            </Button>
           ) : null}
         </div>
       </CardHeader>
