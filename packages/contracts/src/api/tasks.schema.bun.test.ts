@@ -199,4 +199,22 @@ describe("task API schemas", () => {
       scope: { type: "task", taskId: "task-1", limit: 100 },
     })).toMatchObject({ nextCursor: "cursor-2", scope: { type: "task" } });
   });
+  it("validates task model and context strategy overrides", () => {
+    expect(updateTaskBodySchema.parse({
+      executionConfig: {
+        model: "openai-codex/gpt-5.6",
+        contextStrategy: "artifact_backed",
+        allowSubAgents: false,
+      },
+    })).toMatchObject({
+      executionConfig: { contextStrategy: "artifact_backed" },
+    });
+
+    expect(() => updateTaskBodySchema.parse({
+      executionConfig: { contextStrategy: "unbounded" },
+    })).toThrow();
+    expect(() => updateTaskBodySchema.parse({
+      executionConfig: { model: "" },
+    })).toThrow();
+  });
 });

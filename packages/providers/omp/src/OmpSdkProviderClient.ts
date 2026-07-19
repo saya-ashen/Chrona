@@ -1,3 +1,4 @@
+import { resolve } from "node:path";
 import { randomUUID } from "node:crypto";
 
 import {
@@ -30,6 +31,8 @@ import type {
   GetRunInput,
   HealthCheckInput,
   ProviderCapabilities,
+  ProviderConfigurationCapabilities,
+  ProviderRuntimeDiagnostics,
   ProviderConversationCapabilities,
   ProviderConversationState,
   ProviderConversationHandoffInput,
@@ -552,6 +555,79 @@ export class OmpSdkProviderClient implements AgentProviderClient {
     this.config = opts.config ?? {};
   }
 
+  getConfigurationCapabilities(): ProviderConfigurationCapabilities {
+    return {
+      model: { supported: true, taskOverride: true },
+      context: {
+        supported: true,
+        taskOverride: true,
+        strategies: ["provider_default", "auto_compact", "bounded_tool_results", "artifact_backed"],
+      },
+      tooling: {
+        mcp: { supported: true, enabled: true },
+        lsp: { supported: true, enabled: true },
+        subagents: { supported: true, enabled: true },
+        enabledTools: [],
+      },
+    };
+  }
+
+  async getRuntimeDiagnostics(): Promise<ProviderRuntimeDiagnostics> {
+    const environment = applySdkEnvironment(this.config, "diagnostics");
+    const cwd = nonEmpty(this.config.cwd) ?? process.cwd();
+    const configuredAgentDirectory = nonEmpty(this.config.codingAgentDirectory)
+      ?? nonEmpty(this.config.configDirectory);
+    const setup = await createSdkModelSetup(this.config, environment);
+    const terminalTools = sdkToolOptionsForTerminal("chrona_node_complete");
+    const { session, mcpManager } = await createAgentSession({
+      cwd,
+      agentDir: configuredAgentDirectory,
+      modelPattern: setup.modelPattern,
+      ...(setup.authStorage ? { authStorage: setup.authStorage } : {}),
+      ...(setup.modelRegistry ? { modelRegistry: setup.modelRegistry } : {}),
+      ...terminalTools,
+      sessionManager: SessionManager.inMemory(cwd),
+      skipPythonPreflight: true,
+      hasUI: false,
+    });
+    try {
+      const enabledTools = session.getActiveToolNames().sort();
+      const configurationCapabilities: ProviderConfigurationCapabilities = {
+        ...this.getConfigurationCapabilities(),
+        tooling: {
+          mcp: { supported: true, enabled: Boolean(mcpManager) },
+          lsp: { supported: true, enabled: enabledTools.includes("lsp") },
+          subagents: { supported: true, enabled: enabledTools.includes("task") },
+          enabledTools,
+        },
+      };
+      const configuredConfigDirectory = nonEmpty(this.config.configDirectory);
+      const effectiveAgentDirectory = session.settings.getAgentDir();
+      const effectiveModel = session.model;
+      return {
+        provider: PROVIDER,
+        model: effectiveModel ? `${effectiveModel.provider}/${effectiveModel.id}` : null,
+        contextWindow: effectiveModel?.contextWindow ?? null,
+        contextStrategy: "auto_compact",
+        workingDirectory: session.settings.getCwd(),
+        configDirectory: configuredConfigDirectory
+          ? resolve(configuredConfigDirectory)
+          : resolve(effectiveAgentDirectory, ".."),
+        agentDirectory: effectiveAgentDirectory,
+        configurationCapabilities,
+        sources: {
+          model: nonEmpty(this.config.model) ? "provider_override" : "provider_default",
+          context: "provider_default",
+          configDirectory: configuredConfigDirectory ? "provider_override" : "provider_default",
+          agentDirectory: configuredAgentDirectory ? "provider_override" : "provider_default",
+          tools: "runtime",
+        },
+      };
+    } finally {
+      await session.dispose();
+    }
+  }
+
   getCapabilities(): ProviderCapabilities {
     return {
       supportsSessions: true,
@@ -821,7 +897,13 @@ export class OmpSdkProviderClient implements AgentProviderClient {
     const agentDir = nonEmpty(this.config.codingAgentDirectory) ?? nonEmpty(this.config.configDirectory);
     const terminalToolName = nonEmpty(handle.input.terminalToolName);
     const prompt = inputToPrompt(handle.input);
-    const setup = await createSdkModelSetup(this.config, environment);
+    const runConfig: OmpProviderConfig = {
+      ...this.config,
+      ...(nonEmpty(handle.input.runtimeConfiguration?.model)
+        ? { model: nonEmpty(handle.input.runtimeConfiguration?.model) }
+        : {}),
+    };
+    const setup = await createSdkModelSetup(runConfig, environment);
     const { session } = await createAgentSession({
       cwd,
       agentDir,

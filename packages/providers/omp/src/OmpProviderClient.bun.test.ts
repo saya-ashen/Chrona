@@ -98,6 +98,7 @@ describe("OmpSdkProviderClient node runtime tools", () => {
     expect(__ompSdkProviderTestHooks.sdkToolNamesForTerminal("chrona_node_complete")).toEqual([
       "chrona_plan_output",
       "chrona_node_complete",
+      "chrona_node_request_input",
       "chrona_node_block",
       "chrona_node_fail",
     ]);
@@ -114,6 +115,7 @@ describe("OmpSdkProviderClient node runtime tools", () => {
     expect(options.customTools.map((tool) => tool.name)).toEqual([
       "chrona_plan_output",
       "chrona_node_complete",
+      "chrona_node_request_input",
       "chrona_node_block",
       "chrona_node_fail",
     ]);
@@ -266,5 +268,49 @@ describe("OmpProviderClient SDK delegation", () => {
       sessionRef: "/tmp/session.jsonl.handoff",
       handoffText: "compacted context",
     });
+  });
+  it("reports effective SDK configuration without secrets", async () => {
+    const client = new OmpSdkProviderClient({
+      config: {
+        model: "gpt-test",
+        baseUrl: "https://example.invalid/v1",
+        configDirectory: "/tmp/omp-config",
+        codingAgentDirectory: "/tmp/omp-agent",
+        cwd: "/tmp/workspace",
+        apiKey: "secret",
+      },
+    });
+
+    const diagnostics = await client.getRuntimeDiagnostics();
+    expect(diagnostics).toMatchObject({
+      provider: "omp",
+      contextStrategy: "auto_compact",
+      workingDirectory: "/tmp/workspace",
+      configDirectory: "/tmp/omp-config",
+      agentDirectory: "/tmp/omp-agent",
+      configurationCapabilities: {
+        tooling: {
+          mcp: { supported: true, enabled: true },
+          lsp: { supported: true, enabled: true },
+          subagents: { supported: true, enabled: true },
+          enabledTools: expect.arrayContaining([
+            "lsp",
+            "task",
+            "chrona_node_complete",
+            "chrona_node_request_input",
+            "chrona_node_block",
+            "chrona_node_fail",
+          ]),
+        },
+      },
+      sources: {
+        model: "provider_override",
+        context: "provider_default",
+        configDirectory: "provider_override",
+        agentDirectory: "provider_override",
+        tools: "runtime",
+      },
+    });
+    expect(JSON.stringify(diagnostics)).not.toContain("secret");
   });
 });

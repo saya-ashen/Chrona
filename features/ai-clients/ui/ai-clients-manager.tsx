@@ -32,7 +32,7 @@ import {
   type ProviderCapabilityMatrixEntry,
   type ProviderCapabilityName,
 } from "@chrona/contracts";
-import { aiClientsApi } from "../browser-api";
+import { aiClientsApi, type AiClientDiagnosticsResponse } from "../browser-api";
 import { notifyAiClientsChanged } from "../events";
 
 const DEFAULT_PROVIDER_RUN_TIMEOUT_MS = 60 * 60 * 1000;
@@ -649,7 +649,28 @@ const DEFAULTS: Record<string, string> = {
   recoveryUnavailable: "Interrupted runs cannot be recovered automatically.",
   advancedSettings: "Advanced settings",
   advancedSettingsHelp: "Provider endpoints, model overrides, directories, timeouts, and capability assignment.",
+  runtimeConfiguration: "Runtime configuration",
+  viewRuntimeConfiguration: "View runtime configuration",
+  inspectingRuntime: "Inspecting…",
+  providerDefault: "Provider default",
+  defaultSource: "Default",
+  unresolved: "Unresolved",
+  contextStrategy: "Context strategy",
+  configDirectory: "Config directory",
+  agentDirectory: "Agent data directory",
+  subagents: "SubAgents",
+  enabledTools: "Enabled tools",
+  chronaRunToolsOnly: "Chrona run tools only",
 };
+function formatEffectiveValue(
+  value: string | number | null,
+  source: "provider_default" | "provider_override" | "task_override" | "runtime",
+  copy: Record<string, string>,
+): string {
+  const rendered = value ?? copy.unresolved;
+  return source === "provider_default" ? `${rendered} (${copy.defaultSource})` : String(rendered);
+}
+
 
 function getCopy(messages: Record<string, unknown>): Record<string, string> {
   const section = (messages.pages as Record<string, Record<string, string>> | undefined)?.aiClientsPage ?? {};
@@ -1324,6 +1345,8 @@ export function AiClientsManager() {
   const [loading, setLoading] = useState(true);
   const [providers, setProviders] = useState<RuntimeProviderOption[]>([]);
   const [cardTestStates, setCardTestStates] = useState<Record<string, TestResult>>({});
+  const [diagnostics, setDiagnostics] = useState<Record<string, AiClientDiagnosticsResponse["diagnostics"]>>({});
+  const [diagnosticsLoading, setDiagnosticsLoading] = useState<Record<string, boolean>>({});
 
   const refreshAfterMutation = () => {
     notifyAiClientsChanged();
@@ -1407,6 +1430,16 @@ export function AiClientsManager() {
           reason: error instanceof Error ? error.message : copy.reasonUnknown,
         },
       }));
+    }
+  };
+
+  const handleInspectDiagnostics = async (clientId: string) => {
+    setDiagnosticsLoading((current) => ({ ...current, [clientId]: true }));
+    try {
+      const result = await aiClientsApi.diagnostics(clientId);
+      setDiagnostics((current) => ({ ...current, [clientId]: result.diagnostics }));
+    } finally {
+      setDiagnosticsLoading((current) => ({ ...current, [clientId]: false }));
     }
   };
 
@@ -1502,6 +1535,18 @@ export function AiClientsManager() {
                     <span className="text-muted-foreground">{cardTestState.reason ?? copy.reasonUnknown}</span>
                   </div>
                   <ReadinessChecklist items={clientReadiness} />
+                  {diagnostics[client.id] ? (
+                    <div className="grid gap-1 rounded-md border bg-muted/30 p-3 text-xs sm:grid-cols-2" data-testid={`provider-diagnostics-${client.id}`}>
+                      <span>{copy.modelLabel}: {formatEffectiveValue(diagnostics[client.id]?.model ?? null, diagnostics[client.id]!.sources.model, copy)}</span>
+                      <span>{copy.contextStrategy}: {formatEffectiveValue(diagnostics[client.id]!.contextStrategy, diagnostics[client.id]!.sources.context, copy)}</span>
+                      <span>{copy.configDirectory}: {formatEffectiveValue(diagnostics[client.id]?.configDirectory ?? null, diagnostics[client.id]!.sources.configDirectory, copy)}</span>
+                      <span>{copy.agentDirectory}: {formatEffectiveValue(diagnostics[client.id]?.agentDirectory ?? null, diagnostics[client.id]!.sources.agentDirectory, copy)}</span>
+                      <span>MCP: {diagnostics[client.id]?.configurationCapabilities.tooling.mcp.enabled ? copy.enabled : copy.unavailable}</span>
+                      <span>LSP: {diagnostics[client.id]?.configurationCapabilities.tooling.lsp.enabled ? copy.enabled : copy.unavailable}</span>
+                      <span>{copy.subagents}: {diagnostics[client.id]?.configurationCapabilities.tooling.subagents.enabled ? copy.enabled : copy.unavailable}</span>
+                      <span>{copy.enabledTools}: {diagnostics[client.id]?.configurationCapabilities.tooling.enabledTools.join(", ") || copy.chronaRunToolsOnly}</span>
+                    </div>
+                  ) : null}
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2 sm:justify-end">
@@ -1514,6 +1559,15 @@ export function AiClientsManager() {
                       {copy.makeDefault}
                     </Button>
                   )}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="xs"
+                    onClick={() => void handleInspectDiagnostics(client.id)}
+                    disabled={diagnosticsLoading[client.id] === true}
+                  >
+                    {diagnosticsLoading[client.id] ? copy.inspectingRuntime : copy.viewRuntimeConfiguration}
+                  </Button>
                   <Button type="button" variant="outline" size="xs" onClick={() => setEditingId(client.id)}>
                     {copy.edit}
                   </Button>

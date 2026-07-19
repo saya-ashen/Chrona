@@ -31,6 +31,10 @@ type ExecutionProviderRequest = {
   maxOutputTokens?: number;
   timeoutSeconds?: number;
   resumeSessionRef?: string;
+  runtimeConfiguration?: {
+    model?: string;
+    contextStrategy?: "provider_default" | "auto_compact" | "bounded_tool_results" | "artifact_backed";
+  };
 };
 
 export type AiRuntimeInvocationInput = {
@@ -105,7 +109,7 @@ export class AiRuntimeInvoker {
   async invoke(input: AiRuntimeInvocationInput): Promise<AiRuntimeInvocation> {
     const task = await db.task.findUniqueOrThrow({
       where: { id: input.taskId },
-      select: { workspaceId: true },
+      select: { workspaceId: true, executionConfig: true },
     });
     const run = await db.run.create({
       data: {
@@ -166,6 +170,22 @@ export class AiRuntimeInvoker {
         executionRuntime: input.runtimeName,
         resumeSessionRef: priorProviderSessionRef,
       });
+      const executionConfig = task.executionConfig as Record<string, unknown>;
+      const model = typeof executionConfig.model === "string" && executionConfig.model.trim()
+        ? executionConfig.model.trim()
+        : undefined;
+      const contextStrategy = typeof executionConfig.contextStrategy === "string"
+        ? executionConfig.contextStrategy
+        : undefined;
+      request.runtimeConfiguration = {
+        ...(model ? { model } : {}),
+        ...(contextStrategy === "provider_default"
+          || contextStrategy === "auto_compact"
+          || contextStrategy === "bounded_tool_results"
+          || contextStrategy === "artifact_backed"
+          ? { contextStrategy }
+          : {}),
+      };
       const terminalToolName = request.terminalToolName;
       const providerRun = await ensureProviderRunRecord({
         taskId: input.taskId,

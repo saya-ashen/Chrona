@@ -160,6 +160,49 @@ export const providerRecoveryCapabilitySchema = z
     mode: z.enum(["authoritative_run_lookup", "session_history", "local_stream_only"]),
   })
   .strict();
+export const providerConfigurationCapabilitiesSchema = z
+  .object({
+    model: z.object({ supported: z.boolean(), taskOverride: z.boolean() }).strict(),
+    context: z.object({
+      supported: z.boolean(),
+      taskOverride: z.boolean(),
+      strategies: z.array(z.string().min(1)),
+    }).strict(),
+    tooling: z.object({
+      mcp: z.object({ supported: z.boolean(), enabled: z.boolean() }).strict(),
+      lsp: z.object({ supported: z.boolean(), enabled: z.boolean() }).strict(),
+      subagents: z.object({ supported: z.boolean(), enabled: z.boolean() }).strict(),
+      enabledTools: z.array(z.string().min(1)),
+    }).strict(),
+  })
+  .strict();
+
+export const providerRuntimeConfigurationSourceSchema = z.enum([
+  "provider_default",
+  "provider_override",
+  "task_override",
+  "runtime",
+]);
+
+export const providerRuntimeDiagnosticsSchema = z
+  .object({
+    provider: z.string().min(1),
+    model: z.string().nullable(),
+    contextWindow: z.number().int().positive().nullable(),
+    contextStrategy: z.string().min(1),
+    workingDirectory: z.string().min(1),
+    configDirectory: z.string().nullable(),
+    agentDirectory: z.string().nullable(),
+    configurationCapabilities: providerConfigurationCapabilitiesSchema,
+    sources: z.object({
+      model: providerRuntimeConfigurationSourceSchema,
+      context: providerRuntimeConfigurationSourceSchema,
+      configDirectory: providerRuntimeConfigurationSourceSchema,
+      agentDirectory: providerRuntimeConfigurationSourceSchema,
+      tools: providerRuntimeConfigurationSourceSchema,
+    }).strict(),
+  })
+  .strict();
 
 export const providerCapabilitiesSchema = z
   .object({
@@ -254,6 +297,10 @@ export const startRunInputSchema = z
     resumeSessionRef: z.string().min(1).optional(),
     maxOutputTokens: z.number().int().positive().optional(),
     timeoutMs: z.number().int().positive().optional(),
+    runtimeConfiguration: z.object({
+      model: z.string().trim().min(1).optional(),
+      contextStrategy: z.enum(["provider_default", "auto_compact", "bounded_tool_results", "artifact_backed"]).optional(),
+    }).strict().optional(),
     stream: z.boolean().optional(),
     signal: z.custom<AbortSignal>().optional(),
     /** Optional skill-mode control plane handoff. See `startRunControlInputSchema`. */
@@ -529,8 +576,11 @@ export type ProviderApprovalCapability = z.infer<
 export type ProviderRecoveryCapability = z.infer<
   typeof providerRecoveryCapabilitySchema
 >;
-
 export type ProviderApprovalRequest = z.infer<typeof providerApprovalRequestSchema>;
+
+export type ProviderConfigurationCapabilities = z.infer<typeof providerConfigurationCapabilitiesSchema>;
+export type ProviderRuntimeDiagnostics = z.infer<typeof providerRuntimeDiagnosticsSchema>;
+export type ProviderCapabilities = z.infer<typeof providerCapabilitiesSchema>;
 export type ResolveProviderApprovalInput = z.infer<
   typeof resolveProviderApprovalInputSchema
 >;
@@ -538,7 +588,6 @@ export type ProviderApprovalResolution = z.infer<
   typeof providerApprovalResolutionSchema
 >;
 
-export type ProviderCapabilities = z.infer<typeof providerCapabilitiesSchema>;
 export type HealthCheckInput = z.infer<typeof healthCheckInputSchema>;
 export type ProviderHealth = z.infer<typeof providerHealthSchema>;
 export type CreateSessionInput = z.infer<typeof createSessionInputSchema>;
@@ -605,10 +654,19 @@ export type ProviderConfig = {
   timeoutSeconds?: number;
 };
 
+export type ProviderRuntimeConfiguration = {
+  model?: string;
+  contextStrategy?: string;
+};
+
 export interface AgentProviderClient {
   readonly provider: string;
 
   getCapabilities(): ProviderCapabilities | Promise<ProviderCapabilities>;
+
+  getRuntimeDiagnostics?(): ProviderRuntimeDiagnostics | Promise<ProviderRuntimeDiagnostics>;
+
+  getConfigurationCapabilities?(): ProviderConfigurationCapabilities;
 
   checkHealth(input?: HealthCheckInput): Promise<ProviderHealth>;
 

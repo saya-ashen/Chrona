@@ -1363,6 +1363,39 @@ export function TaskConfigForm({
                     </TaskConfigField>
                   </TaskConfigSection>
                 ) : null}
+
+                  <TaskConfigSection title="Execution model" info="Overrides are applied only when the selected provider advertises support.">
+                    <TaskConfigField label="Model override" hint="Leave empty to use the provider default." className="text-xs text-foreground">
+                      <Input
+                        name="executionModel"
+                        value={typeof formState.fieldExecutionConfig.model === "string" ? formState.fieldExecutionConfig.model : ""}
+                        placeholder="Provider default"
+                        disabled={isPending}
+                        onChange={(event) => setValue("fieldExecutionConfig", {
+                          ...formState.fieldExecutionConfig,
+                          model: event.target.value || undefined,
+                        }, { shouldDirty: true })}
+                      />
+                    </TaskConfigField>
+                    <TaskConfigField label="Context strategy" hint="Artifact-backed and bounded strategies require provider support." className="text-xs text-foreground">
+                      <TaskConfigSelect
+                        name="contextStrategy"
+                        value={typeof formState.fieldExecutionConfig.contextStrategy === "string" ? formState.fieldExecutionConfig.contextStrategy : "provider_default"}
+                        options={[
+                          { value: "provider_default", label: "Provider default" },
+                          { value: "auto_compact", label: "Automatic compaction" },
+                          { value: "bounded_tool_results", label: "Bounded tool results" },
+                          { value: "artifact_backed", label: "Artifact-backed results" },
+                        ]}
+                        disabled={isPending}
+                        onValueChange={(value) => setValue("fieldExecutionConfig", {
+                          ...formState.fieldExecutionConfig,
+                          contextStrategy: value,
+                        }, { shouldDirty: true })}
+                      />
+                    </TaskConfigField>
+                  </TaskConfigSection>
+
             </div>
           </div>
         ) : null}

@@ -78,6 +78,38 @@ export function createClientsRoutes(engine: ChronaEngine) {
         );
       }
     })
+    .get("/ai/clients/:clientId/diagnostics", async (c) => {
+      try {
+        const clientId = c.req.param("clientId");
+        const client = await engine.runtime.aiClients.get(clientId);
+        if (!client) return error(c, "AI client not found", 404);
+        const providerClient = client.providerClient;
+        if (!providerClient) {
+          return json(c, {
+            capabilities: null,
+            configurationCapabilities: null,
+            diagnostics: null,
+          });
+        }
+        const [capabilities, diagnostics] = await Promise.all([
+          providerClient.getCapabilities(),
+          providerClient.getRuntimeDiagnostics?.() ?? null,
+        ]);
+        return json(c, {
+          capabilities,
+          configurationCapabilities:
+            providerClient.getConfigurationCapabilities?.() ?? null,
+          diagnostics,
+        });
+      } catch (cause) {
+        return internalServerError(
+          c,
+          "GET /api/ai/clients/:clientId/diagnostics",
+          cause,
+          "Failed to inspect AI client",
+        );
+      }
+    })
     .post(
       "/ai/clients",
       zValidator("json", createAiClientSchema),

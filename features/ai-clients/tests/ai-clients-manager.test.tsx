@@ -742,4 +742,56 @@ describe("AiClientsManager", () => {
     await screen.findByText("Available");
     expect(screen.getByText("Provider health check passed.")).toBeInTheDocument();
   });
+  it("shows SDK-resolved OMP defaults with provenance", async () => {
+    fetchMock.mockResolvedValueOnce({ ok: true, headers: new Headers({ "content-type": "application/json" }), json: async () => ({
+      clients: [{
+        id: "client_omp",
+        name: "PI",
+        type: "omp",
+        config: {},
+        isDefault: true,
+        enabled: true,
+        bindings: ["task.execution"],
+        createdAt: new Date().toISOString(),
+      }],
+    }) });
+    fetchMock.mockResolvedValueOnce({ ok: true, headers: new Headers({ "content-type": "application/json" }), json: async () => providersResponse });
+
+    render(<AiClientsManager />);
+    await screen.findByText("PI");
+    fetchMock.mockResolvedValueOnce({ ok: true, headers: new Headers({ "content-type": "application/json" }), json: async () => ({
+      diagnostics: {
+        provider: "omp",
+        model: "openai-codex/gpt-5.5",
+        contextWindow: 272000,
+        contextStrategy: "auto_compact",
+        workingDirectory: "/workspace",
+        configDirectory: "/home/user/.omp",
+        agentDirectory: "/home/user/.omp/agent",
+        configurationCapabilities: {
+          tooling: {
+            mcp: { supported: true, enabled: false },
+            lsp: { supported: true, enabled: false },
+            subagents: { supported: true, enabled: false },
+            enabledTools: [],
+          },
+        },
+        sources: {
+          model: "provider_default",
+          context: "provider_default",
+          configDirectory: "provider_default",
+          agentDirectory: "provider_default",
+          tools: "runtime",
+        },
+      },
+    }) });
+
+    fireEvent.click(screen.getByRole("button", { name: "View runtime configuration" }));
+
+    expect(await screen.findByText("Model: openai-codex/gpt-5.5 (Default)")).toBeInTheDocument();
+    expect(screen.getByText("Context strategy: auto_compact (Default)")).toBeInTheDocument();
+    expect(screen.getByText("Config directory: /home/user/.omp (Default)")).toBeInTheDocument();
+    expect(screen.getByText("Agent data directory: /home/user/.omp/agent (Default)")).toBeInTheDocument();
+  });
+
 });

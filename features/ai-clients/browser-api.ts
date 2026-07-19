@@ -66,9 +66,39 @@ export type RuntimeProvidersResponse = {
   providers?: unknown[];
 };
 
+export type AiClientDiagnosticsResponse = {
+  diagnostics: null | {
+    provider: string;
+    model: string | null;
+    contextWindow: number | null;
+    contextStrategy: string;
+    workingDirectory: string;
+    configDirectory: string | null;
+    agentDirectory: string | null;
+    configurationCapabilities: {
+      tooling: {
+        mcp: { supported: boolean; enabled: boolean };
+        lsp: { supported: boolean; enabled: boolean };
+        subagents: { supported: boolean; enabled: boolean };
+        enabledTools: string[];
+      };
+    };
+    sources: {
+      model: "provider_default" | "provider_override" | "task_override" | "runtime";
+      context: "provider_default" | "provider_override" | "task_override" | "runtime";
+      configDirectory: "provider_default" | "provider_override" | "task_override" | "runtime";
+      agentDirectory: "provider_default" | "provider_override" | "task_override" | "runtime";
+      tools: "provider_default" | "provider_override" | "task_override" | "runtime";
+    };
+  };
+};
+
 export const aiClientsApi = {
   list: () => apiJson<AiClientsListResponse>("/api/ai/clients"),
   listRuntimeProviders: () => apiJson<RuntimeProvidersResponse>("/api/runtime/providers"),
+  diagnostics: (clientId: string) => apiJson<AiClientDiagnosticsResponse>(
+    `/api/ai/clients/${clientId}/diagnostics`,
+  ),
   create: (payload: AiClientPayload) => apiJson<{ client?: { id?: string } }>(
     "/api/ai/clients",
     { method: "POST", body: JSON.stringify(payload) },
