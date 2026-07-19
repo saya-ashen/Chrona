@@ -47,6 +47,7 @@ export type PlanGraphCommandOrigin = {
 export type PlanGraphCommandContext = {
   actor?: PlanGraphCommandActor;
   origin?: PlanGraphCommandOrigin;
+  runId?: string | null;
   nodeAttemptId?: string | null;
   providerRunId?: string | null;
   toolInvocationId?: string | null;

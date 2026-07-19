@@ -868,8 +868,10 @@ export function deriveResultReview(input: {
   )
     return null;
 
+  const reviewStatus = pageData.resultReview;
   const phase =
-    normalized(pageData.task.status) === "done"
+    reviewStatus?.runId === pageData.latestRunSummary?.id &&
+    reviewStatus?.status === "accepted"
       ? "accepted"
       : "pending_acceptance";
   const completedSteps =

@@ -12,6 +12,11 @@ export async function getTaskReviewContext(input: { taskId: string }) {
         orderBy: { createdAt: "desc" },
         take: 5,
       },
+      events: {
+        where: { eventType: "task.result_accepted" },
+        orderBy: { ingestedAt: "desc" },
+        take: 1,
+      },
     },
   });
   if (!task) {
@@ -19,6 +24,8 @@ export async function getTaskReviewContext(input: { taskId: string }) {
   }
 
   const latestRun = task.runs[0] ?? null;
+  const acceptance = task.events[0] ?? null;
+  const acceptancePayload = acceptance?.payload as { accepted_at?: unknown } | null;
 
   return {
     latestRunSummary: latestRun
@@ -27,6 +34,21 @@ export async function getTaskReviewContext(input: { taskId: string }) {
           status: latestRun.status,
           startedAt: latestRun.startedAt?.toISOString() ?? null,
           syncStatus: latestRun.syncStatus,
+        }
+      : null,
+    resultReview: latestRun
+      ? {
+          status:
+            acceptance?.runId === latestRun.id
+              ? "accepted" as const
+              : "pending_acceptance" as const,
+          runId: latestRun.id,
+          acceptedAt:
+            acceptance?.runId === latestRun.id
+              ? typeof acceptancePayload?.accepted_at === "string"
+                ? acceptancePayload.accepted_at
+                : acceptance.ingestedAt.toISOString()
+              : null,
         }
       : null,
     scheduleProposals: task.scheduleProposals.map((proposal) => ({

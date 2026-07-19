@@ -20,6 +20,7 @@ export function toolCommandContext(operation: ChronaToolOperation, audit?: ToolA
       requestId: audit?.operationId ?? null,
       rawEventId: audit?.inputRawEventId ?? null,
     },
+    runId: audit?.runId ?? null,
     nodeAttemptId: audit?.nodeAttemptId ?? null,
     providerRunId: audit?.providerRunId ?? null,
     toolInvocationId: audit?.invocationId ?? null,

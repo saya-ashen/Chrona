@@ -220,13 +220,21 @@ describe("task workspace interaction model", () => {
     ).toMatchObject(expected);
   });
 
-  it("keeps Completed and Done distinct in result review state", () => {
+  it("keeps execution completion and result acceptance distinct", () => {
     const completedPage = pageData({
       task: { ...pageData().task, status: "Completed" },
       artifacts: [{ id: "artifact_1", title: "Report", type: "json" }],
     });
-    const donePage = pageData({ task: { ...pageData().task, status: "Done" } });
 
+    const acceptedPage = pageData({
+      task: { ...pageData().task, status: "Completed" },
+      latestRunSummary: completedPage.latestRunSummary,
+      resultReview: {
+        status: "accepted",
+        runId: completedPage.latestRunSummary!.id,
+        acceptedAt: "2026-05-18T00:00:00.000Z",
+      },
+    });
     expect(
       deriveTaskWorkspaceStage({
         pageData: completedPage,
@@ -243,7 +251,7 @@ describe("task workspace interaction model", () => {
     });
     expect(
       deriveTaskWorkspaceStage({
-        pageData: donePage,
+        pageData: acceptedPage,
         graphPlan: graphPlan(),
         operationState: operationState({
           status: "execution-completed",
@@ -269,7 +277,7 @@ describe("task workspace interaction model", () => {
       continuation: { visible: false },
     });
     expect(
-      deriveResultReview({ pageData: donePage, graphPlan: graphPlan() }),
+      deriveResultReview({ pageData: acceptedPage, graphPlan: graphPlan() }),
     ).toMatchObject({
       phase: "accepted",
       decision: {

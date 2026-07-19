@@ -89,6 +89,11 @@ export type TaskPageData = {
     startedAt: string | null;
     syncStatus: string;
   } | null;
+  resultReview?: {
+    status: "pending_acceptance" | "accepted";
+    runId: string;
+    acceptedAt: string | null;
+  } | null;
   scheduleProposals: Array<{
     id: string;
     source: string;
@@ -133,7 +138,7 @@ export type TaskWorkspaceBootstrapData = Omit<TaskPageData,
 
 export type TaskWorkspaceRuntimeContextData = Pick<TaskPageData, "defaultExecutionRuntime" | "executionRuntimes" | "availableAiClients">;
 
-export type TaskWorkspaceReviewContextData = Pick<TaskPageData, "latestRunSummary" | "scheduleProposals" | "approvals">;
+export type TaskWorkspaceReviewContextData = Pick<TaskPageData, "latestRunSummary" | "resultReview" | "scheduleProposals" | "approvals">;
 
 export type TaskWorkspaceCommandCenterData = NonNullable<TaskPageData["commandCenter"]>;
 

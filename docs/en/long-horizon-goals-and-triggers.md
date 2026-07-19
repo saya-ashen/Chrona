@@ -47,6 +47,9 @@ The target architecture uses these separate concepts:
 | `Goal` | A durable outcome that may require many changing tasks over time. |
 | `GoalMilestone` | An optional stage or measurable intermediate outcome within a goal. |
 | `Task` | A bounded unit of work and its reusable execution configuration. |
+| `TaskResult` | An immutable, reviewable account of one bounded occurrence's outcome. |
+| `Artifact` | A stable, provenance-preserving file or structured deliverable produced by one occurrence. |
+| `GoalAsset` | A goal-scoped working reference promoted from an accepted result or artifact for continued use, editing, or replacement. |
 | `TaskTrigger` | A persisted rule that may produce task occurrences. Schedule is one trigger kind. |
 | `TriggerDelivery` | One durable, idempotent observation that a trigger condition occurred. |
 | `TaskOccurrence` | One isolated instance of a task becoming eligible for work. |
@@ -76,6 +79,20 @@ Normative decisions:
 10. Webhook support is reserved by contracts and boundaries only. No webhook
     endpoint, dormant schema row, or unvalidated JSON configuration is added
     until the feature is implemented end to end.
+11. A standalone task result is immutable presentation: it may support
+    non-mutating use such as preview, copy, and download, but it does not own
+    editable working state or workflow actions.
+12. Continued editing, stateful interaction, or cross-task reuse requires a
+    Goal. When a user invokes such an action on a standalone task result,
+    Chrona atomically creates a Goal, associates the existing task with it, and
+    promotes the selected accepted result or artifact into a GoalAsset.
+13. "Promote task to Goal" is product shorthand. It never rewrites the Task
+    into another task kind, discards its occurrence history, or lets
+    AI-authored UI create authority. Promotion is an explicit user action; AI
+    may recommend it but cannot perform it silently.
+14. Original TaskResults and Artifacts remain immutable provenance after
+    promotion. Edits create goal-owned working versions or successor artifacts
+    rather than mutating execution history.
 
 ## 3. Aggregate model
 
@@ -84,6 +101,7 @@ erDiagram
     WORKSPACE ||--o{ GOAL : owns
     GOAL ||--o{ GOAL_MILESTONE : tracks
     GOAL ||--o{ TASK : contains
+    GOAL ||--o{ GOAL_ASSET : works_with
     TASK ||--o{ TASK_TRIGGER : activated_by
     TASK ||--o{ TASK_OCCURRENCE : instantiates
     TASK_TRIGGER ||--o{ TRIGGER_DELIVERY : receives
@@ -93,6 +111,8 @@ erDiagram
     TASK_OCCURRENCE ||--o{ TASK_PLAN_RUN : executes
     TASK_OCCURRENCE ||--o{ EXECUTION_SESSION : scopes
     TASK_OCCURRENCE ||--o{ RUN : invokes
+    TASK_OCCURRENCE ||--o{ ARTIFACT : produces
+    ARTIFACT ||--o{ GOAL_ASSET : promoted_as
 ```
 
 A task may exist without a goal. A goal may contain one-time and repeatable
@@ -140,7 +160,112 @@ Goal invariants:
 may be supported, but executable automatic criteria require an explicit typed
 kind and deterministic evaluator.
 
-### 3.2 Goal milestones
+### 3.2 Task results, artifacts, and Goal assets
+
+A standalone task ends in an accepted, immutable result. Its result surface may
+render prose, structured data, and stable Artifact references. It may expose
+non-mutating convenience operations such as preview, copy, and download. It
+must not become a second mutable state store, embed product-authority actions,
+or let AI-authored json-render controls mutate task, goal, external-system, or
+permission state.
+
+An Artifact remains occurrence-scoped execution evidence even when it later
+becomes useful to long-horizon work. Promotion creates a GoalAsset reference or
+working copy; it does not transfer ownership away from the source occurrence or
+mutate the source Artifact.
+
+Conceptual first-release shape:
+
+```ts
+type GoalAssetRole =
+  | "working_document"
+  | "reference"
+  | "evidence"
+  | "submission"
+  | "template";
+
+type GoalAssetStatus =
+  | "Draft"
+  | "NeedsReview"
+  | "Approved"
+  | "Superseded"
+  | "Archived";
+
+type GoalAsset = {
+  id: string;
+  workspaceId: string;
+  goalId: string;
+  sourceArtifactId: string;
+  currentArtifactId: string;
+  role: GoalAssetRole;
+  status: GoalAssetStatus;
+  label: string;
+  createdAt: string;
+  updatedAt: string;
+};
+```
+
+This shape is a target boundary, not a requirement to add a GoalAsset table in
+the first Goal release. The first release may derive goal-visible assets through
+`Task.goalId -> TaskOccurrence -> Artifact`, then add persisted role, current
+version, review status, and archival behavior only when editable working assets
+ship.
+
+Promotion rules:
+
+- a standalone task stays a bounded `single` or `series` task; promotion adds a
+  Goal and `goalId` association rather than changing task execution mode;
+- if the task already belongs to a Goal, the user selects that GoalAsset target
+  instead of creating another Goal;
+- promotion is explicit and idempotent; retrying the same accepted-result
+  promotion must not create duplicate Goals or GoalAssets;
+- the product previews the Goal title, selected assets, and proposed follow-up
+  work before commit;
+- original result specs and Artifacts stay immutable and reviewable;
+- user edits and accepted AI edits create versioned working content or successor
+  Artifacts with source provenance;
+- Goal review consumes accepted results and permitted current GoalAsset versions,
+  never arbitrary mutable UI state;
+- external effects derived from an asset, such as sending email or submitting
+  an application, remain separate bounded tasks behind approval and idempotency.
+
+The default standalone-task experience remains deliberately small: inspect,
+copy, download, accept, or request changes. When the user attempts continued
+editing, persistent checklist interaction, cross-task reuse, or another
+state-changing workflow action, the UI offers **Create Goal and continue**. The
+operation atomically creates the Goal, associates the task, promotes the
+selected result, and opens the Goal workspace. A failed operation must leave no
+partially promoted Goal or detached asset.
+
+### 3.3 Goal applications (reserved future capability)
+
+A Goal may eventually host a reusable, AI-assisted application assembled for
+its domain, for example an application-material editor or an email preparation
+tool. Such an application is not an arbitrary AI-authored program and does not
+turn a Goal into a continuously running agent. It is a versioned product-owned
+capability that composes approved components and actions over GoalAssets and
+bounded tasks.
+
+Reserved invariants:
+
+- AI may propose application layout, content transformations, and workflows,
+  but cannot define credentials, permissions, approval policy, network access,
+  lifecycle authority, or arbitrary executable actions;
+- every action resolves through a server-owned catalog with closed schemas,
+  workspace/Goal ownership checks, audit records, and idempotency boundaries;
+- editable regions use `ai-editable` review/diff/revert semantics; generated
+  explanatory content remains `ai-authored`; execution and external effects
+  remain `runtime-control`;
+- application definitions and versions are separate from immutable task result
+  specs; deleting or replacing an application cannot erase result history;
+- reusable applications are explicitly outside the first Goal release. Initial
+  Goal work ships fixed product UI for assets, tasks, reviews, and approvals.
+
+This reserved direction does not make Chrona a general no-code application
+platform. It permits narrowly scoped Goal tools only after the asset, action,
+permission, and versioning contracts are implemented end to end.
+
+### 3.4 Goal milestones
 
 Milestones express intermediate outcomes such as "base application materials
 ready" or "first five high-fit applications submitted".
@@ -155,7 +280,7 @@ Milestones do not execute. Tasks and accepted results provide their evidence.
 The first Goal release may omit persisted milestones and show task groups
 instead; it must not emulate milestones with fake executable parent tasks.
 
-### 3.3 Task definition and repeatability
+### 3.5 Task definition and repeatability
 
 The target task property is execution mode:
 
@@ -574,6 +699,9 @@ POST   /api/goals
 GET    /api/goals/:goalId
 PATCH  /api/goals/:goalId
 POST   /api/goals/:goalId/actions
+POST   /api/goals/:goalId/assets
+PATCH  /api/goals/:goalId/assets/:goalAssetId
+POST   /api/tasks/:taskId/actions/promote-to-goal
 
 POST   /api/tasks/:taskId/triggers
 PATCH  /api/tasks/:taskId/triggers/:triggerId
@@ -586,6 +714,13 @@ Goal actions are explicit (`pause`, `resume`, `achieve`, `stop`, `review`).
 Trigger actions are explicit (`pause`, `resume`, `retire`). Execution commands
 continue through the task/work command boundary but include `occurrenceId` in
 command context.
+
+`promote-to-goal` accepts an accepted result reference, selected artifact
+references, a proposed Goal title, and an idempotency key. The server resolves
+task, occurrence, result, and artifact ownership; clients and AI-authored specs
+cannot supply private IDs as authority. If the task already has a Goal, the
+same command promotes into that Goal or returns a conflict requiring an
+explicit user choice.
 
 Future external webhook ingress is an integration endpoint, not a generic task
 mutation endpoint. It resolves an opaque endpoint reference server-side and
@@ -669,6 +804,14 @@ permanent dual-write compatibility is prohibited.
   latest accepted results, and next review;
 - reuse bounded tasks for review and follow-up work;
 - add milestones only when the Goal UI needs persisted intermediate outcomes.
+- aggregate accepted occurrence Artifacts in the Goal workspace without
+  changing their provenance;
+- add explicit, idempotent standalone-task promotion that creates a Goal,
+  associates the source task, and promotes selected accepted results atomically;
+- keep Goal assets read-only in the first Goal release unless versioned editable
+  asset, review, and revert semantics ship together;
+- reserve Goal applications at the contract/design boundary only; do not ship
+  arbitrary AI-authored actions or an application runtime.
 
 ### Phase 4 — introduce schedule `TaskTrigger`
 
@@ -710,6 +853,10 @@ Every implementation phase must prove its observable contract.
 - late provider completion from an old execution epoch cannot mutate a restarted
   occurrence;
 - series continues after a completed occurrence until paused/ended.
+- standalone-task promotion is atomic and idempotent under retries;
+- promotion rejects unaccepted results, cross-workspace artifacts, and artifacts
+  not owned by the selected occurrence;
+- editing or superseding a GoalAsset never mutates its source Artifact;
 
 ### Security tests for external triggers
 
@@ -731,6 +878,11 @@ Every implementation phase must prove its observable contract.
 - mobile views have no horizontal overflow;
 - paused Goal/trigger behavior is visible and reversible;
 - external side-effect work always stops at its approval boundary.
+- standalone task results expose only non-mutating result use until promotion;
+- invoking an edit or persistent workflow action offers Goal creation and opens
+  the promoted asset in the Goal workspace;
+- promotion failure leaves no partial Goal, task association, or GoalAsset;
+- accepted result history remains inspectable after asset edits and replacement.
 
 ## 16. Non-goals
 
@@ -739,11 +891,16 @@ This architecture does not make Chrona:
 - a continuously running autonomous agent;
 - a generic event-stream processing platform;
 - a full project/portfolio management suite;
-- an email client or applicant tracking system;
+- a general-purpose email client or applicant tracking system;
 - a store for arbitrary webhook payloads;
 - a provider-session persistence layer;
 - a system where AI-authored UI or incoming events own permissions or runtime
-  state.
+  state;
+- a general no-code platform where AI output can install arbitrary applications
+  or actions.
 
 The purpose is narrower: preserve a long-lived outcome while safely creating,
-scheduling, executing, reviewing, and recovering bounded work occurrences.
+scheduling, executing, reviewing, and recovering bounded work occurrences;
+promote selected immutable results into controlled Goal working assets; and
+leave any future reusable Goal application inside product-owned component,
+action, permission, approval, and versioning boundaries.

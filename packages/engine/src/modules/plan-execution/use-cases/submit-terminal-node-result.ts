@@ -9,6 +9,7 @@ import type { ExecutionActionWithContinuation } from "../types";
 import { dispatchExecutionAction } from "../task-plan-execution";
 import { validateChronaSpec } from "@chrona/ui-protocol";
 import { ENGINE_ERROR_CODES, EngineError } from "../../../errors";
+import { registerGeneratedPlanOutputArtifacts } from "./register-generated-plan-output-artifacts";
 
 
 function decodePointer(path: string): string[] {
@@ -211,6 +212,12 @@ async function updatePlanOutput(input: {
     planOutput,
   });
   if (!saved.committed) throw new EngineError(ENGINE_ERROR_CODES.CONFLICT, "Plan output changed concurrently. Retry with latest output.");
+  await registerGeneratedPlanOutputArtifacts({
+    workspaceId: accepted.workspaceId,
+    taskId: input.taskId,
+    runId: input.commandContext?.runId,
+    spec: planOutput.spec,
+  });
   const mainSession = input.action.sessionId
     ? { id: input.action.sessionId }
     : await ensurePlanMainSession({ taskId: input.taskId, planId: accepted.compiledPlan.editablePlanId });

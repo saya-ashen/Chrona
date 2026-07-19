@@ -1,4 +1,7 @@
 import { describe, expect, it } from "bun:test";
+import { mkdir, rm, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { getChronaGeneratedFilesDir } from "@chrona/shared/data-paths";
 import { TaskStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { getPlanRun } from "@/modules/plan-execution/persistence/plan-run-store";
@@ -213,6 +216,70 @@ describe("plan-runner task executor external results", () => {
         },
       },
     });
+  });
+
+  it("registers generated FileRef output as an idempotent run artifact", async () => {
+    const { workspace, task } = await seedWorkspaceAndTask("Runner registers generated artifact");
+    const run = await db.run.create({
+      data: {
+        taskId: task.id,
+        runtimeName: "hermes",
+        status: "Running",
+        triggeredBy: "system",
+      },
+    });
+    const scope = `artifact-test-${task.id}`;
+    const directory = join(getChronaGeneratedFilesDir(), scope);
+    const path = join(directory, "report.md");
+    await mkdir(directory, { recursive: true });
+    await writeFile(path, "# Registered report\n\nVerified content.\n");
+    const uri = `generated://${scope}/report.md`;
+    const compiledPlan = makeSingleTaskPlan("graph_task_artifact_registration");
+    await seedAcceptedCompiledPlan(workspace.id, task.id, compiledPlan);
+
+    executeTaskNodeCapabilityMock.mockImplementationOnce(async (input) => {
+      const action = {
+        action: "update_plan_output" as const,
+        sessionId: input.mainSession.id,
+        patches: [
+          { op: "add" as const, path: "/root", value: "report" },
+          { op: "add" as const, path: "/elements/report", value: { type: "FileRef", props: { path: uri, title: "Registered report" }, children: [] } },
+        ],
+        summary: "Generated report",
+      };
+      await taskPlanExecution.submitNodeResult({ taskId: input.taskId, commandContext: { runId: run.id }, action });
+      await taskPlanExecution.submitNodeResult({ taskId: input.taskId, commandContext: { runId: run.id }, action: { ...action, patches: [] } });
+      await taskPlanExecution.dispatch({
+        taskId: input.taskId,
+        action: { action: "complete_manual_node", summary: "Done" },
+      });
+      return {
+        status: "started",
+        summary: "External completion observed",
+        evidence: { sessionId: input.mainSession.id },
+      } satisfies NodeExecutionResult;
+    });
+
+    try {
+      await taskPlanExecution.dispatch({ taskId: task.id, action: { action: "start_manual" } });
+      const artifacts = await db.artifact.findMany({ where: { taskId: task.id, runId: run.id } });
+      expect(artifacts).toHaveLength(1);
+      expect(artifacts[0]).toMatchObject({
+        workspaceId: workspace.id,
+        type: "file",
+        title: "Registered report",
+        uri,
+        contentPreview: "# Registered report\n\nVerified content.\n",
+      });
+      expect(artifacts[0]?.metadata).toMatchObject({
+        checksumAlgorithm: "sha256",
+        size: 39,
+        mimeType: "text/markdown",
+        sourceNodeId: "task_node",
+      });
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
   });
 
   it("passes accumulated plan output to the next runtime-backed node", async () => {

@@ -1,8 +1,6 @@
-import { Prisma, TaskStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { appendCanonicalEvent } from "@/modules/events";
 import { publishTaskWorkspaceUpdatedEvent } from "@/modules/projections/task-projection-events";
-import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
 import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
 
 export async function acceptTaskResult(input: { taskId: string }) {
@@ -25,16 +23,29 @@ export async function acceptTaskResult(input: { taskId: string }) {
     );
   }
 
-  const completedAt = latestRun.endedAt ?? new Date();
-
-  await db.task.update({
-    where: { id: task.id },
-    data: {
-      status: TaskStatus.Done,
-      completedAt,
-      blockReason: Prisma.DbNull,
+  const existingAcceptance = await db.event.findFirst({
+    where: {
+      taskId: task.id,
+      runId: latestRun.id,
+      eventType: "task.result_accepted",
     },
+    orderBy: { ingestedAt: "desc" },
+    select: { payload: true, ingestedAt: true },
   });
+  if (existingAcceptance) {
+    const payload = existingAcceptance.payload as { accepted_at?: unknown } | null;
+    return {
+      taskId: task.id,
+      workspaceId: task.workspaceId,
+      runId: latestRun.id,
+      acceptedAt:
+        typeof payload?.accepted_at === "string"
+          ? payload.accepted_at
+          : existingAcceptance.ingestedAt.toISOString(),
+    };
+  }
+
+  const acceptedAt = new Date().toISOString();
 
   await appendCanonicalEvent({
     eventType: "task.result_accepted",
@@ -47,12 +58,11 @@ export async function acceptTaskResult(input: { taskId: string }) {
     source: "ui",
     payload: {
       accepted_run_id: latestRun.id,
-      accepted_at: new Date().toISOString(),
+      accepted_at: acceptedAt,
     },
     dedupeKey: `task.result_accepted:${task.id}:${latestRun.id}`,
   });
 
-  await rebuildTaskProjection(task.id);
 
   publishTaskWorkspaceUpdatedEvent({
     taskId: task.id,
@@ -64,5 +74,6 @@ export async function acceptTaskResult(input: { taskId: string }) {
     taskId: task.id,
     workspaceId: task.workspaceId,
     runId: latestRun.id,
+    acceptedAt,
   };
 }

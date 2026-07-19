@@ -191,6 +191,17 @@ export async function getTaskPage(input: { taskId: string; workBlockId?: string 
     : [];
 
   const latestRun = task.runs[0] ?? null;
+  const resultAcceptance = latestRun
+    ? await db.event.findFirst({
+        where: {
+          taskId,
+          runId: latestRun.id,
+          eventType: "task.result_accepted",
+        },
+        orderBy: { ingestedAt: "desc" },
+      })
+    : null;
+  const resultAcceptancePayload = resultAcceptance?.payload as { accepted_at?: unknown } | null;
   const currentWorkBlock = pickTaskPageWorkBlock(task.workBlocks, selectedWorkBlockId, new Date());
   const importedEvent = task.importedCalendarEvents[0] ?? null;
   const sourceManaged = importedEvent
@@ -358,6 +369,17 @@ export async function getTaskPage(input: { taskId: string; workBlockId?: string 
           executionState: taskExecutionState,
           startedAt: latestRun.startedAt?.toISOString() ?? null,
           syncStatus: latestRun.syncStatus,
+        }
+      : null,
+    resultReview: latestRun
+      ? {
+          status: resultAcceptance ? "accepted" as const : "pending_acceptance" as const,
+          runId: latestRun.id,
+          acceptedAt: resultAcceptance
+            ? typeof resultAcceptancePayload?.accepted_at === "string"
+              ? resultAcceptancePayload.accepted_at
+              : resultAcceptance.ingestedAt.toISOString()
+            : null,
         }
       : null,
     scheduleProposals: task.scheduleProposals.map((proposal) => ({
