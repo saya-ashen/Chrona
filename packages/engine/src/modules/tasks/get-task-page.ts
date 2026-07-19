@@ -117,7 +117,6 @@ export async function getTaskPage(input: { taskId: string; workBlockId?: string 
     where: { id: taskId },
     include: {
       projection: true,
-      runs: { orderBy: { createdAt: "desc" }, take: 1 },
       approvals: { orderBy: { requestedAt: "desc" }, take: 5 },
       artifacts: { orderBy: { createdAt: "desc" }, take: 5 },
       timelineItems: {
@@ -190,7 +189,10 @@ export async function getTaskPage(input: { taskId: string; workBlockId?: string 
       })
     : [];
 
-  const latestRun = task.runs[0] ?? null;
+  const latestRun = await db.run.findFirst({
+    where: { taskId },
+    orderBy: { createdAt: "desc" },
+  });
   const resultAcceptance = latestRun
     ? await db.event.findFirst({
         where: {

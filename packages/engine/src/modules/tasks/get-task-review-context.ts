@@ -5,17 +5,11 @@ export async function getTaskReviewContext(input: { taskId: string }) {
   const task = await db.task.findUnique({
     where: { id: input.taskId },
     select: {
-      runs: { orderBy: { createdAt: "desc" }, take: 1 },
       approvals: { orderBy: { requestedAt: "desc" }, take: 5 },
       scheduleProposals: {
         where: { status: "Pending" },
         orderBy: { createdAt: "desc" },
         take: 5,
-      },
-      events: {
-        where: { eventType: "task.result_accepted" },
-        orderBy: { ingestedAt: "desc" },
-        take: 1,
       },
     },
   });
@@ -23,8 +17,20 @@ export async function getTaskReviewContext(input: { taskId: string }) {
     throw new EngineError(ENGINE_ERROR_CODES.TASK_NOT_FOUND, "Task not found");
   }
 
-  const latestRun = task.runs[0] ?? null;
-  const acceptance = task.events[0] ?? null;
+  const latestRun = await db.run.findFirst({
+    where: { taskId: input.taskId },
+    orderBy: { createdAt: "desc" },
+  });
+  const acceptance = latestRun
+    ? await db.event.findFirst({
+        where: {
+          taskId: input.taskId,
+          runId: latestRun.id,
+          eventType: "task.result_accepted",
+        },
+        orderBy: { ingestedAt: "desc" },
+      })
+    : null;
   const acceptancePayload = acceptance?.payload as { accepted_at?: unknown } | null;
 
   return {
@@ -38,17 +44,13 @@ export async function getTaskReviewContext(input: { taskId: string }) {
       : null,
     resultReview: latestRun
       ? {
-          status:
-            acceptance?.runId === latestRun.id
-              ? "accepted" as const
-              : "pending_acceptance" as const,
+          status: acceptance ? "accepted" as const : "pending_acceptance" as const,
           runId: latestRun.id,
-          acceptedAt:
-            acceptance?.runId === latestRun.id
-              ? typeof acceptancePayload?.accepted_at === "string"
-                ? acceptancePayload.accepted_at
-                : acceptance.ingestedAt.toISOString()
-              : null,
+          acceptedAt: acceptance
+            ? typeof acceptancePayload?.accepted_at === "string"
+              ? acceptancePayload.accepted_at
+              : acceptance.ingestedAt.toISOString()
+            : null,
         }
       : null,
     scheduleProposals: task.scheduleProposals.map((proposal) => ({

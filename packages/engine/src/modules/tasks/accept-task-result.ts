@@ -6,15 +6,12 @@ import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
 export async function acceptTaskResult(input: { taskId: string }) {
   const task = await db.task.findUniqueOrThrow({
     where: { id: input.taskId },
-    include: {
-      runs: {
-        orderBy: { createdAt: "desc" },
-        take: 1,
-      },
-    },
+    select: { id: true, workspaceId: true },
   });
-
-  const latestRun = task.runs[0] ?? null;
+  const latestRun = await db.run.findFirst({
+    where: { taskId: task.id },
+    orderBy: { createdAt: "desc" },
+  });
 
   if (!latestRun || latestRun.status !== "Completed") {
     throw new EngineError(
