@@ -201,6 +201,15 @@ export class AiRuntimeInvoker {
         onRuntimeEvent: input.onRuntimeEvent,
         terminalToolName,
         controlRunToken,
+        onRunStarted: async (providerRun) => {
+          await syncTaskRunState({
+            taskId: input.taskId,
+            taskSessionId: input.taskSessionId,
+            runId: run.id,
+            runStatus: RunStatus.Running,
+            runtimeRunRef: providerRun.nativeRunId ?? providerRun.runId,
+          });
+        },
         eventPersistence: {
           workspaceId: task.workspaceId,
           taskId: input.taskId,
@@ -344,6 +353,7 @@ export async function runProviderRequest(
     eventPersistence?: RuntimeEventPersistenceContext;
     signal?: AbortSignal;
     controlRunToken?: string | null;
+    onRunStarted?: (run: ProviderRunRef) => Promise<void> | void;
   } = {},
 ): Promise<ProviderRunSnapshot> {
   const startInput = sanitizeStartRunInputForProvider(providerClient.provider, toStartRunInput(request));
@@ -363,6 +373,7 @@ export async function runProviderRequest(
     control,
   } as StartRunInput & { idempotencyKey?: string });
   await persistRuntimeRunRef(options.runId, run);
+  await options.onRunStarted?.(run);
   await updateProviderRunRecord(options.providerRunRecordId, {
     providerRunRef: run.nativeRunId ?? run.runId,
     nativeRunId: run.nativeRunId ?? null,

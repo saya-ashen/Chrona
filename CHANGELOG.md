@@ -13,6 +13,7 @@ Date: 2026-07-03
 - Documented Vite + Hono + Bun architecture, package boundaries, API surface, data model, and provider boundary as stable contributor entry points.
 - Added multi-platform release workflow and binary smoke coverage for packaged archives.
 - Expanded focused tests across engine, server, web, providers, feature slices, and Playwright flows.
+- Hardened completed-task restarts so active sessions, canonical runs, task lifecycle timestamps, and task projections converge on the same running state.
 - Added open-source maintenance files for security reporting, support, code of conduct, and issue intake.
 
 ### Known limitations

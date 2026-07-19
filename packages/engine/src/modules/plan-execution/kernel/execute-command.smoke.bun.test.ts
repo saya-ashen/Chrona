@@ -228,4 +228,56 @@ describe("kernel executeCommand (single-writer)", () => {
     });
     expect(abandonedSession).toEqual({ status: "Abandoned" });
   });
+
+  it("atomically reactivates task and projection when restarting a completed graph", async () => {
+    executeTaskNodeCapabilityMock
+      .mockResolvedValueOnce({
+        status: "done",
+        summary: "First task finished",
+        evidence: { sessionId: "main-session", runId: "run-first" },
+      })
+      .mockResolvedValueOnce({
+        status: "done",
+        summary: "Second task finished",
+        evidence: { sessionId: "main-session", runId: "run-second" },
+      })
+      .mockResolvedValueOnce({
+        status: "started",
+        summary: "First task restarted",
+        evidence: { sessionId: "main-session-restart", runId: "run-first-restart" },
+        output: { runtimeRunRef: "runtime-first-restart" },
+      });
+
+    const { workspace, task } = await seedWorkspaceAndTask("Kernel completed restart");
+    const compiledPlan = makeTwoTaskPlan("graph_kernel_completed_restart");
+    await seedAcceptedCompiledPlan(workspace.id, task.id, compiledPlan);
+
+    const completed = await executeCommand({
+      taskId: task.id,
+      command: { type: "start", trigger: "manual" },
+    });
+    expect(completed.status).toBe("completed");
+    await expect(db.task.findUniqueOrThrow({ where: { id: task.id } })).resolves.toMatchObject({
+      status: "Completed",
+      completedAt: expect.any(Date),
+    });
+
+    const restarted = await executeCommand({
+      taskId: task.id,
+      command: { type: "restart_from_beginning", trigger: "manual" },
+    });
+
+    expect(restarted.status).toBe("running");
+    expect(restarted.currentNodeId).toBe("first_task");
+    await expect(db.task.findUniqueOrThrow({ where: { id: task.id } })).resolves.toMatchObject({
+      status: "Running",
+      completedAt: null,
+    });
+    await expect(db.taskProjection.findUniqueOrThrow({ where: { taskId: task.id } })).resolves.toMatchObject({
+      persistedStatus: "Running",
+      displayState: "ExecutionActive",
+      currentNodeId: "first_task",
+    });
+    expect(await db.executionSession.count({ where: { taskId: task.id, status: "Active" } })).toBe(1);
+  });
 });

@@ -26,6 +26,7 @@ Chrona 是一个本地优先的 AI 日程软件。它把任务变成可编辑计
 | 理解持久化模型 | [数据模型（英文）](../en/data-model.md) |
 | 判断代码应该放在哪里 | [包边界说明（英文）](../en/package-boundaries.md) |
 | 扩展 AI/运行时 provider | [Provider 边界（英文）](../en/provider-boundary.md) |
+| 理解已接受的长期目标、Trigger 与任务实例设计 | [长期目标与 Trigger 设计（英文）](../en/long-horizon-goals-and-triggers.md) |
 
 ## 主要用户流程
 

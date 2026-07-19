@@ -47,14 +47,6 @@ export function deriveTaskState(input: DeriveTaskStateInput): DeriveTaskStateRes
     };
   }
 
-  if (input.task.status === "Completed" && input.executionSession?.status !== "Paused") {
-    return {
-      persistedStatus: "Completed",
-      displayState: null,
-      blockReason: null,
-      blockSince: null,
-    };
-  }
 
   // An abandoned execution session is the durable record of a cancelled run.
   // Reproduced here so the projection committer is the only writer of task
@@ -71,6 +63,18 @@ export function deriveTaskState(input: DeriveTaskStateInput): DeriveTaskStateRes
     input.runs.find((run) => run.id === input.task.latestRunId) ??
     [...input.runs].sort((left, right) => right.updatedAt.getTime() - left.updatedAt.getTime()).at(0) ??
     null;
+
+  // A terminal Task without a canonical run must not be reopened by an
+  // orphaned historical Run. Explicit restarts set latestRunId and create an
+  // Active execution session before projection derivation.
+  if (input.task.status === "Completed" && !input.task.latestRunId && !input.executionSession) {
+    return {
+      persistedStatus: "Completed",
+      displayState: null,
+      blockReason: null,
+      blockSince: null,
+    };
+  }
 
   const latestPendingApproval =
     [...input.approvals]

@@ -282,6 +282,50 @@ describe("runProviderRequest runtime ref persistence", () => {
     ]);
   });
 
+  it("publishes Running only after the provider accepts the run", async () => {
+    const { second } = await seedRunPair();
+    const onRunStarted = mock(async () => {});
+    const client = {
+      provider: "hermes",
+      startRun: mock(async () => ({
+        provider: "hermes",
+        runId: "provider-run-started",
+        nativeRunId: "provider-run-started",
+        sessionId: "provider-session-started",
+        status: "running",
+      } satisfies ProviderRunRef)),
+      streamRun: mock(() =>
+        (async function* () {
+          yield {
+            type: "run_completed",
+            run: {
+              runId: "provider-run-started",
+              nativeRunId: "provider-run-started",
+              sessionId: "provider-session-started",
+              status: "completed",
+            },
+            outputText: "ok",
+          } as ProviderRunEvent;
+        })(),
+      ),
+    } as unknown as AgentProviderClient;
+
+    await runProviderRequest(client, request, { runId: second.id, onRunStarted });
+
+    expect(onRunStarted).toHaveBeenCalledTimes(1);
+    expect(onRunStarted).toHaveBeenCalledWith(
+      expect.objectContaining({
+        runId: "provider-run-started",
+        sessionId: "provider-session-started",
+        status: "running",
+      }),
+    );
+    await expect(db.run.findUniqueOrThrow({ where: { id: second.id } })).resolves.toMatchObject({
+      status: RunStatus.Running,
+      runtimeSessionRef: "provider-session-started",
+    });
+  });
+
   it("treats run_completed as completed even when embedded run status is still running", async () => {
     const { second } = await seedRunPair();
     const client = {

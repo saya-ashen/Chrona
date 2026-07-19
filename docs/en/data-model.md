@@ -58,6 +58,19 @@ erDiagram
   CalendarSource ||--o{ ImportedCalendarEvent : imports
 ```
 
+## Accepted target model
+
+The schema inventory above describes the current implementation. Chrona's
+accepted future model adds `Goal`, `TaskTrigger`, `TriggerDelivery`, and a
+neutral `TaskOccurrence`. It separates long-horizon outcome lifecycle, task
+definition lifecycle, occurrence execution state, trigger configuration,
+delivery facts, and optional calendar placement.
+
+The complete target model and phased migration are specified in
+[Long-Horizon Goals and Triggers](./long-horizon-goals-and-triggers.md). Do not
+infer that those future models or APIs exist until their implementation phase
+ships.
+
 ## Task state
 
 Important enums:
@@ -132,6 +145,12 @@ runs/sessions/approvals to the occurrence that most recently executed, so a
 failed or cancelled occurrence never contaminates a sibling occurrence. See
 [Backend Execution Flow](./backend-execution-flow.md) → "Task state authority".
 
+This is the current occurrence implementation: `WorkBlock` is both the time
+container and the scope key. The accepted target introduces
+`TaskOccurrence` as the neutral execution scope and makes `WorkBlock`
+optional. Current `workBlockId` behavior remains authoritative until that
+migration completes.
+
 ## Schedule state
 
 Important models:
@@ -150,6 +169,11 @@ Important enums:
 - `WorkBlockTrigger`
 
 Schedule state supports user-created and AI-suggested time blocks, proposal decision workflows, scheduler automation leasing, and due-work startup.
+
+`WorkBlockTrigger` currently records WorkBlock provenance (`scheduled` or
+`manual`); it is not an extensible trigger-definition catalog. Future
+schedule, webhook, and internal-event activation is specified separately in
+[Long-Horizon Goals and Triggers](./long-horizon-goals-and-triggers.md).
 
 ## External calendar state
 
@@ -206,12 +230,17 @@ Chrona stores AI client configuration in the database and binds clients to featu
 
 ## Workspace and task-kind state
 
-Important enums:
+Important current enums:
 
 - `WorkspaceStatus`
 - `TaskKind`
 
-Workspaces can be lifecycle-gated independently from task state. `TaskKind` distinguishes native Chrona tasks from imported/synthetic task records that exist to project external schedule context.
+Workspaces can be lifecycle-gated independently from task state. Current
+`TaskKind` distinguishes `single` and `recurring`; recurrence is represented by
+task RRULE/anchor fields and expanded into WorkBlocks. This is a current-schema
+description, not the final abstraction: the accepted target separates
+`single` versus `series` execution mode from schedule trigger definitions.
+See [Long-Horizon Goals and Triggers](./long-horizon-goals-and-triggers.md).
 
 ## Operational notes
 

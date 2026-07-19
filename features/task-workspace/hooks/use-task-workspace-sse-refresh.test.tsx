@@ -225,4 +225,22 @@ describe("SSE-driven refetch of dependent queries", () => {
     });
     expect(fetchCallCount(/\/api\/tasks\/task-1(\?|$)/)).toBe(pageBefore);
   });
+
+  it("refetches authoritative workspace state when an SSE connection reconnects", async () => {
+    const pageData = buildPageData("block-A");
+
+    renderHook(() => useTaskWorkspacePageState(pageData), { wrapper });
+
+    await waitFor(() => expect(mocks.eventHandler).not.toBeNull());
+    await pushEvent("ready");
+    const pageBeforeReconnect = fetchCallCount(/\/api\/tasks\/task-1(\?|$)/);
+    const commandCenterBeforeReconnect = fetchCallCount(/\/api\/tasks\/task-1\/command-center(\?|$)/);
+
+    await pushEvent("ready");
+
+    await waitFor(() => {
+      expect(fetchCallCount(/\/api\/tasks\/task-1(\?|$)/)).toBeGreaterThan(pageBeforeReconnect);
+      expect(fetchCallCount(/\/api\/tasks\/task-1\/command-center(\?|$)/)).toBeGreaterThan(commandCenterBeforeReconnect);
+    });
+  });
 });

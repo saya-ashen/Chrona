@@ -75,6 +75,21 @@ Task execution now lives inside the task workspace. Runtime commands use `/api/w
 
 The schedule page shows task/time-block projections, conflicts, suggestions, and scheduling operations. Schedule proposals can be accepted/rejected and due work can become executable WorkBlocks.
 
+### Accepted long-horizon target design
+
+Chrona's accepted target model separates long-lived outcomes, bounded work,
+activation, and calendar placement: a `Goal` contains bounded tasks;
+`TaskTrigger` definitions produce idempotent `TriggerDelivery` facts and
+isolated `TaskOccurrence` instances; a `WorkBlock` is an optional time
+container for an occurrence. Schedule is one trigger kind, while webhook and
+internal-event adapters are reserved for later end-to-end implementation.
+
+This target is not the current persistence model. Its lifecycle invariants,
+security boundaries, state derivation, and phased migration are authoritative
+in [Long-Horizon Goals and Triggers](./long-horizon-goals-and-triggers.md).
+
+The Goal workspace is a planned product surface, not a current route.
+
 ### Action Center projection
 
 Action Center aggregates current, actionable attention items: approvals,
@@ -169,7 +184,17 @@ Provider packages adapt external protocols. They may know provider sessions, res
 
 ## Data and projection model
 
-Chrona stores canonical task, plan, run, session, work block, AI client, and event data in SQLite. UI pages read from query-optimized projections such as TaskProjection and page-specific read models. Execution and plan generation produce event streams that are both visible to users and usable for rebuilding state.
+Chrona currently stores canonical task, plan, run, session, work block, AI
+client, and event data in SQLite. UI pages read from query-optimized
+projections such as TaskProjection and page-specific read models. Execution
+and plan generation produce event streams that are both visible to users and
+usable for rebuilding state.
+
+The accepted future model adds Goal, trigger definition/delivery, and neutral
+task-occurrence aggregates. Until its migration phases ship, current
+WorkBlock-scoped execution remains authoritative; implementation code must not
+pretend the future aggregates already exist. See
+[Long-Horizon Goals and Triggers](./long-horizon-goals-and-triggers.md).
 
 ## Development entrypoints
 

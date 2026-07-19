@@ -190,6 +190,7 @@ function useTaskWorkspaceEventStream(
   const staleTimerRef = useRef<number | null>(null);
   const reconnectTimerRef = useRef<number | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
+  const hasOpenedStreamRef = useRef(false);
 
   const clearStaleTimer = useCallback(() => {
     if (staleTimerRef.current === null) return;
@@ -237,7 +238,13 @@ function useTaskWorkspaceEventStream(
       onEvent({ event, data }) {
         markStreamHealthy();
         if (event === "ready") {
-          void refreshPersistedActivity();
+          const isReconnect = hasOpenedStreamRef.current;
+          hasOpenedStreamRef.current = true;
+          if (isReconnect) {
+            void Promise.all([refreshPersistedActivity(), refreshQueries()]);
+          } else {
+            void refreshPersistedActivity();
+          }
           return;
         }
         if (STREAM_NOOP_EVENTS.has(event)) return;

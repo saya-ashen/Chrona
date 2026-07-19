@@ -309,6 +309,59 @@ describe("rebuildTaskProjection occurrence isolation", () => {
     expect(projection.latestRunStatus).toBe("Running");
   });
 
+  it("reactivates a completed task and clears completedAt for a restarted execution", async () => {
+    const { workspace, task } = await seedRecurringTask();
+    const completedAt = new Date("2026-06-08T08:00:00.000Z");
+    await db.task.update({
+      where: { id: task.id },
+      data: { status: "Completed", completedAt },
+    });
+    const block = await db.workBlock.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        title: "Restarted occurrence",
+        status: "Active",
+        scheduledStartAt: new Date("2026-06-08T09:00:00.000Z"),
+        scheduledEndAt: new Date("2026-06-08T10:00:00.000Z"),
+        trigger: "manual",
+      },
+    });
+    const run = await db.run.create({
+      data: {
+        taskId: task.id,
+        workBlockId: block.id,
+        runtimeName: "hermes",
+        status: "Running",
+        triggeredBy: "user",
+      },
+    });
+    await db.task.update({ where: { id: task.id }, data: { latestRunId: run.id } });
+    await db.executionSession.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        workBlockId: block.id,
+        planId: "plan-restarted",
+        status: "Active",
+        currentNodeId: "restart-node",
+        completedNodeIds: "[]",
+      },
+    });
+
+    await rebuildTaskProjection(task.id);
+
+    const [reloadedTask, projection] = await Promise.all([
+      db.task.findUniqueOrThrow({ where: { id: task.id } }),
+      db.taskProjection.findUniqueOrThrow({ where: { taskId: task.id } }),
+    ]);
+    expect(reloadedTask.status).toBe("Running");
+    expect(reloadedTask.completedAt).toBeNull();
+    expect(projection.persistedStatus).toBe("Running");
+    expect(projection.latestRunStatus).toBe("Running");
+    expect(projection.currentNodeId).toBe("restart-node");
+  });
+
   it("projects pending provider approvals even when no legacy run approval exists", async () => {
     const { workspace, task } = await seedRecurringTask();
     const plan = await db.taskPlan.create({

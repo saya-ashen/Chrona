@@ -186,6 +186,12 @@ committer derives the `Completed` task status from the completed session/run —
 the runner never writes the status itself. Work, Schedule, and Action Center then
 reflect the updated state.
 
+These are current single-task semantics. A known design gap remains for
+recurring series: completing one occurrence must not permanently complete the
+series or stop future expansion. The accepted migration separates task
+definition lifecycle from occurrence execution state; see
+[Long-Horizon Goals and Triggers](./long-horizon-goals-and-triggers.md).
+
 ## Task state authority
 
 `Task.status`, `Task.blockReason`, and the read-optimized `TaskProjection` have
@@ -217,6 +223,12 @@ latest `ExecutionSession` in any state, falling back to the latest plan's work
 block before any run exists). A failed or cancelled occurrence therefore never
 bleeds its state onto a sibling occurrence — a fresh occurrence with a
 just-generated plan is unaffected by an earlier occurrence's provider failure.
+
+`WorkBlock` is the current occurrence identity because all shipped automatic
+activation is schedule-based. The accepted target replaces this coupling with
+a neutral `TaskOccurrence`, with WorkBlock retained as an optional calendar
+container. Until that migration ships, `workBlockId` remains the authoritative
+scope and must not be mixed with hypothetical `occurrenceId` behavior.
 
 ### Projection refresh invariant
 
