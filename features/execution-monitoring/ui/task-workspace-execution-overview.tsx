@@ -304,10 +304,12 @@ export function TaskWorkspaceExecutionOverview({
   const failedNodeError = failedNode?.result?.error?.trim()
     || (typeof failedNode?.metadata?.error === "string" ? failedNode.metadata.error.trim() : "")
     || null;
+  const executionHasFatalFailure = currentExecution?.status === "failed"
+    || currentExecution?.status === "blocked";
   const failureSummary = failedNodeError
     || failedActivity?.summary
     || (failedNode ? `${failedNode.title} failed.` : null);
-  const failureAlert = failureSummary ? (
+  const failureAlert = executionHasFatalFailure && failureSummary ? (
     <div className="mb-3 flex items-start gap-2 rounded-lg border border-destructive/25 bg-destructive/5 px-3 py-2" role="alert">
       <TriangleAlert className="mt-0.5 size-4 shrink-0 text-destructive" aria-hidden />
       <div className="min-w-0">

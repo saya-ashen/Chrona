@@ -98,12 +98,39 @@ describe("TaskWorkspaceExecutionOverview", () => {
           error: "Provider run was cancelled before recording a Chrona terminal result action",
         },
       }],
+      currentExecution: {
+        status: "failed",
+        planOutput: undefined,
+      },
     });
 
     expect(screen.getByRole("alert")).toHaveTextContent("Run had a failure");
     expect(screen.getByRole("alert")).toHaveTextContent(
       "Provider run was cancelled before recording a Chrona terminal result action",
     );
+  });
+
+  it("does not promote a recovered tool failure after execution completes", () => {
+    const view = createTaskWorkspaceExecutionConsoleView(
+      executionMonitoringWorkspaceFixtures.running,
+    );
+    renderOverview(view, {
+      activity: [{
+        id: "read-failed",
+        kind: "tool_completed",
+        title: "Read failed",
+        summary: "Invalid selector ':'",
+        description: "The read command used an invalid selector and execution recovered.",
+        tone: "danger",
+        timestamp: "2026-07-19T10:26:27.509Z",
+      }],
+      currentExecution: {
+        status: "completed",
+        planOutput: undefined,
+      },
+    });
+
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
   it("keeps completed transcript prominent without competing with the result", async () => {
