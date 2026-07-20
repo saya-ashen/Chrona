@@ -64,7 +64,6 @@ export const goalActionBodySchema = z.discriminatedUnion("action", [
   z.object({ action: z.literal("pause") }),
   z.object({ action: z.literal("resume") }),
   z.object({ action: z.literal("stop") }),
-  z.object({ action: z.literal("review") }),
   z.object({
     action: z.literal("achieve"),
     confirmation: z.string().trim().min(1).max(2_000),

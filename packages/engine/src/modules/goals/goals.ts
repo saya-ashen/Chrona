@@ -466,8 +466,6 @@ export async function actOnGoal(input: { goalId: string; command: GoalActionRequ
       case "stop":
         if (goal.status === "Achieved") throw new EngineError(ENGINE_ERROR_CODES.INVALID_TASK_STATE, "An achieved Goal cannot be stopped");
         return { data: { status: "Stopped" as const, stoppedAt: now }, eventType: "goal.stopped" as const, summary: `Stopped Goal: ${goal.title}` };
-      case "review":
-        throw new EngineError(ENGINE_ERROR_CODES.INVALID_TASK_STATE, "Goal reviews must be created as bounded tasks");
     }
   })();
   const updated = await db.goal.update({ where: { id: goal.id }, data: transition.data, include: goalInclude });
