@@ -14,6 +14,30 @@ enum WorkspaceStatus {
   Archived
 }
 
+enum GoalStatus {
+  Draft
+  Active
+  Paused
+  Achieved
+  Stopped
+}
+
+enum GoalAssetRole {
+  working_document
+  reference
+  evidence
+  submission
+  template
+}
+
+enum GoalAssetStatus {
+  Draft
+  NeedsReview
+  Approved
+  Superseded
+  Archived
+}
+
 enum TaskStatus {
   Draft
   Ready
@@ -165,6 +189,8 @@ model Workspace {
   status               WorkspaceStatus
   createdAt            DateTime              @default(now())
   updatedAt            DateTime              @updatedAt
+  goals                Goal[]
+  goalAssets           GoalAsset[]
   tasks                Task[]
   approvals            Approval[]
   artifacts            Artifact[]
@@ -253,9 +279,52 @@ model ImportedCalendarEvent {
   @@index([calendarSourceId, startsAt])
 }
 
+model Goal {
+  id              String      @id @default(cuid())
+  workspaceId     String
+  title           String
+  description     String?
+  successCriteria Json
+  status          GoalStatus  @default(Draft)
+  nextReviewAt    DateTime?
+  createdAt       DateTime    @default(now())
+  updatedAt       DateTime    @updatedAt
+  achievedAt      DateTime?
+  stoppedAt       DateTime?
+  workspace       Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  tasks           Task[]
+  assets          GoalAsset[]
+
+  @@index([workspaceId, status])
+  @@index([workspaceId, updatedAt])
+}
+
+model GoalAsset {
+  id                String          @id @default(cuid())
+  workspaceId       String
+  goalId            String
+  sourceArtifactId  String
+  currentArtifactId String
+  role              GoalAssetRole
+  status            GoalAssetStatus
+  label              String
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+  workspace         Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  goal              Goal            @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  sourceArtifact    Artifact        @relation("GoalAssetSourceArtifact", fields: [sourceArtifactId], references: [id])
+  currentArtifact   Artifact        @relation("GoalAssetCurrentArtifact", fields: [currentArtifactId], references: [id])
+
+  @@unique([goalId, sourceArtifactId])
+  @@index([workspaceId, goalId])
+  @@index([sourceArtifactId])
+  @@index([currentArtifactId])
+}
+
 model Task {
   id                   String                 @id @default(cuid())
   workspaceId          String
+  goalId               String?
   title                String
   description          String?
   kind                 TaskKind               @default(single)
@@ -285,6 +354,7 @@ model Task {
   createdAt            DateTime               @default(now())
   updatedAt            DateTime               @updatedAt
   completedAt          DateTime?
+  goal                 Goal?                  @relation(fields: [goalId], references: [id], onDelete: SetNull)
   workspace            Workspace              @relation(fields: [workspaceId], references: [id])
   runs                 Run[]
   sessions             TaskSession[]          @relation("TaskSessions")
@@ -322,6 +392,7 @@ model Task {
   @@index([workspaceId, priority])
   @@index([workspaceId, seriesExternalUid])
   @@index([defaultSessionId])
+  @@index([goalId])
   @@index([aiClientId])
 }
 
@@ -728,6 +799,8 @@ model Artifact {
   workspace      Workspace    @relation(fields: [workspaceId], references: [id])
   task           Task         @relation(fields: [taskId], references: [id])
   run            Run          @relation(fields: [runId], references: [id])
+  sourceGoalAssets GoalAsset[] @relation("GoalAssetSourceArtifact")
+  currentGoalAssets GoalAsset[] @relation("GoalAssetCurrentArtifact")
 
   @@index([workspaceId, type])
   @@index([taskId, createdAt])

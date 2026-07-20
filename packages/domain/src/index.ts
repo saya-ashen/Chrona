@@ -18,3 +18,4 @@ export * from "./calendar/normalize-imported-events";
 export * from "./calendar/planning-busy-blocks";
 export * from "./schedule/date";
 export * from "./schedule/planning-summary";
+export * from "./goal/derive-goal-projection";

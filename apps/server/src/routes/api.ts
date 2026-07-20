@@ -6,6 +6,7 @@ import { json } from "../lib/http";
 import { createTaskRoutes } from "./tasks";
 import { createPageRoutes } from "./pages";
 import { createWorkspacesRoutes } from "./workspaces.routes";
+import { createGoalRoutes } from "./goals.routes";
 import { createClientsRoutes } from "./ai/clients.routes";
 import { createAssistantSurfaceRoutes } from "./assistant-surface.routes";
 import { createMcpRoutes, createAgentControlRoutes } from "../../../../features/mcp-control-plane/server";
@@ -24,6 +25,7 @@ export function createApiRouter(engine: ChronaEngine, options: ApiRouterOptions 
     .route("/", createTaskRoutes(engine))
     .route("/", createPageRoutes(engine))
     .route("/", createWorkspacesRoutes(engine))
+    .route("/", createGoalRoutes(engine))
     .route("/", createClientsRoutes(engine))
     .route("/", createHermesIntegrationRoutes())
     .route("/", createCalendarSourceRoutes(options.calendarSources))

@@ -1,5 +1,6 @@
 import type { ChronaEnginePorts } from "./ports";
 import { createAiClientsService } from "./services/ai-clients.service";
+import { createGoalsService } from "./services/goals.service";
 import { createAgentToolOperationsService } from "./modules/agent-tools";
 import { createPagesService } from "./services/pages.service";
 import { createRuntimeService } from "./services/runtime.service";
@@ -29,6 +30,7 @@ export function createChronaEngine(_ports: ChronaEnginePorts = {}) {
     },
     agentTools: createAgentToolOperationsService({ tasks, schedule, plan, execution }),
     pages: createPagesService(),
+    goals: createGoalsService(),
     workspaces: createWorkspacesService(),
     aiClients: createAiClientsService(),
     runtime: {
