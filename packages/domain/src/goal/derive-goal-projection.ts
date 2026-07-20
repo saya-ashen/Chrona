@@ -29,6 +29,7 @@ export type GoalProjection = {
 };
 
 const activeTaskStatuses = new Set(["Queued", "Running"]);
+const completedTaskStatuses = new Set(["Completed", "Done"]);
 
 export function deriveGoalProjection(input: GoalProjectionInput): GoalProjection {
   const now = input.now instanceof Date ? input.now : new Date(input.now ?? Date.now());
@@ -68,7 +69,7 @@ export function deriveGoalProjection(input: GoalProjectionInput): GoalProjection
     activity,
     attention,
     nextAction,
-    completedTaskCount: input.tasks.filter((task) => task.status === "Completed").length,
+    completedTaskCount: input.tasks.filter((task) => completedTaskStatuses.has(task.status)).length,
     totalTaskCount: input.tasks.length,
     criteriaSatisfiedCount,
     criteriaTotalCount: input.successCriteria.length,

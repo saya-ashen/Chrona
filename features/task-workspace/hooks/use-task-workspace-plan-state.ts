@@ -645,9 +645,10 @@ export function useTaskWorkspacePlanState(
         (current: TaskPageData | undefined) => current
           ? {
               ...current,
-              task: {
-                ...current.task,
-                status: "Done",
+              resultReview: {
+                status: "accepted",
+                runId: accepted.runId,
+                acceptedAt: accepted.acceptedAt,
               },
               latestRunSummary: current.latestRunSummary
                 ? { ...current.latestRunSummary, id: accepted.runId, status: "Completed" }

@@ -101,6 +101,17 @@ describe("Goal API", () => {
         label: "Accepted outcome evidence",
       },
     });
+    const unconfirmedResponse = await requestJson(app, `/goals/${created.id}/actions`, {
+      action: "achieve",
+      confirmation: "Cannot bypass criterion confirmation",
+      evidenceArtifactIds: [artifact.id],
+    });
+    expect(unconfirmedResponse.status).toBe(409);
+    const confirmedResponse = await requestJson(app, `/goals/${created.id}/criteria/outcome/confirm`, {
+      artifactIds: [artifact.id],
+      note: "The accepted Artifact proves the durable outcome.",
+    });
+    expect(confirmedResponse.status).toBe(200);
     const achieved = await responseJson<GoalData>(await requestJson(app, `/goals/${created.id}/actions`, {
       action: "achieve",
       confirmation: "Offer received and accepted by the user",
@@ -248,6 +259,43 @@ describe("Goal API", () => {
     expect(await db.goalAsset.count()).toBe(1);
     expect((await db.task.findUniqueOrThrow({ where: { id: taskId } })).goalId).toBe(firstBody.id);
     expect(await db.artifact.count({ where: { id: artifact.id, contentPreview: "Immutable final result" } })).toBe(1);
+  });
+
+  it("processes accepted results, confirms criterion evidence, and applies a structured review", async () => {
+    const { workspaceId } = await seedWorkspace("Goal progression");
+    const { taskId } = await seedTask(workspaceId, { title: "Produce evidence", status: "Completed" });
+    const accepted = await seedAcceptedResult(workspaceId, taskId);
+    const app = createApiRouter(createChronaEngine());
+    const goal = await responseJson<GoalData>(await requestJson(app, "/goals", {
+      workspaceId,
+      title: "Progress a durable outcome",
+      successCriteria: [criterion],
+    }));
+    await db.task.update({ where: { id: taskId }, data: { goalId: goal.id } });
+
+    const processed = await responseJson<GoalData>(await requestJson(app, `/goals/${goal.id}/results/${taskId}/process`, {
+      artifactIds: [accepted.artifact.id],
+      addToWorkingSet: true,
+      createGoalAssets: true,
+      criterionId: "outcome",
+    }));
+    expect(processed.assets[0]?.sourceArtifact.id).toBe(accepted.artifact.id);
+    expect(processed.workbench.workingSet.some((item) => item.subjectId === processed.assets[0]?.id)).toBe(true);
+
+    const confirmed = await responseJson<GoalData>(await requestJson(app, `/goals/${goal.id}/criteria/outcome/confirm`, {
+      artifactIds: [accepted.artifact.id],
+      note: "Accepted evidence proves the outcome.",
+    }));
+    expect(confirmed.outcome.criteria[0]).toMatchObject({ satisfied: true, evidenceArtifactIds: [accepted.artifact.id] });
+
+    const reviewed = await responseJson<GoalData>(await requestJson(app, `/goals/${goal.id}/reviews/apply`, {
+      summary: "Focus the next bounded step on final verification.",
+      brief: { outcome: "Verified outcome", currentFocus: "Final verification", strategy: "Use accepted evidence", constraints: ["No invented facts"] },
+      tasks: [{ kind: "task", title: "Verify final package", description: "Check the retained evidence.", priority: "High", autoPlanGeneration: false, expectedOutcome: "A verified final package" }],
+    }));
+    expect(reviewed.workbench.brief?.currentFocus).toBe("Final verification");
+    expect(reviewed.tasks.some((task) => task.title === "Verify final package")).toBe(true);
+    expect(await db.event.count({ where: { eventType: "goal.review_applied", workspaceId } })).toBe(1);
   });
 
   it("rolls back promotion when an artifact is not owned by the accepted result", async () => {

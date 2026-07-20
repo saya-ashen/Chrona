@@ -186,6 +186,10 @@ export {
 } from "./api/projections.schema";
 export type {
   CreateGoalTaskRequest,
+  ApplyGoalReviewRequest,
+  ConfirmGoalCriterionRequest,
+  CreateGoalRequest,
+  ProcessGoalResultRequest,
   GoalActionRequest,
   GoalOperationalBrief,
   GoalStatus,

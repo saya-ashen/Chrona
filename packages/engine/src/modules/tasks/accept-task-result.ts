@@ -10,7 +10,7 @@ export async function acceptTaskResult(input: { taskId: string }) {
   });
   const latestRun = await db.run.findFirst({
     where: { taskId: task.id },
-    orderBy: { createdAt: "desc" },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
   });
 
   if (!latestRun || latestRun.status !== "Completed") {

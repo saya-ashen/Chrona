@@ -23,6 +23,10 @@ const copy: GoalCopy = {
   subtitle: "Durable outcomes",
   emptyTitle: "No goals",
   emptyDescription: "Create one",
+  createGoal: "Create Goal",
+  createGoalDescription: "Define a durable outcome",
+  removeCriterion: "Remove criterion",
+  addCriterion: "Add criterion",
   openGoal: "Open Goal",
   backToGoals: "All Goals",
   ongoingWorkspace: "Ongoing Workspace",
@@ -61,6 +65,20 @@ const copy: GoalCopy = {
   tasksSection: "Tasks",
   resultsAssets: "Results & Assets",
   history: "Activity",
+  processResult: "Use in Goal",
+  processResultDescription: "Retain accepted deliverables",
+  addToWorkingSet: "Add to working set",
+  retainAsAsset: "Retain as asset",
+  linkCriterion: "Link criterion",
+  noCriterion: "No criterion",
+  processedResult: "Processed",
+  confirmCriterion: "Confirm criterion",
+  confirmCriterionDescription: "Confirm with evidence",
+  criterionEvidenceNote: "Evidence note",
+  applyReview: "Apply review",
+  applyReviewDescription: "Review changes",
+  reviewSummary: "Review conclusion",
+  reviewTaskSuggestion: "Suggested task",
   outcome: "Outcome",
   primaryResult: "Final outcome",
   noPrimaryResult: "No final result",
@@ -293,7 +311,8 @@ describe("Goal pages", () => {
   });
 
   it("requires confirmation and retained evidence before achievement", () => {
-    renderInRouter(<GoalWorkspacePage goal={baseGoal} copy={copy} />);
+    const goal: GoalData = { ...baseGoal, outcome: { ...baseGoal.outcome, criteria: baseGoal.outcome.criteria.map((criterion) => ({ ...criterion, satisfied: true, evidenceArtifactIds: [artifact.id] })) } };
+    renderInRouter(<GoalWorkspacePage goal={goal} copy={copy} />);
     fireEvent.click(screen.getAllByRole("button", { name: "Confirm achieved" })[0]);
     const confirmation = screen.getByRole("textbox", { name: "Confirmation" });
     const submit = screen.getAllByRole("button", { name: "Confirm achieved" }).at(-1)!;

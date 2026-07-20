@@ -1,6 +1,8 @@
 /* eslint-disable max-lines */
 import { db, Prisma } from "@chrona/db";
 import type {
+  ApplyGoalReviewRequest,
+  ConfirmGoalCriterionRequest,
   CreateGoalRequest,
   CreateGoalTaskRequest,
   GoalActionRequest,
@@ -8,6 +10,7 @@ import type {
   GoalSuccessCriterion,
   GoalWorkingSetSelection,
   GoalWorkingSetSubjectType,
+  ProcessGoalResultRequest,
   PromoteTaskToGoalRequest,
   UpdateGoalRequest,
 } from "@chrona/contracts/api";
@@ -23,6 +26,9 @@ type GoalEventType =
   | "goal.working_set_updated"
   | "goal.paused"
   | "goal.resumed"
+  | "goal.result_processed"
+  | "goal.criterion_confirmed"
+  | "goal.review_applied"
   | "goal.stopped"
   | "goal.review_task_created"
   | "goal.task_created"
@@ -315,7 +321,9 @@ function toGoalReadModel(goal: GoalWithDetails) {
   };
   const achievementConfirmation = achievementConfirmationFrom(goal.achievementConfirmation);
   const primaryResult = choosePrimaryResult(goal);
-
+  const criterionEvidence = new Map(
+    successCriteria.map((criterion) => [criterion.id, criterion.evidenceArtifactIds ?? []]),
+  );
   return {
     id: goal.id,
     workspaceId: goal.workspaceId,
@@ -339,7 +347,7 @@ function toGoalReadModel(goal: GoalWithDetails) {
       confirmation: achievementConfirmation,
       criteria: successCriteria.map((criterion) => ({
         ...criterion,
-        evidenceArtifactIds: achievementConfirmation?.evidenceArtifactIds ?? [],
+        evidenceArtifactIds: criterionEvidence.get(criterion.id) ?? [],
       })),
     },
     workbench: {
@@ -483,7 +491,18 @@ export async function actOnGoal(input: { goalId: string; command: GoalActionRequ
     if (goal.status !== "Active") {
       throw new EngineError(ENGINE_ERROR_CODES.INVALID_TASK_STATE, "Only active Goals can be achieved");
     }
+    const criteria = criteriaFrom(goal.successCriteria);
+    if (criteria.length === 0 || criteria.some((criterion) => !criterion.satisfied)) {
+      throw new EngineError(
+        ENGINE_ERROR_CODES.INVALID_TASK_STATE,
+        "Every success criterion must be explicitly confirmed before the Goal can be achieved",
+      );
+    }
     const evidenceIds = [...new Set(input.command.evidenceArtifactIds)];
+    const criterionEvidenceIds = new Set(criteria.flatMap((criterion) => criterion.evidenceArtifactIds ?? []));
+    if (evidenceIds.some((id) => !criterionEvidenceIds.has(id))) {
+      throw new EngineError(ENGINE_ERROR_CODES.VALIDATION_FAILED, "Achievement evidence must already confirm a success criterion");
+    }
     const evidence = await db.artifact.findMany({
       where: {
         id: { in: evidenceIds },
@@ -497,10 +516,7 @@ export async function actOnGoal(input: { goalId: string; command: GoalActionRequ
       select: { id: true },
     });
     if (evidence.length !== evidenceIds.length) {
-      throw new EngineError(
-        ENGINE_ERROR_CODES.VALIDATION_FAILED,
-        "Every achievement evidence artifact must belong to this Goal",
-      );
+      throw new EngineError(ENGINE_ERROR_CODES.VALIDATION_FAILED, "Every achievement evidence artifact must belong to this Goal");
     }
     const confirmation: AchievementConfirmation = {
       note: input.command.confirmation,
@@ -509,21 +525,8 @@ export async function actOnGoal(input: { goalId: string; command: GoalActionRequ
       confirmedAt: now.toISOString(),
       evidenceArtifactIds: evidenceIds,
     };
-    const criteria = criteriaFrom(goal.successCriteria).map((criterion) => ({
-      ...criterion,
-      satisfied: true,
-      confirmedAt: now.toISOString(),
-    }));
     await db.$transaction(async (tx) => {
-      await tx.goal.update({
-        where: { id: goal.id },
-        data: {
-          status: "Achieved",
-          achievedAt: now,
-          successCriteria: criteria,
-          achievementConfirmation: confirmation,
-        },
-      });
+      await tx.goal.update({ where: { id: goal.id }, data: { status: "Achieved", achievedAt: now, achievementConfirmation: confirmation } });
       const latest = await tx.event.aggregate({ _max: { ingestSequence: true } });
       await tx.event.create({
         data: {
@@ -532,11 +535,7 @@ export async function actOnGoal(input: { goalId: string; command: GoalActionRequ
           actorType: "user",
           actorId: "server-action",
           source: "ui",
-          payload: {
-            goal_id: goal.id,
-            confirmation: confirmation.note,
-            evidence_artifact_ids: evidenceIds,
-          },
+          payload: { goal_id: goal.id, confirmation: confirmation.note, evidence_artifact_ids: evidenceIds },
           summary: confirmation.note,
           occurredAt: now,
           ingestSequence: (latest._max.ingestSequence ?? 0) + 1,
@@ -711,6 +710,195 @@ export async function updateGoalWorkingSet(input: { goalId: string; selections: 
   });
   return getGoal({ goalId: goal.id });
 }
+function acceptedResultOrThrow(goal: GoalWithDetails, taskId: string) {
+  const task = goal.tasks.find((candidate) => candidate.id === taskId);
+  const result = task ? acceptedResultForTask(task) : null;
+  if (!task || !result) {
+    throw new EngineError(ENGINE_ERROR_CODES.INVALID_TASK_STATE, "The Task must have an accepted result");
+  }
+  return { task, result };
+}
+
+function resultArtifactsOrThrow(
+  result: NonNullable<ReturnType<typeof acceptedResultForTask>>,
+  artifactIds: string[],
+) {
+  const requested = new Set(artifactIds);
+  const artifacts = result.artifacts.filter((artifact) => requested.has(artifact.id));
+  if (artifacts.length !== requested.size) {
+    throw new EngineError(ENGINE_ERROR_CODES.VALIDATION_FAILED, "Every Artifact must belong to the accepted result");
+  }
+  return artifacts;
+}
+
+export async function processGoalResult(input: {
+  goalId: string;
+  taskId: string;
+  command: ProcessGoalResultRequest;
+}) {
+  const goal = await getGoalOrThrow(input.goalId);
+  if (goal.status !== "Active") {
+    throw new EngineError(ENGINE_ERROR_CODES.INVALID_TASK_STATE, "Only active Goals can process results");
+  }
+  const { result } = acceptedResultOrThrow(goal, input.taskId);
+  const artifacts = resultArtifactsOrThrow(result, [...new Set(input.command.artifactIds)]);
+  const criterion = input.command.criterionId
+    ? criteriaFrom(goal.successCriteria).find((candidate) => candidate.id === input.command.criterionId)
+    : null;
+  if (input.command.criterionId && !criterion) {
+    throw new EngineError(ENGINE_ERROR_CODES.VALIDATION_FAILED, "Success criterion not found");
+  }
+  const assetByArtifact = new Map(goal.assets.map((asset) => [asset.sourceArtifactId, asset]));
+  const nextRank = goal.workingSetItems.length;
+  await db.$transaction(async (tx) => {
+    for (const [index, artifact] of artifacts.entries()) {
+      let asset = assetByArtifact.get(artifact.id);
+      if (input.command.createGoalAssets && !asset) {
+        asset = await tx.goalAsset.create({
+          data: {
+            workspaceId: goal.workspaceId,
+            goalId: goal.id,
+            sourceArtifactId: artifact.id,
+            currentArtifactId: artifact.id,
+            role: criterion ? "evidence" : "reference",
+            status: "Approved",
+            label: artifact.title,
+          },
+          include: { sourceArtifact: true, currentArtifact: true },
+        });
+      }
+      if (input.command.addToWorkingSet) {
+        const subjectType = asset ? "goal_asset" : "artifact";
+        const subjectId = asset?.id ?? artifact.id;
+        await tx.goalWorkingSetItem.upsert({
+          where: { goalId_subjectType_subjectId: { goalId: goal.id, subjectType, subjectId } },
+          create: {
+            workspaceId: goal.workspaceId,
+            goalId: goal.id,
+            subjectType,
+            subjectId,
+            label: asset?.label ?? artifact.title,
+            snapshot: asset
+              ? { label: asset.label, role: asset.role, status: asset.status, artifactId: artifact.id, contentPreview: artifact.contentPreview }
+              : { taskId: artifact.taskId, title: artifact.title, type: artifact.type, uri: artifact.uri, contentPreview: artifact.contentPreview },
+            rank: nextRank + index,
+          },
+          update: {},
+        });
+      }
+    }
+  });
+  await appendGoalEvent({
+    eventType: "goal.result_processed",
+    goalId: goal.id,
+    workspaceId: goal.workspaceId,
+    payload: { task_id: input.taskId, run_id: result.runId, artifact_ids: artifacts.map((artifact) => artifact.id), criterion_id: criterion?.id ?? null },
+    summary: `Processed accepted result: ${input.taskId}`,
+  });
+  return getGoal({ goalId: goal.id });
+}
+
+export async function confirmGoalCriterion(input: {
+  goalId: string;
+  criterionId: string;
+  command: ConfirmGoalCriterionRequest;
+}) {
+  const goal = await getGoalOrThrow(input.goalId);
+  if (goal.status !== "Active") {
+    throw new EngineError(ENGINE_ERROR_CODES.INVALID_TASK_STATE, "Only active Goals can confirm success criteria");
+  }
+  const artifacts = await db.artifact.findMany({
+    where: {
+      id: { in: [...new Set(input.command.artifactIds)] },
+      workspaceId: goal.workspaceId,
+      OR: [
+        { task: { goalId: goal.id } },
+        { sourceGoalAssets: { some: { goalId: goal.id } } },
+        { currentGoalAssets: { some: { goalId: goal.id } } },
+      ],
+    },
+    select: { id: true },
+  });
+  if (artifacts.length !== new Set(input.command.artifactIds).size) {
+    throw new EngineError(ENGINE_ERROR_CODES.VALIDATION_FAILED, "Every criterion evidence Artifact must belong to this Goal");
+  }
+  const now = new Date();
+  const criteria = criteriaFrom(goal.successCriteria);
+  const criterionIndex = criteria.findIndex((criterion) => criterion.id === input.criterionId);
+  if (criterionIndex < 0) throw new EngineError(ENGINE_ERROR_CODES.VALIDATION_FAILED, "Success criterion not found");
+  const updatedCriteria = criteria.map((criterion, index) => index === criterionIndex
+    ? { ...criterion, satisfied: true, confirmedAt: now.toISOString(), evidenceArtifactIds: artifacts.map((artifact) => artifact.id) }
+    : criterion);
+  await db.goal.update({ where: { id: goal.id }, data: { successCriteria: updatedCriteria } });
+  await appendGoalEvent({
+    eventType: "goal.criterion_confirmed",
+    goalId: goal.id,
+    workspaceId: goal.workspaceId,
+    occurredAt: now,
+    payload: { criterion_id: input.criterionId, artifact_ids: artifacts.map((artifact) => artifact.id), note: input.command.note },
+    summary: input.command.note,
+  });
+  return getGoal({ goalId: goal.id });
+}
+
+export async function applyGoalReview(input: { goalId: string; command: ApplyGoalReviewRequest }) {
+  const goal = await getGoalOrThrow(input.goalId);
+  if (goal.status !== "Active") {
+    throw new EngineError(ENGINE_ERROR_CODES.INVALID_TASK_STATE, "Only active Goals can apply reviews");
+  }
+  const selections = goal.workingSetItems.map((item) => ({ subjectType: item.subjectType, subjectId: item.subjectId }));
+  const context = goalContextSnapshot(goal, selections);
+  const now = new Date();
+  const workspace = await db.workspace.findUniqueOrThrow({ where: { id: goal.workspaceId }, select: { defaultRuntime: true } });
+  const createdTaskIds: string[] = [];
+  await db.$transaction(async (tx) => {
+    await tx.goal.update({
+      where: { id: goal.id },
+      data: {
+        ...(input.command.brief ? { operationalBrief: input.command.brief } : {}),
+        ...(input.command.nextReviewAt !== undefined ? { nextReviewAt: input.command.nextReviewAt ? new Date(input.command.nextReviewAt) : null } : {}),
+      },
+    });
+    if (input.command.brief) {
+      await tx.goalBriefRevision.create({ data: { workspaceId: goal.workspaceId, goalId: goal.id, brief: input.command.brief, actorType: "user", actorId: "server-action" } });
+    }
+    for (const command of input.command.tasks) {
+      const task = await tx.task.create({
+        data: {
+          workspaceId: goal.workspaceId,
+          goalId: goal.id,
+          title: command.title,
+          description: command.description ?? null,
+          priority: command.priority,
+          kind: "single",
+          status: "Ready",
+          executionRuntime: workspace.defaultRuntime,
+          executionConfig: {},
+          autoPlanGeneration: command.autoPlanGeneration,
+          autoExecute: false,
+          goalContext: { ...context, expectedOutcome: command.expectedOutcome ?? null } as Prisma.InputJsonObject,
+        },
+      });
+      createdTaskIds.push(task.id);
+    }
+    const latest = await tx.event.aggregate({ _max: { ingestSequence: true } });
+    await tx.event.create({
+      data: {
+        eventType: "goal.review_applied",
+        workspaceId: goal.workspaceId,
+        actorType: "user",
+        actorId: "server-action",
+        source: "ui",
+        payload: { goal_id: goal.id, task_ids: createdTaskIds, next_review_at: input.command.nextReviewAt ?? null, brief_updated: Boolean(input.command.brief) },
+        summary: input.command.summary,
+        occurredAt: now,
+        ingestSequence: (latest._max.ingestSequence ?? 0) + 1,
+      },
+    });
+  });
+  return getGoal({ goalId: goal.id });
+}
+
 
 export async function createGoalTask(input: { goalId: string; command: CreateGoalTaskRequest }) {
   const goal = await getGoalOrThrow(input.goalId);

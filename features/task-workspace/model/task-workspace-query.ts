@@ -51,6 +51,7 @@ export type TaskResultAcceptResult = {
   taskId: string;
   workspaceId: string;
   runId: string;
+  acceptedAt: string;
 };
 
 export type TaskCheckpointActionDispatchResult = TaskWorkspaceCommandAck;

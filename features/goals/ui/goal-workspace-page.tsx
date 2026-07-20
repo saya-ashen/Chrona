@@ -54,6 +54,11 @@ import {
   Label,
   PageFrame,
   Separator,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
   Tabs,
   TabsContent,
   TabsList,
@@ -61,7 +66,7 @@ import {
   Textarea,
   cn,
 } from "@shared/ui";
-import { createGoalTask, runGoalAction, updateGoalBrief, updateGoalWorkingSet } from "../browser-api";
+import { applyGoalReview, confirmGoalCriterion, createGoalTask, processGoalResult, runGoalAction, updateGoalBrief, updateGoalWorkingSet } from "../browser-api";
 import type {
   GoalAcceptedResultData,
   GoalArtifactData,
@@ -225,41 +230,11 @@ function PrimaryOutcome({ goal, copy }: { goal: GoalData; copy: GoalCopy }) {
 function ActiveSummary({ goal, copy }: { goal: GoalData; copy: GoalCopy }) {
   return (
     <Card className="border-primary/20 bg-primary/[0.04]">
-      <CardHeader>
-        <Badge variant="secondary" className="w-fit">
-          <Target className="size-3.5" />
-          {copy.ongoingWorkspace}
-        </Badge>
-        <CardTitle className="text-xl">{goal.title}</CardTitle>
-        <CardDescription className="max-w-3xl text-sm leading-6">
-          {goal.description ?? copy.workspaceDescription}
-        </CardDescription>
-      </CardHeader>
+      <CardHeader className="pb-3"><CardTitle className="text-base">{copy.progress}</CardTitle></CardHeader>
       <CardContent className="grid gap-3 sm:grid-cols-3">
-        <div className="rounded-xl border bg-background p-4">
-          <p className="text-xs font-medium text-muted-foreground">{copy.progress}</p>
-          <p className="mt-1 text-lg font-semibold">
-            {format(copy.taskProgress, {
-              completed: goal.projection.completedTaskCount,
-              total: goal.projection.totalTaskCount,
-            })}
-          </p>
-        </div>
-        <div className="rounded-xl border bg-background p-4">
-          <p className="text-xs font-medium text-muted-foreground">{copy.successCriteria}</p>
-          <p className="mt-1 text-lg font-semibold">
-            {format(copy.criteriaProgress, {
-              completed: goal.projection.criteriaSatisfiedCount,
-              total: goal.projection.criteriaTotalCount,
-            })}
-          </p>
-        </div>
-        <div className="rounded-xl border bg-background p-4">
-          <p className="text-xs font-medium text-muted-foreground">{copy.nextReview}</p>
-          <p className="mt-1 text-sm font-semibold">
-            {formatDate(goal.nextReviewAt, useLocale()) ?? copy.noReview}
-          </p>
-        </div>
+        <div className="rounded-xl border bg-background p-3"><p className="text-xs font-medium text-muted-foreground">{copy.tasksSection}</p><p className="mt-1 font-semibold">{format(copy.taskProgress, { completed: goal.projection.completedTaskCount, total: goal.projection.totalTaskCount })}</p></div>
+        <div className="rounded-xl border bg-background p-3"><p className="text-xs font-medium text-muted-foreground">{copy.successCriteria}</p><p className="mt-1 font-semibold">{format(copy.criteriaProgress, { completed: goal.projection.criteriaSatisfiedCount, total: goal.projection.criteriaTotalCount })}</p></div>
+        <div className="rounded-xl border bg-background p-3"><p className="text-xs font-medium text-muted-foreground">{copy.nextReview}</p><p className="mt-1 font-semibold">{goal.nextReviewAt ? formatDate(goal.nextReviewAt, useLocale()) : copy.noReview}</p></div>
       </CardContent>
     </Card>
   );
@@ -390,35 +365,61 @@ function FocusQueue({ goal, copy }: { goal: GoalData; copy: GoalCopy }) {
 }
 
 function CriteriaCard({ goal, copy }: { goal: GoalData; copy: GoalCopy }) {
+  const locale = useLocale();
+  const revalidator = useRevalidator();
+  const [criterionId, setCriterionId] = useState<string | null>(null);
+  const [artifactIds, setArtifactIds] = useState<string[]>([]);
+  const [note, setNote] = useState("");
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const availableArtifacts = goal.assets.map((asset) => asset.currentArtifact);
+
+  async function submit() {
+    if (!criterionId || artifactIds.length === 0 || !note.trim() || pending) return;
+    setPending(true);
+    setError(null);
+    try {
+      await confirmGoalCriterion(goal.id, criterionId, { artifactIds, note: note.trim() });
+      await revalidator.revalidate();
+      setCriterionId(null);
+      setArtifactIds([]);
+      setNote("");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : copy.actionError);
+    } finally {
+      setPending(false);
+    }
+  }
+
   return (
     <Card>
       <CardHeader>
         <CardTitle className="text-base">{copy.successCriteria}</CardTitle>
-        <CardDescription>
-          {format(copy.criteriaProgress, {
-            completed: goal.projection.criteriaSatisfiedCount,
-            total: goal.projection.criteriaTotalCount,
-          })}
-        </CardDescription>
+        <CardDescription>{format(copy.criteriaProgress, { completed: goal.projection.criteriaSatisfiedCount, total: goal.projection.criteriaTotalCount })}</CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
         {goal.outcome.criteria.map((criterion) => (
           <div key={criterion.id} className="flex gap-3 rounded-xl border p-3">
-            {criterion.satisfied ? (
-              <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-emerald-600" aria-hidden />
-            ) : (
-              <CircleDot className="mt-0.5 size-5 shrink-0 text-muted-foreground" aria-hidden />
-            )}
-            <div className="min-w-0">
+            {criterion.satisfied ? <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-emerald-600" aria-hidden /> : <CircleDot className="mt-0.5 size-5 shrink-0 text-muted-foreground" aria-hidden />}
+            <div className="min-w-0 flex-1">
               <p className="text-sm font-medium leading-5">{criterion.description}</p>
-              {criterion.confirmedAt ? (
-                <p className="mt-1 text-xs text-muted-foreground">
-                  {formatDate(criterion.confirmedAt, useLocale())}
-                </p>
-              ) : null}
+              {criterion.confirmedAt ? <p className="mt-1 text-xs text-muted-foreground">{formatDate(criterion.confirmedAt, locale)}</p> : null}
+              {(criterion.evidenceArtifactIds?.length ?? 0) > 0 ? <p className="mt-1 text-xs text-muted-foreground">{criterion.evidenceArtifactIds?.length} {copy.selectedAssets}</p> : null}
             </div>
+            {!criterion.satisfied && goal.status === "Active" ? <Button size="sm" variant="outline" disabled={availableArtifacts.length === 0} onClick={() => { setCriterionId(criterion.id); setArtifactIds([]); }}>{copy.confirmCriterion}</Button> : null}
           </div>
         ))}
+        <Dialog open={criterionId !== null} onOpenChange={(open) => { if (!open) setCriterionId(null); }}>
+          <DialogContent className="sm:max-w-xl">
+            <DialogHeader><DialogTitle>{copy.confirmCriterion}</DialogTitle><DialogDescription>{copy.confirmCriterionDescription}</DialogDescription></DialogHeader>
+            <div className="space-y-4">
+              <div className="space-y-2">{availableArtifacts.map((artifact) => <Label key={artifact.id} className="flex items-center gap-3 rounded-lg border p-3"><Checkbox checked={artifactIds.includes(artifact.id)} onCheckedChange={(checked) => setArtifactIds((current) => checked ? [...current, artifact.id] : current.filter((id) => id !== artifact.id))} /><span>{artifact.title}</span></Label>)}</div>
+              <Field><FieldLabel htmlFor="criterion-evidence-note">{copy.criterionEvidenceNote}</FieldLabel><Textarea id="criterion-evidence-note" value={note} onChange={(event) => setNote(event.target.value)} /></Field>
+              {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
+            </div>
+            <DialogFooter><Button variant="outline" onClick={() => setCriterionId(null)}>{copy.cancel}</Button><Button disabled={artifactIds.length === 0 || !note.trim() || pending} onClick={() => void submit()}>{pending ? copy.saving : copy.confirmCriterion}</Button></DialogFooter>
+          </DialogContent>
+        </Dialog>
       </CardContent>
     </Card>
   );
@@ -485,17 +486,75 @@ function TaskGroupSection({
   );
 }
 
+function ProcessResultDialog({
+  goal,
+  result,
+  taskId,
+  copy,
+}: {
+  goal: GoalData;
+  result: GoalAcceptedResultData;
+  taskId: string;
+  copy: GoalCopy;
+}) {
+  const revalidator = useRevalidator();
+  const [open, setOpen] = useState(false);
+  const [artifactIds, setArtifactIds] = useState(() => result.artifacts.map((artifact) => artifact.id));
+  const [criterionId, setCriterionId] = useState("none");
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit() {
+    if (artifactIds.length === 0 || pending) return;
+    setPending(true);
+    setError(null);
+    try {
+      await processGoalResult(goal.id, taskId, {
+        artifactIds,
+        addToWorkingSet: true,
+        createGoalAssets: true,
+        criterionId: criterionId === "none" ? null : criterionId,
+      });
+      await revalidator.revalidate();
+      setOpen(false);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : copy.actionError);
+    } finally {
+      setPending(false);
+    }
+  }
+
+  if (goal.mode === "archive" || result.artifacts.length === 0) return null;
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <Button type="button" size="sm" onClick={() => setOpen(true)}><Plus className="size-4" />{copy.processResult}</Button>
+      <DialogContent className="sm:max-w-xl">
+        <DialogHeader><DialogTitle>{copy.processResult}</DialogTitle><DialogDescription>{copy.processResultDescription}</DialogDescription></DialogHeader>
+        <div className="space-y-4">
+          <Field><FieldLabel>{copy.selectedAssets}</FieldLabel><div className="space-y-2">{result.artifacts.map((artifact) => <Label key={artifact.id} className="flex items-center gap-3 rounded-lg border p-3"><Checkbox checked={artifactIds.includes(artifact.id)} onCheckedChange={(checked) => setArtifactIds((current) => checked ? [...current, artifact.id] : current.filter((id) => id !== artifact.id))} /><span>{artifact.title}</span></Label>)}</div></Field>
+          <Field><FieldLabel>{copy.linkCriterion}</FieldLabel><Select value={criterionId} onValueChange={(value) => setCriterionId(value ?? "none")}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">{copy.noCriterion}</SelectItem>{goal.outcome.criteria.filter((criterion) => !criterion.satisfied).map((criterion) => <SelectItem key={criterion.id} value={criterion.id}>{criterion.description}</SelectItem>)}</SelectContent></Select></Field>
+          <div className="rounded-lg border bg-muted/20 p-3 text-sm text-muted-foreground">{copy.addToWorkingSet} · {copy.retainAsAsset}</div>
+          {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
+        </div>
+        <DialogFooter><Button variant="outline" onClick={() => setOpen(false)}>{copy.cancel}</Button><Button disabled={artifactIds.length === 0 || pending} onClick={() => void submit()}>{pending ? copy.saving : copy.processResult}</Button></DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 function AcceptedResultCard({
   result,
   taskTitle,
   taskId,
   goalId,
+  goal,
   copy,
 }: {
   result: GoalAcceptedResultData;
   taskTitle: string;
   taskId: string;
   goalId: string;
+  goal: GoalData;
   copy: GoalCopy;
 }) {
   const locale = useLocale();
@@ -521,6 +580,7 @@ function AcceptedResultCard({
             <ArtifactActions artifact={artifact} goalId={goalId} copy={copy} />
           </div>
         ))}
+        <ProcessResultDialog goal={goal} result={result} taskId={taskId} copy={copy} />
         <Button asChild size="sm" variant="outline">
           <LocalizedLink href={`/tasks/${taskId}`}>{copy.openTask}</LocalizedLink>
         </Button>
@@ -651,6 +711,52 @@ function CreateTaskDialog({
             {pending ? copy.creatingTask : copy.createTask}
           </Button>
         </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function ReviewApplyDialog({ goal, copy, open, onOpenChange }: { goal: GoalData; copy: GoalCopy; open: boolean; onOpenChange: (open: boolean) => void }) {
+  const revalidator = useRevalidator();
+  const [summary, setSummary] = useState("");
+  const [focus, setFocus] = useState(goal.workbench.brief?.currentFocus ?? "");
+  const [taskTitle, setTaskTitle] = useState("");
+  const [expectedOutcome, setExpectedOutcome] = useState("");
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function submit() {
+    if (!summary.trim() || pending) return;
+    setPending(true);
+    setError(null);
+    try {
+      await applyGoalReview(goal.id, {
+        summary: summary.trim(),
+        brief: goal.workbench.brief && focus.trim() ? { ...goal.workbench.brief, currentFocus: focus.trim() } : undefined,
+        tasks: taskTitle.trim() && expectedOutcome.trim() ? [{ kind: "task", title: taskTitle.trim(), description: summary.trim(), priority: "High", autoPlanGeneration: false, expectedOutcome: expectedOutcome.trim(), contextSelections: goal.workbench.workingSet.map((item) => ({ subjectType: item.subjectType, subjectId: item.subjectId })) }] : [],
+      });
+      await revalidator.revalidate();
+      onOpenChange(false);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : copy.actionError);
+    } finally {
+      setPending(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-2xl">
+        <DialogHeader><DialogTitle>{copy.applyReview}</DialogTitle><DialogDescription>{copy.applyReviewDescription}</DialogDescription></DialogHeader>
+        <div className="grid gap-4">
+          <div className="grid gap-2 rounded-xl border bg-muted/20 p-4 text-sm sm:grid-cols-3"><span>{goal.outcome.criteria.filter((criterion) => criterion.satisfied).length}/{goal.outcome.criteria.length} {copy.successCriteria}</span><span>{goal.workbench.focus.newResults.length} {copy.newResults}</span><span>{goal.assets.length} {copy.assets}</span></div>
+          <Field><FieldLabel htmlFor="review-summary">{copy.reviewSummary}</FieldLabel><Textarea id="review-summary" value={summary} onChange={(event) => setSummary(event.target.value)} /></Field>
+          <Field><FieldLabel htmlFor="review-focus">{copy.currentFocus}</FieldLabel><Input id="review-focus" value={focus} onChange={(event) => setFocus(event.target.value)} /></Field>
+          <div className="space-y-3 rounded-xl border p-4"><p className="font-medium">{copy.reviewTaskSuggestion}</p><Field><FieldLabel htmlFor="review-task-title">{copy.addTaskTitle}</FieldLabel><Input id="review-task-title" value={taskTitle} onChange={(event) => setTaskTitle(event.target.value)} /></Field><Field><FieldLabel htmlFor="review-task-outcome">{copy.expectedOutcome}</FieldLabel><Textarea id="review-task-outcome" value={expectedOutcome} onChange={(event) => setExpectedOutcome(event.target.value)} /></Field></div>
+          <div className="rounded-xl border border-primary/20 bg-primary/[0.04] p-4 text-sm"><p className="font-medium">{copy.actionPreview}</p><p className="mt-1 text-muted-foreground">{focus !== goal.workbench.brief?.currentFocus ? copy.operationalBrief : copy.currentFocus} · {taskTitle.trim() ? copy.reviewTaskSuggestion : copy.noTasks}</p></div>
+          {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
+        </div>
+        <DialogFooter><Button variant="outline" onClick={() => onOpenChange(false)}>{copy.cancel}</Button><Button disabled={!summary.trim() || pending} onClick={() => void submit()}>{pending ? copy.saving : copy.applyReview}</Button></DialogFooter>
       </DialogContent>
     </Dialog>
   );
@@ -809,7 +915,7 @@ function PrimaryAction({
     if (action === "review") {
       return <Button onClick={onStartReview}><RefreshCw className="size-4" />{copy.startReview}</Button>;
     }
-    if (action === "confirm_outcome") {
+    if (action === "confirm_outcome" && goal.outcome.criteria.length > 0 && goal.outcome.criteria.every((criterion) => criterion.satisfied)) {
       return <Button onClick={onAchieve}><CheckCircle2 className="size-4" />{copy.achieve}</Button>;
     }
     return <Button onClick={onAddTask}><Plus className="size-4" />{copy.addTask}</Button>;
@@ -839,7 +945,8 @@ function PrimaryAction({
 // The workspace composes the four lifecycle sections at the route boundary.
 // eslint-disable-next-line max-lines-per-function, complexity
 export function GoalWorkspacePage({ goal, copy }: { goal: GoalData; copy: GoalCopy }) {
-  const [taskDialog, setTaskDialog] = useState<"task" | "review" | null>(null);
+  const [taskDialog, setTaskDialog] = useState<"task" | null>(null);
+  const [reviewOpen, setReviewOpen] = useState(false);
   const [achievementOpen, setAchievementOpen] = useState(false);
   const isArchive = goal.mode === "archive";
   const [searchParams] = useSearchParams();
@@ -867,7 +974,7 @@ export function GoalWorkspacePage({ goal, copy }: { goal: GoalData; copy: GoalCo
             <PrimaryAction
               goal={goal}
               copy={copy}
-              onStartReview={() => setTaskDialog("review")}
+              onStartReview={() => setReviewOpen(true)}
               onAddTask={() => setTaskDialog("task")}
               onAchieve={() => setAchievementOpen(true)}
             />
@@ -876,11 +983,11 @@ export function GoalWorkspacePage({ goal, copy }: { goal: GoalData; copy: GoalCo
 
         {isArchive ? <PrimaryOutcome goal={goal} copy={copy} /> : (
           <div className="space-y-5">
-            <ActiveSummary goal={goal} copy={copy} />
             <section aria-labelledby="goal-control-plane" className="space-y-3">
               <div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">{copy.controlPlane}</p><h2 id="goal-control-plane" className="mt-1 text-xl font-semibold">{copy.currentFocus}</h2></div>
-              <div className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(20rem,0.65fr)]"><OperationalBriefCard goal={goal} copy={copy} /><FocusQueue goal={goal} copy={copy} /></div>
+              <div className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(20rem,0.65fr)]"><FocusQueue goal={goal} copy={copy} /><OperationalBriefCard goal={goal} copy={copy} /></div>
             </section>
+            <ActiveSummary goal={goal} copy={copy} />
             <section aria-labelledby="goal-workbench" className="space-y-3">
               <div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">{copy.workbench}</p><h2 id="goal-workbench" className="mt-1 text-xl font-semibold">{copy.workingSet}</h2></div>
               <WorkingSetCard goal={goal} copy={copy} />
@@ -958,7 +1065,7 @@ export function GoalWorkspacePage({ goal, copy }: { goal: GoalData; copy: GoalCo
               {goal.acceptedResults.length === 0 ? <Card><CardContent className="pt-6 text-sm text-muted-foreground">{copy.noAcceptedResults}</CardContent></Card> : null}
               <div className="grid gap-4 xl:grid-cols-2">
                 {goal.acceptedResults.map((result) => (
-                  <AcceptedResultCard key={`${result.taskId}:${result.runId}`} result={result} taskTitle={result.taskTitle} taskId={result.taskId} goalId={goal.id} copy={copy} />
+                  <AcceptedResultCard key={`${result.taskId}:${result.runId}`} result={result} taskTitle={result.taskTitle} taskId={result.taskId} goalId={goal.id} goal={goal} copy={copy} />
                 ))}
               </div>
             </section>
@@ -1002,7 +1109,8 @@ export function GoalWorkspacePage({ goal, copy }: { goal: GoalData; copy: GoalCo
           </TabsContent>
         </Tabs>
 
-        <CreateTaskDialog goal={goal} copy={copy} kind={taskDialog ?? "task"} open={taskDialog !== null} onOpenChange={(open) => { if (!open) setTaskDialog(null); }} />
+        <CreateTaskDialog goal={goal} copy={copy} kind="task" open={taskDialog !== null} onOpenChange={(open) => { if (!open) setTaskDialog(null); }} />
+        <ReviewApplyDialog goal={goal} copy={copy} open={reviewOpen} onOpenChange={setReviewOpen} />
         <AchievementDialog goal={goal} copy={copy} open={achievementOpen} onOpenChange={setAchievementOpen} />
       </div>
     </PageFrame>

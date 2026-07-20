@@ -1,11 +1,14 @@
 import { ENGINE_ERROR_CODES, engineErrorFromUnknown } from "../errors";
 import {
+  applyGoalReview,
+  confirmGoalCriterion,
   actOnGoal,
   createGoal,
   createGoalTask,
   getGoal,
   getGoalArtifact,
   listGoals,
+  processGoalResult,
   promoteTaskToGoal,
   updateGoal,
   updateGoalBrief,
@@ -68,6 +71,27 @@ export function createGoalsService() {
         return await createGoalTask(input);
       } catch (cause) {
         throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.INVALID_TASK_STATE, "Failed to create Goal task");
+      }
+    },
+    async processResult(input: Parameters<typeof processGoalResult>[0]) {
+      try {
+        return await processGoalResult(input);
+      } catch (cause) {
+        throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.INVALID_TASK_STATE, "Failed to process Goal result");
+      }
+    },
+    async confirmCriterion(input: Parameters<typeof confirmGoalCriterion>[0]) {
+      try {
+        return await confirmGoalCriterion(input);
+      } catch (cause) {
+        throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.INVALID_TASK_STATE, "Failed to confirm Goal criterion");
+      }
+    },
+    async applyReview(input: Parameters<typeof applyGoalReview>[0]) {
+      try {
+        return await applyGoalReview(input);
+      } catch (cause) {
+        throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.INVALID_TASK_STATE, "Failed to apply Goal review");
       }
     },
     async getArtifact(input: Parameters<typeof getGoalArtifact>[0]) {

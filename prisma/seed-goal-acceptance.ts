@@ -42,6 +42,10 @@ export const GOAL_WORKBENCH_ACCEPTANCE_IDS = {
   discoveryTaskId: "task_goal_active_discovery",
   approvalTaskId: "task_goal_active_approval",
   draftTaskId: "task_goal_active_draft",
+  criteriaArtifactId: "artifact_goal_active_criteria",
+  comparisonArtifactId: "artifact_goal_active_comparison",
+  criteriaRunId: "run_goal_active_criteria",
+  discoveryRunId: "run_goal_active_discovery",
 } as const;
 
 type CompletedTaskInput = {
@@ -656,6 +660,60 @@ export async function seedActiveGoalWorkbenchFixture() {
     },
   });
 
+  await upsertAcceptedResult({
+    taskId: GOAL_WORKBENCH_ACCEPTANCE_IDS.criteriaTaskId,
+    workspaceId,
+    runId: GOAL_WORKBENCH_ACCEPTANCE_IDS.criteriaRunId,
+    planId: "plan_goal_active_criteria",
+    title: "Confirmed application criteria",
+    summary: "Funding, research fit, deadline, and factual-safety constraints were confirmed for the NUS application.",
+    acceptedAt: new Date("2026-07-19T09:00:00.000Z"),
+  });
+  await upsertAcceptedResult({
+    taskId: GOAL_WORKBENCH_ACCEPTANCE_IDS.discoveryTaskId,
+    workspaceId,
+    runId: GOAL_WORKBENCH_ACCEPTANCE_IDS.discoveryRunId,
+    planId: "plan_goal_active_discovery",
+    title: "Accepted opening comparison",
+    summary: "The accepted comparison selected NUS as the primary target while retaining NTU and HKUST as bounded alternatives.",
+    acceptedAt: new Date("2026-07-20T08:30:00.000Z"),
+  });
+  await upsertArtifact({ id: GOAL_WORKBENCH_ACCEPTANCE_IDS.criteriaArtifactId, workspaceId, taskId: GOAL_WORKBENCH_ACCEPTANCE_IDS.criteriaTaskId, runId: GOAL_WORKBENCH_ACCEPTANCE_IDS.criteriaRunId, title: "Confirmed application criteria", type: ArtifactType.summary, uri: "inline://goal-active/criteria", contentPreview: "Funding, fit, deadline, and factual-safety constraints confirmed.", metadata: { fixture: true } });
+  await upsertArtifact({ id: GOAL_WORKBENCH_ACCEPTANCE_IDS.comparisonArtifactId, workspaceId, taskId: GOAL_WORKBENCH_ACCEPTANCE_IDS.discoveryTaskId, runId: GOAL_WORKBENCH_ACCEPTANCE_IDS.discoveryRunId, title: "NUS opening comparison", type: ArtifactType.summary, uri: "inline://goal-active/comparison", contentPreview: "NUS selected as primary target; NTU and HKUST retained as alternatives.", metadata: { fixture: true } });
+
+  const approvalPlanId = "plan_goal_active_approval";
+  const approvalNodeId = "approve_research_statement";
+  const approvalLayerId = `node_layer_${approvalPlanId}_${approvalNodeId}_v1`;
+  const approvalPlan = {
+    id: "compiled_goal_active_approval",
+    editablePlanId: approvalPlanId,
+    sourceVersion: 1,
+    title: "Approve the tailored research statement",
+    goal: "Review the retained research statement and explicitly approve, reject, or request changes.",
+    assumptions: [],
+    nodes: [{ id: approvalNodeId, localId: approvalNodeId, type: "checkpoint", title: "Approve the tailored research statement", config: { checkpointType: "approve", prompt: "Verify applicant facts and research positioning before the final package proceeds.", required: true }, dependencies: [], dependents: [], executor: "user", mode: "manual", estimatedMinutes: 10, priority: "High" }],
+    edges: [],
+    entryNodeIds: [approvalNodeId],
+    terminalNodeIds: [approvalNodeId],
+    topologicalOrder: [approvalNodeId],
+    completionPolicy: { type: "all_tasks_completed" },
+    validationWarnings: [],
+  };
+  const approvalGraph = {
+    id: approvalPlanId,
+    taskId: GOAL_WORKBENCH_ACCEPTANCE_IDS.approvalTaskId,
+    status: "paused",
+    nodes: [{ id: approvalNodeId, semanticKey: approvalNodeId, layers: [{ id: approvalLayerId, nodeId: approvalNodeId, type: "definition", createdAt: "2026-07-20T08:45:00.000Z", createdBy: "system", definition: { title: "Approve the tailored research statement", objective: "Verify applicant facts and research positioning before the final package proceeds.", semantics: { type: "checkpoint", priority: "High", mode: "manual", metadata: { checkpointType: "approve", prompt: "Verify applicant facts and research positioning before the final package proceeds.", required: true } }, executor: "user", estimatedMinutes: 10, metadata: { checkpointType: "approve", prompt: "Verify applicant facts and research positioning before the final package proceeds.", required: true } } }], createdAt: "2026-07-20T08:45:00.000Z", updatedAt: "2026-07-20T08:45:00.000Z" }],
+    edges: [],
+    mutations: [],
+    createdAt: "2026-07-20T08:45:00.000Z",
+    updatedAt: "2026-07-20T08:45:00.000Z",
+  };
+  const approvalAttemptId = "attempt_goal_active_approval_1";
+  await prisma.taskPlan.upsert({ where: { planId: approvalPlanId }, update: { workspaceId, taskId: GOAL_WORKBENCH_ACCEPTANCE_IDS.approvalTaskId, status: "Accepted", prompt: "Review the retained research statement", summary: "User approval gates the final package.", compiledPlan: approvalPlan }, create: { id: "task_plan_goal_active_approval", workspaceId, taskId: GOAL_WORKBENCH_ACCEPTANCE_IDS.approvalTaskId, planId: approvalPlanId, revision: 1, status: "Accepted", prompt: "Review the retained research statement", summary: "User approval gates the final package.", compiledPlan: approvalPlan, generatedBy: "goal-acceptance-fixture" } });
+  await prisma.taskPlanRun.upsert({ where: { id: "task_plan_run_goal_active_approval" }, update: { workspaceId, taskId: GOAL_WORKBENCH_ACCEPTANCE_IDS.approvalTaskId, planId: approvalPlanId, planRun: { planRun: { id: `plan_run_${approvalPlanId}`, compiledPlanId: approvalPlan.id, editablePlanId: approvalPlanId, sourceVersion: 1, status: "waiting_for_approval", nodeStates: { [approvalNodeId]: { nodeId: approvalNodeId, status: "waiting_for_approval", attempts: 1 } }, checkpointResponses: [], artifactRefs: [], attempts: [], createdAt: "2026-07-20T08:45:00.000Z", startedAt: "2026-07-20T08:45:00.000Z" }, mutableGraph: { graph: approvalGraph, attempts: [{ id: approvalAttemptId, taskId: GOAL_WORKBENCH_ACCEPTANCE_IDS.approvalTaskId, graphId: approvalPlanId, nodeId: approvalNodeId, nodeLayerId: approvalLayerId, executionContextSnapshotId: "ctx_goal_active_approval", status: "running", idempotencyKey: "goal-active-approval-attempt", attemptNumber: 1, startedAt: "2026-07-20T08:45:00.000Z" }], results: [{ id: "result_goal_active_approval_wait", taskId: GOAL_WORKBENCH_ACCEPTANCE_IDS.approvalTaskId, graphId: approvalPlanId, nodeId: approvalNodeId, nodeLayerId: approvalLayerId, attemptId: approvalAttemptId, status: "current", outputSummary: "Tailored statement is ready for factual review.", waitKind: "approval", actionForm: { instructions: "Read the statement summary, then approve, reject, or request changes with feedback.", submitLabel: "Submit decision", inputFields: [{ name: "feedback", label: "Approval note", kind: "text", multiline: true, required: false }] } }], executionContextSnapshots: [], planOutput: { spec: { root: "root", elements: { root: { type: "Stack", props: { gap: "md" }, children: ["summary", "statement"] }, summary: { type: "ResultSummary", props: { title: "Tailored research statement ready for approval", summary: "The statement connects verified deep-learning experience to the NUS lab direction without inventing applicant facts." } }, statement: { type: "Markdown", props: { content: "### Approval scope\n\n- Verify every applicant fact.\n- Confirm research fit and positioning.\n- Approve, reject, or request changes before package assembly." } } } }, revision: 1, updatedAt: "2026-07-20T08:45:00.000Z", updatedByNodeId: approvalNodeId, history: [] } } } }, create: { id: "task_plan_run_goal_active_approval", workspaceId, taskId: GOAL_WORKBENCH_ACCEPTANCE_IDS.approvalTaskId, planId: approvalPlanId, planRun: { planRun: { id: `plan_run_${approvalPlanId}`, compiledPlanId: approvalPlan.id, editablePlanId: approvalPlanId, sourceVersion: 1, status: "waiting_for_approval", nodeStates: { [approvalNodeId]: { nodeId: approvalNodeId, status: "waiting_for_approval", attempts: 1 } }, checkpointResponses: [], artifactRefs: [], attempts: [], createdAt: "2026-07-20T08:45:00.000Z", startedAt: "2026-07-20T08:45:00.000Z" }, mutableGraph: { graph: approvalGraph, attempts: [{ id: approvalAttemptId, taskId: GOAL_WORKBENCH_ACCEPTANCE_IDS.approvalTaskId, graphId: approvalPlanId, nodeId: approvalNodeId, nodeLayerId: approvalLayerId, executionContextSnapshotId: "ctx_goal_active_approval", status: "running", idempotencyKey: "goal-active-approval-attempt", attemptNumber: 1, startedAt: "2026-07-20T08:45:00.000Z" }], results: [{ id: "result_goal_active_approval_wait", taskId: GOAL_WORKBENCH_ACCEPTANCE_IDS.approvalTaskId, graphId: approvalPlanId, nodeId: approvalNodeId, nodeLayerId: approvalLayerId, attemptId: approvalAttemptId, status: "current", outputSummary: "Tailored statement is ready for factual review.", waitKind: "approval", actionForm: { instructions: "Read the statement summary, then approve, reject, or request changes with feedback.", submitLabel: "Submit decision", inputFields: [{ name: "feedback", label: "Approval note", kind: "text", multiline: true, required: false }] } }], executionContextSnapshots: [], planOutput: { spec: { root: "root", elements: { root: { type: "Stack", props: { gap: "md" }, children: ["summary", "statement"] }, summary: { type: "ResultSummary", props: { title: "Tailored research statement ready for approval", summary: "The statement connects verified deep-learning experience to the NUS lab direction without inventing applicant facts." } }, statement: { type: "Markdown", props: { content: "### Approval scope\n\n- Verify every applicant fact.\n- Confirm research fit and positioning.\n- Approve, reject, or request changes before package assembly." } } } }, revision: 1, updatedAt: "2026-07-20T08:45:00.000Z", updatedByNodeId: approvalNodeId, history: [] } } } } });
+  await prisma.executionSession.upsert({ where: { id: "execution_session_goal_active_approval" }, update: { workspaceId, taskId: GOAL_WORKBENCH_ACCEPTANCE_IDS.approvalTaskId, planId: approvalPlanId, status: "Paused", currentNodeId: approvalNodeId, pauseReason: "approval", pausedAt: new Date("2026-07-20T08:45:00.000Z") }, create: { id: "execution_session_goal_active_approval", workspaceId, taskId: GOAL_WORKBENCH_ACCEPTANCE_IDS.approvalTaskId, planId: approvalPlanId, status: "Paused", currentNodeId: approvalNodeId, pauseReason: "approval", pausedAt: new Date("2026-07-20T08:45:00.000Z") } });
+
   await prisma.goalBriefRevision.deleteMany({ where: { goalId } });
   await prisma.goalBriefRevision.create({ data: { workspaceId, goalId, brief, actorType: "user", actorId: "acceptance-fixture-user", createdAt: new Date("2026-07-20T09:00:00.000Z") } });
   await prisma.goalWorkingSetItem.deleteMany({ where: { goalId } });
@@ -675,10 +733,10 @@ export async function seedActiveGoalWorkbenchFixture() {
         id: "goal_ws_active_comparison",
         workspaceId,
         goalId,
-        subjectType: "task",
-        subjectId: GOAL_WORKBENCH_ACCEPTANCE_IDS.discoveryTaskId,
+        subjectType: "accepted_result",
+        subjectId: GOAL_WORKBENCH_ACCEPTANCE_IDS.discoveryRunId,
         label: "Accepted opening comparison",
-        snapshot: { title: "Compare the NUS opening with alternatives", status: "Completed", summary: "NUS target selected from the accepted comparison." },
+        snapshot: { taskId: GOAL_WORKBENCH_ACCEPTANCE_IDS.discoveryTaskId, runId: GOAL_WORKBENCH_ACCEPTANCE_IDS.discoveryRunId, summary: "NUS target selected from the accepted comparison.", artifactIds: [GOAL_WORKBENCH_ACCEPTANCE_IDS.comparisonArtifactId] },
         rank: 1,
       },
       {

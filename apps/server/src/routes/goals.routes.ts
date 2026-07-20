@@ -2,12 +2,16 @@ import { Hono } from "hono";
 import { zValidator } from "@hono/zod-validator";
 import type { ChronaEngine } from "@chrona/engine";
 import {
+  applyGoalReviewBodySchema,
+  confirmGoalCriterionBodySchema,
   createGoalBodySchema,
   createGoalTaskBodySchema,
   goalActionBodySchema,
   goalIdParamSchema,
   goalArtifactParamSchema,
   listGoalsQuerySchema,
+  goalTaskParamSchema,
+  processGoalResultBodySchema,
   promoteTaskToGoalBodySchema,
   promoteTaskToGoalParamSchema,
   updateGoalBodySchema,
@@ -119,6 +123,48 @@ export function createGoalRoutes(engine: ChronaEngine) {
           }), 201);
         } catch (cause) {
           return routeFailure(c, "POST /api/goals/:goalId/tasks", cause, "Failed to create Goal task");
+        }
+      },
+    )
+    .post(
+      "/goals/:goalId/results/:taskId/process",
+      zValidator("param", goalTaskParamSchema),
+      zValidator("json", processGoalResultBodySchema),
+      async (c) => {
+        try {
+          return json(c, await engine.goals.processResult({
+            ...c.req.valid("param"),
+            command: c.req.valid("json"),
+          }));
+        } catch (cause) {
+          return routeFailure(c, "POST /api/goals/:goalId/results/:taskId/process", cause, "Failed to process Goal result");
+        }
+      },
+    )
+    .post(
+      "/goals/:goalId/criteria/:criterionId/confirm",
+      zValidator("param", goalTaskParamSchema.extend({ criterionId: goalIdParamSchema.shape.goalId }).omit({ taskId: true })),
+      zValidator("json", confirmGoalCriterionBodySchema),
+      async (c) => {
+        try {
+          return json(c, await engine.goals.confirmCriterion({
+            ...c.req.valid("param"),
+            command: c.req.valid("json"),
+          }));
+        } catch (cause) {
+          return routeFailure(c, "POST /api/goals/:goalId/criteria/:criterionId/confirm", cause, "Failed to confirm Goal criterion");
+        }
+      },
+    )
+    .post(
+      "/goals/:goalId/reviews/apply",
+      zValidator("param", goalIdParamSchema),
+      zValidator("json", applyGoalReviewBodySchema),
+      async (c) => {
+        try {
+          return json(c, await engine.goals.applyReview({ goalId: c.req.valid("param").goalId, command: c.req.valid("json") }));
+        } catch (cause) {
+          return routeFailure(c, "POST /api/goals/:goalId/reviews/apply", cause, "Failed to apply Goal review");
         }
       },
     )

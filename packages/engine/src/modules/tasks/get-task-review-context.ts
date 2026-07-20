@@ -19,7 +19,7 @@ export async function getTaskReviewContext(input: { taskId: string }) {
 
   const latestRun = await db.run.findFirst({
     where: { taskId: input.taskId },
-    orderBy: { createdAt: "desc" },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
   });
   const acceptance = latestRun
     ? await db.event.findFirst({

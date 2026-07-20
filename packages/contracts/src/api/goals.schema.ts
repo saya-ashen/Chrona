@@ -16,6 +16,7 @@ export const goalSuccessCriterionSchema = z.object({
   description: z.string().trim().min(1),
   satisfied: z.boolean().default(false),
   confirmedAt: z.string().datetime().nullable().default(null),
+  evidenceArtifactIds: z.array(z.string().trim().min(1)).optional(),
 });
 
 
@@ -39,6 +40,24 @@ export const goalWorkingSetSelectionSchema = z.object({
   subjectId: z.string().min(1),
 });
 
+export const goalCriterionEvidenceSchema = z.object({
+  criterionId: z.string().trim().min(1),
+  artifactIds: z.array(z.string().trim().min(1)).min(1),
+});
+
+export const processGoalResultBodySchema = z.object({
+  artifactIds: z.array(z.string().trim().min(1)).min(1),
+  addToWorkingSet: z.boolean().default(true),
+  createGoalAssets: z.boolean().default(true),
+  criterionId: z.string().trim().min(1).nullable().optional(),
+});
+
+export const confirmGoalCriterionBodySchema = z.object({
+  artifactIds: z.array(z.string().trim().min(1)).min(1),
+  note: z.string().trim().min(1).max(2_000),
+});
+
+
 export const updateGoalBriefBodySchema = z.object({
   brief: goalOperationalBriefSchema,
 });
@@ -57,6 +76,13 @@ export const createGoalTaskBodySchema = z.object({
   autoPlanGeneration: z.boolean().default(false),
   expectedOutcome: z.string().trim().min(1).optional(),
   contextSelections: z.array(goalWorkingSetSelectionSchema).max(24).optional(),
+});
+
+export const applyGoalReviewBodySchema = z.object({
+  summary: z.string().trim().min(1).max(5_000),
+  nextReviewAt: z.string().datetime().nullable().optional(),
+  brief: goalOperationalBriefSchema.optional(),
+  tasks: z.array(createGoalTaskBodySchema).max(12).default([]),
 });
 
 export const goalTaskParamSchema = z.object({
@@ -122,6 +148,9 @@ export type UpdateGoalRequest = z.infer<typeof updateGoalBodySchema>;
 export type GoalActionRequest = z.infer<typeof goalActionBodySchema>;
 export type PromoteTaskToGoalRequest = z.infer<typeof promoteTaskToGoalBodySchema>;
 export type CreateGoalTaskRequest = z.infer<typeof createGoalTaskBodySchema>;
+export type ProcessGoalResultRequest = z.infer<typeof processGoalResultBodySchema>;
+export type ConfirmGoalCriterionRequest = z.infer<typeof confirmGoalCriterionBodySchema>;
+export type ApplyGoalReviewRequest = z.infer<typeof applyGoalReviewBodySchema>;
 export type GoalOperationalBrief = z.infer<typeof goalOperationalBriefSchema>;
 export type GoalWorkingSetSubjectType = z.infer<typeof goalWorkingSetSubjectTypeSchema>;
 export type GoalWorkingSetSelection = z.infer<typeof goalWorkingSetSelectionSchema>;
