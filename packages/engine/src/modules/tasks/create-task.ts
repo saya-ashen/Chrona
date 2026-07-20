@@ -137,6 +137,9 @@ export async function createTask(input: CreateTaskInput) {
       status,
       parentTaskId: input.parentTaskId ?? null,
       goalId: input.goalId ?? null,
+      goalContext: input.goalContext
+        ? input.goalContext as Prisma.InputJsonObject
+        : undefined,
       aiClientId: input.aiClientId ?? null,
     },
   });

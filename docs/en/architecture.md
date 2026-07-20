@@ -75,16 +75,25 @@ Task execution now lives inside the task workspace. Runtime commands use `/api/w
 
 The schedule page shows task/time-block projections, conflicts, suggestions, and scheduling operations. Schedule proposals can be accepted/rejected and due work can become executable WorkBlocks.
 
-### Long-horizon Goal foundation
+### Long-horizon Goal Control Plane and Workbench
 
-Chrona ships the Phase 3 Goal aggregate and a lifecycle-aware product workspace.
-A `Goal` contains bounded tasks, validated user-confirmed success criteria,
-explicit lifecycle actions, accepted-result summaries, and provenance-preserving
-read-only `GoalAsset` references. `Draft | Active | Paused` render as an Ongoing
-Workspace; `Achieved | Stopped` render as an Outcome Archive with the final
-result, evidence, confirmation actor/note/time, and history prioritized above
-implementation detail. Goal list and detail routes are `/goals` and
-`/goals/:goalId`; a Goal never owns a provider session or execution plan.
+Chrona ships the Phase 3 Goal aggregate and lifecycle-aware Goal surfaces. A
+`Goal` contains bounded tasks, validated user-confirmed success criteria,
+explicit lifecycle actions, accepted-result summaries, provenance-preserving
+read-only `GoalAsset` references, a versioned Operational Brief, and an explicit
+Working Set. `Draft | Active | Paused` render as an Ongoing Workspace with two
+layers: the Goal Control Plane derives Needs You, In Progress, New Results, Up
+Next, current focus, criteria, and one primary action; the Goal Workbench lets
+the user choose context and compose one bounded Task from a previewed immutable
+snapshot. `Achieved | Stopped` render as an Outcome Archive with final result,
+evidence, confirmation actor/note/time, and history prioritized above execution
+detail.
+
+Goal list and detail routes are `/goals` and `/goals/:goalId`. A Goal-scoped
+Task inspector is `/goals/:goalId/workbench/tasks/:taskId`; it verifies
+Goal/Task ownership and reuses the canonical Task Workspace. The Task retains
+its independent `/tasks/:taskId` identity. Goal never owns a provider session,
+Plan, Run, or execution state.
 
 The remaining target separates activation and calendar placement:
 `TaskTrigger` definitions will produce idempotent `TriggerDelivery` facts and

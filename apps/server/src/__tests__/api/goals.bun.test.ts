@@ -146,6 +146,83 @@ describe("Goal API", () => {
     expect(read.primaryAction.kind).toBeDefined();
   });
 
+  it("persists a Goal brief, working set, and immutable bounded-task context", async () => {
+    const { workspaceId } = await seedWorkspace("Goal workbench");
+    const app = createApiRouter(createChronaEngine());
+    const created = await responseJson<GoalData>(await requestJson(app, "/goals", {
+      workspaceId,
+      title: "Prepare a research application",
+      description: "Build an evidence-backed application over several bounded steps.",
+      successCriteria: [{
+        id: "submitted",
+        kind: "user_confirmed",
+        description: "Application submitted",
+        satisfied: false,
+        confirmedAt: null,
+      }],
+    }));
+
+    const brief = {
+      outcome: "Submit a competitive application",
+      currentFocus: "Confirm the target opening",
+      strategy: "Use accepted research evidence before drafting",
+      constraints: ["Do not invent applicant facts"],
+    };
+    const briefResponse = await app.request(`/goals/${created.id}/brief`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ brief }),
+    });
+    expect(briefResponse.status).toBe(200);
+
+    const sourceTask = await responseJson<GoalTaskResponse>(await requestJson(app, `/goals/${created.id}/tasks`, {
+      kind: "task",
+      title: "Confirm target opening",
+      description: "Review the opening requirements.",
+      priority: "High",
+      autoPlanGeneration: false,
+      expectedOutcome: "A confirmed target opening",
+    }));
+    const workingSetResponse = await app.request(`/goals/${created.id}/working-set`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ selections: [{ subjectType: "task", subjectId: sourceTask.taskId }] }),
+    });
+    expect(workingSetResponse.status).toBe(200);
+    const withWorkingSet = await responseJson<GoalData>(workingSetResponse);
+    expect(withWorkingSet.workbench.brief).toEqual(brief);
+    expect(withWorkingSet.workbench.workingSet).toHaveLength(1);
+
+    const nextTask = await responseJson<GoalTaskResponse>(await requestJson(app, `/goals/${created.id}/tasks`, {
+      kind: "task",
+      title: "Draft next application step",
+      description: "Use only the frozen workbench context.",
+      priority: "High",
+      autoPlanGeneration: false,
+      expectedOutcome: "A bounded draft",
+      contextSelections: [{ subjectType: "task", subjectId: sourceTask.taskId }],
+    }));
+    const persisted = await db.task.findUniqueOrThrow({ where: { id: nextTask.taskId } });
+    expect(persisted.goalContext).toMatchObject({
+      goal: { id: created.id, operationalBrief: brief },
+      items: [{ subjectType: "task", subjectId: sourceTask.taskId }],
+      expectedOutcome: "A bounded draft",
+    });
+    const bootstrapResponse = await app.request(`/tasks/${nextTask.taskId}`);
+    expect(bootstrapResponse.status).toBe(200);
+    const bootstrap = await responseJson<{ task: { goalId: string | null; goal: { id: string; title: string } | null } }>(bootstrapResponse);
+    expect(bootstrap.task.goalId).toBe(created.id);
+    expect(bootstrap.task.goal).toEqual({ id: created.id, title: created.title });
+
+    await app.request(`/goals/${created.id}/working-set`, {
+      method: "PUT",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ selections: [] }),
+    });
+    expect((await db.task.findUniqueOrThrow({ where: { id: nextTask.taskId } })).goalContext)
+      .toEqual(persisted.goalContext);
+  });
+
   it("atomically promotes one accepted result and is idempotent", async () => {
     const { workspaceId } = await seedWorkspace("Goal promotion");
     const { taskId } = await seedTask(workspaceId, { title: "Produce a result", status: "Completed" });

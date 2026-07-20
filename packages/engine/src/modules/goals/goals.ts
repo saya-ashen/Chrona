@@ -4,7 +4,10 @@ import type {
   CreateGoalRequest,
   CreateGoalTaskRequest,
   GoalActionRequest,
+  GoalOperationalBrief,
   GoalSuccessCriterion,
+  GoalWorkingSetSelection,
+  GoalWorkingSetSubjectType,
   PromoteTaskToGoalRequest,
   UpdateGoalRequest,
 } from "@chrona/contracts/api";
@@ -16,6 +19,8 @@ import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
 type GoalEventType =
   | "goal.created"
   | "goal.updated"
+  | "goal.brief_updated"
+  | "goal.working_set_updated"
   | "goal.paused"
   | "goal.resumed"
   | "goal.stopped"
@@ -47,6 +52,13 @@ const goalInclude = {
   assets: {
     orderBy: [{ updatedAt: "desc" }, { id: "asc" }],
     include: { sourceArtifact: true, currentArtifact: true },
+  },
+  workingSetItems: {
+    orderBy: [{ rank: "asc" }, { createdAt: "asc" }],
+  },
+  briefRevisions: {
+    orderBy: { createdAt: "desc" },
+    take: 20,
   },
 } satisfies Prisma.GoalInclude;
 
@@ -86,6 +98,52 @@ function achievementConfirmationFrom(value: unknown): AchievementConfirmation | 
       ? record.evidenceArtifactIds.filter((id): id is string => typeof id === "string")
       : [],
   };
+}
+
+function operationalBriefFrom(value: unknown): GoalOperationalBrief | null {
+  const record = recordValue(value);
+  if (
+    !record
+    || typeof record.outcome !== "string"
+    || typeof record.currentFocus !== "string"
+    || typeof record.strategy !== "string"
+    || !Array.isArray(record.constraints)
+  ) return null;
+  return {
+    outcome: record.outcome,
+    currentFocus: record.currentFocus,
+    strategy: record.strategy,
+    constraints: record.constraints.filter((item): item is string => typeof item === "string"),
+  };
+}
+
+function selectionKey(selection: GoalWorkingSetSelection) {
+  return `${selection.subjectType}:${selection.subjectId}`;
+}
+
+function goalContextSnapshot(goal: GoalWithDetails, selections: GoalWorkingSetSelection[]) {
+  const requested = new Set(selections.map(selectionKey));
+  const selectedItems = goal.workingSetItems.filter((item) => requested.has(`${item.subjectType}:${item.subjectId}`));
+  if (selectedItems.length !== requested.size) {
+    throw new EngineError(
+      ENGINE_ERROR_CODES.VALIDATION_FAILED,
+      "Every selected context item must belong to the Goal working set",
+    );
+  }
+  return {
+    goal: {
+      id: goal.id,
+      title: goal.title,
+      operationalBrief: operationalBriefFrom(goal.operationalBrief),
+      capturedAt: new Date().toISOString(),
+    },
+    items: selectedItems.map((item) => ({
+      subjectType: item.subjectType,
+      subjectId: item.subjectId,
+      label: item.label,
+      snapshot: item.snapshot,
+    })),
+  } satisfies Prisma.InputJsonObject;
 }
 
 function acceptedRunId(task: GoalTask) {
@@ -283,6 +341,26 @@ function toGoalReadModel(goal: GoalWithDetails) {
         ...criterion,
         evidenceArtifactIds: achievementConfirmation?.evidenceArtifactIds ?? [],
       })),
+    },
+    workbench: {
+      brief: operationalBriefFrom(goal.operationalBrief),
+      briefRevisionCount: goal.briefRevisions.length,
+      workingSet: goal.workingSetItems.map((item) => ({
+        id: item.id,
+        subjectType: item.subjectType,
+        subjectId: item.subjectId,
+        label: item.label,
+        snapshot: item.snapshot,
+        rank: item.rank,
+        createdAt: item.createdAt.toISOString(),
+        updatedAt: item.updatedAt.toISOString(),
+      })),
+      focus: {
+        needsYou: groupedTasks.attention,
+        inProgress: groupedTasks.active,
+        newResults: groupedTasks.completed.filter((task) => task.acceptedResult),
+        upNext: groupedTasks.planned,
+      },
     },
     taskGroups: groupedTasks,
     tasks,
@@ -492,11 +570,158 @@ export async function actOnGoal(input: { goalId: string; command: GoalActionRequ
   return toGoalReadModel(updated);
 }
 
+export async function updateGoalBrief(input: { goalId: string; brief: GoalOperationalBrief }) {
+  const goal = await getGoalOrThrow(input.goalId);
+  if (goal.status === "Achieved" || goal.status === "Stopped") {
+    throw new EngineError(ENGINE_ERROR_CODES.INVALID_TASK_STATE, "Archived Goals cannot change their operational brief");
+  }
+  await db.$transaction([
+    db.goal.update({
+      where: { id: goal.id },
+      data: { operationalBrief: input.brief },
+    }),
+    db.goalBriefRevision.create({
+      data: {
+        workspaceId: goal.workspaceId,
+        goalId: goal.id,
+        brief: input.brief,
+        actorType: "user",
+        actorId: "server-action",
+      },
+    }),
+  ]);
+  await appendGoalEvent({
+    eventType: "goal.brief_updated",
+    goalId: goal.id,
+    workspaceId: goal.workspaceId,
+    payload: { current_focus: input.brief.currentFocus },
+    summary: `Updated Goal operational brief: ${input.brief.currentFocus}`,
+  });
+  return getGoal({ goalId: goal.id });
+}
+
+type WorkingSetCandidate = {
+  subjectType: GoalWorkingSetSubjectType;
+  subjectId: string;
+  label: string;
+  snapshot: Prisma.InputJsonObject;
+};
+
+function workingSetCandidates(goal: GoalWithDetails): WorkingSetCandidate[] {
+  const taskCandidates = goal.tasks.map((task) => ({
+    subjectType: "task" as const,
+    subjectId: task.id,
+    label: task.title,
+    snapshot: {
+      title: task.title,
+      description: task.description,
+      status: task.status,
+      updatedAt: task.updatedAt.toISOString(),
+    } satisfies Prisma.InputJsonObject,
+  }));
+  const assetCandidates = goal.assets.map((asset) => ({
+    subjectType: "goal_asset" as const,
+    subjectId: asset.id,
+    label: asset.label,
+    snapshot: {
+      label: asset.label,
+      role: asset.role,
+      status: asset.status,
+      artifactId: asset.currentArtifactId,
+      contentPreview: asset.currentArtifact.contentPreview,
+    } satisfies Prisma.InputJsonObject,
+  }));
+  const resultCandidates = goal.tasks.flatMap((task) => {
+    const result = acceptedResultForTask(task);
+    return result ? [{
+      subjectType: "accepted_result" as const,
+      subjectId: result.runId,
+      label: task.title,
+      snapshot: {
+        taskId: task.id,
+        taskTitle: task.title,
+        runId: result.runId,
+        acceptedAt: result.acceptedAt,
+        summary: result.summary,
+      } satisfies Prisma.InputJsonObject,
+    }] : [];
+  });
+  const artifactCandidates = goal.tasks.flatMap((task) => task.runs.flatMap((run) => run.artifacts.map((artifact) => ({
+    subjectType: "artifact" as const,
+    subjectId: artifact.id,
+    label: artifact.title,
+    snapshot: {
+      taskId: artifact.taskId,
+      runId: artifact.runId,
+      title: artifact.title,
+      type: artifact.type,
+      uri: artifact.uri,
+      contentPreview: artifact.contentPreview,
+    } satisfies Prisma.InputJsonObject,
+  }))));
+  const criterionCandidates = criteriaFrom(goal.successCriteria).map((criterion) => ({
+    subjectType: "criterion" as const,
+    subjectId: criterion.id,
+    label: criterion.description,
+    snapshot: {
+      description: criterion.description,
+      satisfied: criterion.satisfied,
+      confirmedAt: criterion.confirmedAt,
+    } satisfies Prisma.InputJsonObject,
+  }));
+  return [...taskCandidates, ...assetCandidates, ...resultCandidates, ...artifactCandidates, ...criterionCandidates];
+}
+
+export async function updateGoalWorkingSet(input: { goalId: string; selections: GoalWorkingSetSelection[] }) {
+  const goal = await getGoalOrThrow(input.goalId);
+  if (goal.status === "Achieved" || goal.status === "Stopped") {
+    throw new EngineError(ENGINE_ERROR_CODES.INVALID_TASK_STATE, "Archived Goals cannot change their working set");
+  }
+  const candidatesByKey = new Map(workingSetCandidates(goal).map((candidate) => [
+    `${candidate.subjectType}:${candidate.subjectId}`,
+    candidate,
+  ]));
+  const selected = input.selections.map((selection) => candidatesByKey.get(selectionKey(selection)));
+  if (selected.some((candidate) => !candidate)) {
+    throw new EngineError(ENGINE_ERROR_CODES.VALIDATION_FAILED, "Every working-set item must belong to this Goal");
+  }
+  await db.$transaction(async (tx) => {
+    await tx.goalWorkingSetItem.deleteMany({ where: { goalId: goal.id } });
+    const entries = selected.filter((candidate): candidate is WorkingSetCandidate => Boolean(candidate));
+    if (entries.length > 0) {
+      await tx.goalWorkingSetItem.createMany({
+        data: entries.map((candidate, rank) => ({
+          workspaceId: goal.workspaceId,
+          goalId: goal.id,
+          subjectType: candidate.subjectType,
+          subjectId: candidate.subjectId,
+          label: candidate.label,
+          snapshot: candidate.snapshot,
+          rank,
+        })),
+      });
+    }
+  });
+  await appendGoalEvent({
+    eventType: "goal.working_set_updated",
+    goalId: goal.id,
+    workspaceId: goal.workspaceId,
+    payload: { item_count: input.selections.length },
+    summary: `Updated Goal working set (${input.selections.length} items)`,
+  });
+  return getGoal({ goalId: goal.id });
+}
+
 export async function createGoalTask(input: { goalId: string; command: CreateGoalTaskRequest }) {
   const goal = await getGoalOrThrow(input.goalId);
   if (goal.status !== "Active") {
     throw new EngineError(ENGINE_ERROR_CODES.INVALID_TASK_STATE, "Only active Goals can create bounded tasks");
   }
+  const contextSelections = input.command.contextSelections ?? goal.workingSetItems.map((item) => ({
+    subjectType: item.subjectType,
+    subjectId: item.subjectId,
+  }));
+  const contextSnapshot = goalContextSnapshot(goal, contextSelections);
   const created = await createTask({
     workspaceId: goal.workspaceId,
     goalId: goal.id,
@@ -505,13 +730,21 @@ export async function createGoalTask(input: { goalId: string; command: CreateGoa
     priority: input.command.priority,
     autoPlanGeneration: input.command.autoPlanGeneration,
     autoExecute: false,
+    goalContext: {
+      ...contextSnapshot,
+      expectedOutcome: input.command.expectedOutcome ?? null,
+    },
   });
   await appendGoalEvent({
     eventType: input.command.kind === "review" ? "goal.review_task_created" : "goal.task_created",
     goalId: goal.id,
     workspaceId: goal.workspaceId,
     taskId: created.taskId,
-    payload: { kind: input.command.kind },
+    payload: {
+      kind: input.command.kind,
+      context_item_count: contextSelections.length,
+      expected_outcome: input.command.expectedOutcome ?? null,
+    },
     summary: input.command.kind === "review"
       ? `Created bounded Goal review: ${input.command.title}`
       : `Created bounded Goal task: ${input.command.title}`,

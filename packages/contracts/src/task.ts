@@ -83,6 +83,7 @@ export type CreateTaskInput = {
   aiClientId?: string | null;
   parentTaskId?: string | null;
   goalId?: string | null;
+  goalContext?: Record<string, unknown> | null;
   recurrenceRule?: string | null;
   recurrenceAnchorStartAt?: string | null;
   recurrenceAnchorEndAt?: string | null;

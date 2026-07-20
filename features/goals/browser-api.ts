@@ -2,6 +2,8 @@ import { apiJson } from "@shared/http";
 import type {
   CreateGoalTaskRequest,
   GoalActionRequest,
+  GoalOperationalBrief,
+  GoalWorkingSetSelection,
   PromoteTaskToGoalRequest,
 } from "@chrona/contracts";
 import type { GoalArtifactData, GoalData } from "./model/goal-types";
@@ -21,6 +23,20 @@ export async function createGoalTask(
     `/api/goals/${encodeURIComponent(goalId)}/tasks`,
     { method: "POST", body: JSON.stringify(command) },
   );
+}
+
+export async function updateGoalBrief(goalId: string, brief: GoalOperationalBrief) {
+  return apiJson<GoalData>(`/api/goals/${encodeURIComponent(goalId)}/brief`, {
+    method: "PUT",
+    body: JSON.stringify({ brief }),
+  });
+}
+
+export async function updateGoalWorkingSet(goalId: string, selections: GoalWorkingSetSelection[]) {
+  return apiJson<GoalData>(`/api/goals/${encodeURIComponent(goalId)}/working-set`, {
+    method: "PUT",
+    body: JSON.stringify({ selections }),
+  });
 }
 
 export async function getGoalArtifact(goalId: string, artifactId: string) {

@@ -6,15 +6,15 @@ Schema source: `prisma/schema.prisma`.
 
 Current schema inventory:
 
-- Models: 41
-- Enums: 27
+- Models: 43
+- Enums: 28
 
 ## Main aggregates
 
 | Aggregate | Key models | Purpose |
 | --- | --- | --- |
 | Workspace | `Workspace` | Scope for tasks, memory, schedule, calendar sources, and configuration. |
-| Goal | `Goal`, `GoalAsset` | Durable outcome lifecycle, validated criteria, bounded-task ownership, and immutable artifact promotion. |
+| Goal | `Goal`, `GoalAsset`, `GoalWorkingSetItem`, `GoalBriefRevision` | Durable outcome lifecycle, versioned operating context, explicit bounded-task inputs, and immutable artifact promotion. |
 | Task | `Task`, `TaskDependency`, `TaskProjection`, `TaskSession`, `TaskTimelineItem` | Core work item, relationships, projection-backed read shape, scoped work sessions, and timeline rows. |
 | Plan | `TaskPlan`, `TaskPlanLayer`, `GraphVersion`, `GraphMutationRecord`, `ReconciliationEvent`, `TaskPlanNodeAttempt`, `TaskPlanTerminalAction` | Generated/accepted executable graph plan, node-attempt history, terminal actions, and graph-change history. |
 | Execution | `TaskPlanRun`, `Run`, `ExecutionSession`, `RuntimeCursor`, `Approval`, `Artifact`, `TaskPlanProviderRun`, `TaskPlanProviderApproval`, `RunToken` | Plan/run/session state, runtime cursoring, provider continuity, approvals, tokens, and outputs. |
@@ -33,6 +33,8 @@ erDiagram
   Workspace ||--o{ Goal : owns
   Goal ||--o{ Task : advances_through
   Goal ||--o{ GoalAsset : works_with
+  Goal ||--o{ GoalWorkingSetItem : selects_context
+  Goal ||--o{ GoalBriefRevision : revises_strategy
   Artifact ||--o{ GoalAsset : promoted_as
   Workspace ||--o{ Memory : owns
   Workspace ||--o{ AiClient : configures
@@ -65,14 +67,24 @@ erDiagram
 
 ## Goal foundation and remaining target
 
-The current schema ships `Goal`, optional `Task.goalId`, and read-only
-`GoalAsset`. Goal lifecycle is `Draft | Active | Paused | Achieved | Stopped`.
-Achievement requires explicit user confirmation and persists the confirmation
-note, actor identity, timestamp, and Goal-owned evidence Artifact IDs in
+The current schema ships `Goal`, optional `Task.goalId`, read-only `GoalAsset`,
+`GoalWorkingSetItem`, `GoalBriefRevision`, and immutable `Task.goalContext`.
+Goal lifecycle is `Draft | Active | Paused | Achieved | Stopped`. Achievement
+requires explicit user confirmation and persists note, actor identity,
+timestamp, and Goal-owned evidence Artifact IDs in
 `Goal.achievementConfirmation`; a canonical `goal.achieved` event provides the
 audit record. `GoalAsset` records source and current Artifact references without
 mutating source execution evidence. Accepted Task results remain immutable and
 separate from these Goal-scoped references.
+
+`Goal.operationalBrief` stores the current intended outcome, current focus,
+strategy, and constraints. Every save appends `GoalBriefRevision` with actor and
+time. `GoalWorkingSetItem` stores an ordered explicit selection of whole Goal
+objects plus a display/audit snapshot; canonical lifecycle remains on the
+source object. When a bounded Goal Task is created, its selected Working Set,
+current Operational Brief, capture time, and expected outcome are frozen into
+`Task.goalContext`. Plan generation consumes this immutable source context;
+later Goal edits do not rewrite existing Task input.
 
 The remaining accepted model adds `TaskTrigger`, `TriggerDelivery`, and a
 neutral `TaskOccurrence`. The complete target model and phased migration are

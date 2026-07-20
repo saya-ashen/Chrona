@@ -61,7 +61,7 @@ import {
   Textarea,
   cn,
 } from "@shared/ui";
-import { createGoalTask, runGoalAction } from "../browser-api";
+import { createGoalTask, runGoalAction, updateGoalBrief, updateGoalWorkingSet } from "../browser-api";
 import type {
   GoalAcceptedResultData,
   GoalArtifactData,
@@ -265,6 +265,130 @@ function ActiveSummary({ goal, copy }: { goal: GoalData; copy: GoalCopy }) {
   );
 }
 
+// The edit/read modes stay together so one card owns its complete product interaction.
+// eslint-disable-next-line complexity
+function OperationalBriefCard({ goal, copy }: { goal: GoalData; copy: GoalCopy }) {
+  const revalidator = useRevalidator();
+  const brief = goal.workbench.brief;
+  const [editing, setEditing] = useState(!brief);
+  const [outcome, setOutcome] = useState(brief?.outcome ?? goal.description ?? "");
+  const [currentFocus, setCurrentFocus] = useState(brief?.currentFocus ?? "");
+  const [strategy, setStrategy] = useState(brief?.strategy ?? "");
+  const [constraints, setConstraints] = useState(brief?.constraints.join("\n") ?? "");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function save() {
+    if (!outcome.trim() || !currentFocus.trim() || saving) return;
+    setSaving(true);
+    setError(null);
+    try {
+      await updateGoalBrief(goal.id, {
+        outcome: outcome.trim(),
+        currentFocus: currentFocus.trim(),
+        strategy: strategy.trim(),
+        constraints: constraints.split("\n").map((item) => item.trim()).filter(Boolean),
+      });
+      await revalidator.revalidate();
+      setEditing(false);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : copy.actionError);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <Card>
+      <CardHeader className="flex-row items-start justify-between gap-3">
+        <div>
+          <CardTitle>{copy.operationalBrief}</CardTitle>
+          <CardDescription>{copy.workspaceDescription}</CardDescription>
+        </div>
+        {!editing ? <Button size="sm" variant="outline" onClick={() => setEditing(true)}>{copy.editBrief}</Button> : null}
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {editing ? (
+          <>
+            <Field><FieldLabel htmlFor="goal-brief-outcome">{copy.outcomeLabel}</FieldLabel><Textarea id="goal-brief-outcome" value={outcome} onChange={(event) => setOutcome(event.target.value)} rows={2} /></Field>
+            <Field><FieldLabel htmlFor="goal-brief-focus">{copy.currentFocus}</FieldLabel><Input id="goal-brief-focus" value={currentFocus} onChange={(event) => setCurrentFocus(event.target.value)} /></Field>
+            <Field><FieldLabel htmlFor="goal-brief-strategy">{copy.strategy}</FieldLabel><Textarea id="goal-brief-strategy" value={strategy} onChange={(event) => setStrategy(event.target.value)} rows={3} /></Field>
+            <Field><FieldLabel htmlFor="goal-brief-constraints">{copy.constraints}</FieldLabel><Textarea id="goal-brief-constraints" value={constraints} onChange={(event) => setConstraints(event.target.value)} rows={3} /></Field>
+            {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
+            <div className="flex justify-end gap-2">
+              {brief ? <Button variant="outline" onClick={() => setEditing(false)}>{copy.cancel}</Button> : null}
+              <Button disabled={!outcome.trim() || !currentFocus.trim() || saving} onClick={() => void save()}>{saving ? copy.saving : copy.saveBrief}</Button>
+            </div>
+          </>
+        ) : brief ? (
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="rounded-xl border bg-muted/20 p-4 sm:col-span-2"><p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">{copy.currentFocus}</p><p className="mt-2 font-semibold">{brief.currentFocus}</p></div>
+            <div><p className="text-xs font-medium text-muted-foreground">{copy.outcomeLabel}</p><p className="mt-1 text-sm leading-6">{brief.outcome}</p></div>
+            <div><p className="text-xs font-medium text-muted-foreground">{copy.strategy}</p><p className="mt-1 text-sm leading-6">{brief.strategy}</p></div>
+            {brief.constraints.length ? <div className="sm:col-span-2"><p className="text-xs font-medium text-muted-foreground">{copy.constraints}</p><ul className="mt-2 space-y-1 text-sm">{brief.constraints.map((constraint) => <li key={constraint}>• {constraint}</li>)}</ul></div> : null}
+          </div>
+        ) : null}
+      </CardContent>
+    </Card>
+  );
+}
+
+function workingSetCandidates(goal: GoalData) {
+  return [
+    ...goal.assets.map((asset) => ({ key: `goal_asset:${asset.id}`, subjectType: "goal_asset" as const, subjectId: asset.id, label: asset.label })),
+    ...goal.acceptedResults.map((result) => ({ key: `accepted_result:${result.runId}`, subjectType: "accepted_result" as const, subjectId: result.runId, label: result.taskTitle })),
+    ...goal.outcome.criteria.map((criterion) => ({ key: `criterion:${criterion.id}`, subjectType: "criterion" as const, subjectId: criterion.id, label: criterion.description })),
+    ...goal.tasks.map((task) => ({ key: `task:${task.id}`, subjectType: "task" as const, subjectId: task.id, label: task.title })),
+  ];
+}
+
+function WorkingSetCard({ goal, copy }: { goal: GoalData; copy: GoalCopy }) {
+  const revalidator = useRevalidator();
+  const candidates = workingSetCandidates(goal);
+  const [editing, setEditing] = useState(false);
+  const [selected, setSelected] = useState(() => new Set(goal.workbench.workingSet.map((item) => `${item.subjectType}:${item.subjectId}`)));
+  const [saving, setSaving] = useState(false);
+  async function save() {
+    setSaving(true);
+    try {
+      await updateGoalWorkingSet(goal.id, candidates.filter((candidate) => selected.has(candidate.key)).map(({ subjectType, subjectId }) => ({ subjectType, subjectId })));
+      await revalidator.revalidate();
+      setEditing(false);
+    } finally {
+      setSaving(false);
+    }
+  }
+  return (
+    <Card>
+      <CardHeader className="flex-row items-start justify-between gap-3">
+        <div><CardTitle>{copy.workingSet}</CardTitle><CardDescription>{copy.workingSetDescription}</CardDescription></div>
+        {!editing ? <Button size="sm" variant="outline" onClick={() => setEditing(true)}>{copy.editWorkingSet}</Button> : null}
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {editing ? candidates.map((candidate) => (
+          <label key={candidate.key} className="flex items-start gap-3 rounded-xl border p-3 text-sm">
+            <Checkbox checked={selected.has(candidate.key)} onCheckedChange={(checked) => setSelected((current) => { const next = new Set(current); if (checked) next.add(candidate.key); else next.delete(candidate.key); return next; })} />
+            <span>{candidate.label}</span>
+          </label>
+        )) : goal.workbench.workingSet.length ? goal.workbench.workingSet.map((item) => (
+          <div key={item.id} className="flex items-center gap-2 rounded-xl border p-3"><Badge variant="outline">{item.subjectType.replaceAll("_", " ")}</Badge><span className="text-sm font-medium">{item.label}</span></div>
+        )) : <p className="text-sm leading-6 text-muted-foreground">{copy.noWorkingSet}</p>}
+        {editing ? <div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setEditing(false)}>{copy.cancel}</Button><Button disabled={saving} onClick={() => void save()}>{saving ? copy.saving : copy.saveWorkingSet}</Button></div> : null}
+      </CardContent>
+    </Card>
+  );
+}
+
+function FocusQueue({ goal, copy }: { goal: GoalData; copy: GoalCopy }) {
+  const groups = [
+    { key: "needsYou", title: copy.needsYou, tasks: goal.workbench.focus.needsYou },
+    { key: "inProgress", title: copy.inProgress, tasks: goal.workbench.focus.inProgress },
+    { key: "newResults", title: copy.newResults, tasks: goal.workbench.focus.newResults },
+    { key: "upNext", title: copy.upNext, tasks: goal.workbench.focus.upNext },
+  ];
+  return <Card><CardHeader><CardTitle>{copy.focusQueue}</CardTitle><CardDescription>{copy.workspaceDescription}</CardDescription></CardHeader><CardContent className="space-y-4">{groups.map((group) => <section key={group.key}><div className="mb-2 flex items-center gap-2"><p className="text-sm font-semibold">{group.title}</p><Badge variant="secondary">{group.tasks.length}</Badge></div>{group.tasks.slice(0, 3).map((task) => <TaskRow key={task.id} task={task} copy={copy} goalId={goal.id} />)}</section>)}</CardContent></Card>;
+}
+
 function CriteriaCard({ goal, copy }: { goal: GoalData; copy: GoalCopy }) {
   return (
     <Card>
@@ -300,7 +424,7 @@ function CriteriaCard({ goal, copy }: { goal: GoalData; copy: GoalCopy }) {
   );
 }
 
-function TaskRow({ task, copy }: { task: GoalTaskData; copy: GoalCopy }) {
+function TaskRow({ task, copy, goalId }: { task: GoalTaskData; copy: GoalCopy; goalId: string }) {
   const locale = useLocale();
   return (
     <div className="flex min-w-0 flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between">
@@ -318,7 +442,7 @@ function TaskRow({ task, copy }: { task: GoalTaskData; copy: GoalCopy }) {
         <p className="mt-1 text-xs text-muted-foreground">{formatDate(task.updatedAt, locale)}</p>
       </div>
       <Button asChild size="sm" variant={task.group === "attention" ? "default" : "outline"}>
-        <LocalizedLink href={`/tasks/${task.id}`}>
+        <LocalizedLink href={`/goals/${goalId}/workbench/tasks/${task.id}`}>
           {copy.openTask}
           <ExternalLink className="size-4" />
         </LocalizedLink>
@@ -332,11 +456,13 @@ function TaskGroupSection({
   tasks,
   copy,
   defaultOpen,
+  goalId,
 }: {
   group: GoalTaskGroup;
   tasks: GoalTaskData[];
   copy: GoalCopy;
   defaultOpen: boolean;
+  goalId: string;
 }) {
   const [open, setOpen] = useState(defaultOpen);
   if (tasks.length === 0) return null;
@@ -354,7 +480,7 @@ function TaskGroupSection({
         </span>
         {open ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
       </button>
-      {open ? <div className="space-y-2">{tasks.map((task) => <TaskRow key={task.id} task={task} copy={copy} />)}</div> : null}
+      {open ? <div className="space-y-2">{tasks.map((task) => <TaskRow key={task.id} task={task} copy={copy} goalId={goalId} />)}</div> : null}
     </section>
   );
 }
@@ -443,6 +569,8 @@ function CreateTaskDialog({
   const revalidator = useRevalidator();
   const navigate = useNavigate();
   const locale = useLocale();
+  const [expectedOutcome, setExpectedOutcome] = useState("");
+  const [selectedContext, setSelectedContext] = useState(() => new Set(goal.workbench.workingSet.map((item) => `${item.subjectType}:${item.subjectId}`)));
   const [title, setTitle] = useState(kind === "review" ? copy.reviewTaskTitle : "");
   const [description, setDescription] = useState(kind === "review" ? copy.reviewTaskDescription : "");
   const [pending, setPending] = useState(false);
@@ -458,11 +586,15 @@ function CreateTaskDialog({
         title: title.trim(),
         description: description.trim() || null,
         priority: "High",
+        expectedOutcome: expectedOutcome.trim() || undefined,
+        contextSelections: goal.workbench.workingSet
+          .filter((item) => selectedContext.has(`${item.subjectType}:${item.subjectId}`))
+          .map((item) => ({ subjectType: item.subjectType, subjectId: item.subjectId })),
         autoPlanGeneration: false,
       });
       await revalidator.revalidate();
       onOpenChange(false);
-      void navigate(localizeHref(locale, `/tasks/${result.taskId}`));
+      void navigate(localizeHref(locale, `/goals/${goal.id}/workbench/tasks/${result.taskId}`));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : copy.actionError);
     } finally {
@@ -497,6 +629,20 @@ function CreateTaskDialog({
               rows={5}
             />
           </Field>
+          <Field>
+            <FieldLabel htmlFor={`goal-${kind}-outcome`}>{copy.expectedOutcome}</FieldLabel>
+            <Input id={`goal-${kind}-outcome`} value={expectedOutcome} onChange={(event) => setExpectedOutcome(event.target.value)} placeholder={copy.expectedOutcomePlaceholder} />
+          </Field>
+          {goal.workbench.workingSet.length ? (
+            <Field>
+              <FieldLabel>{copy.selectedContext}</FieldLabel>
+              <div className="space-y-2">{goal.workbench.workingSet.map((item) => {
+                const key = `${item.subjectType}:${item.subjectId}`;
+                return <label key={item.id} className="flex items-start gap-3 rounded-xl border p-3 text-sm"><Checkbox checked={selectedContext.has(key)} onCheckedChange={(checked) => setSelectedContext((current) => { const next = new Set(current); if (checked) next.add(key); else next.delete(key); return next; })} /><span>{item.label}</span></label>;
+              })}</div>
+            </Field>
+          ) : null}
+          <div className="rounded-xl border bg-muted/20 p-4"><p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">{copy.actionPreview}</p><p className="mt-2 text-sm leading-6">{copy.createBoundedTaskPreview}</p></div>
           {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
         </div>
         <DialogFooter>
@@ -651,7 +797,7 @@ function PrimaryAction({
   const button = (() => {
     if (action === "resolve_attention" && goal.primaryAction.taskId) {
       return (
-        <Button onClick={() => void navigate(localizeHref(locale, `/tasks/${goal.primaryAction.taskId}`))}>
+        <Button onClick={() => void navigate(localizeHref(locale, `/goals/${goal.id}/workbench/tasks/${goal.primaryAction.taskId}`))}>
           <AlertTriangle className="size-4" />
           {copy.nextAction.resolve_attention}
         </Button>
@@ -679,6 +825,7 @@ function PrimaryAction({
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
             <DropdownMenuItem onClick={onStartReview}><RefreshCw className="size-4" />{copy.startReview}</DropdownMenuItem>
+            <DropdownMenuItem onClick={onAddTask}><Plus className="size-4" />{copy.addTask}</DropdownMenuItem>
             <DropdownMenuItem onClick={() => void runLifecycle("pause")}><Pause className="size-4" />{copy.pause}</DropdownMenuItem>
             <DropdownMenuSeparator />
             <DropdownMenuItem variant="destructive" onClick={() => void runLifecycle("stop")}>{copy.stop}</DropdownMenuItem>
@@ -727,7 +874,19 @@ export function GoalWorkspacePage({ goal, copy }: { goal: GoalData; copy: GoalCo
           </div>
         </header>
 
-        {isArchive ? <PrimaryOutcome goal={goal} copy={copy} /> : <ActiveSummary goal={goal} copy={copy} />}
+        {isArchive ? <PrimaryOutcome goal={goal} copy={copy} /> : (
+          <div className="space-y-5">
+            <ActiveSummary goal={goal} copy={copy} />
+            <section aria-labelledby="goal-control-plane" className="space-y-3">
+              <div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">{copy.controlPlane}</p><h2 id="goal-control-plane" className="mt-1 text-xl font-semibold">{copy.currentFocus}</h2></div>
+              <div className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(20rem,0.65fr)]"><OperationalBriefCard goal={goal} copy={copy} /><FocusQueue goal={goal} copy={copy} /></div>
+            </section>
+            <section aria-labelledby="goal-workbench" className="space-y-3">
+              <div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">{copy.workbench}</p><h2 id="goal-workbench" className="mt-1 text-xl font-semibold">{copy.workingSet}</h2></div>
+              <WorkingSetCard goal={goal} copy={copy} />
+            </section>
+          </div>
+        )}
 
         <Tabs defaultValue={defaultSection} className="min-w-0">
           <TabsList className="grid h-auto w-full grid-cols-4 gap-1 overflow-visible rounded-xl p-1">
@@ -782,10 +941,10 @@ export function GoalWorkspacePage({ goal, copy }: { goal: GoalData; copy: GoalCo
               </CardHeader>
               <CardContent className="space-y-6">
                 {goal.tasks.length === 0 ? <p className="text-sm text-muted-foreground">{copy.noTasks}</p> : null}
-                <TaskGroupSection group="attention" tasks={goal.taskGroups.attention} copy={copy} defaultOpen />
-                <TaskGroupSection group="active" tasks={goal.taskGroups.active} copy={copy} defaultOpen />
-                <TaskGroupSection group="planned" tasks={goal.taskGroups.planned} copy={copy} defaultOpen />
-                <TaskGroupSection group="completed" tasks={goal.taskGroups.completed} copy={copy} defaultOpen={!isArchive} />
+                <TaskGroupSection group="attention" tasks={goal.taskGroups.attention} copy={copy} defaultOpen goalId={goal.id} />
+                <TaskGroupSection group="active" tasks={goal.taskGroups.active} copy={copy} defaultOpen goalId={goal.id} />
+                <TaskGroupSection group="planned" tasks={goal.taskGroups.planned} copy={copy} defaultOpen goalId={goal.id} />
+                <TaskGroupSection group="completed" tasks={goal.taskGroups.completed} copy={copy} defaultOpen={!isArchive} goalId={goal.id} />
               </CardContent>
             </Card>
           </TabsContent>

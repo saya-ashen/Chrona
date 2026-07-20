@@ -114,10 +114,14 @@ describe("ensureSqliteDatabase", () => {
     const fresh = new Database(freshPath, { readonly: true });
     try {
       expect(fresh.query("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'WorkspaceUserPreference'").get()).toBeTruthy();
-      expect(fresh.query("SELECT COUNT(*) AS count FROM _prisma_migrations").get()).toEqual({ count: 4 });
+      expect(fresh.query("SELECT COUNT(*) AS count FROM _prisma_migrations").get()).toEqual({ count: 5 });
       expect(fresh.query("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'Goal'").get()).toBeTruthy();
       expect(fresh.query("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'GoalAsset'").get()).toBeTruthy();
       expect(fresh.query("SELECT name FROM pragma_table_info('Goal') WHERE name = 'achievementConfirmation'").get()).toBeTruthy();
+      expect(fresh.query("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'GoalWorkingSetItem'").get()).toBeTruthy();
+      expect(fresh.query("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'GoalBriefRevision'").get()).toBeTruthy();
+      expect(fresh.query("SELECT name FROM pragma_table_info('Goal') WHERE name = 'operationalBrief'").get()).toBeTruthy();
+      expect(fresh.query("SELECT name FROM pragma_table_info('Task') WHERE name = 'goalContext'").get()).toBeTruthy();
     } finally {
       fresh.close();
     }
@@ -142,7 +146,7 @@ describe("ensureSqliteDatabase", () => {
     const upgraded = new Database(upgradePath, { readonly: true });
     try {
       expect(upgraded.query("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'WorkspaceUserPreference'").get()).toBeTruthy();
-      expect(upgraded.query("SELECT COUNT(*) AS count FROM _prisma_migrations").get()).toEqual({ count: 4 });
+      expect(upgraded.query("SELECT COUNT(*) AS count FROM _prisma_migrations").get()).toEqual({ count: 5 });
       expect(
         upgraded.query("SELECT applied_steps_count FROM _prisma_migrations WHERE migration_name = ?")
           .get("20260707000000_add_workspace_user_preferences"),
@@ -150,6 +154,10 @@ describe("ensureSqliteDatabase", () => {
       expect(upgraded.query("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'Goal'").get()).toBeTruthy();
       expect(upgraded.query("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'GoalAsset'").get()).toBeTruthy();
       expect(upgraded.query("SELECT name FROM pragma_table_info('Goal') WHERE name = 'achievementConfirmation'").get()).toBeTruthy();
+      expect(upgraded.query("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'GoalWorkingSetItem'").get()).toBeTruthy();
+      expect(upgraded.query("SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'GoalBriefRevision'").get()).toBeTruthy();
+      expect(upgraded.query("SELECT name FROM pragma_table_info('Goal') WHERE name = 'operationalBrief'").get()).toBeTruthy();
+      expect(upgraded.query("SELECT name FROM pragma_table_info('Task') WHERE name = 'goalContext'").get()).toBeTruthy();
     } finally {
       upgraded.close();
     }

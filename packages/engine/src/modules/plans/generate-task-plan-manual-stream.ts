@@ -304,7 +304,9 @@ export async function* generateTaskPlanManualStream(input: {
     taskId: task.id,
     title: task.title,
     description: task.description ?? undefined,
-    sourceContext: task.importedCalendarEvents[0]?.description ?? undefined,
+    sourceContext: task.goalContext
+      ? JSON.stringify(task.goalContext, null, 2)
+      : task.importedCalendarEvents[0]?.description ?? undefined,
     estimatedMinutes,
     userInstruction,
     revisionContext: currentPlan

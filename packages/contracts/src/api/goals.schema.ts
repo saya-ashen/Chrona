@@ -18,6 +18,34 @@ export const goalSuccessCriterionSchema = z.object({
   confirmedAt: z.string().datetime().nullable().default(null),
 });
 
+
+export const goalOperationalBriefSchema = z.object({
+  outcome: z.string().trim().min(1),
+  currentFocus: z.string().trim().min(1),
+  strategy: z.string().trim(),
+  constraints: z.array(z.string().trim().min(1)),
+});
+
+export const goalWorkingSetSubjectTypeSchema = z.enum([
+  "goal_asset",
+  "accepted_result",
+  "artifact",
+  "criterion",
+  "task",
+]);
+
+export const goalWorkingSetSelectionSchema = z.object({
+  subjectType: goalWorkingSetSubjectTypeSchema,
+  subjectId: z.string().min(1),
+});
+
+export const updateGoalBriefBodySchema = z.object({
+  brief: goalOperationalBriefSchema,
+});
+
+export const updateGoalWorkingSetBodySchema = z.object({
+  selections: z.array(goalWorkingSetSelectionSchema).max(24),
+});
 export const goalIdParamSchema = z.object({
   goalId: z.string().trim().min(1),
 });
@@ -27,6 +55,8 @@ export const createGoalTaskBodySchema = z.object({
   description: z.string().trim().max(10_000).nullable().optional(),
   priority: z.enum(["Low", "Medium", "High", "Urgent"]).default("High"),
   autoPlanGeneration: z.boolean().default(false),
+  expectedOutcome: z.string().trim().min(1).optional(),
+  contextSelections: z.array(goalWorkingSetSelectionSchema).max(24).optional(),
 });
 
 export const goalTaskParamSchema = z.object({
@@ -92,3 +122,8 @@ export type UpdateGoalRequest = z.infer<typeof updateGoalBodySchema>;
 export type GoalActionRequest = z.infer<typeof goalActionBodySchema>;
 export type PromoteTaskToGoalRequest = z.infer<typeof promoteTaskToGoalBodySchema>;
 export type CreateGoalTaskRequest = z.infer<typeof createGoalTaskBodySchema>;
+export type GoalOperationalBrief = z.infer<typeof goalOperationalBriefSchema>;
+export type GoalWorkingSetSubjectType = z.infer<typeof goalWorkingSetSubjectTypeSchema>;
+export type GoalWorkingSetSelection = z.infer<typeof goalWorkingSetSelectionSchema>;
+export type UpdateGoalBriefRequest = z.infer<typeof updateGoalBriefBodySchema>;
+export type UpdateGoalWorkingSetRequest = z.infer<typeof updateGoalWorkingSetBodySchema>;

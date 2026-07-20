@@ -173,3 +173,15 @@ export async function loadTaskPageData({ params, request }: LoaderFunctionArgs):
   };
 }
 
+
+export async function loadGoalTaskInspectorData({ params, request }: LoaderFunctionArgs): Promise<TaskPageRouteData> {
+  if (!params.goalId || !params.taskId) {
+    throw new Response("Goal and task ids are required", { status: 400 });
+  }
+  const origin = getOrigin(request);
+  const bootstrap = await apiJson<TaskWorkspaceBootstrapData>(`${origin}/api/tasks/${params.taskId}`);
+  if (bootstrap.task.goal?.id !== params.goalId) {
+    throw new Response("Task does not belong to this Goal", { status: 404 });
+  }
+  return loadTaskPageData({ params, request } as LoaderFunctionArgs);
+}

@@ -13,6 +13,8 @@ vi.mock("../browser-api", () => ({
   runGoalAction: vi.fn(async () => ({})),
   createGoalTask: vi.fn(async () => ({ taskId: "task-created", goal: {} })),
   promoteTaskToGoal: promoteTaskToGoalMock,
+  updateGoalBrief: vi.fn(async () => ({})),
+  updateGoalWorkingSet: vi.fn(async () => ({})),
 }));
 vi.mock("@chrona/i18n/react", () => ({ useLocale: () => "en" }));
 
@@ -27,6 +29,34 @@ const copy: GoalCopy = {
   outcomeArchive: "Outcome Archive",
   archiveDescription: "Retained outcome record",
   workspaceDescription: "Bounded ongoing work",
+  controlPlane: "Goal Control Plane",
+  workbench: "Goal Workbench",
+  operationalBrief: "Operational brief",
+  outcomeLabel: "Intended outcome",
+  currentFocus: "Current focus",
+  strategy: "Current strategy",
+  constraints: "Constraints",
+  editBrief: "Edit brief",
+  saveBrief: "Save brief",
+  saving: "Saving",
+  workingSet: "Working set",
+  workingSetDescription: "Explicit task context",
+  editWorkingSet: "Choose context",
+  saveWorkingSet: "Save working set",
+  noWorkingSet: "No context selected",
+  focusQueue: "Focus queue",
+  needsYou: "Needs you",
+  inProgress: "In progress",
+  newResults: "New results",
+  upNext: "Up next",
+  composer: "Compose bounded work",
+  expectedOutcome: "Expected outcome",
+  expectedOutcomePlaceholder: "Observable result",
+  selectedContext: "Selected context",
+  actionPreview: "Action preview",
+  createBoundedTaskPreview: "Create one bounded task with frozen context.",
+  taskInspector: "Task inspector",
+  returnToGoal: "Return to Goal",
   overview: "Overview",
   tasksSection: "Tasks",
   resultsAssets: "Results & Assets",
@@ -149,6 +179,17 @@ const baseGoal: GoalData = {
   taskGroups: { attention: [], active: [], planned: [], completed: [] },
   tasks: [],
   acceptedResults: [],
+  workbench: {
+    brief: {
+      outcome: "Reach durable outcome",
+      currentFocus: "Confirm next bounded step",
+      strategy: "Use accepted evidence",
+      constraints: ["Retain provenance"],
+    },
+    briefRevisionCount: 1,
+    workingSet: [],
+    focus: { needsYou: [], inProgress: [], newResults: [], upNext: [] },
+  },
   assets: [{
     id: "asset-1",
     label: "Outcome evidence",
@@ -208,6 +249,47 @@ describe("Goal pages", () => {
     expect(screen.getByRole("tab", { name: "Results & Assets" })).toHaveAttribute("data-state", "active");
     expect(screen.getByText("Outcome evidence")).toBeInTheDocument();
     expect(screen.getByText(/Original accepted artifact/)).toBeInTheDocument();
+  });
+
+  it("shows the active Goal control plane, workbench, and frozen-context composer", () => {
+    const goal: GoalData = {
+      ...baseGoal,
+      primaryAction: { kind: "none", taskId: null },
+      taskGroups: { ...baseGoal.taskGroups, attention: [{
+        id: "attention-1",
+        title: "Approve research statement",
+        description: "Review before submission",
+        status: "WaitingForApproval",
+        priority: "Urgent",
+        kind: "single",
+        dueAt: null,
+        updatedAt: artifact.createdAt,
+        attention: "approval_required",
+        group: "attention",
+        acceptedResult: null,
+      }] },
+      tasks: [],
+      workbench: {
+        ...baseGoal.workbench,
+        workingSet: [{
+          id: "ws-1",
+          subjectType: "criterion",
+          subjectId: "criterion-1",
+          label: "Approved application package",
+          snapshot: { satisfied: false },
+          rank: 0,
+          createdAt: artifact.createdAt,
+          updatedAt: artifact.createdAt,
+        }],
+      },
+    };
+    renderInRouter(<GoalWorkspacePage goal={goal} copy={copy} />);
+    expect(screen.getByText("Goal Control Plane")).toBeInTheDocument();
+    expect(screen.getByText("Confirm next bounded step")).toBeInTheDocument();
+    expect(screen.getByText("Approved application package")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Add task" }));
+    expect(screen.getByText("Action preview")).toBeInTheDocument();
+    expect(screen.getByText("Selected context")).toBeInTheDocument();
   });
 
   it("requires confirmation and retained evidence before achievement", () => {

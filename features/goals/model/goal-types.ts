@@ -1,4 +1,9 @@
-import type { GoalStatus, GoalSuccessCriterion } from "@chrona/contracts";
+import type {
+  GoalOperationalBrief,
+  GoalStatus,
+  GoalSuccessCriterion,
+  GoalWorkingSetSubjectType,
+} from "@chrona/contracts";
 import type { GoalProjection } from "@chrona/domain";
 
 export type GoalArtifactData = {
@@ -76,6 +81,17 @@ export type GoalActivityData = {
   taskId: string | null;
 };
 
+
+export type GoalWorkingSetItemData = {
+  id: string;
+  subjectType: GoalWorkingSetSubjectType;
+  subjectId: string;
+  label: string;
+  snapshot: unknown;
+  rank: number;
+  createdAt: string;
+  updatedAt: string;
+};
 export type GoalData = {
   id: string;
   workspaceId: string;
@@ -99,6 +115,17 @@ export type GoalData = {
     confirmation: GoalAchievementConfirmation | null;
     criteria: Array<GoalSuccessCriterion & { evidenceArtifactIds: string[] }>;
   };
+  workbench: {
+    brief: GoalOperationalBrief | null;
+    briefRevisionCount: number;
+    workingSet: GoalWorkingSetItemData[];
+    focus: {
+      needsYou: GoalTaskData[];
+      inProgress: GoalTaskData[];
+      newResults: GoalTaskData[];
+      upNext: GoalTaskData[];
+    };
+  };
   taskGroups: Record<GoalTaskGroup, GoalTaskData[]>;
   tasks: GoalTaskData[];
   acceptedResults: Array<GoalAcceptedResultData & { taskId: string; taskTitle: string }>;
@@ -117,6 +144,34 @@ export type GoalCopy = {
   outcomeArchive: string;
   archiveDescription: string;
   workspaceDescription: string;
+  controlPlane: string;
+  workbench: string;
+  operationalBrief: string;
+  outcomeLabel: string;
+  currentFocus: string;
+  strategy: string;
+  constraints: string;
+  editBrief: string;
+  saveBrief: string;
+  saving: string;
+  workingSet: string;
+  workingSetDescription: string;
+  editWorkingSet: string;
+  saveWorkingSet: string;
+  noWorkingSet: string;
+  focusQueue: string;
+  needsYou: string;
+  inProgress: string;
+  newResults: string;
+  upNext: string;
+  composer: string;
+  expectedOutcome: string;
+  expectedOutcomePlaceholder: string;
+  selectedContext: string;
+  actionPreview: string;
+  createBoundedTaskPreview: string;
+  taskInspector: string;
+  returnToGoal: string;
   overview: string;
   tasksSection: string;
   resultsAssets: string;

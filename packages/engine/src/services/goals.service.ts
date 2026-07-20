@@ -8,6 +8,8 @@ import {
   listGoals,
   promoteTaskToGoal,
   updateGoal,
+  updateGoalBrief,
+  updateGoalWorkingSet,
 } from "../modules/goals/goals";
 
 export function createGoalsService() {
@@ -45,6 +47,20 @@ export function createGoalsService() {
         return await actOnGoal(input);
       } catch (cause) {
         throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.INVALID_TASK_STATE, "Failed to apply Goal action");
+      }
+    },
+    async updateBrief(input: Parameters<typeof updateGoalBrief>[0]) {
+      try {
+        return await updateGoalBrief(input);
+      } catch (cause) {
+        throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.INVALID_TASK_STATE, "Failed to update Goal brief");
+      }
+    },
+    async updateWorkingSet(input: Parameters<typeof updateGoalWorkingSet>[0]) {
+      try {
+        return await updateGoalWorkingSet(input);
+      } catch (cause) {
+        throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.INVALID_TASK_STATE, "Failed to update Goal working set");
       }
     },
     async createTask(input: Parameters<typeof createGoalTask>[0]) {

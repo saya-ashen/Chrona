@@ -36,6 +36,14 @@ export const GOAL_ACCEPTANCE_IDS = {
   finalArtifactId: "artifact_goal_final_outcome",
 } as const;
 
+export const GOAL_WORKBENCH_ACCEPTANCE_IDS = {
+  goalId: "goal_phd_application_active",
+  criteriaTaskId: "task_goal_active_criteria",
+  discoveryTaskId: "task_goal_active_discovery",
+  approvalTaskId: "task_goal_active_approval",
+  draftTaskId: "task_goal_active_draft",
+} as const;
+
 type CompletedTaskInput = {
   id: string;
   workspaceId: string;
@@ -542,8 +550,162 @@ export async function seedCompletedGoalAcceptanceFixture() {
   };
 }
 
+// This retained acceptance scenario keeps Goal, Task, projection, and context timestamps coherent.
+// eslint-disable-next-line max-lines-per-function
+export async function seedActiveGoalWorkbenchFixture() {
+  const workspace = (await prisma.workspace.findFirst({
+    where: { status: WorkspaceStatus.Active },
+    orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+  })) ?? await prisma.workspace.create({
+    data: {
+      id: GOAL_ACCEPTANCE_IDS.workspaceId,
+      name: "Goal Acceptance Workspace",
+      description: "Retained Goal acceptance evidence.",
+      defaultRuntime: "simulated-goal-acceptance",
+      status: WorkspaceStatus.Active,
+    },
+  });
+  const workspaceId = workspace.id;
+  const goalId = GOAL_WORKBENCH_ACCEPTANCE_IDS.goalId;
+  const criteria = [
+    { id: "shortlist", kind: "user_confirmed", description: "A target opening is explicitly selected", satisfied: true, confirmedAt: "2026-07-19T09:00:00.000Z" },
+    { id: "package", kind: "user_confirmed", description: "The tailored application package is approved", satisfied: false, confirmedAt: null },
+    { id: "submitted", kind: "user_confirmed", description: "The application is submitted before the deadline", satisfied: false, confirmedAt: null },
+  ];
+  const brief = {
+    outcome: "Submit a competitive NUS deep-learning PhD application before 31 July 2026",
+    currentFocus: "Resolve the final statement approval and freeze the submission package",
+    strategy: "Reuse the accepted opening comparison and criteria; draft only from verified applicant facts",
+    constraints: [
+      "Do not invent publications, grades, or research experience",
+      "Require user approval before any external submission",
+      "Keep every accepted result and source artifact immutable",
+    ],
+  };
+  await prisma.goal.upsert({
+    where: { id: goalId },
+    update: {
+      workspaceId,
+      title: "Submit a competitive NUS deep-learning PhD application",
+      description: "Continue accepted research evidence through review, approval, and a controlled final submission.",
+      status: GoalStatus.Active,
+      successCriteria: criteria,
+      nextReviewAt: new Date("2026-07-23T09:00:00.000Z"),
+      achievedAt: null,
+      stoppedAt: null,
+      achievementConfirmation: Prisma.JsonNull,
+      operationalBrief: brief,
+    },
+    create: {
+      id: goalId,
+      workspaceId,
+      title: "Submit a competitive NUS deep-learning PhD application",
+      description: "Continue accepted research evidence through review, approval, and a controlled final submission.",
+      status: GoalStatus.Active,
+      successCriteria: criteria,
+      nextReviewAt: new Date("2026-07-23T09:00:00.000Z"),
+      operationalBrief: brief,
+    },
+  });
+
+  const taskInputs = [
+    { id: GOAL_WORKBENCH_ACCEPTANCE_IDS.criteriaTaskId, title: "Confirm application criteria", description: "Accepted target criteria and non-negotiable constraints.", status: TaskStatus.Completed, priority: TaskPriority.High },
+    { id: GOAL_WORKBENCH_ACCEPTANCE_IDS.discoveryTaskId, title: "Compare the NUS opening with alternatives", description: "Accepted comparison supports the selected target.", status: TaskStatus.Completed, priority: TaskPriority.High },
+    { id: GOAL_WORKBENCH_ACCEPTANCE_IDS.approvalTaskId, title: "Approve the tailored research statement", description: "Review the current statement, correct applicant facts, and approve or request changes.", status: TaskStatus.WaitingForApproval, priority: TaskPriority.Urgent },
+    { id: GOAL_WORKBENCH_ACCEPTANCE_IDS.draftTaskId, title: "Assemble the final application package", description: "Prepare the bounded package after statement approval.", status: TaskStatus.Ready, priority: TaskPriority.High },
+  ];
+  for (const input of taskInputs) {
+    await prisma.task.upsert({
+      where: { id: input.id },
+      update: { workspaceId, goalId, title: input.title, description: input.description, status: input.status, priority: input.priority },
+      create: {
+        id: input.id,
+        workspaceId,
+        goalId,
+        title: input.title,
+        description: input.description,
+        status: input.status,
+        priority: input.priority,
+        executionRuntime: "simulated-goal-acceptance",
+        executionConfig: { simulated: true, purpose: "Active Goal Workbench acceptance" },
+        autoPlanGeneration: false,
+        autoExecute: false,
+      },
+    });
+  }
+  await prisma.taskProjection.upsert({
+    where: { taskId: GOAL_WORKBENCH_ACCEPTANCE_IDS.approvalTaskId },
+    update: {
+      workspaceId,
+      persistedStatus: TaskStatus.WaitingForApproval,
+      displayState: "WaitingForApproval",
+      blockType: "approval_required",
+      blockScope: "task",
+      actionRequired: "Review and approve the tailored research statement",
+      blockDetail: "The final package cannot proceed until the statement is approved.",
+    },
+    create: {
+      taskId: GOAL_WORKBENCH_ACCEPTANCE_IDS.approvalTaskId,
+      workspaceId,
+      persistedStatus: TaskStatus.WaitingForApproval,
+      displayState: "WaitingForApproval",
+      blockType: "approval_required",
+      blockScope: "task",
+      actionRequired: "Review and approve the tailored research statement",
+      blockDetail: "The final package cannot proceed until the statement is approved.",
+    },
+  });
+
+  await prisma.goalBriefRevision.deleteMany({ where: { goalId } });
+  await prisma.goalBriefRevision.create({ data: { workspaceId, goalId, brief, actorType: "user", actorId: "acceptance-fixture-user", createdAt: new Date("2026-07-20T09:00:00.000Z") } });
+  await prisma.goalWorkingSetItem.deleteMany({ where: { goalId } });
+  await prisma.goalWorkingSetItem.createMany({
+    data: [
+      {
+        id: "goal_ws_active_criteria",
+        workspaceId,
+        goalId,
+        subjectType: "task",
+        subjectId: GOAL_WORKBENCH_ACCEPTANCE_IDS.criteriaTaskId,
+        label: "Confirmed application criteria",
+        snapshot: { title: "Confirm application criteria", status: "Completed", summary: "Funding, fit, deadline, and factual-safety constraints confirmed." },
+        rank: 0,
+      },
+      {
+        id: "goal_ws_active_comparison",
+        workspaceId,
+        goalId,
+        subjectType: "task",
+        subjectId: GOAL_WORKBENCH_ACCEPTANCE_IDS.discoveryTaskId,
+        label: "Accepted opening comparison",
+        snapshot: { title: "Compare the NUS opening with alternatives", status: "Completed", summary: "NUS target selected from the accepted comparison." },
+        rank: 1,
+      },
+      {
+        id: "goal_ws_active_criterion",
+        workspaceId,
+        goalId,
+        subjectType: "criterion",
+        subjectId: "package",
+        label: "Application package approved",
+        snapshot: { description: "The tailored application package is approved", satisfied: false },
+        rank: 2,
+      },
+    ],
+  });
+  await prisma.event.upsert({
+    where: { dedupeKey: `goal-workbench:${goalId}:brief` },
+    update: { workspaceId, eventType: "goal.brief_updated", payload: { goal_id: goalId, current_focus: brief.currentFocus }, summary: brief.currentFocus },
+    create: { workspaceId, eventType: "goal.brief_updated", actorType: "user", actorId: "acceptance-fixture-user", source: "fixture", payload: { goal_id: goalId, current_focus: brief.currentFocus }, summary: brief.currentFocus, dedupeKey: `goal-workbench:${goalId}:brief`, ingestSequence: 202607200900 },
+  });
+  return { workspaceId, goalId, taskIds: taskInputs.map((task) => task.id) };
+}
+
 if (import.meta.main) {
-  seedCompletedGoalAcceptanceFixture()
-    .then((result) => console.log(JSON.stringify(result)))
+  Promise.all([
+    seedCompletedGoalAcceptanceFixture(),
+    seedActiveGoalWorkbenchFixture(),
+  ])
+    .then(([archive, workbench]) => console.log(JSON.stringify({ archive, workbench })))
     .finally(() => prisma.$disconnect());
 }

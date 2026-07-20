@@ -112,6 +112,7 @@ export async function getTaskBootstrap(input: { taskId: string; workBlockId?: st
         take: 1,
       },
       workspace: { select: { defaultRuntime: true } },
+      goal: { select: { id: true, title: true } },
       workBlocks: {
         where: { status: { in: ["Scheduled", "Active", "Completed"] } },
         orderBy: [
@@ -208,6 +209,8 @@ export async function getTaskBootstrap(input: { taskId: string; workBlockId?: st
     task: {
       id: task.id,
       workspaceId: task.workspaceId,
+      goalId: task.goalId,
+      goal: task.goal,
       title: task.title,
       description: task.description,
       sourceManaged,

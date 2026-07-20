@@ -10,6 +10,7 @@ import {
   LocaleLandingPage,
   GoalListRoutePage,
   GoalWorkspaceRoutePage,
+  GoalTaskInspectorRoutePage,
   ScheduleRoutePage,
   SettingsRoutePage,
   TaskDetailRoutePage,
@@ -22,6 +23,7 @@ import {
   loadDashboardRouteData,
   loadGoalListData,
   loadGoalWorkspaceData,
+  loadGoalTaskInspectorData,
   loadScheduleRouteData,
   loadTaskListData,
   loadTaskPageData,
@@ -77,6 +79,11 @@ export function createAppRouter() {
           path: "goals/:goalId",
           loader: loadGoalWorkspaceData,
           element: <GoalWorkspaceRoutePage />,
+        },
+        {
+          path: "goals/:goalId/workbench/tasks/:taskId",
+          loader: loadGoalTaskInspectorData,
+          element: <GoalTaskInspectorRoutePage />,
         },
         {
           path: "tasks",

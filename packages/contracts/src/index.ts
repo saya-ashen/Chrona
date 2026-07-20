@@ -184,7 +184,18 @@ export {
   type ActionCenterItem,
   type ActionCenterProjection,
 } from "./api/projections.schema";
-export type { CreateGoalTaskRequest, GoalActionRequest, GoalStatus, GoalSuccessCriterion, PromoteTaskToGoalRequest } from "./api/goals.schema";
+export type {
+  CreateGoalTaskRequest,
+  GoalActionRequest,
+  GoalOperationalBrief,
+  GoalStatus,
+  GoalSuccessCriterion,
+  GoalWorkingSetSelection,
+  GoalWorkingSetSubjectType,
+  PromoteTaskToGoalRequest,
+  UpdateGoalBriefRequest,
+  UpdateGoalWorkingSetRequest,
+} from "./api/goals.schema";
 export {
   clearScheduleParamSchema,
   scheduleBodySchema,

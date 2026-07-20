@@ -257,6 +257,15 @@ export function GoalWorkspaceRoutePage() {
   return <GoalWorkspacePage goal={goal} copy={dictionary.pages.goals} />;
 }
 
+export function GoalTaskInspectorRoutePage() {
+  const { task, dictionary } = useLoaderData() as TaskPageRouteData;
+  return (
+    <PageFrame mode="workspace">
+      <TaskWorkspacePage data={task} copy={dictionary.components.taskPage} />
+    </PageFrame>
+  );
+}
+
 export function TaskListRoutePage() {
   const {
     tasks,

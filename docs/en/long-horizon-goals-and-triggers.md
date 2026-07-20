@@ -1,12 +1,14 @@
 # Long-Horizon Goals, Triggers, and Task Occurrences
 
-Status: Phase 3 Goal aggregate and workspace implemented; trigger and neutral
-occurrence phases remain target design.
+Status: Phase 3 Goal aggregate, lifecycle-aware Outcome Archive, and active
+Goal Control Plane + Workbench implemented; trigger and neutral occurrence
+phases remain target design.
 
 This document is the canonical design for long-horizon work and extensible task
 activation in Chrona. Goal lifecycle, optional `Task.goalId`, immutable
-`GoalAsset` promotion, Goal APIs, and Goal list/workspace surfaces now ship.
-The current execution scope remains WorkBlock/manual-task based until
+`GoalAsset` promotion, explicit Working Set, versioned Operational Brief,
+bounded-task context snapshots, Goal APIs, and Goal list/workspace surfaces now
+ship. The current execution scope remains WorkBlock/manual-task based until
 `TaskOccurrence` and `TaskTrigger` migration phases ship.
 
 ## 1. Problem
@@ -58,6 +60,9 @@ The target architecture uses these separate concepts:
 | `WorkBlock` | Optional calendar placement for an occurrence; it remains a time container. |
 | Automation policy | Whether and when Chrona plans or executes an occurrence after it exists. |
 | Plan/run/session | Execution facts scoped to one occurrence. |
+| `GoalOperationalBrief` | Goal-owned, user-visible strategy context: intended outcome, current focus, constraints, and strategy. |
+| `GoalWorkingSetItem` | A persisted, ordered reference and snapshot of explicit Goal context selected for future bounded work. |
+| `Task.goalContext` | The immutable Working Set and Operational Brief snapshot frozen when a bounded Goal task is created. |
 
 Normative decisions:
 
@@ -95,6 +100,19 @@ Normative decisions:
 14. Original TaskResults and Artifacts remain immutable provenance after
     promotion. Edits create goal-owned working versions or successor artifacts
     rather than mutating execution history.
+15. Active Goals use two coordinated product layers. The **Goal Control Plane**
+    decides what needs attention and what happens next. The **Goal Workbench**
+    makes the context for that bounded work explicit and reusable.
+16. Working Set state is visible and user-controlled; it is not hidden AI
+    memory. Creating a Task freezes the selected items and current Operational
+    Brief into `Task.goalContext`. Later Goal edits cannot mutate that Task
+    input.
+17. Filtering, sorting, opening, copying, selecting, and linking existing
+    objects may execute directly as deterministic UI operations. Every AI
+    query, generation, analysis, review, or content mutation still creates or
+    uses a bounded Task/occurrence.
+18. The Goal Workbench reuses the canonical Task Workspace for inspection and
+    execution. It must not implement a second task/run/approval state machine.
 
 ## 3. Aggregate model
 
@@ -239,7 +257,64 @@ operation atomically creates the Goal, associates the task, promotes the
 selected result, and opens the Goal workspace. A failed operation must leave no
 partially promoted Goal or detached asset.
 
-### 3.3 Goal applications (reserved future capability)
+### 3.3 Goal Control Plane and Workbench
+
+Active, Draft, and Paused Goals render an ongoing-work shell rather than an
+entity dashboard. Achieved and Stopped Goals remain Outcome Archives and lead
+with final outcome, immutable results, evidence, confirmation, provenance, and
+history.
+
+The ongoing shell has two layers:
+
+1. **Goal Control Plane** — Operational Brief, primary next action, Needs You,
+   In Progress, New Results, Up Next, criteria/evidence, and bounded review
+   entry points. Queue items derive from real Task, Approval, Result, criterion,
+   and review facts. The queue stores no second lifecycle.
+2. **Goal Workbench** — explicit Working Set, bounded-work Composer, and
+   Goal-scoped Task Inspector. The Composer previews the action, expected
+   outcome, selected inputs, execution mode, and side-effect/approval policy
+   before creating a Task.
+
+First-release Working Set items reference whole objects: GoalAsset, accepted
+Result, Artifact, criterion, or Task. Arbitrary text fragments and table rows
+remain future derived-Artifact capabilities. Each item retains a snapshot for
+display and audit, but canonical status and lifecycle always come from its
+source object.
+
+Task creation captures:
+
+```ts
+type GoalTaskContextSnapshot = {
+  goal: {
+    id: string;
+    title: string;
+    operationalBrief: GoalOperationalBrief | null;
+    capturedAt: string;
+  };
+  items: Array<{
+    subjectType: "goal_asset" | "accepted_result" | "artifact" | "criterion" | "task";
+    subjectId: string;
+    label: string;
+    snapshot: unknown;
+  }>;
+  expectedOutcome: string | null;
+};
+```
+
+Plan generation consumes this frozen snapshot as `sourceContext`; it must not
+silently reread mutable Goal state. The Task retains its canonical `/tasks/:id`
+identity and is also inspectable through
+`/goals/:goalId/workbench/tasks/:taskId`, where the standard Task Workspace is
+reused after a Goal-ownership check.
+
+Accepted Result acceptance remains whole-result review. Extracting a partial
+result into future working content is a separate derived Artifact/GoalAsset
+operation with selector, hash, and provenance. Goal review remains a bounded
+Task; future structured review proposals must show a reviewed diff and apply
+selected Goal changes atomically with actor, time, idempotency key, and audit
+event.
+
+### 3.4 Goal applications (reserved future capability)
 
 A Goal may eventually host a reusable, AI-assisted application assembled for
 its domain, for example an application-material editor or an email preparation
@@ -267,7 +342,7 @@ This reserved direction does not make Chrona a general no-code application
 platform. It permits narrowly scoped Goal tools only after the asset, action,
 permission, and versioning contracts are implemented end to end.
 
-### 3.4 Goal milestones
+### 3.5 Goal milestones
 
 Milestones express intermediate outcomes such as "base application materials
 ready" or "first five high-fit applications submitted".
@@ -820,6 +895,22 @@ permanent dual-write compatibility is prohibited.
 - reserve Goal applications at the contract/design boundary only; do not ship
   arbitrary AI-authored actions or an application runtime.
 
+
+### Phase 3B — Goal Control Plane and Workbench
+
+- persist a versioned Operational Brief and explicit ordered Working Set;
+- render Needs You, In Progress, New Results, and Up Next from canonical Task
+  and Result state rather than a duplicate queue lifecycle;
+- preview expected outcome and selected context before creating bounded work;
+- freeze Operational Brief and Working Set selections into immutable
+  `Task.goalContext` at Task creation;
+- feed the frozen context into plan generation without mutable Goal rereads;
+- reuse the standard Task Workspace under a Goal-scoped inspector route;
+- preserve Achieved and Stopped Goals as Outcome Archives;
+- defer arbitrary partial-result extraction, editable GoalAssets, structured
+  review proposals, and Milestone persistence until their review/version
+  contracts ship end to end.
+
 ### Phase 4 — introduce schedule `TaskTrigger`
 
 - materialize current one-time and RRULE schedule configuration as validated
@@ -865,6 +956,12 @@ Every implementation phase must prove its observable contract.
   not owned by the selected occurrence;
 - editing or superseding a GoalAsset never mutates its source Artifact;
 
+- Operational Brief revisions are retained with actor and time;
+- Working Set mutations reject cross-Goal objects;
+- creating a Goal Task freezes exact selected context and expected outcome;
+- later Working Set or Operational Brief edits do not mutate an existing
+  `Task.goalContext` snapshot;
+
 ### Security tests for external triggers
 
 - bad/missing signature rejection;
@@ -890,6 +987,14 @@ Every implementation phase must prove its observable contract.
   the promoted asset in the Goal workspace;
 - promotion failure leaves no partial Goal, task association, or GoalAsset;
 - accepted result history remains inspectable after asset edits and replacement.
+
+- Active Goal first view exposes current focus, Needs You, and selected context
+  before entity-level history;
+- bounded-work Composer shows expected outcome, selected context, and action
+  preview before Task creation;
+- Goal-scoped Task Inspector verifies ownership and reuses canonical Task
+  Workspace state/actions;
+- locale, Goal, Task, and query-route context survive Workbench navigation;
 
 ## 16. Non-goals
 
