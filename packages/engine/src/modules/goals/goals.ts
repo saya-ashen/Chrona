@@ -131,12 +131,12 @@ function acceptedResultForTask(task: GoalTask) {
     ? task.description ?? "The accepted result did not include a readable summary."
     : extracted;
   const acceptedAtPayload = recordValue(task.events[0]?.payload)?.accepted_at;
+  const acceptedAt = typeof acceptedAtPayload === "string"
+    ? acceptedAtPayload
+    : task.events[0]?.occurredAt?.toISOString() ?? run.endedAt?.toISOString() ?? null;
   return {
     runId: run.id,
-    acceptedAt:
-      typeof acceptedAtPayload === "string"
-        ? acceptedAtPayload
-        : (task.events[0]?.occurredAt ?? task.events[0]?.createdAt ?? run.endedAt)?.toISOString() ?? null,
+    acceptedAt,
     completedAt: run.endedAt?.toISOString() ?? null,
     summary,
     artifacts: run.artifacts.map(artifactReadModel),
@@ -201,7 +201,7 @@ function eventReadModels(goal: GoalWithDetails) {
         type: "result_accepted",
         title: task.title,
         detail: result.summary,
-        occurredAt: result.acceptedAt ?? result.completedAt ?? task.updatedAt.toISOString(),
+        occurredAt: result.acceptedAt ?? task.updatedAt.toISOString(),
         taskId: task.id,
       });
     }
