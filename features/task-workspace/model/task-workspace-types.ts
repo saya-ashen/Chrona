@@ -9,6 +9,8 @@ export type TaskPlanGenerationStatus = "idle" | "generating" | "waiting_acceptan
 export type TaskData = {
   id: string;
   workspaceId: string;
+  goalId?: string | null;
+  goal?: { id: string; title: string } | null;
   title: string;
   description: string | null;
   executionRuntime: string;

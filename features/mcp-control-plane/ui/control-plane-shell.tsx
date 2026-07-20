@@ -6,6 +6,7 @@ import {
   ClipboardList,
   LayoutDashboard,
   Plus,
+  Target,
   Settings,
 } from "lucide-react";
 import {
@@ -157,6 +158,7 @@ export function ControlPlaneShell({
       if (segment === "dashboard") return t("nav.dashboard");
       if (segment === "schedule") return t("nav.schedule");
       if (segment === "tasks") return t("nav.tasks");
+      if (segment === "goals") return t("nav.goals");
       if (segment === "settings") return t("nav.settings");
       if (segment === "action-center") return t("nav.actionCenter");
       if (segment === "work") return t("common.work");
@@ -174,6 +176,12 @@ export function ControlPlaneShell({
       label: t("nav.schedule"),
       icon: CalendarDays,
       active: pathname.startsWith("/schedule"),
+    },
+    {
+      href: "/goals",
+      label: t("nav.goals"),
+      icon: Target,
+      active: pathname.startsWith("/goals"),
     },
     {
       href: "/tasks",
@@ -200,6 +208,7 @@ export function ControlPlaneShell({
     [
       "/dashboard",
       "/schedule",
+      "/goals",
       "/tasks",
       "/action-center",
       "/settings",

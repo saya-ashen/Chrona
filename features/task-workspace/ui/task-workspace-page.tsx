@@ -15,6 +15,8 @@ import { useTaskWorkspacePageState } from "../hooks/use-task-workspace-page-stat
 import { useTaskWorkspacePlanState } from "../hooks/use-task-workspace-plan-state";
 import { useTaskWorkspaceProposalFlow } from "../hooks/use-task-workspace-proposal-flow";
 import { createTaskAiSidebarContext } from "../adapters/task-ai-sidebar-adapter";
+import { LocalizedLink } from "@/components/i18n/localized-link";
+import { Badge, Button } from "@shared/ui";
 
 function getLatestPersistedActivitySummary(pageData: TaskPageData) {
   const latestActivity = pageData.activityTimeline?.at(-1);
@@ -255,6 +257,14 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2 xl:overflow-hidden">
       <div className="shrink-0 space-y-1">
+        {task.goal ? (
+          <div className="flex flex-wrap items-center gap-2 px-1 text-sm">
+            <Badge variant="outline">{messages.pages.goals.title}</Badge>
+            <Button asChild variant="link" size="sm" className="h-auto p-0">
+              <LocalizedLink href={`/goals/${task.goal.id}`}>{task.goal.title}</LocalizedLink>
+            </Button>
+          </div>
+        ) : null}
         <TaskWorkspaceHeaderEditor
           task={consoleView.task}
           spec={headerSpec}

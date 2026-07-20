@@ -11,6 +11,7 @@ import { SchedulePage } from "@features/schedule";
 import { TaskListPage } from "@features/task-management";
 import { AiClientsDialog } from "@features/ai-clients/ui";
 import { TaskWorkspacePage, type TaskPageData } from "@features/task-workspace";
+import { GoalListPage, GoalWorkspacePage, type GoalData } from "@features/goals";
 import { ActionCenterPageClient } from "@features/action-center";
 import type { ActionCenterProjection } from "@chrona/contracts/api";
 import { LocalizedLink } from "@/components/i18n/localized-link";
@@ -48,6 +49,9 @@ export type DashboardRouteData = {
 export type ActionCenterRouteData = {
   actionCenter: ActionCenterProjection;
 };
+export type GoalListRouteData = { goals: GoalData[] };
+
+export type GoalWorkspaceRouteData = { goal: GoalData };
 
 export type TaskPageRouteData = {
   locale: Locale;
@@ -239,6 +243,18 @@ export function SettingsRoutePage() {
       />
     </>
   );
+}
+
+export function GoalListRoutePage() {
+  const { dictionary } = useAppBootOutletData();
+  const { goals } = useLoaderData() as GoalListRouteData;
+  return <GoalListPage goals={goals} copy={dictionary.pages.goals} />;
+}
+
+export function GoalWorkspaceRoutePage() {
+  const { dictionary } = useAppBootOutletData();
+  const { goal } = useLoaderData() as GoalWorkspaceRouteData;
+  return <GoalWorkspacePage goal={goal} copy={dictionary.pages.goals} />;
 }
 
 export function TaskListRoutePage() {

@@ -2,6 +2,7 @@ import type { LoaderFunctionArgs, Params } from "react-router-dom";
 
 import { getDictionary, resolveLocale, type Locale } from "@chrona/i18n";
 
+import type { GoalData } from "@features/goals";
 import { apiJson } from "../../../shared/http/api-client";
 import type {
   AppBootData,
@@ -10,6 +11,8 @@ import type {
   ScheduleRouteData,
   TaskListRouteData,
   TaskPageRouteData,
+  GoalListRouteData,
+  GoalWorkspaceRouteData,
 } from "./pages";
 import type {
   TaskWorkspaceBootstrapData,
@@ -112,6 +115,22 @@ export async function loadTaskListData({ params, request }: LoaderFunctionArgs):
     pageSize: result.pageSize,
     pageCount: result.pageCount,
     counts: result.counts,
+  };
+}
+
+export async function loadGoalListData({ request }: LoaderFunctionArgs): Promise<GoalListRouteData> {
+  const origin = getOrigin(request);
+  const workspace = await apiJson<{ id: string }>(`${origin}/api/workspaces/default`);
+  return apiJson<GoalListRouteData>(
+    `${origin}/api/goals?workspaceId=${encodeURIComponent(workspace.id)}`,
+  );
+}
+
+export async function loadGoalWorkspaceData({ params, request }: LoaderFunctionArgs): Promise<GoalWorkspaceRouteData> {
+  if (!params.goalId) throw new Response("Goal id is required", { status: 400 });
+  const origin = getOrigin(request);
+  return {
+    goal: await apiJson<GoalData>(`${origin}/api/goals/${encodeURIComponent(params.goalId)}`),
   };
 }
 

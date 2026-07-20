@@ -116,6 +116,7 @@ export async function getTaskPage(input: { taskId: string; workBlockId?: string 
   const task = await db.task.findUnique({
     where: { id: taskId },
     include: {
+      goal: { select: { id: true, title: true } },
       projection: true,
       approvals: { orderBy: { requestedAt: "desc" }, take: 5 },
       artifacts: { orderBy: { createdAt: "desc" }, take: 5 },
@@ -191,7 +192,7 @@ export async function getTaskPage(input: { taskId: string; workBlockId?: string 
 
   const latestRun = await db.run.findFirst({
     where: { taskId },
-    orderBy: { createdAt: "desc" },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
   });
   const resultAcceptance = latestRun
     ? await db.event.findFirst({
@@ -285,6 +286,8 @@ export async function getTaskPage(input: { taskId: string; workBlockId?: string 
     task: {
       id: task.id,
       workspaceId: task.workspaceId,
+      goalId: task.goalId,
+      goal: task.goal,
       title: task.title,
       description: task.description,
       sourceManaged,
