@@ -39,6 +39,7 @@ vi.mock("@chrona/i18n", () => ({
   useI18n: () => ({ t: (key: string) => ({ "nav.brandTitle": "Chrona", "nav.brandTagline": "Human-AI task work", "nav.schedule": "Schedule", "nav.actionCenter": "Action Center", "nav.tasks": "Tasks", "nav.settings": "Settings", "nav.newTask": "New Task", "components.assistantSurface.entryLabel": "Assistant", "locale.label": "Locale" }[key] ?? key) }),
   useLocale: () => "en",
   localizeHref: (locale: string, href: string) => `/${locale}${href}`,
+  stripLocalePrefix: (pathname: string) => pathname.replace(/^\/(?:en|zh)(?=\/|$)/, "") || "/",
   locales: ["en", "zh"],
 }));
 
