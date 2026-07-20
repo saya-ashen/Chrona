@@ -40,8 +40,7 @@ const goalInclude = {
       },
       taskPlanRuns: {
         orderBy: { updatedAt: "desc" },
-        take: 1,
-        select: { planRun: true },
+        select: { planId: true, workBlockId: true, planRun: true },
       },
     },
   },
@@ -122,6 +121,17 @@ function artifactReadModel(artifact: GoalArtifact) {
   };
 }
 
+function acceptedPlanOutput(task: GoalTask, run: GoalTask["runs"][number]) {
+  const planId = typeof run.runtimeConfigSnapshot === "object" && run.runtimeConfigSnapshot !== null && !Array.isArray(run.runtimeConfigSnapshot)
+    ? (run.runtimeConfigSnapshot as Record<string, unknown>).planId
+    : null;
+  const candidates = task.taskPlanRuns.filter((planRun) =>
+    (typeof planId === "string" && planRun.planId === planId) ||
+    planRun.workBlockId === run.workBlockId,
+  );
+  return planOutputSpec((candidates[0] ?? task.taskPlanRuns[0])?.planRun);
+}
+
 // Accepted results reconcile persisted event, run, plan-output, and Artifact records.
 // eslint-disable-next-line complexity
 function acceptedResultForTask(task: GoalTask) {
@@ -129,7 +139,7 @@ function acceptedResultForTask(task: GoalTask) {
   if (!runId) return null;
   const run = task.runs.find((candidate) => candidate.id === runId);
   if (!run) return null;
-  const extracted = extractAcceptedResultText(planOutputSpec(task.taskPlanRuns[0]?.planRun));
+  const extracted = extractAcceptedResultText(acceptedPlanOutput(task, run));
   const summary = extracted.startsWith("No structured result content")
     ? task.description ?? "The accepted result did not include a readable summary."
     : extracted;
