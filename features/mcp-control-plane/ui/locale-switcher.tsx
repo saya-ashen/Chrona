@@ -24,8 +24,7 @@ export function LocaleSwitcher() {
             className={cn("h-8 px-2 text-xs", !isActive && "hidden sm:inline-flex")}
           >
             <LocalizedLink href={localizeHref(candidate, route)}>
-              <span className="sm:hidden">{candidate.toUpperCase()}</span>
-              <span className="hidden sm:inline">{t(`locale.${candidate}`)}</span>
+              <span>{t(`locale.${candidate}`)}</span>
             </LocalizedLink>
           </Button>
         );

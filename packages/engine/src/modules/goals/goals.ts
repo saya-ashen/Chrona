@@ -172,10 +172,13 @@ function choosePrimaryResult(goal: GoalWithDetails) {
   const evidenceIds = new Set(
     achievementConfirmationFrom(goal.achievementConfirmation)?.evidenceArtifactIds ?? [],
   );
-  const finalAsset = goal.assets.find((asset) =>
+  const finalAssets = goal.assets.filter((asset) =>
     evidenceIds.has(asset.currentArtifactId) ||
     recordValue(asset.currentArtifact.metadata)?.finalGoalResult === true,
-  ) ?? goal.assets.find((asset) => asset.role === "evidence" || asset.role === "submission");
+  );
+  const finalAsset = finalAssets.find((asset) => asset.currentArtifact.uri.startsWith("generated://"))
+    ?? finalAssets[0]
+    ?? goal.assets.find((asset) => asset.role === "evidence" || asset.role === "submission");
   if (finalAsset) return artifactReadModel(finalAsset.currentArtifact);
   return goal.tasks.flatMap((task) => acceptedResultForTask(task)?.artifacts ?? [])[0] ?? null;
 }
