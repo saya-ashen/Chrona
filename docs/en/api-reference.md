@@ -17,6 +17,38 @@ Returns server health.
 curl http://localhost:3101/api/health
 ```
 
+## Goals
+
+### GET /api/goals?workspaceId=...
+
+Lists durable Goals with lifecycle/activity/attention projection, bounded tasks,
+accepted results, and read-only Goal assets.
+
+### POST /api/goals
+
+Creates an active Goal with validated user-confirmed success criteria.
+
+### GET /api/goals/:goalId
+
+Returns the Goal workspace read model.
+
+### PATCH /api/goals/:goalId
+
+Updates Goal metadata, criteria, or next-review time without changing execution
+history.
+
+### POST /api/goals/:goalId/actions
+
+Applies explicit `pause`, `resume`, `review`, `stop`, or `achieve` lifecycle
+actions. `achieve` requires a non-empty user confirmation.
+
+### POST /api/tasks/:taskId/actions/promote-to-goal
+
+Atomically promotes an accepted task result into a new Goal. The request carries
+the accepted Run, selected Artifact references, validated criteria, proposed
+title, and an idempotency key. The server verifies workspace/task/run/artifact
+ownership; source results and Artifacts remain immutable.
+
 ## Tasks
 
 ### GET /api/tasks

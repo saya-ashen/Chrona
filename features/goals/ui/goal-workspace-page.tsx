@@ -22,7 +22,7 @@ import {
   PageFrame,
   Separator,
 } from "@shared/ui";
-import { LocalizedLink } from "@/components/i18n/localized-link";
+import { LocalizedLink } from "./localized-link";
 import { runGoalAction } from "../browser-api";
 import type { GoalCopy, GoalData } from "../model/goal-types";
 

@@ -1,4 +1,5 @@
 import { apiJson } from "@shared/http";
+import type { PromoteTaskToGoalRequest } from "@chrona/contracts";
 import type { GoalData } from "./model/goal-types";
 
 export async function runGoalAction(
@@ -10,4 +11,13 @@ export async function runGoalAction(
     method: "POST",
     body: JSON.stringify(action === "achieve" ? { action, confirmation } : { action }),
   });
+}
+export async function promoteTaskToGoal(
+  taskId: string,
+  command: PromoteTaskToGoalRequest,
+) {
+  return apiJson<GoalData>(
+    `/api/tasks/${encodeURIComponent(taskId)}/actions/promote-to-goal`,
+    { method: "POST", body: JSON.stringify(command) },
+  );
 }

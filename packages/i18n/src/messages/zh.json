@@ -1778,7 +1778,22 @@
       "taskProgress": "已完成 {completed} / {total} 个任务",
       "achievedAt": "达成时间",
       "immutableResult": "不可变的已接受结果",
-      "openTask": "打开任务"
+      "openTask": "打开任务",
+      "createFromResult": "创建目标并继续",
+      "createFromResultTitle": "将这个结果继续为目标",
+      "createFromResultDescription": "创建前预览长期结果、已接受交付物和建议的后续工作。原任务结果保持不可变。",
+      "goalTitleLabel": "目标标题",
+      "goalDescriptionLabel": "结果说明",
+      "goalDescriptionPlaceholder": "说明这个目标需要实现的长期结果",
+      "criterionLabel": "成功标准",
+      "criterionPlaceholder": "达到什么条件后，才可以由你明确确认目标已达成？",
+      "selectedAssets": "要提升的已接受交付物",
+      "selectedAssetsRequired": "请至少选择一项已接受交付物。",
+      "proposedFollowUp": "建议的后续工作",
+      "proposedFollowUpDescription": "已接受的任务会成为目标中的第一个有边界任务。后续复盘或执行任务可从目标工作区创建。",
+      "createAndContinue": "创建目标并继续",
+      "creatingGoal": "正在创建目标…",
+      "promotionError": "目标创建失败。任务和已接受结果均未改变。"
     },
     "tasks": {
       "title": "任务中心",

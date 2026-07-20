@@ -1,0 +1,142 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
+import { localizeHref, useLocale } from "@chrona/i18n";
+import {
+  Button,
+  Checkbox,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  Input,
+  Label,
+  Textarea,
+} from "@shared/ui";
+import type { GoalCopy } from "../model/goal-types";
+import { promoteTaskToGoal } from "../browser-api";
+
+type AcceptedArtifact = { id: string; title: string; type: string };
+
+type Props = {
+  taskId: string;
+  workspaceId: string;
+  acceptedRunId: string;
+  taskTitle: string;
+  taskDescription: string | null;
+  artifacts: AcceptedArtifact[];
+  copy: GoalCopy;
+};
+
+function promotionKey(taskId: string, acceptedRunId: string) {
+  return `promote-${taskId}-${acceptedRunId}`;
+}
+
+export function CreateGoalFromResultDialog({
+  taskId,
+  workspaceId,
+  acceptedRunId,
+  taskTitle,
+  taskDescription,
+  artifacts,
+  copy,
+}: Props) {
+  const navigate = useNavigate();
+  const locale = useLocale();
+  const [open, setOpen] = useState(false);
+  const [title, setTitle] = useState(taskTitle);
+  const [description, setDescription] = useState(taskDescription ?? "");
+  const [criterion, setCriterion] = useState("");
+  const [selectedArtifactIds, setSelectedArtifactIds] = useState(() => artifacts.map((artifact) => artifact.id));
+  const [isPending, setIsPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const selected = useMemo(() => new Set(selectedArtifactIds), [selectedArtifactIds]);
+  const canSubmit = title.trim().length > 0 && criterion.trim().length > 0 && selectedArtifactIds.length > 0 && !isPending;
+
+  function toggleArtifact(artifactId: string, checked: boolean) {
+    setSelectedArtifactIds((current) => checked
+      ? Array.from(new Set([...current, artifactId]))
+      : current.filter((id) => id !== artifactId));
+  }
+
+  async function submit() {
+    if (!canSubmit) return;
+    setIsPending(true);
+    setError(null);
+    try {
+      const goal = await promoteTaskToGoal(taskId, {
+        workspaceId,
+        acceptedRunId,
+        artifactIds: selectedArtifactIds,
+        title: title.trim(),
+        description: description.trim() || null,
+        successCriteria: [{
+          id: "outcome-confirmed",
+          kind: "user_confirmed",
+          description: criterion.trim(),
+          satisfied: false,
+          confirmedAt: null,
+        }],
+        idempotencyKey: promotionKey(taskId, acceptedRunId),
+      });
+      navigate(localizeHref(locale, `/goals/${goal.id}`));
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : copy.promotionError);
+    } finally {
+      setIsPending(false);
+    }
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={(next) => { if (!isPending) { setOpen(next); setError(null); } }}>
+      <Button type="button" variant="secondary" size="sm" onClick={() => setOpen(true)}>
+        {copy.createFromResult}
+      </Button>
+      <DialogContent className="max-h-[min(90dvh,48rem)] overflow-y-auto sm:max-w-2xl">
+        <DialogHeader>
+          <DialogTitle>{copy.createFromResultTitle}</DialogTitle>
+          <DialogDescription>{copy.createFromResultDescription}</DialogDescription>
+        </DialogHeader>
+        <div className="grid gap-5 py-1">
+          <div className="grid gap-2">
+            <Label htmlFor="promote-goal-title">{copy.goalTitleLabel}</Label>
+            <Input id="promote-goal-title" value={title} onChange={(event) => setTitle(event.target.value)} disabled={isPending} />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="promote-goal-description">{copy.goalDescriptionLabel}</Label>
+            <Textarea id="promote-goal-description" value={description} onChange={(event) => setDescription(event.target.value)} placeholder={copy.goalDescriptionPlaceholder} disabled={isPending} />
+          </div>
+          <div className="grid gap-2">
+            <Label htmlFor="promote-goal-criterion">{copy.criterionLabel}</Label>
+            <Textarea id="promote-goal-criterion" value={criterion} onChange={(event) => setCriterion(event.target.value)} placeholder={copy.criterionPlaceholder} disabled={isPending} />
+          </div>
+          <fieldset className="grid gap-2">
+            <legend className="text-sm font-medium text-foreground">{copy.selectedAssets}</legend>
+            {artifacts.map((artifact) => (
+              <Label key={artifact.id} className="flex min-w-0 items-start gap-3 rounded-xl border border-border/70 p-3 font-normal">
+                <Checkbox checked={selected.has(artifact.id)} onCheckedChange={(checked) => toggleArtifact(artifact.id, checked === true)} disabled={isPending} />
+                <span className="min-w-0">
+                  <span className="block truncate font-medium text-foreground">{artifact.title}</span>
+                  <span className="block text-xs text-muted-foreground">{artifact.type}</span>
+                </span>
+              </Label>
+            ))}
+            {selectedArtifactIds.length === 0 ? <p className="text-xs font-medium text-destructive">{copy.selectedAssetsRequired}</p> : null}
+          </fieldset>
+          <div className="rounded-xl border border-border/70 bg-muted/45 p-3 text-sm">
+            <p className="font-medium text-foreground">{copy.proposedFollowUp}</p>
+            <p className="mt-1 leading-6 text-muted-foreground">{copy.proposedFollowUpDescription}</p>
+          </div>
+          {error ? <p role="alert" className="text-sm font-medium text-destructive">{error}</p> : null}
+        </div>
+        <DialogFooter>
+          <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={isPending}>{copy.cancel}</Button>
+          <Button type="button" onClick={() => void submit()} disabled={!canSubmit}>{isPending ? copy.creatingGoal : copy.createAndContinue}</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}

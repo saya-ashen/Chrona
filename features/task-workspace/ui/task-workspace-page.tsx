@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import type { StateStore } from "@json-render/react";
 import { useI18n } from "@chrona/i18n"
 import { useAssistantSurface } from "@features/assistant-surface";
+import { CreateGoalFromResultDialog } from "@features/goals";
 import { TaskWorkspacePlanSection } from "./task-workspace-plan-section";
 import { TaskWorkspaceEditSection } from "./task-workspace-edit-section";
 import { TaskWorkspaceHeaderCard } from "./task-workspace-header-card";
@@ -15,7 +16,7 @@ import { useTaskWorkspacePageState } from "../hooks/use-task-workspace-page-stat
 import { useTaskWorkspacePlanState } from "../hooks/use-task-workspace-plan-state";
 import { useTaskWorkspaceProposalFlow } from "../hooks/use-task-workspace-proposal-flow";
 import { createTaskAiSidebarContext } from "../adapters/task-ai-sidebar-adapter";
-import { LocalizedLink } from "@/components/i18n/localized-link";
+import { LocalizedLink } from "./localized-link";
 import { Badge, Button } from "@shared/ui";
 
 function getLatestPersistedActivitySummary(pageData: TaskPageData) {
@@ -199,6 +200,17 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
     handleGeneratePlanFromHeader,
     handleStopPlanGeneration,
   } = useTaskWorkspacePlanState(task, refreshWorkspace, workspaceEvents);
+  const goalPromotionAction = pageData.resultReview?.status === "accepted" && !task.goalId && pageData.artifacts.length > 0 ? (
+    <CreateGoalFromResultDialog
+      taskId={task.id}
+      workspaceId={task.workspaceId}
+      acceptedRunId={pageData.resultReview.runId}
+      taskTitle={task.title}
+      taskDescription={task.description}
+      artifacts={pageData.artifacts}
+      copy={messages.pages.goals}
+    />
+  ) : null;
   const isTaskRunning = task.status === "Running" || currentExecution?.status === "running" || currentExecution?.status === "started";
   const consoleView = useMemo(
     () => createTaskWorkspaceExecutionConsoleView({ pageData, graphPlan, copy: executionConsoleCopy }),
@@ -377,6 +389,7 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
         onAcceptResult={handleAcceptResult}
         isAcceptingResult={isAcceptingResult}
         acceptResultError={acceptResultError}
+        createGoalAction={goalPromotionAction}
       />
     </div>
   );

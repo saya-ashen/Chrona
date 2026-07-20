@@ -1,4 +1,4 @@
-import { db } from "@chrona/db";
+import { db, Prisma } from "@chrona/db";
 import type {
   CreateGoalRequest,
   GoalActionRequest,
@@ -9,38 +9,38 @@ import type {
 import { deriveGoalProjection } from "@chrona/domain";
 import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
 
-function goalInclude() {
-  return {
-    tasks: {
-      orderBy: [{ updatedAt: "desc" as const }, { id: "asc" as const }],
-      include: {
-        projection: true,
-        runs: {
-          where: { status: "Completed" as const },
-          orderBy: [{ createdAt: "desc" as const }, { id: "desc" as const }],
-          take: 1,
-          include: { artifacts: { orderBy: { createdAt: "desc" as const } } },
-        },
+const goalInclude = {
+  tasks: {
+    orderBy: [{ updatedAt: "desc" }, { id: "asc" }],
+    include: {
+      projection: true,
+      runs: {
+        where: { status: "Completed" },
+        orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+        take: 1,
+        include: { artifacts: { orderBy: { createdAt: "desc" } } },
       },
     },
-    assets: {
-      orderBy: [{ updatedAt: "desc" as const }, { id: "asc" as const }],
-      include: { sourceArtifact: true, currentArtifact: true },
-    },
-  };
-}
+  },
+  assets: {
+    orderBy: [{ updatedAt: "desc" }, { id: "asc" }],
+    include: { sourceArtifact: true, currentArtifact: true },
+  },
+} satisfies Prisma.GoalInclude;
+
+type GoalWithDetails = Prisma.GoalGetPayload<{ include: typeof goalInclude }>;
 
 function criteriaFrom(value: unknown): GoalSuccessCriterion[] {
   return Array.isArray(value) ? (value as GoalSuccessCriterion[]) : [];
 }
 
 
-function toGoalReadModel(goal: any) {
+function toGoalReadModel(goal: GoalWithDetails) {
   const successCriteria = criteriaFrom(goal.successCriteria);
   const projection = deriveGoalProjection({
     status: goal.status,
     nextReviewAt: goal.nextReviewAt,
-    tasks: goal.tasks.map((task: any) => ({
+    tasks: goal.tasks.map((task) => ({
       status: task.status,
       blockType: task.projection?.blockType ?? null,
     })),
@@ -60,7 +60,7 @@ function toGoalReadModel(goal: any) {
     achievedAt: goal.achievedAt?.toISOString() ?? null,
     stoppedAt: goal.stoppedAt?.toISOString() ?? null,
     projection,
-    tasks: goal.tasks.map((task: any) => ({
+    tasks: goal.tasks.map((task) => ({
       id: task.id,
       title: task.title,
       description: task.description,
@@ -74,7 +74,7 @@ function toGoalReadModel(goal: any) {
         ? {
             runId: task.runs[0].id,
             completedAt: task.runs[0].endedAt?.toISOString() ?? null,
-            artifacts: task.runs[0].artifacts.map((artifact: any) => ({
+            artifacts: task.runs[0].artifacts.map((artifact) => ({
               id: artifact.id,
               title: artifact.title,
               type: artifact.type,
@@ -85,7 +85,7 @@ function toGoalReadModel(goal: any) {
           }
         : null,
     })),
-    assets: goal.assets.map((asset: any) => ({
+    assets: goal.assets.map((asset) => ({
       id: asset.id,
       label: asset.label,
       role: asset.role,
@@ -113,7 +113,7 @@ function toGoalReadModel(goal: any) {
 }
 
 async function getGoalOrThrow(goalId: string) {
-  const goal = await db.goal.findUnique({ where: { id: goalId }, include: goalInclude() });
+  const goal = await db.goal.findUnique({ where: { id: goalId }, include: goalInclude });
   if (!goal) throw new EngineError(ENGINE_ERROR_CODES.TASK_NOT_FOUND, "Goal not found");
   return goal;
 }
@@ -122,7 +122,7 @@ export async function listGoals(input: { workspaceId: string }) {
   const goals = await db.goal.findMany({
     where: { workspaceId: input.workspaceId },
     orderBy: [{ updatedAt: "desc" }, { id: "asc" }],
-    include: goalInclude(),
+    include: goalInclude,
   });
   return { goals: goals.map(toGoalReadModel) };
 }
@@ -141,7 +141,7 @@ export async function createGoal(input: CreateGoalRequest) {
       status: "Active",
       nextReviewAt: input.nextReviewAt ? new Date(input.nextReviewAt) : null,
     },
-    include: goalInclude(),
+    include: goalInclude,
   });
   return toGoalReadModel(goal);
 }
@@ -160,7 +160,7 @@ export async function updateGoal(input: { goalId: string; patch: UpdateGoalReque
         ? { nextReviewAt: input.patch.nextReviewAt ? new Date(input.patch.nextReviewAt) : null }
         : {}),
     },
-    include: goalInclude(),
+    include: goalInclude,
   });
   return toGoalReadModel(updated);
 }
@@ -194,7 +194,7 @@ export async function actOnGoal(input: { goalId: string; command: GoalActionRequ
     }
   })();
 
-  return toGoalReadModel(await db.goal.update({ where: { id: goal.id }, data, include: goalInclude() }));
+  return toGoalReadModel(await db.goal.update({ where: { id: goal.id }, data, include: goalInclude }));
 }
 
 export async function promoteTaskToGoal(input: { taskId: string; command: PromoteTaskToGoalRequest }) {

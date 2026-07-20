@@ -2,7 +2,7 @@
 
 import { ArrowRight, CheckCircle2, CircleDot, Target } from "lucide-react";
 import { Badge, Button, Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle, PageFrame } from "@shared/ui";
-import { LocalizedLink } from "@/components/i18n/localized-link";
+import { LocalizedLink } from "./localized-link";
 import type { GoalCopy, GoalData } from "../model/goal-types";
 
 function format(copy: string, values: Record<string, string | number>) {

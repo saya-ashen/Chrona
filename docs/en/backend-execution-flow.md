@@ -20,6 +20,8 @@ This document traces the current backend path from task creation to plan executi
 | Task workspace command | `POST /api/work/:taskId/commands` |
 | Task workspace events | `GET /api/work/:taskId/events` |
 | MCP tools | `POST /api/mcp` |
+| Goal query/lifecycle | `GET/POST /api/goals`, `GET/PATCH /api/goals/:goalId`, `POST /api/goals/:goalId/actions` |
+| Accepted-result promotion | `POST /api/tasks/:taskId/actions/promote-to-goal` |
 
 ## End-to-end flow
 
@@ -42,6 +44,17 @@ flowchart TD
   M --> J
   J -->|complete| P[Complete session, task, WorkBlock, projection]
 ```
+
+## Goal boundary
+
+A Goal is durable outcome state above the execution flow. Goal create/update and
+explicit lifecycle actions do not start a Provider, Plan, Run, or
+ExecutionSession. Bounded linked Tasks continue through the flow below.
+Accepted-result promotion is one database transaction: validate the accepted
+Run and selected Artifact ownership, create the Goal, associate `Task.goalId`,
+create read-only GoalAsset references, and record an idempotent promotion Event.
+Failure rolls the whole operation back; source result and Artifact rows remain
+unchanged.
 
 ## Task creation
 

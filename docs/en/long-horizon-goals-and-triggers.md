@@ -1,11 +1,13 @@
 # Long-Horizon Goals, Triggers, and Task Occurrences
 
-Status: accepted target design; not yet implemented.
+Status: Phase 3 Goal aggregate and workspace implemented; trigger and neutral
+occurrence phases remain target design.
 
 This document is the canonical design for long-horizon work and extensible task
-activation in Chrona. It defines the target model and migration boundaries. The
-current implementation remains described in [Data Model](./data-model.md) and
-[Backend Execution Flow](./backend-execution-flow.md) until each phase ships.
+activation in Chrona. Goal lifecycle, optional `Task.goalId`, immutable
+`GoalAsset` promotion, Goal APIs, and Goal list/workspace surfaces now ship.
+The current execution scope remains WorkBlock/manual-task based until
+`TaskOccurrence` and `TaskTrigger` migration phases ship.
 
 ## 1. Problem
 

@@ -1778,7 +1778,22 @@
       "taskProgress": "{completed} of {total} tasks completed",
       "achievedAt": "Achieved",
       "immutableResult": "Immutable accepted result",
-      "openTask": "Open task"
+      "openTask": "Open task",
+      "createFromResult": "Create Goal and continue",
+      "createFromResultTitle": "Continue this result as a Goal",
+      "createFromResultDescription": "Preview the durable outcome, accepted deliverables, and proposed follow-up before creating the Goal. The original task result remains immutable.",
+      "goalTitleLabel": "Goal title",
+      "goalDescriptionLabel": "Outcome description",
+      "goalDescriptionPlaceholder": "Describe the durable outcome this Goal should reach",
+      "criterionLabel": "Success criterion",
+      "criterionPlaceholder": "What must you explicitly confirm before this Goal is achieved?",
+      "selectedAssets": "Accepted deliverables to promote",
+      "selectedAssetsRequired": "Select at least one accepted deliverable.",
+      "proposedFollowUp": "Proposed follow-up",
+      "proposedFollowUpDescription": "The accepted task becomes the first bounded task in the Goal. Create future review or execution tasks from the Goal workspace.",
+      "createAndContinue": "Create Goal and continue",
+      "creatingGoal": "Creating Goal…",
+      "promotionError": "Goal creation failed. The task and accepted result were not changed."
     },
     "tasks": {
       "title": "Task Center",

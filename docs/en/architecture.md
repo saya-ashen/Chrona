@@ -75,20 +75,20 @@ Task execution now lives inside the task workspace. Runtime commands use `/api/w
 
 The schedule page shows task/time-block projections, conflicts, suggestions, and scheduling operations. Schedule proposals can be accepted/rejected and due work can become executable WorkBlocks.
 
-### Accepted long-horizon target design
+### Long-horizon Goal foundation
 
-Chrona's accepted target model separates long-lived outcomes, bounded work,
-activation, and calendar placement: a `Goal` contains bounded tasks;
-`TaskTrigger` definitions produce idempotent `TriggerDelivery` facts and
-isolated `TaskOccurrence` instances; a `WorkBlock` is an optional time
-container for an occurrence. Schedule is one trigger kind, while webhook and
-internal-event adapters are reserved for later end-to-end implementation.
+Chrona now ships the Phase 3 Goal aggregate and fixed product workspace. A
+`Goal` contains bounded tasks, validated user-confirmed success criteria,
+explicit lifecycle actions, accepted-result summaries, and provenance-preserving
+read-only `GoalAsset` references. Goal list and detail routes are `/goals` and
+`/goals/:goalId`; a Goal never owns a provider session or execution plan.
 
-This target is not the current persistence model. Its lifecycle invariants,
-security boundaries, state derivation, and phased migration are authoritative
-in [Long-Horizon Goals and Triggers](./long-horizon-goals-and-triggers.md).
-
-The Goal workspace is a planned product surface, not a current route.
+The remaining target separates activation and calendar placement:
+`TaskTrigger` definitions will produce idempotent `TriggerDelivery` facts and
+isolated `TaskOccurrence` instances; a `WorkBlock` will remain an optional time
+container. Those trigger and neutral-occurrence phases are not shipped.
+Lifecycle invariants, security boundaries, and phased migration remain
+authoritative in [Long-Horizon Goals and Triggers](./long-horizon-goals-and-triggers.md).
 
 ### Action Center projection
 
@@ -184,16 +184,15 @@ Provider packages adapt external protocols. They may know provider sessions, res
 
 ## Data and projection model
 
-Chrona currently stores canonical task, plan, run, session, work block, AI
-client, and event data in SQLite. UI pages read from query-optimized
-projections such as TaskProjection and page-specific read models. Execution
-and plan generation produce event streams that are both visible to users and
-usable for rebuilding state.
+Chrona stores canonical goal, task, plan, run, session, work block, AI client,
+and event data in SQLite. UI pages read from query-optimized projections and
+page-specific read models. Goal projection keeps lifecycle, activity, and
+attention separate; task execution and plan generation produce event streams
+that are visible to users and usable for rebuilding state.
 
-The accepted future model adds Goal, trigger definition/delivery, and neutral
-task-occurrence aggregates. Until its migration phases ship, current
-WorkBlock-scoped execution remains authoritative; implementation code must not
-pretend the future aggregates already exist. See
+The remaining accepted target adds trigger definition/delivery and neutral
+task-occurrence aggregates. Until those migration phases ship, current
+WorkBlock/manual-task execution remains authoritative. See
 [Long-Horizon Goals and Triggers](./long-horizon-goals-and-triggers.md).
 
 ## Development entrypoints

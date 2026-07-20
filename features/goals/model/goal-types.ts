@@ -1,4 +1,4 @@
-import type { GoalStatus, GoalSuccessCriterion } from "@chrona/contracts/api";
+import type { GoalStatus, GoalSuccessCriterion } from "@chrona/contracts";
 import type { GoalProjection } from "@chrona/domain";
 
 export type GoalArtifactData = {
@@ -94,4 +94,19 @@ export type GoalCopy = {
   achievedAt: string;
   immutableResult: string;
   openTask: string;
+  createFromResult: string;
+  createFromResultTitle: string;
+  createFromResultDescription: string;
+  goalTitleLabel: string;
+  goalDescriptionLabel: string;
+  goalDescriptionPlaceholder: string;
+  criterionLabel: string;
+  criterionPlaceholder: string;
+  selectedAssets: string;
+  selectedAssetsRequired: string;
+  proposedFollowUp: string;
+  proposedFollowUpDescription: string;
+  createAndContinue: string;
+  creatingGoal: string;
+  promotionError: string;
 };

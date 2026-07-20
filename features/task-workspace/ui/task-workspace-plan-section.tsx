@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import type { ReactNode } from "react";
 import type {
   ExecutionActionInput,
   PlanExecutionResult,
@@ -904,7 +905,6 @@ function formatResultReviewCopy(
   );
 }
 
-
 function ResultLifecyclePanel({
   taskId,
   review,
@@ -913,6 +913,7 @@ function ResultLifecyclePanel({
   onRequestChanges,
   isAcceptingResult = false,
   acceptResultError,
+  createGoalAction,
 }: {
   taskId: string;
   review: NonNullable<TaskWorkspaceDisplayState["resultReview"]>;
@@ -921,6 +922,7 @@ function ResultLifecyclePanel({
   onRequestChanges: () => void;
   isAcceptingResult?: boolean;
   acceptResultError?: string | null;
+  createGoalAction?: ReactNode;
 }) {
   const isAccepted = review.phase === "accepted";
   const [isAcceptedExpanded, setIsAcceptedExpanded] = useState(false);
@@ -1062,6 +1064,7 @@ function ResultLifecyclePanel({
                 <ListPlus className="size-4" aria-hidden />
                 {copy.followUpCreateTask ?? "Create next task"}
               </Button>
+              {createGoalAction}
               {isAcceptedExpanded ? (
                 <Button
                   type="button"
@@ -1443,6 +1446,7 @@ type TaskWorkspacePlanSectionProps = {
   onAcceptResult?: () => Promise<void> | void;
   isAcceptingResult?: boolean;
   acceptResultError?: string | null;
+  createGoalAction?: ReactNode;
   onEditBrief?: () => void;
 };
 
@@ -1700,6 +1704,7 @@ export function TaskWorkspacePlanSection({
   onAcceptResult,
   isAcceptingResult = false,
   acceptResultError,
+  createGoalAction,
   onEditBrief,
 }: TaskWorkspacePlanSectionProps) {
   const [regenerationInstruction, setRegenerationInstruction] = useState("");
@@ -2059,6 +2064,7 @@ export function TaskWorkspacePlanSection({
                 }}
                 isAcceptingResult={isAcceptingResult}
                 acceptResultError={acceptResultError}
+                createGoalAction={createGoalAction}
               />
             ) : null}
             {isRequestingResultChanges &&

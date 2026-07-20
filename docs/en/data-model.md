@@ -1,19 +1,20 @@
 # Data Model
 
-Chrona persists task, schedule, execution, memory, and AI-client state in SQLite through Prisma 7.
+Chrona persists goal, task, schedule, execution, memory, and AI-client state in SQLite through Prisma 7.
 
 Schema source: `prisma/schema.prisma`.
 
 Current schema inventory:
 
-- Models: 36
-- Enums: 24
+- Models: 41
+- Enums: 27
 
 ## Main aggregates
 
 | Aggregate | Key models | Purpose |
 | --- | --- | --- |
 | Workspace | `Workspace` | Scope for tasks, memory, schedule, calendar sources, and configuration. |
+| Goal | `Goal`, `GoalAsset` | Durable outcome lifecycle, validated criteria, bounded-task ownership, and immutable artifact promotion. |
 | Task | `Task`, `TaskDependency`, `TaskProjection`, `TaskSession`, `TaskTimelineItem` | Core work item, relationships, projection-backed read shape, scoped work sessions, and timeline rows. |
 | Plan | `TaskPlan`, `TaskPlanLayer`, `GraphVersion`, `GraphMutationRecord`, `ReconciliationEvent`, `TaskPlanNodeAttempt`, `TaskPlanTerminalAction` | Generated/accepted executable graph plan, node-attempt history, terminal actions, and graph-change history. |
 | Execution | `TaskPlanRun`, `Run`, `ExecutionSession`, `RuntimeCursor`, `Approval`, `Artifact`, `TaskPlanProviderRun`, `TaskPlanProviderApproval`, `RunToken` | Plan/run/session state, runtime cursoring, provider continuity, approvals, tokens, and outputs. |
@@ -29,6 +30,10 @@ Current schema inventory:
 ```mermaid
 erDiagram
   Workspace ||--o{ Task : contains
+  Workspace ||--o{ Goal : owns
+  Goal ||--o{ Task : advances_through
+  Goal ||--o{ GoalAsset : works_with
+  Artifact ||--o{ GoalAsset : promoted_as
   Workspace ||--o{ Memory : owns
   Workspace ||--o{ AiClient : configures
   Workspace ||--o{ WorkBlock : schedules
@@ -58,17 +63,17 @@ erDiagram
   CalendarSource ||--o{ ImportedCalendarEvent : imports
 ```
 
-## Accepted target model
+## Goal foundation and remaining target
 
-The schema inventory above describes the current implementation. Chrona's
-accepted future model adds `Goal`, `TaskTrigger`, `TriggerDelivery`, and a
-neutral `TaskOccurrence`. It separates long-horizon outcome lifecycle, task
-definition lifecycle, occurrence execution state, trigger configuration,
-delivery facts, and optional calendar placement.
+The current schema ships `Goal`, optional `Task.goalId`, and read-only
+`GoalAsset`. Goal lifecycle is `Draft | Active | Paused | Achieved | Stopped`;
+achievement requires explicit user confirmation. GoalAsset records source and
+current Artifact references without mutating source execution evidence.
 
-The complete target model and phased migration are specified in
-[Long-Horizon Goals and Triggers](./long-horizon-goals-and-triggers.md). Do not
-infer that those future models or APIs exist until their implementation phase
+The remaining accepted model adds `TaskTrigger`, `TriggerDelivery`, and a
+neutral `TaskOccurrence`. The complete target model and phased migration are
+specified in [Long-Horizon Goals and Triggers](./long-horizon-goals-and-triggers.md).
+Do not infer that trigger or neutral-occurrence APIs exist until their phase
 ships.
 
 ## Task state
@@ -246,6 +251,7 @@ See [Long-Horizon Goals and Triggers](./long-horizon-goals-and-triggers.md).
 
 - Prisma client generation: `bun run db:generate`.
 - Seed local data: `bun run db:seed`.
+- Seed retained Goal acceptance evidence: `bun run db:seed:goal-acceptance`.
 - Schema source: `prisma/schema.prisma`; migration SQL lives under
   `prisma/migrations` and is applied by `packages/db/src/sqlite-migrations.ts`.
 - Chrona keeps one mutable release-line migration for the current unreleased
