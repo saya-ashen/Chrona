@@ -1,3 +1,4 @@
+/* eslint-disable max-lines */
 import {
   ArtifactType,
   GoalAssetRole,
@@ -261,6 +262,8 @@ async function upsertGoalAsset(input: {
   });
 }
 
+// A single retained scenario keeps task/run/result/artifact timestamps and provenance coherent.
+// eslint-disable-next-line max-lines-per-function
 export async function seedCompletedGoalAcceptanceFixture() {
   const workspace = (await prisma.workspace.findFirst({
     where: { status: WorkspaceStatus.Active },

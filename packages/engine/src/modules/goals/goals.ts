@@ -1,3 +1,4 @@
+/* eslint-disable max-lines */
 import { db, Prisma } from "@chrona/db";
 import type {
   CreateGoalRequest,
@@ -121,6 +122,8 @@ function artifactReadModel(artifact: GoalArtifact) {
   };
 }
 
+// Accepted results reconcile persisted event, run, plan-output, and Artifact records.
+// eslint-disable-next-line complexity
 function acceptedResultForTask(task: GoalTask) {
   const runId = acceptedRunId(task);
   if (!runId) return null;

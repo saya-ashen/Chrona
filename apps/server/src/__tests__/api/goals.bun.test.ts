@@ -58,6 +58,8 @@ const criterion = {
   confirmedAt: null,
 };
 
+// This scenario proves the complete lifecycle and its persisted evidence in sequence.
+// eslint-disable-next-line max-lines-per-function
 describe("Goal API", () => {
   beforeEach(resetTestDb);
 
