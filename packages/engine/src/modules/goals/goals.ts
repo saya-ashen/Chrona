@@ -494,7 +494,7 @@ export async function actOnGoal(input: { goalId: string; command: GoalActionRequ
     const criteria = criteriaFrom(goal.successCriteria);
     if (criteria.length === 0 || criteria.some((criterion) => !criterion.satisfied)) {
       throw new EngineError(
-        ENGINE_ERROR_CODES.INVALID_TASK_STATE,
+        ENGINE_ERROR_CODES.CONFLICT,
         "Every success criterion must be explicitly confirmed before the Goal can be achieved",
       );
     }
