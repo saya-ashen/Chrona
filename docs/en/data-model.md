@@ -66,9 +66,13 @@ erDiagram
 ## Goal foundation and remaining target
 
 The current schema ships `Goal`, optional `Task.goalId`, and read-only
-`GoalAsset`. Goal lifecycle is `Draft | Active | Paused | Achieved | Stopped`;
-achievement requires explicit user confirmation. GoalAsset records source and
-current Artifact references without mutating source execution evidence.
+`GoalAsset`. Goal lifecycle is `Draft | Active | Paused | Achieved | Stopped`.
+Achievement requires explicit user confirmation and persists the confirmation
+note, actor identity, timestamp, and Goal-owned evidence Artifact IDs in
+`Goal.achievementConfirmation`; a canonical `goal.achieved` event provides the
+audit record. `GoalAsset` records source and current Artifact references without
+mutating source execution evidence. Accepted Task results remain immutable and
+separate from these Goal-scoped references.
 
 The remaining accepted model adds `TaskTrigger`, `TriggerDelivery`, and a
 neutral `TaskOccurrence`. The complete target model and phased migration are

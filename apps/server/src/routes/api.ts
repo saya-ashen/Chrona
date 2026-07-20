@@ -19,6 +19,8 @@ export type ApiRouterOptions = {
   calendarSources?: CalendarSourceRouteOptions;
 };
 
+export type ApiRouter = Hono;
+
 export function createApiRouter(engine: ChronaEngine, options: ApiRouterOptions = {}) {
   const router = new Hono()
     .get("/health", (c) => json(c, { status: "ok" }))

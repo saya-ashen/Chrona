@@ -3,8 +3,10 @@ import { zValidator } from "@hono/zod-validator";
 import type { ChronaEngine } from "@chrona/engine";
 import {
   createGoalBodySchema,
+  createGoalTaskBodySchema,
   goalActionBodySchema,
   goalIdParamSchema,
+  goalArtifactParamSchema,
   listGoalsQuerySchema,
   promoteTaskToGoalBodySchema,
   promoteTaskToGoalParamSchema,
@@ -68,6 +70,32 @@ export function createGoalRoutes(engine: ChronaEngine) {
           }));
         } catch (cause) {
           return routeFailure(c, "POST /api/goals/:goalId/actions", cause, "Failed to apply Goal action");
+        }
+      },
+    )
+    .post(
+      "/goals/:goalId/tasks",
+      zValidator("param", goalIdParamSchema),
+      zValidator("json", createGoalTaskBodySchema),
+      async (c) => {
+        try {
+          return json(c, await engine.goals.createTask({
+            goalId: c.req.valid("param").goalId,
+            command: c.req.valid("json"),
+          }), 201);
+        } catch (cause) {
+          return routeFailure(c, "POST /api/goals/:goalId/tasks", cause, "Failed to create Goal task");
+        }
+      },
+    )
+    .get(
+      "/goals/:goalId/artifacts/:artifactId",
+      zValidator("param", goalArtifactParamSchema),
+      async (c) => {
+        try {
+          return json(c, await engine.goals.getArtifact(c.req.valid("param")));
+        } catch (cause) {
+          return routeFailure(c, "GET /api/goals/:goalId/artifacts/:artifactId", cause, "Failed to get Goal artifact");
         }
       },
     )

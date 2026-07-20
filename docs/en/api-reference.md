@@ -30,7 +30,10 @@ Creates an active Goal with validated user-confirmed success criteria.
 
 ### GET /api/goals/:goalId
 
-Returns the Goal workspace read model.
+Returns the lifecycle-aware Goal workspace read model: mode, projection,
+primary action, evidence-backed outcome, grouped bounded tasks, immutable
+accepted-result summaries, GoalAsset provenance, supported Artifact operations,
+and audit activity.
 
 ### PATCH /api/goals/:goalId
 
@@ -39,8 +42,22 @@ history.
 
 ### POST /api/goals/:goalId/actions
 
-Applies explicit `pause`, `resume`, `review`, `stop`, or `achieve` lifecycle
-actions. `achieve` requires a non-empty user confirmation.
+Applies explicit `pause`, `resume`, `stop`, or `achieve` lifecycle actions.
+`achieve` is valid only for an active Goal and requires a non-empty confirmation
+plus at least one Artifact owned by a Goal task or GoalAsset. It persists actor,
+note, confirmation time, evidence IDs, and a canonical `goal.achieved` event.
+Goal review is bounded work, not a Goal lifecycle/provider action.
+
+### POST /api/goals/:goalId/tasks
+
+Creates a Goal-owned bounded `task` or `review` Task. The Task owns all later
+plan, run, execution-session, and provider-session state.
+
+### GET /api/goals/:goalId/artifacts/:artifactId
+
+Returns a Goal-owned Artifact read model and supported open/copy/download
+operations. Generated-file downloads continue through the task result-file
+authorization boundary; arbitrary local paths are not exposed.
 
 ### POST /api/tasks/:taskId/actions/promote-to-goal
 

@@ -701,8 +701,10 @@ POST   /api/goals
 GET    /api/goals/:goalId
 PATCH  /api/goals/:goalId
 POST   /api/goals/:goalId/actions
-POST   /api/goals/:goalId/assets
-PATCH  /api/goals/:goalId/assets/:goalAssetId
+POST   /api/goals/:goalId/tasks
+GET    /api/goals/:goalId/artifacts/:artifactId
+POST   /api/goals/:goalId/assets                 # reserved for editable/superseding assets
+PATCH  /api/goals/:goalId/assets/:goalAssetId    # reserved; not shipped in read-only v1
 POST   /api/tasks/:taskId/actions/promote-to-goal
 
 POST   /api/tasks/:taskId/triggers
@@ -712,10 +714,13 @@ GET    /api/tasks/:taskId/occurrences
 GET    /api/tasks/:taskId/occurrences/:occurrenceId
 ```
 
-Goal actions are explicit (`pause`, `resume`, `achieve`, `stop`, `review`).
-Trigger actions are explicit (`pause`, `resume`, `retire`). Execution commands
-continue through the task/work command boundary but include `occurrenceId` in
-command context.
+Goal lifecycle actions are explicit (`pause`, `resume`, `achieve`, `stop`).
+`achieve` requires user confirmation plus Goal-owned Artifact evidence and
+persists actor, note, time, and evidence IDs. A review is a Goal-owned bounded
+Task created through `/api/goals/:goalId/tasks`; the Goal itself never owns a
+provider session. Trigger actions are explicit (`pause`, `resume`, `retire`).
+Execution commands continue through the task/work command boundary but include
+`occurrenceId` in command context.
 
 `promote-to-goal` accepts an accepted result reference, selected artifact
 references, a proposed Goal title, and an idempotency key. The server resolves

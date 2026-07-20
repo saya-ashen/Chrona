@@ -77,10 +77,13 @@ The schedule page shows task/time-block projections, conflicts, suggestions, and
 
 ### Long-horizon Goal foundation
 
-Chrona now ships the Phase 3 Goal aggregate and fixed product workspace. A
-`Goal` contains bounded tasks, validated user-confirmed success criteria,
+Chrona ships the Phase 3 Goal aggregate and a lifecycle-aware product workspace.
+A `Goal` contains bounded tasks, validated user-confirmed success criteria,
 explicit lifecycle actions, accepted-result summaries, and provenance-preserving
-read-only `GoalAsset` references. Goal list and detail routes are `/goals` and
+read-only `GoalAsset` references. `Draft | Active | Paused` render as an Ongoing
+Workspace; `Achieved | Stopped` render as an Outcome Archive with the final
+result, evidence, confirmation actor/note/time, and history prioritized above
+implementation detail. Goal list and detail routes are `/goals` and
 `/goals/:goalId`; a Goal never owns a provider session or execution plan.
 
 The remaining target separates activation and calendar placement:

@@ -3,12 +3,29 @@ import type { GoalProjection } from "@chrona/domain";
 
 export type GoalArtifactData = {
   id: string;
+  taskId: string;
   title: string;
   type: string;
   uri: string;
   contentPreview: string | null;
   createdAt: string;
+  operations: {
+    canOpen: boolean;
+    canCopy: boolean;
+    canDownload: boolean;
+    downloadHref: string | null;
+  };
 };
+
+export type GoalAcceptedResultData = {
+  runId: string;
+  acceptedAt: string | null;
+  completedAt: string | null;
+  summary: string;
+  artifacts: GoalArtifactData[];
+};
+
+export type GoalTaskGroup = "attention" | "active" | "planned" | "completed";
 
 export type GoalTaskData = {
   id: string;
@@ -20,11 +37,8 @@ export type GoalTaskData = {
   dueAt: string | null;
   updatedAt: string;
   attention: string | null;
-  latestAcceptedResult: {
-    runId: string;
-    completedAt: string | null;
-    artifacts: GoalArtifactData[];
-  } | null;
+  group: GoalTaskGroup;
+  acceptedResult: GoalAcceptedResultData | null;
 };
 
 export type GoalAssetData = {
@@ -36,6 +50,30 @@ export type GoalAssetData = {
   updatedAt: string;
   sourceArtifact: GoalArtifactData;
   currentArtifact: GoalArtifactData;
+  provenance: {
+    sourceTaskId: string;
+    sourceRunId: string | null;
+    sourceArtifactId: string;
+    currentArtifactId: string;
+    unchanged: boolean;
+  };
+};
+
+export type GoalAchievementConfirmation = {
+  note: string;
+  actorType: string;
+  actorId: string | null;
+  confirmedAt: string;
+  evidenceArtifactIds: string[];
+};
+
+export type GoalActivityData = {
+  id: string;
+  type: string;
+  title: string;
+  detail: string | null;
+  occurredAt: string;
+  taskId: string | null;
 };
 
 export type GoalData = {
@@ -45,14 +83,27 @@ export type GoalData = {
   description: string | null;
   successCriteria: GoalSuccessCriterion[];
   status: GoalStatus;
+  mode: "workspace" | "archive";
   nextReviewAt: string | null;
   createdAt: string;
   updatedAt: string;
   achievedAt: string | null;
   stoppedAt: string | null;
   projection: GoalProjection;
+  primaryAction: {
+    kind: GoalProjection["nextAction"];
+    taskId: string | null;
+  };
+  outcome: {
+    primaryResult: GoalArtifactData | null;
+    confirmation: GoalAchievementConfirmation | null;
+    criteria: Array<GoalSuccessCriterion & { evidenceArtifactIds: string[] }>;
+  };
+  taskGroups: Record<GoalTaskGroup, GoalTaskData[]>;
   tasks: GoalTaskData[];
+  acceptedResults: Array<GoalAcceptedResultData & { taskId: string; taskTitle: string }>;
   assets: GoalAssetData[];
+  activity: GoalActivityData[];
 };
 
 export type GoalCopy = {
@@ -62,7 +113,17 @@ export type GoalCopy = {
   emptyDescription: string;
   openGoal: string;
   backToGoals: string;
+  ongoingWorkspace: string;
+  outcomeArchive: string;
+  archiveDescription: string;
+  workspaceDescription: string;
+  overview: string;
+  tasksSection: string;
+  resultsAssets: string;
+  history: string;
   outcome: string;
+  primaryResult: string;
+  noPrimaryResult: string;
   successCriteria: string;
   progress: string;
   boundedTasks: string;
@@ -72,16 +133,38 @@ export type GoalCopy = {
   noReview: string;
   noTasks: string;
   noAssets: string;
+  noAcceptedResults: string;
   sourceEvidence: string;
   currentVersion: string;
+  provenance: string;
+  provenanceUnchanged: string;
+  sourceTask: string;
+  role: string;
+  assetStatus: string;
   pause: string;
   resume: string;
   stop: string;
   achieve: string;
+  startReview: string;
+  addTask: string;
+  reviewTaskTitle: string;
+  reviewTaskDescription: string;
+  addTaskTitle: string;
+  taskTitleLabel: string;
+  taskDescriptionLabel: string;
+  taskTitlePlaceholder: string;
+  taskDescriptionPlaceholder: string;
+  createTask: string;
+  creatingTask: string;
   confirmAchievement: string;
   confirmAchievementDescription: string;
   confirmationLabel: string;
   confirmationPlaceholder: string;
+  evidenceLabel: string;
+  evidenceDescription: string;
+  evidenceRequired: string;
+  confirmedBy: string;
+  confirmationNote: string;
   cancel: string;
   confirming: string;
   actionError: string;
@@ -89,11 +172,22 @@ export type GoalCopy = {
   activity: Record<string, string>;
   attention: Record<string, string>;
   nextAction: Record<string, string>;
+  taskGroups: Record<GoalTaskGroup, string>;
+  taskStatus: Record<string, string>;
+  assetRoles: Record<string, string>;
+  assetStatuses: Record<string, string>;
   criteriaProgress: string;
   taskProgress: string;
   achievedAt: string;
+  acceptedAt: string;
   immutableResult: string;
   openTask: string;
+  open: string;
+  copy: string;
+  copied: string;
+  download: string;
+  showDetails: string;
+  hideDetails: string;
   createFromResult: string;
   createFromResultTitle: string;
   createFromResultDescription: string;

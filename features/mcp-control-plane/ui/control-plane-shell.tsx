@@ -154,15 +154,16 @@ export function ControlPlaneShell({
   const breadcrumb = pathname
     .split("/")
     .filter(Boolean)
-    .map((segment) => {
-      if (segment === "dashboard") return t("nav.dashboard");
-      if (segment === "schedule") return t("nav.schedule");
-      if (segment === "tasks") return t("nav.tasks");
-      if (segment === "goals") return t("nav.goals");
-      if (segment === "settings") return t("nav.settings");
-      if (segment === "action-center") return t("nav.actionCenter");
-      if (segment === "work") return t("common.work");
-      return segment;
+    .flatMap((segment) => {
+      if (segment === "dashboard") return [t("nav.dashboard")];
+      if (segment === "schedule") return [t("nav.schedule")];
+      if (segment === "tasks") return [t("nav.tasks")];
+      if (segment === "goals") return [t("nav.goals")];
+      if (segment === "settings") return [t("nav.settings")];
+      if (segment === "action-center") return [t("nav.actionCenter")];
+      if (segment === "work") return [t("common.work")];
+      if (/^(?:goal_|task_|cm[a-z0-9]{8,})/i.test(segment)) return [];
+      return [segment];
     });
   const navItems: NavEntry[] = [
     {

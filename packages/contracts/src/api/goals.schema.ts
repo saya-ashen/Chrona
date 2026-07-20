@@ -21,6 +21,23 @@ export const goalSuccessCriterionSchema = z.object({
 export const goalIdParamSchema = z.object({
   goalId: z.string().trim().min(1),
 });
+export const createGoalTaskBodySchema = z.object({
+  kind: z.enum(["task", "review"]),
+  title: z.string().trim().min(1).max(500),
+  description: z.string().trim().max(10_000).nullable().optional(),
+  priority: z.enum(["Low", "Medium", "High", "Urgent"]).default("High"),
+  autoPlanGeneration: z.boolean().default(false),
+});
+
+export const goalTaskParamSchema = z.object({
+  goalId: z.string().trim().min(1),
+  taskId: z.string().trim().min(1),
+});
+
+export const goalArtifactParamSchema = z.object({
+  goalId: z.string().trim().min(1),
+  artifactId: z.string().trim().min(1),
+});
 
 export const listGoalsQuerySchema = z.object({
   workspaceId,
@@ -51,6 +68,7 @@ export const goalActionBodySchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("achieve"),
     confirmation: z.string().trim().min(1).max(2_000),
+    evidenceArtifactIds: z.array(z.string().trim().min(1)).min(1),
   }),
 ]);
 
@@ -74,3 +92,4 @@ export type CreateGoalRequest = z.infer<typeof createGoalBodySchema>;
 export type UpdateGoalRequest = z.infer<typeof updateGoalBodySchema>;
 export type GoalActionRequest = z.infer<typeof goalActionBodySchema>;
 export type PromoteTaskToGoalRequest = z.infer<typeof promoteTaskToGoalBodySchema>;
+export type CreateGoalTaskRequest = z.infer<typeof createGoalTaskBodySchema>;

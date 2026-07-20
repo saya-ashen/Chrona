@@ -82,6 +82,7 @@ export type CreateTaskInput = {
   autoExecuteTiming?: AutomationTimingPreset;
   aiClientId?: string | null;
   parentTaskId?: string | null;
+  goalId?: string | null;
   recurrenceRule?: string | null;
   recurrenceAnchorStartAt?: string | null;
   recurrenceAnchorEndAt?: string | null;

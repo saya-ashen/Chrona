@@ -2,7 +2,9 @@ import { ENGINE_ERROR_CODES, engineErrorFromUnknown } from "../errors";
 import {
   actOnGoal,
   createGoal,
+  createGoalTask,
   getGoal,
+  getGoalArtifact,
   listGoals,
   promoteTaskToGoal,
   updateGoal,
@@ -43,6 +45,20 @@ export function createGoalsService() {
         return await actOnGoal(input);
       } catch (cause) {
         throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.INVALID_TASK_STATE, "Failed to apply Goal action");
+      }
+    },
+    async createTask(input: Parameters<typeof createGoalTask>[0]) {
+      try {
+        return await createGoalTask(input);
+      } catch (cause) {
+        throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.INVALID_TASK_STATE, "Failed to create Goal task");
+      }
+    },
+    async getArtifact(input: Parameters<typeof getGoalArtifact>[0]) {
+      try {
+        return await getGoalArtifact(input);
+      } catch (cause) {
+        throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.TASK_NOT_FOUND, "Failed to get Goal artifact");
       }
     },
     async promoteTask(input: Parameters<typeof promoteTaskToGoal>[0]) {

@@ -1,10 +1,17 @@
 import { beforeEach, describe, expect, it } from "bun:test";
 import { db } from "@chrona/db";
 import { createChronaEngine } from "@chrona/engine";
-import { createApiRouter } from "../../routes/api";
+import { createApiRouter, type ApiRouter } from "../../routes/api";
 import { resetTestDb, seedTask, seedWorkspace } from "../bun-test-helpers";
+import type { GoalData } from "../../../../../features/goals";
 
-function requestJson(app: ReturnType<typeof createApiRouter>, path: string, body: unknown) {
+type GoalTaskResponse = { taskId: string; goal: GoalData };
+
+async function responseJson<T>(response: Response): Promise<T> {
+  return response.json() as Promise<T>;
+}
+
+function requestJson(app: ApiRouter, path: string, body: unknown) {
   return app.request(path, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -64,24 +71,77 @@ describe("Goal API", () => {
       nextReviewAt: "2026-07-01T00:00:00.000Z",
     });
     expect(createdResponse.status).toBe(201);
-    const created = await createdResponse.json() as any;
+    const created = await responseJson<GoalData>(createdResponse);
     expect(created.status).toBe("Active");
     expect(created.projection.activity).toBe("review_due");
 
-    const paused = await (await requestJson(app, `/goals/${created.id}/actions`, { action: "pause" })).json() as any;
+    const paused = await responseJson<GoalData>(await requestJson(app, `/goals/${created.id}/actions`, { action: "pause" }));
     expect(paused.status).toBe("Paused");
     expect(paused.projection.nextAction).toBe("resume");
 
-    const resumed = await (await requestJson(app, `/goals/${created.id}/actions`, { action: "resume" })).json() as any;
+    const resumed = await responseJson<GoalData>(await requestJson(app, `/goals/${created.id}/actions`, { action: "resume" }));
     expect(resumed.status).toBe("Active");
 
-    const achieved = await (await requestJson(app, `/goals/${created.id}/actions`, {
+    const { taskId } = await seedTask(workspaceId, {
+      title: "Confirm durable outcome",
+      status: "Done",
+    });
+    const { artifact } = await seedAcceptedResult(workspaceId, taskId);
+    await db.task.update({ where: { id: taskId }, data: { goalId: created.id } });
+    await db.goalAsset.create({
+      data: {
+        workspaceId,
+        goalId: created.id,
+        sourceArtifactId: artifact.id,
+        currentArtifactId: artifact.id,
+        role: "evidence",
+        status: "Approved",
+        label: "Accepted outcome evidence",
+      },
+    });
+    const achieved = await responseJson<GoalData>(await requestJson(app, `/goals/${created.id}/actions`, {
       action: "achieve",
-      confirmation: "The user accepted the outcome",
-    })).json() as any;
+      confirmation: "Offer received and accepted by the user",
+      evidenceArtifactIds: [artifact.id],
+    }));
     expect(achieved.status).toBe("Achieved");
     expect(achieved.achievedAt).not.toBeNull();
+    expect(achieved.outcome.confirmation).toMatchObject({
+      note: "Offer received and accepted by the user",
+      actorType: "user",
+      evidenceArtifactIds: [artifact.id],
+    });
+    expect(achieved.outcome.primaryResult?.id).toBe(artifact.id);
     expect(achieved.successCriteria[0]).toMatchObject({ satisfied: true });
+    expect(await db.event.count({ where: { eventType: "goal.achieved", workspaceId } })).toBe(1);
+  });
+
+  it("creates Goal review work as a bounded task", async () => {
+    const { workspaceId } = await seedWorkspace("Goal review");
+    const app = createApiRouter(createChronaEngine());
+    const created = await responseJson<GoalData>(await requestJson(app, "/goals", {
+      workspaceId,
+      title: "Reviewable Goal",
+      successCriteria: [criterion],
+    }));
+
+    const response = await requestJson(app, `/goals/${created.id}/tasks`, {
+      kind: "review",
+      title: "Review Goal progress",
+      description: "Review accepted results and decide the next bounded task.",
+      priority: "High",
+      autoPlanGeneration: false,
+    });
+    expect(response.status).toBe(201);
+    const body = await responseJson<GoalTaskResponse>(response);
+    expect(body.goal.taskGroups.planned[0]).toMatchObject({
+      id: body.taskId,
+      title: "Review Goal progress",
+    });
+    expect((await db.task.findUniqueOrThrow({ where: { id: body.taskId } })).goalId).toBe(created.id);
+    expect(await db.event.count({ where: { eventType: "goal.review_task_created", taskId: body.taskId } })).toBe(1);
+    const read = await responseJson<GoalData>(await app.request(`/goals/${created.id}`));
+    expect(read.primaryAction.kind).toBeDefined();
   });
 
   it("atomically promotes one accepted result and is idempotent", async () => {
@@ -102,8 +162,8 @@ describe("Goal API", () => {
     const second = await requestJson(app, `/tasks/${taskId}/actions/promote-to-goal`, command);
     expect(first.status).toBe(201);
     expect(second.status).toBe(201);
-    const firstBody = await first.json() as any;
-    const secondBody = await second.json() as any;
+    const firstBody = await responseJson<GoalData>(first);
+    const secondBody = await responseJson<GoalData>(second);
     expect(secondBody.id).toBe(firstBody.id);
     expect(await db.goal.count()).toBe(1);
     expect(await db.goalAsset.count()).toBe(1);

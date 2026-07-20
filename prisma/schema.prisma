@@ -291,6 +291,7 @@ model Goal {
   updatedAt       DateTime    @updatedAt
   achievedAt      DateTime?
   stoppedAt       DateTime?
+  achievementConfirmation Json?
   workspace       Workspace   @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   tasks           Task[]
   assets          GoalAsset[]
