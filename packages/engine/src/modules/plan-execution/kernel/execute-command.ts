@@ -655,20 +655,6 @@ async function executeCommandUnlocked(
 
   const outcome = await graphRuntime.dispatch(graphCommand);
 
-  // Re-read the current epoch before the guarded write. Between command
-  // entry and dispatch, a concurrent command (e.g. overlapping start) may
-  // have advanced the epoch. Using the stale entry-time epoch would
-  // reject a non-conflicting write. Instead we read the live epoch so
-  // both commands can commit when their outcomes converge.
-  const liveRow = await db.taskPlanRun.findFirst({
-    where: {
-      taskId,
-      planId: runtime.planId,
-      workBlockId: session.workBlockId ?? null,
-    },
-    select: { executionEpoch: true },
-  });
-  const liveEpoch = liveRow?.executionEpoch ?? runtime.persisted.executionEpoch;
 
   // Single writer: one epoch-guarded persist of the final runtime state.
   // Derive PlanRun from outcome so planRun.status reflects the execution
@@ -687,6 +673,7 @@ async function executeCommandUnlocked(
     graph: derivedGraph,
     attempts: outcome.state.attempts,
     results: outcome.state.results,
+    executionContextSnapshots: outcome.state.executionContextSnapshots,
     status,
   });
   const committed = await savePlanRunGuarded({
@@ -694,7 +681,7 @@ async function executeCommandUnlocked(
     taskId,
     planId: runtime.planId,
     workBlockId: session.workBlockId,
-    expectedEpoch: liveEpoch,
+    expectedEpoch: runtime.persisted.executionEpoch,
     run: derivedRun,
     compiledPlan: runtime.compiledPlan,
     graph: derivedGraph,

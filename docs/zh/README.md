@@ -20,6 +20,7 @@ Chrona 是一个本地优先的 AI 日程软件。它把任务变成可编辑计
 | 安装并运行 Chrona | [快速开始](./quick-start.md) |
 | 查看当前产品方向 | [路线图](./roadmap.md) |
 | 优化任务工作区交互链路 | [任务工作区交互优化方案](./task-workspace-interaction-improvements.md) |
+| 理解 Goal Workbench 资产使用区的目标设计 | [Goal Workbench 产品设计](./goal-workbench-product-design.md) |
 | 通过 HTTP 或 MCP 集成 | [API 参考（英文）](../en/api-reference.md) |
 | 理解系统架构 | [系统架构（英文）](../en/architecture.md) |
 | 跟踪执行内部流程 | [后端执行流程（英文）](../en/backend-execution-flow.md) |

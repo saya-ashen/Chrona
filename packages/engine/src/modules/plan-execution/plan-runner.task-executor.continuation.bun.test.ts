@@ -1,7 +1,8 @@
 import { describe, expect, it } from "bun:test";
 import { TaskStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
-import { getPlanRun } from "@/modules/plan-execution/persistence/plan-run-store";
+import { createPlanGraphFromCompiledPlan, getPlanRun } from "@/modules/plan-execution/persistence/plan-run-store";
+import { derivePlanRunFromRuntime } from "@/modules/plan-execution/persistence/plan-runtime-store";
 import {
   executeTaskNodeCapabilityMock,
   makeInputCheckpointThenTaskPlan,
@@ -48,6 +49,8 @@ describe("plan-runner task executor continuation", () => {
           inputFields: {
             location_scope: "北京",
             output_format: "终端文本",
+            channels: ["official", "euraxess"],
+            confirmed: true,
           },
         },
       },
@@ -57,6 +60,10 @@ describe("plan-runner task executor continuation", () => {
     expect(submitted.execution.currentNodeId).toBeNull();
     expect(executeTaskNodeCapabilityMock).toHaveBeenCalledTimes(1);
     expect(executeTaskNodeCapabilityMock.mock.calls[0]?.[0].node.id).toBe("spec_task");
+    expect(executeTaskNodeCapabilityMock.mock.calls[0]?.[0]).toMatchObject({
+      userInput: undefined,
+      inputFields: undefined,
+    });
 
     const persisted = await getPlanRun(task.id, compiledPlan.editablePlanId);
     expect(persisted?.results.map((result) => [result.nodeId, result.status, result.outputSummary])).toEqual([
@@ -64,12 +71,202 @@ describe("plan-runner task executor continuation", () => {
       ["requirements_checkpoint", "current", "Checkpoint completed: Confirm requirements"],
       ["spec_task", "current", "Specification task complete"],
     ]);
+    expect(persisted?.planRun.checkpointResponses).toEqual([
+      expect.objectContaining({
+        planRunId: persisted?.planRun.id,
+        nodeId: "requirements_checkpoint",
+        response: {
+          location_scope: "北京",
+          output_format: "终端文本",
+          channels: ["official", "euraxess"],
+          confirmed: true,
+        },
+      }),
+    ]);
 
     const updatedTask = await db.task.findUniqueOrThrow({ where: { id: task.id } });
     expect(updatedTask.status).toBe(TaskStatus.Completed);
   });
+  it("resumes the same dynamic task node with typed input and persists one response", async () => {
+    executeTaskNodeCapabilityMock
+      .mockResolvedValueOnce({
+        status: "waiting_for_user",
+        prompt: "Provide submission inputs",
+        reason: "The task needs the selected channels and confirmation",
+        evidence: { sessionId: "main-session", runId: "run_waiting" },
+        actionForm: {
+          instructions: "Provide required values",
+          submitLabel: "Continue",
+          inputFields: [
+            { kind: "text", name: "statement", label: "Statement", required: true },
+            { kind: "choice", name: "channels", label: "Channels", selection: "multiple", required: true, options: [
+              { label: "Official", value: "official" },
+              { label: "Euraxess", value: "euraxess" },
+            ] },
+            { kind: "boolean", name: "confirmed", label: "Confirmed" },
+          ],
+        },
+      })
+      .mockResolvedValueOnce({
+        status: "done",
+        summary: "Dynamic task complete",
+        evidence: { sessionId: "main-session", runId: "run_complete" },
+        output: { root: "root", elements: { root: { type: "RichMarkdown", props: { content: "Done" } } } },
+        inputFields: {
+          statement: "Approved statement",
+          channels: ["official", "euraxess"],
+          confirmed: true,
+        },
+      });
+
+    const { workspace, task } = await seedWorkspaceAndTask("Runner dynamic task input handoff");
+    const compiledPlan = makeSingleTaskPlan("graph_dynamic_task_input_handoff");
+    await seedAcceptedCompiledPlan(workspace.id, task.id, compiledPlan);
+
+    const waiting = await taskPlanExecution.dispatch({
+      taskId: task.id,
+      action: { action: "start_manual" },
+    });
+    expect(waiting.status).toBe("waiting_for_user");
+    expect(waiting.currentNodeId).toBe("task_node");
+
+    const fields = {
+      statement: "Approved statement",
+      channels: ["official", "euraxess"],
+      confirmed: true,
+    };
+    const submitted = await taskPlanExecution.submitCheckpointAction({
+      taskId: task.id,
+      action: {
+        checkpointId: waiting.checkpoint?.id ?? "",
+        action: "submit_input",
+        payload: { inputFields: fields },
+      },
+    });
+
+    expect(submitted.execution.status).toBe("completed");
+    expect(executeTaskNodeCapabilityMock).toHaveBeenCalledTimes(2);
+    expect(executeTaskNodeCapabilityMock.mock.calls[1]?.[0]).toMatchObject({
+      userInput: "statement: Approved statement\nchannels: official, euraxess\nconfirmed: true",
+      inputFields: fields,
+    });
+    const persisted = await getPlanRun(task.id, compiledPlan.editablePlanId);
+    expect(persisted?.results.find((result) => result.nodeId === "task_node" && result.status === "current")?.inputFields).toEqual(fields);
+    expect(persisted?.planRun.checkpointResponses).toHaveLength(1);
+    expect(persisted?.planRun.checkpointResponses[0]).toMatchObject({
+      planRunId: persisted?.planRun.id,
+      nodeId: "task_node",
+      response: fields,
+    });
+  });
+
+  it("persists the resumed running attempt before Plan Output and completes without overwriting it", async () => {
+    executeTaskNodeCapabilityMock
+      .mockResolvedValueOnce({
+        status: "waiting_for_user",
+        prompt: "Provide the approved statement",
+        reason: "The task needs user input",
+        evidence: { sessionId: "main-session", runId: "run_waiting" },
+        actionForm: {
+          instructions: "Provide required values",
+          submitLabel: "Continue",
+          inputFields: [
+            { kind: "text", name: "statement", label: "Statement", required: true },
+            { kind: "boolean", name: "confirmed", label: "Confirmed" },
+          ],
+        },
+      })
+      .mockImplementationOnce(async (input) => {
+        const active = await getPlanRun(input.taskId, input.attempt.graphId);
+        expect(active?.attempts.at(-1)).toMatchObject({
+          id: input.attempt.id,
+          nodeId: input.node.id,
+          status: "running",
+        });
+
+        const output = await taskPlanExecution.submitNodeResult({
+          taskId: input.taskId,
+          action: {
+            action: "update_plan_output",
+            patches: [
+              { op: "add", path: "/root", value: "root" },
+              {
+                op: "add",
+                path: "/elements/root",
+                value: { type: "RichMarkdown", props: { content: "Application package ready" } },
+              },
+            ],
+            summary: "Published application package",
+          },
+        });
+        expect(output.status).toBe("running");
+
+        return {
+          status: "done",
+          summary: "Dynamic task complete",
+          evidence: { sessionId: "main-session", runId: "run_complete" },
+          inputFields: input.inputFields,
+        };
+      });
+
+    const { workspace, task } = await seedWorkspaceAndTask("Runner resumed Plan Output");
+    const compiledPlan = makeSingleTaskPlan("graph_resumed_plan_output");
+    await seedAcceptedCompiledPlan(workspace.id, task.id, compiledPlan);
+
+    const waiting = await taskPlanExecution.dispatch({
+      taskId: task.id,
+      action: { action: "start_manual" },
+    });
+    const fields = { statement: "Approved statement", confirmed: true };
+    const submitted = await taskPlanExecution.submitCheckpointAction({
+      taskId: task.id,
+      action: {
+        checkpointId: waiting.checkpoint?.id ?? "",
+        action: "submit_input",
+        payload: { inputFields: fields },
+      },
+    });
+
+    expect(submitted.execution.status).toBe("completed");
+    const persisted = await getPlanRun(task.id, compiledPlan.editablePlanId);
+    expect(persisted?.planOutput).toMatchObject({
+      revision: 1,
+      updatedByNodeId: "task_node",
+      spec: {
+        root: "root",
+        elements: {
+          root: { type: "RichMarkdown", props: { content: "Application package ready" } },
+        },
+      },
+    });
+    expect(persisted?.attempts.at(-1)).toMatchObject({ nodeId: "task_node", status: "succeeded" });
+    expect(persisted?.results.find((result) => result.nodeId === "task_node" && result.status === "current")?.inputFields).toEqual(fields);
+  });
+
+
+  it("ignores non-canonical typed input in runtime snapshots", () => {
+    const compiledPlan = makeSingleTaskPlan("graph_invalid_snapshot_input");
+    const graph = createPlanGraphFromCompiledPlan({ taskId: "task-invalid-input", compiledPlan });
+    const derived = derivePlanRunFromRuntime({
+      compiledPlan,
+      graph,
+      attempts: [],
+      results: [],
+      executionContextSnapshots: [{
+        id: "snapshot-invalid-input",
+        graphId: graph.id,
+        nodeId: "task_node",
+        nodeLayerId: graph.nodes.find((node) => node.id === "task_node")!.layers[0]!.id,
+        graphSignature: "signature",
+        refs: { inputFields: { valid: "text", invalid: 42 } },
+        createdAt: "2026-07-21T00:00:00.000Z",
+      }],
+    });
+    expect(derived.checkpointResponses).toEqual([]);
+  });
 
   it("completes a scheduled occurrence task without keeping a shared series task ready", async () => {
+
     executeTaskNodeCapabilityMock.mockResolvedValueOnce({
       status: "done",
       summary: "Recurring occurrence complete",

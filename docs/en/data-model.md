@@ -6,19 +6,19 @@ Schema source: `prisma/schema.prisma`.
 
 Current schema inventory:
 
-- Models: 43
-- Enums: 28
+- Models: see `prisma/schema.prisma` as the authoritative current inventory.
+- Enums: see `prisma/schema.prisma` as the authoritative current inventory.
 
 ## Main aggregates
 
 | Aggregate | Key models | Purpose |
 | --- | --- | --- |
 | Workspace | `Workspace` | Scope for tasks, memory, schedule, calendar sources, and configuration. |
-| Goal | `Goal`, `GoalAsset`, `GoalWorkingSetItem`, `GoalBriefRevision` | Durable outcome lifecycle, versioned operating context, explicit bounded-task inputs, and immutable artifact promotion. |
+| Goal | `Goal`, `GoalAsset`, `GoalAssetVersion`, `GoalAssetDraft`, `GoalInboxCandidate`, `GoalFormSubmission`, `GoalAssetJob`, `GoalWorkingSetItem`, `GoalBriefRevision` | Durable outcome lifecycle, versioned Workbench assets, result intake, form submissions, export jobs, operating context, explicit bounded-task inputs, and immutable artifact provenance. |
 | Task | `Task`, `TaskDependency`, `TaskProjection`, `TaskSession`, `TaskTimelineItem` | Core work item, relationships, projection-backed read shape, scoped work sessions, and timeline rows. |
 | Plan | `TaskPlan`, `TaskPlanLayer`, `GraphVersion`, `GraphMutationRecord`, `ReconciliationEvent`, `TaskPlanNodeAttempt`, `TaskPlanTerminalAction` | Generated/accepted executable graph plan, node-attempt history, terminal actions, and graph-change history. |
 | Execution | `TaskPlanRun`, `Run`, `ExecutionSession`, `RuntimeCursor`, `Approval`, `Artifact`, `TaskPlanProviderRun`, `TaskPlanProviderApproval`, `RunToken` | Plan/run/session state, runtime cursoring, provider continuity, approvals, tokens, and outputs. |
-| Schedule | `WorkBlock`, `ScheduleProposal`, `SchedulerLease`, `SchedulerEvent` | Time blocks, schedule suggestions, automation leasing, and scheduler events. |
+| Schedule/activation | `TaskTrigger`, `TriggerDelivery`, `TaskOccurrence`, `WorkBlock`, `ScheduleProposal`, `SchedulerLease`, `SchedulerEvent` | Versioned activation definitions and deliveries, neutral execution occurrences, optional time placement, schedule suggestions, and scheduler automation. |
 | External calendar | `CalendarSource`, `ImportedCalendarEvent` | Read-only calendar subscriptions, sync status, imported busy events, and calendar-backed schedule context. |
 | Conversation/tool history | `ConversationEntry`, `ToolCallDetail`, `ToolInvocation`, `TaskAssistantMessage`, `TaskResultContinuation`, `RawEventLog` | User/assistant conversation, accepted-result continuation and idempotency state, runtime tool-call detail, invocation records, and raw event audit data. |
 | Memory | `Memory` | Workspace/task memory entries used by internal projections and AI context-building flows. |
@@ -86,11 +86,17 @@ current Operational Brief, capture time, and expected outcome are frozen into
 `Task.goalContext`. Plan generation consumes this immutable source context;
 later Goal edits do not rewrite existing Task input.
 
-The remaining accepted model adds `TaskTrigger`, `TriggerDelivery`, and a
-neutral `TaskOccurrence`. The complete target model and phased migration are
-specified in [Long-Horizon Goals and Triggers](./long-horizon-goals-and-triggers.md).
-Do not infer that trigger or neutral-occurrence APIs exist until their phase
-ships.
+The shipped model includes closed-union `TaskTrigger`, idempotent
+`TriggerDelivery`, and neutral `TaskOccurrence`. Schedule and bounded internal
+event adapters materialize occurrence authority; webhook ingress remains
+unshipped. The complete invariants and adapter security boundary are specified
+in [Long-Horizon Goals and Triggers](./long-horizon-goals-and-triggers.md).
+
+Goal Workbench persistence uses `GoalAsset` identity plus immutable
+`GoalAssetVersion`, mutable `GoalAssetDraft`, reviewable `GoalInboxCandidate`,
+version-bound `GoalFormSubmission`, and export/thumbnail `GoalAssetJob` records.
+Accepted source Results and Artifacts remain immutable; restoring an old version
+always appends a new formal version.
 
 ## Task state
 
@@ -157,20 +163,15 @@ Important enums:
 
 Execution records distinguish Chrona plan-run state from external runtime/provider runs. `ExecutionSession` is the server-side scope for AI-visible refs. `RuntimeCursor` tracks provider stream/progress cursoring. Approvals and artifacts store intervention and output records.
 
-Execution is occurrence-scoped. A recurring `Task` shares one row across many
-`WorkBlock` occurrences, so `TaskPlanRun`, `ExecutionSession`, and `Run` each
-carry a `workBlockId` that pins them to a single occurrence. `Run` also stores
-`errorSummary`, the authoritative provider failure cause surfaced to the read
-model. The projection committer (`rebuildTaskProjection`) scopes its
-runs/sessions/approvals to the occurrence that most recently executed, so a
-failed or cancelled occurrence never contaminates a sibling occurrence. See
+Execution is occurrence-scoped. `TaskOccurrence` is the durable execution
+identity; `WorkBlock` is optional calendar placement. `TaskPlan`, `TaskPlanRun`,
+`ExecutionSession`, `Run`, and `Artifact` carry `occurrenceId` so a failure,
+wait, result, or late event from one occurrence cannot contaminate a sibling.
+Legacy `workBlockId` remains for schedule placement and scoped compatibility.
+The projection committer (`rebuildTaskProjection`) scopes its
+runs/sessions/approvals to the focused occurrence, so a failed or cancelled
+occurrence never contaminates a sibling occurrence. See
 [Backend Execution Flow](./backend-execution-flow.md) → "Task state authority".
-
-This is the current occurrence implementation: `WorkBlock` is both the time
-container and the scope key. The accepted target introduces
-`TaskOccurrence` as the neutral execution scope and makes `WorkBlock`
-optional. Current `workBlockId` behavior remains authoritative until that
-migration completes.
 
 ## Schedule state
 
@@ -191,10 +192,11 @@ Important enums:
 
 Schedule state supports user-created and AI-suggested time blocks, proposal decision workflows, scheduler automation leasing, and due-work startup.
 
-`WorkBlockTrigger` currently records WorkBlock provenance (`scheduled` or
-`manual`); it is not an extensible trigger-definition catalog. Future
-schedule, webhook, and internal-event activation is specified separately in
-[Long-Horizon Goals and Triggers](./long-horizon-goals-and-triggers.md).
+`TaskTrigger` is the versioned activation definition. Shipped kinds are
+schedule, bounded internal event, and authenticated email. `TriggerDelivery`
+owns replay-safe delivery facts; `TaskOccurrence` is the resulting durable
+execution scope. `WorkBlockTrigger` records only optional calendar-placement
+provenance. Webhook remains rejected until its complete security contract ships.
 
 ## External calendar state
 

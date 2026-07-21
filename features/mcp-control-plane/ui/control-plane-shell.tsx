@@ -18,6 +18,7 @@ import {
 } from "react";
 import { useLocation, useNavigate, useRevalidator } from "react-router-dom";
 import { createScheduledTask, TaskCreateDialog, type SchedulePageData } from "@features/schedule";
+import { createGoalWithFirstTask } from "@features/goals";
 import { apiJson } from "@shared/http";
 import {
   Button,
@@ -405,6 +406,7 @@ export function ControlPlaneShell({
           useSafeDemoDefaults ? true : undefined
         }
         initialAutoExecute={useSafeDemoDefaults ? false : undefined}
+        allowGoalMode
         isOpen={showCreateTaskDialog}
         initialStartAt={taskDialogDefaults.initialStartAt}
         initialEndAt={taskDialogDefaults.initialEndAt}
@@ -417,6 +419,20 @@ export function ControlPlaneShell({
         onSubmit={async (input) => {
           try {
             setIsCreatingTask(true);
+            if (input.mode === "goal") {
+              const created = await createGoalWithFirstTask({
+                workspaceId: _defaultWorkspace.id,
+                intendedOutcome: input.intendedOutcome!,
+                firstWorkItem: input.firstWorkItem!,
+                description: input.description || null,
+                priority: input.priority,
+                idempotencyKey: crypto.randomUUID(),
+              });
+              setCreatedOnboardingTaskId(created.taskId);
+              await revalidate();
+              void navigate(localizeHref(locale, `/goals/${created.goal.id}`));
+              return;
+            }
             const created = await createScheduledTask({
               workspaceId: _defaultWorkspace.id,
               title: input.title,

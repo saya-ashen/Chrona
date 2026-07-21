@@ -11,6 +11,7 @@ import type {
   CompiledPlan,
   EffectivePlanGraph,
   ExecutionContextSnapshot,
+  CheckpointInputFields,
   NodeAttempt,
   NodeExecutionAttempt,
   NodeResult,
@@ -64,12 +65,30 @@ function toLegacyNodeExecutionAttempt(attempt: NodeAttempt): NodeExecutionAttemp
   };
 }
 
+function canonicalCheckpointInputFields(value: unknown): CheckpointInputFields | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const fields: CheckpointInputFields = {};
+  for (const [key, field] of Object.entries(value)) {
+    if (typeof field === "string" || typeof field === "boolean") {
+      fields[key] = field;
+      continue;
+    }
+    if (Array.isArray(field) && field.every((item): item is string => typeof item === "string")) {
+      fields[key] = field;
+      continue;
+    }
+    return null;
+  }
+  return fields;
+}
+
 export function derivePlanRunFromRuntime(input: {
   existingRun?: PlanRun;
   compiledPlan: CompiledPlan;
   graph: PlanGraph;
   attempts: NodeAttempt[];
   results: NodeResult[];
+  executionContextSnapshots?: ExecutionContextSnapshot[];
   status?: PlanExecutionStatus;
 }): PlanRun {
   const effective = toEffectivePlanGraph({
@@ -94,7 +113,7 @@ export function derivePlanRunFromRuntime(input: {
   );
 
   const checkpointResponses = effective.nodes.flatMap((node) => {
-    if (node.type !== "checkpoint" || !node.result?.inputFields) return [];
+    if (!node.result?.inputFields) return [];
     const attempt = input.attempts.findLast((candidate) => candidate.id === node.result?.attemptId);
     return [{
       id: `checkpoint_response_${input.compiledPlan.id}_${node.id}_${node.result.attemptId ?? "current"}`,
@@ -104,6 +123,23 @@ export function derivePlanRunFromRuntime(input: {
       submittedAt: attempt?.finishedAt ?? attempt?.startedAt ?? now,
     }];
   });
+  const currentNodeResponses = (input.executionContextSnapshots ?? []).flatMap((snapshot) => {
+    const fields = canonicalCheckpointInputFields(snapshot.refs?.inputFields);
+    if (!fields) return [];
+    const attempt = input.attempts.findLast(
+      (candidate) => candidate.executionContextSnapshotId === snapshot.id,
+    );
+    return [{
+      id: `checkpoint_response_${input.compiledPlan.id}_${snapshot.nodeId}_${attempt?.id ?? snapshot.id}`,
+      planRunId: existingRun.id,
+      nodeId: snapshot.nodeId,
+      response: fields,
+      submittedAt: attempt?.startedAt ?? snapshot.createdAt,
+    }];
+  });
+  const allCheckpointResponses = [...checkpointResponses, ...currentNodeResponses].filter(
+    (response, index, responses) => responses.findIndex((candidate) => candidate.id === response.id) === index,
+  );
 
   return {
     ...existingRun,
@@ -111,7 +147,7 @@ export function derivePlanRunFromRuntime(input: {
       ? planRunStatusForExecutionStatus(input.status)
       : existingRun.status,
     nodeStates,
-    checkpointResponses,
+    checkpointResponses: allCheckpointResponses,
     attempts: input.attempts.map(toLegacyNodeExecutionAttempt),
     startedAt:
       existingRun.startedAt ??
@@ -234,6 +270,7 @@ export async function persistTerminalRuntimeState(input: {
       graph,
       attempts: input.persisted.attempts,
       results: input.persisted.results,
+      executionContextSnapshots: input.persisted.executionContextSnapshots,
       status: input.status,
     }),
     compiledPlan: input.compiledPlan,

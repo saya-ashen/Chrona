@@ -138,11 +138,20 @@ export function buildCommandCenterCheckpointSpec(input: {
   const inlineActionChildren: string[] = [];
   const formActionChildren: string[] = [];
   const isRecoveryCheckpoint = checkpoint.severity === "error";
+  const state: Record<string, unknown> = {};
+
 
   if (checkpoint.form) {
     for (const field of checkpoint.form.inputFields) {
       const fieldKey = `field:${field.name}`;
       const statePath = `/${field.name}`;
+      state[field.name] = "kind" in field
+        ? field.kind === "choice"
+          ? field.defaultValue ?? (field.selection === "multiple" ? [] : "")
+          : field.kind === "boolean"
+            ? field.defaultValue ?? false
+            : field.defaultValue ?? ""
+        : field.value ?? "";
       const required = "required" in field && field.required;
       if ("kind" in field && field.kind === "choice") {
         elements[fieldKey] = {
@@ -263,7 +272,7 @@ export function buildCommandCenterCheckpointSpec(input: {
     children.push("form-actions");
   }
 
-  return { root: "root", elements, state: {} };
+  return { root: "root", elements, state };
 }
 
 export function buildCommandCenterArtifactsSpec(input: {

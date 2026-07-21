@@ -21,6 +21,11 @@ export async function resetTestDb() {
     await db.aiFeatureBinding.deleteMany();
     await db.workspaceAiSurface.deleteMany();
     await db.workspaceUserPreference.deleteMany();
+    await db.goalAssetJob.deleteMany();
+    await db.goalFormSubmission.deleteMany();
+    await db.goalInboxCandidate.deleteMany();
+    await db.goalAssetDraft.deleteMany();
+    await db.goalAssetVersion.deleteMany();
     await db.goalAsset.deleteMany();
     await db.aiClient.deleteMany();
     await db.importedCalendarEvent.deleteMany();
@@ -46,6 +51,9 @@ export async function resetTestDb() {
     await db.rawEventLog.deleteMany();
     await db.approval.deleteMany();
     await db.artifact.deleteMany();
+    await db.taskOccurrence.deleteMany();
+    await db.triggerDelivery.deleteMany();
+    await db.taskTrigger.deleteMany();
     await db.executionSession.deleteMany();
     await db.workBlock.deleteMany();
     await db.taskProjection.deleteMany();

@@ -89,6 +89,9 @@ export async function saveCompiledPlan(input: {
   const planId = input.compiledPlan.editablePlanId;
   const status = TASK_PLAN_STATUS_TO_DB[input.status];
 
+  const occurrence = input.workBlockId
+    ? await db.taskOccurrence.findUnique({ where: { workBlockId: input.workBlockId }, select: { id: true } })
+    : null;
   await db.$transaction(async (tx) => {
     if (status === TaskPlanStatus.Accepted) {
       await tx.taskPlan.updateMany({
@@ -110,6 +113,7 @@ export async function saveCompiledPlan(input: {
         workspaceId: input.workspaceId,
         taskId: input.taskId,
         workBlockId: input.workBlockId ?? null,
+        occurrenceId: occurrence?.id ?? null,
         planId,
         revision: input.compiledPlan.sourceVersion,
         status,
@@ -123,6 +127,7 @@ export async function saveCompiledPlan(input: {
         workspaceId: input.workspaceId,
         taskId: input.taskId,
         workBlockId: input.workBlockId ?? null,
+        occurrenceId: occurrence?.id ?? null,
         revision: input.compiledPlan.sourceVersion,
         status,
         prompt: input.prompt ?? null,
@@ -177,7 +182,7 @@ export async function getLatestCompiledPlan(
   return row ? toSavedCompiledPlan(row) : null;
 }
 
-export type PlanScope = { workBlockId: string | null; planId: string };
+export type PlanScope = { occurrenceId: string | null; workBlockId: string | null; planId: string };
 
 /**
  * The work block the task's most-recently-touched plan belongs to, regardless
@@ -195,9 +200,9 @@ export async function getLatestPlanScope(
       ...(options?.acceptedOnly ? { status: TaskPlanStatus.Accepted } : {}),
     },
     orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
-    select: { workBlockId: true, planId: true },
+    select: { occurrenceId: true, workBlockId: true, planId: true },
   });
-  return row ? { workBlockId: row.workBlockId, planId: row.planId } : null;
+  return row ? { occurrenceId: row.occurrenceId, workBlockId: row.workBlockId, planId: row.planId } : null;
 }
 
 export async function updateLatestCompiledPlanPrompt(input: {

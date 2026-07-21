@@ -13,6 +13,7 @@ import {
 } from "../packages/db/src/generated/prisma/client";
 import { PrismaBunSqlite } from "prisma-adapter-bun-sqlite";
 import { join } from "node:path";
+import { createHash } from "node:crypto";
 import { mkdir } from "node:fs/promises";
 import { getChronaGeneratedFilesDir } from "../packages/shared/src/data-paths";
 
@@ -20,6 +21,10 @@ const adapter = new PrismaBunSqlite({
   url: process.env.DATABASE_URL || "file:./prisma/dev.db",
 });
 const prisma = new PrismaClient({ adapter });
+
+function contentHash(value: unknown) {
+  return createHash("sha256").update(JSON.stringify(value)).digest("hex");
+}
 
 export const GOAL_ACCEPTANCE_IDS = {
   workspaceId: "ws_goal_acceptance",
@@ -248,8 +253,9 @@ async function upsertGoalAsset(input: {
   artifactId: string;
   role: GoalAssetRole;
   label: string;
+  kind?: "document" | "form" | "page" | "file";
 }) {
-  return prisma.goalAsset.upsert({
+  const asset = await prisma.goalAsset.upsert({
     where: {
       goalId_sourceArtifactId: {
         goalId: input.goalId,
@@ -261,6 +267,7 @@ async function upsertGoalAsset(input: {
       role: input.role,
       status: GoalAssetStatus.Approved,
       label: input.label,
+      kind: input.kind ?? "file",
     },
     create: {
       workspaceId: input.workspaceId,
@@ -270,8 +277,44 @@ async function upsertGoalAsset(input: {
       role: input.role,
       status: GoalAssetStatus.Approved,
       label: input.label,
+      kind: input.kind ?? "file",
     },
   });
+  if (input.kind === "form") {
+    const content = {
+      fields: [
+        { id: "researchThemes", label: "Research themes", type: "textarea", required: true, description: "Describe the confirmed deep-learning themes." },
+        { id: "minimumStipend", label: "Minimum monthly stipend", type: "text", required: true },
+        { id: "requiresFullFunding", label: "Require full funding", type: "checkbox", required: true },
+      ],
+    };
+    const desiredHash = contentHash(content);
+    const existingVersion = await prisma.goalAssetVersion.findFirst({
+      where: { assetId: asset.id, contentHash: desiredHash },
+    });
+    if (!existingVersion) {
+      const latestVersion = await prisma.goalAssetVersion.findFirst({
+        where: { assetId: asset.id },
+        orderBy: { version: "desc" },
+      });
+      await prisma.goalAssetVersion.create({
+        data: {
+          workspaceId: input.workspaceId,
+          goalId: input.goalId,
+          assetId: asset.id,
+          artifactId: input.artifactId,
+          version: (latestVersion?.version ?? 0) + 1,
+          parentVersionId: latestVersion?.id,
+          source: latestVersion ? "manual" : "inbox",
+          content,
+          contentHash: desiredHash,
+          authorType: "system",
+          changeSummary: "Structured selection criteria Form",
+        },
+      });
+    }
+  }
+  return asset;
 }
 
 // A single retained scenario keeps task/run/result/artifact timestamps and provenance coherent.
@@ -497,12 +540,12 @@ export async function seedCompletedGoalAcceptanceFixture() {
   ]);
 
   await Promise.all([
-    upsertGoalAsset({ workspaceId: workspace.id, goalId: goal.id, artifactId: artifacts[0].id, role: GoalAssetRole.reference, label: "Confirmed selection criteria" }),
-    upsertGoalAsset({ workspaceId: workspace.id, goalId: goal.id, artifactId: artifacts[1].id, role: GoalAssetRole.reference, label: "Opening comparison" }),
-    upsertGoalAsset({ workspaceId: workspace.id, goalId: goal.id, artifactId: artifacts[2].id, role: GoalAssetRole.submission, label: "Approved application package" }),
-    upsertGoalAsset({ workspaceId: workspace.id, goalId: goal.id, artifactId: artifacts[3].id, role: GoalAssetRole.evidence, label: "Submission receipt" }),
-    upsertGoalAsset({ workspaceId: workspace.id, goalId: goal.id, artifactId: artifacts[4].id, role: GoalAssetRole.evidence, label: "Offer letter" }),
-    upsertGoalAsset({ workspaceId: workspace.id, goalId: goal.id, artifactId: artifacts[5].id, role: GoalAssetRole.evidence, label: "Acceptance confirmation" }),
+    upsertGoalAsset({ workspaceId: workspace.id, goalId: goal.id, artifactId: artifacts[0].id, role: GoalAssetRole.reference, label: "Confirmed selection criteria", kind: "form" }),
+    upsertGoalAsset({ workspaceId: workspace.id, goalId: goal.id, artifactId: artifacts[1].id, role: GoalAssetRole.reference, label: "Opening comparison", kind: "page" }),
+    upsertGoalAsset({ workspaceId: workspace.id, goalId: goal.id, artifactId: artifacts[2].id, role: GoalAssetRole.submission, label: "Approved application package", kind: "document" }),
+    upsertGoalAsset({ workspaceId: workspace.id, goalId: goal.id, artifactId: artifacts[3].id, role: GoalAssetRole.evidence, label: "Submission receipt", kind: "file" }),
+    upsertGoalAsset({ workspaceId: workspace.id, goalId: goal.id, artifactId: artifacts[4].id, role: GoalAssetRole.evidence, label: "Offer letter", kind: "file" }),
+    upsertGoalAsset({ workspaceId: workspace.id, goalId: goal.id, artifactId: artifacts[5].id, role: GoalAssetRole.evidence, label: "Acceptance confirmation", kind: "document" }),
   ]);
 
   const achievementConfirmation = {
@@ -555,6 +598,46 @@ export async function seedCompletedGoalAcceptanceFixture() {
 }
 
 // This retained acceptance scenario keeps Goal, Task, projection, and context timestamps coherent.
+async function resetActiveGoalRuntimeFixture() {
+  const taskIds = [
+    GOAL_WORKBENCH_ACCEPTANCE_IDS.approvalTaskId,
+    GOAL_WORKBENCH_ACCEPTANCE_IDS.draftTaskId,
+  ];
+  const runs = await prisma.run.findMany({ where: { taskId: { in: taskIds } }, select: { id: true } });
+  const runIds = runs.map(({ id }) => id);
+  const dynamicAssets = await prisma.goalAsset.findMany({
+    where: { goalId: GOAL_WORKBENCH_ACCEPTANCE_IDS.goalId, versions: { some: { sourceTaskId: { in: taskIds } } } },
+    select: { id: true },
+  });
+  const dynamicAssetIds = dynamicAssets.map(({ id }) => id);
+
+  await prisma.$transaction(async (tx) => {
+    if (dynamicAssetIds.length > 0) {
+      await tx.goalAsset.deleteMany({ where: { id: { in: dynamicAssetIds } } });
+    }
+    await tx.goalInboxCandidate.deleteMany({ where: { sourceTaskId: { in: taskIds } } });
+    if (runIds.length > 0) {
+      await tx.conversationEntry.deleteMany({ where: { runId: { in: runIds } } });
+      await tx.approval.deleteMany({ where: { runId: { in: runIds } } });
+      await tx.artifact.deleteMany({ where: { runId: { in: runIds } } });
+      await tx.runtimeCursor.deleteMany({ where: { runId: { in: runIds } } });
+      await tx.run.deleteMany({ where: { id: { in: runIds } } });
+    }
+    await tx.event.deleteMany({ where: { taskId: { in: taskIds } } });
+    await tx.rawEventLog.deleteMany({ where: { taskId: { in: taskIds } } });
+    await tx.executionSession.deleteMany({ where: { taskId: { in: taskIds } } });
+    await tx.taskPlanProviderApproval.deleteMany({ where: { taskId: { in: taskIds } } });
+    await tx.taskPlanProviderRun.deleteMany({ where: { taskId: { in: taskIds } } });
+    await tx.taskPlanNodeAttempt.deleteMany({ where: { taskId: { in: taskIds } } });
+    await tx.taskPlanTerminalAction.deleteMany({ where: { taskId: { in: taskIds } } });
+    await tx.taskPlanRun.deleteMany({ where: { taskId: { in: taskIds } } });
+    await tx.taskPlan.deleteMany({ where: { taskId: { in: taskIds } } });
+    await tx.taskTimelineItem.deleteMany({ where: { taskId: { in: taskIds } } });
+    await tx.taskSession.deleteMany({ where: { taskId: { in: taskIds } } });
+    await tx.taskProjection.deleteMany({ where: { taskId: { in: taskIds } } });
+  });
+}
+
 // eslint-disable-next-line max-lines-per-function
 export async function seedActiveGoalWorkbenchFixture() {
   const workspace = (await prisma.workspace.findFirst({
@@ -611,6 +694,7 @@ export async function seedActiveGoalWorkbenchFixture() {
       operationalBrief: brief,
     },
   });
+  await resetActiveGoalRuntimeFixture();
 
   const taskInputs = [
     { id: GOAL_WORKBENCH_ACCEPTANCE_IDS.criteriaTaskId, title: "Confirm application criteria", description: "Accepted target criteria and non-negotiable constraints.", status: TaskStatus.Completed, priority: TaskPriority.High },
@@ -621,7 +705,26 @@ export async function seedActiveGoalWorkbenchFixture() {
   for (const input of taskInputs) {
     await prisma.task.upsert({
       where: { id: input.id },
-      update: { workspaceId, goalId, title: input.title, description: input.description, status: input.status, priority: input.priority },
+      update: {
+        workspaceId,
+        goalId,
+        title: input.title,
+        description: input.description,
+        status: input.status,
+        priority: input.priority,
+        executionRuntime: "simulated-goal-acceptance",
+        executionConfig: { simulated: true, purpose: "Active Goal Workbench acceptance" },
+        autoPlanGeneration: false,
+        autoExecute: false,
+        latestRunId: null,
+        latestEventId: null,
+        latestRawEventId: null,
+        blockedByEventId: null,
+        blockedByRawEventId: null,
+        blockReason: Prisma.DbNull,
+        completedAt: input.status === TaskStatus.Completed ? new Date("2026-07-20T08:30:00.000Z") : null,
+        definitionStatus: "Active",
+      },
       create: {
         id: input.id,
         workspaceId,
@@ -645,8 +748,20 @@ export async function seedActiveGoalWorkbenchFixture() {
       displayState: "WaitingForApproval",
       blockType: "approval_required",
       blockScope: "task",
+      blockSince: new Date("2026-07-20T08:45:00.000Z"),
       actionRequired: "Review and approve the tailored research statement",
       blockDetail: "The final package cannot proceed until the statement is approved.",
+      blockNodeId: "approve_research_statement",
+      latestRunStatus: RunStatus.WaitingForApproval,
+      approvalPendingCount: 1,
+      latestArtifactTitle: null,
+      lastActivityAt: new Date("2026-07-20T08:45:00.000Z"),
+      latestEventId: null,
+      latestRawEventId: null,
+      blockedByEventId: null,
+      blockedByRawEventId: null,
+      currentNodeId: "approve_research_statement",
+      currentNodeTitle: "Approve the tailored research statement",
     },
     create: {
       taskId: GOAL_WORKBENCH_ACCEPTANCE_IDS.approvalTaskId,
@@ -655,11 +770,17 @@ export async function seedActiveGoalWorkbenchFixture() {
       displayState: "WaitingForApproval",
       blockType: "approval_required",
       blockScope: "task",
+      blockSince: new Date("2026-07-20T08:45:00.000Z"),
       actionRequired: "Review and approve the tailored research statement",
       blockDetail: "The final package cannot proceed until the statement is approved.",
+      blockNodeId: "approve_research_statement",
+      latestRunStatus: RunStatus.WaitingForApproval,
+      approvalPendingCount: 1,
+      lastActivityAt: new Date("2026-07-20T08:45:00.000Z"),
+      currentNodeId: "approve_research_statement",
+      currentNodeTitle: "Approve the tailored research statement",
     },
   });
-
   await upsertAcceptedResult({
     taskId: GOAL_WORKBENCH_ACCEPTANCE_IDS.criteriaTaskId,
     workspaceId,
@@ -711,8 +832,78 @@ export async function seedActiveGoalWorkbenchFixture() {
   };
   const approvalAttemptId = "attempt_goal_active_approval_1";
   await prisma.taskPlan.upsert({ where: { planId: approvalPlanId }, update: { workspaceId, taskId: GOAL_WORKBENCH_ACCEPTANCE_IDS.approvalTaskId, status: "Accepted", prompt: "Review the retained research statement", summary: "User approval gates the final package.", compiledPlan: approvalPlan }, create: { id: "task_plan_goal_active_approval", workspaceId, taskId: GOAL_WORKBENCH_ACCEPTANCE_IDS.approvalTaskId, planId: approvalPlanId, revision: 1, status: "Accepted", prompt: "Review the retained research statement", summary: "User approval gates the final package.", compiledPlan: approvalPlan, generatedBy: "goal-acceptance-fixture" } });
-  await prisma.taskPlanRun.upsert({ where: { id: "task_plan_run_goal_active_approval" }, update: { workspaceId, taskId: GOAL_WORKBENCH_ACCEPTANCE_IDS.approvalTaskId, planId: approvalPlanId, planRun: { planRun: { id: `plan_run_${approvalPlanId}`, compiledPlanId: approvalPlan.id, editablePlanId: approvalPlanId, sourceVersion: 1, status: "waiting_for_approval", nodeStates: { [approvalNodeId]: { nodeId: approvalNodeId, status: "waiting_for_approval", attempts: 1 } }, checkpointResponses: [], artifactRefs: [], attempts: [], createdAt: "2026-07-20T08:45:00.000Z", startedAt: "2026-07-20T08:45:00.000Z" }, mutableGraph: { graph: approvalGraph, attempts: [{ id: approvalAttemptId, taskId: GOAL_WORKBENCH_ACCEPTANCE_IDS.approvalTaskId, graphId: approvalPlanId, nodeId: approvalNodeId, nodeLayerId: approvalLayerId, executionContextSnapshotId: "ctx_goal_active_approval", status: "running", idempotencyKey: "goal-active-approval-attempt", attemptNumber: 1, startedAt: "2026-07-20T08:45:00.000Z" }], results: [{ id: "result_goal_active_approval_wait", taskId: GOAL_WORKBENCH_ACCEPTANCE_IDS.approvalTaskId, graphId: approvalPlanId, nodeId: approvalNodeId, nodeLayerId: approvalLayerId, attemptId: approvalAttemptId, status: "current", outputSummary: "Tailored statement is ready for factual review.", waitKind: "approval", actionForm: { instructions: "Read the statement summary, then approve, reject, or request changes with feedback.", submitLabel: "Submit decision", inputFields: [{ name: "feedback", label: "Approval note", kind: "text", multiline: true, required: false }] } }], executionContextSnapshots: [], planOutput: { spec: { root: "root", elements: { root: { type: "Stack", props: { gap: "md" }, children: ["summary", "statement"] }, summary: { type: "ResultSummary", props: { title: "Tailored research statement ready for approval", summary: "The statement connects verified deep-learning experience to the NUS lab direction without inventing applicant facts." } }, statement: { type: "Markdown", props: { content: "### Approval scope\n\n- Verify every applicant fact.\n- Confirm research fit and positioning.\n- Approve, reject, or request changes before package assembly." } } } }, revision: 1, updatedAt: "2026-07-20T08:45:00.000Z", updatedByNodeId: approvalNodeId, history: [] } } } }, create: { id: "task_plan_run_goal_active_approval", workspaceId, taskId: GOAL_WORKBENCH_ACCEPTANCE_IDS.approvalTaskId, planId: approvalPlanId, planRun: { planRun: { id: `plan_run_${approvalPlanId}`, compiledPlanId: approvalPlan.id, editablePlanId: approvalPlanId, sourceVersion: 1, status: "waiting_for_approval", nodeStates: { [approvalNodeId]: { nodeId: approvalNodeId, status: "waiting_for_approval", attempts: 1 } }, checkpointResponses: [], artifactRefs: [], attempts: [], createdAt: "2026-07-20T08:45:00.000Z", startedAt: "2026-07-20T08:45:00.000Z" }, mutableGraph: { graph: approvalGraph, attempts: [{ id: approvalAttemptId, taskId: GOAL_WORKBENCH_ACCEPTANCE_IDS.approvalTaskId, graphId: approvalPlanId, nodeId: approvalNodeId, nodeLayerId: approvalLayerId, executionContextSnapshotId: "ctx_goal_active_approval", status: "running", idempotencyKey: "goal-active-approval-attempt", attemptNumber: 1, startedAt: "2026-07-20T08:45:00.000Z" }], results: [{ id: "result_goal_active_approval_wait", taskId: GOAL_WORKBENCH_ACCEPTANCE_IDS.approvalTaskId, graphId: approvalPlanId, nodeId: approvalNodeId, nodeLayerId: approvalLayerId, attemptId: approvalAttemptId, status: "current", outputSummary: "Tailored statement is ready for factual review.", waitKind: "approval", actionForm: { instructions: "Read the statement summary, then approve, reject, or request changes with feedback.", submitLabel: "Submit decision", inputFields: [{ name: "feedback", label: "Approval note", kind: "text", multiline: true, required: false }] } }], executionContextSnapshots: [], planOutput: { spec: { root: "root", elements: { root: { type: "Stack", props: { gap: "md" }, children: ["summary", "statement"] }, summary: { type: "ResultSummary", props: { title: "Tailored research statement ready for approval", summary: "The statement connects verified deep-learning experience to the NUS lab direction without inventing applicant facts." } }, statement: { type: "Markdown", props: { content: "### Approval scope\n\n- Verify every applicant fact.\n- Confirm research fit and positioning.\n- Approve, reject, or request changes before package assembly." } } } }, revision: 1, updatedAt: "2026-07-20T08:45:00.000Z", updatedByNodeId: approvalNodeId, history: [] } } } } });
-  await prisma.executionSession.upsert({ where: { id: "execution_session_goal_active_approval" }, update: { workspaceId, taskId: GOAL_WORKBENCH_ACCEPTANCE_IDS.approvalTaskId, planId: approvalPlanId, status: "Paused", currentNodeId: approvalNodeId, pauseReason: "approval", pausedAt: new Date("2026-07-20T08:45:00.000Z") }, create: { id: "execution_session_goal_active_approval", workspaceId, taskId: GOAL_WORKBENCH_ACCEPTANCE_IDS.approvalTaskId, planId: approvalPlanId, status: "Paused", currentNodeId: approvalNodeId, pauseReason: "approval", pausedAt: new Date("2026-07-20T08:45:00.000Z") } });
+  await prisma.taskPlanNodeAttempt.deleteMany({ where: { taskId: GOAL_WORKBENCH_ACCEPTANCE_IDS.approvalTaskId } });
+  await prisma.taskPlanRun.upsert({
+    where: { id: "task_plan_run_goal_active_approval" },
+    update: {
+      workspaceId,
+      taskId: GOAL_WORKBENCH_ACCEPTANCE_IDS.approvalTaskId,
+      planId: approvalPlanId,
+      planRun: { planRun: { id: `plan_run_${approvalPlanId}`, compiledPlanId: approvalPlan.id, editablePlanId: approvalPlanId, sourceVersion: 1, status: "waiting_for_approval", nodeStates: { [approvalNodeId]: { nodeId: approvalNodeId, status: "waiting_for_approval", attempts: 1 } }, checkpointResponses: [], artifactRefs: [], attempts: [], createdAt: "2026-07-20T08:45:00.000Z", startedAt: "2026-07-20T08:45:00.000Z" }, mutableGraph: { graph: approvalGraph, attempts: [{ id: approvalAttemptId, taskId: GOAL_WORKBENCH_ACCEPTANCE_IDS.approvalTaskId, graphId: approvalPlanId, nodeId: approvalNodeId, nodeLayerId: approvalLayerId, executionContextSnapshotId: "ctx_goal_active_approval", status: "running", idempotencyKey: "goal-active-approval-attempt", attemptNumber: 1, startedAt: "2026-07-20T08:45:00.000Z" }], results: [{ id: "result_goal_active_approval_wait", taskId: GOAL_WORKBENCH_ACCEPTANCE_IDS.approvalTaskId, graphId: approvalPlanId, nodeId: approvalNodeId, nodeLayerId: approvalLayerId, attemptId: approvalAttemptId, status: "current", outputSummary: "Tailored statement is ready for factual review.", waitKind: "approval", actionForm: { instructions: "Read the statement summary, then approve, reject, or request changes with feedback.", submitLabel: "Submit decision", inputFields: [{ name: "feedback", label: "Approval note", kind: "text", multiline: true, required: false }] } }], executionContextSnapshots: [], planOutput: { spec: resultSpec("Tailored research statement ready for approval", "The statement connects verified deep-learning experience to the NUS lab direction without inventing applicant facts."), revision: 1, updatedAt: "2026-07-20T08:45:00.000Z", updatedByNodeId: approvalNodeId, history: [] } } },
+      executionOwnerId: null,
+      executionOwnerScope: null,
+      executionLeaseUntil: null,
+      executionEpoch: 0,
+      latestEventId: null,
+      latestRawEventId: null,
+    },
+    create: { id: "task_plan_run_goal_active_approval", workspaceId, taskId: GOAL_WORKBENCH_ACCEPTANCE_IDS.approvalTaskId, planId: approvalPlanId, planRun: { planRun: { id: `plan_run_${approvalPlanId}`, compiledPlanId: approvalPlan.id, editablePlanId: approvalPlanId, sourceVersion: 1, status: "waiting_for_approval", nodeStates: { [approvalNodeId]: { nodeId: approvalNodeId, status: "waiting_for_approval", attempts: 1 } }, checkpointResponses: [], artifactRefs: [], attempts: [], createdAt: "2026-07-20T08:45:00.000Z", startedAt: "2026-07-20T08:45:00.000Z" }, mutableGraph: { graph: approvalGraph, attempts: [{ id: approvalAttemptId, taskId: GOAL_WORKBENCH_ACCEPTANCE_IDS.approvalTaskId, graphId: approvalPlanId, nodeId: approvalNodeId, nodeLayerId: approvalLayerId, executionContextSnapshotId: "ctx_goal_active_approval", status: "running", idempotencyKey: "goal-active-approval-attempt", attemptNumber: 1, startedAt: "2026-07-20T08:45:00.000Z" }], results: [{ id: "result_goal_active_approval_wait", taskId: GOAL_WORKBENCH_ACCEPTANCE_IDS.approvalTaskId, graphId: approvalPlanId, nodeId: approvalNodeId, nodeLayerId: approvalLayerId, attemptId: approvalAttemptId, status: "current", outputSummary: "Tailored statement is ready for factual review.", waitKind: "approval", actionForm: { instructions: "Read the statement summary, then approve, reject, or request changes with feedback.", submitLabel: "Submit decision", inputFields: [{ name: "feedback", label: "Approval note", kind: "text", multiline: true, required: false }] } }], executionContextSnapshots: [], planOutput: { spec: resultSpec("Tailored research statement ready for approval", "The statement connects verified deep-learning experience to the NUS lab direction without inventing applicant facts."), revision: 1, updatedAt: "2026-07-20T08:45:00.000Z", updatedByNodeId: approvalNodeId, history: [] } } } },
+  });
+  await prisma.executionSession.upsert({
+    where: { id: "execution_session_goal_active_approval" },
+    update: {
+      workspaceId,
+      taskId: GOAL_WORKBENCH_ACCEPTANCE_IDS.approvalTaskId,
+      planId: approvalPlanId,
+      status: "Paused",
+      currentNodeId: approvalNodeId,
+      currentNodeAttemptId: approvalAttemptId,
+      pauseReason: "approval",
+      completedNodeIds: "[]",
+      pausedByEventId: null,
+      pausedByRawEventId: null,
+      latestEventId: null,
+      latestRawEventId: null,
+      startedAt: new Date("2026-07-20T08:45:00.000Z"),
+      pausedAt: new Date("2026-07-20T08:45:00.000Z"),
+      completedAt: null,
+    },
+    create: { id: "execution_session_goal_active_approval", workspaceId, taskId: GOAL_WORKBENCH_ACCEPTANCE_IDS.approvalTaskId, planId: approvalPlanId, status: "Paused", currentNodeId: approvalNodeId, currentNodeAttemptId: approvalAttemptId, pauseReason: "approval", completedNodeIds: "[]", startedAt: new Date("2026-07-20T08:45:00.000Z"), pausedAt: new Date("2026-07-20T08:45:00.000Z") },
+  });
+  await prisma.run.upsert({
+    where: { id: "run_goal_active_approval" },
+    update: {
+      taskId: GOAL_WORKBENCH_ACCEPTANCE_IDS.approvalTaskId,
+      runtimeName: "simulated-goal-acceptance",
+      runtimeConfigSnapshot: { simulated: true, noProviderInvoked: true, planId: approvalPlanId },
+      status: RunStatus.WaitingForApproval,
+      startedAt: new Date("2026-07-20T08:45:00.000Z"),
+      endedAt: null,
+      triggeredBy: "acceptance-fixture",
+      syncStatus: "healthy",
+    },
+    create: {
+      id: "run_goal_active_approval",
+      taskId: GOAL_WORKBENCH_ACCEPTANCE_IDS.approvalTaskId,
+      runtimeName: "simulated-goal-acceptance",
+      runtimeConfigSnapshot: { simulated: true, noProviderInvoked: true, planId: approvalPlanId },
+      status: RunStatus.WaitingForApproval,
+      startedAt: new Date("2026-07-20T08:45:00.000Z"),
+      triggeredBy: "acceptance-fixture",
+      syncStatus: "healthy",
+    },
+  });
+  await prisma.task.update({
+    where: { id: GOAL_WORKBENCH_ACCEPTANCE_IDS.approvalTaskId },
+    data: {
+      latestRunId: "run_goal_active_approval",
+      latestEventId: null,
+      latestRawEventId: null,
+      blockedByEventId: null,
+      blockedByRawEventId: null,
+      completedAt: null,
+    },
+  });
 
   await prisma.goalBriefRevision.deleteMany({ where: { goalId } });
   await prisma.goalBriefRevision.create({ data: { workspaceId, goalId, brief, actorType: "user", actorId: "acceptance-fixture-user", createdAt: new Date("2026-07-20T09:00:00.000Z") } });

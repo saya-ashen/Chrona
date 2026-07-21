@@ -1,15 +1,19 @@
 # Long-Horizon Goals, Triggers, and Task Occurrences
 
-Status: Phase 3 Goal aggregate, lifecycle-aware Outcome Archive, and active
-Goal Control Plane + Workbench implemented; trigger and neutral occurrence
-phases remain target design.
+Status: Goal, Goal Control Plane, GoalAsset Workbench, neutral TaskOccurrence,
+versioned TaskTrigger, schedule activation, bounded internal events, and the
+authenticated email adapter are implemented. The shipped external adapter uses
+credential plus HMAC authentication, freshness checks, delivery replay
+deduplication, bounded validated input, workspace isolation, rate limiting, and
+redacted persistence. Webhook remains outside the closed trigger union; Chrona
+does not expose a placeholder webhook route, secret row, or unvalidated config.
 
-This document is the canonical design for long-horizon work and extensible task
-activation in Chrona. Goal lifecycle, optional `Task.goalId`, immutable
-`GoalAsset` promotion, explicit Working Set, versioned Operational Brief,
-bounded-task context snapshots, Goal APIs, and Goal list/workspace surfaces now
-ship. The current execution scope remains WorkBlock/manual-task based until
-`TaskOccurrence` and `TaskTrigger` migration phases ship.
+This document is the canonical design and shipped architecture for long-horizon
+work and extensible task activation in Chrona. Goal lifecycle, atomic entry and
+promotion commands, proposed-criterion review, optional `Task.goalId`, immutable
+GoalAsset promotion, versioned Workbench assets, explicit Working Set, versioned
+Operational Brief, frozen bounded-task context, occurrence-scoped execution,
+and versioned trigger delivery now ship end to end.
 
 ## 1. Problem
 
@@ -89,14 +93,17 @@ Normative decisions:
 11. A standalone task result is immutable presentation: it may support
     non-mutating use such as preview, copy, and download, but it does not own
     editable working state or workflow actions.
-12. Continued editing, stateful interaction, or cross-task reuse requires a
-    Goal. When a user invokes such an action on a standalone task result,
-    Chrona atomically creates a Goal, associates the existing task with it, and
-    promotes the selected accepted result or artifact into a GoalAsset.
+12. Continued editing, stateful interaction, cross-task reuse, or an explicit
+    follow-up work item requires a Goal. A user may create it directly by
+    promoting an accepted standalone Task. Creating the first explicit
+    follow-up Task from that accepted result also atomically creates the Goal,
+    associates both Tasks, and promotes selected evidence.
 13. "Promote task to Goal" is product shorthand. It never rewrites the Task
     into another task kind, discards its occurrence history, or lets
-    AI-authored UI create authority. Promotion is an explicit user action; AI
-    may recommend it but cannot perform it silently.
+    AI-authored UI create lifecycle authority. Manual promotion is an explicit
+    user action. Automatic conversion occurs only as the product-defined
+    consequence of the user's explicit first follow-up Task creation; asking a
+    question or AI merely recommending continued work cannot trigger it.
 14. Original TaskResults and Artifacts remain immutable provenance after
     promotion. Edits create goal-owned working versions or successor artifacts
     rather than mutating execution history.
@@ -231,31 +238,44 @@ the first Goal release. The first release may derive goal-visible assets through
 version, review status, and archival behavior only when editable working assets
 ship.
 
-Promotion rules:
+Promotion and continuation rules:
 
 - a standalone task stays a bounded `single` or `series` task; promotion adds a
   Goal and `goalId` association rather than changing task execution mode;
-- if the task already belongs to a Goal, the user selects that GoalAsset target
-  instead of creating another Goal;
-- promotion is explicit and idempotent; retrying the same accepted-result
-  promotion must not create duplicate Goals or GoalAssets;
-- the product previews the Goal title, selected assets, and proposed follow-up
-  work before commit;
-- original result specs and Artifacts stay immutable and reviewable;
-- user edits and accepted AI edits create versioned working content or successor
-  Artifacts with source provenance;
+- a completed standalone Task with an accepted result exposes a one-click
+  **Promote to Goal** action. Promotion does not require the user to define a
+  follow-up Task first;
+- when a standalone Task with an accepted result gets its first explicitly
+  created follow-up Task, the operation atomically creates a Goal, associates
+  both the source and follow-up Tasks, and promotes the selected accepted result
+  and selected Artifacts into initial GoalAssets;
+- asking a result question or performing another non-mutating continuation does
+  not create a Goal;
+- if the source Task already belongs to a Goal, its follow-up Task joins that
+  Goal rather than creating another one;
+- promotion and follow-up conversion are explicit, idempotent product commands;
+  retries must not create duplicate Goals, Tasks, or GoalAssets;
+- the Goal receives an AI-generated title. The product records that provenance,
+  labels the title as AI-generated, and presents a non-blocking rename notice on
+  the first Goal overview visit. The label disappears after a user rename;
+- original result specs and Artifacts stay immutable and reviewable. Promotion
+  creates GoalAsset references or working copies with source provenance;
+- AI proposes a small initial set of success criteria, but proposed criteria do
+  not contribute to progress or achievement until the user confirms or edits
+  them;
+- while initial criteria await confirmation, the Goal's primary next action is
+  **Review success criteria**. A newly created follow-up Task remains ready and
+  does not start automatically;
 - Goal review consumes accepted results and permitted current GoalAsset versions,
   never arbitrary mutable UI state;
 - external effects derived from an asset, such as sending email or submitting
   an application, remain separate bounded tasks behind approval and idempotency.
 
-The default standalone-task experience remains deliberately small: inspect,
-copy, download, accept, or request changes. When the user attempts continued
-editing, persistent checklist interaction, cross-task reuse, or another
-state-changing workflow action, the UI offers **Create Goal and continue**. The
-operation atomically creates the Goal, associates the task, promotes the
-selected result, and opens the Goal workspace. A failed operation must leave no
-partially promoted Goal or detached asset.
+The default standalone-task result surface remains deliberately small: inspect,
+copy, download, accept, request changes, create a follow-up Task, or promote to a
+Goal. Manual promotion opens the new Goal overview immediately. Follow-up
+conversion creates the Goal and next Task as one transaction. Either operation
+must leave no partial Goal, detached asset, or half-associated Task on failure.
 
 ### 3.3 Goal Control Plane and Workbench
 
@@ -314,7 +334,112 @@ Task; future structured review proposals must show a reviewed diff and apply
 selected Goal changes atomically with actor, time, idempotency key, and audit
 event.
 
-### 3.4 Goal applications (reserved future capability)
+### 3.4 Goal entry points and page information architecture
+
+The Goal product is a **long-lived outcome workspace**, not a project dashboard,
+task backlog, or aggregate metrics page. A user opening a Goal must first be
+able to answer two questions: what is the outcome's current state, and what is
+the single next action that deserves attention?
+
+#### Entry paths
+
+Goal creation follows this priority order:
+
+1. **Promote a completed Task** — the user promotes an accepted result with one
+   action; Chrona creates the Goal, retains the source Task, promotes selected
+   evidence, proposes criteria, and opens the Goal overview.
+2. **Create the first follow-up Task** — when an accepted standalone Task gets
+   its first explicit follow-up, Chrona automatically creates a Goal containing
+   the source and follow-up Tasks. If the source already belongs to a Goal, the
+   follow-up joins it instead.
+3. **Direct Goal mode** — the normal Task creation surface provides a compact,
+   mutually exclusive `Task` / `Goal` mode selector. `Task` remains the default.
+   Goal mode is secondary and requires two distinct fields: **Intended outcome**
+   and **First work item**. Both are required; submission creates the Goal and
+   its first bounded Task. The product does not add a competing prominent global
+   Create Goal call to action.
+
+The mode selector reuses the same creation surface rather than introducing a
+separate Goal creation page. It must state the active mode's meaning and change
+the submit label accordingly. The two inputs must remain separate product
+fields; AI must not infer a long-lived outcome and bounded first task from one
+ambiguous mixed prompt.
+
+#### Goal list
+
+The default Goal list is organized by required attention, not by raw update
+time, card-grid metrics, or lifecycle alone:
+
+1. **Needs attention** — a user decision, review, approval, input, or recovery
+   action is available;
+2. **In progress** — bounded work is actively advancing the outcome;
+3. **Stable or paused** — no immediate action is required; this group may be
+   collapsed by default;
+4. **Archive** — achieved and stopped Goals remain discoverable without
+   competing with ongoing work.
+
+Each row prioritizes decision signals: Goal title, why it needs attention or its
+next action, success-criterion evidence state, current work item, and latest
+material change. Raw Task counts, Artifact counts, timestamps, and synthetic
+completion percentages are secondary metadata and must not dominate the row.
+
+#### Workspace shell and navigation
+
+The ongoing Goal workspace uses a compact operational layout. It avoids a grid
+of oversized statistic cards. A persistent Goal header remains visible across
+the workspace and contains the title, lifecycle state, one primary next action,
+and an overflow management menu. Rename, pause, resume, stop, and archival
+actions belong in that menu. **Achieve Goal** becomes the primary action only
+after the required success criteria have confirmed evidence; it is not a
+permanently available peer button.
+
+The workspace has five top-level tabs with stable ownership:
+
+| Tab | Responsibility |
+| --- | --- |
+| **Overview** | Current outcome state, the single rule-derived next action, material risks or changes, and compact summaries linking into the other tabs. |
+| **Working set** | A bounded set of currently active, waiting, and ready Tasks. Each Task states which success criterion or outcome gap it advances. Completed and inactive Tasks move to History. |
+| **Results** | A review inbox for candidate Task results followed by accepted, provenance-bearing GoalAssets. It presents the flow from new result to durable Goal asset rather than one undifferentiated Artifact stream. |
+| **Success criteria** | Proposed and confirmed criteria, evidence state, evidence provenance, conflicts, and explicit confirmation actions. |
+| **History** | A unified decision timeline across lifecycle changes, criterion decisions, GoalAsset versions, Task transitions, and human choices. Routine automatic events are compressed by default and can be revealed or filtered. |
+
+The fixed header prevents tab navigation from hiding Goal status or the next
+action. Tabs separate dense domains, but Overview must retain cross-domain
+signals rather than becoming an empty collection of links.
+
+#### Progress, authority, and AI suggestions
+
+Progress is represented per success criterion with evidence-backed states such
+as unverified, gathering evidence, satisfied, and user-confirmed. Conflicting or
+insufficient evidence remains visible. The product does not calculate a single
+overall percentage unless a future deterministic, user-understood weighting
+contract is introduced.
+
+The primary next action is derived by product rules from Goal lifecycle,
+unconfirmed criteria, active Tasks, waiting inputs, approvals, result review,
+and recovery state. AI may propose criterion text, work content, summaries, and
+follow-up ideas, but it cannot choose lifecycle authority, start work without
+the applicable product gate, or replace the rule-derived primary action.
+
+AI-generated Goal names and proposed criteria must be visibly attributed.
+Attribution is actionable rather than decorative: the first overview visit
+offers direct rename access, and proposed criteria offer review, edit, and
+confirmation. These notices do not block navigation.
+
+#### Responsive and state requirements
+
+- Desktop, tablet, and mobile retain the same priority: state and next action
+  before metadata, history, or counts.
+- The tab strip may scroll or adapt on narrow screens, but the page itself must
+  not introduce horizontal overflow.
+- Loading, empty, error, blocked, waiting, paused, achieved, and stopped states
+  preserve one understandable next action or an explicit reason none exists.
+- `WaitingForInput` and `WaitingForApproval` remain distinct in copy and action.
+- Achieved and Stopped Goals replace the ongoing-work emphasis with final
+  outcome, accepted evidence, provenance, confirmation, and history while
+  preserving the same stable information ownership.
+
+### 3.5 Goal applications (reserved future capability)
 
 A Goal may eventually host a reusable, AI-assisted application assembled for
 its domain, for example an application-material editor or an email preparation
@@ -677,12 +802,6 @@ Rules:
 - a trigger adapter cannot override task automation policy;
 - automatic execution still observes plan acceptance, provider capability,
   approvals, and side-effect policy;
-- ordinary not-due and already-active conditions remain steady-state scheduler
-  facts, not Action Center failures;
-- every automation action carries occurrence ID, causation ID, actor, origin,
-  and idempotency key.
-
-## 8. State derivation
 
 Chrona must not collapse definition lifecycle, occurrence execution state, and
 attention into one persisted status.
@@ -798,11 +917,14 @@ Execution commands continue through the task/work command boundary but include
 `occurrenceId` in command context.
 
 `promote-to-goal` accepts an accepted result reference, selected artifact
-references, a proposed Goal title, and an idempotency key. The server resolves
-task, occurrence, result, and artifact ownership; clients and AI-authored specs
-cannot supply private IDs as authority. If the task already has a Goal, the
-same command promotes into that Goal or returns a conflict requiring an
-explicit user choice.
+references, and an idempotency key. The server resolves task, occurrence,
+result, and artifact ownership and obtains the initial Goal title through the
+approved AI boundary; clients and AI-authored specs cannot supply private IDs as
+authority. If the Task already has a Goal, follow-up creation joins that Goal,
+while an incompatible promotion request returns a conflict requiring an
+explicit user choice. The follow-up continuation command must apply the same
+ownership and idempotency rules when it creates a Goal and associates both the
+source and follow-up Tasks.
 
 Future external webhook ingress is an integration endpoint, not a generic task
 mutation endpoint. It resolves an opaque endpoint reference server-side and
@@ -894,6 +1016,14 @@ permanent dual-write compatibility is prohibited.
   asset, review, and revert semantics ship together;
 - reserve Goal applications at the contract/design boundary only; do not ship
   arbitrary AI-authored actions or an application runtime.
+- refine Goal entry paths so accepted-result promotion is one click and the
+  first explicit follow-up on a standalone accepted Task creates the Goal and
+  both Task associations atomically;
+- add the secondary `Task` / `Goal` creation mode with required intended-outcome
+  and first-work-item fields;
+- implement AI-title attribution and first-visit rename affordance, proposed
+  success-criterion confirmation, and the criteria-before-execution gate;
+- align Goal list grouping and the five-tab workspace with Section 3.4.
 
 
 ### Phase 3B — Goal Control Plane and Workbench
@@ -981,13 +1111,12 @@ Every implementation phase must prove its observable contract.
 - multiple occurrences remain independently inspectable;
 - mobile views have no horizontal overflow;
 - paused Goal/trigger behavior is visible and reversible;
-- external side-effect work always stops at its approval boundary.
+- external side-effect work always stops at its approval boundary;
 - standalone task results expose only non-mutating result use until promotion;
 - invoking an edit or persistent workflow action offers Goal creation and opens
   the promoted asset in the Goal workspace;
 - promotion failure leaves no partial Goal, task association, or GoalAsset;
-- accepted result history remains inspectable after asset edits and replacement.
-
+- accepted result history remains inspectable after asset edits and replacement;
 - Active Goal first view exposes current focus, Needs You, and selected context
   before entity-level history;
 - bounded-work Composer shows expected outcome, selected context, and action
@@ -995,6 +1124,23 @@ Every implementation phase must prove its observable contract.
 - Goal-scoped Task Inspector verifies ownership and reuses canonical Task
   Workspace state/actions;
 - locale, Goal, Task, and query-route context survive Workbench navigation;
+- Goal list groups attention, active progress, stable/paused work, and archives,
+  and each row exposes the reason to open it rather than only aggregate counts;
+- standalone accepted Task promotion opens a Goal in one action with immutable
+  result provenance and no required follow-up Task;
+- creating the first follow-up from a standalone accepted Task atomically
+  creates one Goal, associates both Tasks, and promotes selected evidence;
+- follow-up creation on an existing Goal joins that Goal and never creates a
+  duplicate;
+- AI-generated Goal titles show attribution and a first-visit rename action;
+- proposed success criteria do not affect progress until confirmed, and review
+  remains the primary action before the ready follow-up Task may start;
+- Goal workspace exposes Overview, Working set, Results, Success criteria, and
+  History with stable header state and one rule-derived primary action;
+- progress is evidence-backed per criterion and does not present an invented
+  aggregate percentage;
+- History reconstructs human decisions and material Goal changes while
+  compressing routine automatic events;
 
 ## 16. Non-goals
 

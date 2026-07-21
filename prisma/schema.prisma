@@ -46,6 +46,81 @@ enum GoalWorkingSetSubjectType {
   task
 }
 
+enum GoalAssetKind {
+  document
+  form
+  page
+  file
+}
+
+enum GoalAssetVersionSource {
+  manual
+  ai_task
+  inbox
+  restored
+  imported
+}
+
+enum GoalAssetDraftStatus {
+  Active
+  Conflict
+  Discarded
+  Submitted
+}
+
+enum GoalInboxCandidateStatus {
+  Pending
+  Accepted
+  Rejected
+}
+
+enum GoalAssetJobKind {
+  thumbnail
+  export
+}
+
+enum GoalAssetJobStatus {
+  Queued
+  Processing
+  Completed
+  Failed
+}
+
+enum TaskDefinitionStatus {
+  Draft
+  Active
+  Paused
+  Completed
+  Stopped
+}
+
+enum TaskOccurrenceStatus {
+  Scheduled
+  Ready
+  Running
+  WaitingForInput
+  WaitingForApproval
+  Blocked
+  Failed
+  Completed
+  Cancelled
+  Ignored
+}
+
+enum TaskTriggerState {
+  Enabled
+  Paused
+  Retired
+}
+
+enum TriggerDeliveryStatus {
+  Received
+  Accepted
+  Ignored
+  Duplicate
+  Failed
+}
+
 enum TaskStatus {
   Draft
   Ready
@@ -230,6 +305,14 @@ model Workspace {
   userPreferences           WorkspaceUserPreference[]
   goalWorkingSetItems       GoalWorkingSetItem[]
   goalBriefRevisions        GoalBriefRevision[]
+  goalAssetVersions         GoalAssetVersion[]
+  goalAssetDrafts           GoalAssetDraft[]
+  goalInboxCandidates       GoalInboxCandidate[]
+  goalFormSubmissions       GoalFormSubmission[]
+  goalAssetJobs             GoalAssetJob[]
+  taskOccurrences           TaskOccurrence[]
+  taskTriggers              TaskTrigger[]
+  triggerDeliveries         TriggerDelivery[]
 }
 
 model CalendarSource {
@@ -293,6 +376,8 @@ model Goal {
   id                      String               @id @default(cuid())
   workspaceId             String
   title                   String
+  titleSource             String               @default("user")
+  titleRenameNoticeSeenAt DateTime?
   description             String?
   successCriteria         Json
   status                  GoalStatus           @default(Draft)
@@ -307,14 +392,19 @@ model Goal {
   tasks                   Task[]
   assets                  GoalAsset[]
   workingSetItems         GoalWorkingSetItem[]
+  inboxCandidates         GoalInboxCandidate[]
+  formSubmissions         GoalFormSubmission[]
+  assetJobs               GoalAssetJob[]
   briefRevisions          GoalBriefRevision[]
+  goalAssetVersions       GoalAssetVersion[]
+  goalAssetDrafts         GoalAssetDraft[]
 
   @@index([workspaceId, status])
   @@index([workspaceId, updatedAt])
 }
 
 model GoalAsset {
-  id                String          @id @default(cuid())
+  id                String               @id @default(cuid())
   workspaceId       String
   goalId            String
   sourceArtifactId  String
@@ -322,17 +412,26 @@ model GoalAsset {
   role              GoalAssetRole
   status            GoalAssetStatus
   label             String
-  createdAt         DateTime        @default(now())
-  updatedAt         DateTime        @updatedAt
-  workspace         Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  goal              Goal            @relation(fields: [goalId], references: [id], onDelete: Cascade)
-  sourceArtifact    Artifact        @relation("GoalAssetSourceArtifact", fields: [sourceArtifactId], references: [id])
-  currentArtifact   Artifact        @relation("GoalAssetCurrentArtifact", fields: [currentArtifactId], references: [id])
+  kind              GoalAssetKind        @default(file)
+  archivedAt        DateTime?
+  lastOpenedAt      DateTime?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  workspace         Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  goal              Goal                 @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  sourceArtifact    Artifact             @relation("GoalAssetSourceArtifact", fields: [sourceArtifactId], references: [id])
+  currentArtifact   Artifact             @relation("GoalAssetCurrentArtifact", fields: [currentArtifactId], references: [id])
+  versions          GoalAssetVersion[]
+  drafts            GoalAssetDraft[]
+  inboxTargets      GoalInboxCandidate[] @relation("GoalInboxTargetAsset")
+  submissions       GoalFormSubmission[]
+  jobs              GoalAssetJob[]
 
   @@unique([goalId, sourceArtifactId])
   @@index([workspaceId, goalId])
   @@index([sourceArtifactId])
   @@index([currentArtifactId])
+  @@index([goalId, archivedAt, updatedAt])
 }
 
 model GoalWorkingSetItem {
@@ -392,6 +491,7 @@ model Task {
   dueAt                     DateTime?
   blockReason               Json?
   goalContext               Json?
+  definitionStatus          TaskDefinitionStatus       @default(Active)
   defaultSessionId          String?
   aiClientId                String?
   latestRunId               String?
@@ -412,6 +512,13 @@ model Task {
   events                    Event[]
   rawEventLogs              RawEventLog[]
   toolInvocations           ToolInvocation[]
+  occurrences               TaskOccurrence[]
+  triggers                  TaskTrigger[]
+  triggerDeliveries         TriggerDelivery[]
+  assetVersions             GoalAssetVersion[]
+  inboxCandidates           GoalInboxCandidate[]
+  formSubmissions           GoalFormSubmission[]
+  assetJobs                 GoalAssetJob[]
   timelineItems             TaskTimelineItem[]
   projection                TaskProjection?
   dependencies              TaskDependency[]           @relation("TaskDependencies")
@@ -441,6 +548,7 @@ model Task {
   @@index([workspaceId, seriesExternalUid])
   @@index([defaultSessionId])
   @@index([goalId])
+  @@index([workspaceId, definitionStatus])
   @@index([aiClientId])
 }
 
@@ -575,6 +683,7 @@ model TaskPlan {
   workspaceId  String
   taskId       String
   workBlockId  String?
+  occurrenceId String?
   planId       String          @unique
   revision     Int
   status       TaskPlanStatus
@@ -588,11 +697,13 @@ model TaskPlan {
   workspace    Workspace       @relation(fields: [workspaceId], references: [id])
   task         Task            @relation(fields: [taskId], references: [id], onDelete: Cascade)
   workBlock    WorkBlock?      @relation(fields: [workBlockId], references: [id], onDelete: SetNull)
+  occurrence   TaskOccurrence? @relation(fields: [occurrenceId], references: [id], onDelete: SetNull)
   runs         TaskPlanRun[]
   layers       TaskPlanLayer[]
 
   @@index([workspaceId, taskId, updatedAt])
   @@index([taskId, workBlockId, status, updatedAt])
+  @@index([occurrenceId, status, updatedAt])
   @@index([workBlockId, status, updatedAt])
 }
 
@@ -601,6 +712,7 @@ model TaskPlanRun {
   workspaceId         String
   taskId              String
   workBlockId         String?
+  occurrenceId        String?
   planId              String
   planRun             Json
   executionOwnerId    String?
@@ -616,6 +728,7 @@ model TaskPlanRun {
   workBlock           WorkBlock?                 @relation(fields: [workBlockId], references: [id], onDelete: SetNull)
   plan                TaskPlan                   @relation(fields: [planId], references: [planId], onDelete: Cascade)
   nodeAttempts        TaskPlanNodeAttempt[]
+  occurrence          TaskOccurrence?            @relation(fields: [occurrenceId], references: [id], onDelete: SetNull)
   providerRuns        TaskPlanProviderRun[]
   providerApprovals   TaskPlanProviderApproval[]
 
@@ -624,6 +737,7 @@ model TaskPlanRun {
   @@index([taskId, workBlockId, planId])
   @@index([executionLeaseUntil])
   @@index([workspaceId, taskId, updatedAt])
+  @@index([occurrenceId, updatedAt])
 }
 
 model TaskPlanNodeAttempt {
@@ -767,6 +881,7 @@ model Run {
   id                    String                   @id @default(cuid())
   taskId                String
   workBlockId           String?
+  occurrenceId          String?
   taskSessionId         String?
   runtimeName           String
   runtimeConfigSnapshot Json?
@@ -774,6 +889,7 @@ model Run {
   runtimeRunRef         String?                  @unique
   runtimeSessionRef     String?
   status                RunStatus
+  occurrence            TaskOccurrence?          @relation(fields: [occurrenceId], references: [id], onDelete: SetNull)
   startedAt             DateTime?
   endedAt               DateTime?
   errorSummary          String?
@@ -806,6 +922,7 @@ model Run {
   @@index([taskId, workBlockId, status])
   @@index([taskSessionId, status])
   @@index([runtimeName, status])
+  @@index([occurrenceId, createdAt])
 }
 
 model Approval {
@@ -833,7 +950,7 @@ model Approval {
 }
 
 model Artifact {
-  id                String       @id @default(cuid())
+  id                String               @id @default(cuid())
   workspaceId       String
   taskId            String
   runId             String
@@ -842,15 +959,20 @@ model Artifact {
   uri               String
   contentPreview    String?
   metadata          Json?
-  createdAt         DateTime     @default(now())
-  workspace         Workspace    @relation(fields: [workspaceId], references: [id])
-  task              Task         @relation(fields: [taskId], references: [id])
-  run               Run          @relation(fields: [runId], references: [id])
-  sourceGoalAssets  GoalAsset[]  @relation("GoalAssetSourceArtifact")
-  currentGoalAssets GoalAsset[]  @relation("GoalAssetCurrentArtifact")
+  occurrenceId      String?
+  createdAt         DateTime             @default(now())
+  workspace         Workspace            @relation(fields: [workspaceId], references: [id])
+  task              Task                 @relation(fields: [taskId], references: [id])
+  run               Run                  @relation(fields: [runId], references: [id])
+  sourceGoalAssets  GoalAsset[]          @relation("GoalAssetSourceArtifact")
+  occurrence        TaskOccurrence?      @relation(fields: [occurrenceId], references: [id], onDelete: SetNull)
+  assetVersions     GoalAssetVersion[]
+  inboxCandidates   GoalInboxCandidate[]
+  currentGoalAssets GoalAsset[]          @relation("GoalAssetCurrentArtifact")
 
   @@index([workspaceId, type])
   @@index([taskId, createdAt])
+  @@index([occurrenceId, createdAt])
   @@index([runId, createdAt])
 }
 
@@ -1263,6 +1385,219 @@ model TaskResultContinuation {
   @@index([createdTaskId])
 }
 
+model GoalAssetVersion {
+  id               String                 @id @default(cuid())
+  workspaceId      String
+  goalId           String
+  assetId          String
+  artifactId       String?
+  version          Int
+  parentVersionId  String?
+  source           GoalAssetVersionSource
+  content          Json
+  contentHash      String
+  mimeType         String?
+  originalFilename String?
+  changeSummary    String?
+  sourceTaskId     String?
+  sourceRunId      String?
+  sourceResultId   String?
+  selector         Json?
+  authorType       String
+  authorId         String?
+  createdAt        DateTime               @default(now())
+  workspace        Workspace              @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  goal             Goal                   @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  asset            GoalAsset              @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  artifact         Artifact?              @relation(fields: [artifactId], references: [id], onDelete: SetNull)
+  sourceTask       Task?                  @relation(fields: [sourceTaskId], references: [id], onDelete: SetNull)
+  parentVersion    GoalAssetVersion?      @relation("GoalAssetVersionParent", fields: [parentVersionId], references: [id], onDelete: SetNull)
+  childVersions    GoalAssetVersion[]     @relation("GoalAssetVersionParent")
+  drafts           GoalAssetDraft[]       @relation("GoalAssetDraftBase")
+  restoredDrafts   GoalAssetDraft[]       @relation("GoalAssetDraftConflict")
+  submissions      GoalFormSubmission[]
+  jobs             GoalAssetJob[]
+
+  @@unique([assetId, version])
+  @@index([goalId, createdAt])
+  @@index([artifactId])
+}
+
+model GoalAssetDraft {
+  id                String               @id @default(cuid())
+  workspaceId       String
+  goalId            String
+  assetId           String
+  baseVersionId     String
+  conflictVersionId String?
+  content           Json
+  contentHash       String
+  status            GoalAssetDraftStatus @default(Active)
+  authorType        String
+  authorId          String?
+  createdAt         DateTime             @default(now())
+  updatedAt         DateTime             @updatedAt
+  workspace         Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  goal              Goal                 @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  asset             GoalAsset            @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  baseVersion       GoalAssetVersion     @relation("GoalAssetDraftBase", fields: [baseVersionId], references: [id])
+  conflictVersion   GoalAssetVersion?    @relation("GoalAssetDraftConflict", fields: [conflictVersionId], references: [id], onDelete: SetNull)
+
+  @@index([assetId, status])
+  @@index([goalId, updatedAt])
+}
+
+model GoalInboxCandidate {
+  id                    String                   @id @default(cuid())
+  workspaceId           String
+  goalId                String
+  sourceTaskId          String
+  sourceRunId           String
+  sourceArtifactId      String?
+  groupKey              String
+  kind                  GoalAssetKind
+  label                 String
+  proposedAction        String
+  proposedTargetAssetId String?
+  reason                String
+  changeSummary         String
+  confidence            Float
+  selector              Json?
+  content               Json
+  contentHash           String
+  status                GoalInboxCandidateStatus @default(Pending)
+  resolvedAt            DateTime?
+  createdAt             DateTime                 @default(now())
+  updatedAt             DateTime                 @updatedAt
+  workspace             Workspace                @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  goal                  Goal                     @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  sourceTask            Task                     @relation(fields: [sourceTaskId], references: [id], onDelete: Cascade)
+  sourceArtifact        Artifact?                @relation(fields: [sourceArtifactId], references: [id], onDelete: SetNull)
+  proposedTargetAsset   GoalAsset?               @relation("GoalInboxTargetAsset", fields: [proposedTargetAssetId], references: [id], onDelete: SetNull)
+
+  @@unique([goalId, sourceRunId, groupKey])
+  @@index([goalId, status, createdAt])
+}
+
+model GoalFormSubmission {
+  id          String           @id @default(cuid())
+  workspaceId String
+  goalId      String
+  assetId     String
+  versionId   String
+  taskId      String?
+  content     Json
+  contentHash String
+  createdAt   DateTime         @default(now())
+  workspace   Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  goal        Goal             @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  asset       GoalAsset        @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  version     GoalAssetVersion @relation(fields: [versionId], references: [id])
+  task        Task?            @relation(fields: [taskId], references: [id], onDelete: SetNull)
+
+  @@index([assetId, createdAt])
+  @@index([goalId, createdAt])
+}
+
+model GoalAssetJob {
+  id           String             @id @default(cuid())
+  workspaceId  String
+  goalId       String
+  assetId      String
+  versionId    String
+  taskId       String?
+  kind         GoalAssetJobKind
+  format       String?
+  status       GoalAssetJobStatus @default(Queued)
+  outputUri    String?
+  errorCode    String?
+  errorMessage String?
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  workspace    Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  goal         Goal               @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  asset        GoalAsset          @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  version      GoalAssetVersion   @relation(fields: [versionId], references: [id])
+  task         Task?              @relation(fields: [taskId], references: [id], onDelete: SetNull)
+
+  @@index([assetId, kind, createdAt])
+  @@index([goalId, status])
+}
+
+model TaskTrigger {
+  id          String            @id @default(cuid())
+  workspaceId String
+  taskId      String
+  kind        String
+  state       TaskTriggerState  @default(Enabled)
+  config      Json
+  version     Int               @default(1)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+  workspace   Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  task        Task              @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  deliveries  TriggerDelivery[]
+  occurrences TaskOccurrence[]
+
+  @@unique([taskId, kind])
+  @@index([workspaceId, state])
+}
+
+model TriggerDelivery {
+  id              String                @id @default(cuid())
+  workspaceId     String
+  triggerId       String
+  taskId          String
+  deliveryKey     String
+  status          TriggerDeliveryStatus @default(Received)
+  receivedAt      DateTime              @default(now())
+  processedAt     DateTime?
+  payloadDigest   String?
+  normalizedInput Json?
+  ignoreReason    String?
+  errorCode       String?
+  workspace       Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  trigger         TaskTrigger           @relation(fields: [triggerId], references: [id], onDelete: Cascade)
+  task            Task                  @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  occurrence      TaskOccurrence?
+
+  @@unique([triggerId, deliveryKey])
+  @@index([workspaceId, status, receivedAt])
+}
+
+model TaskOccurrence {
+  id                String               @id @default(cuid())
+  workspaceId       String
+  taskId            String
+  deliveryId        String?              @unique
+  triggerId         String?
+  workBlockId       String?              @unique
+  occurrenceKey     String
+  triggerVersion    Int?
+  source            Json
+  status            TaskOccurrenceStatus
+  eligibleAt        DateTime
+  materializedAt    DateTime             @default(now())
+  startedAt         DateTime?
+  completedAt       DateTime?
+  normalizedInput   Json?
+  executionEpoch    Int                  @default(1)
+  workspace         Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  task              Task                 @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  trigger           TaskTrigger?         @relation(fields: [triggerId], references: [id], onDelete: SetNull)
+  delivery          TriggerDelivery?     @relation(fields: [deliveryId], references: [id], onDelete: SetNull)
+  workBlock         WorkBlock?           @relation(fields: [workBlockId], references: [id], onDelete: SetNull)
+  taskPlans         TaskPlan[]
+  taskPlanRuns      TaskPlanRun[]
+  executionSessions ExecutionSession[]
+  runs              Run[]
+  artifacts         Artifact[]
+
+  @@unique([taskId, occurrenceKey])
+  @@index([workspaceId, status, eligibleAt])
+  @@index([taskId, status, eligibleAt])
+}
+
 // ────────────────────────────────────────────────────────────────────
 // Execution Layer Models
 // ────────────────────────────────────────────────────────────────────
@@ -1291,6 +1626,7 @@ model WorkBlock {
   executionSessions     ExecutionSession[]
   runs                  Run[]
   importedCalendarEvent ImportedCalendarEvent?
+  occurrence            TaskOccurrence?
   events                Event[]
   timelineItems         TaskTimelineItem[]
 
@@ -1324,10 +1660,13 @@ model ExecutionSession {
   workspace            Workspace              @relation(fields: [workspaceId], references: [id])
   task                 Task                   @relation(fields: [taskId], references: [id], onDelete: Cascade)
   workBlock            WorkBlock?             @relation(fields: [workBlockId], references: [id], onDelete: SetNull)
+  occurrenceId         String?
+  occurrence           TaskOccurrence?        @relation(fields: [occurrenceId], references: [id], onDelete: SetNull)
 
   @@index([workspaceId, status])
   @@index([taskId, status])
   @@index([workBlockId])
+  @@index([occurrenceId])
 }
 
 model RunToken {

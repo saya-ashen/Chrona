@@ -154,6 +154,7 @@ describe("buildCommandCenterCheckpointSpec", () => {
     });
     expect(spec.elements["field:excludeSelfFunded"]?.type).toBe("Checkbox");
     expect(spec.elements["field:notes"]?.type).toBe("Textarea");
+    expect(spec.state).toEqual({ channels: [], excludeSelfFunded: true, notes: "" });
     expect(spec.elements["submit:submit_input"]).toMatchObject({
       on: { press: { action: "submit-checkpoint", params: { values: { $state: "/" } } } },
     });

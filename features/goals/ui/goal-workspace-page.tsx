@@ -54,11 +54,7 @@ import {
   Label,
   PageFrame,
   Separator,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
+  
   Tabs,
   TabsContent,
   TabsList,
@@ -66,9 +62,8 @@ import {
   Textarea,
   cn,
 } from "@shared/ui";
-import { applyGoalReview, confirmGoalCriterion, createGoalTask, processGoalResult, runGoalAction, updateGoalBrief, updateGoalWorkingSet } from "../browser-api";
+import { applyGoalReview, confirmGoalCriterion, createGoalTask, reviewGoalCriterion, runGoalAction, updateGoal, updateGoalBrief, updateGoalWorkingSet } from "../browser-api";
 import type {
-  GoalAcceptedResultData,
   GoalArtifactData,
   GoalCopy,
   GoalData,
@@ -101,10 +96,12 @@ function artifactTypeLabel(type: string) {
 function ArtifactActions({
   artifact,
   goalId,
+  goalAssetId,
   copy,
 }: {
   artifact: GoalArtifactData;
   goalId: string;
+  goalAssetId?: string;
   copy: GoalCopy;
 }) {
   const [copied, setCopied] = useState(false);
@@ -165,7 +162,7 @@ function ArtifactActions({
             </Button>
           ) : null}
           <Button asChild type="button" size="sm" variant="ghost">
-            <LocalizedLink href={`/goals/${goalId}?section=results&artifact=${artifact.id}`}>
+            <LocalizedLink href={`/goals/${goalId}?section=workbench${goalAssetId ? `&asset=${encodeURIComponent(goalAssetId)}` : ""}`}>
               <ExternalLink className="size-4" />
               {copy.showDetails}
             </LocalizedLink>
@@ -208,7 +205,7 @@ function PrimaryOutcome({ goal, copy }: { goal: GoalData; copy: GoalCopy }) {
       </CardHeader>
       <CardContent className="grid gap-5 pt-5 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,0.55fr)]">
         <div>
-          {primary ? <ArtifactActions artifact={primary} goalId={goal.id} copy={copy} /> : null}
+          {primary ? <ArtifactActions artifact={primary} goalId={goal.id} goalAssetId={goal.assets.find((asset) => asset.currentArtifact.id === primary.id || asset.sourceArtifact.id === primary.id)?.id} copy={copy} /> : null}
         </div>
         {confirmation ? (
           <div className="rounded-xl border bg-background/80 p-4">
@@ -372,6 +369,7 @@ function CriteriaCard({ goal, copy }: { goal: GoalData; copy: GoalCopy }) {
   const [note, setNote] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [proposalDraft, setProposalDraft] = useState<Record<string, string>>({});
   const availableArtifacts = goal.assets.map((asset) => asset.currentArtifact);
 
   async function submit() {
@@ -391,6 +389,20 @@ function CriteriaCard({ goal, copy }: { goal: GoalData; copy: GoalCopy }) {
     }
   }
 
+  async function reviewProposal(criterionId: string, description: string) {
+    if (pending) return;
+    setPending(true);
+    setError(null);
+    try {
+      await reviewGoalCriterion(goal.id, criterionId, { description: proposalDraft[criterionId]?.trim() || description });
+      await revalidator.revalidate();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : copy.actionError);
+    } finally {
+      setPending(false);
+    }
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -402,11 +414,15 @@ function CriteriaCard({ goal, copy }: { goal: GoalData; copy: GoalCopy }) {
           <div key={criterion.id} className="flex gap-3 rounded-xl border p-3">
             {criterion.satisfied ? <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-emerald-600" aria-hidden /> : <CircleDot className="mt-0.5 size-5 shrink-0 text-muted-foreground" aria-hidden />}
             <div className="min-w-0 flex-1">
-              <p className="text-sm font-medium leading-5">{criterion.description}</p>
+              <div className="flex flex-wrap items-center gap-2">
+                {criterion.proposalStatus === "proposed" ? <Badge variant="outline">AI proposed</Badge> : null}
+                {criterion.proposalStatus === "proposed" ? <Input aria-label={`Review ${criterion.description}`} value={proposalDraft[criterion.id] ?? criterion.description} onChange={(event) => setProposalDraft((current) => ({ ...current, [criterion.id]: event.target.value }))} /> : <p className="text-sm font-medium leading-5">{criterion.description}</p>}
+              </div>
               {criterion.confirmedAt ? <p className="mt-1 text-xs text-muted-foreground">{formatDate(criterion.confirmedAt, locale)}</p> : null}
               {(criterion.evidenceArtifactIds?.length ?? 0) > 0 ? <p className="mt-1 text-xs text-muted-foreground">{criterion.evidenceArtifactIds?.length} {copy.selectedAssets}</p> : null}
             </div>
-            {!criterion.satisfied && goal.status === "Active" ? <Button size="sm" variant="outline" disabled={availableArtifacts.length === 0} onClick={() => { setCriterionId(criterion.id); setArtifactIds([]); }}>{copy.confirmCriterion}</Button> : null}
+            {criterion.proposalStatus === "proposed" && goal.status === "Active" ? <Button size="sm" disabled={pending} onClick={() => void reviewProposal(criterion.id, criterion.description)}>Confirm criterion</Button> : null}
+            {criterion.proposalStatus !== "proposed" && !criterion.satisfied && goal.status === "Active" ? <Button size="sm" variant="outline" disabled={availableArtifacts.length === 0} onClick={() => { setCriterionId(criterion.id); setArtifactIds([]); }}>{copy.confirmCriterion}</Button> : null}
           </div>
         ))}
         <Dialog open={criterionId !== null} onOpenChange={(open) => { if (!open) setCriterionId(null); }}>
@@ -486,132 +502,7 @@ function TaskGroupSection({
   );
 }
 
-function ProcessResultDialog({
-  goal,
-  result,
-  taskId,
-  copy,
-}: {
-  goal: GoalData;
-  result: GoalAcceptedResultData;
-  taskId: string;
-  copy: GoalCopy;
-}) {
-  const revalidator = useRevalidator();
-  const [open, setOpen] = useState(false);
-  const [artifactIds, setArtifactIds] = useState(() => result.artifacts.map((artifact) => artifact.id));
-  const [criterionId, setCriterionId] = useState("none");
-  const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
-  async function submit() {
-    if (artifactIds.length === 0 || pending) return;
-    setPending(true);
-    setError(null);
-    try {
-      await processGoalResult(goal.id, taskId, {
-        artifactIds,
-        addToWorkingSet: true,
-        createGoalAssets: true,
-        criterionId: criterionId === "none" ? null : criterionId,
-      });
-      await revalidator.revalidate();
-      setOpen(false);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : copy.actionError);
-    } finally {
-      setPending(false);
-    }
-  }
-
-  if (goal.mode === "archive" || result.artifacts.length === 0) return null;
-  return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <Button type="button" size="sm" onClick={() => setOpen(true)}><Plus className="size-4" />{copy.processResult}</Button>
-      <DialogContent className="sm:max-w-xl">
-        <DialogHeader><DialogTitle>{copy.processResult}</DialogTitle><DialogDescription>{copy.processResultDescription}</DialogDescription></DialogHeader>
-        <div className="space-y-4">
-          <Field><FieldLabel>{copy.selectedAssets}</FieldLabel><div className="space-y-2">{result.artifacts.map((artifact) => <Label key={artifact.id} className="flex items-center gap-3 rounded-lg border p-3"><Checkbox checked={artifactIds.includes(artifact.id)} onCheckedChange={(checked) => setArtifactIds((current) => checked ? [...current, artifact.id] : current.filter((id) => id !== artifact.id))} /><span>{artifact.title}</span></Label>)}</div></Field>
-          <Field><FieldLabel>{copy.linkCriterion}</FieldLabel><Select value={criterionId} onValueChange={(value) => setCriterionId(value ?? "none")}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">{copy.noCriterion}</SelectItem>{goal.outcome.criteria.filter((criterion) => !criterion.satisfied).map((criterion) => <SelectItem key={criterion.id} value={criterion.id}>{criterion.description}</SelectItem>)}</SelectContent></Select></Field>
-          <div className="rounded-lg border bg-muted/20 p-3 text-sm text-muted-foreground">{copy.addToWorkingSet} · {copy.retainAsAsset}</div>
-          {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
-        </div>
-        <DialogFooter><Button variant="outline" onClick={() => setOpen(false)}>{copy.cancel}</Button><Button disabled={artifactIds.length === 0 || pending} onClick={() => void submit()}>{pending ? copy.saving : copy.processResult}</Button></DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
-function AcceptedResultCard({
-  result,
-  taskTitle,
-  taskId,
-  goalId,
-  goal,
-  copy,
-}: {
-  result: GoalAcceptedResultData;
-  taskTitle: string;
-  taskId: string;
-  goalId: string;
-  goal: GoalData;
-  copy: GoalCopy;
-}) {
-  const locale = useLocale();
-  return (
-    <Card>
-      <CardHeader className="gap-2">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <Badge variant="secondary">{copy.immutableResult}</Badge>
-          {result.acceptedAt ? (
-            <span className="text-xs text-muted-foreground">
-              {copy.acceptedAt}: {formatDate(result.acceptedAt, locale)}
-            </span>
-          ) : null}
-        </div>
-        <CardTitle className="text-base">{taskTitle}</CardTitle>
-        <CardDescription className="whitespace-pre-wrap leading-6 text-foreground/75">
-          {result.summary}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        {result.artifacts.map((artifact) => (
-          <div key={artifact.id} className="rounded-xl border bg-muted/20 p-4">
-            <ArtifactActions artifact={artifact} goalId={goalId} copy={copy} />
-          </div>
-        ))}
-        <ProcessResultDialog goal={goal} result={result} taskId={taskId} copy={copy} />
-        <Button asChild size="sm" variant="outline">
-          <LocalizedLink href={`/tasks/${taskId}`}>{copy.openTask}</LocalizedLink>
-        </Button>
-      </CardContent>
-    </Card>
-  );
-}
-
-function AssetCard({ asset, goalId, copy }: { asset: GoalData["assets"][number]; goalId: string; copy: GoalCopy }) {
-  return (
-    <Card>
-      <CardHeader className="gap-3">
-        <div className="flex flex-wrap gap-2">
-          <Badge variant="secondary">{copy.assetRoles[asset.role] ?? asset.role}</Badge>
-          <Badge variant="outline">{copy.assetStatuses[asset.status] ?? asset.status}</Badge>
-        </div>
-        <CardTitle className="text-base">{asset.label}</CardTitle>
-        <CardDescription>
-          {copy.provenance}: {asset.provenance.unchanged ? copy.provenanceUnchanged : copy.currentVersion}
-        </CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
-        <ArtifactActions artifact={asset.currentArtifact} goalId={goalId} copy={copy} />
-        <div className="grid gap-2 rounded-xl border bg-muted/20 p-3 text-xs text-muted-foreground sm:grid-cols-2">
-          <span>{copy.sourceEvidence}: {asset.sourceArtifact.title}</span>
-          <span>{copy.sourceTask}: {asset.provenance.sourceTaskId}</span>
-        </div>
-      </CardContent>
-    </Card>
-  );
-}
 
 function CreateTaskDialog({
   goal,
@@ -909,8 +800,19 @@ function PrimaryAction({
         </Button>
       );
     }
+    if (action === "continue_work" && goal.primaryAction.taskId) {
+      return (
+        <Button onClick={() => void navigate(localizeHref(locale, `/goals/${goal.id}/workbench/tasks/${goal.primaryAction.taskId}`))}>
+          <Play className="size-4" />
+          {copy.nextAction.continue_work}
+        </Button>
+      );
+    }
     if (action === "resume") {
       return <Button disabled={pending} onClick={() => void runLifecycle("resume")}><Play className="size-4" />{copy.resume}</Button>;
+    }
+    if (action === "review_criteria") {
+      return <Button onClick={() => void navigate(`${localizeHref(locale, `/goals/${goal.id}`)}?section=criteria`)}><CheckCircle2 className="size-4" />{copy.nextAction.review_criteria}</Button>;
     }
     if (action === "review") {
       return <Button onClick={onStartReview}><RefreshCw className="size-4" />{copy.startReview}</Button>;
@@ -944,13 +846,27 @@ function PrimaryAction({
 
 // The workspace composes the four lifecycle sections at the route boundary.
 // eslint-disable-next-line max-lines-per-function, complexity
-export function GoalWorkspacePage({ goal, copy }: { goal: GoalData; copy: GoalCopy }) {
+export function GoalWorkspacePage({ goal, copy, assetWorkbench }: { goal: GoalData; copy: GoalCopy; assetWorkbench?: React.ReactNode }) {
   const [taskDialog, setTaskDialog] = useState<"task" | null>(null);
+  const [renameTitle, setRenameTitle] = useState(goal.title);
+  const [renamePending, setRenamePending] = useState(false);
+  const revalidator = useRevalidator();
+  async function renameGoal() {
+    if (!renameTitle.trim() || renamePending) return;
+    setRenamePending(true);
+    try {
+      await updateGoal(goal.id, { title: renameTitle.trim() });
+      await revalidator.revalidate();
+    } finally {
+      setRenamePending(false);
+    }
+  }
   const [reviewOpen, setReviewOpen] = useState(false);
   const [achievementOpen, setAchievementOpen] = useState(false);
   const isArchive = goal.mode === "archive";
-  const [searchParams] = useSearchParams();
-  const defaultSection = searchParams.get("section") === "results" ? "results" : "overview";
+  const [searchParams, setSearchParams] = useSearchParams();
+  const requestedSection = searchParams.get("section");
+  const defaultSection = requestedSection === "work" || requestedSection === "workbench" || requestedSection === "criteria" || requestedSection === "history" ? requestedSection : "overview";
   return (
     <PageFrame mode="focused">
       <div className="flex min-w-0 flex-1 flex-col gap-5" data-ui-surface-kind="product-authored">
@@ -980,6 +896,15 @@ export function GoalWorkspacePage({ goal, copy }: { goal: GoalData; copy: GoalCo
             />
           </div>
         </header>
+        {goal.titleSource === "ai" && !goal.titleRenameNoticeSeenAt ? (
+          <Card className="border-primary/30 bg-primary/5">
+            <CardContent className="flex flex-col gap-3 pt-6 sm:flex-row sm:items-center">
+              <div className="min-w-0 flex-1"><p className="font-medium">AI-generated Goal name</p><p className="text-sm text-muted-foreground">Review the suggested name. Renaming removes this attribution notice.</p></div>
+              <Input aria-label="Rename AI-generated Goal" value={renameTitle} onChange={(event) => setRenameTitle(event.target.value)} className="sm:max-w-sm" />
+              <Button disabled={!renameTitle.trim() || renamePending} onClick={() => void renameGoal()}>Rename</Button>
+            </CardContent>
+          </Card>
+        ) : null}
 
         {isArchive ? <PrimaryOutcome goal={goal} copy={copy} /> : (
           <div className="space-y-5">
@@ -995,18 +920,21 @@ export function GoalWorkspacePage({ goal, copy }: { goal: GoalData; copy: GoalCo
           </div>
         )}
 
-        <Tabs defaultValue={defaultSection} className="min-w-0">
-          <TabsList className="grid h-auto w-full grid-cols-4 gap-1 overflow-visible rounded-xl p-1">
-            <TabsTrigger value="overview" className="min-w-0 px-2 py-2 text-xs sm:text-sm">
+        <Tabs value={defaultSection} onValueChange={(section) => { const next = new URLSearchParams(searchParams); if (section === "overview") next.delete("section"); else next.set("section", section); setSearchParams(next, { replace: true }); }} className="min-w-0">
+          <TabsList className="flex h-auto w-full max-w-full overflow-x-auto rounded-xl p-1">
+            <TabsTrigger value="overview" className="shrink-0 px-3 py-2 text-xs sm:text-sm">
               <Target className="hidden size-4 sm:block" />{copy.overview}
             </TabsTrigger>
-            <TabsTrigger value="tasks" className="min-w-0 px-2 py-2 text-xs sm:text-sm">
+            <TabsTrigger value="work" className="shrink-0 px-3 py-2 text-xs sm:text-sm">
               <ListChecks className="hidden size-4 sm:block" />{copy.tasksSection}
             </TabsTrigger>
-            <TabsTrigger value="results" className="min-w-0 px-2 py-2 text-xs sm:text-sm">
-              <FileCheck2 className="hidden size-4 sm:block" />{copy.resultsAssets}
+            <TabsTrigger value="workbench" className="shrink-0 px-3 py-2 text-xs sm:text-sm">
+              <FileCheck2 className="hidden size-4 sm:block" />{copy.workbench}
             </TabsTrigger>
-            <TabsTrigger value="history" className="min-w-0 px-2 py-2 text-xs sm:text-sm">
+            <TabsTrigger value="criteria" className="shrink-0 px-3 py-2 text-xs sm:text-sm">
+              <CheckCircle2 className="hidden size-4 sm:block" />{copy.successCriteria}
+            </TabsTrigger>
+            <TabsTrigger value="history" className="shrink-0 px-3 py-2 text-xs sm:text-sm">
               <History className="hidden size-4 sm:block" />{copy.history}
             </TabsTrigger>
           </TabsList>
@@ -1037,7 +965,7 @@ export function GoalWorkspacePage({ goal, copy }: { goal: GoalData; copy: GoalCo
             </div>
           </TabsContent>
 
-          <TabsContent value="tasks" className="mt-5">
+          <TabsContent value="work" className="mt-5">
             <Card>
               <CardHeader className="flex-row items-start justify-between gap-3">
                 <div>
@@ -1056,30 +984,12 @@ export function GoalWorkspacePage({ goal, copy }: { goal: GoalData; copy: GoalCo
             </Card>
           </TabsContent>
 
-          <TabsContent value="results" className="mt-5 space-y-5">
-            <section className="space-y-3">
-              <div>
-                <h2 className="text-lg font-semibold">{copy.acceptedResults}</h2>
-                <p className="text-sm text-muted-foreground">{copy.immutableResult}</p>
-              </div>
-              {goal.acceptedResults.length === 0 ? <Card><CardContent className="pt-6 text-sm text-muted-foreground">{copy.noAcceptedResults}</CardContent></Card> : null}
-              <div className="grid gap-4 xl:grid-cols-2">
-                {goal.acceptedResults.map((result) => (
-                  <AcceptedResultCard key={`${result.taskId}:${result.runId}`} result={result} taskTitle={result.taskTitle} taskId={result.taskId} goalId={goal.id} goal={goal} copy={copy} />
-                ))}
-              </div>
-            </section>
-            <Separator />
-            <section className="space-y-3">
-              <div>
-                <h2 className="text-lg font-semibold">{copy.assets}</h2>
-                <p className="text-sm text-muted-foreground">{copy.provenance}</p>
-              </div>
-              {goal.assets.length === 0 ? <Card><CardContent className="pt-6 text-sm text-muted-foreground">{copy.noAssets}</CardContent></Card> : null}
-              <div className="grid gap-4 xl:grid-cols-2">
-                {goal.assets.map((asset) => <AssetCard key={asset.id} asset={asset} goalId={goal.id} copy={copy} />)}
-              </div>
-            </section>
+          <TabsContent value="workbench" className="mt-5">
+            {assetWorkbench ?? <Card><CardContent className="pt-6 text-sm text-muted-foreground">{copy.noAssets}</CardContent></Card>}
+          </TabsContent>
+
+          <TabsContent value="criteria" className="mt-5">
+            <CriteriaCard goal={goal} copy={copy} />
           </TabsContent>
 
           <TabsContent value="history" className="mt-5">
@@ -1099,7 +1009,7 @@ export function GoalWorkspacePage({ goal, copy }: { goal: GoalData; copy: GoalCo
                           <span className="text-xs text-muted-foreground">{formatDate(item.occurredAt, useLocale())}</span>
                         </div>
                         {item.detail ? <p className="mt-1 line-clamp-4 whitespace-pre-wrap text-sm leading-6 text-muted-foreground">{item.detail}</p> : null}
-                        {item.taskId ? <Button asChild variant="link" size="sm" className="h-auto px-0 pt-1"><LocalizedLink href={`/tasks/${item.taskId}`}>{copy.openTask}</LocalizedLink></Button> : null}
+                        {item.taskId ? <Button asChild variant="link" size="sm" className="h-auto px-0 pt-1"><LocalizedLink href={`/goals/${goal.id}/workbench/tasks/${item.taskId}`}>{copy.openTask}</LocalizedLink></Button> : null}
                       </div>
                     </li>
                   ))}

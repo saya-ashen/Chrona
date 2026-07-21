@@ -315,6 +315,7 @@ async function createNextTask(input: {
     executionConfig: input.context.task.executionConfig,
     aiClientId: input.context.task.aiClientId,
     parentTaskId: input.context.task.id,
+    goalId: input.context.task.goalId,
     autoPlanGeneration: false,
     autoExecute: false,
   });

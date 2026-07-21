@@ -115,6 +115,8 @@ describe("graph-runtime dispatch", () => {
     expect(first.status).toBe("waiting_for_approval");
     expect(second.state.results[0]?.review?.status).toBe("accepted");
     expect(second.state.results[0]?.status).toBe("obsolete");
+    expect(second.status).toBe("completed");
+    expect(second.state.attempts.at(-1)).toMatchObject({ status: "succeeded" });
   });
 
   it("retries a node by obsoleting current results and re-executing it", async () => {

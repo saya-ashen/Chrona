@@ -3,6 +3,7 @@ import { latestRecordedTerminalAction } from "./agent-control-store";
 import { submitNodeResultActionFromControl } from "@/modules/agent-tools/node-result-action";
 import { db } from "@/lib/db";
 import {
+  type CheckpointInputFields,
   type EffectivePlanGraph,
   type EffectivePlanNode,
   type NodeAttempt,
@@ -33,6 +34,8 @@ export type NodeAiCapabilityInput = {
   plan: EffectivePlanGraph;
   planContext?: NodeExecutionPlanContext;
   runContext?: NodeExecutionRunContext;
+  userInput?: string;
+  inputFields?: CheckpointInputFields;
   attempt: NodeAttempt;
   planOutput?: PlanOutputState;
   runtimeName: string;
@@ -63,6 +66,13 @@ function terminalToolNameFromSnapshot(response: ProviderRunSnapshot): string | u
       ? response.structuredPayload as Record<string, unknown>
       : undefined, "terminalToolName");
   return typeof toolName === "string" && toolName.trim() ? toolName : undefined;
+}
+
+function terminalToolInputFromSnapshot(response: ProviderRunSnapshot): Record<string, unknown> {
+  const raw = asRecord(response.raw);
+  const terminal = asRecord(recordValue(raw, "terminalTool"))
+    ?? asRecord(recordValue(raw, "terminal_tool"));
+  return asRecord(recordValue(terminal, "input")) ?? {};
 }
 
 function asRecord(value: unknown): Record<string, unknown> | undefined {
@@ -133,6 +143,7 @@ function terminalNodeResultFromSnapshot(input: {
   evidence: NodeExecutionEvidence;
   structured: Record<string, unknown> | undefined;
   summary?: string;
+  inputFields?: CheckpointInputFields;
 }): NodeExecutionResult | undefined {
   const terminalToolName = terminalToolNameFromSnapshot(input.invocation.response);
   switch (terminalToolName) {
@@ -174,12 +185,15 @@ function terminalNodeResultFromSnapshot(input: {
           evidence: input.evidence,
         };
       }
+      const terminalInput = terminalToolInputFromSnapshot(input.invocation.response);
       return {
         status: "done",
         summary:
+          (typeof terminalInput.summary === "string" ? terminalInput.summary.trim() : "") ||
           input.summary ||
           `Runtime run ${input.invocation.runtimeRunRef ?? input.invocation.runId} completed`,
         evidence: input.evidence,
+        inputFields: input.inputFields,
       };
     }
     case undefined:
@@ -283,6 +297,7 @@ async function resolveTerminalNodeResult(input: {
   evidence: NodeExecutionEvidence;
   structured: Record<string, unknown> | undefined;
   summary?: string;
+  inputFields?: CheckpointInputFields;
 }): Promise<NodeExecutionResult | undefined> {
   return terminalNodeResultFromSnapshot({
     invocation: input.invocation,
@@ -291,6 +306,7 @@ async function resolveTerminalNodeResult(input: {
     evidence: input.evidence,
     structured: input.structured,
     summary: input.summary,
+    inputFields: input.inputFields,
   });
 }
 export async function runTaskNodeFeature(
@@ -361,6 +377,7 @@ export async function runTaskNodeFeature(
           summary: recordedAction.summary ?? "Node completed",
           evidence,
           output: recordedAction.output,
+          inputFields: input.inputFields,
           selectedBranch: selectedBranch
             ? { label: selectedBranch.label, nextNodeId: selectedBranch.nextNodeId!, source: "ai" }
             : undefined,
@@ -455,6 +472,7 @@ export async function runTaskNodeFeature(
           evidence,
           structured,
           summary,
+          inputFields: input.inputFields,
         })
       : undefined;
     const nodeResult: NodeExecutionResult = terminalNodeResult ?? (invocation.response.status === "completed" && requiresTerminalAction
@@ -568,6 +586,8 @@ export async function executeTaskNodeCapability(
     planOutput: input.planOutput,
     planContext: input.planContext,
     runContext: input.runContext,
+    userInput: input.userInput,
+    inputFields: input.inputFields,
   });
   const featureSpec: PreparedAiFeatureSpec = {
     feature: input.node.type === "condition"

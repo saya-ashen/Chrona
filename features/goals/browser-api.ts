@@ -3,12 +3,14 @@ import type {
   ApplyGoalReviewRequest,
   ConfirmGoalCriterionRequest,
   CreateGoalRequest,
+  CreateGoalWithFirstTaskRequest,
   CreateGoalTaskRequest,
   GoalActionRequest,
   GoalOperationalBrief,
   GoalWorkingSetSelection,
   ProcessGoalResultRequest,
   PromoteTaskToGoalRequest,
+  ReviewGoalCriterionRequest,
 } from "@chrona/contracts";
 import type { GoalArtifactData, GoalData } from "./model/goal-types";
 
@@ -18,6 +20,19 @@ export async function createGoal(command: CreateGoalRequest) {
     body: JSON.stringify(command),
   });
 }
+export async function createGoalWithFirstTask(command: CreateGoalWithFirstTaskRequest) {
+  return apiJson<{ goal: GoalData; taskId: string }>("/api/goals/with-first-task", {
+    method: "POST",
+    body: JSON.stringify(command),
+  });
+}
+export async function updateGoal(goalId: string, patch: { title?: string }) {
+  return apiJson<GoalData>(`/api/goals/${encodeURIComponent(goalId)}`, {
+    method: "PATCH",
+    body: JSON.stringify(patch),
+  });
+}
+
 
 export async function runGoalAction(goalId: string, command: GoalActionRequest) {
   return apiJson<GoalData>(`/api/goals/${encodeURIComponent(goalId)}/actions`, {
@@ -57,6 +72,17 @@ export async function processGoalResult(
 ) {
   return apiJson<GoalData>(
     `/api/goals/${encodeURIComponent(goalId)}/results/${encodeURIComponent(taskId)}/process`,
+    { method: "POST", body: JSON.stringify(command) },
+  );
+}
+
+export async function reviewGoalCriterion(
+  goalId: string,
+  criterionId: string,
+  command: ReviewGoalCriterionRequest,
+) {
+  return apiJson<GoalData>(
+    `/api/goals/${encodeURIComponent(goalId)}/criteria/${encodeURIComponent(criterionId)}/review`,
     { method: "POST", body: JSON.stringify(command) },
   );
 }

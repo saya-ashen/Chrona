@@ -7,6 +7,9 @@ import { createTaskRoutes } from "./tasks";
 import { createPageRoutes } from "./pages";
 import { createWorkspacesRoutes } from "./workspaces.routes";
 import { createGoalRoutes } from "./goals.routes";
+import { createGoalWorkbenchRoutes } from "./goal-workbench.routes";
+import { createTaskTriggerRoutes } from "./task-triggers.routes";
+import { createEmailTriggerAdapterRoutes } from "./email-trigger-adapter.routes";
 import { createClientsRoutes } from "./ai/clients.routes";
 import { createAssistantSurfaceRoutes } from "./assistant-surface.routes";
 import { createMcpRoutes, createAgentControlRoutes } from "../../../../features/mcp-control-plane/server";
@@ -28,6 +31,9 @@ export function createApiRouter(engine: ChronaEngine, options: ApiRouterOptions 
     .route("/", createPageRoutes(engine))
     .route("/", createWorkspacesRoutes(engine))
     .route("/", createGoalRoutes(engine))
+    .route("/", createGoalWorkbenchRoutes(engine))
+    .route("/", createTaskTriggerRoutes(engine))
+    .route("/", createEmailTriggerAdapterRoutes(engine))
     .route("/", createClientsRoutes(engine))
     .route("/", createHermesIntegrationRoutes())
     .route("/", createCalendarSourceRoutes(options.calendarSources))

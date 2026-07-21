@@ -45,10 +45,11 @@ export type PlanNodeGroup = "active" | "attention" | "upcoming" | "done" | "idle
 export type PlanNodeField = {
   key: string;
   label: string;
-  value: string;
-  control?: "text" | "textarea" | "select" | "approval";
+  value: string | boolean | string[];
+  control?: "text" | "textarea" | "select" | "approval" | "choice" | "boolean";
   required?: boolean;
   options?: string[];
+  selection?: "single" | "multiple";
 };
 
 export type PlanNodeAction = {

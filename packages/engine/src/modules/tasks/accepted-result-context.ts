@@ -12,6 +12,7 @@ export type AcceptedResultContext = {
     id: string;
     workspaceId: string;
     title: string;
+    goalId: string | null;
     priority: "Low" | "Medium" | "High" | "Urgent";
     executionRuntime: string;
     executionConfig: Record<string, unknown>;
@@ -183,6 +184,7 @@ export async function getAcceptedResultContext(
       id: true,
       workspaceId: true,
       title: true,
+      goalId: true,
       status: true,
       priority: true,
       executionRuntime: true,
@@ -244,6 +246,7 @@ export async function getAcceptedResultContext(
       id: task.id,
       workspaceId: task.workspaceId,
       title: task.title,
+      goalId: task.goalId,
       priority: task.priority,
       executionRuntime: task.executionRuntime,
       executionConfig: task.executionConfig as Record<string, unknown>,

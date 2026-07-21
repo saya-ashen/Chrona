@@ -168,6 +168,14 @@ describe("resolveExecutionScope", () => {
     expect(scope.workBlockId).toBe("explicit-block");
   });
 
+  it("resolves an explicit occurrence without inventing a WorkBlock", async () => {
+    const { workspace, task } = await createTaskWithWorkBlock();
+    const occurrence = await db.taskOccurrence.create({ data: { workspaceId: workspace.id, taskId: task.id, occurrenceKey: "event:test", source: { kind: "system", reason: "test" }, status: "Ready", eligibleAt: new Date() } });
+    const scope = await resolveExecutionScope(task.id, { occurrenceId: occurrence.id });
+    expect(scope).toMatchObject({ occurrenceId: occurrence.id, workBlockId: null });
+    expect(await db.workBlock.count({ where: { occurrence: { id: occurrence.id } } })).toBe(0);
+  });
+
   it("resolves to null for a task with no plan and no execution", async () => {
     const { task } = await createTaskWithWorkBlock();
     const scope = await resolveExecutionScope(task.id);

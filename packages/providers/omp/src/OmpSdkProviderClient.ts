@@ -73,6 +73,8 @@ type SdkRunHandle = {
   startedAt: string;
   unsubscribe?: () => void;
   inputAbortListener?: () => void;
+  terminalActionAccepted?: boolean;
+  terminalAction?: { name: string; input: Record<string, unknown> };
 };
 
 export type OmpSdkProviderOptions = {
@@ -313,6 +315,10 @@ type NodeRuntimeToolName =
   | "chrona_node_block"
   | "chrona_node_fail";
 
+function isTerminalRuntimeTool(toolName: string): boolean {
+  return toolName === "chrona_node_complete" || toolName === "chrona_condition_select" || toolName === "chrona_wait_complete" || toolName === "chrona_node_request_input" || toolName === "chrona_node_block" || toolName === "chrona_node_fail";
+}
+
 const NODE_RUNTIME_TOOL_SET_BY_TERMINAL: Record<string, readonly NodeRuntimeToolName[]> = {
   chrona_node_complete: ["chrona_plan_output", "chrona_node_complete", "chrona_node_request_input", "chrona_node_block", "chrona_node_fail"],
   chrona_condition_select: ["chrona_condition_select", "chrona_node_block", "chrona_node_fail"],
@@ -406,7 +412,7 @@ function acceptedNodeToolResult(details: Record<string, unknown> = { accepted: t
   };
 }
 
-function createTerminalTool(toolName: string, control?: StartRunInput["control"]): CustomTool {
+function createTerminalTool(toolName: string, control?: StartRunInput["control"], onTerminalAccepted?: () => void): CustomTool {
   if (toolName === CHRONA_PLAN_GENERATE_TOOL_NAME) {
     return {
       name: toolName,
@@ -427,18 +433,18 @@ function createTerminalTool(toolName: string, control?: StartRunInput["control"]
     strict: Boolean(definition),
     description: definition?.description ?? "Submit the final structured payload required by the current Chrona instructions.",
     parameters: definition?.parameters ?? looseObjectSchema,
-    async execute(_toolCallId, params, _onUpdate, _ctx, signal) {
+    async execute(_toolCallId, params, _onUpdate, ctx, signal) {
       if (!definition || !control) return acceptedNodeToolResult();
       const body = { kind: definition.kind, payload: params } as AgentControlActionBody;
       const result = await postControlAction({ control, body, signal });
+      if (isTerminalRuntimeTool(toolName)) { onTerminalAccepted?.(); queueMicrotask(() => ctx.abort()); }
       return acceptedNodeToolResult({ accepted: true, control: result });
     }
   };
 }
-
-function sdkToolOptionsForTerminal(terminalToolName: string | undefined, control?: StartRunInput["control"]): { customTools: CustomTool[] } {
+function sdkToolOptionsForTerminal(terminalToolName: string | undefined, control?: StartRunInput["control"], onTerminalAccepted?: () => void): { customTools: CustomTool[] } {
   return {
-    customTools: sdkToolNamesForTerminal(terminalToolName).map((toolName) => createTerminalTool(toolName, control)),
+    customTools: sdkToolNamesForTerminal(terminalToolName).map((toolName) => createTerminalTool(toolName, control, onTerminalAccepted)),
   };
 }
 
@@ -500,13 +506,32 @@ function agentEndFailure(event: Extract<AgentSessionEvent, { type: "agent_end" }
     || (message.stopReason === "aborted" ? "Oh My Pi SDK run was aborted" : "Oh My Pi SDK run failed");
 }
 
+function agentEndOutcome(event: Extract<AgentSessionEvent, { type: "agent_end" }>, terminalActionAccepted: boolean): { status: "completed" } | { status: "failed"; error: string } {
+  if (terminalActionAccepted) return { status: "completed" };
+  const error = agentEndFailure(event);
+  return error ? { status: "failed", error } : { status: "completed" };
+}
+function terminalNodeToolFromSnapshot(input: { raw?: unknown }) {
+  const terminal = asRecord(asRecord(input.raw).terminalTool);
+  const name = terminal.name;
+  if (typeof name !== "string" || !isTerminalRuntimeTool(name)) return null;
+  return {
+    name,
+    input: asRecord(terminal.input),
+  };
+}
+
+
 export const __ompSdkProviderTestHooks = {
   sdkToolNamesForTerminal,
   sdkToolOptionsForTerminal,
   sdkToolErrorMessage,
+  isTerminalRuntimeTool,
   agentEndFailure,
+  agentEndOutcome,
   toolCallPreview,
   textContentPreview,
+  terminalNodeToolFromSnapshot,
   sdkLifecycleSummary,
 };
 
@@ -904,15 +929,21 @@ export class OmpSdkProviderClient implements AgentProviderClient {
         : {}),
     };
     const setup = await createSdkModelSetup(runConfig, environment);
+    const resumeSessionRef = nonEmpty(handle.input.resumeSessionRef);
+    const sessionManager = resumeSessionRef
+      ? await SessionManager.open(resumeSessionRef, undefined, undefined, {
+          initialCwd: cwd,
+          suppressBreadcrumb: true,
+        })
+      : SessionManager.create(cwd);
     const { session } = await createAgentSession({
       cwd,
       agentDir,
       modelPattern: setup.modelPattern,
       ...(setup.authStorage ? { authStorage: setup.authStorage } : {}),
       ...(setup.modelRegistry ? { modelRegistry: setup.modelRegistry } : {}),
-      deadline: this.config.timeoutMs ? Date.now() + this.config.timeoutMs : undefined,
-      ...sdkToolOptionsForTerminal(terminalToolName, handle.input.control),
-      sessionManager: SessionManager.create(cwd),
+      ...sdkToolOptionsForTerminal(terminalToolName, handle.input.control, () => { handle.terminalActionAccepted = true; }),
+      sessionManager,
       skipPythonPreflight: true,
       hasUI: false,
     });
@@ -984,6 +1015,12 @@ export class OmpSdkProviderClient implements AgentProviderClient {
         break;
       }
       case "tool_execution_start":
+        if (isTerminalRuntimeTool(event.toolName)) {
+          handle.terminalAction = {
+            name: event.toolName,
+            input: asRecord(event.args),
+          };
+        }
         queue.push({
           ...eventBase(handle, event.type),
           type: "tool_call",
@@ -1039,15 +1076,15 @@ export class OmpSdkProviderClient implements AgentProviderClient {
       }
       case "agent_end": {
         if (handle.status !== "running") break;
-        const error = agentEndFailure(event);
-        if (error) {
-          handle.error = error;
+        const outcome = agentEndOutcome(event, handle.terminalActionAccepted === true);
+        if (outcome.status === "failed") {
+          handle.error = outcome.error;
           handle.status = "failed";
           queue.push({
             ...eventBase(handle, event.type),
             type: "run_failed",
             run: runRef(handle, "failed"),
-            error,
+            error: outcome.error,
             raw: event,
           });
           this.finish(handle, queue);
@@ -1062,7 +1099,7 @@ export class OmpSdkProviderClient implements AgentProviderClient {
           output: { text: handle.outputText },
           structuredPayload: parseStructuredPayload(handle.outputText),
           usage: null,
-          raw: event,
+          raw: handle.terminalAction ? { ...asRecord(event), terminalTool: handle.terminalAction } : event,
         });
         this.finish(handle, queue);
         break;

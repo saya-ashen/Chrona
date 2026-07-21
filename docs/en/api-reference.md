@@ -28,6 +28,12 @@ accepted results, and read-only Goal assets.
 
 Creates an active Goal with validated user-confirmed success criteria.
 
+### POST /api/goals/with-first-task
+
+Atomically and idempotently creates a Goal plus its first bounded Task from
+separate intended-outcome and first-work-item fields. Failure leaves neither
+partial object behind.
+
 ### GET /api/goals/:goalId
 
 Returns the lifecycle-aware Goal read model: workspace/archive mode,
@@ -74,6 +80,41 @@ approval, and Result state; later Goal edits cannot mutate the snapshot.
 Returns a Goal-owned Artifact read model and supported open/copy/download
 operations. Generated-file downloads continue through the task result-file
 authorization boundary; arbitrary local paths are not exposed.
+
+### Goal Asset Workbench
+
+- `GET /api/goals/:goalId/assets` lists/searches/sorts typed Goal assets and recent items.
+- `GET|PATCH /api/goals/:goalId/assets/:assetId` reads or renames one asset.
+- `POST /api/goals/:goalId/assets/:assetId/drafts` saves a version-based draft.
+- `POST /api/goals/:goalId/assets/:assetId/drafts/submit` commits a draft or returns an optimistic conflict.
+- `POST /api/goals/:goalId/assets/:assetId/versions/:versionId/restore` recovers an old version as a new version.
+- `POST /api/goals/:goalId/assets/:assetId/archive` archives or restores an asset.
+- `GET /api/goals/:goalId/inbox` lists pending accepted-result candidates.
+- `POST /api/goals/:goalId/inbox/extract` splits one accepted Result into typed candidates.
+- `POST /api/goals/:goalId/inbox/:candidateId/resolve` creates an asset, appends a version, or rejects the candidate.
+- `POST /api/goals/:goalId/assets/:assetId/submissions` persists a Form-version submission.
+- `POST /api/goals/:goalId/assets/:assetId/jobs` creates version-bound thumbnail/export work.
+- `POST /api/goals/:goalId/assets/:assetId/ai-modification-task` creates a bounded Task with an immutable asset-version snapshot.
+
+Every mutating command validates Goal/workspace/asset/version ownership. Source
+Task Results and Artifacts are never mutated.
+
+### Task triggers and occurrences
+
+- `POST /api/tasks/:taskId/triggers` creates a validated schedule,
+  internal-event, or email trigger.
+- `PATCH /api/tasks/:taskId/triggers/:triggerId` applies optimistic versioned updates.
+- `POST /api/tasks/:taskId/triggers/:triggerId/actions` pauses, resumes, or retires a trigger.
+- `GET /api/tasks/:taskId/occurrences` lists isolated occurrence read models.
+- `GET /api/tasks/:taskId/occurrences/:occurrenceId` reads one occurrence and its execution records.
+- `POST /api/integrations/email/events` accepts the first non-time adapter
+  envelope. It requires the server-held email credential, HMAC-SHA256 signature,
+  a timestamp within five minutes, unique delivery ID, bounded validated fields,
+  and an explicit workspace scope.
+
+Unknown trigger kinds are rejected. Internal and email events persist bounded,
+normalized, secret-free input; delivery keys enforce replay idempotency. No
+public webhook ingress is exposed.
 
 ### Goal-scoped Task inspector route
 

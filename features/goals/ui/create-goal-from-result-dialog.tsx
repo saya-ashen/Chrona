@@ -12,9 +12,7 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-  Input,
   Label,
-  Textarea,
 } from "@shared/ui";
 import type { GoalCopy } from "../model/goal-types";
 import { promoteTaskToGoal } from "../browser-api";
@@ -47,14 +45,14 @@ export function CreateGoalFromResultDialog({
   const navigate = useNavigate();
   const locale = useLocale();
   const [open, setOpen] = useState(false);
-  const [title, setTitle] = useState(taskTitle);
-  const [description, setDescription] = useState(taskDescription ?? "");
-  const [criterion, setCriterion] = useState("");
+  const title = taskTitle;
+  const description = taskDescription ?? "";
+  const criterion = `Confirm the durable outcome from ${taskTitle}`;
   const [selectedArtifactIds, setSelectedArtifactIds] = useState(() => artifacts.map((artifact) => artifact.id));
   const [isPending, setIsPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const selected = useMemo(() => new Set(selectedArtifactIds), [selectedArtifactIds]);
-  const canSubmit = title.trim().length > 0 && criterion.trim().length > 0 && selectedArtifactIds.length > 0 && !isPending;
+  const canSubmit = selectedArtifactIds.length > 0 && !isPending;
 
   function toggleArtifact(artifactId: string, checked: boolean) {
     setSelectedArtifactIds((current) => checked
@@ -79,6 +77,7 @@ export function CreateGoalFromResultDialog({
           description: criterion.trim(),
           satisfied: false,
           confirmedAt: null,
+          proposalStatus: "proposed",
         }],
         idempotencyKey: promotionKey(taskId, acceptedRunId),
       });
@@ -101,18 +100,6 @@ export function CreateGoalFromResultDialog({
           <DialogDescription>{copy.createFromResultDescription}</DialogDescription>
         </DialogHeader>
         <div className="grid gap-5 py-1">
-          <div className="grid gap-2">
-            <Label htmlFor="promote-goal-title">{copy.goalTitleLabel}</Label>
-            <Input id="promote-goal-title" value={title} onChange={(event) => setTitle(event.target.value)} disabled={isPending} />
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="promote-goal-description">{copy.goalDescriptionLabel}</Label>
-            <Textarea id="promote-goal-description" value={description} onChange={(event) => setDescription(event.target.value)} placeholder={copy.goalDescriptionPlaceholder} disabled={isPending} />
-          </div>
-          <div className="grid gap-2">
-            <Label htmlFor="promote-goal-criterion">{copy.criterionLabel}</Label>
-            <Textarea id="promote-goal-criterion" value={criterion} onChange={(event) => setCriterion(event.target.value)} placeholder={copy.criterionPlaceholder} disabled={isPending} />
-          </div>
           <fieldset className="grid gap-2">
             <legend className="text-sm font-medium text-foreground">{copy.selectedAssets}</legend>
             {artifacts.map((artifact) => (

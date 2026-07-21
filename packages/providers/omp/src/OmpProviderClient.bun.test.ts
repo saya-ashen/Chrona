@@ -121,6 +121,42 @@ describe("OmpSdkProviderClient node runtime tools", () => {
     ]);
     expect("toolNames" in options).toBe(false);
   });
+  it("treats node result tools as terminal but leaves plan output non-terminal", () => {
+    expect(__ompSdkProviderTestHooks.isTerminalRuntimeTool("chrona_node_request_input")).toBe(true);
+    expect(__ompSdkProviderTestHooks.isTerminalRuntimeTool("chrona_node_complete")).toBe(true);
+    expect(__ompSdkProviderTestHooks.isTerminalRuntimeTool("chrona_plan_output")).toBe(false);
+  });
+  it("aborts only after an accepted node result action", async () => {
+    const originalFetch = globalThis.fetch;
+    const requests: string[] = [];
+    globalThis.fetch = (async (_input: string | URL | Request, init?: RequestInit) => {
+      requests.push(String(init?.body));
+      return new Response(JSON.stringify({ accepted: true }), { status: 200 });
+    }) as typeof fetch;
+    try {
+      let terminalAccepted = 0;
+      let aborts = 0;
+      const tools = __ompSdkProviderTestHooks.sdkToolOptionsForTerminal(
+        "chrona_node_complete",
+        { baseUrl: "http://chrona.test", runToken: "token" },
+        () => { terminalAccepted += 1; },
+      ).customTools;
+      const context = { abort: () => { aborts += 1; } };
+      await tools.find((tool) => tool.name === "chrona_plan_output")!.execute("plan", {}, undefined, context as never, undefined);
+      await Promise.resolve();
+      expect(terminalAccepted).toBe(0);
+      expect(aborts).toBe(0);
+      await tools.find((tool) => tool.name === "chrona_node_request_input")!.execute("input", { title: "Need input", instructions: "Provide it", fields: [] }, undefined, context as never, undefined);
+      await Promise.resolve();
+      expect(terminalAccepted).toBe(1);
+      expect(aborts).toBe(1);
+      expect(requests).toHaveLength(2);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+
   it("surfaces the concrete SDK tool error text", () => {
     expect(__ompSdkProviderTestHooks.sdkToolErrorMessage({
       content: [{ type: "text", text: "Chrona control request timed out" }],
@@ -145,6 +181,40 @@ describe("OmpSdkProviderClient node runtime tools", () => {
       }],
     })).toBe("Deadline exceeded");
   });
+  it("treats an aborted agent end as completed after a terminal action was accepted", () => {
+    const event = {
+      type: "agent_end" as const,
+      messages: [{
+        role: "assistant" as const,
+        content: [],
+        api: "openai-completions",
+        provider: "test",
+        model: "test",
+        usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
+        stopReason: "aborted" as const,
+        errorMessage: "Operation aborted",
+        timestamp: 0,
+      }],
+    };
+    expect(__ompSdkProviderTestHooks.agentEndOutcome(event, true)).toEqual({ status: "completed" });
+    expect(__ompSdkProviderTestHooks.agentEndOutcome(event, false)).toEqual({ status: "failed", error: "Operation aborted" });
+  });
+
+  it("extracts an accepted OMP terminal tool from the completed snapshot", () => {
+    const terminal = __ompSdkProviderTestHooks.terminalNodeToolFromSnapshot({
+      raw: {
+        terminalTool: {
+          name: "chrona_node_complete",
+          input: { summary: "Completed package" },
+        },
+      },
+    });
+    expect(terminal).toEqual({
+      name: "chrona_node_complete",
+      input: { summary: "Completed package" },
+    });
+  });
+
 
   it("accepts successful agent endings", () => {
     expect(__ompSdkProviderTestHooks.agentEndFailure({

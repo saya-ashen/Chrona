@@ -182,6 +182,26 @@ describe("task workspace actions", () => {
     });
   });
 
+  it("preserves string arrays and booleans in checkpoint input", () => {
+    expect(buildWorkspaceCheckpointActionInput({
+      node: node({ nextAction: "Confirm channels", checkpoint }),
+      selectedAction: null,
+      fields: [
+        { key: "statement", label: "Statement", value: "", required: true },
+        { key: "channels", label: "Channels", value: [], control: "choice", selection: "multiple", required: true },
+        { key: "confirmed", label: "Confirmed", value: false, control: "boolean", required: true },
+      ],
+      values: { statement: "Approved", channels: ["official", "euraxess"], confirmed: true },
+    })).toEqual({
+      checkpointId: checkpoint.id,
+      action: "submit_input",
+      payload: {
+        inputFields: { statement: "Approved", channels: ["official", "euraxess"], confirmed: true },
+        message: "Statement: Approved\nChannels: official, euraxess\nConfirmed: true",
+      },
+    });
+  });
+
   it("maps field-only input nodes to checkpoint input", () => {
     expect(buildWorkspaceCheckpointActionInput({
       node: node({ nextAction: "Collect missing information", checkpoint }),

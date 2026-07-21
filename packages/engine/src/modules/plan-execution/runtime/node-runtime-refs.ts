@@ -1,6 +1,7 @@
 import type {
   AiVisibleRefBinding,
   CheckpointConfig,
+  CheckpointInputFields,
   ConditionConfig,
   EffectivePlanGraph,
   EffectivePlanNode,
@@ -154,6 +155,8 @@ function compactPreviousResults(input: {
   planOutput?: PlanOutputState | RuntimeVisiblePlanOutput;
   planContext?: NodeRuntimePlanContext;
   runContext?: NodeRuntimeRunContext;
+  userInput?: string;
+  inputFields?: CheckpointInputFields;
 }): NodeRuntimeInput["context"] {
   const directDependencyIds = dependencyIds(input.node);
   const completed = input.plan.nodes.filter((node) => node.status === "completed" || node.status === "skipped");
@@ -176,6 +179,14 @@ function compactPreviousResults(input: {
   return {
     plan: input.planContext ?? defaultPlanContext(),
     ...(input.runContext ? { run: input.runContext } : {}),
+    ...(input.userInput || input.inputFields
+      ? {
+          currentNodeInput: {
+            ...(input.userInput ? { text: input.userInput } : {}),
+            ...(input.inputFields ? { fields: input.inputFields } : {}),
+          },
+        }
+      : {}),
     relevantPreviousResults: directDependencies,
     ...(globalItems.length > 0
       ? { globalSummary: globalItems.slice(0, 3).join("; ") + (globalItems.length > 3 ? `; +${globalItems.length - 3} more` : "") }
@@ -288,6 +299,8 @@ export function buildNodeRuntimeInput(input: {
   planOutput?: PlanOutputState | RuntimeVisiblePlanOutput;
   planContext?: NodeRuntimePlanContext;
   runContext?: NodeRuntimeRunContext;
+  userInput?: string;
+  inputFields?: CheckpointInputFields;
 }): NodeRuntimeInput {
   const history = buildSemanticRefHistory(input.plan);
   const currentRef = refForNode(history, input.node.id);
@@ -303,7 +316,7 @@ export function buildNodeRuntimeInput(input: {
 
   return {
     node: runtimeNode(input.node, currentRef.ref),
-    context: compactPreviousResults({ plan: input.plan, history, node: input.node, planOutput: input.planOutput, planContext: input.planContext, runContext: input.runContext }),
+    context: compactPreviousResults({ plan: input.plan, history, node: input.node, planOutput: input.planOutput, planContext: input.planContext, runContext: input.runContext, userInput: input.userInput, inputFields: input.inputFields }),
     branchOptions,
   };
 }

@@ -29,6 +29,7 @@ Use this directory as the stable product and developer documentation set. Time-p
 | 理解当前产品界面 | [中文指南](./zh/README.md) |
 | 查看已发布与计划中的产品区域 | [路线图](./zh/roadmap.md) |
 | 运行测试 | [测试指南](./zh/testing.md) |
+| 理解 Goal Workbench 资产使用区的目标设计 | [Goal Workbench 产品设计](./zh/goal-workbench-product-design.md) |
 
 ## Shared/generated docs
 

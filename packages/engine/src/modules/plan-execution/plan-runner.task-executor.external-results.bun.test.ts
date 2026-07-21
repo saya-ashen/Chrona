@@ -645,7 +645,7 @@ describe("plan-runner task executor external results", () => {
     });
 
     expect(result.status).toBe("running");
-    expect(result.message).toBe("Auto task runtime run started");
+    expect(result.message).toBe("Current execution state.");
 
     const persisted = await getPlanRun(task.id, compiledPlan.editablePlanId);
     const conditionResult = [...(persisted?.results ?? [])].reverse().find(

@@ -425,6 +425,37 @@ describe("node runtime refs", () => {
     expect(runtimeContext).not.toContain('"history":');
     expect(runtimeContext).not.toContain('"patches":');
   });
+  it("includes typed current-node input when resuming the same AI node", () => {
+    const current = node({
+      id: "task-real-456",
+      title: "Assemble application package",
+      type: "task",
+    });
+    const plan = graph([current]);
+    const runtime = buildNodeRuntimePrompt({
+      plan,
+      node: current,
+      userInput: "approved: Final statement\nchannels: official, euraxess\nconfirmed: true",
+      inputFields: {
+        approved: "Final statement",
+        channels: ["official", "euraxess"],
+        confirmed: true,
+      },
+    });
+
+    expect(runtime.runtimeInput.context.currentNodeInput).toEqual({
+      text: "approved: Final statement\nchannels: official, euraxess\nconfirmed: true",
+      fields: {
+        approved: "Final statement",
+        channels: ["official", "euraxess"],
+        confirmed: true,
+      },
+    });
+    expect(runtime.instructions).toContain('"currentNodeInput"');
+    expect(runtime.instructions).toContain('"channels": [');
+    expect(runtime.instructions).toContain('"confirmed": true');
+  });
+
   it("spells out file-backed table props for json-render outputs", () => {
     const current = node({
       id: "task-real-456",

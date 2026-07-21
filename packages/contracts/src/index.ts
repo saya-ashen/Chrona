@@ -189,6 +189,7 @@ export type {
   ApplyGoalReviewRequest,
   ConfirmGoalCriterionRequest,
   CreateGoalRequest,
+  CreateGoalWithFirstTaskRequest,
   ProcessGoalResultRequest,
   GoalActionRequest,
   GoalOperationalBrief,
@@ -197,6 +198,7 @@ export type {
   GoalWorkingSetSelection,
   GoalWorkingSetSubjectType,
   PromoteTaskToGoalRequest,
+  ReviewGoalCriterionRequest,
   UpdateGoalBriefRequest,
   UpdateGoalWorkingSetRequest,
 } from "./api/goals.schema";
@@ -483,3 +485,12 @@ export {
   webPlanNodeStatusForRuntimeStatus,
 } from "./plan-runtime";
 export * from "./provider-capability-matrix";
+
+export type {
+  CreateAssetModificationTaskRequest,
+  CreateGoalAssetJobRequest,
+  CreateGoalFormSubmissionRequest,
+  ResolveGoalInboxCandidateRequest,
+  SaveGoalAssetDraftRequest,
+  SubmitGoalAssetDraftRequest,
+} from "./api/goal-workbench.schema";

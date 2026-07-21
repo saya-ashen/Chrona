@@ -190,10 +190,14 @@ export async function savePlanRun(input: {
     planRun: input.run,
   });
 
+  const occurrence = input.workBlockId
+    ? await db.taskOccurrence.findUnique({ where: { workBlockId: input.workBlockId }, select: { id: true } })
+    : null;
   const runData = {
     workspaceId: input.workspaceId,
     taskId: input.taskId,
     workBlockId: input.workBlockId ?? null,
+    occurrenceId: occurrence?.id ?? null,
     planId: input.planId,
     planRun: asJsonValue(persistedRecord),
   };
@@ -204,6 +208,7 @@ export async function savePlanRun(input: {
       data: {
         workspaceId: input.workspaceId,
         workBlockId: input.workBlockId ?? null,
+        occurrenceId: occurrence?.id ?? null,
         planRun: asJsonValue(persistedRecord),
       },
     });
@@ -266,11 +271,15 @@ export async function savePlanRunGuarded(input: {
     planRun: input.run,
   });
 
+  const occurrence = input.workBlockId
+    ? await db.taskOccurrence.findUnique({ where: { workBlockId: input.workBlockId }, select: { id: true } })
+    : null;
   const updated = await db.taskPlanRun.updateMany({
     where: { id: existingRow.id, executionEpoch: input.expectedEpoch },
     data: {
       workspaceId: input.workspaceId,
       workBlockId: input.workBlockId ?? null,
+      occurrenceId: occurrence?.id ?? null,
       planRun: asJsonValue(persistedRecord),
       executionEpoch: input.expectedEpoch + 1,
     },

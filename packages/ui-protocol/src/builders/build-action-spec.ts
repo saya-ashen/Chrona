@@ -3,10 +3,11 @@ import type { UiDocument } from "../document/document";
 export interface ActionFieldInput {
   key: string;
   label: string;
-  value: string;
-  control?: "text" | "textarea" | "select" | "approval";
+  value: string | boolean | string[];
+  control?: "text" | "textarea" | "select" | "approval" | "choice" | "boolean";
   required?: boolean;
   options?: string[];
+  selection?: "single" | "multiple";
 }
 
 export interface ActionItemInput {
@@ -23,7 +24,7 @@ export interface ActionSpecInput {
   fields: ActionFieldInput[];
   actions: ActionItemInput[];
   /** Values already submitted (shown read-only). */
-  submittedValues?: Record<string, string>;
+  submittedValues?: Record<string, string | boolean | string[]>;
   /** When true, renders submitted state: disabled inputs + Alert, no submit button. */
   isReadOnly?: boolean;
   /** Guidance text shown above the form (e.g. node.nextAction). */
@@ -110,7 +111,21 @@ export function buildActionSpec(input: ActionSpecInput): UiDocument {
       ...(checks && { checks, validateOn: "blur" }),
     };
 
-    if (field.control === "approval") {
+    if (field.control === "choice") {
+      elements[elemKey] = {
+        type: "CheckpointChoiceField",
+        props: {
+          label: field.label,
+          name: field.key,
+          selection: field.selection ?? "single",
+          options: (field.options ?? []).map((option) => ({ value: option, label: option })),
+          value: boundValue,
+          required: field.required,
+        },
+      };
+    } else if (field.control === "boolean") {
+      elements[elemKey] = { type: "Checkbox", props: { label: field.label, name: field.key, checked: boundValue } };
+    } else if (field.control === "approval") {
       elements[elemKey] = {
         type: "Select",
         props: { ...baseProps, options: field.options ?? DEFAULT_APPROVAL_OPTIONS },

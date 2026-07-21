@@ -1,0 +1,97 @@
+import { createHmac } from "node:crypto";
+import { beforeEach, describe, expect, it } from "bun:test";
+import { db } from "@chrona/db";
+import { createChronaEngine } from "@chrona/engine";
+import { runGoalReviewDueWorker } from "@chrona/engine/modules/orchestration";
+import { createApiRouter } from "../../routes/api";
+import { resetEnvCacheForTests } from "../../config/env";
+import { resetTestDb, seedWorkspace } from "../bun-test-helpers";
+
+async function task(workspaceId: string, title: string) {
+  return db.task.create({ data: { workspaceId, title, status: "Ready", priority: "Medium", executionRuntime: "hermes", executionConfig: {} } });
+}
+
+async function postEmail(app: ReturnType<typeof createApiRouter>, secret: string, body: Record<string, unknown>, signatureSecret = secret) {
+  const rawBody = JSON.stringify(body);
+  const timestamp = new Date(String(body.timestamp));
+  const signature = createHmac("sha256", signatureSecret).update(`${timestamp.toISOString()}.${rawBody}`).digest("hex");
+  return app.request("/integrations/email/events", { method: "POST", headers: { "content-type": "application/json", "x-chrona-email-secret": secret, "x-chrona-email-signature": signature }, body: rawBody });
+}
+
+describe("Task triggers and occurrence authority", () => {
+  beforeEach(async () => { await resetTestDb(); });
+
+  it("materializes versioned schedule occurrences and rejects unknown kinds", async () => {
+    const { workspaceId } = await seedWorkspace();
+    const target = await task(workspaceId, "Scheduled definition");
+    const engine = createChronaEngine();
+    await engine.triggers.create({ taskId: target.id, command: { workspaceId, definition: { kind: "schedule", config: { mode: "once", fireAt: "2026-08-01T09:00:00.000Z", timezone: "UTC", durationMs: 3_600_000 } } } });
+    const occurrences = await engine.triggers.listOccurrences({ taskId: target.id, workspaceId });
+    expect(occurrences.occurrences).toHaveLength(1);
+    expect(occurrences.occurrences[0]).toMatchObject({ occurrenceKey: "schedule:v1:2026-08-01T09:00:00.000Z", triggerVersion: 1, status: "Scheduled" });
+    expect(() => (engine.triggers.create as unknown as (input: unknown) => unknown)({ taskId: target.id, command: { workspaceId, definition: { kind: "webhook", config: {} } } })).toThrow();
+  });
+
+  it("cancels only unstarted future occurrences when a trigger version changes", async () => {
+    const { workspaceId } = await seedWorkspace();
+    const target = await task(workspaceId, "Versioned schedule");
+    const engine = createChronaEngine();
+    const trigger = await engine.triggers.create({ taskId: target.id, command: { workspaceId, definition: { kind: "schedule", config: { mode: "once", fireAt: "2026-08-01T09:00:00.000Z", timezone: "UTC" } } } });
+    const first = await db.taskOccurrence.findFirstOrThrow({ where: { taskId: target.id } });
+    await db.taskOccurrence.update({ where: { id: first.id }, data: { status: "Running", startedAt: new Date() } });
+
+    await engine.triggers.update({ taskId: target.id, triggerId: trigger.id, command: { workspaceId, expectedVersion: 1, definition: { kind: "schedule", config: { mode: "once", fireAt: "2026-08-02T09:00:00.000Z", timezone: "UTC" } } } });
+    expect((await db.taskOccurrence.findUniqueOrThrow({ where: { id: first.id } })).status).toBe("Running");
+    expect(await db.taskOccurrence.count({ where: { taskId: target.id, triggerVersion: 2, status: "Scheduled" } })).toBe(1);
+  });
+
+  it("activates filtered accepted-result events once with bounded normalized input", async () => {
+    const { workspaceId } = await seedWorkspace();
+    const source = await task(workspaceId, "Source task");
+    const target = await task(workspaceId, "Follow accepted reports");
+    const engine = createChronaEngine();
+    await engine.triggers.create({ taskId: target.id, command: { workspaceId, definition: { kind: "event", config: { topic: "task.result.accepted", filter: { path: "taskId", operator: "eq", value: source.id } } } } });
+    const run = await db.run.create({ data: { taskId: source.id, runtimeName: "hermes", status: "Completed", triggeredBy: "user" } });
+    const first = await engine.triggers.activateEvent({ workspaceId, topic: "task.result.accepted", causationId: run.id, normalizedInput: { taskId: source.id, runId: run.id } });
+    const duplicate = await engine.triggers.activateEvent({ workspaceId, topic: "task.result.accepted", causationId: run.id, normalizedInput: { taskId: source.id, runId: run.id } });
+    expect(first).toBe(1);
+    expect(duplicate).toBe(0);
+    expect(await db.taskOccurrence.count({ where: { taskId: target.id } })).toBe(1);
+  });
+
+  it("authenticates, deduplicates, filters, and bounds external email deliveries", async () => {
+    const { workspaceId } = await seedWorkspace();
+    const target = await task(workspaceId, "Handle launch email");
+    const engine = createChronaEngine();
+    await engine.triggers.create({ taskId: target.id, command: { workspaceId, definition: { kind: "email", config: { recipient: "launch-inbox", subjectContains: "Launch" } } } });
+    process.env.CHRONA_EMAIL_TRIGGER_SECRET = "test-email-trigger-secret";
+    resetEnvCacheForTests();
+    const app = createApiRouter(engine);
+    const delivery = { timestamp: new Date().toISOString(), workspaceId, deliveryId: "mail-1", recipient: "launch-inbox", from: "owner@example.test", subject: "Launch readiness", text: "Review final evidence", receivedAt: new Date().toISOString() };
+
+    expect((await postEmail(app, "wrong-secret", delivery)).status).toBe(401);
+    expect((await postEmail(app, "test-email-trigger-secret", delivery, "wrong-signature-secret")).status).toBe(401);
+    expect((await postEmail(app, "test-email-trigger-secret", { ...delivery, timestamp: new Date(Date.now() - 6 * 60_000).toISOString(), deliveryId: "expired" })).status).toBe(401);
+    expect(await (await postEmail(app, "test-email-trigger-secret", delivery)).json()).toEqual({ accepted: true, activated: 1 });
+    expect(await (await postEmail(app, "test-email-trigger-secret", delivery)).json()).toEqual({ accepted: true, activated: 0 });
+    const occurrence = await db.taskOccurrence.findFirstOrThrow({ where: { taskId: target.id } });
+    const other = await seedWorkspace("Other email workspace");
+    const otherTarget = await task(other.workspaceId, "Other launch email");
+    await engine.triggers.create({ taskId: otherTarget.id, command: { workspaceId: other.workspaceId, definition: { kind: "email", config: { recipient: "launch-inbox", subjectContains: "Launch" } } } });
+    expect(await (await postEmail(app, "test-email-trigger-secret", { ...delivery, deliveryId: "mail-2" })).json()).toEqual({ accepted: true, activated: 1 });
+    expect(await db.taskOccurrence.count({ where: { taskId: otherTarget.id } })).toBe(0);
+    expect(occurrence.normalizedInput).toMatchObject({ adapter: "email", from: "owner@example.test", subject: "Launch readiness" });
+    expect(JSON.stringify(occurrence.normalizedInput)).not.toContain("test-email-trigger-secret");
+  });
+
+  it("publishes review-due Goal facts to internal event triggers", async () => {
+    const { workspaceId } = await seedWorkspace();
+    const target = await task(workspaceId, "Review follow-up");
+    const engine = createChronaEngine();
+    await engine.triggers.create({ taskId: target.id, command: { workspaceId, definition: { kind: "event", config: { topic: "goal.review_due" } } } });
+    const goal = await db.goal.create({ data: { workspaceId, title: "Quarterly launch", description: "Review due", successCriteria: [], status: "Active", nextReviewAt: new Date("2026-07-01T00:00:00.000Z") } });
+    expect(await runGoalReviewDueWorker({ now: new Date("2026-07-02T00:00:00.000Z") })).toBe(1);
+    const occurrence = await db.taskOccurrence.findFirstOrThrow({ where: { taskId: target.id, occurrenceKey: { startsWith: "event:goal.review_due" } } });
+    expect(occurrence.normalizedInput).toMatchObject({ goalId: goal.id, activationDepth: 0 });
+  });
+});

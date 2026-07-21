@@ -152,4 +152,23 @@ describe("buildActionSpec", () => {
     expect((specEnabled.elements.submit.props as Record<string, unknown>).disabled).toBeUndefined();
   });
 
+  it("preserves multiple-choice and boolean state bindings", () => {
+    const spec = buildActionSpec({
+      fields: [
+        { key: "channels", label: "Channels", value: ["official"], control: "choice", selection: "multiple", options: ["official", "euraxess"], required: true },
+        { key: "confirmed", label: "Confirmed", value: false, control: "boolean", required: true },
+      ],
+      actions: [{ id: "submit", label: "input", kind: "input", checkpointAction: "submit_input" }],
+    });
+
+    expect(spec.elements["field:channels"]).toMatchObject({
+      type: "CheckpointChoiceField",
+      props: { selection: "multiple", value: { $bindState: "/channels" } },
+    });
+    expect(spec.elements["field:confirmed"]).toMatchObject({
+      type: "Checkbox",
+      props: { checked: { $bindState: "/confirmed" } },
+    });
+    expect(spec.state).toMatchObject({ channels: ["official"], confirmed: false });
+  });
 });

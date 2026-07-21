@@ -578,6 +578,7 @@ export function deriveTaskWorkspaceStage(input: {
 }): TaskWorkspaceStage {
   const workState = deriveTaskWorkStateView(input);
   const resultAccepted =
+    workState.state === "done" &&
     input.pageData.resultReview?.runId === input.pageData.latestRunSummary?.id &&
     input.pageData.resultReview?.status === "accepted";
   return {

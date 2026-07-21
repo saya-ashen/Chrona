@@ -77,17 +77,18 @@ The schedule page shows task/time-block projections, conflicts, suggestions, and
 
 ### Long-horizon Goal Control Plane and Workbench
 
-Chrona ships the Phase 3 Goal aggregate and lifecycle-aware Goal surfaces. A
-`Goal` contains bounded tasks, validated user-confirmed success criteria,
-explicit lifecycle actions, accepted-result summaries, provenance-preserving
-read-only `GoalAsset` references, a versioned Operational Brief, and an explicit
-Working Set. `Draft | Active | Paused` render as an Ongoing Workspace with two
-layers: the Goal Control Plane derives Needs You, In Progress, New Results, Up
-Next, current focus, criteria, and one primary action; the Goal Workbench lets
-the user choose context and compose one bounded Task from a previewed immutable
-snapshot. `Achieved | Stopped` render as an Outcome Archive with final result,
-evidence, confirmation actor/note/time, and history prioritized above execution
-detail.
+Chrona ships the Goal aggregate and lifecycle-aware Goal surfaces. A `Goal`
+contains bounded Tasks, validated user-confirmed success criteria, explicit
+lifecycle actions, immutable accepted-result summaries, a versioned Operational
+Brief, an explicit Working Set, and durable typed `GoalAsset` identities.
+`Draft | Active | Paused` render as an Ongoing Workspace: the Goal Control Plane
+derives Needs You, In Progress, New Results, Up Next, current focus, criteria,
+and one primary action; the Goal Workbench provides an Office-style library,
+reviewable Result Inbox, explicit asset versions and drafts, typed
+Document/Form/Page/File workspaces, recover-as-new-version, archive/restore,
+exports, and version-bound AI modification Tasks. `Achieved | Stopped` render as
+an Outcome Archive with final result, evidence, confirmation actor/note/time,
+and history prioritized above execution detail.
 
 Goal list and detail routes are `/goals` and `/goals/:goalId`. A Goal-scoped
 Task inspector is `/goals/:goalId/workbench/tasks/:taskId`; it verifies
@@ -95,12 +96,14 @@ Goal/Task ownership and reuses the canonical Task Workspace. The Task retains
 its independent `/tasks/:taskId` identity. Goal never owns a provider session,
 Plan, Run, or execution state.
 
-The remaining target separates activation and calendar placement:
-`TaskTrigger` definitions will produce idempotent `TriggerDelivery` facts and
-isolated `TaskOccurrence` instances; a `WorkBlock` will remain an optional time
-container. Those trigger and neutral-occurrence phases are not shipped.
-Lifecycle invariants, security boundaries, and phased migration remain
-authoritative in [Long-Horizon Goals and Triggers](./long-horizon-goals-and-triggers.md).
+Activation and calendar placement are separate. Closed-union `TaskTrigger`
+definitions (`schedule` and bounded internal `event`) produce idempotent
+`TriggerDelivery` facts and isolated `TaskOccurrence` instances. Execution
+authority propagates `occurrenceId` through TaskPlan, TaskPlanRun, Run,
+ExecutionSession, and Artifact. A `WorkBlock` remains optional calendar
+placement; it is not execution identity. Webhook ingress is intentionally not
+shipped. Lifecycle invariants and security boundaries remain authoritative in
+[Long-Horizon Goals and Triggers](./long-horizon-goals-and-triggers.md).
 
 ### Action Center projection
 

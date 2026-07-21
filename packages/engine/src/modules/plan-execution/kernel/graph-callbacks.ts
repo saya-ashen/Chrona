@@ -63,8 +63,9 @@ export function createKernelGraphCallbacks(
         return;
       }
 
-      // Persist intermediate graph state so that re-entrant (nested)
-      // executeCommand calls see the latest running attempt in the DB.
+      // Persist the new running attempt before invoking the provider. Plan Output
+      // calls arrive over HTTP while this dispatch is still awaiting the provider,
+      // so they must be able to resolve this same active attempt immediately.
       await persistRuntimeState({
         workspaceId,
         taskId,
@@ -75,7 +76,6 @@ export function createKernelGraphCallbacks(
         attempts: state.attempts as unknown as NodeAttempt[],
         results: state.results as unknown as NodeResult[],
         executionContextSnapshots: state.executionContextSnapshots as unknown as ExecutionContextSnapshot[],
-        existingRun: persisted.planRun,
       });
 
       await input.onStateChange?.(resolveEffectivePlanGraph(state));

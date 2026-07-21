@@ -82,6 +82,21 @@ describe("TaskWorkspaceExecutionOverview", () => {
     window.localStorage.clear();
   });
 
+  it("keeps approval waits in stage results instead of final result", () => {
+    const view = createTaskWorkspaceExecutionConsoleView(
+      executionMonitoringWorkspaceFixtures.approvalNeeded,
+    );
+    renderOverview(view, {
+      currentExecution: { status: "waiting_for_approval" } as never,
+    });
+
+    expect(screen.getByRole("heading", { name: "Stage results" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Final result" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("status", { name: "Execution is producing output" })).not.toBeInTheDocument();
+    expect(screen.queryByText("AI is working")).not.toBeInTheDocument();
+    expect(screen.getAllByText("Paused").length).toBeGreaterThan(0);
+  });
+
   it("shows a persisted node error even when Activity has no danger event", () => {
     const view = createTaskWorkspaceExecutionConsoleView(
       executionMonitoringWorkspaceFixtures.running,

@@ -63,19 +63,13 @@ describe("plan-runner task executor approval state", () => {
     expect(updatedTask.status).toBe(TaskStatus.WaitingForApproval);
   });
 
-  it("resumes approval-waiting task node and replaces prior result with a completed result", async () => {
-    executeTaskNodeCapabilityMock
-      .mockResolvedValueOnce({
-        status: "waiting_for_approval",
-        prompt: "Approve the task output",
-        reason: "Need approval",
-        evidence: { sessionId: "main-session" },
-      })
-      .mockResolvedValueOnce({
-        status: "done",
-        summary: "Task approved and completed",
-        evidence: { sessionId: "main-session", runId: "run_approved" },
-      });
+  it("completes an approved terminal task without re-executing accepted output", async () => {
+    executeTaskNodeCapabilityMock.mockResolvedValueOnce({
+      status: "waiting_for_approval",
+      prompt: "Approve the task output",
+      reason: "Need approval",
+      evidence: { sessionId: "main-session" },
+    });
 
     const { workspace, task } = await seedWorkspaceAndTask("Runner resumes approval");
     const compiledPlan = makeSingleTaskPlan("graph_task_resume_approval");
@@ -98,23 +92,21 @@ describe("plan-runner task executor approval state", () => {
     expect(resumed.status).toBe("completed");
     expect(resumed.currentNodeId).toBeNull();
     expect(resumed.executedNodeIds).toContain("task_node");
-    expect(executeTaskNodeCapabilityMock).toHaveBeenCalledTimes(2);
+    expect(executeTaskNodeCapabilityMock).toHaveBeenCalledTimes(1);
 
     const persisted = await getPlanRun(task.id, compiledPlan.editablePlanId);
     expect(persisted?.results.map((item) => [item.nodeId, item.status, item.waitKind, item.review?.status, item.outputSummary])).toEqual([
       ["task_node", "obsolete", undefined, "accepted", undefined],
-      ["task_node", "current", undefined, undefined, "Task approved and completed"],
     ]);
-    expect(persisted?.attempts).toHaveLength(2);
+    expect(persisted?.attempts).toHaveLength(1);
     expect(persisted?.attempts.map((attempt) => attempt.status)).toEqual([
-      "cancelled",
       "succeeded",
     ]);
     expect(
       persisted?.executionContextSnapshots.some(
         (snapshot) => snapshot.nodeId === "task_node" && snapshot.refs?.userInput === "approved in test",
       ),
-    ).toBe(true);
+    ).toBe(false);
 
     const session = await db.executionSession.findFirstOrThrow({
       where: { taskId: task.id },

@@ -11,7 +11,7 @@ import { SchedulePage } from "@features/schedule";
 import { TaskListPage } from "@features/task-management";
 import { AiClientsDialog } from "@features/ai-clients/ui";
 import { TaskWorkspacePage, type TaskPageData } from "@features/task-workspace";
-import { GoalListPage, GoalWorkspacePage, type GoalData } from "@features/goals";
+import { GoalAssetWorkbench, GoalListPage, GoalWorkspacePage, type GoalAssetWorkbenchData, type GoalData, type GoalInboxCandidateData } from "@features/goals";
 import { ActionCenterPageClient } from "@features/action-center";
 import type { ActionCenterProjection } from "@chrona/contracts/api";
 import { LocalizedLink } from "@/components/i18n/localized-link";
@@ -51,7 +51,7 @@ export type ActionCenterRouteData = {
 };
 export type GoalListRouteData = { goals: GoalData[] };
 
-export type GoalWorkspaceRouteData = { goal: GoalData };
+export type GoalWorkspaceRouteData = { goal: GoalData; assets: GoalAssetWorkbenchData[]; recentAssets: GoalAssetWorkbenchData[]; inboxCandidates: GoalInboxCandidateData[] };
 
 export type TaskPageRouteData = {
   locale: Locale;
@@ -253,8 +253,8 @@ export function GoalListRoutePage() {
 
 export function GoalWorkspaceRoutePage() {
   const { dictionary } = useAppBootOutletData();
-  const { goal } = useLoaderData() as GoalWorkspaceRouteData;
-  return <GoalWorkspacePage goal={goal} copy={dictionary.pages.goals} />;
+  const { goal, assets, recentAssets, inboxCandidates } = useLoaderData() as GoalWorkspaceRouteData;
+  return <GoalWorkspacePage goal={goal} copy={dictionary.pages.goals} assetWorkbench={<GoalAssetWorkbench goalId={goal.id} workspaceId={goal.workspaceId} copy={dictionary.pages.goals.assetWorkbench} initialAssets={assets} initialRecent={recentAssets} initialCandidates={inboxCandidates} />} />;
 }
 
 export function GoalTaskInspectorRoutePage() {

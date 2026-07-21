@@ -49,8 +49,8 @@ export function approveCurrentNodeResult(input: {
     ...input.state,
     attempts: input.approved
       ? input.state.attempts.map((attempt) =>
-          attempt.nodeId === input.nodeId && attempt.status === "succeeded"
-            ? { ...attempt, status: "cancelled" }
+          attempt.nodeId === input.nodeId && ["running", "succeeded"].includes(attempt.status)
+            ? { ...attempt, status: "succeeded", finishedAt: input.reviewedAt }
             : attempt,
         )
       : input.state.attempts,

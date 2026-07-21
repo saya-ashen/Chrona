@@ -4,6 +4,7 @@ import type {
   ApplyGoalReviewRequest,
   ConfirmGoalCriterionRequest,
   CreateGoalRequest,
+  CreateGoalWithFirstTaskRequest,
   CreateGoalTaskRequest,
   GoalActionRequest,
   GoalOperationalBrief,
@@ -12,10 +13,12 @@ import type {
   GoalWorkingSetSubjectType,
   ProcessGoalResultRequest,
   PromoteTaskToGoalRequest,
+  ReviewGoalCriterionRequest,
   UpdateGoalRequest,
 } from "@chrona/contracts/api";
 import { deriveGoalProjection } from "@chrona/domain";
 import { createTask } from "../tasks/create-task";
+import { rebuildTaskProjection } from "../projections/rebuild-task-projection";
 import { extractAcceptedResultText } from "../tasks/accepted-result-context";
 import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
 
@@ -169,6 +172,7 @@ function artifactReadModel(artifact: GoalArtifact) {
   return {
     id: artifact.id,
     taskId: artifact.taskId,
+    runId: artifact.runId,
     title: artifact.title,
     type: artifact.type,
     uri: artifact.uri,
@@ -193,7 +197,8 @@ function acceptedPlanOutput(task: GoalTask, run: GoalTask["runs"][number]) {
     (typeof planId === "string" && planRun.planId === planId) ||
     planRun.workBlockId === run.workBlockId,
   );
-  return planOutputSpec((candidates[0] ?? task.taskPlanRuns[0])?.planRun);
+  const candidate = candidates[0] ?? task.taskPlanRuns[0];
+  return candidate ? planOutputSpec(candidate.planRun) : null;
 }
 
 // Accepted results reconcile persisted event, run, plan-output, and Artifact records.
@@ -251,10 +256,9 @@ function choosePrimaryResult(goal: GoalWithDetails) {
     recordValue(asset.currentArtifact.metadata)?.finalGoalResult === true,
   );
   const finalAsset = finalAssets.find((asset) => asset.currentArtifact.uri.startsWith("generated://"))
-    ?? finalAssets[0]
-    ?? goal.assets.find((asset) => asset.role === "evidence" || asset.role === "submission");
-  if (finalAsset) return artifactReadModel(finalAsset.currentArtifact);
-  return goal.tasks.flatMap((task) => acceptedResultForTask(task)?.artifacts ?? [])[0] ?? null;
+    || finalAssets.at(0)
+    || goal.assets.find((asset) => asset.role === "evidence" || asset.role === "submission");
+  return finalAsset ? artifactReadModel(finalAsset.currentArtifact) : goal.tasks.flatMap((task) => acceptedResultForTask(task)?.artifacts ?? [])[0] ?? null;
 }
 
 function eventReadModels(goal: GoalWithDetails) {
@@ -319,6 +323,11 @@ function toGoalReadModel(goal: GoalWithDetails) {
     planned: tasks.filter((task) => task.group === "planned"),
     completed: tasks.filter((task) => task.group === "completed"),
   };
+  const primaryTaskId = projection.nextAction === "resolve_attention"
+    ? groupedTasks.attention[0]?.id ?? null
+    : projection.nextAction === "continue_work"
+      ? groupedTasks.planned[0]?.id ?? groupedTasks.active[0]?.id ?? null
+      : null;
   const achievementConfirmation = achievementConfirmationFrom(goal.achievementConfirmation);
   const primaryResult = choosePrimaryResult(goal);
   const criterionEvidence = new Map(
@@ -328,6 +337,8 @@ function toGoalReadModel(goal: GoalWithDetails) {
     id: goal.id,
     workspaceId: goal.workspaceId,
     title: goal.title,
+    titleSource: goal.titleSource,
+    titleRenameNoticeSeenAt: goal.titleRenameNoticeSeenAt?.toISOString() ?? null,
     description: goal.description,
     successCriteria,
     status: goal.status,
@@ -340,7 +351,7 @@ function toGoalReadModel(goal: GoalWithDetails) {
     projection,
     primaryAction: {
       kind: projection.nextAction,
-      taskId: groupedTasks.attention[0]?.id ?? null,
+      taskId: primaryTaskId,
     },
     outcome: {
       primaryResult,
@@ -460,12 +471,35 @@ export async function createGoal(input: CreateGoalRequest) {
   return toGoalReadModel(goal);
 }
 
+// Direct Goal entry reuses canonical Task persistence inside one transaction so
+// runtime validation, sessions, occurrences, and task.created audit remain
+// identical to every other Task path without exposing a partially-created Goal.
+export async function createGoalWithFirstTask(input: CreateGoalWithFirstTaskRequest) {
+  const dedupeKey = `goal.created_with_first_task:${input.idempotencyKey}`;
+  const existing = await db.event.findUnique({ where: { dedupeKey }, select: { payload: true } });
+  const existingPayload = recordValue(existing?.payload);
+  if (typeof existingPayload?.goal_id === "string" && typeof existingPayload.task_id === "string") {
+    return { goal: await getGoal({ goalId: existingPayload.goal_id }), taskId: existingPayload.task_id };
+  }
+  const result = await db.$transaction(async (tx) => {
+    const raced = await tx.event.findUnique({ where: { dedupeKey }, select: { payload: true } });
+    const racedPayload = recordValue(raced?.payload);
+    if (typeof racedPayload?.goal_id === "string" && typeof racedPayload.task_id === "string") return { goalId: racedPayload.goal_id, taskId: racedPayload.task_id };
+    const goal = await tx.goal.create({ data: { workspaceId: input.workspaceId, title: input.intendedOutcome, description: input.intendedOutcome, successCriteria: [{ id: "outcome-confirmed", kind: "user_confirmed", description: `Confirm: ${input.intendedOutcome}`, satisfied: false, confirmedAt: null, proposalStatus: "proposed" }], status: "Active" } });
+    const taskResult = await createTask({ workspaceId: input.workspaceId, goalId: goal.id, goalContext: { goal: { id: goal.id, title: goal.title, operationalBrief: null, capturedAt: new Date().toISOString() }, items: [], expectedOutcome: input.intendedOutcome }, title: input.firstWorkItem, description: input.description ?? null, priority: input.priority, autoPlanGeneration: false, autoExecute: false }, tx);
+    await tx.event.create({ data: { eventType: "goal.created_with_first_task", workspaceId: input.workspaceId, taskId: taskResult.taskId, actorType: "user", actorId: "server-action", source: "ui", payload: { goal_id: goal.id, task_id: taskResult.taskId }, summary: `Created Goal and first task: ${goal.title}`, dedupeKey, ingestSequence: 1 } });
+    return { goalId: goal.id, taskId: taskResult.taskId };
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
+  await rebuildTaskProjection(result.taskId);
+  return { goal: await getGoal({ goalId: result.goalId }), taskId: result.taskId };
+}
+
 export async function updateGoal(input: { goalId: string; patch: UpdateGoalRequest }) {
   const goal = await getGoalOrThrow(input.goalId);
   const updated = await db.goal.update({
     where: { id: goal.id },
     data: {
-      ...(input.patch.title !== undefined ? { title: input.patch.title } : {}),
+      ...(input.patch.title !== undefined ? { title: input.patch.title, titleSource: "user", titleRenameNoticeSeenAt: new Date() } : {}),
       ...(input.patch.description !== undefined ? { description: input.patch.description } : {}),
       ...(input.patch.successCriteria !== undefined ? { successCriteria: input.patch.successCriteria } : {}),
       ...(input.patch.nextReviewAt !== undefined
@@ -748,45 +782,19 @@ export async function processGoalResult(input: {
   if (input.command.criterionId && !criterion) {
     throw new EngineError(ENGINE_ERROR_CODES.VALIDATION_FAILED, "Success criterion not found");
   }
-  const assetByArtifact = new Map(goal.assets.map((asset) => [asset.sourceArtifactId, asset]));
-  const nextRank = goal.workingSetItems.length;
   await db.$transaction(async (tx) => {
-    for (const [index, artifact] of artifacts.entries()) {
-      let asset = assetByArtifact.get(artifact.id);
-      if (input.command.createGoalAssets && !asset) {
-        asset = await tx.goalAsset.create({
-          data: {
-            workspaceId: goal.workspaceId,
-            goalId: goal.id,
-            sourceArtifactId: artifact.id,
-            currentArtifactId: artifact.id,
-            role: criterion ? "evidence" : "reference",
-            status: "Approved",
-            label: artifact.title,
-          },
-          include: { sourceArtifact: true, currentArtifact: true },
-        });
-      }
-      if (input.command.addToWorkingSet) {
-        const subjectType = asset ? "goal_asset" : "artifact";
-        const subjectId = asset?.id ?? artifact.id;
-        await tx.goalWorkingSetItem.upsert({
-          where: { goalId_subjectType_subjectId: { goalId: goal.id, subjectType, subjectId } },
-          create: {
-            workspaceId: goal.workspaceId,
-            goalId: goal.id,
-            subjectType,
-            subjectId,
-            label: asset?.label ?? artifact.title,
-            snapshot: asset
-              ? { label: asset.label, role: asset.role, status: asset.status, artifactId: artifact.id, contentPreview: artifact.contentPreview }
-              : { taskId: artifact.taskId, title: artifact.title, type: artifact.type, uri: artifact.uri, contentPreview: artifact.contentPreview },
-            rank: nextRank + index,
-          },
-          update: {},
-        });
-      }
+    if (!criterion) return;
+    const formalAssets = await tx.goalAsset.findMany({
+      where: { goalId: goal.id, sourceArtifactId: { in: artifacts.map((artifact) => artifact.id) } },
+      select: { id: true, sourceArtifactId: true },
+    });
+    if (formalAssets.length !== artifacts.length) {
+      throw new EngineError(
+        ENGINE_ERROR_CODES.VALIDATION_FAILED,
+        "Review every selected Artifact in the Goal Workbench Inbox before linking it as criterion evidence",
+      );
     }
+    await tx.goalAsset.updateMany({ where: { id: { in: formalAssets.map((asset) => asset.id) } }, data: { role: "evidence" } });
   });
   await appendGoalEvent({
     eventType: "goal.result_processed",
@@ -794,6 +802,32 @@ export async function processGoalResult(input: {
     workspaceId: goal.workspaceId,
     payload: { task_id: input.taskId, run_id: result.runId, artifact_ids: artifacts.map((artifact) => artifact.id), criterion_id: criterion?.id ?? null },
     summary: `Processed accepted result: ${input.taskId}`,
+  });
+  return getGoal({ goalId: goal.id });
+}
+
+export async function reviewGoalCriterion(input: {
+  goalId: string;
+  criterionId: string;
+  command: ReviewGoalCriterionRequest;
+}) {
+  const goal = await getGoalOrThrow(input.goalId);
+  if (goal.status !== "Active") {
+    throw new EngineError(ENGINE_ERROR_CODES.INVALID_TASK_STATE, "Only active Goals can review success criteria");
+  }
+  const criteria = criteriaFrom(goal.successCriteria);
+  const criterionIndex = criteria.findIndex((criterion) => criterion.id === input.criterionId);
+  if (criterionIndex < 0) throw new EngineError(ENGINE_ERROR_CODES.VALIDATION_FAILED, "Success criterion not found");
+  const updatedCriteria = criteria.map((criterion, index) => index === criterionIndex
+    ? { ...criterion, description: input.command.description, proposalStatus: "confirmed" as const }
+    : criterion);
+  await db.goal.update({ where: { id: goal.id }, data: { successCriteria: updatedCriteria } });
+  await appendGoalEvent({
+    eventType: "goal.criterion_confirmed",
+    goalId: goal.id,
+    workspaceId: goal.workspaceId,
+    payload: { criterion_id: input.criterionId, proposal_reviewed: true },
+    summary: input.command.description,
   });
   return getGoal({ goalId: goal.id });
 }
@@ -991,6 +1025,7 @@ export async function promoteTaskToGoal(input: { taskId: string; command: Promot
       data: {
         workspaceId: task.workspaceId,
         title: input.command.title,
+        titleSource: "ai",
         description: input.command.description ?? null,
         successCriteria: input.command.successCriteria,
         status: "Active",

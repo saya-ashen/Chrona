@@ -12,6 +12,8 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  Field,
+  FieldLabel,
   Input,
   Popover,
   PopoverContent,
@@ -139,6 +141,7 @@ type TaskCreateDialogProps = {
   initialEndAt: Date;
   isPending: boolean;
   onClose: () => void;
+  allowGoalMode?: boolean;
   onSubmit: (input: {
     title: string;
     description: string;
@@ -154,6 +157,9 @@ type TaskCreateDialogProps = {
     recurrenceAnchorStartAt: string | null;
     recurrenceAnchorEndAt: string | null;
     aiClientId: string | null;
+    mode?: "task" | "goal";
+    intendedOutcome?: string;
+    firstWorkItem?: string;
   }) => Promise<void>;
   autoSuggestionsEnabled?: boolean;
   availableAiClients?: TaskConfigAiClient[];
@@ -171,6 +177,7 @@ export function TaskCreateDialog({
   onClose,
   onSubmit,
   autoSuggestionsEnabled,
+  allowGoalMode = false,
   availableAiClients = [],
 }: TaskCreateDialogProps) {
   const aiPreferences = useScheduleAiPreferences();
@@ -178,6 +185,9 @@ export function TaskCreateDialog({
   const defaultAutoExecuteEnabled = aiPreferences.defaultAutoExecuteEnabled;
   const defaultAutoPlanGenerationEnabled = aiPreferences.autoPlanGenerationEnabled;
   const [title, setTitle] = useState(initialTitle);
+  const [productMode, setProductMode] = useState<"task" | "goal">("task");
+  const [intendedOutcome, setIntendedOutcome] = useState("");
+  const [firstWorkItem, setFirstWorkItem] = useState("");
   const { messages } = useI18n();
   const locale = useLocale();
   const [showAutomationDetails, setShowAutomationDetails] = useState(false);
@@ -273,7 +283,8 @@ export function TaskCreateDialog({
   }, [isOpen, initialStartAt, initialEndAt, initialTitle, initialDescription, resolvedInitialAutoExecute, resolvedInitialAutoPlanGeneration]);
 
   async function handleSubmit() {
-    if (!title.trim()) return;
+    if (productMode === "task" && !title.trim()) return;
+    if (productMode === "goal" && (!intendedOutcome.trim() || !firstWorkItem.trim())) return;
 
     const [startHours, startMinutes] = startTime.split(":").map(Number);
     const [endHours, endMinutes] = endTime.split(":").map(Number);
@@ -287,8 +298,8 @@ export function TaskCreateDialog({
     const recurrenceRule = !repeatEnabled ? null : recurrenceRuleFromState(recurrenceMode, customRRULE);
 
     await onSubmit({
-      title: title.trim(),
-      description: description.trim(),
+      title: productMode === "goal" ? firstWorkItem.trim() : title.trim(),
+      description: productMode === "goal" ? `First work item for: ${intendedOutcome.trim()}` : description.trim(),
       priority,
       autoExecute,
       autoPlanGenerationEnabled: autoExecute || autoPlanGenerationEnabled,
@@ -301,6 +312,9 @@ export function TaskCreateDialog({
       recurrenceAnchorStartAt: recurrenceRule ? scheduledStartAt.toISOString() : null,
       recurrenceAnchorEndAt: recurrenceRule ? scheduledEndAt.toISOString() : null,
       aiClientId: aiClientId || null,
+      mode: productMode,
+      intendedOutcome: productMode === "goal" ? intendedOutcome.trim() : undefined,
+      firstWorkItem: productMode === "goal" ? firstWorkItem.trim() : undefined,
     });
 
     onClose();
@@ -379,6 +393,20 @@ export function TaskCreateDialog({
         </DialogHeader>
 
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
+          {allowGoalMode ? (
+            <div className="grid grid-cols-2 gap-1 rounded-lg border bg-muted/30 p-1" role="radiogroup" aria-label="Creation type">
+              <Button type="button" variant={productMode === "task" ? "secondary" : "ghost"} role="radio" aria-checked={productMode === "task"} onClick={() => setProductMode("task")}>Task</Button>
+              <Button type="button" variant={productMode === "goal" ? "secondary" : "ghost"} role="radio" aria-checked={productMode === "goal"} onClick={() => setProductMode("goal")}>Goal</Button>
+            </div>
+          ) : null}
+          {productMode === "goal" ? (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field><FieldLabel htmlFor="goal-intended-outcome">Intended outcome</FieldLabel><Textarea id="goal-intended-outcome" value={intendedOutcome} onChange={(event) => setIntendedOutcome(event.target.value)} placeholder="What durable outcome should this Goal reach?" /></Field>
+              <Field><FieldLabel htmlFor="goal-first-work-item">First work item</FieldLabel><Textarea id="goal-first-work-item" value={firstWorkItem} onChange={(event) => setFirstWorkItem(event.target.value)} placeholder="What bounded work should happen first?" /></Field>
+            </div>
+          ) : null}
+          {productMode === "task" ? (
+          <>
           <div className="relative space-y-1.5">
             <label htmlFor="task-create-title" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               {dialogCopy.titleLabel}
@@ -508,6 +536,8 @@ export function TaskCreateDialog({
               </div>
             )}
           </div>
+          </>
+          ) : null}
 
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px] xl:items-start">
             <div className="flex flex-col gap-4">
@@ -805,12 +835,12 @@ export function TaskCreateDialog({
           <Button
             type="button"
             onClick={() => void handleSubmit()}
-            disabled={isPending || !title.trim()}
+            disabled={isPending || (productMode === "task" ? !title.trim() : !intendedOutcome.trim() || !firstWorkItem.trim())}
             variant="default"
             size="sm"
             className="min-w-20 rounded-lg"
           >
-            {isPending ? dialogCopy.saving : dialogCopy.save}
+            {isPending ? dialogCopy.saving : productMode === "goal" ? "Create Goal and first task" : dialogCopy.save}
           </Button>
         </div>
       </DialogContent>

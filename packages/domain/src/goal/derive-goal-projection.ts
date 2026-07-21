@@ -2,7 +2,7 @@ import type { GoalSuccessCriterion, GoalStatus } from "@chrona/contracts/api";
 
 export type GoalAttention = "none" | "needs_input" | "blocked" | "failed";
 export type GoalActivity = "idle" | "work_active" | "review_due";
-export type GoalNextAction = "review" | "resolve_attention" | "resume" | "confirm_outcome" | "none";
+export type GoalNextAction = "review_criteria" | "review" | "resolve_attention" | "continue_work" | "resume" | "confirm_outcome" | "none";
 
 export type GoalTaskProjectionInput = {
   status: string;
@@ -43,6 +43,7 @@ export function deriveGoalProjection(input: GoalProjectionInput): GoalProjection
   );
   const hasBlocked = input.tasks.some((task) => task.status === "Blocked");
   const hasFailed = input.tasks.some((task) => task.status === "Failed");
+  const hasPlannedWork = input.tasks.some((task) => task.status === "Draft" || task.status === "Ready");
 
   const attention: GoalAttention = hasNeedsInput
     ? "needs_input"
@@ -52,16 +53,20 @@ export function deriveGoalProjection(input: GoalProjectionInput): GoalProjection
         ? "failed"
         : "none";
   const activity: GoalActivity = workActive ? "work_active" : reviewDue ? "review_due" : "idle";
-  const criteriaSatisfiedCount = input.successCriteria.filter((criterion) => criterion.satisfied).length;
+  const confirmedCriteria = input.successCriteria.filter((criterion) => criterion.proposalStatus !== "proposed");
+  const hasProposedCriteria = input.successCriteria.some((criterion) => criterion.proposalStatus === "proposed");
+  const criteriaSatisfiedCount = confirmedCriteria.filter((criterion) => criterion.satisfied).length;
 
   let nextAction: GoalNextAction = "none";
   if (input.status === "Paused") nextAction = "resume";
+  else if (input.status === "Active" && hasProposedCriteria) nextAction = "review_criteria";
   else if (input.status === "Active" && attention !== "none") nextAction = "resolve_attention";
   else if (input.status === "Active" && reviewDue) nextAction = "review";
+  else if (input.status === "Active" && hasPlannedWork) nextAction = "continue_work";
   else if (
     input.status === "Active" &&
-    input.successCriteria.length > 0 &&
-    criteriaSatisfiedCount === input.successCriteria.length
+    confirmedCriteria.length > 0 &&
+    criteriaSatisfiedCount === confirmedCriteria.length
   ) nextAction = "confirm_outcome";
 
   return {
@@ -72,6 +77,6 @@ export function deriveGoalProjection(input: GoalProjectionInput): GoalProjection
     completedTaskCount: input.tasks.filter((task) => completedTaskStatuses.has(task.status)).length,
     totalTaskCount: input.tasks.length,
     criteriaSatisfiedCount,
-    criteriaTotalCount: input.successCriteria.length,
+    criteriaTotalCount: confirmedCriteria.length,
   };
 }

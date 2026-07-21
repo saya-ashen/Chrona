@@ -28,6 +28,7 @@ const allowedIdenticalMessages = new Set([
   "pages.aiClientsPage.hermes",
   "pages.dashboard.title",
   "components.taskWorkspace.followUpChronaLabel",
+  "pages.goals.assetWorkbench.ai",
 ]);
 
 describe("i18n messages", () => {

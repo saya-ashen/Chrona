@@ -76,7 +76,7 @@ export async function registerGeneratedPlanOutputArtifacts(input: {
   if (!input.runId || !input.spec) return 0;
   const run = await db.run.findFirst({
     where: { id: input.runId, taskId: input.taskId },
-    select: { id: true },
+    select: { id: true, occurrenceId: true },
   });
   if (!run) return 0;
 
@@ -105,6 +105,7 @@ export async function registerGeneratedPlanOutputArtifacts(input: {
           workspaceId: input.workspaceId,
           taskId: input.taskId,
           runId: input.runId,
+          occurrenceId: run.occurrenceId,
           type: "file",
           title: file.title,
           uri: file.uri,

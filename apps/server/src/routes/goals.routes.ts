@@ -5,6 +5,7 @@ import {
   applyGoalReviewBodySchema,
   confirmGoalCriterionBodySchema,
   createGoalBodySchema,
+  createGoalWithFirstTaskBodySchema,
   createGoalTaskBodySchema,
   goalActionBodySchema,
   goalIdParamSchema,
@@ -14,6 +15,7 @@ import {
   processGoalResultBodySchema,
   promoteTaskToGoalBodySchema,
   promoteTaskToGoalParamSchema,
+  reviewGoalCriterionBodySchema,
   updateGoalBodySchema,
   updateGoalBriefBodySchema,
   updateGoalWorkingSetBodySchema,
@@ -42,6 +44,13 @@ export function createGoalRoutes(engine: ChronaEngine) {
         return json(c, await engine.goals.create(c.req.valid("json")), 201);
       } catch (cause) {
         return routeFailure(c, "POST /api/goals", cause, "Failed to create Goal");
+      }
+    })
+    .post("/goals/with-first-task", zValidator("json", createGoalWithFirstTaskBodySchema), async (c) => {
+      try {
+        return json(c, await engine.goals.createWithFirstTask(c.req.valid("json")), 201);
+      } catch (cause) {
+        return routeFailure(c, "POST /api/goals/with-first-task", cause, "Failed to create Goal with first task");
       }
     })
     .get("/goals/:goalId", zValidator("param", goalIdParamSchema), async (c) => {
@@ -138,6 +147,21 @@ export function createGoalRoutes(engine: ChronaEngine) {
           }));
         } catch (cause) {
           return routeFailure(c, "POST /api/goals/:goalId/results/:taskId/process", cause, "Failed to process Goal result");
+        }
+      },
+    )
+    .post(
+      "/goals/:goalId/criteria/:criterionId/review",
+      zValidator("param", goalTaskParamSchema.extend({ criterionId: goalIdParamSchema.shape.goalId }).omit({ taskId: true })),
+      zValidator("json", reviewGoalCriterionBodySchema),
+      async (c) => {
+        try {
+          return json(c, await engine.goals.reviewCriterion({
+            ...c.req.valid("param"),
+            command: c.req.valid("json"),
+          }));
+        } catch (cause) {
+          return routeFailure(c, "POST /api/goals/:goalId/criteria/:criterionId/review", cause, "Failed to review Goal criterion");
         }
       },
     )

@@ -129,7 +129,7 @@ describe("POST /api/tasks/:taskId/result/accept", () => {
     await resetTestDb();
   });
 
-  it("accepts a completed run result", async () => {
+  it("accepts a completed run result and closes the task", async () => {
     const { workspaceId } = await seedWorkspace("Accept Test");
     const { taskId } = await seedTask(workspaceId, {
       title: "Accept Task",
@@ -162,9 +162,62 @@ describe("POST /api/tasks/:taskId/result/accept", () => {
     expect(body.runId).toBe(run.id);
 
     const acceptedTask = await db.task.findUniqueOrThrow({ where: { id: taskId } });
-    expect(acceptedTask.status).toBe(TaskStatus.Completed);
+    expect(acceptedTask.status).toBe(TaskStatus.Done);
     expect(await db.event.count({
       where: { taskId, runId: run.id, eventType: "task.result_accepted" },
+    })).toBe(1);
+    expect(await db.event.count({
+      where: { taskId, runId: run.id, eventType: "task.done" },
+    })).toBe(1);
+  });
+
+  it("repairs a legacy accepted result whose task never reached Done", async () => {
+    const { workspaceId } = await seedWorkspace("Legacy Accept Test");
+    const { taskId } = await seedTask(workspaceId, {
+      title: "Legacy Accepted Task",
+      status: TaskStatus.Completed,
+    });
+    const endedAt = new Date("2026-07-21T12:00:00.000Z");
+    const run = await db.run.create({
+      data: {
+        taskId,
+        runtimeName: "hermes",
+        runtimeRunRef: "run-legacy-accept-ref",
+        status: RunStatus.Completed,
+        triggeredBy: "user",
+        startedAt: new Date("2026-07-21T11:59:00.000Z"),
+        endedAt,
+      },
+    });
+    await db.task.update({ where: { id: taskId }, data: { latestRunId: run.id } });
+    await db.event.create({
+      data: {
+        eventType: "task.result_accepted",
+        workspaceId,
+        taskId,
+        runId: run.id,
+        actorType: "user",
+        source: "ui",
+        payload: { accepted_at: "2026-07-21T12:01:00.000Z" },
+        dedupeKey: `task.result_accepted:${taskId}:${run.id}`,
+        ingestSequence: 1,
+      },
+    });
+
+    const first = await app().request(`http://local/api/tasks/${taskId}/result/accept`, { method: "POST" });
+    const second = await app().request(`http://local/api/tasks/${taskId}/result/accept`, { method: "POST" });
+
+    expect(first.status).toBe(200);
+    expect(second.status).toBe(200);
+    expect(await db.task.findUniqueOrThrow({ where: { id: taskId } })).toMatchObject({
+      status: TaskStatus.Done,
+      completedAt: endedAt,
+    });
+    expect(await db.event.count({
+      where: { taskId, runId: run.id, eventType: "task.result_accepted" },
+    })).toBe(1);
+    expect(await db.event.count({
+      where: { taskId, runId: run.id, eventType: "task.done" },
     })).toBe(1);
   });
 });

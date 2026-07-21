@@ -201,6 +201,10 @@ export interface NodeRuntimeInput {
         referenceBase: string;
       };
     };
+    currentNodeInput?: {
+      text?: string;
+      fields?: CheckpointInputFields;
+    };
     relevantPreviousResults: Array<{
       nodeRef: string;
       title: string;

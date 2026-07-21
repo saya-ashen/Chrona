@@ -85,6 +85,19 @@ describe("acceptTaskResult (engine)", () => {
     await expect(acceptTaskResult({ taskId })).rejects.toThrow(/completed run/i);
   });
 
+  it("creates reviewable Workbench candidates for Goal-owned accepted results", async () => {
+    const { workspaceId } = await seedWorkspace("Goal result inbox");
+    const taskId = await seedTaskWithRun(workspaceId, "Goal deliverable");
+    const goal = await db.goal.create({ data: { workspaceId, title: "Durable outcome", successCriteria: [], status: "Active" } });
+    await db.task.update({ where: { id: taskId }, data: { goalId: goal.id } });
+    const run = await db.run.findFirstOrThrow({ where: { taskId }, orderBy: { createdAt: "desc" } });
+    await db.artifact.create({ data: { workspaceId, taskId, runId: run.id, type: "report", title: "Goal report", uri: "generated://goal-report.md", contentPreview: "Accepted Goal evidence" } });
+
+    await acceptTaskResult({ taskId });
+
+    expect(await db.goalInboxCandidate.count({ where: { goalId: goal.id, sourceRunId: run.id, status: "Pending" } })).toBe(1);
+  });
+
   it("throws when the latest run is Failed", async () => {
     const { workspaceId } = await seedWorkspace("Accept result failed run");
     const taskId = await seedTaskWithRun(workspaceId, "Failed run", "Failed");

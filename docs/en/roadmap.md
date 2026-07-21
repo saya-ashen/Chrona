@@ -203,9 +203,9 @@ Mid-term work should deepen the AI schedule loop after near-term state, provider
 | Memory in service of execution | Use task/workspace memory to improve planning and node execution, not as a separate user-facing destination by default. |
 | Projection consistency | Make page projections fast, task-scoped where possible, and consistent across Schedule, Dashboard, and Task Workspace. |
 | Verification | Add focused tests for plan generation, graph execution, task-scoped execution actions, MCP/provider contracts, projections, schedule decisions, and json-render fallback. |
-| Long-horizon goals | Add durable Goal lifecycle and bounded goal-owned tasks without introducing continuously running provider sessions. |
-| Occurrence model | Separate repeatable task-series lifecycle from one execution occurrence; keep WorkBlock as optional calendar placement. |
-| Extensible triggers | Generalize schedule activation into validated trigger definitions and idempotent deliveries; reserve webhook/internal-event adapters until one ships end to end. |
+| Long-horizon goals | Shipped foundation: durable Goal lifecycle, atomic entry/promotion, proposed-criterion authority, Goal Workbench, and bounded goal-owned tasks without persistent provider sessions. Continue refining evidence review and export depth. |
+| Occurrence model | Shipped foundation: neutral TaskOccurrence execution authority with optional WorkBlock placement and sibling/late-event isolation. Continue removing remaining legacy work-block compatibility paths. |
+| Extensible triggers | Shipped foundation: versioned schedule, bounded internal-event, and authenticated email triggers with idempotent deliveries. Keep webhook rejected until its full dedicated security contract ships. |
 
 ## Long-term direction
 

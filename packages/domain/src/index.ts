@@ -8,6 +8,7 @@ export * from "./task/derive-attention-descriptor";
 export * from "./task/derive-automation-policy-preview";
 export * from "./task/derive-user-facing-failure";
 export * from "./task/validate-schedule-window";
+export * from "./task/derive-task-occurrence";
 export * from "./plan";
 export * from "./ai-sidebar/proposal-state";
 export * from "./ai-sidebar/summarize-context";

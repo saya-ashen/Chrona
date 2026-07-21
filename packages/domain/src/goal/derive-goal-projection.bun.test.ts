@@ -8,6 +8,7 @@ const criterion = {
   description: "A suitable offer is accepted",
   satisfied: false,
   confirmedAt: null,
+  proposalStatus: "confirmed" as const,
 };
 
 describe("deriveGoalProjection", () => {
@@ -38,9 +39,24 @@ describe("deriveGoalProjection", () => {
       expected: { lifecycle: "Active", activity: "idle", attention: "none", nextAction: "none" },
     },
     {
+      name: "continues the next bounded task when planned work is ready",
+      input: { status: "Active" as const, nextReviewAt: null, tasks: [{ status: "Ready" }], successCriteria: [criterion] },
+      expected: { lifecycle: "Active", activity: "idle", attention: "none", nextAction: "continue_work" },
+    },
+    {
+      name: "continues a bounded task that still needs plan generation",
+      input: { status: "Active" as const, nextReviewAt: null, tasks: [{ status: "Draft" }], successCriteria: [criterion] },
+      expected: { lifecycle: "Active", activity: "idle", attention: "none", nextAction: "continue_work" },
+    },
+    {
       name: "asks for outcome confirmation when criteria are satisfied",
       input: { status: "Active" as const, nextReviewAt: null, tasks: [{ status: "Completed" }], successCriteria: [{ ...criterion, satisfied: true }] },
       expected: { lifecycle: "Active", activity: "idle", attention: "none", nextAction: "confirm_outcome" },
+    },
+    {
+      name: "requires review before proposed criteria have authority",
+      input: { status: "Active" as const, nextReviewAt: null, tasks: [{ status: "Ready" }], successCriteria: [{ ...criterion, proposalStatus: "proposed" as const }] },
+      expected: { lifecycle: "Active", activity: "idle", attention: "none", nextAction: "review_criteria", criteriaTotalCount: 0 },
     },
   ])("$name", ({ input, expected }) => {
     expect(deriveGoalProjection({ ...input, now: "2026-07-19T00:00:00.000Z" })).toMatchObject(expected);

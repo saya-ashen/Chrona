@@ -2187,8 +2187,8 @@ export function TaskWorkspacePlanSection({
               />
             </div>
             {selectedNode ? (
-              <details className="shrink-0 border-t border-border bg-card/65">
-                <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-foreground">
+              <details className="shrink-0 border-t border-border bg-card/65 xl:pointer-events-none" open>
+                <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-foreground xl:pointer-events-none">
                   {copy.inspectedNodeLabel}: {selectedNode.title}
                 </summary>
                 <div className="border-t border-border/60 p-3">

@@ -83,7 +83,6 @@ describe("plan-runner task executor full execution chain", () => {
       ["route_condition", "obsolete", "user_input", undefined, undefined, undefined],
       ["route_condition", "current", undefined, undefined, "approve", "Condition resolved to branch: approve"],
       ["approval_checkpoint", "obsolete", undefined, "accepted", undefined, undefined],
-      ["approval_checkpoint", "current", undefined, undefined, undefined, "Checkpoint approved: Approve prepared work"],
       ["cooldown_wait", "current", undefined, undefined, undefined, "Wait condition noted: external readiness signal"],
       ["final_task", "current", undefined, undefined, undefined, "Final result produced"],
     ]);
@@ -91,7 +90,6 @@ describe("plan-runner task executor full execution chain", () => {
       ["prepare_task", "succeeded"],
       ["route_condition", "succeeded"],
       ["route_condition", "succeeded"],
-      ["approval_checkpoint", "cancelled"],
       ["approval_checkpoint", "succeeded"],
       ["cooldown_wait", "succeeded"],
       ["final_task", "succeeded"],
@@ -101,18 +99,12 @@ describe("plan-runner task executor full execution chain", () => {
       "route_condition",
       "route_condition",
       "approval_checkpoint",
-      "approval_checkpoint",
       "cooldown_wait",
       "final_task",
     ]);
     expect(
       persisted?.executionContextSnapshots.some(
         (snapshot) => snapshot.nodeId === "route_condition" && (snapshot.refs?.inputFields as Record<string, string> | undefined)?.decision === "approve",
-      ),
-    ).toBe(true);
-    expect(
-      persisted?.executionContextSnapshots.some(
-        (snapshot) => snapshot.nodeId === "approval_checkpoint" && snapshot.refs?.userInput === "approval accepted",
       ),
     ).toBe(true);
 

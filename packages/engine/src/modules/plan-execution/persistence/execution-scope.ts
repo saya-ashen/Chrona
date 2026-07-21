@@ -6,13 +6,10 @@ import {
 import { db } from "@/lib/db";
 import { getActiveExecutionSessionScope } from "./execution-session-store";
 
-/**
- * The resolved execution context for a task. `workBlockId` is the canonical
- * work block that task-scoped operations (plan reads, plan output submission,
- * dispatch) should target. For non-recurring tasks — or tasks whose plan is
- * task-scoped — this is `null`.
- */
+/** Resolved execution authority. `occurrenceId` is the durable execution scope;
+ * `workBlockId` is optional calendar placement retained for scheduling/UI. */
 export type ExecutionScope = {
+  occurrenceId: string | null;
   workBlockId: string | null;
   planId: string | null;
   executionSessionId: string | null;
@@ -42,10 +39,15 @@ export type ExecutionScope = {
  */
 export async function resolveExecutionScope(
   taskId: string,
-  hint?: { workBlockId?: string | null; sessionId?: string | null },
+  hint?: { occurrenceId?: string | null; workBlockId?: string | null; sessionId?: string | null },
 ): Promise<ExecutionScope> {
+  if (typeof hint?.occurrenceId === "string" && hint.occurrenceId.length > 0) {
+    const occurrence = await db.taskOccurrence.findFirst({ where: { id: hint.occurrenceId, taskId }, select: { id: true, workBlockId: true } });
+    if (occurrence) return { occurrenceId: occurrence.id, workBlockId: occurrence.workBlockId, planId: null, executionSessionId: null };
+  }
   if (typeof hint?.workBlockId === "string" && hint.workBlockId.length > 0) {
-    return { workBlockId: hint.workBlockId, planId: null, executionSessionId: null };
+    const occurrence = await db.taskOccurrence.findUnique({ where: { workBlockId: hint.workBlockId }, select: { id: true } });
+    return { occurrenceId: occurrence?.id ?? null, workBlockId: hint.workBlockId, planId: null, executionSessionId: null };
   }
 
   const workBlockIdFromSessionKey = parseWorkBlockPlanSessionKey(taskId, hint?.sessionId);
@@ -55,7 +57,8 @@ export async function resolveExecutionScope(
       select: { id: true, planId: true },
     });
     if (workBlock) {
-      return { workBlockId: workBlock.id, planId: workBlock.planId, executionSessionId: null };
+      const occurrence = await db.taskOccurrence.findUnique({ where: { workBlockId: workBlock.id }, select: { id: true } });
+      return { occurrenceId: occurrence?.id ?? null, workBlockId: workBlock.id, planId: workBlock.planId, executionSessionId: null };
     }
   }
 
@@ -74,13 +77,15 @@ export async function resolveExecutionScope(
         })
       : null;
     if (workBlock) {
-      return { workBlockId: workBlock.id, planId: workBlock.planId, executionSessionId: null };
+      const occurrence = await db.taskOccurrence.findUnique({ where: { workBlockId: workBlock.id }, select: { id: true } });
+      return { occurrenceId: occurrence?.id ?? null, workBlockId: workBlock.id, planId: workBlock.planId, executionSessionId: null };
     }
   }
 
   const active = await getActiveExecutionSessionScope(taskId);
   if (active) {
     return {
+      occurrenceId: active.occurrenceId,
       workBlockId: active.workBlockId,
       planId: active.planId,
       executionSessionId: active.executionSessionId,
@@ -89,15 +94,16 @@ export async function resolveExecutionScope(
 
   const acceptedScope = await getLatestPlanScope(taskId, { acceptedOnly: true });
   if (acceptedScope) {
-    return { workBlockId: acceptedScope.workBlockId, planId: acceptedScope.planId, executionSessionId: null };
+    return { occurrenceId: acceptedScope.occurrenceId, workBlockId: acceptedScope.workBlockId, planId: acceptedScope.planId, executionSessionId: null };
   }
 
   const latestScope = await getLatestPlanScope(taskId);
   if (latestScope) {
-    return { workBlockId: latestScope.workBlockId, planId: latestScope.planId, executionSessionId: null };
+    return { occurrenceId: latestScope.occurrenceId, workBlockId: latestScope.workBlockId, planId: latestScope.planId, executionSessionId: null };
   }
 
-  return { workBlockId: null, planId: null, executionSessionId: null };
+  const focused = await db.taskOccurrence.findFirst({ where: { taskId, status: { in: ["Running", "WaitingForInput", "WaitingForApproval", "Ready", "Scheduled"] } }, orderBy: [{ startedAt: "desc" }, { eligibleAt: "asc" }] });
+  return { occurrenceId: focused?.id ?? null, workBlockId: focused?.workBlockId ?? null, planId: null, executionSessionId: null };
 }
 
 /**
@@ -106,7 +112,7 @@ export async function resolveExecutionScope(
  */
 export async function resolveScopeWorkBlockId(
   taskId: string,
-  hint?: { workBlockId?: string | null; sessionId?: string | null },
+  hint?: { occurrenceId?: string | null; workBlockId?: string | null; sessionId?: string | null },
 ): Promise<string | null> {
   return (await resolveExecutionScope(taskId, hint)).workBlockId;
 }
@@ -138,7 +144,7 @@ function parseWorkBlockPlanSessionKey(taskId: string, sessionId?: string | null)
  */
 export async function getAcceptedCompiledPlanForTask(
   taskId: string,
-  hint?: { workBlockId?: string | null; sessionId?: string | null },
+  hint?: { occurrenceId?: string | null; workBlockId?: string | null; sessionId?: string | null },
 ): Promise<SavedCompiledPlan | null> {
   const workBlockId = await resolveScopeWorkBlockId(taskId, hint);
   return (

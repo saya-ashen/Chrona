@@ -1,4 +1,5 @@
 import type {
+  CheckpointInputFields,
   EffectivePlanGraph,
   EffectivePlanNode,
   NodeRuntimeInput,
@@ -133,6 +134,8 @@ export function buildNodeRuntimePrompt(input: {
   planOutput?: PlanOutputState | NodeRuntimeInput["context"]["planOutput"];
   planContext?: NodeRuntimeInput["context"]["plan"];
   runContext?: NonNullable<NodeRuntimeInput["context"]["run"]>;
+  userInput?: string;
+  inputFields?: CheckpointInputFields;
 }): { instructions: string; runtimeInput: NodeRuntimeInput } {
   const currentNodeResultActionNames = [
     ...NODE_RUNTIME_TERMINAL_TOOLS[input.node.type],
@@ -143,6 +146,8 @@ export function buildNodeRuntimePrompt(input: {
     planOutput: input.planOutput,
     planContext: input.planContext,
     runContext: input.runContext,
+    userInput: input.userInput,
+    inputFields: input.inputFields,
   });
   const runtimeInput: NodeRuntimeInput = input.node.type === "task"
     ? {

@@ -251,11 +251,16 @@ export function TaskWorkspaceExecutionOverview({
   const activeActivity = mergedActivity.find((item) =>
     isRunningActivity(item, mergedActivity),
   );
-  const executionIsActive = isExecutionRunning
+  const executionIsWaitingForHuman = currentExecution?.status === "waiting_for_user"
+    || currentExecution?.status === "waiting_for_approval";
+  const executionIsLive = !executionIsWaitingForHuman && (
+    isExecutionRunning
     || currentExecution?.status === "running"
-    || currentExecution?.status === "started";
+    || currentExecution?.status === "started"
+  );
+  const executionIsActive = executionIsLive || executionIsWaitingForHuman;
   const activityHeartbeat = useMemo<WorkspaceActivityItem | null>(() => {
-    if (!executionIsActive || activeActivity) return null;
+    if (!executionIsLive || activeActivity) return null;
     const latestRuntime = runtimeEvents.at(-1);
     return {
       id: "execution-live-heartbeat",
@@ -272,7 +277,7 @@ export function TaskWorkspaceExecutionOverview({
       provider: latestRuntime?.provider,
       runtimeName: latestRuntime?.runtimeName,
     };
-  }, [activeActivity, executionIsActive, runtimeEvents]);
+  }, [activeActivity, executionIsLive, runtimeEvents]);
   const displayedActivity = useMemo(
     () => activityHeartbeat
       ? mergeWorkspaceActivity([activityHeartbeat, ...mergedActivity], TRAIL_ACTIVITY_LIMIT)
@@ -290,13 +295,13 @@ export function TaskWorkspaceExecutionOverview({
     ?? runningResultActivity?.title
     ?? ws.executionWorkingFallback
     ?? "AI is working";
-  const showLiveStatus = executionIsActive;
+  const showLiveStatus = executionIsLive;
   const activityItems = useMemo(
     () => [...displayedActivity].reverse(),
     [displayedActivity],
   );
   const failedActivityCount = activityItems.filter((item) => item.tone === "danger").length;
-  const activitySummary = executionIsActive
+  const activitySummary = executionIsLive
     ? `${activityItems.length} events · live`
     : `${activityItems.length} events${failedActivityCount > 0 ? ` · ${failedActivityCount} failed` : ""}`;
   const failedActivity = activityItems.find((item) => item.tone === "danger");
@@ -483,7 +488,7 @@ export function TaskWorkspaceExecutionOverview({
                   "Validated output from task execution.")}
             </span>
           </div>
-          {executionIsActive ? (
+          {showLiveStatus ? (
             <div
               className="mt-3 flex items-start gap-3 rounded-xl border border-sky-300/70 bg-sky-500/5 px-3 py-3 text-sm"
               role="status"
@@ -601,8 +606,8 @@ export function TaskWorkspaceExecutionOverview({
           <div className="flex items-center gap-2">
             <TerminalSquare className="size-4 text-primary" aria-hidden />
             <h3 className="font-heading text-base font-semibold text-foreground">Agent transcript</h3>
-            <Badge variant={executionIsActive ? "default" : "secondary"}>
-              {executionIsActive ? "Live" : "Completed"}
+            <Badge variant={executionIsLive ? "default" : "secondary"}>
+              {executionIsLive ? "Live" : executionIsWaitingForHuman ? "Paused" : "Completed"}
             </Badge>
           </div>
           <p className="mt-1 text-xs text-muted-foreground">{activitySummary}</p>

@@ -222,14 +222,24 @@ function checkpointFormFields(checkpoint: ExecutionCheckpoint) {
     const legacy = !("kind" in field);
     const control = legacy
       ? field.type === "select" ? "select" as const : field.type === "text" ? "text" as const : "textarea" as const
-      : field.kind === "text" && field.multiline ? "textarea" as const : field.kind === "choice" ? "select" as const : "text" as const;
+      : field.kind === "choice" ? "choice" as const : field.kind === "boolean" ? "boolean" as const : field.multiline ? "textarea" as const : "text" as const;
+    const value = "value" in field && field.value !== undefined
+      ? field.value
+      : !legacy && field.kind === "choice"
+        ? field.defaultValue ?? (field.selection === "multiple" ? [] : "")
+        : !legacy && field.kind === "boolean"
+          ? field.defaultValue ?? false
+          : !legacy && field.kind === "text"
+            ? field.defaultValue ?? ""
+            : "";
     return {
       key: field.name,
       label: field.label,
-      value: field.value ?? "",
+      value,
       control,
       required: "required" in field ? field.required : false,
       options: legacy ? field.options : field.kind === "choice" ? field.options.map((option) => option.value) : undefined,
+      selection: !legacy && field.kind === "choice" ? field.selection : undefined,
     };
   }) ?? [];
 }

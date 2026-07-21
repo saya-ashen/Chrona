@@ -251,6 +251,9 @@ function useTaskWorkspaceEventStream(
         const envelope = { type: event, ...data } as TaskWorkspaceSseEvent;
         if (isWorkspaceStateEvent(envelope)) {
           applyStateEvent(envelope);
+          if (envelope.type === "state.update") {
+            void refreshQueries();
+          }
           return;
         }
         onWorkspaceEvent(envelope);

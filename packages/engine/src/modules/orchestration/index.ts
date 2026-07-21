@@ -46,5 +46,6 @@ export type { ReconciledTaskState } from "./reconcile-task-state";
 export { deriveRepairActions, detectReconciliationIssues } from "./reconcile-invariants";
 export { runDueScheduledWorkWorker } from "./due-scheduled-work-worker";
 export { runGraphAdvancementWorker } from "./graph-advancement-worker";
+export { runGoalReviewDueWorker } from "./goal-review-due-worker";
 export { runRecurringWorkBlockExpansionWorker } from "./recurring-work-block-expansion-worker";
 export { runRestartRecoveryWorker } from "./restart-recovery-worker";

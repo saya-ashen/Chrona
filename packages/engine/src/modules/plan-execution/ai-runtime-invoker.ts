@@ -111,10 +111,14 @@ export class AiRuntimeInvoker {
       where: { id: input.taskId },
       select: { workspaceId: true, executionConfig: true },
     });
+    const occurrence = input.workBlockId
+      ? await db.taskOccurrence.findUnique({ where: { workBlockId: input.workBlockId }, select: { id: true } })
+      : await db.taskOccurrence.findFirst({ where: { taskId: input.taskId, status: { in: ["Ready", "Running"] } }, orderBy: [{ startedAt: "desc" }, { eligibleAt: "asc" }], select: { id: true } });
     const run = await db.run.create({
       data: {
         taskId: input.taskId,
         workBlockId: input.workBlockId ?? null,
+        occurrenceId: occurrence?.id ?? null,
         taskSessionId: input.taskSessionId,
         runtimeName: input.runtimeName,
         runtimeSessionRef: input.runtimeSessionKey,

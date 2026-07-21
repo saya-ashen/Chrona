@@ -8,7 +8,7 @@ import {
 } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { UiDocument } from "@chrona/ui-protocol";
+import { buildCommandCenterCheckpointSpec, type UiDocument } from "@chrona/ui-protocol";
 import { SpecRenderer } from "./spec-renderer";
 
 const requestResultFileAccessMock = vi.fn();
@@ -316,6 +316,57 @@ describe("workspace result registry", () => {
 
     expect(screen.getAllByText("GitHub Trending full list")).toHaveLength(1);
     expect(screen.getAllByRole("table").length).toBeGreaterThan(0);
+  });
+
+  it("submits text, multiple-choice, and boolean checkpoint values without string coercion", async () => {
+    const spec = buildCommandCenterCheckpointSpec({
+      checkpoint: {
+        id: "checkpoint-typed",
+        nodeId: "node-typed",
+        title: "Application details needed",
+        message: "Provide the approved values.",
+        form: {
+          instructions: "Complete every field",
+          inputFields: [
+            { kind: "text", name: "approvedStatement", label: "Approved statement", required: true },
+            {
+              kind: "choice",
+              name: "channels",
+              label: "Channels",
+              selection: "multiple",
+              options: [
+                { value: "official", label: "Official" },
+                { value: "euraxess", label: "EURAXESS" },
+              ],
+              required: true,
+            },
+            { kind: "boolean", name: "confirmed", label: "Confirmed", defaultValue: false },
+          ],
+        },
+        availableActions: [{ id: "submit_input", label: "Submit input", style: "primary" }],
+      },
+    });
+    const submit = vi.fn(async (_payload: unknown) => undefined);
+
+    render(<SpecRenderer spec={spec} handlers={{ "submit-checkpoint": submit }} />);
+    fireEvent.change(screen.getByRole("textbox", { name: "Approved statement" }), {
+      target: { value: "Approved statement text" },
+    });
+    fireEvent.click(screen.getByRole("checkbox", { name: "Official" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "EURAXESS" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Confirmed" }));
+    fireEvent.click(screen.getByRole("button", { name: "Submit input" }));
+
+    await waitFor(() => expect(submit).toHaveBeenCalledTimes(1));
+    expect(submit.mock.calls[0]?.[0]).toMatchObject({
+      checkpointId: "checkpoint-typed",
+      actionId: "submit_input",
+      values: {
+        approvedStatement: "Approved statement text",
+        channels: ["official", "euraxess"],
+        confirmed: true,
+      },
+    });
   });
 
 });

@@ -4,12 +4,14 @@ import {
   confirmGoalCriterion,
   actOnGoal,
   createGoal,
+  createGoalWithFirstTask,
   createGoalTask,
   getGoal,
   getGoalArtifact,
   listGoals,
   processGoalResult,
   promoteTaskToGoal,
+  reviewGoalCriterion,
   updateGoal,
   updateGoalBrief,
   updateGoalWorkingSet,
@@ -36,6 +38,13 @@ export function createGoalsService() {
         return await createGoal(input);
       } catch (cause) {
         throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.VALIDATION_FAILED, "Failed to create Goal");
+      }
+    },
+    async createWithFirstTask(input: Parameters<typeof createGoalWithFirstTask>[0]) {
+      try {
+        return await createGoalWithFirstTask(input);
+      } catch (error) {
+        throw engineErrorFromUnknown(error, ENGINE_ERROR_CODES.VALIDATION_FAILED, "Failed to create Goal with first task");
       }
     },
     async update(input: Parameters<typeof updateGoal>[0]) {
@@ -85,6 +94,13 @@ export function createGoalsService() {
         return await confirmGoalCriterion(input);
       } catch (cause) {
         throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.INVALID_TASK_STATE, "Failed to confirm Goal criterion");
+      }
+    },
+    async reviewCriterion(input: Parameters<typeof reviewGoalCriterion>[0]) {
+      try {
+        return await reviewGoalCriterion(input);
+      } catch (cause) {
+        throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.INVALID_TASK_STATE, "Failed to review Goal criterion");
       }
     },
     async applyReview(input: Parameters<typeof applyGoalReview>[0]) {

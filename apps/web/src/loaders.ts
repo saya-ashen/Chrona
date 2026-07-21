@@ -129,9 +129,13 @@ export async function loadGoalListData({ request }: LoaderFunctionArgs): Promise
 export async function loadGoalWorkspaceData({ params, request }: LoaderFunctionArgs): Promise<GoalWorkspaceRouteData> {
   if (!params.goalId) throw new Response("Goal id is required", { status: 400 });
   const origin = getOrigin(request);
-  return {
-    goal: await apiJson<GoalData>(`${origin}/api/goals/${encodeURIComponent(params.goalId)}`),
-  };
+  const goal = await apiJson<GoalData>(`${origin}/api/goals/${encodeURIComponent(params.goalId)}`);
+  const assetQuery = new URLSearchParams({ workspaceId: goal.workspaceId });
+  const [assets, inbox] = await Promise.all([
+    apiJson<{ assets: GoalWorkspaceRouteData["assets"]; recent: GoalWorkspaceRouteData["recentAssets"] }>(`${origin}/api/goals/${encodeURIComponent(params.goalId)}/assets?${assetQuery}`),
+    apiJson<{ candidates: GoalWorkspaceRouteData["inboxCandidates"] }>(`${origin}/api/goals/${encodeURIComponent(params.goalId)}/inbox?workspaceId=${encodeURIComponent(goal.workspaceId)}`),
+  ]);
+  return { goal, assets: assets.assets, recentAssets: assets.recent, inboxCandidates: inbox.candidates };
 }
 
 export async function loadTaskPageData({ params, request }: LoaderFunctionArgs): Promise<TaskPageRouteData> {
