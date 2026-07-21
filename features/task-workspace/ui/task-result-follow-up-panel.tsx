@@ -4,7 +4,7 @@ import { Badge, Button, Card, CardContent, Textarea } from "@shared/ui";
 import { ExternalLink, ListPlus, MessageCircle } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useTaskResultFollowUp } from "../hooks/use-task-result-follow-up";
-import { TaskMarkdownContent } from "./task-markdown";
+import { MarkdownContent } from "../../../shared/ui/markdown-content";
 
 export function TaskResultFollowUpPanel({
   taskId,
@@ -138,7 +138,7 @@ export function TaskResultFollowUpPanel({
               {entry.answer ? (
                 <>
                   <p className="pt-1 text-xs font-medium text-muted-foreground">{copy.followUpChronaLabel ?? "Chrona"}</p>
-                  <TaskMarkdownContent className="py-0">{entry.answer}</TaskMarkdownContent>
+                  <MarkdownContent className="py-0">{entry.answer}</MarkdownContent>
                   <p className="text-[11px] text-muted-foreground">
                     {entry.contextSource === "source_session"
                       ? copy.followUpAnsweredFromSession ?? "Answered from the original execution conversation"

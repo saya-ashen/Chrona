@@ -53,14 +53,13 @@ import {
   Input,
   Label,
   PageFrame,
+  MarkdownContent,
   Separator,
-  
   Tabs,
   TabsContent,
   TabsList,
   TabsTrigger,
   Textarea,
-  cn,
 } from "@shared/ui";
 import { applyGoalReview, confirmGoalCriterion, createGoalTask, reviewGoalCriterion, runGoalAction, updateGoal, updateGoalBrief, updateGoalWorkingSet } from "../browser-api";
 import type {
@@ -98,11 +97,13 @@ function ArtifactActions({
   goalId,
   goalAssetId,
   copy,
+  showPreview = true,
 }: {
   artifact: GoalArtifactData;
   goalId: string;
   goalAssetId?: string;
   copy: GoalCopy;
+  showPreview?: boolean;
 }) {
   const [copied, setCopied] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -110,8 +111,8 @@ function ArtifactActions({
 
   return (
     <div className="space-y-3" data-artifact-id={artifact.id}>
-      <div className="flex min-w-0 flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0 space-y-1">
+      {showPreview ? (
+        <div className="min-w-0 space-y-2">
           <div className="flex flex-wrap items-center gap-2">
             <p className="font-medium text-foreground">{artifact.title}</p>
             <Badge variant="outline" className="capitalize">
@@ -119,103 +120,147 @@ function ArtifactActions({
             </Badge>
           </div>
           {preview ? (
-            <p className={cn("whitespace-pre-wrap text-sm leading-6 text-muted-foreground", !previewOpen && "line-clamp-3")}>
-              {preview}
-            </p>
+            previewOpen ? (
+              <MarkdownContent>{preview}</MarkdownContent>
+            ) : (
+              <p className="line-clamp-3 whitespace-pre-wrap text-sm leading-6 text-muted-foreground">
+                {preview}
+              </p>
+            )
           ) : null}
         </div>
-        <div className="flex shrink-0 flex-wrap gap-1.5">
-          {preview && artifact.operations.canOpen ? (
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={() => setPreviewOpen((value) => !value)}
-            >
-              {previewOpen ? <ChevronUp className="size-4" /> : <SquareArrowOutUpRight className="size-4" />}
-              {previewOpen ? copy.hideDetails : copy.open}
-            </Button>
-          ) : null}
-          {artifact.operations.canCopy ? (
-            <Button
-              type="button"
-              size="sm"
-              variant="ghost"
-              onClick={() => {
-                const text = preview || artifact.uri;
-                void navigator.clipboard?.writeText(text).then(() => {
-                  setCopied(true);
-                  window.setTimeout(() => setCopied(false), 1400);
-                });
-              }}
-            >
-              {copied ? <Check className="size-4" /> : <Clipboard className="size-4" />}
-              {copied ? copy.copied : copy.copy}
-            </Button>
-          ) : null}
-          {artifact.operations.canDownload && artifact.operations.downloadHref ? (
-            <Button asChild type="button" size="sm" variant="ghost">
-              <a href={artifact.operations.downloadHref} download>
-                <Download className="size-4" />
-                {copy.download}
-              </a>
-            </Button>
-          ) : null}
-          <Button asChild type="button" size="sm" variant="ghost">
-            <LocalizedLink href={`/goals/${goalId}?section=workbench${goalAssetId ? `&asset=${encodeURIComponent(goalAssetId)}` : ""}`}>
-              <ExternalLink className="size-4" />
-              {copy.showDetails}
-            </LocalizedLink>
+      ) : null}
+      <div className="flex flex-wrap gap-1.5">
+        {showPreview && preview && artifact.operations.canOpen ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={() => setPreviewOpen((value) => !value)}
+          >
+            {previewOpen ? <ChevronUp className="size-4" /> : <SquareArrowOutUpRight className="size-4" />}
+            {previewOpen ? copy.hideDetails : copy.open}
           </Button>
-        </div>
+        ) : null}
+        {artifact.operations.canCopy ? (
+          <Button
+            type="button"
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              const text = preview || artifact.uri;
+              void navigator.clipboard?.writeText(text).then(() => {
+                setCopied(true);
+                window.setTimeout(() => setCopied(false), 1400);
+              });
+            }}
+          >
+            {copied ? <Check className="size-4" /> : <Clipboard className="size-4" />}
+            {copied ? copy.copied : copy.copy}
+          </Button>
+        ) : null}
+        {artifact.operations.canDownload && artifact.operations.downloadHref ? (
+          <Button asChild type="button" size="sm" variant="ghost">
+            <a href={artifact.operations.downloadHref} download>
+              <Download className="size-4" />
+              {copy.download}
+            </a>
+          </Button>
+        ) : null}
+        <Button asChild type="button" size="sm" variant="ghost">
+          <LocalizedLink href={`/goals/${goalId}?section=workbench${goalAssetId ? `&asset=${encodeURIComponent(goalAssetId)}` : ""}`}>
+            <ExternalLink className="size-4" />
+            {copy.showDetails}
+          </LocalizedLink>
+        </Button>
       </div>
     </div>
   );
+}
+
+function confirmationActorLabel(actorType: string, actorId: string | null, copy: GoalCopy) {
+  if (actorType === "user" && (!actorId || actorId === "server-action")) return copy.currentUser;
+  return actorId ?? actorType;
+}
+
+function findPrimaryResultContext(goal: GoalData, primary: GoalArtifactData | null) {
+  if (!primary) return null;
+  const result = goal.acceptedResults.find((candidate) =>
+    candidate.runId === primary.runId || candidate.artifacts.some((artifact) => artifact.id === primary.id),
+  );
+  const asset = goal.assets.find((candidate) =>
+    candidate.currentArtifact.id === primary.id || candidate.sourceArtifact.id === primary.id,
+  );
+  return { result, asset };
 }
 
 function PrimaryOutcome({ goal, copy }: { goal: GoalData; copy: GoalCopy }) {
   const locale = useLocale();
   const primary = goal.outcome.primaryResult;
   const confirmation = goal.outcome.confirmation;
+  const context = findPrimaryResultContext(goal, primary);
+  const sourceTask = primary ? goal.tasks.find((task) => task.id === primary.taskId) : null;
 
   return (
-    <Card className="overflow-hidden border-primary/25 bg-gradient-to-br from-primary/[0.08] via-background to-background shadow-sm">
-      <CardHeader className="gap-3 border-b border-primary/10 pb-5">
+    <Card className="overflow-hidden border-primary/25 shadow-sm">
+      <CardHeader className="gap-3 border-b border-primary/10 bg-primary/[0.04] pb-5">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <Badge className="w-fit">
-            <FileCheck2 className="size-3.5" />
-            {copy.primaryResult}
-          </Badge>
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge className="w-fit">
+              <FileCheck2 className="size-3.5" />
+              {copy.primaryResult}
+            </Badge>
+            {context?.asset?.currentVersion ? <Badge variant="outline">v{context.asset.currentVersion}</Badge> : null}
+          </div>
           {goal.achievedAt ? (
             <span className="text-xs text-muted-foreground">
               {copy.achievedAt}: {formatDate(goal.achievedAt, locale)}
             </span>
           ) : null}
         </div>
-        <CardTitle className="text-xl sm:text-2xl">
-          {primary?.title ?? goal.title}
-        </CardTitle>
-        {primary?.contentPreview ? (
-          <CardDescription className="max-w-4xl whitespace-pre-wrap text-sm leading-6 text-foreground/80 sm:text-base">
-            {primary.contentPreview}
-          </CardDescription>
-        ) : (
-          <CardDescription>{copy.noPrimaryResult}</CardDescription>
-        )}
+        <CardTitle className="text-xl sm:text-2xl">{primary?.title ?? goal.title}</CardTitle>
       </CardHeader>
-      <CardContent className="grid gap-5 pt-5 lg:grid-cols-[minmax(0,1fr)_minmax(18rem,0.55fr)]">
-        <div>
-          {primary ? <ArtifactActions artifact={primary} goalId={goal.id} goalAssetId={goal.assets.find((asset) => asset.currentArtifact.id === primary.id || asset.sourceArtifact.id === primary.id)?.id} copy={copy} /> : null}
-        </div>
+      <CardContent className="space-y-6 pt-5">
+        {primary?.contentPreview ? (
+          <MarkdownContent className="text-sm sm:text-base">{primary.contentPreview}</MarkdownContent>
+        ) : (
+          <p className="text-sm text-muted-foreground">{copy.noPrimaryResult}</p>
+        )}
+        {primary ? (
+          <div className="space-y-3 border-t pt-4">
+            <dl className="grid gap-3 text-sm sm:grid-cols-3">
+              <div>
+                <dt className="text-xs text-muted-foreground">{copy.sourceTask}</dt>
+                <dd className="mt-1 font-medium">{sourceTask?.title ?? primary.taskId}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">{copy.sourceRun}</dt>
+                <dd className="mt-1 font-mono text-xs">{primary.runId}</dd>
+              </div>
+              <div>
+                <dt className="text-xs text-muted-foreground">{copy.currentVersion}</dt>
+                <dd className="mt-1 font-medium">{context?.asset?.currentVersion ? `v${context.asset.currentVersion}` : copy.immutableResult}</dd>
+              </div>
+            </dl>
+            <ArtifactActions
+              artifact={primary}
+              goalId={goal.id}
+              goalAssetId={context?.asset?.id}
+              copy={copy}
+              showPreview={false}
+            />
+          </div>
+        ) : null}
         {confirmation ? (
-          <div className="rounded-xl border bg-background/80 p-4">
-            <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-              {copy.confirmationNote}
-            </p>
+          <div className="rounded-xl border bg-muted/20 p-4">
+            <p className="text-xs font-semibold text-muted-foreground">{copy.confirmationNote}</p>
             <p className="mt-2 text-sm leading-6">{confirmation.note}</p>
             <Separator className="my-3" />
             <p className="text-xs text-muted-foreground">
-              {copy.confirmedBy}: {confirmation.actorId ?? confirmation.actorType} · {formatDate(confirmation.confirmedAt, locale)}
+              {copy.confirmedBy}: {confirmationActorLabel(confirmation.actorType, confirmation.actorId, copy)} · {formatDate(confirmation.confirmedAt, locale)}
+            </p>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {copy.evidenceCount.replace("{count}", String(confirmation.evidenceArtifactIds.length))}
             </p>
           </div>
         ) : null}
@@ -419,7 +464,7 @@ function CriteriaCard({ goal, copy }: { goal: GoalData; copy: GoalCopy }) {
                 {criterion.proposalStatus === "proposed" ? <Input aria-label={`Review ${criterion.description}`} value={proposalDraft[criterion.id] ?? criterion.description} onChange={(event) => setProposalDraft((current) => ({ ...current, [criterion.id]: event.target.value }))} /> : <p className="text-sm font-medium leading-5">{criterion.description}</p>}
               </div>
               {criterion.confirmedAt ? <p className="mt-1 text-xs text-muted-foreground">{formatDate(criterion.confirmedAt, locale)}</p> : null}
-              {(criterion.evidenceArtifactIds?.length ?? 0) > 0 ? <p className="mt-1 text-xs text-muted-foreground">{criterion.evidenceArtifactIds?.length} {copy.selectedAssets}</p> : null}
+              {(criterion.evidenceArtifactIds?.length ?? 0) > 0 ? <p className="mt-1 text-xs text-muted-foreground">{copy.evidenceCount.replace("{count}", String(criterion.evidenceArtifactIds?.length ?? 0))}</p> : null}
             </div>
             {criterion.proposalStatus === "proposed" && goal.status === "Active" ? <Button size="sm" disabled={pending} onClick={() => void reviewProposal(criterion.id, criterion.description)}>Confirm criterion</Button> : null}
             {criterion.proposalStatus !== "proposed" && !criterion.satisfied && goal.status === "Active" ? <Button size="sm" variant="outline" disabled={availableArtifacts.length === 0} onClick={() => { setCriterionId(criterion.id); setArtifactIds([]); }}>{copy.confirmCriterion}</Button> : null}
@@ -883,6 +928,13 @@ export function GoalWorkspacePage({ goal, copy, assetWorkbench }: { goal: GoalDa
                 </Badge>
                 <Badge variant="outline">{isArchive ? copy.outcomeArchive : copy.ongoingWorkspace}</Badge>
                 {goal.projection.attention !== "none" ? <Badge variant="destructive">{copy.attention[goal.projection.attention]}</Badge> : null}
+                {goal.workbench.pendingInboxCount > 0 ? (
+                  <Button asChild size="sm" variant="outline">
+                    <LocalizedLink href={`/goals/${goal.id}?section=workbench&assetView=inbox`}>
+                      {copy.pendingInbox.replace("{count}", String(goal.workbench.pendingInboxCount))}
+                    </LocalizedLink>
+                  </Button>
+                ) : null}
               </div>
               <h1 className="text-balance text-2xl font-semibold tracking-tight sm:text-3xl">{goal.title}</h1>
               <p className="max-w-3xl text-sm leading-6 text-muted-foreground">{goal.description}</p>
@@ -906,63 +958,32 @@ export function GoalWorkspacePage({ goal, copy, assetWorkbench }: { goal: GoalDa
           </Card>
         ) : null}
 
-        {isArchive ? <PrimaryOutcome goal={goal} copy={copy} /> : (
-          <div className="space-y-5">
-            <section aria-labelledby="goal-control-plane" className="space-y-3">
-              <div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">{copy.controlPlane}</p><h2 id="goal-control-plane" className="mt-1 text-xl font-semibold">{copy.currentFocus}</h2></div>
-              <div className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(20rem,0.65fr)]"><FocusQueue goal={goal} copy={copy} /><OperationalBriefCard goal={goal} copy={copy} /></div>
-            </section>
-            <ActiveSummary goal={goal} copy={copy} />
-            <section aria-labelledby="goal-workbench" className="space-y-3">
-              <div><p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">{copy.workbench}</p><h2 id="goal-workbench" className="mt-1 text-xl font-semibold">{copy.workingSet}</h2></div>
-              <WorkingSetCard goal={goal} copy={copy} />
-            </section>
-          </div>
-        )}
-
         <Tabs value={defaultSection} onValueChange={(section) => { const next = new URLSearchParams(searchParams); if (section === "overview") next.delete("section"); else next.set("section", section); setSearchParams(next, { replace: true }); }} className="min-w-0">
-          <TabsList className="flex h-auto w-full max-w-full overflow-x-auto rounded-xl p-1">
-            <TabsTrigger value="overview" className="shrink-0 px-3 py-2 text-xs sm:text-sm">
-              <Target className="hidden size-4 sm:block" />{copy.overview}
-            </TabsTrigger>
-            <TabsTrigger value="work" className="shrink-0 px-3 py-2 text-xs sm:text-sm">
-              <ListChecks className="hidden size-4 sm:block" />{copy.tasksSection}
-            </TabsTrigger>
-            <TabsTrigger value="workbench" className="shrink-0 px-3 py-2 text-xs sm:text-sm">
-              <FileCheck2 className="hidden size-4 sm:block" />{copy.workbench}
-            </TabsTrigger>
-            <TabsTrigger value="criteria" className="shrink-0 px-3 py-2 text-xs sm:text-sm">
-              <CheckCircle2 className="hidden size-4 sm:block" />{copy.successCriteria}
-            </TabsTrigger>
-            <TabsTrigger value="history" className="shrink-0 px-3 py-2 text-xs sm:text-sm">
-              <History className="hidden size-4 sm:block" />{copy.history}
-            </TabsTrigger>
-          </TabsList>
+          <div className="sticky top-0 z-20 -mx-2 bg-background/95 px-2 py-1 backdrop-blur supports-[backdrop-filter]:bg-background/85">
+            <TabsList className="grid h-auto w-full grid-cols-5 rounded-xl p-1">
+              <TabsTrigger value="overview" className="min-w-0 px-1 py-2 text-xs sm:px-3 sm:text-sm"><Target className="hidden size-4 sm:block" />{copy.overview}</TabsTrigger>
+              <TabsTrigger value="work" className="min-w-0 px-1 py-2 text-xs sm:px-3 sm:text-sm"><ListChecks className="hidden size-4 sm:block" />{copy.tasksSection}</TabsTrigger>
+              <TabsTrigger value="workbench" className="min-w-0 px-1 py-2 text-xs sm:px-3 sm:text-sm"><FileCheck2 className="hidden size-4 sm:block" />{copy.workbench}</TabsTrigger>
+              <TabsTrigger value="criteria" className="min-w-0 px-1 py-2 text-xs sm:px-3 sm:text-sm"><CheckCircle2 className="hidden size-4 sm:block" />{copy.successCriteria}</TabsTrigger>
+              <TabsTrigger value="history" className="min-w-0 px-1 py-2 text-xs sm:px-3 sm:text-sm"><History className="hidden size-4 sm:block" />{copy.history}</TabsTrigger>
+            </TabsList>
+          </div>
 
+ 
           <TabsContent value="overview" className="mt-5">
-            <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_minmax(20rem,0.42fr)]">
-              <Card>
-                <CardHeader>
-                  <CardTitle>{isArchive ? copy.outcomeArchive : copy.ongoingWorkspace}</CardTitle>
-                  <CardDescription>{isArchive ? copy.archiveDescription : copy.workspaceDescription}</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {!isArchive ? (
-                    <div className="rounded-xl border bg-muted/20 p-4">
-                      <p className="text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">{copy.nextAction.none}</p>
-                      <p className="mt-2 font-medium">{copy.nextAction[goal.primaryAction.kind]}</p>
-                    </div>
-                  ) : null}
-                  {goal.acceptedResults.slice(0, 2).map((result) => (
-                    <div key={`${result.taskId}:${result.runId}`} className="rounded-xl border p-4">
-                      <p className="font-medium">{result.taskTitle}</p>
-                      <p className="mt-1 line-clamp-3 whitespace-pre-wrap text-sm leading-6 text-muted-foreground">{result.summary}</p>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-              <CriteriaCard goal={goal} copy={copy} />
-            </div>
+            {isArchive ? <PrimaryOutcome goal={goal} copy={copy} /> : (
+              <div className="space-y-5">
+                <section aria-labelledby="goal-control-plane" className="space-y-3">
+                  <div><p className="text-xs font-semibold text-primary">{copy.controlPlane}</p><h2 id="goal-control-plane" className="mt-1 text-xl font-semibold">{copy.currentFocus}</h2></div>
+                  <div className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(20rem,0.65fr)]"><FocusQueue goal={goal} copy={copy} /><OperationalBriefCard goal={goal} copy={copy} /></div>
+                </section>
+                <ActiveSummary goal={goal} copy={copy} />
+                <section aria-labelledby="goal-working-set" className="space-y-3">
+                  <div><p className="text-xs font-semibold text-primary">{copy.workbench}</p><h2 id="goal-working-set" className="mt-1 text-xl font-semibold">{copy.workingSet}</h2></div>
+                  <WorkingSetCard goal={goal} copy={copy} />
+                </section>
+              </div>
+            )}
           </TabsContent>
 
           <TabsContent value="work" className="mt-5">

@@ -54,6 +54,7 @@ export type GoalAssetData = {
   status: string;
   createdAt: string;
   updatedAt: string;
+  currentVersion: number | null;
   sourceArtifact: GoalArtifactData;
   currentArtifact: GoalArtifactData;
   provenance: {
@@ -121,6 +122,7 @@ export type GoalData = {
   workbench: {
     brief: GoalOperationalBrief | null;
     briefRevisionCount: number;
+    pendingInboxCount: number;
     workingSet: GoalWorkingSetItemData[];
     focus: {
       needsYou: GoalTaskData[];
@@ -151,6 +153,7 @@ export type GoalCopy = {
   outcomeArchive: string;
   archiveDescription: string;
   workspaceDescription: string;
+  pendingInbox: string;
   controlPlane: string;
   workbench: string;
   operationalBrief: string;
@@ -243,6 +246,9 @@ export type GoalCopy = {
   evidenceRequired: string;
   confirmedBy: string;
   confirmationNote: string;
+  currentUser: string;
+  sourceRun: string;
+  evidenceCount: string;
   cancel: string;
   confirming: string;
   actionError: string;
@@ -311,6 +317,8 @@ export type GoalCopy = {
     sourceTask: string;
     changeSummary: string;
     assetDestination: string;
+    noConfidentAssetMatch: string;
+    candidateFromAcceptedResult: string;
     createNewAsset: string;
     appendToAsset: string;
     createAsset: string;

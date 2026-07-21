@@ -655,9 +655,9 @@ export async function seedActiveGoalWorkbenchFixture() {
   const workspaceId = workspace.id;
   const goalId = GOAL_WORKBENCH_ACCEPTANCE_IDS.goalId;
   const criteria = [
-    { id: "shortlist", kind: "user_confirmed", description: "A target opening is explicitly selected", satisfied: true, confirmedAt: "2026-07-19T09:00:00.000Z" },
-    { id: "package", kind: "user_confirmed", description: "The tailored application package is approved", satisfied: false, confirmedAt: null },
-    { id: "submitted", kind: "user_confirmed", description: "The application is submitted before the deadline", satisfied: false, confirmedAt: null },
+    { id: "shortlist", kind: "user_confirmed", description: "已明确选择一个目标项目", satisfied: true, confirmedAt: "2026-07-19T09:00:00.000Z" },
+    { id: "package", kind: "user_confirmed", description: "定制申请材料已完成审批", satisfied: false, confirmedAt: null },
+    { id: "submitted", kind: "user_confirmed", description: "申请已在截止日期前提交", satisfied: false, confirmedAt: null },
   ];
   const brief = {
     outcome: "Submit a competitive NUS deep-learning PhD application before 31 July 2026",
@@ -673,8 +673,8 @@ export async function seedActiveGoalWorkbenchFixture() {
     where: { id: goalId },
     update: {
       workspaceId,
-      title: "Submit a competitive NUS deep-learning PhD application",
-      description: "Continue accepted research evidence through review, approval, and a controlled final submission.",
+      title: "提交一份具有竞争力的 NUS 深度学习博士申请",
+      description: "基于已接受的研究证据完成审查、审批，并在受控流程中提交最终申请。",
       status: GoalStatus.Active,
       successCriteria: criteria,
       nextReviewAt: new Date("2026-07-23T09:00:00.000Z"),
@@ -686,8 +686,8 @@ export async function seedActiveGoalWorkbenchFixture() {
     create: {
       id: goalId,
       workspaceId,
-      title: "Submit a competitive NUS deep-learning PhD application",
-      description: "Continue accepted research evidence through review, approval, and a controlled final submission.",
+      title: "提交一份具有竞争力的 NUS 深度学习博士申请",
+      description: "基于已接受的研究证据完成审查、审批，并在受控流程中提交最终申请。",
       status: GoalStatus.Active,
       successCriteria: criteria,
       nextReviewAt: new Date("2026-07-23T09:00:00.000Z"),
@@ -697,10 +697,10 @@ export async function seedActiveGoalWorkbenchFixture() {
   await resetActiveGoalRuntimeFixture();
 
   const taskInputs = [
-    { id: GOAL_WORKBENCH_ACCEPTANCE_IDS.criteriaTaskId, title: "Confirm application criteria", description: "Accepted target criteria and non-negotiable constraints.", status: TaskStatus.Completed, priority: TaskPriority.High },
-    { id: GOAL_WORKBENCH_ACCEPTANCE_IDS.discoveryTaskId, title: "Compare the NUS opening with alternatives", description: "Accepted comparison supports the selected target.", status: TaskStatus.Completed, priority: TaskPriority.High },
-    { id: GOAL_WORKBENCH_ACCEPTANCE_IDS.approvalTaskId, title: "Approve the tailored research statement", description: "Review the current statement, correct applicant facts, and approve or request changes.", status: TaskStatus.WaitingForApproval, priority: TaskPriority.Urgent },
-    { id: GOAL_WORKBENCH_ACCEPTANCE_IDS.draftTaskId, title: "Assemble the final application package", description: "Prepare the bounded package after statement approval.", status: TaskStatus.Ready, priority: TaskPriority.High },
+    { id: GOAL_WORKBENCH_ACCEPTANCE_IDS.criteriaTaskId, title: "确认申请标准", description: "确认目标项目标准和不可妥协的约束。", status: TaskStatus.Completed, priority: TaskPriority.High },
+    { id: GOAL_WORKBENCH_ACCEPTANCE_IDS.discoveryTaskId, title: "比较 NUS 项目与其他备选项目", description: "已接受的对比结果支持当前目标选择。", status: TaskStatus.Completed, priority: TaskPriority.High },
+    { id: GOAL_WORKBENCH_ACCEPTANCE_IDS.approvalTaskId, title: "审批定制研究陈述", description: "审查当前陈述、纠正申请人事实，并选择批准或要求修改。", status: TaskStatus.WaitingForApproval, priority: TaskPriority.Urgent },
+    { id: GOAL_WORKBENCH_ACCEPTANCE_IDS.draftTaskId, title: "组装最终申请材料", description: "在研究陈述获批后准备范围明确的最终材料。", status: TaskStatus.Ready, priority: TaskPriority.High },
   ];
   for (const input of taskInputs) {
     await prisma.task.upsert({

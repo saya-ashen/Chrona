@@ -1,6 +1,6 @@
 import ReactMarkdown, { defaultUrlTransform, type Components } from "react-markdown";
 import remarkGfm from "remark-gfm";
-import { cn } from "@shared/ui";
+import { cn } from "./utils";
 
 const MARKDOWN_COMPONENTS: Components = {
   a: ({ children, href, node: _node, ...props }) => {
@@ -31,7 +31,7 @@ export function normalizeCjkStrongBoundaries(markdown: string) {
   return markdown.replace(/(\*\*|__)([^\r\n]+?)\1(?=[\p{L}\p{N}])/gu, "$1$2$1 ");
 }
 
-export function TaskMarkdownContent({
+export function MarkdownContent({
   children,
   className,
 }: {

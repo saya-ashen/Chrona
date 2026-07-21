@@ -310,16 +310,16 @@ export function ControlPlaneShell({
               </p>
             </div>
 
-            <div className="flex min-w-0 flex-1 items-center justify-center">
+            <div className="hidden min-w-0 flex-1 items-center justify-center md:flex">
               <button
                 type="button"
                 data-assistant-surface-header-drawer-button="true"
                 disabled
                 aria-disabled
                 aria-label={t("components.assistantSurface.entryLabel")}
-                className="group inline-flex h-9 max-w-[2.25rem] scroll-mb-24 items-center gap-2 overflow-hidden rounded-full border border-border/60 bg-muted/40 px-2 text-sm text-muted-foreground md:max-w-[520px] md:px-2.5"
+                className="group inline-flex h-9 max-w-[520px] items-center gap-2 overflow-hidden rounded-full border border-border/60 bg-muted/40 px-2.5 text-sm text-muted-foreground"
               >
-                <span className="hidden min-w-0 flex-1 items-center gap-1.5 md:flex">
+                <span className="flex min-w-0 flex-1 items-center gap-1.5">
                   <span className="shrink-0 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{assistantSummary.label}</span>
                   <span className="min-w-0 max-w-[220px] truncate text-xs font-semibold text-primary lg:max-w-[360px]">{assistantSummary.value}</span>
                 </span>

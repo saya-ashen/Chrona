@@ -34,6 +34,7 @@ const copy: GoalCopy = {
   ongoingWorkspace: "Ongoing Workspace",
   outcomeArchive: "Outcome Archive",
   archiveDescription: "Retained outcome record",
+  pendingInbox: "Review {count} inbox item(s)",
   workspaceDescription: "Bounded ongoing work",
   controlPlane: "Goal Control Plane",
   workbench: "Workbench",
@@ -130,6 +131,9 @@ const copy: GoalCopy = {
   cancel: "Cancel",
   confirming: "Confirming…",
   actionError: "Action failed",
+  currentUser: "Current user",
+  sourceRun: "Source run",
+  evidenceCount: "{count} linked evidence item(s)",
   status: { Draft: "Draft", Active: "Active", Paused: "Paused", Achieved: "Achieved", Stopped: "Stopped" },
   activity: { idle: "Idle", work_active: "Work active", review_due: "Review due" },
   attention: { none: "No attention", needs_input: "Needs input", blocked: "Blocked", failed: "Failed" },
@@ -197,6 +201,8 @@ const copy: GoalCopy = {
     assetDestination: "Asset destination",
     createNewAsset: "Create a new asset",
     appendToAsset: "Append to {asset}",
+    noConfidentAssetMatch: "No existing Goal asset matches",
+    candidateFromAcceptedResult: "Candidate derived from accepted result “{result}”",
     createAsset: "Create asset",
     appendVersion: "Append version",
     rejectCandidate: "Reject",
@@ -296,6 +302,7 @@ const baseGoal: GoalData = {
   tasks: [],
   acceptedResults: [],
   workbench: {
+    pendingInboxCount: 0,
     brief: {
       outcome: "Reach durable outcome",
       currentFocus: "Confirm next bounded step",
@@ -313,6 +320,7 @@ const baseGoal: GoalData = {
     status: "Approved",
     createdAt: artifact.createdAt,
     updatedAt: artifact.createdAt,
+    currentVersion: 1,
     sourceArtifact: artifact,
     currentArtifact: artifact,
     provenance: { sourceTaskId: "task-1", sourceRunId: "run-1", sourceArtifactId: artifact.id, currentArtifactId: artifact.id, unchanged: true },
@@ -358,13 +366,13 @@ describe("Goal pages", () => {
       taskGroups: { attention: [], active: [], planned: [], completed: [completedTask] },
       acceptedResults: [{ ...acceptedResult, taskId: completedTask.id, taskTitle: completedTask.title }],
     };
-    const router = createMemoryRouter([{ path: "*", element: <GoalWorkspacePage goal={goal} copy={copy} /> }], { initialEntries: ["/en/goals/goal-1?section=workbench"] });
+    const router = createMemoryRouter([{ path: "*", element: <GoalWorkspacePage goal={goal} copy={copy} /> }], { initialEntries: ["/en/goals/goal-1"] });
     render(<RouterProvider router={router} />);
-    expect(screen.getAllByText("Final immutable outcome").length).toBeGreaterThan(0);
+    expect(screen.getByText("Final immutable outcome")).toBeInTheDocument();
     expect(screen.getByText("Offer accepted")).toBeInTheDocument();
-    expect(screen.getByRole("tab", { name: "Workbench" })).toHaveAttribute("data-state", "active");
-    const formalAssetLink = screen.getAllByRole("link", { name: "Details" }).find((link) => (link.getAttribute("href") ?? "").includes("asset=asset-1"));
-    expect(formalAssetLink).toBeDefined();
+    expect(screen.getByRole("tab", { name: "Overview" })).toHaveAttribute("data-state", "active");
+    expect(screen.getByText("Bounded step")).toBeInTheDocument();
+
   });
 
   it("shows the active Goal control plane, workbench, and frozen-context composer", () => {

@@ -24,7 +24,7 @@ import {
 } from "lucide-react";
 import { ActivityTimeline } from "../activity-timeline";
 import type { WorkspaceActivityItem } from "../../model/task-workspace-types";
-import { TaskMarkdownContent } from "../task-markdown";
+import { MarkdownContent } from "../../../../shared/ui/markdown-content";
 import { defineRegistry } from "@json-render/react";
 import { shadcnComponents } from "@json-render/shadcn";
 import { useI18n, useLocale } from "@chrona/i18n";
@@ -857,7 +857,7 @@ function FileView({ props }: { props: Record<string, unknown> }) {
               previewHeightClassName,
             )}
           >
-            <TaskMarkdownContent className="py-0">{visibleContent}</TaskMarkdownContent>
+            <MarkdownContent className="py-0">{visibleContent}</MarkdownContent>
           </div>
         ) : (
           <pre
@@ -1591,7 +1591,7 @@ export const { registry: workspaceRegistry } = defineRegistry(chronaCatalog, {
     // domain components (Chrona)
     RichMarkdown: ({ props }) => {
       const content = typeof props.content === "string" ? props.content : "";
-      const contentNode = <TaskMarkdownContent>{content}</TaskMarkdownContent>;
+      const contentNode = <MarkdownContent>{content}</MarkdownContent>;
       return (
         <MaybeCollapsible
           props={props}

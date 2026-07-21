@@ -204,6 +204,46 @@ describe("Goal API", () => {
     expect(read.primaryAction.kind).toBeDefined();
   });
 
+  it("surfaces pending result inbox work on an achieved Goal", async () => {
+    const { workspaceId } = await seedWorkspace("Archived Goal inbox attention");
+    const app = createApiRouter(createChronaEngine());
+    const created = await responseJson<GoalData>(await requestJson(app, "/goals", {
+      workspaceId,
+      title: "Retain an achieved result",
+      description: "Archive with one unprocessed result candidate.",
+      successCriteria: [{ ...criterion, satisfied: true, confirmedAt: new Date().toISOString() }],
+    }));
+    const { taskId } = await seedTask(workspaceId, { title: "Produce retained result", status: "Done" });
+    await db.task.update({ where: { id: taskId }, data: { goalId: created.id } });
+    const { run } = await seedAcceptedResult(workspaceId, taskId);
+    await db.goal.update({
+      where: { id: created.id },
+      data: { status: "Achieved", achievedAt: new Date(), achievementConfirmation: { note: "Confirmed", actorType: "user", actorId: "user-1", confirmedAt: new Date().toISOString(), evidenceArtifactIds: [] } },
+    });
+    await db.goalInboxCandidate.create({
+      data: {
+        workspaceId,
+        goalId: created.id,
+        sourceTaskId: taskId,
+        sourceRunId: run.id,
+        groupKey: "accepted-result",
+        kind: "document",
+        label: "Retained result",
+        proposedAction: "create_asset",
+        reason: "Needs review",
+        changeSummary: "Create retained asset",
+        confidence: 0.8,
+        content: "Result content",
+        contentHash: "pending-result",
+      },
+    });
+
+    const read = await responseJson<GoalData>(await app.request(`/goals/${created.id}`));
+    expect(read.mode).toBe("archive");
+    expect(read.projection.attention).toBe("needs_input");
+    expect(read.workbench.pendingInboxCount).toBe(1);
+  });
+
   it("targets the planned Task when active Goal work can continue", async () => {
     const { workspaceId } = await seedWorkspace("Goal primary action");
     const app = createApiRouter(createChronaEngine());

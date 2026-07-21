@@ -39,6 +39,7 @@ export {
   SelectValue,
 } from "./select";
 export { cn } from "./utils";
+export { MarkdownContent, normalizeCjkStrongBoundaries } from "./markdown-content";
 export { UiSurfaceFrame, type UiSurfaceKind } from "./ui-surface-frame";
 export { PageFrame, type PageFrameMode } from "./page-frame";
 export { Calendar, CalendarDayButton } from "./calendar";

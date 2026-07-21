@@ -60,7 +60,11 @@ const goalInclude = {
   },
   assets: {
     orderBy: [{ updatedAt: "desc" }, { id: "asc" }],
-    include: { sourceArtifact: true, currentArtifact: true },
+    include: {
+      sourceArtifact: true,
+      currentArtifact: true,
+      versions: { orderBy: { version: "desc" }, take: 1, select: { version: true } },
+    },
   },
   workingSetItems: {
     orderBy: [{ rank: "asc" }, { createdAt: "asc" }],
@@ -68,6 +72,10 @@ const goalInclude = {
   briefRevisions: {
     orderBy: { createdAt: "desc" },
     take: 20,
+  },
+  inboxCandidates: {
+    where: { status: "Pending" },
+    select: { id: true },
   },
 } satisfies Prisma.GoalInclude;
 
@@ -307,7 +315,7 @@ function eventReadModels(goal: GoalWithDetails) {
 
 function toGoalReadModel(goal: GoalWithDetails) {
   const successCriteria = criteriaFrom(goal.successCriteria);
-  const projection = deriveGoalProjection({
+  const baseProjection = deriveGoalProjection({
     status: goal.status,
     nextReviewAt: goal.nextReviewAt,
     tasks: goal.tasks.map((task) => ({
@@ -316,6 +324,10 @@ function toGoalReadModel(goal: GoalWithDetails) {
     })),
     successCriteria,
   });
+  const pendingInboxCount = goal.inboxCandidates.length;
+  const projection = pendingInboxCount > 0
+    ? { ...baseProjection, attention: "needs_input" as const }
+    : baseProjection;
   const tasks = goal.tasks.map(taskReadModel);
   const groupedTasks = {
     attention: tasks.filter((task) => task.group === "attention"),
@@ -364,6 +376,7 @@ function toGoalReadModel(goal: GoalWithDetails) {
     workbench: {
       brief: operationalBriefFrom(goal.operationalBrief),
       briefRevisionCount: goal.briefRevisions.length,
+      pendingInboxCount,
       workingSet: goal.workingSetItems.map((item) => ({
         id: item.id,
         subjectType: item.subjectType,
@@ -392,6 +405,7 @@ function toGoalReadModel(goal: GoalWithDetails) {
       createdAt: asset.createdAt.toISOString(),
       updatedAt: asset.updatedAt.toISOString(),
       sourceArtifact: artifactReadModel(asset.sourceArtifact),
+      currentVersion: asset.versions[0]?.version ?? null,
       currentArtifact: artifactReadModel(asset.currentArtifact),
       provenance: {
         sourceTaskId: asset.sourceArtifact.taskId,
