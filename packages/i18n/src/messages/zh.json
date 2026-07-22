@@ -1901,6 +1901,13 @@
       "currentUser": "当前用户",
       "sourceRun": "来源运行",
       "evidenceCount": "已关联 {count} 项证据",
+      "outcomeSummary": "结果摘要",
+      "verifiedOutcome": "已确认结果",
+      "supportingEvidence": "支持证据",
+      "resultActions": "结果操作",
+      "technicalDetails": "技术详情",
+      "outcomeDocument": "结果文档",
+      "copyDocument": "复制文档",
       "taskGroups": {
         "attention": "需要处理",
         "active": "进行中",

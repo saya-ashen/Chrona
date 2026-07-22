@@ -37,7 +37,7 @@ function ControlPlaneShellWithAssistantSummary({
   return (
     <ControlPlaneShell
       defaultWorkspace={defaultWorkspace}
-      assistantSummary={assistant.state.topSummary}
+      assistantSummary={assistant.state.status === "unavailable" || assistant.state.status === "empty" ? undefined : assistant.state.topSummary}
     >
       {children}
     </ControlPlaneShell>

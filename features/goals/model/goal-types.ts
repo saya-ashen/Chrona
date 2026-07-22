@@ -249,6 +249,13 @@ export type GoalCopy = {
   currentUser: string;
   sourceRun: string;
   evidenceCount: string;
+  outcomeSummary: string;
+  verifiedOutcome: string;
+  supportingEvidence: string;
+  resultActions: string;
+  technicalDetails: string;
+  outcomeDocument: string;
+  copyDocument: string;
   cancel: string;
   confirming: string;
   actionError: string;

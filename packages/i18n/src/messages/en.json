@@ -1901,6 +1901,13 @@
       "currentUser": "Current user",
       "sourceRun": "Source run",
       "evidenceCount": "{count} linked evidence item(s)",
+      "outcomeSummary": "Outcome summary",
+      "verifiedOutcome": "Verified outcome",
+      "supportingEvidence": "Supporting evidence",
+      "resultActions": "Result actions",
+      "technicalDetails": "Technical details",
+      "outcomeDocument": "Outcome document",
+      "copyDocument": "Copy document",
       "taskGroups": {
         "attention": "Needs attention",
         "active": "Active work",

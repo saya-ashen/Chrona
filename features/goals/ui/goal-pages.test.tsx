@@ -134,6 +134,13 @@ const copy: GoalCopy = {
   currentUser: "Current user",
   sourceRun: "Source run",
   evidenceCount: "{count} linked evidence item(s)",
+  outcomeSummary: "Outcome summary",
+  verifiedOutcome: "Verified outcome",
+  supportingEvidence: "Supporting evidence",
+  resultActions: "Result actions",
+  technicalDetails: "Technical details",
+  outcomeDocument: "Outcome document",
+  copyDocument: "Copy document",
   status: { Draft: "Draft", Active: "Active", Paused: "Paused", Achieved: "Achieved", Stopped: "Stopped" },
   activity: { idle: "Idle", work_active: "Work active", review_due: "Review due" },
   attention: { none: "No attention", needs_input: "Needs input", blocked: "Blocked", failed: "Failed" },
@@ -370,6 +377,11 @@ describe("Goal pages", () => {
     render(<RouterProvider router={router} />);
     expect(screen.getByText("Final immutable outcome")).toBeInTheDocument();
     expect(screen.getByText("Offer accepted")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Achievement confirmation" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Outcome document" })).toBeInTheDocument();
+    expect(screen.getByText("1 linked evidence item(s)")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Copy document" })).toBeInTheDocument();
+    expect(screen.getByText("Technical details").closest("details")).not.toHaveAttribute("open");
     expect(screen.getByRole("tab", { name: "Overview" })).toHaveAttribute("data-state", "active");
     expect(screen.getByText("Bounded step")).toBeInTheDocument();
 

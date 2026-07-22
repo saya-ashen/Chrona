@@ -76,7 +76,7 @@ function completedAtFromPreference(
 export function ControlPlaneShell({
   children,
   defaultWorkspace: _defaultWorkspace,
-  assistantSummary = { label: "PAGE-AWARE AI", value: "" },
+  assistantSummary,
 }: ControlPlaneShellProps) {
   const { t } = useI18n();
   const locale = useLocale();
@@ -220,7 +220,7 @@ export function ControlPlaneShell({
     <SidebarProvider
       defaultOpen
       className="h-screen min-h-0 bg-canvas text-foreground"
-      style={{ "--sidebar-width": "224px" } as CSSProperties}
+      style={{ "--sidebar-width": "240px" } as CSSProperties}
     >
       <Sidebar
         collapsible="none"
@@ -310,21 +310,23 @@ export function ControlPlaneShell({
               </p>
             </div>
 
-            <div className="hidden min-w-0 flex-1 items-center justify-center md:flex">
-              <button
-                type="button"
-                data-assistant-surface-header-drawer-button="true"
-                disabled
-                aria-disabled
-                aria-label={t("components.assistantSurface.entryLabel")}
-                className="group inline-flex h-9 max-w-[520px] items-center gap-2 overflow-hidden rounded-full border border-border/60 bg-muted/40 px-2.5 text-sm text-muted-foreground"
-              >
-                <span className="flex min-w-0 flex-1 items-center gap-1.5">
-                  <span className="shrink-0 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{assistantSummary.label}</span>
-                  <span className="min-w-0 max-w-[220px] truncate text-xs font-semibold text-primary lg:max-w-[360px]">{assistantSummary.value}</span>
-                </span>
-              </button>
-            </div>
+            {assistantSummary?.value ? (
+              <div className="hidden min-w-0 flex-1 items-center justify-center md:flex">
+                <button
+                  type="button"
+                  data-assistant-surface-header-drawer-button="true"
+                  disabled
+                  aria-disabled
+                  aria-label={t("components.assistantSurface.entryLabel")}
+                  className="group inline-flex h-9 max-w-[520px] items-center gap-2 overflow-hidden rounded-full border border-border/60 bg-muted/40 px-2.5 text-sm text-muted-foreground"
+                >
+                  <span className="flex min-w-0 flex-1 items-center gap-1.5">
+                    <span className="shrink-0 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{assistantSummary.label}</span>
+                    <span className="min-w-0 max-w-[220px] truncate text-xs font-semibold text-primary lg:max-w-[360px]">{assistantSummary.value}</span>
+                  </span>
+                </button>
+              </div>
+            ) : <div className="min-w-0 flex-1" aria-hidden />}
 
             <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
               <Button
@@ -342,7 +344,7 @@ export function ControlPlaneShell({
             </div>
           </div>
         </header>
-        <main className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-background px-4 py-4 pb-[calc(env(safe-area-inset-bottom)+5rem)] sm:px-6 xl:px-8 xl:pb-4">
+        <main className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-background px-4 py-4 pb-[calc(env(safe-area-inset-bottom)+6.5rem)] sm:px-6 xl:px-8 xl:pb-4">
           {shouldShowStartWithChrona ? (
             <StartWithChrona
               className="mb-4"
@@ -376,7 +378,7 @@ export function ControlPlaneShell({
                     href={item.href}
                     aria-current={item.active ? "page" : undefined}
                     className={cn(
-                      "flex flex-col items-center gap-1 px-1 py-2 text-[11px] font-medium transition-colors",
+                      "flex min-h-14 flex-col items-center gap-1 px-1 py-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] text-[11px] font-medium transition-colors",
                       item.active
                         ? "text-primary"
                         : "text-muted-foreground hover:text-foreground",

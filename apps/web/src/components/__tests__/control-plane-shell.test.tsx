@@ -67,6 +67,11 @@ describe("ControlPlaneShell", () => {
     expect(screen.getByText("Task ready")).toBeInTheDocument();
   });
 
+  it("hides the assistant display when no summary is available", () => {
+    render(<ControlPlaneShell defaultWorkspace={{ id: "ws-1", name: "Default" }}><div>Workspace body</div></ControlPlaneShell>);
+    expect(screen.queryByRole("button", { name: "Assistant" })).not.toBeInTheDocument();
+  });
+
   it("creates scheduled tasks through the schedule feature public action", async () => {
     mocks.createScheduledTask.mockResolvedValue({ taskId: "created-task" });
     const user = userEvent.setup();

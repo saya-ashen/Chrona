@@ -5,7 +5,6 @@ import { useMemo, useState } from "react";
 import { useNavigate, useRevalidator, useSearchParams } from "react-router-dom";
 import {
   AlertTriangle,
-  Archive,
   ArrowLeft,
   Check,
   CheckCircle2,
@@ -13,9 +12,11 @@ import {
   ChevronUp,
   CircleDot,
   Clipboard,
+  Clock3,
   Download,
   ExternalLink,
   FileCheck2,
+  FileText,
   History,
   ListChecks,
   MoreHorizontal,
@@ -25,6 +26,7 @@ import {
   RefreshCw,
   SquareArrowOutUpRight,
   Target,
+  UserRound,
 } from "lucide-react";
 import { localizeHref, useLocale } from "@chrona/i18n";
 import {
@@ -54,7 +56,6 @@ import {
   Label,
   PageFrame,
   MarkdownContent,
-  Separator,
   Tabs,
   TabsContent,
   TabsList,
@@ -98,12 +99,14 @@ function ArtifactActions({
   goalAssetId,
   copy,
   showPreview = true,
+  copyLabel,
 }: {
   artifact: GoalArtifactData;
   goalId: string;
   goalAssetId?: string;
   copy: GoalCopy;
   showPreview?: boolean;
+  copyLabel?: string;
 }) {
   const [copied, setCopied] = useState(false);
   const [previewOpen, setPreviewOpen] = useState(false);
@@ -156,7 +159,7 @@ function ArtifactActions({
             }}
           >
             {copied ? <Check className="size-4" /> : <Clipboard className="size-4" />}
-            {copied ? copy.copied : copy.copy}
+            {copied ? copy.copied : copyLabel ?? copy.copy}
           </Button>
         ) : null}
         {artifact.operations.canDownload && artifact.operations.downloadHref ? (
@@ -200,72 +203,115 @@ function PrimaryOutcome({ goal, copy }: { goal: GoalData; copy: GoalCopy }) {
   const confirmation = goal.outcome.confirmation;
   const context = findPrimaryResultContext(goal, primary);
   const sourceTask = primary ? goal.tasks.find((task) => task.id === primary.taskId) : null;
+  const summary = sourceTask?.description?.trim() || context?.result?.summary?.split("\n").find((line) => line.trim())?.trim();
+  const versionLabel = context?.asset?.currentVersion ? `v${context.asset.currentVersion}` : copy.immutableResult;
 
   return (
-    <Card className="overflow-hidden border-primary/25 shadow-sm">
-      <CardHeader className="gap-3 border-b border-primary/10 bg-primary/[0.04] pb-5">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <Badge className="w-fit">
-              <FileCheck2 className="size-3.5" />
-              {copy.primaryResult}
-            </Badge>
-            {context?.asset?.currentVersion ? <Badge variant="outline">v{context.asset.currentVersion}</Badge> : null}
+    <section className="mx-auto w-full max-w-5xl space-y-4" aria-labelledby="goal-final-outcome">
+      <div className="overflow-hidden rounded-2xl border border-primary/20 bg-card shadow-sm">
+        <header className="relative overflow-hidden border-b bg-gradient-to-br from-primary/[0.12] via-primary/[0.05] to-background px-5 py-5 sm:px-7 sm:py-6">
+          <div className="absolute -right-16 -top-20 size-52 rounded-full bg-primary/10 blur-3xl" aria-hidden />
+          <div className="relative flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0 space-y-2">
+              <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-primary">
+                <CheckCircle2 className="size-4" aria-hidden />
+                {copy.verifiedOutcome}
+              </p>
+              <h2 id="goal-final-outcome" className="text-balance text-2xl font-semibold tracking-tight sm:text-3xl">
+                {primary?.title ?? goal.title}
+              </h2>
+              {summary ? <p className="max-w-3xl text-sm leading-6 text-foreground/75 sm:text-base">{summary}</p> : null}
+            </div>
+            {goal.achievedAt ? (
+              <div className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground sm:pt-1">
+                <Clock3 className="size-4 text-primary" aria-hidden />
+                <span>{copy.achievedAt}: {formatDate(goal.achievedAt, locale)}</span>
+              </div>
+            ) : null}
           </div>
-          {goal.achievedAt ? (
-            <span className="text-xs text-muted-foreground">
-              {copy.achievedAt}: {formatDate(goal.achievedAt, locale)}
-            </span>
-          ) : null}
+        </header>
+
+        <div className="grid gap-5 p-5 sm:p-7 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start">
+          <div className="min-w-0 space-y-5">
+            {confirmation ? (
+              <section className="rounded-xl border border-primary/20 bg-primary/[0.04] p-4 sm:p-5" aria-labelledby="goal-achievement-confirmation">
+                <div className="flex items-start gap-3">
+                  <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                    <UserRound className="size-4" aria-hidden />
+                  </span>
+                  <div className="min-w-0">
+                    <h3 id="goal-achievement-confirmation" className="font-semibold">{copy.confirmationNote}</h3>
+                    <p className="mt-1.5 text-sm leading-6 text-foreground/80">{confirmation.note}</p>
+                    <p className="mt-3 text-xs text-muted-foreground">
+                      {copy.confirmedBy}: {confirmationActorLabel(confirmation.actorType, confirmation.actorId, copy)} · {formatDate(confirmation.confirmedAt, locale)}
+                    </p>
+                  </div>
+                </div>
+              </section>
+            ) : null}
+
+            <section className="rounded-xl border bg-background p-4 sm:p-5" aria-labelledby="goal-outcome-document">
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <h3 id="goal-outcome-document" className="flex items-center gap-2 font-semibold">
+                  <FileText className="size-4 text-primary" aria-hidden />
+                  {copy.outcomeDocument}
+                </h3>
+                <Badge variant="outline" className="font-mono text-[11px]">{versionLabel}</Badge>
+              </div>
+              {primary?.contentPreview ? (
+                <MarkdownContent className="py-0 text-sm sm:text-base [&_h1:first-child]:sr-only">{primary.contentPreview}</MarkdownContent>
+              ) : (
+                <p className="text-sm text-muted-foreground">{copy.noPrimaryResult}</p>
+              )}
+            </section>
+          </div>
+
+          <aside className="space-y-3 lg:sticky lg:top-16" aria-label={copy.supportingEvidence}>
+            <div className="rounded-xl border bg-muted/25 p-4">
+              <p className="text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground">{copy.supportingEvidence}</p>
+              <p className="mt-2 text-2xl font-semibold tracking-tight">{confirmation?.evidenceArtifactIds.length ?? 0}</p>
+              <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                {copy.evidenceCount.replace("{count}", String(confirmation?.evidenceArtifactIds.length ?? 0))}
+              </p>
+            </div>
+
+            {primary ? (
+              <div className="rounded-xl border bg-background p-4">
+                <p className="text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground">{copy.resultActions}</p>
+                <div className="mt-3">
+                  <ArtifactActions artifact={primary} goalId={goal.id} goalAssetId={context?.asset?.id} copy={copy} showPreview={false} copyLabel={copy.copyDocument} />
+                </div>
+              </div>
+            ) : null}
+
+            {primary ? (
+              <details className="group rounded-xl border bg-background p-4">
+                <summary className="cursor-pointer list-none text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+                  <span className="flex items-center justify-between gap-3">
+                    {copy.technicalDetails}
+                    <ChevronDown className="size-4 text-muted-foreground transition-transform group-open:rotate-180" aria-hidden />
+                  </span>
+                </summary>
+                <dl className="mt-4 space-y-3 border-t pt-4 text-sm">
+                  <div>
+                    <dt className="text-xs text-muted-foreground">{copy.sourceTask}</dt>
+                    <dd className="mt-1 font-medium">{sourceTask?.title ?? primary.taskId}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-muted-foreground">{copy.sourceRun}</dt>
+                    <dd className="mt-1 break-all font-mono text-xs">{primary.runId}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-xs text-muted-foreground">{copy.currentVersion}</dt>
+                    <dd className="mt-1 font-medium">{versionLabel}</dd>
+                  </div>
+                </dl>
+              </details>
+            ) : null}
+          </aside>
         </div>
-        <CardTitle className="text-xl sm:text-2xl">{primary?.title ?? goal.title}</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-6 pt-5">
-        {primary?.contentPreview ? (
-          <MarkdownContent className="text-sm sm:text-base">{primary.contentPreview}</MarkdownContent>
-        ) : (
-          <p className="text-sm text-muted-foreground">{copy.noPrimaryResult}</p>
-        )}
-        {primary ? (
-          <div className="space-y-3 border-t pt-4">
-            <dl className="grid gap-3 text-sm sm:grid-cols-3">
-              <div>
-                <dt className="text-xs text-muted-foreground">{copy.sourceTask}</dt>
-                <dd className="mt-1 font-medium">{sourceTask?.title ?? primary.taskId}</dd>
-              </div>
-              <div>
-                <dt className="text-xs text-muted-foreground">{copy.sourceRun}</dt>
-                <dd className="mt-1 font-mono text-xs">{primary.runId}</dd>
-              </div>
-              <div>
-                <dt className="text-xs text-muted-foreground">{copy.currentVersion}</dt>
-                <dd className="mt-1 font-medium">{context?.asset?.currentVersion ? `v${context.asset.currentVersion}` : copy.immutableResult}</dd>
-              </div>
-            </dl>
-            <ArtifactActions
-              artifact={primary}
-              goalId={goal.id}
-              goalAssetId={context?.asset?.id}
-              copy={copy}
-              showPreview={false}
-            />
-          </div>
-        ) : null}
-        {confirmation ? (
-          <div className="rounded-xl border bg-muted/20 p-4">
-            <p className="text-xs font-semibold text-muted-foreground">{copy.confirmationNote}</p>
-            <p className="mt-2 text-sm leading-6">{confirmation.note}</p>
-            <Separator className="my-3" />
-            <p className="text-xs text-muted-foreground">
-              {copy.confirmedBy}: {confirmationActorLabel(confirmation.actorType, confirmation.actorId, copy)} · {formatDate(confirmation.confirmedAt, locale)}
-            </p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {copy.evidenceCount.replace("{count}", String(confirmation.evidenceArtifactIds.length))}
-            </p>
-          </div>
-        ) : null}
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   );
 }
 
@@ -788,6 +834,7 @@ function AchievementDialog({
             <FieldLabel htmlFor="goal-achievement-confirmation">{copy.confirmationLabel}</FieldLabel>
             <Textarea
               id="goal-achievement-confirmation"
+              aria-label={copy.confirmationLabel}
               value={confirmation}
               onChange={(event) => setConfirmation(event.target.value)}
               placeholder={copy.confirmationPlaceholder}
@@ -919,14 +966,15 @@ export function GoalWorkspacePage({ goal, copy, assetWorkbench }: { goal: GoalDa
           <Button asChild variant="ghost" size="sm" className="w-fit -ml-2">
             <LocalizedLink href="/goals"><ArrowLeft className="size-4" />{copy.backToGoals}</LocalizedLink>
           </Button>
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
             <div className="min-w-0 space-y-2">
               <div className="flex flex-wrap items-center gap-2">
-                <Badge variant={goal.status === "Achieved" ? "default" : "secondary"}>
-                  {isArchive ? <Archive className="size-3.5" /> : <Target className="size-3.5" />}
+                <span className="inline-flex items-center gap-1.5 text-sm font-medium text-primary">
+                  {isArchive ? <CheckCircle2 className="size-4" /> : <Target className="size-4" />}
                   {copy.status[goal.status]}
-                </Badge>
-                <Badge variant="outline">{isArchive ? copy.outcomeArchive : copy.ongoingWorkspace}</Badge>
+                </span>
+                {isArchive ? <span className="text-sm text-muted-foreground">· {copy.outcomeArchive}</span> : null}
+                {!isArchive ? <Badge variant="outline">{copy.ongoingWorkspace}</Badge> : null}
                 {goal.projection.attention !== "none" ? <Badge variant="destructive">{copy.attention[goal.projection.attention]}</Badge> : null}
                 {goal.workbench.pendingInboxCount > 0 ? (
                   <Button asChild size="sm" variant="outline">
@@ -936,8 +984,8 @@ export function GoalWorkspacePage({ goal, copy, assetWorkbench }: { goal: GoalDa
                   </Button>
                 ) : null}
               </div>
-              <h1 className="text-balance text-2xl font-semibold tracking-tight sm:text-3xl">{goal.title}</h1>
-              <p className="max-w-3xl text-sm leading-6 text-muted-foreground">{goal.description}</p>
+              <h1 className="max-w-4xl text-balance text-2xl font-semibold tracking-tight sm:text-3xl">{goal.title}</h1>
+              <p className="max-w-3xl text-sm leading-6 text-foreground/65">{goal.description}</p>
             </div>
             <PrimaryAction
               goal={goal}
@@ -959,14 +1007,17 @@ export function GoalWorkspacePage({ goal, copy, assetWorkbench }: { goal: GoalDa
         ) : null}
 
         <Tabs value={defaultSection} onValueChange={(section) => { const next = new URLSearchParams(searchParams); if (section === "overview") next.delete("section"); else next.set("section", section); setSearchParams(next, { replace: true }); }} className="min-w-0">
-          <div className="sticky top-0 z-20 -mx-2 bg-background/95 px-2 py-1 backdrop-blur supports-[backdrop-filter]:bg-background/85">
-            <TabsList className="grid h-auto w-full grid-cols-5 rounded-xl p-1">
-              <TabsTrigger value="overview" className="min-w-0 px-1 py-2 text-xs sm:px-3 sm:text-sm"><Target className="hidden size-4 sm:block" />{copy.overview}</TabsTrigger>
-              <TabsTrigger value="work" className="min-w-0 px-1 py-2 text-xs sm:px-3 sm:text-sm"><ListChecks className="hidden size-4 sm:block" />{copy.tasksSection}</TabsTrigger>
-              <TabsTrigger value="workbench" className="min-w-0 px-1 py-2 text-xs sm:px-3 sm:text-sm"><FileCheck2 className="hidden size-4 sm:block" />{copy.workbench}</TabsTrigger>
-              <TabsTrigger value="criteria" className="min-w-0 px-1 py-2 text-xs sm:px-3 sm:text-sm"><CheckCircle2 className="hidden size-4 sm:block" />{copy.successCriteria}</TabsTrigger>
-              <TabsTrigger value="history" className="min-w-0 px-1 py-2 text-xs sm:px-3 sm:text-sm"><History className="hidden size-4 sm:block" />{copy.history}</TabsTrigger>
+          <div className="sticky top-0 z-20 -mx-4 border-y border-border/70 bg-background/95 backdrop-blur sm:-mx-2 supports-[backdrop-filter]:bg-background/85">
+            <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-8 bg-gradient-to-l from-background via-background/85 to-transparent sm:hidden" aria-hidden />
+            <div className="overflow-x-auto px-4 py-2 sm:px-2">
+            <TabsList className="inline-flex h-auto min-w-max justify-start gap-1 rounded-lg bg-muted/60 p-1 sm:w-auto">
+              <TabsTrigger value="overview" className="h-10 shrink-0 px-3 text-sm sm:px-4"><Target className="size-4" />{copy.overview}</TabsTrigger>
+              <TabsTrigger value="work" className="h-10 shrink-0 px-3 text-sm sm:px-4"><ListChecks className="size-4" />{copy.tasksSection}</TabsTrigger>
+              <TabsTrigger value="workbench" className="h-10 shrink-0 px-3 text-sm sm:px-4"><FileCheck2 className="size-4" />{copy.workbench}</TabsTrigger>
+              <TabsTrigger value="criteria" className="h-10 shrink-0 px-3 text-sm sm:px-4"><CheckCircle2 className="size-4" />{copy.successCriteria}</TabsTrigger>
+              <TabsTrigger value="history" className="h-10 shrink-0 px-3 text-sm sm:px-4"><History className="size-4" />{copy.history}</TabsTrigger>
             </TabsList>
+          </div>
           </div>
 
  
