@@ -1,18 +1,43 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ArrowRight, CheckCircle2, CircleDot, Plus, Target } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowRight,
+  CheckCircle2,
+  CircleDot,
+  Clock3,
+  ListChecks,
+  Pause,
+  Plus,
+  Target,
+} from "lucide-react";
 import { useNavigate, useRevalidator } from "react-router-dom";
 import { useLocale, localizeHref } from "@chrona/i18n";
-import { Badge, Button, Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Field, FieldLabel, Input, PageFrame, Textarea } from "@shared/ui";
+import {
+  Badge,
+  Button,
+  Card,
+  CardContent,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  Field,
+  FieldDescription,
+  FieldLabel,
+  Input,
+  PageFrame,
+  Separator,
+  Textarea,
+} from "@shared/ui";
 import { apiJson } from "@shared/http";
 import { createGoalWithFirstTask } from "../browser-api";
 import { LocalizedLink } from "./localized-link";
 import type { GoalCopy, GoalData } from "../model/goal-types";
 
-function format(copy: string, values: Record<string, string | number>) {
-  return Object.entries(values).reduce((text, [key, value]) => text.replace(`{${key}}`, String(value)), copy);
-}
 type GoalListGroup = "attention" | "progress" | "stable" | "archive";
 
 function goalListGroup(goal: GoalData): GoalListGroup {
@@ -38,7 +63,9 @@ function CreateGoalDialog({ copy }: { copy: GoalCopy }) {
     setPending(true);
     setError(null);
     try {
-      const workspace = await apiJson<{ id: string }>("/api/workspaces/default");
+      const workspace = await apiJson<{ id: string }>(
+        "/api/workspaces/default",
+      );
       const created = await createGoalWithFirstTask({
         workspaceId: workspace.id,
         intendedOutcome: outcome.trim(),
@@ -57,69 +84,311 @@ function CreateGoalDialog({ copy }: { copy: GoalCopy }) {
   }
 
   return (
-    <Dialog open={open} onOpenChange={(next) => { if (!pending) setOpen(next); }}>
-      <Button onClick={() => setOpen(true)}><Plus className="size-4" />{copy.createGoal}</Button>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (!pending) setOpen(next);
+      }}
+    >
+      <Button onClick={() => setOpen(true)}>
+        <Plus className="size-4" />
+        {copy.createGoal}
+      </Button>
       <DialogContent className="sm:max-w-xl">
-        <DialogHeader><DialogTitle>{copy.createGoal}</DialogTitle><DialogDescription>{copy.createGoalDescription}</DialogDescription></DialogHeader>
-        <div className="space-y-4">
-          <Field><FieldLabel htmlFor="goal-outcome">{copy.outcomeLabel}</FieldLabel><Textarea id="goal-outcome" value={outcome} onChange={(event) => setOutcome(event.target.value)} /></Field>
-          <Field><FieldLabel htmlFor="goal-first-work">{copy.currentFocus}</FieldLabel><Input id="goal-first-work" value={firstWorkItem} onChange={(event) => setFirstWorkItem(event.target.value)} /></Field>
-          <Field><FieldLabel htmlFor="goal-description">{copy.goalDescriptionLabel}</FieldLabel><Textarea id="goal-description" value={description} onChange={(event) => setDescription(event.target.value)} placeholder={copy.goalDescriptionPlaceholder} /></Field>
-          {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
+        <DialogHeader>
+          <DialogTitle>{copy.createGoal}</DialogTitle>
+          <DialogDescription>{copy.createGoalDescription}</DialogDescription>
+        </DialogHeader>
+        <div className="space-y-5">
+          <section className="space-y-4" aria-labelledby="goal-outcome-group">
+            <div>
+              <p id="goal-outcome-group" className="text-sm font-semibold">
+                {copy.defineOutcome}
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {copy.defineOutcomeDescription}
+              </p>
+            </div>
+            <Field>
+              <FieldLabel htmlFor="goal-outcome">
+                {copy.outcomeLabel}
+              </FieldLabel>
+              <Textarea
+                id="goal-outcome"
+                value={outcome}
+                onChange={(event) => setOutcome(event.target.value)}
+                placeholder={copy.goalOutcomePlaceholder}
+              />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="goal-description">
+                {copy.goalDescriptionLabel}
+              </FieldLabel>
+              <Textarea
+                id="goal-description"
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
+                placeholder={copy.goalDescriptionPlaceholder}
+              />
+              <FieldDescription>{copy.goalDescriptionHelp}</FieldDescription>
+            </Field>
+          </section>
+          <Separator />
+          <section
+            className="space-y-4"
+            aria-labelledby="goal-first-task-group"
+          >
+            <div>
+              <p id="goal-first-task-group" className="text-sm font-semibold">
+                {copy.startFirstTask}
+              </p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {copy.startFirstTaskDescription}
+              </p>
+            </div>
+            <Field>
+              <FieldLabel htmlFor="goal-first-work">
+                {copy.firstTaskLabel}
+              </FieldLabel>
+              <Input
+                id="goal-first-work"
+                value={firstWorkItem}
+                onChange={(event) => setFirstWorkItem(event.target.value)}
+                placeholder={copy.firstTaskPlaceholder}
+              />
+            </Field>
+          </section>
+          {error ? (
+            <p role="alert" className="text-sm text-destructive">
+              {error}
+            </p>
+          ) : null}
         </div>
-        <DialogFooter><Button variant="outline" onClick={() => setOpen(false)}>{copy.cancel}</Button><Button disabled={!outcome.trim() || !firstWorkItem.trim() || pending} onClick={() => void submit()}>{pending ? copy.saving : copy.createGoal}</Button></DialogFooter>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>
+            {copy.cancel}
+          </Button>
+          <Button
+            disabled={!outcome.trim() || !firstWorkItem.trim() || pending}
+            onClick={() => void submit()}
+          >
+            {pending ? copy.saving : copy.createGoal}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
 }
 
-
-export function GoalListPage({ goals, copy }: { goals: GoalData[]; copy: GoalCopy }) {
+export function GoalListPage({
+  goals,
+  copy,
+}: {
+  goals: GoalData[];
+  copy: GoalCopy;
+}) {
   const groups = useMemo(() => {
-    const grouped: Record<GoalListGroup, GoalData[]> = { attention: [], progress: [], stable: [], archive: [] };
+    const grouped: Record<GoalListGroup, GoalData[]> = {
+      attention: [],
+      progress: [],
+      stable: [],
+      archive: [],
+    };
     for (const goal of goals) grouped[goalListGroup(goal)].push(goal);
     return grouped;
   }, [goals]);
-  const sections: Array<{ key: GoalListGroup; title: string; description: string }> = [
-    { key: "attention", title: copy.needsYou, description: copy.focusQueue },
-    { key: "progress", title: copy.inProgress, description: copy.workspaceDescription },
-    { key: "stable", title: copy.stable, description: copy.stableDescription },
-    { key: "archive", title: copy.outcomeArchive, description: copy.archiveDescription },
+  const sections: Array<{
+    key: GoalListGroup;
+    title: string;
+    description: string;
+  }> = [
+    {
+      key: "attention",
+      title: copy.needsYou,
+      description: copy.attentionGoalsDescription,
+    },
+    {
+      key: "progress",
+      title: copy.inProgress,
+      description: copy.progressGoalsDescription,
+    },
+    {
+      key: "stable",
+      title: copy.quietGoals,
+      description: copy.stableDescription,
+    },
+    {
+      key: "archive",
+      title: copy.outcomeArchive,
+      description: copy.archiveDescription,
+    },
   ];
-
   return (
-    <PageFrame mode="overview">
-      <div className="flex min-w-0 flex-1 flex-col gap-6" data-ui-surface-kind="product-authored">
-        <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div className="space-y-1">
-            <div className="flex items-center gap-2"><Target className="size-6 text-primary" aria-hidden /><h1 className="text-2xl font-semibold tracking-tight">{copy.title}</h1></div>
-            <p className="max-w-3xl text-sm text-muted-foreground">{copy.subtitle}</p>
+    <PageFrame mode="focused">
+      <div
+        className="flex min-w-0 flex-1 flex-col gap-8"
+        data-ui-surface-kind="product-authored"
+      >
+        <header className="flex flex-col gap-4 border-b border-border/80 pb-6 sm:flex-row sm:items-end sm:justify-between">
+          <div className="max-w-3xl">
+            <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-primary">
+              <Target className="size-4" aria-hidden />
+              {copy.title}
+            </div>
+            <h1 className="text-balance text-3xl font-semibold tracking-tight sm:text-4xl">
+              {copy.goalPortfolio}
+            </h1>
+            <p className="mt-3 text-sm leading-6 text-muted-foreground sm:text-base">
+              {copy.subtitle}
+            </p>
           </div>
           <CreateGoalDialog copy={copy} />
         </header>
-
         {goals.length === 0 ? (
-          <Card><CardHeader><CardTitle>{copy.emptyTitle}</CardTitle><CardDescription>{copy.emptyDescription}</CardDescription></CardHeader><CardFooter><CreateGoalDialog copy={copy} /></CardFooter></Card>
-        ) : sections.map((section) => groups[section.key].length > 0 ? (
-          <section key={section.key} aria-labelledby={`goal-group-${section.key}`} className="space-y-3">
-            <div><h2 id={`goal-group-${section.key}`} className="text-lg font-semibold">{section.title}</h2><p className="text-sm text-muted-foreground">{section.description}</p></div>
-            <div className="grid gap-4 xl:grid-cols-2">
-              {groups[section.key].map((goal) => (
-                <Card key={goal.id} className="min-w-0 overflow-hidden">
-                  <CardHeader className="gap-3">
-                    <div className="flex flex-wrap items-center gap-2"><Badge variant={goal.status === "Achieved" ? "default" : "secondary"}>{goal.status === "Achieved" ? <CheckCircle2 className="size-3.5" aria-hidden /> : <CircleDot className="size-3.5" aria-hidden />}{copy.status[goal.status]}</Badge>{goal.projection.activity !== "idle" ? <Badge variant="outline">{copy.activity[goal.projection.activity]}</Badge> : null}{goal.projection.attention !== "none" ? <Badge variant="destructive">{copy.attention[goal.projection.attention]}</Badge> : null}</div>
-                    <CardTitle className="text-xl">{goal.title}</CardTitle><CardDescription className="line-clamp-3">{goal.description}</CardDescription>
-                  </CardHeader>
-                  <CardContent className="grid gap-3 text-sm sm:grid-cols-2">
-                    <div className="rounded-lg border bg-muted/30 p-3"><p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{copy.successCriteria}</p><p className="mt-1 font-medium">{format(copy.criteriaProgress, { completed: goal.projection.criteriaSatisfiedCount, total: goal.projection.criteriaTotalCount })}</p></div>
-                    <div className="rounded-lg border bg-muted/30 p-3"><p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{copy.boundedTasks}</p><p className="mt-1 font-medium">{format(copy.taskProgress, { completed: goal.projection.completedTaskCount, total: goal.projection.totalTaskCount })}</p></div>
-                  </CardContent>
-                  <CardFooter className="justify-between gap-3 border-t bg-muted/20 py-3"><span className="truncate text-xs text-muted-foreground">{copy.nextAction[goal.projection.nextAction]}</span><Button asChild size="sm"><LocalizedLink href={`/goals/${goal.id}`}>{copy.openGoal}<ArrowRight className="size-4" aria-hidden /></LocalizedLink></Button></CardFooter>
-                </Card>
-              ))}
-            </div>
-          </section>
-        ) : null)}
+          <div className="rounded-2xl border border-dashed bg-card/60 px-6 py-14 text-center">
+            <Target className="mx-auto size-10 text-muted-foreground" />
+            <h2 className="mt-4 text-lg font-semibold">{copy.emptyTitle}</h2>
+            <p className="mx-auto mt-2 max-w-xl text-sm leading-6 text-muted-foreground">
+              {copy.emptyDescription}
+            </p>
+          </div>
+        ) : null}
+        {sections.map((section) =>
+          groups[section.key].length ? (
+            <section
+              key={section.key}
+              aria-labelledby={`goal-group-${section.key}`}
+              className="space-y-4"
+            >
+              <div className="flex items-end justify-between gap-4 border-b pb-3">
+                <div>
+                  <h2
+                    id={`goal-group-${section.key}`}
+                    className="text-xl font-semibold tracking-tight"
+                  >
+                    {section.title}
+                  </h2>
+                  <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
+                    {section.description}
+                  </p>
+                </div>
+                <span className="shrink-0 text-sm tabular-nums text-muted-foreground">
+                  {groups[section.key].length}
+                </span>
+              </div>
+              <div className="grid gap-3 xl:grid-cols-2">
+                {groups[section.key].map((goal) => {
+                  const isArchive = goal.mode === "archive";
+                  const needsAttention = goal.projection.attention !== "none";
+                  const description =
+                    goal.description?.trim() === goal.title.trim()
+                      ? null
+                      : goal.description;
+                  const StatusIcon = isArchive
+                    ? CheckCircle2
+                    : goal.status === "Paused"
+                      ? Pause
+                      : needsAttention
+                        ? AlertTriangle
+                        : CircleDot;
+                  return (
+                    <Card
+                      key={goal.id}
+                      className={`group min-w-0 overflow-hidden border-l-[3px] shadow-none transition-colors hover:bg-card ${isArchive ? "border-l-success/70 bg-success/[0.025]" : needsAttention ? "border-l-warning bg-warning/[0.035]" : "border-l-info/70"}`}
+                    >
+                      <CardContent className="p-0">
+                        <div className="flex flex-col gap-5 p-5 sm:p-6">
+                          <div className="flex flex-wrap items-center gap-2 text-sm">
+                            <span
+                              className={`inline-flex items-center gap-1.5 font-medium ${isArchive ? "text-success" : needsAttention ? "text-warning" : "text-info"}`}
+                            >
+                              <StatusIcon className="size-4" aria-hidden />
+                              {copy.status[goal.status]}
+                            </span>
+                            {goal.projection.activity !== "idle" ? (
+                              <Badge variant="outline">
+                                {copy.activity[goal.projection.activity]}
+                              </Badge>
+                            ) : null}
+                            {needsAttention ? (
+                              <Badge variant="destructive">
+                                {copy.attention[goal.projection.attention]}
+                              </Badge>
+                            ) : null}
+                          </div>
+                          <div className="min-w-0">
+                            <h3 className="text-balance text-xl font-semibold tracking-tight sm:text-2xl">
+                              {goal.title}
+                            </h3>
+                            {description ? (
+                              <p className="mt-2 line-clamp-2 text-sm leading-6 text-muted-foreground">
+                                {description}
+                              </p>
+                            ) : null}
+                          </div>
+                          <div className="flex flex-wrap gap-x-6 gap-y-2 border-y border-border/70 py-3 text-sm">
+                            <span className="inline-flex items-center gap-2">
+                              <CheckCircle2
+                                className={`size-4 ${isArchive ? "text-success" : "text-muted-foreground"}`}
+                                aria-hidden
+                              />
+                              <span className="font-medium tabular-nums">
+                                {goal.projection.criteriaSatisfiedCount}/
+                                {goal.projection.criteriaTotalCount}
+                              </span>
+                              <span className="text-muted-foreground">
+                                {copy.successCriteria}
+                              </span>
+                            </span>
+                            <span className="inline-flex items-center gap-2">
+                              <ListChecks
+                                className="size-4 text-muted-foreground"
+                                aria-hidden
+                              />
+                              <span className="font-medium tabular-nums">
+                                {goal.projection.completedTaskCount}/
+                                {goal.projection.totalTaskCount}
+                              </span>
+                              <span className="text-muted-foreground">
+                                {copy.boundedTasks}
+                              </span>
+                            </span>
+                            {isArchive && goal.achievedAt ? (
+                              <span className="inline-flex items-center gap-2 text-muted-foreground">
+                                <Clock3 className="size-4" aria-hidden />
+                                {copy.achievedAt}
+                              </span>
+                            ) : null}
+                          </div>
+                          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                            <p
+                              className={`text-sm ${needsAttention ? "font-medium text-warning" : "text-muted-foreground"}`}
+                            >
+                              {isArchive
+                                ? copy.archiveCardSummary
+                                : copy.nextAction[goal.projection.nextAction]}
+                            </p>
+                            <Button
+                              asChild
+                              size="sm"
+                              variant={needsAttention ? "default" : "outline"}
+                              className="shrink-0 self-start sm:self-auto"
+                            >
+                              <LocalizedLink href={`/goals/${goal.id}`}>
+                                {isArchive ? copy.viewOutcome : copy.openGoal}
+                                <ArrowRight className="size-4" aria-hidden />
+                              </LocalizedLink>
+                            </Button>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            </section>
+          ) : null,
+        )}
       </div>
     </PageFrame>
   );

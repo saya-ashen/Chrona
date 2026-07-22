@@ -1,15 +1,26 @@
 import { describe, expect, it, vi } from "vitest";
-import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import {
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { GoalListPage } from "./goal-list-page";
 import { GoalWorkspacePage } from "./goal-workspace-page";
 import { CreateGoalFromResultDialog } from "./create-goal-from-result-dialog";
 import type { GoalArtifactData, GoalCopy, GoalData } from "../model/goal-types";
 
-const { promoteTaskToGoalMock, createGoalWithFirstTaskMock } = vi.hoisted(() => ({
-  promoteTaskToGoalMock: vi.fn(async () => ({ id: "goal-promoted" })),
-  createGoalWithFirstTaskMock: vi.fn(async () => ({ goal: { id: "goal-created" }, taskId: "task-created" })),
-}));
+const { promoteTaskToGoalMock, createGoalWithFirstTaskMock } = vi.hoisted(
+  () => ({
+    promoteTaskToGoalMock: vi.fn(async () => ({ id: "goal-promoted" })),
+    createGoalWithFirstTaskMock: vi.fn(async () => ({
+      goal: { id: "goal-created" },
+      taskId: "task-created",
+    })),
+  }),
+);
 vi.mock("../browser-api", () => ({
   runGoalAction: vi.fn(async () => ({})),
   createGoalTask: vi.fn(async () => ({ taskId: "task-created", goal: {} })),
@@ -27,6 +38,21 @@ const copy: GoalCopy = {
   emptyDescription: "Create one",
   createGoal: "Create Goal",
   createGoalDescription: "Define a durable outcome",
+  goalPortfolio: "Long-horizon outcomes",
+  defineOutcome: "Define the long-term outcome",
+  defineOutcomeDescription: "Set the durable result this Goal should reach.",
+  goalOutcomePlaceholder: "Describe the durable outcome",
+  goalDescriptionHelp: "Keep scope durable and observable.",
+  startFirstTask: "Start with one bounded task",
+  startFirstTaskDescription: "Create the first concrete step.",
+  firstTaskLabel: "First bounded task",
+  firstTaskPlaceholder: "Describe the first task",
+  attentionGoalsDescription: "Goals that need a decision or intervention.",
+  progressGoalsDescription: "Goals with work currently moving.",
+  quietGoals: "No immediate action",
+  archiveCardSummary:
+    "Verified outcome, confirmation, and supporting evidence retained.",
+  viewOutcome: "View outcome",
   removeCriterion: "Remove criterion",
   addCriterion: "Add criterion",
   openGoal: "Open Goal",
@@ -47,6 +73,13 @@ const copy: GoalCopy = {
   saveBrief: "Save brief",
   saving: "Saving",
   workingSet: "Working set",
+  briefDescription: "The durable definition behind the current queue.",
+  currentFocusDescription: "One clear queue for current Goal work.",
+  focusClear: "Focus queue clear",
+  focusClearDescription: "No work currently needs attention.",
+  completedShort: "completed",
+  confirmedShort: "confirmed",
+  scheduledShort: "scheduled",
   workingSetDescription: "Explicit task context",
   editWorkingSet: "Choose context",
   saveWorkingSet: "Save working set",
@@ -86,6 +119,8 @@ const copy: GoalCopy = {
   reviewTaskSuggestion: "Suggested task",
   outcome: "Outcome",
   primaryResult: "Final outcome",
+  confirmedOutcome: "User-confirmed outcome",
+  retainedDeliverable: "Outcome document",
   noPrimaryResult: "No final result",
   successCriteria: "Success criteria",
   progress: "Progress",
@@ -141,11 +176,39 @@ const copy: GoalCopy = {
   technicalDetails: "Technical details",
   outcomeDocument: "Outcome document",
   copyDocument: "Copy document",
-  status: { Draft: "Draft", Active: "Active", Paused: "Paused", Achieved: "Achieved", Stopped: "Stopped" },
-  activity: { idle: "Idle", work_active: "Work active", review_due: "Review due" },
-  attention: { none: "No attention", needs_input: "Needs input", blocked: "Blocked", failed: "Failed" },
-  nextAction: { none: "No action", review_criteria: "Review criteria", review: "Review", resolve_attention: "Resolve", continue_work: "Continue work", resume: "Resume", confirm_outcome: "Confirm outcome" },
-  taskGroups: { attention: "Needs attention", active: "Active", planned: "Planned", completed: "Completed" },
+  status: {
+    Draft: "Draft",
+    Active: "Active",
+    Paused: "Paused",
+    Achieved: "Achieved",
+    Stopped: "Stopped",
+  },
+  activity: {
+    idle: "Idle",
+    work_active: "Work active",
+    review_due: "Review due",
+  },
+  attention: {
+    none: "No attention",
+    needs_input: "Needs input",
+    blocked: "Blocked",
+    failed: "Failed",
+  },
+  nextAction: {
+    none: "No action",
+    review_criteria: "Review criteria",
+    review: "Review",
+    resolve_attention: "Resolve",
+    continue_work: "Continue work",
+    resume: "Resume",
+    confirm_outcome: "Confirm outcome",
+  },
+  taskGroups: {
+    attention: "Needs attention",
+    active: "Active",
+    planned: "Planned",
+    completed: "Completed",
+  },
   taskStatus: { Completed: "Completed", Ready: "Ready" },
   assetRoles: { Evidence: "Evidence", PrimaryOutcome: "Primary outcome" },
   assetStatuses: { Approved: "Approved" },
@@ -202,6 +265,10 @@ const copy: GoalCopy = {
     oldestUpdated: "Oldest updated",
     name: "Name",
     recent: "Recent",
+    assetCount: "assets",
+    filters: "Filters",
+    activeFilters: "Active filters",
+    clearFilters: "Clear",
     match: "match",
     sourceTask: "Source Task",
     changeSummary: "Change summary",
@@ -209,13 +276,15 @@ const copy: GoalCopy = {
     createNewAsset: "Create a new asset",
     appendToAsset: "Append to {asset}",
     noConfidentAssetMatch: "No existing Goal asset matches",
-    candidateFromAcceptedResult: "Candidate derived from accepted result “{result}”",
+    candidateFromAcceptedResult:
+      "Candidate derived from accepted result “{result}”",
     createAsset: "Create asset",
     appendVersion: "Append version",
     rejectCandidate: "Reject",
     candidateUpdateFailed: "Candidate update failed",
     pageSafetyWarning: "Generated Page runs in an isolated frame.",
-    genericFileDescription: "Generic files preserve immutable source provenance.",
+    genericFileDescription:
+      "Generic files preserve immutable source provenance.",
     formSchema: "Form definition JSON",
     fillMode: "Fill",
     designMode: "Design",
@@ -280,7 +349,12 @@ const artifact: GoalArtifactData = {
   uri: "chrona://result",
   contentPreview: "Final immutable outcome",
   createdAt: "2026-07-01T00:00:00.000Z",
-  operations: { canOpen: true, canCopy: true, canDownload: false, downloadHref: null },
+  operations: {
+    canOpen: true,
+    canCopy: true,
+    canDownload: false,
+    downloadHref: null,
+  },
 };
 
 const baseGoal: GoalData = {
@@ -297,13 +371,41 @@ const baseGoal: GoalData = {
   updatedAt: "2026-07-01T00:00:00.000Z",
   achievedAt: null,
   stoppedAt: null,
-  successCriteria: [{ id: "criterion", kind: "user_confirmed", description: "User confirms outcome", satisfied: false, confirmedAt: null, proposalStatus: "confirmed" }],
-  projection: { lifecycle: "Active", activity: "idle", attention: "none", nextAction: "confirm_outcome", completedTaskCount: 0, totalTaskCount: 0, criteriaSatisfiedCount: 0, criteriaTotalCount: 1 },
+  successCriteria: [
+    {
+      id: "criterion",
+      kind: "user_confirmed",
+      description: "User confirms outcome",
+      satisfied: false,
+      confirmedAt: null,
+      proposalStatus: "confirmed",
+    },
+  ],
+  projection: {
+    lifecycle: "Active",
+    activity: "idle",
+    attention: "none",
+    nextAction: "confirm_outcome",
+    completedTaskCount: 0,
+    totalTaskCount: 0,
+    criteriaSatisfiedCount: 0,
+    criteriaTotalCount: 1,
+  },
   primaryAction: { kind: "confirm_outcome", taskId: null },
   outcome: {
     primaryResult: null,
     confirmation: null,
-    criteria: [{ id: "criterion", kind: "user_confirmed", description: "User confirms outcome", satisfied: false, confirmedAt: null, proposalStatus: "confirmed", evidenceArtifactIds: [] }],
+    criteria: [
+      {
+        id: "criterion",
+        kind: "user_confirmed",
+        description: "User confirms outcome",
+        satisfied: false,
+        confirmedAt: null,
+        proposalStatus: "confirmed",
+        evidenceArtifactIds: [],
+      },
+    ],
   },
   taskGroups: { attention: [], active: [], planned: [], completed: [] },
   tasks: [],
@@ -320,23 +422,33 @@ const baseGoal: GoalData = {
     workingSet: [],
     focus: { needsYou: [], inProgress: [], newResults: [], upNext: [] },
   },
-  assets: [{
-    id: "asset-1",
-    label: "Outcome evidence",
-    role: "Evidence",
-    status: "Approved",
-    createdAt: artifact.createdAt,
-    updatedAt: artifact.createdAt,
-    currentVersion: 1,
-    sourceArtifact: artifact,
-    currentArtifact: artifact,
-    provenance: { sourceTaskId: "task-1", sourceRunId: "run-1", sourceArtifactId: artifact.id, currentArtifactId: artifact.id, unchanged: true },
-  }],
+  assets: [
+    {
+      id: "asset-1",
+      label: "Outcome evidence",
+      role: "Evidence",
+      status: "Approved",
+      createdAt: artifact.createdAt,
+      updatedAt: artifact.createdAt,
+      currentVersion: 1,
+      sourceArtifact: artifact,
+      currentArtifact: artifact,
+      provenance: {
+        sourceTaskId: "task-1",
+        sourceRunId: "run-1",
+        sourceArtifactId: artifact.id,
+        currentArtifactId: artifact.id,
+        unchanged: true,
+      },
+    },
+  ],
   activity: [],
 };
 
 function renderInRouter(node: React.ReactNode) {
-  const router = createMemoryRouter([{ path: "*", element: node }], { initialEntries: ["/en/goals"] });
+  const router = createMemoryRouter([{ path: "*", element: node }], {
+    initialEntries: ["/en/goals"],
+  });
   return { ...render(<RouterProvider router={router} />), router };
 }
 
@@ -349,92 +461,193 @@ describe("Goal pages", () => {
   it("shows lifecycle, attention, and one primary next action", () => {
     const goal: GoalData = {
       ...baseGoal,
-      projection: { ...baseGoal.projection, activity: "review_due", attention: "needs_input", nextAction: "resolve_attention" },
+      projection: {
+        ...baseGoal.projection,
+        activity: "review_due",
+        attention: "needs_input",
+        nextAction: "resolve_attention",
+      },
     };
     renderInRouter(<GoalListPage goals={[goal]} copy={copy} />);
     expect(screen.getByText("Active")).toBeInTheDocument();
     expect(screen.getByText("Needs input")).toBeInTheDocument();
     expect(screen.getByText("Resolve")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Open Goal/ })).toHaveAttribute("href", "/en/goals/goal-1");
+    expect(screen.getByRole("link", { name: /Open Goal/ })).toHaveAttribute(
+      "href",
+      "/en/goals/goal-1",
+    );
   });
 
   it("puts the final outcome before archive details and exposes provenance", () => {
-    const acceptedResult = { runId: "run-1", acceptedAt: artifact.createdAt, completedAt: artifact.createdAt, summary: "Accepted result summary", artifacts: [artifact] };
-    const completedTask = { id: "task-1", title: "Bounded step", description: null, status: "Completed", priority: "High", kind: "single", dueAt: null, updatedAt: artifact.createdAt, attention: null, group: "completed" as const, acceptedResult };
+    const acceptedResult = {
+      runId: "run-1",
+      acceptedAt: artifact.createdAt,
+      completedAt: artifact.createdAt,
+      summary: "Accepted result summary",
+      artifacts: [artifact],
+    };
+    const completedTask = {
+      id: "task-1",
+      title: "Bounded step",
+      description: null,
+      status: "Completed",
+      priority: "High",
+      kind: "single",
+      dueAt: null,
+      updatedAt: artifact.createdAt,
+      attention: null,
+      group: "completed" as const,
+      acceptedResult,
+    };
     const goal: GoalData = {
       ...baseGoal,
       status: "Achieved",
       mode: "archive",
       achievedAt: artifact.createdAt,
-      projection: { ...baseGoal.projection, lifecycle: "Achieved", nextAction: "none", completedTaskCount: 1, totalTaskCount: 1, criteriaSatisfiedCount: 1 },
+      projection: {
+        ...baseGoal.projection,
+        lifecycle: "Achieved",
+        nextAction: "none",
+        completedTaskCount: 1,
+        totalTaskCount: 1,
+        criteriaSatisfiedCount: 1,
+      },
       primaryAction: { kind: "none", taskId: null },
-      outcome: { primaryResult: artifact, confirmation: { note: "Offer accepted", actorType: "user", actorId: "acceptance-user", confirmedAt: artifact.createdAt, evidenceArtifactIds: [artifact.id] }, criteria: [{ ...baseGoal.outcome.criteria[0], satisfied: true, confirmedAt: artifact.createdAt, evidenceArtifactIds: [artifact.id] }] },
+      outcome: {
+        primaryResult: artifact,
+        confirmation: {
+          note: "Offer accepted",
+          actorType: "user",
+          actorId: "acceptance-user",
+          confirmedAt: artifact.createdAt,
+          evidenceArtifactIds: [artifact.id],
+        },
+        criteria: [
+          {
+            ...baseGoal.outcome.criteria[0],
+            satisfied: true,
+            confirmedAt: artifact.createdAt,
+            evidenceArtifactIds: [artifact.id],
+          },
+        ],
+      },
       tasks: [completedTask],
-      taskGroups: { attention: [], active: [], planned: [], completed: [completedTask] },
-      acceptedResults: [{ ...acceptedResult, taskId: completedTask.id, taskTitle: completedTask.title }],
+      taskGroups: {
+        attention: [],
+        active: [],
+        planned: [],
+        completed: [completedTask],
+      },
+      acceptedResults: [
+        {
+          ...acceptedResult,
+          taskId: completedTask.id,
+          taskTitle: completedTask.title,
+        },
+      ],
     };
-    const router = createMemoryRouter([{ path: "*", element: <GoalWorkspacePage goal={goal} copy={copy} /> }], { initialEntries: ["/en/goals/goal-1"] });
+    const router = createMemoryRouter(
+      [{ path: "*", element: <GoalWorkspacePage goal={goal} copy={copy} /> }],
+      { initialEntries: ["/en/goals/goal-1"] },
+    );
     render(<RouterProvider router={router} />);
     expect(screen.getByText("Final immutable outcome")).toBeInTheDocument();
     expect(screen.getByText("Offer accepted")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Achievement confirmation" })).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Outcome document" })).toBeInTheDocument();
-    expect(screen.getByText("1 linked evidence item(s)")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Copy document" })).toBeInTheDocument();
-    expect(screen.getByText("Technical details").closest("details")).not.toHaveAttribute("open");
-    expect(screen.getByRole("tab", { name: "Overview" })).toHaveAttribute("data-state", "active");
+    expect(
+      screen.getByRole("heading", { name: "Achievement confirmation" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: "Outcome document" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Outcome evidence")).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Copy document" }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText("Technical details").closest("details"),
+    ).not.toHaveAttribute("open");
+    expect(screen.getByRole("tab", { name: "Overview" })).toHaveAttribute(
+      "data-state",
+      "active",
+    );
     expect(screen.getByText("Bounded step")).toBeInTheDocument();
-
   });
 
   it("shows the active Goal control plane, workbench, and frozen-context composer", () => {
     const goal: GoalData = {
       ...baseGoal,
       primaryAction: { kind: "none", taskId: null },
-      taskGroups: { ...baseGoal.taskGroups, attention: [{
-        id: "attention-1",
-        title: "Approve research statement",
-        description: "Review before submission",
-        status: "WaitingForApproval",
-        priority: "Urgent",
-        kind: "single",
-        dueAt: null,
-        updatedAt: artifact.createdAt,
-        attention: "approval_required",
-        group: "attention",
-        acceptedResult: null,
-      }] },
+      taskGroups: {
+        ...baseGoal.taskGroups,
+        attention: [
+          {
+            id: "attention-1",
+            title: "Approve research statement",
+            description: "Review before submission",
+            status: "WaitingForApproval",
+            priority: "Urgent",
+            kind: "single",
+            dueAt: null,
+            updatedAt: artifact.createdAt,
+            attention: "approval_required",
+            group: "attention",
+            acceptedResult: null,
+          },
+        ],
+      },
       tasks: [],
       workbench: {
         ...baseGoal.workbench,
-        workingSet: [{
-          id: "ws-1",
-          subjectType: "criterion",
-          subjectId: "criterion-1",
-          label: "Approved application package",
-          snapshot: { satisfied: false },
-          rank: 0,
-          createdAt: artifact.createdAt,
-          updatedAt: artifact.createdAt,
-        }],
+        workingSet: [
+          {
+            id: "ws-1",
+            subjectType: "criterion",
+            subjectId: "criterion-1",
+            label: "Approved application package",
+            snapshot: { satisfied: false },
+            rank: 0,
+            createdAt: artifact.createdAt,
+            updatedAt: artifact.createdAt,
+          },
+        ],
       },
     };
     renderInRouter(<GoalWorkspacePage goal={goal} copy={copy} />);
-    expect(screen.getByText("Goal Control Plane")).toBeInTheDocument();
+    expect(
+      screen.getByText("Current focus", { selector: "h2" }),
+    ).toBeInTheDocument();
     expect(screen.getByText("Confirm next bounded step")).toBeInTheDocument();
-    expect(screen.getByText("Approved application package")).toBeInTheDocument();
+    expect(
+      screen.getByText("Approved application package"),
+    ).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Add task" }));
     expect(screen.getByText("Action preview")).toBeInTheDocument();
     expect(screen.getByText("Selected context")).toBeInTheDocument();
   });
 
   it("requires confirmation and retained evidence before achievement", () => {
-    const goal: GoalData = { ...baseGoal, outcome: { ...baseGoal.outcome, criteria: baseGoal.outcome.criteria.map((criterion) => ({ ...criterion, satisfied: true, evidenceArtifactIds: [artifact.id] })) } };
+    const goal: GoalData = {
+      ...baseGoal,
+      outcome: {
+        ...baseGoal.outcome,
+        criteria: baseGoal.outcome.criteria.map((criterion) => ({
+          ...criterion,
+          satisfied: true,
+          evidenceArtifactIds: [artifact.id],
+        })),
+      },
+    };
     renderInRouter(<GoalWorkspacePage goal={goal} copy={copy} />);
-    fireEvent.click(screen.getAllByRole("button", { name: "Confirm achieved" })[0]);
+    fireEvent.click(
+      screen.getAllByRole("button", { name: "Confirm achieved" })[0],
+    );
     const confirmation = screen.getByRole("textbox", { name: "Confirmation" });
-    const submit = screen.getAllByRole("button", { name: "Confirm achieved" }).at(-1)!;
-    fireEvent.change(confirmation, { target: { value: "Outcome evidence confirmed" } });
+    const submit = screen
+      .getAllByRole("button", { name: "Confirm achieved" })
+      .at(-1)!;
+    fireEvent.change(confirmation, {
+      target: { value: "Outcome evidence confirmed" },
+    });
     expect(submit).toBeDisabled();
     fireEvent.click(screen.getByRole("checkbox", { name: /Final result/ }));
     expect(submit).toBeEnabled();
@@ -444,12 +657,18 @@ describe("Goal pages", () => {
     const goal: GoalData = {
       ...baseGoal,
       status: "Paused",
-      projection: { ...baseGoal.projection, lifecycle: "Paused", nextAction: "resume" },
+      projection: {
+        ...baseGoal.projection,
+        lifecycle: "Paused",
+        nextAction: "resume",
+      },
       primaryAction: { kind: "resume", taskId: null },
     };
     renderInRouter(<GoalWorkspacePage goal={goal} copy={copy} />);
     expect(screen.getByText("Paused")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Resume Goal" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Resume Goal" }),
+    ).toBeInTheDocument();
   });
 
   it("previews selected accepted assets and opens the promoted Goal", async () => {
@@ -460,15 +679,33 @@ describe("Goal pages", () => {
         acceptedRunId="run-1"
         taskTitle="Accepted task"
         taskDescription="Accepted result description"
-        artifacts={[{ id: "artifact-1", title: "Final result", type: "markdown" }]}
+        artifacts={[
+          { id: "artifact-1", title: "Final result", type: "markdown" },
+        ]}
         copy={copy}
       />,
     );
-    fireEvent.click(screen.getByRole("button", { name: "Create Goal and continue" }));
+    fireEvent.click(
+      screen.getByRole("button", { name: "Create Goal and continue" }),
+    );
     const dialog = screen.getByRole("dialog");
     expect(within(dialog).getByText("Final result")).toBeInTheDocument();
-    fireEvent.click(within(dialog).getByRole("button", { name: "Create Goal and continue" }));
-    await waitFor(() => expect(promoteTaskToGoalMock).toHaveBeenCalledWith("task-1", expect.objectContaining({ workspaceId: "ws-1", acceptedRunId: "run-1", artifactIds: ["artifact-1"], title: "Accepted task" })));
-    await waitFor(() => expect(router.state.location.pathname).toBe("/en/goals/goal-promoted"));
+    fireEvent.click(
+      within(dialog).getByRole("button", { name: "Create Goal and continue" }),
+    );
+    await waitFor(() =>
+      expect(promoteTaskToGoalMock).toHaveBeenCalledWith(
+        "task-1",
+        expect.objectContaining({
+          workspaceId: "ws-1",
+          acceptedRunId: "run-1",
+          artifactIds: ["artifact-1"],
+          title: "Accepted task",
+        }),
+      ),
+    );
+    await waitFor(() =>
+      expect(router.state.location.pathname).toBe("/en/goals/goal-promoted"),
+    );
   });
 });

@@ -34,9 +34,6 @@ import {
   Button,
   Card,
   CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
   Checkbox,
   Dialog,
   DialogContent,
@@ -62,7 +59,16 @@ import {
   TabsTrigger,
   Textarea,
 } from "@shared/ui";
-import { applyGoalReview, confirmGoalCriterion, createGoalTask, reviewGoalCriterion, runGoalAction, updateGoal, updateGoalBrief, updateGoalWorkingSet } from "../browser-api";
+import {
+  applyGoalReview,
+  confirmGoalCriterion,
+  createGoalTask,
+  reviewGoalCriterion,
+  runGoalAction,
+  updateGoal,
+  updateGoalBrief,
+  updateGoalWorkingSet,
+} from "../browser-api";
 import type {
   GoalArtifactData,
   GoalCopy,
@@ -141,7 +147,11 @@ function ArtifactActions({
             variant="outline"
             onClick={() => setPreviewOpen((value) => !value)}
           >
-            {previewOpen ? <ChevronUp className="size-4" /> : <SquareArrowOutUpRight className="size-4" />}
+            {previewOpen ? (
+              <ChevronUp className="size-4" />
+            ) : (
+              <SquareArrowOutUpRight className="size-4" />
+            )}
             {previewOpen ? copy.hideDetails : copy.open}
           </Button>
         ) : null}
@@ -158,8 +168,12 @@ function ArtifactActions({
               });
             }}
           >
-            {copied ? <Check className="size-4" /> : <Clipboard className="size-4" />}
-            {copied ? copy.copied : copyLabel ?? copy.copy}
+            {copied ? (
+              <Check className="size-4" />
+            ) : (
+              <Clipboard className="size-4" />
+            )}
+            {copied ? copy.copied : (copyLabel ?? copy.copy)}
           </Button>
         ) : null}
         {artifact.operations.canDownload && artifact.operations.downloadHref ? (
@@ -171,7 +185,9 @@ function ArtifactActions({
           </Button>
         ) : null}
         <Button asChild type="button" size="sm" variant="ghost">
-          <LocalizedLink href={`/goals/${goalId}?section=workbench${goalAssetId ? `&asset=${encodeURIComponent(goalAssetId)}` : ""}`}>
+          <LocalizedLink
+            href={`/goals/${goalId}?section=workbench${goalAssetId ? `&asset=${encodeURIComponent(goalAssetId)}` : ""}`}
+          >
             <ExternalLink className="size-4" />
             {copy.showDetails}
           </LocalizedLink>
@@ -181,18 +197,30 @@ function ArtifactActions({
   );
 }
 
-function confirmationActorLabel(actorType: string, actorId: string | null, copy: GoalCopy) {
-  if (actorType === "user" && (!actorId || actorId === "server-action")) return copy.currentUser;
+function confirmationActorLabel(
+  actorType: string,
+  actorId: string | null,
+  copy: GoalCopy,
+) {
+  if (actorType === "user" && (!actorId || actorId === "server-action"))
+    return copy.currentUser;
   return actorId ?? actorType;
 }
 
-function findPrimaryResultContext(goal: GoalData, primary: GoalArtifactData | null) {
+function findPrimaryResultContext(
+  goal: GoalData,
+  primary: GoalArtifactData | null,
+) {
   if (!primary) return null;
-  const result = goal.acceptedResults.find((candidate) =>
-    candidate.runId === primary.runId || candidate.artifacts.some((artifact) => artifact.id === primary.id),
+  const result = goal.acceptedResults.find(
+    (candidate) =>
+      candidate.runId === primary.runId ||
+      candidate.artifacts.some((artifact) => artifact.id === primary.id),
   );
-  const asset = goal.assets.find((candidate) =>
-    candidate.currentArtifact.id === primary.id || candidate.sourceArtifact.id === primary.id,
+  const asset = goal.assets.find(
+    (candidate) =>
+      candidate.currentArtifact.id === primary.id ||
+      candidate.sourceArtifact.id === primary.id,
   );
   return { result, asset };
 }
@@ -202,142 +230,316 @@ function PrimaryOutcome({ goal, copy }: { goal: GoalData; copy: GoalCopy }) {
   const primary = goal.outcome.primaryResult;
   const confirmation = goal.outcome.confirmation;
   const context = findPrimaryResultContext(goal, primary);
-  const sourceTask = primary ? goal.tasks.find((task) => task.id === primary.taskId) : null;
-  const summary = sourceTask?.description?.trim() || context?.result?.summary?.split("\n").find((line) => line.trim())?.trim();
-  const versionLabel = context?.asset?.currentVersion ? `v${context.asset.currentVersion}` : copy.immutableResult;
+  const sourceTask = primary
+    ? goal.tasks.find((task) => task.id === primary.taskId)
+    : null;
+  const summary =
+    sourceTask?.description?.trim() ||
+    context?.result?.summary
+      ?.split("\n")
+      .find((line) => line.trim())
+      ?.trim();
+  const versionLabel = context?.asset?.currentVersion
+    ? `v${context.asset.currentVersion}`
+    : copy.immutableResult;
+  const evidence =
+    confirmation?.evidenceArtifactIds
+      .map((id) => {
+        const asset = goal.assets.find(
+          (candidate) =>
+            candidate.currentArtifact.id === id ||
+            candidate.sourceArtifact.id === id,
+        );
+        const acceptedArtifact = goal.acceptedResults
+          .flatMap((result) => result.artifacts)
+          .find((artifact) => artifact.id === id);
+        const artifact = asset?.currentArtifact ?? acceptedArtifact;
+        return artifact
+          ? {
+              id,
+              title: asset?.label ?? artifact.title,
+              type: artifact.type,
+              taskTitle: goal.tasks.find((task) => task.id === artifact.taskId)
+                ?.title,
+            }
+          : null;
+      })
+      .filter((item): item is NonNullable<typeof item> => item !== null) ?? [];
 
   return (
-    <section className="mx-auto w-full max-w-5xl space-y-4" aria-labelledby="goal-final-outcome">
-      <div className="overflow-hidden rounded-2xl border border-primary/20 bg-card shadow-sm">
-        <header className="relative overflow-hidden border-b bg-gradient-to-br from-primary/[0.12] via-primary/[0.05] to-background px-5 py-5 sm:px-7 sm:py-6">
-          <div className="absolute -right-16 -top-20 size-52 rounded-full bg-primary/10 blur-3xl" aria-hidden />
-          <div className="relative flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-            <div className="min-w-0 space-y-2">
-              <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-primary">
-                <CheckCircle2 className="size-4" aria-hidden />
-                {copy.verifiedOutcome}
+    <article
+      className="mx-auto w-full max-w-5xl"
+      aria-labelledby="goal-final-outcome"
+    >
+      <header className="border-b-2 border-success/35 pb-6">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="min-w-0 space-y-2">
+            <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.12em] text-success">
+              <CheckCircle2 className="size-4" aria-hidden />
+              {copy.verifiedOutcome}
+            </p>
+            <h2
+              id="goal-final-outcome"
+              className="text-balance text-3xl font-semibold tracking-tight sm:text-4xl"
+            >
+              {primary?.title ?? goal.title}
+            </h2>
+            {summary ? (
+              <p className="max-w-3xl text-sm leading-6 text-foreground/75 sm:text-base">
+                {summary}
               </p>
-              <h2 id="goal-final-outcome" className="text-balance text-2xl font-semibold tracking-tight sm:text-3xl">
-                {primary?.title ?? goal.title}
-              </h2>
-              {summary ? <p className="max-w-3xl text-sm leading-6 text-foreground/75 sm:text-base">{summary}</p> : null}
-            </div>
-            {goal.achievedAt ? (
-              <div className="flex shrink-0 items-center gap-2 text-xs text-muted-foreground sm:pt-1">
-                <Clock3 className="size-4 text-primary" aria-hidden />
-                <span>{copy.achievedAt}: {formatDate(goal.achievedAt, locale)}</span>
-              </div>
             ) : null}
           </div>
-        </header>
+          {goal.achievedAt ? (
+            <div className="flex shrink-0 items-center gap-2 rounded-full bg-success/[0.08] px-3 py-1.5 text-xs font-medium text-success sm:mt-1">
+              <Clock3 className="size-4" aria-hidden />
+              <span>
+                {copy.achievedAt}: {formatDate(goal.achievedAt, locale)}
+              </span>
+            </div>
+          ) : null}
+        </div>
+      </header>
 
-        <div className="grid gap-5 p-5 sm:p-7 lg:grid-cols-[minmax(0,1fr)_18rem] lg:items-start">
-          <div className="min-w-0 space-y-5">
-            {confirmation ? (
-              <section className="rounded-xl border border-primary/20 bg-primary/[0.04] p-4 sm:p-5" aria-labelledby="goal-achievement-confirmation">
-                <div className="flex items-start gap-3">
-                  <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
-                    <UserRound className="size-4" aria-hidden />
-                  </span>
-                  <div className="min-w-0">
-                    <h3 id="goal-achievement-confirmation" className="font-semibold">{copy.confirmationNote}</h3>
-                    <p className="mt-1.5 text-sm leading-6 text-foreground/80">{confirmation.note}</p>
-                    <p className="mt-3 text-xs text-muted-foreground">
-                      {copy.confirmedBy}: {confirmationActorLabel(confirmation.actorType, confirmation.actorId, copy)} · {formatDate(confirmation.confirmedAt, locale)}
-                    </p>
-                  </div>
+      <div className="grid gap-8 py-7 lg:grid-cols-[minmax(0,1fr)_17rem] lg:items-start">
+        <div className="min-w-0 space-y-8">
+          {confirmation ? (
+            <section
+              className="border-l-[3px] border-success bg-success/[0.045] px-5 py-4"
+              aria-labelledby="goal-achievement-confirmation"
+            >
+              <div className="flex items-start gap-3">
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-success text-success-foreground">
+                  <UserRound className="size-4" aria-hidden />
+                </span>
+                <div className="min-w-0">
+                  <p className="text-xs font-semibold uppercase tracking-[0.1em] text-success">
+                    {copy.confirmedOutcome}
+                  </p>
+                  <h3
+                    id="goal-achievement-confirmation"
+                    className="mt-1 font-semibold"
+                  >
+                    {copy.confirmationNote}
+                  </h3>
+                  <blockquote className="mt-2 text-sm leading-6 text-foreground/80">
+                    {confirmation.note}
+                  </blockquote>
+                  <p className="mt-3 text-xs text-muted-foreground">
+                    {copy.confirmedBy}:{" "}
+                    {confirmationActorLabel(
+                      confirmation.actorType,
+                      confirmation.actorId,
+                      copy,
+                    )}{" "}
+                    · {formatDate(confirmation.confirmedAt, locale)}
+                  </p>
                 </div>
-              </section>
-            ) : null}
+              </div>
+            </section>
+          ) : null}
 
-            <section className="rounded-xl border bg-background p-4 sm:p-5" aria-labelledby="goal-outcome-document">
-              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-                <h3 id="goal-outcome-document" className="flex items-center gap-2 font-semibold">
-                  <FileText className="size-4 text-primary" aria-hidden />
+          <section aria-labelledby="goal-outcome-document">
+            <div className="mb-4 flex flex-wrap items-center justify-between gap-2 border-b pb-3">
+              <div>
+                <p className="text-xs font-medium text-muted-foreground">
+                  {copy.retainedDeliverable}
+                </p>
+                <h3
+                  id="goal-outcome-document"
+                  className="mt-1 flex items-center gap-2 text-lg font-semibold"
+                >
+                  <FileText className="size-4 text-success" aria-hidden />
                   {copy.outcomeDocument}
                 </h3>
-                <Badge variant="outline" className="font-mono text-[11px]">{versionLabel}</Badge>
               </div>
-              {primary?.contentPreview ? (
-                <MarkdownContent className="py-0 text-sm sm:text-base [&_h1:first-child]:sr-only">{primary.contentPreview}</MarkdownContent>
-              ) : (
-                <p className="text-sm text-muted-foreground">{copy.noPrimaryResult}</p>
-              )}
-            </section>
-          </div>
-
-          <aside className="space-y-3 lg:sticky lg:top-16" aria-label={copy.supportingEvidence}>
-            <div className="rounded-xl border bg-muted/25 p-4">
-              <p className="text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground">{copy.supportingEvidence}</p>
-              <p className="mt-2 text-2xl font-semibold tracking-tight">{confirmation?.evidenceArtifactIds.length ?? 0}</p>
-              <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                {copy.evidenceCount.replace("{count}", String(confirmation?.evidenceArtifactIds.length ?? 0))}
-              </p>
+              <Badge variant="outline" className="font-mono text-[11px]">
+                {versionLabel}
+              </Badge>
             </div>
-
-            {primary ? (
-              <div className="rounded-xl border bg-background p-4">
-                <p className="text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground">{copy.resultActions}</p>
-                <div className="mt-3">
-                  <ArtifactActions artifact={primary} goalId={goal.id} goalAssetId={context?.asset?.id} copy={copy} showPreview={false} copyLabel={copy.copyDocument} />
-                </div>
-              </div>
-            ) : null}
-
-            {primary ? (
-              <details className="group rounded-xl border bg-background p-4">
-                <summary className="cursor-pointer list-none text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
-                  <span className="flex items-center justify-between gap-3">
-                    {copy.technicalDetails}
-                    <ChevronDown className="size-4 text-muted-foreground transition-transform group-open:rotate-180" aria-hidden />
-                  </span>
-                </summary>
-                <dl className="mt-4 space-y-3 border-t pt-4 text-sm">
-                  <div>
-                    <dt className="text-xs text-muted-foreground">{copy.sourceTask}</dt>
-                    <dd className="mt-1 font-medium">{sourceTask?.title ?? primary.taskId}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-xs text-muted-foreground">{copy.sourceRun}</dt>
-                    <dd className="mt-1 break-all font-mono text-xs">{primary.runId}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-xs text-muted-foreground">{copy.currentVersion}</dt>
-                    <dd className="mt-1 font-medium">{versionLabel}</dd>
-                  </div>
-                </dl>
-              </details>
-            ) : null}
-          </aside>
+            {primary?.contentPreview ? (
+              <MarkdownContent className="max-w-none py-0 text-sm sm:text-base [&_h1:first-child]:sr-only">
+                {primary.contentPreview}
+              </MarkdownContent>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                {copy.noPrimaryResult}
+              </p>
+            )}
+          </section>
         </div>
+
+        <aside
+          className="space-y-6 lg:sticky lg:top-16"
+          aria-label={copy.supportingEvidence}
+        >
+          <section aria-labelledby="goal-supporting-evidence">
+            <div className="flex items-center justify-between border-b pb-2">
+              <h3
+                id="goal-supporting-evidence"
+                className="text-sm font-semibold"
+              >
+                {copy.supportingEvidence}
+              </h3>
+              <span className="text-sm font-semibold tabular-nums text-success">
+                {confirmation?.evidenceArtifactIds.length ?? 0}
+              </span>
+            </div>
+            {evidence.length ? (
+              <ul className="divide-y">
+                {evidence.map((item) => (
+                  <li key={item.id} className="py-3">
+                    <div className="flex items-start gap-2">
+                      <CheckCircle2
+                        className="mt-0.5 size-4 shrink-0 text-success"
+                        aria-hidden
+                      />
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium leading-5">
+                          {item.title}
+                        </p>
+                        <p className="mt-1 text-xs capitalize text-muted-foreground">
+                          {artifactTypeLabel(item.type)}
+                          {item.taskTitle ? ` · ${item.taskTitle}` : ""}
+                        </p>
+                      </div>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="py-3 text-sm leading-6 text-muted-foreground">
+                {copy.evidenceCount.replace(
+                  "{count}",
+                  String(confirmation?.evidenceArtifactIds.length ?? 0),
+                )}
+              </p>
+            )}
+          </section>
+
+          {primary ? (
+            <section
+              className="border-t pt-4"
+              aria-labelledby="goal-result-actions"
+            >
+              <h3 id="goal-result-actions" className="text-sm font-semibold">
+                {copy.resultActions}
+              </h3>
+              <div className="mt-3">
+                <ArtifactActions
+                  artifact={primary}
+                  goalId={goal.id}
+                  goalAssetId={context?.asset?.id}
+                  copy={copy}
+                  showPreview={false}
+                  copyLabel={copy.copyDocument}
+                />
+              </div>
+            </section>
+          ) : null}
+
+          {primary ? (
+            <details className="group border-t pt-4">
+              <summary className="cursor-pointer list-none text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+                <span className="flex items-center justify-between gap-3">
+                  {copy.technicalDetails}
+                  <ChevronDown
+                    className="size-4 text-muted-foreground transition-transform group-open:rotate-180"
+                    aria-hidden
+                  />
+                </span>
+              </summary>
+              <dl className="mt-4 space-y-3 text-sm">
+                <div>
+                  <dt className="text-xs text-muted-foreground">
+                    {copy.sourceTask}
+                  </dt>
+                  <dd className="mt-1 font-medium">
+                    {sourceTask?.title ?? primary.taskId}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-muted-foreground">
+                    {copy.sourceRun}
+                  </dt>
+                  <dd className="mt-1 break-all font-mono text-xs">
+                    {primary.runId}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-muted-foreground">
+                    {copy.currentVersion}
+                  </dt>
+                  <dd className="mt-1 font-medium">{versionLabel}</dd>
+                </div>
+              </dl>
+            </details>
+          ) : null}
+        </aside>
       </div>
-    </section>
+    </article>
   );
 }
 
 function ActiveSummary({ goal, copy }: { goal: GoalData; copy: GoalCopy }) {
+  const locale = useLocale();
+  const stats = [
+    {
+      label: copy.tasksSection,
+      value: `${goal.projection.completedTaskCount}/${goal.projection.totalTaskCount}`,
+      detail: copy.completedShort,
+    },
+    {
+      label: copy.successCriteria,
+      value: `${goal.projection.criteriaSatisfiedCount}/${goal.projection.criteriaTotalCount}`,
+      detail: copy.confirmedShort,
+    },
+    {
+      label: copy.nextReview,
+      value: goal.nextReviewAt ? formatDate(goal.nextReviewAt, locale) : "—",
+      detail: goal.nextReviewAt ? copy.scheduledShort : copy.noReview,
+    },
+  ];
   return (
-    <Card className="border-primary/20 bg-primary/[0.04]">
-      <CardHeader className="pb-3"><CardTitle className="text-base">{copy.progress}</CardTitle></CardHeader>
-      <CardContent className="grid gap-3 sm:grid-cols-3">
-        <div className="rounded-xl border bg-background p-3"><p className="text-xs font-medium text-muted-foreground">{copy.tasksSection}</p><p className="mt-1 font-semibold">{format(copy.taskProgress, { completed: goal.projection.completedTaskCount, total: goal.projection.totalTaskCount })}</p></div>
-        <div className="rounded-xl border bg-background p-3"><p className="text-xs font-medium text-muted-foreground">{copy.successCriteria}</p><p className="mt-1 font-semibold">{format(copy.criteriaProgress, { completed: goal.projection.criteriaSatisfiedCount, total: goal.projection.criteriaTotalCount })}</p></div>
-        <div className="rounded-xl border bg-background p-3"><p className="text-xs font-medium text-muted-foreground">{copy.nextReview}</p><p className="mt-1 font-semibold">{goal.nextReviewAt ? formatDate(goal.nextReviewAt, useLocale()) : copy.noReview}</p></div>
-      </CardContent>
-    </Card>
+    <div className="grid border-y border-border/80 sm:grid-cols-3">
+      {stats.map((stat, index) => (
+        <div
+          key={stat.label}
+          className={`py-4 sm:px-5 ${index > 0 ? "border-t sm:border-l sm:border-t-0" : ""}`}
+        >
+          <p className="text-xs font-medium text-muted-foreground">
+            {stat.label}
+          </p>
+          <p className="mt-1 text-lg font-semibold tabular-nums">
+            {stat.value}
+          </p>
+          <p className="mt-0.5 text-xs text-muted-foreground">{stat.detail}</p>
+        </div>
+      ))}
+    </div>
   );
 }
 
 // The edit/read modes stay together so one card owns its complete product interaction.
 // eslint-disable-next-line complexity
-function OperationalBriefCard({ goal, copy }: { goal: GoalData; copy: GoalCopy }) {
+function OperationalBriefCard({
+  goal,
+  copy,
+}: {
+  goal: GoalData;
+  copy: GoalCopy;
+}) {
   const revalidator = useRevalidator();
   const brief = goal.workbench.brief;
   const [editing, setEditing] = useState(!brief);
-  const [outcome, setOutcome] = useState(brief?.outcome ?? goal.description ?? "");
+  const [outcome, setOutcome] = useState(
+    brief?.outcome ?? goal.description ?? "",
+  );
   const [currentFocus, setCurrentFocus] = useState(brief?.currentFocus ?? "");
   const [strategy, setStrategy] = useState(brief?.strategy ?? "");
-  const [constraints, setConstraints] = useState(brief?.constraints.join("\n") ?? "");
+  const [constraints, setConstraints] = useState(
+    brief?.constraints.join("\n") ?? "",
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -350,7 +552,10 @@ function OperationalBriefCard({ goal, copy }: { goal: GoalData; copy: GoalCopy }
         outcome: outcome.trim(),
         currentFocus: currentFocus.trim(),
         strategy: strategy.trim(),
-        constraints: constraints.split("\n").map((item) => item.trim()).filter(Boolean),
+        constraints: constraints
+          .split("\n")
+          .map((item) => item.trim())
+          .filter(Boolean),
       });
       await revalidator.revalidate();
       setEditing(false);
@@ -362,46 +567,161 @@ function OperationalBriefCard({ goal, copy }: { goal: GoalData; copy: GoalCopy }
   }
 
   return (
-    <Card>
-      <CardHeader className="flex-row items-start justify-between gap-3">
+    <section
+      className="border-l-2 border-info/50 pl-4 sm:pl-5"
+      aria-labelledby="goal-operational-brief"
+    >
+      <div className="mb-5 flex items-start justify-between gap-3">
         <div>
-          <CardTitle>{copy.operationalBrief}</CardTitle>
-          <CardDescription>{copy.workspaceDescription}</CardDescription>
+          <h3 id="goal-operational-brief" className="font-semibold">
+            {copy.operationalBrief}
+          </h3>
+          <p className="mt-1 text-sm leading-6 text-muted-foreground">
+            {copy.briefDescription}
+          </p>
         </div>
-        {!editing ? <Button size="sm" variant="outline" onClick={() => setEditing(true)}>{copy.editBrief}</Button> : null}
-      </CardHeader>
-      <CardContent className="space-y-4">
+        {!editing ? (
+          <Button size="sm" variant="ghost" onClick={() => setEditing(true)}>
+            {copy.editBrief}
+          </Button>
+        ) : null}
+      </div>
+      <div className="space-y-4">
         {editing ? (
           <>
-            <Field><FieldLabel htmlFor="goal-brief-outcome">{copy.outcomeLabel}</FieldLabel><Textarea id="goal-brief-outcome" value={outcome} onChange={(event) => setOutcome(event.target.value)} rows={2} /></Field>
-            <Field><FieldLabel htmlFor="goal-brief-focus">{copy.currentFocus}</FieldLabel><Input id="goal-brief-focus" value={currentFocus} onChange={(event) => setCurrentFocus(event.target.value)} /></Field>
-            <Field><FieldLabel htmlFor="goal-brief-strategy">{copy.strategy}</FieldLabel><Textarea id="goal-brief-strategy" value={strategy} onChange={(event) => setStrategy(event.target.value)} rows={3} /></Field>
-            <Field><FieldLabel htmlFor="goal-brief-constraints">{copy.constraints}</FieldLabel><Textarea id="goal-brief-constraints" value={constraints} onChange={(event) => setConstraints(event.target.value)} rows={3} /></Field>
-            {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
+            <Field>
+              <FieldLabel htmlFor="goal-brief-outcome">
+                {copy.outcomeLabel}
+              </FieldLabel>
+              <Textarea
+                id="goal-brief-outcome"
+                value={outcome}
+                onChange={(event) => setOutcome(event.target.value)}
+                rows={2}
+              />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="goal-brief-focus">
+                {copy.currentFocus}
+              </FieldLabel>
+              <Input
+                id="goal-brief-focus"
+                value={currentFocus}
+                onChange={(event) => setCurrentFocus(event.target.value)}
+              />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="goal-brief-strategy">
+                {copy.strategy}
+              </FieldLabel>
+              <Textarea
+                id="goal-brief-strategy"
+                value={strategy}
+                onChange={(event) => setStrategy(event.target.value)}
+                rows={3}
+              />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="goal-brief-constraints">
+                {copy.constraints}
+              </FieldLabel>
+              <Textarea
+                id="goal-brief-constraints"
+                value={constraints}
+                onChange={(event) => setConstraints(event.target.value)}
+                rows={3}
+              />
+            </Field>
+            {error ? (
+              <p role="alert" className="text-sm text-destructive">
+                {error}
+              </p>
+            ) : null}
             <div className="flex justify-end gap-2">
-              {brief ? <Button variant="outline" onClick={() => setEditing(false)}>{copy.cancel}</Button> : null}
-              <Button disabled={!outcome.trim() || !currentFocus.trim() || saving} onClick={() => void save()}>{saving ? copy.saving : copy.saveBrief}</Button>
+              {brief ? (
+                <Button variant="outline" onClick={() => setEditing(false)}>
+                  {copy.cancel}
+                </Button>
+              ) : null}
+              <Button
+                disabled={!outcome.trim() || !currentFocus.trim() || saving}
+                onClick={() => void save()}
+              >
+                {saving ? copy.saving : copy.saveBrief}
+              </Button>
             </div>
           </>
         ) : brief ? (
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="rounded-xl border bg-muted/20 p-4 sm:col-span-2"><p className="text-xs font-medium uppercase tracking-[0.12em] text-muted-foreground">{copy.currentFocus}</p><p className="mt-2 font-semibold">{brief.currentFocus}</p></div>
-            <div><p className="text-xs font-medium text-muted-foreground">{copy.outcomeLabel}</p><p className="mt-1 text-sm leading-6">{brief.outcome}</p></div>
-            <div><p className="text-xs font-medium text-muted-foreground">{copy.strategy}</p><p className="mt-1 text-sm leading-6">{brief.strategy}</p></div>
-            {brief.constraints.length ? <div className="sm:col-span-2"><p className="text-xs font-medium text-muted-foreground">{copy.constraints}</p><ul className="mt-2 space-y-1 text-sm">{brief.constraints.map((constraint) => <li key={constraint}>• {constraint}</li>)}</ul></div> : null}
-          </div>
+          <dl className="space-y-5">
+            <div className="rounded-lg bg-info/[0.07] px-4 py-3">
+              <dt className="text-xs font-medium text-info">
+                {copy.currentFocus}
+              </dt>
+              <dd className="mt-1.5 font-semibold leading-6">
+                {brief.currentFocus}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs font-medium text-muted-foreground">
+                {copy.outcomeLabel}
+              </dt>
+              <dd className="mt-1 text-sm leading-6">{brief.outcome}</dd>
+            </div>
+            {brief.strategy ? (
+              <div>
+                <dt className="text-xs font-medium text-muted-foreground">
+                  {copy.strategy}
+                </dt>
+                <dd className="mt-1 text-sm leading-6">{brief.strategy}</dd>
+              </div>
+            ) : null}
+            {brief.constraints.length ? (
+              <div>
+                <dt className="text-xs font-medium text-muted-foreground">
+                  {copy.constraints}
+                </dt>
+                <dd>
+                  <ul className="mt-2 space-y-1 text-sm">
+                    {brief.constraints.map((constraint) => (
+                      <li key={constraint}>• {constraint}</li>
+                    ))}
+                  </ul>
+                </dd>
+              </div>
+            ) : null}
+          </dl>
         ) : null}
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   );
 }
 
 function workingSetCandidates(goal: GoalData) {
   return [
-    ...goal.assets.map((asset) => ({ key: `goal_asset:${asset.id}`, subjectType: "goal_asset" as const, subjectId: asset.id, label: asset.label })),
-    ...goal.acceptedResults.map((result) => ({ key: `accepted_result:${result.runId}`, subjectType: "accepted_result" as const, subjectId: result.runId, label: result.taskTitle })),
-    ...goal.outcome.criteria.map((criterion) => ({ key: `criterion:${criterion.id}`, subjectType: "criterion" as const, subjectId: criterion.id, label: criterion.description })),
-    ...goal.tasks.map((task) => ({ key: `task:${task.id}`, subjectType: "task" as const, subjectId: task.id, label: task.title })),
+    ...goal.assets.map((asset) => ({
+      key: `goal_asset:${asset.id}`,
+      subjectType: "goal_asset" as const,
+      subjectId: asset.id,
+      label: asset.label,
+    })),
+    ...goal.acceptedResults.map((result) => ({
+      key: `accepted_result:${result.runId}`,
+      subjectType: "accepted_result" as const,
+      subjectId: result.runId,
+      label: result.taskTitle,
+    })),
+    ...goal.outcome.criteria.map((criterion) => ({
+      key: `criterion:${criterion.id}`,
+      subjectType: "criterion" as const,
+      subjectId: criterion.id,
+      label: criterion.description,
+    })),
+    ...goal.tasks.map((task) => ({
+      key: `task:${task.id}`,
+      subjectType: "task" as const,
+      subjectId: task.id,
+      label: task.title,
+    })),
   ];
 }
 
@@ -409,12 +729,24 @@ function WorkingSetCard({ goal, copy }: { goal: GoalData; copy: GoalCopy }) {
   const revalidator = useRevalidator();
   const candidates = workingSetCandidates(goal);
   const [editing, setEditing] = useState(false);
-  const [selected, setSelected] = useState(() => new Set(goal.workbench.workingSet.map((item) => `${item.subjectType}:${item.subjectId}`)));
+  const [selected, setSelected] = useState(
+    () =>
+      new Set(
+        goal.workbench.workingSet.map(
+          (item) => `${item.subjectType}:${item.subjectId}`,
+        ),
+      ),
+  );
   const [saving, setSaving] = useState(false);
   async function save() {
     setSaving(true);
     try {
-      await updateGoalWorkingSet(goal.id, candidates.filter((candidate) => selected.has(candidate.key)).map(({ subjectType, subjectId }) => ({ subjectType, subjectId })));
+      await updateGoalWorkingSet(
+        goal.id,
+        candidates
+          .filter((candidate) => selected.has(candidate.key))
+          .map(({ subjectType, subjectId }) => ({ subjectType, subjectId })),
+      );
       await revalidator.revalidate();
       setEditing(false);
     } finally {
@@ -422,34 +754,147 @@ function WorkingSetCard({ goal, copy }: { goal: GoalData; copy: GoalCopy }) {
     }
   }
   return (
-    <Card>
-      <CardHeader className="flex-row items-start justify-between gap-3">
-        <div><CardTitle>{copy.workingSet}</CardTitle><CardDescription>{copy.workingSetDescription}</CardDescription></div>
-        {!editing ? <Button size="sm" variant="outline" onClick={() => setEditing(true)}>{copy.editWorkingSet}</Button> : null}
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {editing ? candidates.map((candidate) => (
-          <label key={candidate.key} className="flex items-start gap-3 rounded-xl border p-3 text-sm">
-            <Checkbox checked={selected.has(candidate.key)} onCheckedChange={(checked) => setSelected((current) => { const next = new Set(current); if (checked) next.add(candidate.key); else next.delete(candidate.key); return next; })} />
-            <span>{candidate.label}</span>
-          </label>
-        )) : goal.workbench.workingSet.length ? goal.workbench.workingSet.map((item) => (
-          <div key={item.id} className="flex items-center gap-2 rounded-xl border p-3"><Badge variant="outline">{item.subjectType.replaceAll("_", " ")}</Badge><span className="text-sm font-medium">{item.label}</span></div>
-        )) : <p className="text-sm leading-6 text-muted-foreground">{copy.noWorkingSet}</p>}
-        {editing ? <div className="flex justify-end gap-2"><Button variant="outline" onClick={() => setEditing(false)}>{copy.cancel}</Button><Button disabled={saving} onClick={() => void save()}>{saving ? copy.saving : copy.saveWorkingSet}</Button></div> : null}
-      </CardContent>
-    </Card>
+    <section
+      className="border-t border-border/80 pt-5"
+      aria-labelledby="goal-working-set-card"
+    >
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h3 id="goal-working-set-card" className="font-semibold">
+            {copy.workingSet}
+          </h3>
+          <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">
+            {copy.workingSetDescription}
+          </p>
+        </div>
+        {!editing ? (
+          <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
+            {copy.editWorkingSet}
+          </Button>
+        ) : null}
+      </div>
+      <div className="mt-4 space-y-2">
+        {editing ? (
+          candidates.map((candidate) => (
+            <label
+              key={candidate.key}
+              className="flex items-start gap-3 rounded-lg border bg-card p-3 text-sm"
+            >
+              <Checkbox
+                checked={selected.has(candidate.key)}
+                onCheckedChange={(checked) =>
+                  setSelected((current) => {
+                    const next = new Set(current);
+                    if (checked) next.add(candidate.key);
+                    else next.delete(candidate.key);
+                    return next;
+                  })
+                }
+              />
+              <span>{candidate.label}</span>
+            </label>
+          ))
+        ) : goal.workbench.workingSet.length ? (
+          <div className="flex flex-wrap gap-2">
+            {goal.workbench.workingSet.map((item) => (
+              <span
+                key={item.id}
+                className="inline-flex items-center gap-2 rounded-full border bg-card px-3 py-1.5"
+              >
+                <span className="text-xs text-muted-foreground">
+                  {item.subjectType.replaceAll("_", " ")}
+                </span>
+                <span className="text-sm font-medium">{item.label}</span>
+              </span>
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-lg border border-dashed px-4 py-5">
+            <p className="text-sm leading-6 text-muted-foreground">
+              {copy.noWorkingSet}
+            </p>
+          </div>
+        )}
+        {editing ? (
+          <div className="flex justify-end gap-2 pt-2">
+            <Button variant="outline" onClick={() => setEditing(false)}>
+              {copy.cancel}
+            </Button>
+            <Button disabled={saving} onClick={() => void save()}>
+              {saving ? copy.saving : copy.saveWorkingSet}
+            </Button>
+          </div>
+        ) : null}
+      </div>
+    </section>
   );
 }
 
 function FocusQueue({ goal, copy }: { goal: GoalData; copy: GoalCopy }) {
   const groups = [
-    { key: "needsYou", title: copy.needsYou, tasks: goal.workbench.focus.needsYou },
-    { key: "inProgress", title: copy.inProgress, tasks: goal.workbench.focus.inProgress },
-    { key: "newResults", title: copy.newResults, tasks: goal.workbench.focus.newResults },
-    { key: "upNext", title: copy.upNext, tasks: goal.workbench.focus.upNext },
-  ];
-  return <Card><CardHeader><CardTitle>{copy.focusQueue}</CardTitle><CardDescription>{copy.workspaceDescription}</CardDescription></CardHeader><CardContent className="space-y-4">{groups.map((group) => <section key={group.key}><div className="mb-2 flex items-center gap-2"><p className="text-sm font-semibold">{group.title}</p><Badge variant="secondary">{group.tasks.length}</Badge></div>{group.tasks.slice(0, 3).map((task) => <TaskRow key={task.id} task={task} copy={copy} goalId={goal.id} />)}</section>)}</CardContent></Card>;
+    {
+      key: "needsYou",
+      title: copy.needsYou,
+      tasks: goal.workbench.focus.needsYou,
+      tone: "border-warning bg-warning/[0.045]",
+      countTone: "text-warning",
+    },
+    {
+      key: "inProgress",
+      title: copy.inProgress,
+      tasks: goal.workbench.focus.inProgress,
+      tone: "border-info/60 bg-info/[0.04]",
+      countTone: "text-info",
+    },
+    {
+      key: "newResults",
+      title: copy.newResults,
+      tasks: goal.workbench.focus.newResults,
+      tone: "border-success/60 bg-success/[0.04]",
+      countTone: "text-success",
+    },
+    {
+      key: "upNext",
+      title: copy.upNext,
+      tasks: goal.workbench.focus.upNext,
+      tone: "border-border bg-card",
+      countTone: "text-foreground",
+    },
+  ].filter((group) => group.tasks.length > 0);
+  if (groups.length === 0)
+    return (
+      <div className="rounded-xl border border-dashed px-5 py-8 text-center">
+        <CheckCircle2 className="mx-auto size-7 text-success" aria-hidden />
+        <p className="mt-3 font-medium">{copy.focusClear}</p>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {copy.focusClearDescription}
+        </p>
+      </div>
+    );
+  return (
+    <div className="space-y-3">
+      {groups.map((group) => (
+        <section
+          key={group.key}
+          className={`rounded-xl border-l-[3px] p-4 ${group.tone}`}
+        >
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <h3 className="text-sm font-semibold">{group.title}</h3>
+            <span
+              className={`text-sm font-semibold tabular-nums ${group.countTone}`}
+            >
+              {group.tasks.length}
+            </span>
+          </div>
+          <div className="space-y-2">
+            {group.tasks.slice(0, 3).map((task) => (
+              <TaskRow key={task.id} task={task} copy={copy} goalId={goal.id} />
+            ))}
+          </div>
+        </section>
+      ))}
+    </div>
+  );
 }
 
 function CriteriaCard({ goal, copy }: { goal: GoalData; copy: GoalCopy }) {
@@ -460,15 +905,21 @@ function CriteriaCard({ goal, copy }: { goal: GoalData; copy: GoalCopy }) {
   const [note, setNote] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [proposalDraft, setProposalDraft] = useState<Record<string, string>>({});
+  const [proposalDraft, setProposalDraft] = useState<Record<string, string>>(
+    {},
+  );
   const availableArtifacts = goal.assets.map((asset) => asset.currentArtifact);
 
   async function submit() {
-    if (!criterionId || artifactIds.length === 0 || !note.trim() || pending) return;
+    if (!criterionId || artifactIds.length === 0 || !note.trim() || pending)
+      return;
     setPending(true);
     setError(null);
     try {
-      await confirmGoalCriterion(goal.id, criterionId, { artifactIds, note: note.trim() });
+      await confirmGoalCriterion(goal.id, criterionId, {
+        artifactIds,
+        note: note.trim(),
+      });
       await revalidator.revalidate();
       setCriterionId(null);
       setArtifactIds([]);
@@ -485,7 +936,9 @@ function CriteriaCard({ goal, copy }: { goal: GoalData; copy: GoalCopy }) {
     setPending(true);
     setError(null);
     try {
-      await reviewGoalCriterion(goal.id, criterionId, { description: proposalDraft[criterionId]?.trim() || description });
+      await reviewGoalCriterion(goal.id, criterionId, {
+        description: proposalDraft[criterionId]?.trim() || description,
+      });
       await revalidator.revalidate();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : copy.actionError);
@@ -494,62 +947,254 @@ function CriteriaCard({ goal, copy }: { goal: GoalData; copy: GoalCopy }) {
     }
   }
 
+  const confirmedCount = goal.outcome.criteria.filter(
+    (criterion) => criterion.satisfied,
+  ).length;
+  const totalCount = goal.outcome.criteria.length;
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="text-base">{copy.successCriteria}</CardTitle>
-        <CardDescription>{format(copy.criteriaProgress, { completed: goal.projection.criteriaSatisfiedCount, total: goal.projection.criteriaTotalCount })}</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-3">
+    <section className="space-y-5">
+      <div className="flex flex-col gap-4 border-b pb-5 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-sm font-medium text-muted-foreground">
+            {copy.successCriteria}
+          </p>
+          <h2 className="mt-1 text-2xl font-semibold tracking-tight">
+            {format(copy.criteriaProgress, {
+              completed: confirmedCount,
+              total: totalCount,
+            })}
+          </h2>
+        </div>
+        {totalCount > 0 ? (
+          <div className="w-full sm:w-56">
+            <div className="mb-2 flex justify-between text-xs text-muted-foreground">
+              <span>{copy.verifiedOutcome}</span>
+              <span className="tabular-nums">
+                {Math.round((confirmedCount / totalCount) * 100)}%
+              </span>
+            </div>
+            <div className="h-2 overflow-hidden rounded-full bg-muted">
+              <span
+                className="block h-full rounded-full bg-success"
+                style={{ width: `${(confirmedCount / totalCount) * 100}%` }}
+              />
+            </div>
+          </div>
+        ) : null}
+      </div>
+      <div className="divide-y rounded-xl border bg-card">
         {goal.outcome.criteria.map((criterion) => (
-          <div key={criterion.id} className="flex gap-3 rounded-xl border p-3">
-            {criterion.satisfied ? <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-emerald-600" aria-hidden /> : <CircleDot className="mt-0.5 size-5 shrink-0 text-muted-foreground" aria-hidden />}
+          <div
+            key={criterion.id}
+            className={`flex flex-col gap-3 p-4 sm:flex-row sm:items-start ${criterion.satisfied ? "border-l-4 border-l-success bg-success/[0.025]" : criterion.proposalStatus === "proposed" ? "border-l-4 border-l-warning bg-warning/[0.025]" : "border-l-4 border-l-muted"}`}
+          >
+            {criterion.satisfied ? (
+              <CheckCircle2
+                className="mt-0.5 size-5 shrink-0 text-success"
+                aria-hidden
+              />
+            ) : (
+              <CircleDot
+                className="mt-0.5 size-5 shrink-0 text-muted-foreground"
+                aria-hidden
+              />
+            )}
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
-                {criterion.proposalStatus === "proposed" ? <Badge variant="outline">AI proposed</Badge> : null}
-                {criterion.proposalStatus === "proposed" ? <Input aria-label={`Review ${criterion.description}`} value={proposalDraft[criterion.id] ?? criterion.description} onChange={(event) => setProposalDraft((current) => ({ ...current, [criterion.id]: event.target.value }))} /> : <p className="text-sm font-medium leading-5">{criterion.description}</p>}
+                {criterion.proposalStatus === "proposed" ? (
+                  <Badge
+                    variant="outline"
+                    className="border-warning/30 bg-warning/[0.08] text-warning"
+                  >
+                    AI proposed
+                  </Badge>
+                ) : null}
+                {criterion.proposalStatus === "proposed" ? (
+                  <Input
+                    aria-label={`Review ${criterion.description}`}
+                    value={proposalDraft[criterion.id] ?? criterion.description}
+                    onChange={(event) =>
+                      setProposalDraft((current) => ({
+                        ...current,
+                        [criterion.id]: event.target.value,
+                      }))
+                    }
+                  />
+                ) : (
+                  <p className="text-sm font-medium leading-5">
+                    {criterion.description}
+                  </p>
+                )}
               </div>
-              {criterion.confirmedAt ? <p className="mt-1 text-xs text-muted-foreground">{formatDate(criterion.confirmedAt, locale)}</p> : null}
-              {(criterion.evidenceArtifactIds?.length ?? 0) > 0 ? <p className="mt-1 text-xs text-muted-foreground">{copy.evidenceCount.replace("{count}", String(criterion.evidenceArtifactIds?.length ?? 0))}</p> : null}
+              <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+                {criterion.confirmedAt ? (
+                  <span className="inline-flex items-center gap-1.5">
+                    <CheckCircle2 className="size-3.5 text-success" />
+                    {formatDate(criterion.confirmedAt, locale)}
+                  </span>
+                ) : null}
+                {(criterion.evidenceArtifactIds?.length ?? 0) > 0 ? (
+                  <span className="inline-flex items-center gap-1.5">
+                    <FileText className="size-3.5" />
+                    {copy.evidenceCount.replace(
+                      "{count}",
+                      String(criterion.evidenceArtifactIds?.length ?? 0),
+                    )}
+                  </span>
+                ) : null}
+              </div>
             </div>
-            {criterion.proposalStatus === "proposed" && goal.status === "Active" ? <Button size="sm" disabled={pending} onClick={() => void reviewProposal(criterion.id, criterion.description)}>Confirm criterion</Button> : null}
-            {criterion.proposalStatus !== "proposed" && !criterion.satisfied && goal.status === "Active" ? <Button size="sm" variant="outline" disabled={availableArtifacts.length === 0} onClick={() => { setCriterionId(criterion.id); setArtifactIds([]); }}>{copy.confirmCriterion}</Button> : null}
+            {criterion.proposalStatus === "proposed" &&
+            goal.status === "Active" ? (
+              <Button
+                size="sm"
+                disabled={pending}
+                onClick={() =>
+                  void reviewProposal(criterion.id, criterion.description)
+                }
+              >
+                Confirm criterion
+              </Button>
+            ) : null}
+            {criterion.proposalStatus !== "proposed" &&
+            !criterion.satisfied &&
+            goal.status === "Active" ? (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={availableArtifacts.length === 0}
+                onClick={() => {
+                  setCriterionId(criterion.id);
+                  setArtifactIds([]);
+                }}
+              >
+                {copy.confirmCriterion}
+              </Button>
+            ) : null}
           </div>
         ))}
-        <Dialog open={criterionId !== null} onOpenChange={(open) => { if (!open) setCriterionId(null); }}>
+        <Dialog
+          open={criterionId !== null}
+          onOpenChange={(open) => {
+            if (!open) setCriterionId(null);
+          }}
+        >
           <DialogContent className="sm:max-w-xl">
-            <DialogHeader><DialogTitle>{copy.confirmCriterion}</DialogTitle><DialogDescription>{copy.confirmCriterionDescription}</DialogDescription></DialogHeader>
+            <DialogHeader>
+              <DialogTitle>{copy.confirmCriterion}</DialogTitle>
+              <DialogDescription>
+                {copy.confirmCriterionDescription}
+              </DialogDescription>
+            </DialogHeader>
             <div className="space-y-4">
-              <div className="space-y-2">{availableArtifacts.map((artifact) => <Label key={artifact.id} className="flex items-center gap-3 rounded-lg border p-3"><Checkbox checked={artifactIds.includes(artifact.id)} onCheckedChange={(checked) => setArtifactIds((current) => checked ? [...current, artifact.id] : current.filter((id) => id !== artifact.id))} /><span>{artifact.title}</span></Label>)}</div>
-              <Field><FieldLabel htmlFor="criterion-evidence-note">{copy.criterionEvidenceNote}</FieldLabel><Textarea id="criterion-evidence-note" value={note} onChange={(event) => setNote(event.target.value)} /></Field>
-              {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
+              <div className="space-y-2">
+                {availableArtifacts.map((artifact) => (
+                  <Label
+                    key={artifact.id}
+                    className="flex items-center gap-3 rounded-lg border p-3"
+                  >
+                    <Checkbox
+                      checked={artifactIds.includes(artifact.id)}
+                      onCheckedChange={(checked) =>
+                        setArtifactIds((current) =>
+                          checked
+                            ? [...current, artifact.id]
+                            : current.filter((id) => id !== artifact.id),
+                        )
+                      }
+                    />
+                    <span>{artifact.title}</span>
+                  </Label>
+                ))}
+              </div>
+              <Field>
+                <FieldLabel htmlFor="criterion-evidence-note">
+                  {copy.criterionEvidenceNote}
+                </FieldLabel>
+                <Textarea
+                  id="criterion-evidence-note"
+                  value={note}
+                  onChange={(event) => setNote(event.target.value)}
+                />
+              </Field>
+              {error ? (
+                <p role="alert" className="text-sm text-destructive">
+                  {error}
+                </p>
+              ) : null}
             </div>
-            <DialogFooter><Button variant="outline" onClick={() => setCriterionId(null)}>{copy.cancel}</Button><Button disabled={artifactIds.length === 0 || !note.trim() || pending} onClick={() => void submit()}>{pending ? copy.saving : copy.confirmCriterion}</Button></DialogFooter>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setCriterionId(null)}>
+                {copy.cancel}
+              </Button>
+              <Button
+                disabled={artifactIds.length === 0 || !note.trim() || pending}
+                onClick={() => void submit()}
+              >
+                {pending ? copy.saving : copy.confirmCriterion}
+              </Button>
+            </DialogFooter>
           </DialogContent>
         </Dialog>
-      </CardContent>
-    </Card>
+      </div>
+    </section>
   );
 }
 
-function TaskRow({ task, copy, goalId }: { task: GoalTaskData; copy: GoalCopy; goalId: string }) {
+function TaskRow({
+  task,
+  copy,
+  goalId,
+}: {
+  task: GoalTaskData;
+  copy: GoalCopy;
+  goalId: string;
+}) {
   const locale = useLocale();
+  const tone =
+    task.group === "attention"
+      ? "border-l-warning bg-warning/[0.025]"
+      : task.group === "active"
+        ? "border-l-info bg-info/[0.025]"
+        : task.group === "completed"
+          ? "border-l-success bg-success/[0.025]"
+          : "border-l-muted";
   return (
-    <div className="flex min-w-0 flex-col gap-3 rounded-xl border p-4 sm:flex-row sm:items-center sm:justify-between">
+    <div
+      className={`flex min-w-0 flex-col gap-3 border-l-4 py-3 pl-4 pr-2 sm:flex-row sm:items-center sm:justify-between ${tone}`}
+    >
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-2">
           <p className="font-medium">{task.title}</p>
-          <Badge variant={task.group === "attention" ? "destructive" : task.group === "completed" ? "secondary" : "outline"}>
+          <Badge
+            variant={
+              task.group === "attention"
+                ? "destructive"
+                : task.group === "completed"
+                  ? "secondary"
+                  : "outline"
+            }
+          >
             {copy.taskStatus[task.status] ?? task.status}
           </Badge>
-          {task.attention ? <Badge variant="destructive">{task.attention}</Badge> : null}
+          {task.attention ? (
+            <Badge variant="destructive">{task.attention}</Badge>
+          ) : null}
         </div>
         {task.description ? (
-          <p className="mt-1 line-clamp-2 text-sm leading-5 text-muted-foreground">{task.description}</p>
+          <p className="mt-1 line-clamp-2 text-sm leading-5 text-muted-foreground">
+            {task.description}
+          </p>
         ) : null}
-        <p className="mt-1 text-xs text-muted-foreground">{formatDate(task.updatedAt, locale)}</p>
+        <p className="mt-2 text-xs text-muted-foreground">
+          {formatDate(task.updatedAt, locale)}
+        </p>
       </div>
-      <Button asChild size="sm" variant={task.group === "attention" ? "default" : "outline"}>
+      <Button
+        asChild
+        size="sm"
+        variant={task.group === "attention" ? "default" : "outline"}
+      >
         <LocalizedLink href={`/goals/${goalId}/workbench/tasks/${task.id}`}>
           {copy.openTask}
           <ExternalLink className="size-4" />
@@ -558,7 +1203,6 @@ function TaskRow({ task, copy, goalId }: { task: GoalTaskData; copy: GoalCopy; g
     </div>
   );
 }
-
 function TaskGroupSection({
   group,
   tasks,
@@ -586,14 +1230,22 @@ function TaskGroupSection({
           {copy.taskGroups[group]}
           <Badge variant="secondary">{tasks.length}</Badge>
         </span>
-        {open ? <ChevronUp className="size-4" /> : <ChevronDown className="size-4" />}
+        {open ? (
+          <ChevronUp className="size-4" />
+        ) : (
+          <ChevronDown className="size-4" />
+        )}
       </button>
-      {open ? <div className="space-y-2">{tasks.map((task) => <TaskRow key={task.id} task={task} copy={copy} goalId={goalId} />)}</div> : null}
+      {open ? (
+        <div className="space-y-2">
+          {tasks.map((task) => (
+            <TaskRow key={task.id} task={task} copy={copy} goalId={goalId} />
+          ))}
+        </div>
+      ) : null}
     </section>
   );
 }
-
-
 
 function CreateTaskDialog({
   goal,
@@ -612,9 +1264,20 @@ function CreateTaskDialog({
   const navigate = useNavigate();
   const locale = useLocale();
   const [expectedOutcome, setExpectedOutcome] = useState("");
-  const [selectedContext, setSelectedContext] = useState(() => new Set(goal.workbench.workingSet.map((item) => `${item.subjectType}:${item.subjectId}`)));
-  const [title, setTitle] = useState(kind === "review" ? copy.reviewTaskTitle : "");
-  const [description, setDescription] = useState(kind === "review" ? copy.reviewTaskDescription : "");
+  const [selectedContext, setSelectedContext] = useState(
+    () =>
+      new Set(
+        goal.workbench.workingSet.map(
+          (item) => `${item.subjectType}:${item.subjectId}`,
+        ),
+      ),
+  );
+  const [title, setTitle] = useState(
+    kind === "review" ? copy.reviewTaskTitle : "",
+  );
+  const [description, setDescription] = useState(
+    kind === "review" ? copy.reviewTaskDescription : "",
+  );
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -630,13 +1293,23 @@ function CreateTaskDialog({
         priority: "High",
         expectedOutcome: expectedOutcome.trim() || undefined,
         contextSelections: goal.workbench.workingSet
-          .filter((item) => selectedContext.has(`${item.subjectType}:${item.subjectId}`))
-          .map((item) => ({ subjectType: item.subjectType, subjectId: item.subjectId })),
+          .filter((item) =>
+            selectedContext.has(`${item.subjectType}:${item.subjectId}`),
+          )
+          .map((item) => ({
+            subjectType: item.subjectType,
+            subjectId: item.subjectId,
+          })),
         autoPlanGeneration: false,
       });
       await revalidator.revalidate();
       onOpenChange(false);
-      void navigate(localizeHref(locale, `/goals/${goal.id}/workbench/tasks/${result.taskId}`));
+      void navigate(
+        localizeHref(
+          locale,
+          `/goals/${goal.id}/workbench/tasks/${result.taskId}`,
+        ),
+      );
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : copy.actionError);
     } finally {
@@ -648,12 +1321,20 @@ function CreateTaskDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>{kind === "review" ? copy.startReview : copy.addTaskTitle}</DialogTitle>
-          <DialogDescription>{kind === "review" ? copy.reviewTaskDescription : copy.workspaceDescription}</DialogDescription>
+          <DialogTitle>
+            {kind === "review" ? copy.startReview : copy.addTaskTitle}
+          </DialogTitle>
+          <DialogDescription>
+            {kind === "review"
+              ? copy.reviewTaskDescription
+              : copy.workspaceDescription}
+          </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <Field>
-            <FieldLabel htmlFor={`goal-${kind}-title`}>{copy.taskTitleLabel}</FieldLabel>
+            <FieldLabel htmlFor={`goal-${kind}-title`}>
+              {copy.taskTitleLabel}
+            </FieldLabel>
             <Input
               id={`goal-${kind}-title`}
               value={title}
@@ -662,7 +1343,9 @@ function CreateTaskDialog({
             />
           </Field>
           <Field>
-            <FieldLabel htmlFor={`goal-${kind}-description`}>{copy.taskDescriptionLabel}</FieldLabel>
+            <FieldLabel htmlFor={`goal-${kind}-description`}>
+              {copy.taskDescriptionLabel}
+            </FieldLabel>
             <Textarea
               id={`goal-${kind}-description`}
               value={description}
@@ -672,24 +1355,72 @@ function CreateTaskDialog({
             />
           </Field>
           <Field>
-            <FieldLabel htmlFor={`goal-${kind}-outcome`}>{copy.expectedOutcome}</FieldLabel>
-            <Input id={`goal-${kind}-outcome`} value={expectedOutcome} onChange={(event) => setExpectedOutcome(event.target.value)} placeholder={copy.expectedOutcomePlaceholder} />
+            <FieldLabel htmlFor={`goal-${kind}-outcome`}>
+              {copy.expectedOutcome}
+            </FieldLabel>
+            <Input
+              id={`goal-${kind}-outcome`}
+              value={expectedOutcome}
+              onChange={(event) => setExpectedOutcome(event.target.value)}
+              placeholder={copy.expectedOutcomePlaceholder}
+            />
           </Field>
           {goal.workbench.workingSet.length ? (
             <Field>
               <FieldLabel>{copy.selectedContext}</FieldLabel>
-              <div className="space-y-2">{goal.workbench.workingSet.map((item) => {
-                const key = `${item.subjectType}:${item.subjectId}`;
-                return <label key={item.id} className="flex items-start gap-3 rounded-xl border p-3 text-sm"><Checkbox checked={selectedContext.has(key)} onCheckedChange={(checked) => setSelectedContext((current) => { const next = new Set(current); if (checked) next.add(key); else next.delete(key); return next; })} /><span>{item.label}</span></label>;
-              })}</div>
+              <div className="space-y-2">
+                {goal.workbench.workingSet.map((item) => {
+                  const key = `${item.subjectType}:${item.subjectId}`;
+                  return (
+                    <label
+                      key={item.id}
+                      className="flex items-start gap-3 rounded-xl border p-3 text-sm"
+                    >
+                      <Checkbox
+                        checked={selectedContext.has(key)}
+                        onCheckedChange={(checked) =>
+                          setSelectedContext((current) => {
+                            const next = new Set(current);
+                            if (checked) next.add(key);
+                            else next.delete(key);
+                            return next;
+                          })
+                        }
+                      />
+                      <span>{item.label}</span>
+                    </label>
+                  );
+                })}
+              </div>
             </Field>
           ) : null}
-          <div className="rounded-xl border bg-muted/20 p-4"><p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">{copy.actionPreview}</p><p className="mt-2 text-sm leading-6">{copy.createBoundedTaskPreview}</p></div>
-          {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
+          <div className="rounded-xl border bg-muted/20 p-4">
+            <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+              {copy.actionPreview}
+            </p>
+            <p className="mt-2 text-sm leading-6">
+              {copy.createBoundedTaskPreview}
+            </p>
+          </div>
+          {error ? (
+            <p role="alert" className="text-sm text-destructive">
+              {error}
+            </p>
+          ) : null}
         </div>
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>{copy.cancel}</Button>
-          <Button type="button" disabled={!title.trim() || pending} onClick={() => void submit()}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+          >
+            {copy.cancel}
+          </Button>
+          <Button
+            type="button"
+            disabled={!title.trim() || pending}
+            onClick={() => void submit()}
+          >
             {pending ? copy.creatingTask : copy.createTask}
           </Button>
         </DialogFooter>
@@ -698,7 +1429,91 @@ function CreateTaskDialog({
   );
 }
 
-function ReviewApplyDialog({ goal, copy, open, onOpenChange }: { goal: GoalData; copy: GoalCopy; open: boolean; onOpenChange: (open: boolean) => void }) {
+function GoalHistory({
+  goal,
+  copy,
+  isArchive,
+}: {
+  goal: GoalData;
+  copy: GoalCopy;
+  isArchive: boolean;
+}) {
+  const locale = useLocale();
+  return (
+    <section className="space-y-5">
+      <div className="border-b pb-5">
+        <p className="text-sm font-medium text-muted-foreground">
+          {copy.history}
+        </p>
+        <h2 className="mt-1 max-w-3xl text-2xl font-semibold tracking-tight">
+          {isArchive ? copy.archiveDescription : copy.workspaceDescription}
+        </h2>
+      </div>
+      <ol className="relative ml-1 max-w-4xl space-y-0 before:absolute before:bottom-2 before:left-[7px] before:top-2 before:w-px before:bg-border">
+        {goal.activity.map((item) => {
+          const isAchievement = item.type === "goal_achieved";
+          const isResult = item.type === "result_accepted";
+          return (
+            <li key={item.id} className="relative flex gap-4 pb-7 last:pb-0">
+              <span
+                className={`relative z-10 mt-1.5 size-[15px] shrink-0 rounded-full border-[3px] border-background ${isAchievement ? "bg-success" : isResult ? "bg-info" : "bg-muted-foreground/50"}`}
+              />
+              <article
+                className={`min-w-0 flex-1 ${isAchievement ? "-mt-2 rounded-xl border border-success/20 bg-success/[0.035] p-4" : "pb-1"}`}
+              >
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div>
+                    <p className="font-medium">{item.title}</p>
+                    <Badge
+                      variant="outline"
+                      className={`mt-1.5 text-[10px] uppercase tracking-wide ${isAchievement ? "border-success/25 text-success" : isResult ? "border-info/25 text-info" : "text-muted-foreground"}`}
+                    >
+                      {item.type.replaceAll("_", " ")}
+                    </Badge>
+                  </div>
+                  <time className="text-xs text-muted-foreground">
+                    {formatDate(item.occurredAt, locale)}
+                  </time>
+                </div>
+                {item.detail ? (
+                  <p className="mt-2 line-clamp-4 whitespace-pre-wrap text-sm leading-6 text-muted-foreground">
+                    {item.detail}
+                  </p>
+                ) : null}
+                {item.taskId ? (
+                  <Button
+                    asChild
+                    variant="link"
+                    size="sm"
+                    className="mt-1 h-auto px-0"
+                  >
+                    <LocalizedLink
+                      href={`/goals/${goal.id}/workbench/tasks/${item.taskId}`}
+                    >
+                      {copy.openTask}
+                    </LocalizedLink>
+                  </Button>
+                ) : null}
+              </article>
+            </li>
+          );
+        })}
+      </ol>
+    </section>
+  );
+}
+
+function ReviewApplyDialog({
+  goal,
+  copy,
+  open,
+  onOpenChange,
+}: {
+  goal: GoalData;
+  copy: GoalCopy;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
   const revalidator = useRevalidator();
   const [summary, setSummary] = useState("");
   const [focus, setFocus] = useState(goal.workbench.brief?.currentFocus ?? "");
@@ -714,8 +1529,27 @@ function ReviewApplyDialog({ goal, copy, open, onOpenChange }: { goal: GoalData;
     try {
       await applyGoalReview(goal.id, {
         summary: summary.trim(),
-        brief: goal.workbench.brief && focus.trim() ? { ...goal.workbench.brief, currentFocus: focus.trim() } : undefined,
-        tasks: taskTitle.trim() && expectedOutcome.trim() ? [{ kind: "task", title: taskTitle.trim(), description: summary.trim(), priority: "High", autoPlanGeneration: false, expectedOutcome: expectedOutcome.trim(), contextSelections: goal.workbench.workingSet.map((item) => ({ subjectType: item.subjectType, subjectId: item.subjectId })) }] : [],
+        brief:
+          goal.workbench.brief && focus.trim()
+            ? { ...goal.workbench.brief, currentFocus: focus.trim() }
+            : undefined,
+        tasks:
+          taskTitle.trim() && expectedOutcome.trim()
+            ? [
+                {
+                  kind: "task",
+                  title: taskTitle.trim(),
+                  description: summary.trim(),
+                  priority: "High",
+                  autoPlanGeneration: false,
+                  expectedOutcome: expectedOutcome.trim(),
+                  contextSelections: goal.workbench.workingSet.map((item) => ({
+                    subjectType: item.subjectType,
+                    subjectId: item.subjectId,
+                  })),
+                },
+              ]
+            : [],
       });
       await revalidator.revalidate();
       onOpenChange(false);
@@ -729,16 +1563,93 @@ function ReviewApplyDialog({ goal, copy, open, onOpenChange }: { goal: GoalData;
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="sm:max-w-2xl">
-        <DialogHeader><DialogTitle>{copy.applyReview}</DialogTitle><DialogDescription>{copy.applyReviewDescription}</DialogDescription></DialogHeader>
+        <DialogHeader>
+          <DialogTitle>{copy.applyReview}</DialogTitle>
+          <DialogDescription>{copy.applyReviewDescription}</DialogDescription>
+        </DialogHeader>
         <div className="grid gap-4">
-          <div className="grid gap-2 rounded-xl border bg-muted/20 p-4 text-sm sm:grid-cols-3"><span>{goal.outcome.criteria.filter((criterion) => criterion.satisfied).length}/{goal.outcome.criteria.length} {copy.successCriteria}</span><span>{goal.workbench.focus.newResults.length} {copy.newResults}</span><span>{goal.assets.length} {copy.assets}</span></div>
-          <Field><FieldLabel htmlFor="review-summary">{copy.reviewSummary}</FieldLabel><Textarea id="review-summary" value={summary} onChange={(event) => setSummary(event.target.value)} /></Field>
-          <Field><FieldLabel htmlFor="review-focus">{copy.currentFocus}</FieldLabel><Input id="review-focus" value={focus} onChange={(event) => setFocus(event.target.value)} /></Field>
-          <div className="space-y-3 rounded-xl border p-4"><p className="font-medium">{copy.reviewTaskSuggestion}</p><Field><FieldLabel htmlFor="review-task-title">{copy.addTaskTitle}</FieldLabel><Input id="review-task-title" value={taskTitle} onChange={(event) => setTaskTitle(event.target.value)} /></Field><Field><FieldLabel htmlFor="review-task-outcome">{copy.expectedOutcome}</FieldLabel><Textarea id="review-task-outcome" value={expectedOutcome} onChange={(event) => setExpectedOutcome(event.target.value)} /></Field></div>
-          <div className="rounded-xl border border-primary/20 bg-primary/[0.04] p-4 text-sm"><p className="font-medium">{copy.actionPreview}</p><p className="mt-1 text-muted-foreground">{focus !== goal.workbench.brief?.currentFocus ? copy.operationalBrief : copy.currentFocus} · {taskTitle.trim() ? copy.reviewTaskSuggestion : copy.noTasks}</p></div>
-          {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
+          <div className="grid gap-2 rounded-xl border bg-muted/20 p-4 text-sm sm:grid-cols-3">
+            <span>
+              {
+                goal.outcome.criteria.filter((criterion) => criterion.satisfied)
+                  .length
+              }
+              /{goal.outcome.criteria.length} {copy.successCriteria}
+            </span>
+            <span>
+              {goal.workbench.focus.newResults.length} {copy.newResults}
+            </span>
+            <span>
+              {goal.assets.length} {copy.assets}
+            </span>
+          </div>
+          <Field>
+            <FieldLabel htmlFor="review-summary">
+              {copy.reviewSummary}
+            </FieldLabel>
+            <Textarea
+              id="review-summary"
+              value={summary}
+              onChange={(event) => setSummary(event.target.value)}
+            />
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="review-focus">{copy.currentFocus}</FieldLabel>
+            <Input
+              id="review-focus"
+              value={focus}
+              onChange={(event) => setFocus(event.target.value)}
+            />
+          </Field>
+          <div className="space-y-3 rounded-xl border p-4">
+            <p className="font-medium">{copy.reviewTaskSuggestion}</p>
+            <Field>
+              <FieldLabel htmlFor="review-task-title">
+                {copy.addTaskTitle}
+              </FieldLabel>
+              <Input
+                id="review-task-title"
+                value={taskTitle}
+                onChange={(event) => setTaskTitle(event.target.value)}
+              />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="review-task-outcome">
+                {copy.expectedOutcome}
+              </FieldLabel>
+              <Textarea
+                id="review-task-outcome"
+                value={expectedOutcome}
+                onChange={(event) => setExpectedOutcome(event.target.value)}
+              />
+            </Field>
+          </div>
+          <div className="rounded-xl border border-primary/20 bg-primary/[0.04] p-4 text-sm">
+            <p className="font-medium">{copy.actionPreview}</p>
+            <p className="mt-1 text-muted-foreground">
+              {focus !== goal.workbench.brief?.currentFocus
+                ? copy.operationalBrief
+                : copy.currentFocus}{" "}
+              · {taskTitle.trim() ? copy.reviewTaskSuggestion : copy.noTasks}
+            </p>
+          </div>
+          {error ? (
+            <p role="alert" className="text-sm text-destructive">
+              {error}
+            </p>
+          ) : null}
         </div>
-        <DialogFooter><Button variant="outline" onClick={() => onOpenChange(false)}>{copy.cancel}</Button><Button disabled={!summary.trim() || pending} onClick={() => void submit()}>{pending ? copy.saving : copy.applyReview}</Button></DialogFooter>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            {copy.cancel}
+          </Button>
+          <Button
+            disabled={!summary.trim() || pending}
+            onClick={() => void submit()}
+          >
+            {pending ? copy.saving : copy.applyReview}
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
@@ -764,11 +1675,13 @@ function AchievementDialog({
   const [error, setError] = useState<string | null>(null);
   const artifacts = useMemo(() => {
     const seen = new Set<string>();
-    return goal.assets.flatMap((asset) => [asset.currentArtifact]).filter((artifact) => {
-      if (seen.has(artifact.id)) return false;
-      seen.add(artifact.id);
-      return true;
-    });
+    return goal.assets
+      .flatMap((asset) => [asset.currentArtifact])
+      .filter((artifact) => {
+        if (seen.has(artifact.id)) return false;
+        seen.add(artifact.id);
+        return true;
+      });
   }, [goal.assets]);
 
   async function submit() {
@@ -795,13 +1708,18 @@ function AchievementDialog({
       <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>{copy.confirmAchievement}</DialogTitle>
-          <DialogDescription>{copy.confirmAchievementDescription}</DialogDescription>
+          <DialogDescription>
+            {copy.confirmAchievementDescription}
+          </DialogDescription>
         </DialogHeader>
         <div className="space-y-5">
           <div className="space-y-2">
             <p className="text-sm font-medium">{copy.successCriteria}</p>
             {goal.outcome.criteria.map((criterion) => (
-              <div key={criterion.id} className="flex gap-2 rounded-lg border p-3 text-sm">
+              <div
+                key={criterion.id}
+                className="flex gap-2 rounded-lg border p-3 text-sm"
+              >
                 <CheckCircle2 className="mt-0.5 size-4 shrink-0 text-emerald-600" />
                 {criterion.description}
               </div>
@@ -812,26 +1730,43 @@ function AchievementDialog({
             <FieldDescription>{copy.evidenceDescription}</FieldDescription>
             <div className="space-y-2">
               {artifacts.map((artifact) => (
-                <Label key={artifact.id} className="flex cursor-pointer items-start gap-3 rounded-lg border p-3">
+                <Label
+                  key={artifact.id}
+                  className="flex cursor-pointer items-start gap-3 rounded-lg border p-3"
+                >
                   <Checkbox
                     checked={evidenceIds.includes(artifact.id)}
                     onCheckedChange={(checked) => {
-                      setEvidenceIds((current) => checked
-                        ? [...current, artifact.id]
-                        : current.filter((id) => id !== artifact.id));
+                      setEvidenceIds((current) =>
+                        checked
+                          ? [...current, artifact.id]
+                          : current.filter((id) => id !== artifact.id),
+                      );
                     }}
                   />
                   <span className="min-w-0">
-                    <span className="block text-sm font-medium">{artifact.title}</span>
-                    {artifact.contentPreview ? <span className="mt-1 block line-clamp-2 text-xs text-muted-foreground">{artifact.contentPreview}</span> : null}
+                    <span className="block text-sm font-medium">
+                      {artifact.title}
+                    </span>
+                    {artifact.contentPreview ? (
+                      <span className="mt-1 block line-clamp-2 text-xs text-muted-foreground">
+                        {artifact.contentPreview}
+                      </span>
+                    ) : null}
                   </span>
                 </Label>
               ))}
             </div>
-            {evidenceIds.length === 0 ? <FieldDescription className="text-destructive">{copy.evidenceRequired}</FieldDescription> : null}
+            {evidenceIds.length === 0 ? (
+              <FieldDescription className="text-destructive">
+                {copy.evidenceRequired}
+              </FieldDescription>
+            ) : null}
           </Field>
           <Field>
-            <FieldLabel htmlFor="goal-achievement-confirmation">{copy.confirmationLabel}</FieldLabel>
+            <FieldLabel htmlFor="goal-achievement-confirmation">
+              {copy.confirmationLabel}
+            </FieldLabel>
             <Textarea
               id="goal-achievement-confirmation"
               aria-label={copy.confirmationLabel}
@@ -841,11 +1776,27 @@ function AchievementDialog({
               rows={5}
             />
           </Field>
-          {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
+          {error ? (
+            <p role="alert" className="text-sm text-destructive">
+              {error}
+            </p>
+          ) : null}
         </div>
         <DialogFooter>
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>{copy.cancel}</Button>
-          <Button type="button" disabled={!confirmation.trim() || evidenceIds.length === 0 || pending} onClick={() => void submit()}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+          >
+            {copy.cancel}
+          </Button>
+          <Button
+            type="button"
+            disabled={
+              !confirmation.trim() || evidenceIds.length === 0 || pending
+            }
+            onClick={() => void submit()}
+          >
             {pending ? copy.confirming : copy.achieve}
           </Button>
         </DialogFooter>
@@ -886,7 +1837,16 @@ function PrimaryAction({
   const button = (() => {
     if (action === "resolve_attention" && goal.primaryAction.taskId) {
       return (
-        <Button onClick={() => void navigate(localizeHref(locale, `/goals/${goal.id}/workbench/tasks/${goal.primaryAction.taskId}`))}>
+        <Button
+          onClick={() =>
+            void navigate(
+              localizeHref(
+                locale,
+                `/goals/${goal.id}/workbench/tasks/${goal.primaryAction.taskId}`,
+              ),
+            )
+          }
+        >
           <AlertTriangle className="size-4" />
           {copy.nextAction.resolve_attention}
         </Button>
@@ -894,25 +1854,69 @@ function PrimaryAction({
     }
     if (action === "continue_work" && goal.primaryAction.taskId) {
       return (
-        <Button onClick={() => void navigate(localizeHref(locale, `/goals/${goal.id}/workbench/tasks/${goal.primaryAction.taskId}`))}>
+        <Button
+          onClick={() =>
+            void navigate(
+              localizeHref(
+                locale,
+                `/goals/${goal.id}/workbench/tasks/${goal.primaryAction.taskId}`,
+              ),
+            )
+          }
+        >
           <Play className="size-4" />
           {copy.nextAction.continue_work}
         </Button>
       );
     }
     if (action === "resume") {
-      return <Button disabled={pending} onClick={() => void runLifecycle("resume")}><Play className="size-4" />{copy.resume}</Button>;
+      return (
+        <Button disabled={pending} onClick={() => void runLifecycle("resume")}>
+          <Play className="size-4" />
+          {copy.resume}
+        </Button>
+      );
     }
     if (action === "review_criteria") {
-      return <Button onClick={() => void navigate(`${localizeHref(locale, `/goals/${goal.id}`)}?section=criteria`)}><CheckCircle2 className="size-4" />{copy.nextAction.review_criteria}</Button>;
+      return (
+        <Button
+          onClick={() =>
+            void navigate(
+              `${localizeHref(locale, `/goals/${goal.id}`)}?section=criteria`,
+            )
+          }
+        >
+          <CheckCircle2 className="size-4" />
+          {copy.nextAction.review_criteria}
+        </Button>
+      );
     }
     if (action === "review") {
-      return <Button onClick={onStartReview}><RefreshCw className="size-4" />{copy.startReview}</Button>;
+      return (
+        <Button onClick={onStartReview}>
+          <RefreshCw className="size-4" />
+          {copy.startReview}
+        </Button>
+      );
     }
-    if (action === "confirm_outcome" && goal.outcome.criteria.length > 0 && goal.outcome.criteria.every((criterion) => criterion.satisfied)) {
-      return <Button onClick={onAchieve}><CheckCircle2 className="size-4" />{copy.achieve}</Button>;
+    if (
+      action === "confirm_outcome" &&
+      goal.outcome.criteria.length > 0 &&
+      goal.outcome.criteria.every((criterion) => criterion.satisfied)
+    ) {
+      return (
+        <Button onClick={onAchieve}>
+          <CheckCircle2 className="size-4" />
+          {copy.achieve}
+        </Button>
+      );
     }
-    return <Button onClick={onAddTask}><Plus className="size-4" />{copy.addTask}</Button>;
+    return (
+      <Button onClick={onAddTask}>
+        <Plus className="size-4" />
+        {copy.addTask}
+      </Button>
+    );
   })();
 
   return (
@@ -920,15 +1924,38 @@ function PrimaryAction({
       {goal.status !== "Achieved" && goal.status !== "Stopped" ? button : null}
       {goal.status === "Active" ? (
         <DropdownMenu>
-          <DropdownMenuTrigger render={<Button type="button" variant="outline" size="icon" aria-label="Goal actions" />}>
+          <DropdownMenuTrigger
+            render={
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                aria-label="Goal actions"
+              />
+            }
+          >
             <MoreHorizontal className="size-4" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={onStartReview}><RefreshCw className="size-4" />{copy.startReview}</DropdownMenuItem>
-            <DropdownMenuItem onClick={onAddTask}><Plus className="size-4" />{copy.addTask}</DropdownMenuItem>
-            <DropdownMenuItem onClick={() => void runLifecycle("pause")}><Pause className="size-4" />{copy.pause}</DropdownMenuItem>
+            <DropdownMenuItem onClick={onStartReview}>
+              <RefreshCw className="size-4" />
+              {copy.startReview}
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={onAddTask}>
+              <Plus className="size-4" />
+              {copy.addTask}
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => void runLifecycle("pause")}>
+              <Pause className="size-4" />
+              {copy.pause}
+            </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem variant="destructive" onClick={() => void runLifecycle("stop")}>{copy.stop}</DropdownMenuItem>
+            <DropdownMenuItem
+              variant="destructive"
+              onClick={() => void runLifecycle("stop")}
+            >
+              {copy.stop}
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       ) : null}
@@ -938,7 +1965,15 @@ function PrimaryAction({
 
 // The workspace composes the four lifecycle sections at the route boundary.
 // eslint-disable-next-line max-lines-per-function, complexity
-export function GoalWorkspacePage({ goal, copy, assetWorkbench }: { goal: GoalData; copy: GoalCopy; assetWorkbench?: React.ReactNode }) {
+export function GoalWorkspacePage({
+  goal,
+  copy,
+  assetWorkbench,
+}: {
+  goal: GoalData;
+  copy: GoalCopy;
+  assetWorkbench?: React.ReactNode;
+}) {
   const [taskDialog, setTaskDialog] = useState<"task" | null>(null);
   const [renameTitle, setRenameTitle] = useState(goal.title);
   const [renamePending, setRenamePending] = useState(false);
@@ -958,34 +1993,71 @@ export function GoalWorkspacePage({ goal, copy, assetWorkbench }: { goal: GoalDa
   const isArchive = goal.mode === "archive";
   const [searchParams, setSearchParams] = useSearchParams();
   const requestedSection = searchParams.get("section");
-  const defaultSection = requestedSection === "work" || requestedSection === "workbench" || requestedSection === "criteria" || requestedSection === "history" ? requestedSection : "overview";
+  const defaultSection =
+    requestedSection === "work" ||
+    requestedSection === "workbench" ||
+    requestedSection === "criteria" ||
+    requestedSection === "history"
+      ? requestedSection
+      : "overview";
   return (
     <PageFrame mode="focused">
-      <div className="flex min-w-0 flex-1 flex-col gap-5" data-ui-surface-kind="product-authored">
-        <header className="space-y-4">
+      <div
+        className="flex min-w-0 flex-1 flex-col gap-5"
+        data-ui-surface-kind="product-authored"
+      >
+        <header
+          className={`space-y-3 border-b pb-5 ${isArchive ? "border-success/25" : "border-info/25"}`}
+        >
           <Button asChild variant="ghost" size="sm" className="w-fit -ml-2">
-            <LocalizedLink href="/goals"><ArrowLeft className="size-4" />{copy.backToGoals}</LocalizedLink>
+            <LocalizedLink href="/goals">
+              <ArrowLeft className="size-4" />
+              {copy.backToGoals}
+            </LocalizedLink>
           </Button>
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div className="min-w-0 space-y-2">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="inline-flex items-center gap-1.5 text-sm font-medium text-primary">
-                  {isArchive ? <CheckCircle2 className="size-4" /> : <Target className="size-4" />}
+              <div className="flex flex-wrap items-center gap-2 text-sm">
+                <span
+                  className={`inline-flex items-center gap-1.5 font-medium ${isArchive ? "text-success" : "text-info"}`}
+                >
+                  {isArchive ? (
+                    <CheckCircle2 className="size-4" />
+                  ) : (
+                    <Target className="size-4" />
+                  )}
                   {copy.status[goal.status]}
                 </span>
-                {isArchive ? <span className="text-sm text-muted-foreground">· {copy.outcomeArchive}</span> : null}
-                {!isArchive ? <Badge variant="outline">{copy.ongoingWorkspace}</Badge> : null}
-                {goal.projection.attention !== "none" ? <Badge variant="destructive">{copy.attention[goal.projection.attention]}</Badge> : null}
+                <span className="text-muted-foreground">
+                  · {isArchive ? copy.outcomeArchive : copy.ongoingWorkspace}
+                </span>
+                {goal.projection.attention !== "none" ? (
+                  <Badge variant="destructive">
+                    {copy.attention[goal.projection.attention]}
+                  </Badge>
+                ) : null}
                 {goal.workbench.pendingInboxCount > 0 ? (
                   <Button asChild size="sm" variant="outline">
-                    <LocalizedLink href={`/goals/${goal.id}?section=workbench&assetView=inbox`}>
-                      {copy.pendingInbox.replace("{count}", String(goal.workbench.pendingInboxCount))}
+                    <LocalizedLink
+                      href={`/goals/${goal.id}?section=workbench&assetView=inbox`}
+                    >
+                      {copy.pendingInbox.replace(
+                        "{count}",
+                        String(goal.workbench.pendingInboxCount),
+                      )}
                     </LocalizedLink>
                   </Button>
                 ) : null}
               </div>
-              <h1 className="max-w-4xl text-balance text-2xl font-semibold tracking-tight sm:text-3xl">{goal.title}</h1>
-              <p className="max-w-3xl text-sm leading-6 text-foreground/65">{goal.description}</p>
+              <h1 className="max-w-4xl text-balance text-2xl font-semibold tracking-tight sm:text-3xl">
+                {goal.title}
+              </h1>
+              {goal.description?.trim() &&
+              goal.description.trim() !== goal.title.trim() ? (
+                <p className="line-clamp-3 max-w-3xl text-sm leading-6 text-foreground/65">
+                  {goal.description}
+                </p>
+              ) : null}
             </div>
             <PrimaryAction
               goal={goal}
@@ -999,101 +2071,214 @@ export function GoalWorkspacePage({ goal, copy, assetWorkbench }: { goal: GoalDa
         {goal.titleSource === "ai" && !goal.titleRenameNoticeSeenAt ? (
           <Card className="border-primary/30 bg-primary/5">
             <CardContent className="flex flex-col gap-3 pt-6 sm:flex-row sm:items-center">
-              <div className="min-w-0 flex-1"><p className="font-medium">AI-generated Goal name</p><p className="text-sm text-muted-foreground">Review the suggested name. Renaming removes this attribution notice.</p></div>
-              <Input aria-label="Rename AI-generated Goal" value={renameTitle} onChange={(event) => setRenameTitle(event.target.value)} className="sm:max-w-sm" />
-              <Button disabled={!renameTitle.trim() || renamePending} onClick={() => void renameGoal()}>Rename</Button>
+              <div className="min-w-0 flex-1">
+                <p className="font-medium">AI-generated Goal name</p>
+                <p className="text-sm text-muted-foreground">
+                  Review the suggested name. Renaming removes this attribution
+                  notice.
+                </p>
+              </div>
+              <Input
+                aria-label="Rename AI-generated Goal"
+                value={renameTitle}
+                onChange={(event) => setRenameTitle(event.target.value)}
+                className="sm:max-w-sm"
+              />
+              <Button
+                disabled={!renameTitle.trim() || renamePending}
+                onClick={() => void renameGoal()}
+              >
+                Rename
+              </Button>
             </CardContent>
           </Card>
         ) : null}
 
-        <Tabs value={defaultSection} onValueChange={(section) => { const next = new URLSearchParams(searchParams); if (section === "overview") next.delete("section"); else next.set("section", section); setSearchParams(next, { replace: true }); }} className="min-w-0">
-          <div className="sticky top-0 z-20 -mx-4 border-y border-border/70 bg-background/95 backdrop-blur sm:-mx-2 supports-[backdrop-filter]:bg-background/85">
-            <div className="pointer-events-none absolute inset-y-0 right-0 z-10 w-8 bg-gradient-to-l from-background via-background/85 to-transparent sm:hidden" aria-hidden />
-            <div className="overflow-x-auto px-4 py-2 sm:px-2">
-            <TabsList className="inline-flex h-auto min-w-max justify-start gap-1 rounded-lg bg-muted/60 p-1 sm:w-auto">
-              <TabsTrigger value="overview" className="h-10 shrink-0 px-3 text-sm sm:px-4"><Target className="size-4" />{copy.overview}</TabsTrigger>
-              <TabsTrigger value="work" className="h-10 shrink-0 px-3 text-sm sm:px-4"><ListChecks className="size-4" />{copy.tasksSection}</TabsTrigger>
-              <TabsTrigger value="workbench" className="h-10 shrink-0 px-3 text-sm sm:px-4"><FileCheck2 className="size-4" />{copy.workbench}</TabsTrigger>
-              <TabsTrigger value="criteria" className="h-10 shrink-0 px-3 text-sm sm:px-4"><CheckCircle2 className="size-4" />{copy.successCriteria}</TabsTrigger>
-              <TabsTrigger value="history" className="h-10 shrink-0 px-3 text-sm sm:px-4"><History className="size-4" />{copy.history}</TabsTrigger>
-            </TabsList>
-          </div>
+        <Tabs
+          value={defaultSection}
+          onValueChange={(section) => {
+            const next = new URLSearchParams(searchParams);
+            if (section === "overview") next.delete("section");
+            else next.set("section", section);
+            setSearchParams(next, { replace: true });
+          }}
+          className="min-w-0"
+        >
+          <div className="sticky top-0 z-20 -mx-4 border-b border-border/70 bg-background/95 backdrop-blur sm:-mx-2 supports-[backdrop-filter]:bg-background/85">
+            <div
+              className="pointer-events-none absolute inset-y-0 right-0 z-10 w-8 bg-gradient-to-l from-background via-background/85 to-transparent sm:hidden"
+              aria-hidden
+            />
+            <div className="overflow-x-auto px-4 sm:px-2">
+              <TabsList className="inline-flex h-auto min-w-max justify-start gap-0 rounded-none bg-transparent p-0 sm:w-auto">
+                <TabsTrigger
+                  value="overview"
+                  className="h-11 shrink-0 rounded-none border-b-2 border-transparent px-3 text-sm shadow-none data-[state=active]:border-current data-[state=active]:bg-transparent data-[state=active]:shadow-none sm:px-4"
+                >
+                  <Target className="size-4" />
+                  {copy.overview}
+                </TabsTrigger>
+                <TabsTrigger
+                  value="work"
+                  className="h-11 shrink-0 rounded-none border-b-2 border-transparent px-3 text-sm shadow-none data-[state=active]:border-current data-[state=active]:bg-transparent data-[state=active]:shadow-none sm:px-4"
+                >
+                  <ListChecks className="size-4" />
+                  {copy.tasksSection}
+                </TabsTrigger>
+                <TabsTrigger
+                  value="workbench"
+                  className="h-11 shrink-0 rounded-none border-b-2 border-transparent px-3 text-sm shadow-none data-[state=active]:border-current data-[state=active]:bg-transparent data-[state=active]:shadow-none sm:px-4"
+                >
+                  <FileCheck2 className="size-4" />
+                  {copy.workbench}
+                </TabsTrigger>
+                <TabsTrigger
+                  value="criteria"
+                  className="h-11 shrink-0 rounded-none border-b-2 border-transparent px-3 text-sm shadow-none data-[state=active]:border-current data-[state=active]:bg-transparent data-[state=active]:shadow-none sm:px-4"
+                >
+                  <CheckCircle2 className="size-4" />
+                  {copy.successCriteria}
+                </TabsTrigger>
+                <TabsTrigger
+                  value="history"
+                  className="h-11 shrink-0 rounded-none border-b-2 border-transparent px-3 text-sm shadow-none data-[state=active]:border-current data-[state=active]:bg-transparent data-[state=active]:shadow-none sm:px-4"
+                >
+                  <History className="size-4" />
+                  {copy.history}
+                </TabsTrigger>
+              </TabsList>
+            </div>
           </div>
 
- 
           <TabsContent value="overview" className="mt-5">
-            {isArchive ? <PrimaryOutcome goal={goal} copy={copy} /> : (
-              <div className="space-y-5">
-                <section aria-labelledby="goal-control-plane" className="space-y-3">
-                  <div><p className="text-xs font-semibold text-primary">{copy.controlPlane}</p><h2 id="goal-control-plane" className="mt-1 text-xl font-semibold">{copy.currentFocus}</h2></div>
-                  <div className="grid gap-5 xl:grid-cols-[minmax(0,1.35fr)_minmax(20rem,0.65fr)]"><FocusQueue goal={goal} copy={copy} /><OperationalBriefCard goal={goal} copy={copy} /></div>
+            {isArchive ? (
+              <PrimaryOutcome goal={goal} copy={copy} />
+            ) : (
+              <div className="space-y-8">
+                <section
+                  aria-labelledby="goal-control-plane"
+                  className="space-y-4"
+                >
+                  <div className="flex items-end justify-between gap-4">
+                    <div>
+                      <p className="text-xs font-semibold text-info">
+                        {copy.ongoingWorkspace}
+                      </p>
+                      <h2
+                        id="goal-control-plane"
+                        className="mt-1 text-2xl font-semibold tracking-tight"
+                      >
+                        {copy.currentFocus}
+                      </h2>
+                      <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+                        {copy.currentFocusDescription}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="grid gap-7 xl:grid-cols-[minmax(0,1.35fr)_minmax(18rem,0.65fr)]">
+                    <FocusQueue goal={goal} copy={copy} />
+                    <OperationalBriefCard goal={goal} copy={copy} />
+                  </div>
                 </section>
                 <ActiveSummary goal={goal} copy={copy} />
-                <section aria-labelledby="goal-working-set" className="space-y-3">
-                  <div><p className="text-xs font-semibold text-primary">{copy.workbench}</p><h2 id="goal-working-set" className="mt-1 text-xl font-semibold">{copy.workingSet}</h2></div>
-                  <WorkingSetCard goal={goal} copy={copy} />
-                </section>
+                <WorkingSetCard goal={goal} copy={copy} />
               </div>
             )}
           </TabsContent>
 
           <TabsContent value="work" className="mt-5">
-            <Card>
-              <CardHeader className="flex-row items-start justify-between gap-3">
+            <section className="space-y-6">
+              <div className="flex flex-col gap-3 border-b pb-5 sm:flex-row sm:items-end sm:justify-between">
                 <div>
-                  <CardTitle>{copy.boundedTasks}</CardTitle>
-                  <CardDescription>{format(copy.taskProgress, { completed: goal.projection.completedTaskCount, total: goal.projection.totalTaskCount })}</CardDescription>
+                  <p className="text-sm font-medium text-muted-foreground">
+                    {copy.boundedTasks}
+                  </p>
+                  <h2 className="mt-1 text-2xl font-semibold tracking-tight">
+                    {format(copy.taskProgress, {
+                      completed: goal.projection.completedTaskCount,
+                      total: goal.projection.totalTaskCount,
+                    })}
+                  </h2>
                 </div>
-                {goal.status === "Active" ? <Button size="sm" onClick={() => setTaskDialog("task")}><Plus className="size-4" />{copy.addTask}</Button> : null}
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {goal.tasks.length === 0 ? <p className="text-sm text-muted-foreground">{copy.noTasks}</p> : null}
-                <TaskGroupSection group="attention" tasks={goal.taskGroups.attention} copy={copy} defaultOpen goalId={goal.id} />
-                <TaskGroupSection group="active" tasks={goal.taskGroups.active} copy={copy} defaultOpen goalId={goal.id} />
-                <TaskGroupSection group="planned" tasks={goal.taskGroups.planned} copy={copy} defaultOpen goalId={goal.id} />
-                <TaskGroupSection group="completed" tasks={goal.taskGroups.completed} copy={copy} defaultOpen={!isArchive} goalId={goal.id} />
-              </CardContent>
-            </Card>
+                {goal.status === "Active" ? (
+                  <Button size="sm" onClick={() => setTaskDialog("task")}>
+                    <Plus className="size-4" />
+                    {copy.addTask}
+                  </Button>
+                ) : null}
+              </div>
+              <div className="space-y-7">
+                {goal.tasks.length === 0 ? (
+                  <div className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
+                    {copy.noTasks}
+                  </div>
+                ) : null}
+                <TaskGroupSection
+                  group="attention"
+                  tasks={goal.taskGroups.attention}
+                  copy={copy}
+                  defaultOpen
+                  goalId={goal.id}
+                />
+                <TaskGroupSection
+                  group="active"
+                  tasks={goal.taskGroups.active}
+                  copy={copy}
+                  defaultOpen
+                  goalId={goal.id}
+                />
+                <TaskGroupSection
+                  group="planned"
+                  tasks={goal.taskGroups.planned}
+                  copy={copy}
+                  defaultOpen
+                  goalId={goal.id}
+                />
+                <TaskGroupSection
+                  group="completed"
+                  tasks={goal.taskGroups.completed}
+                  copy={copy}
+                  defaultOpen={!isArchive}
+                  goalId={goal.id}
+                />
+              </div>
+            </section>
           </TabsContent>
-
           <TabsContent value="workbench" className="mt-5">
-            {assetWorkbench ?? <Card><CardContent className="pt-6 text-sm text-muted-foreground">{copy.noAssets}</CardContent></Card>}
+            {assetWorkbench ?? (
+              <div className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
+                {copy.noAssets}
+              </div>
+            )}
           </TabsContent>
-
           <TabsContent value="criteria" className="mt-5">
             <CriteriaCard goal={goal} copy={copy} />
           </TabsContent>
-
           <TabsContent value="history" className="mt-5">
-            <Card>
-              <CardHeader>
-                <CardTitle>{copy.history}</CardTitle>
-                <CardDescription>{isArchive ? copy.archiveDescription : copy.workspaceDescription}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ol className="relative space-y-0 before:absolute before:bottom-2 before:left-[7px] before:top-2 before:w-px before:bg-border">
-                  {goal.activity.map((item) => (
-                    <li key={item.id} className="relative flex gap-4 pb-6 last:pb-0">
-                      <span className="relative z-10 mt-1.5 size-[15px] shrink-0 rounded-full border-2 border-background bg-primary" />
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center justify-between gap-2">
-                          <p className="font-medium">{item.title}</p>
-                          <span className="text-xs text-muted-foreground">{formatDate(item.occurredAt, useLocale())}</span>
-                        </div>
-                        {item.detail ? <p className="mt-1 line-clamp-4 whitespace-pre-wrap text-sm leading-6 text-muted-foreground">{item.detail}</p> : null}
-                        {item.taskId ? <Button asChild variant="link" size="sm" className="h-auto px-0 pt-1"><LocalizedLink href={`/goals/${goal.id}/workbench/tasks/${item.taskId}`}>{copy.openTask}</LocalizedLink></Button> : null}
-                      </div>
-                    </li>
-                  ))}
-                </ol>
-              </CardContent>
-            </Card>
+            <GoalHistory goal={goal} copy={copy} isArchive={isArchive} />
           </TabsContent>
         </Tabs>
-
-        <CreateTaskDialog goal={goal} copy={copy} kind="task" open={taskDialog !== null} onOpenChange={(open) => { if (!open) setTaskDialog(null); }} />
-        <ReviewApplyDialog goal={goal} copy={copy} open={reviewOpen} onOpenChange={setReviewOpen} />
-        <AchievementDialog goal={goal} copy={copy} open={achievementOpen} onOpenChange={setAchievementOpen} />
+        <CreateTaskDialog
+          goal={goal}
+          copy={copy}
+          kind="task"
+          open={taskDialog !== null}
+          onOpenChange={(open) => {
+            if (!open) setTaskDialog(null);
+          }}
+        />
+        <ReviewApplyDialog
+          goal={goal}
+          copy={copy}
+          open={reviewOpen}
+          onOpenChange={setReviewOpen}
+        />
+        <AchievementDialog
+          goal={goal}
+          copy={copy}
+          open={achievementOpen}
+          onOpenChange={setAchievementOpen}
+        />
       </div>
     </PageFrame>
   );

@@ -83,7 +83,6 @@ export type GoalActivityData = {
   taskId: string | null;
 };
 
-
 export type GoalWorkingSetItemData = {
   id: string;
   subjectType: GoalWorkingSetSubjectType;
@@ -133,7 +132,9 @@ export type GoalData = {
   };
   taskGroups: Record<GoalTaskGroup, GoalTaskData[]>;
   tasks: GoalTaskData[];
-  acceptedResults: Array<GoalAcceptedResultData & { taskId: string; taskTitle: string }>;
+  acceptedResults: Array<
+    GoalAcceptedResultData & { taskId: string; taskTitle: string }
+  >;
   assets: GoalAssetData[];
   activity: GoalActivityData[];
 };
@@ -146,6 +147,20 @@ export type GoalCopy = {
   openGoal: string;
   createGoal: string;
   createGoalDescription: string;
+  goalPortfolio: string;
+  defineOutcome: string;
+  defineOutcomeDescription: string;
+  goalOutcomePlaceholder: string;
+  goalDescriptionHelp: string;
+  startFirstTask: string;
+  startFirstTaskDescription: string;
+  firstTaskLabel: string;
+  firstTaskPlaceholder: string;
+  attentionGoalsDescription: string;
+  progressGoalsDescription: string;
+  quietGoals: string;
+  archiveCardSummary: string;
+  viewOutcome: string;
   removeCriterion: string;
   addCriterion: string;
   backToGoals: string;
@@ -165,6 +180,13 @@ export type GoalCopy = {
   saveBrief: string;
   saving: string;
   workingSet: string;
+  briefDescription: string;
+  currentFocusDescription: string;
+  focusClear: string;
+  focusClearDescription: string;
+  completedShort: string;
+  confirmedShort: string;
+  scheduledShort: string;
   workingSetDescription: string;
   editWorkingSet: string;
   saveWorkingSet: string;
@@ -256,6 +278,8 @@ export type GoalCopy = {
   technicalDetails: string;
   outcomeDocument: string;
   copyDocument: string;
+  confirmedOutcome: string;
+  retainedDeliverable: string;
   cancel: string;
   confirming: string;
   actionError: string;
@@ -320,6 +344,10 @@ export type GoalCopy = {
     oldestUpdated: string;
     name: string;
     recent: string;
+    assetCount: string;
+    filters: string;
+    activeFilters: string;
+    clearFilters: string;
     match: string;
     sourceTask: string;
     changeSummary: string;
