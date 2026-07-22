@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { cloneElement, useEffect, useMemo, useRef, useState } from "react";
 import {
   Archive,
   ChevronDown,
@@ -11,8 +11,13 @@ import {
   Globe2,
   History,
   Inbox,
+  Info,
   Loader2,
   Search,
+  PanelLeftClose,
+  PanelLeftOpen,
+  PanelRightClose,
+  PanelRightOpen,
   SlidersHorizontal,
   Sparkles,
   Upload,
@@ -576,7 +581,7 @@ function AssetContentEditor({
   }
   if (asset.kind === "file")
     return (
-      <div className="flex min-h-[24rem] flex-col items-center justify-center rounded-xl border border-dashed bg-muted/20 text-center">
+      <div className="flex min-h-[16rem] flex-col items-center justify-center rounded-xl border border-dashed bg-muted/20 px-5 text-center sm:min-h-[22rem]">
         <File className="size-14 text-muted-foreground" />
         <p className="mt-4 font-medium">{asset.sourceArtifact.title}</p>
         <p className="mt-1 max-w-md text-sm text-muted-foreground">
@@ -607,17 +612,365 @@ function AssetContentEditor({
   );
 }
 
+function AssetNavigation({
+  assets,
+  selectedId,
+  copy,
+  onSelect,
+  onCollapse,
+}: {
+  assets: GoalAssetWorkbenchData[];
+  selectedId: string;
+  copy: AssetWorkbenchCopy;
+  onSelect: (assetId: string) => void;
+  onCollapse?: () => void;
+}) {
+  const [query, setQuery] = useState("");
+  const visibleAssets = assets.filter((item) =>
+    item.label.toLowerCase().includes(query.toLowerCase()),
+  );
+  return (
+    <div className="flex h-full min-h-0 flex-col bg-muted/20">
+      <div className="shrink-0 border-b p-3">
+        <div className="flex items-center justify-between gap-2">
+          <p className="font-medium">{copy.assetsNavigation}</p>
+          {onCollapse ? (
+            <Button
+              size="icon-sm"
+              variant="ghost"
+              aria-label={copy.collapseAssets}
+              onClick={onCollapse}
+            >
+              <PanelLeftClose className="size-4" />
+            </Button>
+          ) : null}
+        </div>
+        <div className="relative mt-3">
+          <Search className="absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            aria-label={`${copy.searchAssets} · ${copy.assetsNavigation}`}
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            className="h-8 pl-8"
+            placeholder={copy.searchAssets}
+          />
+        </div>
+      </div>
+      <div className="min-h-0 flex-1 space-y-1 overflow-y-auto p-2">
+        {visibleAssets.map((item) => {
+          const Icon = ICON_BY_KIND[item.kind];
+          const selected = item.id === selectedId;
+          return (
+            <button
+              key={item.id}
+              type="button"
+              aria-current={selected ? "page" : undefined}
+              onClick={() => onSelect(item.id)}
+              className={`flex w-full min-w-0 items-center gap-2.5 rounded-lg border px-2.5 py-2 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${selected ? "border-primary/25 bg-background shadow-xs" : "border-transparent hover:bg-background/70"}`}
+            >
+              <span
+                className={`flex size-8 shrink-0 items-center justify-center rounded-md ${KIND_TONE[item.kind]}`}
+              >
+                <Icon className="size-4" />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-medium">
+                  {item.label}
+                </span>
+                <span className="block text-xs text-muted-foreground">
+                  {kindLabel(item.kind, copy)} · v
+                  {item.versions[0]?.version ?? 1}
+                </span>
+              </span>
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function AssetDetails({
+  goalId,
+  workspaceId,
+  asset,
+  current,
+  label,
+  setLabel,
+  instruction,
+  setInstruction,
+  pending,
+  copy,
+  act,
+  downloadSubmission,
+  onCollapse,
+}: {
+  goalId: string;
+  workspaceId: string;
+  asset: GoalAssetWorkbenchData;
+  current: GoalAssetWorkbenchData["versions"][number] | undefined;
+  label: string;
+  setLabel: (label: string) => void;
+  instruction: string;
+  setInstruction: (instruction: string) => void;
+  pending: boolean;
+  copy: AssetWorkbenchCopy;
+  act: (action: () => Promise<unknown>, success: string) => Promise<void>;
+  downloadSubmission: (
+    asset: GoalAssetWorkbenchData,
+    submission: GoalAssetWorkbenchData["submissions"][number],
+  ) => void;
+  onCollapse?: () => void;
+}) {
+  return (
+    <div className="flex h-full min-h-0 flex-col bg-muted/10">
+      <div className="flex shrink-0 items-center justify-between gap-2 border-b px-4 py-3">
+        <p className="font-medium">{copy.assetDetails}</p>
+        {onCollapse ? (
+          <Button
+            size="icon-sm"
+            variant="ghost"
+            aria-label={copy.collapseDetails}
+            onClick={onCollapse}
+          >
+            <PanelRightClose className="size-4" />
+          </Button>
+        ) : null}
+      </div>
+      <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-4">
+        <section className="space-y-3">
+          <Label htmlFor={`asset-title-${asset.id}`}>{copy.titleLabel}</Label>
+          <div className="flex gap-2">
+            <Input
+              id={`asset-title-${asset.id}`}
+              value={label}
+              onChange={(event) => setLabel(event.target.value)}
+            />
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={!label.trim() || label === asset.label || pending}
+              onClick={() =>
+                void act(
+                  () => renameGoalAsset(goalId, asset.id, label),
+                  copy.renamed,
+                )
+              }
+            >
+              {copy.save}
+            </Button>
+          </div>
+          <dl className="grid grid-cols-2 gap-x-3 gap-y-3 text-sm">
+            <div>
+              <dt className="text-muted-foreground">{copy.type}</dt>
+              <dd>{kindLabel(asset.kind, copy)}</dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground">{copy.formalVersion}</dt>
+              <dd>v{current?.version ?? 1}</dd>
+            </div>
+            <div className="col-span-2">
+              <dt className="text-muted-foreground">{copy.source}</dt>
+              <dd className="break-words">{asset.sourceArtifact.title}</dd>
+            </div>
+            {current?.originalFilename ? (
+              <div className="col-span-2">
+                <dt className="text-muted-foreground">
+                  {copy.originalFilename}
+                </dt>
+                <dd className="break-all">{current.originalFilename}</dd>
+              </div>
+            ) : null}
+            {current?.mimeType ? (
+              <div>
+                <dt className="text-muted-foreground">{copy.mimeType}</dt>
+                <dd>{current.mimeType}</dd>
+              </div>
+            ) : null}
+            <div>
+              <dt className="text-muted-foreground">{copy.updated}</dt>
+              <dd>{new Date(asset.updatedAt).toLocaleDateString()}</dd>
+            </div>
+          </dl>
+        </section>
+        <Separator />
+        <Tabs defaultValue="versions">
+          <TabsList
+            className={`grid w-full ${asset.kind === "form" ? "grid-cols-3" : "grid-cols-2"}`}
+          >
+            <TabsTrigger value="versions">{copy.versions}</TabsTrigger>
+            {asset.kind === "form" ? (
+              <TabsTrigger value="submissions">{copy.submissions}</TabsTrigger>
+            ) : null}
+            <TabsTrigger value="ai">{copy.ai}</TabsTrigger>
+          </TabsList>
+          <TabsContent value="versions" className="space-y-3 pt-3">
+            {asset.versions.map((version) => (
+              <div
+                key={version.id}
+                className="rounded-lg border bg-background p-3"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-medium">v{version.version}</span>
+                  <Badge variant="outline">
+                    {version.id === current?.id
+                      ? copy.currentVersion
+                      : sourceLabel(version.source, copy)}
+                  </Badge>
+                </div>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {version.changeSummary ?? copy.formalVersionFallback}
+                </p>
+                <p className="mt-2 text-xs text-muted-foreground">
+                  {new Date(version.createdAt).toLocaleString()}
+                </p>
+                {version.id !== current?.id ? (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="mt-2"
+                    disabled={pending}
+                    onClick={() =>
+                      void act(
+                        () =>
+                          restoreGoalAssetVersion(
+                            goalId,
+                            asset.id,
+                            version.id,
+                            workspaceId,
+                            `Restore v${version.version}`,
+                          ),
+                        formatCopy(copy.recoveredVersion, {
+                          version: version.version,
+                        }),
+                      )
+                    }
+                  >
+                    <History className="size-4" />
+                    {copy.recover}
+                  </Button>
+                ) : null}
+              </div>
+            ))}
+          </TabsContent>
+          {asset.kind === "form" ? (
+            <TabsContent value="submissions" className="space-y-3 pt-3">
+              {asset.submissions.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  {copy.noSubmissions}
+                </p>
+              ) : (
+                asset.submissions.map((submission) => (
+                  <div key={submission.id} className="rounded-lg border p-3">
+                    <p className="text-xs text-muted-foreground">
+                      {new Date(submission.createdAt).toLocaleString()}
+                    </p>
+                    <pre className="mt-2 max-h-32 overflow-auto whitespace-pre-wrap text-xs">
+                      {JSON.stringify(submission.content, null, 2)}
+                    </pre>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      className="mt-2"
+                      onClick={() => downloadSubmission(asset, submission)}
+                    >
+                      <Download className="size-4" />
+                      {copy.downloadSubmission}
+                    </Button>
+                  </div>
+                ))
+              )}
+            </TabsContent>
+          ) : null}
+          <TabsContent value="ai" className="space-y-3 pt-3">
+            <div className="rounded-lg border border-info/20 bg-info/[0.05] p-3">
+              <div className="flex items-center gap-2 text-sm font-medium text-info">
+                <Sparkles className="size-4" />
+                {copy.ai}
+              </div>
+              <p className="mt-1.5 text-xs leading-5 text-muted-foreground">
+                {copy.aiModificationDescription}
+              </p>
+            </div>
+            <Label htmlFor={`asset-ai-instruction-${asset.id}`}>
+              {copy.modificationRequest}
+            </Label>
+            <Textarea
+              id={`asset-ai-instruction-${asset.id}`}
+              value={instruction}
+              onChange={(event) => setInstruction(event.target.value)}
+              placeholder={copy.modificationPlaceholder}
+            />
+            <Button
+              className="w-full"
+              disabled={!instruction.trim() || !current || pending}
+              onClick={() =>
+                current &&
+                void act(
+                  () =>
+                    createGoalAssetModificationTask(goalId, asset.id, {
+                      workspaceId,
+                      versionId: current.id,
+                      instruction,
+                      expectedOutcome: formatCopy(
+                        copy.expectedModifiedOutcome,
+                        {
+                          asset: asset.label,
+                        },
+                      ),
+                    }),
+                  copy.versionBoundTaskCreated,
+                )
+              }
+            >
+              <Sparkles className="size-4" />
+              {copy.createAiTask}
+            </Button>
+          </TabsContent>
+        </Tabs>
+        <Separator />
+        <Button
+          variant="outline"
+          className="w-full justify-start"
+          disabled={pending}
+          onClick={() =>
+            void act(
+              () =>
+                archiveGoalAsset(
+                  goalId,
+                  asset.id,
+                  workspaceId,
+                  asset.archivedAt ? "restore" : "archive",
+                ),
+              asset.archivedAt ? copy.assetRestored : copy.assetArchived,
+            )
+          }
+        >
+          <Archive className="size-4" />
+          {asset.archivedAt ? copy.restoreAsset : copy.archiveAsset}
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 function AssetEditor({
   goalId,
   workspaceId,
   asset,
+  assets,
   copy,
+  onSelectAsset,
+  onClose,
   onRefresh,
 }: {
   goalId: string;
   workspaceId: string;
   asset: GoalAssetWorkbenchData;
+  assets: GoalAssetWorkbenchData[];
   copy: AssetWorkbenchCopy;
+  onSelectAsset: (assetId: string) => void;
+  onClose: () => void;
   onRefresh: () => void;
 }) {
   const current = asset.versions[0];
@@ -634,10 +987,35 @@ function AssetEditor({
   const [instruction, setInstruction] = useState("");
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [assetsOpen, setAssetsOpen] = useState(false);
+  const [detailsOpen, setDetailsOpen] = useState(false);
+  const [assetsCollapsed, setAssetsCollapsed] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      window.localStorage.getItem("chrona.goalAssets.collapsed") === "true",
+  );
+  const [detailsCollapsed, setDetailsCollapsed] = useState(
+    () =>
+      typeof window !== "undefined" &&
+      window.localStorage.getItem("chrona.goalAssetDetails.collapsed") ===
+        "true",
+  );
   const initialValue = useRef(value);
   const autosaveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
     undefined,
   );
+  useEffect(() => {
+    window.localStorage.setItem(
+      "chrona.goalAssets.collapsed",
+      String(assetsCollapsed),
+    );
+  }, [assetsCollapsed]);
+  useEffect(() => {
+    window.localStorage.setItem(
+      "chrona.goalAssetDetails.collapsed",
+      String(detailsCollapsed),
+    );
+  }, [detailsCollapsed]);
   useEffect(() => {
     const nextValue = contentText(
       draft?.content ??
@@ -739,9 +1117,21 @@ function AssetEditor({
     anchor.rel = "noopener";
     anchor.click();
   }
-
+  function exportAsset() {
+    if (!current) return;
+    void act(
+      () =>
+        createGoalAssetJob(goalId, asset.id, {
+          workspaceId,
+          versionId: current.id,
+          kind: "export",
+          format: asset.kind === "document" ? "md" : "json",
+        }),
+      copy.exportReady,
+    );
+  }
   function downloadSubmission(
-    asset: GoalAssetWorkbenchData,
+    targetAsset: GoalAssetWorkbenchData,
     submission: GoalAssetWorkbenchData["submissions"][number],
   ) {
     const anchor = document.createElement("a");
@@ -750,247 +1140,225 @@ function AssetEditor({
         type: "application/json",
       }),
     );
-    anchor.download = `${asset.label}-submission-${submission.id}.json`;
+    anchor.download = `${targetAsset.label}-submission-${submission.id}.json`;
     anchor.click();
     URL.revokeObjectURL(anchor.href);
   }
+  const editable = asset.kind === "document" || asset.kind === "form";
+  const gridColumns =
+    assetsCollapsed && detailsCollapsed
+      ? "xl:grid-cols-[3rem_minmax(0,1fr)_3rem]"
+      : assetsCollapsed
+        ? "xl:grid-cols-[3rem_minmax(0,1fr)_19rem]"
+        : detailsCollapsed
+          ? "xl:grid-cols-[15rem_minmax(0,1fr)_3rem]"
+          : "xl:grid-cols-[15rem_minmax(0,1fr)_19rem]";
+  const details = (
+    <AssetDetails
+      goalId={goalId}
+      workspaceId={workspaceId}
+      asset={asset}
+      current={current}
+      label={label}
+      setLabel={setLabel}
+      instruction={instruction}
+      setInstruction={setInstruction}
+      pending={pending}
+      copy={copy}
+      act={act}
+      downloadSubmission={downloadSubmission}
+    />
+  );
+  const Icon = ICON_BY_KIND[asset.kind];
   return (
-    <div className="grid min-h-0 flex-1 grid-cols-1 xl:grid-cols-[14rem_minmax(0,1fr)_17rem]">
-      <aside className="border-b bg-muted/20 p-4 xl:border-b-0 xl:border-r">
-        <Label htmlFor="asset-title">{copy.titleLabel}</Label>
-        <div className="mt-2 flex gap-2">
-          <Input
-            id="asset-title"
-            value={label}
-            onChange={(event) => setLabel(event.target.value)}
-          />
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() =>
-              void act(
-                () => renameGoalAsset(goalId, asset.id, label),
-                copy.renamed,
-              )
-            }
-          >
-            {copy.save}
-          </Button>
-        </div>
-        <Separator className="my-4" />
-        <p className="text-sm font-medium">{copy.asset}</p>
-        <dl className="mt-3 space-y-3 text-sm">
-          <div>
-            <dt className="text-muted-foreground">{copy.type}</dt>
-            <dd>{kindLabel(asset.kind, copy)}</dd>
+    <div className="flex h-full min-h-0 flex-col" data-testid="asset-workspace">
+      <SheetHeader className="shrink-0 border-b px-4 py-3 sm:px-5">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="flex min-w-0 items-center gap-3">
+            <span
+              className={`flex size-9 shrink-0 items-center justify-center rounded-lg ${KIND_TONE[asset.kind]}`}
+            >
+              <Icon className="size-4" />
+            </span>
+            <div className="min-w-0">
+              <SheetTitle className="truncate">{asset.label}</SheetTitle>
+              <SheetDescription className="flex flex-wrap items-center gap-1.5">
+                <span>{kindLabel(asset.kind, copy)}</span>
+                <span aria-hidden>·</span>
+                <span>v{current?.version ?? 1}</span>
+                <span aria-hidden>·</span>
+                <span className={draft ? "text-warning" : ""}>
+                  {draft ? copy.draftAvailable : copy.noDraft}
+                </span>
+              </SheetDescription>
+            </div>
           </div>
-          <div>
-            <dt className="text-muted-foreground">{copy.source}</dt>
-            <dd className="break-words">{asset.sourceArtifact.title}</dd>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              className="xl:hidden"
+              onClick={() => setAssetsOpen(true)}
+            >
+              <PanelLeftOpen className="size-4" />
+              {copy.openAssets}
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="xl:hidden"
+              onClick={() => setDetailsOpen(true)}
+            >
+              <Info className="size-4" />
+              {copy.openDetails}
+            </Button>
+            {editable ? (
+              <>
+                <Button
+                  size="sm"
+                  disabled={pending}
+                  onClick={() => void save()}
+                >
+                  {copy.saveDraft}
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={pending}
+                  onClick={() => void publish()}
+                >
+                  {copy.publishVersion}
+                </Button>
+              </>
+            ) : (
+              <Button size="sm" disabled={!current} onClick={downloadSource}>
+                <Download className="size-4" />
+                {copy.downloadSource}
+              </Button>
+            )}
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={!current || pending}
+              onClick={exportAsset}
+            >
+              <Download className="size-4" />
+              {copy.export}
+            </Button>
+            <Button
+              size="icon-sm"
+              variant="ghost"
+              aria-label={copy.closeAssetWorkspace}
+              onClick={onClose}
+            >
+              <X className="size-4" />
+            </Button>
           </div>
-          <div>
-            <dt className="text-muted-foreground">{copy.formalVersion}</dt>
-            <dd>v{current?.version ?? 1}</dd>
-          </div>
-        </dl>
-      </aside>
-      <main className="min-h-[26rem] p-4 sm:p-6 xl:p-8">
-        <AssetContentEditor
-          asset={asset}
-          currentVersionId={current?.id}
-          value={value}
-          formalValue={contentText(
-            current?.content ?? asset.sourceArtifact.contentPreview ?? "",
-          )}
-          setValue={setValue}
-          pending={pending}
-          copy={copy}
-          act={act}
-        />
-        <div className="mt-4 flex flex-wrap gap-2">
-          <Button
-            disabled={pending || asset.kind === "file" || asset.kind === "page"}
-            onClick={() => void save()}
-          >
-            {copy.saveDraft}
-          </Button>
-          <Button
-            variant="outline"
-            disabled={pending || asset.kind === "file" || asset.kind === "page"}
-            onClick={() => void publish()}
-          >
-            {copy.publishVersion}
-          </Button>
-          <Button variant="outline" onClick={downloadSource}>
-            <Download className="size-4" />
-            {copy.downloadSource}
-          </Button>
-          <Button
-            variant="outline"
-            disabled={!current || pending}
-            onClick={() =>
-              current &&
-              void act(
-                () =>
-                  createGoalAssetJob(goalId, asset.id, {
-                    workspaceId,
-                    versionId: current.id,
-                    kind: "export",
-                    format: asset.kind === "document" ? "md" : "json",
-                  }),
-                copy.exportReady,
-              )
-            }
-          >
-            <Download className="size-4" />
-            {copy.export}
-          </Button>
-          <Button
-            variant="outline"
-            disabled={pending}
-            onClick={() =>
-              void act(
-                () =>
-                  archiveGoalAsset(
-                    goalId,
-                    asset.id,
-                    workspaceId,
-                    asset.archivedAt ? "restore" : "archive",
-                  ),
-                asset.archivedAt ? copy.assetRestored : copy.assetArchived,
-              )
-            }
-          >
-            <Archive className="size-4" />
-            {asset.archivedAt ? copy.restore : copy.archived}
-          </Button>
         </div>
         {message ? (
-          <div
-            role="status"
-            className="mt-4 rounded-lg border bg-muted/30 p-3 text-sm"
-          >
+          <p role="status" className="text-sm text-muted-foreground">
             {message}
-          </div>
+          </p>
         ) : null}
-      </main>
-      <aside className="border-t bg-muted/10 p-4 xl:border-l xl:border-t-0">
-        <Tabs defaultValue="versions">
-          <TabsList
-            className={`grid w-full ${asset.kind === "form" ? "grid-cols-3" : "grid-cols-2"}`}
-          >
-            <TabsTrigger value="versions">{copy.versions}</TabsTrigger>
-            {asset.kind === "form" ? (
-              <TabsTrigger value="submissions">{copy.submissions}</TabsTrigger>
-            ) : null}
-            <TabsTrigger value="ai">{copy.ai}</TabsTrigger>
-          </TabsList>
-          <TabsContent value="versions" className="space-y-3 pt-3">
-            {asset.versions.map((version) => (
-              <div key={version.id} className="rounded-lg border p-3">
-                <div className="flex items-center justify-between">
-                  <span className="font-medium">v{version.version}</span>
-                  <Badge variant="outline">
-                    {sourceLabel(version.source, copy)}
-                  </Badge>
-                </div>
-                <p className="mt-2 text-xs text-muted-foreground">
-                  {version.changeSummary ?? copy.formalVersionFallback}
-                </p>
-                {version.id !== current?.id ? (
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    className="mt-2"
-                    disabled={pending}
-                    onClick={() =>
-                      void act(
-                        () =>
-                          restoreGoalAssetVersion(
-                            goalId,
-                            asset.id,
-                            version.id,
-                            workspaceId,
-                            `Restore v${version.version}`,
-                          ),
-                        formatCopy(copy.recoveredVersion, {
-                          version: version.version,
-                        }),
-                      )
-                    }
-                  >
-                    <History className="size-4" />
-                    {copy.recover}
-                  </Button>
-                ) : null}
-              </div>
-            ))}
-          </TabsContent>
-          {asset.kind === "form" ? (
-            <TabsContent value="submissions" className="space-y-3 pt-3">
-              {asset.submissions.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  {copy.noSubmissions}
-                </p>
-              ) : (
-                asset.submissions.map((submission) => (
-                  <div key={submission.id} className="rounded-lg border p-3">
-                    <p className="text-xs text-muted-foreground">
-                      {new Date(submission.createdAt).toLocaleString()}
-                    </p>
-                    <pre className="mt-2 max-h-32 overflow-auto whitespace-pre-wrap text-xs">
-                      {JSON.stringify(submission.content, null, 2)}
-                    </pre>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      className="mt-2"
-                      onClick={() => downloadSubmission(asset, submission)}
-                    >
-                      <Download className="size-4" />
-                      {copy.downloadSubmission}
-                    </Button>
-                  </div>
-                ))
-              )}
-            </TabsContent>
-          ) : null}
-          <TabsContent value="ai" className="space-y-3 pt-3">
-            <Label htmlFor="asset-ai-instruction">
-              {copy.modificationRequest}
-            </Label>
-            <Textarea
-              id="asset-ai-instruction"
-              value={instruction}
-              onChange={(event) => setInstruction(event.target.value)}
-              placeholder={copy.modificationPlaceholder}
+      </SheetHeader>
+      <div className={`grid min-h-0 flex-1 grid-cols-1 ${gridColumns}`}>
+        <aside
+          data-asset-panel={assetsCollapsed ? "assets-collapsed" : "assets"}
+          className="hidden min-h-0 border-r bg-muted/20 xl:block"
+        >
+          {assetsCollapsed ? (
+            <div className="flex h-full justify-center pt-3">
+              <Button
+                size="icon-sm"
+                variant="ghost"
+                aria-label={copy.openAssets}
+                onClick={() => setAssetsCollapsed(false)}
+              >
+                <PanelLeftOpen className="size-4" />
+              </Button>
+            </div>
+          ) : (
+            <AssetNavigation
+              assets={assets}
+              selectedId={asset.id}
+              copy={copy}
+              onSelect={onSelectAsset}
+              onCollapse={() => setAssetsCollapsed(true)}
             />
-            <Button
-              className="w-full"
-              disabled={!instruction.trim() || !current || pending}
-              onClick={() =>
-                current &&
-                void act(
-                  () =>
-                    createGoalAssetModificationTask(goalId, asset.id, {
-                      workspaceId,
-                      versionId: current.id,
-                      instruction,
-                      expectedOutcome: formatCopy(
-                        copy.expectedModifiedOutcome,
-                        { asset: asset.label },
-                      ),
-                    }),
-                  copy.versionBoundTaskCreated,
-                )
-              }
-            >
-              <Sparkles className="size-4" />
-              {copy.createAiTask}
-            </Button>
-          </TabsContent>
-        </Tabs>
-      </aside>
+          )}
+        </aside>
+        <main className="min-h-0 overflow-y-auto bg-background p-4 sm:p-6 xl:p-8">
+          <div className="mx-auto max-w-4xl">
+            <AssetContentEditor
+              asset={asset}
+              currentVersionId={current?.id}
+              value={value}
+              formalValue={contentText(
+                current?.content ?? asset.sourceArtifact.contentPreview ?? "",
+              )}
+              setValue={setValue}
+              pending={pending}
+              copy={copy}
+              act={act}
+            />
+            {editable ? (
+              <div className="mt-4 flex flex-wrap gap-2">
+                <Button variant="outline" onClick={downloadSource}>
+                  <Download className="size-4" />
+                  {copy.downloadSource}
+                </Button>
+              </div>
+            ) : null}
+          </div>
+        </main>
+        <aside
+          data-asset-panel={detailsCollapsed ? "details-collapsed" : "details"}
+          className="hidden min-h-0 border-l bg-muted/10 xl:block"
+        >
+          {detailsCollapsed ? (
+            <div className="flex h-full justify-center pt-3">
+              <Button
+                size="icon-sm"
+                variant="ghost"
+                aria-label={copy.openDetails}
+                onClick={() => setDetailsCollapsed(false)}
+              >
+                <PanelRightOpen className="size-4" />
+              </Button>
+            </div>
+          ) : (
+            cloneElement(details, {
+              onCollapse: () => setDetailsCollapsed(true),
+            })
+          )}
+        </aside>
+      </div>
+      <Sheet open={assetsOpen} onOpenChange={setAssetsOpen}>
+        <SheetContent
+          side="left"
+          className="w-[min(88vw,22rem)]! max-w-none! gap-0 p-0 xl:hidden"
+        >
+          <SheetTitle className="sr-only">{copy.assetsNavigation}</SheetTitle>
+          <AssetNavigation
+            assets={assets}
+            selectedId={asset.id}
+            copy={copy}
+            onSelect={(assetId) => {
+              onSelectAsset(assetId);
+              setAssetsOpen(false);
+            }}
+          />
+        </SheetContent>
+      </Sheet>
+      <Sheet open={detailsOpen} onOpenChange={setDetailsOpen}>
+        <SheetContent
+          side="right"
+          className="w-[min(92vw,28rem)]! max-w-none! gap-0 p-0 xl:hidden"
+        >
+          <SheetTitle className="sr-only">{copy.assetDetails}</SheetTitle>
+          {details}
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
@@ -1379,41 +1747,22 @@ export function GoalAssetWorkbench({
         <SheetContent
           side="right"
           showCloseButton={false}
-          className="flex w-full! max-w-none! flex-col gap-0 p-0 sm:w-[min(92vw,76rem)]!"
+          className="flex w-screen! max-w-none! flex-col gap-0 overflow-hidden p-0"
         >
-          <SheetHeader className="border-b px-5 py-4">
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <SheetTitle>{selected?.label}</SheetTitle>
-                <SheetDescription>
-                  {selected
-                    ? formatCopy(copy.provenanceDescription, {
-                        kind: kindLabel(selected.kind, copy),
-                      })
-                    : ""}
-                </SheetDescription>
-              </div>
-              <Button
-                size="icon"
-                variant="ghost"
-                aria-label={copy.closeAssetWorkspace}
-                onClick={() => updateWorkbenchParams({ asset: null })}
-              >
-                <X className="size-4" />
-              </Button>
-            </div>
-          </SheetHeader>
-          <div className="min-h-0 flex-1 overflow-auto">
-            {selected ? (
-              <AssetEditor
-                goalId={goalId}
-                workspaceId={workspaceId}
-                asset={selected}
-                copy={copy}
-                onRefresh={refresh}
-              />
-            ) : null}
-          </div>
+          {selected ? (
+            <AssetEditor
+              goalId={goalId}
+              workspaceId={workspaceId}
+              asset={selected}
+              assets={initialAssets.filter((asset) => !asset.archivedAt)}
+              copy={copy}
+              onSelectAsset={(assetId) =>
+                updateWorkbenchParams({ asset: assetId })
+              }
+              onClose={() => updateWorkbenchParams({ asset: null })}
+              onRefresh={refresh}
+            />
+          ) : null}
         </SheetContent>
       </Sheet>
     </section>
