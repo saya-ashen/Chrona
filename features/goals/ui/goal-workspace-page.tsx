@@ -1,7 +1,7 @@
 "use client";
 /* eslint-disable max-lines */
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate, useRevalidator, useSearchParams } from "react-router-dom";
 import {
   AlertTriangle,
@@ -1962,6 +1962,91 @@ function PrimaryAction({
     </div>
   );
 }
+type GoalWorkspaceSection =
+  "overview" | "work" | "workbench" | "criteria" | "history";
+
+function GoalSectionNavigation({
+  section,
+  copy,
+}: {
+  section: GoalWorkspaceSection;
+  copy: GoalCopy;
+}) {
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const [scrollEdges, setScrollEdges] = useState({ start: false, end: false });
+  const updateScrollEdges = useCallback(() => {
+    const scroller = scrollerRef.current;
+    if (!scroller) return;
+    const next = {
+      start: scroller.scrollLeft > 1,
+      end:
+        scroller.scrollLeft + scroller.clientWidth < scroller.scrollWidth - 1,
+    };
+    setScrollEdges((current) =>
+      current.start === next.start && current.end === next.end ? current : next,
+    );
+  }, []);
+
+  useEffect(() => {
+    const scroller = scrollerRef.current;
+    if (!scroller) return;
+    const activeTab = scroller.querySelector<HTMLElement>(
+      '[role="tab"][data-state="active"]',
+    );
+    activeTab?.scrollIntoView?.({ block: "nearest", inline: "center" });
+    updateScrollEdges();
+    window.addEventListener("resize", updateScrollEdges);
+    return () => window.removeEventListener("resize", updateScrollEdges);
+  }, [section, updateScrollEdges]);
+
+  const sections = [
+    { value: "overview", label: copy.overview, Icon: Target },
+    { value: "work", label: copy.tasksSection, Icon: ListChecks },
+    { value: "workbench", label: copy.workbench, Icon: FileCheck2 },
+    { value: "criteria", label: copy.successCriteria, Icon: CheckCircle2 },
+    { value: "history", label: copy.history, Icon: History },
+  ] as const;
+
+  return (
+    <nav
+      aria-label={copy.controlPlane}
+      className="shrink-0 border-b border-border/60 bg-background pb-3"
+    >
+      <div className="relative">
+        {scrollEdges.start ? (
+          <span
+            className="pointer-events-none absolute inset-y-px left-px z-10 w-8 rounded-l-xl bg-gradient-to-r from-muted via-muted/85 to-transparent sm:hidden"
+            aria-hidden
+          />
+        ) : null}
+        {scrollEdges.end ? (
+          <span
+            className="pointer-events-none absolute inset-y-px right-px z-10 w-8 rounded-r-xl bg-gradient-to-l from-muted via-muted/85 to-transparent sm:hidden"
+            aria-hidden
+          />
+        ) : null}
+        <div
+          ref={scrollerRef}
+          className="no-scrollbar overflow-x-auto rounded-xl border border-border/70 bg-muted/45 p-1 shadow-xs"
+          onScroll={updateScrollEdges}
+        >
+          <TabsList className="h-auto min-w-max justify-start gap-1 rounded-none bg-transparent p-0">
+            {sections.map(({ value, label, Icon }) => (
+              <TabsTrigger
+                key={value}
+                value={value}
+                className="h-10 flex-none rounded-lg border-transparent px-3 text-sm text-muted-foreground shadow-none hover:bg-background/70 hover:text-foreground data-[state=active]:border-border/70 data-[state=active]:bg-background data-[state=active]:text-foreground data-[state=active]:shadow-xs data-[state=active]:[&_svg]:text-primary sm:px-4"
+              >
+                <Icon className="size-4" />
+                {label}
+              </TabsTrigger>
+            ))}
+          </TabsList>
+        </div>
+      </div>
+    </nav>
+  );
+}
 
 // The workspace composes the four lifecycle sections at the route boundary.
 // eslint-disable-next-line max-lines-per-function, complexity
@@ -2000,10 +2085,14 @@ export function GoalWorkspacePage({
     requestedSection === "history"
       ? requestedSection
       : "overview";
+  const contentScrollRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (contentScrollRef.current) contentScrollRef.current.scrollTop = 0;
+  }, [defaultSection]);
   return (
-    <PageFrame mode="focused">
+    <PageFrame mode="focused" className="overflow-y-hidden">
       <div
-        className="flex min-w-0 flex-1 flex-col gap-5"
+        className="flex h-full min-h-0 min-w-0 flex-1 flex-col gap-5 overflow-hidden"
         data-ui-surface-kind="product-authored"
       >
         <header
@@ -2102,161 +2191,123 @@ export function GoalWorkspacePage({
             else next.set("section", section);
             setSearchParams(next, { replace: true });
           }}
-          className="min-w-0"
+          className="min-h-0 min-w-0 flex-1 gap-0"
         >
-          <div className="sticky top-0 z-20 -mx-4 border-b border-border/70 bg-background/95 backdrop-blur sm:-mx-2 supports-[backdrop-filter]:bg-background/85">
-            <div
-              className="pointer-events-none absolute inset-y-0 right-0 z-10 w-8 bg-gradient-to-l from-background via-background/85 to-transparent sm:hidden"
-              aria-hidden
-            />
-            <div className="overflow-x-auto px-4 sm:px-2">
-              <TabsList className="inline-flex h-auto min-w-max justify-start gap-0 rounded-none bg-transparent p-0 sm:w-auto">
-                <TabsTrigger
-                  value="overview"
-                  className="h-11 shrink-0 rounded-none border-b-2 border-transparent px-3 text-sm shadow-none data-[state=active]:border-current data-[state=active]:bg-transparent data-[state=active]:shadow-none sm:px-4"
-                >
-                  <Target className="size-4" />
-                  {copy.overview}
-                </TabsTrigger>
-                <TabsTrigger
-                  value="work"
-                  className="h-11 shrink-0 rounded-none border-b-2 border-transparent px-3 text-sm shadow-none data-[state=active]:border-current data-[state=active]:bg-transparent data-[state=active]:shadow-none sm:px-4"
-                >
-                  <ListChecks className="size-4" />
-                  {copy.tasksSection}
-                </TabsTrigger>
-                <TabsTrigger
-                  value="workbench"
-                  className="h-11 shrink-0 rounded-none border-b-2 border-transparent px-3 text-sm shadow-none data-[state=active]:border-current data-[state=active]:bg-transparent data-[state=active]:shadow-none sm:px-4"
-                >
-                  <FileCheck2 className="size-4" />
-                  {copy.workbench}
-                </TabsTrigger>
-                <TabsTrigger
-                  value="criteria"
-                  className="h-11 shrink-0 rounded-none border-b-2 border-transparent px-3 text-sm shadow-none data-[state=active]:border-current data-[state=active]:bg-transparent data-[state=active]:shadow-none sm:px-4"
-                >
-                  <CheckCircle2 className="size-4" />
-                  {copy.successCriteria}
-                </TabsTrigger>
-                <TabsTrigger
-                  value="history"
-                  className="h-11 shrink-0 rounded-none border-b-2 border-transparent px-3 text-sm shadow-none data-[state=active]:border-current data-[state=active]:bg-transparent data-[state=active]:shadow-none sm:px-4"
-                >
-                  <History className="size-4" />
-                  {copy.history}
-                </TabsTrigger>
-              </TabsList>
-            </div>
-          </div>
+          <GoalSectionNavigation section={defaultSection} copy={copy} />
 
-          <TabsContent value="overview" className="mt-5">
-            {isArchive ? (
-              <PrimaryOutcome goal={goal} copy={copy} />
-            ) : (
-              <div className="space-y-8">
-                <section
-                  aria-labelledby="goal-control-plane"
-                  className="space-y-4"
-                >
-                  <div className="flex items-end justify-between gap-4">
-                    <div>
-                      <p className="text-xs font-semibold text-info">
-                        {copy.ongoingWorkspace}
-                      </p>
-                      <h2
-                        id="goal-control-plane"
-                        className="mt-1 text-2xl font-semibold tracking-tight"
-                      >
-                        {copy.currentFocus}
-                      </h2>
-                      <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-                        {copy.currentFocusDescription}
-                      </p>
+          <div
+            ref={contentScrollRef}
+            data-goal-section-scroll
+            className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-8"
+          >
+            <TabsContent value="overview" className="mt-5">
+              {isArchive ? (
+                <PrimaryOutcome goal={goal} copy={copy} />
+              ) : (
+                <div className="space-y-8">
+                  <section
+                    aria-labelledby="goal-control-plane"
+                    className="space-y-4"
+                  >
+                    <div className="flex items-end justify-between gap-4">
+                      <div>
+                        <p className="text-xs font-semibold text-info">
+                          {copy.ongoingWorkspace}
+                        </p>
+                        <h2
+                          id="goal-control-plane"
+                          className="mt-1 text-2xl font-semibold tracking-tight"
+                        >
+                          {copy.currentFocus}
+                        </h2>
+                        <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+                          {copy.currentFocusDescription}
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                  <div className="grid gap-7 xl:grid-cols-[minmax(0,1.35fr)_minmax(18rem,0.65fr)]">
-                    <FocusQueue goal={goal} copy={copy} />
-                    <OperationalBriefCard goal={goal} copy={copy} />
-                  </div>
-                </section>
-                <ActiveSummary goal={goal} copy={copy} />
-                <WorkingSetCard goal={goal} copy={copy} />
-              </div>
-            )}
-          </TabsContent>
-
-          <TabsContent value="work" className="mt-5">
-            <section className="space-y-6">
-              <div className="flex flex-col gap-3 border-b pb-5 sm:flex-row sm:items-end sm:justify-between">
-                <div>
-                  <p className="text-sm font-medium text-muted-foreground">
-                    {copy.boundedTasks}
-                  </p>
-                  <h2 className="mt-1 text-2xl font-semibold tracking-tight">
-                    {format(copy.taskProgress, {
-                      completed: goal.projection.completedTaskCount,
-                      total: goal.projection.totalTaskCount,
-                    })}
-                  </h2>
+                    <div className="grid gap-7 xl:grid-cols-[minmax(0,1.35fr)_minmax(18rem,0.65fr)]">
+                      <FocusQueue goal={goal} copy={copy} />
+                      <OperationalBriefCard goal={goal} copy={copy} />
+                    </div>
+                  </section>
+                  <ActiveSummary goal={goal} copy={copy} />
+                  <WorkingSetCard goal={goal} copy={copy} />
                 </div>
-                {goal.status === "Active" ? (
-                  <Button size="sm" onClick={() => setTaskDialog("task")}>
-                    <Plus className="size-4" />
-                    {copy.addTask}
-                  </Button>
-                ) : null}
-              </div>
-              <div className="space-y-7">
-                {goal.tasks.length === 0 ? (
-                  <div className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
-                    {copy.noTasks}
+              )}
+            </TabsContent>
+
+            <TabsContent value="work" className="mt-5">
+              <section className="space-y-6">
+                <div className="flex flex-col gap-3 border-b pb-5 sm:flex-row sm:items-end sm:justify-between">
+                  <div>
+                    <p className="text-sm font-medium text-muted-foreground">
+                      {copy.boundedTasks}
+                    </p>
+                    <h2 className="mt-1 text-2xl font-semibold tracking-tight">
+                      {format(copy.taskProgress, {
+                        completed: goal.projection.completedTaskCount,
+                        total: goal.projection.totalTaskCount,
+                      })}
+                    </h2>
                   </div>
-                ) : null}
-                <TaskGroupSection
-                  group="attention"
-                  tasks={goal.taskGroups.attention}
-                  copy={copy}
-                  defaultOpen
-                  goalId={goal.id}
-                />
-                <TaskGroupSection
-                  group="active"
-                  tasks={goal.taskGroups.active}
-                  copy={copy}
-                  defaultOpen
-                  goalId={goal.id}
-                />
-                <TaskGroupSection
-                  group="planned"
-                  tasks={goal.taskGroups.planned}
-                  copy={copy}
-                  defaultOpen
-                  goalId={goal.id}
-                />
-                <TaskGroupSection
-                  group="completed"
-                  tasks={goal.taskGroups.completed}
-                  copy={copy}
-                  defaultOpen={!isArchive}
-                  goalId={goal.id}
-                />
-              </div>
-            </section>
-          </TabsContent>
-          <TabsContent value="workbench" className="mt-5">
-            {assetWorkbench ?? (
-              <div className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
-                {copy.noAssets}
-              </div>
-            )}
-          </TabsContent>
-          <TabsContent value="criteria" className="mt-5">
-            <CriteriaCard goal={goal} copy={copy} />
-          </TabsContent>
-          <TabsContent value="history" className="mt-5">
-            <GoalHistory goal={goal} copy={copy} isArchive={isArchive} />
-          </TabsContent>
+                  {goal.status === "Active" ? (
+                    <Button size="sm" onClick={() => setTaskDialog("task")}>
+                      <Plus className="size-4" />
+                      {copy.addTask}
+                    </Button>
+                  ) : null}
+                </div>
+                <div className="space-y-7">
+                  {goal.tasks.length === 0 ? (
+                    <div className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
+                      {copy.noTasks}
+                    </div>
+                  ) : null}
+                  <TaskGroupSection
+                    group="attention"
+                    tasks={goal.taskGroups.attention}
+                    copy={copy}
+                    defaultOpen
+                    goalId={goal.id}
+                  />
+                  <TaskGroupSection
+                    group="active"
+                    tasks={goal.taskGroups.active}
+                    copy={copy}
+                    defaultOpen
+                    goalId={goal.id}
+                  />
+                  <TaskGroupSection
+                    group="planned"
+                    tasks={goal.taskGroups.planned}
+                    copy={copy}
+                    defaultOpen
+                    goalId={goal.id}
+                  />
+                  <TaskGroupSection
+                    group="completed"
+                    tasks={goal.taskGroups.completed}
+                    copy={copy}
+                    defaultOpen={!isArchive}
+                    goalId={goal.id}
+                  />
+                </div>
+              </section>
+            </TabsContent>
+            <TabsContent value="workbench" className="mt-5">
+              {assetWorkbench ?? (
+                <div className="rounded-xl border border-dashed p-8 text-center text-sm text-muted-foreground">
+                  {copy.noAssets}
+                </div>
+              )}
+            </TabsContent>
+            <TabsContent value="criteria" className="mt-5">
+              <CriteriaCard goal={goal} copy={copy} />
+            </TabsContent>
+            <TabsContent value="history" className="mt-5">
+              <GoalHistory goal={goal} copy={copy} isArchive={isArchive} />
+            </TabsContent>
+          </div>
         </Tabs>
         <CreateTaskDialog
           goal={goal}

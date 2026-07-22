@@ -1,5 +1,6 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
+  cleanup,
   fireEvent,
   render,
   screen,
@@ -445,14 +446,15 @@ const baseGoal: GoalData = {
   activity: [],
 };
 
-function renderInRouter(node: React.ReactNode) {
+function renderInRouter(node: React.ReactNode, initialEntry = "/en/goals") {
   const router = createMemoryRouter([{ path: "*", element: node }], {
-    initialEntries: ["/en/goals"],
+    initialEntries: [initialEntry],
   });
   return { ...render(<RouterProvider router={router} />), router };
 }
 
 describe("Goal pages", () => {
+  afterEach(() => cleanup());
   it("shows the empty list state", () => {
     renderInRouter(<GoalListPage goals={[]} copy={copy} />);
     expect(screen.getByText("No goals")).toBeInTheDocument();
@@ -571,6 +573,30 @@ describe("Goal pages", () => {
       "active",
     );
     expect(screen.getByText("Bounded step")).toBeInTheDocument();
+  });
+
+  it("opens deep-linked sections in a fixed workspace navigation", () => {
+    renderInRouter(
+      <GoalWorkspacePage goal={baseGoal} copy={copy} />,
+      "/en/goals/goal-1?section=history",
+    );
+
+    expect(
+      screen.getByRole("navigation", { name: "Goal Control Plane" }),
+    ).toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: "History" })).toHaveAttribute(
+      "data-state",
+      "active",
+    );
+    expect(
+      screen.getByRole("heading", { name: copy.workspaceDescription }),
+    ).toBeInTheDocument();
+    expect(document.querySelector("[data-goal-section-scroll]")).toHaveClass(
+      "overflow-y-auto",
+    );
+    expect(document.querySelector('[data-slot="page-frame"]')).toHaveClass(
+      "overflow-y-hidden",
+    );
   });
 
   it("shows the active Goal control plane, workbench, and frozen-context composer", () => {
