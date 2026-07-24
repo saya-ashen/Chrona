@@ -11,6 +11,7 @@ import {
   ChevronDown,
   ChevronUp,
   CircleDot,
+  CircleOff,
   Clipboard,
   Clock3,
   Download,
@@ -483,6 +484,282 @@ function PrimaryOutcome({ goal, copy }: { goal: GoalData; copy: GoalCopy }) {
   );
 }
 
+function StoppedOutcomeArchive({
+  goal,
+  copy,
+}: {
+  goal: GoalData;
+  copy: GoalCopy;
+}) {
+  const locale = useLocale();
+  const [resultOpen, setResultOpen] = useState(false);
+  const primary = goal.outcome.primaryResult;
+  const context = findPrimaryResultContext(goal, primary);
+  const sourceTask = primary
+    ? goal.tasks.find((task) => task.id === primary.taskId)
+    : null;
+  const acceptedSummary = context?.result?.summary.trim() ?? "";
+  const acceptedSummaryLead = acceptedSummary
+    .split("\n")
+    .find((line) => line.trim())
+    ?.trim();
+  const retainedResultCount = goal.acceptedResults.length;
+  const confirmedCriteria = goal.outcome.criteria.filter(
+    (criterion) => criterion.satisfied,
+  ).length;
+  const evidenceCount =
+    goal.outcome.confirmation?.evidenceArtifactIds.length ?? 0;
+  const stoppedDate = formatDate(goal.stoppedAt, locale);
+
+  return (
+    <article className="mx-auto w-full max-w-5xl space-y-7">
+      <header className="grid gap-4 rounded-xl border border-l-4 border-l-muted-foreground bg-card p-5 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-start sm:p-6">
+        <span className="flex size-10 items-center justify-center rounded-full bg-muted text-muted-foreground">
+          <CircleOff className="size-5" aria-hidden />
+        </span>
+        <div className="min-w-0">
+          <h2 className="text-xl font-semibold tracking-tight">
+            {copy.stoppedUnconfirmed}
+          </h2>
+          <p className="mt-1.5 text-sm leading-6 text-muted-foreground">
+            {retainedResultCount > 0
+              ? format(copy.stoppedWithResultsDescription, {
+                  completed: goal.projection.completedTaskCount,
+                  results: retainedResultCount,
+                })
+              : copy.stoppedWithoutResultsDescription}
+          </p>
+        </div>
+        <div className="text-sm text-muted-foreground sm:text-right">
+          {stoppedDate ? (
+            <p>{format(copy.stoppedAt, { date: stoppedDate })}</p>
+          ) : null}
+          <p className="mt-1 font-medium text-foreground">
+            {copy.stopReasonMissing}
+          </p>
+        </div>
+      </header>
+
+      <div className="grid gap-7 lg:grid-cols-[minmax(0,1fr)_18.5rem] lg:items-start">
+        <section aria-labelledby="goal-retained-results">
+          <p className="text-xs font-medium text-muted-foreground">
+            {copy.completedBeforeStop}
+          </p>
+          <h2
+            id="goal-retained-results"
+            className="mt-1 text-2xl font-semibold tracking-tight"
+          >
+            {format(copy.retainedResultsCount, {
+              count: retainedResultCount,
+            })}
+          </h2>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {copy.retainedResultsDescription}
+          </p>
+
+          {primary ? (
+            <Card className="mt-5 overflow-hidden py-0">
+              <CardContent className="space-y-5 p-5 sm:p-6">
+                <div>
+                  <p className="flex items-center gap-2 text-xs font-semibold text-success">
+                    <Check className="size-4" aria-hidden />
+                    {copy.acceptedTaskResult}
+                  </p>
+                  <h3 className="mt-2 text-2xl font-semibold tracking-tight">
+                    {primary.title}
+                  </h3>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {copy.sourceTask}: {sourceTask?.title ?? primary.taskId}
+                    {context?.result?.acceptedAt
+                      ? ` · ${formatDate(context.result.acceptedAt, locale)}`
+                      : ""}
+                  </p>
+                </div>
+
+                {primary.contentPreview ? (
+                  <div className="rounded-lg bg-success/[0.07] px-4 py-3">
+                    <p className="text-xs font-semibold text-success">
+                      {copy.outcomeSummary}
+                    </p>
+                    <p className="mt-1 text-base font-semibold leading-7">
+                      {primary.contentPreview}
+                    </p>
+                  </div>
+                ) : null}
+
+                <div className="grid gap-4 border-t pt-4 sm:grid-cols-2">
+                  <div>
+                    <h4 className="text-sm font-semibold">
+                      {copy.resultCompleted}
+                    </h4>
+                    <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                      {acceptedSummaryLead ||
+                        primary.contentPreview ||
+                        copy.noPrimaryResult}
+                    </p>
+                  </div>
+                  <div>
+                    <h4 className="text-sm font-semibold">
+                      {copy.resultDidNotConfirm}
+                    </h4>
+                    <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                      {copy.criterionEvidenceSummary}
+                    </p>
+                  </div>
+                </div>
+
+                {resultOpen && acceptedSummary ? (
+                  <div className="border-t pt-4">
+                    <MarkdownContent>{acceptedSummary}</MarkdownContent>
+                  </div>
+                ) : null}
+
+                <div className="flex flex-col gap-2 sm:flex-row">
+                  {acceptedSummary ? (
+                    <Button
+                      type="button"
+                      onClick={() => setResultOpen((value) => !value)}
+                    >
+                      {resultOpen ? copy.hideFullResult : copy.viewFullResult}
+                    </Button>
+                  ) : null}
+                  {sourceTask ? (
+                    <Button asChild type="button" variant="outline">
+                      <LocalizedLink
+                        href={`/goals/${goal.id}/workbench/tasks/${sourceTask.id}`}
+                      >
+                        {copy.openSourceTask}
+                      </LocalizedLink>
+                    </Button>
+                  ) : null}
+                </div>
+              </CardContent>
+
+              {context?.asset ? (
+                <div className="flex flex-col gap-3 border-t bg-muted/30 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span className="flex size-9 shrink-0 items-center justify-center rounded-lg border bg-background text-success">
+                      <FileText className="size-4" aria-hidden />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-semibold">
+                        {copy.retainedInWorkbench}: {context.asset.label}
+                      </p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {artifactTypeLabel(context.asset.currentArtifact.type)}{" "}
+                        · v{context.asset.currentVersion ?? 1}
+                      </p>
+                    </div>
+                  </div>
+                  <Button asChild type="button" size="sm" variant="ghost">
+                    <LocalizedLink
+                      href={`/goals/${goal.id}?section=workbench&asset=${encodeURIComponent(context.asset.id)}`}
+                    >
+                      {copy.openAsset}
+                      <ExternalLink className="size-4" aria-hidden />
+                    </LocalizedLink>
+                  </Button>
+                </div>
+              ) : null}
+            </Card>
+          ) : (
+            <Card className="mt-5">
+              <CardContent className="p-6 text-sm leading-6 text-muted-foreground">
+                {copy.noPrimaryResult}
+              </CardContent>
+            </Card>
+          )}
+        </section>
+
+        <aside className="space-y-4" aria-label={copy.archiveStatus}>
+          <Card>
+            <CardContent className="p-5">
+              <h3 className="font-semibold">{copy.archiveStatus}</h3>
+              <dl className="mt-4 divide-y text-sm">
+                <div className="flex items-center justify-between gap-4 py-3 first:pt-0">
+                  <dt className="text-muted-foreground">{copy.goalStatus}</dt>
+                  <dd className="font-semibold">{copy.status.Stopped}</dd>
+                </div>
+                <div className="flex items-center justify-between gap-4 py-3">
+                  <dt className="text-muted-foreground">
+                    {copy.completedTasks}
+                  </dt>
+                  <dd className="font-semibold tabular-nums">
+                    {goal.projection.completedTaskCount} /{" "}
+                    {goal.projection.totalTaskCount}
+                  </dd>
+                </div>
+                <div className="flex items-center justify-between gap-4 py-3">
+                  <dt className="text-muted-foreground">
+                    {copy.confirmedCriteria}
+                  </dt>
+                  <dd className="font-semibold tabular-nums text-warning">
+                    {confirmedCriteria} / {goal.outcome.criteria.length}
+                  </dd>
+                </div>
+                <div className="flex items-center justify-between gap-4 py-3 last:pb-0">
+                  <dt className="text-muted-foreground">
+                    {copy.achievementEvidence}
+                  </dt>
+                  <dd className="font-semibold tabular-nums text-warning">
+                    {format(copy.achievementEvidenceCount, {
+                      count: evidenceCount,
+                    })}
+                  </dd>
+                </div>
+              </dl>
+            </CardContent>
+          </Card>
+
+          <section className="rounded-xl bg-warning/[0.09] p-5 text-sm leading-6 text-warning-foreground">
+            <h3 className="font-semibold">{copy.whyNotAchieved}</h3>
+            <p className="mt-1 text-foreground/75">
+              {copy.whyNotAchievedDescription}
+            </p>
+          </section>
+
+          {primary ? (
+            <details className="group border-t pt-4">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-sm text-muted-foreground">
+                <span>{copy.technicalDetails}</span>
+                <ChevronDown className="size-4 transition-transform group-open:rotate-180" />
+              </summary>
+              <dl className="mt-4 space-y-3 text-sm">
+                <div>
+                  <dt className="text-xs text-muted-foreground">
+                    {copy.sourceTask}
+                  </dt>
+                  <dd className="mt-1 font-medium">
+                    {sourceTask?.title ?? primary.taskId}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs text-muted-foreground">
+                    {copy.sourceRun}
+                  </dt>
+                  <dd className="mt-1 break-all font-mono text-xs">
+                    {primary.runId}
+                  </dd>
+                </div>
+                {context?.asset ? (
+                  <div>
+                    <dt className="text-xs text-muted-foreground">
+                      {copy.currentVersion}
+                    </dt>
+                    <dd className="mt-1 font-medium">
+                      v{context.asset.currentVersion ?? 1}
+                    </dd>
+                  </div>
+                ) : null}
+              </dl>
+            </details>
+          ) : null}
+        </aside>
+      </div>
+    </article>
+  );
+}
+
 function ActiveSummary({ goal, copy }: { goal: GoalData; copy: GoalCopy }) {
   const locale = useLocale();
   const stats = [
@@ -698,7 +975,6 @@ function OperationalBriefCard({
   );
 }
 
-
 function FocusQueue({ goal, copy }: { goal: GoalData; copy: GoalCopy }) {
   const groups = [
     {
@@ -834,22 +1110,6 @@ function CriteriaCard({ goal, copy }: { goal: GoalData; copy: GoalCopy }) {
             })}
           </h2>
         </div>
-        {totalCount > 0 ? (
-          <div className="w-full sm:w-56">
-            <div className="mb-2 flex justify-between text-xs text-muted-foreground">
-              <span>{copy.verifiedOutcome}</span>
-              <span className="tabular-nums">
-                {Math.round((confirmedCount / totalCount) * 100)}%
-              </span>
-            </div>
-            <div className="h-2 overflow-hidden rounded-full bg-muted">
-              <span
-                className="block h-full rounded-full bg-success"
-                style={{ width: `${(confirmedCount / totalCount) * 100}%` }}
-              />
-            </div>
-          </div>
-        ) : null}
       </div>
       <div className="divide-y rounded-xl border bg-card">
         {goal.outcome.criteria.map((criterion) => (
@@ -1339,21 +1599,36 @@ function ReviewApplyDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const revalidator = useRevalidator();
-  const proposal = goal.reviewProposals.find((candidate) =>
-    candidate.status === "Generating" || candidate.status === "Ready" || candidate.status === "PartiallyApplied"
-  ) ?? goal.reviewProposals[0] ?? null;
+  const proposal =
+    goal.reviewProposals.find(
+      (candidate) =>
+        candidate.status === "Generating" ||
+        candidate.status === "Ready" ||
+        candidate.status === "PartiallyApplied",
+    ) ??
+    goal.reviewProposals[0] ??
+    null;
   const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!proposal || proposal.status !== "Ready") return;
-    setSelected(Object.fromEntries(proposal.items.filter((item) => item.decision === "Pending").map((item) => [item.itemId, true])));
+    setSelected(
+      Object.fromEntries(
+        proposal.items
+          .filter((item) => item.decision === "Pending")
+          .map((item) => [item.itemId, true]),
+      ),
+    );
   }, [proposal?.id, proposal?.status]);
 
   useEffect(() => {
     if (!open || proposal?.status !== "Generating") return;
-    const timer = window.setInterval(() => void revalidator.revalidate(), 2_000);
+    const timer = window.setInterval(
+      () => void revalidator.revalidate(),
+      2_000,
+    );
     return () => window.clearInterval(timer);
   }, [open, proposal?.status, revalidator]);
 
@@ -1362,7 +1637,9 @@ function ReviewApplyDialog({
     setPending(true);
     setError(null);
     try {
-      await generateGoalReview(goal.id, { idempotencyKey: crypto.randomUUID() });
+      await generateGoalReview(goal.id, {
+        idempotencyKey: crypto.randomUUID(),
+      });
       await revalidator.revalidate();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : copy.actionError);
@@ -1378,14 +1655,21 @@ function ReviewApplyDialog({
       .map((item) => ({
         itemId: item.itemId,
         action: selected[item.itemId]
-          ? item.kind === "evidence_gap" ? "convert_to_task" as const : "accept" as const
-          : item.kind === "evidence_gap" ? "ignore" as const : "reject" as const,
+          ? item.kind === "evidence_gap"
+            ? ("convert_to_task" as const)
+            : ("accept" as const)
+          : item.kind === "evidence_gap"
+            ? ("ignore" as const)
+            : ("reject" as const),
       }));
     if (decisions.length === 0) return;
     setPending(true);
     setError(null);
     try {
-      await applyGoalReviewProposal(goal.id, proposal.id, { idempotencyKey: crypto.randomUUID(), decisions });
+      await applyGoalReviewProposal(goal.id, proposal.id, {
+        idempotencyKey: crypto.randomUUID(),
+        decisions,
+      });
       await revalidator.revalidate();
       onOpenChange(false);
     } catch (cause) {
@@ -1401,7 +1685,9 @@ function ReviewApplyDialog({
     setPending(true);
     setError(null);
     try {
-      await rejectGoalReviewProposal(goal.id, proposal.id, { idempotencyKey: crypto.randomUUID() });
+      await rejectGoalReviewProposal(goal.id, proposal.id, {
+        idempotencyKey: crypto.randomUUID(),
+      });
       await revalidator.revalidate();
       onOpenChange(false);
     } catch (cause) {
@@ -1412,12 +1698,17 @@ function ReviewApplyDialog({
   }
 
   const itemLabel = (item: NonNullable<typeof proposal>["items"][number]) => {
-    const payload = item.payload && typeof item.payload === "object" && !Array.isArray(item.payload)
-      ? item.payload as Record<string, unknown>
-      : {};
-    if (item.kind === "brief_field") return `${copy.operationalBrief}: ${String(payload.field ?? "")}`;
+    const payload =
+      item.payload &&
+      typeof item.payload === "object" &&
+      !Array.isArray(item.payload)
+        ? (item.payload as Record<string, unknown>)
+        : {};
+    if (item.kind === "brief_field")
+      return `${copy.operationalBrief}: ${String(payload.field ?? "")}`;
     if (item.kind === "next_review_at") return copy.nextReview;
-    if (item.kind === "task_candidate") return String(payload.title ?? copy.reviewTaskSuggestion);
+    if (item.kind === "task_candidate")
+      return String(payload.title ?? copy.reviewTaskSuggestion);
     return String(payload.title ?? copy.successCriteria);
   };
 
@@ -1430,17 +1721,31 @@ function ReviewApplyDialog({
         </DialogHeader>
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
           <div className="grid gap-2 rounded-xl border bg-muted/20 p-4 text-sm sm:grid-cols-3">
-            <span>{goal.outcome.criteria.filter((criterion) => criterion.satisfied).length}/{goal.outcome.criteria.length} {copy.successCriteria}</span>
-            <span>{goal.workbench.focus.newResults.length} {copy.newResults}</span>
-            <span>{goal.acceptedResults.length} {copy.acceptedResults}</span>
+            <span>
+              {
+                goal.outcome.criteria.filter((criterion) => criterion.satisfied)
+                  .length
+              }
+              /{goal.outcome.criteria.length} {copy.successCriteria}
+            </span>
+            <span>
+              {goal.workbench.focus.newResults.length} {copy.newResults}
+            </span>
+            <span>
+              {goal.acceptedResults.length} {copy.acceptedResults}
+            </span>
           </div>
           {!proposal ? (
             <Card>
               <CardContent className="space-y-3 p-5">
                 <p className="font-medium">{copy.reviewSummary}</p>
-                <p className="text-sm text-muted-foreground">{copy.applyReviewDescription}</p>
+                <p className="text-sm text-muted-foreground">
+                  {copy.applyReviewDescription}
+                </p>
                 <Button disabled={pending} onClick={() => void generate()}>
-                  <RefreshCw className={pending ? "size-4 animate-spin" : "size-4"} />
+                  <RefreshCw
+                    className={pending ? "size-4 animate-spin" : "size-4"}
+                  />
                   {pending ? copy.generatingReview : copy.generateReview}
                 </Button>
               </CardContent>
@@ -1451,30 +1756,56 @@ function ReviewApplyDialog({
                 <RefreshCw className="size-4 animate-spin" />
                 <div>
                   <p className="font-medium">{copy.generatingReview}</p>
-                  <p className="text-muted-foreground">{copy.proposalSource} · {proposal.sourceTask.title}</p>
+                  <p className="text-muted-foreground">
+                    {copy.proposalSource} · {proposal.sourceTask.title}
+                  </p>
                 </div>
               </CardContent>
             </Card>
           ) : proposal.status === "Failed" ? (
-            <div role="alert" className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm">
-              <p className="font-medium text-destructive">{copy.proposalFailed}</p>
-              <p className="mt-1 text-muted-foreground">{proposal.generationError}</p>
-              <Button className="mt-3" variant="outline" disabled={pending} onClick={() => void generate()}>
+            <div
+              role="alert"
+              className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm"
+            >
+              <p className="font-medium text-destructive">
+                {copy.proposalFailed}
+              </p>
+              <p className="mt-1 text-muted-foreground">
+                {proposal.generationError}
+              </p>
+              <Button
+                className="mt-3"
+                variant="outline"
+                disabled={pending}
+                onClick={() => void generate()}
+              >
                 {copy.generateReview}
               </Button>
             </div>
           ) : (
             <div className="space-y-3">
-              {proposal.summary ? <p className="text-sm text-muted-foreground">{proposal.summary}</p> : null}
+              {proposal.summary ? (
+                <p className="text-sm text-muted-foreground">
+                  {proposal.summary}
+                </p>
+              ) : null}
               {proposal.items.map((item) => {
                 const pendingItem = item.decision === "Pending";
                 const checked = Boolean(selected[item.itemId]);
                 return (
-                  <label key={item.id} className="flex gap-3 rounded-xl border p-4">
+                  <label
+                    key={item.id}
+                    className="flex gap-3 rounded-xl border p-4"
+                  >
                     <Checkbox
                       checked={checked}
                       disabled={!pendingItem}
-                      onCheckedChange={(value) => setSelected((current) => ({ ...current, [item.itemId]: value === true }))}
+                      onCheckedChange={(value) =>
+                        setSelected((current) => ({
+                          ...current,
+                          [item.itemId]: value === true,
+                        }))
+                      }
                       aria-label={itemLabel(item)}
                     />
                     <span className="min-w-0 space-y-1">
@@ -1482,22 +1813,47 @@ function ReviewApplyDialog({
                         {itemLabel(item)}
                         <Badge variant="outline">{item.decision}</Badge>
                       </span>
-                      <span className="block text-sm text-muted-foreground">{item.rationale}</span>
-                      {item.decisionReason ? <span className="block text-sm text-destructive">{item.decisionReason}</span> : null}
+                      <span className="block text-sm text-muted-foreground">
+                        {item.rationale}
+                      </span>
+                      {item.decisionReason ? (
+                        <span className="block text-sm text-destructive">
+                          {item.decisionReason}
+                        </span>
+                      ) : null}
                     </span>
                   </label>
                 );
               })}
             </div>
           )}
-          {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
+          {error ? (
+            <p role="alert" className="text-sm text-destructive">
+              {error}
+            </p>
+          ) : null}
         </div>
         <DialogFooter className="border-t pt-4">
-          <Button variant="outline" onClick={() => onOpenChange(false)}>{copy.cancel}</Button>
-          {proposal?.status === "Ready" || proposal?.status === "PartiallyApplied" ? (
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            {copy.cancel}
+          </Button>
+          {proposal?.status === "Ready" ||
+          proposal?.status === "PartiallyApplied" ? (
             <>
-              <Button variant="outline" disabled={pending} onClick={() => void reject()}>{copy.rejectProposal}</Button>
-              <Button disabled={pending || proposal.items.every((item) => item.decision !== "Pending")} onClick={() => void apply()}>
+              <Button
+                variant="outline"
+                disabled={pending}
+                onClick={() => void reject()}
+              >
+                {copy.rejectProposal}
+              </Button>
+              <Button
+                disabled={
+                  pending ||
+                  proposal.items.every((item) => item.decision !== "Pending")
+                }
+                onClick={() => void apply()}
+              >
                 {pending ? copy.saving : copy.applyReview}
               </Button>
             </>
@@ -1943,7 +2299,11 @@ export function GoalWorkspacePage({
     if (contentScrollRef.current) contentScrollRef.current.scrollTop = 0;
   }, [defaultSection]);
   return (
-    <PageFrame mode="focused" data-domain={defaultSection === "workbench" ? "workbench" : "goals"} className="overflow-y-hidden p-1 sm:p-2">
+    <PageFrame
+      mode="focused"
+      data-domain={defaultSection === "workbench" ? "workbench" : "goals"}
+      className="overflow-y-hidden p-1 sm:p-2"
+    >
       <div
         className="flex h-full min-h-0 min-w-0 flex-1 flex-col gap-5 overflow-hidden"
         data-ui-surface-kind="product-authored"
@@ -1959,17 +2319,20 @@ export function GoalWorkspacePage({
           }
           title={goal.title}
           description={
-            goal.description?.trim() && goal.description.trim() !== goal.title.trim()
+            goal.description?.trim() &&
+            goal.description.trim() !== goal.title.trim()
               ? goal.description
               : undefined
           }
           meta={
             <>
               <span
-                className={`inline-flex items-center gap-1.5 text-sm font-medium ${isArchive ? "text-success" : "text-info"}`}
+                className={`inline-flex items-center gap-1.5 text-sm font-medium ${goal.status === "Achieved" ? "text-success" : goal.status === "Stopped" ? "text-muted-foreground" : "text-info"}`}
               >
-                {isArchive ? (
+                {goal.status === "Achieved" ? (
                   <CheckCircle2 className="size-4" />
+                ) : goal.status === "Stopped" ? (
+                  <CircleOff className="size-4" />
                 ) : (
                   <Target className="size-4" />
                 )}
@@ -2051,7 +2414,9 @@ export function GoalWorkspacePage({
             className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-8"
           >
             <TabsContent value="overview" className="mt-5">
-              {isArchive ? (
+              {goal.status === "Stopped" ? (
+                <StoppedOutcomeArchive goal={goal} copy={copy} />
+              ) : isArchive ? (
                 <PrimaryOutcome goal={goal} copy={copy} />
               ) : (
                 <div className="space-y-8">

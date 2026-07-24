@@ -82,7 +82,6 @@ export type GoalActivityData = {
   taskId: string | null;
 };
 
-
 export type GoalReviewProposalItemData = {
   id: string;
   itemId: string;
@@ -92,7 +91,8 @@ export type GoalReviewProposalItemData = {
   evidenceRefs: unknown;
   warnings: unknown;
   dependencyHash: string;
-  decision: "Pending" | "Accepted" | "Rejected" | "Converted" | "Ignored" | "Stale";
+  decision:
+    "Pending" | "Accepted" | "Rejected" | "Converted" | "Ignored" | "Stale";
   decisionReason: string | null;
   appliedObjectType: string | null;
   appliedObjectId: string | null;
@@ -101,7 +101,14 @@ export type GoalReviewProposalItemData = {
 
 export type GoalReviewProposalData = {
   id: string;
-  status: "Generating" | "Ready" | "PartiallyApplied" | "Applied" | "Rejected" | "Superseded" | "Failed";
+  status:
+    | "Generating"
+    | "Ready"
+    | "PartiallyApplied"
+    | "Applied"
+    | "Rejected"
+    | "Superseded"
+    | "Failed";
   sourceTaskId: string;
   sourceRunId: string | null;
   sourceTask: {
@@ -109,7 +116,11 @@ export type GoalReviewProposalData = {
     title: string;
     status: string;
     latestRunId: string | null;
-    latestRun: { id: string; status: string; errorSummary: string | null } | null;
+    latestRun: {
+      id: string;
+      status: string;
+      errorSummary: string | null;
+    } | null;
   };
   inputSnapshotHash: string;
   schemaVersion: number;
@@ -177,7 +188,6 @@ export type GoalCopy = {
   openGoal: string;
   createGoal: string;
   createGoalDescription: string;
-  goalPortfolio: string;
   defineOutcome: string;
   defineOutcomeDescription: string;
   goalOutcomePlaceholder: string;
@@ -189,8 +199,12 @@ export type GoalCopy = {
   attentionGoalsDescription: string;
   progressGoalsDescription: string;
   quietGoals: string;
+  currentGoals: string;
+  archivedGoals: string;
+  archivedGoalsDescription: string;
+  archivedGoalsEmpty: string;
+  archivedGoalsEmptyDescription: string;
   archiveCardSummary: string;
-  viewOutcome: string;
   removeCriterion: string;
   addCriterion: string;
   backToGoals: string;
@@ -312,6 +326,31 @@ export type GoalCopy = {
   copyDocument: string;
   confirmedOutcome: string;
   retainedDeliverable: string;
+  stoppedUnconfirmed: string;
+  stoppedWithResultsDescription: string;
+  stoppedWithoutResultsDescription: string;
+  stoppedAt: string;
+  stopReasonMissing: string;
+  completedBeforeStop: string;
+  retainedResultsCount: string;
+  retainedResultsDescription: string;
+  acceptedTaskResult: string;
+  resultCompleted: string;
+  resultDidNotConfirm: string;
+  criterionEvidenceSummary: string;
+  viewFullResult: string;
+  hideFullResult: string;
+  openSourceTask: string;
+  retainedInWorkbench: string;
+  openAsset: string;
+  archiveStatus: string;
+  goalStatus: string;
+  completedTasks: string;
+  confirmedCriteria: string;
+  achievementEvidence: string;
+  achievementEvidenceCount: string;
+  whyNotAchieved: string;
+  whyNotAchievedDescription: string;
   cancel: string;
   confirming: string;
   actionError: string;
