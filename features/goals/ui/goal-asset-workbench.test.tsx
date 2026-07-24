@@ -23,13 +23,14 @@ const mocks = vi.hoisted(() => ({
   saveGoalAssetDraft: vi.fn(async () => ({ id: "draft-saved" })),
   submitGoalAssetDraft: vi.fn(async () => ({ id: "version-published" })),
   submitGoalForm: vi.fn(async () => ({ id: "submission-saved" })),
+  createGoalAssetJob: vi.fn(async (_goalId: string, _assetId: string, command: { format?: string }) => ({ format: command.format ?? null })),
 }));
 
 vi.mock("../workbench-api", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../workbench-api")>()),
   archiveGoalAsset: vi.fn(async () => ({})),
   applyGoalAssetOwnership: mocks.applyGoalAssetOwnership,
-  createGoalAssetJob: vi.fn(async () => ({})),
+  createGoalAssetJob: mocks.createGoalAssetJob,
   createGoalAssetModificationTask: vi.fn(async () => ({})),
   generateGoalAssetOwnership: mocks.generateGoalAssetOwnership,
   renameGoalAsset: vi.fn(async () => ({})),
@@ -516,5 +517,44 @@ describe("GoalAssetWorkbench", () => {
         name: copy.formSchema,
       }).value,
     ).toContain("draftOnly");
+  });
+  it("renders a structured result without exposing raw JSON and exports each supported format", async () => {
+    mocks.createGoalAssetJob.mockClear();
+    const structured = asset(
+      "structured",
+      "Selected destination",
+      {
+        format: "chrona-json-render",
+        schemaVersion: 1,
+        catalogVersion: "1.0.0",
+        summary: "日照＋临沂沂蒙山",
+        spec: {
+          root: "root",
+          elements: {
+            root: { type: "Stack", props: { gap: "md" }, children: ["summary", "risk"] },
+            summary: { type: "ResultSummary", props: { text: "日照＋临沂沂蒙山最适合本次旅行。" } },
+            risk: { type: "Alert", props: { title: "Travel constraint", description: "Avoid the holiday peak." } },
+          },
+        },
+        artifactRefs: [],
+      },
+      1,
+      "structured_result",
+    );
+    renderWorkbench([structured], "/goals/goal-1?section=workbench&asset=structured");
+
+    expect(await screen.findByLabelText(copy.structuredResultContent)).toHaveTextContent("日照＋临沂沂蒙山最适合本次旅行。");
+    expect(screen.getByText("Travel constraint")).toBeInTheDocument();
+    expect(screen.queryByText("chrona-json-render")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: copy.saveDraft })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: copy.export }));
+    await waitFor(() => expect(screen.getByText(copy.exportMarkdown)).toBeInTheDocument());
+    screen.getByText(copy.exportMarkdown).click();
+    await waitFor(() => expect(mocks.createGoalAssetJob).toHaveBeenCalledWith("goal-1", "structured", expect.objectContaining({ format: "md" })));
+
+    await userEvent.click(screen.getByRole("button", { name: copy.export }));
+    await waitFor(() => expect(screen.getByText(copy.exportPdf)).toBeInTheDocument());
+    screen.getByText(copy.exportPdf).click();
+    await waitFor(() => expect(mocks.createGoalAssetJob).toHaveBeenCalledWith("goal-1", "structured", expect.objectContaining({ format: "pdf" })));
   });
 });

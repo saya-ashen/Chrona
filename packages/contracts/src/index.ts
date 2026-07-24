@@ -1,3 +1,11 @@
+export {
+  STRUCTURED_RESULT_FORMAT,
+  STRUCTURED_RESULT_SCHEMA_VERSION,
+  isStructuredResultAssetContent,
+  type StructuredResultArtifactRef,
+  type StructuredResultAssetContent,
+} from "./goal-structured-result";
+
 // AI plan contracts — new architecture
 export type {
   CalendarAutomationPolicy,

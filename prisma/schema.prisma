@@ -59,6 +59,7 @@ enum GoalAssetKind {
   form
   page
   file
+  structured_result
 }
 
 enum GoalAssetVersionSource {

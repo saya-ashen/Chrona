@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { workspaceId } from "./common";
 
-export const goalAssetKindSchema = z.enum(["document", "form", "page", "file"]);
+export const goalAssetKindSchema = z.enum(["document", "form", "page", "file", "structured_result"]);
 export const goalAssetVersionSourceSchema = z.enum(["manual", "ai_task", "inbox", "restored", "imported"]);
 export const goalAssetDraftStatusSchema = z.enum(["Active", "Conflict", "Discarded", "Submitted"]);
 export const goalInboxCandidateStatusSchema = z.enum(["Pending", "Accepted", "Rejected"]);

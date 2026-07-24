@@ -1,5 +1,5 @@
 import { db } from "@/lib/db";
-import { getCurrentExecution } from "@/modules/plan-execution/use-cases/get-current-execution";
+import type { UiDocument } from "@chrona/ui-protocol";
 import { hydrateFilePreviewSpec } from "./file-preview";
 import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
 
@@ -25,6 +25,7 @@ export type AcceptedResultContext = {
     providerSessionRef: string | null;
   };
   summary: string;
+  spec: unknown | null;
   artifacts: Array<{
     id: string;
     title: string;
@@ -185,7 +186,6 @@ export async function getAcceptedResultContext(
       workspaceId: true,
       title: true,
       goalId: true,
-      status: true,
       priority: true,
       executionRuntime: true,
       executionConfig: true,
@@ -194,12 +194,6 @@ export async function getAcceptedResultContext(
   });
   if (!task) {
     throw new EngineError(ENGINE_ERROR_CODES.TASK_NOT_FOUND, "Task not found");
-  }
-  if (task.status !== "Done") {
-    throw new EngineError(
-      ENGINE_ERROR_CODES.INVALID_TASK_STATE,
-      "Accept the completed task result before continuing from it",
-    );
   }
 
   const acceptance = await db.event.findFirst({
@@ -223,6 +217,12 @@ export async function getAcceptedResultContext(
       taskSessionId: true,
       runtimeSessionRef: true,
       taskSession: { select: { providerSessionRef: true } },
+      events: {
+        where: { planId: { not: null } },
+        orderBy: { ingestSequence: "desc" },
+        take: 1,
+        select: { planId: true },
+      },
       artifacts: {
         orderBy: { createdAt: "asc" },
         select: { id: true, title: true, type: true, uri: true },
@@ -235,11 +235,23 @@ export async function getAcceptedResultContext(
       "Accepted run is unavailable",
     );
   }
-  const execution = await getCurrentExecution({ taskId });
-  const hydratedSpec = execution.planOutput?.spec
-    ? await hydrateFilePreviewSpec(execution.planOutput.spec, { taskId })
+
+  const acceptedPlanId = run.events[0]?.planId ?? null;
+  const acceptedPlanRun = acceptedPlanId
+    ? await db.taskPlanRun.findFirst({
+        where: { taskId, planId: acceptedPlanId },
+        orderBy: { updatedAt: "desc" },
+        select: { planRun: true },
+      })
     : null;
-  const spec = hydratedSpec ?? execution.planOutput?.spec ?? execution.planOutput;
+  const persisted = recordValue(acceptedPlanRun?.planRun);
+  const mutableGraph = recordValue(persisted?.mutableGraph);
+  const planOutput = recordValue(mutableGraph?.planOutput);
+  const rawSpec = planOutput?.spec ?? null;
+  const hydratedSpec = rawSpec
+    ? await hydrateFilePreviewSpec(rawSpec as UiDocument, { taskId })
+    : null;
+  const spec = hydratedSpec ?? rawSpec;
 
   return {
     task: {
@@ -260,6 +272,7 @@ export async function getAcceptedResultContext(
         run.taskSession?.providerSessionRef ?? run.runtimeSessionRef ?? null,
     },
     summary: extractAcceptedResultText(spec),
+    spec,
     artifacts: run.artifacts.map((artifact) => ({
       id: artifact.id,
       title: artifact.title,

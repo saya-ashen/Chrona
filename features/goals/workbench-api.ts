@@ -10,7 +10,7 @@ import type {
   SubmitGoalAssetDraftRequest,
 } from "@chrona/contracts";
 
-export type GoalAssetKind = "document" | "form" | "page" | "file";
+export type GoalAssetKind = "document" | "form" | "page" | "file" | "structured_result";
 export type GoalAssetVersionData = {
   id: string;
   version: number;

@@ -21,7 +21,9 @@ const workspaceQuery = z.object({ workspaceId: z.string().trim().min(1) });
 const goalParam = z.object({ goalId: z.string().trim().min(1) });
 const assetParam = goalParam.extend({ assetId: z.string().trim().min(1) });
 const versionParam = assetParam.extend({ versionId: z.string().trim().min(1) });
-const assetDownloadQuery = z.object({ versionId: z.string().trim().min(1), mode: z.enum(["source", "export"]).default("source") });
+const artifactParam = assetParam.extend({ artifactRef: z.string().regex(/^GF[0-9A-F]{12}$/) });
+const artifactDownloadQuery = z.object({ versionId: z.string().trim().min(1) });
+const assetDownloadQuery = z.object({ versionId: z.string().trim().min(1), mode: z.enum(["source", "export"]).default("source"), format: z.string().trim().min(1).max(50).optional() });
 const candidateParam = goalParam.extend({ candidateId: z.string().trim().min(1) });
 const listAssetsQuery = workspaceQuery.extend({
   query: z.string().optional(),
@@ -55,6 +57,12 @@ export function createGoalWorkbenchRoutes(engine: ChronaEngine) {
         const { body, filename, mimeType } = await engine.goals.workbench.openAssetFile({ ...c.req.valid("param"), ...c.req.valid("query") });
         return new Response(body, { headers: { "content-type": mimeType, "content-disposition": `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`, "cache-control": "private, no-store", "x-content-type-options": "nosniff" } });
       } catch (cause) { return fail(c, "GET /api/goals/:goalId/assets/:assetId/download", cause); }
+    })
+    .get("/goals/:goalId/assets/:assetId/artifacts/:artifactRef/download", zValidator("param", artifactParam), zValidator("query", artifactDownloadQuery), async (c) => {
+      try {
+        const { body, filename, mimeType } = await engine.goals.workbench.openStructuredArtifact({ ...c.req.valid("param"), ...c.req.valid("query") });
+        return new Response(body, { headers: { "content-type": mimeType, "content-disposition": `attachment; filename*=UTF-8''${encodeURIComponent(filename)}`, "cache-control": "private, no-store", "x-content-type-options": "nosniff" } });
+      } catch (cause) { return fail(c, "GET /api/goals/:goalId/assets/:assetId/artifacts/:artifactRef/download", cause); }
     })
     .patch("/goals/:goalId/assets/:assetId", zValidator("param", assetParam), zValidator("json", renameBody), async (c) => {
       try { return json(c, await engine.goals.workbench.renameAsset({ ...c.req.valid("param"), ...c.req.valid("json") })); }

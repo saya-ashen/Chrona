@@ -1,4 +1,7 @@
 import { beforeEach, describe, expect, it } from "bun:test";
+import { mkdir, writeFile } from "node:fs/promises";
+import path from "node:path";
+import { getChronaGeneratedFilesDir } from "@chrona/shared/data-paths";
 import { db } from "@chrona/db";
 import { aiClientRegistry, createChronaEngine, waitForGoalAssetOwnershipGeneration } from "@chrona/engine";
 import { createApiRouter, type ApiRouter } from "../../routes/api";
@@ -19,6 +22,18 @@ async function seedGoalResult() {
   return { workspaceId, goal, task, run, artifact };
 }
 
+async function seedStructuredGoalResultWithoutArtifacts() {
+  const { workspaceId } = await seedWorkspace("Structured Goal result");
+  const goal = await db.goal.create({ data: { workspaceId, title: "Plan a trip", successCriteria: [], status: "Active" } });
+  const task = await db.task.create({ data: { workspaceId, goalId: goal.id, title: "Select destination", executionRuntime: "hermes", executionConfig: {}, status: "Done", priority: "Medium" } });
+  const run = await db.run.create({ data: { taskId: task.id, runtimeName: "hermes", status: "Completed", triggeredBy: "user" } });
+  const plan = await db.taskPlan.create({ data: { workspaceId, taskId: task.id, planId: "structured-result-plan", revision: 1, status: "Accepted", compiledPlan: {} } });
+  await db.taskPlanRun.create({ data: { workspaceId, taskId: task.id, planId: plan.planId, planRun: { planRun: { id: "structured-result-run", compiledPlanId: "compiled-structured", editablePlanId: "structured-result-plan", sourceVersion: 1, status: "completed", nodeStates: {}, checkpointResponses: [], artifactRefs: [], attempts: [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }, mutableGraph: { graph: { id: "structured-result-plan", version: 1, nodes: [], edges: [], entryNodeIds: [], mutations: [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }, attempts: [], results: [], executionContextSnapshots: [], planOutput: { spec: { root: "summary", elements: { summary: { type: "ResultSummary", props: { text: "日照＋临沂沂蒙山最适合本次旅行。", copyText: "首选日照＋临沂沂蒙山" } } } }, revision: 1, updatedAt: new Date().toISOString(), updatedByNodeId: "node-final", history: [] } } } } });
+  await db.event.create({ data: { workspaceId, taskId: task.id, runId: run.id, planId: plan.planId, eventType: "provider.run_completed", actorType: "runtime", source: "provider", payload: {}, dedupeKey: `provider-completed:${run.id}`, ingestSequence: 1 } });
+  await db.event.create({ data: { workspaceId, taskId: task.id, runId: run.id, eventType: "task.result_accepted", actorType: "user", source: "ui", payload: { accepted_run_id: run.id }, dedupeKey: `accepted:${run.id}`, ingestSequence: 2 } });
+  return { workspaceId, goal, task, run };
+}
+
 describe("Goal Workbench API", () => {
   beforeEach(async () => { await resetTestDb(); });
 
@@ -37,6 +52,86 @@ describe("Goal Workbench API", () => {
     const assetsResponse = await app.request(`/goals/${seeded.goal.id}/assets?workspaceId=${seeded.workspaceId}`);
     const { assets } = await assetsResponse.json() as { assets: Array<{ kind: string; versions: Array<{ version: number; source: string }> }> };
     expect(assets[0]).toMatchObject({ kind: "document", versions: [{ version: 1, source: "inbox" }] });
+  });
+
+  it("preserves a structured accepted result as an immutable json-render asset", async () => {
+    const seeded = await seedStructuredGoalResultWithoutArtifacts();
+    const app = createApiRouter(createChronaEngine());
+    const extracted = await post(app, `/goals/${seeded.goal.id}/inbox/extract`, { taskId: seeded.task.id, runId: seeded.run.id });
+    expect(extracted.status).toBe(200);
+    const { candidates } = await extracted.json() as { candidates: Array<{ id: string; kind: string; content: { format: string; summary: string; spec: unknown } }> };
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0]).toMatchObject({ kind: "structured_result", content: { format: "chrona-json-render", summary: expect.stringContaining("日照＋临沂沂蒙山"), spec: { root: "summary" } } });
+
+    const resolved = await post(app, `/goals/${seeded.goal.id}/inbox/${candidates[0]!.id}/resolve`, { workspaceId: seeded.workspaceId, action: "create_asset", label: "Selected destination" });
+    expect(resolved.status).toBe(200);
+    const version = await db.goalAssetVersion.findFirstOrThrow({ where: { goalId: seeded.goal.id } });
+    expect(version.content).toMatchObject({ format: "chrona-json-render", spec: { root: "summary" } });
+    expect((await db.goalAsset.findFirstOrThrow({ where: { goalId: seeded.goal.id } })).kind).toBe("structured_result");
+  });
+
+  it("registers generated files and persists only opaque structured references", async () => {
+    const seeded = await seedStructuredGoalResultWithoutArtifacts();
+    const csvPath = path.join(getChronaGeneratedFilesDir(), "tests", seeded.run.id, "destination-shortlist.csv");
+    await mkdir(path.dirname(csvPath), { recursive: true });
+    await writeFile(csvPath, "candidate,budget\n日照＋临沂沂蒙山,8000\n", "utf8");
+    const row = await db.taskPlanRun.findFirstOrThrow({ where: { taskId: seeded.task.id } });
+    const stored = row.planRun as Record<string, any>;
+    const spec = stored.mutableGraph.planOutput.spec;
+    spec.elements.summary = { type: "FileRef", props: { path: csvPath, title: "destination-shortlist.csv" } };
+    stored.mutableGraph.planOutput.spec = spec;
+    await db.taskPlanRun.update({ where: { id: row.id }, data: { planRun: stored } });
+
+    const app = createApiRouter(createChronaEngine());
+    const extracted = await post(app, `/goals/${seeded.goal.id}/inbox/extract`, { taskId: seeded.task.id, runId: seeded.run.id });
+    expect(extracted.status).toBe(200);
+    const { candidates } = await extracted.json() as { candidates: Array<{ id: string; content: { artifactRefs: Array<{ ref: string }> } }> };
+    const serialized = JSON.stringify(candidates[0]!.content);
+    expect(serialized).toContain("GF");
+    expect(serialized).not.toContain(csvPath);
+    expect(serialized).not.toContain(seeded.task.id);
+    const artifact = await db.artifact.findFirstOrThrow({ where: { runId: seeded.run.id, title: "destination-shortlist.csv" } });
+    expect(artifact.uri).toMatch(/^generated:\/\/tests\//);
+    expect(artifact.metadata).toMatchObject({ mimeType: "text/csv", size: expect.any(Number), checksum: expect.any(String) });
+    const resolved = await post(app, `/goals/${seeded.goal.id}/inbox/${candidates[0]!.id}/resolve`, { workspaceId: seeded.workspaceId, action: "create_asset", label: "Selected destination" });
+    const { assetId } = await resolved.json() as { assetId: string };
+    const version = await db.goalAssetVersion.findFirstOrThrow({ where: { assetId } });
+    const download = await app.request(`/goals/${seeded.goal.id}/assets/${assetId}/artifacts/${candidates[0]!.content.artifactRefs[0]!.ref}/download?versionId=${version.id}`);
+    expect(download.status).toBe(200);
+    expect(await download.text()).toContain("日照＋临沂沂蒙山");
+  });
+
+  it("rejects execution controls in structured result assets", async () => {
+    const seeded = await seedStructuredGoalResultWithoutArtifacts();
+    const row = await db.taskPlanRun.findFirstOrThrow({ where: { taskId: seeded.task.id } });
+    const stored = row.planRun as Record<string, any>;
+    stored.mutableGraph.planOutput.spec.elements.summary = { type: "WorkspaceActionCard", props: { title: "Run again", taskId: seeded.task.id }, on: { click: { action: "dispatchExecution" } } };
+    await db.taskPlanRun.update({ where: { id: row.id }, data: { planRun: stored } });
+    const app = createApiRouter(createChronaEngine());
+    const response = await post(app, `/goals/${seeded.goal.id}/inbox/extract`, { taskId: seeded.task.id, runId: seeded.run.id });
+    expect(response.status).toBe(400);
+    expect(await response.json()).toMatchObject({ error: expect.stringContaining("component is not allowed") });
+  });
+
+  it("exports structured result assets to Markdown, PDF, and JSON", async () => {
+    const seeded = await seedStructuredGoalResultWithoutArtifacts();
+    const app = createApiRouter(createChronaEngine());
+    const extracted = await post(app, `/goals/${seeded.goal.id}/inbox/extract`, { taskId: seeded.task.id, runId: seeded.run.id });
+    const { candidates } = await extracted.json() as { candidates: Array<{ id: string }> };
+    const resolved = await post(app, `/goals/${seeded.goal.id}/inbox/${candidates[0]!.id}/resolve`, { workspaceId: seeded.workspaceId, action: "create_asset", label: "Selected destination" });
+    const { assetId } = await resolved.json() as { assetId: string };
+    const version = await db.goalAssetVersion.findFirstOrThrow({ where: { assetId } });
+
+    for (const format of ["md", "pdf", "json"] as const) {
+      const exported = await post(app, `/goals/${seeded.goal.id}/assets/${assetId}/jobs`, { workspaceId: seeded.workspaceId, versionId: version.id, kind: "export", format });
+      expect(exported.status).toBe(200);
+      expect(await exported.json()).toMatchObject({ status: "Completed", format, outputUri: expect.stringContaining(`.${format}`) });
+      const download = await app.request(`/goals/${seeded.goal.id}/assets/${assetId}/download?versionId=${version.id}&mode=export&format=${format}`);
+      expect(download.status).toBe(200);
+      const body = await download.arrayBuffer();
+      expect(body.byteLength).toBeGreaterThan(format === "pdf" ? 1_000 : 40);
+      if (format === "md") expect(new TextDecoder().decode(body)).toContain("日照＋临沂沂蒙山");
+    }
   });
 
   it("generates a bounded AI ownership proposal and applies it only after user confirmation", async () => {
@@ -197,10 +292,10 @@ describe("Goal Workbench API", () => {
     const created = await db.task.findUniqueOrThrow({ where: { id: taskId } });
     expect(created.goalId).toBe(seeded.goal.id);
     expect(created.autoExecute).toBe(false);
-    expect(created.goalContext).toMatchObject({ items: [{ snapshot: { assetId: asset.id, versionId: version.id, contentHash: "base-v1" } }], expectedOutcome: "A reviewed clearer brief" });
+    expect(created.goalContext).toMatchObject({ asset: { label: "Launch brief", version: 1, contentHash: "base-v1" }, expectedOutcome: "A reviewed clearer brief" });
 
     await db.goalAssetVersion.create({ data: { workspaceId: seeded.workspaceId, goalId: seeded.goal.id, assetId: asset.id, version: 2, parentVersionId: version.id, source: "manual", content: "Newer content", contentHash: "base-v2", authorType: "user" } });
-    expect((await db.task.findUniqueOrThrow({ where: { id: taskId } })).goalContext).toMatchObject({ items: [{ snapshot: { versionId: version.id, contentHash: "base-v1" } }] });
+    expect((await db.task.findUniqueOrThrow({ where: { id: taskId } })).goalContext).toMatchObject({ asset: { version: 1, contentHash: "base-v1" } });
   });
 
   it("rejects appending an Inbox candidate when the selected base version is stale", async () => {

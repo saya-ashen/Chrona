@@ -371,6 +371,7 @@ export type GoalCopy = {
     forms: string;
     pages: string;
     files: string;
+    structuredResults: string;
     allSources: string;
     allStatuses: string;
     draft: string;
@@ -401,6 +402,8 @@ export type GoalCopy = {
     candidateUpdateFailed: string;
     pageSafetyWarning: string;
     genericFileDescription: string;
+    structuredResultDescription: string;
+    invalidStructuredResult: string;
     formSchema: string;
     fillMode: string;
     designMode: string;
@@ -412,6 +415,7 @@ export type GoalCopy = {
     noSubmissions: string;
     downloadSubmission: string;
     documentContent: string;
+    structuredResultContent: string;
     draftAutosaved: string;
     draftSaved: string;
     publishVersion: string;
@@ -429,6 +433,9 @@ export type GoalCopy = {
     downloadSource: string;
     export: string;
     exportReady: string;
+    exportMarkdown: string;
+    exportPdf: string;
+    exportJson: string;
     restore: string;
     assetRestored: string;
     assetArchived: string;

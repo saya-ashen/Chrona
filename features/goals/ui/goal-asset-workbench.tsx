@@ -1,6 +1,10 @@
 "use client";
 
 import { cloneElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { JSONUIProvider, Renderer } from "@json-render/react";
+import { isStructuredResultAssetContent, type StructuredResultAssetContent } from "@chrona/contracts";
+import { isCatalogCompatible, validateChronaSpec } from "@chrona/ui-protocol";
+import { workspaceRegistry } from "@features/task-workspace";
 import {
   Archive,
   ChevronDown,
@@ -33,6 +37,12 @@ import {
   CardDescription,
   CardHeader,
   CardTitle,
+} from "@shared/ui";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
 } from "@shared/ui";
 import { Input } from "@shared/ui";
 import { Label } from "@shared/ui";
@@ -77,6 +87,7 @@ const ICON_BY_KIND: Record<GoalAssetKind, typeof File> = {
   form: FormInput,
   page: Globe2,
   file: File,
+  structured_result: FileText,
 };
 type AssetWorkbenchCopy = GoalCopy["assetWorkbench"];
 const KIND_TONE: Record<GoalAssetKind, string> = {
@@ -84,6 +95,7 @@ const KIND_TONE: Record<GoalAssetKind, string> = {
   form: "bg-success/[0.09] text-success",
   page: "bg-primary/[0.09] text-primary",
   file: "bg-warning/[0.09] text-warning",
+  structured_result: "bg-violet-500/[0.09] text-violet-700 dark:text-violet-300",
 };
 
 function formatCopy(template: string, values: Record<string, string | number>) {
@@ -94,6 +106,7 @@ function formatCopy(template: string, values: Record<string, string | number>) {
 }
 function kindLabel(kind: GoalAssetKind, copy: AssetWorkbenchCopy) {
   return {
+    structured_result: copy.structuredResults,
     document: copy.documentKind,
     form: copy.formKind,
     page: copy.pageKind,
@@ -730,6 +743,61 @@ function InboxCandidate({
   );
 }
 
+function hydrateStructuredArtifactLinks(content: StructuredResultAssetContent, goalId: string, assetId: string, versionId: string) {
+  const refs = new Set(content.artifactRefs.map((artifact) => artifact.ref));
+  return {
+    ...content.spec,
+    elements: Object.fromEntries(Object.entries(content.spec.elements).map(([key, element]) => {
+      const props = element.props as Record<string, unknown>;
+      const ref = typeof props.path === "string" && refs.has(props.path) ? props.path : null;
+      return [key, ref ? {
+        ...element,
+        props: {
+          ...props,
+          downloadHref: `/api/goals/${encodeURIComponent(goalId)}/assets/${encodeURIComponent(assetId)}/artifacts/${encodeURIComponent(ref)}/download?versionId=${encodeURIComponent(versionId)}`,
+        },
+      } : element];
+    })),
+  };
+}
+
+function StructuredResultViewer({ value, copy, goalId, assetId, versionId }: {
+  value: unknown;
+  copy: AssetWorkbenchCopy;
+  goalId: string;
+  assetId: string;
+  versionId: string;
+}) {
+  if (!isStructuredResultAssetContent(value) || !isCatalogCompatible(value.catalogVersion)) {
+    return (
+      <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+        {copy.invalidStructuredResult}
+      </p>
+    );
+  }
+  const spec = hydrateStructuredArtifactLinks(value, goalId, assetId, versionId);
+  const validation = validateChronaSpec(spec);
+  if (!validation.ok) {
+    return (
+      <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+        {copy.invalidStructuredResult}
+      </p>
+    );
+  }
+  return (
+    <section
+      aria-label={copy.structuredResultContent}
+      data-ui-surface-kind="ai-authored"
+      className="min-w-0 space-y-3 rounded-xl border bg-background p-4 sm:p-6"
+    >
+      <p className="text-xs text-muted-foreground">{copy.structuredResultDescription}</p>
+      <JSONUIProvider registry={workspaceRegistry} handlers={{}}>
+        <Renderer spec={spec} registry={workspaceRegistry} />
+      </JSONUIProvider>
+    </section>
+  );
+}
+
 function AssetContentEditor({
   asset,
   currentVersionId,
@@ -749,6 +817,9 @@ function AssetContentEditor({
   copy: AssetWorkbenchCopy;
   act: (action: () => Promise<unknown>, success: string) => Promise<void>;
 }) {
+  if (asset.kind === "structured_result") {
+    return <StructuredResultViewer value={parseContent(formalValue)} copy={copy} goalId={asset.goalId} assetId={asset.id} versionId={currentVersionId ?? ""} />;
+  }
   if (asset.kind === "page") {
     const content = parseContent(value);
     const source =
@@ -1312,19 +1383,31 @@ function AssetEditor({
     anchor.rel = "noopener";
     anchor.click();
   }
-  function exportAsset() {
+  function exportAsset(format: string) {
     if (!current) return;
     void act(
-      () =>
-        createGoalAssetJob(goalId, asset.id, {
+      async () => {
+        const job = await createGoalAssetJob(goalId, asset.id, {
           workspaceId,
           versionId: current.id,
           kind: "export",
-          format: asset.kind === "document" ? "md" : "json",
-        }),
+          format,
+        });
+        const anchor = document.createElement("a");
+        anchor.href = `/api/goals/${encodeURIComponent(goalId)}/assets/${encodeURIComponent(asset.id)}/download?versionId=${encodeURIComponent(current.id)}&mode=export&format=${encodeURIComponent(job.format ?? format)}`;
+        anchor.rel = "noopener";
+        anchor.click();
+      },
       copy.exportReady,
     );
   }
+  const exportFormats = asset.kind === "structured_result"
+    ? [{ format: "md", label: copy.exportMarkdown }, { format: "pdf", label: copy.exportPdf }, { format: "json", label: copy.exportJson }]
+    : asset.kind === "document"
+      ? [{ format: "md", label: copy.exportMarkdown }, { format: "pdf", label: copy.exportPdf }]
+      : asset.kind === "page"
+        ? [{ format: "html", label: "HTML" }, { format: "pdf", label: copy.exportPdf }]
+        : [{ format: "json", label: copy.exportJson }];
   function downloadSubmission(
     targetAsset: GoalAssetWorkbenchData,
     submission: GoalAssetWorkbenchData["submissions"][number],
@@ -1409,19 +1492,10 @@ function AssetEditor({
             </Button>
             {editable ? (
               <>
-                <Button
-                  size="sm"
-                  disabled={pending}
-                  onClick={() => void save()}
-                >
+                <Button size="sm" disabled={pending} onClick={() => void save()}>
                   {copy.saveDraft}
                 </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  disabled={pending}
-                  onClick={() => void publish()}
-                >
+                <Button size="sm" variant="outline" disabled={pending} onClick={() => void publish()}>
                   {copy.publishVersion}
                 </Button>
               </>
@@ -1431,15 +1505,24 @@ function AssetEditor({
                 {copy.downloadSource}
               </Button>
             )}
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={!current || pending}
-              onClick={exportAsset}
-            >
-              <Download className="size-4" />
-              {copy.export}
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={
+                  <Button size="sm" variant="outline" disabled={!current || pending}>
+                    <Download className="size-4" />
+                    {copy.export}
+                    <ChevronDown className="size-3.5" />
+                  </Button>
+                }
+              />
+              <DropdownMenuContent align="end">
+                {exportFormats.map((option) => (
+                  <DropdownMenuItem key={option.format} onClick={() => exportAsset(option.format)}>
+                    {option.label}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Button
               size="icon-sm"
               variant="ghost"
@@ -1746,6 +1829,7 @@ export function GoalAssetWorkbench({
                   <SelectItem value="form">{copy.forms}</SelectItem>
                   <SelectItem value="page">{copy.pages}</SelectItem>
                   <SelectItem value="file">{copy.files}</SelectItem>
+                  <SelectItem value="structured_result">{copy.structuredResults}</SelectItem>
                 </SelectContent>
               </Select>
               <details className="group">

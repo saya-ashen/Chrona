@@ -26,11 +26,19 @@ function generatedFileReferences(spec: UiDocument): GeneratedFileReference[] {
   for (const element of Object.values(spec.elements)) {
     if (element.type !== "FileRef" && element.type !== "FileView") continue;
     const props = element.props as Record<string, unknown>;
-    const uri = typeof props.path === "string" ? props.path : null;
-    if (!uri?.startsWith("generated://")) continue;
+    const rawPath = typeof props.path === "string" ? props.path : typeof props.uri === "string" ? props.uri : null;
+    if (!rawPath) continue;
+    const root = resolve(generatedFilesRoot());
+    const absolute = resolve(rawPath);
+    const uri = rawPath.startsWith("generated://")
+      ? rawPath
+      : isWithinGeneratedRoot(absolute)
+        ? `generated://${absolute.slice(root.length + 1).split(sep).join("/")}`
+        : null;
+    if (!uri) continue;
     references.set(uri, {
       uri,
-      title: typeof props.title === "string" && props.title.trim() ? props.title.trim() : basename(uri),
+      title: typeof props.title === "string" && props.title.trim() ? props.title.trim() : basename(rawPath),
       sourceNodeId: typeof props.xChronaSourceNodeId === "string" ? props.xChronaSourceNodeId : null,
     });
   }
