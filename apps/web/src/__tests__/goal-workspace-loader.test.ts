@@ -12,7 +12,7 @@ describe("loadGoalWorkspaceData", () => {
     vi.mocked(apiJson).mockReset();
   });
 
-  it("requests archived assets when the archived Workbench deep link is loaded", async () => {
+  it("requests archived assets when the archived Workbench tab is loaded", async () => {
     vi.mocked(apiJson)
       .mockResolvedValueOnce({ id: "goal-1", workspaceId: "ws-1" })
       .mockResolvedValueOnce({ assets: [], recent: [] })
@@ -21,7 +21,7 @@ describe("loadGoalWorkspaceData", () => {
     await loadGoalWorkspaceData({
       params: { goalId: "goal-1" },
       request: new Request(
-        "http://chrona.test/zh/goals/goal-1?section=workbench&assetState=archived",
+        "http://chrona.test/zh/goals/goal-1?section=workbench&assetView=archived",
       ),
       context: undefined,
       unstable_url: new URL("http://chrona.test/zh/goals/goal-1"),

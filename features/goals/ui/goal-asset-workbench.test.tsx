@@ -180,25 +180,27 @@ describe("GoalAssetWorkbench", () => {
     ).toHaveValue("Second content");
   });
 
-  it("labels the default scope as active assets and separates archived assets", async () => {
-    const active = asset("active", "Active document", "Active content");
+  it("separates archived assets into a top-level Workbench tab", async () => {
     const archived = {
       ...asset("archived", "Archived document", "Archived content", 2),
       status: "Archived",
       archivedAt: "2026-07-03T00:00:00.000Z",
     };
-    renderWorkbench([active, archived]);
-
-    expect(screen.getByRole("combobox", { name: copy.activeAssets })).toHaveTextContent(
-      copy.activeAssets,
+    const router = renderWorkbench(
+      [archived],
+      "/goals/goal-1?section=workbench&assetView=archived",
     );
-    expect(screen.getByRole("button", { name: /Active document/ })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Archived document/ })).not.toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole("combobox", { name: copy.activeAssets }));
-    await userEvent.click(screen.getByRole("option", { name: copy.archived }));
-    expect(await screen.findByRole("button", { name: /Archived document/ })).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Active document/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("tab", { name: copy.archived })).toHaveAttribute(
+      "data-state",
+      "active",
+    );
+    expect(screen.getByRole("button", { name: /Archived document/ })).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /Archived document/ }));
+    expect(await screen.findByRole("dialog")).toHaveTextContent("Archived document");
+    expect(screen.getByRole("button", { name: copy.restoreAsset })).toBeInTheDocument();
+    expect(router.state.location.search).toContain("assetView=archived");
   });
 
   it("prioritizes type-specific actions and exposes responsive workspace controls", async () => {

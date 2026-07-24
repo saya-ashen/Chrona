@@ -1688,8 +1688,10 @@ export function GoalAssetWorkbench({
   const [sort, setSort] = useState(
     () => searchParams.get("assetSort") ?? "updated_desc",
   );
-  const assetView =
-    searchParams.get("assetView") === "inbox" ? "inbox" : "library";
+  const requestedAssetView = searchParams.get("assetView");
+  const assetView = requestedAssetView === "inbox" || requestedAssetView === "archived"
+    ? requestedAssetView
+    : "library";
   useEffect(() => {
     setQuery(searchParams.get("assetQuery") ?? "");
     const nextState = searchParams.get("assetState") ?? "active";
@@ -1714,19 +1716,16 @@ export function GoalAssetWorkbench({
     () =>
       initialAssets
         .filter((asset) => {
-          const matchesState =
-            state === "archived"
-              ? Boolean(asset.archivedAt)
-              : !asset.archivedAt &&
-                (state === "active" ||
-                  (state === "draft" && asset.drafts.length > 0) ||
-                  (state === "running" &&
-                    asset.jobs.some(
-                      (job) =>
-                        job.status === "Queued" || job.status === "Processing",
-                    )) ||
-                  (state === "failed" &&
-                    asset.jobs.some((job) => job.status === "Failed")));
+          const matchesState = !asset.archivedAt &&
+            (state === "active" ||
+              (state === "draft" && asset.drafts.length > 0) ||
+              (state === "running" &&
+                asset.jobs.some(
+                  (job) =>
+                    job.status === "Queued" || job.status === "Processing",
+                )) ||
+              (state === "failed" &&
+                asset.jobs.some((job) => job.status === "Failed")));
           return (
             matchesState &&
             (!query ||
@@ -1768,6 +1767,8 @@ export function GoalAssetWorkbench({
         onValueChange={(value) =>
           updateWorkbenchParams({
             assetView: value === "library" ? null : value,
+            assetState: null,
+            asset: null,
           })
         }
       >
@@ -1791,6 +1792,10 @@ export function GoalAssetWorkbench({
             >
               {initialCandidates.length}
             </Badge>
+          </TabsTrigger>
+          <TabsTrigger value="archived">
+            <Archive className="size-4" />
+            {copy.archived}
           </TabsTrigger>
         </TabsList>
         <TabsContent value="library" className="space-y-6 pt-4">
@@ -1869,15 +1874,14 @@ export function GoalAssetWorkbench({
                       });
                     }}
                   >
-                    <SelectTrigger aria-label={copy.activeAssets}>
+                    <SelectTrigger aria-label={copy.allStatuses}>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="active">{copy.activeAssets}</SelectItem>
+                      <SelectItem value="active">{copy.allStatuses}</SelectItem>
                       <SelectItem value="draft">{copy.draft}</SelectItem>
                       <SelectItem value="running">{copy.processing}</SelectItem>
                       <SelectItem value="failed">{copy.failed}</SelectItem>
-                      <SelectItem value="archived">{copy.archived}</SelectItem>
                     </SelectContent>
                   </Select>
                   <Select
@@ -1924,7 +1928,7 @@ export function GoalAssetWorkbench({
                 ) : null}
                 {state !== "active" ? (
                   <Badge variant="outline">
-                    {state === "archived" ? copy.archived : state}
+                    {state}
                   </Badge>
                 ) : null}
                 <Button
@@ -2016,6 +2020,36 @@ export function GoalAssetWorkbench({
             </div>
           )}
         </TabsContent>
+        <TabsContent value="archived" className="space-y-4 pt-4">
+          <section>
+            <div className="mb-3 flex items-center justify-between">
+              <h3 className="text-sm font-semibold">{copy.archived}</h3>
+              <span className="text-xs tabular-nums text-muted-foreground">
+                {initialAssets.length}
+              </span>
+            </div>
+            {initialAssets.length === 0 ? (
+              <div className="rounded-xl border border-dashed px-5 py-10 text-center">
+                <Archive className="mx-auto size-8 text-muted-foreground" />
+                <p className="mt-3 font-medium">{copy.archivedEmpty}</p>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {copy.archivedEmptyDescription}
+                </p>
+              </div>
+            ) : (
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                {initialAssets.map((asset) => (
+                  <AssetTile
+                    key={asset.id}
+                    asset={asset}
+                    copy={copy}
+                    onOpen={() => updateWorkbenchParams({ asset: asset.id })}
+                  />
+                ))}
+              </div>
+            )}
+          </section>
+        </TabsContent>
       </Tabs>
       <Sheet
         open={selected !== null}
@@ -2033,7 +2067,7 @@ export function GoalAssetWorkbench({
               goalId={goalId}
               workspaceId={workspaceId}
               asset={selected}
-              assets={initialAssets.filter((asset) => !asset.archivedAt)}
+              assets={assetView === "archived" ? initialAssets : initialAssets.filter((asset) => !asset.archivedAt)}
               copy={copy}
               onSelectAsset={(assetId) =>
                 updateWorkbenchParams({ asset: assetId })
