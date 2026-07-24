@@ -10,6 +10,7 @@ type PageHeaderProps = Omit<React.ComponentProps<"header">, "title"> & {
   actions?: React.ReactNode;
   toolbar?: React.ReactNode;
   titleClassName?: string;
+  surface?: "plain" | "workspace";
 };
 
 export function PageHeader({
@@ -21,32 +22,38 @@ export function PageHeader({
   toolbar,
   className,
   titleClassName,
+  surface = "plain",
   ...props
 }: PageHeaderProps) {
   return (
     <header
       data-slot="page-header"
-      className={cn("border-b border-panel-border pb-4 pt-1 sm:pb-5", className)}
+      className={cn(
+        surface === "workspace"
+          ? "relative overflow-hidden border-y border-panel-border bg-muted/70 px-4 py-3 before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-primary sm:px-5 sm:py-3.5"
+          : "border-b border-panel-border pb-4 pt-1 sm:pb-5",
+        className,
+      )}
       {...props}
     >
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+      <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
           {eyebrow ? (
-            <div data-slot="page-header-eyebrow" className="mb-1.5 text-xs font-medium text-muted-foreground">
+            <div data-slot="page-header-eyebrow" className="mb-0.5 text-xs font-medium text-muted-foreground">
               {eyebrow}
             </div>
           ) : null}
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <h1
               data-slot="page-header-title"
-              className={cn("text-2xl font-semibold tracking-tight text-foreground sm:text-3xl", titleClassName)}
+              className={cn("text-xl font-semibold tracking-tight text-foreground sm:text-2xl", surface === "workspace" && "w-full", titleClassName)}
             >
               {title}
             </h1>
             {meta}
           </div>
           {description ? (
-            <div data-slot="page-header-description" className="mt-1.5 max-w-3xl text-sm leading-5 text-muted-foreground">
+            <div data-slot="page-header-description" className="mt-1 max-w-3xl text-sm leading-5 text-muted-foreground">
               {description}
             </div>
           ) : null}

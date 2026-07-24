@@ -390,5 +390,6 @@ describe("resolveTaskHeaderViewModel — header status follows the selected occu
     expect(headerView.status).toBe("completed");
     expect(headerView.statusLabel).toBe("Result ready");
     expect(headerView.workspaceStateGuidance).toBe("Accept result or request changes");
+    expect(headerView.progressLabel).toBe("1/1 steps");
   });
 });

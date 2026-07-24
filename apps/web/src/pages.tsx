@@ -167,7 +167,7 @@ export function ActionCenterRoutePage() {
   const { actionCenter } = useLoaderData() as ActionCenterRouteData;
 
   return (
-    <PageFrame mode="overview" data-domain="attention" className="p-1 sm:p-2">
+    <PageFrame mode="main" data-domain="attention" className="p-1 sm:p-2">
       <div className="flex w-full flex-1 flex-col gap-4">
         <PageHeader
           title={dictionary.pages.actionCenter.title}
@@ -194,7 +194,7 @@ export function SettingsRoutePage() {
 
   return (
     <>
-      <PageFrame mode="focused" data-domain="settings" className="p-1 sm:p-2">
+      <PageFrame mode="main" data-domain="settings" className="p-1 sm:p-2">
         <div className="flex w-full flex-1 flex-col gap-4">
           <PageHeader
             title={t.title}

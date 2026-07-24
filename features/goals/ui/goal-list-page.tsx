@@ -407,7 +407,7 @@ export function GoalListPage({
   ];
 
   return (
-    <PageFrame mode="focused" data-domain="goals" className="p-1 sm:p-2">
+    <PageFrame mode="main" data-domain="goals" className="p-1 sm:p-2">
       <div
         className="flex min-w-0 flex-1 flex-col gap-6"
         data-ui-surface-kind="product-authored"

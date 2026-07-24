@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from "react";
 import { type StateStore } from "@json-render/react";
-import { useI18n } from "@chrona/i18n"
+import { useI18n } from "@chrona/i18n";
+import { ArrowLeft, Target } from "lucide-react";
 import {
   Button,
   Dialog,
@@ -12,6 +13,7 @@ import {
 } from "@shared/ui";
 import { UI_ACTION, type UiDocument } from "@chrona/ui-protocol";
 import { SpecRenderer } from "./catalog/spec-renderer";
+import { LocalizedLink } from "./localized-link";
 import type { TaskData, TaskHeaderAction } from "../model/task-workspace-types";
 
 function hideHeaderActions(spec: UiDocument, input: { generatePlan?: boolean; acceptPlan?: boolean }): UiDocument {
@@ -31,7 +33,7 @@ function hideHeaderActions(spec: UiDocument, input: { generatePlan?: boolean; ac
 type HeaderActionId = TaskHeaderAction["id"];
 
 type TaskWorkspaceHeaderCardProps = {
-  task: Pick<TaskData, "title">;
+  task: Pick<TaskData, "title" | "goal">;
   spec: UiDocument;
   store: StateStore;
   onAction: (action: TaskHeaderAction) => void | Promise<void>;
@@ -186,7 +188,29 @@ export function TaskWorkspaceHeaderCard({
 
   return (
     <>
-      <SpecRenderer spec={hideHeaderActions(spec, { generatePlan: hideGeneratePlan, acceptPlan: hideAcceptPlan })} handlers={handlers} store={store} />
+      <header className="relative z-30 min-w-0 overflow-hidden border-y border-panel-border bg-muted/70 px-4 py-3 before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-primary [&_h1]:w-full [&_h1]:min-w-0 [&_h1]:break-words [&_h1]:text-xl [&_h1]:font-semibold [&_h1]:tracking-tight sm:px-5 sm:py-3.5 sm:[&_h1]:text-2xl">
+        <nav aria-label={task.goal ? messages.components.taskWorkspace.owningGoal : messages.components.taskWorkspace.backToTasks} className="mb-0.5">
+          <Button asChild variant="ghost" size="sm" className="-ml-2 h-7 max-w-full justify-start px-2 text-xs text-muted-foreground hover:text-foreground">
+            {task.goal ? (
+              <LocalizedLink
+                href={`/goals/${task.goal.id}?section=work`}
+                aria-label={`${messages.pages.goals.openGoal}: ${task.goal.title}`}
+              >
+                <Target className="size-4 shrink-0" aria-hidden />
+                <span className="shrink-0">{messages.components.taskWorkspace.owningGoal}</span>
+                <span aria-hidden className="text-border">/</span>
+                <span className="truncate font-medium text-foreground/80">{task.goal.title}</span>
+              </LocalizedLink>
+            ) : (
+              <LocalizedLink href="/tasks">
+                <ArrowLeft className="size-4 shrink-0" aria-hidden />
+                {messages.components.taskWorkspace.backToTasks}
+              </LocalizedLink>
+            )}
+          </Button>
+        </nav>
+        <SpecRenderer spec={hideHeaderActions(spec, { generatePlan: hideGeneratePlan, acceptPlan: hideAcceptPlan })} handlers={handlers} store={store} />
+      </header>
       <p className="sr-only" role="status" aria-live="polite">
         {actionStatus ?? ""}
       </p>

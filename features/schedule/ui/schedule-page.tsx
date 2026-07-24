@@ -226,7 +226,7 @@ export function SchedulePage({
   }, []);
 
   return (
-    <PageFrame mode="workspace" data-domain="schedule" className="p-1 sm:p-2">
+    <PageFrame mode="main" data-domain="schedule" className="p-1 sm:p-2">
       <p className="sr-only" aria-live="polite">
         {announcement}
       </p>

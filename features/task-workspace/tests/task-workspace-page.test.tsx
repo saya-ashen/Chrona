@@ -154,6 +154,18 @@ vi.mock("../ui/task-workspace-header-card", () => ({
     const hasOverflow = Boolean(elements["header-overflow"]);
     return (
       <header>
+        <nav>
+          {task.goal ? (
+            <a
+              href={`/goals/${task.goal.id}?section=work`}
+              aria-label={`Open Goal: ${task.goal.title}`}
+            >
+              Goal / {task.goal.title}
+            </a>
+          ) : (
+            <a href="/tasks">Task list</a>
+          )}
+        </nav>
         <h1>{task.title}</h1>
         <section aria-label="Workspace state">
           <p>Current state</p>
@@ -345,11 +357,11 @@ describe("TaskWorkspacePage", () => {
 
     render(<TaskWorkspacePage data={data} />);
 
-    expect(screen.getByText("Plan a summer trip")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Open Goal" })).toHaveAttribute(
-      "href",
-      "/goals/goal-1?section=work",
-    );
+    expect(
+      screen.getByRole("link", { name: "Open Goal: Plan a summer trip" }),
+    ).toHaveAttribute("href", "/goals/goal-1?section=work");
+    expect(screen.getByRole("heading", { level: 1, name: "Plan migration" })).toBeInTheDocument();
+    expect(screen.getAllByRole("banner")).toHaveLength(1);
     expect(screen.queryByRole("link", { name: "All Goals" })).not.toBeInTheDocument();
   });
 

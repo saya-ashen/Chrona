@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import type React from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createStateStore } from "@json-render/core";
+import { MemoryRouter } from "react-router-dom";
 import { createHeaderSpecFixture } from "@features/task-workspace/test";
 import { TaskWorkspaceHeaderCard } from "../ui/task-workspace-header-card";
 import type { TaskData } from "./task-workspace-model";
@@ -62,25 +63,27 @@ function renderHeader(
   const store = createStateStore(spec.state ?? {});
   store.update(state);
   return render(
-    <TaskWorkspaceHeaderCard
-      task={task}
-      spec={spec}
-      store={store}
-      onAction={onAction}
-      onAcceptPlan={vi.fn()}
-      onGeneratePlan={vi.fn()}
-      onStopPlanGeneration={onStopPlanGeneration}
-      onRestartPlan={vi.fn()}
-      onEdit={vi.fn()}
-      showDeleteConfirm={false}
-      isDeleting={false}
-      onStartDeleteConfirm={vi.fn()}
-      onCancelDeleteConfirm={vi.fn()}
-      onDelete={vi.fn()}
-      onRecoveryRetry={vi.fn()}
-      onRecoveryEditInstruction={vi.fn()}
-      onRecoveryCancel={vi.fn()}
-    />,
+    <MemoryRouter initialEntries={["/en/tasks/task-1"]}>
+      <TaskWorkspaceHeaderCard
+        task={task}
+        spec={spec}
+        store={store}
+        onAction={onAction}
+        onAcceptPlan={vi.fn()}
+        onGeneratePlan={vi.fn()}
+        onStopPlanGeneration={onStopPlanGeneration}
+        onRestartPlan={vi.fn()}
+        onEdit={vi.fn()}
+        showDeleteConfirm={false}
+        isDeleting={false}
+        onStartDeleteConfirm={vi.fn()}
+        onCancelDeleteConfirm={vi.fn()}
+        onDelete={vi.fn()}
+        onRecoveryRetry={vi.fn()}
+        onRecoveryEditInstruction={vi.fn()}
+        onRecoveryCancel={vi.fn()}
+      />
+    </MemoryRouter>,
   );
 }
 

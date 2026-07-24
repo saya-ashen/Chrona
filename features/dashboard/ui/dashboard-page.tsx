@@ -881,7 +881,7 @@ export function DashboardPage({
   }, [autoCompleted]);
 
   return (
-    <PageFrame mode="overview" data-domain="dashboard" className="p-1 sm:p-2">
+    <PageFrame mode="main" data-domain="dashboard" className="p-1 sm:p-2">
       <div className="w-full space-y-4 sm:space-y-5">
         <HeadlineBanner
           copy={copy}

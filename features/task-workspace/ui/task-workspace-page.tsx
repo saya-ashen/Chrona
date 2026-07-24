@@ -16,8 +16,6 @@ import { useTaskWorkspacePageState } from "../hooks/use-task-workspace-page-stat
 import { useTaskWorkspacePlanState } from "../hooks/use-task-workspace-plan-state";
 import { useTaskWorkspaceProposalFlow } from "../hooks/use-task-workspace-proposal-flow";
 import { createTaskAiSidebarContext } from "../adapters/task-ai-sidebar-adapter";
-import { LocalizedLink } from "./localized-link";
-import { Badge, Button } from "@shared/ui";
 
 function getLatestPersistedActivitySummary(pageData: TaskPageData) {
   const latestActivity = pageData.activityTimeline?.at(-1);
@@ -316,35 +314,7 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2 xl:overflow-hidden">
-      <div className="shrink-0 space-y-1">
-        {task.goal ? (
-          <section
-            className="mx-1 mb-2 flex flex-col gap-2 border-l-4 border-l-info bg-info/[0.035] px-3 py-2 sm:flex-row sm:items-center sm:justify-between"
-            aria-label={messages.pages.goals.ongoingWorkspace}
-          >
-            <div className="min-w-0">
-              <div className="flex items-center gap-2">
-                <Badge
-                  variant="outline"
-                  className="border-info/25 bg-info/[0.06] text-info"
-                >
-                  {messages.pages.goals.ongoingWorkspace}
-                </Badge>
-                <span className="text-xs text-muted-foreground">
-                  {messages.pages.goals.currentFocus}
-                </span>
-              </div>
-              <p className="mt-1 truncate text-sm font-semibold">
-                {task.goal.title}
-              </p>
-            </div>
-            <Button asChild variant="outline" size="sm" className="shrink-0">
-              <LocalizedLink href={`/goals/${task.goal.id}?section=work`}>
-                {messages.pages.goals.openGoal}
-              </LocalizedLink>
-            </Button>
-          </section>
-        ) : null}
+      <div className="shrink-0">
         <TaskWorkspaceHeaderEditor
           task={consoleView.task}
           spec={headerSpec}

@@ -295,57 +295,55 @@ function StageBarCard({
   const activeIndex = stages.findIndex((item) => item.id === visibleStage);
   return (
     <div
-      className="flex min-w-0 flex-col gap-2 border-b border-border/70 px-4 py-2 lg:flex-row lg:items-center lg:justify-between"
+      className="min-w-0 border-b border-border/60 bg-background px-3 pb-3 pt-3 sm:px-4"
       data-ui-surface-kind="runtime-control"
     >
-      <ol
-        className="flex min-w-0 items-center gap-0.5 text-xs"
-        aria-label="Task stage"
-      >
-        {stages.map((item, index) => (
-          <li key={item.id} className="flex min-w-0 items-center gap-0.5">
-            <span
-              aria-current={index === activeIndex ? "step" : undefined}
-              className={
-                index === activeIndex
-                  ? "rounded-full bg-primary px-2 py-1.5 font-semibold text-primary-foreground sm:px-2.5"
-                  : index < activeIndex
-                    ? "rounded-full bg-primary/10 px-2 py-1.5 font-medium text-foreground sm:px-2.5"
-                    : "px-1 py-1.5 text-muted-foreground sm:px-1.5"
-              }
-            >
-              {item.label}
-            </span>
-            {index < stages.length - 1 ? (
-              <span
-                className={
-                  index < activeIndex
-                    ? "flex size-4 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary"
-                    : "flex size-4 shrink-0 items-center justify-center rounded-full bg-muted/60 text-muted-foreground/70"
-                }
-                aria-hidden
-              >
-                <ChevronRight className="size-3" strokeWidth={2.25} />
-              </span>
-            ) : null}
-          </li>
-        ))}
-      </ol>
-      <div className="flex min-w-0 items-center gap-2 text-xs">
-        <span className="shrink-0 font-semibold text-foreground">
-          {stage.statusLabel}
-        </span>
-        <span className="truncate text-muted-foreground">
-          {stage.nextActionLabel}
-        </span>
-        {stage.currentNodeLabel ? (
-          <Badge
-            variant="outline"
-            className="hidden max-w-52 truncate bg-background xl:inline-flex"
+      <div className="flex min-w-0 flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+        <div className="no-scrollbar min-w-0 overflow-x-auto">
+          <ol
+            className="flex min-w-max items-center gap-0.5 text-xs sm:gap-1"
+            aria-label="Task stage"
           >
-            {stage.currentNodeLabel}
-          </Badge>
-        ) : null}
+            {stages.map((item, index) => (
+              <li key={item.id} className="flex items-center gap-1">
+                <span
+                  className={
+                    index === activeIndex
+                      ? "rounded-lg bg-muted px-2.5 py-2 font-semibold text-foreground sm:px-3"
+                      : index < activeIndex
+                        ? "rounded-lg px-2.5 py-2 font-medium text-foreground hover:bg-muted/70 sm:px-3"
+                        : "rounded-lg px-2.5 py-2 text-muted-foreground hover:bg-muted/70 hover:text-foreground sm:px-3"
+                  }
+                >
+                  {item.label}
+                </span>
+                {index < stages.length - 1 ? (
+                  <ChevronRight
+                    className={index < activeIndex ? "hidden size-3 text-primary sm:block sm:size-3.5" : "hidden size-3 text-muted-foreground/55 sm:block sm:size-3.5"}
+                    strokeWidth={2.25}
+                    aria-hidden
+                  />
+                ) : null}
+              </li>
+            ))}
+          </ol>
+        </div>
+        <div className="flex min-w-0 items-center gap-2 px-1 text-xs lg:max-w-[34rem] lg:justify-end">
+          <span className="shrink-0 font-semibold text-foreground">
+            {stage.statusLabel}
+          </span>
+          <span className="truncate text-muted-foreground">
+            {stage.nextActionLabel}
+          </span>
+          {stage.currentNodeLabel ? (
+            <Badge
+              variant="outline"
+              className="hidden max-w-52 truncate bg-background xl:inline-flex"
+            >
+              {stage.currentNodeLabel}
+            </Badge>
+          ) : null}
+        </div>
       </div>
     </div>
   );

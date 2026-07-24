@@ -271,7 +271,7 @@ function PrimaryOutcome({ goal, copy }: { goal: GoalData; copy: GoalCopy }) {
 
   return (
     <article
-      className="mx-auto w-full max-w-5xl"
+      className="w-full"
       aria-labelledby="goal-final-outcome"
     >
       <header className="border-b-2 border-success/35 pb-6">
@@ -512,7 +512,7 @@ function StoppedOutcomeArchive({
   const stoppedDate = formatDate(goal.stoppedAt, locale);
 
   return (
-    <article className="mx-auto w-full max-w-5xl space-y-7">
+    <article className="w-full space-y-7">
       <header className="grid gap-4 rounded-xl border border-l-4 border-l-muted-foreground bg-card p-5 sm:grid-cols-[auto_minmax(0,1fr)_auto] sm:items-start sm:p-6">
         <span className="flex size-10 items-center justify-center rounded-full bg-muted text-muted-foreground">
           <CircleOff className="size-5" aria-hidden />
@@ -2219,7 +2219,7 @@ function GoalSectionNavigation({
   return (
     <nav
       aria-label={copy.controlPlane}
-      className="shrink-0 border-b border-border/60 bg-background pb-3"
+      className="shrink-0 border-b border-border/60 bg-background pb-3 pt-0.5"
     >
       <div className="relative">
         {scrollEdges.start ? (
@@ -2300,7 +2300,7 @@ export function GoalWorkspacePage({
   }, [defaultSection]);
   return (
     <PageFrame
-      mode="focused"
+      mode="workspace"
       data-domain={defaultSection === "workbench" ? "workbench" : "goals"}
       className="overflow-y-hidden p-1 sm:p-2"
     >
@@ -2309,6 +2309,7 @@ export function GoalWorkspacePage({
         data-ui-surface-kind="product-authored"
       >
         <PageHeader
+          surface="workspace"
           eyebrow={
             <Button asChild variant="ghost" size="sm" className="w-fit -ml-2">
               <LocalizedLink href="/goals">
@@ -2337,9 +2338,6 @@ export function GoalWorkspacePage({
                   <Target className="size-4" />
                 )}
                 {copy.status[goal.status]}
-              </span>
-              <span className="text-sm text-muted-foreground">
-                {isArchive ? copy.outcomeArchive : copy.ongoingWorkspace}
               </span>
               {goal.projection.attention !== "none" ? (
                 <Badge variant="destructive">
@@ -2411,7 +2409,7 @@ export function GoalWorkspacePage({
           <div
             ref={contentScrollRef}
             data-goal-section-scroll
-            className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-8"
+            className="min-h-0 flex-1 overflow-y-auto overscroll-contain pb-8 [scrollbar-gutter:stable]"
           >
             <TabsContent value="overview" className="mt-5">
               {goal.status === "Stopped" ? (

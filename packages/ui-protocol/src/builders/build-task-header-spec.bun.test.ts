@@ -20,16 +20,19 @@ describe("buildTaskHeaderSpec", () => {
       type: "Text",
       props: { text: "3 steps · 2 accepted · 67%" },
     });
-    expect(spec.elements.guidance).toMatchObject({
-      type: "Text",
-      props: { text: "Execution paused for review." },
+    expect(spec.elements.guidance).toBeUndefined();
+    expect(spec.elements.root).toMatchObject({
+      type: "Stack",
+      props: { className: expect.not.stringContaining("rounded") },
     });
-    expect(spec.elements["meta-row"]).toMatchObject({
-      children: expect.arrayContaining(["summary", "guidance"]),
-    });
+    const detailChildren = JSON.stringify(spec.elements["detail-row"]?.children);
+    expect(detailChildren).not.toContain("guidance");
     expect(spec.elements["title-row"]).toMatchObject({
-      children: expect.arrayContaining(["badge:workspace-state", "badge:primary-state", "badge:priority"]),
+      children: ["title"],
     });
+    expect(detailChildren).toContain("badge:workspace-state");
+    expect(detailChildren).toContain("badge:primary-state");
+    expect(detailChildren).toContain("badge:priority");
   });
 
   it("places plan generation stop action in header actions", () => {

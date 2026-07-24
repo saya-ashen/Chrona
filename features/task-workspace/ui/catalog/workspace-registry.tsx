@@ -1522,7 +1522,8 @@ export const { registry: workspaceRegistry } = defineRegistry(chronaCatalog, {
           ...input.props,
           className: cn(
             input.props.className,
-            "min-w-0 w-full max-w-full",
+            "min-w-0 max-w-full",
+            !input.props.className?.includes("w-auto") && "w-full",
             !input.props.align && "items-stretch",
           ),
         },

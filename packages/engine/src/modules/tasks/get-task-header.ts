@@ -280,7 +280,6 @@ export function resolveTaskHeaderViewModel(input: BuildHeaderSpecInput & { now?:
   const occurrenceValueCurrent = occurrenceValue(task.id, currentWorkBlock?.id ?? null);
   const totalSteps = savedPlan?.effectivePlan.nodes.length ?? 0;
   const completedSteps = savedPlan?.effectivePlan.completedNodeIds.length ?? currentExecution.executedNodeIds.length;
-  const progressPercent = totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0;
   // Work blocks scope pre-acceptance occurrence state, but accepting a task
   // result is authoritative for the task lifecycle. A completed work block
   // must not mask Task.status=Done and keep Result Review in acceptance mode.
@@ -321,7 +320,9 @@ export function resolveTaskHeaderViewModel(input: BuildHeaderSpecInput & { now?:
     workspaceStateGuidance: workStateGuidance,
     status,
     statusLabel: taskStatusLabel({ status, executionStatus: currentExecution.status, taskStatus: scopedTaskStatus }),
-    progressLabel: `${totalSteps} step${totalSteps === 1 ? "" : "s"} · ${completedSteps} accepted · ${progressPercent}%`,
+    progressLabel: totalSteps > 0
+      ? `${completedSteps}/${totalSteps} steps`
+      : "0 steps",
     priorityLabel: task.priority,
     priorityTone: priorityTone(task.priority),
     occurrenceLabel: occurrenceWindow ? `Occurrence · ${occurrenceWindow}` : null,

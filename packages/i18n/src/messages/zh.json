@@ -1221,6 +1221,8 @@
       "requestSentSuffix": "请求已发送。",
       "actionFailedPrefix": "操作失败：",
       "taskEyebrow": "任务",
+      "backToTasks": "任务列表",
+      "owningGoal": "所属目标",
       "commandCenter": "执行",
       "executionOverviewAria": "执行概览",
       "currentOperation": "当前操作",

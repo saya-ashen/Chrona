@@ -1221,6 +1221,8 @@
       "requestSentSuffix": "request sent.",
       "actionFailedPrefix": "Failed to",
       "taskEyebrow": "Task",
+      "backToTasks": "Task list",
+      "owningGoal": "Goal",
       "commandCenter": "Execution",
       "executionOverviewAria": "Execution overview",
       "currentOperation": "Current operation",

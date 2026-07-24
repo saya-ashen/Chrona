@@ -655,7 +655,7 @@ export function TaskListPage({
   }
 
   return (
-    <PageFrame mode="workspace" data-domain="tasks" className="p-1 sm:p-2">
+    <PageFrame mode="main" data-domain="tasks" className="p-1 sm:p-2">
       <div className="flex min-h-0 flex-1 flex-col gap-3 p-3 sm:p-4">
         <TaskListHero
           title={copy.nav.tasks}

@@ -170,39 +170,26 @@ function appendSummary(elements: MutableElements, children: string[], text: stri
     type: "Text",
     props: {
       text,
-      className: "min-w-0 truncate text-xs text-muted-foreground",
+      className: "min-w-0 shrink truncate text-xs leading-5 text-muted-foreground",
     },
   };
   children.push("summary");
 }
 
-function appendGuidance(elements: MutableElements, children: string[], text: string) {
-  elements.guidance = {
-    type: "Text",
-    props: {
-      text,
-      className: "min-w-0 truncate text-xs text-muted-foreground",
-    },
-  };
-  children.push("guidance");
-}
 
 export function buildTaskHeaderSpec(input: TaskHeaderSpecInput): UiDocument {
   const elements: MutableElements = {};
   const statusChildren: string[] = [];
-  const metaChildren: string[] = [];
+  const detailChildren: string[] = [];
   const actionChildren: string[] = [];
 
   appendBadge(elements, statusChildren, input.workspaceStateLabel ? { id: "workspace-state", label: input.workspaceStateLabel, tone: "info" } : null);
   appendBadge(elements, statusChildren, { id: "primary-state", label: input.statusLabel, tone: statusTone(input.status) });
   appendBadge(elements, statusChildren, input.priorityLabel ? { id: "priority", label: input.priorityLabel, tone: input.priorityTone ?? "neutral" } : null);
 
-  appendOccurrence(elements, metaChildren, input);
-  appendBadge(elements, metaChildren, input.sourceLabel ? { id: "source", label: input.sourceLabel, tone: "neutral" } : null);
-  appendSummary(elements, metaChildren, input.progressLabel);
-  if (input.workspaceStateGuidance) {
-    appendGuidance(elements, metaChildren, input.workspaceStateGuidance);
-  }
+  appendOccurrence(elements, detailChildren, input);
+  appendBadge(elements, detailChildren, input.sourceLabel ? { id: "source", label: input.sourceLabel, tone: "neutral" } : null);
+  appendSummary(elements, detailChildren, input.progressLabel);
 
   // Always materialise the five execution-flow action elements so the
   // server can toggle their visibility/disabled through the
@@ -221,20 +208,20 @@ export function buildTaskHeaderSpec(input: TaskHeaderSpecInput): UiDocument {
   appendOverflowMenu(elements, actionChildren, input.actions.filter((action) => action.id === "restart" || action.id === "edit" || action.id === "delete"));
 
   elements.root = {
-    type: "Card",
-    props: { className: "relative z-30 min-w-0 overflow-visible rounded-[1.5rem] border-border bg-card p-4" },
+    type: "Stack",
+    props: { gap: "sm", className: "relative min-w-0 overflow-visible" },
     children: ["layout", "error-region"],
   };
   elements.layout = {
     type: "Stack",
-    props: { direction: "horizontal", gap: "lg", align: "center", justify: "between", className: "min-w-0 flex-wrap" },
+    props: { direction: "horizontal", gap: "sm", align: "center", justify: "between", className: "min-w-0 flex-nowrap" },
     children: ["identity", "actions"],
   };
-  elements.identity = { type: "Stack", props: { gap: "sm", className: "min-w-0 flex-1" }, children: ["title-row", "meta-row"] };
-  elements["title-row"] = { type: "Stack", props: { direction: "horizontal", gap: "sm", align: "center", className: "min-w-0 flex-wrap" }, children: ["title", ...statusChildren] };
-  elements.title = { type: "Heading", props: { text: input.title, level: "h1", className: "min-w-0 break-words font-heading text-[2rem] font-medium leading-none tracking-[-0.05em] text-foreground lg:max-w-[46vw]" } };
-  elements["meta-row"] = { type: "Stack", props: { direction: "horizontal", gap: "sm", align: "center", className: "min-w-0 flex-wrap" }, children: [...metaChildren] };
-  elements.actions = { type: "Stack", props: { direction: "horizontal", gap: "sm", align: "center", justify: "end", className: "w-full flex-wrap sm:w-auto" }, children: actionChildren };
+  elements.identity = { type: "Stack", props: { gap: "xs", className: "min-w-0 flex-1 basis-0 w-auto" }, children: ["title-row", "detail-row"] };
+  elements["title-row"] = { type: "Stack", props: { className: "min-w-0" }, children: ["title"] };
+  elements.title = { type: "Heading", props: { text: input.title, level: "h1" } };
+  elements["detail-row"] = { type: "Stack", props: { direction: "horizontal", gap: "sm", align: "center", className: "no-scrollbar min-w-0 flex-nowrap overflow-x-auto" }, children: [...statusChildren, ...detailChildren] };
+  elements.actions = { type: "Stack", props: { direction: "horizontal", gap: "sm", align: "center", justify: "end", className: "w-auto shrink-0 flex-nowrap" }, children: actionChildren };
 
   // Inline error banner. Visibility + content are driven by `state.update`
   // pushes on `/plan/generation/error/*` from the workspace SSE bus. The

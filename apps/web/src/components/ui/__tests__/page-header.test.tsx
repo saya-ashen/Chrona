@@ -34,4 +34,14 @@ describe("PageHeader", () => {
     expect(container.querySelector('[data-slot="page-header-actions"]')).toBeNull();
     expect(container.querySelector('[data-slot="page-header-toolbar"]')).toBeNull();
   });
+
+  it("renders a distinct workspace surface when requested", () => {
+    const { container } = render(<PageHeader title="Workspace" surface="workspace" />);
+
+    expect(container.querySelector("header")).toHaveClass(
+      "border-y",
+      "bg-muted/70",
+    );
+    expect(container.querySelector("header")).not.toHaveClass("rounded-2xl", "shadow-sm");
+  });
 });
