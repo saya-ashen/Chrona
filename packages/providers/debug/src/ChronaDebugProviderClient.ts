@@ -417,6 +417,9 @@ export class ChronaDebugProviderClient implements AgentProviderClient {
     const nodeRef = currentNodeRef(streamInput);
     const branchRef = preferredBranchRef(streamInput);
     const signal = "signal" in input ? input.signal : undefined;
+    const isGoalReview = "structuredOutputSchema" in streamInput && streamInput.structuredOutputSchema?.name === "goal_review_result";
+    const isGoalAssetOwnership = "structuredOutputSchema" in streamInput && streamInput.structuredOutputSchema?.name === "goal_asset_ownership_result";
+    const isSuggestion = "structuredOutputSchema" in streamInput && streamInput.structuredOutputSchema?.name === "suggest_task_completions";
     let sequence = 0;
 
     yield {
@@ -454,6 +457,25 @@ export class ChronaDebugProviderClient implements AgentProviderClient {
         tool: PLAN_TOOL,
         callId: "chrona-debug-plan-call",
         result: { ok: true, message: "Debug plan emitted." },
+      };
+    } else if (isSuggestion) {
+      yield {
+        ...eventBase(this.provider, run, sequence++),
+        type: "tool_call",
+        tool: "suggest_task_completions",
+        callId: "chrona-debug-suggest-call",
+        input: {
+          suggestions: [
+            {
+              title: "Review suggested task",
+              description: "A deterministic provider-backed suggestion.",
+              priority: "Medium",
+              estimatedMinutes: 30,
+              tags: ["suggested"],
+            },
+          ],
+        },
+        status: "completed",
       };
     } else if (nodeType === "condition") {
       const title = nodeTitle;
@@ -577,19 +599,47 @@ export class ChronaDebugProviderClient implements AgentProviderClient {
       run: providerRunRef(this.provider, run, "completed"),
       outputText: isPlanGeneration(streamInput)
         ? "Debug plan generation completed."
-        : this.profile === "hermes-like"
-          ? `Hermes-like debug runtime run completed for ${nodeTitle}.`
-          : `Debug runtime run completed for ${nodeTitle}.`,
-      output: isPlanGeneration(streamInput)
-        ? undefined
-        : {
-            text: this.profile === "hermes-like"
+        : isGoalReview
+          ? "Debug Goal review completed."
+          : isGoalAssetOwnership
+            ? "Debug Goal asset ownership review completed."
+            : this.profile === "hermes-like"
               ? `Hermes-like debug runtime run completed for ${nodeTitle}.`
               : `Debug runtime run completed for ${nodeTitle}.`,
-          },
-      structuredPayload: nodeType === "condition"
-        ? { terminalToolName: CONDITION_SELECT_TOOL, nodeId: nodeRef, branchRef, summary: `Debug provider selected fast path for ${nodeTitle}.` }
-        : undefined,
+      output: isPlanGeneration(streamInput)
+        ? undefined
+        : { text: isGoalReview ? "Debug Goal review completed." : isGoalAssetOwnership ? "Debug Goal asset ownership review completed." : this.profile === "hermes-like" ? `Hermes-like debug runtime run completed for ${nodeTitle}.` : `Debug runtime run completed for ${nodeTitle}.` },
+      structuredPayload: isGoalReview
+        ? {
+            schemaVersion: 1,
+            summary: "Review the current Goal focus and schedule another check-in.",
+            items: [
+              {
+                itemId: "debug-current-focus",
+                kind: "brief_field",
+                field: "currentFocus",
+                value: "Review the next bounded outcome",
+                rationale: "The frozen snapshot supports a focused next step.",
+                evidenceRefs: [],
+                warnings: [],
+              },
+            ],
+          }
+        : isGoalAssetOwnership
+          ? {
+              schemaVersion: 1,
+              decision: "create_asset",
+              targetAssetId: null,
+              proposedLabel: "Reviewed accepted result",
+              rationale: "The frozen candidate has no safe matching asset in the bounded set.",
+              differenceSummary: "Create a separate asset from the accepted result.",
+              certainty: "medium",
+              evidence: ["The candidate contains accepted result content."],
+              counterEvidence: ["The debug provider has no semantic domain context."],
+            }
+        : nodeType === "condition"
+          ? { terminalToolName: CONDITION_SELECT_TOOL, nodeId: nodeRef, branchRef, summary: `Debug provider selected fast path for ${nodeTitle}.` }
+          : undefined,
       usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
       raw: { debugProvider: true, profile: this.profile },
     };

@@ -1,4 +1,7 @@
+import { z } from "zod";
 import type { GenerateTaskPlanRequest } from "./plan-runtime";
+import { goalAssetOwnershipResultSchema } from "./api/goal-workbench.schema";
+import { goalReviewResultSchema } from "./api/goals.schema";
 import { planBlueprintSchema } from "./ai-plan-blueprint";
 
 export type AiFeatureToolSpec = {
@@ -19,7 +22,9 @@ export type StructuredAiFeature =
   | "generate_plan"
   | "execute_task_node"
   | "evaluate_condition_node"
-  | "review_checkpoint_node";
+  | "review_checkpoint_node"
+  | "goal.asset_ownership"
+  | "goal.review";
 
 export type PreparedAiFeatureSpec = {
   feature: StructuredAiFeature;
@@ -225,7 +230,7 @@ export function buildGeneratePlanFeatureInputText(
   if (input.sourceContext?.trim()) {
     parts.push(
       "",
-      "Calendar event details (read-only, from the external calendar source):",
+      "Source context (read-only; provenance is preserved in the payload):",
       input.sourceContext.trim(),
     );
   }
@@ -270,6 +275,22 @@ export function buildSuggestFeatureSpec(): PreparedAiFeatureSpec {
     structuredOutputSchema: toStructuredOutputSchema(
       suggestTaskCompletionsToolSpec,
     ),
+  };
+}
+
+export function buildGoalAssetOwnershipFeatureSpec(): PreparedAiFeatureSpec {
+  return {
+    feature: "goal.asset_ownership",
+    instructions:
+      "You classify one accepted task result into a frozen set of Goal asset candidates. Use only the supplied snapshot. Return one discrete ownership decision with evidence and counter-evidence. Never create, modify, archive, or publish assets.",
+    structuredOutputSchema: {
+      name: "goal_asset_ownership_result",
+      description: "A bounded recommendation for the ownership of one Goal Inbox candidate.",
+      schema: z.toJSONSchema(goalAssetOwnershipResultSchema, {
+        target: "draft-07",
+        unrepresentable: "any",
+      }) as Record<string, unknown>,
+    },
   };
 }
 
@@ -325,6 +346,26 @@ export function validatePreparedFeaturePayload(
     }
     case "suggest":
       return validateSuggestPayload(payload);
+    case "goal.asset_ownership": {
+      const validation = goalAssetOwnershipResultSchema.safeParse(payload);
+      if (!validation.success) {
+        return {
+          ok: false,
+          error: validation.error.issues[0]?.message ?? "Feature 'goal.asset_ownership' returned an invalid proposal payload",
+        };
+      }
+      return { ok: true };
+    }
+    case "goal.review": {
+      const validation = goalReviewResultSchema.safeParse(payload);
+      if (!validation.success) {
+        return {
+          ok: false,
+          error: validation.error.issues[0]?.message ?? "Feature 'goal.review' returned an invalid proposal payload",
+        };
+      }
+      return { ok: true };
+    }
     case "execute_task_node":
     case "evaluate_condition_node":
     case "review_checkpoint_node":

@@ -286,6 +286,7 @@ export const startRunInputSchema = z
     input: providerRunInputSchema,
     structuredOutputSchema: providerStructuredOutputSchemaSchema.optional(),
     terminalToolName: z.string().min(1).optional(),
+    toolPolicy: z.enum(["full", "read_only"]).optional(),
     previousResponseId: z.string().min(1).optional(),
     /**
      * Provider-native session id captured from a PRIOR run for this Chrona

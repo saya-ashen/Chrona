@@ -21,6 +21,8 @@ export async function resetTestDb() {
     await db.aiFeatureBinding.deleteMany();
     await db.workspaceAiSurface.deleteMany();
     await db.workspaceUserPreference.deleteMany();
+    await db.goalReviewProposalItem.deleteMany();
+    await db.goalReviewProposal.deleteMany();
     await db.goalAssetJob.deleteMany();
     await db.goalFormSubmission.deleteMany();
     await db.goalInboxCandidate.deleteMany();

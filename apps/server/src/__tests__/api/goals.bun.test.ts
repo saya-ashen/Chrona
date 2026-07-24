@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "bun:test";
 import { db } from "@chrona/db";
-import { createChronaEngine } from "@chrona/engine";
+import { aiClientRegistry, createChronaEngine, waitForGoalReviewGeneration } from "@chrona/engine";
 import { createApiRouter, type ApiRouter } from "../../routes/api";
 import { resetTestDb, seedTask, seedWorkspace } from "../bun-test-helpers";
 import type { GoalData } from "../../../../../features/goals";
@@ -263,7 +263,7 @@ describe("Goal API", () => {
     expect(taskResponse.goal.primaryAction).toEqual({ kind: "continue_work", taskId: taskResponse.taskId });
   });
 
-  it("persists a Goal brief, working set, and immutable bounded-task context", async () => {
+  it("persists a Goal brief and immutable accepted-result context automatically", async () => {
     const { workspaceId } = await seedWorkspace("Goal workbench");
     const app = createApiRouter(createChronaEngine());
     const created = await responseJson<GoalData>(await requestJson(app, "/goals", {
@@ -300,15 +300,7 @@ describe("Goal API", () => {
       autoPlanGeneration: false,
       expectedOutcome: "A confirmed target opening",
     }));
-    const workingSetResponse = await app.request(`/goals/${created.id}/working-set`, {
-      method: "PUT",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ selections: [{ subjectType: "task", subjectId: sourceTask.taskId }] }),
-    });
-    expect(workingSetResponse.status).toBe(200);
-    const withWorkingSet = await responseJson<GoalData>(workingSetResponse);
-    expect(withWorkingSet.workbench.brief).toEqual(brief);
-    expect(withWorkingSet.workbench.workingSet).toHaveLength(1);
+    const { run } = await seedAcceptedResult(workspaceId, sourceTask.taskId);
 
     const nextTask = await responseJson<GoalTaskResponse>(await requestJson(app, `/goals/${created.id}/tasks`, {
       kind: "task",
@@ -317,27 +309,32 @@ describe("Goal API", () => {
       priority: "High",
       autoPlanGeneration: false,
       expectedOutcome: "A bounded draft",
-      contextSelections: [{ subjectType: "task", subjectId: sourceTask.taskId }],
     }));
     const persisted = await db.task.findUniqueOrThrow({ where: { id: nextTask.taskId } });
     expect(persisted.goalContext).toMatchObject({
-      goal: { id: created.id, operationalBrief: brief },
-      items: [{ subjectType: "task", subjectId: sourceTask.taskId }],
+      goal: { title: created.title, operationalBrief: brief },
+      acceptedResults: [{ taskTitle: "Confirm target opening" }],
       expectedOutcome: "A bounded draft",
     });
+    expect(persisted.goalContext).toBeTruthy();
+    expect(typeof persisted.goalContext).toBe("object");
+    expect(persisted.goalContext).not.toBeInstanceOf(Array);
+    const acceptedResults = persisted.goalContext && typeof persisted.goalContext === "object" && !Array.isArray(persisted.goalContext) && "acceptedResults" in persisted.goalContext
+      ? persisted.goalContext.acceptedResults
+      : null;
+    expect(Array.isArray(acceptedResults)).toBe(true);
+    const firstAcceptedResult = Array.isArray(acceptedResults) ? acceptedResults[0] : null;
+    const acceptedResultRef = firstAcceptedResult && typeof firstAcceptedResult === "object" && "ref" in firstAcceptedResult
+      ? firstAcceptedResult.ref
+      : null;
+    expect(acceptedResultRef).toMatch(/^GR[0-9A-F]{12}$/);
+    expect(acceptedResultRef).not.toContain(run.id);
     const bootstrapResponse = await app.request(`/tasks/${nextTask.taskId}`);
     expect(bootstrapResponse.status).toBe(200);
     const bootstrap = await responseJson<{ task: { goalId: string | null; goal: { id: string; title: string } | null } }>(bootstrapResponse);
     expect(bootstrap.task.goalId).toBe(created.id);
     expect(bootstrap.task.goal).toEqual({ id: created.id, title: created.title });
 
-    await app.request(`/goals/${created.id}/working-set`, {
-      method: "PUT",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify({ selections: [] }),
-    });
-    expect((await db.task.findUniqueOrThrow({ where: { id: nextTask.taskId } })).goalContext)
-      .toEqual(persisted.goalContext);
   });
 
   it("atomically promotes one accepted result and is idempotent", async () => {
@@ -361,6 +358,8 @@ describe("Goal API", () => {
     const firstBody = await responseJson<GoalData>(first);
     const secondBody = await responseJson<GoalData>(second);
     expect(secondBody.id).toBe(firstBody.id);
+    expect(firstBody.titleSource).toBe("system");
+    expect(firstBody.titleRenameNoticeSeenAt).toBeNull();
     expect(await db.goal.count()).toBe(1);
     expect(await db.goalAsset.count()).toBe(1);
     expect((await db.task.findUniqueOrThrow({ where: { id: taskId } })).goalId).toBe(firstBody.id);
@@ -411,6 +410,110 @@ describe("Goal API", () => {
     expect(await db.event.count({ where: { eventType: "goal.review_applied", workspaceId } })).toBe(1);
   });
 
+
+  it("generates, persists, and atomically applies an itemized Goal Review Proposal", async () => {
+    const { workspaceId } = await seedWorkspace("Goal AI review");
+    const aiClient = await db.aiClient.create({
+      data: {
+        name: "Goal review debug provider",
+        type: "debug",
+        config: { profile: "deterministic" },
+        isDefault: true,
+        enabled: true,
+      },
+    });
+    await db.aiFeatureBinding.create({ data: { feature: "goal.review", clientId: aiClient.id } });
+    const engine = createChronaEngine();
+    await aiClientRegistry.refresh();
+    const app = createApiRouter(engine);
+    const goal = await responseJson<GoalData>(await requestJson(app, "/goals", {
+      workspaceId,
+      title: "Review a durable outcome",
+      successCriteria: [criterion],
+    }));
+    await requestJson(app, `/goals/${goal.id}/brief`, {
+      brief: { outcome: "Durable outcome", currentFocus: "Initial focus", strategy: "Use evidence", constraints: ["No invented facts"] },
+    });
+
+    const generation = await requestJson(app, `/goals/${goal.id}/reviews/generate`, { idempotencyKey: "goal-review-request-1" });
+    expect(generation.status).toBe(202);
+    const started = await responseJson<{ proposalId: string; sourceTaskId: string }>(generation);
+    await waitForGoalReviewGeneration(started.proposalId);
+    const proposal = await db.goalReviewProposal.findUnique({ where: { id: started.proposalId }, include: { items: true } });
+    expect(proposal?.status).toBe("Ready");
+    expect(proposal?.providerName).toBe("debug");
+    expect(proposal?.items).toHaveLength(1);
+    expect(proposal?.items[0]?.kind).toBe("brief_field");
+
+    const apply = await requestJson(app, `/goals/${goal.id}/reviews/${started.proposalId}/apply`, {
+      idempotencyKey: "goal-review-apply-1",
+      decisions: [{ itemId: "debug-current-focus", action: "accept" }],
+    });
+    expect(apply.status).toBe(200);
+    const refreshed = await responseJson<GoalData>(await app.request(`/goals/${goal.id}`));
+    expect(refreshed.workbench.brief?.currentFocus).toBe("Review the next bounded outcome");
+    expect(refreshed.reviewProposals[0]?.status).toBe("Applied");
+    expect(refreshed.reviewProposals[0]?.items[0]?.decision).toBe("Accepted");
+
+    const replay = await requestJson(app, `/goals/${goal.id}/reviews/${started.proposalId}/apply`, {
+      idempotencyKey: "goal-review-apply-1",
+      decisions: [{ itemId: "debug-current-focus", action: "accept" }],
+    });
+    expect(replay.status).toBe(200);
+    expect(await db.goalBriefRevision.count({ where: { goalId: goal.id } })).toBe(1);
+  });
+
+  it("marks conflicting Goal Review items stale without overwriting current state", async () => {
+    const { workspaceId } = await seedWorkspace("Goal stale review");
+    const goal = await db.goal.create({
+      data: {
+        workspaceId,
+        title: "Guard review dependencies",
+        description: null,
+        status: "Active",
+        successCriteria: [criterion],
+        operationalBrief: { outcome: "Outcome", currentFocus: "Frozen focus", strategy: "Strategy", constraints: [] },
+      },
+    });
+    const { taskId } = await seedTask(workspaceId, { title: "Review source" });
+    await db.task.update({ where: { id: taskId }, data: { goalId: goal.id } });
+    const proposal = await db.goalReviewProposal.create({
+      data: {
+        workspaceId,
+        goalId: goal.id,
+        sourceTaskId: taskId,
+        status: "Ready",
+        inputSnapshot: {},
+        inputSnapshotHash: "snapshot",
+        requestIdempotencyKey: "stale-review-request",
+        items: {
+          create: {
+            workspaceId,
+            goalId: goal.id,
+            itemId: "focus-change",
+            kind: "brief_field",
+            payload: { field: "currentFocus", value: "Proposed focus" },
+            rationale: "Old rationale",
+            evidenceRefs: [],
+            warnings: [],
+            dependencySnapshot: { kind: "brief_field", field: "currentFocus", value: "Frozen focus" },
+            dependencyHash: "sha256:not-current",
+          },
+        },
+      },
+    });
+    await db.goal.update({ where: { id: goal.id }, data: { operationalBrief: { outcome: "Outcome", currentFocus: "User changed focus", strategy: "Strategy", constraints: [] } } });
+    const app = createApiRouter(createChronaEngine());
+    const response = await requestJson(app, `/goals/${goal.id}/reviews/${proposal.id}/apply`, {
+      idempotencyKey: "stale-review-apply",
+      decisions: [{ itemId: "focus-change", action: "accept" }],
+    });
+    expect(response.status).toBe(200);
+    const storedGoal = await db.goal.findUniqueOrThrow({ where: { id: goal.id } });
+    expect(storedGoal.operationalBrief).toMatchObject({ currentFocus: "User changed focus" });
+    const item = await db.goalReviewProposalItem.findFirstOrThrow({ where: { proposalId: proposal.id } });
+    expect(item.decision).toBe("Stale");
+  });
   it("rejects criterion evidence until every selected Artifact is formalized in the Inbox", async () => {
     const { workspaceId } = await seedWorkspace("Goal unformalized evidence");
     const { taskId } = await seedTask(workspaceId, { title: "Produce pending evidence", status: "Completed" });
@@ -473,5 +576,44 @@ describe("Goal API", () => {
     expect(await db.goal.count()).toBe(0);
     expect(await db.goalAsset.count()).toBe(0);
     expect((await db.task.findUniqueOrThrow({ where: { id: taskId } })).goalId).toBeNull();
+  });
+
+  it("reads only accepted results scoped through the current Goal Task", async () => {
+    const { workspaceId } = await seedWorkspace("Goal result retrieval");
+    const otherWorkspace = await seedWorkspace("Isolated Goal result retrieval");
+    const engine = createChronaEngine();
+    const created = await engine.goals.createWithFirstTask({
+      workspaceId,
+      intendedOutcome: "Synthesize accepted research",
+      firstWorkItem: "Collect evidence",
+      priority: "Medium",
+      idempotencyKey: "goal-result-search",
+    });
+    const accepted = await seedAcceptedResult(workspaceId, created.taskId);
+    const rejectedTask = await seedTask(workspaceId, { title: "Rejected evidence", status: "Completed" });
+    await db.task.update({ where: { id: rejectedTask.taskId }, data: { goalId: created.goal.id } });
+    await db.run.create({ data: { taskId: rejectedTask.taskId, runtimeName: "hermes", status: "Completed", triggeredBy: "test" } });
+    const reader = await seedTask(workspaceId, { title: "Use Goal evidence" });
+    await db.task.update({ where: { id: reader.taskId }, data: { goalId: created.goal.id } });
+
+    const firstPage = await engine.goals.readAcceptedResults({ taskId: reader.taskId, workspaceId, query: "immutable", limit: 1 });
+    expect(firstPage).toMatchObject({ linked: true, results: [{ title: "Collect evidence" }], nextCursor: null });
+    expect(firstPage.results[0]?.ref).toMatch(/^GR[0-9A-F]{12}$/);
+    expect(firstPage.results[0]?.ref).not.toContain(accepted.run.id);
+    expect(firstPage.results.some((result) => result.title === "Rejected evidence")).toBe(false);
+    expect(firstPage.results[0]?.artifacts[0]).toEqual({
+      title: "Accepted final result",
+      type: "summary",
+      contentPreview: "Immutable final result",
+    });
+    expect(JSON.stringify(firstPage)).not.toContain("chrona://result/final");
+
+    await expect(engine.goals.readAcceptedResults({ taskId: reader.taskId, workspaceId: otherWorkspace.workspaceId, limit: 5 }))
+      .rejects.toThrow("Task not found");
+    const standalone = await seedTask(workspaceId, { title: "Standalone Task" });
+    await expect(engine.goals.readAcceptedResults({ taskId: standalone.taskId, workspaceId, limit: 5 }))
+      .resolves.toEqual({ linked: false, message: "Current Task is not linked to a Goal.", results: [], nextCursor: null });
+    await expect(engine.goals.readAcceptedResults({ taskId: reader.taskId, workspaceId, limit: 5, cursor: "GR000000000000" }))
+      .rejects.toThrow("Goal result cursor is invalid or stale");
   });
 });

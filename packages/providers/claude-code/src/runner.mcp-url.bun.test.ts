@@ -8,6 +8,7 @@
 import { afterEach, describe, expect, mock, test } from "bun:test";
 
 import type { StartRunInput } from "@chrona/providers-foundation";
+import { createClaudeCodeRunner, probeClaudeCodeSdk } from "./runner";
 
 let capturedOptions: Record<string, unknown> | null = null;
 let capturedPrompt: unknown = null;
@@ -54,7 +55,6 @@ function stubMcpProbe() {
 describe("Claude Code MCP URL session identity", () => {
   test("uses Chrona sessionKey for MCP authorization instead of provider sessionId", async () => {
     stubMcpProbe();
-    const { createClaudeCodeRunner } = await import("./runner");
     const runner = await createClaudeCodeRunner({
       mcpBaseUrl: "http://mcp.test/",
       mcpRunToken: "",
@@ -80,8 +80,6 @@ describe("Claude Code MCP URL session identity", () => {
 
   test("does not pass synthetic Claude Code run ids to SDK resume", async () => {
     stubMcpProbe();
-    // Dynamic import required: this test verifies runner behavior with the mocked SDK module above.
-    const { createClaudeCodeRunner } = await import("./runner");
     const runner = await createClaudeCodeRunner({
       mcpBaseUrl: "http://mcp.test/",
       mcpRunToken: "",
@@ -98,10 +96,34 @@ describe("Claude Code MCP URL session identity", () => {
     expect(capturedOptions?.["resume"]).toBeUndefined();
   });
 
+
+  test("removes mutating tools and Chrona MCP for read-only runs", async () => {
+    const forbiddenFetch = mock((_input: string | URL | Request, _init?: RequestInit) => {
+      throw new Error("read-only runs must not probe MCP");
+    });
+    globalThis.fetch = Object.assign(forbiddenFetch, { preconnect: ORIGINAL_FETCH.preconnect }) as typeof fetch;
+    const runner = await createClaudeCodeRunner({
+      mcpBaseUrl: "http://mcp.test",
+      mcpRunToken: "token",
+      cwd: "/tmp/chrona",
+    });
+    await runner.start({
+      sessionId: "chrona-session-read-only",
+      sessionKey: "chrona:goal:review",
+      instructions: "Review without side effects.",
+      input: { type: "text", text: "Review this Goal." },
+      toolPolicy: "read_only",
+    } satisfies StartRunInput);
+
+    expect(capturedOptions?.["mcpServers"]).toBeUndefined();
+    expect(capturedOptions?.["permissionMode"]).toBe("dontAsk");
+    expect(capturedOptions?.["allowedTools"]).toEqual([]);
+    expect(capturedOptions?.["disallowedTools"]).toEqual([
+      "Bash", "Edit", "Write", "NotebookEdit", "WebFetch", "WebSearch", "Task",
+    ]);
+  });
   test("passes native Claude session ids to SDK resume", async () => {
     stubMcpProbe();
-    // Dynamic import required: this test verifies runner behavior with the mocked SDK module above.
-    const { createClaudeCodeRunner } = await import("./runner");
     const runner = await createClaudeCodeRunner({
       mcpBaseUrl: "http://mcp.test/",
       mcpRunToken: "",
@@ -123,8 +145,6 @@ describe("Claude Code MCP URL session identity", () => {
 describe("Claude Code health probe", () => {
   test("runs a tool-free one-turn SDK query", async () => {
     nextQueryMessages = [{ type: "result", subtype: "success", is_error: false }];
-    // Test must import after mock.module so runner binds mocked SDK query.
-    const { probeClaudeCodeSdk } = await import("./runner");
 
     await expect(probeClaudeCodeSdk({
       config: {
@@ -150,8 +170,6 @@ describe("Claude Code health probe", () => {
 
   test("reports SDK result errors as failed connectivity", async () => {
     nextQueryMessages = [{ type: "result", subtype: "error_during_execution", is_error: true, errors: ["invalid auth"] }];
-    // Test must import after mock.module so runner binds mocked SDK query.
-    const { probeClaudeCodeSdk } = await import("./runner");
 
     await expect(probeClaudeCodeSdk({ config: { mcpBaseUrl: "http://mcp.test", mcpRunToken: "" }, timeoutMs: 1000 })).resolves.toContain("invalid auth");
   });

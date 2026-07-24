@@ -43,12 +43,13 @@ export async function resetDb() {
   await db.runtimeCursor.deleteMany();
   await db.event.deleteMany();
   await db.approval.deleteMany();
+  await db.goalReviewProposalItem.deleteMany();
+  await db.goalReviewProposal.deleteMany();
   await db.goalAssetJob.deleteMany();
   await db.goalFormSubmission.deleteMany();
   await db.goalAssetDraft.deleteMany();
   await db.goalInboxCandidate.deleteMany();
   await db.goalAssetVersion.deleteMany();
-  await db.goalWorkingSetItem.deleteMany();
   await db.goalAsset.deleteMany();
   await db.goalBriefRevision.deleteMany();
   await db.taskOccurrence.deleteMany();

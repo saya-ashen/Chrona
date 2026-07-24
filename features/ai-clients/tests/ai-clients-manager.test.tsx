@@ -148,6 +148,29 @@ describe("AiClientsManager", () => {
     expect(await screen.findByText("Available")).toBeInTheDocument();
   });
 
+  it("hides the unavailable Smart Suggestions binding", async () => {
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      headers: new Headers({ "content-type": "application/json" }),
+      json: async () => ({ clients: [] }),
+    });
+    fetchMock.mockResolvedValueOnce({
+      ok: true,
+      headers: new Headers({ "content-type": "application/json" }),
+      json: async () => providersResponse,
+    });
+
+    render(<AiClientsManager />);
+
+    await screen.findByText(
+      "No AI client is connected yet. Connect one to unlock planning, suggestions, and execution previews.",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "+ Add Client" }));
+
+    expect(screen.queryByText("Smart Suggestions")).not.toBeInTheDocument();
+    expect(screen.getByText("Task Planning")).toBeInTheDocument();
+  });
+
   it("creates a Hermes client with Hermes-specific config", async () => {
     const user = userEvent.setup();
     fetchMock.mockResolvedValueOnce({ ok: true, headers: new Headers({ "content-type": "application/json" }), json: async () => ({ clients: [] }) });

@@ -153,6 +153,7 @@ export {
   agentControlActionKindSchema,
   agentControlActionPayloadSchemas,
   chronaPublicToolPayloadSchemas,
+  goalResultsReadPayloadSchema,
   chronaToolAffectedSchema,
   chronaToolContextSchema,
   chronaToolExpectedStateSchema,
@@ -174,6 +175,8 @@ export {
   parseChronaToolPayload,
 } from "./api/mcp-task-tools.schema";
 
+export { autoCompleteBodySchema } from "./api/ai.schema";
+
 export {
   scheduleProjectionQuerySchema,
 } from "./api/projections.schema";
@@ -184,9 +187,23 @@ export {
   type ActionCenterItem,
   type ActionCenterProjection,
 } from "./api/projections.schema";
+export {
+  applyGoalReviewProposalBodySchema,
+  generateGoalReviewBodySchema,
+  goalReviewResultSchema,
+  rejectGoalReviewProposalBodySchema,
+} from "./api/goals.schema";
 export type {
   CreateGoalTaskRequest,
   ApplyGoalReviewRequest,
+  ApplyGoalReviewProposalRequest,
+  GenerateGoalReviewRequest,
+  GoalReviewEvidenceRef,
+  GoalReviewProposalItemDecision,
+  GoalReviewProposalItemKind,
+  GoalReviewProposalStatus,
+  GoalReviewResult,
+  RejectGoalReviewProposalRequest,
   ConfirmGoalCriterionRequest,
   CreateGoalRequest,
   CreateGoalWithFirstTaskRequest,
@@ -195,12 +212,8 @@ export type {
   GoalOperationalBrief,
   GoalStatus,
   GoalSuccessCriterion,
-  GoalWorkingSetSelection,
-  GoalWorkingSetSubjectType,
   PromoteTaskToGoalRequest,
   ReviewGoalCriterionRequest,
-  UpdateGoalBriefRequest,
-  UpdateGoalWorkingSetRequest,
 } from "./api/goals.schema";
 export {
   clearScheduleParamSchema,
@@ -382,6 +395,7 @@ export type {
 } from "./ai-feature-specs";
 
 export type { AiFeatureToolSpec } from "./ai-feature-specs";
+export { buildGoalAssetOwnershipFeatureSpec } from "./ai-feature-specs";
 
 export type { StructuredSuggestion } from "./ai-shared-types";
 
@@ -487,10 +501,25 @@ export {
 export * from "./provider-capability-matrix";
 
 export type {
+  ApplyGoalAssetOwnershipRequest,
   CreateAssetModificationTaskRequest,
   CreateGoalAssetJobRequest,
+  GenerateGoalAssetOwnershipRequest,
+  GoalAssetOwnershipCandidate,
+  GoalAssetOwnershipDecision,
+  GoalAssetOwnershipProposalStatus,
+  GoalAssetOwnershipResult,
   CreateGoalFormSubmissionRequest,
   ResolveGoalInboxCandidateRequest,
   SaveGoalAssetDraftRequest,
   SubmitGoalAssetDraftRequest,
+} from "./api/goal-workbench.schema";
+export {
+  applyGoalAssetOwnershipBodySchema,
+  generateGoalAssetOwnershipBodySchema,
+  goalAssetOwnershipCandidateSchema,
+  goalAssetOwnershipDecisionSchema,
+  goalAssetOwnershipProposalParamSchema,
+  goalAssetOwnershipProposalStatusSchema,
+  goalAssetOwnershipResultSchema,
 } from "./api/goal-workbench.schema";

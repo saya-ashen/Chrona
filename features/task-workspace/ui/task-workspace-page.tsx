@@ -340,7 +340,7 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
             </div>
             <Button asChild variant="outline" size="sm" className="shrink-0">
               <LocalizedLink href={`/goals/${task.goal.id}?section=work`}>
-                {messages.pages.goals.backToGoals}
+                {messages.pages.goals.openGoal}
               </LocalizedLink>
             </Button>
           </section>

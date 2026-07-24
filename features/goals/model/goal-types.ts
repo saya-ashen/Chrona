@@ -2,7 +2,6 @@ import type {
   GoalOperationalBrief,
   GoalStatus,
   GoalSuccessCriterion,
-  GoalWorkingSetSubjectType,
 } from "@chrona/contracts";
 import type { GoalProjection } from "@chrona/domain";
 
@@ -83,21 +82,52 @@ export type GoalActivityData = {
   taskId: string | null;
 };
 
-export type GoalWorkingSetItemData = {
+
+export type GoalReviewProposalItemData = {
   id: string;
-  subjectType: GoalWorkingSetSubjectType;
-  subjectId: string;
-  label: string;
-  snapshot: unknown;
-  rank: number;
+  itemId: string;
+  kind: "brief_field" | "next_review_at" | "task_candidate" | "evidence_gap";
+  payload: unknown;
+  rationale: string;
+  evidenceRefs: unknown;
+  warnings: unknown;
+  dependencyHash: string;
+  decision: "Pending" | "Accepted" | "Rejected" | "Converted" | "Ignored" | "Stale";
+  decisionReason: string | null;
+  appliedObjectType: string | null;
+  appliedObjectId: string | null;
+  decidedAt: string | null;
+};
+
+export type GoalReviewProposalData = {
+  id: string;
+  status: "Generating" | "Ready" | "PartiallyApplied" | "Applied" | "Rejected" | "Superseded" | "Failed";
+  sourceTaskId: string;
+  sourceRunId: string | null;
+  sourceTask: {
+    id: string;
+    title: string;
+    status: string;
+    latestRunId: string | null;
+    latestRun: { id: string; status: string; errorSummary: string | null } | null;
+  };
+  inputSnapshotHash: string;
+  schemaVersion: number;
+  providerName: string | null;
+  modelName: string | null;
+  summary: string | null;
+  generationError: string | null;
+  appliedAt: string | null;
+  rejectedAt: string | null;
   createdAt: string;
   updatedAt: string;
+  items: GoalReviewProposalItemData[];
 };
 export type GoalData = {
   id: string;
   workspaceId: string;
   title: string;
-  titleSource: "user" | "ai";
+  titleSource: "user" | "system" | "ai";
   titleRenameNoticeSeenAt: string | null;
   description: string | null;
   successCriteria: GoalSuccessCriterion[];
@@ -122,7 +152,6 @@ export type GoalData = {
     brief: GoalOperationalBrief | null;
     briefRevisionCount: number;
     pendingInboxCount: number;
-    workingSet: GoalWorkingSetItemData[];
     focus: {
       needsYou: GoalTaskData[];
       inProgress: GoalTaskData[];
@@ -130,6 +159,7 @@ export type GoalData = {
       upNext: GoalTaskData[];
     };
   };
+  reviewProposals: GoalReviewProposalData[];
   taskGroups: Record<GoalTaskGroup, GoalTaskData[]>;
   tasks: GoalTaskData[];
   acceptedResults: Array<
@@ -179,7 +209,6 @@ export type GoalCopy = {
   editBrief: string;
   saveBrief: string;
   saving: string;
-  workingSet: string;
   briefDescription: string;
   currentFocusDescription: string;
   focusClear: string;
@@ -187,10 +216,6 @@ export type GoalCopy = {
   completedShort: string;
   confirmedShort: string;
   scheduledShort: string;
-  workingSetDescription: string;
-  editWorkingSet: string;
-  saveWorkingSet: string;
-  noWorkingSet: string;
   focusQueue: string;
   needsYou: string;
   inProgress: string;
@@ -201,7 +226,6 @@ export type GoalCopy = {
   composer: string;
   expectedOutcome: string;
   expectedOutcomePlaceholder: string;
-  selectedContext: string;
   actionPreview: string;
   createBoundedTaskPreview: string;
   taskInspector: string;
@@ -231,6 +255,14 @@ export type GoalCopy = {
   applyReviewDescription: string;
   reviewSummary: string;
   reviewTaskSuggestion: string;
+  generateReview: string;
+  generatingReview: string;
+  rejectProposal: string;
+  proposalFailed: string;
+  proposalPending: string;
+  proposalStale: string;
+  proposalSource: string;
+  proposalNoItems: string;
   assets: string;
   nextReview: string;
   noReview: string;
@@ -318,6 +350,11 @@ export type GoalCopy = {
   createAndContinue: string;
   creatingGoal: string;
   promotionError: string;
+  suggestedCriterion: string;
+  suggestedGoalName: string;
+  suggestedGoalNameDescription: string;
+  renameSuggestedGoal: string;
+  renameGoal: string;
   assetWorkbench: {
     title: string;
     description: string;
@@ -348,11 +385,13 @@ export type GoalCopy = {
     filters: string;
     activeFilters: string;
     clearFilters: string;
-    match: string;
+    ruleBasedMatch: string;
+    noRuleBasedMatch: string;
+    ruleBasedMatchDescription: string;
+    noRuleBasedMatchDescription: string;
     sourceTask: string;
     changeSummary: string;
     assetDestination: string;
-    noConfidentAssetMatch: string;
     candidateFromAcceptedResult: string;
     createNewAsset: string;
     appendToAsset: string;
@@ -429,5 +468,24 @@ export type GoalCopy = {
     inboxSource: string;
     restoredSource: string;
     importedSource: string;
+    aiRecommendation: string;
+    generateAiRecommendation: string;
+    generatingAiRecommendation: string;
+    aiRecommendationFailed: string;
+    applyAiRecommendation: string;
+    aiDecisionCreate: string;
+    aiDecisionAppend: string;
+    aiDecisionSeparate: string;
+    rationale: string;
+    differenceSummaryLabel: string;
+    certainty: string;
+    certaintyLow: string;
+    certaintyMedium: string;
+    certaintyHigh: string;
+    evidence: string;
+    counterEvidence: string;
+    aiSource: string;
+    proposalStale: string;
+    proposalApplied: string;
   };
 };

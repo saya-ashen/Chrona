@@ -189,7 +189,12 @@ describe("continueFromTaskResult", () => {
     await db.task.update({ where: { id: source.taskId }, data: { goalId: goal.id } });
 
     const result = await continueFromTaskResult({ taskId: source.taskId, intent: "create_task", instruction: "Continue bounded work", sessionStrategy: "fresh_with_result" }, deps);
-    expect((await db.task.findUniqueOrThrow({ where: { id: result.createdTask!.id } })).goalId).toBe(goal.id);
+    const followUp = await db.task.findUniqueOrThrow({ where: { id: result.createdTask!.id } });
+    expect(followUp.goalId).toBe(goal.id);
+    expect(followUp.goalContext).toMatchObject({
+      goal: { title: "Long horizon" },
+      acceptedResults: [{ taskTitle: sourceTask.title }],
+    });
   });
 
   it("creates a clean linked draft without invoking provider handoff", async () => {

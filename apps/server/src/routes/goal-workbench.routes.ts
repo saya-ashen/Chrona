@@ -3,9 +3,11 @@ import { z } from "zod";
 import { zValidator } from "@hono/zod-validator";
 import {
   archiveGoalAssetBodySchema,
+  applyGoalAssetOwnershipBodySchema,
   createAssetModificationTaskBodySchema,
   createGoalAssetJobBodySchema,
   createGoalFormSubmissionBodySchema,
+  generateGoalAssetOwnershipBodySchema,
   goalAssetKindSchema,
   resolveGoalInboxCandidateBodySchema,
   restoreGoalAssetVersionBodySchema,
@@ -29,6 +31,7 @@ const listAssetsQuery = workspaceQuery.extend({
   sort: z.enum(["updated_desc", "updated_asc", "name_asc"]).default("updated_desc"),
 });
 const renameBody = z.object({ label: z.string().trim().min(1).max(200) });
+const ownershipProposalParam = candidateParam.extend({ proposalId: z.string().trim().min(1) });
 const extractBody = z.object({ taskId: z.string().trim().min(1), runId: z.string().trim().min(1) });
 
 function fail(c: Parameters<typeof error>[0], route: string, cause: unknown) {
@@ -84,6 +87,14 @@ export function createGoalWorkbenchRoutes(engine: ChronaEngine) {
     .post("/goals/:goalId/inbox/:candidateId/resolve", zValidator("param", candidateParam), zValidator("json", resolveGoalInboxCandidateBodySchema), async (c) => {
       try { return json(c, await engine.goals.workbench.resolveCandidate({ ...c.req.valid("param"), command: c.req.valid("json") })); }
       catch (cause) { return fail(c, "POST /api/goals/:goalId/inbox/:candidateId/resolve", cause); }
+    })
+    .post("/goals/:goalId/inbox/:candidateId/ownership-proposals", zValidator("param", candidateParam), zValidator("json", generateGoalAssetOwnershipBodySchema), async (c) => {
+      try { return json(c, await engine.goals.workbench.generateOwnershipProposal({ ...c.req.valid("param"), command: c.req.valid("json") }), 202); }
+      catch (cause) { return fail(c, "POST /api/goals/:goalId/inbox/:candidateId/ownership-proposals", cause); }
+    })
+    .post("/goals/:goalId/inbox/:candidateId/ownership-proposals/:proposalId/apply", zValidator("param", ownershipProposalParam), zValidator("json", applyGoalAssetOwnershipBodySchema), async (c) => {
+      try { return json(c, await engine.goals.workbench.applyOwnershipProposal({ ...c.req.valid("param"), command: c.req.valid("json") })); }
+      catch (cause) { return fail(c, "POST /api/goals/:goalId/inbox/:candidateId/ownership-proposals/:proposalId/apply", cause); }
     })
     .post("/goals/:goalId/assets/:assetId/submissions", zValidator("param", assetParam), zValidator("json", createGoalFormSubmissionBodySchema), async (c) => {
       try { return json(c, await engine.goals.workbench.createSubmission({ ...c.req.valid("param"), command: c.req.valid("json") })); }

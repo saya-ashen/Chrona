@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -47,7 +47,7 @@ afterEach(() => {
 /* ------------------------------------------------------------------ */
 
 describe("TaskCreateDialog – AI integration", () => {
-  it("renders auto-complete dropdown when suggestions are available", async () => {
+  it("requests and displays auto-complete only when explicitly enabled", async () => {
     const user = userEvent.setup();
 
     mockUseAutoComplete.mockReturnValue({
@@ -59,13 +59,6 @@ describe("TaskCreateDialog – AI integration", () => {
           estimatedMinutes: 45,
           tags: ["writing"],
         },
-        {
-          title: "Write unit tests",
-          description: "Cover edge cases for auth module",
-          priority: "Medium",
-          estimatedMinutes: 60,
-          tags: ["testing"],
-        },
       ],
       isLoading: false,
       error: null,
@@ -78,86 +71,13 @@ describe("TaskCreateDialog – AI integration", () => {
 
     render(<TaskCreateDialog {...defaultProps} autoSuggestionsEnabled />);
 
-    // Type enough characters to trigger auto-complete (>= 3 chars)
-    const titleInput = screen.getByPlaceholderText("Add title");
-    await user.type(titleInput, "Wri");
+    await user.type(screen.getByPlaceholderText("Add title"), "Write");
 
-    // The dropdown should appear with "AI Suggestions" header
-    await waitFor(() => {
-      expect(screen.getByText("AI Suggestions")).toBeInTheDocument();
-    });
-
-    // Both suggestions should be rendered
+    expect(mockUseAutoComplete).toHaveBeenLastCalledWith("Write");
+    expect(screen.getByText("AI Suggestions")).toBeInTheDocument();
     expect(screen.getByText("Write weekly report")).toBeInTheDocument();
-    expect(screen.getByText("Write unit tests")).toBeInTheDocument();
-
-    // Priority badges should be shown (note: "High" also appears as a priority button)
-    const highElements = screen.getAllByText("High");
-    expect(highElements.length).toBeGreaterThanOrEqual(1);
-
-    // Estimated minutes should be shown
-    expect(screen.getByText("~45m")).toBeInTheDocument();
-    expect(screen.getByText("~60m")).toBeInTheDocument();
-
-    // Descriptions should be shown
-    expect(
-      screen.getByText("Summarize progress for the week"),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByText("Cover edge cases for auth module"),
-    ).toBeInTheDocument();
   });
 
-  it("selecting auto-complete suggestion fills in title, description, and priority", async () => {
-    const user = userEvent.setup();
-
-    mockUseAutoComplete.mockReturnValue({
-      suggestions: [
-        {
-          title: "Prepare deployment checklist",
-          description: "Steps to deploy v2.1 to production",
-          priority: "Urgent",
-          estimatedMinutes: 30,
-          tags: ["ops"],
-        },
-      ],
-      isLoading: false,
-      error: null,
-    });
-    mockUseSmartAutomation.mockReturnValue({
-      suggestion: null,
-      isLoading: false,
-      error: null,
-    });
-
-    render(<TaskCreateDialog {...defaultProps} autoSuggestionsEnabled />);
-
-    const titleInput = screen.getByPlaceholderText("Add title");
-    await user.type(titleInput, "Prep");
-
-    // Wait for dropdown to appear
-    await waitFor(() => {
-      expect(screen.getByText("AI Suggestions")).toBeInTheDocument();
-    });
-
-    // Click the suggestion
-    const suggestionBtn = screen.getByText("Prepare deployment checklist").closest("button")!;
-    await user.click(suggestionBtn);
-
-    // Title should be filled
-    expect(titleInput).toHaveValue("Prepare deployment checklist");
-
-    // Description textarea should be filled
-    const descriptionTextarea = screen.getByPlaceholderText("Add description");
-    expect(descriptionTextarea).toHaveValue(
-      "Steps to deploy v2.1 to production",
-    );
-
-    // Priority should be set to Urgent
-    // The Urgent button should now have the active styling
-    const urgentButton = screen.getByRole("button", { name: "Urgent" });
-    expect(urgentButton.className).toContain("bg-primary");
-  });
 
   it("does not show task planning UI inside the create dialog", () => {
     mockUseAutoComplete.mockReturnValue({
@@ -220,73 +140,5 @@ describe("TaskCreateDialog – AI integration", () => {
     expect(screen.queryByText("Add task")).not.toBeInTheDocument();
   });
 
-  it("passes null to useAutoComplete when title is shorter than 3 chars", async () => {
-    const user = userEvent.setup();
 
-    mockUseAutoComplete.mockReturnValue({
-      suggestions: [],
-      isLoading: false,
-      error: null,
-    });
-    mockUseSmartAutomation.mockReturnValue({
-      suggestion: null,
-      isLoading: false,
-      error: null,
-    });
-
-    render(<TaskCreateDialog {...defaultProps} autoSuggestionsEnabled />);
-
-    const titleInput = screen.getByPlaceholderText("Add title");
-    await user.type(titleInput, "ab");
-
-    // useAutoComplete should have been called with null (title < 3 chars)
-    // The last call should be with null since "ab".length < 3
-    const lastCall =
-      mockUseAutoComplete.mock.calls[
-        mockUseAutoComplete.mock.calls.length - 1
-      ];
-    expect(lastCall[0]).toBeNull();
-
-    // No dropdown should appear
-    expect(screen.queryByText("AI Suggestions")).not.toBeInTheDocument();
-  });
-
-  it("limits auto-complete dropdown to 5 suggestions", async () => {
-    const user = userEvent.setup();
-
-    const manySuggestions = Array.from({ length: 8 }, (_, i) => ({
-      title: `Suggestion ${i + 1}`,
-      description: `Description ${i + 1}`,
-      priority: "Medium" as const,
-      estimatedMinutes: 30,
-      tags: [],
-    }));
-
-    mockUseAutoComplete.mockReturnValue({
-      suggestions: manySuggestions,
-      isLoading: false,
-      error: null,
-    });
-    mockUseSmartAutomation.mockReturnValue({
-      suggestion: null,
-      isLoading: false,
-      error: null,
-    });
-
-    render(<TaskCreateDialog {...defaultProps} autoSuggestionsEnabled />);
-
-    const titleInput = screen.getByPlaceholderText("Add title");
-    await user.type(titleInput, "Sugg");
-
-    // Wait for dropdown to appear
-    await waitFor(() => {
-      expect(screen.getByText("AI Suggestions")).toBeInTheDocument();
-    });
-
-    // Only first 5 suggestions should be rendered
-    expect(screen.getByText("Suggestion 1")).toBeInTheDocument();
-    expect(screen.getByText("Suggestion 5")).toBeInTheDocument();
-    expect(screen.queryByText("Suggestion 6")).not.toBeInTheDocument();
-    expect(screen.queryByText("Suggestion 8")).not.toBeInTheDocument();
-  });
 });

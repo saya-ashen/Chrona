@@ -46,6 +46,16 @@ export async function executeValidatedTool(
         taskId: requireTaskId(input),
         workspaceId: requireWorkspaceId(input),
       });
+    case "chrona.goal.results.read": {
+      const body = payload as { query?: string; limit: number; cursor?: string };
+      return deps.goals.readAcceptedResults({
+        taskId: requireTaskId(input),
+        workspaceId: requireWorkspaceId(input),
+        query: body.query,
+        limit: body.limit,
+        cursor: body.cursor,
+      });
+    }
     case "chrona.plan.read":
       return readAiExecutionView(await deps.plan.getState({ taskId: requireTaskId(input) }));
     case "chrona.plan.generate":

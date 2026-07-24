@@ -181,8 +181,8 @@ describe("generatePlanStream", () => {
         instructions: "Generate plan",
         inputText: "Build plan",
         structuredOutputSchema: {
-          name: "ignored_schema",
-          description: "Should not be sent to Hermes.",
+          name: "plan_schema",
+          description: "Structured plan output.",
           schema: { type: "object" },
         },
       } as never,
@@ -199,7 +199,9 @@ describe("generatePlanStream", () => {
       expect.objectContaining({ sessionId: expect.stringMatching(/^ai-generate_plan-task-1-/) }),
     );
     expect(startRunMock).toHaveBeenCalledWith(
-      expect.not.objectContaining({ structuredOutputSchema: expect.anything() }),
+      expect.objectContaining({
+        structuredOutputSchema: expect.objectContaining({ name: "plan_schema" }),
+      }),
     );
     expect(streamRunMock).toHaveBeenCalledWith(expect.objectContaining({ runId: "run-1" }));
     expect(streamRunMock).toHaveBeenCalledWith(

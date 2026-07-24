@@ -15,6 +15,7 @@ export const chronaToolNames = [
   "chrona.task.read",
   "chrona.task.create",
   "chrona.task.update",
+  "chrona.goal.results.read",
   "chrona.plan.read",
   "chrona.plan.generate",
   "chrona.plan.mutate",
@@ -97,6 +98,11 @@ export const chronaToolContextSchema = z.object({
 
 const readPayloadSchema = z.object({}).passthrough().optional().default({});
 const publicReadPayloadSchema = z.object({}).passthrough();
+export const goalResultsReadPayloadSchema = z.object({
+  query: z.string().trim().min(1).max(500).optional(),
+  limit: z.number().int().min(1).max(10).default(5),
+  cursor: z.string().trim().regex(/^GR[0-9A-F]{12}$/).optional(),
+}).strict();
 const nodeEvidencePayloadSchema = z.record(z.string(), z.unknown()).optional();
 
 const planOutputAddPatchSchema = z.object({ op: z.literal("add"), path: z.string().min(1), value: z.unknown() }).strict();
@@ -206,6 +212,7 @@ export const dashboardBriefPayloadSchema = z.object({
 export const chronaToolPayloadSchemas = {
   "chrona.task.read": readPayloadSchema,
   "chrona.task.create": createTaskBodySchema.omit({ workspaceId: true }),
+  "chrona.goal.results.read": goalResultsReadPayloadSchema,
   "chrona.task.update": updateTaskBodySchema.omit({ workspaceId: true }),
   "chrona.plan.read": readPayloadSchema,
   "chrona.plan.generate": planGenerateToolPayloadSchema,
@@ -230,6 +237,7 @@ export const chronaToolPayloadSchemas = {
 export const chronaPublicToolPayloadSchemas = {
   ...chronaToolPayloadSchemas,
   "chrona.task.read": publicReadPayloadSchema,
+  "chrona.goal.results.read": goalResultsReadPayloadSchema,
   "chrona.plan.read": publicReadPayloadSchema,
   "chrona.schedule.read": publicReadPayloadSchema,
   "chrona.execution.read": publicReadPayloadSchema,

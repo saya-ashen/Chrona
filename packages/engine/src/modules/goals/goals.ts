@@ -9,8 +9,6 @@ import type {
   GoalActionRequest,
   GoalOperationalBrief,
   GoalSuccessCriterion,
-  GoalWorkingSetSelection,
-  GoalWorkingSetSubjectType,
   ProcessGoalResultRequest,
   PromoteTaskToGoalRequest,
   ReviewGoalCriterionRequest,
@@ -20,18 +18,23 @@ import { deriveGoalProjection } from "@chrona/domain";
 import { createTask } from "../tasks/create-task";
 import { rebuildTaskProjection } from "../projections/rebuild-task-projection";
 import { extractAcceptedResultText } from "../tasks/accepted-result-context";
+import { buildAutomaticGoalTaskContext, goalAcceptedResultRef } from "./goal-task-context";
 import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
 
 type GoalEventType =
   | "goal.created"
   | "goal.updated"
   | "goal.brief_updated"
-  | "goal.working_set_updated"
   | "goal.paused"
   | "goal.resumed"
   | "goal.result_processed"
   | "goal.criterion_confirmed"
   | "goal.review_applied"
+  | "goal.review_generation_started"
+  | "goal.review_proposal_ready"
+  | "goal.review_proposal_failed"
+  | "goal.review_proposal_applied"
+  | "goal.review_proposal_rejected"
   | "goal.stopped"
   | "goal.review_task_created"
   | "goal.task_created"
@@ -66,9 +69,6 @@ const goalInclude = {
       versions: { orderBy: { version: "desc" }, take: 1, select: { version: true } },
     },
   },
-  workingSetItems: {
-    orderBy: [{ rank: "asc" }, { createdAt: "asc" }],
-  },
   briefRevisions: {
     orderBy: { createdAt: "desc" },
     take: 20,
@@ -76,6 +76,22 @@ const goalInclude = {
   inboxCandidates: {
     where: { status: "Pending" },
     select: { id: true },
+  },
+  reviewProposals: {
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+    take: 10,
+    include: {
+      items: { orderBy: [{ createdAt: "asc" }, { id: "asc" }] },
+      sourceTask: {
+        select: {
+          id: true,
+          title: true,
+          status: true,
+          latestRunId: true,
+          runs: { orderBy: [{ createdAt: "desc" }, { id: "desc" }], take: 1, select: { id: true, status: true, errorSummary: true } },
+        },
+      },
+    },
   },
 } satisfies Prisma.GoalInclude;
 
@@ -134,34 +150,35 @@ function operationalBriefFrom(value: unknown): GoalOperationalBrief | null {
   };
 }
 
-function selectionKey(selection: GoalWorkingSetSelection) {
-  return `${selection.subjectType}:${selection.subjectId}`;
+const GOAL_CONTEXT_RESULT_LIMIT = 8;
+const GOAL_CONTEXT_SUMMARY_LIMIT = 400;
+const GOAL_RESULT_SEARCH_SUMMARY_LIMIT = 2_000;
+const GOAL_RESULT_PAGE_CHARACTER_LIMIT = 24_000;
+const GOAL_RESULT_ARTIFACT_LIMIT = 8;
+const GOAL_RESULT_TITLE_LIMIT = 240;
+
+
+function boundedText(value: string, limit: number) {
+  return value.length <= limit ? value : `${value.slice(0, limit).trimEnd()}…`;
 }
 
-function goalContextSnapshot(goal: GoalWithDetails, selections: GoalWorkingSetSelection[]) {
-  const requested = new Set(selections.map(selectionKey));
-  const selectedItems = goal.workingSetItems.filter((item) => requested.has(`${item.subjectType}:${item.subjectId}`));
-  if (selectedItems.length !== requested.size) {
-    throw new EngineError(
-      ENGINE_ERROR_CODES.VALIDATION_FAILED,
-      "Every selected context item must belong to the Goal working set",
-    );
-  }
-  return {
-    goal: {
-      id: goal.id,
-      title: goal.title,
-      operationalBrief: operationalBriefFrom(goal.operationalBrief),
-      capturedAt: new Date().toISOString(),
-    },
-    items: selectedItems.map((item) => ({
-      subjectType: item.subjectType,
-      subjectId: item.subjectId,
-      label: item.label,
-      snapshot: item.snapshot,
-    })),
-  } satisfies Prisma.InputJsonObject;
+
+function acceptedResultCatalog(goal: GoalWithDetails) {
+  return goal.tasks
+    .flatMap((task) => {
+      const result = acceptedResultForTask(task);
+      return result ? [{
+        ref: goalAcceptedResultRef(result.runId),
+        taskTitle: task.title,
+        acceptedAt: result.acceptedAt,
+        summary: boundedText(result.summary, GOAL_CONTEXT_SUMMARY_LIMIT),
+        artifactCount: result.artifacts.length,
+      }] : [];
+    })
+    .sort((left, right) => (right.acceptedAt ?? "").localeCompare(left.acceptedAt ?? ""))
+    .slice(0, GOAL_CONTEXT_RESULT_LIMIT);
 }
+
 
 function acceptedRunId(task: GoalTask) {
   const payload = recordValue(task.events[0]?.payload);
@@ -313,6 +330,48 @@ function eventReadModels(goal: GoalWithDetails) {
   return taskActivity.sort((left, right) => right.occurredAt.localeCompare(left.occurredAt));
 }
 
+function reviewProposalReadModel(proposal: GoalWithDetails["reviewProposals"][number]) {
+  const sourceRun = proposal.sourceTask.runs[0] ?? null;
+  return {
+    id: proposal.id,
+    status: proposal.status,
+    sourceTaskId: proposal.sourceTaskId,
+    sourceRunId: proposal.sourceRunId,
+    sourceTask: {
+      id: proposal.sourceTask.id,
+      title: proposal.sourceTask.title,
+      status: proposal.sourceTask.status,
+      latestRunId: proposal.sourceTask.latestRunId,
+      latestRun: sourceRun ? { id: sourceRun.id, status: sourceRun.status, errorSummary: sourceRun.errorSummary } : null,
+    },
+    inputSnapshotHash: proposal.inputSnapshotHash,
+    schemaVersion: proposal.schemaVersion,
+    providerName: proposal.providerName,
+    modelName: proposal.modelName,
+    summary: proposal.summary,
+    generationError: proposal.generationError,
+    appliedAt: proposal.appliedAt?.toISOString() ?? null,
+    rejectedAt: proposal.rejectedAt?.toISOString() ?? null,
+    createdAt: proposal.createdAt.toISOString(),
+    updatedAt: proposal.updatedAt.toISOString(),
+    items: proposal.items.map((item) => ({
+      id: item.id,
+      itemId: item.itemId,
+      kind: item.kind,
+      payload: item.payload,
+      rationale: item.rationale,
+      evidenceRefs: item.evidenceRefs,
+      warnings: item.warnings,
+      dependencyHash: item.dependencyHash,
+      decision: item.decision,
+      decisionReason: item.decisionReason,
+      appliedObjectType: item.appliedObjectType,
+      appliedObjectId: item.appliedObjectId,
+      decidedAt: item.decidedAt?.toISOString() ?? null,
+    })),
+  };
+}
+
 function toGoalReadModel(goal: GoalWithDetails) {
   const successCriteria = criteriaFrom(goal.successCriteria);
   const baseProjection = deriveGoalProjection({
@@ -320,6 +379,7 @@ function toGoalReadModel(goal: GoalWithDetails) {
     nextReviewAt: goal.nextReviewAt,
     tasks: goal.tasks.map((task) => ({
       status: task.status,
+
       blockType: task.projection?.blockType ?? null,
     })),
     successCriteria,
@@ -377,16 +437,6 @@ function toGoalReadModel(goal: GoalWithDetails) {
       brief: operationalBriefFrom(goal.operationalBrief),
       briefRevisionCount: goal.briefRevisions.length,
       pendingInboxCount,
-      workingSet: goal.workingSetItems.map((item) => ({
-        id: item.id,
-        subjectType: item.subjectType,
-        subjectId: item.subjectId,
-        label: item.label,
-        snapshot: item.snapshot,
-        rank: item.rank,
-        createdAt: item.createdAt.toISOString(),
-        updatedAt: item.updatedAt.toISOString(),
-      })),
       focus: {
         needsYou: groupedTasks.attention,
         inProgress: groupedTasks.active,
@@ -394,6 +444,7 @@ function toGoalReadModel(goal: GoalWithDetails) {
         upNext: groupedTasks.planned,
       },
     },
+    reviewProposals: goal.reviewProposals.map(reviewProposalReadModel),
     taskGroups: groupedTasks,
     tasks,
     acceptedResults: tasks.flatMap((task) => task.acceptedResult ? [{ taskId: task.id, taskTitle: task.title, ...task.acceptedResult }] : []),
@@ -423,6 +474,89 @@ async function getGoalOrThrow(goalId: string) {
   const goal = await db.goal.findUnique({ where: { id: goalId }, include: goalInclude });
   if (!goal) throw new EngineError(ENGINE_ERROR_CODES.TASK_NOT_FOUND, "Goal not found");
   return goal;
+}
+
+function resultMatchesQuery(input: { taskTitle: string; summary: string; artifacts: Array<{ title: string; contentPreview: string | null }> }, query?: string) {
+  if (!query) return true;
+  const terms = query.toLocaleLowerCase().split(/\s+/).filter(Boolean);
+  const haystack = [
+    input.taskTitle,
+    input.summary,
+    ...input.artifacts.flatMap((artifact) => [artifact.title, artifact.contentPreview ?? ""]),
+  ].join("\n").toLocaleLowerCase();
+  return terms.every((term) => haystack.includes(term));
+}
+
+function goalResultReadModel(candidate: GoalTask, result: NonNullable<ReturnType<typeof acceptedResultForTask>>) {
+  return {
+    ref: goalAcceptedResultRef(result.runId),
+    title: boundedText(candidate.title, GOAL_RESULT_TITLE_LIMIT),
+    acceptedAt: result.acceptedAt,
+    summary: boundedText(result.summary, GOAL_RESULT_SEARCH_SUMMARY_LIMIT),
+    artifacts: result.artifacts.slice(0, GOAL_RESULT_ARTIFACT_LIMIT).map((artifact) => ({
+      title: boundedText(artifact.title, GOAL_RESULT_TITLE_LIMIT),
+      type: artifact.type,
+      contentPreview: artifact.contentPreview ? boundedText(artifact.contentPreview, GOAL_CONTEXT_SUMMARY_LIMIT) : null,
+    })),
+  };
+}
+
+function boundedGoalResultPage(
+  matching: Array<{ candidate: GoalTask; result: NonNullable<ReturnType<typeof acceptedResultForTask>> }>,
+  offset: number,
+  limit: number,
+) {
+  const results: Array<ReturnType<typeof goalResultReadModel>> = [];
+  let characterCount = 0;
+  for (const { candidate, result } of matching.slice(offset, offset + limit)) {
+    const readModel = goalResultReadModel(candidate, result);
+    const nextCharacterCount = characterCount + JSON.stringify(readModel).length;
+    if (results.length > 0 && nextCharacterCount > GOAL_RESULT_PAGE_CHARACTER_LIMIT) break;
+    results.push(readModel);
+    characterCount = nextCharacterCount;
+  }
+  return results;
+}
+
+export async function readGoalAcceptedResults(input: {
+  taskId: string;
+  workspaceId: string;
+  query?: string;
+  limit: number;
+  cursor?: string;
+}) {
+  const task = await db.task.findFirst({
+    where: { id: input.taskId, workspaceId: input.workspaceId },
+    select: { goalId: true },
+  });
+  if (!task) throw new EngineError(ENGINE_ERROR_CODES.TASK_NOT_FOUND, "Task not found");
+  if (!task.goalId) {
+    return { linked: false, message: "Current Task is not linked to a Goal.", results: [], nextCursor: null };
+  }
+  const goal = await getGoalOrThrow(task.goalId);
+  if (goal.workspaceId !== input.workspaceId) {
+    throw new EngineError(ENGINE_ERROR_CODES.TASK_NOT_FOUND, "Goal not found");
+  }
+  const matching = goal.tasks
+    .flatMap((candidate) => {
+      const result = acceptedResultForTask(candidate);
+      if (!result || !resultMatchesQuery({ taskTitle: candidate.title, summary: result.summary, artifacts: result.artifacts }, input.query)) return [];
+      return [{ candidate, result }];
+    })
+    .sort((left, right) => (right.result.acceptedAt ?? "").localeCompare(left.result.acceptedAt ?? ""));
+  const offset = input.cursor ? matching.findIndex(({ result }) => goalAcceptedResultRef(result.runId) === input.cursor) + 1 : 0;
+  if (input.cursor && offset === 0) {
+    throw new EngineError(ENGINE_ERROR_CODES.VALIDATION_FAILED, "Goal result cursor is invalid or stale");
+  }
+  const results = boundedGoalResultPage(matching, offset, input.limit);
+  const hasMore = offset + results.length < matching.length;
+  return {
+    linked: true,
+    goal: { title: goal.title },
+    query: input.query ?? null,
+    results,
+    nextCursor: hasMore ? results.at(-1)!.ref : null,
+  };
 }
 
 async function appendGoalEvent(input: {
@@ -500,7 +634,7 @@ export async function createGoalWithFirstTask(input: CreateGoalWithFirstTaskRequ
     const racedPayload = recordValue(raced?.payload);
     if (typeof racedPayload?.goal_id === "string" && typeof racedPayload.task_id === "string") return { goalId: racedPayload.goal_id, taskId: racedPayload.task_id };
     const goal = await tx.goal.create({ data: { workspaceId: input.workspaceId, title: input.intendedOutcome, description: input.intendedOutcome, successCriteria: [{ id: "outcome-confirmed", kind: "user_confirmed", description: `Confirm: ${input.intendedOutcome}`, satisfied: false, confirmedAt: null, proposalStatus: "proposed" }], status: "Active" } });
-    const taskResult = await createTask({ workspaceId: input.workspaceId, goalId: goal.id, goalContext: { goal: { id: goal.id, title: goal.title, operationalBrief: null, capturedAt: new Date().toISOString() }, items: [], expectedOutcome: input.intendedOutcome }, title: input.firstWorkItem, description: input.description ?? null, priority: input.priority, autoPlanGeneration: false, autoExecute: false }, tx);
+    const taskResult = await createTask({ workspaceId: input.workspaceId, goalId: goal.id, goalContext: { expectedOutcome: input.intendedOutcome }, title: input.firstWorkItem, description: input.description ?? null, priority: input.priority, autoPlanGeneration: false, autoExecute: false }, tx);
     await tx.event.create({ data: { eventType: "goal.created_with_first_task", workspaceId: input.workspaceId, taskId: taskResult.taskId, actorType: "user", actorId: "server-action", source: "ui", payload: { goal_id: goal.id, task_id: taskResult.taskId }, summary: `Created Goal and first task: ${goal.title}`, dedupeKey, ingestSequence: 1 } });
     return { goalId: goal.id, taskId: taskResult.taskId };
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
@@ -647,117 +781,6 @@ export async function updateGoalBrief(input: { goalId: string; brief: GoalOperat
   return getGoal({ goalId: goal.id });
 }
 
-type WorkingSetCandidate = {
-  subjectType: GoalWorkingSetSubjectType;
-  subjectId: string;
-  label: string;
-  snapshot: Prisma.InputJsonObject;
-};
-
-function workingSetCandidates(goal: GoalWithDetails): WorkingSetCandidate[] {
-  const taskCandidates = goal.tasks.map((task) => ({
-    subjectType: "task" as const,
-    subjectId: task.id,
-    label: task.title,
-    snapshot: {
-      title: task.title,
-      description: task.description,
-      status: task.status,
-      updatedAt: task.updatedAt.toISOString(),
-    } satisfies Prisma.InputJsonObject,
-  }));
-  const assetCandidates = goal.assets.map((asset) => ({
-    subjectType: "goal_asset" as const,
-    subjectId: asset.id,
-    label: asset.label,
-    snapshot: {
-      label: asset.label,
-      role: asset.role,
-      status: asset.status,
-      artifactId: asset.currentArtifactId,
-      contentPreview: asset.currentArtifact.contentPreview,
-    } satisfies Prisma.InputJsonObject,
-  }));
-  const resultCandidates = goal.tasks.flatMap((task) => {
-    const result = acceptedResultForTask(task);
-    return result ? [{
-      subjectType: "accepted_result" as const,
-      subjectId: result.runId,
-      label: task.title,
-      snapshot: {
-        taskId: task.id,
-        taskTitle: task.title,
-        runId: result.runId,
-        acceptedAt: result.acceptedAt,
-        summary: result.summary,
-      } satisfies Prisma.InputJsonObject,
-    }] : [];
-  });
-  const artifactCandidates = goal.tasks.flatMap((task) => task.runs.flatMap((run) => run.artifacts.map((artifact) => ({
-    subjectType: "artifact" as const,
-    subjectId: artifact.id,
-    label: artifact.title,
-    snapshot: {
-      taskId: artifact.taskId,
-      runId: artifact.runId,
-      title: artifact.title,
-      type: artifact.type,
-      uri: artifact.uri,
-      contentPreview: artifact.contentPreview,
-    } satisfies Prisma.InputJsonObject,
-  }))));
-  const criterionCandidates = criteriaFrom(goal.successCriteria).map((criterion) => ({
-    subjectType: "criterion" as const,
-    subjectId: criterion.id,
-    label: criterion.description,
-    snapshot: {
-      description: criterion.description,
-      satisfied: criterion.satisfied,
-      confirmedAt: criterion.confirmedAt,
-    } satisfies Prisma.InputJsonObject,
-  }));
-  return [...taskCandidates, ...assetCandidates, ...resultCandidates, ...artifactCandidates, ...criterionCandidates];
-}
-
-export async function updateGoalWorkingSet(input: { goalId: string; selections: GoalWorkingSetSelection[] }) {
-  const goal = await getGoalOrThrow(input.goalId);
-  if (goal.status === "Achieved" || goal.status === "Stopped") {
-    throw new EngineError(ENGINE_ERROR_CODES.INVALID_TASK_STATE, "Archived Goals cannot change their working set");
-  }
-  const candidatesByKey = new Map(workingSetCandidates(goal).map((candidate) => [
-    `${candidate.subjectType}:${candidate.subjectId}`,
-    candidate,
-  ]));
-  const selected = input.selections.map((selection) => candidatesByKey.get(selectionKey(selection)));
-  if (selected.some((candidate) => !candidate)) {
-    throw new EngineError(ENGINE_ERROR_CODES.VALIDATION_FAILED, "Every working-set item must belong to this Goal");
-  }
-  await db.$transaction(async (tx) => {
-    await tx.goalWorkingSetItem.deleteMany({ where: { goalId: goal.id } });
-    const entries = selected.filter((candidate): candidate is WorkingSetCandidate => Boolean(candidate));
-    if (entries.length > 0) {
-      await tx.goalWorkingSetItem.createMany({
-        data: entries.map((candidate, rank) => ({
-          workspaceId: goal.workspaceId,
-          goalId: goal.id,
-          subjectType: candidate.subjectType,
-          subjectId: candidate.subjectId,
-          label: candidate.label,
-          snapshot: candidate.snapshot,
-          rank,
-        })),
-      });
-    }
-  });
-  await appendGoalEvent({
-    eventType: "goal.working_set_updated",
-    goalId: goal.id,
-    workspaceId: goal.workspaceId,
-    payload: { item_count: input.selections.length },
-    summary: `Updated Goal working set (${input.selections.length} items)`,
-  });
-  return getGoal({ goalId: goal.id });
-}
 function acceptedResultOrThrow(goal: GoalWithDetails, taskId: string) {
   const task = goal.tasks.find((candidate) => candidate.id === taskId);
   const result = task ? acceptedResultForTask(task) : null;
@@ -894,8 +917,7 @@ export async function applyGoalReview(input: { goalId: string; command: ApplyGoa
   if (goal.status !== "Active") {
     throw new EngineError(ENGINE_ERROR_CODES.INVALID_TASK_STATE, "Only active Goals can apply reviews");
   }
-  const selections = goal.workingSetItems.map((item) => ({ subjectType: item.subjectType, subjectId: item.subjectId }));
-  const context = goalContextSnapshot(goal, selections);
+  const context = await buildAutomaticGoalTaskContext({ goalId: goal.id, workspaceId: goal.workspaceId });
   const now = new Date();
   const workspace = await db.workspace.findUniqueOrThrow({ where: { id: goal.workspaceId }, select: { defaultRuntime: true } });
   const createdTaskIds: string[] = [];
@@ -953,11 +975,7 @@ export async function createGoalTask(input: { goalId: string; command: CreateGoa
   if (goal.status !== "Active") {
     throw new EngineError(ENGINE_ERROR_CODES.INVALID_TASK_STATE, "Only active Goals can create bounded tasks");
   }
-  const contextSelections = input.command.contextSelections ?? goal.workingSetItems.map((item) => ({
-    subjectType: item.subjectType,
-    subjectId: item.subjectId,
-  }));
-  const contextSnapshot = goalContextSnapshot(goal, contextSelections);
+  const contextSnapshot = await buildAutomaticGoalTaskContext({ goalId: goal.id, workspaceId: goal.workspaceId });
   const created = await createTask({
     workspaceId: goal.workspaceId,
     goalId: goal.id,
@@ -978,7 +996,7 @@ export async function createGoalTask(input: { goalId: string; command: CreateGoa
     taskId: created.taskId,
     payload: {
       kind: input.command.kind,
-      context_item_count: contextSelections.length,
+      context_result_count: acceptedResultCatalog(goal).length,
       expected_outcome: input.command.expectedOutcome ?? null,
     },
     summary: input.command.kind === "review"
@@ -1039,7 +1057,7 @@ export async function promoteTaskToGoal(input: { taskId: string; command: Promot
       data: {
         workspaceId: task.workspaceId,
         title: input.command.title,
-        titleSource: "ai",
+        titleSource: "system",
         description: input.command.description ?? null,
         successCriteria: input.command.successCriteria,
         status: "Active",
@@ -1077,3 +1095,11 @@ export async function promoteTaskToGoal(input: { taskId: string; command: Promot
 
   return getGoal({ goalId });
 }
+
+export {
+  applyGoalReviewProposal,
+  generateGoalReview,
+  rejectGoalReviewProposal,
+  runGoalReviewGeneration,
+  waitForGoalReviewGeneration,
+} from "./goal-review-proposals";

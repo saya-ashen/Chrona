@@ -193,6 +193,7 @@ describe("MCP routes", () => {
       "chrona_condition_select",
       "chrona_dashboard_brief",
       "chrona_execution_read",
+      "chrona_goal_results_read",
       "chrona_node_block",
       "chrona_node_complete",
       "chrona_node_fail",
@@ -221,6 +222,16 @@ describe("MCP routes", () => {
     expect(conditionSelect.inputSchema.shape.nextNodeId).toBeUndefined();
     expect(conditionSelect.inputSchema.shape.idempotencyKey).toBeUndefined();
     expect(conditionSelect.inputSchema.shape.evidence).toBeUndefined();
+  });
+
+  it("exports bounded Goal result search without backend Goal identity", () => {
+    const goalResults = __mcpRouteTestHooks.externalTools.chrona_goal_results_read;
+    expect(goalResults.inputSchema.shape.query).toBeDefined();
+    expect(goalResults.inputSchema.shape.limit).toBeDefined();
+    expect(goalResults.inputSchema.shape.cursor).toBeDefined();
+    expect(goalResults.inputSchema.shape.goalId).toBeUndefined();
+    expect(goalResults.inputSchema.safeParse({ query: "research", limit: 5 }).success).toBe(true);
+    expect(goalResults.inputSchema.safeParse({ limit: 11 }).success).toBe(false);
   });
 
   it("exports chrona plan output with plan-output patch schema", () => {
@@ -280,6 +291,12 @@ describe("MCP routes", () => {
 
     expect(input.sessionId).toBe(hiddenContextArguments.sessionId);
     expect(input.payload).toEqual(planOutputSpec);
+
+    const goalResultInput = __mcpRouteTestHooks.toChronaInput(
+      "chrona.goal.results.read",
+      { query: "research", limit: 3, _meta: { sessionId: hiddenContextArguments.sessionId } },
+    );
+    expect(goalResultInput.payload).toEqual({ query: "research", limit: 3 });
     expect(input.evidence).toBeUndefined();
   });
 
@@ -302,6 +319,38 @@ describe("MCP routes", () => {
     expect(JSON.stringify(structuredContent)).not.toContain("idempotency");
   });
 
+
+  it("returns bounded Goal results without internal operation metadata", async () => {
+    const result = await callTool("chrona.goal.results.read", {
+      query: "research",
+      limit: 3,
+      _meta: { sessionId: "chrona:task:task-1:plan-generation" },
+    }, {
+      resultOverride: {
+        state: {
+          result: {
+            linked: true,
+            goal: { title: "Launch program" },
+            results: [{ ref: "GRABCDEF012345", title: "Accepted research", summary: "Evidence" }],
+            nextCursor: null,
+          },
+        },
+      },
+    });
+
+    expect(expectStructuredContent(result)).toEqual({
+      status: "accepted",
+      message: "Tool executed.",
+      result: {
+        linked: true,
+        goal: { title: "Launch program" },
+        results: [{ ref: "GRABCDEF012345", title: "Accepted research", summary: "Evidence" }],
+        nextCursor: null,
+      },
+    });
+    expect(JSON.stringify(expectStructuredContent(result))).not.toContain("operationId");
+    expect(JSON.stringify(expectStructuredContent(result))).not.toContain("taskId");
+  });
   it("allows execution tools in plan execution main sessions", async () => {
     const operations: CapturedToolOperation[] = [];
     await callTool("chrona.node.complete", {
@@ -322,6 +371,7 @@ describe("MCP routes", () => {
     const planSessionId = "chrona:task:task-1:plan-generation";
     const cases = [
       ["chrona.execution.read", executionSessionId, {}, {}],
+      ["chrona.goal.results.read", executionSessionId, { query: "research", limit: 3 }, { query: "research", limit: 3 }],
       ["chrona.plan.read", executionSessionId, {}, {}],
       ["chrona.plan.generate", planSessionId, {
         title: "Generated MCP plan",

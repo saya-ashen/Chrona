@@ -890,17 +890,20 @@ class SdkRunner implements ClaudeCodeRunner {
         headers: cfg.mcpRunToken ? { Authorization: `Bearer ${cfg.mcpRunToken}` } : {},
       },
     };
+    const readOnly = input.toolPolicy === "read_only";
     // Fail-fast: the agent model needs the `mcp__chrona__*` tool group
     // to be reachable BEFORE it can call `mcp__chrona__chrona_plan_generate`.
     // The 401 we keep hitting in dev comes from this transport being
     // registered with a stale/invalid token — the agent would only
     // notice mid-session (wasting model turn). Probe MCP server once
     // here so a bad token / wrong URL is reported at start() time.
-    await probeMcpServer({
-      baseUrl: mcpBaseUrl,
-      token: cfg.mcpRunToken,
-      runId: "preflight",
-    });
+    if (!readOnly) {
+      await probeMcpServer({
+        baseUrl: mcpBaseUrl,
+        token: cfg.mcpRunToken,
+        runId: "preflight",
+      });
+    }
     const abortController = new AbortController();
     const runId = `claude-sdk-${crypto.randomUUID()}`;
     // Prefer the live in-process capture (same process, mid-conversation);
@@ -920,8 +923,11 @@ class SdkRunner implements ClaudeCodeRunner {
     const options = {
       ...(cfg.sdkOptions ?? {}),
       model,
-      mcpServers,
-      permissionMode: "bypassPermissions",
+      ...(readOnly ? {} : { mcpServers }),
+      permissionMode: readOnly ? "dontAsk" : "bypassPermissions",
+      ...(readOnly
+        ? { allowedTools: [], disallowedTools: ["Bash", "Edit", "Write", "NotebookEdit", "WebFetch", "WebSearch", "Task"] }
+        : {}),
       abortController,
       cwd: cfg.cwd,
       env: claudeRunEnv(cfg),

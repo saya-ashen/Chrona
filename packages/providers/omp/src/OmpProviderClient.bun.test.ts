@@ -121,6 +121,15 @@ describe("OmpSdkProviderClient node runtime tools", () => {
     ]);
     expect("toolNames" in options).toBe(false);
   });
+
+  it("disables built-in tools, MCP, and LSP for read-only runs", () => {
+    expect(__ompSdkProviderTestHooks.sdkReadOnlyToolOptions("read_only")).toEqual({
+      toolNames: [],
+      enableMCP: false,
+      enableLsp: false,
+    });
+    expect(__ompSdkProviderTestHooks.sdkReadOnlyToolOptions("full")).toEqual({});
+  });
   it("treats node result tools as terminal but leaves plan output non-terminal", () => {
     expect(__ompSdkProviderTestHooks.isTerminalRuntimeTool("chrona_node_request_input")).toBe(true);
     expect(__ompSdkProviderTestHooks.isTerminalRuntimeTool("chrona_node_complete")).toBe(true);

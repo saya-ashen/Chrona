@@ -37,10 +37,10 @@ partial object behind.
 ### GET /api/goals/:goalId
 
 Returns the lifecycle-aware Goal read model: workspace/archive mode,
-projection, primary action, Operational Brief, ordered Working Set, derived
-Needs You/In Progress/New Results/Up Next focus groups, evidence-backed outcome,
-grouped bounded tasks, immutable accepted-result summaries, GoalAsset
-provenance, supported Artifact operations, and audit activity.
+projection, primary action, Operational Brief, derived Needs You/In Progress/
+New Results/Up Next focus groups, evidence-backed outcome, grouped bounded
+tasks, immutable accepted-result summaries, GoalAsset provenance, supported
+Artifact operations, and audit activity.
 
 ### PATCH /api/goals/:goalId
 
@@ -52,12 +52,6 @@ history.
 Replaces the current validated Operational Brief and appends an immutable
 `GoalBriefRevision` with actor and time. Archived Goals reject this mutation.
 
-### PUT /api/goals/:goalId/working-set
-
-Replaces the ordered Working Set with Goal-owned whole-object selections:
-`goal_asset`, `accepted_result`, `artifact`, `criterion`, or `task`. The server
-validates every selection against the Goal and records source snapshots; it
-rejects cross-Goal references and archived-Goal mutations.
 
 ### POST /api/goals/:goalId/actions
 
@@ -69,11 +63,13 @@ Goal review is bounded work, not a Goal lifecycle/provider action.
 
 ### POST /api/goals/:goalId/tasks
 
-Creates a Goal-owned bounded `task` or `review` Task. The request may include an
-expected outcome and selected Working Set references. The server freezes those
-references and the current Operational Brief in immutable `Task.goalContext`.
-The Task owns all later Plan, Run, execution-session, provider-session,
-approval, and Result state; later Goal edits cannot mutate the snapshot.
+Creates a Goal-owned bounded `task` or `review` Task. The server automatically
+freezes the current Operational Brief plus a compact catalog of accepted Goal
+results in immutable `Task.goalContext`. Full accepted result content remains
+available to planning and execution sessions through bounded
+`chrona_goal_results_read` calls. The Task owns all later Plan, Run,
+execution-session, provider-session, approval, and Result state; later Goal
+edits or accepted results cannot mutate the snapshot.
 
 ### GET /api/goals/:goalId/artifacts/:artifactId
 

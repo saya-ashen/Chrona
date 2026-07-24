@@ -28,6 +28,7 @@ type ExecutionProviderRequest = {
   input: unknown;
   structuredOutputSchema?: PreparedAiFeatureSpec["structuredOutputSchema"];
   terminalToolName?: string;
+  toolPolicy?: "full" | "read_only";
   maxOutputTokens?: number;
   timeoutSeconds?: number;
   resumeSessionRef?: string;
@@ -145,7 +146,7 @@ export class AiRuntimeInvoker {
         );
       }
       const providerName = client.providerClient.provider;
-      const useChronaControl = usesChronaControlPlane(providerName);
+      const useChronaControl = input.featureSpec.feature !== "goal.review" && usesChronaControlPlane(providerName);
       let controlRunToken: string | null = null;
       if (useChronaControl) {
         controlRunToken = await mintRunToken({
@@ -327,6 +328,8 @@ function toStartRunInput(request: ExecutionProviderRequest): StartRunInput {
     input: request.input as ProviderRunInput,
     maxOutputTokens: request.maxOutputTokens,
     terminalToolName: request.terminalToolName,
+    structuredOutputSchema: request.structuredOutputSchema,
+    toolPolicy: request.toolPolicy,
     ...(request.resumeSessionRef
       ? { resumeSessionRef: request.resumeSessionRef }
       : {}),
@@ -1060,6 +1063,10 @@ function buildExecutionGatewayRequest(input: {
     input: aiInput,
     structuredOutputSchema: input.featureSpec.structuredOutputSchema,
     terminalToolName: input.featureSpec.terminalToolName,
+    toolPolicy:
+      input.featureSpec.feature === "goal.review" || input.featureSpec.feature === "goal.asset_ownership"
+        ? "read_only"
+        : "full",
     maxOutputTokens: typeof maxTokens === "number" ? maxTokens : undefined,
     ...(input.resumeSessionRef
       ? { resumeSessionRef: input.resumeSessionRef }
@@ -1078,6 +1085,7 @@ function buildExecutionAiInput(input: {
     case "execute_task_node":
     case "evaluate_condition_node":
     case "review_checkpoint_node":
+    case "goal.review":
       return runtimeInput;
     case "suggest":
     case "generate_plan":

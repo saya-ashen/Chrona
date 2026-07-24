@@ -69,6 +69,7 @@ describe("default task orchestrator workers", () => {
       "due-scheduled-work",
       "due-auto-plan-generation",
       "recurring-work-block-expansion",
+      "goal-review-due",
       "graph-advancement",
     ]);
   });

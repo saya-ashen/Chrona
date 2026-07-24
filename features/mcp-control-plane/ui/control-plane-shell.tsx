@@ -311,7 +311,7 @@ export function ControlPlaneShell({
             </div>
 
             {assistantSummary?.value ? (
-              <div className="hidden min-w-0 flex-1 items-center justify-center md:flex">
+              <div className="flex min-w-0 flex-1 items-center justify-center">
                 <button
                   type="button"
                   data-assistant-surface-header-drawer-button="true"

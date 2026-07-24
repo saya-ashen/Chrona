@@ -14,6 +14,10 @@ import {
   splitAcceptedResultIntoCandidates,
   submitGoalAssetDraft,
 } from "../modules/goals/goal-workbench";
+import {
+  applyGoalAssetOwnershipProposal,
+  generateGoalAssetOwnership,
+} from "../modules/goals/goal-asset-ownership";
 
 export function createGoalWorkbenchService() {
   return {
@@ -28,6 +32,8 @@ export function createGoalWorkbenchService() {
     listInbox: listGoalInbox,
     extractCandidates: splitAcceptedResultIntoCandidates,
     resolveCandidate: resolveGoalInboxCandidate,
+    generateOwnershipProposal: generateGoalAssetOwnership,
+    applyOwnershipProposal: applyGoalAssetOwnershipProposal,
     createSubmission: createGoalFormSubmission,
     createJob: createGoalAssetJob,
     createModificationTask: createAssetModificationTask,

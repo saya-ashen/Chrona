@@ -14,7 +14,7 @@ Current schema inventory:
 | Aggregate | Key models | Purpose |
 | --- | --- | --- |
 | Workspace | `Workspace` | Scope for tasks, memory, schedule, calendar sources, and configuration. |
-| Goal | `Goal`, `GoalAsset`, `GoalAssetVersion`, `GoalAssetDraft`, `GoalInboxCandidate`, `GoalFormSubmission`, `GoalAssetJob`, `GoalWorkingSetItem`, `GoalBriefRevision` | Durable outcome lifecycle, versioned Workbench assets, result intake, form submissions, export jobs, operating context, explicit bounded-task inputs, and immutable artifact provenance. |
+| Goal | `Goal`, `GoalAsset`, `GoalAssetVersion`, `GoalAssetDraft`, `GoalInboxCandidate`, `GoalFormSubmission`, `GoalAssetJob`, `GoalBriefRevision` | Durable outcome lifecycle, versioned Workbench assets, result intake, form submissions, export jobs, automatic accepted-result context, and immutable artifact provenance. |
 | Task | `Task`, `TaskDependency`, `TaskProjection`, `TaskSession`, `TaskTimelineItem` | Core work item, relationships, projection-backed read shape, scoped work sessions, and timeline rows. |
 | Plan | `TaskPlan`, `TaskPlanLayer`, `GraphVersion`, `GraphMutationRecord`, `ReconciliationEvent`, `TaskPlanNodeAttempt`, `TaskPlanTerminalAction` | Generated/accepted executable graph plan, node-attempt history, terminal actions, and graph-change history. |
 | Execution | `TaskPlanRun`, `Run`, `ExecutionSession`, `RuntimeCursor`, `Approval`, `Artifact`, `TaskPlanProviderRun`, `TaskPlanProviderApproval`, `RunToken` | Plan/run/session state, runtime cursoring, provider continuity, approvals, tokens, and outputs. |
@@ -33,7 +33,6 @@ erDiagram
   Workspace ||--o{ Goal : owns
   Goal ||--o{ Task : advances_through
   Goal ||--o{ GoalAsset : works_with
-  Goal ||--o{ GoalWorkingSetItem : selects_context
   Goal ||--o{ GoalBriefRevision : revises_strategy
   Artifact ||--o{ GoalAsset : promoted_as
   Workspace ||--o{ Memory : owns
@@ -68,7 +67,7 @@ erDiagram
 ## Goal foundation and remaining target
 
 The current schema ships `Goal`, optional `Task.goalId`, read-only `GoalAsset`,
-`GoalWorkingSetItem`, `GoalBriefRevision`, and immutable `Task.goalContext`.
+`GoalBriefRevision`, and immutable `Task.goalContext`.
 Goal lifecycle is `Draft | Active | Paused | Achieved | Stopped`. Achievement
 requires explicit user confirmation and persists note, actor identity,
 timestamp, and Goal-owned evidence Artifact IDs in
@@ -79,12 +78,13 @@ separate from these Goal-scoped references.
 
 `Goal.operationalBrief` stores the current intended outcome, current focus,
 strategy, and constraints. Every save appends `GoalBriefRevision` with actor and
-time. `GoalWorkingSetItem` stores an ordered explicit selection of whole Goal
-objects plus a display/audit snapshot; canonical lifecycle remains on the
-source object. When a bounded Goal Task is created, its selected Working Set,
-current Operational Brief, capture time, and expected outcome are frozen into
-`Task.goalContext`. Plan generation consumes this immutable source context;
-later Goal edits do not rewrite existing Task input.
+time. When any Goal-linked Task is created, Chrona automatically freezes the
+current Operational Brief, capture time, expected outcome, and a compact
+catalog of then-accepted Goal results into `Task.goalContext`. Plan generation
+consumes this immutable source context; later Goal edits and newly accepted
+results do not rewrite existing Task input. Planning and execution sessions can
+retrieve full accepted results on demand through a bounded, Task-scoped,
+read-only MCP operation.
 
 The shipped model includes closed-union `TaskTrigger`, idempotent
 `TriggerDelivery`, and neutral `TaskOccurrence`. Schedule and bounded internal

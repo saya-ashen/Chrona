@@ -1,6 +1,6 @@
 "use client";
 
-import { cloneElement, useEffect, useMemo, useRef, useState } from "react";
+import { cloneElement, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Archive,
   ChevronDown,
@@ -55,8 +55,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@shared/ui";
 import { Textarea } from "@shared/ui";
 import {
   archiveGoalAsset,
+  applyGoalAssetOwnership,
   createGoalAssetJob,
   createGoalAssetModificationTask,
+  generateGoalAssetOwnership,
   renameGoalAsset,
   resolveGoalInboxCandidate,
   restoreGoalAssetVersion,
@@ -66,6 +68,7 @@ import {
   type GoalAssetKind,
   type GoalAssetWorkbenchData,
   type GoalInboxCandidateData,
+  type GoalAssetOwnershipProposalData,
 } from "../workbench-api";
 import type { GoalCopy } from "../model/goal-types";
 
@@ -374,9 +377,19 @@ function AssetTile({
 }
 
 function inboxReasonLabel(reason: string, copy: AssetWorkbenchCopy) {
-  return reason === "No confident existing asset identity match"
-    ? copy.noConfidentAssetMatch
-    : reason;
+  if (
+    reason === "rule_based_name_match" ||
+    reason === "Same asset type and a similar user-confirmed name"
+  ) {
+    return copy.ruleBasedMatchDescription;
+  }
+  if (
+    reason === "no_rule_based_name_match" ||
+    reason === "No confident existing asset identity match"
+  ) {
+    return copy.noRuleBasedMatchDescription;
+  }
+  return reason;
 }
 
 function inboxChangeSummaryLabel(
@@ -388,6 +401,113 @@ function inboxChangeSummaryLabel(
     `Candidate derived from accepted result “${candidateLabel}”`
     ? formatCopy(copy.candidateFromAcceptedResult, { result: candidateLabel })
     : summary;
+}
+
+function AssetOwnershipRecommendation({
+  proposal,
+  copy,
+  pending,
+  onGenerate,
+  onApply,
+}: {
+  proposal: GoalAssetOwnershipProposalData | null;
+  copy: AssetWorkbenchCopy;
+  pending: boolean;
+  onGenerate: () => void;
+  onApply: () => void;
+}) {
+  const result = proposal?.result;
+  const targetLabel = proposal?.targetAsset?.label ?? result?.proposedLabel ?? "";
+  const decision = result
+    ? result.decision === "append_version"
+      ? formatCopy(copy.aiDecisionAppend, { asset: targetLabel })
+      : result.decision === "separate_asset"
+        ? copy.aiDecisionSeparate
+        : copy.aiDecisionCreate
+    : null;
+  const certainty = result
+    ? {
+        low: copy.certaintyLow,
+        medium: copy.certaintyMedium,
+        high: copy.certaintyHigh,
+      }[result.certainty]
+    : null;
+  return (
+    <div className="space-y-3 rounded-lg border border-primary/20 bg-primary/[0.03] p-3">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-2">
+          <Sparkles className="size-4 text-primary" />
+          <span className="text-sm font-medium">{copy.aiRecommendation}</span>
+          {proposal ? <Badge variant="outline">{proposal.status}</Badge> : null}
+        </div>
+        {!proposal || proposal.status === "Failed" || proposal.status === "Stale" ? (
+          <Button size="sm" variant="outline" disabled={pending} onClick={onGenerate}>
+            {pending ? <Loader2 className="size-4 animate-spin" /> : null}
+            {copy.generateAiRecommendation}
+          </Button>
+        ) : null}
+      </div>
+      {proposal?.status === "Generating" ? (
+        <p className="text-sm text-muted-foreground">{copy.generatingAiRecommendation}</p>
+      ) : null}
+      {proposal?.status === "Failed" ? (
+        <p role="alert" className="text-sm text-destructive">
+          {proposal.generationError ?? copy.aiRecommendationFailed}
+        </p>
+      ) : null}
+      {proposal?.status === "Stale" ? (
+        <p role="alert" className="text-sm text-warning-foreground">{copy.proposalStale}</p>
+      ) : null}
+      {proposal?.status === "Ready" && result ? (
+        <div className="space-y-3 text-sm">
+          <div className="flex flex-wrap items-center gap-2">
+            <Badge variant="secondary">{decision}</Badge>
+            <span className="text-xs text-muted-foreground">
+              {formatCopy(copy.certainty, { certainty: certainty ?? result.certainty })}
+            </span>
+          </div>
+          <dl className="grid gap-2 sm:grid-cols-2">
+            <div>
+              <dt className="text-xs text-muted-foreground">{copy.rationale}</dt>
+              <dd>{result.rationale}</dd>
+            </div>
+            <div>
+              <dt className="text-xs text-muted-foreground">{copy.differenceSummaryLabel}</dt>
+              <dd>{result.differenceSummary}</dd>
+            </div>
+          </dl>
+          <div className="grid gap-2 sm:grid-cols-2">
+            <div>
+              <p className="text-xs text-muted-foreground">{copy.evidence}</p>
+              <ul className="list-disc pl-4 text-xs">
+                {result.evidence.map((item) => <li key={item}>{item}</li>)}
+              </ul>
+            </div>
+            {result.counterEvidence.length > 0 ? (
+              <div>
+                <p className="text-xs text-muted-foreground">{copy.counterEvidence}</p>
+                <ul className="list-disc pl-4 text-xs">
+                  {result.counterEvidence.map((item) => <li key={item}>{item}</li>)}
+                </ul>
+              </div>
+            ) : null}
+          </div>
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <p className="text-xs text-muted-foreground">
+              {formatCopy(copy.aiSource, {
+                provider: proposal.providerType ?? "AI provider",
+                model: proposal.model ? ` · ${proposal.model}` : "",
+              })}
+            </p>
+            <Button size="sm" disabled={pending} onClick={onApply}>
+              {pending ? <Loader2 className="size-4 animate-spin" /> : null}
+              {copy.applyAiRecommendation}
+            </Button>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 function InboxCandidate({
@@ -407,14 +527,80 @@ function InboxCandidate({
 }) {
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const proposal = candidate.ownershipProposals?.[0] ?? null;
+  useEffect(() => {
+    if (proposal?.status !== "Generating") return;
+    const timeout = window.setTimeout(onResolved, 1_000);
+    return () => window.clearTimeout(timeout);
+  }, [onResolved, proposal?.status]);
   const [targetAssetId, setTargetAssetId] = useState(
     candidate.proposedTargetAssetId ?? "new",
   );
   const selectedTarget = assets.find((asset) => asset.id === targetAssetId);
+  async function generateOwnership() {
+    setPending(true);
+    setError(null);
+    try {
+      await generateGoalAssetOwnership(goalId, candidate.id, {
+        workspaceId,
+        idempotencyKey: crypto.randomUUID(),
+      });
+      onResolved();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : copy.aiRecommendationFailed);
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function applyOwnership(current: GoalAssetOwnershipProposalData) {
+    setPending(true);
+    setError(null);
+    try {
+      await applyGoalAssetOwnership(goalId, candidate.id, current.id, {
+        workspaceId,
+        idempotencyKey: crypto.randomUUID(),
+        action: "apply_suggestion",
+      });
+      onResolved();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : copy.candidateUpdateFailed);
+    } finally {
+      setPending(false);
+    }
+  }
+
   async function resolve(action: "create_asset" | "append_version" | "reject") {
     setPending(true);
     setError(null);
     try {
+      if (proposal?.status === "Ready") {
+        if (action === "create_asset") {
+          await applyGoalAssetOwnership(goalId, candidate.id, proposal.id, {
+            workspaceId,
+            idempotencyKey: crypto.randomUUID(),
+            action,
+            label: candidate.label,
+          });
+        } else if (action === "append_version" && targetAssetId !== "new" && selectedTarget?.versions[0]) {
+          await applyGoalAssetOwnership(goalId, candidate.id, proposal.id, {
+            workspaceId,
+            idempotencyKey: crypto.randomUUID(),
+            action,
+            targetAssetId,
+            baseVersionId: selectedTarget.versions[0].id,
+            changeSummary: candidate.changeSummary,
+          });
+        } else if (action === "reject") {
+          await applyGoalAssetOwnership(goalId, candidate.id, proposal.id, {
+            workspaceId,
+            idempotencyKey: crypto.randomUUID(),
+            action,
+          });
+        }
+        onResolved();
+        return;
+      }
       if (action === "create_asset")
         await resolveGoalInboxCandidate(goalId, candidate.id, {
           workspaceId,
@@ -453,7 +639,9 @@ function InboxCandidate({
         <div className="flex flex-wrap items-center gap-2">
           <Badge>{kindLabel(candidate.kind, copy)}</Badge>
           <Badge variant="outline">
-            {Math.round(candidate.confidence * 100)}% {copy.match}
+            {candidate.proposedTargetAssetId
+              ? copy.ruleBasedMatch
+              : copy.noRuleBasedMatch}
           </Badge>
         </div>
         <CardTitle className="text-base">{candidate.label}</CardTitle>
@@ -481,6 +669,13 @@ function InboxCandidate({
         <pre className="max-h-36 overflow-auto whitespace-pre-wrap rounded-lg bg-muted p-3 text-xs">
           {contentText(candidate.content)}
         </pre>
+        <AssetOwnershipRecommendation
+          proposal={proposal}
+          copy={copy}
+          pending={pending}
+          onGenerate={() => void generateOwnership()}
+          onApply={() => proposal && void applyOwnership(proposal)}
+        />
         <div className="space-y-2">
           <Label htmlFor={`candidate-target-${candidate.id}`}>
             {copy.assetDestination}
@@ -1426,12 +1621,12 @@ export function GoalAssetWorkbench({
   function updateWorkbenchParams(patch: Record<string, string | null>) {
     const next = new URLSearchParams(searchParams);
     for (const [key, value] of Object.entries(patch)) {
-      if (value) next.set(key, value);
+      if (value !== null) next.set(key, value);
       else next.delete(key);
     }
     setSearchParams(next, { replace: true });
   }
-  const refresh = () => revalidator.revalidate();
+  const refresh = useCallback(() => revalidator.revalidate(), [revalidator]);
   const assets = useMemo(
     () =>
       initialAssets

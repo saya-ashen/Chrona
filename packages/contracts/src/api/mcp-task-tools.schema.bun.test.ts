@@ -49,6 +49,13 @@ describe("MCP task tool contracts", () => {
     expect(isChronaToolMutating("chrona.task.update")).toBe(true);
   });
 
+  it("bounds session-scoped Goal result search payloads", () => {
+    expect(parseChronaToolPayload("chrona.goal.results.read", { query: "research", limit: 5 }))
+      .toEqual({ query: "research", limit: 5 });
+    expect(() => parseChronaToolPayload("chrona.goal.results.read", { limit: 11 })).toThrow();
+    expect(isChronaToolMutating("chrona.goal.results.read")).toBe(false);
+  });
+
   it("accepts session-scoped tool input before Chrona resolves task context", () => {
     expect(
       chronaToolInputSchema.parse({

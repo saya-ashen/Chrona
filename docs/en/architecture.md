@@ -80,14 +80,15 @@ The schedule page shows task/time-block projections, conflicts, suggestions, and
 Chrona ships the Goal aggregate and lifecycle-aware Goal surfaces. A `Goal`
 contains bounded Tasks, validated user-confirmed success criteria, explicit
 lifecycle actions, immutable accepted-result summaries, a versioned Operational
-Brief, an explicit Working Set, and durable typed `GoalAsset` identities.
-`Draft | Active | Paused` render as an Ongoing Workspace: the Goal Control Plane
-derives Needs You, In Progress, New Results, Up Next, current focus, criteria,
-and one primary action; the Goal Workbench provides an Office-style library,
-reviewable Result Inbox, explicit asset versions and drafts, typed
-Document/Form/Page/File workspaces, recover-as-new-version, archive/restore,
-exports, and version-bound AI modification Tasks. `Achieved | Stopped` render as
-an Outcome Archive with final result, evidence, confirmation actor/note/time,
+Brief, automatic accepted-result context for new Goal Tasks, and durable typed
+`GoalAsset` identities. `Draft | Active | Paused` render as an Ongoing
+Workspace: the Goal Control Plane derives Needs You, In Progress, New Results,
+Up Next, current focus, criteria, and one primary action; the Goal Workbench
+provides an Office-style library, reviewable Result Inbox, explicit asset
+versions and drafts, typed Document/Form/Page/File workspaces,
+recover-as-new-version, archive/restore, exports, and version-bound AI
+modification Tasks. `Achieved | Stopped` render as an Outcome Archive with
+final result, evidence, confirmation actor/note/time,
 and history prioritized above execution detail.
 
 Goal list and detail routes are `/goals` and `/goals/:goalId`. A Goal-scoped

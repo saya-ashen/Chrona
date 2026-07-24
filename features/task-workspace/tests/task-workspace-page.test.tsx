@@ -24,6 +24,12 @@ vi.mock("react-router-dom", () => ({
   useNavigate: () => mocks.navigate,
 }));
 
+vi.mock("../ui/localized-link", () => ({
+  LocalizedLink: ({ href, children }: { href: string; children: string }) => (
+    <a href={href}>{children}</a>
+  ),
+}));
+
 vi.mock("@features/assistant-surface", () => ({
   useAssistantSurface: () => ({
     registerHandlers: vi.fn(() => vi.fn()),
@@ -331,6 +337,21 @@ describe("TaskWorkspacePage", () => {
 
   });
 
+
+  it("links Goal tasks to their corresponding Goal instead of the Goal list", () => {
+    const data = taskData();
+    data.task.goalId = "goal-1";
+    data.task.goal = { id: "goal-1", title: "Plan a summer trip" };
+
+    render(<TaskWorkspacePage data={data} />);
+
+    expect(screen.getByText("Plan a summer trip")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open Goal" })).toHaveAttribute(
+      "href",
+      "/goals/goal-1?section=work",
+    );
+    expect(screen.queryByRole("link", { name: "All Goals" })).not.toBeInTheDocument();
+  });
 
   it("passes generating-plan state through the console regions", () => {
     mocks.planGenerationStatus = "generating";

@@ -60,14 +60,15 @@ import {
   Textarea,
 } from "@shared/ui";
 import {
-  applyGoalReview,
+  applyGoalReviewProposal,
   confirmGoalCriterion,
   createGoalTask,
+  generateGoalReview,
+  rejectGoalReviewProposal,
   reviewGoalCriterion,
   runGoalAction,
   updateGoal,
   updateGoalBrief,
-  updateGoalWorkingSet,
 } from "../browser-api";
 import type {
   GoalArtifactData,
@@ -696,139 +697,6 @@ function OperationalBriefCard({
   );
 }
 
-function workingSetCandidates(goal: GoalData) {
-  return [
-    ...goal.assets.map((asset) => ({
-      key: `goal_asset:${asset.id}`,
-      subjectType: "goal_asset" as const,
-      subjectId: asset.id,
-      label: asset.label,
-    })),
-    ...goal.acceptedResults.map((result) => ({
-      key: `accepted_result:${result.runId}`,
-      subjectType: "accepted_result" as const,
-      subjectId: result.runId,
-      label: result.taskTitle,
-    })),
-    ...goal.outcome.criteria.map((criterion) => ({
-      key: `criterion:${criterion.id}`,
-      subjectType: "criterion" as const,
-      subjectId: criterion.id,
-      label: criterion.description,
-    })),
-    ...goal.tasks.map((task) => ({
-      key: `task:${task.id}`,
-      subjectType: "task" as const,
-      subjectId: task.id,
-      label: task.title,
-    })),
-  ];
-}
-
-function WorkingSetCard({ goal, copy }: { goal: GoalData; copy: GoalCopy }) {
-  const revalidator = useRevalidator();
-  const candidates = workingSetCandidates(goal);
-  const [editing, setEditing] = useState(false);
-  const [selected, setSelected] = useState(
-    () =>
-      new Set(
-        goal.workbench.workingSet.map(
-          (item) => `${item.subjectType}:${item.subjectId}`,
-        ),
-      ),
-  );
-  const [saving, setSaving] = useState(false);
-  async function save() {
-    setSaving(true);
-    try {
-      await updateGoalWorkingSet(
-        goal.id,
-        candidates
-          .filter((candidate) => selected.has(candidate.key))
-          .map(({ subjectType, subjectId }) => ({ subjectType, subjectId })),
-      );
-      await revalidator.revalidate();
-      setEditing(false);
-    } finally {
-      setSaving(false);
-    }
-  }
-  return (
-    <section
-      className="border-t border-border/80 pt-5"
-      aria-labelledby="goal-working-set-card"
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h3 id="goal-working-set-card" className="font-semibold">
-            {copy.workingSet}
-          </h3>
-          <p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">
-            {copy.workingSetDescription}
-          </p>
-        </div>
-        {!editing ? (
-          <Button size="sm" variant="outline" onClick={() => setEditing(true)}>
-            {copy.editWorkingSet}
-          </Button>
-        ) : null}
-      </div>
-      <div className="mt-4 space-y-2">
-        {editing ? (
-          candidates.map((candidate) => (
-            <label
-              key={candidate.key}
-              className="flex items-start gap-3 rounded-lg border bg-card p-3 text-sm"
-            >
-              <Checkbox
-                checked={selected.has(candidate.key)}
-                onCheckedChange={(checked) =>
-                  setSelected((current) => {
-                    const next = new Set(current);
-                    if (checked) next.add(candidate.key);
-                    else next.delete(candidate.key);
-                    return next;
-                  })
-                }
-              />
-              <span>{candidate.label}</span>
-            </label>
-          ))
-        ) : goal.workbench.workingSet.length ? (
-          <div className="flex flex-wrap gap-2">
-            {goal.workbench.workingSet.map((item) => (
-              <span
-                key={item.id}
-                className="inline-flex items-center gap-2 rounded-full border bg-card px-3 py-1.5"
-              >
-                <span className="text-xs text-muted-foreground">
-                  {item.subjectType.replaceAll("_", " ")}
-                </span>
-                <span className="text-sm font-medium">{item.label}</span>
-              </span>
-            ))}
-          </div>
-        ) : (
-          <div className="rounded-lg border border-dashed px-4 py-5">
-            <p className="text-sm leading-6 text-muted-foreground">
-              {copy.noWorkingSet}
-            </p>
-          </div>
-        )}
-        {editing ? (
-          <div className="flex justify-end gap-2 pt-2">
-            <Button variant="outline" onClick={() => setEditing(false)}>
-              {copy.cancel}
-            </Button>
-            <Button disabled={saving} onClick={() => void save()}>
-              {saving ? copy.saving : copy.saveWorkingSet}
-            </Button>
-          </div>
-        ) : null}
-      </div>
-    </section>
-  );
-}
 
 function FocusQueue({ goal, copy }: { goal: GoalData; copy: GoalCopy }) {
   const groups = [
@@ -1006,7 +874,7 @@ function CriteriaCard({ goal, copy }: { goal: GoalData; copy: GoalCopy }) {
                     variant="outline"
                     className="border-warning/30 bg-warning/[0.08] text-warning"
                   >
-                    AI proposed
+                    {copy.suggestedCriterion}
                   </Badge>
                 ) : null}
                 {criterion.proposalStatus === "proposed" ? (
@@ -1264,14 +1132,6 @@ function CreateTaskDialog({
   const navigate = useNavigate();
   const locale = useLocale();
   const [expectedOutcome, setExpectedOutcome] = useState("");
-  const [selectedContext, setSelectedContext] = useState(
-    () =>
-      new Set(
-        goal.workbench.workingSet.map(
-          (item) => `${item.subjectType}:${item.subjectId}`,
-        ),
-      ),
-  );
   const [title, setTitle] = useState(
     kind === "review" ? copy.reviewTaskTitle : "",
   );
@@ -1292,14 +1152,6 @@ function CreateTaskDialog({
         description: description.trim() || null,
         priority: "High",
         expectedOutcome: expectedOutcome.trim() || undefined,
-        contextSelections: goal.workbench.workingSet
-          .filter((item) =>
-            selectedContext.has(`${item.subjectType}:${item.subjectId}`),
-          )
-          .map((item) => ({
-            subjectType: item.subjectType,
-            subjectId: item.subjectId,
-          })),
         autoPlanGeneration: false,
       });
       await revalidator.revalidate();
@@ -1365,35 +1217,6 @@ function CreateTaskDialog({
               placeholder={copy.expectedOutcomePlaceholder}
             />
           </Field>
-          {goal.workbench.workingSet.length ? (
-            <Field>
-              <FieldLabel>{copy.selectedContext}</FieldLabel>
-              <div className="space-y-2">
-                {goal.workbench.workingSet.map((item) => {
-                  const key = `${item.subjectType}:${item.subjectId}`;
-                  return (
-                    <label
-                      key={item.id}
-                      className="flex items-start gap-3 rounded-xl border p-3 text-sm"
-                    >
-                      <Checkbox
-                        checked={selectedContext.has(key)}
-                        onCheckedChange={(checked) =>
-                          setSelectedContext((current) => {
-                            const next = new Set(current);
-                            if (checked) next.add(key);
-                            else next.delete(key);
-                            return next;
-                          })
-                        }
-                      />
-                      <span>{item.label}</span>
-                    </label>
-                  );
-                })}
-              </div>
-            </Field>
-          ) : null}
           <div className="rounded-xl border bg-muted/20 p-4">
             <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
               {copy.actionPreview}
@@ -1515,42 +1338,69 @@ function ReviewApplyDialog({
   onOpenChange: (open: boolean) => void;
 }) {
   const revalidator = useRevalidator();
-  const [summary, setSummary] = useState("");
-  const [focus, setFocus] = useState(goal.workbench.brief?.currentFocus ?? "");
-  const [taskTitle, setTaskTitle] = useState("");
-  const [expectedOutcome, setExpectedOutcome] = useState("");
+  const proposal = goal.reviewProposals.find((candidate) =>
+    candidate.status === "Generating" || candidate.status === "Ready" || candidate.status === "PartiallyApplied"
+  ) ?? goal.reviewProposals[0] ?? null;
+  const [selected, setSelected] = useState<Record<string, boolean>>({});
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  async function submit() {
-    if (!summary.trim() || pending) return;
+  useEffect(() => {
+    if (!proposal || proposal.status !== "Ready") return;
+    setSelected(Object.fromEntries(proposal.items.filter((item) => item.decision === "Pending").map((item) => [item.itemId, true])));
+  }, [proposal?.id, proposal?.status]);
+
+  useEffect(() => {
+    if (!open || proposal?.status !== "Generating") return;
+    const timer = window.setInterval(() => void revalidator.revalidate(), 2_000);
+    return () => window.clearInterval(timer);
+  }, [open, proposal?.status, revalidator]);
+
+  async function generate() {
+    if (pending) return;
     setPending(true);
     setError(null);
     try {
-      await applyGoalReview(goal.id, {
-        summary: summary.trim(),
-        brief:
-          goal.workbench.brief && focus.trim()
-            ? { ...goal.workbench.brief, currentFocus: focus.trim() }
-            : undefined,
-        tasks:
-          taskTitle.trim() && expectedOutcome.trim()
-            ? [
-                {
-                  kind: "task",
-                  title: taskTitle.trim(),
-                  description: summary.trim(),
-                  priority: "High",
-                  autoPlanGeneration: false,
-                  expectedOutcome: expectedOutcome.trim(),
-                  contextSelections: goal.workbench.workingSet.map((item) => ({
-                    subjectType: item.subjectType,
-                    subjectId: item.subjectId,
-                  })),
-                },
-              ]
-            : [],
-      });
+      await generateGoalReview(goal.id, { idempotencyKey: crypto.randomUUID() });
+      await revalidator.revalidate();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : copy.actionError);
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function apply() {
+    if (!proposal || pending) return;
+    const decisions = proposal.items
+      .filter((item) => item.decision === "Pending")
+      .map((item) => ({
+        itemId: item.itemId,
+        action: selected[item.itemId]
+          ? item.kind === "evidence_gap" ? "convert_to_task" as const : "accept" as const
+          : item.kind === "evidence_gap" ? "ignore" as const : "reject" as const,
+      }));
+    if (decisions.length === 0) return;
+    setPending(true);
+    setError(null);
+    try {
+      await applyGoalReviewProposal(goal.id, proposal.id, { idempotencyKey: crypto.randomUUID(), decisions });
+      await revalidator.revalidate();
+      onOpenChange(false);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : copy.actionError);
+      await revalidator.revalidate();
+    } finally {
+      setPending(false);
+    }
+  }
+
+  async function reject() {
+    if (!proposal || pending) return;
+    setPending(true);
+    setError(null);
+    try {
+      await rejectGoalReviewProposal(goal.id, proposal.id, { idempotencyKey: crypto.randomUUID() });
       await revalidator.revalidate();
       onOpenChange(false);
     } catch (cause) {
@@ -1560,95 +1410,97 @@ function ReviewApplyDialog({
     }
   }
 
+  const itemLabel = (item: NonNullable<typeof proposal>["items"][number]) => {
+    const payload = item.payload && typeof item.payload === "object" && !Array.isArray(item.payload)
+      ? item.payload as Record<string, unknown>
+      : {};
+    if (item.kind === "brief_field") return `${copy.operationalBrief}: ${String(payload.field ?? "")}`;
+    if (item.kind === "next_review_at") return copy.nextReview;
+    if (item.kind === "task_candidate") return String(payload.title ?? copy.reviewTaskSuggestion);
+    return String(payload.title ?? copy.successCriteria);
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-2xl">
+      <DialogContent className="flex max-h-[88dvh] flex-col sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle>{copy.applyReview}</DialogTitle>
           <DialogDescription>{copy.applyReviewDescription}</DialogDescription>
         </DialogHeader>
-        <div className="grid gap-4">
+        <div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1">
           <div className="grid gap-2 rounded-xl border bg-muted/20 p-4 text-sm sm:grid-cols-3">
-            <span>
-              {
-                goal.outcome.criteria.filter((criterion) => criterion.satisfied)
-                  .length
-              }
-              /{goal.outcome.criteria.length} {copy.successCriteria}
-            </span>
-            <span>
-              {goal.workbench.focus.newResults.length} {copy.newResults}
-            </span>
-            <span>
-              {goal.assets.length} {copy.assets}
-            </span>
+            <span>{goal.outcome.criteria.filter((criterion) => criterion.satisfied).length}/{goal.outcome.criteria.length} {copy.successCriteria}</span>
+            <span>{goal.workbench.focus.newResults.length} {copy.newResults}</span>
+            <span>{goal.acceptedResults.length} {copy.acceptedResults}</span>
           </div>
-          <Field>
-            <FieldLabel htmlFor="review-summary">
-              {copy.reviewSummary}
-            </FieldLabel>
-            <Textarea
-              id="review-summary"
-              value={summary}
-              onChange={(event) => setSummary(event.target.value)}
-            />
-          </Field>
-          <Field>
-            <FieldLabel htmlFor="review-focus">{copy.currentFocus}</FieldLabel>
-            <Input
-              id="review-focus"
-              value={focus}
-              onChange={(event) => setFocus(event.target.value)}
-            />
-          </Field>
-          <div className="space-y-3 rounded-xl border p-4">
-            <p className="font-medium">{copy.reviewTaskSuggestion}</p>
-            <Field>
-              <FieldLabel htmlFor="review-task-title">
-                {copy.addTaskTitle}
-              </FieldLabel>
-              <Input
-                id="review-task-title"
-                value={taskTitle}
-                onChange={(event) => setTaskTitle(event.target.value)}
-              />
-            </Field>
-            <Field>
-              <FieldLabel htmlFor="review-task-outcome">
-                {copy.expectedOutcome}
-              </FieldLabel>
-              <Textarea
-                id="review-task-outcome"
-                value={expectedOutcome}
-                onChange={(event) => setExpectedOutcome(event.target.value)}
-              />
-            </Field>
-          </div>
-          <div className="rounded-xl border border-primary/20 bg-primary/[0.04] p-4 text-sm">
-            <p className="font-medium">{copy.actionPreview}</p>
-            <p className="mt-1 text-muted-foreground">
-              {focus !== goal.workbench.brief?.currentFocus
-                ? copy.operationalBrief
-                : copy.currentFocus}{" "}
-              · {taskTitle.trim() ? copy.reviewTaskSuggestion : copy.noTasks}
-            </p>
-          </div>
-          {error ? (
-            <p role="alert" className="text-sm text-destructive">
-              {error}
-            </p>
-          ) : null}
+          {!proposal ? (
+            <Card>
+              <CardContent className="space-y-3 p-5">
+                <p className="font-medium">{copy.reviewSummary}</p>
+                <p className="text-sm text-muted-foreground">{copy.applyReviewDescription}</p>
+                <Button disabled={pending} onClick={() => void generate()}>
+                  <RefreshCw className={pending ? "size-4 animate-spin" : "size-4"} />
+                  {pending ? copy.generatingReview : copy.generateReview}
+                </Button>
+              </CardContent>
+            </Card>
+          ) : proposal.status === "Generating" ? (
+            <Card>
+              <CardContent className="flex items-center gap-3 p-5 text-sm">
+                <RefreshCw className="size-4 animate-spin" />
+                <div>
+                  <p className="font-medium">{copy.generatingReview}</p>
+                  <p className="text-muted-foreground">{copy.proposalSource} · {proposal.sourceTask.title}</p>
+                </div>
+              </CardContent>
+            </Card>
+          ) : proposal.status === "Failed" ? (
+            <div role="alert" className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm">
+              <p className="font-medium text-destructive">{copy.proposalFailed}</p>
+              <p className="mt-1 text-muted-foreground">{proposal.generationError}</p>
+              <Button className="mt-3" variant="outline" disabled={pending} onClick={() => void generate()}>
+                {copy.generateReview}
+              </Button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              {proposal.summary ? <p className="text-sm text-muted-foreground">{proposal.summary}</p> : null}
+              {proposal.items.map((item) => {
+                const pendingItem = item.decision === "Pending";
+                const checked = Boolean(selected[item.itemId]);
+                return (
+                  <label key={item.id} className="flex gap-3 rounded-xl border p-4">
+                    <Checkbox
+                      checked={checked}
+                      disabled={!pendingItem}
+                      onCheckedChange={(value) => setSelected((current) => ({ ...current, [item.itemId]: value === true }))}
+                      aria-label={itemLabel(item)}
+                    />
+                    <span className="min-w-0 space-y-1">
+                      <span className="flex flex-wrap items-center gap-2 font-medium">
+                        {itemLabel(item)}
+                        <Badge variant="outline">{item.decision}</Badge>
+                      </span>
+                      <span className="block text-sm text-muted-foreground">{item.rationale}</span>
+                      {item.decisionReason ? <span className="block text-sm text-destructive">{item.decisionReason}</span> : null}
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          )}
+          {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
         </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            {copy.cancel}
-          </Button>
-          <Button
-            disabled={!summary.trim() || pending}
-            onClick={() => void submit()}
-          >
-            {pending ? copy.saving : copy.applyReview}
-          </Button>
+        <DialogFooter className="border-t pt-4">
+          <Button variant="outline" onClick={() => onOpenChange(false)}>{copy.cancel}</Button>
+          {proposal?.status === "Ready" || proposal?.status === "PartiallyApplied" ? (
+            <>
+              <Button variant="outline" disabled={pending} onClick={() => void reject()}>{copy.rejectProposal}</Button>
+              <Button disabled={pending || proposal.items.every((item) => item.decision !== "Pending")} onClick={() => void apply()}>
+                {pending ? copy.saving : copy.applyReview}
+              </Button>
+            </>
+          ) : null}
         </DialogFooter>
       </DialogContent>
     </Dialog>
@@ -2157,18 +2009,18 @@ export function GoalWorkspacePage({
             />
           </div>
         </header>
-        {goal.titleSource === "ai" && !goal.titleRenameNoticeSeenAt ? (
+        {(goal.titleSource === "system" || goal.titleSource === "ai") &&
+        !goal.titleRenameNoticeSeenAt ? (
           <Card className="border-primary/30 bg-primary/5">
             <CardContent className="flex flex-col gap-3 pt-6 sm:flex-row sm:items-center">
               <div className="min-w-0 flex-1">
-                <p className="font-medium">AI-generated Goal name</p>
+                <p className="font-medium">{copy.suggestedGoalName}</p>
                 <p className="text-sm text-muted-foreground">
-                  Review the suggested name. Renaming removes this attribution
-                  notice.
+                  {copy.suggestedGoalNameDescription}
                 </p>
               </div>
               <Input
-                aria-label="Rename AI-generated Goal"
+                aria-label={copy.renameSuggestedGoal}
                 value={renameTitle}
                 onChange={(event) => setRenameTitle(event.target.value)}
                 className="sm:max-w-sm"
@@ -2177,7 +2029,7 @@ export function GoalWorkspacePage({
                 disabled={!renameTitle.trim() || renamePending}
                 onClick={() => void renameGoal()}
               >
-                Rename
+                {copy.renameGoal}
               </Button>
             </CardContent>
           </Card>
@@ -2231,7 +2083,6 @@ export function GoalWorkspacePage({
                     </div>
                   </section>
                   <ActiveSummary goal={goal} copy={copy} />
-                  <WorkingSetCard goal={goal} copy={copy} />
                 </div>
               )}
             </TabsContent>

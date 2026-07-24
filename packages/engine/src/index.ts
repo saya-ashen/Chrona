@@ -65,6 +65,8 @@ export {
   buildProviderFeatureRequest,
   getProviderBaseUrl,
   testAiClientAvailability,
+  getAiClientForFeature,
+  suggestStream,
 } from "./modules/ai";
 export type {
   DebugProfiledProviderClient,
@@ -77,3 +79,5 @@ export type {
   EngineOmpClient,
   EngineProviderClient,
 } from "./modules/ai";
+export { waitForGoalReviewGeneration } from "./modules/goals/goals";
+export { waitForGoalAssetOwnershipGeneration } from "./modules/goals/goal-asset-ownership";

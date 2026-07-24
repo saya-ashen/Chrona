@@ -28,18 +28,6 @@ export const goalOperationalBriefSchema = z.object({
   constraints: z.array(z.string().trim().min(1)),
 });
 
-export const goalWorkingSetSubjectTypeSchema = z.enum([
-  "goal_asset",
-  "accepted_result",
-  "artifact",
-  "criterion",
-  "task",
-]);
-
-export const goalWorkingSetSelectionSchema = z.object({
-  subjectType: goalWorkingSetSubjectTypeSchema,
-  subjectId: z.string().min(1),
-});
 
 export const goalCriterionEvidenceSchema = z.object({
   criterionId: z.string().trim().min(1),
@@ -65,11 +53,12 @@ export const updateGoalBriefBodySchema = z.object({
   brief: goalOperationalBriefSchema,
 });
 
-export const updateGoalWorkingSetBodySchema = z.object({
-  selections: z.array(goalWorkingSetSelectionSchema).max(24),
-});
 export const goalIdParamSchema = z.object({
   goalId: z.string().trim().min(1),
+});
+export const goalReviewProposalParamSchema = z.object({
+  goalId: z.string().trim().min(1),
+  proposalId: z.string().trim().min(1),
 });
 export const createGoalTaskBodySchema = z.object({
   kind: z.enum(["task", "review"]),
@@ -78,7 +67,6 @@ export const createGoalTaskBodySchema = z.object({
   priority: z.enum(["Low", "Medium", "High", "Urgent"]).default("High"),
   autoPlanGeneration: z.boolean().default(false),
   expectedOutcome: z.string().trim().min(1).optional(),
-  contextSelections: z.array(goalWorkingSetSelectionSchema).max(24).optional(),
 });
 
 export const applyGoalReviewBodySchema = z.object({
@@ -139,6 +127,111 @@ export const goalActionBodySchema = z.discriminatedUnion("action", [
   }),
 ]);
 
+export const goalReviewProposalStatusSchema = z.enum([
+  "Generating",
+  "Ready",
+  "PartiallyApplied",
+  "Applied",
+  "Rejected",
+  "Superseded",
+  "Failed",
+]);
+
+export const goalReviewProposalItemKindSchema = z.enum([
+  "brief_field",
+  "next_review_at",
+  "task_candidate",
+  "evidence_gap",
+]);
+
+export const goalReviewProposalItemDecisionSchema = z.enum([
+  "Pending",
+  "Accepted",
+  "Rejected",
+  "Converted",
+  "Ignored",
+  "Stale",
+]);
+
+export const goalReviewEvidenceRefSchema = z.object({
+  type: z.enum(["goal", "criterion", "task", "result", "artifact", "asset", "working_set"]),
+  id: z.string().trim().min(1),
+  version: z.string().trim().min(1).optional(),
+  hash: z.string().trim().min(1).optional(),
+  label: z.string().trim().min(1).optional(),
+});
+
+const goalReviewCommonResultItemSchema = z.object({
+  itemId: z.string().trim().min(1),
+  rationale: z.string().trim().min(1),
+  evidenceRefs: z.array(goalReviewEvidenceRefSchema).default([]),
+  warnings: z.array(z.string().trim().min(1)).default([]),
+});
+
+export const goalReviewBriefFieldResultItemSchema = goalReviewCommonResultItemSchema.extend({
+  kind: z.literal("brief_field"),
+  field: z.enum(["outcome", "currentFocus", "strategy", "constraints"]),
+  value: z.union([z.string().trim().min(1), z.array(z.string().trim().min(1))]),
+}).superRefine((item, ctx) => {
+  if (item.field === "constraints" && !Array.isArray(item.value)) {
+    ctx.addIssue({ code: "custom", path: ["value"], message: "constraints must be an array" });
+  }
+  if (item.field !== "constraints" && typeof item.value !== "string") {
+    ctx.addIssue({ code: "custom", path: ["value"], message: `${item.field} must be a string` });
+  }
+});
+
+export const goalReviewNextReviewResultItemSchema = goalReviewCommonResultItemSchema.extend({
+  kind: z.literal("next_review_at"),
+  value: z.string().datetime(),
+});
+
+export const goalReviewTaskCandidateResultItemSchema = goalReviewCommonResultItemSchema.extend({
+  kind: z.literal("task_candidate"),
+  title: z.string().trim().min(1),
+  description: z.string().trim().min(1),
+  expectedOutcome: z.string().trim().min(1),
+});
+
+export const goalReviewEvidenceGapResultItemSchema = goalReviewCommonResultItemSchema.extend({
+  kind: z.literal("evidence_gap"),
+  criterionId: z.string().trim().min(1),
+  title: z.string().trim().min(1),
+  description: z.string().trim().min(1),
+  suggestedTask: z.object({
+    title: z.string().trim().min(1),
+    description: z.string().trim().min(1),
+    expectedOutcome: z.string().trim().min(1),
+  }).optional(),
+});
+
+export const goalReviewResultSchema = z.object({
+  schemaVersion: z.literal(1),
+  summary: z.string().trim().min(1),
+  items: z.array(z.discriminatedUnion("kind", [
+    goalReviewBriefFieldResultItemSchema,
+    goalReviewNextReviewResultItemSchema,
+    goalReviewTaskCandidateResultItemSchema,
+    goalReviewEvidenceGapResultItemSchema,
+  ])).min(1).max(50),
+});
+
+export const generateGoalReviewBodySchema = z.object({
+  idempotencyKey: z.string().trim().min(1).max(128),
+});
+
+export const applyGoalReviewProposalBodySchema = z.object({
+  idempotencyKey: z.string().trim().min(1).max(128),
+  decisions: z.array(z.object({
+    itemId: z.string().trim().min(1),
+    action: z.enum(["accept", "reject", "convert_to_task", "ignore"]),
+  })).min(1).max(50),
+});
+
+export const rejectGoalReviewProposalBodySchema = z.object({
+  idempotencyKey: z.string().trim().min(1).max(128),
+});
+
 export const promoteTaskToGoalParamSchema = z.object({
   taskId: z.string().trim().min(1),
 });
@@ -165,8 +258,13 @@ export type ProcessGoalResultRequest = z.infer<typeof processGoalResultBodySchem
 export type ConfirmGoalCriterionRequest = z.infer<typeof confirmGoalCriterionBodySchema>;
 export type ReviewGoalCriterionRequest = z.infer<typeof reviewGoalCriterionBodySchema>;
 export type ApplyGoalReviewRequest = z.infer<typeof applyGoalReviewBodySchema>;
+export type GoalReviewProposalStatus = z.infer<typeof goalReviewProposalStatusSchema>;
+export type GoalReviewProposalItemKind = z.infer<typeof goalReviewProposalItemKindSchema>;
+export type GoalReviewProposalItemDecision = z.infer<typeof goalReviewProposalItemDecisionSchema>;
+export type GoalReviewEvidenceRef = z.infer<typeof goalReviewEvidenceRefSchema>;
+export type GoalReviewResult = z.infer<typeof goalReviewResultSchema>;
+export type GenerateGoalReviewRequest = z.infer<typeof generateGoalReviewBodySchema>;
+export type ApplyGoalReviewProposalRequest = z.infer<typeof applyGoalReviewProposalBodySchema>;
+export type RejectGoalReviewProposalRequest = z.infer<typeof rejectGoalReviewProposalBodySchema>;
 export type GoalOperationalBrief = z.infer<typeof goalOperationalBriefSchema>;
-export type GoalWorkingSetSubjectType = z.infer<typeof goalWorkingSetSubjectTypeSchema>;
-export type GoalWorkingSetSelection = z.infer<typeof goalWorkingSetSelectionSchema>;
 export type UpdateGoalBriefRequest = z.infer<typeof updateGoalBriefBodySchema>;
-export type UpdateGoalWorkingSetRequest = z.infer<typeof updateGoalWorkingSetBodySchema>;

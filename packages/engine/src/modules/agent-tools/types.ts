@@ -3,12 +3,14 @@ import type { createTaskExecutionService } from "../../services/task-execution.s
 import type { createTaskPlanService } from "../../services/task-plan.service";
 import type { createTaskScheduleService } from "../../services/task-schedule.service";
 import type { createTasksService } from "../../services/tasks.service";
+import type { GoalAcceptedResultsReader } from "../../services/goals.service";
 
 export type AgentToolOperationsDeps = {
   tasks: ReturnType<typeof createTasksService>;
   plan: ReturnType<typeof createTaskPlanService>;
   schedule: ReturnType<typeof createTaskScheduleService>;
   execution: ReturnType<typeof createTaskExecutionService>;
+  goals: GoalAcceptedResultsReader;
 };
 
 export type ToolAuditContext = {

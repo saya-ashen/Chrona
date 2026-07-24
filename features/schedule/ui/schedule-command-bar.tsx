@@ -7,7 +7,10 @@ import { DEFAULT_SCHEDULE_PAGE_COPY, getSchedulePageCopy } from "./schedule-page
 import type { QuickCreateDraft } from "./schedule-page-types";
 import { buildQuickCreateDraft, toDateForDay } from "./schedule-page-utils";
 import { Button, cn } from "@shared/ui";
-import { useScheduleAiPreferences } from "./schedule-ai-preferences";
+import {
+  SCHEDULE_AUTO_SUGGESTIONS_AVAILABLE,
+  useScheduleAiPreferences,
+} from "./schedule-ai-preferences";
 import { useAutoComplete, type StructuredSuggestion } from "./use-auto-complete";
 import { useI18n } from "@chrona/i18n"
 import { createLogger, summarizeText } from "@shared/http";
@@ -129,7 +132,9 @@ export function ScheduleCommandBar({
 }) {
   const { messages } = useI18n();
   const aiPreferences = useScheduleAiPreferences();
-  const resolvedAutoSuggestionsEnabled = autoSuggestionsEnabled ?? aiPreferences.autoSuggestionsEnabled;
+  const resolvedAutoSuggestionsEnabled =
+    SCHEDULE_AUTO_SUGGESTIONS_AVAILABLE &&
+    (autoSuggestionsEnabled ?? aiPreferences.autoSuggestionsEnabled);
   const copy = useMemo(() => getSchedulePageCopy(messages.components.schedulePage), [messages.components.schedulePage]);
   const cmdBarCopy = {
     generatingSuggestions: "Generating suggestions...",

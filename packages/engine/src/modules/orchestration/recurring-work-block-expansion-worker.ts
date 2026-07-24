@@ -53,11 +53,12 @@ async function expandTaskSchedule(task: RecurringTask, now: Date, lookaheadDate:
     const definition = taskTriggerDefinitionSchema.parse({ kind: trigger.kind, config: trigger.config });
     if (definition.kind !== "schedule" || definition.config.mode !== "recurring") continue;
     const latestBlock = task.workBlocks[0];
-    if (latestBlock.scheduledEndAt.getTime() >= lookaheadDate.getTime()) continue;
-    const expansionFrom = new Date(Math.max(latestBlock.scheduledEndAt.getTime(), now.getTime()));
+    if (latestBlock?.scheduledEndAt.getTime() >= lookaheadDate.getTime()) continue;
+    const anchorStartAt = new Date(definition.config.anchorStartAt);
+    const expansionFrom = new Date(Math.max(latestBlock?.scheduledEndAt.getTime() ?? anchorStartAt.getTime(), now.getTime()));
     const expansionTo = definition.config.windowUntil ? new Date(Math.min(lookaheadDate.getTime(), new Date(definition.config.windowUntil).getTime())) : lookaheadDate;
     if (expansionTo <= expansionFrom) continue;
-    const occurrences = expandRecurrenceRule(definition.config.rrule, new Date(definition.config.anchorStartAt), definition.config.durationMs ?? 3_600_000, { from: expansionFrom, to: expansionTo, maxOccurrences: EXPANSION_MAX_OCCURRENCES });
+    const occurrences = expandRecurrenceRule(definition.config.rrule, anchorStartAt, definition.config.durationMs ?? 3_600_000, { from: expansionFrom, to: expansionTo, maxOccurrences: EXPANSION_MAX_OCCURRENCES });
     const existingKeys = new Set((await db.workBlock.findMany({ where: { taskId: task.id, recurrenceKey: { not: null } }, select: { recurrenceKey: true } })).map((block) => block.recurrenceKey));
     for (const occurrence of occurrences) created += Number(await materializeOccurrence(task, trigger, occurrence, now, existingKeys));
   }

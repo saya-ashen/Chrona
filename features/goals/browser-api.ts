@@ -1,16 +1,18 @@
 import { apiJson } from "@shared/http";
 import type {
   ApplyGoalReviewRequest,
+  ApplyGoalReviewProposalRequest,
   ConfirmGoalCriterionRequest,
   CreateGoalRequest,
   CreateGoalWithFirstTaskRequest,
   CreateGoalTaskRequest,
+  GenerateGoalReviewRequest,
   GoalActionRequest,
   GoalOperationalBrief,
-  GoalWorkingSetSelection,
   ProcessGoalResultRequest,
   PromoteTaskToGoalRequest,
   ReviewGoalCriterionRequest,
+  RejectGoalReviewProposalRequest,
 } from "@chrona/contracts";
 import type { GoalArtifactData, GoalData } from "./model/goal-types";
 
@@ -58,12 +60,6 @@ export async function updateGoalBrief(goalId: string, brief: GoalOperationalBrie
   });
 }
 
-export async function updateGoalWorkingSet(goalId: string, selections: GoalWorkingSetSelection[]) {
-  return apiJson<GoalData>(`/api/goals/${encodeURIComponent(goalId)}/working-set`, {
-    method: "PUT",
-    body: JSON.stringify({ selections }),
-  });
-}
 
 export async function processGoalResult(
   goalId: string,
@@ -103,6 +99,35 @@ export async function applyGoalReview(goalId: string, command: ApplyGoalReviewRe
     method: "POST",
     body: JSON.stringify(command),
   });
+}
+
+export async function generateGoalReview(goalId: string, command: GenerateGoalReviewRequest) {
+  return apiJson<{ proposalId: string; sourceTaskId: string; status: string }>(
+    `/api/goals/${encodeURIComponent(goalId)}/reviews/generate`,
+    { method: "POST", body: JSON.stringify(command) },
+  );
+}
+
+export async function applyGoalReviewProposal(
+  goalId: string,
+  proposalId: string,
+  command: ApplyGoalReviewProposalRequest,
+) {
+  return apiJson(
+    `/api/goals/${encodeURIComponent(goalId)}/reviews/${encodeURIComponent(proposalId)}/apply`,
+    { method: "POST", body: JSON.stringify(command) },
+  );
+}
+
+export async function rejectGoalReviewProposal(
+  goalId: string,
+  proposalId: string,
+  command: RejectGoalReviewProposalRequest,
+) {
+  return apiJson(
+    `/api/goals/${encodeURIComponent(goalId)}/reviews/${encodeURIComponent(proposalId)}/reject`,
+    { method: "POST", body: JSON.stringify(command) },
+  );
 }
 
 export async function getGoalArtifact(goalId: string, artifactId: string) {

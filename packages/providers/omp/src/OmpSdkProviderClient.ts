@@ -522,9 +522,16 @@ function terminalNodeToolFromSnapshot(input: { raw?: unknown }) {
 }
 
 
+function sdkReadOnlyToolOptions(toolPolicy: StartRunInput["toolPolicy"]) {
+  return toolPolicy === "read_only"
+    ? { toolNames: [] as string[], enableMCP: false, enableLsp: false }
+    : {};
+}
+
 export const __ompSdkProviderTestHooks = {
   sdkToolNamesForTerminal,
   sdkToolOptionsForTerminal,
+  sdkReadOnlyToolOptions,
   sdkToolErrorMessage,
   isTerminalRuntimeTool,
   agentEndFailure,
@@ -936,6 +943,7 @@ export class OmpSdkProviderClient implements AgentProviderClient {
           suppressBreadcrumb: true,
         })
       : SessionManager.create(cwd);
+    const readOnlyToolOptions = sdkReadOnlyToolOptions(handle.input.toolPolicy);
     const { session } = await createAgentSession({
       cwd,
       agentDir,
@@ -943,6 +951,7 @@ export class OmpSdkProviderClient implements AgentProviderClient {
       ...(setup.authStorage ? { authStorage: setup.authStorage } : {}),
       ...(setup.modelRegistry ? { modelRegistry: setup.modelRegistry } : {}),
       ...sdkToolOptionsForTerminal(terminalToolName, handle.input.control, () => { handle.terminalActionAccepted = true; }),
+      ...readOnlyToolOptions,
       sessionManager,
       skipPythonPreflight: true,
       hasUI: false,

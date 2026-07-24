@@ -28,7 +28,10 @@ import {
 } from "@shared/ui";
 import { useAutoComplete } from "../use-auto-complete";
 import { useI18n, useLocale } from "@chrona/i18n"
-import { useScheduleAiPreferences } from "../schedule-ai-preferences";
+import {
+  SCHEDULE_AUTO_SUGGESTIONS_AVAILABLE,
+  useScheduleAiPreferences,
+} from "../schedule-ai-preferences";
 import { AUTOMATION_TIMING_PRESETS, normalizeAutomationTiming } from "@chrona/contracts";
 import type { AutomationTimingPreset } from "@chrona/contracts";
 import { deriveAutomationPolicyPreview } from "@chrona/domain";
@@ -181,7 +184,9 @@ export function TaskCreateDialog({
   availableAiClients = [],
 }: TaskCreateDialogProps) {
   const aiPreferences = useScheduleAiPreferences();
-  const resolvedAutoSuggestionsEnabled = autoSuggestionsEnabled ?? aiPreferences.autoSuggestionsEnabled;
+  const resolvedAutoSuggestionsEnabled =
+    SCHEDULE_AUTO_SUGGESTIONS_AVAILABLE &&
+    (autoSuggestionsEnabled ?? aiPreferences.autoSuggestionsEnabled);
   const defaultAutoExecuteEnabled = aiPreferences.defaultAutoExecuteEnabled;
   const defaultAutoPlanGenerationEnabled = aiPreferences.autoPlanGenerationEnabled;
   const [title, setTitle] = useState(initialTitle);

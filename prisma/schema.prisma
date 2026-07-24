@@ -38,12 +38,20 @@ enum GoalAssetStatus {
   Archived
 }
 
-enum GoalWorkingSetSubjectType {
-  goal_asset
-  accepted_result
-  artifact
-  criterion
-  task
+
+enum GoalAssetOwnershipProposalStatus {
+  Generating
+  Ready
+  Applied
+  Rejected
+  Stale
+  Failed
+}
+
+enum GoalAssetOwnershipDecision {
+  create_asset
+  append_version
+  separate_asset
 }
 
 enum GoalAssetKind {
@@ -84,6 +92,32 @@ enum GoalAssetJobStatus {
   Processing
   Completed
   Failed
+}
+
+enum GoalReviewProposalStatus {
+  Generating
+  Ready
+  PartiallyApplied
+  Applied
+  Rejected
+  Superseded
+  Failed
+}
+
+enum GoalReviewItemKind {
+  brief_field
+  next_review_at
+  task_candidate
+  evidence_gap
+}
+
+enum GoalReviewItemDecision {
+  Pending
+  Accepted
+  Rejected
+  Converted
+  Ignored
+  Stale
 }
 
 enum TaskDefinitionStatus {
@@ -280,6 +314,8 @@ model Workspace {
   memories                  Memory[]
   events                    Event[]
   rawEventLogs              RawEventLog[]
+  goalReviewProposals       GoalReviewProposal[]
+  goalReviewItems           GoalReviewProposalItem[]
   toolInvocations           ToolInvocation[]
   taskTimelineItems         TaskTimelineItem[]
   taskDependencies          TaskDependency[]
@@ -303,13 +339,13 @@ model Workspace {
   taskPlanTerminalActions   TaskPlanTerminalAction[]
   aiSurfaces                WorkspaceAiSurface[]
   userPreferences           WorkspaceUserPreference[]
-  goalWorkingSetItems       GoalWorkingSetItem[]
   goalBriefRevisions        GoalBriefRevision[]
   goalAssetVersions         GoalAssetVersion[]
   goalAssetDrafts           GoalAssetDraft[]
   goalInboxCandidates       GoalInboxCandidate[]
   goalFormSubmissions       GoalFormSubmission[]
   goalAssetJobs             GoalAssetJob[]
+  assetOwnershipProposals    GoalAssetOwnershipProposal[]
   taskOccurrences           TaskOccurrence[]
   taskTriggers              TaskTrigger[]
   triggerDeliveries         TriggerDelivery[]
@@ -391,13 +427,15 @@ model Goal {
   workspace               Workspace            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   tasks                   Task[]
   assets                  GoalAsset[]
-  workingSetItems         GoalWorkingSetItem[]
   inboxCandidates         GoalInboxCandidate[]
   formSubmissions         GoalFormSubmission[]
   assetJobs               GoalAssetJob[]
+  assetOwnershipProposals GoalAssetOwnershipProposal[]
   briefRevisions          GoalBriefRevision[]
   goalAssetVersions       GoalAssetVersion[]
   goalAssetDrafts         GoalAssetDraft[]
+  reviewProposals         GoalReviewProposal[]
+  reviewProposalItems     GoalReviewProposalItem[]
 
   @@index([workspaceId, status])
   @@index([workspaceId, updatedAt])
@@ -426,6 +464,8 @@ model GoalAsset {
   inboxTargets      GoalInboxCandidate[] @relation("GoalInboxTargetAsset")
   submissions       GoalFormSubmission[]
   jobs              GoalAssetJob[]
+  ownershipProposalTargets GoalAssetOwnershipProposal[]
+  ownershipProposalFinalAssets GoalAssetOwnershipProposal[] @relation("GoalAssetOwnershipFinalAsset")
 
   @@unique([goalId, sourceArtifactId])
   @@index([workspaceId, goalId])
@@ -434,23 +474,6 @@ model GoalAsset {
   @@index([goalId, archivedAt, updatedAt])
 }
 
-model GoalWorkingSetItem {
-  id          String                    @id @default(cuid())
-  workspaceId String
-  goalId      String
-  subjectType GoalWorkingSetSubjectType
-  subjectId   String
-  label       String
-  snapshot    Json
-  rank        Int                       @default(0)
-  createdAt   DateTime                  @default(now())
-  updatedAt   DateTime                  @updatedAt
-  workspace   Workspace                 @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  goal        Goal                      @relation(fields: [goalId], references: [id], onDelete: Cascade)
-
-  @@unique([goalId, subjectType, subjectId])
-  @@index([workspaceId, goalId, rank])
-}
 
 model GoalBriefRevision {
   id          String    @id @default(cuid())
@@ -466,6 +489,68 @@ model GoalBriefRevision {
   @@index([goalId, createdAt])
   @@index([workspaceId, goalId])
 }
+
+model GoalReviewProposal {
+  id                  String                   @id @default(cuid())
+  workspaceId         String
+  goalId              String
+  sourceTaskId        String                   @unique
+  sourceRunId         String?                  @unique
+  status              GoalReviewProposalStatus @default(Generating)
+  inputSnapshot       Json
+  inputSnapshotHash   String
+  schemaVersion       Int                      @default(1)
+  providerName        String?
+  modelName           String?
+  summary             String?
+  rawResult           Json?
+  generationError     String?
+  requestIdempotencyKey String
+  applicationIdempotencyKey String?
+  appliedAt           DateTime?
+  rejectedAt          DateTime?
+  createdAt           DateTime                 @default(now())
+  updatedAt           DateTime                 @updatedAt
+  workspace           Workspace                @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  goal                Goal                     @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  sourceTask          Task                     @relation("GoalReviewSourceTask", fields: [sourceTaskId], references: [id], onDelete: Restrict)
+  sourceRun           Run?                     @relation("GoalReviewSourceRun", fields: [sourceRunId], references: [id], onDelete: SetNull)
+  items               GoalReviewProposalItem[]
+
+  @@unique([goalId, requestIdempotencyKey])
+  @@index([workspaceId, goalId, status])
+  @@index([goalId, createdAt])
+}
+
+model GoalReviewProposalItem {
+  id                 String                         @id @default(cuid())
+  workspaceId        String
+  goalId             String
+  proposalId         String
+  itemId             String
+  kind               GoalReviewItemKind
+  payload            Json
+  rationale          String
+  evidenceRefs       Json
+  warnings           Json
+  dependencySnapshot Json
+  dependencyHash     String
+  decision           GoalReviewItemDecision         @default(Pending)
+  decisionReason     String?
+  appliedObjectType  String?
+  appliedObjectId    String?
+  decidedAt          DateTime?
+  createdAt          DateTime                       @default(now())
+  updatedAt          DateTime                       @updatedAt
+  workspace          Workspace                      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  goal               Goal                           @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  proposal           GoalReviewProposal             @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+
+  @@unique([proposalId, itemId])
+  @@index([workspaceId, goalId, decision])
+  @@index([proposalId, kind])
+}
+
 
 model Task {
   id                        String                     @id @default(cuid())
@@ -516,6 +601,7 @@ model Task {
   triggers                  TaskTrigger[]
   triggerDeliveries         TriggerDelivery[]
   assetVersions             GoalAssetVersion[]
+  goalReviewSourceProposal GoalReviewProposal?        @relation("GoalReviewSourceTask")
   inboxCandidates           GoalInboxCandidate[]
   formSubmissions           GoalFormSubmission[]
   assetJobs                 GoalAssetJob[]
@@ -542,6 +628,7 @@ model Task {
   importedCalendarEvents    ImportedCalendarEvent[]
   runTokens                 RunToken[]
   taskPlanTerminalActions   TaskPlanTerminalAction[]
+  assetOwnershipProposals GoalAssetOwnershipProposal[]
 
   @@index([workspaceId, status])
   @@index([workspaceId, priority])
@@ -917,6 +1004,8 @@ model Run {
   runtimeCursor         RuntimeCursor?
   runTokens             RunToken[]
   terminalActions       TaskPlanTerminalAction[]
+  goalReviewSourceProposal GoalReviewProposal? @relation("GoalReviewSourceRun")
+  goalAssetOwnershipSourceProposal GoalAssetOwnershipProposal? @relation("GoalAssetOwnershipSourceRun")
 
   @@index([taskId, status])
   @@index([taskId, workBlockId, status])
@@ -1474,9 +1563,51 @@ model GoalInboxCandidate {
   sourceTask            Task                     @relation(fields: [sourceTaskId], references: [id], onDelete: Cascade)
   sourceArtifact        Artifact?                @relation(fields: [sourceArtifactId], references: [id], onDelete: SetNull)
   proposedTargetAsset   GoalAsset?               @relation("GoalInboxTargetAsset", fields: [proposedTargetAssetId], references: [id], onDelete: SetNull)
+  ownershipProposals     GoalAssetOwnershipProposal[]
 
   @@unique([goalId, sourceRunId, groupKey])
   @@index([goalId, status, createdAt])
+}
+
+model GoalAssetOwnershipProposal {
+  id                    String                            @id @default(cuid())
+  workspaceId           String
+  goalId                String
+  inboxCandidateId      String
+  sourceTaskId          String
+  sourceRunId           String?                           @unique
+  status                GoalAssetOwnershipProposalStatus @default(Generating)
+  schemaVersion         Int                               @default(1)
+  requestIdempotencyKey String
+  applicationKey        String?
+  inputSnapshot         Json
+  inputHash             String
+  result                Json?
+  decision              GoalAssetOwnershipDecision?
+  targetAssetId         String?
+  providerType          String?
+  model                 String?
+  generationError       String?
+  finalAction            String?
+  finalAssetId           String?
+  createdAt             DateTime                          @default(now())
+  updatedAt             DateTime                          @updatedAt
+  readyAt               DateTime?
+  appliedAt             DateTime?
+  rejectedAt            DateTime?
+
+  workspace      Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  goal           Goal               @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  inboxCandidate GoalInboxCandidate @relation(fields: [inboxCandidateId], references: [id], onDelete: Cascade)
+  sourceTask     Task               @relation(fields: [sourceTaskId], references: [id], onDelete: Cascade)
+  sourceRun      Run?               @relation("GoalAssetOwnershipSourceRun", fields: [sourceRunId], references: [id], onDelete: SetNull)
+  targetAsset    GoalAsset?         @relation(fields: [targetAssetId], references: [id], onDelete: SetNull)
+  finalAsset     GoalAsset?         @relation("GoalAssetOwnershipFinalAsset", fields: [finalAssetId], references: [id], onDelete: SetNull)
+
+  @@unique([inboxCandidateId, requestIdempotencyKey])
+  @@index([workspaceId, status, updatedAt])
+  @@index([goalId, updatedAt])
+  @@index([inboxCandidateId, createdAt])
 }
 
 model GoalFormSubmission {

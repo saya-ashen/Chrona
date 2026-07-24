@@ -270,6 +270,7 @@ async function* agentProviderStream(
         instructions: providerInput.instructions,
         input: providerInput.input as ProviderRunInput,
         terminalToolName: providerInput.terminalToolName,
+        structuredOutputSchema: providerInput.structuredOutputSchema,
         timeoutMs: timeout * 1000,
         stream: true,
         signal: input.signal,

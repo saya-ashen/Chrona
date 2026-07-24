@@ -2,6 +2,7 @@ import { describe, expect, it } from "bun:test";
 
 import {
   SUGGEST_TASK_COMPLETIONS_TOOL_NAME,
+  buildGoalAssetOwnershipFeatureSpec,
   buildSuggestFeatureSpec,
   GENERATE_PLAN_BLUEPRINT_TOOL_NAME,
   buildGeneratePlanFeatureSpec,
@@ -141,4 +142,33 @@ describe("structured feature specs", () => {
     ).toMatchObject({ ok: false });
   });
 
+  it("builds and validates the bounded asset ownership contract", () => {
+    const spec = buildGoalAssetOwnershipFeatureSpec();
+    expect(spec).toMatchObject({
+      feature: "goal.asset_ownership",
+      structuredOutputSchema: { name: "goal_asset_ownership_result" },
+    });
+    expect(validatePreparedFeaturePayload(spec, {
+      schemaVersion: 1,
+      decision: "append_version",
+      targetAssetId: "asset-1",
+      proposedLabel: "Launch brief",
+      rationale: "The accepted result updates the same deliverable.",
+      differenceSummary: "Adds final launch details.",
+      certainty: "high",
+      evidence: ["Same deliverable and asset type."],
+      counterEvidence: [],
+    })).toEqual({ ok: true });
+    expect(validatePreparedFeaturePayload(spec, {
+      schemaVersion: 1,
+      decision: "append_version",
+      targetAssetId: null,
+      proposedLabel: "Launch brief",
+      rationale: "Missing target.",
+      differenceSummary: "Missing target.",
+      certainty: "low",
+      evidence: ["Insufficient evidence."],
+      counterEvidence: [],
+    })).toMatchObject({ ok: false });
+  });
 });

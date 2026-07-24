@@ -12,9 +12,14 @@ import userEvent from "@testing-library/user-event";
 import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import en from "@chrona/i18n/messages/en.json";
 import { GoalAssetWorkbench } from "./goal-asset-workbench";
-import type { GoalAssetWorkbenchData } from "../workbench-api";
+import type {
+  GoalAssetWorkbenchData,
+  GoalInboxCandidateData,
+} from "../workbench-api";
 
 const mocks = vi.hoisted(() => ({
+  applyGoalAssetOwnership: vi.fn(async () => ({})),
+  generateGoalAssetOwnership: vi.fn(async () => ({})),
   saveGoalAssetDraft: vi.fn(async () => ({ id: "draft-saved" })),
   submitGoalAssetDraft: vi.fn(async () => ({ id: "version-published" })),
   submitGoalForm: vi.fn(async () => ({ id: "submission-saved" })),
@@ -23,8 +28,10 @@ const mocks = vi.hoisted(() => ({
 vi.mock("../workbench-api", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../workbench-api")>()),
   archiveGoalAsset: vi.fn(async () => ({})),
+  applyGoalAssetOwnership: mocks.applyGoalAssetOwnership,
   createGoalAssetJob: vi.fn(async () => ({})),
   createGoalAssetModificationTask: vi.fn(async () => ({})),
+  generateGoalAssetOwnership: mocks.generateGoalAssetOwnership,
   renameGoalAsset: vi.fn(async () => ({})),
   resolveGoalInboxCandidate: vi.fn(async () => ({})),
   restoreGoalAssetVersion: vi.fn(async () => ({})),
@@ -89,6 +96,7 @@ function asset(
 function renderWorkbench(
   initialAssets: GoalAssetWorkbenchData[],
   initialEntry = "/goals/goal-1?section=workbench",
+  initialCandidates: GoalInboxCandidateData[] = [],
 ) {
   const router = createMemoryRouter(
     [
@@ -101,7 +109,7 @@ function renderWorkbench(
             copy={copy}
             initialAssets={initialAssets}
             initialRecent={[]}
-            initialCandidates={[]}
+            initialCandidates={initialCandidates}
           />
         ),
       },
@@ -229,6 +237,89 @@ describe("GoalAssetWorkbench", () => {
         name: copy.openDetails,
       }),
     ).toBeInTheDocument();
+  });
+
+  it("labels Inbox identity suggestions as rule-based without percentages", async () => {
+    const candidate: GoalInboxCandidateData = {
+      id: "candidate-1",
+      sourceTaskId: "task-1",
+      sourceRunId: "run-1",
+      kind: "document",
+      label: "First document revision",
+      proposedAction: "append_version",
+      proposedTargetAssetId: "first",
+      content: "Revised content",
+      reason: "rule_based_name_match",
+      changeSummary: "Candidate derived from accepted result “Bounded task”",
+      confidence: 1,
+      sourceArtifact: null,
+      sourceTask: { title: "Bounded task" },
+      proposedTargetAsset: { id: "first", label: "First document" },
+    };
+
+    renderWorkbench(
+      [asset("first", "First document", "First content")],
+      "/goals/goal-1?section=workbench&assetView=inbox",
+      [candidate],
+    );
+
+    expect(await screen.findAllByText(copy.ruleBasedMatch)).not.toHaveLength(0);
+    expect(screen.queryByText(/\d+%/)).not.toBeInTheDocument();
+  });
+
+  it("renders persisted AI ownership provenance and applies only on explicit confirmation", async () => {
+    const candidate: GoalInboxCandidateData = {
+      id: "candidate-ai",
+      sourceTaskId: "task-1",
+      sourceRunId: "run-1",
+      kind: "document",
+      label: "Reviewed launch brief",
+      proposedAction: "create_asset",
+      proposedTargetAssetId: null,
+      content: "Accepted result",
+      reason: "no_rule_based_name_match",
+      changeSummary: "Accepted result candidate",
+      confidence: 0,
+      sourceArtifact: null,
+      sourceTask: { title: "Draft launch brief" },
+      proposedTargetAsset: null,
+      ownershipProposals: [{
+        id: "ownership-1",
+        status: "Ready",
+        sourceTaskId: "ownership-task",
+        sourceRunId: "ownership-run",
+        providerType: "debug",
+        model: "provider/default",
+        generationError: null,
+        result: {
+          schemaVersion: 1,
+          decision: "create_asset",
+          targetAssetId: null,
+          proposedLabel: "Reviewed launch brief",
+          rationale: "No safe existing asset matches the accepted result.",
+          differenceSummary: "Create a separate formal asset.",
+          certainty: "medium",
+          evidence: ["Accepted result contains a complete launch brief."],
+          counterEvidence: ["No matching asset was supplied."],
+        },
+        sourceTask: { id: "ownership-task", title: "Review asset ownership" },
+        targetAsset: null,
+      }],
+    };
+    renderWorkbench([], "/goals/goal-1?section=workbench&assetView=inbox", [candidate]);
+
+    expect(await screen.findByText(copy.aiRecommendation)).toBeInTheDocument();
+    expect(screen.getByText(candidate.ownershipProposals![0]!.result!.rationale)).toBeInTheDocument();
+    expect(screen.getByText(/debug/)).toBeInTheDocument();
+    expect(mocks.applyGoalAssetOwnership).not.toHaveBeenCalled();
+
+    await userEvent.click(screen.getByRole("button", { name: copy.applyAiRecommendation }));
+    expect(mocks.applyGoalAssetOwnership).toHaveBeenCalledWith(
+      "goal-1",
+      "candidate-ai",
+      "ownership-1",
+      expect.objectContaining({ action: "apply_suggestion", workspaceId: "workspace-1" }),
+    );
   });
 
   it("switches assets inside the desktop asset navigator", async () => {

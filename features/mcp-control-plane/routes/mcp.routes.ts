@@ -131,6 +131,12 @@ const externalTools = {
     description: "Read execution session state and supported next actions.",
     inputSchema: publicToolSchema(chronaPublicToolPayloadSchemas["chrona.execution.read"]),
   },
+  chrona_goal_results_read: {
+    internalName: "chrona.goal.results.read",
+    title: "Chrona Goal Results Read",
+    description: "Search accepted results from the current Task's Goal. Chrona resolves Goal scope from the session; use returned refs for AI-visible provenance.",
+    inputSchema: publicToolSchema(chronaPublicToolPayloadSchemas["chrona.goal.results.read"]),
+  },
   chrona_plan_read: {
     internalName: "chrona.plan.read",
     title: "Chrona Plan Read",
@@ -277,6 +283,9 @@ function idempotencyKeyFrom(input: Record<string, unknown>, toolName: ChronaTool
 
 function aiVisibleToolResult(toolName: ChronaToolName, result: ChronaToolResult): Record<string, unknown> {
   if (result.status === "accepted") {
+    if (toolName === "chrona.goal.results.read") {
+      return { status: result.status, message: result.message, result: result.state.result };
+    }
     if (toolName.endsWith(".read")) return { status: result.status, message: result.message, state: result.state };
     if (toolName === "chrona.plan.output") return { status: result.status, message: result.message, next: "continue_or_complete" };
     return { status: result.status, message: result.message, next: "stop" };
@@ -326,9 +335,11 @@ function toChronaInput(
   const evidence = meta.evidence && typeof meta.evidence === "object"
     ? meta.evidence as Record<string, unknown>
     : undefined;
-  const validatedPayload = toolName.endsWith(".read") || toolName === "chrona.schedule.clear"
-    ? {}
-    : chronaPublicToolPayloadSchemas[toolName].parse(payload);
+  const validatedPayload = toolName === "chrona.goal.results.read"
+    ? chronaPublicToolPayloadSchemas[toolName].parse(payload)
+    : toolName.endsWith(".read") || toolName === "chrona.schedule.clear"
+      ? {}
+      : chronaPublicToolPayloadSchemas[toolName].parse(payload);
   return {
     sessionId: sessionIdFrom(input, extra, requestSessionId),
     actorType: "agent" as const,
@@ -342,11 +353,13 @@ function toChronaInput(
 const planGenerationTools = new Set<ChronaToolName>([
   "chrona.plan.generate",
   "chrona.plan.read",
+  "chrona.goal.results.read",
 ]);
 
 const executionTools = new Set<ChronaToolName>([
   "chrona.execution.read",
   "chrona.plan.read",
+  "chrona.goal.results.read",
   "chrona.node.read",
   "chrona.plan.output",
   "chrona.node.complete",

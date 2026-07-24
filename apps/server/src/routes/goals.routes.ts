@@ -3,22 +3,25 @@ import { zValidator } from "@hono/zod-validator";
 import type { ChronaEngine } from "@chrona/engine";
 import {
   applyGoalReviewBodySchema,
+  applyGoalReviewProposalBodySchema,
   confirmGoalCriterionBodySchema,
   createGoalBodySchema,
   createGoalWithFirstTaskBodySchema,
   createGoalTaskBodySchema,
   goalActionBodySchema,
+  generateGoalReviewBodySchema,
   goalIdParamSchema,
   goalArtifactParamSchema,
   listGoalsQuerySchema,
+  goalReviewProposalParamSchema,
   goalTaskParamSchema,
   processGoalResultBodySchema,
   promoteTaskToGoalBodySchema,
   promoteTaskToGoalParamSchema,
   reviewGoalCriterionBodySchema,
+  rejectGoalReviewProposalBodySchema,
   updateGoalBodySchema,
   updateGoalBriefBodySchema,
-  updateGoalWorkingSetBodySchema,
 } from "@chrona/contracts/api";
 import { error, internalServerError, json, toHttpError } from "../lib/http";
 
@@ -87,21 +90,6 @@ export function createGoalRoutes(engine: ChronaEngine) {
           }));
         } catch (cause) {
           return routeFailure(c, "PUT /api/goals/:goalId/brief", cause, "Failed to update Goal brief");
-        }
-      },
-    )
-    .put(
-      "/goals/:goalId/working-set",
-      zValidator("param", goalIdParamSchema),
-      zValidator("json", updateGoalWorkingSetBodySchema),
-      async (c) => {
-        try {
-          return json(c, await engine.goals.updateWorkingSet({
-            goalId: c.req.valid("param").goalId,
-            selections: c.req.valid("json").selections,
-          }));
-        } catch (cause) {
-          return routeFailure(c, "PUT /api/goals/:goalId/working-set", cause, "Failed to update Goal working set");
         }
       },
     )
@@ -177,6 +165,51 @@ export function createGoalRoutes(engine: ChronaEngine) {
           }));
         } catch (cause) {
           return routeFailure(c, "POST /api/goals/:goalId/criteria/:criterionId/confirm", cause, "Failed to confirm Goal criterion");
+        }
+      },
+    )
+    .post(
+      "/goals/:goalId/reviews/generate",
+      zValidator("param", goalIdParamSchema),
+      zValidator("json", generateGoalReviewBodySchema),
+      async (c) => {
+        try {
+          return json(c, await engine.goals.generateReview({
+            goalId: c.req.valid("param").goalId,
+            command: c.req.valid("json"),
+          }), 202);
+        } catch (cause) {
+          return routeFailure(c, "POST /api/goals/:goalId/reviews/generate", cause, "Failed to generate Goal review");
+        }
+      },
+    )
+    .post(
+      "/goals/:goalId/reviews/:proposalId/apply",
+      zValidator("param", goalReviewProposalParamSchema),
+      zValidator("json", applyGoalReviewProposalBodySchema),
+      async (c) => {
+        try {
+          return json(c, await engine.goals.applyReviewProposal({
+            ...c.req.valid("param"),
+            command: c.req.valid("json"),
+          }));
+        } catch (cause) {
+          return routeFailure(c, "POST /api/goals/:goalId/reviews/:proposalId/apply", cause, "Failed to apply Goal review proposal");
+        }
+      },
+    )
+    .post(
+      "/goals/:goalId/reviews/:proposalId/reject",
+      zValidator("param", goalReviewProposalParamSchema),
+      zValidator("json", rejectGoalReviewProposalBodySchema),
+      async (c) => {
+        try {
+          return json(c, await engine.goals.rejectReviewProposal({
+            ...c.req.valid("param"),
+            command: c.req.valid("json"),
+          }));
+        } catch (cause) {
+          return routeFailure(c, "POST /api/goals/:goalId/reviews/:proposalId/reject", cause, "Failed to reject Goal review proposal");
         }
       },
     )

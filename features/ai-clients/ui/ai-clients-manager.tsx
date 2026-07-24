@@ -558,7 +558,9 @@ function getFeatureCopy(feature: string) {
 }
 
 function getProviderFeatures(providers: RuntimeProviderOption[], type: AiClientType) {
-  return providers.find((provider) => provider.key === type)?.features ?? [];
+  return (providers.find((provider) => provider.key === type)?.features ?? []).filter(
+    (feature) => feature !== "suggest",
+  );
 }
 
 const RECOMMENDED_FEATURE_ORDER = ["task.plan", "task.execution", "dashboard.brief"];
@@ -784,7 +786,13 @@ function ClientForm({
   }, [availableFeatures, form, initial, values.type]);
 
   function handleSave(nextValues: ClientFormValues) {
-    onSave({ payload: buildClientPayload({ ...nextValues, isDefault: forceDefault || nextValues.isDefault }), bindings: nextValues.bindings });
+    onSave({
+      payload: buildClientPayload({
+        ...nextValues,
+        isDefault: forceDefault || nextValues.isDefault,
+      }),
+      bindings: nextValues.bindings.filter((feature) => feature !== "suggest"),
+    });
   }
 
   return (
@@ -1460,7 +1468,7 @@ export function AiClientsManager() {
           <p className="text-sm text-muted-foreground">{copy.subtitle}</p>
           <p className="text-sm text-muted-foreground">{copy.hermesIntro}</p>
         </div>
-        <Button type="button" onClick={() => setShowForm(true)}>
+        <Button type="button" disabled={showForm} onClick={() => setShowForm(true)}>
           {copy.addClient}
         </Button>
       </div>
@@ -1514,11 +1522,15 @@ export function AiClientsManager() {
                         {(client.config as { baseUrl?: string }).baseUrl ?? "—"} · {(client.config as { model?: string }).model ?? "default"}
                       </span>
                     )}
-                  {client.bindings.length > 0 && (
+                  {client.bindings.some((feature) => feature !== "suggest") && (
                     <div className="flex flex-wrap gap-1">
-                      {client.bindings.map((feature) => (
-                        <Badge key={feature} variant="outline">{getFeatureCopy(feature).label}</Badge>
-                      ))}
+                      {client.bindings
+                        .filter((feature) => feature !== "suggest")
+                        .map((feature) => (
+                          <Badge key={feature} variant="outline">
+                            {getFeatureCopy(feature).label}
+                          </Badge>
+                        ))}
                     </div>
                   )}
                   </CardDescription>

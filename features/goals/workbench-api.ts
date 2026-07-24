@@ -1,8 +1,10 @@
 import { apiJson } from "@shared/http";
 import type {
+  ApplyGoalAssetOwnershipRequest,
   CreateAssetModificationTaskRequest,
   CreateGoalAssetJobRequest,
   CreateGoalFormSubmissionRequest,
+  GenerateGoalAssetOwnershipRequest,
   ResolveGoalInboxCandidateRequest,
   SaveGoalAssetDraftRequest,
   SubmitGoalAssetDraftRequest,
@@ -43,6 +45,29 @@ export type GoalAssetWorkbenchData = {
   submissions: Array<{ id: string; versionId: string; content: unknown; createdAt: string }>;
   jobs: GoalAssetJobData[];
 };
+export type GoalAssetOwnershipProposalData = {
+  id: string;
+  status: "Generating" | "Ready" | "Applied" | "Rejected" | "Stale" | "Failed";
+  sourceTaskId: string;
+  sourceRunId: string | null;
+  providerType: string | null;
+  model: string | null;
+  generationError: string | null;
+  result: {
+    schemaVersion: 1;
+    decision: "create_asset" | "append_version" | "separate_asset";
+    targetAssetId: string | null;
+    proposedLabel: string;
+    rationale: string;
+    differenceSummary: string;
+    certainty: "low" | "medium" | "high";
+    evidence: string[];
+    counterEvidence: string[];
+  } | null;
+  sourceTask: { id: string; title: string };
+  targetAsset: { id: string; label: string } | null;
+};
+
 export type GoalInboxCandidateData = {
   id: string;
   sourceTaskId: string;
@@ -58,6 +83,7 @@ export type GoalInboxCandidateData = {
   sourceArtifact: { id: string; title: string; uri: string; contentPreview: string | null } | null;
   sourceTask: { title: string };
   proposedTargetAsset: { id: string; label: string } | null;
+  ownershipProposals?: GoalAssetOwnershipProposalData[];
 };
 
 export async function listGoalAssets(goalId: string, workspaceId: string, query = "") {
@@ -72,6 +98,8 @@ export async function archiveGoalAsset(goalId: string, assetId: string, workspac
 export async function listGoalInbox(goalId: string, workspaceId: string) { return apiJson<{ candidates: GoalInboxCandidateData[] }>(`/api/goals/${encodeURIComponent(goalId)}/inbox?workspaceId=${encodeURIComponent(workspaceId)}`); }
 export async function extractGoalInboxCandidates(goalId: string, taskId: string, runId: string) { return apiJson<{ candidates: GoalInboxCandidateData[] }>(`/api/goals/${encodeURIComponent(goalId)}/inbox/extract`, { method: "POST", body: JSON.stringify({ taskId, runId }) }); }
 export async function resolveGoalInboxCandidate(goalId: string, candidateId: string, command: ResolveGoalInboxCandidateRequest) { return apiJson(`/api/goals/${encodeURIComponent(goalId)}/inbox/${encodeURIComponent(candidateId)}/resolve`, { method: "POST", body: JSON.stringify(command) }); }
+export async function generateGoalAssetOwnership(goalId: string, candidateId: string, command: GenerateGoalAssetOwnershipRequest) { return apiJson<{ proposalId: string; sourceTaskId: string; status: string }>(`/api/goals/${encodeURIComponent(goalId)}/inbox/${encodeURIComponent(candidateId)}/ownership-proposals`, { method: "POST", body: JSON.stringify(command) }); }
+export async function applyGoalAssetOwnership(goalId: string, candidateId: string, proposalId: string, command: ApplyGoalAssetOwnershipRequest) { return apiJson<GoalAssetOwnershipProposalData>(`/api/goals/${encodeURIComponent(goalId)}/inbox/${encodeURIComponent(candidateId)}/ownership-proposals/${encodeURIComponent(proposalId)}/apply`, { method: "POST", body: JSON.stringify(command) }); }
 export async function submitGoalForm(goalId: string, assetId: string, command: CreateGoalFormSubmissionRequest) { return apiJson(`/api/goals/${encodeURIComponent(goalId)}/assets/${encodeURIComponent(assetId)}/submissions`, { method: "POST", body: JSON.stringify(command) }); }
 export async function createGoalAssetJob(goalId: string, assetId: string, command: CreateGoalAssetJobRequest) { return apiJson<GoalAssetJobData>(`/api/goals/${encodeURIComponent(goalId)}/assets/${encodeURIComponent(assetId)}/jobs`, { method: "POST", body: JSON.stringify(command) }); }
 export async function createGoalAssetModificationTask(goalId: string, assetId: string, command: CreateAssetModificationTaskRequest) { return apiJson(`/api/goals/${encodeURIComponent(goalId)}/assets/${encodeURIComponent(assetId)}/ai-modification-task`, { method: "POST", body: JSON.stringify(command) }); }

@@ -20,6 +20,7 @@ export function createChronaEngine(_ports: ChronaEnginePorts = {}) {
   const schedule = createTaskScheduleService();
   const plan = createTaskPlanService();
   const execution = createTaskExecutionService();
+  const goals = createGoalsService();
 
   return {
     tasks: {
@@ -30,10 +31,10 @@ export function createChronaEngine(_ports: ChronaEnginePorts = {}) {
       lifecycle: createTaskLifecycleService(),
       result: createTaskResultService(),
     },
-    agentTools: createAgentToolOperationsService({ tasks, schedule, plan, execution }),
+    agentTools: createAgentToolOperationsService({ tasks, schedule, plan, execution, goals }),
     pages: createPagesService(),
     goals: {
-      ...createGoalsService(),
+      ...goals,
       workbench: createGoalWorkbenchService(),
     },
     triggers: createTaskTriggersService(),

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "bun:test";
 import { db } from "@chrona/db";
-import { createChronaEngine } from "@chrona/engine";
+import { aiClientRegistry, createChronaEngine, waitForGoalAssetOwnershipGeneration } from "@chrona/engine";
 import { createApiRouter, type ApiRouter } from "../../routes/api";
 import { resetTestDb, seedWorkspace } from "../bun-test-helpers";
 
@@ -30,13 +30,76 @@ describe("Goal Workbench API", () => {
     const { candidates } = await extracted.json() as { candidates: Array<{ id: string; kind: string; reason: string }> };
     expect(candidates).toHaveLength(1);
     expect(candidates[0]).toMatchObject({ kind: "document" });
-    expect(candidates[0]!.reason).toContain("No confident");
+    expect(candidates[0]!.reason).toBe("no_rule_based_name_match");
 
     const resolved = await post(app, `/goals/${seeded.goal.id}/inbox/${candidates[0]!.id}/resolve`, { workspaceId: seeded.workspaceId, action: "create_asset", label: "Launch brief" });
     expect(resolved.status).toBe(200);
     const assetsResponse = await app.request(`/goals/${seeded.goal.id}/assets?workspaceId=${seeded.workspaceId}`);
     const { assets } = await assetsResponse.json() as { assets: Array<{ kind: string; versions: Array<{ version: number; source: string }> }> };
     expect(assets[0]).toMatchObject({ kind: "document", versions: [{ version: 1, source: "inbox" }] });
+  });
+
+  it("generates a bounded AI ownership proposal and applies it only after user confirmation", async () => {
+    const seeded = await seedGoalResult();
+    const aiClient = await db.aiClient.create({
+      data: { name: "Asset ownership debug provider", type: "debug", config: { profile: "deterministic" }, isDefault: true, enabled: true },
+    });
+    await db.aiFeatureBinding.create({ data: { feature: "goal.asset_ownership", clientId: aiClient.id } });
+    await aiClientRegistry.refresh();
+    const app = createApiRouter(createChronaEngine());
+    const extracted = await post(app, `/goals/${seeded.goal.id}/inbox/extract`, { taskId: seeded.task.id, runId: seeded.run.id });
+    const { candidates } = await extracted.json() as { candidates: Array<{ id: string }> };
+    const candidateId = candidates[0]!.id;
+
+    const generated = await post(app, `/goals/${seeded.goal.id}/inbox/${candidateId}/ownership-proposals`, {
+      workspaceId: seeded.workspaceId,
+      idempotencyKey: "asset-ownership-generate-1",
+    });
+    expect(generated.status).toBe(202);
+    const started = await generated.json() as { proposalId: string; sourceTaskId: string };
+    await waitForGoalAssetOwnershipGeneration(started.proposalId);
+    const proposal = await db.goalAssetOwnershipProposal.findUniqueOrThrow({ where: { id: started.proposalId } });
+    expect(proposal.status).toBe("Ready");
+    expect(proposal.providerType).toBe("debug");
+    expect(proposal.decision).toBe("create_asset");
+    expect(await db.goalAsset.count({ where: { goalId: seeded.goal.id } })).toBe(0);
+
+    const applied = await post(app, `/goals/${seeded.goal.id}/inbox/${candidateId}/ownership-proposals/${proposal.id}/apply`, {
+      workspaceId: seeded.workspaceId,
+      idempotencyKey: "asset-ownership-apply-1",
+      action: "apply_suggestion",
+    });
+    expect(applied.status).toBe(200);
+    expect((await applied.json() as { status: string }).status).toBe("Applied");
+    expect(await db.goalAsset.count({ where: { goalId: seeded.goal.id } })).toBe(1);
+
+    const replay = await post(app, `/goals/${seeded.goal.id}/inbox/${candidateId}/ownership-proposals/${proposal.id}/apply`, {
+      workspaceId: seeded.workspaceId,
+      idempotencyKey: "asset-ownership-apply-1",
+      action: "apply_suggestion",
+    });
+    expect(replay.status).toBe(200);
+    expect(await db.goalAsset.count({ where: { goalId: seeded.goal.id } })).toBe(1);
+  });
+
+  it("marks an ownership proposal stale when the frozen candidate set changes", async () => {
+    const seeded = await seedGoalResult();
+    const aiClient = await db.aiClient.create({ data: { name: "Stale ownership debug", type: "debug", config: {}, isDefault: true, enabled: true } });
+    await db.aiFeatureBinding.create({ data: { feature: "goal.asset_ownership", clientId: aiClient.id } });
+    await aiClientRegistry.refresh();
+    const app = createApiRouter(createChronaEngine());
+    const extracted = await post(app, `/goals/${seeded.goal.id}/inbox/extract`, { taskId: seeded.task.id, runId: seeded.run.id });
+    const { candidates } = await extracted.json() as { candidates: Array<{ id: string }> };
+    const candidateId = candidates[0]!.id;
+    const generated = await post(app, `/goals/${seeded.goal.id}/inbox/${candidateId}/ownership-proposals`, { workspaceId: seeded.workspaceId, idempotencyKey: "stale-generate" });
+    const { proposalId } = await generated.json() as { proposalId: string };
+    await waitForGoalAssetOwnershipGeneration(proposalId);
+
+    await db.goalInboxCandidate.update({ where: { id: candidateId }, data: { label: "Renamed after review" } });
+    const apply = await post(app, `/goals/${seeded.goal.id}/inbox/${candidateId}/ownership-proposals/${proposalId}/apply`, { workspaceId: seeded.workspaceId, idempotencyKey: "stale-apply", action: "apply_suggestion" });
+    expect(apply.status).toBe(409);
+    expect((await db.goalAssetOwnershipProposal.findUniqueOrThrow({ where: { id: proposalId } })).status).toBe("Stale");
+    expect(await db.goalAsset.count({ where: { goalId: seeded.goal.id } })).toBe(0);
   });
 
   it("rejects resolving the same Inbox candidate twice without duplicate versions", async () => {

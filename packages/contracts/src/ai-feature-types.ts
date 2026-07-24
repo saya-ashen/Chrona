@@ -16,6 +16,8 @@ export const AI_FEATURES = [
   "execute_task_node",
   "evaluate_condition_node",
   "review_checkpoint_node",
+  "goal.asset_ownership",
+  "goal.review",
   "dashboard.brief",
   "task.plan",
   "task.execution",

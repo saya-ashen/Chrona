@@ -230,12 +230,11 @@ async function upsertInboxCandidate(input: {
   const matches = await db.goalAsset.findMany({ where: { goalId: input.goal.id, kind, archivedAt: null }, take: 3, orderBy: { updatedAt: "desc" } });
   const normalizedTitle = input.artifact.title.toLowerCase();
   const target = matches.find((candidate) => normalizedTitle.includes(candidate.label.toLowerCase()) || candidate.label.toLowerCase().includes(normalizedTitle));
-  const confidence = target ? 0.78 : 0.42;
-  const appendVersion = Boolean(target && confidence >= 0.7);
+  const appendVersion = Boolean(target);
   const groupKey = input.artifact.id ?? `result:${input.runId}`;
   await db.goalInboxCandidate.upsert({
     where: { goalId_sourceRunId_groupKey: { goalId: input.goal.id, sourceRunId: input.runId, groupKey } },
-    create: { workspaceId: input.goal.workspaceId, goalId: input.goal.id, sourceTaskId: input.task.id, sourceRunId: input.runId, sourceArtifactId: input.artifact.id, groupKey, kind, label: input.artifact.title, proposedAction: appendVersion ? "append_version" : "create_asset", proposedTargetAssetId: appendVersion ? target?.id : null, reason: target ? "Same asset type and a similar user-confirmed name" : "No confident existing asset identity match", changeSummary: `Candidate derived from accepted result “${input.task.title}”`, confidence, selector: input.artifact.id ? { artifactId: input.artifact.id } : { acceptedResult: true }, content: content as Prisma.InputJsonValue, contentHash: hash(content) },
+    create: { workspaceId: input.goal.workspaceId, goalId: input.goal.id, sourceTaskId: input.task.id, sourceRunId: input.runId, sourceArtifactId: input.artifact.id, groupKey, kind, label: input.artifact.title, proposedAction: appendVersion ? "append_version" : "create_asset", proposedTargetAssetId: appendVersion ? target?.id : null, reason: target ? "rule_based_name_match" : "no_rule_based_name_match", changeSummary: `Candidate derived from accepted result “${input.task.title}”`, confidence: target ? 1 : 0, selector: input.artifact.id ? { artifactId: input.artifact.id } : { acceptedResult: true }, content: content as Prisma.InputJsonValue, contentHash: hash(content) },
     update: {},
   });
 }
@@ -254,7 +253,20 @@ export async function splitAcceptedResultIntoCandidates(input: { goalId: string;
 
 export async function listGoalInbox(input: { goalId: string }) {
   await goalOrThrow(input.goalId);
-  const candidates = await db.goalInboxCandidate.findMany({ where: { goalId: input.goalId, status: "Pending" }, orderBy: [{ sourceRunId: "desc" }, { createdAt: "asc" }], include: { sourceTask: true, sourceArtifact: true, proposedTargetAsset: true } });
+  const candidates = await db.goalInboxCandidate.findMany({
+    where: { goalId: input.goalId, status: "Pending" },
+    orderBy: [{ sourceRunId: "desc" }, { createdAt: "asc" }],
+    include: {
+      sourceTask: true,
+      sourceArtifact: true,
+      proposedTargetAsset: true,
+      ownershipProposals: {
+        orderBy: { createdAt: "desc" },
+        take: 1,
+        include: { sourceTask: { select: { id: true, title: true } }, targetAsset: { select: { id: true, label: true } } },
+      },
+    },
+  });
   return { candidates: candidates.map((candidate) => ({ ...candidate, createdAt: candidate.createdAt.toISOString(), updatedAt: candidate.updatedAt.toISOString() })) };
 }
 
@@ -393,5 +405,17 @@ export async function createAssetModificationTask(input: { goalId: string; asset
   const asset = await assetOrThrow(input.goalId, input.assetId, input.command.workspaceId);
   const version = await db.goalAssetVersion.findFirst({ where: { id: input.command.versionId, assetId: asset.id } });
   if (!version) throw new EngineError(ENGINE_ERROR_CODES.VALIDATION_FAILED, "Asset version not found");
-  return createTask({ workspaceId: asset.workspaceId, goalId: asset.goalId, title: `Modify ${asset.label}`, description: input.command.instruction, priority: "Medium", autoPlanGeneration: false, autoExecute: false, goalContext: { goal: { id: asset.goalId, title: "", operationalBrief: null, capturedAt: new Date().toISOString() }, items: [{ subjectType: "goal_asset", subjectId: asset.id, label: asset.label, snapshot: { assetId: asset.id, versionId: version.id, version: version.version, contentHash: version.contentHash } }], expectedOutcome: input.command.expectedOutcome } });
+  return createTask({
+    workspaceId: asset.workspaceId,
+    goalId: asset.goalId,
+    title: `Modify ${asset.label}`,
+    description: input.command.instruction,
+    priority: "Medium",
+    autoPlanGeneration: false,
+    autoExecute: false,
+    goalContext: {
+      asset: { label: asset.label, version: version.version, contentHash: version.contentHash },
+      expectedOutcome: input.command.expectedOutcome,
+    },
+  });
 }

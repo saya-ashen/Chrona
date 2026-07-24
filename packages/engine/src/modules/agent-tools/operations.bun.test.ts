@@ -31,6 +31,13 @@ function service(input: { materialize?: (input: Record<string, unknown>) => Prom
       getPage: async () => ({ task }),
       list: async () => ({ tasks: [task] }),
     },
+    goals: {
+      readAcceptedResults: async (input: Record<string, unknown>) => ({
+        linked: true,
+        results: [{ ref: "GRABCDEF012345", title: "Research", summary: "Accepted evidence" }],
+        query: input.query ?? null,
+      }),
+    },
     plan: {
       getState: async () => ({
         taskId: task.id,
@@ -95,6 +102,9 @@ function serviceWithDispatchError(code: keyof typeof ENGINE_ERROR_CODES) {
       delete: async () => ({}),
       getPage: async () => ({ task: { id: "task-1", status: "Ready" } }),
       list: async () => ({ tasks: [] }),
+    },
+    goals: {
+      readAcceptedResults: async () => ({ linked: false, results: [] }),
     },
     plan: {
       getState: async () => ({ taskId: "task-1", aiPlanGenerationStatus: "accepted", savedPlan: null, generationSession: null }),
@@ -281,6 +291,21 @@ describe("agent tool operations service", () => {
         input: { workspaceId: "workspace-1", taskId: "task-1", actorType: "agent" },
       }),
     ).resolves.toMatchObject({ status: "accepted", state: { taskStatus: "Ready" } });
+
+    await expect(
+      service().execute({
+        toolName: "chrona.goal.results.read",
+        input: {
+          workspaceId: "workspace-1",
+          taskId: "task-1",
+          actorType: "agent",
+          payload: { query: "evidence", limit: 5 },
+        },
+      }),
+    ).resolves.toMatchObject({
+      status: "accepted",
+      state: { result: { linked: true, results: [{ ref: "GRABCDEF012345" }], query: "evidence" } },
+    });
 
     await expect(
       service().execute({

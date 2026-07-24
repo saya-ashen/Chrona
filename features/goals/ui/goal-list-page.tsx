@@ -13,6 +13,7 @@ import {
   Target,
 } from "lucide-react";
 import { useNavigate, useRevalidator } from "react-router-dom";
+import { v4 as uuidv4 } from "uuid";
 import { useLocale, localizeHref } from "@chrona/i18n";
 import {
   Badge,
@@ -72,7 +73,7 @@ function CreateGoalDialog({ copy }: { copy: GoalCopy }) {
         firstWorkItem: firstWorkItem.trim(),
         description: description.trim() || null,
         priority: "High",
-        idempotencyKey: crypto.randomUUID(),
+        idempotencyKey: uuidv4(),
       });
       await revalidator.revalidate();
       void navigate(localizeHref(locale, `/goals/${created.goal.id}`));

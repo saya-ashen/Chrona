@@ -907,41 +907,6 @@ export async function seedActiveGoalWorkbenchFixture() {
 
   await prisma.goalBriefRevision.deleteMany({ where: { goalId } });
   await prisma.goalBriefRevision.create({ data: { workspaceId, goalId, brief, actorType: "user", actorId: "acceptance-fixture-user", createdAt: new Date("2026-07-20T09:00:00.000Z") } });
-  await prisma.goalWorkingSetItem.deleteMany({ where: { goalId } });
-  await prisma.goalWorkingSetItem.createMany({
-    data: [
-      {
-        id: "goal_ws_active_criteria",
-        workspaceId,
-        goalId,
-        subjectType: "task",
-        subjectId: GOAL_WORKBENCH_ACCEPTANCE_IDS.criteriaTaskId,
-        label: "Confirmed application criteria",
-        snapshot: { title: "Confirm application criteria", status: "Completed", summary: "Funding, fit, deadline, and factual-safety constraints confirmed." },
-        rank: 0,
-      },
-      {
-        id: "goal_ws_active_comparison",
-        workspaceId,
-        goalId,
-        subjectType: "accepted_result",
-        subjectId: GOAL_WORKBENCH_ACCEPTANCE_IDS.discoveryRunId,
-        label: "Accepted opening comparison",
-        snapshot: { taskId: GOAL_WORKBENCH_ACCEPTANCE_IDS.discoveryTaskId, runId: GOAL_WORKBENCH_ACCEPTANCE_IDS.discoveryRunId, summary: "NUS target selected from the accepted comparison.", artifactIds: [GOAL_WORKBENCH_ACCEPTANCE_IDS.comparisonArtifactId] },
-        rank: 1,
-      },
-      {
-        id: "goal_ws_active_criterion",
-        workspaceId,
-        goalId,
-        subjectType: "criterion",
-        subjectId: "package",
-        label: "Application package approved",
-        snapshot: { description: "The tailored application package is approved", satisfied: false },
-        rank: 2,
-      },
-    ],
-  });
   await prisma.event.upsert({
     where: { dedupeKey: `goal-workbench:${goalId}:brief` },
     update: { workspaceId, eventType: "goal.brief_updated", payload: { goal_id: goalId, current_focus: brief.currentFocus }, summary: brief.currentFocus },

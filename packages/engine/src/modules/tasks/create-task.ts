@@ -8,6 +8,7 @@ import type { CreateTaskInput } from "@chrona/contracts";
 import { normalizeAutomationTiming } from "@chrona/contracts";
 import { expandRecurrenceRule } from "@chrona/integrations";
 import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
+import { buildAutomaticGoalTaskContext } from "../goals/goal-task-context";
 
 const SELF_SERIES_WINDOW_DAYS = 180;
 const SELF_SERIES_MAX_OCCURRENCES = 365;
@@ -110,6 +111,14 @@ export async function createTask(input: CreateTaskInput, client: Prisma.Transact
     }
   }
 
+  const goalContext = input.goalId
+    ? await buildAutomaticGoalTaskContext({
+        goalId: input.goalId,
+        workspaceId: input.workspaceId,
+        additionalContext: input.goalContext as Prisma.InputJsonObject | undefined,
+      }, client)
+    : input.goalContext as Prisma.InputJsonObject | undefined;
+
   const task = await client.task.create({
     data: {
       workspaceId: input.workspaceId,
@@ -136,9 +145,7 @@ export async function createTask(input: CreateTaskInput, client: Prisma.Transact
       status,
       parentTaskId: input.parentTaskId ?? null,
       goalId: input.goalId ?? null,
-      goalContext: input.goalContext
-        ? input.goalContext as Prisma.InputJsonObject
-        : undefined,
+      goalContext,
       aiClientId: input.aiClientId ?? null,
     },
   });
