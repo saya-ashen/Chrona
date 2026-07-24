@@ -219,14 +219,14 @@ export function ControlPlaneShell({
   return (
     <SidebarProvider
       defaultOpen
-      className="h-screen min-h-0 bg-canvas text-foreground"
+      className="h-screen min-h-0 bg-workspace text-foreground"
       style={{ "--sidebar-width": "240px" } as CSSProperties}
     >
       <Sidebar
         collapsible="none"
-        className="hidden border-r border-border bg-sidebar xl:flex"
+        className="hidden border-r border-sidebar-border bg-sidebar shadow-[8px_0_30px_rgb(31_32_45/0.05)] xl:flex"
       >
-        <SidebarHeader className="border-b border-border px-4 py-4">
+        <SidebarHeader className="border-b border-sidebar-border bg-sidebar px-4 py-4">
           <LocalizedLink
             href="/schedule"
             aria-label={t("nav.brandTitle")}
@@ -267,10 +267,10 @@ export function ControlPlaneShell({
                         }
                         isActive={item.active}
                         className={cn(
-                          "h-auto rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors",
+                          "h-auto rounded-xl border px-3 py-2.5 text-sm font-semibold transition-colors",
                           item.active
-                            ? "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground [&_svg]:text-primary-foreground"
-                            : "text-muted-foreground hover:bg-card hover:text-foreground",
+                            ? "border-primary-border bg-primary-soft text-primary shadow-sm hover:bg-primary-soft-hover hover:text-primary [&_svg]:text-primary"
+                            : "border-transparent text-muted-foreground hover:border-panel-border hover:bg-panel hover:text-foreground",
                         )}
                       >
                         <Icon className="size-4" />
@@ -286,7 +286,7 @@ export function ControlPlaneShell({
       </Sidebar>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="relative z-50 border-b border-border bg-background/90 supports-[backdrop-filter]:backdrop-blur-md">
+        <header className="relative z-50 border-b border-panel-border bg-panel/92 shadow-[0_1px_12px_rgb(31_32_45/0.04)] supports-[backdrop-filter]:backdrop-blur-md">
           <div className="relative mx-auto flex h-16 w-full max-w-[1600px] items-center gap-2 px-4 sm:gap-3 sm:px-6 xl:px-8">
             <div className="flex min-w-0 shrink items-center gap-3">
               <LocalizedLink
@@ -344,7 +344,7 @@ export function ControlPlaneShell({
             </div>
           </div>
         </header>
-        <main className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-background px-4 py-4 pb-[calc(env(safe-area-inset-bottom)+6.5rem)] sm:px-6 xl:px-8 xl:pb-4">
+        <main className="chrona-app-main flex min-h-0 flex-1 flex-col overflow-y-auto px-4 py-4 pb-[calc(env(safe-area-inset-bottom)+6.5rem)] sm:px-6 xl:px-8 xl:pb-4">
           {shouldShowStartWithChrona ? (
             <StartWithChrona
               className="mb-4"
@@ -367,7 +367,7 @@ export function ControlPlaneShell({
 
         <nav
           aria-label="Primary"
-          className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/92 pb-[env(safe-area-inset-bottom)] backdrop-blur-md xl:hidden"
+          className="fixed inset-x-0 bottom-0 z-40 border-t border-panel-border bg-panel/94 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_24px_rgb(31_32_45/0.08)] backdrop-blur-md xl:hidden"
         >
           <ul className="mx-auto flex max-w-lg items-stretch justify-around">
             {navItems.map((item) => {

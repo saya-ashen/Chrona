@@ -69,6 +69,18 @@
   --color-surface-soft: var(--surface-soft);
   --color-surface-strong: var(--surface-strong);
   --color-surface-dark: var(--surface-dark);
+  --color-workspace: var(--workspace);
+  --color-workspace-strong: var(--workspace-strong);
+  --color-panel: var(--panel);
+  --color-panel-muted: var(--panel-muted);
+  --color-panel-border: var(--panel-border);
+  --color-domain-dashboard: var(--domain-dashboard);
+  --color-domain-goals: var(--domain-goals);
+  --color-domain-tasks: var(--domain-tasks);
+  --color-domain-schedule: var(--domain-schedule);
+  --color-domain-workbench: var(--domain-workbench);
+  --color-domain-attention: var(--domain-attention);
+  --color-domain-settings: var(--domain-settings);
   --radius-sm: 0.25rem;
   --radius-md: 0.375rem;
   --radius-lg: 0.5rem;
@@ -82,6 +94,11 @@
   --background: #f7f7f5;
   --foreground: #18181b;
   --canvas: #ffffff;
+  --workspace: #edeef3;
+  --workspace-strong: #e5e7ee;
+  --panel: #ffffff;
+  --panel-muted: #f5f5f8;
+  --panel-border: #d5d7e0;
   --card: #ffffff;
   --card-foreground: #18181b;
   --popover: #ffffff;
@@ -117,6 +134,13 @@
   --surface-soft: #f1f1ee;
   --surface-strong: #e8e8e3;
   --surface-dark: #17181d;
+  --domain-dashboard: #6257c7;
+  --domain-goals: #28756d;
+  --domain-tasks: #2970a6;
+  --domain-schedule: #4c67bd;
+  --domain-workbench: #7c4dc4;
+  --domain-attention: #b76a00;
+  --domain-settings: #5d6475;
   --chart-1: #6257c7;
   --chart-2: #2970a6;
   --chart-3: #258451;
@@ -148,6 +172,11 @@
   --primary-border: #565087;
   --secondary: #202127;
   --secondary-foreground: #d4d4d8;
+  --workspace: #0c0d11;
+  --workspace-strong: #08090c;
+  --panel: #17181d;
+  --panel-muted: #1d1e24;
+  --panel-border: #373944;
   --muted: #202127;
   --muted-foreground: #a1a1aa;
   --accent: #39251f;
@@ -175,6 +204,13 @@
   --sidebar-accent-foreground: #e3e0ff;
   --sidebar-border: #303138;
   --sidebar-ring: #9b91ee;
+  --domain-dashboard: #9b91ee;
+  --domain-goals: #67b7a6;
+  --domain-tasks: #62a7d8;
+  --domain-schedule: #8296e8;
+  --domain-workbench: #b28ae8;
+  --domain-attention: #e8a23a;
+  --domain-settings: #a7adbd;
 }
 
 @layer base {
@@ -192,6 +228,21 @@
   }
   html {
     @apply font-sans;
+  }
+}
+
+@layer components {
+  .chrona-app-main {
+    background: var(--workspace);
+  }
+
+  [data-slot="page-frame"] {
+    position: relative;
+  }
+
+
+  [data-slot="card"] {
+    box-shadow: 0 1px 2px rgb(24 24 27 / 0.04), 0 6px 18px rgb(39 39 58 / 0.035);
   }
 }
 

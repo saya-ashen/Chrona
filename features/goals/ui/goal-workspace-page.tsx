@@ -52,6 +52,7 @@ import {
   Input,
   Label,
   PageFrame,
+  PageHeader,
   MarkdownContent,
   Tabs,
   TabsContent,
@@ -1942,64 +1943,61 @@ export function GoalWorkspacePage({
     if (contentScrollRef.current) contentScrollRef.current.scrollTop = 0;
   }, [defaultSection]);
   return (
-    <PageFrame mode="focused" className="overflow-y-hidden">
+    <PageFrame mode="focused" data-domain={defaultSection === "workbench" ? "workbench" : "goals"} className="overflow-y-hidden p-1 sm:p-2">
       <div
         className="flex h-full min-h-0 min-w-0 flex-1 flex-col gap-5 overflow-hidden"
         data-ui-surface-kind="product-authored"
       >
-        <header
-          className={`space-y-3 border-b pb-5 ${isArchive ? "border-success/25" : "border-info/25"}`}
-        >
-          <Button asChild variant="ghost" size="sm" className="w-fit -ml-2">
-            <LocalizedLink href="/goals">
-              <ArrowLeft className="size-4" />
-              {copy.backToGoals}
-            </LocalizedLink>
-          </Button>
-          <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-            <div className="min-w-0 space-y-2">
-              <div className="flex flex-wrap items-center gap-2 text-sm">
-                <span
-                  className={`inline-flex items-center gap-1.5 font-medium ${isArchive ? "text-success" : "text-info"}`}
-                >
-                  {isArchive ? (
-                    <CheckCircle2 className="size-4" />
-                  ) : (
-                    <Target className="size-4" />
-                  )}
-                  {copy.status[goal.status]}
-                </span>
-                <span className="text-muted-foreground">
-                  · {isArchive ? copy.outcomeArchive : copy.ongoingWorkspace}
-                </span>
-                {goal.projection.attention !== "none" ? (
-                  <Badge variant="destructive">
-                    {copy.attention[goal.projection.attention]}
-                  </Badge>
-                ) : null}
-                {goal.workbench.pendingInboxCount > 0 ? (
-                  <Button asChild size="sm" variant="outline">
-                    <LocalizedLink
-                      href={`/goals/${goal.id}?section=workbench&assetView=inbox`}
-                    >
-                      {copy.pendingInbox.replace(
-                        "{count}",
-                        String(goal.workbench.pendingInboxCount),
-                      )}
-                    </LocalizedLink>
-                  </Button>
-                ) : null}
-              </div>
-              <h1 className="max-w-4xl text-balance text-2xl font-semibold tracking-tight sm:text-3xl">
-                {goal.title}
-              </h1>
-              {goal.description?.trim() &&
-              goal.description.trim() !== goal.title.trim() ? (
-                <p className="line-clamp-3 max-w-3xl text-sm leading-6 text-foreground/65">
-                  {goal.description}
-                </p>
+        <PageHeader
+          eyebrow={
+            <Button asChild variant="ghost" size="sm" className="w-fit -ml-2">
+              <LocalizedLink href="/goals">
+                <ArrowLeft className="size-4" />
+                {copy.backToGoals}
+              </LocalizedLink>
+            </Button>
+          }
+          title={goal.title}
+          description={
+            goal.description?.trim() && goal.description.trim() !== goal.title.trim()
+              ? goal.description
+              : undefined
+          }
+          meta={
+            <>
+              <span
+                className={`inline-flex items-center gap-1.5 text-sm font-medium ${isArchive ? "text-success" : "text-info"}`}
+              >
+                {isArchive ? (
+                  <CheckCircle2 className="size-4" />
+                ) : (
+                  <Target className="size-4" />
+                )}
+                {copy.status[goal.status]}
+              </span>
+              <span className="text-sm text-muted-foreground">
+                {isArchive ? copy.outcomeArchive : copy.ongoingWorkspace}
+              </span>
+              {goal.projection.attention !== "none" ? (
+                <Badge variant="destructive">
+                  {copy.attention[goal.projection.attention]}
+                </Badge>
               ) : null}
-            </div>
+              {goal.workbench.pendingInboxCount > 0 ? (
+                <Button asChild size="sm" variant="outline">
+                  <LocalizedLink
+                    href={`/goals/${goal.id}?section=workbench&assetView=inbox`}
+                  >
+                    {copy.pendingInbox.replace(
+                      "{count}",
+                      String(goal.workbench.pendingInboxCount),
+                    )}
+                  </LocalizedLink>
+                </Button>
+              ) : null}
+            </>
+          }
+          actions={
             <PrimaryAction
               goal={goal}
               copy={copy}
@@ -2007,8 +2005,8 @@ export function GoalWorkspacePage({
               onAddTask={() => setTaskDialog("task")}
               onAchieve={() => setAchievementOpen(true)}
             />
-          </div>
-        </header>
+          }
+        />
         {(goal.titleSource === "system" || goal.titleSource === "ai") &&
         !goal.titleRenameNoticeSeenAt ? (
           <Card className="border-primary/30 bg-primary/5">

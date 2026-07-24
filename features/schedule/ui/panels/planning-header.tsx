@@ -12,6 +12,7 @@ import {
   Popover,
   PopoverContent,
   PopoverTrigger,
+  PageHeader,
 } from "@shared/ui";
 
 type PlanningDayLink = {
@@ -58,18 +59,14 @@ export function PlanningHeader({
   const nextDay = dayLinks.find((link) => link.kind === "next");
 
   return (
-    <header
+    <PageHeader
       data-testid="planning-header"
       aria-label={ariaLabel}
-      className="border-b border-border bg-canvas px-3 py-3 sm:px-4 lg:px-5"
-    >
-      <div className="flex flex-col gap-3 xl:flex-row xl:items-center xl:justify-between">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2 text-muted-foreground">
-            <CalendarDays className="size-4" aria-hidden="true" />
-            <span className="text-xs font-medium">{title}</span>
-          </div>
-          <div className="mt-1 flex min-w-0 items-center gap-0.5">
+      title={title}
+      description={summary}
+      toolbar={
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex min-w-0 items-center gap-0.5">
             {previousDay ? (
               <Button
                 type="button"
@@ -81,9 +78,9 @@ export function PlanningHeader({
                 <ChevronLeft />
               </Button>
             ) : null}
-            <h1 className="min-w-0 flex-1 whitespace-nowrap text-base font-semibold tracking-tight text-foreground sm:flex-none sm:text-xl">
+            <h2 className="min-w-0 truncate text-base font-semibold tracking-tight text-foreground sm:text-lg">
               {activeDayLabel}
-            </h1>
+            </h2>
             <Popover open={datePickerOpen} onOpenChange={setDatePickerOpen}>
               <PopoverTrigger asChild>
                 <Button
@@ -135,42 +132,38 @@ export function PlanningHeader({
               </Button>
             ) : null}
           </div>
-          <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
-            {summary}
-          </p>
-        </div>
-
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <div
-            className="grid grid-cols-2 rounded-md border border-border bg-surface-soft p-0.5"
-            aria-label={ariaLabel}
-          >
-            <Button
-              type="button"
-              size="sm"
-              variant={activeView === "timeline" ? "secondary" : "ghost"}
-              aria-current={activeView === "timeline" ? "page" : undefined}
-              onClick={() => onNavigate?.(timelineHref)}
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+            <div
+              className="grid grid-cols-2 rounded-md border border-border bg-surface-soft p-0.5"
+              aria-label={ariaLabel}
             >
-              <Clock />
-              {timelineLabel}
-            </Button>
-            <Button
-              type="button"
-              size="sm"
-              variant={activeView === "list" ? "secondary" : "ghost"}
-              aria-current={activeView === "list" ? "page" : undefined}
-              onClick={() => onNavigate?.(listHref)}
-            >
-              <LayoutList />
-              {listLabel}
+              <Button
+                type="button"
+                size="sm"
+                variant={activeView === "timeline" ? "secondary" : "ghost"}
+                aria-current={activeView === "timeline" ? "page" : undefined}
+                onClick={() => onNavigate?.(timelineHref)}
+              >
+                <Clock />
+                {timelineLabel}
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={activeView === "list" ? "secondary" : "ghost"}
+                aria-current={activeView === "list" ? "page" : undefined}
+                onClick={() => onNavigate?.(listHref)}
+              >
+                <LayoutList />
+                {listLabel}
+              </Button>
+            </div>
+            <Button type="button" onClick={primaryAction.onClick}>
+              {primaryAction.label}
             </Button>
           </div>
-          <Button type="button" onClick={primaryAction.onClick}>
-            {primaryAction.label}
-          </Button>
         </div>
-      </div>
-    </header>
+      }
+    />
   );
 }

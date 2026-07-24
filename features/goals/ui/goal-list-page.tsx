@@ -31,6 +31,7 @@ import {
   FieldLabel,
   Input,
   PageFrame,
+  PageHeader,
   Separator,
   Textarea,
 } from "@shared/ui";
@@ -225,26 +226,22 @@ export function GoalListPage({
     },
   ];
   return (
-    <PageFrame mode="focused">
+    <PageFrame mode="focused" data-domain="goals" className="p-1 sm:p-2">
       <div
         className="flex min-w-0 flex-1 flex-col gap-8"
         data-ui-surface-kind="product-authored"
       >
-        <header className="flex flex-col gap-4 border-b border-border/80 pb-6 sm:flex-row sm:items-end sm:justify-between">
-          <div className="max-w-3xl">
-            <div className="mb-2 flex items-center gap-2 text-sm font-semibold text-primary">
+        <PageHeader
+          eyebrow={
+            <span className="inline-flex items-center gap-2">
               <Target className="size-4" aria-hidden />
               {copy.title}
-            </div>
-            <h1 className="text-balance text-3xl font-semibold tracking-tight sm:text-4xl">
-              {copy.goalPortfolio}
-            </h1>
-            <p className="mt-3 text-sm leading-6 text-muted-foreground sm:text-base">
-              {copy.subtitle}
-            </p>
-          </div>
-          <CreateGoalDialog copy={copy} />
-        </header>
+            </span>
+          }
+          title={copy.goalPortfolio}
+          description={copy.subtitle}
+          actions={<CreateGoalDialog copy={copy} />}
+        />
         {goals.length === 0 ? (
           <div className="rounded-2xl border border-dashed bg-card/60 px-6 py-14 text-center">
             <Target className="mx-auto size-10 text-muted-foreground" />

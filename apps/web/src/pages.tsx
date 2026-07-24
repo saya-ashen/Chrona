@@ -24,7 +24,7 @@ CardFooter,
 CardHeader,
 CardTitle, } from "@shared/ui"
 import { PageFrame } from "@shared/ui"
-import { Separator } from "@shared/ui";
+import { PageHeader } from "@shared/ui"
 import type { getDictionary, Locale } from "@chrona/i18n";
 import { localizeHref, resolveLocale } from "@chrona/i18n";
 import type { WorkStateView } from "@chrona/domain";
@@ -167,17 +167,12 @@ export function ActionCenterRoutePage() {
   const { actionCenter } = useLoaderData() as ActionCenterRouteData;
 
   return (
-    <PageFrame mode="overview">
+    <PageFrame mode="overview" data-domain="attention" className="p-1 sm:p-2">
       <div className="flex w-full flex-1 flex-col gap-4">
-        <div className="flex flex-col gap-1">
-          <h1 className="text-2xl font-semibold tracking-tight">
-            {dictionary.pages.actionCenter.title}
-          </h1>
-          <p className="text-sm text-muted-foreground">
-            {dictionary.pages.actionCenter.subtitle}
-          </p>
-        </div>
-        <Separator />
+        <PageHeader
+          title={dictionary.pages.actionCenter.title}
+          description={dictionary.pages.actionCenter.subtitle}
+        />
         <ActionCenterPageClient
           workspaceId={defaultWorkspace.id}
           initialData={actionCenter}
@@ -199,21 +194,14 @@ export function SettingsRoutePage() {
 
   return (
     <>
-      <PageFrame mode="focused">
+      <PageFrame mode="focused" data-domain="settings" className="p-1 sm:p-2">
         <div className="flex w-full flex-1 flex-col gap-4">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-            <div className="flex min-w-0 flex-col gap-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-2xl font-semibold tracking-tight">
-                  {t.title}
-                </h1>
-                <Badge variant="secondary">{t.controlCenter}</Badge>
-              </div>
-              <p className="text-sm text-muted-foreground">{t.subtitle}</p>
-            </div>
-          </div>
+          <PageHeader
+            title={t.title}
+            description={t.subtitle}
+            meta={<Badge variant="secondary">{t.controlCenter}</Badge>}
+          />
 
-          <Separator />
 
           <div className="grid min-h-0 flex-1 items-start gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
             <Card className="self-start">
@@ -260,7 +248,7 @@ export function GoalWorkspaceRoutePage() {
 export function GoalTaskInspectorRoutePage() {
   const { task, dictionary } = useLoaderData() as TaskPageRouteData;
   return (
-    <PageFrame mode="workspace">
+    <PageFrame mode="workspace" data-domain="tasks" className="p-1 sm:p-2">
       <TaskWorkspacePage data={task} copy={dictionary.components.taskPage} />
     </PageFrame>
   );
@@ -295,7 +283,7 @@ export function TaskDetailRoutePage() {
   const { task, dictionary } = useLoaderData() as TaskPageRouteData;
 
   return (
-    <PageFrame mode="workspace">
+    <PageFrame mode="workspace" data-domain="tasks" className="p-1 sm:p-2">
       <TaskWorkspacePage data={task} copy={dictionary.components.taskPage} />
     </PageFrame>
   );
