@@ -131,6 +131,8 @@ export async function loadGoalWorkspaceData({ params, request }: LoaderFunctionA
   const origin = getOrigin(request);
   const goal = await apiJson<GoalData>(`${origin}/api/goals/${encodeURIComponent(params.goalId)}`);
   const assetQuery = new URLSearchParams({ workspaceId: goal.workspaceId });
+  const requestedAssetState = new URL(request.url).searchParams.get("assetState");
+  if (requestedAssetState === "archived") assetQuery.set("state", "archived");
   const [assets, inbox] = await Promise.all([
     apiJson<{ assets: GoalWorkspaceRouteData["assets"]; recent: GoalWorkspaceRouteData["recentAssets"] }>(`${origin}/api/goals/${encodeURIComponent(params.goalId)}/assets?${assetQuery}`),
     apiJson<{ candidates: GoalWorkspaceRouteData["inboxCandidates"] }>(`${origin}/api/goals/${encodeURIComponent(params.goalId)}/inbox?workspaceId=${encodeURIComponent(goal.workspaceId)}`),
