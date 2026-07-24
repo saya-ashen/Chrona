@@ -1994,7 +1994,7 @@
         "files": "文件",
         "structuredResults": "结构化结果",
         "allSources": "全部来源",
-        "allStatuses": "全部状态",
+        "activeAssets": "未归档资产",
         "draft": "草稿",
         "processing": "处理中",
         "failed": "失败",

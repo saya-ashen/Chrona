@@ -48,7 +48,7 @@ describe("loadGoalWorkspaceData", () => {
     });
     expect(apiJson).toHaveBeenNthCalledWith(
       2,
-      "http://chrona.test/api/goals/goal-1/assets?workspaceId=ws-1",
+      "http://chrona.test/api/goals/goal-1/assets?workspaceId=ws-1&state=active",
     );
   });
 });

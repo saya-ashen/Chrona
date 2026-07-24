@@ -373,7 +373,7 @@ export type GoalCopy = {
     files: string;
     structuredResults: string;
     allSources: string;
-    allStatuses: string;
+    activeAssets: string;
     draft: string;
     processing: string;
     failed: string;

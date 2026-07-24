@@ -130,7 +130,7 @@ export async function loadGoalWorkspaceData({ params, request }: LoaderFunctionA
   if (!params.goalId) throw new Response("Goal id is required", { status: 400 });
   const origin = getOrigin(request);
   const goal = await apiJson<GoalData>(`${origin}/api/goals/${encodeURIComponent(params.goalId)}`);
-  const assetQuery = new URLSearchParams({ workspaceId: goal.workspaceId });
+  const assetQuery = new URLSearchParams({ workspaceId: goal.workspaceId, state: "active" });
   const requestedAssetState = new URL(request.url).searchParams.get("assetState");
   if (requestedAssetState === "archived") assetQuery.set("state", "archived");
   const [assets, inbox] = await Promise.all([

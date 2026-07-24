@@ -8,7 +8,7 @@ import {
   createGoalAssetJobBodySchema,
   createGoalFormSubmissionBodySchema,
   generateGoalAssetOwnershipBodySchema,
-  goalAssetKindSchema,
+  listGoalAssetsQuerySchema,
   resolveGoalInboxCandidateBodySchema,
   restoreGoalAssetVersionBodySchema,
   saveGoalAssetDraftBodySchema,
@@ -25,13 +25,6 @@ const artifactParam = assetParam.extend({ artifactRef: z.string().regex(/^GF[0-9
 const artifactDownloadQuery = z.object({ versionId: z.string().trim().min(1) });
 const assetDownloadQuery = z.object({ versionId: z.string().trim().min(1), mode: z.enum(["source", "export"]).default("source"), format: z.string().trim().min(1).max(50).optional() });
 const candidateParam = goalParam.extend({ candidateId: z.string().trim().min(1) });
-const listAssetsQuery = workspaceQuery.extend({
-  query: z.string().optional(),
-  kind: goalAssetKindSchema.optional(),
-  sourceTaskId: z.string().optional(),
-  state: z.enum(["all", "draft", "running", "failed", "archived"]).default("all"),
-  sort: z.enum(["updated_desc", "updated_asc", "name_asc"]).default("updated_desc"),
-});
 const renameBody = z.object({ label: z.string().trim().min(1).max(200) });
 const ownershipProposalParam = candidateParam.extend({ proposalId: z.string().trim().min(1) });
 const extractBody = z.object({ taskId: z.string().trim().min(1), runId: z.string().trim().min(1) });
@@ -44,7 +37,7 @@ function fail(c: Parameters<typeof error>[0], route: string, cause: unknown) {
 
 export function createGoalWorkbenchRoutes(engine: ChronaEngine) {
   return new Hono()
-    .get("/goals/:goalId/assets", zValidator("param", goalParam), zValidator("query", listAssetsQuery), async (c) => {
+    .get("/goals/:goalId/assets", zValidator("param", goalParam), zValidator("query", listGoalAssetsQuerySchema), async (c) => {
       try { return json(c, await engine.goals.workbench.listAssets({ goalId: c.req.valid("param").goalId, ...c.req.valid("query") })); }
       catch (cause) { return fail(c, "GET /api/goals/:goalId/assets", cause); }
     })

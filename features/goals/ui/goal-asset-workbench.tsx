@@ -1662,7 +1662,7 @@ export function GoalAssetWorkbench({
     () => searchParams.get("assetQuery") ?? "",
   );
   const [state, setState] = useState(
-    () => searchParams.get("assetState") ?? "all",
+    () => searchParams.get("assetState") ?? "active",
   );
   const sourceTasks = useMemo(
     () =>
@@ -1692,7 +1692,7 @@ export function GoalAssetWorkbench({
     searchParams.get("assetView") === "inbox" ? "inbox" : "library";
   useEffect(() => {
     setQuery(searchParams.get("assetQuery") ?? "");
-    const nextState = searchParams.get("assetState") ?? "all";
+    const nextState = searchParams.get("assetState") ?? "active";
     setState(nextState);
     setSourceTaskId(searchParams.get("assetSourceTask") ?? "all");
     setKind((searchParams.get("assetKind") as GoalAssetKind | null) ?? "all");
@@ -1718,7 +1718,7 @@ export function GoalAssetWorkbench({
             state === "archived"
               ? Boolean(asset.archivedAt)
               : !asset.archivedAt &&
-                (state === "all" ||
+                (state === "active" ||
                   (state === "draft" && asset.drafts.length > 0) ||
                   (state === "running" &&
                     asset.jobs.some(
@@ -1865,15 +1865,15 @@ export function GoalAssetWorkbench({
                     onValueChange={(value) => {
                       setState(value);
                       updateWorkbenchParams({
-                        assetState: value === "all" ? null : value,
+                        assetState: value === "active" ? null : value,
                       });
                     }}
                   >
-                    <SelectTrigger aria-label={copy.allStatuses}>
+                    <SelectTrigger aria-label={copy.activeAssets}>
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="all">{copy.allStatuses}</SelectItem>
+                      <SelectItem value="active">{copy.activeAssets}</SelectItem>
                       <SelectItem value="draft">{copy.draft}</SelectItem>
                       <SelectItem value="running">{copy.processing}</SelectItem>
                       <SelectItem value="failed">{copy.failed}</SelectItem>
@@ -1907,7 +1907,7 @@ export function GoalAssetWorkbench({
             </div>
             {kind !== "all" ||
             sourceTaskId !== "all" ||
-            state !== "all" ||
+            state !== "active" ||
             sort !== "updated_desc" ? (
               <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
                 <span>{copy.activeFilters}</span>
@@ -1922,7 +1922,7 @@ export function GoalAssetWorkbench({
                     }
                   </Badge>
                 ) : null}
-                {state !== "all" ? (
+                {state !== "active" ? (
                   <Badge variant="outline">
                     {state === "archived" ? copy.archived : state}
                   </Badge>

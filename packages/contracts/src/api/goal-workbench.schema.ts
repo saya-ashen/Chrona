@@ -39,7 +39,7 @@ export const listGoalAssetsQuerySchema = z.object({
   query: z.string().trim().max(200).optional(),
   kind: goalAssetKindSchema.optional(),
   sourceTaskId: z.string().trim().min(1).optional(),
-  state: z.enum(["all", "draft", "running", "failed", "archived"]).default("all"),
+  state: z.enum(["active", "draft", "running", "failed", "archived"]).default("active"),
   sort: z.enum(["updated_desc", "updated_asc", "name_asc"]).default("updated_desc"),
 });
 

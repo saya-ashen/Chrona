@@ -264,7 +264,7 @@ export async function listGoalAssets(input: {
   query?: string;
   kind?: "document" | "form" | "page" | "file" | "structured_result";
   sourceTaskId?: string;
-  state: "all" | "draft" | "running" | "failed" | "archived";
+  state: "active" | "draft" | "running" | "failed" | "archived";
   sort: "updated_desc" | "updated_asc" | "name_asc";
 }) {
   await goalOrThrow(input.goalId, input.workspaceId);

@@ -271,7 +271,7 @@ const copy: GoalCopy = {
     invalidStructuredResult: "Invalid structured result",
     structuredResultContent: "Structured result content",
     allSources: "All sources",
-    allStatuses: "All statuses",
+    activeAssets: "Active assets",
     draft: "Draft",
     processing: "Processing",
     failed: "Failed",

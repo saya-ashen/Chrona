@@ -1994,7 +1994,7 @@
         "files": "Files",
         "structuredResults": "Structured results",
         "allSources": "All sources",
-        "allStatuses": "All statuses",
+        "activeAssets": "Active assets",
         "draft": "Draft",
         "processing": "Processing",
         "failed": "Failed",
