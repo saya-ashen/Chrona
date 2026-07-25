@@ -18,7 +18,6 @@ Use this directory as the stable product and developer documentation set. Time-p
 | Place code in the right package | [Package Boundaries](./en/package-boundaries.md) |
 | Understand the frontend (`apps/web`) | [Frontend Structure](./en/frontend-structure.md) |
 | Extend AI/runtime providers | [Provider Boundary](./en/provider-boundary.md) |
-| Understand plan-level output architecture | [Plan-Level Output Architecture](./en/plan-level-output-architecture.md) |
 | Understand the accepted Goal, trigger, and occurrence target design | [Long-Horizon Goals and Triggers](./en/long-horizon-goals-and-triggers.md) |
 
 ## 中文文档

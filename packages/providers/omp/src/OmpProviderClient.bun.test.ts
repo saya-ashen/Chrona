@@ -96,7 +96,6 @@ describe("OmpSdkProviderClient direct config", () => {
 describe("OmpSdkProviderClient node runtime tools", () => {
   it("expands task node terminal action into the full task runtime tool set", () => {
     expect(__ompSdkProviderTestHooks.sdkToolNamesForTerminal("chrona_node_complete")).toEqual([
-      "chrona_plan_output",
       "chrona_node_complete",
       "chrona_node_request_input",
       "chrona_node_block",
@@ -113,7 +112,6 @@ describe("OmpSdkProviderClient node runtime tools", () => {
   it("does not narrow OMP SDK tools with toolNames", () => {
     const options = __ompSdkProviderTestHooks.sdkToolOptionsForTerminal("chrona_node_complete");
     expect(options.customTools.map((tool) => tool.name)).toEqual([
-      "chrona_plan_output",
       "chrona_node_complete",
       "chrona_node_request_input",
       "chrona_node_block",
@@ -130,10 +128,9 @@ describe("OmpSdkProviderClient node runtime tools", () => {
     });
     expect(__ompSdkProviderTestHooks.sdkReadOnlyToolOptions("full")).toEqual({});
   });
-  it("treats node result tools as terminal but leaves plan output non-terminal", () => {
+  it("treats node result tools as terminal", () => {
     expect(__ompSdkProviderTestHooks.isTerminalRuntimeTool("chrona_node_request_input")).toBe(true);
     expect(__ompSdkProviderTestHooks.isTerminalRuntimeTool("chrona_node_complete")).toBe(true);
-    expect(__ompSdkProviderTestHooks.isTerminalRuntimeTool("chrona_plan_output")).toBe(false);
   });
   it("aborts only after an accepted node result action", async () => {
     const originalFetch = globalThis.fetch;
@@ -151,14 +148,14 @@ describe("OmpSdkProviderClient node runtime tools", () => {
         () => { terminalAccepted += 1; },
       ).customTools;
       const context = { abort: () => { aborts += 1; } };
-      await tools.find((tool) => tool.name === "chrona_plan_output")!.execute("plan", {}, undefined, context as never, undefined);
-      await Promise.resolve();
-      expect(terminalAccepted).toBe(0);
-      expect(aborts).toBe(0);
-      await tools.find((tool) => tool.name === "chrona_node_request_input")!.execute("input", { title: "Need input", instructions: "Provide it", fields: [] }, undefined, context as never, undefined);
+      await tools.find((tool) => tool.name === "chrona_node_complete")!.execute("complete", { summary: "Done" }, undefined, context as never, undefined);
       await Promise.resolve();
       expect(terminalAccepted).toBe(1);
       expect(aborts).toBe(1);
+      await tools.find((tool) => tool.name === "chrona_node_request_input")!.execute("input", { title: "Need input", instructions: "Provide it", fields: [] }, undefined, context as never, undefined);
+      await Promise.resolve();
+      expect(terminalAccepted).toBe(2);
+      expect(aborts).toBe(2);
       expect(requests).toHaveLength(2);
     } finally {
       globalThis.fetch = originalFetch;

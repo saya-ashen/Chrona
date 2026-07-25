@@ -61,6 +61,12 @@ const DEFAULT_DIALOG_COPY = {
   close: "Close",
   titlePlaceholder: "Add title",
   titleLabel: "Title",
+  goalLabel: "Goal",
+  goalPlaceholder: "What outcome do you ultimately want to achieve?",
+  goalAdditionalInformation: "Additional information (optional)",
+  goalAdditionalInformationPlaceholder: "Add background, scope, constraints, or preferences",
+  firstTaskLabel: "First task",
+  firstTaskPlaceholder: "What bounded work should happen first?",
   aiSuggestions: "AI Suggestions",
   generatingSuggestions: "Generating suggestions...",
   mode: "How should Chrona help?",
@@ -161,8 +167,8 @@ type TaskCreateDialogProps = {
     recurrenceAnchorEndAt: string | null;
     aiClientId: string | null;
     mode?: "task" | "goal";
-    intendedOutcome?: string;
-    firstWorkItem?: string;
+    goalTitle?: string;
+    firstTaskTitle?: string;
   }) => Promise<void>;
   autoSuggestionsEnabled?: boolean;
   availableAiClients?: TaskConfigAiClient[];
@@ -191,8 +197,8 @@ export function TaskCreateDialog({
   const defaultAutoPlanGenerationEnabled = aiPreferences.autoPlanGenerationEnabled;
   const [title, setTitle] = useState(initialTitle);
   const [productMode, setProductMode] = useState<"task" | "goal">("task");
-  const [intendedOutcome, setIntendedOutcome] = useState("");
-  const [firstWorkItem, setFirstWorkItem] = useState("");
+  const [goalTitle, setGoalTitle] = useState("");
+  const [firstTaskTitle, setFirstTaskTitle] = useState("");
   const { messages } = useI18n();
   const locale = useLocale();
   const [showAutomationDetails, setShowAutomationDetails] = useState(false);
@@ -273,6 +279,8 @@ export function TaskCreateDialog({
       setEndTime(formatTime(initialEndAt));
       setTitle(initialTitle);
       setDescription(initialDescription);
+      setGoalTitle("");
+      setFirstTaskTitle("");
       setPriority("Medium");
       setAutoExecute(resolvedInitialAutoExecute);
       setAutoPlanGenerationEnabled(resolvedInitialAutoPlanGeneration);
@@ -289,7 +297,7 @@ export function TaskCreateDialog({
 
   async function handleSubmit() {
     if (productMode === "task" && !title.trim()) return;
-    if (productMode === "goal" && (!intendedOutcome.trim() || !firstWorkItem.trim())) return;
+    if (productMode === "goal" && (!goalTitle.trim() || !firstTaskTitle.trim())) return;
 
     const [startHours, startMinutes] = startTime.split(":").map(Number);
     const [endHours, endMinutes] = endTime.split(":").map(Number);
@@ -303,8 +311,8 @@ export function TaskCreateDialog({
     const recurrenceRule = !repeatEnabled ? null : recurrenceRuleFromState(recurrenceMode, customRRULE);
 
     await onSubmit({
-      title: productMode === "goal" ? firstWorkItem.trim() : title.trim(),
-      description: productMode === "goal" ? `First work item for: ${intendedOutcome.trim()}` : description.trim(),
+      title: productMode === "goal" ? firstTaskTitle.trim() : title.trim(),
+      description: description.trim(),
       priority,
       autoExecute,
       autoPlanGenerationEnabled: autoExecute || autoPlanGenerationEnabled,
@@ -318,8 +326,8 @@ export function TaskCreateDialog({
       recurrenceAnchorEndAt: recurrenceRule ? scheduledEndAt.toISOString() : null,
       aiClientId: aiClientId || null,
       mode: productMode,
-      intendedOutcome: productMode === "goal" ? intendedOutcome.trim() : undefined,
-      firstWorkItem: productMode === "goal" ? firstWorkItem.trim() : undefined,
+      goalTitle: productMode === "goal" ? goalTitle.trim() : undefined,
+      firstTaskTitle: productMode === "goal" ? firstTaskTitle.trim() : undefined,
     });
 
     onClose();
@@ -406,8 +414,14 @@ export function TaskCreateDialog({
           ) : null}
           {productMode === "goal" ? (
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field><FieldLabel htmlFor="goal-intended-outcome">Intended outcome</FieldLabel><Textarea id="goal-intended-outcome" value={intendedOutcome} onChange={(event) => setIntendedOutcome(event.target.value)} placeholder="What durable outcome should this Goal reach?" /></Field>
-              <Field><FieldLabel htmlFor="goal-first-work-item">First work item</FieldLabel><Textarea id="goal-first-work-item" value={firstWorkItem} onChange={(event) => setFirstWorkItem(event.target.value)} placeholder="What bounded work should happen first?" /></Field>
+              <Field>
+                <FieldLabel htmlFor="goal-title">{dialogCopy.goalLabel}</FieldLabel>
+                <Input id="goal-title" value={goalTitle} onChange={(event) => setGoalTitle(event.target.value)} placeholder={dialogCopy.goalPlaceholder} />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="goal-first-task">{dialogCopy.firstTaskLabel}</FieldLabel>
+                <Input id="goal-first-task" value={firstTaskTitle} onChange={(event) => setFirstTaskTitle(event.target.value)} placeholder={dialogCopy.firstTaskPlaceholder} />
+              </Field>
             </div>
           ) : null}
           {productMode === "task" ? (
@@ -570,11 +584,11 @@ export function TaskCreateDialog({
                 </div>
               </TaskConfigSection>
 
-              <TaskConfigSection title={dialogCopy.description}>
+              <TaskConfigSection title={productMode === "goal" ? dialogCopy.goalAdditionalInformation : dialogCopy.description}>
                 <Textarea
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  placeholder={dialogCopy.descriptionPlaceholder}
+                  placeholder={productMode === "goal" ? dialogCopy.goalAdditionalInformationPlaceholder : dialogCopy.descriptionPlaceholder}
                   disabled={isPending}
                   rows={4}
                   className="bg-background"
@@ -840,7 +854,7 @@ export function TaskCreateDialog({
           <Button
             type="button"
             onClick={() => void handleSubmit()}
-            disabled={isPending || (productMode === "task" ? !title.trim() : !intendedOutcome.trim() || !firstWorkItem.trim())}
+            disabled={isPending || (productMode === "task" ? !title.trim() : !goalTitle.trim() || !firstTaskTitle.trim())}
             variant="default"
             size="sm"
             className="min-w-20 rounded-lg"

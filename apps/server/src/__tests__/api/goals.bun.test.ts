@@ -66,7 +66,7 @@ describe("Goal API", () => {
   it("atomically and idempotently creates a direct Goal with its first bounded Task", async () => {
     const { workspaceId } = await seedWorkspace("Direct Goal entry");
     const app = createApiRouter(createChronaEngine());
-    const command = { workspaceId, intendedOutcome: "Launch a durable program", firstWorkItem: "Draft the launch brief", description: "Start with evidence", priority: "High", idempotencyKey: "direct-goal-entry-1" };
+    const command = { workspaceId, title: "Launch a durable program", firstTaskTitle: "Draft the launch brief", additionalContext: "Start with evidence", priority: "High", idempotencyKey: "direct-goal-entry-1" };
 
     const first = await responseJson<GoalTaskResponse>(await requestJson(app, "/goals/with-first-task", command));
     const second = await responseJson<GoalTaskResponse>(await requestJson(app, "/goals/with-first-task", command));
@@ -74,9 +74,27 @@ describe("Goal API", () => {
     expect(second.goal.id).toBe(first.goal.id);
     expect(await db.goal.count({ where: { workspaceId } })).toBe(1);
     expect(await db.task.count({ where: { workspaceId, goalId: first.goal.id } })).toBe(1);
+    const createdGoal = await db.goal.findUniqueOrThrow({ where: { id: first.goal.id } });
+    expect(createdGoal.description).toBe("Start with evidence");
+    expect(createdGoal.operationalBrief).toMatchObject({
+      outcome: "Launch a durable program",
+      currentFocus: "Draft the launch brief",
+      strategy: "",
+      constraints: [],
+    });
     expect(await db.taskOccurrence.count({ where: { taskId: first.taskId } })).toBe(1);
     const createdTask = await db.task.findUniqueOrThrow({ where: { id: first.taskId }, include: { sessions: true, projection: true } });
-    expect(createdTask.goalContext).toMatchObject({ expectedOutcome: "Launch a durable program" });
+    expect(createdTask.description).toBeNull();
+    expect(createdTask.goalContext).toMatchObject({
+      goal: {
+        title: "Launch a durable program",
+        additionalContext: "Start with evidence",
+        operationalBrief: {
+          outcome: "Launch a durable program",
+          currentFocus: "Draft the launch brief",
+        },
+      },
+    });
     expect(createdTask.sessions).toHaveLength(1);
     expect(createdTask.defaultSessionId).toBe(createdTask.sessions[0]?.id);
     expect(createdTask.sessions[0]?.sessionKey).toBe(`chrona:task:${first.taskId}:default`);
@@ -87,7 +105,7 @@ describe("Goal API", () => {
   it("coalesces concurrent retries into one Goal and first Task", async () => {
     const { workspaceId } = await seedWorkspace("Concurrent direct Goal entry");
     const app = createApiRouter(createChronaEngine());
-    const command = { workspaceId, intendedOutcome: "One durable outcome", firstWorkItem: "One bounded Task", idempotencyKey: "concurrent-direct-goal" };
+    const command = { workspaceId, title: "One durable outcome", firstTaskTitle: "One bounded Task", idempotencyKey: "concurrent-direct-goal" };
 
     const responses = await Promise.all([requestJson(app, "/goals/with-first-task", command), requestJson(app, "/goals/with-first-task", command)]);
     expect(responses.map((response) => response.status)).toEqual([201, 201]);
@@ -102,7 +120,7 @@ describe("Goal API", () => {
     const { workspaceId } = await seedWorkspace("Invalid direct Goal entry");
     const app = createApiRouter(createChronaEngine());
 
-    const response = await requestJson(app, "/goals/with-first-task", { workspaceId, intendedOutcome: "Never persist partially", firstWorkItem: "   ", idempotencyKey: "invalid-direct-goal" });
+    const response = await requestJson(app, "/goals/with-first-task", { workspaceId, title: "Never persist partially", firstTaskTitle: "   ", idempotencyKey: "invalid-direct-goal" });
 
     expect(response.status).toBe(400);
     expect(await db.goal.count({ where: { workspaceId } })).toBe(0);
@@ -584,8 +602,8 @@ describe("Goal API", () => {
     const engine = createChronaEngine();
     const created = await engine.goals.createWithFirstTask({
       workspaceId,
-      intendedOutcome: "Synthesize accepted research",
-      firstWorkItem: "Collect evidence",
+      title: "Synthesize accepted research",
+      firstTaskTitle: "Collect evidence",
       priority: "Medium",
       idempotencyKey: "goal-result-search",
     });

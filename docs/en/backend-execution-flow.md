@@ -135,6 +135,19 @@ to.
 | `failed` | `Run.status=Failed` + `errorSummary`; session `Paused` → `Blocked` (`run_failed`) carrying the real error + node id |
 | `replan_required` | Session `Paused`, `pauseReason=replan_required` → `WaitingForApproval` (replan) |
 
+An authoritative Task/Run/session wait outranks other graph nodes that are merely
+`ready`. A paused `user_input` or approval session must therefore project an
+execution checkpoint even when another independent or downstream node is ready;
+otherwise the workspace loses the persisted action form while still saying that
+input is required.
+
+Before invoking a node, the engine also projects the Task's frozen Goal context
+snapshot into the AI-visible runtime input. Only the bounded Goal title,
+additional context, operational brief, capture time, and accepted-result catalog
+are forwarded. Database identifiers and unrelated `goalContext` extension fields
+remain server-owned. Nodes must use this supplied context before requesting the
+same information from the user again.
+
 ## Context segments
 
 Provider sessions are not the same as Chrona execution sessions. Chrona should use context segments as the default long-task provider-session boundary: related plan nodes share one provider task session, then Chrona writes a structured segment summary and switches to the next segment session.
@@ -167,6 +180,22 @@ Supported command categories include plan generation, plan acceptance, execution
 External agents use `POST /api/mcp` tools. Chrona injects hidden context such as session ID, task ID, expected revision, and idempotency key. Public tool inputs expose only the AI-safe payload, including node/branch refs where needed.
 
 Important rule: agents must not invent backend IDs. They should call read tools only when state is missing or stale, and submit final node outcomes with the appropriate Chrona tool.
+
+## Canonical task-result flow
+
+Task nodes do not co-author a shared json-render page. A task node submits one terminal semantic result containing its summary, keyed findings, decisions, caveats, next actions, evidence, and generated-file deliverable declarations.
+
+Chrona then owns the result lifecycle:
+
+1. Resolve every generated file inside the generated-files root, verify its canonical path and file metadata, register a Run-owned `Artifact`, and replace the declaration with an opaque `AF...` reference.
+2. Persist the immutable `NodeResult` with semantic provenance.
+3. Deterministically aggregate current node results into `ResultManifest`. Its revision advances only when canonical result content changes.
+4. After graph completion, run the internal `task.result_finalization` AI feature with no MCP/LSP tools. It may organize only Manifest facts and declared Artifact refs into one `validateChronaSpec()`-validated document.
+5. Persist finalization independently as `Pending -> Running -> Ready | Failed`. Finalization failure does not convert completed execution into failure.
+6. Render only a `Ready` finalized result. The host resolves opaque Artifact refs into safe previews and download routes without persisting host-only paths or URLs in the Spec.
+7. `task.result_accepted` records review state independently from Task execution status. For Goal-owned Tasks, acceptance idempotently creates or refreshes a pending Workbench Inbox candidate; a user must still confirm creation of a formal `GoalAsset`.
+
+The removed `chrona.plan.output` / RFC 6902 path is not a compatibility surface. Providers and clients submit semantic node results through `chrona.node.complete` only.
 
 ## Accepted-result continuation
 

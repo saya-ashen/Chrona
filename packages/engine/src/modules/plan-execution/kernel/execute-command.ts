@@ -18,6 +18,8 @@ import type {
   ExecutionCommandEnvelope,
   ExecutionTrigger,
   PlanExecutionResult,
+  NodeDeliverable,
+  NodeDeliverableDeclaration,
   SubmittedNodeResult,
   WaitKind,
 } from "@chrona/contracts/ai";
@@ -56,8 +58,11 @@ import {
 } from "../runtime/runtime-outcome";
 import { appendGraphRuntimeEvents } from "../persistence/runtime-event-store";
 import { createKernelGraphCallbacks } from "./graph-callbacks";
-import type { EngineRuntimeContext, PlanExecutionObserver } from "./kernel-types";
+import type { EngineRuntimeContext, KernelCallbacksInput, PlanExecutionObserver } from "./kernel-types";
 import { branchBindingForRef, buildSemanticRefHistory } from "../runtime/node-runtime-refs";
+import { registerNodeDeliverables } from "../use-cases/register-generated-plan-output-artifacts";
+import { aggregateResultManifest } from "../results/result-manifest";
+import { finalizeTaskResult } from "../results/finalize-task-result";
 
 const DEFAULT_MAX_STEPS = 10;
 
@@ -158,12 +163,17 @@ function resolveSubmitNodeId(
       .find((attempt) => attempt.status === "running");
     return running?.nodeId ?? null;
   }
-  return (
-    effective.nodes.find((node) => node.status === "running")?.id ??
-    waitingNode(effective)?.id ??
-    effective.readyNodeIds[0] ??
-    null
-  );
+  const running = effective.nodes.find((node) => node.status === "running");
+  if (running) return running.id;
+  const waiting = waitingNode(effective);
+  if (waiting) return waiting.id;
+  return effective.readyNodeIds[0] ?? null;
+}
+
+function isDeliverableDeclaration(
+  deliverable: NodeDeliverableDeclaration | NodeDeliverable,
+): deliverable is NodeDeliverableDeclaration {
+  return "source" in deliverable;
 }
 
 function toSubmittedNodeResult(
@@ -194,6 +204,17 @@ function toSubmittedNodeResult(
     }
   }
 
+  const deliverables = result.kind === "done"
+    ? result.deliverables?.filter((deliverable): deliverable is NodeDeliverable =>
+        !isDeliverableDeclaration(deliverable))
+    : undefined;
+  if (
+    result.kind === "done" &&
+    deliverables?.length !== result.deliverables?.length
+  ) {
+    throw new Error("Node result deliverables must be registered before graph submission");
+  }
+
   switch (result.kind) {
     case "done":
       return {
@@ -203,6 +224,12 @@ function toSubmittedNodeResult(
         evidence: result.evidence,
         output: result.output,
         selectedBranch: result.selectedBranch ?? selectedBranch,
+        deliverables,
+        findings: result.findings,
+        decisions: result.decisions,
+        caveats: result.caveats,
+        nextActions: result.nextActions,
+        resultEvidence: result.resultEvidence,
       };
     case "failed":
       return { nodeId, status: "failed", error: result.error, evidence: result.evidence };
@@ -391,11 +418,16 @@ async function finalizeOutcome(input: {
     });
   }
   if (status === "cancelled") {
-    await cancelActiveRunsForTask(taskId, outcome.message ?? null);
+    await cancelActiveRunsForTask(taskId, outcome.message);
     await releaseWorkBlock(taskId, session.workBlockId);
   }
 
   await rebuildTaskProjection(taskId);
+
+  const latestExecution = await getCurrentExecution({
+    taskId,
+    workBlockId: session.workBlockId,
+  });
 
   return buildExecutionResponse({
     taskId,
@@ -410,6 +442,7 @@ async function finalizeOutcome(input: {
     message: outcome.message,
     errorDetails: errorDetailsFromOutcome(outcome),
     waitKind,
+    planOutput: latestExecution.planOutput,
   });
 }
 
@@ -451,6 +484,69 @@ export async function executeCommand(
  * block, fail, retry, pause, cancel, mutate — flows through here as one
  * ExecutionCommand, dispatched once and persisted once under an epoch guard.
  */
+function record(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : null;
+}
+
+function optionalText(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim().length > 0 ? value : undefined;
+}
+
+function frozenGoalContext(value: unknown): KernelCallbacksInput["goalContext"] {
+  const context = record(value);
+  const goal = record(context?.goal);
+  const title = optionalText(goal?.title);
+  if (!goal || !title) return undefined;
+  if (!context) return undefined;
+
+  const brief = record(goal.operationalBrief);
+  const outcome = optionalText(brief?.outcome);
+  const currentFocus = optionalText(brief?.currentFocus);
+  const strategy = typeof brief?.strategy === "string" ? brief.strategy : undefined;
+  const constraints = Array.isArray(brief?.constraints)
+    ? brief.constraints.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+    : undefined;
+  const operationalBrief = outcome && currentFocus && strategy !== undefined && constraints
+    ? { outcome, currentFocus, strategy, constraints }
+    : undefined;
+
+  const acceptedResultsValue = context.acceptedResults;
+  const acceptedResults = Array.isArray(acceptedResultsValue)
+    ? acceptedResultsValue.flatMap((value) => {
+        const result = record(value);
+        if (!result) return [];
+        const ref = optionalText(result.ref);
+        const taskTitle = optionalText(result.taskTitle);
+        const summary = optionalText(result.summary);
+        const artifactCount = typeof result.artifactCount === "number" && Number.isFinite(result.artifactCount)
+          ? Math.max(0, Math.trunc(result.artifactCount))
+          : null;
+        if (!ref || !taskTitle || !summary || artifactCount === null) return [];
+        return [{
+          ref,
+          taskTitle,
+          ...(typeof result.acceptedAt === "string" || result.acceptedAt === null
+            ? { acceptedAt: result.acceptedAt }
+            : {}),
+          summary,
+          artifactCount,
+        }];
+      })
+    : [];
+
+  return {
+    goal: {
+      title,
+      ...(optionalText(goal.additionalContext) ? { additionalContext: optionalText(goal.additionalContext) } : {}),
+      ...(operationalBrief ? { operationalBrief } : {}),
+      ...(optionalText(goal.capturedAt) ? { capturedAt: optionalText(goal.capturedAt) } : {}),
+    },
+    acceptedResults,
+  };
+}
+
 async function executeCommandUnlocked(
   input: ExecutionCommandEnvelope & PlanExecutionObserver,
 ): Promise<PlanExecutionResult> {
@@ -466,6 +562,11 @@ async function executeCommandUnlocked(
 
   const runtime = await ensureNativePlanRun(taskId, requestedWorkBlockId);
   if (!runtime) return noPlanResponse(taskId, context.sessionId);
+  const taskGoalContext = await db.task.findUniqueOrThrow({
+    where: { id: taskId },
+    select: { goalContext: true },
+  });
+  const goalContext = frozenGoalContext(taskGoalContext.goalContext);
   const workBlockId = requestedWorkBlockId ?? runtime.workBlockId ?? null;
   if (command.type === "retry_node") {
     const activeProviderRun = await db.taskPlanProviderRun.findFirst({
@@ -522,6 +623,35 @@ async function executeCommandUnlocked(
   });
   const runtimeName = await getRuntimeName(taskId);
 
+  if (
+    command.type === "submit_node_result" &&
+    command.result.kind === "done" &&
+    command.result.deliverables?.length
+  ) {
+    const nodeId =
+      command.nodeId ??
+      session.currentNodeId ??
+      resolveEffectivePlanGraph(toGraphExecutionState(runtime.persisted)).nodes.find(
+        (node) => node.status === "running",
+      )?.id;
+    if (!nodeId) {
+      throw new Error("No active node is available for deliverable registration");
+    }
+    const declarations: NodeDeliverableDeclaration[] = [];
+    for (const deliverable of command.result.deliverables) {
+      if (!isDeliverableDeclaration(deliverable)) {
+        throw new Error("Node result deliverables were already registered");
+      }
+      declarations.push(deliverable);
+    }
+    command.result.deliverables = await registerNodeDeliverables({
+      workspaceId: runtime.workspaceId,
+      taskId,
+      runId: undefined,
+      sourceNodeId: nodeId,
+      declarations,
+    });
+  }
   if (command.type === "start" || command.type === "restart_from_beginning") {
     await activateWorkBlock(taskId, session.workBlockId);
     await appendMainSessionEvent({
@@ -640,6 +770,7 @@ async function executeCommandUnlocked(
       compiledPlan: runtime.compiledPlan,
       persisted: runtime.persisted,
       planSummary: runtime.planSummary,
+      goalContext,
       initialRunContext: command.type === "start" || command.type === "restart_from_beginning"
         ? {
             ...(runtime.planPrompt ? { planningPrompt: runtime.planPrompt } : {}),
@@ -676,6 +807,35 @@ async function executeCommandUnlocked(
     executionContextSnapshots: outcome.state.executionContextSnapshots,
     status,
   });
+  const manifest = aggregateResultManifest({
+    results: outcome.state.results,
+    previous: runtime.persisted.planOutput.manifest,
+    sourceNodeRef: (nodeId: string) =>
+      buildSemanticRefHistory(outcome.effective).nodeRefs.find((binding) =>
+        binding.nodeId === nodeId || binding.backendId === nodeId
+      )?.ref ?? nodeId,
+  });
+  const manifestChanged =
+    manifest.sourceRevision !== runtime.persisted.planOutput.manifest.sourceRevision;
+  const planOutput = {
+    ...runtime.persisted.planOutput,
+    manifest,
+    finalizedResult: manifestChanged
+      ? null
+      : runtime.persisted.planOutput.finalizedResult,
+    finalization: manifestChanged
+      ? { status: "Pending" as const, sourceRevision: manifest.sourceRevision }
+      : runtime.persisted.planOutput.finalization,
+    revision: manifestChanged
+      ? runtime.persisted.planOutput.revision + 1
+      : runtime.persisted.planOutput.revision,
+    updatedAt: manifestChanged
+      ? new Date().toISOString()
+      : runtime.persisted.planOutput.updatedAt,
+    updatedByNodeId: manifestChanged && command.type === "submit_node_result"
+      ? command.nodeId ?? session.currentNodeId
+      : runtime.persisted.planOutput.updatedByNodeId,
+  };
   const committed = await savePlanRunGuarded({
     workspaceId: runtime.workspaceId,
     taskId,
@@ -688,6 +848,7 @@ async function executeCommandUnlocked(
     attempts: outcome.state.attempts,
     results: outcome.state.results,
     executionContextSnapshots: outcome.state.executionContextSnapshots,
+    planOutput,
   });
   if (!committed.committed) {
     // A concurrent command advanced the run first; surface current state.
@@ -712,7 +873,9 @@ async function executeCommandUnlocked(
       actor: context.actor ?? (command.type === "submit_node_result"
         ? { type: "user" }
         : { type: "system", service: "plan-execution" }),
-      origin: context.origin ?? { channel: command.type === "submit_node_result" ? "api" : "internal" },
+      origin: context.origin ?? {
+        channel: command.type === "submit_node_result" ? "api" : "internal",
+      },
       correlation: {
         taskId,
         planId: runtime.planId,
@@ -722,6 +885,39 @@ async function executeCommandUnlocked(
     },
   });
 
+  if (status === "completed") {
+    await appendMainSessionEvent({
+      taskId,
+      planId: runtime.planId,
+      sessionId: mainSession.id,
+      eventType: "result_finalization_started",
+      payload: { sourceRevision: planOutput.manifest.sourceRevision },
+    });
+    try {
+      const finalized = await finalizeTaskResult({
+        taskId,
+        workBlockId: session.workBlockId,
+      });
+      await appendMainSessionEvent({
+        taskId,
+        planId: runtime.planId,
+        sessionId: mainSession.id,
+        eventType: "result_finalization_ready",
+        payload: { sourceRevision: finalized.manifest.sourceRevision },
+      });
+    } catch (error) {
+      await appendMainSessionEvent({
+        taskId,
+        planId: runtime.planId,
+        sessionId: mainSession.id,
+        eventType: "result_finalization_failed",
+        payload: {
+          sourceRevision: planOutput.manifest.sourceRevision,
+          message: error instanceof Error ? error.message : String(error),
+        },
+      });
+    }
+  }
   return finalizeOutcome({
     taskId,
     runtime,

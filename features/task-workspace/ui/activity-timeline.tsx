@@ -134,7 +134,7 @@ export function buildRenderList(items: WorkspaceActivityItem[], transcript = fal
     }
 
     if (transcript && executionHeaderSessionId !== sessionId) {
-      result.push({ type: "execution_header", key: `execution-phase:${sessionId ?? "unscoped"}` });
+      result.push({ type: "execution_header", key: `execution-phase:${sessionId ?? "unscoped"}:${item.id}` });
       executionHeaderSessionId = sessionId;
     }
     const completedTool = getToolPair(visibleItems, item, i);

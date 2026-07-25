@@ -12,18 +12,16 @@ export {
 export { chronaSchema, type ChronaSchema } from "./schema";
 export {
   chronaCatalog,
-  chronaPlanOutputCatalog,
-  chronaPlanOutputCatalogPrompt,
-  chronaPlanOutputElementJsonSchema,
-  chronaPlanOutputElementSchema,
-  chronaPlanOutputPatchJsonSchema,
-  chronaPlanOutputPatchValueJsonSchema,
-  chronaPlanOutputSpecJsonSchema,
-  chronaPlanOutputSpecJsonSchemaFromCatalog,
-  chronaPlanOutputSpecSchema,
-  chronaPlanOutputToolInputJsonSchema,
+  chronaResultCatalog,
+  chronaResultElementJsonSchema,
+  chronaResultElementSchema,
+  chronaResultSpecJsonSchema,
+  chronaResultSpecJsonSchemaFromCatalog,
+  chronaResultSpecSchema,
   type ChronaCatalog,
   type ChronaComponentName,
+  type ChronaResultCatalog,
+  type ChronaResultComponentName,
 } from "./catalog/components";
 export { CATALOG_VERSION, isCatalogCompatible } from "./catalog/catalog-version";
 export {

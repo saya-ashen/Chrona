@@ -210,6 +210,75 @@ describe("workspace result registry", () => {
     expect(card).not.toHaveClass("max-w-sm");
   });
 
+  it("renders the operational result hierarchy with semantic surfaces", () => {
+    const spec: UiDocument = {
+      root: "root",
+      elements: {
+        root: { type: "Stack", props: { gap: "lg" }, children: ["hero", "deliverables", "insights", "actions", "caveats", "evidence"] },
+        hero: {
+          type: "ResultHero",
+          props: {
+            title: "Research package ready",
+            summary: "Verified sources and an operating guide are assembled.",
+            readiness: "ready_with_caveats",
+            readinessSummary: "Confirm one access-limited source.",
+            metrics: [{ label: "Deliverables", value: "2" }, { label: "Verified sources", value: "37" }],
+          },
+        },
+        deliverables: { type: "Stack", props: { direction: "horizontal", gap: "md" }, children: ["primary", "support"] },
+        primary: {
+          type: "ResultDeliverable",
+          props: {
+            title: "Operating guide",
+            summary: "Primary workflow",
+            artifactRef: "AF111111111111",
+            role: "primary",
+            kind: "document",
+            formatLabel: "Markdown",
+            contentKind: "markdown",
+            contentPreview: "# Guide\n\nStart here.",
+            downloadHref: "/api/tasks/task-1/result-files/download?path=guide",
+          },
+        },
+        support: {
+          type: "ResultDeliverable",
+          props: { title: "Source table", artifactRef: "AF222222222222", role: "supporting", kind: "table" },
+        },
+        insights: {
+          type: "ResultInsight",
+          props: { title: "Confirm on official sources", summary: "Discovery networks provide early signals.", emphasis: "lead", points: ["Discover", "Verify"] },
+        },
+        actions: {
+          type: "ResultActionPlan",
+          props: { title: "Recommended route", phases: [{ timeframe: "now", title: "Confirm constraints", actions: ["Choose target regions"] }] },
+        },
+        caveats: { type: "ResultCaveats", props: { title: "Before accepting", items: ["One source requires manual verification"] } },
+        evidence: { type: "ResultEvidence", props: { title: "Evidence and source boundaries", summary: "2 records", items: ["Official source checked"], defaultCollapsed: true } },
+      },
+    };
+
+    render(<SpecRenderer spec={spec} />);
+
+    expect(screen.getByRole("region", { name: "Result overview" })).toHaveTextContent("Ready with caveats");
+    expect(screen.getByText("Research package ready")).toBeInTheDocument();
+    expect(screen.getByText("37")).toBeInTheDocument();
+    const primaryDeliverable = screen.getByText("Operating guide").closest("article");
+    expect(primaryDeliverable).toHaveAttribute("data-result-deliverable-role", "primary");
+    expect(screen.getByText("Source table").closest("article")).toHaveAttribute("data-result-deliverable-role", "supporting");
+    const deliverables = primaryDeliverable?.parentElement;
+    expect(deliverables).toHaveClass("flex-row");
+    expect(deliverables).toHaveClass("flex-wrap");
+    expect(deliverables).toHaveClass("[&>*]:flex-[1_1_18rem]");
+    expect(within(primaryDeliverable as HTMLElement).getByRole("link", { name: /download/i })).toHaveAttribute("href", "/api/tasks/task-1/result-files/download?path=guide");
+    fireEvent.click(screen.getByRole("button", { name: "Preview" }));
+    expect(screen.getByRole("heading", { name: "Guide" })).toBeInTheDocument();
+    expect(screen.getByText("Now")).toBeInTheDocument();
+    expect(screen.getByText("One source requires manual verification")).toBeInTheDocument();
+    expect(screen.queryByText("Official source checked")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /evidence and source boundaries/i }));
+    expect(screen.getByText("Official source checked")).toBeInTheDocument();
+  });
+
   it("renders file-backed JSON tables with links, sorting, and pagination", () => {
     const spec: UiDocument = {
       root: "root",

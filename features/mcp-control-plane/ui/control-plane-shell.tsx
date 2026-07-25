@@ -424,9 +424,9 @@ export function ControlPlaneShell({
             if (input.mode === "goal") {
               const created = await createGoalWithFirstTask({
                 workspaceId: _defaultWorkspace.id,
-                intendedOutcome: input.intendedOutcome!,
-                firstWorkItem: input.firstWorkItem!,
-                description: input.description || null,
+                title: input.goalTitle!,
+                firstTaskTitle: input.firstTaskTitle!,
+                additionalContext: input.description || null,
                 priority: input.priority,
                 idempotencyKey: crypto.randomUUID(),
               });

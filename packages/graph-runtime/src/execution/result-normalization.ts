@@ -60,6 +60,12 @@ export function appendExecutionResult(input: {
           inputFields: input.result.inputFields,
           evidence,
           selectedBranch: input.result.selectedBranch,
+          deliverables: input.result.deliverables,
+          findings: input.result.findings,
+          decisions: input.result.decisions,
+          caveats: input.result.caveats,
+          nextActions: input.result.nextActions,
+          resultEvidence: input.result.resultEvidence,
         },
       });
     }

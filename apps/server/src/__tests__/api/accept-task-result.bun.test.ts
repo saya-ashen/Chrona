@@ -51,7 +51,7 @@ describe("acceptTaskResult (engine)", () => {
     expect(result.acceptedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
 
     const acceptedTask = await db.task.findUniqueOrThrow({ where: { id: taskId } });
-    expect(acceptedTask.status).toBe("Done");
+    expect(acceptedTask.status).toBe("Completed");
 
     const events = await db.event.findMany({
       where: { taskId, eventType: "task.result_accepted" },

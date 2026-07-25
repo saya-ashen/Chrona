@@ -129,7 +129,7 @@ describe("POST /api/tasks/:taskId/result/accept", () => {
     await resetTestDb();
   });
 
-  it("accepts a completed run result and closes the task", async () => {
+  it("accepts a completed run result without changing task execution state", async () => {
     const { workspaceId } = await seedWorkspace("Accept Test");
     const { taskId } = await seedTask(workspaceId, {
       title: "Accept Task",
@@ -162,16 +162,16 @@ describe("POST /api/tasks/:taskId/result/accept", () => {
     expect(body.runId).toBe(run.id);
 
     const acceptedTask = await db.task.findUniqueOrThrow({ where: { id: taskId } });
-    expect(acceptedTask.status).toBe(TaskStatus.Done);
+    expect(acceptedTask.status).toBe(TaskStatus.Completed);
     expect(await db.event.count({
       where: { taskId, runId: run.id, eventType: "task.result_accepted" },
     })).toBe(1);
     expect(await db.event.count({
       where: { taskId, runId: run.id, eventType: "task.done" },
-    })).toBe(1);
+    })).toBe(0);
   });
 
-  it("repairs a legacy accepted result whose task never reached Done", async () => {
+  it("replays a legacy accepted result without mutating task execution state", async () => {
     const { workspaceId } = await seedWorkspace("Legacy Accept Test");
     const { taskId } = await seedTask(workspaceId, {
       title: "Legacy Accepted Task",
@@ -210,14 +210,14 @@ describe("POST /api/tasks/:taskId/result/accept", () => {
     expect(first.status).toBe(200);
     expect(second.status).toBe(200);
     expect(await db.task.findUniqueOrThrow({ where: { id: taskId } })).toMatchObject({
-      status: TaskStatus.Done,
-      completedAt: endedAt,
+      status: TaskStatus.Completed,
+      completedAt: null,
     });
     expect(await db.event.count({
       where: { taskId, runId: run.id, eventType: "task.result_accepted" },
     })).toBe(1);
     expect(await db.event.count({
       where: { taskId, runId: run.id, eventType: "task.done" },
-    })).toBe(1);
+    })).toBe(0);
   });
 });

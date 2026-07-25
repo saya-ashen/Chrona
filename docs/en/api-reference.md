@@ -30,9 +30,9 @@ Creates an active Goal with validated user-confirmed success criteria.
 
 ### POST /api/goals/with-first-task
 
-Atomically and idempotently creates a Goal plus its first bounded Task from
-separate intended-outcome and first-work-item fields. Failure leaves neither
-partial object behind.
+Atomically and idempotently creates a Goal plus its first bounded Task from a
+Goal title, optional Goal-level additional context, and a separate first Task
+title. Failure leaves neither partial object behind.
 
 ### GET /api/goals/:goalId
 

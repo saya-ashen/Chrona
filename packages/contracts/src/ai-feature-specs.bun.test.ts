@@ -3,11 +3,43 @@ import { describe, expect, it } from "bun:test";
 import {
   SUGGEST_TASK_COMPLETIONS_TOOL_NAME,
   buildGoalAssetOwnershipFeatureSpec,
+  buildResultFinalizationFeatureSpec,
   buildSuggestFeatureSpec,
   GENERATE_PLAN_BLUEPRINT_TOOL_NAME,
   buildGeneratePlanFeatureSpec,
   validatePreparedFeaturePayload,
 } from "./ai";
+
+describe("task result finalization feature spec", () => {
+  it("requires the operational result workspace and exposes the strict result catalog schema", () => {
+    const feature = buildResultFinalizationFeatureSpec({
+      manifest: {
+        outcome: { title: "Research package", summary: "Ready for review" },
+        readiness: { status: "ready_with_caveats", summary: "Confirm one source" },
+      },
+    });
+
+    expect(feature.feature).toBe("task.result_finalization");
+    expect(feature.instructions).toContain("exactly one ResultHero");
+    expect(feature.instructions).toContain("exactly one primary role");
+    expect(feature.instructions).toContain("at most six ResultInsight");
+    expect(feature.instructions).toContain("one ResultActionPlan");
+    expect(feature.instructions).toContain("defaultCollapsed true");
+    expect(feature.instructions).toContain("Do not reproduce the manifest as a linear report");
+
+    const schema = feature.structuredOutputSchema?.schema as {
+      properties?: { elements?: { additionalProperties?: { properties?: { type?: { enum?: string[] } } } } };
+    };
+    const componentNames = schema.properties?.elements?.additionalProperties?.properties?.type?.enum ?? [];
+    expect(componentNames).toContain("ResultHero");
+    expect(componentNames).toContain("ResultDeliverable");
+    expect(componentNames).toContain("ResultInsight");
+    expect(componentNames).toContain("ResultActionPlan");
+    expect(componentNames).toContain("ResultCaveats");
+    expect(componentNames).toContain("ResultEvidence");
+    expect(componentNames).not.toContain("Button");
+  });
+});
 
 describe("generate_plan feature spec", () => {
   it("builds a provider-agnostic feature spec that delegates persistence to MCP", () => {
@@ -54,7 +86,7 @@ describe("generate_plan feature spec", () => {
     expect(claudeCode.instructions).not.toContain("tool_search");
   });
 
-  it("includes both the editable Chrona note and the read-only calendar source context as distinct sections", () => {
+  it("keeps the editable task description separate from read-only source context", () => {
     const spec = buildGeneratePlanFeatureSpec({
       taskId: "task-cal",
       title: "获取今天的github trendings",
@@ -64,7 +96,7 @@ describe("generate_plan feature spec", () => {
 
     expect(spec.inputText).toContain("Description: 我的本地笔记");
     expect(spec.inputText).toContain(
-      "Calendar event details (read-only, from the external calendar source):",
+      "Source context (read-only; provenance is preserved in the payload):",
     );
     expect(spec.inputText).toContain(
       "读取今天最新的github trendings，并总结成一份markdown报告",

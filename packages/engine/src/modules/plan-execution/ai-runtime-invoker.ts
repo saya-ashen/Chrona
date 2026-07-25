@@ -146,7 +146,9 @@ export class AiRuntimeInvoker {
         );
       }
       const providerName = client.providerClient.provider;
-      const useChronaControl = input.featureSpec.feature !== "goal.review" && usesChronaControlPlane(providerName);
+      const useChronaControl = input.featureSpec.feature !== "goal.review" &&
+        input.featureSpec.feature !== "task.result_finalization" &&
+        usesChronaControlPlane(providerName);
       let controlRunToken: string | null = null;
       if (useChronaControl) {
         controlRunToken = await mintRunToken({
@@ -388,7 +390,7 @@ export async function runProviderRequest(
   });
 
   const cancelProviderRun = async (): Promise<ProviderRunSnapshot> => {
-    const snapshot = await providerClient.cancelRun?.({
+    const snapshot = await providerClient.cancelRun({
       runId: run.runId,
       sessionId: run.sessionId,
       reason: "Execution stopped",
@@ -705,7 +707,7 @@ async function collectProviderRunSnapshot(
       };
     }
     if (event.type === "tool_call") {
-      terminalToolName = event.tool ?? terminalToolName;
+      terminalToolName = event.tool;
     }
     if (event.type === "tool_completed") {
       terminalToolName = event.toolName ?? terminalToolName;
@@ -1059,12 +1061,14 @@ function buildExecutionGatewayRequest(input: {
   return {
     sessionId: input.sessionId,
     sessionKey: input.sessionKey,
-    instructions: input.featureSpec.instructions ?? parts.join("\n\n"),
+    instructions: input.featureSpec.instructions,
     input: aiInput,
     structuredOutputSchema: input.featureSpec.structuredOutputSchema,
     terminalToolName: input.featureSpec.terminalToolName,
     toolPolicy:
-      input.featureSpec.feature === "goal.review" || input.featureSpec.feature === "goal.asset_ownership"
+      input.featureSpec.feature === "goal.review" ||
+      input.featureSpec.feature === "goal.asset_ownership" ||
+      input.featureSpec.feature === "task.result_finalization"
         ? "read_only"
         : "full",
     maxOutputTokens: typeof maxTokens === "number" ? maxTokens : undefined,
@@ -1086,6 +1090,7 @@ function buildExecutionAiInput(input: {
     case "evaluate_condition_node":
     case "review_checkpoint_node":
     case "goal.review":
+    case "task.result_finalization":
       return runtimeInput;
     case "suggest":
     case "generate_plan":
@@ -1121,8 +1126,8 @@ async function persistRuntimeHistory(input: {
     for (let index = 0; index < history.messages.length; index += 1) {
       const message = history.messages[index];
       if (
-        typeof message?.role !== "string" ||
-        typeof message?.content !== "string" ||
+        typeof message.role !== "string" ||
+        typeof message.content !== "string" ||
         message.content.length === 0
       ) {
         continue;

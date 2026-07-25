@@ -18,6 +18,7 @@ export { AiClientManagement, aiClientManagement } from "./management/ai-client-m
 export type { ProviderFeatureRequest } from "./providers";
 export {
   testAiClientAvailability,
+  runProviderRequest,
   extractJSON,
   providerCall,
   llmCall,

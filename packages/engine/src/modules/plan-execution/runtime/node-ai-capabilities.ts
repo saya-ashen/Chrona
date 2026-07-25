@@ -381,6 +381,15 @@ export async function runTaskNodeFeature(
           selectedBranch: selectedBranch
             ? { label: selectedBranch.label, nextNodeId: selectedBranch.nextNodeId!, source: "ai" }
             : undefined,
+          deliverables: recordedAction.deliverables,
+          findings: recordedAction.findings,
+          decisions: recordedAction.decisions,
+          caveats: recordedAction.caveats,
+          nextActions: recordedAction.nextActions,
+          resultEvidence: recordedAction.evidenceItems?.map((item) => ({
+            ...item,
+            sourceNodeRef: "",
+          })),
         };
         await updateInvocationRunFromNodeResult(invocation, completedResult);
         return completedResult;

@@ -32,6 +32,12 @@ export type GraphNodeExecutionResult =
       output?: unknown;
       inputFields?: CheckpointInputFields;
       selectedBranch?: NodeResult["selectedBranch"];
+      deliverables?: NodeResult["deliverables"];
+      findings?: NodeResult["findings"];
+      decisions?: NodeResult["decisions"];
+      caveats?: NodeResult["caveats"];
+      nextActions?: NodeResult["nextActions"];
+      resultEvidence?: NodeResult["resultEvidence"];
     }
   | {
       status: "waiting_for_user";
@@ -73,6 +79,12 @@ export type GraphSubmittedNodeResult =
       evidence?: GraphNodeExecutionEvidence;
       output?: unknown;
       selectedBranch?: NodeResult["selectedBranch"];
+      deliverables?: NodeResult["deliverables"];
+      findings?: NodeResult["findings"];
+      decisions?: NodeResult["decisions"];
+      caveats?: NodeResult["caveats"];
+      nextActions?: NodeResult["nextActions"];
+      resultEvidence?: NodeResult["resultEvidence"];
     }
   | {
       nodeId: string;

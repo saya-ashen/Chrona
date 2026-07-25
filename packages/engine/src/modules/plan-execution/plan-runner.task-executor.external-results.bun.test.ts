@@ -139,56 +139,28 @@ describe("plan-runner task executor external results", () => {
     expect(attemptCountAfterReplay).toBe(attemptCountBeforeReplay);
   });
 
-  it("patches shared plan output without writing node-local outputs", async () => {
+  it("persists semantic node contributions without node-local output blobs", async () => {
     executeTaskNodeCapabilityMock.mockImplementationOnce(async (input) => {
-      const firstAppend = await taskPlanExecution.submitNodeResult({
-        taskId: input.taskId,
-        action: {
-          action: "update_plan_output",
-          sessionId: input.mainSession.id,
-          patches: [
-            { op: "add", path: "/root", value: "root" },
-            { op: "add", path: "/elements/root", value: { type: "Stack", props: { gap: "sm" }, children: ["partial"] } },
-            { op: "add", path: "/elements/partial", value: { type: "RichMarkdown", props: { content: "Partial output" }, children: [] } },
-          ],
-          summary: "Partial output",
-        },
-      });
-      expect(firstAppend.status).toBe("running");
-
-      await taskPlanExecution.submitNodeResult({
-        taskId: input.taskId,
-        action: {
-          action: "update_plan_output",
-          sessionId: input.mainSession.id,
-          patches: [
-            { op: "replace", path: "/elements/root/children", value: ["summary"] },
-            { op: "remove", path: "/elements/partial" },
-            { op: "add", path: "/elements/summary", value: { type: "RichMarkdown", props: { content: "Final UI output" }, children: [] } },
-          ],
-          summary: "Final output",
-        },
-      });
-
       const submittedResult = await taskPlanExecution.dispatch({
         taskId: input.taskId,
         action: {
           action: "complete_manual_node",
           summary: "Task wrapped up",
+          findings: [{ key: "final-finding", content: "Final semantic finding" }],
+          decisions: [{ key: "publish", content: "Publish the result" }],
         },
       });
       expect(submittedResult.status).toBe("completed");
 
       return {
         status: "started",
-        summary: "Provider stream observed external completion after outputs",
+        summary: "Provider stream observed external completion",
         evidence: { sessionId: input.mainSession.id },
-        output: { runtimeRunRef: "stale-after-outputs" },
       } satisfies NodeExecutionResult;
     });
 
-    const { workspace, task } = await seedWorkspaceAndTask("Runner patches plan output");
-    const compiledPlan = makeSingleTaskPlan("graph_task_output_patch");
+    const { workspace, task } = await seedWorkspaceAndTask("Runner persists semantic results");
+    const compiledPlan = makeSingleTaskPlan("graph_task_semantic_result");
     await seedAcceptedCompiledPlan(workspace.id, task.id, compiledPlan);
 
     const result = await taskPlanExecution.dispatch({
@@ -204,18 +176,114 @@ describe("plan-runner task executor external results", () => {
     expect(completed).toMatchObject({
       status: "current",
       outputSummary: "Task wrapped up",
+      findings: [{ key: "final-finding", content: "Final semantic finding" }],
+      decisions: [{ key: "publish", content: "Publish the result" }],
     });
     expect(completed).not.toHaveProperty("outputs");
-    expect(persisted?.planOutput).toMatchObject({
-      revision: 2,
-      spec: {
-        root: "root",
-        elements: {
-          root: { type: "Stack", props: { gap: "sm", xChronaSourceNodeId: "task_node" }, children: ["summary"] },
-          summary: { type: "RichMarkdown", props: { content: "Final UI output", xChronaSourceNodeId: "task_node" }, children: [] },
-        },
+    expect(persisted?.planOutput.manifest.findings).toHaveLength(1);
+  });
+
+  it("persists semantic contributions returned by the runtime terminal action", async () => {
+    executeTaskNodeCapabilityMock.mockImplementationOnce(async (input) => ({
+      status: "done",
+      summary: "Runtime result complete",
+      evidence: { sessionId: input.mainSession.id },
+      findings: [{ key: "runtime-finding", content: "Preserved runtime finding" }],
+      decisions: [{ key: "runtime-decision", content: "Preserved runtime decision" }],
+      caveats: [{ key: "runtime-caveat", content: "Preserved runtime caveat" }],
+      nextActions: [{ key: "runtime-next", content: "Preserved runtime next action" }],
+      resultEvidence: [{
+        key: "runtime-evidence",
+        summary: "Preserved runtime evidence",
+        sourceNodeRef: "",
+      }],
+    } satisfies NodeExecutionResult));
+
+    const { workspace, task } = await seedWorkspaceAndTask("Runner preserves runtime semantic results");
+    const compiledPlan = makeSingleTaskPlan("graph_task_runtime_semantic_result");
+    await seedAcceptedCompiledPlan(workspace.id, task.id, compiledPlan);
+
+    const result = await taskPlanExecution.dispatch({
+      taskId: task.id,
+      action: { action: "start_manual" },
+    });
+    expect(result.status).toBe("completed");
+
+    const persisted = await getPlanRun(task.id, compiledPlan.editablePlanId);
+    const completed = persisted?.results.find(
+      (entry) => entry.nodeId === "task_node" && entry.status === "current",
+    );
+    expect(completed).toMatchObject({
+      outputSummary: "Runtime result complete",
+      findings: [{ key: "runtime-finding", content: "Preserved runtime finding" }],
+      decisions: [{ key: "runtime-decision", content: "Preserved runtime decision" }],
+      caveats: [{ key: "runtime-caveat", content: "Preserved runtime caveat" }],
+      nextActions: [{ key: "runtime-next", content: "Preserved runtime next action" }],
+      resultEvidence: [{ key: "runtime-evidence", summary: "Preserved runtime evidence" }],
+    });
+    expect(persisted?.planOutput.manifest).toMatchObject({
+      findings: [{ key: "runtime-finding", content: "Preserved runtime finding" }],
+      decisions: [{ key: "runtime-decision", content: "Preserved runtime decision" }],
+      caveats: [{ key: "runtime-caveat", content: "Preserved runtime caveat" }],
+      nextActions: [{ key: "runtime-next", content: "Preserved runtime next action" }],
+      evidence: [{ key: "runtime-evidence", summary: "Preserved runtime evidence" }],
+    });
+  });
+
+  it("registers generated deliverables returned by the runtime terminal action", async () => {
+    const { workspace, task } = await seedWorkspaceAndTask("Runner registers runtime deliverable");
+    const run = await db.run.create({
+      data: {
+        taskId: task.id,
+        runtimeName: "hermes",
+        status: "Running",
+        triggeredBy: "system",
       },
     });
+    const scope = `runtime-artifact-test-${task.id}`;
+    const directory = join(getChronaGeneratedFilesDir(), scope);
+    const path = join(directory, "report.md");
+    await mkdir(directory, { recursive: true });
+    await writeFile(path, "# Runtime report\n\nPreserved content.\n");
+    const uri = `generated://${scope}/report.md` as `generated://${string}`;
+    const compiledPlan = makeSingleTaskPlan("graph_task_runtime_artifact_registration");
+    await seedAcceptedCompiledPlan(workspace.id, task.id, compiledPlan);
+
+    executeTaskNodeCapabilityMock.mockImplementationOnce(async (input) => ({
+      status: "done",
+      summary: "Generated runtime report",
+      evidence: { sessionId: input.mainSession.id, runId: run.id },
+      deliverables: [{
+        deliverableKey: "runtime-report",
+        title: "Runtime report",
+        kind: "document",
+        source: { type: "generated_file", uri },
+      }],
+    } satisfies NodeExecutionResult));
+
+    try {
+      const result = await taskPlanExecution.dispatch({
+        taskId: task.id,
+        action: { action: "start_manual" },
+      });
+      expect(result.status).toBe("completed");
+
+      const artifacts = await db.artifact.findMany({ where: { taskId: task.id, runId: run.id } });
+      expect(artifacts).toHaveLength(1);
+      expect(artifacts[0]).toMatchObject({
+        title: "Runtime report",
+        uri,
+        contentPreview: "# Runtime report\n\nPreserved content.\n",
+      });
+      const persisted = await getPlanRun(task.id, compiledPlan.editablePlanId);
+      expect(persisted?.planOutput.manifest.deliverables).toMatchObject([{
+        deliverableKey: "runtime-report",
+        title: "Runtime report",
+        status: "current",
+      }]);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
   });
 
   it("registers generated FileRef output as an idempotent run artifact", async () => {
@@ -239,16 +307,17 @@ describe("plan-runner task executor external results", () => {
 
     executeTaskNodeCapabilityMock.mockImplementationOnce(async (input) => {
       const action = {
-        action: "update_plan_output" as const,
+        action: "complete_manual_node" as const,
         sessionId: input.mainSession.id,
-        patches: [
-          { op: "add" as const, path: "/root", value: "report" },
-          { op: "add" as const, path: "/elements/report", value: { type: "FileRef", props: { path: uri, title: "Registered report" }, children: [] } },
-        ],
         summary: "Generated report",
+        deliverables: [{
+          deliverableKey: "report",
+          title: "Registered report",
+          kind: "document" as const,
+          source: { type: "generated_file" as const, uri: uri as `generated://${string}` },
+        }],
       };
       await taskPlanExecution.submitNodeResult({ taskId: input.taskId, commandContext: { runId: run.id }, action });
-      await taskPlanExecution.submitNodeResult({ taskId: input.taskId, commandContext: { runId: run.id }, action: { ...action, patches: [] } });
       await taskPlanExecution.dispatch({
         taskId: input.taskId,
         action: { action: "complete_manual_node", summary: "Done" },
@@ -282,28 +351,16 @@ describe("plan-runner task executor external results", () => {
     }
   });
 
-  it("passes accumulated plan output to the next runtime-backed node", async () => {
+  it("passes the accumulated semantic manifest to the next runtime-backed node", async () => {
     executeTaskNodeCapabilityMock
       .mockImplementationOnce(async (input) => {
-        await taskPlanExecution.submitNodeResult({
-          taskId: input.taskId,
-          action: {
-            action: "update_plan_output",
-            sessionId: input.mainSession.id,
-            patches: [
-              { op: "add", path: "/root", value: "existingRoot" },
-              { op: "add", path: "/elements/existingRoot", value: { type: "Stack", props: { gap: "sm" }, children: ["firstSection"] } },
-              { op: "add", path: "/elements/firstSection", value: { type: "RichMarkdown", props: { content: "First section" }, children: [] } },
-            ],
-            summary: "First visible section",
-          },
-        });
         await taskPlanExecution.submitNodeResult({
           taskId: input.taskId,
           action: {
             action: "complete_manual_node",
             sessionId: input.mainSession.id,
             summary: "First task completed",
+            findings: [{ key: "first-finding", content: "First finding" }],
           },
         });
 
@@ -311,32 +368,23 @@ describe("plan-runner task executor external results", () => {
           status: "started",
           summary: "Provider observed first task completion",
           evidence: { sessionId: input.mainSession.id },
-          output: { runtimeRunRef: "runtime-first-after-plan-output" },
         } satisfies NodeExecutionResult;
       })
       .mockImplementationOnce(async (input) => {
         expect(input.node.id).toBe("second_task");
-        expect(input.planOutput).toMatchObject({
-          revision: 1,
-          spec: {
-            root: "existingRoot",
-            elements: {
-              existingRoot: { type: "Stack", props: { gap: "sm" }, children: ["firstSection"] },
-              firstSection: { type: "RichMarkdown", props: { content: "First section" }, children: [] },
-            },
-          },
-        });
+        expect(input.planOutput?.manifest.findings).toMatchObject([
+          { key: "first-finding", content: "First finding" },
+        ]);
 
         return {
           status: "started",
           summary: "Second runtime run started",
           evidence: { sessionId: input.mainSession.id },
-          output: { runtimeRunRef: "runtime-second-after-plan-output" },
         } satisfies NodeExecutionResult;
       });
 
-    const { workspace, task } = await seedWorkspaceAndTask("Runner passes accumulated plan output");
-    const compiledPlan = makeTwoTaskPlan("graph_passes_accumulated_plan_output");
+    const { workspace, task } = await seedWorkspaceAndTask("Runner passes accumulated manifest");
+    const compiledPlan = makeTwoTaskPlan("graph_passes_accumulated_manifest");
     await seedAcceptedCompiledPlan(workspace.id, task.id, compiledPlan);
 
     const result = await taskPlanExecution.dispatch({
@@ -347,8 +395,7 @@ describe("plan-runner task executor external results", () => {
     expect(result.status).toBe("running");
     await waitForTaskNodeCalls(["first_task", "second_task"]);
     const persisted = await getPlanRun(task.id, compiledPlan.editablePlanId);
-    expect(persisted?.planOutput.revision).toBe(1);
-    expect(persisted?.planOutput.spec?.root).toBe("existingRoot");
+    expect(persisted?.planOutput.manifest.findings).toHaveLength(1);
   });
 
   it("continues to downstream work when a running task submits its own terminal result", async () => {
@@ -363,7 +410,7 @@ describe("plan-runner task executor external results", () => {
             output: {
               root: "root",
               elements: {
-                root: { type: "JsonView", props: { value: { source: "chrona_plan_output" } } },
+                root: { type: "JsonView", props: { value: { source: "finalized_result" } } },
               },
             },
           },

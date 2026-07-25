@@ -13,7 +13,30 @@ import type {
 } from "@chrona/contracts/ai";
 import { ENGINE_ERROR_CODES, EngineError } from "../../../errors";
 
-export type NodeRuntimePlanContext = NodeRuntimeInput["context"]["plan"];
+type RuntimeGoalContext = {
+  goal: {
+    title: string;
+    additionalContext?: string;
+    operationalBrief?: {
+      outcome: string;
+      currentFocus: string;
+      strategy: string;
+      constraints: string[];
+    };
+    capturedAt?: string;
+  };
+  acceptedResults: Array<{
+    ref: string;
+    taskTitle: string;
+    acceptedAt?: string | null;
+    summary: string;
+    artifactCount: number;
+  }>;
+};
+
+export type NodeRuntimePlanContext = NodeRuntimeInput["context"]["plan"] & {
+  goalContext?: RuntimeGoalContext;
+};
 export type NodeRuntimeRunContext = NonNullable<NodeRuntimeInput["context"]["run"]>;
 
 function defaultPlanContext(): NodeRuntimePlanContext {
@@ -123,28 +146,27 @@ function runtimeNode(node: EffectivePlanNode, ref: string): NodeRuntimeInput["no
   }
 }
 
-type RuntimeVisiblePlanOutput = NodeRuntimeInput["context"]["planOutput"];
+type RuntimeVisibleResultManifest = NodeRuntimeInput["context"]["resultManifest"];
 
-function visiblePlanOutput(
-  planOutput: PlanOutputState | RuntimeVisiblePlanOutput | undefined,
-): RuntimeVisiblePlanOutput {
-  if (!planOutput) {
-    return { revision: 0, hasSpec: false, root: null, rootChildren: [], elementIds: [], updatedAt: null };
-  }
-  if ("hasSpec" in planOutput) return planOutput;
-  const root = planOutput.spec?.root ?? null;
-  const elements = planOutput.spec?.elements ?? {};
-  const rootElement = root ? elements[root] : undefined;
-  const rootChildren = Array.isArray(rootElement?.children) ? rootElement.children : [];
-  const summary = planOutput.history.at(-1)?.summary;
+function visibleResultManifest(
+  planOutput: PlanOutputState | RuntimeVisibleResultManifest | undefined,
+): RuntimeVisibleResultManifest {
+  if (planOutput && "sourceRevision" in planOutput) return planOutput;
+  const manifest = planOutput?.manifest;
   return {
-    revision: planOutput.revision,
-    hasSpec: planOutput.spec !== null,
-    root,
-    rootChildren,
-    elementIds: Object.keys(elements),
-    updatedAt: planOutput.updatedAt,
-    ...(summary ? { lastSummary: summary } : {}),
+    sourceRevision: manifest?.sourceRevision ?? 0,
+    outcome: manifest?.outcome ?? {
+      title: "Result pending",
+      summary: "No node result has been submitted.",
+    },
+    currentDeliverableKeys:
+      manifest?.deliverables
+        .filter((item) => item.status === "current")
+        .map((item) => item.deliverableKey) ?? [],
+    findingKeys: manifest?.findings.map((item) => item.key) ?? [],
+    decisionKeys: manifest?.decisions.map((item) => item.key) ?? [],
+    caveatKeys: manifest?.caveats.map((item) => item.key) ?? [],
+    nextActionKeys: manifest?.nextActions.map((item) => item.key) ?? [],
   };
 }
 
@@ -152,7 +174,7 @@ function compactPreviousResults(input: {
   plan: EffectivePlanGraph;
   history: SemanticRefHistory;
   node: EffectivePlanNode;
-  planOutput?: PlanOutputState | RuntimeVisiblePlanOutput;
+  planOutput?: PlanOutputState | RuntimeVisibleResultManifest;
   planContext?: NodeRuntimePlanContext;
   runContext?: NodeRuntimeRunContext;
   userInput?: string;
@@ -175,10 +197,19 @@ function compactPreviousResults(input: {
       return summary ? `${node.title}: ${summary}` : node.title;
     })
     .filter((item) => item.trim().length > 0);
+  const { goalContext, ...planContext } = input.planContext ?? defaultPlanContext();
 
   return {
-    plan: input.planContext ?? defaultPlanContext(),
+    plan: planContext,
     ...(input.runContext ? { run: input.runContext } : {}),
+    ...(goalContext
+      ? {
+          goal: goalContext.goal,
+          ...(goalContext.acceptedResults.length > 0
+            ? { acceptedGoalResults: goalContext.acceptedResults }
+            : {}),
+        }
+      : {}),
     ...(input.userInput || input.inputFields
       ? {
           currentNodeInput: {
@@ -191,7 +222,7 @@ function compactPreviousResults(input: {
     ...(globalItems.length > 0
       ? { globalSummary: globalItems.slice(0, 3).join("; ") + (globalItems.length > 3 ? `; +${globalItems.length - 3} more` : "") }
       : {}),
-    planOutput: visiblePlanOutput(input.planOutput),
+    resultManifest: visibleResultManifest(input.planOutput),
   };
 }
 
@@ -296,7 +327,7 @@ export function branchBindingForRef(input: {
 export function buildNodeRuntimeInput(input: {
   plan: EffectivePlanGraph;
   node: EffectivePlanNode;
-  planOutput?: PlanOutputState | RuntimeVisiblePlanOutput;
+  planOutput?: PlanOutputState | RuntimeVisibleResultManifest;
   planContext?: NodeRuntimePlanContext;
   runContext?: NodeRuntimeRunContext;
   userInput?: string;

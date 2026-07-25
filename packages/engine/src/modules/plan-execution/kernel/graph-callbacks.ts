@@ -12,6 +12,8 @@ import { markExecutionNodeActive } from "../persistence/task-execution-store";
 import { persistRuntimeState } from "../persistence/plan-runtime-store";
 import { getPlanRun } from "../persistence/plan-run-store";
 import { committedStateIfRunningNodeAdvanced, committedStateForSubmittedNode } from "../runtime/committed-state";
+import { registerNodeDeliverables } from "../use-cases/register-generated-plan-output-artifacts";
+import { buildSemanticRefHistory } from "../runtime/node-runtime-refs";
 
 /**
  * Kernel graph callbacks. Unlike the lightweight version these:
@@ -30,6 +32,7 @@ export function createKernelGraphCallbacks(
     goal: compiledPlan.goal,
     assumptions: compiledPlan.assumptions,
     ...(input.planSummary ? { summary: input.planSummary } : {}),
+    ...(input.goalContext ? { goalContext: input.goalContext } : {}),
   };
   let initialRunContext = input.initialRunContext;
   return {
@@ -90,7 +93,7 @@ export function createKernelGraphCallbacks(
         ? initialRunContext
         : undefined;
       initialRunContext = undefined;
-      return executor.execute({
+      const result = await executor.execute({
         taskId,
         workBlockId,
         mainSession,
@@ -115,6 +118,22 @@ export function createKernelGraphCallbacks(
               })
           : undefined,
       });
+      if (result.status !== "done") return result;
+      if (!result.deliverables?.length) {
+        const { deliverables: _deliverables, ...completed } = result;
+        return completed;
+      }
+      const deliverables = await registerNodeDeliverables({
+        workspaceId,
+        taskId,
+        runId: result.evidence.runId,
+        sourceNodeId: executorInput.node.id,
+        sourceNodeRef: buildSemanticRefHistory(executorInput.plan).nodeRefs.find((binding) =>
+          binding.nodeId === executorInput.node.id || binding.backendId === executorInput.node.id
+        )?.ref,
+        declarations: result.deliverables,
+      });
+      return { ...result, deliverables };
     },
     resolveSubmittedNodeState: async (executorInput) => {
       const committed = await committedStateForSubmittedNode({

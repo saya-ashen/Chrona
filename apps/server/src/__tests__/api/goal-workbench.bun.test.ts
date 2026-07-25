@@ -2,8 +2,10 @@ import { beforeEach, describe, expect, it } from "bun:test";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { getChronaGeneratedFilesDir } from "@chrona/shared/data-paths";
+import { createHash } from "node:crypto";
 import { db } from "@chrona/db";
 import { aiClientRegistry, createChronaEngine, waitForGoalAssetOwnershipGeneration } from "@chrona/engine";
+import { acceptTaskResult } from "@chrona/engine/modules/tasks/accept-task-result";
 import { createApiRouter, type ApiRouter } from "../../routes/api";
 import { resetTestDb, seedWorkspace } from "../bun-test-helpers";
 
@@ -28,7 +30,65 @@ async function seedStructuredGoalResultWithoutArtifacts() {
   const task = await db.task.create({ data: { workspaceId, goalId: goal.id, title: "Select destination", executionRuntime: "hermes", executionConfig: {}, status: "Done", priority: "Medium" } });
   const run = await db.run.create({ data: { taskId: task.id, runtimeName: "hermes", status: "Completed", triggeredBy: "user" } });
   const plan = await db.taskPlan.create({ data: { workspaceId, taskId: task.id, planId: "structured-result-plan", revision: 1, status: "Accepted", compiledPlan: {} } });
-  await db.taskPlanRun.create({ data: { workspaceId, taskId: task.id, planId: plan.planId, planRun: { planRun: { id: "structured-result-run", compiledPlanId: "compiled-structured", editablePlanId: "structured-result-plan", sourceVersion: 1, status: "completed", nodeStates: {}, checkpointResponses: [], artifactRefs: [], attempts: [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }, mutableGraph: { graph: { id: "structured-result-plan", version: 1, nodes: [], edges: [], entryNodeIds: [], mutations: [], createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }, attempts: [], results: [], executionContextSnapshots: [], planOutput: { spec: { root: "summary", elements: { summary: { type: "ResultSummary", props: { text: "日照＋临沂沂蒙山最适合本次旅行。", copyText: "首选日照＋临沂沂蒙山" } } } }, revision: 1, updatedAt: new Date().toISOString(), updatedByNodeId: "node-final", history: [] } } } } });
+  const now = new Date().toISOString();
+  const spec = {
+    root: "summary",
+    elements: {
+      summary: {
+        type: "ResultSummary",
+        props: { text: "推荐日照＋临沂沂蒙山，路线完整且适合周末出行。" },
+      },
+    },
+  };
+  const manifest = {
+    schemaVersion: 1,
+    sourceRevision: 1,
+    outcome: { title: "Destination selected", summary: "推荐日照＋临沂沂蒙山" },
+    readiness: { status: "ready", summary: "Ready" },
+    sections: [{ key: "outcome", title: "Outcome", kind: "outcome", itemKeys: [] }],
+    deliverables: [],
+    findings: [],
+    decisions: [],
+    caveats: [],
+    nextActions: [],
+    evidence: [],
+  };
+  await db.taskPlanRun.create({
+    data: {
+      workspaceId,
+      taskId: task.id,
+      planId: plan.planId,
+      planRun: {
+        planRun: {
+          id: "structured-result-run",
+          compiledPlanId: "compiled-structured",
+          editablePlanId: "structured-result-plan",
+          sourceVersion: 1,
+          status: "completed",
+          nodeStates: {},
+          checkpointResponses: [],
+          artifactRefs: [],
+          attempts: [],
+          createdAt: now,
+          updatedAt: now,
+        },
+        mutableGraph: {
+          graph: { id: "structured-result-plan", version: 1, nodes: [], edges: [], entryNodeIds: [], mutations: [], createdAt: now, updatedAt: now },
+          attempts: [],
+          results: [],
+          executionContextSnapshots: [],
+          planOutput: {
+            manifest,
+            finalizedResult: { sourceRevision: 1, manifest, spec, finalizedAt: now },
+            finalization: { status: "Ready", sourceRevision: 1, attempt: 1, finalizedAt: now },
+            revision: 1,
+            updatedAt: now,
+            updatedByNodeId: null,
+          },
+        },
+      },
+    },
+  });
   await db.event.create({ data: { workspaceId, taskId: task.id, runId: run.id, planId: plan.planId, eventType: "provider.run_completed", actorType: "runtime", source: "provider", payload: {}, dedupeKey: `provider-completed:${run.id}`, ingestSequence: 1 } });
   await db.event.create({ data: { workspaceId, taskId: task.id, runId: run.id, eventType: "task.result_accepted", actorType: "user", source: "ui", payload: { accepted_run_id: run.id }, dedupeKey: `accepted:${run.id}`, ingestSequence: 2 } });
   return { workspaceId, goal, task, run };
@@ -54,6 +114,29 @@ describe("Goal Workbench API", () => {
     expect(assets[0]).toMatchObject({ kind: "document", versions: [{ version: 1, source: "inbox" }] });
   });
 
+  it("automatically syncs accepted finalized results into a reviewable Inbox candidate", async () => {
+    const seeded = await seedStructuredGoalResultWithoutArtifacts();
+
+    const accepted = await acceptTaskResult({ taskId: seeded.task.id });
+
+    expect(accepted.runId).toBe(seeded.run.id);
+    const candidates = await db.goalInboxCandidate.findMany({
+      where: { goalId: seeded.goal.id, sourceRunId: seeded.run.id },
+      select: { kind: true, status: true, groupKey: true, content: true },
+    });
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0]).toMatchObject({
+      kind: "structured_result",
+      status: "Pending",
+      groupKey: "structured-result:1",
+      content: {
+        format: "chrona-json-render",
+        spec: { root: "summary" },
+      },
+    });
+    expect(await db.goalAsset.count({ where: { goalId: seeded.goal.id } })).toBe(0);
+  });
+
   it("preserves a structured accepted result as an immutable json-render asset", async () => {
     const seeded = await seedStructuredGoalResultWithoutArtifacts();
     const app = createApiRouter(createChronaEngine());
@@ -68,6 +151,31 @@ describe("Goal Workbench API", () => {
     const version = await db.goalAssetVersion.findFirstOrThrow({ where: { goalId: seeded.goal.id } });
     expect(version.content).toMatchObject({ format: "chrona-json-render", spec: { root: "summary" } });
     expect((await db.goalAsset.findFirstOrThrow({ where: { goalId: seeded.goal.id } })).kind).toBe("structured_result");
+
+    const planRun = await db.taskPlanRun.findFirstOrThrow({ where: { taskId: seeded.task.id } });
+    const stored = planRun.planRun as Record<string, any>;
+    stored.mutableGraph.planOutput.manifest.sourceRevision = 2;
+    stored.mutableGraph.planOutput.finalizedResult.sourceRevision = 2;
+    stored.mutableGraph.planOutput.finalizedResult.manifest.sourceRevision = 2;
+    stored.mutableGraph.planOutput.finalizedResult.spec.elements.summary.props.text = "推荐青岛，新的最终结果。";
+    await db.taskPlanRun.update({ where: { id: planRun.id }, data: { planRun: stored } });
+
+    const replayed = await post(app, `/goals/${seeded.goal.id}/inbox/extract`, {
+      taskId: seeded.task.id,
+      runId: seeded.run.id,
+    });
+    expect(replayed.status).toBe(200);
+    expect(await db.goalInboxCandidate.count({
+      where: { goalId: seeded.goal.id, sourceRunId: seeded.run.id },
+    })).toBe(2);
+    expect(await db.goalInboxCandidate.findMany({
+      where: { goalId: seeded.goal.id, sourceRunId: seeded.run.id },
+      orderBy: { groupKey: "asc" },
+      select: { groupKey: true },
+    })).toEqual([
+      { groupKey: "structured-result:1" },
+      { groupKey: "structured-result:2" },
+    ]);
   });
 
   it("registers generated files and persists only opaque structured references", async () => {
@@ -77,9 +185,25 @@ describe("Goal Workbench API", () => {
     await writeFile(csvPath, "candidate,budget\n日照＋临沂沂蒙山,8000\n", "utf8");
     const row = await db.taskPlanRun.findFirstOrThrow({ where: { taskId: seeded.task.id } });
     const stored = row.planRun as Record<string, any>;
-    const spec = stored.mutableGraph.planOutput.spec;
+    const spec = stored.mutableGraph.planOutput.finalizedResult.spec;
     spec.elements.summary = { type: "FileRef", props: { path: csvPath, title: "destination-shortlist.csv" } };
-    stored.mutableGraph.planOutput.spec = spec;
+    stored.mutableGraph.planOutput.finalizedResult.spec = spec;
+    const content = await Bun.file(csvPath).arrayBuffer();
+    await db.artifact.create({
+      data: {
+        workspaceId: seeded.workspaceId,
+        taskId: seeded.task.id,
+        runId: seeded.run.id,
+        type: "file",
+        title: "destination-shortlist.csv",
+        uri: `generated://tests/${seeded.run.id}/destination-shortlist.csv`,
+        metadata: {
+          checksum: createHash("sha256").update(new Uint8Array(content)).digest("hex"),
+          size: content.byteLength,
+          mimeType: "text/csv",
+        },
+      },
+    });
     await db.taskPlanRun.update({ where: { id: row.id }, data: { planRun: stored } });
 
     const app = createApiRouter(createChronaEngine());
@@ -101,11 +225,84 @@ describe("Goal Workbench API", () => {
     expect(await download.text()).toContain("日照＋临沂沂蒙山");
   });
 
+  it("accepts file-backed tables without persisting task-scoped download links", async () => {
+    const seeded = await seedStructuredGoalResultWithoutArtifacts();
+    const csvPath = path.join(
+      getChronaGeneratedFilesDir(),
+      "tests",
+      seeded.run.id,
+      "channel-table.csv",
+    );
+    await mkdir(path.dirname(csvPath), { recursive: true });
+    await writeFile(csvPath, "channel,url\nChrona,https://chrona.example\n", "utf8");
+    const row = await db.taskPlanRun.findFirstOrThrow({
+      where: { taskId: seeded.task.id },
+    });
+    const stored = row.planRun as Record<string, any>;
+    stored.mutableGraph.planOutput.finalizedResult.spec.elements.summary = {
+      type: "Table",
+      props: {
+        title: "Updated channels",
+        uri: csvPath,
+        columns: [
+          { key: "channel", label: "Channel" },
+          { key: "url", label: "URL", type: "link" },
+        ],
+      },
+    };
+    const tableContent = await Bun.file(csvPath).arrayBuffer();
+    await db.artifact.create({
+      data: {
+        workspaceId: seeded.workspaceId,
+        taskId: seeded.task.id,
+        runId: seeded.run.id,
+        type: "file",
+        title: "channel-table.csv",
+        uri: `generated://tests/${seeded.run.id}/channel-table.csv`,
+        metadata: {
+          checksum: createHash("sha256").update(new Uint8Array(tableContent)).digest("hex"),
+          size: tableContent.byteLength,
+          mimeType: "text/csv",
+        },
+      },
+    });
+    await db.taskPlanRun.update({
+      where: { id: row.id },
+      data: { planRun: stored },
+    });
+
+    const app = createApiRouter(createChronaEngine());
+    const extracted = await post(
+      app,
+      `/goals/${seeded.goal.id}/inbox/extract`,
+      { taskId: seeded.task.id, runId: seeded.run.id },
+    );
+
+    expect(extracted.status).toBe(200);
+    const { candidates } = (await extracted.json()) as {
+      candidates: Array<{
+        content: {
+          spec: { elements: Record<string, { props: Record<string, unknown> }> };
+          artifactRefs: Array<{ ref: string }>;
+        };
+      }>;
+    };
+    expect(candidates).toHaveLength(1);
+    expect(candidates[0]!.content.artifactRefs).toHaveLength(1);
+    expect(candidates[0]!.content.spec.elements.summary!.props).toMatchObject({
+      path: candidates[0]!.content.artifactRefs[0]!.ref,
+      displayPath: "channel-table.csv",
+    });
+    expect(candidates[0]!.content.spec.elements.summary!.props).not.toHaveProperty(
+      "downloadHref",
+    );
+  });
+
   it("rejects execution controls in structured result assets", async () => {
     const seeded = await seedStructuredGoalResultWithoutArtifacts();
     const row = await db.taskPlanRun.findFirstOrThrow({ where: { taskId: seeded.task.id } });
     const stored = row.planRun as Record<string, any>;
-    stored.mutableGraph.planOutput.spec.elements.summary = { type: "WorkspaceActionCard", props: { title: "Run again", taskId: seeded.task.id }, on: { click: { action: "dispatchExecution" } } };
+    stored.mutableGraph.planOutput.finalizedResult.spec.elements.summary = { type: "WorkspaceActionCard", props: { title: "Run again", taskId: seeded.task.id }, on: { click: { action: "dispatchExecution" } } };
     await db.taskPlanRun.update({ where: { id: row.id }, data: { planRun: stored } });
     const app = createApiRouter(createChronaEngine());
     const response = await post(app, `/goals/${seeded.goal.id}/inbox/extract`, { taskId: seeded.task.id, runId: seeded.run.id });

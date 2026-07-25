@@ -5,6 +5,11 @@ export async function getTaskReviewContext(input: { taskId: string }) {
   const task = await db.task.findUnique({
     where: { id: input.taskId },
     select: {
+      artifacts: {
+        orderBy: { createdAt: "desc" },
+        take: 5,
+        select: { id: true, title: true, type: true, uri: true },
+      },
       approvals: { orderBy: { requestedAt: "desc" }, take: 5 },
       scheduleProposals: {
         where: { status: "Pending" },
@@ -53,6 +58,7 @@ export async function getTaskReviewContext(input: { taskId: string }) {
             : null,
         }
       : null,
+    artifacts: task.artifacts,
     scheduleProposals: task.scheduleProposals.map((proposal) => ({
       id: proposal.id,
       source: proposal.source,

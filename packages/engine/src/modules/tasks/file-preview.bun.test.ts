@@ -173,6 +173,33 @@ describe("hydrateFilePreviewSpec", () => {
     });
   });
 
+  it("hydrates ResultDeliverable preview and download props", async () => {
+    const spec = await hydrateFilePreviewSpec(
+      {
+        root: "deliverable",
+        elements: {
+          deliverable: {
+            type: "ResultDeliverable",
+            props: {
+              title: "Operating guide",
+              artifactRef: "AF111111111111",
+              path: "generated://20260716/N20260716-01/guide.md",
+              role: "primary",
+              kind: "document",
+            },
+          },
+        },
+      },
+      { taskId: "task-1" },
+    );
+
+    expect(spec.elements.deliverable.props).toMatchObject({
+      artifactRef: "AF111111111111",
+      downloadHref:
+        "/api/tasks/task-1/result-files/download?path=generated%3A%2F%2F20260716%2FN20260716-01%2Fguide.md",
+    });
+  });
+
   it("hydrates Table props from JSON artifacts", async () => {
     await withTempDir(async (dir) => {
       await Bun.write(

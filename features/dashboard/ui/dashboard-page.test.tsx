@@ -19,6 +19,7 @@ vi.mock("@shared/ui", () => ({
   CardHeader: ({ children, ...props }: { children?: ReactNode } & ComponentPropsWithoutRef<"div">) => <div {...props}>{children}</div>,
   CardTitle: ({ children, ...props }: { children?: ReactNode } & ComponentPropsWithoutRef<"div">) => <div {...props}>{children}</div>,
   PageFrame: ({ children, ...props }: { children?: ReactNode } & ComponentPropsWithoutRef<"div">) => <div {...props}>{children}</div>,
+  PageHeader: ({ title, description }: { title: string; description?: string }) => <header><h1>{title}</h1>{description ? <p>{description}</p> : null}</header>,
   UiSurfaceFrame: ({ kind, label, children, ...props }: { kind: string; label: string; children?: ReactNode } & ComponentPropsWithoutRef<"section">) => <section aria-label={label} data-ui-surface-kind={kind} {...props}>{children}<span>{kind === "ai-authored" ? "AI generated" : ""}</span></section>,
   cn: (...values: Array<string | undefined | false>) => values.filter(Boolean).join(" "),
 }));

@@ -11,13 +11,21 @@ import { useNavigate } from "react-router-dom";
 import {
   Archive,
   Bot,
+  ArrowRight,
   Check,
   ChevronDown,
   ChevronUp,
   Circle,
+  Clock3,
   Copy,
+  Download,
   FileText,
+  Eye,
   LockKeyhole,
+  FileArchive,
+  FileCode2,
+  FileImage,
+  FileSpreadsheet,
   Sparkles,
   TriangleAlert,
   Wrench,
@@ -587,6 +595,425 @@ function ResultSummary({
         {text}
       </p>
     </section>
+  );
+}
+
+type ResultMetric = { label: string; value: string };
+type ResultActionPhase = {
+  timeframe: "now" | "this_week" | "later";
+  title: string;
+  actions: string[];
+};
+
+const readinessPresentation = {
+  ready: {
+    messageKey: "resultReadinessReady",
+    fallback: "Ready",
+    className: "border-success/30 bg-success/10 text-success-foreground",
+    iconClassName: "bg-success/15 text-success",
+  },
+  ready_with_caveats: {
+    messageKey: "resultReadinessReadyWithCaveats",
+    fallback: "Ready with caveats",
+    className: "border-warning/35 bg-warning/10 text-warning-foreground",
+    iconClassName: "bg-warning/15 text-warning",
+  },
+  partial: {
+    messageKey: "resultReadinessPartial",
+    fallback: "Partially ready",
+    className: "border-info/30 bg-info/10 text-info-foreground",
+    iconClassName: "bg-info/15 text-info",
+  },
+  blocked: {
+    messageKey: "resultReadinessBlocked",
+    fallback: "Blocked",
+    className: "border-destructive/30 bg-destructive/10 text-destructive",
+    iconClassName: "bg-destructive/10 text-destructive",
+  },
+} as const;
+
+function ResultHero({
+  props,
+}: {
+  props: {
+    title: string;
+    summary: string;
+    readiness: keyof typeof readinessPresentation;
+    readinessSummary: string;
+    metrics?: ResultMetric[];
+  };
+}) {
+  const { messages } = useI18n();
+  const copy = messages.components.taskWorkspace;
+  const presentation = readinessPresentation[props.readiness];
+  const readinessLabel = {
+    ready: copy.resultReadinessReady ?? "Ready",
+    ready_with_caveats:
+      copy.resultReadinessReadyWithCaveats ?? "Ready with caveats",
+    partial: copy.resultReadinessPartial ?? "Partially ready",
+    blocked: copy.resultReadinessBlocked ?? "Blocked",
+  }[props.readiness];
+  const metrics = Array.isArray(props.metrics) ? props.metrics.slice(0, 4) : [];
+  return (
+    <section
+      aria-label={copy.resultOverviewLabel ?? "Result overview"}
+      className="grid min-w-0 gap-5 overflow-hidden rounded-2xl border border-primary/15 bg-primary-soft/25 p-5 shadow-sm sm:p-6 lg:grid-cols-[minmax(0,1fr)_minmax(15rem,0.34fr)] lg:gap-8"
+    >
+      <div className="min-w-0">
+        <Badge
+          variant="outline"
+          className={cn(
+            "mb-4 gap-1.5 rounded-full px-2.5 py-1 text-xs",
+            presentation.className,
+          )}
+        >
+          <Check className="size-3.5" aria-hidden />
+          {readinessLabel}
+        </Badge>
+        <h2 className="max-w-3xl font-heading text-2xl font-semibold leading-tight tracking-[-0.025em] text-foreground sm:text-[1.75rem]">
+          {props.title}
+        </h2>
+        <p className="mt-3 max-w-3xl text-sm leading-6 text-foreground/75 sm:text-[15px] sm:leading-7">
+          {props.summary}
+        </p>
+        {metrics.length > 0 ? (
+          <dl className="mt-6 grid grid-cols-2 gap-x-4 gap-y-4 border-t border-border/60 pt-5 sm:grid-cols-4">
+            {metrics.map((metric) => (
+              <div key={`${metric.label}:${metric.value}`} className="min-w-0">
+                <dd className="truncate font-heading text-xl font-semibold tracking-[-0.02em] text-foreground">
+                  {metric.value}
+                </dd>
+                <dt className="mt-0.5 text-xs leading-4 text-muted-foreground">
+                  {metric.label}
+                </dt>
+              </div>
+            ))}
+          </dl>
+        ) : null}
+      </div>
+      <aside className="rounded-xl border border-border/70 bg-background/85 p-4 shadow-sm lg:self-start">
+        <div
+          className={cn(
+            "flex size-9 items-center justify-center rounded-lg",
+            presentation.iconClassName,
+          )}
+        >
+          {props.readiness === "blocked" ? (
+            <TriangleAlert className="size-4.5" aria-hidden />
+          ) : (
+            <Check className="size-4.5" aria-hidden />
+          )}
+        </div>
+        <p className="mt-3 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+          {copy.resultReadinessLabel ?? "Readiness"}
+        </p>
+        <p className="mt-1.5 text-sm leading-6 text-foreground/80">
+          {props.readinessSummary}
+        </p>
+      </aside>
+    </section>
+  );
+}
+
+function deliverableIcon(kind: string) {
+  if (kind === "table" || kind === "dataset") return FileSpreadsheet;
+  if (kind === "image") return FileImage;
+  if (kind === "archive") return FileArchive;
+  if (kind === "code") return FileCode2;
+  return FileText;
+}
+
+function ResultDeliverable({ props }: { props: Record<string, unknown> }) {
+  const { messages } = useI18n();
+  const copy = messages.components.taskWorkspace;
+  const title = stringProp(props.title) ?? "Deliverable";
+  const summary = stringProp(props.summary);
+  const role = stringProp(props.role) ?? "supporting";
+  const kind = stringProp(props.kind) ?? "other";
+  const formatLabel = stringProp(props.formatLabel) ?? kind;
+  const Icon = deliverableIcon(kind);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const preview = stringProp(props.contentPreview);
+  const isPrimary = role === "primary";
+  const roleLabel = isPrimary
+    ? (copy.resultPrimaryDeliverable ?? "Primary deliverable")
+    : role === "evidence"
+      ? (copy.resultEvidenceMaterial ?? "Evidence")
+      : (copy.resultSupportingMaterial ?? "Supporting material");
+  return (
+    <article
+      data-result-deliverable-role={role}
+      className={cn(
+        "group min-w-0 overflow-hidden rounded-xl border transition-colors",
+        isPrimary
+          ? "border-primary/25 bg-primary-soft/45 p-5 sm:p-6"
+          : "border-border/70 bg-background p-4 hover:border-primary/25",
+      )}
+    >
+      <div className="flex min-w-0 items-start gap-3">
+        <span
+          className={cn(
+            "flex shrink-0 items-center justify-center rounded-lg",
+            isPrimary
+              ? "size-10 bg-primary text-primary-foreground"
+              : "size-9 bg-muted text-muted-foreground",
+          )}
+        >
+          <Icon className="size-4.5" aria-hidden />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+            {roleLabel} · {formatLabel}
+          </p>
+          <h3
+            className={cn(
+              "mt-1.5 break-words font-heading font-semibold leading-snug tracking-[-0.015em] text-foreground",
+              isPrimary ? "text-xl sm:text-2xl" : "text-base",
+            )}
+          >
+            {title}
+          </h3>
+          {summary ? (
+            <p
+              className={cn(
+                "mt-2 text-foreground/70",
+                isPrimary
+                  ? "max-w-2xl text-sm leading-6"
+                  : "text-xs leading-5",
+              )}
+            >
+              {summary}
+            </p>
+          ) : null}
+          <div className="mt-4 flex flex-wrap gap-2">
+            {preview ? (
+              <Button
+                type="button"
+                size="sm"
+                variant={isPrimary ? "default" : "outline"}
+                onClick={() => setPreviewOpen((current) => !current)}
+                aria-expanded={previewOpen}
+              >
+                <Eye className="size-3.5" aria-hidden />
+                {previewOpen
+                  ? (copy.artifactHidePreview ?? "Hide preview")
+                  : (copy.artifactPreview ?? "Preview")}
+              </Button>
+            ) : null}
+            {typeof props.downloadHref === "string" ? (
+              <Button
+                asChild
+                size="sm"
+                variant={isPrimary ? "outline" : "ghost"}
+              >
+                <a href={props.downloadHref} download>
+                  <Download className="size-3.5" aria-hidden />
+                  {copy.downloadArtifact ?? "Download"}
+                </a>
+              </Button>
+            ) : null}
+          </div>
+        </div>
+        {!isPrimary ? (
+          <ArrowRight
+            className="mt-1 size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-primary"
+            aria-hidden
+          />
+        ) : null}
+      </div>
+      {preview && previewOpen ? (
+        <div className="mt-4 max-h-[70vh] min-w-0 overflow-auto rounded-lg border border-border/60 bg-background/80 p-3 text-sm leading-6">
+          {props.contentKind === "markdown" ? (
+            <MarkdownContent className="py-0">{preview}</MarkdownContent>
+          ) : (
+            <pre className="whitespace-pre-wrap break-words text-xs leading-5 text-foreground/80">
+              {preview}
+            </pre>
+          )}
+        </div>
+      ) : null}
+    </article>
+  );
+}
+
+function ResultInsight({
+  props,
+}: {
+  props: {
+    title: string;
+    summary: string;
+    emphasis?: "lead" | "supporting";
+    points?: string[];
+  };
+}) {
+  const { messages } = useI18n();
+  const copy = messages.components.taskWorkspace;
+  const lead = props.emphasis === "lead";
+  return (
+    <article
+      className={cn(
+        "min-w-0 rounded-xl border p-4 sm:p-5",
+        lead
+          ? "border-info/25 bg-info/10 md:row-span-2"
+          : "border-border/70 bg-background",
+      )}
+    >
+      {lead ? (
+        <p className="mb-3 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-info">
+          <Sparkles className="size-3.5" aria-hidden />
+          {copy.resultKeyStrategy ?? "Key strategy"}
+        </p>
+      ) : null}
+      <h3
+        className={cn(
+          "font-heading font-semibold leading-snug tracking-[-0.015em] text-foreground",
+          lead ? "text-xl" : "text-base",
+        )}
+      >
+        {props.title}
+      </h3>
+      <p className="mt-2 text-sm leading-6 text-foreground/70">
+        {props.summary}
+      </p>
+      {props.points?.length ? (
+        <ul className="mt-4 grid gap-2 text-xs leading-5 text-foreground/75">
+          {props.points.slice(0, 4).map((point) => (
+            <li
+              key={point}
+              className="rounded-lg border border-border/60 bg-background/70 px-3 py-2"
+            >
+              {point}
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </article>
+  );
+}
+
+function ResultActionPlan({
+  props,
+}: {
+  props: { title?: string; summary?: string; phases: ResultActionPhase[] };
+}) {
+  const { messages } = useI18n();
+  const copy = messages.components.taskWorkspace;
+  const timeframeLabels = {
+    now: copy.resultTimeframeNow ?? "Now",
+    this_week: copy.resultTimeframeThisWeek ?? "This week",
+    later: copy.resultTimeframeLater ?? "Later",
+  };
+  return (
+    <section
+      aria-label={props.title ?? copy.resultActionPlan ?? "Action plan"}
+      className="min-w-0"
+    >
+      {props.title ? (
+        <h2 className="font-heading text-xl font-semibold tracking-[-0.02em] text-foreground">
+          {props.title}
+        </h2>
+      ) : null}
+      {props.summary ? (
+        <p className="mt-1.5 text-sm leading-6 text-muted-foreground">
+          {props.summary}
+        </p>
+      ) : null}
+      <div className="mt-4 grid gap-3 md:grid-cols-3">
+        {props.phases.slice(0, 3).map((phase, index) => (
+          <article
+            key={phase.timeframe}
+            className="rounded-xl border border-border/70 bg-background p-4"
+          >
+            <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.1em] text-primary">
+              <span className="flex size-6 items-center justify-center rounded-full bg-primary-soft text-[11px]">
+                {index + 1}
+              </span>
+              {timeframeLabels[phase.timeframe]}
+            </p>
+            <h3 className="mt-3 font-heading text-base font-semibold text-foreground">
+              {phase.title}
+            </h3>
+            <ul className="mt-3 space-y-2 text-sm leading-5 text-foreground/75">
+              {phase.actions.slice(0, 5).map((action) => (
+                <li key={action} className="flex gap-2">
+                  <Clock3
+                    className="mt-0.5 size-3.5 shrink-0 text-muted-foreground"
+                    aria-hidden
+                  />
+                  <span>{action}</span>
+                </li>
+              ))}
+            </ul>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ResultCaveats({
+  props,
+}: {
+  props: { title?: string; items: string[] };
+}) {
+  const { messages } = useI18n();
+  const copy = messages.components.taskWorkspace;
+  const title = props.title ?? copy.resultCaveats ?? "Before accepting";
+  return (
+    <section
+      aria-label={title}
+      className="flex min-w-0 flex-col gap-4 rounded-xl border border-warning/30 bg-warning/10 p-4 sm:flex-row sm:items-start"
+    >
+      <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-warning/15 text-warning">
+        <TriangleAlert className="size-4.5" aria-hidden />
+      </span>
+      <div className="min-w-0">
+        <h2 className="font-heading text-base font-semibold text-foreground">
+          {title}
+        </h2>
+        <ul className="mt-2 grid gap-1.5 text-sm leading-5 text-warning-foreground sm:grid-cols-2 lg:grid-cols-3">
+          {props.items.slice(0, 3).map((item) => (
+            <li key={item}>{item}</li>
+          ))}
+        </ul>
+      </div>
+    </section>
+  );
+}
+
+function ResultEvidence({
+  props,
+}: {
+  props: {
+    title?: string;
+    summary?: string;
+    items: string[];
+    defaultCollapsed?: boolean;
+  };
+}) {
+  const { messages } = useI18n();
+  const copy = messages.components.taskWorkspace;
+  return (
+    <CollapsibleBlock
+      title={
+        props.title ??
+        copy.resultEvidenceAndSources ??
+        "Evidence and source boundaries"
+      }
+      summary={props.summary}
+      defaultCollapsed={props.defaultCollapsed ?? true}
+    >
+      <ul className="space-y-2 text-sm leading-6 text-foreground/75">
+        {props.items.map((item) => (
+          <li
+            key={item}
+            className="border-t border-border/60 pt-2 first:border-t-0 first:pt-0"
+          >
+            {item}
+          </li>
+        ))}
+      </ul>
+    </CollapsibleBlock>
   );
 }
 
@@ -1515,8 +1942,9 @@ export const { registry: workspaceRegistry } = defineRegistry(chronaCatalog, {
       }
       return shadcnComponents.Card({ ...input, props });
     },
-    Stack: (input) =>
-      shadcnComponents.Stack({
+    Stack: (input) => {
+      const horizontal = input.props.direction === "horizontal";
+      return shadcnComponents.Stack({
         ...input,
         props: {
           ...input.props,
@@ -1525,9 +1953,11 @@ export const { registry: workspaceRegistry } = defineRegistry(chronaCatalog, {
             "min-w-0 max-w-full",
             !input.props.className?.includes("w-auto") && "w-full",
             !input.props.align && "items-stretch",
+            horizontal && "[&>*]:min-w-0 [&>*]:flex-[1_1_18rem]",
           ),
         },
-      }),
+      });
+    },
     Separator: shadcnComponents.Separator,
     Text: shadcnComponents.Text,
     Heading: shadcnComponents.Heading,
@@ -1545,6 +1975,12 @@ export const { registry: workspaceRegistry } = defineRegistry(chronaCatalog, {
     Table: WorkspaceTable,
     heading: shadcnComponents.Heading,
     DropdownMenu: shadcnComponents.DropdownMenu,
+    ResultHero: ({ props }) => <ResultHero props={props} />,
+    ResultDeliverable: ({ props }) => <ResultDeliverable props={props} />,
+    ResultInsight: ({ props }) => <ResultInsight props={props} />,
+    ResultActionPlan: ({ props }) => <ResultActionPlan props={props} />,
+    ResultCaveats: ({ props }) => <ResultCaveats props={props} />,
+    ResultEvidence: ({ props }) => <ResultEvidence props={props} />,
     paragraph: ({ props }) => (
       <p className="text-sm leading-6 text-foreground/85">
         {props.text ?? props.content}

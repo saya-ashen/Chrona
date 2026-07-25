@@ -710,7 +710,7 @@ describe("TaskWorkspaceExecutionOverview", () => {
     expect(screen.getAllByText("Requesting AI provider...").length).toBeGreaterThan(0);
   });
 
-  it("renders shared plan output and artifacts as primary results content", () => {
+  it("renders finalized result and artifacts as primary results content", () => {
     const view = createTaskWorkspaceExecutionConsoleView(
       executionMonitoringWorkspaceFixtures.artifactPresent,
     );
@@ -737,7 +737,7 @@ describe("TaskWorkspaceExecutionOverview", () => {
     expect(screen.getByText("file://report.md")).toBeInTheDocument();
   });
 
-  it("renders a completed node summary when persisted plan output is absent", () => {
+  it("renders a completed node summary when finalized result is absent", () => {
     const view = createTaskWorkspaceExecutionConsoleView(
       executionMonitoringWorkspaceFixtures.running,
     );

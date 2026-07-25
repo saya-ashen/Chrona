@@ -189,7 +189,7 @@ function planOutputSpec(value: unknown) {
   const planRun = recordValue(value);
   const mutableGraph = recordValue(planRun?.mutableGraph);
   const planOutput = recordValue(mutableGraph?.planOutput);
-  return planOutput?.spec ?? null;
+  return recordValue(planOutput?.finalizedResult)?.spec ?? null;
 }
 
 function artifactReadModel(artifact: GoalArtifact) {
@@ -633,8 +633,37 @@ export async function createGoalWithFirstTask(input: CreateGoalWithFirstTaskRequ
     const raced = await tx.event.findUnique({ where: { dedupeKey }, select: { payload: true } });
     const racedPayload = recordValue(raced?.payload);
     if (typeof racedPayload?.goal_id === "string" && typeof racedPayload.task_id === "string") return { goalId: racedPayload.goal_id, taskId: racedPayload.task_id };
-    const goal = await tx.goal.create({ data: { workspaceId: input.workspaceId, title: input.intendedOutcome, description: input.intendedOutcome, successCriteria: [{ id: "outcome-confirmed", kind: "user_confirmed", description: `Confirm: ${input.intendedOutcome}`, satisfied: false, confirmedAt: null, proposalStatus: "proposed" }], status: "Active" } });
-    const taskResult = await createTask({ workspaceId: input.workspaceId, goalId: goal.id, goalContext: { expectedOutcome: input.intendedOutcome }, title: input.firstWorkItem, description: input.description ?? null, priority: input.priority, autoPlanGeneration: false, autoExecute: false }, tx);
+    const goal = await tx.goal.create({
+      data: {
+        workspaceId: input.workspaceId,
+        title: input.title,
+        description: input.additionalContext ?? null,
+        operationalBrief: {
+          outcome: input.title,
+          currentFocus: input.firstTaskTitle,
+          strategy: "",
+          constraints: [],
+        },
+        successCriteria: [{
+          id: "outcome-confirmed",
+          kind: "user_confirmed",
+          description: `Confirm: ${input.title}`,
+          satisfied: false,
+          confirmedAt: null,
+          proposalStatus: "proposed",
+        }],
+        status: "Active",
+      },
+    });
+    const taskResult = await createTask({
+      workspaceId: input.workspaceId,
+      goalId: goal.id,
+      title: input.firstTaskTitle,
+      description: null,
+      priority: input.priority,
+      autoPlanGeneration: false,
+      autoExecute: false,
+    }, tx);
     await tx.event.create({ data: { eventType: "goal.created_with_first_task", workspaceId: input.workspaceId, taskId: taskResult.taskId, actorType: "user", actorId: "server-action", source: "ui", payload: { goal_id: goal.id, task_id: taskResult.taskId }, summary: `Created Goal and first task: ${goal.title}`, dedupeKey, ingestSequence: 1 } });
     return { goalId: goal.id, taskId: taskResult.taskId };
   }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });

@@ -184,22 +184,6 @@ describe("plan-runner task executor continuation", () => {
           status: "running",
         });
 
-        const output = await taskPlanExecution.submitNodeResult({
-          taskId: input.taskId,
-          action: {
-            action: "update_plan_output",
-            patches: [
-              { op: "add", path: "/root", value: "root" },
-              {
-                op: "add",
-                path: "/elements/root",
-                value: { type: "RichMarkdown", props: { content: "Application package ready" } },
-              },
-            ],
-            summary: "Published application package",
-          },
-        });
-        expect(output.status).toBe("running");
 
         return {
           status: "done",
@@ -230,13 +214,14 @@ describe("plan-runner task executor continuation", () => {
     expect(submitted.execution.status).toBe("completed");
     const persisted = await getPlanRun(task.id, compiledPlan.editablePlanId);
     expect(persisted?.planOutput).toMatchObject({
-      revision: 1,
-      updatedByNodeId: "task_node",
-      spec: {
-        root: "root",
-        elements: {
-          root: { type: "RichMarkdown", props: { content: "Application package ready" } },
-        },
+      revision: 2,
+      manifest: {
+        outcome: { title: "Dynamic task complete" },
+        sourceRevision: 2,
+      },
+      finalization: {
+        status: "Failed",
+        errorCode: "RESULT_FINALIZATION_FAILED",
       },
     });
     expect(persisted?.attempts.at(-1)).toMatchObject({ nodeId: "task_node", status: "succeeded" });
@@ -305,7 +290,7 @@ describe("plan-runner task executor continuation", () => {
     ]);
   });
 
-  it("fails a completed runtime run that has no terminal plan output", async () => {
+  it("fails a completed runtime run that has no accepted terminal result", async () => {
     executeTaskNodeCapabilityMock.mockResolvedValueOnce({
       status: "started",
       summary: "First runtime run started",

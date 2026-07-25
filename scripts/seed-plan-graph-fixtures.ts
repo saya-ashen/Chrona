@@ -437,38 +437,59 @@ function createFixturePlanOutput(fixture: Fixture): PlanOutputState {
   const resultNodeId = `${fixture.slug}-${fixture.nodes.at(-1)?.id ?? "result"}`;
 
   if (fixture.slug !== "inactive-branch-tail") {
-    return {
-      spec: {
-        root: "root",
-        elements: {
-          root: { type: "Stack", props: { gap: "md" }, children: ["summary", "details"] },
-          summary: {
-            type: "ResultSummary",
-            props: { text: `${fixture.graphType} fixture ready for documentation capture.` },
-            children: [],
-          },
-          details: {
-            type: "Markdown",
-            props: { content: `### ${fixture.graphType} result\n\n- Fixture seeded for README and graph layout screenshots.\n- Workflow uses English release-readiness labels.` },
-            children: [],
-          },
+    const spec = {
+      root: "root",
+      elements: {
+        root: { type: "Stack", props: { gap: "md" }, children: ["summary", "details"] },
+        summary: {
+          type: "ResultSummary",
+          props: { text: `${fixture.graphType} fixture ready for documentation capture.` },
+          children: [],
+        },
+        details: {
+          type: "Markdown",
+          props: { content: `### ${fixture.graphType} result\n\n- Fixture seeded for README and graph layout screenshots.\n- Workflow uses English release-readiness labels.` },
+          children: [],
         },
       },
+    };
+    const manifest = {
+      schemaVersion: 1 as const,
+      sourceRevision: 1,
+      outcome: { title: `${fixture.graphType} fixture`, summary: "Fixture result ready." },
+      readiness: { status: "ready" as const, summary: "Ready" },
+      sections: [],
+      deliverables: [],
+      findings: [],
+      decisions: [],
+      caveats: [],
+      nextActions: [],
+      evidence: [],
+    };
+    return {
+      manifest,
+      finalizedResult: { sourceRevision: 1, manifest, spec, finalizedAt: createdAt },
+      finalization: { status: "Ready", sourceRevision: 1, attempt: 1, finalizedAt: createdAt },
       revision: 1,
       updatedAt: createdAt,
       updatedByNodeId: resultNodeId,
-      history: [{
-        id: `fixture-output-${fixture.slug}`,
-        nodeId: resultNodeId,
-        summary: `${fixture.graphType} fixture result`,
-        patches: [],
-        createdAt,
-      }],
     };
   }
 
-  return {
-    spec: {
+  const manifest = {
+    schemaVersion: 1 as const,
+    sourceRevision: 1,
+    outcome: { title: "GitHub Trending engineering brief", summary: "Brief complete." },
+    readiness: { status: "ready" as const, summary: "Ready" },
+    sections: [],
+    deliverables: [],
+    findings: [],
+    decisions: [],
+    caveats: [],
+    nextActions: [],
+    evidence: [],
+  };
+  const spec = {
       root: "root",
       elements: {
         root: {
@@ -533,17 +554,14 @@ function createFixturePlanOutput(fixture: Fixture): PlanOutputState {
           children: [],
         },
       },
-    },
+  };
+  return {
+    manifest,
+    finalizedResult: { sourceRevision: 1, manifest, spec, finalizedAt: createdAt },
+    finalization: { status: "Ready", sourceRevision: 1, attempt: 1, finalizedAt: createdAt },
     revision: 1,
     updatedAt: createdAt,
     updatedByNodeId: resultNodeId,
-    history: [{
-      id: `fixture-output-${fixture.slug}`,
-      nodeId: resultNodeId,
-      summary: "GitHub Trending engineering brief",
-      patches: [],
-      createdAt,
-    }],
   };
 }
 
@@ -583,8 +601,8 @@ function createFixtureTimelineItems(fixture: Fixture, input: { workspaceId: stri
       workspaceId: input.workspaceId,
       taskId: input.taskId,
       kind: "tool.accepted",
-      title: "chrona.plan.output",
-      body: "AI submitted the visible Trending brief through Chrona-owned result state.",
+      title: "chrona.node.complete",
+      body: "AI submitted semantic result contributions through Chrona-owned result state.",
       severity: "success",
       status: "accepted",
       nodeId,

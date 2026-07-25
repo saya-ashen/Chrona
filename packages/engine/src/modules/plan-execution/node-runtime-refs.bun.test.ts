@@ -214,6 +214,65 @@ describe("node runtime refs", () => {
     expect(nextInput.context.run).toBeUndefined();
   });
 
+  it("projects the frozen Goal snapshot without exposing backend identifiers", () => {
+    const current = node({
+      id: "task-real-goal-context",
+      title: "Build candidate profile",
+      type: "task",
+    });
+    const plan = graph([current]);
+
+    const input = buildNodeRuntimeInput({
+      plan,
+      node: current,
+      planContext: {
+        title: "PhD search plan",
+        goal: "Find relevant AI Agent PhD positions.",
+        assumptions: [],
+        goalContext: {
+          goal: {
+            title: "Apply for an AI Agent PhD",
+            additionalContext: "Bioinformatics graduate student; research focus: AI, Agent, LLM.",
+            operationalBrief: {
+              outcome: "Apply for an AI Agent PhD",
+              currentFocus: "Find positions",
+              strategy: "",
+              constraints: ["Fully funded"],
+            },
+            capturedAt: "2026-07-25T12:25:05.730Z",
+          },
+          acceptedResults: [{
+            ref: "GRABCDEF123456",
+            taskTitle: "Previous research",
+            acceptedAt: "2026-07-24T10:00:00.000Z",
+            summary: "Candidate prefers LLM agents and tool use.",
+            artifactCount: 1,
+          }],
+        },
+      },
+    });
+
+    expect(input.context.goal).toEqual({
+      title: "Apply for an AI Agent PhD",
+      additionalContext: "Bioinformatics graduate student; research focus: AI, Agent, LLM.",
+      operationalBrief: {
+        outcome: "Apply for an AI Agent PhD",
+        currentFocus: "Find positions",
+        strategy: "",
+        constraints: ["Fully funded"],
+      },
+      capturedAt: "2026-07-25T12:25:05.730Z",
+    });
+    expect(input.context.acceptedGoalResults).toEqual([{
+      ref: "GRABCDEF123456",
+      taskTitle: "Previous research",
+      acceptedAt: "2026-07-24T10:00:00.000Z",
+      summary: "Candidate prefers LLM agents and tool use.",
+      artifactCount: 1,
+    }]);
+    expect(JSON.stringify(input)).not.toContain("task-real-goal-context");
+  });
+
   it("resolves only exact branch refs scoped to the current condition node", () => {
     const condition = node({
       id: "condition-real-123",
@@ -287,37 +346,29 @@ describe("node runtime refs", () => {
     );
   });
 
-  it("prompts task nodes to patch shared json-render specs", () => {
+  it("prompts task nodes to submit semantic results", () => {
     const current = node({
       id: "task-real-789",
-      title: "Render result",
+      title: "Research result",
       type: "task",
-      description: "Create a visible result.",
+      description: "Create a semantic result.",
     });
     const plan = graph([current]);
     const runtime = buildNodeRuntimePrompt({ plan, node: current });
 
-    expect(runtime.instructions).toContain("CATALOG_UI_SPEC");
-    expect(runtime.instructions).toContain("RFC 6902 SpecStream patches");
-    expect(runtime.instructions).toContain("Current Node Context JSON.context.planOutput");
-    expect(runtime.instructions).toContain("context.planOutput.hasSpec is false");
-    expect(runtime.instructions).toContain("root MUST equal one element id");
-    expect(runtime.instructions).toContain('"type": "RichMarkdown"');
-    expect(runtime.instructions).toContain("RichMarkdown.content is an ordinary Markdown string");
-    expect(runtime.instructions).toContain(
-      '"content": "## Key findings\\n\\n- Finding one\\n- Finding two"',
-    );
-    expect(runtime.instructions).not.toContain("## Key findings\n\n- Finding one\n- Finding two");
-    expect(runtime.instructions).not.toContain('"type": "Markdown"');
-    expect(runtime.instructions).not.toContain("SCHEMA LAB OVERRIDE:");
-    expect(runtime.instructions).not.toContain("Submit the complete Spec as the chrona_plan_output tool argument");
-    expect(runtime.runtimeInput.context.planOutput).toEqual({
-      revision: 0,
-      hasSpec: false,
-      root: null,
-      rootChildren: [],
-      elementIds: [],
-      updatedAt: null,
+    expect(runtime.instructions).toContain("chrona_node_complete");
+    expect(runtime.instructions).toContain("Declare every user-visible generated file through deliverables");
+    expect(runtime.instructions).toContain("findings");
+    expect(runtime.instructions).not.toContain("RFC 6902");
+    expect(runtime.instructions).not.toContain("chrona_plan_output");
+    expect(runtime.runtimeInput.context.resultManifest).toEqual({
+      sourceRevision: 0,
+      outcome: { title: "Result pending", summary: "No node result has been submitted." },
+      currentDeliverableKeys: [],
+      findingKeys: [],
+      decisionKeys: [],
+      caveatKeys: [],
+      nextActionKeys: [],
     });
     expect(runtime.runtimeInput.context.run?.generatedFiles).toEqual({
       directory: expect.stringMatching(/\/generated\/\d{8}\/N20260516-01$/),
@@ -329,101 +380,51 @@ describe("node runtime refs", () => {
     const generatedReference = runtime.runtimeInput.context.run?.generatedFiles?.referenceBase;
     expect(generatedReference).toBeDefined();
     expect(runtime.instructions).toContain(generatedReference!);
-    expect(runtime.instructions).toContain("FileView or FileRef");
   });
 
-  it("includes Results design guidance for task-node outputs", () => {
-    const current = node({
-      id: "task-real-791",
-      title: "Render useful result",
-      type: "task",
-    });
-    const plan = graph([current]);
-    const runtime = buildNodeRuntimePrompt({ plan, node: current });
-
-    expect(runtime.instructions).toContain("Design user-visible Results as a concise deliverable");
-    expect(runtime.instructions).toContain("not a raw data dump");
-    expect(runtime.instructions).toContain("what was completed");
-    expect(runtime.instructions).toContain("the most important findings");
-    expect(runtime.instructions).toContain("the primary data or report needed to inspect the result");
-    expect(runtime.instructions).toContain("where full artifacts or evidence live");
-    expect(runtime.instructions).toContain("Choose components based on the result shape");
-    expect(runtime.instructions).toContain("Table for ranked lists, comparisons, records, and datasets users need to scan");
-    expect(runtime.instructions).toContain("JsonView only for diagnostics or machine-readable evidence");
-    expect(runtime.instructions).toContain("choose columns that best explain the data for the user's goal");
-    expect(runtime.instructions).toContain("Do not mechanically include every field");
-    expect(runtime.instructions).toContain("Do not drop fields that explain why a row matters");
-    expect(runtime.instructions).toContain("prefer making the name or title a link");
-  });
-
-  it("keeps Results design guidance out of non-task node prompts", () => {
-    const current = node({
-      id: "condition-real-791",
-      title: "Choose branch",
-      type: "condition",
-      config: {
-        evaluationBy: "ai",
-        condition: "Pick next step",
-        branches: [],
-      },
-    });
-    const plan = graph([current]);
-    const runtime = buildNodeRuntimePrompt({ plan, node: current });
-
-    expect(runtime.instructions).not.toContain("Design user-visible Results as a concise deliverable");
-    expect(runtime.instructions).not.toContain("choose columns that best explain the data for the user's goal");
-    expect(runtime.instructions).not.toContain("prefer making the name or title a link");
-  });
-  it("passes existing accumulated plan output into task prompts", () => {
+  it("passes the accumulated semantic manifest into task prompts", () => {
     const current = node({
       id: "task-real-790",
-      title: "Append result",
+      title: "Continue result",
       type: "task",
-      description: "Append to visible result.",
+      description: "Continue from prior findings.",
     });
     const plan = graph([current]);
     const planOutput = {
-      revision: 1,
-      spec: {
-        root: "existingRoot",
-        elements: {
-          existingRoot: { type: "Stack", props: { gap: "sm" }, children: ["firstSection"] },
-          firstSection: { type: "RichMarkdown", props: { content: "First section" }, children: [] },
-        },
+      manifest: {
+        schemaVersion: 1 as const,
+        sourceRevision: 1,
+        outcome: { title: "Research", summary: "First section complete" },
+        readiness: { status: "partial" as const, summary: "More work remains" },
+        sections: [],
+        deliverables: [],
+        findings: [{ key: "first-finding", content: "First finding", sourceNodeRef: "N20260516-01" }],
+        decisions: [],
+        caveats: [],
+        nextActions: [],
+        evidence: [],
       },
+      finalizedResult: null,
+      finalization: { status: "Pending" as const, sourceRevision: 1 },
+      revision: 1,
       updatedAt: "2026-05-16T00:01:00.000Z",
       updatedByNodeId: "first-task",
-      history: [
-        {
-          id: "plan_output_1",
-          nodeId: "first-task",
-          summary: "First section",
-          patches: [{ op: "add" as const, path: "/root", value: "existingRoot" }],
-          createdAt: "2026-05-16T00:01:00.000Z",
-        },
-      ],
     };
 
     const runtime = buildNodeRuntimePrompt({ plan, node: current, planOutput });
 
-    expect(runtime.runtimeInput.context.planOutput).toEqual({
-      revision: 1,
-      hasSpec: true,
-      root: "existingRoot",
-      rootChildren: ["firstSection"],
-      elementIds: ["existingRoot", "firstSection"],
-      updatedAt: "2026-05-16T00:01:00.000Z",
-      lastSummary: "First section",
+    expect(runtime.runtimeInput.context.resultManifest).toEqual({
+      sourceRevision: 1,
+      outcome: { title: "Research", summary: "First section complete" },
+      currentDeliverableKeys: [],
+      findingKeys: ["first-finding"],
+      decisionKeys: [],
+      caveatKeys: [],
+      nextActionKeys: [],
     });
-    expect(runtime.instructions).toContain('"revision": 1');
-    expect(runtime.instructions).toContain('"root": "existingRoot"');
-    expect(runtime.instructions).toContain('"rootChildren": [');
-    expect(runtime.instructions).toContain('"lastSummary": "First section"');
-    const runtimeContext = runtime.instructions.split("Current Node Context JSON:").at(-1) ?? "";
-    expect(runtimeContext).not.toContain('"spec":');
-    expect(runtimeContext).not.toContain('"revision": 0');
-    expect(runtimeContext).not.toContain('"history":');
-    expect(runtimeContext).not.toContain('"patches":');
+    expect(runtime.instructions).toContain('"sourceRevision": 1');
+    expect(runtime.instructions).toContain('"findingKeys": [');
+    expect(runtime.instructions).not.toContain('"spec":');
   });
   it("includes typed current-node input when resuming the same AI node", () => {
     const current = node({
@@ -456,21 +457,6 @@ describe("node runtime refs", () => {
     expect(runtime.instructions).toContain('"confirmed": true');
   });
 
-  it("spells out file-backed table props for json-render outputs", () => {
-    const current = node({
-      id: "task-real-456",
-      title: "Render table",
-      type: "task",
-    });
-    const plan = graph([current]);
-    const runtime = buildNodeRuntimePrompt({ plan, node: current });
-
-    expect(runtime.instructions).toContain("File-backed data table");
-    expect(runtime.instructions).toContain("do not inline rows");
-    expect(runtime.instructions).toContain("pageSize");
-    expect(runtime.instructions).toContain("RFC 6902");
-    expect(runtime.instructions).not.toContain("Spec shape for chrona_plan_output tool arguments: { root: string, elements: Array<");
-  });
 
   it("does not expose checkpoint submit as an AI terminal tool", () => {
     const current = node({

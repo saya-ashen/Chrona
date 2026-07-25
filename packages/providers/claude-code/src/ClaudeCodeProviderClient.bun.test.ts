@@ -53,7 +53,7 @@ describe("ClaudeCodeProviderClient — MCP preflight", () => {
         runId: "probe-test",
       });
 
-      expect(result.toolNames).toEqual(["chrona_plan_output", "chrona_node_complete"]);
+      expect(result.toolNames).toEqual(["chrona_node_complete"]);
     } finally {
       server.stop(true);
     }
@@ -315,10 +315,8 @@ describe("ClaudeCodeProviderClient — cancel + error paths", () => {
     const events = await collect(client.streamRun({ runId: ref.runId }));
 
     expect(events.at(-1)).toMatchObject({
-      type: "run_failed",
-      error: "Claude Code process aborted before Chrona received plan output",
-      raw: { stage: "before_plan_output_submission" },
-
+      error: "Claude Code process aborted before Chrona received node completion",
+      raw: { stage: "before_node_complete_submission" },
     });
   });
 
@@ -378,10 +376,9 @@ describe("ClaudeCodeProviderClient — cancel + error paths", () => {
     const events = await collect(client.streamRun({ runId: ref.runId }));
 
     expect(events.at(-1)).toMatchObject({
-      type: "run_failed",
-      error: "Claude Code run timed out after 120s idle timeout: Claude Code process aborted before Chrona received plan output",
+      error: "Claude Code run timed out after 120s idle timeout: Claude Code process aborted before Chrona received node completion",
       raw: {
-        stage: "before_plan_output_submission",
+        stage: "before_node_complete_submission",
         runner: { timeoutTriggered: true, timeoutMode: "idle", timeoutMs: 120_000 },
       },
     });

@@ -289,7 +289,7 @@ export type PlanExecutionResult = {
   blockedNodeIds: string[];
   message: string;
   checkpoint: ExecutionCheckpoint | null;
-  planOutput?: Pick<PlanOutputState, "spec" | "revision" | "updatedAt" | "updatedByNodeId">;
+  planOutput?: Pick<PlanOutputState, "manifest" | "finalizedResult" | "finalization" | "revision" | "updatedAt" | "updatedByNodeId">;
   ui?: {
     currentOperationSpec?: UiDocument | null;
   };

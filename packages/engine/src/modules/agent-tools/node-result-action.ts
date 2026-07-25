@@ -1,4 +1,10 @@
-import type { AgentControlActionBody, ChronaToolName, ChronaToolOperation, PlanOutputPatch } from "@chrona/contracts";
+import type {
+  AgentControlActionBody,
+  ChronaToolName,
+  ChronaToolOperation,
+  NodeDeliverableDeclaration,
+  ResultContribution,
+} from "@chrona/contracts";
 import type { AgentToolOperationsDeps } from "./types";
 
 export type SubmitNodeResultAction = Parameters<AgentToolOperationsDeps["execution"]["submitNodeResult"]>[0]["action"];
@@ -9,16 +15,29 @@ export function submitNodeResultActionFromTool(input: {
   payload: unknown;
 }): SubmitNodeResultAction | null {
   switch (input.toolName) {
-    case "chrona.plan.output": {
-      const body = input.payload as { patches: PlanOutputPatch[]; summary?: string };
-      return {
-        action: "update_plan_output",
-        sessionId: input.sessionId,
-        patches: body.patches,
-        summary: body.summary,
+    case "chrona.node.complete": {
+      const body = input.payload as {
+        summary: string;
+        deliverables?: NodeDeliverableDeclaration[];
+        findings?: ResultContribution[];
+        decisions?: ResultContribution[];
+        caveats?: ResultContribution[];
+        nextActions?: ResultContribution[];
+        evidenceItems?: Array<{ key: string; summary: string; artifactRef?: string }>;
       };
+      return {
+        action: "complete_manual_node",
+        sessionId: input.sessionId,
+        summary: body.summary,
+        deliverables: body.deliverables,
+        findings: body.findings,
+        decisions: body.decisions,
+        caveats: body.caveats,
+        nextActions: body.nextActions,
+        evidenceItems: body.evidenceItems,
+        terminalKind: "task",
+      } as SubmitNodeResultAction;
     }
-    case "chrona.node.complete":
     case "chrona.node.condition_select":
     case "chrona.node.wait_complete": {
       const body = input.payload as {
@@ -36,11 +55,7 @@ export function submitNodeResultActionFromTool(input: {
         nodeId: body.nodeId,
         summary: body.summary,
         output: body.input,
-        terminalKind: input.toolName === "chrona.node.condition_select"
-          ? "condition"
-          : input.toolName === "chrona.node.wait_complete"
-            ? "wait"
-            : "task",
+        terminalKind: input.toolName === "chrona.node.condition_select" ? "condition" : "wait",
         branchRef: body.branchRef,
         decision: body.decision,
         feedback: body.feedback,
@@ -92,8 +107,6 @@ export function submitNodeResultActionFromTool(input: {
 
 export function toolNameFromControlKind(kind: AgentControlActionBody["kind"]): ChronaToolName | null {
   switch (kind) {
-    case "plan_output":
-      return "chrona.plan.output";
     case "complete":
       return "chrona.node.complete";
     case "condition_select":
@@ -130,8 +143,6 @@ export function submitNodeResultActionFromControl(input: {
 
 export function controlKindFromToolName(toolName: ChronaToolName): AgentControlActionBody["kind"] | null {
   switch (toolName) {
-    case "chrona.plan.output":
-      return "plan_output";
     case "chrona.node.complete":
       return "complete";
     case "chrona.node.condition_select":

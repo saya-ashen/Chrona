@@ -49,7 +49,7 @@ const copy: GoalCopy = {
   defineOutcome: "Define the long-term outcome",
   defineOutcomeDescription: "Set the durable result this Goal should reach.",
   goalOutcomePlaceholder: "Describe the durable outcome",
-  goalDescriptionHelp: "Keep scope durable and observable.",
+  goalDescriptionHelp: "This context is available to future bounded tasks.",
   startFirstTask: "Start with one bounded task",
   startFirstTaskDescription: "Create the first concrete step.",
   firstTaskLabel: "First bounded task",
@@ -269,9 +269,9 @@ const copy: GoalCopy = {
   createFromResult: "Create Goal and continue",
   createFromResultTitle: "Continue as Goal",
   createFromResultDescription: "Preview promotion",
-  goalTitleLabel: "Goal title",
-  goalDescriptionLabel: "Description",
-  goalDescriptionPlaceholder: "Describe outcome",
+  goalTitleLabel: "Goal",
+  goalDescriptionLabel: "Additional information (optional)",
+  goalDescriptionPlaceholder: "Add context, scope, constraints, or preferences",
   criterionLabel: "Success criterion",
   criterionPlaceholder: "Confirm outcome",
   selectedAssets: "Selected assets",
@@ -560,8 +560,11 @@ describe("Goal pages", () => {
     renderInRouter(<GoalListPage goals={[]} copy={copy} />);
     fireEvent.click(screen.getByRole("button", { name: "Create Goal" }));
     const dialog = screen.getByRole("dialog");
-    fireEvent.change(within(dialog).getByLabelText("Intended outcome"), {
+    fireEvent.change(within(dialog).getByLabelText("Goal"), {
       target: { value: "Plan a two-week trip to Japan" },
+    });
+    fireEvent.change(within(dialog).getByLabelText("Additional information (optional)"), {
+      target: { value: "Travel in October with a total budget of $5,000" },
     });
     fireEvent.change(within(dialog).getByLabelText("First bounded task"), {
       target: { value: "Draft the itinerary and budget" },
@@ -573,9 +576,9 @@ describe("Goal pages", () => {
     await waitFor(() =>
       expect(createGoalWithFirstTaskMock).toHaveBeenCalledWith({
         workspaceId: "workspace-default",
-        intendedOutcome: "Plan a two-week trip to Japan",
-        firstWorkItem: "Draft the itinerary and budget",
-        description: null,
+        title: "Plan a two-week trip to Japan",
+        firstTaskTitle: "Draft the itinerary and budget",
+        additionalContext: "Travel in October with a total budget of $5,000",
         priority: "High",
         idempotencyKey: "goal-idempotency-key",
       }),

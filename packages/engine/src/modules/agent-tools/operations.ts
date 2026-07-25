@@ -41,7 +41,6 @@ const toolDescriptions: Record<ChronaToolName, string> = {
   "chrona.execution.dispatch": "Dispatch an execution lifecycle action.",
   "chrona.node.read": "Read current execution node state.",
   "chrona.dashboard.brief": "Submit validated dashboard AI summary spec.",
-  "chrona.plan.output": "Patch shared plan-level user-visible output.",
   "chrona.node.complete": "Complete the current task node.",
   "chrona.node.condition_select": "Select the current condition node branch.",
   "chrona.node.block": "Block the current execution node.",

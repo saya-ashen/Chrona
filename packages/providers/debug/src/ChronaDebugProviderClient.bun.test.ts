@@ -199,4 +199,34 @@ describe("ChronaDebugProviderClient", () => {
       (event) => event.type === "text_delta" && event.text.includes("Hermes-like debug profile accepted"),
     )).toBe(false);
   });
+
+  it("returns a valid structured task result for finalization", async () => {
+    const client = new ChronaDebugProviderClient();
+    const events = [];
+
+    for await (const event of client.streamRun({
+      sessionId: "debug-result-finalization",
+      instructions: "Finalize the immutable ResultManifest.",
+      input: { manifest: { sourceRevision: 1 } },
+      structuredOutputSchema: {
+        name: "chrona_finalized_result_spec",
+        description: "Finalized result",
+        schema: { type: "object" },
+      },
+      stream: true,
+    })) {
+      events.push(event);
+    }
+
+    expect(events.at(-1)).toMatchObject({
+      type: "run_completed",
+      structuredPayload: {
+        root: "result",
+        elements: {
+          summary: { type: "ResultSummary" },
+          details: { type: "RichMarkdown" },
+        },
+      },
+    });
+  });
 });

@@ -1,32 +1,122 @@
 import type { CheckpointInputFields, CheckpointResponse } from "./checkpoints";
 import type { NodeActionForm, WaitKind } from "./node";
-import type { Spec } from "@chrona/ui-protocol";
+import type { UiDocument } from "@chrona/ui-protocol";
 
-export type PlanOutputPatch =
-  | { op: "add"; path: string; value: unknown }
-  | { op: "remove"; path: string }
-  | { op: "replace"; path: string; value: unknown }
-  | { op: "move"; path: string; from: string }
-  | { op: "copy"; path: string; from: string }
-  | { op: "test"; path: string; value: unknown };
 
-export type PlanOutputRevision = {
-  id: string;
-  nodeId: string | null;
-  nodeLayerId?: string | null;
-  attemptId?: string | null;
-  sessionId?: string;
-  summary?: string;
-  patches: PlanOutputPatch[];
-  createdAt: string;
+export type AiArtifactRef = `AF${string}`;
+
+export type DeliverableKind =
+  | "document"
+  | "table"
+  | "dataset"
+  | "image"
+  | "archive"
+  | "code"
+  | "other";
+
+export type DeliverablePresentation = {
+  primary: "table" | "file" | "document" | "image";
+  allowDownload: boolean;
 };
 
+export type NodeDeliverableDeclaration = {
+  deliverableKey: string;
+  title: string;
+  kind: DeliverableKind;
+  source:
+    | { type: "generated_file"; uri: `generated://${string}` }
+    | { type: "existing_artifact"; artifactRef: AiArtifactRef };
+  summary?: string;
+  presentation?: DeliverablePresentation;
+  placement?: "primary" | "supporting" | "evidence";
+};
+
+export type NodeDeliverable = {
+  deliverableKey: string;
+  title: string;
+  kind: DeliverableKind;
+  artifactRef: AiArtifactRef;
+  status: "current" | "superseded";
+  supersedes?: AiArtifactRef;
+  sourceNodeRef: string;
+  summary?: string;
+  presentation: DeliverablePresentation;
+  placement: "primary" | "supporting" | "evidence";
+};
+
+export type ResultContribution = {
+  key: string;
+  title?: string;
+  content: string;
+  importance?: "primary" | "supporting";
+  sourceNodeRef?: string;
+};
+
+export type ResultEvidence = {
+  key: string;
+  summary: string;
+  artifactRef?: AiArtifactRef;
+  sourceNodeRef: string;
+};
+
+export type ResultSection = {
+  key: string;
+  title: string;
+  kind:
+    | "outcome"
+    | "deliverables"
+    | "findings"
+    | "decisions"
+    | "caveats"
+    | "next_actions"
+    | "evidence";
+  itemKeys: string[];
+};
+
+export type ResultReadiness = "ready" | "ready_with_caveats" | "partial" | "blocked";
+
+export type ResultManifest = {
+  schemaVersion: 1;
+  sourceRevision: number;
+  outcome: { title: string; summary: string };
+  readiness: { status: ResultReadiness; summary: string };
+  sections: ResultSection[];
+  deliverables: NodeDeliverable[];
+  findings: ResultContribution[];
+  decisions: ResultContribution[];
+  caveats: ResultContribution[];
+  nextActions: ResultContribution[];
+  evidence: ResultEvidence[];
+};
+
+export type ResultFinalizationState =
+  | { status: "Pending"; sourceRevision: number }
+  | { status: "Running"; sourceRevision: number; attempt: number; startedAt: string }
+  | { status: "Ready"; sourceRevision: number; attempt: number; finalizedAt: string }
+  | {
+      status: "Failed";
+      sourceRevision: number;
+      attempt: number;
+      failedAt: string;
+      errorCode: string;
+      errorMessage: string;
+    };
+
+export type FinalizedResult = {
+  sourceRevision: number;
+  manifest: ResultManifest;
+  spec: UiDocument;
+  finalizedAt: string;
+};
+
+
 export type PlanOutputState = {
-  spec: Spec | null;
+  manifest: ResultManifest;
+  finalizedResult: FinalizedResult | null;
+  finalization: ResultFinalizationState;
   revision: number;
   updatedAt: string | null;
   updatedByNodeId: string | null;
-  history: PlanOutputRevision[];
 };
 
 export interface NodeResultEvidence {
@@ -61,6 +151,12 @@ export interface NodeResult {
   inputFields?: CheckpointInputFields;
   evidence?: NodeResultEvidence;
   artifactRefs?: ArtifactRef[];
+  deliverables?: NodeDeliverable[];
+  findings?: ResultContribution[];
+  decisions?: ResultContribution[];
+  caveats?: ResultContribution[];
+  nextActions?: ResultContribution[];
+  resultEvidence?: ResultEvidence[];
   checkpointResponse?: CheckpointResponse["response"];
   error?: string;
   errorDetails?: unknown;

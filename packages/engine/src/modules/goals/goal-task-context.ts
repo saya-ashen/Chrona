@@ -28,7 +28,7 @@ function planOutputSpec(value: unknown) {
   const planRun = record(value);
   const mutableGraph = record(planRun?.mutableGraph);
   const planOutput = record(mutableGraph?.planOutput);
-  return planOutput?.spec ?? null;
+  return record(planOutput?.finalizedResult)?.spec ?? null;
 }
 
 function acceptedResultCatalog(goal: Awaited<ReturnType<typeof loadGoalContext>>) {
@@ -71,6 +71,7 @@ function loadGoalContext(goalId: string, client: GoalContextClient) {
     select: {
       workspaceId: true,
       title: true,
+      description: true,
       operationalBrief: true,
       tasks: {
         orderBy: [{ updatedAt: "desc" as const }, { id: "asc" as const }],
@@ -116,6 +117,7 @@ export async function buildAutomaticGoalTaskContext(
     ...(input.additionalContext ?? {}),
     goal: {
       title: goal.title,
+      additionalContext: goal.description,
       operationalBrief: goal.operationalBrief,
       capturedAt: new Date().toISOString(),
     },

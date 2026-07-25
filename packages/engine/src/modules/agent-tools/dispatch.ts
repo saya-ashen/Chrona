@@ -120,7 +120,6 @@ export async function executeValidatedTool(
       }
       return { summaryText: body.summaryText ?? null, spec: validation.spec };
     }
-    case "chrona.plan.output":
     case "chrona.node.complete":
     case "chrona.node.condition_select":
     case "chrona.node.wait_complete":

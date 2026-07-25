@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { chronaResultSpecJsonSchema } from "@chrona/ui-protocol";
 import type { GenerateTaskPlanRequest } from "./plan-runtime";
 import { goalAssetOwnershipResultSchema } from "./api/goal-workbench.schema";
 import { goalReviewResultSchema } from "./api/goals.schema";
@@ -23,6 +24,7 @@ export type StructuredAiFeature =
   | "execute_task_node"
   | "evaluate_condition_node"
   | "review_checkpoint_node"
+  | "task.result_finalization"
   | "goal.asset_ownership"
   | "goal.review";
 
@@ -290,6 +292,36 @@ export function buildGoalAssetOwnershipFeatureSpec(): PreparedAiFeatureSpec {
         target: "draft-07",
         unrepresentable: "any",
       }) as Record<string, unknown>,
+    },
+  };
+}
+
+export function buildResultFinalizationFeatureSpec(input: {
+  manifest: unknown;
+}): PreparedAiFeatureSpec {
+  return {
+    feature: "task.result_finalization",
+    instructions: [
+      "You are Chrona's restricted result finalizer.",
+      "Transform the supplied immutable ResultManifest into one concise, operational Chrona result workspace. Do not reproduce the manifest as a linear report.",
+      "Do not invent facts, numbers, paths, URLs, artifact identities, task IDs, run IDs, provider data, execution status, or readiness. Every statement and metric must be directly supported by the manifest.",
+      "Return one complete validated Spec. Do not call tools, request input, emit actions, or use dynamic state bindings.",
+      "The root MUST be Stack with gap 'lg'. Its direct children MUST follow this order: exactly one ResultHero; deliverables; synthesized insights; at most one ResultActionPlan; at most one ResultCaveats; exactly one final ResultEvidence when evidence exists.",
+      "ResultHero MUST use manifest.outcome.title, manifest.outcome.summary, manifest.readiness.status, and manifest.readiness.summary. It is the first visible block. Include zero to four metrics only when their exact values are supported by manifest content; never derive or estimate counts.",
+      "For current deliverables, emit one ResultDeliverable per file and set artifactRef to its opaque manifest artifactRef. Choose exactly one primary role when deliverables exist: prefer a current deliverable already placed primary that best enables the user to act. Mark the others supporting or evidence. Never repeat artifactRefs or expose paths as prose.",
+      "Group ResultDeliverable elements in one or two Stack containers: primary first, then supporting. Use direction 'horizontal' for supporting deliverables so the host can render a responsive grid. Do not wrap each deliverable in Card or FileRef.",
+      "Synthesize related findings and decisions into at most six ResultInsight elements. Use emphasis 'lead' at most once. A ResultInsight is a theme, not a one-to-one copy of one manifest item. Do not generate more than two consecutive insights with the same semantic shape when fewer themes suffice.",
+      "Consolidate nextActions into one ResultActionPlan with one to three chronological phases: now, this_week, later. Use at most five actions per phase and do not repeat actions.",
+      "If caveats exist, select at most three material acceptance caveats for one ResultCaveats. If readiness is ready_with_caveats, partial, or blocked, preserve that limitation visibly; never describe it as unconditionally ready.",
+      "If evidence exists, consolidate it into one ResultEvidence as the final element, set defaultCollapsed true, and preserve source boundaries. Do not emit evidence as cards, tables, or expanded raw JSON.",
+      "Use only these domain components for the primary composition: Stack, ResultHero, ResultDeliverable, ResultInsight, ResultActionPlan, ResultCaveats, and ResultEvidence. RichMarkdown, Table, JsonView, Card, Heading, Text, Badge, Alert, Separator, FileRef, ResultSummary, CollapsibleText, and CollapsibleBlock are reserved for exceptional secondary content that cannot be represented by the domain components.",
+      "Keep the first viewport useful: one outcome, readiness, up to four grounded metrics, and the primary deliverable. Keep detailed evidence collapsed. Prefer compression over exhaustive repetition.",
+    ].join("\n"),
+    inputText: JSON.stringify({ manifest: input.manifest }, null, 2),
+    structuredOutputSchema: {
+      name: "chrona_finalized_result_spec",
+      description: "One complete Chrona json-render result workspace.",
+      schema: chronaResultSpecJsonSchema as Record<string, unknown>,
     },
   };
 }

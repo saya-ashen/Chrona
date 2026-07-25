@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { resetTestDb, seedTask, seedWorkspace } from "../../../../../apps/server/src/__tests__/bun-test-helpers";
 import { generatedFilesRoot } from "./result-file-access";
 import { openTaskResultFile } from "./open-task-result-file";
+import { aiArtifactRef } from "../plan-execution/use-cases/register-generated-plan-output-artifacts";
 
 describe("openTaskResultFile", () => {
   beforeEach(async () => {
@@ -32,6 +33,25 @@ describe("openTaskResultFile", () => {
         compiledPlan: {},
       },
     });
+    const run = await db.run.create({
+      data: { taskId, runtimeName: "test", status: "Completed", triggeredBy: "user" },
+    });
+    const artifact = await db.artifact.create({
+      data: { workspaceId, taskId, runId: run.id, type: "file", title: "Report", uri: reference },
+    });
+    await db.event.create({
+      data: {
+        workspaceId,
+        taskId,
+        runId: run.id,
+        planId: "download-plan",
+        eventType: "provider.run_completed",
+        actorType: "runtime",
+        source: "provider",
+        payload: {},
+        ingestSequence: 1,
+      },
+    });
     await db.taskPlanRun.create({
       data: {
         workspaceId,
@@ -40,11 +60,13 @@ describe("openTaskResultFile", () => {
         planRun: {
           mutableGraph: {
             planOutput: {
-              spec: {
-                root: "root",
-                elements: {
-                  root: { type: "Stack", props: {}, children: ["report"] },
-                  report: { type: "FileRef", props: { path: reference } },
+              finalizedResult: {
+                spec: {
+                  root: "root",
+                  elements: {
+                    root: { type: "Stack", props: {}, children: ["report"] },
+                    report: { type: "FileRef", props: { path: aiArtifactRef(artifact.id) } },
+                  },
                 },
               },
             },
@@ -63,7 +85,7 @@ describe("openTaskResultFile", () => {
           taskId,
           requestedPath: `generated://${fixtureScope}/node/unreferenced.md`,
         }),
-      ).rejects.toThrow(/not referenced by the task result/i);
+      ).rejects.toThrow(/not a registered task result Artifact/i);
     } finally {
       await rm(fixtureRoot, {
         recursive: true,

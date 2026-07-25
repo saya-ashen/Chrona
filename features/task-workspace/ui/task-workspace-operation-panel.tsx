@@ -288,7 +288,7 @@ export function TaskWorkspaceOperationPanel({
           </div>
           <div className="rounded-xl border bg-muted/35 p-3 text-xs text-muted-foreground">
             <p className="font-medium text-foreground">{recoveryAction === "restart" ? (copy.recoveryKeepsPlan ?? "Keeps the task, accepted plan, history, and artifacts.") : (copy.recoveryKeepsHistory ?? "Keeps the task, previous plan, history, and artifacts.")}</p>
-            <p className="mt-1">{recoveryAction === "restart" ? (copy.recoveryResetsExecution ?? "Resets current node progress, execution context, pending checkpoints, and plan output.") : (copy.recoveryRequiresReview ?? "The new plan remains a draft until you review and accept it.")}</p>
+            <p className="mt-1">{recoveryAction === "restart" ? (copy.recoveryResetsExecution ?? "Resets current node progress, execution context, pending checkpoints, and result finalization.") : (copy.recoveryRequiresReview ?? "The new plan remains a draft until you review and accept it.")}</p>
             <p className="mt-1 font-medium text-warning-foreground">{copy.recoverySideEffectWarning ?? "Completed steps may already have changed external systems. Running again can repeat those actions."}</p>
           </div>
           <label className="space-y-1.5 text-sm font-medium">

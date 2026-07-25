@@ -193,6 +193,24 @@ export interface NodeRuntimeInput {
       assumptions: string[];
       summary?: string;
     };
+    goal?: {
+      title: string;
+      additionalContext?: string;
+      operationalBrief?: {
+        outcome: string;
+        currentFocus: string;
+        strategy: string;
+        constraints: string[];
+      };
+      capturedAt?: string;
+    };
+    acceptedGoalResults?: Array<{
+      ref: string;
+      taskTitle: string;
+      acceptedAt?: string | null;
+      summary: string;
+      artifactCount: number;
+    }>;
     run?: {
       planningPrompt?: string;
       startPrompt?: string;
@@ -212,14 +230,14 @@ export interface NodeRuntimeInput {
       inputFields?: CheckpointInputFields;
     }>;
     globalSummary?: string;
-    planOutput: {
-      revision: number;
-      hasSpec: boolean;
-      root: string | null;
-      rootChildren: string[];
-      elementIds: string[];
-      updatedAt: string | null;
-      lastSummary?: string;
+    resultManifest: {
+      sourceRevision: number;
+      outcome: { title: string; summary: string };
+      currentDeliverableKeys: string[];
+      findingKeys: string[];
+      decisionKeys: string[];
+      caveatKeys: string[];
+      nextActionKeys: string[];
     };
   };
   branchOptions?: Array<{

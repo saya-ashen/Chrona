@@ -156,7 +156,6 @@ export type {
 } from "./api/mcp-task-tools.schema";
 
 export {
-  CHRONA_PLAN_OUTPUT_TOOL_DESCRIPTION,
   agentControlActionBodySchema,
   agentControlActionKindSchema,
   agentControlActionPayloadSchemas,
@@ -179,7 +178,6 @@ export {
   chronaToolResultSchema,
   chronaToolStatusSchema,
   isChronaToolMutating,
-  describeChronaPlanOutputPublicTool,
   parseChronaToolPayload,
 } from "./api/mcp-task-tools.schema";
 
@@ -351,9 +349,19 @@ export type {
   SubmitCheckpointActionInput,
   ArtifactRef,
   NodeResultEvidence,
-  PlanOutputPatch,
-  PlanOutputRevision,
   PlanOutputState,
+  AiArtifactRef,
+  DeliverableKind,
+  DeliverablePresentation,
+  NodeDeliverableDeclaration,
+  NodeDeliverable,
+  ResultContribution,
+  ResultEvidence,
+  ResultSection,
+  ResultReadiness,
+  ResultManifest,
+  ResultFinalizationState,
+  FinalizedResult,
   ExecutionContextSnapshot,
   NodeAttempt,
   RuntimeCommand,
@@ -403,7 +411,10 @@ export type {
 } from "./ai-feature-specs";
 
 export type { AiFeatureToolSpec } from "./ai-feature-specs";
-export { buildGoalAssetOwnershipFeatureSpec } from "./ai-feature-specs";
+export {
+  buildGoalAssetOwnershipFeatureSpec,
+  buildResultFinalizationFeatureSpec,
+} from "./ai-feature-specs";
 
 export type { StructuredSuggestion } from "./ai-shared-types";
 

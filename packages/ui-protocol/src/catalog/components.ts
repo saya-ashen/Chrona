@@ -138,6 +138,150 @@ const tableComponentDefinition = {
   },
 };
 
+const resultMetricSchema = z
+  .object({
+    label: z.string(),
+    value: z.string(),
+  })
+  .strict();
+
+const resultHeroComponentDefinition = {
+  props: z
+    .object({
+      title: z.string(),
+      summary: z.string(),
+      readiness: z.enum(["ready", "ready_with_caveats", "partial", "blocked"]),
+      readinessSummary: z.string(),
+      metrics: z.array(resultMetricSchema).max(4).optional(),
+    })
+    .strict(),
+  description:
+    "Primary finalized-result brief. Use exactly once as the first content block. Keep summary concise, use manifest readiness verbatim, and include at most four evidence-backed metrics.",
+  example: {
+    title: "Research package ready for review",
+    summary: "The verified sources, search strategy, and maintenance guide are assembled for immediate use.",
+    readiness: "ready_with_caveats",
+    readinessSummary: "Ready to use after confirming two access-limited sources.",
+    metrics: [
+      { label: "Deliverables", value: "5" },
+      { label: "Verified sources", value: "37" },
+    ],
+  },
+};
+
+const resultDeliverableComponentDefinition = {
+  props: z
+    .object({
+      title: z.string(),
+      summary: z.string().optional(),
+      artifactRef: z.string(),
+      role: z.enum(["primary", "supporting", "evidence"]),
+      kind: z.enum(["document", "table", "dataset", "image", "archive", "code", "other"]),
+      formatLabel: z.string().optional(),
+      path: z.string().optional(),
+      downloadHref: z.string().optional(),
+      displayPath: z.string().optional(),
+      contentKind: z.enum(["markdown", "json", "text", "csv"]).optional(),
+      contentPreview: z.string().optional(),
+      contentTruncated: z.boolean().optional(),
+      contentBytes: z.number().optional(),
+      previewError: z.enum(["unsafe_path", "not_found", "unsupported_type", "read_failed", "permission_required"]).optional(),
+      accessTaskId: z.string().optional(),
+      accessRequestedPath: z.string().optional(),
+    })
+    .strict(),
+  description:
+    "One generated deliverable with host-hydrated preview and download controls. Use exactly one primary deliverable when any current deliverable exists; render remaining current files as supporting or evidence. artifactRef must be an opaque manifest artifactRef.",
+  example: {
+    title: "Primary research guide",
+    summary: "Complete workflow and verified source directory.",
+    artifactRef: "AF111111111111",
+    role: "primary",
+    kind: "document",
+    formatLabel: "Markdown",
+  },
+};
+
+const resultInsightComponentDefinition = {
+  props: z
+    .object({
+      title: z.string(),
+      summary: z.string(),
+      emphasis: z.enum(["lead", "supporting"]).optional(),
+      points: z.array(z.string()).max(4).optional(),
+    })
+    .strict(),
+  description:
+    "A synthesized finding or decision theme. Merge related manifest contributions; emit no more than six insights and use lead emphasis at most once.",
+  example: {
+    title: "Official and discovery sources serve different roles",
+    summary: "Confirm openings on official pages while using research networks for earlier discovery.",
+    emphasis: "lead",
+    points: ["Official sources confirm", "Networks discover", "Lab updates signal early"],
+  },
+};
+
+const resultActionPhaseSchema = z
+  .object({
+    timeframe: z.enum(["now", "this_week", "later"]),
+    title: z.string(),
+    actions: z.array(z.string()).min(1).max(5),
+  })
+  .strict();
+
+const resultActionPlanComponentDefinition = {
+  props: z
+    .object({
+      title: z.string().optional(),
+      summary: z.string().optional(),
+      phases: z.array(resultActionPhaseSchema).min(1).max(3),
+    })
+    .strict(),
+  description:
+    "Time-ordered next-action route. Consolidate manifest nextActions into no more than three phases: now, this_week, then later. Use once.",
+  example: {
+    title: "Recommended route",
+    phases: [
+      { timeframe: "now", title: "Confirm constraints", actions: ["Choose target regions", "Confirm funding requirements"] },
+      { timeframe: "this_week", title: "Configure monitoring", actions: ["Enable priority alerts"] },
+    ],
+  },
+};
+
+const resultCaveatsComponentDefinition = {
+  props: z
+    .object({
+      title: z.string().optional(),
+      items: z.array(z.string()).min(1).max(3),
+    })
+    .strict(),
+  description:
+    "Prominent acceptance caveats. Include at most three material caveats, only when supplied by the manifest. Use once and omit when there are none.",
+  example: {
+    title: "Before accepting",
+    items: ["Confirm access-limited sources manually", "Use official pages as the final authority"],
+  },
+};
+
+const resultEvidenceComponentDefinition = {
+  props: z
+    .object({
+      title: z.string().optional(),
+      summary: z.string().optional(),
+      items: z.array(z.string()).min(1),
+      defaultCollapsed: z.boolean().optional(),
+    })
+    .strict(),
+  description:
+    "Secondary evidence and source-boundary list. Use once as the final block and set defaultCollapsed true.",
+  example: {
+    title: "Evidence and source boundaries",
+    summary: "20 source records",
+    items: ["Official sources were checked directly", "One directory requires manual verification"],
+    defaultCollapsed: true,
+  },
+};
+
 const collapsibleTextComponentDefinition = {
   props: z.object({ text: z.string(), threshold: z.number().optional() }),
   description:
@@ -175,7 +319,7 @@ const nodeResultSectionComponentDefinition = {
     .strict(),
   slots: ["default"],
   description:
-    "Host-generated lightweight section wrapper for output owned by one execution node. AI-authored plan output should not emit this component.",
+    "Host-generated lightweight section wrapper for output owned by one execution node. AI-authored finalized results should not emit this component.",
 };
 
 const sectionSchema = z.object({
@@ -303,6 +447,13 @@ export const chronaCatalog = defineCatalog(chronaSchema, {
       description:
         "Compact occurrence calendar picker for recurring task workspace header.",
     },
+    ResultHero: resultHeroComponentDefinition,
+    ResultDeliverable: resultDeliverableComponentDefinition,
+    ResultInsight: resultInsightComponentDefinition,
+    ResultActionPlan: resultActionPlanComponentDefinition,
+    ResultCaveats: resultCaveatsComponentDefinition,
+    ResultEvidence: resultEvidenceComponentDefinition,
+
     RichMarkdown: {
       props: markdownPropsSchema,
       description: "Rich Markdown result content rendered with CommonMark and GFM support.",
@@ -489,7 +640,7 @@ export const chronaCatalog = defineCatalog(chronaSchema, {
   },
 });
 
-export const chronaPlanOutputCatalog = defineCatalog(chronaSchema, {
+export const chronaResultCatalog = defineCatalog(chronaSchema, {
   components: {
     Stack: shadcn.Stack,
     Card: cardComponentDefinition,
@@ -499,6 +650,12 @@ export const chronaPlanOutputCatalog = defineCatalog(chronaSchema, {
     Badge: shadcn.Badge,
     Alert: shadcn.Alert,
     Table: tableComponentDefinition,
+    ResultHero: resultHeroComponentDefinition,
+    ResultDeliverable: resultDeliverableComponentDefinition,
+    ResultInsight: resultInsightComponentDefinition,
+    ResultActionPlan: resultActionPlanComponentDefinition,
+    ResultCaveats: resultCaveatsComponentDefinition,
+    ResultEvidence: resultEvidenceComponentDefinition,
     RichMarkdown: {
       props: markdownPropsSchema,
       description:
@@ -540,7 +697,7 @@ export const chronaPlanOutputCatalog = defineCatalog(chronaSchema, {
         copyText: z.string().optional(),
       }),
       description:
-        "Compact result summary header with optional copy text. Use once near the top of plan output.",
+        "Compact result summary header with optional copy text. Use once near the top of a finalized result.",
       example: { text: "Implementation complete; focused tests passed." },
     },
     CollapsibleText: collapsibleTextComponentDefinition,
@@ -549,17 +706,17 @@ export const chronaPlanOutputCatalog = defineCatalog(chronaSchema, {
   actions: {},
 });
 
-const planOutputComponentEntries = Object.entries(
-  chronaPlanOutputCatalog.data.components,
+const resultComponentEntries = Object.entries(
+  chronaResultCatalog.data.components,
 );
 
-const planOutputComponentNames = planOutputComponentEntries.map(
+const resultComponentNames = resultComponentEntries.map(
   ([name]) => name,
 ) as [string, ...string[]];
 
-export const chronaPlanOutputElementSchema = z
+export const chronaResultElementSchema = z
   .object({
-    type: z.enum(planOutputComponentNames),
+    type: z.enum(resultComponentNames),
     props: z.record(z.string(), z.unknown()).optional(),
     children: z.array(z.string()).optional(),
     visible: z.unknown().optional(),
@@ -568,7 +725,6 @@ export const chronaPlanOutputElementSchema = z
 
 function schemaVariants(schema: z.core.JSONSchema.JSONSchema) {
   if (
-    schema &&
     typeof schema === "object" &&
     !Array.isArray(schema) &&
     "anyOf" in schema
@@ -596,10 +752,10 @@ function mergeJsonSchemas(
   return unique.length === 1 ? unique[0]! : { anyOf: unique };
 }
 
-function planOutputPropsJsonSchema(): z.core.JSONSchema.JSONSchema {
+function resultPropsJsonSchema(): z.core.JSONSchema.JSONSchema {
   const properties: Record<string, z.core.JSONSchema.JSONSchema> = {};
-  for (const [, component] of planOutputComponentEntries) {
-    const schema = planOutputComponentPropsJsonSchema(component) as {
+  for (const [, component] of resultComponentEntries) {
+    const schema = resultComponentPropsJsonSchema(component) as {
       properties?: Record<string, z.core.JSONSchema.JSONSchema>;
     };
     for (const [key, propSchema] of Object.entries(schema.properties ?? {})) {
@@ -614,33 +770,14 @@ function planOutputPropsJsonSchema(): z.core.JSONSchema.JSONSchema {
   };
 }
 
-export function chronaPlanOutputCatalogPrompt() {
-  return chronaPlanOutputCatalog.prompt({
-    editModes: ["patch"],
-    customRules: [
-      "Each patch is a JSON Patch operation over the accumulated plan output Spec summarized by Current Node Context JSON.context.planOutput.",
-      "planOutput is task-level storage shared by every node in this task run; every chrona_plan_output call modifies the same accumulated user-visible result, not a node-local document.",
-      "Chrona does not accept raw JSONL text. Put the generated RFC 6902 patch objects in chrona_plan_output.patches.",
-      "Use chrona_plan_output for shared task-level user-visible output only.",
-      "Bootstrap /root only when Current Node Context JSON.context.planOutput.hasSpec is false. In that first call only, add /root and all referenced /elements/<id> entries together.",
-      "When planOutput.hasSpec is true, never patch /root, /elements, or the existing root element as a replacement. Preserve the current root id from context.planOutput.root.",
-      "For later updates, add node-specific sections under stable /elements/<id> paths, then append/reorder those ids inside an existing children array such as /elements/<currentRootId>/children/-. Use context.planOutput.rootChildren and context.planOutput.elementIds to avoid duplicate ids and preserve prior sections unless the user explicitly asks to remove them.",
-      "User-facing reports should compose clear sections with Card containers around RichMarkdown/Table/ResultSummary content so each major block has a visible background.",
-      "Use component-level defaultCollapsed on Card, RichMarkdown, Table, JsonView, or FileRef when a block should have a Chrona-owned collapsible shell; do not emit CollapsibleBlock for ordinary user-facing sections. Set defaultCollapsed true for long logs, raw JSON, large file references, secondary evidence, and diagnostics. Set defaultCollapsed false for major sections that should remain open but user-collapsible. Do not collapse the primary ResultSummary or the main user-requested answer.",
-      "FileRef preview expansion is separate from component-level collapse: FileRef collapsible/defaultCollapsed hides the whole file result block, while preview expansion only changes the visible preview height.",
-      "Use JsonView sparingly: only for diagnostics, API payloads, machine-readable evidence, or debugging details. Do not show source data or report rationale as raw JSON when RichMarkdown or Table would be readable.",
-      "Do not submit legacy spec/mode fields, markdown-only text, backend IDs, node-local outputs, NodeResultSection wrappers, or complete replacement Specs after bootstrap.",
-    ],
-  });
-}
 
 function withoutSchemaKeyword(schema: z.core.JSONSchema.JSONSchema) {
   const { $schema: _schema, ...rest } = schema as Record<string, unknown>;
   return rest as z.core.JSONSchema.JSONSchema;
 }
 
-function planOutputComponentPropsJsonSchema(
-  component: (typeof planOutputComponentEntries)[number][1],
+function resultComponentPropsJsonSchema(
+  component: (typeof resultComponentEntries)[number][1],
 ): z.core.JSONSchema.JSONSchema {
   return withoutSchemaKeyword(
     z.toJSONSchema(component.props, {
@@ -650,12 +787,12 @@ function planOutputComponentPropsJsonSchema(
   );
 }
 
-export function chronaPlanOutputElementJsonSchema(): z.core.JSONSchema.JSONSchema {
+export function chronaResultElementJsonSchema(): z.core.JSONSchema.JSONSchema {
   return {
     type: "object",
     properties: {
-      type: { type: "string", enum: planOutputComponentNames },
-      props: planOutputPropsJsonSchema(),
+      type: { type: "string", enum: resultComponentNames },
+      props: resultPropsJsonSchema(),
       children: { type: "array", items: { type: "string" } },
       visible: {},
     },
@@ -664,21 +801,15 @@ export function chronaPlanOutputElementJsonSchema(): z.core.JSONSchema.JSONSchem
   };
 }
 
-export function chronaPlanOutputPatchValueJsonSchema(): z.core.JSONSchema.JSONSchema {
-  return {
-    description:
-      "Patch value. Required for add/replace/test; omit for remove/move/copy. Use element object for /elements/<id>, string[] for children arrays, string for scalar props or element ids appended to children, object for props/state/JsonView, or number/boolean/null for scalar values.",
-  };
-}
 
-export function chronaPlanOutputSpecJsonSchemaFromCatalog(): z.core.JSONSchema.JSONSchema {
+export function chronaResultSpecJsonSchemaFromCatalog(): z.core.JSONSchema.JSONSchema {
   return {
     type: "object",
     properties: {
       root: { type: "string" },
       elements: {
         type: "object",
-        additionalProperties: chronaPlanOutputElementJsonSchema(),
+        additionalProperties: chronaResultElementJsonSchema(),
       },
       state: { type: "object", additionalProperties: true },
     },
@@ -687,59 +818,13 @@ export function chronaPlanOutputSpecJsonSchemaFromCatalog(): z.core.JSONSchema.J
   };
 }
 
-export function chronaPlanOutputPatchJsonSchema(): z.core.JSONSchema.JSONSchema {
-  const path: z.core.JSONSchema.JSONSchema = {
-    type: "string",
-    minLength: 1,
-    description:
-      "JSON Pointer into the plan-output Spec. Common update paths: /elements/<id>, /elements/<id>/children, /elements/<id>/children/<index>, /elements/<id>/children/-, or /elements/<id>/props/<prop>. Use /state/<key> only when the element uses json-render state expressions.",
-  };
-  const from: z.core.JSONSchema.JSONSchema = {
-    ...path,
-    description:
-      "Source JSON Pointer. Required for move/copy; omit for add/replace/remove/test.",
-  };
-  const value = chronaPlanOutputPatchValueJsonSchema();
 
-  return {
-    type: "object",
-    properties: {
-      op: {
-        type: "string",
-        enum: ["add", "replace", "remove", "move", "copy", "test"],
-      },
-      path,
-      from,
-      value,
-    },
-    required: ["op", "path"],
-    additionalProperties: false,
-  };
-}
+export const chronaResultSpecJsonSchema =
+  chronaResultSpecJsonSchemaFromCatalog();
+export const chronaResultSpecSchema = chronaResultCatalog.zodSchema();
 
-export function chronaPlanOutputToolInputJsonSchema(): z.core.JSONSchema.JSONSchema {
-  return {
-    type: "object",
-    properties: {
-      patches: {
-        type: "array",
-        minItems: 1,
-        items: chronaPlanOutputPatchJsonSchema(),
-        description: "RFC 6902 patches over the shared plan-output Spec.",
-      },
-      summary: { type: "string", minLength: 1 },
-    },
-    required: ["patches"],
-    additionalProperties: false,
-  };
-}
-
-export const chronaPlanOutputSpecJsonSchema =
-  chronaPlanOutputSpecJsonSchemaFromCatalog();
-export const chronaPlanOutputSpecSchema = chronaPlanOutputCatalog.zodSchema();
-
-export type ChronaPlanOutputCatalog = typeof chronaPlanOutputCatalog;
-export type ChronaPlanOutputComponentName =
-  keyof typeof chronaPlanOutputCatalog.data.components;
+export type ChronaResultCatalog = typeof chronaResultCatalog;
+export type ChronaResultComponentName =
+  keyof typeof chronaResultCatalog.data.components;
 export type ChronaCatalog = typeof chronaCatalog;
 export type ChronaComponentName = keyof typeof chronaCatalog.data.components;

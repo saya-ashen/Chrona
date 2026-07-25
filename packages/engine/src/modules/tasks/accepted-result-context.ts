@@ -1,6 +1,4 @@
 import { db } from "@/lib/db";
-import type { UiDocument } from "@chrona/ui-protocol";
-import { hydrateFilePreviewSpec } from "./file-preview";
 import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
 
 const RESULT_CONTEXT_LIMIT = 12_000;
@@ -247,11 +245,8 @@ export async function getAcceptedResultContext(
   const persisted = recordValue(acceptedPlanRun?.planRun);
   const mutableGraph = recordValue(persisted?.mutableGraph);
   const planOutput = recordValue(mutableGraph?.planOutput);
-  const rawSpec = planOutput?.spec ?? null;
-  const hydratedSpec = rawSpec
-    ? await hydrateFilePreviewSpec(rawSpec as UiDocument, { taskId })
-    : null;
-  const spec = hydratedSpec ?? rawSpec;
+  const finalizedResult = recordValue(planOutput?.finalizedResult);
+  const spec = finalizedResult?.spec ?? null;
 
   return {
     task: {

@@ -171,7 +171,6 @@ export async function loadTaskPageData({ params, request }: LoaderFunctionArgs):
       ...bootstrap,
       ...runtimeContext,
       ...reviewContext,
-      artifacts: [],
       activityTimeline: [],
       commandCenter,
       header,

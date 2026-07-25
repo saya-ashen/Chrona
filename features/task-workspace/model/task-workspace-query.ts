@@ -629,7 +629,6 @@ export async function fetchTaskWorkspacePage(
     ...bootstrap,
     ...runtimeContext,
     ...reviewContext,
-    artifacts: [],
     activityTimeline: [],
   };
 }

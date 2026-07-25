@@ -1,6 +1,12 @@
 import type { CheckpointInputFields } from "./checkpoints";
 import type { GraphMutationOperation } from "./graph";
 import type { NodeActionForm } from "./node";
+import type {
+  NodeDeliverable,
+  NodeDeliverableDeclaration,
+  ResultContribution,
+  ResultEvidence,
+} from "./node-result";
 
 type SubmittedNodeEvidence = {
   sessionId?: string;
@@ -42,12 +48,20 @@ export type ExecutionCommandOrigin = {
  * The terminal result a node produces. Submitted in-process by an executor or
  * out-of-band by a provider run — both flow through the same command.
  */
+export type SubmittedNodeDeliverable = NodeDeliverableDeclaration | NodeDeliverable;
+
 export type SubmittedNodeResult =
   | {
       kind: "done";
       summary?: string;
       output?: unknown;
       evidence?: SubmittedNodeEvidence;
+      deliverables?: SubmittedNodeDeliverable[];
+      findings?: ResultContribution[];
+      decisions?: ResultContribution[];
+      caveats?: ResultContribution[];
+      nextActions?: ResultContribution[];
+      resultEvidence?: ResultEvidence[];
       selectedBranch?: {
         ref?: string;
         key?: string;

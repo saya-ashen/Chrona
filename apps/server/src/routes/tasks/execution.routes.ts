@@ -159,7 +159,7 @@ export function createExecutionRoutes(engine: ChronaEngine) {
 
             const result = await engine.tasks.execution.dispatch({
               taskId,
-              action,
+              action: action as Parameters<typeof engine.tasks.execution.dispatch>[0]["action"],
               onGraphEvent(event: GraphExecutionEvent) {
                 void writeEvent(summarizeGraphEvent(event));
               },

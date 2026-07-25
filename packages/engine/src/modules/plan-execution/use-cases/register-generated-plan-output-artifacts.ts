@@ -1,9 +1,14 @@
 import { createHash } from "node:crypto";
 import { readFile, realpath, stat } from "node:fs/promises";
-import { basename, extname, resolve, sep } from "node:path";
-import type { UiDocument } from "@chrona/ui-protocol";
+import { extname, relative, resolve, sep } from "node:path";
+import type {
+  AiArtifactRef,
+  NodeDeliverable,
+  NodeDeliverableDeclaration,
+} from "@chrona/contracts/ai";
 import { db } from "@/lib/db";
 import { generatedFilesRoot, resolveGeneratedFileReference } from "../../tasks/result-file-access";
+import { ENGINE_ERROR_CODES, EngineError } from "../../../errors";
 
 const PREVIEW_BYTES = 64 * 1024;
 const TEXT_EXTENSIONS = new Set([".md", ".markdown", ".txt", ".json", ".csv"]);
@@ -13,59 +18,64 @@ const MIME_TYPES: Readonly<Record<string, string>> = {
   ".txt": "text/plain",
   ".json": "application/json",
   ".csv": "text/csv",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".jpeg": "image/jpeg",
+  ".webp": "image/webp",
+  ".pdf": "application/pdf",
+  ".zip": "application/zip",
 };
-
-type GeneratedFileReference = {
-  uri: string;
-  title: string;
-  sourceNodeId: string | null;
-};
-
-function generatedFileReferences(spec: UiDocument): GeneratedFileReference[] {
-  const references = new Map<string, GeneratedFileReference>();
-  for (const element of Object.values(spec.elements)) {
-    if (element.type !== "FileRef" && element.type !== "FileView") continue;
-    const props = element.props as Record<string, unknown>;
-    const rawPath = typeof props.path === "string" ? props.path : typeof props.uri === "string" ? props.uri : null;
-    if (!rawPath) continue;
-    const root = resolve(generatedFilesRoot());
-    const absolute = resolve(rawPath);
-    const uri = rawPath.startsWith("generated://")
-      ? rawPath
-      : isWithinGeneratedRoot(absolute)
-        ? `generated://${absolute.slice(root.length + 1).split(sep).join("/")}`
-        : null;
-    if (!uri) continue;
-    references.set(uri, {
-      uri,
-      title: typeof props.title === "string" && props.title.trim() ? props.title.trim() : basename(rawPath),
-      sourceNodeId: typeof props.xChronaSourceNodeId === "string" ? props.xChronaSourceNodeId : null,
-    });
-  }
-  return [...references.values()];
-}
 
 function isWithinGeneratedRoot(path: string) {
   const root = resolve(generatedFilesRoot());
   return path === root || path.startsWith(`${root}${sep}`);
 }
 
-async function inspectGeneratedFile(reference: GeneratedFileReference) {
-  const resolved = resolveGeneratedFileReference(reference.uri);
-  if (!resolved) return null;
+export function aiArtifactRef(artifactId: string): AiArtifactRef {
+  return `AF${createHash("sha256")
+    .update(artifactId)
+    .digest("hex")
+    .slice(0, 12)
+    .toUpperCase()}`;
+}
+
+async function inspectGeneratedFile(uri: string) {
+  const resolved = resolveGeneratedFileReference(uri);
+  if (!resolved) {
+    throw new EngineError(
+      ENGINE_ERROR_CODES.VALIDATION_FAILED,
+      "Deliverable URI must resolve inside the generated-files root.",
+    );
+  }
   let canonicalPath: string;
   try {
     canonicalPath = await realpath(resolved);
   } catch {
-    return null;
+    throw new EngineError(
+      ENGINE_ERROR_CODES.VALIDATION_FAILED,
+      `Generated deliverable does not exist: ${uri}`,
+    );
   }
-  if (!isWithinGeneratedRoot(canonicalPath)) return null;
+  if (!isWithinGeneratedRoot(canonicalPath)) {
+    throw new EngineError(
+      ENGINE_ERROR_CODES.VALIDATION_FAILED,
+      "Generated deliverable escapes the generated-files root.",
+    );
+  }
   const fileStat = await stat(canonicalPath);
-  if (!fileStat.isFile()) return null;
+  if (!fileStat.isFile()) {
+    throw new EngineError(
+      ENGINE_ERROR_CODES.VALIDATION_FAILED,
+      "Generated deliverable must be a regular file.",
+    );
+  }
   const content = await readFile(canonicalPath);
   const extension = extname(canonicalPath).toLowerCase();
+  const relativePath = relative(resolve(generatedFilesRoot()), canonicalPath)
+    .split(sep)
+    .join("/");
   return {
-    ...reference,
+    uri: `generated://${relativePath}`,
     checksum: createHash("sha256").update(content).digest("hex"),
     size: fileStat.size,
     mimeType: MIME_TYPES[extension] ?? "application/octet-stream",
@@ -75,53 +85,170 @@ async function inspectGeneratedFile(reference: GeneratedFileReference) {
   };
 }
 
-export async function registerGeneratedPlanOutputArtifacts(input: {
+async function artifactFromRef(input: {
   workspaceId: string;
   taskId: string;
-  runId: string | null | undefined;
-  spec: UiDocument | null;
+  runId: string;
+  ref: AiArtifactRef;
 }) {
-  if (!input.runId || !input.spec) return 0;
-  const run = await db.run.findFirst({
-    where: { id: input.runId, taskId: input.taskId },
-    select: { id: true, occurrenceId: true },
+  const artifacts = await db.artifact.findMany({
+    where: {
+      workspaceId: input.workspaceId,
+      taskId: input.taskId,
+      runId: input.runId,
+      type: "file",
+    },
+    select: { id: true },
   });
-  if (!run) return 0;
+  const artifact = artifacts.find((candidate) => aiArtifactRef(candidate.id) === input.ref);
+  if (!artifact) {
+    throw new EngineError(
+      ENGINE_ERROR_CODES.VALIDATION_FAILED,
+      `Unknown artifact reference: ${input.ref}`,
+    );
+  }
+  return artifact;
+}
 
-  const inspected = (await Promise.all(generatedFileReferences(input.spec).map(inspectGeneratedFile)))
-    .filter((file): file is NonNullable<typeof file> => file !== null);
-  for (const file of inspected) {
+async function registerDeclaration(input: {
+  workspaceId: string;
+  taskId: string;
+  runId: string;
+  occurrenceId: string | null;
+  sourceNodeId: string;
+  declaration: NodeDeliverableDeclaration;
+}): Promise<NodeDeliverable> {
+  let artifactId: string;
+  if (input.declaration.source.type === "existing_artifact") {
+    artifactId = (
+      await artifactFromRef({
+        workspaceId: input.workspaceId,
+        taskId: input.taskId,
+        runId: input.runId,
+        ref: input.declaration.source.artifactRef,
+      })
+    ).id;
+  } else {
+    const file = await inspectGeneratedFile(input.declaration.source.uri);
+    const registrationKey = createHash("sha256")
+      .update(
+        [
+          input.workspaceId,
+          input.taskId,
+          input.runId,
+          file.uri,
+          file.checksum,
+        ].join("\0"),
+      )
+      .digest("hex");
     const metadata = {
+      registrationKey,
       checksumAlgorithm: "sha256",
       checksum: file.checksum,
       size: file.size,
       mimeType: file.mimeType,
-      sourceNodeId: file.sourceNodeId,
+      sourceNodeId: input.sourceNodeId,
+      deliverableKey: input.declaration.deliverableKey,
     };
     const existing = await db.artifact.findFirst({
-      where: { taskId: input.taskId, runId: input.runId, uri: file.uri },
-      select: { id: true },
+      where: {
+        workspaceId: input.workspaceId,
+        taskId: input.taskId,
+        runId: input.runId,
+        uri: file.uri,
+      },
+      select: { id: true, metadata: true },
     });
     if (existing) {
-      await db.artifact.update({
-        where: { id: existing.id },
-        data: { title: file.title, contentPreview: file.contentPreview, metadata },
-      });
+      const existingMetadata = existing.metadata as Record<string, unknown> | null;
+      if (existingMetadata?.checksum !== file.checksum) {
+        throw new EngineError(
+          ENGINE_ERROR_CODES.CONFLICT,
+          `Generated deliverable path changed after registration: ${file.uri}`,
+        );
+      }
+      artifactId = existing.id;
     } else {
-      await db.artifact.create({
-        data: {
-          workspaceId: input.workspaceId,
-          taskId: input.taskId,
-          runId: input.runId,
-          occurrenceId: run.occurrenceId,
-          type: "file",
-          title: file.title,
-          uri: file.uri,
-          contentPreview: file.contentPreview,
-          metadata,
-        },
-      });
+      artifactId = (
+        await db.artifact.create({
+          data: {
+            workspaceId: input.workspaceId,
+            taskId: input.taskId,
+            runId: input.runId,
+            occurrenceId: input.occurrenceId,
+            type: "file",
+            title: input.declaration.title,
+            uri: file.uri,
+            contentPreview: file.contentPreview,
+            metadata,
+          },
+          select: { id: true },
+        })
+      ).id;
     }
   }
-  return inspected.length;
+  return {
+    deliverableKey: input.declaration.deliverableKey,
+    title: input.declaration.title,
+    kind: input.declaration.kind,
+    artifactRef: aiArtifactRef(artifactId),
+    status: "current",
+    sourceNodeRef: input.sourceNodeId,
+    ...(input.declaration.summary ? { summary: input.declaration.summary } : {}),
+    presentation: input.declaration.presentation ?? {
+      primary:
+        input.declaration.kind === "table" || input.declaration.kind === "dataset"
+          ? "table"
+          : "file",
+      allowDownload: true,
+    },
+    placement: input.declaration.placement ?? "primary",
+  };
+}
+
+export async function registerNodeDeliverables(input: {
+  workspaceId: string;
+  taskId: string;
+  runId: string | null | undefined;
+  sourceNodeId: string;
+  sourceNodeRef?: string;
+  declarations: NodeDeliverableDeclaration[];
+}): Promise<NodeDeliverable[]> {
+  if (input.declarations.length === 0) return [];
+  const run = input.runId
+    ? await db.run.findFirst({
+        where: { id: input.runId, taskId: input.taskId },
+        select: { id: true, occurrenceId: true },
+      })
+    : await db.run.findFirst({
+        where: {
+          taskId: input.taskId,
+          status: { in: ["Pending", "Running", "WaitingForApproval", "WaitingForInput"] },
+        },
+        orderBy: { startedAt: "desc" },
+        select: { id: true, occurrenceId: true },
+      });
+  if (!run) {
+    throw new EngineError(
+      ENGINE_ERROR_CODES.INVALID_TASK_STATE,
+      "Canonical Run is unavailable for deliverable registration.",
+    );
+  }
+  const registered: NodeDeliverable[] = [];
+  for (const declaration of input.declarations) {
+    registered.push(
+      await registerDeclaration({
+        workspaceId: input.workspaceId,
+        taskId: input.taskId,
+        runId: run.id,
+        occurrenceId: run.occurrenceId,
+        sourceNodeId: input.sourceNodeId,
+        declaration,
+      }).then((deliverable) => ({
+        ...deliverable,
+        sourceNodeRef: input.sourceNodeRef ?? deliverable.sourceNodeRef,
+      })),
+    );
+  }
+  return registered;
 }

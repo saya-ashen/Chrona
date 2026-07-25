@@ -40,6 +40,60 @@ describe("kernel executeCommand (single-writer)", () => {
     ]);
   });
 
+  it("passes the Task's frozen Goal snapshot into node execution", async () => {
+    executeTaskNodeCapabilityMock.mockResolvedValue({
+      status: "started",
+      summary: "Runtime run started",
+      evidence: { sessionId: "main-session", runId: "run-goal-context" },
+    });
+
+    const { workspace, task } = await seedWorkspaceAndTask("Kernel Goal context");
+    await db.task.update({
+      where: { id: task.id },
+      data: {
+        goalContext: {
+          goal: {
+            title: "Apply for an AI Agent PhD",
+            additionalContext: "Bioinformatics graduate student; AI, Agent, LLM.",
+            operationalBrief: {
+              outcome: "Apply for an AI Agent PhD",
+              currentFocus: "Find positions",
+              strategy: "",
+              constraints: ["Fully funded"],
+            },
+            capturedAt: "2026-07-25T12:25:05.730Z",
+          },
+          acceptedResults: [],
+          internalTaskId: "must-not-be-forwarded",
+        },
+      },
+    });
+    const compiledPlan = makeTwoTaskPlan("graph_kernel_goal_context");
+    await seedAcceptedCompiledPlan(workspace.id, task.id, compiledPlan);
+
+    await executeCommand({
+      taskId: task.id,
+      command: { type: "start", trigger: "manual" },
+    });
+
+    const call = executeTaskNodeCapabilityMock.mock.calls[0]?.[0];
+    expect(call?.planContext?.goalContext).toEqual({
+      goal: {
+        title: "Apply for an AI Agent PhD",
+        additionalContext: "Bioinformatics graduate student; AI, Agent, LLM.",
+        operationalBrief: {
+          outcome: "Apply for an AI Agent PhD",
+          currentFocus: "Find positions",
+          strategy: "",
+          constraints: ["Fully funded"],
+        },
+        capturedAt: "2026-07-25T12:25:05.730Z",
+      },
+      acceptedResults: [],
+    });
+    expect(JSON.stringify(call?.planContext)).not.toContain("must-not-be-forwarded");
+  });
+
   it("does not start a second provider attempt when start is retried while running", async () => {
     executeTaskNodeCapabilityMock.mockResolvedValue({
       status: "started",

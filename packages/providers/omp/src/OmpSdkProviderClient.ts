@@ -21,7 +21,6 @@ import {
 } from "@chrona/contracts/ai";
 import {
   agentControlActionPayloadSchemas,
-  chronaPublicToolPayloadSchemas,
   type AgentControlActionBody,
 } from "@chrona/contracts/api";
 import type {
@@ -228,7 +227,6 @@ function renderProviderInput(input: ProviderRunInput): string {
     }
   }
   if (
-    input &&
     typeof input === "object" &&
     "type" in input &&
     input.type === "text" &&
@@ -307,7 +305,6 @@ const looseObjectSchema = z.object({}).catchall(z.unknown());
 
 
 type NodeRuntimeToolName =
-  | "chrona_plan_output"
   | "chrona_node_complete"
   | "chrona_condition_select"
   | "chrona_wait_complete"
@@ -320,7 +317,7 @@ function isTerminalRuntimeTool(toolName: string): boolean {
 }
 
 const NODE_RUNTIME_TOOL_SET_BY_TERMINAL: Record<string, readonly NodeRuntimeToolName[]> = {
-  chrona_node_complete: ["chrona_plan_output", "chrona_node_complete", "chrona_node_request_input", "chrona_node_block", "chrona_node_fail"],
+  chrona_node_complete: ["chrona_node_complete", "chrona_node_request_input", "chrona_node_block", "chrona_node_fail"],
   chrona_condition_select: ["chrona_condition_select", "chrona_node_block", "chrona_node_fail"],
   chrona_wait_complete: ["chrona_wait_complete", "chrona_node_block", "chrona_node_fail"],
   chrona_node_request_input: ["chrona_node_request_input", "chrona_node_block", "chrona_node_fail"],
@@ -335,14 +332,9 @@ type NodeRuntimeToolDefinition = {
 };
 
 const NODE_RUNTIME_TOOL_DEFINITIONS: Partial<Record<string, NodeRuntimeToolDefinition>> = {
-  chrona_plan_output: {
-    kind: "plan_output",
-    description: "Patch task-level shared user-visible plan output as json-render SpecStream patches before completing the node.",
-    parameters: chronaPublicToolPayloadSchemas["chrona.plan.output"],
-  },
   chrona_node_complete: {
     kind: "complete",
-    description: "Mark the current Chrona task node complete after its objective and required user-visible output are satisfied.",
+    description: "Complete the current Chrona task node with semantic result contributions and declared deliverables after its objective is satisfied.",
     parameters: agentControlActionPayloadSchemas.complete,
   },
   chrona_condition_select: {
@@ -844,7 +836,7 @@ export class OmpSdkProviderClient implements AgentProviderClient {
   }
 
   async startRun(input: StartRunInput): Promise<ProviderRunRef> {
-    const sessionId = input.sessionId ?? input.sessionKey ?? `${SDK_RUN_PREFIX}-session-${randomUUID()}`;
+    const sessionId = input.sessionId;
     const runId = `${SDK_RUN_PREFIX}-${randomUUID()}`;
     const startedAt = now();
     const handle: SdkRunHandle = {
@@ -884,7 +876,7 @@ export class OmpSdkProviderClient implements AgentProviderClient {
     const handle = runId ? this.runs.get(runId) : undefined;
     if (!handle) throw new Error(`streamRun: unknown OMP SDK runId "${runId ?? ""}"`);
     const queue = new AsyncEventQueue(handle);
-    while (true) {
+    for (;;) {
       const item = await queue.next(input.signal);
       if (item.type === "end") return;
       yield item;

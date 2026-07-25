@@ -19,16 +19,25 @@ function jsonFile(name: string, value: unknown) {
 }
 
 describe("buildControlPayload", () => {
-  it("maps plan output argv to control payload", () => {
-    const patches = [{ op: "add", path: "/root", value: "card" }] as const;
-    const path = jsonFile("patches.json", patches);
+  it("maps semantic node result argv to control payload", () => {
+    const result = {
+      findings: [{ key: "finding-1", content: "Verified outcome" }],
+    };
+    const path = jsonFile("result.json", result);
 
-    expect(buildControlPayload(["plan", "output", "--patches-file", path, "--summary", "partial"]).body).toEqual({
-      kind: "plan_output",
-      payload: { patches: [...patches], summary: "partial" },
+    expect(
+      buildControlPayload([
+        "node",
+        "complete",
+        "--summary",
+        "done",
+        "--result-file",
+        path,
+      ]).body,
+    ).toEqual({
+      kind: "complete",
+      payload: { summary: "done", ...result },
     });
-
-    expect(() => buildControlPayload(["node", "output", "--patches-file", path])).toThrow("Use plan output");
   });
 
 

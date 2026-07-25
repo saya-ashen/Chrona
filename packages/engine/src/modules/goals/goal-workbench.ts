@@ -27,7 +27,6 @@ import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
 import { createTask } from "../tasks/create-task";
 import { getAcceptedResultContext } from "../tasks/accepted-result-context";
 import { requestResultFileAccess, resolveGeneratedFileReference } from "../tasks/result-file-access";
-import { registerGeneratedPlanOutputArtifacts } from "../plan-execution/use-cases/register-generated-plan-output-artifacts";
 import { goalAssetContentToMarkdown } from "./goal-asset-export";
 
 function hash(value: unknown) {
@@ -46,7 +45,7 @@ function declaredAssetKind(value: unknown) {
     file: true,
     structured_result: true,
   };
-  return typeof value === "string" && kinds[value]
+  return typeof value === "string" && value in kinds
     ? value as "document" | "form" | "page" | "file" | "structured_result"
     : null;
 }
@@ -72,6 +71,12 @@ const STRUCTURED_RESULT_COMPONENTS: Readonly<Record<string, true>> = {
   Table: true,
   JsonView: true,
   FileRef: true,
+  ResultHero: true,
+  ResultDeliverable: true,
+  ResultInsight: true,
+  ResultActionPlan: true,
+  ResultCaveats: true,
+  ResultEvidence: true,
   FileView: true,
   Separator: true,
   CollapsibleBlock: true,
@@ -83,7 +88,7 @@ function stripHostActions(spec: UiDocument): UiDocument {
     elements: Object.fromEntries(
       Object.entries(spec.elements).map(([key, element]) => {
         const { on: _on, ...readOnlyElement } = element as typeof element & { on?: unknown };
-        if (!STRUCTURED_RESULT_COMPONENTS[readOnlyElement.type]) {
+        if (!(readOnlyElement.type in STRUCTURED_RESULT_COMPONENTS)) {
           throw new EngineError(ENGINE_ERROR_CODES.VALIDATION_FAILED, `Structured result component is not allowed in Goal Workbench: ${readOnlyElement.type}`);
         }
         const props = record(readOnlyElement.props);
@@ -127,15 +132,31 @@ function bindStructuredResultArtifacts(
   artifacts: Array<StructuredResultArtifactRef & { sourceUri: string }>,
 ): UiDocument {
   const artifactByUri = Object.fromEntries(artifacts.map((artifact) => [artifact.sourceUri, artifact]));
+  const artifactByRef = Object.fromEntries(
+    artifacts.map((artifact) => [artifact.ref.replace(/^GF/, "AF"), artifact]),
+  );
   return {
     ...spec,
     elements: Object.fromEntries(
       Object.entries(spec.elements).map(([key, element]) => {
         const props = record(element.props) ?? {};
-        const isFileComponent = element.type === "FileRef" || element.type === "FileView";
+        const isFileComponent =
+          element.type === "FileRef" ||
+          element.type === "FileView" ||
+          element.type === "ResultDeliverable" ||
+          element.type === "Table";
         if (!isFileComponent) return [key, element];
-        const source = typeof props.path === "string" ? props.path : typeof props.uri === "string" ? props.uri : null;
-        const artifact = source ? artifactByUri[normalizedGeneratedUri(source)] : undefined;
+        const source =
+          typeof props.artifactRef === "string"
+            ? props.artifactRef
+            : typeof props.path === "string"
+              ? props.path
+              : typeof props.uri === "string"
+                ? props.uri
+                : null;
+        const artifact = source
+          ? artifactByUri[normalizedGeneratedUri(source)] ?? artifactByRef[source]
+          : undefined;
         const { path: _path, uri: _uri, downloadHref: _downloadHref, accessTaskId: _accessTaskId, accessRequestedPath: _accessRequestedPath, previewError: _previewError, ...safeProps } = props;
         return [key, {
           ...element,
@@ -393,6 +414,7 @@ async function upsertStructuredResultCandidate(input: {
   goal: CandidateGoal;
   task: CandidateTask;
   runId: string;
+  sourceRevision: number;
   content: StructuredResultAssetContent;
 }) {
   const matches = await db.goalAsset.findMany({
@@ -402,15 +424,16 @@ async function upsertStructuredResultCandidate(input: {
   });
   const normalizedTitle = input.task.title.toLowerCase();
   const target = matches.find((candidate) => normalizedTitle.includes(candidate.label.toLowerCase()) || candidate.label.toLowerCase().includes(normalizedTitle));
+  const groupKey = `structured-result:${input.sourceRevision}`;
   await db.goalInboxCandidate.upsert({
-    where: { goalId_sourceRunId_groupKey: { goalId: input.goal.id, sourceRunId: input.runId, groupKey: "structured-result" } },
+    where: { goalId_sourceRunId_groupKey: { goalId: input.goal.id, sourceRunId: input.runId, groupKey } },
     create: {
       workspaceId: input.goal.workspaceId,
       goalId: input.goal.id,
       sourceTaskId: input.task.id,
       sourceRunId: input.runId,
       sourceArtifactId: null,
-      groupKey: "structured-result",
+      groupKey,
       kind: "structured_result",
       label: input.task.title,
       proposedAction: target ? "append_version" : "create_asset",
@@ -422,7 +445,19 @@ async function upsertStructuredResultCandidate(input: {
       content: input.content as unknown as Prisma.InputJsonValue,
       contentHash: hash(input.content),
     },
-    update: {},
+    update: {
+      label: input.task.title,
+      proposedAction: target ? "append_version" : "create_asset",
+      proposedTargetAssetId: target?.id ?? null,
+      reason: target ? "rule_based_name_match" : "no_rule_based_name_match",
+      confidence: target ? 1 : 0,
+      changeSummary: `Structured result derived from accepted result “${input.task.title}”`,
+      selector: { acceptedResult: true, format: STRUCTURED_RESULT_FORMAT },
+      content: input.content as unknown as Prisma.InputJsonValue,
+      contentHash: hash(input.content),
+      status: "Pending",
+      resolvedAt: null,
+    },
   });
 }
 
@@ -436,23 +471,42 @@ export async function splitAcceptedResultIntoCandidates(input: { goalId: string;
   if (!run) throw new EngineError(ENGINE_ERROR_CODES.INVALID_TASK_STATE, "Accepted run is unavailable");
   const acceptedResult = await getAcceptedResultContext(task.id);
   if (acceptedResult.spec) {
-    await registerGeneratedPlanOutputArtifacts({
-      workspaceId: goal.workspaceId,
-      taskId: task.id,
-      runId: run.id,
-      spec: acceptedResult.spec as UiDocument,
-    });
     const artifacts = await db.artifact.findMany({
       where: { taskId: task.id, runId: run.id },
       select: { id: true, title: true, uri: true, metadata: true },
     });
+    const planEvent = await db.event.findFirst({
+      where: { taskId: task.id, runId: run.id, planId: { not: null } },
+      orderBy: { ingestSequence: "desc" },
+      select: { planId: true },
+    });
+    const planRun = planEvent?.planId
+      ? await db.taskPlanRun.findFirst({
+          where: { taskId: task.id, planId: planEvent.planId },
+          orderBy: { updatedAt: "desc" },
+          select: { planRun: true },
+        })
+      : null;
+    const planRunEnvelope = record(planRun?.planRun);
+    const mutableGraph = record(planRunEnvelope?.mutableGraph);
+    const planOutput = record(mutableGraph?.planOutput);
+    const finalizedResult = record(planOutput?.finalizedResult);
+    const sourceRevision = typeof finalizedResult?.sourceRevision === "number"
+      ? finalizedResult.sourceRevision
+      : 0;
     const content = await buildStructuredResultContent({
       spec: acceptedResult.spec,
       summary: acceptedResult.summary,
       taskId: task.id,
       artifacts,
     });
-    await upsertStructuredResultCandidate({ goal, task, runId: run.id, content });
+    await upsertStructuredResultCandidate({
+      goal,
+      task,
+      runId: run.id,
+      sourceRevision,
+      content,
+    });
   } else {
     const candidates = run.artifacts.length > 0
       ? run.artifacts
@@ -610,7 +664,8 @@ async function writePdf(outputPath: string, title: string, content: string) {
       process.once("error", (cause) => { clearTimeout(timeout); reject(cause); });
       process.once("exit", (code) => {
         clearTimeout(timeout);
-        code === 0 ? resolve() : reject(new Error(`PDF renderer exited with code ${code ?? "unknown"}`));
+        if (code === 0) resolve();
+        else reject(new Error(`PDF renderer exited with code ${code ?? "unknown"}`));
       });
     });
   } finally {

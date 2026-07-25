@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   DEFAULT_SCHEDULE_AI_PREFERENCES,
   type ScheduleAiPreferences,
@@ -61,11 +61,20 @@ export function ScheduleAiSettingsPanel({
 }: ScheduleAiSettingsPanelProps) {
   const storedPreferences = useScheduleAiPreferences();
   const [savingKey, setSavingKey] = useState<keyof ScheduleAiPreferences | null>(null);
+  const clearSavingTimerRef = useRef<number | null>(null);
+
+  useEffect(() => () => {
+    if (clearSavingTimerRef.current !== null) window.clearTimeout(clearSavingTimerRef.current);
+  }, []);
 
   const updatePreference = (key: keyof ScheduleAiPreferences, value: boolean) => {
     setSavingKey(key);
     writeScheduleAiPreferences({ ...storedPreferences, [key]: value });
-    window.setTimeout(() => setSavingKey((current) => (current === key ? null : current)), 250);
+    if (clearSavingTimerRef.current !== null) window.clearTimeout(clearSavingTimerRef.current);
+    clearSavingTimerRef.current = window.setTimeout(() => {
+      setSavingKey((current) => (current === key ? null : current));
+      clearSavingTimerRef.current = null;
+    }, 250);
   };
 
   return (

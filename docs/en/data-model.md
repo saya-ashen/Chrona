@@ -173,6 +173,19 @@ runs/sessions/approvals to the focused occurrence, so a failed or cancelled
 occurrence never contaminates a sibling occurrence. See
 [Backend Execution Flow](./backend-execution-flow.md) → "Task state authority".
 
+### Canonical result state
+
+`TaskPlanRun.planRun.mutableGraph.planOutput` is the persisted result container. Its name remains tied to the existing JSON envelope, but its contents are canonical result state rather than a mutable page:
+
+- `manifest`: deterministic `ResultManifest` aggregated from current immutable `NodeResult` records.
+- `finalizedResult`: the validated final Spec plus the exact Manifest revision used to produce it.
+- `finalization`: `Pending`, `Running`, `Ready`, or `Failed`, including attempt and failure metadata.
+- `revision`, `updatedAt`, and `updatedByNodeId`: canonical result-change metadata.
+
+Run-owned `Artifact` rows hold file identity, generated URI, checksum, size, MIME, preview, source node, and deliverable key. AI-visible structures refer to these rows only through deterministic opaque `AF...` references. Host preview/download fields are materialized at read time and are never persisted in finalized Specs.
+
+Result review is stored as a canonical `task.result_accepted` Event scoped to a completed Run. It does not change Task execution status. Goal Workbench candidates copy a read-only finalized result and opaque artifact references into an auditable pending Inbox item; only candidate resolution creates a formal immutable `GoalAssetVersion`.
+
 ## Schedule state
 
 Important models:

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { chronaCatalog, chronaPlanOutputCatalog, chronaPlanOutputCatalogPrompt, chronaPlanOutputSpecSchema, validateChronaSpec, validateDashboardSummarySpec, type ValidateResult } from "../index";
+import { chronaCatalog, chronaResultCatalog, chronaResultSpecSchema, validateChronaSpec, validateDashboardSummarySpec, type ValidateResult } from "../index";
 import type { UiDocument } from "./document";
 
 function expectIssue(result: ValidateResult, fragment: string) {
@@ -54,14 +54,6 @@ describe("validateChronaSpec", () => {
     expect(prompt).toContain("threshold MUST be a JSON number such as 800");
   });
 
-  test("plan-output prompt discourages raw JsonView reports", () => {
-    const prompt = chronaPlanOutputCatalogPrompt();
-
-    expect(prompt).toContain("Card containers");
-    expect(prompt).toContain("Use JsonView sparingly");
-    expect(prompt).toContain("context.planOutput.hasSpec");
-    expect(prompt).toContain("context.planOutput.rootChildren");
-  });
 
 
   test("allows omitting optional/nullable props", () => {
@@ -253,25 +245,131 @@ describe("validateChronaSpec", () => {
     expect(validateChronaSpec(spec).ok).toBe(true);
   });
 
-  test("keeps NodeResultSection host-owned while allowing plan output collapse metadata", () => {
-    expect("NodeResultSection" in chronaPlanOutputCatalog.data.components).toBe(false);
+  test("keeps NodeResultSection host-owned while allowing result collapse metadata", () => {
+    expect("NodeResultSection" in chronaResultCatalog.data.components).toBe(false);
     expect("NodeResultSection" in chronaCatalog.data.components).toBe(true);
 
-    const outputSpec = chronaPlanOutputSpecSchema.safeParse({
+    const outputSpec = chronaResultSpecSchema.safeParse({
       root: "root",
       elements: {
         root: { type: "Stack", props: { gap: "md" }, children: ["answer", "details", "json", "file"] },
         answer: { type: "ResultSummary", props: { title: "Answer", summary: "Primary answer stays visible." } },
-        details: { type: "Card", props: { title: "Evidence", defaultCollapsed: true, xChronaSourceNodeId: "node-1" }, children: ["json"] },
-        json: { type: "JsonView", props: { title: "Payload", value: { ok: true }, defaultCollapsed: true, sourceNodeId: "node-1" } },
-        file: { type: "FileRef", props: { path: ".chrona/outputs/node-1/result.json", defaultCollapsed: true, collapseTitle: "Raw artifact", xChronaSourceNodeId: "node-1" } },
+        details: { type: "Card", props: { title: "Evidence", defaultCollapsed: true }, children: ["json"] },
+        json: { type: "JsonView", props: { title: "Payload", value: { ok: true }, defaultCollapsed: true } },
+        file: { type: "FileRef", props: { path: "AF111111111111", defaultCollapsed: true, collapseTitle: "Raw artifact" } },
       },
     });
 
     expect(outputSpec.success).toBe(true);
-    const catalogText = JSON.stringify(chronaPlanOutputCatalogPrompt());
-    expect(catalogText).toContain("defaultCollapsed");
-    expect(catalogText).toContain("do not emit CollapsibleBlock");
+  });
+
+  test("accepts the bounded finalized-result domain composition", () => {
+    const result = chronaResultSpecSchema.safeParse({
+      root: "root",
+      elements: {
+        root: {
+          type: "Stack",
+          props: { gap: "lg" },
+          children: ["hero", "primary", "supporting", "insight", "actions", "caveats", "evidence"],
+        },
+        hero: {
+          type: "ResultHero",
+          props: {
+            title: "Research package ready",
+            summary: "Verified sources and an operating guide are assembled.",
+            readiness: "ready_with_caveats",
+            readinessSummary: "Confirm one access-limited source.",
+            metrics: [{ label: "Deliverables", value: "2" }],
+          },
+        },
+        primary: {
+          type: "ResultDeliverable",
+          props: {
+            title: "Operating guide",
+            summary: "Primary workflow",
+            artifactRef: "AF111111111111",
+            role: "primary",
+            kind: "document",
+          },
+        },
+        supporting: {
+          type: "ResultDeliverable",
+          props: {
+            title: "Source table",
+            artifactRef: "AF222222222222",
+            role: "supporting",
+            kind: "table",
+          },
+        },
+        insight: {
+          type: "ResultInsight",
+          props: {
+            title: "Use official sources for confirmation",
+            summary: "Discovery networks provide early signals but are not final authority.",
+            emphasis: "lead",
+            points: ["Discover", "Verify"],
+          },
+        },
+        actions: {
+          type: "ResultActionPlan",
+          props: {
+            title: "Recommended route",
+            phases: [{ timeframe: "now", title: "Confirm constraints", actions: ["Choose target regions"] }],
+          },
+        },
+        caveats: {
+          type: "ResultCaveats",
+          props: { items: ["One source requires manual verification"] },
+        },
+        evidence: {
+          type: "ResultEvidence",
+          props: { items: ["Official source checked"], defaultCollapsed: true },
+        },
+      },
+    });
+
+    expect(result.success).toBe(true);
+  });
+
+  test("bounds result metrics, caveats, and action phases", () => {
+    expect(chronaResultSpecSchema.safeParse({
+      root: "hero",
+      elements: {
+        hero: {
+          type: "ResultHero",
+          props: {
+            title: "Result",
+            summary: "Summary",
+            readiness: "ready",
+            readinessSummary: "Ready",
+            metrics: Array.from({ length: 5 }, (_, index) => ({ label: `Metric ${index}`, value: String(index) })),
+          },
+        },
+      },
+    }).success).toBe(false);
+
+    expect(chronaResultSpecSchema.safeParse({
+      root: "caveats",
+      elements: {
+        caveats: { type: "ResultCaveats", props: { items: ["1", "2", "3", "4"] } },
+      },
+    }).success).toBe(false);
+
+    expect(chronaResultSpecSchema.safeParse({
+      root: "actions",
+      elements: {
+        actions: {
+          type: "ResultActionPlan",
+          props: {
+            phases: ["now", "this_week", "later", "later"].map((timeframe, index) => ({
+              timeframe,
+              title: `Phase ${index}`,
+              actions: ["Act"],
+            })),
+          },
+        },
+      },
+    }).success).toBe(false);
   });
 
 describe("validateDashboardSummarySpec", () => {

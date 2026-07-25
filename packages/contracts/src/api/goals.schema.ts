@@ -100,9 +100,9 @@ export const createGoalBodySchema = z.object({
 
 export const createGoalWithFirstTaskBodySchema = z.object({
   workspaceId,
-  intendedOutcome: z.string().trim().min(1).max(5_000),
-  firstWorkItem: z.string().trim().min(1).max(200),
-  description: z.string().trim().max(10_000).nullable().optional(),
+  title: z.string().trim().min(1).max(200),
+  firstTaskTitle: z.string().trim().min(1).max(200),
+  additionalContext: z.string().trim().max(5_000).nullable().optional(),
   priority: z.enum(["Low", "Medium", "High", "Urgent"]).default("High"),
   idempotencyKey: z.string().trim().min(8).max(200),
 });

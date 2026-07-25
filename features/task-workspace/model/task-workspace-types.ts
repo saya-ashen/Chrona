@@ -140,7 +140,7 @@ export type TaskWorkspaceBootstrapData = Omit<TaskPageData,
 
 export type TaskWorkspaceRuntimeContextData = Pick<TaskPageData, "defaultExecutionRuntime" | "executionRuntimes" | "availableAiClients">;
 
-export type TaskWorkspaceReviewContextData = Pick<TaskPageData, "latestRunSummary" | "resultReview" | "scheduleProposals" | "approvals">;
+export type TaskWorkspaceReviewContextData = Pick<TaskPageData, "latestRunSummary" | "resultReview" | "scheduleProposals" | "approvals" | "artifacts">;
 
 export type TaskWorkspaceCommandCenterData = NonNullable<TaskPageData["commandCenter"]>;
 

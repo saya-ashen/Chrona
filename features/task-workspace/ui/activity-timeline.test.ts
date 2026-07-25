@@ -50,4 +50,16 @@ describe("ActivityTimeline execution runs", () => {
   it("does not add a divider to legacy activity without execution-session metadata", () => {
     expect(buildRenderList([activity({ id: "legacy" })]).some((entry) => entry.type === "run_divider")).toBe(false);
   });
+
+  it("keeps execution-stage keys unique when scoped and legacy activity interleave", () => {
+    const entries = buildRenderList([
+      activity({ id: "scoped-1", executionSessionId: "session-1" }),
+      activity({ id: "legacy-1" }),
+      activity({ id: "scoped-2", executionSessionId: "session-1" }),
+      activity({ id: "legacy-2" }),
+    ], true);
+    const keys = entries.map((entry) => entry.key);
+
+    expect(new Set(keys).size).toBe(keys.length);
+  });
 });

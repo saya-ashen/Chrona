@@ -5,6 +5,7 @@ import {
   buildCommandCenterTrailSpec,
   type UiDocument,
 } from "@chrona/ui-protocol";
+import type { AiArtifactRef } from "@chrona/contracts/ai";
 import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
 import {
   buildActivityTimeline,
@@ -14,6 +15,42 @@ import {
 } from "./task-activity";
 import { getCurrentExecution } from "../plan-execution/use-cases/get-current-execution";
 import { hydrateFilePreviewSpec, resolveFilePreview } from "./file-preview";
+import { aiArtifactRef } from "../plan-execution/use-cases/register-generated-plan-output-artifacts";
+
+function materializeResultArtifactRefs(
+  spec: UiDocument,
+  artifacts: Array<{ id: string; uri: string }>,
+): UiDocument {
+  const uriByRef = new Map(
+    artifacts.map((artifact) => [aiArtifactRef(artifact.id), artifact.uri]),
+  );
+  return {
+    ...spec,
+    elements: Object.fromEntries(
+      Object.entries(spec.elements).map(([key, element]) => {
+        if (
+          element.type !== "FileView" &&
+          element.type !== "FileRef" &&
+          element.type !== "ResultDeliverable" &&
+          element.type !== "WorkspaceArtifactItem" &&
+          element.type !== "Table"
+        ) return [key, element];
+        const props = element.props as Record<string, unknown>;
+        const opaqueRef = typeof props.artifactRef === "string"
+          ? props.artifactRef
+          : typeof props.path === "string" && props.path.startsWith("AF")
+            ? props.path
+            : typeof props.uri === "string" && props.uri.startsWith("AF")
+              ? props.uri
+              : null;
+        const uri = opaqueRef ? uriByRef.get(opaqueRef as AiArtifactRef) : undefined;
+        return uri
+          ? [key, { ...element, props: { ...props, path: uri } }]
+          : [key, element];
+      }),
+    ),
+  };
+}
 
 function nowTone(status: string) {
   if (status === "completed") return "success" as const;
@@ -71,7 +108,10 @@ export async function getTaskCommandCenter(input: {
     where: { id: input.taskId },
     select: {
       id: true,
-      artifacts: { orderBy: { createdAt: "desc" }, take: 5 },
+      artifacts: {
+        orderBy: { createdAt: "desc" },
+        ...(currentExecution.planOutput?.finalizedResult ? {} : { take: 5 }),
+      },
       timelineItems: {
         where:
           selectedWorkBlockId !== null
@@ -118,8 +158,12 @@ export async function getTaskCommandCenter(input: {
         currentOperationSpec: currentExecution.ui?.currentOperationSpec ?? null,
       }),
       output: await hydrateFilePreviewSpec(
-        (currentExecution.planOutput?.spec as UiDocument | null | undefined) ??
-          buildCommandCenterArtifactsSpec({ artifacts }),
+        currentExecution.planOutput?.finalizedResult?.spec
+          ? materializeResultArtifactRefs(
+              currentExecution.planOutput.finalizedResult.spec as UiDocument,
+              task.artifacts,
+            )
+          : buildCommandCenterArtifactsSpec({ artifacts }),
         { taskId: input.taskId },
       ),
       trail: buildCommandCenterTrailSpec({

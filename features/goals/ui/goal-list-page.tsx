@@ -59,14 +59,14 @@ function CreateGoalDialog({ copy }: { copy: GoalCopy }) {
   const navigate = useNavigate();
   const revalidator = useRevalidator();
   const [open, setOpen] = useState(false);
-  const [outcome, setOutcome] = useState("");
-  const [firstWorkItem, setFirstWorkItem] = useState("");
-  const [description, setDescription] = useState("");
+  const [title, setTitle] = useState("");
+  const [firstTaskTitle, setFirstTaskTitle] = useState("");
+  const [additionalContext, setAdditionalContext] = useState("");
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function submit() {
-    if (!outcome.trim() || !firstWorkItem.trim() || pending) return;
+    if (!title.trim() || !firstTaskTitle.trim() || pending) return;
     setPending(true);
     setError(null);
     try {
@@ -75,9 +75,9 @@ function CreateGoalDialog({ copy }: { copy: GoalCopy }) {
       );
       const created = await createGoalWithFirstTask({
         workspaceId: workspace.id,
-        intendedOutcome: outcome.trim(),
-        firstWorkItem: firstWorkItem.trim(),
-        description: description.trim() || null,
+        title: title.trim(),
+        firstTaskTitle: firstTaskTitle.trim(),
+        additionalContext: additionalContext.trim() || null,
         priority: "High",
         idempotencyKey: uuidv4(),
       });
@@ -117,24 +117,24 @@ function CreateGoalDialog({ copy }: { copy: GoalCopy }) {
               </p>
             </div>
             <Field>
-              <FieldLabel htmlFor="goal-outcome">
-                {copy.outcomeLabel}
+              <FieldLabel htmlFor="goal-title">
+                {copy.goalTitleLabel}
               </FieldLabel>
-              <Textarea
-                id="goal-outcome"
-                value={outcome}
-                onChange={(event) => setOutcome(event.target.value)}
+              <Input
+                id="goal-title"
+                value={title}
+                onChange={(event) => setTitle(event.target.value)}
                 placeholder={copy.goalOutcomePlaceholder}
               />
             </Field>
             <Field>
-              <FieldLabel htmlFor="goal-description">
+              <FieldLabel htmlFor="goal-additional-context">
                 {copy.goalDescriptionLabel}
               </FieldLabel>
               <Textarea
-                id="goal-description"
-                value={description}
-                onChange={(event) => setDescription(event.target.value)}
+                id="goal-additional-context"
+                value={additionalContext}
+                onChange={(event) => setAdditionalContext(event.target.value)}
                 placeholder={copy.goalDescriptionPlaceholder}
               />
               <FieldDescription>{copy.goalDescriptionHelp}</FieldDescription>
@@ -159,8 +159,8 @@ function CreateGoalDialog({ copy }: { copy: GoalCopy }) {
               </FieldLabel>
               <Input
                 id="goal-first-work"
-                value={firstWorkItem}
-                onChange={(event) => setFirstWorkItem(event.target.value)}
+                value={firstTaskTitle}
+                onChange={(event) => setFirstTaskTitle(event.target.value)}
                 placeholder={copy.firstTaskPlaceholder}
               />
             </Field>
@@ -176,7 +176,7 @@ function CreateGoalDialog({ copy }: { copy: GoalCopy }) {
             {copy.cancel}
           </Button>
           <Button
-            disabled={!outcome.trim() || !firstWorkItem.trim() || pending}
+            disabled={!title.trim() || !firstTaskTitle.trim() || pending}
             onClick={() => void submit()}
           >
             {pending ? copy.saving : copy.createGoal}

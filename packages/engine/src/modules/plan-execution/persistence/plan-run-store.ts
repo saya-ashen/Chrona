@@ -12,6 +12,7 @@ import type {
   PlanGraph,
   PlanRun,
 } from "@chrona/contracts/ai";
+import { createEmptyResultManifest } from "../results/result-manifest";
 
 export function createPlanGraphFromCompiledPlan(input: {
   taskId: string;
@@ -28,11 +29,12 @@ function asJsonValue(value: unknown): Prisma.InputJsonValue {
 
 export function createEmptyPlanOutput(): PlanOutputState {
   return {
-    spec: null,
+    manifest: createEmptyResultManifest(),
+    finalizedResult: null,
+    finalization: { status: "Pending", sourceRevision: 0 },
     revision: 0,
     updatedAt: null,
     updatedByNodeId: null,
-    history: [],
   };
 }
 
@@ -316,7 +318,7 @@ export async function getPlanRun(
       attempts: record.mutableGraph.attempts,
       results: record.mutableGraph.results,
       executionContextSnapshots: record.mutableGraph.executionContextSnapshots,
-      planOutput: record.mutableGraph.planOutput ?? createEmptyPlanOutput(),
+      planOutput: record.mutableGraph.planOutput,
       executionOwnerId: row.executionOwnerId,
       executionOwnerScope: row.executionOwnerScope,
       executionLeaseUntil: row.executionLeaseUntil,

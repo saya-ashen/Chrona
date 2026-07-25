@@ -301,8 +301,8 @@ test.describe("Task create → plan → run → result", () => {
     });
 
     // 5. The Work page shows result-review state and exposes explicit product-owned
-    //    result acceptance. Accept via the same UI path users see, then assert the
-    //    projection flips to done.
+    //    result acceptance. Acceptance updates review state without changing the
+    //    completed execution lifecycle.
     await test.step("Accept the result through the workspace UI", async () => {
       const beforeBody = await getCurrentExecution(request, task.taskId);
       expect(beforeBody.status).toBe("completed");
@@ -326,9 +326,8 @@ test.describe("Task create → plan → run → result", () => {
 
       await page.goto(WORK_URL(task.taskId));
       await dismissTaskEditorIfOpen(page);
-      await expect(
-        page.locator('[data-slot="badge"]').filter({ hasText: /^task done$/i }),
-      ).toBeVisible({ timeout: 15_000 });
+      await expect(page.getByText(/^Result accepted$/)).toBeVisible({ timeout: 15_000 });
+      expect((await getCurrentExecution(request, task.taskId)).status).toBe("completed");
     });
 
     if (viewport === "mobile") {

@@ -11,7 +11,7 @@ export type McpTestServerOptions = {
   onToolCall?: (call: McpTestToolCall) => void | Promise<void>;
 };
 
-const DEFAULT_TOOL_NAMES = ["chrona_plan_output", "chrona_node_complete"] as const;
+const DEFAULT_TOOL_NAMES = ["chrona_node_complete"] as const;
 
 /**
  * Minimal Streamable HTTP MCP peer for provider tests.

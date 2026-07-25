@@ -642,19 +642,6 @@ describe("agent tool operations service", () => {
   it("maps node terminal tools to execution dispatch with model-supplied condition node ids", async () => {
     const agentTools = service();
 
-    await expect(
-      agentTools.execute({
-        toolName: "chrona.plan.output",
-        input: {
-          workspaceId: "workspace-1",
-          taskId: "task-1",
-          sessionId: "session-1",
-          actorType: "agent",
-          idempotencyKey: "plan-output-1",
-          payload: { patches: [{ op: "add", path: "/root", value: "root" }] },
-        },
-      }),
-    ).resolves.toMatchObject({ status: "accepted" });
 
     await expect(
       agentTools.execute({
@@ -720,11 +707,6 @@ describe("agent tool operations service", () => {
 
     expect(agentTools.calls.dispatchActions).toEqual([]);
     expect(agentTools.calls.submittedNodeResults).toEqual([
-      {
-        action: "update_plan_output",
-        sessionId: "session-1",
-        patches: [{ op: "add", path: "/root", value: "root" }],
-      },
       {
         action: "complete_manual_node",
         sessionId: "session-1",

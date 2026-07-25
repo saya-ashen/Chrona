@@ -4,8 +4,10 @@ import type {
   EffectivePlanGraph,
   NodeActionForm,
   NodeAttempt,
+  NodeDeliverableDeclaration,
   PlanOutputState,
   PlanPatch,
+  ResultContribution,
 } from "@chrona/contracts/ai";
 import type { ProviderRunEvent } from "@chrona/providers-foundation";
 
@@ -14,6 +16,26 @@ export type NodeExecutionPlanContext = {
   goal: string;
   assumptions: string[];
   summary?: string;
+  goalContext?: {
+    goal: {
+      title: string;
+      additionalContext?: string;
+      operationalBrief?: {
+        outcome: string;
+        currentFocus: string;
+        strategy: string;
+        constraints: string[];
+      };
+      capturedAt?: string;
+    };
+    acceptedResults: Array<{
+      ref: string;
+      taskTitle: string;
+      acceptedAt?: string | null;
+      summary: string;
+      artifactCount: number;
+    }>;
+  };
 };
 
 export type NodeExecutionRunContext = {
@@ -50,6 +72,17 @@ export type NodeExecutionResult =
         nextNodeId: string;
         source: "user" | "ai" | "system" | "default";
       };
+      deliverables?: NodeDeliverableDeclaration[];
+      findings?: ResultContribution[];
+      decisions?: ResultContribution[];
+      caveats?: ResultContribution[];
+      nextActions?: ResultContribution[];
+      resultEvidence?: Array<{
+        key: string;
+        summary: string;
+        artifactRef?: `AF${string}`;
+        sourceNodeRef: string;
+      }>;
     }
   | {
       status: "waiting_for_user";

@@ -52,6 +52,39 @@ describe("currentExecutionStatusFromEffectiveGraph", () => {
     })).toBe("waiting_for_user");
   });
 
+  it("lets an authoritative input wait outrank other ready graph work", () => {
+    expect(currentExecutionStatusFromEffectiveGraph({
+      effective: effectiveGraph({
+        nodes: [
+          { id: "node-1", status: "waiting_for_user", reachable: true } as never,
+          { id: "node-2", status: "ready", reachable: true } as never,
+        ],
+        readyNodeIds: ["node-2"],
+        waitingNodeIds: ["node-1"],
+      }),
+      hasActiveExecutionSession: true,
+      activeRunStatus: "WaitingForInput",
+      taskStatus: "WaitingForInput",
+      pauseReason: "user_input",
+    })).toBe("waiting_for_user");
+  });
+
+  it("lets an authoritative approval wait outrank other ready graph work", () => {
+    expect(currentExecutionStatusFromEffectiveGraph({
+      effective: effectiveGraph({
+        nodes: [
+          { id: "node-1", status: "waiting_for_approval", reachable: true } as never,
+          { id: "node-2", status: "ready", reachable: true } as never,
+        ],
+        readyNodeIds: ["node-2"],
+        waitingNodeIds: ["node-1"],
+      }),
+      hasActiveExecutionSession: true,
+      activeRunStatus: "WaitingForApproval",
+      pauseReason: "review",
+    })).toBe("waiting_for_approval");
+  });
+
 
   it("preserves failed evidence after the active execution session closes", () => {
     expect(currentExecutionStatusFromEffectiveGraph({
