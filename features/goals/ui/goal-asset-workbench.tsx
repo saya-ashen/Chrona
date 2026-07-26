@@ -743,30 +743,43 @@ function InboxCandidate({
   );
 }
 
-function hydrateStructuredArtifactLinks(content: StructuredResultAssetContent, goalId: string, assetId: string, versionId: string) {
+function hydrateStructuredArtifactLinks(
+  content: StructuredResultAssetContent,
+  goalId: string,
+  assetId: string,
+  versionId: string,
+  linkedAssets: Array<{ ref: string; assetId: string }>,
+) {
   const refs = new Set(content.artifactRefs.map((artifact) => artifact.ref));
+  const linkedAssetByRef = new Map(linkedAssets.map((asset) => [asset.ref, asset.assetId]));
   return {
     ...content.spec,
     elements: Object.fromEntries(Object.entries(content.spec.elements).map(([key, element]) => {
       const props = element.props as Record<string, unknown>;
       const ref = typeof props.path === "string" && refs.has(props.path) ? props.path : null;
+      const linkedAssetId = ref ? linkedAssetByRef.get(ref) : null;
       return [key, ref ? {
         ...element,
         props: {
           ...props,
           downloadHref: `/api/goals/${encodeURIComponent(goalId)}/assets/${encodeURIComponent(assetId)}/artifacts/${encodeURIComponent(ref)}/download?versionId=${encodeURIComponent(versionId)}`,
+          ...(linkedAssetId ? {
+            openAssetHref: `?section=workbench&asset=${encodeURIComponent(linkedAssetId)}`,
+            suppressContentPreview: true,
+          } : {}),
         },
       } : element];
     })),
   };
 }
 
-function StructuredResultViewer({ value, copy, goalId, assetId, versionId }: {
+function StructuredResultViewer({ value, copy, goalId, assetId, versionId, linkedAssets }: {
   value: unknown;
   copy: AssetWorkbenchCopy;
   goalId: string;
   assetId: string;
   versionId: string;
+  linkedAssets: Array<{ ref: string; assetId: string }>;
 }) {
   if (!isStructuredResultAssetContent(value) || !isCatalogCompatible(value.catalogVersion)) {
     return (
@@ -775,15 +788,15 @@ function StructuredResultViewer({ value, copy, goalId, assetId, versionId }: {
       </p>
     );
   }
-  const spec = hydrateStructuredArtifactLinks(value, goalId, assetId, versionId);
-  const validation = validateChronaSpec(spec);
-  if (!validation.ok) {
+  const canonicalValidation = validateChronaSpec(value.spec);
+  if (!canonicalValidation.ok) {
     return (
       <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
         {copy.invalidStructuredResult}
       </p>
     );
   }
+  const spec = hydrateStructuredArtifactLinks(value, goalId, assetId, versionId, linkedAssets);
   return (
     <section
       aria-label={copy.structuredResultContent}
@@ -818,7 +831,7 @@ function AssetContentEditor({
   act: (action: () => Promise<unknown>, success: string) => Promise<void>;
 }) {
   if (asset.kind === "structured_result") {
-    return <StructuredResultViewer value={parseContent(formalValue)} copy={copy} goalId={asset.goalId} assetId={asset.id} versionId={currentVersionId ?? ""} />;
+    return <StructuredResultViewer value={parseContent(formalValue)} copy={copy} goalId={asset.goalId} assetId={asset.id} versionId={currentVersionId ?? ""} linkedAssets={asset.linkedAssets ?? []} />;
   }
   if (asset.kind === "page") {
     const content = parseContent(value);
@@ -1047,13 +1060,7 @@ function AssetDetails({
                 <dd className="break-all">{current.originalFilename}</dd>
               </div>
             ) : null}
-            {current?.mimeType ? (
-              <div>
-                <dt className="text-muted-foreground">{copy.mimeType}</dt>
-                <dd>{current.mimeType}</dd>
-              </div>
-            ) : null}
-            <div>
+            <div className="col-span-2 min-w-0">
               <dt className="text-muted-foreground">{copy.updated}</dt>
               <dd>{new Date(asset.updatedAt).toLocaleDateString()}</dd>
             </div>

@@ -7,7 +7,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   Archive,
   Bot,
@@ -746,6 +746,8 @@ function ResultDeliverable({ props }: { props: Record<string, unknown> }) {
   const [previewOpen, setPreviewOpen] = useState(false);
   const preview = stringProp(props.contentPreview);
   const downloadHref = stringProp(props.downloadHref);
+  const openAssetHref = stringProp(props.openAssetHref);
+  const suppressContentPreview = props.suppressContentPreview === true;
   const isPrimary = role === "primary";
   const roleLabel = isPrimary
     ? (copy.resultPrimaryDeliverable ?? "Primary deliverable")
@@ -799,7 +801,19 @@ function ResultDeliverable({ props }: { props: Record<string, unknown> }) {
               </p>
             ) : null}
             <div className="mt-4 flex flex-wrap gap-2">
-              {preview ? (
+              {openAssetHref ? (
+                <Button
+                  asChild
+                  size="sm"
+                  variant={isPrimary ? "default" : "outline"}
+                >
+                  <Link to={openAssetHref}>
+                    <ArrowRight className="size-3.5" aria-hidden />
+                    {copy.openWorkbenchAsset ?? "Open asset"}
+                  </Link>
+                </Button>
+              ) : null}
+              {preview && !suppressContentPreview ? (
                 <Button
                   type="button"
                   size="sm"
@@ -832,7 +846,7 @@ function ResultDeliverable({ props }: { props: Record<string, unknown> }) {
           ) : null}
         </div>
       </article>
-      {preview ? (
+      {preview && !suppressContentPreview ? (
         <Sheet open={previewOpen} onOpenChange={setPreviewOpen}>
           <SheetContent
             side="right"

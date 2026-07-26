@@ -35,6 +35,15 @@ export type NodeExecutionPlanContext = {
       summary: string;
       artifactCount: number;
     }>;
+    assets?: Array<{
+      ref: string;
+      label: string;
+      kind: string;
+      role: string;
+      version: number | null;
+      updatedAt: string;
+      content: string;
+    }>;
   };
 };
 

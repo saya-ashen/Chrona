@@ -319,6 +319,42 @@ describe("Goal API", () => {
       expectedOutcome: "A confirmed target opening",
     }));
     const { run } = await seedAcceptedResult(workspaceId, sourceTask.taskId);
+    const formalArtifact = await db.artifact.create({
+      data: {
+        workspaceId,
+        taskId: sourceTask.taskId,
+        runId: run.id,
+        type: "file",
+        title: "Current research brief",
+        uri: "generated://tests/current-research-brief.md",
+        contentPreview: "Current approved guidance",
+      },
+    });
+    const formalAsset = await db.goalAsset.create({
+      data: {
+        workspaceId,
+        goalId: created.id,
+        sourceArtifactId: formalArtifact.id,
+        currentArtifactId: formalArtifact.id,
+        role: "working_document",
+        status: "Approved",
+        label: "Research brief",
+        kind: "document",
+      },
+    });
+    await db.goalAssetVersion.create({
+      data: {
+        workspaceId,
+        goalId: created.id,
+        assetId: formalAsset.id,
+        artifactId: formalArtifact.id,
+        version: 1,
+        source: "inbox",
+        content: "Current approved guidance",
+        contentHash: "formal-v1",
+        authorType: "user",
+      },
+    });
 
     const nextTask = await responseJson<GoalTaskResponse>(await requestJson(app, `/goals/${created.id}/tasks`, {
       kind: "task",
@@ -334,6 +370,34 @@ describe("Goal API", () => {
       acceptedResults: [{ taskTitle: "Confirm target opening" }],
       expectedOutcome: "A bounded draft",
     });
+    expect(persisted.goalContext).toMatchObject({
+      assets: [{
+        label: "Research brief",
+        version: 1,
+        content: "Current approved guidance",
+      }],
+    });
+    const formalAssets = persisted.goalContext && typeof persisted.goalContext === "object" && !Array.isArray(persisted.goalContext) && "assets" in persisted.goalContext
+      ? persisted.goalContext.assets
+      : null;
+    const firstAsset = Array.isArray(formalAssets) ? formalAssets[0] : null;
+    const formalAssetRef = firstAsset && typeof firstAsset === "object" && "ref" in firstAsset
+      ? firstAsset.ref
+      : null;
+    expect(formalAssetRef).toMatch(/^GA[0-9A-F]{12}$/);
+    expect(formalAssetRef).not.toContain(formalAsset.id);
+    const goalResults = await createChronaEngine().goals.readAcceptedResults({
+      taskId: nextTask.taskId,
+      workspaceId,
+      query: "Current approved guidance",
+      limit: 5,
+    });
+    expect(goalResults.results).toMatchObject([{
+      ref: formalAssetRef,
+      title: "Research brief",
+      version: 1,
+      summary: "Current approved guidance",
+    }]);
     expect(persisted.goalContext).toBeTruthy();
     expect(typeof persisted.goalContext).toBe("object");
     expect(persisted.goalContext).not.toBeInstanceOf(Array);

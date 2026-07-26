@@ -19,6 +19,7 @@ import { createTask } from "../tasks/create-task";
 import { rebuildTaskProjection } from "../projections/rebuild-task-projection";
 import { extractAcceptedResultText } from "../tasks/accepted-result-context";
 import { buildAutomaticGoalTaskContext, goalAcceptedResultRef } from "./goal-task-context";
+import { goalAssetRef } from "./goal-task-context";
 import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
 
 type GoalEventType =
@@ -66,7 +67,7 @@ const goalInclude = {
     include: {
       sourceArtifact: true,
       currentArtifact: true,
-      versions: { orderBy: { version: "desc" }, take: 1, select: { version: true } },
+      versions: { orderBy: { version: "desc" }, take: 1, select: { version: true, content: true } },
     },
   },
   briefRevisions: {
@@ -475,6 +476,31 @@ async function getGoalOrThrow(goalId: string) {
   if (!goal) throw new EngineError(ENGINE_ERROR_CODES.TASK_NOT_FOUND, "Goal not found");
   return goal;
 }
+function formalAssetReadModel(asset: GoalWithDetails["assets"][number]) {
+  const version = asset.versions[0];
+  const content = typeof version?.content === "string"
+    ? version.content
+    : recordValue(version?.content)?.format === "chrona-json-render"
+      ? extractAcceptedResultText(recordValue(version?.content)?.spec)
+      : version?.content
+        ? JSON.stringify(version.content)
+        : asset.currentArtifact.contentPreview ?? "No readable asset content was available.";
+  return {
+    ref: goalAssetRef(asset.id),
+    title: boundedText(asset.label, GOAL_RESULT_TITLE_LIMIT),
+    kind: asset.kind,
+    role: asset.role,
+    version: version?.version ?? null,
+    updatedAt: asset.updatedAt.toISOString(),
+    summary: boundedText(content, GOAL_RESULT_SEARCH_SUMMARY_LIMIT),
+    artifacts: [{
+      title: boundedText(asset.currentArtifact.title, GOAL_RESULT_TITLE_LIMIT),
+      type: asset.currentArtifact.type,
+      contentPreview: boundedText(content, GOAL_CONTEXT_SUMMARY_LIMIT),
+    }],
+  };
+}
+
 
 function resultMatchesQuery(input: { taskTitle: string; summary: string; artifacts: Array<{ title: string; contentPreview: string | null }> }, query?: string) {
   if (!query) return true;
@@ -537,19 +563,31 @@ export async function readGoalAcceptedResults(input: {
   if (goal.workspaceId !== input.workspaceId) {
     throw new EngineError(ENGINE_ERROR_CODES.TASK_NOT_FOUND, "Goal not found");
   }
-  const matching = goal.tasks
+  const assets = goal.assets
+    .filter((asset) => asset.status === "Approved" && asset.archivedAt === null)
+    .map(formalAssetReadModel)
+    .filter((asset) => resultMatchesQuery({
+      taskTitle: asset.title,
+      summary: asset.summary,
+      artifacts: asset.artifacts,
+    }, input.query));
+  const acceptedResults = goal.tasks
     .flatMap((candidate) => {
       const result = acceptedResultForTask(candidate);
       if (!result || !resultMatchesQuery({ taskTitle: candidate.title, summary: result.summary, artifacts: result.artifacts }, input.query)) return [];
       return [{ candidate, result }];
     })
     .sort((left, right) => (right.result.acceptedAt ?? "").localeCompare(left.result.acceptedAt ?? ""));
-  const offset = input.cursor ? matching.findIndex(({ result }) => goalAcceptedResultRef(result.runId) === input.cursor) + 1 : 0;
+  const combined = [
+    ...assets,
+    ...boundedGoalResultPage(acceptedResults, 0, acceptedResults.length),
+  ];
+  const offset = input.cursor ? combined.findIndex((result) => result.ref === input.cursor) + 1 : 0;
   if (input.cursor && offset === 0) {
     throw new EngineError(ENGINE_ERROR_CODES.VALIDATION_FAILED, "Goal result cursor is invalid or stale");
   }
-  const results = boundedGoalResultPage(matching, offset, input.limit);
-  const hasMore = offset + results.length < matching.length;
+  const results = combined.slice(offset, offset + input.limit);
+  const hasMore = offset + results.length < combined.length;
   return {
     linked: true,
     goal: { title: goal.title },

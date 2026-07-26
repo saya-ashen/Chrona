@@ -163,6 +163,74 @@ describe("GoalAssetWorkbench", () => {
     await vi.advanceTimersByTimeAsync(800);
     expect(mocks.saveGoalAssetDraft).not.toHaveBeenCalled();
   });
+  it("opens a structured deliverable as its linked Workbench asset", async () => {
+    const content = {
+      format: "chrona-json-render",
+      schemaVersion: 1,
+      catalogVersion: "1.0.0",
+      summary: "Guide ready",
+      spec: {
+        root: "deliverable",
+        elements: {
+          deliverable: {
+            type: "ResultDeliverable",
+            props: {
+              title: "Chinese guide",
+              summary: "Primary guide",
+              role: "primary",
+              kind: "document",
+              formatLabel: "Markdown",
+              path: "GF0364A5F97C1D",
+              contentPreview: "# Guide preview",
+            },
+          },
+        },
+      },
+      artifactRefs: [{
+        ref: "GF0364A5F97C1D",
+        title: "guide.md",
+        mimeType: "text/markdown",
+        size: 100,
+        checksum: "checksum",
+      }],
+    };
+    const structured = asset("structured", "Structured result", content, 1, "structured_result");
+    structured.linkedAssets = [{ ref: "GF0364A5F97C1D", assetId: "guide" }];
+    const guide = asset("guide", "Chinese guide", "# Full guide");
+    const router = renderWorkbench(
+      [structured, guide],
+      "/goals/goal-1?section=workbench&asset=structured",
+    );
+
+    const open = await screen.findByRole("link", { name: "Open asset" });
+    expect(screen.queryByRole("button", { name: "Preview" })).not.toBeInTheDocument();
+    await userEvent.click(open);
+    await waitFor(() => expect(router.state.location.search).toContain("asset=guide"));
+    expect(await screen.findByRole("dialog")).toHaveTextContent("Chinese guide");
+  });
+
+  it("keeps MIME metadata internal when the asset type is already shown", async () => {
+    const structured = asset(
+      "structured-metadata",
+      "Structured result",
+      { format: "chrona-json-render" },
+      1,
+      "structured_result",
+    );
+    structured.versions[0]!.mimeType = "application/vnd.chrona.structured-result+json";
+    renderWorkbench(
+      [structured],
+      "/goals/goal-1?section=workbench&asset=structured-metadata",
+    );
+
+    expect((await screen.findAllByText("Structured results")).length).toBeGreaterThan(0);
+    expect(screen.queryByText("MIME type")).not.toBeInTheDocument();
+    expect(
+      screen.queryByText("application/vnd.chrona.structured-result+json"),
+    ).not.toBeInTheDocument();
+    expect(screen.getByText("Updated")).toBeInTheDocument();
+  });
+
   it("restores selected asset and filters from the URL", async () => {
     const first = asset("first", "First document", "First content");
     const second = asset("second", "Second document", "Second content", 2);

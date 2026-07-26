@@ -248,6 +248,15 @@ describe("node runtime refs", () => {
             summary: "Candidate prefers LLM agents and tool use.",
             artifactCount: 1,
           }],
+          assets: [{
+            ref: "GA123456ABCDEF",
+            label: "Current guide",
+            kind: "document",
+            role: "working_document",
+            version: 2,
+            updatedAt: "2026-07-25T11:00:00.000Z",
+            content: "Current approved content",
+          }],
         },
       },
     });
@@ -269,6 +278,15 @@ describe("node runtime refs", () => {
       acceptedAt: "2026-07-24T10:00:00.000Z",
       summary: "Candidate prefers LLM agents and tool use.",
       artifactCount: 1,
+    }]);
+    expect(input.context.goalAssets).toEqual([{
+      ref: "GA123456ABCDEF",
+      label: "Current guide",
+      kind: "document",
+      role: "working_document",
+      version: 2,
+      updatedAt: "2026-07-25T11:00:00.000Z",
+      content: "Current approved content",
     }]);
     expect(JSON.stringify(input)).not.toContain("task-real-goal-context");
   });

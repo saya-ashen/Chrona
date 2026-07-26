@@ -5,6 +5,7 @@ import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
 
 const GOAL_CONTEXT_RESULT_LIMIT = 8;
 const GOAL_CONTEXT_SUMMARY_LIMIT = 400;
+const GOAL_CONTEXT_ASSET_CONTENT_LIMIT = 2_000;
 
 type GoalContextClient = Prisma.TransactionClient | typeof db;
 
@@ -22,6 +23,35 @@ function boundedText(value: string, limit: number) {
 
 export function goalAcceptedResultRef(runId: string) {
   return `GR${createHash("sha256").update(runId).digest("hex").slice(0, 12).toUpperCase()}`;
+}
+
+export function goalAssetRef(assetId: string) {
+  return `GA${createHash("sha256").update(assetId).digest("hex").slice(0, 12).toUpperCase()}`;
+}
+
+function formalAssetText(content: unknown) {
+  if (typeof content === "string") return content;
+  const value = record(content);
+  if (value?.format === "chrona-json-render" && record(value.spec)) {
+    return extractAcceptedResultText(value.spec);
+  }
+  return JSON.stringify(content);
+}
+
+function formalAssetCatalog(goal: NonNullable<Awaited<ReturnType<typeof loadGoalContext>>>) {
+  return goal.assets.map((asset) => {
+    const version = asset.versions[0];
+    const content = version ? formalAssetText(version.content) : asset.currentArtifact.contentPreview ?? "";
+    return {
+      ref: goalAssetRef(asset.id),
+      label: asset.label,
+      kind: asset.kind,
+      role: asset.role,
+      version: version?.version ?? null,
+      updatedAt: asset.updatedAt.toISOString(),
+      content: boundedText(content, GOAL_CONTEXT_ASSET_CONTENT_LIMIT),
+    };
+  });
 }
 
 function planOutputSpec(value: unknown) {
@@ -73,6 +103,24 @@ function loadGoalContext(goalId: string, client: GoalContextClient) {
       title: true,
       description: true,
       operationalBrief: true,
+      assets: {
+        where: { status: "Approved", archivedAt: null },
+        orderBy: [{ updatedAt: "desc" as const }, { id: "asc" as const }],
+        take: GOAL_CONTEXT_RESULT_LIMIT,
+        select: {
+          id: true,
+          label: true,
+          kind: true,
+          role: true,
+          updatedAt: true,
+          currentArtifact: { select: { contentPreview: true } },
+          versions: {
+            orderBy: { version: "desc" as const },
+            take: 1,
+            select: { version: true, content: true },
+          },
+        },
+      },
       tasks: {
         orderBy: [{ updatedAt: "desc" as const }, { id: "asc" as const }],
         select: {
@@ -122,5 +170,6 @@ export async function buildAutomaticGoalTaskContext(
       capturedAt: new Date().toISOString(),
     },
     acceptedResults: acceptedResultCatalog(goal),
+    assets: formalAssetCatalog(goal),
   })) as Prisma.InputJsonObject;
 }

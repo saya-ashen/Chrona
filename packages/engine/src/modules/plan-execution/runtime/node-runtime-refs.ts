@@ -32,6 +32,15 @@ type RuntimeGoalContext = {
     summary: string;
     artifactCount: number;
   }>;
+  assets?: Array<{
+    ref: string;
+    label: string;
+    kind: string;
+    role: string;
+    version: number | null;
+    updatedAt: string;
+    content: string;
+  }>;
 };
 
 export type NodeRuntimePlanContext = NodeRuntimeInput["context"]["plan"] & {
@@ -205,6 +214,9 @@ function compactPreviousResults(input: {
     ...(goalContext
       ? {
           goal: goalContext.goal,
+          ...(goalContext.assets?.length
+            ? { goalAssets: goalContext.assets }
+            : {}),
           ...(goalContext.acceptedResults.length > 0
             ? { acceptedGoalResults: goalContext.acceptedResults }
             : {}),

@@ -211,6 +211,15 @@ export interface NodeRuntimeInput {
       summary: string;
       artifactCount: number;
     }>;
+    goalAssets?: Array<{
+      ref: string;
+      label: string;
+      kind: string;
+      role: string;
+      version: number | null;
+      updatedAt: string;
+      content: string;
+    }>;
     run?: {
       planningPrompt?: string;
       startPrompt?: string;

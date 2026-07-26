@@ -1564,6 +1564,7 @@
       "copyArtifactPath": "复制路径",
       "artifactPathCopied": "已复制",
       "downloadArtifact": "下载",
+      "openWorkbenchAsset": "打开资产",
       "resultOverviewLabel": "结果概览",
       "resultReadinessLabel": "可用状态",
       "resultReadinessReady": "可直接使用",

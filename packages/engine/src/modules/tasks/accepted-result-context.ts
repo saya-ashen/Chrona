@@ -86,6 +86,24 @@ function tableText(props: Record<string, unknown>) {
   return [labels.join(" | "), ...body].filter(Boolean).join("\n");
 }
 
+function actionPlanText(props: Record<string, unknown>) {
+  const phases = Array.isArray(props.phases) ? props.phases : [];
+  return phases
+    .map((value) => {
+      const phase = recordValue(value);
+      if (!phase) return "";
+      const actions = Array.isArray(phase.actions)
+        ? phase.actions.map(textValue).filter(Boolean)
+        : [];
+      return [phase.title, phase.timeframe, ...actions]
+        .map(textValue)
+        .filter(Boolean)
+        .join("\n");
+    })
+    .filter(Boolean)
+    .join("\n");
+}
+
 export function extractAcceptedResultText(spec: unknown) {
   const document = recordValue(spec);
   const elements = recordValue(document?.elements);
@@ -108,6 +126,63 @@ export function extractAcceptedResultText(spec: unknown) {
           props.summary,
           props.description,
           props.outcome,
+        ]
+          .map(textValue)
+          .filter(Boolean)
+          .join("\n");
+        break;
+      case "ResultHero":
+        text = [
+          props.title,
+          props.summary,
+          props.readinessSummary,
+          ...(Array.isArray(props.metrics)
+            ? props.metrics.map((value) => {
+                const metric = recordValue(value);
+                return metric
+                  ? [metric.label, metric.value].map(textValue).filter(Boolean).join(": ")
+                  : "";
+              })
+            : []),
+        ]
+          .map(textValue)
+          .filter(Boolean)
+          .join("\n");
+        break;
+      case "ResultDeliverable":
+        text = [
+          props.title,
+          props.summary,
+          props.formatLabel,
+          props.displayPath ?? props.path,
+          props.contentPreview,
+        ]
+          .map(textValue)
+          .filter(Boolean)
+          .join("\n");
+        break;
+      case "ResultInsight":
+        text = [
+          props.title,
+          props.summary,
+          ...(Array.isArray(props.points) ? props.points : []),
+        ]
+          .map(textValue)
+          .filter(Boolean)
+          .join("\n");
+        break;
+      case "ResultActionPlan":
+        text = [props.title, props.summary, actionPlanText(props)]
+          .map(textValue)
+          .filter(Boolean)
+          .join("\n");
+        break;
+      case "ResultCaveats":
+      case "ResultEvidence":
+        text = [
+          props.title,
+          props.summary,
+          ...(Array.isArray(props.items) ? props.items : []),
         ]
           .map(textValue)
           .filter(Boolean)

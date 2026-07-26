@@ -118,6 +118,38 @@ function artifactRef(artifact: {
   };
 }
 
+function artifactIdForStructuredRef(
+  ref: string,
+  artifacts: Array<{ id: string; uri: string; metadata: unknown }>,
+) {
+  return artifacts.find((artifact) => artifactRef({
+    ...artifact,
+    title: "",
+  })?.ref === ref)?.id ?? null;
+}
+
+function referencedArtifactIds(
+  content: StructuredResultAssetContent,
+  artifacts: Array<{ id: string; uri: string; metadata: unknown }>,
+) {
+  const refs = new Set<string>();
+  for (const element of Object.values(content.spec.elements)) {
+    if (
+      element.type !== "FileRef" &&
+      element.type !== "FileView" &&
+      element.type !== "ResultDeliverable" &&
+      element.type !== "Table"
+    ) continue;
+    const props = record(element.props);
+    if (typeof props?.path === "string" && /^GF[0-9A-F]{12}$/.test(props.path)) {
+      refs.add(props.path);
+    }
+  }
+  return [...refs]
+    .map((ref) => artifactIdForStructuredRef(ref, artifacts))
+    .filter((id): id is string => id !== null);
+}
+
 function normalizedGeneratedUri(value: string) {
   if (value.startsWith("generated://")) return value;
   const root = path.resolve(getChronaGeneratedFilesDir());
@@ -211,6 +243,40 @@ async function buildStructuredResultContent(input: {
   };
 }
 
+async function linkedAssetsForStructuredResult(asset: {
+  workspaceId: string;
+  goalId: string;
+  versions: Array<{ content: unknown }>;
+  sourceArtifact: { taskId: string; runId: string };
+}) {
+  const content = asset.versions[0]?.content;
+  if (!isStructuredResultAssetContent(content)) return [];
+  const refs = new Set(content.artifactRefs.map((artifact) => artifact.ref));
+  if (refs.size === 0) return [];
+  const sourceArtifacts = await db.artifact.findMany({
+    where: {
+      workspaceId: asset.workspaceId,
+      taskId: asset.sourceArtifact.taskId,
+      runId: asset.sourceArtifact.runId,
+      sourceGoalAssets: { some: { goalId: asset.goalId, archivedAt: null } },
+    },
+    include: {
+      sourceGoalAssets: {
+        where: { goalId: asset.goalId, archivedAt: null },
+        select: { id: true },
+        take: 1,
+      },
+    },
+  });
+  return sourceArtifacts.flatMap((artifact) => {
+    const identity = artifactRef(artifact);
+    const linkedAsset = artifact.sourceGoalAssets[0];
+    return identity && linkedAsset && refs.has(identity.ref)
+      ? [{ ref: identity.ref, assetId: linkedAsset.id }]
+      : [];
+  });
+}
+
 
 function artifactContent(artifact: { uri: string; contentPreview: string | null; metadata: unknown }) {
   const metadata = record(artifact.metadata);
@@ -239,9 +305,10 @@ async function assetOrThrow(goalId: string, assetId: string, workspaceId?: strin
   return asset;
 }
 
-function assetReadModel(asset: Awaited<ReturnType<typeof assetOrThrow>>) {
+async function assetReadModel(asset: Awaited<ReturnType<typeof assetOrThrow>>) {
   return {
     ...asset,
+    linkedAssets: await linkedAssetsForStructuredResult(asset),
     archivedAt: asset.archivedAt?.toISOString() ?? null,
     lastOpenedAt: asset.lastOpenedAt?.toISOString() ?? null,
     createdAt: asset.createdAt.toISOString(),
@@ -313,9 +380,17 @@ export async function listGoalAssets(input: {
   });
   for (const asset of assets) if (asset.versions.length === 0) await ensureAssetVersion(asset.id);
   const hydrated = await Promise.all(assets.map((asset) => assetOrThrow(input.goalId, asset.id, input.workspaceId)));
+  const readModels = await Promise.all(hydrated.map(assetReadModel));
+  const recentIds = new Set(
+    hydrated
+      .filter((asset) => asset.lastOpenedAt)
+      .sort((a, b) => (b.lastOpenedAt?.getTime() ?? 0) - (a.lastOpenedAt?.getTime() ?? 0))
+      .slice(0, 6)
+      .map((asset) => asset.id),
+  );
   return {
-    assets: hydrated.map(assetReadModel),
-    recent: hydrated.filter((asset) => asset.lastOpenedAt).sort((a, b) => (b.lastOpenedAt?.getTime() ?? 0) - (a.lastOpenedAt?.getTime() ?? 0)).slice(0, 6).map(assetReadModel),
+    assets: readModels,
+    recent: readModels.filter((asset) => recentIds.has(asset.id)),
   };
 }
 
@@ -470,6 +545,9 @@ export async function splitAcceptedResultIntoCandidates(input: { goalId: string;
   const run = task.runs[0];
   if (!run) throw new EngineError(ENGINE_ERROR_CODES.INVALID_TASK_STATE, "Accepted run is unavailable");
   const acceptedResult = await getAcceptedResultContext(task.id);
+  const resultArtifacts = run.artifacts.filter((artifact) =>
+    record(artifact.metadata)?.derivedFromAcceptedResult !== true
+  );
   if (acceptedResult.spec) {
     const artifacts = await db.artifact.findMany({
       where: { taskId: task.id, runId: run.id },
@@ -507,9 +585,15 @@ export async function splitAcceptedResultIntoCandidates(input: { goalId: string;
       sourceRevision,
       content,
     });
+    const referencedIds = new Set(referencedArtifactIds(content, artifacts));
+    await Promise.all(
+      resultArtifacts
+        .filter((artifact) => referencedIds.has(artifact.id))
+        .map((artifact) => upsertInboxCandidate({ goal, task, runId: run.id, artifact })),
+    );
   } else {
-    const candidates = run.artifacts.length > 0
-      ? run.artifacts
+    const candidates = resultArtifacts.length > 0
+      ? resultArtifacts
       : [{ id: null, title: task.title, type: "summary", uri: "accepted-result", contentPreview: acceptedResult.summary, metadata: null }];
     await Promise.all(candidates.map((artifact) => upsertInboxCandidate({ goal, task, runId: run.id, artifact })));
   }
@@ -533,6 +617,83 @@ export async function listGoalInbox(input: { goalId: string }) {
     },
   });
   return { candidates: candidates.map((candidate) => ({ ...candidate, createdAt: candidate.createdAt.toISOString(), updatedAt: candidate.updatedAt.toISOString() })) };
+}
+
+async function createLinkedFileAssets(
+  tx: Prisma.TransactionClient,
+  candidate: {
+    workspaceId: string;
+    goalId: string;
+    sourceTaskId: string;
+    sourceRunId: string;
+    content: unknown;
+  },
+) {
+  if (!isStructuredResultAssetContent(candidate.content)) return [];
+  const refs = new Set(candidate.content.artifactRefs.map((artifact) => artifact.ref));
+  if (refs.size === 0) return [];
+  const artifacts = await tx.artifact.findMany({
+    where: {
+      workspaceId: candidate.workspaceId,
+      taskId: candidate.sourceTaskId,
+      runId: candidate.sourceRunId,
+    },
+  });
+  const linked: Array<{ ref: string; assetId: string }> = [];
+  for (const artifact of artifacts) {
+    const artifactIdentity = artifactRef(artifact);
+    if (!artifactIdentity || !refs.has(artifactIdentity.ref)) continue;
+    const content = artifactContent(artifact);
+    const existing = await tx.goalAsset.findUnique({
+      where: {
+        goalId_sourceArtifactId: {
+          goalId: candidate.goalId,
+          sourceArtifactId: artifact.id,
+        },
+      },
+      include: { versions: { orderBy: { version: "desc" }, take: 1 } },
+    });
+    if (existing) {
+      linked.push({ ref: artifactIdentity.ref, assetId: existing.id });
+      continue;
+    }
+    const asset = await tx.goalAsset.create({
+      data: {
+        workspaceId: candidate.workspaceId,
+        goalId: candidate.goalId,
+        sourceArtifactId: artifact.id,
+        currentArtifactId: artifact.id,
+        kind: artifactKind(artifact),
+        role: "working_document",
+        status: "Approved",
+        label: artifact.title,
+      },
+    });
+    const metadata = record(artifact.metadata);
+    await tx.goalAssetVersion.create({
+      data: {
+        workspaceId: candidate.workspaceId,
+        goalId: candidate.goalId,
+        assetId: asset.id,
+        artifactId: artifact.id,
+        version: 1,
+        source: "inbox",
+        content: content as Prisma.InputJsonValue,
+        contentHash: hash(content),
+        mimeType: typeof metadata?.mimeType === "string" ? metadata.mimeType : undefined,
+        originalFilename: typeof metadata?.filename === "string" ? metadata.filename : artifact.title,
+        sourceTaskId: candidate.sourceTaskId,
+        sourceRunId: candidate.sourceRunId,
+        sourceResultId: candidate.sourceRunId,
+        selector: { structuredResultRef: artifactIdentity.ref },
+        authorType: "user",
+        authorId: "server-action",
+        changeSummary: "Promoted file referenced by accepted structured result",
+      },
+    });
+    linked.push({ ref: artifactIdentity.ref, assetId: asset.id });
+  }
+  return linked;
 }
 
 export async function resolveGoalInboxCandidate(input: { goalId: string; candidateId: string; command: ResolveGoalInboxCandidateRequest }) {
@@ -570,9 +731,24 @@ export async function resolveGoalInboxCandidate(input: { goalId: string; candida
           });
       const sourceArtifactId = candidate.sourceArtifactId ?? sourceArtifact?.id;
       if (!sourceArtifactId) throw new EngineError(ENGINE_ERROR_CODES.VALIDATION_FAILED, "Inbox candidate source artifact is unavailable");
-      const asset = await tx.goalAsset.create({ data: { workspaceId: candidate.workspaceId, goalId: candidate.goalId, sourceArtifactId, currentArtifactId: sourceArtifactId, kind: candidate.kind, role: "working_document", status: "Approved", label: command.label } });
-      assetId = asset.id;
-      await tx.goalAssetVersion.create({ data: { workspaceId: candidate.workspaceId, goalId: candidate.goalId, assetId: asset.id, artifactId: sourceArtifactId, version: 1, source: "inbox", content: candidate.content as Prisma.InputJsonValue, contentHash: candidate.contentHash, mimeType: candidate.kind === "structured_result" ? "application/vnd.chrona.structured-result+json" : record(candidate.sourceArtifact?.metadata)?.mimeType as string | undefined, originalFilename: record(candidate.sourceArtifact?.metadata)?.filename as string | undefined, sourceTaskId: candidate.sourceTaskId, sourceRunId: candidate.sourceRunId, sourceResultId: candidate.sourceRunId, selector: candidate.selector as Prisma.InputJsonValue, authorType: "user", authorId: "server-action", changeSummary: candidate.changeSummary } });
+      const existing = await tx.goalAsset.findUnique({
+        where: {
+          goalId_sourceArtifactId: {
+            goalId: candidate.goalId,
+            sourceArtifactId,
+          },
+        },
+      });
+      if (existing) {
+        if (existing.kind !== candidate.kind) {
+          throw new EngineError(ENGINE_ERROR_CODES.VALIDATION_FAILED, "Existing linked asset type does not match the Inbox candidate");
+        }
+        assetId = existing.id;
+      } else {
+        const asset = await tx.goalAsset.create({ data: { workspaceId: candidate.workspaceId, goalId: candidate.goalId, sourceArtifactId, currentArtifactId: sourceArtifactId, kind: candidate.kind, role: "working_document", status: "Approved", label: command.label } });
+        assetId = asset.id;
+        await tx.goalAssetVersion.create({ data: { workspaceId: candidate.workspaceId, goalId: candidate.goalId, assetId: asset.id, artifactId: sourceArtifactId, version: 1, source: "inbox", content: candidate.content as Prisma.InputJsonValue, contentHash: candidate.contentHash, mimeType: candidate.kind === "structured_result" ? "application/vnd.chrona.structured-result+json" : record(candidate.sourceArtifact?.metadata)?.mimeType as string | undefined, originalFilename: record(candidate.sourceArtifact?.metadata)?.filename as string | undefined, sourceTaskId: candidate.sourceTaskId, sourceRunId: candidate.sourceRunId, sourceResultId: candidate.sourceRunId, selector: candidate.selector as Prisma.InputJsonValue, authorType: "user", authorId: "server-action", changeSummary: candidate.changeSummary } });
+      }
     } else {
       const target = await tx.goalAsset.findFirst({ where: { id: command.targetAssetId, goalId: candidate.goalId, workspaceId: candidate.workspaceId, archivedAt: null } });
       if (!target) throw new EngineError(ENGINE_ERROR_CODES.VALIDATION_FAILED, "Target asset does not belong to this Goal");
@@ -583,9 +759,10 @@ export async function resolveGoalInboxCandidate(input: { goalId: string; candida
       await tx.goalAssetVersion.create({ data: { workspaceId: candidate.workspaceId, goalId: candidate.goalId, assetId: target.id, artifactId: candidate.sourceArtifactId, version: current.version + 1, parentVersionId: current.id, source: "inbox", content: candidate.content as Prisma.InputJsonValue, contentHash: candidate.contentHash, mimeType: candidate.kind === "structured_result" ? "application/vnd.chrona.structured-result+json" : record(candidate.sourceArtifact?.metadata)?.mimeType as string | undefined, originalFilename: record(candidate.sourceArtifact?.metadata)?.filename as string | undefined, sourceTaskId: candidate.sourceTaskId, sourceRunId: candidate.sourceRunId, sourceResultId: candidate.sourceRunId, selector: candidate.selector as Prisma.InputJsonValue, authorType: "user", authorId: "server-action", changeSummary: command.changeSummary } });
       assetId = target.id;
     }
+    const linkedAssets = await createLinkedFileAssets(tx, candidate);
     const resolved = await tx.goalInboxCandidate.updateMany({ where: { id: candidate.id, status: "Pending" }, data: { status: "Accepted", resolvedAt: new Date() } });
     if (resolved.count !== 1) throw new EngineError(ENGINE_ERROR_CODES.CONFLICT, "Inbox candidate was already resolved");
-    return { assetId };
+    return { assetId, linkedAssets };
   });
 }
 

@@ -189,7 +189,7 @@ describe("Goal Workbench API", () => {
     spec.elements.summary = { type: "FileRef", props: { path: csvPath, title: "destination-shortlist.csv" } };
     stored.mutableGraph.planOutput.finalizedResult.spec = spec;
     const content = await Bun.file(csvPath).arrayBuffer();
-    await db.artifact.create({
+    const artifact = await db.artifact.create({
       data: {
         workspaceId: seeded.workspaceId,
         taskId: seeded.task.id,
@@ -209,20 +209,49 @@ describe("Goal Workbench API", () => {
     const app = createApiRouter(createChronaEngine());
     const extracted = await post(app, `/goals/${seeded.goal.id}/inbox/extract`, { taskId: seeded.task.id, runId: seeded.run.id });
     expect(extracted.status).toBe(200);
-    const { candidates } = await extracted.json() as { candidates: Array<{ id: string; content: { artifactRefs: Array<{ ref: string }> } }> };
-    const serialized = JSON.stringify(candidates[0]!.content);
+    const { candidates } = await extracted.json() as {
+      candidates: Array<{
+        id: string;
+        kind: string;
+        sourceArtifact: { id: string } | null;
+        content: { artifactRefs?: Array<{ ref: string }> };
+      }>;
+    };
+    expect(candidates).toHaveLength(2);
+    const structured = candidates.find((candidate) => candidate.kind === "structured_result")!;
+    const fileCandidate = candidates.find((candidate) => candidate.sourceArtifact?.id === artifact.id)!;
+    const serialized = JSON.stringify(structured.content);
     expect(serialized).toContain("GF");
     expect(serialized).not.toContain(csvPath);
     expect(serialized).not.toContain(seeded.task.id);
-    const artifact = await db.artifact.findFirstOrThrow({ where: { runId: seeded.run.id, title: "destination-shortlist.csv" } });
     expect(artifact.uri).toMatch(/^generated:\/\/tests\//);
     expect(artifact.metadata).toMatchObject({ mimeType: "text/csv", size: expect.any(Number), checksum: expect.any(String) });
-    const resolved = await post(app, `/goals/${seeded.goal.id}/inbox/${candidates[0]!.id}/resolve`, { workspaceId: seeded.workspaceId, action: "create_asset", label: "Selected destination" });
-    const { assetId } = await resolved.json() as { assetId: string };
+    const resolved = await post(app, `/goals/${seeded.goal.id}/inbox/${structured.id}/resolve`, { workspaceId: seeded.workspaceId, action: "create_asset", label: "Selected destination" });
+    expect(resolved.status).toBe(200);
+    const { assetId, linkedAssets } = await resolved.json() as {
+      assetId: string;
+      linkedAssets: Array<{ ref: string; assetId: string }>;
+    };
+    expect(linkedAssets).toHaveLength(1);
+    expect(linkedAssets[0]!.ref).toBe(structured.content.artifactRefs![0]!.ref);
+    const linkedAsset = await db.goalAsset.findUniqueOrThrow({
+      where: { goalId_sourceArtifactId: { goalId: seeded.goal.id, sourceArtifactId: artifact.id } },
+      include: { versions: true },
+    });
+    expect(linkedAsset.id).toBe(linkedAssets[0]!.assetId);
+    expect(linkedAsset.kind).toBe("file");
+    expect(linkedAsset.versions).toHaveLength(1);
+    const assetResponse = await app.request(`/goals/${seeded.goal.id}/assets/${assetId}`);
+    expect(assetResponse.status).toBe(200);
+    expect(await assetResponse.json()).toMatchObject({
+      linkedAssets: [{ ref: structured.content.artifactRefs![0]!.ref, assetId: linkedAsset.id }],
+    });
     const version = await db.goalAssetVersion.findFirstOrThrow({ where: { assetId } });
-    const download = await app.request(`/goals/${seeded.goal.id}/assets/${assetId}/artifacts/${candidates[0]!.content.artifactRefs[0]!.ref}/download?versionId=${version.id}`);
+    const download = await app.request(`/goals/${seeded.goal.id}/assets/${assetId}/artifacts/${structured.content.artifactRefs![0]!.ref}/download?versionId=${version.id}`);
     expect(download.status).toBe(200);
     expect(await download.text()).toContain("日照＋临沂沂蒙山");
+    await post(app, `/goals/${seeded.goal.id}/inbox/${fileCandidate.id}/resolve`, { workspaceId: seeded.workspaceId, action: "create_asset", label: fileCandidate.sourceArtifact!.id });
+    expect(await db.goalAsset.count({ where: { goalId: seeded.goal.id, sourceArtifactId: artifact.id } })).toBe(1);
   });
 
   it("accepts file-backed tables without persisting task-scoped download links", async () => {

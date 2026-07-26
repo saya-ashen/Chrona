@@ -64,7 +64,7 @@ const externalTools = {
   chrona_goal_results_read: {
     internalName: "chrona.goal.results.read",
     title: "Chrona Goal Results Read",
-    description: "Search accepted results from the current Task's Goal. Chrona resolves Goal scope from the session; use returned refs for AI-visible provenance.",
+    description: "Search current approved Goal assets and immutable accepted-result history for the current Task's Goal. Chrona resolves Goal scope from the session; use returned refs for AI-visible provenance.",
     inputSchema: publicToolSchema(chronaPublicToolPayloadSchemas["chrona.goal.results.read"]),
   },
   chrona_plan_read: {

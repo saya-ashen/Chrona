@@ -44,6 +44,7 @@ export type GoalAssetWorkbenchData = {
   drafts: GoalAssetDraftData[];
   submissions: Array<{ id: string; versionId: string; content: unknown; createdAt: string }>;
   jobs: GoalAssetJobData[];
+  linkedAssets?: Array<{ ref: string; assetId: string }>;
 };
 export type GoalAssetOwnershipProposalData = {
   id: string;

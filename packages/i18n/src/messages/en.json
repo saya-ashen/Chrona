@@ -1564,6 +1564,7 @@
       "copyArtifactPath": "Copy path",
       "artifactPathCopied": "Copied",
       "downloadArtifact": "Download",
+      "openWorkbenchAsset": "Open asset",
       "resultOverviewLabel": "Result overview",
       "resultReadinessLabel": "Readiness",
       "resultReadinessReady": "Ready",
