@@ -285,6 +285,9 @@ describe("workspace result registry", () => {
     fireEvent.click(screen.getByRole("button", { name: "Preview" }));
     const preview = screen.getByRole("dialog");
     expect(preview).toHaveAttribute("data-result-content-preview");
+    expect(preview).toHaveClass("max-w-[70rem]!");
+    expect(preview).toHaveClass("rounded-2xl");
+    expect(preview).not.toHaveClass("w-screen!");
     expect(within(preview).getByRole("heading", { name: "Operating guide" })).toBeInTheDocument();
     expect(within(preview).getByText("Content preview")).toBeInTheDocument();
     expect(within(preview).getByRole("heading", { name: "Guide" })).toBeInTheDocument();

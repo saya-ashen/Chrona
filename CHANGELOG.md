@@ -5,7 +5,7 @@
 ### Fixed
 - Aligned result-finalizer provider schemas with Chrona's strict per-component contracts, surfaced finalization failures with retry controls, prevented acceptance of failed finalizations, and removed duplicate artifact fallback lists.
 - Compacted finalized-result readiness into the primary summary flow and corrected light-theme warning text contrast across result caveats and warning surfaces.
-- Moved finalized-result content previews into a full-viewport Workbench-style Sheet, promoted the key strategy into a single editorial feature surface, and reduced evidence/source boundaries to a compact collapsible footnote.
+- Moved finalized-result content previews into a bounded Workbench-style Sheet dialog, promoted the key strategy into a single editorial feature surface, and reduced evidence/source boundaries to a compact collapsible footnote.
 
 ## 0.1.9 — Alpha public-readiness polish
 

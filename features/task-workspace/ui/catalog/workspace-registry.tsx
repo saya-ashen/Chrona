@@ -837,7 +837,7 @@ function ResultDeliverable({ props }: { props: Record<string, unknown> }) {
           <SheetContent
             side="right"
             showCloseButton={false}
-            className="flex w-screen! max-w-none! flex-col gap-0 overflow-hidden p-0"
+            className="inset-y-4! right-4! flex h-auto! w-[calc(100vw-2rem)]! max-w-[70rem]! flex-col gap-0 overflow-hidden rounded-2xl border p-0 shadow-2xl sm:inset-y-6! sm:right-6! sm:w-[calc(100vw-3rem)]!"
             data-result-content-preview
           >
             <SheetHeader className="shrink-0 border-b px-4 py-3 sm:px-5">
