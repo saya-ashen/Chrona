@@ -221,6 +221,9 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
     handleAcceptResult,
     isAcceptingResult,
     acceptResultError,
+    handleRetryFinalization,
+    isRetryingFinalization,
+    finalizationRetryError,
     handleGeneratePlanFromHeader,
     handleStopPlanGeneration,
   } = useTaskWorkspacePlanState(task, refreshWorkspace, workspaceEvents);
@@ -454,6 +457,9 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
         onAcceptResult={handleAcceptResult}
         isAcceptingResult={isAcceptingResult}
         acceptResultError={acceptResultError}
+        onRetryFinalization={handleRetryFinalization}
+        isRetryingFinalization={isRetryingFinalization}
+        finalizationRetryError={finalizationRetryError}
         createGoalAction={goalPromotionAction}
       />
     </div>

@@ -148,6 +148,50 @@ describe("TaskWorkspaceExecutionOverview", () => {
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
+  it("shows finalization failure with retry instead of validated-result labeling", async () => {
+    const user = userEvent.setup();
+    const retry = vi.fn();
+    const view = createTaskWorkspaceExecutionConsoleView(
+      executionMonitoringWorkspaceFixtures.artifactPresent,
+    );
+
+    renderOverview(view, {
+      currentExecution: {
+        status: "completed",
+        planOutput: {
+          manifest: {
+            schemaVersion: 1,
+            sourceRevision: 3,
+            outcome: { title: "", summary: "" },
+            readiness: { status: "partial", summary: "" },
+            sections: [], deliverables: [], findings: [], decisions: [],
+            caveats: [], nextActions: [], evidence: [],
+          },
+          finalizedResult: null,
+          revision: 3,
+          updatedAt: null,
+          updatedByNodeId: null,
+          finalization: {
+            status: "Failed",
+            sourceRevision: 3,
+            attempt: 1,
+            failedAt: "2026-07-26T00:00:00.000Z",
+            errorCode: "RESULT_FINALIZATION_FAILED",
+            errorMessage: "Invalid result schema",
+          },
+        },
+      },
+      onRetryFinalization: retry,
+    });
+
+    expect(screen.getByRole("heading", { name: "Final result unavailable" })).toBeInTheDocument();
+    expect(screen.getByText("Finalization failed")).toBeInTheDocument();
+    expect(screen.queryByText("AI generated")).not.toBeInTheDocument();
+    expect(screen.queryByText("Validated output from task execution.")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Retry finalization" }));
+    expect(retry).toHaveBeenCalledOnce();
+  });
+
   it("keeps completed transcript prominent without competing with the result", async () => {
     const user = userEvent.setup();
     const view = createTaskWorkspaceExecutionConsoleView(
@@ -159,6 +203,29 @@ describe("TaskWorkspaceExecutionOverview", () => {
           now: nowDocument(),
           output: nowDocument("Output"),
           trail: nowDocument("Trail"),
+        },
+      },
+      currentExecution: {
+        status: "completed",
+        planOutput: {
+          manifest: {
+            schemaVersion: 1,
+            sourceRevision: 1,
+            outcome: { title: "", summary: "" },
+            readiness: { status: "ready", summary: "" },
+            sections: [], deliverables: [], findings: [], decisions: [],
+            caveats: [], nextActions: [], evidence: [],
+          },
+          finalizedResult: null,
+          revision: 1,
+          updatedAt: null,
+          updatedByNodeId: null,
+          finalization: {
+            status: "Ready",
+            sourceRevision: 1,
+            attempt: 1,
+            finalizedAt: "2026-07-26T00:00:00.000Z",
+          },
         },
       },
     });
@@ -1253,6 +1320,46 @@ describe("TaskWorkspaceExecutionOverview", () => {
       screen.getAllByText(".chrona/outputs/node-1/log.txt").length,
     ).toBeGreaterThan(0);
     expect(screen.getByRole("button", { name: /Preview/ })).toBeInTheDocument();
+  });
+
+  it("does not append artifacts when the API output already owns the artifact list", () => {
+    const view = createTaskWorkspaceExecutionConsoleView(
+      executionMonitoringWorkspaceFixtures.artifactPresent,
+    );
+    const apiArtifactsSpec: UiDocument = {
+      root: "root",
+      elements: {
+        root: { type: "Stack", props: { gap: "sm" }, children: ["artifact-list"] },
+        "artifact-list": {
+          type: "WorkspaceArtifactList",
+          props: { emptyLabel: "No artifacts" },
+          children: ["api-artifact"],
+        },
+        "api-artifact": {
+          type: "WorkspaceArtifactItem",
+          props: { title: "API artifact", type: "file", uri: "artifact://api" },
+        },
+      },
+    };
+
+    const spec = buildCommandCenterOutputTabSpec({
+      latestCompletedNode: view.latestCompletedNode,
+      resultSpec: nowDocument("Result fallback"),
+      artifacts: view.artifacts,
+      apiArtifactsSpec,
+      copy: {},
+    });
+
+    expect(
+      Object.values(spec.elements).filter(
+        (element) => element.type === "WorkspaceArtifactList",
+      ),
+    ).toHaveLength(1);
+    expect(
+      Object.values(spec.elements).filter(
+        (element) => element.type === "WorkspaceArtifactItem",
+      ),
+    ).toHaveLength(1);
   });
 
   it("builds valid output and trail fallback specs", () => {

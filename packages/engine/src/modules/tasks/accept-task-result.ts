@@ -4,6 +4,7 @@ import { publishTaskWorkspaceUpdatedEvent } from "@/modules/projections/task-pro
 import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
 import { activateInternalEvent } from "../triggers/task-triggers";
 import { splitAcceptedResultIntoCandidates } from "../goals/goal-workbench";
+import { getCurrentExecution } from "../plan-execution/use-cases/get-current-execution";
 
 export async function acceptTaskResult(input: { taskId: string }) {
   const task = await db.task.findUniqueOrThrow({
@@ -19,6 +20,17 @@ export async function acceptTaskResult(input: { taskId: string }) {
     throw new EngineError(
       ENGINE_ERROR_CODES.INVALID_TASK_STATE,
       "Only completed runs can be accepted.",
+    );
+  }
+
+  const currentExecution = await getCurrentExecution({ taskId: task.id });
+  if (
+    currentExecution.planOutput &&
+    currentExecution.planOutput.finalization.status !== "Ready"
+  ) {
+    throw new EngineError(
+      ENGINE_ERROR_CODES.INVALID_TASK_STATE,
+      "Only successfully finalized task results can be accepted.",
     );
   }
 

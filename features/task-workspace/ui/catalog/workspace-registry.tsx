@@ -609,19 +609,19 @@ const readinessPresentation = {
   ready: {
     messageKey: "resultReadinessReady",
     fallback: "Ready",
-    className: "border-success/30 bg-success/10 text-success-foreground",
+    className: "border-success/30 bg-success/10 text-success dark:text-success-foreground",
     iconClassName: "bg-success/15 text-success",
   },
   ready_with_caveats: {
     messageKey: "resultReadinessReadyWithCaveats",
     fallback: "Ready with caveats",
-    className: "border-warning/35 bg-warning/10 text-warning-foreground",
+    className: "border-warning/35 bg-warning/10 text-warning dark:text-warning-foreground",
     iconClassName: "bg-warning/15 text-warning",
   },
   partial: {
     messageKey: "resultReadinessPartial",
     fallback: "Partially ready",
-    className: "border-info/30 bg-info/10 text-info-foreground",
+    className: "border-info/30 bg-info/10 text-info dark:text-info-foreground",
     iconClassName: "bg-info/15 text-info",
   },
   blocked: {
@@ -657,7 +657,7 @@ function ResultHero({
   return (
     <section
       aria-label={copy.resultOverviewLabel ?? "Result overview"}
-      className="grid min-w-0 gap-5 overflow-hidden rounded-2xl border border-primary/15 bg-primary-soft/25 p-5 shadow-sm sm:p-6 lg:grid-cols-[minmax(0,1fr)_minmax(15rem,0.34fr)] lg:gap-8"
+      className="min-w-0 overflow-hidden rounded-2xl border border-primary/15 bg-primary-soft/25 p-5 shadow-sm sm:p-6"
     >
       <div className="min-w-0">
         <Badge
@@ -670,47 +670,51 @@ function ResultHero({
           <Check className="size-3.5" aria-hidden />
           {readinessLabel}
         </Badge>
-        <h2 className="max-w-3xl font-heading text-2xl font-semibold leading-tight tracking-[-0.025em] text-foreground sm:text-[1.75rem]">
+        <h2 className="w-full font-heading text-2xl font-semibold leading-tight tracking-[-0.025em] text-foreground sm:text-[1.75rem]">
           {props.title}
         </h2>
-        <p className="mt-3 max-w-3xl text-sm leading-6 text-foreground/75 sm:text-[15px] sm:leading-7">
+        <p className="mt-3 w-full text-sm leading-6 text-foreground/75 sm:text-[15px] sm:leading-7">
           {props.summary}
         </p>
-        {metrics.length > 0 ? (
-          <dl className="mt-6 grid grid-cols-2 gap-x-4 gap-y-4 border-t border-border/60 pt-5 sm:grid-cols-4">
-            {metrics.map((metric) => (
-              <div key={`${metric.label}:${metric.value}`} className="min-w-0">
-                <dd className="truncate font-heading text-xl font-semibold tracking-[-0.02em] text-foreground">
-                  {metric.value}
-                </dd>
-                <dt className="mt-0.5 text-xs leading-4 text-muted-foreground">
-                  {metric.label}
-                </dt>
-              </div>
-            ))}
-          </dl>
-        ) : null}
-      </div>
-      <aside className="rounded-xl border border-border/70 bg-background/85 p-4 shadow-sm lg:self-start">
-        <div
-          className={cn(
-            "flex size-9 items-center justify-center rounded-lg",
-            presentation.iconClassName,
-          )}
-        >
-          {props.readiness === "blocked" ? (
-            <TriangleAlert className="size-4.5" aria-hidden />
-          ) : (
-            <Check className="size-4.5" aria-hidden />
-          )}
+        <div className="mt-5 flex flex-col gap-4 border-t border-border/60 pt-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex min-w-0 items-start gap-3">
+            <span
+              className={cn(
+                "flex size-8 shrink-0 items-center justify-center rounded-lg",
+                presentation.iconClassName,
+              )}
+            >
+              {props.readiness === "blocked" ? (
+                <TriangleAlert className="size-4" aria-hidden />
+              ) : (
+                <Check className="size-4" aria-hidden />
+              )}
+            </span>
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                {copy.resultReadinessLabel ?? "Readiness"}
+              </p>
+              <p className="mt-1 text-sm leading-6 text-foreground/80">
+                {props.readinessSummary}
+              </p>
+            </div>
+          </div>
+          {metrics.length > 0 ? (
+            <dl className="grid shrink-0 grid-cols-2 gap-x-5 gap-y-3 sm:max-w-xl sm:grid-cols-4">
+              {metrics.map((metric) => (
+                <div key={`${metric.label}:${metric.value}`} className="min-w-0">
+                  <dd className="truncate font-heading text-lg font-semibold tracking-[-0.02em] text-foreground">
+                    {metric.value}
+                  </dd>
+                  <dt className="mt-0.5 text-xs leading-4 text-muted-foreground">
+                    {metric.label}
+                  </dt>
+                </div>
+              ))}
+            </dl>
+          ) : null}
         </div>
-        <p className="mt-3 text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
-          {copy.resultReadinessLabel ?? "Readiness"}
-        </p>
-        <p className="mt-1.5 text-sm leading-6 text-foreground/80">
-          {props.readinessSummary}
-        </p>
-      </aside>
+      </div>
     </section>
   );
 }
@@ -971,7 +975,7 @@ function ResultCaveats({
         <h2 className="font-heading text-base font-semibold text-foreground">
           {title}
         </h2>
-        <ul className="mt-2 grid gap-1.5 text-sm leading-5 text-warning-foreground sm:grid-cols-2 lg:grid-cols-3">
+        <ul className="mt-2 grid gap-1.5 text-sm leading-5 text-foreground/80 sm:grid-cols-2 lg:grid-cols-3">
           {props.items.slice(0, 3).map((item) => (
             <li key={item}>{item}</li>
           ))}
@@ -1218,7 +1222,7 @@ function FileView({ props }: { props: Record<string, unknown> }) {
         </p>
       ) : null}
       {props.previewError === "permission_required" && !accessRequest ? (
-        <p className="mt-2 rounded-md border border-warning/30 bg-warning/10 px-2 py-1.5 text-xs text-warning-foreground">
+        <p className="mt-2 rounded-md border border-warning/30 bg-warning/10 px-2 py-1.5 text-xs text-foreground/80">
           {copy.fileAccessRequired ??
             "This file is outside Chrona's generated-file directory. Review the path before allowing a one-time read."}
         </p>
@@ -2345,12 +2349,12 @@ export const { registry: workspaceRegistry } = defineRegistry(chronaCatalog, {
         {props.risks.length > 0 ? (
           <div className="rounded-2xl border border-warning/30 bg-warning/15 px-4 py-3">
             <div className="flex items-start gap-2">
-              <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warning-foreground" />
+              <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warning" />
               <div>
-                <p className="text-sm font-medium text-warning-foreground">
+                <p className="text-sm font-medium text-foreground">
                   High Risk Changes
                 </p>
-                <ul className="mt-1 list-disc space-y-0.5 pl-4 text-xs text-warning-foreground/90">
+                <ul className="mt-1 list-disc space-y-0.5 pl-4 text-xs text-foreground/80">
                   {props.risks.map((risk, index) => (
                     <li key={`${risk}:${index}`}>{risk}</li>
                   ))}
@@ -2366,7 +2370,7 @@ export const { registry: workspaceRegistry } = defineRegistry(chronaCatalog, {
                 key={`${warning}:${index}`}
                 className="flex items-start gap-1.5"
               >
-                <TriangleAlert className="mt-0.5 size-3 shrink-0 text-warning-foreground" />
+                <TriangleAlert className="mt-0.5 size-3 shrink-0 text-warning" />
                 <span>{warning}</span>
               </div>
             ))}

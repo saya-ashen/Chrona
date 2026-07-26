@@ -179,6 +179,9 @@ export function TaskWorkspaceExecutionOverview({
   artifacts,
   activity,
   currentExecution,
+  onRetryFinalization,
+  isRetryingFinalization = false,
+  finalizationRetryError,
   runtimeEvents = [],
   liveActivity = [],
   copy: copyProp,
@@ -200,6 +203,9 @@ export function TaskWorkspaceExecutionOverview({
   currentExecution?: Pick<PlanExecutionResult, "status" | "planOutput"> | null;
   runtimeEvents?: WorkspaceRuntimeEvent[];
   liveActivity?: WorkspaceActivityItem[];
+  onRetryFinalization?: () => Promise<void> | void;
+  isRetryingFinalization?: boolean;
+  finalizationRetryError?: string | null;
   primaryAction?: CommandCenterPrimaryAction | null;
   copy?: Partial<CommandCenterCopy>;
   activityLayout?: ActivityLayout;
@@ -259,6 +265,10 @@ export function TaskWorkspaceExecutionOverview({
     || currentExecution?.status === "started"
   );
   const executionIsActive = executionIsLive || executionIsWaitingForHuman;
+  const finalization = currentExecution?.planOutput?.finalization;
+  const finalizationFailed = !executionIsActive && finalization?.status === "Failed";
+  const finalizationRunning = !executionIsActive && finalization?.status === "Running";
+  const finalizationReady = !executionIsActive && finalization?.status === "Ready";
   const activityHeartbeat = useMemo<WorkspaceActivityItem | null>(() => {
     if (!executionIsLive || activeActivity) return null;
     const latestRuntime = runtimeEvents.at(-1);
@@ -460,7 +470,11 @@ export function TaskWorkspaceExecutionOverview({
           >
             {executionIsActive
               ? (ws.stageResultsTitle ?? "Stage results")
-              : (ws.finalResultTitle ?? "Final result")}
+              : finalizationFailed
+                ? (ws.finalizationFailedTitle ?? "Final result unavailable")
+                : finalizationRunning
+                  ? (ws.finalizationRunningTitle ?? "Preparing final result")
+                  : (ws.finalResultTitle ?? "Final result")}
           </h3>
           <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             <Badge
@@ -468,14 +482,24 @@ export function TaskWorkspaceExecutionOverview({
               className={
                 executionIsActive
                   ? "bg-sky-500/10 text-sky-700 dark:text-sky-200"
-                  : "bg-violet-500/10 text-violet-700 dark:text-violet-200"
+                  : finalizationFailed
+                    ? "border-destructive/30 bg-destructive/10 text-destructive"
+                    : finalizationRunning
+                      ? "bg-amber-500/10 text-amber-700 dark:text-amber-200"
+                      : "bg-violet-500/10 text-violet-700 dark:text-violet-200"
               }
             >
               {executionIsActive
                 ? liveResultSpec || executionResultState === "available"
                   ? (ws.resultsAvailableBadge ?? "Results available")
                   : (ws.resultsPendingBadge ?? "No result yet")
-                : (ws.aiGeneratedBadge ?? "AI generated")}
+                : finalizationFailed
+                  ? (ws.finalizationFailedBadge ?? "Finalization failed")
+                  : finalizationRunning
+                    ? (ws.finalizationRunningBadge ?? "Preparing")
+                    : finalizationReady
+                      ? (ws.aiGeneratedBadge ?? "AI generated")
+                      : (ws.finalizationUnavailableBadge ?? "Artifacts only")}
             </Badge>
             <span>
               {executionIsActive
@@ -484,10 +508,40 @@ export function TaskWorkspaceExecutionOverview({
                     "Current output and completed step results collected during this run.")
                   : (ws.resultsPendingDescription ??
                     "The current step has not produced viewable output yet. Follow execution activity for live progress.")
-                : (ws.validatedOutputDescription ??
-                  "Validated output from task execution.")}
+                : finalizationFailed
+                  ? (ws.finalizationFailedDescription ??
+                    "Chrona could not assemble the final result. Generated files remain available below.")
+                  : finalizationRunning
+                    ? (ws.finalizationRunningDescription ??
+                      "Chrona is assembling and validating the final result.")
+                    : finalizationReady
+                      ? (ws.validatedOutputDescription ??
+                        "Validated output from task execution.")
+                      : (ws.finalizationUnavailableDescription ??
+                        "The final result is unavailable. Generated files are shown below.")}
             </span>
           </div>
+          {finalizationFailed ? (
+            <div className="mt-3 space-y-2 rounded-xl border border-destructive/30 bg-destructive/5 px-3 py-3 text-sm" role="alert">
+              <p className="font-medium text-foreground">
+                {ws.finalizationFailedActionDescription ??
+                  "Retry finalization to assemble and validate the complete result."}
+              </p>
+              {finalizationRetryError ? (
+                <p className="text-xs text-destructive">{finalizationRetryError}</p>
+              ) : null}
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => void onRetryFinalization?.()}
+                disabled={!onRetryFinalization || isRetryingFinalization}
+              >
+                {isRetryingFinalization
+                  ? (ws.finalizationRetrying ?? "Retrying finalization...")
+                  : (ws.finalizationRetry ?? "Retry finalization")}
+              </Button>
+            </div>
+          ) : null}
           {showLiveStatus ? (
             <div
               className="mt-3 flex items-start gap-3 rounded-xl border border-sky-300/70 bg-sky-500/5 px-3 py-3 text-sm"

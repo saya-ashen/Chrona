@@ -23,6 +23,9 @@ export function TaskWorkspaceInspector({
   runtimeEvents,
   liveActivity,
   currentExecution,
+  onRetryFinalization,
+  isRetryingFinalization = false,
+  finalizationRetryError,
   commandCenterCopy,
   copy,
   operationPanel,
@@ -40,6 +43,9 @@ export function TaskWorkspaceInspector({
   runtimeEvents: WorkspaceRuntimeEvent[];
   liveActivity: WorkspaceActivityItem[];
   currentExecution?: PlanExecutionResult | null;
+  onRetryFinalization?: () => Promise<void> | void;
+  isRetryingFinalization?: boolean;
+  finalizationRetryError?: string | null;
   commandCenterCopy?: Partial<CommandCenterCopy>;
   copy: WorkspaceCopy;
   isPlanCompact?: boolean;
@@ -103,6 +109,9 @@ export function TaskWorkspaceInspector({
                 runtimeEvents={runtimeEvents}
                 liveActivity={liveActivity}
                 currentExecution={currentExecution}
+                onRetryFinalization={onRetryFinalization}
+                isRetryingFinalization={isRetryingFinalization}
+                finalizationRetryError={finalizationRetryError}
                 isExecutionRunning={isExecutionRunning}
                 executionResultState={executionResultState}
                 primaryAction={null}
@@ -130,6 +139,9 @@ export function TaskWorkspaceInspector({
               runtimeEvents={runtimeEvents}
               liveActivity={liveActivity}
               currentExecution={currentExecution}
+              onRetryFinalization={onRetryFinalization}
+              isRetryingFinalization={isRetryingFinalization}
+              finalizationRetryError={finalizationRetryError}
               isExecutionRunning={isExecutionRunning}
               executionResultState={executionResultState}
               primaryAction={null}

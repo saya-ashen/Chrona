@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { chronaCatalog, chronaResultCatalog, chronaResultSpecSchema, validateChronaSpec, validateDashboardSummarySpec, type ValidateResult } from "../index";
+import { chronaCatalog, chronaResultCatalog, chronaResultElementJsonSchema, chronaResultSpecSchema, validateChronaSpec, validateDashboardSummarySpec, type ValidateResult } from "../index";
 import type { UiDocument } from "./document";
 
 function expectIssue(result: ValidateResult, fragment: string) {
@@ -262,6 +262,42 @@ describe("validateChronaSpec", () => {
 
     expect(outputSpec.success).toBe(true);
   });
+
+  test("exposes component-specific props in finalized-result JSON Schema", () => {
+    const schema = chronaResultElementJsonSchema() as {
+      oneOf?: Array<{
+        properties?: {
+          type?: { enum?: string[] };
+          props?: { properties?: Record<string, unknown> };
+        };
+      }>;
+    };
+    const evidence = schema.oneOf?.find((variant) =>
+      variant.properties?.type?.enum?.includes("ResultEvidence"),
+    );
+
+    expect(evidence?.properties?.props?.properties).toHaveProperty("summary");
+    expect(evidence?.properties?.props?.properties).not.toHaveProperty(
+      "collapsedSummary",
+    );
+  });
+  test("rejects the same cross-component prop before provider output is saved", () => {
+    const spec = {
+      root: "evidence",
+      elements: {
+        evidence: {
+          type: "ResultEvidence",
+          props: { items: ["Official source checked"], collapsedSummary: "Evidence" },
+        },
+      },
+    };
+
+    expect(validateChronaSpec(spec).ok).toBe(false);
+    const schema = chronaResultElementJsonSchema();
+    expect(schema).toHaveProperty("oneOf");
+    expect(JSON.stringify(schema)).not.toContain('"collapsedSummary"');
+  });
+
 
   test("accepts the bounded finalized-result domain composition", () => {
     const result = chronaResultSpecSchema.safeParse({

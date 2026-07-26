@@ -8,6 +8,7 @@ import {
   dispatchTaskExecutionAction,
   fetchCurrentTaskExecution,
   fetchTaskPlanState,
+  retryTaskResultFinalization,
   submitTaskCheckpointAction,
   taskWorkspaceQueryKeys,
   type TaskPlanState,
@@ -392,6 +393,8 @@ export function useTaskWorkspacePlanState(
   const lastWorkspaceEventSequenceRef = useRef(0);
   const [acceptResultError, setAcceptResultError] = useState<string | null>(null);
   const [isAcceptingResult, setIsAcceptingResult] = useState(false);
+  const [finalizationRetryError, setFinalizationRetryError] = useState<string | null>(null);
+  const [isRetryingFinalization, setIsRetryingFinalization] = useState(false);
 
   const planStateQuery = useQuery({
     queryKey: taskWorkspaceQueryKeys.planState(task.id, selectedWorkBlockId),
@@ -645,6 +648,22 @@ export function useTaskWorkspacePlanState(
     return result;
   }, [refreshExecutionQueries, selectedWorkBlockId, task.id]);
 
+  const handleRetryFinalization = useCallback(async () => {
+    setFinalizationRetryError(null);
+    setIsRetryingFinalization(true);
+    try {
+      await retryTaskResultFinalization(task.id);
+      await refreshExecutionQueries();
+    } catch (cause) {
+      setFinalizationRetryError(
+        cause instanceof Error ? cause.message : "Failed to finalize task result",
+      );
+      await currentExecutionQuery.refetch();
+    } finally {
+      setIsRetryingFinalization(false);
+    }
+  }, [currentExecutionQuery, refreshExecutionQueries, task.id]);
+
   const handleAcceptResult = useCallback(async () => {
     setAcceptResultError(null);
     setIsAcceptingResult(true);
@@ -746,6 +765,9 @@ export function useTaskWorkspacePlanState(
     handleAcceptResult,
     isAcceptingResult,
     acceptResultError,
+    handleRetryFinalization,
+    isRetryingFinalization,
+    finalizationRetryError,
     handleGeneratePlanFromHeader,
     handleStopPlanGeneration,
     assistantBuildCurrentPlan,

@@ -28,9 +28,27 @@ describe("task result finalization feature spec", () => {
     expect(feature.instructions).toContain("Do not reproduce the manifest as a linear report");
 
     const schema = feature.structuredOutputSchema?.schema as {
-      properties?: { elements?: { additionalProperties?: { properties?: { type?: { enum?: string[] } } } } };
+      properties?: {
+        elements?: {
+          additionalProperties?: {
+            oneOf?: Array<{
+              properties?: {
+                type?: { enum?: string[] };
+                props?: { properties?: Record<string, unknown> };
+              };
+            }>;
+          };
+        };
+      };
     };
-    const componentNames = schema.properties?.elements?.additionalProperties?.properties?.type?.enum ?? [];
+    const componentVariants =
+      schema.properties?.elements?.additionalProperties?.oneOf ?? [];
+    const componentNames = componentVariants.flatMap(
+      (variant) => variant.properties?.type?.enum ?? [],
+    );
+    const evidenceVariant = componentVariants.find((variant) =>
+      variant.properties?.type?.enum?.includes("ResultEvidence"),
+    );
     expect(componentNames).toContain("ResultHero");
     expect(componentNames).toContain("ResultDeliverable");
     expect(componentNames).toContain("ResultInsight");
@@ -38,6 +56,10 @@ describe("task result finalization feature spec", () => {
     expect(componentNames).toContain("ResultCaveats");
     expect(componentNames).toContain("ResultEvidence");
     expect(componentNames).not.toContain("Button");
+    expect(evidenceVariant?.properties?.props?.properties).toHaveProperty("summary");
+    expect(evidenceVariant?.properties?.props?.properties).not.toHaveProperty(
+      "collapsedSummary",
+    );
   });
 });
 

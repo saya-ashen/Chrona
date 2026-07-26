@@ -448,6 +448,14 @@ function emptyTextSpec(message: string): UiDocument {
 }
 
 
+function containsArtifactList(spec: UiDocument | null | undefined) {
+  return Boolean(
+    spec && Object.values(spec.elements).some(
+      (element) => element.type === "WorkspaceArtifactList",
+    ),
+  );
+}
+
 export function buildCommandCenterOutputTabSpec(input: {
   latestCompletedNode: PlanNodeDataModel | null;
   resultSpec: UiDocument;
@@ -480,7 +488,7 @@ export function buildCommandCenterOutputTabSpec(input: {
     });
   }
 
-  if (input.artifacts.length > 0) {
+  if (input.artifacts.length > 0 && !containsArtifactList(input.apiArtifactsSpec)) {
     const filteredArtifacts = !input.selectedNodeId || input.selectedNodeId === "all"
       ? input.artifacts
       : input.artifacts.filter((artifact) => !artifact.sourceNodeId || artifact.sourceNodeId === input.selectedNodeId);

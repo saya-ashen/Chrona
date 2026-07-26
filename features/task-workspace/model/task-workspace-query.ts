@@ -719,3 +719,14 @@ export async function acceptTaskResult(
     { method: "POST" },
   );
 }
+
+export async function retryTaskResultFinalization(taskId: string) {
+  return apiJson<{
+    taskId: string;
+    finalization: NonNullable<PlanExecutionResult["planOutput"]>["finalization"];
+    finalizedResult: NonNullable<PlanExecutionResult["planOutput"]>["finalizedResult"];
+  }>(
+    `/api/tasks/${encodeURIComponent(taskId)}/result/finalization/retry`,
+    { method: "POST" },
+  );
+}

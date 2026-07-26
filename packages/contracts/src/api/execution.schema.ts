@@ -385,6 +385,11 @@ export const taskReopenParamSchema = z.object({ taskId: taskIdParam });
 // ── POST /tasks/:taskId/result/accept ──
 export const taskResultAcceptParamSchema = z.object({ taskId: taskIdParam });
 
+// ── POST /tasks/:taskId/result/finalization/retry ──
+export const taskResultFinalizationRetryParamSchema = z.object({
+  taskId: taskIdParam,
+});
+
 export const taskResultFollowUpParamSchema = z.object({ taskId: taskIdParam });
 
 const taskResultContinuationRequestIdSchema = z.string().uuid();

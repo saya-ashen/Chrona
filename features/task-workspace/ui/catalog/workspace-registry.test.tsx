@@ -260,8 +260,20 @@ describe("workspace result registry", () => {
     render(<SpecRenderer spec={spec} />);
 
     expect(screen.getByRole("region", { name: "Result overview" })).toHaveTextContent("Ready with caveats");
-    expect(screen.getByText("Research package ready")).toBeInTheDocument();
+    const heroTitle = screen.getByText("Research package ready");
+    expect(heroTitle).toHaveClass("w-full");
+    expect(heroTitle).not.toHaveClass("max-w-3xl");
+    const heroSummary = screen.getByText("Verified sources and an operating guide are assembled.");
+    expect(heroSummary).toHaveClass("w-full");
+    expect(heroSummary).not.toHaveClass("max-w-3xl");
     expect(screen.getByText("37")).toBeInTheDocument();
+    const resultOverview = screen.getByRole("region", { name: "Result overview" });
+    expect(resultOverview).not.toHaveClass("grid");
+    expect(within(resultOverview).getByText("Readiness")).toBeInTheDocument();
+    expect(within(resultOverview).getByText("Confirm one access-limited source.")).toBeInTheDocument();
+    const readinessBadge = within(resultOverview).getByText("Ready with caveats");
+    expect(readinessBadge).toHaveClass("text-warning");
+    expect(readinessBadge).not.toHaveClass("text-warning-foreground");
     const primaryDeliverable = screen.getByText("Operating guide").closest("article");
     expect(primaryDeliverable).toHaveAttribute("data-result-deliverable-role", "primary");
     expect(screen.getByText("Source table").closest("article")).toHaveAttribute("data-result-deliverable-role", "supporting");
@@ -274,6 +286,9 @@ describe("workspace result registry", () => {
     expect(screen.getByRole("heading", { name: "Guide" })).toBeInTheDocument();
     expect(screen.getByText("Now")).toBeInTheDocument();
     expect(screen.getByText("One source requires manual verification")).toBeInTheDocument();
+    const caveat = screen.getByText("One source requires manual verification");
+    expect(caveat.parentElement).toHaveClass("text-foreground/80");
+    expect(caveat.parentElement).not.toHaveClass("text-warning-foreground");
     expect(screen.queryByText("Official source checked")).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /evidence and source boundaries/i }));
     expect(screen.getByText("Official source checked")).toBeInTheDocument();

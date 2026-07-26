@@ -1444,6 +1444,9 @@ type TaskWorkspacePlanSectionProps = {
   onAcceptResult?: () => Promise<void> | void;
   isAcceptingResult?: boolean;
   acceptResultError?: string | null;
+  onRetryFinalization?: () => Promise<void> | void;
+  isRetryingFinalization?: boolean;
+  finalizationRetryError?: string | null;
   createGoalAction?: ReactNode;
   onEditBrief?: () => void;
 };
@@ -1702,6 +1705,9 @@ export function TaskWorkspacePlanSection({
   onAcceptResult,
   isAcceptingResult = false,
   acceptResultError,
+  onRetryFinalization,
+  isRetryingFinalization = false,
+  finalizationRetryError,
   createGoalAction,
   onEditBrief,
 }: TaskWorkspacePlanSectionProps) {
@@ -2050,12 +2056,18 @@ export function TaskWorkspacePlanSection({
         <div className="min-h-[560px] flex-1 p-3 xl:min-h-0">
           <div className="flex min-h-0 flex-col gap-3">
             {displayState.panels.resultLifecycle &&
-            displayState.resultReview ? (
+            displayState.resultReview &&
+            (displayState.resultReview.phase === "accepted" ||
+              currentExecution?.planOutput?.finalization.status === "Ready") ? (
               <ResultLifecyclePanel
                 taskId={pageData.task.id}
                 review={displayState.resultReview}
                 copy={copy}
-                onAcceptResult={onAcceptResult}
+                onAcceptResult={
+                  currentExecution?.planOutput?.finalization.status === "Ready"
+                    ? onAcceptResult
+                    : undefined
+                }
                 onRequestChanges={() => {
                   setResultChangeError(null);
                   setIsRequestingResultChanges(true);
@@ -2096,6 +2108,9 @@ export function TaskWorkspacePlanSection({
                 runtimeEvents={runtimeEvents}
                 liveActivity={liveActivity}
                 currentExecution={currentExecution}
+                onRetryFinalization={onRetryFinalization}
+                isRetryingFinalization={isRetryingFinalization}
+                finalizationRetryError={finalizationRetryError}
                 showHeader={false}
                 copy={copy}
                 onAction={focusNodeActions}

@@ -723,49 +723,19 @@ export const chronaResultElementSchema = z
   })
   .strict();
 
-function schemaVariants(schema: z.core.JSONSchema.JSONSchema) {
-  if (
-    typeof schema === "object" &&
-    !Array.isArray(schema) &&
-    "anyOf" in schema
-  ) {
-    const variants = (schema as { anyOf?: z.core.JSONSchema.JSONSchema[] })
-      .anyOf;
-    if (Array.isArray(variants)) return variants;
-  }
-  return [schema];
-}
-
-function mergeJsonSchemas(
-  left: z.core.JSONSchema.JSONSchema | undefined,
-  right: z.core.JSONSchema.JSONSchema,
+function resultElementVariantJsonSchema(
+  name: string,
+  component: (typeof resultComponentEntries)[number][1],
 ): z.core.JSONSchema.JSONSchema {
-  const variants = [
-    ...(left ? schemaVariants(left) : []),
-    ...schemaVariants(right),
-  ];
-  const unique = Array.from(
-    new Map(
-      variants.map((variant) => [JSON.stringify(variant), variant]),
-    ).values(),
-  );
-  return unique.length === 1 ? unique[0]! : { anyOf: unique };
-}
-
-function resultPropsJsonSchema(): z.core.JSONSchema.JSONSchema {
-  const properties: Record<string, z.core.JSONSchema.JSONSchema> = {};
-  for (const [, component] of resultComponentEntries) {
-    const schema = resultComponentPropsJsonSchema(component) as {
-      properties?: Record<string, z.core.JSONSchema.JSONSchema>;
-    };
-    for (const [key, propSchema] of Object.entries(schema.properties ?? {})) {
-      properties[key] = mergeJsonSchemas(properties[key], propSchema);
-    }
-  }
-
   return {
     type: "object",
-    properties,
+    properties: {
+      type: { type: "string", enum: [name] },
+      props: resultComponentPropsJsonSchema(component),
+      children: { type: "array", items: { type: "string" } },
+      visible: {},
+    },
+    required: ["type", "props"],
     additionalProperties: false,
   };
 }
@@ -789,15 +759,9 @@ function resultComponentPropsJsonSchema(
 
 export function chronaResultElementJsonSchema(): z.core.JSONSchema.JSONSchema {
   return {
-    type: "object",
-    properties: {
-      type: { type: "string", enum: resultComponentNames },
-      props: resultPropsJsonSchema(),
-      children: { type: "array", items: { type: "string" } },
-      visible: {},
-    },
-    required: ["type", "props"],
-    additionalProperties: false,
+    oneOf: resultComponentEntries.map(([name, component]) =>
+      resultElementVariantJsonSchema(name, component),
+    ),
   };
 }
 
