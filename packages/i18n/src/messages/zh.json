@@ -1268,6 +1268,8 @@
       "artifactsLabel": "产物",
       "showAllArtifacts": "显示全部",
       "showFewerArtifacts": "收起",
+      "otherGeneratedFiles": "其他生成文件",
+      "otherGeneratedFilesDescription": "未作为主要交付物展示的附加文件。",
       "tabResult": "结果",
       "tabAction": "操作",
       "tabActivity": "动态",

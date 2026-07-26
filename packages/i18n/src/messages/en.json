@@ -1268,6 +1268,8 @@
       "artifactsLabel": "Artifacts",
       "showAllArtifacts": "Show all",
       "showFewerArtifacts": "Show fewer",
+      "otherGeneratedFiles": "Other generated files",
+      "otherGeneratedFilesDescription": "Additional files not shown as primary deliverables.",
       "tabResult": "Result",
       "tabAction": "Action",
       "tabActivity": "Activity",

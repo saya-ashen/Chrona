@@ -464,6 +464,7 @@ function buildArtifactItems(
 ): WorkspaceArtifactItem[] {
   return pageData.artifacts.map((artifact) => ({
     id: artifact.id,
+    artifactRef: artifact.artifactRef,
     title: artifact.title,
     type: artifact.type,
     uri: artifact.uri,

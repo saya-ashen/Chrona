@@ -1362,6 +1362,103 @@ describe("TaskWorkspaceExecutionOverview", () => {
     ).toHaveLength(1);
   });
 
+  it("omits artifacts already represented by finalized deliverables", () => {
+    const view = createTaskWorkspaceExecutionConsoleView(
+      executionMonitoringWorkspaceFixtures.artifactPresent,
+    );
+    const artifact = view.artifacts[0];
+    if (!artifact) throw new Error("Expected artifact fixture");
+    const spec = buildCommandCenterOutputTabSpec({
+      latestCompletedNode: view.latestCompletedNode,
+      resultSpec: nowDocument("Result fallback"),
+      artifacts: [{ ...artifact, artifactRef: "AFREPORT" }],
+      apiArtifactsSpec: {
+        root: "root",
+        elements: {
+          root: { type: "Stack", props: { gap: "sm" }, children: ["deliverable"] },
+          deliverable: {
+            type: "ResultDeliverable",
+            props: {
+              title: "Report",
+              summary: "Final report",
+              artifactRef: "AFREPORT",
+              role: "primary",
+              kind: "document",
+            },
+          },
+        },
+      },
+      copy: {},
+    });
+
+    expect(
+      Object.values(spec.elements).filter(
+        (element) => element.type === "WorkspaceArtifactList",
+      ),
+    ).toHaveLength(0);
+    expect(
+      Object.values(spec.elements).filter(
+        (element) => element.type === "ResultDeliverable",
+      ),
+    ).toHaveLength(1);
+  });
+
+  it("keeps only unrepresented artifacts in a collapsed secondary section", () => {
+    const view = createTaskWorkspaceExecutionConsoleView(
+      executionMonitoringWorkspaceFixtures.artifactPresent,
+    );
+    const artifact = view.artifacts[0];
+    if (!artifact) throw new Error("Expected artifact fixture");
+    const spec = buildCommandCenterOutputTabSpec({
+      latestCompletedNode: view.latestCompletedNode,
+      resultSpec: nowDocument("Result fallback"),
+      artifacts: [
+        { ...artifact, artifactRef: "AFREPORT" },
+        {
+          id: "extra-1",
+          artifactRef: "AFEXTRA",
+          title: "Supporting notes",
+          type: "markdown",
+          uri: "generated://supporting-notes.md",
+        },
+      ],
+      apiArtifactsSpec: {
+        root: "root",
+        elements: {
+          root: { type: "Stack", props: { gap: "sm" }, children: ["deliverable"] },
+          deliverable: {
+            type: "ResultDeliverable",
+            props: {
+              title: "Report",
+              summary: "Final report",
+              artifactRef: "AFREPORT",
+              role: "primary",
+              kind: "document",
+            },
+          },
+        },
+      },
+      copy: {
+        otherGeneratedFiles: "Other generated files",
+        otherGeneratedFilesDescription: "Additional files",
+      },
+    });
+
+    const artifactItems = Object.values(spec.elements).filter(
+      (element) => element.type === "WorkspaceArtifactItem",
+    );
+    expect(artifactItems).toHaveLength(1);
+    expect(artifactItems[0]?.props).toMatchObject({ title: "Supporting notes" });
+    expect(
+      Object.values(spec.elements).find(
+        (element) => element.type === "CollapsibleBlock",
+      )?.props,
+    ).toMatchObject({
+      title: "Other generated files",
+      defaultCollapsed: true,
+    });
+  });
+
   it("builds valid output and trail fallback specs", () => {
     const view = createTaskWorkspaceExecutionConsoleView(
       executionMonitoringWorkspaceFixtures.artifactPresent,

@@ -115,6 +115,7 @@ export type TaskPageData = {
   }>;
   artifacts: Array<{
     id: string;
+    artifactRef?: string;
     title: string;
     type: string;
     uri?: string;
@@ -228,6 +229,7 @@ export type ExecutionOverviewCard = {
 
 export type WorkspaceArtifactItem = {
   id: string;
+  artifactRef?: string;
   title: string;
   type: string;
   uri?: string;

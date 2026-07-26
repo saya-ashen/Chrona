@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
+import { aiArtifactRef } from "../plan-execution/use-cases/register-generated-plan-output-artifacts";
 
 export async function getTaskReviewContext(input: { taskId: string }) {
   const task = await db.task.findUnique({
@@ -58,7 +59,10 @@ export async function getTaskReviewContext(input: { taskId: string }) {
             : null,
         }
       : null,
-    artifacts: task.artifacts,
+    artifacts: task.artifacts.map((artifact) => ({
+      ...artifact,
+      artifactRef: aiArtifactRef(artifact.id),
+    })),
     scheduleProposals: task.scheduleProposals.map((proposal) => ({
       id: proposal.id,
       source: proposal.source,
