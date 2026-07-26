@@ -12,6 +12,7 @@ import {
   Archive,
   Bot,
   ArrowRight,
+  BookOpenText,
   Check,
   ChevronDown,
   ChevronUp,
@@ -29,6 +30,7 @@ import {
   Sparkles,
   TriangleAlert,
   Wrench,
+  X,
 } from "lucide-react";
 import { ActivityTimeline } from "../activity-timeline";
 import type { WorkspaceActivityItem } from "../../model/task-workspace-types";
@@ -60,6 +62,11 @@ import {
   Popover,
   PopoverContent,
   PopoverTrigger,
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
 } from "@shared/ui";
 import { taskWorkspaceActivityMessages } from "@chrona/i18n";
 import {
@@ -738,6 +745,7 @@ function ResultDeliverable({ props }: { props: Record<string, unknown> }) {
   const Icon = deliverableIcon(kind);
   const [previewOpen, setPreviewOpen] = useState(false);
   const preview = stringProp(props.contentPreview);
+  const downloadHref = stringProp(props.downloadHref);
   const isPrimary = role === "primary";
   const roleLabel = isPrimary
     ? (copy.resultPrimaryDeliverable ?? "Primary deliverable")
@@ -745,98 +753,151 @@ function ResultDeliverable({ props }: { props: Record<string, unknown> }) {
       ? (copy.resultEvidenceMaterial ?? "Evidence")
       : (copy.resultSupportingMaterial ?? "Supporting material");
   return (
-    <article
-      data-result-deliverable-role={role}
-      className={cn(
-        "group min-w-0 overflow-hidden rounded-xl border transition-colors",
-        isPrimary
-          ? "border-primary/25 bg-primary-soft/45 p-5 sm:p-6"
-          : "border-border/70 bg-background p-4 hover:border-primary/25",
-      )}
-    >
-      <div className="flex min-w-0 items-start gap-3">
-        <span
-          className={cn(
-            "flex shrink-0 items-center justify-center rounded-lg",
-            isPrimary
-              ? "size-10 bg-primary text-primary-foreground"
-              : "size-9 bg-muted text-muted-foreground",
-          )}
-        >
-          <Icon className="size-4.5" aria-hidden />
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
-            {roleLabel} · {formatLabel}
-          </p>
-          <h3
+    <>
+      <article
+        data-result-deliverable-role={role}
+        className={cn(
+          "group min-w-0 overflow-hidden rounded-xl border transition-colors",
+          isPrimary
+            ? "border-primary/25 bg-primary-soft/45 p-5 sm:p-6"
+            : "border-border/70 bg-background p-4 hover:border-primary/25",
+        )}
+      >
+        <div className="flex min-w-0 items-start gap-3">
+          <span
             className={cn(
-              "mt-1.5 break-words font-heading font-semibold leading-snug tracking-[-0.015em] text-foreground",
-              isPrimary ? "text-xl sm:text-2xl" : "text-base",
+              "flex shrink-0 items-center justify-center rounded-lg",
+              isPrimary
+                ? "size-10 bg-primary text-primary-foreground"
+                : "size-9 bg-muted text-muted-foreground",
             )}
           >
-            {title}
-          </h3>
-          {summary ? (
-            <p
+            <Icon className="size-4.5" aria-hidden />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+              {roleLabel} · {formatLabel}
+            </p>
+            <h3
               className={cn(
-                "mt-2 text-foreground/70",
-                isPrimary
-                  ? "max-w-2xl text-sm leading-6"
-                  : "text-xs leading-5",
+                "mt-1.5 break-words font-heading font-semibold leading-snug tracking-[-0.015em] text-foreground",
+                isPrimary ? "text-xl sm:text-2xl" : "text-base",
               )}
             >
-              {summary}
-            </p>
-          ) : null}
-          <div className="mt-4 flex flex-wrap gap-2">
-            {preview ? (
-              <Button
-                type="button"
-                size="sm"
-                variant={isPrimary ? "default" : "outline"}
-                onClick={() => setPreviewOpen((current) => !current)}
-                aria-expanded={previewOpen}
+              {title}
+            </h3>
+            {summary ? (
+              <p
+                className={cn(
+                  "mt-2 text-foreground/70",
+                  isPrimary
+                    ? "max-w-2xl text-sm leading-6"
+                    : "text-xs leading-5",
+                )}
               >
-                <Eye className="size-3.5" aria-hidden />
-                {previewOpen
-                  ? (copy.artifactHidePreview ?? "Hide preview")
-                  : (copy.artifactPreview ?? "Preview")}
-              </Button>
+                {summary}
+              </p>
             ) : null}
-            {typeof props.downloadHref === "string" ? (
-              <Button
-                asChild
-                size="sm"
-                variant={isPrimary ? "outline" : "ghost"}
-              >
-                <a href={props.downloadHref} download>
-                  <Download className="size-3.5" aria-hidden />
-                  {copy.downloadArtifact ?? "Download"}
-                </a>
-              </Button>
-            ) : null}
+            <div className="mt-4 flex flex-wrap gap-2">
+              {preview ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={isPrimary ? "default" : "outline"}
+                  onClick={() => setPreviewOpen(true)}
+                >
+                  <Eye className="size-3.5" aria-hidden />
+                  {copy.artifactPreview ?? "Preview"}
+                </Button>
+              ) : null}
+              {downloadHref ? (
+                <Button
+                  asChild
+                  size="sm"
+                  variant={isPrimary ? "outline" : "ghost"}
+                >
+                  <a href={downloadHref} download>
+                    <Download className="size-3.5" aria-hidden />
+                    {copy.downloadArtifact ?? "Download"}
+                  </a>
+                </Button>
+              ) : null}
+            </div>
           </div>
+          {!isPrimary ? (
+            <ArrowRight
+              className="mt-1 size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-primary"
+              aria-hidden
+            />
+          ) : null}
         </div>
-        {!isPrimary ? (
-          <ArrowRight
-            className="mt-1 size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-primary"
-            aria-hidden
-          />
-        ) : null}
-      </div>
-      {preview && previewOpen ? (
-        <div className="mt-4 max-h-[70vh] min-w-0 overflow-auto rounded-lg border border-border/60 bg-background/80 p-3 text-sm leading-6">
-          {props.contentKind === "markdown" ? (
-            <MarkdownContent className="py-0">{preview}</MarkdownContent>
-          ) : (
-            <pre className="whitespace-pre-wrap break-words text-xs leading-5 text-foreground/80">
-              {preview}
-            </pre>
-          )}
-        </div>
+      </article>
+      {preview ? (
+        <Sheet open={previewOpen} onOpenChange={setPreviewOpen}>
+          <SheetContent
+            side="right"
+            showCloseButton={false}
+            className="flex w-screen! max-w-none! flex-col gap-0 overflow-hidden p-0"
+            data-result-content-preview
+          >
+            <SheetHeader className="shrink-0 border-b px-4 py-3 sm:px-5">
+              <div className="flex min-w-0 items-center justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary">
+                    <Icon className="size-4" aria-hidden />
+                  </span>
+                  <div className="min-w-0">
+                    <SheetTitle className="truncate">{title}</SheetTitle>
+                    <SheetDescription className="flex flex-wrap items-center gap-1.5">
+                      <span>{copy.resultContentPreview ?? "Content preview"}</span>
+                      <span aria-hidden>·</span>
+                      <span>{formatLabel}</span>
+                    </SheetDescription>
+                  </div>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  {downloadHref ? (
+                    <Button asChild size="sm" variant="outline">
+                      <a href={downloadHref} download>
+                        <Download className="size-3.5" aria-hidden />
+                        <span className="hidden sm:inline">
+                          {copy.downloadArtifact ?? "Download"}
+                        </span>
+                      </a>
+                    </Button>
+                  ) : null}
+                  <Button
+                    type="button"
+                    size="icon-sm"
+                    variant="ghost"
+                    aria-label={copy.closeResultPreview ?? "Close preview"}
+                    onClick={() => setPreviewOpen(false)}
+                  >
+                    <X className="size-4" aria-hidden />
+                  </Button>
+                </div>
+              </div>
+            </SheetHeader>
+            <main className="min-h-0 flex-1 overflow-y-auto bg-background p-4 sm:p-6 xl:p-8">
+              <div className="mx-auto w-full max-w-4xl">
+                {summary ? (
+                  <p className="mb-5 border-b border-border/60 pb-4 text-sm leading-6 text-muted-foreground">
+                    {summary}
+                  </p>
+                ) : null}
+                {props.contentKind === "markdown" ? (
+                  <MarkdownContent className="py-0">{preview}</MarkdownContent>
+                ) : (
+                  <pre className="whitespace-pre-wrap break-words text-sm leading-6 text-foreground/85">
+                    {preview}
+                  </pre>
+                )}
+              </div>
+            </main>
+          </SheetContent>
+        </Sheet>
       ) : null}
-    </article>
+    </>
   );
 }
 
@@ -853,40 +914,63 @@ function ResultInsight({
   const { messages } = useI18n();
   const copy = messages.components.taskWorkspace;
   const lead = props.emphasis === "lead";
-  return (
-    <article
-      className={cn(
-        "min-w-0 rounded-xl border p-4 sm:p-5",
-        lead
-          ? "border-info/25 bg-info/10 md:row-span-2"
-          : "border-border/70 bg-background",
-      )}
-    >
-      {lead ? (
-        <p className="mb-3 flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-info">
-          <Sparkles className="size-3.5" aria-hidden />
-          {copy.resultKeyStrategy ?? "Key strategy"}
-        </p>
-      ) : null}
-      <h3
-        className={cn(
-          "font-heading font-semibold leading-snug tracking-[-0.015em] text-foreground",
-          lead ? "text-xl" : "text-base",
-        )}
+  if (lead) {
+    return (
+      <article
+        data-result-insight-emphasis="lead"
+        className="min-w-0 overflow-hidden rounded-2xl border border-info/30 bg-info/10"
       >
+        <div className="grid min-w-0 gap-0 lg:grid-cols-[minmax(0,0.9fr)_minmax(22rem,1.1fr)]">
+          <div className="min-w-0 p-5 sm:p-7 lg:border-r lg:border-info/20">
+            <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-info">
+              <span className="flex size-7 items-center justify-center rounded-full bg-info/15">
+                <Sparkles className="size-3.5" aria-hidden />
+              </span>
+              {copy.resultKeyStrategy ?? "Key strategy"}
+            </p>
+            <h2 className="mt-5 font-heading text-2xl font-semibold leading-tight tracking-[-0.025em] text-foreground sm:text-[1.75rem]">
+              {props.title}
+            </h2>
+            <p className="mt-3 text-sm leading-6 text-foreground/75 sm:text-[15px] sm:leading-7">
+              {props.summary}
+            </p>
+          </div>
+          {props.points?.length ? (
+            <ol className="grid content-center gap-0 border-t border-info/20 px-5 py-3 sm:px-7 lg:border-t-0">
+              {props.points.slice(0, 4).map((point, index) => (
+                <li
+                  key={point}
+                  className="flex gap-3 border-t border-info/20 py-3.5 text-sm leading-6 text-foreground/80 first:border-t-0"
+                >
+                  <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full border border-info/30 bg-background/70 text-[11px] font-semibold text-info">
+                    {index + 1}
+                  </span>
+                  <span>{point}</span>
+                </li>
+              ))}
+            </ol>
+          ) : null}
+        </div>
+      </article>
+    );
+  }
+  return (
+    <article className="min-w-0 rounded-xl border border-border/70 bg-background p-4 sm:p-5">
+      <h3 className="font-heading text-base font-semibold leading-snug tracking-[-0.015em] text-foreground">
         {props.title}
       </h3>
       <p className="mt-2 text-sm leading-6 text-foreground/70">
         {props.summary}
       </p>
       {props.points?.length ? (
-        <ul className="mt-4 grid gap-2 text-xs leading-5 text-foreground/75">
+        <ul className="mt-4 space-y-2 text-xs leading-5 text-foreground/75">
           {props.points.slice(0, 4).map((point) => (
-            <li
-              key={point}
-              className="rounded-lg border border-border/60 bg-background/70 px-3 py-2"
-            >
-              {point}
+            <li key={point} className="flex gap-2">
+              <Check
+                className="mt-0.5 size-3.5 shrink-0 text-muted-foreground"
+                aria-hidden
+              />
+              <span>{point}</span>
             </li>
           ))}
         </ul>
@@ -998,26 +1082,34 @@ function ResultEvidence({
   const { messages } = useI18n();
   const copy = messages.components.taskWorkspace;
   return (
-    <CollapsibleBlock
-      title={
-        props.title ??
-        copy.resultEvidenceAndSources ??
-        "Evidence and source boundaries"
-      }
-      summary={props.summary}
-      defaultCollapsed={props.defaultCollapsed ?? true}
-    >
-      <ul className="space-y-2 text-sm leading-6 text-foreground/75">
-        {props.items.map((item) => (
-          <li
-            key={item}
-            className="border-t border-border/60 pt-2 first:border-t-0 first:pt-0"
-          >
-            {item}
-          </li>
-        ))}
-      </ul>
-    </CollapsibleBlock>
+    <div data-result-evidence-footnote className="text-muted-foreground">
+      <div className="mb-1 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.12em]">
+        <BookOpenText className="size-3.5" aria-hidden />
+        {copy.resultEvidenceFootnote ?? "Result notes"}
+      </div>
+      <CollapsibleBlock
+        title={
+          props.title ??
+          copy.resultEvidenceAndSources ??
+          "Evidence and source boundaries"
+        }
+        summary={props.summary}
+        defaultCollapsed={props.defaultCollapsed ?? true}
+        subtle
+      >
+        <ul className="space-y-1.5 text-xs leading-5 text-muted-foreground">
+          {props.items.map((item) => (
+            <li key={item} className="flex gap-2">
+              <span
+                aria-hidden
+                className="mt-[0.45rem] size-1 shrink-0 rounded-full bg-muted-foreground/60"
+              />
+              <span>{item}</span>
+            </li>
+          ))}
+        </ul>
+      </CollapsibleBlock>
+    </div>
   );
 }
 

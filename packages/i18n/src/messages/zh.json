@@ -1557,6 +1557,8 @@
       "executionWorkingFallback": "AI 正在处理",
       "artifactPreview": "预览",
       "artifactHidePreview": "收起预览",
+      "resultContentPreview": "内容预览",
+      "closeResultPreview": "关闭预览",
       "copyArtifactPath": "复制路径",
       "artifactPathCopied": "已复制",
       "downloadArtifact": "下载",
@@ -1575,6 +1577,7 @@
       "resultTimeframeThisWeek": "本周",
       "resultTimeframeLater": "后续",
       "resultCaveats": "接受结果前需要知道",
+      "resultEvidenceFootnote": "结果注记",
       "resultEvidenceAndSources": "证据、核验详情与来源边界"
     }
   },

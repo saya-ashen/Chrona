@@ -1557,6 +1557,8 @@
       "executionWorkingFallback": "AI is working",
       "artifactPreview": "Preview",
       "artifactHidePreview": "Hide preview",
+      "resultContentPreview": "Content preview",
+      "closeResultPreview": "Close preview",
       "copyArtifactPath": "Copy path",
       "artifactPathCopied": "Copied",
       "downloadArtifact": "Download",
@@ -1575,6 +1577,7 @@
       "resultTimeframeThisWeek": "This week",
       "resultTimeframeLater": "Later",
       "resultCaveats": "Before accepting",
+      "resultEvidenceFootnote": "Result notes",
       "resultEvidenceAndSources": "Evidence and source boundaries"
     }
   },
