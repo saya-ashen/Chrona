@@ -19,6 +19,7 @@ export type { TaskConfigDraftState } from "./ui/forms/task-config-form";
 export {
   DEFAULT_SCHEDULE_AI_PREFERENCES,
   SCHEDULE_AI_PREFERENCES_STORAGE_KEY,
+  SCHEDULE_AUTO_SUGGESTIONS_AVAILABLE,
   useScheduleAiPreferences,
   writeScheduleAiPreferences,
   type ScheduleAiPreferences,

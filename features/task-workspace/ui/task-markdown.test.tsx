@@ -1,8 +1,8 @@
 import { render, screen } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
-import { normalizeCjkStrongBoundaries, TaskMarkdownContent } from "./task-markdown";
+import { normalizeCjkStrongBoundaries, MarkdownContent } from "../../../shared/ui/markdown-content";
 
-describe("TaskMarkdownContent", () => {
+describe("MarkdownContent", () => {
   it("inserts a boundary after strong CJK text followed by CJK prose", () => {
     expect(normalizeCjkStrongBoundaries("**值得试用：**愿意配置")).toBe(
       "**值得试用：** 愿意配置",
@@ -11,7 +11,7 @@ describe("TaskMarkdownContent", () => {
 
   it("renders GFM answers as semantic HTML", () => {
     const { container } = render(
-      <TaskMarkdownContent>{[
+      <MarkdownContent>{[
         "## DeepTutor",
         "",
         "**值得试用：**愿意配置模型/API。",
@@ -25,7 +25,7 @@ describe("TaskMarkdownContent", () => {
         "| Metric | Value |",
         "| --- | --- |",
         "| Rank | 8 |",
-      ].join("\n")}</TaskMarkdownContent>,
+      ].join("\n")}</MarkdownContent>,
     );
 
     expect(screen.getByRole("heading", { name: "DeepTutor", level: 2 })).toBeVisible();

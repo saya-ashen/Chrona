@@ -1,23 +1,24 @@
 # Data Model
 
-Chrona persists task, schedule, execution, memory, and AI-client state in SQLite through Prisma 7.
+Chrona persists goal, task, schedule, execution, memory, and AI-client state in SQLite through Prisma 7.
 
 Schema source: `prisma/schema.prisma`.
 
 Current schema inventory:
 
-- Models: 36
-- Enums: 24
+- Models: see `prisma/schema.prisma` as the authoritative current inventory.
+- Enums: see `prisma/schema.prisma` as the authoritative current inventory.
 
 ## Main aggregates
 
 | Aggregate | Key models | Purpose |
 | --- | --- | --- |
 | Workspace | `Workspace` | Scope for tasks, memory, schedule, calendar sources, and configuration. |
+| Goal | `Goal`, `GoalAsset`, `GoalAssetVersion`, `GoalAssetDraft`, `GoalInboxCandidate`, `GoalFormSubmission`, `GoalAssetJob`, `GoalBriefRevision` | Durable outcome lifecycle, versioned Workbench assets, result intake, form submissions, export jobs, automatic accepted-result context, and immutable artifact provenance. |
 | Task | `Task`, `TaskDependency`, `TaskProjection`, `TaskSession`, `TaskTimelineItem` | Core work item, relationships, projection-backed read shape, scoped work sessions, and timeline rows. |
 | Plan | `TaskPlan`, `TaskPlanLayer`, `GraphVersion`, `GraphMutationRecord`, `ReconciliationEvent`, `TaskPlanNodeAttempt`, `TaskPlanTerminalAction` | Generated/accepted executable graph plan, node-attempt history, terminal actions, and graph-change history. |
 | Execution | `TaskPlanRun`, `Run`, `ExecutionSession`, `RuntimeCursor`, `Approval`, `Artifact`, `TaskPlanProviderRun`, `TaskPlanProviderApproval`, `RunToken` | Plan/run/session state, runtime cursoring, provider continuity, approvals, tokens, and outputs. |
-| Schedule | `WorkBlock`, `ScheduleProposal`, `SchedulerLease`, `SchedulerEvent` | Time blocks, schedule suggestions, automation leasing, and scheduler events. |
+| Schedule/activation | `TaskTrigger`, `TriggerDelivery`, `TaskOccurrence`, `WorkBlock`, `ScheduleProposal`, `SchedulerLease`, `SchedulerEvent` | Versioned activation definitions and deliveries, neutral execution occurrences, optional time placement, schedule suggestions, and scheduler automation. |
 | External calendar | `CalendarSource`, `ImportedCalendarEvent` | Read-only calendar subscriptions, sync status, imported busy events, and calendar-backed schedule context. |
 | Conversation/tool history | `ConversationEntry`, `ToolCallDetail`, `ToolInvocation`, `TaskAssistantMessage`, `TaskResultContinuation`, `RawEventLog` | User/assistant conversation, accepted-result continuation and idempotency state, runtime tool-call detail, invocation records, and raw event audit data. |
 | Memory | `Memory` | Workspace/task memory entries used by internal projections and AI context-building flows. |
@@ -29,6 +30,11 @@ Current schema inventory:
 ```mermaid
 erDiagram
   Workspace ||--o{ Task : contains
+  Workspace ||--o{ Goal : owns
+  Goal ||--o{ Task : advances_through
+  Goal ||--o{ GoalAsset : works_with
+  Goal ||--o{ GoalBriefRevision : revises_strategy
+  Artifact ||--o{ GoalAsset : promoted_as
   Workspace ||--o{ Memory : owns
   Workspace ||--o{ AiClient : configures
   Workspace ||--o{ WorkBlock : schedules
@@ -57,6 +63,40 @@ erDiagram
   Workspace ||--o{ CalendarSource : subscribes
   CalendarSource ||--o{ ImportedCalendarEvent : imports
 ```
+
+## Goal foundation and remaining target
+
+The current schema ships `Goal`, optional `Task.goalId`, read-only `GoalAsset`,
+`GoalBriefRevision`, and immutable `Task.goalContext`.
+Goal lifecycle is `Draft | Active | Paused | Achieved | Stopped`. Achievement
+requires explicit user confirmation and persists note, actor identity,
+timestamp, and Goal-owned evidence Artifact IDs in
+`Goal.achievementConfirmation`; a canonical `goal.achieved` event provides the
+audit record. `GoalAsset` records source and current Artifact references without
+mutating source execution evidence. Accepted Task results remain immutable and
+separate from these Goal-scoped references.
+
+`Goal.operationalBrief` stores the current intended outcome, current focus,
+strategy, and constraints. Every save appends `GoalBriefRevision` with actor and
+time. When any Goal-linked Task is created, Chrona automatically freezes the
+current Operational Brief, capture time, expected outcome, and a compact
+catalog of then-accepted Goal results into `Task.goalContext`. Plan generation
+consumes this immutable source context; later Goal edits and newly accepted
+results do not rewrite existing Task input. Planning and execution sessions can
+retrieve full accepted results on demand through a bounded, Task-scoped,
+read-only MCP operation.
+
+The shipped model includes closed-union `TaskTrigger`, idempotent
+`TriggerDelivery`, and neutral `TaskOccurrence`. Schedule and bounded internal
+event adapters materialize occurrence authority; webhook ingress remains
+unshipped. The complete invariants and adapter security boundary are specified
+in [Long-Horizon Goals and Triggers](./long-horizon-goals-and-triggers.md).
+
+Goal Workbench persistence uses `GoalAsset` identity plus immutable
+`GoalAssetVersion`, mutable `GoalAssetDraft`, reviewable `GoalInboxCandidate`,
+version-bound `GoalFormSubmission`, and export/thumbnail `GoalAssetJob` records.
+Accepted source Results and Artifacts remain immutable; restoring an old version
+always appends a new formal version.
 
 ## Task state
 
@@ -123,14 +163,28 @@ Important enums:
 
 Execution records distinguish Chrona plan-run state from external runtime/provider runs. `ExecutionSession` is the server-side scope for AI-visible refs. `RuntimeCursor` tracks provider stream/progress cursoring. Approvals and artifacts store intervention and output records.
 
-Execution is occurrence-scoped. A recurring `Task` shares one row across many
-`WorkBlock` occurrences, so `TaskPlanRun`, `ExecutionSession`, and `Run` each
-carry a `workBlockId` that pins them to a single occurrence. `Run` also stores
-`errorSummary`, the authoritative provider failure cause surfaced to the read
-model. The projection committer (`rebuildTaskProjection`) scopes its
-runs/sessions/approvals to the occurrence that most recently executed, so a
-failed or cancelled occurrence never contaminates a sibling occurrence. See
+Execution is occurrence-scoped. `TaskOccurrence` is the durable execution
+identity; `WorkBlock` is optional calendar placement. `TaskPlan`, `TaskPlanRun`,
+`ExecutionSession`, `Run`, and `Artifact` carry `occurrenceId` so a failure,
+wait, result, or late event from one occurrence cannot contaminate a sibling.
+Legacy `workBlockId` remains for schedule placement and scoped compatibility.
+The projection committer (`rebuildTaskProjection`) scopes its
+runs/sessions/approvals to the focused occurrence, so a failed or cancelled
+occurrence never contaminates a sibling occurrence. See
 [Backend Execution Flow](./backend-execution-flow.md) → "Task state authority".
+
+### Canonical result state
+
+`TaskPlanRun.planRun.mutableGraph.planOutput` is the persisted result container. Its name remains tied to the existing JSON envelope, but its contents are canonical result state rather than a mutable page:
+
+- `manifest`: deterministic `ResultManifest` aggregated from current immutable `NodeResult` records.
+- `finalizedResult`: the validated final Spec plus the exact Manifest revision used to produce it.
+- `finalization`: `Pending`, `Running`, `Ready`, or `Failed`, including attempt and failure metadata.
+- `revision`, `updatedAt`, and `updatedByNodeId`: canonical result-change metadata.
+
+Run-owned `Artifact` rows hold file identity, generated URI, checksum, size, MIME, preview, source node, and deliverable key. AI-visible structures refer to these rows only through deterministic opaque `AF...` references. Host preview/download fields are materialized at read time and are never persisted in finalized Specs.
+
+Result review is stored as a canonical `task.result_accepted` Event scoped to a completed Run. It does not change Task execution status. Goal Workbench candidates copy a read-only finalized result and opaque artifact references into an auditable pending Inbox item; only candidate resolution creates a formal immutable `GoalAssetVersion`.
 
 ## Schedule state
 
@@ -150,6 +204,12 @@ Important enums:
 - `WorkBlockTrigger`
 
 Schedule state supports user-created and AI-suggested time blocks, proposal decision workflows, scheduler automation leasing, and due-work startup.
+
+`TaskTrigger` is the versioned activation definition. Shipped kinds are
+schedule, bounded internal event, and authenticated email. `TriggerDelivery`
+owns replay-safe delivery facts; `TaskOccurrence` is the resulting durable
+execution scope. `WorkBlockTrigger` records only optional calendar-placement
+provenance. Webhook remains rejected until its complete security contract ships.
 
 ## External calendar state
 
@@ -206,17 +266,23 @@ Chrona stores AI client configuration in the database and binds clients to featu
 
 ## Workspace and task-kind state
 
-Important enums:
+Important current enums:
 
 - `WorkspaceStatus`
 - `TaskKind`
 
-Workspaces can be lifecycle-gated independently from task state. `TaskKind` distinguishes native Chrona tasks from imported/synthetic task records that exist to project external schedule context.
+Workspaces can be lifecycle-gated independently from task state. Current
+`TaskKind` distinguishes `single` and `recurring`; recurrence is represented by
+task RRULE/anchor fields and expanded into WorkBlocks. This is a current-schema
+description, not the final abstraction: the accepted target separates
+`single` versus `series` execution mode from schedule trigger definitions.
+See [Long-Horizon Goals and Triggers](./long-horizon-goals-and-triggers.md).
 
 ## Operational notes
 
 - Prisma client generation: `bun run db:generate`.
 - Seed local data: `bun run db:seed`.
+- Seed retained Goal acceptance evidence: `bun run db:seed:goal-acceptance`.
 - Schema source: `prisma/schema.prisma`; migration SQL lives under
   `prisma/migrations` and is applied by `packages/db/src/sqlite-migrations.ts`.
 - Chrona keeps one mutable release-line migration for the current unreleased

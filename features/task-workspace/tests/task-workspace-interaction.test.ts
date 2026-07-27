@@ -220,13 +220,27 @@ describe("task workspace interaction model", () => {
     ).toMatchObject(expected);
   });
 
-  it("keeps Completed and Done distinct in result review state", () => {
+  it("keeps execution completion and result acceptance distinct", () => {
     const completedPage = pageData({
       task: { ...pageData().task, status: "Completed" },
+      latestRunSummary: {
+        id: "run-1",
+        status: "Completed",
+        startedAt: "2026-05-18T00:00:00.000Z",
+        syncStatus: "healthy",
+      },
       artifacts: [{ id: "artifact_1", title: "Report", type: "json" }],
     });
-    const donePage = pageData({ task: { ...pageData().task, status: "Done" } });
 
+    const acceptedPage = pageData({
+      task: { ...pageData().task, status: "Done" },
+      latestRunSummary: completedPage.latestRunSummary,
+      resultReview: {
+        status: "accepted",
+        runId: completedPage.latestRunSummary!.id,
+        acceptedAt: "2026-05-18T00:00:00.000Z",
+      },
+    });
     expect(
       deriveTaskWorkspaceStage({
         pageData: completedPage,
@@ -243,7 +257,7 @@ describe("task workspace interaction model", () => {
     });
     expect(
       deriveTaskWorkspaceStage({
-        pageData: donePage,
+        pageData: acceptedPage,
         graphPlan: graphPlan(),
         operationState: operationState({
           status: "execution-completed",
@@ -254,6 +268,27 @@ describe("task workspace interaction model", () => {
       stage: "result",
       statusLabel: "Task done",
       nextActionLabel: "Ask a follow-up or create a next task",
+    });
+    const waitingAcceptedPage = pageData({
+      task: { ...pageData().task, status: "WaitingForApproval" },
+      latestRunSummary: {
+        ...completedPage.latestRunSummary!,
+        status: "waiting_for_approval",
+        executionState: "waiting_for_approval",
+      },
+      resultReview: acceptedPage.resultReview,
+    });
+    expect(deriveTaskWorkspaceStage({
+      pageData: waitingAcceptedPage,
+      graphPlan: graphPlan(),
+      operationState: operationState({
+        status: "execution-blocked",
+        action: "current-operation",
+      } as unknown as Partial<TaskWorkspaceOperationState>),
+    })).toMatchObject({
+      stage: "run",
+      statusLabel: "Approval needed",
+      nextActionLabel: "Review the request, then approve, reject, or request changes",
     });
     expect(
       deriveResultReview({ pageData: completedPage, graphPlan: graphPlan() }),
@@ -269,7 +304,7 @@ describe("task workspace interaction model", () => {
       continuation: { visible: false },
     });
     expect(
-      deriveResultReview({ pageData: donePage, graphPlan: graphPlan() }),
+      deriveResultReview({ pageData: acceptedPage, graphPlan: graphPlan() }),
     ).toMatchObject({
       phase: "accepted",
       decision: {

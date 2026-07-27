@@ -132,6 +132,15 @@ const eslintConfig = defineConfig([
     ],
     rules: {
       "@typescript-eslint/no-explicit-any": "off",
+      // Test bodies favor explicit scenario setup and assertions. Applying
+      // production complexity/size budgets here obscures actionable source
+      // warnings and makes the global CI warning ratchet depend on test count.
+      "max-lines": "off",
+      "max-lines-per-function": "off",
+      complexity: "off",
+      "max-depth": "off",
+      "max-params": "off",
+      "max-statements": "off",
     },
   },
   {

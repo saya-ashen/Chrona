@@ -12,6 +12,8 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  Field,
+  FieldLabel,
   Input,
   Popover,
   PopoverContent,
@@ -26,7 +28,10 @@ import {
 } from "@shared/ui";
 import { useAutoComplete } from "../use-auto-complete";
 import { useI18n, useLocale } from "@chrona/i18n"
-import { useScheduleAiPreferences } from "../schedule-ai-preferences";
+import {
+  SCHEDULE_AUTO_SUGGESTIONS_AVAILABLE,
+  useScheduleAiPreferences,
+} from "../schedule-ai-preferences";
 import { AUTOMATION_TIMING_PRESETS, normalizeAutomationTiming } from "@chrona/contracts";
 import type { AutomationTimingPreset } from "@chrona/contracts";
 import { deriveAutomationPolicyPreview } from "@chrona/domain";
@@ -56,6 +61,12 @@ const DEFAULT_DIALOG_COPY = {
   close: "Close",
   titlePlaceholder: "Add title",
   titleLabel: "Title",
+  goalLabel: "Goal",
+  goalPlaceholder: "What outcome do you ultimately want to achieve?",
+  goalAdditionalInformation: "Additional information (optional)",
+  goalAdditionalInformationPlaceholder: "Add background, scope, constraints, or preferences",
+  firstTaskLabel: "First task",
+  firstTaskPlaceholder: "What bounded work should happen first?",
   aiSuggestions: "AI Suggestions",
   generatingSuggestions: "Generating suggestions...",
   mode: "How should Chrona help?",
@@ -139,6 +150,7 @@ type TaskCreateDialogProps = {
   initialEndAt: Date;
   isPending: boolean;
   onClose: () => void;
+  allowGoalMode?: boolean;
   onSubmit: (input: {
     title: string;
     description: string;
@@ -154,6 +166,9 @@ type TaskCreateDialogProps = {
     recurrenceAnchorStartAt: string | null;
     recurrenceAnchorEndAt: string | null;
     aiClientId: string | null;
+    mode?: "task" | "goal";
+    goalTitle?: string;
+    firstTaskTitle?: string;
   }) => Promise<void>;
   autoSuggestionsEnabled?: boolean;
   availableAiClients?: TaskConfigAiClient[];
@@ -171,13 +186,19 @@ export function TaskCreateDialog({
   onClose,
   onSubmit,
   autoSuggestionsEnabled,
+  allowGoalMode = false,
   availableAiClients = [],
 }: TaskCreateDialogProps) {
   const aiPreferences = useScheduleAiPreferences();
-  const resolvedAutoSuggestionsEnabled = autoSuggestionsEnabled ?? aiPreferences.autoSuggestionsEnabled;
+  const resolvedAutoSuggestionsEnabled =
+    SCHEDULE_AUTO_SUGGESTIONS_AVAILABLE &&
+    (autoSuggestionsEnabled ?? aiPreferences.autoSuggestionsEnabled);
   const defaultAutoExecuteEnabled = aiPreferences.defaultAutoExecuteEnabled;
   const defaultAutoPlanGenerationEnabled = aiPreferences.autoPlanGenerationEnabled;
   const [title, setTitle] = useState(initialTitle);
+  const [productMode, setProductMode] = useState<"task" | "goal">("task");
+  const [goalTitle, setGoalTitle] = useState("");
+  const [firstTaskTitle, setFirstTaskTitle] = useState("");
   const { messages } = useI18n();
   const locale = useLocale();
   const [showAutomationDetails, setShowAutomationDetails] = useState(false);
@@ -258,6 +279,8 @@ export function TaskCreateDialog({
       setEndTime(formatTime(initialEndAt));
       setTitle(initialTitle);
       setDescription(initialDescription);
+      setGoalTitle("");
+      setFirstTaskTitle("");
       setPriority("Medium");
       setAutoExecute(resolvedInitialAutoExecute);
       setAutoPlanGenerationEnabled(resolvedInitialAutoPlanGeneration);
@@ -273,7 +296,8 @@ export function TaskCreateDialog({
   }, [isOpen, initialStartAt, initialEndAt, initialTitle, initialDescription, resolvedInitialAutoExecute, resolvedInitialAutoPlanGeneration]);
 
   async function handleSubmit() {
-    if (!title.trim()) return;
+    if (productMode === "task" && !title.trim()) return;
+    if (productMode === "goal" && (!goalTitle.trim() || !firstTaskTitle.trim())) return;
 
     const [startHours, startMinutes] = startTime.split(":").map(Number);
     const [endHours, endMinutes] = endTime.split(":").map(Number);
@@ -287,7 +311,7 @@ export function TaskCreateDialog({
     const recurrenceRule = !repeatEnabled ? null : recurrenceRuleFromState(recurrenceMode, customRRULE);
 
     await onSubmit({
-      title: title.trim(),
+      title: productMode === "goal" ? firstTaskTitle.trim() : title.trim(),
       description: description.trim(),
       priority,
       autoExecute,
@@ -301,6 +325,9 @@ export function TaskCreateDialog({
       recurrenceAnchorStartAt: recurrenceRule ? scheduledStartAt.toISOString() : null,
       recurrenceAnchorEndAt: recurrenceRule ? scheduledEndAt.toISOString() : null,
       aiClientId: aiClientId || null,
+      mode: productMode,
+      goalTitle: productMode === "goal" ? goalTitle.trim() : undefined,
+      firstTaskTitle: productMode === "goal" ? firstTaskTitle.trim() : undefined,
     });
 
     onClose();
@@ -379,6 +406,26 @@ export function TaskCreateDialog({
         </DialogHeader>
 
         <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-4 py-4 sm:px-6 sm:py-5">
+          {allowGoalMode ? (
+            <div className="grid grid-cols-2 gap-1 rounded-lg border bg-muted/30 p-1" role="radiogroup" aria-label="Creation type">
+              <Button type="button" variant={productMode === "task" ? "secondary" : "ghost"} role="radio" aria-checked={productMode === "task"} onClick={() => setProductMode("task")}>Task</Button>
+              <Button type="button" variant={productMode === "goal" ? "secondary" : "ghost"} role="radio" aria-checked={productMode === "goal"} onClick={() => setProductMode("goal")}>Goal</Button>
+            </div>
+          ) : null}
+          {productMode === "goal" ? (
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field>
+                <FieldLabel htmlFor="goal-title">{dialogCopy.goalLabel}</FieldLabel>
+                <Input id="goal-title" value={goalTitle} onChange={(event) => setGoalTitle(event.target.value)} placeholder={dialogCopy.goalPlaceholder} />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="goal-first-task">{dialogCopy.firstTaskLabel}</FieldLabel>
+                <Input id="goal-first-task" value={firstTaskTitle} onChange={(event) => setFirstTaskTitle(event.target.value)} placeholder={dialogCopy.firstTaskPlaceholder} />
+              </Field>
+            </div>
+          ) : null}
+          {productMode === "task" ? (
+          <>
           <div className="relative space-y-1.5">
             <label htmlFor="task-create-title" className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
               {dialogCopy.titleLabel}
@@ -508,6 +555,8 @@ export function TaskCreateDialog({
               </div>
             )}
           </div>
+          </>
+          ) : null}
 
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px] xl:items-start">
             <div className="flex flex-col gap-4">
@@ -535,11 +584,11 @@ export function TaskCreateDialog({
                 </div>
               </TaskConfigSection>
 
-              <TaskConfigSection title={dialogCopy.description}>
+              <TaskConfigSection title={productMode === "goal" ? dialogCopy.goalAdditionalInformation : dialogCopy.description}>
                 <Textarea
                   value={description}
                   onChange={(e) => setDescription(e.target.value)}
-                  placeholder={dialogCopy.descriptionPlaceholder}
+                  placeholder={productMode === "goal" ? dialogCopy.goalAdditionalInformationPlaceholder : dialogCopy.descriptionPlaceholder}
                   disabled={isPending}
                   rows={4}
                   className="bg-background"
@@ -805,12 +854,12 @@ export function TaskCreateDialog({
           <Button
             type="button"
             onClick={() => void handleSubmit()}
-            disabled={isPending || !title.trim()}
+            disabled={isPending || (productMode === "task" ? !title.trim() : !goalTitle.trim() || !firstTaskTitle.trim())}
             variant="default"
             size="sm"
             className="min-w-20 rounded-lg"
           >
-            {isPending ? dialogCopy.saving : dialogCopy.save}
+            {isPending ? dialogCopy.saving : productMode === "goal" ? "Create Goal and first task" : dialogCopy.save}
           </Button>
         </div>
       </DialogContent>

@@ -6,6 +6,7 @@ import {
   ClipboardList,
   LayoutDashboard,
   Plus,
+  Target,
   Settings,
 } from "lucide-react";
 import {
@@ -17,6 +18,7 @@ import {
 } from "react";
 import { useLocation, useNavigate, useRevalidator } from "react-router-dom";
 import { createScheduledTask, TaskCreateDialog, type SchedulePageData } from "@features/schedule";
+import { createGoalWithFirstTask } from "@features/goals";
 import { apiJson } from "@shared/http";
 import {
   Button,
@@ -74,7 +76,7 @@ function completedAtFromPreference(
 export function ControlPlaneShell({
   children,
   defaultWorkspace: _defaultWorkspace,
-  assistantSummary = { label: "PAGE-AWARE AI", value: "" },
+  assistantSummary,
 }: ControlPlaneShellProps) {
   const { t } = useI18n();
   const locale = useLocale();
@@ -153,14 +155,16 @@ export function ControlPlaneShell({
   const breadcrumb = pathname
     .split("/")
     .filter(Boolean)
-    .map((segment) => {
-      if (segment === "dashboard") return t("nav.dashboard");
-      if (segment === "schedule") return t("nav.schedule");
-      if (segment === "tasks") return t("nav.tasks");
-      if (segment === "settings") return t("nav.settings");
-      if (segment === "action-center") return t("nav.actionCenter");
-      if (segment === "work") return t("common.work");
-      return segment;
+    .flatMap((segment) => {
+      if (segment === "dashboard") return [t("nav.dashboard")];
+      if (segment === "schedule") return [t("nav.schedule")];
+      if (segment === "tasks") return [t("nav.tasks")];
+      if (segment === "goals") return [t("nav.goals")];
+      if (segment === "settings") return [t("nav.settings")];
+      if (segment === "action-center") return [t("nav.actionCenter")];
+      if (segment === "work") return [t("common.work")];
+      if (/^(?:goal_|task_|cm[a-z0-9]{8,})/i.test(segment)) return [];
+      return [segment];
     });
   const navItems: NavEntry[] = [
     {
@@ -174,6 +178,12 @@ export function ControlPlaneShell({
       label: t("nav.schedule"),
       icon: CalendarDays,
       active: pathname.startsWith("/schedule"),
+    },
+    {
+      href: "/goals",
+      label: t("nav.goals"),
+      icon: Target,
+      active: pathname.startsWith("/goals"),
     },
     {
       href: "/tasks",
@@ -200,6 +210,7 @@ export function ControlPlaneShell({
     [
       "/dashboard",
       "/schedule",
+      "/goals",
       "/tasks",
       "/action-center",
       "/settings",
@@ -208,14 +219,14 @@ export function ControlPlaneShell({
   return (
     <SidebarProvider
       defaultOpen
-      className="h-screen min-h-0 bg-canvas text-foreground"
-      style={{ "--sidebar-width": "224px" } as CSSProperties}
+      className="h-screen min-h-0 bg-workspace text-foreground"
+      style={{ "--sidebar-width": "240px" } as CSSProperties}
     >
       <Sidebar
         collapsible="none"
-        className="hidden border-r border-border bg-sidebar xl:flex"
+        className="hidden border-r border-sidebar-border bg-sidebar shadow-[8px_0_30px_rgb(31_32_45/0.05)] xl:flex"
       >
-        <SidebarHeader className="border-b border-border px-4 py-4">
+        <SidebarHeader className="border-b border-sidebar-border bg-sidebar px-4 py-4">
           <LocalizedLink
             href="/schedule"
             aria-label={t("nav.brandTitle")}
@@ -256,10 +267,10 @@ export function ControlPlaneShell({
                         }
                         isActive={item.active}
                         className={cn(
-                          "h-auto rounded-xl px-3 py-2.5 text-sm font-semibold transition-colors",
+                          "h-auto rounded-xl border px-3 py-2.5 text-sm font-semibold transition-colors",
                           item.active
-                            ? "bg-primary text-primary-foreground hover:bg-primary hover:text-primary-foreground [&_svg]:text-primary-foreground"
-                            : "text-muted-foreground hover:bg-card hover:text-foreground",
+                            ? "border-primary-border bg-primary-soft text-primary shadow-sm hover:bg-primary-soft-hover hover:text-primary [&_svg]:text-primary"
+                            : "border-transparent text-muted-foreground hover:border-panel-border hover:bg-panel hover:text-foreground",
                         )}
                       >
                         <Icon className="size-4" />
@@ -275,7 +286,7 @@ export function ControlPlaneShell({
       </Sidebar>
 
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="relative z-50 border-b border-border bg-background/90 supports-[backdrop-filter]:backdrop-blur-md">
+        <header className="relative z-50 border-b border-panel-border bg-panel/92 shadow-[0_1px_12px_rgb(31_32_45/0.04)] supports-[backdrop-filter]:backdrop-blur-md">
           <div className="relative mx-auto flex h-16 w-full max-w-[1600px] items-center gap-2 px-4 sm:gap-3 sm:px-6 xl:px-8">
             <div className="flex min-w-0 shrink items-center gap-3">
               <LocalizedLink
@@ -299,21 +310,23 @@ export function ControlPlaneShell({
               </p>
             </div>
 
-            <div className="flex min-w-0 flex-1 items-center justify-center">
-              <button
-                type="button"
-                data-assistant-surface-header-drawer-button="true"
-                disabled
-                aria-disabled
-                aria-label={t("components.assistantSurface.entryLabel")}
-                className="group inline-flex h-9 max-w-[2.25rem] scroll-mb-24 items-center gap-2 overflow-hidden rounded-full border border-border/60 bg-muted/40 px-2 text-sm text-muted-foreground md:max-w-[520px] md:px-2.5"
-              >
-                <span className="hidden min-w-0 flex-1 items-center gap-1.5 md:flex">
-                  <span className="shrink-0 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{assistantSummary.label}</span>
-                  <span className="min-w-0 max-w-[220px] truncate text-xs font-semibold text-primary lg:max-w-[360px]">{assistantSummary.value}</span>
-                </span>
-              </button>
-            </div>
+            {assistantSummary?.value ? (
+              <div className="flex min-w-0 flex-1 items-center justify-center">
+                <button
+                  type="button"
+                  data-assistant-surface-header-drawer-button="true"
+                  disabled
+                  aria-disabled
+                  aria-label={t("components.assistantSurface.entryLabel")}
+                  className="group inline-flex h-9 max-w-[520px] items-center gap-2 overflow-hidden rounded-full border border-border/60 bg-muted/40 px-2.5 text-sm text-muted-foreground"
+                >
+                  <span className="flex min-w-0 flex-1 items-center gap-1.5">
+                    <span className="shrink-0 text-[11px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{assistantSummary.label}</span>
+                    <span className="min-w-0 max-w-[220px] truncate text-xs font-semibold text-primary lg:max-w-[360px]">{assistantSummary.value}</span>
+                  </span>
+                </button>
+              </div>
+            ) : <div className="min-w-0 flex-1" aria-hidden />}
 
             <div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
               <Button
@@ -331,7 +344,7 @@ export function ControlPlaneShell({
             </div>
           </div>
         </header>
-        <main className="flex min-h-0 flex-1 flex-col overflow-y-auto bg-background px-4 py-4 pb-[calc(env(safe-area-inset-bottom)+5rem)] sm:px-6 xl:px-8 xl:pb-4">
+        <main className="chrona-app-main flex min-h-0 flex-1 flex-col overflow-y-auto px-4 py-4 pb-[calc(env(safe-area-inset-bottom)+6.5rem)] sm:px-6 xl:px-8 xl:pb-4">
           {shouldShowStartWithChrona ? (
             <StartWithChrona
               className="mb-4"
@@ -354,7 +367,7 @@ export function ControlPlaneShell({
 
         <nav
           aria-label="Primary"
-          className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/92 pb-[env(safe-area-inset-bottom)] backdrop-blur-md xl:hidden"
+          className="fixed inset-x-0 bottom-0 z-40 border-t border-panel-border bg-panel/94 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_24px_rgb(31_32_45/0.08)] backdrop-blur-md xl:hidden"
         >
           <ul className="mx-auto flex max-w-lg items-stretch justify-around">
             {navItems.map((item) => {
@@ -365,7 +378,7 @@ export function ControlPlaneShell({
                     href={item.href}
                     aria-current={item.active ? "page" : undefined}
                     className={cn(
-                      "flex flex-col items-center gap-1 px-1 py-2 text-[11px] font-medium transition-colors",
+                      "flex min-h-14 flex-col items-center gap-1 px-1 py-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] text-[11px] font-medium transition-colors",
                       item.active
                         ? "text-primary"
                         : "text-muted-foreground hover:text-foreground",
@@ -395,6 +408,7 @@ export function ControlPlaneShell({
           useSafeDemoDefaults ? true : undefined
         }
         initialAutoExecute={useSafeDemoDefaults ? false : undefined}
+        allowGoalMode
         isOpen={showCreateTaskDialog}
         initialStartAt={taskDialogDefaults.initialStartAt}
         initialEndAt={taskDialogDefaults.initialEndAt}
@@ -407,6 +421,20 @@ export function ControlPlaneShell({
         onSubmit={async (input) => {
           try {
             setIsCreatingTask(true);
+            if (input.mode === "goal") {
+              const created = await createGoalWithFirstTask({
+                workspaceId: _defaultWorkspace.id,
+                title: input.goalTitle!,
+                firstTaskTitle: input.firstTaskTitle!,
+                additionalContext: input.description || null,
+                priority: input.priority,
+                idempotencyKey: crypto.randomUUID(),
+              });
+              setCreatedOnboardingTaskId(created.taskId);
+              await revalidate();
+              void navigate(localizeHref(locale, `/goals/${created.goal.id}`));
+              return;
+            }
             const created = await createScheduledTask({
               workspaceId: _defaultWorkspace.id,
               title: input.title,

@@ -28,9 +28,14 @@ type ExecutionProviderRequest = {
   input: unknown;
   structuredOutputSchema?: PreparedAiFeatureSpec["structuredOutputSchema"];
   terminalToolName?: string;
+  toolPolicy?: "full" | "read_only";
   maxOutputTokens?: number;
   timeoutSeconds?: number;
   resumeSessionRef?: string;
+  runtimeConfiguration?: {
+    model?: string;
+    contextStrategy?: "provider_default" | "auto_compact" | "bounded_tool_results" | "artifact_backed";
+  };
 };
 
 export type AiRuntimeInvocationInput = {
@@ -105,12 +110,16 @@ export class AiRuntimeInvoker {
   async invoke(input: AiRuntimeInvocationInput): Promise<AiRuntimeInvocation> {
     const task = await db.task.findUniqueOrThrow({
       where: { id: input.taskId },
-      select: { workspaceId: true },
+      select: { workspaceId: true, executionConfig: true },
     });
+    const occurrence = input.workBlockId
+      ? await db.taskOccurrence.findUnique({ where: { workBlockId: input.workBlockId }, select: { id: true } })
+      : await db.taskOccurrence.findFirst({ where: { taskId: input.taskId, status: { in: ["Ready", "Running"] } }, orderBy: [{ startedAt: "desc" }, { eligibleAt: "asc" }], select: { id: true } });
     const run = await db.run.create({
       data: {
         taskId: input.taskId,
         workBlockId: input.workBlockId ?? null,
+        occurrenceId: occurrence?.id ?? null,
         taskSessionId: input.taskSessionId,
         runtimeName: input.runtimeName,
         runtimeSessionRef: input.runtimeSessionKey,
@@ -137,7 +146,9 @@ export class AiRuntimeInvoker {
         );
       }
       const providerName = client.providerClient.provider;
-      const useChronaControl = usesChronaControlPlane(providerName);
+      const useChronaControl = input.featureSpec.feature !== "goal.review" &&
+        input.featureSpec.feature !== "task.result_finalization" &&
+        usesChronaControlPlane(providerName);
       let controlRunToken: string | null = null;
       if (useChronaControl) {
         controlRunToken = await mintRunToken({
@@ -166,6 +177,22 @@ export class AiRuntimeInvoker {
         executionRuntime: input.runtimeName,
         resumeSessionRef: priorProviderSessionRef,
       });
+      const executionConfig = task.executionConfig as Record<string, unknown>;
+      const model = typeof executionConfig.model === "string" && executionConfig.model.trim()
+        ? executionConfig.model.trim()
+        : undefined;
+      const contextStrategy = typeof executionConfig.contextStrategy === "string"
+        ? executionConfig.contextStrategy
+        : undefined;
+      request.runtimeConfiguration = {
+        ...(model ? { model } : {}),
+        ...(contextStrategy === "provider_default"
+          || contextStrategy === "auto_compact"
+          || contextStrategy === "bounded_tool_results"
+          || contextStrategy === "artifact_backed"
+          ? { contextStrategy }
+          : {}),
+      };
       const terminalToolName = request.terminalToolName;
       const providerRun = await ensureProviderRunRecord({
         taskId: input.taskId,
@@ -181,6 +208,15 @@ export class AiRuntimeInvoker {
         onRuntimeEvent: input.onRuntimeEvent,
         terminalToolName,
         controlRunToken,
+        onRunStarted: async (providerRun) => {
+          await syncTaskRunState({
+            taskId: input.taskId,
+            taskSessionId: input.taskSessionId,
+            runId: run.id,
+            runStatus: RunStatus.Running,
+            runtimeRunRef: providerRun.nativeRunId ?? providerRun.runId,
+          });
+        },
         eventPersistence: {
           workspaceId: task.workspaceId,
           taskId: input.taskId,
@@ -294,6 +330,8 @@ function toStartRunInput(request: ExecutionProviderRequest): StartRunInput {
     input: request.input as ProviderRunInput,
     maxOutputTokens: request.maxOutputTokens,
     terminalToolName: request.terminalToolName,
+    structuredOutputSchema: request.structuredOutputSchema,
+    toolPolicy: request.toolPolicy,
     ...(request.resumeSessionRef
       ? { resumeSessionRef: request.resumeSessionRef }
       : {}),
@@ -324,6 +362,7 @@ export async function runProviderRequest(
     eventPersistence?: RuntimeEventPersistenceContext;
     signal?: AbortSignal;
     controlRunToken?: string | null;
+    onRunStarted?: (run: ProviderRunRef) => Promise<void> | void;
   } = {},
 ): Promise<ProviderRunSnapshot> {
   const startInput = sanitizeStartRunInputForProvider(providerClient.provider, toStartRunInput(request));
@@ -343,6 +382,7 @@ export async function runProviderRequest(
     control,
   } as StartRunInput & { idempotencyKey?: string });
   await persistRuntimeRunRef(options.runId, run);
+  await options.onRunStarted?.(run);
   await updateProviderRunRecord(options.providerRunRecordId, {
     providerRunRef: run.nativeRunId ?? run.runId,
     nativeRunId: run.nativeRunId ?? null,
@@ -350,7 +390,7 @@ export async function runProviderRequest(
   });
 
   const cancelProviderRun = async (): Promise<ProviderRunSnapshot> => {
-    const snapshot = await providerClient.cancelRun?.({
+    const snapshot = await providerClient.cancelRun({
       runId: run.runId,
       sessionId: run.sessionId,
       reason: "Execution stopped",
@@ -667,7 +707,7 @@ async function collectProviderRunSnapshot(
       };
     }
     if (event.type === "tool_call") {
-      terminalToolName = event.tool ?? terminalToolName;
+      terminalToolName = event.tool;
     }
     if (event.type === "tool_completed") {
       terminalToolName = event.toolName ?? terminalToolName;
@@ -1021,10 +1061,16 @@ function buildExecutionGatewayRequest(input: {
   return {
     sessionId: input.sessionId,
     sessionKey: input.sessionKey,
-    instructions: input.featureSpec.instructions ?? parts.join("\n\n"),
+    instructions: input.featureSpec.instructions,
     input: aiInput,
     structuredOutputSchema: input.featureSpec.structuredOutputSchema,
     terminalToolName: input.featureSpec.terminalToolName,
+    toolPolicy:
+      input.featureSpec.feature === "goal.review" ||
+      input.featureSpec.feature === "goal.asset_ownership" ||
+      input.featureSpec.feature === "task.result_finalization"
+        ? "read_only"
+        : "full",
     maxOutputTokens: typeof maxTokens === "number" ? maxTokens : undefined,
     ...(input.resumeSessionRef
       ? { resumeSessionRef: input.resumeSessionRef }
@@ -1043,6 +1089,8 @@ function buildExecutionAiInput(input: {
     case "execute_task_node":
     case "evaluate_condition_node":
     case "review_checkpoint_node":
+    case "goal.review":
+    case "task.result_finalization":
       return runtimeInput;
     case "suggest":
     case "generate_plan":
@@ -1078,8 +1126,8 @@ async function persistRuntimeHistory(input: {
     for (let index = 0; index < history.messages.length; index += 1) {
       const message = history.messages[index];
       if (
-        typeof message?.role !== "string" ||
-        typeof message?.content !== "string" ||
+        typeof message.role !== "string" ||
+        typeof message.content !== "string" ||
         message.content.length === 0
       ) {
         continue;

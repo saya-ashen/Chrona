@@ -33,6 +33,19 @@ export async function approveCurrentNodeCommand<TContext>(input: {
       message: input.command.input.feedback ?? "Approval rejected",
     };
   }
+  const effective = resolveEffectivePlanGraph(approvedState);
+  const approvedNode = effective.nodes.find((node) => node.id === input.command.input.nodeId);
+  if (approvedNode?.status === "completed" && approvedNode.type === "task") {
+    return {
+      status: "completed",
+      currentNodeId: null,
+      executedNodeIds: [input.command.input.nodeId],
+      effective,
+      state: approvedState,
+      events: input.events,
+      message: "Approval accepted",
+    };
+  }
 
   const outcome = await runGraphExecution({
     taskId: input.options.taskId,
@@ -42,10 +55,14 @@ export async function approveCurrentNodeCommand<TContext>(input: {
     context: input.command.context as TContext,
     maxSteps: input.options.policies?.maxSteps,
     maxConcurrency: input.options.policies?.maxConcurrency,
-    forcedNodeId: input.command.input.nodeId,
+    forcedNodeId: approvedNode?.status === "completed" ? undefined : input.command.input.nodeId,
     userInput: input.command.input.userInput,
     now: input.options.now,
     callbacks: input.callbacks,
   });
-  return { ...outcome, events: input.events };
+  return {
+    ...outcome,
+    executedNodeIds: [input.command.input.nodeId, ...outcome.executedNodeIds],
+    events: input.events,
+  };
 }

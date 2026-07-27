@@ -23,7 +23,7 @@ function resolveRequestedFiles(paths: string[]) {
   return paths;
 }
 
-async function runWithFreshDatabase(file: string, fileDbPath: string): Promise<number> {
+async function runWithFreshDatabase(file: string, fileDbPath: string, dataDir: string): Promise<number> {
   if (existsSync(fileDbPath)) {
     rmSync(fileDbPath, { force: true });
   }
@@ -46,7 +46,12 @@ async function runWithFreshDatabase(file: string, fileDbPath: string): Promise<n
 
   const proc = Bun.spawn(["bun", "test", file], {
     cwd: rootDir,
-    env: { ...process.env, DATABASE_URL: `file:${fileDbPath}`, NODE_ENV: "test" },
+    env: {
+      ...process.env,
+      DATABASE_URL: `file:${fileDbPath}`,
+      CHRONA_DATA_DIR: dataDir,
+      NODE_ENV: "test",
+    },
     stdout: "inherit",
     stderr: "inherit",
   });
@@ -62,20 +67,23 @@ const files = requestedFiles.length > 0
 if (files.length === 0) {
   process.exit(0);
 }
-
 mkdirSync(tempDir, { recursive: true });
 
 let exitCode = 0;
 const failedFiles: Array<{ file: string; code: number }> = [];
-const pending = files.map((file, index) => ({ file, fileDbPath: resolve(tempDir, `bun-test-${index}.db`) }));
+const pending = files.map((file, index) => ({
+  file,
+  fileDbPath: resolve(tempDir, `bun-test-${index}.db`),
+  dataDir: resolve(tempDir, `bun-test-${index}-data`),
+}));
 
 console.log(`Running ${files.length} Bun test file${files.length === 1 ? "" : "s"} with concurrency ${concurrency}...`);
 
 try {
   const active = new Set<Promise<void>>();
-  const launch = (file: string, fileDbPath: string) => {
+  const launch = (file: string, fileDbPath: string, dataDir: string) => {
     const job = (async () => {
-      const code = await runWithFreshDatabase(file, fileDbPath);
+      const code = await runWithFreshDatabase(file, fileDbPath, dataDir);
       if (code !== 0) {
         exitCode = code;
         failedFiles.push({ file, code });
@@ -89,15 +97,14 @@ try {
     while (active.size >= concurrency) {
       await Promise.race(active);
     }
-    launch(item.file, item.fileDbPath);
+    launch(item.file, item.fileDbPath, item.dataDir);
   }
 
   await Promise.all(active);
 } finally {
-  for (const { fileDbPath } of pending) {
-    if (existsSync(fileDbPath)) {
-      rmSync(fileDbPath, { force: true });
-    }
+  for (const { fileDbPath, dataDir } of pending) {
+    if (existsSync(fileDbPath)) rmSync(fileDbPath, { force: true });
+    if (existsSync(dataDir)) rmSync(dataDir, { recursive: true, force: true });
   }
 }
 

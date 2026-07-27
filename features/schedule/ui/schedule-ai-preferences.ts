@@ -12,6 +12,8 @@ export const SCHEDULE_AI_PREFERENCES_STORAGE_KEY =
 const SCHEDULE_AI_PREFERENCES_UPDATED_EVENT =
   "chrona:schedule-ai-preferences-updated";
 
+export const SCHEDULE_AUTO_SUGGESTIONS_AVAILABLE = true;
+
 export const DEFAULT_SCHEDULE_AI_PREFERENCES: ScheduleAiPreferences = {
   autoSuggestionsEnabled: false,
   autoPlanGenerationEnabled: true,

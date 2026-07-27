@@ -1,3 +1,11 @@
+export {
+  STRUCTURED_RESULT_FORMAT,
+  STRUCTURED_RESULT_SCHEMA_VERSION,
+  isStructuredResultAssetContent,
+  type StructuredResultArtifactRef,
+  type StructuredResultAssetContent,
+} from "./goal-structured-result";
+
 // AI plan contracts — new architecture
 export type {
   CalendarAutomationPolicy,
@@ -148,11 +156,11 @@ export type {
 } from "./api/mcp-task-tools.schema";
 
 export {
-  CHRONA_PLAN_OUTPUT_TOOL_DESCRIPTION,
   agentControlActionBodySchema,
   agentControlActionKindSchema,
   agentControlActionPayloadSchemas,
   chronaPublicToolPayloadSchemas,
+  goalResultsReadPayloadSchema,
   chronaToolAffectedSchema,
   chronaToolContextSchema,
   chronaToolExpectedStateSchema,
@@ -170,9 +178,10 @@ export {
   chronaToolResultSchema,
   chronaToolStatusSchema,
   isChronaToolMutating,
-  describeChronaPlanOutputPublicTool,
   parseChronaToolPayload,
 } from "./api/mcp-task-tools.schema";
+
+export { autoCompleteBodySchema } from "./api/ai.schema";
 
 export {
   scheduleProjectionQuerySchema,
@@ -184,6 +193,34 @@ export {
   type ActionCenterItem,
   type ActionCenterProjection,
 } from "./api/projections.schema";
+export {
+  applyGoalReviewProposalBodySchema,
+  generateGoalReviewBodySchema,
+  goalReviewResultSchema,
+  rejectGoalReviewProposalBodySchema,
+} from "./api/goals.schema";
+export type {
+  CreateGoalTaskRequest,
+  ApplyGoalReviewRequest,
+  ApplyGoalReviewProposalRequest,
+  GenerateGoalReviewRequest,
+  GoalReviewEvidenceRef,
+  GoalReviewProposalItemDecision,
+  GoalReviewProposalItemKind,
+  GoalReviewProposalStatus,
+  GoalReviewResult,
+  RejectGoalReviewProposalRequest,
+  ConfirmGoalCriterionRequest,
+  CreateGoalRequest,
+  CreateGoalWithFirstTaskRequest,
+  ProcessGoalResultRequest,
+  GoalActionRequest,
+  GoalOperationalBrief,
+  GoalStatus,
+  GoalSuccessCriterion,
+  PromoteTaskToGoalRequest,
+  ReviewGoalCriterionRequest,
+} from "./api/goals.schema";
 export {
   clearScheduleParamSchema,
   scheduleBodySchema,
@@ -214,6 +251,8 @@ export type {
   PlanNodeType,
   TaskExecutor,
   TaskMode,
+  UserInteractionLevel,
+  CheckpointSchemaSource,
   CheckpointType,
   InputFieldType,
   GeneratePlanBlueprintToolPayload,
@@ -235,6 +274,8 @@ export {
   AI_PLAN_NODE_TYPES,
   AI_TASK_EXECUTORS,
   AI_TASK_MODES,
+  AI_USER_INTERACTION_LEVELS,
+  AI_CHECKPOINT_SCHEMA_SOURCES,
   AI_CHECKPOINT_TYPES,
   AI_INPUT_FIELD_TYPES,
   AI_CONDITION_EVALUATORS,
@@ -302,13 +343,24 @@ export type {
   WebPlanNodeStatus,
   NodeExecutionAttempt,
   CheckpointResponse,
+  CheckpointFieldValue,
+  CheckpointInputFields,
   CheckpointActionKind,
   SubmitCheckpointActionInput,
   ArtifactRef,
   NodeResultEvidence,
-  PlanOutputPatch,
-  PlanOutputRevision,
   PlanOutputState,
+  AiArtifactRef,
+  DeliverableKind,
+  DeliverablePresentation,
+  NodeDeliverableDeclaration,
+  NodeDeliverable,
+  ResultContribution,
+  ResultEvidence,
+  ResultReadiness,
+  ResultManifest,
+  ResultFinalizationState,
+  FinalizedResult,
   ExecutionContextSnapshot,
   NodeAttempt,
   RuntimeCommand,
@@ -358,6 +410,10 @@ export type {
 } from "./ai-feature-specs";
 
 export type { AiFeatureToolSpec } from "./ai-feature-specs";
+export {
+  buildGoalAssetOwnershipFeatureSpec,
+  buildResultFinalizationFeatureSpec,
+} from "./ai-feature-specs";
 
 export type { StructuredSuggestion } from "./ai-shared-types";
 
@@ -461,3 +517,27 @@ export {
   webPlanNodeStatusForRuntimeStatus,
 } from "./plan-runtime";
 export * from "./provider-capability-matrix";
+
+export type {
+  ApplyGoalAssetOwnershipRequest,
+  CreateAssetModificationTaskRequest,
+  CreateGoalAssetJobRequest,
+  GenerateGoalAssetOwnershipRequest,
+  GoalAssetOwnershipCandidate,
+  GoalAssetOwnershipDecision,
+  GoalAssetOwnershipProposalStatus,
+  GoalAssetOwnershipResult,
+  CreateGoalFormSubmissionRequest,
+  ResolveGoalInboxCandidateRequest,
+  SaveGoalAssetDraftRequest,
+  SubmitGoalAssetDraftRequest,
+} from "./api/goal-workbench.schema";
+export {
+  applyGoalAssetOwnershipBodySchema,
+  generateGoalAssetOwnershipBodySchema,
+  goalAssetOwnershipCandidateSchema,
+  goalAssetOwnershipDecisionSchema,
+  goalAssetOwnershipProposalParamSchema,
+  goalAssetOwnershipProposalStatusSchema,
+  goalAssetOwnershipResultSchema,
+} from "./api/goal-workbench.schema";

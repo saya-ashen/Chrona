@@ -179,6 +179,9 @@ export function TaskWorkspaceExecutionOverview({
   artifacts,
   activity,
   currentExecution,
+  onRetryFinalization,
+  isRetryingFinalization = false,
+  finalizationRetryError,
   runtimeEvents = [],
   liveActivity = [],
   copy: copyProp,
@@ -200,6 +203,9 @@ export function TaskWorkspaceExecutionOverview({
   currentExecution?: Pick<PlanExecutionResult, "status" | "planOutput"> | null;
   runtimeEvents?: WorkspaceRuntimeEvent[];
   liveActivity?: WorkspaceActivityItem[];
+  onRetryFinalization?: () => Promise<void> | void;
+  isRetryingFinalization?: boolean;
+  finalizationRetryError?: string | null;
   primaryAction?: CommandCenterPrimaryAction | null;
   copy?: Partial<CommandCenterCopy>;
   activityLayout?: ActivityLayout;
@@ -251,11 +257,20 @@ export function TaskWorkspaceExecutionOverview({
   const activeActivity = mergedActivity.find((item) =>
     isRunningActivity(item, mergedActivity),
   );
-  const executionIsActive = isExecutionRunning
+  const executionIsWaitingForHuman = currentExecution?.status === "waiting_for_user"
+    || currentExecution?.status === "waiting_for_approval";
+  const executionIsLive = !executionIsWaitingForHuman && (
+    isExecutionRunning
     || currentExecution?.status === "running"
-    || currentExecution?.status === "started";
+    || currentExecution?.status === "started"
+  );
+  const executionIsActive = executionIsLive || executionIsWaitingForHuman;
+  const finalization = currentExecution?.planOutput?.finalization;
+  const finalizationFailed = !executionIsActive && finalization?.status === "Failed";
+  const finalizationRunning = !executionIsActive && finalization?.status === "Running";
+  const finalizationReady = !executionIsActive && finalization?.status === "Ready";
   const activityHeartbeat = useMemo<WorkspaceActivityItem | null>(() => {
-    if (!executionIsActive || activeActivity) return null;
+    if (!executionIsLive || activeActivity) return null;
     const latestRuntime = runtimeEvents.at(-1);
     return {
       id: "execution-live-heartbeat",
@@ -272,7 +287,7 @@ export function TaskWorkspaceExecutionOverview({
       provider: latestRuntime?.provider,
       runtimeName: latestRuntime?.runtimeName,
     };
-  }, [activeActivity, executionIsActive, runtimeEvents]);
+  }, [activeActivity, executionIsLive, runtimeEvents]);
   const displayedActivity = useMemo(
     () => activityHeartbeat
       ? mergeWorkspaceActivity([activityHeartbeat, ...mergedActivity], TRAIL_ACTIVITY_LIMIT)
@@ -290,16 +305,31 @@ export function TaskWorkspaceExecutionOverview({
     ?? runningResultActivity?.title
     ?? ws.executionWorkingFallback
     ?? "AI is working";
-  const showLiveStatus = executionIsActive;
-  const activityItems = useMemo(
-    () => [...displayedActivity].reverse(),
-    [displayedActivity],
-  );
+  const showLiveStatus = executionIsLive;
+  const activityItems = displayedActivity;
   const failedActivityCount = activityItems.filter((item) => item.tone === "danger").length;
-  const activitySummary = executionIsActive
+  const activitySummary = executionIsLive
     ? `${activityItems.length} events · live`
     : `${activityItems.length} events${failedActivityCount > 0 ? ` · ${failedActivityCount} failed` : ""}`;
   const failedActivity = activityItems.find((item) => item.tone === "danger");
+  const failedNode = nodes.find((node) => node.status === "failed");
+  const failedNodeError = failedNode?.result?.error?.trim()
+    || (typeof failedNode?.metadata?.error === "string" ? failedNode.metadata.error.trim() : "")
+    || null;
+  const executionHasFatalFailure = currentExecution?.status === "failed"
+    || currentExecution?.status === "blocked";
+  const failureSummary = failedNodeError
+    || failedActivity?.summary
+    || (failedNode ? `${failedNode.title} failed.` : null);
+  const failureAlert = executionHasFatalFailure && failureSummary ? (
+    <div className="mb-3 flex items-start gap-2 rounded-lg border border-destructive/25 bg-destructive/5 px-3 py-2" role="alert">
+      <TriangleAlert className="mt-0.5 size-4 shrink-0 text-destructive" aria-hidden />
+      <div className="min-w-0">
+        <p className="text-xs font-semibold text-destructive">Run had a failure</p>
+        <p className="mt-0.5 text-xs text-muted-foreground">{failureSummary}</p>
+      </div>
+    </div>
+  ) : null;
   const activityContent = (
     <ActivityTimeline
       items={activityItems}
@@ -437,7 +467,11 @@ export function TaskWorkspaceExecutionOverview({
           >
             {executionIsActive
               ? (ws.stageResultsTitle ?? "Stage results")
-              : (ws.finalResultTitle ?? "Final result")}
+              : finalizationFailed
+                ? (ws.finalizationFailedTitle ?? "Final result unavailable")
+                : finalizationRunning
+                  ? (ws.finalizationRunningTitle ?? "Preparing final result")
+                  : (ws.finalResultTitle ?? "Final result")}
           </h3>
           <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
             <Badge
@@ -445,14 +479,24 @@ export function TaskWorkspaceExecutionOverview({
               className={
                 executionIsActive
                   ? "bg-sky-500/10 text-sky-700 dark:text-sky-200"
-                  : "bg-violet-500/10 text-violet-700 dark:text-violet-200"
+                  : finalizationFailed
+                    ? "border-destructive/30 bg-destructive/10 text-destructive"
+                    : finalizationRunning
+                      ? "bg-amber-500/10 text-amber-700 dark:text-amber-200"
+                      : "bg-violet-500/10 text-violet-700 dark:text-violet-200"
               }
             >
               {executionIsActive
                 ? liveResultSpec || executionResultState === "available"
                   ? (ws.resultsAvailableBadge ?? "Results available")
                   : (ws.resultsPendingBadge ?? "No result yet")
-                : (ws.aiGeneratedBadge ?? "AI generated")}
+                : finalizationFailed
+                  ? (ws.finalizationFailedBadge ?? "Finalization failed")
+                  : finalizationRunning
+                    ? (ws.finalizationRunningBadge ?? "Preparing")
+                    : finalizationReady
+                      ? (ws.aiGeneratedBadge ?? "AI generated")
+                      : (ws.finalizationUnavailableBadge ?? "Artifacts only")}
             </Badge>
             <span>
               {executionIsActive
@@ -461,11 +505,41 @@ export function TaskWorkspaceExecutionOverview({
                     "Current output and completed step results collected during this run.")
                   : (ws.resultsPendingDescription ??
                     "The current step has not produced viewable output yet. Follow execution activity for live progress.")
-                : (ws.validatedOutputDescription ??
-                  "Validated output from task execution.")}
+                : finalizationFailed
+                  ? (ws.finalizationFailedDescription ??
+                    "Chrona could not assemble the final result. Generated files remain available below.")
+                  : finalizationRunning
+                    ? (ws.finalizationRunningDescription ??
+                      "Chrona is assembling and validating the final result.")
+                    : finalizationReady
+                      ? (ws.validatedOutputDescription ??
+                        "Validated output from task execution.")
+                      : (ws.finalizationUnavailableDescription ??
+                        "The final result is unavailable. Generated files are shown below.")}
             </span>
           </div>
-          {executionIsActive ? (
+          {finalizationFailed ? (
+            <div className="mt-3 space-y-2 rounded-xl border border-destructive/30 bg-destructive/5 px-3 py-3 text-sm" role="alert">
+              <p className="font-medium text-foreground">
+                {ws.finalizationFailedActionDescription ??
+                  "Retry finalization to assemble and validate the complete result."}
+              </p>
+              {finalizationRetryError ? (
+                <p className="text-xs text-destructive">{finalizationRetryError}</p>
+              ) : null}
+              <Button
+                type="button"
+                size="sm"
+                onClick={() => void onRetryFinalization?.()}
+                disabled={!onRetryFinalization || isRetryingFinalization}
+              >
+                {isRetryingFinalization
+                  ? (ws.finalizationRetrying ?? "Retrying finalization...")
+                  : (ws.finalizationRetry ?? "Retry finalization")}
+              </Button>
+            </div>
+          ) : null}
+          {showLiveStatus ? (
             <div
               className="mt-3 flex items-start gap-3 rounded-xl border border-sky-300/70 bg-sky-500/5 px-3 py-3 text-sm"
               role="status"
@@ -583,8 +657,8 @@ export function TaskWorkspaceExecutionOverview({
           <div className="flex items-center gap-2">
             <TerminalSquare className="size-4 text-primary" aria-hidden />
             <h3 className="font-heading text-base font-semibold text-foreground">Agent transcript</h3>
-            <Badge variant={executionIsActive ? "default" : "secondary"}>
-              {executionIsActive ? "Live" : "Completed"}
+            <Badge variant={executionIsLive ? "default" : "secondary"}>
+              {executionIsLive ? "Live" : executionIsWaitingForHuman ? "Paused" : "Completed"}
             </Badge>
           </div>
           <p className="mt-1 text-xs text-muted-foreground">{activitySummary}</p>
@@ -593,25 +667,16 @@ export function TaskWorkspaceExecutionOverview({
           <span className="text-xs font-medium text-muted-foreground">{runtimeEvents.at(-1)?.provider}</span>
         ) : null}
       </div>
-      {failedActivity ? (
-        <div className="mt-3 flex items-start gap-2 rounded-lg border border-destructive/25 bg-destructive/5 px-3 py-2">
-          <TriangleAlert className="mt-0.5 size-4 shrink-0 text-destructive" aria-hidden />
-          <div className="min-w-0">
-            <p className="text-xs font-semibold text-destructive">Run had a failure</p>
-            <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{failedActivity.summary}</p>
-          </div>
-        </div>
-      ) : null}
     </div>
   );
 
   const activityTimeline = (
     <section
       aria-label={copy.trailTab}
-      className="min-h-0 overflow-y-auto rounded-xl border border-border/60 bg-background/70 p-4"
+      className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-border/60 bg-background/70"
     >
-      {activityHeader}
-      <div className="mt-3">{activityContent}</div>
+      <div className="z-10 shrink-0 bg-background/95 p-4 pb-0 backdrop-blur supports-[backdrop-filter]:bg-background/85">{activityHeader}</div>
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4 pt-3">{activityContent}</div>
     </section>
   );
 
@@ -634,12 +699,12 @@ export function TaskWorkspaceExecutionOverview({
           <Badge variant="secondary" className="h-5 min-w-5 px-1.5 text-[10px]">{activityItems.length}</Badge>
         </span>
       </SheetTrigger>
-      <SheetContent className="w-[92vw] max-w-[62rem] overflow-y-auto data-[side=right]:sm:w-[72vw] data-[side=right]:sm:max-w-[62rem]">
-        <SheetHeader className="border-b border-border/60">
+      <SheetContent className="w-[92vw] max-w-[62rem] gap-0 overflow-hidden data-[side=right]:w-[92vw] data-[side=right]:sm:w-[72vw] data-[side=right]:sm:max-w-[62rem]">
+        <SheetHeader className="z-10 shrink-0 border-b border-border/60 bg-popover/95 backdrop-blur supports-[backdrop-filter]:bg-popover/85">
           <SheetTitle>Agent transcript</SheetTitle>
-          <SheetDescription>Intent, tool calls, results, and execution state in chronological order.</SheetDescription>
+          <SheetDescription>Intent, tool calls, results, and execution state. Latest activity appears first.</SheetDescription>
         </SheetHeader>
-        <div className="px-5 pb-8 pt-4">{activityHeader}<div className="mt-4">{activityContent}</div></div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-8 pt-4"><div className="mt-1">{activityContent}</div></div>
       </SheetContent>
     </Sheet>
   ) : null;
@@ -650,6 +715,7 @@ export function TaskWorkspaceExecutionOverview({
       aria-label={ws.executionOverviewAria}
       className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
     >
+      {failureAlert}
       {executionIsActive ? (
         <Tabs defaultValue="activity" className="min-h-0 flex-1 xl:hidden">
           <TabsList className="grid w-full grid-cols-2">

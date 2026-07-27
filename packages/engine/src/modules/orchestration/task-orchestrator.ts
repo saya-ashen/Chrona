@@ -2,6 +2,7 @@ import { readTaskOrchestratorConfig, type TaskOrchestratorConfig } from "./orche
 import { runDueAutoPlanGenerationWorker } from "./due-auto-plan-generation-worker";
 import { runDueScheduledWorkWorker } from "./due-scheduled-work-worker";
 import { runGraphAdvancementWorker } from "./graph-advancement-worker";
+import { runGoalReviewDueWorker } from "./goal-review-due-worker";
 import { runRecurringWorkBlockExpansionWorker } from "./recurring-work-block-expansion-worker";
 import { runRestartRecoveryWorker } from "./restart-recovery-worker";
 import { TaskPlanGenerationInFlightError } from "@/modules/plans/task-plan-generation-registry";
@@ -160,6 +161,12 @@ export function createDefaultTaskOrchestratorWorkers(): TaskOrchestratorWorker[]
       name: "recurring-work-block-expansion",
       async run() {
         await runRecurringWorkBlockExpansionWorker();
+      },
+    },
+    {
+      name: "goal-review-due",
+      async run() {
+        await runGoalReviewDueWorker();
       },
     },
     {

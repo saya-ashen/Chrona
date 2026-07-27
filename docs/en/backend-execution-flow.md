@@ -20,6 +20,8 @@ This document traces the current backend path from task creation to plan executi
 | Task workspace command | `POST /api/work/:taskId/commands` |
 | Task workspace events | `GET /api/work/:taskId/events` |
 | MCP tools | `POST /api/mcp` |
+| Goal query/lifecycle | `GET/POST /api/goals`, `GET/PATCH /api/goals/:goalId`, `POST /api/goals/:goalId/actions` |
+| Accepted-result promotion | `POST /api/tasks/:taskId/actions/promote-to-goal` |
 
 ## End-to-end flow
 
@@ -42,6 +44,17 @@ flowchart TD
   M --> J
   J -->|complete| P[Complete session, task, WorkBlock, projection]
 ```
+
+## Goal boundary
+
+A Goal is durable outcome state above the execution flow. Goal create/update and
+explicit lifecycle actions do not start a Provider, Plan, Run, or
+ExecutionSession. Bounded linked Tasks continue through the flow below.
+Accepted-result promotion is one database transaction: validate the accepted
+Run and selected Artifact ownership, create the Goal, associate `Task.goalId`,
+create read-only GoalAsset references, and record an idempotent promotion Event.
+Failure rolls the whole operation back; source result and Artifact rows remain
+unchanged.
 
 ## Task creation
 
@@ -122,6 +135,19 @@ to.
 | `failed` | `Run.status=Failed` + `errorSummary`; session `Paused` → `Blocked` (`run_failed`) carrying the real error + node id |
 | `replan_required` | Session `Paused`, `pauseReason=replan_required` → `WaitingForApproval` (replan) |
 
+An authoritative Task/Run/session wait outranks other graph nodes that are merely
+`ready`. A paused `user_input` or approval session must therefore project an
+execution checkpoint even when another independent or downstream node is ready;
+otherwise the workspace loses the persisted action form while still saying that
+input is required.
+
+Before invoking a node, the engine also projects the Task's frozen Goal context
+snapshot into the AI-visible runtime input. Only the bounded Goal title,
+additional context, operational brief, capture time, and accepted-result catalog
+are forwarded. Database identifiers and unrelated `goalContext` extension fields
+remain server-owned. Nodes must use this supplied context before requesting the
+same information from the user again.
+
 ## Context segments
 
 Provider sessions are not the same as Chrona execution sessions. Chrona should use context segments as the default long-task provider-session boundary: related plan nodes share one provider task session, then Chrona writes a structured segment summary and switches to the next segment session.
@@ -155,6 +181,23 @@ External agents use `POST /api/mcp` tools. Chrona injects hidden context such as
 
 Important rule: agents must not invent backend IDs. They should call read tools only when state is missing or stale, and submit final node outcomes with the appropriate Chrona tool.
 
+## Canonical task-result flow
+
+Task nodes do not co-author a shared json-render page. A task node submits one terminal semantic result containing its summary, keyed findings, decisions, caveats, next actions, evidence, and generated-file deliverable declarations.
+
+Chrona then owns the result lifecycle:
+
+1. Resolve every generated file inside the generated-files root, verify its canonical path and file metadata, register a Run-owned `Artifact`, and replace the declaration with an opaque `AF...` reference.
+2. Persist the immutable `NodeResult` with semantic provenance.
+3. Deterministically aggregate current node results into `ResultManifest`. Its revision advances only when canonical result content changes.
+4. After graph completion, run the internal `task.result_finalization` AI feature with no MCP/LSP tools. It may organize only Manifest facts and declared Artifact refs into one adaptive semantic canvas validated against the restricted result catalog. The Manifest describes content, not page sections; the finalizer chooses composition, grouping, and order from the result's actual shape instead of a fixed report template.
+5. Semantic validation requires declared Artifact and provenance keys, visible non-ready limitations, coverage of primary content, and bounded element count and nesting depth. The host strips authority-bearing props and retains Task status, acceptance, permissions, downloads, and Goal lifecycle controls outside the AI Spec.
+6. Persist finalization independently as `Pending -> Running -> Ready | Failed`. Finalization failure does not convert completed execution into failure.
+7. Render only a `Ready` finalized result. The host resolves opaque Artifact refs into safe previews and download routes without persisting host-only paths or URLs in the Spec.
+8. `task.result_accepted` records review state independently from Task execution status. For Goal-owned Tasks, acceptance idempotently creates or refreshes a pending Workbench Inbox candidate; a user must still confirm creation of a formal `GoalAsset`.
+
+The removed `chrona.plan.output` / RFC 6902 path is not a compatibility surface. Providers and clients submit semantic node results through `chrona.node.complete` only.
+
 ## Accepted-result continuation
 
 Accepting a result freezes the task's accepted Run, result spec, artifacts, plan, and execution state, but the provider conversation can continue for result questions. `GET /api/tasks/:taskId/result/follow-up` restores persisted continuation history and reports whether the accepted Run's provider session is available.
@@ -185,6 +228,12 @@ When no ready nodes remain, the runner transitions the `ExecutionSession` to
 committer derives the `Completed` task status from the completed session/run —
 the runner never writes the status itself. Work, Schedule, and Action Center then
 reflect the updated state.
+
+These are current single-task semantics. A known design gap remains for
+recurring series: completing one occurrence must not permanently complete the
+series or stop future expansion. The accepted migration separates task
+definition lifecycle from occurrence execution state; see
+[Long-Horizon Goals and Triggers](./long-horizon-goals-and-triggers.md).
 
 ## Task state authority
 
@@ -217,6 +266,12 @@ latest `ExecutionSession` in any state, falling back to the latest plan's work
 block before any run exists). A failed or cancelled occurrence therefore never
 bleeds its state onto a sibling occurrence — a fresh occurrence with a
 just-generated plan is unaffected by an earlier occurrence's provider failure.
+
+`WorkBlock` is the current occurrence identity because all shipped automatic
+activation is schedule-based. The accepted target replaces this coupling with
+a neutral `TaskOccurrence`, with WorkBlock retained as an optional calendar
+container. Until that migration ships, `workBlockId` remains the authoritative
+scope and must not be mixed with hypothetical `occurrenceId` behavior.
 
 ### Projection refresh invariant
 

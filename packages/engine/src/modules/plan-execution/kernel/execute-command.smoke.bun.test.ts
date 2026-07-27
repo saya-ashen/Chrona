@@ -40,6 +40,60 @@ describe("kernel executeCommand (single-writer)", () => {
     ]);
   });
 
+  it("passes the Task's frozen Goal snapshot into node execution", async () => {
+    executeTaskNodeCapabilityMock.mockResolvedValue({
+      status: "started",
+      summary: "Runtime run started",
+      evidence: { sessionId: "main-session", runId: "run-goal-context" },
+    });
+
+    const { workspace, task } = await seedWorkspaceAndTask("Kernel Goal context");
+    await db.task.update({
+      where: { id: task.id },
+      data: {
+        goalContext: {
+          goal: {
+            title: "Apply for an AI Agent PhD",
+            additionalContext: "Bioinformatics graduate student; AI, Agent, LLM.",
+            operationalBrief: {
+              outcome: "Apply for an AI Agent PhD",
+              currentFocus: "Find positions",
+              strategy: "",
+              constraints: ["Fully funded"],
+            },
+            capturedAt: "2026-07-25T12:25:05.730Z",
+          },
+          acceptedResults: [],
+          internalTaskId: "must-not-be-forwarded",
+        },
+      },
+    });
+    const compiledPlan = makeTwoTaskPlan("graph_kernel_goal_context");
+    await seedAcceptedCompiledPlan(workspace.id, task.id, compiledPlan);
+
+    await executeCommand({
+      taskId: task.id,
+      command: { type: "start", trigger: "manual" },
+    });
+
+    const call = executeTaskNodeCapabilityMock.mock.calls[0]?.[0];
+    expect(call?.planContext?.goalContext).toEqual({
+      goal: {
+        title: "Apply for an AI Agent PhD",
+        additionalContext: "Bioinformatics graduate student; AI, Agent, LLM.",
+        operationalBrief: {
+          outcome: "Apply for an AI Agent PhD",
+          currentFocus: "Find positions",
+          strategy: "",
+          constraints: ["Fully funded"],
+        },
+        capturedAt: "2026-07-25T12:25:05.730Z",
+      },
+      acceptedResults: [],
+    });
+    expect(JSON.stringify(call?.planContext)).not.toContain("must-not-be-forwarded");
+  });
+
   it("does not start a second provider attempt when start is retried while running", async () => {
     executeTaskNodeCapabilityMock.mockResolvedValue({
       status: "started",
@@ -204,6 +258,7 @@ describe("kernel executeCommand (single-writer)", () => {
     const beforeRestartSession = await db.executionSession.findFirstOrThrow({
       where: { taskId: task.id, status: "Active" },
     });
+    const beforeRestart = await getPlanRun(task.id, compiledPlan.editablePlanId);
 
     const restarted = await executeCommand({ taskId: task.id, command: { type: "restart_from_beginning", trigger: "manual" } });
 
@@ -219,11 +274,64 @@ describe("kernel executeCommand (single-writer)", () => {
     expect(persisted?.attempts.map((a) => [a.nodeId, a.status])).toEqual([
       ["first_task", "running"],
     ]);
+    expect(persisted?.executionEpoch).toBeGreaterThan(beforeRestart?.executionEpoch ?? 0);
 
     const abandonedSession = await db.executionSession.findUniqueOrThrow({
       where: { id: beforeRestartSession.id },
       select: { status: true },
     });
     expect(abandonedSession).toEqual({ status: "Abandoned" });
+  });
+
+  it("atomically reactivates task and projection when restarting a completed graph", async () => {
+    executeTaskNodeCapabilityMock
+      .mockResolvedValueOnce({
+        status: "done",
+        summary: "First task finished",
+        evidence: { sessionId: "main-session", runId: "run-first" },
+      })
+      .mockResolvedValueOnce({
+        status: "done",
+        summary: "Second task finished",
+        evidence: { sessionId: "main-session", runId: "run-second" },
+      })
+      .mockResolvedValueOnce({
+        status: "started",
+        summary: "First task restarted",
+        evidence: { sessionId: "main-session-restart", runId: "run-first-restart" },
+        output: { runtimeRunRef: "runtime-first-restart" },
+      });
+
+    const { workspace, task } = await seedWorkspaceAndTask("Kernel completed restart");
+    const compiledPlan = makeTwoTaskPlan("graph_kernel_completed_restart");
+    await seedAcceptedCompiledPlan(workspace.id, task.id, compiledPlan);
+
+    const completed = await executeCommand({
+      taskId: task.id,
+      command: { type: "start", trigger: "manual" },
+    });
+    expect(completed.status).toBe("completed");
+    expect(await db.task.findUniqueOrThrow({ where: { id: task.id } })).toMatchObject({
+      status: "Completed",
+      completedAt: expect.any(Date),
+    });
+
+    const restarted = await executeCommand({
+      taskId: task.id,
+      command: { type: "restart_from_beginning", trigger: "manual" },
+    });
+
+    expect(restarted.status).toBe("running");
+    expect(restarted.currentNodeId).toBe("first_task");
+    expect(await db.task.findUniqueOrThrow({ where: { id: task.id } })).toMatchObject({
+      status: "Running",
+      completedAt: null,
+    });
+    expect(await db.taskProjection.findUniqueOrThrow({ where: { taskId: task.id } })).toMatchObject({
+      persistedStatus: "Running",
+      displayState: "ExecutionActive",
+      currentNodeId: "first_task",
+    });
+    expect(await db.executionSession.count({ where: { taskId: task.id, status: "Active" } })).toBe(1);
   });
 });

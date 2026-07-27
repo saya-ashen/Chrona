@@ -1,5 +1,6 @@
 import type {
   CheckpointActionKind,
+  CheckpointInputFields,
   ExecutionCheckpoint,
   PostCheckpointTransition,
 } from "@chrona/contracts/ai";
@@ -35,17 +36,19 @@ export function resolveCheckpointAction(input: {
   return TRANSITION_BY_ACTION[input.action](input.payload);
 }
 
-export function checkpointPayloadFields(payload: unknown): Record<string, string> {
+export function checkpointPayloadFields(payload: unknown): CheckpointInputFields {
   if (!payload || typeof payload !== "object") return {};
   const record = payload as Record<string, unknown>;
   const source = typeof record.inputFields === "object" && record.inputFields
     ? record.inputFields as Record<string, unknown>
     : record;
   return Object.fromEntries(
-    Object.entries(source)
-      .filter(([, value]) => typeof value === "string")
-      .map(([key, value]) => [key, value as string]),
-  );
+    Object.entries(source).filter(([, value]) =>
+      typeof value === "string" ||
+      typeof value === "boolean" ||
+      (Array.isArray(value) && value.every((entry) => typeof entry === "string")),
+    ),
+  ) as CheckpointInputFields;
 }
 
 export function checkpointPayloadText(payload: unknown) {

@@ -49,8 +49,8 @@ export function approveCurrentNodeResult(input: {
     ...input.state,
     attempts: input.approved
       ? input.state.attempts.map((attempt) =>
-          attempt.nodeId === input.nodeId && attempt.status === "succeeded"
-            ? { ...attempt, status: "cancelled" }
+          attempt.nodeId === input.nodeId && ["running", "succeeded"].includes(attempt.status)
+            ? { ...attempt, status: "succeeded", finishedAt: input.reviewedAt }
             : attempt,
         )
       : input.state.attempts,
@@ -161,7 +161,7 @@ export function submitNodeResultState(input: {
       status: "stale",
       outputSummary:
         input.nodeResult.status === "done"
-          ? input.nodeResult.summary ?? currentResult?.outputSummary
+          ? input.nodeResult.summary
           : undefined,
       error: input.nodeResult.status === "failed"
         ? input.nodeResult.error
@@ -170,6 +170,16 @@ export function submitNodeResultState(input: {
           : undefined,
       evidence: normalizeResultEvidence(input.nodeResult.evidence),
       selectedBranch: input.nodeResult.status === "done" ? input.nodeResult.selectedBranch : undefined,
+      ...(input.nodeResult.status === "done"
+        ? {
+            deliverables: input.nodeResult.deliverables,
+            findings: input.nodeResult.findings,
+            decisions: input.nodeResult.decisions,
+            caveats: input.nodeResult.caveats,
+            nextActions: input.nodeResult.nextActions,
+            resultEvidence: input.nodeResult.resultEvidence,
+          }
+        : {}),
     };
     return {
       ...input.state,
@@ -208,9 +218,15 @@ export function submitNodeResultState(input: {
         syncedResult = {
           ...baseResult,
           status: "current",
-          outputSummary: input.nodeResult.summary ?? currentResult?.outputSummary,
+          outputSummary: input.nodeResult.summary,
           evidence,
           selectedBranch: input.nodeResult.selectedBranch,
+          deliverables: input.nodeResult.deliverables,
+          findings: input.nodeResult.findings,
+          decisions: input.nodeResult.decisions,
+          caveats: input.nodeResult.caveats,
+          nextActions: input.nodeResult.nextActions,
+          resultEvidence: input.nodeResult.resultEvidence,
         };
         attemptStatus = "succeeded";
       }

@@ -1,5 +1,6 @@
 import { ENGINE_ERROR_CODES, engineErrorFromUnknown } from "../errors";
 import { tasks } from "../modules/tasks";
+import { finalizeTaskResult } from "../modules/plan-execution";
 
 export function createTaskResultService() {
   return {
@@ -11,6 +12,22 @@ export function createTaskResultService() {
           cause,
           ENGINE_ERROR_CODES.INVALID_TASK_STATE,
           "Failed to accept task result",
+        );
+      }
+    },
+    async retryFinalization(input: Parameters<typeof finalizeTaskResult>[0]) {
+      try {
+        const planOutput = await finalizeTaskResult({ ...input, force: true });
+        return {
+          taskId: input.taskId,
+          finalizedResult: planOutput.finalizedResult,
+          finalization: planOutput.finalization,
+        };
+      } catch (cause) {
+        throw engineErrorFromUnknown(
+          cause,
+          ENGINE_ERROR_CODES.INVALID_TASK_STATE,
+          "Failed to finalize task result",
         );
       }
     },

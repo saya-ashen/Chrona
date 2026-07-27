@@ -1,4 +1,8 @@
+import { z } from "zod";
+import { chronaResultSpecJsonSchema } from "@chrona/ui-protocol";
 import type { GenerateTaskPlanRequest } from "./plan-runtime";
+import { goalAssetOwnershipResultSchema } from "./api/goal-workbench.schema";
+import { goalReviewResultSchema } from "./api/goals.schema";
 import { planBlueprintSchema } from "./ai-plan-blueprint";
 
 export type AiFeatureToolSpec = {
@@ -19,7 +23,10 @@ export type StructuredAiFeature =
   | "generate_plan"
   | "execute_task_node"
   | "evaluate_condition_node"
-  | "review_checkpoint_node";
+  | "review_checkpoint_node"
+  | "task.result_finalization"
+  | "goal.asset_ownership"
+  | "goal.review";
 
 export type PreparedAiFeatureSpec = {
   feature: StructuredAiFeature;
@@ -63,12 +70,17 @@ Only include fields that belong to the chosen node type. Do NOT copy task-only f
 The core execution unit. Describes WHAT to do, not HOW to do it.
 - executor: "ai" (AI/runtime can execute), "user" (human must do it), "system" (deterministic software automation)
 - mode: "auto" (fully automatic), "assist" (AI helps but user active), "manual" (user does it)
+- Every task node must set userInteraction to either {level:"not_expected"} or {level:"possible",reason:"..."}.
+- Use "possible" when the task can still produce a correct, useful result without user input, but runtime discoveries may reveal an ambiguity, preference, or tradeoff worth asking about. The reason must name that concrete trigger. Do not predefine fields because runtime context determines the request.
+- "not_expected" is an expectation, not a restriction: runtime AI may still request input if an unanticipated information gap appears.
 - Do NOT specify tool calls, API calls, integrations, or AI actions inside the node — those are runtime concerns. A step that calls a tool (create calendar, send email, read context) is still a single task node.
 
 ### checkpoint
-Interaction gate for human confirmation, input, choice, edit, or approval.
+Mandatory human interaction gate. Use only when execution must pause for the user regardless of what runtime work discovers.
+- interaction.schemaSource: "static" when the complete form is known now; use checkpointType/options/inputFields to define it.
+- interaction.schemaSource: "ai" when participation is mandatory but the concrete question, choices, recommendations, or defaults depend on prior execution; include interaction.instruction and do not invent placeholder fields.
 - checkpointType: "confirm" (yes/no), "choose" (pick from options), "input" (fill fields), "edit" (modify something), "approve" (sign-off gate)
-- prompt: what to show the user; options: for "choose"; inputFields: for "input"; required: whether it can be skipped
+- prompt: user-facing purpose of the gate; required: whether it can be skipped. For ai-defined checkpoints, Runtime AI constructs the actual request later.
 
 ### condition
 Branching gate that evaluates a condition and routes to different paths.
@@ -82,19 +94,21 @@ Pause execution for a duration or external event.
 - waitFor: what is being waited for
 - timeout: optional {minutes, onTimeout}; onTimeout: "continue" | "pause" | "fail" | "notify_user"
 
-## Sizing — match structure to the task, never pad it
+## Plan shape — model every necessary state transition
 
-- Use the fewest nodes the task genuinely needs. For simple fetch/summarize/report tasks, prefer 1-3 nodes total. A simple task may be a SINGLE task node that both does the work and delivers the result.
-- Typical tasks use 3-5 nodes. Use 6-8 only for real branching, user checkpoints, external waits, or clearly independent parallel work. Use more than 8 only for complex multi-phase work.
-- Do not split one coherent action into micro-nodes; keep tightly coupled work in one task node.
-- Prefer a mostly linear graph. Use multiple entry nodes only for real parallel work where each entry feeds the same final deliverable.
-- Add a node only if it changes execution state, gathers required user input, waits for an external event, branches the flow, gates real risk, or performs necessary work toward the final deliverable. Otherwise remove or merge it.
+- Choose the graph structure from execution dependencies, not a target node count. A simple task may be one task node; a complex task may use as many nodes as its real work, decisions, required user input, waits, and branches need.
+- Keep coherent work together, but never merge across a state boundary: required user participation, approval, an external wait, a branch decision, or independently executable work deserves its own node.
+- Prefer a readable graph with meaningful nodes. Remove nodes that only restate, narrate, summarize, or hand off work already owned by another node.
+- Add every node needed for correctness even when that makes the plan longer. Do not omit a checkpoint, wait, condition, dependency, or final consuming task merely to keep the graph compact.
 
-## Minimize user friction
+## User participation — distinguish optional help from required facts
 
-- Do not interrupt the user unless correctness, safety, or a genuine user decision requires it.
-- Do not add checkpoints for low-risk internal progress reviews, status updates, summaries, or "verify before continuing" steps.
-- When user input is needed, use the least-effort checkpoint: "confirm" for yes/no, "choose" when options are known, "input" only for truly free-form fields, "edit" only when the user must modify generated content. Prefer bounded choices over free-form input. Always express user input/choice/confirmation as a checkpoint — never invent separate user_input or decision nodes.
+- Do not interrupt the user for low-risk progress reviews, status updates, internal implementation choices, or information the runtime can reliably obtain itself.
+- Use task userInteraction.level "possible" only when execution can produce a correct and useful result without the user response. It may improve or personalize the result, but it must not be a hidden prerequisite for completion.
+- Use a required checkpoint when correctness or the requested deliverable depends on user-only facts, preferences, authorization, approval, or a genuine decision that is absent from the provided context.
+- Personalized, factual, submission-ready, identity-dependent, or user-specific deliverables require a checkpoint before the task that consumes missing user facts. A generic template, placeholders, assumptions about the user, or a list of missing information does NOT satisfy such completion criteria unless the user explicitly requested a template or draft with placeholders.
+- Prefer one focused checkpoint that collects the related required input together. Use interaction.schemaSource "ai" when prior execution determines the concrete questions, choices, recommendations, or defaults; use "static" only when the complete form is already known.
+- For static checkpoints, use the least-effort accurate form: confirm for yes/no, choose for known options, input for truly free-form fields, and edit when the user must modify known content. Never use a generic placeholder textarea when runtime results should determine the form.
 
 ## Delivering the result
 
@@ -127,7 +141,9 @@ export const CODEX_GENERATE_PLAN_DISCOVERY_PROMPT = `
 Codex provider note: MCP tools may be deferred behind tool_search. If chrona_plan_generate is not visible in the current tool list, first call tool_search with query "chrona_plan_generate", then call the discovered chrona_plan_generate tool. Do not use list_mcp_resources, list_mcp_resource_templates, or read_mcp_resource for plan generation.
 `.trim();
 
-function buildGeneratePlanInstructions(options?: GeneratePlanFeatureSpecOptions): string {
+function buildGeneratePlanInstructions(
+  options?: GeneratePlanFeatureSpecOptions,
+): string {
   if (options?.providerType === "codex") {
     return `${GENERATE_PLAN_SYSTEM_PROMPT}\n\n${CODEX_GENERATE_PLAN_DISCOVERY_PROMPT}`;
   }
@@ -184,14 +200,18 @@ function currentPlanRevisionText(input: GenerateTaskPlanRequest) {
   const context = input.revisionContext;
   if (!context) return null;
 
-  return JSON.stringify({
-    planId: context.planId,
-    status: context.status,
-    revision: context.revision,
-    summary: context.summary,
-    selectedNodeId: context.selectedNodeId ?? null,
-    blueprint: context.blueprint,
-  }, null, 2);
+  return JSON.stringify(
+    {
+      planId: context.planId,
+      status: context.status,
+      revision: context.revision,
+      summary: context.summary,
+      selectedNodeId: context.selectedNodeId ?? null,
+      blueprint: context.blueprint,
+    },
+    null,
+    2,
+  );
 }
 
 export function buildGeneratePlanFeatureInputText(
@@ -200,11 +220,11 @@ export function buildGeneratePlanFeatureInputText(
   const parts: string[] = [
     input.revisionContext
       ? "Revise the current draft plan instead of starting from a blank plan. Preserve unchanged good parts. Apply the user request to the selected node when selectedNodeId is set; otherwise apply it to the whole plan. Return the full revised plan blueprint."
-      : "Create a concise plan blueprint for the task below.",
-    "Do not ask follow-up questions.",
-    "Make reasonable assumptions if the task is underspecified.",
-    "Use the fewest nodes possible. Default to one task node for simple information requests; use two nodes only when gather and summarize/deliver must be distinct; use more than two only when the task explicitly requires branching, waiting, or independent dependencies.",
-    "Prefer automatic execution nodes when no human approval/input is truly required.",
+      : "Create an execution plan blueprint for the task below.",
+    "Do not ask follow-up questions during planning; represent mandatory participation as a checkpoint in the plan.",
+    "Make only assumptions that do not invent user-specific facts or weaken the requested deliverable.",
+    "Choose nodes from real execution work and state transitions. A simple task can be one node, while required input, approvals, waits, branches, or independent dependencies require explicit nodes.",
+    "Prefer automatic execution where it remains correct; never omit required human input merely to make the plan shorter or more automatic.",
     "",
     "Task to plan",
   ];
@@ -218,7 +238,7 @@ export function buildGeneratePlanFeatureInputText(
   if (input.sourceContext?.trim()) {
     parts.push(
       "",
-      "Calendar event details (read-only, from the external calendar source):",
+      "Source context (read-only; provenance is preserved in the payload):",
       input.sourceContext.trim(),
     );
   }
@@ -263,6 +283,54 @@ export function buildSuggestFeatureSpec(): PreparedAiFeatureSpec {
     structuredOutputSchema: toStructuredOutputSchema(
       suggestTaskCompletionsToolSpec,
     ),
+  };
+}
+
+export function buildGoalAssetOwnershipFeatureSpec(): PreparedAiFeatureSpec {
+  return {
+    feature: "goal.asset_ownership",
+    instructions:
+      "You classify one accepted task result into a frozen set of Goal asset candidates. Use only the supplied snapshot. Return one discrete ownership decision with evidence and counter-evidence. Never create, modify, archive, or publish assets.",
+    structuredOutputSchema: {
+      name: "goal_asset_ownership_result",
+      description:
+        "A bounded recommendation for the ownership of one Goal Inbox candidate.",
+      schema: z.toJSONSchema(goalAssetOwnershipResultSchema, {
+        target: "draft-07",
+        unrepresentable: "any",
+      }) as Record<string, unknown>,
+    },
+  };
+}
+
+export function buildResultFinalizationFeatureSpec(input: {
+  manifest: unknown;
+}): PreparedAiFeatureSpec {
+  return {
+    feature: "task.result_finalization",
+    instructions: [
+      "You are Chrona's restricted result finalizer.",
+      "Transform the supplied immutable ResultManifest into one concise, operational Chrona result workspace. The manifest is semantic source material, not a page outline. Do not reproduce it as a linear report or map its arrays one-to-one into sections.",
+      "Do not invent facts, numbers, paths, URLs, artifact identities, task IDs, run IDs, provider data, execution status, or readiness. Every statement and metric must be directly supported by the manifest.",
+      "Return one complete validated Spec. Do not call tools, request input, emit actions, or use dynamic state bindings.",
+      "Choose the information architecture from the user's likely result task: reading, comparing, deciding, inspecting data, applying a deliverable, reviewing changes, following a timeline, or a justified mixture. This intent guides composition but never selects a fixed template. The root may be any container that owns the whole composition.",
+      "Use ResultOverview for the editorial lead in ordinary results. Legacy ResultHero is allowed only when readiness itself is the result's dominant message, not as the default first block. Keep the overview title under 96 characters and synthesize its summary from manifest.outcome rather than copying a long node summary into the title.",
+      "If readiness is ready_with_caveats, partial, or blocked, render ResultReadiness as its own visible component wherever the limitation affects interpretation or action. Do not hide non-ready semantics inside a hero badge or evidence appendix.",
+      "Use ResultSection to create meaningful regions with stack, grid, split, or rail layout. Use ResultComparison for bounded option trade-offs, ResultTimeline for dates or ordered milestones, ResultChecklist for operational steps, ResultMetricGrid only for exact manifest-supported values, and ResultChangeSummary for concrete code, configuration, or document changes.",
+      "Use ResultDeliverable only for current deliverables worth featuring in the narrative and set artifactRef to its opaque manifest artifactRef. At most one may have role primary and at most three deliverables may appear in the Spec. The host independently exposes all generated Artifacts, so omit supporting files that add no decision value. Never repeat artifactRefs or expose paths as prose.",
+      "Legacy ResultInsight, ResultActionPlan, ResultCaveats, ResultEvidence, and ResultHero exist for persisted result compatibility. Prefer ResultSection, ResultComparison, ResultTimeline, ResultChecklist, ResultReadiness, and CollapsibleBlock in newly finalized results. Do not emit more than two legacy ResultInsight blocks, and do not recreate the sequence Hero → Deliverables → Insights → ActionPlan → Caveats → Evidence.",
+      "Use RichMarkdown, Table, JsonView, Card, Heading, Text, Badge, Alert, Separator, FileRef, ResultSummary, CollapsibleText, and CollapsibleBlock when their semantics fit. Do not wrap every item in a card and do not generate more than two consecutive isomorphic blocks when a comparison, collection, or synthesis is clearer.",
+      "Every element that states, transforms, or summarizes manifest content MUST set sourceKeys to the exact manifest keys it covers. Valid keys are deliverableKey values plus finding, decision, caveat, nextAction, and evidence keys. Elements containing only manifest.outcome or manifest.readiness may omit sourceKeys.",
+      "Preserve material caveats visibly before any affected recommendation or action. If readiness is ready_with_caveats, partial, or blocked, never describe the result as unconditionally ready. Evidence and raw diagnostic detail should normally be collapsed and subordinate.",
+      "Keep the first viewport useful: a concise outcome, the main decision/content/deliverable, and any limitation needed to use it safely. Keep the complete Spec under 48 elements, nesting at most five levels, and avoid long prose when a comparison, checklist, timeline, metric group, or Artifact preview expresses the result better.",
+      "Examples of valid variation: a research result may lead with ResultOverview, a ResultComparison of the strongest findings, and one primary document; a shortlist may lead with ResultComparison and ResultTimeline; a code task may lead with ResultChangeSummary and ResultChecklist; a data task may lead with ResultMetricGrid and a file-backed Table; a media task may lead with selected deliverables. These are examples, not templates.",
+    ].join("\n"),
+    inputText: JSON.stringify({ manifest: input.manifest }, null, 2),
+    structuredOutputSchema: {
+      name: "chrona_finalized_result_spec",
+      description: "One complete Chrona json-render result workspace.",
+      schema: chronaResultSpecJsonSchema as Record<string, unknown>,
+    },
   };
 }
 
@@ -318,6 +386,30 @@ export function validatePreparedFeaturePayload(
     }
     case "suggest":
       return validateSuggestPayload(payload);
+    case "goal.asset_ownership": {
+      const validation = goalAssetOwnershipResultSchema.safeParse(payload);
+      if (!validation.success) {
+        return {
+          ok: false,
+          error:
+            validation.error.issues[0]?.message ??
+            "Feature 'goal.asset_ownership' returned an invalid proposal payload",
+        };
+      }
+      return { ok: true };
+    }
+    case "goal.review": {
+      const validation = goalReviewResultSchema.safeParse(payload);
+      if (!validation.success) {
+        return {
+          ok: false,
+          error:
+            validation.error.issues[0]?.message ??
+            "Feature 'goal.review' returned an invalid proposal payload",
+        };
+      }
+      return { ok: true };
+    }
     case "execute_task_node":
     case "evaluate_condition_node":
     case "review_checkpoint_node":

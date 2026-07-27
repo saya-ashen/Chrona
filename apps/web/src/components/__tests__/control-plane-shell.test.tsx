@@ -15,7 +15,10 @@ vi.mock("react-router-dom", () => ({
   useRevalidator: () => ({ revalidate: vi.fn() }),
 }));
 
-vi.mock("@shared/http", () => ({ apiJson: mocks.apiJson }));
+vi.mock("@shared/http", () => ({
+  apiJson: mocks.apiJson,
+  createLogger: () => ({ debug: vi.fn(), error: vi.fn(), info: vi.fn(), warn: vi.fn() }),
+}));
 vi.mock("@shared/ui", () => ({
   Button: ({ children, ...props }: { children: ReactNode }) => <button {...props}>{children}</button>,
   cn: (...classes: Array<string | false | null | undefined>) => classes.filter(Boolean).join(" "),
@@ -37,8 +40,10 @@ vi.mock("@features/schedule", () => ({
 }));
 vi.mock("@chrona/i18n", () => ({
   useI18n: () => ({ t: (key: string) => ({ "nav.brandTitle": "Chrona", "nav.brandTagline": "Human-AI task work", "nav.schedule": "Schedule", "nav.actionCenter": "Action Center", "nav.tasks": "Tasks", "nav.settings": "Settings", "nav.newTask": "New Task", "components.assistantSurface.entryLabel": "Assistant", "locale.label": "Locale" }[key] ?? key) }),
+  getAssistantSurfaceMessages: () => ({ statusLabel: "Status", noActiveContext: "No active assistant context" }),
   useLocale: () => "en",
   localizeHref: (locale: string, href: string) => `/${locale}${href}`,
+  stripLocalePrefix: (pathname: string) => pathname.replace(/^\/(?:en|zh)(?=\/|$)/, "") || "/",
   locales: ["en", "zh"],
 }));
 
@@ -64,6 +69,11 @@ describe("ControlPlaneShell", () => {
     expect(screen.getByRole("link", { name: "Tasks" })).toHaveAttribute("href", "/en/tasks");
     expect(screen.getByRole("button", { name: "Assistant" })).toBeDisabled();
     expect(screen.getByText("Task ready")).toBeInTheDocument();
+  });
+
+  it("hides the assistant display when no summary is available", () => {
+    render(<ControlPlaneShell defaultWorkspace={{ id: "ws-1", name: "Default" }}><div>Workspace body</div></ControlPlaneShell>);
+    expect(screen.queryByRole("button", { name: "Assistant" })).not.toBeInTheDocument();
   });
 
   it("creates scheduled tasks through the schedule feature public action", async () => {

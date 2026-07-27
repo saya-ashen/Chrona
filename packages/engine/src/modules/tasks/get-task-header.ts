@@ -46,7 +46,7 @@ function taskStatusLabel(input: {
     taskStatus: input.taskStatus,
     executionStatus: input.executionStatus,
   });
-  if (input.status === "approval-needed" || input.status === "blocked" || input.status === "completed") return workState.label;
+  if (input.status === "approval-needed" || input.status === "blocked" || input.status === "completed" || input.status === "cancelled") return workState.label;
   return input.status.charAt(0).toUpperCase() + input.status.slice(1);
 }
 
@@ -85,6 +85,7 @@ export function taskHeaderStatus(input: {
   executionStatus: PlanExecutionStatus;
   hasActiveExecution: boolean;
 }): TaskHeaderTaskStatus {
+  if (input.taskStatus === "Cancelled" || input.executionStatus === "cancelled") return "cancelled";
   if (input.executionStatus === "running") return "running";
   if (input.executionStatus === "waiting_for_user" || input.executionStatus === "waiting_for_approval") {
     return "approval-needed";
@@ -279,11 +280,10 @@ export function resolveTaskHeaderViewModel(input: BuildHeaderSpecInput & { now?:
   const occurrenceValueCurrent = occurrenceValue(task.id, currentWorkBlock?.id ?? null);
   const totalSteps = savedPlan?.effectivePlan.nodes.length ?? 0;
   const completedSteps = savedPlan?.effectivePlan.completedNodeIds.length ?? currentExecution.executedNodeIds.length;
-  const progressPercent = totalSteps > 0 ? Math.round((completedSteps / totalSteps) * 100) : 0;
   // Work blocks scope pre-acceptance occurrence state, but accepting a task
   // result is authoritative for the task lifecycle. A completed work block
   // must not mask Task.status=Done and keep Result Review in acceptance mode.
-  const scopedTaskStatus = task.status === "Done"
+  const scopedTaskStatus = task.status === "Done" || task.status === "Cancelled"
     ? task.status
     : currentWorkBlock?.status ?? task.status;
   const status = taskHeaderStatus({
@@ -296,16 +296,17 @@ export function resolveTaskHeaderViewModel(input: BuildHeaderSpecInput & { now?:
     currentWorkBlock?.scheduledEndAt ?? task.projection?.scheduledEndAt ?? null,
   );
   const source = task.importedCalendarEvents[0] ?? null;
-  const actions = headerActions({
-    executionStatus: currentExecution.status,
-    hasPlan: Boolean(savedPlan),
-    hasAcceptedPlan: savedPlan?.status === "accepted",
-    isRunnable: currentExecution.status !== "no_plan",
-  });
-  actions.push({ id: "edit", label: "Edit" }, { id: "delete", label: "Delete Task" });
-
   const hasPlan = Boolean(savedPlan);
   const hasAcceptedPlan = savedPlan?.status === "accepted";
+  const actions = headerActions({
+    executionStatus: currentExecution.status,
+    hasPlan,
+    hasAcceptedPlan,
+    isRunnable: currentExecution.status !== "no_plan",
+  });
+  if (hasAcceptedPlan && scopedTaskStatus !== "Done") actions.push({ id: "restart", label: "Run plan from beginning" });
+  actions.push({ id: "edit", label: "Edit" }, { id: "delete", label: "Delete Task" });
+
   const workStateGuidance = workspaceStateGuidance({
     status,
     executionStatus: currentExecution.status,
@@ -319,7 +320,9 @@ export function resolveTaskHeaderViewModel(input: BuildHeaderSpecInput & { now?:
     workspaceStateGuidance: workStateGuidance,
     status,
     statusLabel: taskStatusLabel({ status, executionStatus: currentExecution.status, taskStatus: scopedTaskStatus }),
-    progressLabel: `${totalSteps} step${totalSteps === 1 ? "" : "s"} · ${completedSteps} accepted · ${progressPercent}%`,
+    progressLabel: totalSteps > 0
+      ? `${completedSteps}/${totalSteps} steps`
+      : "0 steps",
     priorityLabel: task.priority,
     priorityTone: priorityTone(task.priority),
     occurrenceLabel: occurrenceWindow ? `Occurrence · ${occurrenceWindow}` : null,

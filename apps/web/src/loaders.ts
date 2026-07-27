@@ -2,6 +2,7 @@ import type { LoaderFunctionArgs, Params } from "react-router-dom";
 
 import { getDictionary, resolveLocale, type Locale } from "@chrona/i18n";
 
+import type { GoalData } from "@features/goals";
 import { apiJson } from "../../../shared/http/api-client";
 import type {
   AppBootData,
@@ -10,6 +11,8 @@ import type {
   ScheduleRouteData,
   TaskListRouteData,
   TaskPageRouteData,
+  GoalListRouteData,
+  GoalWorkspaceRouteData,
 } from "./pages";
 import type {
   TaskWorkspaceBootstrapData,
@@ -115,6 +118,28 @@ export async function loadTaskListData({ params, request }: LoaderFunctionArgs):
   };
 }
 
+export async function loadGoalListData({ request }: LoaderFunctionArgs): Promise<GoalListRouteData> {
+  const origin = getOrigin(request);
+  const workspace = await apiJson<{ id: string }>(`${origin}/api/workspaces/default`);
+  return apiJson<GoalListRouteData>(
+    `${origin}/api/goals?workspaceId=${encodeURIComponent(workspace.id)}`,
+  );
+}
+
+export async function loadGoalWorkspaceData({ params, request }: LoaderFunctionArgs): Promise<GoalWorkspaceRouteData> {
+  if (!params.goalId) throw new Response("Goal id is required", { status: 400 });
+  const origin = getOrigin(request);
+  const goal = await apiJson<GoalData>(`${origin}/api/goals/${encodeURIComponent(params.goalId)}`);
+  const assetQuery = new URLSearchParams({ workspaceId: goal.workspaceId, state: "active" });
+  const requestedAssetView = new URL(request.url).searchParams.get("assetView");
+  if (requestedAssetView === "archived") assetQuery.set("state", "archived");
+  const [assets, inbox] = await Promise.all([
+    apiJson<{ assets: GoalWorkspaceRouteData["assets"]; recent: GoalWorkspaceRouteData["recentAssets"] }>(`${origin}/api/goals/${encodeURIComponent(params.goalId)}/assets?${assetQuery}`),
+    apiJson<{ candidates: GoalWorkspaceRouteData["inboxCandidates"] }>(`${origin}/api/goals/${encodeURIComponent(params.goalId)}/inbox?workspaceId=${encodeURIComponent(goal.workspaceId)}`),
+  ]);
+  return { goal, assets: assets.assets, recentAssets: assets.recent, inboxCandidates: inbox.candidates };
+}
+
 export async function loadTaskPageData({ params, request }: LoaderFunctionArgs): Promise<TaskPageRouteData> {
   const locale = await resolveRouteLocale(params);
   const dictionary = await getDictionary(locale);
@@ -146,7 +171,6 @@ export async function loadTaskPageData({ params, request }: LoaderFunctionArgs):
       ...bootstrap,
       ...runtimeContext,
       ...reviewContext,
-      artifacts: [],
       activityTimeline: [],
       commandCenter,
       header,
@@ -154,3 +178,15 @@ export async function loadTaskPageData({ params, request }: LoaderFunctionArgs):
   };
 }
 
+
+export async function loadGoalTaskInspectorData({ params, request }: LoaderFunctionArgs): Promise<TaskPageRouteData> {
+  if (!params.goalId || !params.taskId) {
+    throw new Response("Goal and task ids are required", { status: 400 });
+  }
+  const origin = getOrigin(request);
+  const bootstrap = await apiJson<TaskWorkspaceBootstrapData>(`${origin}/api/tasks/${params.taskId}`);
+  if (bootstrap.task.goal?.id !== params.goalId) {
+    throw new Response("Task does not belong to this Goal", { status: 404 });
+  }
+  return loadTaskPageData({ params, request } as LoaderFunctionArgs);
+}

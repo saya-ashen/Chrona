@@ -53,10 +53,10 @@ describe("chrona CLI: `chrona node <verb>` skill-mode dispatcher", () => {
     expect(result.stderr).toBe("");
   });
 
-  it("forwards `chrona plan output --patches-file <file>` reading JSON patches from disk", async () => {
-    const fixturePath = `${import.meta.dir}/__fixtures__/plan-output-patches.json`;
-    const patches = [{ op: "add", path: "/root", value: "root" }];
-    await Bun.write(fixturePath, JSON.stringify(patches));
+  it("forwards semantic node completion from --result-file", async () => {
+    const fixturePath = `${import.meta.dir}/__fixtures__/node-result.json`;
+    const findings = [{ key: "verified", content: "Result verified." }];
+    await Bun.write(fixturePath, JSON.stringify({ findings }));
 
     let capturedBody: string | null = null;
     globalThis.fetch = makeFetchMock(async (_url, init) => {
@@ -64,12 +64,14 @@ describe("chrona CLI: `chrona node <verb>` skill-mode dispatcher", () => {
       return new Response("{}", { status: 200 });
     });
 
-    const result = await dispatchNodeCommand(["plan", "output", "--patches-file", fixturePath]);
+    const result = await dispatchNodeCommand([
+      "node", "complete", "--summary", "done", "--result-file", fixturePath,
+    ]);
     expect(result.code).toBe(0);
     expect(capturedBody).not.toBeNull();
     expect(JSON.parse(capturedBody!)).toEqual({
-      kind: "plan_output",
-      payload: { patches },
+      kind: "complete",
+      payload: { summary: "done", findings },
     });
   });
 
@@ -77,7 +79,7 @@ describe("chrona CLI: `chrona node <verb>` skill-mode dispatcher", () => {
     const result = await dispatchNodeCommand(["node", "teleport"]);
     expect(result.code).toBe(1);
     expect(result.stderr).toMatch(/Usage error/);
-    expect(result.stderr).toMatch(/chrona plan output --patches-file/);
+    expect(result.stderr).toMatch(/chrona node complete --summary/);
   });
 
   it("returns exit code 1 with Config error when env is missing", async () => {

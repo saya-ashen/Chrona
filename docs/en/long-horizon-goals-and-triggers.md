@@ -1,0 +1,1164 @@
+# Long-Horizon Goals, Triggers, and Task Occurrences
+
+Status: Goal, Goal Control Plane, GoalAsset Workbench, neutral TaskOccurrence,
+versioned TaskTrigger, schedule activation, bounded internal events, and the
+authenticated email adapter are implemented. The shipped external adapter uses
+credential plus HMAC authentication, freshness checks, delivery replay
+deduplication, bounded validated input, workspace isolation, rate limiting, and
+redacted persistence. Webhook remains outside the closed trigger union; Chrona
+does not expose a placeholder webhook route, secret row, or unvalidated config.
+
+This document is the canonical design and shipped architecture for long-horizon
+work and extensible task activation in Chrona. Goal lifecycle, atomic entry and
+promotion commands, proposed-criterion review, optional `Task.goalId`, immutable
+GoalAsset promotion, versioned Workbench assets, explicit Working Set, versioned
+Operational Brief, frozen bounded-task context, occurrence-scoped execution,
+and versioned trigger delivery now ship end to end.
+
+## 1. Problem
+
+Chrona currently models two task kinds:
+
+- `single`: one task progresses through one bounded workflow to a result;
+- `recurring`: an RRULE expands one task into scheduled `WorkBlock`
+  occurrences.
+
+That is enough for a one-time deliverable and for repeating substantially the
+same work on a clock. It is not enough for a long-horizon outcome such as
+"obtain a suitable PhD offer":
+
+- the outcome may take months;
+- the strategy changes as external facts change;
+- repeated discovery produces heterogeneous follow-up work;
+- several applications may progress concurrently;
+- waits can last days or weeks without a live AI process;
+- external side effects such as sending email require isolated approval and
+  retry boundaries;
+- completion of one search or application must not complete the overall
+  outcome.
+
+The current recurrence model also couples three independent concerns:
+
+1. whether a task may have more than one execution occurrence;
+2. whether occurrences are produced by a schedule;
+3. whether an occurrence is represented by a calendar `WorkBlock`.
+
+This coupling prevents clean support for non-time sources such as webhooks or
+internal events.
+
+## 2. Decisions
+
+The target architecture uses these separate concepts:
+
+| Concept | Responsibility |
+| --- | --- |
+| `Goal` | A durable outcome that may require many changing tasks over time. |
+| `GoalMilestone` | An optional stage or measurable intermediate outcome within a goal. |
+| `Task` | A bounded unit of work and its reusable execution configuration. |
+| `TaskResult` | An immutable, reviewable account of one bounded occurrence's outcome. |
+| `Artifact` | A stable, provenance-preserving file or structured deliverable produced by one occurrence. |
+| `GoalAsset` | A goal-scoped working reference promoted from an accepted result or artifact for continued use, editing, or replacement. |
+| `TaskTrigger` | A persisted rule that may produce task occurrences. Schedule is one trigger kind. |
+| `TriggerDelivery` | One durable, idempotent observation that a trigger condition occurred. |
+| `TaskOccurrence` | One isolated instance of a task becoming eligible for work. |
+| `WorkBlock` | Optional calendar placement for an occurrence; it remains a time container. |
+| Automation policy | Whether and when Chrona plans or executes an occurrence after it exists. |
+| Plan/run/session | Execution facts scoped to one occurrence. |
+| `GoalOperationalBrief` | Goal-owned, user-visible strategy context: intended outcome, current focus, constraints, and strategy. |
+| `GoalWorkingSetItem` | A persisted, ordered reference and snapshot of explicit Goal context selected for future bounded work. |
+| `Task.goalContext` | The immutable Working Set and Operational Brief snapshot frozen when a bounded Goal task is created. |
+
+Normative decisions:
+
+1. Long-horizon work is modeled as a `Goal`, not a third
+   `TaskKind.long_running`.
+2. A goal is advanced by bounded tasks. It never owns a provider session or a
+   continuously running execution.
+3. A repeated task and a scheduled task are not synonyms. Repeatability is a
+   task property; schedule is a trigger kind.
+4. A trigger creates or materializes an occurrence. It does not mutate plan
+   nodes or call a provider directly.
+5. Automation policy is independent of trigger kind.
+6. `TaskOccurrence` is the execution scope. `WorkBlock` is optional and must
+   not be fabricated for webhook or internal-event activations.
+7. Trigger definitions and trigger deliveries are separate durable facts.
+8. Manual execution is a built-in activation source, not a persisted empty
+   trigger definition.
+9. Existing `ExecutionTrigger` remains command provenance. Existing
+   `WorkBlockTrigger` remains WorkBlock provenance. Neither becomes the trigger
+   definition catalog.
+10. Webhook support is reserved by contracts and boundaries only. No webhook
+    endpoint, dormant schema row, or unvalidated JSON configuration is added
+    until the feature is implemented end to end.
+11. A standalone task result is immutable presentation: it may support
+    non-mutating use such as preview, copy, and download, but it does not own
+    editable working state or workflow actions.
+12. Continued editing, stateful interaction, cross-task reuse, or an explicit
+    follow-up work item requires a Goal. A user may create it directly by
+    promoting an accepted standalone Task. Creating the first explicit
+    follow-up Task from that accepted result also atomically creates the Goal,
+    associates both Tasks, and promotes selected evidence.
+13. "Promote task to Goal" is product shorthand. It never rewrites the Task
+    into another task kind, discards its occurrence history, or lets
+    AI-authored UI create lifecycle authority. Manual promotion is an explicit
+    user action. Automatic conversion occurs only as the product-defined
+    consequence of the user's explicit first follow-up Task creation; asking a
+    question or AI merely recommending continued work cannot trigger it.
+14. Original TaskResults and Artifacts remain immutable provenance after
+    promotion. Edits create goal-owned working versions or successor artifacts
+    rather than mutating execution history.
+15. Active Goals use two coordinated product layers. The **Goal Control Plane**
+    decides what needs attention and what happens next. The **Goal Workbench**
+    makes the context for that bounded work explicit and reusable.
+16. Working Set state is visible and user-controlled; it is not hidden AI
+    memory. Creating a Task freezes the selected items and current Operational
+    Brief into `Task.goalContext`. Later Goal edits cannot mutate that Task
+    input.
+17. Filtering, sorting, opening, copying, selecting, and linking existing
+    objects may execute directly as deterministic UI operations. Every AI
+    query, generation, analysis, review, or content mutation still creates or
+    uses a bounded Task/occurrence.
+18. The Goal Workbench reuses the canonical Task Workspace for inspection and
+    execution. It must not implement a second task/run/approval state machine.
+
+## 3. Aggregate model
+
+```mermaid
+erDiagram
+    WORKSPACE ||--o{ GOAL : owns
+    GOAL ||--o{ GOAL_MILESTONE : tracks
+    GOAL ||--o{ TASK : contains
+    GOAL ||--o{ GOAL_ASSET : works_with
+    TASK ||--o{ TASK_TRIGGER : activated_by
+    TASK ||--o{ TASK_OCCURRENCE : instantiates
+    TASK_TRIGGER ||--o{ TRIGGER_DELIVERY : receives
+    TRIGGER_DELIVERY o|--o| TASK_OCCURRENCE : activates
+    TASK_OCCURRENCE o|--o| WORK_BLOCK : scheduled_as
+    TASK_OCCURRENCE ||--o{ TASK_PLAN : plans
+    TASK_OCCURRENCE ||--o{ TASK_PLAN_RUN : executes
+    TASK_OCCURRENCE ||--o{ EXECUTION_SESSION : scopes
+    TASK_OCCURRENCE ||--o{ RUN : invokes
+    TASK_OCCURRENCE ||--o{ ARTIFACT : produces
+    ARTIFACT ||--o{ GOAL_ASSET : promoted_as
+```
+
+A task may exist without a goal. A goal may contain one-time and repeatable
+tasks. A task may have zero or more persisted triggers and may still be started
+manually.
+
+### 3.1 Goal
+
+Target shape:
+
+```ts
+type GoalStatus = "Draft" | "Active" | "Paused" | "Achieved" | "Stopped";
+
+type Goal = {
+  id: string;
+  workspaceId: string;
+  title: string;
+  description: string | null;
+  successCriteria: GoalSuccessCriterion[];
+  status: GoalStatus;
+  nextReviewAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  achievedAt: string | null;
+  stoppedAt: string | null;
+};
+```
+
+Goal invariants:
+
+- `Active` means the outcome is still being pursued. It does not mean an AI
+  process is running.
+- `Paused` prevents automatic goal review and automatic creation of new goal
+  tasks. It does not rewrite immutable task/run history.
+- `Achieved` requires explicit user acceptance or a product-defined success
+  criterion confirmed by the user. Completion of a child task alone cannot
+  achieve the goal.
+- `Stopped` means the user no longer intends to pursue the outcome. It is not a
+  failure state.
+- `Needs attention`, `work active`, and `review due` are derived presentation
+  facets, not competing lifecycle states.
+- A goal does not own a Plan, Run, ExecutionSession, or provider session.
+
+`GoalSuccessCriterion` must be a validated product contract. Free-text criteria
+may be supported, but executable automatic criteria require an explicit typed
+kind and deterministic evaluator.
+
+### 3.2 Task results, artifacts, and Goal assets
+
+A standalone task ends in an accepted, immutable result. Its result surface may
+render prose, structured data, and stable Artifact references. It may expose
+non-mutating convenience operations such as preview, copy, and download. It
+must not become a second mutable state store, embed product-authority actions,
+or let AI-authored json-render controls mutate task, goal, external-system, or
+permission state.
+
+An Artifact remains occurrence-scoped execution evidence even when it later
+becomes useful to long-horizon work. Promotion creates a GoalAsset reference or
+working copy; it does not transfer ownership away from the source occurrence or
+mutate the source Artifact.
+
+Conceptual first-release shape:
+
+```ts
+type GoalAssetRole =
+  | "working_document"
+  | "reference"
+  | "evidence"
+  | "submission"
+  | "template";
+
+type GoalAssetStatus =
+  | "Draft"
+  | "NeedsReview"
+  | "Approved"
+  | "Superseded"
+  | "Archived";
+
+type GoalAsset = {
+  id: string;
+  workspaceId: string;
+  goalId: string;
+  sourceArtifactId: string;
+  currentArtifactId: string;
+  role: GoalAssetRole;
+  status: GoalAssetStatus;
+  label: string;
+  createdAt: string;
+  updatedAt: string;
+};
+```
+
+This shape is a target boundary, not a requirement to add a GoalAsset table in
+the first Goal release. The first release may derive goal-visible assets through
+`Task.goalId -> TaskOccurrence -> Artifact`, then add persisted role, current
+version, review status, and archival behavior only when editable working assets
+ship.
+
+Promotion and continuation rules:
+
+- a standalone task stays a bounded `single` or `series` task; promotion adds a
+  Goal and `goalId` association rather than changing task execution mode;
+- a completed standalone Task with an accepted result exposes a one-click
+  **Promote to Goal** action. Promotion does not require the user to define a
+  follow-up Task first;
+- when a standalone Task with an accepted result gets its first explicitly
+  created follow-up Task, the operation atomically creates a Goal, associates
+  both the source and follow-up Tasks, and promotes the selected accepted result
+  and selected Artifacts into initial GoalAssets;
+- asking a result question or performing another non-mutating continuation does
+  not create a Goal;
+- if the source Task already belongs to a Goal, its follow-up Task joins that
+  Goal rather than creating another one;
+- promotion and follow-up conversion are explicit, idempotent product commands;
+  retries must not create duplicate Goals, Tasks, or GoalAssets;
+- the Goal receives an AI-generated title. The product records that provenance,
+  labels the title as AI-generated, and presents a non-blocking rename notice on
+  the first Goal overview visit. The label disappears after a user rename;
+- original result specs and Artifacts stay immutable and reviewable. Promotion
+  creates GoalAsset references or working copies with source provenance;
+- AI proposes a small initial set of success criteria, but proposed criteria do
+  not contribute to progress or achievement until the user confirms or edits
+  them;
+- while initial criteria await confirmation, the Goal's primary next action is
+  **Review success criteria**. A newly created follow-up Task remains ready and
+  does not start automatically;
+- Goal review consumes accepted results and permitted current GoalAsset versions,
+  never arbitrary mutable UI state;
+- external effects derived from an asset, such as sending email or submitting
+  an application, remain separate bounded tasks behind approval and idempotency.
+
+The default standalone-task result surface remains deliberately small: inspect,
+copy, download, accept, request changes, create a follow-up Task, or promote to a
+Goal. Manual promotion opens the new Goal overview immediately. Follow-up
+conversion creates the Goal and next Task as one transaction. Either operation
+must leave no partial Goal, detached asset, or half-associated Task on failure.
+
+### 3.3 Goal Control Plane and Workbench
+
+Active, Draft, and Paused Goals render an ongoing-work shell rather than an
+entity dashboard. Achieved and Stopped Goals remain Outcome Archives and lead
+with final outcome, immutable results, evidence, confirmation, provenance, and
+history.
+
+The ongoing shell has two layers:
+
+1. **Goal Control Plane** — Operational Brief, primary next action, Needs You,
+   In Progress, New Results, Up Next, criteria/evidence, and bounded review
+   entry points. Queue items derive from real Task, Approval, Result, criterion,
+   and review facts. The queue stores no second lifecycle.
+2. **Goal Workbench** — explicit Working Set, bounded-work Composer, and
+   Goal-scoped Task Inspector. The Composer previews the action, expected
+   outcome, selected inputs, execution mode, and side-effect/approval policy
+   before creating a Task.
+
+First-release Working Set items reference whole objects: GoalAsset, accepted
+Result, Artifact, criterion, or Task. Arbitrary text fragments and table rows
+remain future derived-Artifact capabilities. Each item retains a snapshot for
+display and audit, but canonical status and lifecycle always come from its
+source object.
+
+Task creation captures:
+
+```ts
+type GoalTaskContextSnapshot = {
+  goal: {
+    id: string;
+    title: string;
+    operationalBrief: GoalOperationalBrief | null;
+    capturedAt: string;
+  };
+  items: Array<{
+    subjectType: "goal_asset" | "accepted_result" | "artifact" | "criterion" | "task";
+    subjectId: string;
+    label: string;
+    snapshot: unknown;
+  }>;
+  expectedOutcome: string | null;
+};
+```
+
+Plan generation consumes this frozen snapshot as `sourceContext`; it must not
+silently reread mutable Goal state. The Task retains its canonical `/tasks/:id`
+identity and is also inspectable through
+`/goals/:goalId/workbench/tasks/:taskId`, where the standard Task Workspace is
+reused after a Goal-ownership check.
+
+Accepted Result acceptance remains whole-result review. Extracting a partial
+result into future working content is a separate derived Artifact/GoalAsset
+operation with selector, hash, and provenance. Goal review remains a bounded
+Task; future structured review proposals must show a reviewed diff and apply
+selected Goal changes atomically with actor, time, idempotency key, and audit
+event.
+
+### 3.4 Goal entry points and page information architecture
+
+The Goal product is a **long-lived outcome workspace**, not a project dashboard,
+task backlog, or aggregate metrics page. A user opening a Goal must first be
+able to answer two questions: what is the outcome's current state, and what is
+the single next action that deserves attention?
+
+#### Entry paths
+
+Goal creation follows this priority order:
+
+1. **Promote a completed Task** — the user promotes an accepted result with one
+   action; Chrona creates the Goal, retains the source Task, promotes selected
+   evidence, proposes criteria, and opens the Goal overview.
+2. **Create the first follow-up Task** — when an accepted standalone Task gets
+   its first explicit follow-up, Chrona automatically creates a Goal containing
+   the source and follow-up Tasks. If the source already belongs to a Goal, the
+   follow-up joins it instead.
+3. **Direct Goal mode** — the normal Task creation surface provides a compact,
+   mutually exclusive `Task` / `Goal` mode selector. `Task` remains the default.
+   Goal mode is secondary and requires two distinct fields: **Intended outcome**
+   and **First work item**. Both are required; submission creates the Goal and
+   its first bounded Task. The product does not add a competing prominent global
+   Create Goal call to action.
+
+The mode selector reuses the same creation surface rather than introducing a
+separate Goal creation page. It must state the active mode's meaning and change
+the submit label accordingly. The two inputs must remain separate product
+fields; AI must not infer a long-lived outcome and bounded first task from one
+ambiguous mixed prompt.
+
+#### Goal list
+
+The default Goal list is organized by required attention, not by raw update
+time, card-grid metrics, or lifecycle alone:
+
+1. **Needs attention** — a user decision, review, approval, input, or recovery
+   action is available;
+2. **In progress** — bounded work is actively advancing the outcome;
+3. **Stable or paused** — no immediate action is required; this group may be
+   collapsed by default;
+4. **Archive** — achieved and stopped Goals remain discoverable without
+   competing with ongoing work.
+
+Each row prioritizes decision signals: Goal title, why it needs attention or its
+next action, success-criterion evidence state, current work item, and latest
+material change. Raw Task counts, Artifact counts, timestamps, and synthetic
+completion percentages are secondary metadata and must not dominate the row.
+
+#### Workspace shell and navigation
+
+The ongoing Goal workspace uses a compact operational layout. It avoids a grid
+of oversized statistic cards. A persistent Goal header remains visible across
+the workspace and contains the title, lifecycle state, one primary next action,
+and an overflow management menu. Rename, pause, resume, stop, and archival
+actions belong in that menu. **Achieve Goal** becomes the primary action only
+after the required success criteria have confirmed evidence; it is not a
+permanently available peer button.
+
+The workspace has five top-level tabs with stable ownership:
+
+| Tab | Responsibility |
+| --- | --- |
+| **Overview** | Current outcome state, the single rule-derived next action, material risks or changes, and compact summaries linking into the other tabs. |
+| **Working set** | A bounded set of currently active, waiting, and ready Tasks. Each Task states which success criterion or outcome gap it advances. Completed and inactive Tasks move to History. |
+| **Results** | A review inbox for candidate Task results followed by accepted, provenance-bearing GoalAssets. It presents the flow from new result to durable Goal asset rather than one undifferentiated Artifact stream. |
+| **Success criteria** | Proposed and confirmed criteria, evidence state, evidence provenance, conflicts, and explicit confirmation actions. |
+| **History** | A unified decision timeline across lifecycle changes, criterion decisions, GoalAsset versions, Task transitions, and human choices. Routine automatic events are compressed by default and can be revealed or filtered. |
+
+The fixed header prevents tab navigation from hiding Goal status or the next
+action. Tabs separate dense domains, but Overview must retain cross-domain
+signals rather than becoming an empty collection of links.
+
+#### Progress, authority, and AI suggestions
+
+Progress is represented per success criterion with evidence-backed states such
+as unverified, gathering evidence, satisfied, and user-confirmed. Conflicting or
+insufficient evidence remains visible. The product does not calculate a single
+overall percentage unless a future deterministic, user-understood weighting
+contract is introduced.
+
+The primary next action is derived by product rules from Goal lifecycle,
+unconfirmed criteria, active Tasks, waiting inputs, approvals, result review,
+and recovery state. AI may propose criterion text, work content, summaries, and
+follow-up ideas, but it cannot choose lifecycle authority, start work without
+the applicable product gate, or replace the rule-derived primary action.
+
+AI-generated Goal names and proposed criteria must be visibly attributed.
+Attribution is actionable rather than decorative: the first overview visit
+offers direct rename access, and proposed criteria offer review, edit, and
+confirmation. These notices do not block navigation.
+
+#### Responsive and state requirements
+
+- Desktop, tablet, and mobile retain the same priority: state and next action
+  before metadata, history, or counts.
+- The tab strip may scroll or adapt on narrow screens, but the page itself must
+  not introduce horizontal overflow.
+- Loading, empty, error, blocked, waiting, paused, achieved, and stopped states
+  preserve one understandable next action or an explicit reason none exists.
+- `WaitingForInput` and `WaitingForApproval` remain distinct in copy and action.
+- Achieved and Stopped Goals replace the ongoing-work emphasis with final
+  outcome, accepted evidence, provenance, confirmation, and history while
+  preserving the same stable information ownership.
+
+### 3.5 Goal applications (reserved future capability)
+
+A Goal may eventually host a reusable, AI-assisted application assembled for
+its domain, for example an application-material editor or an email preparation
+tool. Such an application is not an arbitrary AI-authored program and does not
+turn a Goal into a continuously running agent. It is a versioned product-owned
+capability that composes approved components and actions over GoalAssets and
+bounded tasks.
+
+Reserved invariants:
+
+- AI may propose application layout, content transformations, and workflows,
+  but cannot define credentials, permissions, approval policy, network access,
+  lifecycle authority, or arbitrary executable actions;
+- every action resolves through a server-owned catalog with closed schemas,
+  workspace/Goal ownership checks, audit records, and idempotency boundaries;
+- editable regions use `ai-editable` review/diff/revert semantics; generated
+  explanatory content remains `ai-authored`; execution and external effects
+  remain `runtime-control`;
+- application definitions and versions are separate from immutable task result
+  specs; deleting or replacing an application cannot erase result history;
+- reusable applications are explicitly outside the first Goal release. Initial
+  Goal work ships fixed product UI for assets, tasks, reviews, and approvals.
+
+This reserved direction does not make Chrona a general no-code application
+platform. It permits narrowly scoped Goal tools only after the asset, action,
+permission, and versioning contracts are implemented end to end.
+
+### 3.5 Goal milestones
+
+Milestones express intermediate outcomes such as "base application materials
+ready" or "first five high-fit applications submitted".
+
+Target lifecycle:
+
+```ts
+type GoalMilestoneStatus = "Planned" | "Active" | "Achieved" | "Skipped";
+```
+
+Milestones do not execute. Tasks and accepted results provide their evidence.
+The first Goal release may omit persisted milestones and show task groups
+instead; it must not emulate milestones with fake executable parent tasks.
+
+### 3.5 Task definition and repeatability
+
+The target task property is execution mode:
+
+```ts
+type TaskExecutionMode = "single" | "series";
+```
+
+- `single` accepts one effective occurrence. Once that occurrence reaches its
+  accepted terminal result, later automatic deliveries are ignored.
+- `series` may create many isolated occurrences until the series is paused or
+  ended.
+
+The current `TaskKind = single | recurring` is a legacy coupling. During
+migration, `recurring` maps to `series` plus a schedule trigger. New code must
+not assume that every future series uses RRULE.
+
+Definition lifecycle and occurrence execution state are separate:
+
+```ts
+type TaskDefinitionStatus =
+  | "Draft"
+  | "Active"
+  | "Paused"
+  | "Completed"
+  | "Stopped";
+```
+
+For a `single` task, completion of its accepted occurrence may complete the
+task definition. For a `series`, completion of one occurrence must not complete
+the task definition. A series completes only through an explicit end condition
+or user action. User-facing running/waiting/failed state is derived from the
+focused occurrence rather than persisted as the series lifecycle.
+
+Existing `parentTaskId` and `TaskDependency` continue to express bounded task
+hierarchy and `blocks` / `relates_to` / `child_of` relationships. They do not
+replace Goal ownership or Goal success state.
+
+## 4. Trigger model
+
+### 4.1 Trigger definition
+
+Target contract:
+
+```ts
+type TaskTriggerDefinition =
+  | ScheduleTriggerDefinition
+  | WebhookTriggerDefinition
+  | EventTriggerDefinition;
+
+type TaskTriggerState = "Enabled" | "Paused" | "Retired";
+
+type TaskTrigger = {
+  id: string;
+  workspaceId: string;
+  taskId: string;
+  state: TaskTriggerState;
+  definition: TaskTriggerDefinition;
+  version: number;
+  createdAt: string;
+  updatedAt: string;
+};
+```
+
+Persistence may store `kind` as a string and `config` as JSON so adding an
+adapter does not require a database enum migration. The contracts package must
+still validate the pair through a closed discriminated union for every shipped
+kind. Unknown kinds are rejected, not treated as inert configurations.
+
+A task may have multiple triggers. Pausing or retiring a trigger affects future
+deliveries only; it never deletes occurrences or execution history.
+
+### 4.2 Schedule trigger
+
+```ts
+type ScheduleTriggerDefinition = {
+  kind: "schedule";
+  config:
+    | {
+        mode: "once";
+        fireAt: string;
+        timezone: string;
+        durationMs?: number;
+      }
+    | {
+        mode: "recurring";
+        rrule: string;
+        anchorStartAt: string;
+        timezone: string;
+        durationMs?: number;
+        windowUntil?: string;
+      };
+};
+```
+
+Rules:
+
+- recurrence expansion may materialize occurrences ahead of their eligibility
+  time;
+- the schedule occurrence key is derived deterministically from the trigger
+  version and occurrence start;
+- a scheduled occurrence may own a `WorkBlock` with the same time window;
+- timezone is explicit; RRULE evaluation must not depend on server local time;
+- editing a schedule trigger increments its version and reconciles only future,
+  unstarted occurrences;
+- started or terminal occurrences remain immutable history;
+- cancellation of a future WorkBlock cancels or suppresses the corresponding
+  occurrence according to an explicit command, never by deleting facts.
+
+Existing recurrence fields remain authoritative until the schedule-trigger
+migration phase. There must be no permanent dual writer between legacy fields
+and `TaskTrigger`.
+
+### 4.3 Reserved webhook trigger
+
+Webhook is a future kind, not part of the first implementation:
+
+```ts
+type WebhookTriggerDefinition = {
+  kind: "webhook";
+  config: {
+    endpointRef: string;
+    credentialRef: string;
+    eventType?: string;
+    payloadSchema?: unknown;
+    filter?: TriggerFilter;
+  };
+};
+```
+
+This shape reserves these boundaries:
+
+- `endpointRef` identifies a server-owned endpoint; it is not the secret;
+- `credentialRef` points to server-side secret storage;
+- filters use a bounded declarative language, never arbitrary JavaScript;
+- payload schema and filter evaluation happen before occurrence creation;
+- only normalized, bounded, redacted input may enter an occurrence or AI
+  context;
+- provider-specific event names remain adapter details unless promoted into a
+  documented product event contract.
+
+No placeholder webhook route or database configuration is created before
+signature verification, replay protection, idempotency, rate limiting,
+redaction, secret rotation, and audit behavior can ship together.
+
+### 4.4 Reserved internal event trigger
+
+```ts
+type EventTriggerDefinition = {
+  kind: "event";
+  config: {
+    topic: string;
+    filter?: TriggerFilter;
+  };
+};
+```
+
+Potential product topics include `task.result.accepted`, `goal.review_due`, and
+`integration.event.received`. Topics are versioned product contracts. Raw
+provider/runtime events are not automatically eligible topics.
+
+An event trigger consumes committed domain facts after their originating
+transaction. It must not create recursive activation loops; loop prevention
+uses causation IDs, maximum activation depth, and per-trigger idempotency.
+
+### 4.5 Manual activation
+
+Manual start remains available without a `TaskTrigger` row:
+
+```ts
+type TaskActivationSource =
+  | { kind: "manual"; actor: ExecutionActor }
+  | { kind: "trigger"; triggerId: string; deliveryId: string }
+  | { kind: "system"; reason: string };
+```
+
+A manual activation still creates a `TaskOccurrence`, giving manual and
+automatic work identical execution isolation and history.
+
+## 5. Trigger delivery
+
+A definition is configuration. A delivery is one observed signal.
+
+```ts
+type TriggerDeliveryStatus =
+  | "Received"
+  | "Accepted"
+  | "Ignored"
+  | "Duplicate"
+  | "Failed";
+
+type TriggerDelivery = {
+  id: string;
+  workspaceId: string;
+  triggerId: string;
+  deliveryKey: string;
+  status: TriggerDeliveryStatus;
+  receivedAt: string;
+  processedAt: string | null;
+  payloadDigest: string | null;
+  normalizedInput: unknown | null;
+  occurrenceId: string | null;
+  ignoreReason: string | null;
+  errorCode: string | null;
+};
+```
+
+Required constraint:
+
+```text
+unique(triggerId, deliveryKey)
+```
+
+Delivery processing is at-least-once at the adapter boundary and effectively
+once at occurrence creation. A retry returns the existing delivery outcome; it
+must not create a second occurrence.
+
+Raw webhook bodies and authentication headers are not persisted by default.
+If a future integration requires retained evidence, it needs a separate,
+bounded, encrypted/redacted retention policy and must never expose secrets to
+browser responses, logs, tests, json-render output, or AI context.
+
+## 6. Task occurrence
+
+Target shape:
+
+```ts
+type TaskOccurrenceStatus =
+  | "Scheduled"
+  | "Ready"
+  | "Running"
+  | "WaitingForInput"
+  | "WaitingForApproval"
+  | "Blocked"
+  | "Failed"
+  | "Completed"
+  | "Cancelled"
+  | "Ignored";
+
+type TaskOccurrence = {
+  id: string;
+  workspaceId: string;
+  taskId: string;
+  triggerId: string | null;
+  deliveryId: string | null;
+  occurrenceKey: string;
+  source: TaskActivationSource;
+  status: TaskOccurrenceStatus;
+  eligibleAt: string;
+  materializedAt: string;
+  startedAt: string | null;
+  completedAt: string | null;
+  normalizedInput: unknown | null;
+  workBlockId: string | null;
+};
+```
+
+Occurrence invariants:
+
+- one accepted `TriggerDelivery` creates at most one occurrence;
+- one occurrence belongs to exactly one task;
+- trigger-derived occurrences record the trigger version used to evaluate them;
+- schedule occurrences may be materialized before `eligibleAt`;
+- webhook and internal-event occurrences are normally eligible immediately;
+- Plan, TaskPlanRun, ExecutionSession, Run, Approval, Artifact, and result
+  selection must resolve through `occurrenceId`;
+- terminal occurrence facts are immutable except for explicit result acceptance
+  metadata;
+- retry creates a new attempt/run within the same occurrence;
+- restart-from-beginning creates a new execution epoch within the same
+  occurrence;
+- a genuinely new signal creates a new occurrence;
+- an occurrence cannot be simultaneously running and waiting/terminal in the
+  same authoritative state machine.
+
+### 6.1 WorkBlock relationship
+
+`WorkBlock` remains the scheduling and calendar container:
+
+- it has start/end times, schedule status, conflicts, and schedule provenance;
+- it may point to one occurrence;
+- it is optional for unscheduled/manual/webhook/event occurrences;
+- execution must not create a fake fixed-duration WorkBlock merely to satisfy a
+  foreign key;
+- Schedule reads WorkBlocks; Task Workspace reads the selected occurrence and
+  may show its WorkBlock when present.
+
+During migration, current `workBlockId` scoping remains supported until every
+execution fact has `occurrenceId` and projections have cut over.
+
+## 7. Automation policy
+
+Trigger kind answers "why did this occurrence exist?" Automation policy answers
+"what may Chrona do after it exists?"
+
+Target policy:
+
+```ts
+type AutomationStepPolicy = {
+  mode: "manual" | "automatic";
+  offsetMs: number;
+};
+
+type TaskAutomationPolicy = {
+  plan: AutomationStepPolicy;
+  execute: AutomationStepPolicy;
+};
+```
+
+`offsetMs` is relative to `TaskOccurrence.eligibleAt`. A schedule occurrence may
+plan before its scheduled start. An immediate webhook occurrence normally uses
+zero. Product presets such as `before_30m` remain UI conveniences mapped to this
+contract.
+
+Rules:
+
+- auto-plan and auto-execute remain separate permissions;
+- a trigger adapter cannot override task automation policy;
+- automatic execution still observes plan acceptance, provider capability,
+  approvals, and side-effect policy;
+
+Chrona must not collapse definition lifecycle, occurrence execution state, and
+attention into one persisted status.
+
+### Goal projection
+
+```text
+lifecycle: Draft | Active | Paused | Achieved | Stopped
+activity: idle | work_active | review_due
+attention: none | needs_input | blocked | failed
+```
+
+The UI chooses one primary label by a pure state table while retaining activity
+and attention as metadata. `Active` and `Needs attention` must not appear as two
+competing lifecycle states.
+
+### Task projection
+
+A task projection derives:
+
+1. definition lifecycle;
+2. focused occurrence (active, otherwise actionable, otherwise latest);
+3. focused occurrence execution state;
+4. next future occurrence;
+5. next action.
+
+A terminal occurrence completes a `single` task when its result is accepted. A
+terminal occurrence does not complete an active `series` task.
+
+### Trigger projection
+
+Trigger configuration state is only `Enabled`, `Paused`, or `Retired`.
+Delivery failures and latest activation state are derived diagnostics. One bad
+delivery must not silently retire a trigger or fail its task series.
+
+All derivation belongs in pure helpers under the domain/model layers. Pages and
+React components must consume the same derived state source.
+
+## 9. Goal review
+
+Long-horizon progress is episodic, not a continuously running provider session.
+A Goal review:
+
+1. reads committed goal criteria, recent accepted task results, artifacts,
+   deadlines, and blockers;
+2. identifies changes since the previous review;
+3. proposes creation, cancellation, reprioritization, or rescheduling of bounded
+   tasks;
+4. requires review before mutating the goal plan or creating side-effecting
+   work;
+5. persists its conclusions as Chrona facts;
+6. ends its provider session like any bounded task.
+
+A review cadence should initially be implemented as a normal goal-owned series
+task with a schedule trigger. Goal must not gain a second private scheduler.
+Event-driven reviews can later use the same trigger architecture.
+
+## 10. Example: PhD search and application
+
+```mermaid
+flowchart TD
+    G[Goal: obtain a suitable PhD offer]
+    G --> C[Single task: confirm research and location criteria]
+    G --> S[Series task: discover new openings]
+    S --> ST[Schedule trigger: weekly]
+    S --> WT[Reserved future webhook: opening feed]
+    S --> E[Occurrence: search or evaluate new openings]
+    E --> A[Single child task per promising opening]
+    A --> M[Prepare tailored materials]
+    M --> R[Approval: review application or email]
+    R --> X[External submission]
+    X --> F[Scheduled follow-up occurrence]
+```
+
+Completion rules:
+
+- one search occurrence completing does not complete the discovery series;
+- one rejected opening does not fail the goal;
+- one submitted application does not achieve the goal;
+- sending email/application is isolated behind approval and idempotency;
+- the goal becomes `Achieved` only when the success criterion is explicitly
+  confirmed;
+- the goal becomes `Stopped` when the user ends the search without achievement.
+
+## 11. API and command boundary
+
+Target APIs are resource-oriented; exact routes ship only with their feature:
+
+```text
+POST   /api/goals
+GET    /api/goals/:goalId
+PATCH  /api/goals/:goalId
+POST   /api/goals/:goalId/actions
+POST   /api/goals/:goalId/tasks
+GET    /api/goals/:goalId/artifacts/:artifactId
+POST   /api/goals/:goalId/assets                 # reserved for editable/superseding assets
+PATCH  /api/goals/:goalId/assets/:goalAssetId    # reserved; not shipped in read-only v1
+POST   /api/tasks/:taskId/actions/promote-to-goal
+
+POST   /api/tasks/:taskId/triggers
+PATCH  /api/tasks/:taskId/triggers/:triggerId
+POST   /api/tasks/:taskId/triggers/:triggerId/actions
+GET    /api/tasks/:taskId/occurrences
+GET    /api/tasks/:taskId/occurrences/:occurrenceId
+```
+
+Goal lifecycle actions are explicit (`pause`, `resume`, `achieve`, `stop`).
+`achieve` requires user confirmation plus Goal-owned Artifact evidence and
+persists actor, note, time, and evidence IDs. A review is a Goal-owned bounded
+Task created through `/api/goals/:goalId/tasks`; the Goal itself never owns a
+provider session. Trigger actions are explicit (`pause`, `resume`, `retire`).
+Execution commands continue through the task/work command boundary but include
+`occurrenceId` in command context.
+
+`promote-to-goal` accepts an accepted result reference, selected artifact
+references, and an idempotency key. The server resolves task, occurrence,
+result, and artifact ownership and obtains the initial Goal title through the
+approved AI boundary; clients and AI-authored specs cannot supply private IDs as
+authority. If the Task already has a Goal, follow-up creation joins that Goal,
+while an incompatible promotion request returns a conflict requiring an
+explicit user choice. The follow-up continuation command must apply the same
+ownership and idempotency rules when it creates a Goal and associates both the
+source and follow-up Tasks.
+
+Future external webhook ingress is an integration endpoint, not a generic task
+mutation endpoint. It resolves an opaque endpoint reference server-side and
+cannot accept Chrona task, plan, node, or workspace IDs from the payload as
+authority.
+
+## 12. Security and trust boundaries
+
+Before any external trigger ships, it must provide:
+
+- an unguessable endpoint reference;
+- signature/secret verification before parsing untrusted fields into product
+  input;
+- request timestamp and replay-window validation;
+- bounded body size and accepted content types;
+- workspace and trigger ownership validation;
+- per-endpoint rate limiting;
+- secret rotation, revocation, and disabled-trigger behavior;
+- delivery deduplication;
+- closed payload schema validation and declarative filtering;
+- redacted audit records;
+- causation and occurrence IDs on resulting actions.
+
+AI-authored output may summarize normalized trigger input but cannot define
+credentials, permission decisions, execution lifecycle rules, or product
+authority controls. Webhook payloads never bypass checkpoints or approval
+requirements.
+
+## 13. Package ownership
+
+Target placement follows current package boundaries:
+
+| Concern | Owner |
+| --- | --- |
+| Goal/trigger/occurrence schemas and DTOs | `packages/contracts` |
+| Pure lifecycle, eligibility, and projection reducers | `packages/domain` |
+| Goal commands, trigger evaluation orchestration, delivery processing, occurrence creation | `packages/engine` |
+| RRULE/calendar and future external-system adapters | `packages/integrations/*` |
+| Prisma models/repositories/migrations | `packages/db` + `prisma` |
+| Thin HTTP validation/composition | `apps/server` |
+| Goal workspace and task-trigger configuration UI | `features/*`, composed by `apps/web` |
+| Provider execution | `packages/providers/*` after an occurrence is authorized |
+
+Providers must not decide whether a trigger is valid, create occurrences, or
+change Goal lifecycle.
+
+## 14. Migration plan
+
+Schema changes follow the release-line migration policy in `AGENTS.md` and
+[Data Model](./data-model.md). Each phase must have one authoritative writer;
+permanent dual-write compatibility is prohibited.
+
+### Phase 0 — design reservation
+
+- adopt this document as the target architecture;
+- keep current APIs and schema unchanged;
+- stop expanding legacy enums as if they were trigger catalogs;
+- do not add webhook placeholders.
+
+### Phase 1 — correct recurring-series semantics
+
+- distinguish series lifecycle from occurrence execution state in domain
+  derivation;
+- ensure one completed WorkBlock does not complete or stop recurrence expansion;
+- expose selected occurrence and series state separately in Schedule and Task
+  Workspace;
+- add table-driven state tests and recurrence-horizon tests.
+
+### Phase 2 — introduce `TaskOccurrence`
+
+- create occurrences for existing WorkBlocks and for unscheduled manual work;
+- backfill and add `occurrenceId` to plan/run/session/artifact authority paths;
+- migrate projections to occurrence scoping;
+- retain `workBlockId` only as the optional schedule relationship;
+- verify late run completions cannot mutate a different occurrence.
+
+### Phase 3 — introduce Goal
+
+- add Goal CRUD/lifecycle and optional task `goalId`;
+- build a minimal Goal workspace showing criteria, active/actionable tasks,
+  latest accepted results, and next review;
+- reuse bounded tasks for review and follow-up work;
+- add milestones only when the Goal UI needs persisted intermediate outcomes.
+- aggregate accepted occurrence Artifacts in the Goal workspace without
+  changing their provenance;
+- add explicit, idempotent standalone-task promotion that creates a Goal,
+  associates the source task, and promotes selected accepted results atomically;
+- keep Goal assets read-only in the first Goal release unless versioned editable
+  asset, review, and revert semantics ship together;
+- reserve Goal applications at the contract/design boundary only; do not ship
+  arbitrary AI-authored actions or an application runtime.
+- refine Goal entry paths so accepted-result promotion is one click and the
+  first explicit follow-up on a standalone accepted Task creates the Goal and
+  both Task associations atomically;
+- add the secondary `Task` / `Goal` creation mode with required intended-outcome
+  and first-work-item fields;
+- implement AI-title attribution and first-visit rename affordance, proposed
+  success-criterion confirmation, and the criteria-before-execution gate;
+- align Goal list grouping and the five-tab workspace with Section 3.4.
+
+
+### Phase 3B — Goal Control Plane and Workbench
+
+- persist a versioned Operational Brief and explicit ordered Working Set;
+- render Needs You, In Progress, New Results, and Up Next from canonical Task
+  and Result state rather than a duplicate queue lifecycle;
+- preview expected outcome and selected context before creating bounded work;
+- freeze Operational Brief and Working Set selections into immutable
+  `Task.goalContext` at Task creation;
+- feed the frozen context into plan generation without mutable Goal rereads;
+- reuse the standard Task Workspace under a Goal-scoped inspector route;
+- preserve Achieved and Stopped Goals as Outcome Archives;
+- defer arbitrary partial-result extraction, editable GoalAssets, structured
+  review proposals, and Milestone persistence until their review/version
+  contracts ship end to end.
+
+### Phase 4 — introduce schedule `TaskTrigger`
+
+- materialize current one-time and RRULE schedule configuration as validated
+  schedule triggers;
+- version trigger edits and reconcile only future unstarted occurrences;
+- cut recurrence expansion over to trigger-owned occurrence creation;
+- remove legacy recurrence columns and permanent mapping code after all callers
+  migrate;
+- keep automation policy independent.
+
+### Phase 5 — add the first non-time adapter
+
+Implement `TriggerDelivery` and one real adapter end to end. If webhook is the
+first adapter, signature verification, secret storage, replay protection,
+idempotency, rate limits, payload validation, audit redaction, UI configuration,
+and operational tests ship together. Only then add `webhook` to the shipped
+contract union.
+
+## 15. Verification requirements
+
+Every implementation phase must prove its observable contract.
+
+### Domain tests
+
+- single versus series completion precedence;
+- Goal lifecycle and derived attention/activity facets;
+- trigger state versus delivery failure separation;
+- occurrence state mutual exclusion and terminal stability;
+- focused-occurrence selection and next-action derivation.
+
+### Persistence/runtime tests
+
+- unique delivery key prevents duplicate occurrence creation under concurrency;
+- schedule re-expansion is idempotent;
+- trigger edit does not rewrite started/terminal occurrences;
+- Run/Session/Plan failure cannot contaminate a sibling occurrence;
+- retry stays in one occurrence; new signal creates a new occurrence;
+- late provider completion from an old execution epoch cannot mutate a restarted
+  occurrence;
+- series continues after a completed occurrence until paused/ended.
+- standalone-task promotion is atomic and idempotent under retries;
+- promotion rejects unaccepted results, cross-workspace artifacts, and artifacts
+  not owned by the selected occurrence;
+- editing or superseding a GoalAsset never mutates its source Artifact;
+
+- Operational Brief revisions are retained with actor and time;
+- Working Set mutations reject cross-Goal objects;
+- creating a Goal Task freezes exact selected context and expected outcome;
+- later Working Set or Operational Brief edits do not mutate an existing
+  `Task.goalContext` snapshot;
+
+### Security tests for external triggers
+
+- bad/missing signature rejection;
+- expired timestamp and replay rejection;
+- oversized/unsupported request rejection;
+- disabled/retired trigger rejection;
+- cross-workspace isolation;
+- secret and raw payload redaction;
+- payload cannot select private Chrona IDs or bypass approval.
+
+### Product/E2E tests
+
+- Goal shows stable lifecycle, active work, attention, and one primary next
+  action;
+- Schedule occurrence and webhook occurrence render without inventing a
+  WorkBlock;
+- multiple occurrences remain independently inspectable;
+- mobile views have no horizontal overflow;
+- paused Goal/trigger behavior is visible and reversible;
+- external side-effect work always stops at its approval boundary;
+- standalone task results expose only non-mutating result use until promotion;
+- invoking an edit or persistent workflow action offers Goal creation and opens
+  the promoted asset in the Goal workspace;
+- promotion failure leaves no partial Goal, task association, or GoalAsset;
+- accepted result history remains inspectable after asset edits and replacement;
+- Active Goal first view exposes current focus, Needs You, and selected context
+  before entity-level history;
+- bounded-work Composer shows expected outcome, selected context, and action
+  preview before Task creation;
+- Goal-scoped Task Inspector verifies ownership and reuses canonical Task
+  Workspace state/actions;
+- locale, Goal, Task, and query-route context survive Workbench navigation;
+- Goal list groups attention, active progress, stable/paused work, and archives,
+  and each row exposes the reason to open it rather than only aggregate counts;
+- standalone accepted Task promotion opens a Goal in one action with immutable
+  result provenance and no required follow-up Task;
+- creating the first follow-up from a standalone accepted Task atomically
+  creates one Goal, associates both Tasks, and promotes selected evidence;
+- follow-up creation on an existing Goal joins that Goal and never creates a
+  duplicate;
+- AI-generated Goal titles show attribution and a first-visit rename action;
+- proposed success criteria do not affect progress until confirmed, and review
+  remains the primary action before the ready follow-up Task may start;
+- Goal workspace exposes Overview, Working set, Results, Success criteria, and
+  History with stable header state and one rule-derived primary action;
+- progress is evidence-backed per criterion and does not present an invented
+  aggregate percentage;
+- History reconstructs human decisions and material Goal changes while
+  compressing routine automatic events;
+
+## 16. Non-goals
+
+This architecture does not make Chrona:
+
+- a continuously running autonomous agent;
+- a generic event-stream processing platform;
+- a full project/portfolio management suite;
+- a general-purpose email client or applicant tracking system;
+- a store for arbitrary webhook payloads;
+- a provider-session persistence layer;
+- a system where AI-authored UI or incoming events own permissions or runtime
+  state;
+- a general no-code platform where AI output can install arbitrary applications
+  or actions.
+
+The purpose is narrower: preserve a long-lived outcome while safely creating,
+scheduling, executing, reviewing, and recovering bounded work occurrences;
+promote selected immutable results into controlled Goal working assets; and
+leave any future reusable Goal application inside product-owned component,
+action, permission, approval, and versioning boundaries.

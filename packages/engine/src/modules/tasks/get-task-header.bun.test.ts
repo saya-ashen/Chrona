@@ -90,12 +90,7 @@ describe("taskHeaderStatus", () => {
       ).toBe("running");
     });
 
-    it("returns 'waiting' when hasActiveExecution is false and taskStatus is 'Blocked'", () => {
-      // The selected occurrence is idle (no plan / started / cancelled). A
-      // stale Blocked on the task row from a prior occurrence must NOT bleed
-      // into the header — the user has switched away from the blocked
-      // occurrence, so the header should reflect "nothing happening here
-      // yet" rather than the dead execution of an unrelated occurrence.
+    it("uses terminal execution state when there is no active execution", () => {
       expect(
         taskHeaderStatus({
           taskStatus: "Blocked",
@@ -109,7 +104,7 @@ describe("taskHeaderStatus", () => {
           executionStatus: "cancelled",
           hasActiveExecution: false,
         }),
-      ).toBe("waiting");
+      ).toBe("cancelled");
       expect(
         taskHeaderStatus({
           taskStatus: "Blocked",
@@ -263,6 +258,54 @@ describe("resolveTaskHeaderViewModel — header status follows the selected occu
     });
     expect(headerView.status).toBe("waiting");
   });
+  it("keeps a cancelled task cancelled despite a stale selected work block and wait graph", () => {
+    const task = {
+      id: "task-cancelled",
+      workspaceId: "ws-1",
+      seriesExternalUid: null,
+      title: "Cancelled task",
+      status: "Cancelled",
+      priority: "Medium",
+      dueAt: null,
+      projection: null,
+      workBlocks: [{
+        id: "block-scheduled",
+        status: "Scheduled",
+        scheduledStartAt: new Date("2026-06-12T09:00:00.000Z"),
+        scheduledEndAt: new Date("2026-06-12T10:00:00.000Z"),
+      }],
+      importedCalendarEvents: [],
+    } as unknown as HeaderTaskView;
+
+    const headerView = resolveTaskHeaderViewModel({
+      task,
+      recurrenceSeriesTasks: [],
+      currentExecution: {
+        taskId: task.id,
+        planId: "plan-1",
+        mainSessionId: "session-1",
+        status: "cancelled",
+        currentNodeId: "node-1",
+        executedNodeIds: [],
+        waitingNodeIds: ["node-1"],
+        blockedNodeIds: [],
+        message: "No active execution session.",
+        checkpoint: null,
+      },
+      savedPlan: {
+        id: "plan-1",
+        status: "accepted",
+        effectivePlan: { nodes: [{ id: "node-1" }], completedNodeIds: [] },
+      } as unknown as BuildHeaderSpecInput["savedPlan"],
+      workBlockId: "block-scheduled",
+      now: new Date("2026-06-12T00:00:00.000Z"),
+    });
+
+    expect(headerView.status).toBe("cancelled");
+    expect(headerView.statusLabel).toBe("Cancelled");
+    expect(headerView.actions.map((action) => action.id)).toContain("restart");
+    expect(headerView.actions.map((action) => action.id)).not.toContain("stop");
+  });
   it("falls back to the task row status when no work block is selected", () => {
     const baseTime = new Date("2026-06-12T00:00:00.000Z");
     const task: HeaderTaskView = {
@@ -347,5 +390,6 @@ describe("resolveTaskHeaderViewModel — header status follows the selected occu
     expect(headerView.status).toBe("completed");
     expect(headerView.statusLabel).toBe("Result ready");
     expect(headerView.workspaceStateGuidance).toBe("Accept result or request changes");
+    expect(headerView.progressLabel).toBe("1/1 steps");
   });
 });

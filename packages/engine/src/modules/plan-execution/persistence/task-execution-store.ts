@@ -32,6 +32,29 @@ export async function syncTaskRunState(input: {
     runStatus: input.runStatus,
     runtimeRunRef: input.runtimeRunRef,
   });
+  const occurrence = await db.run.findUnique({ where: { id: input.runId }, select: { occurrenceId: true } });
+  if (occurrence?.occurrenceId) {
+    const terminal = input.runStatus === RunStatus.Completed || input.runStatus === RunStatus.Cancelled || input.runStatus === RunStatus.Failed;
+    const occurrenceStatus = input.runStatus === RunStatus.Completed
+      ? "Completed"
+      : input.runStatus === RunStatus.Cancelled
+        ? "Cancelled"
+        : input.runStatus === RunStatus.Failed
+          ? "Failed"
+          : input.runStatus === RunStatus.WaitingForInput
+            ? "WaitingForInput"
+            : input.runStatus === RunStatus.WaitingForApproval
+              ? "WaitingForApproval"
+              : "Running";
+    await db.taskOccurrence.update({
+      where: { id: occurrence.occurrenceId },
+      data: {
+        status: occurrenceStatus,
+        startedAt: terminal ? undefined : new Date(),
+        completedAt: terminal ? new Date() : null,
+      },
+    });
+  }
   if (input.rebuildProjection !== false) {
     await rebuildTaskProjection(input.taskId);
   }

@@ -15,7 +15,12 @@ export async function getAiClientForFeature(feature: AiFeature): Promise<EngineA
 
 export async function getAiClientForTask(input: {
   taskId: string;
-  purpose: "task.plan" | "task.execution";
+  purpose:
+    | "task.plan"
+    | "task.execution"
+    | "task.result_finalization"
+    | "goal.asset_ownership"
+    | "goal.review";
 }): Promise<EngineAiClient | null> {
   const task = await db.task.findUnique({ where: { id: input.taskId }, select: { aiClientId: true } });
   return task?.aiClientId ? getAiClient(task.aiClientId) : getAiClientForFeature(input.purpose);

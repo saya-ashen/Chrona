@@ -448,6 +448,24 @@ function emptyTextSpec(message: string): UiDocument {
 }
 
 
+function containsArtifactList(spec: UiDocument | null | undefined) {
+  return Boolean(
+    spec && Object.values(spec.elements).some(
+      (element) => element.type === "WorkspaceArtifactList",
+    ),
+  );
+}
+function representedArtifactRefs(spec: UiDocument | null | undefined) {
+  const refs = new Set<string>();
+  if (!spec) return refs;
+  for (const element of Object.values(spec.elements)) {
+    if (element.type !== "ResultDeliverable") continue;
+    const artifactRef = element.props?.artifactRef;
+    if (typeof artifactRef === "string") refs.add(artifactRef);
+  }
+  return refs;
+}
+
 export function buildCommandCenterOutputTabSpec(input: {
   latestCompletedNode: PlanNodeDataModel | null;
   resultSpec: UiDocument;
@@ -480,12 +498,32 @@ export function buildCommandCenterOutputTabSpec(input: {
     });
   }
 
-  if (input.artifacts.length > 0) {
-    const filteredArtifacts = !input.selectedNodeId || input.selectedNodeId === "all"
-      ? input.artifacts
-      : input.artifacts.filter((artifact) => !artifact.sourceNodeId || artifact.sourceNodeId === input.selectedNodeId);
+  if (input.artifacts.length > 0 && !containsArtifactList(input.apiArtifactsSpec)) {
+    const finalizedArtifactRefs = representedArtifactRefs(input.apiArtifactsSpec);
+    const unrepresentedArtifacts = input.artifacts.filter(
+      (artifact) =>
+        !artifact.artifactRef || !finalizedArtifactRefs.has(artifact.artifactRef),
+    );
+    const filteredArtifacts =
+      !input.selectedNodeId || input.selectedNodeId === "all"
+        ? unrepresentedArtifacts
+        : unrepresentedArtifacts.filter(
+            (artifact) =>
+              !artifact.sourceNodeId ||
+              artifact.sourceNodeId === input.selectedNodeId,
+          );
     if (filteredArtifacts.length > 0) {
-      appendDocument(elements, children, "artifacts", buildArtifactsSpec({ artifacts: filteredArtifacts, copy: input.copy, onLocate: true }));
+      appendDocument(
+        elements,
+        children,
+        "artifacts",
+        buildArtifactsSpec({
+          artifacts: filteredArtifacts,
+          copy: input.copy,
+          onLocate: true,
+          secondary: finalizedArtifactRefs.size > 0,
+        }),
+      );
     }
   }
 
@@ -534,12 +572,18 @@ export function buildArtifactsSpec(input: {
   artifacts: WorkspaceArtifactItem[];
   copy: WorkspaceCopy;
   onLocate?: boolean;
+  secondary?: boolean;
 }): UiDocument {
   const elements: UiDocument["elements"] = {};
   const artifactChildren: string[] = [];
   elements["artifact-title"] = {
     type: "Heading",
-    props: { text: input.copy.artifactsLabel ?? "Artifacts", level: "h3" },
+    props: {
+      text: input.secondary
+        ? (input.copy.otherGeneratedFiles ?? "Other generated files")
+        : (input.copy.artifactsLabel ?? "Artifacts"),
+      level: "h3",
+    },
   };
 
 
@@ -573,7 +617,30 @@ export function buildArtifactsSpec(input: {
     children: artifactChildren,
   };
 
-  const rootChildren = ["artifact-title", "artifact-list"];
-  elements.root = { type: "Stack", props: { gap: "sm" }, children: rootChildren };
+  const contentChildren = ["artifact-title", "artifact-list"];
+  if (input.secondary) {
+    elements["artifact-section"] = {
+      type: "CollapsibleBlock",
+      props: {
+        title: input.copy.otherGeneratedFiles ?? "Other generated files",
+        summary:
+          input.copy.otherGeneratedFilesDescription ??
+          "Additional files not shown as primary deliverables.",
+        defaultCollapsed: true,
+      },
+      children: ["artifact-list"],
+    };
+    elements.root = {
+      type: "Stack",
+      props: { gap: "sm" },
+      children: ["artifact-section"],
+    };
+  } else {
+    elements.root = {
+      type: "Stack",
+      props: { gap: "sm" },
+      children: contentChildren,
+    };
+  }
   return { root: "root", elements };
 }

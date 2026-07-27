@@ -23,14 +23,14 @@ export function buildExecutionResponse(input: {
   errorDetails?: unknown;
   waitKind?: WaitKind;
   checkpoint?: ExecutionCheckpoint | null;
-  planOutput?: Pick<PlanOutputState, "spec" | "revision" | "updatedAt" | "updatedByNodeId">;
+  planOutput?: Pick<PlanOutputState, "manifest" | "finalizedResult" | "finalization" | "revision" | "updatedAt" | "updatedByNodeId">;
 }): PlanExecutionResult {
   const checkpoint = input.checkpoint ?? (
-    input.executionSessionId && input.planRunId
+    input.planRunId || input.effective.waitingNodeIds.length > 0
       ? deriveExecutionCheckpoint({
           taskId: input.taskId,
-          sessionId: input.executionSessionId,
-          planRunId: input.planRunId,
+          sessionId: input.executionSessionId ?? input.mainSessionId,
+          planRunId: input.planRunId ?? input.planId,
           status: input.status,
           effective: input.effective,
           currentNodeId: input.currentNodeId,
@@ -55,7 +55,7 @@ export function buildExecutionResponse(input: {
     waitingNodeIds: input.effective.waitingNodeIds,
     blockedNodeIds: input.effective.blockedNodeIds,
     checkpoint,
-    planOutput: input.planOutput ?? { spec: null, revision: 0, updatedAt: null, updatedByNodeId: null },
+    planOutput: input.planOutput,
     ui: { currentOperationSpec },
     message: input.message,
     ...(input.errorDetails ? { errorDetails: input.errorDetails } : {}),

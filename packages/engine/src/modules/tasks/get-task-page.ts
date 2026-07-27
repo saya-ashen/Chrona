@@ -116,8 +116,8 @@ export async function getTaskPage(input: { taskId: string; workBlockId?: string 
   const task = await db.task.findUnique({
     where: { id: taskId },
     include: {
+      goal: { select: { id: true, title: true } },
       projection: true,
-      runs: { orderBy: { createdAt: "desc" }, take: 1 },
       approvals: { orderBy: { requestedAt: "desc" }, take: 5 },
       artifacts: { orderBy: { createdAt: "desc" }, take: 5 },
       timelineItems: {
@@ -190,7 +190,21 @@ export async function getTaskPage(input: { taskId: string; workBlockId?: string 
       })
     : [];
 
-  const latestRun = task.runs[0] ?? null;
+  const latestRun = await db.run.findFirst({
+    where: { taskId },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+  });
+  const resultAcceptance = latestRun
+    ? await db.event.findFirst({
+        where: {
+          taskId,
+          runId: latestRun.id,
+          eventType: "task.result_accepted",
+        },
+        orderBy: { ingestedAt: "desc" },
+      })
+    : null;
+  const resultAcceptancePayload = resultAcceptance?.payload as { accepted_at?: unknown } | null;
   const currentWorkBlock = pickTaskPageWorkBlock(task.workBlocks, selectedWorkBlockId, new Date());
   const importedEvent = task.importedCalendarEvents[0] ?? null;
   const sourceManaged = importedEvent
@@ -228,11 +242,15 @@ export async function getTaskPage(input: { taskId: string; workBlockId?: string 
         readinessReason: runnability.summary,
         taskStatus: task.status,
         blockReason: readBlockReason(task),
+        hasActiveRun: latestRun?.status === "Pending" || latestRun?.status === "Running",
       })
     : null;
-  const taskExecutionState = orchestratorState?.summary.executionState ?? deriveTaskExecutionState({
+  const taskExecutionState = deriveTaskExecutionState({
+    graph: savedPlan?.effectivePlan ?? null,
     taskStatus: task.status,
     runStatus: latestRun?.status ?? null,
+    hasActiveRun: latestRun?.status === "Pending" || latestRun?.status === "Running",
+    blockReason: readBlockReason(task),
   });
   const latestRunPresentationStatus = taskExecutionStateToRunStatus(taskExecutionState);
 
@@ -268,6 +286,8 @@ export async function getTaskPage(input: { taskId: string; workBlockId?: string 
     task: {
       id: task.id,
       workspaceId: task.workspaceId,
+      goalId: task.goalId,
+      goal: task.goal,
       title: task.title,
       description: task.description,
       sourceManaged,
@@ -354,6 +374,17 @@ export async function getTaskPage(input: { taskId: string; workBlockId?: string 
           executionState: taskExecutionState,
           startedAt: latestRun.startedAt?.toISOString() ?? null,
           syncStatus: latestRun.syncStatus,
+        }
+      : null,
+    resultReview: latestRun
+      ? {
+          status: resultAcceptance ? "accepted" as const : "pending_acceptance" as const,
+          runId: latestRun.id,
+          acceptedAt: resultAcceptance
+            ? typeof resultAcceptancePayload?.accepted_at === "string"
+              ? resultAcceptancePayload.accepted_at
+              : resultAcceptance.ingestedAt.toISOString()
+            : null,
         }
       : null,
     scheduleProposals: task.scheduleProposals.map((proposal) => ({

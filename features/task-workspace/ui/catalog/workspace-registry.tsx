@@ -5,27 +5,39 @@ import {
   useEffect,
   useMemo,
   useState,
+  useRef,
   type ReactNode,
 } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import {
   Archive,
   Bot,
+  ArrowRight,
+  BookOpenText,
   Check,
   ChevronDown,
   ChevronUp,
   Circle,
+  Clock3,
   Copy,
+  Download,
   FileText,
+  Eye,
   LockKeyhole,
+  FileArchive,
+  FileCode2,
+  FileImage,
+  FileSpreadsheet,
   Sparkles,
   TriangleAlert,
   Wrench,
+  X,
 } from "lucide-react";
 import { ActivityTimeline } from "../activity-timeline";
 import type { WorkspaceActivityItem } from "../../model/task-workspace-types";
-import { TaskMarkdownContent } from "../task-markdown";
+import { MarkdownContent } from "../../../../shared/ui/markdown-content";
 import { defineRegistry } from "@json-render/react";
+import { useVirtualizer } from "@tanstack/react-virtual";
 import { shadcnComponents } from "@json-render/shadcn";
 import { useI18n, useLocale } from "@chrona/i18n";
 import {
@@ -37,15 +49,26 @@ import {
   type ColumnDef,
   type SortingState,
 } from "@tanstack/react-table";
+import { useBoundProp } from "@json-render/react";
 import { chronaCatalog } from "@chrona/ui-protocol";
 import {
   Badge,
   Button,
+  Checkbox,
+  Field,
+  FieldDescription,
+  FieldLabel,
+  Label,
   Calendar,
   cn,
   Popover,
   PopoverContent,
   PopoverTrigger,
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
 } from "@shared/ui";
 import { taskWorkspaceActivityMessages } from "@chrona/i18n";
 import {
@@ -288,6 +311,17 @@ type CollapsibleProps = {
 
 function stringProp(value: unknown) {
   return typeof value === "string" ? value : undefined;
+}
+
+function recordProp(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? Object.fromEntries(Object.entries(value))
+    : null;
+}
+
+function stringField(value: unknown, field: string) {
+  const record = recordProp(value);
+  return record ? stringProp(record[field]) : undefined;
 }
 
 const AUTO_COLLAPSE_MARKDOWN_LENGTH = 4000;
@@ -584,6 +618,989 @@ function ResultSummary({
   );
 }
 
+type ResultMetric = { label: string; value: string };
+type ResultActionPhase = {
+  timeframe: "now" | "this_week" | "later";
+  title: string;
+  actions: string[];
+};
+
+const readinessPresentation = {
+  ready: {
+    messageKey: "resultReadinessReady",
+    fallback: "Ready",
+    className:
+      "border-success/30 bg-success/10 text-success dark:text-success-foreground",
+    iconClassName: "bg-success/15 text-success",
+  },
+  ready_with_caveats: {
+    messageKey: "resultReadinessReadyWithCaveats",
+    fallback: "Ready with caveats",
+    className:
+      "border-warning/35 bg-warning/10 text-warning dark:text-warning-foreground",
+    iconClassName: "bg-warning/15 text-warning",
+  },
+  partial: {
+    messageKey: "resultReadinessPartial",
+    fallback: "Partially ready",
+    className: "border-info/30 bg-info/10 text-info dark:text-info-foreground",
+    iconClassName: "bg-info/15 text-info",
+  },
+  blocked: {
+    messageKey: "resultReadinessBlocked",
+    fallback: "Blocked",
+    className: "border-destructive/30 bg-destructive/10 text-destructive",
+    iconClassName: "bg-destructive/10 text-destructive",
+  },
+} as const;
+
+function ResultHero({
+  props,
+}: {
+  props: {
+    title: string;
+    summary: string;
+    readiness: keyof typeof readinessPresentation;
+    readinessSummary: string;
+    metrics?: ResultMetric[];
+  };
+}) {
+  const { messages } = useI18n();
+  const copy = messages.components.taskWorkspace;
+  const presentation = readinessPresentation[props.readiness];
+  const readinessLabel = {
+    ready: copy.resultReadinessReady ?? "Ready",
+    ready_with_caveats:
+      copy.resultReadinessReadyWithCaveats ?? "Ready with caveats",
+    partial: copy.resultReadinessPartial ?? "Partially ready",
+    blocked: copy.resultReadinessBlocked ?? "Blocked",
+  }[props.readiness];
+  const metrics = Array.isArray(props.metrics) ? props.metrics.slice(0, 4) : [];
+  return (
+    <section
+      aria-label={copy.resultOverviewLabel ?? "Result overview"}
+      className="min-w-0 overflow-hidden rounded-2xl border border-primary/15 bg-primary-soft/25 p-5 shadow-sm sm:p-6"
+    >
+      <div className="min-w-0">
+        <Badge
+          variant="outline"
+          className={cn(
+            "mb-4 gap-1.5 rounded-full px-2.5 py-1 text-xs",
+            presentation.className,
+          )}
+        >
+          <Check className="size-3.5" aria-hidden />
+          {readinessLabel}
+        </Badge>
+        <h2 className="w-full font-heading text-2xl font-semibold leading-tight tracking-[-0.025em] text-foreground sm:text-[1.75rem]">
+          {props.title}
+        </h2>
+        <p className="mt-3 w-full text-sm leading-6 text-foreground/75 sm:text-[15px] sm:leading-7">
+          {props.summary}
+        </p>
+        <div className="mt-5 flex flex-col gap-4 border-t border-border/60 pt-4 sm:flex-row sm:items-start sm:justify-between">
+          <div className="flex min-w-0 items-start gap-3">
+            <span
+              className={cn(
+                "flex size-8 shrink-0 items-center justify-center rounded-lg",
+                presentation.iconClassName,
+              )}
+            >
+              {props.readiness === "blocked" ? (
+                <TriangleAlert className="size-4" aria-hidden />
+              ) : (
+                <Check className="size-4" aria-hidden />
+              )}
+            </span>
+            <div className="min-w-0">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">
+                {copy.resultReadinessLabel ?? "Readiness"}
+              </p>
+              <p className="mt-1 text-sm leading-6 text-foreground/80">
+                {props.readinessSummary}
+              </p>
+            </div>
+          </div>
+          {metrics.length > 0 ? (
+            <dl className="grid shrink-0 grid-cols-2 gap-x-5 gap-y-3 sm:max-w-xl sm:grid-cols-4">
+              {metrics.map((metric) => (
+                <div
+                  key={`${metric.label}:${metric.value}`}
+                  className="min-w-0"
+                >
+                  <dd className="truncate font-heading text-lg font-semibold tracking-[-0.02em] text-foreground">
+                    {metric.value}
+                  </dd>
+                  <dt className="mt-0.5 text-xs leading-4 text-muted-foreground">
+                    {metric.label}
+                  </dt>
+                </div>
+              ))}
+            </dl>
+          ) : null}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function deliverableIcon(kind: string) {
+  if (kind === "table" || kind === "dataset") return FileSpreadsheet;
+  if (kind === "image") return FileImage;
+  if (kind === "archive") return FileArchive;
+  if (kind === "code") return FileCode2;
+  return FileText;
+}
+
+function ResultDeliverable({ props }: { props: Record<string, unknown> }) {
+  const { messages } = useI18n();
+  const copy = messages.components.taskWorkspace;
+  const title = stringProp(props.title) ?? "Deliverable";
+  const summary = stringProp(props.summary);
+  const role = stringProp(props.role) ?? "supporting";
+  const kind = stringProp(props.kind) ?? "other";
+  const formatLabel = stringProp(props.formatLabel) ?? kind;
+  const Icon = deliverableIcon(kind);
+  const [previewOpen, setPreviewOpen] = useState(false);
+  const preview = stringProp(props.contentPreview);
+  const downloadHref = stringProp(props.downloadHref);
+  const openAssetHref = stringProp(props.openAssetHref);
+  const suppressContentPreview = props.suppressContentPreview === true;
+  const isPrimary = role === "primary";
+  const roleLabel = isPrimary
+    ? (copy.resultPrimaryDeliverable ?? "Primary deliverable")
+    : role === "evidence"
+      ? (copy.resultEvidenceMaterial ?? "Evidence")
+      : (copy.resultSupportingMaterial ?? "Supporting material");
+  return (
+    <>
+      <article
+        data-result-deliverable-role={role}
+        className={cn(
+          "group min-w-0 overflow-hidden rounded-xl border transition-colors",
+          isPrimary
+            ? "border-primary/25 bg-primary-soft/45 p-5 sm:p-6"
+            : "border-border/70 bg-background p-4 hover:border-primary/25",
+        )}
+      >
+        <div className="flex min-w-0 items-start gap-3">
+          <span
+            className={cn(
+              "flex shrink-0 items-center justify-center rounded-lg",
+              isPrimary
+                ? "size-10 bg-primary text-primary-foreground"
+                : "size-9 bg-muted text-muted-foreground",
+            )}
+          >
+            <Icon className="size-4.5" aria-hidden />
+          </span>
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+              {roleLabel} · {formatLabel}
+            </p>
+            <h3
+              className={cn(
+                "mt-1.5 break-words font-heading font-semibold leading-snug tracking-[-0.015em] text-foreground",
+                isPrimary ? "text-xl sm:text-2xl" : "text-base",
+              )}
+            >
+              {title}
+            </h3>
+            {summary ? (
+              <p
+                className={cn(
+                  "mt-2 text-foreground/70",
+                  isPrimary
+                    ? "max-w-2xl text-sm leading-6"
+                    : "text-xs leading-5",
+                )}
+              >
+                {summary}
+              </p>
+            ) : null}
+            <div className="mt-4 flex flex-wrap gap-2">
+              {openAssetHref ? (
+                <Button
+                  asChild
+                  size="sm"
+                  variant={isPrimary ? "default" : "outline"}
+                >
+                  <Link to={openAssetHref}>
+                    <ArrowRight className="size-3.5" aria-hidden />
+                    {copy.openWorkbenchAsset ?? "Open asset"}
+                  </Link>
+                </Button>
+              ) : null}
+              {preview && !suppressContentPreview ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={isPrimary ? "default" : "outline"}
+                  onClick={() => setPreviewOpen(true)}
+                >
+                  <Eye className="size-3.5" aria-hidden />
+                  {copy.artifactPreview ?? "Preview"}
+                </Button>
+              ) : null}
+              {downloadHref ? (
+                <Button
+                  asChild
+                  size="sm"
+                  variant={isPrimary ? "outline" : "ghost"}
+                >
+                  <a href={downloadHref} download>
+                    <Download className="size-3.5" aria-hidden />
+                    {copy.downloadArtifact ?? "Download"}
+                  </a>
+                </Button>
+              ) : null}
+            </div>
+          </div>
+          {!isPrimary ? (
+            <ArrowRight
+              className="mt-1 size-4 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-primary"
+              aria-hidden
+            />
+          ) : null}
+        </div>
+      </article>
+      {preview && !suppressContentPreview ? (
+        <Sheet open={previewOpen} onOpenChange={setPreviewOpen}>
+          <SheetContent
+            side="right"
+            showCloseButton={false}
+            className="inset-y-4! left-0! right-0! mx-auto flex h-auto! w-[calc(100vw-2rem)]! max-w-[70rem]! flex-col gap-0 overflow-hidden rounded-2xl border p-0 shadow-2xl sm:inset-y-6! sm:w-[calc(100vw-3rem)]!"
+            data-result-content-preview
+          >
+            <SheetHeader className="shrink-0 border-b px-4 py-3 sm:px-5">
+              <div className="flex min-w-0 items-center justify-between gap-3">
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-primary-soft text-primary">
+                    <Icon className="size-4" aria-hidden />
+                  </span>
+                  <div className="min-w-0">
+                    <SheetTitle className="truncate">{title}</SheetTitle>
+                    <SheetDescription className="flex flex-wrap items-center gap-1.5">
+                      <span>
+                        {copy.resultContentPreview ?? "Content preview"}
+                      </span>
+                      <span aria-hidden>·</span>
+                      <span>{formatLabel}</span>
+                    </SheetDescription>
+                  </div>
+                </div>
+                <div className="flex shrink-0 items-center gap-2">
+                  {downloadHref ? (
+                    <Button asChild size="sm" variant="outline">
+                      <a href={downloadHref} download>
+                        <Download className="size-3.5" aria-hidden />
+                        <span className="hidden sm:inline">
+                          {copy.downloadArtifact ?? "Download"}
+                        </span>
+                      </a>
+                    </Button>
+                  ) : null}
+                  <Button
+                    type="button"
+                    size="icon-sm"
+                    variant="ghost"
+                    aria-label={copy.closeResultPreview ?? "Close preview"}
+                    onClick={() => setPreviewOpen(false)}
+                  >
+                    <X className="size-4" aria-hidden />
+                  </Button>
+                </div>
+              </div>
+            </SheetHeader>
+            <main className="min-h-0 flex-1 overflow-y-auto bg-background p-4 sm:p-6 xl:p-8">
+              <div className="mx-auto w-full max-w-4xl">
+                {summary ? (
+                  <p className="mb-5 border-b border-border/60 pb-4 text-sm leading-6 text-muted-foreground">
+                    {summary}
+                  </p>
+                ) : null}
+                {props.contentKind === "markdown" ? (
+                  <MarkdownContent className="py-0 text-base leading-7 [&>div]:space-y-4">{preview}</MarkdownContent>
+                ) : props.contentKind === "csv" ? (
+                  <WorkspaceTable
+                    props={{
+                      contentKind: "csv",
+                      contentPreview: preview,
+                      contentBytes: typeof props.contentBytes === "number" ? props.contentBytes : null,
+                      contentTruncated: props.contentTruncated === true,
+                      pageSize: 10,
+                      wide: true,
+                    }}
+                  />
+                ) : (
+                  <pre className="whitespace-pre-wrap break-words text-base leading-7 text-foreground/85">
+                    {preview}
+                  </pre>
+                )}
+              </div>
+            </main>
+          </SheetContent>
+        </Sheet>
+      ) : null}
+    </>
+  );
+}
+
+function ResultInsight({
+  props,
+}: {
+  props: {
+    title: string;
+    summary: string;
+    emphasis?: "lead" | "supporting";
+    points?: string[];
+  };
+}) {
+  const { messages } = useI18n();
+  const copy = messages.components.taskWorkspace;
+  const lead = props.emphasis === "lead";
+  if (lead) {
+    return (
+      <article
+        data-result-insight-emphasis="lead"
+        className="min-w-0 overflow-hidden rounded-2xl border border-info/30 bg-info/10"
+      >
+        <div className="grid min-w-0 gap-0 lg:grid-cols-[minmax(0,0.9fr)_minmax(22rem,1.1fr)]">
+          <div className="min-w-0 p-5 sm:p-7 lg:border-r lg:border-info/20">
+            <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.12em] text-info">
+              <span className="flex size-7 items-center justify-center rounded-full bg-info/15">
+                <Sparkles className="size-3.5" aria-hidden />
+              </span>
+              {copy.resultKeyStrategy ?? "Key strategy"}
+            </p>
+            <h2 className="mt-5 font-heading text-2xl font-semibold leading-tight tracking-[-0.025em] text-foreground sm:text-[1.75rem]">
+              {props.title}
+            </h2>
+            <p className="mt-3 text-sm leading-6 text-foreground/75 sm:text-[15px] sm:leading-7">
+              {props.summary}
+            </p>
+          </div>
+          {props.points?.length ? (
+            <ol className="grid content-center gap-0 border-t border-info/20 px-5 py-3 sm:px-7 lg:border-t-0">
+              {props.points.slice(0, 4).map((point, index) => (
+                <li
+                  key={point}
+                  className="flex gap-3 border-t border-info/20 py-3.5 text-sm leading-6 text-foreground/80 first:border-t-0"
+                >
+                  <span className="mt-0.5 flex size-6 shrink-0 items-center justify-center rounded-full border border-info/30 bg-background/70 text-[11px] font-semibold text-info">
+                    {index + 1}
+                  </span>
+                  <span>{point}</span>
+                </li>
+              ))}
+            </ol>
+          ) : null}
+        </div>
+      </article>
+    );
+  }
+  return (
+    <article className="min-w-0 rounded-xl border border-border/70 bg-background p-4 sm:p-5">
+      <h3 className="font-heading text-base font-semibold leading-snug tracking-[-0.015em] text-foreground">
+        {props.title}
+      </h3>
+      <p className="mt-2 text-sm leading-6 text-foreground/70">
+        {props.summary}
+      </p>
+      {props.points?.length ? (
+        <ul className="mt-4 space-y-2 text-xs leading-5 text-foreground/75">
+          {props.points.slice(0, 4).map((point) => (
+            <li key={point} className="flex gap-2">
+              <Check
+                className="mt-0.5 size-3.5 shrink-0 text-muted-foreground"
+                aria-hidden
+              />
+              <span>{point}</span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </article>
+  );
+}
+
+function ResultActionPlan({
+  props,
+}: {
+  props: { title?: string; summary?: string; phases: ResultActionPhase[] };
+}) {
+  const { messages } = useI18n();
+  const copy = messages.components.taskWorkspace;
+  const timeframeLabels = {
+    now: copy.resultTimeframeNow ?? "Now",
+    this_week: copy.resultTimeframeThisWeek ?? "This week",
+    later: copy.resultTimeframeLater ?? "Later",
+  };
+  return (
+    <section
+      aria-label={props.title ?? copy.resultActionPlan ?? "Action plan"}
+      className="min-w-0"
+    >
+      {props.title ? (
+        <h2 className="font-heading text-xl font-semibold tracking-[-0.02em] text-foreground">
+          {props.title}
+        </h2>
+      ) : null}
+      {props.summary ? (
+        <p className="mt-1.5 text-sm leading-6 text-muted-foreground">
+          {props.summary}
+        </p>
+      ) : null}
+      <div className="mt-4 grid gap-3 md:grid-cols-3">
+        {props.phases.slice(0, 3).map((phase, index) => (
+          <article
+            key={phase.timeframe}
+            className="rounded-xl border border-border/70 bg-background p-4"
+          >
+            <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.1em] text-primary">
+              <span className="flex size-6 items-center justify-center rounded-full bg-primary-soft text-[11px]">
+                {index + 1}
+              </span>
+              {timeframeLabels[phase.timeframe]}
+            </p>
+            <h3 className="mt-3 font-heading text-base font-semibold text-foreground">
+              {phase.title}
+            </h3>
+            <ul className="mt-3 space-y-2 text-sm leading-5 text-foreground/75">
+              {phase.actions.slice(0, 5).map((action) => (
+                <li key={action} className="flex gap-2">
+                  <Clock3
+                    className="mt-0.5 size-3.5 shrink-0 text-muted-foreground"
+                    aria-hidden
+                  />
+                  <span>{action}</span>
+                </li>
+              ))}
+            </ul>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ResultCaveats({
+  props,
+}: {
+  props: { title?: string; items: string[] };
+}) {
+  const { messages } = useI18n();
+  const copy = messages.components.taskWorkspace;
+  const title = props.title ?? copy.resultCaveats ?? "Before accepting";
+  return (
+    <section
+      aria-label={title}
+      className="flex min-w-0 flex-col gap-4 rounded-xl border border-warning/30 bg-warning/10 p-4 sm:flex-row sm:items-start"
+    >
+      <span className="flex size-9 shrink-0 items-center justify-center rounded-lg bg-warning/15 text-warning">
+        <TriangleAlert className="size-4.5" aria-hidden />
+      </span>
+      <div className="min-w-0">
+        <h2 className="font-heading text-base font-semibold text-foreground">
+          {title}
+        </h2>
+        <ul className="mt-2 grid gap-1.5 text-sm leading-5 text-foreground/80 sm:grid-cols-2 lg:grid-cols-3">
+          {props.items.slice(0, 3).map((item) => (
+            <li key={item}>{item}</li>
+          ))}
+        </ul>
+      </div>
+    </section>
+  );
+}
+
+function ResultEvidence({
+  props,
+}: {
+  props: {
+    title?: string;
+    summary?: string;
+    items: string[];
+    defaultCollapsed?: boolean;
+  };
+}) {
+  const { messages } = useI18n();
+  const copy = messages.components.taskWorkspace;
+  return (
+    <div data-result-evidence-footnote className="text-muted-foreground">
+      <div className="mb-1 flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.12em]">
+        <BookOpenText className="size-3.5" aria-hidden />
+        {copy.resultEvidenceFootnote ?? "Result notes"}
+      </div>
+      <CollapsibleBlock
+        title={
+          props.title ??
+          copy.resultEvidenceAndSources ??
+          "Evidence and source boundaries"
+        }
+        summary={props.summary}
+        defaultCollapsed={props.defaultCollapsed ?? true}
+        subtle
+      >
+        <ul className="space-y-1.5 text-xs leading-5 text-muted-foreground">
+          {props.items.map((item) => (
+            <li key={item} className="flex gap-2">
+              <span
+                aria-hidden
+                className="mt-[0.45rem] size-1 shrink-0 rounded-full bg-muted-foreground/60"
+              />
+              <span>{item}</span>
+            </li>
+          ))}
+        </ul>
+      </CollapsibleBlock>
+    </div>
+  );
+}
+
+function ResultOverview({ props }: { props: Record<string, unknown> }) {
+  const metrics = Array.isArray(props.metrics)
+    ? props.metrics.filter(
+        (item): item is { label: string; value: string } =>
+          stringField(item, "label") !== undefined &&
+          stringField(item, "value") !== undefined,
+      )
+    : [];
+  return (
+    <section
+      className="min-w-0 rounded-2xl border border-border/70 bg-background px-5 py-6 sm:px-7"
+      aria-label="Result overview"
+    >
+      {typeof props.eyebrow === "string" ? (
+        <p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">
+          {props.eyebrow}
+        </p>
+      ) : null}
+      <h2 className="mt-1 font-heading text-2xl font-semibold leading-tight text-foreground sm:text-3xl">
+        {stringProp(props.title) ?? "Result"}
+      </h2>
+      <p className="mt-3 max-w-4xl text-sm leading-6 text-foreground/75 sm:text-base">
+        {stringProp(props.summary)}
+      </p>
+      {metrics.length > 0 ? (
+        <dl className="mt-5 grid gap-3 border-t border-border/60 pt-4 sm:grid-cols-2 lg:grid-cols-4">
+          {metrics.map((metric) => (
+            <div key={`${metric.label}:${metric.value}`}>
+              <dd className="font-heading text-lg font-semibold text-foreground">
+                {metric.value}
+              </dd>
+              <dt className="mt-0.5 text-xs text-muted-foreground">
+                {metric.label}
+              </dt>
+            </div>
+          ))}
+        </dl>
+      ) : null}
+    </section>
+  );
+}
+
+function ResultReadiness({ props }: { props: Record<string, unknown> }) {
+  const { messages } = useI18n();
+  const copy = messages.components.taskWorkspace as Record<string, string>;
+  const status = (stringProp(props.status) ??
+    "partial") as keyof typeof readinessPresentation;
+  const presentation =
+    readinessPresentation[status] ?? readinessPresentation.partial;
+  const label = copy[presentation.messageKey] ?? presentation.fallback;
+  const items = Array.isArray(props.items)
+    ? props.items
+        .filter((item): item is string => typeof item === "string")
+        .slice(0, 3)
+    : [];
+  return (
+    <aside
+      className={cn(
+        "min-w-0 rounded-xl border px-4 py-3",
+        presentation.className,
+      )}
+      data-result-readiness={status}
+    >
+      <div className="flex items-start gap-3">
+        <span
+          className={cn(
+            "mt-0.5 flex size-7 shrink-0 items-center justify-center rounded-full",
+            presentation.iconClassName,
+          )}
+        >
+          <Check className="size-3.5" aria-hidden />
+        </span>
+        <div className="min-w-0">
+          <p className="text-xs font-semibold uppercase tracking-[0.12em]">
+            {label}
+          </p>
+          <p className="mt-1 text-sm leading-5 text-foreground/80">
+            {stringProp(props.summary)}
+          </p>
+        </div>
+      </div>
+      {items.length > 0 ? (
+        <ul className="mt-3 grid gap-1.5 text-sm text-foreground/80 sm:grid-cols-2">
+          {items.map((item) => (
+            <li key={item} className="flex gap-2">
+              <span aria-hidden>•</span>
+              <span>{item}</span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </aside>
+  );
+}
+
+function ResultSection({
+  props,
+  children,
+}: {
+  props: Record<string, unknown>;
+  children?: ReactNode;
+}) {
+  const layout = stringProp(props.layout) ?? "stack";
+  const tone = stringProp(props.tone) ?? "default";
+  const body = (
+    <div
+      className={cn(
+        "mt-3 min-w-0",
+        layout === "grid" && "grid gap-4 sm:grid-cols-2",
+        layout === "split" && "grid gap-5 lg:grid-cols-2",
+        layout === "rail" &&
+          "flex gap-4 overflow-x-auto pb-2 [&>*]:min-w-[18rem] [&>*]:flex-1",
+        layout === "stack" && "space-y-4",
+      )}
+    >
+      {children}
+    </div>
+  );
+  if (props.defaultCollapsed === true)
+    return (
+      <CollapsibleBlock
+        title={stringProp(props.title)}
+        summary={stringProp(props.summary)}
+        defaultCollapsed
+      >
+        {body}
+      </CollapsibleBlock>
+    );
+  return (
+    <section
+      className={cn(
+        "min-w-0",
+        tone === "subtle" && "rounded-2xl bg-muted/35 p-4 sm:p-5",
+        tone === "accent" &&
+          "rounded-2xl border border-primary/20 bg-primary-soft/30 p-4 sm:p-5",
+      )}
+    >
+      <h2 className="font-heading text-lg font-semibold text-foreground">
+        {stringProp(props.title) ?? "Result section"}
+      </h2>
+      {typeof props.summary === "string" ? (
+        <p className="mt-1 text-sm leading-5 text-muted-foreground">
+          {props.summary}
+        </p>
+      ) : null}
+      {body}
+    </section>
+  );
+}
+
+function ResultMetricGrid({ props }: { props: Record<string, unknown> }) {
+  const items = Array.isArray(props.items)
+    ? props.items.filter(
+        (item): item is { label: string; value: string; detail?: string } =>
+          stringField(item, "label") !== undefined &&
+          stringField(item, "value") !== undefined,
+      )
+    : [];
+  return (
+    <section className="min-w-0">
+      {typeof props.title === "string" ? (
+        <h3 className="mb-3 font-heading text-base font-semibold">
+          {props.title}
+        </h3>
+      ) : null}
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        {items.map((item) => (
+          <div
+            key={`${item.label}:${item.value}`}
+            className="rounded-xl border border-border/60 bg-background p-4"
+          >
+            <p className="text-xs font-medium text-muted-foreground">
+              {item.label}
+            </p>
+            <p className="mt-1 font-heading text-xl font-semibold text-foreground">
+              {item.value}
+            </p>
+            {item.detail ? (
+              <p className="mt-1 text-xs leading-4 text-muted-foreground">
+                {item.detail}
+              </p>
+            ) : null}
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function ResultComparison({ props }: { props: Record<string, unknown> }) {
+  const columns = Array.isArray(props.columns)
+    ? props.columns.filter(
+        (item): item is { key: string; label: string } =>
+          stringField(item, "key") !== undefined &&
+          stringField(item, "label") !== undefined,
+      )
+    : [];
+  const rows = Array.isArray(props.rows)
+    ? props.rows.filter(
+        (
+          item,
+        ): item is {
+          label: string;
+          values: Record<string, string>;
+          emphasis?: string;
+        } => {
+          const record = recordProp(item);
+          return (
+            stringField(item, "label") !== undefined &&
+            recordProp(record?.values) !== null
+          );
+        },
+      )
+    : [];
+  return (
+    <section className="min-w-0 overflow-hidden rounded-2xl border border-border/70 bg-background">
+      <div className="p-4 sm:p-5">
+        <h3 className="font-heading text-base font-semibold">
+          {stringProp(props.title) ?? "Comparison"}
+        </h3>
+        {typeof props.summary === "string" ? (
+          <p className="mt-1 text-sm text-muted-foreground">{props.summary}</p>
+        ) : null}
+      </div>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[40rem] border-collapse text-left text-sm">
+          <thead>
+            <tr className="border-y border-border/60 bg-muted/35">
+              <th className="px-4 py-3 font-semibold">&nbsp;</th>
+              {columns.map((column) => (
+                <th key={column.key} className="px-4 py-3 font-semibold">
+                  {column.label}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr
+                key={row.label}
+                className={cn(
+                  "border-b border-border/50 last:border-b-0",
+                  row.emphasis === "recommended" && "bg-success/5",
+                  row.emphasis === "warning" && "bg-warning/5",
+                  row.emphasis === "muted" && "text-muted-foreground",
+                )}
+              >
+                <th className="px-4 py-3 font-medium">{row.label}</th>
+                {columns.map((column) => (
+                  <td
+                    key={column.key}
+                    className="px-4 py-3 align-top leading-5"
+                  >
+                    {row.values[column.key] ?? "—"}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+function ResultTimeline({ props }: { props: Record<string, unknown> }) {
+  const items = Array.isArray(props.items)
+    ? props.items.filter(
+        (
+          item,
+        ): item is {
+          label: string;
+          title: string;
+          summary?: string;
+          status?: string;
+        } =>
+          stringField(item, "label") !== undefined &&
+          stringField(item, "title") !== undefined,
+      )
+    : [];
+  return (
+    <section className="min-w-0">
+      <h3 className="font-heading text-base font-semibold">
+        {stringProp(props.title) ?? "Timeline"}
+      </h3>
+      {typeof props.summary === "string" ? (
+        <p className="mt-1 text-sm text-muted-foreground">{props.summary}</p>
+      ) : null}
+      <ol className="mt-4 space-y-0">
+        {items.map((item, index) => (
+          <li
+            key={`${item.label}:${item.title}`}
+            className="relative grid grid-cols-[1.25rem_minmax(0,1fr)] gap-3 pb-5 last:pb-0"
+          >
+            <span
+              className={cn(
+                "mt-1 size-3 rounded-full border-2 bg-background",
+                item.status === "completed" && "border-success bg-success",
+                item.status === "current" && "border-primary bg-primary",
+                item.status === "blocked" &&
+                  "border-destructive bg-destructive",
+                (!item.status || item.status === "upcoming") && "border-border",
+              )}
+            />
+            {index < items.length - 1 ? (
+              <span className="absolute left-[0.34rem] top-4 h-[calc(100%-0.5rem)] w-px bg-border" />
+            ) : null}
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+                {item.label}
+              </p>
+              <p className="mt-0.5 text-sm font-semibold text-foreground">
+                {item.title}
+              </p>
+              {item.summary ? (
+                <p className="mt-1 text-sm leading-5 text-muted-foreground">
+                  {item.summary}
+                </p>
+              ) : null}
+            </div>
+          </li>
+        ))}
+      </ol>
+    </section>
+  );
+}
+
+function ResultChecklist({ props }: { props: Record<string, unknown> }) {
+  const items = Array.isArray(props.items)
+    ? props.items.filter(
+        (
+          item,
+        ): item is {
+          label: string;
+          detail?: string;
+          status: string;
+          statusLabel?: string;
+        } =>
+          stringField(item, "label") !== undefined &&
+          stringField(item, "status") !== undefined,
+      )
+    : [];
+  return (
+    <section className="min-w-0 rounded-2xl border border-border/60 bg-background p-4 sm:p-5">
+      <h3 className="font-heading text-base font-semibold">
+        {stringProp(props.title) ?? "Checklist"}
+      </h3>
+      {typeof props.summary === "string" ? (
+        <p className="mt-1 text-sm text-muted-foreground">{props.summary}</p>
+      ) : null}
+      <ul className="mt-4 divide-y divide-border/50">
+        {items.map((item) => (
+          <li
+            key={`${item.status}:${item.label}`}
+            className="flex gap-3 py-3 first:pt-0 last:pb-0"
+          >
+            <span
+              className={cn(
+                "mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border",
+                item.status === "done" &&
+                  "border-success bg-success text-success-foreground",
+                item.status === "blocked" &&
+                  "border-destructive text-destructive",
+                item.status === "in_progress" && "border-primary text-primary",
+              )}
+            >
+              {item.status === "done" ? (
+                <Check className="size-3" />
+              ) : (
+                <Circle className="size-2.5" />
+              )}
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <p className="text-sm font-medium">{item.label}</p>
+                {item.statusLabel ? (
+                  <span className="text-xs text-muted-foreground">
+                    {item.statusLabel}
+                  </span>
+                ) : null}
+              </div>
+              {item.detail ? (
+                <p className="mt-1 text-xs leading-5 text-muted-foreground">
+                  {item.detail}
+                </p>
+              ) : null}
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+function ResultChangeSummary({ props }: { props: Record<string, unknown> }) {
+  const items = Array.isArray(props.items)
+    ? props.items.filter(
+        (
+          item,
+        ): item is {
+          path: string;
+          summary: string;
+          status: string;
+          validation?: string;
+        } =>
+          stringField(item, "path") !== undefined &&
+          stringField(item, "summary") !== undefined &&
+          stringField(item, "status") !== undefined,
+      )
+    : [];
+  return (
+    <section className="min-w-0 rounded-2xl border border-border/70 bg-background p-4 sm:p-5">
+      <h3 className="font-heading text-base font-semibold">
+        {stringProp(props.title) ?? "Changes"}
+      </h3>
+      {typeof props.summary === "string" ? (
+        <p className="mt-1 text-sm text-muted-foreground">{props.summary}</p>
+      ) : null}
+      <ul className="mt-4 divide-y divide-border/50">
+        {items.map((item) => (
+          <li
+            key={`${item.status}:${item.path}`}
+            className="grid gap-1 py-3 first:pt-0 last:pb-0 sm:grid-cols-[minmax(12rem,0.7fr)_minmax(0,1.3fr)] sm:gap-4"
+          >
+            <code className="break-all text-xs font-semibold text-foreground">
+              {item.path}
+            </code>
+            <div>
+              <p className="text-sm leading-5 text-foreground/85">
+                {item.summary}
+              </p>
+              {item.validation ? (
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {item.validation}
+                </p>
+              ) : null}
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
 function FileView({ props }: { props: Record<string, unknown> }) {
   const { messages } = useI18n();
   const copy = messages.components.taskWorkspace;
@@ -785,7 +1802,7 @@ function FileView({ props }: { props: Record<string, unknown> }) {
         </p>
       ) : null}
       {props.previewError === "permission_required" && !accessRequest ? (
-        <p className="mt-2 rounded-md border border-warning/30 bg-warning/10 px-2 py-1.5 text-xs text-warning-foreground">
+        <p className="mt-2 rounded-md border border-warning/30 bg-warning/10 px-2 py-1.5 text-xs text-foreground/80">
           {copy.fileAccessRequired ??
             "This file is outside Chrona's generated-file directory. Review the path before allowing a one-time read."}
         </p>
@@ -851,7 +1868,7 @@ function FileView({ props }: { props: Record<string, unknown> }) {
               previewHeightClassName,
             )}
           >
-            <TaskMarkdownContent className="py-0">{visibleContent}</TaskMarkdownContent>
+            <MarkdownContent className="py-0">{visibleContent}</MarkdownContent>
           </div>
         ) : (
           <pre
@@ -994,6 +2011,7 @@ type WorkspaceTableProps = {
   defaultCollapsed?: boolean | null;
   collapseTitle?: string | null;
   collapsedSummary?: string | null;
+  wide?: boolean | null;
 };
 
 function tableCellText(value: unknown) {
@@ -1170,9 +2188,7 @@ function WorkspaceTableCell({
   const text = tableCellText(value);
   const href = column.hrefKey
     ? safeExternalHref(tableCellText(row[column.hrefKey]))
-    : column.type === "link"
-      ? safeExternalHref(text)
-      : null;
+    : safeExternalHref(text);
   if (href) {
     return (
       <a
@@ -1196,6 +2212,7 @@ function WorkspaceTable({ props }: { props: WorkspaceTableProps }) {
   const { messages } = useI18n();
   const copy = messages.components.taskWorkspace;
   const [sorting, setSorting] = useState<SortingState>([]);
+  const scrollRef = useRef<HTMLDivElement>(null);
   const parsed = useMemo(
     () => parseTablePreview(props.contentKind, props.contentPreview),
     [props.contentKind, props.contentPreview],
@@ -1231,8 +2248,18 @@ function WorkspaceTable({ props }: { props: WorkspaceTableProps }) {
     onSortingChange: setSorting,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-    initialState: { pagination: { pageSize } },
+    ...(props.wide ? {} : {
+      getPaginationRowModel: getPaginationRowModel(),
+      initialState: { pagination: { pageSize } },
+    }),
+  });
+  const displayRows = table.getRowModel().rows;
+  const rowVirtualizer = useVirtualizer({
+    count: props.wide ? displayRows.length : 0,
+    getScrollElement: () => scrollRef.current,
+    estimateSize: () => 49,
+    initialRect: { width: 900, height: 600 },
+    overscan: Math.min(20, parsed.rows.length),
   });
   const path = props.displayPath ?? props.uri ?? props.path;
   const size = formatFileSize(props.contentBytes);
@@ -1291,9 +2318,19 @@ function WorkspaceTable({ props }: { props: WorkspaceTableProps }) {
       ) : null}
       {parsed.rows.length > 0 && tableColumns.length > 0 ? (
         <>
-          <div className="min-w-0 w-full max-w-full overflow-hidden rounded-md border border-border/80 bg-background">
-            <table className="w-full table-fixed caption-bottom text-sm">
-              <thead className="bg-muted/55 [&_tr]:border-b">
+          <div
+            ref={props.wide ? scrollRef : undefined}
+            data-result-table-scroll={props.wide ? "virtual" : undefined}
+            className={cn(
+              "min-w-0 w-full max-w-full rounded-md border border-border/80 bg-background",
+              props.wide ? "max-h-[60vh] overflow-auto" : "overflow-hidden",
+            )}
+          >
+            <table
+              className={cn("caption-bottom text-sm", props.wide ? "table-fixed" : "w-full table-fixed")}
+              style={props.wide ? { width: `${Math.max(1, tableColumns.length) * 224}px` } : undefined}
+            >
+              <thead className={cn("bg-muted/55 [&_tr]:border-b", props.wide && "sticky top-0 z-20 shadow-sm")}>
                 {table.getHeaderGroups().map((headerGroup) => (
                   <tr
                     key={headerGroup.id}
@@ -1311,7 +2348,11 @@ function WorkspaceTable({ props }: { props: WorkspaceTableProps }) {
                                 ? "descending"
                                 : "none"
                           }
-                          className={`h-10 min-w-0 px-1 align-middle font-medium text-foreground ${tableColumns[header.index]?.type === "number" ? "text-right" : "text-left"}`}
+                          className={cn(
+                            "h-10 px-1 align-middle font-semibold text-foreground",
+                            props.wide ? "w-56 min-w-56 max-w-56 border-r border-border/60 last:border-r-0" : "min-w-0",
+                            tableColumns[header.index]?.type === "number" ? "text-right" : "text-left",
+                          )}
                         >
                           <button
                             type="button"
@@ -1343,55 +2384,63 @@ function WorkspaceTable({ props }: { props: WorkspaceTableProps }) {
                   </tr>
                 ))}
               </thead>
-              <tbody className="[&_tr:last-child]:border-0">
-                {table.getRowModel().rows.map((row) => (
-                  <tr
-                    key={row.id}
-                    className="border-b transition-colors hover:bg-muted/50"
-                  >
-                    {row.getVisibleCells().map((cell) => (
-                      <td
-                        key={cell.id}
-                        className={`min-w-0 p-2 align-top text-foreground/80 ${tableColumns[cell.column.getIndex()]?.type === "number" ? "text-right tabular-nums" : ""}`}
-                      >
-                        {flexRender(
-                          cell.column.columnDef.cell,
-                          cell.getContext(),
-                        )}
-                      </td>
-                    ))}
-                  </tr>
-                ))}
+              <tbody
+                className="[&_tr:last-child]:border-0"
+                style={props.wide ? { height: `${rowVirtualizer.getTotalSize()}px`, position: "relative" } : undefined}
+              >
+                {(props.wide
+                  ? (rowVirtualizer.getVirtualItems().length > 0
+                    ? rowVirtualizer.getVirtualItems()
+                    : displayRows.slice(0, 20).map((_, index) => ({ index, start: index * 49 })))
+                  : displayRows.map((_, index) => ({ index, start: index * 49 }))).map((item) => {
+                  const row = displayRows[item.index];
+                  if (!row) return null;
+                  const virtualItem = props.wide ? item : null;
+                  return (
+                    <tr
+                      key={row.id}
+                      data-index={virtualItem?.index}
+                      ref={props.wide ? (node) => rowVirtualizer.measureElement(node) : undefined}
+                      className="border-b transition-colors hover:bg-muted/50"
+                      style={virtualItem ? {
+                        position: "absolute",
+                        top: 0,
+                        left: 0,
+                        width: "100%",
+                        transform: `translateY(${virtualItem.start}px)`,
+                        display: "table",
+                        tableLayout: "fixed",
+                      } : undefined}
+                    >
+                      {row.getVisibleCells().map((cell) => (
+                        <td
+                          key={cell.id}
+                          className={cn(
+                            "p-2 align-top text-foreground/80",
+                            props.wide ? "w-56 min-w-56 max-w-56 border-r border-border/60 last:border-r-0" : "min-w-0",
+                            tableColumns[cell.column.getIndex()]?.type === "number" ? "text-right tabular-nums" : "",
+                          )}
+                        >
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        </td>
+                      ))}
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
           <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground">
             <span>
-              {parsed.rows.length} rows ·{" "}
-              {table.getPageCount() > 1
-                ? `page ${table.getState().pagination.pageIndex + 1} of ${table.getPageCount()}`
-                : "1 page"}
+              {parsed.rows.length} rows
+              {props.wide ? " · scroll to explore" : ` · ${table.getPageCount() > 1 ? `page ${table.getState().pagination.pageIndex + 1} of ${table.getPageCount()}` : "1 page"}`}
             </span>
-            {table.getPageCount() > 1 ? (
+            {!props.wide && table.getPageCount() > 1 ? (
               <div className="flex gap-1.5">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-7 px-2 text-xs"
-                  disabled={!table.getCanPreviousPage()}
-                  onClick={() => table.previousPage()}
-                >
+                <Button type="button" variant="outline" size="sm" className="h-7 px-2 text-xs" disabled={!table.getCanPreviousPage()} onClick={() => table.previousPage()}>
                   Previous
                 </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-7 px-2 text-xs"
-                  disabled={!table.getCanNextPage()}
-                  onClick={() => table.nextPage()}
-                >
+                <Button type="button" variant="outline" size="sm" className="h-7 px-2 text-xs" disabled={!table.getCanNextPage()} onClick={() => table.nextPage()}>
                   Next
                 </Button>
               </div>
@@ -1417,12 +2466,92 @@ function WorkspaceTable({ props }: { props: WorkspaceTableProps }) {
  * `@json-render/shadcn` components (they inherit Chrona's Tailwind CSS-variable
  * theme); domain components (`RichMarkdown`, `JsonView`, `FileRef`, `ResultSummary`,
  * `ActivityRow`, `ToolDetails`, `CollapsibleText`) render with Chrona JSX.
- *
  * Actions are declared required by the catalog but are only exercised by the
- * Node-action panel (Phase 3), which wires real dispatch via providers; until
- * then the handlers throw loudly if ever invoked (activity/result specs emit no
- * actions).
+ * Node-action panel, which wires real dispatch via providers.
  */
+function CheckpointChoiceField({
+  props,
+  bindings,
+}: {
+  props: {
+    label: string;
+    name: string;
+    description?: string;
+    selection: "single" | "multiple";
+    options: Array<{
+      value: string;
+      label: string;
+      description?: string;
+      recommended?: boolean;
+    }>;
+    value?: string | string[] | { $bindState: string };
+    required?: boolean;
+  };
+  bindings?: Record<string, string>;
+}) {
+  const propValue =
+    typeof props.value === "object" && !Array.isArray(props.value)
+      ? undefined
+      : props.value;
+  const [value, setValue] = useBoundProp<string | string[]>(
+    propValue,
+    bindings?.value,
+  );
+  const selected = Array.isArray(value) ? value : value ? [value] : [];
+  const selectOption = (optionValue: string, checked: boolean) => {
+    if (props.selection === "single") {
+      setValue(checked ? optionValue : "");
+      return;
+    }
+    setValue(
+      checked
+        ? [...new Set([...selected, optionValue])]
+        : selected.filter((entry) => entry !== optionValue),
+    );
+  };
+
+  return (
+    <Field className="min-w-0 gap-2">
+      <FieldLabel>
+        {props.label}
+        {props.required ? <span aria-hidden="true"> *</span> : null}
+      </FieldLabel>
+      {props.description ? (
+        <FieldDescription>{props.description}</FieldDescription>
+      ) : null}
+      <div className="grid min-w-0 gap-2 sm:grid-cols-2">
+        {props.options.map((option) => (
+          <Label
+            key={option.value}
+            className="flex min-w-0 items-start gap-2 rounded-lg border border-border/60 p-2.5 font-normal"
+          >
+            <Checkbox
+              checked={selected.includes(option.value)}
+              onCheckedChange={(next) =>
+                selectOption(option.value, next === true)
+              }
+              aria-label={option.label}
+            />
+            <span className="min-w-0 space-y-0.5">
+              <span className="flex flex-wrap items-center gap-1 text-sm font-medium leading-5">
+                {option.label}
+                {option.recommended ? (
+                  <Badge variant="secondary">Recommended</Badge>
+                ) : null}
+              </span>
+              {option.description ? (
+                <span className="block text-xs leading-4 text-muted-foreground">
+                  {option.description}
+                </span>
+              ) : null}
+            </span>
+          </Label>
+        ))}
+      </div>
+    </Field>
+  );
+}
+
 export const { registry: workspaceRegistry } = defineRegistry(chronaCatalog, {
   components: {
     // standard primitives (shadcn)
@@ -1436,9 +2565,7 @@ export const { registry: workspaceRegistry } = defineRegistry(chronaCatalog, {
           stringProp(input.props.collapseTitle) ??
           stringProp(input.props.title) ??
           "Result";
-        const summary =
-          stringProp(input.props.collapsedSummary) ??
-          stringProp(input.props.description);
+        const summary = stringProp(input.props.description);
         return (
           <CollapsibleBlock
             title={title}
@@ -1452,32 +2579,55 @@ export const { registry: workspaceRegistry } = defineRegistry(chronaCatalog, {
       }
       return shadcnComponents.Card({ ...input, props });
     },
-    Stack: (input) =>
-      shadcnComponents.Stack({
+    Stack: (input) => {
+      const horizontal = input.props.direction === "horizontal";
+      return shadcnComponents.Stack({
         ...input,
         props: {
           ...input.props,
           className: cn(
             input.props.className,
-            "min-w-0 w-full max-w-full",
+            "min-w-0 max-w-full",
+            !input.props.className?.includes("w-auto") && "w-full",
             !input.props.align && "items-stretch",
+            horizontal && "[&>*]:min-w-0 [&>*]:flex-[1_1_18rem]",
           ),
         },
-      }),
+      });
+    },
     Separator: shadcnComponents.Separator,
     Text: shadcnComponents.Text,
     Heading: shadcnComponents.Heading,
     Badge: shadcnComponents.Badge,
     Alert: shadcnComponents.Alert,
     Button: shadcnComponents.Button,
+    CheckpointChoiceField,
     Link: shadcnComponents.Link,
     Input: shadcnComponents.Input,
     Textarea: shadcnComponents.Textarea,
     Select: shadcnComponents.Select,
+    Checkbox: shadcnComponents.Checkbox,
+    Radio: shadcnComponents.Radio,
     Tabs: shadcnComponents.Tabs,
     Table: WorkspaceTable,
     heading: shadcnComponents.Heading,
     DropdownMenu: shadcnComponents.DropdownMenu,
+    ResultOverview: ({ props }) => <ResultOverview props={props} />,
+    ResultReadiness: ({ props }) => <ResultReadiness props={props} />,
+    ResultSection: ({ props, children }) => (
+      <ResultSection props={props}>{children}</ResultSection>
+    ),
+    ResultMetricGrid: ({ props }) => <ResultMetricGrid props={props} />,
+    ResultComparison: ({ props }) => <ResultComparison props={props} />,
+    ResultTimeline: ({ props }) => <ResultTimeline props={props} />,
+    ResultChecklist: ({ props }) => <ResultChecklist props={props} />,
+    ResultChangeSummary: ({ props }) => <ResultChangeSummary props={props} />,
+    ResultHero: ({ props }) => <ResultHero props={props} />,
+    ResultDeliverable: ({ props }) => <ResultDeliverable props={props} />,
+    ResultInsight: ({ props }) => <ResultInsight props={props} />,
+    ResultActionPlan: ({ props }) => <ResultActionPlan props={props} />,
+    ResultCaveats: ({ props }) => <ResultCaveats props={props} />,
+    ResultEvidence: ({ props }) => <ResultEvidence props={props} />,
     paragraph: ({ props }) => (
       <p className="text-sm leading-6 text-foreground/85">
         {props.text ?? props.content}
@@ -1525,7 +2675,7 @@ export const { registry: workspaceRegistry } = defineRegistry(chronaCatalog, {
     // domain components (Chrona)
     RichMarkdown: ({ props }) => {
       const content = typeof props.content === "string" ? props.content : "";
-      const contentNode = <TaskMarkdownContent>{content}</TaskMarkdownContent>;
+      const contentNode = <MarkdownContent>{content}</MarkdownContent>;
       return (
         <MaybeCollapsible
           props={props}
@@ -1842,12 +2992,12 @@ export const { registry: workspaceRegistry } = defineRegistry(chronaCatalog, {
         {props.risks.length > 0 ? (
           <div className="rounded-2xl border border-warning/30 bg-warning/15 px-4 py-3">
             <div className="flex items-start gap-2">
-              <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warning-foreground" />
+              <TriangleAlert className="mt-0.5 size-4 shrink-0 text-warning" />
               <div>
-                <p className="text-sm font-medium text-warning-foreground">
+                <p className="text-sm font-medium text-foreground">
                   High Risk Changes
                 </p>
-                <ul className="mt-1 list-disc space-y-0.5 pl-4 text-xs text-warning-foreground/90">
+                <ul className="mt-1 list-disc space-y-0.5 pl-4 text-xs text-foreground/80">
                   {props.risks.map((risk, index) => (
                     <li key={`${risk}:${index}`}>{risk}</li>
                   ))}
@@ -1863,7 +3013,7 @@ export const { registry: workspaceRegistry } = defineRegistry(chronaCatalog, {
                 key={`${warning}:${index}`}
                 className="flex items-start gap-1.5"
               >
-                <TriangleAlert className="mt-0.5 size-3 shrink-0 text-warning-foreground" />
+                <TriangleAlert className="mt-0.5 size-3 shrink-0 text-warning" />
                 <span>{warning}</span>
               </div>
             ))}

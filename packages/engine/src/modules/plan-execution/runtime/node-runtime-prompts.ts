@@ -1,10 +1,10 @@
 import type {
+  CheckpointInputFields,
   EffectivePlanGraph,
   EffectivePlanNode,
   NodeRuntimeInput,
   PlanOutputState,
 } from "@chrona/contracts/ai";
-import { chronaPlanOutputCatalogPrompt } from "@chrona/ui-protocol";
 
 import { buildNodeRuntimeInput } from "./node-runtime-refs";
 import { mkdirSync } from "node:fs";
@@ -13,17 +13,13 @@ import { getChronaGeneratedFilesDir } from "@chrona/shared/data-paths";
 
 export const NODE_RUNTIME_TERMINAL_TOOLS = {
   task: [
-    "chrona_plan_output",
     "chrona_node_complete",
+    "chrona_node_request_input",
     "chrona_node_block",
     "chrona_node_fail",
   ],
-  condition: [
-    "chrona_condition_select",
-    "chrona_node_block",
-    "chrona_node_fail",
-  ],
-  checkpoint: ["chrona_node_block", "chrona_node_fail"],
+  condition: ["chrona_condition_select", "chrona_node_block", "chrona_node_fail"],
+  checkpoint: ["chrona_node_request_input", "chrona_node_block", "chrona_node_fail"],
   wait: ["chrona_wait_complete", "chrona_node_block", "chrona_node_fail"],
 } as const;
 
@@ -35,26 +31,16 @@ You must never invent or emit backend IDs.
 Do not call chrona_node_read or chrona_execution_read by default.
 Call chrona_node_read only when the current node details, result submission actions, or branch refs are missing, ambiguous, or suspected stale.
 Call chrona_execution_read only after a Chrona result submission action is rejected/errors, or when overall execution status/recovery actions are needed.
-Use context.plan.goal and context.plan.assumptions as the global objective and constraints for the current node. If context.run is present, treat it as initial run-level planning context and do not repeat it in node outputs.
-When you call chrona_node_block you must include a reason and an actionForm that tells the user how to unblock: actionForm.instructions (what the user should do) and actionForm.inputFields (at least one field, each with name and label; set type "text", "textarea", or "select", and options for a select). Without a valid actionForm the block is rejected.
-After chrona_node_complete, chrona_condition_select, chrona_wait_complete, chrona_node_block, or chrona_node_fail succeeds, stop immediately. Do not continue downstream nodes.
+Use context.plan.goal and context.plan.assumptions as the global objective and constraints for the current node. If context.goal is present, it is the Task's frozen Goal snapshot: use its additionalContext and operationalBrief before requesting information the user already supplied. If context.acceptedGoalResults is present, treat those entries as bounded summaries with opaque refs, not as permission to access undeclared files. context.resultManifest lists semantic keys already contributed by earlier nodes. If context.run is present, treat it as initial run-level planning context and do not repeat it in node outputs.
+Call chrona_node_request_input only when normal execution still needs structured user input after using the supplied plan, Goal, prior-result, and current-node context. Keep chrona_node_block for exceptional external blockers such as missing access or unavailable capability. A request-input form uses only text, choice, and boolean field kinds; choice.selection distinguishes single from multiple selection.
+After chrona_node_complete, chrona_condition_select, chrona_wait_complete, chrona_node_request_input, chrona_node_block, or chrona_node_fail succeeds, stop immediately. Do not continue downstream nodes.
 `.trim();
 
-const PLAN_OUTPUT_CATALOG_PROMPT = chronaPlanOutputCatalogPrompt();
-const RESULTS_DESIGN_BRIEF = `
-Design user-visible Results as a concise deliverable, not a raw data dump. Help the user understand what was completed, the most important findings, the primary data or report needed to inspect the result, and where full artifacts or evidence live.
-
-Choose components based on the result shape: use ResultSummary for the outcome, Markdown or Card for interpretation, caveats, and key findings, Table for ranked lists, comparisons, records, and datasets users need to scan, FileRef or FileView for full artifacts, and JsonView only for diagnostics or machine-readable evidence.
-
-For Tables, choose columns that best explain the data for the user's goal. Prefer readable, semantic fields over implementation fields. Do not mechanically include every field. Do not drop fields that explain why a row matters. When a row name or title has a URL, prefer making the name or title a link when that reads better than a standalone URL column.
-
-Keep Results rich enough to be useful, but avoid duplicating the same information across summaries, tables, and files.
-`.trim();
 
 function resultArtifactGuidance(runtimeInput: NodeRuntimeInput): string {
   const generatedFiles = runtimeInput.context.run?.generatedFiles;
   if (!generatedFiles) return "";
-  return `For generated result artifacts not explicitly requested as repo/code changes, write only under the absolute output directory ${generatedFiles.directory}. Reference those files from plan output with FileView or FileRef using ${generatedFiles.referenceBase}<filename>, not the absolute path. For long Markdown reports or large evidence, prefer a .md/.txt/.json/.csv file there. Keep ResultSummary/Card/Markdown/Table as the readable summary; do not dump long report bodies directly into chrona_plan_output patches. Do not use .. segments, secrets/tokens/credentials/key paths, backend IDs, or paths outside the assigned output directory for generated deliverables.`;
+  return `For generated result artifacts not explicitly requested as repo/code changes, write only under the absolute output directory ${generatedFiles.directory}. Declare each file in chrona_node_complete.deliverables using a stable deliverableKey and ${generatedFiles.referenceBase}<filename>. Submit concise semantic findings, decisions, caveats, nextActions, and evidenceItems in the same terminal call. Do not build UI, generate download URLs, use .. segments, expose secrets/tokens/backend IDs, or reference paths outside the assigned output directory.`;
 }
 
 function generatedFilesContext(nodeRef: string) {
@@ -67,22 +53,20 @@ function generatedFilesContext(nodeRef: string) {
   };
 }
 
+
 function nodeTypeInstructions(node: EffectivePlanNode): string {
   switch (node.type) {
     case "task":
-      return `When the current task-node has user-visible deliverables, call chrona_plan_output with RFC 6902 SpecStream patches before completion. Generate UI using only the Chrona plan-output catalog (see CATALOG_UI_SPEC below). chrona_plan_output edits one task-level plan output shared by every node in this task run; each call patches the same accumulated result, not a node-local document. Call chrona_node_complete only when the current task-node objective is fully satisfied and required output patches have succeeded. If the objective requires filesystem, shell, browser, network, or code execution capability you do not have, block instead of pretending completion.
-
-      Read Current Node Context JSON.context.planOutput before patching. If context.planOutput.hasSpec is false, bootstrap once with /root and every required /elements/<id> entry in the same chrona_plan_output call. If context.planOutput.hasSpec is true, NEVER patch /root, /elements, or replace the existing root element; preserve context.planOutput.root and append node-specific sections under that existing layout. Existing element ids are summarized in context.planOutput.elementIds; existing root children are summarized in context.planOutput.rootChildren.
-
-      For later user-visible deliverables, pass "patches" as incremental JSON Patch operations. Example later update call: { patches: [{ "op": "add", "path": "/elements/marketSummary", "value": { "type": "Card", "props": { "title": "Market summary" }, "children": ["marketSummaryBody"] } }, { "op": "add", "path": "/elements/marketSummaryBody", "value": { "type": "RichMarkdown", "props": { "content": "**Key findings**\n\n- Finding one\n- Finding two" }, "children": [] } }, { "op": "add", "path": "/elements/<currentRootId>/children/-", "value": "marketSummary" }], summary: "Added market summary section" }. RichMarkdown multiline content must contain actual newline characters; the tool SDK handles JSON serialization, so never submit pre-escaped literal \\n text.
-
-      Final Spec after applying patches must be valid and closed: root must reference an existing element id, every child id referenced in any children array must exist as an element id, every element id must be unique, and no element may be omitted as a placeholder unless that element is also declared in elements. For existing plan output, satisfy these rules by preserving the current root and adding/appending elements; do not rebuild the whole Spec.
-
-      Spec hard rules, all enforced by validation: (1) root MUST equal one element id. (2) Leaf elements use children: []. (3) children contains child element-id strings only. (4) Every child id MUST exist in elements. (5) No element may include itself or create a cycle. (6) Component type MUST be from CATALOG_UI_SPEC. (7) props MUST match that component schema exactly. (8) visible is an element-level field, not a prop. (9) The plan-output catalog is intentionally small: use Stack/Card/Heading/Text/RichMarkdown/Table/Badge/Alert/FileRef/JsonView/ResultSummary/CollapsibleText/Separator only.`;
+      return `Complete the node objective, then call chrona_node_complete once with a concise summary and semantic result contributions. Use stable keys that describe meaning rather than execution order. Declare every user-visible generated file through deliverables; Chrona registers files and organizes the final result after the execution graph completes. Do not create or patch json-render UI. Do not duplicate existing keys from context.resultManifest unless this node intentionally replaces that logical deliverable. If the objective requires filesystem, shell, browser, network, or code execution capability you do not have, block instead of pretending completion.`;
     case "condition":
       return `Evaluate exactly one listed branch and call chrona_condition_select with branchRef. Do not use labels, nextNodeId, default branches, natural-language conclusions, or incomplete JSON as routing authority. If no explicit branchRef is safe, call chrona_node_block.`;
-    case "checkpoint":
-      return `Review only the current checkpoint context. Do not submit checkpoint decisions: Checkpoint submission is performed by the user in the frontend. Call chrona_node_block when waiting for user input or approval, and chrona_node_fail only for unrecoverable errors.`;
+    case "checkpoint": {
+      const config = node.config as { required?: boolean; interaction?: { schemaSource?: string; instruction?: string } };
+      if (config.interaction?.schemaSource === "ai") {
+        return `This is a required AI-defined human interaction gate. Use prior execution context and results to decide the concrete question, field kinds, choices, recommendations, and defaults. You MUST call chrona_node_request_input with a concise validated form; do not call chrona_node_complete and do not substitute chrona_node_block. Planning instruction: ${config.interaction.instruction ?? node.title}`;
+      }
+      return `Review only the current checkpoint context. Do not submit checkpoint decisions: Checkpoint submission is performed by the user in the frontend. Call chrona_node_request_input when structured user input is required, chrona_node_block only for an exceptional external blocker, and chrona_node_fail only for unrecoverable errors.`;
+    }
     case "wait":
       return `Complete only when the wait condition is satisfied by explicit evidence. Otherwise block or fail with a concise reason.`;
   }
@@ -95,9 +79,11 @@ function runtimeJson(runtimeInput: NodeRuntimeInput): string {
 export function buildNodeRuntimePrompt(input: {
   plan: EffectivePlanGraph;
   node: EffectivePlanNode;
-  planOutput?: PlanOutputState | NodeRuntimeInput["context"]["planOutput"];
+  planOutput?: PlanOutputState | NodeRuntimeInput["context"]["resultManifest"];
   planContext?: NodeRuntimeInput["context"]["plan"];
   runContext?: NonNullable<NodeRuntimeInput["context"]["run"]>;
+  userInput?: string;
+  inputFields?: CheckpointInputFields;
 }): { instructions: string; runtimeInput: NodeRuntimeInput } {
   const currentNodeResultActionNames = [
     ...NODE_RUNTIME_TERMINAL_TOOLS[input.node.type],
@@ -108,6 +94,8 @@ export function buildNodeRuntimePrompt(input: {
     planOutput: input.planOutput,
     planContext: input.planContext,
     runContext: input.runContext,
+    userInput: input.userInput,
+    inputFields: input.inputFields,
   });
   const runtimeInput: NodeRuntimeInput = input.node.type === "task"
     ? {
@@ -122,19 +110,14 @@ export function buildNodeRuntimePrompt(input: {
       }
     : baseRuntimeInput;
 
-  const catalogSection =
-    input.node.type === "task"
-      ? [
-          RESULTS_DESIGN_BRIEF,
-          resultArtifactGuidance(runtimeInput),
-          PLAN_OUTPUT_CATALOG_PROMPT,
-        ]
-      : [];
+  const catalogSection = input.node.type === "task"
+    ? [resultArtifactGuidance(runtimeInput)]
+    : [];
 
   const instructions = [
     NODE_RUNTIME_PROTOCOL,
     nodeTypeInstructions(input.node),
-    `When task-node work produces deliverables, submit them with chrona_plan_output first. Finish with one terminal Chrona action: ${currentNodeResultActionNames.filter((name) => name !== "chrona_plan_output").join(", ")}. These actions report this Chrona node outcome back to Chrona.`,
+    `Finish with one terminal Chrona action: ${currentNodeResultActionNames.join(", ")}. Task completion carries semantic result contributions and declared deliverables; Chrona owns artifact registration and final presentation.`,
     ...catalogSection,
     "Current Node Context JSON:",
     runtimeJson(runtimeInput),

@@ -3,6 +3,7 @@ import { latestRecordedTerminalAction } from "./agent-control-store";
 import { submitNodeResultActionFromControl } from "@/modules/agent-tools/node-result-action";
 import { db } from "@/lib/db";
 import {
+  type CheckpointInputFields,
   type EffectivePlanGraph,
   type EffectivePlanNode,
   type NodeAttempt,
@@ -33,6 +34,8 @@ export type NodeAiCapabilityInput = {
   plan: EffectivePlanGraph;
   planContext?: NodeExecutionPlanContext;
   runContext?: NodeExecutionRunContext;
+  userInput?: string;
+  inputFields?: CheckpointInputFields;
   attempt: NodeAttempt;
   planOutput?: PlanOutputState;
   runtimeName: string;
@@ -65,11 +68,24 @@ function terminalToolNameFromSnapshot(response: ProviderRunSnapshot): string | u
   return typeof toolName === "string" && toolName.trim() ? toolName : undefined;
 }
 
+function terminalToolInputFromSnapshot(response: ProviderRunSnapshot): Record<string, unknown> {
+  const raw = asRecord(response.raw);
+  const terminal = asRecord(recordValue(raw, "terminalTool"))
+    ?? asRecord(recordValue(raw, "terminal_tool"));
+  return asRecord(recordValue(terminal, "input")) ?? {};
+}
+
 function asRecord(value: unknown): Record<string, unknown> | undefined {
   return value && typeof value === "object" && !Array.isArray(value)
     ? value as Record<string, unknown>
     : undefined;
 }
+function requiresAiDefinedInput(node: EffectivePlanNode) {
+  if (node.type !== "checkpoint") return false;
+  const config = node.config as { required?: boolean; interaction?: { schemaSource?: string } };
+  return config.required !== false && config.interaction?.schemaSource === "ai";
+}
+
 
 function blockedReasonFromSnapshot(input: {
   response: ProviderRunSnapshot;
@@ -127,6 +143,7 @@ function terminalNodeResultFromSnapshot(input: {
   evidence: NodeExecutionEvidence;
   structured: Record<string, unknown> | undefined;
   summary?: string;
+  inputFields?: CheckpointInputFields;
 }): NodeExecutionResult | undefined {
   const terminalToolName = terminalToolNameFromSnapshot(input.invocation.response);
   switch (terminalToolName) {
@@ -161,12 +178,22 @@ function terminalNodeResultFromSnapshot(input: {
         evidence: input.evidence,
       });
       if (override) return override;
+      if (requiresAiDefinedInput(input.node)) {
+        return {
+          status: "failed",
+          error: `Required AI-defined checkpoint ${input.node.id} completed without chrona_node_request_input`,
+          evidence: input.evidence,
+        };
+      }
+      const terminalInput = terminalToolInputFromSnapshot(input.invocation.response);
       return {
         status: "done",
         summary:
+          (typeof terminalInput.summary === "string" ? terminalInput.summary.trim() : "") ||
           input.summary ||
           `Runtime run ${input.invocation.runtimeRunRef ?? input.invocation.runId} completed`,
         evidence: input.evidence,
+        inputFields: input.inputFields,
       };
     }
     case undefined:
@@ -270,6 +297,7 @@ async function resolveTerminalNodeResult(input: {
   evidence: NodeExecutionEvidence;
   structured: Record<string, unknown> | undefined;
   summary?: string;
+  inputFields?: CheckpointInputFields;
 }): Promise<NodeExecutionResult | undefined> {
   return terminalNodeResultFromSnapshot({
     invocation: input.invocation,
@@ -278,6 +306,7 @@ async function resolveTerminalNodeResult(input: {
     evidence: input.evidence,
     structured: input.structured,
     summary: input.summary,
+    inputFields: input.inputFields,
   });
 }
 export async function runTaskNodeFeature(
@@ -334,17 +363,47 @@ export async function runTaskNodeFeature(
         const selectedBranch = recordedAction.branchRef
           ? branchBindingForRef({ plan: input.plan, node: input.node, branchRef: recordedAction.branchRef })
           : null;
+        if (requiresAiDefinedInput(input.node)) {
+          const protocolFailure: NodeExecutionResult = {
+            status: "failed",
+            error: `Required AI-defined checkpoint ${input.node.id} completed without chrona_node_request_input`,
+            evidence,
+          };
+          await updateInvocationRunFromNodeResult(invocation, protocolFailure);
+          return protocolFailure;
+        }
         const completedResult: NodeExecutionResult = {
           status: "done",
           summary: recordedAction.summary ?? "Node completed",
           evidence,
           output: recordedAction.output,
+          inputFields: input.inputFields,
           selectedBranch: selectedBranch
             ? { label: selectedBranch.label, nextNodeId: selectedBranch.nextNodeId!, source: "ai" }
             : undefined,
+          deliverables: recordedAction.deliverables,
+          findings: recordedAction.findings,
+          decisions: recordedAction.decisions,
+          caveats: recordedAction.caveats,
+          nextActions: recordedAction.nextActions,
+          resultEvidence: recordedAction.evidenceItems?.map((item) => ({
+            ...item,
+            sourceNodeRef: "",
+          })),
         };
         await updateInvocationRunFromNodeResult(invocation, completedResult);
         return completedResult;
+      }
+      if (parsedAction.kind === "request_input" && recordedAction?.action === "block_current_node") {
+        const waitingResult: NodeExecutionResult = {
+          status: "waiting_for_user",
+          prompt: parsedAction.payload.title,
+          reason: parsedAction.payload.instructions,
+          evidence,
+          actionForm: recordedAction.actionForm,
+        };
+        await updateInvocationRunFromNodeResult(invocation, waitingResult);
+        return waitingResult;
       }
       if (recordedAction?.action === "block_current_node") {
         const blockedResult: NodeExecutionResult = {
@@ -422,6 +481,7 @@ export async function runTaskNodeFeature(
           evidence,
           structured,
           summary,
+          inputFields: input.inputFields,
         })
       : undefined;
     const nodeResult: NodeExecutionResult = terminalNodeResult ?? (invocation.response.status === "completed" && requiresTerminalAction
@@ -470,7 +530,7 @@ async function updateInvocationRunFromNodeResult(
   invocation: AiRuntimeInvocation,
   result: NodeExecutionResult,
 ) {
-  const status = invocation.response.status === "cancelled" ? RunStatus.Cancelled : runStatusFromNodeResult(result);
+  const status = runStatusFromNodeResult(result);
   const run = await db.run.update({
     where: { id: invocation.runId },
     data: {
@@ -535,6 +595,8 @@ export async function executeTaskNodeCapability(
     planOutput: input.planOutput,
     planContext: input.planContext,
     runContext: input.runContext,
+    userInput: input.userInput,
+    inputFields: input.inputFields,
   });
   const featureSpec: PreparedAiFeatureSpec = {
     feature: input.node.type === "condition"

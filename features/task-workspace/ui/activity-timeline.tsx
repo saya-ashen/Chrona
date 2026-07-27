@@ -8,6 +8,7 @@ import type { WorkspaceActivityItem, WorkspaceActivityTone } from "..";
 type Tone = WorkspaceActivityTone | undefined;
 
 type RenderEntry =
+  | { type: "run_divider"; key: string; runNumber: number; restarted: boolean; timestamp?: string | null }
   | { type: "node_header"; key: string; nodeTitle: string }
   | { type: "single"; key: string; item: WorkspaceActivityItem }
   | { type: "tool_pair"; key: string; started: WorkspaceActivityItem; progress: WorkspaceActivityItem[]; completed?: WorkspaceActivityItem }
@@ -70,6 +71,23 @@ function getToolProgress(items: WorkspaceActivityItem[], started: WorkspaceActiv
     candidate.kind === "tool_progress" && isSameToolActivity(started, candidate)
   );
 }
+function findStartedTool(items: WorkspaceActivityItem[], item: WorkspaceActivityItem) {
+  return items.find((candidate) =>
+    candidate.kind === "tool_started" && isSameToolActivity(candidate, item)
+  );
+}
+
+function hasCompletedTool(items: WorkspaceActivityItem[], item: WorkspaceActivityItem) {
+  return items.some((candidate) =>
+    candidate.kind === "tool_completed" && isSameToolActivity(candidate, item)
+  );
+}
+
+function hasToolProgress(items: WorkspaceActivityItem[], item: WorkspaceActivityItem) {
+  return items.some((candidate) =>
+    candidate.kind === "tool_progress" && isSameToolActivity(candidate, item)
+  );
+}
 
 const TRANSCRIPT_HIDDEN_EVENTS = new Set([
   "plan_generation.status",
@@ -79,20 +97,48 @@ const TRANSCRIPT_HIDDEN_EVENTS = new Set([
   "turn_end",
 ]);
 
+
+function executionSessionId(item: WorkspaceActivityItem) {
+  return item.executionSessionId;
+}
+
+function executionSessionOrder(items: WorkspaceActivityItem[]) {
+  const sessions: string[] = [];
+  for (const item of [...items].reverse()) {
+    const sessionId = executionSessionId(item);
+    if (sessionId && !sessions.includes(sessionId)) sessions.push(sessionId);
+  }
+  return sessions;
+}
 /**
  * Flattens items into a render list, grouping plan and tool lifecycles.
  */
-function buildRenderList(items: WorkspaceActivityItem[], transcript = false): RenderEntry[] {
+export function buildRenderList(items: WorkspaceActivityItem[], transcript = false): RenderEntry[] {
   const visibleItems = transcript
     ? items.filter((item) => !TRANSCRIPT_HIDDEN_EVENTS.has(item.rawEventType ?? ""))
     : items;
   const result: RenderEntry[] = [];
   let lastNodeId: string | undefined = undefined;
   const groupedPlanGenerationKeys = new Set<string>();
-  let executionHeaderAdded = false;
+  const sessionOrder = executionSessionOrder(visibleItems);
+  let previousSessionId: string | undefined;
+  let executionHeaderSessionId: string | undefined;
 
   for (let i = 0; i < visibleItems.length; i++) {
     const item = visibleItems[i];
+    const sessionId = executionSessionId(item);
+    if (sessionId && sessionId !== previousSessionId) {
+      const runNumber = sessionOrder.indexOf(sessionId) + 1;
+      result.push({
+        type: "run_divider",
+        key: `run:${sessionId}`,
+        runNumber,
+        restarted: item.executionTrigger === "restart" || runNumber > 1,
+        timestamp: item.timestamp,
+      });
+      previousSessionId = sessionId;
+      lastNodeId = undefined;
+    }
     lastNodeId = pushNodeHeader(result, item, lastNodeId);
 
     const planGroupKey = planGenerationGroupKey(item);
@@ -104,12 +150,41 @@ function buildRenderList(items: WorkspaceActivityItem[], transcript = false): Re
       continue;
     }
 
-    if (transcript && !executionHeaderAdded) {
-      result.push({ type: "execution_header", key: "execution-phase" });
-      executionHeaderAdded = true;
+    if (transcript && executionHeaderSessionId !== sessionId) {
+      result.push({ type: "execution_header", key: `execution-phase:${sessionId ?? "unscoped"}:${item.id}` });
+      executionHeaderSessionId = sessionId;
+    }
+    if (transcript && item.kind === "tool_completed") {
+      const startedTool = findStartedTool(visibleItems, item);
+      if (startedTool) {
+        result.push({
+          type: "tool_pair",
+          key: startedTool.id,
+          started: startedTool,
+          progress: getToolProgress(visibleItems, startedTool),
+          completed: item,
+        });
+        continue;
+      }
+    }
+    if (transcript && item.kind === "tool_progress") {
+      const startedTool = findStartedTool(visibleItems, item);
+      if (startedTool && !hasCompletedTool(visibleItems, item)) {
+        const latestProgress = getToolProgress(visibleItems, startedTool)[0];
+        if (latestProgress?.id === item.id) {
+          result.push({
+            type: "tool_pair",
+            key: startedTool.id,
+            started: startedTool,
+            progress: getToolProgress(visibleItems, startedTool),
+          });
+        }
+        continue;
+      }
     }
     const completedTool = getToolPair(visibleItems, item, i);
     if (item.kind === "tool_started") {
+      if (transcript && (completedTool || hasToolProgress(visibleItems, item))) continue;
       result.push({
         type: "tool_pair",
         key: item.id,
@@ -548,8 +623,25 @@ function ExecutionHeaderRow() {
   );
 }
 
+function RunDividerRow({ runNumber, restarted, timestamp }: { runNumber: number; restarted: boolean; timestamp?: string | null }) {
+  const time = timestamp
+    ? new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(new Date(timestamp))
+    : null;
+  return (
+    <div className="my-3 flex items-center gap-2" role="separator" aria-label={`${restarted ? "Run restarted from beginning" : "Execution started"} · Run ${runNumber}`}>
+      <span className="h-px flex-1 bg-border" />
+      <span className="shrink-0 rounded-full border border-border bg-muted/60 px-2.5 py-1 text-[11px] font-semibold text-foreground">
+        {restarted ? "Run restarted from beginning" : "Execution started"} · Run {runNumber}{time ? ` · ${time}` : ""}
+      </span>
+      <span className="h-px flex-1 bg-border" />
+    </div>
+  );
+}
+
 function railTitle(entry: RenderEntry) {
   switch (entry.type) {
+    case "run_divider":
+      return `Run ${entry.runNumber}`;
     case "node_header":
       return entry.nodeTitle;
     case "tool_pair":
@@ -565,6 +657,8 @@ function railTitle(entry: RenderEntry) {
 
 function railDetail(entry: RenderEntry) {
   switch (entry.type) {
+    case "run_divider":
+      return entry.restarted ? "Restarted" : "Started";
     case "node_header":
       return "Node";
     case "tool_pair": {
@@ -596,6 +690,8 @@ function railDetail(entry: RenderEntry) {
 
 function railTone(entry: RenderEntry): Tone {
   switch (entry.type) {
+    case "run_divider":
+      return "neutral";
     case "node_header":
       return "info";
     case "tool_pair": {
@@ -705,6 +801,8 @@ export function ActivityTimeline({
       {renderList.map((entry, idx) => {
         const isLast = idx === lastIdx;
         switch (entry.type) {
+          case "run_divider":
+            return <RunDividerRow key={entry.key} runNumber={entry.runNumber} restarted={entry.restarted} timestamp={entry.timestamp} />;
           case "node_header":
             return <NodeHeaderRow key={entry.key} nodeTitle={entry.nodeTitle} isLast={isLast} />;
           case "tool_pair":

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import type { ReactNode } from "react";
 import type {
   ExecutionActionInput,
   PlanExecutionResult,
@@ -37,6 +38,7 @@ import type {
 } from "../hooks/use-task-workspace-plan-state";
 import {
   createTaskWorkspaceExecutionConsoleView,
+  pickWorkspaceCurrentNode,
   type TaskExecutionDispatchResult,
 } from "../model/task-workspace-query";
 import { deriveTaskWorkspaceDisplayState } from "../model/task-workspace-interaction";
@@ -78,9 +80,9 @@ function hasNodeActionPayload(node: PlanNodeDataModel | null) {
   if (!node) return false;
   if ((node.availableActions?.length ?? 0) > 0) return true;
   if ((node.interactiveFields?.length ?? 0) === 0) return false;
-  const submittedInput =
-    node.inputFields &&
-    Object.values(node.inputFields).some((value) => value.trim());
+  const submittedInput = node.inputFields && Object.values(node.inputFields).some((value) =>
+    Array.isArray(value) ? value.length > 0 : typeof value === "boolean" ? true : value.trim().length > 0,
+  );
   return (
     !(node.status === "done" || node.status === "skipped") || !submittedInput
   );
@@ -198,6 +200,12 @@ function PlanNodeDetailCard({
         <NodeDetailRow label="Objective" value={node.objective} />
         <NodeDetailRow label="Summary" value={node.summary} />
         <NodeDetailRow label="Next action" value={node.nextAction} />
+        {node.userInteractionExpectation === "possible" ? (
+          <NodeDetailRow
+            label={copy.possibleUserInputReason ?? "Why input may be needed"}
+            value={node.userInteractionReason}
+          />
+        ) : null}
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
           <NodeDetailRow
             label="Mode"
@@ -287,57 +295,55 @@ function StageBarCard({
   const activeIndex = stages.findIndex((item) => item.id === visibleStage);
   return (
     <div
-      className="flex min-w-0 flex-col gap-2 border-b border-border/70 px-4 py-2 lg:flex-row lg:items-center lg:justify-between"
+      className="min-w-0 border-b border-border/60 bg-background px-3 pb-3 pt-3 sm:px-4"
       data-ui-surface-kind="runtime-control"
     >
-      <ol
-        className="flex min-w-0 items-center gap-0.5 text-xs"
-        aria-label="Task stage"
-      >
-        {stages.map((item, index) => (
-          <li key={item.id} className="flex min-w-0 items-center gap-0.5">
-            <span
-              aria-current={index === activeIndex ? "step" : undefined}
-              className={
-                index === activeIndex
-                  ? "rounded-full bg-primary px-2 py-1.5 font-semibold text-primary-foreground sm:px-2.5"
-                  : index < activeIndex
-                    ? "rounded-full bg-primary/10 px-2 py-1.5 font-medium text-foreground sm:px-2.5"
-                    : "px-1 py-1.5 text-muted-foreground sm:px-1.5"
-              }
-            >
-              {item.label}
-            </span>
-            {index < stages.length - 1 ? (
-              <span
-                className={
-                  index < activeIndex
-                    ? "flex size-4 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary"
-                    : "flex size-4 shrink-0 items-center justify-center rounded-full bg-muted/60 text-muted-foreground/70"
-                }
-                aria-hidden
-              >
-                <ChevronRight className="size-3" strokeWidth={2.25} />
-              </span>
-            ) : null}
-          </li>
-        ))}
-      </ol>
-      <div className="flex min-w-0 items-center gap-2 text-xs">
-        <span className="shrink-0 font-semibold text-foreground">
-          {stage.statusLabel}
-        </span>
-        <span className="truncate text-muted-foreground">
-          {stage.nextActionLabel}
-        </span>
-        {stage.currentNodeLabel ? (
-          <Badge
-            variant="outline"
-            className="hidden max-w-52 truncate bg-background xl:inline-flex"
+      <div className="flex min-w-0 flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+        <div className="no-scrollbar min-w-0 overflow-x-auto">
+          <ol
+            className="flex min-w-max items-center gap-0.5 text-xs sm:gap-1"
+            aria-label="Task stage"
           >
-            {stage.currentNodeLabel}
-          </Badge>
-        ) : null}
+            {stages.map((item, index) => (
+              <li key={item.id} className="flex items-center gap-1">
+                <span
+                  className={
+                    index === activeIndex
+                      ? "rounded-lg bg-muted px-2.5 py-2 font-semibold text-foreground sm:px-3"
+                      : index < activeIndex
+                        ? "rounded-lg px-2.5 py-2 font-medium text-foreground hover:bg-muted/70 sm:px-3"
+                        : "rounded-lg px-2.5 py-2 text-muted-foreground hover:bg-muted/70 hover:text-foreground sm:px-3"
+                  }
+                >
+                  {item.label}
+                </span>
+                {index < stages.length - 1 ? (
+                  <ChevronRight
+                    className={index < activeIndex ? "hidden size-3 text-primary sm:block sm:size-3.5" : "hidden size-3 text-muted-foreground/55 sm:block sm:size-3.5"}
+                    strokeWidth={2.25}
+                    aria-hidden
+                  />
+                ) : null}
+              </li>
+            ))}
+          </ol>
+        </div>
+        <div className="flex min-w-0 items-center gap-2 px-1 text-xs lg:max-w-[34rem] lg:justify-end">
+          <span className="shrink-0 font-semibold text-foreground">
+            {stage.statusLabel}
+          </span>
+          <span className="truncate text-muted-foreground">
+            {stage.nextActionLabel}
+          </span>
+          {stage.currentNodeLabel ? (
+            <Badge
+              variant="outline"
+              className="hidden max-w-52 truncate bg-background xl:inline-flex"
+            >
+              {stage.currentNodeLabel}
+            </Badge>
+          ) : null}
+        </div>
       </div>
     </div>
   );
@@ -897,7 +903,6 @@ function formatResultReviewCopy(
   );
 }
 
-
 function ResultLifecyclePanel({
   taskId,
   review,
@@ -906,6 +911,7 @@ function ResultLifecyclePanel({
   onRequestChanges,
   isAcceptingResult = false,
   acceptResultError,
+  createGoalAction,
 }: {
   taskId: string;
   review: NonNullable<TaskWorkspaceDisplayState["resultReview"]>;
@@ -914,6 +920,7 @@ function ResultLifecyclePanel({
   onRequestChanges: () => void;
   isAcceptingResult?: boolean;
   acceptResultError?: string | null;
+  createGoalAction?: ReactNode;
 }) {
   const isAccepted = review.phase === "accepted";
   const [isAcceptedExpanded, setIsAcceptedExpanded] = useState(false);
@@ -1055,6 +1062,7 @@ function ResultLifecyclePanel({
                 <ListPlus className="size-4" aria-hidden />
                 {copy.followUpCreateTask ?? "Create next task"}
               </Button>
+              {createGoalAction}
               {isAcceptedExpanded ? (
                 <Button
                   type="button"
@@ -1436,6 +1444,10 @@ type TaskWorkspacePlanSectionProps = {
   onAcceptResult?: () => Promise<void> | void;
   isAcceptingResult?: boolean;
   acceptResultError?: string | null;
+  onRetryFinalization?: () => Promise<void> | void;
+  isRetryingFinalization?: boolean;
+  finalizationRetryError?: string | null;
+  createGoalAction?: ReactNode;
   onEditBrief?: () => void;
 };
 
@@ -1693,6 +1705,10 @@ export function TaskWorkspacePlanSection({
   onAcceptResult,
   isAcceptingResult = false,
   acceptResultError,
+  onRetryFinalization,
+  isRetryingFinalization = false,
+  finalizationRetryError,
+  createGoalAction,
   onEditBrief,
 }: TaskWorkspacePlanSectionProps) {
   const [regenerationInstruction, setRegenerationInstruction] = useState("");
@@ -1710,8 +1726,33 @@ export function TaskWorkspacePlanSection({
   const [isSubmittingResultChanges, setIsSubmittingResultChanges] =
     useState(false);
   const [graphMode, setGraphMode] = useState<"full" | "compact">("full");
+  const [recoveryError, setRecoveryError] = useState<string | null>(null);
   const { messages } = useI18n();
   const copy = messages.components.taskWorkspace;
+  const restartPlanFromBeginning = async (prompt?: string) => {
+    setRecoveryError(null);
+    try {
+      await onDispatchExecutionAction({
+        action: "restart_from_beginning",
+        ...(prompt ? { prompt } : {}),
+      });
+    } catch (cause) {
+      setRecoveryError(cause instanceof Error ? cause.message : "Failed to restart plan");
+      throw cause;
+    }
+  };
+  const regeneratePlanForRecovery = async (instruction?: string) => {
+    setRecoveryError(null);
+    try {
+      onGeneratePlan({
+        userInstruction: instruction ?? null,
+        replaceActiveExecution: true,
+      });
+    } catch (cause) {
+      setRecoveryError(cause instanceof Error ? cause.message : "Failed to regenerate plan");
+      throw cause;
+    }
+  };
   const consoleView = useMemo(
     () =>
       createTaskWorkspaceExecutionConsoleView({
@@ -1760,7 +1801,10 @@ export function TaskWorkspacePlanSection({
   useEffect(() => {
     setSubmittedRevisionInstruction(null);
   }, [plan?.id, plan?.revision]);
-  const currentOperationNode = consoleView.nodeDetail.currentNode;
+  const graphCurrentOperationNode = pickWorkspaceCurrentNode(graphPlan);
+  const currentOperationNode = graphCurrentOperationNode && currentExecution?.checkpoint?.nodeId === graphCurrentOperationNode.id
+    ? { ...graphCurrentOperationNode, checkpoint: currentExecution.checkpoint, actionable: true }
+    : graphCurrentOperationNode;
   const taskPrimaryAction =
     pageData.task.executionSummary?.primaryAction ?? null;
   const primaryActionNodeId = graphNodeIdForAction(
@@ -1778,10 +1822,12 @@ export function TaskWorkspacePlanSection({
     taskPrimaryAction.type !== "none" &&
     taskPrimaryAction.type !== "start",
   );
-  const hasCurrentOperationControls =
-    Boolean(currentOperationNode?.checkpoint) &&
-    hasNodeActionPayload(currentOperationNode) &&
-    !consoleView.nodeDetail.disabledActionReason;
+  const hasCurrentOperationControls = Boolean(
+    currentExecution?.checkpoint ||
+    (currentOperationNode?.checkpoint &&
+      hasNodeActionPayload(currentOperationNode) &&
+      !consoleView.nodeDetail.disabledActionReason),
+  );
   const shouldShowCurrentOperation = Boolean(
     currentOperationNode &&
     (hasCurrentOperationControls || currentOperationNode.status === "blocked"),
@@ -1817,28 +1863,34 @@ export function TaskWorkspacePlanSection({
           throw new Error("Checkpoint action payload is incomplete.");
         const rawValues = (params.values ?? {}) as Record<string, unknown>;
         const values = Object.fromEntries(
-          Object.entries(rawValues).filter(
-            ([, value]) => typeof value === "string" && value.trim().length > 0,
+          Object.entries(rawValues).filter(([, value]) =>
+            typeof value === "boolean" ||
+            (typeof value === "string" && value.trim().length > 0) ||
+            (Array.isArray(value) && value.every((entry) => typeof entry === "string")),
           ),
-        ) as Record<string, string>;
-        const payloadValue = Object.values(values)[0];
+        );
         return onSubmitCheckpointAction({
           checkpointId,
           action: actionId as SubmitCheckpointActionInput["action"],
-          ...(payloadValue ? { payload: payloadValue } : {}),
+          ...(Object.keys(values).length > 0 ? { payload: values } : {}),
         });
       },
     }),
     [currentExecution?.checkpoint?.id, onSubmitCheckpointAction],
   );
-  const currentOperationSpec =
-    apiCurrentOperationSpec ?? currentOperationAction.spec;
+  const currentOperationSpec = currentExecution?.checkpoint && apiCurrentOperationSpec
+    ? apiCurrentOperationSpec
+    : hasCurrentOperationControls
+      ? currentOperationAction.spec
+      : apiCurrentOperationSpec ?? currentOperationAction.spec;
   const currentOperationHandlers = useMemo(
-    () => ({
-      ...commandCenterActionHandlers,
-      ...currentOperationAction.handlers,
-    }),
-    [commandCenterActionHandlers, currentOperationAction.handlers],
+    () => currentExecution?.checkpoint && apiCurrentOperationSpec
+      ? commandCenterActionHandlers
+      : {
+          ...commandCenterActionHandlers,
+          ...currentOperationAction.handlers,
+        },
+    [apiCurrentOperationSpec, commandCenterActionHandlers, currentExecution?.checkpoint, currentOperationAction.handlers],
   );
   const operationState = resolveTaskWorkspaceOperationState({
     plan,
@@ -1858,7 +1910,7 @@ export function TaskWorkspacePlanSection({
     currentOperationSpec,
     currentOperationHandlers,
     onCurrentOperationStateChange: currentOperationAction.onStateChange,
-    shouldUseTaskPrimaryAction,
+    shouldUseTaskPrimaryAction: shouldUseTaskPrimaryAction && !currentExecution?.checkpoint,
     taskPrimaryAction,
     runtimeEvents,
   });
@@ -2004,18 +2056,25 @@ export function TaskWorkspacePlanSection({
         <div className="min-h-[560px] flex-1 p-3 xl:min-h-0">
           <div className="flex min-h-0 flex-col gap-3">
             {displayState.panels.resultLifecycle &&
-            displayState.resultReview ? (
+            displayState.resultReview &&
+            (displayState.resultReview.phase === "accepted" ||
+              currentExecution?.planOutput?.finalization.status === "Ready") ? (
               <ResultLifecyclePanel
                 taskId={pageData.task.id}
                 review={displayState.resultReview}
                 copy={copy}
-                onAcceptResult={onAcceptResult}
+                onAcceptResult={
+                  currentExecution?.planOutput?.finalization.status === "Ready"
+                    ? onAcceptResult
+                    : undefined
+                }
                 onRequestChanges={() => {
                   setResultChangeError(null);
                   setIsRequestingResultChanges(true);
                 }}
                 isAcceptingResult={isAcceptingResult}
                 acceptResultError={acceptResultError}
+                createGoalAction={createGoalAction}
               />
             ) : null}
             {isRequestingResultChanges &&
@@ -2049,6 +2108,9 @@ export function TaskWorkspacePlanSection({
                 runtimeEvents={runtimeEvents}
                 liveActivity={liveActivity}
                 currentExecution={currentExecution}
+                onRetryFinalization={onRetryFinalization}
+                isRetryingFinalization={isRetryingFinalization}
+                finalizationRetryError={finalizationRetryError}
                 showHeader={false}
                 copy={copy}
                 onAction={focusNodeActions}
@@ -2138,8 +2200,8 @@ export function TaskWorkspacePlanSection({
               />
             </div>
             {selectedNode ? (
-              <details className="shrink-0 border-t border-border bg-card/65">
-                <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-foreground">
+              <details className="shrink-0 border-t border-border bg-card/65 xl:pointer-events-none" open>
+                <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-foreground xl:pointer-events-none">
                   {copy.inspectedNodeLabel}: {selectedNode.title}
                 </summary>
                 <div className="border-t border-border/60 p-3">
@@ -2198,11 +2260,9 @@ export function TaskWorkspacePlanSection({
                     onStartPlan={() =>
                       void onDispatchExecutionAction({ action: "start_manual" })
                     }
-                    onRestartPlan={() =>
-                      void onDispatchExecutionAction({
-                        action: "restart_from_beginning",
-                      })
-                    }
+                    onRestartPlan={restartPlanFromBeginning}
+                    onRegeneratePlan={regeneratePlanForRecovery}
+                    hasAcceptedPlan={isPlanAccepted}
                     onTaskPrimaryAction={
                       primaryActionDispatch
                         ? () =>
@@ -2221,7 +2281,7 @@ export function TaskWorkspacePlanSection({
         <div
           className={
             graphMode === "compact"
-              ? "grid min-h-[560px] flex-1 gap-4 p-4 xl:min-h-0 xl:grid-cols-[minmax(0,0.42fr)_minmax(36rem,1.58fr)]"
+              ? "grid min-h-[560px] flex-1 gap-4 p-4 xl:min-h-0 xl:grid-cols-[minmax(20rem,0.58fr)_minmax(36rem,1.42fr)]"
               : "grid min-h-[560px] flex-1 gap-4 p-4 xl:min-h-0 xl:grid-cols-[minmax(0,1.12fr)_minmax(22rem,0.68fr)]"
           }
         >
@@ -2229,7 +2289,7 @@ export function TaskWorkspacePlanSection({
             aria-label={copy.executionFlow ?? "Execution flow"}
             className="flex min-h-0 min-w-0 flex-col overflow-hidden rounded-[1.75rem] border border-border bg-background/70"
           >
-            <div className="min-h-0 flex-1">
+            <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain">
               <TaskWorkspacePlanContent
                 label={label}
                 graphPlan={graphPlan}
@@ -2285,11 +2345,9 @@ export function TaskWorkspacePlanSection({
                     onStartPlan={() =>
                       void onDispatchExecutionAction({ action: "start_manual" })
                     }
-                    onRestartPlan={() =>
-                      void onDispatchExecutionAction({
-                        action: "restart_from_beginning",
-                      })
-                    }
+                    onRestartPlan={restartPlanFromBeginning}
+                    onRegeneratePlan={regeneratePlanForRecovery}
+                    hasAcceptedPlan={isPlanAccepted}
                     onTaskPrimaryAction={
                       primaryActionDispatch
                         ? () =>
@@ -2299,6 +2357,9 @@ export function TaskWorkspacePlanSection({
                         : undefined
                     }
                   />
+                ) : null}
+                {recoveryError ? (
+                  <p role="alert" className="text-xs text-destructive">{recoveryError}</p>
                 ) : null}
               </div>
             }

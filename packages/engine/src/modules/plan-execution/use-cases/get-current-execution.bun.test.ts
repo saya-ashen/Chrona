@@ -28,9 +28,63 @@ describe("currentExecutionStatusFromEffectiveGraph", () => {
     expect(currentExecutionStatusFromEffectiveGraph({
       effective: effectiveGraph({ readyNodeIds: ["node-1"] }),
       hasActiveExecutionSession: false,
-      hasActiveRun: true,
+      activeRunStatus: "Running",
     })).toBe("running");
   });
+  it("lets terminal graph evidence override a stale running Run", () => {
+    expect(currentExecutionStatusFromEffectiveGraph({
+      effective: effectiveGraph({
+        nodes: [{ id: "node-1", status: "failed", reachable: true } as never],
+        failedNodeIds: ["node-1"],
+      }),
+      hasActiveExecutionSession: true,
+      activeRunStatus: "Running",
+    })).toBe("failed");
+  });
+  it("preserves waiting-for-user when the active run is waiting for input", () => {
+    expect(currentExecutionStatusFromEffectiveGraph({
+      effective: effectiveGraph({
+        nodes: [{ id: "node-1", status: "waiting_for_user", reachable: true } as never],
+        waitingNodeIds: ["node-1"],
+      }),
+      hasActiveExecutionSession: true,
+      activeRunStatus: "WaitingForInput",
+    })).toBe("waiting_for_user");
+  });
+
+  it("lets an authoritative input wait outrank other ready graph work", () => {
+    expect(currentExecutionStatusFromEffectiveGraph({
+      effective: effectiveGraph({
+        nodes: [
+          { id: "node-1", status: "waiting_for_user", reachable: true } as never,
+          { id: "node-2", status: "ready", reachable: true } as never,
+        ],
+        readyNodeIds: ["node-2"],
+        waitingNodeIds: ["node-1"],
+      }),
+      hasActiveExecutionSession: true,
+      activeRunStatus: "WaitingForInput",
+      taskStatus: "WaitingForInput",
+      pauseReason: "user_input",
+    })).toBe("waiting_for_user");
+  });
+
+  it("lets an authoritative approval wait outrank other ready graph work", () => {
+    expect(currentExecutionStatusFromEffectiveGraph({
+      effective: effectiveGraph({
+        nodes: [
+          { id: "node-1", status: "waiting_for_approval", reachable: true } as never,
+          { id: "node-2", status: "ready", reachable: true } as never,
+        ],
+        readyNodeIds: ["node-2"],
+        waitingNodeIds: ["node-1"],
+      }),
+      hasActiveExecutionSession: true,
+      activeRunStatus: "WaitingForApproval",
+      pauseReason: "review",
+    })).toBe("waiting_for_approval");
+  });
+
 
   it("preserves failed evidence after the active execution session closes", () => {
     expect(currentExecutionStatusFromEffectiveGraph({
@@ -60,5 +114,16 @@ describe("currentExecutionStatusFromEffectiveGraph", () => {
       }),
       hasActiveExecutionSession: false,
     })).toBe("waiting_for_user");
+  });
+
+  it("lets cancelled task lifecycle override stale waiting graph evidence", () => {
+    expect(currentExecutionStatusFromEffectiveGraph({
+      effective: effectiveGraph({
+        nodes: [{ id: "node-1", status: "waiting_for_user", reachable: true } as never],
+        waitingNodeIds: ["node-1"],
+      }),
+      hasActiveExecutionSession: false,
+      taskStatus: "Cancelled",
+    })).toBe("cancelled");
   });
 });

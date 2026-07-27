@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import type { UiDocument } from "@chrona/ui-protocol";
 import type { PlanExecutionResult } from "@chrona/contracts";
 import type {
@@ -10,6 +10,7 @@ import {
   TaskWorkspaceExecutionOverview,
   type CommandCenterCopy,
 } from "./task-workspace-execution-overview";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@shared/ui";
 
 type ConsoleView = ReturnType<typeof createTaskWorkspaceExecutionConsoleView>;
 type WorkspaceCopy = Record<string, string | undefined>;
@@ -22,6 +23,9 @@ export function TaskWorkspaceInspector({
   runtimeEvents,
   liveActivity,
   currentExecution,
+  onRetryFinalization,
+  isRetryingFinalization = false,
+  finalizationRetryError,
   commandCenterCopy,
   copy,
   operationPanel,
@@ -39,6 +43,9 @@ export function TaskWorkspaceInspector({
   runtimeEvents: WorkspaceRuntimeEvent[];
   liveActivity: WorkspaceActivityItem[];
   currentExecution?: PlanExecutionResult | null;
+  onRetryFinalization?: () => Promise<void> | void;
+  isRetryingFinalization?: boolean;
+  finalizationRetryError?: string | null;
   commandCenterCopy?: Partial<CommandCenterCopy>;
   copy: WorkspaceCopy;
   isPlanCompact?: boolean;
@@ -49,6 +56,12 @@ export function TaskWorkspaceInspector({
   showHeader?: boolean;
   onAction: (nodeId?: string) => void;
 }) {
+  const hasCheckpointForm = currentExecution?.status === "waiting_for_user" && Boolean(operationPanel);
+  const [activePanel, setActivePanel] = useState<"input" | "results">("input");
+  useEffect(() => {
+    if (hasCheckpointForm) setActivePanel("input");
+  }, [currentExecution?.checkpoint?.id, hasCheckpointForm]);
+
   return (
     <aside
       className={showHeader
@@ -70,31 +83,75 @@ export function TaskWorkspaceInspector({
           </div>
         </div>
       ) : null}
-      <div className={showHeader ? "flex min-h-0 flex-1 flex-col gap-4 p-4" : "flex min-h-0 flex-col gap-4"}>
-        {operationPlacement === "before" ? operationPanel : null}
-        <TaskWorkspaceExecutionOverview
-          taskId={taskId}
-          progress={consoleView.progress}
-          readiness={consoleView.readiness}
-          latestResult={consoleView.latestResult}
-          attention={consoleView.attention}
-          latestCompletedNode={consoleView.latestCompletedNode}
-          nodes={consoleView.graphPlan?.nodes ?? []}
-          artifacts={consoleView.artifacts}
-          activity={consoleView.activity}
-          commandCenterActionHandlers={commandCenterActionHandlers}
-          commandCenter={commandCenter}
-          runtimeEvents={runtimeEvents}
-          liveActivity={liveActivity}
-          currentExecution={currentExecution}
-          isExecutionRunning={isExecutionRunning}
-          executionResultState={executionResultState}
-          primaryAction={null}
-          copy={commandCenterCopy}
-          activityLayout="side"
-          onAction={onAction}
-        />
-        {operationPlacement === "after" ? operationPanel : null}
+      <div className={showHeader ? "flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto overscroll-contain p-4" : "flex min-h-0 flex-col gap-4"}>
+        {showHeader && hasCheckpointForm ? (
+          <Tabs value={activePanel} onValueChange={(value) => setActivePanel(value as "input" | "results")} className="min-h-0">
+            <TabsList className="sticky top-0 z-10 grid w-full grid-cols-2 bg-background/95 shadow-sm backdrop-blur">
+              <TabsTrigger value="input">{copy.provideInput ?? "Provide input"}</TabsTrigger>
+              <TabsTrigger value="results">{commandCenterCopy?.outputTab ?? "Results"}</TabsTrigger>
+            </TabsList>
+            <TabsContent value="input" className="mt-3 min-h-0">
+              {operationPanel}
+            </TabsContent>
+            <TabsContent value="results" className="mt-3 min-h-0">
+              <TaskWorkspaceExecutionOverview
+                taskId={taskId}
+                progress={consoleView.progress}
+                readiness={consoleView.readiness}
+                latestResult={consoleView.latestResult}
+                attention={consoleView.attention}
+                latestCompletedNode={consoleView.latestCompletedNode}
+                nodes={consoleView.graphPlan?.nodes ?? []}
+                artifacts={consoleView.artifacts}
+                activity={consoleView.activity}
+                commandCenterActionHandlers={commandCenterActionHandlers}
+                commandCenter={commandCenter}
+                runtimeEvents={runtimeEvents}
+                liveActivity={liveActivity}
+                currentExecution={currentExecution}
+                onRetryFinalization={onRetryFinalization}
+                isRetryingFinalization={isRetryingFinalization}
+                finalizationRetryError={finalizationRetryError}
+                isExecutionRunning={isExecutionRunning}
+                executionResultState={executionResultState}
+                primaryAction={null}
+                copy={commandCenterCopy}
+                activityLayout="side"
+                onAction={onAction}
+              />
+            </TabsContent>
+          </Tabs>
+        ) : (
+          <>
+            {operationPlacement === "before" ? operationPanel : null}
+            <TaskWorkspaceExecutionOverview
+              taskId={taskId}
+              progress={consoleView.progress}
+              readiness={consoleView.readiness}
+              latestResult={consoleView.latestResult}
+              attention={consoleView.attention}
+              latestCompletedNode={consoleView.latestCompletedNode}
+              nodes={consoleView.graphPlan?.nodes ?? []}
+              artifacts={consoleView.artifacts}
+              activity={consoleView.activity}
+              commandCenterActionHandlers={commandCenterActionHandlers}
+              commandCenter={commandCenter}
+              runtimeEvents={runtimeEvents}
+              liveActivity={liveActivity}
+              currentExecution={currentExecution}
+              onRetryFinalization={onRetryFinalization}
+              isRetryingFinalization={isRetryingFinalization}
+              finalizationRetryError={finalizationRetryError}
+              isExecutionRunning={isExecutionRunning}
+              executionResultState={executionResultState}
+              primaryAction={null}
+              copy={commandCenterCopy}
+              activityLayout="side"
+              onAction={onAction}
+            />
+            {operationPlacement === "after" ? operationPanel : null}
+          </>
+        )}
       </div>
     </aside>
   );

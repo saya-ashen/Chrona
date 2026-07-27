@@ -51,6 +51,7 @@ export type TaskResultAcceptResult = {
   taskId: string;
   workspaceId: string;
   runId: string;
+  acceptedAt: string;
 };
 
 export type TaskCheckpointActionDispatchResult = TaskWorkspaceCommandAck;
@@ -463,6 +464,7 @@ function buildArtifactItems(
 ): WorkspaceArtifactItem[] {
   return pageData.artifacts.map((artifact) => ({
     id: artifact.id,
+    artifactRef: artifact.artifactRef,
     title: artifact.title,
     type: artifact.type,
     uri: artifact.uri,
@@ -628,7 +630,6 @@ export async function fetchTaskWorkspacePage(
     ...bootstrap,
     ...runtimeContext,
     ...reviewContext,
-    artifacts: [],
     activityTimeline: [],
   };
 }
@@ -716,6 +717,17 @@ export async function acceptTaskResult(
 ): Promise<TaskResultAcceptResult> {
   return apiJson<TaskResultAcceptResult>(
     `/api/tasks/${encodeURIComponent(taskId)}/result/accept`,
+    { method: "POST" },
+  );
+}
+
+export async function retryTaskResultFinalization(taskId: string) {
+  return apiJson<{
+    taskId: string;
+    finalization: NonNullable<PlanExecutionResult["planOutput"]>["finalization"];
+    finalizedResult: NonNullable<PlanExecutionResult["planOutput"]>["finalizedResult"];
+  }>(
+    `/api/tasks/${encodeURIComponent(taskId)}/result/finalization/retry`,
     { method: "POST" },
   );
 }

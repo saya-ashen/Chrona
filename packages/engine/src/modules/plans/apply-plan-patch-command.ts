@@ -41,6 +41,9 @@ function rawToTaskNode(raw: Record<string, unknown>, id: string): EditableTaskNo
       : typeof raw.executionMode === "string" && raw.executionMode === "hybrid"
         ? "assist"
         : "auto") as "auto" | "assist" | "manual",
+    userInteraction: raw.userInteraction && typeof raw.userInteraction === "object"
+      ? raw.userInteraction as EditableTaskNode["userInteraction"]
+      : { level: "not_expected" },
     ...(typeof raw.estimatedMinutes === "number" ? { estimatedMinutes: raw.estimatedMinutes } : {}),
     ...(typeof raw.objective === "string" ? { expectedOutput: raw.objective } : {}),
   };
@@ -59,6 +62,7 @@ function editableNodeToDefinition(node: EditableNode): NodeDefinition {
             required: node.required,
             options: node.options,
             inputFields: node.inputFields,
+            interaction: node.interaction,
           },
         },
       };
@@ -99,6 +103,7 @@ function editableNodeToDefinition(node: EditableNode): NodeDefinition {
           mode: node.mode,
           metadata: {
             completionCriteria: node.completionCriteria,
+            userInteraction: node.userInteraction,
           },
         },
       };

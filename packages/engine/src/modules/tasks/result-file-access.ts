@@ -140,7 +140,6 @@ export async function requestResultFileAccess(input: {
       canonicalPath,
     };
   }
-
   const id = randomUUID();
   const now = Date.now();
   const grant: ResultFileGrant = {

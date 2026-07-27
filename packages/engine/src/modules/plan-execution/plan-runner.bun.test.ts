@@ -261,6 +261,43 @@ function makeChooseCheckpointPlan(): CompiledPlan {
   };
 }
 
+function makeEditCheckpointPlan(): CompiledPlan {
+  const config: CheckpointConfig = {
+    checkpointType: "edit",
+    prompt: "Review and edit the candidate channels",
+    required: true,
+    inputFields: [
+      { name: "selectedChannels", label: "Channels to keep", type: "textarea", required: true },
+      { name: "channelChanges", label: "Channel changes", type: "textarea" },
+    ],
+  };
+
+  return {
+    id: "compiled_edit_checkpoint",
+    editablePlanId: "graph_edit_checkpoint",
+    sourceVersion: 1,
+    title: "Edit checkpoint",
+    goal: "Let the user edit generated content before continuing",
+    assumptions: [],
+    nodes: [{
+      id: "checkpoint_edit",
+      localId: "checkpoint_edit",
+      type: "checkpoint",
+      title: "Confirm search channels",
+      description: "User edits the generated channel list",
+      config,
+      dependencies: [],
+      dependents: [],
+    }],
+    edges: [],
+    entryNodeIds: ["checkpoint_edit"],
+    terminalNodeIds: ["checkpoint_edit"],
+    topologicalOrder: ["checkpoint_edit"],
+    completionPolicy: { type: "all_tasks_completed" },
+    validationWarnings: [],
+  };
+}
+
 async function seedAcceptedCompiledPlan(workspaceId: string, taskId: string, compiledPlan: CompiledPlan) {
   await saveCompiledPlan({
     workspaceId,
@@ -483,6 +520,49 @@ describe("plan-runner native execution actions", () => {
 
     const persisted = await getPlanRun(task.id, compiledPlan.editablePlanId);
     expect(persisted?.results[0]?.actionForm).toEqual(initial.checkpoint?.form);
+  });
+
+  it("pauses edit checkpoints for user input instead of failing the run", async () => {
+    const { workspace, task } = await seedWorkspaceAndTask("Runner edit checkpoint");
+    const compiledPlan = makeEditCheckpointPlan();
+    await seedAcceptedCompiledPlan(workspace.id, task.id, compiledPlan);
+
+    const initial = await taskPlanExecution.dispatch({
+      taskId: task.id,
+      action: { action: "start_manual" },
+    });
+
+    expect(initial.status).toBe("waiting_for_user");
+    expect(initial.checkpoint).toMatchObject({
+      kind: "user_input",
+      nodeId: "checkpoint_edit",
+      form: {
+        instructions: "Review and edit the candidate channels",
+        submitLabel: "Submit edits",
+        inputFields: [
+          { name: "selectedChannels", label: "Channels to keep", type: "textarea", required: true },
+          { name: "channelChanges", label: "Channel changes", type: "textarea" },
+        ],
+      },
+    });
+
+    const providerRun = await db.run.findFirst({ where: { taskId: task.id } });
+    expect(providerRun).toBeNull();
+
+    const persisted = await getPlanRun(task.id, compiledPlan.editablePlanId);
+    expect(persisted?.results[0]).toMatchObject({
+      nodeId: "checkpoint_edit",
+      status: "current",
+      waitKind: "user_input",
+    });
+    expect(persisted?.attempts.map((attempt) => attempt.status)).toEqual(["succeeded"]);
+
+    const updatedTask = await db.task.findUniqueOrThrow({ where: { id: task.id } });
+    expect(updatedTask.status).toBe(TaskStatus.WaitingForInput);
+    expect(updatedTask.blockReason).toMatchObject({
+      blockType: "human_input_required",
+      scope: "plan_node",
+    });
   });
 
   it("cancels paused execution session and marks task cancelled", async () => {

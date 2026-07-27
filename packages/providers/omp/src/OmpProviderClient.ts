@@ -31,6 +31,26 @@ export class OmpProviderClient implements AgentProviderClient {
     return this.sdk.getCapabilities();
   }
 
+  getRuntimeDiagnostics() {
+    if (!this.sdk.getRuntimeDiagnostics) {
+      return Promise.reject(new Error("OMP runtime diagnostics are unavailable"));
+    }
+    return this.sdk.getRuntimeDiagnostics();
+  }
+
+  getConfigurationCapabilities() {
+    return this.sdk.getConfigurationCapabilities?.() ?? {
+      model: { supported: false, taskOverride: false },
+      context: { supported: false, taskOverride: false, strategies: [] },
+      tooling: {
+        mcp: { supported: false, enabled: false },
+        lsp: { supported: false, enabled: false },
+        subagents: { supported: false, enabled: false },
+        enabledTools: [],
+      },
+    };
+  }
+
   getConversationCapabilities() {
     return this.sdk.getConversationCapabilities?.() ?? {
       resume: false,

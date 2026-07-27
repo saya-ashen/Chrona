@@ -10,6 +10,8 @@ export const AI_PLAN_NODE_TYPES = [
 ] as const;
 export const AI_TASK_EXECUTORS = ["user", "ai", "system"] as const;
 export const AI_TASK_MODES = ["manual", "assist", "auto"] as const;
+export const AI_USER_INTERACTION_LEVELS = ["not_expected", "possible"] as const;
+export const AI_CHECKPOINT_SCHEMA_SOURCES = ["static", "ai"] as const;
 export const AI_CHECKPOINT_TYPES = [
   "confirm",
   "choose",
@@ -34,6 +36,8 @@ export const AI_WAIT_TIMEOUT_ACTIONS = [
 export type PlanNodeType = (typeof AI_PLAN_NODE_TYPES)[number];
 export type TaskExecutor = (typeof AI_TASK_EXECUTORS)[number];
 export type TaskMode = (typeof AI_TASK_MODES)[number];
+export type UserInteractionLevel = (typeof AI_USER_INTERACTION_LEVELS)[number];
+export type CheckpointSchemaSource = (typeof AI_CHECKPOINT_SCHEMA_SOURCES)[number];
 export type CheckpointType = (typeof AI_CHECKPOINT_TYPES)[number];
 export type InputFieldType = (typeof AI_INPUT_FIELD_TYPES)[number];
 export type ConditionEvaluator = (typeof AI_CONDITION_EVALUATORS)[number];
@@ -70,6 +74,7 @@ function upgradeNode(node: PlanBlueprintNode): EditableNode {
         ...node,
         executor: node.executor ?? "ai",
         mode: node.mode ?? "auto",
+        userInteraction: node.userInteraction ?? { level: "not_expected" },
       };
     case "checkpoint":
       return {
@@ -87,6 +92,7 @@ function upgradeNode(node: PlanBlueprintNode): EditableNode {
           required: f.required,
           options: f.options,
         })),
+        interaction: node.interaction,
       };
     case "condition":
       return {
@@ -163,6 +169,25 @@ const aiPlanInputFieldSchema = z
   })
   .describe("Structured user input field for checkpoint nodes.")
   .strict();
+const taskUserInteractionSchema = z
+  .discriminatedUnion("level", [
+    z.object({ level: z.literal("not_expected") }).strict(),
+    z.object({
+      level: z.literal("possible"),
+      reason: z.string().trim().min(1).describe("Concrete condition that may require user participation during execution."),
+    }).strict(),
+  ])
+  .describe("Plan-time expectation of whether this task may need user participation. This is advisory and never restricts runtime input requests.");
+
+const checkpointInteractionSchema = z
+  .discriminatedUnion("schemaSource", [
+    z.object({ schemaSource: z.literal("static") }).strict(),
+    z.object({
+      schemaSource: z.literal("ai"),
+      instruction: z.string().trim().min(1).describe("Instruction for the runtime AI to construct the required input request from execution context."),
+    }).strict(),
+  ])
+  .describe("Whether a required checkpoint form is known during planning or must be defined by AI at runtime.");
 
 export const planBlueprintTaskNodeSchema = z
   .object({
@@ -174,6 +199,7 @@ export const planBlueprintTaskNodeSchema = z
     expectedOutput: z.string().optional().describe("What successful completion should produce."),
     completionCriteria: z.string().optional().describe("How to determine this node is done."),
     estimatedMinutes: z.number().positive().optional().describe("Best-effort duration estimate for this node."),
+    userInteraction: taskUserInteractionSchema.optional().describe("Expected user participation. Omitted legacy plans are treated as not_expected."),
   })
   .describe("Task node. Only task nodes may include executor/mode/output fields.")
   .strict();
@@ -188,6 +214,7 @@ export const planBlueprintCheckpointNodeSchema = z
     required: z.boolean().optional().describe("Whether this checkpoint can be skipped."),
     options: z.array(z.string()).optional().describe("Available options for choose-style checkpoints."),
     inputFields: z.array(aiPlanInputFieldSchema).optional().describe("Input fields for input-style checkpoints."),
+    interaction: checkpointInteractionSchema.optional().describe("Input schema source. Omitted legacy checkpoints retain their existing static behavior."),
   })
   .describe("Checkpoint node. Use for human confirmation, choice, input, edit, or approval.")
   .strict();
@@ -288,6 +315,7 @@ export const editableTaskNodeSchema = z
     mode: z.enum(AI_TASK_MODES),
     expectedOutput: z.string().optional(),
     completionCriteria: z.string().optional(),
+    userInteraction: taskUserInteractionSchema,
     estimatedMinutes: z.number().positive().optional(),
   })
   .strict();
@@ -302,6 +330,7 @@ export const editableCheckpointNodeSchema = z
     required: z.boolean(),
     options: z.array(z.string()).optional(),
     inputFields: z.array(editableInputFieldSchema).optional(),
+    interaction: checkpointInteractionSchema.optional(),
   })
   .strict();
 

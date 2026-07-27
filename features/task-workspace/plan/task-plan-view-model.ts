@@ -37,6 +37,7 @@ type PlanMetadata = {
   timeout?: { minutes?: number };
   expectedOutput?: string;
   completionCriteria?: string[];
+  userInteraction?: TaskConfig["userInteraction"];
 };
 
 type NodeResultActionForm = NonNullable<EffectivePlanNode["result"]>["actionForm"];
@@ -315,6 +316,7 @@ function nodeConfigToMetadata(node: {
   return {
     ...base,
     expectedOutput: config.expectedOutput,
+    userInteraction: config.userInteraction,
     completionCriteria: Array.isArray(config.completionCriteria)
       ? config.completionCriteria.filter((item): item is string => typeof item === "string")
       : undefined,
@@ -332,13 +334,21 @@ function buildInteractiveFields(node: {
 
   if (node.actionForm?.inputFields.length) {
     for (const [index, input] of node.actionForm.inputFields.entries()) {
+      const legacy = !("kind" in input);
+      const options = legacy
+        ? input.options
+        : input.kind === "choice"
+          ? input.options.map((option) => option.value)
+          : undefined;
       fields.push({
         key: input.name || `blocker:${index}`,
         label: input.label || `${node.copy.inputLabelPrefix} ${index + 1}`,
         value: "",
-        control: input.type === "textarea" ? "textarea" : input.options?.length ? "select" : "text",
-        required: input.required ?? false,
-        options: input.options,
+        control: legacy
+          ? input.type === "textarea" ? "textarea" : options?.length ? "select" : "text"
+          : input.kind === "text" && input.multiline ? "textarea" : options?.length ? "select" : "text",
+        required: "required" in input ? input.required ?? false : false,
+        options,
       });
     }
     return fields;
@@ -534,6 +544,7 @@ function toPlanNode(node: {
   const actionForm = node.result?.actionForm ?? null;
   const nextAction = status === "blocked" ? (actionForm?.instructions ?? resolveBlockedNodeAction(node)) : (node.nextAction ?? null);
   const requiredInfo = node.requiredInfo ?? [];
+  const userInteraction = kind === "task" ? (metadata.userInteraction as TaskConfig["userInteraction"] | undefined) : undefined;
   const interactiveFields = buildInteractiveFields({ kind, metadata, requiredInfo, actionForm, copy: node.copy });
   const intent = inferIntent(kind, metadata, status);
   const interactionType = inferInteractionType({
@@ -558,6 +569,9 @@ function toPlanNode(node: {
     group: statusGroup(status),
     statusLabel: statusLabel(status, node.copy),
     badges: [kind, intent, node.mode].filter((value): value is string => Boolean(value)),
+    requiresHumanInput: status === "waiting_for_user" || status === "waiting_for_approval",
+    userInteractionExpectation: userInteraction?.level ?? "not_expected",
+    userInteractionReason: userInteraction?.level === "possible" ? userInteraction.reason : null,
     executionMode: node.mode ?? metadata.mode,
     executor: node.executor ?? metadata.executor,
     estimatedMinutes: node.estimatedMinutes ?? null,
@@ -593,6 +607,7 @@ function toPlanNode(node: {
     }),
     metadata: {
       ...(metadata as Record<string, unknown>),
+      ...(userInteraction ? { userInteraction } : {}),
       ...(node.result?.error ? { error: node.result.error } : {}),
       ...(node.result?.errorDetails ? { errorDetails: node.result.errorDetails } : {}),
     },

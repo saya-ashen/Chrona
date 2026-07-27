@@ -106,7 +106,13 @@ export async function getTaskBootstrap(input: { taskId: string; workBlockId?: st
     where: { id: input.taskId },
     include: {
       projection: true,
+      runs: {
+        where: selectedWorkBlockId === null ? {} : { workBlockId: selectedWorkBlockId },
+        orderBy: { createdAt: "desc" },
+        take: 1,
+      },
       workspace: { select: { defaultRuntime: true } },
+      goal: { select: { id: true, title: true } },
       workBlocks: {
         where: { status: { in: ["Scheduled", "Active", "Completed"] } },
         orderBy: [
@@ -169,6 +175,7 @@ export async function getTaskBootstrap(input: { taskId: string; workBlockId?: st
         immutableFields: ["title", "scheduledStartAt", "scheduledEndAt"] as const,
       }
     : null;
+  const latestRun = task.runs[0] ?? null;
   const recurrenceOccurrences = [
     { id: task.id, title: task.title, status: task.status, workBlocks: task.workBlocks },
     ...recurrenceSeriesTasks,
@@ -194,6 +201,7 @@ export async function getTaskBootstrap(input: { taskId: string; workBlockId?: st
         readinessReason: runnability.summary,
         taskStatus: task.status,
         blockReason: readBlockReason(task),
+        hasActiveRun: latestRun?.status === "Pending" || latestRun?.status === "Running",
       })
     : null;
 
@@ -201,6 +209,8 @@ export async function getTaskBootstrap(input: { taskId: string; workBlockId?: st
     task: {
       id: task.id,
       workspaceId: task.workspaceId,
+      goalId: task.goalId,
+      goal: task.goal,
       title: task.title,
       description: task.description,
       sourceManaged,
@@ -212,7 +222,7 @@ export async function getTaskBootstrap(input: { taskId: string; workBlockId?: st
       autoPlanGenerationTiming: task.autoPlanGenerationTiming,
       autoExecuteTiming: task.autoExecuteTiming,
       recurrenceRule: task.recurrenceRule,
-      status: task.status === "Done" ? task.status : currentWorkBlock?.status ?? task.status,
+      status: task.status === "Done" || task.status === "Cancelled" ? task.status : currentWorkBlock?.status ?? task.status,
       priority: task.priority,
       dueAt: task.dueAt?.toISOString() ?? null,
       scheduledStartAt: currentWorkBlock?.scheduledStartAt.toISOString() ?? task.projection?.scheduledStartAt?.toISOString() ?? null,

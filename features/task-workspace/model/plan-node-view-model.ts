@@ -1,8 +1,11 @@
-import type { CheckpointActionKind,
-ExecutionActionInput,
-ExecutionCheckpoint,
-NodeResult,
-NodeResultEvidence, } from "@chrona/contracts"
+import type {
+  CheckpointActionKind,
+  CheckpointInputFields,
+  ExecutionActionInput,
+  ExecutionCheckpoint,
+  NodeResult,
+  NodeResultEvidence,
+} from "@chrona/contracts";
 
 export type PlanNodeKind = "task" | "checkpoint" | "condition" | "wait" | "step" | "user_input";
 
@@ -42,10 +45,11 @@ export type PlanNodeGroup = "active" | "attention" | "upcoming" | "done" | "idle
 export type PlanNodeField = {
   key: string;
   label: string;
-  value: string;
-  control?: "text" | "textarea" | "select" | "approval";
+  value: string | boolean | string[];
+  control?: "text" | "textarea" | "select" | "approval" | "choice" | "boolean";
   required?: boolean;
   options?: string[];
+  selection?: "single" | "multiple";
 };
 
 export type PlanNodeAction = {
@@ -82,12 +86,14 @@ export type PlanNodeDataModel = {
   readiness?: "ready" | "blocked" | "waiting";
   reachable?: boolean;
   requiresHumanInput?: boolean;
+  userInteractionExpectation?: "not_expected" | "possible";
+  userInteractionReason?: string | null;
   dependencies?: string[];
   requiredInfo?: string[];
   nextAction?: string | null;
   completionSummary?: string | null;
   result?: NodeResult | null;
-  inputFields?: Record<string, string>;
+  inputFields?: CheckpointInputFields;
   resultEvidence?: NodeResultEvidence | null;
   branchLabels?: string[];
   options?: string[];

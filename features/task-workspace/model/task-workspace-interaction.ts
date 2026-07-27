@@ -577,11 +577,17 @@ export function deriveTaskWorkspaceStage(input: {
   operationState: TaskWorkspaceOperationState;
 }): TaskWorkspaceStage {
   const workState = deriveTaskWorkStateView(input);
+  const resultAccepted =
+    workState.state === "done" &&
+    input.pageData.resultReview?.runId === input.pageData.latestRunSummary?.id &&
+    input.pageData.resultReview?.status === "accepted";
   return {
     stage: workState.stage,
-    statusLabel: workState.label,
+    statusLabel: resultAccepted ? "Task done" : workState.label,
     currentNodeLabel: workState.currentNodeLabel ?? undefined,
-    nextActionLabel: workState.nextActionLabel,
+    nextActionLabel: resultAccepted
+      ? "Ask a follow-up or create a next task"
+      : workState.nextActionLabel,
     primaryActionId: workState.primaryActionId ?? "none",
     tone: toneFromWorkState(workState.tone),
   };
@@ -594,18 +600,15 @@ function displayModeFor(input: {
 }): TaskWorkspaceDisplayMode {
   const taskStatus = normalized(input.pageData.task.status);
   if (taskStatus === "done") return "done";
-  if (input.stage.stage === "result") return "completed";
   if (
     input.operationState.status === "execution-blocked" ||
-    taskStatus === "blocked"
+    input.operationState.status === "execution-action" ||
+    input.operationState.status === "task-action" ||
+    ["waiting_for_input", "waitingforinput", "waiting_for_approval", "waitingforapproval", "blocked"].includes(taskStatus)
   )
     return "blocked";
-  if (
-    input.operationState.status === "execution-running" ||
-    input.operationState.status === "execution-action" ||
-    input.operationState.status === "task-action"
-  )
-    return "running";
+  if (input.operationState.status === "execution-running") return "running";
+  if (input.stage.stage === "result") return "completed";
   if (input.operationState.status === "plan-ready-to-run")
     return "ready_to_run";
   if (input.operationState.status === "plan-review") return "reviewing_plan";
@@ -871,8 +874,10 @@ export function deriveResultReview(input: {
   )
     return null;
 
+  const reviewStatus = pageData.resultReview;
   const phase =
-    normalized(pageData.task.status) === "done"
+    reviewStatus?.runId === pageData.latestRunSummary?.id &&
+    reviewStatus?.status === "accepted"
       ? "accepted"
       : "pending_acceptance";
   const completedSteps =

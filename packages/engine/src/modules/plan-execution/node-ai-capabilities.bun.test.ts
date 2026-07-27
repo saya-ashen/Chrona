@@ -256,7 +256,7 @@ describe("runTaskNodeFeature", () => {
     expect(run.endedAt).not.toBeNull();
   });
 
-  it("marks provider-cancelled task snapshots terminal instead of started", async () => {
+  it("marks unexpected provider cancellation as a failed Run", async () => {
     const workspace = await db.workspace.create({
       data: { name: "Node AI cancelled workspace", status: "Active", defaultRuntime: "hermes" },
     });
@@ -328,8 +328,9 @@ describe("runTaskNodeFeature", () => {
       error: "Provider cancelled runtime run runtime-cancelled",
     });
     const run = await db.run.findUniqueOrThrow({ where: { id: "local-run-cancelled" } });
-    expect(run.status).toBe("Cancelled");
+    expect(run.status).toBe("Failed");
     expect(run.endedAt).toBeInstanceOf(Date);
+    expect(run.errorSummary).toBe("Provider cancelled runtime run runtime-cancelled");
   });
 
   it("sends non-null accumulated plan output to the runtime invoker", async () => {
@@ -359,25 +360,24 @@ describe("runTaskNodeFeature", () => {
       },
     });
     const planOutput = {
-      revision: 1,
-      spec: {
-        root: "existingRoot",
-        elements: {
-          existingRoot: { type: "Stack", props: { gap: "sm" }, children: ["firstSection"] },
-          firstSection: { type: "RichMarkdown", props: { content: "First section" }, children: [] },
-        },
+      manifest: {
+        schemaVersion: 1 as const,
+        sourceRevision: 1,
+        outcome: { title: "Research", summary: "First section" },
+        readiness: { status: "partial" as const, summary: "More work remains" },
+        sections: [],
+        deliverables: [],
+        findings: [{ key: "first-finding", content: "First finding", sourceNodeRef: "N20260522-01" }],
+        decisions: [],
+        caveats: [],
+        nextActions: [],
+        evidence: [],
       },
+      finalizedResult: null,
+      finalization: { status: "Pending" as const, sourceRevision: 1 },
+      revision: 1,
       updatedAt: "2026-05-22T00:01:00.000Z",
       updatedByNodeId: "first_entry",
-      history: [
-        {
-          id: "plan_output_1",
-          nodeId: "first_entry",
-          summary: "First section",
-          patches: [{ op: "add" as const, path: "/root", value: "existingRoot" }],
-          createdAt: "2026-05-22T00:01:00.000Z",
-        },
-      ],
     };
     const invocations: unknown[] = [];
     const aiRuntimeInvoker = {
@@ -414,20 +414,19 @@ describe("runTaskNodeFeature", () => {
       aiRuntimeInvoker: aiRuntimeInvoker as AiRuntimeInvoker,
     });
 
-    const expectedPlanOutput = {
-      revision: 1,
-      hasSpec: true,
-      root: "existingRoot",
-      rootChildren: ["firstSection"],
-      elementIds: ["existingRoot", "firstSection"],
-      updatedAt: "2026-05-22T00:01:00.000Z",
-      lastSummary: "First section",
+    const expectedResultManifest = {
+      sourceRevision: 1,
+      outcome: { title: "Research", summary: "First section" },
+      currentDeliverableKeys: [],
+      findingKeys: ["first-finding"],
+      decisionKeys: [],
+      caveatKeys: [],
+      nextActionKeys: [],
     };
-    const invocation = invocations[0] as { runtimeInput: { context: { planOutput: unknown } }; instructions: string; featureSpec: { inputText: string } };
-    expect(invocation.runtimeInput.context.planOutput).toEqual(expectedPlanOutput);
-    expect(JSON.parse(invocation.featureSpec.inputText).context.planOutput).toEqual(expectedPlanOutput);
-    expect(invocation.instructions).toContain('"revision": 1');
-    expect(invocation.instructions).toContain('"root": "existingRoot"');
+    const invocation = invocations[0] as { runtimeInput: { context: { resultManifest: unknown } }; instructions: string; featureSpec: { inputText: string } };
+    expect(invocation.runtimeInput.context.resultManifest).toEqual(expectedResultManifest);
+    expect(JSON.parse(invocation.featureSpec.inputText).context.resultManifest).toEqual(expectedResultManifest);
+    expect(invocation.instructions).toContain('"sourceRevision": 1');
     expect(invocation.instructions).not.toContain('"spec":');
   });
 

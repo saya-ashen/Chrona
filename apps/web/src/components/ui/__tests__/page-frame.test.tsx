@@ -5,9 +5,8 @@ import { PageFrame, type PageFrameMode } from "@shared/ui"
 afterEach(cleanup);
 
 const expectedWidth: Record<PageFrameMode, string> = {
+  main: "max-w-[1440px]",
   workspace: "max-w-[1600px]",
-  overview: "max-w-[1280px]",
-  focused: "max-w-[1120px]",
 };
 
 describe("PageFrame", () => {
@@ -23,7 +22,7 @@ describe("PageFrame", () => {
   );
 
   it("provides one shared transparent scroll contract", () => {
-    render(<PageFrame mode="overview">Content</PageFrame>);
+    render(<PageFrame mode="main">Content</PageFrame>);
 
     const frame = screen.getByText("Content");
     expect(frame).toHaveClass(

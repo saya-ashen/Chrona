@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   DEFAULT_SCHEDULE_AI_PREFERENCES,
   type ScheduleAiPreferences,
@@ -27,6 +27,8 @@ type ScheduleAiSettingsPanelProps = {
   description?: string;
   copy?: {
     autoPlanGeneration: string;
+    autoSuggestions: string;
+    autoSuggestionsDescription: string;
     autoPlanGenerationDescription: string;
     defaultAutoExecute: string;
     defaultAutoExecuteDescription: string;
@@ -39,6 +41,8 @@ type ScheduleAiSettingsPanelProps = {
 };
 
 const fallbackCopy = {
+  autoSuggestions: "AI task title suggestions",
+  autoSuggestionsDescription: "Send typed task titles to the configured AI provider and show reviewable suggestions. Off by default; each suggestion is applied only when selected.",
   autoPlanGeneration: "Auto-generate plan after saving",
   autoPlanGenerationDescription: "Start task plan generation after saving a task. On by default; disable to require manual Regenerate.",
   defaultAutoExecute: "Default task auto-execution",
@@ -57,11 +61,20 @@ export function ScheduleAiSettingsPanel({
 }: ScheduleAiSettingsPanelProps) {
   const storedPreferences = useScheduleAiPreferences();
   const [savingKey, setSavingKey] = useState<keyof ScheduleAiPreferences | null>(null);
+  const clearSavingTimerRef = useRef<number | null>(null);
+
+  useEffect(() => () => {
+    if (clearSavingTimerRef.current !== null) window.clearTimeout(clearSavingTimerRef.current);
+  }, []);
 
   const updatePreference = (key: keyof ScheduleAiPreferences, value: boolean) => {
     setSavingKey(key);
     writeScheduleAiPreferences({ ...storedPreferences, [key]: value });
-    window.setTimeout(() => setSavingKey((current) => (current === key ? null : current)), 250);
+    if (clearSavingTimerRef.current !== null) window.clearTimeout(clearSavingTimerRef.current);
+    clearSavingTimerRef.current = window.setTimeout(() => {
+      setSavingKey((current) => (current === key ? null : current));
+      clearSavingTimerRef.current = null;
+    }, 250);
   };
 
   return (
@@ -72,6 +85,15 @@ export function ScheduleAiSettingsPanel({
       </CardHeader>
       <CardContent>
         <FieldGroup className="gap-3">
+        <PreferenceToggle
+          label={copy.autoSuggestions}
+          description={copy.autoSuggestionsDescription}
+          checked={storedPreferences.autoSuggestionsEnabled}
+          defaultChecked={DEFAULT_SCHEDULE_AI_PREFERENCES.autoSuggestionsEnabled}
+          saving={savingKey === "autoSuggestionsEnabled"}
+          copy={copy}
+          onChange={(checked) => updatePreference("autoSuggestionsEnabled", checked)}
+        />
         <PreferenceToggle
           label={copy.autoPlanGeneration}
           description={copy.autoPlanGenerationDescription}

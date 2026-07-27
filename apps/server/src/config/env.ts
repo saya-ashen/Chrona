@@ -16,6 +16,7 @@ const envSchema = z.object({
   CHRONA_UNSAFE_PUBLIC_BIND: z.string().optional(),
   CHRONA_WEB_DIST: z.string().optional(),
   CHRONA_EXPERIMENTAL_DASHBOARD_AI_SUMMARY: z.string().optional(),
+  CHRONA_EMAIL_TRIGGER_SECRET: z.string().min(16).optional(),
 });
 
 type Env = z.output<typeof envSchema>;

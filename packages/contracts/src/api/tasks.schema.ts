@@ -20,6 +20,25 @@ function executionRuntimeSchema(supportedRuntimes?: readonly string[]) {
   });
 }
 
+const contextStrategySchema = z.enum([
+  "provider_default",
+  "auto_compact",
+  "bounded_tool_results",
+  "artifact_backed",
+]);
+
+const taskExecutionConfigSchema = z.record(z.string(), z.unknown()).superRefine((value, context) => {
+  if (value.model !== undefined && (typeof value.model !== "string" || value.model.trim().length === 0)) {
+    context.addIssue({ code: "custom", path: ["model"], message: "model must be a non-empty string" });
+  }
+  if (value.contextStrategy !== undefined && !contextStrategySchema.safeParse(value.contextStrategy).success) {
+    context.addIssue({ code: "custom", path: ["contextStrategy"], message: "Unsupported context strategy" });
+  }
+  if (value.allowSubAgents !== undefined && typeof value.allowSubAgents !== "boolean") {
+    context.addIssue({ code: "custom", path: ["allowSubAgents"], message: "allowSubAgents must be a boolean" });
+  }
+});
+
 export function createTaskBodySchemaForSupportedRuntimes(
   supportedRuntimes: readonly string[],
 ) {
@@ -123,7 +142,7 @@ export const createTaskBodySchema = z.object({
   autoPlanGenerationTiming: automationTimingSchema.optional(),
   autoExecuteTiming: automationTimingSchema.optional(),
   executionRuntime: executionRuntimeSchema().optional(),
-  executionConfig: z.record(z.string(), z.unknown()).optional(),
+  executionConfig: taskExecutionConfigSchema.optional(),
   aiClientId: z.string().trim().min(1).nullable().optional(),
   parentTaskId: z.string().nullable().optional(),
   recurrenceRule: z
@@ -183,7 +202,7 @@ export const updateTaskBodySchema = z.object({
   autoExecuteTiming: automationTimingSchema.optional(),
   status: taskStatusEnum.optional(),
   executionRuntime: executionRuntimeSchema().optional(),
-  executionConfig: z.record(z.string(), z.unknown()).optional(),
+  executionConfig: taskExecutionConfigSchema.optional(),
   aiClientId: z.string().trim().min(1).nullable().optional(),
   recurrenceRule: z
     .string()
@@ -262,6 +281,9 @@ export const workspaceActivityItemSchema = z.object({
   nativeRunId: z.string().optional(),
   sequence: z.number().optional(),
   rawEventType: z.string().optional(),
+  executionSessionId: z.string().optional(),
+  executionEpoch: z.number().int().nonnegative().optional(),
+  executionTrigger: z.enum(["initial", "restart"]).optional(),
   tool: workspaceToolActivitySchema.optional(),
   assistant: workspaceAssistantActivitySchema.optional(),
   raw: z.unknown().optional(),

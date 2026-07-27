@@ -53,6 +53,7 @@ const acceptedContextMock = mock(async (taskId: string) => {
       id: task.id,
       workspaceId: task.workspaceId,
       title: task.title,
+      goalId: task.goalId,
       priority: task.priority,
       executionRuntime: task.executionRuntime,
       executionConfig: task.executionConfig as Record<string, unknown>,
@@ -179,6 +180,21 @@ describe("continueFromTaskResult", () => {
         dependencyType: "child_of",
       }),
     );
+  });
+
+  it("joins a follow-up to the source Goal", async () => {
+    const source = await seedAcceptedTask();
+    const sourceTask = await db.task.findUniqueOrThrow({ where: { id: source.taskId } });
+    const goal = await db.goal.create({ data: { workspaceId: sourceTask.workspaceId, title: "Long horizon", successCriteria: [], status: "Active" } });
+    await db.task.update({ where: { id: source.taskId }, data: { goalId: goal.id } });
+
+    const result = await continueFromTaskResult({ taskId: source.taskId, intent: "create_task", instruction: "Continue bounded work", sessionStrategy: "fresh_with_result" }, deps);
+    const followUp = await db.task.findUniqueOrThrow({ where: { id: result.createdTask!.id } });
+    expect(followUp.goalId).toBe(goal.id);
+    expect(followUp.goalContext).toMatchObject({
+      goal: { title: "Long horizon" },
+      acceptedResults: [{ taskTitle: sourceTask.title }],
+    });
   });
 
   it("creates a clean linked draft without invoking provider handoff", async () => {

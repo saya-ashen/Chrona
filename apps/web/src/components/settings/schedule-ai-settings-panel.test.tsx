@@ -17,7 +17,7 @@ describe("ScheduleAiSettingsPanel", () => {
     render(<ScheduleAiSettingsPanel />);
 
     expect(screen.getByText("Schedule AI automation")).toBeInTheDocument();
-    expect(screen.queryByRole("switch", { name: /auto suggestions/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("switch", { name: /AI task title suggestions/i })).not.toBeChecked();
     expect(screen.getByRole("switch", { name: /auto-generate plan after saving/i })).toBeChecked();
     expect(screen.getByRole("switch", { name: /default task auto-execution/i })).not.toBeChecked();
   });
@@ -25,11 +25,12 @@ describe("ScheduleAiSettingsPanel", () => {
   it("persists updated preferences to localStorage", () => {
     render(<ScheduleAiSettingsPanel />);
 
+    fireEvent.click(screen.getByRole("switch", { name: /AI task title suggestions/i }));
     fireEvent.click(screen.getByRole("switch", { name: /auto-generate plan after saving/i }));
     fireEvent.click(screen.getByRole("switch", { name: /default task auto-execution/i }));
 
     expect(JSON.parse(window.localStorage.getItem(SCHEDULE_AI_PREFERENCES_STORAGE_KEY) ?? "{}")).toEqual({
-      autoSuggestionsEnabled: false,
+      autoSuggestionsEnabled: true,
       autoPlanGenerationEnabled: false,
       defaultAutoExecuteEnabled: true,
     });

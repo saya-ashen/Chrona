@@ -225,17 +225,6 @@ describe("terminal action recording", () => {
   });
 });
 describe("kind -> action mapper", () => {
-  it("maps plan_output kind to update_plan_output action", () => {
-    const action = submitNodeResultActionFromControl({
-      body: {
-        kind: "plan_output",
-        payload: {
-          patches: [{ op: "add", path: "/root", value: "root" }],
-        },
-      },
-    });
-    expect(action?.action).toBe("update_plan_output");
-  });
 
   it("maps terminal kinds (complete / condition_select / wait_complete / block / fail)", () => {
     expect(submitNodeResultActionFromControl({ body: { kind: "complete", payload: { summary: "ok" } } })?.action).toBe("complete_manual_node");
@@ -245,13 +234,12 @@ describe("kind -> action mapper", () => {
     expect(submitNodeResultActionFromControl({ body: { kind: "fail", payload: { error: "boom" } } })?.action).toBe("fail_current_node");
   });
 
-  it("isTerminalControlKind only true for the five terminal kinds", () => {
+  it("isTerminalControlKind only true for terminal kinds", () => {
     expect(isTerminalControlKind("complete")).toBe(true);
     expect(isTerminalControlKind("condition_select")).toBe(true);
     expect(isTerminalControlKind("wait_complete")).toBe(true);
     expect(isTerminalControlKind("block")).toBe(true);
     expect(isTerminalControlKind("fail")).toBe(true);
-    expect(isTerminalControlKind("plan_output")).toBe(false);
     expect(isTerminalControlKind("task_read")).toBe(false);
     expect(isTerminalControlKind("plan_read")).toBe(false);
   });
@@ -268,7 +256,6 @@ describe("kind -> action mapper", () => {
   });
 
   it("toolNameFromControlKind round-trips with dispatch tool names", () => {
-    expect(toolNameFromControlKind("plan_output")).toBe("chrona.plan.output");
     expect(toolNameFromControlKind("complete")).toBe("chrona.node.complete");
     expect(toolNameFromControlKind("block")).toBe("chrona.node.block");
   });

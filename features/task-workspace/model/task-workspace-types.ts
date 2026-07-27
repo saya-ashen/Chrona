@@ -9,6 +9,8 @@ export type TaskPlanGenerationStatus = "idle" | "generating" | "waiting_acceptan
 export type TaskData = {
   id: string;
   workspaceId: string;
+  goalId?: string | null;
+  goal?: { id: string; title: string } | null;
   title: string;
   description: string | null;
   executionRuntime: string;
@@ -89,6 +91,11 @@ export type TaskPageData = {
     startedAt: string | null;
     syncStatus: string;
   } | null;
+  resultReview?: {
+    status: "pending_acceptance" | "accepted";
+    runId: string;
+    acceptedAt: string | null;
+  } | null;
   scheduleProposals: Array<{
     id: string;
     source: string;
@@ -108,6 +115,7 @@ export type TaskPageData = {
   }>;
   artifacts: Array<{
     id: string;
+    artifactRef?: string;
     title: string;
     type: string;
     uri?: string;
@@ -133,7 +141,7 @@ export type TaskWorkspaceBootstrapData = Omit<TaskPageData,
 
 export type TaskWorkspaceRuntimeContextData = Pick<TaskPageData, "defaultExecutionRuntime" | "executionRuntimes" | "availableAiClients">;
 
-export type TaskWorkspaceReviewContextData = Pick<TaskPageData, "latestRunSummary" | "scheduleProposals" | "approvals">;
+export type TaskWorkspaceReviewContextData = Pick<TaskPageData, "latestRunSummary" | "resultReview" | "scheduleProposals" | "approvals" | "artifacts">;
 
 export type TaskWorkspaceCommandCenterData = NonNullable<TaskPageData["commandCenter"]>;
 
@@ -176,7 +184,7 @@ export type WorkspaceStateTreatment = {
 };
 
 export type TaskHeaderAction = {
-  id: "start" | "pause" | "stop" | "more";
+  id: "start" | "pause" | "stop" | "restart" | "more";
   label: string;
   disabled?: boolean;
   disabledReason?: string;
@@ -221,6 +229,7 @@ export type ExecutionOverviewCard = {
 
 export type WorkspaceArtifactItem = {
   id: string;
+  artifactRef?: string;
   title: string;
   type: string;
   uri?: string;
@@ -283,6 +292,9 @@ export type WorkspaceActivityItem = {
   nativeRunId?: string;
   sequence?: number;
   rawEventType?: string;
+  executionSessionId?: string;
+  executionEpoch?: number;
+  executionTrigger?: "initial" | "restart";
   activityGroup?: WorkspaceActivityGroup;
   tool?: WorkspaceToolActivity;
   assistant?: WorkspaceAssistantActivity;

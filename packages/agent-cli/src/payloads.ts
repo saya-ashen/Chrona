@@ -75,39 +75,28 @@ export function buildControlPayload(argv: string[]): ParseResult {
     return { body: { kind: "plan_read", payload: {} } };
   }
 
-  if (domain === "plan" && command === "output") {
-    const patchesFile = takeOption(args, "--patches-file");
-    const summary = takeOption(args, "--summary");
-    ensureNoExtra(args);
-    return {
-      body: {
-        kind: "plan_output",
-        payload: {
-          patches: readJsonFile(requireString(patchesFile, "--patches-file"), "--patches-file") as never,
-          ...(summary ? { summary } : {}),
-        },
-      },
-    };
-  }
 
   if (domain !== "node") {
     throw new UsageError("Expected command: node|task|plan");
   }
 
   switch (command) {
-    case "output":
-      throw new UsageError("Use plan output for shared execution output");
     case "complete": {
-      const summary = takeOption(args, "--summary");
+      const summary = requireString(takeOption(args, "--summary"), "--summary");
+      const resultFile = takeOption(args, "--result-file");
       ensureNoExtra(args);
+      const result = resultFile
+        ? optionalObject(readJsonFile(resultFile, "--result-file"), "--result-file")
+        : undefined;
       return {
         body: {
           kind: "complete",
           payload: {
-            ...(summary ? { summary } : {}),
+            summary,
+            ...(result ?? {}),
           },
         },
-      };
+      } as unknown as ParseResult;
     }
     case "condition-select": {
       const branchRef = takeOption(args, "--branch") ?? takeOption(args, "--branch-ref");
@@ -178,6 +167,6 @@ export function buildControlPayload(argv: string[]): ParseResult {
       };
     }
     default:
-      throw new UsageError(`Unknown node command: ${command ?? ""}`);
+      throw new UsageError(`Unknown node command: ${command}`);
   }
 }

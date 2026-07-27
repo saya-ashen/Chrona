@@ -77,6 +77,23 @@ const cases: ConsistencyCase[] = [
     attentionRequired: true,
   },
   {
+    name: "authoritative input wait overrides stale completed execution",
+    input: {
+      taskStatus: "WaitingForInput",
+      executionStatus: "completed",
+      operationStatus: "execution_action",
+      currentNodeId: "confirm-channels",
+    },
+    expected: {
+      state: "waiting_for_input",
+      label: "Input needed",
+      tone: "warning",
+      primaryActionId: "provide_input",
+      nextActionLabel: "Provide the requested input so execution can continue",
+    },
+    attentionRequired: true,
+  },
+  {
     name: "approval wait stays distinct despite generic blocked task metadata",
     input: {
       taskStatus: "Blocked",

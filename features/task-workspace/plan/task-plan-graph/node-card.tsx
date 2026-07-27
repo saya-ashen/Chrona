@@ -341,6 +341,14 @@ function NodeCardContent({ data, estimatedLabel, kindTheme, runtimeSpotlight }: 
           {runtimeSpotlight ? (
             <span className={cn("rounded-full border px-1.5 py-0.5 text-[10px] font-medium", runtimeSpotlight.badge)}>{runtimeSpotlight.label}</span>
           ) : null}
+          {node.userInteractionExpectation === "possible" && node.status !== "waiting_for_user" ? (
+            <span
+              className="rounded-full border border-warning/35 bg-warning/10 px-1.5 py-0.5 text-[10px] font-medium text-warning-foreground"
+              title={node.userInteractionReason ?? undefined}
+            >
+              {graphCopy.possibleUserInputLabel}
+            </span>
+          ) : null}
         </div>
 
         <p className="mt-1.5 break-words pr-6 text-[13px] font-semibold leading-snug text-foreground line-clamp-2">{node.title}</p>

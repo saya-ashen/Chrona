@@ -148,6 +148,27 @@ describe("deriveTaskState", () => {
     });
   });
 
+  it("reactivates a completed task when a new execution session is active", () => {
+    expect(
+      deriveTaskState({
+        task: { status: "Completed", latestRunId: "run_restart" },
+        runs: [{ id: "run_restart", status: "Pending", updatedAt }],
+        approvals: [],
+        sync: { stale: false },
+        executionSession: {
+          status: "Active",
+          currentNodeId: "cn_restart_1",
+          pauseReason: null,
+        },
+      }),
+    ).toEqual({
+      persistedStatus: "Running",
+      displayState: "ExecutionActive",
+      blockReason: null,
+      blockSince: null,
+    });
+  });
+
   it("does not let stale running runs reopen a completed task", () => {
     expect(
       deriveTaskState({

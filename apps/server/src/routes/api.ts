@@ -6,7 +6,12 @@ import { json } from "../lib/http";
 import { createTaskRoutes } from "./tasks";
 import { createPageRoutes } from "./pages";
 import { createWorkspacesRoutes } from "./workspaces.routes";
+import { createGoalRoutes } from "./goals.routes";
+import { createGoalWorkbenchRoutes } from "./goal-workbench.routes";
+import { createTaskTriggerRoutes } from "./task-triggers.routes";
+import { createEmailTriggerAdapterRoutes } from "./email-trigger-adapter.routes";
 import { createClientsRoutes } from "./ai/clients.routes";
+import { createAiSuggestionRoutes } from "./ai/suggestions.routes";
 import { createAssistantSurfaceRoutes } from "./assistant-surface.routes";
 import { createMcpRoutes, createAgentControlRoutes } from "../../../../features/mcp-control-plane/server";
 import { createRuntimeRoutes } from "./runtime.routes";
@@ -18,13 +23,20 @@ export type ApiRouterOptions = {
   calendarSources?: CalendarSourceRouteOptions;
 };
 
+export type ApiRouter = Hono;
+
 export function createApiRouter(engine: ChronaEngine, options: ApiRouterOptions = {}) {
   const router = new Hono()
     .get("/health", (c) => json(c, { status: "ok" }))
     .route("/", createTaskRoutes(engine))
     .route("/", createPageRoutes(engine))
     .route("/", createWorkspacesRoutes(engine))
+    .route("/", createGoalRoutes(engine))
+    .route("/", createGoalWorkbenchRoutes(engine))
+    .route("/", createTaskTriggerRoutes(engine))
+    .route("/", createEmailTriggerAdapterRoutes(engine))
     .route("/", createClientsRoutes(engine))
+    .route("/", createAiSuggestionRoutes(engine))
     .route("/", createHermesIntegrationRoutes())
     .route("/", createCalendarSourceRoutes(options.calendarSources))
     .route("/", createRuntimeRoutes(engine))

@@ -100,13 +100,13 @@ function TaskWorkspacePlanBrief({
 
   return (
     <section aria-label="Plan brief" className="space-y-2 rounded-xl border border-border/65 bg-background px-3 py-3 shadow-sm">
-      <div className="flex min-w-0 flex-col gap-2 lg:flex-row lg:items-start lg:justify-between">
-        <div className="min-w-0 space-y-1">
+      <div className="flex min-w-0 flex-col gap-2">
+        <div className="min-w-0 flex-1 space-y-1">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
             <span className="text-[11px] font-semibold uppercase tracking-[0.14em] text-primary">Plan brief</span>
             <Badge variant="secondary" className="h-5 text-[10px]">{plan.status}</Badge>
           </div>
-          <h2 className="text-lg font-semibold tracking-tight text-foreground">{brief.title}</h2>
+          <h2 className="break-words text-lg font-semibold tracking-tight text-foreground">{brief.title}</h2>
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2 text-xs text-muted-foreground">
           <Badge variant="outline">{graphPlan.nodes.length} step{graphPlan.nodes.length === 1 ? "" : "s"}</Badge>
@@ -205,7 +205,7 @@ export function TaskWorkspacePlanContent({
   );
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
+    <div className="flex min-h-full flex-col">
       {graphPlan && plan ? (
         <>
           <div className="border-b border-border/55 p-3">

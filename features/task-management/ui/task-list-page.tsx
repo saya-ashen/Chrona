@@ -17,6 +17,7 @@ import { localizeHref, useLocale, type Messages } from "@chrona/i18n";
 import { Badge } from "@shared/ui"
 import { Button } from "@shared/ui"
 import { PageFrame } from "@shared/ui"
+import { PageHeader } from "@shared/ui"
 import { Checkbox } from "@shared/ui"
 import { Dialog,
 DialogContent,
@@ -222,36 +223,36 @@ function TaskListHero({
   counts: TaskCounts;
 }) {
   return (
-    <div className="flex flex-wrap items-center justify-between gap-2 px-1 py-0.5">
-      <div className="min-w-0">
-        <div className="flex flex-wrap items-center gap-2">
-          <h1 className="text-lg font-semibold tracking-tight">{title}</h1>
-          <span className="rounded-full border border-primary/15 bg-primary-soft px-2 py-0.5 text-[10px] font-medium text-primary">
-            {activeFilterLabel}
-          </span>
+    <PageHeader
+      className="-mx-3 -mt-3 sm:-mx-4 sm:-mt-4"
+      title={title}
+      description={copy.listDescription}
+      meta={
+        <span className="rounded-full border border-primary/15 bg-primary-soft px-2 py-0.5 text-[10px] font-medium text-primary">
+          {activeFilterLabel}
+        </span>
+      }
+      actions={
+        <div className="flex shrink-0 flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
+          <TaskStat label={copy.statTotal} value={counts.all} />
+          <TaskStat
+            label={copy.statNeeds}
+            value={counts.needsMe}
+            className="text-warning-foreground"
+          />
+          <TaskStat
+            label={copy.statReady}
+            value={counts.ready}
+            className="text-info"
+          />
         </div>
-        <p className="mt-0.5 text-xs text-muted-foreground">
-          {copy.listDescription}
+      }
+      toolbar={
+        <p className="text-[11px] text-muted-foreground">
+          Needs you: input, approval, or review required · Ready: can start now · Running: active execution · Failed: execution stopped and needs recovery
         </p>
-      </div>
-      <div className="flex shrink-0 flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
-        <TaskStat label={copy.statTotal} value={counts.all} />
-        <TaskStat
-          label={copy.statNeeds}
-          value={counts.needsMe}
-          className="text-warning-foreground"
-        />
-        <TaskStat
-          label={copy.statReady}
-          value={counts.ready}
-          className="text-info"
-        />
-      </div>
-      <p className="basis-full text-[11px] text-muted-foreground">
-        Needs you: input, approval, or review required · Ready: can start now ·
-        Running: active execution · Failed: execution stopped and needs recovery
-      </p>
-    </div>
+      }
+    />
   );
 }
 
@@ -654,8 +655,8 @@ export function TaskListPage({
   }
 
   return (
-    <PageFrame mode="workspace">
-      <div className="flex min-h-0 flex-1 flex-col gap-3 bg-card p-3 sm:p-4">
+    <PageFrame mode="main" data-domain="tasks" className="p-1 sm:p-2">
+      <div className="flex min-h-0 flex-1 flex-col gap-3 p-3 sm:p-4">
         <TaskListHero
           title={copy.nav.tasks}
           copy={taskCopy}

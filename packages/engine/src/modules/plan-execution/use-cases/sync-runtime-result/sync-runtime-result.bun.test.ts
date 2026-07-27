@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import type { NodeAttempt } from "@chrona/contracts/ai";
 import { attemptForRuntimeRun, runningAttemptForRuntimeRun, runtimeRunRefFromAttempt } from "./attempts";
+import { shouldReconcileTerminalProviderRun } from "./reconcile-stale-runtime-runs";
 import { nodeResultForRuntimeRun } from "./node-result";
 
 const runningAttempt = {
@@ -67,5 +68,37 @@ describe("nodeResultForRuntimeRun", () => {
       status: "Failed",
       error: "  provider crashed  ",
     })).toMatchObject({ status: "failed", error: "provider crashed" });
+  });
+});
+
+describe("terminal provider Run convergence", () => {
+  it("repairs an active canonical Run after its provider record becomes terminal", () => {
+    expect(shouldReconcileTerminalProviderRun({
+      providerStatus: "cancelled",
+      runStatus: "Running",
+      runId: "run-1",
+      latestRunId: "run-1",
+      taskStatus: "Running",
+    })).toBe(true);
+  });
+
+  it("repairs the legacy cancelled-Run mismatch while the task is still non-terminal", () => {
+    expect(shouldReconcileTerminalProviderRun({
+      providerStatus: "cancelled",
+      runStatus: "Cancelled",
+      runId: "run-1",
+      latestRunId: "run-1",
+      taskStatus: "Running",
+    })).toBe(true);
+  });
+
+  it("does not replay historical terminal provider records", () => {
+    expect(shouldReconcileTerminalProviderRun({
+      providerStatus: "cancelled",
+      runStatus: "Cancelled",
+      runId: "run-old",
+      latestRunId: "run-new",
+      taskStatus: "Running",
+    })).toBe(false);
   });
 });

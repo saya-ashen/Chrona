@@ -28,6 +28,7 @@ CardDescription,
 CardHeader,
 CardTitle, } from "@shared/ui"
 import { PageFrame } from "@shared/ui"
+import { PageHeader } from "@shared/ui"
 import { UiSurfaceFrame } from "@shared/ui"
 import { SpecRenderer } from "@features/task-workspace";
 import type { UiDocument } from "@chrona/ui-protocol";
@@ -233,18 +234,12 @@ function HeadlineBanner({
   }
 
   return (
-    <header className="border-b border-border/70 pb-4 pt-1 sm:pb-5">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-        <div className="min-w-0 space-y-1.5">
-          <p className="text-xs font-medium text-muted-foreground">
-            {copy.subtitle}
-          </p>
-          <h1 className="text-2xl font-semibold sm:text-3xl">{copy.title}</h1>
-          <p className="max-w-3xl text-sm leading-5 text-muted-foreground">
-            {sentence}
-          </p>
-        </div>
-        <div className="grid shrink-0 grid-cols-3 overflow-hidden rounded-lg border bg-background py-1">
+    <PageHeader
+      eyebrow={copy.subtitle}
+      title={copy.title}
+      description={sentence}
+      actions={
+        <div className="grid shrink-0 grid-cols-3 overflow-hidden rounded-lg border bg-panel py-1">
           <MetricPill
             icon={AlertTriangle}
             label={copy.summary.title}
@@ -264,8 +259,8 @@ function HeadlineBanner({
             tone="success"
           />
         </div>
-      </div>
-    </header>
+      }
+    />
   );
 }
 
@@ -616,7 +611,7 @@ function InProgressCard({
   items: DashboardInProgressItem[];
 }) {
   return (
-    <Card className="shadow-sm">
+    <Card size="sm" className="bg-panel shadow-sm">
       <CardHeader className="pb-2">
         <CardTitle className="flex items-center gap-2 text-base">
           <Loader2 className="size-4 text-sky-500" aria-hidden />
@@ -626,7 +621,7 @@ function InProgressCard({
       </CardHeader>
       <CardContent>
         {items.length === 0 ? (
-          <div className="flex items-center gap-2 rounded-2xl border bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
+          <div className="flex items-center gap-2 px-1 py-2 text-sm text-muted-foreground">
             <Clock
               className="size-4 shrink-0 text-muted-foreground/70"
               aria-hidden
@@ -677,7 +672,7 @@ function RecentCompletionsCard({
   const visibleItems = items.slice(0, 5);
 
   return (
-    <Card className="shadow-sm">
+    <Card size="sm" className="bg-panel shadow-sm">
       <CardHeader className="pb-2">
         <CardTitle className="flex items-center gap-2 text-base">
           <CheckCircle2 className="size-4 text-emerald-500" aria-hidden />
@@ -689,7 +684,7 @@ function RecentCompletionsCard({
       </CardHeader>
       <CardContent>
         {visibleItems.length === 0 ? (
-          <div className="flex items-center gap-2 rounded-2xl border bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
+          <div className="flex items-center gap-2 px-1 py-2 text-sm text-muted-foreground">
             <Sparkles
               className="size-4 shrink-0 text-muted-foreground/70"
               aria-hidden
@@ -743,7 +738,7 @@ function UpcomingTodayCard({
   const visibleItems = items.slice(0, 5);
 
   return (
-    <Card className="shadow-sm">
+    <Card size="sm" className="bg-panel shadow-sm">
       <CardHeader className="pb-2">
         <CardTitle className="flex items-center gap-2 text-base">
           <Clock className="size-4 text-sky-500" aria-hidden />
@@ -753,7 +748,7 @@ function UpcomingTodayCard({
       </CardHeader>
       <CardContent>
         {visibleItems.length === 0 ? (
-          <div className="flex items-center gap-2 rounded-2xl border bg-muted/20 px-3 py-2 text-sm text-muted-foreground">
+          <div className="flex items-center gap-2 px-1 py-2 text-sm text-muted-foreground">
             <CheckCircle2
               className="size-4 shrink-0 text-emerald-500/70"
               aria-hidden
@@ -815,7 +810,7 @@ function RecentActivitySection({
   const visibleEvents = events.slice(0, 8);
 
   return (
-    <Card>
+    <Card className="bg-panel">
       <CardHeader className="pb-3">
         <CardTitle className="text-lg">{copy.feed.title}</CardTitle>
         <CardDescription>{copy.feed.description}</CardDescription>
@@ -886,7 +881,7 @@ export function DashboardPage({
   }, [autoCompleted]);
 
   return (
-    <PageFrame mode="overview">
+    <PageFrame mode="main" data-domain="dashboard" className="p-1 sm:p-2">
       <div className="w-full space-y-4 sm:space-y-5">
         <HeadlineBanner
           copy={copy}
@@ -905,7 +900,7 @@ export function DashboardPage({
           <RecentCompletionsCard copy={copy} items={autoCompleted} />
         </div>
 
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)]">
+        <div className={`grid grid-cols-1 gap-4 ${data.aiBrief?.status !== "disabled" ? "xl:grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)]" : ""}`}>
           <RecentActivitySection copy={copy} events={recentEvents} />
           {data.aiBrief?.status !== "disabled" ? (
             <DigestModule

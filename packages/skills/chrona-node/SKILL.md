@@ -28,21 +28,20 @@ run start; never copy it, never echo it, never pass it as a flag).
 Pick the verb that matches the node type you were given in the prompt:
 
 ```sh
-# Shared plan output (non-terminal; can call multiple times)
-chrona plan output --patches-file ./patches.json
+# Submit one semantic terminal result. --result-file is an optional JSON object
+# with deliverables, findings, decisions, caveats, nextActions, and evidenceItems.
+chrona node complete --summary "..." --result-file ./node-result.json
 
-# Terminal verbs (first one wins)
-chrona node complete           --summary "..."
-chrona node condition-select   --branch <branchRef> --summary "..."
-chrona node wait-complete      --summary "..."
-chrona node block              --reason "..." --action-form '{...}'
-chrona node fail               --error "..."
+# Other terminal verbs (first one wins)
+chrona node condition-select --branch <branchRef> --summary "..."
+chrona node wait-complete    --summary "..."
+chrona node block            --reason "..." --action-form '{...}'
+chrona node fail             --error "..."
 ```
 
-- `--patches-file` reads JSON Patch operations from disk. Write the file with
-  your normal `Bash` tools first, then reference it.
-- The CLI exits non-zero with an actionable error if the env is missing or the
-  engine rejects the action; read the message and adjust.
+- Generated deliverables must be declared in `--result-file`; use only `generated://` URIs inside Chrona's generated-files root.
+- Do not construct final json-render UI, download URLs, backend IDs, or file-system paths.
+- The CLI exits non-zero with an actionable error if the env is missing or the engine rejects the action; read the message and adjust.
 
 ## Read-only context (optional)
 

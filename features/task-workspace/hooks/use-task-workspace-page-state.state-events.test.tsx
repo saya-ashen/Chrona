@@ -294,4 +294,28 @@ describe("useTaskWorkspacePageState — state.snapshot / state.update dispatch",
       expect(mocks.fetchUrls.some((url) => url.includes("/api/tasks/task-1/review-context"))).toBe(true);
     });
   });
+
+  it("refreshes canonical workspace data after state updates", async () => {
+    initialPageForTest = taskWorkspaceStateFixtures.idle.pageData;
+    renderHook(() => useTaskWorkspacePageState(initialPageForTest), { wrapper });
+
+    await waitFor(() => expect(mocks.streamOpened).toBe(true));
+    fetchMock.mockClear();
+    mocks.fetchUrls = [];
+
+    await act(async () => {
+      pushEvent("state.update", {
+        type: "state.update",
+        updates: {
+          "/execution/status": "completed",
+        },
+      });
+    });
+
+    await waitFor(() => {
+      expect(mocks.fetchUrls.some((url) => url === "/api/tasks/task-1" || url.includes("/api/tasks/task-1?"))).toBe(true);
+      expect(mocks.fetchUrls.some((url) => url.includes("/api/tasks/task-1/runtime-context"))).toBe(true);
+      expect(mocks.fetchUrls.some((url) => url.includes("/api/tasks/task-1/review-context"))).toBe(true);
+    });
+  });
 });

@@ -47,14 +47,6 @@ export function deriveTaskState(input: DeriveTaskStateInput): DeriveTaskStateRes
     };
   }
 
-  if (input.task.status === "Completed" && input.executionSession?.status !== "Paused") {
-    return {
-      persistedStatus: "Completed",
-      displayState: null,
-      blockReason: null,
-      blockSince: null,
-    };
-  }
 
   // An abandoned execution session is the durable record of a cancelled run.
   // Reproduced here so the projection committer is the only writer of task
@@ -72,23 +64,23 @@ export function deriveTaskState(input: DeriveTaskStateInput): DeriveTaskStateRes
     [...input.runs].sort((left, right) => right.updatedAt.getTime() - left.updatedAt.getTime()).at(0) ??
     null;
 
+  // A terminal Task without a canonical run must not be reopened by an
+  // orphaned historical Run. Explicit restarts set latestRunId and create an
+  // Active execution session before projection derivation.
+  if (input.task.status === "Completed" && !input.task.latestRunId && !input.executionSession) {
+    return {
+      persistedStatus: "Completed",
+      displayState: null,
+      blockReason: null,
+      blockSince: null,
+    };
+  }
+
   const latestPendingApproval =
     [...input.approvals]
       .filter((approval) => approval.status === "Pending")
       .sort((left, right) => right.requestedAt.getTime() - left.requestedAt.getTime()).at(0) ?? null;
 
-  if (input.sync.stale) {
-    return {
-      persistedStatus: input.task.status,
-      displayState: "Sync Stale",
-      blockReason: {
-        blockType: "sync_stale",
-        scope: "run",
-        actionRequired: "Re-sync",
-      },
-      blockSince: activeRun?.updatedAt ?? null,
-    };
-  }
 
   if (activeRun?.status === "WaitingForApproval") {
     return {
@@ -116,14 +108,7 @@ export function deriveTaskState(input: DeriveTaskStateInput): DeriveTaskStateRes
     };
   }
 
-  if (activeRun?.status === "Running" || activeRun?.status === "Pending") {
-    return {
-      persistedStatus: "Running",
-      displayState: null,
-      blockReason: null,
-      blockSince: null,
-    };
-  }
+
 
   if (
     activeRun?.status === "Failed" &&
@@ -247,6 +232,17 @@ export function deriveTaskState(input: DeriveTaskStateInput): DeriveTaskStateRes
     };
   }
 
+  // A live provider Run is the fallback execution fact only when the plan
+  // session has not already reached a durable paused/terminal transition.
+  if (activeRun?.status === "Running" || activeRun?.status === "Pending") {
+    return {
+      persistedStatus: "Running",
+      displayState: null,
+      blockReason: null,
+      blockSince: null,
+    };
+  }
+
   // A completed execution session is the authoritative record of a finished
   // run; a completed run is the same signal from the provider side. Either
   // means the task is done. (The run may be absent — e.g. occurrence-scoped or
@@ -264,6 +260,19 @@ export function deriveTaskState(input: DeriveTaskStateInput): DeriveTaskStateRes
       displayState: null,
       blockReason: null,
       blockSince: null,
+    };
+  }
+
+  if (input.sync.stale) {
+    return {
+      persistedStatus: input.task.status,
+      displayState: "Sync Stale",
+      blockReason: {
+        blockType: "sync_stale",
+        scope: "run",
+        actionRequired: "Re-sync",
+      },
+      blockSince: activeRun?.updatedAt ?? null,
     };
   }
 

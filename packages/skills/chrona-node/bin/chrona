@@ -66,7 +66,9 @@ async function readJsonFile(flag) {
   if (!path) return undefined;
   const fs = await import("node:fs/promises");
   try {
-    return JSON.parse(await fs.readFile(path, "utf8"));
+    const value = JSON.parse(await fs.readFile(path, "utf8"));
+    if (!value || typeof value !== "object" || Array.isArray(value)) fail(`${flag} must contain a JSON object.`);
+    return value;
   } catch (error) {
     fail(`Could not read JSON from ${path}: ${error instanceof Error ? error.message : String(error)}`);
   }
@@ -76,11 +78,13 @@ async function payload() {
   const [scope, command] = args;
   if (scope === "task" && command === "read") return { kind: "task_read", payload: {} };
   if (scope === "plan" && command === "read") return { kind: "plan_read", payload: {} };
-  if (scope === "plan" && command === "output") return { kind: "plan_output", payload: { patches: await readJsonFile("--patches-file"), summary: take("--summary") } };
-  if (scope !== "node") fail("Usage: chrona plan output --patches-file <path> | chrona node <complete|condition-select|wait-complete|block|fail> [...]");
+  if (scope !== "node") fail("Usage: chrona node <complete|condition-select|wait-complete|block|fail> [...]");
 
-  if (command === "output") fail("Use chrona plan output --patches-file <path>");
-  if (command === "complete") return { kind: "complete", payload: { summary: take("--summary") } };
+  if (command === "complete") {
+    const summary = take("--summary");
+    if (!summary) fail("--summary is required.");
+    return { kind: "complete", payload: { summary, ...(await readJsonFile("--result-file")) } };
+  }
   if (command === "condition-select") return { kind: "condition_select", payload: { branchRef: take("--branch"), summary: takeAny("--reason", "--summary") } };
   if (command === "wait-complete") return { kind: "wait_complete", payload: { summary: takeAny("--reason", "--summary") } };
   if (command === "block") return { kind: "block", payload: { reason: takeAny("--reason", "--summary"), actionForm: take("--action-form") } };

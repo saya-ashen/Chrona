@@ -841,7 +841,7 @@ describe("task workspace execution console view model", () => {
     expect(view.readiness).toMatchObject({ description: "Run first step", actionLabel: "Open run controls", actionNodeId: "ready" });
   });
 
-  it("does not treat node-local renderable output as latest plan output", () => {
+  it("does not treat node-local renderable output as the finalized task result", () => {
     const specOnly = node({
       id: "spec-output",
       status: "done",

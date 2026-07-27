@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import type { ExecutionActionInput, SubmitCheckpointActionInput } from "@chrona/contracts";
+import type { CheckpointInputFields, ExecutionActionInput, SubmitCheckpointActionInput } from "@chrona/contracts";
 import { buildActionSpec, type ActionItemInput } from "@chrona/ui-protocol";
 import {
   actionKindForNode,
@@ -14,8 +14,14 @@ function isTerminalStatus(status: PlanNodeDataModel["status"]) {
   return status === "done" || status === "skipped";
 }
 
-function hasSubmittedInputFields(inputFields: Record<string, string> | undefined) {
-  return Boolean(inputFields && Object.values(inputFields).some((value) => value.trim()));
+function submittedInputFields(inputFields: PlanNodeDataModel["inputFields"]): CheckpointInputFields | undefined {
+  return inputFields;
+}
+
+function hasSubmittedInputFields(inputFields: PlanNodeDataModel["inputFields"]) {
+  return Boolean(inputFields && Object.values(inputFields).some((value) =>
+    Array.isArray(value) ? value.length > 0 : typeof value === "boolean" ? true : value.trim().length > 0,
+  ));
 }
 
 export function useActionSpecRenderConfig({
@@ -34,12 +40,12 @@ export function useActionSpecRenderConfig({
 
   // Track current values of required fields so we can disable the submit button
   // when any are empty — mirrors the legacy getWorkspaceActionDisabledReason gate.
-  const [requiredFieldValues, setRequiredFieldValues] = useState<Record<string, string>>(() =>
-    Object.fromEntries(fields.filter((f) => f.required).map((f) => [f.key, f.value])),
+  const [requiredFieldValues, setRequiredFieldValues] = useState<CheckpointInputFields>(() =>
+    Object.fromEntries(fields.filter((field) => field.required).map((field) => [field.key, field.value])),
   );
   useEffect(() => {
     setRequiredFieldValues(
-      Object.fromEntries(fields.filter((f) => f.required).map((f) => [f.key, f.value])),
+      Object.fromEntries(fields.filter((field) => field.required).map((field) => [field.key, field.value])),
     );
   }, [fields]);
   const actionDisabledReason = useMemo(
@@ -49,12 +55,11 @@ export function useActionSpecRenderConfig({
   const handleStateChange = useCallback((changes: Array<{ path: string; value: unknown }>) => {
     setRequiredFieldValues((prev) => {
       let changed = false;
-      const updates: Record<string, string> = {};
+      const updates: CheckpointInputFields = {};
       for (const { path, value } of changes) {
         const key = path.startsWith("/") ? path.slice(1) : path;
-        if (key in prev) {
-          const str = typeof value === "string" ? value : "";
-          if (prev[key] !== str) { updates[key] = str; changed = true; }
+        if (key in prev && (typeof value === "string" || typeof value === "boolean" || (Array.isArray(value) && value.every((item) => typeof item === "string")))) {
+          if (JSON.stringify(prev[key]) !== JSON.stringify(value)) { updates[key] = value; changed = true; }
         }
       }
       return changed ? { ...prev, ...updates } : prev;
@@ -91,16 +96,17 @@ export function useActionSpecRenderConfig({
   }, [node, fields]);
 
   const spec = useMemo(() => node ? buildActionSpec({
-    fields: fields.map((f) => ({
-      key: f.key,
-      label: f.label,
-      value: f.value,
-      control: f.control,
-      required: f.required,
-      options: f.options,
+    fields: fields.map((field) => ({
+      key: field.key,
+      label: field.label,
+      value: field.value,
+      control: field.control,
+      required: field.required,
+      options: field.options,
+      selection: field.selection,
     })),
     actions: normalizedActions,
-    submittedValues: node.inputFields,
+    submittedValues: submittedInputFields(node.inputFields),
     isReadOnly,
     nodeNextAction: node.nextAction,
     disabledReason: actionDisabledReason ?? undefined,
@@ -122,10 +128,14 @@ export function useActionSpecRenderConfig({
       const checkpointAction = params.checkpointAction as string | undefined;
       const actionId = params.actionId as string | undefined;
       const rawValues = (params.values ?? {}) as Record<string, unknown>;
-      // Strip non-string entries (e.g. $bindState refs that were not resolved) for defense-in-depth.
       const values = Object.fromEntries(
-        Object.entries(rawValues).filter(([, v]) => typeof v === "string"),
-      ) as Record<string, string>;
+        fields.flatMap((field) => {
+          const value = rawValues[field.key];
+          return typeof value === "string" || typeof value === "boolean" || (Array.isArray(value) && value.every((item) => typeof item === "string"))
+            ? [[field.key, value] as const]
+            : [];
+        }),
+      ) as CheckpointInputFields;
       const selectedAction = node.availableActions?.find((a) => a.checkpointAction === checkpointAction || a.id === actionId) ?? null;
       if (!onSubmitCheckpointAction) throw new Error("Checkpoint actions are not available for this view.");
       const result = await onSubmitCheckpointAction(

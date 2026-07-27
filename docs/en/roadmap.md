@@ -28,7 +28,7 @@ Chrona's durable value should grow with AI capability:
 
 | Durable capability | Why it compounds with stronger AI |
 | --- | --- |
-| Schedule-triggered execution | Stronger AI can do more work, but still needs user-owned time constraints. |
+| Trigger-driven execution | Stronger AI can do more work, but still needs user-owned activation rules; schedule is the shipped trigger source and future sources must preserve the same approval, idempotency, and audit boundaries. |
 | Human approval and recovery | More capable automation raises the cost of unchecked mistakes. |
 | Observable execution records | Longer AI work needs explainable progress, evidence, and failure causes. |
 | Unified user-facing work state | More dynamic AI behavior creates more internal states; users need one clear status and next action. |
@@ -68,7 +68,7 @@ These capabilities exist in the current codebase and should be treated as produc
 
 ## AI-first operating principles
 
-1. **Scheduled work is the product center.** Plans, providers, and result surfaces exist to move scheduled work forward.
+1. **Scheduled work is the current product center.** The accepted target generalizes schedule into trigger-created task occurrences while keeping time constraints, approval, and user control authoritative.
 2. **AI may propose; Chrona owns state.** Models can suggest plans, patches, summaries, and results, but Chrona owns task, schedule, execution, approval, and recovery state.
 3. **Every non-happy path needs one clear next action.** Waiting, blocked, failed, cancelled, and review states must tell the user what to do next.
 4. **Provider differences stay below the product layer.** Product UI should depend on capabilities and normalized events, not provider names.
@@ -203,6 +203,9 @@ Mid-term work should deepen the AI schedule loop after near-term state, provider
 | Memory in service of execution | Use task/workspace memory to improve planning and node execution, not as a separate user-facing destination by default. |
 | Projection consistency | Make page projections fast, task-scoped where possible, and consistent across Schedule, Dashboard, and Task Workspace. |
 | Verification | Add focused tests for plan generation, graph execution, task-scoped execution actions, MCP/provider contracts, projections, schedule decisions, and json-render fallback. |
+| Long-horizon goals | Shipped foundation: durable Goal lifecycle, atomic entry/promotion, proposed-criterion authority, Goal Workbench, and bounded goal-owned tasks without persistent provider sessions. Continue refining evidence review and export depth. |
+| Occurrence model | Shipped foundation: neutral TaskOccurrence execution authority with optional WorkBlock placement and sibling/late-event isolation. Continue removing remaining legacy work-block compatibility paths. |
+| Extensible triggers | Shipped foundation: versioned schedule, bounded internal-event, and authenticated email triggers with idempotent deliveries. Keep webhook rejected until its full dedicated security contract ships. |
 
 ## Long-term direction
 
@@ -210,10 +213,10 @@ Long-term direction is strategic intent, not a near-term promise.
 
 | Theme | Direction |
 | --- | --- |
-| Proactive AI scheduling | Let Chrona identify when work should be planned, scheduled, executed, reviewed, or deferred based on task state, user time, and provider capability. |
-| External ingestion | Turn conversations, email, notes, and external systems into structured Chrona tasks that can be planned, scheduled, executed, and reviewed. |
-| Human-governed automation | Support stronger automation while preserving approval boundaries, audit trails, recovery paths, and user-owned schedule policy. |
-| Agent ecosystem | Let more agents and tools participate through explicit, inspectable contracts while Chrona remains the authoritative AI schedule app. |
+| Proactive activation | Let Chrona identify when work should be planned, scheduled, triggered, executed, reviewed, or deferred based on goal/task state, user policy, and provider capability. |
+| External ingestion and triggers | Turn conversations, email, notes, and external systems into validated trigger deliveries or structured Chrona tasks without allowing incoming payloads to own permissions or runtime state. |
+| Human-governed automation | Support stronger schedule/event automation while preserving approval boundaries, idempotency, audit trails, recovery paths, and user-owned policy. |
+| Agent ecosystem | Let more agents, triggers, and tools participate through explicit, inspectable contracts while Chrona remains authoritative for Goals, tasks, occurrences, and execution state. |
 | Collaboration | Add stronger multi-user review, approvals, audit trails, and shared execution context when single-user execution governance is solid. |
 | Production hardening | Improve authentication, backup/restore, observability, migration safety, deployment docs, and operational runbooks without abandoning local-first simplicity. |
 | Organization-scale planning | Connect individual tasks, schedules, dependencies, and execution history into project/portfolio visibility. |

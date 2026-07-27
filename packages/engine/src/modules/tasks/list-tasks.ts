@@ -103,7 +103,7 @@ export async function listTasksByWorkspace(input: ListTasksInput) {
         runs: {
           orderBy: { createdAt: "desc" },
           take: 1,
-          select: { id: true, status: true, runtimeName: true, workBlockId: true, createdAt: true },
+          select: { id: true, status: true, runtimeName: true, occurrenceId: true, workBlockId: true, createdAt: true },
         },
         artifacts: {
           orderBy: { createdAt: "desc" },
@@ -147,7 +147,7 @@ export async function listTasksByWorkspace(input: ListTasksInput) {
         runId: latestRun.id,
         runStatus: latestRun.status,
         provider: latestRun.runtimeName,
-        occurrenceId: latestRun.workBlockId,
+        occurrenceId: latestRun.occurrenceId,
         executedAt: latestRun.createdAt,
         artifact: latestArtifact,
       } : latestArtifact ? {

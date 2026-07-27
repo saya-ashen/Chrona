@@ -3,9 +3,8 @@ import * as React from "react";
 import { cn } from "./utils";
 
 const pageFrameWidths = {
+  main: "max-w-[1440px]",
   workspace: "max-w-[1600px]",
-  overview: "max-w-[1280px]",
-  focused: "max-w-[1120px]",
 } as const;
 
 export type PageFrameMode = keyof typeof pageFrameWidths;

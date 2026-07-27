@@ -1,3 +1,4 @@
+import { resolve } from "node:path";
 import { randomUUID } from "node:crypto";
 
 import {
@@ -5,6 +6,7 @@ import {
   discoverAuthStorage,
   ModelRegistry,
   SessionManager,
+  Settings,
   z,
   type AuthStorage,
   type AgentSession,
@@ -20,7 +22,6 @@ import {
 } from "@chrona/contracts/ai";
 import {
   agentControlActionPayloadSchemas,
-  chronaPublicToolPayloadSchemas,
   type AgentControlActionBody,
 } from "@chrona/contracts/api";
 import type {
@@ -30,6 +31,8 @@ import type {
   GetRunInput,
   HealthCheckInput,
   ProviderCapabilities,
+  ProviderConfigurationCapabilities,
+  ProviderRuntimeDiagnostics,
   ProviderConversationCapabilities,
   ProviderConversationState,
   ProviderConversationHandoffInput,
@@ -70,6 +73,8 @@ type SdkRunHandle = {
   startedAt: string;
   unsubscribe?: () => void;
   inputAbortListener?: () => void;
+  terminalActionAccepted?: boolean;
+  terminalAction?: { name: string; input: Record<string, unknown> };
 };
 
 export type OmpSdkProviderOptions = {
@@ -158,6 +163,10 @@ function hasDirectProviderConfig(config: OmpProviderConfig): boolean {
   return Boolean(nonEmpty(config.apiKey) || nonEmpty(config.baseUrl));
 }
 
+async function loadSdkSettings(environment: SdkEnvironment, cwd: string) {
+  return Settings.loadIsolated({ cwd, agentDir: environment.agentDir });
+}
+
 async function createSdkModelSetup(config: OmpProviderConfig, environment: SdkEnvironment): Promise<SdkModelSetup> {
   const model = nonEmpty(config.model);
   if (!hasDirectProviderConfig(config)) return { modelPattern: model };
@@ -223,7 +232,6 @@ function renderProviderInput(input: ProviderRunInput): string {
     }
   }
   if (
-    input &&
     typeof input === "object" &&
     "type" in input &&
     input.type === "text" &&
@@ -302,17 +310,22 @@ const looseObjectSchema = z.object({}).catchall(z.unknown());
 
 
 type NodeRuntimeToolName =
-  | "chrona_plan_output"
   | "chrona_node_complete"
   | "chrona_condition_select"
   | "chrona_wait_complete"
+  | "chrona_node_request_input"
   | "chrona_node_block"
   | "chrona_node_fail";
 
+function isTerminalRuntimeTool(toolName: string): boolean {
+  return toolName === "chrona_node_complete" || toolName === "chrona_condition_select" || toolName === "chrona_wait_complete" || toolName === "chrona_node_request_input" || toolName === "chrona_node_block" || toolName === "chrona_node_fail";
+}
+
 const NODE_RUNTIME_TOOL_SET_BY_TERMINAL: Record<string, readonly NodeRuntimeToolName[]> = {
-  chrona_node_complete: ["chrona_plan_output", "chrona_node_complete", "chrona_node_block", "chrona_node_fail"],
+  chrona_node_complete: ["chrona_node_complete", "chrona_node_request_input", "chrona_node_block", "chrona_node_fail"],
   chrona_condition_select: ["chrona_condition_select", "chrona_node_block", "chrona_node_fail"],
   chrona_wait_complete: ["chrona_wait_complete", "chrona_node_block", "chrona_node_fail"],
+  chrona_node_request_input: ["chrona_node_request_input", "chrona_node_block", "chrona_node_fail"],
   chrona_node_block: ["chrona_node_block", "chrona_node_fail"],
   chrona_node_fail: ["chrona_node_block", "chrona_node_fail"],
 };
@@ -324,14 +337,9 @@ type NodeRuntimeToolDefinition = {
 };
 
 const NODE_RUNTIME_TOOL_DEFINITIONS: Partial<Record<string, NodeRuntimeToolDefinition>> = {
-  chrona_plan_output: {
-    kind: "plan_output",
-    description: "Patch task-level shared user-visible plan output as json-render SpecStream patches before completing the node.",
-    parameters: chronaPublicToolPayloadSchemas["chrona.plan.output"],
-  },
   chrona_node_complete: {
     kind: "complete",
-    description: "Mark the current Chrona task node complete after its objective and required user-visible output are satisfied.",
+    description: "Complete the current Chrona task node with semantic result contributions and declared deliverables after its objective is satisfied.",
     parameters: agentControlActionPayloadSchemas.complete,
   },
   chrona_condition_select: {
@@ -344,9 +352,14 @@ const NODE_RUNTIME_TOOL_DEFINITIONS: Partial<Record<string, NodeRuntimeToolDefin
     description: "Mark the current Chrona wait node complete when the wait condition is satisfied by evidence.",
     parameters: agentControlActionPayloadSchemas.wait_complete,
   },
+  chrona_node_request_input: {
+    kind: "request_input",
+    description: "Pause the current Chrona node for normal structured user input. Use semantic text, choice, or boolean fields; choice.selection selects single or multiple values.",
+    parameters: agentControlActionPayloadSchemas.request_input,
+  },
   chrona_node_block: {
     kind: "block",
-    description: "Block the current Chrona node when required user input, approval, or unavailable capability prevents safe completion.",
+    description: "Block the current Chrona node only when an exceptional external blocker such as missing access or unavailable capability prevents safe completion.",
     parameters: agentControlActionPayloadSchemas.block,
   },
   chrona_node_fail: {
@@ -396,7 +409,7 @@ function acceptedNodeToolResult(details: Record<string, unknown> = { accepted: t
   };
 }
 
-function createTerminalTool(toolName: string, control?: StartRunInput["control"]): CustomTool {
+function createTerminalTool(toolName: string, control?: StartRunInput["control"], onTerminalAccepted?: () => void): CustomTool {
   if (toolName === CHRONA_PLAN_GENERATE_TOOL_NAME) {
     return {
       name: toolName,
@@ -417,18 +430,18 @@ function createTerminalTool(toolName: string, control?: StartRunInput["control"]
     strict: Boolean(definition),
     description: definition?.description ?? "Submit the final structured payload required by the current Chrona instructions.",
     parameters: definition?.parameters ?? looseObjectSchema,
-    async execute(_toolCallId, params, _onUpdate, _ctx, signal) {
+    async execute(_toolCallId, params, _onUpdate, ctx, signal) {
       if (!definition || !control) return acceptedNodeToolResult();
       const body = { kind: definition.kind, payload: params } as AgentControlActionBody;
       const result = await postControlAction({ control, body, signal });
+      if (isTerminalRuntimeTool(toolName)) { onTerminalAccepted?.(); queueMicrotask(() => ctx.abort()); }
       return acceptedNodeToolResult({ accepted: true, control: result });
     }
   };
 }
-
-function sdkToolOptionsForTerminal(terminalToolName: string | undefined, control?: StartRunInput["control"]): { customTools: CustomTool[] } {
+function sdkToolOptionsForTerminal(terminalToolName: string | undefined, control?: StartRunInput["control"], onTerminalAccepted?: () => void): { customTools: CustomTool[] } {
   return {
-    customTools: sdkToolNamesForTerminal(terminalToolName).map((toolName) => createTerminalTool(toolName, control)),
+    customTools: sdkToolNamesForTerminal(terminalToolName).map((toolName) => createTerminalTool(toolName, control, onTerminalAccepted)),
   };
 }
 
@@ -490,14 +503,41 @@ function agentEndFailure(event: Extract<AgentSessionEvent, { type: "agent_end" }
     || (message.stopReason === "aborted" ? "Oh My Pi SDK run was aborted" : "Oh My Pi SDK run failed");
 }
 
+function agentEndOutcome(event: Extract<AgentSessionEvent, { type: "agent_end" }>, terminalActionAccepted: boolean): { status: "completed" } | { status: "failed"; error: string } {
+  if (terminalActionAccepted) return { status: "completed" };
+  const error = agentEndFailure(event);
+  return error ? { status: "failed", error } : { status: "completed" };
+}
+function terminalNodeToolFromSnapshot(input: { raw?: unknown }) {
+  const terminal = asRecord(asRecord(input.raw).terminalTool);
+  const name = terminal.name;
+  if (typeof name !== "string" || !isTerminalRuntimeTool(name)) return null;
+  return {
+    name,
+    input: asRecord(terminal.input),
+  };
+}
+
+
+function sdkReadOnlyToolOptions(toolPolicy: StartRunInput["toolPolicy"]) {
+  return toolPolicy === "read_only"
+    ? { toolNames: [] as string[], enableMCP: false, enableLsp: false }
+    : {};
+}
+
 export const __ompSdkProviderTestHooks = {
   sdkToolNamesForTerminal,
   sdkToolOptionsForTerminal,
+  sdkReadOnlyToolOptions,
   sdkToolErrorMessage,
+  isTerminalRuntimeTool,
   agentEndFailure,
+  agentEndOutcome,
   toolCallPreview,
   textContentPreview,
+  terminalNodeToolFromSnapshot,
   sdkLifecycleSummary,
+  loadSdkSettings,
 };
 
 function applySdkEnvironment(config: OmpProviderConfig, runId = "health"): SdkEnvironment {
@@ -543,6 +583,81 @@ export class OmpSdkProviderClient implements AgentProviderClient {
 
   constructor(opts: OmpSdkProviderOptions = {}) {
     this.config = opts.config ?? {};
+  }
+
+  getConfigurationCapabilities(): ProviderConfigurationCapabilities {
+    return {
+      model: { supported: true, taskOverride: true },
+      context: {
+        supported: true,
+        taskOverride: true,
+        strategies: ["provider_default", "auto_compact", "bounded_tool_results", "artifact_backed"],
+      },
+      tooling: {
+        mcp: { supported: true, enabled: true },
+        lsp: { supported: true, enabled: true },
+        subagents: { supported: true, enabled: true },
+        enabledTools: [],
+      },
+    };
+  }
+
+  async getRuntimeDiagnostics(): Promise<ProviderRuntimeDiagnostics> {
+    const environment = applySdkEnvironment(this.config, "diagnostics");
+    const cwd = nonEmpty(this.config.cwd) ?? process.cwd();
+    const configuredAgentDirectory = nonEmpty(this.config.codingAgentDirectory)
+      ?? nonEmpty(this.config.configDirectory);
+    const setup = await createSdkModelSetup(this.config, environment);
+    const settings = await loadSdkSettings(environment, cwd);
+    const terminalTools = sdkToolOptionsForTerminal("chrona_node_complete");
+    const { session, mcpManager } = await createAgentSession({
+      cwd,
+      agentDir: configuredAgentDirectory,
+      modelPattern: setup.modelPattern,
+      ...(setup.authStorage ? { authStorage: setup.authStorage } : {}),
+      ...(setup.modelRegistry ? { modelRegistry: setup.modelRegistry } : {}),
+      ...terminalTools,
+      settings,
+      sessionManager: SessionManager.inMemory(cwd),
+      skipPythonPreflight: true,
+      hasUI: false,
+    });
+    try {
+      const enabledTools = session.getActiveToolNames().sort();
+      const configurationCapabilities: ProviderConfigurationCapabilities = {
+        ...this.getConfigurationCapabilities(),
+        tooling: {
+          mcp: { supported: true, enabled: Boolean(mcpManager) },
+          lsp: { supported: true, enabled: enabledTools.includes("lsp") },
+          subagents: { supported: true, enabled: enabledTools.includes("task") },
+          enabledTools,
+        },
+      };
+      const configuredConfigDirectory = nonEmpty(this.config.configDirectory);
+      const effectiveAgentDirectory = session.settings.getAgentDir();
+      const effectiveModel = session.model;
+      return {
+        provider: PROVIDER,
+        model: effectiveModel ? `${effectiveModel.provider}/${effectiveModel.id}` : null,
+        contextWindow: effectiveModel?.contextWindow ?? null,
+        contextStrategy: "auto_compact",
+        workingDirectory: session.settings.getCwd(),
+        configDirectory: configuredConfigDirectory
+          ? resolve(configuredConfigDirectory)
+          : resolve(effectiveAgentDirectory, ".."),
+        agentDirectory: effectiveAgentDirectory,
+        configurationCapabilities,
+        sources: {
+          model: nonEmpty(this.config.model) ? "provider_override" : "provider_default",
+          context: "provider_default",
+          configDirectory: configuredConfigDirectory ? "provider_override" : "provider_default",
+          agentDirectory: configuredAgentDirectory ? "provider_override" : "provider_default",
+          tools: "runtime",
+        },
+      };
+    } finally {
+      await session.dispose();
+    }
   }
 
   getCapabilities(): ProviderCapabilities {
@@ -701,12 +816,14 @@ export class OmpSdkProviderClient implements AgentProviderClient {
     const cwd = nonEmpty(this.config.cwd) ?? process.cwd();
     const agentDir = nonEmpty(this.config.codingAgentDirectory) ?? nonEmpty(this.config.configDirectory);
     const setup = await createSdkModelSetup(this.config, environment);
+    const settings = await loadSdkSettings(environment, cwd);
     return createAgentSession({
       cwd,
       agentDir,
       modelPattern: setup.modelPattern,
       ...(setup.authStorage ? { authStorage: setup.authStorage } : {}),
       ...(setup.modelRegistry ? { modelRegistry: setup.modelRegistry } : {}),
+      settings,
       sessionManager,
       skipPythonPreflight: true,
       hasUI: false,
@@ -729,7 +846,7 @@ export class OmpSdkProviderClient implements AgentProviderClient {
   }
 
   async startRun(input: StartRunInput): Promise<ProviderRunRef> {
-    const sessionId = input.sessionId ?? input.sessionKey ?? `${SDK_RUN_PREFIX}-session-${randomUUID()}`;
+    const sessionId = input.sessionId;
     const runId = `${SDK_RUN_PREFIX}-${randomUUID()}`;
     const startedAt = now();
     const handle: SdkRunHandle = {
@@ -769,7 +886,7 @@ export class OmpSdkProviderClient implements AgentProviderClient {
     const handle = runId ? this.runs.get(runId) : undefined;
     if (!handle) throw new Error(`streamRun: unknown OMP SDK runId "${runId ?? ""}"`);
     const queue = new AsyncEventQueue(handle);
-    while (true) {
+    for (;;) {
       const item = await queue.next(input.signal);
       if (item.type === "end") return;
       yield item;
@@ -814,16 +931,32 @@ export class OmpSdkProviderClient implements AgentProviderClient {
     const agentDir = nonEmpty(this.config.codingAgentDirectory) ?? nonEmpty(this.config.configDirectory);
     const terminalToolName = nonEmpty(handle.input.terminalToolName);
     const prompt = inputToPrompt(handle.input);
-    const setup = await createSdkModelSetup(this.config, environment);
+    const runConfig: OmpProviderConfig = {
+      ...this.config,
+      ...(nonEmpty(handle.input.runtimeConfiguration?.model)
+        ? { model: nonEmpty(handle.input.runtimeConfiguration?.model) }
+        : {}),
+    };
+    const setup = await createSdkModelSetup(runConfig, environment);
+    const settings = await loadSdkSettings(environment, cwd);
+    const resumeSessionRef = nonEmpty(handle.input.resumeSessionRef);
+    const sessionManager = resumeSessionRef
+      ? await SessionManager.open(resumeSessionRef, undefined, undefined, {
+          initialCwd: cwd,
+          suppressBreadcrumb: true,
+        })
+      : SessionManager.create(cwd);
+    const readOnlyToolOptions = sdkReadOnlyToolOptions(handle.input.toolPolicy);
     const { session } = await createAgentSession({
       cwd,
       agentDir,
       modelPattern: setup.modelPattern,
       ...(setup.authStorage ? { authStorage: setup.authStorage } : {}),
       ...(setup.modelRegistry ? { modelRegistry: setup.modelRegistry } : {}),
-      deadline: this.config.timeoutMs ? Date.now() + this.config.timeoutMs : undefined,
-      ...sdkToolOptionsForTerminal(terminalToolName, handle.input.control),
-      sessionManager: SessionManager.create(cwd),
+      settings,
+      ...sdkToolOptionsForTerminal(terminalToolName, handle.input.control, () => { handle.terminalActionAccepted = true; }),
+      ...readOnlyToolOptions,
+      sessionManager,
       skipPythonPreflight: true,
       hasUI: false,
     });
@@ -895,6 +1028,12 @@ export class OmpSdkProviderClient implements AgentProviderClient {
         break;
       }
       case "tool_execution_start":
+        if (isTerminalRuntimeTool(event.toolName)) {
+          handle.terminalAction = {
+            name: event.toolName,
+            input: asRecord(event.args),
+          };
+        }
         queue.push({
           ...eventBase(handle, event.type),
           type: "tool_call",
@@ -950,15 +1089,15 @@ export class OmpSdkProviderClient implements AgentProviderClient {
       }
       case "agent_end": {
         if (handle.status !== "running") break;
-        const error = agentEndFailure(event);
-        if (error) {
-          handle.error = error;
+        const outcome = agentEndOutcome(event, handle.terminalActionAccepted === true);
+        if (outcome.status === "failed") {
+          handle.error = outcome.error;
           handle.status = "failed";
           queue.push({
             ...eventBase(handle, event.type),
             type: "run_failed",
             run: runRef(handle, "failed"),
-            error,
+            error: outcome.error,
             raw: event,
           });
           this.finish(handle, queue);
@@ -973,7 +1112,7 @@ export class OmpSdkProviderClient implements AgentProviderClient {
           output: { text: handle.outputText },
           structuredPayload: parseStructuredPayload(handle.outputText),
           usage: null,
-          raw: event,
+          raw: handle.terminalAction ? { ...asRecord(event), terminalTool: handle.terminalAction } : event,
         });
         this.finish(handle, queue);
         break;

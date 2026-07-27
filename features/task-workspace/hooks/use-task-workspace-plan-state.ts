@@ -8,6 +8,7 @@ import {
   dispatchTaskExecutionAction,
   fetchCurrentTaskExecution,
   fetchTaskPlanState,
+  retryTaskResultFinalization,
   submitTaskCheckpointAction,
   taskWorkspaceQueryKeys,
   type TaskPlanState,
@@ -35,7 +36,7 @@ const STARTING_NODE_NEXT_ACTION = "Starting execution...";
 export type WorkspaceRuntimeEvent = Extract<PlanExecutionSSEEvent, { type: "runtime_event" }>;
 type WorkspaceRuntimeTextEvent = WorkspaceRuntimeEvent & { event: Extract<WorkspaceRuntimeEvent["event"], { type: "assistant_text_delta" | "reasoning_delta" }> };
 type WorkspaceExecutionRuntimeSseEvent = TaskWorkspaceSseEvent & Omit<WorkspaceRuntimeEvent, "type"> & { type: "execution.runtime_event" };
-export type PlanGenerationRequest = { userInstruction?: string | null; selectedNodeId?: string | null };
+export type PlanGenerationRequest = { userInstruction?: string | null; selectedNodeId?: string | null; replaceActiveExecution?: boolean };
 
 function compactActivityText(value: string) {
   return value.replace(/\s+/g, " ").trim().slice(0, 96);
@@ -218,14 +219,30 @@ function checkpointActionKind(actionId: ExecutionCheckpoint["availableActions"][
 }
 
 function checkpointFormFields(checkpoint: ExecutionCheckpoint) {
-  return checkpoint.form?.inputFields.map((field) => ({
-    key: field.name,
-    label: field.label,
-    value: field.value ?? "",
-    control: field.type === "select" ? "select" as const : field.type === "text" ? "text" as const : "textarea" as const,
-    required: field.required,
-    options: field.options,
-  })) ?? [];
+  return checkpoint.form?.inputFields.map((field) => {
+    const legacy = !("kind" in field);
+    const control = legacy
+      ? field.type === "select" ? "select" as const : field.type === "text" ? "text" as const : "textarea" as const
+      : field.kind === "choice" ? "choice" as const : field.kind === "boolean" ? "boolean" as const : field.multiline ? "textarea" as const : "text" as const;
+    const value = "value" in field && field.value !== undefined
+      ? field.value
+      : !legacy && field.kind === "choice"
+        ? field.defaultValue ?? (field.selection === "multiple" ? [] : "")
+        : !legacy && field.kind === "boolean"
+          ? field.defaultValue ?? false
+          : !legacy && field.kind === "text"
+            ? field.defaultValue ?? ""
+            : "";
+    return {
+      key: field.name,
+      label: field.label,
+      value,
+      control,
+      required: "required" in field ? field.required : false,
+      options: legacy ? field.options : field.kind === "choice" ? field.options.map((option) => option.value) : undefined,
+      selection: !legacy && field.kind === "choice" ? field.selection : undefined,
+    };
+  }) ?? [];
 }
 
 function withCanonicalExecutionActions(graphPlan: TaskPlanGraphPlan | null, checkpoint: ExecutionCheckpoint | null) {
@@ -376,6 +393,8 @@ export function useTaskWorkspacePlanState(
   const lastWorkspaceEventSequenceRef = useRef(0);
   const [acceptResultError, setAcceptResultError] = useState<string | null>(null);
   const [isAcceptingResult, setIsAcceptingResult] = useState(false);
+  const [finalizationRetryError, setFinalizationRetryError] = useState<string | null>(null);
+  const [isRetryingFinalization, setIsRetryingFinalization] = useState(false);
 
   const planStateQuery = useQuery({
     queryKey: taskWorkspaceQueryKeys.planState(task.id, selectedWorkBlockId),
@@ -520,9 +539,10 @@ export function useTaskWorkspacePlanState(
       if (shouldRefreshExecutionSnapshot(event)) {
         void currentExecutionQuery.refetch();
         void planStateQuery.refetch();
+        void refreshWorkspace();
       }
     }
-  }, [currentExecutionQuery, planStateQuery, selectedWorkBlockId, workspaceEvents]);
+  }, [currentExecutionQuery, planStateQuery, refreshWorkspace, selectedWorkBlockId, workspaceEvents]);
 
   useEffect(() => {
     if (!plan) {
@@ -606,7 +626,7 @@ export function useTaskWorkspacePlanState(
     const userInstruction = request?.userInstruction?.trim() || null;
     const selectedNodeId = request?.selectedNodeId?.trim() || null;
     setGenerationUserInstruction(userInstruction);
-    void dispatchWorkspaceCommand(task.id, { type: "plan.generate", forceRefresh: true, workBlockId: selectedWorkBlockId, userInstruction, selectedNodeId });
+    void dispatchWorkspaceCommand(task.id, { type: "plan.generate", forceRefresh: true, workBlockId: selectedWorkBlockId, userInstruction, selectedNodeId, replaceActiveExecution: request?.replaceActiveExecution ?? false });
   }, [isGeneratingPlan, selectedWorkBlockId, task.id]);
 
   const handleStopPlanGeneration = useCallback(async () => {
@@ -617,16 +637,32 @@ export function useTaskWorkspacePlanState(
   const dispatchExecutionAction = useCallback(async (action: ExecutionActionInput) => {
     setRuntimeEvents([]);
     const result = await dispatchTaskExecutionAction(task.id, action, selectedWorkBlockId);
-    void refreshExecutionQueries();
+    await refreshExecutionQueries();
     return result;
   }, [refreshExecutionQueries, selectedWorkBlockId, task.id]);
 
   const submitCheckpointAction = useCallback(async (action: SubmitCheckpointActionInput) => {
     setRuntimeEvents([]);
     const result = await submitTaskCheckpointAction(task.id, action, selectedWorkBlockId);
-    void refreshExecutionQueries();
+    await refreshExecutionQueries();
     return result;
   }, [refreshExecutionQueries, selectedWorkBlockId, task.id]);
+
+  const handleRetryFinalization = useCallback(async () => {
+    setFinalizationRetryError(null);
+    setIsRetryingFinalization(true);
+    try {
+      await retryTaskResultFinalization(task.id);
+      await refreshExecutionQueries();
+    } catch (cause) {
+      setFinalizationRetryError(
+        cause instanceof Error ? cause.message : "Failed to finalize task result",
+      );
+      await currentExecutionQuery.refetch();
+    } finally {
+      setIsRetryingFinalization(false);
+    }
+  }, [currentExecutionQuery, refreshExecutionQueries, task.id]);
 
   const handleAcceptResult = useCallback(async () => {
     setAcceptResultError(null);
@@ -638,9 +674,10 @@ export function useTaskWorkspacePlanState(
         (current: TaskPageData | undefined) => current
           ? {
               ...current,
-              task: {
-                ...current.task,
-                status: "Done",
+              resultReview: {
+                status: "accepted",
+                runId: accepted.runId,
+                acceptedAt: accepted.acceptedAt,
               },
               latestRunSummary: current.latestRunSummary
                 ? { ...current.latestRunSummary, id: accepted.runId, status: "Completed" }
@@ -728,6 +765,9 @@ export function useTaskWorkspacePlanState(
     handleAcceptResult,
     isAcceptingResult,
     acceptResultError,
+    handleRetryFinalization,
+    isRetryingFinalization,
+    finalizationRetryError,
     handleGeneratePlanFromHeader,
     handleStopPlanGeneration,
     assistantBuildCurrentPlan,

@@ -257,6 +257,29 @@ function validateNodeSpecific(
           message: "Checkpoint node must specify required (true/false)",
         });
       }
+      if (node.interaction?.schemaSource === "static") {
+        const hasChoiceOptions = node.checkpointType === "choose" && (node.options?.length ?? 0) > 0;
+        const hasInputFields =
+          (node.checkpointType === "input" || node.checkpointType === "edit") &&
+          (node.inputFields?.length ?? 0) > 0;
+        const needsStructuredForm =
+          node.checkpointType === "choose" || node.checkpointType === "input" || node.checkpointType === "edit";
+        if (needsStructuredForm && !hasChoiceOptions && !hasInputFields) {
+          errors.push({
+            path: `nodes.${index}.interaction`,
+            message: "Static checkpoint must define its complete options or input fields",
+          });
+        }
+      }
+      if (
+        node.interaction?.schemaSource === "ai" &&
+        ((node.options?.length ?? 0) > 0 || (node.inputFields?.length ?? 0) > 0)
+      ) {
+        errors.push({
+          path: `nodes.${index}.interaction`,
+          message: "AI-defined checkpoint must not include static options or input fields",
+        });
+      }
       break;
     }
     case "condition": {

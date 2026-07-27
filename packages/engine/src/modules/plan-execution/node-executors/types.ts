@@ -1,10 +1,13 @@
 import type {
+  CheckpointInputFields,
   EffectivePlanNode,
   EffectivePlanGraph,
   NodeActionForm,
   NodeAttempt,
+  NodeDeliverableDeclaration,
   PlanOutputState,
   PlanPatch,
+  ResultContribution,
 } from "@chrona/contracts/ai";
 import type { ProviderRunEvent } from "@chrona/providers-foundation";
 
@@ -13,6 +16,35 @@ export type NodeExecutionPlanContext = {
   goal: string;
   assumptions: string[];
   summary?: string;
+  goalContext?: {
+    goal: {
+      title: string;
+      additionalContext?: string;
+      operationalBrief?: {
+        outcome: string;
+        currentFocus: string;
+        strategy: string;
+        constraints: string[];
+      };
+      capturedAt?: string;
+    };
+    acceptedResults: Array<{
+      ref: string;
+      taskTitle: string;
+      acceptedAt?: string | null;
+      summary: string;
+      artifactCount: number;
+    }>;
+    assets?: Array<{
+      ref: string;
+      label: string;
+      kind: string;
+      role: string;
+      version: number | null;
+      updatedAt: string;
+      content: string;
+    }>;
+  };
 };
 
 export type NodeExecutionRunContext = {
@@ -43,12 +75,23 @@ export type NodeExecutionResult =
       summary: string;
       evidence: NodeExecutionEvidence;
       output?: unknown;
-      inputFields?: Record<string, string>;
+      inputFields?: CheckpointInputFields;
       selectedBranch?: {
         label: string;
         nextNodeId: string;
         source: "user" | "ai" | "system" | "default";
       };
+      deliverables?: NodeDeliverableDeclaration[];
+      findings?: ResultContribution[];
+      decisions?: ResultContribution[];
+      caveats?: ResultContribution[];
+      nextActions?: ResultContribution[];
+      resultEvidence?: Array<{
+        key: string;
+        summary: string;
+        artifactRef?: `AF${string}`;
+        sourceNodeRef: string;
+      }>;
     }
   | {
       status: "waiting_for_user";
@@ -100,7 +143,7 @@ export interface NodeExecutorInput {
   trigger: "manual" | "scheduler" | "system" | "auto";
   runtimeName: string;
   userInput?: string;
-  inputFields?: Record<string, string>;
+  inputFields?: CheckpointInputFields;
   onRuntimeEvent?: (event: ProviderRunEvent) => Promise<void> | void;
   signal?: AbortSignal;
 }

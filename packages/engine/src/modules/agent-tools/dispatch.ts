@@ -20,6 +20,7 @@ export function toolCommandContext(operation: ChronaToolOperation, audit?: ToolA
       requestId: audit?.operationId ?? null,
       rawEventId: audit?.inputRawEventId ?? null,
     },
+    runId: audit?.runId ?? null,
     nodeAttemptId: audit?.nodeAttemptId ?? null,
     providerRunId: audit?.providerRunId ?? null,
     toolInvocationId: audit?.invocationId ?? null,
@@ -45,6 +46,16 @@ export async function executeValidatedTool(
         taskId: requireTaskId(input),
         workspaceId: requireWorkspaceId(input),
       });
+    case "chrona.goal.results.read": {
+      const body = payload as { query?: string; limit: number; cursor?: string };
+      return deps.goals.readAcceptedResults({
+        taskId: requireTaskId(input),
+        workspaceId: requireWorkspaceId(input),
+        query: body.query,
+        limit: body.limit,
+        cursor: body.cursor,
+      });
+    }
     case "chrona.plan.read":
       return readAiExecutionView(await deps.plan.getState({ taskId: requireTaskId(input) }));
     case "chrona.plan.generate":
@@ -109,10 +120,10 @@ export async function executeValidatedTool(
       }
       return { summaryText: body.summaryText ?? null, spec: validation.spec };
     }
-    case "chrona.plan.output":
     case "chrona.node.complete":
     case "chrona.node.condition_select":
     case "chrona.node.wait_complete":
+    case "chrona.node.request_input":
     case "chrona.node.block":
     case "chrona.node.fail": {
       const action = submitNodeResultActionFromTool({

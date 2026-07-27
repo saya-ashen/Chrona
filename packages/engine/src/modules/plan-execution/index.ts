@@ -14,6 +14,8 @@ export {
   createPlanRunFromCompiledPlan,
 } from "./persistence/plan-runtime-store";
 
+
+export { finalizeTaskResult } from "./results/finalize-task-result";
 export {
   TaskPlanExecution,
   taskPlanExecution,

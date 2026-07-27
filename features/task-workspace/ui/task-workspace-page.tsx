@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { StateStore } from "@json-render/react";
-import { useI18n } from "@chrona/i18n"
+import { useI18n } from "@chrona/i18n";
 import { useAssistantSurface } from "@features/assistant-surface";
+import { CreateGoalFromResultDialog } from "@features/goals";
 import { TaskWorkspacePlanSection } from "./task-workspace-plan-section";
 import { TaskWorkspaceEditSection } from "./task-workspace-edit-section";
 import { TaskWorkspaceHeaderCard } from "./task-workspace-header-card";
@@ -32,13 +33,24 @@ type TaskWorkspaceHeaderEditorProps = {
   store: StateStore;
   onAction: Parameters<typeof TaskWorkspaceHeaderCard>[0]["onAction"];
   onAcceptPlan: Parameters<typeof TaskWorkspaceHeaderCard>[0]["onAcceptPlan"];
-  onGeneratePlan: Parameters<typeof TaskWorkspaceHeaderCard>[0]["onGeneratePlan"];
-  onStopPlanGeneration: Parameters<typeof TaskWorkspaceHeaderCard>[0]["onStopPlanGeneration"];
+  onGeneratePlan: Parameters<
+    typeof TaskWorkspaceHeaderCard
+  >[0]["onGeneratePlan"];
+  onStopPlanGeneration: Parameters<
+    typeof TaskWorkspaceHeaderCard
+  >[0]["onStopPlanGeneration"];
+  onRestartPlan: Parameters<typeof TaskWorkspaceHeaderCard>[0]["onRestartPlan"];
   hideGeneratePlan?: boolean;
   hideAcceptPlan?: boolean;
-  onRecoveryRetry: Parameters<typeof TaskWorkspaceHeaderCard>[0]["onRecoveryRetry"];
-  onRecoveryEditInstruction: Parameters<typeof TaskWorkspaceHeaderCard>[0]["onRecoveryEditInstruction"];
-  onRecoveryCancel: Parameters<typeof TaskWorkspaceHeaderCard>[0]["onRecoveryCancel"];
+  onRecoveryRetry: Parameters<
+    typeof TaskWorkspaceHeaderCard
+  >[0]["onRecoveryRetry"];
+  onRecoveryEditInstruction: Parameters<
+    typeof TaskWorkspaceHeaderCard
+  >[0]["onRecoveryEditInstruction"];
+  onRecoveryCancel: Parameters<
+    typeof TaskWorkspaceHeaderCard
+  >[0]["onRecoveryCancel"];
   isEditExpanded: boolean;
   onToggleEditExpanded: () => void;
   showDeleteConfirm: boolean;
@@ -46,14 +58,19 @@ type TaskWorkspaceHeaderEditorProps = {
   onStartDeleteConfirm: () => void;
   onCancelDeleteConfirm: () => void;
   onDelete: () => void;
-  editSectionProps: Omit<Parameters<typeof TaskWorkspaceEditSection>[0], "isEditExpanded" | "onToggleExpanded">;
+  editSectionProps: Omit<
+    Parameters<typeof TaskWorkspaceEditSection>[0],
+    "isEditExpanded" | "onToggleExpanded"
+  >;
 };
 
 type HeaderPlanAcceptInput = {
   plan: ReturnType<typeof useTaskWorkspacePlanState>["plan"];
   canAcceptPlan: boolean;
   setAcceptPlanError: (value: string | null) => void;
-  acceptPlanById: ReturnType<typeof useTaskWorkspacePlanState>["acceptPlanById"];
+  acceptPlanById: ReturnType<
+    typeof useTaskWorkspacePlanState
+  >["acceptPlanById"];
 };
 
 const DEFAULT_COPY = {
@@ -93,6 +110,7 @@ function TaskWorkspaceHeaderEditor({
   onAcceptPlan,
   onGeneratePlan,
   onStopPlanGeneration,
+  onRestartPlan,
   hideGeneratePlan,
   hideAcceptPlan,
   onRecoveryRetry,
@@ -119,6 +137,7 @@ function TaskWorkspaceHeaderEditor({
         hideAcceptPlan={hideAcceptPlan}
         hideGeneratePlan={hideGeneratePlan}
         onStopPlanGeneration={onStopPlanGeneration}
+        onRestartPlan={onRestartPlan}
         onEdit={onToggleEditExpanded}
         showDeleteConfirm={showDeleteConfirm}
         isDeleting={isDeleting}
@@ -138,20 +157,31 @@ function TaskWorkspaceHeaderEditor({
   );
 }
 
-async function acceptHeaderPlan({ plan, canAcceptPlan, setAcceptPlanError, acceptPlanById }: HeaderPlanAcceptInput) {
+async function acceptHeaderPlan({
+  plan,
+  canAcceptPlan,
+  setAcceptPlanError,
+  acceptPlanById,
+}: HeaderPlanAcceptInput) {
   if (!plan?.id || !canAcceptPlan) return;
   setAcceptPlanError(null);
   await acceptPlanById(plan.id);
 }
-
-
 
 export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
   const copy = { ...DEFAULT_COPY, ...copyProp };
   const { messages } = useI18n();
   const executionConsoleCopy = messages.components.taskWorkspace;
   const { registerHandlers, setPageContext } = useAssistantSurface();
-  const { pageData, commandCenter, setTask, refreshWorkspace, workspaceEvents, headerSpec, headerStore } = useTaskWorkspacePageState(data);
+  const {
+    pageData,
+    commandCenter,
+    setTask,
+    refreshWorkspace,
+    workspaceEvents,
+    headerSpec,
+    headerStore,
+  } = useTaskWorkspacePageState(data);
   const task = pageData.task;
   const [isEditExpanded, setIsEditExpanded] = useState(false);
   const toggleEditExpanded = useCallback(() => {
@@ -191,15 +221,41 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
     handleAcceptResult,
     isAcceptingResult,
     acceptResultError,
+    handleRetryFinalization,
+    isRetryingFinalization,
+    finalizationRetryError,
     handleGeneratePlanFromHeader,
     handleStopPlanGeneration,
   } = useTaskWorkspacePlanState(task, refreshWorkspace, workspaceEvents);
-  const isTaskRunning = task.status === "Running" || currentExecution?.status === "running" || currentExecution?.status === "started";
+  const goalPromotionAction =
+    pageData.resultReview?.status === "accepted" &&
+    !task.goalId &&
+    pageData.artifacts.length > 0 ? (
+      <CreateGoalFromResultDialog
+        taskId={task.id}
+        workspaceId={task.workspaceId}
+        acceptedRunId={pageData.resultReview.runId}
+        taskTitle={task.title}
+        taskDescription={task.description}
+        artifacts={pageData.artifacts}
+        copy={messages.pages.goals}
+      />
+    ) : null;
+  const isTaskRunning =
+    task.status === "Running" ||
+    currentExecution?.status === "running" ||
+    currentExecution?.status === "started";
   const consoleView = useMemo(
-    () => createTaskWorkspaceExecutionConsoleView({ pageData, graphPlan, copy: executionConsoleCopy }),
+    () =>
+      createTaskWorkspaceExecutionConsoleView({
+        pageData,
+        graphPlan,
+        copy: executionConsoleCopy,
+      }),
     [pageData, graphPlan, executionConsoleCopy],
   );
-  const assistantActivitySummary = latestActivitySummary ?? getLatestPersistedActivitySummary(pageData);
+  const assistantActivitySummary =
+    latestActivitySummary ?? getLatestPersistedActivitySummary(pageData);
   const {
     currentProposal,
     isApplying,
@@ -219,20 +275,24 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
       taskId: task.id,
       setSaveError,
     });
-  const assistantContext = useMemo(() => createTaskAiSidebarContext(task, {
-    latestActivitySummary: assistantActivitySummary,
-  }), [
-    assistantActivitySummary,
-    task.blockReason?.actionRequired,
-    task.blockReason?.blockType,
-    task.executionSummary?.waiting,
-    task.graphNodeStates,
-    task.id,
-    task.isRunnable,
-    task.savedPlan?.id,
-    task.status,
-    task.title,
-  ]);
+  const assistantContext = useMemo(
+    () =>
+      createTaskAiSidebarContext(task, {
+        latestActivitySummary: assistantActivitySummary,
+      }),
+    [
+      assistantActivitySummary,
+      task.blockReason?.actionRequired,
+      task.blockReason?.blockType,
+      task.executionSummary?.waiting,
+      task.graphNodeStates,
+      task.id,
+      task.isRunnable,
+      task.savedPlan?.id,
+      task.status,
+      task.title,
+    ],
+  );
 
   useEffect(() => {
     const { context, actions } = assistantContext;
@@ -247,29 +307,54 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
       },
       onDismissProposal: handleCancelProposal,
     });
-  }, [assistantContext, handleApplyProposal, handleCancelProposal, registerHandlers, setPageContext]);
+  }, [
+    assistantContext,
+    handleApplyProposal,
+    handleCancelProposal,
+    registerHandlers,
+    setPageContext,
+  ]);
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-2 xl:overflow-hidden">
-      <div className="shrink-0 space-y-1">
+      <div className="shrink-0">
         <TaskWorkspaceHeaderEditor
           task={consoleView.task}
           spec={headerSpec}
           store={headerStore}
-          onAcceptPlan={() => acceptHeaderPlan({ plan, canAcceptPlan, setAcceptPlanError, acceptPlanById })}
+          onAcceptPlan={() =>
+            acceptHeaderPlan({
+              plan,
+              canAcceptPlan,
+              setAcceptPlanError,
+              acceptPlanById,
+            })
+          }
           onGeneratePlan={handleGeneratePlanFromHeader}
           onStopPlanGeneration={handleStopPlanGeneration}
           hideGeneratePlan={planGenerationStatus === "idle" && !plan}
           hideAcceptPlan={false}
+          onRestartPlan={async () => {
+            await dispatchExecutionAction({
+              action: "restart_from_beginning",
+              prompt: "Restarted from task workspace",
+            });
+          }}
           onAction={async (action) => {
             if (action.id === "start") {
               await dispatchExecutionAction({ action: "start_manual" });
             }
             if (action.id === "pause") {
-              await dispatchExecutionAction({ action: "pause_session", reason: "Paused from task workspace" });
+              await dispatchExecutionAction({
+                action: "pause_session",
+                reason: "Paused from task workspace",
+              });
             }
             if (action.id === "stop") {
-              await dispatchExecutionAction({ action: "cancel_session", reason: "Stopped from task workspace" });
+              await dispatchExecutionAction({
+                action: "cancel_session",
+                reason: "Stopped from task workspace",
+              });
             }
           }}
           onRecoveryRetry={() => {
@@ -280,7 +365,10 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
             headerStore.set("/plan/generation/error/code", null);
             headerStore.set("/plan/generation/error/message", null);
             headerStore.set("/plan/generation/error/buttonRetry", false);
-            headerStore.set("/plan/generation/error/buttonEditInstruction", false);
+            headerStore.set(
+              "/plan/generation/error/buttonEditInstruction",
+              false,
+            );
             headerStore.set("/plan/generation/error/buttonCancel", false);
             void handleGeneratePlanFromHeader();
           }}
@@ -288,7 +376,10 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
             headerStore.set("/plan/generation/error/code", null);
             headerStore.set("/plan/generation/error/message", null);
             headerStore.set("/plan/generation/error/buttonRetry", false);
-            headerStore.set("/plan/generation/error/buttonEditInstruction", false);
+            headerStore.set(
+              "/plan/generation/error/buttonEditInstruction",
+              false,
+            );
             headerStore.set("/plan/generation/error/buttonCancel", false);
             setAcceptPlanError(null);
             setSaveError(null);
@@ -298,7 +389,10 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
             headerStore.set("/plan/generation/error/code", null);
             headerStore.set("/plan/generation/error/message", null);
             headerStore.set("/plan/generation/error/buttonRetry", false);
-            headerStore.set("/plan/generation/error/buttonEditInstruction", false);
+            headerStore.set(
+              "/plan/generation/error/buttonEditInstruction",
+              false,
+            );
             headerStore.set("/plan/generation/error/buttonCancel", false);
           }}
           isEditExpanded={isEditExpanded}
@@ -315,7 +409,9 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
             taskConfigInitialValues,
             availableAiClients: data.availableAiClients,
             disableAiClientSelection: isTaskRunning,
-            aiClientSelectionDisabledHint: isTaskRunning ? "AI provider cannot be changed while task is running." : undefined,
+            aiClientSelectionDisabledHint: isTaskRunning
+              ? "AI provider cannot be changed while task is running."
+              : undefined,
             sourceManaged: consoleView.task.sourceManaged,
             saveSuccess,
             saveError,
@@ -361,6 +457,10 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
         onAcceptResult={handleAcceptResult}
         isAcceptingResult={isAcceptingResult}
         acceptResultError={acceptResultError}
+        onRetryFinalization={handleRetryFinalization}
+        isRetryingFinalization={isRetryingFinalization}
+        finalizationRetryError={finalizationRetryError}
+        createGoalAction={goalPromotionAction}
       />
     </div>
   );

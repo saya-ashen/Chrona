@@ -75,6 +75,37 @@ Task execution now lives inside the task workspace. Runtime commands use `/api/w
 
 The schedule page shows task/time-block projections, conflicts, suggestions, and scheduling operations. Schedule proposals can be accepted/rejected and due work can become executable WorkBlocks.
 
+### Long-horizon Goal Control Plane and Workbench
+
+Chrona ships the Goal aggregate and lifecycle-aware Goal surfaces. A `Goal`
+contains bounded Tasks, validated user-confirmed success criteria, explicit
+lifecycle actions, immutable accepted-result summaries, a versioned Operational
+Brief, automatic accepted-result context for new Goal Tasks, and durable typed
+`GoalAsset` identities. `Draft | Active | Paused` render as an Ongoing
+Workspace: the Goal Control Plane derives Needs You, In Progress, New Results,
+Up Next, current focus, criteria, and one primary action; the Goal Workbench
+provides an Office-style library, reviewable Result Inbox, explicit asset
+versions and drafts, typed Document/Form/Page/File workspaces,
+recover-as-new-version, archive/restore, exports, and version-bound AI
+modification Tasks. `Achieved | Stopped` render as an Outcome Archive with
+final result, evidence, confirmation actor/note/time,
+and history prioritized above execution detail.
+
+Goal list and detail routes are `/goals` and `/goals/:goalId`. A Goal-scoped
+Task inspector is `/goals/:goalId/workbench/tasks/:taskId`; it verifies
+Goal/Task ownership and reuses the canonical Task Workspace. The Task retains
+its independent `/tasks/:taskId` identity. Goal never owns a provider session,
+Plan, Run, or execution state.
+
+Activation and calendar placement are separate. Closed-union `TaskTrigger`
+definitions (`schedule` and bounded internal `event`) produce idempotent
+`TriggerDelivery` facts and isolated `TaskOccurrence` instances. Execution
+authority propagates `occurrenceId` through TaskPlan, TaskPlanRun, Run,
+ExecutionSession, and Artifact. A `WorkBlock` remains optional calendar
+placement; it is not execution identity. Webhook ingress is intentionally not
+shipped. Lifecycle invariants and security boundaries remain authoritative in
+[Long-Horizon Goals and Triggers](./long-horizon-goals-and-triggers.md).
+
 ### Action Center projection
 
 Action Center aggregates current, actionable attention items: approvals,
@@ -169,7 +200,16 @@ Provider packages adapt external protocols. They may know provider sessions, res
 
 ## Data and projection model
 
-Chrona stores canonical task, plan, run, session, work block, AI client, and event data in SQLite. UI pages read from query-optimized projections such as TaskProjection and page-specific read models. Execution and plan generation produce event streams that are both visible to users and usable for rebuilding state.
+Chrona stores canonical goal, task, plan, run, session, work block, AI client,
+and event data in SQLite. UI pages read from query-optimized projections and
+page-specific read models. Goal projection keeps lifecycle, activity, and
+attention separate; task execution and plan generation produce event streams
+that are visible to users and usable for rebuilding state.
+
+The remaining accepted target adds trigger definition/delivery and neutral
+task-occurrence aggregates. Until those migration phases ship, current
+WorkBlock/manual-task execution remains authoritative. See
+[Long-Horizon Goals and Triggers](./long-horizon-goals-and-triggers.md).
 
 ## Development entrypoints
 

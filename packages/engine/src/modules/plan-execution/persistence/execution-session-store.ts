@@ -9,6 +9,9 @@ export async function ensureExecutionSession(input: {
   workBlockId?: string | null;
   sessionId?: string;
 }) {
+  const occurrence = input.workBlockId
+    ? await db.taskOccurrence.findUnique({ where: { workBlockId: input.workBlockId }, select: { id: true } })
+    : null;
   const explicitSession = input.sessionId
     ? await db.executionSession.findFirst({
         where: { id: input.sessionId, taskId: input.taskId },
@@ -35,6 +38,7 @@ export async function ensureExecutionSession(input: {
       data: {
         planId: input.planId,
         workBlockId: input.workBlockId ?? existing.workBlockId,
+        occurrenceId: occurrence?.id ?? existing.occurrenceId,
       },
     });
   }
@@ -45,6 +49,7 @@ export async function ensureExecutionSession(input: {
       taskId: input.taskId,
       planId: input.planId,
       workBlockId: input.workBlockId ?? null,
+      occurrenceId: occurrence?.id ?? null,
       status: "Active",
       currentNodeId: null,
       pauseReason: null,
@@ -91,6 +96,7 @@ export async function getActiveExecutionWorkBlockId(taskId: string): Promise<str
 export type ActiveExecutionSessionScope = {
   executionSessionId: string;
   workBlockId: string | null;
+  occurrenceId: string | null;
   planId: string | null;
 };
 
@@ -110,11 +116,12 @@ export async function getActiveExecutionSessionScope(
       status: { in: ["Active", "Paused"] },
     },
     orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
-    select: { id: true, workBlockId: true, planId: true },
+    select: { id: true, occurrenceId: true, workBlockId: true, planId: true },
   });
   if (!session) return null;
   return {
     executionSessionId: session.id,
+    occurrenceId: session.occurrenceId,
     workBlockId: session.workBlockId,
     planId: session.planId,
   };

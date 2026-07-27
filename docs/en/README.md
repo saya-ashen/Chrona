@@ -26,6 +26,7 @@ Chrona is a local-first AI schedule app. It helps you turn tasks into editable p
 | Understand persistence | [Data Model](./data-model.md) |
 | Place code in the right package | [Package Boundaries](./package-boundaries.md) |
 | Extend AI/runtime providers | [Provider Boundary](./provider-boundary.md) |
+| Understand the accepted Goal, trigger, and occurrence target design | [Long-Horizon Goals and Triggers](./long-horizon-goals-and-triggers.md) |
 
 ## Main user workflows
 

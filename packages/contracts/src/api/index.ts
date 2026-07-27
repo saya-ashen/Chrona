@@ -5,3 +5,6 @@ export * from "./execution.schema";
 export * from "./mcp-task-tools.schema";
 export * from "./ai.schema";
 export * from "./projections.schema";
+export * from "./goals.schema";
+export * from "./goal-workbench.schema";
+export * from "./task-triggers.schema";

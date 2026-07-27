@@ -32,7 +32,6 @@ export type ChronaDebugProviderConfig = {
 };
 
 const PLAN_TOOL = "chrona_plan_generate";
-const PLAN_OUTPUT_TOOL = "chrona_plan_output";
 const NODE_COMPLETE_TOOL = "chrona_node_complete";
 const CONDITION_SELECT_TOOL = "chrona_condition_select";
 const DEFAULT_DEBUG_PROVIDER_PROFILE: DebugProviderProfile = "deterministic";
@@ -378,7 +377,7 @@ export class ChronaDebugProviderClient implements AgentProviderClient {
       return {
         ...replayRun,
         provider: this.provider,
-        sessionId: replayRun.sessionId ?? input.sessionId ?? run.sessionId,
+        sessionId: replayRun.sessionId,
       };
     }
     const run = createRun({
@@ -417,6 +416,10 @@ export class ChronaDebugProviderClient implements AgentProviderClient {
     const nodeRef = currentNodeRef(streamInput);
     const branchRef = preferredBranchRef(streamInput);
     const signal = "signal" in input ? input.signal : undefined;
+    const isGoalReview = "structuredOutputSchema" in streamInput && streamInput.structuredOutputSchema?.name === "goal_review_result";
+    const isGoalAssetOwnership = "structuredOutputSchema" in streamInput && streamInput.structuredOutputSchema?.name === "goal_asset_ownership_result";
+    const isSuggestion = "structuredOutputSchema" in streamInput && streamInput.structuredOutputSchema?.name === "suggest_task_completions";
+    const isResultFinalization = "structuredOutputSchema" in streamInput && streamInput.structuredOutputSchema?.name === "chrona_finalized_result_spec";
     let sequence = 0;
 
     yield {
@@ -455,6 +458,25 @@ export class ChronaDebugProviderClient implements AgentProviderClient {
         callId: "chrona-debug-plan-call",
         result: { ok: true, message: "Debug plan emitted." },
       };
+    } else if (isSuggestion) {
+      yield {
+        ...eventBase(this.provider, run, sequence++),
+        type: "tool_call",
+        tool: "suggest_task_completions",
+        callId: "chrona-debug-suggest-call",
+        input: {
+          suggestions: [
+            {
+              title: "Review suggested task",
+              description: "A deterministic provider-backed suggestion.",
+              priority: "Medium",
+              estimatedMinutes: 30,
+              tags: ["suggested"],
+            },
+          ],
+        },
+        status: "completed",
+      };
     } else if (nodeType === "condition") {
       const title = nodeTitle;
       const nodeId = nodeRef;
@@ -487,7 +509,6 @@ export class ChronaDebugProviderClient implements AgentProviderClient {
       };
     } else {
       const title = currentNodeTitle(streamInput);
-      const outputCallId = `chrona-debug-output-${sequence}`;
       const completeCallId = `chrona-debug-complete-${sequence}`;
       yield {
         ...eventBase(this.provider, run, sequence++),
@@ -504,41 +525,14 @@ export class ChronaDebugProviderClient implements AgentProviderClient {
       yield {
         ...eventBase(this.provider, run, sequence++),
         type: "tool_call",
-        tool: PLAN_OUTPUT_TOOL,
-        callId: outputCallId,
-        input: {
-          summary: `Debug provider produced output for ${title}.`,
-          patches: [
-            { op: "add", path: "/root", value: "root" },
-            {
-              op: "add",
-              path: "/elements/root",
-              value: {
-                type: "JsonView",
-                props: { value: { provider: this.provider, nodeTitle: title } },
-                children: [],
-              },
-            },
-          ],
-        },
-        status: "completed",
-      };
-      await pause(signal);
-      yield {
-        ...eventBase(this.provider, run, sequence++),
-        type: "tool_result",
-        tool: PLAN_OUTPUT_TOOL,
-        callId: outputCallId,
-        result: { ok: true, message: `Debug provider submitted output for ${title}.` },
-      };
-      await pause(signal);
-      yield {
-        ...eventBase(this.provider, run, sequence++),
-        type: "tool_call",
         tool: NODE_COMPLETE_TOOL,
         callId: completeCallId,
         input: {
           summary: `Debug provider completed ${title}.`,
+          findings: [{
+            key: "debug-execution",
+            content: `Debug provider ${this.provider} completed ${title}.`,
+          }],
         },
         status: "completed",
       };
@@ -577,19 +571,58 @@ export class ChronaDebugProviderClient implements AgentProviderClient {
       run: providerRunRef(this.provider, run, "completed"),
       outputText: isPlanGeneration(streamInput)
         ? "Debug plan generation completed."
-        : this.profile === "hermes-like"
-          ? `Hermes-like debug runtime run completed for ${nodeTitle}.`
-          : `Debug runtime run completed for ${nodeTitle}.`,
+        : isGoalReview
+          ? "Debug Goal review completed."
+          : isGoalAssetOwnership
+            ? "Debug Goal asset ownership review completed."
+            : isResultFinalization
+              ? "Debug task result finalization completed."
+              : this.profile === "hermes-like"
+                ? `Hermes-like debug runtime run completed for ${nodeTitle}.`
+                : `Debug runtime run completed for ${nodeTitle}.`,
       output: isPlanGeneration(streamInput)
         ? undefined
-        : {
-            text: this.profile === "hermes-like"
-              ? `Hermes-like debug runtime run completed for ${nodeTitle}.`
-              : `Debug runtime run completed for ${nodeTitle}.`,
-          },
-      structuredPayload: nodeType === "condition"
-        ? { terminalToolName: CONDITION_SELECT_TOOL, nodeId: nodeRef, branchRef, summary: `Debug provider selected fast path for ${nodeTitle}.` }
-        : undefined,
+        : { text: isGoalReview ? "Debug Goal review completed." : isGoalAssetOwnership ? "Debug Goal asset ownership review completed." : isResultFinalization ? "Debug task result finalization completed." : this.profile === "hermes-like" ? `Hermes-like debug runtime run completed for ${nodeTitle}.` : `Debug runtime run completed for ${nodeTitle}.` },
+      structuredPayload: isGoalReview
+        ? {
+            schemaVersion: 1,
+            summary: "Review the current Goal focus and schedule another check-in.",
+            items: [
+              {
+                itemId: "debug-current-focus",
+                kind: "brief_field",
+                field: "currentFocus",
+                value: "Review the next bounded outcome",
+                rationale: "The frozen snapshot supports a focused next step.",
+                evidenceRefs: [],
+                warnings: [],
+              },
+            ],
+          }
+        : isGoalAssetOwnership
+          ? {
+              schemaVersion: 1,
+              decision: "create_asset",
+              targetAssetId: null,
+              proposedLabel: "Reviewed accepted result",
+              rationale: "The frozen candidate has no safe matching asset in the bounded set.",
+              differenceSummary: "Create a separate asset from the accepted result.",
+              certainty: "medium",
+              evidence: ["The candidate contains accepted result content."],
+              counterEvidence: ["The debug provider has no semantic domain context."],
+            }
+        : isResultFinalization
+          ? {
+              root: "result",
+              elements: {
+                result: { type: "Stack", props: { gap: "md" }, children: ["summary", "details"] },
+                summary: { type: "ResultSummary", props: { title: "Task result", summary: "The deterministic debug task completed." } },
+                details: { type: "RichMarkdown", props: { title: "Details", content: "- Outcome recorded\n- Result ready for review" } },
+              },
+            }
+          : nodeType === "condition"
+            ? { terminalToolName: CONDITION_SELECT_TOOL, nodeId: nodeRef, branchRef, summary: `Debug provider selected fast path for ${nodeTitle}.` }
+            : undefined,
       usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
       raw: { debugProvider: true, profile: this.profile },
     };

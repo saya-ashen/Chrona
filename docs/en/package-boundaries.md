@@ -14,6 +14,7 @@ This document explains where code belongs in Chrona's monorepo.
 | `packages/domain` | Pure domain rules with no IO, HTTP, Prisma, provider, or React dependency |
 | `packages/db` | Prisma client/bootstrap/repositories and SQLite access |
 | `packages/engine` | Application use cases: tasks, plans, execution, scheduling, projections, AI clients |
+| `features/goals` | Goal list/workspace UI, Goal browser actions, and browser-safe Goal read models |
 | `packages/graph-runtime` | Graph construction, resolution, transitions, and execution-command primitives |
 | `packages/providers/*` | External AI/runtime protocol adapters |
 | `packages/integrations` | External calendar parsing/normalization and user-approved local/remote integration helpers |

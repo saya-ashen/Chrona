@@ -1,5 +1,5 @@
 import { buildAccessKeyHeaders, handleUnauthorizedResponse } from "@shared/http";
-import type { CheckpointActionKind, SubmitCheckpointActionInput } from "@chrona/contracts"
+import type { CheckpointActionKind, CheckpointInputFields, SubmitCheckpointActionInput } from "@chrona/contracts";
 import type { PlanNodeAction, PlanNodeDataModel, PlanNodeField } from "./plan-node-view-model";
 import type { WorkspaceActivityPage, WorkspaceStateTreatment } from "./task-workspace-types";
 
@@ -208,9 +208,9 @@ export function buildWorkspaceStateTreatment(input: WorkspacePresentationInput):
   };
 }
 
-export function buildDefaultWorkspaceActionFields(fields: PlanNodeField[]) {
+export function buildDefaultWorkspaceActionFields(fields: PlanNodeField[]): CheckpointInputFields {
   return Object.fromEntries(
-    fields.map((field) => [field.key, field.value || ""]),
+    fields.map((field) => [field.key, field.value]),
   );
 }
 
@@ -223,13 +223,17 @@ export function pickDefaultWorkspaceAction(node: PlanNodeDataModel) {
   );
 }
 
-export function getMissingWorkspaceActionFields(fields: PlanNodeField[], values: Record<string, string>) {
-  return fields.filter((field) => field.required && !values[field.key]?.trim());
+export function getMissingWorkspaceActionFields(fields: PlanNodeField[], values: CheckpointInputFields) {
+  return fields.filter((field) => {
+    if (!field.required) return false;
+    const value = values[field.key];
+    return Array.isArray(value) ? value.length === 0 : typeof value === "boolean" ? value !== true : !value?.trim();
+  });
 }
 
 export function getWorkspaceActionDisabledReason(input: {
   fields: PlanNodeField[];
-  values: Record<string, string>;
+  values: CheckpointInputFields;
   isDispatching: boolean;
   baseReason?: string;
   copy?: Partial<WorkspaceActionDisabledReasonCopy>;
@@ -252,7 +256,7 @@ export function buildWorkspaceCheckpointActionInput(input: {
   node: PlanNodeDataModel;
   selectedAction: PlanNodeAction | null;
   fields: PlanNodeField[];
-  values: Record<string, string>;
+  values: CheckpointInputFields;
 }): SubmitCheckpointActionInput {
   const checkpointId = input.selectedAction?.checkpointId ?? input.node.checkpoint?.id;
   const checkpointAction = input.selectedAction?.checkpointAction ?? actionKindForNode(input.node, input.selectedAction);
@@ -308,7 +312,7 @@ export function actionKindForNode(node: PlanNodeDataModel, selectedAction: PlanN
 
 function buildCheckpointActionPayload(input: {
   action: CheckpointActionKind;
-  inputFields: Record<string, string>;
+  inputFields: CheckpointInputFields;
   inputText: string;
   fallbackText?: string;
 }) {
@@ -349,19 +353,21 @@ function buildCheckpointActionPayload(input: {
   return message ? { message } : undefined;
 }
 
-function buildWorkspaceInputFields(fields: PlanNodeField[], values: Record<string, string>) {
+function buildWorkspaceInputFields(fields: PlanNodeField[], values: CheckpointInputFields): CheckpointInputFields {
   return Object.fromEntries(
     fields
-      .map((field) => [field.key, values[field.key].trim()] as const)
-      .filter(([, value]) => Boolean(value)),
+      .map((field) => [field.key, values[field.key]] as const)
+      .filter(([, value]) => Array.isArray(value) ? value.length > 0 : typeof value === "boolean" ? true : Boolean(value?.trim())),
   );
 }
 
-function buildWorkspaceInputText(fields: PlanNodeField[], values: Record<string, string>) {
+function buildWorkspaceInputText(fields: PlanNodeField[], values: CheckpointInputFields) {
   return fields
     .map((field) => {
-      const value = values[field.key].trim();
-      return value ? `${field.label}: ${value}` : null;
+      const raw = values[field.key];
+      if (raw === undefined || (typeof raw === "string" && !raw.trim()) || (Array.isArray(raw) && raw.length === 0)) return null;
+      const value = Array.isArray(raw) ? raw.join(", ") : String(raw);
+      return `${field.label}: ${value}`;
     })
     .filter((value): value is string => Boolean(value))
     .join("\n");

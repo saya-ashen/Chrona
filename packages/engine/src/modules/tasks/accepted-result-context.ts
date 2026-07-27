@@ -1,6 +1,4 @@
 import { db } from "@/lib/db";
-import { getCurrentExecution } from "@/modules/plan-execution/use-cases/get-current-execution";
-import { hydrateFilePreviewSpec } from "./file-preview";
 import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
 
 const RESULT_CONTEXT_LIMIT = 12_000;
@@ -12,6 +10,7 @@ export type AcceptedResultContext = {
     id: string;
     workspaceId: string;
     title: string;
+    goalId: string | null;
     priority: "Low" | "Medium" | "High" | "Urgent";
     executionRuntime: string;
     executionConfig: Record<string, unknown>;
@@ -24,6 +23,7 @@ export type AcceptedResultContext = {
     providerSessionRef: string | null;
   };
   summary: string;
+  spec: unknown | null;
   artifacts: Array<{
     id: string;
     title: string;
@@ -86,6 +86,24 @@ function tableText(props: Record<string, unknown>) {
   return [labels.join(" | "), ...body].filter(Boolean).join("\n");
 }
 
+function actionPlanText(props: Record<string, unknown>) {
+  const phases = Array.isArray(props.phases) ? props.phases : [];
+  return phases
+    .map((value) => {
+      const phase = recordValue(value);
+      if (!phase) return "";
+      const actions = Array.isArray(phase.actions)
+        ? phase.actions.map(textValue).filter(Boolean)
+        : [];
+      return [phase.title, phase.timeframe, ...actions]
+        .map(textValue)
+        .filter(Boolean)
+        .join("\n");
+    })
+    .filter(Boolean)
+    .join("\n");
+}
+
 export function extractAcceptedResultText(spec: unknown) {
   const document = recordValue(spec);
   const elements = recordValue(document?.elements);
@@ -108,6 +126,63 @@ export function extractAcceptedResultText(spec: unknown) {
           props.summary,
           props.description,
           props.outcome,
+        ]
+          .map(textValue)
+          .filter(Boolean)
+          .join("\n");
+        break;
+      case "ResultHero":
+        text = [
+          props.title,
+          props.summary,
+          props.readinessSummary,
+          ...(Array.isArray(props.metrics)
+            ? props.metrics.map((value) => {
+                const metric = recordValue(value);
+                return metric
+                  ? [metric.label, metric.value].map(textValue).filter(Boolean).join(": ")
+                  : "";
+              })
+            : []),
+        ]
+          .map(textValue)
+          .filter(Boolean)
+          .join("\n");
+        break;
+      case "ResultDeliverable":
+        text = [
+          props.title,
+          props.summary,
+          props.formatLabel,
+          props.displayPath ?? props.path,
+          props.contentPreview,
+        ]
+          .map(textValue)
+          .filter(Boolean)
+          .join("\n");
+        break;
+      case "ResultInsight":
+        text = [
+          props.title,
+          props.summary,
+          ...(Array.isArray(props.points) ? props.points : []),
+        ]
+          .map(textValue)
+          .filter(Boolean)
+          .join("\n");
+        break;
+      case "ResultActionPlan":
+        text = [props.title, props.summary, actionPlanText(props)]
+          .map(textValue)
+          .filter(Boolean)
+          .join("\n");
+        break;
+      case "ResultCaveats":
+      case "ResultEvidence":
+        text = [
+          props.title,
+          props.summary,
+          ...(Array.isArray(props.items) ? props.items : []),
         ]
           .map(textValue)
           .filter(Boolean)
@@ -183,7 +258,7 @@ export async function getAcceptedResultContext(
       id: true,
       workspaceId: true,
       title: true,
-      status: true,
+      goalId: true,
       priority: true,
       executionRuntime: true,
       executionConfig: true,
@@ -192,12 +267,6 @@ export async function getAcceptedResultContext(
   });
   if (!task) {
     throw new EngineError(ENGINE_ERROR_CODES.TASK_NOT_FOUND, "Task not found");
-  }
-  if (task.status !== "Done") {
-    throw new EngineError(
-      ENGINE_ERROR_CODES.INVALID_TASK_STATE,
-      "Accept the completed task result before continuing from it",
-    );
   }
 
   const acceptance = await db.event.findFirst({
@@ -221,6 +290,12 @@ export async function getAcceptedResultContext(
       taskSessionId: true,
       runtimeSessionRef: true,
       taskSession: { select: { providerSessionRef: true } },
+      events: {
+        where: { planId: { not: null } },
+        orderBy: { ingestSequence: "desc" },
+        take: 1,
+        select: { planId: true },
+      },
       artifacts: {
         orderBy: { createdAt: "asc" },
         select: { id: true, title: true, type: true, uri: true },
@@ -233,17 +308,27 @@ export async function getAcceptedResultContext(
       "Accepted run is unavailable",
     );
   }
-  const execution = await getCurrentExecution({ taskId });
-  const hydratedSpec = execution.planOutput?.spec
-    ? await hydrateFilePreviewSpec(execution.planOutput.spec, { taskId })
+
+  const acceptedPlanId = run.events[0]?.planId ?? null;
+  const acceptedPlanRun = acceptedPlanId
+    ? await db.taskPlanRun.findFirst({
+        where: { taskId, planId: acceptedPlanId },
+        orderBy: { updatedAt: "desc" },
+        select: { planRun: true },
+      })
     : null;
-  const spec = hydratedSpec ?? execution.planOutput?.spec ?? execution.planOutput;
+  const persisted = recordValue(acceptedPlanRun?.planRun);
+  const mutableGraph = recordValue(persisted?.mutableGraph);
+  const planOutput = recordValue(mutableGraph?.planOutput);
+  const finalizedResult = recordValue(planOutput?.finalizedResult);
+  const spec = finalizedResult?.spec ?? null;
 
   return {
     task: {
       id: task.id,
       workspaceId: task.workspaceId,
       title: task.title,
+      goalId: task.goalId,
       priority: task.priority,
       executionRuntime: task.executionRuntime,
       executionConfig: task.executionConfig as Record<string, unknown>,
@@ -257,6 +342,7 @@ export async function getAcceptedResultContext(
         run.taskSession?.providerSessionRef ?? run.runtimeSessionRef ?? null,
     },
     summary: extractAcceptedResultText(spec),
+    spec,
     artifacts: run.artifacts.map((artifact) => ({
       id: artifact.id,
       title: artifact.title,

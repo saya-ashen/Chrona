@@ -170,15 +170,13 @@ export async function hydrateFilePreviewSpec(
     if (
       element.type !== "FileView" &&
       element.type !== "FileRef" &&
+      element.type !== "ResultDeliverable" &&
       element.type !== "WorkspaceArtifactItem" &&
       element.type !== "Table"
     )
       continue;
-    const preview = await resolveFilePreview(
-      fileUriFromProps(element.props),
-      options,
-    );
     const uri = fileUriFromProps(element.props);
+    const preview = await resolveFilePreview(uri, options);
     elements[key] = {
       ...element,
       props: {

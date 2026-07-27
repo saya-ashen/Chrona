@@ -1,14 +1,18 @@
 import "@testing-library/jest-dom/vitest";
 import {
+  cleanup,
   fireEvent,
   render,
   screen,
   waitFor,
   within,
 } from "@testing-library/react";
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { UiDocument } from "@chrona/ui-protocol";
+import {
+  buildCommandCenterCheckpointSpec,
+  type UiDocument,
+} from "@chrona/ui-protocol";
 import { SpecRenderer } from "./spec-renderer";
 
 const requestResultFileAccessMock = vi.fn();
@@ -20,6 +24,8 @@ vi.mock("../../model/task-actions-client", () => ({
   approveResultFileAccess: (...args: unknown[]) =>
     approveResultFileAccessMock(...args),
 }));
+
+afterEach(() => cleanup());
 
 beforeEach(() => {
   requestResultFileAccessMock.mockReset();
@@ -210,6 +216,307 @@ describe("workspace result registry", () => {
     expect(card).not.toHaveClass("max-w-sm");
   });
 
+  it("renders the operational result hierarchy with semantic surfaces", async () => {
+    const spec: UiDocument = {
+      root: "root",
+      elements: {
+        root: {
+          type: "Stack",
+          props: { gap: "lg" },
+          children: [
+            "hero",
+            "deliverables",
+            "insights",
+            "actions",
+            "caveats",
+            "evidence",
+          ],
+        },
+        hero: {
+          type: "ResultHero",
+          props: {
+            title: "Research package ready",
+            summary: "Verified sources and an operating guide are assembled.",
+            readiness: "ready_with_caveats",
+            readinessSummary: "Confirm one access-limited source.",
+            metrics: [
+              { label: "Deliverables", value: "2" },
+              { label: "Verified sources", value: "37" },
+            ],
+          },
+        },
+        deliverables: {
+          type: "Stack",
+          props: { direction: "horizontal", gap: "md" },
+          children: ["primary", "support"],
+        },
+        primary: {
+          type: "ResultDeliverable",
+          props: {
+            title: "Operating guide",
+            summary: "Primary workflow",
+            artifactRef: "AF111111111111",
+            role: "primary",
+            kind: "document",
+            formatLabel: "Markdown",
+            contentKind: "markdown",
+            contentPreview: "# Guide\n\nStart here.",
+            downloadHref: "/api/tasks/task-1/result-files/download?path=guide",
+          },
+        },
+        support: {
+          type: "ResultDeliverable",
+          props: {
+            title: "Source table",
+            artifactRef: "AF222222222222",
+            role: "supporting",
+            kind: "table",
+            formatLabel: "CSV",
+            contentKind: "csv",
+            contentPreview: [
+              "name,official_url,note",
+              'JKU,https://www.jku.at/,"Agent, tool use, and safety"',
+              "Aarhus,https://phd.tech.au.dk/,Adaptive AI",
+            ].join("\n"),
+            contentBytes: 128,
+            downloadHref: "/api/tasks/task-1/result-files/download?path=sources.csv",
+          },
+        },
+        insights: {
+          type: "ResultInsight",
+          props: {
+            title: "Confirm on official sources",
+            summary: "Discovery networks provide early signals.",
+            emphasis: "lead",
+            points: ["Discover", "Verify"],
+          },
+        },
+        actions: {
+          type: "ResultActionPlan",
+          props: {
+            title: "Recommended route",
+            phases: [
+              {
+                timeframe: "now",
+                title: "Confirm constraints",
+                actions: ["Choose target regions"],
+              },
+            ],
+          },
+        },
+        caveats: {
+          type: "ResultCaveats",
+          props: {
+            title: "Before accepting",
+            items: ["One source requires manual verification"],
+          },
+        },
+        evidence: {
+          type: "ResultEvidence",
+          props: {
+            title: "Evidence and source boundaries",
+            summary: "2 records",
+            items: ["Official source checked"],
+            defaultCollapsed: true,
+          },
+        },
+      },
+    };
+
+    render(<SpecRenderer spec={spec} />);
+
+    expect(
+      screen.getByRole("region", { name: "Result overview" }),
+    ).toHaveTextContent("Ready with caveats");
+    const heroTitle = screen.getByText("Research package ready");
+    expect(heroTitle).toHaveClass("w-full");
+    expect(heroTitle).not.toHaveClass("max-w-3xl");
+    const heroSummary = screen.getByText(
+      "Verified sources and an operating guide are assembled.",
+    );
+    expect(heroSummary).toHaveClass("w-full");
+    expect(heroSummary).not.toHaveClass("max-w-3xl");
+    expect(screen.getByText("37")).toBeInTheDocument();
+    const resultOverview = screen.getByRole("region", {
+      name: "Result overview",
+    });
+    expect(resultOverview).not.toHaveClass("grid");
+    expect(within(resultOverview).getByText("Readiness")).toBeInTheDocument();
+    expect(
+      within(resultOverview).getByText("Confirm one access-limited source."),
+    ).toBeInTheDocument();
+    const readinessBadge =
+      within(resultOverview).getByText("Ready with caveats");
+    expect(readinessBadge).toHaveClass("text-warning");
+    expect(readinessBadge).not.toHaveClass("text-warning-foreground");
+    const primaryDeliverable = screen
+      .getByText("Operating guide")
+      .closest("article");
+    expect(primaryDeliverable).toHaveAttribute(
+      "data-result-deliverable-role",
+      "primary",
+    );
+    expect(screen.getByText("Source table").closest("article")).toHaveAttribute(
+      "data-result-deliverable-role",
+      "supporting",
+    );
+    const deliverables = primaryDeliverable?.parentElement;
+    expect(deliverables).toHaveClass("flex-row");
+    expect(deliverables).toHaveClass("flex-wrap");
+    expect(deliverables).toHaveClass("[&>*]:flex-[1_1_18rem]");
+    expect(
+      within(primaryDeliverable as HTMLElement).getByRole("link", {
+        name: /download/i,
+      }),
+    ).toHaveAttribute(
+      "href",
+      "/api/tasks/task-1/result-files/download?path=guide",
+    );
+    fireEvent.click(within(primaryDeliverable as HTMLElement).getByRole("button", { name: "Preview" }));
+    const preview = screen.getByRole("dialog");
+    expect(preview).toHaveAttribute("data-result-content-preview");
+    expect(preview).toHaveClass("max-w-[70rem]!");
+    expect(preview).toHaveClass("left-0!");
+    expect(preview).toHaveClass("right-0!");
+    expect(preview).toHaveClass("mx-auto");
+    expect(preview).toHaveClass("rounded-2xl");
+    expect(preview).not.toHaveClass("w-screen!");
+    expect(
+      within(preview).getByRole("heading", { name: "Operating guide" }),
+    ).toBeInTheDocument();
+    expect(within(preview).getByText("Content preview")).toBeInTheDocument();
+    expect(
+      within(preview).getByRole("heading", { name: "Guide" }),
+    ).toBeInTheDocument();
+    expect(within(preview).getByRole("heading", { name: "Guide" }).closest("article")).toHaveClass("text-base", "leading-7");
+    fireEvent.click(
+      within(preview).getByRole("button", { name: "Close preview" }),
+    );
+    fireEvent.click(within(screen.getByText("Source table").closest("article") as HTMLElement).getByRole("button", { name: "Preview" }));
+    const csvPreview = screen.getByRole("dialog");
+    expect(within(csvPreview).getByRole("table")).toBeInTheDocument();
+    expect(within(csvPreview).getByRole("columnheader", { name: /official_url/i })).toBeInTheDocument();
+    expect(within(csvPreview).getByRole("table").parentElement).toHaveAttribute("data-result-table-scroll", "virtual");
+    expect(within(csvPreview).getByText("2 rows · scroll to explore")).toBeInTheDocument();
+    expect(within(csvPreview).queryByRole("button", { name: "Next" })).not.toBeInTheDocument();
+    expect(await within(csvPreview).findByRole("link", { name: "https://www.jku.at/" })).toHaveAttribute("href", "https://www.jku.at/");
+    expect(await within(csvPreview).findByText("Agent, tool use, and safety")).toBeInTheDocument();
+    expect(within(csvPreview).queryByText(/name,official_url,note/)).not.toBeInTheDocument();
+    fireEvent.click(within(csvPreview).getByRole("button", { name: "Close preview" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByText("Now")).toBeInTheDocument();
+    expect(
+      screen.getByText("One source requires manual verification"),
+    ).toBeInTheDocument();
+    const caveat = screen.getByText("One source requires manual verification");
+    expect(caveat.parentElement).toHaveClass("text-foreground/80");
+    expect(caveat.parentElement).not.toHaveClass("text-warning-foreground");
+    const keyStrategy = screen.getByText("Key strategy").closest("article");
+    expect(keyStrategy).toHaveAttribute("data-result-insight-emphasis", "lead");
+    expect(
+      within(keyStrategy as HTMLElement).getByText("Discover"),
+    ).toBeInTheDocument();
+    const evidenceFootnote = screen.getByText("Result notes").parentElement;
+    expect(evidenceFootnote).toHaveAttribute("data-result-evidence-footnote");
+    expect(
+      screen.queryByText("Official source checked"),
+    ).not.toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", { name: /evidence and source boundaries/i }),
+    );
+    expect(screen.getByText("Official source checked")).toBeInTheDocument();
+  });
+
+  it("renders an adaptive comparison workspace without the legacy result template", () => {
+    const spec: UiDocument = {
+      root: "root",
+      elements: {
+        root: {
+          type: "Stack",
+          props: { gap: "lg" },
+          children: ["overview", "decision", "work"],
+        },
+        overview: {
+          type: "ResultOverview",
+          props: {
+            title: "Four opportunities are actionable",
+            summary: "Compare deadlines and funding before applying.",
+            metrics: [{ label: "Immediate", value: "2" }],
+          },
+        },
+        decision: {
+          type: "ResultSection",
+          props: {
+            title: "Choose the next application",
+            layout: "split",
+            tone: "subtle",
+          },
+          children: ["comparison", "timeline"],
+        },
+        comparison: {
+          type: "ResultComparison",
+          props: {
+            title: "Priority comparison",
+            columns: [
+              { key: "priority", label: "Priority" },
+              { key: "deadline", label: "Deadline" },
+            ],
+            rows: [
+              {
+                label: "Earlham",
+                values: { priority: "P0", deadline: "30 July" },
+                emphasis: "recommended",
+              },
+              {
+                label: "KCL",
+                values: { priority: "P1", deadline: "15 August" },
+                emphasis: "warning",
+              },
+            ],
+          },
+        },
+        timeline: {
+          type: "ResultTimeline",
+          props: {
+            title: "Application sequence",
+            items: [
+              { label: "Now", title: "Submit Earlham", status: "current" },
+              {
+                label: "Next",
+                title: "Confirm KCL funding",
+                status: "upcoming",
+              },
+            ],
+          },
+        },
+        work: {
+          type: "ResultChecklist",
+          props: {
+            title: "Application work",
+            items: [
+              { label: "Prepare CV", status: "next", statusLabel: "Next" },
+              {
+                label: "Verify funding",
+                status: "blocked",
+                statusLabel: "Blocked",
+              },
+            ],
+          },
+        },
+      },
+    };
+
+    render(<SpecRenderer spec={spec} />);
+
+    expect(
+      screen.getByRole("region", { name: "Result overview" }),
+    ).toHaveTextContent("Four opportunities are actionable");
+    expect(screen.getByText("Priority comparison")).toBeInTheDocument();
+    expect(screen.getByText("Earlham")).toBeInTheDocument();
+    expect(screen.getByText("Application sequence")).toBeInTheDocument();
+    expect(screen.getByText("Prepare CV")).toBeInTheDocument();
+    expect(screen.queryByText("Readiness")).not.toBeInTheDocument();
+  });
   it("renders file-backed JSON tables with links, sorting, and pagination", () => {
     const spec: UiDocument = {
       root: "root",
@@ -318,4 +625,71 @@ describe("workspace result registry", () => {
     expect(screen.getAllByRole("table").length).toBeGreaterThan(0);
   });
 
+  it("submits text, multiple-choice, and boolean checkpoint values without string coercion", async () => {
+    const spec = buildCommandCenterCheckpointSpec({
+      checkpoint: {
+        id: "checkpoint-typed",
+        nodeId: "node-typed",
+        title: "Application details needed",
+        message: "Provide the approved values.",
+        form: {
+          instructions: "Complete every field",
+          inputFields: [
+            {
+              kind: "text",
+              name: "approvedStatement",
+              label: "Approved statement",
+              required: true,
+            },
+            {
+              kind: "choice",
+              name: "channels",
+              label: "Channels",
+              selection: "multiple",
+              options: [
+                { value: "official", label: "Official" },
+                { value: "euraxess", label: "EURAXESS" },
+              ],
+              required: true,
+            },
+            {
+              kind: "boolean",
+              name: "confirmed",
+              label: "Confirmed",
+              defaultValue: false,
+            },
+          ],
+        },
+        availableActions: [
+          { id: "submit_input", label: "Submit input", style: "primary" },
+        ],
+      },
+    });
+    const submit = vi.fn(async (_payload: unknown) => undefined);
+
+    render(
+      <SpecRenderer spec={spec} handlers={{ "submit-checkpoint": submit }} />,
+    );
+    fireEvent.change(
+      screen.getByRole("textbox", { name: "Approved statement" }),
+      {
+        target: { value: "Approved statement text" },
+      },
+    );
+    fireEvent.click(screen.getByRole("checkbox", { name: "Official" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "EURAXESS" }));
+    fireEvent.click(screen.getByRole("checkbox", { name: "Confirmed" }));
+    fireEvent.click(screen.getByRole("button", { name: "Submit input" }));
+
+    await waitFor(() => expect(submit).toHaveBeenCalledTimes(1));
+    expect(submit.mock.calls[0]?.[0]).toMatchObject({
+      checkpointId: "checkpoint-typed",
+      actionId: "submit_input",
+      values: {
+        approvedStatement: "Approved statement text",
+        channels: ["official", "euraxess"],
+        confirmed: true,
+      },
+    });
+  });
 });

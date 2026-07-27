@@ -31,9 +31,28 @@ export function hasExecutionEvidence(effective: EffectivePlanGraph) {
 export function currentExecutionStatusFromEffectiveGraph(input: {
   effective: EffectivePlanGraph;
   hasActiveExecutionSession: boolean;
-  hasActiveRun?: boolean;
+  activeRunStatus?: RunStatus;
+  taskStatus?: string;
+  pauseReason?: WaitKind | null;
 }) {
-  return input.hasActiveExecutionSession || input.hasActiveRun || hasExecutionEvidence(input.effective)
+  if (input.taskStatus === "Cancelled") return "cancelled";
+  if (
+    input.taskStatus === "WaitingForInput" ||
+    input.activeRunStatus === RunStatus.WaitingForInput ||
+    input.pauseReason === "user_input"
+  ) return "waiting_for_user";
+  if (
+    input.taskStatus === "WaitingForApproval" ||
+    input.activeRunStatus === RunStatus.WaitingForApproval ||
+    input.pauseReason === "approval" ||
+    input.pauseReason === "review" ||
+    input.pauseReason === "replan_required"
+  ) return "waiting_for_approval";
+  if (hasExecutionEvidence(input.effective)) {
+    return executionStatusFromEffectiveGraph(input.effective);
+  }
+  if (input.activeRunStatus === RunStatus.Pending || input.activeRunStatus === RunStatus.Running) return "running";
+  return input.hasActiveExecutionSession || input.activeRunStatus !== undefined
     ? executionStatusFromEffectiveGraph(input.effective)
     : "started";
 }
@@ -50,7 +69,6 @@ export async function getCurrentExecution(input: { taskId: string; workBlockId?:
       waitingNodeIds: [],
       blockedNodeIds: [],
       checkpoint: null,
-      planOutput: { spec: null, revision: 0, updatedAt: null, updatedByNodeId: null },
       message: "No accepted plan. Create or accept a plan before execution.",
     };
   }
@@ -66,7 +84,7 @@ export async function getCurrentExecution(input: { taskId: string; workBlockId?:
   });
   const latestRunPointer = await db.task.findUniqueOrThrow({
     where: { id: input.taskId },
-    select: { latestRunId: true },
+    select: { latestRunId: true, status: true },
   });
   const activeRun = latestRunPointer.latestRunId
     ? await db.run.findFirst({
@@ -88,11 +106,12 @@ export async function getCurrentExecution(input: { taskId: string; workBlockId?:
     results: runtime.persisted.results,
   }) as unknown as EffectivePlanGraph;
   const hasActiveExecutionSession = Boolean(executionSession);
-  const hasActiveRun = Boolean(activeRun);
   const status = currentExecutionStatusFromEffectiveGraph({
     effective,
     hasActiveExecutionSession,
-    hasActiveRun,
+    activeRunStatus: activeRun?.status,
+    taskStatus: latestRunPointer.status,
+    pauseReason: executionSession?.pauseReason as WaitKind | null | undefined,
   });
   const currentNodeId = currentNodeFromEffective(effective)?.id
     ?? (!hasActiveExecutionSession && status === "started" ? effective.readyNodeIds[0] : null)
@@ -112,7 +131,9 @@ export async function getCurrentExecution(input: { taskId: string; workBlockId?:
     message: executionSession ? "Current execution state." : "No active execution session.",
     waitKind: executionSession?.pauseReason as WaitKind | undefined,
     planOutput: {
-      spec: runtime.persisted.planOutput.spec,
+      manifest: runtime.persisted.planOutput.manifest,
+      finalizedResult: runtime.persisted.planOutput.finalizedResult,
+      finalization: runtime.persisted.planOutput.finalization,
       revision: runtime.persisted.planOutput.revision,
       updatedAt: runtime.persisted.planOutput.updatedAt,
       updatedByNodeId: runtime.persisted.planOutput.updatedByNodeId,

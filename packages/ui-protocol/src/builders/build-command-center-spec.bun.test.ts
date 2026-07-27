@@ -125,4 +125,39 @@ describe("buildCommandCenterCheckpointSpec", () => {
     expect(spec.elements["action:cancel_session"]).toBeUndefined();
     expect(spec.elements["form-actions"]).toBeUndefined();
   });
+  it("renders semantic checkpoint fields with host-owned controls", () => {
+    const spec = buildCommandCenterCheckpointSpec({
+      checkpoint: {
+        id: "checkpoint-1",
+        nodeId: "confirm-channels",
+        title: "Confirm channels",
+        message: "Choose channels for the next stage.",
+        form: {
+          instructions: "Choose channels",
+          submitLabel: "Confirm and continue",
+          inputFields: [
+            { kind: "choice", name: "channels", label: "Channels", selection: "multiple", options: [{ value: "eu", label: "Europe" }] },
+            { kind: "boolean", name: "excludeSelfFunded", label: "Exclude self-funded", defaultValue: true },
+            { kind: "text", name: "notes", label: "Notes", multiline: true },
+          ],
+        },
+        availableActions: [{ id: "submit_input", label: "Confirm and continue", style: "primary" }],
+      },
+    });
+
+    expect(spec.elements["field:channels"]).toMatchObject({
+      type: "CheckpointChoiceField",
+      props: {
+        selection: "multiple",
+        options: [{ value: "eu", label: "Europe" }],
+      },
+    });
+    expect(spec.elements["field:excludeSelfFunded"]?.type).toBe("Checkbox");
+    expect(spec.elements["field:notes"]?.type).toBe("Textarea");
+    expect(spec.state).toEqual({ channels: [], excludeSelfFunded: true, notes: "" });
+    expect(spec.elements["submit:submit_input"]).toMatchObject({
+      on: { press: { action: "submit-checkpoint", params: { values: { $state: "/" } } } },
+    });
+    expect(spec.elements["field:submit_input"]).toBeUndefined();
+  });
 });

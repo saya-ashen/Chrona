@@ -152,13 +152,23 @@ describe("task API schemas", () => {
       nativeRunId: "native-1",
       sequence: 7,
       rawEventType: "tool_completed",
+      executionSessionId: "execution-session-2",
+      executionEpoch: 2,
+      executionTrigger: "restart",
       tool: {
         name: "chrona_plan_read",
         label: "Read plan",
         durationMs: 24,
         state: "completed",
       },
-    })).toMatchObject({ kind: "tool_completed", tone: "success", tool: { state: "completed" } });
+    })).toMatchObject({
+      kind: "tool_completed",
+      tone: "success",
+      executionSessionId: "execution-session-2",
+      executionEpoch: 2,
+      executionTrigger: "restart",
+      tool: { state: "completed" },
+    });
 
     expect(() => workspaceActivityItemSchema.parse({
       id: "event-2",
@@ -188,5 +198,23 @@ describe("task API schemas", () => {
       nextCursor: "cursor-2",
       scope: { type: "task", taskId: "task-1", limit: 100 },
     })).toMatchObject({ nextCursor: "cursor-2", scope: { type: "task" } });
+  });
+  it("validates task model and context strategy overrides", () => {
+    expect(updateTaskBodySchema.parse({
+      executionConfig: {
+        model: "openai-codex/gpt-5.6",
+        contextStrategy: "artifact_backed",
+        allowSubAgents: false,
+      },
+    })).toMatchObject({
+      executionConfig: { contextStrategy: "artifact_backed" },
+    });
+
+    expect(() => updateTaskBodySchema.parse({
+      executionConfig: { contextStrategy: "unbounded" },
+    })).toThrow();
+    expect(() => updateTaskBodySchema.parse({
+      executionConfig: { model: "" },
+    })).toThrow();
   });
 });

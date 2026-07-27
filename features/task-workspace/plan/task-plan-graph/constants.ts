@@ -180,6 +180,7 @@ export const DEFAULT_GRAPH_COPY: GraphCopy = {
   statusBlocked: "Blocked",
   statusDone: "Done",
   statusSkipped: "Skipped",
+  possibleUserInputLabel: "May need your input",
   edgeSequential: "Sequential",
   edgeDependency: "Dependency",
   edgeBranch: "Branch",

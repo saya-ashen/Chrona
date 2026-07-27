@@ -12,81 +12,11 @@ import {
   CHRONA_PLAN_GENERATE_TOOL_DESCRIPTION,
   CHRONA_PLAN_GENERATE_TOOL_NAME,
   CHRONA_PLAN_GENERATE_TOOL_TITLE,
-  CHRONA_PLAN_OUTPUT_TOOL_DESCRIPTION,
   chronaPublicToolPayloadSchemas,
   chronaToolInputSchema,
   type ChronaToolName,
   type ChronaToolResult,
 } from "@chrona/contracts";
-import { chronaPlanOutputElementSchema } from "@chrona/ui-protocol";
-
-const planOutputPatchPathSchema = z
-  .string()
-  .min(1)
-  .describe(
-    "JSON Pointer into the plan-output Spec. Use /root, /elements/<id>, /elements/<id>/children, /elements/<id>/children/<index>, or /elements/<id>/props/<prop>. Use /state/<key> only when the element uses json-render state expressions.",
-  );
-
-const planOutputPropValueSchema = z.union([
-  z.string(),
-  z.array(z.string()),
-  z.number(),
-  z.boolean(),
-  z.null(),
-  z.record(z.string(), z.unknown()),
-]);
-
-const planOutputPatchValueSchema = z.union([
-  chronaPlanOutputElementSchema,
-  planOutputPropValueSchema,
-]);
-
-function planOutputValueSchemaForPath(path: string) {
-  if (/^\/elements\/[^/]+$/.test(path)) return chronaPlanOutputElementSchema;
-  return planOutputPatchValueSchema;
-}
-
-function validatePlanOutputPatchValue(
-  value: unknown,
-  ctx: z.RefinementCtx,
-  path: string,
-) {
-  const result = planOutputValueSchemaForPath(path).safeParse(value);
-  if (result.success) return;
-  ctx.addIssue({
-    code: z.ZodIssueCode.custom,
-    path: ["value"],
-    message: result.error.issues[0]?.message ?? "Invalid plan output patch value",
-  });
-}
-
-const planOutputValuePatchSchema = z
-  .object({
-    op: z.union([z.literal("add"), z.literal("replace"), z.literal("test")]),
-    path: planOutputPatchPathSchema,
-    value: planOutputPatchValueSchema,
-  })
-  .strict()
-  .superRefine((patch, ctx) => validatePlanOutputPatchValue(patch.value, ctx, patch.path));
-
-const publicPlanOutputPatchSchema = z.union([
-  planOutputValuePatchSchema,
-  z.object({ op: z.literal("remove"), path: planOutputPatchPathSchema }).strict(),
-  z.object({
-    op: z.union([z.literal("move"), z.literal("copy")]),
-    path: planOutputPatchPathSchema,
-    from: planOutputPatchPathSchema,
-  }).strict(),
-]);
-
-const publicPlanOutputPayloadSchema = z.object({
-  patches: z.array(publicPlanOutputPatchSchema).min(1),
-  summary: z.string().min(1).optional(),
-});
-
-function publicPlanOutputSchema() {
-  return publicPlanOutputPayloadSchema.passthrough();
-}
 
 
 type ExternalChronaToolName = keyof typeof externalTools;
@@ -131,6 +61,12 @@ const externalTools = {
     description: "Read execution session state and supported next actions.",
     inputSchema: publicToolSchema(chronaPublicToolPayloadSchemas["chrona.execution.read"]),
   },
+  chrona_goal_results_read: {
+    internalName: "chrona.goal.results.read",
+    title: "Chrona Goal Results Read",
+    description: "Search current approved Goal assets and immutable accepted-result history for the current Task's Goal. Chrona resolves Goal scope from the session; use returned refs for AI-visible provenance.",
+    inputSchema: publicToolSchema(chronaPublicToolPayloadSchemas["chrona.goal.results.read"]),
+  },
   chrona_plan_read: {
     internalName: "chrona.plan.read",
     title: "Chrona Plan Read",
@@ -154,12 +90,6 @@ const externalTools = {
     title: "Chrona Dashboard Brief",
     description: "Submit Dashboard AI summary as { summaryText, spec }. Chrona validates and stores the compact dashboard brief spec; use only Stack, Card, Heading, Text, Alert, Badge, Separator, Table.",
     inputSchema: publicToolSchema(chronaPublicToolPayloadSchemas["chrona.dashboard.brief"]),
-  },
-  chrona_plan_output: {
-    internalName: "chrona.plan.output",
-    title: "Chrona Plan Output",
-    description: CHRONA_PLAN_OUTPUT_TOOL_DESCRIPTION,
-    inputSchema: publicPlanOutputSchema(),
   },
   chrona_node_complete: {
     internalName: "chrona.node.complete",
@@ -277,8 +207,10 @@ function idempotencyKeyFrom(input: Record<string, unknown>, toolName: ChronaTool
 
 function aiVisibleToolResult(toolName: ChronaToolName, result: ChronaToolResult): Record<string, unknown> {
   if (result.status === "accepted") {
+    if (toolName === "chrona.goal.results.read") {
+      return { status: result.status, message: result.message, result: result.state.result };
+    }
     if (toolName.endsWith(".read")) return { status: result.status, message: result.message, state: result.state };
-    if (toolName === "chrona.plan.output") return { status: result.status, message: result.message, next: "continue_or_complete" };
     return { status: result.status, message: result.message, next: "stop" };
   }
 
@@ -326,9 +258,11 @@ function toChronaInput(
   const evidence = meta.evidence && typeof meta.evidence === "object"
     ? meta.evidence as Record<string, unknown>
     : undefined;
-  const validatedPayload = toolName.endsWith(".read") || toolName === "chrona.schedule.clear"
-    ? {}
-    : chronaPublicToolPayloadSchemas[toolName].parse(payload);
+  const validatedPayload = toolName === "chrona.goal.results.read"
+    ? chronaPublicToolPayloadSchemas[toolName].parse(payload)
+    : toolName.endsWith(".read") || toolName === "chrona.schedule.clear"
+      ? {}
+      : chronaPublicToolPayloadSchemas[toolName].parse(payload);
   return {
     sessionId: sessionIdFrom(input, extra, requestSessionId),
     actorType: "agent" as const,
@@ -342,13 +276,14 @@ function toChronaInput(
 const planGenerationTools = new Set<ChronaToolName>([
   "chrona.plan.generate",
   "chrona.plan.read",
+  "chrona.goal.results.read",
 ]);
 
 const executionTools = new Set<ChronaToolName>([
   "chrona.execution.read",
   "chrona.plan.read",
+  "chrona.goal.results.read",
   "chrona.node.read",
-  "chrona.plan.output",
   "chrona.node.complete",
   "chrona.node.condition_select",
   "chrona.node.block",

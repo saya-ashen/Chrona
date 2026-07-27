@@ -46,6 +46,7 @@ function buildNodeConfig(
       return {
         expectedOutput: node.expectedOutput,
         completionCriteria: node.completionCriteria,
+        userInteraction: node.userInteraction,
       } satisfies TaskConfig;
     case "checkpoint":
       return {
@@ -54,6 +55,7 @@ function buildNodeConfig(
         required: node.required,
         options: node.options,
         inputFields: node.inputFields,
+        interaction: node.interaction,
       } satisfies CheckpointConfig;
     case "condition":
       if (!localToCompiled) {

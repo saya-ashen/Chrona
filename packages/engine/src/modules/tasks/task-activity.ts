@@ -34,6 +34,9 @@ export type WorkspaceActivityTimelineItem = {
   nativeRunId?: string;
   sequence?: number;
   rawEventType?: string;
+  executionSessionId?: string;
+  executionEpoch?: number;
+  executionTrigger?: "initial" | "restart";
   activityGroup?: WorkspaceActivityGroup;
   tool?: {
     name?: string;
@@ -152,6 +155,23 @@ function numberPayloadValue(payload: unknown, key: string) {
 function planGenerationActivityGroup(payload: unknown) {
   const id = stringPayloadValue(payload, "generation_id");
   return id ? { kind: "plan_generation" as const, id } : undefined;
+}
+
+function executionActivityMetadata(payload: unknown) {
+  const record = payloadRecord(payload);
+  const correlation = payloadRecord(record?.correlation);
+  const executionSessionId = typeof correlation?.executionSessionId === "string"
+    ? correlation.executionSessionId
+    : undefined;
+  const executionEpoch = typeof record?.executionEpoch === "number"
+    ? record.executionEpoch
+    : undefined;
+  const executionTrigger = record?.command === "restart_from_beginning"
+    ? "restart" as const
+    : executionSessionId
+      ? "initial" as const
+      : undefined;
+  return { executionSessionId, executionEpoch, executionTrigger };
 }
 
 function compactParts(parts: Array<string | null | undefined>) {
@@ -420,6 +440,7 @@ function mapProviderEventToActivity(
     sequence,
     rawEventType,
     raw: redactActivityRaw(payloadEvent ?? event.payload),
+    ...executionActivityMetadata(event.payload),
     ...(event.nodeId ? { sourceNodeId: event.nodeId } : {}),
     ...(event.nodeTitle ? { sourceNodeTitle: event.nodeTitle } : {}),
   });
@@ -906,6 +927,7 @@ function mapTaskEventToActivity(
           sourceNodeId: event.nodeId ?? undefined,
           sourceNodeTitle: event.nodeTitle ?? undefined,
           rawEventType: event.eventType,
+          ...executionActivityMetadata(payload),
         });
       }
       return taskActivityItem({
@@ -919,8 +941,20 @@ function mapTaskEventToActivity(
   }
 }
 
+function providerToolProgressMergeKey(
+  event: TaskActivityEvent,
+  payloadEvent: Record<string, unknown>,
+) {
+  return [
+    providerActivityMergeKey(event, "tool_progress"),
+    optionalStringEventValue(payloadEvent, "callId") ?? "call",
+    optionalStringEventValue(payloadEvent, "toolName") ?? "tool",
+  ].join(":");
+}
+
 export function buildActivityTimeline(events: TaskActivityEvent[]) {
   const items: WorkspaceActivityTimelineItem[] = [];
+  const toolProgressIndexes = new Map<string, number>();
   let currentTextSegment: {
     key: string;
     item: WorkspaceActivityTimelineItem;
@@ -935,6 +969,20 @@ export function buildActivityTimeline(events: TaskActivityEvent[]) {
       !isDisplayableProviderEvent(eventType, payloadEvent)
     ) {
       currentTextSegment = null;
+      continue;
+    }
+
+    if (event.source === "provider" && payloadEvent && eventType === "tool_progress") {
+      currentTextSegment = null;
+      const progressItem = mapProviderEventToActivity(event);
+      const progressKey = providerToolProgressMergeKey(event, payloadEvent);
+      const existingIndex = toolProgressIndexes.get(progressKey);
+      if (existingIndex !== undefined) {
+        items[existingIndex] = progressItem;
+      } else {
+        toolProgressIndexes.set(progressKey, items.length);
+        items.push(progressItem);
+      }
       continue;
     }
 

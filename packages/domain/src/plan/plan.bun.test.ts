@@ -29,6 +29,7 @@ function makeTask(
     title: `Task ${id}`,
     executor: "ai",
     mode: "auto",
+    userInteraction: { level: "not_expected" },
     ...overrides,
   };
 }
@@ -180,6 +181,7 @@ describe("validateEditablePlan", () => {
           title: "Bad",
           executor: "ai",
           mode: "auto",
+          userInteraction: { level: "not_expected" },
         },
       ],
       [],
@@ -234,6 +236,51 @@ describe("validateEditablePlan", () => {
     const result = validateEditablePlan(plan);
     expect(result.ok).toBe(true);
     expect(result.warnings).toEqual([]);
+  });
+
+  it("9b. rejects explicit static edit checkpoints without a complete form", () => {
+    const plan = makePlan(
+      "plan_static_edit",
+      [
+        makeCheckpoint("review", {
+          checkpointType: "edit",
+          interaction: { schemaSource: "static" },
+        }),
+        makeTask("publish"),
+      ],
+      [{ from: "review", to: "publish" }],
+    );
+
+    const result = validateEditablePlan(plan);
+
+    expect(result.ok).toBe(false);
+    expect(result.errors).toContainEqual({
+      path: "nodes.0.interaction",
+      message: "Static checkpoint must define its complete options or input fields",
+    });
+  });
+
+  it("9c. rejects AI-defined checkpoints containing static form placeholders", () => {
+    const plan = makePlan(
+      "plan_ai_edit",
+      [
+        makeCheckpoint("review", {
+          checkpointType: "edit",
+          inputFields: [{ name: "content", label: "Content" }],
+          interaction: { schemaSource: "ai", instruction: "Build the form from prior results" },
+        }),
+        makeTask("publish"),
+      ],
+      [{ from: "review", to: "publish" }],
+    );
+
+    const result = validateEditablePlan(plan);
+
+    expect(result.ok).toBe(false);
+    expect(result.errors).toContainEqual({
+      path: "nodes.0.interaction",
+      message: "AI-defined checkpoint must not include static options or input fields",
+    });
   });
 
   it("10. accepts valid snake_case ids with numbers and underscores", () => {
@@ -349,6 +396,7 @@ describe("validateEditablePlan", () => {
           title: "Bad",
           executor: "" as TaskExecutor,
           mode: "" as TaskMode,
+          userInteraction: { level: "not_expected" },
         },
       ],
       [],
@@ -841,11 +889,22 @@ describe("compileEditablePlan", () => {
     const plan = makePlan(
       "plan_config",
       [
-        makeTask("t", { expectedOutput: "Output", completionCriteria: "Done" }),
+        makeTask("t", {
+          expectedOutput: "Output",
+          completionCriteria: "Done",
+          userInteraction: {
+            level: "possible",
+            reason: "A runtime tradeoff may require a user choice",
+          },
+        }),
         makeCheckpoint("c", {
           checkpointType: "approve",
           prompt: "Please approve",
           required: true,
+          interaction: {
+            schemaSource: "ai",
+            instruction: "Build an approval request from the prior result",
+          },
         }),
         makeWait("w", {
           waitFor: "signal",
@@ -867,7 +926,9 @@ describe("compileEditablePlan", () => {
     const condNode = compiled.nodes.find((n) => n.localId === "cond")!;
 
     expect(tNode.config).toHaveProperty("expectedOutput", "Output");
+    expect(tNode.config).toHaveProperty("userInteraction.level", "possible");
     expect(cNode.config).toHaveProperty("checkpointType", "approve");
+    expect(cNode.config).toHaveProperty("interaction.schemaSource", "ai");
     expect(wNode.config).toHaveProperty("waitFor", "signal");
     expect(condNode.config).toHaveProperty("condition", "Check something");
   });

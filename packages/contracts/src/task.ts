@@ -33,6 +33,9 @@ export type TaskExecutionConfig = {
   approvalPolicy?: "never" | "on-request" | "always";
   toolMode?: "read-only" | "workspace-write" | "full-access";
   sessionStrategy?: "shared" | "per_subtask";
+  model?: string;
+  contextStrategy?: "provider_default" | "auto_compact" | "bounded_tool_results" | "artifact_backed";
+  allowSubAgents?: boolean;
 };
 
 export type TaskRuntimeFields = {
@@ -79,6 +82,8 @@ export type CreateTaskInput = {
   autoExecuteTiming?: AutomationTimingPreset;
   aiClientId?: string | null;
   parentTaskId?: string | null;
+  goalId?: string | null;
+  goalContext?: Record<string, unknown> | null;
   recurrenceRule?: string | null;
   recurrenceAnchorStartAt?: string | null;
   recurrenceAnchorEndAt?: string | null;

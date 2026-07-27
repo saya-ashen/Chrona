@@ -4,6 +4,7 @@ import { executionStatusFromEffectiveGraph } from "./execution-state-machine";
 import { deriveExecutionCheckpoint } from "./execution-checkpoint";
 import { resolveCheckpointAction } from "./execution-actions";
 import type {
+  CheckpointInputFields,
   EffectivePlanGraph,
   ExecutionCommand,
   ExecutionCommandContext,
@@ -20,6 +21,7 @@ import type {
   OrchestratorTrigger,
   PlanExecutionObserver,
 } from "./types";
+import type { SubmittedNodeResult } from "@chrona/contracts/plan-runtime/execution-command";
 import { ensureNativePlanRun } from "./persistence/plan-runtime-store";
 import { ensurePlanMainSession } from "./persistence/plan-state-store";
 import { currentNodeFromEffective } from "./projection/execution-graph-selectors";
@@ -66,7 +68,7 @@ export async function continuePlanExecution(
     taskId: string;
     reason: string;
     userInput?: string;
-    inputFields?: Record<string, string>;
+    inputFields?: CheckpointInputFields;
     sessionId?: string;
     nodeId?: string;
     resumeReadyNode?: boolean;
@@ -155,28 +157,34 @@ function commandForExecutionAction(
         command: { type: "resume_after_unblock", nodeId: action.nodeId, note: action.note },
         context,
       };
-    case "update_plan_output":
-      throw new EngineError(
-        ENGINE_ERROR_CODES.VALIDATION_FAILED,
-        "update_plan_output must be handled through plan output submission",
-      );
-    case "complete_manual_node":
+    case "complete_manual_node": {
+      const result: SubmittedNodeResult = {
+        kind: "done",
+        summary: action.summary,
+        output: action.output,
+        evidence: action.sessionId ? { sessionId: action.sessionId } : undefined,
+        selectedBranch: action.selectedBranch,
+        branchRef: action.branchRef,
+        deliverables: action.deliverables,
+        findings: action.findings,
+        decisions: action.decisions,
+        caveats: action.caveats,
+        nextActions: action.nextActions,
+        resultEvidence: action.evidenceItems?.map((item) => ({
+          ...item,
+          sourceNodeRef: "",
+        })),
+      };
       return {
         command: {
           type: "submit_node_result",
           nodeId: action.nodeId,
-          result: {
-            kind: "done",
-            summary: action.summary,
-            output: action.output,
-            evidence: action.sessionId ? { sessionId: action.sessionId } : undefined,
-            selectedBranch: action.selectedBranch,
-            branchRef: action.branchRef,
-          },
+          result,
           continueExecution: action.continueExecution ?? true,
         },
         context,
       };
+    }
     case "block_current_node":
       return {
         command: {

@@ -29,6 +29,7 @@ const toolDescriptions: Record<ChronaToolName, string> = {
   "chrona.task.read": "Read task lifecycle state.",
   "chrona.task.create": "Create a task through Chrona validation.",
   "chrona.task.update": "Update task fields through Chrona validation.",
+  "chrona.goal.results.read": "Search current approved Goal assets and accepted-result history.",
   "chrona.plan.read": "Read accepted plan state.",
   "chrona.plan.generate": "Generate a draft plan for the session task.",
   "chrona.plan.mutate": "Apply a plan graph mutation.",
@@ -40,10 +41,10 @@ const toolDescriptions: Record<ChronaToolName, string> = {
   "chrona.execution.dispatch": "Dispatch an execution lifecycle action.",
   "chrona.node.read": "Read current execution node state.",
   "chrona.dashboard.brief": "Submit validated dashboard AI summary spec.",
-  "chrona.plan.output": "Patch shared plan-level user-visible output.",
   "chrona.node.complete": "Complete the current task node.",
   "chrona.node.condition_select": "Select the current condition node branch.",
   "chrona.node.block": "Block the current execution node.",
+  "chrona.node.request_input": "Request structured user input for the current execution node.",
   "chrona.node.fail": "Fail the current execution node.",
   "chrona.node.wait_complete": "Complete the current wait node.",
 };
@@ -94,7 +95,9 @@ function taskIdFromResult(result: unknown) {
 }
 
 function acceptedStateFor(toolName: ChronaToolName, state: Record<string, unknown>, result: unknown) {
-  return toolName === "chrona.dashboard.brief" ? { ...state, result } : state;
+  return toolName === "chrona.dashboard.brief" || toolName === "chrona.goal.results.read"
+    ? { ...state, result }
+    : state;
 }
 
 function ensureExpectedState(operation: ChronaToolOperation, state: Record<string, unknown>) {

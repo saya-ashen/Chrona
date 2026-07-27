@@ -25,6 +25,7 @@ export type KernelCallbacksInput = {
   compiledPlan: CompiledPlan;
   persisted: PersistedPlanRun;
   planSummary?: string | null;
+  goalContext?: import("../node-executors/types").NodeExecutionPlanContext["goalContext"];
   initialRunContext?: NodeExecutionRunContext;
   updateSessionProjection?: boolean;
 };

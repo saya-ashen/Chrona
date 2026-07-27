@@ -140,6 +140,7 @@ beforeEach(() => {
   mocks.commandCenterResponses.length = 0;
   mocks.planStateResponses.length = 0;
   mocks.executionResponses.length = 0;
+  vi.stubGlobal("fetch", fetchMock);
 });
 
 afterEach(() => {
@@ -205,6 +206,41 @@ describe("SSE-driven refetch of dependent queries", () => {
 
     await waitFor(() => {
       expect(fetchCallCount(/\/api\/tasks\/task-1(\?|$)/)).toBeGreaterThan(pageBeforePhase2);
+    });
+  });
+
+  it("refetches persisted activity when an SSE connection becomes ready", async () => {
+    const pageData = buildPageData("block-A");
+
+    renderHook(() => useTaskWorkspacePageState(pageData), { wrapper });
+
+    await waitFor(() => expect(mocks.eventHandler).not.toBeNull());
+    const commandCenterBefore = fetchCallCount(/\/api\/tasks\/task-1\/command-center(\?|$)/);
+    const pageBefore = fetchCallCount(/\/api\/tasks\/task-1(\?|$)/);
+
+    await pushEvent("ready");
+
+    await waitFor(() => {
+      expect(fetchCallCount(/\/api\/tasks\/task-1\/command-center(\?|$)/)).toBeGreaterThan(commandCenterBefore);
+    });
+    expect(fetchCallCount(/\/api\/tasks\/task-1(\?|$)/)).toBe(pageBefore);
+  });
+
+  it("refetches authoritative workspace state when an SSE connection reconnects", async () => {
+    const pageData = buildPageData("block-A");
+
+    renderHook(() => useTaskWorkspacePageState(pageData), { wrapper });
+
+    await waitFor(() => expect(mocks.eventHandler).not.toBeNull());
+    await pushEvent("ready");
+    const pageBeforeReconnect = fetchCallCount(/\/api\/tasks\/task-1(\?|$)/);
+    const commandCenterBeforeReconnect = fetchCallCount(/\/api\/tasks\/task-1\/command-center(\?|$)/);
+
+    await pushEvent("ready");
+
+    await waitFor(() => {
+      expect(fetchCallCount(/\/api\/tasks\/task-1(\?|$)/)).toBeGreaterThan(pageBeforeReconnect);
+      expect(fetchCallCount(/\/api\/tasks\/task-1\/command-center(\?|$)/)).toBeGreaterThan(commandCenterBeforeReconnect);
     });
   });
 });

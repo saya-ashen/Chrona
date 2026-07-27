@@ -2,7 +2,7 @@ import "@testing-library/jest-dom/vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import type { PropsWithChildren } from "react";
+import type { PropsWithChildren, ReactNode } from "react";
 import type { TaskPlanReadModel } from "@chrona/contracts"
 
 import { TaskWorkspacePage } from "../ui/task-workspace-page";
@@ -59,7 +59,12 @@ vi.mock("@features/assistant-surface", () => ({
 
 vi.mock("@chrona/i18n/react", () => ({
   useI18n: () => ({ messages: { components: { taskWorkspace: {} } } }),
+  useLocale: () => "en",
 }));
+vi.mock("../ui/localized-link", () => ({
+  LocalizedLink: ({ children, href }: { children: ReactNode; href: string }) => <a href={`/en${href}`}>{children}</a>,
+}));
+
 
 
 vi.mock("../ui/task-workspace-edit-section", () => ({

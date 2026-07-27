@@ -694,14 +694,16 @@ function newSessionRequest(config: AcpProviderConfig, input: StartRunInput): New
   return {
     cwd: config.cwd ?? process.cwd(),
     additionalDirectories: config.additionalDirectories,
-    mcpServers: [
-      {
-        type: "http",
-        name: "chrona",
-        url: mcp.url,
-        headers: mcp.headers,
-      } satisfies McpServer,
-    ],
+    mcpServers: input.toolPolicy === "read_only"
+      ? []
+      : [
+          {
+            type: "http",
+            name: "chrona",
+            url: mcp.url,
+            headers: mcp.headers,
+          } satisfies McpServer,
+        ],
     _meta: {
       chrona: {
         sessionId: input.sessionId,

@@ -10,11 +10,13 @@ import {
   scheduleBodySchema,
   scheduleProposalBodySchema,
 } from "./execution.schema";
+import { nodeDeliverableSchema, resultContributionSchema, resultEvidenceSchema } from "./result.schema";
 
 export const chronaToolNames = [
   "chrona.task.read",
   "chrona.task.create",
   "chrona.task.update",
+  "chrona.goal.results.read",
   "chrona.plan.read",
   "chrona.plan.generate",
   "chrona.plan.mutate",
@@ -26,10 +28,10 @@ export const chronaToolNames = [
   "chrona.execution.dispatch",
   "chrona.node.read",
   "chrona.dashboard.brief",
-  "chrona.plan.output",
   "chrona.node.complete",
   "chrona.node.condition_select",
   "chrona.node.block",
+  "chrona.node.request_input",
   "chrona.node.fail",
   "chrona.node.wait_complete",
 ] as const;
@@ -96,42 +98,80 @@ export const chronaToolContextSchema = z.object({
 
 const readPayloadSchema = z.object({}).passthrough().optional().default({});
 const publicReadPayloadSchema = z.object({}).passthrough();
+export const goalResultsReadPayloadSchema = z.object({
+  query: z.string().trim().min(1).max(500).optional(),
+  limit: z.number().int().min(1).max(10).default(5),
+  cursor: z.string().trim().regex(/^(?:GR|GA)[0-9A-F]{12}$/).optional(),
+}).strict();
 const nodeEvidencePayloadSchema = z.record(z.string(), z.unknown()).optional();
 
-const planOutputAddPatchSchema = z.object({ op: z.literal("add"), path: z.string().min(1), value: z.unknown() }).strict();
-const planOutputRemovePatchSchema = z.object({ op: z.literal("remove"), path: z.string().min(1) }).strict();
-const planOutputReplacePatchSchema = z.object({ op: z.literal("replace"), path: z.string().min(1), value: z.unknown() }).strict();
-const planOutputMovePatchSchema = z.object({ op: z.literal("move"), path: z.string().min(1), from: z.string().min(1) }).strict();
-const planOutputCopyPatchSchema = z.object({ op: z.literal("copy"), path: z.string().min(1), from: z.string().min(1) }).strict();
-const planOutputTestPatchSchema = z.object({ op: z.literal("test"), path: z.string().min(1), value: z.unknown() }).strict();
 
-export const planOutputPatchSchema = z.discriminatedUnion("op", [
-  planOutputAddPatchSchema,
-  planOutputRemovePatchSchema,
-  planOutputReplacePatchSchema,
-  planOutputMovePatchSchema,
-  planOutputCopyPatchSchema,
-  planOutputTestPatchSchema,
-]);
 
-const planOutputPayloadShape = {
-  patches: z.array(planOutputPatchSchema).min(1),
-  summary: z.string().min(1).optional(),
-};
-
-export const CHRONA_PLAN_OUTPUT_TOOL_DESCRIPTION = "Patch task-level shared user-visible plan output as json-render SpecStream patches. Submit { patches, summary }. Patches are RFC 6902 JSON Patch operations over the current accumulated plan output Spec for the whole task run; every chrona_plan_output call modifies the same result, not a node-local output. If current planOutput.hasSpec is false, bootstrap once with /root plus all required /elements/<id> entries. If current planOutput.hasSpec is true, do not patch /root, /elements, or replace the existing root element; preserve current root from planOutput.root and add node-specific sections under stable /elements/<id> paths, then append/reorder ids in existing children arrays such as /elements/<currentRootId>/children/-. Use planOutput.elementIds and planOutput.rootChildren to avoid duplicate ids and preserve prior sections. Do not submit complete replacement Specs after bootstrap, markdown-only text, legacy spec/mode fields, or backend IDs. Final Spec after applying patches must be valid against Chrona plan-output catalog.";
-
-export function describeChronaPlanOutputPublicTool() {
-  return { name: "chrona_plan_output", internalName: "chrona.plan.output", description: CHRONA_PLAN_OUTPUT_TOOL_DESCRIPTION, visibleArguments: ["patches", "summary"] };
-}
-
-export const planOutputPayloadSchema = z.object({ ...planOutputPayloadShape, evidence: nodeEvidencePayloadSchema }).strict();
-
-const publicPlanOutputPayloadSchema = z.object(planOutputPayloadShape).strict();
-
-export const taskCompletePayloadSchema = z.object({ summary: z.string().min(1).optional(), evidence: nodeEvidencePayloadSchema }).strict();
+export const taskCompletePayloadSchema = z.object({
+  summary: z.string().min(1),
+  deliverables: z.array(nodeDeliverableSchema).optional(),
+  findings: z.array(resultContributionSchema).optional(),
+  decisions: z.array(resultContributionSchema).optional(),
+  caveats: z.array(resultContributionSchema).optional(),
+  nextActions: z.array(resultContributionSchema).optional(),
+  evidenceItems: z.array(resultEvidenceSchema).optional(),
+}).strict();
 
 export const conditionSelectPayloadSchema = z.object({ nodeId: z.string().min(1), branchRef: z.string().min(1), summary: z.string().min(1), evidence: nodeEvidencePayloadSchema }).strict();
+
+const interactionOptionSchema = z.object({
+  value: z.string().min(1),
+  label: z.string().min(1),
+  description: z.string().min(1).optional(),
+  recommended: z.boolean().optional(),
+}).strict();
+
+const textInteractionFieldSchema = z.object({
+  kind: z.literal("text"),
+  name: z.string().min(1),
+  label: z.string().min(1),
+  description: z.string().min(1).optional(),
+  multiline: z.boolean().optional(),
+  required: z.boolean().optional(),
+  placeholder: z.string().optional(),
+  defaultValue: z.string().optional(),
+}).strict();
+
+const choiceInteractionFieldSchema = z.object({
+  kind: z.literal("choice"),
+  name: z.string().min(1),
+  label: z.string().min(1),
+  description: z.string().min(1).optional(),
+  selection: z.enum(["single", "multiple"]),
+  options: z.array(interactionOptionSchema).min(1),
+  required: z.boolean().optional(),
+  defaultValue: z.union([z.string(), z.array(z.string())]).optional(),
+  minSelections: z.number().int().nonnegative().optional(),
+  maxSelections: z.number().int().positive().optional(),
+}).strict();
+
+const booleanInteractionFieldSchema = z.object({
+  kind: z.literal("boolean"),
+  name: z.string().min(1),
+  label: z.string().min(1),
+  description: z.string().min(1).optional(),
+  defaultValue: z.boolean().optional(),
+}).strict();
+
+export const interactionFieldSchema = z.discriminatedUnion("kind", [
+  textInteractionFieldSchema,
+  choiceInteractionFieldSchema,
+  booleanInteractionFieldSchema,
+]);
+
+export const requestInputPayloadSchema = z.object({
+  title: z.string().min(1),
+  instructions: z.string().min(1),
+  fields: z.array(interactionFieldSchema).min(1),
+  submitLabel: z.string().min(1).optional(),
+  relatedOutputElementIds: z.array(z.string().min(1)).optional(),
+  evidence: nodeEvidencePayloadSchema,
+}).strict();
 
 const blockActionFormFieldSchema = z.object({ name: z.string().min(1), label: z.string().min(1), type: z.enum(["text", "textarea", "select"]).optional(), required: z.boolean().optional(), options: z.array(z.string().min(1)).optional() }).strict();
 
@@ -151,6 +191,7 @@ export const dashboardBriefPayloadSchema = z.object({
 export const chronaToolPayloadSchemas = {
   "chrona.task.read": readPayloadSchema,
   "chrona.task.create": createTaskBodySchema.omit({ workspaceId: true }),
+  "chrona.goal.results.read": goalResultsReadPayloadSchema,
   "chrona.task.update": updateTaskBodySchema.omit({ workspaceId: true }),
   "chrona.plan.read": readPayloadSchema,
   "chrona.plan.generate": planGenerateToolPayloadSchema,
@@ -163,10 +204,10 @@ export const chronaToolPayloadSchemas = {
   "chrona.execution.dispatch": executionActionBodySchema,
   "chrona.node.read": readPayloadSchema,
   "chrona.dashboard.brief": dashboardBriefPayloadSchema,
-  "chrona.plan.output": planOutputPayloadSchema,
   "chrona.node.complete": taskCompletePayloadSchema,
   "chrona.node.condition_select": conditionSelectPayloadSchema,
   "chrona.node.block": blockPayloadSchema,
+  "chrona.node.request_input": requestInputPayloadSchema,
   "chrona.node.fail": failPayloadSchema,
   "chrona.node.wait_complete": waitCompletePayloadSchema,
 } as const;
@@ -174,15 +215,16 @@ export const chronaToolPayloadSchemas = {
 export const chronaPublicToolPayloadSchemas = {
   ...chronaToolPayloadSchemas,
   "chrona.task.read": publicReadPayloadSchema,
+  "chrona.goal.results.read": goalResultsReadPayloadSchema,
   "chrona.plan.read": publicReadPayloadSchema,
   "chrona.schedule.read": publicReadPayloadSchema,
   "chrona.execution.read": publicReadPayloadSchema,
   "chrona.node.read": publicReadPayloadSchema,
   "chrona.dashboard.brief": dashboardBriefPayloadSchema,
-  "chrona.plan.output": publicPlanOutputPayloadSchema,
-  "chrona.node.complete": taskCompletePayloadSchema.omit({ evidence: true }).strict(),
+  "chrona.node.complete": taskCompletePayloadSchema,
   "chrona.node.condition_select": conditionSelectPayloadSchema.omit({ evidence: true }).strict(),
   "chrona.node.block": blockPayloadSchema.omit({ evidence: true }).strict(),
+  "chrona.node.request_input": requestInputPayloadSchema.omit({ evidence: true }).strict(),
   "chrona.node.fail": failPayloadSchema.omit({ evidence: true }).strict(),
   "chrona.node.wait_complete": waitCompletePayloadSchema.omit({ evidence: true }).strict(),
 } as const;
@@ -190,33 +232,33 @@ export const chronaPublicToolPayloadSchemas = {
 export const agentControlActionKindSchema = z.enum([
   "task_read",
   "plan_read",
-  "plan_output",
   "complete",
   "condition_select",
   "wait_complete",
   "block",
+  "request_input",
   "fail",
 ]);
 
 export const agentControlActionPayloadSchemas = {
   task_read: chronaPublicToolPayloadSchemas["chrona.task.read"],
   plan_read: chronaPublicToolPayloadSchemas["chrona.plan.read"],
-  plan_output: chronaPublicToolPayloadSchemas["chrona.plan.output"],
   complete: chronaPublicToolPayloadSchemas["chrona.node.complete"],
   condition_select: chronaPublicToolPayloadSchemas["chrona.node.condition_select"],
   wait_complete: chronaPublicToolPayloadSchemas["chrona.node.wait_complete"],
   block: chronaPublicToolPayloadSchemas["chrona.node.block"],
+  request_input: chronaPublicToolPayloadSchemas["chrona.node.request_input"],
   fail: chronaPublicToolPayloadSchemas["chrona.node.fail"],
 } as const;
 
 export const agentControlActionBodySchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("task_read"), payload: agentControlActionPayloadSchemas.task_read }).strict(),
   z.object({ kind: z.literal("plan_read"), payload: agentControlActionPayloadSchemas.plan_read }).strict(),
-  z.object({ kind: z.literal("plan_output"), payload: agentControlActionPayloadSchemas.plan_output }).strict(),
   z.object({ kind: z.literal("complete"), payload: agentControlActionPayloadSchemas.complete }).strict(),
   z.object({ kind: z.literal("condition_select"), payload: agentControlActionPayloadSchemas.condition_select }).strict(),
   z.object({ kind: z.literal("wait_complete"), payload: agentControlActionPayloadSchemas.wait_complete }).strict(),
   z.object({ kind: z.literal("block"), payload: agentControlActionPayloadSchemas.block }).strict(),
+  z.object({ kind: z.literal("request_input"), payload: agentControlActionPayloadSchemas.request_input }).strict(),
   z.object({ kind: z.literal("fail"), payload: agentControlActionPayloadSchemas.fail }).strict(),
 ]);
 

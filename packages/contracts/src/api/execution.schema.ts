@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { isoDateOrNull, taskIdParam, taskPriorityEnum } from "./common";
+import { nodeDeliverableSchema, resultContributionSchema, resultEvidenceSchema } from "./result.schema";
 
 const nodeIdSchema = z.string().min(1, "nodeId is required");
 const sessionIdSchema = z.string().min(1, "sessionId is required");
@@ -24,44 +25,6 @@ const nodeActionFormSchema = z
   })
   .strict();
 
-const planOutputPatchSchema = z.discriminatedUnion("op", [
-  z
-    .object({
-      op: z.literal("add"),
-      path: z.string().min(1),
-      value: z.unknown(),
-    })
-    .strict(),
-  z.object({ op: z.literal("remove"), path: z.string().min(1) }).strict(),
-  z
-    .object({
-      op: z.literal("replace"),
-      path: z.string().min(1),
-      value: z.unknown(),
-    })
-    .strict(),
-  z
-    .object({
-      op: z.literal("move"),
-      path: z.string().min(1),
-      from: z.string().min(1),
-    })
-    .strict(),
-  z
-    .object({
-      op: z.literal("copy"),
-      path: z.string().min(1),
-      from: z.string().min(1),
-    })
-    .strict(),
-  z
-    .object({
-      op: z.literal("test"),
-      path: z.string().min(1),
-      value: z.unknown(),
-    })
-    .strict(),
-]);
 
 export const providerApprovalChoiceSchema = z.enum([
   "approve_once",
@@ -202,19 +165,17 @@ export const executionActionBodySchema = z.discriminatedUnion("action", [
     idempotencyKey: idempotencyKeySchema.optional(),
   }),
   z.object({
-    action: z.literal("update_plan_output"),
-    sessionId: sessionIdSchema.optional(),
-    nodeId: nodeIdSchema.optional(),
-    patches: z.array(planOutputPatchSchema).min(1),
-    summary: z.string().optional(),
-    idempotencyKey: idempotencyKeySchema.optional(),
-  }),
-  z.object({
     action: z.literal("complete_manual_node"),
     sessionId: sessionIdSchema.optional(),
     nodeId: nodeIdSchema.optional(),
     summary: z.string().optional(),
     output: z.unknown().optional(),
+    deliverables: z.array(nodeDeliverableSchema).optional(),
+    findings: z.array(resultContributionSchema).optional(),
+    decisions: z.array(resultContributionSchema).optional(),
+    caveats: z.array(resultContributionSchema).optional(),
+    nextActions: z.array(resultContributionSchema).optional(),
+    evidenceItems: z.array(resultEvidenceSchema).optional(),
     terminalKind: z
       .enum(["task", "condition", "checkpoint", "wait"])
       .optional(),
@@ -423,6 +384,11 @@ export const taskReopenParamSchema = z.object({ taskId: taskIdParam });
 
 // ── POST /tasks/:taskId/result/accept ──
 export const taskResultAcceptParamSchema = z.object({ taskId: taskIdParam });
+
+// ── POST /tasks/:taskId/result/finalization/retry ──
+export const taskResultFinalizationRetryParamSchema = z.object({
+  taskId: taskIdParam,
+});
 
 export const taskResultFollowUpParamSchema = z.object({ taskId: taskIdParam });
 

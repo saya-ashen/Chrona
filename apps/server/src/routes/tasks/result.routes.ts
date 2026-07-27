@@ -3,6 +3,7 @@ import { zValidator } from "@hono/zod-validator";
 import type { ChronaEngine } from "@chrona/engine";
 import {
   taskResultAcceptParamSchema,
+  taskResultFinalizationRetryParamSchema,
   taskResultFollowUpBodySchema,
   taskResultFollowUpParamSchema,
 } from "@chrona/contracts/api";
@@ -47,6 +48,28 @@ export function createTaskResultRoutes(engine: ChronaEngine) {
             "POST /api/tasks/:taskId/result/accept",
             cause,
             "Failed to accept task result",
+          );
+        }
+      },
+    )
+    .post(
+      "/tasks/:taskId/result/finalization/retry",
+      zValidator("param", taskResultFinalizationRetryParamSchema),
+      async (c) => {
+        try {
+          const { taskId } = c.req.valid("param");
+          return json(
+            c,
+            await engine.tasks.result.retryFinalization({ taskId }),
+          );
+        } catch (cause) {
+          const httpError = toHttpError(cause);
+          if (httpError) return error(c, httpError.message, httpError.status);
+          return internalServerError(
+            c,
+            "POST /api/tasks/:taskId/result/finalization/retry",
+            cause,
+            "Failed to finalize task result",
           );
         }
       },

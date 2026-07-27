@@ -66,6 +66,7 @@ function editablePlanToBlueprint(editablePlan: EditablePlan): PlanBlueprint {
             mode: node.mode,
             expectedOutput: node.expectedOutput,
             completionCriteria: node.completionCriteria,
+            userInteraction: node.userInteraction,
             estimatedMinutes: node.estimatedMinutes,
           };
         case "checkpoint":
@@ -84,6 +85,7 @@ function editablePlanToBlueprint(editablePlan: EditablePlan): PlanBlueprint {
               required: field.required,
               options: field.options,
             })),
+            interaction: node.interaction,
           };
         case "condition":
           return {
@@ -133,6 +135,7 @@ function compiledPlanToBlueprint(compiledPlan: CompiledPlan): PlanBlueprint {
             typeof config.completionCriteria === "string"
               ? config.completionCriteria
               : undefined,
+          userInteraction: config.userInteraction ?? { level: "not_expected" },
           estimatedMinutes: node.estimatedMinutes,
         } satisfies PlanBlueprintTaskNode;
       }
@@ -155,6 +158,7 @@ function compiledPlanToBlueprint(compiledPlan: CompiledPlan): PlanBlueprint {
             required: field.required,
             options: field.options,
           })),
+          interaction: config.interaction,
         } satisfies PlanBlueprintCheckpointNode;
       }
       case "condition": {

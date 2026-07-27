@@ -11,6 +11,7 @@ function task(id: string, title = id): EditableNode {
     title,
     executor: "ai",
     mode: "auto",
+    userInteraction: { level: "not_expected" },
     expectedOutput: `${title} done`,
   };
 }

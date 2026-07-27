@@ -3,8 +3,8 @@
 Pure logic for the **Chrona skill-mode** control plane (Spec 018). Used by
 `@chrona/cli` to expose `chrona node <verb>` and `chrona task|plan read`
 subcommands. The `claude_code` provider mounts a skill into every run, and
-the agent invokes the same `chrona` binary to report non-terminal outputs
-and terminal outcomes. Scope (`taskId`, `nodeId`, `sessionId`) is **never**
+the agent invokes the same `chrona` binary to submit semantic terminal
+results and outcomes. Scope (`taskId`, `nodeId`, `sessionId`) is **never**
 read from the command line — it is resolved server-side from an opaque run
 token injected as `CHRONA_RUN_TOKEN` at run start.
 
@@ -44,23 +44,22 @@ stderr. The agent is the operator; the exit code is its only feedback.
 
 The CLI accepts flag-based argv. **Task / node ids are never accepted on
 argv** — they are resolved server-side from the run token. Only payload
-fields (e.g. `--summary`, `--error`, `--branch`) and file paths (e.g.
-`--patches-file`, `--diagnostics-file`) are read from argv.
+fields (e.g. `--summary`, `--error`, `--branch`) and bounded JSON files
+(e.g. `--result-file`, `--diagnostics-file`) are read from argv.
 
 ### Node actions
 
 ```text
-chrona plan output        --patches-file <path> [--summary <s>]
-chrona node complete      [--summary <s>]
+chrona node complete      --summary <s> [--result-file <path>]
 chrona node condition-select --branch <ref> --summary <s> [--node-id <id>]
 chrona node wait-complete --summary <s>
 chrona node block         --reason <s> --action-form <json> | --action-form-file <path> [--retryable]
 chrona node fail          --error <s> [--diagnostics <json> | --diagnostics-file <path>] [--retryable]
 ```
 
-`--patches-file` takes a path to a JSON Patch array on disk (the
-canonical way to pass large patches without shell-escaping). The
-condition-select `--node-id` defaults to `"current"`; the server resolves
+`--result-file` takes a JSON object containing semantic `deliverables`,
+`findings`, `decisions`, `caveats`, `nextActions`, or `evidenceItems`.
+The condition-select `--node-id` defaults to `"current"`; the server resolves
 the actual id from the run token.
 
 ### Reads
@@ -73,8 +72,8 @@ chrona plan read
 ### Examples
 
 ```bash
-# Plan output — write JSON Patch operations to disk, then post them.
-chrona plan output --patches-file /tmp/output-patches.json --summary "wrote card"
+# Complete a node with semantic contributions and generated-file declarations.
+chrona node complete --summary "report complete" --result-file ./node-result.json
 
 # Node fail with structured diagnostics.
 chrona node fail --error "command exited 1" --diagnostics '{"exitCode":1}'
@@ -96,7 +95,6 @@ Every command POSTs to `<CHRONA_BASE_URL>/agent/control` with
 
 | Command                         | Wire `kind`        |
 | ------------------------------- | ------------------ |
-| `chrona plan output`            | `plan_output`      |
 | `chrona node complete`          | `complete`         |
 | `chrona node condition-select`  | `condition_select` |
 | `chrona node wait-complete`     | `wait_complete`    |

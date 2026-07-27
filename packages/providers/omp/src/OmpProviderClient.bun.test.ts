@@ -1,4 +1,7 @@
 import { describe, expect, it } from "bun:test";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type {
   AgentProviderClient,
   ProviderRunRef,
@@ -96,8 +99,8 @@ describe("OmpSdkProviderClient direct config", () => {
 describe("OmpSdkProviderClient node runtime tools", () => {
   it("expands task node terminal action into the full task runtime tool set", () => {
     expect(__ompSdkProviderTestHooks.sdkToolNamesForTerminal("chrona_node_complete")).toEqual([
-      "chrona_plan_output",
       "chrona_node_complete",
+      "chrona_node_request_input",
       "chrona_node_block",
       "chrona_node_fail",
     ]);
@@ -112,13 +115,57 @@ describe("OmpSdkProviderClient node runtime tools", () => {
   it("does not narrow OMP SDK tools with toolNames", () => {
     const options = __ompSdkProviderTestHooks.sdkToolOptionsForTerminal("chrona_node_complete");
     expect(options.customTools.map((tool) => tool.name)).toEqual([
-      "chrona_plan_output",
       "chrona_node_complete",
+      "chrona_node_request_input",
       "chrona_node_block",
       "chrona_node_fail",
     ]);
     expect("toolNames" in options).toBe(false);
   });
+
+  it("disables built-in tools, MCP, and LSP for read-only runs", () => {
+    expect(__ompSdkProviderTestHooks.sdkReadOnlyToolOptions("read_only")).toEqual({
+      toolNames: [],
+      enableMCP: false,
+      enableLsp: false,
+    });
+    expect(__ompSdkProviderTestHooks.sdkReadOnlyToolOptions("full")).toEqual({});
+  });
+  it("treats node result tools as terminal", () => {
+    expect(__ompSdkProviderTestHooks.isTerminalRuntimeTool("chrona_node_request_input")).toBe(true);
+    expect(__ompSdkProviderTestHooks.isTerminalRuntimeTool("chrona_node_complete")).toBe(true);
+  });
+  it("aborts only after an accepted node result action", async () => {
+    const originalFetch = globalThis.fetch;
+    const requests: string[] = [];
+    globalThis.fetch = (async (_input: string | URL | Request, init?: RequestInit) => {
+      requests.push(String(init?.body));
+      return new Response(JSON.stringify({ accepted: true }), { status: 200 });
+    }) as typeof fetch;
+    try {
+      let terminalAccepted = 0;
+      let aborts = 0;
+      const tools = __ompSdkProviderTestHooks.sdkToolOptionsForTerminal(
+        "chrona_node_complete",
+        { baseUrl: "http://chrona.test", runToken: "token" },
+        () => { terminalAccepted += 1; },
+      ).customTools;
+      const context = { abort: () => { aborts += 1; } };
+      await tools.find((tool) => tool.name === "chrona_node_complete")!.execute("complete", { summary: "Done" }, undefined, context as never, undefined);
+      await Promise.resolve();
+      expect(terminalAccepted).toBe(1);
+      expect(aborts).toBe(1);
+      await tools.find((tool) => tool.name === "chrona_node_request_input")!.execute("input", { title: "Need input", instructions: "Provide it", fields: [] }, undefined, context as never, undefined);
+      await Promise.resolve();
+      expect(terminalAccepted).toBe(2);
+      expect(aborts).toBe(2);
+      expect(requests).toHaveLength(2);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+
   it("surfaces the concrete SDK tool error text", () => {
     expect(__ompSdkProviderTestHooks.sdkToolErrorMessage({
       content: [{ type: "text", text: "Chrona control request timed out" }],
@@ -143,6 +190,40 @@ describe("OmpSdkProviderClient node runtime tools", () => {
       }],
     })).toBe("Deadline exceeded");
   });
+  it("treats an aborted agent end as completed after a terminal action was accepted", () => {
+    const event = {
+      type: "agent_end" as const,
+      messages: [{
+        role: "assistant" as const,
+        content: [],
+        api: "openai-completions",
+        provider: "test",
+        model: "test",
+        usage: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, totalTokens: 0, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } },
+        stopReason: "aborted" as const,
+        errorMessage: "Operation aborted",
+        timestamp: 0,
+      }],
+    };
+    expect(__ompSdkProviderTestHooks.agentEndOutcome(event, true)).toEqual({ status: "completed" });
+    expect(__ompSdkProviderTestHooks.agentEndOutcome(event, false)).toEqual({ status: "failed", error: "Operation aborted" });
+  });
+
+  it("extracts an accepted OMP terminal tool from the completed snapshot", () => {
+    const terminal = __ompSdkProviderTestHooks.terminalNodeToolFromSnapshot({
+      raw: {
+        terminalTool: {
+          name: "chrona_node_complete",
+          input: { summary: "Completed package" },
+        },
+      },
+    });
+    expect(terminal).toEqual({
+      name: "chrona_node_complete",
+      input: { summary: "Completed package" },
+    });
+  });
+
 
   it("accepts successful agent endings", () => {
     expect(__ompSdkProviderTestHooks.agentEndFailure({
@@ -266,5 +347,68 @@ describe("OmpProviderClient SDK delegation", () => {
       sessionRef: "/tmp/session.jsonl.handoff",
       handoffText: "compacted context",
     });
+  });
+  it("loads the current OMP default independently of process-global Settings", async () => {
+    const agentDir = await mkdtemp(join(tmpdir(), "chrona-omp-settings-"));
+    try {
+      await writeFile(join(agentDir, "config.yml"), [
+        "modelRoles:",
+        "  default: OmniRoute/gpt-5.6-sol",
+        "",
+      ].join("\n"));
+
+      const settings = await __ompSdkProviderTestHooks.loadSdkSettings({
+        agentDir,
+      }, "/tmp/workspace");
+
+      expect(settings.getModelRole("default")).toBe("OmniRoute/gpt-5.6-sol");
+    } finally {
+      await rm(agentDir, { recursive: true, force: true });
+    }
+  });
+
+  it("reports effective SDK configuration without secrets", async () => {
+    const client = new OmpSdkProviderClient({
+      config: {
+        model: "gpt-test",
+        baseUrl: "https://example.invalid/v1",
+        configDirectory: "/tmp/omp-config",
+        codingAgentDirectory: "/tmp/omp-agent",
+        cwd: "/tmp/workspace",
+        apiKey: "secret",
+      },
+    });
+
+    const diagnostics = await client.getRuntimeDiagnostics();
+    expect(diagnostics).toMatchObject({
+      provider: "omp",
+      contextStrategy: "auto_compact",
+      workingDirectory: "/tmp/workspace",
+      configDirectory: "/tmp/omp-config",
+      agentDirectory: "/tmp/omp-agent",
+      configurationCapabilities: {
+        tooling: {
+          mcp: { supported: true, enabled: true },
+          lsp: { supported: true, enabled: true },
+          subagents: { supported: true, enabled: true },
+          enabledTools: expect.arrayContaining([
+            "lsp",
+            "task",
+            "chrona_node_complete",
+            "chrona_node_request_input",
+            "chrona_node_block",
+            "chrona_node_fail",
+          ]),
+        },
+      },
+      sources: {
+        model: "provider_override",
+        context: "provider_default",
+        configDirectory: "provider_override",
+        agentDirectory: "provider_override",
+        tools: "runtime",
+      },
+    });
+    expect(JSON.stringify(diagnostics)).not.toContain("secret");
   });
 });

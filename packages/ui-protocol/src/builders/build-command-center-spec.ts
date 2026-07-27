@@ -28,6 +28,12 @@ export interface CommandCenterCopyInput {
   showFewerArtifacts?: string;
 }
 
+export type CommandCenterCheckpointFieldInput =
+  | { kind: "text"; name: string; label: string; description?: string; multiline?: boolean; required?: boolean; placeholder?: string; defaultValue?: string }
+  | { kind: "choice"; name: string; label: string; description?: string; selection: "single" | "multiple"; options: Array<{ value: string; label: string; description?: string; recommended?: boolean }>; required?: boolean; defaultValue?: string | string[]; minSelections?: number; maxSelections?: number }
+  | { kind: "boolean"; name: string; label: string; description?: string; defaultValue?: boolean }
+  | { name: string; label: string; type?: "text" | "textarea" | "select"; required?: boolean; options?: string[]; value?: string };
+
 export interface CommandCenterCheckpointActionInput {
   id: string;
   label: string;
@@ -41,6 +47,7 @@ export interface CommandCenterCheckpointInput {
   title: string;
   message: string;
   severity?: "info" | "warning" | "error";
+  form?: { instructions: string; submitLabel?: string; inputFields: CommandCenterCheckpointFieldInput[] };
   availableActions: CommandCenterCheckpointActionInput[];
 }
 
@@ -131,14 +138,60 @@ export function buildCommandCenterCheckpointSpec(input: {
   const inlineActionChildren: string[] = [];
   const formActionChildren: string[] = [];
   const isRecoveryCheckpoint = checkpoint.severity === "error";
+  const state: Record<string, unknown> = {};
 
+
+  if (checkpoint.form) {
+    for (const field of checkpoint.form.inputFields) {
+      const fieldKey = `field:${field.name}`;
+      const statePath = `/${field.name}`;
+      state[field.name] = "kind" in field
+        ? field.kind === "choice"
+          ? field.defaultValue ?? (field.selection === "multiple" ? [] : "")
+          : field.kind === "boolean"
+            ? field.defaultValue ?? false
+            : field.defaultValue ?? ""
+        : field.value ?? "";
+      const required = "required" in field && field.required;
+      if ("kind" in field && field.kind === "choice") {
+        elements[fieldKey] = {
+          type: "CheckpointChoiceField",
+          props: {
+            label: field.label,
+            name: field.name,
+            description: field.description,
+            selection: field.selection,
+            options: field.options,
+            value: { $bindState: statePath },
+            required,
+          },
+        };
+      } else if ("kind" in field && field.kind === "boolean") {
+        elements[fieldKey] = { type: "Checkbox", props: { label: field.label, name: field.name, checked: { $bindState: statePath } } };
+      } else {
+        const multiline = "kind" in field ? field.multiline : field.type !== "text" && field.type !== "select";
+        const select = !("kind" in field) && field.type === "select";
+        elements[fieldKey] = {
+          type: select ? "Select" : multiline ? "Textarea" : "Input",
+          props: {
+            label: field.label,
+            name: field.name,
+            value: { $bindState: statePath },
+            ...(select ? { options: field.options ?? [] } : {}),
+            ...(required ? { checks: [{ type: "required" }], validateOn: "blur" } : {}),
+          },
+        };
+      }
+      children.push(fieldKey);
+    }
+  }
   for (const action of checkpoint.availableActions) {
     if (!shouldRenderCheckpointAction({ isRecoveryCheckpoint, actionId: action.id })) continue;
     const actionChildren: string[] = [];
     const actionKey = `action:${action.id}`;
     const stateKey = `payload_${action.id}`;
 
-    if (action.requiresPayload) {
+    if (action.requiresPayload && !checkpoint.form) {
       const fieldKey = `field:${action.id}`;
       elements[fieldKey] = {
         type: "Textarea",
@@ -165,7 +218,11 @@ export function buildCommandCenterCheckpointSpec(input: {
           params: {
             checkpointId: checkpoint.id,
             actionId: action.id,
-            values: action.requiresPayload ? { [stateKey]: { $state: `/${stateKey}` } } : undefined,
+            values: checkpoint.form
+              ? { $state: "/" }
+              : action.requiresPayload
+                ? { [stateKey]: { $state: `/${stateKey}` } }
+                : undefined,
           },
         },
       },
@@ -215,7 +272,7 @@ export function buildCommandCenterCheckpointSpec(input: {
     children.push("form-actions");
   }
 
-  return { root: "root", elements, state: {} };
+  return { root: "root", elements, state };
 }
 
 export function buildCommandCenterArtifactsSpec(input: {

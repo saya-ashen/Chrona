@@ -1,6 +1,7 @@
 import type {
   AiVisibleRefBinding,
   CheckpointConfig,
+  CheckpointInputFields,
   ConditionConfig,
   EffectivePlanGraph,
   EffectivePlanNode,
@@ -12,7 +13,39 @@ import type {
 } from "@chrona/contracts/ai";
 import { ENGINE_ERROR_CODES, EngineError } from "../../../errors";
 
-export type NodeRuntimePlanContext = NodeRuntimeInput["context"]["plan"];
+type RuntimeGoalContext = {
+  goal: {
+    title: string;
+    additionalContext?: string;
+    operationalBrief?: {
+      outcome: string;
+      currentFocus: string;
+      strategy: string;
+      constraints: string[];
+    };
+    capturedAt?: string;
+  };
+  acceptedResults: Array<{
+    ref: string;
+    taskTitle: string;
+    acceptedAt?: string | null;
+    summary: string;
+    artifactCount: number;
+  }>;
+  assets?: Array<{
+    ref: string;
+    label: string;
+    kind: string;
+    role: string;
+    version: number | null;
+    updatedAt: string;
+    content: string;
+  }>;
+};
+
+export type NodeRuntimePlanContext = NodeRuntimeInput["context"]["plan"] & {
+  goalContext?: RuntimeGoalContext;
+};
 export type NodeRuntimeRunContext = NonNullable<NodeRuntimeInput["context"]["run"]>;
 
 function defaultPlanContext(): NodeRuntimePlanContext {
@@ -122,28 +155,27 @@ function runtimeNode(node: EffectivePlanNode, ref: string): NodeRuntimeInput["no
   }
 }
 
-type RuntimeVisiblePlanOutput = NodeRuntimeInput["context"]["planOutput"];
+type RuntimeVisibleResultManifest = NodeRuntimeInput["context"]["resultManifest"];
 
-function visiblePlanOutput(
-  planOutput: PlanOutputState | RuntimeVisiblePlanOutput | undefined,
-): RuntimeVisiblePlanOutput {
-  if (!planOutput) {
-    return { revision: 0, hasSpec: false, root: null, rootChildren: [], elementIds: [], updatedAt: null };
-  }
-  if ("hasSpec" in planOutput) return planOutput;
-  const root = planOutput.spec?.root ?? null;
-  const elements = planOutput.spec?.elements ?? {};
-  const rootElement = root ? elements[root] : undefined;
-  const rootChildren = Array.isArray(rootElement?.children) ? rootElement.children : [];
-  const summary = planOutput.history.at(-1)?.summary;
+function visibleResultManifest(
+  planOutput: PlanOutputState | RuntimeVisibleResultManifest | undefined,
+): RuntimeVisibleResultManifest {
+  if (planOutput && "sourceRevision" in planOutput) return planOutput;
+  const manifest = planOutput?.manifest;
   return {
-    revision: planOutput.revision,
-    hasSpec: planOutput.spec !== null,
-    root,
-    rootChildren,
-    elementIds: Object.keys(elements),
-    updatedAt: planOutput.updatedAt,
-    ...(summary ? { lastSummary: summary } : {}),
+    sourceRevision: manifest?.sourceRevision ?? 0,
+    outcome: manifest?.outcome ?? {
+      title: "Result pending",
+      summary: "No node result has been submitted.",
+    },
+    currentDeliverableKeys:
+      manifest?.deliverables
+        .filter((item) => item.status === "current")
+        .map((item) => item.deliverableKey) ?? [],
+    findingKeys: manifest?.findings.map((item) => item.key) ?? [],
+    decisionKeys: manifest?.decisions.map((item) => item.key) ?? [],
+    caveatKeys: manifest?.caveats.map((item) => item.key) ?? [],
+    nextActionKeys: manifest?.nextActions.map((item) => item.key) ?? [],
   };
 }
 
@@ -151,9 +183,11 @@ function compactPreviousResults(input: {
   plan: EffectivePlanGraph;
   history: SemanticRefHistory;
   node: EffectivePlanNode;
-  planOutput?: PlanOutputState | RuntimeVisiblePlanOutput;
+  planOutput?: PlanOutputState | RuntimeVisibleResultManifest;
   planContext?: NodeRuntimePlanContext;
   runContext?: NodeRuntimeRunContext;
+  userInput?: string;
+  inputFields?: CheckpointInputFields;
 }): NodeRuntimeInput["context"] {
   const directDependencyIds = dependencyIds(input.node);
   const completed = input.plan.nodes.filter((node) => node.status === "completed" || node.status === "skipped");
@@ -163,6 +197,7 @@ function compactPreviousResults(input: {
       nodeRef: refForNode(input.history, node.id).ref,
       title: node.title,
       summary: outputSummary(node),
+      ...(node.result?.inputFields ? { inputFields: node.result.inputFields } : {}),
     }));
   const globalItems = completed
     .filter((node) => !matchesDependency(node, directDependencyIds))
@@ -171,15 +206,35 @@ function compactPreviousResults(input: {
       return summary ? `${node.title}: ${summary}` : node.title;
     })
     .filter((item) => item.trim().length > 0);
+  const { goalContext, ...planContext } = input.planContext ?? defaultPlanContext();
 
   return {
-    plan: input.planContext ?? defaultPlanContext(),
+    plan: planContext,
     ...(input.runContext ? { run: input.runContext } : {}),
+    ...(goalContext
+      ? {
+          goal: goalContext.goal,
+          ...(goalContext.assets?.length
+            ? { goalAssets: goalContext.assets }
+            : {}),
+          ...(goalContext.acceptedResults.length > 0
+            ? { acceptedGoalResults: goalContext.acceptedResults }
+            : {}),
+        }
+      : {}),
+    ...(input.userInput || input.inputFields
+      ? {
+          currentNodeInput: {
+            ...(input.userInput ? { text: input.userInput } : {}),
+            ...(input.inputFields ? { fields: input.inputFields } : {}),
+          },
+        }
+      : {}),
     relevantPreviousResults: directDependencies,
     ...(globalItems.length > 0
       ? { globalSummary: globalItems.slice(0, 3).join("; ") + (globalItems.length > 3 ? `; +${globalItems.length - 3} more` : "") }
       : {}),
-    planOutput: visiblePlanOutput(input.planOutput),
+    resultManifest: visibleResultManifest(input.planOutput),
   };
 }
 
@@ -284,9 +339,11 @@ export function branchBindingForRef(input: {
 export function buildNodeRuntimeInput(input: {
   plan: EffectivePlanGraph;
   node: EffectivePlanNode;
-  planOutput?: PlanOutputState | RuntimeVisiblePlanOutput;
+  planOutput?: PlanOutputState | RuntimeVisibleResultManifest;
   planContext?: NodeRuntimePlanContext;
   runContext?: NodeRuntimeRunContext;
+  userInput?: string;
+  inputFields?: CheckpointInputFields;
 }): NodeRuntimeInput {
   const history = buildSemanticRefHistory(input.plan);
   const currentRef = refForNode(history, input.node.id);
@@ -302,7 +359,7 @@ export function buildNodeRuntimeInput(input: {
 
   return {
     node: runtimeNode(input.node, currentRef.ref),
-    context: compactPreviousResults({ plan: input.plan, history, node: input.node, planOutput: input.planOutput, planContext: input.planContext, runContext: input.runContext }),
+    context: compactPreviousResults({ plan: input.plan, history, node: input.node, planOutput: input.planOutput, planContext: input.planContext, runContext: input.runContext, userInput: input.userInput, inputFields: input.inputFields }),
     branchOptions,
   };
 }

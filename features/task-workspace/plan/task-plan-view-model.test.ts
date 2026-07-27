@@ -689,4 +689,44 @@ describe("task-plan-view-model", () => {
     expect(graphPlan?.analytics.entryNodeIds).not.toContain("task-yes");
     expect(graphPlan?.analytics.terminalNodeIds).toEqual(["condition-1"]);
   });
+  it("projects possible user interaction without treating it as a live input wait", () => {
+    const plan: CompiledPlan = {
+      id: "compiled-interaction",
+      editablePlanId: "plan-interaction",
+      sourceVersion: 1,
+      title: "Interaction forecast",
+      goal: "Warn before execution",
+      assumptions: [],
+      nodes: [{
+        id: "task-research",
+        localId: "task_research",
+        type: "task",
+        title: "Research options",
+        executor: "ai",
+        mode: "auto",
+        config: {
+          userInteraction: {
+            level: "possible",
+            reason: "Meaningful tradeoffs may require a choice",
+          },
+        },
+        dependencies: [],
+        dependents: [],
+      }],
+      edges: [],
+      entryNodeIds: ["task-research"],
+      terminalNodeIds: ["task-research"],
+      topologicalOrder: ["task-research"],
+      completionPolicy: { type: "all_tasks_completed" },
+      validationWarnings: [],
+    };
+
+    const node = compiledPlanToGraphPlan(plan)?.nodes[0];
+
+    expect(node).toMatchObject({
+      userInteractionExpectation: "possible",
+      userInteractionReason: "Meaningful tradeoffs may require a choice",
+      requiresHumanInput: false,
+    });
+  });
 });

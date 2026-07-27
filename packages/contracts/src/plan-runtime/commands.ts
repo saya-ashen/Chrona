@@ -1,7 +1,13 @@
 import type { PlanPatch } from "../ai-plan-blueprint";
+import type { CheckpointInputFields } from "./checkpoints";
 import type { GraphMutationOperation } from "./graph";
 import type { NodeActionForm } from "./node";
-import type { NodeResult, PlanOutputPatch } from "./node-result";
+import type {
+  AiArtifactRef,
+  NodeDeliverableDeclaration,
+  NodeResult,
+  ResultContribution,
+} from "./node-result";
 
 export type RuntimeCommand =
   | { type: "start_plan" }
@@ -20,7 +26,6 @@ export type ExecutionActionType =
   | "resume_with_input"
   | "resume_with_approval"
   | "resume_after_unblock"
-  | "update_plan_output"
   | "complete_manual_node"
   | "block_current_node"
   | "fail_current_node"
@@ -50,7 +55,7 @@ export type ExecutionActionInput =
       action: "resume_with_input";
       sessionId?: string;
       nodeId?: string;
-      inputFields: Record<string, string>;
+      inputFields: CheckpointInputFields;
       workBlockId?: string;
       idempotencyKey?: string;
     }
@@ -73,19 +78,21 @@ export type ExecutionActionInput =
       idempotencyKey?: string;
     }
   | {
-      action: "update_plan_output";
-      sessionId?: string;
-      nodeId?: string;
-      patches: PlanOutputPatch[];
-      summary?: string;
-      idempotencyKey?: string;
-    }
-  | {
       action: "complete_manual_node";
       sessionId?: string;
       nodeId?: string;
       summary?: string;
       output?: unknown;
+      deliverables?: NodeDeliverableDeclaration[];
+      findings?: ResultContribution[];
+      decisions?: ResultContribution[];
+      caveats?: ResultContribution[];
+      nextActions?: ResultContribution[];
+      evidenceItems?: Array<{
+        key: string;
+        summary: string;
+        artifactRef?: AiArtifactRef;
+      }>;
       selectedBranch?: NodeResult["selectedBranch"];
       terminalKind?: "task" | "condition" | "checkpoint" | "wait";
       branchRef?: string;

@@ -28,7 +28,7 @@ Chrona 的长期价值应随 AI 能力增强而增强：
 
 | 长期能力 | 为什么会随 AI 变强而更重要 |
 | --- | --- |
-| 日程触发执行 | AI 能做更多事，但仍需要用户拥有的时间约束。 |
+| Trigger 驱动执行 | AI 能做更多事，但仍需要用户拥有的触发规则；日程是当前已实现来源，未来来源必须保持相同的审批、幂等与审计边界。 |
 | 人工审批与恢复 | 自动化越强，未经约束的错误代价越高。 |
 | 可观察执行记录 | 更长的 AI 工作需要进度、证据和失败原因。 |
 | 统一用户态状态 | AI 行为越动态，内部状态越多；用户需要一个清晰状态和下一步动作。 |
@@ -68,7 +68,7 @@ Chrona 的长期价值应随 AI 能力增强而增强：
 
 ## AI-first 执行原则
 
-1. **已排期工作是产品中心。** 计划、Provider 和结果表面都服务于推进已排期工作。
+1. **已排期工作是当前产品中心。** 已接受的目标设计会把日程推广为 Trigger 创建的任务实例，同时保持时间约束、审批和用户控制为权威。
 2. **AI 可以提出建议，Chrona 拥有状态。** 模型可以建议计划、patch、摘要和结果，但 task、schedule、execution、approval、recovery 状态由 Chrona 拥有。
 3. **每个非 happy path 都要有一个清晰下一步动作。** waiting、blocked、failed、cancelled、review 状态必须告诉用户下一步做什么。
 4. **Provider 差异停留在产品层以下。** 产品 UI 依赖 capability 和归一化事件，而不是 Provider 名称。
@@ -203,6 +203,9 @@ Download release -> start binary -> configure provider -> run demo schedule task
 | 服务执行的记忆 | 用 task/workspace memory 改善规划和节点执行，但默认不把它作为独立用户目的地。 |
 | 投影一致性 | 让 Schedule、Dashboard、Task Workspace 的页面投影更快、更一致，并在可能时保持 task-scoped。 |
 | 验证 | 为 plan generation、graph execution、task-scoped execution actions、MCP/provider contracts、projections、schedule decisions 和 json-render fallback 增加聚焦测试。 |
+| 长期目标 | 增加持久 Goal 生命周期和有边界的 Goal 子任务，不引入持续运行的 Provider session。 |
+| 任务实例模型 | 分离可重复任务系列生命周期与单次执行状态；WorkBlock 只保留为可选日历容器。 |
+| 可扩展 Trigger | 将日程激活推广为经过验证的 Trigger 定义和幂等 Delivery；Webhook/内部事件必须等到端到端实现时再加入。 |
 
 ## 长期方向
 
@@ -210,10 +213,10 @@ Download release -> start binary -> configure provider -> run demo schedule task
 
 | 主题 | 方向 |
 | --- | --- |
-| 主动 AI 排期 | Chrona 根据任务状态、用户时间和 Provider capability 判断何时应规划、排期、执行、审查或延后工作。 |
-| 外部输入 | 将对话、邮件、笔记和外部系统转成可规划、可排期、可执行、可审查的 Chrona 任务。 |
-| 人类治理的自动化 | 支持更强自动化，同时保留审批边界、审计轨迹、恢复路径和用户拥有的日程策略。 |
-| Agent 生态 | 让更多 agents 和 tools 通过显式、可检查 contracts 参与工作，同时 Chrona 保持 AI 日程软件的权威状态。 |
+| 主动激活 | Chrona 根据 Goal/任务状态、用户策略和 Provider capability 判断何时应规划、排期、触发、执行、审查或延后工作。 |
+| 外部输入与 Trigger | 将对话、邮件、笔记和外部系统转换为经过验证的 Trigger Delivery 或结构化任务，不允许外部 payload 拥有权限或运行时状态。 |
+| 人类治理的自动化 | 支持更强的日程/事件自动化，同时保留审批边界、幂等、审计轨迹、恢复路径和用户拥有的策略。 |
+| Agent 生态 | 让更多 Agent、Trigger 和工具通过显式、可检查契约参与工作，同时 Chrona 对 Goal、任务、任务实例和执行状态保持权威。 |
 | 协作 | 在单用户执行治理稳定后，加入更强的多人审查、审批、审计轨迹和共享执行上下文。 |
 | 生产强化 | 改进认证、备份/恢复、可观测性、迁移安全、部署文档和运维 runbooks，同时不放弃 local-first 简洁性。 |
 | 组织级规划 | 将个人任务、日程、依赖和执行历史连接成项目/组合级可见性。 |

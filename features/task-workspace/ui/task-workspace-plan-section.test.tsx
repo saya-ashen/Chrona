@@ -449,17 +449,31 @@ describe("TaskWorkspacePlanSection", () => {
     ).toBeInTheDocument();
     expect(
       within(getOperationPanel()).getByRole("button", {
-        name: "Restart from beginning",
+        name: "Run plan from beginning",
       }),
     ).toBeInTheDocument();
     fireEvent.click(
       within(getOperationPanel()).getByRole("button", {
-        name: "Restart from beginning",
+        name: "Run plan from beginning",
       }),
     );
-    expect(onDispatchExecutionAction).toHaveBeenCalledWith({
+    expect(screen.getByRole("dialog", { name: "Choose how to recover this task" })).toBeInTheDocument();
+    expect(screen.getByText("Completed steps may already have changed external systems. Running again can repeat those actions.")).toBeInTheDocument();
+    fireEvent.change(screen.getByPlaceholderText("For example: collect fresh data and do not reuse earlier search results."), { target: { value: "Use fresh sources" } });
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Run plan from beginning" }));
+    await waitFor(() => expect(onDispatchExecutionAction).toHaveBeenCalledWith({
       action: "restart_from_beginning",
-    });
+      prompt: "Use fresh sources",
+    }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    fireEvent.click(within(getOperationPanel()).getByRole("button", { name: "Run plan from beginning" }));
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: /^Generate a new plan/ }));
+    fireEvent.change(screen.getByPlaceholderText("For example: use a different approach and remove the unreliable step."), { target: { value: "Remove the unreliable step" } });
+    fireEvent.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Generate a new plan" }));
+    await waitFor(() => expect(onGeneratePlan).toHaveBeenCalledWith({
+      userInstruction: "Remove the unreliable step",
+      replaceActiveExecution: true,
+    }));
 
     accepted.rerender(
       <TaskWorkspacePlanSection
@@ -501,19 +515,11 @@ describe("TaskWorkspacePlanSection", () => {
     expect(
       within(getOperationPanel()).getByLabelText(/Decision/),
     ).toBeInTheDocument();
-    expect(screen.getByTestId("execution-focus-header")).toHaveTextContent(
-      "Review generated output",
-    );
+    expect(screen.queryByTestId("execution-focus-header")).not.toBeInTheDocument();
+    expect(getOperationPanel()).toHaveTextContent("Review generated output");
     expect(screen.queryByTestId("current-runtime-activity")).not.toBeInTheDocument();
-    expect(
-      screen.getByRole("region", { name: "Stage results" }),
-    ).toHaveTextContent("Starting plan");
-    expect(screen.getByTestId("execution-navigator")).toHaveTextContent(
-      "steps complete",
-    );
-    expect(
-      screen.queryByTestId("task-plan-graph-panel"),
-    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Stage results" })).not.toBeInTheDocument();
+    expect(screen.getByTestId("task-plan-graph-panel")).toBeInTheDocument();
   });
 
   it("separates the inspected step from the current execution step", () => {
@@ -1648,6 +1654,42 @@ describe("TaskWorkspacePlanSection", () => {
         planGenerationStatus="idle"
         acceptPlanError={null}
         runtimeEvents={[]}
+        currentExecution={{
+          taskId: "task-1",
+          planId: "plan-1",
+          mainSessionId: "session-1",
+          status: "completed",
+          currentNodeId: null,
+          executedNodeIds: ["weather-script"],
+          waitingNodeIds: [],
+          blockedNodeIds: [],
+          message: "Execution completed",
+          checkpoint: null,
+          planOutput: {
+            manifest: {
+              schemaVersion: 1,
+              sourceRevision: 1,
+              outcome: { title: "Weather script", summary: "Script created." },
+              readiness: { status: "ready", summary: "Ready for review." },
+              deliverables: [],
+              findings: [],
+              decisions: [],
+              caveats: [],
+              nextActions: [],
+              evidence: [],
+            },
+            finalizedResult: null,
+            finalization: {
+              status: "Ready",
+              sourceRevision: 1,
+              attempt: 1,
+              finalizedAt: "2026-05-18T00:00:00.000Z",
+            },
+            revision: 1,
+            updatedAt: "2026-05-18T00:00:00.000Z",
+            updatedByNodeId: "weather-script",
+          },
+        }}
         onGeneratePlan={vi.fn()}
         onApplyPlan={vi.fn()}
         onDispatchExecutionAction={onDispatchExecutionAction}
@@ -1743,6 +1785,17 @@ describe("TaskWorkspacePlanSection", () => {
         isGraphPlanPending={false}
         pageData={createTaskWorkspaceFixturePageData({
           task: { status: "Done" },
+          latestRunSummary: {
+            id: "run-1",
+            status: "Completed",
+            startedAt: "2026-05-18T00:00:00.000Z",
+            syncStatus: "healthy",
+          },
+          resultReview: {
+            status: "accepted",
+            runId: "run-1",
+            acceptedAt: "2026-05-18T00:00:00.000Z",
+          },
         })}
         plan={
           {
@@ -1865,6 +1918,17 @@ describe("TaskWorkspacePlanSection", () => {
         isGraphPlanPending={false}
         pageData={createTaskWorkspaceFixturePageData({
           task: { status: "Done" },
+          latestRunSummary: {
+            id: "run-1",
+            status: "Completed",
+            startedAt: "2026-05-18T00:00:00.000Z",
+            syncStatus: "healthy",
+          },
+          resultReview: {
+            status: "accepted",
+            runId: "run-1",
+            acceptedAt: "2026-05-18T00:00:00.000Z",
+          },
         })}
         plan={
           {

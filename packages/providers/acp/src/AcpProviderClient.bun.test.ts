@@ -223,6 +223,25 @@ describe("AcpProviderClient", () => {
     expect(streamed.at(-1)).toMatchObject({ type: "run_completed", provider: "test_acp" });
   });
 
+
+  it("removes Chrona MCP from read-only sessions", async () => {
+    const transport = new FakeAcpTransport({ updates: [{ kind: "stop", stopReason: "end_turn", response: { stopReason: "end_turn" } }] });
+    const client = new AcpProviderClient({
+      config: config({ mcpBaseUrl: "http://chrona.test", mcpRunToken: "run-token" }),
+      transport,
+    });
+
+    const run = await client.startRun(baseInput({
+      sessionId: "chrona-session-read-only",
+      sessionKey: "chrona:goal:review",
+      toolPolicy: "read_only",
+    }));
+    await Array.fromAsync(client.streamRun({ runId: run.runId }));
+
+    expect(transport.requests.find((request) => request.method === "session/new")?.params).toMatchObject({
+      mcpServers: [],
+    });
+  });
   it("loads the prior ACP session when resumeSessionRef is present", async () => {
     const transport = new FakeAcpTransport({ updates: [{ kind: "stop", stopReason: "end_turn", response: { stopReason: "end_turn" } }] });
     const client = new AcpProviderClient({

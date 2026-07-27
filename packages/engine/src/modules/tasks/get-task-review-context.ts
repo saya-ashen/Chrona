@@ -1,11 +1,16 @@
 import { db } from "@/lib/db";
 import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
+import { aiArtifactRef } from "../plan-execution/use-cases/register-generated-plan-output-artifacts";
 
 export async function getTaskReviewContext(input: { taskId: string }) {
   const task = await db.task.findUnique({
     where: { id: input.taskId },
     select: {
-      runs: { orderBy: { createdAt: "desc" }, take: 1 },
+      artifacts: {
+        orderBy: { createdAt: "desc" },
+        take: 5,
+        select: { id: true, title: true, type: true, uri: true },
+      },
       approvals: { orderBy: { requestedAt: "desc" }, take: 5 },
       scheduleProposals: {
         where: { status: "Pending" },
@@ -18,7 +23,21 @@ export async function getTaskReviewContext(input: { taskId: string }) {
     throw new EngineError(ENGINE_ERROR_CODES.TASK_NOT_FOUND, "Task not found");
   }
 
-  const latestRun = task.runs[0] ?? null;
+  const latestRun = await db.run.findFirst({
+    where: { taskId: input.taskId },
+    orderBy: [{ createdAt: "desc" }, { id: "desc" }],
+  });
+  const acceptance = latestRun
+    ? await db.event.findFirst({
+        where: {
+          taskId: input.taskId,
+          runId: latestRun.id,
+          eventType: "task.result_accepted",
+        },
+        orderBy: { ingestedAt: "desc" },
+      })
+    : null;
+  const acceptancePayload = acceptance?.payload as { accepted_at?: unknown } | null;
 
   return {
     latestRunSummary: latestRun
@@ -29,6 +48,21 @@ export async function getTaskReviewContext(input: { taskId: string }) {
           syncStatus: latestRun.syncStatus,
         }
       : null,
+    resultReview: latestRun
+      ? {
+          status: acceptance ? "accepted" as const : "pending_acceptance" as const,
+          runId: latestRun.id,
+          acceptedAt: acceptance
+            ? typeof acceptancePayload?.accepted_at === "string"
+              ? acceptancePayload.accepted_at
+              : acceptance.ingestedAt.toISOString()
+            : null,
+        }
+      : null,
+    artifacts: task.artifacts.map((artifact) => ({
+      ...artifact,
+      artifactRef: aiArtifactRef(artifact.id),
+    })),
     scheduleProposals: task.scheduleProposals.map((proposal) => ({
       id: proposal.id,
       source: proposal.source,

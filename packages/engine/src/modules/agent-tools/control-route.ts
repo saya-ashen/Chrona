@@ -96,6 +96,10 @@ export async function handleControlAction(input: HandleControlActionInput): Prom
 
   const result = await submitTerminalNodeResult({
     taskId: scope.taskId,
+    commandContext: {
+      runId: scope.runId,
+      nodeAttemptId: scope.nodeAttemptId,
+    },
     action,
   });
 

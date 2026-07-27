@@ -82,6 +82,116 @@ describe("TaskWorkspaceExecutionOverview", () => {
     window.localStorage.clear();
   });
 
+  it("keeps approval waits in stage results instead of final result", () => {
+    const view = createTaskWorkspaceExecutionConsoleView(
+      executionMonitoringWorkspaceFixtures.approvalNeeded,
+    );
+    renderOverview(view, {
+      currentExecution: { status: "waiting_for_approval" } as never,
+    });
+
+    expect(screen.getByRole("heading", { name: "Stage results" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Final result" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("status", { name: "Execution is producing output" })).not.toBeInTheDocument();
+    expect(screen.queryByText("AI is working")).not.toBeInTheDocument();
+    expect(screen.getAllByText("Paused").length).toBeGreaterThan(0);
+  });
+
+  it("shows a persisted node error even when Activity has no danger event", () => {
+    const view = createTaskWorkspaceExecutionConsoleView(
+      executionMonitoringWorkspaceFixtures.running,
+    );
+    renderOverview(view, {
+      activity: [],
+      nodes: [{
+        id: "search-jobs",
+        title: "Find matching PhD roles",
+        objective: "Find matching roles",
+        phase: "Execution",
+        status: "failed",
+        metadata: {
+          error: "Provider run was cancelled before recording a Chrona terminal result action",
+        },
+      }],
+      currentExecution: {
+        status: "failed",
+        planOutput: undefined,
+      },
+    });
+
+    expect(screen.getByRole("alert")).toHaveTextContent("Run had a failure");
+    expect(screen.getByRole("alert")).toHaveTextContent(
+      "Provider run was cancelled before recording a Chrona terminal result action",
+    );
+  });
+
+  it("does not promote a recovered tool failure after execution completes", () => {
+    const view = createTaskWorkspaceExecutionConsoleView(
+      executionMonitoringWorkspaceFixtures.running,
+    );
+    renderOverview(view, {
+      activity: [{
+        id: "read-failed",
+        kind: "tool_completed",
+        title: "Read failed",
+        summary: "Invalid selector ':'",
+        description: "The read command used an invalid selector and execution recovered.",
+        tone: "danger",
+        timestamp: "2026-07-19T10:26:27.509Z",
+      }],
+      currentExecution: {
+        status: "completed",
+        planOutput: undefined,
+      },
+    });
+
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+
+  it("shows finalization failure with retry instead of validated-result labeling", async () => {
+    const user = userEvent.setup();
+    const retry = vi.fn();
+    const view = createTaskWorkspaceExecutionConsoleView(
+      executionMonitoringWorkspaceFixtures.artifactPresent,
+    );
+
+    renderOverview(view, {
+      currentExecution: {
+        status: "completed",
+        planOutput: {
+          manifest: {
+            schemaVersion: 1,
+            sourceRevision: 3,
+            outcome: { title: "", summary: "" },
+            readiness: { status: "partial", summary: "" },
+            deliverables: [], findings: [], decisions: [],
+            caveats: [], nextActions: [], evidence: [],
+          },
+          finalizedResult: null,
+          revision: 3,
+          updatedAt: null,
+          updatedByNodeId: null,
+          finalization: {
+            status: "Failed",
+            sourceRevision: 3,
+            attempt: 1,
+            failedAt: "2026-07-26T00:00:00.000Z",
+            errorCode: "RESULT_FINALIZATION_FAILED",
+            errorMessage: "Invalid result schema",
+          },
+        },
+      },
+      onRetryFinalization: retry,
+    });
+
+    expect(screen.getByRole("heading", { name: "Final result unavailable" })).toBeInTheDocument();
+    expect(screen.getByText("Finalization failed")).toBeInTheDocument();
+    expect(screen.queryByText("AI generated")).not.toBeInTheDocument();
+    expect(screen.queryByText("Validated output from task execution.")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Retry finalization" }));
+    expect(retry).toHaveBeenCalledOnce();
+  });
+
   it("keeps completed transcript prominent without competing with the result", async () => {
     const user = userEvent.setup();
     const view = createTaskWorkspaceExecutionConsoleView(
@@ -93,6 +203,29 @@ describe("TaskWorkspaceExecutionOverview", () => {
           now: nowDocument(),
           output: nowDocument("Output"),
           trail: nowDocument("Trail"),
+        },
+      },
+      currentExecution: {
+        status: "completed",
+        planOutput: {
+          manifest: {
+            schemaVersion: 1,
+            sourceRevision: 1,
+            outcome: { title: "", summary: "" },
+            readiness: { status: "ready", summary: "" },
+            deliverables: [], findings: [], decisions: [],
+            caveats: [], nextActions: [], evidence: [],
+          },
+          finalizedResult: null,
+          revision: 1,
+          updatedAt: null,
+          updatedByNodeId: null,
+          finalization: {
+            status: "Ready",
+            sourceRevision: 1,
+            attempt: 1,
+            finalizedAt: "2026-07-26T00:00:00.000Z",
+          },
         },
       },
     });
@@ -644,7 +777,7 @@ describe("TaskWorkspaceExecutionOverview", () => {
     expect(screen.getAllByText("Requesting AI provider...").length).toBeGreaterThan(0);
   });
 
-  it("renders shared plan output and artifacts as primary results content", () => {
+  it("renders finalized result and artifacts as primary results content", () => {
     const view = createTaskWorkspaceExecutionConsoleView(
       executionMonitoringWorkspaceFixtures.artifactPresent,
     );
@@ -671,7 +804,7 @@ describe("TaskWorkspaceExecutionOverview", () => {
     expect(screen.getByText("file://report.md")).toBeInTheDocument();
   });
 
-  it("renders a completed node summary when persisted plan output is absent", () => {
+  it("renders a completed node summary when finalized result is absent", () => {
     const view = createTaskWorkspaceExecutionConsoleView(
       executionMonitoringWorkspaceFixtures.running,
     );
@@ -1187,6 +1320,143 @@ describe("TaskWorkspaceExecutionOverview", () => {
       screen.getAllByText(".chrona/outputs/node-1/log.txt").length,
     ).toBeGreaterThan(0);
     expect(screen.getByRole("button", { name: /Preview/ })).toBeInTheDocument();
+  });
+
+  it("does not append artifacts when the API output already owns the artifact list", () => {
+    const view = createTaskWorkspaceExecutionConsoleView(
+      executionMonitoringWorkspaceFixtures.artifactPresent,
+    );
+    const apiArtifactsSpec: UiDocument = {
+      root: "root",
+      elements: {
+        root: { type: "Stack", props: { gap: "sm" }, children: ["artifact-list"] },
+        "artifact-list": {
+          type: "WorkspaceArtifactList",
+          props: { emptyLabel: "No artifacts" },
+          children: ["api-artifact"],
+        },
+        "api-artifact": {
+          type: "WorkspaceArtifactItem",
+          props: { title: "API artifact", type: "file", uri: "artifact://api" },
+        },
+      },
+    };
+
+    const spec = buildCommandCenterOutputTabSpec({
+      latestCompletedNode: view.latestCompletedNode,
+      resultSpec: nowDocument("Result fallback"),
+      artifacts: view.artifacts,
+      apiArtifactsSpec,
+      copy: {},
+    });
+
+    expect(
+      Object.values(spec.elements).filter(
+        (element) => element.type === "WorkspaceArtifactList",
+      ),
+    ).toHaveLength(1);
+    expect(
+      Object.values(spec.elements).filter(
+        (element) => element.type === "WorkspaceArtifactItem",
+      ),
+    ).toHaveLength(1);
+  });
+
+  it("omits artifacts already represented by finalized deliverables", () => {
+    const view = createTaskWorkspaceExecutionConsoleView(
+      executionMonitoringWorkspaceFixtures.artifactPresent,
+    );
+    const artifact = view.artifacts[0];
+    if (!artifact) throw new Error("Expected artifact fixture");
+    const spec = buildCommandCenterOutputTabSpec({
+      latestCompletedNode: view.latestCompletedNode,
+      resultSpec: nowDocument("Result fallback"),
+      artifacts: [{ ...artifact, artifactRef: "AFREPORT" }],
+      apiArtifactsSpec: {
+        root: "root",
+        elements: {
+          root: { type: "Stack", props: { gap: "sm" }, children: ["deliverable"] },
+          deliverable: {
+            type: "ResultDeliverable",
+            props: {
+              title: "Report",
+              summary: "Final report",
+              artifactRef: "AFREPORT",
+              role: "primary",
+              kind: "document",
+            },
+          },
+        },
+      },
+      copy: {},
+    });
+
+    expect(
+      Object.values(spec.elements).filter(
+        (element) => element.type === "WorkspaceArtifactList",
+      ),
+    ).toHaveLength(0);
+    expect(
+      Object.values(spec.elements).filter(
+        (element) => element.type === "ResultDeliverable",
+      ),
+    ).toHaveLength(1);
+  });
+
+  it("keeps only unrepresented artifacts in a collapsed secondary section", () => {
+    const view = createTaskWorkspaceExecutionConsoleView(
+      executionMonitoringWorkspaceFixtures.artifactPresent,
+    );
+    const artifact = view.artifacts[0];
+    if (!artifact) throw new Error("Expected artifact fixture");
+    const spec = buildCommandCenterOutputTabSpec({
+      latestCompletedNode: view.latestCompletedNode,
+      resultSpec: nowDocument("Result fallback"),
+      artifacts: [
+        { ...artifact, artifactRef: "AFREPORT" },
+        {
+          id: "extra-1",
+          artifactRef: "AFEXTRA",
+          title: "Supporting notes",
+          type: "markdown",
+          uri: "generated://supporting-notes.md",
+        },
+      ],
+      apiArtifactsSpec: {
+        root: "root",
+        elements: {
+          root: { type: "Stack", props: { gap: "sm" }, children: ["deliverable"] },
+          deliverable: {
+            type: "ResultDeliverable",
+            props: {
+              title: "Report",
+              summary: "Final report",
+              artifactRef: "AFREPORT",
+              role: "primary",
+              kind: "document",
+            },
+          },
+        },
+      },
+      copy: {
+        otherGeneratedFiles: "Other generated files",
+        otherGeneratedFilesDescription: "Additional files",
+      },
+    });
+
+    const artifactItems = Object.values(spec.elements).filter(
+      (element) => element.type === "WorkspaceArtifactItem",
+    );
+    expect(artifactItems).toHaveLength(1);
+    expect(artifactItems[0]?.props).toMatchObject({ title: "Supporting notes" });
+    expect(
+      Object.values(spec.elements).find(
+        (element) => element.type === "CollapsibleBlock",
+      )?.props,
+    ).toMatchObject({
+      title: "Other generated files",
+      defaultCollapsed: true,
+    });
   });
 
   it("builds valid output and trail fallback specs", () => {
