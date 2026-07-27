@@ -893,11 +893,9 @@ export async function openGoalAssetFile(input: { goalId: string; assetId: string
   if (!job?.outputUri) throw new EngineError(ENGINE_ERROR_CODES.VALIDATION_FAILED, "No completed export exists for this version");
   const generatedPath = resolveGeneratedFileReference(job.outputUri);
   if (!generatedPath) throw new EngineError(ENGINE_ERROR_CODES.VALIDATION_FAILED, "Export path is invalid");
-  const access = await requestResultFileAccess({ taskId: job.taskId ?? `goal_asset:${asset.id}`, requestedPath: generatedPath });
-  if (access.status !== "already_allowed") throw new EngineError(ENGINE_ERROR_CODES.VALIDATION_FAILED, "Export path is invalid");
-  const file = Bun.file(access.canonicalPath);
+  const file = Bun.file(generatedPath);
   if (!(await file.exists())) throw new EngineError(ENGINE_ERROR_CODES.VALIDATION_FAILED, "Export file was not found");
-  return { body: file, filename: path.basename(access.canonicalPath), mimeType: file.type || "application/octet-stream" };
+  return { body: file, filename: path.basename(generatedPath), mimeType: file.type || "application/octet-stream" };
 }
 
 export async function openGoalStructuredArtifact(input: { goalId: string; assetId: string; versionId: string; artifactRef: string }) {
