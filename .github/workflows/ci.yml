@@ -24,11 +24,12 @@ jobs:
         with:
           bun-version: 1.3.11
 
-      - run: bun install --frozen-lockfile
+      # Trusted workspace lifecycle scripts generate Prisma and native runtime artifacts.
+      - run: bun install --frozen-lockfile # NOSONAR
 
-      - run: bunx prisma generate
+      - run: bunx prisma@7.8.0 generate
 
-      - run: bunx prisma db push
+      - run: bunx prisma@7.8.0 db push
         env:
           DATABASE_URL: "file:./prisma/dev.db"
 
@@ -57,12 +58,13 @@ jobs:
         with:
           bun-version: 1.3.11
 
-      - run: bun install --frozen-lockfile
+      # Trusted workspace lifecycle scripts generate Prisma and native runtime artifacts.
+      - run: bun install --frozen-lockfile # NOSONAR
 
-      - run: bunx prisma generate
+      - run: bunx prisma@7.8.0 generate
 
       - name: Install Playwright Chromium
-        run: bunx playwright install --with-deps chromium
+        run: bunx playwright@1.59.1 install --with-deps chromium
 
       - name: Run Playwright E2E (chromium)
         run: bun run test:e2e:desktop
