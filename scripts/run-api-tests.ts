@@ -31,7 +31,7 @@ const failedFiles: Array<{ file: string; code: number }> = [];
 
 mkdirSync(tempDir, { recursive: true });
 
-async function runFile(path: string, dbPath: string): Promise<number> {
+async function runFile(path: string, dbPath: string, dataDir: string): Promise<number> {
   if (existsSync(dbPath)) {
     rmSync(dbPath, { force: true });
   }
@@ -48,19 +48,23 @@ async function runFile(path: string, dbPath: string): Promise<number> {
 
   const proc = Bun.spawn(["bun", "test", path], {
     cwd: rootDir,
-    env: { ...process.env, DATABASE_URL: `file:${dbPath}`, NODE_ENV: "test" },
+    env: { ...process.env, DATABASE_URL: `file:${dbPath}`, CHRONA_DATA_DIR: dataDir, NODE_ENV: "test" },
     stdout: "inherit",
     stderr: "inherit",
   });
   return await proc.exited;
 }
 
-const files: Array<{ file: string; dbPath: string }> = [];
+const files: Array<{ file: string; dbPath: string; dataDir: string }> = [];
 for (const dir of dirs) {
   const entries = (await Array.fromAsync(glob.scan(dir))).sort((a, b) => a.localeCompare(b));
   for (const file of entries) {
     const fullPath = `${dir}/${file}`;
-    files.push({ file: fullPath, dbPath: resolve(tempDir, `${dir.replaceAll("/", "-")}-${file}.db`) });
+    files.push({
+      file: fullPath,
+      dbPath: resolve(tempDir, `${dir.replaceAll("/", "-")}-${file}.db`),
+      dataDir: resolve(tempDir, `${dir.replaceAll("/", "-")}-${file}-data`),
+    });
   }
 }
 
@@ -72,8 +76,8 @@ console.log(
 
 
 try {
-  for (const { file, dbPath } of serial) {
-    const code = await runFile(file, dbPath);
+  for (const { file, dbPath, dataDir } of serial) {
+    const code = await runFile(file, dbPath, dataDir);
     if (code !== 0) {
       exitCode = code;
       failedFiles.push({ file, code });
@@ -81,9 +85,9 @@ try {
   }
 
   const active = new Set<Promise<void>>();
-  const launch = (file: string, dbPath: string) => {
+  const launch = (file: string, dbPath: string, dataDir: string) => {
     const job = (async () => {
-      const code = await runFile(file, dbPath);
+      const code = await runFile(file, dbPath, dataDir);
       if (code !== 0) {
         exitCode = code;
         failedFiles.push({ file, code });
@@ -93,11 +97,11 @@ try {
     job.finally(() => active.delete(job));
   };
 
-  for (const { file, dbPath } of parallel) {
+  for (const { file, dbPath, dataDir } of parallel) {
     while (active.size >= concurrency) {
       await Promise.race(active);
     }
-    launch(file, dbPath);
+    launch(file, dbPath, dataDir);
   }
 
   await Promise.all(active);
