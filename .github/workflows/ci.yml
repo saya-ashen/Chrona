@@ -33,8 +33,8 @@ jobs:
           DATABASE_URL: "file:./prisma/dev.db"
 
       - run: bun run check
-      - name: Expose installed Chromium to result export tests
-        run: sudo ln -sf "$(find "$HOME/.cache/ms-playwright" -type f -path '*/chrome-linux64/chrome' -perm -111 | head -n 1)" /usr/local/bin/chromium
+      - name: Install Chromium for result export tests
+        run: sudo apt-get update && sudo apt-get install --yes chromium-browser
 
       - name: Run CI tests
         run: bun run test:ci
