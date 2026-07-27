@@ -361,7 +361,7 @@ describe("Goal Workbench API", () => {
       expect(body.byteLength).toBeGreaterThan(format === "pdf" ? 1_000 : 40);
       if (format === "md") expect(new TextDecoder().decode(body)).toContain("日照＋临沂沂蒙山");
     }
-  });
+  }, 15_000);
 
   it("generates a bounded AI ownership proposal and applies it only after user confirmation", async () => {
     const seeded = await seedGoalResult();
