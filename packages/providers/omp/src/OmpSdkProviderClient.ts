@@ -6,6 +6,7 @@ import {
   discoverAuthStorage,
   ModelRegistry,
   SessionManager,
+  Settings,
   z,
   type AuthStorage,
   type AgentSession,
@@ -160,6 +161,10 @@ function directConfigApi(config: OmpProviderConfig): NonNullable<ProviderConfigI
 
 function hasDirectProviderConfig(config: OmpProviderConfig): boolean {
   return Boolean(nonEmpty(config.apiKey) || nonEmpty(config.baseUrl));
+}
+
+async function loadSdkSettings(environment: SdkEnvironment, cwd: string) {
+  return Settings.loadIsolated({ cwd, agentDir: environment.agentDir });
 }
 
 async function createSdkModelSetup(config: OmpProviderConfig, environment: SdkEnvironment): Promise<SdkModelSetup> {
@@ -532,6 +537,7 @@ export const __ompSdkProviderTestHooks = {
   textContentPreview,
   terminalNodeToolFromSnapshot,
   sdkLifecycleSummary,
+  loadSdkSettings,
 };
 
 function applySdkEnvironment(config: OmpProviderConfig, runId = "health"): SdkEnvironment {
@@ -602,6 +608,7 @@ export class OmpSdkProviderClient implements AgentProviderClient {
     const configuredAgentDirectory = nonEmpty(this.config.codingAgentDirectory)
       ?? nonEmpty(this.config.configDirectory);
     const setup = await createSdkModelSetup(this.config, environment);
+    const settings = await loadSdkSettings(environment, cwd);
     const terminalTools = sdkToolOptionsForTerminal("chrona_node_complete");
     const { session, mcpManager } = await createAgentSession({
       cwd,
@@ -610,6 +617,7 @@ export class OmpSdkProviderClient implements AgentProviderClient {
       ...(setup.authStorage ? { authStorage: setup.authStorage } : {}),
       ...(setup.modelRegistry ? { modelRegistry: setup.modelRegistry } : {}),
       ...terminalTools,
+      settings,
       sessionManager: SessionManager.inMemory(cwd),
       skipPythonPreflight: true,
       hasUI: false,
@@ -808,12 +816,14 @@ export class OmpSdkProviderClient implements AgentProviderClient {
     const cwd = nonEmpty(this.config.cwd) ?? process.cwd();
     const agentDir = nonEmpty(this.config.codingAgentDirectory) ?? nonEmpty(this.config.configDirectory);
     const setup = await createSdkModelSetup(this.config, environment);
+    const settings = await loadSdkSettings(environment, cwd);
     return createAgentSession({
       cwd,
       agentDir,
       modelPattern: setup.modelPattern,
       ...(setup.authStorage ? { authStorage: setup.authStorage } : {}),
       ...(setup.modelRegistry ? { modelRegistry: setup.modelRegistry } : {}),
+      settings,
       sessionManager,
       skipPythonPreflight: true,
       hasUI: false,
@@ -928,6 +938,7 @@ export class OmpSdkProviderClient implements AgentProviderClient {
         : {}),
     };
     const setup = await createSdkModelSetup(runConfig, environment);
+    const settings = await loadSdkSettings(environment, cwd);
     const resumeSessionRef = nonEmpty(handle.input.resumeSessionRef);
     const sessionManager = resumeSessionRef
       ? await SessionManager.open(resumeSessionRef, undefined, undefined, {
@@ -942,6 +953,7 @@ export class OmpSdkProviderClient implements AgentProviderClient {
       modelPattern: setup.modelPattern,
       ...(setup.authStorage ? { authStorage: setup.authStorage } : {}),
       ...(setup.modelRegistry ? { modelRegistry: setup.modelRegistry } : {}),
+      settings,
       ...sdkToolOptionsForTerminal(terminalToolName, handle.input.control, () => { handle.terminalActionAccepted = true; }),
       ...readOnlyToolOptions,
       sessionManager,

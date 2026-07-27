@@ -546,7 +546,6 @@ describe("task workspace page synchronization", () => {
           sourceRevision: 0,
           outcome: { title: "", summary: "" },
           readiness: { status: "partial", summary: "" },
-          sections: [],
           deliverables: [],
           findings: [],
           decisions: [],

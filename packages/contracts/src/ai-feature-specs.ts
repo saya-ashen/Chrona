@@ -141,7 +141,9 @@ export const CODEX_GENERATE_PLAN_DISCOVERY_PROMPT = `
 Codex provider note: MCP tools may be deferred behind tool_search. If chrona_plan_generate is not visible in the current tool list, first call tool_search with query "chrona_plan_generate", then call the discovered chrona_plan_generate tool. Do not use list_mcp_resources, list_mcp_resource_templates, or read_mcp_resource for plan generation.
 `.trim();
 
-function buildGeneratePlanInstructions(options?: GeneratePlanFeatureSpecOptions): string {
+function buildGeneratePlanInstructions(
+  options?: GeneratePlanFeatureSpecOptions,
+): string {
   if (options?.providerType === "codex") {
     return `${GENERATE_PLAN_SYSTEM_PROMPT}\n\n${CODEX_GENERATE_PLAN_DISCOVERY_PROMPT}`;
   }
@@ -198,14 +200,18 @@ function currentPlanRevisionText(input: GenerateTaskPlanRequest) {
   const context = input.revisionContext;
   if (!context) return null;
 
-  return JSON.stringify({
-    planId: context.planId,
-    status: context.status,
-    revision: context.revision,
-    summary: context.summary,
-    selectedNodeId: context.selectedNodeId ?? null,
-    blueprint: context.blueprint,
-  }, null, 2);
+  return JSON.stringify(
+    {
+      planId: context.planId,
+      status: context.status,
+      revision: context.revision,
+      summary: context.summary,
+      selectedNodeId: context.selectedNodeId ?? null,
+      blueprint: context.blueprint,
+    },
+    null,
+    2,
+  );
 }
 
 export function buildGeneratePlanFeatureInputText(
@@ -287,7 +293,8 @@ export function buildGoalAssetOwnershipFeatureSpec(): PreparedAiFeatureSpec {
       "You classify one accepted task result into a frozen set of Goal asset candidates. Use only the supplied snapshot. Return one discrete ownership decision with evidence and counter-evidence. Never create, modify, archive, or publish assets.",
     structuredOutputSchema: {
       name: "goal_asset_ownership_result",
-      description: "A bounded recommendation for the ownership of one Goal Inbox candidate.",
+      description:
+        "A bounded recommendation for the ownership of one Goal Inbox candidate.",
       schema: z.toJSONSchema(goalAssetOwnershipResultSchema, {
         target: "draft-07",
         unrepresentable: "any",
@@ -303,19 +310,20 @@ export function buildResultFinalizationFeatureSpec(input: {
     feature: "task.result_finalization",
     instructions: [
       "You are Chrona's restricted result finalizer.",
-      "Transform the supplied immutable ResultManifest into one concise, operational Chrona result workspace. Do not reproduce the manifest as a linear report.",
+      "Transform the supplied immutable ResultManifest into one concise, operational Chrona result workspace. The manifest is semantic source material, not a page outline. Do not reproduce it as a linear report or map its arrays one-to-one into sections.",
       "Do not invent facts, numbers, paths, URLs, artifact identities, task IDs, run IDs, provider data, execution status, or readiness. Every statement and metric must be directly supported by the manifest.",
       "Return one complete validated Spec. Do not call tools, request input, emit actions, or use dynamic state bindings.",
-      "The root MUST be Stack with gap 'lg'. Its direct children MUST follow this order: exactly one ResultHero; deliverables; synthesized insights; at most one ResultActionPlan; at most one ResultCaveats; exactly one final ResultEvidence when evidence exists.",
-      "ResultHero MUST use manifest.outcome.title, manifest.outcome.summary, manifest.readiness.status, and manifest.readiness.summary. It is the first visible block. Include zero to four metrics only when their exact values are supported by manifest content; never derive or estimate counts.",
-      "For current deliverables, emit one ResultDeliverable per file and set artifactRef to its opaque manifest artifactRef. Choose exactly one primary role when deliverables exist: prefer a current deliverable already placed primary that best enables the user to act. Mark the others supporting or evidence. Never repeat artifactRefs or expose paths as prose.",
-      "Group ResultDeliverable elements in one or two Stack containers: primary first, then supporting. Use direction 'horizontal' for supporting deliverables so the host can render a responsive grid. Do not wrap each deliverable in Card or FileRef.",
-      "Synthesize related findings and decisions into at most six ResultInsight elements. Use emphasis 'lead' at most once. A ResultInsight is a theme, not a one-to-one copy of one manifest item. Do not generate more than two consecutive insights with the same semantic shape when fewer themes suffice.",
-      "Consolidate nextActions into one ResultActionPlan with one to three chronological phases: now, this_week, later. Use at most five actions per phase and do not repeat actions.",
-      "If caveats exist, select at most three material acceptance caveats for one ResultCaveats. If readiness is ready_with_caveats, partial, or blocked, preserve that limitation visibly; never describe it as unconditionally ready.",
-      "If evidence exists, consolidate it into one ResultEvidence as the final element, set defaultCollapsed true, and preserve source boundaries. Do not emit evidence as cards, tables, or expanded raw JSON.",
-      "Use only these domain components for the primary composition: Stack, ResultHero, ResultDeliverable, ResultInsight, ResultActionPlan, ResultCaveats, and ResultEvidence. RichMarkdown, Table, JsonView, Card, Heading, Text, Badge, Alert, Separator, FileRef, ResultSummary, CollapsibleText, and CollapsibleBlock are reserved for exceptional secondary content that cannot be represented by the domain components.",
-      "Keep the first viewport useful: one outcome, readiness, up to four grounded metrics, and the primary deliverable. Keep detailed evidence collapsed. Prefer compression over exhaustive repetition.",
+      "Choose the information architecture from the user's likely result task: reading, comparing, deciding, inspecting data, applying a deliverable, reviewing changes, following a timeline, or a justified mixture. This intent guides composition but never selects a fixed template. The root may be any container that owns the whole composition.",
+      "Use ResultOverview for the editorial lead in ordinary results. Legacy ResultHero is allowed only when readiness itself is the result's dominant message, not as the default first block. Keep the overview title under 96 characters and synthesize its summary from manifest.outcome rather than copying a long node summary into the title.",
+      "If readiness is ready_with_caveats, partial, or blocked, render ResultReadiness as its own visible component wherever the limitation affects interpretation or action. Do not hide non-ready semantics inside a hero badge or evidence appendix.",
+      "Use ResultSection to create meaningful regions with stack, grid, split, or rail layout. Use ResultComparison for bounded option trade-offs, ResultTimeline for dates or ordered milestones, ResultChecklist for operational steps, ResultMetricGrid only for exact manifest-supported values, and ResultChangeSummary for concrete code, configuration, or document changes.",
+      "Use ResultDeliverable only for current deliverables worth featuring in the narrative and set artifactRef to its opaque manifest artifactRef. At most one may have role primary and at most three deliverables may appear in the Spec. The host independently exposes all generated Artifacts, so omit supporting files that add no decision value. Never repeat artifactRefs or expose paths as prose.",
+      "Legacy ResultInsight, ResultActionPlan, ResultCaveats, ResultEvidence, and ResultHero exist for persisted result compatibility. Prefer ResultSection, ResultComparison, ResultTimeline, ResultChecklist, ResultReadiness, and CollapsibleBlock in newly finalized results. Do not emit more than two legacy ResultInsight blocks, and do not recreate the sequence Hero → Deliverables → Insights → ActionPlan → Caveats → Evidence.",
+      "Use RichMarkdown, Table, JsonView, Card, Heading, Text, Badge, Alert, Separator, FileRef, ResultSummary, CollapsibleText, and CollapsibleBlock when their semantics fit. Do not wrap every item in a card and do not generate more than two consecutive isomorphic blocks when a comparison, collection, or synthesis is clearer.",
+      "Every element that states, transforms, or summarizes manifest content MUST set sourceKeys to the exact manifest keys it covers. Valid keys are deliverableKey values plus finding, decision, caveat, nextAction, and evidence keys. Elements containing only manifest.outcome or manifest.readiness may omit sourceKeys.",
+      "Preserve material caveats visibly before any affected recommendation or action. If readiness is ready_with_caveats, partial, or blocked, never describe the result as unconditionally ready. Evidence and raw diagnostic detail should normally be collapsed and subordinate.",
+      "Keep the first viewport useful: a concise outcome, the main decision/content/deliverable, and any limitation needed to use it safely. Keep the complete Spec under 48 elements, nesting at most five levels, and avoid long prose when a comparison, checklist, timeline, metric group, or Artifact preview expresses the result better.",
+      "Examples of valid variation: a research result may lead with ResultOverview, a ResultComparison of the strongest findings, and one primary document; a shortlist may lead with ResultComparison and ResultTimeline; a code task may lead with ResultChangeSummary and ResultChecklist; a data task may lead with ResultMetricGrid and a file-backed Table; a media task may lead with selected deliverables. These are examples, not templates.",
     ].join("\n"),
     inputText: JSON.stringify({ manifest: input.manifest }, null, 2),
     structuredOutputSchema: {
@@ -383,7 +391,9 @@ export function validatePreparedFeaturePayload(
       if (!validation.success) {
         return {
           ok: false,
-          error: validation.error.issues[0]?.message ?? "Feature 'goal.asset_ownership' returned an invalid proposal payload",
+          error:
+            validation.error.issues[0]?.message ??
+            "Feature 'goal.asset_ownership' returned an invalid proposal payload",
         };
       }
       return { ok: true };
@@ -393,7 +403,9 @@ export function validatePreparedFeaturePayload(
       if (!validation.success) {
         return {
           ok: false,
-          error: validation.error.issues[0]?.message ?? "Feature 'goal.review' returned an invalid proposal payload",
+          error:
+            validation.error.issues[0]?.message ??
+            "Feature 'goal.review' returned an invalid proposal payload",
         };
       }
       return { ok: true };

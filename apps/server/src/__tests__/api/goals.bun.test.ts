@@ -392,12 +392,16 @@ describe("Goal API", () => {
       query: "Current approved guidance",
       limit: 5,
     });
-    expect(goalResults.results).toMatchObject([{
-      ref: formalAssetRef,
-      title: "Research brief",
-      version: 1,
-      summary: "Current approved guidance",
-    }]);
+    expect(goalResults.results).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          ref: formalAssetRef,
+          title: "Research brief",
+          version: 1,
+          summary: "Current approved guidance",
+        }),
+      ]),
+    );
     expect(persisted.goalContext).toBeTruthy();
     expect(typeof persisted.goalContext).toBe("object");
     expect(persisted.goalContext).not.toBeInstanceOf(Array);

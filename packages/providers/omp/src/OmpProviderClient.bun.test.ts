@@ -1,4 +1,7 @@
 import { describe, expect, it } from "bun:test";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import type {
   AgentProviderClient,
   ProviderRunRef,
@@ -345,6 +348,25 @@ describe("OmpProviderClient SDK delegation", () => {
       handoffText: "compacted context",
     });
   });
+  it("loads the current OMP default independently of process-global Settings", async () => {
+    const agentDir = await mkdtemp(join(tmpdir(), "chrona-omp-settings-"));
+    try {
+      await writeFile(join(agentDir, "config.yml"), [
+        "modelRoles:",
+        "  default: OmniRoute/gpt-5.6-sol",
+        "",
+      ].join("\n"));
+
+      const settings = await __ompSdkProviderTestHooks.loadSdkSettings({
+        agentDir,
+      }, "/tmp/workspace");
+
+      expect(settings.getModelRole("default")).toBe("OmniRoute/gpt-5.6-sol");
+    } finally {
+      await rm(agentDir, { recursive: true, force: true });
+    }
+  });
+
   it("reports effective SDK configuration without secrets", async () => {
     const client = new OmpSdkProviderClient({
       config: {

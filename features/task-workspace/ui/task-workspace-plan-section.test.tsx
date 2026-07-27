@@ -1654,6 +1654,42 @@ describe("TaskWorkspacePlanSection", () => {
         planGenerationStatus="idle"
         acceptPlanError={null}
         runtimeEvents={[]}
+        currentExecution={{
+          taskId: "task-1",
+          planId: "plan-1",
+          mainSessionId: "session-1",
+          status: "completed",
+          currentNodeId: null,
+          executedNodeIds: ["weather-script"],
+          waitingNodeIds: [],
+          blockedNodeIds: [],
+          message: "Execution completed",
+          checkpoint: null,
+          planOutput: {
+            manifest: {
+              schemaVersion: 1,
+              sourceRevision: 1,
+              outcome: { title: "Weather script", summary: "Script created." },
+              readiness: { status: "ready", summary: "Ready for review." },
+              deliverables: [],
+              findings: [],
+              decisions: [],
+              caveats: [],
+              nextActions: [],
+              evidence: [],
+            },
+            finalizedResult: null,
+            finalization: {
+              status: "Ready",
+              sourceRevision: 1,
+              attempt: 1,
+              finalizedAt: "2026-05-18T00:00:00.000Z",
+            },
+            revision: 1,
+            updatedAt: "2026-05-18T00:00:00.000Z",
+            updatedByNodeId: "weather-script",
+          },
+        }}
         onGeneratePlan={vi.fn()}
         onApplyPlan={vi.fn()}
         onDispatchExecutionAction={onDispatchExecutionAction}

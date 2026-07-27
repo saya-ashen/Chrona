@@ -59,20 +59,6 @@ export type ResultEvidence = {
   sourceNodeRef: string;
 };
 
-export type ResultSection = {
-  key: string;
-  title: string;
-  kind:
-    | "outcome"
-    | "deliverables"
-    | "findings"
-    | "decisions"
-    | "caveats"
-    | "next_actions"
-    | "evidence";
-  itemKeys: string[];
-};
-
 export type ResultReadiness = "ready" | "ready_with_caveats" | "partial" | "blocked";
 
 export type ResultManifest = {
@@ -80,7 +66,6 @@ export type ResultManifest = {
   sourceRevision: number;
   outcome: { title: string; summary: string };
   readiness: { status: ResultReadiness; summary: string };
-  sections: ResultSection[];
   deliverables: NodeDeliverable[];
   findings: ResultContribution[];
   decisions: ResultContribution[];

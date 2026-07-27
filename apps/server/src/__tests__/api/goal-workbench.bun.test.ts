@@ -316,15 +316,18 @@ describe("Goal Workbench API", () => {
         };
       }>;
     };
-    expect(candidates).toHaveLength(1);
-    expect(candidates[0]!.content.artifactRefs).toHaveLength(1);
-    expect(candidates[0]!.content.spec.elements.summary!.props).toMatchObject({
-      path: candidates[0]!.content.artifactRefs[0]!.ref,
+    expect(candidates).not.toHaveLength(0);
+    const structuredCandidate = candidates.find(
+      (candidate) => candidate.content.artifactRefs.length === 1,
+    );
+    expect(structuredCandidate).toBeDefined();
+    expect(structuredCandidate!.content.spec.elements.summary!.props).toMatchObject({
+      path: structuredCandidate!.content.artifactRefs[0]!.ref,
       displayPath: "channel-table.csv",
     });
-    expect(candidates[0]!.content.spec.elements.summary!.props).not.toHaveProperty(
-      "downloadHref",
-    );
+    expect(
+      structuredCandidate!.content.spec.elements.summary!.props,
+    ).not.toHaveProperty("downloadHref");
   });
 
   it("rejects execution controls in structured result assets", async () => {

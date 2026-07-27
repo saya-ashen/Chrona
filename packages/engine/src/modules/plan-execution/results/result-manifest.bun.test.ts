@@ -7,12 +7,14 @@ import {
 
 describe("ResultManifest aggregation", () => {
   it("is stable when canonical node results do not change", () => {
-    const results: NodeResult[] = [{
-      nodeId: "node-a",
-      status: "current",
-      outputSummary: "Research complete",
-      findings: [{ key: "market-fit", content: "Strong fit" }],
-    }];
+    const results: NodeResult[] = [
+      {
+        nodeId: "node-a",
+        status: "current",
+        outputSummary: "Research complete",
+        findings: [{ key: "market-fit", content: "Strong fit" }],
+      },
+    ];
     const first = aggregateResultManifest({
       results,
       previous: createEmptyResultManifest(),
@@ -30,57 +32,69 @@ describe("ResultManifest aggregation", () => {
 
   it("uses current semantic results and preserves superseded deliverables", () => {
     const first = aggregateResultManifest({
-      results: [{
-        nodeId: "node-a",
-        status: "current",
-        outputSummary: "Draft complete",
-        deliverables: [{
-          deliverableKey: "report",
-          title: "Report",
-          kind: "document",
-          artifactRef: "AF111111111111",
+      results: [
+        {
+          nodeId: "node-a",
           status: "current",
-          sourceNodeRef: "N20260725-01",
-          presentation: { primary: "file", allowDownload: true },
-          placement: "primary",
-        }],
-      }],
+          outputSummary: "Draft complete",
+          deliverables: [
+            {
+              deliverableKey: "report",
+              title: "Report",
+              kind: "document",
+              artifactRef: "AF111111111111",
+              status: "current",
+              sourceNodeRef: "N20260725-01",
+              presentation: { primary: "file", allowDownload: true },
+              placement: "primary",
+            },
+          ],
+        },
+      ],
       previous: createEmptyResultManifest(),
       sourceNodeRef: () => "N20260725-01",
     });
     const second = aggregateResultManifest({
-      results: [{
-        nodeId: "node-b",
-        status: "current",
-        outputSummary: "Final report complete",
-        deliverables: [{
-          deliverableKey: "report",
-          title: "Report",
-          kind: "document",
-          artifactRef: "AF222222222222",
+      results: [
+        {
+          nodeId: "node-b",
           status: "current",
-          sourceNodeRef: "N20260725-02",
-          presentation: { primary: "file", allowDownload: true },
-          placement: "primary",
-        }],
-      }],
+          outputSummary: "Final report complete",
+          deliverables: [
+            {
+              deliverableKey: "report",
+              title: "Report",
+              kind: "document",
+              artifactRef: "AF222222222222",
+              status: "current",
+              sourceNodeRef: "N20260725-02",
+              presentation: { primary: "file", allowDownload: true },
+              placement: "primary",
+            },
+          ],
+        },
+      ],
       previous: first,
       sourceNodeRef: () => "N20260725-02",
     });
 
     expect(second.sourceRevision).toBe(2);
     expect(second.deliverables).toEqual([
-      expect.objectContaining({ artifactRef: "AF111111111111", status: "superseded" }),
+      expect.objectContaining({
+        artifactRef: "AF111111111111",
+        status: "superseded",
+      }),
       expect.objectContaining({
         artifactRef: "AF222222222222",
         status: "current",
         supersedes: "AF111111111111",
       }),
     ]);
-    expect(second.sections.map((section) => section.kind)).toEqual([
-      "outcome",
-      "deliverables",
-    ]);
+    expect(
+      second.deliverables.filter((item) => item.status === "current"),
+    ).toHaveLength(1);
+    expect(second.findings).toEqual([]);
+    expect(second.decisions).toEqual([]);
   });
 
   it("excludes stale contributions from the canonical manifest", () => {
@@ -100,7 +114,8 @@ describe("ResultManifest aggregation", () => {
         },
       ],
       previous: createEmptyResultManifest(),
-      sourceNodeRef: (nodeId) => nodeId === "node-current" ? "N20260725-02" : "N20260725-01",
+      sourceNodeRef: (nodeId) =>
+        nodeId === "node-current" ? "N20260725-02" : "N20260725-01",
     });
 
     expect(manifest.outcome.title).toBe("Current answer");

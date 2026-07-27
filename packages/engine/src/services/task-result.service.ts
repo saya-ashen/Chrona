@@ -17,7 +17,7 @@ export function createTaskResultService() {
     },
     async retryFinalization(input: Parameters<typeof finalizeTaskResult>[0]) {
       try {
-        const planOutput = await finalizeTaskResult(input);
+        const planOutput = await finalizeTaskResult({ ...input, force: true });
         return {
           taskId: input.taskId,
           finalizedResult: planOutput.finalizedResult,

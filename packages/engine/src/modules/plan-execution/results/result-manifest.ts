@@ -40,54 +40,8 @@ function mergeEvidence(
   return [...current.values()];
 }
 
-function resultSections(
-  manifest: Omit<ResultManifest, "sections">,
-): ResultManifest["sections"] {
-  return [
-    { key: "outcome", title: "Outcome", kind: "outcome" as const, itemKeys: [] },
-    {
-      key: "deliverables",
-      title: "Current deliverables",
-      kind: "deliverables" as const,
-      itemKeys: manifest.deliverables
-        .filter((item) => item.status === "current")
-        .map((item) => item.deliverableKey),
-    },
-    {
-      key: "findings",
-      title: "Key findings",
-      kind: "findings" as const,
-      itemKeys: manifest.findings.map((item) => item.key),
-    },
-    {
-      key: "decisions",
-      title: "Decisions",
-      kind: "decisions" as const,
-      itemKeys: manifest.decisions.map((item) => item.key),
-    },
-    {
-      key: "caveats",
-      title: "Caveats",
-      kind: "caveats" as const,
-      itemKeys: manifest.caveats.map((item) => item.key),
-    },
-    {
-      key: "next-actions",
-      title: "Next actions",
-      kind: "next_actions" as const,
-      itemKeys: manifest.nextActions.map((item) => item.key),
-    },
-    {
-      key: "evidence",
-      title: "Evidence and execution details",
-      kind: "evidence" as const,
-      itemKeys: manifest.evidence.map((item) => item.key),
-    },
-  ].filter((section) => section.kind === "outcome" || section.itemKeys.length > 0);
-}
-
 export function createEmptyResultManifest(): ResultManifest {
-  const base: Omit<ResultManifest, "sections"> = {
+  const base: ResultManifest = {
     schemaVersion: 1,
     sourceRevision: 0,
     outcome: {
@@ -105,7 +59,7 @@ export function createEmptyResultManifest(): ResultManifest {
     nextActions: [],
     evidence: [],
   };
-  return { ...base, sections: resultSections(base) };
+  return base;
 }
 
 export function aggregateResultManifest(input: {
@@ -122,8 +76,9 @@ export function aggregateResultManifest(input: {
   const superseded = input.previous.deliverables
     .filter((prior) => {
       const current = currentByKey.get(prior.deliverableKey);
-      return prior.status === "superseded" || (
-        current !== undefined && current.artifactRef !== prior.artifactRef
+      return (
+        prior.status === "superseded" ||
+        (current !== undefined && current.artifactRef !== prior.artifactRef)
       );
     })
     .map((prior) => ({ ...prior, status: "superseded" as const }));
@@ -148,28 +103,47 @@ export function aggregateResultManifest(input: {
         (candidate) => candidate.artifactRef === deliverable.artifactRef,
       ) === index,
   );
-  const findings = mergeContributions(input.results, "findings", input.sourceNodeRef);
-  const decisions = mergeContributions(input.results, "decisions", input.sourceNodeRef);
-  const caveats = mergeContributions(input.results, "caveats", input.sourceNodeRef);
-  const nextActions = mergeContributions(input.results, "nextActions", input.sourceNodeRef);
+  const findings = mergeContributions(
+    input.results,
+    "findings",
+    input.sourceNodeRef,
+  );
+  const decisions = mergeContributions(
+    input.results,
+    "decisions",
+    input.sourceNodeRef,
+  );
+  const caveats = mergeContributions(
+    input.results,
+    "caveats",
+    input.sourceNodeRef,
+  );
+  const nextActions = mergeContributions(
+    input.results,
+    "nextActions",
+    input.sourceNodeRef,
+  );
   const evidence = mergeEvidence(input.results, input.sourceNodeRef);
   const summaries = input.results
     .filter(
       (result) => result.status === "current" && result.outputSummary?.trim(),
     )
     .map((result) => result.outputSummary!.trim());
-  const base: Omit<ResultManifest, "sections"> = {
+  const candidate: ResultManifest = {
     schemaVersion: 1,
     sourceRevision: input.previous.sourceRevision,
     outcome: {
       title: summaries.at(-1) ?? "Execution result",
-      summary: summaries.join("\n\n") || "Execution completed without a textual summary.",
+      summary:
+        summaries.join("\n\n") ||
+        "Execution completed without a textual summary.",
     },
     readiness: {
       status: caveats.length > 0 ? "ready_with_caveats" : "ready",
-      summary: caveats.length > 0
-        ? "Result is ready with documented caveats."
-        : "Result is ready for final organization.",
+      summary:
+        caveats.length > 0
+          ? "Result is ready with documented caveats."
+          : "Result is ready for final organization.",
     },
     deliverables,
     findings,
@@ -178,7 +152,6 @@ export function aggregateResultManifest(input: {
     nextActions,
     evidence,
   };
-  const candidate = { ...base, sections: resultSections(base) };
   if (JSON.stringify(candidate) === JSON.stringify(input.previous)) {
     return input.previous;
   }

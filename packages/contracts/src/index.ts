@@ -357,7 +357,6 @@ export type {
   NodeDeliverable,
   ResultContribution,
   ResultEvidence,
-  ResultSection,
   ResultReadiness,
   ResultManifest,
   ResultFinalizationState,

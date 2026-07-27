@@ -190,10 +190,11 @@ Chrona then owns the result lifecycle:
 1. Resolve every generated file inside the generated-files root, verify its canonical path and file metadata, register a Run-owned `Artifact`, and replace the declaration with an opaque `AF...` reference.
 2. Persist the immutable `NodeResult` with semantic provenance.
 3. Deterministically aggregate current node results into `ResultManifest`. Its revision advances only when canonical result content changes.
-4. After graph completion, run the internal `task.result_finalization` AI feature with no MCP/LSP tools. It may organize only Manifest facts and declared Artifact refs into one `validateChronaSpec()`-validated document.
-5. Persist finalization independently as `Pending -> Running -> Ready | Failed`. Finalization failure does not convert completed execution into failure.
-6. Render only a `Ready` finalized result. The host resolves opaque Artifact refs into safe previews and download routes without persisting host-only paths or URLs in the Spec.
-7. `task.result_accepted` records review state independently from Task execution status. For Goal-owned Tasks, acceptance idempotently creates or refreshes a pending Workbench Inbox candidate; a user must still confirm creation of a formal `GoalAsset`.
+4. After graph completion, run the internal `task.result_finalization` AI feature with no MCP/LSP tools. It may organize only Manifest facts and declared Artifact refs into one adaptive semantic canvas validated against the restricted result catalog. The Manifest describes content, not page sections; the finalizer chooses composition, grouping, and order from the result's actual shape instead of a fixed report template.
+5. Semantic validation requires declared Artifact and provenance keys, visible non-ready limitations, coverage of primary content, and bounded element count and nesting depth. The host strips authority-bearing props and retains Task status, acceptance, permissions, downloads, and Goal lifecycle controls outside the AI Spec.
+6. Persist finalization independently as `Pending -> Running -> Ready | Failed`. Finalization failure does not convert completed execution into failure.
+7. Render only a `Ready` finalized result. The host resolves opaque Artifact refs into safe previews and download routes without persisting host-only paths or URLs in the Spec.
+8. `task.result_accepted` records review state independently from Task execution status. For Goal-owned Tasks, acceptance idempotently creates or refreshes a pending Workbench Inbox candidate; a user must still confirm creation of a formal `GoalAsset`.
 
 The removed `chrona.plan.output` / RFC 6902 path is not a compatibility surface. Providers and clients submit semantic node results through `chrona.node.complete` only.
 

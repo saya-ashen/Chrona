@@ -30,7 +30,7 @@
     "typecheck": "bunx tsc --noEmit --pretty false && bunx tsc --project e2e/tsconfig.json --noEmit --pretty false",
     "typecheck:app": "bunx tsc --noEmit --pretty false",
     "typecheck:e2e": "bunx tsc --project e2e/tsconfig.json --noEmit --pretty false",
-    "lint": "eslint . --max-warnings 906",
+    "lint": "eslint . --max-warnings 724",
     "lint:warn": "eslint .",
     "check": "bun run chrona check",
     "assets:capture": "bun run scripts/assets.ts capture",
