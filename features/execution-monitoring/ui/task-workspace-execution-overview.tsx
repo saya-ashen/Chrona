@@ -306,10 +306,7 @@ export function TaskWorkspaceExecutionOverview({
     ?? ws.executionWorkingFallback
     ?? "AI is working";
   const showLiveStatus = executionIsLive;
-  const activityItems = useMemo(
-    () => [...displayedActivity].reverse(),
-    [displayedActivity],
-  );
+  const activityItems = displayedActivity;
   const failedActivityCount = activityItems.filter((item) => item.tone === "danger").length;
   const activitySummary = executionIsLive
     ? `${activityItems.length} events · live`
@@ -676,10 +673,10 @@ export function TaskWorkspaceExecutionOverview({
   const activityTimeline = (
     <section
       aria-label={copy.trailTab}
-      className="min-h-0 overflow-y-auto rounded-xl border border-border/60 bg-background/70 p-4"
+      className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-border/60 bg-background/70"
     >
-      {activityHeader}
-      <div className="mt-3">{activityContent}</div>
+      <div className="z-10 shrink-0 bg-background/95 p-4 pb-0 backdrop-blur supports-[backdrop-filter]:bg-background/85">{activityHeader}</div>
+      <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4 pt-3">{activityContent}</div>
     </section>
   );
 
@@ -702,12 +699,12 @@ export function TaskWorkspaceExecutionOverview({
           <Badge variant="secondary" className="h-5 min-w-5 px-1.5 text-[10px]">{activityItems.length}</Badge>
         </span>
       </SheetTrigger>
-      <SheetContent className="w-[92vw] max-w-[62rem] overflow-y-auto data-[side=right]:sm:w-[72vw] data-[side=right]:sm:max-w-[62rem]">
-        <SheetHeader className="border-b border-border/60">
+      <SheetContent className="w-[92vw] max-w-[62rem] gap-0 overflow-hidden data-[side=right]:w-[92vw] data-[side=right]:sm:w-[72vw] data-[side=right]:sm:max-w-[62rem]">
+        <SheetHeader className="z-10 shrink-0 border-b border-border/60 bg-popover/95 backdrop-blur supports-[backdrop-filter]:bg-popover/85">
           <SheetTitle>Agent transcript</SheetTitle>
-          <SheetDescription>Intent, tool calls, results, and execution state in chronological order.</SheetDescription>
+          <SheetDescription>Intent, tool calls, results, and execution state. Latest activity appears first.</SheetDescription>
         </SheetHeader>
-        <div className="px-5 pb-8 pt-4">{activityHeader}<div className="mt-4">{activityContent}</div></div>
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-8 pt-4"><div className="mt-1">{activityContent}</div></div>
       </SheetContent>
     </Sheet>
   ) : null;

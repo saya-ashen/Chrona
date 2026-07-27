@@ -13,7 +13,9 @@ describe("openTaskResultFile", () => {
     await resetTestDb();
   });
 
-  it("downloads only generated files referenced by the same task result", async () => {
+  it.each(["FileRef", "ResultDeliverable", "WorkspaceArtifactItem", "Table"])(
+    "downloads generated files referenced by same-task %s results",
+    async (componentType) => {
     const { workspaceId } = await seedWorkspace("Result download");
     const { taskId } = await seedTask(workspaceId, { title: "Create report" });
     const fixtureScope = `download-test-${randomUUID()}`;
@@ -58,6 +60,9 @@ describe("openTaskResultFile", () => {
         taskId,
         planId: "download-plan",
         planRun: {
+          planRun: {
+            id: "persisted-run-metadata",
+          },
           mutableGraph: {
             planOutput: {
               finalizedResult: {
@@ -65,7 +70,7 @@ describe("openTaskResultFile", () => {
                   root: "root",
                   elements: {
                     root: { type: "Stack", props: {}, children: ["report"] },
-                    report: { type: "FileRef", props: { path: aiArtifactRef(artifact.id) } },
+                    report: { type: componentType, props: { artifactRef: aiArtifactRef(artifact.id) } },
                   },
                 },
               },
@@ -92,5 +97,6 @@ describe("openTaskResultFile", () => {
         force: true,
       });
     }
-  });
+    },
+  );
 });

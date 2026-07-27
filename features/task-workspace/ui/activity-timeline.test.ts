@@ -62,4 +62,36 @@ describe("ActivityTimeline execution runs", () => {
 
     expect(new Set(keys).size).toBe(keys.length);
   });
+  it("groups a newest-first completed tool at its latest event position", () => {
+    const entries = buildRenderList([
+      activity({
+        id: "completed",
+        kind: "tool_completed",
+        timestamp: "2026-07-18T10:00:02.000Z",
+        tool: { callId: "call-1", name: "read", label: "Read", state: "completed" },
+      }),
+      activity({
+        id: "progress",
+        kind: "tool_progress",
+        timestamp: "2026-07-18T10:00:01.000Z",
+        tool: { callId: "call-1", name: "read", label: "Read", state: "progress" },
+      }),
+      activity({
+        id: "started",
+        kind: "tool_started",
+        timestamp: "2026-07-18T10:00:00.000Z",
+        tool: { callId: "call-1", name: "read", label: "Read", state: "started" },
+      }),
+      activity({ id: "older", timestamp: "2026-07-18T09:59:59.000Z" }),
+    ], true);
+
+    expect(entries).toEqual([
+      expect.objectContaining({
+        type: "tool_pair",
+        started: expect.objectContaining({ id: "started" }),
+        completed: expect.objectContaining({ id: "completed" }),
+      }),
+      expect.objectContaining({ type: "single", item: expect.objectContaining({ id: "older" }) }),
+    ]);
+  });
 });

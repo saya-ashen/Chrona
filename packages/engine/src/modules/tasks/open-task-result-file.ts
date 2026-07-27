@@ -7,12 +7,15 @@ import {
 } from "./result-file-access";
 import { aiArtifactRef } from "../plan-execution/use-cases/register-generated-plan-output-artifacts";
 
-function outputSpecFromPlanRun(value: unknown) {
+function outputSpecFromPlanRun(value: unknown): {
+  elements?: Record<string, { type?: unknown; props?: unknown }>;
+} | null {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const record = value as Record<string, unknown>;
   const nestedPlanRun = record.planRun;
   if (nestedPlanRun && typeof nestedPlanRun === "object" && !Array.isArray(nestedPlanRun)) {
-    return outputSpecFromPlanRun(nestedPlanRun);
+    const nestedSpec = outputSpecFromPlanRun(nestedPlanRun);
+    if (nestedSpec) return nestedSpec;
   }
   const graph = record.mutableGraph;
   if (!graph || typeof graph !== "object" || Array.isArray(graph)) return null;
@@ -32,7 +35,13 @@ function outputSpecFromPlanRun(value: unknown) {
 function specReferencesFile(value: unknown, requestedIdentities: ReadonlySet<string>) {
   const spec = outputSpecFromPlanRun(value);
   return Object.values(spec?.elements ?? {}).some((element) => {
-    if (element.type !== "FileRef" && element.type !== "FileView") return false;
+    if (
+      element.type !== "FileRef" &&
+      element.type !== "FileView" &&
+      element.type !== "ResultDeliverable" &&
+      element.type !== "WorkspaceArtifactItem" &&
+      element.type !== "Table"
+    ) return false;
     if (!element.props || typeof element.props !== "object" || Array.isArray(element.props))
       return false;
     const props = element.props as Record<string, unknown>;

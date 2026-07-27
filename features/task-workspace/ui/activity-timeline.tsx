@@ -71,6 +71,23 @@ function getToolProgress(items: WorkspaceActivityItem[], started: WorkspaceActiv
     candidate.kind === "tool_progress" && isSameToolActivity(started, candidate)
   );
 }
+function findStartedTool(items: WorkspaceActivityItem[], item: WorkspaceActivityItem) {
+  return items.find((candidate) =>
+    candidate.kind === "tool_started" && isSameToolActivity(candidate, item)
+  );
+}
+
+function hasCompletedTool(items: WorkspaceActivityItem[], item: WorkspaceActivityItem) {
+  return items.some((candidate) =>
+    candidate.kind === "tool_completed" && isSameToolActivity(candidate, item)
+  );
+}
+
+function hasToolProgress(items: WorkspaceActivityItem[], item: WorkspaceActivityItem) {
+  return items.some((candidate) =>
+    candidate.kind === "tool_progress" && isSameToolActivity(candidate, item)
+  );
+}
 
 const TRANSCRIPT_HIDDEN_EVENTS = new Set([
   "plan_generation.status",
@@ -137,8 +154,37 @@ export function buildRenderList(items: WorkspaceActivityItem[], transcript = fal
       result.push({ type: "execution_header", key: `execution-phase:${sessionId ?? "unscoped"}:${item.id}` });
       executionHeaderSessionId = sessionId;
     }
+    if (transcript && item.kind === "tool_completed") {
+      const startedTool = findStartedTool(visibleItems, item);
+      if (startedTool) {
+        result.push({
+          type: "tool_pair",
+          key: startedTool.id,
+          started: startedTool,
+          progress: getToolProgress(visibleItems, startedTool),
+          completed: item,
+        });
+        continue;
+      }
+    }
+    if (transcript && item.kind === "tool_progress") {
+      const startedTool = findStartedTool(visibleItems, item);
+      if (startedTool && !hasCompletedTool(visibleItems, item)) {
+        const latestProgress = getToolProgress(visibleItems, startedTool)[0];
+        if (latestProgress?.id === item.id) {
+          result.push({
+            type: "tool_pair",
+            key: startedTool.id,
+            started: startedTool,
+            progress: getToolProgress(visibleItems, startedTool),
+          });
+        }
+        continue;
+      }
+    }
     const completedTool = getToolPair(visibleItems, item, i);
     if (item.kind === "tool_started") {
+      if (transcript && (completedTool || hasToolProgress(visibleItems, item))) continue;
       result.push({
         type: "tool_pair",
         key: item.id,
