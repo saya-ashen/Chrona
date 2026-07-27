@@ -1,6 +1,7 @@
 import { mkdtemp, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
+import { getChronaGeneratedFilesDir } from "@chrona/shared/data-paths";
 import { beforeEach, describe, expect, it } from "bun:test";
 import {
   __resetResultFileAccessGrantsForTests,
@@ -67,6 +68,18 @@ describe("result file access", () => {
       ).rejects.toThrow(/sensitive path/i);
     } finally {
       await rm(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("allows generated files even when a parent directory matches sensitive-path rules", async () => {
+    const path = join(getChronaGeneratedFilesDir(), "tests", "token-like-run", "report.md");
+    try {
+      await Bun.write(path, "# Report");
+      await expect(
+        requestResultFileAccess({ taskId: "task-1", requestedPath: path }),
+      ).resolves.toMatchObject({ status: "already_allowed", canonicalPath: path });
+    } finally {
+      await rm(path, { force: true });
     }
   });
 

@@ -41,7 +41,6 @@ jobs:
         env:
           DATABASE_URL: "file:./prisma/dev.db"
           CHRONA_LLM_FIXTURE_MODE: "replay"
-          CHRONA_DATA_DIR: "/tmp/chrona-ci-data"
           OPENCLAW_MODE: "mock"
 
       - name: Verify fresh install and previous-release migration paths

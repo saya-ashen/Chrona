@@ -131,7 +131,7 @@ export async function requestResultFileAccess(input: {
   requestedPath: string;
 }) {
   pruneGrants();
-  const { canonicalPath, stat } = await canonicalFile(input.requestedPath);
+  const canonicalPath = await realpath(isAbsolute(input.requestedPath) ? resolve(input.requestedPath) : resolve(process.cwd(), input.requestedPath));
   const generatedRoot = generatedFilesRoot();
   if (isWithinRoot(generatedRoot, canonicalPath)) {
     return {
@@ -140,7 +140,7 @@ export async function requestResultFileAccess(input: {
       canonicalPath,
     };
   }
-
+  const { stat } = await canonicalFile(canonicalPath);
   const id = randomUUID();
   const now = Date.now();
   const grant: ResultFileGrant = {
