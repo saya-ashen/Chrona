@@ -828,12 +828,20 @@ function pdfHtml(title: string, markdown: string) {
   return `<!doctype html><html><head><meta charset="utf-8"><style>@page{size:A4;margin:18mm}body{font:15px/1.65 system-ui,sans-serif;color:#18181b}h1{font-size:26px}pre{white-space:pre-wrap;font:14px/1.65 ui-monospace,monospace}header{border-bottom:1px solid #ddd;margin-bottom:20px}</style></head><body><header><h1>${escapeHtml(title)}</h1></header><pre>${escapeHtml(markdown)}</pre></body></html>`;
 }
 
+function chromiumExecutable() {
+  return (
+    process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ??
+    process.env.CHROMIUM_PATH ??
+    "chromium"
+  );
+}
+
 async function writePdf(outputPath: string, title: string, content: string) {
   const htmlPath = `${outputPath}.html`;
   await writeFile(htmlPath, pdfHtml(title, content), "utf8");
   try {
     await new Promise<void>((resolve, reject) => {
-      const process = spawn("chromium", ["--headless", "--no-sandbox", "--disable-gpu", `--print-to-pdf=${outputPath}`, `file://${htmlPath}`], { stdio: "ignore" });
+      const process = spawn(chromiumExecutable(), ["--headless", "--no-sandbox", "--disable-gpu", `--print-to-pdf=${outputPath}`, `file://${htmlPath}`], { stdio: "ignore" });
       const timeout = setTimeout(() => {
         process.kill("SIGKILL");
         reject(new Error("PDF renderer timed out"));
