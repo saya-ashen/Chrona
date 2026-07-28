@@ -79,6 +79,20 @@ function startInput(terminalToolName?: string): StartRunInput {
 }
 
 
+describe("OmpSdkProviderClient recovery capabilities", () => {
+  it("advertises durable session history without claiming cross-process run lookup", () => {
+    const client = new OmpSdkProviderClient();
+
+    expect(client.getCapabilities().recovery).toEqual({
+      sessionResume: true,
+      historyReplay: true,
+      activeRunLookup: false,
+      streamReconnect: false,
+      mode: "session_history",
+    });
+  });
+});
+
 describe("OmpSdkProviderClient direct config", () => {
   it("copies configured API key and base URL into SDK environment variables", async () => {
     const client = new OmpSdkProviderClient({
@@ -165,6 +179,19 @@ describe("OmpSdkProviderClient node runtime tools", () => {
     }
   });
 
+
+  it("rejects provider model drift before execution", () => {
+    expect(() => __ompSdkProviderTestHooks.assertExpectedModel(
+      "OmniRoute/gpt-5.6-sol",
+      "openai-codex/gpt-5.5",
+    )).toThrow(
+      "OMP model routing conflict: expected 'OmniRoute/gpt-5.6-sol', resolved 'openai-codex/gpt-5.5'",
+    );
+    expect(() => __ompSdkProviderTestHooks.assertExpectedModel(
+      "OmniRoute/gpt-5.6-sol",
+      "OmniRoute/gpt-5.6-sol",
+    )).not.toThrow();
+  });
 
   it("surfaces the concrete SDK tool error text", () => {
     expect(__ompSdkProviderTestHooks.sdkToolErrorMessage({

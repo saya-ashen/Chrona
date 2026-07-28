@@ -1,6 +1,6 @@
 import "@testing-library/jest-dom/vitest";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
@@ -11,6 +11,7 @@ import {
 import { createTaskWorkspaceExecutionConsoleView } from "@features/task-workspace";
 import { executionMonitoringWorkspaceFixtures } from "./execution-monitoring-test-fixtures";
 import { TaskWorkspaceExecutionOverview } from "../ui/task-workspace-execution-overview";
+import type { WorkspaceRuntimeEvent } from "../model/workspace-runtime-events";
 import {
   buildCommandCenterOutputTabSpec,
   buildCommandCenterTrailTabSpec,
@@ -80,7 +81,9 @@ describe("TaskWorkspaceExecutionOverview", () => {
   afterEach(() => {
     cleanup();
     window.localStorage.clear();
+    vi.useRealTimers();
   });
+
 
   it("keeps approval waits in stage results instead of final result", () => {
     const view = createTaskWorkspaceExecutionConsoleView(
@@ -465,11 +468,10 @@ describe("TaskWorkspaceExecutionOverview", () => {
       currentExecution: { status: "running" },
     });
 
-    const currentActivity = screen.getByRole("status", { name: "Execution is producing output" });
-    expect(currentActivity).toHaveTextContent("Writing report");
-    expect(currentActivity).toHaveTextContent("Generating report sections");
-    expect(currentActivity).toHaveTextContent('{"section":"architecture"}');
-    expect(currentActivity).not.toHaveTextContent("Step: Generate report");
+    const results = screen.getByRole("region", { name: "Stage results" });
+    expect(within(results).queryByRole("status", { name: "Execution is producing output" })).not.toBeInTheDocument();
+    expect(within(results).queryByText("Writing report")).not.toBeInTheDocument();
+    expect(screen.getAllByText("Generating report sections").length).toBeGreaterThan(0);
   });
 
   it("renders the complete live tool process in Activity", () => {
@@ -584,6 +586,65 @@ describe("TaskWorkspaceExecutionOverview", () => {
     expect(screen.queryByRole("note", { name: "Current step result pending" })).not.toBeInTheDocument();
   });
 
+
+  it("buffers rapid assistant deltas instead of repainting every token", async () => {
+    vi.useFakeTimers();
+    const view = createTaskWorkspaceExecutionConsoleView(
+      executionMonitoringWorkspaceFixtures.running,
+    );
+    const firstEvent = {
+      type: "runtime_event" as const,
+      action: "start_manual" as const,
+      nodeId: "execute",
+      nodeTitle: "Generate report",
+      runtimeName: "hermes",
+      provider: "hermes",
+      runId: "run-1",
+      sequence: 1,
+      timestamp: "2026-05-12T10:01:00.000Z",
+      event: { type: "assistant_text_delta" as const, text: "First" },
+    };
+    const { rerender } = renderOverview(view, {
+      runtimeEvents: [firstEvent],
+      currentExecution: { status: "running" },
+      isExecutionRunning: true,
+    });
+    const renderAgain = (runtimeEvents: WorkspaceRuntimeEvent[]) => rerender(
+      <TaskWorkspaceExecutionOverview
+        taskId="task-1"
+        progress={view.progress}
+        readiness={view.readiness}
+        latestResult={view.latestResult}
+        attention={view.attention}
+        nodes={view.graphPlan?.nodes ?? []}
+        latestCompletedNode={view.latestCompletedNode}
+        artifacts={view.artifacts}
+        activity={view.activity}
+        runtimeEvents={runtimeEvents}
+        currentExecution={{ status: "running" }}
+        isExecutionRunning
+      />,
+    );
+    const secondEvent = {
+      ...firstEvent,
+      sequence: 2,
+      event: { type: "assistant_text_delta" as const, text: " second" },
+    };
+    const thirdEvent = {
+      ...firstEvent,
+      sequence: 3,
+      event: { type: "assistant_text_delta" as const, text: " third" },
+    };
+
+    renderAgain([firstEvent, secondEvent]);
+    renderAgain([firstEvent, secondEvent, thirdEvent]);
+    expect(screen.getByRole("region", { name: "Stage results" })).toHaveTextContent("First");
+    expect(screen.getByRole("region", { name: "Stage results" })).not.toHaveTextContent("second");
+
+    await act(async () => vi.advanceTimersByTimeAsync(100));
+    expect(screen.getByRole("region", { name: "Stage results" })).toHaveTextContent("First second third");
+  });
+
   it("explains that stage results are pending while activity stays live", () => {
     const view = createTaskWorkspaceExecutionConsoleView(
       executionMonitoringWorkspaceFixtures.running,
@@ -612,11 +673,11 @@ describe("TaskWorkspaceExecutionOverview", () => {
       executionResultState: "waiting",
     });
 
-    expect(screen.getByRole("region", { name: "Stage results" })).toHaveTextContent("Waiting for output");
-    const liveStatus = screen.getByRole("status", { name: "Execution is producing output" });
-    expect(liveStatus).toHaveTextContent("AI is working");
-    expect(liveStatus).toHaveTextContent("Working on the current step");
-    expect(liveStatus.querySelector(".animate-spin")).toBeInTheDocument();
+    const results = screen.getByRole("region", { name: "Stage results" });
+    expect(results).toHaveTextContent("Waiting for output");
+    expect(within(results).queryByRole("status", { name: "Execution is producing output" })).not.toBeInTheDocument();
+    expect(within(results).queryByText("Current activity")).not.toBeInTheDocument();
+    expect(results.querySelector(".animate-spin")).not.toBeInTheDocument();
   });
 
   it("hides live status strip after completion even when stale activity looks active", () => {

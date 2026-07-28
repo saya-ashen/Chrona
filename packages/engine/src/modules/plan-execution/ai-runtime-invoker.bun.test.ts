@@ -611,6 +611,43 @@ describe("runProviderRequest resume threading", () => {
   });
 });
 
+describe("runProviderRequest runtime model threading", () => {
+  it("forwards the task-pinned model to provider startRun", async () => {
+    const startRun = mock(async () => runRef());
+    const streamRun = mock(() =>
+      (async function* () {
+        yield {
+          type: "run_completed",
+          run: { runId: "run-1", nativeRunId: "run-1", sessionId: "sdk-session-1", status: "completed" },
+          outputText: "ok",
+        } as ProviderRunEvent;
+      })(),
+    );
+    const client = {
+      provider: "omp",
+      startRun,
+      streamRun,
+    } as unknown as AgentProviderClient;
+
+    await runProviderRequest(client, {
+      ...request,
+      runtimeConfiguration: {
+        model: "OmniRoute/gpt-5.6-sol",
+        contextStrategy: "auto_compact",
+      },
+    });
+
+    expect(startRun).toHaveBeenCalledWith(
+      expect.objectContaining({
+        runtimeConfiguration: {
+          model: "OmniRoute/gpt-5.6-sol",
+          contextStrategy: "auto_compact",
+        },
+      }),
+    );
+  });
+});
+
 describe("runProviderRequest Chrona control handoff", () => {
   it("passes run-token control config to the OMP provider", async () => {
     const previousBaseUrl = process.env.CHRONA_BASE_URL;

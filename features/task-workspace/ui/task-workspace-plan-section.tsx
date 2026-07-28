@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import type {
   ExecutionActionInput,
@@ -1960,14 +1960,14 @@ export function TaskWorkspacePlanSection({
       setIsSubmittingResultChanges(false);
     }
   };
-  const focusNodeActions = (nodeId?: string) => {
+  const focusNodeActions = useCallback((nodeId?: string) => {
     if (!nodeId) return;
 
     const actionsPanel = document.getElementById("task-workspace-node-actions");
     if (typeof actionsPanel?.scrollIntoView === "function") {
       actionsPanel.scrollIntoView({ block: "nearest", behavior: "smooth" });
     }
-  };
+  }, []);
   const planReviewDecisionPanel =
     plan && graphPlan ? (
       <PlanReviewDecisionPanel

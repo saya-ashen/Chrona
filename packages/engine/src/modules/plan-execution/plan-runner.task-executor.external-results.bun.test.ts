@@ -9,6 +9,7 @@ import type { CompiledPlan, ConditionConfig, TaskConfig } from "@chrona/contract
 import { resolveEffectivePlanGraph } from "@chrona/graph-runtime";
 import type { NodeExecutionResult } from "./node-executors/types";
 import { buildSemanticRefHistory } from "./runtime/node-runtime-refs";
+import { recoverRecordedTerminalActions } from "./use-cases/recover-recorded-terminal-actions";
 import {
   executeTaskNodeCapabilityMock,
   evaluateConditionNodeCapabilityMock,
@@ -926,6 +927,83 @@ describe("plan-runner task executor external results", () => {
     expect(updatedTask.status).toBe(TaskStatus.Completed);
     expect(updatedTask.blockReason).toBeNull();
   });
+  it("replays a recorded terminal action after process loss and completes the task exactly once", async () => {
+    executeTaskNodeCapabilityMock.mockResolvedValueOnce({
+      status: "started",
+      summary: "Provider run remains active until its terminal action is committed",
+      evidence: { sessionId: "provider-session", runId: "provider-run" },
+      output: { runtimeRunRef: "runtime-interrupted-terminal" },
+    });
+
+    const { workspace, task } = await seedWorkspaceAndTask("Recorded terminal restart recovery");
+    const compiledPlan = makeSingleTaskPlan("graph_recorded_terminal_restart_recovery");
+    await seedAcceptedCompiledPlan(workspace.id, task.id, compiledPlan);
+
+    const started = await taskPlanExecution.dispatch({
+      taskId: task.id,
+      action: { action: "start_manual" },
+    });
+    expect(started.status).toBe("running");
+
+    const attempt = await db.taskPlanNodeAttempt.findFirstOrThrow({
+      where: { taskId: task.id, nodeId: "task_node", status: "running" },
+    });
+    const run = await db.run.findFirstOrThrow({
+      where: { taskId: task.id, status: "Running" },
+      orderBy: { startedAt: "desc" },
+    });
+    const mainSession = await db.taskSession.findFirstOrThrow({
+      where: { taskId: task.id },
+      orderBy: { createdAt: "desc" },
+    });
+    await db.task.update({
+      where: { id: task.id },
+      data: { latestRunId: run.id },
+    });
+    await db.taskPlanProviderRun.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        planId: compiledPlan.editablePlanId,
+        planRunId: attempt.planRunId,
+        nodeAttemptId: attempt.id,
+        idempotencyKey: `provider-run:${attempt.id}`,
+        providerRunRef: "runtime-interrupted-terminal",
+        runtimeName: "hermes",
+        status: "running",
+      },
+    });
+    await db.taskPlanTerminalAction.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        runId: run.id,
+        taskSessionId: mainSession.id,
+        runtimeSessionKey: mainSession.sessionKey,
+        nodeId: "task_node",
+        nodeAttemptId: attempt.id,
+        kind: "complete",
+        payload: { summary: "Recovered durable completion" },
+      },
+    });
+
+    const first = await recoverRecordedTerminalActions({ taskId: task.id });
+    const second = await recoverRecordedTerminalActions({ taskId: task.id });
+
+    expect(first).toEqual({ checked: 1, recovered: 1, skipped: 0, failed: 0 });
+    expect(second).toEqual({ checked: 0, recovered: 0, skipped: 0, failed: 0 });
+    expect((await db.task.findUniqueOrThrow({ where: { id: task.id } })).status).toBe("Completed");
+    expect((await db.executionSession.findFirstOrThrow({ where: { taskId: task.id } })).status).toBe("Completed");
+    expect((await db.run.findUniqueOrThrow({ where: { id: run.id } })).status).toBe("Completed");
+    expect((await db.taskPlanNodeAttempt.findUniqueOrThrow({ where: { id: attempt.id } })).status).toBe("succeeded");
+    expect((await db.taskPlanProviderRun.findFirstOrThrow({ where: { nodeAttemptId: attempt.id } })).status).toBe("completed");
+    const persisted = await getPlanRun(task.id, compiledPlan.editablePlanId);
+    expect(persisted?.results.find((result) => result.nodeId === "task_node")).toMatchObject({
+      status: "current",
+      outputSummary: "Recovered durable completion",
+    });
+  });
+
 });
 
 async function waitForTaskNodeCalls(expectedNodeIds: string[]) {

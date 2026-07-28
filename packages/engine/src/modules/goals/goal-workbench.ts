@@ -7,6 +7,7 @@ import { getChronaGeneratedFilesDir } from "@chrona/shared/data-paths";
 import { db, Prisma } from "@chrona/db";
 import {
   CATALOG_VERSION,
+  chronaResultCatalog,
   validateChronaSpec,
   type UiDocument,
 } from "@chrona/ui-protocol";
@@ -59,28 +60,6 @@ function artifactKind(artifact: { type: string; uri: string; metadata: unknown }
   if (extension === "html" || extension === "htm") return "page" as const;
   return metadata?.formSchema ? "form" as const : "file" as const;
 }
-const STRUCTURED_RESULT_COMPONENTS: Readonly<Record<string, true>> = {
-  Stack: true,
-  Card: true,
-  Heading: true,
-  Text: true,
-  RichMarkdown: true,
-  Alert: true,
-  Badge: true,
-  ResultSummary: true,
-  Table: true,
-  JsonView: true,
-  FileRef: true,
-  ResultHero: true,
-  ResultDeliverable: true,
-  ResultInsight: true,
-  ResultActionPlan: true,
-  ResultCaveats: true,
-  ResultEvidence: true,
-  FileView: true,
-  Separator: true,
-  CollapsibleBlock: true,
-};
 
 function stripHostActions(spec: UiDocument): UiDocument {
   return {
@@ -88,7 +67,7 @@ function stripHostActions(spec: UiDocument): UiDocument {
     elements: Object.fromEntries(
       Object.entries(spec.elements).map(([key, element]) => {
         const { on: _on, ...readOnlyElement } = element as typeof element & { on?: unknown };
-        if (!(readOnlyElement.type in STRUCTURED_RESULT_COMPONENTS)) {
+        if (!(readOnlyElement.type in chronaResultCatalog.data.components)) {
           throw new EngineError(ENGINE_ERROR_CODES.VALIDATION_FAILED, `Structured result component is not allowed in Goal Workbench: ${readOnlyElement.type}`);
         }
         const props = record(readOnlyElement.props);

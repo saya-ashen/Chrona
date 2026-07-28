@@ -28,6 +28,7 @@ import {
   FileCode2,
   FileImage,
   FileSpreadsheet,
+  MoreHorizontal,
   Sparkles,
   TriangleAlert,
   Wrench,
@@ -59,6 +60,10 @@ import {
   FieldDescription,
   FieldLabel,
   Label,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
   Calendar,
   cn,
   Popover,
@@ -2551,9 +2556,87 @@ function CheckpointChoiceField({
     </Field>
   );
 }
+function horizontalStackChildrenClass(className?: string | null) {
+  if (className?.includes("children-intrinsic")) {
+    return "[&>*]:min-w-0 [&>*]:flex-none";
+  }
+  return "[&>*]:min-w-0 [&>*]:flex-[1_1_18rem]";
+}
+
+
+function WorkspaceButton({
+  props,
+  emit,
+}: {
+  props: {
+    label: string;
+    variant?: "primary" | "secondary" | "danger" | null;
+    size?: "sm" | "md" | "lg" | null;
+    disabled?: boolean | null;
+  };
+  emit: (event: string) => void;
+}) {
+  const variant = props.variant === "danger"
+    ? "destructive"
+    : props.variant === "secondary"
+      ? "secondary"
+      : "default";
+  const size = props.size === "lg" ? "lg" : props.size === "sm" ? "sm" : "default";
+  return (
+    <Button
+      type="button"
+      variant={variant}
+      size={size}
+      disabled={props.disabled ?? false}
+      onClick={() => emit("press")}
+    >
+      {props.label}
+    </Button>
+  );
+}
+
+function WorkspaceDropdownMenu({
+  props,
+  bindings,
+  emit,
+}: {
+  props: {
+    label: string;
+    value?: string | null;
+    items?: Array<{ label: string; value: string }> | null;
+  };
+  bindings?: Record<string, string>;
+  emit: (event: string) => void;
+}) {
+  const [, setBoundValue] = useBoundProp(props.value ?? undefined, bindings?.value);
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        className="inline-flex size-8 shrink-0 items-center justify-center rounded-lg border border-border/90 bg-background/80 text-foreground shadow-xs outline-none transition-colors hover:bg-muted/70 focus-visible:ring-2 focus-visible:ring-ring/25"
+        aria-label={props.label === "..." ? "More task actions" : props.label}
+      >
+        <MoreHorizontal className="size-4" aria-hidden />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        {(props.items ?? []).map((item) => (
+          <DropdownMenuItem
+            key={item.value}
+            onClick={() => {
+              setBoundValue(item.value);
+              emit("select");
+            }}
+          >
+            {item.label}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
 
 export const { registry: workspaceRegistry } = defineRegistry(chronaCatalog, {
   components: {
+
     // standard primitives (shadcn)
     Card: (input) => {
       const props = {
@@ -2579,6 +2662,7 @@ export const { registry: workspaceRegistry } = defineRegistry(chronaCatalog, {
       }
       return shadcnComponents.Card({ ...input, props });
     },
+
     Stack: (input) => {
       const horizontal = input.props.direction === "horizontal";
       return shadcnComponents.Stack({
@@ -2590,7 +2674,7 @@ export const { registry: workspaceRegistry } = defineRegistry(chronaCatalog, {
             "min-w-0 max-w-full",
             !input.props.className?.includes("w-auto") && "w-full",
             !input.props.align && "items-stretch",
-            horizontal && "[&>*]:min-w-0 [&>*]:flex-[1_1_18rem]",
+            horizontal && horizontalStackChildrenClass(input.props.className),
           ),
         },
       });
@@ -2600,7 +2684,7 @@ export const { registry: workspaceRegistry } = defineRegistry(chronaCatalog, {
     Heading: shadcnComponents.Heading,
     Badge: shadcnComponents.Badge,
     Alert: shadcnComponents.Alert,
-    Button: shadcnComponents.Button,
+    Button: WorkspaceButton,
     CheckpointChoiceField,
     Link: shadcnComponents.Link,
     Input: shadcnComponents.Input,
@@ -2611,7 +2695,7 @@ export const { registry: workspaceRegistry } = defineRegistry(chronaCatalog, {
     Tabs: shadcnComponents.Tabs,
     Table: WorkspaceTable,
     heading: shadcnComponents.Heading,
-    DropdownMenu: shadcnComponents.DropdownMenu,
+    DropdownMenu: WorkspaceDropdownMenu,
     ResultOverview: ({ props }) => <ResultOverview props={props} />,
     ResultReadiness: ({ props }) => <ResultReadiness props={props} />,
     ResultSection: ({ props, children }) => (

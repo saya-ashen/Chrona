@@ -114,6 +114,22 @@ export async function updateTask(
     workspaceDefaultRuntime: currentTask.workspace.defaultRuntime,
     executionConfig: nextExecutionConfig,
   });
+  const currentExecutionConfig = currentTask.executionConfig as Record<string, unknown>;
+  const nextExecutionConfigRecord = validatedRuntimeConfig.executionConfig as Record<string, unknown>;
+  const currentConfiguredModel = typeof currentExecutionConfig.model === "string"
+    ? currentExecutionConfig.model.trim()
+    : "";
+  const nextConfiguredModel = typeof nextExecutionConfigRecord.model === "string"
+    ? nextExecutionConfigRecord.model.trim()
+    : "";
+  const nextExecutionRuntime = input.executionRuntime === undefined
+    ? currentTask.executionRuntime
+    : input.executionRuntime;
+  const nextAiClientId = input.aiClientId === undefined ? currentTask.aiClientId : input.aiClientId;
+  const modelRoutingChanged = (
+    input.executionConfig !== undefined && currentConfiguredModel !== nextConfiguredModel
+  ) || nextExecutionRuntime !== currentTask.executionRuntime
+    || nextAiClientId !== currentTask.aiClientId;
   const acceptedPlan = await getAcceptedCompiledPlanForTask(currentTask.id);
   const nextStatus = (() => {
     if (input.status) {
@@ -231,6 +247,8 @@ export async function updateTask(
       executionConfig: shouldPersistResolvedRuntimeConfig
         ? (validatedRuntimeConfig.executionConfig as Prisma.InputJsonObject)
         : executionConfig,
+      pinnedModel: modelRoutingChanged ? (nextConfiguredModel || null) : undefined,
+      pinnedModelSource: modelRoutingChanged ? (nextConfiguredModel ? "user" : null) : undefined,
       status: nextStatus,
       recurrenceRule: input.recurrenceRule !== undefined ? nextRecurrenceRule : undefined,
       kind: input.recurrenceRule !== undefined ? (nextRecurrenceRule ? "recurring" : "single") : undefined,

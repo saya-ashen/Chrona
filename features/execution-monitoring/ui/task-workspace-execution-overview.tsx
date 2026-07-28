@@ -1,5 +1,5 @@
 import { Activity, TerminalSquare, TriangleAlert } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { createStateStore } from "@json-render/react";
 import { buildResultSpec, type UiDocument } from "@chrona/ui-protocol";
 import type { PlanExecutionResult } from "@chrona/contracts";
@@ -77,6 +77,7 @@ const DEFAULT_COMMAND_CENTER_COPY: CommandCenterCopy = {
 };
 
 const TRAIL_ACTIVITY_LIMIT = 300;
+const LIVE_RESULT_UPDATE_INTERVAL_MS = 100;
 type ResultCollapseCommandState = {
   mode: "collapse" | "expand";
   revision: number;
@@ -123,16 +124,75 @@ function isAssistantTextEvent(
   return runtimeEvent.event.type === "assistant_text_delta";
 }
 
-function buildLiveResultContentSpec(runtimeEvents: WorkspaceRuntimeEvent[], title: string) {
-  const text = runtimeEvents
-    .filter(isAssistantTextEvent)
-    .map((runtimeEvent) => runtimeEvent.event.text)
-    .join("")
-    .trim();
-  if (!text) return null;
-  return buildResultSpec([
-    { kind: "markdown", title, content: text },
-  ]);
+type LiveResult = {
+  content: string;
+  ownerNodeId: string | null;
+};
+
+function collectLiveResult(runtimeEvents: WorkspaceRuntimeEvent[]) {
+  let text = "";
+  let ownerNodeId: string | null = null;
+  for (const runtimeEvent of runtimeEvents) {
+    if (!isAssistantTextEvent(runtimeEvent)) continue;
+    text += runtimeEvent.event.text;
+    ownerNodeId = runtimeEvent.nodeId ?? null;
+  }
+  const content = text.trim();
+  return content ? { content, ownerNodeId } : null;
+}
+
+function sameLiveResult(left: LiveResult | null, right: LiveResult | null) {
+  return left?.content === right?.content
+    && left?.ownerNodeId === right?.ownerNodeId;
+}
+
+function useBufferedLiveResult(runtimeEvents: WorkspaceRuntimeEvent[]) {
+  const nextResult = useMemo(
+    () => collectLiveResult(runtimeEvents),
+    [runtimeEvents],
+  );
+  const [publishedResult, setPublishedResult] = useState(nextResult);
+  const publishedResultRef = useRef(publishedResult);
+  const latestResultRef = useRef(nextResult);
+  const lastPublishedAtRef = useRef(performance.now());
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  latestResultRef.current = nextResult;
+
+  useEffect(() => {
+    if (sameLiveResult(publishedResultRef.current, nextResult)) return;
+
+    const publish = () => {
+      timerRef.current = null;
+      const latestResult = latestResultRef.current;
+      if (sameLiveResult(publishedResultRef.current, latestResult)) return;
+      publishedResultRef.current = latestResult;
+      lastPublishedAtRef.current = performance.now();
+      setPublishedResult(latestResult);
+    };
+    const elapsed = performance.now() - lastPublishedAtRef.current;
+    if (
+      publishedResultRef.current === null
+      || nextResult === null
+      || elapsed >= LIVE_RESULT_UPDATE_INTERVAL_MS
+    ) {
+      if (timerRef.current !== null) clearTimeout(timerRef.current);
+      publish();
+      return;
+    }
+    if (timerRef.current === null) {
+      timerRef.current = setTimeout(
+        publish,
+        LIVE_RESULT_UPDATE_INTERVAL_MS - elapsed,
+      );
+    }
+  }, [nextResult]);
+
+  useEffect(() => () => {
+    if (timerRef.current !== null) clearTimeout(timerRef.current);
+  }, []);
+
+  return publishedResult;
 }
 
 function isSameToolActivity(
@@ -294,17 +354,6 @@ export function TaskWorkspaceExecutionOverview({
       : mergedActivity,
     [activityHeartbeat, mergedActivity],
   );
-  const runningResultActivity = activeActivity ?? activityHeartbeat;
-  const currentActivityDetail = runningResultActivity?.tool?.preview
-    ?? runningResultActivity?.assistant?.text
-    ?? runningResultActivity?.summary
-    ?? runningResultActivity?.description;
-  const currentActivityInput = runningResultActivity?.tool?.inputSummary;
-  const currentActivityTitle = runningResultActivity?.tool?.label
-    ?? runningResultActivity?.tool?.name
-    ?? runningResultActivity?.title
-    ?? ws.executionWorkingFallback
-    ?? "AI is working";
   const showLiveStatus = executionIsLive;
   const activityItems = displayedActivity;
   const failedActivityCount = activityItems.filter((item) => item.tone === "danger").length;
@@ -397,25 +446,27 @@ export function TaskWorkspaceExecutionOverview({
     }));
   };
 
-  const locateHandlers = {
+  const locateHandlers = useMemo(() => ({
     "locate-workspace-node": (params: Record<string, unknown>) => {
       const nodeId =
         typeof params.nodeId === "string" ? params.nodeId : undefined;
       if (nodeId) onAction?.(nodeId);
     },
-  };
-  const latestLiveResultEvent = [...runtimeEvents]
-    .reverse()
-    .find((runtimeEvent) => runtimeEvent.event.type === "assistant_text_delta");
-  const liveResultSpec = executionIsActive
-    ? buildLiveResultContentSpec(
-      runtimeEvents,
-      ws.currentStepOutputTitle ?? "Current step output",
-    )
-    : null;
-  const resultSpec = buildNodeResultContentSpec(
-    latestCompletedNode,
-    ws.noResultYet,
+  }), [onAction]);
+  const liveResult = useBufferedLiveResult(runtimeEvents);
+  const liveResultSpec = useMemo(
+    () => executionIsActive && liveResult
+      ? buildResultSpec([{
+        kind: "markdown",
+        title: ws.currentStepOutputTitle ?? "Current step output",
+        content: liveResult.content,
+      }])
+      : null,
+    [executionIsActive, liveResult?.content, ws.currentStepOutputTitle],
+  );
+  const resultSpec = useMemo(
+    () => buildNodeResultContentSpec(latestCompletedNode, ws.noResultYet),
+    [latestCompletedNode, ws.noResultYet],
   );
 
   const outputSpec = useMemo(
@@ -426,7 +477,7 @@ export function TaskWorkspaceExecutionOverview({
         artifacts,
         copy: ws,
         liveResultSpec,
-        liveResultOwnerNodeId: latestLiveResultEvent?.nodeId ?? null,
+        liveResultOwnerNodeId: liveResult?.ownerNodeId ?? null,
         apiArtifactsSpec: hasCommandCenterOutput(commandCenter?.documents.output)
           ? (commandCenter?.documents.output ?? null)
           : null,
@@ -439,7 +490,7 @@ export function TaskWorkspaceExecutionOverview({
       artifacts,
       commandCenter?.documents.output,
       currentExecution?.planOutput?.updatedByNodeId,
-      latestLiveResultEvent?.nodeId,
+      liveResult?.ownerNodeId,
       liveResultSpec,
       latestCompletedNode,
       nodeOptions,
@@ -537,48 +588,6 @@ export function TaskWorkspaceExecutionOverview({
                   ? (ws.finalizationRetrying ?? "Retrying finalization...")
                   : (ws.finalizationRetry ?? "Retry finalization")}
               </Button>
-            </div>
-          ) : null}
-          {showLiveStatus ? (
-            <div
-              className="mt-3 flex items-start gap-3 rounded-xl border border-sky-300/70 bg-sky-500/5 px-3 py-3 text-sm"
-              role="status"
-              aria-live="polite"
-              aria-label={
-                ws.executionProducingOutputAria ??
-                "Execution is producing output"
-              }
-            >
-              <span
-                className="mt-0.5 size-4 shrink-0 animate-spin rounded-full border-2 border-sky-500/25 border-t-sky-600 motion-reduce:animate-none"
-                aria-hidden="true"
-              />
-              <div className="min-w-0 space-y-0.5">
-                <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-sky-700 dark:text-sky-200">
-                  {ws.currentActivity ?? "Current activity"}
-                </p>
-                <div className="flex flex-wrap items-center gap-2">
-                  <p className="font-medium text-foreground">{currentActivityTitle}</p>
-                  {runningResultActivity?.tool?.state ? (
-                    <Badge variant="secondary" className="h-5 px-1.5 text-[10px]">
-                      {runningResultActivity.tool.state}
-                    </Badge>
-                  ) : null}
-                </div>
-                {currentActivityDetail ? (
-                  <p className="max-w-3xl whitespace-pre-wrap break-words text-xs leading-relaxed text-muted-foreground">
-                    {currentActivityDetail}
-                  </p>
-                ) : null}
-                {currentActivityInput ? (
-                  <div className="mt-1 rounded-lg border border-sky-300/50 bg-background/70 px-2.5 py-2">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Input</p>
-                    <pre className="mt-1 max-h-24 overflow-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed text-foreground/80">
-                      {currentActivityInput}
-                    </pre>
-                  </div>
-                ) : null}
-              </div>
             </div>
           ) : null}
         </div>

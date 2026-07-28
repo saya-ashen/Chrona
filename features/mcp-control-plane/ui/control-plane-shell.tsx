@@ -335,7 +335,7 @@ export function ControlPlaneShell({
                 variant="default"
                 size="sm"
                 aria-label={t("nav.newTask")}
-                className="h-11 gap-1.5 rounded-xl px-4 sm:px-5"
+                className="h-9 gap-1.5 px-3.5 sm:px-4"
               >
                 <Plus className="size-4" />
                 <span className="hidden sm:inline">{t("nav.newTask")}</span>

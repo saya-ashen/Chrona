@@ -224,6 +224,52 @@ describe("updateTask", () => {
     });
   });
 
+  it("updates or clears the model pin only when user routing changes", async () => {
+    const workspace = await db.workspace.create({
+      data: {
+        name: "Model Pin Updates",
+        status: "Active",
+        defaultRuntime: "omp",
+      },
+    });
+    const task = await db.task.create({
+      data: {
+        workspaceId: workspace.id,
+        title: "Pinned model task",
+        executionRuntime: "omp",
+        executionConfig: { prompt: "Original prompt" },
+        pinnedModel: "OmniRoute/gpt-5.6-sol",
+        pinnedModelSource: "automatic",
+        status: "Ready",
+        priority: "High",
+      },
+    });
+
+    await updateTask({ taskId: task.id, title: "Renamed task" });
+    expect(await db.task.findUniqueOrThrow({ where: { id: task.id } })).toMatchObject({
+      pinnedModel: "OmniRoute/gpt-5.6-sol",
+      pinnedModelSource: "automatic",
+    });
+
+    await updateTask({
+      taskId: task.id,
+      executionConfig: { prompt: "Original prompt", model: "OpenRouter/gpt-5.6" },
+    });
+    expect(await db.task.findUniqueOrThrow({ where: { id: task.id } })).toMatchObject({
+      pinnedModel: "OpenRouter/gpt-5.6",
+      pinnedModelSource: "user",
+    });
+
+    await updateTask({
+      taskId: task.id,
+      executionConfig: { prompt: "Original prompt" },
+    });
+    expect(await db.task.findUniqueOrThrow({ where: { id: task.id } })).toMatchObject({
+      pinnedModel: null,
+      pinnedModelSource: null,
+    });
+  });
+
   it("keeps draft tasks in draft when no accepted plan exists", async () => {
     const workspace = await db.workspace.create({
       data: {

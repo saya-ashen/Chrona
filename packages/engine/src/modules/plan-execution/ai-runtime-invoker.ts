@@ -8,6 +8,7 @@ import {
 import type { PreparedAiFeatureSpec } from "@chrona/contracts/ai";
 import type { NodeAttempt } from "@chrona/contracts/ai";
 import type {
+  AgentProviderClient,
   ProviderRunEvent,
   ProviderRunSnapshot,
   ProviderRunInput,
@@ -37,6 +38,70 @@ type ExecutionProviderRequest = {
     contextStrategy?: "provider_default" | "auto_compact" | "bounded_tool_results" | "artifact_backed";
   };
 };
+
+const MODEL_PIN_SOURCE_AUTOMATIC = "automatic";
+const MODEL_PIN_SOURCE_USER = "user";
+
+function nonEmptyString(value: unknown): string | undefined {
+  return typeof value === "string" && value.trim() ? value.trim() : undefined;
+}
+
+async function resolveTaskModel(input: {
+  taskId: string;
+  executionConfig: Record<string, unknown>;
+  pinnedModel: string | null;
+  pinnedModelSource: string | null;
+  providerClient: AgentProviderClient;
+}): Promise<string | undefined> {
+  const configuredModel = nonEmptyString(input.executionConfig.model);
+  if (configuredModel) {
+    if (input.pinnedModel !== configuredModel || input.pinnedModelSource !== MODEL_PIN_SOURCE_USER) {
+      await db.task.update({
+        where: { id: input.taskId },
+        data: { pinnedModel: configuredModel, pinnedModelSource: MODEL_PIN_SOURCE_USER },
+      });
+    }
+    return configuredModel;
+  }
+
+  const pinnedModel = nonEmptyString(input.pinnedModel);
+  if (pinnedModel && input.pinnedModelSource !== MODEL_PIN_SOURCE_USER) return pinnedModel;
+  if (pinnedModel && input.pinnedModelSource === MODEL_PIN_SOURCE_USER) {
+    await db.task.update({
+      where: { id: input.taskId },
+      data: { pinnedModel: null, pinnedModelSource: null },
+    });
+  }
+  const modelCapabilities = input.providerClient.getConfigurationCapabilities?.().model;
+  if (!modelCapabilities?.supported || !modelCapabilities.taskOverride) return undefined;
+  if (!input.providerClient.getRuntimeDiagnostics) {
+    throw new Error(
+      `Runtime '${input.providerClient.provider}' cannot resolve an effective model for task pinning`,
+    );
+  }
+
+  const diagnostics = await input.providerClient.getRuntimeDiagnostics();
+  const effectiveModel = nonEmptyString(diagnostics.model);
+  if (!effectiveModel) {
+    throw new Error(
+      `Runtime '${input.providerClient.provider}' did not resolve an effective model for task pinning`,
+    );
+  }
+
+  const claimed = await db.task.updateMany({
+    where: { id: input.taskId, pinnedModel: null },
+    data: { pinnedModel: effectiveModel, pinnedModelSource: MODEL_PIN_SOURCE_AUTOMATIC },
+  });
+  if (claimed.count === 1) return effectiveModel;
+
+  const concurrent = await db.task.findUniqueOrThrow({
+    where: { id: input.taskId },
+    select: { executionConfig: true, pinnedModel: true },
+  });
+  return nonEmptyString((concurrent.executionConfig as Record<string, unknown>).model)
+    ?? nonEmptyString(concurrent.pinnedModel)
+    ?? effectiveModel;
+}
 
 export type AiRuntimeInvocationInput = {
   taskId: string;
@@ -110,7 +175,12 @@ export class AiRuntimeInvoker {
   async invoke(input: AiRuntimeInvocationInput): Promise<AiRuntimeInvocation> {
     const task = await db.task.findUniqueOrThrow({
       where: { id: input.taskId },
-      select: { workspaceId: true, executionConfig: true },
+      select: {
+        workspaceId: true,
+        executionConfig: true,
+        pinnedModel: true,
+        pinnedModelSource: true,
+      },
     });
     const occurrence = input.workBlockId
       ? await db.taskOccurrence.findUnique({ where: { workBlockId: input.workBlockId }, select: { id: true } })
@@ -178,9 +248,13 @@ export class AiRuntimeInvoker {
         resumeSessionRef: priorProviderSessionRef,
       });
       const executionConfig = task.executionConfig as Record<string, unknown>;
-      const model = typeof executionConfig.model === "string" && executionConfig.model.trim()
-        ? executionConfig.model.trim()
-        : undefined;
+      const model = await resolveTaskModel({
+        taskId: input.taskId,
+        executionConfig,
+        pinnedModel: task.pinnedModel,
+        pinnedModelSource: task.pinnedModelSource,
+        providerClient: client.providerClient,
+      });
       const contextStrategy = typeof executionConfig.contextStrategy === "string"
         ? executionConfig.contextStrategy
         : undefined;
@@ -332,6 +406,7 @@ function toStartRunInput(request: ExecutionProviderRequest): StartRunInput {
     terminalToolName: request.terminalToolName,
     structuredOutputSchema: request.structuredOutputSchema,
     toolPolicy: request.toolPolicy,
+    runtimeConfiguration: request.runtimeConfiguration,
     ...(request.resumeSessionRef
       ? { resumeSessionRef: request.resumeSessionRef }
       : {}),

@@ -1099,11 +1099,13 @@ describe("TaskWorkspacePlanSection", () => {
       ),
     ).toHaveClass("animate-spin");
     const stageResults = screen.getByRole("region", { name: "Stage results" });
-    const stageStatus = within(stageResults).getByRole("status", {
-      name: "Execution is producing output",
-    });
-    expect(stageStatus).toHaveTextContent("AI is working");
-    expect(stageStatus.querySelector(".animate-spin")).toBeInTheDocument();
+    expect(stageResults).toHaveTextContent("Waiting for output");
+    expect(
+      within(stageResults).queryByRole("status", {
+        name: "Execution is producing output",
+      }),
+    ).not.toBeInTheDocument();
+    expect(stageResults.querySelector(".animate-spin")).not.toBeInTheDocument();
     expect(
       screen.queryByRole("region", { name: "Current operation" }),
     ).not.toBeInTheDocument();

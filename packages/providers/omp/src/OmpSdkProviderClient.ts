@@ -519,6 +519,13 @@ function terminalNodeToolFromSnapshot(input: { raw?: unknown }) {
 }
 
 
+function assertExpectedModel(expectedModel: string | undefined, actualModel: string | null) {
+  if (!expectedModel || actualModel === expectedModel) return;
+  throw new Error(
+    `OMP model routing conflict: expected '${expectedModel}', resolved '${actualModel ?? "none"}'`,
+  );
+}
+
 function sdkReadOnlyToolOptions(toolPolicy: StartRunInput["toolPolicy"]) {
   return toolPolicy === "read_only"
     ? { toolNames: [] as string[], enableMCP: false, enableLsp: false }
@@ -537,6 +544,7 @@ export const __ompSdkProviderTestHooks = {
   textContentPreview,
   terminalNodeToolFromSnapshot,
   sdkLifecycleSummary,
+  assertExpectedModel,
   loadSdkSettings,
 };
 
@@ -669,11 +677,11 @@ export class OmpSdkProviderClient implements AgentProviderClient {
       supportsToolCalls: true,
       supportsPreviousResponse: false,
       recovery: {
-        sessionResume: false,
-        historyReplay: false,
-        activeRunLookup: true,
+        sessionResume: true,
+        historyReplay: true,
+        activeRunLookup: false,
         streamReconnect: false,
-        mode: "local_stream_only",
+        mode: "session_history",
       },
       reason: "Oh My Pi SDK custom tools run in-process for structured Chrona callbacks.",
     };
@@ -960,6 +968,14 @@ export class OmpSdkProviderClient implements AgentProviderClient {
       skipPythonPreflight: true,
       hasUI: false,
     });
+    const expectedModel = nonEmpty(handle.input.runtimeConfiguration?.model);
+    const actualModel = session.model ? `${session.model.provider}/${session.model.id}` : null;
+    try {
+      assertExpectedModel(expectedModel, actualModel);
+    } catch (error) {
+      await session.dispose();
+      throw error;
+    }
     handle.session = session;
     const persistedSessionRef = session.sessionManager.getSessionFile();
     if (persistedSessionRef) {

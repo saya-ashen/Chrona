@@ -31,11 +31,57 @@ type TestProviderResponseClient = AgentProviderClient;
 function createMockProviderClient(input: {
   outputMessages: string[];
   runStarted?: boolean;
-}): TestProviderResponseClient {
+  effectiveModel?: string;
+}) {
+  const calls = {
+    startRun: [] as Array<Parameters<AgentProviderClient["startRun"]>[0]>,
+    getRuntimeDiagnostics: 0,
+  };
   const messages: Array<{ role: string; content: string }> = [];
   let latestRun: ProviderRunRef | null = null;
 
-  return {
+  const client: TestProviderResponseClient = {
+    getConfigurationCapabilities() {
+      return {
+        model: { supported: true, taskOverride: true },
+        context: { supported: true, taskOverride: true, strategies: ["auto_compact"] },
+        tooling: {
+          mcp: { supported: false, enabled: false },
+          lsp: { supported: false, enabled: false },
+          subagents: { supported: false, enabled: false },
+          enabledTools: [],
+        },
+      };
+    },
+    async getRuntimeDiagnostics() {
+      calls.getRuntimeDiagnostics += 1;
+      return {
+        provider: "test-provider",
+        model: input.effectiveModel ?? "OmniRoute/gpt-5.6-sol",
+        contextWindow: 200_000,
+        contextStrategy: "auto_compact",
+        workingDirectory: process.cwd(),
+        configDirectory: null,
+        agentDirectory: null,
+        configurationCapabilities: {
+          model: { supported: true, taskOverride: true },
+          context: { supported: true, taskOverride: true, strategies: ["auto_compact"] },
+          tooling: {
+            mcp: { supported: false, enabled: false },
+            lsp: { supported: false, enabled: false },
+            subagents: { supported: false, enabled: false },
+            enabledTools: [],
+          },
+        },
+        sources: {
+          model: "provider_default" as const,
+          context: "provider_default" as const,
+          configDirectory: "provider_default" as const,
+          agentDirectory: "provider_default" as const,
+          tools: "runtime" as const,
+        },
+      };
+    },
     provider: "test-provider",
     getCapabilities(): ProviderCapabilities {
       return {
@@ -62,6 +108,7 @@ function createMockProviderClient(input: {
       };
     },
     async startRun(request): Promise<ProviderRunRef> {
+      calls.startRun.push(request);
       messages.push({ role: "user", content: extractUserText(request) });
       for (const outputContent of input.outputMessages) {
         messages.push({ role: "assistant", content: outputContent });
@@ -109,6 +156,7 @@ function createMockProviderClient(input: {
       };
     },
   };
+  return { client, calls };
 }
 
 function createThrowingProviderClient(): TestProviderResponseClient {
@@ -496,7 +544,7 @@ describe("executeTaskNodeCapability output persistence", () => {
     const outputContent = "Hello from the mock runtime! The task has been completed successfully.";
     const { taskId, planId, sessionId, sessionKey, planGraph } = await seedFullSetup();
     const node = planGraph.nodes[0];
-    const providerClient = createMockProviderClient({
+    const { client: providerClient } = createMockProviderClient({
       outputMessages: [outputContent],
     });
     installMockRegistryClient(providerClient);
@@ -566,6 +614,81 @@ describe("executeTaskNodeCapability output persistence", () => {
     });
   });
 
+  it("pins the first effective model and reuses it after the provider default changes", async () => {
+    const { taskId, planId, sessionId, sessionKey, planGraph } = await seedFullSetup();
+    const node = planGraph.nodes[0];
+    const first = createMockProviderClient({
+      outputMessages: ["First run complete"],
+      effectiveModel: "OmniRoute/gpt-5.6-sol",
+    });
+    installMockRegistryClient(first.client);
+
+    await executeTaskNodeCapability({
+      taskId,
+      mainSession: { id: sessionId, taskId, sessionKey },
+      node,
+      plan: planGraph,
+      attempt: createNodeAttempt({ taskId, planId, nodeId: node.id }),
+      runtimeName: "test-provider",
+      aiRuntimeInvoker: createAiRuntimeInvoker(),
+    });
+
+    expect(first.calls.getRuntimeDiagnostics).toBe(1);
+    expect(first.calls.startRun[0].runtimeConfiguration?.model).toBe("OmniRoute/gpt-5.6-sol");
+    expect(await db.task.findUniqueOrThrow({ where: { id: taskId } })).toMatchObject({
+      pinnedModel: "OmniRoute/gpt-5.6-sol",
+      pinnedModelSource: "automatic",
+    });
+
+    const second = createMockProviderClient({
+      outputMessages: ["Second run complete"],
+      effectiveModel: "openai-codex/gpt-5.5",
+    });
+    installMockRegistryClient(second.client);
+    await executeTaskNodeCapability({
+      taskId,
+      mainSession: { id: sessionId, taskId, sessionKey },
+      node,
+      plan: planGraph,
+      attempt: createNodeAttempt({ taskId, planId, nodeId: node.id }),
+      runtimeName: "test-provider",
+      aiRuntimeInvoker: createAiRuntimeInvoker(),
+    });
+
+    expect(second.calls.getRuntimeDiagnostics).toBe(0);
+    expect(second.calls.startRun[0].runtimeConfiguration?.model).toBe("OmniRoute/gpt-5.6-sol");
+  });
+
+  it("uses a user-configured model without consulting the provider default", async () => {
+    const { taskId, planId, sessionId, sessionKey, planGraph } = await seedFullSetup();
+    await db.task.update({
+      where: { id: taskId },
+      data: { executionConfig: { model: "OpenRouter/gpt-5.6" } },
+    });
+    const provider = createMockProviderClient({
+      outputMessages: ["Configured run complete"],
+      effectiveModel: "openai-codex/gpt-5.5",
+    });
+    installMockRegistryClient(provider.client);
+
+    await executeTaskNodeCapability({
+      taskId,
+      mainSession: { id: sessionId, taskId, sessionKey },
+      node: planGraph.nodes[0],
+      plan: planGraph,
+      attempt: createNodeAttempt({ taskId, planId, nodeId: planGraph.nodes[0].id }),
+      runtimeName: "test-provider",
+      aiRuntimeInvoker: createAiRuntimeInvoker(),
+    });
+
+    expect(provider.calls.getRuntimeDiagnostics).toBe(0);
+    expect(provider.calls.startRun[0].runtimeConfiguration?.model).toBe("OpenRouter/gpt-5.6");
+    expect(await db.task.findUniqueOrThrow({ where: { id: taskId } })).toMatchObject({
+      pinnedModel: "OpenRouter/gpt-5.6",
+      pinnedModelSource: "user",
+    });
+  });
+
 
   it("rebuilds projection when provider setup fails after run creation", async () => {
     const { taskId, planId, sessionId, sessionKey, planGraph } = await seedFullSetup();
@@ -609,7 +732,7 @@ describe("executeTaskNodeCapability output persistence", () => {
   });
   it("keeps the node running when the provider produces no output", async () => {
     const { taskId, planId, sessionId, sessionKey, planGraph } = await seedFullSetup();
-    const providerClient = createMockProviderClient({
+    const { client: providerClient } = createMockProviderClient({
       outputMessages: [],
     });
     installMockRegistryClient(providerClient);
@@ -641,7 +764,7 @@ describe("executeTaskNodeCapability output persistence", () => {
 
   it("does not require structured output when text output is empty", async () => {
     const { taskId, planId, sessionId, sessionKey, planGraph } = await seedFullSetup();
-    const providerClient = createMockProviderClient({
+    const { client: providerClient } = createMockProviderClient({
       outputMessages: [],
     });
     installMockRegistryClient(providerClient);
@@ -674,7 +797,7 @@ describe("executeTaskNodeCapability output persistence", () => {
 
   it("derives task running state from the active provider run", async () => {
     const { taskId, planId, sessionId, sessionKey, planGraph } = await seedFullSetup();
-    const providerClient = createMockProviderClient({
+    const { client: providerClient } = createMockProviderClient({
       outputMessages: [],
     });
     installMockRegistryClient(providerClient);
@@ -697,7 +820,7 @@ describe("executeTaskNodeCapability output persistence", () => {
 
   it("sets run status to Failed when the provider refuses to start", async () => {
     const { taskId, planId, sessionId, sessionKey, planGraph } = await seedFullSetup();
-    const providerClient = createMockProviderClient({
+    const { client: providerClient } = createMockProviderClient({
       outputMessages: [],
       runStarted: false,
     });
@@ -720,7 +843,7 @@ describe("executeTaskNodeCapability output persistence", () => {
   it("persists the final provider response when a response has multiple deltas", async () => {
     const { taskId, planId, sessionId, sessionKey, planGraph } = await seedFullSetup();
     const node = planGraph.nodes[0];
-    const providerClient = createMockProviderClient({
+    const { client: providerClient } = createMockProviderClient({
       outputMessages: [
         "Thinking about this...",
         "Step 1 done.",

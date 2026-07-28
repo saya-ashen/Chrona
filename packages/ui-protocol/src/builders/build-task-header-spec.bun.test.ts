@@ -33,6 +33,12 @@ describe("buildTaskHeaderSpec", () => {
     expect(detailChildren).toContain("badge:workspace-state");
     expect(detailChildren).toContain("badge:primary-state");
     expect(detailChildren).toContain("badge:priority");
+    expect(spec.elements.layout?.props).toMatchObject({
+      className: expect.stringContaining("children-intrinsic"),
+    });
+    expect(spec.elements.actions?.props).toMatchObject({
+      className: expect.stringContaining("w-auto"),
+    });
   });
 
   it("places plan generation stop action in header actions", () => {

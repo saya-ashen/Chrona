@@ -567,6 +567,8 @@ model Task {
   recurrenceWindowUntil     DateTime?
   executionRuntime          String
   executionConfig           Json
+  pinnedModel                String?
+  pinnedModelSource          String?
   status                    TaskStatus
   priority                  TaskPriority
   autoPlanGeneration        Boolean                    @default(false)

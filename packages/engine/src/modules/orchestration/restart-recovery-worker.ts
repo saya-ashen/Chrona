@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { taskPlanExecution } from "@/modules/plan-execution/facade/task-plan-execution.facade";
 import { setExecutionSessionState } from "@/modules/plan-execution/persistence/execution-session-store";
 import { rebuildTaskProjection } from "@/modules/projections";
+import { recoverRecordedTerminalActions } from "@/modules/plan-execution/use-cases/recover-recorded-terminal-actions";
 import { recordOrchestratorEvent } from "./scheduler-events";
 import { createLogger } from "@chrona/logging";
 
@@ -25,6 +26,7 @@ const LIVE_RUN_STATUSES: RunStatus[] = [
 
 type RestartRecoveryWorkerDeps = {
   recordEvent?: typeof recordOrchestratorEvent;
+  recoverRecordedTerminalActions?: typeof recoverRecordedTerminalActions;
   reconcileStaleRuntimeRuns?: typeof taskPlanExecution.reconcileStaleRuntimeRuns;
   setExecutionSessionState?: typeof setExecutionSessionState;
   rebuildTaskProjection?: typeof rebuildTaskProjection;
@@ -40,6 +42,7 @@ export async function runRestartRecoveryWorker(input: {
     taskPlanExecution.reconcileStaleRuntimeRuns.bind(taskPlanExecution);
   const abandonSession = input.deps?.setExecutionSessionState ?? setExecutionSessionState;
   const rebuildProjection = input.deps?.rebuildTaskProjection ?? rebuildTaskProjection;
+  const recoverTerminalActions = input.deps?.recoverRecordedTerminalActions ?? recoverRecordedTerminalActions;
   const expiredLeases = await db.schedulerLease.findMany({ where: { expiresAt: { lte: now } } });
   await db.schedulerLease.deleteMany({ where: { expiresAt: { lte: now } } });
 
@@ -116,6 +119,11 @@ export async function runRestartRecoveryWorker(input: {
     }),
   );
 
+  // A terminal control action is durable proof that the provider finished the
+  // node. Replay it through the execution kernel before runtime-run lookup so
+  // process loss cannot strand an acknowledged result in Running.
+  const terminalActionRecovery = await recoverTerminalActions({ limit: 25 });
+
   const runtimeReconciliation = await reconcileStaleRuntimeRuns({ limit: 25 });
 
   return {
@@ -124,5 +132,6 @@ export async function runRestartRecoveryWorker(input: {
     abandonedSessionCount,
     degradedRunCount: degradedRuns.length,
     runtimeReconciliation,
+    terminalActionRecovery,
   };
 }

@@ -32,8 +32,55 @@ async function seedStructuredGoalResultWithoutArtifacts() {
   const plan = await db.taskPlan.create({ data: { workspaceId, taskId: task.id, planId: "structured-result-plan", revision: 1, status: "Accepted", compiledPlan: {} } });
   const now = new Date().toISOString();
   const spec = {
-    root: "summary",
+    root: "workspace",
     elements: {
+      workspace: {
+        type: "Stack",
+        props: { gap: "lg" },
+        children: [
+          "overview",
+          "readiness",
+          "section",
+          "metrics",
+          "comparison",
+          "timeline",
+          "checklist",
+          "changes",
+          "summary",
+        ],
+      },
+      overview: {
+        type: "ResultOverview",
+        props: { title: "Destination selected", summary: "推荐日照＋临沂沂蒙山" },
+      },
+      readiness: {
+        type: "ResultReadiness",
+        props: { status: "ready", summary: "Ready" },
+      },
+      section: {
+        type: "ResultSection",
+        props: { title: "Recommendation", layout: "stack" },
+      },
+      metrics: {
+        type: "ResultMetricGrid",
+        props: { metrics: [{ label: "Stops", value: "2" }] },
+      },
+      comparison: {
+        type: "ResultComparison",
+        props: { title: "Options", items: [{ label: "日照", summary: "Coastal route" }] },
+      },
+      timeline: {
+        type: "ResultTimeline",
+        props: { title: "Weekend", items: [{ label: "Day 1", summary: "Arrive in 日照" }] },
+      },
+      checklist: {
+        type: "ResultChecklist",
+        props: { title: "Before departure", items: [{ label: "Book hotel", status: "pending" }] },
+      },
+      changes: {
+        type: "ResultChangeSummary",
+        props: { title: "Plan changes", items: [{ label: "Route", summary: "Added 沂蒙山" }] },
+      },
       summary: {
         type: "ResultSummary",
         props: { text: "推荐日照＋临沂沂蒙山，路线完整且适合周末出行。" },
