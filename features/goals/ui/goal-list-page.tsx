@@ -8,8 +8,6 @@ import {
   CheckCircle2,
   CircleDot,
   CircleOff,
-  Clock3,
-  ListChecks,
   Pause,
   Plus,
   Target,
@@ -42,7 +40,7 @@ import {
   TabsTrigger,
 } from "@shared/ui";
 import { apiJson } from "@shared/http";
-import { createGoalWithFirstTask } from "../browser-api";
+import { createGoal, createGoalWithFirstTask } from "../browser-api";
 import { LocalizedLink } from "./localized-link";
 import type { GoalCopy, GoalData } from "../model/goal-types";
 
@@ -66,23 +64,42 @@ function CreateGoalDialog({ copy }: { copy: GoalCopy }) {
   const [error, setError] = useState<string | null>(null);
 
   async function submit() {
-    if (!title.trim() || !firstTaskTitle.trim() || pending) return;
+    if (!title.trim() || pending) return;
     setPending(true);
     setError(null);
     try {
       const workspace = await apiJson<{ id: string }>(
         "/api/workspaces/default",
       );
-      const created = await createGoalWithFirstTask({
-        workspaceId: workspace.id,
-        title: title.trim(),
-        firstTaskTitle: firstTaskTitle.trim(),
-        additionalContext: additionalContext.trim() || null,
-        priority: "High",
-        idempotencyKey: uuidv4(),
-      });
-      await revalidator.revalidate();
-      void navigate(localizeHref(locale, `/goals/${created.goal.id}`));
+      if (firstTaskTitle.trim()) {
+        const created = await createGoalWithFirstTask({
+          workspaceId: workspace.id,
+          title: title.trim(),
+          firstTaskTitle: firstTaskTitle.trim(),
+          additionalContext: additionalContext.trim() || null,
+          priority: "Medium",
+          idempotencyKey: uuidv4(),
+        });
+        navigate(localizeHref(locale, `/goals/${created.goal.id}`));
+      } else {
+        const created = await createGoal({
+          workspaceId: workspace.id,
+          title: title.trim(),
+          description: additionalContext.trim() || null,
+          successCriteria: [
+            {
+              id: uuidv4(),
+              kind: "user_confirmed",
+              description: copy.initialCriterionDescription,
+              satisfied: false,
+              confirmedAt: null,
+              proposalStatus: "proposed",
+            },
+          ],
+        });
+        navigate(localizeHref(locale, `/goals/${created.id}`));
+      }
+      revalidator.revalidate();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : copy.actionError);
     } finally {
@@ -157,12 +174,14 @@ function CreateGoalDialog({ copy }: { copy: GoalCopy }) {
               <FieldLabel htmlFor="goal-first-work">
                 {copy.firstTaskLabel}
               </FieldLabel>
+              <FieldDescription>{copy.optional}</FieldDescription>
               <Input
                 id="goal-first-work"
                 value={firstTaskTitle}
                 onChange={(event) => setFirstTaskTitle(event.target.value)}
                 placeholder={copy.firstTaskPlaceholder}
               />
+              <FieldDescription>{copy.firstTaskOptionalHelp}</FieldDescription>
             </Field>
           </section>
           {error ? (
@@ -176,10 +195,14 @@ function CreateGoalDialog({ copy }: { copy: GoalCopy }) {
             {copy.cancel}
           </Button>
           <Button
-            disabled={!title.trim() || !firstTaskTitle.trim() || pending}
+            disabled={!title.trim() || pending}
             onClick={() => void submit()}
           >
-            {pending ? copy.saving : copy.createGoal}
+            {pending
+              ? copy.saving
+              : firstTaskTitle.trim()
+                ? copy.createGoalAndTask
+                : copy.createGoalOnly}
           </Button>
         </DialogFooter>
       </DialogContent>
@@ -221,11 +244,6 @@ function GoalCard({ goal, copy }: { goal: GoalData; copy: GoalCopy }) {
                 <StatusIcon className="size-4" aria-hidden />
                 {copy.status[goal.status]}
               </span>
-              {goal.projection.activity !== "idle" ? (
-                <Badge variant="outline">
-                  {copy.activity[goal.projection.activity]}
-                </Badge>
-              ) : null}
               {needsAttention ? (
                 <Badge variant="destructive">
                   {copy.attention[goal.projection.attention]}
@@ -242,37 +260,21 @@ function GoalCard({ goal, copy }: { goal: GoalData; copy: GoalCopy }) {
                 </p>
               ) : null}
             </div>
-            <div className="flex flex-wrap gap-x-6 gap-y-2 border-y border-border/70 py-3 text-sm">
-              <span className="inline-flex items-center gap-2">
-                <CheckCircle2
-                  className={`size-4 ${goal.status === "Achieved" ? "text-success" : "text-muted-foreground"}`}
-                  aria-hidden
-                />
-                <span className="font-medium tabular-nums">
-                  {goal.projection.criteriaSatisfiedCount}/
-                  {goal.projection.criteriaTotalCount}
-                </span>
-                <span className="text-muted-foreground">
-                  {copy.successCriteria}
-                </span>
-              </span>
-              <span className="inline-flex items-center gap-2">
-                <ListChecks
-                  className="size-4 text-muted-foreground"
-                  aria-hidden
-                />
-                <span className="font-medium tabular-nums">
+            <div className="flex flex-wrap gap-x-5 gap-y-2 border-y border-border/70 py-3 text-sm text-muted-foreground">
+              <span>
+                <strong className="font-semibold tabular-nums text-foreground">
                   {goal.projection.completedTaskCount}/
                   {goal.projection.totalTaskCount}
-                </span>
-                <span className="text-muted-foreground">
-                  {copy.boundedTasks}
-                </span>
+                </strong>{" "}
+                {copy.boundedTasks}
               </span>
-              {isArchive && goal.achievedAt ? (
-                <span className="inline-flex items-center gap-2 text-muted-foreground">
-                  <Clock3 className="size-4" aria-hidden />
-                  {copy.achievedAt}
+              {goal.projection.criteriaTotalCount > 0 ? (
+                <span>
+                  <strong className="font-semibold tabular-nums text-foreground">
+                    {goal.projection.criteriaSatisfiedCount}/
+                    {goal.projection.criteriaTotalCount}
+                  </strong>{" "}
+                  {copy.successCriteria}
                 </span>
               ) : null}
             </div>
@@ -311,21 +313,23 @@ function GoalSection({
       aria-labelledby={`goal-group-${section.key}`}
       className="space-y-4"
     >
-      <div className="flex items-end justify-between gap-4 border-b pb-3">
-        <div>
+      <div className="flex items-center justify-between gap-4 border-b pb-3">
+        <div className="flex items-center gap-2">
           <h2
             id={`goal-group-${section.key}`}
-            className="text-xl font-semibold tracking-tight"
+            className="text-lg font-semibold tracking-tight"
           >
             {section.title}
           </h2>
-          <p className="mt-1 max-w-3xl text-sm text-muted-foreground">
+          <span className="text-sm tabular-nums text-muted-foreground">
+            {goals.length}
+          </span>
+        </div>
+        {section.key === "attention" ? (
+          <p className="hidden max-w-xl text-sm text-muted-foreground md:block">
             {section.description}
           </p>
-        </div>
-        <span className="shrink-0 text-sm tabular-nums text-muted-foreground">
-          {goals.length}
-        </span>
+        ) : null}
       </div>
       <div className="grid gap-3 xl:grid-cols-2">
         {goals.map((goal) => (

@@ -23,7 +23,13 @@ const mocks = vi.hoisted(() => ({
   saveGoalAssetDraft: vi.fn(async () => ({ id: "draft-saved" })),
   submitGoalAssetDraft: vi.fn(async () => ({ id: "version-published" })),
   submitGoalForm: vi.fn(async () => ({ id: "submission-saved" })),
-  createGoalAssetJob: vi.fn(async (_goalId: string, _assetId: string, command: { format?: string }) => ({ format: command.format ?? null })),
+  createGoalAssetJob: vi.fn(
+    async (
+      _goalId: string,
+      _assetId: string,
+      command: { format?: string },
+    ) => ({ format: command.format ?? null }),
+  ),
 }));
 
 vi.mock("../workbench-api", async (importOriginal) => ({
@@ -80,7 +86,10 @@ function asset(
         source: "inbox",
         content,
         contentHash: `hash-${id}-${version}`,
-        mimeType: kind === "structured_result" ? "application/vnd.chrona.structured-result+json" : "text/plain",
+        mimeType:
+          kind === "structured_result"
+            ? "application/vnd.chrona.structured-result+json"
+            : "text/plain",
         originalFilename: `${id}.txt`,
         changeSummary: "Initial version",
         sourceTaskId: `task-${id}`,
@@ -124,7 +133,6 @@ function renderWorkbench(
   return router;
 }
 
-
 describe("GoalAssetWorkbench", () => {
   afterEach(() => {
     cleanup();
@@ -143,9 +151,12 @@ describe("GoalAssetWorkbench", () => {
       "/goals/goal-1?section=workbench&asset=first",
     );
 
-    fireEvent.change(screen.getByRole("textbox", { name: copy.documentContent }), {
-      target: { value: "Autosave first edit" },
-    });
+    fireEvent.change(
+      screen.getByRole("textbox", { name: copy.documentContent }),
+      {
+        target: { value: "Autosave first edit" },
+      },
+    );
     await vi.advanceTimersByTimeAsync(799);
     expect(mocks.saveGoalAssetDraft).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(1);
@@ -189,15 +200,23 @@ describe("GoalAssetWorkbench", () => {
           },
         },
       },
-      artifactRefs: [{
-        ref: "GF0364A5F97C1D",
-        title: "guide.md",
-        mimeType: "text/markdown",
-        size: 100,
-        checksum: "checksum",
-      }],
+      artifactRefs: [
+        {
+          ref: "GF0364A5F97C1D",
+          title: "guide.md",
+          mimeType: "text/markdown",
+          size: 100,
+          checksum: "checksum",
+        },
+      ],
     };
-    const structured = asset("structured", "Structured result", content, 1, "structured_result");
+    const structured = asset(
+      "structured",
+      "Structured result",
+      content,
+      1,
+      "structured_result",
+    );
     structured.linkedAssets = [{ ref: "GF0364A5F97C1D", assetId: "guide" }];
     const guide = asset("guide", "Chinese guide", "# Full guide");
     const router = renderWorkbench(
@@ -206,10 +225,16 @@ describe("GoalAssetWorkbench", () => {
     );
 
     const open = await screen.findByRole("link", { name: "Open asset" });
-    expect(screen.queryByRole("button", { name: "Preview" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Preview" }),
+    ).not.toBeInTheDocument();
     await userEvent.click(open);
-    await waitFor(() => expect(router.state.location.search).toContain("asset=guide"));
-    expect(await screen.findByRole("dialog")).toHaveTextContent("Chinese guide");
+    await waitFor(() =>
+      expect(router.state.location.search).toContain("asset=guide"),
+    );
+    expect(await screen.findByRole("dialog")).toHaveTextContent(
+      "Chinese guide",
+    );
   });
 
   it("keeps MIME metadata internal when the asset type is already shown", async () => {
@@ -220,13 +245,16 @@ describe("GoalAssetWorkbench", () => {
       1,
       "structured_result",
     );
-    structured.versions[0]!.mimeType = "application/vnd.chrona.structured-result+json";
+    structured.versions[0]!.mimeType =
+      "application/vnd.chrona.structured-result+json";
     renderWorkbench(
       [structured],
       "/goals/goal-1?section=workbench&asset=structured-metadata",
     );
 
-    expect((await screen.findAllByText("Structured reports")).length).toBeGreaterThan(0);
+    expect(
+      (await screen.findAllByText("Structured reports")).length,
+    ).toBeGreaterThan(0);
     expect(screen.queryByText("MIME type")).not.toBeInTheDocument();
     expect(
       screen.queryByText("application/vnd.chrona.structured-result+json"),
@@ -264,11 +292,19 @@ describe("GoalAssetWorkbench", () => {
       "data-state",
       "active",
     );
-    expect(screen.getByRole("button", { name: /Archived document/ })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Archived document/ }),
+    ).toBeInTheDocument();
 
-    await userEvent.click(screen.getByRole("button", { name: /Archived document/ }));
-    expect(await screen.findByRole("dialog")).toHaveTextContent("Archived document");
-    expect(screen.getByRole("button", { name: copy.restoreAsset })).toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole("button", { name: /Archived document/ }),
+    );
+    expect(await screen.findByRole("dialog")).toHaveTextContent(
+      "Archived document",
+    );
+    expect(
+      screen.getByRole("button", { name: copy.restoreAsset }),
+    ).toBeInTheDocument();
     expect(router.state.location.search).toContain("assetView=archived");
   });
 
@@ -376,42 +412,53 @@ describe("GoalAssetWorkbench", () => {
       sourceArtifact: null,
       sourceTask: { title: "Draft launch brief" },
       proposedTargetAsset: null,
-      ownershipProposals: [{
-        id: "ownership-1",
-        status: "Ready",
-        sourceTaskId: "ownership-task",
-        sourceRunId: "ownership-run",
-        providerType: "debug",
-        model: "provider/default",
-        generationError: null,
-        result: {
-          schemaVersion: 1,
-          decision: "create_asset",
-          targetAssetId: null,
-          proposedLabel: "Reviewed launch brief",
-          rationale: "No safe existing asset matches the accepted result.",
-          differenceSummary: "Create a separate formal asset.",
-          certainty: "medium",
-          evidence: ["Accepted result contains a complete launch brief."],
-          counterEvidence: ["No matching asset was supplied."],
+      ownershipProposals: [
+        {
+          id: "ownership-1",
+          status: "Ready",
+          sourceTaskId: "ownership-task",
+          sourceRunId: "ownership-run",
+          providerType: "debug",
+          model: "provider/default",
+          generationError: null,
+          result: {
+            schemaVersion: 1,
+            decision: "create_asset",
+            targetAssetId: null,
+            proposedLabel: "Reviewed launch brief",
+            rationale: "No safe existing asset matches the accepted result.",
+            differenceSummary: "Create a separate formal asset.",
+            certainty: "medium",
+            evidence: ["Accepted result contains a complete launch brief."],
+            counterEvidence: ["No matching asset was supplied."],
+          },
+          sourceTask: { id: "ownership-task", title: "Review asset ownership" },
+          targetAsset: null,
         },
-        sourceTask: { id: "ownership-task", title: "Review asset ownership" },
-        targetAsset: null,
-      }],
+      ],
     };
-    renderWorkbench([], "/goals/goal-1?section=workbench&assetView=inbox", [candidate]);
+    renderWorkbench([], "/goals/goal-1?section=workbench&assetView=inbox", [
+      candidate,
+    ]);
 
     expect(await screen.findByText(copy.aiRecommendation)).toBeInTheDocument();
-    expect(screen.getByText(candidate.ownershipProposals![0]!.result!.rationale)).toBeInTheDocument();
+    expect(
+      screen.getByText(candidate.ownershipProposals![0]!.result!.rationale),
+    ).toBeInTheDocument();
     expect(screen.getByText(/debug/)).toBeInTheDocument();
     expect(mocks.applyGoalAssetOwnership).not.toHaveBeenCalled();
 
-    await userEvent.click(screen.getByRole("button", { name: copy.applyAiRecommendation }));
+    await userEvent.click(
+      screen.getByRole("button", { name: copy.applyAiRecommendation }),
+    );
     expect(mocks.applyGoalAssetOwnership).toHaveBeenCalledWith(
       "goal-1",
       "candidate-ai",
       "ownership-1",
-      expect.objectContaining({ action: "apply_suggestion", workspaceId: "workspace-1" }),
+      expect.objectContaining({
+        action: "apply_suggestion",
+        workspaceId: "workspace-1",
+      }),
     );
   });
 
@@ -464,9 +511,12 @@ describe("GoalAssetWorkbench", () => {
       "/goals/goal-1?section=workbench&asset=first",
     );
 
-    fireEvent.change(screen.getByRole("textbox", { name: copy.documentContent }), {
-      target: { value: "Newest editor content" },
-    });
+    fireEvent.change(
+      screen.getByRole("textbox", { name: copy.documentContent }),
+      {
+        target: { value: "Newest editor content" },
+      },
+    );
     fireEvent.click(screen.getByRole("button", { name: copy.publishVersion }));
 
     await waitFor(() =>
@@ -608,22 +658,27 @@ describe("GoalAssetWorkbench", () => {
     ).toContain("draftOnly");
   });
   it("renders Markdown documents by default while preserving source editing", async () => {
-    const markdown = asset("guide", "Research guide", "# Guide\n\nUse **official sources**.");
-    markdown.versions[0]!.mimeType = "text/markdown";
-    markdown.versions[0]!.originalFilename = "guide.md";
-    renderWorkbench(
-      [markdown],
-      "/goals/goal-1?section=workbench&asset=guide",
-    );
-
-    expect(await screen.findByRole("heading", { name: "Guide" })).toBeInTheDocument();
-    expect(screen.getByText("official sources")).toHaveClass("font-bold");
-    expect(screen.queryByRole("textbox", { name: copy.documentContent })).not.toBeInTheDocument();
-
-    await userEvent.click(screen.getByRole("tab", { name: copy.editMode }));
-    expect(screen.getByRole("textbox", { name: copy.documentContent })).toHaveValue(
+    const markdown = asset(
+      "guide",
+      "Research guide",
       "# Guide\n\nUse **official sources**.",
     );
+    markdown.versions[0]!.mimeType = "text/markdown";
+    markdown.versions[0]!.originalFilename = "guide.md";
+    renderWorkbench([markdown], "/goals/goal-1?section=workbench&asset=guide");
+
+    expect(
+      await screen.findByRole("heading", { name: "Guide" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("official sources")).toHaveClass("font-bold");
+    expect(
+      screen.queryByRole("textbox", { name: copy.documentContent }),
+    ).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("tab", { name: copy.editMode }));
+    expect(
+      screen.getByRole("textbox", { name: copy.documentContent }),
+    ).toHaveValue("# Guide\n\nUse **official sources**.");
   });
 
   it("renders CSV files as a virtualized table", async () => {
@@ -644,13 +699,19 @@ describe("GoalAssetWorkbench", () => {
 
     const preview = await screen.findByLabelText(copy.csvPreview);
     expect(within(preview).getByRole("table")).toBeInTheDocument();
-    expect(within(preview).getByRole("columnheader", { name: /official_url/i })).toBeInTheDocument();
-    expect(within(preview).getByText("Agent, tool use, and safety")).toBeInTheDocument();
+    expect(
+      within(preview).getByRole("columnheader", { name: /official_url/i }),
+    ).toBeInTheDocument();
+    expect(
+      within(preview).getByText("Agent, tool use, and safety"),
+    ).toBeInTheDocument();
     expect(within(preview).getByRole("table").parentElement).toHaveAttribute(
       "data-result-table-scroll",
       "virtual",
     );
-    expect(within(preview).queryByText(/name,official_url,note/)).not.toBeInTheDocument();
+    expect(
+      within(preview).queryByText(/name,official_url,note/),
+    ).not.toBeInTheDocument();
   });
 
   it("renders a structured result without exposing raw JSON and exports each supported format", async () => {
@@ -666,9 +727,22 @@ describe("GoalAssetWorkbench", () => {
         spec: {
           root: "root",
           elements: {
-            root: { type: "Stack", props: { gap: "md" }, children: ["summary", "risk"] },
-            summary: { type: "ResultSummary", props: { text: "日照＋临沂沂蒙山最适合本次旅行。" } },
-            risk: { type: "Alert", props: { title: "Travel constraint", description: "Avoid the holiday peak." } },
+            root: {
+              type: "Stack",
+              props: { gap: "md" },
+              children: ["summary", "risk"],
+            },
+            summary: {
+              type: "ResultSummary",
+              props: { text: "日照＋临沂沂蒙山最适合本次旅行。" },
+            },
+            risk: {
+              type: "Alert",
+              props: {
+                title: "Travel constraint",
+                description: "Avoid the holiday peak.",
+              },
+            },
           },
         },
         artifactRefs: [],
@@ -676,20 +750,43 @@ describe("GoalAssetWorkbench", () => {
       1,
       "structured_result",
     );
-    renderWorkbench([structured], "/goals/goal-1?section=workbench&asset=structured");
+    renderWorkbench(
+      [structured],
+      "/goals/goal-1?section=workbench&asset=structured",
+    );
 
-    expect(await screen.findByLabelText(copy.structuredResultContent)).toHaveTextContent("日照＋临沂沂蒙山最适合本次旅行。");
+    expect(
+      await screen.findByLabelText(copy.structuredResultContent),
+    ).toHaveTextContent("日照＋临沂沂蒙山最适合本次旅行。");
     expect(screen.getByText("Travel constraint")).toBeInTheDocument();
     expect(screen.queryByText("chrona-json-render")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: copy.saveDraft })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: copy.saveDraft }),
+    ).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: copy.export }));
-    await waitFor(() => expect(screen.getByText(copy.exportMarkdown)).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText(copy.exportMarkdown)).toBeInTheDocument(),
+    );
     screen.getByText(copy.exportMarkdown).click();
-    await waitFor(() => expect(mocks.createGoalAssetJob).toHaveBeenCalledWith("goal-1", "structured", expect.objectContaining({ format: "md" })));
+    await waitFor(() =>
+      expect(mocks.createGoalAssetJob).toHaveBeenCalledWith(
+        "goal-1",
+        "structured",
+        expect.objectContaining({ format: "md" }),
+      ),
+    );
 
     await userEvent.click(screen.getByRole("button", { name: copy.export }));
-    await waitFor(() => expect(screen.getByText(copy.exportPdf)).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByText(copy.exportPdf)).toBeInTheDocument(),
+    );
     screen.getByText(copy.exportPdf).click();
-    await waitFor(() => expect(mocks.createGoalAssetJob).toHaveBeenCalledWith("goal-1", "structured", expect.objectContaining({ format: "pdf" })));
+    await waitFor(() =>
+      expect(mocks.createGoalAssetJob).toHaveBeenCalledWith(
+        "goal-1",
+        "structured",
+        expect.objectContaining({ format: "pdf" }),
+      ),
+    );
   });
 });

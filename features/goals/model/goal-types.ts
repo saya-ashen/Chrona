@@ -196,6 +196,12 @@ export type GoalCopy = {
   startFirstTaskDescription: string;
   firstTaskLabel: string;
   firstTaskPlaceholder: string;
+  optional: string;
+  firstTaskOptionalHelp: string;
+  createGoalOnly: string;
+  createGoalAndTask: string;
+  initialCriterionTitle: string;
+  initialCriterionDescription: string;
   attentionGoalsDescription: string;
   progressGoalsDescription: string;
   quietGoals: string;

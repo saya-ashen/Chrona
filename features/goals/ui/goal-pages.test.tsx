@@ -54,6 +54,14 @@ const copy: GoalCopy = {
   startFirstTaskDescription: "Create the first concrete step.",
   firstTaskLabel: "First bounded task",
   firstTaskPlaceholder: "Describe the first task",
+  optional: "Optional",
+  firstTaskOptionalHelp:
+    "You can create the Goal now and add its first task later.",
+  createGoalOnly: "Create Goal",
+  createGoalAndTask: "Create Goal and first task",
+  initialCriterionTitle: "Confirm the intended outcome",
+  initialCriterionDescription:
+    "Confirm that the Goal outcome has been achieved.",
   attentionGoalsDescription: "Goals that need a decision or intervention.",
   progressGoalsDescription: "Goals with work currently moving.",
   quietGoals: "No immediate action",
@@ -300,7 +308,8 @@ const copy: GoalCopy = {
     descriptionLabel: "Description",
     purpose: "Purpose",
     futureTaskImpact: "Future Task availability",
-    activeVersionImpact: "Available to new Tasks; existing Tasks keep captured versions.",
+    activeVersionImpact:
+      "Available to new Tasks; existing Tasks keep captured versions.",
     draftVersionImpact: "Draft excluded until published.",
     roleWorkingDocument: "Working document",
     roleReference: "Reference",
@@ -617,14 +626,19 @@ describe("Goal pages", () => {
     fireEvent.change(within(dialog).getByLabelText("Goal"), {
       target: { value: "Plan a two-week trip to Japan" },
     });
-    fireEvent.change(within(dialog).getByLabelText("Additional information (optional)"), {
-      target: { value: "Travel in October with a total budget of $5,000" },
-    });
+    fireEvent.change(
+      within(dialog).getByLabelText("Additional information (optional)"),
+      {
+        target: { value: "Travel in October with a total budget of $5,000" },
+      },
+    );
     fireEvent.change(within(dialog).getByLabelText("First bounded task"), {
       target: { value: "Draft the itinerary and budget" },
     });
     fireEvent.click(
-      within(dialog).getByRole("button", { name: "Create Goal" }),
+      within(dialog).getByRole("button", {
+        name: "Create Goal and first task",
+      }),
     );
 
     await waitFor(() =>
@@ -633,7 +647,7 @@ describe("Goal pages", () => {
         title: "Plan a two-week trip to Japan",
         firstTaskTitle: "Draft the itinerary and budget",
         additionalContext: "Travel in October with a total budget of $5,000",
-        priority: "High",
+        priority: "Medium",
         idempotencyKey: "goal-idempotency-key",
       }),
     );
