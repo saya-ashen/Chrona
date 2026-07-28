@@ -47,11 +47,14 @@ export async function executeValidatedTool(
         workspaceId: requireWorkspaceId(input),
       });
     case "chrona.goal.results.read": {
-      const body = payload as { query?: string; limit: number; cursor?: string };
+      const body = payload as { query?: string; ref?: string; offset: number; maxChars: number; limit: number; cursor?: string };
       return deps.goals.readAcceptedResults({
         taskId: requireTaskId(input),
         workspaceId: requireWorkspaceId(input),
         query: body.query,
+        ref: body.ref,
+        offset: body.offset,
+        maxChars: body.maxChars,
         limit: body.limit,
         cursor: body.cursor,
       });

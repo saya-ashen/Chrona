@@ -114,6 +114,10 @@ describe("generate_plan feature spec", () => {
     );
     expect(spec.inputText).not.toContain("Use the fewest nodes possible");
     expect(spec.inputText).not.toContain("use more than two only");
+    expect(spec.instructions).toContain("complete frozen Goal asset catalog");
+    expect(spec.instructions).toContain("never traverse the entire catalog indiscriminately");
+    expect(spec.instructions).toContain("do not ask the user to select assets or versions");
+    expect(spec.instructions).toContain("chrona_goal_results_read");
   });
 
   it("adds Codex-only tool discovery guidance", () => {

@@ -246,7 +246,7 @@ describe("MCP routes", () => {
       "chrona.goal.results.read",
       { query: "research", limit: 3, _meta: { sessionId: hiddenContextArguments.sessionId } },
     );
-    expect(goalResultInput.payload).toEqual({ query: "research", limit: 3 });
+    expect(goalResultInput.payload).toEqual({ query: "research", offset: 0, maxChars: 12_000, limit: 3 });
     expect(input.evidence).toBeUndefined();
   });
 
@@ -321,7 +321,7 @@ describe("MCP routes", () => {
     const planSessionId = "chrona:task:task-1:plan-generation";
     const cases = [
       ["chrona.execution.read", executionSessionId, {}, {}],
-      ["chrona.goal.results.read", executionSessionId, { query: "research", limit: 3 }, { query: "research", limit: 3 }],
+      ["chrona.goal.results.read", executionSessionId, { query: "research", limit: 3 }, { query: "research", offset: 0, maxChars: 12_000, limit: 3 }],
       ["chrona.plan.read", executionSessionId, {}, {}],
       ["chrona.plan.generate", planSessionId, {
         title: "Generated MCP plan",
@@ -470,6 +470,24 @@ describe("MCP routes", () => {
       status: "accepted",
       message: "Tool executed.",
       state: { taskStatus: "Ready" },
+    });
+  });
+
+  it("allows frozen Goal knowledge reads in plan generation sessions", async () => {
+    const operations: CapturedToolOperation[] = [];
+    const result = await callTool("chrona.goal.results.read", {
+      ref: "GA123456ABCDEF",
+      offset: 0,
+      maxChars: 4_000,
+      limit: 1,
+      _meta: { sessionId: "chrona:task:task-1:plan-generation" },
+    }, { operations });
+
+    expect(result.isError).toBeFalsy();
+    expect(operations).toHaveLength(1);
+    expect(operations[0]).toMatchObject({
+      toolName: "chrona.goal.results.read",
+      input: { sessionId: "chrona:task:task-1:plan-generation" },
     });
   });
 

@@ -61,6 +61,7 @@ Given a task, produce a structured plan using ONLY these 4 node types: task, che
 You MUST call the chrona_plan_generate tool.
 Put the complete final graph directly into that tool input. Assistant free text is optional and non-authoritative.
 After chrona_plan_generate returns success/accepted/completed, STOP immediately. Do NOT call chrona_execution_read, chrona_node_* tools, list_mcp_resources, list_mcp_resource_templates, or any execution tools. Do NOT start execution. If chrona_plan_generate is rejected with validation issues, fix the exact graph issues and call chrona_plan_generate again; still do NOT call chrona_execution_read or execution/node tools.
+The Task source context may include a complete frozen Goal asset catalog. Each entry is metadata only: opaque GA ref, bounded title and description, purpose role, technical kind, captured formal version, and update time. Do not infer body facts from metadata. Use chrona_goal_results_read with an exact GA ref only when the asset body can materially change the plan graph, required checkpoints, dependencies, or constraints. Read only relevant assets; never traverse the entire catalog indiscriminately. The tool resolves the Task-captured version, so do not ask the user to select assets or versions.
 The chrona_plan_generate tool input MUST be a PlanBlueprint object with title, goal, nodes, and optional edges/assumptions.
 Only include fields that belong to the chosen node type. Do NOT copy task-only fields onto checkpoint, condition, or wait nodes.
 
@@ -130,7 +131,7 @@ Pause execution for a duration or external event.
 - Every non-terminal node must have at least one outgoing edge or condition branch/default target. Do NOT leave retry, fallback, empty-result, or explanatory nodes unconnected.
 - Checkpoint options are labels for user choices only; they do NOT create control-flow. If a choice should run work, add explicit downstream edges to existing nodes and still converge to the single final task.
 
-This phase is planning only — do NOT execute, implement, inspect execution state, read execution context, or continue after chrona_plan_generate succeeds.
+This phase is planning only — do not execute or inspect execution state. You may use the read-only chrona_goal_results_read tool only for relevant frozen Goal knowledge whose body can materially change the plan. Do not continue after chrona_plan_generate succeeds.
 Respond in the same language as the input.`.trim();
 
 export type GeneratePlanFeatureSpecOptions = {

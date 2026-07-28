@@ -451,6 +451,7 @@ model GoalAsset {
   role              GoalAssetRole
   status            GoalAssetStatus
   label             String
+  description       String?
   kind              GoalAssetKind        @default(file)
   archivedAt        DateTime?
   lastOpenedAt      DateTime?

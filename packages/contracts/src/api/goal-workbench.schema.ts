@@ -45,6 +45,7 @@ export const listGoalAssetsQuerySchema = z.object({
 
 export const renameGoalAssetBodySchema = z.object({
   label: z.string().trim().min(1).max(200),
+  description: z.string().trim().max(400).nullable().optional(),
 });
 
 export const saveGoalAssetDraftBodySchema = z.object({

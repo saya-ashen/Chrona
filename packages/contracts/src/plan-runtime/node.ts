@@ -213,12 +213,12 @@ export interface NodeRuntimeInput {
     }>;
     goalAssets?: Array<{
       ref: string;
-      label: string;
+      title: string;
+      description: string;
       kind: string;
       role: string;
-      version: number | null;
+      version: number;
       updatedAt: string;
-      content: string;
     }>;
     run?: {
       planningPrompt?: string;

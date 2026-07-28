@@ -78,3 +78,22 @@ describe("result submission contracts", () => {
     );
   });
 });
+
+describe("Goal result read contract", () => {
+  it("accepts an opaque exact ref and rejects backend identities", () => {
+    expect(parseChronaToolPayload("chrona.goal.results.read", {
+      ref: "GA123456ABCDEF",
+      offset: 12_000,
+      maxChars: 4_000,
+      limit: 1,
+    })).toEqual({ ref: "GA123456ABCDEF", offset: 12_000, maxChars: 4_000, limit: 1 });
+    expect(() => parseChronaToolPayload("chrona.goal.results.read", {
+      ref: "cms4h510s0006fhfumew2hks4",
+      limit: 1,
+    })).toThrow();
+    expect(() => parseChronaToolPayload("chrona.goal.results.read", {
+      ref: "GA123456ABCDEF",
+      maxChars: 12_001,
+    })).toThrow();
+  });
+});

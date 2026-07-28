@@ -64,7 +64,7 @@ const externalTools = {
   chrona_goal_results_read: {
     internalName: "chrona.goal.results.read",
     title: "Chrona Goal Results Read",
-    description: "Search current approved Goal assets and immutable accepted-result history for the current Task's Goal. Chrona resolves Goal scope from the session; use returned refs for AI-visible provenance.",
+    description: "Search bounded metadata for current approved Goal assets and immutable accepted-result history, or read one approved asset body by opaque ref. Use offset and maxChars to continue long asset reads. Chrona resolves Goal scope from the session; catalog refs expose no backend identity.",
     inputSchema: publicToolSchema(chronaPublicToolPayloadSchemas["chrona.goal.results.read"]),
   },
   chrona_plan_read: {

@@ -100,6 +100,9 @@ const readPayloadSchema = z.object({}).passthrough().optional().default({});
 const publicReadPayloadSchema = z.object({}).passthrough();
 export const goalResultsReadPayloadSchema = z.object({
   query: z.string().trim().min(1).max(500).optional(),
+  ref: z.string().trim().regex(/^(?:GR|GA)[0-9A-F]{12}$/).optional(),
+  offset: z.number().int().nonnegative().default(0),
+  maxChars: z.number().int().min(1).max(12_000).default(12_000),
   limit: z.number().int().min(1).max(10).default(5),
   cursor: z.string().trim().regex(/^(?:GR|GA)[0-9A-F]{12}$/).optional(),
 }).strict();

@@ -15,6 +15,7 @@ export { TaskWorkspacePage } from "./ui/task-workspace-page";
 export { TaskWorkspaceHeaderCard } from "./ui/task-workspace-header-card";
 export { SpecRenderer } from "./ui/catalog/spec-renderer";
 export { workspaceRegistry } from "./ui/catalog/workspace-registry";
+export { VirtualizedCsvPreview } from "./ui/catalog/workspace-registry";
 export { ActivityTimeline } from "./ui/activity-timeline";
 export {
   acceptTaskActionResult,

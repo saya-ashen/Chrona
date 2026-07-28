@@ -309,6 +309,21 @@ describe("agent tool operations service", () => {
 
     await expect(
       service().execute({
+        toolName: "chrona.goal.results.read",
+        input: {
+          workspaceId: "workspace-1",
+          taskId: "task-1",
+          actorType: "agent",
+          payload: { ref: "GRABCDEF012345", limit: 1 },
+        },
+      }),
+    ).resolves.toMatchObject({
+      status: "accepted",
+      state: { result: { linked: true, results: [{ ref: "GRABCDEF012345" }] } },
+    });
+
+    await expect(
+      service().execute({
         toolName: "chrona.task.update",
         input: {
           workspaceId: "workspace-1",

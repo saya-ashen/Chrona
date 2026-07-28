@@ -4,7 +4,7 @@ import { cloneElement, useCallback, useEffect, useMemo, useRef, useState } from 
 import { JSONUIProvider, Renderer } from "@json-render/react";
 import { isStructuredResultAssetContent, type StructuredResultAssetContent } from "@chrona/contracts";
 import { isCatalogCompatible, validateChronaSpec } from "@chrona/ui-protocol";
-import { workspaceRegistry } from "@features/task-workspace";
+import { VirtualizedCsvPreview, workspaceRegistry } from "@features/task-workspace";
 import {
   Archive,
   ChevronDown,
@@ -28,7 +28,7 @@ import {
   X,
 } from "lucide-react";
 import { useRevalidator, useSearchParams } from "react-router-dom";
-import { Badge } from "@shared/ui";
+import { Badge, MarkdownContent } from "@shared/ui";
 import { Button } from "@shared/ui";
 import { Checkbox } from "@shared/ui";
 import {
@@ -112,6 +112,15 @@ function kindLabel(kind: GoalAssetKind, copy: AssetWorkbenchCopy) {
     page: copy.pageKind,
     file: copy.fileKind,
   }[kind];
+}
+function roleLabel(role: GoalAssetWorkbenchData["role"], copy: AssetWorkbenchCopy) {
+  return {
+    working_document: copy.roleWorkingDocument,
+    reference: copy.roleReference,
+    evidence: copy.roleEvidence,
+    submission: copy.roleSubmission,
+    template: copy.roleTemplate,
+  }[role ?? "working_document"];
 }
 
 function sourceLabel(source: string, copy: AssetWorkbenchCopy) {
@@ -372,18 +381,19 @@ function AssetTile({
         </span>
         <div className="min-w-0 flex-1">
           <p className="line-clamp-2 font-semibold leading-5">{asset.label}</p>
-          <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">
-            {asset.sourceArtifact.title}
+          <p className="mt-1 line-clamp-2 min-h-8 text-xs leading-4 text-muted-foreground">
+            {asset.description || copy.activeVersionImpact}
           </p>
         </div>
       </div>
-      <div className="mt-4 flex items-center justify-between gap-2 border-t pt-3">
-        <span className="text-xs font-medium text-muted-foreground">
-          {kindLabel(asset.kind, copy)}
+      <div className="mt-4 flex flex-wrap items-center gap-1.5 border-t pt-3 text-xs text-muted-foreground">
+        <span className="font-medium text-foreground/80">
+          {roleLabel(asset.role, copy)}
         </span>
-        <span className="font-mono text-xs text-muted-foreground">
-          v{asset.versions[0]?.version ?? 1}
-        </span>
+        <span aria-hidden>·</span>
+        <span>{kindLabel(asset.kind, copy)}</span>
+        <span aria-hidden>·</span>
+        <span className="font-mono">v{asset.versions[0]?.version ?? 1}</span>
       </div>
     </button>
   );
@@ -811,6 +821,16 @@ function StructuredResultViewer({ value, copy, goalId, assetId, versionId, linke
   );
 }
 
+function versionFormat(asset: GoalAssetWorkbenchData, currentVersionId?: string) {
+  const version = asset.versions.find((item) => item.id === currentVersionId) ?? asset.versions[0];
+  const mimeType = version?.mimeType?.toLowerCase() ?? "";
+  const filename = version?.originalFilename?.toLowerCase() ?? "";
+  return {
+    markdown: mimeType === "text/markdown" || filename.endsWith(".md") || filename.endsWith(".markdown"),
+    csv: mimeType === "text/csv" || filename.endsWith(".csv"),
+  };
+}
+
 function AssetContentEditor({
   asset,
   currentVersionId,
@@ -830,8 +850,16 @@ function AssetContentEditor({
   copy: AssetWorkbenchCopy;
   act: (action: () => Promise<unknown>, success: string) => Promise<void>;
 }) {
+  const format = versionFormat(asset, currentVersionId);
   if (asset.kind === "structured_result") {
     return <StructuredResultViewer value={parseContent(formalValue)} copy={copy} goalId={asset.goalId} assetId={asset.id} versionId={currentVersionId ?? ""} linkedAssets={asset.linkedAssets ?? []} />;
+  }
+  if (asset.kind === "file" && format.csv) {
+    return (
+      <section aria-label={copy.csvPreview} className="min-w-0 space-y-3">
+        <VirtualizedCsvPreview content={formalValue} contentBytes={new TextEncoder().encode(formalValue).byteLength} />
+      </section>
+    );
   }
   if (asset.kind === "page") {
     const content = parseContent(value);
@@ -881,6 +909,27 @@ function AssetContentEditor({
         act={act}
       />
     );
+  if (asset.kind === "document" && format.markdown) {
+    return (
+      <Tabs defaultValue="preview" className="min-w-0">
+        <TabsList aria-label={copy.documentViewMode}>
+          <TabsTrigger value="preview">{copy.previewMode}</TabsTrigger>
+          <TabsTrigger value="edit">{copy.editMode}</TabsTrigger>
+        </TabsList>
+        <TabsContent value="preview" className="mt-4 min-w-0 rounded-xl border bg-background px-4 py-5 sm:px-6">
+          <MarkdownContent className="py-0 text-base leading-7 [&>div]:space-y-4">{value}</MarkdownContent>
+        </TabsContent>
+        <TabsContent value="edit" className="mt-4">
+          <Textarea
+            aria-label={copy.documentContent}
+            value={value}
+            onChange={(event) => setValue(event.target.value)}
+            className="min-h-[30rem] resize-y font-mono text-sm leading-6"
+          />
+        </TabsContent>
+      </Tabs>
+    );
+  }
   return (
     <Textarea
       aria-label={copy.documentContent}
@@ -976,6 +1025,8 @@ function AssetDetails({
   current,
   label,
   setLabel,
+  description,
+  setDescription,
   instruction,
   setInstruction,
   pending,
@@ -990,6 +1041,8 @@ function AssetDetails({
   current: GoalAssetWorkbenchData["versions"][number] | undefined;
   label: string;
   setLabel: (label: string) => void;
+  description: string;
+  setDescription: (description: string) => void;
   instruction: string;
   setInstruction: (instruction: string) => void;
   pending: boolean;
@@ -1018,31 +1071,53 @@ function AssetDetails({
       </div>
       <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-4">
         <section className="space-y-3">
-          <Label htmlFor={`asset-title-${asset.id}`}>{copy.titleLabel}</Label>
-          <div className="flex gap-2">
+          <div className="space-y-2">
+            <Label htmlFor={`asset-title-${asset.id}`}>{copy.titleLabel}</Label>
             <Input
               id={`asset-title-${asset.id}`}
               value={label}
               onChange={(event) => setLabel(event.target.value)}
             />
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={!label.trim() || label === asset.label || pending}
-              onClick={() =>
-                void act(
-                  () => renameGoalAsset(goalId, asset.id, label),
-                  copy.renamed,
-                )
-              }
-            >
-              {copy.save}
-            </Button>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor={`asset-description-${asset.id}`}>
+              {copy.descriptionLabel}
+            </Label>
+            <Textarea
+              id={`asset-description-${asset.id}`}
+              value={description}
+              maxLength={400}
+              onChange={(event) => setDescription(event.target.value)}
+              className="min-h-20 resize-y"
+            />
+          </div>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={!label.trim() || (label === asset.label && description === (asset.description ?? "")) || pending}
+            onClick={() =>
+              void act(
+                () => renameGoalAsset(goalId, asset.id, label, description || null),
+                copy.renamed,
+              )
+            }
+          >
+            {copy.save}
+          </Button>
+          <div className="rounded-lg border bg-background p-3 text-sm">
+            <p className="font-medium">{copy.futureTaskImpact}</p>
+            <p className="mt-1 text-muted-foreground">
+              {asset.drafts.length ? copy.draftVersionImpact : copy.activeVersionImpact}
+            </p>
           </div>
           <dl className="grid grid-cols-2 gap-x-3 gap-y-3 text-sm">
             <div>
               <dt className="text-muted-foreground">{copy.type}</dt>
               <dd>{kindLabel(asset.kind, copy)}</dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground">{copy.purpose}</dt>
+              <dd>{roleLabel(asset.role, copy)}</dd>
             </div>
             <div>
               <dt className="text-muted-foreground">{copy.formalVersion}</dt>
@@ -1065,6 +1140,29 @@ function AssetDetails({
               <dd>{new Date(asset.updatedAt).toLocaleDateString()}</dd>
             </div>
           </dl>
+        </section>
+        <Separator />
+        <section className="space-y-3">
+          <h3 className="font-medium">{copy.usageHistory}</h3>
+          {asset.usageHistory?.length ? (
+            <ul className="space-y-2 text-sm">
+              {asset.usageHistory.map((usage) => (
+                <li key={`${usage.taskTitle}-${usage.version}-${usage.completedAt}`} className="rounded-lg border bg-background p-3">
+                  <p>
+                    {formatCopy(copy.usageHistoryEntry, {
+                      version: usage.version,
+                      task: usage.taskTitle,
+                    })}
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {new Date(usage.completedAt).toLocaleString()}
+                  </p>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="text-sm text-muted-foreground">{copy.usageHistoryEmpty}</p>
+          )}
         </section>
         <Separator />
         <Tabs defaultValue="versions">
@@ -1257,6 +1355,7 @@ function AssetEditor({
     ),
   );
   const [label, setLabel] = useState(asset.label);
+  const [description, setDescription] = useState(asset.description ?? "");
   const [instruction, setInstruction] = useState("");
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -1299,6 +1398,7 @@ function AssetEditor({
     clearTimeout(autosaveTimer.current);
     setValue(nextValue);
     setLabel(asset.label);
+    setDescription(asset.description ?? "");
     setInstruction("");
     setMessage(null);
     initialValue.current = nextValue;
@@ -1446,6 +1546,8 @@ function AssetEditor({
       current={current}
       label={label}
       setLabel={setLabel}
+      description={description}
+      setDescription={setDescription}
       instruction={instruction}
       setInstruction={setInstruction}
       pending={pending}
@@ -1718,6 +1820,26 @@ export function GoalAssetWorkbench({
     }
     setSearchParams(next, { replace: true });
   }
+  const activeAssets = initialAssets.filter((asset) => !asset.archivedAt);
+  const draftAssets = activeAssets.filter((asset) => asset.drafts.length > 0);
+  const guidance = initialCandidates.length > 0
+    ? {
+        title: formatCopy(copy.inboxActionTitle, { count: initialCandidates.length }),
+        description: copy.inboxActionDescription,
+        action: copy.reviewInbox,
+        view: "inbox" as const,
+      }
+    : draftAssets.length > 0
+      ? {
+          title: formatCopy(copy.draftActionTitle, { count: draftAssets.length }),
+          description: copy.draftActionDescription,
+          action: copy.continueEditing,
+          assetId: draftAssets[0]!.id,
+        }
+      : {
+          title: copy.readyTitle,
+          description: formatCopy(copy.readyDescription, { count: activeAssets.length }),
+        };
   const refresh = useCallback(() => revalidator.revalidate(), [revalidator]);
   const assets = useMemo(
     () =>
@@ -1768,6 +1890,27 @@ export function GoalAssetWorkbench({
         <p className="text-sm text-muted-foreground">
           {initialAssets.length} {copy.assetCount}
         </p>
+      </div>
+      <div className="flex flex-col gap-3 rounded-xl border bg-muted/20 p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="space-y-1">
+          <p className="font-semibold">{guidance.title}</p>
+          <p className="max-w-3xl text-sm leading-5 text-muted-foreground">
+            {guidance.description}
+          </p>
+        </div>
+        {"action" in guidance ? (
+          <Button
+            onClick={() =>
+              updateWorkbenchParams(
+                guidance.view === "inbox"
+                  ? { assetView: "inbox", asset: null }
+                  : { assetView: null, asset: guidance.assetId ?? null },
+              )
+            }
+          >
+            {guidance.action}
+          </Button>
+        ) : null}
       </div>
       <Tabs
         value={assetView}
@@ -1956,7 +2099,7 @@ export function GoalAssetWorkbench({
               </div>
             ) : null}
           </div>
-          {initialRecent.filter((asset) => !asset.archivedAt).length > 0 ? (
+          {assets.length > 6 && initialRecent.filter((asset) => !asset.archivedAt).length > 0 ? (
             <section>
               <h3 className="mb-3 text-sm font-semibold">{copy.recent}</h3>
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">

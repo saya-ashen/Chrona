@@ -33,7 +33,7 @@ function hideHeaderActions(spec: UiDocument, input: { generatePlan?: boolean; ac
 type HeaderActionId = TaskHeaderAction["id"];
 
 type TaskWorkspaceHeaderCardProps = {
-  task: Pick<TaskData, "title" | "goal">;
+  task: Pick<TaskData, "title" | "goal" | "goalKnowledge">;
   spec: UiDocument;
   store: StateStore;
   onAction: (action: TaskHeaderAction) => void | Promise<void>;
@@ -209,6 +209,16 @@ export function TaskWorkspaceHeaderCard({
             )}
           </Button>
         </nav>
+        {task.goalKnowledge ? (
+          <p
+            className="mb-1 text-xs text-muted-foreground"
+            title={messages.components.taskWorkspace.goalKnowledgeCapturedHint}
+          >
+            {messages.components.taskWorkspace.goalKnowledgeCaptured
+              .replace("{captured}", String(task.goalKnowledge.captured.length))
+              .replace("{read}", String(task.goalKnowledge.read.length))}
+          </p>
+        ) : null}
         <SpecRenderer spec={hideHeaderActions(spec, { generatePlan: hideGeneratePlan, acceptPlan: hideAcceptPlan })} handlers={handlers} store={store} />
       </header>
       <p className="sr-only" role="status" aria-live="polite">

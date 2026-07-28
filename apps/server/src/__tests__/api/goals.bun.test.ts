@@ -59,7 +59,6 @@ const criterion = {
 };
 
 // This scenario proves the complete lifecycle and its persisted evidence in sequence.
-// eslint-disable-next-line max-lines-per-function
 describe("Goal API", () => {
   beforeEach(resetTestDb);
 
@@ -372,9 +371,9 @@ describe("Goal API", () => {
     });
     expect(persisted.goalContext).toMatchObject({
       assets: [{
-        label: "Research brief",
+        title: "Research brief",
+        description: "",
         version: 1,
-        content: "Current approved guidance",
       }],
     });
     const formalAssets = persisted.goalContext && typeof persisted.goalContext === "object" && !Array.isArray(persisted.goalContext) && "assets" in persisted.goalContext
@@ -386,22 +385,84 @@ describe("Goal API", () => {
       : null;
     expect(formalAssetRef).toMatch(/^GA[0-9A-F]{12}$/);
     expect(formalAssetRef).not.toContain(formalAsset.id);
+    expect(firstAsset).not.toHaveProperty("content");
     const goalResults = await createChronaEngine().goals.readAcceptedResults({
       taskId: nextTask.taskId,
       workspaceId,
-      query: "Current approved guidance",
+      query: "Research brief",
       limit: 5,
     });
-    expect(goalResults.results).toEqual(
-      expect.arrayContaining([
-        expect.objectContaining({
-          ref: formalAssetRef,
-          title: "Research brief",
-          version: 1,
-          summary: "Current approved guidance",
-        }),
-      ]),
-    );
+    expect(goalResults.results).toEqual([
+      expect.objectContaining({
+        ref: formalAssetRef,
+        title: "Research brief",
+        description: "",
+        version: 1,
+      }),
+    ]);
+    expect(goalResults.results[0]).not.toHaveProperty("summary");
+    expect(goalResults.results[0]).not.toHaveProperty("content");
+    const exactGoalResult = await createChronaEngine().goals.readAcceptedResults({
+      taskId: nextTask.taskId,
+      workspaceId,
+      ref: formalAssetRef as string,
+      offset: 8,
+      maxChars: 8,
+      limit: 5,
+    });
+    expect(exactGoalResult.results).toEqual([
+      expect.objectContaining({
+        ref: formalAssetRef,
+        title: "Research brief",
+        version: 1,
+        content: "approved",
+        nextOffset: 16,
+      }),
+    ]);
+    await db.goalAssetVersion.create({
+      data: {
+        workspaceId,
+        goalId: created.id,
+        assetId: formalAsset.id,
+        artifactId: formalArtifact.id,
+        version: 2,
+        parentVersionId: (await db.goalAssetVersion.findFirstOrThrow({ where: { assetId: formalAsset.id, version: 1 } })).id,
+        source: "manual",
+        content: "Replacement guidance from v2",
+        contentHash: "formal-v2",
+        authorType: "user",
+      },
+    });
+    await db.goalAsset.update({
+      where: { id: formalAsset.id },
+      data: { status: "Archived", archivedAt: new Date() },
+    });
+    const frozenAfterArchive = await createChronaEngine().goals.readAcceptedResults({
+      taskId: nextTask.taskId,
+      workspaceId,
+      ref: formalAssetRef as string,
+      offset: 0,
+      maxChars: 12_000,
+      limit: 5,
+    });
+    expect(frozenAfterArchive.results).toEqual([
+      expect.objectContaining({ version: 1, content: "Current approved guidance", nextOffset: null }),
+    ]);
+    const taskAfterPublication = await responseJson<GoalTaskResponse>(await requestJson(app, `/goals/${created.id}/tasks`, {
+      kind: "task",
+      title: "Use knowledge after archive",
+      priority: "Medium",
+      autoPlanGeneration: false,
+      expectedOutcome: "Archived assets stay excluded",
+    }));
+    const futureContext = (await db.task.findUniqueOrThrow({ where: { id: taskAfterPublication.taskId } })).goalContext as { assets?: unknown[] } | null;
+    expect(futureContext?.assets).toEqual([]);
+    await expect(createChronaEngine().goals.readAcceptedResults({
+      taskId: taskAfterPublication.taskId,
+      workspaceId,
+      ref: formalAssetRef as string,
+      limit: 5,
+    })).rejects.toThrow("current Task snapshot");
     expect(persisted.goalContext).toBeTruthy();
     expect(typeof persisted.goalContext).toBe("object");
     expect(persisted.goalContext).not.toBeInstanceOf(Array);
@@ -421,6 +482,87 @@ describe("Goal API", () => {
     expect(bootstrap.task.goalId).toBe(created.id);
     expect(bootstrap.task.goal).toEqual({ id: created.id, title: created.title });
 
+  });
+
+  it("captures every active formal asset with bounded metadata", async () => {
+    const { workspaceId } = await seedWorkspace("Goal asset catalog bounds");
+    const app = createApiRouter(createChronaEngine());
+    const created = await responseJson<GoalTaskResponse>(await requestJson(app, "/goals/with-first-task", {
+      workspaceId,
+      title: "Bound every asset field",
+      additionalContext: "Keep every approved asset available.",
+      firstTaskTitle: "Create source artifacts",
+      priority: "Medium",
+      idempotencyKey: "goal-asset-catalog-bounds",
+    }));
+    const seededSource = await seedTask(workspaceId, { title: "Create source artifacts", status: "Completed" });
+    await db.task.update({ where: { id: seededSource.taskId }, data: { goalId: created.goal.id } });
+    const sourceTask = await db.task.findUniqueOrThrow({ where: { id: seededSource.taskId } });
+    const run = await db.run.create({
+      data: { taskId: sourceTask.id, runtimeName: "hermes", status: "Completed", triggeredBy: "test" },
+    });
+    for (let index = 0; index < 50; index += 1) {
+      const artifact = await db.artifact.create({
+        data: {
+          workspaceId,
+          taskId: sourceTask.id,
+          runId: run.id,
+          type: "file",
+          title: `Artifact ${index}`,
+          uri: `generated://tests/catalog-${index}.md`,
+          contentPreview: `SECRET BODY ${index}`,
+          metadata: {
+            description: index === 0 ? `Description ${"d".repeat(500)}` : `Description ${index}`,
+            backendId: `internal-${index}`,
+          },
+        },
+      });
+      const asset = await db.goalAsset.create({
+        data: {
+          workspaceId,
+          goalId: created.goal.id,
+          sourceArtifactId: artifact.id,
+          currentArtifactId: artifact.id,
+          role: "reference",
+          status: index === 48 ? "Archived" : "Approved",
+          archivedAt: index === 48 ? new Date() : null,
+          label: index === 0 ? `Title ${"t".repeat(220)}` : `Reference ${index}`,
+          description: index === 0 ? `Description ${"d".repeat(500)}` : `Description ${index}`,
+          kind: "document",
+        },
+      });
+      await db.goalAssetVersion.create({
+        data: {
+          workspaceId,
+          goalId: created.goal.id,
+          assetId: asset.id,
+          artifactId: artifact.id,
+          version: 1,
+          source: "inbox",
+          content: `SECRET BODY ${index}`,
+          contentHash: `catalog-${index}`,
+          authorType: "user",
+        },
+      });
+    }
+    const task = await responseJson<GoalTaskResponse>(await requestJson(app, `/goals/${created.goal.id}/tasks`, {
+      kind: "task",
+      title: "Consume complete catalog",
+      priority: "Medium",
+      autoPlanGeneration: false,
+      expectedOutcome: "All active metadata",
+    }));
+    const persisted = await db.task.findUniqueOrThrow({ where: { id: task.taskId } });
+    const context = persisted.goalContext as { assets?: Array<Record<string, unknown>> } | null;
+    expect(context?.assets).toHaveLength(49);
+    const longest = context?.assets?.find((asset) => typeof asset.title === "string" && asset.title.startsWith("Title "));
+    expect(longest?.title).toHaveLength(160);
+    expect(longest?.description).toHaveLength(400);
+    expect(context?.assets?.every((asset) => typeof asset.version === "number")).toBe(true);
+    expect(JSON.stringify(context?.assets)).not.toContain("SECRET BODY");
+    expect(JSON.stringify(context?.assets)).not.toContain("internal-");
+    expect(JSON.stringify(context?.assets)).not.toContain(sourceTask.id);
+    expect(JSON.stringify(context?.assets)).not.toContain(run.id);
   });
 
   it("atomically promotes one accepted result and is idempotent", async () => {
@@ -679,15 +821,30 @@ describe("Goal API", () => {
     const rejectedTask = await seedTask(workspaceId, { title: "Rejected evidence", status: "Completed" });
     await db.task.update({ where: { id: rejectedTask.taskId }, data: { goalId: created.goal.id } });
     await db.run.create({ data: { taskId: rejectedTask.taskId, runtimeName: "hermes", status: "Completed", triggeredBy: "test" } });
-    const reader = await seedTask(workspaceId, { title: "Use Goal evidence" });
-    await db.task.update({ where: { id: reader.taskId }, data: { goalId: created.goal.id } });
+    const reader = await engine.goals.createTask({
+      goalId: created.goal.id,
+      command: {
+        kind: "task",
+        title: "Use Goal evidence",
+        priority: "Medium",
+        autoPlanGeneration: false,
+        expectedOutcome: "Use frozen accepted evidence",
+      },
+    });
 
-    const firstPage = await engine.goals.readAcceptedResults({ taskId: reader.taskId, workspaceId, query: "immutable", limit: 1 });
+    const firstPage = await engine.goals.readAcceptedResults({ taskId: reader.taskId, workspaceId, limit: 1 });
     expect(firstPage).toMatchObject({ linked: true, results: [{ title: "Collect evidence" }], nextCursor: null });
     expect(firstPage.results[0]?.ref).toMatch(/^GR[0-9A-F]{12}$/);
     expect(firstPage.results[0]?.ref).not.toContain(accepted.run.id);
     expect(firstPage.results.some((result) => result.title === "Rejected evidence")).toBe(false);
-    expect(firstPage.results[0]?.artifacts[0]).toEqual({
+    const exactAccepted = await engine.goals.readAcceptedResults({
+      taskId: reader.taskId,
+      workspaceId,
+      ref: firstPage.results[0]?.ref,
+      limit: 1,
+    });
+    const acceptedRead = exactAccepted.results[0];
+    expect(acceptedRead && "artifacts" in acceptedRead ? acceptedRead.artifacts[0] : null).toEqual({
       title: "Accepted final result",
       type: "summary",
       contentPreview: "Immutable final result",

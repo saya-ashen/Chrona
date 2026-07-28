@@ -2465,6 +2465,25 @@ function WorkspaceTable({ props }: { props: WorkspaceTableProps }) {
     </MaybeCollapsible>
   );
 }
+export function VirtualizedCsvPreview({
+  content,
+  contentBytes,
+}: {
+  content: string;
+  contentBytes?: number | null;
+}) {
+  return (
+    <WorkspaceTable
+      props={{
+        contentKind: "csv",
+        contentPreview: content,
+        contentBytes,
+        wide: true,
+      }}
+    />
+  );
+}
+
 
 /**
  * The Chrona workspace registry: standard primitives render with the prebuilt

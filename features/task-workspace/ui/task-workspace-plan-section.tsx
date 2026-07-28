@@ -46,6 +46,7 @@ import { dispatchInputForPrimaryAction } from "../model/task-workspace-primary-a
 import { resolveTaskWorkspaceOperationState } from "../model/task-workspace-operation-machine";
 import type {
   TaskPageData,
+  TaskData,
   TaskPlanGenerationStatus,
   WorkspaceActivityItem,
 } from "../model/task-workspace-types";
@@ -912,6 +913,7 @@ function ResultLifecyclePanel({
   isAcceptingResult = false,
   acceptResultError,
   createGoalAction,
+  goalKnowledge,
 }: {
   taskId: string;
   review: NonNullable<TaskWorkspaceDisplayState["resultReview"]>;
@@ -921,6 +923,7 @@ function ResultLifecyclePanel({
   isAcceptingResult?: boolean;
   acceptResultError?: string | null;
   createGoalAction?: ReactNode;
+  goalKnowledge?: TaskData["goalKnowledge"];
 }) {
   const isAccepted = review.phase === "accepted";
   const [isAcceptedExpanded, setIsAcceptedExpanded] = useState(false);
@@ -980,6 +983,25 @@ function ResultLifecyclePanel({
                 </p>
               ) : null}
             </div>
+            {goalKnowledge && goalKnowledge.read.length > 0 ? (
+              <div className="rounded-lg border bg-muted/25 p-3 text-sm">
+                <p className="font-medium">
+                  {copy.goalKnowledgeUsed ?? "Goal knowledge used"}
+                </p>
+                <ul className="mt-2 space-y-1.5 text-muted-foreground">
+                  {goalKnowledge.read.map((asset) => (
+                    <li key={asset.ref}>
+                      <span className="text-foreground/90">{asset.title}</span>{" "}
+                      <span className="font-mono text-xs">
+                        {(copy.goalKnowledgeVersion ?? "{ref} · captured v{version}")
+                          .replace("{ref}", asset.ref)
+                          .replace("{version}", String(asset.version))}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ) : null}
             {!isAccepted || isAcceptedExpanded ? (
             <div
               className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground"
@@ -2063,6 +2085,7 @@ export function TaskWorkspacePlanSection({
                 taskId={pageData.task.id}
                 review={displayState.resultReview}
                 copy={copy}
+                goalKnowledge={pageData.task.goalKnowledge}
                 onAcceptResult={
                   currentExecution?.planOutput?.finalization.status === "Ready"
                     ? onAcceptResult

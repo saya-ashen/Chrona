@@ -11,6 +11,18 @@ export type TaskData = {
   workspaceId: string;
   goalId?: string | null;
   goal?: { id: string; title: string } | null;
+  goalKnowledge?: {
+    captured: Array<{
+      ref: string;
+      title: string;
+      version: number;
+    }>;
+    read: Array<{
+      ref: string;
+      title: string;
+      version: number;
+    }>;
+  };
   title: string;
   description: string | null;
   executionRuntime: string;

@@ -18,8 +18,13 @@ import { deriveGoalProjection } from "@chrona/domain";
 import { createTask } from "../tasks/create-task";
 import { rebuildTaskProjection } from "../projections/rebuild-task-projection";
 import { extractAcceptedResultText } from "../tasks/accepted-result-context";
-import { buildAutomaticGoalTaskContext, goalAcceptedResultRef } from "./goal-task-context";
-import { goalAssetRef } from "./goal-task-context";
+import {
+  buildAutomaticGoalTaskContext,
+  goalAcceptedResultRef,
+  goalAssetRef,
+  parseFrozenGoalTaskContext,
+  type FrozenGoalAsset,
+} from "./goal-task-context";
 import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
 
 type GoalEventType =
@@ -154,7 +159,6 @@ function operationalBriefFrom(value: unknown): GoalOperationalBrief | null {
 const GOAL_CONTEXT_RESULT_LIMIT = 8;
 const GOAL_CONTEXT_SUMMARY_LIMIT = 400;
 const GOAL_RESULT_SEARCH_SUMMARY_LIMIT = 2_000;
-const GOAL_RESULT_PAGE_CHARACTER_LIMIT = 24_000;
 const GOAL_RESULT_ARTIFACT_LIMIT = 8;
 const GOAL_RESULT_TITLE_LIMIT = 240;
 
@@ -476,42 +480,45 @@ async function getGoalOrThrow(goalId: string) {
   if (!goal) throw new EngineError(ENGINE_ERROR_CODES.TASK_NOT_FOUND, "Goal not found");
   return goal;
 }
-function formalAssetReadModel(asset: GoalWithDetails["assets"][number]) {
-  const version = asset.versions[0];
-  const content = typeof version?.content === "string"
-    ? version.content
-    : recordValue(version?.content)?.format === "chrona-json-render"
-      ? extractAcceptedResultText(recordValue(version?.content)?.spec)
-      : version?.content
-        ? JSON.stringify(version.content)
-        : asset.currentArtifact.contentPreview ?? "No readable asset content was available.";
+function formalAssetContent(content: Prisma.JsonValue) {
+  return typeof content === "string"
+    ? content
+    : recordValue(content)?.format === "chrona-json-render"
+      ? extractAcceptedResultText(recordValue(content)?.spec)
+      : JSON.stringify(content);
+}
+
+function frozenAssetReadModel(asset: FrozenGoalAsset) {
   return {
-    ref: goalAssetRef(asset.id),
-    title: boundedText(asset.label, GOAL_RESULT_TITLE_LIMIT),
+    ref: asset.ref,
+    title: asset.title,
+    description: asset.description,
     kind: asset.kind,
     role: asset.role,
-    version: version?.version ?? null,
-    updatedAt: asset.updatedAt.toISOString(),
-    summary: boundedText(content, GOAL_RESULT_SEARCH_SUMMARY_LIMIT),
-    artifacts: [{
-      title: boundedText(asset.currentArtifact.title, GOAL_RESULT_TITLE_LIMIT),
-      type: asset.currentArtifact.type,
-      contentPreview: boundedText(content, GOAL_CONTEXT_SUMMARY_LIMIT),
-    }],
+    version: asset.version,
+    updatedAt: asset.updatedAt,
   };
 }
 
-
-function resultMatchesQuery(input: { taskTitle: string; summary: string; artifacts: Array<{ title: string; contentPreview: string | null }> }, query?: string) {
+function frozenResultReadModel(result: ReturnType<typeof parseFrozenGoalTaskContext>["acceptedResults"][number]) {
+  return {
+    ref: result.ref,
+    title: result.taskTitle,
+    acceptedAt: result.acceptedAt,
+    summary: result.summary,
+    artifactCount: result.artifactCount,
+  };
+}
+function frozenAssetMatchesQuery(asset: FrozenGoalAsset, query?: string) {
   if (!query) return true;
   const terms = query.toLocaleLowerCase().split(/\s+/).filter(Boolean);
-  const haystack = [
-    input.taskTitle,
-    input.summary,
-    ...input.artifacts.flatMap((artifact) => [artifact.title, artifact.contentPreview ?? ""]),
-  ].join("\n").toLocaleLowerCase();
+  const haystack = [asset.title, asset.description, asset.kind, asset.role]
+    .join("\n")
+    .toLocaleLowerCase();
   return terms.every((term) => haystack.includes(term));
 }
+
+
 
 function goalResultReadModel(candidate: GoalTask, result: NonNullable<ReturnType<typeof acceptedResultForTask>>) {
   return {
@@ -527,61 +534,97 @@ function goalResultReadModel(candidate: GoalTask, result: NonNullable<ReturnType
   };
 }
 
-function boundedGoalResultPage(
-  matching: Array<{ candidate: GoalTask; result: NonNullable<ReturnType<typeof acceptedResultForTask>> }>,
-  offset: number,
-  limit: number,
-) {
-  const results: Array<ReturnType<typeof goalResultReadModel>> = [];
-  let characterCount = 0;
-  for (const { candidate, result } of matching.slice(offset, offset + limit)) {
-    const readModel = goalResultReadModel(candidate, result);
-    const nextCharacterCount = characterCount + JSON.stringify(readModel).length;
-    if (results.length > 0 && nextCharacterCount > GOAL_RESULT_PAGE_CHARACTER_LIMIT) break;
-    results.push(readModel);
-    characterCount = nextCharacterCount;
-  }
-  return results;
-}
-
 export async function readGoalAcceptedResults(input: {
   taskId: string;
   workspaceId: string;
   query?: string;
+  ref?: string;
+  offset?: number;
+  maxChars?: number;
   limit: number;
   cursor?: string;
 }) {
   const task = await db.task.findFirst({
     where: { id: input.taskId, workspaceId: input.workspaceId },
-    select: { goalId: true },
+    select: { goalId: true, goalContext: true },
   });
   if (!task) throw new EngineError(ENGINE_ERROR_CODES.TASK_NOT_FOUND, "Task not found");
   if (!task.goalId) {
     return { linked: false, message: "Current Task is not linked to a Goal.", results: [], nextCursor: null };
   }
-  const goal = await getGoalOrThrow(task.goalId);
-  if (goal.workspaceId !== input.workspaceId) {
-    throw new EngineError(ENGINE_ERROR_CODES.TASK_NOT_FOUND, "Goal not found");
+  const goal = await db.goal.findFirst({
+    where: { id: task.goalId, workspaceId: input.workspaceId },
+    select: { title: true },
+  });
+  if (!goal) throw new EngineError(ENGINE_ERROR_CODES.TASK_NOT_FOUND, "Goal not found");
+
+  const snapshot = parseFrozenGoalTaskContext(task.goalContext);
+  if (input.ref?.startsWith("GA")) {
+    const asset = snapshot.assets.find((candidate) => candidate.ref === input.ref);
+    if (!asset) {
+      throw new EngineError(ENGINE_ERROR_CODES.TASK_NOT_FOUND, "Goal asset ref was not found in the current Task snapshot");
+    }
+    const candidates = await db.goalAsset.findMany({
+      where: { goalId: task.goalId, workspaceId: input.workspaceId },
+      select: {
+        id: true,
+        versions: {
+          where: { version: asset.version },
+          take: 1,
+          select: { content: true },
+        },
+      },
+    });
+    const version = candidates.find((candidate) => goalAssetRef(candidate.id) === asset.ref)?.versions[0];
+    if (!version) {
+      throw new EngineError(ENGINE_ERROR_CODES.TASK_NOT_FOUND, "Captured Goal asset version was not found");
+    }
+    const content = formalAssetContent(version.content);
+    const offset = input.offset ?? 0;
+    const maxChars = input.maxChars ?? 12_000;
+    const nextOffset = offset + maxChars < content.length ? offset + maxChars : null;
+    return {
+      linked: true,
+      goal: { title: goal.title },
+      query: input.query ?? null,
+      results: [{ ...frozenAssetReadModel(asset), content: content.slice(offset, offset + maxChars), nextOffset }],
+      nextCursor: null,
+    };
   }
-  const assets = goal.assets
-    .filter((asset) => asset.status === "Approved" && asset.archivedAt === null)
-    .map(formalAssetReadModel)
-    .filter((asset) => resultMatchesQuery({
-      taskTitle: asset.title,
-      summary: asset.summary,
-      artifacts: asset.artifacts,
-    }, input.query));
-  const acceptedResults = goal.tasks
-    .flatMap((candidate) => {
+  if (input.ref?.startsWith("GR")) {
+    const frozenResult = snapshot.acceptedResults.find((candidate) => candidate.ref === input.ref);
+    if (!frozenResult) {
+      throw new EngineError(ENGINE_ERROR_CODES.TASK_NOT_FOUND, "Goal accepted-result ref was not found in the current Task snapshot");
+    }
+    const liveGoal = await getGoalOrThrow(task.goalId);
+    const match = liveGoal.tasks.flatMap((candidate) => {
       const result = acceptedResultForTask(candidate);
-      if (!result || !resultMatchesQuery({ taskTitle: candidate.title, summary: result.summary, artifacts: result.artifacts }, input.query)) return [];
-      return [{ candidate, result }];
+      return result && goalAcceptedResultRef(result.runId) === frozenResult.ref
+        ? [{ candidate, result }]
+        : [];
+    })[0];
+    if (!match) {
+      throw new EngineError(ENGINE_ERROR_CODES.TASK_NOT_FOUND, "Captured Goal accepted result was not found");
+    }
+    return {
+      linked: true,
+      goal: { title: goal.title },
+      query: input.query ?? null,
+      results: [goalResultReadModel(match.candidate, match.result)],
+      nextCursor: null,
+    };
+  }
+  const assets = snapshot.assets
+    .filter((asset) => frozenAssetMatchesQuery(asset, input.query))
+    .map(frozenAssetReadModel);
+  const terms = input.query?.toLocaleLowerCase().split(/\s+/).filter(Boolean) ?? [];
+  const acceptedResults = snapshot.acceptedResults
+    .filter((result) => {
+      const haystack = `${result.taskTitle}\n${result.summary}`.toLocaleLowerCase();
+      return terms.every((term) => haystack.includes(term));
     })
-    .sort((left, right) => (right.result.acceptedAt ?? "").localeCompare(left.result.acceptedAt ?? ""));
-  const combined = [
-    ...assets,
-    ...boundedGoalResultPage(acceptedResults, 0, acceptedResults.length),
-  ];
+    .map(frozenResultReadModel);
+  const combined = [...assets, ...acceptedResults];
   const offset = input.cursor ? combined.findIndex((result) => result.ref === input.cursor) + 1 : 0;
   if (input.cursor && offset === 0) {
     throw new EngineError(ENGINE_ERROR_CODES.VALIDATION_FAILED, "Goal result cursor is invalid or stale");

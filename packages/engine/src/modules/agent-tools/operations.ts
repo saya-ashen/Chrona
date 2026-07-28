@@ -29,7 +29,7 @@ const toolDescriptions: Record<ChronaToolName, string> = {
   "chrona.task.read": "Read task lifecycle state.",
   "chrona.task.create": "Create a task through Chrona validation.",
   "chrona.task.update": "Update task fields through Chrona validation.",
-  "chrona.goal.results.read": "Search current approved Goal assets and accepted-result history.",
+  "chrona.goal.results.read": "Search bounded Goal knowledge metadata or read approved asset content by opaque ref.",
   "chrona.plan.read": "Read accepted plan state.",
   "chrona.plan.generate": "Generate a draft plan for the session task.",
   "chrona.plan.mutate": "Apply a plan graph mutation.",

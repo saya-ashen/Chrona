@@ -12,6 +12,7 @@ import {
   taskExecutionStateToRunStatus,
 } from "@chrona/domain";
 import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
+import { parseFrozenGoalTaskContext } from "../goals/goal-task-context";
 import {
   buildActivityTimeline,
   deduplicateProjectedActivity,
@@ -275,6 +276,31 @@ export async function getTaskPage(input: { taskId: string; workBlockId?: string 
     orderBy: { createdAt: "asc" },
   });
 
+  const frozenGoalContext = parseFrozenGoalTaskContext(task.goalContext);
+  const exactGoalAssetReads = task.goalId && frozenGoalContext.assets.length > 0
+    ? await db.toolInvocation.findMany({
+        where: {
+          taskId: task.id,
+          toolName: "chrona.goal.results.read",
+          status: "accepted",
+        },
+        select: { inputPayload: true },
+        orderBy: { completedAt: "asc" },
+      })
+    : [];
+  const readRefs = new Set(
+    exactGoalAssetReads.flatMap((invocation) => {
+      const payload = invocation.inputPayload;
+      if (!payload || typeof payload !== "object" || Array.isArray(payload)) return [];
+      const ref = (payload as Record<string, unknown>).ref;
+      return typeof ref === "string" && ref.startsWith("GA") ? [ref] : [];
+    }),
+  );
+  const capturedGoalAssets = frozenGoalContext.assets.map((asset) => ({
+    ref: asset.ref,
+    title: asset.title,
+    version: asset.version,
+  }));
   return {
     defaultExecutionRuntime: task.workspace.defaultRuntime,
     executionRuntimes: listExecutionRuntimes().map((key) => ({
@@ -288,6 +314,12 @@ export async function getTaskPage(input: { taskId: string; workBlockId?: string 
       workspaceId: task.workspaceId,
       goalId: task.goalId,
       goal: task.goal,
+      goalKnowledge: task.goalId
+        ? {
+            captured: capturedGoalAssets,
+            read: capturedGoalAssets.filter((asset) => readRefs.has(asset.ref)),
+          }
+        : undefined,
       title: task.title,
       description: task.description,
       sourceManaged,

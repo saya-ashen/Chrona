@@ -397,6 +397,27 @@ export type GoalCopy = {
   assetWorkbench: {
     title: string;
     description: string;
+    readyTitle: string;
+    readyDescription: string;
+    inboxActionTitle: string;
+    inboxActionDescription: string;
+    draftActionTitle: string;
+    draftActionDescription: string;
+    reviewInbox: string;
+    continueEditing: string;
+    descriptionLabel: string;
+    purpose: string;
+    futureTaskImpact: string;
+    activeVersionImpact: string;
+    draftVersionImpact: string;
+    roleWorkingDocument: string;
+    roleReference: string;
+    roleEvidence: string;
+    roleSubmission: string;
+    roleTemplate: string;
+    usageHistory: string;
+    usageHistoryEmpty: string;
+    usageHistoryEntry: string;
     library: string;
     inbox: string;
     allAssets: string;
@@ -457,6 +478,11 @@ export type GoalCopy = {
     downloadSubmission: string;
     documentContent: string;
     structuredResultContent: string;
+    documentViewMode: string;
+    previewMode: string;
+    editMode: string;
+    csvPreview: string;
+
     draftAutosaved: string;
     draftSaved: string;
     publishVersion: string;

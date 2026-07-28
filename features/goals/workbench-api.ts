@@ -34,6 +34,8 @@ export type GoalAssetWorkbenchData = {
   workspaceId: string;
   goalId: string;
   label: string;
+  description?: string | null;
+  role?: "working_document" | "reference" | "evidence" | "submission" | "template";
   kind: GoalAssetKind;
   status: string;
   archivedAt: string | null;
@@ -43,6 +45,7 @@ export type GoalAssetWorkbenchData = {
   versions: GoalAssetVersionData[];
   drafts: GoalAssetDraftData[];
   submissions: Array<{ id: string; versionId: string; content: unknown; createdAt: string }>;
+  usageHistory?: Array<{ taskTitle: string; version: number; completedAt: string }>;
   jobs: GoalAssetJobData[];
   linkedAssets?: Array<{ ref: string; assetId: string }>;
 };
@@ -91,7 +94,7 @@ export async function listGoalAssets(goalId: string, workspaceId: string, query 
   return apiJson<{ assets: GoalAssetWorkbenchData[]; recent: GoalAssetWorkbenchData[] }>(`/api/goals/${encodeURIComponent(goalId)}/assets?workspaceId=${encodeURIComponent(workspaceId)}${query}`);
 }
 export async function getGoalAsset(goalId: string, assetId: string) { return apiJson<GoalAssetWorkbenchData>(`/api/goals/${encodeURIComponent(goalId)}/assets/${encodeURIComponent(assetId)}`); }
-export async function renameGoalAsset(goalId: string, assetId: string, label: string) { return apiJson<GoalAssetWorkbenchData>(`/api/goals/${encodeURIComponent(goalId)}/assets/${encodeURIComponent(assetId)}`, { method: "PATCH", body: JSON.stringify({ label }) }); }
+export async function renameGoalAsset(goalId: string, assetId: string, label: string, description?: string | null) { return apiJson<GoalAssetWorkbenchData>(`/api/goals/${encodeURIComponent(goalId)}/assets/${encodeURIComponent(assetId)}`, { method: "PATCH", body: JSON.stringify({ label, ...(description !== undefined ? { description } : {}) }) }); }
 export async function saveGoalAssetDraft(goalId: string, assetId: string, command: SaveGoalAssetDraftRequest) { return apiJson<GoalAssetDraftData>(`/api/goals/${encodeURIComponent(goalId)}/assets/${encodeURIComponent(assetId)}/drafts`, { method: "POST", body: JSON.stringify(command) }); }
 export async function submitGoalAssetDraft(goalId: string, assetId: string, command: SubmitGoalAssetDraftRequest) { return apiJson<GoalAssetVersionData>(`/api/goals/${encodeURIComponent(goalId)}/assets/${encodeURIComponent(assetId)}/drafts/submit`, { method: "POST", body: JSON.stringify(command) }); }
 export async function restoreGoalAssetVersion(goalId: string, assetId: string, versionId: string, workspaceId: string, changeSummary: string) { return apiJson<GoalAssetVersionData>(`/api/goals/${encodeURIComponent(goalId)}/assets/${encodeURIComponent(assetId)}/versions/${encodeURIComponent(versionId)}/restore`, { method: "POST", body: JSON.stringify({ workspaceId, changeSummary }) }); }

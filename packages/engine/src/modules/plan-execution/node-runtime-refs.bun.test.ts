@@ -250,12 +250,12 @@ describe("node runtime refs", () => {
           }],
           assets: [{
             ref: "GA123456ABCDEF",
-            label: "Current guide",
+            title: "Current guide",
+            description: "Current approved guide",
             kind: "document",
             role: "working_document",
             version: 2,
             updatedAt: "2026-07-25T11:00:00.000Z",
-            content: "Current approved content",
           }],
         },
       },
@@ -281,12 +281,12 @@ describe("node runtime refs", () => {
     }]);
     expect(input.context.goalAssets).toEqual([{
       ref: "GA123456ABCDEF",
-      label: "Current guide",
+      title: "Current guide",
+      description: "Current approved guide",
       kind: "document",
       role: "working_document",
       version: 2,
       updatedAt: "2026-07-25T11:00:00.000Z",
-      content: "Current approved content",
     }]);
     expect(JSON.stringify(input)).not.toContain("task-real-goal-context");
   });
@@ -362,6 +362,9 @@ describe("node runtime refs", () => {
     expect(runtime.instructions).toContain(
       "Call chrona_execution_read only after",
     );
+    expect(runtime.instructions).toContain("complete metadata-only catalog captured when this Task was created");
+    expect(runtime.instructions).toContain("never traverse the entire catalog indiscriminately");
+    expect(runtime.instructions).toContain("captured formal version, not the live latest version");
   });
 
   it("prompts task nodes to submit semantic results", () => {

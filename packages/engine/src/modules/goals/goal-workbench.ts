@@ -37,6 +37,26 @@ function hash(value: unknown) {
 function record(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
 }
+function boundedDescription(value: unknown) {
+  return typeof value === "string" && value.trim()
+    ? value.trim().slice(0, 400)
+    : null;
+}
+
+function artifactDescription(metadata: unknown) {
+  const value = record(metadata);
+  return boundedDescription(value?.description ?? value?.summary);
+}
+
+function candidateDescription(candidate: {
+  changeSummary: string;
+  content: unknown;
+  sourceArtifact: { metadata: unknown } | null;
+}) {
+  return artifactDescription(candidate.sourceArtifact?.metadata)
+    ?? boundedDescription(record(candidate.content)?.summary)
+    ?? boundedDescription(candidate.changeSummary);
+}
 
 function declaredAssetKind(value: unknown) {
   const kinds: Record<string, true> = {
@@ -284,9 +304,41 @@ async function assetOrThrow(goalId: string, assetId: string, workspaceId?: strin
   return asset;
 }
 
+async function assetUsageHistory(asset: Awaited<ReturnType<typeof assetOrThrow>>) {
+  const ref = `GA${createHash("sha256").update(asset.id).digest("hex").slice(0, 12).toUpperCase()}`;
+  const invocations = await db.toolInvocation.findMany({
+    where: {
+      toolName: "chrona.goal.results.read",
+      status: "accepted",
+      task: { goalId: asset.goalId, workspaceId: asset.workspaceId },
+    },
+    select: {
+      inputPayload: true,
+      completedAt: true,
+      task: { select: { title: true, goalContext: true } },
+    },
+    orderBy: { completedAt: "desc" },
+    take: 200,
+  });
+  return invocations.flatMap((invocation) => {
+    const input = record(invocation.inputPayload);
+    if (input?.ref !== ref || !invocation.task || !invocation.completedAt) return [];
+    const snapshot = record(invocation.task.goalContext);
+    const assets = Array.isArray(snapshot?.assets) ? snapshot.assets : [];
+    const frozen = assets.map(record).find((candidate) => candidate?.ref === ref);
+    if (typeof frozen?.version !== "number") return [];
+    return [{
+      taskTitle: invocation.task.title,
+      version: frozen.version,
+      completedAt: invocation.completedAt.toISOString(),
+    }];
+  }).slice(0, 20);
+}
+
 async function assetReadModel(asset: Awaited<ReturnType<typeof assetOrThrow>>) {
   return {
     ...asset,
+    usageHistory: await assetUsageHistory(asset),
     linkedAssets: await linkedAssetsForStructuredResult(asset),
     archivedAt: asset.archivedAt?.toISOString() ?? null,
     lastOpenedAt: asset.lastOpenedAt?.toISOString() ?? null,
@@ -379,9 +431,22 @@ export async function getGoalAsset(input: { goalId: string; assetId: string }) {
   return assetReadModel(await assetOrThrow(input.goalId, input.assetId));
 }
 
-export async function renameGoalAsset(input: { goalId: string; assetId: string; label: string }) {
+export async function renameGoalAsset(input: {
+  goalId: string;
+  assetId: string;
+  label: string;
+  description?: string | null;
+}) {
   await assetOrThrow(input.goalId, input.assetId);
-  await db.goalAsset.update({ where: { id: input.assetId }, data: { label: input.label } });
+  await db.goalAsset.update({
+    where: { id: input.assetId },
+    data: {
+      label: input.label,
+      ...(input.description !== undefined
+        ? { description: input.description || null }
+        : {}),
+    },
+  });
   return getGoalAsset(input);
 }
 
@@ -646,6 +711,7 @@ async function createLinkedFileAssets(
         role: "working_document",
         status: "Approved",
         label: artifact.title,
+        description: artifactDescription(artifact.metadata),
       },
     });
     const metadata = record(artifact.metadata);
@@ -724,7 +790,7 @@ export async function resolveGoalInboxCandidate(input: { goalId: string; candida
         }
         assetId = existing.id;
       } else {
-        const asset = await tx.goalAsset.create({ data: { workspaceId: candidate.workspaceId, goalId: candidate.goalId, sourceArtifactId, currentArtifactId: sourceArtifactId, kind: candidate.kind, role: "working_document", status: "Approved", label: command.label } });
+        const asset = await tx.goalAsset.create({ data: { workspaceId: candidate.workspaceId, goalId: candidate.goalId, sourceArtifactId, currentArtifactId: sourceArtifactId, kind: candidate.kind, role: "working_document", status: "Approved", label: command.label, description: candidateDescription(candidate) } });
         assetId = asset.id;
         await tx.goalAssetVersion.create({ data: { workspaceId: candidate.workspaceId, goalId: candidate.goalId, assetId: asset.id, artifactId: sourceArtifactId, version: 1, source: "inbox", content: candidate.content as Prisma.InputJsonValue, contentHash: candidate.contentHash, mimeType: candidate.kind === "structured_result" ? "application/vnd.chrona.structured-result+json" : record(candidate.sourceArtifact?.metadata)?.mimeType as string | undefined, originalFilename: record(candidate.sourceArtifact?.metadata)?.filename as string | undefined, sourceTaskId: candidate.sourceTaskId, sourceRunId: candidate.sourceRunId, sourceResultId: candidate.sourceRunId, selector: candidate.selector as Prisma.InputJsonValue, authorType: "user", authorId: "server-action", changeSummary: candidate.changeSummary } });
       }

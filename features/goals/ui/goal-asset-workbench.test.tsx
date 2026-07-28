@@ -78,8 +78,8 @@ function asset(
         source: "inbox",
         content,
         contentHash: `hash-${id}-${version}`,
-        mimeType: "text/markdown",
-        originalFilename: `${id}.md`,
+        mimeType: kind === "structured_result" ? "application/vnd.chrona.structured-result+json" : "text/plain",
+        originalFilename: `${id}.txt`,
         changeSummary: "Initial version",
         sourceTaskId: `task-${id}`,
         sourceRunId: `run-${id}`,
@@ -121,6 +121,7 @@ function renderWorkbench(
   return router;
 }
 
+
 describe("GoalAssetWorkbench", () => {
   afterEach(() => {
     cleanup();
@@ -139,10 +140,9 @@ describe("GoalAssetWorkbench", () => {
       "/goals/goal-1?section=workbench&asset=first",
     );
 
-    fireEvent.change(
-      screen.getByRole("textbox", { name: copy.documentContent }),
-      { target: { value: "Autosave first edit" } },
-    );
+    fireEvent.change(screen.getByRole("textbox", { name: copy.documentContent }), {
+      target: { value: "Autosave first edit" },
+    });
     await vi.advanceTimersByTimeAsync(799);
     expect(mocks.saveGoalAssetDraft).not.toHaveBeenCalled();
     await vi.advanceTimersByTimeAsync(1);
@@ -223,7 +223,7 @@ describe("GoalAssetWorkbench", () => {
       "/goals/goal-1?section=workbench&asset=structured-metadata",
     );
 
-    expect((await screen.findAllByText("Structured results")).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText("Structured reports")).length).toBeGreaterThan(0);
     expect(screen.queryByText("MIME type")).not.toBeInTheDocument();
     expect(
       screen.queryByText("application/vnd.chrona.structured-result+json"),
@@ -243,9 +243,7 @@ describe("GoalAssetWorkbench", () => {
       "Second document",
     );
     expect(screen.getByLabelText(copy.searchAssets)).toHaveValue("Second");
-    expect(
-      screen.getByRole("textbox", { name: copy.documentContent }),
-    ).toHaveValue("Second content");
+    expect(screen.getByText("Second content")).toBeInTheDocument();
   });
 
   it("separates archived assets into a top-level Workbench tab", async () => {
@@ -428,9 +426,7 @@ describe("GoalAssetWorkbench", () => {
     await waitFor(() =>
       expect(router.state.location.search).toContain("asset=second"),
     );
-    expect(
-      screen.getByRole("textbox", { name: copy.documentContent }),
-    ).toHaveValue("Second content");
+    expect(screen.getByText("Second content")).toBeInTheDocument();
   });
 
   it("resets editor-local state when the selected asset changes", async () => {
@@ -465,10 +461,9 @@ describe("GoalAssetWorkbench", () => {
       "/goals/goal-1?section=workbench&asset=first",
     );
 
-    fireEvent.change(
-      screen.getByRole("textbox", { name: copy.documentContent }),
-      { target: { value: "Newest editor content" } },
-    );
+    fireEvent.change(screen.getByRole("textbox", { name: copy.documentContent }), {
+      target: { value: "Newest editor content" },
+    });
     fireEvent.click(screen.getByRole("button", { name: copy.publishVersion }));
 
     await waitFor(() =>
@@ -609,6 +604,52 @@ describe("GoalAssetWorkbench", () => {
       }).value,
     ).toContain("draftOnly");
   });
+  it("renders Markdown documents by default while preserving source editing", async () => {
+    const markdown = asset("guide", "Research guide", "# Guide\n\nUse **official sources**.");
+    markdown.versions[0]!.mimeType = "text/markdown";
+    markdown.versions[0]!.originalFilename = "guide.md";
+    renderWorkbench(
+      [markdown],
+      "/goals/goal-1?section=workbench&asset=guide",
+    );
+
+    expect(await screen.findByRole("heading", { name: "Guide" })).toBeInTheDocument();
+    expect(screen.getByText("official sources")).toHaveClass("font-bold");
+    expect(screen.queryByRole("textbox", { name: copy.documentContent })).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("tab", { name: copy.editMode }));
+    expect(screen.getByRole("textbox", { name: copy.documentContent })).toHaveValue(
+      "# Guide\n\nUse **official sources**.",
+    );
+  });
+
+  it("renders CSV files as a virtualized table", async () => {
+    const csv = asset(
+      "sources",
+      "Sources",
+      [
+        "name,official_url,note",
+        'JKU,https://www.jku.at/,"Agent, tool use, and safety"',
+        "Aarhus,https://phd.tech.au.dk/,Adaptive AI",
+      ].join("\n"),
+      1,
+      "file",
+    );
+    csv.versions[0]!.mimeType = "text/csv";
+    csv.versions[0]!.originalFilename = "sources.csv";
+    renderWorkbench([csv], "/goals/goal-1?section=workbench&asset=sources");
+
+    const preview = await screen.findByLabelText(copy.csvPreview);
+    expect(within(preview).getByRole("table")).toBeInTheDocument();
+    expect(within(preview).getByRole("columnheader", { name: /official_url/i })).toBeInTheDocument();
+    expect(within(preview).getByText("Agent, tool use, and safety")).toBeInTheDocument();
+    expect(within(preview).getByRole("table").parentElement).toHaveAttribute(
+      "data-result-table-scroll",
+      "virtual",
+    );
+    expect(within(preview).queryByText(/name,official_url,note/)).not.toBeInTheDocument();
+  });
+
   it("renders a structured result without exposing raw JSON and exports each supported format", async () => {
     mocks.createGoalAssetJob.mockClear();
     const structured = asset(
