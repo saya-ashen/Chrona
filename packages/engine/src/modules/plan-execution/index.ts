@@ -17,6 +17,11 @@ export {
 
 export { finalizeTaskResult } from "./results/finalize-task-result";
 export {
+  resolveProviderApproval,
+  type ResolveProviderApprovalInput,
+  type ResolveProviderApprovalResult,
+} from "./use-cases/resolve-provider-approval";
+export {
   TaskPlanExecution,
   taskPlanExecution,
 } from "./facade/task-plan-execution.facade";

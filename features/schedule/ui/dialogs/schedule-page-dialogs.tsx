@@ -5,6 +5,13 @@ import type {
   TimelineCreateInput,
 } from "../schedule-page-types";
 import type { SchedulePageViewModel } from "../schedule-page-view-model";
+import type { Locale } from "@chrona/i18n";
+
+type ScheduleViewHrefBuilder = (
+  day: string,
+  view: ScheduleViewMode,
+  taskId?: string,
+) => string;
 
 export function SchedulePageDialogs({
   showQuickAddDialog,
@@ -33,11 +40,9 @@ export function SchedulePageDialogs({
   activeView: ScheduleViewMode;
   workspaceId: string;
   routerPush: (href: string) => void;
-  locale: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  localizeHref: (locale: any, href: string) => string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-buildScheduleViewHref: (...args: any[]) => string;
+  locale: Locale;
+  localizeHref: (locale: Locale | undefined, href: string) => string;
+  buildScheduleViewHref: ScheduleViewHrefBuilder;
   actionFailedMessage: string;
   onCloseQuickAdd: () => void;
   handleCreateTaskBlock: (input: TimelineCreateInput) => Promise<void>;

@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { Readable, Writable } from "node:stream";
 import type { Readable as NodeReadable, Writable as NodeWritable } from "node:stream";
 import * as acp from "@agentclientprotocol/sdk";
+import { BoundedTerminalRunSnapshots } from "@chrona/providers-foundation";
 import type {
   ActiveSession,
   ClientContext,
@@ -80,7 +81,9 @@ export type AcpRunHandle = {
   sequence: number;
   toolLabels: Map<string, string>;
   approvalEvents: ProviderRunEvent[];
-  approvalWaiters: Array<() => void>;
+  approvalWaiters: Set<() => void>;
+  pendingApprovalIds: Set<string>;
+  inputAbortListener?: () => void;
 };
 
 type InternalRun = {
@@ -542,12 +545,37 @@ function approvalRequestFromAcp(config: AcpProviderConfig, handle: AcpRunHandle,
 
 function queueApprovalEvent(handle: AcpRunHandle, event: ProviderRunEvent) {
   handle.approvalEvents.push(event);
-  const waiters = handle.approvalWaiters.splice(0);
+  const waiters = Array.from(handle.approvalWaiters);
+  handle.approvalWaiters.clear();
   for (const wake of waiters) wake();
 }
 
-function waitForApprovalEvent(handle: AcpRunHandle) {
-  return new Promise<void>((resolve) => handle.approvalWaiters.push(resolve));
+function waitForApprovalEvent(handle: AcpRunHandle, signal: AbortSignal): { promise: Promise<void>; cancel(): void } {
+  let settled = false;
+  let resolve!: () => void;
+  const cleanup = () => {
+    if (settled) return;
+    settled = true;
+    handle.approvalWaiters.delete(resolve);
+    signal.removeEventListener("abort", onAbort);
+  };
+  const onAbort = () => {
+    cleanup();
+    resolve();
+  };
+  const promise = new Promise<void>((next) => {
+    resolve = () => {
+      cleanup();
+      next();
+    };
+    if (signal.aborted) {
+      resolve();
+      return;
+    }
+    handle.approvalWaiters.add(resolve);
+    signal.addEventListener("abort", onAbort, { once: true });
+  });
+  return { promise, cancel: cleanup };
 }
 
 
@@ -720,6 +748,7 @@ export class AcpProviderClient implements AgentProviderClient {
   private readonly transport: AcpTransport;
   private readonly diagnostics?: AcpDiagnostics;
   private readonly runs = new Map<string, InternalRun>();
+  private readonly terminalSnapshots = new BoundedTerminalRunSnapshots();
   private readonly pendingApprovals = new Map<string, PendingAcpApproval>();
 
   constructor(opts: AcpProviderOptions) {
@@ -816,10 +845,10 @@ export class AcpProviderClient implements AgentProviderClient {
 
   async getRun(input: GetRunInput): Promise<ProviderRunSnapshot> {
     const internal = this.runs.get(input.runId);
-    if (!internal) {
-      throw new AcpProviderError(`getRun: unknown runId "${input.runId}"`, { retryable: false, provider: this.provider });
-    }
-    return this.snapshot(internal.handle);
+    if (internal) return this.snapshot(internal.handle);
+    const snapshot = this.terminalSnapshots.get(input.runId);
+    if (snapshot) return snapshot;
+    throw new AcpProviderError(`getRun: unknown runId "${input.runId}"`, { retryable: false, provider: this.provider });
   }
 
   async cancelRun(input: CancelRunInput): Promise<ProviderRunSnapshot> {
@@ -844,29 +873,34 @@ export class AcpProviderClient implements AgentProviderClient {
     }
     const optionId = pending.optionByChoice.get(input.choice);
     pending.resolve(optionId ? { outcome: { outcome: "selected", optionId } } : { outcome: { outcome: "cancelled" } });
-    this.pendingApprovals.delete(pending.request.id ?? "");
     return { provider: this.provider, runId: input.runId, nativeRunId: input.nativeRunId, choice: input.choice, resolved: 1, status: "resolved" };
   }
 
   private async requestPermission(handle: AcpRunHandle, params: RequestPermissionRequest): Promise<RequestPermissionResponse> {
     const mapped = approvalRequestFromAcp(this.config, handle, params);
     const approvalId = mapped.request.id ?? `${handle.ref.runId}:${params.toolCall.toolCallId}`;
-    const response = await new Promise<RequestPermissionResponse>((resolve) => {
-      this.pendingApprovals.set(approvalId, { handle, request: mapped.request, optionByChoice: mapped.optionByChoice, resolve });
+    return new Promise<RequestPermissionResponse>((resolve) => {
+      const settle = (response: RequestPermissionResponse) => {
+        this.pendingApprovals.delete(approvalId);
+        handle.pendingApprovalIds.delete(approvalId);
+        resolve(response);
+      };
+      handle.pendingApprovalIds.add(approvalId);
+      this.pendingApprovals.set(approvalId, { handle, request: mapped.request, optionByChoice: mapped.optionByChoice, resolve: settle });
       queueApprovalEvent(handle, {
         ...eventBase(this.config, handle, "approval_required"),
         type: "approval_required",
         approval: mapped.request,
         raw: params,
       });
+      handle.abort.signal.addEventListener("abort", () => settle({ outcome: { outcome: "cancelled" } }), { once: true });
     });
-    this.pendingApprovals.delete(approvalId);
-    return response;
   }
 
   private async start(input: StartRunInput): Promise<AcpRunHandle> {
     const abort = new AbortController();
-    input.signal?.addEventListener("abort", () => abort.abort(), { once: true });
+    const inputAbortListener = () => abort.abort(input.signal?.reason);
+    input.signal?.addEventListener("abort", inputAbortListener, { once: true });
     const timeout = input.timeoutMs ?? this.config.timeoutMs;
     const timer = timeout && timeout > 0 ? setTimeout(() => abort.abort(), timeout) : undefined;
     const runId = `${this.provider}-run-${crypto.randomUUID()}`;
@@ -891,7 +925,9 @@ export class AcpProviderClient implements AgentProviderClient {
       approvalEvents: [],
       toolLabels: new Map(),
 
-      approvalWaiters: [],
+      approvalWaiters: new Set(),
+      pendingApprovalIds: new Set(),
+      inputAbortListener,
     };
 
     let resolveReady!: () => void;
@@ -941,11 +977,15 @@ export class AcpProviderClient implements AgentProviderClient {
         }
         const session = handle.session;
         if (!session) break;
+        const approvalWait = waitForApprovalEvent(handle, handle.abort.signal);
         const next = await Promise.race([
           session.nextUpdate().then((message) => ({ kind: "message" as const, message })),
-          waitForApprovalEvent(handle).then(() => ({ kind: "approval" as const })),
-        ]);
-        if (next.kind === "approval") continue;
+          approvalWait.promise.then(() => ({ kind: "approval" as const })),
+        ]).finally(approvalWait.cancel);
+        if (next.kind === "approval") {
+          if (handle.abort.signal.aborted) break;
+          continue;
+        }
         const message = next.message;
         if (!message) break;
         if (message.kind === "stop") {
@@ -982,7 +1022,18 @@ export class AcpProviderClient implements AgentProviderClient {
       yield { ...eventBase(this.config, handle, "error"), type: "run_failed", run: providerRunRef(handle, "failed"), error: handle.error };
     } finally {
       clearTimeout(handle.timer);
-      handle.session?.dispose();
+      handle.input.signal?.removeEventListener("abort", handle.inputAbortListener!);
+      handle.approvalWaiters.clear();
+      for (const approvalId of handle.pendingApprovalIds) {
+        this.pendingApprovals.get(approvalId)?.resolve({ outcome: { outcome: "cancelled" } });
+      }
+      handle.pendingApprovalIds.clear();
+      try {
+        await handle.session?.dispose();
+      } catch (error) {
+        console.error("ACP session disposal failed", error);
+      }
+      await this.retainSnapshot(handle);
     }
   }
 
@@ -1013,6 +1064,12 @@ export class AcpProviderClient implements AgentProviderClient {
     }
     handle.status = "cancelled";
   }
+  private async retainSnapshot(handle: AcpRunHandle): Promise<void> {
+    const snapshot = await this.snapshot(handle);
+    this.runs.delete(handle.ref.runId);
+    this.terminalSnapshots.set(snapshot);
+  }
+
 
   private async resolveStreamHandle(input: StreamRunInput): Promise<AcpRunHandle> {
     if ("runId" in input && input.runId) {

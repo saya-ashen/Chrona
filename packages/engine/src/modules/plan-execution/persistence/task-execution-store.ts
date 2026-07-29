@@ -2,13 +2,14 @@ import { RunStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
 import { updateTaskSessionStateFromRun } from "@/modules/execution-runtime";
+import { revokeRunTokensForRun } from "../runtime/agent-control-store";
 
-const ACTIVE_RUN_STATUSES = [
+const ACTIVE_RUN_STATUSES: readonly RunStatus[] = [
   RunStatus.Pending,
   RunStatus.Running,
   RunStatus.WaitingForApproval,
   RunStatus.WaitingForInput,
-] as const;
+];
 
 
 export async function syncTaskRunState(input: {
@@ -32,6 +33,9 @@ export async function syncTaskRunState(input: {
     runStatus: input.runStatus,
     runtimeRunRef: input.runtimeRunRef,
   });
+  if (!ACTIVE_RUN_STATUSES.includes(input.runStatus)) {
+    await revokeRunTokensForRun(input.runId);
+  }
   const occurrence = await db.run.findUnique({ where: { id: input.runId }, select: { occurrenceId: true } });
   if (occurrence?.occurrenceId) {
     const terminal = input.runStatus === RunStatus.Completed || input.runStatus === RunStatus.Cancelled || input.runStatus === RunStatus.Failed;

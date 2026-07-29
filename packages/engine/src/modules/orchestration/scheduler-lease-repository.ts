@@ -8,59 +8,60 @@ export type SchedulerLeaseInput = {
   metadata?: unknown;
 };
 
+function isUniqueConstraintError(error: unknown) {
+  return typeof error === "object" && error !== null && "code" in error && error.code === "P2002";
+}
+
 export async function acquireSchedulerLease(input: SchedulerLeaseInput) {
   const now = input.now ?? new Date();
   const expiresAt = new Date(now.getTime() + input.ttlMs);
-  const current = await db.schedulerLease.findUnique({ where: { name: input.name } });
 
-  if (current && current.expiresAt > now && current.ownerId !== input.ownerId) {
-    return { acquired: false as const, lease: current };
+  try {
+    const lease = await db.schedulerLease.create({
+      data: {
+        name: input.name,
+        ownerId: input.ownerId,
+        heartbeatAt: now,
+        expiresAt,
+        metadata: input.metadata ?? undefined,
+      },
+    });
+    return { acquired: true as const, lease };
+  } catch (error) {
+    if (!isUniqueConstraintError(error)) throw error;
   }
 
-  const lease = await db.schedulerLease.upsert({
-    where: { name: input.name },
-    create: {
+  const claimed = await db.schedulerLease.updateMany({
+    where: {
       name: input.name,
-      ownerId: input.ownerId,
-      heartbeatAt: now,
-      expiresAt,
-      metadata: input.metadata ?? undefined,
+      OR: [{ ownerId: input.ownerId }, { expiresAt: { lte: now } }],
     },
-    update: {
+    data: {
       ownerId: input.ownerId,
       heartbeatAt: now,
       expiresAt,
       metadata: input.metadata ?? undefined,
     },
   });
-
-  return { acquired: true as const, lease };
+  const lease = await db.schedulerLease.findUniqueOrThrow({ where: { name: input.name } });
+  return { acquired: claimed.count === 1, lease };
 }
 
 export async function renewSchedulerLease(input: SchedulerLeaseInput) {
   const now = input.now ?? new Date();
-  const lease = await db.schedulerLease.findUnique({ where: { name: input.name } });
-  if (!lease || lease.ownerId !== input.ownerId || lease.expiresAt <= now) {
-    return { renewed: false as const, lease };
-  }
-
-  const renewed = await db.schedulerLease.update({
-    where: { name: input.name },
+  const renewed = await db.schedulerLease.updateMany({
+    where: { name: input.name, ownerId: input.ownerId, expiresAt: { gt: now } },
     data: {
       heartbeatAt: now,
       expiresAt: new Date(now.getTime() + input.ttlMs),
       metadata: input.metadata ?? undefined,
     },
   });
-
-  return { renewed: true as const, lease: renewed };
+  const lease = await db.schedulerLease.findUnique({ where: { name: input.name } });
+  return { renewed: renewed.count === 1, lease };
 }
 
 export async function releaseSchedulerLease(name: string, ownerId: string) {
-  const lease = await db.schedulerLease.findUnique({ where: { name } });
-  if (!lease || lease.ownerId !== ownerId) {
-    return false;
-  }
-  await db.schedulerLease.delete({ where: { name } });
-  return true;
+  const released = await db.schedulerLease.deleteMany({ where: { name, ownerId } });
+  return released.count === 1;
 }

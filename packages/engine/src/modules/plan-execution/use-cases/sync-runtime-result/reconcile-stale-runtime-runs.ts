@@ -7,6 +7,7 @@ import { syncTaskRunState } from "../../persistence/task-execution-store";
 
 type ReconcileOutcome = "synced" | "left_running" | "skipped";
 const TERMINAL_FINALIZATION_GRACE_MS = 60_000;
+const RECONCILING_SYNC_STATUSES: string[] = ["reconciling_healthy", "reconciling_degraded"];
 
 export type ReconcileStaleRuntimeRunsResult = {
   checked: number;
@@ -58,6 +59,9 @@ async function findRunningProviderRuns(input: { taskId?: string; limit?: number 
           status: { in: ["completed", "failed", "cancelled"] },
           finishedAt: { lte: finalizationCutoff },
         },
+        {
+          task: { runs: { some: { syncStatus: { in: RECONCILING_SYNC_STATUSES } } } },
+        },
       ],
     },
     include: {
@@ -89,6 +93,10 @@ async function reconcileProviderRun(providerRun: RunningProviderRun): Promise<Re
 
   const run = await db.run.findUnique({ where: { runtimeRunRef } });
   if (!run) return "skipped";
+  if (isReconciliationProjectionPending(run.syncStatus)) {
+    await syncCanonicalRunProjection(run, run.status, reconciliationTargetSyncStatus(run.syncStatus));
+    return "synced";
+  }
   if (providerRun.status !== "running") {
     if (!shouldReconcileTerminalProviderRun({
       providerStatus: providerRun.status,
@@ -116,7 +124,7 @@ async function reconcileProviderRun(providerRun: RunningProviderRun): Promise<Re
       status: "Failed",
       error: reason,
     });
-    await syncCanonicalRunProjection(run, RunStatus.Failed);
+    await syncCanonicalRunProjection(run, RunStatus.Failed, "degraded");
     return "synced";
   }
 
@@ -138,7 +146,7 @@ async function reconcileProviderRun(providerRun: RunningProviderRun): Promise<Re
       status: "Failed",
       error: reason,
     });
-    await syncCanonicalRunProjection(run, RunStatus.Failed);
+    await syncCanonicalRunProjection(run, RunStatus.Failed, "degraded");
     return "synced";
   }
 }
@@ -162,7 +170,7 @@ async function reconcileTerminalProviderRecord(input: {
       status: "Failed",
       error: reason,
     });
-    await syncCanonicalRunProjection(input.run, RunStatus.Failed);
+    await syncCanonicalRunProjection(input.run, RunStatus.Failed, "degraded");
     return "synced";
   }
 
@@ -176,7 +184,7 @@ async function reconcileTerminalProviderRecord(input: {
     status: "Failed",
     error: reason,
   });
-  await syncCanonicalRunProjection(input.run, RunStatus.Failed);
+  await syncCanonicalRunProjection(input.run, RunStatus.Failed, "degraded");
   return "synced";
 }
 
@@ -218,7 +226,7 @@ async function reconcileSnapshot(input: {
       summary: input.snapshot.outputText,
       output: input.snapshot.structuredPayload ?? input.snapshot.output ?? input.snapshot.raw,
     });
-    await syncCanonicalRunProjection(input.run, RunStatus.Completed);
+    await syncCanonicalRunProjection(input.run, RunStatus.Completed, "healthy");
     return "synced";
   }
 
@@ -242,7 +250,7 @@ async function reconcileSnapshot(input: {
     summary: input.snapshot.outputText,
     output: input.snapshot.structuredPayload ?? input.snapshot.output ?? input.snapshot.raw,
   });
-  await syncCanonicalRunProjection(input.run, status);
+  await syncCanonicalRunProjection(input.run, status, providerCancelled ? "degraded" : "healthy");
   return "synced";
 }
 
@@ -296,7 +304,7 @@ async function persistCanonicalRunTerminalState(input: {
       status: input.status,
       endedAt: new Date(),
       errorSummary: input.errorSummary,
-      syncStatus: input.syncStatus,
+      syncStatus: `reconciling_${input.syncStatus}`,
       lastSyncedAt: new Date(),
       retryable: input.retryable ?? false,
       pendingInputPrompt: null,
@@ -307,6 +315,7 @@ async function persistCanonicalRunTerminalState(input: {
 async function syncCanonicalRunProjection(
   run: CanonicalRun,
   status: RunStatus,
+  syncStatus: "healthy" | "degraded",
 ) {
   await syncTaskRunState({
     taskId: run.taskId,
@@ -315,6 +324,18 @@ async function syncCanonicalRunProjection(
     runStatus: status,
     runtimeRunRef: run.runtimeRunRef,
   });
+  await db.run.updateMany({
+    where: { id: run.id, syncStatus: { in: RECONCILING_SYNC_STATUSES } },
+    data: { syncStatus, lastSyncedAt: new Date() },
+  });
+}
+
+function isReconciliationProjectionPending(syncStatus: string) {
+  return RECONCILING_SYNC_STATUSES.includes(syncStatus);
+}
+
+function reconciliationTargetSyncStatus(syncStatus: string): "healthy" | "degraded" {
+  return syncStatus === "reconciling_degraded" ? "degraded" : "healthy";
 }
 
 function isTerminalMissingRun(error: unknown) {

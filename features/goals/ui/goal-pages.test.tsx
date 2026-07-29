@@ -950,7 +950,7 @@ describe("Goal pages", () => {
       screen.queryByText("Approved application package"),
     ).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Add task" }));
-    expect(screen.getByText("Action preview")).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Add bounded task" })).toBeInTheDocument();
     expect(screen.queryByText("Selected context")).not.toBeInTheDocument();
   });
 

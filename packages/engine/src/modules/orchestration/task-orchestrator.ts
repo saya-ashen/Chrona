@@ -1,4 +1,5 @@
 import { readTaskOrchestratorConfig, type TaskOrchestratorConfig } from "./orchestrator-config";
+import { archiveExpiredEventRecords } from "@/modules/events";
 import { runDueAutoPlanGenerationWorker } from "./due-auto-plan-generation-worker";
 import { runDueScheduledWorkWorker } from "./due-scheduled-work-worker";
 import { runGraphAdvancementWorker } from "./graph-advancement-worker";
@@ -44,6 +45,15 @@ export type TaskOrchestratorOptions = {
   clearIntervalFn?: typeof clearInterval;
 };
 
+function registerWorkers(
+  workers: Map<string, TaskOrchestratorWorker>,
+  configuredWorkers: TaskOrchestratorWorker[],
+) {
+  for (const worker of configuredWorkers) {
+    workers.set(worker.name, worker);
+  }
+}
+
 export function createTaskOrchestrator(options: TaskOrchestratorOptions = {}): TaskOrchestrator {
   const config = options.config ?? readTaskOrchestratorConfig();
   const workers = new Map<string, TaskOrchestratorWorker>();
@@ -56,53 +66,59 @@ export function createTaskOrchestrator(options: TaskOrchestratorOptions = {}): T
   const setIntervalFn = options.setIntervalFn ?? setInterval;
   const clearIntervalFn = options.clearIntervalFn ?? clearInterval;
   let timer: ReturnType<typeof setInterval> | null = null;
-  let inFlight = false;
+  let tickPromise: Promise<void> | null = null;
+  let stopPromise: Promise<void> | null = null;
   let leaseHeld = false;
 
-  for (const worker of options.workers ?? []) {
-    workers.set(worker.name, worker);
-  }
-
-  async function tick() {
-    if (inFlight) {
-      return;
+  registerWorkers(workers, options.workers ?? []);
+  function tick() {
+    if (tickPromise) {
+      return tickPromise;
     }
-    inFlight = true;
-    try {
-      const lease = await leaseRepository.acquire({
-        name: config.leaseName,
-        ownerId: config.leaseOwnerId,
-        ttlMs: config.leaseTtlMs,
-        now: now(),
-      });
-      if (!lease.acquired) {
-        return;
-      }
-      leaseHeld = true;
 
-      for (const worker of workers.values()) {
-        await leaseRepository.renew({
+    tickPromise = (async () => {
+      try {
+        const lease = await leaseRepository.acquire({
           name: config.leaseName,
           ownerId: config.leaseOwnerId,
           ttlMs: config.leaseTtlMs,
           now: now(),
         });
-        try {
-          await worker.run();
-        } catch (cause) {
-          const taskId = cause instanceof TaskPlanGenerationInFlightError ? cause.taskId : null;
-          const workBlockId = cause instanceof TaskPlanGenerationInFlightError ? cause.workBlockId : null;
-          logger.error("worker.failed", {
-            worker: worker.name,
-            error: cause,
-            taskId,
-            workBlockId,
-          });
+        if (!lease.acquired) {
+          return;
         }
+        leaseHeld = true;
+
+        for (const worker of workers.values()) {
+          const renewal = await leaseRepository.renew({
+            name: config.leaseName,
+            ownerId: config.leaseOwnerId,
+            ttlMs: config.leaseTtlMs,
+            now: now(),
+          });
+          if (!renewal.renewed) {
+            leaseHeld = false;
+            return;
+          }
+          try {
+            await worker.run();
+          } catch (cause) {
+            const taskId = cause instanceof TaskPlanGenerationInFlightError ? cause.taskId : null;
+            const workBlockId = cause instanceof TaskPlanGenerationInFlightError ? cause.workBlockId : null;
+            logger.error("worker.failed", {
+              worker: worker.name,
+              error: cause,
+              taskId,
+              workBlockId,
+            });
+          }
+        }
+      } finally {
+        tickPromise = null;
       }
-    } finally {
-      inFlight = false;
-    }
+    })();
+
+    return tickPromise;
   }
 
   return {
@@ -118,14 +134,20 @@ export function createTaskOrchestrator(options: TaskOrchestratorOptions = {}): T
       }, config.intervalMs);
     },
     async stop() {
-      if (timer) {
-        clearIntervalFn(timer);
-        timer = null;
+      if (!stopPromise) {
+        stopPromise = (async () => {
+          if (timer) {
+            clearIntervalFn(timer);
+            timer = null;
+          }
+          await tickPromise;
+          if (leaseHeld) {
+            await leaseRepository.release(config.leaseName, config.leaseOwnerId);
+            leaseHeld = false;
+          }
+        })();
       }
-      if (leaseHeld) {
-        await leaseRepository.release(config.leaseName, config.leaseOwnerId);
-        leaseHeld = false;
-      }
+      await stopPromise;
     },
     tick,
     isRunning() {
@@ -139,6 +161,12 @@ export function createTaskOrchestrator(options: TaskOrchestratorOptions = {}): T
 
 export function createDefaultTaskOrchestratorWorkers(): TaskOrchestratorWorker[] {
   return [
+    {
+      name: "event-retention",
+      async run() {
+        await archiveExpiredEventRecords();
+      },
+    },
     {
       name: "restart-recovery",
       async run() {

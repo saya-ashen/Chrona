@@ -524,7 +524,7 @@ describe("plan-runner task executor continuation", () => {
     });
 
     expect(restarted.status).toBe("running");
-    expect(restarted.message).toBe("Execution running: no ready nodes");
+    expect(restarted.message).toBe("Current execution state.");
     expect(executeTaskNodeCapabilityMock.mock.calls.map((call) => call[0].node.id)).toEqual([
       "first_task",
       "second_task",
@@ -549,7 +549,7 @@ describe("plan-runner task executor continuation", () => {
       select: { status: true, currentNodeId: true, currentNodeAttemptId: true },
     });
     expect(sessions).toEqual([
-      { status: "Active", currentNodeId: null, currentNodeAttemptId: null },
+      { status: "Active", currentNodeId: "second_task", currentNodeAttemptId: null },
     ]);
   });
 

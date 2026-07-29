@@ -4,8 +4,8 @@ mock.module("../runtime/ai-service", () => ({
   aiChat: mock(() => Promise.resolve(null)),
 }));
 
-import { aiChat } from "../runtime/ai-service";
-import { analyzeConflictsSmart, analyzeConflicts } from "../conflict-analyzer";
+import { aiChat } from "@chrona/engine/test-support";
+import { analyzeConflictsSmart, analyzeConflicts } from "@chrona/engine/test-support";
 import type { ScheduledTaskInfo } from "@chrona/contracts/ai";
 
 function d(hour: number, minute = 0): Date {

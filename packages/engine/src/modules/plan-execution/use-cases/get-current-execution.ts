@@ -52,9 +52,9 @@ export function currentExecutionStatusFromEffectiveGraph(input: {
     return executionStatusFromEffectiveGraph(input.effective);
   }
   if (input.activeRunStatus === RunStatus.Pending || input.activeRunStatus === RunStatus.Running) return "running";
-  return input.hasActiveExecutionSession || input.activeRunStatus !== undefined
-    ? executionStatusFromEffectiveGraph(input.effective)
-    : "started";
+  if (input.hasActiveExecutionSession) return executionStatusFromEffectiveGraph(input.effective);
+  if (input.activeRunStatus !== undefined) return executionStatusFromEffectiveGraph(input.effective);
+  return "started";
 }
 export async function getCurrentExecution(input: { taskId: string; workBlockId?: string | null }): Promise<PlanExecutionResult> {
   const runtime = await ensureNativePlanRun(input.taskId, input.workBlockId ?? null);

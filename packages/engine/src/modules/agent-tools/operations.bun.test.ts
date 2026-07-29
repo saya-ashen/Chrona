@@ -4,7 +4,7 @@ import type { PlanBlueprint } from "@chrona/contracts";
 import { PlanCompileError } from "@chrona/contracts/ai";
 import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
 import { createChronaEngine } from "../../engine";
-import { createAgentToolOperationsService } from "./operations";
+import { createAgentToolOperationsService, resetAgentToolMutationFlightsForTest } from "./operations";
 
 function service(input: { materialize?: (input: Record<string, unknown>) => Promise<unknown> } = {}) {
   const calls = {
@@ -135,6 +135,58 @@ function serviceWithDispatchError(code: keyof typeof ENGINE_ERROR_CODES) {
     },
   } as unknown as Parameters<typeof createAgentToolOperationsService>[0]);
 }
+async function seedTerminalToolCapability() {
+  await db.workspace.create({
+    data: { id: "workspace-1", name: "Terminal tool workspace", status: "Active", defaultRuntime: "hermes" },
+  });
+  await db.task.create({
+    data: {
+      id: "task-1",
+      workspaceId: "workspace-1",
+      title: "Build MCP tools",
+      status: "Running",
+      priority: "High",
+      executionRuntime: "hermes",
+      executionConfig: {},
+    },
+  });
+  await db.taskSession.create({
+    data: {
+      id: "task-session-terminal",
+      taskId: "task-1",
+      runtimeName: "hermes",
+      sessionKey: "session-1",
+      status: "running",
+      activeRunId: "run-terminal",
+      capabilityScope: "plan_execution",
+      allowedToolNames: JSON.stringify([
+        "chrona.node.complete",
+        "chrona.node.condition_select",
+        "chrona.node.block",
+        "chrona.node.fail",
+      ]),
+    },
+  });
+  await db.run.create({
+    data: {
+      id: "run-terminal",
+      taskId: "task-1",
+      taskSessionId: "task-session-terminal",
+      runtimeName: "hermes",
+      status: "Running",
+      triggeredBy: "agent",
+    },
+  });
+  await db.executionSession.create({
+    data: {
+      workspaceId: "workspace-1",
+      taskId: "task-1",
+      status: "Active",
+      currentNodeId: "condition-node",
+      startedAt: new Date(),
+    },
+  });
+}
 
 async function seedNodeToolAuditRuntime(taskId: string) {
   await db.taskSession.create({
@@ -144,6 +196,10 @@ async function seedNodeToolAuditRuntime(taskId: string) {
       runtimeName: "hermes",
       sessionKey: "runtime-session-audit",
       label: "Audit session",
+      status: "running",
+      activeRunId: "run-audit",
+      capabilityScope: "plan_execution",
+      allowedToolNames: JSON.stringify(["chrona.node.condition_select"]),
     },
   });
   await db.run.create({
@@ -188,6 +244,7 @@ function testBlueprint(title: string): PlanBlueprint {
 }
 
 async function resetDb() {
+  await db.agentToolMutation.deleteMany();
   await db.toolInvocation.deleteMany();
   await db.rawEventLog.deleteMany();
   await db.executionSession.deleteMany();
@@ -272,6 +329,7 @@ async function seedNodeToolAuditFixture() {
 
 describe("agent tool operations service", () => {
   beforeEach(async () => {
+    resetAgentToolMutationFlightsForTest();
     await resetDb();
   });
 
@@ -588,7 +646,21 @@ describe("agent tool operations service", () => {
         taskId: task.id,
         runtimeName: "hermes",
         sessionKey: "provider-session-for-6-6",
+        status: "running",
+        activeRunId: "plan-generation-run-6-6",
+        capabilityScope: "plan_generation",
+        allowedToolNames: JSON.stringify(["chrona.plan.generate"]),
         label: "6.6 plan generation session",
+      },
+    });
+    await db.run.create({
+      data: {
+        id: "plan-generation-run-6-6",
+        taskId: task.id,
+        taskSessionId: taskSession.id,
+        runtimeName: "hermes",
+        status: "Running",
+        triggeredBy: "agent",
       },
     });
     await db.workBlock.update({
@@ -655,6 +727,7 @@ describe("agent tool operations service", () => {
   });
 
   it("maps node terminal tools to execution dispatch with model-supplied condition node ids", async () => {
+    await seedTerminalToolCapability();
     const agentTools = service();
 
 
@@ -758,6 +831,39 @@ describe("agent tool operations service", () => {
     await db.workspace.create({
       data: { id: "workspace-dashboard-tool", name: "Dashboard tool workspace", status: "Active", defaultRuntime: "codex" },
     });
+    const dashboardTask = await db.task.create({
+      data: {
+        id: "task-dashboard-tool",
+        workspaceId: "workspace-dashboard-tool",
+        title: "Dashboard brief capability",
+        status: "Running",
+        priority: "Medium",
+        executionRuntime: "codex",
+        executionConfig: {},
+      },
+    });
+    const dashboardSession = await db.taskSession.create({
+      data: {
+        id: "session-dashboard-tool",
+        taskId: dashboardTask.id,
+        runtimeName: "codex",
+        sessionKey: "workspace:workspace-dashboard-tool:dashboard.brief:fingerprint",
+        status: "running",
+        activeRunId: "run-dashboard-tool",
+        capabilityScope: "dashboard_brief",
+        allowedToolNames: JSON.stringify(["chrona.dashboard.brief"]),
+      },
+    });
+    await db.run.create({
+      data: {
+        id: "run-dashboard-tool",
+        taskId: dashboardTask.id,
+        taskSessionId: dashboardSession.id,
+        runtimeName: "codex",
+        status: "Running",
+        triggeredBy: "agent",
+      },
+    });
 
     const result = await service().execute({
       toolName: "chrona.dashboard.brief",
@@ -859,6 +965,67 @@ describe("agent tool operations service", () => {
     });
   });
 
+  it("rejects spoofed, stale, and mismatched persisted mutation sessions", async () => {
+    const workspace = await db.workspace.create({
+      data: { id: "workspace-capability", name: "Capability Workspace", status: "Active", defaultRuntime: "hermes" },
+    });
+    const task = await db.task.create({
+      data: {
+        id: "task-capability",
+        workspaceId: workspace.id,
+        title: "Capability task",
+        status: "Running",
+        priority: "Medium",
+        executionRuntime: "hermes",
+        executionConfig: {},
+      },
+    });
+    const session = await db.taskSession.create({
+      data: {
+        id: "session-capability",
+        taskId: task.id,
+        runtimeName: "hermes",
+        sessionKey: "capability-session",
+        status: "running",
+        activeRunId: "run-capability",
+        capabilityScope: "plan_execution",
+        allowedToolNames: JSON.stringify(["chrona.task.update"]),
+      },
+    });
+    await db.run.create({
+      data: {
+        id: "run-capability",
+        taskId: task.id,
+        taskSessionId: session.id,
+        runtimeName: "hermes",
+        status: "Running",
+        triggeredBy: "agent",
+      },
+    });
+    const agentTools = service();
+    const valid = {
+      toolName: "chrona.task.update" as const,
+      input: {
+        sessionId: session.sessionKey,
+        actorType: "agent" as const,
+        idempotencyKey: "capability-key",
+        payload: { title: "Updated" },
+      },
+    };
+
+    await expect(agentTools.resolveInputContext(valid.input, valid.toolName)).resolves.toMatchObject({
+      workspaceId: workspace.id,
+      taskId: task.id,
+      sessionId: session.id,
+    });
+    await expect(agentTools.resolveInputContext({ ...valid.input, workspaceId: "spoofed" }, valid.toolName)).rejects.toThrow("workspaceId does not match");
+    await expect(agentTools.resolveInputContext({ ...valid.input, taskId: "spoofed" }, valid.toolName)).rejects.toThrow("taskId does not match");
+    await expect(agentTools.resolveInputContext({ ...valid.input, sessionId: "unknown" }, valid.toolName)).rejects.toThrow("Chrona-owned");
+
+    await db.run.update({ where: { id: "run-capability" }, data: { status: "Completed" } });
+    await expect(agentTools.resolveInputContext(valid.input, valid.toolName)).rejects.toThrow("no longer owns an active run");
+  });
+
   it("replays duplicate mutating operations without duplicate side effects", async () => {
     const agentTools = service();
     const operation = {
@@ -878,6 +1045,142 @@ describe("agent tool operations service", () => {
       reasonCode: "DUPLICATE_OPERATION",
       idempotency: "replayed",
     });
+  });
+
+  it("persists completed mutation replay across service restarts and concurrent claims", async () => {
+    const workspace = await db.workspace.create({
+      data: { id: "workspace-replay", name: "Replay Workspace", status: "Active", defaultRuntime: "hermes" },
+    });
+    const task = await db.task.create({
+      data: {
+        id: "task-replay",
+        workspaceId: workspace.id,
+        title: "Replay task",
+        status: "Running",
+        priority: "Medium",
+        executionRuntime: "hermes",
+        executionConfig: {},
+      },
+    });
+    const session = await db.taskSession.create({
+      data: {
+        id: "session-replay",
+        taskId: task.id,
+        runtimeName: "hermes",
+        sessionKey: "replay-session",
+        status: "running",
+        activeRunId: "run-replay",
+        capabilityScope: "plan_execution",
+        allowedToolNames: JSON.stringify(["chrona.task.update"]),
+      },
+    });
+    await db.run.create({
+      data: {
+        id: "run-replay",
+        taskId: task.id,
+        taskSessionId: session.id,
+        runtimeName: "hermes",
+        status: "Running",
+        triggeredBy: "agent",
+      },
+    });
+    const operation = {
+      toolName: "chrona.task.update" as const,
+      input: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        sessionId: session.id,
+        actorType: "agent" as const,
+        idempotencyKey: "restart-key",
+        payload: { title: "Updated" },
+      },
+    };
+    const first = service();
+    await expect(first.execute(operation)).resolves.toMatchObject({ status: "accepted" });
+    await expect(service().execute(operation)).resolves.toMatchObject({
+      status: "noop",
+      reasonCode: "DUPLICATE_OPERATION",
+      idempotency: "replayed",
+    });
+    expect(await db.agentToolMutation.count({ where: { idempotencyKey: "restart-key" } })).toBe(1);
+
+    const concurrentOperation = {
+      ...operation,
+      input: { ...operation.input, idempotencyKey: "concurrent-key" },
+    };
+    const [left, right] = await Promise.all([service().execute(concurrentOperation), service().execute(concurrentOperation)]);
+    expect([left.status, right.status]).toContain("accepted");
+    expect([left.status, right.status]).toContain("noop");
+    expect([left.idempotency, right.idempotency]).toContain("replayed");
+    expect(await db.agentToolMutation.count({ where: { idempotencyKey: "concurrent-key" } })).toBe(1);
+  });
+
+  it("bounds duplicate waits when a persisted mutation owner never records a terminal result", async () => {
+    const workspace = await db.workspace.create({
+      data: { id: "workspace-stuck", name: "Stuck Workspace", status: "Active", defaultRuntime: "hermes" },
+    });
+    const task = await db.task.create({
+      data: {
+        id: "task-stuck",
+        workspaceId: workspace.id,
+        title: "Stuck task",
+        status: "Running",
+        priority: "Medium",
+        executionRuntime: "hermes",
+        executionConfig: {},
+      },
+    });
+    const session = await db.taskSession.create({
+      data: {
+        id: "session-stuck",
+        taskId: task.id,
+        runtimeName: "hermes",
+        sessionKey: "stuck-session",
+        status: "running",
+        activeRunId: "run-stuck",
+        capabilityScope: "plan_execution",
+        allowedToolNames: JSON.stringify(["chrona.task.update"]),
+      },
+    });
+    await db.run.create({
+      data: {
+        id: "run-stuck",
+        taskId: task.id,
+        taskSessionId: session.id,
+        runtimeName: "hermes",
+        status: "Running",
+        triggeredBy: "agent",
+      },
+    });
+    await db.agentToolMutation.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        taskSessionId: session.id,
+        runId: "run-stuck",
+        taskScopeKey: task.id,
+        taskSessionScopeKey: session.id,
+        runScopeKey: "run-stuck",
+        nodeScopeKey: "",
+        toolName: "chrona.task.update",
+        idempotencyKey: "stuck-key",
+      },
+    });
+
+    const startedAt = performance.now();
+    const result = await service().execute({
+      toolName: "chrona.task.update",
+      input: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        sessionId: session.id,
+        actorType: "agent",
+        idempotencyKey: "stuck-key",
+        payload: { title: "Updated" },
+      },
+    });
+    expect(result).toMatchObject({ status: "rejected", reasonCode: "CONFLICT" });
+    expect(performance.now() - startedAt).toBeLessThan(1_000);
   });
 
   it("maps engine failures to structured rejection reason codes", async () => {

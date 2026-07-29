@@ -65,6 +65,7 @@ function createHarness(overrides: Partial<TaskOrchestratorOptions> = {}) {
 describe("default task orchestrator workers", () => {
   it("includes due scheduled work in the production worker set", () => {
     expect(createDefaultTaskOrchestratorWorkers().map((worker) => worker.name)).toEqual([
+      "event-retention",
       "restart-recovery",
       "due-scheduled-work",
       "due-auto-plan-generation",
@@ -128,19 +129,26 @@ describe("task orchestrator lifecycle", () => {
 
   it("does not re-enter while a tick is in flight", async () => {
     let resolveWorker!: () => void;
+    let signalWorkerStarted!: () => void;
     const pending = new Promise<void>((resolve) => { resolveWorker = resolve; });
-    const { orchestrator, worker } = createHarness({
-      workers: [{ name: "slow-worker", run: mock(async () => { await pending; }) }],
+    const workerStarted = new Promise<void>((resolve) => { signalWorkerStarted = resolve; });
+    const worker = mock(async () => {
+      signalWorkerStarted();
+      await pending;
+    });
+    const { orchestrator } = createHarness({
+      workers: [{ name: "slow-worker", run: worker }],
     });
 
     const firstTick = orchestrator.tick();
-    await Promise.resolve();
-    await orchestrator.tick();
+    await workerStarted;
+    const reenteredTick = orchestrator.tick();
 
-    expect(worker).not.toHaveBeenCalled();
+    expect(reenteredTick).toBe(firstTick);
+    expect(worker).toHaveBeenCalledTimes(1);
 
     resolveWorker();
-    await firstTick;
+    await Promise.all([firstTick, reenteredTick]);
   });
 
   it("runs workers registered after startup", async () => {
@@ -179,6 +187,25 @@ describe("task orchestrator lifecycle", () => {
 
     expect(orchestrator.isRunning()).toBe(false);
     expect(clearedHandles).toHaveLength(1);
+    expect(leaseRepository.release).toHaveBeenCalledWith(config.leaseName, config.leaseOwnerId);
+  });
+
+  it("waits for an active tick before releasing its lease", async () => {
+    let resolveWorker!: () => void;
+    const pendingWorker = new Promise<void>((resolve) => { resolveWorker = resolve; });
+    const { leaseRepository, orchestrator } = createHarness({
+      workers: [{ name: "pending-worker", run: async () => pendingWorker }],
+    });
+
+    orchestrator.start();
+    const tick = orchestrator.tick();
+    await Promise.resolve();
+    const stop = orchestrator.stop();
+
+    expect(leaseRepository.release).not.toHaveBeenCalled();
+    resolveWorker();
+    await Promise.all([tick, stop]);
+
     expect(leaseRepository.release).toHaveBeenCalledWith(config.leaseName, config.leaseOwnerId);
   });
 });

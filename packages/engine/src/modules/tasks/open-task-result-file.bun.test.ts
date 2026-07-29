@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { beforeEach, describe, expect, it } from "bun:test";
 import { db } from "@/lib/db";
-import { resetTestDb, seedTask, seedWorkspace } from "../../../../../apps/server/src/__tests__/bun-test-helpers";
+import { resetTestDb, seedTask, seedWorkspace } from "@chrona/db/test-support";
 import { generatedFilesRoot } from "./result-file-access";
 import { openTaskResultFile } from "./open-task-result-file";
 import { aiArtifactRef } from "../plan-execution/use-cases/register-generated-plan-output-artifacts";

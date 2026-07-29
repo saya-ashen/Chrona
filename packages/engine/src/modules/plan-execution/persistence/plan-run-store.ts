@@ -63,6 +63,7 @@ type SavedPlanRunState = {
   executionOwnerScope: string | null;
   executionLeaseUntil: Date | null;
   executionEpoch: number;
+  executionCommandKey: string | null;
 };
 
 function createEmptyPlanRun(compiledPlan: CompiledPlan): PlanRun {
@@ -100,6 +101,7 @@ async function loadCompiledPlanForRun(taskId: string, planId: string, workBlockI
 
   return (row?.compiledPlan as CompiledPlan | undefined) ?? null;
 }
+
 
 function toPersistedPlanRunRecord(input: {
   existing?: PersistedPlanRunRecord | null;
@@ -169,11 +171,14 @@ export async function savePlanRun(input: {
   executionContextSnapshots?: ExecutionContextSnapshot[];
   planOutput?: PlanOutputState;
 }): Promise<PlanRun> {
-  const existingRow = await db.taskPlanRun.findFirst({
+  const scopeKey = input.workBlockId ?? "";
+  const existingRow = await db.taskPlanRun.findUnique({
     where: {
-      taskId: input.taskId,
-      planId: input.planId,
-      workBlockId: input.workBlockId ?? null,
+      taskId_planId_workBlockScopeKey: {
+        taskId: input.taskId,
+        planId: input.planId,
+        workBlockScopeKey: scopeKey,
+      },
     },
   });
 
@@ -195,30 +200,30 @@ export async function savePlanRun(input: {
   const occurrence = input.workBlockId
     ? await db.taskOccurrence.findUnique({ where: { workBlockId: input.workBlockId }, select: { id: true } })
     : null;
-  const runData = {
-    workspaceId: input.workspaceId,
-    taskId: input.taskId,
-    workBlockId: input.workBlockId ?? null,
-    occurrenceId: occurrence?.id ?? null,
-    planId: input.planId,
-    planRun: asJsonValue(persistedRecord),
-  };
-
-  if (existingRow) {
-    await db.taskPlanRun.update({
-      where: { id: existingRow.id },
-      data: {
-        workspaceId: input.workspaceId,
-        workBlockId: input.workBlockId ?? null,
-        occurrenceId: occurrence?.id ?? null,
-        planRun: asJsonValue(persistedRecord),
+  await db.taskPlanRun.upsert({
+    where: {
+      taskId_planId_workBlockScopeKey: {
+        taskId: input.taskId,
+        planId: input.planId,
+        workBlockScopeKey: scopeKey,
       },
-    });
-  } else {
-    await db.taskPlanRun.create({
-      data: runData,
-    });
-  }
+    },
+    update: {
+      workspaceId: input.workspaceId,
+      workBlockId: input.workBlockId ?? null,
+      occurrenceId: occurrence?.id ?? null,
+      planRun: asJsonValue(persistedRecord),
+    },
+    create: {
+      workspaceId: input.workspaceId,
+      taskId: input.taskId,
+      workBlockId: input.workBlockId ?? null,
+      workBlockScopeKey: scopeKey,
+      occurrenceId: occurrence?.id ?? null,
+      planId: input.planId,
+      planRun: asJsonValue(persistedRecord),
+    },
+  });
 
   return persistedRecord.planRun;
 }
@@ -244,11 +249,13 @@ export async function savePlanRunGuarded(input: {
   executionContextSnapshots: ExecutionContextSnapshot[];
   planOutput?: PlanOutputState;
 }): Promise<{ committed: boolean; planRun: PlanRun }> {
-  const existingRow = await db.taskPlanRun.findFirst({
+  const existingRow = await db.taskPlanRun.findUnique({
     where: {
-      taskId: input.taskId,
-      planId: input.planId,
-      workBlockId: input.workBlockId ?? null,
+      taskId_planId_workBlockScopeKey: {
+        taskId: input.taskId,
+        planId: input.planId,
+        workBlockScopeKey: input.workBlockId ?? "",
+      },
     },
   });
   if (!existingRow) {
@@ -290,16 +297,49 @@ export async function savePlanRunGuarded(input: {
   return { committed: updated.count > 0, planRun: persistedRecord.planRun };
 }
 
+/**
+ * Claims the persisted runtime epoch before a command causes any observable
+ * effect. Only the connection that advances the epoch may run callbacks or
+ * dispatch a provider; stale and duplicate keys exit before those effects.
+ */
+export async function claimPlanRunCommand(input: {
+  taskId: string;
+  planId: string;
+  workBlockId?: string | null;
+  expectedEpoch: number;
+  commandKey: string;
+}) {
+  const claimed = await db.taskPlanRun.updateMany({
+    where: {
+      taskId: input.taskId,
+      planId: input.planId,
+      workBlockScopeKey: input.workBlockId ?? "",
+      executionEpoch: input.expectedEpoch,
+      OR: [
+        { executionCommandKey: null },
+        { executionCommandKey: { not: input.commandKey } },
+      ],
+    },
+    data: {
+      executionEpoch: input.expectedEpoch + 1,
+      executionCommandKey: input.commandKey,
+    },
+  });
+  return claimed.count === 1;
+}
+
 export async function getPlanRun(
   taskId: string,
   planId: string,
   workBlockId?: string | null,
 ): Promise<SavedPlanRunState | null> {
-  const row = await db.taskPlanRun.findFirst({
+  const row = await db.taskPlanRun.findUnique({
     where: {
-      taskId,
-      planId,
-      workBlockId: workBlockId ?? null,
+      taskId_planId_workBlockScopeKey: {
+        taskId,
+        planId,
+        workBlockScopeKey: workBlockId ?? "",
+      },
     },
   });
 
@@ -322,6 +362,7 @@ export async function getPlanRun(
       executionOwnerId: row.executionOwnerId,
       executionOwnerScope: row.executionOwnerScope,
       executionLeaseUntil: row.executionLeaseUntil,
+      executionCommandKey: row.executionCommandKey,
       executionEpoch: row.executionEpoch,
     };
   }
@@ -339,6 +380,7 @@ export async function getPlanRun(
       executionOwnerId: row.executionOwnerId,
       executionOwnerScope: row.executionOwnerScope,
       executionLeaseUntil: row.executionLeaseUntil,
+      executionCommandKey: row.executionCommandKey,
       executionEpoch: row.executionEpoch,
     };
   }
@@ -376,6 +418,7 @@ export async function getPlanRun(
     executionOwnerId: row.executionOwnerId,
     executionOwnerScope: row.executionOwnerScope,
     executionLeaseUntil: row.executionLeaseUntil,
+    executionCommandKey: row.executionCommandKey,
     executionEpoch: row.executionEpoch,
   };
 }

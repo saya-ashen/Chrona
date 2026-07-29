@@ -5,9 +5,9 @@ import { beforeEach, describe, expect, it } from "bun:test";
 import { Hono } from "hono";
 import { RunStatus, TaskStatus } from "@chrona/db/generated/prisma/client";
 import { db } from "@chrona/db";
-import { acceptTaskResult } from "@chrona/engine/modules/tasks/accept-task-result";
-import { markTaskDone } from "@chrona/engine/modules/tasks/mark-task-done";
-import { reopenTask } from "@chrona/engine/modules/tasks/reopen-task";
+import { acceptTaskResult } from "@chrona/engine/test-support";
+import { markTaskDone } from "@chrona/engine/test-support";
+import { reopenTask } from "@chrona/engine/test-support";
 import { resetTestDb, seedWorkspace, seedTask, json } from "../../__tests__/bun-test-helpers";
 
 function createClosureRouter() {

@@ -27,12 +27,17 @@ jobs:
       # Trusted workspace lifecycle scripts generate Prisma and native runtime artifacts.
       - run: bun install --frozen-lockfile # NOSONAR
 
+      - name: Audit high and critical dependencies
+        run: bun run audit:security
+
       - run: bunx prisma@7.8.0 generate
 
       - run: bunx prisma@7.8.0 db push
         env:
           DATABASE_URL: "file:./prisma/dev.db"
 
+      - name: Smoke documented development entrypoints
+        run: bun run smoke:entrypoints
       - run: bun run check
       - name: Install Chromium for result export tests
         run: sudo apt-get update && sudo apt-get install --yes chromium-browser

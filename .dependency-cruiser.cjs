@@ -24,9 +24,9 @@ function featureNames() {
     .map((entry) => entry.name);
 }
 
-const FEATURE_PUBLIC_ENTRYPOINT = "^features/[^/]+/(index|ui|server|test)\\.ts$";
-const FEATURE_BROWSER_ENTRYPOINT = "^features/[^/]+/(index|ui)\\.ts$";
-const FEATURE_SERVER_ENTRYPOINT = "^features/[^/]+/(index|server)\\.ts$";
+const FEATURE_PUBLIC_ENTRYPOINT = "^features/[^/]+/(?:(?:index|ui|server|test)\\.ts|public/[^/]+\\.ts)$";
+const FEATURE_BROWSER_ENTRYPOINT = "^features/[^/]+/(?:(?:index|ui)\\.ts|public/[^/]+\\.ts)$";
+const FEATURE_SERVER_ENTRYPOINT = "^features/[^/]+/(?:(?:index|server)\\.ts|public/[^/]+\\.ts)$";
 const FEATURE_PUBLIC_IMPORT_RULES = featureNames().map((feature) => ({
   name: `feature-${feature}-internals-are-private`,
   comment:
@@ -35,7 +35,7 @@ const FEATURE_PUBLIC_IMPORT_RULES = featureNames().map((feature) => ({
   from: { path: `^features/(?!${feature}/)[^/]+/` },
   to: {
     path: `^features/${feature}/`,
-    pathNot: `^features/${feature}/(index|ui|server|test)\\.ts$`,
+    pathNot: `^features/${feature}/(?:(?:index|ui|server|test)\.ts|public/[^/]+\.ts)$`,
   },
 }));
 
@@ -49,15 +49,15 @@ const BROWSER_FORBIDDEN_DEPENDENCIES =
 /** A package's public entry points (barrels). Importing anything else in the
  *  package from the outside is a boundary violation. */
 const ENGINE_PUBLIC = "^packages/engine/src/(index|engine)\\.ts$";
+const ENGINE_TEST_PUBLIC = "^packages/engine/src/(index|engine|test-support)\\.ts$";
 const DB_INTERNAL = "^packages/db/src/(generated/|db\\.ts$)";
 
 module.exports = {
   forbidden: [
     {
       name: "no-circular",
-      comment:
-        "Circular dependencies should be avoided. Remaining cycles are intra-package type-only debt; do not add new ones.",
-      severity: "warn",
+      comment: "Circular dependencies are prohibited; dependency-cruiser fails every cycle.",
+      severity: "error",
       from: {},
       to: { circular: true },
     },
@@ -184,7 +184,7 @@ module.exports = {
       },
       to: {
         path: "^packages/engine/src/",
-        pathNot: ENGINE_PUBLIC,
+        pathNot: ENGINE_TEST_PUBLIC,
       },
     },
 

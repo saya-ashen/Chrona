@@ -4,7 +4,7 @@ import { db } from "@chrona/db";
 import { Hono } from "hono";
 import { createChronaEngine } from "@chrona/engine";
 import { createApiRouter } from "../../routes/api";
-import { getTaskPage } from "@chrona/engine/modules/tasks/get-task-page";
+import { getTaskPage } from "@chrona/engine/test-support";
 import { json, resetTestDb, seedScheduleProposal, seedTask, seedWorkspace } from "../bun-test-helpers";
 
 function app() {

@@ -24,29 +24,30 @@ import {
   agentControlActionPayloadSchemas,
   type AgentControlActionBody,
 } from "@chrona/contracts/api";
-import type {
-  AgentProviderClient,
-  CancelRunInput,
-  CreateSessionInput,
-  GetRunInput,
-  HealthCheckInput,
-  ProviderCapabilities,
-  ProviderConfigurationCapabilities,
-  ProviderRuntimeDiagnostics,
-  ProviderConversationCapabilities,
-  ProviderConversationState,
-  ProviderConversationHandoffInput,
-  ProviderConversationHandoffResult,
-  ProviderConversationTurnInput,
-  ProviderConversationTurnResult,
-  ProviderRunEvent,
-  ProviderRunInput,
-  ProviderRunRef,
-  ProviderRunSnapshot,
-  ProviderRunStatus,
-  ProviderSessionRef,
-  StartRunInput,
-  StreamRunInput,
+import {
+  BoundedTerminalRunSnapshots,
+  type AgentProviderClient,
+  type CancelRunInput,
+  type CreateSessionInput,
+  type GetRunInput,
+  type HealthCheckInput,
+  type ProviderCapabilities,
+  type ProviderConfigurationCapabilities,
+  type ProviderRuntimeDiagnostics,
+  type ProviderConversationCapabilities,
+  type ProviderConversationState,
+  type ProviderConversationHandoffInput,
+  type ProviderConversationHandoffResult,
+  type ProviderConversationTurnInput,
+  type ProviderConversationTurnResult,
+  type ProviderRunEvent,
+  type ProviderRunInput,
+  type ProviderRunRef,
+  type ProviderRunSnapshot,
+  type ProviderRunStatus,
+  type ProviderSessionRef,
+  type StartRunInput,
+  type StreamRunInput,
 } from "@chrona/providers-foundation";
 import type { OmpProviderConfig } from "./types";
 
@@ -588,6 +589,7 @@ export class OmpSdkProviderClient implements AgentProviderClient {
   readonly provider = PROVIDER;
   private readonly config: OmpProviderConfig;
   private readonly runs = new Map<string, SdkRunHandle>();
+  private readonly terminalSnapshots = new BoundedTerminalRunSnapshots();
 
   constructor(opts: OmpSdkProviderOptions = {}) {
     this.config = opts.config ?? {};
@@ -903,7 +905,25 @@ export class OmpSdkProviderClient implements AgentProviderClient {
 
   async getRun(input: GetRunInput): Promise<ProviderRunSnapshot> {
     const handle = this.runs.get(input.runId);
-    if (!handle) throw new Error(`getRun: unknown OMP SDK runId "${input.runId}"`);
+    if (handle) return this.snapshot(handle);
+    const snapshot = this.terminalSnapshots.get(input.runId);
+    if (snapshot) return snapshot;
+    throw new Error(`getRun: unknown OMP SDK runId "${input.runId}"`);
+  }
+
+  async cancelRun(input: CancelRunInput): Promise<ProviderRunSnapshot> {
+    const handle = this.runs.get(input.runId);
+    if (!handle) throw new Error(`cancelRun: unknown OMP SDK runId "${input.runId}"`);
+    const queue = new AsyncEventQueue(handle);
+    handle.status = "cancelled";
+    handle.abort.abort();
+    handle.session?.abort();
+    queue.push({ ...eventBase(handle, "cancelled"), type: "run_cancelled", run: runRef(handle, "cancelled") });
+    await this.finish(handle, queue);
+    return this.snapshot(handle);
+  }
+
+  private snapshot(handle: SdkRunHandle): ProviderRunSnapshot {
     return {
       provider: PROVIDER,
       runId: handle.ref.runId,
@@ -919,18 +939,6 @@ export class OmpSdkProviderClient implements AgentProviderClient {
       error: handle.error ?? null,
       raw: { mode: "sdk" },
     };
-  }
-
-  async cancelRun(input: CancelRunInput): Promise<ProviderRunSnapshot> {
-    const handle = this.runs.get(input.runId);
-    if (!handle) throw new Error(`cancelRun: unknown OMP SDK runId "${input.runId}"`);
-    const queue = new AsyncEventQueue(handle);
-    handle.status = "cancelled";
-    handle.abort.abort();
-    handle.session?.abort();
-    queue.push({ ...eventBase(handle, "cancelled"), type: "run_cancelled", run: runRef(handle, "cancelled") });
-    this.finish(handle, queue);
-    return this.getRun({ runId: input.runId, sessionId: input.sessionId });
   }
 
   private async startSdkTurn(handle: SdkRunHandle, queue: AsyncEventQueue) {
@@ -1150,7 +1158,7 @@ export class OmpSdkProviderClient implements AgentProviderClient {
     this.finish(handle, queue);
   }
 
-  private finish(handle: SdkRunHandle, queue: AsyncEventQueue) {
+  private async finish(handle: SdkRunHandle, queue: AsyncEventQueue): Promise<void> {
     if (handle.done) return;
     handle.done = true;
     clearTimeout(handle.timer);
@@ -1158,7 +1166,13 @@ export class OmpSdkProviderClient implements AgentProviderClient {
       handle.input.signal.removeEventListener("abort", handle.inputAbortListener);
     }
     handle.unsubscribe?.();
-    handle.session?.dispose();
+    this.runs.delete(handle.ref.runId);
+    this.terminalSnapshots.set(this.snapshot(handle));
+    try {
+      await handle.session?.dispose();
+    } catch (error) {
+      console.error("OMP SDK session disposal failed", error);
+    }
     queue.push({ type: "end" });
   }
 }

@@ -4,7 +4,7 @@ import { db } from "@chrona/db";
 import type { ConversationEntry, Event, Run } from "@chrona/db/generated/prisma/client";
 import { createChronaEngine } from "@chrona/engine";
 import { aiClientRegistry } from "../../../../../features/ai-clients/server";
-import { saveCompiledPlan } from "@chrona/engine/modules/plan-execution/persistence/compiled-plan-store";
+import { saveCompiledPlan } from "@chrona/engine/test-support";
 import type {
   AgentProviderClient,
   ProviderCapabilities,

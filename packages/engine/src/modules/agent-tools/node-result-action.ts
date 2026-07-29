@@ -2,12 +2,15 @@ import type {
   AgentControlActionBody,
   ChronaToolName,
   ChronaToolOperation,
+  ExecutionActionInput,
   NodeDeliverableDeclaration,
   ResultContribution,
 } from "@chrona/contracts";
-import type { AgentToolOperationsDeps } from "./types";
 
-export type SubmitNodeResultAction = Parameters<AgentToolOperationsDeps["execution"]["submitNodeResult"]>[0]["action"];
+export type SubmitNodeResultAction = Extract<
+  ExecutionActionInput,
+  { action: "complete_manual_node" | "block_current_node" | "fail_current_node" }
+>;
 
 export function submitNodeResultActionFromTool(input: {
   toolName: ChronaToolName;

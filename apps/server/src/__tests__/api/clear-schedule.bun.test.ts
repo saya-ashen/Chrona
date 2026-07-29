@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "bun:test";
 import { db } from "@chrona/db";
-import { clearSchedule } from "@chrona/engine/modules/scheduling/clear-schedule";
+import { clearSchedule } from "@chrona/engine/test-support";
 import { resetTestDb, seedTask, seedWorkspace } from "../bun-test-helpers";
 
 // clearSchedule — engine-layer unit for the schedule-clear primitive.

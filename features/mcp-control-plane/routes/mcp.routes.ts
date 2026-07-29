@@ -18,6 +18,35 @@ import {
   type ChronaToolResult,
 } from "@chrona/contracts";
 
+const MAX_MCP_TRANSPORT_SESSIONS = 100;
+const MCP_TRANSPORT_IDLE_TTL_MS = 10 * 60 * 1_000;
+type ManagedTransport = {
+  transport: WebStandardStreamableHTTPServerTransport;
+  lastActivityAt: number;
+};
+
+function closeManagedTransport(
+  transports: Map<string, ManagedTransport>,
+  sessionId: string,
+  reason: "idle" | "closed" | "aborted" | "capacity",
+) {
+  const entry = transports.get(sessionId);
+  if (!entry) return;
+  transports.delete(sessionId);
+  logger.info("mcp.transport.closed", { sessionId, reason, activeSessions: transports.size });
+  void entry.transport.close().catch((cause: unknown) => {
+    logger.warn("mcp.transport.close_failed", { sessionId, reason, error: cause instanceof Error ? cause.message : String(cause) });
+  });
+}
+
+function evictExpiredTransports(transports: Map<string, ManagedTransport>, now = Date.now()) {
+  for (const [sessionId, entry] of transports) {
+    if (now - entry.lastActivityAt > MCP_TRANSPORT_IDLE_TTL_MS) {
+      closeManagedTransport(transports, sessionId, "idle");
+    }
+  }
+}
+
 
 type ExternalChronaToolName = keyof typeof externalTools;
 
@@ -133,20 +162,49 @@ function sessionIdFrom(
   extra?: RequestHandlerExtra<ServerRequest, ServerNotification>,
   requestSessionId?: string,
 ) {
-  const meta = input._meta && typeof input._meta === "object" ? input._meta as Record<string, unknown> : undefined;
-  const extraMeta = extra?._meta as Record<string, unknown> | undefined;
-  assertNoSnakeSessionId(input, "arguments");
-  if (meta) assertNoSnakeSessionId(meta, "arguments._meta");
-  if (extraMeta) assertNoSnakeSessionId(extraMeta, "extra._meta");
-  assertValidSessionId(requestSessionId, "request.session_id");
-  assertValidSessionId(input.sessionId, "arguments.sessionId");
-  assertValidSessionId(meta?.sessionId, "arguments._meta.sessionId");
-  assertValidSessionId(extraMeta?.sessionId, "extra._meta.sessionId");
-  assertValidSessionId(extra?.sessionId, "extra.sessionId");
-  const sessionId = requestSessionId ?? (typeof input.sessionId === "string"
-    ? input.sessionId
-    : meta?.sessionId ?? extraMeta?.sessionId ?? extra?.sessionId);
+  const meta = objectRecord(input._meta);
+  const extraMeta = objectRecord(extra?._meta);
+  assertNoSnakeSessionIds([
+    [input, "arguments"],
+    [meta, "arguments._meta"],
+    [extraMeta, "extra._meta"],
+  ]);
+  assertValidSessionIds([
+    [requestSessionId, "request.session_id"],
+    [input.sessionId, "arguments.sessionId"],
+    [meta?.sessionId, "arguments._meta.sessionId"],
+    [extraMeta?.sessionId, "extra._meta.sessionId"],
+    [extra?.sessionId, "extra.sessionId"],
+  ]);
+  const sessionId = requestSessionId ?? sessionIdFromInput(input, meta, extraMeta, extra);
   return typeof sessionId === "string" && sessionId.length > 0 ? sessionId : undefined;
+}
+
+function objectRecord(value: unknown): Record<string, unknown> | undefined {
+  if (value && typeof value === "object") return value as Record<string, unknown>;
+  return undefined;
+}
+
+function assertNoSnakeSessionIds(sources: readonly (readonly [Record<string, unknown> | undefined, string])[]) {
+  for (const [input, source] of sources) {
+    if (input) assertNoSnakeSessionId(input, source);
+  }
+}
+
+function assertValidSessionIds(sources: readonly (readonly [unknown, string])[]) {
+  for (const [value, source] of sources) {
+    assertValidSessionId(value, source);
+  }
+}
+
+function sessionIdFromInput(
+  input: Record<string, unknown>,
+  meta: Record<string, unknown> | undefined,
+  extraMeta: Record<string, unknown> | undefined,
+  extra: RequestHandlerExtra<ServerRequest, ServerNotification> | undefined,
+) {
+  if (typeof input.sessionId === "string") return input.sessionId;
+  return meta?.sessionId ?? extraMeta?.sessionId ?? extra?.sessionId;
 }
 
 function assertNoSnakeSessionId(input: Record<string, unknown>, source: string) {
@@ -273,67 +331,20 @@ function toChronaInput(
   };
 }
 
-const planGenerationTools = new Set<ChronaToolName>([
-  "chrona.plan.generate",
-  "chrona.plan.read",
-  "chrona.goal.results.read",
-]);
 
-const executionTools = new Set<ChronaToolName>([
-  "chrona.execution.read",
-  "chrona.plan.read",
-  "chrona.goal.results.read",
-  "chrona.node.read",
-  "chrona.node.complete",
-  "chrona.node.condition_select",
-  "chrona.node.block",
-  "chrona.node.fail",
-  "chrona.node.wait_complete",
-]);
-
-const dashboardBriefTools = new Set<ChronaToolName>([
-  "chrona.dashboard.brief",
-]);
-
-function toolSessionPurpose(sessionId?: string | null): "plan_generation" | "execution" | "dashboard_brief" | "unknown" {
-  if (!sessionId) return "unknown";
-  if (sessionId.includes(":dashboard.brief:")) return "dashboard_brief";
-  if (
-    sessionId.endsWith(":pg") ||
-    sessionId.endsWith(":plan-graph") ||
-    sessionId.endsWith(":plan-generation")
-  ) {
-    return "plan_generation";
-  }
-  if (
-    sessionId.includes(":work-block:") ||
-    sessionId.includes(":execute:") ||
-    sessionId.endsWith(":execute") ||
-    sessionId.includes(":plan-")
-  ) {
-    return "execution";
-  }
-  return "unknown";
-}
-
-function isToolAllowedForSession(toolName: ChronaToolName, sessionId?: string | null): boolean {
-  const purpose = toolSessionPurpose(sessionId);
-  if (purpose === "plan_generation") return planGenerationTools.has(toolName);
-  if (purpose === "execution") return executionTools.has(toolName);
-  if (purpose === "dashboard_brief") return dashboardBriefTools.has(toolName);
+function isToolAllowedForSession(toolName: ChronaToolName): boolean {
   return toolName.endsWith(".read");
 }
 
-function toolNotAllowedResult(toolName: ChronaToolName, sessionId?: string | null): CallToolResult {
-  const purpose = toolSessionPurpose(sessionId);
-  const message = `${toolName} is not allowed for ${purpose} session.`;
+function toolNotAllowedResult(toolName: ChronaToolName): CallToolResult {
+  const message = `${toolName} requires a persisted active capability session.`;
   return {
     content: [{ type: "text", text: message }],
     structuredContent: {
       status: "rejected",
       message,
       reasonCode: "UNAUTHORIZED",
-      recovery: { action: purpose === "plan_generation" ? "stop" : "use_allowed_tool" },
+      recovery: { action: "use_allowed_tool" },
     },
     isError: true,
   };
@@ -347,50 +358,20 @@ async function callChronaTool(
   requestSessionId?: string,
 ): Promise<CallToolResult> {
   const chronaInput = toChronaInput(toolName, input, extra, requestSessionId);
-  logger.info("tool.call.received", {
-    toolName,
-    externalSessionId: sessionIdFrom(input, extra, requestSessionId) ?? null,
-    inputSessionId: typeof input.sessionId === "string" ? input.sessionId : null,
-    inputMetaSessionId: input._meta && typeof input._meta === "object"
-      ? (input._meta as Record<string, unknown>).sessionId ?? null
-      : null,
-    extraSessionId: extra?.sessionId ?? null,
-    extraMetaSessionId: extra?._meta && typeof extra._meta === "object"
-      ? (extra._meta as Record<string, unknown>).sessionId ?? null
-      : null,
-    requestSessionId: requestSessionId ?? null,
-    payloadKeys: Object.keys(input).filter((key) => key !== "_meta"),
-  });
-  const resolvedInput = "resolveInputContext" in engine.agentTools
-    ? await engine.agentTools.resolveInputContext(chronaInput)
-    : chronaToolInputSchema.parse(chronaInput);
-  if (!isToolAllowedForSession(toolName, resolvedInput.sessionId)) {
-    logger.warn("tool.call.rejected_by_session_policy", {
-      toolName,
-      sessionId: resolvedInput.sessionId ?? null,
-      purpose: toolSessionPurpose(resolvedInput.sessionId),
-    });
-    return toolNotAllowedResult(toolName, resolvedInput.sessionId);
+  let resolvedInput;
+  try {
+    resolvedInput = "resolveInputContext" in engine.agentTools
+      ? await engine.agentTools.resolveInputContext(chronaInput, toolName)
+      : chronaToolInputSchema.parse(chronaInput);
+  } catch (cause) {
+    const message = cause instanceof Error ? cause.message : "Chrona rejected the mutation session.";
+    logger.warn("tool.call.rejected_by_session_policy", { toolName, message });
+    return toolNotAllowedResult(toolName);
   }
-  logger.info("tool.call.resolved", {
-    toolName,
-    sessionId: resolvedInput.sessionId ?? null,
-    taskId: resolvedInput.taskId ?? null,
-    workspaceId: resolvedInput.workspaceId ?? null,
-    hasIdempotencyKey: Boolean(resolvedInput.idempotencyKey),
-  });
-  const result = await engine.agentTools.execute({
-    toolName,
-    input: resolvedInput,
-  });
-  logger.info("tool.call.result", {
-    toolName,
-    sessionId: resolvedInput.sessionId ?? null,
-    taskId: resolvedInput.taskId ?? null,
-    status: result.status,
-    reasonCode: "reasonCode" in result ? result.reasonCode : undefined,
-    message: result.message,
-  });
+  if (!isToolAllowedForSession(toolName) && !resolvedInput.sessionId) {
+    return toolNotAllowedResult(toolName);
+  }
+  const result = await engine.agentTools.execute({ toolName, input: resolvedInput });
   return {
     content: [{ type: "text", text: aiVisibleToolText(result) }],
     structuredContent: aiVisibleToolResult(toolName, result),
@@ -435,13 +416,27 @@ export const __mcpRouteTestHooks = {
 };
 
 export function createMcpRoutes(engine: ChronaEngine) {
-  const transports = new Map<string, WebStandardStreamableHTTPServerTransport>();
+  const app = new Hono();
+  const transports = new Map<string, ManagedTransport>();
 
-  return new Hono().all("/mcp", async (c) => {
+  app.all("/mcp", async (c) => {
+    evictExpiredTransports(transports);
     const mcpSessionId = c.req.header("mcp-session-id");
     const existingTransport = mcpSessionId ? transports.get(mcpSessionId) : undefined;
     if (existingTransport) {
-      return existingTransport.handleRequest(c.req.raw);
+      existingTransport.lastActivityAt = Date.now();
+      if (c.req.raw.signal.aborted) {
+        closeManagedTransport(transports, mcpSessionId!, "aborted");
+        return c.body(null, 408);
+      }
+      return existingTransport.transport.handleRequest(c.req.raw);
+    }
+    if (mcpSessionId) {
+      return c.json({ error: "Unknown or expired MCP session." }, 404);
+    }
+    if (transports.size >= MAX_MCP_TRANSPORT_SESSIONS) {
+      logger.warn("mcp.transport.capacity_rejected", { activeSessions: transports.size, maxSessions: MAX_MCP_TRANSPORT_SESSIONS });
+      return c.json({ error: "MCP transport session capacity reached." }, 503);
     }
 
     const requestSessionId = c.req.query("session_id") ?? c.req.query("sessionId") ?? undefined;
@@ -449,17 +444,23 @@ export function createMcpRoutes(engine: ChronaEngine) {
       enableJsonResponse: true,
       sessionIdGenerator: randomUUID,
       onsessioninitialized: (sessionId) => {
-        transports.set(sessionId, transport);
+        transports.set(sessionId, { transport, lastActivityAt: Date.now() });
+        logger.info("mcp.transport.opened", { sessionId, activeSessions: transports.size });
       },
       onsessionclosed: (sessionId) => {
-        if (sessionId) transports.delete(sessionId);
+        if (sessionId) closeManagedTransport(transports, sessionId, "closed");
       },
     });
     transport.onclose = () => {
-      if (transport.sessionId) transports.delete(transport.sessionId);
+      if (transport.sessionId) closeManagedTransport(transports, transport.sessionId, "closed");
     };
+    const abort = () => {
+      if (transport.sessionId) closeManagedTransport(transports, transport.sessionId, "aborted");
+    };
+    c.req.raw.signal.addEventListener("abort", abort, { once: true });
     const server = createChronaMcpServer(engine, requestSessionId);
     await server.connect(transport);
     return transport.handleRequest(c.req.raw);
   });
+  return app;
 }

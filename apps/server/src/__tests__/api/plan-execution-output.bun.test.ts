@@ -4,7 +4,7 @@ import {
   evaluateConditionNodeCapability,
   executeTaskNodeCapability,
   reviewCheckpointNodeCapability,
-} from "@chrona/engine/modules/plan-execution";
+} from "@chrona/engine/test-support";
 import { aiClientRegistry } from "../../../../../features/ai-clients/server";
 import type { EngineAiClient } from "../../../../../features/ai-clients/server";
 import { db } from "@chrona/db";
@@ -127,9 +127,17 @@ function createMockProviderClient(input: {
       if (!("runId" in request) || !latestRun || request.runId !== latestRun.runId) {
         throw new Error("Mock provider streamRun requires runId");
       }
+      const eventMetadata = {
+        provider: latestRun.provider,
+        runId: latestRun.runId,
+        nativeRunId: latestRun.nativeRunId,
+        sessionId: latestRun.sessionId,
+        sequence: 0,
+      };
       if (input.runStarted === false) {
         yield {
           type: "run_failed" as const,
+          ...eventMetadata,
           run: latestRun,
           error: "provider refused to start",
         };
@@ -137,6 +145,7 @@ function createMockProviderClient(input: {
       }
       yield {
         type: "run_completed" as const,
+        ...eventMetadata,
         run: { ...latestRun, status: "running" as const },
         outputText: input.outputMessages.at(-1) ?? "",
       };
@@ -249,7 +258,7 @@ function createMockHermesClient(input: {
       return {
         provider: "hermes",
         runId: "hermes-run-1",
-        sessionId: request.sessionId,
+        sessionId: request.sessionId ?? "hermes-session-key",
         status: "running",
       };
     },
@@ -258,14 +267,19 @@ function createMockHermesClient(input: {
       if (!("runId" in request) || request.runId !== "hermes-run-1") {
         throw new Error("Mock Hermes streamRun requires runId");
       }
+      const run = {
+        provider: "hermes" as const,
+        runId: "hermes-run-1",
+        sessionId: request.sessionId ?? "hermes-session-key",
+        status: "running" as const,
+      } satisfies ProviderRunRef;
       yield {
+        provider: run.provider,
+        runId: run.runId,
+        sessionId: run.sessionId,
+        sequence: 0,
         type: "run_completed" as const,
-        run: {
-          provider: "hermes",
-          runId: "hermes-run-1",
-          sessionId: "hermes-session-key",
-          status: "running" as const,
-        },
+        run,
         outputText: input.outputContent,
       };
     },
@@ -326,7 +340,7 @@ function createRecoverableHermesClient() {
       return {
         provider: "hermes",
         runId: "hermes-run-recoverable",
-        sessionId: request.sessionId,
+        sessionId: request.sessionId ?? "hermes-session-key",
         status: "running",
       };
     },
@@ -339,14 +353,19 @@ function createRecoverableHermesClient() {
           retryable: true,
         });
       }
+      const run = {
+        provider: "hermes" as const,
+        runId: "hermes-run-recoverable",
+        sessionId: request.sessionId ?? "hermes-session-key",
+        status: "running" as const,
+      } satisfies ProviderRunRef;
       yield {
+        provider: run.provider,
+        runId: run.runId,
+        sessionId: run.sessionId,
+        sequence: 0,
         type: "run_completed" as const,
-        run: {
-          provider: "hermes",
-          runId: "hermes-run-recoverable",
-          sessionId: "hermes-session-key",
-          status: "running" as const,
-        },
+        run,
         outputText: "Recovered from existing Hermes run",
       };
     },
@@ -443,6 +462,13 @@ async function seedFullSetup() {
       runtimeName: "test-provider",
       label: "Main session",
       status: "idle",
+      capabilityScope: "plan_execution",
+      allowedToolNames: JSON.stringify([
+        "chrona.node.complete",
+        "chrona.node.condition_select",
+        "chrona.node.block",
+        "chrona.node.fail",
+      ]),
     },
   });
 
@@ -520,6 +546,42 @@ async function seedFullSetup() {
     failedNodeIds: [],
     pendingNodeIds: [node.id],
   } satisfies EffectivePlanGraph;
+  await db.taskPlan.create({
+    data: {
+      workspaceId,
+      taskId,
+      planId: memory.id,
+      revision: 1,
+      status: "Accepted",
+      compiledPlan: planGraph,
+    },
+  });
+  await db.taskPlanRun.create({
+    data: {
+      workspaceId,
+      taskId,
+      planId: memory.id,
+      workBlockScopeKey: "",
+      planRun: {
+        id: `plan_run_${memory.id}`,
+        compiledPlanId: memory.id,
+        editablePlanId: memory.id,
+        sourceVersion: 1,
+        status: "pending",
+        nodeStates: {
+          [node.id]: {
+            nodeId: node.id,
+            status: "pending",
+            attempts: 0,
+          },
+        },
+        checkpointResponses: [],
+        artifactRefs: [],
+        attempts: [],
+        createdAt: now,
+      },
+    },
+  });
 
   return {
     workspaceId,

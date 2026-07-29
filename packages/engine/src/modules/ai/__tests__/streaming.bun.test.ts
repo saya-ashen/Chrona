@@ -32,10 +32,9 @@ mock.module("../runtime/client-registry", () => ({
   },
 }));
 
-import { generatePlanStream } from "../features/generate-plan";
-import { dispatchStream } from "../streaming";
+import { dispatchStream, generatePlanStream } from "../index";
+import type { EngineAiClient } from "../index";
 import type { AgentProviderClient } from "@chrona/providers-foundation";
-import type { EngineAiClient } from "../runtime/client-registry";
 
 describe("generatePlanStream", () => {
   it("does not fall back to blocking provider calls when streaming generate_plan fails", async () => {
@@ -245,7 +244,6 @@ describe("generatePlanStream", () => {
       },
     } as unknown as EngineAiClient;
 
-    const { dispatchStream } = await import("../streaming");
     const events = [] as Array<{ type: string; tool?: string; input?: Record<string, unknown>; result?: string; error?: boolean; text?: string; structured?: unknown }>;
     for await (const event of dispatchStream(client, "generate_plan", {
       scope: "task-1",

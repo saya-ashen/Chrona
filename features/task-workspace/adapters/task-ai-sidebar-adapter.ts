@@ -1,10 +1,11 @@
 import { deriveWorkStateView } from "@chrona/domain";
 import type { AiSidebarPageContextSummary, AiSidebarQuickAction } from "@chrona/contracts";
+import type { GraphNodeState } from "@chrona/contracts";
 import type { TaskData } from "../model/task-workspace-types";
 
 type TaskHighlight = AiSidebarPageContextSummary["highlights"][number];
 
-function findActiveNode(task: TaskData) {
+function findActiveNode(task: TaskData): GraphNodeState | undefined {
   const currentNodeId = task.executionSummary?.currentNodeId;
   return task.graphNodeStates?.find((node) => node.id === currentNodeId)
     ?? task.graphNodeStates?.find((node) => node.current || node.status === "running")
@@ -14,7 +15,7 @@ function findActiveNode(task: TaskData) {
 
 function getPlanNodeTitle(task: TaskData, nodeId: string | null) {
   if (!nodeId) return null;
-  const node = task.savedPlan?.effectivePlan.nodes.find((item) => item.id === nodeId || item.nodeId === nodeId);
+  const node = task.savedPlan?.effectivePlan.nodes.find((item: { id: string; nodeId?: string | null }) => item.id === nodeId || item.nodeId === nodeId);
   return node?.title ?? null;
 }
 

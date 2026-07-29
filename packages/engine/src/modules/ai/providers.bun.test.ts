@@ -1,6 +1,6 @@
 import { describe, expect, it, mock } from "bun:test";
 import type { AgentProviderClient } from "@chrona/providers-foundation";
-import { runProviderRequest, type ProviderFeatureRequest } from "./providers";
+import { runProviderRequest, type ProviderFeatureRequest } from "@chrona/engine/test-support";
 
 const request: ProviderFeatureRequest = {
   sessionId: "session-key",
@@ -32,6 +32,10 @@ describe("runProviderRequest", () => {
       });
       yield {
         type: "run_completed" as const,
+        provider: "test",
+        runId: "provider-run",
+        sessionId: "provider-session",
+        sequence: 0,
         run: {
           provider: "test",
           sessionId: "provider-session",

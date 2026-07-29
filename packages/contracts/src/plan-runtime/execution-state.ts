@@ -1,10 +1,8 @@
-import type { UiDocument } from "@chrona/ui-protocol";
 import type { PlanBlueprint } from "../ai-plan-blueprint";
 import type { WaitKind } from "./node";
-import type { ArtifactRef, PlanOutputState } from "./node-result";
+import type { ArtifactRef } from "./node-result";
 import type {
   CheckpointResponse,
-  ExecutionCheckpoint,
   CompiledPlan,
   EffectivePlanGraph,
   PlanGraphStatus,
@@ -12,6 +10,7 @@ import type {
   GeneratePlanErrorCode,
   GeneratePlanStatusPhase,
 } from "./_leaf";
+export type { PlanExecutionResult, PlanExecutionStatus } from "./_leaf";
 
 export type PlanRunStatus = "pending" | "running" | "paused" | "completed" | "failed" | "cancelled";
 
@@ -69,41 +68,26 @@ export type WebPlanNodeStatus =
   | "cancelled"
   | "invalidated";
 
+const WEB_PLAN_NODE_STATUS_BY_RUNTIME_STATUS = {
+  pending: "idle",
+  ready: "ready",
+  running: "active",
+  waiting: "waiting",
+  waiting_for_user: "waiting_for_user",
+  waiting_for_approval: "waiting_for_approval",
+  blocked: "blocked",
+  degraded: "degraded",
+  completed: "done",
+  failed: "failed",
+  cancelled: "cancelled",
+  invalidated: "invalidated",
+  skipped: "skipped",
+} as const satisfies Record<NodeRuntimeStatus, WebPlanNodeStatus>;
+
 export function webPlanNodeStatusForRuntimeStatus(
   status: NodeRuntimeStatus | null | undefined,
 ): WebPlanNodeStatus {
-  switch (status) {
-    case "running":
-      return "active";
-    case "waiting_for_approval":
-      return "waiting_for_approval";
-    case "waiting_for_user":
-      return "waiting_for_user";
-    case "waiting":
-      return "waiting";
-    case "degraded":
-      return "degraded";
-    case "blocked":
-      return "blocked";
-    case "failed":
-      return "failed";
-    case "completed":
-      return "done";
-    case "cancelled":
-      return "cancelled";
-    case "skipped":
-      return "skipped";
-    case "invalidated":
-      return "invalidated";
-    case "ready":
-      return "ready";
-    case undefined:
-    case null:
-      return "idle";
-    case "pending":
-    default:
-      return "idle";
-  }
+  return status === null || status === undefined ? "idle" : WEB_PLAN_NODE_STATUS_BY_RUNTIME_STATUS[status];
 }
 
 export function runtimeProgressStatusForWaitKind(
@@ -265,36 +249,6 @@ export interface PlanRun {
   completedAt?: string;
 }
 
-export type PlanExecutionStatus =
-  | "started"
-  | "running"
-  | "waiting_for_user"
-  | "waiting_for_approval"
-  | "blocked"
-  | "failed"
-  | "completed"
-  | "cancelled"
-  | "no_plan";
-
-export type PlanExecutionResult = {
-  taskId: string;
-  planId: string | null;
-  mainSessionId: string | null;
-  executionSessionId?: string | null;
-  planRunId?: string | null;
-  status: PlanExecutionStatus;
-  currentNodeId: string | null;
-  executedNodeIds: string[];
-  waitingNodeIds: string[];
-  blockedNodeIds: string[];
-  message: string;
-  checkpoint: ExecutionCheckpoint | null;
-  planOutput?: Pick<PlanOutputState, "manifest" | "finalizedResult" | "finalization" | "revision" | "updatedAt" | "updatedByNodeId">;
-  ui?: {
-    currentOperationSpec?: UiDocument | null;
-  };
-  errorDetails?: unknown;
-};
 
 export interface TaskPlanReadModel {
   id: string;

@@ -159,7 +159,18 @@ export function derivePlanRunFromRuntime(input: {
   };
 }
 
-export async function ensureNativePlanRun(taskId: string, workBlockId?: string | null) {
+export type NativePlanRuntime = {
+  workBlockId: string | null;
+  taskId: string;
+  workspaceId: string;
+  planId: string;
+  compiledPlan: CompiledPlan;
+  persisted: NonNullable<Awaited<ReturnType<typeof getPlanRun>>>;
+  planPrompt: string | null;
+  planSummary: string | null;
+};
+
+export async function ensureNativePlanRun(taskId: string, workBlockId?: string | null): Promise<NativePlanRuntime | null> {
   const savedCompiled = await getAcceptedCompiledPlanForTask(taskId, { workBlockId });
   if (!savedCompiled) {
     return null;

@@ -20,3 +20,5 @@ export type {
   ImportedCalendarEventWrite,
   ImportedCalendarReplacementResult,
 } from "./external-calendar";
+export { resetTestDb, seedTask, seedWorkspace } from "./test-support";
+export type { SeedTaskResult, SeedWorkspaceResult } from "./test-support";

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "bun:test";
 import { db } from "@chrona/db";
-import { getMemoryConsole } from "@chrona/engine/modules/pages/get-memory-console";
+import { getMemoryConsole } from "@chrona/engine/test-support";
 import { resetTestDb, seedTask, seedWorkspace } from "../bun-test-helpers";
 
 // getMemoryConsole — engine-layer unit for the memory read-model.

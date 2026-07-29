@@ -2,7 +2,8 @@ import { describe, expect, test } from "bun:test";
 import type { AiClientRecord } from "@chrona/contracts";
 import { AiClientError } from "@chrona/contracts";
 import type { AgentProviderClient, ProviderRunEvent, ProviderRunSnapshot } from "@chrona/providers-foundation";
-import type { EngineAiClient } from "../runtime/client-registry";
+import type { EngineAiClient } from "@chrona/engine/test-support";
+import { dispatchFeaturePayload } from "../index";
 
 process.env.DATABASE_URL ??= "file:/tmp/chrona-provider-response-parsing.sqlite";
 
@@ -34,17 +35,26 @@ function client(snapshot: ProviderRunSnapshot): EngineAiClient {
     createSession: async () => ({ provider: "debug", sessionId: "session-1" }),
     startRun: async () => ({ provider: "debug", runId: "run-1", sessionId: "session-1" }),
     streamRun: async function* (): AsyncIterable<ProviderRunEvent> {
+      const eventIdentity = {
+        provider: "debug",
+        runId: snapshot.runId,
+        sessionId: snapshot.sessionId ?? "session-1",
+      };
       if (snapshot.error) {
         yield {
+          ...eventIdentity,
+          sequence: 0,
           type: "run_failed",
-          run: { provider: "debug", runId: snapshot.runId, sessionId: snapshot.sessionId ?? "session-1", status: "failed" },
+          run: { ...eventIdentity, status: "failed" },
           error: snapshot.error,
         };
         return;
       }
       yield {
+        ...eventIdentity,
+        sequence: 0,
         type: "run_completed",
-        run: { provider: "debug", runId: snapshot.runId, sessionId: snapshot.sessionId ?? "session-1", status: snapshot.status },
+        run: { ...eventIdentity, status: snapshot.status },
         outputText: snapshot.outputText,
         structuredPayload: snapshot.structuredPayload,
       };
@@ -108,7 +118,6 @@ function clientWithStreamFailure(error: Error): EngineAiClient {
 
 describe("provider response parsing", () => {
   test("returns parsed structured payload and debug metadata", async () => {
-    const { dispatchFeaturePayload } = await import("../providers");
     const result = await dispatchFeaturePayload<{ answer: string }>(client(providerSnapshot()), "chat", { prompt: "hello" }, "scope-1");
 
     expect(result.parsed).toEqual({ answer: "ok" });
@@ -117,19 +126,16 @@ describe("provider response parsing", () => {
   });
 
   test("rejects provider responses without parsed payload", async () => {
-    const { dispatchFeaturePayload } = await import("../providers");
     await expect(dispatchFeaturePayload(client(providerSnapshot({ structuredPayload: { rawOutput: "text only" } })), "chat", {}, "scope-1"))
       .rejects.toMatchObject({ code: "invalid_response" } satisfies Partial<AiClientError>);
   });
 
   test("rejects provider error snapshots before parsing", async () => {
-    const { dispatchFeaturePayload } = await import("../providers");
     await expect(dispatchFeaturePayload(client(providerSnapshot({ error: "provider failed", structuredPayload: null })), "chat", {}, "scope-1"))
       .rejects.toMatchObject({ code: "internal", message: "[debug] provider failed" } satisfies Partial<AiClientError>);
   });
 
   test("wraps provider stream failures as AiClientError", async () => {
-    const { dispatchFeaturePayload } = await import("../providers");
     await expect(dispatchFeaturePayload(clientWithStreamFailure(new Error("provider stream timeout")), "chat", {}, "scope-1"))
       .rejects.toMatchObject({ code: "internal", message: "[debug] provider stream timeout" } satisfies Partial<AiClientError>);
   });

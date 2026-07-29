@@ -11,6 +11,38 @@ import {
   scheduleProposalBodySchema,
 } from "./execution.schema";
 import { nodeDeliverableSchema, resultContributionSchema, resultEvidenceSchema } from "./result.schema";
+const MAX_MCP_STRING_LENGTH = 16_000;
+const MAX_MCP_JSON_DEPTH = 8;
+const MAX_MCP_JSON_ELEMENTS = 1_000;
+
+function hasBoundedJsonShape(value: unknown, depth = 0, state = { elements: 0 }): boolean {
+  if (depth > MAX_MCP_JSON_DEPTH || ++state.elements > MAX_MCP_JSON_ELEMENTS) return false;
+  if (typeof value === "string") return value.length <= MAX_MCP_STRING_LENGTH;
+  if (value === null || typeof value === "boolean" || typeof value === "number") return true;
+  if (Array.isArray(value)) return value.every((entry) => hasBoundedJsonShape(entry, depth + 1, state));
+  if (typeof value !== "object") return false;
+  return Object.entries(value).every(([key, entry]) =>
+    key.length <= 128 && hasBoundedJsonShape(entry, depth + 1, state)
+  );
+}
+
+const boundedJsonValueSchema = z.unknown().superRefine((value, ctx) => {
+  if (!hasBoundedJsonShape(value)) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: `JSON values must be at most ${MAX_MCP_JSON_DEPTH} levels deep with at most ${MAX_MCP_JSON_ELEMENTS} elements.`,
+    });
+  }
+});
+
+const boundedRecordSchema = z.record(z.string().max(128), boundedJsonValueSchema).superRefine((value, ctx) => {
+  if (Object.keys(value).length > 100) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Record values must contain at most 100 keys.",
+    });
+  }
+});
 
 export const chronaToolNames = [
   "chrona.task.read",
@@ -58,37 +90,35 @@ export const chronaToolIdempotencyStatusSchema = z.enum([
 ]);
 
 export const chronaToolExpectedStateSchema = z.object({
-  taskStatus: z.string().optional(),
+  taskStatus: z.string().max(256).optional(),
   taskRevision: z.number().int().nonnegative().optional(),
-  planGraphId: z.string().optional(),
+  planGraphId: z.string().max(256).optional(),
   planRevision: z.number().int().nonnegative().optional(),
-  scheduleStatus: z.string().optional(),
-  executionStatus: z.string().optional(),
-  executionSessionId: z.string().optional(),
-  nodeId: z.string().optional(),
-}).passthrough();
+  scheduleStatus: z.string().max(256).optional(),
+  executionStatus: z.string().max(256).optional(),
+  executionSessionId: z.string().max(256).optional(),
+  nodeId: z.string().max(256).optional(),
+}).catchall(boundedJsonValueSchema);
 
 export const chronaToolEvidenceSchema = z.object({
-  providerText: z.string().optional(),
-  toolCalls: z.array(z.record(z.string(), z.unknown())).optional(),
-  toolOutputs: z.array(z.record(z.string(), z.unknown())).optional(),
-  structuredOutput: z.unknown().optional(),
-}).passthrough();
+  providerText: z.string().max(MAX_MCP_STRING_LENGTH).optional(),
+  toolCalls: z.array(boundedRecordSchema).max(32).optional(),
+  toolOutputs: z.array(boundedRecordSchema).max(32).optional(),
+  structuredOutput: boundedJsonValueSchema.optional(),
+}).catchall(boundedJsonValueSchema);
 
 export const chronaToolContextSchema = z.object({
-  workspaceId: z.string().min(1).optional(),
-  taskId: z.string().min(1).optional(),
-  sessionId: z.string().min(1).optional(),
+  workspaceId: z.string().min(1).max(256).optional(),
+  taskId: z.string().min(1).max(256).optional(),
+  sessionId: z.string().min(1).max(256).optional(),
   actorType: z.enum(["agent", "human", "system"]).optional().default("agent"),
-  actorId: z.string().min(1).optional(),
-  idempotencyKey: z.string().min(1).optional(),
+  actorId: z.string().min(1).max(256).optional(),
+  idempotencyKey: z.string().min(1).max(256).optional(),
   expectedState: chronaToolExpectedStateSchema.optional(),
   expectedRevision: z.number().int().nonnegative().optional(),
   evidence: chronaToolEvidenceSchema.optional(),
 }).superRefine((value, ctx) => {
-  if (value.taskId || value.sessionId) {
-    return;
-  }
+  if (value.taskId || value.sessionId) return;
   ctx.addIssue({
     code: z.ZodIssueCode.custom,
     path: ["sessionId"],
@@ -106,58 +136,63 @@ export const goalResultsReadPayloadSchema = z.object({
   limit: z.number().int().min(1).max(10).default(5),
   cursor: z.string().trim().regex(/^(?:GR|GA)[0-9A-F]{12}$/).optional(),
 }).strict();
-const nodeEvidencePayloadSchema = z.record(z.string(), z.unknown()).optional();
+const nodeEvidencePayloadSchema = boundedRecordSchema.optional();
 
 
 
 export const taskCompletePayloadSchema = z.object({
-  summary: z.string().min(1),
-  deliverables: z.array(nodeDeliverableSchema).optional(),
-  findings: z.array(resultContributionSchema).optional(),
-  decisions: z.array(resultContributionSchema).optional(),
-  caveats: z.array(resultContributionSchema).optional(),
-  nextActions: z.array(resultContributionSchema).optional(),
-  evidenceItems: z.array(resultEvidenceSchema).optional(),
+  summary: z.string().min(1).max(MAX_MCP_STRING_LENGTH),
+  deliverables: z.array(nodeDeliverableSchema).max(100).optional(),
+  findings: z.array(resultContributionSchema).max(100).optional(),
+  decisions: z.array(resultContributionSchema).max(100).optional(),
+  caveats: z.array(resultContributionSchema).max(100).optional(),
+  nextActions: z.array(resultContributionSchema).max(100).optional(),
+  evidenceItems: z.array(resultEvidenceSchema).max(100).optional(),
 }).strict();
 
-export const conditionSelectPayloadSchema = z.object({ nodeId: z.string().min(1), branchRef: z.string().min(1), summary: z.string().min(1), evidence: nodeEvidencePayloadSchema }).strict();
+export const conditionSelectPayloadSchema = z.object({
+  nodeId: z.string().min(1).max(256),
+  branchRef: z.string().min(1).max(256),
+  summary: z.string().min(1).max(MAX_MCP_STRING_LENGTH),
+  evidence: nodeEvidencePayloadSchema,
+}).strict();
 
 const interactionOptionSchema = z.object({
-  value: z.string().min(1),
-  label: z.string().min(1),
-  description: z.string().min(1).optional(),
+  value: z.string().min(1).max(256),
+  label: z.string().min(1).max(512),
+  description: z.string().min(1).max(4_000).optional(),
   recommended: z.boolean().optional(),
 }).strict();
 
 const textInteractionFieldSchema = z.object({
   kind: z.literal("text"),
-  name: z.string().min(1),
-  label: z.string().min(1),
-  description: z.string().min(1).optional(),
+  name: z.string().min(1).max(128),
+  label: z.string().min(1).max(512),
+  description: z.string().min(1).max(4_000).optional(),
   multiline: z.boolean().optional(),
   required: z.boolean().optional(),
-  placeholder: z.string().optional(),
-  defaultValue: z.string().optional(),
+  placeholder: z.string().max(4_000).optional(),
+  defaultValue: z.string().max(4_000).optional(),
 }).strict();
 
 const choiceInteractionFieldSchema = z.object({
   kind: z.literal("choice"),
-  name: z.string().min(1),
-  label: z.string().min(1),
-  description: z.string().min(1).optional(),
+  name: z.string().min(1).max(128),
+  label: z.string().min(1).max(512),
+  description: z.string().min(1).max(4_000).optional(),
   selection: z.enum(["single", "multiple"]),
-  options: z.array(interactionOptionSchema).min(1),
+  options: z.array(interactionOptionSchema).min(1).max(100),
   required: z.boolean().optional(),
-  defaultValue: z.union([z.string(), z.array(z.string())]).optional(),
+  defaultValue: z.union([z.string().max(256), z.array(z.string().max(256)).max(100)]).optional(),
   minSelections: z.number().int().nonnegative().optional(),
-  maxSelections: z.number().int().positive().optional(),
+  maxSelections: z.number().int().positive().max(100).optional(),
 }).strict();
 
 const booleanInteractionFieldSchema = z.object({
   kind: z.literal("boolean"),
-  name: z.string().min(1),
-  label: z.string().min(1),
-  description: z.string().min(1).optional(),
+  name: z.string().min(1).max(128),
+  label: z.string().min(1).max(512),
+  description: z.string().min(1).max(4_000).optional(),
   defaultValue: z.boolean().optional(),
 }).strict();
 
@@ -168,26 +203,49 @@ export const interactionFieldSchema = z.discriminatedUnion("kind", [
 ]);
 
 export const requestInputPayloadSchema = z.object({
-  title: z.string().min(1),
-  instructions: z.string().min(1),
-  fields: z.array(interactionFieldSchema).min(1),
-  submitLabel: z.string().min(1).optional(),
-  relatedOutputElementIds: z.array(z.string().min(1)).optional(),
+  title: z.string().min(1).max(512),
+  instructions: z.string().min(1).max(MAX_MCP_STRING_LENGTH),
+  fields: z.array(interactionFieldSchema).min(1).max(100),
+  submitLabel: z.string().min(1).max(256).optional(),
+  relatedOutputElementIds: z.array(z.string().min(1).max(256)).max(100).optional(),
   evidence: nodeEvidencePayloadSchema,
 }).strict();
 
-const blockActionFormFieldSchema = z.object({ name: z.string().min(1), label: z.string().min(1), type: z.enum(["text", "textarea", "select"]).optional(), required: z.boolean().optional(), options: z.array(z.string().min(1)).optional() }).strict();
+const blockActionFormFieldSchema = z.object({
+  name: z.string().min(1).max(128),
+  label: z.string().min(1).max(512),
+  type: z.enum(["text", "textarea", "select"]).optional(),
+  required: z.boolean().optional(),
+  options: z.array(z.string().min(1).max(256)).max(100).optional(),
+}).strict();
 
-const blockActionFormSchema = z.object({ instructions: z.string().min(1), submitLabel: z.string().min(1).optional(), inputFields: z.array(blockActionFormFieldSchema).min(1) }).strict();
+const blockActionFormSchema = z.object({
+  instructions: z.string().min(1).max(MAX_MCP_STRING_LENGTH),
+  submitLabel: z.string().min(1).max(256).optional(),
+  inputFields: z.array(blockActionFormFieldSchema).min(1).max(100),
+}).strict();
 
-export const blockPayloadSchema = z.object({ reason: z.string().min(1), actionForm: blockActionFormSchema, retryable: z.boolean().optional(), evidence: nodeEvidencePayloadSchema }).strict();
+export const blockPayloadSchema = z.object({
+  reason: z.string().min(1).max(MAX_MCP_STRING_LENGTH),
+  actionForm: blockActionFormSchema,
+  retryable: z.boolean().optional(),
+  evidence: nodeEvidencePayloadSchema,
+}).strict();
 
-export const failPayloadSchema = z.object({ error: z.string().min(1), retryable: z.boolean().optional(), diagnostics: z.unknown().optional(), evidence: nodeEvidencePayloadSchema }).strict();
+export const failPayloadSchema = z.object({
+  error: z.string().min(1).max(MAX_MCP_STRING_LENGTH),
+  retryable: z.boolean().optional(),
+  diagnostics: boundedJsonValueSchema.optional(),
+  evidence: nodeEvidencePayloadSchema,
+}).strict();
 
-export const waitCompletePayloadSchema = z.object({ summary: z.string().min(1), evidence: nodeEvidencePayloadSchema }).strict();
+export const waitCompletePayloadSchema = z.object({
+  summary: z.string().min(1).max(MAX_MCP_STRING_LENGTH),
+  evidence: nodeEvidencePayloadSchema,
+}).strict();
 export const dashboardBriefPayloadSchema = z.object({
   summaryText: z.string().trim().min(1).max(500).optional(),
-  spec: z.unknown(),
+  spec: boundedJsonValueSchema,
 }).strict();
 
 

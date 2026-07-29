@@ -37,6 +37,10 @@ async function toErrorMessage(response: Response) {
   );
 }
 
+function isJsonEventSourcePayload(value: unknown): value is JsonEventSourcePayload {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
 export async function fetchJsonEventSource(
   input: string,
   { onEvent, onInvalidMessage, onNonStreamResponse, ...init }: JsonEventSourceOptions,
@@ -76,9 +80,14 @@ export async function fetchJsonEventSource(
         }
 
         try {
+          const data = JSON.parse(message.data) as unknown;
+          if (!isJsonEventSourcePayload(data)) {
+            throw new Error("Expected SSE JSON payload to be an object");
+          }
+
           onEvent({
             event: message.event || "message",
-            data: JSON.parse(message.data) as JsonEventSourcePayload,
+            data,
             message,
           });
         } catch (error) {

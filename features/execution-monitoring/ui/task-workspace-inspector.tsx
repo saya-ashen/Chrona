@@ -1,10 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 import type { UiDocument } from "@chrona/ui-protocol";
 import type { PlanExecutionResult } from "@chrona/contracts";
-import type {
-  WorkspaceActivityItem,
-  createTaskWorkspaceExecutionConsoleView,
-} from "@features/task-workspace";
+import type { WorkspaceActivityItem, createTaskWorkspaceExecutionConsoleView } from "@features/task-workspace/public/workspace-integration";
 import type { WorkspaceRuntimeEvent } from "../model/workspace-runtime-events";
 import {
   TaskWorkspaceExecutionOverview,

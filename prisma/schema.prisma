@@ -318,6 +318,7 @@ model Workspace {
   goalReviewProposals       GoalReviewProposal[]
   goalReviewItems           GoalReviewProposalItem[]
   toolInvocations           ToolInvocation[]
+  agentToolMutations      AgentToolMutation[]
   taskTimelineItems         TaskTimelineItem[]
   taskDependencies          TaskDependency[]
   taskProjections           TaskProjection[]
@@ -633,6 +634,7 @@ model Task {
   runTokens                 RunToken[]
   taskPlanTerminalActions   TaskPlanTerminalAction[]
   assetOwnershipProposals GoalAssetOwnershipProposal[]
+  agentToolMutations      AgentToolMutation[]
 
   @@index([workspaceId, status])
   @@index([workspaceId, priority])
@@ -742,11 +744,14 @@ model TaskSession {
   activeRunId        String?
   lastRunRef         String?
   providerSessionRef String?
+  capabilityScope    String     @default("unknown")
+  allowedToolNames   String     @default("[]") /// JSON array; empty denies all mutations.
   createdByFramework Boolean    @default(true)
   createdAt          DateTime   @default(now())
   updatedAt          DateTime   @updatedAt
   task               Task       @relation("TaskSessions", fields: [taskId], references: [id], onDelete: Cascade)
   runs               Run[]
+  agentToolMutations      AgentToolMutation[]
   workBlock          WorkBlock? @relation("WorkBlockSession")
 
   @@index([taskId, createdAt])
@@ -803,6 +808,7 @@ model TaskPlanRun {
   workspaceId         String
   taskId              String
   workBlockId         String?
+  workBlockScopeKey   String                     @default("")
   occurrenceId        String?
   planId              String
   planRun             Json
@@ -810,6 +816,7 @@ model TaskPlanRun {
   executionOwnerScope String?
   executionLeaseUntil DateTime?
   executionEpoch      Int                        @default(0)
+  executionCommandKey String?
   latestEventId       String?
   latestRawEventId    String?
   createdAt           DateTime                   @default(now())
@@ -823,9 +830,10 @@ model TaskPlanRun {
   providerRuns        TaskPlanProviderRun[]
   providerApprovals   TaskPlanProviderApproval[]
 
-  @@unique([taskId, planId, workBlockId])
+  @@unique([taskId, planId, workBlockScopeKey])
   @@index([taskId, planId, executionOwnerId])
   @@index([taskId, workBlockId, planId])
+  @@index([taskId, planId, workBlockScopeKey])
   @@index([executionLeaseUntil])
   @@index([workspaceId, taskId, updatedAt])
   @@index([occurrenceId, updatedAt])
@@ -999,6 +1007,7 @@ model Run {
   workBlock             WorkBlock?               @relation(fields: [workBlockId], references: [id], onDelete: SetNull)
   taskSession           TaskSession?             @relation(fields: [taskSessionId], references: [id], onDelete: SetNull)
   approvals             Approval[]
+  agentToolMutations      AgentToolMutation[]
   artifacts             Artifact[]
   events                Event[]
   rawEventLogs          RawEventLog[]
@@ -1016,6 +1025,33 @@ model Run {
   @@index([taskSessionId, status])
   @@index([runtimeName, status])
   @@index([occurrenceId, createdAt])
+}
+
+model AgentToolMutation {
+  id                  String       @id @default(cuid())
+  workspaceId         String
+  taskId              String?
+  taskSessionId       String?
+  runId               String?
+  taskScopeKey        String       @default("")
+  taskSessionScopeKey String       @default("")
+  runScopeKey         String       @default("")
+  nodeScopeKey        String       @default("")
+  toolName            String
+  idempotencyKey      String
+  status              String       @default("claimed")
+  result              Json?
+  createdAt           DateTime     @default(now())
+  updatedAt           DateTime     @updatedAt
+  workspace           Workspace    @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  task                Task?        @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  taskSession         TaskSession? @relation(fields: [taskSessionId], references: [id], onDelete: SetNull)
+  run                 Run?         @relation(fields: [runId], references: [id], onDelete: SetNull)
+
+  @@unique([workspaceId, taskScopeKey, taskSessionScopeKey, runScopeKey, nodeScopeKey, toolName, idempotencyKey])
+  @@index([taskId, createdAt])
+  @@index([taskSessionId, createdAt])
+  @@index([runId, createdAt])
 }
 
 model Approval {
@@ -1183,6 +1219,23 @@ model RawEventLog {
   @@index([correlationId, receivedAt])
   @@index([nativeToolCallId])
   @@index([workspaceId, source, receivedAt])
+}
+
+model EventRetentionArchive {
+  id                String   @id @default(cuid())
+  source            String
+  cutoffAt          DateTime
+  recordCount       Int
+  firstRecordId     String
+  lastRecordId      String
+  firstRecordedAt   DateTime
+  lastRecordedAt    DateTime
+  checksum          String
+  checksumAlgorithm String   @default("sha256")
+  createdAt         DateTime @default(now())
+
+  @@index([source, cutoffAt])
+  @@index([source, createdAt])
 }
 
 model ConversationEntry {
@@ -1797,10 +1850,12 @@ model ExecutionSession {
   workBlock            WorkBlock?             @relation(fields: [workBlockId], references: [id], onDelete: SetNull)
   occurrenceId         String?
   occurrence           TaskOccurrence?        @relation(fields: [occurrenceId], references: [id], onDelete: SetNull)
+  activeScopeKey       String?
 
   @@index([workspaceId, status])
   @@index([taskId, status])
   @@index([workBlockId])
+  @@unique([taskId, activeScopeKey])
   @@index([occurrenceId])
 }
 

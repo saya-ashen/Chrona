@@ -2,7 +2,7 @@ import { createHmac } from "node:crypto";
 import { beforeEach, describe, expect, it } from "bun:test";
 import { db } from "@chrona/db";
 import { createChronaEngine } from "@chrona/engine";
-import { runGoalReviewDueWorker } from "@chrona/engine/modules/orchestration";
+import { runGoalReviewDueWorker } from "@chrona/engine/test-support";
 import { createApiRouter } from "../../routes/api";
 import { resetEnvCacheForTests } from "../../config/env";
 import { resetTestDb, seedWorkspace } from "../bun-test-helpers";

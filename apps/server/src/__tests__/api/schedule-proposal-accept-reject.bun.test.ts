@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "bun:test";
 import { db } from "@chrona/db";
-import { decideScheduleProposal } from "@chrona/engine/modules/scheduling/decide-schedule-proposal";
-import { proposeSchedule } from "@chrona/engine/modules/scheduling/propose-schedule";
+import { decideScheduleProposal } from "@chrona/engine/test-support";
+import { proposeSchedule } from "@chrona/engine/test-support";
 import { ScheduleSource, ScheduleProposalStatus } from "@chrona/db/generated/prisma/client";
 import { resetTestDb, seedScheduleProposal, seedTask, seedWorkspace } from "../bun-test-helpers";
 

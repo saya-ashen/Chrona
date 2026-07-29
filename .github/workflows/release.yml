@@ -29,6 +29,9 @@ jobs:
 
       - run: bun install --frozen-lockfile
 
+      - name: Audit high and critical dependencies
+        run: bun run audit:security
+
       - run: bunx prisma generate
 
       - run: bunx prisma db push

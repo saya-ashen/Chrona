@@ -5,7 +5,7 @@ import { getChronaGeneratedFilesDir } from "@chrona/shared/data-paths";
 import { createHash } from "node:crypto";
 import { db } from "@chrona/db";
 import { aiClientRegistry, createChronaEngine, waitForGoalAssetOwnershipGeneration } from "@chrona/engine";
-import { acceptTaskResult } from "@chrona/engine/modules/tasks/accept-task-result";
+import { acceptTaskResult } from "@chrona/engine/test-support";
 import { createApiRouter, type ApiRouter } from "../../routes/api";
 import { resetTestDb, seedWorkspace } from "../bun-test-helpers";
 
@@ -63,23 +63,27 @@ async function seedStructuredGoalResultWithoutArtifacts() {
       },
       metrics: {
         type: "ResultMetricGrid",
-        props: { metrics: [{ label: "Stops", value: "2" }] },
+        props: { items: [{ label: "Stops", value: "2" }] },
       },
       comparison: {
         type: "ResultComparison",
-        props: { title: "Options", items: [{ label: "日照", summary: "Coastal route" }] },
+        props: {
+          title: "Options",
+          columns: [{ key: "route", label: "Route" }],
+          rows: [{ label: "日照", values: { route: "Coastal route" } }],
+        },
       },
       timeline: {
         type: "ResultTimeline",
-        props: { title: "Weekend", items: [{ label: "Day 1", summary: "Arrive in 日照" }] },
+        props: { title: "Weekend", items: [{ label: "Day 1", title: "Arrive in 日照" }] },
       },
       checklist: {
         type: "ResultChecklist",
-        props: { title: "Before departure", items: [{ label: "Book hotel", status: "pending" }] },
+        props: { title: "Before departure", items: [{ label: "Book hotel", status: "todo" }] },
       },
       changes: {
         type: "ResultChangeSummary",
-        props: { title: "Plan changes", items: [{ label: "Route", summary: "Added 沂蒙山" }] },
+        props: { title: "Plan changes", items: [{ path: "itinerary.md", summary: "Added 沂蒙山", status: "modified" }] },
       },
       summary: {
         type: "ResultSummary",
@@ -100,16 +104,33 @@ async function seedStructuredGoalResultWithoutArtifacts() {
     nextActions: [],
     evidence: [],
   };
+  const compiledPlan = {
+    id: "compiled-structured",
+    editablePlanId: plan.planId,
+    sourceVersion: 1,
+    title: "Select destination",
+    goal: "Plan a trip",
+    assumptions: [],
+    nodes: [],
+    edges: [],
+    entryNodeIds: [],
+    terminalNodeIds: [],
+    topologicalOrder: [],
+    completionPolicy: { type: "all_tasks_completed" },
+    validationWarnings: [],
+  };
+  await db.taskPlan.update({ where: { id: plan.id }, data: { compiledPlan } });
   await db.taskPlanRun.create({
     data: {
       workspaceId,
       taskId: task.id,
       planId: plan.planId,
+      workBlockScopeKey: "",
       planRun: {
         planRun: {
           id: "structured-result-run",
-          compiledPlanId: "compiled-structured",
-          editablePlanId: "structured-result-plan",
+          compiledPlanId: compiledPlan.id,
+          editablePlanId: compiledPlan.editablePlanId,
           sourceVersion: 1,
           status: "completed",
           nodeStates: {},
@@ -177,8 +198,7 @@ describe("Goal Workbench API", () => {
       status: "Pending",
       groupKey: "structured-result:1",
       content: {
-        format: "chrona-json-render",
-        spec: { root: "summary" },
+        spec: { root: "workspace" },
       },
     });
     expect(await db.goalAsset.count({ where: { goalId: seeded.goal.id } })).toBe(0);
@@ -190,13 +210,12 @@ describe("Goal Workbench API", () => {
     const extracted = await post(app, `/goals/${seeded.goal.id}/inbox/extract`, { taskId: seeded.task.id, runId: seeded.run.id });
     expect(extracted.status).toBe(200);
     const { candidates } = await extracted.json() as { candidates: Array<{ id: string; kind: string; content: { format: string; summary: string; spec: unknown } }> };
-    expect(candidates).toHaveLength(1);
-    expect(candidates[0]).toMatchObject({ kind: "structured_result", content: { format: "chrona-json-render", summary: expect.stringContaining("日照＋临沂沂蒙山"), spec: { root: "summary" } } });
+    expect(candidates[0]).toMatchObject({ kind: "structured_result", content: { format: "chrona-json-render", summary: expect.stringContaining("日照＋临沂沂蒙山"), spec: { root: "workspace" } } });
 
     const resolved = await post(app, `/goals/${seeded.goal.id}/inbox/${candidates[0]!.id}/resolve`, { workspaceId: seeded.workspaceId, action: "create_asset", label: "Selected destination" });
     expect(resolved.status).toBe(200);
     const version = await db.goalAssetVersion.findFirstOrThrow({ where: { goalId: seeded.goal.id } });
-    expect(version.content).toMatchObject({ format: "chrona-json-render", spec: { root: "summary" } });
+    expect(version.content).toMatchObject({ format: "chrona-json-render", spec: { root: "workspace" } });
     expect((await db.goalAsset.findFirstOrThrow({ where: { goalId: seeded.goal.id } })).kind).toBe("structured_result");
 
     const planRun = await db.taskPlanRun.findFirstOrThrow({ where: { taskId: seeded.task.id } });

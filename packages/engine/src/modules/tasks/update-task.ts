@@ -66,6 +66,68 @@ function mergeSessionStrategyIntoExecutionConfig(
   return Object.keys(nextConfig).length > 0 ? nextConfig : null;
 }
 
+async function materializeTaskRecurrence(input: {
+  taskId: string;
+  workspaceId: string;
+  title: string;
+  recurrenceRule: string;
+  startsAt: Date;
+  endsAt: Date;
+  runtimeName: string;
+}) {
+  const durationMs = input.endsAt.getTime() - input.startsAt.getTime();
+  const windowTo = new Date(
+    input.startsAt.getTime() + SELF_SERIES_WINDOW_DAYS * 24 * 60 * 60 * 1000,
+  );
+  const occurrences = expandRecurrenceRule(input.recurrenceRule, input.startsAt, durationMs, {
+    from: input.startsAt,
+    to: windowTo,
+    maxOccurrences: SELF_SERIES_MAX_OCCURRENCES,
+  });
+  const nextKeys = new Set(occurrences.map((occurrence) => occurrence.startsAt.toISOString()));
+  await db.workBlock.updateMany({
+    where: {
+      taskId: input.taskId,
+      status: "Scheduled",
+      recurrenceKey: { not: null },
+      NOT: { recurrenceKey: { in: [...nextKeys] } },
+    },
+    data: { status: "Cancelled", completedAt: new Date() },
+  });
+
+  for (const occurrence of occurrences) {
+    const recurrenceKey = occurrence.startsAt.toISOString();
+    const workBlock = await db.workBlock.upsert({
+      where: { taskId_recurrenceKey: { taskId: input.taskId, recurrenceKey } },
+      create: {
+        workspaceId: input.workspaceId,
+        taskId: input.taskId,
+        recurrenceKey,
+        title: input.title,
+        status: "Scheduled",
+        scheduledStartAt: occurrence.startsAt,
+        scheduledEndAt: occurrence.endsAt,
+        trigger: "manual",
+      },
+      update: {
+        title: input.title,
+        scheduledStartAt: occurrence.startsAt,
+        scheduledEndAt: occurrence.endsAt,
+        trigger: "manual",
+      },
+      select: { id: true, sessionId: true },
+    });
+    await ensureWorkBlockTaskSession({
+      taskId: input.taskId,
+      taskTitle: input.title,
+      runtimeName: input.runtimeName,
+      workBlockId: workBlock.id,
+      sessionId: workBlock.sessionId,
+      label: `${input.title} · Work block session`,
+    });
+  }
+}
+
 export async function updateTask(
   input: UpdateTaskInput & {
     sessionStrategy?: "shared" | "per_subtask" | null;
@@ -292,66 +354,15 @@ export async function updateTask(
   }
 
   if (!shouldCancelOpenWorkBlocks && shouldMaterializeRecurrence && recurrenceAnchorStartAt && recurrenceAnchorEndAt && nextRecurrenceRule) {
-    const durationMs = recurrenceAnchorEndAt.getTime() - recurrenceAnchorStartAt.getTime();
-    const windowTo = new Date(
-      recurrenceAnchorStartAt.getTime() + SELF_SERIES_WINDOW_DAYS * 24 * 60 * 60 * 1000,
-    );
-    const occurrences = expandRecurrenceRule(nextRecurrenceRule, recurrenceAnchorStartAt, durationMs, {
-      from: recurrenceAnchorStartAt,
-      to: windowTo,
-      maxOccurrences: SELF_SERIES_MAX_OCCURRENCES,
+    await materializeTaskRecurrence({
+      taskId: task.id,
+      workspaceId: task.workspaceId,
+      title: task.title,
+      recurrenceRule: nextRecurrenceRule,
+      startsAt: recurrenceAnchorStartAt,
+      endsAt: recurrenceAnchorEndAt,
+      runtimeName: validatedRuntimeConfig.executionRuntime,
     });
-    const nextKeys = new Set(occurrences.map((occurrence) => occurrence.startsAt.toISOString()));
-
-    await db.workBlock.updateMany({
-      where: {
-        taskId: task.id,
-        status: "Scheduled",
-        recurrenceKey: { not: null },
-        NOT: { recurrenceKey: { in: [...nextKeys] } },
-      },
-      data: {
-        status: "Cancelled",
-        completedAt: new Date(),
-      },
-    });
-
-    for (const occurrence of occurrences) {
-      const recurrenceKey = occurrence.startsAt.toISOString();
-      const workBlock = await db.workBlock.upsert({
-        where: {
-          taskId_recurrenceKey: {
-            taskId: task.id,
-            recurrenceKey,
-          },
-        },
-        create: {
-          workspaceId: task.workspaceId,
-          taskId: task.id,
-          recurrenceKey,
-          title: task.title,
-          status: "Scheduled",
-          scheduledStartAt: occurrence.startsAt,
-          scheduledEndAt: occurrence.endsAt,
-          trigger: "manual",
-        },
-        update: {
-          title: task.title,
-          scheduledStartAt: occurrence.startsAt,
-          scheduledEndAt: occurrence.endsAt,
-          trigger: "manual",
-        },
-        select: { id: true, sessionId: true },
-      });
-      await ensureWorkBlockTaskSession({
-        taskId: task.id,
-        taskTitle: task.title,
-        runtimeName: validatedRuntimeConfig.executionRuntime,
-        workBlockId: workBlock.id,
-        sessionId: workBlock.sessionId,
-        label: `${task.title} · Work block session`,
-      });
-    }
   }
   await appendCanonicalEvent({
     eventType: "task.updated",

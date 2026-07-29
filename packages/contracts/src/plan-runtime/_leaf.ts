@@ -12,6 +12,7 @@
 // (`./node`, `./node-result`, `./attempts` for ExecutionContextSnapshot)
 // — none of which ever import back from plan-runtime siblings.
 
+import type { UiDocument } from "@chrona/ui-protocol";
 import type {
   CompiledPlanCompletionPolicy,
   TaskExecutor,
@@ -24,8 +25,9 @@ import type {
   NodeDefinition,
   TaskPriority,
   WaitKind,
-} from "./node";
+} from "./node-core";
 import type { NodeResult } from "./node-result";
+import type { PlanOutputState } from "./node-result";
 
 // Inline status enum so this file does not need to import from
 // ./execution-state. The status union itself is part of the public
@@ -127,6 +129,39 @@ export interface ExecutionCheckpoint {
   availableActions: CheckpointAction[];
   createdAt: string;
 }
+
+// ─── Execution result shared types (originally from execution-state.ts) ──
+
+export type PlanExecutionStatus =
+  | "started"
+  | "running"
+  | "waiting_for_user"
+  | "waiting_for_approval"
+  | "blocked"
+  | "failed"
+  | "completed"
+  | "cancelled"
+  | "no_plan";
+
+export type PlanExecutionResult = {
+  taskId: string;
+  planId: string | null;
+  mainSessionId: string | null;
+  executionSessionId?: string | null;
+  planRunId?: string | null;
+  status: PlanExecutionStatus;
+  currentNodeId: string | null;
+  executedNodeIds: string[];
+  waitingNodeIds: string[];
+  blockedNodeIds: string[];
+  message: string;
+  checkpoint: ExecutionCheckpoint | null;
+  planOutput?: Pick<PlanOutputState, "manifest" | "finalizedResult" | "finalization" | "revision" | "updatedAt" | "updatedByNodeId">;
+  ui?: {
+    currentOperationSpec?: UiDocument | null;
+  };
+  errorDetails?: unknown;
+};
 
 // ─── Graph compiled/effective (originally from graph.ts) ─────────────
 

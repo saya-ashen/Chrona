@@ -1,6 +1,10 @@
 import { describe, expect, it } from "bun:test";
+import { mkdir, rm, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { getChronaGeneratedFilesDir } from "@chrona/shared/data-paths";
 import { db } from "@/lib/db";
 import { getPlanRun } from "@/modules/plan-execution/persistence/plan-run-store";
+import { ensureNativePlanRun } from "../persistence/plan-runtime-store";
 import {
   executeTaskNodeCapabilityMock,
   makeTwoTaskPlan,
@@ -117,6 +121,95 @@ describe("kernel executeCommand (single-writer)", () => {
     expect(persisted?.attempts.map((a) => [a.nodeId, a.status])).toEqual([
       ["first_task", "running"],
     ]);
+  });
+
+  it("claims concurrent commands before provider, event, artifact, and cancellation effects", async () => {
+    executeTaskNodeCapabilityMock.mockResolvedValue({
+      status: "started",
+      summary: "Runtime run started",
+      evidence: { sessionId: "main-session", runId: "run-first-task" },
+      output: { runtimeRunRef: "runtime-first-task" },
+    });
+
+    const { workspace, task } = await seedWorkspaceAndTask("Kernel command claim effects");
+    const compiledPlan = makeTwoTaskPlan("graph_kernel_command_claim_effects");
+    await seedAcceptedCompiledPlan(workspace.id, task.id, compiledPlan);
+    await ensureNativePlanRun(task.id);
+    const virginClaim = await getPlanRun(task.id, compiledPlan.editablePlanId);
+    expect(virginClaim?.executionCommandKey).toBeNull();
+
+    const [firstClaim, duplicateClaim] = await Promise.all([
+      executeCommand({
+        taskId: task.id,
+        command: { type: "start", trigger: "manual" },
+        context: { idempotencyKey: "virgin-claim-once" },
+      }),
+      executeCommand({
+        taskId: task.id,
+        command: { type: "start", trigger: "manual" },
+        context: { idempotencyKey: "virgin-claim-once" },
+      }),
+    ]);
+    expect(firstClaim.status).toBe("running");
+    expect(duplicateClaim.status).toBe("running");
+    expect(executeTaskNodeCapabilityMock).toHaveBeenCalledTimes(1);
+    const activeRun = await db.run.create({
+      data: { taskId: task.id, runtimeName: "hermes", status: "Running", triggeredBy: "system" },
+    });
+
+    await Promise.all([
+      executeCommand({
+        taskId: task.id,
+        command: { type: "restart_from_beginning", trigger: "manual" },
+        context: { idempotencyKey: "restart-once" },
+      }),
+      executeCommand({
+        taskId: task.id,
+        command: { type: "restart_from_beginning", trigger: "manual" },
+        context: { idempotencyKey: "restart-once" },
+      }),
+    ]);
+
+    expect(executeTaskNodeCapabilityMock).toHaveBeenCalledTimes(2);
+    expect(await db.event.count({
+      where: { taskId: task.id, eventType: "plan_execution.execution_started" },
+    })).toBe(2);
+    expect(await db.run.findUniqueOrThrow({ where: { id: activeRun.id } })).toMatchObject({
+      status: "Cancelled",
+    });
+    await db.run.create({
+      data: { taskId: task.id, runtimeName: "hermes", status: "Running", triggeredBy: "system" },
+    });
+
+    const scope = `command-claim-${task.id}`;
+    const directory = join(getChronaGeneratedFilesDir(), scope);
+    const uri = `generated://${scope}/result.md` as `generated://${string}`;
+    await mkdir(directory, { recursive: true });
+    await writeFile(join(directory, "result.md"), "# Claimed result\n");
+    try {
+      const submit = () => executeCommand({
+        taskId: task.id,
+        command: {
+          type: "submit_node_result",
+          nodeId: "first_task",
+          result: {
+            kind: "done",
+            summary: "Claimed result",
+            deliverables: [{
+              deliverableKey: "claimed-result",
+              title: "Claimed result",
+              kind: "document",
+              source: { type: "generated_file", uri },
+            }],
+          },
+        },
+        context: { idempotencyKey: "deliverable-once" },
+      });
+      await Promise.all([submit(), submit()]);
+      expect(await db.artifact.count({ where: { taskId: task.id } })).toBe(1);
+    } finally {
+      await rm(directory, { recursive: true, force: true });
+    }
   });
 
 

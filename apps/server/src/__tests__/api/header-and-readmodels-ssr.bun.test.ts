@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "bun:test";
 import { Hono } from "hono";
 import { db } from "@chrona/db";
 import { createChronaEngine } from "@chrona/engine";
-import { runRecurringWorkBlockExpansionWorker } from "@chrona/engine/modules/orchestration/recurring-work-block-expansion-worker";
+import { runRecurringWorkBlockExpansionWorker } from "@chrona/engine/test-support";
 import { createApiRouter } from "../../routes/api";
 import { resetTestDb, seedWorkspace } from "../bun-test-helpers";
 

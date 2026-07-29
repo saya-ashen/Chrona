@@ -1,3 +1,5 @@
+import { lookup } from "node:dns/promises";
+import { isIP } from "node:net";
 import { z } from "zod";
 import { applyChronaRuntimeConfigToEnv } from "@chrona/shared/runtime-config";
 
@@ -11,9 +13,10 @@ const envSchema = z.object({
       message: "PORT must be a valid integer string",
     }),
   DATABASE_URL: z.string().default("file:./prisma/dev.db"),
-  ALLOWED_ORIGINS: z.string().default("*"),
+  ALLOWED_ORIGINS: z.string().optional(),
   API_KEY: z.string().optional(),
   CHRONA_UNSAFE_PUBLIC_BIND: z.string().optional(),
+  CHRONA_UNSAFE_CORS: z.string().optional(),
   CHRONA_WEB_DIST: z.string().optional(),
   CHRONA_EXPERIMENTAL_DASHBOARD_AI_SUMMARY: z.string().optional(),
   CHRONA_EMAIL_TRIGGER_SECRET: z.string().min(16).optional(),
@@ -52,24 +55,74 @@ export function resolvePort(env: Env): number {
 }
 
 export function resolveAllowedOrigins(env: Env): string[] {
-  if (!env.ALLOWED_ORIGINS || env.ALLOWED_ORIGINS === "*") return ["*"];
-  return env.ALLOWED_ORIGINS.split(",").map((s) => s.trim()).filter(Boolean);
+  const value = env.ALLOWED_ORIGINS?.trim();
+  if (!value) return [];
+  if (value === "*") {
+    if (env.CHRONA_UNSAFE_CORS !== "1") {
+      throw new Error(
+        "ALLOWED_ORIGINS=* requires the explicit CHRONA_UNSAFE_CORS=1 override.",
+      );
+    }
+    return ["*"];
+  }
+  return value.split(",").map((origin) => origin.trim()).filter(Boolean);
 }
 
-export function assertSafeBind(env: Env): void {
-  if (env.HOST !== "0.0.0.0" || env.API_KEY || env.CHRONA_UNSAFE_PUBLIC_BIND === "1") {
-    return;
+export function isTrustedRequestOrigin(
+  requestUrl: string,
+  origin: string | undefined,
+  allowedOrigins: string[],
+): boolean {
+  if (!origin) return true;
+  if (allowedOrigins.includes("*")) return true;
+  if (allowedOrigins.includes(origin)) return true;
+  return origin === new URL(requestUrl).origin;
+}
+
+function normalizeHost(host: string): string {
+  return host.trim().replace(/^\[/, "").replace(/\]$/, "").split("%")[0].toLowerCase();
+}
+
+function isLoopbackAddress(address: string): boolean {
+  const normalized = normalizeHost(address);
+  if (isIP(normalized) === 4) return normalized.startsWith("127.");
+  if (isIP(normalized) === 6) {
+    return normalized === "::1" || /^::ffff:127(?:\.\d{1,3}){3}$/.test(normalized);
   }
+  return false;
+}
+
+/**
+ * Resolves every hostname address and accepts only hosts whose entire address
+ * set is loopback. Resolution failures deliberately fail closed.
+ */
+export async function isLoopbackBindHost(host: string): Promise<boolean> {
+  const normalized = normalizeHost(host);
+  if (isIP(normalized)) return isLoopbackAddress(normalized);
+
+  try {
+    const addresses = await lookup(normalized, { all: true, verbatim: true });
+    return addresses.length > 0 && addresses.every(({ address }) => isLoopbackAddress(address));
+  } catch {
+    return false;
+  }
+}
+
+export async function assertSafeBind(env: Env): Promise<void> {
+  if (env.API_KEY || env.CHRONA_UNSAFE_PUBLIC_BIND === "1") return;
+  if (await isLoopbackBindHost(env.HOST)) return;
 
   throw new Error(
     [
-      "Refusing to start Chrona on HOST=0.0.0.0 without API_KEY.",
+      `Refusing to start Chrona on non-loopback HOST=${env.HOST} without API_KEY.`,
       "This exposes your local Chrona API to your network.",
-      "Set API_KEY for protected access, bind to HOST=127.0.0.1, or explicitly set CHRONA_UNSAFE_PUBLIC_BIND=1 to allow unsafe public binding.",
+      "Set API_KEY, bind to a loopback address, or explicitly set CHRONA_UNSAFE_PUBLIC_BIND=1 to allow an unsafe public binding.",
     ].join(" "),
   );
 }
 
-export function isUnsafePublicBindOverride(env: Env): boolean {
-  return env.HOST === "0.0.0.0" && !env.API_KEY && env.CHRONA_UNSAFE_PUBLIC_BIND === "1";
+export async function isUnsafePublicBindOverride(env: Env): Promise<boolean> {
+  return !env.API_KEY
+    && env.CHRONA_UNSAFE_PUBLIC_BIND === "1"
+    && !(await isLoopbackBindHost(env.HOST));
 }

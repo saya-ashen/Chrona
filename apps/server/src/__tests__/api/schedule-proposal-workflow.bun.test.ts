@@ -12,8 +12,8 @@ import type { Context } from "hono";
 import { db } from "@chrona/db";
 import { ScheduleSource } from "@chrona/db/generated/prisma/client";
 import { scheduleProposalBodySchema } from "@chrona/contracts/api";
-import { decideScheduleProposal } from "@chrona/engine/modules/scheduling/decide-schedule-proposal";
-import { proposeSchedule } from "@chrona/engine/modules/scheduling/propose-schedule";
+import { decideScheduleProposal } from "@chrona/engine/test-support";
+import { proposeSchedule } from "@chrona/engine/test-support";
 import { resetTestDb, seedScheduleProposal, seedWorkspace, seedTask } from "../bun-test-helpers";
 
 // ---------------------------------------------------------------------------

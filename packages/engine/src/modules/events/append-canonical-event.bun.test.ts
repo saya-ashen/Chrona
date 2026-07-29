@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "bun:test";
 import { db } from "@/lib/db";
 
-import { appendCanonicalEvent, appendRawEventLog } from "./append-canonical-event";
+import { appendCanonicalEvent, appendRawEventLog } from "@chrona/engine/test-support";
 
 async function resetDb() {
   await db.importedCalendarEvent.deleteMany();

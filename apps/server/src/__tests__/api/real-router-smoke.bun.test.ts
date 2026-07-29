@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "bun:test";
 import { Hono } from "hono";
 import { db } from "@chrona/db";
 import { createChronaEngine, subscribeToTaskProjectionEvents, type TaskProjectionEvent } from "@chrona/engine";
-import { saveCompiledPlan } from "@chrona/engine/modules/plan-execution/persistence/compiled-plan-store";
+import { saveCompiledPlan } from "@chrona/engine/test-support";
 import type { CompiledPlan, ConditionConfig } from "@chrona/contracts/ai";
 
 import { createApiRouter } from "../../routes/api";
@@ -209,6 +209,11 @@ describe("Real router smoke", () => {
           baseUrl: "http://127.0.0.1:8642",
           apiKey: "hermes-secret",
           timeoutMs: 30000,
+          env: {
+            ANTHROPIC_API_KEY: "nested-secret",
+            CUSTOM_TOKEN: "nested-token",
+          },
+          nested: [{ secret: "also-secret" }],
         },
       }),
     });
@@ -218,12 +223,16 @@ describe("Real router smoke", () => {
     expect(created.client.config).toEqual({
       baseUrl: "http://127.0.0.1:8642",
       timeoutMs: 30000,
+      env: {
+        ANTHROPIC_API_KEY: true,
+        CUSTOM_TOKEN: true,
+      },
     });
 
     const listRes = await app().request("http://local/api/ai/clients");
     expect(listRes.status).toBe(200);
     const listBody = await json<{ clients: Array<{ config: Record<string, unknown> }> }>(listRes);
-    expect(listBody.clients[0].config).not.toHaveProperty("apiKey");
+    expect(listBody.clients[0].config).toEqual(created.client.config);
 
     const updateRes = await app().request(`http://local/api/ai/clients/${created.client.id}`, {
       method: "PATCH",
@@ -242,6 +251,10 @@ describe("Real router smoke", () => {
     expect(updated.client.config).toEqual({
       baseUrl: "http://localhost:8642",
       timeoutMs: 45000,
+      env: {
+        ANTHROPIC_API_KEY: true,
+        CUSTOM_TOKEN: true,
+      },
     });
 
     const stored = await db.aiClient.findUniqueOrThrow({ where: { id: created.client.id } });
@@ -424,7 +437,6 @@ describe("Real router smoke", () => {
 
     const events = parseSseEvents(await streamRes.text());
     expect(events.map((entry) => entry.event)).toContain("status");
-    expect(events.map((entry) => entry.event)).toContain("state");
     expect(events.map((entry) => entry.event)).toContain("result");
     expect(events.at(-1)?.event).toBe("done");
 

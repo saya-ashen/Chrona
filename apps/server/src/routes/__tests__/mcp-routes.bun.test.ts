@@ -1,7 +1,10 @@
-import { describe, expect, it } from "bun:test";
+import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { Hono } from "hono";
 import { LATEST_PROTOCOL_VERSION } from "@modelcontextprotocol/sdk/types.js";
 import type { ChronaToolName } from "@chrona/contracts/api";
+import { db } from "@chrona/db";
+import { createChronaEngine } from "@chrona/engine";
+import { resetTestDb, seedTask, seedWorkspace } from "../../__tests__/bun-test-helpers";
 import { __mcpRouteTestHooks, createMcpRoutes } from "../mcp/mcp.routes";
 
 type CapturedToolOperation = {
@@ -42,6 +45,56 @@ const blockPayload = {
     inputFields: [{ name: "apiDetails", label: "API details" }],
   },
 };
+
+const persistedEngine = createChronaEngine();
+
+async function seedCapabilitySession(input: {
+  sessionKey: string;
+  capabilityScope: "plan_generation" | "plan_execution";
+  allowedToolNames: ChronaToolName[];
+  nodeId?: string;
+}) {
+  const { workspaceId } = await seedWorkspace("MCP Routes Test");
+  const { taskId } = await seedTask(workspaceId, { status: "Running" });
+  const session = await db.taskSession.create({
+    data: {
+      taskId,
+      runtimeName: "hermes",
+      sessionKey: input.sessionKey,
+      status: "running",
+      activeRunId: `run:${input.sessionKey}`,
+      capabilityScope: input.capabilityScope,
+      allowedToolNames: JSON.stringify(input.allowedToolNames),
+    },
+  });
+  await db.run.create({
+    data: {
+      id: `run:${input.sessionKey}`,
+      taskId,
+      taskSessionId: session.id,
+      runtimeName: "hermes",
+      status: "Running",
+      triggeredBy: "agent",
+    },
+  });
+  if (input.nodeId) {
+    await db.executionSession.create({
+      data: { workspaceId, taskId, status: "Active", currentNodeId: input.nodeId, startedAt: new Date() },
+    });
+  }
+  return session;
+}
+
+async function callPersistedTool(toolName: ChronaToolName, input: Record<string, unknown>) {
+  const { sessionId, ...payload } = input;
+  return __mcpRouteTestHooks.callChronaTool(
+    persistedEngine,
+    toolName,
+    payload,
+    undefined,
+    typeof sessionId === "string" ? sessionId : undefined,
+  );
+}
 
 
 function createStubEngine(
@@ -115,6 +168,7 @@ function callTool(
   );
 }
 
+
 type ToolCallResult = Awaited<ReturnType<typeof callTool>>;
 
 function expectStructuredContent(result: ToolCallResult) {
@@ -130,6 +184,13 @@ function expectTextContent(result: ToolCallResult) {
 
 
 describe("MCP routes", () => {
+  beforeEach(async () => {
+    await resetTestDb();
+  });
+
+  afterEach(async () => {
+    await resetTestDb();
+  });
   it("responds to standard MCP initialize", async () => {
     const response = await app().request("/api/mcp", {
       method: "POST",
@@ -492,51 +553,67 @@ describe("MCP routes", () => {
   });
 
   it("rejects execution tools in plan generation sessions before dispatch", async () => {
-    const operations: CapturedToolOperation[] = [];
-    const result = await callTool("chrona.execution.read", {
-      _meta: { sessionId: "chrona:task:task-1:plan-generation" },
-    }, { operations });
+    const session = await seedCapabilitySession({
+      sessionKey: "chrona:task:task-1:plan-generation",
+      capabilityScope: "plan_generation",
+      allowedToolNames: ["chrona.plan.generate", "chrona.plan.read", "chrona.goal.results.read"],
+    });
+    const result = await callPersistedTool("chrona.execution.read", {
+      sessionId: session.id,
+    });
 
-    expect(operations).toHaveLength(0);
+    await expect(
+      persistedEngine.agentTools.resolveInputContext({
+        sessionId: session.id,
+        actorType: "agent",
+        payload: {},
+      }, "chrona.execution.read"),
+    ).rejects.toThrow("is not granted");
     expect(result).toMatchObject({
       isError: true,
       structuredContent: {
         status: "rejected",
         reasonCode: "UNAUTHORIZED",
-        recovery: { action: "stop" },
+        recovery: { action: "use_allowed_tool" },
       },
     });
   });
 
   it("rejects execution tools in work-block plan generation sessions", async () => {
-    const operations: CapturedToolOperation[] = [];
-    const result = await callTool("chrona.node.complete", {
+    const session = await seedCapabilitySession({
+      sessionKey: "chrona:task:task-1:work-block:block-1:plan-generation",
+      capabilityScope: "plan_generation",
+      allowedToolNames: ["chrona.plan.generate", "chrona.plan.read", "chrona.goal.results.read"],
+    });
+    const result = await callPersistedTool("chrona.node.complete", {
+      sessionId: session.id,
       summary: "Done",
-      _meta: { sessionId: "chrona:task:task-1:work-block:block-1:plan-generation" },
-    }, { operations });
+    });
 
-    expect(operations).toHaveLength(0);
     expect(result).toMatchObject({
       isError: true,
       structuredContent: {
         status: "rejected",
         reasonCode: "UNAUTHORIZED",
-        recovery: { action: "stop" },
+        recovery: { action: "use_allowed_tool" },
       },
     });
   });
 
   it("rejects plan generation in execution sessions before dispatch", async () => {
-    const operations: CapturedToolOperation[] = [];
-    const result = await callTool("chrona.plan.generate", {
+    const session = await seedCapabilitySession({
+      sessionKey: "chrona:task:task-1:work-block:block-1",
+      capabilityScope: "plan_execution",
+      allowedToolNames: ["chrona.execution.read", "chrona.node.complete"],
+    });
+    const result = await callPersistedTool("chrona.plan.generate", {
+      sessionId: session.id,
       title: "Generated MCP plan",
       goal: "Persist a complete graph",
       nodes: [{ id: "first_step", type: "task", title: "First step" }],
       edges: [],
-      _meta: { sessionId: "chrona:task:task-1:work-block:block-1" },
-    }, { operations });
+    });
 
-    expect(operations).toHaveLength(0);
     expect(result).toMatchObject({
       isError: true,
       structuredContent: {

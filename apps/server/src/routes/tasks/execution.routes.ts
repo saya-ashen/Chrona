@@ -2,7 +2,6 @@ import { Hono } from "hono";
 import { streamSSE } from "hono/streaming";
 import { zValidator } from "@hono/zod-validator";
 import type { ChronaEngine } from "@chrona/engine";
-import { rebuildTaskProjection } from "@chrona/engine";
 import { db } from "@chrona/db";
 import {
   checkpointActionBodySchema,
@@ -301,88 +300,20 @@ export function createExecutionRoutes(engine: ChronaEngine) {
       try {
         const { taskId, approvalId } = c.req.valid("param");
         const body = c.req.valid("json");
-        const approval = await db.taskPlanProviderApproval.findFirst({
-          where: { id: approvalId, taskId },
-          include: { providerRun: true },
-        });
-        if (!approval) {
-          return error(c, "Provider approval not found", 404);
-        }
-        if (approval.status !== "pending") {
-          return c.json({
-            approval: toApprovalReadModel(approval),
-            provider: approval.provider,
-            runId: approval.nativeRunId ?? approval.providerRun.providerRunRef ?? approval.providerRunId,
-            choice: body.choice,
-            resolved: 0,
-            status: "not_pending" as const,
-          });
-        }
-        const choices = Array.isArray(approval.choices) ? approval.choices : [];
-        if (!choices.includes(body.choice)) {
-          return error(c, "Approval choice is not allowed", 400);
-        }
-        const client = await engine.runtime.aiClients.get();
-        const providerClient = client?.providerClient;
-        if (!providerClient || providerClient.provider !== approval.provider || !providerClient.resolveApproval) {
-          const now = new Date();
-          const updated = await db.taskPlanProviderApproval.update({
-            where: { id: approval.id },
-            data: {
-              status: "failed",
-              resolvedAt: now,
-              choice: body.choice,
-              resolveAll: body.resolveAll === true,
-              error: toJsonInput({ message: "Provider does not support approval resolution" }),
-              resolutionRaw: toJsonInput({ status: "not_active", reason: "unsupported_provider_resolution" }),
-            },
-          });
-          await db.taskPlanProviderRun.update({
-            where: { id: approval.providerRunId },
-            data: { status: "failed", finishedAt: now },
-          }).catch(() => undefined);
-          await rebuildTaskProjection(taskId);
-          return c.json({
-            approval: toApprovalReadModel(updated),
-            provider: approval.provider,
-            runId: approval.providerRun.providerRunRef ?? approval.nativeRunId ?? approval.providerRunId,
-            choice: body.choice,
-            resolved: 0,
-            status: "not_active" as const,
-          });
-        }
-        const resolution = await providerClient.resolveApproval({
-          runId: approval.providerRun.providerRunRef ?? approval.nativeRunId ?? approval.providerRunId,
-          nativeRunId: approval.nativeRunId ?? approval.providerRun.nativeRunId ?? undefined,
-          approvalId: approval.approvalRef ?? undefined,
+        const result = await engine.tasks.execution.resolveProviderApproval({
+          taskId,
+          approvalId,
           choice: body.choice,
           resolveAll: body.resolveAll,
-          reason: body.note,
+          note: body.note,
         });
-        const status = resolution.status === "resolved"
-          ? body.choice === "deny" ? "denied" : "approved"
-          : resolution.status === "not_pending" ? "superseded" : "failed";
-        const updated = await db.taskPlanProviderApproval.update({
-          where: { id: approval.id },
-          data: {
-            status,
-            resolvedAt: new Date(),
-            choice: body.choice,
-            resolveAll: body.resolveAll === true,
-            resolutionRaw: resolution.raw === undefined || resolution.raw === null ? undefined : resolution.raw,
-          },
-        });
-        await db.taskPlanProviderRun.update({
-          where: { id: approval.providerRunId },
-          data: { status: resolution.status === "resolved" ? "running" : approval.providerRun.status },
-        }).catch(() => undefined);
         return c.json({
-          approval: toApprovalReadModel(updated),
-          provider: resolution.provider,
-          runId: resolution.runId,
-          choice: resolution.choice,
-          resolved: resolution.resolved,
-          status: resolution.status,
+          approval: toApprovalReadModel(result.approval),
+          provider: result.provider,
+          runId: result.runId,
+          choice: result.choice,
+          resolved: result.resolved,
+          status: result.status,
         });
       } catch (cause) {
         const httpError = toHttpError(cause);

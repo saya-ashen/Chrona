@@ -6,13 +6,13 @@ import {
   useMemo,
   useRef,
   useState,
-  type MouseEvent,
 } from "react";
 import { X } from "lucide-react";
 import {
   useEdgesState,
   useNodesState,
   type NodeMouseHandler,
+  type OnNodeDrag,
 } from "@xyflow/react";
 import { useI18n } from "@chrona/i18n"
 import { Dialog,
@@ -109,7 +109,7 @@ function GraphShell({
   edgeLegend: ReturnType<typeof useGraphLegend>["edgeLegend"];
   nodeLegend: ReturnType<typeof useGraphLegend>["nodeLegend"];
   handleNodeClick: NodeMouseHandler<FlowGraphNode>;
-  stopIfNodeButton: (event: MouseEvent<Element>) => void;
+  stopIfNodeButton: OnNodeDrag<FlowGraphNode>;
   onCenterCurrentNode: () => void;
   onExpandGraph: () => void;
   onFitGraph: () => void;
@@ -218,7 +218,7 @@ export function TaskPlanGraph({
     [handleNodeSelect],
   );
 
-  const stopIfNodeButton = useCallback((event: MouseEvent<Element>) => {
+  const stopIfNodeButton = useCallback<OnNodeDrag<FlowGraphNode>>((event) => {
     const target = event.target as HTMLElement | null;
     if (target?.closest("button[data-testid^='task-plan-node-']")) {
       event.preventDefault();

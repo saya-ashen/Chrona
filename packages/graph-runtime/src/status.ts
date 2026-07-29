@@ -2,7 +2,7 @@ import {
   runtimeProgressStatusForNodes,
   runtimeProgressStatusForWaitKind,
 } from "./types/runtime";
-import type { EffectivePlanGraph, WaitKind } from "./types";
+import type { EffectivePlanGraph, WaitKind } from "@chrona/contracts/ai";
 
 export type GraphExecutionStatus =
   | "running"

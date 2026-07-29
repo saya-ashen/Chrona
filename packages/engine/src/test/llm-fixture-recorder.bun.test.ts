@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, describe, expect, test } from "bun:test";
 import type { ProviderRunSnapshot } from "@chrona/providers-foundation";
-import type { ProviderFeatureRequest } from "../modules/ai/providers";
+import type { ProviderFeatureRequest } from "@chrona/engine/test-support";
 import { cassettePath, withProviderResponseFixture } from "./llm-fixture-recorder";
 
 const tempDirs: string[] = [];

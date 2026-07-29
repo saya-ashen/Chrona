@@ -1,4 +1,5 @@
 import type { UiDocument } from "../document/document";
+import { ActionBindingSchema, type ActionBinding } from "@json-render/core";
 
 export interface ActionFieldInput {
   key: string;
@@ -41,6 +42,30 @@ function primaryAction(actions: ActionItemInput[]): ActionItemInput | undefined 
   return actions.find((a) => a.emphasis === "primary") ?? actions[0];
 }
 
+
+function checkpointActionBinding(checkpointAction: string | { $state: string } | null): ActionBinding {
+  return ActionBindingSchema.parse({
+    action: "submit-checkpoint",
+    params: {
+      checkpointAction,
+      values: { $state: "/" },
+    },
+  });
+}
+
+function actionBindingFor(primary: ActionItemInput, hasMultipleCheckpoints: boolean): ActionBinding {
+  if (primary.executionAction) {
+    return ActionBindingSchema.parse({
+      action: "dispatch-execution",
+      params: { actionId: primary.id },
+    });
+  }
+
+  return checkpointActionBinding(
+    hasMultipleCheckpoints ? { $state: "/__checkpointAction" } : (primary.checkpointAction ?? null),
+  );
+}
+
 /**
  * Deterministically build a Node-action {@link UiDocument} from typed
  * plan-node fields and available actions (plan §5.2). Mirrors the layout of
@@ -56,8 +81,10 @@ function primaryAction(actions: ActionItemInput[]): ActionItemInput | undefined 
  *
  * Note: `$bindState` references in field `value` props are resolved by
  * json-render's `StateProvider` at render time. These props intentionally do
- * not conform to the catalog Zod string schema, so backend action specs skip
- * `validateChronaSpec` (plan §7, D3).
+ * not conform to the catalog Zod string schema, so backend action specs must
+ * be validated with `validateChronaSpec`, which accepts dynamic expressions.
+ * Action bindings are parsed through json-render's `ActionBindingSchema`
+ * before they become part of the document.
  */
 export function buildActionSpec(input: ActionSpecInput): UiDocument {
   const { fields, actions, submittedValues, isReadOnly = false, nodeNextAction, disabledReason, disabledButton } = input;
@@ -101,7 +128,9 @@ export function buildActionSpec(input: ActionSpecInput): UiDocument {
     // ensures the submitted value renders.
     state[field.key] = fieldValue;
     const boundValue = { $bindState: stateKey };
-    const checks = !isReadOnly && field.required ? [{ type: "required" }] : undefined;
+    const checks = !isReadOnly && field.required
+      ? [{ type: "required", message: `${field.label} is required` }]
+      : undefined
 
     const baseProps: Record<string, unknown> = {
       label: field.label,
@@ -169,23 +198,7 @@ export function buildActionSpec(input: ActionSpecInput): UiDocument {
   if (!isReadOnly && actions.length > 0) {
     const primary = primaryAction(actions);
     if (primary) {
-      const actionBinding: Record<string, unknown> = primary.executionAction
-        ? { action: "dispatch-execution", params: { actionId: primary.id } }
-        : hasMultipleCheckpoints
-          ? {
-              action: "submit-checkpoint",
-              params: {
-                checkpointAction: { $state: "/__checkpointAction" },
-                values: { $state: "/" },
-              },
-            }
-          : {
-              action: "submit-checkpoint",
-              params: {
-                checkpointAction: primary.checkpointAction ?? null,
-                values: { $state: "/" },
-              },
-            };
+      const actionBinding = actionBindingFor(primary, hasMultipleCheckpoints);
 
       elements.submit = {
         type: "Button",
@@ -194,8 +207,7 @@ export function buildActionSpec(input: ActionSpecInput): UiDocument {
           variant: primary.emphasis === "danger" ? "danger" : "primary",
           ...((disabledReason || disabledButton) && { disabled: true }),
         },
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        on: { press: actionBinding as any },
+        on: { press: actionBinding }
       };
       rootChildren.push("submit");
     }

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "bun:test";
 import { db } from "@chrona/db";
-import { proposeSchedule } from "@chrona/engine/modules/scheduling/propose-schedule";
+import { proposeSchedule } from "@chrona/engine/test-support";
 import { resetTestDb, seedTask, seedWorkspace } from "../bun-test-helpers";
 
 // proposeSchedule — engine-layer unit for the schedule-proposal creation

@@ -1,48 +1,25 @@
-import { Activity, TerminalSquare, TriangleAlert } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { createStateStore } from "@json-render/react";
-import { buildResultSpec, type UiDocument } from "@chrona/ui-protocol";
+import { TriangleAlert } from "lucide-react";
+import type { ReactNode } from "react";
+import type { UiDocument } from "@chrona/ui-protocol";
 import type { PlanExecutionResult } from "@chrona/contracts";
 import { useI18n } from "@chrona/i18n";
 import type { WorkspaceRuntimeEvent } from "../model/workspace-runtime-events";
-import type {
-  ExecutionOverviewCard,
-  PlanNodeDataModel,
-  ProgressSummary,
-  WorkspaceActivityItem,
-  WorkspaceArtifactItem,
-} from "@features/task-workspace";
-import { ActivityTimeline, mergeWorkspaceActivity, runtimeEventsToWorkspaceActivity, SpecRenderer } from "@features/task-workspace";
+import type { ExecutionOverviewCard, PlanNodeDataModel, ProgressSummary, WorkspaceActivityItem, WorkspaceArtifactItem } from "@features/task-workspace/public/workspace-integration";
+import { ExecutionOverviewContent } from "./execution-overview-content";
 import {
-  buildCommandCenterOutputTabSpec,
-  type ResultNodeFilter,
-  type ResultNodeOption,
-} from "./build-execution-overview-spec";
+  DEFAULT_COMMAND_CENTER_COPY,
+  resultStatusFor,
+  type CommandCenterCopy,
+} from "./execution-overview-model";
 import {
-  Badge,
-  Button,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-  Sheet,
-  SheetContent,
-  SheetDescription,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
-} from "@shared/ui";
+  useExecutionOverviewActivity,
+  useExecutionOverviewOutput,
+} from "./execution-overview-hooks";
 
 type OverviewAction = (nodeId?: string) => void;
+type ActivityLayout = "below" | "side";
+
+export type { CommandCenterCopy } from "./execution-overview-model";
 
 export type CommandCenterPrimaryAction = {
   kind?: string;
@@ -54,202 +31,12 @@ export type CommandCenterPrimaryAction = {
   isLoading?: boolean;
   onClick?: () => void;
   actionSpec?: UiDocument | null;
-  actionHandlers?: Record<
-    string,
-    (params: Record<string, unknown>) => Promise<unknown> | unknown
-  >;
-  onActionStateChange?: (
-    changes: Array<{ path: string; value: unknown }>,
-  ) => void;
+  actionHandlers?: Record<string, (params: Record<string, unknown>) => Promise<unknown> | unknown>;
+  onActionStateChange?: (changes: Array<{ path: string; value: unknown }>) => void;
   suppressAttentionCard?: boolean;
 };
 
-export type CommandCenterCopy = {
-  nowTab: string;
-  outputTab: string;
-  trailTab: string;
-};
-
-const DEFAULT_COMMAND_CENTER_COPY: CommandCenterCopy = {
-  nowTab: "Now",
-  outputTab: "Results",
-  trailTab: "Activity",
-};
-
-const TRAIL_ACTIVITY_LIMIT = 300;
-const LIVE_RESULT_UPDATE_INTERVAL_MS = 100;
-type ResultCollapseCommandState = {
-  mode: "collapse" | "expand";
-  revision: number;
-};
-
-function commandCenterTrailItems(
-  commandCenter?: { documents: { trail: UiDocument } } | null,
-) {
-  const items = commandCenter?.documents.trail.state?.trail;
-  if (!items || typeof items !== "object" || Array.isArray(items)) return [];
-  const trailItems = (items as { items?: unknown }).items;
-  return Array.isArray(trailItems)
-    ? (trailItems as WorkspaceActivityItem[])
-    : [];
-}
-
-function hasCommandCenterOutput(document: UiDocument | null | undefined) {
-  if (!document?.root) return false;
-  const root = document.elements[document.root];
-  const children = root?.children ?? [];
-  if (children.length !== 1) return children.length > 0;
-  const onlyChild = document.elements[children[0]!];
-  return onlyChild?.type !== "WorkspaceArtifactList"
-    || (onlyChild.children?.length ?? 0) > 0;
-}
-
-function buildNodeResultContentSpec(
-  node: PlanNodeDataModel | null,
-  emptyMessage: string,
-) {
-  const summary = node?.result?.outputSummary?.trim()
-    || node?.completionSummary?.trim();
-  if (!summary) return buildResultSpec([], { emptyMessage });
-  return buildResultSpec([
-    { kind: "markdown", title: node?.title, content: summary },
-  ]);
-}
-
-function isAssistantTextEvent(
-  runtimeEvent: WorkspaceRuntimeEvent,
-): runtimeEvent is WorkspaceRuntimeEvent & {
-  event: Extract<WorkspaceRuntimeEvent["event"], { type: "assistant_text_delta" }>;
-} {
-  return runtimeEvent.event.type === "assistant_text_delta";
-}
-
-type LiveResult = {
-  content: string;
-  ownerNodeId: string | null;
-};
-
-function collectLiveResult(runtimeEvents: WorkspaceRuntimeEvent[]) {
-  let text = "";
-  let ownerNodeId: string | null = null;
-  for (const runtimeEvent of runtimeEvents) {
-    if (!isAssistantTextEvent(runtimeEvent)) continue;
-    text += runtimeEvent.event.text;
-    ownerNodeId = runtimeEvent.nodeId ?? null;
-  }
-  const content = text.trim();
-  return content ? { content, ownerNodeId } : null;
-}
-
-function sameLiveResult(left: LiveResult | null, right: LiveResult | null) {
-  return left?.content === right?.content
-    && left?.ownerNodeId === right?.ownerNodeId;
-}
-
-function useBufferedLiveResult(runtimeEvents: WorkspaceRuntimeEvent[]) {
-  const nextResult = useMemo(
-    () => collectLiveResult(runtimeEvents),
-    [runtimeEvents],
-  );
-  const [publishedResult, setPublishedResult] = useState(nextResult);
-  const publishedResultRef = useRef(publishedResult);
-  const latestResultRef = useRef(nextResult);
-  const lastPublishedAtRef = useRef(performance.now());
-  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  latestResultRef.current = nextResult;
-
-  useEffect(() => {
-    if (sameLiveResult(publishedResultRef.current, nextResult)) return;
-
-    const publish = () => {
-      timerRef.current = null;
-      const latestResult = latestResultRef.current;
-      if (sameLiveResult(publishedResultRef.current, latestResult)) return;
-      publishedResultRef.current = latestResult;
-      lastPublishedAtRef.current = performance.now();
-      setPublishedResult(latestResult);
-    };
-    const elapsed = performance.now() - lastPublishedAtRef.current;
-    if (
-      publishedResultRef.current === null
-      || nextResult === null
-      || elapsed >= LIVE_RESULT_UPDATE_INTERVAL_MS
-    ) {
-      if (timerRef.current !== null) clearTimeout(timerRef.current);
-      publish();
-      return;
-    }
-    if (timerRef.current === null) {
-      timerRef.current = setTimeout(
-        publish,
-        LIVE_RESULT_UPDATE_INTERVAL_MS - elapsed,
-      );
-    }
-  }, [nextResult]);
-
-  useEffect(() => () => {
-    if (timerRef.current !== null) clearTimeout(timerRef.current);
-  }, []);
-
-  return publishedResult;
-}
-
-function isSameToolActivity(
-  left: WorkspaceActivityItem,
-  right: WorkspaceActivityItem,
-) {
-  return (
-    left.sourceNodeId === right.sourceNodeId &&
-    left.runId === right.runId &&
-    left.nativeRunId === right.nativeRunId &&
-    left.tool?.name === right.tool?.name
-  );
-}
-
-function hasCompletedToolActivity(
-  item: WorkspaceActivityItem,
-  items: WorkspaceActivityItem[],
-) {
-  if (item.tool?.state !== "started") return false;
-  return items.some(
-    (candidate) =>
-      candidate.kind === "tool_completed" &&
-      candidate.tool?.state !== "started" &&
-      isSameToolActivity(item, candidate),
-  );
-}
-
-function isRunningActivity(
-  item: WorkspaceActivityItem,
-  items: WorkspaceActivityItem[],
-) {
-  if (item.tool?.state === "started")
-    return !hasCompletedToolActivity(item, items);
-  if (item.rawEventType === "turn_start" || item.rawEventType === "turn_end") return false;
-  return item.kind === "provider_run" && item.tone === "info";
-}
-
-type ActivityLayout = "below" | "side";
-
-export function TaskWorkspaceExecutionOverview({
-  taskId,
-  latestCompletedNode,
-  nodes = [],
-  artifacts,
-  activity,
-  currentExecution,
-  onRetryFinalization,
-  isRetryingFinalization = false,
-  finalizationRetryError,
-  runtimeEvents = [],
-  liveActivity = [],
-  copy: copyProp,
-  commandCenter,
-  isExecutionRunning = false,
-  executionResultState = "waiting",
-  onAction,
-}: {
+export type TaskWorkspaceExecutionOverviewProps = {
   taskId: string;
   progress: ProgressSummary;
   readiness: ExecutionOverviewCard;
@@ -279,467 +66,90 @@ export function TaskWorkspaceExecutionOverview({
       trail: UiDocument;
     };
   } | null;
-  commandCenterActionHandlers?: Record<
-    string,
-    (params: Record<string, unknown>) => Promise<unknown> | unknown
-  >;
-}) {
-  const { messages } = useI18n();
-  const ws = messages.components.taskWorkspace;
-  const copy = { ...DEFAULT_COMMAND_CENTER_COPY, ...copyProp };
+  commandCenterActionHandlers?: Record<string, (params: Record<string, unknown>) => Promise<unknown> | unknown>;
+};
 
-  const trailStore = useMemo(
-    () =>
-      commandCenter?.documents.trail
-        ? createStateStore(commandCenter.documents.trail.state ?? {})
-        : null,
-    [commandCenter?.documents.trail],
-  );
-  const savedTrailActivity = useMemo(
-    () =>
-      commandCenter?.documents.trail
-        ? commandCenterTrailItems(commandCenter)
-        : activity,
-    [activity, commandCenter],
-  );
-  const liveRuntimeActivity = useMemo(
-    () => runtimeEventsToWorkspaceActivity(runtimeEvents, TRAIL_ACTIVITY_LIMIT),
-    [runtimeEvents],
-  );
-  const mergedActivity = useMemo(
-    () =>
-      mergeWorkspaceActivity(
-        [...liveActivity, ...liveRuntimeActivity, ...savedTrailActivity],
-        TRAIL_ACTIVITY_LIMIT,
-      ),
-    [liveActivity, liveRuntimeActivity, savedTrailActivity],
-  );
-  const activeActivity = mergedActivity.find((item) =>
-    isRunningActivity(item, mergedActivity),
-  );
-  const executionIsWaitingForHuman = currentExecution?.status === "waiting_for_user"
-    || currentExecution?.status === "waiting_for_approval";
-  const executionIsLive = !executionIsWaitingForHuman && (
-    isExecutionRunning
-    || currentExecution?.status === "running"
-    || currentExecution?.status === "started"
-  );
-  const executionIsActive = executionIsLive || executionIsWaitingForHuman;
-  const finalization = currentExecution?.planOutput?.finalization;
-  const finalizationFailed = !executionIsActive && finalization?.status === "Failed";
-  const finalizationRunning = !executionIsActive && finalization?.status === "Running";
-  const finalizationReady = !executionIsActive && finalization?.status === "Ready";
-  const activityHeartbeat = useMemo<WorkspaceActivityItem | null>(() => {
-    if (!executionIsLive || activeActivity) return null;
-    const latestRuntime = runtimeEvents.at(-1);
-    return {
-      id: "execution-live-heartbeat",
-      kind: "provider_run",
-      title: "AI is working",
-      summary: latestRuntime?.nodeTitle
-        ? `Working on ${latestRuntime.nodeTitle}`
-        : "Working on the current step",
-      description: "Execution is active. Waiting for the provider's next progress update.",
-      tone: "info",
-      timestamp: latestRuntime?.timestamp ?? null,
-      sourceNodeId: latestRuntime?.nodeId,
-      sourceNodeTitle: latestRuntime?.nodeTitle,
-      provider: latestRuntime?.provider,
-      runtimeName: latestRuntime?.runtimeName,
-    };
-  }, [activeActivity, executionIsLive, runtimeEvents]);
-  const displayedActivity = useMemo(
-    () => activityHeartbeat
-      ? mergeWorkspaceActivity([activityHeartbeat, ...mergedActivity], TRAIL_ACTIVITY_LIMIT)
-      : mergedActivity,
-    [activityHeartbeat, mergedActivity],
-  );
-  const showLiveStatus = executionIsLive;
-  const activityItems = displayedActivity;
-  const failedActivityCount = activityItems.filter((item) => item.tone === "danger").length;
-  const activitySummary = executionIsLive
-    ? `${activityItems.length} events · live`
-    : `${activityItems.length} events${failedActivityCount > 0 ? ` · ${failedActivityCount} failed` : ""}`;
-  const failedActivity = activityItems.find((item) => item.tone === "danger");
-  const failedNode = nodes.find((node) => node.status === "failed");
-  const failedNodeError = failedNode?.result?.error?.trim()
-    || (typeof failedNode?.metadata?.error === "string" ? failedNode.metadata.error.trim() : "")
-    || null;
-  const executionHasFatalFailure = currentExecution?.status === "failed"
-    || currentExecution?.status === "blocked";
-  const failureSummary = failedNodeError
-    || failedActivity?.summary
-    || (failedNode ? `${failedNode.title} failed.` : null);
-  const failureAlert = executionHasFatalFailure && failureSummary ? (
+function ExecutionFailureAlert({ summary }: { summary: string | null }): ReactNode {
+  if (!summary) return null;
+  return (
     <div className="mb-3 flex items-start gap-2 rounded-lg border border-destructive/25 bg-destructive/5 px-3 py-2" role="alert">
       <TriangleAlert className="mt-0.5 size-4 shrink-0 text-destructive" aria-hidden />
       <div className="min-w-0">
         <p className="text-xs font-semibold text-destructive">Run had a failure</p>
-        <p className="mt-0.5 text-xs text-muted-foreground">{failureSummary}</p>
+        <p className="mt-0.5 text-xs text-muted-foreground">{summary}</p>
       </div>
     </div>
-  ) : null;
-  const activityContent = (
-    <ActivityTimeline
-      items={activityItems}
-      density="detailed"
-      active={showLiveStatus}
-      transcript
-    />
   );
+}
 
-  useEffect(() => {
-    if (!trailStore) return;
-    trailStore.set("/trail/items", displayedActivity);
-    trailStore.set(
-      "/trail/liveCount",
-      liveActivity.length + runtimeEvents.length,
-    );
-    trailStore.set("/trail/savedCount", savedTrailActivity.length);
-    trailStore.set("/trail/provider", runtimeEvents.at(-1)?.provider ?? null);
-  }, [
-    displayedActivity,
-    liveActivity.length,
+export function TaskWorkspaceExecutionOverview({
+  taskId,
+  latestCompletedNode,
+  nodes = [],
+  artifacts,
+  activity,
+  currentExecution,
+  onRetryFinalization,
+  isRetryingFinalization = false,
+  finalizationRetryError,
+  runtimeEvents = [],
+  liveActivity = [],
+  copy: copyProp,
+  commandCenter,
+  isExecutionRunning = false,
+  executionResultState = "waiting",
+  onAction,
+}: TaskWorkspaceExecutionOverviewProps) {
+  const { messages } = useI18n();
+  const workspaceCopy = messages.components.taskWorkspace;
+  const copy = { ...DEFAULT_COMMAND_CENTER_COPY, ...copyProp };
+  const activityState = useExecutionOverviewActivity({
+    activity,
+    commandCenter,
+    currentExecution,
+    isExecutionRunning,
+    liveActivity,
+    nodes,
     runtimeEvents,
-    savedTrailActivity.length,
-    trailStore,
-  ]);
-
-  const nodeOptions = useMemo<ResultNodeOption[]>(() => {
-    const byId = new Map<string, ResultNodeOption>();
-    for (const node of nodes) {
-      byId.set(node.id, {
-        id: node.id,
-        title: node.title,
-        status: node.statusLabel ?? node.status,
-      });
-    }
-    for (const artifact of artifacts) {
-      if (artifact.sourceNodeId && !byId.has(artifact.sourceNodeId)) {
-        byId.set(artifact.sourceNodeId, {
-          id: artifact.sourceNodeId,
-          title: artifact.sourceNodeId,
-        });
-      }
-    }
-    return Array.from(byId.values());
-  }, [artifacts, nodes]);
-  const [selectedNodeId, setSelectedNodeId] = useState<ResultNodeFilter>("all");
-
-  useEffect(() => {
-    if (
-      selectedNodeId !== "all" &&
-      !nodeOptions.some((node) => node.id === selectedNodeId)
-    ) {
-      setSelectedNodeId("all");
-    }
-  }, [nodeOptions, selectedNodeId]);
-  const [resultCollapseCommand, setResultCollapseCommand] =
-    useState<ResultCollapseCommandState | null>(null);
-  const [transcriptOpen, setTranscriptOpen] = useState(false);
-  const issueResultCollapseCommand = (
-    mode: ResultCollapseCommandState["mode"],
-  ) => {
-    setResultCollapseCommand((current) => ({
-      mode,
-      revision: (current?.revision ?? 0) + 1,
-    }));
-  };
-
-  const locateHandlers = useMemo(() => ({
-    "locate-workspace-node": (params: Record<string, unknown>) => {
-      const nodeId =
-        typeof params.nodeId === "string" ? params.nodeId : undefined;
-      if (nodeId) onAction?.(nodeId);
-    },
-  }), [onAction]);
-  const liveResult = useBufferedLiveResult(runtimeEvents);
-  const liveResultSpec = useMemo(
-    () => executionIsActive && liveResult
-      ? buildResultSpec([{
-        kind: "markdown",
-        title: ws.currentStepOutputTitle ?? "Current step output",
-        content: liveResult.content,
-      }])
-      : null,
-    [executionIsActive, liveResult?.content, ws.currentStepOutputTitle],
-  );
-  const resultSpec = useMemo(
-    () => buildNodeResultContentSpec(latestCompletedNode, ws.noResultYet),
-    [latestCompletedNode, ws.noResultYet],
-  );
-
-  const outputSpec = useMemo(
-    () =>
-      buildCommandCenterOutputTabSpec({
-        latestCompletedNode,
-        resultSpec,
-        artifacts,
-        copy: ws,
-        liveResultSpec,
-        liveResultOwnerNodeId: liveResult?.ownerNodeId ?? null,
-        apiArtifactsSpec: hasCommandCenterOutput(commandCenter?.documents.output)
-          ? (commandCenter?.documents.output ?? null)
-          : null,
-        selectedNodeId,
-        nodeOptions,
-        outputOwnerNodeId:
-          currentExecution?.planOutput?.updatedByNodeId ?? null,
-      }),
-    [
-      artifacts,
-      commandCenter?.documents.output,
-      currentExecution?.planOutput?.updatedByNodeId,
-      liveResult?.ownerNodeId,
-      liveResultSpec,
-      latestCompletedNode,
-      nodeOptions,
-      resultSpec,
-      selectedNodeId,
-      ws,
-    ],
-  );
-
-
-  const results = (
-    <section
-      aria-label={
-        executionIsActive
-          ? (ws.stageResultsTitle ?? "Stage results")
-          : (ws.finalResultTitle ?? "Final result")
-      }
-      className="min-h-0 flex-1 overflow-y-auto"
-    >
-      <div className="mb-3 flex flex-wrap items-start justify-between gap-3 border-b border-border/70 pb-3">
-        <div className="min-w-0 space-y-1">
-          <h3
-            id="task-workspace-results-heading"
-            className="font-heading text-base font-semibold text-foreground"
-          >
-            {executionIsActive
-              ? (ws.stageResultsTitle ?? "Stage results")
-              : finalizationFailed
-                ? (ws.finalizationFailedTitle ?? "Final result unavailable")
-                : finalizationRunning
-                  ? (ws.finalizationRunningTitle ?? "Preparing final result")
-                  : (ws.finalResultTitle ?? "Final result")}
-          </h3>
-          <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-            <Badge
-              variant="outline"
-              className={
-                executionIsActive
-                  ? "bg-sky-500/10 text-sky-700 dark:text-sky-200"
-                  : finalizationFailed
-                    ? "border-destructive/30 bg-destructive/10 text-destructive"
-                    : finalizationRunning
-                      ? "bg-amber-500/10 text-amber-700 dark:text-amber-200"
-                      : "bg-violet-500/10 text-violet-700 dark:text-violet-200"
-              }
-            >
-              {executionIsActive
-                ? liveResultSpec || executionResultState === "available"
-                  ? (ws.resultsAvailableBadge ?? "Results available")
-                  : (ws.resultsPendingBadge ?? "No result yet")
-                : finalizationFailed
-                  ? (ws.finalizationFailedBadge ?? "Finalization failed")
-                  : finalizationRunning
-                    ? (ws.finalizationRunningBadge ?? "Preparing")
-                    : finalizationReady
-                      ? (ws.aiGeneratedBadge ?? "AI generated")
-                      : (ws.finalizationUnavailableBadge ?? "Artifacts only")}
-            </Badge>
-            <span>
-              {executionIsActive
-                ? liveResultSpec || executionResultState === "available"
-                  ? (ws.resultsAvailableDescription ??
-                    "Current output and completed step results collected during this run.")
-                  : (ws.resultsPendingDescription ??
-                    "The current step has not produced viewable output yet. Follow execution activity for live progress.")
-                : finalizationFailed
-                  ? (ws.finalizationFailedDescription ??
-                    "Chrona could not assemble the final result. Generated files remain available below.")
-                  : finalizationRunning
-                    ? (ws.finalizationRunningDescription ??
-                      "Chrona is assembling and validating the final result.")
-                    : finalizationReady
-                      ? (ws.validatedOutputDescription ??
-                        "Validated output from task execution.")
-                      : (ws.finalizationUnavailableDescription ??
-                        "The final result is unavailable. Generated files are shown below.")}
-            </span>
-          </div>
-          {finalizationFailed ? (
-            <div className="mt-3 space-y-2 rounded-xl border border-destructive/30 bg-destructive/5 px-3 py-3 text-sm" role="alert">
-              <p className="font-medium text-foreground">
-                {ws.finalizationFailedActionDescription ??
-                  "Retry finalization to assemble and validate the complete result."}
-              </p>
-              {finalizationRetryError ? (
-                <p className="text-xs text-destructive">{finalizationRetryError}</p>
-              ) : null}
-              <Button
-                type="button"
-                size="sm"
-                onClick={() => void onRetryFinalization?.()}
-                disabled={!onRetryFinalization || isRetryingFinalization}
-              >
-                {isRetryingFinalization
-                  ? (ws.finalizationRetrying ?? "Retrying finalization...")
-                  : (ws.finalizationRetry ?? "Retry finalization")}
-              </Button>
-            </div>
-          ) : null}
-        </div>
-        <div className="flex flex-wrap items-center justify-end gap-2">
-          {nodeOptions.length > 1 ? (
-            <Select
-              value={selectedNodeId}
-              onValueChange={(value) =>
-                setSelectedNodeId(value as ResultNodeFilter)
-              }
-            >
-              <SelectTrigger
-                aria-label={
-                  ws.resultNodeFilterLabel ?? "Filter results by node"
-                }
-                size="sm"
-                className="max-w-full bg-background/90 text-xs"
-              >
-                <SelectValue
-                  placeholder={ws.resultNodeFilterAll ?? "All nodes"}
-                />
-              </SelectTrigger>
-              <SelectContent align="end">
-                <SelectItem value="all">
-                  {ws.resultNodeFilterAll ?? "All nodes"}
-                </SelectItem>
-                {nodeOptions.map((node) => (
-                  <SelectItem key={node.id} value={node.id}>
-                    {node.title}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          ) : null}
-          <DropdownMenu>
-            <DropdownMenuTrigger
-              render={
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="h-8 px-2.5 text-xs"
-                />
-              }
-            >
-              {ws.resultOptions ?? "Result options"}
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem
-                onClick={() => issueResultCollapseCommand("collapse")}
-              >
-                {ws.collapseAllResults ?? "Collapse all"}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                onClick={() => issueResultCollapseCommand("expand")}
-              >
-                {ws.expandAllResults ?? "Expand all"}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </div>
-      <SpecRenderer
-        spec={outputSpec}
-        handlers={locateHandlers}
-        resultCollapseCommand={resultCollapseCommand}
-        resultCollapseStorageKey={`task:${taskId}:execution-result`}
-      />
-    </section>
-  );
-
-  const activityHeader = (
-    <div className="border-b border-border/60 pb-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <TerminalSquare className="size-4 text-primary" aria-hidden />
-            <h3 className="font-heading text-base font-semibold text-foreground">Agent transcript</h3>
-            <Badge variant={executionIsLive ? "default" : "secondary"}>
-              {executionIsLive ? "Live" : executionIsWaitingForHuman ? "Paused" : "Completed"}
-            </Badge>
-          </div>
-          <p className="mt-1 text-xs text-muted-foreground">{activitySummary}</p>
-        </div>
-        {runtimeEvents.at(-1)?.provider ? (
-          <span className="text-xs font-medium text-muted-foreground">{runtimeEvents.at(-1)?.provider}</span>
-        ) : null}
-      </div>
-    </div>
-  );
-
-  const activityTimeline = (
-    <section
-      aria-label={copy.trailTab}
-      className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-border/60 bg-background/70"
-    >
-      <div className="z-10 shrink-0 bg-background/95 p-4 pb-0 backdrop-blur supports-[backdrop-filter]:bg-background/85">{activityHeader}</div>
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4 pt-3">{activityContent}</div>
-    </section>
-  );
-
-  const completedActivitySheet = !executionIsActive ? (
-    <Sheet open={transcriptOpen} onOpenChange={setTranscriptOpen}>
-      <SheetTrigger
-        render={
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="fixed right-0 top-1/2 z-40 h-auto min-w-11 -translate-y-1/2 touch-manipulation rounded-r-none border-r-0 bg-background/95 px-2.5 py-3 shadow-lg backdrop-blur transition-colors supports-[backdrop-filter]:bg-background/85"
-            aria-label={`Open Agent transcript · ${activityItems.length} events`}
-          />
-        }
-      >
-        <span className="flex flex-col items-center gap-2">
-          <Activity className="size-4 text-primary" aria-hidden />
-          <span className="[writing-mode:vertical-rl] text-[10px] font-semibold tracking-[0.08em]">Agent transcript</span>
-          <Badge variant="secondary" className="h-5 min-w-5 px-1.5 text-[10px]">{activityItems.length}</Badge>
-        </span>
-      </SheetTrigger>
-      <SheetContent className="w-[92vw] max-w-[62rem] gap-0 overflow-hidden data-[side=right]:w-[92vw] data-[side=right]:sm:w-[72vw] data-[side=right]:sm:max-w-[62rem]">
-        <SheetHeader className="z-10 shrink-0 border-b border-border/60 bg-popover/95 backdrop-blur supports-[backdrop-filter]:bg-popover/85">
-          <SheetTitle>Agent transcript</SheetTitle>
-          <SheetDescription>Intent, tool calls, results, and execution state. Latest activity appears first.</SheetDescription>
-        </SheetHeader>
-        <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-8 pt-4"><div className="mt-1">{activityContent}</div></div>
-      </SheetContent>
-    </Sheet>
-  ) : null;
-
+  });
+  const output = useExecutionOverviewOutput({
+    artifacts,
+    commandCenter,
+    currentExecution,
+    executionIsActive: activityState.executionIsActive,
+    latestCompletedNode,
+    nodes,
+    onAction,
+    runtimeEvents,
+    workspaceCopy,
+  });
 
   return (
-    <section
-      aria-label={ws.executionOverviewAria}
-      className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden"
-    >
-      {failureAlert}
-      {executionIsActive ? (
-        <Tabs defaultValue="activity" className="min-h-0 flex-1 xl:hidden">
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="results">{copy.outputTab}</TabsTrigger>
-            <TabsTrigger value="activity">{copy.trailTab}</TabsTrigger>
-          </TabsList>
-          <TabsContent value="results" className="min-h-0 overflow-y-auto pt-3">{results}</TabsContent>
-          <TabsContent value="activity" className="min-h-0 overflow-y-auto pt-3">{activityTimeline}</TabsContent>
-        </Tabs>
-      ) : null}
-      {!executionIsActive ? completedActivitySheet : null}
-      <div className={executionIsActive ? "hidden min-h-0 flex-1 xl:grid xl:grid-cols-[minmax(0,1.15fr)_minmax(24rem,0.85fr)] xl:gap-4" : "min-h-0 flex-1"}>
-        {results}
-        {executionIsActive ? activityTimeline : null}
-      </div>
-    </section>
+    <ExecutionOverviewContent
+      taskId={taskId}
+      workspaceCopy={workspaceCopy}
+      copy={copy}
+      executionIsActive={activityState.executionIsActive}
+      failureAlert={activityState.executionHasFatalFailure
+        ? <ExecutionFailureAlert summary={activityState.failureSummary} />
+        : null}
+      status={resultStatusFor(activityState)}
+      hasAvailableResult={Boolean(output.liveResultSpec) || executionResultState === "available"}
+      finalizationRetryError={finalizationRetryError}
+      onRetryFinalization={onRetryFinalization}
+      isRetryingFinalization={isRetryingFinalization}
+      nodeOptions={output.nodeOptions}
+      selectedNodeId={output.selectedNodeId}
+      onSelectedNodeIdChange={output.setSelectedNodeId}
+      onCollapseCommand={output.onCollapseCommand}
+      outputSpec={output.outputSpec}
+      handlers={output.handlers}
+      resultCollapseCommand={output.resultCollapseCommand}
+      waitingForHuman={activityState.executionIsWaitingForHuman}
+      isLive={activityState.executionIsLive}
+      activityItems={activityState.activityItems}
+      activitySummary={activityState.activitySummary}
+      provider={runtimeEvents.at(-1)?.provider}
+    />
   );
 }

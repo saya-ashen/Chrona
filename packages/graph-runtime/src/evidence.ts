@@ -1,4 +1,4 @@
-import type { NodeResultEvidence } from "./types";
+import type { NodeResultEvidence } from "@chrona/contracts/ai";
 
 export type GraphNodeExecutionEvidence = {
   sessionId?: string;

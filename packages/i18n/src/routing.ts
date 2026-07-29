@@ -1,4 +1,4 @@
-import { defaultLocale, locales, type Locale, resolveLocale } from "./locale";
+import { defaultLocale, locales, type Locale, resolveLocale } from "./locale-core";
 
 function isExternalHref(href: string) {
   return /^[a-zA-Z][a-zA-Z\d+\-.]*:/.test(href);

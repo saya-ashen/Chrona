@@ -18,6 +18,74 @@ function writeWorkEvent(stream: SseStream, event: TaskProjectionEvent) {
   return stream.writeSSE({ event: event.type, data: JSON.stringify(event) });
 }
 
+function createWorkEventStream(
+  engine: ChronaEngine,
+  taskId: string,
+  workBlockId: string | null,
+) {
+  return async (stream: SseStream) => {
+    let writeQueue = Promise.resolve();
+    const writeQueued = (write: () => Promise<unknown>) => {
+      writeQueue = writeQueue.then(async () => {
+        try {
+          await write();
+        } catch (cause) {
+          logger.warn("work_sse.write_failed", { taskId, error: cause });
+          throw cause;
+        }
+      }).then(() => undefined);
+      return writeQueue;
+    };
+    const writeEvent = (event: TaskProjectionEvent) => writeQueued(() => writeWorkEvent(stream, event));
+    const writeHeartbeat = () => writeQueued(async () => {
+      await stream.writeSSE({ event: "heartbeat", data: "{}" });
+    });
+    const writeSnapshot = (state: Record<string, unknown>) => writeQueued(async () => {
+      const workspaceId = await getTaskWorkspaceId(engine, taskId);
+      const event = appendTaskWorkspaceEvent({
+        type: "state.snapshot",
+        taskId,
+        workspaceId,
+        workBlockId,
+        state,
+      });
+      await stream.writeSSE({ event: event.type, data: JSON.stringify(event) });
+    });
+    let isClosed = false;
+    let resolveClosed: (() => void) | null = null;
+    const closed = new Promise<void>((resolve) => {
+      resolveClosed = () => {
+        isClosed = true;
+        resolve();
+      };
+    });
+    const heartbeatLoop = async () => {
+      while (!isClosed) {
+        await stream.sleep(heartbeatDelayMs());
+        await writeHeartbeat();
+      }
+    };
+    const subscription = subscribeToTaskProjectionEvents(taskId, (event) => {
+      void writeEvent(event);
+    });
+    stream.onAbort(() => {
+      subscription.unsubscribe();
+      resolveClosed?.();
+    });
+    try {
+      const snapshot = await buildTaskWorkspaceStateSnapshot(engine, { taskId, workBlockId });
+      await writeSnapshot(snapshot);
+      await writeQueued(() => stream.writeSSE({ event: "ready", data: JSON.stringify({ taskId }) }));
+      await writeHeartbeat();
+      await Promise.race([closed, heartbeatLoop()]);
+    } finally {
+      isClosed = true;
+      await writeQueue;
+      subscription.unsubscribe();
+    }
+  };
+}
+
 
 export function createWorkRoutes(engine: ChronaEngine) {
   return new Hono()
@@ -55,74 +123,6 @@ export function createWorkRoutes(engine: ChronaEngine) {
     .get("/work/:taskId/events", zValidator("param", workProjectionParamSchema), async (c) => {
       const { taskId } = c.req.valid("param");
       const workBlockId = c.req.query("workBlockId") ?? null;
-
-      return streamSSE(c, async (stream) => {
-        let writeQueue = Promise.resolve();
-        const writeQueued = (write: () => Promise<unknown>) => {
-          writeQueue = writeQueue.then(async () => {
-            try {
-              await write();
-            } catch (cause) {
-              logger.warn("work_sse.write_failed", {
-                taskId,
-                error: cause,
-              });
-              throw cause;
-            }
-          }).then(() => undefined);
-          return writeQueue;
-        };
-        const writeEvent = (event: TaskProjectionEvent) => writeQueued(() => writeWorkEvent(stream, event));
-        const writeHeartbeat = () => writeQueued(async () => {
-          await stream.writeSSE({ event: "heartbeat", data: "{}" });
-        });
-        const writeSnapshot = (state: Record<string, unknown>) => writeQueued(async () => {
-          const workspaceId = await getTaskWorkspaceId(engine, taskId);
-          const event = appendTaskWorkspaceEvent({
-            type: "state.snapshot",
-            taskId,
-            workspaceId,
-            workBlockId,
-            state,
-          });
-          await stream.writeSSE({ event: event.type, data: JSON.stringify(event) });
-        });
-        let isClosed = false;
-        let resolveClosed: (() => void) | null = null;
-        const closed = new Promise<void>((resolve) => {
-          resolveClosed = () => {
-            isClosed = true;
-            resolve();
-          };
-        });
-        const heartbeatLoop = async () => {
-          while (!isClosed) {
-            await stream.sleep(heartbeatDelayMs());
-            if (isClosed) break;
-            await writeHeartbeat();
-          }
-        };
-
-        const subscription = subscribeToTaskProjectionEvents(taskId, (event) => {
-          void writeEvent(event);
-        });
-
-        stream.onAbort(() => {
-          subscription.unsubscribe();
-          resolveClosed?.();
-        });
-
-        try {
-          const snapshot = await buildTaskWorkspaceStateSnapshot(engine, { taskId, workBlockId });
-          await writeSnapshot(snapshot);
-          await writeQueued(() => stream.writeSSE({ event: "ready", data: JSON.stringify({ taskId }) }));
-          await writeHeartbeat();
-          await Promise.race([closed, heartbeatLoop()]);
-        } finally {
-          isClosed = true;
-          await writeQueue;
-          subscription.unsubscribe();
-        }
-      });
+      return streamSSE(c, createWorkEventStream(engine, taskId, workBlockId));
     });
 }

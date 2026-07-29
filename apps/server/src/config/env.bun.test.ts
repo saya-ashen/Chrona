@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { assertSafeBind, readEnv, resetEnvCacheForTests } from "./env";
+import { assertSafeBind, readEnv, resetEnvCacheForTests, resolveAllowedOrigins } from "./env";
 
 const tempDirs: string[] = [];
 
@@ -24,6 +24,7 @@ function resetEnv() {
   delete process.env.CHRONA_CONFIG_FILE;
   delete process.env.CHRONA_MIGRATIONS_DIR;
   delete process.env.CHRONA_UNSAFE_PUBLIC_BIND;
+  delete process.env.CHRONA_UNSAFE_CORS;
   delete process.env.CHRONA_WEB_DIST;
   delete process.env.CHRONA_EXPERIMENTAL_DASHBOARD_AI_SUMMARY;
   resetEnvCacheForTests();
@@ -68,19 +69,37 @@ describe("server environment safety", () => {
     expect(readEnv().PORT).toBe("3109");
   });
 
-  it("refuses public binding without API_KEY unless explicitly overridden", () => {
-    expect(() => assertSafeBind({
-      ...readEnv(),
-      HOST: "0.0.0.0",
+  it("allows only loopback binds without an API key or explicit override", async () => {
+    const env = readEnv();
+    const insecureBind = {
+      ...env,
       API_KEY: undefined,
       CHRONA_UNSAFE_PUBLIC_BIND: undefined,
-    })).toThrow("Refusing to start Chrona");
+    };
 
-    expect(() => assertSafeBind({
-      ...readEnv(),
-      HOST: "0.0.0.0",
-      API_KEY: undefined,
-      CHRONA_UNSAFE_PUBLIC_BIND: "1",
-    })).not.toThrow();
+    for (const host of ["127.0.0.1", "::1", "::ffff:127.0.0.1", "localhost"]) {
+      await expect(assertSafeBind({ ...insecureBind, HOST: host })).resolves.toBeUndefined();
+    }
+    for (const host of ["0.0.0.0", "::", "192.168.1.50"]) {
+      await expect(assertSafeBind({ ...insecureBind, HOST: host })).rejects.toThrow(
+        "Refusing to start Chrona",
+      );
+    }
+
+    await expect(assertSafeBind({ ...insecureBind, HOST: "0.0.0.0", API_KEY: "key" }))
+      .resolves.toBeUndefined();
+    await expect(assertSafeBind({ ...insecureBind, HOST: "::", CHRONA_UNSAFE_PUBLIC_BIND: "1" }))
+      .resolves.toBeUndefined();
+  });
+
+  it("requires an explicit unsafe override for wildcard CORS", () => {
+    const env = readEnv();
+    expect(resolveAllowedOrigins({ ...env, ALLOWED_ORIGINS: undefined })).toEqual([]);
+    expect(() => resolveAllowedOrigins({ ...env, ALLOWED_ORIGINS: "*" })).toThrow(
+      "CHRONA_UNSAFE_CORS=1",
+    );
+    expect(
+      resolveAllowedOrigins({ ...env, ALLOWED_ORIGINS: "*", CHRONA_UNSAFE_CORS: "1" }),
+    ).toEqual(["*"]);
   });
 });

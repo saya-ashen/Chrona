@@ -16,19 +16,39 @@ const request = {
   input: { kind: "task" },
 };
 
-function runRef(): ProviderRunRef {
+function runRef(overrides: Partial<ProviderRunRef> = {}): ProviderRunRef {
   return {
     provider: "hermes",
     runId: "run-1",
     nativeRunId: "run-1",
     sessionId: "session-1",
     status: "running",
+    ...overrides,
   };
 }
 
-function incompleteStream(): AsyncIterable<ProviderRunEvent> {
+let eventSequence = 0;
+
+function providerEvent(event: Record<string, unknown>, fallbackRun = runRef()): ProviderRunEvent {
+  const terminalRun = event.run;
+  const identity = terminalRun && typeof terminalRun === "object"
+    ? { ...fallbackRun, ...terminalRun, provider: fallbackRun.provider }
+    : fallbackRun;
+  const normalizedTerminalRun = terminalRun && typeof terminalRun === "object"
+    ? { ...terminalRun, provider: identity.provider, runId: identity.runId, sessionId: identity.sessionId }
+    : terminalRun;
+  return {
+    ...event,
+    provider: identity.provider,
+    runId: identity.runId,
+    sessionId: identity.sessionId,
+    sequence: ++eventSequence,
+    ...(normalizedTerminalRun === undefined ? {} : { run: normalizedTerminalRun }),
+  } as ProviderRunEvent;
+}
+function incompleteStream(run = runRef()): AsyncIterable<ProviderRunEvent> {
   return (async function* () {
-    yield { type: "text_delta", text: "partial", runId: "run-1" } as ProviderRunEvent;
+    yield providerEvent({ type: "text_delta", text: "partial" }, run);
     // Ends without a terminal run_completed/run_failed event.
   })();
 }
@@ -97,6 +117,7 @@ async function seedProviderRunChain() {
   const run = await db.run.create({
     data: { taskId: task.id, runtimeName: "hermes", status: RunStatus.Pending, triggeredBy: "system" },
   });
+  eventSequence = 0;
   return { workspace, task, plan, planRun, attempt, providerRun, run };
 }
 
@@ -123,6 +144,7 @@ describe("runProviderRequest stream-interruption fallback", () => {
 
     const client = {
       provider: "hermes",
+      getCapabilities: mock(() => ({ recovery: { activeRunLookup: true } })),
       startRun,
       streamRun,
       getRun,
@@ -154,6 +176,7 @@ describe("runProviderRequest stream-interruption fallback", () => {
 
     const client = {
       provider: "hermes",
+      getCapabilities: mock(() => ({ recovery: { activeRunLookup: true } })),
       startRun: mock(async () => runRef()),
       streamRun,
       getRun,
@@ -173,6 +196,7 @@ describe("runProviderRequest stream-interruption fallback", () => {
 
     const client = {
       provider: "hermes",
+      getCapabilities: mock(() => ({ recovery: { activeRunLookup: true } })),
       startRun: mock(async () => runRef()),
       streamRun: mock(() => incompleteStream()),
       getRun,
@@ -209,7 +233,7 @@ describe("runProviderRequest stream-interruption fallback", () => {
         },
       })),
       startRun: mock(async () => ({ ...runRef(), provider: "codex" })),
-      streamRun: mock(() => incompleteStream()),
+      streamRun: mock(() => incompleteStream(runRef({ provider: "codex" }))),
       getRun,
     } as unknown as AgentProviderClient;
 
@@ -264,11 +288,11 @@ describe("runProviderRequest runtime ref persistence", () => {
       } satisfies ProviderRunRef)),
       streamRun: mock(() =>
         (async function* () {
-          yield {
+          yield providerEvent({
             type: "run_completed",
             run: { runId: "provider-run-1", nativeRunId: "provider-run-1", sessionId: "provider-session-1", status: "completed" },
             outputText: "ok",
-          } as ProviderRunEvent;
+          });
         })(),
       ),
     } as unknown as AgentProviderClient;
@@ -296,7 +320,7 @@ describe("runProviderRequest runtime ref persistence", () => {
       } satisfies ProviderRunRef)),
       streamRun: mock(() =>
         (async function* () {
-          yield {
+          yield providerEvent({
             type: "run_completed",
             run: {
               runId: "provider-run-started",
@@ -305,7 +329,7 @@ describe("runProviderRequest runtime ref persistence", () => {
               status: "completed",
             },
             outputText: "ok",
-          } as ProviderRunEvent;
+          });
         })(),
       ),
     } as unknown as AgentProviderClient;
@@ -339,11 +363,11 @@ describe("runProviderRequest runtime ref persistence", () => {
       } satisfies ProviderRunRef)),
       streamRun: mock(() =>
         (async function* () {
-          yield {
+          yield providerEvent({
             type: "run_completed",
             run: { runId: "provider-run-1", nativeRunId: "provider-run-1", sessionId: "provider-session-1", status: "running" },
             outputText: "ok",
-          } as ProviderRunEvent;
+          });
         })(),
       ),
     } as unknown as AgentProviderClient;
@@ -367,11 +391,11 @@ describe("runProviderRequest runtime ref persistence", () => {
       } satisfies ProviderRunRef)),
       streamRun: mock(() =>
         (async function* () {
-          yield {
+          yield providerEvent({
             type: "run_completed",
             run: { runId: "provider-run-1", nativeRunId: "provider-run-1", sessionId: "provider-session-1", status: "running" },
             outputText: "ok",
-          } as ProviderRunEvent;
+          });
         })(),
       ),
     } as unknown as AgentProviderClient;
@@ -398,24 +422,46 @@ describe("runProviderRequest runtime ref persistence", () => {
     expect(reloaded.failedByEventId).toBeNull();
   });
 
+  it("does not synthesize terminal tool metadata from the configured terminal tool", async () => {
+    const client = {
+      provider: "hermes",
+      startRun: mock(async () => runRef()),
+      streamRun: mock(() =>
+        (async function* () {
+          yield providerEvent({
+            type: "run_completed",
+            run: { runId: "run-1", nativeRunId: "run-1", sessionId: "session-1", status: "completed" },
+            outputText: "done",
+          });
+        })(),
+      ),
+    } as unknown as AgentProviderClient;
+
+    const snapshot = await runProviderRequest(client, request, {
+      terminalToolName: "chrona_node_complete",
+    });
+
+    expect(snapshot.raw).toBeUndefined();
+  });
+
   it("keeps the last provider tool_call as terminal tool metadata", async () => {
     const client = {
       provider: "hermes",
       startRun: mock(async () => runRef()),
       streamRun: mock(() =>
         (async function* () {
-          yield {
+          yield providerEvent({
             type: "tool_call",
             tool: "chrona_node_complete",
             callId: "complete-1",
             input: { summary: "done" },
             status: "completed",
-          } as ProviderRunEvent;
-          yield {
+          });
+          yield providerEvent({
             type: "run_completed",
             run: { runId: "run-1", nativeRunId: "run-1", sessionId: "session-1", status: "completed" },
             outputText: "done",
-          } as ProviderRunEvent;
+          });
         })(),
       ),
     } as unknown as AgentProviderClient;
@@ -438,11 +484,11 @@ describe("runProviderRequest runtime ref persistence", () => {
       } satisfies ProviderRunRef)),
       streamRun: mock(() =>
         (async function* () {
-          yield {
+          yield providerEvent({
             type: "run_cancelled",
             run: { runId: "provider-run-1", nativeRunId: "provider-run-1", sessionId: "provider-session-1", status: "cancelled" },
             raw: { reason: "interrupted" },
-          } as ProviderRunEvent;
+          });
         })(),
       ),
     } as unknown as AgentProviderClient;
@@ -492,12 +538,12 @@ describe("runProviderRequest runtime ref persistence", () => {
       } satisfies ProviderRunRef)),
       streamRun: mock(() =>
         (async function* () {
-          yield { type: "text_delta", text: "started" } as ProviderRunEvent;
-          yield {
+          yield providerEvent({ type: "text_delta", text: "started" }, runRef({ runId: "provider-run-1", nativeRunId: "provider-run-1", sessionId: "provider-session-1" }));
+          yield providerEvent({
             type: "run_completed",
             run: { runId: "provider-run-1", nativeRunId: "provider-run-1", sessionId: "provider-session-1", status: "completed" },
             outputText: "late completion",
-          } as ProviderRunEvent;
+          });
         })(),
       ),
       cancelRun,
@@ -525,17 +571,16 @@ describe("runProviderRequest runtime ref persistence", () => {
   });
 
 });
-
 describe("runProviderRequest resume threading", () => {
   it("forwards request.resumeSessionRef to the provider startRun for cross-process resume", async () => {
-    const startRun = mock(async () => runRef());
+    const startRun = mock(async () => runRef({ provider: "claude_code", sessionId: "sdk-session-1" }));
     const streamRun = mock(() =>
       (async function* () {
-        yield {
+        yield providerEvent({
           type: "run_completed",
           run: { runId: "run-1", nativeRunId: "run-1", sessionId: "sdk-session-1", status: "completed" },
           outputText: "ok",
-        } as ProviderRunEvent;
+        }, runRef({ provider: "claude_code", sessionId: "sdk-session-1" }));
       })(),
     );
 
@@ -558,14 +603,14 @@ describe("runProviderRequest resume threading", () => {
   });
 
   it("does not forward synthetic Claude Code run ids as cross-process resume refs", async () => {
-    const startRun = mock(async () => runRef());
+    const startRun = mock(async () => runRef({ provider: "claude_code", sessionId: "sdk-session-1" }));
     const streamRun = mock(() =>
       (async function* () {
-        yield {
+        yield providerEvent({
           type: "run_completed",
           run: { runId: "run-1", nativeRunId: "run-1", sessionId: "sdk-session-1", status: "completed" },
           outputText: "ok",
-        } as ProviderRunEvent;
+        }, runRef({ provider: "claude_code", sessionId: "sdk-session-1" }));
       })(),
     );
 
@@ -586,14 +631,14 @@ describe("runProviderRequest resume threading", () => {
   });
 
   it("omits resumeSessionRef when the request has no prior provider session", async () => {
-    const startRun = mock(async () => runRef());
+    const startRun = mock(async () => runRef({ provider: "claude_code", sessionId: "sdk-session-1" }));
     const streamRun = mock(() =>
       (async function* () {
-        yield {
+        yield providerEvent({
           type: "run_completed",
           run: { runId: "run-1", nativeRunId: "run-1", sessionId: "sdk-session-1", status: "completed" },
           outputText: "ok",
-        } as ProviderRunEvent;
+        }, runRef({ provider: "claude_code", sessionId: "sdk-session-1" }));
       })(),
     );
 
@@ -613,14 +658,14 @@ describe("runProviderRequest resume threading", () => {
 
 describe("runProviderRequest runtime model threading", () => {
   it("forwards the task-pinned model to provider startRun", async () => {
-    const startRun = mock(async () => runRef());
+    const startRun = mock(async () => runRef({ provider: "omp", sessionId: "sdk-session-1" }));
     const streamRun = mock(() =>
       (async function* () {
-        yield {
+        yield providerEvent({
           type: "run_completed",
           run: { runId: "run-1", nativeRunId: "run-1", sessionId: "sdk-session-1", status: "completed" },
           outputText: "ok",
-        } as ProviderRunEvent;
+        }, runRef({ provider: "omp", sessionId: "sdk-session-1" }));
       })(),
     );
     const client = {
@@ -652,14 +697,14 @@ describe("runProviderRequest Chrona control handoff", () => {
   it("passes run-token control config to the OMP provider", async () => {
     const previousBaseUrl = process.env.CHRONA_BASE_URL;
     process.env.CHRONA_BASE_URL = "http://127.0.0.1:3101/api";
-    const startRun = mock(async () => ({ ...runRef(), provider: "omp" }));
+    const startRun = mock(async () => runRef({ provider: "omp", sessionId: "sdk-session-1" }));
     const streamRun = mock(() =>
       (async function* () {
-        yield {
+        yield providerEvent({
           type: "run_completed",
           run: { runId: "run-1", nativeRunId: "run-1", sessionId: "sdk-session-1", status: "completed" },
           outputText: "ok",
-        } as ProviderRunEvent;
+        }, runRef({ provider: "omp", sessionId: "sdk-session-1" }));
       })(),
     );
 
@@ -691,14 +736,14 @@ describe("runProviderRequest Chrona control handoff", () => {
     const previousPort = process.env.PORT;
     delete process.env.CHRONA_BASE_URL;
     process.env.PORT = "3199";
-    const startRun = mock(async () => ({ ...runRef(), provider: "omp" }));
+    const startRun = mock(async () => runRef({ provider: "omp", sessionId: "sdk-session-1" }));
     const streamRun = mock(() =>
       (async function* () {
-        yield {
+        yield providerEvent({
           type: "run_completed",
           run: { runId: "run-1", nativeRunId: "run-1", sessionId: "sdk-session-1", status: "completed" },
           outputText: "ok",
-        } as ProviderRunEvent;
+        }, runRef({ provider: "omp", sessionId: "sdk-session-1" }));
       })(),
     );
 

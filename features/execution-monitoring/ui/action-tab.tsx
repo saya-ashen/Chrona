@@ -8,7 +8,7 @@ import {
   SpecRenderer,
   type PlanNodeDataModel,
   type TaskExecutionDispatchResult,
-} from "@features/task-workspace";
+} from "@features/task-workspace/public/workspace-integration";
 
 function isTerminalStatus(status: PlanNodeDataModel["status"]) {
   return status === "done" || status === "skipped";

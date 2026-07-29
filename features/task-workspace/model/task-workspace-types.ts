@@ -1,8 +1,23 @@
-import type { TaskConfigAiClient, TaskConfigExecutionRuntime } from "@features/schedule";
-import type { PlanNodeDataModel, TaskPlanGraphPlan } from "./plan-node-view-model";
-import type { TaskPlanReadModel, TaskWorkspaceUpdateProposal } from "@chrona/contracts"
-import type { GraphNodeState, ReconciliationResult, TaskExecutionSummary } from "@chrona/contracts";
+import type {
+  AiClientRecord,
+  GraphNodeState,
+  ReconciliationResult,
+  TaskExecutionSummary,
+  TaskPlanReadModel,
+  TaskWorkspaceUpdateProposal,
+} from "@chrona/contracts";
+import type { RuntimeTaskConfigSpec } from "@chrona/runtime-core";
 import type { UiDocument } from "@chrona/ui-protocol";
+import type { PlanNodeDataModel, TaskPlanGraphPlan } from "./plan-node-view-model";
+
+export type TaskConfigExecutionRuntime = {
+  key: string;
+  label: string;
+  spec: RuntimeTaskConfigSpec;
+};
+
+export type TaskConfigAiClient = Pick<AiClientRecord, "id" | "name" | "enabled">;
+
 
 export type TaskPlanGenerationStatus = "idle" | "generating" | "waiting_acceptance" | "accepted";
 

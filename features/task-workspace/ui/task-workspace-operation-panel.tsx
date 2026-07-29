@@ -19,7 +19,7 @@ import {
 } from "@shared/ui";
 import { SpecRenderer } from "./catalog/spec-renderer";
 import type { PlanNodeDataModel } from "../plan/task-plan-graph/types";
-import { ProviderApprovalBanner } from "@features/execution-monitoring";
+import { ProviderApprovalBanner } from "@features/execution-monitoring/ui";
 import type { TaskWorkspaceOperationState } from "../model/task-workspace-operation-machine";
 
 type WorkspaceCopy = Record<string, string | undefined>;

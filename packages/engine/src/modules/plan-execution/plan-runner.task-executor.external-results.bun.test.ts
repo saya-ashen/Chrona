@@ -948,9 +948,19 @@ describe("plan-runner task executor external results", () => {
     const attempt = await db.taskPlanNodeAttempt.findFirstOrThrow({
       where: { taskId: task.id, nodeId: "task_node", status: "running" },
     });
-    const run = await db.run.findFirstOrThrow({
-      where: { taskId: task.id, status: "Running" },
-      orderBy: { startedAt: "desc" },
+    const run = await db.run.create({
+      data: {
+        taskId: task.id,
+        taskSessionId: (await db.taskSession.findFirstOrThrow({
+          where: { taskId: task.id },
+          orderBy: { createdAt: "desc" },
+        })).id,
+        runtimeName: "hermes",
+        status: "Running",
+        startedAt: new Date(),
+        triggeredBy: "system",
+        syncStatus: "healthy",
+      },
     });
     const mainSession = await db.taskSession.findFirstOrThrow({
       where: { taskId: task.id },

@@ -1,20 +1,19 @@
-import type {
-  AgentProviderClient,
-  CancelRunInput,
-  CreateSessionInput,
-  GetRunInput,
-  HealthCheckInput,
-  ProviderCapabilities,
-  ProviderHealth,
-  ProviderRunEvent,
-  ProviderRunRef,
-  ProviderRunSnapshot,
-  StartRunInput,
-  StreamRunInput,
-} from "@chrona/providers-foundation";
 import {
+  BoundedTerminalRunSnapshots,
   readProviderReplayTape,
   terminalSnapshotFromEvents,
+  type AgentProviderClient,
+  type CancelRunInput,
+  type CreateSessionInput,
+  type GetRunInput,
+  type HealthCheckInput,
+  type ProviderCapabilities,
+  type ProviderHealth,
+  type ProviderRunEvent,
+  type ProviderRunRef,
+  type ProviderRunSnapshot,
+  type StartRunInput,
+  type StreamRunInput,
 } from "@chrona/providers-foundation";
 
 export const CHRONA_DEBUG_PROVIDER_TYPE = "debug";
@@ -42,6 +41,8 @@ type DebugRun = {
   sessionKey?: string;
   input?: StartRunInput;
   status: ProviderRunRef["status"];
+  outputText?: string;
+  error?: string;
 };
 
 function now() {
@@ -309,6 +310,7 @@ export class ChronaDebugProviderClient implements AgentProviderClient {
   readonly provider: string;
   readonly profile: DebugProviderProfile;
   private readonly runs = new Map<string, DebugRun>();
+  private readonly terminalSnapshots = new BoundedTerminalRunSnapshots();
   private replayTape?: Awaited<ReturnType<typeof readProviderReplayTape>>;
 
   constructor(config: ChronaDebugProviderConfig | string = {}) {
@@ -564,22 +566,23 @@ export class ChronaDebugProviderClient implements AgentProviderClient {
     }
 
     await pause(signal);
-    run.status = "completed";
+    const outputText = isPlanGeneration(streamInput)
+      ? "Debug plan generation completed."
+      : isGoalReview
+        ? "Debug Goal review completed."
+        : isGoalAssetOwnership
+          ? "Debug Goal asset ownership review completed."
+          : isResultFinalization
+            ? "Debug task result finalization completed."
+            : this.profile === "hermes-like"
+              ? `Hermes-like debug runtime run completed for ${nodeTitle}.`
+              : `Debug runtime run completed for ${nodeTitle}.`;
+    this.finishRun(run, { status: "completed", outputText });
     yield {
       ...eventBase(this.provider, run, sequence),
       type: "run_completed",
       run: providerRunRef(this.provider, run, "completed"),
-      outputText: isPlanGeneration(streamInput)
-        ? "Debug plan generation completed."
-        : isGoalReview
-          ? "Debug Goal review completed."
-          : isGoalAssetOwnership
-            ? "Debug Goal asset ownership review completed."
-            : isResultFinalization
-              ? "Debug task result finalization completed."
-              : this.profile === "hermes-like"
-                ? `Hermes-like debug runtime run completed for ${nodeTitle}.`
-                : `Debug runtime run completed for ${nodeTitle}.`,
+      outputText,
       output: isPlanGeneration(streamInput)
         ? undefined
         : { text: isGoalReview ? "Debug Goal review completed." : isGoalAssetOwnership ? "Debug Goal asset ownership review completed." : isResultFinalization ? "Debug task result finalization completed." : this.profile === "hermes-like" ? `Hermes-like debug runtime run completed for ${nodeTitle}.` : `Debug runtime run completed for ${nodeTitle}.` },
@@ -640,34 +643,43 @@ export class ChronaDebugProviderClient implements AgentProviderClient {
       };
     }
     const run = this.runs.get(input.runId);
-    return {
-      provider: this.provider,
-      runId: input.runId,
-      nativeRunId: input.runId,
-      providerRunId: input.runId,
-      sessionId: run?.sessionId ?? input.sessionId ?? input.sessionKey ?? input.runId,
-      status: run?.status ?? "completed",
-      outputText: this.profile === "hermes-like"
-        ? `Hermes-like debug runtime run ${input.runId} completed during sync.`
-        : `Debug runtime run ${input.runId} completed during sync.`,
-      error: null,
-      raw: { debugProvider: true, profile: this.profile },
-    };
+    if (run) return this.snapshot(run);
+    const snapshot = this.terminalSnapshots.get(input.runId);
+    if (snapshot) return snapshot;
+    throw new Error(`getRun: unknown debug runId "${input.runId}"`);
   }
 
   async cancelRun(input: CancelRunInput): Promise<ProviderRunSnapshot> {
     const run = this.runs.get(input.runId);
-    if (run) run.status = "cancelled";
+    if (run) {
+      this.finishRun(run, { status: "cancelled" });
+      return this.snapshot(run);
+    }
+    const snapshot = this.terminalSnapshots.get(input.runId);
+    if (snapshot) return snapshot;
+    throw new Error(`cancelRun: unknown debug runId "${input.runId}"`);
+  }
+
+  private snapshot(run: DebugRun): ProviderRunSnapshot {
     return {
       provider: this.provider,
-      runId: input.runId,
-      nativeRunId: input.runId,
-      providerRunId: input.runId,
-      sessionId: run?.sessionId ?? input.sessionId ?? input.runId,
-      status: "cancelled",
-      error: null,
-      raw: { debugProvider: true, cancelled: true },
+      runId: run.runId,
+      nativeRunId: run.runId,
+      providerRunId: run.runId,
+      sessionId: run.sessionId,
+      status: run.status ?? "completed",
+      outputText: run.outputText,
+      error: run.error ?? null,
+      raw: { debugProvider: true, profile: this.profile },
     };
+  }
+
+  private finishRun(run: DebugRun, update: { status: NonNullable<ProviderRunRef["status"]>; outputText?: string; error?: string }): void {
+    run.status = update.status;
+    run.outputText = update.outputText;
+    run.error = update.error;
+    this.runs.delete(run.runId);
+    this.terminalSnapshots.set(this.snapshot(run));
   }
 
   private async loadReplayTape() {

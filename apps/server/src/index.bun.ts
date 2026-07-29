@@ -15,19 +15,19 @@ export async function startBunServer() {
   const host = env.HOST;
   const port = resolvePort(env);
 
-  assertSafeBind(env);
+  await assertSafeBind(env);
   ensureSqliteDatabase({
     databaseUrl: env.DATABASE_URL,
     migrationsDir: process.env.CHRONA_MIGRATIONS_DIR ?? resolve("prisma", "migrations"),
   });
-  bootstrapServerRuntime();
+  const runtimeLifecycle = bootstrapServerRuntime();
 
   const app = await createServerApp();
-  if (isUnsafePublicBindOverride(env)) {
+  if (await isUnsafePublicBindOverride(env)) {
     log.warn("unsafe public bind enabled", {
       host,
       port,
-      warning: "HOST=0.0.0.0 without API_KEY exposes Chrona to your network.",
+      warning: "A non-loopback HOST without API_KEY exposes Chrona to your network.",
     });
   }
   if (!env.API_KEY) {
@@ -38,8 +38,8 @@ export async function startBunServer() {
     });
   }
   if (resolveAllowedOrigins(env).includes("*")) {
-    log.warn("cors wildcard enabled", {
-      warning: "ALLOWED_ORIGINS=* allows browser requests from any origin.",
+    log.warn("unsafe cors wildcard enabled", {
+      warning: "ALLOWED_ORIGINS=* with CHRONA_UNSAFE_CORS=1 allows browser requests from any origin.",
     });
   }
   const server = Bun.serve({
@@ -68,6 +68,11 @@ export async function startBunServer() {
     log.info("shutdown started", { signal });
 
     server.stop(true);
+    try {
+      await runtimeLifecycle.stop();
+    } catch (err) {
+      log.error("runtime shutdown failed", { error: String(err) });
+    }
 
     try {
       const { db } = await import("@chrona/db/db");

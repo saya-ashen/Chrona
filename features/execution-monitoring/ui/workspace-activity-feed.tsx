@@ -7,7 +7,7 @@ import {
   mergeWorkspaceActivity,
   runtimeEventsToWorkspaceActivity,
   type WorkspaceActivityItem,
-} from "@features/task-workspace";
+} from "@features/task-workspace/public/workspace-integration";
 import type { WorkspaceRuntimeEvent } from "../model/workspace-runtime-events";
 type ActivityLayer = "Progress" | "Decisions" | "Results" | "Tools" | "Diagnostics";
 

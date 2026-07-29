@@ -33,6 +33,7 @@ import {
 } from "@chrona/contracts";
 import type { EngineAiClient } from "./runtime/client-registry";
 import { aiClientRegistry } from "./runtime/client-registry";
+import { createProviderStreamEventBoundary } from "./provider-stream-contract";
 
 function trimTrailingSlashes(value: string) {
   let end = value.length;
@@ -321,11 +322,13 @@ export async function runProviderRequest(
 ): Promise<ProviderRunSnapshot> {
   const run = await providerClient.startRun(toStartRunInput(request));
   let finalSnapshot: ProviderRunSnapshot | null = null;
+  const boundary = createProviderStreamEventBoundary(run);
   try {
-    for await (const event of providerClient.streamRun({
+    for await (const value of providerClient.streamRun({
       runId: run.runId,
       sessionId: run.sessionId,
     })) {
+      const event = boundary.accept(value);
       if (event.type === "run_completed") {
         finalSnapshot = providerRunCompletedSnapshot(
           providerClient.provider,
@@ -340,6 +343,7 @@ export async function runProviderRequest(
         );
       }
     }
+    boundary.finish();
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     throw new AiClientError(message, providerClient.provider, "internal");

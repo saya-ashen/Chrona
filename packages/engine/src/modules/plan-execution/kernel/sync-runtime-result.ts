@@ -2,8 +2,10 @@ import { createLogger } from "@chrona/logging";
 import type { SubmittedNodeResult } from "@chrona/contracts/ai";
 import type { SyncPlanRunRuntimeResultInput } from "../types";
 import { executeCommand } from "./execute-command";
+import { isStaleRuntimeResultSyncError } from "./runtime-result-sync-errors";
 
 const logger = createLogger("engine.plan-execution.sync");
+
 
 /**
  * Out-of-band provider result. In the single-writer model this is just an
@@ -46,12 +48,21 @@ export async function syncPlanRunRuntimeResult(
       },
     });
   } catch (cause) {
-    // No running attempt matches the runtimeRunRef (stale/duplicate sync): ignore.
-    logger.warn("runtime_sync.ignored", {
+    if (isStaleRuntimeResultSyncError(cause)) {
+      logger.warn("runtime_sync.stale", {
+        taskId: input.taskId,
+        runtimeRunRef: input.runtimeRunRef,
+        status: input.status,
+        reason: cause.reason,
+      });
+      return;
+    }
+    logger.error("runtime_sync.failed", {
       taskId: input.taskId,
       runtimeRunRef: input.runtimeRunRef,
       status: input.status,
-      reason: cause instanceof Error ? cause.message : String(cause),
+      error: cause,
     });
+    throw cause;
   }
 }

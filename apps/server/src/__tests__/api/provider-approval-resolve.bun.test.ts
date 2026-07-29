@@ -92,6 +92,17 @@ async function seedPendingApproval(workspaceId: string, taskId: string) {
   return { approval, planRun, providerRun };
 }
 
+async function resolveApproval(taskId: string, approvalId: string, choice = "approve_once") {
+  return app().request(
+    `http://local/api/tasks/${taskId}/provider-approvals/${approvalId}/resolve`,
+    {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ choice }),
+    },
+  );
+}
+
 describe("provider approval resolve", () => {
   beforeEach(async () => {
     await resetTestDb();
@@ -211,5 +222,86 @@ describe("provider approval resolve", () => {
     const pending = await app().request(`http://local/api/tasks/${taskId}/provider-approvals?status=pending`);
     const pendingBody = (await pending.json()) as { approvals: unknown[] };
     expect(pendingBody.approvals).toHaveLength(0);
+  });
+
+  it("atomically finalizes a pending approval and its provider Run", async () => {
+    const ws = await seedWorkspace("Approval resolve atomic finalization");
+    const { taskId } = await seedTask(ws.workspaceId);
+    const { approval, providerRun } = await seedPendingApproval(ws.workspaceId, taskId);
+
+    const response = await resolveApproval(taskId, approval.id);
+
+    expect(response.status).toBe(200);
+    expect((await response.json() as { status: string }).status).toBe("not_active");
+    const [updatedApproval, updatedProviderRun] = await Promise.all([
+      db.taskPlanProviderApproval.findUniqueOrThrow({ where: { id: approval.id } }),
+      db.taskPlanProviderRun.findUniqueOrThrow({ where: { id: providerRun.id } }),
+    ]);
+    expect(updatedApproval).toMatchObject({
+      status: "failed",
+      choice: "approve_once",
+      resolveAll: false,
+    });
+    expect(updatedApproval.resolvedAt).toBeInstanceOf(Date);
+    expect(updatedProviderRun.status).toBe("failed");
+    const projection = await db.taskProjection.findUniqueOrThrow({ where: { taskId } });
+    expect(projection.approvalPendingCount).toBe(0);
+    expect(updatedProviderRun.finishedAt).toBeInstanceOf(Date);
+  });
+
+  it("returns not_pending without overwriting a concurrent terminal resolution", async () => {
+    const ws = await seedWorkspace("Approval resolve compare and swap");
+    const { taskId } = await seedTask(ws.workspaceId);
+    const { approval, providerRun } = await seedPendingApproval(ws.workspaceId, taskId);
+    const resolvedAt = new Date("2026-07-29T12:00:00.000Z");
+    await db.$transaction([
+      db.taskPlanProviderApproval.update({
+        where: { id: approval.id },
+        data: { status: "approved", choice: "approve_session", resolvedAt },
+      }),
+      db.taskPlanProviderRun.update({
+        where: { id: providerRun.id },
+        data: { status: "running" },
+      }),
+    ]);
+
+    const response = await resolveApproval(taskId, approval.id);
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({
+      status: "not_pending",
+      choice: "approve_once",
+      resolved: 0,
+    });
+    const [updatedApproval, updatedProviderRun] = await Promise.all([
+      db.taskPlanProviderApproval.findUniqueOrThrow({ where: { id: approval.id } }),
+      db.taskPlanProviderRun.findUniqueOrThrow({ where: { id: providerRun.id } }),
+    ]);
+    expect(updatedApproval).toMatchObject({
+      status: "approved",
+      choice: "approve_session",
+      resolvedAt,
+    });
+    expect(updatedProviderRun.status).toBe("running");
+  });
+
+  it("rejects choices absent from the persisted approval contract", async () => {
+    const ws = await seedWorkspace("Approval invalid choice");
+    const { taskId } = await seedTask(ws.workspaceId);
+    const { approval, providerRun } = await seedPendingApproval(ws.workspaceId, taskId);
+    await db.taskPlanProviderApproval.update({
+      where: { id: approval.id },
+      data: { choices: ["deny"] as object },
+    });
+
+    const response = await resolveApproval(taskId, approval.id);
+
+    expect(response.status).toBe(400);
+    const [updatedApproval, updatedProviderRun] = await Promise.all([
+      db.taskPlanProviderApproval.findUniqueOrThrow({ where: { id: approval.id } }),
+      db.taskPlanProviderRun.findUniqueOrThrow({ where: { id: providerRun.id } }),
+    ]);
+    expect(updatedApproval.status).toBe("pending");
+    expect(updatedProviderRun.status).toBe("running");
   });
 });

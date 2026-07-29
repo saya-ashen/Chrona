@@ -1,5 +1,6 @@
 "use client";
 
+import type { Locale } from "@chrona/i18n";
 import type { Dispatch, DragEvent, SetStateAction } from "react";
 import type {
   SchedulePageData,
@@ -32,7 +33,7 @@ type UseSchedulePageActionsArgs = {
   viewData: SchedulePageData;
   activeView: ScheduleViewMode;
   activeDay: string;
-  locale: string;
+  locale: Locale;
   copy: SchedulePageCopy;
   draggedTask: DraggedTask;
   setDraggedTask: Dispatch<SetStateAction<DraggedTask>>;

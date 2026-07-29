@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "bun:test";
 import { db } from "@chrona/db";
-import { markTaskDone } from "@chrona/engine/modules/tasks/mark-task-done";
+import { markTaskDone } from "@chrona/engine/test-support";
 import { resetTestDb, seedTask, seedWorkspace } from "../bun-test-helpers";
 
 // markTaskDone — engine-layer unit for the task-done primitive.

@@ -12,6 +12,7 @@
 
 import {
   appendProviderReplayRecord,
+  BoundedTerminalRunSnapshots,
   type AgentProviderClient,
   type CancelRunInput,
   type CreateSessionInput,
@@ -200,6 +201,7 @@ export class ClaudeCodeProviderClient implements AgentProviderClient {
   private readonly runner: ClaudeCodeRunner;
   private readonly ownsRunner: boolean;
   private readonly runs = new Map<string, InternalRun>();
+  private readonly terminalSnapshots = new BoundedTerminalRunSnapshots();
   private runnerInitPromise: Promise<ClaudeCodeRunner> | null = null;
 
   constructor(opts: ClaudeCodeProviderOptions) {
@@ -378,11 +380,12 @@ export class ClaudeCodeProviderClient implements AgentProviderClient {
     try {
       for await (const event of this.iterateRunEvents(runner, handle)) {
         noteProviderEvent(failureContext, event);
-        yield event;
         if (this.isTerminalEvent(event)) {
           await this.recordFinalSnapshot(handle, event);
+          yield event;
           return;
         }
+        yield event;
       }
       // The runner's iterator ended without a terminal event. If the run
       // was cancelled (SdkRunner sets the internal `cancelRequested` flag
@@ -395,8 +398,8 @@ export class ClaudeCodeProviderClient implements AgentProviderClient {
           type: "run_cancelled",
           run: this.snapshotAsRef(postSnap, handle),
         };
-        yield cancelledEvent;
         await this.recordFinalSnapshot(handle, cancelledEvent);
+        yield cancelledEvent;
         return;
       }
       if (postSnap.status === "failed") {
@@ -405,8 +408,8 @@ export class ClaudeCodeProviderClient implements AgentProviderClient {
           run: this.snapshotAsRef(postSnap, handle),
           error: postSnap.error ?? "run ended without a terminal event",
         };
-        yield failedEvent;
         await this.recordFinalSnapshot(handle, failedEvent);
+        yield failedEvent;
         return;
       }
     } catch (err) {
@@ -414,30 +417,28 @@ export class ClaudeCodeProviderClient implements AgentProviderClient {
       // `result` messages. `Query.interrupt()` (our cancel path) typically
       // makes the generator throw an abort error — so a thrown exception
       // after a cancel is a cancellation, not a failure. Check the snapshot
-      // first: SdkRunner reports "cancelled" once `cancelRequested` is set.
-      const snap = await runner.snapshot(handle).catch(() => null);
-      if (snap?.status === "cancelled") {
+      // before classifying the error.
+      const postSnap = await runner.snapshot(handle).catch(() => null);
+      if (postSnap?.status === "cancelled") {
         const cancelledEvent: ProviderRunEvent = {
           type: "run_cancelled",
-          run: this.snapshotAsRef(snap, handle),
+          run: this.snapshotAsRef(postSnap, handle),
         };
-        yield cancelledEvent;
         await this.recordFinalSnapshot(handle, cancelledEvent);
+        yield cancelledEvent;
         return;
       }
       // Otherwise it is a genuine LLM/runtime error (4xx, network, JSON
-      // parse). Map it to `run_failed` so callers always see a terminal —
-      // matches the spec 017 §5 contract and lets the engine show the error
-      // in Action Center without a separate `getRun` poll.
+      // parse). Map it to `run_failed` so callers always see a terminal.
       const message = providerFailureMessage(err, failureContext, handle);
       const failedEvent: ProviderRunEvent = {
         type: "run_failed",
-        run: snap ? this.snapshotAsRef(snap, handle) : handle.ref,
+        run: { ...handle.ref, status: "failed" },
         error: message,
         raw: providerFailureRaw(err, failureContext, handle),
       };
-      yield failedEvent;
       await this.recordFinalSnapshot(handle, failedEvent);
+      yield failedEvent;
       return;
     }
   }
@@ -514,13 +515,13 @@ export class ClaudeCodeProviderClient implements AgentProviderClient {
   async getRun(input: GetRunInput): Promise<ProviderRunSnapshot> {
     const runner = await this.ensureRunner();
     const internal = this.runs.get(input.runId);
-    if (!internal) {
-      throw new ClaudeCodeProviderError(
-        `getRun: unknown runId "${input.runId}"`,
-        { retryable: false },
-      );
-    }
-    return runner.snapshot(internal.handle);
+    if (internal) return runner.snapshot(internal.handle);
+    const snapshot = this.terminalSnapshots.get(input.runId);
+    if (snapshot) return snapshot;
+    throw new ClaudeCodeProviderError(
+      `getRun: unknown runId "${input.runId}"`,
+      { retryable: false },
+    );
   }
 
   async cancelRun(input: CancelRunInput): Promise<ProviderRunSnapshot> {
@@ -627,7 +628,6 @@ export class ClaudeCodeProviderClient implements AgentProviderClient {
     handle: ClaudeCodeRunHandle,
     terminal: ProviderRunEvent,
   ): Promise<void> {
-    if (!handle.recordPath) return;
     const status =
       terminal.type === "run_completed"
         ? "completed"
@@ -645,15 +645,24 @@ export class ClaudeCodeProviderClient implements AgentProviderClient {
       output: terminal.type === "run_completed" ? terminal.output : undefined,
       error: terminal.type === "run_failed" ? terminal.error : undefined,
     };
-    await appendProviderReplayRecord(handle.recordPath, {
-      kind: "snapshot",
-      provider: this.provider,
-      recordedAt: new Date().toISOString(),
-      snapshot,
-    });
+    this.runs.delete(handle.runId);
+    this.terminalSnapshots.set(snapshot);
+    try {
+      await this.ensureRunner().then((runner) => runner.dispose(handle));
+    } catch (error) {
+      console.error("Claude Code run disposal failed", error);
+    }
+    if (handle.recordPath) {
+      await appendProviderReplayRecord(handle.recordPath, {
+        kind: "snapshot",
+        provider: this.provider,
+        recordedAt: new Date().toISOString(),
+        snapshot,
+      });
+    }
   }
 
-  /** Convenience for tests: list known runIds. */
+  /** Convenience for tests: list live runIds only. */
   knownRunIds(): string[] {
     return Array.from(this.runs.keys());
   }

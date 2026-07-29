@@ -28,6 +28,7 @@ import {
   hydrateSchedulePageData,
   sortScheduledItems,
 } from "./schedule-page-utils";
+import type { Locale } from "@chrona/i18n";
 import { apiJson } from "@shared/http";
 import type { TaskConfigFormInput } from "./forms/task-config-form";
 
@@ -324,6 +325,12 @@ export async function handleScheduleDropAction({
   }
 }
 
+type ScheduleViewHrefBuilder = (
+  day: string,
+  view: ScheduleViewMode,
+  taskId?: string,
+) => string;
+
 export async function handleCreateTaskBlockAction({
   input,
   workspaceId,
@@ -348,17 +355,15 @@ export async function handleCreateTaskBlockAction({
   workspaceId: string;
   activeDay: string;
   activeView: ScheduleViewMode;
-  locale: string;
+  locale: Locale;
   copy: SchedulePageCopy;
   applyOptimisticViewData: (
     updater: (current: SchedulePageData) => SchedulePageData,
   ) => void;
   setLocalSelectedTaskId: (taskId: string) => void;
   pushRoute: (href: string) => void;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  localizeHref: (locale: any, href: string) => string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  buildScheduleViewHref: (...args: any[]) => string;
+  localizeHref: (locale: Locale | undefined, href: string) => string;
+  buildScheduleViewHref: ScheduleViewHrefBuilder;
   setAnnouncement: (value: string) => void;
   setIsPending: (value: boolean) => void;
   setErrorMessage: (value: string | null) => void;

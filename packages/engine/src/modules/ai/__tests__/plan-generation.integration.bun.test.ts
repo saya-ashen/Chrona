@@ -12,7 +12,7 @@
 
 import { describe, expect, it } from "bun:test";
 
-import { extractJSON, llmCall } from "@/modules/ai/providers";
+import { extractJSON, llmCall } from "@chrona/engine/test-support";
 import { createPlanGraphFromCompiledPlan } from "@/modules/plan-execution/persistence/plan-run-store";
 import type {
   PlanBlueprintNode,

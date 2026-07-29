@@ -1,10 +1,11 @@
-import { createHash, randomBytes, timingSafeEqual } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 import { db } from "@/lib/db";
 import type { AgentControlActionKind } from "@chrona/contracts/api";
 
 const TOKEN_BYTES = 32;
-const TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
-
+const DEFAULT_TOKEN_TTL_MS = 15 * 60 * 1000;
+const MIN_TOKEN_TTL_MS = 60 * 1000;
+const MAX_TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
 export type RunTokenScope = {
   token: string;
   taskId: string;
@@ -44,10 +45,10 @@ function hashToken(token: string) {
   return createHash("sha256").update(token).digest("hex");
 }
 
-function safeTokenEquals(left: string, right: string) {
-  const leftBuffer = Buffer.from(left, "hex");
-  const rightBuffer = Buffer.from(right, "hex");
-  return leftBuffer.length === rightBuffer.length && timingSafeEqual(leftBuffer, rightBuffer);
+function tokenTtlMs() {
+  const configured = Number.parseInt(process.env.CHRONA_RUN_TOKEN_TTL_MS ?? "", 10);
+  if (!Number.isSafeInteger(configured)) return DEFAULT_TOKEN_TTL_MS;
+  return Math.min(Math.max(configured, MIN_TOKEN_TTL_MS), MAX_TOKEN_TTL_MS);
 }
 
 export async function mintRunToken(input: {
@@ -71,7 +72,7 @@ export async function mintRunToken(input: {
       runtimeSessionKey: input.runtimeSessionKey,
       nodeId: input.nodeId ?? null,
       nodeAttemptId: input.nodeAttemptId ?? null,
-      expiresAt: input.expiresAt ?? new Date(Date.now() + TOKEN_TTL_MS),
+      expiresAt: input.expiresAt ?? new Date(Date.now() + tokenTtlMs()),
     },
   });
   return token;
@@ -79,10 +80,9 @@ export async function mintRunToken(input: {
 
 export async function validateRunToken(token: string): Promise<RunTokenScope | null> {
   const tokenHash = hashToken(token);
-  const candidates = await db.runToken.findMany({
-    where: { revokedAt: null, expiresAt: { gt: new Date() } },
+  const match = await db.runToken.findUnique({
+    where: { tokenHash },
     select: {
-      tokenHash: true,
       taskId: true,
       workspaceId: true,
       taskSessionId: true,
@@ -90,10 +90,63 @@ export async function validateRunToken(token: string): Promise<RunTokenScope | n
       runtimeSessionKey: true,
       nodeId: true,
       nodeAttemptId: true,
+      revokedAt: true,
+      expiresAt: true,
     },
   });
-  const match = candidates.find((candidate) => safeTokenEquals(candidate.tokenHash, tokenHash));
-  if (!match || !match.taskId || !match.workspaceId || !match.runId || !match.runtimeSessionKey) return null;
+  if (
+    !match
+    || match.revokedAt
+    || match.expiresAt <= new Date()
+    || !match.taskId
+    || !match.workspaceId
+    || !match.runId
+    || !match.runtimeSessionKey
+  ) return null;
+  return {
+    token,
+    taskId: match.taskId,
+    workspaceId: match.workspaceId,
+    taskSessionId: match.taskSessionId,
+    runId: match.runId,
+    runtimeSessionKey: match.runtimeSessionKey,
+    nodeId: match.nodeId,
+    nodeAttemptId: match.nodeAttemptId,
+  };
+}
+
+/**
+ * Returns a still-live token's scope only after it has been revoked.
+ *
+ * This is intentionally narrower than validateRunToken: callers may use it
+ * only to acknowledge an already-persisted terminal action, never to start
+ * new work with a revoked credential.
+ */
+export async function validateRevokedRunToken(token: string): Promise<RunTokenScope | null> {
+  const tokenHash = hashToken(token);
+  const match = await db.runToken.findUnique({
+    where: { tokenHash },
+    select: {
+      taskId: true,
+      workspaceId: true,
+      taskSessionId: true,
+      runId: true,
+      runtimeSessionKey: true,
+      nodeId: true,
+      nodeAttemptId: true,
+      revokedAt: true,
+      expiresAt: true,
+    },
+  });
+  if (
+    !match
+    || !match.revokedAt
+    || match.expiresAt <= new Date()
+    || !match.taskId
+    || !match.workspaceId
+    || !match.runId
+    || !match.runtimeSessionKey
+  ) return null;
   return {
     token,
     taskId: match.taskId,
@@ -113,6 +166,14 @@ export async function revokeRunToken(token: string): Promise<boolean> {
     data: { revokedAt: new Date() },
   });
   return result.count > 0;
+}
+
+export async function revokeRunTokensForRun(runId: string): Promise<number> {
+  const result = await db.runToken.updateMany({
+    where: { runId, revokedAt: null },
+    data: { revokedAt: new Date() },
+  });
+  return result.count;
 }
 
 export async function recordTerminalAction(input: {

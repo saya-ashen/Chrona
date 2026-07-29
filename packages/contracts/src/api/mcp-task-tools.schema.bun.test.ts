@@ -97,3 +97,24 @@ describe("Goal result read contract", () => {
     })).toThrow();
   });
 });
+
+describe("MCP resource limits", () => {
+  it("rejects oversized records and deeply nested evidence", () => {
+    const oversizedEvidence = Object.fromEntries(Array.from({ length: 101 }, (_, index) => [`key-${index}`, "value"]));
+    expect(() => parseChronaToolPayload("chrona.node.condition_select", {
+      nodeId: "node-1",
+      branchRef: "branch-1",
+      summary: "Selected",
+      evidence: oversizedEvidence,
+    })).toThrow();
+
+    let deeplyNested: unknown = "leaf";
+    for (let depth = 0; depth < 9; depth += 1) deeplyNested = { deeplyNested };
+    expect(() => parseChronaToolPayload("chrona.node.condition_select", {
+      nodeId: "node-1",
+      branchRef: "branch-1",
+      summary: "Selected",
+      evidence: { deeplyNested },
+    })).toThrow();
+  });
+});

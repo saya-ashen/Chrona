@@ -6,7 +6,7 @@ import { RunStatus } from "@chrona/db/generated/prisma/client";
 import type { CompiledPlan, TaskConfig } from "@chrona/contracts/ai";
 import { createChronaEngine } from "@chrona/engine";
 import { aiClientRegistry } from "../../../../../features/ai-clients/server";
-import { saveCompiledPlan } from "@chrona/engine/modules/plan-execution/persistence/compiled-plan-store";
+import { saveCompiledPlan } from "@chrona/engine/test-support";
 import type {
   AgentProviderClient,
   ProviderCapabilities,

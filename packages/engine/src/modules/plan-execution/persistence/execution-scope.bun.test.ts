@@ -123,7 +123,7 @@ describe("resolveExecutionScope", () => {
 
   it("prefers the live Active/Paused ExecutionSession's work block over the latest accepted plan", async () => {
     const { workspace, task, workBlock } = await createTaskWithWorkBlock();
-    await acceptPlanAtWorkBlock({ taskId: task.id, workspaceId: workspace.id, workBlockId: workBlock.id });
+    const planId = await acceptPlanAtWorkBlock({ taskId: task.id, workspaceId: workspace.id, workBlockId: workBlock.id });
 
     const otherBlock = await db.workBlock.create({
       data: {
@@ -141,6 +141,8 @@ describe("resolveExecutionScope", () => {
         workspaceId: workspace.id,
         taskId: task.id,
         workBlockId: otherBlock.id,
+        planId,
+        activeScopeKey: "active",
         status: "Active",
         completedNodeIds: "[]",
       },
@@ -153,12 +155,14 @@ describe("resolveExecutionScope", () => {
 
   it("lets an explicit concrete workBlockId hint win", async () => {
     const { workspace, task, workBlock } = await createTaskWithWorkBlock();
-    await acceptPlanAtWorkBlock({ taskId: task.id, workspaceId: workspace.id, workBlockId: workBlock.id });
+    const planId = await acceptPlanAtWorkBlock({ taskId: task.id, workspaceId: workspace.id, workBlockId: workBlock.id });
     await db.executionSession.create({
       data: {
         workspaceId: workspace.id,
         taskId: task.id,
         workBlockId: workBlock.id,
+        planId,
+        activeScopeKey: "active",
         status: "Active",
         completedNodeIds: "[]",
       },

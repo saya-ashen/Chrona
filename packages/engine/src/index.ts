@@ -51,6 +51,7 @@ export {
   mintRunToken,
   validateRunToken,
   revokeRunToken,
+  revokeRunTokensForRun,
   recordTerminalAction,
   latestRecordedTerminalAction,
   findRecordedTerminalAction,

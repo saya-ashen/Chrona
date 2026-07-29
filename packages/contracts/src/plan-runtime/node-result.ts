@@ -1,5 +1,6 @@
-import type { CheckpointInputFields, CheckpointResponse } from "./checkpoints";
-import type { NodeActionForm, WaitKind } from "./node";
+import type { NodeActionForm, WaitKind } from "./node-core";
+type CheckpointInputFields = Record<string, string | boolean | string[]>;
+type CheckpointResponse = { response: unknown };
 import type { UiDocument } from "@chrona/ui-protocol";
 
 

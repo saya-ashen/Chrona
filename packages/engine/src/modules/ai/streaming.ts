@@ -17,9 +17,10 @@ import type {
 } from "@chrona/contracts";
 import { buildSuggestFeatureSpec } from "@chrona/contracts";
 import { createLogger } from "@chrona/logging";
-import type {
-  ProviderRunEvent,
-  ProviderRunInput,
+import {
+  parseJsonServerEventStream,
+  type ProviderRunEvent,
+  type ProviderRunInput,
 } from "@chrona/providers-foundation";
 import { normalizeSuggestResponse } from "./feature-normalizers";
 import {
@@ -406,40 +407,28 @@ async function* llmStream(
 
   yield { type: "status", message: "AI is generating..." };
 
-  const reader = res.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
   let fullText = "";
 
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-
-    buffer += decoder.decode(value, { stream: true });
-    const lines = buffer.split("\n");
-    buffer = lines.pop() ?? "";
-
-    for (const line of lines) {
-      if (!line.startsWith("data: ")) continue;
-      const raw = line.slice(6).trim();
-      if (raw === "[DONE]") {
-        yield { type: "done", text: fullText, structured: null };
-        return;
-      }
-      try {
-        const chunk = JSON.parse(raw) as {
-          choices?: Array<{ delta?: { content?: string } }>;
-        };
-        const content = chunk.choices?.[0]?.delta?.content;
-        if (content) {
-          fullText += content;
-          yield { type: "partial", text: content };
-        }
-      } catch {
-        // skip malformed SSE lines
+  try {
+    for await (const value of parseJsonServerEventStream(res.body, {
+      signal: requestSignal,
+      doneSentinel: "[DONE]",
+    })) {
+      const chunk = value as { choices?: Array<{ delta?: { content?: string } }> };
+      const content = chunk.choices?.[0]?.delta?.content;
+      if (content) {
+        fullText += content;
+        yield { type: "partial", text: content };
       }
     }
+  } catch (error) {
+    yield {
+      type: "error",
+      message: error instanceof Error ? error.message : "LLM event stream failed",
+    };
+    return;
   }
+
   yield { type: "done", text: fullText, structured: null };
 }
 

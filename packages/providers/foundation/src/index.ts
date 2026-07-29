@@ -1,4 +1,13 @@
 export {
+  parseJsonServerEventStream,
+  parseServerEventStream,
+  parseTypedJsonServerEventStream,
+  ServerEventStreamParseError,
+  type ParseServerEventStreamOptions,
+  type ServerEventFrame,
+} from "./server-event-stream";
+
+export {
   type AgentProviderClient,
   type CancelRunInput,
   type CreateSessionInput,
@@ -89,3 +98,5 @@ export {
   type ProviderRecoveryCapabilityName,
   type ProviderRecoveryMode,
 } from "./provider-capability-matrix";
+
+export { BoundedTerminalRunSnapshots } from "./bounded-terminal-run-snapshots";

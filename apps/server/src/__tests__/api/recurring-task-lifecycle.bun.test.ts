@@ -2,8 +2,11 @@ import { beforeEach, describe, expect, it } from "bun:test";
 import { Hono } from "hono";
 import { db } from "@chrona/db";
 import { createChronaEngine } from "@chrona/engine";
-import { runRecurringWorkBlockExpansionWorker } from "@chrona/engine/modules/orchestration/recurring-work-block-expansion-worker";
-import { saveCompiledPlan } from "@chrona/engine/modules/plan-execution/persistence/compiled-plan-store";
+import {
+  getLatestTaskPlanReadModel,
+  runRecurringWorkBlockExpansionWorker,
+  saveCompiledPlan,
+} from "@chrona/engine/test-support";
 import { expandRecurrenceRule } from "@chrona/integrations";
 import type { CompiledPlan } from "@chrona/contracts/ai";
 import { createApiRouter } from "../../routes/api";
@@ -167,9 +170,6 @@ describe("Recurring task lifecycle", () => {
     // getLatestTaskPlanReadModel(workBlockId=first) must return the plan we
     // just saved. getLatestTaskPlanReadModel(workBlockId=second) must NOT —
     // the second occurrence has its own scope and a different plan lookup.
-    const { getLatestTaskPlanReadModel } = await import(
-      "@chrona/engine/modules/plans/task-plan-read-model"
-    );
     const firstPlan = await getLatestTaskPlanReadModel(task.id, first.id);
     const secondPlan = await getLatestTaskPlanReadModel(task.id, second.id);
     expect(firstPlan?.summary).toBe("Audit the first occurrence");

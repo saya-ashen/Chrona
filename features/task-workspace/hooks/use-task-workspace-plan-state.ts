@@ -28,7 +28,7 @@ import { mergeWorkspaceActivity, workspaceEventToWorkspaceActivity } from "../mo
 import type { TaskData, TaskPageData, WorkspaceActivityItem } from "../model/task-workspace-types";
 import { stopTaskPlanGenerationSession, useTaskPlanGenerationSession, type TaskPlanSessionState } from "./task-plan-generation-session-store";
 import type { TaskWorkspaceSseEvent } from "./use-task-workspace-page-state";
-import type { ExecutionActionInput, ExecutionCheckpoint, PlanExecutionResult, PlanExecutionSSEEvent, SubmitCheckpointActionInput } from "@chrona/contracts"
+import type { ExecutionActionInput, ExecutionCheckpoint, PlanExecutionResult, PlanExecutionSSEEvent, SubmitCheckpointActionInput, TaskPlanReadModel } from "@chrona/contracts";
 
 const STARTING_NODE_STATUS_LABEL = "Starting";
 const STARTING_NODE_NEXT_ACTION = "Starting execution...";
@@ -707,7 +707,7 @@ export function useTaskWorkspacePlanState(
       status: "draft" as const,
       revision: compiledPlan.sourceVersion,
       summary: compiledPlan.goal,
-      nodes: compiledPlan.nodes.map((node) => ({
+      nodes: compiledPlan.nodes.map((node: TaskPlanReadModel["compiledPlan"]["nodes"][number]) => ({
         id: node.id,
         title: node.title,
         objective: node.description ?? "",
@@ -718,7 +718,7 @@ export function useTaskWorkspacePlanState(
         executionMode: node.mode ?? "automatic",
         dependsOn: deps.get(node.id) ?? [],
       })),
-      edges: compiledPlan.edges.map((edge) => ({
+      edges: compiledPlan.edges.map((edge: TaskPlanReadModel["compiledPlan"]["edges"][number]) => ({
         id: edge.id,
         fromNodeId: edge.from,
         toNodeId: edge.to,
