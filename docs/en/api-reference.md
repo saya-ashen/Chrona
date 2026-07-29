@@ -71,6 +71,15 @@ available to planning and execution sessions through bounded
 execution-session, provider-session, approval, and Result state; later Goal
 edits or accepted results cannot mutate the snapshot.
 
+### POST /api/tasks/:taskId/actions/rebuild-with-latest-goal-assets
+
+Destructively replaces a Goal-linked Task with a new canonical Task using the
+same definition and the Goal's current approved, unarchived asset versions.
+The old Task tree, Plan, Runs, execution history, Artifacts, and Results are
+deleted atomically; the replacement starts Ready without a Plan or execution
+progress. Standalone Tasks are rejected. The response identifies both the new
+`taskId` and `replacedTaskId`; callers must navigate to the new Task.
+
 ### GET /api/goals/:goalId/artifacts/:artifactId
 
 Returns a Goal-owned Artifact read model and supported open/copy/download

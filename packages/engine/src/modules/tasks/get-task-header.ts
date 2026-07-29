@@ -14,6 +14,7 @@ async function loadHeaderTaskView(taskId: string) {
     select: {
       id: true,
       workspaceId: true,
+      goalId: true,
       seriesExternalUid: true,
       title: true,
       status: true,
@@ -305,6 +306,7 @@ export function resolveTaskHeaderViewModel(input: BuildHeaderSpecInput & { now?:
     isRunnable: currentExecution.status !== "no_plan",
   });
   if (hasAcceptedPlan && scopedTaskStatus !== "Done") actions.push({ id: "restart", label: "Run plan from beginning" });
+  if (task.goalId) actions.push({ id: "rebuild", label: "Rebuild with latest Goal assets" });
   actions.push({ id: "edit", label: "Edit" }, { id: "delete", label: "Delete Task" });
 
   const workStateGuidance = workspaceStateGuidance({

@@ -63,6 +63,7 @@ type SdkRunHandle = {
   abort: AbortController;
   session?: AgentSession;
   sessionId: string;
+  nativeSessionId?: string;
   status: ProviderRunStatus;
   outputText: string;
   error?: string;
@@ -291,6 +292,7 @@ function runRef(handle: SdkRunHandle, status = handle.status): ProviderRunRef {
   return {
     ...handle.ref,
     sessionId: handle.sessionId,
+    nativeSessionId: handle.nativeSessionId,
     status,
   };
 }
@@ -301,6 +303,7 @@ function eventBase(handle: SdkRunHandle, rawEventType?: string) {
     runId: handle.ref.runId,
     nativeRunId: handle.ref.nativeRunId,
     sessionId: handle.sessionId,
+    nativeSessionId: handle.nativeSessionId,
     sequence: handle.sequence++,
     timestamp: now(),
     rawEventType,
@@ -928,6 +931,7 @@ export class OmpSdkProviderClient implements AgentProviderClient {
       provider: PROVIDER,
       runId: handle.ref.runId,
       sessionId: handle.sessionId,
+      nativeSessionId: handle.nativeSessionId,
       nativeRunId: handle.ref.nativeRunId,
       providerRunId: handle.ref.providerRunId,
       status: handle.status,
@@ -986,14 +990,7 @@ export class OmpSdkProviderClient implements AgentProviderClient {
     }
     handle.session = session;
     const persistedSessionRef = session.sessionManager.getSessionFile();
-    if (persistedSessionRef) {
-      handle.sessionId = persistedSessionRef;
-      handle.ref = {
-        ...handle.ref,
-        sessionId: persistedSessionRef,
-        providerRunId: handle.ref.providerRunId ?? handle.ref.runId,
-      };
-    }
+    if (persistedSessionRef) handle.nativeSessionId = persistedSessionRef;
     handle.unsubscribe = session.subscribe((event) => this.onSessionEvent(handle, queue, event));
     if (handle.input.signal) {
       const abort = () => {

@@ -5,4 +5,5 @@ export { getTaskHeaderSpec } from "./get-task-header";
 export { getTaskPage } from "./get-task-page";
 export { markTaskDone } from "./mark-task-done";
 export { reopenTask } from "./reopen-task";
+export { rebuildTaskWithLatestGoalAssets } from "./rebuild-task-with-latest-goal-assets";
 export { updateTask } from "./update-task";

@@ -2,6 +2,8 @@ import { apiJson } from "@shared/http";
 import type {
   ApplyGoalAssetOwnershipRequest,
   CreateAssetModificationTaskRequest,
+  CreateAssetUseTaskRequest,
+  CreateGoalAssetReviewRequest,
   CreateGoalAssetJobRequest,
   CreateGoalFormSubmissionRequest,
   GenerateGoalAssetOwnershipRequest,
@@ -10,7 +12,7 @@ import type {
   SubmitGoalAssetDraftRequest,
 } from "@chrona/contracts";
 
-export type GoalAssetKind = "document" | "form" | "page" | "file" | "structured_result";
+export type GoalAssetKind = "document" | "form" | "page" | "file" | "data_table" | "structured_result";
 export type GoalAssetVersionData = {
   id: string;
   version: number;
@@ -29,6 +31,7 @@ export type GoalAssetVersionData = {
 };
 export type GoalAssetDraftData = { id: string; baseVersionId: string; status: string; content: string | Record<string, unknown> | unknown[]; updatedAt: string };
 export type GoalAssetJobData = { id: string; versionId: string; kind: string; format: string | null; status: string; outputUri: string | null; errorMessage: string | null; createdAt: string };
+export type GoalAssetReviewData = { id: string; versionId: string; verifiedAt: string; nextReviewAt: string | null; summary: string | null; authorType: "user" | "task_result"; sourceTaskId: string | null; sourceRunId: string | null; createdAt: string };
 export type GoalAssetWorkbenchData = {
   id: string;
   workspaceId: string;
@@ -47,6 +50,7 @@ export type GoalAssetWorkbenchData = {
   submissions: Array<{ id: string; versionId: string; content: unknown; createdAt: string }>;
   usageHistory?: Array<{ taskTitle: string; version: number; completedAt: string }>;
   jobs: GoalAssetJobData[];
+  reviews: GoalAssetReviewData[];
   linkedAssets?: Array<{ ref: string; assetId: string }>;
 };
 export type GoalAssetOwnershipProposalData = {
@@ -107,3 +111,5 @@ export async function applyGoalAssetOwnership(goalId: string, candidateId: strin
 export async function submitGoalForm(goalId: string, assetId: string, command: CreateGoalFormSubmissionRequest) { return apiJson(`/api/goals/${encodeURIComponent(goalId)}/assets/${encodeURIComponent(assetId)}/submissions`, { method: "POST", body: JSON.stringify(command) }); }
 export async function createGoalAssetJob(goalId: string, assetId: string, command: CreateGoalAssetJobRequest) { return apiJson<GoalAssetJobData>(`/api/goals/${encodeURIComponent(goalId)}/assets/${encodeURIComponent(assetId)}/jobs`, { method: "POST", body: JSON.stringify(command) }); }
 export async function createGoalAssetModificationTask(goalId: string, assetId: string, command: CreateAssetModificationTaskRequest) { return apiJson(`/api/goals/${encodeURIComponent(goalId)}/assets/${encodeURIComponent(assetId)}/ai-modification-task`, { method: "POST", body: JSON.stringify(command) }); }
+export async function createGoalAssetReview(goalId: string, assetId: string, command: CreateGoalAssetReviewRequest) { return apiJson<GoalAssetReviewData>(`/api/goals/${encodeURIComponent(goalId)}/assets/${encodeURIComponent(assetId)}/reviews`, { method: "POST", body: JSON.stringify(command) }); }
+export async function createGoalAssetUseTask(goalId: string, assetId: string, command: CreateAssetUseTaskRequest) { return apiJson<{ taskId: string }>(`/api/goals/${encodeURIComponent(goalId)}/assets/${encodeURIComponent(assetId)}/use-task`, { method: "POST", body: JSON.stringify(command) }); }

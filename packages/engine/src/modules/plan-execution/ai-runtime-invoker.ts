@@ -219,7 +219,7 @@ type FinalizeRuntimeInvocationInput = {
 };
 
 async function finalizeRuntimeInvocation(value: FinalizeRuntimeInvocationInput): Promise<AiRuntimeInvocation> {
-  const runtimeSessionKey = requireRuntimeSessionId(value.response.sessionId, "provider snapshot");
+  const runtimeSessionKey = requireRuntimeSessionId(value.response.nativeSessionId ?? value.response.sessionId, "provider snapshot");
   const runtimeRunRef = await uniqueRuntimeRunRef(value.runId, value.response.nativeRunId ?? value.response.runId);
   const conversationEntryIds = await persistRuntimeHistory({ runId: value.runId, request: value.request, response: value.response });
   const runStatus = runStatusFromProviderSnapshot(value.response);

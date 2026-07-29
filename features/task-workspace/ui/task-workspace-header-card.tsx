@@ -44,6 +44,11 @@ type TaskWorkspaceHeaderCardProps = {
   onStopPlanGeneration: () => void | Promise<void>;
   onRestartPlan: () => void | Promise<void>;
   onEdit: () => void;
+  showRebuildConfirm: boolean;
+  isRebuilding: boolean;
+  onStartRebuildConfirm: () => void;
+  onCancelRebuildConfirm: () => void;
+  onRebuild: () => void;
   showDeleteConfirm: boolean;
   isDeleting: boolean;
   onStartDeleteConfirm: () => void;
@@ -73,6 +78,11 @@ export function TaskWorkspaceHeaderCard({
   onStopPlanGeneration,
   onRestartPlan,
   onEdit,
+  showRebuildConfirm,
+  isRebuilding,
+  onStartRebuildConfirm,
+  onCancelRebuildConfirm,
+  onRebuild,
   showDeleteConfirm,
   isDeleting,
   onStartDeleteConfirm,
@@ -97,6 +107,7 @@ export function TaskWorkspaceHeaderCard({
     onStopPlanGeneration,
     onRestartPlan,
     onEdit,
+    onStartRebuildConfirm,
     onStartDeleteConfirm,
     onAction,
     onRecoveryRetry,
@@ -113,6 +124,7 @@ export function TaskWorkspaceHeaderCard({
     onStopPlanGeneration,
     onRestartPlan,
     onEdit,
+    onStartRebuildConfirm,
     onStartDeleteConfirm,
     onAction,
     onRecoveryRetry,
@@ -137,6 +149,11 @@ export function TaskWorkspaceHeaderCard({
       if (actionId === "restart") {
         ref.current.store.set("/headerOverflowAction", "");
         setRestartConfirmOpen(true);
+        return;
+      }
+      if (actionId === "rebuild") {
+        ref.current.onStartRebuildConfirm();
+        ref.current.store.set("/headerOverflowAction", "");
         return;
       }
       if (actionId === "edit") {
@@ -250,6 +267,31 @@ export function TaskWorkspaceHeaderCard({
               }}
             >
               {copy.runPlanFromBeginning ?? "Run plan from beginning"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog
+        open={showRebuildConfirm}
+        onOpenChange={(open) => {
+          if (!open) onCancelRebuildConfirm();
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{copy.rebuildTaskTitle}</DialogTitle>
+            <DialogDescription>{copy.rebuildTaskDescription}</DialogDescription>
+          </DialogHeader>
+          <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-sm text-muted-foreground">
+            <p>{copy.rebuildTaskReplacementWarning}</p>
+            <p className="mt-2 font-medium text-destructive">{copy.rebuildTaskIrreversibleWarning}</p>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={onCancelRebuildConfirm} disabled={isRebuilding}>
+              {copy.cancel}
+            </Button>
+            <Button type="button" variant="destructive" onClick={onRebuild} disabled={isRebuilding}>
+              {isRebuilding ? copy.rebuildingTask : copy.rebuildTask}
             </Button>
           </DialogFooter>
         </DialogContent>

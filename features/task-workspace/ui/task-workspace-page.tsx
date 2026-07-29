@@ -53,6 +53,11 @@ type TaskWorkspaceHeaderEditorProps = {
   >[0]["onRecoveryCancel"];
   isEditExpanded: boolean;
   onToggleEditExpanded: () => void;
+  showRebuildConfirm: boolean;
+  isRebuilding: boolean;
+  onStartRebuildConfirm: () => void;
+  onCancelRebuildConfirm: () => void;
+  onRebuild: () => void;
   showDeleteConfirm: boolean;
   isDeleting: boolean;
   onStartDeleteConfirm: () => void;
@@ -118,6 +123,11 @@ function TaskWorkspaceHeaderEditor({
   onRecoveryCancel,
   isEditExpanded,
   onToggleEditExpanded,
+  showRebuildConfirm,
+  isRebuilding,
+  onStartRebuildConfirm,
+  onCancelRebuildConfirm,
+  onRebuild,
   showDeleteConfirm,
   isDeleting,
   onStartDeleteConfirm,
@@ -139,6 +149,11 @@ function TaskWorkspaceHeaderEditor({
         onStopPlanGeneration={onStopPlanGeneration}
         onRestartPlan={onRestartPlan}
         onEdit={onToggleEditExpanded}
+        showRebuildConfirm={showRebuildConfirm}
+        isRebuilding={isRebuilding}
+        onStartRebuildConfirm={onStartRebuildConfirm}
+        onCancelRebuildConfirm={onCancelRebuildConfirm}
+        onRebuild={onRebuild}
         showDeleteConfirm={showDeleteConfirm}
         isDeleting={isDeleting}
         onStartDeleteConfirm={onStartDeleteConfirm}
@@ -270,7 +285,16 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
     fetchPlan,
     refreshWorkspace,
   });
-  const { showDeleteConfirm, setShowDeleteConfirm, isDeleting, handleDelete } =
+  const {
+    showDeleteConfirm,
+    setShowDeleteConfirm,
+    isDeleting,
+    handleDelete,
+    showRebuildConfirm,
+    setShowRebuildConfirm,
+    isRebuilding,
+    handleRebuild,
+  } =
     useTaskWorkspaceDeleteFlow({
       taskId: task.id,
       setSaveError,
@@ -397,6 +421,11 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
           }}
           isEditExpanded={isEditExpanded}
           onToggleEditExpanded={toggleEditExpanded}
+          showRebuildConfirm={showRebuildConfirm}
+          isRebuilding={isRebuilding}
+          onStartRebuildConfirm={() => setShowRebuildConfirm(true)}
+          onCancelRebuildConfirm={() => setShowRebuildConfirm(false)}
+          onRebuild={() => void handleRebuild()}
           showDeleteConfirm={showDeleteConfirm}
           isDeleting={isDeleting}
           onStartDeleteConfirm={() => setShowDeleteConfirm(true)}

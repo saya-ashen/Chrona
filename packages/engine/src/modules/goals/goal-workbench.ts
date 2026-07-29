@@ -16,6 +16,8 @@ import {
   STRUCTURED_RESULT_SCHEMA_VERSION,
   isStructuredResultAssetContent,
   type CreateAssetModificationTaskRequest,
+  type CreateAssetUseTaskRequest,
+  type CreateGoalAssetReviewRequest,
   type CreateGoalAssetJobRequest,
   type CreateGoalFormSubmissionRequest,
   type ResolveGoalInboxCandidateRequest,
@@ -27,6 +29,7 @@ import {
 import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
 import { createTask } from "../tasks/create-task";
 import { getAcceptedResultContext } from "../tasks/accepted-result-context";
+import { goalAssetRef } from "./goal-task-context";
 import { requestResultFileAccess, resolveGeneratedFileReference } from "../tasks/result-file-access";
 import { goalAssetContentToMarkdown } from "./goal-asset-export";
 
@@ -64,10 +67,11 @@ function declaredAssetKind(value: unknown) {
     form: true,
     page: true,
     file: true,
+    data_table: true,
     structured_result: true,
   };
   return typeof value === "string" && value in kinds
-    ? value as "document" | "form" | "page" | "file" | "structured_result"
+    ? value as "document" | "form" | "page" | "file" | "data_table" | "structured_result"
     : null;
 }
 
@@ -298,6 +302,7 @@ async function assetOrThrow(goalId: string, assetId: string, workspaceId?: strin
       currentArtifact: true,
       submissions: { orderBy: { createdAt: "desc" }, take: 20 },
       jobs: { orderBy: { createdAt: "desc" }, take: 20 },
+      reviews: { orderBy: { verifiedAt: "desc" }, take: 50 },
     },
   });
   if (!asset) throw new EngineError(ENGINE_ERROR_CODES.TASK_NOT_FOUND, "Goal asset not found");
@@ -345,6 +350,7 @@ async function assetReadModel(asset: Awaited<ReturnType<typeof assetOrThrow>>) {
     createdAt: asset.createdAt.toISOString(),
     updatedAt: asset.updatedAt.toISOString(),
     versions: asset.versions.map((version) => ({ ...version, createdAt: version.createdAt.toISOString() })),
+    reviews: asset.reviews.map((review) => ({ ...review, verifiedAt: review.verifiedAt.toISOString(), nextReviewAt: review.nextReviewAt?.toISOString() ?? null, createdAt: review.createdAt.toISOString() })),
     drafts: asset.drafts.map((draft) => ({ ...draft, createdAt: draft.createdAt.toISOString(), updatedAt: draft.updatedAt.toISOString() })),
     submissions: asset.submissions.map((item) => ({ ...item, createdAt: item.createdAt.toISOString() })),
     jobs: asset.jobs.map((item) => ({ ...item, createdAt: item.createdAt.toISOString(), updatedAt: item.updatedAt.toISOString() })),
@@ -381,7 +387,7 @@ export async function listGoalAssets(input: {
   goalId: string;
   workspaceId: string;
   query?: string;
-  kind?: "document" | "form" | "page" | "file" | "structured_result";
+  kind?: "document" | "form" | "page" | "file" | "data_table" | "structured_result";
   sourceTaskId?: string;
   state: "active" | "draft" | "running" | "failed" | "archived";
   sort: "updated_desc" | "updated_asc" | "name_asc";
@@ -407,6 +413,7 @@ export async function listGoalAssets(input: {
       drafts: { where: { status: { in: ["Active", "Conflict"] } }, orderBy: { updatedAt: "desc" } },
       jobs: { orderBy: { createdAt: "desc" }, take: 5 },
       submissions: { orderBy: { createdAt: "desc" }, take: 5 },
+      reviews: { orderBy: { verifiedAt: "desc" }, take: 50 },
     },
   });
   for (const asset of assets) if (asset.versions.length === 0) await ensureAssetVersion(asset.id);
@@ -963,6 +970,29 @@ export async function openGoalStructuredArtifact(input: { goalId: string; assetI
 }
 
 
+export async function createGoalAssetReview(input: { goalId: string; assetId: string; command: CreateGoalAssetReviewRequest }) {
+  const asset = await assetOrThrow(input.goalId, input.assetId, input.command.workspaceId);
+  const version = await db.goalAssetVersion.findFirst({ where: { id: input.command.versionId, assetId: asset.id } });
+  if (!version) throw new EngineError(ENGINE_ERROR_CODES.VALIDATION_FAILED, "Asset version not found");
+  const verifiedAt = new Date(input.command.verifiedAt);
+  const nextReviewAt = input.command.nextReviewAt ? new Date(input.command.nextReviewAt) : null;
+  if (Number.isNaN(verifiedAt.getTime()) || (nextReviewAt && Number.isNaN(nextReviewAt.getTime()))) {
+    throw new EngineError(ENGINE_ERROR_CODES.VALIDATION_FAILED, "Review dates are invalid");
+  }
+  if (nextReviewAt && nextReviewAt <= verifiedAt) {
+    throw new EngineError(ENGINE_ERROR_CODES.VALIDATION_FAILED, "Next review must be after verification");
+  }
+  return db.goalAssetReview.create({ data: { workspaceId: asset.workspaceId, goalId: asset.goalId, assetId: asset.id, versionId: version.id, verifiedAt, nextReviewAt, summary: input.command.summary || null, authorType: "user" } });
+}
+
+export async function createAssetUseTask(input: { goalId: string; assetId: string; command: CreateAssetUseTaskRequest }) {
+  const asset = await assetOrThrow(input.goalId, input.assetId, input.command.workspaceId);
+  const version = await db.goalAssetVersion.findFirst({ where: { id: input.command.versionId, assetId: asset.id } });
+  if (!version) throw new EngineError(ENGINE_ERROR_CODES.VALIDATION_FAILED, "Asset version not found");
+  const description = `${input.command.instruction.trim()}\n\nUse the Goal asset “${asset.label}” (${goalAssetRef(asset.id)}) at captured version v${version.version}. Read it with chrona_goal_results_read when its full content is needed; do not assume the asset body is embedded in this Task description.`;
+  return createTask({ workspaceId: asset.workspaceId, goalId: asset.goalId, title: input.command.title, description, priority: "Medium", autoPlanGeneration: false, autoExecute: false, goalContext: { expectedOutcome: input.command.expectedOutcome } });
+}
+
 export async function createAssetModificationTask(input: { goalId: string; assetId: string; command: CreateAssetModificationTaskRequest }) {
   const asset = await assetOrThrow(input.goalId, input.assetId, input.command.workspaceId);
   const version = await db.goalAssetVersion.findFirst({ where: { id: input.command.versionId, assetId: asset.id } });
@@ -971,12 +1001,11 @@ export async function createAssetModificationTask(input: { goalId: string; asset
     workspaceId: asset.workspaceId,
     goalId: asset.goalId,
     title: `Modify ${asset.label}`,
-    description: input.command.instruction,
+    description: `${input.command.instruction.trim()}\n\nModify the Goal asset “${asset.label}” (${goalAssetRef(asset.id)}) at captured version v${version.version}. Read it with chrona_goal_results_read when its full content is needed. Produce the proposed replacement through the Goal Inbox; do not assume the asset body is embedded in this Task description.`,
     priority: "Medium",
     autoPlanGeneration: false,
     autoExecute: false,
     goalContext: {
-      asset: { label: asset.label, version: version.version, contentHash: version.contentHash },
       expectedOutcome: input.command.expectedOutcome,
     },
   });

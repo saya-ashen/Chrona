@@ -221,6 +221,7 @@ describe("resolveTaskHeaderViewModel — header status follows the selected occu
     const task: HeaderTaskView = {
       id: "task-1",
       workspaceId: "ws-1",
+      goalId: "goal-1",
       seriesExternalUid: "series-1",
       title: "Recurring task",
       status: "Blocked", // task-row status is shared across the series
@@ -311,6 +312,7 @@ describe("resolveTaskHeaderViewModel — header status follows the selected occu
     const task: HeaderTaskView = {
       id: "task-1",
       workspaceId: "ws-1",
+      goalId: null,
       seriesExternalUid: null,
       title: "Single-shot task",
       status: "Blocked",
@@ -351,6 +353,7 @@ describe("resolveTaskHeaderViewModel — header status follows the selected occu
     const task: HeaderTaskView = {
       id: "task-1",
       workspaceId: "ws-1",
+      goalId: "goal-1",
       seriesExternalUid: null,
       title: "Completed task",
       status: "Completed",

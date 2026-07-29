@@ -126,6 +126,10 @@ vi.mock("../hooks/use-task-workspace-delete-flow", () => ({
     setShowDeleteConfirm: vi.fn(),
     isDeleting: false,
     handleDelete: vi.fn(),
+    showRebuildConfirm: false,
+    setShowRebuildConfirm: vi.fn(),
+    isRebuilding: false,
+    handleRebuild: vi.fn(),
   }),
 }));
 

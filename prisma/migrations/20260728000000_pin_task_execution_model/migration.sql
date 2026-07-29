@@ -81,3 +81,27 @@ CREATE TABLE "EventRetentionArchive" (
 );
 CREATE INDEX "EventRetentionArchive_source_cutoffAt_idx" ON "EventRetentionArchive"("source", "cutoffAt");
 CREATE INDEX "EventRetentionArchive_source_createdAt_idx" ON "EventRetentionArchive"("source", "createdAt");
+
+-- Track explicit content verification independently from metadata edits.
+CREATE TABLE "GoalAssetReview" (
+  "id" TEXT NOT NULL PRIMARY KEY,
+  "workspaceId" TEXT NOT NULL,
+  "goalId" TEXT NOT NULL,
+  "assetId" TEXT NOT NULL,
+  "versionId" TEXT NOT NULL,
+  "verifiedAt" DATETIME NOT NULL,
+  "nextReviewAt" DATETIME,
+  "summary" TEXT,
+  "authorType" TEXT NOT NULL,
+  "sourceTaskId" TEXT,
+  "sourceRunId" TEXT,
+  "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "GoalAssetReview_workspaceId_fkey" FOREIGN KEY ("workspaceId") REFERENCES "Workspace" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT "GoalAssetReview_goalId_fkey" FOREIGN KEY ("goalId") REFERENCES "Goal" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT "GoalAssetReview_assetId_fkey" FOREIGN KEY ("assetId") REFERENCES "GoalAsset" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT "GoalAssetReview_versionId_fkey" FOREIGN KEY ("versionId") REFERENCES "GoalAssetVersion" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT "GoalAssetReview_sourceTaskId_fkey" FOREIGN KEY ("sourceTaskId") REFERENCES "Task" ("id") ON DELETE SET NULL ON UPDATE CASCADE
+);
+CREATE INDEX "GoalAssetReview_assetId_verifiedAt_idx" ON "GoalAssetReview"("assetId", "verifiedAt");
+CREATE INDEX "GoalAssetReview_versionId_verifiedAt_idx" ON "GoalAssetReview"("versionId", "verifiedAt");
+CREATE INDEX "GoalAssetReview_goalId_nextReviewAt_idx" ON "GoalAssetReview"("goalId", "nextReviewAt");

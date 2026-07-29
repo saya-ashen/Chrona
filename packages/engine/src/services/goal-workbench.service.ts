@@ -1,5 +1,7 @@
 import {
   archiveGoalAsset,
+  createAssetUseTask,
+  createGoalAssetReview,
   createAssetModificationTask,
   createGoalAssetJob,
   createGoalFormSubmission,
@@ -39,5 +41,7 @@ export function createGoalWorkbenchService() {
     createSubmission: createGoalFormSubmission,
     createJob: createGoalAssetJob,
     createModificationTask: createAssetModificationTask,
+    createUseTask: createAssetUseTask,
+    createReview: createGoalAssetReview,
   };
 }

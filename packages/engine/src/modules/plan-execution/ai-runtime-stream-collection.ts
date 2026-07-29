@@ -16,7 +16,7 @@ export class IncompleteRunStreamError extends Error {
 type SnapshotContext = {
   provider: string;
   fallbackSessionId: string;
-  fallbackRun?: { runId: string; nativeRunId?: string; sessionId?: string };
+  fallbackRun?: { runId: string; nativeRunId?: string; sessionId?: string; nativeSessionId?: string };
   terminalToolName?: string;
 };
 
@@ -24,7 +24,7 @@ export async function collectProviderRunSnapshot(
   provider: string,
   events: AsyncIterable<ProviderRunEvent>,
   fallbackSessionId: string,
-  fallbackRun?: { runId: string; nativeRunId?: string; sessionId?: string },
+  fallbackRun?: { runId: string; nativeRunId?: string; sessionId?: string; nativeSessionId?: string },
   options: {
     onRuntimeEvent?: (event: ProviderRunEvent) => Promise<void> | void;
     eventPersistence?: RuntimeEventPersistenceContext;
@@ -76,6 +76,7 @@ function completedSnapshot(event: Extract<ProviderRunEvent, { type: "run_complet
     runId: event.run.runId,
     nativeRunId: event.run.nativeRunId,
     sessionId: requireRuntimeSessionId(event.run.sessionId, "completed event"),
+    nativeSessionId: event.run.nativeSessionId,
     status: "completed",
     outputText: event.outputText,
     structuredPayload: event.structuredPayload,
@@ -97,6 +98,7 @@ function terminalSnapshot(
     runId: run?.runId ?? crypto.randomUUID(),
     nativeRunId: run?.nativeRunId,
     sessionId: run?.sessionId ?? context.fallbackSessionId,
+    nativeSessionId: run?.nativeSessionId,
     status,
     error,
     raw: event.raw,

@@ -54,11 +54,17 @@ enum GoalAssetOwnershipDecision {
   separate_asset
 }
 
+enum GoalAssetReviewAuthorType {
+  user
+  task_result
+}
+
 enum GoalAssetKind {
   document
   form
   page
   file
+  data_table
   structured_result
 }
 
@@ -347,6 +353,7 @@ model Workspace {
   goalInboxCandidates       GoalInboxCandidate[]
   goalFormSubmissions       GoalFormSubmission[]
   goalAssetJobs             GoalAssetJob[]
+  goalAssetReviews          GoalAssetReview[]
   assetOwnershipProposals    GoalAssetOwnershipProposal[]
   taskOccurrences           TaskOccurrence[]
   taskTriggers              TaskTrigger[]
@@ -436,6 +443,7 @@ model Goal {
   briefRevisions          GoalBriefRevision[]
   goalAssetVersions       GoalAssetVersion[]
   goalAssetDrafts         GoalAssetDraft[]
+  goalAssetReviews        GoalAssetReview[]
   reviewProposals         GoalReviewProposal[]
   reviewProposalItems     GoalReviewProposalItem[]
 
@@ -467,6 +475,7 @@ model GoalAsset {
   inboxTargets      GoalInboxCandidate[] @relation("GoalInboxTargetAsset")
   submissions       GoalFormSubmission[]
   jobs              GoalAssetJob[]
+  reviews           GoalAssetReview[]
   ownershipProposalTargets GoalAssetOwnershipProposal[]
   ownershipProposalFinalAssets GoalAssetOwnershipProposal[] @relation("GoalAssetOwnershipFinalAsset")
 
@@ -610,6 +619,7 @@ model Task {
   inboxCandidates           GoalInboxCandidate[]
   formSubmissions           GoalFormSubmission[]
   assetJobs                 GoalAssetJob[]
+  assetReviews             GoalAssetReview[]
   timelineItems             TaskTimelineItem[]
   projection                TaskProjection?
   dependencies              TaskDependency[]           @relation("TaskDependencies")
@@ -1563,10 +1573,35 @@ model GoalAssetVersion {
   restoredDrafts   GoalAssetDraft[]       @relation("GoalAssetDraftConflict")
   submissions      GoalFormSubmission[]
   jobs             GoalAssetJob[]
+  reviews          GoalAssetReview[]
 
   @@unique([assetId, version])
   @@index([goalId, createdAt])
   @@index([artifactId])
+}
+
+model GoalAssetReview {
+  id           String                    @id @default(cuid())
+  workspaceId  String
+  goalId       String
+  assetId      String
+  versionId    String
+  verifiedAt   DateTime
+  nextReviewAt DateTime?
+  summary      String?
+  authorType   GoalAssetReviewAuthorType
+  sourceTaskId String?
+  sourceRunId  String?
+  createdAt    DateTime                  @default(now())
+  workspace    Workspace                 @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  goal         Goal                      @relation(fields: [goalId], references: [id], onDelete: Cascade)
+  asset        GoalAsset                 @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  version      GoalAssetVersion          @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  sourceTask   Task?                     @relation(fields: [sourceTaskId], references: [id], onDelete: SetNull)
+
+  @@index([assetId, verifiedAt])
+  @@index([versionId, verifiedAt])
+  @@index([goalId, nextReviewAt])
 }
 
 model GoalAssetDraft {

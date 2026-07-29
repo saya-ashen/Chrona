@@ -574,23 +574,42 @@ describe("Goal Workbench API", () => {
     }
   });
 
-  it("creates a bounded AI modification Task with an immutable asset version snapshot", async () => {
+  it("creates bounded metadata-only asset Tasks", async () => {
     const seeded = await seedGoalResult();
     const asset = await db.goalAsset.create({ data: { workspaceId: seeded.workspaceId, goalId: seeded.goal.id, sourceArtifactId: seeded.artifact.id, currentArtifactId: seeded.artifact.id, kind: "document", role: "working_document", status: "Approved", label: "Launch brief" } });
-    const version = await db.goalAssetVersion.create({ data: { workspaceId: seeded.workspaceId, goalId: seeded.goal.id, assetId: asset.id, artifactId: seeded.artifact.id, version: 1, source: "inbox", content: "Immutable base", contentHash: "base-v1", authorType: "user" } });
+    const version = await db.goalAssetVersion.create({ data: { workspaceId: seeded.workspaceId, goalId: seeded.goal.id, assetId: asset.id, artifactId: seeded.artifact.id, version: 1, source: "inbox", content: "SECRET ASSET BODY", contentHash: "base-v1", authorType: "user" } });
     const app = createApiRouter(createChronaEngine());
 
-    const response = await post(app, `/goals/${seeded.goal.id}/assets/${asset.id}/ai-modification-task`, { workspaceId: seeded.workspaceId, versionId: version.id, instruction: "Clarify the recommendation", expectedOutcome: "A reviewed clearer brief" });
+    for (const route of ["ai-modification-task", "use-task"]) {
+      const body = route === "ai-modification-task"
+        ? { workspaceId: seeded.workspaceId, versionId: version.id, instruction: "Clarify the recommendation", expectedOutcome: "A reviewed clearer brief" }
+        : { workspaceId: seeded.workspaceId, versionId: version.id, title: "Use launch brief", instruction: "Prepare the next decision", expectedOutcome: "A decision memo" };
+      const response = await post(app, `/goals/${seeded.goal.id}/assets/${asset.id}/${route}`, body);
+      expect(response.status).toBe(200);
+      const { taskId } = await response.json() as { taskId: string };
+      const created = await db.task.findUniqueOrThrow({ where: { id: taskId } });
+      expect(created.goalId).toBe(seeded.goal.id);
+      expect(created.autoExecute).toBe(false);
+      expect(created.description).toContain("chrona_goal_results_read");
+      expect(created.description).toMatch(/GA[A-F0-9]{12}/);
+      expect(created.description).toContain("captured version v1");
+      expect(created.description).not.toContain("SECRET ASSET BODY");
+      expect(JSON.stringify(created.goalContext)).not.toContain("SECRET ASSET BODY");
+      expect(JSON.stringify(created.goalContext)).not.toContain(asset.id);
+      expect(JSON.stringify(created.goalContext)).not.toContain(version.id);
+    }
+  });
 
+  it("records append-only version-specific asset verification", async () => {
+    const seeded = await seedGoalResult();
+    const asset = await db.goalAsset.create({ data: { workspaceId: seeded.workspaceId, goalId: seeded.goal.id, sourceArtifactId: seeded.artifact.id, currentArtifactId: seeded.artifact.id, kind: "document", role: "reference", status: "Approved", label: "Reference" } });
+    const version = await db.goalAssetVersion.create({ data: { workspaceId: seeded.workspaceId, goalId: seeded.goal.id, assetId: asset.id, version: 1, source: "manual", content: "Reference", contentHash: "reference-v1", authorType: "user" } });
+    const app = createApiRouter(createChronaEngine());
+    const response = await post(app, `/goals/${seeded.goal.id}/assets/${asset.id}/reviews`, { workspaceId: seeded.workspaceId, versionId: version.id, verifiedAt: "2026-07-29T10:00:00.000Z", nextReviewAt: "2026-08-29T10:00:00.000Z", summary: "Checked source links" });
     expect(response.status).toBe(200);
-    const { taskId } = await response.json() as { taskId: string };
-    const created = await db.task.findUniqueOrThrow({ where: { id: taskId } });
-    expect(created.goalId).toBe(seeded.goal.id);
-    expect(created.autoExecute).toBe(false);
-    expect(created.goalContext).toMatchObject({ asset: { label: "Launch brief", version: 1, contentHash: "base-v1" }, expectedOutcome: "A reviewed clearer brief" });
-
-    await db.goalAssetVersion.create({ data: { workspaceId: seeded.workspaceId, goalId: seeded.goal.id, assetId: asset.id, version: 2, parentVersionId: version.id, source: "manual", content: "Newer content", contentHash: "base-v2", authorType: "user" } });
-    expect((await db.task.findUniqueOrThrow({ where: { id: taskId } })).goalContext).toMatchObject({ asset: { version: 1, contentHash: "base-v1" } });
+    const review = await response.json() as { assetId: string; versionId: string; summary: string };
+    expect(review).toMatchObject({ assetId: asset.id, versionId: version.id, summary: "Checked source links" });
+    expect(await db.goalAssetReview.count({ where: { assetId: asset.id } })).toBe(1);
   });
 
   it("rejects appending an Inbox candidate when the selected base version is stale", async () => {

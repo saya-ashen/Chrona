@@ -521,12 +521,15 @@ export * from "./provider-capability-matrix";
 export type {
   ApplyGoalAssetOwnershipRequest,
   CreateAssetModificationTaskRequest,
+  CreateAssetUseTaskRequest,
+  CreateGoalAssetReviewRequest,
   CreateGoalAssetJobRequest,
   GenerateGoalAssetOwnershipRequest,
   GoalAssetOwnershipCandidate,
   GoalAssetOwnershipDecision,
   GoalAssetOwnershipProposalStatus,
   GoalAssetOwnershipResult,
+  GoalDataTableContent,
   CreateGoalFormSubmissionRequest,
   ResolveGoalInboxCandidateRequest,
   SaveGoalAssetDraftRequest,
@@ -540,4 +543,7 @@ export {
   goalAssetOwnershipProposalParamSchema,
   goalAssetOwnershipProposalStatusSchema,
   goalAssetOwnershipResultSchema,
+  createAssetUseTaskBodySchema,
+  createGoalAssetReviewBodySchema,
+  goalDataTableContentSchema,
 } from "./api/goal-workbench.schema";

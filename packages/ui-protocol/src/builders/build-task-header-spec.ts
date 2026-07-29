@@ -4,7 +4,7 @@ import type { UiDocument } from "../document/document";
 export type TaskHeaderTaskStatus = "completed" | "running" | "waiting" | "approval-needed" | "blocked" | "cancelled";
 
 export type TaskHeaderActionInput = {
-  id: "start" | "pause" | "stop" | "restart" | "accept-plan" | "generate-plan" | "edit" | "delete";
+  id: "start" | "pause" | "stop" | "restart" | "accept-plan" | "generate-plan" | "rebuild" | "edit" | "delete";
   label: string;
   disabled?: boolean;
   disabledReason?: string;
@@ -205,7 +205,7 @@ export function buildTaskHeaderSpec(input: TaskHeaderSpecInput): UiDocument {
   appendAction(elements, actionChildren, "accept-plan", "Accept plan");
   appendAction(elements, actionChildren, "generate-plan", "Generate plan");
   appendStopPlanGenerationAction(elements, actionChildren);
-  appendOverflowMenu(elements, actionChildren, input.actions.filter((action) => action.id === "restart" || action.id === "edit" || action.id === "delete"));
+  appendOverflowMenu(elements, actionChildren, input.actions.filter((action) => action.id === "restart" || action.id === "rebuild" || action.id === "edit" || action.id === "delete"));
 
   elements.root = {
     type: "Stack",

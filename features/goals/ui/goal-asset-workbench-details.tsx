@@ -1,4 +1,5 @@
 "use client";
+import { useState } from "react";
 
 import {
   Archive,
@@ -25,6 +26,8 @@ import { Textarea } from "@shared/ui";
 import {
   archiveGoalAsset,
   createGoalAssetModificationTask,
+  createGoalAssetUseTask,
+  createGoalAssetReview,
   renameGoalAsset,
   restoreGoalAssetVersion,
   type GoalAssetWorkbenchData,
@@ -70,6 +73,20 @@ function AssetAiTab({ goalId, workspaceId, asset, current, instruction, setInstr
   return <TabsContent value="ai" className="space-y-3 pt-3"><div className="rounded-lg border border-info/20 bg-info/[0.05] p-3"><div className="flex items-center gap-2 text-sm font-medium text-info"><Sparkles className="size-4" />{copy.ai}</div><p className="mt-1.5 text-xs leading-5 text-muted-foreground">{copy.aiModificationDescription}</p></div><Label htmlFor={`asset-ai-instruction-${asset.id}`}>{copy.modificationRequest}</Label><Textarea id={`asset-ai-instruction-${asset.id}`} value={instruction} onChange={(event) => setInstruction(event.target.value)} placeholder={copy.modificationPlaceholder} /><Button className="w-full" disabled={!instruction.trim() || !current || pending} onClick={() => current && void act(() => createGoalAssetModificationTask(goalId, asset.id, { workspaceId, versionId: current.id, instruction, expectedOutcome: formatCopy(copy.expectedModifiedOutcome, { asset: asset.label }) }), copy.versionBoundTaskCreated)}><Sparkles className="size-4" />{copy.createAiTask}</Button></TabsContent>;
 }
 
+function AssetReviewPanel({ goalId, workspaceId, asset, current, pending, copy, act }: Pick<AssetDetailsProps, "goalId" | "workspaceId" | "asset" | "current" | "pending" | "copy" | "act">) {
+  const [summary, setSummary] = useState("");
+  const [nextReviewAt, setNextReviewAt] = useState("");
+  const review = asset.reviews.find((item) => item.versionId === current?.id);
+  return <section className="space-y-3"><div><h3 className="font-medium">{copy.freshness}</h3>{review ? <p className="mt-1 text-xs text-muted-foreground">{copy.lastVerified}: {new Date(review.verifiedAt).toLocaleDateString()}{review.nextReviewAt ? ` · ${copy.nextReview}: ${new Date(review.nextReviewAt).toLocaleDateString()}` : ""}</p> : <p className="mt-1 text-xs text-muted-foreground">{copy.noReview}</p>}</div><Label htmlFor={`asset-review-summary-${asset.id}`}>{copy.reviewSummary}</Label><Textarea id={`asset-review-summary-${asset.id}`} value={summary} onChange={(event) => setSummary(event.target.value)} placeholder={copy.reviewSummaryPlaceholder} /><Label htmlFor={`asset-next-review-${asset.id}`}>{copy.nextReview}</Label><Input id={`asset-next-review-${asset.id}`} type="date" value={nextReviewAt} min={new Date().toISOString().slice(0, 10)} onChange={(event) => setNextReviewAt(event.target.value)} /><Button size="sm" variant="outline" disabled={!current || pending} onClick={() => current && void act(() => createGoalAssetReview(goalId, asset.id, { workspaceId, versionId: current.id, verifiedAt: new Date().toISOString(), nextReviewAt: nextReviewAt ? new Date(`${nextReviewAt}T23:59:59`).toISOString() : undefined, summary: summary.trim() || undefined }), copy.reviewSaved)}>{copy.markVerified}</Button></section>;
+}
+
+function AssetUseTaskPanel({ goalId, workspaceId, asset, current, pending, copy, act }: Pick<AssetDetailsProps, "goalId" | "workspaceId" | "asset" | "current" | "pending" | "copy" | "act">) {
+  const [title, setTitle] = useState("");
+  const [instruction, setInstruction] = useState("");
+  const [expectedOutcome, setExpectedOutcome] = useState("");
+  return <section className="space-y-3"><h3 className="font-medium">{copy.useTaskTitle}</h3><Label htmlFor={`asset-task-title-${asset.id}`}>{copy.useTaskTitle}</Label><Input id={`asset-task-title-${asset.id}`} value={title} onChange={(event) => setTitle(event.target.value)} /><Label htmlFor={`asset-task-instruction-${asset.id}`}>{copy.taskInstruction}</Label><Textarea id={`asset-task-instruction-${asset.id}`} value={instruction} onChange={(event) => setInstruction(event.target.value)} placeholder={copy.taskInstructionPlaceholder} /><Label htmlFor={`asset-task-outcome-${asset.id}`}>{copy.expectedOutcomeLabel}</Label><Input id={`asset-task-outcome-${asset.id}`} value={expectedOutcome} onChange={(event) => setExpectedOutcome(event.target.value)} /><Button className="w-full" disabled={!current || !title.trim() || !instruction.trim() || !expectedOutcome.trim() || pending} onClick={() => current && void act(() => createGoalAssetUseTask(goalId, asset.id, { workspaceId, versionId: current.id, title: title.trim(), instruction: instruction.trim(), expectedOutcome: expectedOutcome.trim() }), copy.useTaskCreated)}>{copy.createTask}</Button></section>;
+}
+
 function AssetDetailsTabs(props: AssetDetailsProps) {
   const { asset, copy } = props;
   return <Tabs defaultValue="versions"><TabsList className={`grid w-full ${asset.kind === "form" ? "grid-cols-3" : "grid-cols-2"}`}><TabsTrigger value="versions">{copy.versions}</TabsTrigger>{asset.kind === "form" ? <TabsTrigger value="submissions">{copy.submissions}</TabsTrigger> : null}<TabsTrigger value="ai">{copy.ai}</TabsTrigger></TabsList><AssetVersionsTab {...props} />{asset.kind === "form" ? <AssetSubmissionsTab {...props} /> : null}<AssetAiTab {...props} /></Tabs>;
@@ -80,5 +97,5 @@ function AssetLifecycleAction({ goalId, workspaceId, asset, pending, copy, act }
 }
 
 export function AssetDetails(props: AssetDetailsProps) {
-  return <div className="flex h-full min-h-0 flex-col bg-muted/10"><AssetDetailsHeader {...props} /><div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-4"><AssetIdentityDetails {...props} /><Separator /><AssetUsageHistory {...props} /><Separator /><AssetDetailsTabs {...props} /><Separator /><AssetLifecycleAction {...props} /></div></div>;
+  return <div className="flex h-full min-h-0 flex-col bg-muted/10"><AssetDetailsHeader {...props} /><div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-4"><AssetIdentityDetails {...props} /><Separator /><AssetUseTaskPanel {...props} /><Separator /><AssetReviewPanel {...props} /><Separator /><AssetUsageHistory {...props} /><Separator /><AssetDetailsTabs {...props} /><Separator /><AssetLifecycleAction {...props} /></div></div>;
 }

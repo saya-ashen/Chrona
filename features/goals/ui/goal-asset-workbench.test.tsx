@@ -32,6 +32,8 @@ vi.mock("../workbench-api", async (importOriginal) => ({
   applyGoalAssetOwnership: mocks.applyGoalAssetOwnership,
   createGoalAssetJob: mocks.createGoalAssetJob,
   createGoalAssetModificationTask: vi.fn(async () => ({})),
+  createGoalAssetReview: vi.fn(async () => ({})),
+  createGoalAssetUseTask: vi.fn(async () => ({})),
   generateGoalAssetOwnership: mocks.generateGoalAssetOwnership,
   renameGoalAsset: vi.fn(async () => ({})),
   resolveGoalInboxCandidate: vi.fn(async () => ({})),
@@ -91,6 +93,7 @@ function asset(
     drafts: [],
     submissions: [],
     jobs: [],
+    reviews: [],
   };
 }
 

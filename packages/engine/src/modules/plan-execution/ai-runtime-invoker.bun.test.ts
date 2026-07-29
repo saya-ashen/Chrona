@@ -306,6 +306,41 @@ describe("runProviderRequest runtime ref persistence", () => {
     ]);
   });
 
+  it("keeps the logical stream identity stable while returning the provider-native session ref", async () => {
+    const logicalSessionId = "chrona:task:task-1:execute:plan-1";
+    const nativeSessionId = "/tmp/omp-session.jsonl";
+    const providerRun = runRef({
+      provider: "omp",
+      sessionId: logicalSessionId,
+      nativeSessionId,
+    });
+    const client = {
+      provider: "omp",
+      startRun: mock(async () => providerRun),
+      streamRun: mock(() =>
+        (async function* () {
+          yield providerEvent({ type: "run_started", run: providerRun }, providerRun);
+          yield providerEvent({
+            type: "run_completed",
+            run: { ...providerRun, status: "completed" },
+            outputText: "ok",
+          }, providerRun);
+        })(),
+      ),
+    } as unknown as AgentProviderClient;
+
+    const snapshot = await runProviderRequest(client, {
+      ...request,
+      sessionId: logicalSessionId,
+    });
+
+    expect(snapshot).toMatchObject({
+      sessionId: logicalSessionId,
+      nativeSessionId,
+      status: "completed",
+    });
+  });
+
   it("publishes Running only after the provider accepts the run", async () => {
     const { second } = await seedRunPair();
     const onRunStarted = mock(async () => {});

@@ -24,6 +24,15 @@ export function createTasksService() {
         throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.TASK_NOT_FOUND, "Failed to delete task");
       }
     },
+    async rebuildWithLatestGoalAssets(
+      input: Parameters<typeof tasks.rebuildWithLatestGoalAssets>[0],
+    ) {
+      try {
+        return await tasks.rebuildWithLatestGoalAssets(input);
+      } catch (cause) {
+        throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.VALIDATION_FAILED, "Failed to rebuild task with latest Goal assets");
+      }
+    },
     async getPage(input: Parameters<typeof tasks.getPage>[0]) {
       try {
         return await tasks.getPage(input);

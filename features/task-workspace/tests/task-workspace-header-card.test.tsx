@@ -59,6 +59,7 @@ function renderHeader(
   state: Record<string, unknown> = {},
   onAction = vi.fn(),
   onStopPlanGeneration = vi.fn(),
+  rebuild: { open?: boolean; pending?: boolean; onConfirm?: () => void } = {},
 ) {
   const store = createStateStore(spec.state ?? {});
   store.update(state);
@@ -74,6 +75,11 @@ function renderHeader(
         onStopPlanGeneration={onStopPlanGeneration}
         onRestartPlan={vi.fn()}
         onEdit={vi.fn()}
+        showRebuildConfirm={rebuild.open ?? false}
+        isRebuilding={rebuild.pending ?? false}
+        onStartRebuildConfirm={vi.fn()}
+        onCancelRebuildConfirm={vi.fn()}
+        onRebuild={rebuild.onConfirm ?? vi.fn()}
         showDeleteConfirm={false}
         isDeleting={false}
         onStartDeleteConfirm={vi.fn()}
@@ -181,6 +187,17 @@ describe("TaskWorkspaceHeaderCard", () => {
     expect(screen.queryByRole("button", { name: "Start" })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Pause" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Stop" })).toBeInTheDocument();
+  });
+
+  it("requires destructive confirmation before rebuilding the Task", () => {
+    const onConfirm = vi.fn();
+    renderHeader(undefined, {}, vi.fn(), vi.fn(), { open: true, onConfirm });
+
+    expect(screen.getByRole("heading", { name: "Rebuild task with latest Goal assets?" })).toBeInTheDocument();
+    expect(screen.getByText(/current Task, plan, execution history, artifacts, results, and child Tasks/i)).toBeInTheDocument();
+    const confirm = screen.getByRole("button", { name: "Rebuild Task" });
+    fireEvent.click(confirm);
+    expect(onConfirm).toHaveBeenCalledTimes(1);
   });
 
   it("announces sent action without adding visible header height", async () => {

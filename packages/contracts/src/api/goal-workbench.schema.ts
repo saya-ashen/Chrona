@@ -2,7 +2,7 @@ import { z } from "zod";
 
 import { workspaceId } from "./common";
 
-export const goalAssetKindSchema = z.enum(["document", "form", "page", "file", "structured_result"]);
+export const goalAssetKindSchema = z.enum(["document", "form", "page", "file", "data_table", "structured_result"]);
 export const goalAssetVersionSourceSchema = z.enum(["manual", "ai_task", "inbox", "restored", "imported"]);
 export const goalAssetDraftStatusSchema = z.enum(["Active", "Conflict", "Discarded", "Submitted"]);
 export const goalInboxCandidateStatusSchema = z.enum(["Pending", "Accepted", "Rejected"]);
@@ -17,6 +17,36 @@ const assetContentSchema = z.union([
   z.record(z.string(), z.unknown()),
   z.array(z.unknown()),
 ]);
+
+export const goalDataTableContentSchema = z.object({
+  schemaVersion: z.literal(1),
+  columns: z.array(z.object({
+    id: z.string().trim().min(1).max(100),
+    label: z.string().trim().min(1).max(200),
+    type: z.enum(["text", "long_text", "number", "date", "url", "single_select"]),
+    options: z.array(z.object({ value: z.string().max(200), label: z.string().max(200) })).max(100).optional(),
+  })).min(1).max(100),
+  rows: z.array(z.object({
+    id: z.string().trim().min(1).max(100),
+    values: z.record(z.string(), z.union([z.string(), z.number(), z.null()])),
+  })).max(20_000),
+});
+
+export const createGoalAssetReviewBodySchema = z.object({
+  workspaceId,
+  versionId: z.string().trim().min(1),
+  verifiedAt: z.string().datetime(),
+  nextReviewAt: z.string().datetime().nullable().optional(),
+  summary: z.string().trim().max(2_000).nullable().optional(),
+});
+
+export const createAssetUseTaskBodySchema = z.object({
+  workspaceId,
+  versionId: z.string().trim().min(1),
+  title: z.string().trim().min(1).max(200),
+  instruction: z.string().trim().min(1).max(10_000),
+  expectedOutcome: z.string().trim().min(1).max(2_000),
+});
 
 export const goalAssetParamSchema = z.object({
   goalId: z.string().trim().min(1),
@@ -158,6 +188,9 @@ export type ResolveGoalInboxCandidateRequest = z.infer<typeof resolveGoalInboxCa
 export type CreateGoalFormSubmissionRequest = z.infer<typeof createGoalFormSubmissionBodySchema>;
 export type CreateGoalAssetJobRequest = z.infer<typeof createGoalAssetJobBodySchema>;
 export type CreateAssetModificationTaskRequest = z.infer<typeof createAssetModificationTaskBodySchema>;
+export type GoalDataTableContent = z.infer<typeof goalDataTableContentSchema>;
+export type CreateGoalAssetReviewRequest = z.infer<typeof createGoalAssetReviewBodySchema>;
+export type CreateAssetUseTaskRequest = z.infer<typeof createAssetUseTaskBodySchema>;
 export type GoalAssetOwnershipProposalStatus = z.infer<typeof goalAssetOwnershipProposalStatusSchema>;
 export type GoalAssetOwnershipDecision = z.infer<typeof goalAssetOwnershipDecisionSchema>;
 export type GoalAssetOwnershipCandidate = z.infer<typeof goalAssetOwnershipCandidateSchema>;

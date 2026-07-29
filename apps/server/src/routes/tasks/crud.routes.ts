@@ -364,6 +364,25 @@ export function createTasksRoutes(engine: ChronaEngine) {
         }
       },
     )
+    .post(
+      "/tasks/:taskId/actions/rebuild-with-latest-goal-assets",
+      zValidator("param", taskDetailParamSchema),
+      async (c) => {
+        try {
+          const { taskId } = c.req.valid("param");
+          return json(c, await engine.tasks.rebuildWithLatestGoalAssets({ taskId }));
+        } catch (cause) {
+          const httpError = toHttpError(cause);
+          if (httpError) return error(c, httpError.message, httpError.status);
+          return internalServerError(
+            c,
+            "POST /api/tasks/:taskId/actions/rebuild-with-latest-goal-assets",
+            cause,
+            "Failed to rebuild task with latest Goal assets",
+          );
+        }
+      },
+    )
     .delete(
       "/tasks/:taskId",
       zValidator("param", deleteTaskParamSchema),

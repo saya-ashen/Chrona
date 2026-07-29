@@ -93,7 +93,7 @@ async function cancelProviderRun(providerClient: ProviderClient, run: ProviderRu
 }
 
 function cancelledSnapshot(provider: string, run: ProviderRunRef): ProviderRunSnapshot {
-  return { provider, runId: run.runId, nativeRunId: run.nativeRunId, sessionId: run.sessionId, status: "cancelled", error: null };
+  return { provider, runId: run.runId, nativeRunId: run.nativeRunId, sessionId: run.sessionId, nativeSessionId: run.nativeSessionId, status: "cancelled", error: null };
 }
 
 async function reconcileInterruptedRun(providerClient: ProviderClient, run: ProviderRunRef, signal?: AbortSignal): Promise<ProviderRunSnapshot> {
@@ -102,7 +102,7 @@ async function reconcileInterruptedRun(providerClient: ProviderClient, run: Prov
   try {
     return await providerClient.getRun({ runId: run.runId, sessionId: run.sessionId, signal });
   } catch {
-    return { provider: providerClient.provider, runId: run.runId, nativeRunId: run.nativeRunId, sessionId: run.sessionId, status: "running", error: null };
+    return { provider: providerClient.provider, runId: run.runId, nativeRunId: run.nativeRunId, sessionId: run.sessionId, nativeSessionId: run.nativeSessionId, status: "running", error: null };
   }
 }
 
@@ -112,6 +112,7 @@ function recoveryUnavailableSnapshot(provider: string, run: ProviderRunRef, mode
     runId: run.runId,
     nativeRunId: run.nativeRunId,
     sessionId: run.sessionId,
+    nativeSessionId: run.nativeSessionId,
     status: "failed",
     rawStatus: "interrupted",
     error: `Provider recovery mode ${mode} cannot reconnect active run ${run.runId}. Retry can resume from saved provider session history.`,

@@ -1,5 +1,6 @@
 import { createTask } from "./create-task";
 import { deleteTask } from "./delete-task";
+import { rebuildTaskWithLatestGoalAssets } from "./rebuild-task-with-latest-goal-assets";
 import { getTaskPage } from "./get-task-page";
 import { getTaskBootstrap } from "./get-task-bootstrap";
 import { getTaskCommandCenter } from "./get-task-command-center";
@@ -41,6 +42,12 @@ export class Tasks {
       await ensureTaskInWorkspace(input.taskId, input.workspaceId);
     }
     return deleteTask(input.taskId);
+  }
+  async rebuildWithLatestGoalAssets(input: { taskId: string; workspaceId?: string }) {
+    if (input.workspaceId) {
+      await ensureTaskInWorkspace(input.taskId, input.workspaceId);
+    }
+    return rebuildTaskWithLatestGoalAssets(input);
   }
 
   getPage(input: { taskId: string; workBlockId?: string | null }) {

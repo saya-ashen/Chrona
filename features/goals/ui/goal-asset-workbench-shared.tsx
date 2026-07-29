@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   File,
+  FileSpreadsheet,
   FileText,
   FormInput,
   Globe2,
@@ -32,6 +33,7 @@ export const ICON_BY_KIND: Record<GoalAssetKind, typeof File> = {
   form: FormInput,
   page: Globe2,
   file: File,
+  data_table: FileSpreadsheet,
   structured_result: FileText,
 };
 export type AssetWorkbenchCopy = GoalCopy["assetWorkbench"];
@@ -40,6 +42,7 @@ export const KIND_TONE: Record<GoalAssetKind, string> = {
   form: "bg-success/[0.09] text-success",
   page: "bg-primary/[0.09] text-primary",
   file: "bg-warning/[0.09] text-warning",
+  data_table: "bg-emerald-500/[0.09] text-emerald-700 dark:text-emerald-300",
   structured_result: "bg-violet-500/[0.09] text-violet-700 dark:text-violet-300",
 };
 
@@ -55,6 +58,7 @@ export function kindLabel(kind: GoalAssetKind, copy: AssetWorkbenchCopy) {
     document: copy.documentKind,
     form: copy.formKind,
     page: copy.pageKind,
+    data_table: copy.dataTableKind,
     file: copy.fileKind,
   }[kind];
 }
@@ -237,6 +241,29 @@ export function FormEditor(props: FormEditorProps) {
   );
 }
 
+export type AssetFreshness = "not_applicable" | "unknown" | "current" | "due_soon" | "overdue";
+
+export function deriveAssetFreshness(asset: GoalAssetWorkbenchData, now = new Date()): AssetFreshness {
+  const current = asset.versions[0];
+  const review = asset.reviews.find((item) => item.versionId === current?.id);
+  if (!review?.nextReviewAt) return review ? "current" : "not_applicable";
+  const due = new Date(review.nextReviewAt).getTime();
+  if (due <= now.getTime()) return "overdue";
+  return due - now.getTime() <= 7 * 24 * 60 * 60 * 1000 ? "due_soon" : "current";
+}
+
+export function assetSummary(asset: GoalAssetWorkbenchData, copy: AssetWorkbenchCopy) {
+  if (asset.description?.trim()) return asset.description;
+  const current = asset.versions[0];
+  if (asset.kind === "data_table" && current?.content && typeof current.content === "object" && !Array.isArray(current.content)) {
+    const content = current.content as { columns?: unknown[]; rows?: unknown[] };
+    return formatCopy(copy.dataTableSummary, { rows: content.rows?.length ?? 0, columns: content.columns?.length ?? 0 });
+  }
+  if (asset.kind === "file") return current?.originalFilename ?? asset.sourceArtifact.title;
+  if (asset.kind === "structured_result") return formatCopy(copy.resultFromTask, { task: asset.sourceArtifact.title });
+  return copy.missingAssetDescription;
+}
+
 export function AssetTile({
   asset,
   copy,
@@ -262,7 +289,7 @@ export function AssetTile({
         <div className="min-w-0 flex-1">
           <p className="line-clamp-2 font-semibold leading-5">{asset.label}</p>
           <p className="mt-1 line-clamp-2 min-h-8 text-xs leading-4 text-muted-foreground">
-            {asset.description || copy.activeVersionImpact}
+            {assetSummary(asset, copy)}
           </p>
         </div>
       </div>
@@ -274,6 +301,11 @@ export function AssetTile({
         <span>{kindLabel(asset.kind, copy)}</span>
         <span aria-hidden>·</span>
         <span className="font-mono">v{asset.versions[0]?.version ?? 1}</span>
+        <span aria-hidden>·</span>
+        <span>{new Date(asset.versions[0]?.createdAt ?? asset.updatedAt).toLocaleDateString()}</span>
+        {asset.drafts.length ? <span className="rounded-full bg-warning/10 px-1.5 py-0.5 text-warning">{copy.draftAvailable}</span> : null}
+        {deriveAssetFreshness(asset) === "due_soon" ? <span className="rounded-full bg-warning/10 px-1.5 py-0.5 text-warning">{copy.reviewDueSoon}</span> : null}
+        {deriveAssetFreshness(asset) === "overdue" ? <span className="rounded-full bg-destructive/10 px-1.5 py-0.5 text-destructive">{copy.reviewOverdue}</span> : null}
       </div>
     </button>
   );

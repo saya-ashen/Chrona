@@ -5,6 +5,8 @@ import {
   archiveGoalAssetBodySchema,
   applyGoalAssetOwnershipBodySchema,
   createAssetModificationTaskBodySchema,
+  createAssetUseTaskBodySchema,
+  createGoalAssetReviewBodySchema,
   createGoalAssetJobBodySchema,
   createGoalFormSubmissionBodySchema,
   generateGoalAssetOwnershipBodySchema,
@@ -108,5 +110,13 @@ export function createGoalWorkbenchRoutes(engine: ChronaEngine) {
     .post("/goals/:goalId/assets/:assetId/ai-modification-task", zValidator("param", assetParam), zValidator("json", createAssetModificationTaskBodySchema), async (c) => {
       try { return json(c, await engine.goals.workbench.createModificationTask({ ...c.req.valid("param"), command: c.req.valid("json") })); }
       catch (cause) { return fail(c, "POST /api/goals/:goalId/assets/:assetId/ai-modification-task", cause); }
+    })
+    .post("/goals/:goalId/assets/:assetId/reviews", zValidator("param", assetParam), zValidator("json", createGoalAssetReviewBodySchema), async (c) => {
+      try { return json(c, await engine.goals.workbench.createReview({ ...c.req.valid("param"), command: c.req.valid("json") })); }
+      catch (cause) { return fail(c, "POST /api/goals/:goalId/assets/:assetId/reviews", cause); }
+    })
+    .post("/goals/:goalId/assets/:assetId/use-task", zValidator("param", assetParam), zValidator("json", createAssetUseTaskBodySchema), async (c) => {
+      try { return json(c, await engine.goals.workbench.createUseTask({ ...c.req.valid("param"), command: c.req.valid("json") })); }
+      catch (cause) { return fail(c, "POST /api/goals/:goalId/assets/:assetId/use-task", cause); }
     });
 }

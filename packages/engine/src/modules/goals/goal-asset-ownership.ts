@@ -22,7 +22,7 @@ type OwnershipSnapshot = {
   candidate: {
     id: string;
     goalId: string;
-    kind: "document" | "form" | "page" | "file" | "structured_result";
+    kind: "document" | "form" | "page" | "file" | "data_table" | "structured_result";
     label: string;
     content: unknown;
     contentHash: string;
@@ -44,7 +44,7 @@ type OwnershipSnapshot = {
   candidateAssets: Array<{
     assetId: string;
     label: string;
-    kind: "document" | "form" | "page" | "file" | "structured_result";
+    kind: "document" | "form" | "page" | "file" | "data_table" | "structured_result";
     currentVersionId: string;
     currentVersion: number;
     contentHash: string;
