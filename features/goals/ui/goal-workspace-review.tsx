@@ -1,9 +1,6 @@
 "use client";
 
-import type {
-  GoalCopy,
-  GoalData,
-} from "../model/goal-types";
+import type { GoalCopy, GoalData } from "../model/goal-types";
 import { ReviewApplyDialogContent } from "./goal-workspace-review-apply";
 import { AchievementDialogContent } from "./goal-workspace-achievement";
 
@@ -18,7 +15,14 @@ export function ReviewApplyDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  return <ReviewApplyDialogContent goal={goal} copy={copy} open={open} onOpenChange={onOpenChange} />;
+  return (
+    <ReviewApplyDialogContent
+      goal={goal}
+      copy={copy}
+      open={open}
+      onOpenChange={onOpenChange}
+    />
+  );
 }
 
 export function AchievementDialog({
@@ -32,6 +36,12 @@ export function AchievementDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  return <AchievementDialogContent goal={goal} copy={copy} open={open} onOpenChange={onOpenChange} />;
+  return (
+    <AchievementDialogContent
+      goal={goal}
+      copy={copy}
+      open={open}
+      onOpenChange={onOpenChange}
+    />
+  );
 }
-

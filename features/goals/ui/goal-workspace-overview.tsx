@@ -2,27 +2,20 @@
 
 import { useState } from "react";
 import { useRevalidator } from "react-router-dom";
-import {
-  CheckCircle2,
-} from "lucide-react";
+import { CheckCircle2 } from "lucide-react";
 import { useLocale } from "@chrona/i18n";
-import {
-  Button,
-  Field,
-  FieldLabel,
-  Input,
-  Textarea,
-} from "@shared/ui";
-import {
-  updateGoalBrief,
-} from "../browser-api";
-import type {
-  GoalCopy,
-  GoalData,
-} from "../model/goal-types";
+import { Button, Field, FieldLabel, Input, Textarea } from "@shared/ui";
+import { updateGoalBrief } from "../browser-api";
+import type { GoalCopy, GoalData } from "../model/goal-types";
 import { TaskRow } from "./goal-workspace-tasks";
 import { formatDate } from "./goal-workspace-shared";
-export function ActiveSummary({ goal, copy }: { goal: GoalData; copy: GoalCopy }) {
+export function ActiveSummary({
+  goal,
+  copy,
+}: {
+  goal: GoalData;
+  copy: GoalCopy;
+}) {
   const locale = useLocale();
   const stats = [
     {
@@ -72,10 +65,14 @@ export function OperationalBriefCard({
   const revalidator = useRevalidator();
   const brief = goal.workbench.brief;
   const [editing, setEditing] = useState(!brief);
-  const [outcome, setOutcome] = useState(brief?.outcome ?? goal.description ?? "");
+  const [outcome, setOutcome] = useState(
+    brief?.outcome ?? goal.description ?? "",
+  );
   const [currentFocus, setCurrentFocus] = useState(brief?.currentFocus ?? "");
   const [strategy, setStrategy] = useState(brief?.strategy ?? "");
-  const [constraints, setConstraints] = useState(brief?.constraints.join("\n") ?? "");
+  const [constraints, setConstraints] = useState(
+    brief?.constraints.join("\n") ?? "",
+  );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -88,7 +85,10 @@ export function OperationalBriefCard({
         outcome: outcome.trim(),
         currentFocus: currentFocus.trim(),
         strategy: strategy.trim(),
-        constraints: constraints.split("\n").map((item) => item.trim()).filter(Boolean),
+        constraints: constraints
+          .split("\n")
+          .map((item) => item.trim())
+          .filter(Boolean),
       });
       await revalidator.revalidate();
       setEditing(false);
@@ -100,8 +100,15 @@ export function OperationalBriefCard({
   }
 
   return (
-    <section className="border-l-2 border-info/50 pl-4 sm:pl-5" aria-labelledby="goal-operational-brief">
-      <BriefHeader copy={copy} editing={editing} onEdit={() => setEditing(true)} />
+    <section
+      className="border-l-2 border-info/50 pl-4 sm:pl-5"
+      aria-labelledby="goal-operational-brief"
+    >
+      <BriefHeader
+        copy={copy}
+        editing={editing}
+        onEdit={() => setEditing(true)}
+      />
       <div className="space-y-4">
         {editing ? (
           <OperationalBriefForm
@@ -120,58 +127,217 @@ export function OperationalBriefCard({
             onCancel={() => setEditing(false)}
             onSave={() => void save()}
           />
-        ) : brief ? <OperationalBriefDetails brief={brief} copy={copy} /> : null}
+        ) : brief ? (
+          <OperationalBriefDetails brief={brief} copy={copy} />
+        ) : null}
       </div>
     </section>
   );
 }
 
-function BriefHeader({ copy, editing, onEdit }: { copy: GoalCopy; editing: boolean; onEdit: () => void }) {
-  return <div className="mb-5 flex items-start justify-between gap-3">
-    <div>
-      <h3 id="goal-operational-brief" className="font-semibold">{copy.operationalBrief}</h3>
-      <p className="mt-1 text-sm leading-6 text-muted-foreground">{copy.briefDescription}</p>
+function BriefHeader({
+  copy,
+  editing,
+  onEdit,
+}: {
+  copy: GoalCopy;
+  editing: boolean;
+  onEdit: () => void;
+}) {
+  return (
+    <div className="mb-5 flex items-start justify-between gap-3">
+      <div>
+        <h3 id="goal-operational-brief" className="font-semibold">
+          {copy.operationalBrief}
+        </h3>
+        <p className="mt-1 text-sm leading-6 text-muted-foreground">
+          {copy.briefDescription}
+        </p>
+      </div>
+      {!editing ? (
+        <Button size="sm" variant="ghost" onClick={onEdit}>
+          {copy.editBrief}
+        </Button>
+      ) : null}
     </div>
-    {!editing ? <Button size="sm" variant="ghost" onClick={onEdit}>{copy.editBrief}</Button> : null}
-  </div>;
+  );
 }
 
 function OperationalBriefForm({
-  brief, copy, outcome, currentFocus, strategy, constraints, saving, error,
-  onOutcomeChange, onCurrentFocusChange, onStrategyChange, onConstraintsChange, onCancel, onSave,
+  brief,
+  copy,
+  outcome,
+  currentFocus,
+  strategy,
+  constraints,
+  saving,
+  error,
+  onOutcomeChange,
+  onCurrentFocusChange,
+  onStrategyChange,
+  onConstraintsChange,
+  onCancel,
+  onSave,
 }: {
-  brief: GoalData["workbench"]["brief"]; copy: GoalCopy; outcome: string; currentFocus: string; strategy: string; constraints: string; saving: boolean; error: string | null;
-  onOutcomeChange: (value: string) => void; onCurrentFocusChange: (value: string) => void; onStrategyChange: (value: string) => void; onConstraintsChange: (value: string) => void; onCancel: () => void; onSave: () => void;
+  brief: GoalData["workbench"]["brief"];
+  copy: GoalCopy;
+  outcome: string;
+  currentFocus: string;
+  strategy: string;
+  constraints: string;
+  saving: boolean;
+  error: string | null;
+  onOutcomeChange: (value: string) => void;
+  onCurrentFocusChange: (value: string) => void;
+  onStrategyChange: (value: string) => void;
+  onConstraintsChange: (value: string) => void;
+  onCancel: () => void;
+  onSave: () => void;
 }) {
-  return <>
-    <BriefFields outcome={outcome} currentFocus={currentFocus} strategy={strategy} constraints={constraints} copy={copy} onOutcomeChange={onOutcomeChange} onCurrentFocusChange={onCurrentFocusChange} onStrategyChange={onStrategyChange} onConstraintsChange={onConstraintsChange} />
-    {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
-    <div className="flex justify-end gap-2">
-      {brief ? <Button variant="outline" onClick={onCancel}>{copy.cancel}</Button> : null}
-      <Button disabled={!outcome.trim() || !currentFocus.trim() || saving} onClick={onSave}>{saving ? copy.saving : copy.saveBrief}</Button>
-    </div>
-  </>;
+  return (
+    <>
+      <BriefFields
+        outcome={outcome}
+        currentFocus={currentFocus}
+        strategy={strategy}
+        constraints={constraints}
+        copy={copy}
+        onOutcomeChange={onOutcomeChange}
+        onCurrentFocusChange={onCurrentFocusChange}
+        onStrategyChange={onStrategyChange}
+        onConstraintsChange={onConstraintsChange}
+      />
+      {error ? (
+        <p role="alert" className="text-sm text-destructive">
+          {error}
+        </p>
+      ) : null}
+      <div className="flex justify-end gap-2">
+        {brief ? (
+          <Button variant="outline" onClick={onCancel}>
+            {copy.cancel}
+          </Button>
+        ) : null}
+        <Button
+          disabled={!outcome.trim() || !currentFocus.trim() || saving}
+          onClick={onSave}
+        >
+          {saving ? copy.saving : copy.saveBrief}
+        </Button>
+      </div>
+    </>
+  );
 }
 
-function BriefFields({ outcome, currentFocus, strategy, constraints, copy, onOutcomeChange, onCurrentFocusChange, onStrategyChange, onConstraintsChange }: {
-  outcome: string; currentFocus: string; strategy: string; constraints: string; copy: GoalCopy;
-  onOutcomeChange: (value: string) => void; onCurrentFocusChange: (value: string) => void; onStrategyChange: (value: string) => void; onConstraintsChange: (value: string) => void;
+function BriefFields({
+  outcome,
+  currentFocus,
+  strategy,
+  constraints,
+  copy,
+  onOutcomeChange,
+  onCurrentFocusChange,
+  onStrategyChange,
+  onConstraintsChange,
+}: {
+  outcome: string;
+  currentFocus: string;
+  strategy: string;
+  constraints: string;
+  copy: GoalCopy;
+  onOutcomeChange: (value: string) => void;
+  onCurrentFocusChange: (value: string) => void;
+  onStrategyChange: (value: string) => void;
+  onConstraintsChange: (value: string) => void;
 }) {
-  return <>
-    <Field><FieldLabel htmlFor="goal-brief-outcome">{copy.outcomeLabel}</FieldLabel><Textarea id="goal-brief-outcome" value={outcome} onChange={(event) => onOutcomeChange(event.target.value)} rows={2} /></Field>
-    <Field><FieldLabel htmlFor="goal-brief-focus">{copy.currentFocus}</FieldLabel><Input id="goal-brief-focus" value={currentFocus} onChange={(event) => onCurrentFocusChange(event.target.value)} /></Field>
-    <Field><FieldLabel htmlFor="goal-brief-strategy">{copy.strategy}</FieldLabel><Textarea id="goal-brief-strategy" value={strategy} onChange={(event) => onStrategyChange(event.target.value)} rows={3} /></Field>
-    <Field><FieldLabel htmlFor="goal-brief-constraints">{copy.constraints}</FieldLabel><Textarea id="goal-brief-constraints" value={constraints} onChange={(event) => onConstraintsChange(event.target.value)} rows={3} /></Field>
-  </>;
+  return (
+    <>
+      <Field>
+        <FieldLabel htmlFor="goal-brief-outcome">
+          {copy.outcomeLabel}
+        </FieldLabel>
+        <Textarea
+          id="goal-brief-outcome"
+          value={outcome}
+          onChange={(event) => onOutcomeChange(event.target.value)}
+          rows={2}
+        />
+      </Field>
+      <Field>
+        <FieldLabel htmlFor="goal-brief-focus">{copy.currentFocus}</FieldLabel>
+        <Input
+          id="goal-brief-focus"
+          value={currentFocus}
+          onChange={(event) => onCurrentFocusChange(event.target.value)}
+        />
+      </Field>
+      <Field>
+        <FieldLabel htmlFor="goal-brief-strategy">{copy.strategy}</FieldLabel>
+        <Textarea
+          id="goal-brief-strategy"
+          value={strategy}
+          onChange={(event) => onStrategyChange(event.target.value)}
+          rows={3}
+        />
+      </Field>
+      <Field>
+        <FieldLabel htmlFor="goal-brief-constraints">
+          {copy.constraints}
+        </FieldLabel>
+        <Textarea
+          id="goal-brief-constraints"
+          value={constraints}
+          onChange={(event) => onConstraintsChange(event.target.value)}
+          rows={3}
+        />
+      </Field>
+    </>
+  );
 }
 
-function OperationalBriefDetails({ brief, copy }: { brief: NonNullable<GoalData["workbench"]["brief"]>; copy: GoalCopy }) {
-  return <dl className="space-y-5">
-    <div className="rounded-lg bg-info/[0.07] px-4 py-3"><dt className="text-xs font-medium text-info">{copy.currentFocus}</dt><dd className="mt-1.5 font-semibold leading-6">{brief.currentFocus}</dd></div>
-    <div><dt className="text-xs font-medium text-muted-foreground">{copy.outcomeLabel}</dt><dd className="mt-1 text-sm leading-6">{brief.outcome}</dd></div>
-    {brief.strategy ? <div><dt className="text-xs font-medium text-muted-foreground">{copy.strategy}</dt><dd className="mt-1 text-sm leading-6">{brief.strategy}</dd></div> : null}
-    {brief.constraints.length ? <div><dt className="text-xs font-medium text-muted-foreground">{copy.constraints}</dt><dd><ul className="mt-2 space-y-1 text-sm">{brief.constraints.map((constraint) => <li key={constraint}>• {constraint}</li>)}</ul></dd></div> : null}
-  </dl>;
+function OperationalBriefDetails({
+  brief,
+  copy,
+}: {
+  brief: NonNullable<GoalData["workbench"]["brief"]>;
+  copy: GoalCopy;
+}) {
+  return (
+    <dl className="space-y-5">
+      <div className="rounded-lg bg-info/[0.07] px-4 py-3">
+        <dt className="text-xs font-medium text-info">{copy.currentFocus}</dt>
+        <dd className="mt-1.5 font-semibold leading-6">{brief.currentFocus}</dd>
+      </div>
+      <div>
+        <dt className="text-xs font-medium text-muted-foreground">
+          {copy.outcomeLabel}
+        </dt>
+        <dd className="mt-1 text-sm leading-6">{brief.outcome}</dd>
+      </div>
+      {brief.strategy ? (
+        <div>
+          <dt className="text-xs font-medium text-muted-foreground">
+            {copy.strategy}
+          </dt>
+          <dd className="mt-1 text-sm leading-6">{brief.strategy}</dd>
+        </div>
+      ) : null}
+      {brief.constraints.length ? (
+        <div>
+          <dt className="text-xs font-medium text-muted-foreground">
+            {copy.constraints}
+          </dt>
+          <dd>
+            <ul className="mt-2 space-y-1 text-sm">
+              {brief.constraints.map((constraint) => (
+                <li key={constraint}>• {constraint}</li>
+              ))}
+            </ul>
+          </dd>
+        </div>
+      ) : null}
+    </dl>
+  );
 }
 
 export function FocusQueue({ goal, copy }: { goal: GoalData; copy: GoalCopy }) {
@@ -240,4 +406,3 @@ export function FocusQueue({ goal, copy }: { goal: GoalData; copy: GoalCopy }) {
     </div>
   );
 }
-

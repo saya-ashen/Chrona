@@ -19,10 +19,17 @@ import {
   SelectTrigger,
   cn,
 } from "@shared/ui";
-import { normalizeAutomationTiming, AUTOMATION_TIMING_PRESETS } from "@chrona/contracts";
+import {
+  normalizeAutomationTiming,
+  AUTOMATION_TIMING_PRESETS,
+} from "@chrona/contracts";
 import type { AutomationTimingPreset } from "@chrona/contracts";
 import { CalendarIcon, Info } from "lucide-react";
-import { formatLocalDateInput, formatLocalDateLabel, parseLocalDateInput } from "./task-config-form-conversions";
+import {
+  formatLocalDateInput,
+  formatLocalDateLabel,
+  parseLocalDateInput,
+} from "./task-config-form-conversions";
 
 type TaskConfigSelectOption = { value: string; label: string };
 const EMPTY_SELECT_OPTION_VALUE = "__chrona_empty_select_value__";
@@ -52,7 +59,13 @@ export function TaskConfigField({
 }) {
   return (
     <Field data-invalid={invalid} className={className}>
-      <div className={cn("flex items-center gap-1.5", titleClassName, hideTitle && "sr-only")}>
+      <div
+        className={cn(
+          "flex items-center gap-1.5",
+          titleClassName,
+          hideTitle && "sr-only",
+        )}
+      >
         <FieldLabel htmlFor={htmlFor}>{label}</FieldLabel>
         {tooltip ? <InfoPopover label={label} content={tooltip} /> : null}
       </div>
@@ -63,7 +76,13 @@ export function TaskConfigField({
   );
 }
 
-export function InfoPopover({ label, content }: { label: string; content: string }) {
+export function InfoPopover({
+  label,
+  content,
+}: {
+  label: string;
+  content: string;
+}) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -103,7 +122,12 @@ export function TaskConfigSection({
   children: ReactNode;
 }) {
   return (
-    <section className={cn("rounded-[1.2rem] border border-border/60 bg-background/80 p-3 text-sm text-foreground shadow-sm", compact && "rounded-xl")}>
+    <section
+      className={cn(
+        "rounded-[1.2rem] border border-border/60 bg-background/80 p-3 text-sm text-foreground shadow-sm",
+        compact && "rounded-xl",
+      )}
+    >
       <div className="mb-2 flex items-start justify-between gap-3">
         <div className="flex min-w-0 items-center gap-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
           <span className="truncate">{title}</span>
@@ -145,11 +169,18 @@ export function TaskConfigSelect({
         open={isOpen}
         value={selectValue}
         onOpenChange={(nextOpen) => setIsOpen(disabled ? false : nextOpen)}
-        onValueChange={(nextValue) => onValueChange(nextValue === EMPTY_SELECT_OPTION_VALUE ? "" : nextValue)}
+        onValueChange={(nextValue) =>
+          onValueChange(
+            nextValue === EMPTY_SELECT_OPTION_VALUE ? "" : nextValue,
+          )
+        }
         disabled={disabled}
       >
         <SelectTrigger id={triggerId} className="w-full" disabled={disabled}>
-          <span data-slot="select-value" className={selectedOption ? undefined : "text-muted-foreground"}>
+          <span
+            data-slot="select-value"
+            className={selectedOption ? undefined : "text-muted-foreground"}
+          >
             {selectedOption?.label ?? placeholder}
           </span>
         </SelectTrigger>
@@ -157,7 +188,10 @@ export function TaskConfigSelect({
           <SelectContent position="popper" className="z-[160] max-h-72">
             <SelectGroup>
               {options.map((option) => {
-                const itemValue = option.value === "" ? EMPTY_SELECT_OPTION_VALUE : option.value;
+                const itemValue =
+                  option.value === ""
+                    ? EMPTY_SELECT_OPTION_VALUE
+                    : option.value;
 
                 return (
                   <SelectItem key={itemValue} value={itemValue}>
@@ -207,7 +241,9 @@ export function TaskConfigDatePicker({
           <Calendar
             mode="single"
             selected={selectedDate ?? undefined}
-            onSelect={(date) => onValueChange(formatLocalDateInput(date ?? null))}
+            onSelect={(date) =>
+              onValueChange(formatLocalDateInput(date ?? null))
+            }
           />
         </PopoverContent>
       </Popover>
@@ -236,12 +272,18 @@ function TaskAutomationOption({
         name={name}
         checked={checked}
         disabled={disabled}
-        onCheckedChange={onCheckedChange ? (nextChecked) => onCheckedChange(nextChecked === true) : undefined}
+        onCheckedChange={
+          onCheckedChange
+            ? (nextChecked) => onCheckedChange(nextChecked === true)
+            : undefined
+        }
         className="mt-0.5"
       />
       <span className="min-w-0">
         <span className="block font-medium leading-5">{label}</span>
-        <span className="mt-0.5 block text-xs leading-5 text-muted-foreground">{description}</span>
+        <span className="mt-0.5 block text-xs leading-5 text-muted-foreground">
+          {description}
+        </span>
       </span>
     </label>
   );
@@ -288,7 +330,13 @@ export function TaskAutomationSection({
     <TaskConfigSection
       title={copy.automation}
       compact={compact}
-      actions={effectiveAutoPlanGeneration ? <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">On</span> : null}
+      actions={
+        effectiveAutoPlanGeneration ? (
+          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
+            On
+          </span>
+        ) : null
+      }
     >
       <div className="grid gap-2">
         <div className="grid gap-2">
@@ -358,4 +406,3 @@ function TaskAutomationTimingSelect({
     </div>
   );
 }
-

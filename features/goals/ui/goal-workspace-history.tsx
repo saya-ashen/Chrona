@@ -1,18 +1,9 @@
 "use client";
 
-
-
 import { useLocale } from "@chrona/i18n";
-import {
-  Badge,
-  Button,
-} from "@shared/ui";
+import { Badge, Button } from "@shared/ui";
 
-
-import type {
-  GoalCopy,
-  GoalData,
-} from "../model/goal-types";
+import type { GoalCopy, GoalData } from "../model/goal-types";
 import { LocalizedLink } from "./localized-link";
 import { formatDate } from "./goal-workspace-shared";
 
@@ -89,4 +80,3 @@ export function GoalHistory({
     </section>
   );
 }
-
