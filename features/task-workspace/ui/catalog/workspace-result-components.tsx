@@ -1,14 +1,7 @@
 import { useState } from "react";
 import { Badge, Button, cn } from "@shared/ui";
 import { useI18n } from "@chrona/i18n";
-import {
-  BookOpenText,
-  Check,
-  Clock3,
-  Copy,
-  Sparkles,
-  TriangleAlert,
-} from "lucide-react";
+import { BookOpenText, Check, Clock3, Copy, Sparkles, TriangleAlert } from "lucide-react";
 import { stringField, stringProp } from "./workspace-registry-utilities";
 import { CollapsibleBlock } from "./workspace-collapse";
 
@@ -195,6 +188,7 @@ export function ResultHero({
     </section>
   );
 }
+
 
 export function ResultInsight({
   props,

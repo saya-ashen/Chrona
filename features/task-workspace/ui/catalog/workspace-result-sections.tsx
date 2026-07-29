@@ -58,11 +58,7 @@ export function ResultSection({
   );
 }
 
-export function ResultMetricGrid({
-  props,
-}: {
-  props: Record<string, unknown>;
-}) {
+export function ResultMetricGrid({ props }: { props: Record<string, unknown> }) {
   const items = Array.isArray(props.items)
     ? props.items.filter(
         (item): item is { label: string; value: string; detail?: string } =>
