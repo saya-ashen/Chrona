@@ -18,6 +18,11 @@ function runRef(status: "running" | "completed" = "running") {
   };
 }
 
+function eventRef() {
+  const { status: _status, ...metadata } = runRef();
+  return metadata;
+}
+
 describe("provider native session references", () => {
   it("keeps logical stream identity separate from the provider-native resume ref", () => {
     expect(providerRunRefSchema.parse(runRef())).toMatchObject({
@@ -26,7 +31,7 @@ describe("provider native session references", () => {
     });
 
     expect(providerRunEventSchema.parse({
-      ...runRef(),
+      ...eventRef(),
       sequence: 1,
       type: "run_completed",
       run: runRef("completed"),
