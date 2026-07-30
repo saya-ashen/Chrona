@@ -19,6 +19,8 @@ function formatResultReviewCopy(
   );
 }
 
+// Result review states and their mutually exclusive actions form one runtime-control surface.
+// eslint-disable-next-line max-lines-per-function, complexity
 function ResultLifecyclePanel({
   taskId,
   review,

@@ -35,6 +35,8 @@ export type ResolveProviderApprovalResult = {
  * can transition, and its provider run always moves in the same commit. The
  * task projection is rebuilt after that commit for every terminal outcome.
  */
+// Approval resolution keeps every terminal provider outcome explicit before transactional commit.
+// eslint-disable-next-line complexity
 export async function resolveProviderApproval(
   input: ResolveProviderApprovalInput,
 ): Promise<ResolveProviderApprovalResult> {

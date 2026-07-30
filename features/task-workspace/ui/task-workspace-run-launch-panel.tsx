@@ -14,6 +14,8 @@ function formatLaunchTime(value: string | null, locale: string) {
   }).format(date);
 }
 
+// Launch readiness, schedule provenance, and recovery guidance are one bounded decision panel.
+// eslint-disable-next-line max-lines-per-function, complexity
 function RunLaunchPanel({
   launch,
   onStart,

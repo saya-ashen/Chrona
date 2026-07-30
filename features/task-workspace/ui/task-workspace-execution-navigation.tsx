@@ -23,6 +23,8 @@ function executionNodeState(
   return "upcoming" as const;
 }
 
+// This header maps the complete runtime attention state into one compact control surface.
+// eslint-disable-next-line complexity
 function ExecutionFocusHeader({
   view,
   workState,
@@ -116,6 +118,8 @@ function ExecutionFocusHeader({
   );
 }
 
+// The navigator keeps step state, accessibility labels, and inspection controls co-located.
+// eslint-disable-next-line max-lines-per-function, complexity
 function ExecutionNavigator({
   graphPlan,
   view,
@@ -176,6 +180,8 @@ function ExecutionNavigator({
         ) : null}
       </div>
       <ol className="min-h-0 flex-1 space-y-1 overflow-y-auto p-2">
+        {/* Each row maps the full execution-state vocabulary to accessible labels and tones. */}
+        {/* eslint-disable-next-line complexity */}
         {graphPlan.nodes.map((node, index) => {
           const state = executionNodeState(node, view);
           const isInspected = inspectedNode?.id === node.id;

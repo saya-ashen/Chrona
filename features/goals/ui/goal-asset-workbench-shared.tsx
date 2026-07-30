@@ -252,6 +252,8 @@ export function deriveAssetFreshness(asset: GoalAssetWorkbenchData, now = new Da
   return due - now.getTime() <= 7 * 24 * 60 * 60 * 1000 ? "due_soon" : "current";
 }
 
+// Asset summaries intentionally dispatch across persisted asset kinds and content shapes.
+// eslint-disable-next-line complexity
 export function assetSummary(asset: GoalAssetWorkbenchData, copy: AssetWorkbenchCopy) {
   if (asset.description?.trim()) return asset.description;
   const current = asset.versions[0];

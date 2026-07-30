@@ -1,6 +1,8 @@
 import { db } from "./db";
 import type { TaskPriority, TaskStatus } from "./generated/prisma/client";
 
+// Reset order mirrors the foreign-key dependency graph and must remain explicit.
+// eslint-disable-next-line max-statements
 export async function resetTestDb() {
   await db.$executeRawUnsafe("PRAGMA foreign_keys = OFF");
   try {

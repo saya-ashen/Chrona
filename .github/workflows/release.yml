@@ -38,7 +38,7 @@ jobs:
         env:
           DATABASE_URL: "file:./prisma/dev.db"
 
-      - run: bun run check
+      - run: bun run analyze
 
       - name: Run release tests
         run: bun run test:ci

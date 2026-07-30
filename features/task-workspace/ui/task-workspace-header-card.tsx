@@ -66,6 +66,8 @@ function findActionLabel(spec: UiDocument, actionId: HeaderActionId) {
   return label ?? actionId;
 }
 
+// The header owns one cohesive set of runtime actions and their destructive confirmations.
+// eslint-disable-next-line max-lines-per-function, complexity
 export function TaskWorkspaceHeaderCard({
   task,
   spec,

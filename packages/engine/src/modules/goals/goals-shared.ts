@@ -186,7 +186,7 @@ export function acceptedPlanRun(task: GoalTask, run: GoalTask["runs"][number]) {
 
 export function acceptedPlanOutput(task: GoalTask, run: GoalTask["runs"][number]) {
   const planRun = acceptedPlanRun(task, run);
-  return planRun ? planOutputSpec(planRun.planRun) : null;
+  return planOutputSpec(planRun.planRun);
 }
 
 export function acceptedResultSummary(task: GoalTask, run: GoalTask["runs"][number]) {

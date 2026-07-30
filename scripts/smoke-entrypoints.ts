@@ -44,7 +44,7 @@ async function stopProcess(child: Bun.Subprocess): Promise<void> {
     child.exited,
     Bun.sleep(5_000).then(() => null),
   ]);
-  if (exited === null && child.exitCode === null) {
+  if (exited === null) {
     child.kill("SIGKILL");
     await child.exited;
   }

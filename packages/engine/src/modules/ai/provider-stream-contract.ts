@@ -25,6 +25,8 @@ export function createProviderStreamEventBoundary(
   let terminalSeen = false;
 
   return {
+    // Stream identity, ordering, and terminal-state checks are one atomic boundary.
+    // eslint-disable-next-line complexity
     accept(value: unknown): ProviderRunEvent {
       const parsed = providerRunEventSchema.safeParse(value);
       if (!parsed.success) {

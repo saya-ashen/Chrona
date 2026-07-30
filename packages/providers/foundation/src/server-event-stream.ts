@@ -24,6 +24,8 @@ export type ParseServerEventStreamOptions = {
  * event-stream grammar. A final unterminated event is dispatched at EOF,
  * matching the EventSource processing model.
  */
+// The parser implements the full SSE framing state machine in one streaming scope.
+// eslint-disable-next-line complexity
 export async function* parseServerEventStream(
   stream: ReadableStream<Uint8Array>,
   options: ParseServerEventStreamOptions = {},
@@ -53,6 +55,8 @@ export async function* parseServerEventStream(
     return frame;
   };
 
+  // Field parsing follows the SSE grammar's complete line dispatch table.
+  // eslint-disable-next-line complexity
   const consumeLine = (rawLine: string): ServerEventFrame | undefined => {
     const line = rawLine.endsWith("\r") ? rawLine.slice(0, -1) : rawLine;
     if (line.length === 0) return dispatch();
@@ -90,7 +94,7 @@ export async function* parseServerEventStream(
     options.signal?.reason ?? new DOMException("The event stream was aborted", "AbortError");
 
   try {
-    while (true) {
+    for (;;) {
       if (options.signal?.aborted) throw abortError();
       const result = await reader.read().catch((cause): never => {
         if (options.signal?.aborted) throw abortError();

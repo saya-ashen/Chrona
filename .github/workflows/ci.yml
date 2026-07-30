@@ -38,7 +38,7 @@ jobs:
 
       - name: Smoke documented development entrypoints
         run: bun run smoke:entrypoints
-      - run: bun run check
+      - run: bun run analyze
       - name: Install Chromium for result export tests
         run: sudo apt-get update && sudo apt-get install --yes chromium-browser
 

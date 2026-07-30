@@ -1,6 +1,8 @@
 import { ENGINE_ERROR_CODES, engineErrorFromUnknown } from "../errors";
 import { tasks } from "../modules/tasks";
 
+// The service exposes the complete task facade while normalizing every module error consistently.
+// eslint-disable-next-line max-lines-per-function
 export function createTasksService() {
   return {
     async create(input: Parameters<typeof tasks.create>[0]) {

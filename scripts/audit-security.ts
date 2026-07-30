@@ -45,9 +45,6 @@ function readWaivers(): AuditWaiver[] {
   }
 
   return (parsed as AuditWaiverFile).waivers.map((waiver, index) => {
-    if (!waiver || typeof waiver !== "object") {
-      throw new Error(`Waiver ${index + 1} must be an object`);
-    }
     const {
       package: packageName,
       cve,

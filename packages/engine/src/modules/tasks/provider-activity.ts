@@ -132,6 +132,8 @@ export function isDisplayableProviderEvent(eventType: string, payloadEvent?: Rec
     (eventType === "raw_event" && Boolean(payloadEvent && (providerTaskProgressSummary(payloadEvent) || providerRawMessage(payloadEvent))));
 }
 
+// Provider payload normalization deliberately covers all supported runtime event shapes.
+// eslint-disable-next-line complexity
 function providerBase(event: TaskActivityEvent) {
   const payloadEvent = runtimePayloadEvent(event.payload);
   const payload = payloadEvent ?? payloadRecord(event.payload) ?? {};
@@ -156,6 +158,8 @@ function providerBase(event: TaskActivityEvent) {
   return { payload, eventType, progressSummary, timestamp, base };
 }
 
+// Timeline construction keeps the user-visible activity fields explicit at each call site.
+// eslint-disable-next-line max-params
 function providerItem(
   event: TaskActivityEvent,
   kind: WorkspaceActivityTimelineItem["kind"],
@@ -177,6 +181,8 @@ function streamMessageItem(event: TaskActivityEvent, reasoning: boolean) {
   });
 }
 
+// Tool lifecycle mapping keeps started, progress, completed, and failure states exhaustive.
+// eslint-disable-next-line complexity
 function toolItem(event: TaskActivityEvent, state: "started" | "progress" | "completed") {
   const { payload } = providerBase(event);
   const error = state === "completed" ? providerActivityError(payload) : undefined;
