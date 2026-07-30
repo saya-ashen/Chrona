@@ -1,4 +1,5 @@
 "use client";
+import { v4 as uuidv4 } from "uuid";
 
 import { useEffect, useState } from "react";
 import { useRevalidator } from "react-router-dom";
@@ -42,9 +43,9 @@ function useReviewActions({ goal, copy, proposal, onOpenChange }: DialogProps & 
   };
   return {
     pending, error,
-    generate: () => run(() => generateGoalReview(goal.id, { idempotencyKey: crypto.randomUUID() })),
-    apply: (selected: Record<string, boolean>) => proposal ? run(() => applyGoalReviewProposal(goal.id, proposal.id, { idempotencyKey: crypto.randomUUID(), decisions: reviewDecisions(proposal, selected) }), true) : undefined,
-    reject: () => proposal ? run(() => rejectGoalReviewProposal(goal.id, proposal.id, { idempotencyKey: crypto.randomUUID() }), true) : undefined,
+    generate: () => run(() => generateGoalReview(goal.id, { idempotencyKey: uuidv4() })),
+    apply: (selected: Record<string, boolean>) => proposal ? run(() => applyGoalReviewProposal(goal.id, proposal.id, { idempotencyKey: uuidv4(), decisions: reviewDecisions(proposal, selected) }), true) : undefined,
+    reject: () => proposal ? run(() => rejectGoalReviewProposal(goal.id, proposal.id, { idempotencyKey: uuidv4() }), true) : undefined,
   };
 }
 

@@ -7,6 +7,7 @@ import {
   FileText,
   FormInput,
   Globe2,
+  Presentation,
 } from "lucide-react";
 import { Button } from "@shared/ui";
 import { Checkbox } from "@shared/ui";
@@ -21,6 +22,7 @@ import { Label } from "@shared/ui";
 
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@shared/ui";
+import { parseTablePreview } from "@features/task-workspace/ui/catalog/workspace-table-data";
 import { Textarea } from "@shared/ui";
 import {
   submitGoalForm,
@@ -252,6 +254,81 @@ export function deriveAssetFreshness(asset: GoalAssetWorkbenchData, now = new Da
   return due - now.getTime() <= 7 * 24 * 60 * 60 * 1000 ? "due_soon" : "current";
 }
 
+type AssetDisplayKind = "document" | "spreadsheet" | "form" | "page" | "file" | "structured_result";
+
+const DISPLAY_KIND_BY_ASSET_KIND: Record<GoalAssetKind, AssetDisplayKind> = {
+  document: "document",
+  form: "form",
+  page: "page",
+  file: "file",
+  data_table: "spreadsheet",
+  structured_result: "structured_result",
+};
+const CSV_MIME_TYPES = new Set(["text/csv", "application/csv", "application/vnd.ms-excel"]);
+
+export function assetDisplayKind(asset: GoalAssetWorkbenchData): AssetDisplayKind {
+  const version = asset.versions[0];
+  const mimeType = version?.mimeType?.toLowerCase() ?? "";
+  const extension = version?.originalFilename?.toLowerCase().split(".").at(-1) ?? "";
+  return extension === "csv" || CSV_MIME_TYPES.has(mimeType)
+    ? "spreadsheet"
+    : DISPLAY_KIND_BY_ASSET_KIND[asset.kind];
+}
+
+export function assetDisplayLabel(asset: GoalAssetWorkbenchData, copy: AssetWorkbenchCopy) {
+  return assetDisplayKind(asset) === "spreadsheet" ? copy.dataTables : kindLabel(asset.kind, copy);
+}
+
+const DISPLAY_ICON: Record<AssetDisplayKind, typeof File> = {
+  document: FileText,
+  spreadsheet: FileSpreadsheet,
+  form: FormInput,
+  page: Globe2,
+  file: File,
+  structured_result: Presentation,
+};
+
+const DISPLAY_TONE: Record<AssetDisplayKind, string> = {
+  document: "bg-sky-500/[0.10] text-sky-700 dark:text-sky-300",
+  spreadsheet: "bg-emerald-500/[0.10] text-emerald-700 dark:text-emerald-300",
+  form: "bg-success/[0.10] text-success",
+  page: "bg-primary/[0.10] text-primary",
+  file: "bg-warning/[0.10] text-warning",
+  structured_result: "bg-violet-500/[0.10] text-violet-700 dark:text-violet-300",
+};
+
+function spreadsheetPreview(asset: GoalAssetWorkbenchData) {
+  const version = asset.versions[0];
+  if (typeof version?.content !== "string") return null;
+  const parsed = parseTablePreview("csv", version.content);
+  if (parsed.parseError || parsed.inferredColumns.length === 0) return null;
+  return { columns: parsed.inferredColumns.slice(0, 4), rows: parsed.rows.slice(0, 4), totalRows: parsed.rows.length };
+}
+
+function SpreadsheetThumbnail({ asset }: { asset: GoalAssetWorkbenchData }) {
+  const preview = spreadsheetPreview(asset);
+  if (!preview) return null;
+  return <div className="h-36 overflow-hidden bg-white text-[9px] leading-4 text-slate-700 dark:bg-slate-950 dark:text-slate-200"><table className="w-full table-fixed border-collapse"><thead><tr>{preview.columns.map((column) => <th key={column} className="truncate border border-emerald-200 bg-emerald-50 px-1.5 py-1 text-left font-semibold dark:border-emerald-900 dark:bg-emerald-950">{column}</th>)}</tr></thead><tbody>{preview.rows.map((row, index) => <tr key={index}>{preview.columns.map((column) => <td key={column} className="truncate border border-slate-200 px-1.5 py-1 dark:border-slate-800">{String(row[column] ?? "")}</td>)}</tr>)}</tbody></table><p className="px-2 py-1 text-emerald-700 dark:text-emerald-300">{preview.totalRows} rows</p></div>;
+}
+
+function textPreview(asset: GoalAssetWorkbenchData) {
+  const version = asset.versions[0];
+  const content = typeof version?.content === "string" ? version.content : typeof version?.content === "object" && version.content ? String((version.content as Record<string, unknown>).summary ?? "") : "";
+  return content.replace(/^#{1,6}\s+/gm, "").replace(/[*_`]/g, "").replace(/\s+/g, " ").trim();
+}
+
+function DocumentThumbnail({ asset }: { asset: GoalAssetWorkbenchData }) {
+  const preview = textPreview(asset);
+  if (!preview) return null;
+  const midpoint = Math.max(1, Math.floor(preview.length / 2));
+  return <div aria-hidden="true" className="mx-auto h-36 w-[78%] overflow-hidden border-x border-t bg-white px-3 py-3 shadow-sm dark:bg-slate-950"><div className="mb-2 h-1.5 w-1/2 rounded bg-sky-500/70" /><p className="line-clamp-6 text-[9px] leading-4 text-slate-600 dark:text-slate-300"><span>{preview.slice(0, midpoint)}</span><span>{preview.slice(midpoint)}</span></p></div>;
+}
+
+function AssetThumbnail({ asset }: { asset: GoalAssetWorkbenchData }) {
+  const displayKind = assetDisplayKind(asset);
+  return <div className="mb-3 overflow-hidden rounded-lg border bg-muted/30">{displayKind === "spreadsheet" ? <SpreadsheetThumbnail asset={asset} /> : <DocumentThumbnail asset={asset} />}</div>;
+}
+
 // Asset summaries intentionally dispatch across persisted asset kinds and content shapes.
 // eslint-disable-next-line complexity
 export function assetSummary(asset: GoalAssetWorkbenchData, copy: AssetWorkbenchCopy) {
@@ -261,7 +338,7 @@ export function assetSummary(asset: GoalAssetWorkbenchData, copy: AssetWorkbench
     const content = current.content as { columns?: unknown[]; rows?: unknown[] };
     return formatCopy(copy.dataTableSummary, { rows: content.rows?.length ?? 0, columns: content.columns?.length ?? 0 });
   }
-  if (asset.kind === "file") return current?.originalFilename ?? asset.sourceArtifact.title;
+  if (assetDisplayKind(asset) === "spreadsheet") return current?.originalFilename ?? asset.sourceArtifact.title;
   if (asset.kind === "structured_result") return formatCopy(copy.resultFromTask, { task: asset.sourceArtifact.title });
   return copy.missingAssetDescription;
 }
@@ -275,32 +352,28 @@ export function AssetTile({
   copy: AssetWorkbenchCopy;
   onOpen: () => void;
 }) {
-  const Icon = ICON_BY_KIND[asset.kind];
+  const displayKind = assetDisplayKind(asset);
+  const Icon = DISPLAY_ICON[displayKind];
   return (
     <button
       type="button"
       onClick={onOpen}
-      className="group min-w-0 rounded-xl border bg-card p-4 text-left transition-colors hover:border-foreground/25 hover:bg-muted/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      className="group min-w-0 overflow-hidden rounded-xl border bg-card p-3 text-left shadow-sm transition-all hover:-translate-y-0.5 hover:border-foreground/25 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
+      <AssetThumbnail asset={asset} />
       <div className="flex items-start gap-3">
-        <span
-          className={`flex size-10 shrink-0 items-center justify-center rounded-lg ${KIND_TONE[asset.kind]}`}
-        >
+        <span className={`flex size-10 shrink-0 items-center justify-center rounded-lg ${DISPLAY_TONE[displayKind]}`}>
           <Icon className="size-5" aria-hidden />
         </span>
         <div className="min-w-0 flex-1">
           <p className="line-clamp-2 font-semibold leading-5">{asset.label}</p>
-          <p className="mt-1 line-clamp-2 min-h-8 text-xs leading-4 text-muted-foreground">
-            {assetSummary(asset, copy)}
-          </p>
+          <p className="mt-1 line-clamp-2 min-h-8 text-xs leading-4 text-muted-foreground">{assetSummary(asset, copy)}</p>
         </div>
       </div>
-      <div className="mt-4 flex flex-wrap items-center gap-1.5 border-t pt-3 text-xs text-muted-foreground">
-        <span className="font-medium text-foreground/80">
-          {roleLabel(asset.role, copy)}
-        </span>
+      <div className="mt-3 flex flex-wrap items-center gap-1.5 border-t pt-3 text-xs text-muted-foreground">
+        <span className="font-medium text-foreground/80">{roleLabel(asset.role, copy)}</span>
         <span aria-hidden>·</span>
-        <span>{kindLabel(asset.kind, copy)}</span>
+        <span>{assetDisplayLabel(asset, copy)}</span>
         <span aria-hidden>·</span>
         <span className="font-mono">v{asset.versions[0]?.version ?? 1}</span>
         <span aria-hidden>·</span>

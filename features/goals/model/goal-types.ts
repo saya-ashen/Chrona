@@ -468,6 +468,12 @@ export type GoalCopy = {
     createAsset: string;
     appendVersion: string;
     rejectCandidate: string;
+    candidateGroupTitle: string;
+    candidateGroupDescription: string;
+    candidateProgress: string;
+    createAssetDescription: string;
+    updateVersionDescription: string;
+    hideDetails: string;
     candidateUpdateFailed: string;
     pageSafetyWarning: string;
     genericFileDescription: string;
@@ -488,6 +494,8 @@ export type GoalCopy = {
     documentViewMode: string;
     previewMode: string;
     editMode: string;
+    markdownSourceMode: string;
+    markdownRichMode: string;
     csvPreview: string;
     dataTableSummary: string;
     resultFromTask: string;

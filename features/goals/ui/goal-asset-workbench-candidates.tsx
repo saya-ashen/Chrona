@@ -1,7 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { v4 as uuidv4 } from "uuid";
 import {
+  FileSearch,
   Loader2,
   Sparkles,
 } from "lucide-react";
@@ -65,6 +67,40 @@ function inboxChangeSummaryLabel(
     `Candidate derived from accepted result “${candidateLabel}”`
     ? formatCopy(copy.candidateFromAcceptedResult, { result: candidateLabel })
     : summary;
+}
+
+function normalizedPreviewText(content: GoalInboxCandidateData["content"]) {
+  if (typeof content === "string") {
+    return content
+      .replace(/^#{1,6}\s+/gm, "")
+      .replace(/[*_`]/g, "")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+  if (content && typeof content === "object" && !Array.isArray(content)) {
+    const summary = (content as Record<string, unknown>).summary;
+    if (typeof summary === "string" && summary.trim()) return summary.replace(/\s+/g, " ").trim();
+  }
+  return contentText(content).replace(/\s+/g, " ").trim();
+}
+
+function CandidatePreview({ candidate, copy }: { candidate: GoalInboxCandidateData; copy: AssetWorkbenchCopy }) {
+  const preview = useMemo(() => normalizedPreviewText(candidate.content), [candidate.content]);
+  return (
+    <div className="rounded-lg border bg-muted/30 p-3">
+      <div className="flex items-start gap-2">
+        <FileSearch className="mt-0.5 size-4 shrink-0 text-muted-foreground" />
+        <p className="line-clamp-3 text-sm leading-6">{preview || copy.genericFileDescription}</p>
+      </div>
+      <details className="group mt-2">
+        <summary className="cursor-pointer list-none text-sm font-medium text-primary underline-offset-4 hover:underline [&::-webkit-details-marker]:hidden">
+          <span className="group-open:hidden">{copy.previewMode}</span>
+          <span className="hidden group-open:inline">{copy.hideDetails}</span>
+        </summary>
+        <pre className="mt-3 max-h-72 overflow-auto whitespace-pre-wrap break-words rounded-md bg-background p-3 text-xs leading-5">{contentText(candidate.content)}</pre>
+      </details>
+    </div>
+  );
 }
 
 type OwnershipResult = NonNullable<GoalAssetOwnershipProposalData["result"]>;
@@ -152,8 +188,10 @@ function candidateActionRequest(
   return { action, targetAssetId, baseVersionId: selectedTarget.versions[0].id, changeSummary: candidate.changeSummary };
 }
 
-function CandidateCardContent({ candidate, assets, copy, proposal, pending, error, targetAssetId, setTargetAssetId, onGenerate, onApply, onResolve }: {
+function CandidateCardContent({ candidate, position, total, assets, copy, proposal, pending, error, targetAssetId, setTargetAssetId, onGenerate, onApply, onResolve }: {
   candidate: GoalInboxCandidateData;
+  position: number;
+  total: number;
   assets: GoalAssetWorkbenchData[];
   copy: AssetWorkbenchCopy;
   proposal: GoalAssetOwnershipProposalData | null;
@@ -166,23 +204,26 @@ function CandidateCardContent({ candidate, assets, copy, proposal, pending, erro
   onResolve: (action: CandidateAction) => void;
 }) {
   const mainAction = targetAssetId === "new" ? "create_asset" : "append_version";
+  const selectedTarget = assets.find((asset) => asset.id === targetAssetId);
   return <CardContent className="space-y-4">
-    <dl className="grid gap-2 text-sm sm:grid-cols-2"><div><dt className="text-muted-foreground">{copy.sourceTask}</dt><dd className="font-medium">{candidate.sourceTask.title}</dd></div><div><dt className="text-muted-foreground">{copy.changeSummary}</dt><dd>{inboxChangeSummaryLabel(candidate.changeSummary, candidate.label, copy)}</dd></div></dl>
-    <pre className="max-h-36 overflow-auto whitespace-pre-wrap rounded-lg bg-muted p-3 text-xs">{contentText(candidate.content)}</pre>
+    <dl className="grid gap-2 text-sm sm:grid-cols-2"><div><dt className="text-muted-foreground">{copy.sourceTask}</dt><dd className="font-medium">{candidate.sourceTask.title}</dd></div><div><dt className="text-muted-foreground">{copy.changeSummary}</dt><dd className="line-clamp-2">{inboxChangeSummaryLabel(candidate.changeSummary, candidate.label, copy)}</dd></div></dl>
+    <CandidatePreview candidate={candidate} copy={copy} />
     <AssetOwnershipRecommendation proposal={proposal} copy={copy} pending={pending} onGenerate={onGenerate} onApply={onApply} />
-    <div className="space-y-2"><Label htmlFor={`candidate-target-${candidate.id}`}>{copy.assetDestination}</Label><Select value={targetAssetId} onValueChange={setTargetAssetId}><SelectTrigger id={`candidate-target-${candidate.id}`}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="new">{copy.createNewAsset}</SelectItem>{assets.filter((asset) => !asset.archivedAt && asset.kind === candidate.kind).map((asset) => <SelectItem key={asset.id} value={asset.id}>{formatCopy(copy.appendToAsset, { asset: asset.label })}</SelectItem>)}</SelectContent></Select></div>
+    <div className="space-y-2 rounded-lg border p-3"><Label htmlFor={`candidate-target-${candidate.id}`}>{copy.assetDestination}</Label><Select value={targetAssetId} onValueChange={setTargetAssetId}><SelectTrigger id={`candidate-target-${candidate.id}`} className="min-h-11"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="new">{copy.createNewAsset}</SelectItem>{assets.filter((asset) => !asset.archivedAt && asset.kind === candidate.kind).map((asset) => <SelectItem key={asset.id} value={asset.id}>{formatCopy(copy.appendToAsset, { asset: asset.label })}</SelectItem>)}</SelectContent></Select>{selectedTarget ? <p className="text-xs leading-5 text-muted-foreground">{formatCopy(copy.updateVersionDescription, { asset: selectedTarget.label, version: selectedTarget.versions[0]?.version ?? 0 })}</p> : <p className="text-xs leading-5 text-muted-foreground">{copy.createAssetDescription}</p>}</div>
     {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
-    <div className="flex flex-wrap gap-2"><Button size="sm" disabled={pending} onClick={() => onResolve(mainAction)}>{pending ? <Loader2 className="size-4 animate-spin" /> : null}{targetAssetId === "new" ? copy.createAsset : copy.appendVersion}</Button><Button size="sm" variant="ghost" disabled={pending} onClick={() => onResolve("reject")}>{copy.rejectCandidate}</Button></div>
+    <div className="sticky bottom-0 z-10 -mx-6 border-t bg-card/95 px-6 py-3 backdrop-blur supports-[backdrop-filter]:bg-card/85 sm:static sm:mx-0 sm:border-0 sm:bg-transparent sm:p-0"><div className="mb-2 flex min-w-0 items-center justify-between gap-2 sm:hidden"><p className="truncate text-sm font-medium">{candidate.label}</p><span className="shrink-0 text-xs text-muted-foreground">{formatCopy(copy.candidateProgress, { current: position, total })}</span></div><div className="flex gap-2"><Button className="min-h-11 flex-1 sm:flex-none" disabled={pending} onClick={() => onResolve(mainAction)}>{pending ? <Loader2 className="size-4 animate-spin" /> : null}{targetAssetId === "new" ? copy.createAsset : copy.appendVersion}</Button><Button className="min-h-11" variant="outline" disabled={pending} onClick={() => onResolve("reject")}>{copy.rejectCandidate}</Button></div></div>
   </CardContent>;
 }
 
 function CandidateHeader({ candidate, copy }: { candidate: GoalInboxCandidateData; copy: AssetWorkbenchCopy }) {
-  return <CardHeader><div className="flex flex-wrap items-center gap-2"><Badge>{kindLabel(candidate.kind, copy)}</Badge><Badge variant="outline">{candidate.proposedTargetAssetId ? copy.ruleBasedMatch : copy.noRuleBasedMatch}</Badge></div><CardTitle className="text-base">{candidate.label}</CardTitle><CardDescription>{inboxReasonLabel(candidate.reason, copy)}</CardDescription></CardHeader>;
+  return <CardHeader className="space-y-3"><div className="flex flex-wrap items-center gap-2"><Badge>{kindLabel(candidate.kind, copy)}</Badge><Badge variant="outline">{candidate.proposedTargetAssetId ? copy.ruleBasedMatch : copy.noRuleBasedMatch}</Badge></div><div><CardTitle className="text-base sm:text-lg">{candidate.label}</CardTitle><CardDescription className="mt-1 line-clamp-2">{inboxReasonLabel(candidate.reason, copy)}</CardDescription></div></CardHeader>;
 }
 
 export function InboxCandidate({
   goalId,
   candidate,
+  position,
+  total,
   workspaceId,
   assets,
   copy,
@@ -190,6 +231,8 @@ export function InboxCandidate({
 }: {
   goalId: string;
   candidate: GoalInboxCandidateData;
+  position: number;
+  total: number;
   workspaceId: string;
   assets: GoalAssetWorkbenchData[];
   copy: AssetWorkbenchCopy;
@@ -213,7 +256,7 @@ export function InboxCandidate({
     try {
       await generateGoalAssetOwnership(goalId, candidate.id, {
         workspaceId,
-        idempotencyKey: crypto.randomUUID(),
+        idempotencyKey: uuidv4(),
       });
       onResolved();
     } catch (cause) {
@@ -229,7 +272,7 @@ export function InboxCandidate({
     try {
       await applyGoalAssetOwnership(goalId, candidate.id, current.id, {
         workspaceId,
-        idempotencyKey: crypto.randomUUID(),
+        idempotencyKey: uuidv4(),
         action: "apply_suggestion",
       });
       onResolved();
@@ -249,7 +292,7 @@ export function InboxCandidate({
       if (proposal?.status === "Ready") {
         await applyGoalAssetOwnership(goalId, candidate.id, proposal.id, {
           workspaceId,
-          idempotencyKey: crypto.randomUUID(),
+          idempotencyKey: uuidv4(),
           ...request,
         });
       } else {
@@ -267,6 +310,8 @@ export function InboxCandidate({
       <CandidateHeader candidate={candidate} copy={copy} />
       <CandidateCardContent
         candidate={candidate}
+        position={position}
+        total={total}
         assets={assets}
         copy={copy}
         proposal={proposal}

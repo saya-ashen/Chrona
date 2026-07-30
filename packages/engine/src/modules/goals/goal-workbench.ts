@@ -80,6 +80,8 @@ function artifactKind(artifact: { type: string; uri: string; metadata: unknown }
   const declared = declaredAssetKind(metadata?.assetKind);
   if (declared) return declared;
   const extension = artifact.uri.toLowerCase().split(".").at(-1);
+  const mimeType = typeof metadata?.mimeType === "string" ? metadata.mimeType.toLowerCase() : "";
+  if (extension === "csv" || mimeType === "text/csv") return "data_table" as const;
   if (artifact.type === "report" || extension === "md" || extension === "txt") return "document" as const;
   if (extension === "html" || extension === "htm") return "page" as const;
   return metadata?.formSchema ? "form" as const : "file" as const;

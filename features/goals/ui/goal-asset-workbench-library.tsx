@@ -25,7 +25,7 @@ import type {
   GoalAssetWorkbenchData,
   GoalInboxCandidateData,
 } from "../workbench-api";
-import type { AssetWorkbenchCopy } from "./goal-asset-workbench-shared";
+import { formatCopy, type AssetWorkbenchCopy } from "./goal-asset-workbench-shared";
 import { AssetTile, kindLabel } from "./goal-asset-workbench-shared";
 import { InboxCandidate } from "./goal-asset-workbench-candidates";
 
@@ -220,7 +220,19 @@ export function InboxContent({
   onRefresh: () => void;
 }) {
   if (candidates.length === 0) return <EmptyPanel icon={<Inbox className="mx-auto size-8 text-success" />} title={copy.inboxClear} description={copy.inboxClearDescription} />;
-  return <div className="grid gap-4 lg:grid-cols-2">{candidates.map((candidate) => <InboxCandidate key={candidate.id} goalId={goalId} candidate={candidate} workspaceId={workspaceId} assets={assets} copy={copy} onResolved={onRefresh} />)}</div>;
+  const groups = Array.from(candidates.reduce((map, candidate) => {
+    const group = map.get(candidate.sourceTaskId);
+    if (group) group.push(candidate);
+    else map.set(candidate.sourceTaskId, [candidate]);
+    return map;
+  }, new Map<string, GoalInboxCandidateData[]>()).values());
+  return <div className="space-y-5">{groups.map((group) => {
+    const sourceTask = group[0]!.sourceTask.title;
+    return <section key={group[0]!.sourceTaskId} aria-label={formatCopy(copy.candidateGroupTitle, { task: sourceTask })} className="space-y-3 rounded-xl border bg-muted/15 p-3 sm:p-4">
+      <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{copy.sourceTask}</p><h3 className="text-lg font-semibold">{sourceTask}</h3><p className="text-sm text-muted-foreground">{formatCopy(copy.candidateGroupDescription, { count: group.length })}</p></div><Badge variant="secondary">{formatCopy(copy.candidateProgress, { current: group.length, total: candidates.length })}</Badge></div>
+      <div className="grid gap-4 xl:grid-cols-2">{group.map((candidate) => <InboxCandidate key={candidate.id} goalId={goalId} candidate={candidate} position={candidates.indexOf(candidate) + 1} total={candidates.length} workspaceId={workspaceId} assets={assets} copy={copy} onResolved={onRefresh} />)}</div>
+    </section>;
+  })}</div>;
 }
 
 export function ArchivedContent({
@@ -255,7 +267,7 @@ function AssetGrid({
   return (
     <section>
       <div className="mb-3 flex items-center justify-between"><h3 className="text-sm font-semibold">{title}</h3><span className="text-xs tabular-nums text-muted-foreground">{assets.length}</span></div>
-      {assets.length === 0 ? <EmptyPanel icon={emptyIcon} title={emptyTitle} description={emptyDescription} /> : <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">{assets.map((asset) => <AssetTile key={asset.id} asset={asset} copy={copy} onOpen={() => onSelectAsset(asset.id)} />)}</div>}
+      {assets.length === 0 ? <EmptyPanel icon={emptyIcon} title={emptyTitle} description={emptyDescription} /> : <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{assets.map((asset) => <AssetTile key={asset.id} asset={asset} copy={copy} onOpen={() => onSelectAsset(asset.id)} />)}</div>}
     </section>
   );
 }

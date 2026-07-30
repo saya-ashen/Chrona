@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState } from "react";
 import {
+  Eye,
+  Pencil,
   ChevronDown,
   Download,
   Info,
@@ -36,12 +38,14 @@ import {
 import {
   AssetContentEditor,
   AssetNavigation,
+  type AssetCanvasMode,
 } from "./goal-asset-workbench-content";
 import {
+  assetDisplayLabel,
+  assetDisplayKind,
   contentText,
   ICON_BY_KIND,
   KIND_TONE,
-  kindLabel,
   parseContent,
   type AssetWorkbenchCopy,
 } from "./goal-asset-workbench-shared";
@@ -63,12 +67,12 @@ function assetExportFormats(asset: GoalAssetWorkbenchData, copy: AssetWorkbenchC
   return [{ format: "json", label: copy.exportJson }];
 }
 
-function AssetEditorHeader({ asset, current, draft, copy, editable, actions, onClose, openAssets, openDetails, message }: {
+function AssetEditorHeader({ asset, current, draft, copy, editable, mode, actions, onClose, openAssets, openDetails, onModeChange, message }: {
   asset: GoalAssetWorkbenchData; current: GoalAssetWorkbenchData["versions"][number] | undefined; draft: GoalAssetWorkbenchData["drafts"][number] | undefined;
-  copy: AssetWorkbenchCopy; editable: boolean; actions: AssetEditorActions; onClose: () => void; openAssets: () => void; openDetails: () => void; message: string | null;
+  copy: AssetWorkbenchCopy; editable: boolean; mode: AssetCanvasMode; actions: AssetEditorActions; onClose: () => void; openAssets: () => void; openDetails: () => void; onModeChange: (mode: AssetCanvasMode) => void; message: string | null;
 }) {
   const Icon = ICON_BY_KIND[asset.kind];
-  return <SheetHeader className="shrink-0 border-b px-4 py-3 sm:px-5"><div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between"><div className="flex min-w-0 items-center gap-3"><span className={`flex size-9 shrink-0 items-center justify-center rounded-lg ${KIND_TONE[asset.kind]}`}><Icon className="size-4" /></span><div className="min-w-0"><SheetTitle className="truncate">{asset.label}</SheetTitle><SheetDescription className="flex flex-wrap items-center gap-1.5"><span>{kindLabel(asset.kind, copy)}</span><span aria-hidden>·</span><span>v{current?.version ?? 1}</span><span aria-hidden>·</span><span className={draft ? "text-warning" : ""}>{draft ? copy.draftAvailable : copy.noDraft}</span></SheetDescription></div></div><div className="flex flex-wrap items-center gap-2"><Button size="sm" variant="outline" className="xl:hidden" onClick={openAssets}><PanelLeftOpen className="size-4" />{copy.openAssets}</Button><Button size="sm" variant="outline" className="xl:hidden" onClick={openDetails}><Info className="size-4" />{copy.openDetails}</Button>{editable ? <><Button size="sm" disabled={actions.pending} onClick={actions.save}>{copy.saveDraft}</Button><Button size="sm" variant="outline" disabled={actions.pending} onClick={actions.publish}>{copy.publishVersion}</Button></> : <Button size="sm" disabled={!current} onClick={actions.downloadSource}><Download className="size-4" />{copy.downloadSource}</Button>}<DropdownMenu><DropdownMenuTrigger render={<Button size="sm" variant="outline" disabled={!current || actions.pending}><Download className="size-4" />{copy.export}<ChevronDown className="size-3.5" /></Button>} /><DropdownMenuContent align="end">{actions.exportFormats.map((option) => <DropdownMenuItem key={option.format} onClick={() => actions.exportAsset(option.format)}>{option.label}</DropdownMenuItem>)}</DropdownMenuContent></DropdownMenu><Button size="icon-sm" variant="ghost" aria-label={copy.closeAssetWorkspace} onClick={onClose}><X className="size-4" /></Button></div></div>{message ? <p role="status" className="text-sm text-muted-foreground">{message}</p> : null}</SheetHeader>;
+  return <SheetHeader className="shrink-0 border-b px-4 py-3 sm:px-5"><div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between"><div className="flex min-w-0 items-center gap-3"><span className={`flex size-9 shrink-0 items-center justify-center rounded-lg ${KIND_TONE[asset.kind]}`}><Icon className="size-4" /></span><div className="min-w-0"><SheetTitle className="truncate">{asset.label}</SheetTitle><SheetDescription className="flex flex-wrap items-center gap-1.5"><span>{assetDisplayLabel(asset, copy)}</span><span aria-hidden>·</span><span>v{current?.version ?? 1}</span><span aria-hidden>·</span><span className={draft ? "text-warning" : ""}>{draft ? copy.draftAvailable : copy.noDraft}</span></SheetDescription></div></div><div className="flex flex-wrap items-center gap-2 [&_button]:max-sm:min-h-11"><Button variant="outline" size="sm" className="xl:hidden" onClick={openAssets}><PanelLeftOpen className="size-4" />{copy.openAssets}</Button><Button variant="outline" size="sm" className="xl:hidden" onClick={openDetails}><Info className="size-4" />{copy.openDetails}</Button>{editable ? <Button size="sm" variant={mode === "edit" ? "secondary" : "outline"} aria-pressed={mode === "edit"} onClick={() => onModeChange(mode === "edit" ? "read" : "edit")}>{mode === "edit" ? <Eye className="size-4" /> : <Pencil className="size-4" />}{mode === "edit" ? copy.previewMode : copy.editMode}</Button> : null}{editable && mode === "edit" ? <Button size="sm" variant="outline" disabled={actions.pending} onClick={actions.save}>{copy.saveDraft}</Button> : null}{editable && mode === "edit" ? <Button size="sm" disabled={actions.pending} onClick={actions.publish}>{copy.publishVersion}</Button> : null}<Button size="sm" variant="outline" onClick={actions.downloadSource}><Download className="size-4" />{copy.downloadSource}</Button><DropdownMenu><DropdownMenuTrigger render={<Button size="sm" variant="outline" />}>{copy.export}<ChevronDown className="size-4" /></DropdownMenuTrigger><DropdownMenuContent align="end">{actions.exportFormats.map((entry) => <DropdownMenuItem key={entry.format} onClick={() => actions.exportAsset(entry.format)}>{entry.label}</DropdownMenuItem>)}</DropdownMenuContent></DropdownMenu><Button size="icon-sm" variant="ghost" aria-label={copy.closeAssetWorkspace} onClick={onClose}><X className="size-4" /></Button></div></div>{message ? <p role="status" className="text-xs text-muted-foreground">{message}</p> : null}</SheetHeader>;
 }
 
 function CollapsibleAssetNavigation({ assets, asset, copy, collapsed, setCollapsed, onSelect }: { assets: GoalAssetWorkbenchData[]; asset: GoalAssetWorkbenchData; copy: AssetWorkbenchCopy; collapsed: boolean; setCollapsed: (value: boolean) => void; onSelect: (id: string) => void }) {
@@ -116,6 +120,9 @@ export function AssetEditor({ goalId, workspaceId, asset, assets, copy, onSelect
   const current = asset.versions[0];
   const draft = asset.drafts[0];
   const { value, setValue, label, setLabel, description, setDescription, instruction, setInstruction, message, setMessage, initialValue, autosaveTimer } = useAssetEditorState(asset, current, draft);
+  const displayKind = assetDisplayKind(asset);
+  const editable = asset.kind === "document" || asset.kind === "data_table" || asset.kind === "form" || displayKind === "spreadsheet";
+  const [mode, setMode] = useState<AssetCanvasMode>(asset.kind === "form" ? "edit" : "read");
   const [pending, setPending] = useState(false);
   const [assetsOpen, setAssetsOpen] = useState(false);
   const [detailsOpen, setDetailsOpen] = useState(false);
@@ -127,74 +134,44 @@ export function AssetEditor({ goalId, workspaceId, asset, assets, copy, onSelect
   useEffect(() => {
     window.localStorage.setItem("chrona.goalAssetDetails.collapsed", String(detailsCollapsed));
   }, [detailsCollapsed]);
+  useEffect(() => {
+    setMode(asset.kind === "form" ? "edit" : "read");
+  }, [asset.id, editable]);
   const { act, save, publish, downloadSource, exportAsset } = useAssetEditorActions({
     goalId, workspaceId, asset, current, value, initialValue, autosaveTimer, copy, onRefresh, setPending, setMessage,
   });
   useEffect(() => {
-    if (!current || (asset.kind !== "document" && asset.kind !== "form") || value === initialValue.current || pending) return;
+    if (!current || !editable || mode !== "edit" || value === initialValue.current || pending) return;
     clearTimeout(autosaveTimer.current);
     autosaveTimer.current = setTimeout(() => {
       void act(() => saveGoalAssetDraft(goalId, asset.id, { workspaceId, baseVersionId: current.id, authorType: "user", content: parseContent(value) as string | Record<string, unknown> | unknown[] }), copy.draftAutosaved);
       initialValue.current = value;
     }, 800);
     return () => clearTimeout(autosaveTimer.current);
-  }, [asset.id, asset.kind, current, goalId, pending, value, workspaceId]);
+  }, [asset.id, current, editable, goalId, mode, pending, value, workspaceId]);
   const exportFormats = assetExportFormats(asset, copy);
-  function downloadSubmission(
-    targetAsset: GoalAssetWorkbenchData,
-    submission: GoalAssetWorkbenchData["submissions"][number],
-  ) {
+  function downloadSubmission(targetAsset: GoalAssetWorkbenchData, submission: GoalAssetWorkbenchData["submissions"][number]) {
     const anchor = document.createElement("a");
-    anchor.href = URL.createObjectURL(
-      new Blob([JSON.stringify(submission.content, null, 2)], {
-        type: "application/json",
-      }),
-    );
+    anchor.href = URL.createObjectURL(new Blob([JSON.stringify(submission.content, null, 2)], { type: "application/json" }));
     anchor.download = `${targetAsset.label}-submission-${submission.id}.json`;
     anchor.click();
     URL.revokeObjectURL(anchor.href);
   }
-  const editable = asset.kind === "document" || asset.kind === "form";
-  const gridColumns =
-    assetsCollapsed && detailsCollapsed
-      ? "xl:grid-cols-[3rem_minmax(0,1fr)_3rem]"
-      : assetsCollapsed
-        ? "xl:grid-cols-[3rem_minmax(0,1fr)_19rem]"
-        : detailsCollapsed
-          ? "xl:grid-cols-[15rem_minmax(0,1fr)_3rem]"
-          : "xl:grid-cols-[15rem_minmax(0,1fr)_19rem]";
-  const details = (
-    <AssetDetails
-      goalId={goalId}
-      workspaceId={workspaceId}
-      asset={asset}
-      current={current}
-      label={label}
-      setLabel={setLabel}
-      description={description}
-      setDescription={setDescription}
-      instruction={instruction}
-      setInstruction={setInstruction}
-      pending={pending}
-      copy={copy}
-      act={act}
-      downloadSubmission={downloadSubmission}
-    />
-  );
-  const actions: AssetEditorActions = {
-    pending,
-    save: () => void save(),
-    publish: () => void publish(),
-    downloadSource,
-    exportAsset,
-    exportFormats,
-  };
+  const gridColumns = assetsCollapsed && detailsCollapsed
+    ? "xl:grid-cols-[3rem_minmax(0,1fr)_3rem]"
+    : assetsCollapsed
+      ? "xl:grid-cols-[3rem_minmax(0,1fr)_19rem]"
+      : detailsCollapsed
+        ? "xl:grid-cols-[15rem_minmax(0,1fr)_3rem]"
+        : "xl:grid-cols-[15rem_minmax(0,1fr)_19rem]";
+  const details = <AssetDetails goalId={goalId} workspaceId={workspaceId} asset={asset} current={current} label={label} setLabel={setLabel} description={description} setDescription={setDescription} instruction={instruction} setInstruction={setInstruction} pending={pending} copy={copy} act={act} downloadSubmission={downloadSubmission} />;
+  const actions: AssetEditorActions = { pending, save: () => void save(), publish: () => void publish(), downloadSource, exportAsset, exportFormats };
   return (
     <div className="flex h-full min-h-0 flex-col" data-testid="asset-workspace">
-      <AssetEditorHeader asset={asset} current={current} draft={draft} copy={copy} editable={editable} actions={actions} onClose={onClose} openAssets={() => setAssetsOpen(true)} openDetails={() => setDetailsOpen(true)} message={message} />
+      <AssetEditorHeader asset={asset} current={current} draft={draft} copy={copy} editable={editable} mode={mode} actions={actions} onClose={onClose} openAssets={() => setAssetsOpen(true)} openDetails={() => setDetailsOpen(true)} onModeChange={setMode} message={message} />
       <div className={`grid min-h-0 flex-1 grid-cols-1 ${gridColumns}`}>
         <CollapsibleAssetNavigation assets={assets} asset={asset} copy={copy} collapsed={assetsCollapsed} setCollapsed={setAssetsCollapsed} onSelect={onSelectAsset} />
-        <main className="min-h-0 overflow-y-auto bg-background p-4 sm:p-6 xl:p-8"><div className="mx-auto max-w-4xl"><AssetContentEditor asset={asset} currentVersionId={current?.id} value={value} formalValue={contentText(current?.content ?? asset.sourceArtifact.contentPreview ?? "")} setValue={setValue} pending={pending} copy={copy} act={act} />{editable ? <div className="mt-4 flex flex-wrap gap-2"><Button variant="outline" onClick={downloadSource}><Download className="size-4" />{copy.downloadSource}</Button></div> : null}</div></main>
+        <main className="flex min-h-0 flex-col overflow-y-auto bg-muted/15 p-3 sm:p-5 xl:p-6"><div className={displayKind === "spreadsheet" || displayKind === "document" || displayKind === "structured_result" ? "flex min-h-[32rem] w-full flex-1 flex-col" : asset.kind === "file" ? "mx-auto w-full max-w-[96rem]" : "mx-auto w-full max-w-5xl"}><AssetContentEditor asset={asset} currentVersionId={current?.id} value={value} formalValue={contentText(current?.content ?? asset.sourceArtifact.contentPreview ?? "")} mode={mode} setValue={setValue} pending={pending} copy={copy} act={act} /></div></main>
         <CollapsibleAssetDetails details={details} copy={copy} collapsed={detailsCollapsed} setCollapsed={setDetailsCollapsed} />
       </div>
       <MobileAssetDrawers assetsOpen={assetsOpen} setAssetsOpen={setAssetsOpen} detailsOpen={detailsOpen} setDetailsOpen={setDetailsOpen} assets={assets} asset={asset} copy={copy} onSelectAsset={onSelectAsset} details={details} />

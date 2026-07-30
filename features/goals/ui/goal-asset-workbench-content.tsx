@@ -1,28 +1,17 @@
 "use client";
-
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { JSONUIProvider, Renderer } from "@json-render/react";
-import { goalDataTableContentSchema, isStructuredResultAssetContent, type GoalDataTableContent, type StructuredResultAssetContent } from "@chrona/contracts";
+import { goalDataTableContentSchema, isStructuredResultAssetContent, type StructuredResultAssetContent } from "@chrona/contracts";
 import { isCatalogCompatible, validateChronaSpec } from "@chrona/ui-protocol";
-import { VirtualizedCsvPreview, workspaceRegistry } from "@features/task-workspace/ui";
+import { workspaceRegistry } from "@features/task-workspace/ui";
 import {
   File,
   Search,
   PanelLeftClose,
 } from "lucide-react";
-import { MarkdownContent } from "@shared/ui";
-import { Button } from "@shared/ui";
 
+import { Button, Input } from "@shared/ui";
 
-
-
-import { Input } from "@shared/ui";
-
-
-
-
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@shared/ui";
-import { Textarea } from "@shared/ui";
 import {
   type GoalAssetWorkbenchData,
 } from "../workbench-api";
@@ -34,6 +23,11 @@ import {
   parseContent,
   type AssetWorkbenchCopy,
 } from "./goal-asset-workbench-shared";
+import { MarkdownAssetCanvas } from "./goal-asset-canvas-markdown";
+import { SpreadsheetAssetCanvas } from "./goal-asset-canvas-spreadsheet";
+
+import { csvFromGoalDataTable, goalDataTableFromCsv } from "./goal-asset-canvas-csv";
+const GoalAssetFilePreview = lazy(() => import("./goal-asset-file-preview"));
 function hydrateStructuredArtifactLinks(
   content: StructuredResultAssetContent,
   goalId: string,
@@ -91,13 +85,21 @@ function StructuredResultViewer({ value, copy, goalId, assetId, versionId, linke
   return (
     <section
       aria-label={copy.structuredResultContent}
+      data-asset-canvas="structured-result"
+      data-asset-canvas-mode="read"
       data-ui-surface-kind="ai-authored"
-      className="min-w-0 space-y-3 rounded-xl border bg-background p-4 sm:p-6"
+      className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl border bg-background shadow-xs"
     >
-      <p className="text-xs text-muted-foreground">{copy.structuredResultDescription}</p>
-      <JSONUIProvider registry={workspaceRegistry} handlers={{}}>
-        <Renderer spec={spec} registry={workspaceRegistry} />
-      </JSONUIProvider>
+      <div className="flex min-h-11 shrink-0 items-center border-b bg-muted/20 px-4 py-2">
+        <p className="text-xs text-muted-foreground">{copy.structuredResultDescription}</p>
+      </div>
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-4 py-5 sm:px-6 sm:py-6">
+        <div className="mx-auto w-full max-w-5xl">
+          <JSONUIProvider registry={workspaceRegistry} handlers={{}}>
+            <Renderer spec={spec} registry={workspaceRegistry} />
+          </JSONUIProvider>
+        </div>
+      </div>
     </section>
   );
 }
@@ -119,29 +121,67 @@ function PageAssetContent({ asset, value, copy }: { asset: GoalAssetWorkbenchDat
   return <div className="space-y-3"><div role="alert" className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm">{copy.pageSafetyWarning}</div><div className="h-full min-h-[30rem] overflow-hidden rounded-lg border bg-white"><iframe title={asset.label} sandbox="allow-scripts allow-forms allow-modals" srcDoc={source} className="h-full min-h-[30rem] w-full" /></div></div>;
 }
 
-function FileAssetContent({ asset, formalValue, csv, copy }: { asset: GoalAssetWorkbenchData; formalValue: string; csv: boolean; copy: AssetWorkbenchCopy }) {
-  if (csv) return <section aria-label={copy.csvPreview} className="min-w-0 space-y-3"><VirtualizedCsvPreview content={formalValue} contentBytes={new TextEncoder().encode(formalValue).byteLength} /></section>;
+function FileAssetContent({ asset, currentVersionId, value, formalValue, mode, csv, setValue, copy }: { asset: GoalAssetWorkbenchData; currentVersionId?: string; value: string; formalValue: string; mode: AssetCanvasMode; csv: boolean; setValue: (value: string) => void; copy: AssetWorkbenchCopy }) {
+  if (csv) {
+    const content = mode === "edit" ? value : formalValue;
+    const table = goalDataTableFromCsv(content);
+    if (!table) return <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{copy.dataTableInvalid}</p>;
+    const summary = copy.dataTableSummary.replace("{rows}", String(table.rows.length)).replace("{columns}", String(table.columns.length));
+    return (
+      <SpreadsheetAssetCanvas
+        assetId={asset.id}
+        label={asset.label}
+        locale={typeof document !== "undefined" && document.documentElement.lang.startsWith("zh") ? "zh" : "en"}
+        mode={mode}
+        table={table}
+        summary={summary}
+        onChange={(next) => setValue(csvFromGoalDataTable(next))}
+      />
+    );
+  }
+  const version = asset.versions.find((item) => item.id === currentVersionId) ?? asset.versions[0];
+  if (!version) return <GenericFileFallback asset={asset} copy={copy} />;
+  const source = `/api/goals/${encodeURIComponent(asset.goalId)}/assets/${encodeURIComponent(asset.id)}/download?versionId=${encodeURIComponent(version.id)}&mode=source`;
+  return (
+    <Suspense fallback={<GenericFileFallback asset={asset} copy={copy} />}>
+      <GoalAssetFilePreview source={source} filename={version.originalFilename ?? asset.sourceArtifact.title} mimeType={version.mimeType} locale={typeof document !== "undefined" && document.documentElement.lang.startsWith("zh") ? "zh-CN" : "en-US"} description={copy.genericFileDescription} />
+    </Suspense>
+  );
+}
+
+function GenericFileFallback({ asset, copy }: { asset: GoalAssetWorkbenchData; copy: AssetWorkbenchCopy }) {
   return <div className="flex min-h-[16rem] flex-col items-center justify-center rounded-xl border border-dashed bg-muted/20 px-5 text-center sm:min-h-[22rem]"><File className="size-14 text-muted-foreground" /><p className="mt-4 font-medium">{asset.sourceArtifact.title}</p><p className="mt-1 max-w-md text-sm text-muted-foreground">{copy.genericFileDescription}</p></div>;
 }
 
-function DataTableAssetContent({ value, setValue, copy }: { value: string; setValue: (value: string) => void; copy: AssetWorkbenchCopy }) {
+function DataTableAssetContent({ asset, value, mode, setValue, copy }: { asset: GoalAssetWorkbenchData; value: string; mode: "read" | "edit"; setValue: (value: string) => void; copy: AssetWorkbenchCopy }) {
   const parsed = goalDataTableContentSchema.safeParse(parseContent(value));
   if (!parsed.success) return <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{copy.dataTableInvalid}</p>;
-  const table = parsed.data as GoalDataTableContent;
-  const update = (next: GoalDataTableContent) => setValue(JSON.stringify(next));
-  return <section className="min-w-0 space-y-3"><div className="flex items-center justify-between"><p className="text-sm text-muted-foreground">{copy.dataTableSummary.replace("{rows}", String(table.rows.length)).replace("{columns}", String(table.columns.length))}</p><Button size="sm" variant="outline" onClick={() => update({ ...table, rows: [...table.rows, { id: crypto.randomUUID(), values: Object.fromEntries(table.columns.map((column) => [column.id, null])) }] })}>{copy.addRow}</Button></div><div className="max-h-[36rem] overflow-auto rounded-lg border"><table className="w-full min-w-max text-sm"><thead className="sticky top-0 bg-muted"><tr>{table.columns.map((column) => <th key={column.id} className="border-b px-3 py-2 text-left font-medium">{column.label}</th>)}<th className="border-b px-3 py-2" /></tr></thead><tbody>{table.rows.map((row) => <tr key={row.id} className="border-b last:border-b-0">{table.columns.map((column) => <td key={column.id} className="p-1"><Input value={row.values[column.id] == null ? "" : String(row.values[column.id])} type={column.type === "number" ? "number" : column.type === "date" ? "date" : column.type === "url" ? "url" : "text"} onChange={(event) => update({ ...table, rows: table.rows.map((candidate) => candidate.id === row.id ? { ...candidate, values: { ...candidate.values, [column.id]: column.type === "number" ? (event.target.value === "" ? null : Number(event.target.value)) : event.target.value } } : candidate) })} className="min-w-32 border-transparent bg-transparent shadow-none focus-visible:border-input" /></td>)}<td className="p-1"><Button size="sm" variant="ghost" onClick={() => update({ ...table, rows: table.rows.filter((candidate) => candidate.id !== row.id) })}>{copy.deleteRow}</Button></td></tr>)}</tbody></table></div></section>;
+  const table = parsed.data;
+  return (
+    <SpreadsheetAssetCanvas
+      assetId={asset.id}
+      label={asset.label}
+      locale={typeof document !== "undefined" && document.documentElement.lang.startsWith("zh") ? "zh" : "en"}
+      mode={mode}
+      table={table}
+      summary={copy.dataTableSummary.replace("{rows}", String(table.rows.length)).replace("{columns}", String(table.columns.length))}
+      onChange={(next) => setValue(JSON.stringify(next))}
+    />
+  );
 }
 
-function DocumentAssetContent({ value, markdown, copy, setValue }: { value: string; markdown: boolean; copy: AssetWorkbenchCopy; setValue: (value: string) => void }) {
-  if (!markdown) return <Textarea aria-label={copy.documentContent} value={value} onChange={(event) => setValue(event.target.value)} className="min-h-[30rem] resize-y font-mono text-sm leading-6" />;
-  return <Tabs defaultValue="preview" className="min-w-0"><TabsList aria-label={copy.documentViewMode}><TabsTrigger value="preview">{copy.previewMode}</TabsTrigger><TabsTrigger value="edit">{copy.editMode}</TabsTrigger></TabsList><TabsContent value="preview" className="mt-4 min-w-0 rounded-xl border bg-background px-4 py-5 sm:px-6"><MarkdownContent className="py-0 text-base leading-7 [&>div]:space-y-4">{value}</MarkdownContent></TabsContent><TabsContent value="edit" className="mt-4"><Textarea aria-label={copy.documentContent} value={value} onChange={(event) => setValue(event.target.value)} className="min-h-[30rem] resize-y font-mono text-sm leading-6" /></TabsContent></Tabs>;
+function DocumentAssetContent({ value, mode, copy, setValue }: { value: string; mode: "read" | "edit"; copy: AssetWorkbenchCopy; setValue: (value: string) => void }) {
+  return <MarkdownAssetCanvas mode={mode} value={value} ariaLabel={copy.documentContent} sourceModeLabel={copy.markdownSourceMode} richModeLabel={copy.markdownRichMode} previewModeLabel={copy.previewMode} onChange={setValue} />;
 }
+
+export type AssetCanvasMode = "read" | "edit";
 
 export function AssetContentEditor({
   asset,
   currentVersionId,
   value,
   formalValue,
+  mode,
   setValue,
   pending,
   copy,
@@ -151,20 +191,22 @@ export function AssetContentEditor({
   currentVersionId?: string;
   value: string;
   formalValue: string;
+  mode: AssetCanvasMode;
   setValue: (value: string) => void;
   pending: boolean;
   copy: AssetWorkbenchCopy;
   act: (action: () => Promise<unknown>, success: string) => Promise<void>;
 }) {
   const format = versionFormat(asset, currentVersionId);
+  if (format.csv) return <FileAssetContent asset={asset} currentVersionId={currentVersionId} value={value} formalValue={formalValue} mode={mode} csv setValue={setValue} copy={copy} />;
   if (asset.kind === "structured_result") {
     return <StructuredResultViewer value={parseContent(formalValue)} copy={copy} goalId={asset.goalId} assetId={asset.id} versionId={currentVersionId ?? ""} linkedAssets={asset.linkedAssets ?? []} />;
   }
-  if (asset.kind === "file") return <FileAssetContent asset={asset} formalValue={formalValue} csv={format.csv} copy={copy} />;
-  if (asset.kind === "data_table") return <DataTableAssetContent value={value} setValue={setValue} copy={copy} />;
+  if (asset.kind === "file") return <FileAssetContent asset={asset} currentVersionId={currentVersionId} value={value} formalValue={formalValue} mode={mode} csv={false} setValue={setValue} copy={copy} />;
+  if (asset.kind === "data_table") return <DataTableAssetContent asset={asset} value={value} mode={mode} setValue={setValue} copy={copy} />;
   if (asset.kind === "page") return <PageAssetContent asset={asset} value={value} copy={copy} />;
   if (asset.kind === "form") return <FormEditor asset={asset} currentVersionId={currentVersionId} value={value} formalValue={formalValue} setValue={setValue} pending={pending} copy={copy} act={act} />;
-  return <DocumentAssetContent value={value} markdown={format.markdown} copy={copy} setValue={setValue} />;
+  return <DocumentAssetContent value={value} mode={mode} copy={copy} setValue={setValue} />;
 }
 
 export function AssetNavigation({
