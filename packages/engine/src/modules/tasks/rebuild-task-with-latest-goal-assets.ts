@@ -72,6 +72,11 @@ export async function rebuildTaskWithLatestGoalAssets(input: {
       goalContext: expectedOutcome === undefined ? undefined : { expectedOutcome },
     }, tx);
 
+    await tx.task.update({
+      where: { id: created.taskId },
+      data: { status: "Ready" },
+    });
+
     await tx.event.update({
       where: { dedupeKey: `task.created:${created.taskId}` },
       data: {

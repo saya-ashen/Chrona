@@ -177,7 +177,10 @@ export function runPlanId(run: GoalTask["runs"][number]) {
   return typeof snapshot?.planId === "string" ? snapshot.planId : null;
 }
 
-export function acceptedPlanRun(task: GoalTask, run: GoalTask["runs"][number]) {
+export function acceptedPlanRun(
+  task: GoalTask,
+  run: GoalTask["runs"][number],
+): GoalTask["taskPlanRuns"][number] | undefined {
   const planId = runPlanId(run);
   return task.taskPlanRuns.find((planRun) =>
     planRun.workBlockId === run.workBlockId || (planId !== null && planRun.planId === planId),
@@ -186,7 +189,7 @@ export function acceptedPlanRun(task: GoalTask, run: GoalTask["runs"][number]) {
 
 export function acceptedPlanOutput(task: GoalTask, run: GoalTask["runs"][number]) {
   const planRun = acceptedPlanRun(task, run);
-  return planOutputSpec(planRun.planRun);
+  return planRun ? planOutputSpec(planRun.planRun) : null;
 }
 
 export function acceptedResultSummary(task: GoalTask, run: GoalTask["runs"][number]) {
