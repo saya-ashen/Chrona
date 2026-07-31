@@ -102,7 +102,7 @@ export async function applyGoalReview(goalId: string, command: ApplyGoalReviewRe
 }
 
 export async function generateGoalReview(goalId: string, command: GenerateGoalReviewRequest) {
-  return apiJson<{ proposalId: string; sourceTaskId: string; status: string }>(
+  return apiJson<{ proposalId: string; status: string }>(
     `/api/goals/${encodeURIComponent(goalId)}/reviews/generate`,
     { method: "POST", body: JSON.stringify(command) },
   );

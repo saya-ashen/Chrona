@@ -1,6 +1,7 @@
 import { RunStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { aiClientRegistry } from "@/modules/ai";
+import type { EngineAiClient } from "@/modules/ai";
 import type { ProviderRunSnapshot } from "@chrona/providers-foundation";
 import { syncPlanRunRuntimeResult } from "../../kernel/sync-runtime-result";
 import { syncTaskRunState } from "../../persistence/task-execution-store";
@@ -65,7 +66,7 @@ async function findRunningProviderRuns(input: { taskId?: string; limit?: number 
       ],
     },
     include: {
-      task: { select: { executionRuntime: true, defaultSessionId: true, latestRunId: true, status: true } },
+      task: { select: { executionRuntime: true, defaultSessionId: true, latestRunId: true, status: true, aiClientId: true } },
       nodeAttempt: { select: { nodeId: true } },
     },
     orderBy: { updatedAt: "asc" },
@@ -109,9 +110,23 @@ async function reconcileProviderRun(providerRun: RunningProviderRun): Promise<Re
   }
   if (run.status !== RunStatus.Running) return "skipped";
   const runtimeName = providerRun.runtimeName ?? run.runtimeName;
-  const client = await providerClientForRuntime(runtimeName);
+  const providerName = await persistedProviderName(providerRun);
+  const client = await providerClientForRecovery({
+    runtimeName,
+    providerName,
+    aiClientId: providerRun.task.aiClientId,
+  });
   if (!client) {
-    return "skipped";
+    const reason = `Runtime run ${runtimeRunRef} was interrupted, but no enabled AI client can recover provider ${providerName ?? runtimeName}.`;
+    await markRunFailed({ run, reason, retryable: true });
+    await syncPlanRunRuntimeResult({
+      taskId: providerRun.taskId,
+      runtimeRunRef,
+      status: "Failed",
+      error: reason,
+    });
+    await syncCanonicalRunProjection(run, RunStatus.Failed, "degraded");
+    return "synced";
   }
 
   const capabilities = typeof client.getCapabilities === "function" ? await client.getCapabilities() : undefined;
@@ -188,18 +203,67 @@ async function reconcileTerminalProviderRecord(input: {
   return "synced";
 }
 
-async function providerClientForRuntime(runtimeName: string) {
-  const defaultClient = await aiClientRegistry.get();
-  if (defaultClient?.record.type === runtimeName && defaultClient.providerClient) {
-    return defaultClient.providerClient;
+async function persistedProviderName(providerRun: RunningProviderRun): Promise<string | null> {
+  if (providerRun.lastRawEventId) {
+    const lastEvent = await db.rawEventLog.findUnique({
+      where: { id: providerRun.lastRawEventId },
+      select: { provider: true },
+    });
+    if (lastEvent?.provider?.trim()) return lastEvent.provider.trim();
   }
 
-  const clients = await aiClientRegistry.list();
-  const matchingClient = clients.find((client) => client.type === runtimeName && client.enabled);
-  if (!matchingClient) return null;
+  const providerEvent = await db.rawEventLog.findFirst({
+    where: { providerRunId: providerRun.id, provider: { not: null } },
+    orderBy: { occurredAt: "desc" },
+    select: { provider: true },
+  });
+  return providerEvent?.provider?.trim() || null;
+}
 
-  const resolvedClient = await aiClientRegistry.get(matchingClient.id);
-  return resolvedClient?.providerClient ?? null;
+type RecoveryClient = EngineAiClient;
+
+export function selectRecoveryProviderClient(input: {
+  runtimeName: string;
+  providerName: string | null;
+  taskClient: RecoveryClient | null;
+  defaultClient: RecoveryClient | null;
+  enabledClients: RecoveryClient[];
+}) {
+  const candidates = [input.taskClient, input.defaultClient, ...input.enabledClients]
+    .filter((client): client is RecoveryClient => client !== null && client.providerClient !== null);
+  const providerMatch = input.providerName
+    ? candidates.find((client) => client.providerClient?.provider === input.providerName || client.record.type === input.providerName)
+    : undefined;
+  if (providerMatch?.providerClient) return providerMatch.providerClient;
+  if (input.providerName) return null;
+
+  if (input.taskClient?.providerClient) return input.taskClient.providerClient;
+  if (input.defaultClient?.providerClient) return input.defaultClient.providerClient;
+  return candidates.find((client) => client.record.type === input.runtimeName)?.providerClient ?? null;
+}
+
+async function providerClientForRecovery(input: {
+  runtimeName: string;
+  providerName: string | null;
+  aiClientId: string | null;
+}) {
+  const [taskClient, defaultClient, clientRecords] = await Promise.all([
+    input.aiClientId ? aiClientRegistry.get(input.aiClientId) : Promise.resolve(null),
+    aiClientRegistry.get(),
+    aiClientRegistry.list(),
+  ]);
+  const enabledClients = await Promise.all(
+    clientRecords
+      .filter((client) => client.enabled)
+      .map((client) => aiClientRegistry.get(client.id)),
+  );
+  return selectRecoveryProviderClient({
+    runtimeName: input.runtimeName,
+    providerName: input.providerName,
+    taskClient,
+    defaultClient,
+    enabledClients: enabledClients.filter((client): client is RecoveryClient => client !== null),
+  });
 }
 
 async function reconcileSnapshot(input: {

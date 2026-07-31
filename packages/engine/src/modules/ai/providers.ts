@@ -602,6 +602,51 @@ async function providerFeaturePayloadFull<T>(
     },
   };
 }
+export async function dispatchPreparedFeaturePayload<T = unknown>(
+  client: EngineAiClient,
+  featureSpec: PreparedAiFeatureSpec,
+  scope: string,
+  options?: {
+    toolPolicy?: "full" | "read_only";
+    timeoutSeconds?: number;
+    maxOutputTokens?: number;
+  },
+): Promise<FeaturePayloadResult<T>> {
+  if (client.providerClient) {
+    return providerFeaturePayloadFull<T>(
+      client,
+      featureSpec.feature,
+      buildProviderFeatureRequest({
+        sessionKey: scope,
+        input: featureSpec.inputText,
+        featureSpec,
+        stream: false,
+        toolPolicy: options?.toolPolicy,
+        timeoutSeconds: options?.timeoutSeconds,
+        maxOutputTokens: options?.maxOutputTokens,
+      }),
+      featureSpec,
+    );
+  }
+
+  const llmClient = aiClientRegistry.requireLlmClient(client);
+  const text = await llmCall(
+    llmClient.record.config,
+    featureSpec.instructions,
+    featureSpec.inputText ?? "",
+    { jsonMode: true },
+  );
+  const parsed = extractJSON(text);
+  const validation = validatePreparedFeaturePayload(featureSpec, parsed);
+  if (!validation.ok) {
+    throw new AiClientError(
+      validation.error,
+      client.record.type,
+      "invalid_response",
+    );
+  }
+  return { parsed: parsed as T, rawText: text };
+}
 
 function getStructuredField(payload: unknown, field: string): unknown {
   return payload && typeof payload === "object" && field in payload

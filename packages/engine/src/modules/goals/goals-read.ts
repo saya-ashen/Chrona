@@ -117,19 +117,21 @@ export function eventReadModels(goal: GoalWithDetails) {
 }
 
 export function reviewProposalReadModel(proposal: GoalWithDetails["reviewProposals"][number]) {
-  const sourceRun = proposal.sourceTask.runs[0];
+  const sourceRun = proposal.sourceTask?.runs[0] ?? null;
   return {
     id: proposal.id,
     status: proposal.status,
     sourceTaskId: proposal.sourceTaskId,
     sourceRunId: proposal.sourceRunId,
-    sourceTask: {
-      id: proposal.sourceTask.id,
-      title: proposal.sourceTask.title,
-      status: proposal.sourceTask.status,
-      latestRunId: proposal.sourceTask.latestRunId,
-      latestRun: { id: sourceRun.id, status: sourceRun.status, errorSummary: sourceRun.errorSummary },
-    },
+    sourceTask: proposal.sourceTask
+      ? {
+          id: proposal.sourceTask.id,
+          title: proposal.sourceTask.title,
+          status: proposal.sourceTask.status,
+          latestRunId: proposal.sourceTask.latestRunId,
+          latestRun: sourceRun ? { id: sourceRun.id, status: sourceRun.status, errorSummary: sourceRun.errorSummary } : null,
+        }
+      : null,
     inputSnapshotHash: proposal.inputSnapshotHash,
     schemaVersion: proposal.schemaVersion,
     providerName: proposal.providerName,

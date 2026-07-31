@@ -26,6 +26,7 @@ export {
   buildProviderFeatureRequest,
   dispatch,
   dispatchFeaturePayload,
+  dispatchPreparedFeaturePayload,
 } from "./providers";
 export { createProviderStreamEventBoundary, ProviderStreamContractError } from "./provider-stream-contract";
 export type { ProviderStreamEventBoundary } from "./provider-stream-contract";

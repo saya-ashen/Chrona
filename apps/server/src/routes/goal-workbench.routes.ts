@@ -9,6 +9,7 @@ import {
   createGoalAssetReviewBodySchema,
   createGoalAssetJobBodySchema,
   createGoalFormSubmissionBodySchema,
+  discardGoalAssetDraftBodySchema,
   generateGoalAssetOwnershipBodySchema,
   listGoalAssetsQuerySchema,
   resolveGoalInboxCandidateBodySchema,
@@ -70,6 +71,10 @@ export function createGoalWorkbenchRoutes(engine: ChronaEngine) {
     .post("/goals/:goalId/assets/:assetId/drafts/submit", zValidator("param", assetParam), zValidator("json", submitGoalAssetDraftBodySchema), async (c) => {
       try { return json(c, await engine.goals.workbench.submitDraft({ ...c.req.valid("param"), command: c.req.valid("json") })); }
       catch (cause) { return fail(c, "POST /api/goals/:goalId/assets/:assetId/drafts/submit", cause); }
+    })
+    .post("/goals/:goalId/assets/:assetId/drafts/discard", zValidator("param", assetParam), zValidator("json", discardGoalAssetDraftBodySchema), async (c) => {
+      try { return json(c, await engine.goals.workbench.discardDraft({ ...c.req.valid("param"), ...c.req.valid("json") })); }
+      catch (cause) { return fail(c, "POST /api/goals/:goalId/assets/:assetId/drafts/discard", cause); }
     })
     .post("/goals/:goalId/assets/:assetId/versions/:versionId/restore", zValidator("param", versionParam), zValidator("json", restoreGoalAssetVersionBodySchema), async (c) => {
       try { return json(c, await engine.goals.workbench.restoreVersion({ ...c.req.valid("param"), ...c.req.valid("json") })); }

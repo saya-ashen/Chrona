@@ -10,10 +10,10 @@ import {
   type ResolveGoalInboxCandidateRequest,
 } from "@chrona/contracts";
 import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
-import { getAiClientForTask } from "../ai";
-import { AiRuntimeInvoker } from "../plan-execution/ai-runtime-invoker";
-import { rebuildTaskProjection } from "../projections/rebuild-task-projection";
-import { createTask } from "../tasks/create-task";
+import {
+  dispatchPreparedFeaturePayload,
+  getAiClientForFeature,
+} from "../ai";
 import { resolveGoalInboxCandidate } from "./goal-workbench";
 
 const SCHEMA_VERSION = 1;
@@ -75,13 +75,6 @@ function record(value: unknown): Record<string, unknown> | null {
     : null;
 }
 
-function normalizeStructuredPayload(value: unknown): unknown {
-  const candidate = record(value);
-  if (!candidate) return value;
-  const nested =
-    candidate.result ?? candidate.output ?? candidate.payload ?? candidate.arguments;
-  return nested && typeof nested === "object" ? nested : value;
-}
 
 async function snapshotCandidate(input: {
   goalId: string;
@@ -202,44 +195,18 @@ export async function generateGoalAssetOwnership(input: {
       },
     },
   });
-  if (existing) {
-    return {
-      proposalId: existing.id,
-      sourceTaskId: existing.sourceTaskId,
-      status: existing.status,
-    };
-  }
+  if (existing) return { proposalId: existing.id, status: existing.status };
 
   const snapshot = await snapshotCandidate({
     goalId: input.goalId,
     candidateId: input.candidateId,
     workspaceId: input.command.workspaceId,
   });
-  const goal = await db.goal.findUniqueOrThrow({
-    where: { id: input.goalId },
-    select: { title: true },
-  });
-  const createdTask = await createTask({
-    workspaceId: input.command.workspaceId,
-    goalId: input.goalId,
-    title: `Review asset ownership: ${snapshot.candidate.label}`,
-    description: `Read the frozen accepted result and candidate assets for Goal “${goal.title}”, then produce one structured ownership recommendation without mutating Goal state.`,
-    priority: "Medium",
-    autoPlanGeneration: false,
-    autoExecute: false,
-    goalContext: asJsonObject({
-      kind: "goal_asset_ownership",
-      readOnly: true,
-      snapshot,
-      snapshotHash: hashValue(snapshot),
-    }),
-  });
   const proposal = await db.goalAssetOwnershipProposal.create({
     data: {
       workspaceId: input.command.workspaceId,
       goalId: input.goalId,
       inboxCandidateId: input.candidateId,
-      sourceTaskId: createdTask.taskId,
       inputSnapshot: asJsonObject(snapshot),
       inputHash: hashValue(snapshot),
       requestIdempotencyKey: input.command.idempotencyKey,
@@ -250,7 +217,6 @@ export async function generateGoalAssetOwnership(input: {
     data: {
       eventType: "goal.asset_ownership_generation_started",
       workspaceId: input.command.workspaceId,
-      taskId: createdTask.taskId,
       actorType: "user",
       actorId: "server-action",
       source: "ui",
@@ -263,19 +229,12 @@ export async function generateGoalAssetOwnership(input: {
       ingestSequence: 0,
     },
   });
-
-  const generationPromise = runGoalAssetOwnershipGeneration({
-    proposalId: proposal.id,
-  });
+  const generationPromise = runGoalAssetOwnershipGeneration({ proposalId: proposal.id });
   generationPromises.set(proposal.id, generationPromise);
   void generationPromise
     .finally(() => generationPromises.delete(proposal.id))
     .catch(() => undefined);
-  return {
-    proposalId: proposal.id,
-    sourceTaskId: proposal.sourceTaskId,
-    status: proposal.status,
-  };
+  return { proposalId: proposal.id, status: proposal.status };
 }
 
 export async function runGoalAssetOwnershipGeneration(input: {
@@ -283,25 +242,13 @@ export async function runGoalAssetOwnershipGeneration(input: {
 }) {
   const proposal = await db.goalAssetOwnershipProposal.findUnique({
     where: { id: input.proposalId },
-    include: {
-      sourceTask: {
-        include: { sessions: { orderBy: { createdAt: "asc" }, take: 1 } },
-      },
-    },
   });
   if (!proposal || proposal.status !== "Generating") return proposal;
-  const session = proposal.sourceTask.sessions[0];
-  if (!session) throw new Error("Asset Ownership Task has no runtime session");
 
   try {
-    const client = await getAiClientForTask({
-      taskId: proposal.sourceTaskId,
-      purpose: "goal.asset_ownership",
-    });
-    if (!client?.providerClient) {
-      throw new Error(
-        "No provider AI client is configured for Asset Ownership",
-      );
+    const client = await getAiClientForFeature("goal.asset_ownership");
+    if (!client) {
+      throw new Error("No AI client is configured for Asset Ownership");
     }
     const featureSpec = buildGoalAssetOwnershipFeatureSpec();
     featureSpec.inputText = JSON.stringify(
@@ -313,30 +260,13 @@ export async function runGoalAssetOwnershipGeneration(input: {
       null,
       2,
     );
-    const invocation = await new AiRuntimeInvoker().invoke({
-      taskId: proposal.sourceTaskId,
-      taskSessionId: session.id,
-      runtimeName: proposal.sourceTask.executionRuntime,
-      runtimeSessionKey: session.sessionKey,
-      runtimeInput: {
-        snapshot: proposal.inputSnapshot,
-        snapshotHash: proposal.inputHash,
-        schemaVersion: SCHEMA_VERSION,
-      },
-      instructions: featureSpec.instructions,
+    const invocation = await dispatchPreparedFeaturePayload<GoalAssetOwnershipResult>(
+      client,
       featureSpec,
-      triggeredBy: "user",
-      clientId: client.record.id,
-    });
-    if (invocation.response.error || invocation.response.status !== "completed") {
-      throw new Error(
-        invocation.response.error ??
-          `Asset Ownership provider ended with status ${invocation.response.status}`,
-      );
-    }
-    const parsed = goalAssetOwnershipResultSchema.safeParse(
-      normalizeStructuredPayload(invocation.response.structuredPayload),
+      `goal-asset-ownership:${proposal.id}`,
+      { toolPolicy: "read_only" },
     );
+    const parsed = goalAssetOwnershipResultSchema.safeParse(invocation.parsed);
     if (!parsed.success) {
       throw new Error(
         `Asset Ownership returned an invalid structured result: ${parsed.error.issues
@@ -357,7 +287,6 @@ export async function runGoalAssetOwnershipGeneration(input: {
         await tx.goalAssetOwnershipProposal.update({
           where: { id: proposal.id },
           data: {
-            sourceRunId: invocation.runId,
             status: "Ready",
             result: asJsonObject(parsed.data),
             decision: parsed.data.decision,
@@ -368,24 +297,20 @@ export async function runGoalAssetOwnershipGeneration(input: {
             readyAt: new Date(),
           },
         });
-        await tx.task.update({
-          where: { id: proposal.sourceTaskId },
-          data: { completedAt: new Date() },
-        });
         await tx.event.create({
           data: {
             eventType: "goal.asset_ownership_proposal_ready",
             workspaceId: proposal.workspaceId,
-            taskId: proposal.sourceTaskId,
-            runId: invocation.runId,
             actorType: "agent",
-            actorId: invocation.providerName,
-            source: "plan_execution",
+            actorId: client.record.type,
+            source: "ai_feature",
             payload: {
               goal_id: proposal.goalId,
               candidate_id: proposal.inboxCandidateId,
               proposal_id: proposal.id,
               decision: parsed.data.decision,
+              provider_client_id: client.record.id,
+              provider_run_id: invocation.debug?.runId ?? null,
             },
             summary: parsed.data.rationale,
             dedupeKey: `goal.asset_ownership_proposal_ready:${proposal.id}`,
@@ -395,10 +320,7 @@ export async function runGoalAssetOwnershipGeneration(input: {
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable },
     );
-    await rebuildTaskProjection(proposal.sourceTaskId);
-    return db.goalAssetOwnershipProposal.findUnique({
-      where: { id: proposal.id },
-    });
+    return db.goalAssetOwnershipProposal.findUnique({ where: { id: proposal.id } });
   } catch (error) {
     const message = await markGenerationFailed(proposal.id, error);
     await db.event
@@ -406,10 +328,9 @@ export async function runGoalAssetOwnershipGeneration(input: {
         data: {
           eventType: "goal.asset_ownership_proposal_failed",
           workspaceId: proposal.workspaceId,
-          taskId: proposal.sourceTaskId,
           actorType: "system",
           actorId: "asset-ownership",
-          source: "plan_execution",
+          source: "ai_feature",
           payload: {
             goal_id: proposal.goalId,
             candidate_id: proposal.inboxCandidateId,
@@ -579,7 +500,7 @@ export async function applyGoalAssetOwnershipProposal(input: {
           ? "goal.asset_ownership_proposal_rejected"
           : "goal.asset_ownership_proposal_applied",
       workspaceId: proposal.workspaceId,
-      taskId: proposal.sourceTaskId,
+      taskId: null,
       source: "ui",
       actorType: "user",
       actorId: "server-action",

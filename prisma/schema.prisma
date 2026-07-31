@@ -506,7 +506,7 @@ model GoalReviewProposal {
   id                  String                   @id @default(cuid())
   workspaceId         String
   goalId              String
-  sourceTaskId        String                   @unique
+  sourceTaskId        String?                  @unique
   sourceRunId         String?                  @unique
   status              GoalReviewProposalStatus @default(Generating)
   inputSnapshot       Json
@@ -525,7 +525,7 @@ model GoalReviewProposal {
   updatedAt           DateTime                 @updatedAt
   workspace           Workspace                @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   goal                Goal                     @relation(fields: [goalId], references: [id], onDelete: Cascade)
-  sourceTask          Task                     @relation("GoalReviewSourceTask", fields: [sourceTaskId], references: [id], onDelete: Restrict)
+  sourceTask          Task?                    @relation("GoalReviewSourceTask", fields: [sourceTaskId], references: [id], onDelete: SetNull)
   sourceRun           Run?                     @relation("GoalReviewSourceRun", fields: [sourceRunId], references: [id], onDelete: SetNull)
   items               GoalReviewProposalItem[]
 
@@ -1666,7 +1666,7 @@ model GoalAssetOwnershipProposal {
   workspaceId           String
   goalId                String
   inboxCandidateId      String
-  sourceTaskId          String
+  sourceTaskId          String?
   sourceRunId           String?                           @unique
   status                GoalAssetOwnershipProposalStatus @default(Generating)
   schemaVersion         Int                               @default(1)
@@ -1691,7 +1691,7 @@ model GoalAssetOwnershipProposal {
   workspace      Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   goal           Goal               @relation(fields: [goalId], references: [id], onDelete: Cascade)
   inboxCandidate GoalInboxCandidate @relation(fields: [inboxCandidateId], references: [id], onDelete: Cascade)
-  sourceTask     Task               @relation(fields: [sourceTaskId], references: [id], onDelete: Cascade)
+  sourceTask     Task?              @relation(fields: [sourceTaskId], references: [id], onDelete: SetNull)
   sourceRun      Run?               @relation("GoalAssetOwnershipSourceRun", fields: [sourceRunId], references: [id], onDelete: SetNull)
   targetAsset    GoalAsset?         @relation(fields: [targetAssetId], references: [id], onDelete: SetNull)
   finalAsset     GoalAsset?         @relation("GoalAssetOwnershipFinalAsset", fields: [finalAssetId], references: [id], onDelete: SetNull)

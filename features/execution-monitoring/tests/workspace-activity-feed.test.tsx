@@ -156,7 +156,11 @@ describe("WorkspaceActivityFeed", () => {
     expect(screen.getByText("Read plan completed")).toBeInTheDocument();
     expect(screen.getByText("Read plan")).toBeInTheDocument(); // source-node badge
     expect(screen.getByText("completed")).toBeInTheDocument(); // tool-state badge
-    expect(screen.getByText("09:30:00")).toBeInTheDocument(); // derived time label
+    expect(screen.getByText(new Intl.DateTimeFormat(undefined, {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    }).format(new Date("2026-05-21T09:30:00.000Z")))).toBeInTheDocument(); // browser-local time label
     expect(screen.getByText("taskId=task-1")).toBeInTheDocument(); // ToolDetails row value
   });
 

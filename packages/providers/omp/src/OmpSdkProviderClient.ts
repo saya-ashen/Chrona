@@ -523,6 +523,15 @@ function terminalNodeToolFromSnapshot(input: { raw?: unknown }) {
 }
 
 
+function sdkModelPatternForSession(modelPattern: string | undefined, resumeSessionRef: string | undefined) {
+  // A resumed OMP session already persists its concrete model selection. Let
+  // the SDK restore that model from session history, then verify it against
+  // Chrona's task pin. Passing the pin again turns restoration into a fresh
+  // deferred lookup and can resolve to no model when the provider is supplied
+  // by the resumed session's extension/config context.
+  return resumeSessionRef ? undefined : modelPattern;
+}
+
 function assertExpectedModel(expectedModel: string | undefined, actualModel: string | null) {
   if (!expectedModel || actualModel === expectedModel) return;
   throw new Error(
@@ -549,6 +558,7 @@ export const __ompSdkProviderTestHooks = {
   terminalNodeToolFromSnapshot,
   sdkLifecycleSummary,
   assertExpectedModel,
+  sdkModelPatternForSession,
   loadSdkSettings,
 };
 
@@ -970,7 +980,7 @@ export class OmpSdkProviderClient implements AgentProviderClient {
     const { session } = await createAgentSession({
       cwd,
       agentDir,
-      modelPattern: setup.modelPattern,
+      modelPattern: sdkModelPatternForSession(setup.modelPattern, resumeSessionRef),
       ...(setup.authStorage ? { authStorage: setup.authStorage } : {}),
       ...(setup.modelRegistry ? { modelRegistry: setup.modelRegistry } : {}),
       settings,

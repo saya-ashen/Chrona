@@ -109,7 +109,7 @@ export type GoalReviewProposalData = {
     | "Rejected"
     | "Superseded"
     | "Failed";
-  sourceTaskId: string;
+  sourceTaskId: string | null;
   sourceRunId: string | null;
   sourceTask: {
     id: string;
@@ -121,7 +121,7 @@ export type GoalReviewProposalData = {
       status: string;
       errorSummary: string | null;
     } | null;
-  };
+  } | null;
   inputSnapshotHash: string;
   schemaVersion: number;
   providerName: string | null;
@@ -569,6 +569,12 @@ export type GoalCopy = {
     currentVersion: string;
     draftAvailable: string;
     noDraft: string;
+    draftChangedAt: string;
+    discardDraft: string;
+    discardDraftTitle: string;
+    discardDraftDescription: string;
+    discardDraftCancel: string;
+    draftDiscarded: string;
     originalFilename: string;
     mimeType: string;
     updated: string;

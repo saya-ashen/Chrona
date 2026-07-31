@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { WorkspaceActivityItem } from "../model/task-workspace-types";
-import { buildRenderList } from "./activity-timeline";
+import { buildRenderList, formatActivityTime } from "./activity-timeline";
 
 function activity(input: Partial<WorkspaceActivityItem> & Pick<WorkspaceActivityItem, "id">): WorkspaceActivityItem {
   return {
@@ -13,6 +13,26 @@ function activity(input: Partial<WorkspaceActivityItem> & Pick<WorkspaceActivity
     ...input,
   };
 }
+
+describe("formatActivityTime", () => {
+  it("formats ISO timestamps in the requested local time zone", () => {
+    const timestamp = "2026-07-18T10:05:06.000Z";
+    const expected = new Intl.DateTimeFormat(undefined, {
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      timeZone: "Asia/Shanghai",
+    }).format(new Date(timestamp));
+
+    expect(formatActivityTime(timestamp, "Asia/Shanghai")).toBe(expected);
+    expect(formatActivityTime(timestamp, "Asia/Shanghai")).not.toBe("10:05:06");
+  });
+
+  it("omits missing or invalid timestamps", () => {
+    expect(formatActivityTime(undefined)).toBeUndefined();
+    expect(formatActivityTime("not-a-date")).toBeUndefined();
+  });
+});
 
 describe("ActivityTimeline execution runs", () => {
   it("adds one ordered divider for each execution session", () => {

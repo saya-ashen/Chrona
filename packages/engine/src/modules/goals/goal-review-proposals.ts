@@ -9,10 +9,10 @@ import {
   type GoalReviewResult,
   type RejectGoalReviewProposalRequest,
 } from "@chrona/contracts/api";
-import { AiRuntimeInvoker } from "../plan-execution/ai-runtime-invoker";
-import { getAiClientForTask } from "../ai";
-import { createTask } from "../tasks/create-task";
-import { rebuildTaskProjection } from "../projections/rebuild-task-projection";
+import {
+  dispatchPreparedFeaturePayload,
+  getAiClientForFeature,
+} from "../ai";
 import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
 import { buildAutomaticGoalTaskContext } from "./goal-task-context";
 
@@ -219,12 +219,6 @@ function reviewJsonSchema() {
   }) as Record<string, unknown>;
 }
 
-function normalizeStructuredPayload(value: unknown): unknown {
-  const candidate = record(value);
-  if (!candidate) return value;
-  const nested = candidate.result ?? candidate.output ?? candidate.payload ?? candidate.arguments;
-  return nested && typeof nested === "object" ? nested : value;
-}
 
 async function markGenerationFailed(proposalId: string, error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
@@ -245,25 +239,14 @@ export async function generateGoalReview(input: { goalId: string; command: Gener
   const existing = await db.goalReviewProposal.findUnique({
     where: { goalId_requestIdempotencyKey: { goalId: input.goalId, requestIdempotencyKey: input.command.idempotencyKey } },
   });
-  if (existing) return { proposalId: existing.id, sourceTaskId: existing.sourceTaskId, status: existing.status };
+  if (existing) return { proposalId: existing.id, status: existing.status };
 
   const snapshot = await snapshotGoal(input.goalId);
   const goal = await db.goal.findUniqueOrThrow({ where: { id: input.goalId }, select: { workspaceId: true, title: true } });
-  const createdTask = await createTask({
-    workspaceId: goal.workspaceId,
-    goalId: input.goalId,
-    title: `Review Goal: ${goal.title}`,
-    description: "Read the frozen Goal context and produce a structured, reviewable proposal without mutating Goal state.",
-    priority: "High",
-    autoPlanGeneration: false,
-    autoExecute: false,
-    goalContext: asJsonObject({ kind: "goal_review", readOnly: true, snapshot, snapshotHash: hashValue(snapshot) }),
-  });
   const proposal = await db.goalReviewProposal.create({
     data: {
       workspaceId: goal.workspaceId,
       goalId: input.goalId,
-      sourceTaskId: createdTask.taskId,
       status: "Generating",
       inputSnapshot: asJsonObject(snapshot),
       inputSnapshotHash: hashValue(snapshot),
@@ -275,11 +258,10 @@ export async function generateGoalReview(input: { goalId: string; command: Gener
     data: {
       eventType: "goal.review_generation_started",
       workspaceId: goal.workspaceId,
-      taskId: createdTask.taskId,
       actorType: "user",
       actorId: "server-action",
       source: "ui",
-      payload: { goal_id: input.goalId, proposal_id: proposal.id, source_task_id: createdTask.taskId },
+      payload: { goal_id: input.goalId, proposal_id: proposal.id },
       summary: `Started AI review for Goal: ${goal.title}`,
       dedupeKey: `goal.review_generation_started:${proposal.id}`,
       ingestSequence: 0,
@@ -289,49 +271,40 @@ export async function generateGoalReview(input: { goalId: string; command: Gener
   const generationPromise = runGoalReviewGeneration({ proposalId: proposal.id });
   generationPromises.set(proposal.id, generationPromise);
   void generationPromise.finally(() => generationPromises.delete(proposal.id)).catch(() => undefined);
-  return { proposalId: proposal.id, sourceTaskId: proposal.sourceTaskId, status: proposal.status };
+  return { proposalId: proposal.id, status: proposal.status };
 }
 
 export async function runGoalReviewGeneration(input: { proposalId: string }) {
   const proposal = await db.goalReviewProposal.findUnique({
     where: { id: input.proposalId },
-    include: { sourceTask: { include: { sessions: { orderBy: { createdAt: "asc" }, take: 1 } } } },
   });
   if (!proposal || proposal.status !== "Generating") return proposal;
-  const session = proposal.sourceTask.sessions[0];
-  if (!session) throw new Error("Goal Review Task has no runtime session");
   try {
-    const client = await getAiClientForTask({ taskId: proposal.sourceTaskId, purpose: "goal.review" });
-    if (!client?.providerClient) throw new Error("No provider AI client is configured for Goal Review");
-    const invocation = await new AiRuntimeInvoker().invoke({
-      taskId: proposal.sourceTaskId,
-      taskSessionId: session.id,
-      runtimeName: proposal.sourceTask.executionRuntime,
-      runtimeSessionKey: session.sessionKey,
-      runtimeInput: { snapshot: proposal.inputSnapshot, snapshotHash: proposal.inputSnapshotHash, schemaVersion: REVIEW_SCHEMA_VERSION },
+    const client = await getAiClientForFeature("goal.review");
+    if (!client) throw new Error("No AI client is configured for Goal Review");
+    const featureSpec = {
+      feature: "goal.review" as const,
       instructions: goalReviewInstructions(),
-      featureSpec: {
-        feature: "goal.review",
-        instructions: goalReviewInstructions(),
-        inputText: JSON.stringify({ snapshot: proposal.inputSnapshot, snapshotHash: proposal.inputSnapshotHash }, null, 2),
-        structuredOutputSchema: {
-          name: "goal_review_result",
-          description: "A governed, itemized Goal review proposal grounded in the frozen snapshot.",
-          schema: reviewJsonSchema(),
-        },
+      inputText: JSON.stringify({ snapshot: proposal.inputSnapshot, snapshotHash: proposal.inputSnapshotHash }, null, 2),
+      structuredOutputSchema: {
+        name: "goal_review_result",
+        description: "A governed, itemized Goal review proposal grounded in the frozen snapshot.",
+        schema: reviewJsonSchema(),
       },
-      triggeredBy: "user",
-      clientId: client.record.id,
-    });
-    if (invocation.response.error || invocation.response.status !== "completed") {
-      throw new Error(invocation.response.error ?? `Goal Review provider ended with status ${invocation.response.status}`);
-    }
-    const parsed = goalReviewResultSchema.safeParse(normalizeStructuredPayload(invocation.response.structuredPayload));
+    };
+    const invocation = await dispatchPreparedFeaturePayload<GoalReviewResult>(
+      client,
+      featureSpec,
+      `goal-review:${proposal.id}`,
+      { toolPolicy: "read_only" },
+    );
+    const parsed = goalReviewResultSchema.safeParse(invocation.parsed);
     if (!parsed.success) {
       throw new Error(`Goal Review returned an invalid structured result: ${parsed.error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`).join("; ")}`);
     }
     const snapshot = proposal.inputSnapshot as unknown as ReviewSnapshot;
     const records = parsed.data.items.map((item) => itemRecord(snapshot, item));
+    const config = record(client.record.config);
     await db.$transaction(async (tx) => {
       const current = await tx.goalReviewProposal.findUnique({ where: { id: proposal.id }, select: { status: true } });
       if (current?.status !== "Generating") return;
@@ -346,35 +319,34 @@ export async function runGoalReviewGeneration(input: { proposalId: string }) {
       await tx.goalReviewProposal.update({
         where: { id: proposal.id },
         data: {
-          sourceRunId: invocation.runId,
           status: "Ready",
-          providerName: invocation.providerName,
-          modelName: typeof proposal.sourceTask.executionConfig === "object" && proposal.sourceTask.executionConfig && !Array.isArray(proposal.sourceTask.executionConfig)
-            ? String((proposal.sourceTask.executionConfig as Record<string, unknown>).model ?? "") || null
-            : null,
+          providerName: client.record.type,
+          modelName: typeof config?.model === "string" ? config.model : null,
           summary: parsed.data.summary,
           rawResult: asJsonObject(parsed.data),
           generationError: null,
         },
       });
-      await tx.task.update({ where: { id: proposal.sourceTaskId }, data: { completedAt: new Date() } });
       await tx.event.create({
         data: {
           eventType: "goal.review_proposal_ready",
           workspaceId: proposal.workspaceId,
-          taskId: proposal.sourceTaskId,
-          runId: invocation.runId,
           actorType: "agent",
-          actorId: invocation.providerName,
-          source: "plan_execution",
-          payload: { goal_id: proposal.goalId, proposal_id: proposal.id, item_count: records.length },
+          actorId: client.record.type,
+          source: "ai_feature",
+          payload: {
+            goal_id: proposal.goalId,
+            proposal_id: proposal.id,
+            item_count: records.length,
+            provider_client_id: client.record.id,
+            provider_run_id: invocation.debug?.runId ?? null,
+          },
           summary: parsed.data.summary,
           dedupeKey: `goal.review_proposal_ready:${proposal.id}`,
           ingestSequence: 0,
         },
       });
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
-    await rebuildTaskProjection(proposal.sourceTaskId);
     return db.goalReviewProposal.findUnique({ where: { id: proposal.id }, include: { items: true } });
   } catch (error) {
     const message = await markGenerationFailed(proposal.id, error);
@@ -382,10 +354,9 @@ export async function runGoalReviewGeneration(input: { proposalId: string }) {
       data: {
         eventType: "goal.review_proposal_failed",
         workspaceId: proposal.workspaceId,
-        taskId: proposal.sourceTaskId,
         actorType: "system",
         actorId: "goal-review",
-        source: "plan_execution",
+        source: "ai_feature",
         payload: { goal_id: proposal.goalId, proposal_id: proposal.id, error: message },
         summary: message,
         dedupeKey: `goal.review_proposal_failed:${proposal.id}`,

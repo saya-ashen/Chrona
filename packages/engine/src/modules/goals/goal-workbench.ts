@@ -495,6 +495,13 @@ export async function submitGoalAssetDraft(input: { goalId: string; assetId: str
   });
 }
 
+export async function discardGoalAssetDraft(input: { goalId: string; assetId: string; workspaceId: string; draftId: string }) {
+  const asset = await assetOrThrow(input.goalId, input.assetId, input.workspaceId);
+  const draft = await db.goalAssetDraft.findFirst({ where: { id: input.draftId, assetId: asset.id, status: "Active" } });
+  if (!draft) throw new EngineError(ENGINE_ERROR_CODES.VALIDATION_FAILED, "Active draft not found");
+  return db.goalAssetDraft.update({ where: { id: draft.id }, data: { status: "Discarded" } });
+}
+
 export async function restoreGoalAssetVersion(input: { goalId: string; assetId: string; versionId: string; workspaceId: string; changeSummary: string }) {
   const asset = await assetOrThrow(input.goalId, input.assetId, input.workspaceId);
   const source = await db.goalAssetVersion.findFirst({ where: { id: input.versionId, assetId: asset.id } });

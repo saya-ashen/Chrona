@@ -180,6 +180,17 @@ describe("OmpSdkProviderClient node runtime tools", () => {
   });
 
 
+  it("lets resumed sessions restore their persisted model before pin verification", () => {
+    expect(__ompSdkProviderTestHooks.sdkModelPatternForSession(
+      "OmniRoute/gpt-5.6-sol",
+      "/tmp/session.jsonl",
+    )).toBeUndefined();
+    expect(__ompSdkProviderTestHooks.sdkModelPatternForSession(
+      "OmniRoute/gpt-5.6-sol",
+      undefined,
+    )).toBe("OmniRoute/gpt-5.6-sol");
+  });
+
   it("rejects provider model drift before execution", () => {
     expect(() => __ompSdkProviderTestHooks.assertExpectedModel(
       "OmniRoute/gpt-5.6-sol",

@@ -523,6 +523,7 @@ export type {
   CreateAssetModificationTaskRequest,
   CreateAssetUseTaskRequest,
   CreateGoalAssetReviewRequest,
+  DiscardGoalAssetDraftRequest,
   CreateGoalAssetJobRequest,
   GenerateGoalAssetOwnershipRequest,
   GoalAssetOwnershipCandidate,

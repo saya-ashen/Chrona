@@ -441,17 +441,21 @@ describe("Goal Workbench API", () => {
     const { candidates } = await extracted.json() as { candidates: Array<{ id: string }> };
     const candidateId = candidates[0]!.id;
 
+    const taskCountBefore = await db.task.count();
     const generated = await post(app, `/goals/${seeded.goal.id}/inbox/${candidateId}/ownership-proposals`, {
       workspaceId: seeded.workspaceId,
       idempotencyKey: "asset-ownership-generate-1",
     });
     expect(generated.status).toBe(202);
-    const started = await generated.json() as { proposalId: string; sourceTaskId: string };
+    const started = await generated.json() as { proposalId: string };
     await waitForGoalAssetOwnershipGeneration(started.proposalId);
     const proposal = await db.goalAssetOwnershipProposal.findUniqueOrThrow({ where: { id: started.proposalId } });
     expect(proposal.status).toBe("Ready");
     expect(proposal.providerType).toBe("debug");
     expect(proposal.decision).toBe("create_asset");
+    expect(proposal.sourceTaskId).toBeNull();
+    expect(proposal.sourceRunId).toBeNull();
+    expect(await db.task.count()).toBe(taskCountBefore);
     expect(await db.goalAsset.count({ where: { goalId: seeded.goal.id } })).toBe(0);
 
     const applied = await post(app, `/goals/${seeded.goal.id}/inbox/${candidateId}/ownership-proposals/${proposal.id}/apply`, {
@@ -503,6 +507,25 @@ describe("Goal Workbench API", () => {
     expect((await post(app, `/goals/${seeded.goal.id}/inbox/${candidates[0]!.id}/resolve`, command)).status).toBe(404);
     expect(await db.goalAsset.count({ where: { goalId: seeded.goal.id } })).toBe(1);
     expect(await db.goalAssetVersion.count({ where: { goalId: seeded.goal.id } })).toBe(1);
+  });
+
+  it("discards only the active draft for the requested asset", async () => {
+    const seeded = await seedGoalResult();
+    const firstAsset = await db.goalAsset.create({ data: { workspaceId: seeded.workspaceId, goalId: seeded.goal.id, sourceArtifactId: seeded.artifact.id, currentArtifactId: seeded.artifact.id, kind: "document", role: "working_document", status: "Approved", label: "First brief" } });
+    const secondAsset = await db.goalAsset.create({ data: { workspaceId: seeded.workspaceId, goalId: seeded.goal.id, sourceArtifactId: seeded.artifact.id, currentArtifactId: seeded.artifact.id, kind: "document", role: "working_document", status: "Approved", label: "Second brief" } });
+    const firstVersion = await db.goalAssetVersion.create({ data: { workspaceId: seeded.workspaceId, goalId: seeded.goal.id, assetId: firstAsset.id, artifactId: seeded.artifact.id, version: 1, source: "inbox", content: "formal one", contentHash: "formal-one", authorType: "user" } });
+    const secondVersion = await db.goalAssetVersion.create({ data: { workspaceId: seeded.workspaceId, goalId: seeded.goal.id, assetId: secondAsset.id, artifactId: seeded.artifact.id, version: 1, source: "inbox", content: "formal two", contentHash: "formal-two", authorType: "user" } });
+    const firstDraft = await db.goalAssetDraft.create({ data: { workspaceId: seeded.workspaceId, goalId: seeded.goal.id, assetId: firstAsset.id, baseVersionId: firstVersion.id, content: "draft one", contentHash: "draft-one", authorType: "user", authorId: "test" } });
+    const secondDraft = await db.goalAssetDraft.create({ data: { workspaceId: seeded.workspaceId, goalId: seeded.goal.id, assetId: secondAsset.id, baseVersionId: secondVersion.id, content: "draft two", contentHash: "draft-two", authorType: "user", authorId: "test" } });
+    const app = createApiRouter(createChronaEngine());
+
+    const discarded = await post(app, `/goals/${seeded.goal.id}/assets/${firstAsset.id}/drafts/discard`, { workspaceId: seeded.workspaceId, draftId: firstDraft.id });
+    expect(discarded.status).toBe(200);
+    expect((await db.goalAssetDraft.findUniqueOrThrow({ where: { id: firstDraft.id } })).status).toBe("Discarded");
+    expect((await db.goalAssetDraft.findUniqueOrThrow({ where: { id: secondDraft.id } })).status).toBe("Active");
+
+    const replay = await post(app, `/goals/${seeded.goal.id}/assets/${firstAsset.id}/drafts/discard`, { workspaceId: seeded.workspaceId, draftId: firstDraft.id });
+    expect(replay.status).toBe(400);
   });
 
   it("detects optimistic conflicts and recovers old versions as new versions", async () => {

@@ -74,7 +74,7 @@ export function GoalAssetWorkbench({ goalId, workspaceId, copy, initialAssets, i
         <TabsContent value="inbox" className="space-y-4 pt-4"><InboxContent candidates={initialCandidates} goalId={goalId} workspaceId={workspaceId} assets={initialAssets} copy={copy} onRefresh={refresh} /></TabsContent>
         <TabsContent value="archived" className="space-y-4 pt-4"><ArchivedContent assets={initialAssets.filter((asset) => asset.archivedAt)} copy={copy} onSelectAsset={(assetId) => update({ asset: assetId })} /></TabsContent>
       </Tabs>
-      <Sheet open={selected !== null} onOpenChange={(open) => { if (!open) update({ asset: null }); }}><SheetContent side="right" showCloseButton={false} className="flex w-screen! max-w-none! flex-col gap-0 overflow-hidden p-0">{selected ? <AssetEditor goalId={goalId} workspaceId={workspaceId} asset={selected} assets={assetView === "archived" ? initialAssets : activeAssets} copy={copy} onSelectAsset={(assetId) => update({ asset: assetId })} onClose={() => update({ asset: null })} onRefresh={refresh} /> : null}</SheetContent></Sheet>
+      <Sheet open={selected !== null} onOpenChange={(open) => { if (!open) update({ asset: null }); }}><SheetContent side="right" showCloseButton={false} className="flex w-screen! max-w-none! flex-col gap-0 overflow-hidden p-0">{selected ? <AssetEditor key={selected.id} goalId={goalId} workspaceId={workspaceId} asset={selected} assets={assetView === "archived" ? initialAssets : activeAssets} copy={copy} onSelectAsset={(assetId) => update({ asset: assetId })} onClose={() => update({ asset: null })} onRefresh={refresh} /> : null}</SheetContent></Sheet>
     </section>
   );
 }

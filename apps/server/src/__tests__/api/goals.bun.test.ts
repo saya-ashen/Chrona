@@ -663,15 +663,19 @@ describe("Goal API", () => {
       brief: { outcome: "Durable outcome", currentFocus: "Initial focus", strategy: "Use evidence", constraints: ["No invented facts"] },
     });
 
+    const taskCountBefore = await db.task.count();
     const generation = await requestJson(app, `/goals/${goal.id}/reviews/generate`, { idempotencyKey: "goal-review-request-1" });
     expect(generation.status).toBe(202);
-    const started = await responseJson<{ proposalId: string; sourceTaskId: string }>(generation);
+    const started = await responseJson<{ proposalId: string }>(generation);
     await waitForGoalReviewGeneration(started.proposalId);
     const proposal = await db.goalReviewProposal.findUnique({ where: { id: started.proposalId }, include: { items: true } });
     expect(proposal?.status).toBe("Ready");
     expect(proposal?.providerName).toBe("debug");
     expect(proposal?.items).toHaveLength(1);
     expect(proposal?.items[0]?.kind).toBe("brief_field");
+    expect(proposal?.sourceTaskId).toBeNull();
+    expect(proposal?.sourceRunId).toBeNull();
+    expect(await db.task.count()).toBe(taskCountBefore);
 
     const apply = await requestJson(app, `/goals/${goal.id}/reviews/${started.proposalId}/apply`, {
       idempotencyKey: "goal-review-apply-1",

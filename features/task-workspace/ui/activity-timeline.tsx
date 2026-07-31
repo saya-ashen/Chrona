@@ -228,8 +228,16 @@ function toneIconClass(tone: Tone): string {
   return "bg-muted-foreground/80 text-background ring-muted-foreground/20";
 }
 
-function fmtTime(ts: string | null | undefined): string | undefined {
-  return ts ? ts.slice(11, 19) : undefined;
+export function formatActivityTime(ts: string | null | undefined, timeZone?: string): string | undefined {
+  if (!ts) return undefined;
+  const date = new Date(ts);
+  if (Number.isNaN(date.getTime())) return undefined;
+  return new Intl.DateTimeFormat(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    timeZone,
+  }).format(date);
 }
 
 function fmtDuration(ms?: number): string | undefined {
@@ -319,7 +327,7 @@ function NodeHeaderRow({ nodeTitle, isLast }: { nodeTitle: string; isLast: boole
 function SingleEventRow({ item, isLast, compact }: { item: WorkspaceActivityItem; isLast: boolean; compact: boolean }) {
   const tone = item.tone as Tone;
   const Icon = entryIcon(item.kind, tone);
-  const time = fmtTime(item.timestamp);
+  const time = formatActivityTime(item.timestamp);
   const text = item.kind === "provider_run" && item.summary === item.provider
     ? undefined
     : item.assistant?.text ?? (item.summary && item.summary !== item.title ? item.summary : undefined);
@@ -405,7 +413,7 @@ function ToolPairRow({
   const [detailsOpen, setDetailsOpen] = useState(failed);
   const done = !!completed;
   const duration = fmtDuration(tool?.durationMs);
-  const time = fmtTime(started.timestamp);
+  const time = formatActivityTime(started.timestamp);
   const iconTone: Tone = failed ? "danger" : done ? "success" : "neutral";
   const latestUpdate = progress.findLast((item) => item.tool?.preview)?.tool?.preview;
   const detailPreviews = [
@@ -512,7 +520,7 @@ function ToolPairRow({
 function PlanPhaseEvent({ item, compact }: { item: WorkspaceActivityItem; compact: boolean }) {
   const milestone = isPlanGenerationMilestone(item);
   const text = getPlanPhaseEventText(item);
-  const time = fmtTime(item.timestamp);
+  const time = formatActivityTime(item.timestamp);
   const title = milestone ? item.title : text;
   const detail = getPlanPhaseEventDetail(item, text, milestone, compact);
 
@@ -624,9 +632,7 @@ function ExecutionHeaderRow() {
 }
 
 function RunDividerRow({ runNumber, restarted, timestamp }: { runNumber: number; restarted: boolean; timestamp?: string | null }) {
-  const time = timestamp
-    ? new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(new Date(timestamp))
-    : null;
+  const time = formatActivityTime(timestamp);
   return (
     <div className="my-3 flex items-center gap-2" role="separator" aria-label={`${restarted ? "Run restarted from beginning" : "Execution started"} · Run ${runNumber}`}>
       <span className="h-px flex-1 bg-border" />
@@ -683,7 +689,7 @@ function railDetail(entry: RenderEntry) {
         return duration ? `done · ${duration}` : "done";
       }
       if (item.tool?.state === "started" || item.tool?.state === "progress") return item.summary || "running";
-      return item.assistant?.text ?? (item.summary && item.summary !== item.title ? item.summary : item.provider ?? fmtTime(item.timestamp));
+      return item.assistant?.text ?? (item.summary && item.summary !== item.title ? item.summary : item.provider ?? formatActivityTime(item.timestamp));
     }
   }
 }

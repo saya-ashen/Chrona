@@ -121,10 +121,9 @@ function PageAssetContent({ asset, value, copy }: { asset: GoalAssetWorkbenchDat
   return <div className="space-y-3"><div role="alert" className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-sm">{copy.pageSafetyWarning}</div><div className="h-full min-h-[30rem] overflow-hidden rounded-lg border bg-white"><iframe title={asset.label} sandbox="allow-scripts allow-forms allow-modals" srcDoc={source} className="h-full min-h-[30rem] w-full" /></div></div>;
 }
 
-function FileAssetContent({ asset, currentVersionId, value, formalValue, mode, csv, setValue, copy }: { asset: GoalAssetWorkbenchData; currentVersionId?: string; value: string; formalValue: string; mode: AssetCanvasMode; csv: boolean; setValue: (value: string) => void; copy: AssetWorkbenchCopy }) {
+function FileAssetContent({ asset, currentVersionId, value, csv, editable, setValue, copy }: { asset: GoalAssetWorkbenchData; currentVersionId?: string; value: string; csv: boolean; editable: boolean; setValue: (value: string) => void; copy: AssetWorkbenchCopy }) {
   if (csv) {
-    const content = mode === "edit" ? value : formalValue;
-    const table = goalDataTableFromCsv(content);
+    const table = goalDataTableFromCsv(value);
     if (!table) return <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{copy.dataTableInvalid}</p>;
     const summary = copy.dataTableSummary.replace("{rows}", String(table.rows.length)).replace("{columns}", String(table.columns.length));
     return (
@@ -132,7 +131,7 @@ function FileAssetContent({ asset, currentVersionId, value, formalValue, mode, c
         assetId={asset.id}
         label={asset.label}
         locale={typeof document !== "undefined" && document.documentElement.lang.startsWith("zh") ? "zh" : "en"}
-        mode={mode}
+        mode={editable ? "edit" : "read"}
         table={table}
         summary={summary}
         onChange={(next) => setValue(csvFromGoalDataTable(next))}
@@ -153,7 +152,7 @@ function GenericFileFallback({ asset, copy }: { asset: GoalAssetWorkbenchData; c
   return <div className="flex min-h-[16rem] flex-col items-center justify-center rounded-xl border border-dashed bg-muted/20 px-5 text-center sm:min-h-[22rem]"><File className="size-14 text-muted-foreground" /><p className="mt-4 font-medium">{asset.sourceArtifact.title}</p><p className="mt-1 max-w-md text-sm text-muted-foreground">{copy.genericFileDescription}</p></div>;
 }
 
-function DataTableAssetContent({ asset, value, mode, setValue, copy }: { asset: GoalAssetWorkbenchData; value: string; mode: "read" | "edit"; setValue: (value: string) => void; copy: AssetWorkbenchCopy }) {
+function DataTableAssetContent({ asset, value, editable, setValue, copy }: { asset: GoalAssetWorkbenchData; value: string; editable: boolean; setValue: (value: string) => void; copy: AssetWorkbenchCopy }) {
   const parsed = goalDataTableContentSchema.safeParse(parseContent(value));
   if (!parsed.success) return <p role="alert" className="rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">{copy.dataTableInvalid}</p>;
   const table = parsed.data;
@@ -162,7 +161,7 @@ function DataTableAssetContent({ asset, value, mode, setValue, copy }: { asset: 
       assetId={asset.id}
       label={asset.label}
       locale={typeof document !== "undefined" && document.documentElement.lang.startsWith("zh") ? "zh" : "en"}
-      mode={mode}
+      mode={editable ? "edit" : "read"}
       table={table}
       summary={copy.dataTableSummary.replace("{rows}", String(table.rows.length)).replace("{columns}", String(table.columns.length))}
       onChange={(next) => setValue(JSON.stringify(next))}
@@ -170,18 +169,16 @@ function DataTableAssetContent({ asset, value, mode, setValue, copy }: { asset: 
   );
 }
 
-function DocumentAssetContent({ value, mode, copy, setValue }: { value: string; mode: "read" | "edit"; copy: AssetWorkbenchCopy; setValue: (value: string) => void }) {
-  return <MarkdownAssetCanvas mode={mode} value={value} ariaLabel={copy.documentContent} sourceModeLabel={copy.markdownSourceMode} richModeLabel={copy.markdownRichMode} previewModeLabel={copy.previewMode} onChange={setValue} />;
+function DocumentAssetContent({ value, copy, setValue }: { value: string; copy: AssetWorkbenchCopy; setValue: (value: string) => void }) {
+  return <MarkdownAssetCanvas value={value} ariaLabel={copy.documentContent} onChange={setValue} />;
 }
-
-export type AssetCanvasMode = "read" | "edit";
 
 export function AssetContentEditor({
   asset,
   currentVersionId,
   value,
   formalValue,
-  mode,
+  editable,
   setValue,
   pending,
   copy,
@@ -191,22 +188,22 @@ export function AssetContentEditor({
   currentVersionId?: string;
   value: string;
   formalValue: string;
-  mode: AssetCanvasMode;
+  editable: boolean;
   setValue: (value: string) => void;
   pending: boolean;
   copy: AssetWorkbenchCopy;
   act: (action: () => Promise<unknown>, success: string) => Promise<void>;
 }) {
   const format = versionFormat(asset, currentVersionId);
-  if (format.csv) return <FileAssetContent asset={asset} currentVersionId={currentVersionId} value={value} formalValue={formalValue} mode={mode} csv setValue={setValue} copy={copy} />;
+  if (format.csv) return <FileAssetContent asset={asset} currentVersionId={currentVersionId} value={value} csv editable={editable} setValue={setValue} copy={copy} />;
   if (asset.kind === "structured_result") {
     return <StructuredResultViewer value={parseContent(formalValue)} copy={copy} goalId={asset.goalId} assetId={asset.id} versionId={currentVersionId ?? ""} linkedAssets={asset.linkedAssets ?? []} />;
   }
-  if (asset.kind === "file") return <FileAssetContent asset={asset} currentVersionId={currentVersionId} value={value} formalValue={formalValue} mode={mode} csv={false} setValue={setValue} copy={copy} />;
-  if (asset.kind === "data_table") return <DataTableAssetContent asset={asset} value={value} mode={mode} setValue={setValue} copy={copy} />;
+  if (asset.kind === "file") return <FileAssetContent asset={asset} currentVersionId={currentVersionId} value={value} csv={false} editable={false} setValue={setValue} copy={copy} />;
+  if (asset.kind === "data_table") return <DataTableAssetContent asset={asset} value={value} editable={editable} setValue={setValue} copy={copy} />;
   if (asset.kind === "page") return <PageAssetContent asset={asset} value={value} copy={copy} />;
   if (asset.kind === "form") return <FormEditor asset={asset} currentVersionId={currentVersionId} value={value} formalValue={formalValue} setValue={setValue} pending={pending} copy={copy} act={act} />;
-  return <DocumentAssetContent value={value} mode={mode} copy={copy} setValue={setValue} />;
+  return <DocumentAssetContent value={value} copy={copy} setValue={setValue} />;
 }
 
 export function AssetNavigation({

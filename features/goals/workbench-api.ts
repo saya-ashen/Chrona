@@ -2,6 +2,7 @@ import { apiJson } from "@shared/http";
 import type {
   ApplyGoalAssetOwnershipRequest,
   CreateAssetModificationTaskRequest,
+  DiscardGoalAssetDraftRequest,
   CreateAssetUseTaskRequest,
   CreateGoalAssetReviewRequest,
   CreateGoalAssetJobRequest,
@@ -56,7 +57,7 @@ export type GoalAssetWorkbenchData = {
 export type GoalAssetOwnershipProposalData = {
   id: string;
   status: "Generating" | "Ready" | "Applied" | "Rejected" | "Stale" | "Failed";
-  sourceTaskId: string;
+  sourceTaskId: string | null;
   sourceRunId: string | null;
   providerType: string | null;
   model: string | null;
@@ -101,12 +102,13 @@ export async function getGoalAsset(goalId: string, assetId: string) { return api
 export async function renameGoalAsset(goalId: string, assetId: string, label: string, description?: string | null) { return apiJson<GoalAssetWorkbenchData>(`/api/goals/${encodeURIComponent(goalId)}/assets/${encodeURIComponent(assetId)}`, { method: "PATCH", body: JSON.stringify({ label, ...(description !== undefined ? { description } : {}) }) }); }
 export async function saveGoalAssetDraft(goalId: string, assetId: string, command: SaveGoalAssetDraftRequest) { return apiJson<GoalAssetDraftData>(`/api/goals/${encodeURIComponent(goalId)}/assets/${encodeURIComponent(assetId)}/drafts`, { method: "POST", body: JSON.stringify(command) }); }
 export async function submitGoalAssetDraft(goalId: string, assetId: string, command: SubmitGoalAssetDraftRequest) { return apiJson<GoalAssetVersionData>(`/api/goals/${encodeURIComponent(goalId)}/assets/${encodeURIComponent(assetId)}/drafts/submit`, { method: "POST", body: JSON.stringify(command) }); }
+export async function discardGoalAssetDraft(goalId: string, assetId: string, command: DiscardGoalAssetDraftRequest) { return apiJson<GoalAssetDraftData>(`/api/goals/${encodeURIComponent(goalId)}/assets/${encodeURIComponent(assetId)}/drafts/discard`, { method: "POST", body: JSON.stringify(command) }); }
 export async function restoreGoalAssetVersion(goalId: string, assetId: string, versionId: string, workspaceId: string, changeSummary: string) { return apiJson<GoalAssetVersionData>(`/api/goals/${encodeURIComponent(goalId)}/assets/${encodeURIComponent(assetId)}/versions/${encodeURIComponent(versionId)}/restore`, { method: "POST", body: JSON.stringify({ workspaceId, changeSummary }) }); }
 export async function archiveGoalAsset(goalId: string, assetId: string, workspaceId: string, action: "archive" | "restore") { return apiJson(`/api/goals/${encodeURIComponent(goalId)}/assets/${encodeURIComponent(assetId)}/archive`, { method: "POST", body: JSON.stringify({ workspaceId, action }) }); }
 export async function listGoalInbox(goalId: string, workspaceId: string) { return apiJson<{ candidates: GoalInboxCandidateData[] }>(`/api/goals/${encodeURIComponent(goalId)}/inbox?workspaceId=${encodeURIComponent(workspaceId)}`); }
 export async function extractGoalInboxCandidates(goalId: string, taskId: string, runId: string) { return apiJson<{ candidates: GoalInboxCandidateData[] }>(`/api/goals/${encodeURIComponent(goalId)}/inbox/extract`, { method: "POST", body: JSON.stringify({ taskId, runId }) }); }
 export async function resolveGoalInboxCandidate(goalId: string, candidateId: string, command: ResolveGoalInboxCandidateRequest) { return apiJson(`/api/goals/${encodeURIComponent(goalId)}/inbox/${encodeURIComponent(candidateId)}/resolve`, { method: "POST", body: JSON.stringify(command) }); }
-export async function generateGoalAssetOwnership(goalId: string, candidateId: string, command: GenerateGoalAssetOwnershipRequest) { return apiJson<{ proposalId: string; sourceTaskId: string; status: string }>(`/api/goals/${encodeURIComponent(goalId)}/inbox/${encodeURIComponent(candidateId)}/ownership-proposals`, { method: "POST", body: JSON.stringify(command) }); }
+export async function generateGoalAssetOwnership(goalId: string, candidateId: string, command: GenerateGoalAssetOwnershipRequest) { return apiJson<{ proposalId: string; status: string }>(`/api/goals/${encodeURIComponent(goalId)}/inbox/${encodeURIComponent(candidateId)}/ownership-proposals`, { method: "POST", body: JSON.stringify(command) }); }
 export async function applyGoalAssetOwnership(goalId: string, candidateId: string, proposalId: string, command: ApplyGoalAssetOwnershipRequest) { return apiJson<GoalAssetOwnershipProposalData>(`/api/goals/${encodeURIComponent(goalId)}/inbox/${encodeURIComponent(candidateId)}/ownership-proposals/${encodeURIComponent(proposalId)}/apply`, { method: "POST", body: JSON.stringify(command) }); }
 export async function submitGoalForm(goalId: string, assetId: string, command: CreateGoalFormSubmissionRequest) { return apiJson(`/api/goals/${encodeURIComponent(goalId)}/assets/${encodeURIComponent(assetId)}/submissions`, { method: "POST", body: JSON.stringify(command) }); }
 export async function createGoalAssetJob(goalId: string, assetId: string, command: CreateGoalAssetJobRequest) { return apiJson<GoalAssetJobData>(`/api/goals/${encodeURIComponent(goalId)}/assets/${encodeURIComponent(assetId)}/jobs`, { method: "POST", body: JSON.stringify(command) }); }

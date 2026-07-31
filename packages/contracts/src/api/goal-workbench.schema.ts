@@ -91,6 +91,11 @@ export const submitGoalAssetDraftBodySchema = z.object({
   changeSummary: z.string().trim().min(1).max(2_000),
 });
 
+export const discardGoalAssetDraftBodySchema = z.object({
+  workspaceId,
+  draftId: z.string().trim().min(1),
+});
+
 export const restoreGoalAssetVersionBodySchema = z.object({
   workspaceId,
   changeSummary: z.string().trim().min(1).max(2_000),
@@ -184,6 +189,7 @@ export const createAssetModificationTaskBodySchema = z.object({
 export type GoalAssetKind = z.infer<typeof goalAssetKindSchema>;
 export type SaveGoalAssetDraftRequest = z.infer<typeof saveGoalAssetDraftBodySchema>;
 export type SubmitGoalAssetDraftRequest = z.infer<typeof submitGoalAssetDraftBodySchema>;
+export type DiscardGoalAssetDraftRequest = z.infer<typeof discardGoalAssetDraftBodySchema>;
 export type ResolveGoalInboxCandidateRequest = z.infer<typeof resolveGoalInboxCandidateBodySchema>;
 export type CreateGoalFormSubmissionRequest = z.infer<typeof createGoalFormSubmissionBodySchema>;
 export type CreateGoalAssetJobRequest = z.infer<typeof createGoalAssetJobBodySchema>;

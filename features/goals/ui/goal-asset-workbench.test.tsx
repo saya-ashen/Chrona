@@ -20,6 +20,7 @@ import type {
 
 const mocks = vi.hoisted(() => ({
   applyGoalAssetOwnership: vi.fn(async () => ({})),
+  discardGoalAssetDraft: vi.fn(async () => ({ id: "draft-discarded", status: "Discarded" })),
   generateGoalAssetOwnership: vi.fn(async () => ({})),
   saveGoalAssetDraft: vi.fn(async () => ({ id: "draft-saved" })),
   submitGoalAssetDraft: vi.fn(async () => ({ id: "version-published" })),
@@ -70,6 +71,7 @@ vi.mock("../workbench-api", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../workbench-api")>()),
   archiveGoalAsset: vi.fn(async () => ({})),
   applyGoalAssetOwnership: mocks.applyGoalAssetOwnership,
+  discardGoalAssetDraft: mocks.discardGoalAssetDraft,
   createGoalAssetJob: mocks.createGoalAssetJob,
   createGoalAssetModificationTask: vi.fn(async () => ({})),
   createGoalAssetReview: vi.fn(async () => ({})),
@@ -180,6 +182,8 @@ describe("GoalAssetWorkbench", () => {
     mocks.saveGoalAssetDraft.mockResolvedValue({ id: "draft-saved" });
     mocks.submitGoalAssetDraft.mockReset();
     mocks.submitGoalAssetDraft.mockResolvedValue({ id: "version-published" });
+    mocks.discardGoalAssetDraft.mockReset();
+    mocks.discardGoalAssetDraft.mockResolvedValue({ id: "draft-discarded", status: "Discarded" });
   });
   it("renders Office-style document and quoted CSV previews with derived types", () => {
     const document = asset("brief", "Research brief", "# Priority faculty\nContact the top-ranked labs this week.");
@@ -203,6 +207,30 @@ describe("GoalAssetWorkbench", () => {
     expect(within(spreadsheetCard).queryByText(copy.files)).not.toBeInTheDocument();
   });
 
+  it("shows draft timing and discards an autosaved draft after confirmation", async () => {
+    const document = asset("brief", "Research brief", "Formal content");
+    document.drafts = [{
+      id: "draft-brief",
+      baseVersionId: document.versions[0]!.id,
+      status: "Active",
+      content: "Draft content",
+      updatedAt: "2026-07-31T01:30:00.000Z",
+    }];
+    renderWorkbench([document], "/goals/goal-1?section=workbench&asset=brief");
+
+    expect(screen.getAllByText(copy.draftAvailable).length).toBeGreaterThan(0);
+    expect(screen.getByText(new RegExp(copy.draftChangedAt.split("{time}")[0]))).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: copy.discardDraft }));
+    const dialog = await screen.findByRole("dialog", { name: copy.discardDraftTitle });
+    expect(within(dialog).getByText(copy.discardDraftDescription)).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole("button", { name: copy.discardDraft }));
+
+    await waitFor(() => expect(mocks.discardGoalAssetDraft).toHaveBeenCalledWith("goal-1", "brief", {
+      workspaceId: "workspace-1",
+      draftId: "draft-brief",
+    }));
+  });
+
   it("autosaves after 800ms and cancels the pending timer on asset switch", async () => {
     vi.useFakeTimers();
     mocks.saveGoalAssetDraft.mockClear();
@@ -213,7 +241,6 @@ describe("GoalAssetWorkbench", () => {
       "/goals/goal-1?section=workbench&asset=first",
     );
 
-    fireEvent.click(screen.getByRole("button", { name: copy.editMode }));
     fireEvent.change(screen.getByRole("textbox", { name: copy.documentContent }), { target: { value: "Autosave first edit" } });
     await act(async () => { await vi.advanceTimersByTimeAsync(799); });
     expect(mocks.saveGoalAssetDraft).not.toHaveBeenCalled();
@@ -231,7 +258,60 @@ describe("GoalAssetWorkbench", () => {
     });
     await act(async () => { await vi.advanceTimersByTimeAsync(800); });
     expect(mocks.saveGoalAssetDraft).not.toHaveBeenCalled();
+    await act(async () => {
+      await router.navigate("/goals/goal-1?section=workbench&asset=first");
+    });
+    fireEvent.change(screen.getByRole("textbox", { name: copy.documentContent }), { target: { value: "Never save to the next asset" } });
+    await act(async () => {
+      await router.navigate("/goals/goal-1?section=workbench&asset=second");
+      await vi.advanceTimersByTimeAsync(800);
+    });
+    expect(mocks.saveGoalAssetDraft).not.toHaveBeenCalledWith("goal-1", "second", expect.anything());
+    expect(screen.getByRole("textbox", { name: copy.documentContent })).toHaveValue("Second content");
   });
+  it("renders the selected asset content immediately when switching asset kinds", async () => {
+    const structured = asset(
+      "guide",
+      "PhD channel guide",
+      {
+        format: "chrona-json-render",
+        schemaVersion: 1,
+        catalogVersion: "1.0.0",
+        summary: "Guide ready",
+        spec: {
+          root: "root",
+          elements: {
+            root: {
+              type: "ResultSummary",
+              props: { text: "Structured guide content" },
+            },
+          },
+        },
+        artifactRefs: [],
+      },
+      1,
+      "structured_result",
+    );
+    const tracker = asset("tracker", "Faculty priority tracker", {
+      schemaVersion: 1,
+      columns: [{ id: "faculty", label: "Faculty", type: "text" }],
+      rows: [{ id: "row-1", values: { faculty: "Priority professor" } }],
+    }, 1, "data_table");
+    const router = renderWorkbench(
+      [structured, tracker],
+      "/goals/goal-1?section=workbench&asset=guide",
+    );
+
+    expect(await screen.findByText("Structured guide content")).toBeInTheDocument();
+    await act(async () => {
+      await router.navigate("/goals/goal-1?section=workbench&asset=tracker");
+    });
+
+    expect(document.querySelector('[data-asset-canvas="spreadsheet-editor"]')).toHaveTextContent("1 rows · 1 columns");
+    expect(screen.queryByText("Structured guide content")).not.toBeInTheDocument();
+    expect(screen.queryByText("chrona-json-render")).not.toBeInTheDocument();
+  });
+
   it("opens a structured deliverable as its linked Workbench asset", async () => {
     const content = {
       format: "chrona-json-render",
@@ -361,6 +441,15 @@ describe("GoalAssetWorkbench", () => {
       screen.getByRole("button", { name: copy.restoreAsset }),
     ).toBeInTheDocument();
     expect(router.state.location.search).toContain("assetView=archived");
+  });
+
+  it("opens Markdown assets directly in the unified editor", async () => {
+    renderWorkbench([asset("document", "Research brief", "# Editable brief")], "/goals/goal-1?section=workbench&asset=document");
+
+    await screen.findByRole("textbox", { name: copy.documentContent });
+    expect(screen.queryByRole("button", { name: copy.previewMode })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: copy.saveDraft })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: copy.publishVersion })).toBeInTheDocument();
   });
 
   it("prioritizes type-specific actions and exposes responsive workspace controls", async () => {
@@ -604,7 +693,6 @@ describe("GoalAssetWorkbench", () => {
       "/goals/goal-1?section=workbench&asset=first",
     );
 
-    await userEvent.click(screen.getByRole("button", { name: copy.editMode }));
     const editor = screen.getByRole("textbox", { name: copy.documentContent });
     fireEvent.change(editor, { target: { value: "Unsaved first edit" } });
     expect(editor).toHaveValue("Unsaved first edit");
@@ -627,7 +715,6 @@ describe("GoalAssetWorkbench", () => {
       "/goals/goal-1?section=workbench&asset=first",
     );
 
-    await userEvent.click(screen.getByRole("button", { name: copy.editMode }));
     fireEvent.change(screen.getByRole("textbox", { name: copy.documentContent }), { target: { value: "Newest editor content" } });
     fireEvent.click(screen.getByRole("button", { name: copy.publishVersion }));
 
@@ -776,7 +863,7 @@ describe("GoalAssetWorkbench", () => {
       }).value,
     ).toContain("draftOnly");
   });
-  it("renders Markdown documents by default while preserving source editing", async () => {
+  it("opens Markdown documents directly in MDXEditor", async () => {
     const markdown = asset(
       "guide",
       "Research guide",
@@ -786,12 +873,8 @@ describe("GoalAssetWorkbench", () => {
     markdown.versions[0]!.originalFilename = "guide.md";
     renderWorkbench([markdown], "/goals/goal-1?section=workbench&asset=guide");
 
-    expect(
-      await screen.findByRole("heading", { name: "Guide" }),
-    ).toBeInTheDocument();
-    expect(screen.queryByRole("textbox", { name: copy.documentContent })).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: copy.editMode }));
-    expect(await screen.findByRole("textbox", { name: copy.documentContent })).toHaveValue("# Guide\n\nUse **official sources**.");
+    await screen.findByRole("textbox", { name: copy.documentContent });
+    expect(screen.queryByRole("button", { name: copy.previewMode })).not.toBeInTheDocument();
   });
 
   it("edits CSV cells through the shared draft and version lifecycle", async () => {
@@ -810,23 +893,14 @@ describe("GoalAssetWorkbench", () => {
     csv.versions[0]!.originalFilename = "sources.csv";
     renderWorkbench([csv], "/goals/goal-1?section=workbench&asset=sources");
 
-    const preview = document.querySelector('[data-asset-canvas="data-table"]');
-    expect(preview).not.toBeNull();
-    expect(preview).toHaveAttribute("data-asset-canvas-mode", "read");
-    const editButton = screen.getByRole("button", { name: copy.editMode });
-    expect(editButton).toHaveAttribute("aria-pressed", "false");
-    await userEvent.click(editButton);
     const spreadsheet = document.querySelector('[data-asset-canvas="spreadsheet-editor"]');
     expect(spreadsheet).not.toBeNull();
-    expect(spreadsheet).toHaveAttribute("data-asset-canvas", "spreadsheet-editor");
-    const previewButton = screen.getByRole("button", { name: copy.previewMode });
-    expect(previewButton).toHaveAttribute("aria-pressed", "true");
+    expect(spreadsheet).toHaveAttribute("data-asset-canvas-mode", "edit");
+    expect(screen.queryByRole("button", { name: copy.previewMode })).not.toBeInTheDocument();
     await userEvent.click(within(spreadsheet as HTMLElement).getByRole("button", { name: "Update first note" }));
     await waitFor(() => expect(mocks.saveGoalAssetDraft).toHaveBeenCalled(), { timeout: 1_500 });
     const latestCall = mocks.saveGoalAssetDraft.mock.calls.at(-1) as unknown as [string, string, { content: string }];
     expect(latestCall[2].content).toContain('"Updated, quoted note"');
-    await userEvent.click(previewButton);
-    expect(document.querySelector('[data-asset-canvas="data-table"]')).toHaveAttribute("data-asset-canvas-mode", "read");
   });
 
   it("opens structured data tables in the shared spreadsheet canvas", async () => {
@@ -837,28 +911,20 @@ describe("GoalAssetWorkbench", () => {
     }, 1, "data_table");
     renderWorkbench([dataTable], "/goals/goal-1?section=workbench&asset=tracker");
 
-    const canvas = document.querySelector('[data-asset-canvas="data-table"]');
+    const canvas = document.querySelector('[data-asset-canvas="spreadsheet-editor"]');
     expect(canvas).not.toBeNull();
-    expect(canvas).toHaveAttribute("data-asset-canvas", "data-table");
-    expect(canvas).toHaveAttribute("data-asset-canvas-mode", "read");
-    const editButton = screen.getByRole("button", { name: copy.editMode });
-    expect(editButton).toHaveAttribute("aria-pressed", "false");
-    await userEvent.click(editButton);
-    expect(document.querySelector('[data-asset-canvas="spreadsheet-editor"]')).toHaveAttribute("data-asset-canvas-mode", "edit");
-    const previewButton = screen.getByRole("button", { name: copy.previewMode });
-    expect(previewButton).toHaveAttribute("aria-pressed", "true");
-    await userEvent.click(previewButton);
-    expect(document.querySelector('[data-asset-canvas="data-table"]')).toHaveAttribute("data-asset-canvas-mode", "read");
+    expect(canvas).toHaveAttribute("data-asset-canvas-mode", "edit");
+    expect(screen.queryByRole("button", { name: copy.previewMode })).not.toBeInTheDocument();
   });
 
-  it("routes CSV content to the shared Univer preview even when persisted as a document", () => {
+  it("routes CSV content directly to the shared Univer editor even when persisted as a document", () => {
     const csv = asset("legacy-csv", "Legacy tracker", "Name,Status\nJane,Ready", 1, "document", { mimeType: "text/csv", originalFilename: "tracker.csv" });
     renderWorkbench([csv], "/goals/goal-1?section=workbench&asset=legacy-csv");
 
-    const preview = document.querySelector('[data-asset-canvas="data-table"]');
-    expect(preview).not.toBeNull();
-    expect(preview).toHaveAttribute("data-asset-canvas-mode", "read");
-    expect(preview).toHaveTextContent("1 rows · 2 columns");
+    const editor = document.querySelector('[data-asset-canvas="spreadsheet-editor"]');
+    expect(editor).not.toBeNull();
+    expect(editor).toHaveAttribute("data-asset-canvas-mode", "edit");
+    expect(editor).toHaveTextContent("1 rows · 2 columns");
   });
 
   it("renders a structured result without exposing raw JSON and exports each supported format", async () => {
