@@ -31,6 +31,17 @@ const HOST_ONLY_KEYS: Readonly<Record<string, true>> = {
 const ARTIFACT_REF_PATTERN = /^AF[A-F0-9]{12}$/;
 const BACKEND_ID_PATTERN = /^c[a-z0-9]{20,}$/;
 
+function parsedProviderPayload(payload: unknown): unknown {
+  if (
+    !payload ||
+    typeof payload !== "object" ||
+    !("parsed" in payload)
+  ) {
+    throw new Error("Result finalization provider did not return a parsed payload");
+  }
+  return payload.parsed;
+}
+
 function stripHostOnly(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(stripHostOnly);
   if (!value || typeof value !== "object") return value;
@@ -357,6 +368,7 @@ async function restoreRecordedTerminalResults(input: {
   ))!;
 }
 export const __resultFinalizationTestHooks = {
+  parsedProviderPayload,
   validateFinalizedSpec: validateFinalizedResultSpec,
   restoreRecordedTerminalResults,
   validateSemanticComposition,
@@ -449,7 +461,7 @@ export async function finalizeTaskResult(input: {
     }
     const spec = validateFinalizedResultSpec({
       manifest: running.manifest,
-      payload: response.structuredPayload,
+      payload: parsedProviderPayload(response.structuredPayload),
     });
     const latest = await getPlanRun(
       input.taskId,

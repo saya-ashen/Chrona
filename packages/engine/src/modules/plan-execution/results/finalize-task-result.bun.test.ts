@@ -53,6 +53,23 @@ function resultSpec(fileRef = "AF111111111111") {
   };
 }
 
+
+describe("finalized result provider payload", () => {
+  it("unwraps the provider structured-output envelope", () => {
+    expect(
+      __resultFinalizationTestHooks.parsedProviderPayload({
+        parsed: resultSpec(),
+        rawOutput: "provider output",
+      }),
+    ).toEqual(resultSpec());
+  });
+
+  it("rejects a structured payload without the parsed envelope", () => {
+    expect(() =>
+      __resultFinalizationTestHooks.parsedProviderPayload(resultSpec()),
+    ).toThrow("did not return a parsed payload");
+  });
+});
 describe("finalized result validation", () => {
   it("accepts only declared opaque Artifact refs and strips host provenance", () => {
     const spec = resultSpec() as Record<string, unknown>;
