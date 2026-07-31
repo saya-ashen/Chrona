@@ -35,4 +35,28 @@ describe("MarkdownAssetCanvas", () => {
     expect(screen.getAllByRole("toolbar")).toHaveLength(2);
     expect(screen.getAllByRole("textbox", { name: /editable markdown/i })).toHaveLength(2);
   });
+
+  it("keeps source and diff editors inside independently scrollable canvases", () => {
+    render(
+      <MarkdownAssetCanvas
+        value="# Draft"
+        diffValue="# Published"
+        ariaLabel="Document content"
+        onChange={vi.fn()}
+      />,
+    );
+
+    const editor = document.querySelector(".mdxeditor");
+    expect(editor).toHaveClass(
+      "[&_.mdxeditor-source-editor]:h-full",
+      "[&_.mdxeditor-source-editor>.cm-editor]:h-full!",
+      "[&_.cm-mergeView]:h-full!",
+      "[&_.cm-mergeView]:overflow-hidden",
+      "[&_.mdxeditor-diff-editor]:h-full",
+      "[&_.cm-mergeViewEditors]:h-full!",
+      "[&_.cm-mergeViewEditor]:h-full!",
+      "[&_.cm-mergeViewEditor_.cm-editor]:h-full!",
+      "[&_.cm-scroller]:overflow-y-auto",
+    );
+  });
 });

@@ -1173,6 +1173,7 @@ model Event {
   rawEvent           RawEventLog?       @relation(fields: [rawEventId], references: [id], onDelete: SetNull)
   timelineItems      TaskTimelineItem[]
 
+  @@index([rawEventId])
   @@index([taskId, workBlockId, ingestSequence])
   @@index([taskId, nodeId, workBlockId, ingestSequence])
   @@index([runId, ingestSequence])
@@ -1332,6 +1333,7 @@ model TaskTimelineItem {
   event              Event?       @relation(fields: [eventId], references: [id], onDelete: SetNull)
   rawEvent           RawEventLog? @relation(fields: [rawEventId], references: [id], onDelete: SetNull)
 
+  @@index([rawEventId])
   @@index([taskId, workBlockId, sortTime])
   @@index([taskId, nodeId, workBlockId, sortTime])
   @@index([runId, sortTime])

@@ -19,7 +19,14 @@ export function createTasksService() {
         throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.VALIDATION_FAILED, "Failed to update task");
       }
     },
-    async delete(input: { taskId: string; workspaceId?: string }) {
+    async getDeleteImpact(input: Parameters<typeof tasks.getDeleteImpact>[0]) {
+      try {
+        return await tasks.getDeleteImpact(input);
+      } catch (cause) {
+        throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.TASK_NOT_FOUND, "Failed to inspect task deletion");
+      }
+    },
+    async delete(input: Parameters<typeof tasks.delete>[0]) {
       try {
         return await tasks.delete(input);
       } catch (cause) {

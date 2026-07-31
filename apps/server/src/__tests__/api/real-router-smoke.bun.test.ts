@@ -186,9 +186,21 @@ describe("Real router smoke", () => {
     expect(verifyBody.task.title).toBe("Router-updated task");
     expect(verifyBody.task.status).toBe("Blocked");
 
+    const deleteImpactRes = await app().request(
+      `http://local/api/tasks/${created.taskId}/delete-impact?workspaceId=${workspaceId}`,
+    );
+    const deleteImpact = await json<{ taskIds: string[]; assets: Array<{ id: string }> }>(deleteImpactRes);
+
     const deleteRes = await app().request(
       `http://local/api/tasks/${created.taskId}?workspaceId=${workspaceId}`,
-      { method: "DELETE" },
+      {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          expectedTaskIds: deleteImpact.taskIds,
+          expectedAssetIds: deleteImpact.assets.map((asset) => asset.id),
+        }),
+      },
     );
     expect(deleteRes.status).toBe(200);
 

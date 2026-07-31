@@ -188,5 +188,9 @@ CREATE INDEX "GoalAssetOwnershipProposal_workspaceId_status_updatedAt_idx" ON "G
 CREATE INDEX "GoalAssetOwnershipProposal_goalId_updatedAt_idx" ON "GoalAssetOwnershipProposal"("goalId", "updatedAt");
 CREATE INDEX "GoalAssetOwnershipProposal_inboxCandidateId_createdAt_idx" ON "GoalAssetOwnershipProposal"("inboxCandidateId", "createdAt");
 
+-- Index nullable RawEvent foreign keys so ON DELETE SET NULL does not rescan child tables per deleted row.
+CREATE INDEX "Event_rawEventId_idx" ON "Event"("rawEventId");
+CREATE INDEX "TaskTimelineItem_rawEventId_idx" ON "TaskTimelineItem"("rawEventId");
+
 PRAGMA foreign_key_check;
 PRAGMA foreign_keys=ON;

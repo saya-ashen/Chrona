@@ -59,6 +59,9 @@ type TaskWorkspaceHeaderEditorProps = {
   onCancelRebuildConfirm: () => void;
   onRebuild: () => void;
   showDeleteConfirm: boolean;
+  deleteImpact: Parameters<typeof TaskWorkspaceHeaderCard>[0]["deleteImpact"];
+  isLoadingDeleteImpact: boolean;
+  deleteImpactError: string | null;
   isDeleting: boolean;
   onStartDeleteConfirm: () => void;
   onCancelDeleteConfirm: () => void;
@@ -129,6 +132,9 @@ function TaskWorkspaceHeaderEditor({
   onCancelRebuildConfirm,
   onRebuild,
   showDeleteConfirm,
+  deleteImpact,
+  isLoadingDeleteImpact,
+  deleteImpactError,
   isDeleting,
   onStartDeleteConfirm,
   onCancelDeleteConfirm,
@@ -155,6 +161,9 @@ function TaskWorkspaceHeaderEditor({
         onCancelRebuildConfirm={onCancelRebuildConfirm}
         onRebuild={onRebuild}
         showDeleteConfirm={showDeleteConfirm}
+        deleteImpact={deleteImpact}
+        isLoadingDeleteImpact={isLoadingDeleteImpact}
+        deleteImpactError={deleteImpactError}
         isDeleting={isDeleting}
         onStartDeleteConfirm={onStartDeleteConfirm}
         onCancelDeleteConfirm={onCancelDeleteConfirm}
@@ -288,6 +297,9 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
   const {
     showDeleteConfirm,
     setShowDeleteConfirm,
+    deleteImpact,
+    isLoadingDeleteImpact,
+    deleteImpactError,
     isDeleting,
     handleDelete,
     showRebuildConfirm,
@@ -297,6 +309,8 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
   } =
     useTaskWorkspaceDeleteFlow({
       taskId: task.id,
+      workspaceId: task.workspaceId,
+      goalId: task.goalId,
       setSaveError,
     });
   const assistantContext = useMemo(
@@ -427,6 +441,9 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
           onCancelRebuildConfirm={() => setShowRebuildConfirm(false)}
           onRebuild={() => void handleRebuild()}
           showDeleteConfirm={showDeleteConfirm}
+          deleteImpact={deleteImpact}
+          isLoadingDeleteImpact={isLoadingDeleteImpact}
+          deleteImpactError={deleteImpactError}
           isDeleting={isDeleting}
           onStartDeleteConfirm={() => setShowDeleteConfirm(true)}
           onCancelDeleteConfirm={() => setShowDeleteConfirm(false)}

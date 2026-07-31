@@ -2,7 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { v4 as uuidv4 } from "uuid";
-import { LocaleType, type ICellData, type IWorkbookData } from "@univerjs/core";
+import { CommandType, LocaleType, type ICellData, type IWorkbookData } from "@univerjs/core";
 import { createUniver } from "@univerjs/presets";
 import { UniverSheetsCorePreset } from "@univerjs/preset-sheets-core";
 import enUS from "@univerjs/preset-sheets-core/locales/en-US";
@@ -122,6 +122,7 @@ export function SpreadsheetAssetCanvas({ assetId, label, locale, mode, table, su
   const containerRef = useRef<HTMLDivElement>(null);
   const initialTableRef = useRef(table);
   const onChangeRef = useRef(onChange);
+  const renderedRef = useRef(false);
   onChangeRef.current = onChange;
 
   useEffect(() => {
@@ -143,6 +144,7 @@ export function SpreadsheetAssetCanvas({ assetId, label, locale, mode, table, su
     const workbook = univerAPI.createWorkbook(goalDataTableToWorkbook(initialTableRef.current, label, localeType));
     const rendered = univerAPI.addEvent(univerAPI.Event.LifeCycleChanged, ({ stage }) => {
       if (stage !== univerAPI.Enum.LifecycleStages.Rendered) return;
+      renderedRef.current = true;
       const activeWorkbook = univerAPI.getActiveWorkbook();
       if (!activeWorkbook) return;
       const permission = activeWorkbook.getWorkbookPermission();
@@ -155,12 +157,15 @@ export function SpreadsheetAssetCanvas({ assetId, label, locale, mode, table, su
         permission.setPermissionDialogVisible(false);
       }
     });
-    const subscription = workbook.onCommandExecuted(() => {
-      if (mode === "edit") onChangeRef.current(workbookToGoalDataTable(workbook.save(), initialTableRef.current));
+    renderedRef.current = false;
+    const subscription = workbook.onCommandExecuted((command) => {
+      if (mode !== "edit" || !renderedRef.current || command.type !== CommandType.MUTATION) return;
+      onChangeRef.current(workbookToGoalDataTable(workbook.save(), initialTableRef.current));
     });
     return () => {
       rendered.dispose();
       subscription.dispose();
+      renderedRef.current = false;
       univer.dispose();
     };
   }, [assetId, label, locale, mode]);

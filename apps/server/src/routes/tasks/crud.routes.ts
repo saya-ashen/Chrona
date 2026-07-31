@@ -10,6 +10,7 @@ import {
   updateTaskBodySchemaForSupportedRuntimes,
   deleteTaskParamSchema,
   deleteTaskQuerySchema,
+  deleteTaskBodySchema,
   workspaceActivityPageQuerySchema,
   resultFileAccessApproveBodySchema,
   resultFileAccessParamSchema,
@@ -383,15 +384,38 @@ export function createTasksRoutes(engine: ChronaEngine) {
         }
       },
     )
-    .delete(
-      "/tasks/:taskId",
+    .get(
+      "/tasks/:taskId/delete-impact",
       zValidator("param", deleteTaskParamSchema),
       zValidator("query", deleteTaskQuerySchema),
       async (c) => {
         try {
           const { taskId } = c.req.valid("param");
           const { workspaceId } = c.req.valid("query");
-          return json(c, await engine.tasks.delete({ taskId, workspaceId }));
+          return json(c, await engine.tasks.getDeleteImpact({ taskId, workspaceId }));
+        } catch (cause) {
+          const httpError = toHttpError(cause);
+          if (httpError) return error(c, httpError.message, httpError.status);
+          return internalServerError(
+            c,
+            "GET /api/tasks/:taskId/delete-impact",
+            cause,
+            "Failed to inspect task deletion",
+          );
+        }
+      },
+    )
+    .delete(
+      "/tasks/:taskId",
+      zValidator("param", deleteTaskParamSchema),
+      zValidator("query", deleteTaskQuerySchema),
+      zValidator("json", deleteTaskBodySchema),
+      async (c) => {
+        try {
+          const { taskId } = c.req.valid("param");
+          const { workspaceId } = c.req.valid("query");
+          const { expectedTaskIds, expectedAssetIds } = c.req.valid("json");
+          return json(c, await engine.tasks.delete({ taskId, workspaceId, expectedTaskIds, expectedAssetIds }));
         } catch (cause) {
           const httpError = toHttpError(cause);
           if (httpError) {

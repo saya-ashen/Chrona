@@ -367,7 +367,8 @@ const copy: GoalCopy = {
     appendVersion: "Create new version",
     rejectCandidate: "Reject",
     candidateGroupTitle: "Candidates from {task}",
-    candidateGroupDescription: "{count} related deliverables share this source Task",
+    candidateGroupDescription:
+      "{count} related deliverables share this source Task",
     candidateProgress: "{current} of {total} in this Task",
     createAssetDescription: "Creates a separate formal Goal asset",
     updateVersionDescription: "Creates v{version} + 1 for {asset}",
@@ -447,6 +448,22 @@ const copy: GoalCopy = {
     restoreAsset: "Restore asset",
     aiModificationDescription:
       "Creates a bounded Task based on this exact version.",
+    overview: "Overview",
+    activity: "Activity",
+    cancel: "Cancel",
+    editAssetInfo: "Edit asset information",
+    editAssetInfoDescription: "Edit name and description",
+    moreAssetActions: "More asset actions",
+    modifyWithAi: "Modify with AI",
+    newTasksUseCurrentVersion: "New Tasks use this version.",
+    existingTasksKeepVersion: "Existing Tasks keep captured versions.",
+    useTaskDescription: "Use {asset} v{version}",
+    taskTitleLabel: "Task title",
+    aiModificationDialogDescription: "Modify {asset} v{version}",
+    recordVerification: "Record verification",
+    updateVerification: "Update verification",
+    recordVerificationDescription: "Record verification details",
+    restoreAsNewVersion: "Restore as new version",
     createAiTask: "Create AI Task",
     provenanceDescription: "{kind} · provenance",
     closeAssetWorkspace: "Close asset workspace",
@@ -1007,7 +1024,9 @@ describe("Goal pages", () => {
       screen.queryByText("Approved application package"),
     ).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Add task" }));
-    expect(screen.getByRole("dialog", { name: "Add bounded task" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("dialog", { name: "Add bounded task" }),
+    ).toBeInTheDocument();
     expect(screen.queryByText("Selected context")).not.toBeInTheDocument();
   });
 

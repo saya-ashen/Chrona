@@ -321,3 +321,20 @@ export const deleteTaskParamSchema = z.object({
 export const deleteTaskQuerySchema = z.object({
   workspaceId: z.string().optional(),
 });
+
+export const deleteTaskBodySchema = z.object({
+  expectedTaskIds: z.array(z.string()).min(1),
+  expectedAssetIds: z.array(z.string()),
+});
+
+export const taskDeleteImpactSchema = z.object({
+  taskIds: z.array(z.string()),
+  taskCount: z.number().int().nonnegative(),
+  assets: z.array(z.object({
+    id: z.string(),
+    label: z.string(),
+    goalId: z.string(),
+  })),
+});
+
+export type TaskDeleteImpact = z.infer<typeof taskDeleteImpactSchema>;

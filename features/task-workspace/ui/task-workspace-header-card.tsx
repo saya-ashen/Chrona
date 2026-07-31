@@ -15,6 +15,7 @@ import { UI_ACTION, type UiDocument } from "@chrona/ui-protocol";
 import { SpecRenderer } from "./catalog/spec-renderer";
 import { LocalizedLink } from "./localized-link";
 import type { TaskData, TaskHeaderAction } from "../model/task-workspace-types";
+import type { TaskDeleteImpact } from "@chrona/contracts/api";
 
 function hideHeaderActions(spec: UiDocument, input: { generatePlan?: boolean; acceptPlan?: boolean }): UiDocument {
   const generateAction = spec.elements["action:generate-plan"];
@@ -50,6 +51,9 @@ type TaskWorkspaceHeaderCardProps = {
   onCancelRebuildConfirm: () => void;
   onRebuild: () => void;
   showDeleteConfirm: boolean;
+  deleteImpact: TaskDeleteImpact | null;
+  isLoadingDeleteImpact: boolean;
+  deleteImpactError: string | null;
   isDeleting: boolean;
   onStartDeleteConfirm: () => void;
   onCancelDeleteConfirm: () => void;
@@ -86,6 +90,9 @@ export function TaskWorkspaceHeaderCard({
   onCancelRebuildConfirm,
   onRebuild,
   showDeleteConfirm,
+  deleteImpact,
+  isLoadingDeleteImpact,
+  deleteImpactError,
   isDeleting,
   onStartDeleteConfirm,
   onCancelDeleteConfirm,
@@ -99,6 +106,7 @@ export function TaskWorkspaceHeaderCard({
   const [pendingActionId, setPendingActionId] = useState<HeaderActionId | null>(null);
   const [actionStatus, setActionStatus] = useState<string | null>(null);
   const [restartConfirmOpen, setRestartConfirmOpen] = useState(false);
+  const [deleteConfirmationStep, setDeleteConfirmationStep] = useState<1 | 2>(1);
 
   // Refs so that the handlers object (passed to ActionProvider which stores it in
   // useState on mount and never re-syncs prop updates) always reads the current
@@ -301,32 +309,59 @@ export function TaskWorkspaceHeaderCard({
       <Dialog
         open={showDeleteConfirm}
         onOpenChange={(open) => {
-          if (!open) onCancelDeleteConfirm();
+          if (!open) {
+            setDeleteConfirmationStep(1);
+            onCancelDeleteConfirm();
+          }
         }}
       >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>{copy.deleteConfirmTitlePrefix} &ldquo;{task.title}&rdquo;{copy.deleteConfirmTitleSuffix}</DialogTitle>
             <DialogDescription>
-              {copy.deleteConfirmDescription}
+              {deleteConfirmationStep === 1 ? copy.deleteConfirmDescription : copy.deleteFinalConfirmDescription}
             </DialogDescription>
           </DialogHeader>
+          {deleteConfirmationStep === 2 ? (
+            <div className="space-y-3 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm">
+              {isLoadingDeleteImpact ? <p>{copy.deleteImpactLoading}</p> : null}
+              {deleteImpactError ? <p className="text-destructive">{deleteImpactError}</p> : null}
+              {deleteImpact ? (
+                <>
+                  <p className="font-medium">
+                    {copy.deleteImpactSummary
+                      .replace("{tasks}", String(deleteImpact.taskCount))
+                      .replace("{assets}", String(deleteImpact.assets.length))}
+                  </p>
+                  {deleteImpact.assets.length > 0 ? (
+                    <ul className="max-h-48 list-disc space-y-1 overflow-y-auto pl-5" aria-label={copy.deleteAssetListLabel}>
+                      {deleteImpact.assets.map((asset) => <li key={asset.id}>{asset.label}</li>)}
+                    </ul>
+                  ) : <p className="text-muted-foreground">{copy.deleteNoAssets}</p>}
+                  <p className="font-medium text-destructive">{copy.deletePermanentWarning}</p>
+                </>
+              ) : null}
+            </div>
+          ) : null}
           <DialogFooter>
             <Button
               type="button"
-              onClick={onCancelDeleteConfirm}
+              onClick={() => {
+                if (deleteConfirmationStep === 2) setDeleteConfirmationStep(1);
+                else onCancelDeleteConfirm();
+              }}
               variant="outline"
               disabled={isDeleting}
             >
-              {copy.cancel}
+              {deleteConfirmationStep === 2 ? copy.back : copy.cancel}
             </Button>
             <Button
               type="button"
-              onClick={onDelete}
+              onClick={deleteConfirmationStep === 1 ? () => setDeleteConfirmationStep(2) : onDelete}
               variant="destructive"
-              disabled={isDeleting}
+              disabled={isDeleting || (deleteConfirmationStep === 2 && (!deleteImpact || isLoadingDeleteImpact || Boolean(deleteImpactError)))}
             >
-              {isDeleting ? copy.deleting : copy.deleteTask}
+              {isDeleting ? copy.deleting : deleteConfirmationStep === 1 ? copy.reviewDeleteImpact : copy.deleteTaskConfirm}
             </Button>
           </DialogFooter>
         </DialogContent>

@@ -60,6 +60,7 @@ function renderHeader(
   onAction = vi.fn(),
   onStopPlanGeneration = vi.fn(),
   rebuild: { open?: boolean; pending?: boolean; onConfirm?: () => void } = {},
+  deletion: { open?: boolean; pending?: boolean; onConfirm?: () => void } = {},
 ) {
   const store = createStateStore(spec.state ?? {});
   store.update(state);
@@ -80,11 +81,14 @@ function renderHeader(
         onStartRebuildConfirm={vi.fn()}
         onCancelRebuildConfirm={vi.fn()}
         onRebuild={rebuild.onConfirm ?? vi.fn()}
-        showDeleteConfirm={false}
-        isDeleting={false}
+        showDeleteConfirm={deletion.open ?? false}
+        deleteImpact={deletion.open ? { taskIds: ["task-1"], taskCount: 1, assets: [{ id: "asset-1", label: "导师申请清单", goalId: "goal-1" }] } : null}
+        isLoadingDeleteImpact={false}
+        deleteImpactError={null}
+        isDeleting={deletion.pending ?? false}
         onStartDeleteConfirm={vi.fn()}
         onCancelDeleteConfirm={vi.fn()}
-        onDelete={vi.fn()}
+        onDelete={deletion.onConfirm ?? vi.fn()}
         onRecoveryRetry={vi.fn()}
         onRecoveryEditInstruction={vi.fn()}
         onRecoveryCancel={vi.fn()}
@@ -197,6 +201,20 @@ describe("TaskWorkspaceHeaderCard", () => {
     expect(screen.getByText(/current Task, plan, execution history, artifacts, results, and child Tasks/i)).toBeInTheDocument();
     const confirm = screen.getByRole("button", { name: "Rebuild Task" });
     fireEvent.click(confirm);
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+  });
+
+  it("requires a second confirmation and lists corresponding Goal assets", () => {
+    const onConfirm = vi.fn();
+    renderHeader(undefined, {}, vi.fn(), vi.fn(), {}, { open: true, onConfirm });
+
+    expect(screen.queryByText("导师申请清单")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Review what will be deleted" }));
+
+    expect(screen.getByText("This will delete 1 task(s) and 1 corresponding Goal asset(s).")).toBeInTheDocument();
+    expect(screen.getByRole("list", { name: "Goal assets that will be deleted" })).toHaveTextContent("导师申请清单");
+    expect(onConfirm).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Permanently delete" }));
     expect(onConfirm).toHaveBeenCalledTimes(1);
   });
 

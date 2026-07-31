@@ -109,14 +109,15 @@ function useAssetEditorState(asset: GoalAssetWorkbenchData, current: GoalAssetWo
   return { value, setValue, label, setLabel, description, setDescription, instruction, setInstruction, message, setMessage, initialValue, autosaveTimer };
 }
 
-function useAssetEditorActions({ goalId, workspaceId, asset, current, value, initialValue, autosaveTimer, copy, onRefresh, setPending, setMessage }: {
-  goalId: string; workspaceId: string; asset: GoalAssetWorkbenchData; current: GoalAssetWorkbenchData["versions"][number] | undefined; value: string; initialValue: React.MutableRefObject<string>; autosaveTimer: React.MutableRefObject<ReturnType<typeof setTimeout> | undefined>; copy: AssetWorkbenchCopy; onRefresh: () => void; setPending: (value: boolean) => void; setMessage: (value: string | null) => void;
+function useAssetEditorActions({ goalId, workspaceId, asset, current, value, initialValue, autosaveTimer, autosaveRequest, copy, onRefresh, setValue, setPending, setMessage }: {
+  goalId: string; workspaceId: string; asset: GoalAssetWorkbenchData; current: GoalAssetWorkbenchData["versions"][number] | undefined; value: string; initialValue: React.MutableRefObject<string>; autosaveTimer: React.MutableRefObject<ReturnType<typeof setTimeout> | undefined>; autosaveRequest: React.MutableRefObject<Promise<unknown> | null>; copy: AssetWorkbenchCopy; onRefresh: () => void; setValue: (value: string) => void; setPending: (value: boolean) => void; setMessage: (value: string | null) => void;
 }) {
   async function act(action: () => Promise<unknown>, success: string) { setPending(true); setMessage(null); try { await action(); setMessage(success); onRefresh(); } catch (cause) { setMessage(cause instanceof Error ? cause.message : copy.actionFailed); } finally { setPending(false); } }
-  async function ensureDraft() { if (!current) return null; const created = await saveGoalAssetDraft(goalId, asset.id, { workspaceId, baseVersionId: current.id, authorType: "user", content: parseContent(value) as string | Record<string, unknown> | unknown[] }); initialValue.current = value; return created.id; }
+  async function waitForAutosave() { const request = autosaveRequest.current; if (request) await request; }
+  async function ensureDraft() { if (!current) return null; await waitForAutosave(); const created = await saveGoalAssetDraft(goalId, asset.id, { workspaceId, baseVersionId: current.id, authorType: "user", content: parseContent(value) as string | Record<string, unknown> | unknown[] }); initialValue.current = value; return created.id; }
   function save() { if (!current) return; clearTimeout(autosaveTimer.current); void act(async () => { await ensureDraft(); }, copy.draftSaved); }
   function publish() { if (!current) return; clearTimeout(autosaveTimer.current); void act(async () => { const draftId = await ensureDraft(); if (!draftId) return; await submitGoalAssetDraft(goalId, asset.id, { workspaceId, draftId, changeSummary: copy.manualEditSummary }); }, copy.newFormalVersionCreated); }
-  function discard(draftId: string) { clearTimeout(autosaveTimer.current); void act(() => discardGoalAssetDraft(goalId, asset.id, { workspaceId, draftId }), copy.draftDiscarded); }
+  function discard(draftId: string) { clearTimeout(autosaveTimer.current); const formalValue = contentText(current?.content ?? asset.sourceArtifact.contentPreview ?? ""); initialValue.current = formalValue; setValue(formalValue); void act(async () => { await waitForAutosave(); await discardGoalAssetDraft(goalId, asset.id, { workspaceId, draftId }); }, copy.draftDiscarded); }
   function downloadSource() { if (!current) return; const anchor = document.createElement("a"); anchor.href = `/api/goals/${encodeURIComponent(goalId)}/assets/${encodeURIComponent(asset.id)}/download?versionId=${encodeURIComponent(current.id)}&mode=source`; anchor.download = current.originalFilename ?? `${asset.label}-v${current.version}`; anchor.rel = "noopener"; anchor.click(); }
   function exportAsset(format: string) { if (!current) return; void act(async () => { const job = await createGoalAssetJob(goalId, asset.id, { workspaceId, versionId: current.id, kind: "export", format }); const anchor = document.createElement("a"); anchor.href = `/api/goals/${encodeURIComponent(goalId)}/assets/${encodeURIComponent(asset.id)}/download?versionId=${encodeURIComponent(current.id)}&mode=export&format=${encodeURIComponent(job.format ?? format)}`; anchor.rel = "noopener"; anchor.click(); }, copy.exportReady); }
   return { act, ensureDraft, save, publish, discard, downloadSource, exportAsset };
@@ -126,6 +127,7 @@ export function AssetEditor({ goalId, workspaceId, asset, assets, copy, onSelect
   const current = asset.versions[0];
   const draft = asset.drafts[0];
   const { value, setValue, label, setLabel, description, setDescription, instruction, setInstruction, message, setMessage, initialValue, autosaveTimer } = useAssetEditorState(asset, current, draft);
+  const autosaveRequest = useRef<Promise<unknown> | null>(null);
   const displayKind = assetDisplayKind(asset);
   const editable = asset.kind === "document" || asset.kind === "data_table" || asset.kind === "form" || displayKind === "spreadsheet";
   const [pending, setPending] = useState(false);
@@ -140,13 +142,25 @@ export function AssetEditor({ goalId, workspaceId, asset, assets, copy, onSelect
     window.localStorage.setItem("chrona.goalAssetDetails.collapsed", String(detailsCollapsed));
   }, [detailsCollapsed]);
   const { act, save, publish, discard, downloadSource, exportAsset } = useAssetEditorActions({
-    goalId, workspaceId, asset, current, value, initialValue, autosaveTimer, copy, onRefresh, setPending, setMessage,
+    goalId, workspaceId, asset, current, value, initialValue, autosaveTimer, autosaveRequest, copy, onRefresh, setValue, setPending, setMessage,
   });
   useEffect(() => {
     if (!current || !editable || value === initialValue.current || pending) return;
     clearTimeout(autosaveTimer.current);
     autosaveTimer.current = setTimeout(() => {
-      void act(() => saveGoalAssetDraft(goalId, asset.id, { workspaceId, baseVersionId: current.id, authorType: "user", content: parseContent(value) as string | Record<string, unknown> | unknown[] }), copy.draftAutosaved);
+      const request = saveGoalAssetDraft(goalId, asset.id, { workspaceId, baseVersionId: current.id, authorType: "user", content: parseContent(value) as string | Record<string, unknown> | unknown[] });
+      autosaveRequest.current = request;
+      void (async () => {
+        try {
+          await request;
+          setMessage(copy.draftAutosaved);
+          onRefresh();
+        } catch (cause) {
+          setMessage(cause instanceof Error ? cause.message : copy.actionFailed);
+        } finally {
+          if (autosaveRequest.current === request) autosaveRequest.current = null;
+        }
+      })();
       initialValue.current = value;
     }, 800);
     return () => clearTimeout(autosaveTimer.current);

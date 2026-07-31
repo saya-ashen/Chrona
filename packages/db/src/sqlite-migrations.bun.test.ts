@@ -25,6 +25,17 @@ function releaseFixturePath(migrationsDir: string, fixturePath: string): string 
   return join(migrationsDir, fixturePath);
 }
 
+function expectRawEventForeignKeyIndexes(db: Database): void {
+  expect(db.query("SELECT name FROM sqlite_master WHERE type = 'index' AND name = ?").get("Event_rawEventId_idx"))
+    .toBeTruthy();
+  expect(db.query("SELECT name FROM sqlite_master WHERE type = 'index' AND name = ?").get("TaskTimelineItem_rawEventId_idx"))
+    .toBeTruthy();
+  const eventPlan = db.query('EXPLAIN QUERY PLAN SELECT 1 FROM "Event" WHERE "rawEventId" = ?').all("raw-event");
+  const timelinePlan = db.query('EXPLAIN QUERY PLAN SELECT 1 FROM "TaskTimelineItem" WHERE "rawEventId" = ?').all("raw-event");
+  expect(JSON.stringify(eventPlan)).toContain("Event_rawEventId_idx");
+  expect(JSON.stringify(timelinePlan)).toContain("TaskTimelineItem_rawEventId_idx");
+}
+
 describe("ensureSqliteDatabase", () => {
   it("applies migrations and records real checksums", () => {
     const dir = mkdtempSync(join(tmpdir(), "chrona-migrations-"));
@@ -124,6 +135,7 @@ describe("ensureSqliteDatabase", () => {
     try {
       expect(schemaFingerprint(fresh)).toBe(metadata.releaseLineSchemaFingerprint);
       expect(fresh.query("PRAGMA integrity_check").get()).toEqual({ integrity_check: "ok" });
+      expectRawEventForeignKeyIndexes(fresh);
       expect(fresh.query("SELECT COUNT(*) AS count FROM _prisma_migrations").get()).toEqual({
         count: Object.keys(metadata.releasedMigrationChecksums).length + 1,
       });
@@ -147,6 +159,7 @@ describe("ensureSqliteDatabase", () => {
     try {
       expect(schemaFingerprint(upgraded)).toBe(metadata.releaseLineSchemaFingerprint);
       expect(upgraded.query("PRAGMA integrity_check").get()).toEqual({ integrity_check: "ok" });
+      expectRawEventForeignKeyIndexes(upgraded);
       expect(upgraded.query('SELECT "id", "title" FROM "Task" WHERE "id" = ?').get("fixture-task")).toEqual(priorTask);
       expect(upgraded.query("SELECT COUNT(*) AS count FROM _prisma_migrations").get()).toEqual({
         count: Object.keys(metadata.releasedMigrationChecksums).length + 1,
