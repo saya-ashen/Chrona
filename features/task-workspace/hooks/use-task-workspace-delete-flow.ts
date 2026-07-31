@@ -2,7 +2,7 @@ import { useCallback, useState } from "react";
 import { localizeHref, useLocale } from "@chrona/i18n";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiJson } from "@shared/http";
-import type { TaskDeleteImpact } from "@chrona/contracts/api";
+import type { TaskDeleteImpact } from "@chrona/contracts";
 
 type UseTaskWorkspaceDeleteFlowInput = {
   taskId: string;

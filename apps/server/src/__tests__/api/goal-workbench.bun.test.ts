@@ -305,7 +305,7 @@ describe("Goal Workbench API", () => {
       include: { versions: true },
     });
     expect(linkedAsset.id).toBe(linkedAssets[0]!.assetId);
-    expect(linkedAsset.kind).toBe("file");
+    expect(linkedAsset.kind).toBe("data_table");
     expect(linkedAsset.versions).toHaveLength(1);
     const assetResponse = await app.request(`/goals/${seeded.goal.id}/assets/${assetId}`);
     expect(assetResponse.status).toBe(200);
@@ -512,9 +512,10 @@ describe("Goal Workbench API", () => {
   it("discards only the active draft for the requested asset", async () => {
     const seeded = await seedGoalResult();
     const firstAsset = await db.goalAsset.create({ data: { workspaceId: seeded.workspaceId, goalId: seeded.goal.id, sourceArtifactId: seeded.artifact.id, currentArtifactId: seeded.artifact.id, kind: "document", role: "working_document", status: "Approved", label: "First brief" } });
-    const secondAsset = await db.goalAsset.create({ data: { workspaceId: seeded.workspaceId, goalId: seeded.goal.id, sourceArtifactId: seeded.artifact.id, currentArtifactId: seeded.artifact.id, kind: "document", role: "working_document", status: "Approved", label: "Second brief" } });
+    const secondArtifact = await db.artifact.create({ data: { workspaceId: seeded.workspaceId, taskId: seeded.task.id, runId: seeded.run.id, type: "report", title: "Second brief source", uri: "generated://tests/second-brief.md", contentPreview: "formal two" } });
+    const secondAsset = await db.goalAsset.create({ data: { workspaceId: seeded.workspaceId, goalId: seeded.goal.id, sourceArtifactId: secondArtifact.id, currentArtifactId: secondArtifact.id, kind: "document", role: "working_document", status: "Approved", label: "Second brief" } });
     const firstVersion = await db.goalAssetVersion.create({ data: { workspaceId: seeded.workspaceId, goalId: seeded.goal.id, assetId: firstAsset.id, artifactId: seeded.artifact.id, version: 1, source: "inbox", content: "formal one", contentHash: "formal-one", authorType: "user" } });
-    const secondVersion = await db.goalAssetVersion.create({ data: { workspaceId: seeded.workspaceId, goalId: seeded.goal.id, assetId: secondAsset.id, artifactId: seeded.artifact.id, version: 1, source: "inbox", content: "formal two", contentHash: "formal-two", authorType: "user" } });
+    const secondVersion = await db.goalAssetVersion.create({ data: { workspaceId: seeded.workspaceId, goalId: seeded.goal.id, assetId: secondAsset.id, artifactId: secondArtifact.id, version: 1, source: "inbox", content: "formal two", contentHash: "formal-two", authorType: "user" } });
     const firstDraft = await db.goalAssetDraft.create({ data: { workspaceId: seeded.workspaceId, goalId: seeded.goal.id, assetId: firstAsset.id, baseVersionId: firstVersion.id, content: "draft one", contentHash: "draft-one", authorType: "user", authorId: "test" } });
     const secondDraft = await db.goalAssetDraft.create({ data: { workspaceId: seeded.workspaceId, goalId: seeded.goal.id, assetId: secondAsset.id, baseVersionId: secondVersion.id, content: "draft two", contentHash: "draft-two", authorType: "user", authorId: "test" } });
     const app = createApiRouter(createChronaEngine());

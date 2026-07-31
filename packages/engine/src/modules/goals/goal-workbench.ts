@@ -75,6 +75,8 @@ function declaredAssetKind(value: unknown) {
     : null;
 }
 
+// Artifact classification intentionally keeps precedence across declared kind, MIME, extension, and artifact type explicit.
+// eslint-disable-next-line complexity
 function artifactKind(artifact: { type: string; uri: string; metadata: unknown }) {
   const metadata = record(artifact.metadata);
   const declared = declaredAssetKind(metadata?.assetKind);

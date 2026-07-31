@@ -15,7 +15,7 @@ import { UI_ACTION, type UiDocument } from "@chrona/ui-protocol";
 import { SpecRenderer } from "./catalog/spec-renderer";
 import { LocalizedLink } from "./localized-link";
 import type { TaskData, TaskHeaderAction } from "../model/task-workspace-types";
-import type { TaskDeleteImpact } from "@chrona/contracts/api";
+import type { TaskDeleteImpact } from "@chrona/contracts";
 
 function hideHeaderActions(spec: UiDocument, input: { generatePlan?: boolean; acceptPlan?: boolean }): UiDocument {
   const generateAction = spec.elements["action:generate-plan"];

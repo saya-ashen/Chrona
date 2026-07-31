@@ -221,10 +221,12 @@ describe("ChronaDebugProviderClient", () => {
     expect(events.at(-1)).toMatchObject({
       type: "run_completed",
       structuredPayload: {
-        root: "result",
-        elements: {
-          summary: { type: "ResultSummary" },
-          details: { type: "RichMarkdown" },
+        parsed: {
+          root: "result",
+          elements: {
+            summary: { type: "ResultSummary" },
+            details: { type: "RichMarkdown" },
+          },
         },
       },
     });

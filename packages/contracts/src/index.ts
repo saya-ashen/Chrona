@@ -1,3 +1,5 @@
+export type { TaskDeleteImpact } from "./api/tasks.schema";
+
 export {
   STRUCTURED_RESULT_FORMAT,
   STRUCTURED_RESULT_SCHEMA_VERSION,

@@ -123,6 +123,8 @@ function useAssetEditorActions({ goalId, workspaceId, asset, current, value, ini
   return { act, ensureDraft, save, publish, discard, downloadSource, exportAsset };
 }
 
+// The editor is the composition boundary for mutually dependent asset-kind, draft, and responsive-rail states.
+// eslint-disable-next-line complexity
 export function AssetEditor({ goalId, workspaceId, asset, assets, copy, onSelectAsset, onClose, onRefresh }: AssetEditorProps) {
   const current = asset.versions[0];
   const draft = asset.drafts[0];

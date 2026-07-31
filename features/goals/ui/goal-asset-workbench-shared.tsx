@@ -22,7 +22,7 @@ import { Label } from "@shared/ui";
 
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@shared/ui";
-import { parseTablePreview } from "@features/task-workspace/ui/catalog/workspace-table-data";
+import { parseTablePreview } from "@features/task-workspace/ui";
 import { Textarea } from "@shared/ui";
 import {
   submitGoalForm,

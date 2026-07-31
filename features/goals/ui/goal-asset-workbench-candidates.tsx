@@ -219,6 +219,8 @@ function CandidateHeader({ candidate, copy }: { candidate: GoalInboxCandidateDat
   return <CardHeader className="space-y-3"><div className="flex flex-wrap items-center gap-2"><Badge>{kindLabel(candidate.kind, copy)}</Badge><Badge variant="outline">{candidate.proposedTargetAssetId ? copy.ruleBasedMatch : copy.noRuleBasedMatch}</Badge></div><div><CardTitle className="text-base sm:text-lg">{candidate.label}</CardTitle><CardDescription className="mt-1 line-clamp-2">{inboxReasonLabel(candidate.reason, copy)}</CardDescription></div></CardHeader>;
 }
 
+// Candidate actions share pending/error/ownership state; splitting this component would obscure the atomic transition.
+// eslint-disable-next-line max-lines-per-function
 export function InboxCandidate({
   goalId,
   candidate,
