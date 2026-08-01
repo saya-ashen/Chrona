@@ -73,6 +73,7 @@ export const aiObjectiveSchema = z
     expectedOutcome: z.string().trim().min(1).max(AI_FEATURE_RUNTIME_LIMITS.text),
     successCriteria: z
       .array(z.string().trim().min(1).max(AI_FEATURE_RUNTIME_LIMITS.text))
+      .min(1)
       .max(32),
     constraints: z
       .array(z.string().trim().min(1).max(AI_FEATURE_RUNTIME_LIMITS.text))

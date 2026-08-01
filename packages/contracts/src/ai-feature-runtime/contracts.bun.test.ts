@@ -8,6 +8,7 @@ import {
   aiFeatureRunDtoSchema,
   aiJsonObjectSchema,
   aiObservationEnvelopeSchema,
+  aiObjectiveSchema,
   aiRunResultSchema,
   aiFeatureRuntimeErrorCodeSchema,
   artifactBindingSchema,
@@ -45,6 +46,14 @@ describe("AI feature runtime contracts", () => {
   it("parses only strict manifests and retains explicit versioned bindings", () => {
     expect(aiFeatureManifestSchema.parse(manifest)).toEqual(manifest);
     expect(aiFeatureManifestSchema.safeParse({ ...manifest, unknown: true }).success).toBeFalse();
+    expect(
+      aiObjectiveSchema.safeParse({
+        statement: "Review the goal.",
+        expectedOutcome: "A bounded recommendation.",
+        successCriteria: [],
+        constraints: [],
+      }).success,
+    ).toBeFalse();
     expect(
       aiFeatureManifestSchema.safeParse({
         ...manifest,
