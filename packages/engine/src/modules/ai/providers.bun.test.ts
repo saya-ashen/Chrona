@@ -68,4 +68,79 @@ describe("runProviderRequest", () => {
       outputText: "13",
     });
   });
+
+  it("observes validated stream events in provider order", async () => {
+    const observed: string[] = [];
+    const provider = {
+      provider: "test",
+      startRun: async () => ({
+        provider: "test",
+        sessionId: "provider-session",
+        runId: "provider-run",
+      }),
+      streamRun: async function* () {
+        yield {
+          type: "run_started" as const,
+          provider: "test",
+          runId: "provider-run",
+          sessionId: "provider-session",
+          sequence: 0,
+          run: {
+            provider: "test",
+            sessionId: "provider-session",
+            runId: "provider-run",
+            status: "running" as const,
+          },
+        };
+        yield {
+          type: "run_completed" as const,
+          provider: "test",
+          runId: "provider-run",
+          sessionId: "provider-session",
+          sequence: 1,
+          run: {
+            provider: "test",
+            sessionId: "provider-session",
+            runId: "provider-run",
+            status: "completed" as const,
+          },
+          outputText: "13",
+        };
+      },
+    } as unknown as AgentProviderClient;
+
+    await runProviderRequest(provider, request, {
+      onEvent: async (event) => {
+        observed.push(event.type);
+      },
+    });
+
+    expect(observed).toEqual(["run_started", "run_completed"]);
+  });
+
+  it("does not expose invalid events to observers", async () => {
+    const observer = mock(() => undefined);
+    const provider = {
+      provider: "test",
+      startRun: async () => ({
+        provider: "test",
+        sessionId: "provider-session",
+        runId: "provider-run",
+      }),
+      streamRun: async function* () {
+        yield {
+          type: "text_delta",
+          provider: "test",
+          runId: "wrong-run",
+          sessionId: "provider-session",
+          sequence: 0,
+          text: "untrusted",
+        };
+      },
+    } as unknown as AgentProviderClient;
+
+    await expect(runProviderRequest(provider, request, { onEvent: observer }))
+      .rejects.toMatchObject({ code: "internal" });
+    expect(observer).not.toHaveBeenCalled();
+  });
 });

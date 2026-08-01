@@ -316,9 +316,14 @@ function toStartRunInput(request: ProviderFeatureRequest): StartRunInput {
   };
 }
 
+export type ProviderRunRequestOptions = {
+  onEvent?: (event: ProviderRunEvent) => void | Promise<void>;
+};
+
 export async function runProviderRequest(
   providerClient: NonNullable<EngineAiClient["providerClient"]>,
   request: ProviderFeatureRequest,
+  options?: ProviderRunRequestOptions,
 ): Promise<ProviderRunSnapshot> {
   const run = await providerClient.startRun(toStartRunInput(request));
   let finalSnapshot: ProviderRunSnapshot | null = null;
@@ -329,6 +334,7 @@ export async function runProviderRequest(
       sessionId: run.sessionId,
     })) {
       const event = boundary.accept(value);
+      await options?.onEvent?.(event);
       if (event.type === "run_completed") {
         finalSnapshot = providerRunCompletedSnapshot(
           providerClient.provider,
@@ -537,21 +543,25 @@ async function providerFeaturePayloadFull<T>(
   feature: AiFeature,
   request: ProviderFeatureRequest,
   featureSpec?: PreparedAiFeatureSpec,
+  options?: ProviderRunRequestOptions,
 ): Promise<FeaturePayloadResult<T>> {
   const providerClient =
     aiClientRegistry.requireProviderClient(client).providerClient;
-  const result = await runProviderRequest(providerClient, request);
+  const result = await runProviderRequest(providerClient, request, options);
 
   if (result.error) {
     throw new AiClientError(result.error, client.record.type, "internal");
   }
 
+  const structuredPayload = unknownRecord(result.structuredPayload);
+  const parsedStructuredPayload =
+    structuredPayload && "parsed" in structuredPayload
+      ? structuredPayload.parsed
+      : structuredPayload;
   const rawPayload =
-    result.structuredPayload &&
-    typeof result.structuredPayload === "object" &&
-    "parsed" in result.structuredPayload
-      ? result.structuredPayload.parsed
-      : null;
+    parsedStructuredPayload ??
+    unknownRecord(unknownRecord(result.raw)?.terminalTool)?.input ??
+    extractJSON(result.outputText ?? "");
 
   if (rawPayload == null) {
     throw new AiClientError(
@@ -610,6 +620,7 @@ export async function dispatchPreparedFeaturePayload<T = unknown>(
     toolPolicy?: "full" | "read_only";
     timeoutSeconds?: number;
     maxOutputTokens?: number;
+    onEvent?: ProviderRunRequestOptions["onEvent"];
   },
 ): Promise<FeaturePayloadResult<T>> {
   if (client.providerClient) {
@@ -626,6 +637,7 @@ export async function dispatchPreparedFeaturePayload<T = unknown>(
         maxOutputTokens: options?.maxOutputTokens,
       }),
       featureSpec,
+      { onEvent: options?.onEvent },
     );
   }
 

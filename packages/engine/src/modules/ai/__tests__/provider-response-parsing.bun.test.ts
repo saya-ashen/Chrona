@@ -3,7 +3,7 @@ import type { AiClientRecord } from "@chrona/contracts";
 import { AiClientError } from "@chrona/contracts";
 import type { AgentProviderClient, ProviderRunEvent, ProviderRunSnapshot } from "@chrona/providers-foundation";
 import type { EngineAiClient } from "@chrona/engine/test-support";
-import { dispatchFeaturePayload } from "../index";
+import { dispatchFeaturePayload, dispatchPreparedFeaturePayload } from "../index";
 
 process.env.DATABASE_URL ??= "file:/tmp/chrona-provider-response-parsing.sqlite";
 
@@ -57,6 +57,7 @@ function client(snapshot: ProviderRunSnapshot): EngineAiClient {
         run: { ...eventIdentity, status: snapshot.status },
         outputText: snapshot.outputText,
         structuredPayload: snapshot.structuredPayload,
+        raw: snapshot.raw,
       };
     },
     getRun: async () => snapshot,
@@ -125,9 +126,65 @@ describe("provider response parsing", () => {
     expect(result.debug).toMatchObject({ feature: "chat", runId: "run-1", rawOutput: "raw output" });
   });
 
-  test("rejects provider responses without parsed payload", async () => {
-    await expect(dispatchFeaturePayload(client(providerSnapshot({ structuredPayload: { rawOutput: "text only" } })), "chat", {}, "scope-1"))
-      .rejects.toMatchObject({ code: "invalid_response" } satisfies Partial<AiClientError>);
+  test("accepts direct structured objects", async () => {
+    const result = await dispatchFeaturePayload<{ answer: string }>(
+      client(providerSnapshot({ structuredPayload: { answer: "direct" } })),
+      "chat",
+      {},
+      "scope-1",
+    );
+
+    expect(result.parsed).toEqual({ answer: "direct" });
+  });
+
+  test("falls back to fenced JSON output when no structured payload is present", async () => {
+    const result = await dispatchFeaturePayload<{ answer: string }>(
+      client(providerSnapshot({ structuredPayload: null, outputText: "```json\n{\"answer\":\"fenced\"}\n```" })),
+      "chat",
+      {},
+      "scope-1",
+    );
+
+    expect(result.parsed).toEqual({ answer: "fenced" });
+  });
+
+  test("falls back to terminal tool input before output text", async () => {
+    const result = await dispatchFeaturePayload<{ answer: string }>(
+      client(providerSnapshot({
+        structuredPayload: null,
+        outputText: "not JSON",
+        raw: { terminalTool: { input: { answer: "tool" } } },
+      })),
+      "chat",
+      {},
+      "scope-1",
+    );
+
+    expect(result.parsed).toEqual({ answer: "tool" });
+  });
+
+  test("rejects provider responses after all parsed payload fallbacks fail", async () => {
+    await expect(dispatchFeaturePayload(client(providerSnapshot({ structuredPayload: null, outputText: "text only" })), "chat", {}, "scope-1"))
+      .rejects.toMatchObject({ code: "invalid_response", message: "[debug] Feature 'chat' did not return a parsed payload" } satisfies Partial<AiClientError>);
+  });
+
+  test("retains prepared feature validation errors for schema-invalid payloads", async () => {
+    await expect(dispatchPreparedFeaturePayload(
+      client(providerSnapshot({ structuredPayload: { parsed: { suggestions: [{}] } } })),
+      {
+        feature: "suggest",
+        instructions: "Return suggestions",
+        structuredOutputSchema: {
+          name: "suggestions",
+          description: "Suggestions",
+          schema: {},
+        },
+      },
+      "scope-1",
+    )).rejects.toMatchObject({
+      code: "invalid_response",
+      message: "[debug] Feature 'suggest' suggestions must include a non-empty title",
+    } satisfies Partial<AiClientError>);
   });
 
   test("rejects provider error snapshots before parsing", async () => {
