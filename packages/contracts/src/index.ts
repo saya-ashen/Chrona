@@ -183,7 +183,17 @@ export {
   parseChronaToolPayload,
 } from "./api/mcp-task-tools.schema";
 
-export { autoCompleteBodySchema } from "./api/ai.schema";
+export {
+  aiRunProgressEventSchema,
+  aiRunProgressOperationParamSchema,
+  aiRunProgressPhaseSchema,
+  autoCompleteBodySchema,
+} from "./api/ai.schema";
+export type {
+  AiRunProgressEvent,
+  AiRunProgressOperationParam,
+  AiRunProgressPhase,
+} from "./api/ai.schema";
 
 export {
   scheduleProjectionQuerySchema,

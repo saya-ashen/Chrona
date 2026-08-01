@@ -59,3 +59,36 @@ export const taskWorkspaceChatSchema = z.object({
     )
     .optional(),
 });
+
+// ── GET /ai/runs/:operationId/events ──
+export const aiRunProgressOperationParamSchema = z.object({
+  operationId: z.string().trim().min(1, "operationId is required").max(200),
+});
+
+export const aiRunProgressPhaseSchema = z.enum([
+  "queued",
+  "connecting",
+  "thinking",
+  "responding",
+  "using_tool",
+  "validating",
+  "saving",
+  "completed",
+  "failed",
+]);
+
+export const aiRunProgressEventSchema = z
+  .object({
+    operationId: z.string().trim().min(1).max(200),
+    feature: z.string().trim().min(1).max(100),
+    sequence: z.number().int().nonnegative(),
+    occurredAt: z.string().datetime(),
+    phase: aiRunProgressPhaseSchema,
+    toolName: z.string().trim().min(1).max(120).optional(),
+    error: z.string().trim().min(1).max(240).optional(),
+  })
+  .strict();
+
+export type AiRunProgressOperationParam = z.infer<typeof aiRunProgressOperationParamSchema>;
+export type AiRunProgressPhase = z.infer<typeof aiRunProgressPhaseSchema>;
+export type AiRunProgressEvent = z.infer<typeof aiRunProgressEventSchema>;

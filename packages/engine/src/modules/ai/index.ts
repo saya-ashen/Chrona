@@ -15,7 +15,7 @@ export { aiChat, aiGeneratePlanStream } from "./runtime/ai-service";
 export { chat } from "./feature-normalizers";
 export { dispatchStream, suggestStream } from "./streaming";
 export { AiClientManagement, aiClientManagement } from "./management/ai-client-management";
-export type { ProviderFeatureRequest } from "./providers";
+export type { ProviderFeatureRequest, ProviderRunRequestOptions } from "./providers";
 export {
   testAiClientAvailability,
   runProviderRequest,
@@ -29,6 +29,8 @@ export {
   dispatchPreparedFeaturePayload,
 } from "./providers";
 export { createProviderStreamEventBoundary, ProviderStreamContractError } from "./provider-stream-contract";
+export { startAiRunProgress, subscribeToAiRunProgress } from "./ai-run-progress";
+export type { AiRunProgressReporter, AiRunProgressSubscription } from "./ai-run-progress";
 export type { ProviderStreamEventBoundary } from "./provider-stream-contract";
 export { analyzeConflicts, analyzeConflictsSmart } from "./conflict-analyzer";
 export {

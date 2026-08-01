@@ -52,6 +52,10 @@ export async function fetchJsonEventSource(
       headers,
       openWhenHidden: true,
       async onopen(response) {
+        if (!response.ok && onNonStreamResponse) {
+          await onNonStreamResponse(response);
+          throw new NonStreamResponseHandled();
+        }
         if (!response.ok) {
           handleUnauthorizedResponse(response);
           throw new Error(await toErrorMessage(response));

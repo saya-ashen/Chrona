@@ -141,4 +141,23 @@ describe("fetchJsonEventSource", () => {
 
     expect(calls).toBe(1);
   });
+
+  it("lets callers handle a non-success response without retrying", async () => {
+    const statuses: number[] = [];
+    let calls = 0;
+
+    await fetchJsonEventSource("https://chrona.test/events", {
+      fetch: (async (_input: RequestInfo | URL, _init?: RequestInit) => {
+        calls += 1;
+        return new Response(JSON.stringify({ error: "not found" }), { status: 404 });
+      }) as typeof fetch,
+      onEvent: () => undefined,
+      onNonStreamResponse: (response) => {
+        statuses.push(response.status);
+      },
+    });
+
+    expect(calls).toBe(1);
+    expect(statuses).toEqual([404]);
+  });
 });

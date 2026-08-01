@@ -69,6 +69,8 @@ export {
   getAiClientForFeature,
   suggestStream,
 } from "./modules/ai";
+export { startAiRunProgress, subscribeToAiRunProgress } from "./modules/ai";
+export type { AiRunProgressReporter, AiRunProgressSubscription } from "./modules/ai";
 export type {
   DebugProfiledProviderClient,
   EngineAiClient,
@@ -78,6 +80,7 @@ export type {
   EngineHermesClient,
   EngineLlmClient,
   EngineOmpClient,
+  ProviderRunRequestOptions,
   EngineProviderClient,
 } from "./modules/ai";
 export { waitForGoalReviewGeneration } from "./modules/goals/goals";
