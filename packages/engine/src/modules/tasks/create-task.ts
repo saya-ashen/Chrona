@@ -1,6 +1,5 @@
 import { Prisma, TaskPriority, TaskStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
-import { startAutoPlanGenerationForTask } from "@/modules/plans/auto-generate-task-plan";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
 import { validateTaskRuntimeConfig, getRuntimeTaskConfigSpec } from "@/modules/execution-runtime";
 import { deriveTaskStaticState } from "@chrona/domain";
@@ -278,9 +277,6 @@ export async function createTask(input: CreateTaskInput, client: Prisma.Transact
 
   if (client === db) await rebuildTaskProjection(task.id);
 
-  if (client === db && task.autoPlanGeneration && autoPlanGenerationTiming === "immediate") {
-    startAutoPlanGenerationForTask({ taskId: task.id, workBlockId: firstWorkBlockId, accept: task.autoExecute });
-  }
 
   return {
     taskId: task.id,

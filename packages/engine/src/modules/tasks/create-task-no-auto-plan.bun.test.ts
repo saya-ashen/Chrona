@@ -55,33 +55,35 @@ describe("createTask auto plan generation", () => {
     expect(autoPlanGenerationMock).not.toHaveBeenCalled();
   });
 
-  it("starts and accepts automatic plan generation when auto-execute is enabled", async () => {
+  it("does not start planning or execution during creation when auto-execute is enabled", async () => {
     const workspace = await db.workspace.create({
       data: { name: "Auto Plan Workspace", status: "Active", defaultRuntime: "hermes" },
     });
 
     const result = await createTask({
       workspaceId: workspace.id,
-      title: "Create task with auto plan",
-      description: "Plan generation should start in the background.",
+      title: "Create task with deferred automation",
+      description: "Creation must not start plan generation or execution.",
       autoExecute: true,
       autoPlanGenerationTiming: "immediate",
       executionRuntime: "hermes",
       executionConfig: { prompt: "Do it" },
     });
 
-    expect(autoPlanGenerationMock).toHaveBeenCalledWith({ taskId: result.taskId, workBlockId: null, accept: true });
+    expect(result.autoPlanGeneration).toBe(true);
+    expect(result.autoExecute).toBe(true);
+    expect(autoPlanGenerationMock).not.toHaveBeenCalled();
   });
 
-  it("starts draft plan generation when only auto-plan is enabled", async () => {
+  it("persists auto-plan preference without starting generation during creation", async () => {
     const workspace = await db.workspace.create({
       data: { name: "Auto Draft Plan Workspace", status: "Active", defaultRuntime: "hermes" },
     });
 
     const result = await createTask({
       workspaceId: workspace.id,
-      title: "Create task with auto draft plan",
-      description: "Plan generation should start without accepting the plan.",
+      title: "Create task with deferred draft plan",
+      description: "Plan generation must be requested by a later command.",
       autoPlanGeneration: true,
       autoExecute: false,
       autoPlanGenerationTiming: "immediate",
@@ -95,12 +97,12 @@ describe("createTask auto plan generation", () => {
     expect(result.autoExecute).toBe(false);
     expect(persisted.autoPlanGeneration).toBe(true);
     expect(persisted.autoExecute).toBe(false);
-    expect(autoPlanGenerationMock).toHaveBeenCalledWith({ taskId: result.taskId, workBlockId: null, accept: false });
+    expect(autoPlanGenerationMock).not.toHaveBeenCalled();
   });
 
-  it("persists and returns the explicit task auto-execute choice", async () => {
+  it("persists explicit automation choices without triggering creation side effects", async () => {
     const workspace = await db.workspace.create({
-      data: { name: "Auto Execute Workspace", status: "Active", defaultRuntime: "hermes" },
+      data: { name: "Automation Preferences Workspace", status: "Active", defaultRuntime: "hermes" },
     });
 
     const enabled = await createTask({
@@ -133,9 +135,10 @@ describe("createTask auto plan generation", () => {
     expect(persistedById.get(enabled.taskId)?.autoExecute).toBe(true);
     expect(persistedById.get(disabled.taskId)?.autoPlanGeneration).toBe(false);
     expect(persistedById.get(disabled.taskId)?.autoExecute).toBe(false);
-    expect(autoPlanGenerationMock).toHaveBeenCalledTimes(1);
-    expect(autoPlanGenerationMock).toHaveBeenCalledWith({ taskId: enabled.taskId, workBlockId: null, accept: true });
+    expect(autoPlanGenerationMock).not.toHaveBeenCalled();
   });
+
+
 
 
   it("keeps one task entry when workspace edit enables recurrence", async () => {
