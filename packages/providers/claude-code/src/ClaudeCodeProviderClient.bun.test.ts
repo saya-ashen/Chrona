@@ -105,6 +105,7 @@ describe("ClaudeCodeProviderClient — happy path", () => {
       sessionId: "chrona-session-fixture-happy",
       instructions: "Plan the next steps for Chrona task #42.",
       input: { type: "text", text: "Generate a plan for the next 30 minutes." },
+      clientOperationId: "claude-code-happy-path",
     });
     expect(ref.provider).toBe("claude_code");
     expect(ref.status).toBe("running");
@@ -186,6 +187,7 @@ describe("ClaudeCodeProviderClient — tool round-trip", () => {
         sessionId: "chrona-session-fixture-tool",
         instructions: "Dispatch task node and report completion.",
         input: { type: "text", text: "Run node 3." },
+        clientOperationId: "claude-code-tool-call-stream",
       }),
     );
     const types = events.map((e) => e.type);
@@ -218,6 +220,7 @@ describe("ClaudeCodeProviderClient — tool round-trip", () => {
       sessionId: "chrona-session-fixture-tool",
       instructions: "Dispatch task node and report completion.",
       input: { type: "text", text: "Run node 3." },
+      clientOperationId: "claude-code-tool-call-roundtrip",
     });
     const events = await collect(
       client.streamRun({ runId: ref.runId } as unknown as Parameters<typeof client.streamRun>[0]),
@@ -259,6 +262,7 @@ describe("ClaudeCodeProviderClient — cancel + error paths", () => {
       sessionId: "chrona-session-fixture-cancel",
       instructions: "Run a long task and let the user cancel it.",
       input: { type: "text", text: "Long task." },
+      clientOperationId: "claude-code-cancel-mid-run",
     });
     const cancelled = await client.cancelRun({ runId: ref.runId });
     expect(cancelled.runId).toBe(ref.runId);
@@ -311,6 +315,7 @@ describe("ClaudeCodeProviderClient — cancel + error paths", () => {
       sessionId: "chrona-session-aborted",
       instructions: "Trigger an SDK abort.",
       input: { type: "text", text: "abort" },
+      clientOperationId: "claude-code-aborted",
     });
     const events = await collect(client.streamRun({ runId: ref.runId }));
 
@@ -372,6 +377,7 @@ describe("ClaudeCodeProviderClient — cancel + error paths", () => {
       sessionId: "chrona-session-timeout",
       instructions: "Trigger an SDK timeout.",
       input: { type: "text", text: "timeout" },
+      clientOperationId: "claude-code-timeout",
     });
     const events = await collect(client.streamRun({ runId: ref.runId }));
 

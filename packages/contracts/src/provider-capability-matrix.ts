@@ -5,13 +5,18 @@ export type ProviderExecutionCapabilityName =
   | "cancelActiveRun"
   | "toolTraces"
   | "structuredOutput"
-  | "approvalBridge";
+  | "approvalBridge"
+  | "engineManagedToolResults"
+  | "externalControlPlaneActions";
 
 export type ProviderRecoveryCapabilityName =
   | "sessionResume"
   | "historyReplay"
   | "activeRunLookup"
-  | "streamReconnect";
+  | "streamReconnect"
+  | "clientOperationLookup"
+  | "providerResumeRef"
+  | "runEventReplay";
 
 export type ProviderCapabilityName =
   | ProviderExecutionCapabilityName
@@ -23,7 +28,7 @@ export type ProviderRecoveryMode =
   | "local_stream_only";
 
 export type ProviderCapabilityMatrixEntry = {
-  provider: "hermes" | "claude_code" | "codex" | "omp";
+  provider: "debug" | "hermes" | "claude_code" | "codex" | "omp";
   label: string;
   execution: Record<ProviderExecutionCapabilityName, boolean>;
   recovery: Record<ProviderRecoveryCapabilityName, boolean> & {
@@ -40,16 +45,16 @@ const UI_BEHAVIOR: Record<ProviderCapabilityName, string> = {
   cancelActiveRun: "Workspace can show cancel/stop action during active runs.",
   approvalBridge: "Workspace can show provider approval checkpoint actions.",
   toolTraces: "Activity view can show provider tool activity.",
-  structuredOutput:
-    "Result panel can validate json-render output and fall back to text.",
-  sessionResume:
-    "Workspace can resume provider session context after interruption.",
-  historyReplay:
-    "Engine can replay provider session history for terminal evidence.",
-  activeRunLookup:
-    "Engine can query an active provider run snapshot by run id.",
-  streamReconnect:
-    "Workspace can reconnect to an active provider run stream.",
+  structuredOutput: "Result panel can validate json-render output and fall back to text.",
+  engineManagedToolResults: "Engine can submit a result for a provider-pending tool call.",
+  externalControlPlaneActions: "Agent can invoke run-scoped control-plane actions.",
+  sessionResume: "Workspace can resume provider session context after interruption.",
+  historyReplay: "Engine can replay provider session history for terminal evidence.",
+  activeRunLookup: "Engine can query an active provider run snapshot by run id.",
+  streamReconnect: "Workspace can reconnect to an active provider run stream.",
+  clientOperationLookup: "Engine can repair a missing provider run ref by stable client operation id.",
+  providerResumeRef: "Engine can persist a provider-private resume reference for recovery.",
+  runEventReplay: "Engine can replay or reattach provider run events after interruption.",
 };
 
 function matrixEntry(
@@ -63,6 +68,11 @@ function matrixEntry(
       historyReplay: input.recovery.historyReplay,
       activeRunLookup: input.recovery.activeRunLookup,
       streamReconnect: input.recovery.streamReconnect,
+      clientOperationLookup: input.recovery.clientOperationLookup,
+      providerResumeRef: input.recovery.providerResumeRef,
+      runEventReplay: input.recovery.runEventReplay,
+      engineManagedToolResults: input.execution.engineManagedToolResults,
+      externalControlPlaneActions: input.execution.externalControlPlaneActions,
     },
     uiBehavior: UI_BEHAVIOR,
   };
@@ -80,6 +90,8 @@ export const providerCapabilityMatrix = [
       approvalBridge: true,
       toolTraces: true,
       structuredOutput: true,
+      engineManagedToolResults: false,
+      externalControlPlaneActions: false,
     },
     recovery: {
       sessionResume: true,
@@ -87,6 +99,9 @@ export const providerCapabilityMatrix = [
       activeRunLookup: true,
       streamReconnect: true,
       mode: "authoritative_run_lookup",
+      clientOperationLookup: false,
+      providerResumeRef: true,
+      runEventReplay: true,
     },
   }),
   matrixEntry({
@@ -100,6 +115,8 @@ export const providerCapabilityMatrix = [
       approvalBridge: false,
       toolTraces: true,
       structuredOutput: true,
+      engineManagedToolResults: false,
+      externalControlPlaneActions: true,
     },
     recovery: {
       sessionResume: true,
@@ -107,6 +124,9 @@ export const providerCapabilityMatrix = [
       activeRunLookup: true,
       streamReconnect: false,
       mode: "authoritative_run_lookup",
+      clientOperationLookup: false,
+      providerResumeRef: true,
+      runEventReplay: true,
     },
   }),
   matrixEntry({
@@ -120,6 +140,8 @@ export const providerCapabilityMatrix = [
       approvalBridge: true,
       toolTraces: true,
       structuredOutput: true,
+      engineManagedToolResults: false,
+      externalControlPlaneActions: true,
     },
     recovery: {
       sessionResume: true,
@@ -127,6 +149,9 @@ export const providerCapabilityMatrix = [
       activeRunLookup: false,
       streamReconnect: false,
       mode: "session_history",
+      clientOperationLookup: false,
+      providerResumeRef: true,
+      runEventReplay: false,
     },
   }),
   matrixEntry({
@@ -140,6 +165,8 @@ export const providerCapabilityMatrix = [
       approvalBridge: true,
       toolTraces: true,
       structuredOutput: true,
+      engineManagedToolResults: false,
+      externalControlPlaneActions: true,
     },
     recovery: {
       sessionResume: true,
@@ -147,6 +174,34 @@ export const providerCapabilityMatrix = [
       activeRunLookup: false,
       streamReconnect: false,
       mode: "session_history",
+      clientOperationLookup: false,
+      providerResumeRef: true,
+      runEventReplay: false,
+    },
+  }),
+  matrixEntry({
+    provider: "debug",
+    label: "Chrona Debug",
+    execution: {
+      healthCheck: true,
+      startRun: true,
+      streamEvents: true,
+      cancelActiveRun: true,
+      approvalBridge: false,
+      toolTraces: true,
+      structuredOutput: true,
+      engineManagedToolResults: true,
+      externalControlPlaneActions: false,
+    },
+    recovery: {
+      sessionResume: true,
+      historyReplay: true,
+      activeRunLookup: true,
+      streamReconnect: true,
+      clientOperationLookup: true,
+      providerResumeRef: true,
+      runEventReplay: true,
+      mode: "authoritative_run_lookup",
     },
   }),
 ] as const satisfies readonly ProviderCapabilityMatrixEntry[];

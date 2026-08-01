@@ -17,6 +17,7 @@ import type {
   StreamRunInput,
 } from "@chrona/providers-foundation";
 import {
+  assertProviderStartSupported,
   appendProviderReplayRecord,
   providerReplayRecord,
   replayPathForRun,
@@ -187,15 +188,14 @@ export class HermesProviderClient implements AgentProviderClient {
     };
   }
 
-  async startRun(
-    input: StartRunInput & { idempotencyKey?: string },
-  ): Promise<ProviderRunRef> {
+  async startRun(input: StartRunInput): Promise<ProviderRunRef> {
+    assertProviderStartSupported(await this.getCapabilities(), input, this.provider);
     const body = buildRunBody(input);
     const response = await this.http.request("/v1/runs", {
       method: "POST",
       body: JSON.stringify(body),
       signal: input.signal,
-      idempotencyKey: input.idempotencyKey,
+      idempotencyKey: input.clientOperationId,
       timeoutMs: input.timeoutMs,
     });
     const raw = asRecord(await ensureHermesOk(response, "start run"));
@@ -217,6 +217,7 @@ export class HermesProviderClient implements AgentProviderClient {
       sessionId: input.sessionId,
       status: "running",
       startedAt: new Date().toISOString(),
+      providerResumeRef: input.resumeSessionRef ?? runId,
       stream: {
         supported: true,
         reconnectable: true,

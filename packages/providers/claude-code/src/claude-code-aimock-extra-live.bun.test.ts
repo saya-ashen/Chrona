@@ -198,6 +198,7 @@ describe.skipIf(!HAS_CLAUDE)(
           const ref = await live.client.startRun({
             sessionId: "live-sess-cancel",
             instructions: "Block node n9 (will be cancelled).",
+            clientOperationId: "claude-code-live-cancel",
             input: { type: "text", text: "Block n9." },
           });
 
@@ -206,6 +207,7 @@ describe.skipIf(!HAS_CLAUDE)(
           const iter = live.client.streamRun({
             runId: ref.runId,
             sessionId: ref.sessionId,
+            clientOperationId: "claude-code-live-cancel-stream",
             instructions: "Block node n9 (will be cancelled).",
             input: { type: "text", text: "Block n9." },
           });

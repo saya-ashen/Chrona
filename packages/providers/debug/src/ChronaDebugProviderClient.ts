@@ -5,6 +5,7 @@ import {
   type AgentProviderClient,
   type CancelRunInput,
   type CreateSessionInput,
+  type FindRunByClientOperationInput,
   type GetRunInput,
   type HealthCheckInput,
   type ProviderCapabilities,
@@ -12,10 +13,11 @@ import {
   type ProviderRunEvent,
   type ProviderRunRef,
   type ProviderRunSnapshot,
+  type ProviderToolResultInput,
+  type ProviderToolResultOutcome,
   type StartRunInput,
   type StreamRunInput,
 } from "@chrona/providers-foundation";
-
 export const CHRONA_DEBUG_PROVIDER_TYPE = "debug";
 export const DEBUG_PROVIDER_PROFILES = [
   "deterministic",
@@ -42,7 +44,7 @@ type DebugRun = {
   input?: StartRunInput;
   status: ProviderRunRef["status"];
   outputText?: string;
-  error?: string;
+  pendingToolResults: Map<string, ProviderToolResultInput | null>;
 };
 
 function now() {
@@ -61,6 +63,7 @@ function createRun(input: {
     sessionKey: input.sessionKey,
     input: input.startInput,
     status: "running",
+    pendingToolResults: new Map(),
   };
 }
 
@@ -77,6 +80,7 @@ function providerRunRef(
     sessionId: run.sessionId,
     status,
     startedAt: now(),
+    providerResumeRef: run.runId,
     stream: { supported: true, reconnectable: true },
   };
 }
@@ -311,6 +315,7 @@ export class ChronaDebugProviderClient implements AgentProviderClient {
   readonly profile: DebugProviderProfile;
   private readonly runs = new Map<string, DebugRun>();
   private readonly terminalSnapshots = new BoundedTerminalRunSnapshots();
+  private readonly runsByClientOperation = new Map<string, DebugRun>();
   private replayTape?: Awaited<ReturnType<typeof readProviderReplayTape>>;
 
   constructor(config: ChronaDebugProviderConfig | string = {}) {
@@ -329,11 +334,16 @@ export class ChronaDebugProviderClient implements AgentProviderClient {
       supportsCancellation: true,
       supportsToolCalls: true,
       supportsPreviousResponse: false,
+      actionInvocation: "engine_managed",
+      startIdempotency: "client_operation_id",
+      lookupByClientOperationId: true,
       recovery: {
         sessionResume: true,
         historyReplay: true,
         activeRunLookup: true,
         streamReconnect: true,
+        providerResumeRef: true,
+        runEventReplay: true,
         mode: "authoritative_run_lookup",
       },
       reason: `Chrona local debug provider (${this.profile})`,
@@ -366,6 +376,9 @@ export class ChronaDebugProviderClient implements AgentProviderClient {
   }
 
   async startRun(input: StartRunInput): Promise<ProviderRunRef> {
+    const attached = this.runsByClientOperation.get(input.clientOperationId);
+    if (attached) return providerRunRef(this.provider, attached, attached.status);
+
     const replayTape = await this.loadReplayTape();
     if (replayTape?.start) {
       const replayRun = replayTape.start.run;
@@ -376,10 +389,12 @@ export class ChronaDebugProviderClient implements AgentProviderClient {
         startInput: input,
       });
       this.runs.set(run.runId, run);
+      this.runsByClientOperation.set(input.clientOperationId, run);
       return {
         ...replayRun,
         provider: this.provider,
         sessionId: replayRun.sessionId,
+        providerResumeRef: replayRun.providerResumeRef ?? replayRun.runId,
       };
     }
     const run = createRun({
@@ -388,7 +403,21 @@ export class ChronaDebugProviderClient implements AgentProviderClient {
       startInput: input,
     });
     this.runs.set(run.runId, run);
+    this.runsByClientOperation.set(input.clientOperationId, run);
     return providerRunRef(this.provider, run);
+  }
+
+  async findRunByClientOperationId(input: FindRunByClientOperationInput): Promise<ProviderRunRef | null> {
+    const run = this.runsByClientOperation.get(input.clientOperationId);
+    return run ? providerRunRef(this.provider, run, run.status) : null;
+  }
+
+  async submitToolResult(input: ProviderToolResultInput): Promise<ProviderToolResultOutcome> {
+    const run = this.runs.get(input.runId);
+    if (!run) return { code: "not_pending" };
+    if (!run.pendingToolResults.has(input.callId)) return { code: "not_pending" };
+    run.pendingToolResults.set(input.callId, input);
+    return { code: "accepted" };
   }
 
   async *streamRun(input: StreamRunInput): AsyncIterable<ProviderRunEvent> {
@@ -430,6 +459,32 @@ export class ChronaDebugProviderClient implements AgentProviderClient {
       run: providerRunRef(this.provider, run),
     };
     await pause(signal);
+
+    if (this.profile === "tool-submit" && streamInput.tools?.length) {
+      const tool = streamInput.tools[0];
+      const callId = `chrona-debug-pending-${sequence}`;
+      run.pendingToolResults.set(callId, null);
+      yield {
+        ...eventBase(this.provider, run, sequence++),
+        type: "tool_call",
+        tool: tool.name,
+        callId,
+        input: {},
+        status: "pending",
+      };
+      while (!run.pendingToolResults.get(callId)) {
+        await pause(signal);
+      }
+      const submitted = run.pendingToolResults.get(callId)!;
+      run.pendingToolResults.delete(callId);
+      yield {
+        ...eventBase(this.provider, run, sequence++),
+        type: "tool_result",
+        tool: tool.name,
+        callId,
+        result: submitted.error ? { error: submitted.error } : submitted.result,
+      };
+    }
 
     if (isPlanGeneration(streamInput)) {
       yield {
@@ -673,6 +728,7 @@ export class ChronaDebugProviderClient implements AgentProviderClient {
       nativeRunId: run.runId,
       providerRunId: run.runId,
       sessionId: run.sessionId,
+      providerResumeRef: run.runId,
       status: run.status ?? "completed",
       outputText: run.outputText,
       error: run.error ?? null,

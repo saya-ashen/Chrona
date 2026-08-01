@@ -3,7 +3,7 @@ import { createRequire } from "node:module";
 import { homedir } from "node:os";
 import { join } from "node:path";
 import { AcpProviderClient, type AcpDiagnostics, type AcpProviderOptions } from "@chrona/acp-provider";
-import type { AgentProviderClient, CancelRunInput, CreateSessionInput, GetRunInput, HealthCheckInput, StartRunInput, StreamRunInput } from "@chrona/providers-foundation";
+import type { AgentProviderClient, CancelRunInput, CreateSessionInput, GetRunInput, HealthCheckInput, ProviderCapabilities, StartRunInput, StreamRunInput } from "@chrona/providers-foundation";
 import { codexAcpConfig, type CodexProviderConfig } from "./types";
 type SQLiteDatabase = {
   query<T>(sql: string): { all(): T[] };
@@ -31,8 +31,14 @@ export class CodexProviderClient implements AgentProviderClient {
     });
   }
 
-  getCapabilities() {
-    return this.acp.getCapabilities();
+  async getCapabilities(): Promise<ProviderCapabilities> {
+    const inherited = await this.acp.getCapabilities();
+    return {
+      ...inherited,
+      actionInvocation: "external_control_plane",
+      startIdempotency: "unsupported",
+      lookupByClientOperationId: false,
+    };
   }
 
   checkHealth(input?: HealthCheckInput) {

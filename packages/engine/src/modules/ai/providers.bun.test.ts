@@ -1,8 +1,30 @@
 import { describe, expect, it, mock } from "bun:test";
 import type { AgentProviderClient } from "@chrona/providers-foundation";
 import { runProviderRequest, type ProviderFeatureRequest } from "@chrona/engine/test-support";
+const providerCapabilities = {
+  supportsSessions: true,
+  supportsStreaming: true,
+  supportsRunLookup: true,
+  supportsCancellation: true,
+  supportsToolCalls: true,
+  supportsPreviousResponse: false,
+  actionInvocation: "unsupported" as const,
+  startIdempotency: "unsupported" as const,
+  lookupByClientOperationId: false,
+  recovery: {
+    sessionResume: false,
+    historyReplay: false,
+    activeRunLookup: false,
+    streamReconnect: false,
+    providerResumeRef: false,
+    runEventReplay: false,
+    mode: "local_stream_only" as const,
+  },
+};
+
 
 const request: ProviderFeatureRequest = {
+  clientOperationId: "providers-test-operation",
   sessionId: "session-key",
   sessionKey: "session-key",
   instructions: "Answer from the accepted result",
@@ -47,6 +69,7 @@ describe("runProviderRequest", () => {
     });
     const provider = {
       provider: "test",
+      getCapabilities: async () => providerCapabilities,
       startRun,
       streamRun,
     } as unknown as AgentProviderClient;
@@ -73,6 +96,7 @@ describe("runProviderRequest", () => {
     const observed: string[] = [];
     const provider = {
       provider: "test",
+      getCapabilities: async () => providerCapabilities,
       startRun: async () => ({
         provider: "test",
         sessionId: "provider-session",
@@ -122,6 +146,7 @@ describe("runProviderRequest", () => {
     const observer = mock(() => undefined);
     const provider = {
       provider: "test",
+      getCapabilities: async () => providerCapabilities,
       startRun: async () => ({
         provider: "test",
         sessionId: "provider-session",

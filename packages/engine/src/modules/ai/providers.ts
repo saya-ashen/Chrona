@@ -9,11 +9,12 @@ import {
   CHRONA_DEBUG_PROVIDER_TYPE,
   normalizeDebugProviderProfile,
 } from "@chrona/providers-debug";
-import type {
-  ProviderRunInput,
-  ProviderRunEvent,
-  ProviderRunSnapshot,
-  StartRunInput,
+import {
+  assertProviderStartSupported,
+  type ProviderRunInput,
+  type ProviderRunEvent,
+  type ProviderRunSnapshot,
+  type StartRunInput,
 } from "@chrona/providers-foundation";
 import type {
   AiClientRecord,
@@ -275,6 +276,7 @@ export function extractJSON(text: string): Record<string, unknown> | null {
 
 export type ProviderFeatureRequest = {
   sessionId: string;
+  clientOperationId: string;
   sessionKey: string;
   instructions: string;
   input: unknown;
@@ -301,6 +303,7 @@ async function providerFeaturePayload(
 
 function toStartRunInput(request: ProviderFeatureRequest): StartRunInput {
   return {
+    clientOperationId: request.clientOperationId,
     sessionId: request.sessionId,
     sessionKey: request.sessionKey,
     instructions: request.instructions,
@@ -325,6 +328,7 @@ export async function runProviderRequest(
   request: ProviderFeatureRequest,
   options?: ProviderRunRequestOptions,
 ): Promise<ProviderRunSnapshot> {
+  assertProviderStartSupported(await providerClient.getCapabilities(), toStartRunInput(request), providerClient.provider);
   const run = await providerClient.startRun(toStartRunInput(request));
   let finalSnapshot: ProviderRunSnapshot | null = null;
   const boundary = createProviderStreamEventBoundary(run);
@@ -514,6 +518,7 @@ export function buildProviderFeatureRequest(input: {
     : input.input;
 
   return {
+    clientOperationId: `chrona-feature:${input.sessionKey}`,
     sessionId: input.sessionKey,
     sessionKey: input.sessionKey,
     instructions: input.featureSpec?.instructions ?? fallbackInstructions,

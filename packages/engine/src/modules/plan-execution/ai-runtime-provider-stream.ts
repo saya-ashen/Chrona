@@ -1,4 +1,4 @@
-import type { AgentProviderClient, ProviderRunEvent, ProviderRunRef, ProviderRunSnapshot, StartRunInput } from "@chrona/providers-foundation";
+import { assertProviderStartSupported, type AgentProviderClient, type ProviderRunEvent, type ProviderRunRef, type ProviderRunSnapshot, type StartRunInput } from "@chrona/providers-foundation";
 import { collectProviderRunSnapshot } from "./ai-runtime-stream-collection";
 import { persistRuntimeRunRef, updateProviderRunRecord } from "./ai-runtime-persistence";
 import { toStartRunInput, type ExecutionProviderRequest } from "./ai-runtime-request";
@@ -12,6 +12,7 @@ type ProviderClient = AgentProviderClient;
 type ProviderRunRequestOptions = {
   runId?: string;
   idempotencyKey?: string;
+  clientOperationId?: string;
   providerRunRecordId?: string;
   onRuntimeEvent?: (event: ProviderRunEvent) => Promise<void> | void;
   terminalToolName?: string;
@@ -40,12 +41,14 @@ export async function runProviderRequest(
 
 async function startProviderRun(providerClient: ProviderClient, request: ExecutionProviderRequest, options: ProviderRunRequestOptions): Promise<ProviderRunRef> {
   const input = sanitizeStartRunInputForProvider(providerClient.provider, toStartRunInput(request));
+  const clientOperationId = options.clientOperationId ?? options.runId ?? input.clientOperationId;
+  assertProviderStartSupported(await providerClient.getCapabilities(), input, providerClient.provider);
   const run = await providerClient.startRun({
     ...input,
+    clientOperationId,
     signal: options.signal,
-    idempotencyKey: options.idempotencyKey ?? (options.runId ? `chrona-runtime:${options.runId}` : undefined),
     control: controlForRun(providerClient.provider, options.controlRunToken),
-  } as StartRunInput);
+  });
   await persistRuntimeRunRef(options.runId, run);
   await options.onRunStarted?.(run);
   await updateProviderRunRecord(options.providerRunRecordId, {
@@ -115,6 +118,7 @@ function recoveryUnavailableSnapshot(provider: string, run: ProviderRunRef, mode
     nativeSessionId: run.nativeSessionId,
     status: "failed",
     rawStatus: "interrupted",
+    outcomeCode: "provider_run_unrecoverable",
     error: `Provider recovery mode ${mode} cannot reconnect active run ${run.runId}. Retry can resume from saved provider session history.`,
   };
 }

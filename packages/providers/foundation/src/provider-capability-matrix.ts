@@ -25,5 +25,10 @@ export function summarizeProviderCapabilities(capabilities: ProviderCapabilities
     historyReplay: recovery?.historyReplay ?? capabilities.supportsRunLookup,
     activeRunLookup: recovery?.activeRunLookup ?? capabilities.supportsRunLookup,
     streamReconnect: recovery?.streamReconnect ?? capabilities.supportsRunLookup,
+    clientOperationLookup: capabilities.lookupByClientOperationId ?? false,
+    providerResumeRef: recovery?.providerResumeRef ?? false,
+    runEventReplay: recovery?.runEventReplay ?? false,
+    engineManagedToolResults: capabilities.actionInvocation === "engine_managed",
+    externalControlPlaneActions: capabilities.actionInvocation === "external_control_plane",
   };
 }

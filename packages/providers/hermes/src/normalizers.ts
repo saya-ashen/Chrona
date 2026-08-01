@@ -15,6 +15,9 @@ const defaultCapabilities: ProviderCapabilities = {
   supportsCancellation: true,
   supportsToolCalls: true,
   supportsPreviousResponse: false,
+  actionInvocation: "unsupported",
+  startIdempotency: "client_operation_id",
+  lookupByClientOperationId: false,
   approval: {
     supported: true,
     choices: ["approve_once", "approve_session", "approve_always", "deny"],
@@ -27,6 +30,8 @@ const defaultCapabilities: ProviderCapabilities = {
     activeRunLookup: true,
     streamReconnect: true,
     mode: "authoritative_run_lookup",
+    providerResumeRef: true,
+    runEventReplay: true,
   },
 };
 
@@ -47,12 +52,17 @@ export function mapCapabilities(raw: unknown, fallbackReason?: string): Provider
     supportsCancellation: Boolean(features.run_stop),
     supportsToolCalls: true,
     supportsPreviousResponse: false,
+    actionInvocation: "unsupported",
+    startIdempotency: "client_operation_id",
+    lookupByClientOperationId: false,
     recovery: {
       sessionResume: true,
       historyReplay: true,
       activeRunLookup: Boolean(features.run_status),
       streamReconnect: Boolean(features.run_events_sse),
       mode: "authoritative_run_lookup",
+      providerResumeRef: true,
+      runEventReplay: Boolean(features.run_events_sse),
     },
     details: {
       runs: {

@@ -7,6 +7,7 @@ import type {
 
 export type ExecutionProviderRequest = {
   sessionId: string;
+  clientOperationId: string;
   sessionKey: string;
   instructions: string;
   input: unknown;
@@ -29,10 +30,12 @@ export function buildExecutionGatewayRequest(input: {
   sessionKey: string;
   sessionId: string;
   executionRuntime: string;
+  clientOperationId?: string;
   resumeSessionRef?: string;
 }): ExecutionProviderRequest {
   const maxTokens = input.runtimeInput.maxTokens ?? input.runtimeInput.maxOutputTokens;
   return {
+    clientOperationId: input.clientOperationId ?? `chrona-session:${input.sessionId}`,
     sessionId: input.sessionId,
     sessionKey: input.sessionKey,
     instructions: input.featureSpec.instructions,
@@ -64,6 +67,7 @@ function passthroughRuntimeInput(feature: PreparedAiFeatureSpec["feature"]): boo
 
 export function toStartRunInput(request: ExecutionProviderRequest): StartRunInput {
   return {
+    clientOperationId: request.clientOperationId,
     sessionId: request.sessionId,
     sessionKey: request.sessionKey,
     instructions: request.instructions,

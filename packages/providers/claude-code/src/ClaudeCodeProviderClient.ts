@@ -12,8 +12,10 @@
 
 import {
   appendProviderReplayRecord,
+  assertProviderStartSupported,
   BoundedTerminalRunSnapshots,
   type AgentProviderClient,
+  ProviderOperationError,
   type CancelRunInput,
   type CreateSessionInput,
   type GetRunInput,
@@ -202,6 +204,7 @@ export class ClaudeCodeProviderClient implements AgentProviderClient {
   private readonly ownsRunner: boolean;
   private readonly runs = new Map<string, InternalRun>();
   private readonly terminalSnapshots = new BoundedTerminalRunSnapshots();
+  private readonly startedClientOperations = new Set<string>();
   private runnerInitPromise: Promise<ClaudeCodeRunner> | null = null;
 
   constructor(opts: ClaudeCodeProviderOptions) {
@@ -223,6 +226,9 @@ export class ClaudeCodeProviderClient implements AgentProviderClient {
       supportsCancellation: true,
       supportsToolCalls: true,
       supportsPreviousResponse: false,
+      actionInvocation: "external_control_plane",
+      startIdempotency: "unsupported",
+      lookupByClientOperationId: false,
       approval: {
         supported: false,
         choices: [],
@@ -235,6 +241,8 @@ export class ClaudeCodeProviderClient implements AgentProviderClient {
         activeRunLookup: true,
         streamReconnect: false,
         mode: "authoritative_run_lookup",
+        providerResumeRef: true,
+        runEventReplay: true,
       },
     };
   }
@@ -357,18 +365,31 @@ export class ClaudeCodeProviderClient implements AgentProviderClient {
   }
 
   async startRun(input: StartRunInput): Promise<ProviderRunRef> {
+    assertProviderStartSupported(this.getCapabilities(), input, this.provider);
+    if (this.startedClientOperations.has(input.clientOperationId)) {
+      throw new ProviderOperationError({
+        code: "provider_start_outcome_unknown",
+        provider: this.provider,
+        message: `Claude Code cannot safely attach client operation ${input.clientOperationId}`,
+      });
+    }
     const runner = await this.ensureRunner();
     const startedAt = new Date().toISOString();
     let startResult: { handle: ClaudeCodeRunHandle };
     try {
       startResult = await runner.start(input);
     } catch (err) {
-      throw new ClaudeCodeProviderError(
-        `ClaudeCode startRun failed: ${errorMessage(err)}`,
-        { retryable: false, cause: err },
-      );
+      this.startedClientOperations.add(input.clientOperationId);
+      throw new ProviderOperationError({
+        code: "provider_start_outcome_unknown",
+        provider: this.provider,
+        message: `Claude Code start outcome is unknown for client operation ${input.clientOperationId}`,
+        cause: err,
+      });
     }
+    this.startedClientOperations.add(input.clientOperationId);
     const handle = startResult.handle;
+    handle.ref.providerResumeRef ??= input.resumeSessionRef ?? handle.ref.nativeSessionId ?? handle.ref.nativeRunId ?? handle.ref.runId;
     this.runs.set(handle.runId, { handle, startedAt, input });
     return handle.ref;
   }

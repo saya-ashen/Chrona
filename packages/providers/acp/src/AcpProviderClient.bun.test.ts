@@ -11,6 +11,7 @@ function baseInput(overrides: Partial<StartRunInput> = {}): StartRunInput {
   return {
     sessionId: "acp-session-1",
     instructions: "Finish node.",
+    clientOperationId: "acp-base-operation",
     input: "Return success.",
     stream: true,
     ...overrides,

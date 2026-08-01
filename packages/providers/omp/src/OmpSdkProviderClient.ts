@@ -26,7 +26,9 @@ import {
 } from "@chrona/contracts/api";
 import {
   BoundedTerminalRunSnapshots,
+  assertProviderStartSupported,
   type AgentProviderClient,
+  ProviderOperationError,
   type CancelRunInput,
   type CreateSessionInput,
   type GetRunInput,
@@ -603,6 +605,7 @@ export class OmpSdkProviderClient implements AgentProviderClient {
   private readonly config: OmpProviderConfig;
   private readonly runs = new Map<string, SdkRunHandle>();
   private readonly terminalSnapshots = new BoundedTerminalRunSnapshots();
+  private readonly startedClientOperations = new Set<string>();
 
   constructor(opts: OmpSdkProviderOptions = {}) {
     this.config = opts.config ?? {};
@@ -691,12 +694,17 @@ export class OmpSdkProviderClient implements AgentProviderClient {
       supportsCancellation: true,
       supportsToolCalls: true,
       supportsPreviousResponse: false,
+      actionInvocation: "external_control_plane",
+      startIdempotency: "unsupported",
+      lookupByClientOperationId: false,
       recovery: {
         sessionResume: true,
         historyReplay: true,
         activeRunLookup: false,
         streamReconnect: false,
         mode: "session_history",
+        providerResumeRef: true,
+        runEventReplay: false,
       },
       reason: "Oh My Pi SDK custom tools run in-process for structured Chrona callbacks.",
     };
@@ -869,6 +877,14 @@ export class OmpSdkProviderClient implements AgentProviderClient {
   }
 
   async startRun(input: StartRunInput): Promise<ProviderRunRef> {
+    assertProviderStartSupported(this.getCapabilities(), input, this.provider);
+    if (this.startedClientOperations.has(input.clientOperationId)) {
+      throw new ProviderOperationError({
+        code: "provider_start_outcome_unknown",
+        provider: this.provider,
+        message: `Oh My Pi cannot safely attach client operation ${input.clientOperationId}`,
+      });
+    }
     const sessionId = input.sessionId;
     const runId = `${SDK_RUN_PREFIX}-${randomUUID()}`;
     const startedAt = now();
@@ -878,6 +894,7 @@ export class OmpSdkProviderClient implements AgentProviderClient {
         runId,
         sessionId,
         providerRunId: runId,
+        providerResumeRef: input.resumeSessionRef ?? runId,
         status: "running",
         startedAt,
         stream: { supported: true, reconnectable: false },
@@ -897,6 +914,7 @@ export class OmpSdkProviderClient implements AgentProviderClient {
     this.runs.set(runId, handle);
 
     const queue = new AsyncEventQueue(handle);
+    this.startedClientOperations.add(input.clientOperationId);
     queue.push({ ...eventBase(handle, "run_started"), type: "run_started", run: runRef(handle) });
     this.startSdkTurn(handle, queue).catch((error) => {
       this.fail(handle, queue, error);

@@ -30,6 +30,9 @@ class RecordingProvider implements AgentProviderClient {
       supportsCancellation: true,
       supportsToolCalls: true,
       supportsPreviousResponse: false,
+      actionInvocation: "unsupported" as const,
+      startIdempotency: "unsupported" as const,
+      lookupByClientOperationId: false,
     };
   }
 
@@ -74,6 +77,7 @@ function startInput(terminalToolName?: string): StartRunInput {
     sessionId: "session-1",
     instructions: "instructions",
     input: { type: "text", text: "input" },
+    clientOperationId: "omp-test-operation",
     terminalToolName,
   };
 }
@@ -88,6 +92,8 @@ describe("OmpSdkProviderClient recovery capabilities", () => {
       historyReplay: true,
       activeRunLookup: false,
       streamReconnect: false,
+      providerResumeRef: true,
+      runEventReplay: false,
       mode: "session_history",
     });
   });

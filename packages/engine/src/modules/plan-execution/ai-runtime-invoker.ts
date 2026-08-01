@@ -135,6 +135,7 @@ async function createProviderRequest(
   providerClient: NonNullable<Awaited<ReturnType<typeof requireAiClient>>["providerClient"]>,
 ): Promise<ExecutionProviderRequest> {
   const request = buildExecutionGatewayRequest({
+    clientOperationId: input.providerRunIdempotencyKey ?? `chrona-runtime:${run.id}`,
     instructions: input.instructions,
     runtimeInput: input.runtimeInput,
     featureSpec: input.featureSpec,
@@ -163,6 +164,7 @@ async function providerRequestOptions(
   providerName: string,
 ) {
   return {
+    clientOperationId: input.providerRunIdempotencyKey ?? `chrona-runtime:${runId}`,
     runId,
     idempotencyKey: input.providerRunIdempotencyKey,
     providerRunRecordId: providerRun?.id,

@@ -4,6 +4,7 @@ export type {
   CreateSessionInput,
   ExistingRunStreamInput,
   GetRunInput,
+  FindRunByClientOperationInput,
   HealthCheckInput,
   ProviderApprovalCapability,
   ProviderApprovalChoice,
@@ -13,8 +14,11 @@ export type {
   ProviderApprovalScopePolicy,
   ProviderApprovalSubject,
   ProviderCapabilities,
+  ProviderActionInvocationMode,
   ProviderRecoveryCapability,
+  ProviderOutcomeCode,
   ProviderConfigurationCapabilities,
+  ProviderStartIdempotency,
   ProviderRuntimeDiagnostics,
   ProviderConfig,
   ProviderHealth,
@@ -32,6 +36,9 @@ export type {
   ProviderConversationTurnInput,
   ProviderConversationTurnResult,
   ProviderStructuredOutputSchema,
+  ProviderToolDefinition,
+  ProviderToolResultInput,
+  ProviderToolResultOutcome,
   ProviderUsage,
   ResolveProviderApprovalInput,
   StartRunControlInput,
@@ -42,10 +49,12 @@ export type {
 from "./contracts/provider";
 
 export {
+  assertProviderStartSupported,
   cancelRunInputSchema,
   createSessionInputSchema,
   existingRunStreamInputSchema,
   getRunInputSchema,
+  findRunByClientOperationInputSchema,
   healthCheckInputSchema,
   providerApprovalCapabilitySchema,
   providerApprovalChoiceSchema,
@@ -57,6 +66,12 @@ export {
   providerCapabilitiesSchema,
   providerConfigurationCapabilitiesSchema,
   providerRuntimeDiagnosticsSchema,
+  providerOutcomeCodeSchema,
+  providerActionInvocationModeSchema,
+  providerStartIdempotencySchema,
+  providerToolDefinitionSchema,
+  providerToolResultInputSchema,
+  providerToolResultOutcomeSchema,
   providerRecoveryCapabilitySchema,
   providerHealthSchema,
   providerRunInputSchema,
@@ -70,6 +85,7 @@ export {
   resolveProviderApprovalInputSchema,
   startRunInputSchema,
   streamRunInputSchema,
+  ProviderOperationError,
 } from "./contracts/provider";
 
 export {

@@ -151,15 +151,6 @@ export const providerApprovalResolutionSchema = z
     raw: z.unknown().optional(),
   })
   .strict();
-export const providerRecoveryCapabilitySchema = z
-  .object({
-    sessionResume: z.boolean(),
-    historyReplay: z.boolean(),
-    activeRunLookup: z.boolean(),
-    streamReconnect: z.boolean(),
-    mode: z.enum(["authoritative_run_lookup", "session_history", "local_stream_only"]),
-  })
-  .strict();
 export const providerConfigurationCapabilitiesSchema = z
   .object({
     model: z.object({ supported: z.boolean(), taskOverride: z.boolean() }).strict(),
@@ -204,6 +195,115 @@ export const providerRuntimeDiagnosticsSchema = z
   })
   .strict();
 
+export const providerActionInvocationModeSchema = z.enum([
+  "engine_managed",
+  "external_control_plane",
+  "unsupported",
+]);
+
+export const providerStartIdempotencySchema = z.enum([
+  "client_operation_id",
+  "unsupported",
+]);
+
+export const providerOutcomeCodeSchema = z.enum([
+  "provider_capability_mismatch",
+  "provider_start_outcome_unknown",
+  "provider_run_unrecoverable",
+]);
+
+/**
+ * A provider-neutral tool that may be offered to a run. The definition
+ * deliberately describes protocol shape only; it has no Chrona feature,
+ * goal, or task semantics.
+ */
+export const providerToolDefinitionSchema = z
+  .object({
+    name: z.string().min(1),
+    description: z.string().min(1).optional(),
+    inputSchema: providerJsonValueSchema,
+  })
+  .strict();
+
+export const findRunByClientOperationInputSchema = z
+  .object({
+    clientOperationId: z.string().min(1),
+    signal: z.custom<AbortSignal>().optional(),
+  })
+  .strict();
+
+export const providerToolResultInputSchema = z
+  .object({
+    runId: z.string().min(1),
+    callId: z.string().min(1),
+    result: z.unknown().optional(),
+    error: z
+      .object({
+        code: z.string().min(1),
+        message: z.string().min(1),
+      })
+      .strict()
+      .optional(),
+    signal: z.custom<AbortSignal>().optional(),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.result === undefined && !value.error) {
+      context.addIssue({ code: z.ZodIssueCode.custom, message: "Provider tool result requires result or error" });
+    }
+    if (value.result !== undefined && value.error) {
+      context.addIssue({ code: z.ZodIssueCode.custom, message: "Provider tool result cannot include both result and error" });
+    }
+  });
+
+export const providerToolResultOutcomeSchema = z
+  .object({
+    code: z.enum(["accepted", "not_pending", "unsupported"]),
+  })
+  .strict();
+
+/** A stable, safe-to-project failure classification for provider lifecycle boundaries. */
+export class ProviderOperationError extends Error {
+  readonly code: z.infer<typeof providerOutcomeCodeSchema>;
+  readonly provider?: string;
+
+  constructor(input: { code: z.infer<typeof providerOutcomeCodeSchema>; message: string; provider?: string; cause?: unknown }) {
+    super(input.message, { cause: input.cause });
+    this.name = "ProviderOperationError";
+    this.code = input.code;
+    this.provider = input.provider;
+  }
+}
+
+/** Reject a requested engine-managed tool loop before a provider start is issued. */
+export function assertProviderStartSupported(
+  capabilities: ProviderCapabilities,
+  input: Pick<StartRunInput, "tools">,
+  provider?: string,
+): void {
+  if (input.tools?.length && capabilities.actionInvocation !== "engine_managed") {
+    throw new ProviderOperationError({
+      code: "provider_capability_mismatch",
+      provider,
+      message: `${provider ?? "Provider"} does not support engine-managed tool results`,
+    });
+  }
+}
+
+export const providerRecoveryCapabilitySchema = z
+  .object({
+    sessionResume: z.boolean(),
+    historyReplay: z.boolean(),
+    activeRunLookup: z.boolean(),
+    streamReconnect: z.boolean(),
+    /** A persisted provider-native reference can resume a run after interruption. */
+    providerResumeRef: z.boolean().optional(),
+    /** A previous run's events can be replayed or its stream reattached. */
+    runEventReplay: z.boolean().optional(),
+    mode: z.enum(["authoritative_run_lookup", "session_history", "local_stream_only"]),
+  })
+  .strict();
+
 export const providerCapabilitiesSchema = z
   .object({
     supportsSessions: z.boolean(),
@@ -212,12 +312,19 @@ export const providerCapabilitiesSchema = z
     supportsCancellation: z.boolean(),
     supportsToolCalls: z.boolean(),
     supportsPreviousResponse: z.boolean(),
+    /** How this adapter can execute provider tool/action calls, if at all. */
+    actionInvocation: providerActionInvocationModeSchema.optional(),
+    /** Whether repeating startRun with the same clientOperationId attaches instead of starting again. */
+    startIdempotency: providerStartIdempotencySchema.optional(),
+    /** Whether a prior accepted start can be found by clientOperationId after ref persistence is interrupted. */
+    lookupByClientOperationId: z.boolean().optional(),
     reason: z.string().optional(),
     approval: providerApprovalCapabilitySchema.optional(),
     recovery: providerRecoveryCapabilitySchema.optional(),
     details: z.unknown().optional(),
   })
   .strict();
+
 
 export const healthCheckInputSchema = z
   .object({
@@ -280,20 +387,20 @@ export const startRunControlInputSchema = z
 
 export const startRunInputSchema = z
   .object({
+    /** Stable caller-owned idempotency key. The same operation must never create a second provider run. */
+    clientOperationId: z.string().min(1),
     sessionId: z.string().min(1),
     sessionKey: z.string().min(1).optional(),
     instructions: z.string().min(1),
     input: providerRunInputSchema,
+    tools: z.array(providerToolDefinitionSchema).optional(),
     structuredOutputSchema: providerStructuredOutputSchemaSchema.optional(),
     terminalToolName: z.string().min(1).optional(),
     toolPolicy: z.enum(["full", "read_only"]).optional(),
     previousResponseId: z.string().min(1).optional(),
     /**
-     * Provider-native session id captured from a PRIOR run for this Chrona
-     * session (e.g. Claude Code SDK `message.session_id`). Lets a fresh
-     * process resume the same provider conversation: the in-process runner
-     * cache is empty after restart, so the engine threads the persisted id
-     * here and the runner uses it as the SDK `resume` target.
+     * Provider-native session id captured from a prior run. This is an
+     * adapter-internal recovery reference, never a public progress field.
      */
     resumeSessionRef: z.string().min(1).optional(),
     maxOutputTokens: z.number().int().positive().optional(),
@@ -304,7 +411,6 @@ export const startRunInputSchema = z
     }).strict().optional(),
     stream: z.boolean().optional(),
     signal: z.custom<AbortSignal>().optional(),
-    /** Optional skill-mode control plane handoff. See `startRunControlInputSchema`. */
     control: startRunControlInputSchema.optional(),
   })
   .strict();
@@ -356,6 +462,8 @@ export const providerRunRefSchema = z
     nativeSessionId: z.string().min(1).optional(),
     nativeRunId: z.string().min(1).optional(),
     providerRunId: z.string().min(1).optional(),
+    /** Provider-private recovery reference persisted by the runtime, never surfaced as public progress. */
+    providerResumeRef: z.string().min(1).optional(),
     status: providerRunStatusSchema.optional(),
     responseId: z.string().min(1).optional(),
     startedAt: z.string().datetime().optional(),
@@ -537,7 +645,9 @@ export const providerRunSnapshotSchema = z
     nativeSessionId: z.string().min(1).optional(),
     nativeRunId: z.string().min(1).optional(),
     providerRunId: z.string().min(1).optional(),
+    providerResumeRef: z.string().min(1).optional(),
     status: providerRunStatusSchema,
+    outcomeCode: providerOutcomeCodeSchema.optional(),
     rawStatus: z.string().optional(),
     outputText: z.string().optional(),
     output: z
@@ -608,6 +718,13 @@ export type ProviderRunEvent = z.infer<typeof providerRunEventSchema>;
 export type GetRunInput = z.infer<typeof getRunInputSchema>;
 export type ProviderRunSnapshot = z.infer<typeof providerRunSnapshotSchema>;
 export type CancelRunInput = z.infer<typeof cancelRunInputSchema>;
+export type ProviderActionInvocationMode = z.infer<typeof providerActionInvocationModeSchema>;
+export type ProviderStartIdempotency = z.infer<typeof providerStartIdempotencySchema>;
+export type ProviderOutcomeCode = z.infer<typeof providerOutcomeCodeSchema>;
+export type ProviderToolDefinition = z.infer<typeof providerToolDefinitionSchema>;
+export type FindRunByClientOperationInput = z.infer<typeof findRunByClientOperationInputSchema>;
+export type ProviderToolResultInput = z.infer<typeof providerToolResultInputSchema>;
+export type ProviderToolResultOutcome = z.infer<typeof providerToolResultOutcomeSchema>;
 
 export type ProviderConversationCapabilities = {
   resume: boolean;
@@ -676,7 +793,21 @@ export interface AgentProviderClient {
 
   createSession(input?: CreateSessionInput): Promise<ProviderSessionRef>;
 
+  /**
+   * Start or attach to the provider run represented by clientOperationId.
+   * If the adapter cannot determine the result of an earlier start it must
+   * reject with ProviderOperationError(provider_start_outcome_unknown), not
+   * issue an unguarded second start.
+   */
   startRun(input: StartRunInput): Promise<ProviderRunRef>;
+
+  findRunByClientOperationId?(
+    input: FindRunByClientOperationInput,
+  ): Promise<ProviderRunRef | null>;
+
+  submitToolResult?(
+    input: ProviderToolResultInput,
+  ): Promise<ProviderToolResultOutcome>;
 
   streamRun(input: StreamRunInput): AsyncIterable<ProviderRunEvent>;
 

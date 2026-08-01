@@ -445,6 +445,7 @@ export async function finalizeTaskResult(input: {
       manifest: running.manifest,
     });
     const response = await runProviderRequest(client.providerClient, {
+      clientOperationId: `result-finalization:${input.taskId}:${sourceRevision}:${attempt}`,
       sessionId: `result-finalization:${input.taskId}:${sourceRevision}:${attempt}`,
       sessionKey: `result-finalization:${input.taskId}:${sourceRevision}:${attempt}`,
       instructions: featureSpec.instructions,

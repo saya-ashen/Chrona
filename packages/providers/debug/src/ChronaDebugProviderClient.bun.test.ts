@@ -22,12 +22,21 @@ afterEach(() => {
   }
 });
 
+const startInput = (overrides: Record<string, unknown> = {}) => ({
+  clientOperationId: "debug-operation-1",
+  sessionId: "debug-test-session",
+  instructions: "Complete the current task node.",
+  input: "Complete it.",
+  stream: true,
+  ...overrides,
+});
 describe("ChronaDebugProviderClient", () => {
   it("emits a schema-valid boundary debug plan", async () => {
     const client = new ChronaDebugProviderClient();
     const events = [];
 
     for await (const event of client.streamRun({
+      clientOperationId: "debug-plan-stream-operation",
       sessionId: "debug-test-session",
       instructions: "Use chrona_plan_generate to create a test plan.",
       input: "Generate boundary debug plan.",
@@ -118,6 +127,7 @@ describe("ChronaDebugProviderClient", () => {
     const run = await client.startRun({
       sessionId: "ignored-session",
       instructions: "ignored",
+      clientOperationId: "debug-replay-operation",
       input: "ignored",
     });
     const events = [];
@@ -152,6 +162,7 @@ describe("ChronaDebugProviderClient", () => {
     const events = [];
 
     for await (const event of client.streamRun({
+      clientOperationId: "debug-hermes-like-stream-operation",
       sessionId: "debug-task-session",
       instructions: "Complete the current task node.",
       input: {
@@ -182,6 +193,7 @@ describe("ChronaDebugProviderClient", () => {
     const events = [];
 
     for await (const event of client.streamRun({
+      clientOperationId: "debug-direct-stream-operation",
       sessionId: "debug-task-session",
       instructions: "Complete the current task node.",
       input: {
@@ -205,6 +217,7 @@ describe("ChronaDebugProviderClient", () => {
     const events = [];
 
     for await (const event of client.streamRun({
+      clientOperationId: "debug-finalization-stream-operation",
       sessionId: "debug-result-finalization",
       instructions: "Finalize the immutable ResultManifest.",
       input: { manifest: { sourceRevision: 1 } },
@@ -230,5 +243,31 @@ describe("ChronaDebugProviderClient", () => {
         },
       },
     });
+  });
+});
+
+describe("debug operation bridge", () => {
+  it("attaches the same operation to one run and finds it after start", async () => {
+    const client = new ChronaDebugProviderClient();
+    const first = await client.startRun(startInput());
+    const second = await client.startRun(startInput());
+    expect(second.runId).toBe(first.runId);
+    await expect(client.findRunByClientOperationId({ clientOperationId: "debug-operation-1" })).resolves.toMatchObject({ runId: first.runId });
+  });
+
+  it("accepts an engine-managed result for a pending debug tool call", async () => {
+    const client = new ChronaDebugProviderClient({ profile: "tool-submit" });
+    const run = await client.startRun(startInput({ clientOperationId: "debug-tool-operation", tools: [{ name: "test_tool", inputSchema: { type: "object" } }] }));
+    const events = [];
+    const streaming = (async () => {
+      for await (const event of client.streamRun({ runId: run.runId })) {
+        events.push(event);
+        if (event.type === "tool_call" && event.status === "pending") {
+          await client.submitToolResult({ runId: run.runId, callId: event.callId, result: { accepted: true } });
+        }
+      }
+    })();
+    await streaming;
+    expect(events.some((event) => event.type === "tool_result" && event.callId === "chrona-debug-pending-1")).toBe(true);
   });
 });

@@ -266,6 +266,7 @@ async function* agentProviderStream(
       // returned ref so both sides converge on the provider's id. We do not
       // fabricate a separate session ref via `createSession`.
       const run = await agentClient.providerClient.startRun({
+        clientOperationId: `chrona-stream:${feature}:${input.scope}:${sessionKey}`,
         sessionId,
         sessionKey,
         instructions: providerInput.instructions,

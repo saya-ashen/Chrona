@@ -53,6 +53,29 @@ function incompleteStream(run = runRef()): AsyncIterable<ProviderRunEvent> {
   })();
 }
 
+function providerCapabilities() {
+  return {
+    supportsSessions: true,
+    supportsStreaming: true,
+    supportsRunLookup: true,
+    supportsCancellation: true,
+    supportsToolCalls: true,
+    supportsPreviousResponse: false,
+    actionInvocation: "unsupported" as const,
+    startIdempotency: "unsupported" as const,
+    lookupByClientOperationId: false,
+    recovery: {
+      sessionResume: true,
+      historyReplay: true,
+      activeRunLookup: true,
+      streamReconnect: true,
+      providerResumeRef: true,
+      runEventReplay: true,
+      mode: "authoritative_run_lookup" as const,
+    },
+  };
+}
+
 
 async function resetDb() {
   await db.run.deleteMany();
@@ -144,7 +167,18 @@ describe("runProviderRequest stream-interruption fallback", () => {
 
     const client = {
       provider: "hermes",
-      getCapabilities: mock(() => ({ recovery: { activeRunLookup: true } })),
+      getCapabilities: mock(() => ({
+        supportsSessions: true,
+        supportsStreaming: true,
+        supportsRunLookup: true,
+        supportsCancellation: true,
+        supportsToolCalls: true,
+        supportsPreviousResponse: false,
+        actionInvocation: "unsupported" as const,
+        startIdempotency: "unsupported" as const,
+        lookupByClientOperationId: false,
+        recovery: { sessionResume: true, historyReplay: true, activeRunLookup: true, streamReconnect: true, providerResumeRef: true, runEventReplay: true, mode: "authoritative_run_lookup" as const },
+      })),
       startRun,
       streamRun,
       getRun,
@@ -176,7 +210,18 @@ describe("runProviderRequest stream-interruption fallback", () => {
 
     const client = {
       provider: "hermes",
-      getCapabilities: mock(() => ({ recovery: { activeRunLookup: true } })),
+      getCapabilities: mock(() => ({
+        supportsSessions: true,
+        supportsStreaming: true,
+        supportsRunLookup: true,
+        supportsCancellation: true,
+        supportsToolCalls: true,
+        supportsPreviousResponse: false,
+        actionInvocation: "unsupported" as const,
+        startIdempotency: "unsupported" as const,
+        lookupByClientOperationId: false,
+        recovery: { sessionResume: true, historyReplay: true, activeRunLookup: true, streamReconnect: true, providerResumeRef: true, runEventReplay: true, mode: "authoritative_run_lookup" as const },
+      })),
       startRun: mock(async () => runRef()),
       streamRun,
       getRun,
@@ -196,7 +241,18 @@ describe("runProviderRequest stream-interruption fallback", () => {
 
     const client = {
       provider: "hermes",
-      getCapabilities: mock(() => ({ recovery: { activeRunLookup: true } })),
+      getCapabilities: mock(() => ({
+        supportsSessions: true,
+        supportsStreaming: true,
+        supportsRunLookup: true,
+        supportsCancellation: true,
+        supportsToolCalls: true,
+        supportsPreviousResponse: false,
+        actionInvocation: "unsupported" as const,
+        startIdempotency: "unsupported" as const,
+        lookupByClientOperationId: false,
+        recovery: { sessionResume: true, historyReplay: true, activeRunLookup: true, streamReconnect: true, providerResumeRef: true, runEventReplay: true, mode: "authoritative_run_lookup" as const },
+      })),
       startRun: mock(async () => runRef()),
       streamRun: mock(() => incompleteStream()),
       getRun,
@@ -224,12 +280,17 @@ describe("runProviderRequest stream-interruption fallback", () => {
         supportsCancellation: true,
         supportsToolCalls: true,
         supportsPreviousResponse: false,
+        actionInvocation: "unsupported" as const,
+        startIdempotency: "unsupported" as const,
+        lookupByClientOperationId: false,
         recovery: {
           sessionResume: true,
           historyReplay: true,
           activeRunLookup: false,
           streamReconnect: false,
           mode: "session_history",
+          providerResumeRef: true,
+          runEventReplay: false,
         },
       })),
       startRun: mock(async () => ({ ...runRef(), provider: "codex" })),
@@ -261,6 +322,7 @@ describe("runProviderRequest stream-interruption fallback", () => {
 
     const client = {
       provider: "hermes",
+      getCapabilities: () => providerCapabilities(),
       startRun: mock(async () => runRef()),
       streamRun,
       getRun,
@@ -279,6 +341,7 @@ describe("runProviderRequest runtime ref persistence", () => {
     const { first, second } = await seedRunPair();
     const client = {
       provider: "hermes",
+      getCapabilities: () => providerCapabilities(),
       startRun: mock(async () => ({
         provider: "hermes",
         runId: "provider-run-1",
@@ -316,6 +379,7 @@ describe("runProviderRequest runtime ref persistence", () => {
     });
     const client = {
       provider: "omp",
+      getCapabilities: () => providerCapabilities(),
       startRun: mock(async () => providerRun),
       streamRun: mock(() =>
         (async function* () {
@@ -346,6 +410,7 @@ describe("runProviderRequest runtime ref persistence", () => {
     const onRunStarted = mock(async () => {});
     const client = {
       provider: "hermes",
+      getCapabilities: () => providerCapabilities(),
       startRun: mock(async () => ({
         provider: "hermes",
         runId: "provider-run-started",
@@ -389,6 +454,7 @@ describe("runProviderRequest runtime ref persistence", () => {
     const { second } = await seedRunPair();
     const client = {
       provider: "hermes",
+      getCapabilities: () => providerCapabilities(),
       startRun: mock(async () => ({
         provider: "hermes",
         runId: "provider-run-1",
@@ -417,6 +483,7 @@ describe("runProviderRequest runtime ref persistence", () => {
     const { workspace, task, providerRun, run } = await seedProviderRunChain();
     const client = {
       provider: "hermes",
+      getCapabilities: () => providerCapabilities(),
       startRun: mock(async () => ({
         provider: "hermes",
         runId: "provider-run-1",
@@ -460,6 +527,7 @@ describe("runProviderRequest runtime ref persistence", () => {
   it("does not synthesize terminal tool metadata from the configured terminal tool", async () => {
     const client = {
       provider: "hermes",
+      getCapabilities: () => providerCapabilities(),
       startRun: mock(async () => runRef()),
       streamRun: mock(() =>
         (async function* () {
@@ -482,6 +550,7 @@ describe("runProviderRequest runtime ref persistence", () => {
   it("keeps the last provider tool_call as terminal tool metadata", async () => {
     const client = {
       provider: "hermes",
+      getCapabilities: () => providerCapabilities(),
       startRun: mock(async () => runRef()),
       streamRun: mock(() =>
         (async function* () {
@@ -510,6 +579,7 @@ describe("runProviderRequest runtime ref persistence", () => {
     const { workspace, task, providerRun, run } = await seedProviderRunChain();
     const client = {
       provider: "hermes",
+      getCapabilities: () => providerCapabilities(),
       startRun: mock(async () => ({
         provider: "hermes",
         runId: "provider-run-1",
@@ -564,6 +634,7 @@ describe("runProviderRequest runtime ref persistence", () => {
     }));
     const client = {
       provider: "hermes",
+      getCapabilities: () => providerCapabilities(),
       startRun: mock(async () => ({
         provider: "hermes",
         runId: "provider-run-1",
@@ -621,6 +692,7 @@ describe("runProviderRequest resume threading", () => {
 
     const client = {
       provider: "claude_code",
+      getCapabilities: () => providerCapabilities(),
       startRun,
       streamRun,
     } as unknown as AgentProviderClient;
@@ -651,6 +723,7 @@ describe("runProviderRequest resume threading", () => {
 
     const client = {
       provider: "claude_code",
+      getCapabilities: () => providerCapabilities(),
       startRun,
       streamRun,
     } as unknown as AgentProviderClient;
@@ -679,6 +752,7 @@ describe("runProviderRequest resume threading", () => {
 
     const client = {
       provider: "claude_code",
+      getCapabilities: () => providerCapabilities(),
       startRun,
       streamRun,
     } as unknown as AgentProviderClient;
@@ -705,6 +779,7 @@ describe("runProviderRequest runtime model threading", () => {
     );
     const client = {
       provider: "omp",
+      getCapabilities: () => providerCapabilities(),
       startRun,
       streamRun,
     } as unknown as AgentProviderClient;
@@ -745,6 +820,7 @@ describe("runProviderRequest Chrona control handoff", () => {
 
     const client = {
       provider: "omp",
+      getCapabilities: () => providerCapabilities(),
       startRun,
       streamRun,
     } as unknown as AgentProviderClient;
@@ -784,6 +860,7 @@ describe("runProviderRequest Chrona control handoff", () => {
 
     const client = {
       provider: "omp",
+      getCapabilities: () => providerCapabilities(),
       startRun,
       streamRun,
     } as unknown as AgentProviderClient;

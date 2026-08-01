@@ -2,7 +2,7 @@ import { spawn } from "node:child_process";
 import { Readable, Writable } from "node:stream";
 import type { Readable as NodeReadable, Writable as NodeWritable } from "node:stream";
 import * as acp from "@agentclientprotocol/sdk";
-import { BoundedTerminalRunSnapshots } from "@chrona/providers-foundation";
+import { assertProviderStartSupported, BoundedTerminalRunSnapshots, ProviderOperationError } from "@chrona/providers-foundation";
 import type {
   ActiveSession,
   ClientContext,
@@ -750,6 +750,7 @@ export class AcpProviderClient implements AgentProviderClient {
   private readonly runs = new Map<string, InternalRun>();
   private readonly terminalSnapshots = new BoundedTerminalRunSnapshots();
   private readonly pendingApprovals = new Map<string, PendingAcpApproval>();
+  private readonly startedClientOperations = new Set<string>();
 
   constructor(opts: AcpProviderOptions) {
     this.config = opts.config;
@@ -766,12 +767,17 @@ export class AcpProviderClient implements AgentProviderClient {
       supportsCancellation: true,
       supportsToolCalls: true,
       supportsPreviousResponse: false,
+      actionInvocation: "external_control_plane",
+      startIdempotency: "unsupported",
+      lookupByClientOperationId: false,
       approval: { supported: true, choices: ["approve_once", "approve_always", "deny"], scopes: ["once", "always"], resolveAll: false },
       recovery: {
         sessionResume: true,
         historyReplay: true,
         activeRunLookup: false,
         streamReconnect: false,
+        providerResumeRef: true,
+        runEventReplay: false,
         mode: "session_history",
       },
       reason: `${this.config.displayName ?? this.provider} ACP provider`,
@@ -822,16 +828,30 @@ export class AcpProviderClient implements AgentProviderClient {
   }
 
   async startRun(input: StartRunInput): Promise<ProviderRunRef> {
+    assertProviderStartSupported(this.getCapabilities(), input, this.provider);
+      if (this.startedClientOperations.has(input.clientOperationId)) {
+        throw new ProviderOperationError({
+          code: "provider_start_outcome_unknown",
+          provider: this.provider,
+          message: `${this.provider} cannot safely attach client operation ${input.clientOperationId}`,
+        });
+      }
     try {
       const handle = await this.start(input);
       if (input.resumeSessionRef) await handle.ready;
+      this.startedClientOperations.add(input.clientOperationId);
       this.runs.set(handle.ref.runId, { handle, startedAt: now(), input });
       return handle.ref;
     } catch (error) {
-      throw new AcpProviderError(`${this.provider} startRun failed: ${providerErrorMessage(error, this.diagnosticDetails())}`, {
-        retryable: false,
-        cause: error,
+      // Configuration/protocol failures are known before ACP can accept a
+      // prompt; preserve them and leave the operation eligible for correction.
+      if (error instanceof AcpProviderError) throw error;
+      this.startedClientOperations.add(input.clientOperationId);
+      throw new ProviderOperationError({
+        code: "provider_start_outcome_unknown",
         provider: this.provider,
+        message: `${this.provider} start outcome is unknown for client operation ${input.clientOperationId}`,
+        cause: error,
       });
     }
   }
@@ -911,6 +931,7 @@ export class AcpProviderClient implements AgentProviderClient {
         nativeRunId: runId,
         providerRunId: runId,
         sessionId: input.sessionId,
+        providerResumeRef: input.resumeSessionRef ?? runId,
         status: "running",
         stream: { supported: true, reconnectable: false },
       },

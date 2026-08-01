@@ -63,4 +63,46 @@ describe("providerCapabilityMatrix", () => {
       streamReconnect: false,
     });
   });
+
+  it("models the debug adapter as the only engine-managed operation bridge", () => {
+    const debug = providerCapabilityMatrix.find((entry) => entry.provider === "debug");
+    expect(debug?.execution).toMatchObject({
+      engineManagedToolResults: true,
+      externalControlPlaneActions: false,
+    });
+    expect(debug?.recovery).toMatchObject({
+      clientOperationLookup: true,
+      providerResumeRef: true,
+      runEventReplay: true,
+    });
+  });
+
+  it("summarizes invocation and operation recovery capabilities", () => {
+    expect(summarizeProviderCapabilities({
+      supportsSessions: true,
+      supportsStreaming: true,
+      supportsRunLookup: true,
+      supportsCancellation: true,
+      supportsToolCalls: true,
+      supportsPreviousResponse: false,
+      actionInvocation: "engine_managed",
+      startIdempotency: "client_operation_id",
+      lookupByClientOperationId: true,
+      recovery: {
+        sessionResume: true,
+        historyReplay: true,
+        activeRunLookup: true,
+        streamReconnect: true,
+        providerResumeRef: true,
+        runEventReplay: true,
+        mode: "authoritative_run_lookup",
+      },
+    })).toMatchObject({
+      clientOperationLookup: true,
+      providerResumeRef: true,
+      runEventReplay: true,
+      engineManagedToolResults: true,
+      externalControlPlaneActions: false,
+    });
+  });
 });

@@ -167,12 +167,12 @@ describe("HermesProviderClient", () => {
       sessionId: "session-1",
       instructions: "Be concise",
       input: { type: "text", text: "Hello" },
+      clientOperationId: "hermes-start-body",
       structuredOutputSchema: {
         name: "ignored_schema",
         description: "Hermes tools decide authoritative actions through MCP.",
         schema: { type: "object" },
       },
-      idempotencyKey: "idem-1",
     });
 
     expect(seenBody).toEqual({
@@ -181,7 +181,7 @@ describe("HermesProviderClient", () => {
       input: "Hello",
     });
     expect(seenHeaders?.get("Authorization")).toBe("Bearer secret");
-    expect(seenHeaders?.get("Idempotency-Key")).toBe("idem-1");
+    expect(seenHeaders?.get("Idempotency-Key")).toBe("hermes-start-body");
     expect(run).toMatchObject({
       provider: "hermes",
       runId: "run-1",
@@ -189,6 +189,7 @@ describe("HermesProviderClient", () => {
       sessionId: "session-1",
       status: "running",
       stream: { supported: true, reconnectable: true },
+      providerResumeRef: "run-1",
     });
     expect(Date.parse(run.startedAt ?? "")).not.toBeNaN();
   });
@@ -205,6 +206,7 @@ describe("HermesProviderClient", () => {
       sessionId: "session-1",
       instructions: "Be concise",
       previousResponseId: "resp-1",
+      clientOperationId: "hermes-history-previous-response",
       input: {
         type: "messages",
         messages: [
@@ -234,6 +236,7 @@ describe("HermesProviderClient", () => {
       sessionId: "session-1",
       instructions: "go",
       input: { type: "text", text: "Hello" },
+      clientOperationId: "hermes-rate-limited",
     })).rejects.toMatchObject({
       code: "rate_limited",
       retryable: true,
@@ -253,6 +256,7 @@ describe("HermesProviderClient", () => {
       sessionId: "session-1",
       instructions: "go",
       input: { type: "text", text: "Hello" },
+      clientOperationId: "hermes-timeout",
     })).rejects.toMatchObject({
       code: "aborted",
       retryable: true,
@@ -274,6 +278,7 @@ describe("HermesProviderClient", () => {
       sessionId: "session-1",
       instructions: "go",
       input: { type: "text", text: "Hello" },
+      clientOperationId: "hermes-caller-aborted",
       signal: controller.signal,
     })).rejects.toMatchObject({
       code: "aborted",
@@ -290,6 +295,7 @@ describe("HermesProviderClient", () => {
       sessionId: "session-1",
       instructions: "go",
       input: { type: "text", text: "Hello" },
+      clientOperationId: "hermes-unauthorized",
     })).rejects.toMatchObject({
       code: "misconfigured",
       status: 401,
@@ -491,6 +497,7 @@ describe("HermesProviderClient", () => {
       sessionId: "session-1",
       instructions: "go",
       input: { type: "text", text: "Hello" },
+      clientOperationId: "hermes-debug-replay",
     });
     for await (const _event of client.streamRun({ runId: "run-1", sessionId: "session-1" })) {
       // consume stream to flush replay records
