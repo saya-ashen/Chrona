@@ -1,12 +1,13 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useLocale, localizeHref } from "@chrona/i18n";
 import {
   AlertTriangle,
   Archive,
   ArrowRight,
-  CheckCircle2,
   CircleDot,
+  CheckCircle2,
   CircleOff,
   Pause,
   Plus,
@@ -14,7 +15,6 @@ import {
 } from "lucide-react";
 import { useNavigate, useRevalidator, useSearchParams } from "react-router-dom";
 import { v4 as uuidv4 } from "uuid";
-import { useLocale, localizeHref } from "@chrona/i18n";
 import {
   Badge,
   Button,
@@ -40,9 +40,9 @@ import {
   TabsTrigger,
 } from "@shared/ui";
 import { apiJson } from "@shared/http";
-import { createGoal, createGoalWithFirstTask } from "../browser-api";
+import { createGoal, createGoalWithFirstTask, generateGoalReview } from "../browser-api";
 import { LocalizedLink } from "./localized-link";
-import type { GoalCopy, GoalData } from "../model/goal-types";
+import { goalAiProgressText, type GoalCopy, type GoalData } from "../model/goal-types";
 
 type GoalListGroup = "attention" | "progress" | "stable";
 
@@ -61,16 +61,19 @@ function CreateGoalDialog({ copy }: { copy: GoalCopy }) {
   const [firstTaskTitle, setFirstTaskTitle] = useState("");
   const [additionalContext, setAdditionalContext] = useState("");
   const [pending, setPending] = useState(false);
+  const [progressText, setProgressText] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function submit() {
     if (!title.trim() || pending) return;
     setPending(true);
+    setProgressText(null);
     setError(null);
     try {
       const workspace = await apiJson<{ id: string }>(
         "/api/workspaces/default",
       );
+      let goalId: string;
       if (firstTaskTitle.trim()) {
         const created = await createGoalWithFirstTask({
           workspaceId: workspace.id,
@@ -80,25 +83,23 @@ function CreateGoalDialog({ copy }: { copy: GoalCopy }) {
           priority: "Medium",
           idempotencyKey: uuidv4(),
         });
-        navigate(localizeHref(locale, `/goals/${created.goal.id}`));
+        goalId = created.goal.id;
       } else {
         const created = await createGoal({
           workspaceId: workspace.id,
           title: title.trim(),
           description: additionalContext.trim() || null,
-          successCriteria: [
-            {
-              id: uuidv4(),
-              kind: "user_confirmed",
-              description: copy.initialCriterionDescription,
-              satisfied: false,
-              confirmedAt: null,
-              proposalStatus: "proposed",
-            },
-          ],
+          successCriteria: [{ id: uuidv4(), kind: "user_confirmed", description: copy.initialCriterionDescription, satisfied: false, confirmedAt: null, proposalStatus: "proposed" }],
         });
-        navigate(localizeHref(locale, `/goals/${created.id}`));
+        goalId = created.id;
       }
+      setProgressText(copy.aiProgress.queued);
+      try {
+        await generateGoalReview(goalId, { idempotencyKey: uuidv4(), mode: "initial" }, { onProgress: (event) => setProgressText(goalAiProgressText(copy, event)) });
+      } catch {
+        // Goal creation remains successful; the workspace exposes an explicit retry.
+      }
+      navigate(localizeHref(locale, `/goals/${goalId}?review=initial`));
       revalidator.revalidate();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : copy.actionError);
@@ -184,6 +185,12 @@ function CreateGoalDialog({ copy }: { copy: GoalCopy }) {
               <FieldDescription>{copy.firstTaskOptionalHelp}</FieldDescription>
             </Field>
           </section>
+          {pending ? (
+            <p className="flex items-center gap-2 text-sm text-muted-foreground" role="status">
+              <Target className="size-4 animate-pulse" aria-hidden />
+              {progressText ?? copy.creatingGoal}
+            </p>
+          ) : null}
           {error ? (
             <p role="alert" className="text-sm text-destructive">
               {error}
@@ -199,7 +206,7 @@ function CreateGoalDialog({ copy }: { copy: GoalCopy }) {
             onClick={() => void submit()}
           >
             {pending
-              ? copy.saving
+              ? progressText ?? copy.creatingGoal
               : firstTaskTitle.trim()
                 ? copy.createGoalAndTask
                 : copy.createGoalOnly}

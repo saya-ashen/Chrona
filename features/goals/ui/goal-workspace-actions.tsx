@@ -208,7 +208,7 @@ export function GoalSectionNavigation({
   return (
     <nav
       aria-label={copy.controlPlane}
-      className="shrink-0 border-b border-border/60 bg-background pb-3 pt-0.5"
+      className="shrink-0 border-b border-border/60 bg-background pt-0.5"
     >
       <div className="relative">
         {scrollEdges.start ? (
@@ -225,7 +225,7 @@ export function GoalSectionNavigation({
         ) : null}
         <div
           ref={scrollerRef}
-          className="no-scrollbar overflow-x-auto rounded-xl border border-border/70 bg-muted/45 p-1 shadow-xs"
+          className="no-scrollbar w-fit max-w-full overflow-x-auto rounded-xl border border-border/70 bg-muted/45 p-1 shadow-xs"
           onScroll={updateScrollEdges}
         >
           <TabsList className="h-auto min-w-max justify-start gap-1 rounded-none bg-transparent p-0">

@@ -1,4 +1,5 @@
 import type {
+  AiRunProgressEvent,
   GoalOperationalBrief,
   GoalStatus,
   GoalSuccessCriterion,
@@ -100,6 +101,7 @@ export type GoalReviewProposalItemData = {
 };
 
 export type GoalReviewProposalData = {
+  mode: "initial" | "progress";
   id: string;
   status:
     | "Generating"
@@ -273,16 +275,41 @@ export type GoalCopy = {
   criterionEvidenceNote: string;
   applyReview: string;
   applyReviewDescription: string;
+  initialPlanTitle: string;
+  initialPlanDescription: string;
   reviewSummary: string;
   reviewTaskSuggestion: string;
+  proposedChange: string;
+  updateReviewField: string;
+  createTaskReviewItem: string;
+  resolveEvidenceReviewItem: string;
+  currentReviewValue: string;
+  suggestedReviewValue: string;
+  reviewReason: string;
+  evidenceReferences: string;
+  reviewWarnings: string;
   generateReview: string;
   generatingReview: string;
+  aiProgress: Record<"queued" | "connecting" | "thinking" | "responding" | "using_tool" | "validating" | "saving" | "completed" | "failed", string>;
+  aiToolEvent: string;
   rejectProposal: string;
   proposalFailed: string;
   proposalPending: string;
   proposalStale: string;
   proposalSource: string;
   proposalNoItems: string;
+  applyReviewItem: string;
+  createReviewTask: string;
+  rejectReviewItem: string;
+  applyAllReview: string;
+  rejectAllReview: string;
+  reviewEvidenceCount: string;
+  reviewWarningCount: string;
+  reviewItemCannotApply: string;
+  proposalAccepted: string;
+  proposalRejected: string;
+  proposalConverted: string;
+  proposalIgnored: string;
   assets: string;
   nextReview: string;
   noReview: string;
@@ -628,3 +655,10 @@ export type GoalCopy = {
     proposalApplied: string;
   };
 };
+
+export function goalAiProgressText(copy: GoalCopy, event: Pick<AiRunProgressEvent, "phase" | "toolName">) {
+  if (event.phase === "using_tool" && event.toolName) {
+    return copy.aiToolEvent.replace("{tool}", event.toolName);
+  }
+  return copy.aiProgress[event.phase];
+}

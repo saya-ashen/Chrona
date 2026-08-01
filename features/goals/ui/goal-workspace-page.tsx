@@ -12,13 +12,13 @@ function sectionFrom(searchParams: URLSearchParams): GoalWorkspaceSection {
 }
 
 function GoalWorkspaceContent({ goal, copy, assetWorkbench }: { goal: GoalData; copy: GoalCopy; assetWorkbench?: React.ReactNode }) {
+  const [searchParams, setSearchParams] = useSearchParams();
   const [taskDialog, setTaskDialog] = useState<"task" | null>(null);
   const [renameTitle, setRenameTitle] = useState(goal.title);
   const [renamePending, setRenamePending] = useState(false);
-  const [reviewOpen, setReviewOpen] = useState(false);
+  const [reviewOpen, setReviewOpen] = useState(searchParams.get("review") === "initial");
   const [achievementOpen, setAchievementOpen] = useState(false);
   const revalidator = useRevalidator();
-  const [searchParams, setSearchParams] = useSearchParams();
   const section = sectionFrom(searchParams);
   const contentScrollRef = useRef<HTMLDivElement>(null);
   useEffect(() => { if (contentScrollRef.current) contentScrollRef.current.scrollTop = 0; }, [section]);
