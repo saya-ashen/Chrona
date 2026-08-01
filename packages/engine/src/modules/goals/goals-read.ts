@@ -120,6 +120,7 @@ export function reviewProposalReadModel(proposal: GoalWithDetails["reviewProposa
   const sourceRun = proposal.sourceTask?.runs[0] ?? null;
   return {
     id: proposal.id,
+    mode: (recordValue(proposal.inputSnapshot)?.mode === "initial" ? "initial" : "progress") as "initial" | "progress",
     status: proposal.status,
     sourceTaskId: proposal.sourceTaskId,
     sourceRunId: proposal.sourceRunId,

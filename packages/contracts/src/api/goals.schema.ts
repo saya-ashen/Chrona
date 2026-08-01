@@ -218,6 +218,8 @@ export const goalReviewResultSchema = z.object({
 
 export const generateGoalReviewBodySchema = z.object({
   idempotencyKey: z.string().trim().min(1).max(128),
+  progressId: z.string().uuid().optional(),
+  mode: z.enum(["initial", "progress"]).default("progress"),
 });
 
 export const applyGoalReviewProposalBodySchema = z.object({

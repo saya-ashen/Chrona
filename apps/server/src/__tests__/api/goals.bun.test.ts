@@ -663,6 +663,9 @@ describe("Goal API", () => {
       brief: { outcome: "Durable outcome", currentFocus: "Initial focus", strategy: "Use evidence", constraints: ["No invented facts"] },
     });
 
+    const { taskId: completedTaskId } = await seedTask(workspaceId, { title: "Completed evidence task" });
+    await db.task.update({ where: { id: completedTaskId }, data: { goalId: goal.id, status: "Completed" } });
+    const accepted = await seedAcceptedResult(workspaceId, completedTaskId);
     const taskCountBefore = await db.task.count();
     const generation = await requestJson(app, `/goals/${goal.id}/reviews/generate`, { idempotencyKey: "goal-review-request-1" });
     expect(generation.status).toBe(202);
@@ -676,6 +679,12 @@ describe("Goal API", () => {
     expect(proposal?.sourceTaskId).toBeNull();
     expect(proposal?.sourceRunId).toBeNull();
     expect(await db.task.count()).toBe(taskCountBefore);
+    const snapshot = proposal?.inputSnapshot as { mode?: string; tasks?: Array<{ id: string; acceptedResult: { runId: string; summary: string; artifacts: Array<{ id: string; title: string }> } | null }> };
+    expect(snapshot.mode).toBe("progress");
+    expect(snapshot.tasks?.find((task) => task.id === completedTaskId)?.acceptedResult).toMatchObject({
+      runId: accepted.run.id,
+      artifacts: [{ id: accepted.artifact.id, title: "Accepted final result" }],
+    });
 
     const apply = await requestJson(app, `/goals/${goal.id}/reviews/${started.proposalId}/apply`, {
       idempotencyKey: "goal-review-apply-1",

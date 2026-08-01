@@ -12,15 +12,18 @@ import {
 import {
   dispatchPreparedFeaturePayload,
   getAiClientForFeature,
+  startAiRunProgress,
+  type AiRunProgressReporter,
 } from "../ai";
 import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
 import { buildAutomaticGoalTaskContext } from "./goal-task-context";
+import { acceptedResultSummary, boundedText } from "./goals-shared";
 
 const REVIEW_SCHEMA_VERSION = 1;
 const BRIEF_FIELDS = ["outcome", "currentFocus", "strategy", "constraints"] as const;
 type BriefField = (typeof BRIEF_FIELDS)[number];
-
 type ReviewSnapshot = {
+  mode?: "initial" | "progress";
   goal: {
     id: string;
     title: string;
@@ -36,6 +39,11 @@ type ReviewSnapshot = {
     description: string | null;
     status: string;
     updatedAt: string;
+    acceptedResult: {
+      runId: string;
+      summary: string;
+      artifacts: Array<{ id: string; title: string; type: string; contentPreview: string | null }>;
+    } | null;
   }>;
   capturedAt: string;
 };
@@ -96,34 +104,38 @@ function asJsonArray(value: unknown[]): Prisma.InputJsonArray {
   return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonArray;
 }
 
-async function snapshotGoal(goalId: string): Promise<ReviewSnapshot> {
+async function snapshotGoal(goalId: string, mode: "initial" | "progress"): Promise<ReviewSnapshot> {
   const goal = await db.goal.findUnique({
     where: { id: goalId },
     include: {
-      tasks: { orderBy: [{ updatedAt: "desc" }, { id: "asc" }] },
+      tasks: {
+        orderBy: [{ updatedAt: "desc" }, { id: "asc" }],
+        include: {
+          projection: true,
+          events: { where: { eventType: "task.result_accepted" }, orderBy: [{ ingestSequence: "desc" }, { createdAt: "desc" }], take: 1 },
+          runs: { where: { status: "Completed" }, orderBy: [{ createdAt: "desc" }, { id: "desc" }], include: { artifacts: { orderBy: [{ createdAt: "desc" }, { id: "asc" }] } } },
+          taskPlanRuns: { orderBy: { updatedAt: "desc" }, select: { planId: true, workBlockId: true, planRun: true } },
+        },
+      },
     },
   });
   if (!goal) throw new EngineError(ENGINE_ERROR_CODES.TASK_NOT_FOUND, "Goal not found");
-  if (goal.status !== "Active") {
-    throw new EngineError(ENGINE_ERROR_CODES.INVALID_TASK_STATE, "Only active Goals can generate reviews");
-  }
+  if (goal.status !== "Active") throw new EngineError(ENGINE_ERROR_CODES.INVALID_TASK_STATE, "Only active Goals can generate reviews");
   return {
-    goal: {
-      id: goal.id,
-      title: goal.title,
-      description: goal.description,
-      operationalBrief: operationalBrief(goal.operationalBrief),
-      nextReviewAt: goal.nextReviewAt?.toISOString() ?? null,
-      successCriteria: goal.successCriteria,
-      updatedAt: goal.updatedAt.toISOString(),
-    },
-    tasks: goal.tasks.map((task) => ({
-      id: task.id,
-      title: task.title,
-      description: task.description,
-      status: task.status,
-      updatedAt: task.updatedAt.toISOString(),
-    })),
+    mode,
+    goal: { id: goal.id, title: goal.title, description: goal.description, operationalBrief: operationalBrief(goal.operationalBrief), nextReviewAt: goal.nextReviewAt?.toISOString() ?? null, successCriteria: goal.successCriteria, updatedAt: goal.updatedAt.toISOString() },
+    tasks: goal.tasks.map((task) => {
+      const acceptedRunId = record(task.events[0]?.payload)?.accepted_run_id;
+      const acceptedRun = typeof acceptedRunId === "string" ? task.runs.find((run) => run.id === acceptedRunId) : undefined;
+      return {
+        id: task.id,
+        title: task.title,
+        description: task.description,
+        updatedAt: task.updatedAt.toISOString(),
+        status: task.status,
+        acceptedResult: acceptedRun ? { runId: acceptedRun.id, summary: boundedText(acceptedResultSummary(task, acceptedRun), 1_200), artifacts: acceptedRun.artifacts.map((artifact) => ({ id: artifact.id, title: artifact.title, type: artifact.type, contentPreview: artifact.contentPreview ? boundedText(artifact.contentPreview, 400) : null })) } : null,
+      };
+    }),
     capturedAt: new Date().toISOString(),
   };
 }
@@ -133,6 +145,14 @@ function briefDependency(snapshot: ReviewSnapshot, field: BriefField) {
     kind: "brief_field" as const,
     field,
     value: snapshot.goal.operationalBrief?.[field] ?? null,
+  };
+}
+
+function taskCandidateDependency(input: { goalUpdatedAt: string; tasks: Array<{ id: string; status: string; updatedAt: string }> }) {
+  return {
+    kind: "task_candidate" as const,
+    goalUpdatedAt: input.goalUpdatedAt,
+    tasks: [...input.tasks].sort((left, right) => left.id.localeCompare(right.id)),
   };
 }
 
@@ -167,7 +187,7 @@ function itemRecord(snapshot: ReviewSnapshot, item: GoalReviewResult["items"][nu
       };
     }
     case "task_candidate": {
-      const dependency = { kind: item.kind, inputSnapshotHash: hashValue(snapshot) };
+      const dependency = taskCandidateDependency({ goalUpdatedAt: snapshot.goal.updatedAt, tasks: snapshot.tasks.map((task) => ({ id: task.id, status: task.status, updatedAt: task.updatedAt })) });
       return {
         itemId: item.itemId,
         kind: item.kind,
@@ -203,8 +223,12 @@ function itemRecord(snapshot: ReviewSnapshot, item: GoalReviewResult["items"][nu
   }
 }
 
-function goalReviewInstructions() {
-  return `You are performing a governed review of one Chrona Goal from a frozen read-only snapshot.
+function goalReviewInstructions(mode: "initial" | "progress") {
+  const phase = mode === "initial"
+    ? "This is an initial planning review immediately after Goal creation. Prioritize a clear current focus, a practical strategy, and 1-5 bounded next Tasks. Do not assume work is completed."
+    : "This is a progress review after work has started. Use accepted results and evidence gaps to propose grounded next Tasks.";
+  return `You are performing a governed ${mode === "initial" ? "initial planning" : "progress review"} of one Chrona Goal from a frozen read-only snapshot.
+${phase}
 Return only a GoalReviewResult matching schema version 1.
 You may propose changes only to operational brief fields, nextReviewAt, bounded candidate Tasks, and evidence gaps.
 Never propose changes to Goal title, description, or success criteria. Never mutate data, call tools, browse files, or access the network.
@@ -213,12 +237,8 @@ Use qualitative reasoning. Do not fabricate confidence percentages. If the snaps
 }
 
 function reviewJsonSchema() {
-  return z.toJSONSchema(goalReviewResultSchema, {
-    target: "draft-07",
-    unrepresentable: "any",
-  }) as Record<string, unknown>;
+  return z.toJSONSchema(goalReviewResultSchema, { target: "draft-07", unrepresentable: "any" }) as Record<string, unknown>;
 }
-
 
 async function markGenerationFailed(proposalId: string, error: unknown) {
   const message = error instanceof Error ? error.message : String(error);
@@ -235,13 +255,36 @@ export function waitForGoalReviewGeneration(proposalId: string) {
   return generationPromises.get(proposalId) ?? Promise.resolve();
 }
 
+function startTrackedGoalReviewGeneration(proposalId: string, progress: AiRunProgressReporter) {
+  const generationPromise = runGoalReviewGeneration({ proposalId, progress });
+  generationPromises.set(proposalId, generationPromise);
+  void generationPromise.finally(() => generationPromises.delete(proposalId)).catch(() => undefined);
+  return generationPromise;
+}
+
 export async function generateGoalReview(input: { goalId: string; command: GenerateGoalReviewRequest }) {
+  const progress = startAiRunProgress({
+    operationId: input.command.progressId ?? input.command.idempotencyKey,
+    feature: "goal.review",
+  });
   const existing = await db.goalReviewProposal.findUnique({
     where: { goalId_requestIdempotencyKey: { goalId: input.goalId, requestIdempotencyKey: input.command.idempotencyKey } },
   });
-  if (existing) return { proposalId: existing.id, status: existing.status };
+  if (existing) {
+    if (existing.status === "Generating") {
+      const activeGeneration = generationPromises.get(existing.id);
+      if (activeGeneration) {
+        void activeGeneration.then(() => progress.complete()).catch(() => progress.fail("Goal review generation failed"));
+      } else {
+        startTrackedGoalReviewGeneration(existing.id, progress);
+      }
+    } else if (existing.status === "Failed") progress.fail("Goal review generation failed");
+    else progress.complete();
+    return { proposalId: existing.id, status: existing.status };
+  }
 
-  const snapshot = await snapshotGoal(input.goalId);
+  const mode = input.command.mode;
+  const snapshot = await snapshotGoal(input.goalId, mode);
   const goal = await db.goal.findUniqueOrThrow({ where: { id: input.goalId }, select: { workspaceId: true, title: true } });
   const proposal = await db.goalReviewProposal.create({
     data: {
@@ -253,7 +296,11 @@ export async function generateGoalReview(input: { goalId: string; command: Gener
       schemaVersion: REVIEW_SCHEMA_VERSION,
       requestIdempotencyKey: input.command.idempotencyKey,
     },
+  }).catch((error) => {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") return null;
+    throw error;
   });
+  if (!proposal) return generateGoalReview(input);
   await db.event.create({
     data: {
       eventType: "goal.review_generation_started",
@@ -268,101 +315,53 @@ export async function generateGoalReview(input: { goalId: string; command: Gener
     },
   });
 
-  const generationPromise = runGoalReviewGeneration({ proposalId: proposal.id });
-  generationPromises.set(proposal.id, generationPromise);
-  void generationPromise.finally(() => generationPromises.delete(proposal.id)).catch(() => undefined);
+  startTrackedGoalReviewGeneration(proposal.id, progress);
   return { proposalId: proposal.id, status: proposal.status };
 }
 
-export async function runGoalReviewGeneration(input: { proposalId: string }) {
-  const proposal = await db.goalReviewProposal.findUnique({
-    where: { id: input.proposalId },
-  });
+export async function runGoalReviewGeneration(input: { proposalId: string; progress?: AiRunProgressReporter }) {
+  const proposal = await db.goalReviewProposal.findUnique({ where: { id: input.proposalId } });
   if (!proposal || proposal.status !== "Generating") return proposal;
+  const progress = input.progress ?? startAiRunProgress({
+    operationId: proposal.requestIdempotencyKey,
+    feature: "goal.review",
+  });
   try {
     const client = await getAiClientForFeature("goal.review");
     if (!client) throw new Error("No AI client is configured for Goal Review");
-    const featureSpec = {
-      feature: "goal.review" as const,
-      instructions: goalReviewInstructions(),
-      inputText: JSON.stringify({ snapshot: proposal.inputSnapshot, snapshotHash: proposal.inputSnapshotHash }, null, 2),
-      structuredOutputSchema: {
-        name: "goal_review_result",
-        description: "A governed, itemized Goal review proposal grounded in the frozen snapshot.",
-        schema: reviewJsonSchema(),
-      },
-    };
+    const snapshot = proposal.inputSnapshot as unknown as ReviewSnapshot;
+    progress.emitPhase("connecting");
     const invocation = await dispatchPreparedFeaturePayload<GoalReviewResult>(
       client,
-      featureSpec,
+      {
+        feature: "goal.review",
+        instructions: goalReviewInstructions(snapshot.mode ?? "progress"),
+        inputText: JSON.stringify({ snapshot: proposal.inputSnapshot, snapshotHash: proposal.inputSnapshotHash }, null, 2),
+        structuredOutputSchema: { name: "goal_review_result", description: "A governed, itemized Goal review proposal grounded in the frozen snapshot.", schema: reviewJsonSchema() },
+      },
       `goal-review:${proposal.id}`,
-      { toolPolicy: "read_only" },
+      { toolPolicy: "read_only", onEvent: progress.observeProviderEvent },
     );
+    progress.emitPhase("validating");
     const parsed = goalReviewResultSchema.safeParse(invocation.parsed);
-    if (!parsed.success) {
-      throw new Error(`Goal Review returned an invalid structured result: ${parsed.error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`).join("; ")}`);
-    }
-    const snapshot = proposal.inputSnapshot as unknown as ReviewSnapshot;
+    if (!parsed.success) throw new Error(`Goal Review returned an invalid structured result: ${parsed.error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`).join("; ")}`);
     const records = parsed.data.items.map((item) => itemRecord(snapshot, item));
     const config = record(client.record.config);
+    progress.emitPhase("saving");
     await db.$transaction(async (tx) => {
       const current = await tx.goalReviewProposal.findUnique({ where: { id: proposal.id }, select: { status: true } });
       if (current?.status !== "Generating") return;
-      await tx.goalReviewProposalItem.createMany({
-        data: records.map((item) => ({
-          workspaceId: proposal.workspaceId,
-          goalId: proposal.goalId,
-          proposalId: proposal.id,
-          ...item,
-        })),
-      });
-      await tx.goalReviewProposal.update({
-        where: { id: proposal.id },
-        data: {
-          status: "Ready",
-          providerName: client.record.type,
-          modelName: typeof config?.model === "string" ? config.model : null,
-          summary: parsed.data.summary,
-          rawResult: asJsonObject(parsed.data),
-          generationError: null,
-        },
-      });
-      await tx.event.create({
-        data: {
-          eventType: "goal.review_proposal_ready",
-          workspaceId: proposal.workspaceId,
-          actorType: "agent",
-          actorId: client.record.type,
-          source: "ai_feature",
-          payload: {
-            goal_id: proposal.goalId,
-            proposal_id: proposal.id,
-            item_count: records.length,
-            provider_client_id: client.record.id,
-            provider_run_id: invocation.debug?.runId ?? null,
-          },
-          summary: parsed.data.summary,
-          dedupeKey: `goal.review_proposal_ready:${proposal.id}`,
-          ingestSequence: 0,
-        },
-      });
+      await tx.goalReviewProposalItem.createMany({ data: records.map((item) => ({ workspaceId: proposal.workspaceId, goalId: proposal.goalId, proposalId: proposal.id, ...item })) });
+      await tx.goalReviewProposal.update({ where: { id: proposal.id }, data: { status: "Ready", providerName: client.record.type, modelName: typeof config?.model === "string" ? config.model : null, summary: parsed.data.summary, rawResult: asJsonObject(parsed.data), generationError: null } });
+      await tx.event.create({ data: { eventType: "goal.review_proposal_ready", workspaceId: proposal.workspaceId, actorType: "agent", actorId: client.record.type, source: "ai_feature", payload: { goal_id: proposal.goalId, proposal_id: proposal.id, item_count: records.length, provider_client_id: client.record.id, provider_run_id: invocation.debug?.runId ?? null }, summary: parsed.data.summary, dedupeKey: `goal.review_proposal_ready:${proposal.id}`, ingestSequence: 0 } });
     }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
-    return db.goalReviewProposal.findUnique({ where: { id: proposal.id }, include: { items: true } });
+    const savedProposal = await db.goalReviewProposal.findUnique({ where: { id: proposal.id }, include: { items: true } });
+    progress.complete();
+    return savedProposal;
   } catch (error) {
+    progress.fail("Goal review generation failed");
     const message = await markGenerationFailed(proposal.id, error);
-    await db.event.create({
-      data: {
-        eventType: "goal.review_proposal_failed",
-        workspaceId: proposal.workspaceId,
-        actorType: "system",
-        actorId: "goal-review",
-        source: "ai_feature",
-        payload: { goal_id: proposal.goalId, proposal_id: proposal.id, error: message },
-        summary: message,
-        dedupeKey: `goal.review_proposal_failed:${proposal.id}`,
-        ingestSequence: 0,
-      },
-    }).catch(() => undefined);
+    await db.event.create({ data: { eventType: "goal.review_proposal_failed", workspaceId: proposal.workspaceId, actorType: "system", actorId: "goal-review", source: "ai_feature", payload: { goal_id: proposal.goalId, proposal_id: proposal.id, error: message }, summary: message, dedupeKey: `goal.review_proposal_failed:${proposal.id}`, ingestSequence: 0 } }).catch(() => undefined);
     throw error;
   }
 }
@@ -371,6 +370,8 @@ function currentDependency(goal: {
   operationalBrief: unknown;
   nextReviewAt: Date | null;
   successCriteria: unknown;
+  updatedAt: Date;
+  tasks: Array<{ id: string; status: string; updatedAt: Date }>;
 }, item: { kind: string; payload: unknown; dependencySnapshot: unknown }) {
   const payload = record(item.payload);
   switch (item.kind) {
@@ -383,7 +384,7 @@ function currentDependency(goal: {
     case "next_review_at":
       return { kind: "next_review_at", value: goal.nextReviewAt?.toISOString() ?? null };
     case "task_candidate":
-      return item.dependencySnapshot;
+      return taskCandidateDependency({ goalUpdatedAt: goal.updatedAt.toISOString(), tasks: goal.tasks.map((task) => ({ id: task.id, status: task.status, updatedAt: task.updatedAt.toISOString() })) });
     case "evidence_gap": {
       const criterionId = payload?.criterionId;
       const criterion = Array.isArray(goal.successCriteria)
@@ -447,14 +448,16 @@ export async function applyGoalReviewProposal(input: {
       include: { items: true },
     });
     if (!proposal) throw new EngineError(ENGINE_ERROR_CODES.TASK_NOT_FOUND, "Goal Review Proposal not found");
-    if (proposal.applicationIdempotencyKey === input.command.idempotencyKey) return proposal;
-    if (proposal.applicationIdempotencyKey) {
+    const applicationDedupeKey = `goal.review_proposal_applied:${proposal.id}:${input.command.idempotencyKey}`;
+    const existingApplication = await tx.event.findUnique({ where: { dedupeKey: applicationDedupeKey }, select: { id: true } });
+    if (existingApplication) return proposal;
+    if (proposal.applicationIdempotencyKey && proposal.status !== "PartiallyApplied") {
       throw new EngineError(ENGINE_ERROR_CODES.CONFLICT, "Goal Review Proposal was already applied with a different request");
     }
     if (proposal.status !== "Ready" && proposal.status !== "PartiallyApplied") {
       throw new EngineError(ENGINE_ERROR_CODES.INVALID_TASK_STATE, "Only ready Goal Review Proposals can be applied");
     }
-    const goal = await tx.goal.findUniqueOrThrow({ where: { id: input.goalId } });
+    const goal = await tx.goal.findUniqueOrThrow({ where: { id: input.goalId }, include: { tasks: { select: { id: true, status: true, updatedAt: true } } } });
     if (goal.status !== "Active") throw new EngineError(ENGINE_ERROR_CODES.INVALID_TASK_STATE, "Only active Goals can apply reviews");
     const decisionByItem = new Map(input.command.decisions.map((decision) => [decision.itemId, decision.action]));
     const unknown = [...decisionByItem.keys()].filter((itemId) => !proposal.items.some((item) => item.itemId === itemId));
@@ -630,7 +633,7 @@ export async function applyGoalReviewProposal(input: {
           stale_count: itemUpdates.filter((item) => item.decision === "Stale").length,
         },
         summary: `Applied Goal Review Proposal with ${itemUpdates.length} decisions`,
-        dedupeKey: `goal.review_proposal_applied:${proposal.id}:${input.command.idempotencyKey}`,
+        dedupeKey: applicationDedupeKey,
         ingestSequence: 0,
       },
     });
