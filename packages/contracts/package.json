@@ -6,7 +6,8 @@
   "exports": {
     ".": "./src/index.ts",
     "./ai": "./src/ai.ts",
-    "./api": "./src/api/index.ts"
+    "./api": "./src/api/index.ts",
+    "./ai-feature-runtime": "./src/ai-feature-runtime/index.ts"
   },
   "dependencies": {
     "@chrona/ui-protocol": "workspace:*",

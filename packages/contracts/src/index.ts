@@ -560,3 +560,6 @@ export {
   createGoalAssetReviewBodySchema,
   goalDataTableContentSchema,
 } from "./api/goal-workbench.schema";
+
+// AI feature runtime contracts
+export * from "./ai-feature-runtime";
