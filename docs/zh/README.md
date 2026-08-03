@@ -52,7 +52,7 @@ Chrona 是一个本地优先的 AI 日程软件。它把任务变成可编辑计
 
 ### 3. 智能体集成
 
-外部智能体通过 MCP 工具调用 Chrona，例如 `chrona_plan_generate`、`chrona_node_complete`、`chrona_node_block`、`chrona_condition_select`。智能体只能使用 Chrona 提供的 AI 可见 node / branch refs 提交结果，不能编造后端 ID。
+外部智能体通过 MCP 工具调用 Chrona，例如 `chrona_plan_read`、`chrona_plan_mutate`、`chrona_node_complete`、`chrona_node_block`、`chrona_condition_select`。智能体只能使用 Chrona 提供的 AI 可见 node / branch refs 提交结果，不能编造后端 ID。
 
 ## 开发者地图
 

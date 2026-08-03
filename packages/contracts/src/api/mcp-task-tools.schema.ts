@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { planGenerateToolPayloadSchema } from "../plan-generate-tool";
 import {
   createTaskBodySchema,
   updateTaskBodySchema,
@@ -50,7 +49,6 @@ export const chronaToolNames = [
   "chrona.task.update",
   "chrona.goal.results.read",
   "chrona.plan.read",
-  "chrona.plan.generate",
   "chrona.plan.mutate",
   "chrona.schedule.read",
   "chrona.schedule.propose",
@@ -59,7 +57,6 @@ export const chronaToolNames = [
   "chrona.execution.read",
   "chrona.execution.dispatch",
   "chrona.node.read",
-  "chrona.dashboard.brief",
   "chrona.node.complete",
   "chrona.node.condition_select",
   "chrona.node.block",
@@ -243,10 +240,6 @@ export const waitCompletePayloadSchema = z.object({
   summary: z.string().min(1).max(MAX_MCP_STRING_LENGTH),
   evidence: nodeEvidencePayloadSchema,
 }).strict();
-export const dashboardBriefPayloadSchema = z.object({
-  summaryText: z.string().trim().min(1).max(500).optional(),
-  spec: boundedJsonValueSchema,
-}).strict();
 
 
 export const chronaToolPayloadSchemas = {
@@ -255,7 +248,6 @@ export const chronaToolPayloadSchemas = {
   "chrona.goal.results.read": goalResultsReadPayloadSchema,
   "chrona.task.update": updateTaskBodySchema.omit({ workspaceId: true }),
   "chrona.plan.read": readPayloadSchema,
-  "chrona.plan.generate": planGenerateToolPayloadSchema,
   "chrona.plan.mutate": planMutationBodySchema,
   "chrona.schedule.read": readPayloadSchema,
   "chrona.schedule.propose": scheduleProposalBodySchema.omit({ workspaceId: true }),
@@ -264,7 +256,6 @@ export const chronaToolPayloadSchemas = {
   "chrona.execution.read": readPayloadSchema,
   "chrona.execution.dispatch": executionActionBodySchema,
   "chrona.node.read": readPayloadSchema,
-  "chrona.dashboard.brief": dashboardBriefPayloadSchema,
   "chrona.node.complete": taskCompletePayloadSchema,
   "chrona.node.condition_select": conditionSelectPayloadSchema,
   "chrona.node.block": blockPayloadSchema,
@@ -281,7 +272,6 @@ export const chronaPublicToolPayloadSchemas = {
   "chrona.schedule.read": publicReadPayloadSchema,
   "chrona.execution.read": publicReadPayloadSchema,
   "chrona.node.read": publicReadPayloadSchema,
-  "chrona.dashboard.brief": dashboardBriefPayloadSchema,
   "chrona.node.complete": taskCompletePayloadSchema,
   "chrona.node.condition_select": conditionSelectPayloadSchema.omit({ evidence: true }).strict(),
   "chrona.node.block": blockPayloadSchema.omit({ evidence: true }).strict(),

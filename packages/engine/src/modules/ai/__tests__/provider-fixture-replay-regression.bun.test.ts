@@ -2,8 +2,7 @@ import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, describe, expect, it } from "bun:test";
-import type { ProviderRunSnapshot } from "@chrona/providers-foundation";
-import type { ProviderFeatureRequest } from "@chrona/engine/test-support";
+import type { ProviderRunSnapshot, StartRunInput } from "@chrona/providers-foundation";
 import { cassettePath, withProviderResponseFixture } from "../../../test/llm-fixture-recorder";
 
 const tempDirs: string[] = [];
@@ -12,8 +11,9 @@ afterEach(async () => {
   await Promise.all(tempDirs.splice(0).map((dir) => rm(dir, { recursive: true, force: true })));
 });
 
-function request(): ProviderFeatureRequest {
+function request(): StartRunInput {
   return {
+    clientOperationId: "provider-fixture-replay-regression-request",
     sessionId: "session-replay-regression",
     sessionKey: "fixture-replay-regression",
     instructions: "Replay only",

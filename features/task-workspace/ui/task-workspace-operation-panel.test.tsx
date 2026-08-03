@@ -47,6 +47,8 @@ const operationState = operationStateBase as unknown as TaskWorkspaceOperationSt
 
 const commonProps = {
   taskId: "task-1",
+  workBlockId: null,
+  executionScope: null,
   state: operationState,
   copy: {},
   onGeneratePlan: vi.fn(),

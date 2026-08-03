@@ -174,7 +174,11 @@ describe("POST /work/:taskId/commands — plan.generate header state lifecycle",
       && event.updates["/plan/generation/header-action-disabled"] === false
     ));
 
-    const res = await postCommand(taskId, { type: "plan.generate", forceRefresh: true });
+    const res = await postCommand(taskId, {
+      type: "plan.generate",
+      forceRefresh: true,
+      idempotencyKey: "generation-header-state-lifecycle",
+    });
     expect(res.status).toBe(202);
 
     await runningReceived;

@@ -50,6 +50,7 @@ from "./contracts/provider";
 
 export {
   assertProviderStartSupported,
+  supportsDurableFeatureRuntime,
   cancelRunInputSchema,
   createSessionInputSchema,
   existingRunStreamInputSchema,

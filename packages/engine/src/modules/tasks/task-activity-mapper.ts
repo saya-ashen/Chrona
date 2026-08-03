@@ -4,7 +4,6 @@ import {
   arrayPayloadValue,
   executionActivityMetadata,
   humanizeEventType,
-  numberPayloadValue,
   planGenerationActivityGroup,
   stringPayloadValue,
   taskActivityItem,
@@ -59,36 +58,20 @@ function updatedTaskActivity(event: TaskActivityEvent) {
 
 function planGenerationActivity(event: TaskActivityEvent): WorkspaceActivityTimelineItem | null {
   const details: Partial<Record<string, TaskEventDetails>> = {
-    "plan_generation.started": { kind: "task", title: "Plan generation started", description: stringPayloadValue(event.payload, "instruction") ?? "Generating a task plan.", tone: "info" },
-    "plan_generation.status": { kind: "task", title: "Plan generation update", description: stringPayloadValue(event.payload, "message") ?? stringPayloadValue(event.payload, "phase") ?? "Plan generation progressed.", tone: "info" },
+    "plan_generation.started": { kind: "task", title: "Plan generation started", description: "Generating a task plan.", tone: "info" },
+    "plan_generation.status": { kind: "task", title: "Plan generation update", description: "Plan generation progressed.", tone: "info" },
     "plan_generation.draft_saved": { kind: "task", title: "Plan draft saved", description: stringPayloadValue(event.payload, "plan_title") ?? "Generated plan draft was saved.", tone: "success" },
     "plan_generation.completed": { kind: "task", title: "Plan generated", description: stringPayloadValue(event.payload, "plan_title") ?? "Plan generation completed.", tone: "success" },
-    "plan_generation.failed": { kind: "task", title: "Plan generation failed", description: stringPayloadValue(event.payload, "message") ?? stringPayloadValue(event.payload, "code") ?? "Plan generation failed.", tone: "danger" },
+    "plan_generation.failed": { kind: "task", title: "Plan generation failed", description: "Plan generation failed.", tone: "danger" },
     "plan_generation.cancelled": { kind: "task", title: "Plan generation cancelled", description: "Plan generation was cancelled.", tone: "warning" },
   };
-  if (event.eventType === "plan_generation.tool_called") {
-    return taskEvent(event, {
-      kind: "task",
-      title: "Plan tool called",
-      description: compactParts([
-        stringPayloadValue(event.payload, "tool"),
-        stringPayloadValue(event.payload, "plan_title"),
-        numberPayloadValue(event.payload, "node_count") !== null ? `${numberPayloadValue(event.payload, "node_count")} nodes` : null,
-      ]) || "AI produced a plan blueprint.",
-      tone: "info",
-      extra: {
-        rawEventType: event.eventType,
-        activityGroup: planGenerationActivityGroup(event.payload),
-      },
-    });
-  }
+  if (event.eventType === "plan_generation.tool_called") return null;
   const detail = details[event.eventType];
   return detail
     ? taskEvent(event, {
       ...detail,
       extra: {
         ...detail.extra,
-        rawEventType: event.eventType,
         activityGroup: planGenerationActivityGroup(event.payload),
       },
     })
@@ -109,22 +92,22 @@ function planExecutionActivity(event: TaskActivityEvent) {
     extra: {
       sourceNodeId: event.nodeId ?? undefined,
       sourceNodeTitle: event.nodeTitle ?? undefined,
-      rawEventType: event.eventType,
       ...executionActivityMetadata(event.payload),
     },
   });
 }
 
-export function mapTaskEventToActivity(event: TaskActivityEvent): WorkspaceActivityTimelineItem {
+export function mapTaskEventToActivity(event: TaskActivityEvent): WorkspaceActivityTimelineItem | null {
   if (event.source === "provider" || event.eventType.startsWith("provider.")) return mapProviderEventToActivity(event);
   if (event.eventType === "task.updated") return updatedTaskActivity(event);
+  if (event.eventType === "plan_generation.tool_called") return null;
   const lifecycle = taskLifecycleActivity(event);
   if (lifecycle) return lifecycle;
   const generation = planGenerationActivity(event);
   if (generation) return generation;
   if (event.eventType === "plan_execution.executable_path_computed" || event.eventType === "plan_execution.plan_output_updated") {
-    return taskEvent(event, { kind: "raw", title: "Execution detail", description: humanizeEventType(event.eventType), tone: "neutral", extra: { rawEventType: event.eventType } });
+    return taskEvent(event, { kind: "task", title: "Execution detail", description: humanizeEventType(event.eventType), tone: "neutral" });
   }
   if (event.eventType.startsWith("plan_execution.")) return planExecutionActivity(event);
-  return taskEvent(event, { kind: "raw", title: "Task event", description: humanizeEventType(event.eventType), tone: "neutral" });
+  return taskEvent(event, { kind: "task", title: "Task event", description: humanizeEventType(event.eventType), tone: "neutral" });
 }

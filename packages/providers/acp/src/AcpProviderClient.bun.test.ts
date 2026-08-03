@@ -138,7 +138,7 @@ describe("AcpProviderClient", () => {
   });
 
   it("authenticates with advertised agent credentials before opening sessions", async () => {
-    stubMcpTools(["chrona_plan_generate", "chrona_plan_read"]);
+    stubMcpTools(["terminal_result", "plan_context"]);
     const transport = new FakeAcpTransport({
       init: {
         protocolVersion: 1,
@@ -158,7 +158,7 @@ describe("AcpProviderClient", () => {
 
 
   it("opens a provider session when session health is requested", async () => {
-    stubMcpTools(["chrona_plan_generate", "chrona_plan_read"]);
+    stubMcpTools(["terminal_result", "plan_context"]);
     const transport = new FakeAcpTransport();
     const client = new AcpProviderClient({
       config: config({ healthCheck: "session", mcpBaseUrl: "http://chrona.test", mcpRunToken: "run-token" }),
@@ -173,27 +173,13 @@ describe("AcpProviderClient", () => {
     expect(transport.requests.find((request) => request.method === "session/new")?.params).toMatchObject({
       mcpServers: [
         {
-          url: "http://chrona.test/api/mcp?session_id=chrona%3Aprovider-health%3Atest_acp%3Aplan-generation",
+          url: "http://chrona.test/api/mcp?session_id=chrona%3Aprovider-health%3Atest_acp",
           headers: [{ name: "Authorization", value: "Bearer run-token" }],
         },
       ],
     });
   });
 
-  it("fails session health when Chrona MCP tools omit plan generation", async () => {
-    stubMcpTools(["chrona_plan_read"]);
-    const client = new AcpProviderClient({
-      config: config({ healthCheck: "session", mcpBaseUrl: "http://chrona.test", mcpRunToken: "run-token" }),
-      transport: new FakeAcpTransport(),
-    });
-
-    await expect(client.checkHealth()).resolves.toMatchObject({
-      provider: "test_acp",
-      ok: false,
-      status: "error",
-      reason: expect.stringContaining("chrona_plan_generate"),
-    });
-  });
   it("sends Chrona HTTP MCP server through ACP session setup", async () => {
     const transport = new FakeAcpTransport({ updates: [{ kind: "stop", stopReason: "end_turn", response: { stopReason: "end_turn" } }] });
     const client = new AcpProviderClient({
@@ -204,7 +190,7 @@ describe("AcpProviderClient", () => {
     const run = await client.startRun(baseInput({
       sessionId: "chrona-session",
       sessionKey: "chrona:task:task-1:plan-generation",
-      terminalToolName: "chrona_node_complete",
+      terminalToolName: "terminal_result",
     }));
     const streamed = [];
     for await (const event of client.streamRun({ runId: run.runId })) streamed.push(event);
@@ -339,7 +325,7 @@ describe("AcpProviderClient", () => {
   });
 
   it("streams ACP tool completion events", async () => {
-    const terminalTool = "chrona_node_complete";
+    const terminalTool = "terminal_result";
     const transport = new FakeAcpTransport({
       updates: [
         {
@@ -381,7 +367,7 @@ describe("AcpProviderClient", () => {
     const transport = new FakeAcpTransport({ updates: [{ kind: "stop", stopReason: "end_turn", response: { stopReason: "end_turn" } }] });
     const client = new AcpProviderClient({ config: config(), transport });
     const run = await client.startRun(baseInput({
-      terminalToolName: "chrona_node_complete",
+      terminalToolName: "terminal_result",
       structuredOutputSchema: { name: "result", description: "Result payload", schema: { type: "object", properties: { ok: { type: "boolean" } } } },
     }));
 
@@ -392,7 +378,7 @@ describe("AcpProviderClient", () => {
     expect(transport.session.promptBlocks).toEqual([
       {
         type: "text",
-        text: expect.stringContaining("When finished, call the MCP tool `chrona_node_complete`"),
+        text: expect.stringContaining("When finished, call the MCP tool `terminal_result`"),
       },
     ]);
     const promptText = (transport.session.promptBlocks as Array<{ text: string }>)[0]?.text ?? "";
@@ -404,40 +390,17 @@ describe("AcpProviderClient", () => {
     expect(promptText).not.toContain("tool_search");
   });
 
-  it("tells ACP agents to submit generated plans through chrona_plan_generate", async () => {
-    const transport = new FakeAcpTransport({ updates: [{ kind: "stop", stopReason: "end_turn", response: { stopReason: "end_turn" } }] });
-    const client = new AcpProviderClient({ config: config(), transport });
-    const run = await client.startRun(baseInput({
-      instructions: "You MUST call the chrona_plan_generate tool.",
-      input: { type: "text", text: "Plan this task." },
-      terminalToolName: "chrona_plan_generate",
-      structuredOutputSchema: {
-        name: "chrona_plan_generate",
-        description: "Plan blueprint",
-        schema: { type: "object", properties: { title: { type: "string" } }, required: ["title"] },
-      },
-    }));
-
-    for await (const _event of client.streamRun({ runId: run.runId })) {
-      // drain stream
-    }
-    const promptText = (transport.session.promptBlocks as Array<{ text: string }>)[0]?.text ?? "";
-
-    expect(promptText).toContain("When the plan is ready, call the MCP tool `chrona_plan_generate` with the complete PlanBlueprint object.");
-    expect(promptText).toContain("Do not answer only in text; the plan is not submitted until that MCP tool call succeeds.");
-    expect(promptText).not.toContain("final Chrona node result");
-  });
 
   it("does not inject Codex-specific MCP discovery instructions into task prompts", async () => {
     const transport = new FakeAcpTransport({ updates: [{ kind: "stop", stopReason: "end_turn", response: { stopReason: "end_turn" } }] });
     const client = new AcpProviderClient({ config: config(), transport });
     const run = await client.startRun(baseInput({
-      instructions: "You MUST call the chrona_plan_generate tool.",
-      input: { type: "text", text: "Plan this task." },
+      instructions: "You MUST call the custom_terminal tool.",
+      input: { type: "text", text: "Complete this task." },
       structuredOutputSchema: {
-        name: "chrona_plan_generate",
-        description: "Plan blueprint",
-        schema: { type: "object", properties: { title: { type: "string" } }, required: ["title"] },
+        name: "custom_terminal",
+        description: "Terminal payload",
+        schema: { type: "object", properties: { summary: { type: "string" } }, required: ["summary"] },
       },
     }));
 
@@ -446,8 +409,8 @@ describe("AcpProviderClient", () => {
     }
     const promptText = (transport.session.promptBlocks as Array<{ text: string }>)[0]?.text ?? "";
 
-    expect(promptText).toContain("You MUST call the chrona_plan_generate tool.");
-    expect(promptText).toContain("Plan this task.");
+    expect(promptText).toContain("You MUST call the custom_terminal tool.");
+    expect(promptText).toContain("Complete this task.");
     expect(promptText).toContain("Structured output schema:");
     expect(promptText).not.toContain("Required Chrona MCP tools for this turn");
     expect(promptText).not.toContain("mcp__chrona");

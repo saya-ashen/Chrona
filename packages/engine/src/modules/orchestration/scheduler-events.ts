@@ -22,6 +22,9 @@ export type SchedulerEventDetails = {
   payload?: Prisma.InputJsonValue;
 };
 
-export function recordOrchestratorEvent(input: SchedulerEventDetails) {
-  return recordSchedulerEvent(input);
+export function recordOrchestratorEvent(
+  input: SchedulerEventDetails,
+  tx?: Prisma.TransactionClient,
+) {
+  return recordSchedulerEvent(input, tx);
 }

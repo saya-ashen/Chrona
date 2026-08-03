@@ -182,7 +182,7 @@ export async function getTaskBootstrap(input: { taskId: string; workBlockId?: st
   ];
   const savedPlan = latestSavedPlan;
   const aiPlanGenerationStatus: TaskPlanGenerationStatus =
-    isTaskPlanGenerationRunning({ taskId: task.id, workBlockId: planWorkBlockId })
+    await isTaskPlanGenerationRunning({ taskId: task.id, workBlockId: planWorkBlockId })
       ? "generating"
       : savedPlan !== null && savedPlan.status === "accepted"
         ? "accepted"

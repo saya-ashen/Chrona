@@ -41,23 +41,11 @@ function structuredSuggestions(
 function toSse(event: StreamEvent): { event: string; data: string } | null {
   switch (event.type) {
     case "status":
-      return { event: "status", data: JSON.stringify({ message: event.message }) };
+      return { event: "status", data: JSON.stringify({ phase: "running" }) };
     case "tool_call":
-      return {
-        event: "tool_call",
-        data: JSON.stringify({ tool: event.tool, input: event.input }),
-      };
     case "tool_result":
-      return {
-        event: "tool_result",
-        data: JSON.stringify({
-          tool: event.tool,
-          result: event.result,
-          error: event.error,
-        }),
-      };
     case "partial":
-      return { event: "partial", data: JSON.stringify({ text: event.text }) };
+      return null;
     case "result":
       if ("suggestions" in event) {
         return {
@@ -77,7 +65,7 @@ function toSse(event: StreamEvent): { event: string; data: string } | null {
     case "done":
       return { event: "done", data: JSON.stringify({}) };
     case "error":
-      return { event: "error", data: JSON.stringify({ message: event.message }) };
+      return { event: "error", data: JSON.stringify({ message: "Suggestion generation failed" }) };
   }
 }
 
@@ -104,16 +92,11 @@ export function createAiSuggestionRoutes(_engine: ChronaEngine) {
               const serialized = toSse(event);
               if (serialized) await stream.writeSSE(serialized);
             }
-          } catch (cause) {
+          } catch {
             if (!abortController.signal.aborted) {
               await stream.writeSSE({
                 event: "error",
-                data: JSON.stringify({
-                  message:
-                    cause instanceof Error
-                      ? cause.message
-                      : "Suggestion generation failed",
-                }),
+                data: JSON.stringify({ message: "Suggestion generation failed" }),
               });
             }
           }

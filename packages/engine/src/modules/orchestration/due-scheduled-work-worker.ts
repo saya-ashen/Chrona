@@ -3,22 +3,28 @@ import {
   autoStartScheduledPlanTasks,
   type AutoStartScheduledPlanResult,
 } from "@/modules/scheduling/auto-start-scheduled-plan";
+import { assertSchedulerWorkOwnership, type SchedulerWorkContext, withSchedulerWorkOwnership } from "./scheduler-lease-repository";
 import { recordOrchestratorEvent } from "./scheduler-events";
 
 type DueScheduledWorkWorkerDeps = {
   startDueWork?: typeof autoStartScheduledPlanTasks;
-  recordEvent?: typeof recordOrchestratorEvent;
+  recordEvent?: (
+    input: Parameters<typeof recordOrchestratorEvent>[0],
+    tx?: Parameters<typeof recordOrchestratorEvent>[1],
+  ) => PromiseLike<unknown> | unknown;
 };
 
 export async function runDueScheduledWorkWorker(
   input: {
     now?: Date;
+    workContext?: SchedulerWorkContext;
     deps?: DueScheduledWorkWorkerDeps;
   } = {},
 ): Promise<AutoStartScheduledPlanResult> {
   const startDueWork = input.deps?.startDueWork ?? autoStartScheduledPlanTasks;
   const recordEvent = input.deps?.recordEvent ?? recordOrchestratorEvent;
-  const result = await startDueWork({ now: input.now });
+  await assertSchedulerWorkOwnership(input.workContext);
+  const result = await startDueWork({ now: input.now, workContext: input.workContext });
   const taskIds = [...result.started, ...result.skipped, ...result.failed].map(
     (entry) => entry.taskId,
   );
@@ -26,6 +32,7 @@ export async function runDueScheduledWorkWorker(
     where: { id: { in: taskIds } },
     select: { id: true, workspaceId: true },
   });
+  await assertSchedulerWorkOwnership(input.workContext);
   const workspaceByTaskId = new Map(
     tasks.map((task) => [task.id, task.workspaceId]),
   );
@@ -33,11 +40,13 @@ export async function runDueScheduledWorkWorker(
   for (const entry of result.started) {
     const workspaceId = workspaceByTaskId.get(entry.taskId);
     if (!workspaceId) continue;
-    await recordEvent({
-      workspaceId,
-      taskId: entry.taskId,
-      eventType: "scheduler.start",
-      payload: { workBlockId: entry.workBlockId, runId: entry.runId },
+    await withSchedulerWorkOwnership(input.workContext, async (tx) => {
+      await recordEvent({
+        workspaceId,
+        taskId: entry.taskId,
+        eventType: "scheduler.start",
+        payload: { workBlockId: entry.workBlockId, runId: entry.runId },
+      }, tx);
     });
   }
 
@@ -45,28 +54,32 @@ export async function runDueScheduledWorkWorker(
     if (!entry.actionable) continue;
     const workspaceId = workspaceByTaskId.get(entry.taskId);
     if (!workspaceId) continue;
-    await recordEvent({
-      workspaceId,
-      taskId: entry.taskId,
-      eventType: "scheduler.skip",
-      reason: entry.reason,
-      payload: {
-        workBlockId: entry.workBlockId,
-        reasonCode: entry.reasonCode,
-        actionable: true,
-      },
+    await withSchedulerWorkOwnership(input.workContext, async (tx) => {
+      await recordEvent({
+        workspaceId,
+        taskId: entry.taskId,
+        eventType: "scheduler.skip",
+        reason: entry.reason,
+        payload: {
+          workBlockId: entry.workBlockId,
+          reasonCode: entry.reasonCode,
+          actionable: true,
+        },
+      }, tx);
     });
   }
 
   for (const entry of result.failed) {
     const workspaceId = workspaceByTaskId.get(entry.taskId);
     if (!workspaceId) continue;
-    await recordEvent({
-      workspaceId,
-      taskId: entry.taskId,
-      eventType: "scheduler.fail",
-      reason: entry.error,
-      payload: { workBlockId: entry.workBlockId },
+    await withSchedulerWorkOwnership(input.workContext, async (tx) => {
+      await recordEvent({
+        workspaceId,
+        taskId: entry.taskId,
+        eventType: "scheduler.fail",
+        reason: entry.error,
+        payload: { workBlockId: entry.workBlockId },
+      }, tx);
     });
   }
 

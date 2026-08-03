@@ -1,12 +1,17 @@
-import { mkdir, rm } from "node:fs/promises";
-import { randomUUID } from "node:crypto";
+import { mkdir, readdir, rm } from "node:fs/promises";
+import { createHash, randomUUID } from "node:crypto";
 import { join } from "node:path";
+import { tmpdir } from "node:os";
 import { beforeEach, describe, expect, it } from "bun:test";
 import { db } from "@/lib/db";
 import { resetTestDb, seedTask, seedWorkspace } from "@chrona/db/test-support";
 import { generatedFilesRoot } from "./result-file-access";
 import { openTaskResultFile } from "./open-task-result-file";
 import { aiArtifactRef } from "../plan-execution/use-cases/register-generated-plan-output-artifacts";
+
+async function resultSnapshotDirectories() {
+  return (await readdir(tmpdir())).filter((name) => name.startsWith("chrona-result-file-")).sort();
+}
 
 describe("openTaskResultFile", () => {
   beforeEach(async () => {
@@ -39,7 +44,20 @@ describe("openTaskResultFile", () => {
       data: { taskId, runtimeName: "test", status: "Completed", triggeredBy: "user" },
     });
     const artifact = await db.artifact.create({
-      data: { workspaceId, taskId, runId: run.id, type: "file", title: "Report", uri: reference },
+      data: {
+        workspaceId,
+        taskId,
+        runId: run.id,
+        type: "file",
+        title: "Report",
+        uri: reference,
+        metadata: {
+          checksumAlgorithm: "sha256",
+          checksum: createHash("sha256").update("# Report").digest("hex"),
+          size: Buffer.byteLength("# Report"),
+          mimeType: "text/markdown",
+        },
+      },
     });
     await db.event.create({
       data: {
@@ -83,7 +101,18 @@ describe("openTaskResultFile", () => {
     try {
       const result = await openTaskResultFile({ taskId, requestedPath: reference });
       expect(result.filename).toBe("report.md");
-      expect(await result.file.text()).toBe("# Report");
+      expect(await new Response(result.stream).text()).toBe("# Report");
+
+      const snapshotsBeforeCancel = await resultSnapshotDirectories();
+      const cancelled = await openTaskResultFile({ taskId, requestedPath: reference });
+      expect(await resultSnapshotDirectories()).toHaveLength(snapshotsBeforeCancel.length + 1);
+      await cancelled.stream.cancel();
+      expect(await resultSnapshotDirectories()).toEqual(snapshotsBeforeCancel);
+
+      await Bun.write(filePath, "# Tampered report");
+      await expect(openTaskResultFile({ taskId, requestedPath: reference })).rejects.toThrow(
+        /changed after registration/i,
+      );
 
       await expect(
         openTaskResultFile({

@@ -176,11 +176,6 @@ function expectStructuredContent(result: ToolCallResult) {
   return result.structuredContent as Record<string, unknown>;
 }
 
-function expectTextContent(result: ToolCallResult) {
-  const content = result.content[0];
-  expect(content?.type).toBe("text");
-  return content as { type: "text"; text: string };
-}
 
 
 describe("MCP routes", () => {
@@ -236,14 +231,12 @@ describe("MCP routes", () => {
     expect(body).toMatchObject({ jsonrpc: "2.0" });
     expect(body.result.tools.map((tool: { name: string }) => tool.name).sort()).toEqual([
       "chrona_condition_select",
-      "chrona_dashboard_brief",
       "chrona_execution_read",
       "chrona_goal_results_read",
       "chrona_node_block",
       "chrona_node_complete",
       "chrona_node_fail",
       "chrona_node_read",
-      "chrona_plan_generate",
       "chrona_plan_read",
       "chrona_wait_complete",
     ]);
@@ -272,19 +265,6 @@ describe("MCP routes", () => {
   });
 
 
-  it("does not expose hidden context fields in plan generation schema", () => {
-    const planGenerate = __mcpRouteTestHooks.externalTools.chrona_plan_generate;
-
-    expect(planGenerate.inputSchema.shape.title).toBeDefined();
-    expect(planGenerate.inputSchema.shape.goal).toBeDefined();
-    expect(planGenerate.inputSchema.shape.nodes).toBeDefined();
-    expect(planGenerate.inputSchema.shape.sessionId).toBeUndefined();
-    expect(planGenerate.inputSchema.shape.actorType).toBeUndefined();
-    expect(planGenerate.inputSchema.shape.actorId).toBeUndefined();
-    expect(planGenerate.inputSchema.shape.idempotencyKey).toBeUndefined();
-    expect(planGenerate.inputSchema.shape.evidence).toBeUndefined();
-    expect(planGenerate.inputSchema.shape.expectedRevision).toBeUndefined();
-  });
 
   it("does not expose hidden context fields in any public tool schema", () => {
     for (const tool of Object.values(__mcpRouteTestHooks.externalTools) as Array<{ inputSchema: { shape: Record<string, unknown> } }>) {
@@ -379,22 +359,10 @@ describe("MCP routes", () => {
 
   it("dispatches every exposed Chrona MCP tool to the expected internal operation", async () => {
     const executionSessionId = "chrona:task:task-1:execute";
-    const planSessionId = "chrona:task:task-1:plan-generation";
     const cases = [
       ["chrona.execution.read", executionSessionId, {}, {}],
       ["chrona.goal.results.read", executionSessionId, { query: "research", limit: 3 }, { query: "research", offset: 0, maxChars: 12_000, limit: 3 }],
       ["chrona.plan.read", executionSessionId, {}, {}],
-      ["chrona.plan.generate", planSessionId, {
-        title: "Generated MCP plan",
-        goal: "Persist a complete graph",
-        nodes: [{ id: "first_step", type: "task", title: "First step" }],
-        edges: [],
-      }, {
-        title: "Generated MCP plan",
-        goal: "Persist a complete graph",
-        nodes: [{ id: "first_step", type: "task", title: "First step" }],
-        edges: [],
-      }],
       ["chrona.node.read", executionSessionId, {}, {}],
       ["chrona.node.complete", executionSessionId, { summary: "Done" }, { summary: "Done" }],
       ["chrona.node.condition_select", executionSessionId, { nodeId: "condition-node", branchRef: "B20260516-01-A", summary: "Yes" }, { nodeId: "condition-node", branchRef: "B20260516-01-A", summary: "Yes" }],
@@ -459,44 +427,12 @@ describe("MCP routes", () => {
     })).rejects.toThrow("arguments._meta.session_id is not supported; expected sessionId");
   });
 
-  it("accepts hidden context injected into plan generation arguments", async () => {
-    const blueprint = {
-      title: "Generated MCP plan",
-      goal: "Persist a complete graph",
-      nodes: [{ id: "first_step", type: "task", title: "First step" }],
-      edges: [],
-    };
-    const operations: CapturedToolOperation[] = [];
-    await callTool("chrona.plan.generate", { ...blueprint, ...hiddenContextArguments }, { operations });
-
-    expect(operations).toHaveLength(1);
-    expect(operations[0]).toMatchObject({
-      toolName: "chrona.plan.generate",
-      input: {
-        sessionId: "chrona:task:task-1:plan-generation",
-        taskId: "task-from-session",
-        payload: blueprint,
-      },
-    });
-    expect(operations[0].input.payload).toEqual(blueprint);
-  });
 
   it("accepts hidden context injected into every public tool call", async () => {
     const executionSessionId = "chrona:task:task-1:execute";
     const cases = [
       ["chrona.execution.read", executionSessionId, {}, {}],
       ["chrona.plan.read", hiddenContextArguments.sessionId, {}, {}],
-      ["chrona.plan.generate", hiddenContextArguments.sessionId, {
-        title: "Generated MCP plan",
-        goal: "Persist a complete graph",
-        nodes: [{ id: "first_step", type: "task", title: "First step" }],
-        edges: [],
-      }, {
-        title: "Generated MCP plan",
-        goal: "Persist a complete graph",
-        nodes: [{ id: "first_step", type: "task", title: "First step" }],
-        edges: [],
-      }],
       ["chrona.node.read", executionSessionId, {}, {}],
       ["chrona.node.complete", executionSessionId, { summary: "Done" }, { summary: "Done" }],
       ["chrona.node.condition_select", executionSessionId, { nodeId: "condition-node", branchRef: "B20260516-01-A", summary: "Yes" }, { nodeId: "condition-node", branchRef: "B20260516-01-A", summary: "Yes" }],
@@ -556,7 +492,7 @@ describe("MCP routes", () => {
     const session = await seedCapabilitySession({
       sessionKey: "chrona:task:task-1:plan-generation",
       capabilityScope: "plan_generation",
-      allowedToolNames: ["chrona.plan.generate", "chrona.plan.read", "chrona.goal.results.read"],
+      allowedToolNames: ["chrona.plan.read", "chrona.goal.results.read"],
     });
     const result = await callPersistedTool("chrona.execution.read", {
       sessionId: session.id,
@@ -583,7 +519,7 @@ describe("MCP routes", () => {
     const session = await seedCapabilitySession({
       sessionKey: "chrona:task:task-1:work-block:block-1:plan-generation",
       capabilityScope: "plan_generation",
-      allowedToolNames: ["chrona.plan.generate", "chrona.plan.read", "chrona.goal.results.read"],
+      allowedToolNames: ["chrona.plan.read", "chrona.goal.results.read"],
     });
     const result = await callPersistedTool("chrona.node.complete", {
       sessionId: session.id,
@@ -600,29 +536,6 @@ describe("MCP routes", () => {
     });
   });
 
-  it("rejects plan generation in execution sessions before dispatch", async () => {
-    const session = await seedCapabilitySession({
-      sessionKey: "chrona:task:task-1:work-block:block-1",
-      capabilityScope: "plan_execution",
-      allowedToolNames: ["chrona.execution.read", "chrona.node.complete"],
-    });
-    const result = await callPersistedTool("chrona.plan.generate", {
-      sessionId: session.id,
-      title: "Generated MCP plan",
-      goal: "Persist a complete graph",
-      nodes: [{ id: "first_step", type: "task", title: "First step" }],
-      edges: [],
-    });
-
-    expect(result).toMatchObject({
-      isError: true,
-      structuredContent: {
-        status: "rejected",
-        reasonCode: "UNAUTHORIZED",
-        recovery: { action: "use_allowed_tool" },
-      },
-    });
-  });
 
   it("returns rejected Chrona results as MCP tool errors with structured content", async () => {
     const result = await callTool("chrona.execution.read", {
@@ -639,39 +552,6 @@ describe("MCP routes", () => {
     });
   });
 
-  it("exposes plan generation validation issues to the model", async () => {
-    const issue = {
-      path: "edges.0.to",
-      message: "Unknown target node 'missing_target'",
-    };
-    const result = await callTool("chrona.plan.generate", {
-      title: "Invalid plan",
-      goal: "Expose validation issues",
-      nodes: [{ id: "task_inspect_unscheduled_cards", type: "task", title: "Inspect unscheduled cards" }],
-      edges: [{ from: "task_inspect_unscheduled_cards", to: "missing_target" }],
-      _meta: { sessionId: "chrona:task:task-1:plan-generation" },
-    }, {
-      resultOverride: {
-        status: "rejected",
-        reasonCode: "VALIDATION_ERROR",
-        message: "Plan blueprint compilation failed",
-        recovery: { nextTool: "chrona.plan.read", details: { issues: [issue] } },
-        evidence: { validationIssues: [issue] },
-      },
-    });
-
-    expect(result.isError).toBe(true);
-    const textContent = expectTextContent(result);
-
-    expect(textContent.text).toContain("Validation issues:");
-    expect(textContent.text).toContain(issue.path);
-    expect(expectStructuredContent(result)).toMatchObject({
-      status: "rejected",
-      reasonCode: "VALIDATION_ERROR",
-      recovery: { details: { issues: [issue] } },
-      evidence: { validationIssues: [issue] },
-    });
-  });
 
   it("does not expose idempotency fields in mutating tool schemas", () => {
     const taskComplete = __mcpRouteTestHooks.externalTools.chrona_node_complete;

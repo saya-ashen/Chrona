@@ -27,6 +27,7 @@ describe("task orchestrator ownership", () => {
         lease: {
           name: baseConfig.leaseName,
           ownerId: "owner-b",
+          epoch: 1,
           heartbeatAt: new Date(),
           expiresAt: new Date(Date.now() + 30_000),
           metadata: null,
@@ -35,6 +36,7 @@ describe("task orchestrator ownership", () => {
         },
       })),
       renew: mock(async () => ({ renewed: false as const, lease: null })),
+      complete: mock(async () => false),
       release: mock(async () => false),
     };
     const orchestrator = createTaskOrchestrator({

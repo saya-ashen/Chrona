@@ -432,6 +432,7 @@ describe("HermesProviderClient", () => {
     globalThis.fetch = mockFetch(async (url, init) => {
       expect(String(url)).toBe("http://127.0.0.1:8642/v1/runs/run-native/approval");
       expect(init?.method).toBe("POST");
+      expect(new Headers(init?.headers).get("Idempotency-Key")).toBe("approval-idem-1");
       seenBody = JSON.parse(String(init?.body));
       return jsonResponse({ object: "hermes.run.approval_response", run_id: "run-native", choice: "session", resolved: 1 });
     });
@@ -442,6 +443,7 @@ describe("HermesProviderClient", () => {
       nativeRunId: "run-native",
       choice: "approve_session",
       resolveAll: true,
+      idempotencyKey: "approval-idem-1",
     });
 
     expect(seenBody).toEqual({ choice: "session", resolve_all: true });

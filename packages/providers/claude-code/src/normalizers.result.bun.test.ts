@@ -145,7 +145,7 @@ describe("normalizers non-emitting SDK messages", () => {
         event: {
           type: "content_block_start",
           index: 0,
-          content_block: { type: "tool_use", id: "toolu_1", name: "chrona_plan_generate" },
+          content_block: { type: "tool_use", id: "toolu_1", name: "fixture_echo" },
         },
       },
       {

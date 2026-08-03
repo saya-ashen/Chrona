@@ -152,7 +152,6 @@ function statusReason(code: string, reason?: string) {
 }
 
 
-const CHRONA_PLAN_GENERATE_TOOL_NAME = "chrona_plan_generate";
 const MCP_PROBE_TIMEOUT_MS = 5_000;
 const MCP_PROBE_PROTOCOL_VERSION = "2025-03-26";
 
@@ -163,37 +162,6 @@ type ChronaMcpConnection = {
   headers: Array<{ name: string; value: string }>;
 };
 
-function toolNamesFromMcpBody(text: string): string[] {
-  const tools: string[] = [];
-  try {
-    const parsed = JSON.parse(text) as { result?: { tools?: Array<{ name?: unknown }> } };
-    if (Array.isArray(parsed.result?.tools)) {
-      for (const tool of parsed.result.tools) {
-        if (typeof tool.name === "string") tools.push(tool.name);
-      }
-      return tools;
-    }
-  } catch {
-    /* fall through to SSE frame scan */
-  }
-
-  for (const line of text.split(/\r?\n/)) {
-    if (!line.startsWith("data:")) continue;
-    const data = line.slice(5).trim();
-    if (!data) continue;
-    try {
-      const parsed = JSON.parse(data) as { result?: { tools?: Array<{ name?: unknown }> } };
-      if (Array.isArray(parsed.result?.tools)) {
-        for (const tool of parsed.result.tools) {
-          if (typeof tool.name === "string") tools.push(tool.name);
-        }
-      }
-    } catch {
-      /* ignore non-JSON SSE frames */
-    }
-  }
-  return tools;
-}
 
 function chronaMcpConnection(config: AcpProviderConfig, sessionId?: string | null, control?: StartRunInputWithControl["control"]): ChronaMcpConnection {
   const baseUrl = nonEmpty(control?.baseUrl) ?? nonEmpty(config.mcpBaseUrl) ?? nonEmpty(process.env.CHRONA_MCP_BASE_URL) ?? defaultMcpBaseUrl();
@@ -283,14 +251,6 @@ async function probeChronaMcpTools(input: { config: AcpProviderConfig; sessionId
     });
   }
 
-  const toolNames = toolNamesFromMcpBody(await toolsResponse.text());
-  if (!toolNames.includes(CHRONA_PLAN_GENERATE_TOOL_NAME)) {
-    throw new AcpProviderError(
-      `Chrona MCP tools missing required tool ${CHRONA_PLAN_GENERATE_TOOL_NAME}. Loaded tools: ${toolNames.length > 0 ? toolNames.join(", ") : "none"}.`,
-      { retryable: false, provider: input.config.provider },
-    );
-  }
-  return toolNames;
 }
 
 function stripTrailingSlash(value: string) {
@@ -349,12 +309,6 @@ function renderProviderInput(input: ProviderRunInput): string {
 
 function terminalToolInstruction(input: StartRunInput): string | undefined {
   if (!input.terminalToolName) return undefined;
-  if (input.terminalToolName === "chrona_plan_generate") {
-    return [
-      "When the plan is ready, call the MCP tool `chrona_plan_generate` with the complete PlanBlueprint object.",
-      "Do not answer only in text; the plan is not submitted until that MCP tool call succeeds.",
-    ].join("\n");
-  }
   return [
     `When finished, call the MCP tool \`${input.terminalToolName}\` with the final structured payload required by the current Chrona instructions.`,
     "Do not treat this instruction itself as evidence that the tool has run.",
@@ -639,9 +593,10 @@ function handlers(requestPermission?: (params: RequestPermissionRequest) => Prom
 }
 async function checkAcpSessionHealth(config: AcpProviderConfig, context: ClientContext, signal?: AbortSignal) {
   const sessionId = `${config.provider}-health-${crypto.randomUUID()}`;
-  const sessionKey = `chrona:provider-health:${config.provider}:plan-generation`;
+  const sessionKey = `chrona:provider-health:${config.provider}`;
   await probeChronaMcpTools({ config, sessionId: sessionKey, signal });
   const session = await context.buildSession(newSessionRequest(config, {
+    clientOperationId: `${config.provider}:health:${sessionId}`,
     sessionId,
     sessionKey,
     instructions: "Health check.",
@@ -776,6 +731,7 @@ export class AcpProviderClient implements AgentProviderClient {
         historyReplay: true,
         activeRunLookup: false,
         streamReconnect: false,
+        crossProcessDurable: false,
         providerResumeRef: true,
         runEventReplay: false,
         mode: "session_history",
@@ -1100,8 +1056,9 @@ export class AcpProviderClient implements AgentProviderClient {
       }
       return internal.handle;
     }
-    const handle = await this.start(input as StartRunInput);
-    this.runs.set(handle.ref.runId, { handle, startedAt: now(), input: input as StartRunInput });
+    const startInput = input as Exclude<StreamRunInput, { runId: string }>;
+    const handle = await this.start(startInput);
+    this.runs.set(handle.ref.runId, { handle, startedAt: now(), input: startInput });
     return handle;
   }
 }

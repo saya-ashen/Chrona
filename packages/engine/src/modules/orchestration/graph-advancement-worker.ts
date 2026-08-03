@@ -2,6 +2,7 @@ import { TaskStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { taskPlanExecution } from "@/modules/plan-execution/facade/task-plan-execution.facade";
 import { recordOrchestratorEvent } from "./scheduler-events";
+import { assertSchedulerWorkOwnership, type SchedulerWorkContext, withSchedulerWorkOwnership } from "./scheduler-lease-repository";
 
 type GraphAdvancementWorkerDeps = {
   startExecution?: typeof taskPlanExecution.start;
@@ -9,6 +10,7 @@ type GraphAdvancementWorkerDeps = {
 };
 
 export async function runGraphAdvancementWorker(input: {
+  workContext?: SchedulerWorkContext;
   deps?: GraphAdvancementWorkerDeps;
 } = {}) {
   const startExecution = input.deps?.startExecution ?? taskPlanExecution.start.bind(taskPlanExecution);
@@ -31,14 +33,16 @@ export async function runGraphAdvancementWorker(input: {
 
   const advanced: Array<{ taskId: string; status: string }> = [];
   for (const task of tasks) {
-    const execution = await startExecution({ taskId: task.id, trigger: "system" });
+    await assertSchedulerWorkOwnership(input.workContext);
+    const execution = await startExecution({ taskId: task.id, trigger: "system", workContext: input.workContext });
+    await assertSchedulerWorkOwnership(input.workContext);
     advanced.push({ taskId: task.id, status: execution.status });
-    await recordEvent({
+    await withSchedulerWorkOwnership(input.workContext, (tx) => recordEvent({
       workspaceId: task.workspaceId,
       taskId: task.id,
       eventType: execution.status === "completed" ? "scheduler.complete" : "scheduler.advance",
       payload: { status: execution.status, currentNodeId: execution.currentNodeId },
-    });
+    }, tx));
   }
 
   return { advanced };

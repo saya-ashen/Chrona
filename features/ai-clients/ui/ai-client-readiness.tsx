@@ -30,7 +30,7 @@ function providerMatrixEntry(type: AiClientType): ProviderCapabilityMatrixEntry 
 function recoveryReadiness(matrix: ProviderCapabilityMatrixEntry | undefined, copy: Record<string, string>): ReadinessItem {
   if (!matrix) return { key: "recovery", label: copy.readinessRecovery, state: "warning", detail: copy.readinessCapabilityUnknown };
   if (!matrix.recovery.sessionResume && !matrix.recovery.historyReplay) return { key: "recovery", label: copy.readinessRecovery, state: "warning", detail: copy.recoveryUnavailable };
-  if (matrix.recovery.streamReconnect) return { key: "recovery", label: copy.readinessRecovery, state: "ready", detail: copy.recoveryFull };
+  if (matrix.recovery.crossProcessDurable && matrix.recovery.streamReconnect) return { key: "recovery", label: copy.readinessRecovery, state: "ready", detail: copy.recoveryFull };
   return matrix.recovery.activeRunLookup
     ? { key: "recovery", label: copy.readinessRecovery, state: "limited", detail: copy.recoverySnapshotOnly }
     : { key: "recovery", label: copy.readinessRecovery, state: "limited", detail: copy.recoverySessionHistory };
@@ -57,8 +57,8 @@ function overallReadiness(input: ReadinessInput): ReadinessItem {
     providerConfigured: input.configured && input.enabled,
     providerTested: input.testStatus !== "idle",
     providerReachable: input.testStatus === "available",
-    planningCapable: hasBinding(input.bindings, ["generate_plan", "generatePlan", "task.plan"]),
-    executionCapable: hasBinding(input.bindings, ["task.execution", "execute"]),
+    planningCapable: hasBinding(input.bindings, ["task.plan"]) && providerMatrixEntry(input.type)?.recovery.crossProcessDurable === true,
+    executionCapable: hasBinding(input.bindings, ["task.execution"]),
     requiresPlanning: true, autoExecute: true, hasAcceptedPlan: true, scheduledStartAt: new Date(0),
   });
   return { key: "overall", label: readiness.readiness === "ready" ? input.copy.ready : input.copy.needsAttention, state: readiness.readiness === "ready" ? "ready" : "pending", detail: readiness.disabledReason ?? input.copy.readinessCapabilityDetail };

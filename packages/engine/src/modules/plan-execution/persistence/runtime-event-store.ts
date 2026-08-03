@@ -1,6 +1,7 @@
 import type { GraphExecutionEvent } from "@chrona/graph-runtime";
 import { appendMainSessionEvent } from "./plan-state-store";
 import type { PlanGraphCommandEnvelope } from "../types";
+import type { Prisma } from "@/generated/prisma/client";
 
 export async function appendGraphRuntimeEvents(input: {
   taskId: string;
@@ -9,7 +10,7 @@ export async function appendGraphRuntimeEvents(input: {
   sessionId: string;
   events: GraphExecutionEvent[];
   envelope?: PlanGraphCommandEnvelope;
-}) {
+}, tx?: Prisma.TransactionClient) {
   for (const event of input.events) {
     switch (event.type) {
       case "command_received":
@@ -33,7 +34,7 @@ export async function appendGraphRuntimeEvents(input: {
             pendingCount: event.effective.pendingNodeIds.length,
           },
           envelope: input.envelope,
-        });
+        }, tx);
         break;
       case "node_started":
         await appendMainSessionEvent({
@@ -49,7 +50,7 @@ export async function appendGraphRuntimeEvents(input: {
             nodeType: event.node.type,
           },
           envelope: input.envelope,
-        });
+        }, tx);
         break;
       case "node_completed":
         if (event.result.status !== "done") break;
@@ -64,7 +65,7 @@ export async function appendGraphRuntimeEvents(input: {
           rawEvent: event,
           payload: { summary: event.result.summary },
           envelope: input.envelope,
-        });
+        }, tx);
         break;
       case "node_waiting_for_user":
         if (event.result.status !== "waiting_for_user") break;
@@ -79,7 +80,7 @@ export async function appendGraphRuntimeEvents(input: {
           rawEvent: event,
           payload: { prompt: event.result.prompt },
           envelope: input.envelope,
-        });
+        }, tx);
         break;
       case "node_waiting_for_approval":
         if (event.result.status !== "waiting_for_approval") break;
@@ -94,7 +95,7 @@ export async function appendGraphRuntimeEvents(input: {
           rawEvent: event,
           payload: { prompt: event.result.prompt },
           envelope: input.envelope,
-        });
+        }, tx);
         break;
       case "node_blocked":
         if (event.result.status !== "blocked") break;
@@ -109,7 +110,7 @@ export async function appendGraphRuntimeEvents(input: {
           rawEvent: event,
           payload: { reason: event.result.reason },
           envelope: input.envelope,
-        });
+        }, tx);
         break;
       case "replan_proposed":
         if (event.result.status !== "replan_required") break;
@@ -124,7 +125,7 @@ export async function appendGraphRuntimeEvents(input: {
           rawEvent: event,
           payload: { reason: event.result.reason },
           envelope: input.envelope,
-        });
+        }, tx);
         break;
       case "graph_mutation_applied":
         await appendMainSessionEvent({
@@ -139,7 +140,7 @@ export async function appendGraphRuntimeEvents(input: {
             affectedNodeIds: event.affectedNodeIds,
           },
           envelope: input.envelope,
-        });
+        }, tx);
         break;
       case "node_result_submitted":
         await appendMainSessionEvent({
@@ -152,7 +153,7 @@ export async function appendGraphRuntimeEvents(input: {
           rawEvent: event,
           payload: { status: event.status },
           envelope: input.envelope,
-        });
+        }, tx);
         break;
     }
   }

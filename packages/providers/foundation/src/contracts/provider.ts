@@ -136,6 +136,7 @@ export const resolveProviderApprovalInputSchema = z
     choice: providerApprovalChoiceSchema,
     resolveAll: z.boolean().optional(),
     reason: z.string().optional(),
+    idempotencyKey: z.string().min(1).optional(),
     signal: z.custom<AbortSignal>().optional(),
   })
   .strict();
@@ -290,12 +291,27 @@ export function assertProviderStartSupported(
   }
 }
 
+/** True only when an interrupted run can be authoritatively reattached across process restarts. */
+export function supportsDurableFeatureRuntime(capabilities: ProviderCapabilities): boolean {
+  const recovery = capabilities.recovery;
+  return capabilities.startIdempotency === "client_operation_id"
+    && capabilities.supportsRunLookup === true
+    && capabilities.supportsStreaming === true
+    && recovery?.crossProcessDurable === true
+    && recovery.activeRunLookup === true
+    && recovery.streamReconnect === true
+    && recovery.providerResumeRef === true
+    && recovery.mode === "authoritative_run_lookup";
+}
+
 export const providerRecoveryCapabilitySchema = z
   .object({
     sessionResume: z.boolean(),
     historyReplay: z.boolean(),
     activeRunLookup: z.boolean(),
     streamReconnect: z.boolean(),
+    /** Lookup and stream reattachment remain authoritative after a process restart. */
+    crossProcessDurable: z.boolean().optional(),
     /** A persisted provider-native reference can resume a run after interruption. */
     providerResumeRef: z.boolean().optional(),
     /** A previous run's events can be replayed or its stream reattached. */

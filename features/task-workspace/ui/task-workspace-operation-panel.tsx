@@ -26,6 +26,8 @@ type WorkspaceCopy = Record<string, string | undefined>;
 
 type TaskWorkspaceOperationPanelProps = {
   taskId: string;
+  workBlockId: string | null;
+  executionScope: string | null | undefined;
   state: TaskWorkspaceOperationState;
   workState: WorkStateView;
   copy: WorkspaceCopy;
@@ -57,20 +59,16 @@ function operationToneClass(tone: TaskWorkspaceOperationState["tone"]) {
 function formatRuntimeEvent(event: TaskWorkspaceOperationState["runtimeEvents"][number]) {
   const value = event.event;
   switch (value.type) {
-    case "assistant_text_delta":
-      return `Assistant: ${value.text}`;
-    case "reasoning_delta":
-      return `Reasoning: ${value.text}`;
     case "tool_started":
       return `Tool: ${value.label}`;
+    case "tool_progress":
+      return `Tool: ${value.label} running`;
     case "tool_completed":
       return value.error ? `Tool: ${value.label} failed` : `Tool: ${value.label} completed`;
     case "approval_required":
       return "Approval required";
     case "run_status":
-      return `Status: ${value.message ?? value.status}`;
-    case "raw_event":
-      return value.message ? `Progress: ${value.message}` : `Event: ${value.rawEventType ?? "Runtime event"}`;
+      return `Status: ${value.status}`;
   }
 }
 
@@ -138,6 +136,8 @@ function DecisionRecoveryCard({ workState }: { workState: WorkStateView }) {
 
 export function TaskWorkspaceOperationPanel({
   taskId,
+  workBlockId,
+  executionScope,
   state,
   workState,
   copy,
@@ -221,7 +221,7 @@ export function TaskWorkspaceOperationPanel({
       </CardHeader>
       <CardContent className="space-y-3 px-3">
         <DecisionRecoveryCard workState={workState} />
-        <ProviderApprovalBanner taskId={taskId} />
+        <ProviderApprovalBanner taskId={taskId} workBlockId={workBlockId} executionScope={executionScope} />
         {state.status === "task-action" ? (
           <div className="space-y-2">
             <div className="flex flex-col gap-2 rounded-xl border border-destructive/25 bg-background/80 px-3 py-2 shadow-sm sm:flex-row sm:items-center sm:justify-between" data-testid="current-operation-primary-action">

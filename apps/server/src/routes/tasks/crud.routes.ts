@@ -196,6 +196,7 @@ export function createTasksRoutes(engine: ChronaEngine) {
         taskContextResponse(c, "GET /api/tasks/:taskId/runtime-context", () =>
           engine.tasks.getRuntimeContext({
             taskId: c.req.valid("param").taskId,
+            workBlockId: c.req.query("workBlockId") ?? null,
           }),
         ),
     )
@@ -206,6 +207,7 @@ export function createTasksRoutes(engine: ChronaEngine) {
         taskContextResponse(c, "GET /api/tasks/:taskId/review-context", () =>
           engine.tasks.getReviewContext({
             taskId: c.req.valid("param").taskId,
+            workBlockId: c.req.query("workBlockId") ?? null,
           }),
         ),
     )
@@ -230,9 +232,9 @@ export function createTasksRoutes(engine: ChronaEngine) {
             taskId: c.req.valid("param").taskId,
             requestedPath: c.req.valid("query").path,
           });
-          return new Response(result.file, {
+          return new Response(result.stream, {
             headers: {
-              "Content-Type": result.file.type || "application/octet-stream",
+              "Content-Type": result.contentType,
               "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(result.filename)}`,
               "X-Content-Type-Options": "nosniff",
             },

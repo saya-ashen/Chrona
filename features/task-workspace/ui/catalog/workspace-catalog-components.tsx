@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { Archive, Bot, Check, ChevronDown, ChevronUp, Circle, FileText, MoreHorizontal, Sparkles, TriangleAlert, Wrench } from "lucide-react";
+import { Archive, Check, ChevronDown, ChevronUp, Circle, FileText, MoreHorizontal, Sparkles, TriangleAlert, Wrench } from "lucide-react";
 import { useBoundProp } from "@json-render/react";
 import { Badge, Button, Checkbox, cn, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, Field, FieldDescription, FieldLabel, Label } from "@shared/ui";
 export { CollapsibleBlock } from "./workspace-collapse";
@@ -35,7 +35,6 @@ export function activityIcon(kind: string | undefined, tone: Tone) {
   if (tone === "danger" || kind === "approval") return TriangleAlert;
   if (tone === "success") return Check;
   if (kind?.startsWith("tool_")) return Wrench;
-  if (kind === "assistant_message" || kind === "reasoning") return Bot;
   if (kind === "artifact") return FileText;
   return Circle;
 }

@@ -10,9 +10,9 @@ import type {
 
 const defaultCapabilities: ProviderCapabilities = {
   supportsSessions: true,
-  supportsStreaming: true,
-  supportsRunLookup: true,
-  supportsCancellation: true,
+  supportsStreaming: false,
+  supportsRunLookup: false,
+  supportsCancellation: false,
   supportsToolCalls: true,
   supportsPreviousResponse: false,
   actionInvocation: "unsupported",
@@ -25,13 +25,14 @@ const defaultCapabilities: ProviderCapabilities = {
     resolveAll: true,
   },
   recovery: {
-    sessionResume: true,
-    historyReplay: true,
-    activeRunLookup: true,
-    streamReconnect: true,
+    sessionResume: false,
+    historyReplay: false,
+    activeRunLookup: false,
+    streamReconnect: false,
+    crossProcessDurable: false,
     mode: "authoritative_run_lookup",
-    providerResumeRef: true,
-    runEventReplay: true,
+    providerResumeRef: false,
+    runEventReplay: false,
   },
 };
 
@@ -60,6 +61,7 @@ export function mapCapabilities(raw: unknown, fallbackReason?: string): Provider
       historyReplay: true,
       activeRunLookup: Boolean(features.run_status),
       streamReconnect: Boolean(features.run_events_sse),
+      crossProcessDurable: Boolean(features.run_status && features.run_events_sse),
       mode: "authoritative_run_lookup",
       providerResumeRef: true,
       runEventReplay: Boolean(features.run_events_sse),

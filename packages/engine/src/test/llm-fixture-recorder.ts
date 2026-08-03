@@ -2,8 +2,7 @@ import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type { AiFeature } from "@chrona/contracts";
-import type { ProviderRunSnapshot } from "@chrona/providers-foundation";
-import type { ProviderFeatureRequest } from "../modules/ai";
+import type { ProviderRunSnapshot, StartRunInput } from "@chrona/providers-foundation";
 
 const DEFAULT_CASSETTE_DIR = "packages/engine/src/test/llm-fixtures";
 
@@ -27,7 +26,7 @@ export interface LlmFixtureRecorderOptions {
   provider: string;
   feature: AiFeature | string;
   name: string;
-  sanitizeRequest?: (request: ProviderFeatureRequest) => unknown;
+  sanitizeRequest?: (request: StartRunInput) => unknown;
   sanitizeResponse?: (response: ProviderRunSnapshot) => ProviderRunSnapshot;
 }
 
@@ -38,7 +37,7 @@ function stableStringify(value: unknown): string {
   });
 }
 
-function requestHash(request: ProviderFeatureRequest): string {
+function requestHash(request: StartRunInput): string {
   return `sha256:${createHash("sha256").update(JSON.stringify(request)).digest("hex")}`;
 }
 
@@ -62,7 +61,7 @@ export async function readProviderResponseFixture(path: string): Promise<Provide
 }
 
 export async function withProviderResponseFixture(
-  request: ProviderFeatureRequest,
+  request: StartRunInput,
   runProviderRequest: () => Promise<ProviderRunSnapshot>,
   options: LlmFixtureRecorderOptions,
 ): Promise<ProviderRunSnapshot> {

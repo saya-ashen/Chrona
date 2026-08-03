@@ -1,6 +1,6 @@
 import { useEffect, useState, type ReactNode } from "react";
 import type { UiDocument } from "@chrona/ui-protocol";
-import type { PlanExecutionResult } from "@chrona/contracts";
+import type { PublicPlanExecutionResult } from "@chrona/contracts";
 import type { WorkspaceActivityItem, createTaskWorkspaceExecutionConsoleView } from "@features/task-workspace/public/workspace-integration";
 import type { WorkspaceRuntimeEvent } from "../model/workspace-runtime-events";
 import {
@@ -39,7 +39,7 @@ export function TaskWorkspaceInspector({
   commandCenterActionHandlers?: Record<string, (params: Record<string, unknown>) => Promise<unknown> | unknown>;
   runtimeEvents: WorkspaceRuntimeEvent[];
   liveActivity: WorkspaceActivityItem[];
-  currentExecution?: PlanExecutionResult | null;
+  currentExecution?: PublicPlanExecutionResult | null;
   onRetryFinalization?: () => Promise<void> | void;
   isRetryingFinalization?: boolean;
   finalizationRetryError?: string | null;

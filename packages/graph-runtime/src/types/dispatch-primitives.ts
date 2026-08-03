@@ -21,11 +21,17 @@ export type GraphNodeExecutionResult =
   | { status: "blocked"; reason: string; evidence?: GraphNodeExecutionEvidence; actionForm?: NodeResult["actionForm"] }
   | { status: "replan_required"; reason: string; evidence?: GraphNodeExecutionEvidence; proposedPatch?: unknown }
   | { status: "failed"; error: string; evidence?: GraphNodeExecutionEvidence; details?: unknown };
+type GraphSubmittedNodeResultIdentity = {
+  expectedAttemptId?: string;
+  runtimeRunRef?: string | null;
+  providerRunId?: string | null;
+};
+
 export type GraphSubmittedNodeResult =
-  | { nodeId: string; status: "done"; summary: string; evidence?: GraphNodeExecutionEvidence; output?: unknown; selectedBranch?: NodeResult["selectedBranch"]; deliverables?: NodeResult["deliverables"]; findings?: NodeResult["findings"]; decisions?: NodeResult["decisions"]; caveats?: NodeResult["caveats"]; nextActions?: NodeResult["nextActions"]; resultEvidence?: NodeResult["resultEvidence"] }
-  | { nodeId: string; status: "failed"; error: string; evidence?: GraphNodeExecutionEvidence }
-  | { nodeId: string; status: "blocked"; reason: string; actionForm?: NodeResult["actionForm"]; evidence?: GraphNodeExecutionEvidence }
-  | { nodeId: string; status: "cancelled"; reason?: string; evidence?: GraphNodeExecutionEvidence };
+  | ({ nodeId: string; status: "done"; summary: string; evidence?: GraphNodeExecutionEvidence; output?: unknown; selectedBranch?: NodeResult["selectedBranch"]; deliverables?: NodeResult["deliverables"]; findings?: NodeResult["findings"]; decisions?: NodeResult["decisions"]; caveats?: NodeResult["caveats"]; nextActions?: NodeResult["nextActions"]; resultEvidence?: NodeResult["resultEvidence"] } & GraphSubmittedNodeResultIdentity)
+  | ({ nodeId: string; status: "failed"; error: string; evidence?: GraphNodeExecutionEvidence } & GraphSubmittedNodeResultIdentity)
+  | ({ nodeId: string; status: "blocked"; reason: string; actionForm?: NodeResult["actionForm"]; evidence?: GraphNodeExecutionEvidence } & GraphSubmittedNodeResultIdentity)
+  | ({ nodeId: string; status: "cancelled"; reason?: string; evidence?: GraphNodeExecutionEvidence } & GraphSubmittedNodeResultIdentity);
 export type GraphExecutionState = { graph: PlanGraph; attempts: NodeAttempt[]; results: NodeResult[]; executionContextSnapshots: ExecutionContextSnapshot[] };
 export type GraphNodeExecutorInput<TContext = unknown> = { node: EffectivePlanNode; plan: EffectivePlanGraph; attempt: NodeAttempt; trigger: GraphExecutionTrigger; runtimeName: string; userInput?: string; inputFields?: CheckpointInputFields; context: TContext; signal?: AbortSignal };
 export type GraphExecutionControl = { signal?: AbortSignal; shouldPause?: () => boolean };

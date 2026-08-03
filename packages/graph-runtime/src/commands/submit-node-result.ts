@@ -20,6 +20,7 @@ export async function submitNodeResultCommand<TContext>(input: {
     nodeResult: input.command.nodeResult,
     submittedAt,
   });
+  await input.callbacks.onStateChange?.(submittedState);
   input.events.push({
     type: "node_result_submitted",
     nodeId: input.command.nodeResult.nodeId,

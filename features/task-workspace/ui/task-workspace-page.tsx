@@ -228,6 +228,7 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
   const {
     plan,
     fetchPlan,
+    planHeadStateVersion,
     planGenerationStatus,
     graphPlan,
     canAcceptPlan,
@@ -288,6 +289,7 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
   } = useTaskWorkspaceProposalFlow({
     task,
     plan,
+    planHeadStateVersion,
     draftEditableTask,
     setTask,
     setSaveError,

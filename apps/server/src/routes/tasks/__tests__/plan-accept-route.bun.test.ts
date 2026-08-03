@@ -21,7 +21,7 @@ import { createPlansRoutes } from "../plan.routes";
 import type { ChronaEngine } from "@chrona/engine";
 
 function makeEngineMock(options: {
-  acceptImpl: (args: { taskId: string; planId: string; workspaceId: string; workBlockId: string | null }) => Promise<unknown>;
+  acceptImpl: (args: { taskId: string; planId: string; workspaceId: string; workBlockId: string | null; expectedHeadStateVersion: number; idempotencyKey: string }) => Promise<unknown>;
 }): ChronaEngine {
   return {
     tasks: {
@@ -34,7 +34,7 @@ function makeEngineMock(options: {
 
 describe("POST /api/tasks/:taskId/plan/accept", () => {
   it("E1. happy path: route forwards the validated args to engine.tasks.plan.accept and returns the engine's response", async () => {
-    const acceptCalls: Array<{ taskId: string; planId: string; workspaceId: string; workBlockId: string | null }> = [];
+    const acceptCalls: Array<{ taskId: string; planId: string; workspaceId: string; workBlockId: string | null; expectedHeadStateVersion: number; idempotencyKey: string }> = [];
     const engine = makeEngineMock({
       acceptImpl: async (args) => {
         acceptCalls.push(args);
@@ -52,6 +52,8 @@ describe("POST /api/tasks/:taskId/plan/accept", () => {
           planId: "plan-1",
           workspaceId: "workspace-1",
           workBlockId: "wb-1",
+          expectedHeadStateVersion: 4,
+          idempotencyKey: "accept-1",
         }),
       },
     );
@@ -66,6 +68,8 @@ describe("POST /api/tasks/:taskId/plan/accept", () => {
       planId: "plan-1",
       workspaceId: "workspace-1",
       workBlockId: "wb-1",
+      expectedHeadStateVersion: 4,
+      idempotencyKey: "accept-1",
     });
   });
 
@@ -87,6 +91,8 @@ describe("POST /api/tasks/:taskId/plan/accept", () => {
           planId: "plan-1",
           workspaceId: "workspace-1",
           workBlockId: null,
+          expectedHeadStateVersion: 0,
+          idempotencyKey: "accept-fail-1",
         }),
       },
     );

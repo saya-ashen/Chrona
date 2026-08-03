@@ -185,6 +185,7 @@ describe("terminal action recording", () => {
       runtimeSessionKey: "sess",
       nodeId: attempt.nodeId,
       nodeAttemptId: attempt.id,
+      providerRunId: null,
     };
     const first = await recordTerminalAction({ scope, kind: "complete", payload: { summary: "ok" }, workspaceId: workspace.id });
     const retry = await recordTerminalAction({ scope, kind: "complete", payload: { summary: "again" }, workspaceId: workspace.id });

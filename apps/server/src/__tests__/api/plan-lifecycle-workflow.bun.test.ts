@@ -18,7 +18,7 @@ function createPlanLifecycleRouter() {
     try {
       const taskId = c.req.param("taskId");
       const savedPlan = await getLatestTaskPlanReadModel(taskId);
-      const aiPlanGenerationStatus = isTaskPlanGenerationRunning({ taskId })
+      const aiPlanGenerationStatus = await isTaskPlanGenerationRunning({ taskId })
         ? "generating"
         : savedPlan?.status === "accepted"
           ? "accepted"
@@ -208,7 +208,7 @@ describe("Plan lifecycle workflow", () => {
     const res = await app().request(`http://local/api/tasks/${taskId}/plan/accept`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ planId }),
+      body: JSON.stringify({ planId, expectedHeadStateVersion: 0, idempotencyKey: "accept-plan-1", workBlockId: null }),
     });
 
     expect(res.status).toBe(200);
@@ -225,7 +225,7 @@ describe("Plan lifecycle workflow", () => {
     await app().request(`http://local/api/tasks/${taskId}/plan/accept`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ planId }),
+      body: JSON.stringify({ planId, expectedHeadStateVersion: 0, idempotencyKey: "accepted-state-plan-1", workBlockId: null }),
     });
 
     const res = await app().request(`http://local/api/tasks/${taskId}/plan`);

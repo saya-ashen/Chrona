@@ -75,6 +75,21 @@ async function createRecurringDailySeries(input: {
       recurrenceAnchorEndAt: new Date(anchor.getTime() + 30 * 60 * 1000),
     },
   });
+  await db.taskTrigger.create({
+    data: {
+      workspaceId: input.workspaceId,
+      taskId: task.id,
+      kind: "schedule",
+      state: "Enabled",
+      config: {
+        mode: "recurring",
+        rrule: `FREQ=DAILY;COUNT=${input.count}`,
+        anchorStartAt: anchor.toISOString(),
+        timezone: "UTC",
+        durationMs: 30 * 60 * 1000,
+      },
+    },
+  });
   await runRecurringWorkBlockExpansionWorker({ now: anchor });
   const blocks = await db.workBlock.findMany({
     where: { taskId: task.id },

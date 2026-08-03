@@ -1,5 +1,7 @@
 import { db } from "@/lib/db";
+import type { Prisma } from "@/generated/prisma/client";
 import type { OrchestratorTrigger } from "../types";
+import { withPlanExecutionDurability } from "./scheduler-durability";
 
 export async function ensureExecutionSession(input: {
   workspaceId: string;
@@ -8,17 +10,28 @@ export async function ensureExecutionSession(input: {
   trigger: OrchestratorTrigger;
   workBlockId?: string | null;
   sessionId?: string;
-}) {
+}, suppliedTx?: Prisma.TransactionClient) {
+  return withPlanExecutionDurability((tx) => ensureExecutionSessionInTransaction(input, tx), suppliedTx);
+}
+
+async function ensureExecutionSessionInTransaction(input: {
+  workspaceId: string;
+  taskId: string;
+  planId: string;
+  trigger: OrchestratorTrigger;
+  workBlockId?: string | null;
+  sessionId?: string;
+}, tx: Prisma.TransactionClient) {
   const occurrence = input.workBlockId
-    ? await db.taskOccurrence.findUnique({ where: { workBlockId: input.workBlockId }, select: { id: true } })
+    ? await tx.taskOccurrence.findUnique({ where: { workBlockId: input.workBlockId }, select: { id: true } })
     : null;
   const explicitSession = input.sessionId
-    ? await db.executionSession.findFirst({
+    ? await tx.executionSession.findFirst({
         where: { id: input.sessionId, taskId: input.taskId },
       })
     : null;
   if (explicitSession) {
-    return db.executionSession.update({
+    return tx.executionSession.update({
       where: { id: explicitSession.id },
       data: {
         planId: input.planId,
@@ -33,7 +46,7 @@ export async function ensureExecutionSession(input: {
 
   // The unique activeScopeKey makes the first writer across independent DB
   // connections authoritative for a task's one live execution session.
-  return db.executionSession.upsert({
+  return tx.executionSession.upsert({
     where: {
       taskId_activeScopeKey: { taskId: input.taskId, activeScopeKey: "active" },
     },
@@ -61,8 +74,9 @@ export async function abandonActiveExecutionSessions(input: {
   taskId: string;
   workBlockId?: string | null;
   reason?: string;
-}) {
-  return db.executionSession.updateMany({
+}, suppliedTx?: Prisma.TransactionClient) {
+  return withPlanExecutionDurability((tx) => tx.executionSession.updateMany({
+
     where: {
       taskId: input.taskId,
       status: { in: ["Active", "Paused"] },
@@ -76,7 +90,7 @@ export async function abandonActiveExecutionSessions(input: {
       pauseReason: input.reason ?? null,
       completedAt: new Date(),
     },
-  });
+  }), suppliedTx);
 }
 
 export type ExecutionSessionRow = Awaited<ReturnType<typeof ensureExecutionSession>>;
@@ -127,8 +141,8 @@ export async function setExecutionSessionState(input: {
   pausedByRawEventId?: string | null;
   latestEventId?: string | null;
   latestRawEventId?: string | null;
-}) {
-  return db.executionSession.update({
+}, suppliedTx?: Prisma.TransactionClient) {
+  return withPlanExecutionDurability((tx) => tx.executionSession.update({
     where: { id: input.sessionId },
     data: {
       status: input.status,
@@ -149,5 +163,5 @@ export async function setExecutionSessionState(input: {
           ? new Date()
           : null,
     },
-  });
+  }), suppliedTx);
 }

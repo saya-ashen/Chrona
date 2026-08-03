@@ -3,7 +3,7 @@ import type { AiClientRecord } from "@chrona/contracts";
 import { AiClientError } from "@chrona/contracts";
 import type { AgentProviderClient, ProviderRunEvent, ProviderRunSnapshot } from "@chrona/providers-foundation";
 import type { EngineAiClient } from "@chrona/engine/test-support";
-import { dispatchFeaturePayload, dispatchPreparedFeaturePayload } from "../index";
+import { dispatchFeaturePayload } from "../index";
 
 process.env.DATABASE_URL ??= "file:/tmp/chrona-provider-response-parsing.sqlite";
 
@@ -174,24 +174,6 @@ describe("provider response parsing", () => {
       .rejects.toMatchObject({ code: "invalid_response", message: "[debug] Feature 'chat' did not return a parsed payload" } satisfies Partial<AiClientError>);
   });
 
-  test("retains prepared feature validation errors for schema-invalid payloads", async () => {
-    await expect(dispatchPreparedFeaturePayload(
-      client(providerSnapshot({ structuredPayload: { parsed: { suggestions: [{}] } } })),
-      {
-        feature: "suggest",
-        instructions: "Return suggestions",
-        structuredOutputSchema: {
-          name: "suggestions",
-          description: "Suggestions",
-          schema: {},
-        },
-      },
-      "scope-1",
-    )).rejects.toMatchObject({
-      code: "invalid_response",
-      message: "[debug] Feature 'suggest' suggestions must include a non-empty title",
-    } satisfies Partial<AiClientError>);
-  });
 
   test("rejects provider error snapshots before parsing", async () => {
     await expect(dispatchFeaturePayload(client(providerSnapshot({ error: "provider failed", structuredPayload: null })), "chat", {}, "scope-1"))

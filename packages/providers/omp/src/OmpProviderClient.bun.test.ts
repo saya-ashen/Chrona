@@ -91,6 +91,7 @@ describe("OmpSdkProviderClient recovery capabilities", () => {
       sessionResume: true,
       historyReplay: true,
       activeRunLookup: false,
+      crossProcessDurable: false,
       streamReconnect: false,
       providerResumeRef: true,
       runEventReplay: false,
@@ -116,31 +117,44 @@ describe("OmpSdkProviderClient direct config", () => {
   });
 });
 
-describe("OmpSdkProviderClient node runtime tools", () => {
-  it("expands task node terminal action into the full task runtime tool set", () => {
-    expect(__ompSdkProviderTestHooks.sdkToolNamesForTerminal("chrona_node_complete")).toEqual([
-      "chrona_node_complete",
-      "chrona_node_request_input",
-      "chrona_node_block",
-      "chrona_node_fail",
-    ]);
-  });
+describe("OmpSdkProviderClient declared runtime tools", () => {
+  const runtimeTools: NonNullable<StartRunInput["tools"]> = [
+    {
+      name: "runtime_complete",
+      description: "Record a completed runtime result.",
+      inputSchema: {
+        type: "object",
+        properties: { summary: { type: "string" } },
+        required: ["summary"],
+      },
+    },
+    {
+      name: "runtime_lookup",
+      description: "Look up runtime information.",
+      inputSchema: {
+        type: "object",
+        properties: { key: { type: "string" } },
+        required: ["key"],
+      },
+    },
+  ];
 
-  it("keeps plan generation as a single strict terminal tool", () => {
-    expect(__ompSdkProviderTestHooks.sdkToolNamesForTerminal("chrona_plan_generate")).toEqual([
-      "chrona_plan_generate",
-    ]);
-  });
-
-  it("does not narrow OMP SDK tools with toolNames", () => {
-    const options = __ompSdkProviderTestHooks.sdkToolOptionsForTerminal("chrona_node_complete");
-    expect(options.customTools.map((tool) => tool.name)).toEqual([
-      "chrona_node_complete",
-      "chrona_node_request_input",
-      "chrona_node_block",
-      "chrona_node_fail",
-    ]);
+  it("exposes only request-declared tools", () => {
+    const options = __ompSdkProviderTestHooks.sdkToolOptions(runtimeTools, "runtime_complete");
+    expect(options.customTools.map((tool) => tool.name)).toEqual(["runtime_complete", "runtime_lookup"]);
     expect("toolNames" in options).toBe(false);
+  });
+
+  it("adapts declared JSON Schema to SDK tool parameters", () => {
+    const schema = __ompSdkProviderTestHooks.jsonSchemaToZod(runtimeTools[0].inputSchema);
+    expect(schema.safeParse({ summary: "Done" }).success).toBe(true);
+    expect(schema.safeParse({}).success).toBe(false);
+  });
+
+  it("identifies only the declared terminal tool", () => {
+    expect(__ompSdkProviderTestHooks.isDeclaredTerminalTool("runtime_complete", runtimeTools, "runtime_complete")).toBe(true);
+    expect(__ompSdkProviderTestHooks.isDeclaredTerminalTool("runtime_complete", runtimeTools, "runtime_lookup")).toBe(false);
+    expect(__ompSdkProviderTestHooks.isDeclaredTerminalTool("runtime_complete", undefined, "runtime_complete")).toBe(false);
   });
 
   it("disables built-in tools, MCP, and LSP for read-only runs", () => {
@@ -151,38 +165,21 @@ describe("OmpSdkProviderClient node runtime tools", () => {
     });
     expect(__ompSdkProviderTestHooks.sdkReadOnlyToolOptions("full")).toEqual({});
   });
-  it("treats node result tools as terminal", () => {
-    expect(__ompSdkProviderTestHooks.isTerminalRuntimeTool("chrona_node_request_input")).toBe(true);
-    expect(__ompSdkProviderTestHooks.isTerminalRuntimeTool("chrona_node_complete")).toBe(true);
-  });
-  it("aborts only after an accepted node result action", async () => {
-    const originalFetch = globalThis.fetch;
-    const requests: string[] = [];
-    globalThis.fetch = (async (_input: string | URL | Request, init?: RequestInit) => {
-      requests.push(String(init?.body));
-      return new Response(JSON.stringify({ accepted: true }), { status: 200 });
-    }) as typeof fetch;
-    try {
-      let terminalAccepted = 0;
-      let aborts = 0;
-      const tools = __ompSdkProviderTestHooks.sdkToolOptionsForTerminal(
-        "chrona_node_complete",
-        { baseUrl: "http://chrona.test", runToken: "token" },
-        () => { terminalAccepted += 1; },
-      ).customTools;
-      const context = { abort: () => { aborts += 1; } };
-      await tools.find((tool) => tool.name === "chrona_node_complete")!.execute("complete", { summary: "Done" }, undefined, context as never, undefined);
-      await Promise.resolve();
-      expect(terminalAccepted).toBe(1);
-      expect(aborts).toBe(1);
-      await tools.find((tool) => tool.name === "chrona_node_request_input")!.execute("input", { title: "Need input", instructions: "Provide it", fields: [] }, undefined, context as never, undefined);
-      await Promise.resolve();
-      expect(terminalAccepted).toBe(2);
-      expect(aborts).toBe(2);
-      expect(requests).toHaveLength(2);
-    } finally {
-      globalThis.fetch = originalFetch;
-    }
+
+  it("accepts and aborts only after the declared terminal tool runs", async () => {
+    let terminalAccepted = 0;
+    let aborts = 0;
+    const tools = __ompSdkProviderTestHooks.sdkToolOptions(
+      runtimeTools,
+      "runtime_complete",
+      () => { terminalAccepted += 1; },
+    ).customTools;
+    const context = { abort: () => { aborts += 1; } };
+    await tools.find((tool) => tool.name === "runtime_lookup")!.execute("lookup", { key: "status" }, undefined, context as never, undefined);
+    await tools.find((tool) => tool.name === "runtime_complete")!.execute("complete", { summary: "Done" }, undefined, context as never, undefined);
+    await Promise.resolve();
+    expect(terminalAccepted).toBe(1);
+    expect(aborts).toBe(1);
   });
 
 
@@ -212,9 +209,9 @@ describe("OmpSdkProviderClient node runtime tools", () => {
 
   it("surfaces the concrete SDK tool error text", () => {
     expect(__ompSdkProviderTestHooks.sdkToolErrorMessage({
-      content: [{ type: "text", text: "Chrona control request timed out" }],
+      content: [{ type: "text", text: "Runtime tool execution timed out" }],
       isError: true,
-    })).toBe("Chrona control request timed out");
+    })).toBe("Runtime tool execution timed out");
     expect(__ompSdkProviderTestHooks.sdkToolErrorMessage({ details: {} })).toBe("Oh My Pi SDK tool call failed");
   });
 
@@ -253,17 +250,20 @@ describe("OmpSdkProviderClient node runtime tools", () => {
     expect(__ompSdkProviderTestHooks.agentEndOutcome(event, false)).toEqual({ status: "failed", error: "Operation aborted" });
   });
 
-  it("extracts an accepted OMP terminal tool from the completed snapshot", () => {
-    const terminal = __ompSdkProviderTestHooks.terminalNodeToolFromSnapshot({
+  it("extracts a declared terminal tool from the completed snapshot", () => {
+    const tools = [{ name: "runtime_complete", inputSchema: { type: "object" } }];
+    const terminal = __ompSdkProviderTestHooks.terminalToolFromSnapshot({
       raw: {
         terminalTool: {
-          name: "chrona_node_complete",
+          name: "runtime_complete",
           input: { summary: "Completed package" },
         },
       },
+      terminalToolName: "runtime_complete",
+      tools,
     });
     expect(terminal).toEqual({
-      name: "chrona_node_complete",
+      name: "runtime_complete",
       input: { summary: "Completed package" },
     });
   });
@@ -317,18 +317,18 @@ describe("OmpSdkProviderClient node runtime tools", () => {
       willRetry: false,
     })).toBe("Context compaction completed (context-full).");
   });
-
 });
+
 describe("OmpProviderClient SDK delegation", () => {
-  it("uses the SDK for plan-generation terminal tool calls", async () => {
+  it("uses the SDK for arbitrary terminal tool calls", async () => {
     const sdk = new RecordingProvider("sdk-run");
     const client = new OmpProviderClient({ sdkClient: sdk });
 
-    const run = await client.startRun(startInput("chrona_plan_generate"));
+    const run = await client.startRun(startInput("custom_terminal"));
     await Array.fromAsync(client.streamRun({ runId: run.runId, sessionId: run.sessionId }));
 
     expect(run.runId).toBe("sdk-run");
-    expect(sdk.calls).toEqual(["startRun:chrona_plan_generate", "streamRun"]);
+    expect(sdk.calls).toEqual(["startRun:custom_terminal", "streamRun"]);
   });
 
   it("uses the SDK for normal OMP runs", async () => {
@@ -438,10 +438,6 @@ describe("OmpProviderClient SDK delegation", () => {
           enabledTools: expect.arrayContaining([
             "lsp",
             "task",
-            "chrona_node_complete",
-            "chrona_node_request_input",
-            "chrona_node_block",
-            "chrona_node_fail",
           ]),
         },
       },

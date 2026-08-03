@@ -2,8 +2,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { afterEach, describe, expect, test } from "bun:test";
-import type { ProviderRunSnapshot } from "@chrona/providers-foundation";
-import type { ProviderFeatureRequest } from "@chrona/engine/test-support";
+import type { ProviderRunSnapshot, StartRunInput } from "@chrona/providers-foundation";
 import { cassettePath, withProviderResponseFixture } from "./llm-fixture-recorder";
 
 const tempDirs: string[] = [];
@@ -14,8 +13,9 @@ async function tempCassetteDir() {
   return dir;
 }
 
-function request(overrides: Partial<ProviderFeatureRequest> = {}): ProviderFeatureRequest {
+function request(overrides: Partial<StartRunInput> = {}): StartRunInput {
   return {
+    clientOperationId: "llm-fixture-recorder-request",
     sessionId: "session-1",
     sessionKey: "fixture-session",
     instructions: "Use synthetic fixture data only",

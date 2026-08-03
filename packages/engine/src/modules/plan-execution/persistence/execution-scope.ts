@@ -46,8 +46,17 @@ export async function resolveExecutionScope(
     if (occurrence) return { occurrenceId: occurrence.id, workBlockId: occurrence.workBlockId, planId: null, executionSessionId: null };
   }
   if (typeof hint?.workBlockId === "string" && hint.workBlockId.length > 0) {
-    const occurrence = await db.taskOccurrence.findUnique({ where: { workBlockId: hint.workBlockId }, select: { id: true } });
-    return { occurrenceId: occurrence?.id ?? null, workBlockId: hint.workBlockId, planId: null, executionSessionId: null };
+    const workBlock = await db.workBlock.findFirst({
+      where: { id: hint.workBlockId, taskId },
+      select: { id: true, planId: true, occurrence: { select: { id: true } } },
+    });
+    if (!workBlock) return { occurrenceId: null, workBlockId: null, planId: null, executionSessionId: null };
+    return {
+      occurrenceId: workBlock.occurrence?.id ?? null,
+      workBlockId: workBlock.id,
+      planId: workBlock.planId,
+      executionSessionId: null,
+    };
   }
 
   const workBlockIdFromSessionKey = parseWorkBlockPlanSessionKey(taskId, hint?.sessionId);

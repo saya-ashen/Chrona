@@ -59,9 +59,6 @@ export type GoalAssetOwnershipProposalData = {
   status: "Generating" | "Ready" | "Applied" | "Rejected" | "Stale" | "Failed";
   sourceTaskId: string | null;
   sourceRunId: string | null;
-  providerType: string | null;
-  model: string | null;
-  generationError: string | null;
   result: {
     schemaVersion: 1;
     decision: "create_asset" | "append_version" | "separate_asset";

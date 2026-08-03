@@ -8,7 +8,6 @@ import type { GenerateTaskPlanRequest as RuntimeGenerateTaskPlanRequest } from "
 export type AiClientType = "llm" | "hermes" | "debug" | "claude_code" | "codex" | "omp" | (string & {});
 export const AI_FEATURES = [
   "suggest",
-  "generate_plan",
   "conflicts",
   "timeslots",
   "chat",

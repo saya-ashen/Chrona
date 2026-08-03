@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from "bun:test";
 import { Hono } from "hono";
 import { randomUUID } from "node:crypto";
 
+import { AI_FEATURES } from "@chrona/contracts";
 import { db } from "@chrona/db";
 import { resetTestDb, seedWorkspace, expectApiError, json } from "../bun-test-helpers";
 import { error, internalServerError, json as httpJson } from "../../lib/http";
@@ -10,7 +11,6 @@ import { error, internalServerError, json as httpJson } from "../../lib/http";
 // Inline AI feature binding router
 // ---------------------------------------------------------------------------
 
-const VALID_AI_FEATURES = ["suggest", "generate_plan", "conflicts", "timeslots", "chat"] as const;
 
 function createBindingRouter() {
   const api = new Hono();
@@ -24,6 +24,12 @@ function createBindingRouter() {
       if (!Array.isArray(features)) {
         return error(c, "features must be an array", 400);
       }
+      if (features.some(
+        (feature) => typeof feature !== "string"
+          || !(AI_FEATURES as readonly string[]).includes(feature),
+      )) {
+        return error(c, "features contains an unknown AI feature", 400);
+      }
 
       const client = await db.aiClient.findUnique({ where: { id: clientId } });
       if (!client) {
@@ -32,7 +38,7 @@ function createBindingRouter() {
 
       const validFeatures = [...new Set(
         features.filter((feature: string) =>
-          (VALID_AI_FEATURES as readonly string[]).includes(feature),
+          (AI_FEATURES as readonly string[]).includes(feature),
         ),
       )];
 
@@ -169,17 +175,15 @@ describe("AI Feature Binding", () => {
   // Edge cases
   // ──────────────────────────────────────────────
 
-  it("PUT bindings filters out invalid feature names, keeps valid ones", async () => {
+  it("PUT bindings rejects unknown feature names without changing bindings", async () => {
     const client = await createClient("Client A");
+    await putBindings(client.id, ["suggest"]);
 
     const res = await putBindings(client.id, ["suggest", "nonexistent_feature", "chat"]);
-    expect(res.status).toBe(200);
-    const body = await json<{ bindings: string[] }>(res);
+    await expectApiError(res, 400);
 
-    expect(body.bindings).toContain("suggest");
-    expect(body.bindings).toContain("chat");
-    expect(body.bindings).not.toContain("nonexistent_feature");
-    expect(body.bindings.length).toBe(2);
+    const bindings = await db.aiFeatureBinding.findMany({ where: { clientId: client.id } });
+    expect(bindings.map(({ feature }) => feature)).toEqual(["suggest"]);
   });
 
   it("PUT bindings idempotent: same feature bound twice does not duplicate", async () => {

@@ -50,7 +50,7 @@ Chrona is a local-first AI schedule app. It helps you turn tasks into editable p
 
 ### 3. Agent integration
 
-External agents call Chrona through MCP tools such as `chrona_plan_generate`, `chrona_node_complete`, `chrona_node_block`, and `chrona_condition_select`. Agents receive AI-visible node and branch refs from Chrona and must submit results through those refs instead of inventing backend IDs.
+External agents call Chrona through MCP tools such as `chrona_plan_read`, `chrona_plan_mutate`, `chrona_node_complete`, `chrona_node_block`, and `chrona_condition_select`. Agents receive AI-visible node and branch refs from Chrona and must submit results through those refs instead of inventing backend IDs.
 
 ## Developer map
 

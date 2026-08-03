@@ -1,19 +1,22 @@
-import type { PreparedAiFeatureSpec } from "@chrona/contracts/ai";
-import type {
-  ProviderRunInput,
-  ProviderRunSnapshot,
-  StartRunInput,
+import { z } from "zod";
+import {
+  providerRunInputSchema,
+  providerStructuredOutputSchemaSchema,
+  type ProviderRunInput,
+  type ProviderRunSnapshot,
+  type StartRunInput,
 } from "@chrona/providers-foundation";
 
 export type ExecutionProviderRequest = {
-  sessionId: string;
+  provider: string;
   clientOperationId: string;
+  sessionId: string;
   sessionKey: string;
   instructions: string;
-  input: unknown;
-  structuredOutputSchema?: PreparedAiFeatureSpec["structuredOutputSchema"];
+  input: ProviderRunInput;
+  structuredOutputSchema?: StartRunInput["structuredOutputSchema"];
   terminalToolName?: string;
-  toolPolicy?: "full" | "read_only";
+  toolPolicy: "full" | "read_only";
   maxOutputTokens?: number;
   timeoutSeconds?: number;
   resumeSessionRef?: string;
@@ -23,46 +26,27 @@ export type ExecutionProviderRequest = {
   };
 };
 
-export function buildExecutionGatewayRequest(input: {
-  instructions: string;
-  runtimeInput: Record<string, unknown>;
-  featureSpec: PreparedAiFeatureSpec;
-  sessionKey: string;
-  sessionId: string;
-  executionRuntime: string;
-  clientOperationId?: string;
-  resumeSessionRef?: string;
-}): ExecutionProviderRequest {
-  const maxTokens = input.runtimeInput.maxTokens ?? input.runtimeInput.maxOutputTokens;
-  return {
-    clientOperationId: input.clientOperationId ?? `chrona-session:${input.sessionId}`,
-    sessionId: input.sessionId,
-    sessionKey: input.sessionKey,
-    instructions: input.featureSpec.instructions,
-    input: buildExecutionAiInput(input),
-    structuredOutputSchema: input.featureSpec.structuredOutputSchema,
-    terminalToolName: input.featureSpec.terminalToolName,
-    toolPolicy: readOnlyFeature(input.featureSpec.feature) ? "read_only" : "full",
-    maxOutputTokens: typeof maxTokens === "number" ? maxTokens : undefined,
-    ...(input.resumeSessionRef ? { resumeSessionRef: input.resumeSessionRef } : {}),
-  };
-}
+const executionProviderRequestSchema = z.object({
+  provider: z.string().trim().min(1).max(128),
+  clientOperationId: z.string().trim().min(1).max(512),
+  sessionId: z.string().trim().min(1).max(512),
+  sessionKey: z.string().trim().min(1).max(512),
+  instructions: z.string().trim().min(1).max(100_000),
+  input: providerRunInputSchema,
+  terminalToolName: z.string().trim().min(1).max(128).optional(),
+  toolPolicy: z.enum(["full", "read_only"]),
+  maxOutputTokens: z.number().int().positive().max(1_000_000).optional(),
+  timeoutSeconds: z.number().positive().max(3_600).optional(),
+  resumeSessionRef: z.string().trim().min(1).max(512).optional(),
+  runtimeConfiguration: z.object({
+    model: z.string().trim().min(1).max(512).optional(),
+    contextStrategy: z.enum(["provider_default", "auto_compact", "bounded_tool_results", "artifact_backed"]).optional(),
+  }).strict().optional(),
+  structuredOutputSchema: providerStructuredOutputSchemaSchema.optional(),
+}).strict();
 
-function readOnlyFeature(feature: PreparedAiFeatureSpec["feature"]): boolean {
-  return feature === "goal.review" || feature === "goal.asset_ownership" || feature === "task.result_finalization";
-}
-
-function buildExecutionAiInput(input: {
-  executionRuntime: string;
-  runtimeInput: Record<string, unknown>;
-  featureSpec: PreparedAiFeatureSpec;
-}): string | Record<string, unknown> {
-  if (passthroughRuntimeInput(input.featureSpec.feature)) return input.runtimeInput;
-  return { executionRuntime: input.executionRuntime, runtimeInput: input.runtimeInput };
-}
-
-function passthroughRuntimeInput(feature: PreparedAiFeatureSpec["feature"]): boolean {
-  return feature === "execute_task_node" || feature === "evaluate_condition_node" || feature === "review_checkpoint_node" || feature === "goal.review" || feature === "task.result_finalization";
+export function createExecutionProviderRequest(input: ExecutionProviderRequest): ExecutionProviderRequest {
+  return executionProviderRequestSchema.parse(input);
 }
 
 export function toStartRunInput(request: ExecutionProviderRequest): StartRunInput {
@@ -71,7 +55,7 @@ export function toStartRunInput(request: ExecutionProviderRequest): StartRunInpu
     sessionId: request.sessionId,
     sessionKey: request.sessionKey,
     instructions: request.instructions,
-    input: request.input as ProviderRunInput,
+    input: request.input,
     maxOutputTokens: request.maxOutputTokens,
     terminalToolName: request.terminalToolName,
     structuredOutputSchema: request.structuredOutputSchema,
@@ -86,27 +70,17 @@ export function toStartRunInput(request: ExecutionProviderRequest): StartRunInpu
 export function extractAssistantContent(response: ProviderRunSnapshot): string | null {
   const output = response.outputText?.trim();
   if (output) return output;
-  return extractStructuredAssistantContent(response.structuredPayload);
-}
-
-function extractStructuredAssistantContent(structured: unknown): string | null {
-  const parsed = parsedPayload(structured);
-  if (!parsed) return null;
-  if (typeof parsed === "string") return parsed.trim() || null;
-  if (typeof parsed !== "object" || Array.isArray(parsed)) return null;
-  return extractRecordContent(parsed as Record<string, unknown>);
+  const structured = parsedPayload(response.structuredPayload);
+  if (typeof structured === "string") return structured.trim() || null;
+  if (!structured || typeof structured !== "object" || Array.isArray(structured)) return null;
+  const record = structured as Record<string, unknown>;
+  const value = record.output ?? record.summary;
+  return typeof value === "string" && value.trim()
+    ? value.trim()
+    : JSON.stringify(record);
 }
 
 function parsedPayload(structured: unknown): unknown {
-  if (!structured || typeof structured !== "object" || !("ok" in structured) || !structured.ok) return null;
-  return (structured as { parsed?: unknown }).parsed;
-}
-
-function extractRecordContent(record: Record<string, unknown>): string {
-  const output = stringValue(record.output) ?? stringValue(record.summary);
-  return output ?? JSON.stringify(record);
-}
-
-function stringValue(value: unknown): string | null {
-  return typeof value === "string" && value.trim() ? value.trim() : null;
+  const envelope = z.object({ ok: z.literal(true), parsed: z.unknown() }).passthrough().safeParse(structured);
+  return envelope.success ? envelope.data.parsed : null;
 }

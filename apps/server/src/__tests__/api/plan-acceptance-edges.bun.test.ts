@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "bun:test";
 import { Hono } from "hono";
-import { db } from "@chrona/db";
+import { db, TaskPlanGenerationHeadStatus } from "@chrona/db";
 import { createChronaEngine } from "@chrona/engine";
 import { runRecurringWorkBlockExpansionWorker } from "@chrona/engine/test-support";
 import { saveCompiledPlan } from "@chrona/engine/test-support";
@@ -51,6 +51,37 @@ function minimalCompiledPlan(id: string, title: string): CompiledPlan {
   };
 }
 
+async function seedPlanAcceptanceHead(input: {
+  workspaceId: string;
+  taskId: string;
+  planId: string;
+  workBlockId?: string | null;
+}) {
+  await db.taskPlanGenerationHead.upsert({
+    where: {
+      taskId_workBlockScopeKey: {
+        taskId: input.taskId,
+        workBlockScopeKey: input.workBlockId ?? "",
+      },
+    },
+    create: {
+      workspaceId: input.workspaceId,
+      taskId: input.taskId,
+      workBlockScopeKey: input.workBlockId ?? "",
+      currentPlanId: input.planId,
+      currentPlanStatus: "Draft",
+      status: TaskPlanGenerationHeadStatus.Current,
+      stateVersion: 0,
+    },
+    update: {
+      currentPlanId: input.planId,
+      currentPlanStatus: "Draft",
+      status: TaskPlanGenerationHeadStatus.Current,
+      stateVersion: 0,
+    },
+  });
+}
+
 describe("plan acceptance edges", () => {
   beforeEach(async () => {
     await resetTestDb();
@@ -78,11 +109,12 @@ describe("plan acceptance edges", () => {
       summary: "draft",
       generatedBy: "test",
     });
+    await seedPlanAcceptanceHead({ workspaceId, taskId: task.id, planId: "idem-plan" });
 
     const first = await app().request(`http://local/api/tasks/${task.id}/plan/accept`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ planId: "idem-plan", workspaceId }),
+      body: JSON.stringify({ planId: "idem-plan", workspaceId, expectedHeadStateVersion: 0, idempotencyKey: "idem-plan-accept" }),
     });
     expect(first.status).toBe(200);
     const firstBody = (await first.json()) as { savedPlan: { status: string } };
@@ -91,7 +123,7 @@ describe("plan acceptance edges", () => {
     const second = await app().request(`http://local/api/tasks/${task.id}/plan/accept`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ planId: "idem-plan", workspaceId }),
+      body: JSON.stringify({ planId: "idem-plan", workspaceId, expectedHeadStateVersion: 0, idempotencyKey: "idem-plan-accept" }),
     });
     expect(second.status).toBe(200);
     const secondBody = (await second.json()) as { savedPlan: { status: string } };
@@ -113,11 +145,10 @@ describe("plan acceptance edges", () => {
         executionConfig: {},
       },
     });
-
     const response = await app().request(`http://local/api/tasks/${task.id}/plan/accept`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ planId: "nope", workspaceId }),
+      body: JSON.stringify({ planId: "nope", workspaceId, expectedHeadStateVersion: 0, idempotencyKey: "missing-plan-accept" }),
     });
     expect(response.status).toBe(404);
     const body = (await response.json()) as { error?: string };
@@ -146,12 +177,13 @@ describe("plan acceptance edges", () => {
       summary: "draft",
       generatedBy: "test",
     });
+    await seedPlanAcceptanceHead({ workspaceId, taskId: task.id, planId: "re-accept" });
     await db.task.update({ where: { id: task.id }, data: { status: "Done" } });
 
     const response = await app().request(`http://local/api/tasks/${task.id}/plan/accept`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ planId: "re-accept", workspaceId }),
+      body: JSON.stringify({ planId: "re-accept", workspaceId, expectedHeadStateVersion: 0, idempotencyKey: "done-plan-accept" }),
     });
     expect(response.status).toBe(200);
     const body = (await response.json()) as { savedPlan: { status: string } };
@@ -174,6 +206,21 @@ describe("plan acceptance edges", () => {
         recurrenceAnchorEndAt: new Date(anchor.getTime() + 30 * 60 * 1000),
       },
     });
+    await db.taskTrigger.create({
+      data: {
+        workspaceId,
+        taskId: task.id,
+        kind: "schedule",
+        state: "Enabled",
+        config: {
+          mode: "recurring",
+          rrule: "FREQ=DAILY;COUNT=2",
+          anchorStartAt: anchor.toISOString(),
+          timezone: "UTC",
+          durationMs: 30 * 60 * 1000,
+        },
+      },
+    });
     await runRecurringWorkBlockExpansionWorker({ now: anchor });
     const [first, second] = await db.workBlock.findMany({
       where: { taskId: task.id },
@@ -192,11 +239,12 @@ describe("plan acceptance edges", () => {
       summary: "draft",
       generatedBy: "test",
     });
+    await seedPlanAcceptanceHead({ workspaceId, taskId: task.id, planId: "occ-plan", workBlockId: first!.id });
 
     const response = await app().request(`http://local/api/tasks/${task.id}/plan/accept`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ planId: "occ-plan", workspaceId, workBlockId: first!.id }),
+      body: JSON.stringify({ planId: "occ-plan", workspaceId, workBlockId: first!.id, expectedHeadStateVersion: 0, idempotencyKey: "occurrence-plan-accept" }),
     });
     expect(response.status).toBe(200);
 

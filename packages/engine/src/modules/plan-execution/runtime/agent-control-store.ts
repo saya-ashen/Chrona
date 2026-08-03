@@ -14,6 +14,7 @@ export type RunTokenScope = {
   runId: string;
   runtimeSessionKey: string;
   nodeId: string | null;
+  providerRunId: string | null;
   nodeAttemptId: string | null;
 };
 
@@ -58,6 +59,7 @@ export async function mintRunToken(input: {
   runId: string;
   runtimeSessionKey: string;
   nodeId?: string | null;
+  providerRunId?: string | null;
   nodeAttemptId?: string | null;
   expiresAt?: Date;
 }): Promise<string> {
@@ -72,6 +74,7 @@ export async function mintRunToken(input: {
       runtimeSessionKey: input.runtimeSessionKey,
       nodeId: input.nodeId ?? null,
       nodeAttemptId: input.nodeAttemptId ?? null,
+      providerRunId: input.providerRunId ?? null,
       expiresAt: input.expiresAt ?? new Date(Date.now() + tokenTtlMs()),
     },
   });
@@ -90,6 +93,7 @@ export async function validateRunToken(token: string): Promise<RunTokenScope | n
       runtimeSessionKey: true,
       nodeId: true,
       nodeAttemptId: true,
+      providerRunId: true,
       revokedAt: true,
       expiresAt: true,
     },
@@ -112,6 +116,7 @@ export async function validateRunToken(token: string): Promise<RunTokenScope | n
     runtimeSessionKey: match.runtimeSessionKey,
     nodeId: match.nodeId,
     nodeAttemptId: match.nodeAttemptId,
+    providerRunId: match.providerRunId,
   };
 }
 
@@ -134,6 +139,7 @@ export async function validateRevokedRunToken(token: string): Promise<RunTokenSc
       runtimeSessionKey: true,
       nodeId: true,
       nodeAttemptId: true,
+      providerRunId: true,
       revokedAt: true,
       expiresAt: true,
     },
@@ -156,6 +162,8 @@ export async function validateRevokedRunToken(token: string): Promise<RunTokenSc
     runtimeSessionKey: match.runtimeSessionKey,
     nodeId: match.nodeId,
     nodeAttemptId: match.nodeAttemptId,
+    providerRunId: match.providerRunId,
+
   };
 }
 

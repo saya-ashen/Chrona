@@ -53,7 +53,7 @@ describe("ClaudeCodeProviderClient — MCP preflight", () => {
         runId: "probe-test",
       });
 
-      expect(result.toolNames).toEqual(["chrona_node_complete"]);
+      expect(result.toolNames).toEqual(["fixture_echo"]);
     } finally {
       server.stop(true);
     }
@@ -65,9 +65,10 @@ describe("ClaudeCodeProviderClient — happy path", () => {
     const client = makeClient("happy-path");
     const events = await collect(
       client.streamRun({
-        sessionId: "chrona-session-fixture-happy",
-        instructions: "Plan the next steps for Chrona task #42.",
-        input: { type: "text", text: "Generate a plan for the next 30 minutes." },
+        clientOperationId: "claude-code-happy-path-stream",
+        sessionId: "fixture-session-happy",
+        instructions: "Outline the next steps.",
+        input: { type: "text", text: "Generate a short outline." },
       }),
     );
     const types = events.map((e) => e.type);
@@ -102,9 +103,9 @@ describe("ClaudeCodeProviderClient — happy path", () => {
   test("startRun / getRun round-trip", async () => {
     const client = makeClient("happy-path");
     const ref = await client.startRun({
-      sessionId: "chrona-session-fixture-happy",
-      instructions: "Plan the next steps for Chrona task #42.",
-      input: { type: "text", text: "Generate a plan for the next 30 minutes." },
+      sessionId: "fixture-session-happy",
+      instructions: "Outline the next steps.",
+      input: { type: "text", text: "Generate a short outline." },
       clientOperationId: "claude-code-happy-path",
     });
     expect(ref.provider).toBe("claude_code");
@@ -140,8 +141,8 @@ describe("Claude Code normalizer — streamed tool inputs", () => {
           index: 0,
           content_block: {
             type: "tool_use",
-            id: "toolu_plan",
-            name: "mcp__chrona__chrona_plan_generate",
+            id: "toolu_fixture",
+            name: "mcp__run_tools__fixture_echo",
           },
         },
       },
@@ -152,7 +153,7 @@ describe("Claude Code normalizer — streamed tool inputs", () => {
           index: 0,
           delta: {
             type: "input_json_delta",
-            partial_json: "{\"title\":\"Generated\",\"goal\":\"Persist\",\"nodes\":[],\"edges\":[]}",
+            partial_json: "{\"value\":\"completed\"}",
           },
         },
       },
@@ -166,13 +167,10 @@ describe("Claude Code normalizer — streamed tool inputs", () => {
     expect(call).toBeDefined();
     expect(call).toMatchObject({
       type: "tool_call",
-      tool: "mcp__chrona__chrona_plan_generate",
-      callId: "toolu_plan",
+      tool: "mcp__run_tools__fixture_echo",
+      callId: "toolu_fixture",
       input: {
-        title: "Generated",
-        goal: "Persist",
-        nodes: [],
-        edges: [],
+        value: "completed",
       },
       status: "pending",
     });
@@ -184,10 +182,10 @@ describe("ClaudeCodeProviderClient — tool round-trip", () => {
     const client = makeClient("tool-call-roundtrip");
     const events = await collect(
       client.streamRun({
-        sessionId: "chrona-session-fixture-tool",
-        instructions: "Dispatch task node and report completion.",
-        input: { type: "text", text: "Run node 3." },
         clientOperationId: "claude-code-tool-call-stream",
+        sessionId: "fixture-session-tool",
+        instructions: "Call the declared synthetic tool.",
+        input: { type: "text", text: "Send the fixture payload." },
       }),
     );
     const types = events.map((e) => e.type);
@@ -202,14 +200,14 @@ describe("ClaudeCodeProviderClient — tool round-trip", () => {
     const call = events.find((e) => e.type === "tool_call");
     expect(call).toBeDefined();
     if (call?.type === "tool_call") {
-      expect(call.tool).toBe("chrona_node_complete");
+      expect(call.tool).toBe("fixture_echo");
       expect(call.callId).toBe("call_abc");
       expect(call.status).toBe("pending");
     }
     const result = events.find((e) => e.type === "tool_result");
     expect(result).toBeDefined();
     if (result?.type === "tool_result") {
-      expect(result.tool).toBe("chrona_node_complete");
+      expect(result.tool).toBe("fixture_echo");
       expect(result.callId).toBe("call_abc");
     }
   });
@@ -217,14 +215,12 @@ describe("ClaudeCodeProviderClient — tool round-trip", () => {
   test("streamRun with runId branch: looks up an existing handle", async () => {
     const client = makeClient("tool-call-roundtrip");
     const ref = await client.startRun({
-      sessionId: "chrona-session-fixture-tool",
-      instructions: "Dispatch task node and report completion.",
-      input: { type: "text", text: "Run node 3." },
+      sessionId: "fixture-session-tool",
+      instructions: "Call the declared synthetic tool.",
+      input: { type: "text", text: "Send the fixture payload." },
       clientOperationId: "claude-code-tool-call-roundtrip",
     });
-    const events = await collect(
-      client.streamRun({ runId: ref.runId } as unknown as Parameters<typeof client.streamRun>[0]),
-    );
+    const events = await collect(client.streamRun({ runId: ref.runId }));
     const types = events.map((e) => e.type);
     expect(types[0]).toBe("run_started");
     expect(types.at(-1)).toBe("run_completed");
@@ -241,9 +237,10 @@ describe("ClaudeCodeProviderClient — cancel + error paths", () => {
     const client = makeClient("cancel-mid-run");
     const events = await collect(
       client.streamRun({
-        sessionId: "chrona-session-fixture-cancel",
-        instructions: "Run a long task and let the user cancel it.",
-        input: { type: "text", text: "Long task." },
+        clientOperationId: "claude-code-cancel-stream",
+        sessionId: "fixture-session-cancel",
+        instructions: "Run a long operation and then cancel it.",
+        input: { type: "text", text: "Long operation." },
       }),
     );
     const types = events.map((e) => e.type);
@@ -259,9 +256,9 @@ describe("ClaudeCodeProviderClient — cancel + error paths", () => {
   test("cancelRun: marks the handle cancelled and snapshot reflects it", async () => {
     const client = makeClient("cancel-mid-run");
     const ref = await client.startRun({
-      sessionId: "chrona-session-fixture-cancel",
-      instructions: "Run a long task and let the user cancel it.",
-      input: { type: "text", text: "Long task." },
+      sessionId: "fixture-session-cancel",
+      instructions: "Run a long operation and then cancel it.",
+      input: { type: "text", text: "Long operation." },
       clientOperationId: "claude-code-cancel-mid-run",
     });
     const cancelled = await client.cancelRun({ runId: ref.runId });
@@ -276,7 +273,7 @@ describe("ClaudeCodeProviderClient — cancel + error paths", () => {
       ref: {
         provider: "claude_code",
         runId: "run-aborted",
-        sessionId: "chrona-session-aborted",
+        sessionId: "session-aborted",
         status: "running",
       },
       internal: {
@@ -285,7 +282,7 @@ describe("ClaudeCodeProviderClient — cancel + error paths", () => {
         cancelRequested: false,
       },
       normalizer: createNormalizerContext(),
-      chronaSessionId: "chrona-session-aborted",
+      runSessionId: "session-aborted",
       logger: {} as ClaudeCodeRunHandle["logger"],
     } satisfies ClaudeCodeRunHandle;
     const runner: ClaudeCodeRunner = {
@@ -299,7 +296,7 @@ describe("ClaudeCodeProviderClient — cancel + error paths", () => {
         return {
           provider: "claude_code",
           runId: "run-aborted",
-          sessionId: "chrona-session-aborted",
+          sessionId: "session-aborted",
           status: "running",
         };
       },
@@ -312,7 +309,7 @@ describe("ClaudeCodeProviderClient — cancel + error paths", () => {
     });
 
     const ref = await client.startRun({
-      sessionId: "chrona-session-aborted",
+      sessionId: "session-aborted",
       instructions: "Trigger an SDK abort.",
       input: { type: "text", text: "abort" },
       clientOperationId: "claude-code-aborted",
@@ -320,8 +317,8 @@ describe("ClaudeCodeProviderClient — cancel + error paths", () => {
     const events = await collect(client.streamRun({ runId: ref.runId }));
 
     expect(events.at(-1)).toMatchObject({
-      error: "Claude Code process aborted before Chrona received node completion",
-      raw: { stage: "before_node_complete_submission" },
+      error: "Claude Code process aborted before the terminal tool completed",
+      raw: { stage: "before_terminal_tool_call" },
     });
   });
 
@@ -332,7 +329,7 @@ describe("ClaudeCodeProviderClient — cancel + error paths", () => {
       ref: {
         provider: "claude_code",
         runId: "run-timeout",
-        sessionId: "chrona-session-timeout",
+        sessionId: "session-timeout",
         status: "running",
       },
       internal: {
@@ -341,7 +338,7 @@ describe("ClaudeCodeProviderClient — cancel + error paths", () => {
         cancelRequested: false,
       },
       normalizer: createNormalizerContext(),
-      chronaSessionId: "chrona-session-timeout",
+      runSessionId: "session-timeout",
       logger: {} as ClaudeCodeRunHandle["logger"],
       diagnostics: {
         timeoutMs: 120_000,
@@ -361,7 +358,7 @@ describe("ClaudeCodeProviderClient — cancel + error paths", () => {
         return {
           provider: "claude_code",
           runId: "run-timeout",
-          sessionId: "chrona-session-timeout",
+          sessionId: "session-timeout",
           status: "running",
         };
       },
@@ -374,7 +371,7 @@ describe("ClaudeCodeProviderClient — cancel + error paths", () => {
     });
 
     const ref = await client.startRun({
-      sessionId: "chrona-session-timeout",
+      sessionId: "session-timeout",
       instructions: "Trigger an SDK timeout.",
       input: { type: "text", text: "timeout" },
       clientOperationId: "claude-code-timeout",
@@ -382,9 +379,9 @@ describe("ClaudeCodeProviderClient — cancel + error paths", () => {
     const events = await collect(client.streamRun({ runId: ref.runId }));
 
     expect(events.at(-1)).toMatchObject({
-      error: "Claude Code run timed out after 120s idle timeout: Claude Code process aborted before Chrona received node completion",
+      error: "Claude Code run timed out after 120s idle timeout: Claude Code process aborted before the terminal tool completed",
       raw: {
-        stage: "before_node_complete_submission",
+        stage: "before_terminal_tool_call",
         runner: { timeoutTriggered: true, timeoutMode: "idle", timeoutMs: 120_000 },
       },
     });
@@ -393,9 +390,7 @@ describe("ClaudeCodeProviderClient — cancel + error paths", () => {
   test("streamRun with unknown runId: throws ClaudeCodeProviderError", () => {
     const client = makeClient("happy-path");
     expect(
-      collect(
-        client.streamRun({ runId: "does-not-exist" } as unknown as Parameters<typeof client.streamRun>[0]),
-      ),
+      collect(client.streamRun({ runId: "does-not-exist" })),
     ).rejects.toThrow(/unknown runId/);
   });
 
@@ -407,67 +402,45 @@ describe("ClaudeCodeProviderClient — cancel + error paths", () => {
 });
 
 /**
- * T10 — Golden-path dry run (replay simulation).
- *
- * Mirrors the milestone §1.3 scenario at the provider boundary, in
- * deterministic replay mode. The fixture records what a real Claude Code
- * run looks like when the agent decides to dispatch a task node and
- * report completion via Chrona's AI-visible-ref MCP tool
- * (`chrona_node_complete`). Asserting the tool name + tool_result shape
- * here proves the provider preserves the public MCP contract end to end,
- * which is what the engine / Action Center recovery / task workspace read downstream.
+ * Replay coverage verifies that provider tool events remain protocol-neutral.
  */
-describe("ClaudeCodeProviderClient — golden-path replay (T10)", () => {
-  test("dispatch + AI-visible-ref tool call flows to run_completed", async () => {
+describe("ClaudeCodeProviderClient — generic tool replay", () => {
+  test("declared synthetic tool call flows to run_completed", async () => {
     const client = makeClient("tool-call-roundtrip");
     const events = await collect(
       client.streamRun({
-        sessionId: "chrona-session-golden-path",
-        instructions: "Run a scheduled task and call chrona.task.complete.",
-        input: { type: "text", text: "Run the scheduled task." },
+        clientOperationId: "claude-code-tool-replay",
+        sessionId: "fixture-session-tool-replay",
+        instructions: "Call the declared fixture tool.",
+        input: { type: "text", text: "Use the fixture tool." },
+        tools: [{
+          name: "fixture_echo",
+          description: "Echo a value.",
+          inputSchema: {
+            type: "object",
+            properties: { value: { type: "string" } },
+            required: ["value"],
+          },
+        }],
+        terminalToolName: "fixture_echo",
       }),
     );
 
-    // 1. Event order matches the milestone §1.3 positive path.
-    const types = events.map((e) => e.type);
-    expect(types).toEqual([
+    expect(events.map((event) => event.type)).toEqual([
       "run_started",
       "text_delta",
       "tool_call",
       "tool_result",
       "run_completed",
     ]);
-
-    // 2. The tool call uses the AI-visible-ref MCP tool name (not a
-    //    raw chrona table id). This is the contract the engine and
-    //    Action Center recovery rely on.
-    const call = events.find((e) => e.type === "tool_call");
-    expect(call).toBeDefined();
-    if (call?.type === "tool_call") {
-      expect(call.tool).toBe("chrona_node_complete");
-      expect(call.status).toBe("pending");
-    }
-
-    // 3. The tool_result is a structured ack from the Chrona MCP
-    //    server (the agent never sees the runtime id directly — it
-    //    gets an opaque `runId` back).
-    const result = events.find((e) => e.type === "tool_result");
-    expect(result).toBeDefined();
-    if (result?.type === "tool_result") {
-      expect(result.tool).toBe("chrona_node_complete");
-      expect(result.result).toMatchObject({ ok: true });
-    }
-
-    // 4. Terminal snapshot from the foundation agrees: completed.
-    const snap = terminalSnapshotFromEvents(events);
-    expect(snap?.status).toBe("completed");
-
-    // 5. The provider surfaces usage so the engine can render it in
-    //    task workspace execution state.
-    const completed = events.find((e) => e.type === "run_completed");
-    expect(completed).toBeDefined();
-    if (completed?.type === "run_completed") {
-      expect(completed.usage?.totalTokens).toBeGreaterThan(0);
-    }
+    expect(events.find((event) => event.type === "tool_call")).toMatchObject({
+      tool: "fixture_echo",
+      status: "pending",
+    });
+    expect(events.find((event) => event.type === "tool_result")).toMatchObject({
+      tool: "fixture_echo",
+      result: { ok: true },
+    });
+    expect(terminalSnapshotFromEvents(events)?.status).toBe("completed");
   });
 });

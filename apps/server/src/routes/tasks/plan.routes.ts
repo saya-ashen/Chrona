@@ -1,5 +1,4 @@
 import { Hono } from "hono";
-import { streamSSE } from "hono/streaming";
 import { randomUUID } from "node:crypto";
 import { zValidator } from "@hono/zod-validator";
 import { ENGINE_ERROR_CODES, EngineError, type ChronaEngine } from "@chrona/engine";
@@ -8,7 +7,6 @@ import {
   planStateParamSchema,
   planAcceptParamSchema,
   planAcceptBodySchema,
-  planGenerateActiveParamSchema,
   planGenerateParamSchema,
   planGenerateBodySchema,
   planGenerateStopParamSchema,
@@ -17,43 +15,7 @@ import {
 } from "@chrona/contracts/api";
 import { logger, planGenerationConflictBody } from "../helpers";
 import { error, internalServerError, json, toHttpError } from "../../lib/http";
-import { startSseHeartbeat } from "../../lib/sse-heartbeat";
 
-function writePlanGenerationEvent(
-  stream: Parameters<typeof streamSSE>[1] extends (stream: infer T) => Promise<unknown> ? T : never,
-  event: import("@chrona/contracts").GeneratePlanSSEEvent,
-) {
-  switch (event.type) {
-    case "status":
-      return stream.writeSSE({
-        event: "status",
-        data: JSON.stringify({ phase: event.phase, message: event.message }),
-      });
-    case "tool_call":
-      return stream.writeSSE({
-        event: "tool_call",
-        data: JSON.stringify({ tool: event.tool, input: event.input }),
-      });
-    case "partial":
-      return stream.writeSSE({ event: "partial", data: JSON.stringify({ text: event.text }) });
-    case "result":
-      return stream.writeSSE({ event: "result", data: JSON.stringify(event) });
-    case "error":
-      return stream.writeSSE({
-        event: "error",
-        data: JSON.stringify({
-          code: event.code,
-          message: event.message,
-          rawText: event.rawText,
-          diagnostics: event.diagnostics,
-        }),
-      });
-    case "cancelled":
-      return stream.writeSSE({ event: "cancelled", data: "{}" });
-    case "done":
-      return stream.writeSSE({ event: "done", data: "{}" });
-  }
-}
 
 
 
@@ -83,9 +45,16 @@ export function createPlansRoutes(engine: ChronaEngine) {
       async (c) => {
         try {
           const { taskId } = c.req.valid("param");
-          const { planId, workspaceId, workBlockId } = c.req.valid("json");
+          const { planId, workspaceId, workBlockId, expectedHeadStateVersion, idempotencyKey } = c.req.valid("json");
 
-          return json(c, await engine.tasks.plan.accept({ taskId, planId, workspaceId, workBlockId }));
+          return json(c, await engine.tasks.plan.accept({
+            taskId,
+            planId,
+            workspaceId,
+            workBlockId,
+            expectedHeadStateVersion,
+            idempotencyKey,
+          }));
         } catch (cause) {
           const httpError = toHttpError(cause);
           if (httpError) {
@@ -95,91 +64,6 @@ export function createPlansRoutes(engine: ChronaEngine) {
         }
       },
     )
-    .get(
-      "/tasks/:taskId/plan/generations/active",
-      zValidator("param", planGenerateActiveParamSchema),
-      async (c) => {
-        try {
-          const { taskId } = c.req.valid("param");
-          const workBlockId = c.req.query("workBlockId") || null;
-          return json(c, engine.tasks.plan.getActiveGeneration({ taskId, workBlockId }));
-        } catch (cause) {
-          return internalServerError(
-            c,
-            "GET /api/tasks/:taskId/plan/generations/active",
-            cause,
-            "Failed to get active task plan generation",
-          );
-        }
-      },
-    )
-    .get(
-      "/tasks/:taskId/plan/generations/active/events",
-      zValidator("param", planGenerateActiveParamSchema),
-      async (c) => {
-        const { taskId } = c.req.valid("param");
-        const workBlockId = c.req.query("workBlockId") || null;
-        const active = engine.tasks.plan.getActiveGeneration({ taskId, workBlockId }).generationSession;
-        if (!active) {
-          return error(c, "No active task plan generation", 404);
-        }
-
-        return streamSSE(c, async (stream) => {
-          const stopHeartbeat = startSseHeartbeat(stream);
-          let resolveClosed: (() => void) | null = null;
-          const closed = new Promise<void>((resolve) => {
-            resolveClosed = resolve;
-          });
-
-          const current = engine.tasks.plan.getActiveGeneration({ taskId, workBlockId }).generationSession;
-          if (current && current.generationId === active.generationId) {
-            await stream.writeSSE({
-              event: "session",
-              data: JSON.stringify({ generationId: current.generationId, snapshot: current }),
-            });
-          }
-
-          let writeQueue = Promise.resolve();
-          const writeEvent = (event: import("@chrona/contracts").GeneratePlanSSEEvent) => {
-            writeQueue = writeQueue
-              .then(() => writePlanGenerationEvent(stream, event))
-              .then(() => undefined);
-
-            return writeQueue;
-          };
-
-          const subscription = engine.tasks.plan.subscribeToActiveGeneration({
-            taskId,
-            workBlockId,
-            onEvent(event) {
-              void writeEvent(event);
-              if (event.type === "done" || event.type === "error" || event.type === "cancelled") {
-                void writeQueue.finally(() => {
-                  resolveClosed?.();
-                });
-              }
-            },
-          });
-
-          if (!subscription || subscription.generationId !== active.generationId) {
-            await stream.writeSSE({ event: "done", data: "{}" });
-            return;
-          }
-
-          stream.onAbort(() => {
-            stopHeartbeat();
-            subscription.unsubscribe();
-            resolveClosed?.();
-          });
-
-          try {
-            await closed;
-          } finally {
-            stopHeartbeat();
-          }
-        });
-      },
-    )
     .post(
       "/tasks/:taskId/plan/generations/stop",
       zValidator("param", planGenerateStopParamSchema),
@@ -187,7 +71,7 @@ export function createPlansRoutes(engine: ChronaEngine) {
         try {
           const { taskId } = c.req.valid("param");
           const workBlockId = c.req.query("workBlockId") || null;
-          return json(c, engine.tasks.plan.stopGeneration({ taskId, workBlockId }));
+          return json(c, await engine.tasks.plan.stopGeneration({ taskId, workBlockId }));
         } catch (cause) {
           return internalServerError(
             c,
@@ -204,151 +88,67 @@ export function createPlansRoutes(engine: ChronaEngine) {
       zValidator("json", planGenerateBodySchema),
       async (c) => {
         const { taskId } = c.req.valid("param");
-        const { forceRefresh, userInstruction, workBlockId, selectedNodeId } = c.req.valid("json");
+        const { idempotencyKey, forceRefresh, userInstruction, workBlockId, selectedNodeId } = c.req.valid("json");
         try {
           const requestId = randomUUID();
           logger.info("request.start", {
             requestId,
-            feature: "generate_plan",
+            feature: "task.plan.generate",
             taskId,
             streaming: true,
             forceRefresh,
             hasUserInstruction: Boolean(userInstruction?.trim()),
           });
 
-          const generation = engine.tasks.plan.generate({ taskId, workBlockId, forceRefresh, userInstruction, selectedNodeId });
+          const generation = await engine.tasks.plan.generate({
+            taskId,
+            workBlockId,
+            forceRefresh,
+            userInstruction,
+            selectedNodeId,
+            idempotencyKey,
+          });
 
           void (async () => {
             try {
               for await (const event of generation.events) {
                 generation.emit(event);
-                logger.info("stream.event", {
-                  requestId,
-                  feature: "generate_plan",
-                  taskId,
-                  generationId: generation.generationId,
-                  eventType: event.type,
-                });
-
-                if (event.type === "error") {
-                  logger.error("request.stream_event_error", {
+                if (event.type === "failed") {
+                  logger.error("request.stream_event_failed", {
                     requestId,
-                    feature: "generate_plan",
+                    feature: "task.plan.generate",
                     taskId,
                     code: event.code,
                     message: event.message,
-                    rawText: event.rawText ?? null,
-                    diagnostics: event.diagnostics ?? null,
                   });
                 }
               }
-
               logger.info("request.done", {
                 requestId,
-                feature: "generate_plan",
+                feature: "task.plan.generate",
                 taskId,
                 generationId: generation.generationId,
               });
             } catch (cause) {
               logger.error("request.stream_error", {
                 requestId,
-                feature: "generate_plan",
+                feature: "task.plan.generate",
                 taskId,
                 generationId: generation.generationId,
                 error: cause instanceof Error ? cause.message : String(cause),
               });
-              const errorEvent: import("@chrona/contracts").GeneratePlanSSEEvent = {
-                type: "error",
-                code: "INTERNAL_ERROR",
-                message: cause instanceof Error ? cause.message : "Failed to generate task plan",
-              };
-              generation.emit(errorEvent);
             } finally {
               generation.finish();
             }
           })();
 
-          return streamSSE(c, async (stream) => {
-            const stopHeartbeat = startSseHeartbeat(stream);
-
-            let resolveClosed: (() => void) | null = null;
-            const closed = new Promise<void>((resolve) => {
-              resolveClosed = resolve;
-            });
-
-            let writeQueue = Promise.resolve();
-            const writeEvent = (event: import("@chrona/contracts").GeneratePlanSSEEvent) => {
-              writeQueue = writeQueue
-                .then(() => writePlanGenerationEvent(stream, event))
-                .then(() => undefined);
-
-              return writeQueue;
-            };
-
-            const subscription = engine.tasks.plan.subscribeToGeneration({
-              generationId: generation.generationId,
-              onEvent(event) {
-                void writeEvent(event);
-                if (event.type === "done" || event.type === "error" || event.type === "cancelled") {
-                  void writeQueue.finally(() => {
-                    resolveClosed?.();
-                  });
-                }
-              },
-            });
-
-            if (!subscription) {
-              await stream.writeSSE({
-                event: "error",
-                data: JSON.stringify({
-                  code: "INTERNAL_ERROR",
-                  message: "Failed to subscribe to task plan generation session",
-                }),
-              });
-              return;
-            }
-
-            stream.onAbort(() => {
-              stopHeartbeat();
-              subscription.unsubscribe();
-              resolveClosed?.();
-            });
-
-            await stream.writeSSE({
-              event: "session",
-              data: JSON.stringify({ generationId: generation.generationId }),
-            });
-
-            const snapshot = engine.tasks.plan.getGenerationSession({
-              generationId: generation.generationId,
-            }).generationSession;
-            if (snapshot) {
-              await stream.writeSSE({
-                event: "session",
-                data: JSON.stringify({
-                  generationId: generation.generationId,
-                  snapshot,
-                }),
-              });
-            }
-
-            try {
-              await closed;
-            } finally {
-              stopHeartbeat();
-            }
-          });
+          return json(c, { generationId: generation.generationId }, 202);
         } catch (cause) {
-          if (
-            cause instanceof EngineError &&
-            cause.code === ENGINE_ERROR_CODES.PLAN_GENERATION_IN_FLIGHT
-          ) {
+          if (cause instanceof EngineError && cause.code === ENGINE_ERROR_CODES.PLAN_GENERATION_IN_FLIGHT) {
             return json(c, planGenerationConflictBody(taskId, getPreferredLocale(c.req.header("accept-language"))), 409);
           }
           const httpError = toHttpError(cause);
-          if (httpError) {
-            return error(c, httpError.message, httpError.status);
-          }
+          if (httpError) return error(c, httpError.message, httpError.status);
           return internalServerError(c, "POST /api/tasks/:taskId/plan/generations", cause, getApiMessages(getPreferredLocale(c.req.header("accept-language"))).failedGenerateTaskPlan);
         }
       },
@@ -362,24 +162,24 @@ export function createPlansRoutes(engine: ChronaEngine) {
           const { taskId } = c.req.valid("param");
           const {
             operation,
+            expectedHeadStateVersion,
+            idempotencyKey,
             nodes,
             edges,
             nodePatches,
             deletedNodeIds,
-            reorder,
             summary,
           } = c.req.valid("json");
 
           const result = await engine.tasks.plan.patch({
             taskId,
             operation,
+            expectedHeadStateVersion,
+            idempotencyKey,
             nodes: nodes as Array<Record<string, unknown>> | undefined,
             edges: edges as Array<Record<string, unknown>> | undefined,
-            nodePatches: nodePatches as
-              | Array<{ id: string } & Record<string, unknown>>
-              | undefined,
+            nodePatches: nodePatches as Array<{ id: string } & Record<string, unknown>> | undefined,
             deletedNodeIds,
-            reorder,
             summary,
           });
 

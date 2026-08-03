@@ -19,7 +19,7 @@
  */
 import "@testing-library/jest-dom/vitest";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, renderHook } from "@testing-library/react";
+import { act, cleanup, renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { PropsWithChildren } from "react";
 import type * as SharedHttp from "@shared/http";
@@ -44,7 +44,7 @@ const mocks = vi.hoisted(() => ({
       generatedAt: "2026-06-10T00:00:00.000Z",
       updatedAt: "2026-06-10T00:00:00.000Z",
     },
-    generationSession: null,
+    generationSession: { generationId: "generation-1", taskId: "task-1", headStateVersion: 2, status: "completed" as const, phase: null, statusMessage: null, error: null, startedAt: "2026-06-10T00:00:00.000Z", finishedAt: "2026-06-10T00:00:00.000Z" },
   },
   // All command POSTs the hook makes — used to count dispatches + capture
   // bodies.
@@ -132,7 +132,17 @@ beforeEach(() => {
       generatedAt: "2026-06-10T00:00:00.000Z",
       updatedAt: "2026-06-10T00:00:00.000Z",
     },
-    generationSession: null,
+    generationSession: {
+      generationId: "generation-1",
+      taskId: "task-1",
+      headStateVersion: 2,
+      status: "completed" as const,
+      phase: null,
+      statusMessage: null,
+      error: null,
+      startedAt: "2026-06-10T00:00:00.000Z",
+      finishedAt: "2026-06-10T00:00:00.000Z",
+    },
   };
 });
 
@@ -158,6 +168,7 @@ describe("B. Accept plan — happy path", () => {
       () => useTaskWorkspacePlanState(initialPage.task, refreshWorkspace, []),
       { wrapper },
     );
+    await waitFor(() => expect(result.current.planHeadStateVersion).toBe(2));
 
     expect(result.current.planFlowStatus).toBe("waiting_acceptance");
     expect(result.current.canAcceptPlan).toBe(true);
@@ -186,6 +197,7 @@ describe("B. Accept plan — happy path", () => {
       () => useTaskWorkspacePlanState(initialPage.task, refreshWorkspace, []),
       { wrapper },
     );
+    await waitFor(() => expect(result.current.planHeadStateVersion).toBe(2));
 
     await act(async () => {
       await result.current.acceptPlanById("plan-1");
@@ -228,6 +240,7 @@ describe("C. Accept plan — error paths", () => {
       () => useTaskWorkspacePlanState(initialPage.task, refreshWorkspace, []),
       { wrapper },
     );
+    await waitFor(() => expect(result.current.planHeadStateVersion).toBe(2));
 
     await act(async () => {
       await result.current.handleAcceptPlan();
@@ -247,6 +260,7 @@ describe("C. Accept plan — error paths", () => {
       () => useTaskWorkspacePlanState(initialPage.task, refreshWorkspace, []),
       { wrapper },
     );
+    await waitFor(() => expect(result.current.planHeadStateVersion).toBe(2));
 
     await act(async () => {
       await result.current.handleAcceptPlan();
@@ -270,6 +284,7 @@ describe("C. Accept plan — error paths", () => {
       () => useTaskWorkspacePlanState(initialPage.task, refreshWorkspace, []),
       { wrapper },
     );
+    await waitFor(() => expect(result.current.planHeadStateVersion).toBe(2));
 
     await act(async () => {
       await result.current.handleAcceptPlan();
@@ -307,6 +322,7 @@ describe("D. Accept plan — in-flight state and refresh behavior", () => {
       () => useTaskWorkspacePlanState(initialPage.task, refreshWorkspace, []),
       { wrapper },
     );
+    await waitFor(() => expect(result.current.planHeadStateVersion).toBe(2));
 
     expect(result.current.isAcceptingPlan).toBe(false);
     expect(result.current.canAcceptPlan).toBe(true);
@@ -347,6 +363,7 @@ describe("D. Accept plan — in-flight state and refresh behavior", () => {
       () => useTaskWorkspacePlanState(initialPage.task, refreshWorkspace, []),
       { wrapper },
     );
+    await waitFor(() => expect(result.current.planHeadStateVersion).toBe(2));
 
     await act(async () => {
       await result.current.handleAcceptPlan();

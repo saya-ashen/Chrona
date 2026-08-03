@@ -4,7 +4,7 @@ import type { Prisma } from "@chrona/db";
 import { isDashboardAiSummaryEnabled } from "@chrona/shared/runtime-config";
 
 import { db } from "@/lib/db";
-import { buildProviderFeatureRequest, dispatchFeaturePayload, getAiClientForFeature, providerCall } from "@/modules/ai";
+import { buildProviderFeatureRequest, dispatchFeaturePayload, getAiClientForFeature, runProviderRequest } from "@/modules/ai";
 import { validateDashboardSummarySpec } from "@chrona/ui-protocol";
 
 export const DASHBOARD_BRIEF_SURFACE = "dashboard.brief" as const;
@@ -76,13 +76,21 @@ const DASHBOARD_BRIEF_PROMPT_VERSION = 4;
 const dashboardAiBriefResultSchema = z.object({
   summaryText: z.string().trim().min(1).max(500).optional(),
   spec: z.custom<unknown>((value) => value !== undefined),
-});
+}).strict();
 
-const acceptedDashboardBriefToolResultSchema = z.object({
-  state: z.object({
-    result: dashboardAiBriefResultSchema,
-  }),
-});
+const dashboardBriefStructuredOutputSchema = {
+  name: "dashboard_brief_result",
+  description: "A bounded Dashboard brief with a validated UI specification.",
+  schema: {
+    type: "object" as const,
+    properties: {
+      summaryText: { type: "string" as const, maxLength: 500 },
+      spec: { type: "object" as const },
+    },
+    required: ["spec"],
+    additionalProperties: false,
+  },
+};
 
 export function parseDashboardBriefPayload(input: unknown) {
   const parsed = dashboardAiBriefResultSchema.safeParse(input);
@@ -106,8 +114,8 @@ export function buildDashboardBriefPromptInput(input: DashboardFingerprintInput)
       "Use running work, recent completions, and recent events only to explain momentum, value delivered, or meaningful change patterns.",
       "Do not list every task. Summarize implications and only mention task titles when they clarify a user decision.",
       "Recommended next step must be plain informational text, not an action control or command.",
-      "Submit the final brief by calling the MCP tool chrona_dashboard_brief with { summaryText, spec }.",
-      "Do not rely on assistant text as the final answer; Chrona persists only the chrona_dashboard_brief tool payload.",
+      "Return the final brief as the structured output { summaryText, spec }.",
+      "Do not rely on assistant prose as the final answer.",
       "spec may use ONLY these component types: Stack, Card, Heading, Text, Alert, Badge, Separator, Table.",
       "All props must be literal JSON values. No actions, links, buttons, forms, inputs, repeat, state, dynamic expressions, or custom components.",
       "Do not invent task IDs, counts, statuses, hrefs, approval actions, destructive actions, secrets, provider payloads, or raw task context.",
@@ -137,22 +145,6 @@ function errorMessage(cause: unknown) {
   return cause instanceof Error ? cause.message : String(cause);
 }
 
-export async function dashboardBriefFromTool(scope: string) {
-  const rawEvent = await db.rawEventLog.findFirst({
-    where: { source: "chrona_tool", rawType: "chrona.dashboard.brief", taskSessionId: scope },
-    orderBy: { receivedAt: "desc" },
-    select: { correlationId: true },
-  });
-  const invocation = rawEvent?.correlationId
-    ? await db.toolInvocation.findFirst({
-        where: { toolName: "chrona.dashboard.brief", status: "accepted", correlationId: rawEvent.correlationId },
-        orderBy: { completedAt: "desc" },
-        select: { outputPayload: true },
-      })
-    : null;
-  const parsed = acceptedDashboardBriefToolResultSchema.safeParse(invocation?.outputPayload);
-  return parsed.success ? parsed.data.state.result : null;
-}
 
 
 
@@ -384,17 +376,15 @@ export async function generateDashboardBrief(input: {
 
   try {
     const scope = `workspace:${input.workspaceId}:dashboard.brief:${inputFingerprint}`;
-    const parsed = provider.providerClient
-      ? parseDashboardBriefPayload(await (async () => {
-          await providerCall(provider, buildProviderFeatureRequest({
-            sessionKey: scope,
-            instructions: "Feature: dashboard.brief",
-            input: buildDashboardBriefPromptInput(input.fingerprintInput),
-            stream: false,
-            terminalToolName: "chrona_dashboard_brief",
-          }));
-          return dashboardBriefFromTool(scope);
-        })())
+    const providerClient = provider.providerClient;
+    const parsed = providerClient
+      ? parseDashboardBriefPayload((await runProviderRequest(providerClient, buildProviderFeatureRequest({
+          sessionKey: scope,
+          instructions: "Feature: dashboard.brief",
+          input: buildDashboardBriefPromptInput(input.fingerprintInput),
+          stream: false,
+          structuredOutputSchema: dashboardBriefStructuredOutputSchema,
+        }))).structuredPayload)
       : parseDashboardBriefPayload((await dispatchFeaturePayload(
           provider,
           DASHBOARD_BRIEF_SURFACE,

@@ -7,27 +7,20 @@ import { createHash, randomUUID } from "node:crypto";
 import type {
   AiFeature,
   LLMClientConfig,
-  PreparedAiFeatureSpec,
   SmartSuggestRequest,
   StreamEvent,
-  GenerateTaskPlanRequest,
-  AnalyzeConflictsRequest,
-  SuggestTimeslotRequest,
-  ChatRequest,
 } from "@chrona/contracts";
-import { buildSuggestFeatureSpec } from "@chrona/contracts";
 import { createLogger } from "@chrona/logging";
 import {
   parseJsonServerEventStream,
   type ProviderRunEvent,
   type ProviderRunInput,
+  type ProviderStructuredOutputSchema,
+  type StartRunInput,
 } from "@chrona/providers-foundation";
 import { normalizeSuggestResponse } from "./feature-normalizers";
-import {
-  buildPreparedFeatureRequest,
-  buildProviderFeatureRequest,
-  providerCall,
-} from "./providers";
+import { buildProviderFeatureRequest } from "./providers";
+import { createProviderStreamEventBoundary } from "./provider-stream-contract";
 import type { EngineAiClient } from "./runtime/client-registry";
 import { aiClientRegistry } from "./runtime/client-registry";
 import { buildSessionIdentity } from "./session";
@@ -43,48 +36,64 @@ function summarizeText(value: string, maxLength: number) {
   return `${value.slice(0, maxLength - 1)}…`;
 }
 
+const SUGGEST_TASK_COMPLETIONS_TOOL_NAME = "suggest_task_completions";
+const SUGGEST_SYSTEM_PROMPT = `
+You are a smart scheduling assistant for a task planning application.
+When given a partial task title and context, generate 2-4 task suggestions.
+You MUST return JSON with a suggestions array. Each suggestion needs a title and may include description, priority, estimatedMinutes, tags, and suggestedSlot.
+Respond in the same language as the input.`;
+const suggestResponseSchema: ProviderStructuredOutputSchema = {
+  name: SUGGEST_TASK_COMPLETIONS_TOOL_NAME,
+  description: "Return Chrona task suggestions as structured JSON.",
+  schema: {
+    type: "object",
+    additionalProperties: true,
+    properties: {
+      suggestions: {
+        type: "array",
+        minItems: 2,
+        maxItems: 4,
+        items: {
+          type: "object",
+          additionalProperties: true,
+          properties: {
+            title: { type: "string", minLength: 1 },
+            description: { type: "string" },
+            priority: { type: "string" },
+            estimatedMinutes: { type: "number" },
+            tags: { type: "array", items: { type: "string" } },
+            suggestedSlot: {
+              type: "object",
+              additionalProperties: true,
+              properties: {
+                startAt: { type: "string" },
+                endAt: { type: "string" },
+              },
+            },
+          },
+          required: ["title"],
+        },
+      },
+    },
+    required: ["suggestions"],
+  },
+};
+
 const logger = createLogger("ai-features.provider.streaming");
 
-export type PreparedStreamInput = {
+export type ProviderStreamRequest = {
   scope: string;
   instructions: string;
-  inputText: string;
   input: ProviderRunInput;
-  featureSpec?: PreparedAiFeatureSpec;
-  userMessage: string;
+  userMessage?: string;
+  responseSchema?: ProviderStructuredOutputSchema;
+  terminalToolName?: string;
   signal?: AbortSignal;
 };
 
-export function prepareStreamInput(
-  scope: string,
-  input:
-    | string
-    | SmartSuggestRequest
-    | GenerateTaskPlanRequest
-    | AnalyzeConflictsRequest
-    | SuggestTimeslotRequest
-    | ChatRequest,
-  featureSpec?: PreparedAiFeatureSpec,
-): PreparedStreamInput {
-  const prepared = buildPreparedFeatureRequest(input);
-  const signal =
-    input && typeof input === "object" && "signal" in input
-      ? (input.signal as AbortSignal | undefined)
-      : undefined;
-  return {
-    scope,
-    instructions: featureSpec?.instructions ?? prepared.instructions,
-    inputText: featureSpec?.inputText ?? prepared.inputText,
-    featureSpec,
-    input: prepared.input as ProviderRunInput,
-    userMessage: featureSpec?.inputText ?? prepared.inputText,
-    signal,
-  };
-}
-
 function toLlmStreamRequest(
   feature: AiFeature,
-  input: PreparedStreamInput,
+  input: ProviderStreamRequest,
 ): {
   systemPrompt: string;
   userMessage: string;
@@ -92,10 +101,27 @@ function toLlmStreamRequest(
 } {
   return {
     systemPrompt: input.instructions || `Feature: ${feature}`,
-    userMessage: input.userMessage,
+    userMessage: input.userMessage ?? JSON.stringify(input.input),
     options: { jsonMode: feature !== "chat" },
   };
 }
+function isValidSuggestPayload(value: unknown): value is Record<string, unknown> {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const suggestions = (value as Record<string, unknown>).suggestions;
+  return Array.isArray(suggestions)
+    && suggestions.length >= 2
+    && suggestions.length <= 4
+    && suggestions.every((suggestion) => {
+      if (!suggestion || typeof suggestion !== "object" || Array.isArray(suggestion)) return false;
+      const title = (suggestion as Record<string, unknown>).title;
+      return typeof title === "string" && title.trim().length > 0;
+    });
+}
+function unwrapProviderStructuredPayload(value: unknown): unknown {
+  const payload = asRecord(value);
+  return "parsed" in payload ? payload.parsed : value;
+}
+
 
 function asToolCallInput(evt: Extract<ProviderRunEvent, { type: "tool_started" }>) {
   if (evt.input !== undefined) return asRecord(evt.input);
@@ -141,7 +167,7 @@ function convertProviderEvent(evt: ProviderRunEvent): StreamEvent | null {
       return {
         type: "done",
         text: evt.outputText ?? "",
-        structured: isStructuredDebugInfo(evt.structuredPayload)
+        structured: isProviderPayloadDebug(evt.structuredPayload)
           ? evt.structuredPayload
           : null,
       };
@@ -162,7 +188,7 @@ function asRecord(value: unknown): Record<string, unknown> {
     : {};
 }
 
-function isStructuredDebugInfo(
+function isProviderPayloadDebug(
   value: unknown,
 ): value is NonNullable<Extract<StreamEvent, { type: "done" }>["structured"]> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -228,128 +254,91 @@ export function summarizeStreamEvent(event: StreamEvent | null) {
 async function* agentProviderStream(
   client: EngineAiClient,
   feature: AiFeature,
-  input: PreparedStreamInput,
+  input: ProviderStreamRequest,
 ): AsyncGenerator<StreamEvent> {
   const agentClient = aiClientRegistry.requireProviderClient(client);
-  const config = agentClient.record.config;
-  const timeout = config.timeoutSeconds ?? 120;
+  const timeoutMs = (agentClient.record.config.timeoutSeconds ?? 120) * 1000;
   const { sessionId, sessionKey } = buildSessionIdentity(feature, input.scope);
-  const providerInput = buildProviderFeatureRequest({
+  const providerInput: StartRunInput = buildProviderFeatureRequest({
     sessionKey,
     input: input.input,
     instructions: input.instructions,
-    featureSpec: input.featureSpec,
-    timeoutSeconds: timeout,
-    stream: false,
+    structuredOutputSchema: input.responseSchema,
+    terminalToolName: input.terminalToolName,
+    timeoutMs,
+    stream: true,
+    signal: input.signal,
   });
 
   logger.info("provider.stream.start", {
     feature,
     scope: input.scope,
     sessionId,
-    timeout,
+    timeout: timeoutMs / 1000,
     inputSummary: summarizeText(JSON.stringify(input.input), 160),
   });
 
   yield { type: "status", message: "Connecting to AI service..." };
 
-  const streamableFeatures: AiFeature[] = ["suggest", "generate_plan"];
-  if (streamableFeatures.includes(feature)) {
-    try {
-      yield { type: "status", message: "AI is thinking..." };
-      let fullText = "";
-
-      // Session identity is owned by the provider, not Chrona. Pass the
-      // engine-scoped `sessionId` (from `buildSessionIdentity`) straight to
-      // `startRun`; providers that natively manage sessions (e.g. Claude
-      // Code) capture their own `session_id` from the run and rewrite the
-      // returned ref so both sides converge on the provider's id. We do not
-      // fabricate a separate session ref via `createSession`.
-      const run = await agentClient.providerClient.startRun({
-        clientOperationId: `chrona-stream:${feature}:${input.scope}:${sessionKey}`,
-        sessionId,
-        sessionKey,
-        instructions: providerInput.instructions,
-        input: providerInput.input as ProviderRunInput,
-        terminalToolName: providerInput.terminalToolName,
-        structuredOutputSchema: providerInput.structuredOutputSchema,
-        timeoutMs: timeout * 1000,
-        stream: true,
-        signal: input.signal,
-      });
-      let cancelled = false;
-      const cancelProviderRun = async () => {
-        if (cancelled) return;
-        cancelled = true;
-        await agentClient.providerClient.cancelRun?.({
-          runId: run.runId,
-          sessionId: run.sessionId,
-          reason: "Provider stream aborted",
-        }).catch(() => undefined);
-      };
-
-      for await (const event of agentClient.providerClient.streamRun({
+  try {
+    yield { type: "status", message: "AI is thinking..." };
+    let fullText = "";
+    const run = await agentClient.providerClient.startRun({
+      ...providerInput,
+      clientOperationId: `chrona-stream:${feature}:${input.scope}:${sessionKey}`,
+      sessionId,
+    });
+    const boundary = createProviderStreamEventBoundary(run);
+    let cancelled = false;
+    const cancelProviderRun = async () => {
+      if (cancelled) return;
+      cancelled = true;
+      await agentClient.providerClient.cancelRun?.({
         runId: run.runId,
         sessionId: run.sessionId,
-        signal: input.signal,
-      })) {
-        if (input.signal?.aborted) {
-          await cancelProviderRun();
-          return;
-        }
-        const parsed = convertProviderEvent(event);
-        if (!parsed) continue;
-        if (parsed.type === "partial") {
-          fullText += parsed.text;
-        }
-        yield parsed;
-        if (input.signal?.aborted) {
-          await cancelProviderRun();
-          return;
-        }
-        if (parsed.type === "error" || parsed.type === "done") {
-          return;
-        }
-      }
+        reason: "Provider stream aborted",
+      }).catch(() => undefined);
+    };
 
-      logger.info("provider.stream.done", {
-        feature,
-        scope: input.scope,
-        sessionId,
-        ok: true,
-        textLength: fullText.length,
-      });
-
-      yield { type: "done", text: fullText, structured: null };
-      return;
-    } catch (error) {
-      logger.warn("provider.stream.fallback_to_blocking", {
-        feature,
-        scope: input.scope,
-        sessionId,
-        error: error instanceof Error ? error.message : String(error),
-      });
-
-      if (feature === "generate_plan") {
-        yield {
-          type: "error",
-          message:
-            error instanceof Error ? error.message : "Unknown streaming error",
-        };
+    for await (const value of agentClient.providerClient.streamRun({
+      runId: run.runId,
+      sessionId: run.sessionId,
+      signal: input.signal,
+    })) {
+      if (input.signal?.aborted) {
+        await cancelProviderRun();
         return;
       }
+      const parsed = convertProviderEvent(boundary.accept(value));
+      if (!parsed) continue;
+      if (parsed.type === "partial") fullText += parsed.text;
+      yield parsed;
+      if (input.signal?.aborted) {
+        await cancelProviderRun();
+        return;
+      }
+      if (parsed.type === "error" || parsed.type === "done") return;
     }
-  }
+    boundary.finish();
 
-  yield { type: "status", message: "AI is generating suggestions..." };
-  try {
-    const text = await providerCall(client, providerInput);
-    yield { type: "partial", text };
-    yield { type: "done", text, structured: null };
+    logger.info("provider.stream.done", {
+      feature,
+      scope: input.scope,
+      sessionId,
+      ok: true,
+      textLength: fullText.length,
+    });
+    yield { type: "done", text: fullText, structured: null };
   } catch (error) {
+    logger.warn("provider.stream.failed", {
+      feature,
+      scope: input.scope,
+      sessionId,
+      error: error instanceof Error ? error.message : String(error),
+    });
     yield {
       type: "error",
-      message: error instanceof Error ? error.message : "Unknown error",
+      message: error instanceof Error ? error.message : "Unknown streaming error",
     };
   }
 }
@@ -436,7 +425,7 @@ async function* llmStream(
 export function dispatchStream(
   client: EngineAiClient,
   feature: AiFeature,
-  input: PreparedStreamInput,
+  input: ProviderStreamRequest,
 ): AsyncGenerator<StreamEvent> {
   if (client.providerClient) {
     return agentProviderStream(client, feature, input);
@@ -487,12 +476,13 @@ export async function* suggestStream(
   client: EngineAiClient,
   request: SmartSuggestRequest,
 ): AsyncGenerator<StreamEvent> {
-  const preparedInput = prepareStreamInput(
-    buildSuggestScope(request),
-    request,
-    buildSuggestFeatureSpec(),
-  );
-  const generator = dispatchStream(client, "suggest", preparedInput);
+  const generator = dispatchStream(client, "suggest", {
+    scope: buildSuggestScope(request),
+    instructions: SUGGEST_SYSTEM_PROMPT,
+    input: { type: "text", text: JSON.stringify(request) },
+    userMessage: JSON.stringify(request),
+    responseSchema: suggestResponseSchema,
+  });
 
   let finalText = "";
   let latestToolInput: Record<string, unknown> | null = null;
@@ -503,7 +493,7 @@ export async function* suggestStream(
   for await (const event of generator) {
     if (
       event.type === "tool_call" &&
-      event.tool === "suggest_task_completions"
+      event.tool === SUGGEST_TASK_COMPLETIONS_TOOL_NAME
     ) {
       latestToolInput = event.input;
       yield event;
@@ -519,16 +509,24 @@ export async function* suggestStream(
     if (event.type === "done") {
       const text = event.text ?? finalText;
       latestStructured = event.structured ?? null;
+      const structuredPayload = unwrapProviderStructuredPayload(event.structured);
       const parsed =
         latestToolInput ??
+        (isValidSuggestPayload(structuredPayload) ? structuredPayload : null) ??
         (() => {
           try {
-            return text ? JSON.parse(text) : { suggestions: [] };
+            return text ? JSON.parse(text) : null;
           } catch {
-            return { suggestions: [] };
+            return null;
           }
         })();
-
+      if (!isValidSuggestPayload(parsed)) {
+        yield {
+          type: "error",
+          message: "Suggestion response must include an array of titled suggestions",
+        };
+        return;
+      }
       const suggestions = normalizeSuggestResponse({
         parsed,
         source: client.record.type,

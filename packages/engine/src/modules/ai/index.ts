@@ -11,7 +11,7 @@ export type {
 } from "./runtime/client-registry";
 export { getProviderBaseUrl, AiClientRegistry, aiClientRegistry } from "./runtime/client-registry";
 export { getAiClient, getAiClientForFeature, getAiClientForTask, requireAiClient } from "./runtime/client-resolution";
-export { aiChat, aiGeneratePlanStream } from "./runtime/ai-service";
+export { aiChat } from "./runtime/ai-service";
 export { chat } from "./feature-normalizers";
 export { dispatchStream, suggestStream } from "./streaming";
 export { AiClientManagement, aiClientManagement } from "./management/ai-client-management";
@@ -20,17 +20,12 @@ export {
   testAiClientAvailability,
   runProviderRequest,
   extractJSON,
-  providerCall,
   llmCall,
-  buildPreparedFeatureRequest,
   buildProviderFeatureRequest,
   dispatch,
   dispatchFeaturePayload,
-  dispatchPreparedFeaturePayload,
 } from "./providers";
 export { createProviderStreamEventBoundary, ProviderStreamContractError } from "./provider-stream-contract";
-export { startAiRunProgress, subscribeToAiRunProgress } from "./ai-run-progress";
-export type { AiRunProgressReporter, AiRunProgressSubscription } from "./ai-run-progress";
 export type { ProviderStreamEventBoundary } from "./provider-stream-contract";
 export { analyzeConflicts, analyzeConflictsSmart } from "./conflict-analyzer";
 export {
@@ -39,4 +34,46 @@ export {
   detectOverload,
   detectTimeOverlaps,
 } from "./conflict-detector";
-export { generatePlanStream } from "./features/generate-plan";
+export {
+  defineAiFeature,
+  AiFeatureDefinitionRegistry,
+  runAiFeature,
+  startOrAttachAiFeatureRun,
+  executeAiFeatureRunById,
+  AiFeatureRuntimeError,
+  stableJsonHash,
+  stableJsonStringify,
+} from "./feature-runtime";
+export {
+  commitAiFeatureRunAtomically,
+  PrismaAiFeatureRunStore,
+} from "./runtime/feature-runtime/prisma-run-store";
+export { FoundationProviderRuntime } from "./runtime/feature-runtime/foundation-provider-runtime";
+export {
+  runAiFeatureWithRuntime,
+  startAiFeatureWithRuntime,
+  resumeAiFeatureRun,
+  recoverAiFeatureRuns,
+  startAiFeatureRecoveryWorker,
+} from "./runtime/feature-runtime/runtime-service";
+export { readAiFeatureRunPublic } from "./runtime/feature-runtime/public-query";
+export type {
+  AiFeatureActionDefinition,
+  AiFeatureArtifactDefinition,
+  AiFeatureCommitContext,
+  AiFeatureCommitResult,
+  AiFeatureCompletionContext,
+  AiFeatureDefinition,
+  AiFeatureObservationDefinition,
+  AiFeatureRunnerPorts,
+  AiFeatureProviderPort,
+  AiFeatureProviderStart,
+  DefinedAiFeature,
+  AiFeatureRunPublicRead,
+  ReadAiFeatureRunPublicInput,
+  AiFeatureRunRecord,
+  AiFeatureRunRepositoryPort,
+  AiFeatureRunActionRecord,
+} from "./feature-runtime";
+export type { AtomicAiFeatureRunCommit } from "./runtime/feature-runtime/prisma-run-store";
+export type { AiFeatureRecoveryWorker, DefaultAiFeatureRunInput } from "./runtime/feature-runtime/runtime-service";

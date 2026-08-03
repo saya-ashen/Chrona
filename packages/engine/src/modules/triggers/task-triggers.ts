@@ -10,6 +10,7 @@ import type {
 import { taskTriggerDefinitionSchema } from "@chrona/contracts/api";
 import { expandRecurrenceRule } from "@chrona/integrations";
 import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
+import { withSchedulerWorkOwnership, type SchedulerWorkContext } from "../orchestration/scheduler-lease-repository";
 
 const LOOKAHEAD_DAYS = 90;
 const MAX_OCCURRENCES = 200;
@@ -220,19 +221,20 @@ async function activateEventTrigger(trigger: { id: string; taskId: string; versi
   activationDepth: number;
   normalizedInput: Record<string, unknown>;
   encoded: string;
+  workContext?: SchedulerWorkContext;
 }) {
   const deliveryKey = `${input.topic}:${input.causationId}`;
-  const duplicate = await db.triggerDelivery.findUnique({
-    where: { triggerId_deliveryKey: { triggerId: trigger.id, deliveryKey } },
-    select: { id: true },
-  });
-  if (duplicate) return false;
   try {
-    await db.$transaction(async (tx) => {
+    return await withSchedulerWorkOwnership(input.workContext, async (tx) => {
+      const duplicate = await tx.triggerDelivery.findUnique({
+        where: { triggerId_deliveryKey: { triggerId: trigger.id, deliveryKey } },
+        select: { id: true },
+      });
+      if (duplicate) return false;
       const delivery = await tx.triggerDelivery.create({ data: { workspaceId: input.workspaceId, triggerId: trigger.id, taskId: trigger.taskId, deliveryKey, status: "Accepted", processedAt: new Date(), payloadDigest: createHash("sha256").update(input.encoded).digest("hex"), normalizedInput: { ...input.normalizedInput, activationDepth: input.activationDepth } as Json } });
       await tx.taskOccurrence.create({ data: { workspaceId: input.workspaceId, taskId: trigger.taskId, triggerId: trigger.id, deliveryId: delivery.id, occurrenceKey: `event:${deliveryKey}`, triggerVersion: trigger.version, source: { kind: "trigger", triggerId: trigger.id, deliveryId: delivery.id }, status: "Ready", eligibleAt: new Date(), normalizedInput: { ...input.normalizedInput, activationDepth: input.activationDepth } as Json } });
+      return true;
     });
-    return true;
   } catch (cause) {
     if (cause instanceof Prisma.PrismaClientKnownRequestError && cause.code === "P2002") return false;
     throw cause;
@@ -245,6 +247,7 @@ export async function activateInternalEvent(input: {
   causationId: string;
   activationDepth?: number;
   normalizedInput: Record<string, unknown>;
+  workContext?: SchedulerWorkContext;
 }) {
   const activationDepth = input.activationDepth ?? 0;
   if (activationDepth > 4) return 0;

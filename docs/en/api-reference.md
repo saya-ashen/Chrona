@@ -534,7 +534,6 @@ Public tool names:
 | --- | --- |
 | `chrona_execution_read` | Read execution session state and supported next actions |
 | `chrona_plan_read` | Read accepted plan state through AI-visible refs |
-| `chrona_plan_generate` | Generate a draft plan for the session task from a complete plan blueprint |
 | `chrona_node_read` | Read current execution node state through AI-visible refs |
 | `chrona_node_output` | Submit a json-render node output spec before completing the current task node |
 | `chrona_node_complete` | Complete the current task node after required outputs have been submitted |

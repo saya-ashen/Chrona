@@ -1,6 +1,8 @@
 import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
+import { existsSync, readdirSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
+import { homedir } from "node:os";
 import path from "node:path";
 import { getChronaGeneratedFilesDir } from "@chrona/shared/data-paths";
 
@@ -678,7 +680,42 @@ export async function listGoalInbox(input: { goalId: string }) {
       },
     },
   });
-  return { candidates: candidates.map((candidate) => ({ ...candidate, createdAt: candidate.createdAt.toISOString(), updatedAt: candidate.updatedAt.toISOString() })) };
+  return {
+    candidates: candidates.map((candidate) => ({
+      id: candidate.id,
+      sourceTaskId: candidate.sourceTaskId,
+      sourceRunId: candidate.sourceRunId,
+      kind: candidate.kind,
+      label: candidate.label,
+      proposedAction: candidate.proposedAction,
+      proposedTargetAssetId: candidate.proposedTargetAssetId,
+      content: candidate.content,
+      reason: candidate.reason,
+      changeSummary: candidate.changeSummary,
+      confidence: candidate.confidence,
+      sourceArtifact: candidate.sourceArtifact
+        ? {
+            id: candidate.sourceArtifact.id,
+            title: candidate.sourceArtifact.title,
+            uri: candidate.sourceArtifact.uri,
+            contentPreview: candidate.sourceArtifact.contentPreview,
+          }
+        : null,
+      sourceTask: { title: candidate.sourceTask.title },
+      proposedTargetAsset: candidate.proposedTargetAsset
+        ? { id: candidate.proposedTargetAsset.id, label: candidate.proposedTargetAsset.label }
+        : null,
+      ownershipProposals: candidate.ownershipProposals.map((proposal) => ({
+        id: proposal.id,
+        status: proposal.status,
+        sourceTaskId: proposal.sourceTaskId,
+        sourceRunId: proposal.sourceRunId,
+        result: proposal.result,
+        sourceTask: proposal.sourceTask,
+        targetAsset: proposal.targetAsset,
+      })),
+    })),
+  };
 }
 
 async function createLinkedFileAssets(
@@ -892,11 +929,26 @@ function pdfHtml(title: string, markdown: string) {
 }
 
 function chromiumExecutable() {
-  return (
-    process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ??
-    process.env.CHROMIUM_PATH ??
-    "chromium"
-  );
+  const explicit = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ?? process.env.CHROMIUM_PATH;
+  if (explicit) return explicit;
+
+  const browserRoots = [
+    process.env.PLAYWRIGHT_BROWSERS_PATH,
+    path.join(homedir(), ".cache", "ms-playwright"),
+  ].filter((root): root is string => Boolean(root));
+  for (const browserRoot of browserRoots) {
+    if (!existsSync(browserRoot)) continue;
+    const releases = readdirSync(browserRoot, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory() && /^chromium-\d+$/.test(entry.name))
+      .sort((left, right) => right.name.localeCompare(left.name, undefined, { numeric: true }));
+    for (const release of releases) {
+      for (const relativePath of ["chrome-linux64/chrome", "chrome-linux/chrome"]) {
+        const candidate = path.join(browserRoot, release.name, relativePath);
+        if (existsSync(candidate)) return candidate;
+      }
+    }
+  }
+  return "chromium";
 }
 
 async function writePdf(outputPath: string, title: string, content: string) {

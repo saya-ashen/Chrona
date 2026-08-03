@@ -142,13 +142,9 @@ function runningDescription(input: ResolveTaskWorkspaceOperationStateInput) {
   const latestRuntime = input.runtimeEvents.at(-1)?.event;
   if (!latestRuntime) return currentOperationDescription(input);
   switch (latestRuntime.type) {
-    case "assistant_text_delta":
-    case "reasoning_delta":
-      return latestRuntime.text.trim() || currentOperationDescription(input);
     case "tool_started":
-      return latestRuntime.label;
     case "tool_progress":
-      return latestRuntime.preview ?? latestRuntime.label;
+      return latestRuntime.label;
     case "tool_completed":
       return latestRuntime.error
         ? `${latestRuntime.label} failed`
@@ -156,9 +152,7 @@ function runningDescription(input: ResolveTaskWorkspaceOperationStateInput) {
     case "approval_required":
       return "Approval required.";
     case "run_status":
-      return latestRuntime.message ?? latestRuntime.status;
-    case "raw_event":
-      return latestRuntime.rawEventType ?? "Runtime event";
+      return latestRuntime.status;
   }
 }
 

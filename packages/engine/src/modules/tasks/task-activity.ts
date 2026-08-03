@@ -12,11 +12,8 @@ import {
 } from "./task-activity-types";
 import {
   isDisplayableProviderEvent,
-  isMergeableProviderTextEvent,
   mapProviderEventToActivity,
   providerActivityEventType,
-  providerActivityMergeKey,
-  providerActivityText,
   providerToolProgressMergeKey,
 } from "./provider-activity";
 import { mapTaskEventToActivity } from "./task-activity-mapper";
@@ -28,35 +25,26 @@ export type {
   WorkspaceActivityTimelineItem,
 } from "./task-activity-types";
 
-function activityEventId(item: WorkspaceActivityTimelineItem) {
-  if (!item.raw || typeof item.raw !== "object" || Array.isArray(item.raw) || !("eventId" in item.raw)) return undefined;
-  return typeof item.raw.eventId === "string" ? item.raw.eventId : undefined;
-}
-
 export function deduplicateProjectedActivity(items: WorkspaceActivityTimelineItem[]) {
-  const canonicalEventIds = new Set(items.map((item) => item.id));
+  const seen = new Set<string>();
   return items.filter((item) => {
-    const eventId = activityEventId(item);
-    return !eventId || item.id === eventId || !canonicalEventIds.has(eventId);
+    if (seen.has(item.id)) return false;
+    seen.add(item.id);
+    return true;
   });
 }
 
 type ActivityTimelineState = {
   items: WorkspaceActivityTimelineItem[];
   toolProgressIndexes: Map<string, number>;
-  textSegment: { current: { key: string; item: WorkspaceActivityTimelineItem } | null };
 };
 
-function clearTextSegment(state: ActivityTimelineState) {
-  state.textSegment.current = null;
-}
 
 function shouldSkipProviderEvent(
   event: TaskActivityEvent,
   eventType: string,
-  payloadEvent: Record<string, unknown> | null,
 ) {
-  return event.source === "provider" && !isDisplayableProviderEvent(eventType, payloadEvent);
+  return event.source === "provider" && !isDisplayableProviderEvent(eventType);
 }
 
 function replaceToolProgress(
@@ -78,52 +66,19 @@ function replaceToolProgress(
   return true;
 }
 
-function appendMergedProviderText(
-  state: ActivityTimelineState,
-  event: TaskActivityEvent,
-  eventType: string,
-  payloadEvent: Record<string, unknown> | null,
-) {
-  if (event.source !== "provider" || !payloadEvent || !isMergeableProviderTextEvent(eventType)) return false;
-  const key = providerActivityMergeKey(event, eventType);
-  const text = providerActivityText(payloadEvent) ?? "";
-  const nextItem = mapProviderEventToActivity(event);
-  if (state.textSegment.current?.key === key) {
-    const item = state.textSegment.current.item;
-    item.description = `${item.description}${text}`;
-    item.summary = item.description;
-    item.assistant = { text: item.description, isReasoning: eventType === "reasoning_delta", isPartial: true };
-    item.timestamp = nextItem.timestamp;
-    return true;
-  }
-  nextItem.description = text || nextItem.description;
-  nextItem.summary = nextItem.description;
-  if (nextItem.assistant) nextItem.assistant.text = nextItem.description;
-  state.items.push(nextItem);
-  state.textSegment.current = { key, item: nextItem };
-  return true;
-}
 
 export function buildActivityTimeline(events: TaskActivityEvent[]) {
   const state: ActivityTimelineState = {
     items: [],
     toolProgressIndexes: new Map(),
-    textSegment: { current: null },
   };
   for (const event of events) {
     const payloadEvent = runtimePayloadEvent(event.payload);
     const eventType = providerActivityEventType(event, payloadEvent);
-    if (shouldSkipProviderEvent(event, eventType, payloadEvent)) {
-      clearTextSegment(state);
-      continue;
-    }
-    if (replaceToolProgress(state, event, eventType, payloadEvent)) {
-      clearTextSegment(state);
-      continue;
-    }
-    if (appendMergedProviderText(state, event, eventType, payloadEvent)) continue;
-    clearTextSegment(state);
-    state.items.push(mapTaskEventToActivity(event));
+    if (shouldSkipProviderEvent(event, eventType)) continue;
+    if (replaceToolProgress(state, event, eventType, payloadEvent)) continue;
+    const activity = mapTaskEventToActivity(event);
+    if (activity) state.items.push(activity);
   }
   return state.items;
 }
@@ -156,14 +111,13 @@ export function mapTimelineItemToActivity(
   item: TaskTimelineActivityItem,
 ): WorkspaceActivityTimelineItem {
   return taskActivityItem({
-    id: item.id,
+    id: item.eventId ?? item.id,
     kind: item.kind.startsWith("plan_execution.") ? "node" : "task",
     title: item.title,
     description: item.body ?? item.status ?? item.kind,
     tone: timelineTone(item.severity),
     timestamp: item.sortTime.toISOString(),
     sourceNodeId: item.nodeId ?? undefined,
-    raw: { metadata: item.metadata, eventId: item.eventId ?? undefined },
   });
 }
 

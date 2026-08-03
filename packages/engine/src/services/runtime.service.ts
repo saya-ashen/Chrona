@@ -1,6 +1,9 @@
 import { getTaskOrchestrator, startTaskOrchestrator } from "../modules/orchestration";
 import { listExecutionRuntimes } from "../modules/execution-runtime";
 import { db } from "@/lib/db";
+import { AiFeatureDefinitionRegistry, startAiFeatureRecoveryWorker, type AiFeatureRecoveryWorker } from "../modules/ai";
+import { goalReviewFeature } from "../modules/goals/ai/goal.review";
+import { taskPlanGenerateFeature } from "../modules/plans/ai/task.plan.generate";
 
 export type RuntimeReadiness = {
   status: "ready" | "not_ready";
@@ -12,13 +15,28 @@ export type RuntimeReadiness = {
 };
 
 export function createRuntimeService() {
+  const featureDefinitions = new AiFeatureDefinitionRegistry([goalReviewFeature, taskPlanGenerateFeature]);
+  let featureRecoveryWorker: AiFeatureRecoveryWorker | null = null;
+  let featureRecoveryFailed = false;
   return {
     listExecutionRuntimes: () => listExecutionRuntimes(),
     startTaskOrchestrator: () => startTaskOrchestrator(),
     stopTaskOrchestrator: () => getTaskOrchestrator().stop(),
+    startAiFeatureRecoveryWorker() {
+      featureRecoveryWorker ??= startAiFeatureRecoveryWorker({
+        definitions: featureDefinitions,
+        onError: () => { featureRecoveryFailed = true; },
+        onSuccess: () => { featureRecoveryFailed = false; },
+      });
+      return featureRecoveryWorker;
+    },
+    async stopAiFeatureRecoveryWorker() {
+      await featureRecoveryWorker?.stop();
+      featureRecoveryWorker = null;
+    },
     async getReadiness(): Promise<RuntimeReadiness> {
       let database: RuntimeReadiness["checks"]["database"] = "ok";
-      let recovery: RuntimeReadiness["checks"]["recovery"] = "clear";
+      let recovery: RuntimeReadiness["checks"]["recovery"] = featureRecoveryFailed ? "failed" : "clear";
 
       try {
         await db.$queryRawUnsafe("SELECT 1");

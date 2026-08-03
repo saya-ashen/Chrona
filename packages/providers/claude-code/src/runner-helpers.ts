@@ -17,7 +17,7 @@ export function renderPrompt(input: StartRunInput): string | undefined {
   const payload = renderInputPayload(input.input);
   if (!payload) return instructions;
   if (!instructions) return payload;
-  return `${instructions}\n\n## Chrona provider input\n${payload}`;
+  return `${instructions}\n\n## Provider input\n${payload}`;
 }
 
 function renderInstructions(instructions: StartRunInput["instructions"]): string | undefined {

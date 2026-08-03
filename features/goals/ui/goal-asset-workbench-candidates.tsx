@@ -122,7 +122,7 @@ function ReadyOwnershipRecommendation({ proposal, result, copy, pending, onApply
       <div className="flex flex-wrap items-center gap-2"><Badge variant="secondary">{decision}</Badge><span className="text-xs text-muted-foreground">{formatCopy(copy.certainty, { certainty })}</span></div>
       <dl className="grid gap-2 sm:grid-cols-2"><div><dt className="text-xs text-muted-foreground">{copy.rationale}</dt><dd>{result.rationale}</dd></div><div><dt className="text-xs text-muted-foreground">{copy.differenceSummaryLabel}</dt><dd>{result.differenceSummary}</dd></div></dl>
       <div className="grid gap-2 sm:grid-cols-2"><div><p className="text-xs text-muted-foreground">{copy.evidence}</p><ul className="list-disc pl-4 text-xs">{result.evidence.map((item) => <li key={item}>{item}</li>)}</ul></div>{result.counterEvidence.length > 0 ? <div><p className="text-xs text-muted-foreground">{copy.counterEvidence}</p><ul className="list-disc pl-4 text-xs">{result.counterEvidence.map((item) => <li key={item}>{item}</li>)}</ul></div> : null}</div>
-      <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-xs text-muted-foreground">{formatCopy(copy.aiSource, { provider: proposal.providerType ?? "AI provider", model: proposal.model ? ` · ${proposal.model}` : "" })}</p><Button size="sm" disabled={pending} onClick={onApply}>{pending ? <Loader2 className="size-4 animate-spin" /> : null}{copy.applyAiRecommendation}</Button></div>
+      <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-xs text-muted-foreground">{formatCopy(copy.aiSource, { provider: "AI", model: "" })}</p><Button size="sm" disabled={pending} onClick={onApply}>{pending ? <Loader2 className="size-4 animate-spin" /> : null}{copy.applyAiRecommendation}</Button></div>
     </div>
   );
 }
@@ -135,7 +135,7 @@ function OwnershipRecommendationStatus({ proposal, result, copy, pending, onAppl
   onApply: () => void;
 }) {
   if (proposal?.status === "Generating") return <p className="text-sm text-muted-foreground">{copy.generatingAiRecommendation}</p>;
-  if (proposal?.status === "Failed") return <p role="alert" className="text-sm text-destructive">{proposal.generationError ?? copy.aiRecommendationFailed}</p>;
+  if (proposal?.status === "Failed") return <p role="alert" className="text-sm text-destructive">{copy.aiRecommendationFailed}</p>;
   if (proposal?.status === "Stale") return <p role="alert" className="text-sm text-warning-foreground">{copy.proposalStale}</p>;
   return proposal?.status === "Ready" && result ? <ReadyOwnershipRecommendation proposal={proposal} result={result} copy={copy} pending={pending} onApply={onApply} /> : null;
 }

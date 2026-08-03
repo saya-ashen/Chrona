@@ -1,7 +1,12 @@
+import type { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 
-export async function activateWorkBlock(taskId: string, workBlockId?: string | null) {
-  const targetWorkBlockId = workBlockId ?? (await db.workBlock.findFirst({
+export async function activateWorkBlock(
+  taskId: string,
+  workBlockId?: string | null,
+  tx: Prisma.TransactionClient = db,
+) {
+  const targetWorkBlockId = workBlockId ?? (await tx.workBlock.findFirst({
     where: { taskId, status: "Scheduled" },
     orderBy: { scheduledStartAt: "asc" },
     select: { id: true },
@@ -9,14 +14,18 @@ export async function activateWorkBlock(taskId: string, workBlockId?: string | n
 
   if (!targetWorkBlockId) return;
 
-  await db.workBlock.updateMany({
+  await tx.workBlock.updateMany({
     where: { id: targetWorkBlockId, taskId },
     data: { status: "Active", startedAt: new Date() },
   });
 }
 
-export async function completeWorkBlock(taskId: string, workBlockId?: string | null) {
-  await db.workBlock.updateMany({
+export async function completeWorkBlock(
+  taskId: string,
+  workBlockId?: string | null,
+  tx: Prisma.TransactionClient = db,
+) {
+  await tx.workBlock.updateMany({
     where: workBlockId
       ? { id: workBlockId, taskId }
       : { taskId, status: "Active" },
@@ -24,8 +33,12 @@ export async function completeWorkBlock(taskId: string, workBlockId?: string | n
   });
 }
 
-export async function releaseWorkBlock(taskId: string, workBlockId?: string | null) {
-  await db.workBlock.updateMany({
+export async function releaseWorkBlock(
+  taskId: string,
+  workBlockId?: string | null,
+  tx: Prisma.TransactionClient = db,
+) {
+  await tx.workBlock.updateMany({
     where: workBlockId
       ? { id: workBlockId, taskId }
       : { taskId, status: "Active" },

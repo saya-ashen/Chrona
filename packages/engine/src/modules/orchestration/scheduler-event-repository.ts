@@ -10,8 +10,11 @@ export type SchedulerEventInput = {
   payload?: Prisma.InputJsonValue;
 };
 
-export function recordSchedulerEvent(input: SchedulerEventInput) {
-  return db.schedulerEvent.create({
+export function recordSchedulerEvent(
+  input: SchedulerEventInput,
+  tx: Prisma.TransactionClient = db,
+) {
+  return tx.schedulerEvent.create({
     data: {
       workspaceId: input.workspaceId,
       taskId: input.taskId,

@@ -32,9 +32,6 @@ export type ChronaDebugProviderConfig = {
   profile?: DebugProviderProfile;
 };
 
-const PLAN_TOOL = "chrona_plan_generate";
-const NODE_COMPLETE_TOOL = "chrona_node_complete";
-const CONDITION_SELECT_TOOL = "chrona_condition_select";
 const DEFAULT_DEBUG_PROVIDER_PROFILE: DebugProviderProfile = "deterministic";
 
 type DebugRun = {
@@ -44,7 +41,12 @@ type DebugRun = {
   input?: StartRunInput;
   status: ProviderRunRef["status"];
   outputText?: string;
+  error?: string;
   pendingToolResults: Map<string, ProviderToolResultInput | null>;
+  phase: "initial" | "awaiting_tool_result" | "after_tool_result";
+  pendingCallId?: string;
+  pendingToolName?: string;
+  sequence: number;
 };
 
 function now() {
@@ -58,12 +60,14 @@ function createRun(input: {
   startInput?: StartRunInput;
 }): DebugRun {
   return {
-    runId: input.runId ?? `chrona-debug-run-${crypto.randomUUID()}`,
-    sessionId: input.sessionId ?? `chrona-debug-session-${crypto.randomUUID()}`,
+    runId: input.runId ?? `debug-run-${crypto.randomUUID()}`,
+    sessionId: input.sessionId ?? `debug-session-${crypto.randomUUID()}`,
     sessionKey: input.sessionKey,
     input: input.startInput,
     status: "running",
     pendingToolResults: new Map(),
+    phase: "initial",
+    sequence: 0,
   };
 }
 
@@ -91,207 +95,124 @@ export function normalizeDebugProviderProfile(input: unknown): DebugProviderProf
     : DEFAULT_DEBUG_PROVIDER_PROFILE;
 }
 
-function debugPlanBlueprint() {
-  return {
-    title: "SSE Boundary Debug Plan",
-    goal: "Exercise deterministic provider streaming, parallel starts, human gates, branch routing, waits, risky-action approvals, joins, and workspace projection boundaries.",
-    assumptions: [
-      "This plan is synthetic and should be safe to run repeatedly.",
-      "All node ids are stable so runtime projections can be compared across runs.",
-    ],
-    nodes: [
-      {
-        id: "debug_collect_context",
-        type: "task",
-        title: "Collect boundary context",
-        executor: "ai",
-        mode: "auto",
-        estimatedMinutes: 2,
-        expectedOutput: "Structured context summary with stream, graph, and workspace projection constraints.",
-        completionCriteria: "Generation stream and first runtime stream are visible with stable node mapping.",
-      },
-      {
-        id: "debug_load_fixture",
-        type: "task",
-        title: "Load deterministic fixture",
-        executor: "system",
-        mode: "auto",
-        estimatedMinutes: 1,
-        expectedOutput: "Fixture payload containing large text, empty arrays, nested metadata, and nullable values.",
-        completionCriteria: "Runtime accepts non-user system output without provider-specific fields leaking into the workspace.",
-      },
-      {
-        id: "debug_user_boundary_input",
-        type: "checkpoint",
-        title: "Capture boundary choices",
-        checkpointType: "input",
-        prompt: "Provide boundary-case inputs used to validate checkpoint rendering and resume behavior.",
-        required: true,
-        inputFields: [
-          {
-            key: "scenario_label",
-            label: "Scenario label",
-            inputType: "text",
-            required: true,
-          },
-          {
-            key: "include_slow_wait",
-            label: "Include slow wait path",
-            inputType: "boolean",
-            required: false,
-          },
-          {
-            key: "priority",
-            label: "Priority",
-            inputType: "choice",
-            required: true,
-            options: ["low", "normal", "urgent"],
-          },
-        ],
-      },
-      {
-        id: "debug_route_boundary",
-        type: "condition",
-        title: "Route boundary scenario",
-        condition: "Does the checkpoint input request the slow external wait path?",
-        evaluationBy: "ai",
-        branches: [
-          { label: "slow wait", nextNodeId: "debug_wait_external_event" },
-          { label: "fast path", nextNodeId: "debug_validate_parallel_join" },
-        ],
-        defaultNextNodeId: "debug_validate_parallel_join",
-      },
-      {
-        id: "debug_wait_external_event",
-        type: "wait",
-        title: "Wait for external boundary event",
-        waitFor: "Synthetic external event or timeout used to test waiting, cancellation, and resume projection.",
-        estimatedMinutes: 3,
-        timeout: {
-          minutes: 5,
-          onTimeout: "notify_user",
-        },
-      },
-      {
-        id: "debug_validate_parallel_join",
-        type: "task",
-        title: "Validate parallel branch join",
-        executor: "ai",
-        mode: "auto",
-        estimatedMinutes: 2,
-        expectedOutput: "Join report proving context, fixture, and optional wait outputs are available exactly once.",
-        completionCriteria: "Workspace shows upstream branches completed or skipped without duplicate execution attempts.",
-      },
-      {
-        id: "debug_approve_risky_projection",
-        type: "checkpoint",
-        title: "Approve risky projection update",
-        checkpointType: "approve",
-        prompt: "Approve the synthetic risky action so downstream execution can verify approval-gated tasks.",
-        required: true,
-      },
-      {
-        id: "debug_apply_risky_projection",
-        type: "task",
-        title: "Apply risky projection update",
-        executor: "system",
-        mode: "auto",
-        estimatedMinutes: 1,
-        expectedOutput: "Synthetic mutation record with before/after workspace projection metadata.",
-        completionCriteria: "Risky task only runs after approval checkpoint completion.",
-      },
-      {
-        id: "debug_manual_review",
-        type: "task",
-        title: "Manual review boundary state",
-        executor: "user",
-        mode: "manual",
-        estimatedMinutes: 2,
-        expectedOutput: "Human-visible review note confirming active node, blocked state, and primary action are obvious.",
-        completionCriteria: "Manual node can be completed without provider execution and downstream state resumes.",
-      },
-      {
-        id: "debug_complete_boundary_run",
-        type: "task",
-        title: "Complete boundary run",
-        executor: "ai",
-        mode: "auto",
-        estimatedMinutes: 1,
-        expectedOutput: "Final deterministic debug output with all boundary node statuses summarized.",
-        completionCriteria: "Workspace reaches completed status with no unresolved waits, approvals, or branch targets.",
-      },
-    ],
-    edges: [
-      { from: "debug_collect_context", to: "debug_user_boundary_input" },
-      { from: "debug_load_fixture", to: "debug_user_boundary_input" },
-      { from: "debug_user_boundary_input", to: "debug_route_boundary" },
-      { from: "debug_route_boundary", to: "debug_wait_external_event", label: "slow wait" },
-      { from: "debug_route_boundary", to: "debug_validate_parallel_join", label: "fast path" },
-      { from: "debug_wait_external_event", to: "debug_validate_parallel_join" },
-      { from: "debug_validate_parallel_join", to: "debug_approve_risky_projection" },
-      { from: "debug_approve_risky_projection", to: "debug_apply_risky_projection" },
-      { from: "debug_apply_risky_projection", to: "debug_manual_review" },
-      { from: "debug_manual_review", to: "debug_complete_boundary_run" },
-    ],
-  };
-}
 
-function inputRecord(input: StreamRunInput): Record<string, unknown> | null {
-  const candidate = "input" in input ? input.input : null;
-  return candidate && typeof candidate === "object" && !Array.isArray(candidate)
-    ? (candidate as Record<string, unknown>)
+const MAX_SCHEMA_DEPTH = 4;
+const MAX_SCHEMA_ELEMENTS = 16;
+const MAX_ARRAY_ITEMS = 4;
+const MAX_OBJECT_PROPERTIES = 12;
+const NO_SCHEMA_VALUE = Symbol("no-schema-value");
+
+type JsonSchema = Record<string, unknown>;
+
+type SynthesisState = {
+  remaining: number;
+};
+
+function asJsonSchema(value: unknown): JsonSchema | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? value as JsonSchema
     : null;
 }
 
-function currentNodeTitle(input: StreamRunInput) {
-  const record = inputRecord(input);
-  const node = record?.node;
-  if (!node || typeof node !== "object" || Array.isArray(node))
-    return "debug node";
-  const title = (node as Record<string, unknown>).title;
-  return typeof title === "string" && title.trim()
-    ? title.trim()
-    : "debug node";
+function schemaSample(schema: JsonSchema): unknown | typeof NO_SCHEMA_VALUE {
+  if (Array.isArray(schema.examples) && schema.examples.length > 0) return schema.examples[0];
+  if (Object.hasOwn(schema, "default")) return schema.default;
+  if (Object.hasOwn(schema, "const")) return schema.const;
+  if (Array.isArray(schema.enum) && schema.enum.length > 0) return schema.enum[0];
+  return NO_SCHEMA_VALUE;
 }
 
-function currentNodeType(input: StreamRunInput) {
-  const record = inputRecord(input);
-  const node = record?.node;
-  if (!node || typeof node !== "object" || Array.isArray(node)) return null;
-  const type = (node as Record<string, unknown>).type;
-  return typeof type === "string" ? type : null;
+function schemaCost(schema: JsonSchema, depth = 0): number {
+  if (depth >= MAX_SCHEMA_DEPTH || schemaSample(schema) !== NO_SCHEMA_VALUE) return 1;
+  const branches = [
+    ...(Array.isArray(schema.oneOf) ? schema.oneOf : []),
+    ...(Array.isArray(schema.anyOf) ? schema.anyOf : []),
+  ];
+  if (branches.length > 0) {
+    const costs = branches
+      .map(asJsonSchema)
+      .filter((branch): branch is JsonSchema => branch !== null)
+      .map((branch) => schemaCost(branch, depth + 1));
+    return costs.length > 0 ? Math.min(...costs) : Number.POSITIVE_INFINITY;
+  }
+  if (schema.type === "array") return 1 + Math.min(MAX_ARRAY_ITEMS, Math.max(0, Number(schema.minItems) || 0));
+  if (schema.type === "object" || schema.properties || schema.required) {
+    const required = Array.isArray(schema.required) ? schema.required.filter((key): key is string => typeof key === "string") : [];
+    return 1 + Math.min(MAX_OBJECT_PROPERTIES, required.length);
+  }
+  return 1;
 }
 
-function currentNodeRef(input: StreamRunInput) {
-  const record = inputRecord(input);
-  const node = record?.node;
-  if (!node || typeof node !== "object" || Array.isArray(node)) return null;
-  const ref = (node as Record<string, unknown>).ref;
-  return typeof ref === "string" && ref.trim() ? ref.trim() : null;
+function smallestSchemaBranch(schema: JsonSchema): JsonSchema | null {
+  const branches = [
+    ...(Array.isArray(schema.oneOf) ? schema.oneOf : []),
+    ...(Array.isArray(schema.anyOf) ? schema.anyOf : []),
+  ];
+  return branches
+    .map(asJsonSchema)
+    .filter((branch): branch is JsonSchema => branch !== null)
+    .reduce<JsonSchema | null>((best, branch) => !best || schemaCost(branch) < schemaCost(best) ? branch : best, null);
 }
 
-function preferredBranchRef(input: StreamRunInput) {
-  const record = inputRecord(input);
-  const directBranchOptions = "branchOptions" in input ? input.branchOptions : undefined;
-  const branchOptions = Array.isArray(record?.branchOptions) ? record.branchOptions : directBranchOptions;
-  if (!Array.isArray(branchOptions)) return null;
-  const branch = branchOptions.find((option) => {
-    if (!option || typeof option !== "object" || Array.isArray(option)) return false;
-    return (option as Record<string, unknown>).label === "fast path";
-  }) ?? branchOptions[0];
-  if (!branch || typeof branch !== "object" || Array.isArray(branch)) return null;
-  const ref = (branch as Record<string, unknown>).ref;
-  return typeof ref === "string" && ref.trim() ? ref : null;
-}
-function isPlanGeneration(input: StreamRunInput) {
-  return "instructions" in input && input.instructions.includes(PLAN_TOOL);
+function boundedJsonValue(value: unknown, depth: number, state: SynthesisState): unknown {
+  if (state.remaining <= 0 || depth >= MAX_SCHEMA_DEPTH) return null;
+  state.remaining -= 1;
+  if (value === null || typeof value !== "object") return value;
+  if (Array.isArray(value)) {
+    return value.slice(0, MAX_ARRAY_ITEMS).map((item) => boundedJsonValue(item, depth + 1, state));
+  }
+  return Object.fromEntries(
+    Object.entries(value)
+      .slice(0, MAX_OBJECT_PROPERTIES)
+      .map(([key, item]) => [key, boundedJsonValue(item, depth + 1, state)]),
+  );
 }
 
-function streamInputForRun(run: DebugRun, input: StreamRunInput): StreamRunInput {
-  if ("instructions" in input) return input;
-  if (!run.input) return input;
-  return { ...run.input, runId: run.runId, signal: input.signal, stream: true };
+function synthesizeJsonSchema(schemaValue: unknown, depth = 0, state: SynthesisState = { remaining: MAX_SCHEMA_ELEMENTS }): unknown {
+  const schema = asJsonSchema(schemaValue);
+  if (!schema || state.remaining <= 0 || depth >= MAX_SCHEMA_DEPTH) return null;
+
+  const sample = schemaSample(schema);
+  if (sample !== NO_SCHEMA_VALUE) return boundedJsonValue(sample, depth, state);
+
+  const branch = smallestSchemaBranch(schema);
+  if (branch) return synthesizeJsonSchema(branch, depth + 1, state);
+
+  state.remaining -= 1;
+  const type = Array.isArray(schema.type)
+    ? schema.type.find((candidate): candidate is string => typeof candidate === "string" && candidate !== "null") ?? schema.type[0]
+    : schema.type;
+  if (type === "string") {
+    const minLength = typeof schema.minLength === "number" && Number.isFinite(schema.minLength)
+      ? Math.max(0, Math.floor(schema.minLength))
+      : 0;
+    return "x".repeat(Math.min(256, minLength));
+  }
+  if (type === "number" || type === "integer") return 0;
+  if (type === "boolean") return false;
+  if (type === "null") return null;
+  if (type === "array") {
+    const minItems = typeof schema.minItems === "number" && Number.isFinite(schema.minItems)
+      ? Math.max(0, Math.floor(schema.minItems))
+      : 0;
+    return Array.from({ length: Math.min(MAX_ARRAY_ITEMS, minItems) }, () => synthesizeJsonSchema(schema.items, depth + 1, state));
+  }
+  if (type === "object" || schema.properties || schema.required) {
+    const properties = asJsonSchema(schema.properties) ?? {};
+    const required = Array.isArray(schema.required)
+      ? schema.required.filter((key): key is string => typeof key === "string")
+      : [];
+    const keys = [...new Set([...required, ...Object.keys(properties)])].slice(0, MAX_OBJECT_PROPERTIES);
+    const result: Record<string, unknown> = {};
+    for (const key of keys) {
+      if (state.remaining <= 0) break;
+      result[key] = synthesizeJsonSchema(properties[key], depth + 1, state);
+    }
+    return result;
+  }
+  return null;
 }
+
 
 function eventBase(provider: string, run: DebugRun, sequence: number) {
   return {
@@ -342,11 +263,12 @@ export class ChronaDebugProviderClient implements AgentProviderClient {
         historyReplay: true,
         activeRunLookup: true,
         streamReconnect: true,
+        crossProcessDurable: false,
         providerResumeRef: true,
         runEventReplay: true,
-        mode: "authoritative_run_lookup",
+        mode: "local_stream_only",
       },
-      reason: `Chrona local debug provider (${this.profile})`,
+      reason: `Local debug provider (${this.profile})`,
     };
   }
 
@@ -357,13 +279,12 @@ export class ChronaDebugProviderClient implements AgentProviderClient {
       checkedAt: now(),
       latencyMs: 0,
       status: "ok",
-      reason: `Chrona debug provider is local (${this.profile})`,
+      reason: `Debug provider is local (${this.profile})`,
     };
   }
 
   async createSession(input: CreateSessionInput = {}) {
-    const sessionId =
-      input.sessionKey ?? `chrona-debug-session-${crypto.randomUUID()}`;
+    const sessionId = input.sessionKey ?? `debug-session-${crypto.randomUUID()}`;
     return {
       provider: this.provider,
       sessionId,
@@ -431,9 +352,9 @@ export class ChronaDebugProviderClient implements AgentProviderClient {
       }
       return;
     }
+
     const inputRunId = "runId" in input ? input.runId : undefined;
-    const existingRun = inputRunId ? this.runs.get(inputRunId) : null;
-    const run = existingRun ?? createRun({
+    const run = (inputRunId ? this.runs.get(inputRunId) : undefined) ?? createRun({
       runId: inputRunId,
       sessionId: "sessionId" in input ? input.sessionId : undefined,
       sessionKey: "sessionKey" in input ? input.sessionKey : undefined,
@@ -441,252 +362,108 @@ export class ChronaDebugProviderClient implements AgentProviderClient {
     });
     this.runs.set(run.runId, run);
     run.status = "running";
-    const streamInput = streamInputForRun(run, input);
-    const nodeType = currentNodeType(streamInput);
-    const nodeTitle = currentNodeTitle(streamInput);
-    const nodeRef = currentNodeRef(streamInput);
-    const branchRef = preferredBranchRef(streamInput);
+    const startInput = "instructions" in input ? input : run.input;
     const signal = "signal" in input ? input.signal : undefined;
-    const isGoalReview = "structuredOutputSchema" in streamInput && streamInput.structuredOutputSchema?.name === "goal_review_result";
-    const isGoalAssetOwnership = "structuredOutputSchema" in streamInput && streamInput.structuredOutputSchema?.name === "goal_asset_ownership_result";
-    const isSuggestion = "structuredOutputSchema" in streamInput && streamInput.structuredOutputSchema?.name === "suggest_task_completions";
-    const isResultFinalization = "structuredOutputSchema" in streamInput && streamInput.structuredOutputSchema?.name === "chrona_finalized_result_spec";
-    let sequence = 0;
+    let sequence = run.sequence;
 
-    yield {
-      ...eventBase(this.provider, run, sequence++),
-      type: "run_started",
-      run: providerRunRef(this.provider, run),
-    };
-    await pause(signal);
-
-    if (this.profile === "tool-submit" && streamInput.tools?.length) {
-      const tool = streamInput.tools[0];
-      const callId = `chrona-debug-pending-${sequence}`;
-      run.pendingToolResults.set(callId, null);
+    if (run.phase === "initial") {
       yield {
         ...eventBase(this.provider, run, sequence++),
-        type: "tool_call",
-        tool: tool.name,
-        callId,
-        input: {},
-        status: "pending",
+        type: "run_started",
+        run: providerRunRef(this.provider, run),
       };
-      while (!run.pendingToolResults.get(callId)) {
-        await pause(signal);
+      await pause(signal);
+
+      if (this.profile === "tool-submit" && startInput?.tools?.length) {
+        const tool = startInput.tools[0];
+        const callId = `debug-pending-${sequence}`;
+        run.pendingToolResults.set(callId, null);
+        run.pendingCallId = callId;
+        run.pendingToolName = tool.name;
+        run.phase = "awaiting_tool_result";
+        const synthesizedInput = synthesizeJsonSchema(tool.inputSchema);
+        yield {
+          ...eventBase(this.provider, run, sequence++),
+          type: "tool_call",
+          tool: tool.name,
+          callId,
+          input: asJsonSchema(synthesizedInput) ?? {},
+          status: "pending",
+        };
+        run.sequence = sequence;
+        return;
       }
-      const submitted = run.pendingToolResults.get(callId)!;
+    }
+
+    if (run.phase === "awaiting_tool_result") {
+      const callId = run.pendingCallId;
+      const toolName = run.pendingToolName;
+      const submitted = callId ? run.pendingToolResults.get(callId) : undefined;
+      if (!callId || !toolName || !submitted) return;
       run.pendingToolResults.delete(callId);
+      run.pendingCallId = undefined;
+      run.pendingToolName = undefined;
+      run.phase = "after_tool_result";
       yield {
         ...eventBase(this.provider, run, sequence++),
         type: "tool_result",
-        tool: tool.name,
+        tool: toolName,
         callId,
         result: submitted.error ? { error: submitted.error } : submitted.result,
       };
+      await pause(signal);
     }
 
-    if (isPlanGeneration(streamInput)) {
-      yield {
-        ...eventBase(this.provider, run, sequence++),
-        type: "reasoning_delta",
-        text: "Debug provider: building deterministic SSE test plan.",
-      };
-      await pause(signal);
-      yield {
-        ...eventBase(this.provider, run, sequence++),
-        type: "text_delta",
-        text: "Debug plan generation output: prepare -> execute -> verify.\n",
-      };
-      await pause(signal);
-      yield {
-        ...eventBase(this.provider, run, sequence++),
-        type: "tool_call",
-        tool: PLAN_TOOL,
-        callId: "chrona-debug-plan-call",
-        input: debugPlanBlueprint(),
-        status: "completed",
-      };
-      await pause(signal);
-      yield {
-        ...eventBase(this.provider, run, sequence++),
-        type: "tool_result",
-        tool: PLAN_TOOL,
-        callId: "chrona-debug-plan-call",
-        result: { ok: true, message: "Debug plan emitted." },
-      };
-    } else if (isSuggestion) {
-      yield {
-        ...eventBase(this.provider, run, sequence++),
-        type: "tool_call",
-        tool: "suggest_task_completions",
-        callId: "chrona-debug-suggest-call",
-        input: {
-          suggestions: [
-            {
-              title: "Review suggested task",
-              description: "A deterministic provider-backed suggestion.",
-              priority: "Medium",
-              estimatedMinutes: 30,
-              tags: ["suggested"],
-            },
-          ],
-        },
-        status: "completed",
-      };
-    } else if (nodeType === "condition") {
-      const title = nodeTitle;
-      const nodeId = nodeRef;
-      const conditionCallId = `chrona-debug-condition-${sequence}`;
-      yield {
-        ...eventBase(this.provider, run, sequence++),
-        type: "reasoning_delta",
-        text: `Debug provider: selecting condition branch for ${title}.`,
-      };
-      await pause(signal);
-      yield {
-        ...eventBase(this.provider, run, sequence++),
-        type: "tool_call",
-        tool: CONDITION_SELECT_TOOL,
-        callId: conditionCallId,
-        input: {
-          nodeId,
-          branchRef,
-          summary: `Debug provider selected fast path for ${title}.`,
-        },
-        status: "completed",
-      };
-      await pause(signal);
-      yield {
-        ...eventBase(this.provider, run, sequence++),
-        type: "tool_result",
-        tool: CONDITION_SELECT_TOOL,
-        callId: conditionCallId,
-        result: { ok: true, message: `Debug provider selected ${branchRef ?? "a branch"} for ${title}.` },
-      };
-    } else {
-      const title = currentNodeTitle(streamInput);
-      const completeCallId = `chrona-debug-complete-${sequence}`;
-      yield {
-        ...eventBase(this.provider, run, sequence++),
-        type: "reasoning_delta",
-        text: `Debug provider: executing ${title}.`,
-      };
-      await pause(signal);
-      yield {
-        ...eventBase(this.provider, run, sequence++),
-        type: "text_delta",
-        text: `Debug execution output for ${title}.\n`,
-      };
-      await pause(signal);
-      yield {
-        ...eventBase(this.provider, run, sequence++),
-        type: "tool_call",
-        tool: NODE_COMPLETE_TOOL,
-        callId: completeCallId,
-        input: {
-          summary: `Debug provider completed ${title}.`,
-          findings: [{
-            key: "debug-execution",
-            content: `Debug provider ${this.provider} completed ${title}.`,
-          }],
-        },
-        status: "completed",
-      };
-      await pause(signal);
-      yield {
-        ...eventBase(this.provider, run, sequence++),
-        type: "tool_result",
-        tool: NODE_COMPLETE_TOOL,
-        callId: completeCallId,
-        result: { ok: true, message: `Debug provider completed ${title}.` },
-      };
-      if (this.profile !== "deterministic") {
-        await pause(signal);
-        yield {
-          ...eventBase(this.provider, run, sequence++),
-          type: "tool_completed",
-          toolName: NODE_COMPLETE_TOOL,
-          raw: { debugProvider: true, profile: this.profile },
-        };
-      }
-      if (this.profile === "hermes-like") {
-        await pause(signal);
-        yield {
-          ...eventBase(this.provider, run, sequence++),
-          type: "text_delta",
-          text: `Hermes-like debug profile accepted ${title} through Chrona tools.\n`,
-        };
-      }
-    }
-
+    yield {
+      ...eventBase(this.provider, run, sequence++),
+      type: "reasoning_delta",
+      text: `Debug provider ${this.provider} is processing this session.`,
+    };
     await pause(signal);
-    const outputText = isPlanGeneration(streamInput)
-      ? "Debug plan generation completed."
-      : isGoalReview
-        ? "Debug Goal review completed."
-        : isGoalAssetOwnership
-          ? "Debug Goal asset ownership review completed."
-          : isResultFinalization
-            ? "Debug task result finalization completed."
-            : this.profile === "hermes-like"
-              ? `Hermes-like debug runtime run completed for ${nodeTitle}.`
-              : `Debug runtime run completed for ${nodeTitle}.`;
+    yield {
+      ...eventBase(this.provider, run, sequence++),
+      type: "text_delta",
+      text: `Debug provider ${this.provider} completed its response.\n`,
+    };
+    await pause(signal);
+
+    const terminalToolName = startInput?.terminalToolName;
+    if (terminalToolName) {
+      const terminalTool = startInput.tools?.find((tool) => tool.name === terminalToolName);
+      const callId = `debug-terminal-${sequence}`;
+      const synthesizedInput = synthesizeJsonSchema(terminalTool?.inputSchema);
+      const toolInput = asJsonSchema(synthesizedInput) ?? {};
+      yield {
+        ...eventBase(this.provider, run, sequence++),
+        type: "tool_call",
+        tool: terminalToolName,
+        callId,
+        input: toolInput,
+        status: "completed",
+      };
+      await pause(signal);
+      yield {
+        ...eventBase(this.provider, run, sequence++),
+        type: "tool_result",
+        tool: terminalToolName,
+        callId,
+        result: toolInput,
+      };
+      await pause(signal);
+    }
+
+    const outputText = `Debug provider ${this.provider} completed the session.`;
+    const structuredPayload = !terminalToolName && startInput?.structuredOutputSchema
+      ? { parsed: synthesizeJsonSchema(startInput.structuredOutputSchema.schema) }
+      : undefined;
     this.finishRun(run, { status: "completed", outputText });
     yield {
       ...eventBase(this.provider, run, sequence),
       type: "run_completed",
       run: providerRunRef(this.provider, run, "completed"),
       outputText,
-      output: isPlanGeneration(streamInput)
-        ? undefined
-        : { text: isGoalReview ? "Debug Goal review completed." : isGoalAssetOwnership ? "Debug Goal asset ownership review completed." : isResultFinalization ? "Debug task result finalization completed." : this.profile === "hermes-like" ? `Hermes-like debug runtime run completed for ${nodeTitle}.` : `Debug runtime run completed for ${nodeTitle}.` },
-      structuredPayload: isGoalReview
-        ? {
-            parsed: {
-              schemaVersion: 1,
-              summary: "Review the current Goal focus and schedule another check-in.",
-              items: [
-                {
-                  itemId: "debug-current-focus",
-                  kind: "brief_field",
-                  field: "currentFocus",
-                  value: "Review the next bounded outcome",
-                  rationale: "The frozen snapshot supports a focused next step.",
-                  evidenceRefs: [],
-                  warnings: [],
-                },
-              ],
-            },
-          }
-        : isGoalAssetOwnership
-          ? {
-              parsed: {
-                schemaVersion: 1,
-                decision: "create_asset",
-                targetAssetId: null,
-                proposedLabel: "Reviewed accepted result",
-                rationale: "The frozen candidate has no safe matching asset in the bounded set.",
-                differenceSummary: "Create a separate asset from the accepted result.",
-                certainty: "medium",
-                evidence: ["The candidate contains accepted result content."],
-                counterEvidence: ["The debug provider has no semantic domain context."],
-              },
-            }
-          : isResultFinalization
-            ? {
-                parsed: {
-                  root: "result",
-                  elements: {
-                    result: { type: "Stack", props: { gap: "md" }, children: ["summary", "details"] },
-                    summary: { type: "ResultSummary", props: { title: "Task result", summary: "The deterministic debug task completed." } },
-                    details: { type: "RichMarkdown", props: { title: "Details", content: "- Outcome recorded\n- Result ready for review" } },
-                  },
-                },
-              }
-            : nodeType === "condition"
-              ? { terminalToolName: CONDITION_SELECT_TOOL, nodeId: nodeRef, branchRef, summary: `Debug provider selected fast path for ${nodeTitle}.` }
-              : undefined,
+      output: { text: outputText },
+      structuredPayload,
       usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
       raw: { debugProvider: true, profile: this.profile },
     };

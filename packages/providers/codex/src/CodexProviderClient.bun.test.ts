@@ -10,6 +10,7 @@ import { CodexProviderClient } from "./CodexProviderClient";
 
 function baseInput(overrides: Partial<StartRunInput> = {}): StartRunInput {
   return {
+    clientOperationId: "codex-base-operation",
     sessionId: "codex-session-1",
     instructions: "Finish node.",
     input: "Return success.",
@@ -222,7 +223,7 @@ describe("CodexProviderClient", () => {
       acp: { transport },
     });
 
-    expect(client.getCapabilities()).toMatchObject({
+    expect(await client.getCapabilities()).toMatchObject({
       supportsSessions: true,
       supportsStreaming: true,
       supportsToolCalls: true,
@@ -245,7 +246,7 @@ describe("CodexProviderClient", () => {
       ],
     });
 
-    stubMcpTools(["chrona_plan_generate", "chrona_plan_read"]);
+    stubMcpTools(["terminal_result", "plan_context"]);
     await expect(client.checkHealth()).resolves.toMatchObject({
       provider: "codex",
       ok: true,

@@ -1,8 +1,7 @@
 import type { EffectivePlanGraph } from "@chrona/contracts/ai";
-import {
-  getLatestCompiledPlan,
-  type SavedCompiledPlan,
-} from "@/modules/plan-execution/persistence/compiled-plan-store";
+import type { SavedCompiledPlan } from "@/modules/plan-execution/persistence/compiled-plan-store";
+import { db } from "@/lib/db";
+import { resolveScopeWorkBlockId } from "@/modules/plan-execution/persistence/execution-scope";
 import { resolveSavedPlanEffectiveGraph } from "./task-plan-read-model";
 
 type CompatPlan = SavedCompiledPlan & {
@@ -26,10 +25,30 @@ async function toCompatPlan(savedPlan: SavedCompiledPlan): Promise<CompatPlan> {
 
 export async function getLatestTaskPlanGraph(
   taskId: string,
+  workBlockId?: string | null,
 ): Promise<CompatPlan | null> {
-  const result = await getLatestCompiledPlan(taskId);
-  if (!result) return null;
-  return toCompatPlan(result);
+  const scope = await resolveScopeWorkBlockId(taskId, { workBlockId });
+  const head = await db.taskPlanGenerationHead.findUnique({
+    where: { taskId_workBlockScopeKey: { taskId, workBlockScopeKey: scope ?? "" } },
+    include: { currentPlan: true },
+  });
+  if (!head?.currentPlan) return null;
+  const plan = head.currentPlan;
+  return toCompatPlan({
+    recordId: plan.id,
+    workspaceId: plan.workspaceId,
+    taskId: plan.taskId,
+    workBlockId: plan.workBlockId,
+    compiledPlan: plan.compiledPlan as unknown as SavedCompiledPlan["compiledPlan"],
+    editablePlan: plan.editablePlan as unknown as SavedCompiledPlan["editablePlan"],
+    status: plan.status === "Accepted" ? "accepted" : plan.status === "Draft" ? "draft" : plan.status === "Superseded" ? "superseded" : "archived",
+    prompt: plan.prompt,
+    summary: plan.summary,
+    generatedBy: plan.generatedBy,
+    changeSummary: null,
+    createdAt: plan.createdAt.toISOString(),
+    updatedAt: plan.updatedAt.toISOString(),
+  });
 }
 
 export function getReadyAutoRunnableNodes(

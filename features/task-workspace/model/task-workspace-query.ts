@@ -5,7 +5,7 @@ import {
 } from "../plan/task-action-node-action";
 import type { PlanNodeDataModel, TaskPlanGraphPlan } from "./plan-node-view-model";
 import type { ExecutionActionInput,
-PlanExecutionResult,
+PublicPlanExecutionResult,
 SubmitCheckpointActionInput,
 TaskPlanGenerationSessionReadModel, } from "@chrona/contracts"
 import type {
@@ -670,8 +670,8 @@ export async function fetchTaskPlanState(
 export function fetchCurrentTaskExecution(
   taskId: string,
   workBlockId?: string | null,
-): Promise<PlanExecutionResult> {
-  return apiJson<PlanExecutionResult>(
+): Promise<PublicPlanExecutionResult> {
+  return apiJson<PublicPlanExecutionResult>(
     `/api/tasks/${encodeURIComponent(taskId)}/execution/current${taskScopedQuery(workBlockId)}`,
   );
 }
@@ -681,7 +681,8 @@ export async function dispatchTaskExecutionAction(
   action: ExecutionActionInput,
   workBlockId?: string | null,
 ): Promise<TaskWorkspaceCommandAck> {
-  const scopedAction = workBlockId ? { ...action, workBlockId } : action;
+  const idempotencyKey = action.idempotencyKey ?? crypto.randomUUID();
+  const scopedAction = workBlockId ? { ...action, workBlockId, idempotencyKey } : { ...action, idempotencyKey };
   const ack = await apiJson<Omit<TaskWorkspaceCommandAck, "message">>(
     `/api/work/${encodeURIComponent(taskId)}/commands`,
     { method: "POST", body: JSON.stringify({ type: "execution.action", ...scopedAction }) },
@@ -694,7 +695,8 @@ export async function submitTaskCheckpointAction(
   action: SubmitCheckpointActionInput,
   workBlockId?: string | null,
 ): Promise<TaskWorkspaceCommandAck> {
-  const scopedAction = workBlockId ? { ...action, workBlockId } : action;
+  const idempotencyKey = action.idempotencyKey ?? crypto.randomUUID();
+  const scopedAction = workBlockId ? { ...action, workBlockId, idempotencyKey } : { ...action, idempotencyKey };
   const ack = await apiJson<Omit<TaskWorkspaceCommandAck, "message">>(
     `/api/work/${encodeURIComponent(taskId)}/commands`,
     {
@@ -705,7 +707,7 @@ export async function submitTaskCheckpointAction(
         action: scopedAction.action,
         payload: scopedAction.payload as Record<string, unknown> | undefined,
         workBlockId: scopedAction.workBlockId ?? undefined,
-        idempotencyKey: scopedAction.idempotencyKey,
+        idempotencyKey,
       }),
     },
   );
@@ -724,8 +726,8 @@ export async function acceptTaskResult(
 export async function retryTaskResultFinalization(taskId: string) {
   return apiJson<{
     taskId: string;
-    finalization: NonNullable<PlanExecutionResult["planOutput"]>["finalization"];
-    finalizedResult: NonNullable<PlanExecutionResult["planOutput"]>["finalizedResult"];
+    finalization: NonNullable<PublicPlanExecutionResult["planOutput"]>["finalization"];
+    finalizedResult: NonNullable<PublicPlanExecutionResult["planOutput"]>["finalizedResult"];
   }>(
     `/api/tasks/${encodeURIComponent(taskId)}/result/finalization/retry`,
     { method: "POST" },

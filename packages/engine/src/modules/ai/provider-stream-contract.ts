@@ -15,6 +15,7 @@ export class ProviderStreamContractError extends Error {
 export type ProviderStreamEventBoundary = {
   accept(event: unknown): ProviderRunEvent;
   finish(): void;
+  pauseAfterToolCall(callId: string): void;
 };
 
 /** Enforces identity, ordering, and exactly-one-terminal provider stream semantics. */
@@ -23,6 +24,7 @@ export function createProviderStreamEventBoundary(
 ): ProviderStreamEventBoundary {
   let previousSequence = -1;
   let terminalSeen = false;
+  let paused = false;
 
   return {
     // Stream identity, ordering, and terminal-state checks are one atomic boundary.
@@ -76,9 +78,14 @@ export function createProviderStreamEventBoundary(
     },
 
     finish(): void {
-      if (!terminalSeen) {
+      if (!terminalSeen && !paused) {
         throw new ProviderStreamContractError("Provider stream ended without exactly one terminal event");
       }
+    },
+
+    pauseAfterToolCall(callId: string): void {
+      if (terminalSeen || previousSequence < 0 || !callId) throw new ProviderStreamContractError("Provider stream cannot pause before a valid action request");
+      paused = true;
     },
   };
 }

@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
+import { withSchedulerWorkOwnership, type SchedulerWorkContext } from "@/modules/orchestration/scheduler-lease-repository";
 
-import { db } from "@/lib/db";
 
 const DEFAULT_RETENTION_DAYS = 30;
 const DEFAULT_BATCH_SIZE = 250;
@@ -53,68 +53,73 @@ function checksum(source: RetentionSource, records: RetentionRecord[]) {
   return digest.digest("hex");
 }
 
-async function archiveBatch(source: RetentionSource, cutoffAt: Date, batchSize: number): Promise<number> {
-  let records: RetentionRecord[];
+async function archiveBatch(
+  source: RetentionSource,
+  cutoffAt: Date,
+  batchSize: number,
+  workContext?: SchedulerWorkContext,
+): Promise<number> {
+  return withSchedulerWorkOwnership(workContext, async (tx) => {
+    let records: RetentionRecord[];
 
-  switch (source) {
-    case "raw_event_log": {
-      const rows = await db.rawEventLog.findMany({
-        where: { receivedAt: { lt: cutoffAt } },
-        orderBy: [{ receivedAt: "asc" }, { id: "asc" }],
-        take: batchSize,
-        select: { id: true, receivedAt: true, payloadHash: true },
-      });
-      records = rows.map((row) => ({ id: row.id, recordedAt: row.receivedAt, checksumMaterial: row.payloadHash }));
-      break;
+    switch (source) {
+      case "raw_event_log": {
+        const rows = await tx.rawEventLog.findMany({
+          where: { receivedAt: { lt: cutoffAt } },
+          orderBy: [{ receivedAt: "asc" }, { id: "asc" }],
+          take: batchSize,
+          select: { id: true, receivedAt: true, payloadHash: true },
+        });
+        records = rows.map((row) => ({ id: row.id, recordedAt: row.receivedAt, checksumMaterial: row.payloadHash }));
+        break;
+      }
+      case "event": {
+        const rows = await tx.event.findMany({
+          where: { createdAt: { lt: cutoffAt } },
+          orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+          take: batchSize,
+          select: { id: true, createdAt: true, eventType: true, ingestSequence: true, summary: true },
+        });
+        records = rows.map((row) => ({
+          id: row.id,
+          recordedAt: row.createdAt,
+          checksumMaterial: `${row.eventType}\u0000${row.ingestSequence}\u0000${row.summary ?? ""}`,
+        }));
+        break;
+      }
+      case "task_timeline_item": {
+        const rows = await tx.taskTimelineItem.findMany({
+          where: { createdAt: { lt: cutoffAt } },
+          orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+          take: batchSize,
+          select: { id: true, createdAt: true, kind: true, title: true, status: true },
+        });
+        records = rows.map((row) => ({
+          id: row.id,
+          recordedAt: row.createdAt,
+          checksumMaterial: `${row.kind}\u0000${row.title}\u0000${row.status ?? ""}`,
+        }));
+        break;
+      }
     }
-    case "event": {
-      const rows = await db.event.findMany({
-        where: { createdAt: { lt: cutoffAt } },
-        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-        take: batchSize,
-        select: { id: true, createdAt: true, eventType: true, ingestSequence: true, summary: true },
-      });
-      records = rows.map((row) => ({
-        id: row.id,
-        recordedAt: row.createdAt,
-        checksumMaterial: `${row.eventType}\u0000${row.ingestSequence}\u0000${row.summary ?? ""}`,
-      }));
-      break;
-    }
-    case "task_timeline_item": {
-      const rows = await db.taskTimelineItem.findMany({
-        where: { createdAt: { lt: cutoffAt } },
-        orderBy: [{ createdAt: "asc" }, { id: "asc" }],
-        take: batchSize,
-        select: { id: true, createdAt: true, kind: true, title: true, status: true },
-      });
-      records = rows.map((row) => ({
-        id: row.id,
-        recordedAt: row.createdAt,
-        checksumMaterial: `${row.kind}\u0000${row.title}\u0000${row.status ?? ""}`,
-      }));
-      break;
-    }
-  }
 
-  if (records.length === 0) return 0;
+    if (records.length === 0) return 0;
 
-  const first = records[0]!;
-  const last = records.at(-1)!;
-  const recordIds = records.map((record) => record.id);
-  const archive = {
-    source,
-    cutoffAt,
-    recordCount: records.length,
-    firstRecordId: first.id,
-    lastRecordId: last.id,
-    firstRecordedAt: first.recordedAt,
-    lastRecordedAt: last.recordedAt,
-    checksum: checksum(source, records),
-  };
-
-  await db.$transaction(async (tx) => {
-    await tx.eventRetentionArchive.create({ data: archive });
+    const first = records[0]!;
+    const last = records.at(-1)!;
+    const recordIds = records.map((record) => record.id);
+    await tx.eventRetentionArchive.create({
+      data: {
+        source,
+        cutoffAt,
+        recordCount: records.length,
+        firstRecordId: first.id,
+        lastRecordId: last.id,
+        firstRecordedAt: first.recordedAt,
+        lastRecordedAt: last.recordedAt,
+        checksum: checksum(source, records),
+      },
+    });
     if (source === "raw_event_log") {
       await tx.rawEventLog.deleteMany({ where: { id: { in: recordIds } } });
     } else if (source === "event") {
@@ -122,9 +127,9 @@ async function archiveBatch(source: RetentionSource, cutoffAt: Date, batchSize: 
     } else {
       await tx.taskTimelineItem.deleteMany({ where: { id: { in: recordIds } } });
     }
-  });
 
-  return records.length;
+    return records.length;
+  });
 }
 
 /**
@@ -135,6 +140,7 @@ async function archiveBatch(source: RetentionSource, cutoffAt: Date, batchSize: 
 export async function archiveExpiredEventRecords(input: {
   config?: EventRetentionConfig;
   now?: Date;
+  workContext?: SchedulerWorkContext;
 } = {}): Promise<EventRetentionArchiveResult> {
   const config = input.config ?? readEventRetentionConfig();
   const cutoffAt = new Date((input.now ?? new Date()).getTime() - config.retentionDays * 24 * 60 * 60 * 1_000);
@@ -142,7 +148,7 @@ export async function archiveExpiredEventRecords(input: {
   const archived = {} as Record<RetentionSource, number>;
 
   for (const source of sources) {
-    archived[source] = await archiveBatch(source, cutoffAt, config.batchSize);
+    archived[source] = await archiveBatch(source, cutoffAt, config.batchSize, input.workContext);
   }
 
   return { cutoffAt, archived };

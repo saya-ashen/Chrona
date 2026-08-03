@@ -51,7 +51,6 @@ export { useTaskWorkspacePlanState, type PlanGenerationRequest, type WorkspaceRu
 export { useTaskWorkspaceProposalFlow } from "./hooks/use-task-workspace-proposal-flow";
 export {
   bindTaskPlanSessionToStateStore,
-  hydrateTaskPlanGenerationSession,
   startTaskPlanGenerationSession,
   stopTaskPlanGenerationSession,
   useTaskPlanGenerationSession,

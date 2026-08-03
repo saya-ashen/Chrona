@@ -45,6 +45,21 @@ async function createRecurringTaskWithOccurrences(input: {
       recurrenceAnchorEndAt: new Date(input.anchor.getTime() + 30 * 60 * 1000),
     },
   });
+  await db.taskTrigger.create({
+    data: {
+      workspaceId: input.workspaceId,
+      taskId: task.id,
+      kind: "schedule",
+      state: "Enabled",
+      config: {
+        mode: "recurring",
+        rrule: input.rrule,
+        anchorStartAt: input.anchor.toISOString(),
+        timezone: "UTC",
+        durationMs: 30 * 60 * 1000,
+      },
+    },
+  });
   await runRecurringWorkBlockExpansionWorker({ now: input.anchor });
   const blocks = await db.workBlock.findMany({
     where: { taskId: task.id },

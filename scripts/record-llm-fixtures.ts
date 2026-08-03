@@ -1,6 +1,6 @@
 import { ChronaDebugProviderClient } from "@chrona/providers-debug";
 import { HermesProviderClient } from "@chrona/hermes";
-import type { AgentProviderClient, ProviderRunSnapshot } from "@chrona/providers-foundation";
+import { providerRunInputSchema, type AgentProviderClient, type ProviderRunSnapshot } from "@chrona/providers-foundation";
 import type { AiFeature } from "@chrona/contracts";
 import type { ProviderFeatureRequest } from "../packages/engine/src/modules/ai/providers";
 import { withProviderResponseFixture } from "../packages/engine/src/test/llm-fixture-recorder";
@@ -27,6 +27,7 @@ if (process.env.CHRONA_LLM_FIXTURE_MODE !== "record") {
 if (Bun.argv.slice(2).length === 0) {
   await withProviderResponseFixture(
     {
+      clientOperationId: "record-llm-fixtures-default-debug-chat",
       sessionId: "debug-chat-fixture",
       sessionKey: "debug-chat-fixture",
       instructions: "Feature: chat",
@@ -157,13 +158,14 @@ async function runProviderRequest(
 ): Promise<ProviderRunSnapshot> {
   let finalSnapshot: ProviderRunSnapshot | null = null;
   for await (const event of providerClient.streamRun({
+    clientOperationId: request.clientOperationId,
     sessionId: request.sessionId,
     sessionKey: request.sessionKey,
     instructions: request.instructions,
-    input: request.input as never,
+    input: request.input,
     structuredOutputSchema: request.structuredOutputSchema,
     maxOutputTokens: request.maxOutputTokens,
-    timeoutMs: request.timeoutSeconds ? request.timeoutSeconds * 1000 : undefined,
+    timeoutMs: request.timeoutMs,
     stream: true,
   })) {
     if (event.type === "run_completed") {
@@ -206,11 +208,13 @@ function sanitizeResponse(response: ProviderRunSnapshot): ProviderRunSnapshot {
 const options = await parseOptions();
 const sessionKey = options.sessionKey ?? `${options.provider}-${options.feature}-${options.name}`;
 const request: ProviderFeatureRequest = {
+  clientOperationId: `record-llm-fixture:${options.provider}:${options.feature}:${options.name}`,
   sessionId: sessionKey,
   sessionKey,
   instructions: options.instructions ?? `Feature: ${options.feature}`,
-  input: options.input,
+  input: providerRunInputSchema.parse(options.input),
   stream: options.stream,
+  timeoutMs: options.timeoutMs,
 };
 const providerClient = createProviderClient(options);
 

@@ -24,14 +24,19 @@ async function seedRun() {
       status: "Running",
     },
   });
+  const taskSession = await db.taskSession.create({
+    data: { taskId: task.id, runtimeName: "test", sessionKey: `deliverable-${crypto.randomUUID()}` },
+  });
   const run = await db.run.create({
     data: {
       taskId: task.id,
+      taskSessionId: taskSession.id,
       runtimeName: "test",
       status: "Running",
       triggeredBy: "system",
     },
   });
+  await mkdir(join(dataDir, "generated", run.id), { recursive: true });
   return { workspace, task, run };
 }
 
@@ -63,13 +68,15 @@ afterEach(async () => {
 describe("registerNodeDeliverables", () => {
   it("registers immutable file facts and reuses the same Artifact on replay", async () => {
     const { workspace, task, run } = await seedRun();
-    await writeFile(join(dataDir, "generated", "report.md"), "# Result\n\nComplete.\n");
+    await writeFile(join(dataDir, "generated", run.id, "report.md"), "# Result\n\nComplete.\n");
     const input = {
       workspaceId: workspace.id,
       taskId: task.id,
       runId: run.id,
+      taskSessionId: run.taskSessionId,
+      workBlockId: run.workBlockId,
       sourceNodeId: "node-1",
-      declarations: [generatedDeclaration("generated://report.md")],
+      declarations: [generatedDeclaration(`generated://${run.id}/report.md`)],
     };
 
     const first = await registerNodeDeliverables(input);
@@ -99,28 +106,51 @@ describe("registerNodeDeliverables", () => {
       where: { id: run.id },
       data: { status: "Completed", endedAt: new Date() },
     });
-    await writeFile(join(dataDir, "generated", "completed-report.md"), "# Completed result\n");
+    await writeFile(join(dataDir, "generated", run.id, "completed-report.md"), "# Completed result\n");
 
     const deliverables = await registerNodeDeliverables({
       workspaceId: workspace.id,
       taskId: task.id,
       runId: run.id,
+      taskSessionId: run.taskSessionId,
+      workBlockId: run.workBlockId,
       sourceNodeId: "node-1",
-      declarations: [generatedDeclaration("generated://completed-report.md")],
+      declarations: [generatedDeclaration(`generated://${run.id}/completed-report.md`)],
     });
 
     expect(deliverables).toHaveLength(1);
     expect(await db.artifact.count({ where: { runId: run.id } })).toBe(1);
   });
 
+  it("rejects a same-task Run outside the requested execution session scope", async () => {
+    const { workspace, task, run } = await seedRun();
+    const foreignSession = await db.taskSession.create({
+      data: { taskId: task.id, runtimeName: "test", sessionKey: `foreign-${crypto.randomUUID()}` },
+    });
+    await writeFile(join(dataDir, "generated", run.id, "scoped.md"), "# Scoped\n");
+
+    await expect(registerNodeDeliverables({
+      workspaceId: workspace.id,
+      taskId: task.id,
+      taskSessionId: foreignSession.id,
+      workBlockId: run.workBlockId,
+      runId: run.id,
+      sourceNodeId: "node-1",
+      declarations: [generatedDeclaration(`generated://${run.id}/scoped.md`)],
+    })).rejects.toThrow("Canonical Run is unavailable");
+    expect(await db.artifact.count({ where: { taskId: task.id } })).toBe(0);
+  });
+
   it("rejects traversal and symlinks that escape the generated root", async () => {
     const { workspace, task, run } = await seedRun();
     const outside = join(dataDir, "outside.txt");
     await writeFile(outside, "secret");
-    await symlink(outside, join(dataDir, "generated", "leak.txt"));
+    await symlink(outside, join(dataDir, "generated", run.id, "leak.txt"));
     const base = {
       workspaceId: workspace.id,
       taskId: task.id,
+      taskSessionId: run.taskSessionId,
+      workBlockId: run.workBlockId,
       runId: run.id,
       sourceNodeId: "node-1",
     };
@@ -131,7 +161,7 @@ describe("registerNodeDeliverables", () => {
     })).rejects.toThrow("inside the generated-files root");
     await expect(registerNodeDeliverables({
       ...base,
-      declarations: [generatedDeclaration("generated://leak.txt")],
+      declarations: [generatedDeclaration(`generated://${run.id}/leak.txt`)],
     })).rejects.toThrow("escapes the generated-files root");
   });
 
@@ -155,23 +185,25 @@ describe("registerNodeDeliverables", () => {
         uri: "generated://foreign.txt",
       },
     });
-    const reportPath = join(dataDir, "generated", "report.json");
+    const reportPath = join(dataDir, "generated", run.id, "report.json");
     await writeFile(reportPath, "{\"version\":1}");
     const base = {
       workspaceId: workspace.id,
       taskId: task.id,
+      taskSessionId: run.taskSessionId,
+      workBlockId: run.workBlockId,
       runId: run.id,
       sourceNodeId: "node-1",
     };
     await registerNodeDeliverables({
       ...base,
-      declarations: [generatedDeclaration("generated://report.json")],
+      declarations: [generatedDeclaration(`generated://${run.id}/report.json`)],
     });
     await writeFile(reportPath, "{\"version\":2}");
 
     await expect(registerNodeDeliverables({
       ...base,
-      declarations: [generatedDeclaration("generated://report.json")],
+      declarations: [generatedDeclaration(`generated://${run.id}/report.json`)],
     })).rejects.toThrow("changed after registration");
     await expect(registerNodeDeliverables({
       ...base,

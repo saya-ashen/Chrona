@@ -25,7 +25,7 @@ async function createRecurringTask(input: {
   anchorStart: Date;
   anchorEnd: Date;
 }) {
-  return db.task.create({
+  const task = await db.task.create({
     data: {
       workspaceId: input.workspaceId,
       title: input.title,
@@ -38,6 +38,22 @@ async function createRecurringTask(input: {
       recurrenceAnchorEndAt: input.anchorEnd,
     },
   });
+  await db.taskTrigger.create({
+    data: {
+      workspaceId: input.workspaceId,
+      taskId: task.id,
+      kind: "schedule",
+      state: "Enabled",
+      config: {
+        mode: "recurring",
+        rrule: input.rrule,
+        anchorStartAt: input.anchorStart.toISOString(),
+        timezone: "UTC",
+        durationMs: input.anchorEnd.getTime() - input.anchorStart.getTime(),
+      },
+    },
+  });
+  return task;
 }
 
 describe("Recurring task lifecycle", () => {
@@ -65,11 +81,11 @@ describe("Recurring task lifecycle", () => {
     });
     expect(blocks).toHaveLength(5);
     expect(blocks.map((b) => b.recurrenceKey)).toEqual([
-      "2026-06-15T09:00:00.000Z",
-      "2026-06-16T09:00:00.000Z",
-      "2026-06-17T09:00:00.000Z",
-      "2026-06-18T09:00:00.000Z",
-      "2026-06-19T09:00:00.000Z",
+      "schedule:v1:2026-06-15T09:00:00.000Z",
+      "schedule:v1:2026-06-16T09:00:00.000Z",
+      "schedule:v1:2026-06-17T09:00:00.000Z",
+      "schedule:v1:2026-06-18T09:00:00.000Z",
+      "schedule:v1:2026-06-19T09:00:00.000Z",
     ]);
     expect(blocks.every((b) => b.status === "Scheduled")).toBe(true);
     expect(blocks.every((b) => b.title === "Daily standup")).toBe(true);

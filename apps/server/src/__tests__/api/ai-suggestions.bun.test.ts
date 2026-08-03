@@ -40,18 +40,20 @@ describe("AI suggestion API", () => {
     expect(response.status).toBe(200);
     expect(response.headers.get("content-type")).toContain("text/event-stream");
     const events = sseEvents(await response.text());
-    expect(events.some((event) => event.event === "tool_call")).toBe(true);
+    expect(events.every((event) => ["status", "suggestions", "done", "error"].includes(event.event))).toBe(true);
     const suggestions = events.find((event) => event.event === "suggestions");
     expect(suggestions?.data.isFinal).toBe(true);
-    expect(suggestions?.data.suggestions).toEqual([
-      expect.objectContaining({
-        summary: "A deterministic provider-backed suggestion.",
-        action: expect.objectContaining({
-          type: "create_task",
-          title: "Review suggested task",
-        }),
+    const suggestionItems = suggestions?.data.suggestions;
+    expect(Array.isArray(suggestionItems)).toBe(true);
+    if (!Array.isArray(suggestionItems)) throw new Error("suggestion payload must be an array");
+    expect(suggestionItems.length).toBeGreaterThanOrEqual(2);
+    expect(suggestionItems[0]).toEqual(expect.objectContaining({
+      summary: expect.any(String),
+      action: expect.objectContaining({
+        type: "create_task",
+        title: expect.any(String),
       }),
-    ]);
+    }));
     expect(events.at(-1)?.event).toBe("done");
   });
 

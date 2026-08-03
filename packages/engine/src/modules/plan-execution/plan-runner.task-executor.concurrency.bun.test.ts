@@ -162,7 +162,7 @@ describe("plan-runner task executor concurrency", () => {
     expect(persisted?.attempts.filter((attempt) => attempt.status === "running")).toHaveLength(1);
   });
 
-  it("does not leave another entry idle when one entry provider completed before runtime sync", async () => {
+  it("does not advance another entry when terminal tool submission failed", async () => {
     executeTaskNodeCapabilityMock
       .mockResolvedValueOnce({
         status: "done",
@@ -192,13 +192,12 @@ describe("plan-runner task executor concurrency", () => {
     });
 
     expect(started.status).toBe("running");
-    expect(started.currentNodeId).toBe("second_entry");
-    expect(executeTaskNodeCapabilityMock).toHaveBeenCalledTimes(2);
+    expect(started.currentNodeId).toBe("first_entry");
+    expect(executeTaskNodeCapabilityMock).toHaveBeenCalledTimes(1);
 
     const persisted = await getPlanRun(task.id, compiledPlan.editablePlanId);
     expect(persisted?.attempts.map((attempt) => [attempt.nodeId, attempt.status])).toEqual([
       ["first_entry", "succeeded"],
-      ["second_entry", "running"],
     ]);
     expect(persisted?.results.find((result) => result.nodeId === "first_entry")).toMatchObject({
       nodeId: "first_entry",

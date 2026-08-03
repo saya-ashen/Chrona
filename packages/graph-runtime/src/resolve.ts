@@ -49,6 +49,7 @@ export function resolveEffectivePlanGraph(
     graphId: graph.id,
     basePlanId: graph.id,
     resolvedVersion: graph.mutations.length,
+    resolvedAt: input.resolvedAt,
     nodeMap,
     edgeMap,
     entryNodeIds,
@@ -61,6 +62,7 @@ function buildEffectiveGraphSummary(input: {
   basePlanId: string;
   resolvedVersion: number;
   nodeMap: Map<string, EffectivePlanNode>;
+  resolvedAt?: string;
   edgeMap: Map<string, EffectivePlanEdge>;
   entryNodeIds: string[];
   reachableNodeIds: Set<string>;
@@ -164,7 +166,7 @@ function buildEffectiveGraphSummary(input: {
   return {
     graphId: input.graphId,
     basePlanId: input.basePlanId,
-    resolvedAt: new Date().toISOString(),
+    resolvedAt: input.resolvedAt ?? new Date().toISOString(),
     resolvedVersion: input.resolvedVersion,
     nodes: [...input.nodeMap.values()],
     edges: [...input.edgeMap.values()],
@@ -218,14 +220,22 @@ function buildEffectiveNodeFromGraphNode(
     .filter((result) => result.nodeLayerId === activeDefinitionLayer.id);
   const currentResult =
     activeLayerResults.find((result) => result.status === "current") ??
+    activeLayerResults.find((result) => result.status === "obsolete" && result.review?.status === "accepted") ??
     activeLayerResults.find(
       (result) => result.status === "rejected" && result.errorDetails === "degraded",
     ) ??
     activeLayerResults.find((result) => result.status === "rejected");
+  const obsoleteAttemptIds = new Set(
+    results
+      .filter((result) => result.nodeId === node.id && result.status === "obsolete" && result.attemptId && result.review?.status !== "accepted")
+      .map((result) => result.attemptId!),
+  );
   const activeAttempt = [...attempts]
     .filter(
       (attempt) =>
-        attempt.nodeId === node.id && attempt.nodeLayerId === activeDefinitionLayer.id,
+        attempt.nodeId === node.id
+        && attempt.nodeLayerId === activeDefinitionLayer.id
+        && !obsoleteAttemptIds.has(attempt.id),
     )
     .sort(compareAttemptsForEffectiveState)[0];
   const definition = activeDefinitionLayer.definition;
@@ -306,8 +316,6 @@ function isFailedSubmissionNodeResult(result: NodeResult): boolean {
   return FAILED_SUBMISSION_RESULT_PATTERNS.some((pattern) => pattern.test(text));
 }
 
-
-
 function compareAttemptsForEffectiveState(a: NodeAttempt, b: NodeAttempt): number {
   const statusDelta = attemptStatusPriority(b.status) - attemptStatusPriority(a.status);
   if (statusDelta !== 0) return statusDelta;
@@ -372,12 +380,15 @@ function deriveNodeStatus(input: {
     input.result?.artifactRefs?.length ||
     input.result?.selectedBranch !== undefined ||
     input.result?.status === "current" ||
-    input.activeAttempt?.status === "succeeded"
+    input.result?.review?.status === "accepted"
   ) {
     return "completed";
   }
   if (input.activeAttempt?.status === "failed") {
     return "failed";
+  }
+  if (input.activeAttempt?.status === "cancelled") {
+    return "cancelled";
   }
   return "pending";
 }

@@ -5,11 +5,9 @@
  * `createReplayRunner`), these helpers spawn the **real** `claude` binary via
  * the Agent SDK and point it at:
  *
- *   - a mocked LLM endpoint (`@copilotkit/aimock`'s `LLMock`, which speaks the
- *     Anthropic `/v1/messages` wire format) via `ANTHROPIC_BASE_URL`, and
- *   - a tiny in-process Chrona MCP server (real `@modelcontextprotocol/sdk`
- *     `StreamableHTTPServerTransport`) that actually executes the tools the
- *     agent calls.
+ *   - a mocked LLM endpoint (`LLMock`) that speaks the Anthropic messages
+ *     wire format. Request-declared tools are registered in-process by the
+ *     provider through the Agent SDK.
  *
  * The result is a genuine end-to-end exercise of `runner.ts` (SDK backend) +
  * `normalizers.ts` + `ClaudeCodeProviderClient` against real Claude Code
@@ -20,17 +18,12 @@
  */
 
 import { spawnSync, type SpawnSyncReturns } from "node:child_process";
-import { createServer, type Server } from "node:http";
 import { existsSync, mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
-import { AddressInfo } from "node:net";
 import { fileURLToPath } from "node:url";
 
 import { LLMock } from "@copilotkit/aimock";
-import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import { z } from "zod";
 
 import {
   createClaudeCodeRunner,
@@ -146,104 +139,6 @@ function resolvePackageRoot(): string | null {
 }
 
 /* -------------------------------------------------------------------------- */
-/*                            In-process MCP stub                              */
-/* -------------------------------------------------------------------------- */
-
-/** A tool the stub MCP server exposes to the spawned agent. */
-export interface McpToolStub {
-  /** Bare tool name (the agent calls it as `mcp__chrona__<name>`). */
-  name: string;
-  description: string;
-  /** Zod raw shape for the tool input. */
-  inputShape: z.ZodRawShape;
-  /**
-   * Returns the structured object the tool result should carry.
-   * Throw to simulate an MCP server error — Anthropic forwards the
-   * `is_error: true` flag through the tool_result content block, and
-   * the call is still recorded in `calls`.
-   */
-  handler: (args: Record<string, unknown>) => Record<string, unknown>;
-}
-
-export interface ChronaMcpStub {
-  /** Base URL WITHOUT the `/api/mcp` suffix (runner appends it). */
-  baseUrl: string;
-  /** Every tool invocation the server actually executed, in order. */
-  calls: Array<{ tool: string; args: Record<string, unknown> }>;
-  close: () => Promise<void>;
-}
-
-/**
- * Start a minimal Chrona-shaped MCP server over Streamable HTTP.
- *
- * The MCP SDK's stateless HTTP transport requires a fresh `McpServer` +
- * transport per request (a reused transport makes `tools/list` 500 and the
- * agent then reports "No such tool available"). We rebuild per request and
- * tear down on response close.
- */
-export async function startChronaMcpStub(
-  tools: readonly McpToolStub[],
-): Promise<ChronaMcpStub> {
-  const calls: ChronaMcpStub["calls"] = [];
-
-  const build = (): McpServer => {
-    const mcp = new McpServer({ name: "chrona", version: "0.0.0-test" });
-    for (const tool of tools) {
-      mcp.registerTool(
-        tool.name,
-        { description: tool.description, inputSchema: tool.inputShape },
-        async (args: Record<string, unknown>) => {
-          calls.push({ tool: tool.name, args });
-          try {
-            const result = tool.handler(args);
-            return {
-              content: [{ type: "text" as const, text: JSON.stringify(result) }],
-            };
-          } catch (err) {
-            // The MCP SDK forwards thrown errors as `isError: true` content
-            // blocks. Anthropic then puts the error in the tool_result
-            // message with `is_error: true` set in the content block.
-            const message = err instanceof Error ? err.message : String(err);
-            return {
-              isError: true,
-              content: [{ type: "text" as const, text: message }],
-            };
-          }
-        },
-      );
-    }
-    return mcp;
-  };
-
-  const server: Server = createServer(async (req, res) => {
-    const chunks: Buffer[] = [];
-    for await (const c of req) chunks.push(c as Buffer);
-    const raw = Buffer.concat(chunks).toString();
-    const mcp = build();
-    const transport = new StreamableHTTPServerTransport({
-      sessionIdGenerator: undefined,
-      enableJsonResponse: true,
-    });
-    res.on("close", () => {
-      void transport.close();
-      void mcp.close();
-    });
-    await mcp.connect(transport);
-    await transport.handleRequest(req, res, raw ? JSON.parse(raw) : undefined);
-  });
-
-  await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
-  const { port } = server.address() as AddressInfo;
-
-  return {
-    baseUrl: `http://127.0.0.1:${port}`,
-    calls,
-    close: () =>
-      new Promise<void>((resolve) => server.close(() => resolve())),
-  };
-}
-
-/* -------------------------------------------------------------------------- */
 /*                              Mock LLM lifecycle                             */
 /* -------------------------------------------------------------------------- */
 
@@ -279,22 +174,11 @@ export interface LiveClient {
 
 /**
  * Build a `ClaudeCodeProviderClient` whose runner spawns the real `claude`
- * binary, routed at the mock LLM (`mockUrl`) and the stub MCP server
- * (`mcpBaseUrl`).
- *
- * Isolation env:
- *   - `ANTHROPIC_BASE_URL` → mock LLM; `ANTHROPIC_API_KEY` / `ANTHROPIC_AUTH_TOKEN`
- *     are placeholders the SDK requires even when the base URL is mocked.
- *   - fresh `CLAUDE_CONFIG_DIR` (temp) so host Claude config / sessions don't leak in.
- *   - `DISABLE_OMC` / `OMC_SKIP_HOOKS` so global oh-my-claudecode SessionStart
- *     hooks don't inject noise into the stream-json output.
- *   - When the binary was located outside the user's PATH (npm-shipped
- *     fallback), its directory is prepended to PATH inside the spawned
- *     process so the SDK's own binary resolver still finds it.
+ * binary, routed at the mocked LLM endpoint. Request-declared tools are
+ * registered in-process by the provider.
  */
 export async function makeLiveClient(opts: {
   mockUrl: string;
-  mcpBaseUrl: string;
   model?: string;
 }): Promise<LiveClient> {
   const claudeExecutable = findClaudeBinary();
@@ -304,7 +188,7 @@ export async function makeLiveClient(opts: {
     );
   }
 
-  const configDir = mkdtempSync(join(tmpdir(), "chrona-claude-live-"));
+  const configDir = mkdtempSync(join(tmpdir(), "claude-provider-live-"));
   const onPath = process.env.PATH ?? "";
   const executableDir = dirname(claudeExecutable);
   const needsPathPrepend = !onPath.split(":").includes(executableDir);
@@ -321,13 +205,13 @@ export async function makeLiveClient(opts: {
 
   const cfg: ClaudeCodeRunnerConfig = {
     model: opts.model ?? "claude-opus-4-8",
-    mcpBaseUrl: opts.mcpBaseUrl,
-    mcpRunToken: "live-test-token",
+    mcpBaseUrl: "http://unused.test",
+    mcpRunToken: "",
     env,
   };
   const runner = await createClaudeCodeRunner(cfg);
   const client = new ClaudeCodeProviderClient({
-    config: { mcpBaseUrl: opts.mcpBaseUrl },
+    config: { mcpBaseUrl: "http://unused.test" },
     runner,
   });
 
@@ -364,9 +248,9 @@ export function extractToolResultText(result: unknown): string {
   if (typeof result === "string") return result;
   if (Array.isArray(result)) {
     return result
-      .map((b) =>
-        b && typeof b === "object" && "text" in b
-          ? String((b as { text: unknown }).text)
+      .map((block) =>
+        block && typeof block === "object" && "text" in block
+          ? String(block.text)
           : "",
       )
       .join("");

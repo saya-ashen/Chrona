@@ -5,8 +5,9 @@ import { useEffect, useState } from "react";
 import { useRevalidator, useSearchParams } from "react-router-dom";
 import { RefreshCw } from "lucide-react";
 import { Badge, Button, Card, CardContent, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@shared/ui";
-import { applyGoalReviewProposal, generateGoalReview, rejectGoalReviewProposal } from "../browser-api";
-import { goalAiProgressText, type GoalCopy, type GoalData, type GoalReviewProposalData } from "../model/goal-types";
+import { aiJsonValueSchema, type AiJsonValue } from "@chrona/contracts";
+import { answerGoalReview, applyGoalReviewProposal, generateGoalReview, rejectGoalReviewProposal, retryGoalReview } from "../browser-api";
+import { type GoalCopy, type GoalData, type GoalReviewProgressEvent, type GoalReviewProposalData } from "../model/goal-types";
 
 type DialogProps = { goal: GoalData; copy: GoalCopy; open: boolean; onOpenChange: (open: boolean) => void };
 type Proposal = GoalReviewProposalData | null;
@@ -16,7 +17,14 @@ type ReviewDecision = { itemId: string; action: "accept" | "reject" | "convert_t
 function activeProposal(goal: GoalData): Proposal {
   const latest = goal.reviewProposals[0] ?? null;
   if (!latest) return null;
-  if (latest.status === "Generating" || latest.status === "Ready" || latest.status === "PartiallyApplied" || latest.status === "Failed") return latest;
+  if (
+    latest.status === "Generating"
+    || latest.status === "Ready"
+    || latest.status === "NeedsInput"
+    || latest.status === "CannotComplete"
+    || latest.status === "PartiallyApplied"
+    || latest.status === "Failed"
+  ) return latest;
   return null;
 }
 
@@ -72,24 +80,40 @@ function allReviewDecisions(proposal: NonNullable<Proposal>) {
 function useReviewActions({ goal, copy, proposal, mode, onOpenChange }: DialogProps & { proposal: Proposal; mode: "initial" | "progress" }) {
   const revalidator = useRevalidator();
   const [pending, setPending] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [progressText, setProgressText] = useState(copy.aiProgress.queued);
+  const [error, setError] = useState(false);
+  const [progressText, setProgressText] = useState(copy.reviewProgress.queued);
+  const onProgress = (event: GoalReviewProgressEvent) => {
+    setProgressText(event.message || copy.reviewProgress[event.status] || copy.reviewProgress.running);
+    if (event.status === "needs_input" || event.status === "cannot_complete" || event.status === "completed" || event.status === "failed") void revalidator.revalidate();
+  };
   const run = async (operation: () => Promise<unknown>, close = false) => {
     if (pending) return;
-    setPending(true); setError(null);
+    setPending(true); setError(false);
     try { await operation(); await revalidator.revalidate(); if (close) onOpenChange(false); }
-    catch (cause) { setError(cause instanceof Error ? cause.message : copy.actionError); await revalidator.revalidate(); }
+    catch { setError(true); await revalidator.revalidate(); }
     finally { setPending(false); }
   };
   const applyDecisions = (decisions: ReviewDecision[], close: boolean) => proposal
-    ? run(() => applyGoalReviewProposal(goal.id, proposal.id, { idempotencyKey: uuidv4(), decisions }), close)
+    ? run(() => applyGoalReviewProposal(goal.id, proposal.id, {
+      idempotencyKey: uuidv4(),
+      expectedVersion: proposal.version,
+      expectedGoalUpdatedAt: goal.updatedAt,
+      dependencyHashes: Object.fromEntries(proposal.items.map((item) => [item.itemId, item.dependencyHash])),
+      decisions,
+    }), close)
     : undefined;
   return {
     pending, error, progressText,
     generate: () => {
-      setProgressText(copy.aiProgress.queued);
-      return run(() => generateGoalReview(goal.id, { idempotencyKey: uuidv4(), mode }, { onProgress: (event) => setProgressText(goalAiProgressText(copy, event)) }));
+      setProgressText(copy.reviewProgress.queued);
+      return run(() => generateGoalReview(goal.id, { idempotencyKey: uuidv4(), mode }, { onProgress }));
     },
+    answer: (answers: Array<{ questionId: string; answer: AiJsonValue }>) => proposal
+      ? run(() => answerGoalReview(goal.id, proposal.id, { expectedVersion: proposal.version, answers }))
+      : undefined,
+    retry: () => proposal
+      ? run(() => retryGoalReview(goal.id, proposal.id, { expectedVersion: proposal.version }))
+      : undefined,
     applyItem: (item: ReviewItem, accept: boolean) => applyDecisions([reviewDecision(item, accept)], proposal?.items.filter((candidate) => candidate.decision === "Pending").length === 1),
     applyAll: () => proposal ? applyDecisions(allReviewDecisions(proposal), true) : undefined,
     rejectAll: () => proposal ? run(() => rejectGoalReviewProposal(goal.id, proposal.id, { idempotencyKey: uuidv4() }), true) : undefined,
@@ -108,23 +132,50 @@ export function ReviewApplyDialogContent({ goal, copy, open, onOpenChange }: Dia
     }
     onOpenChange(nextOpen);
   };
-  const { pending, error, progressText, generate, applyItem, applyAll, rejectAll } = useReviewActions({ goal, copy, proposal, mode, open, onOpenChange: changeOpen });
+  const { pending, error, progressText, generate, answer, retry, applyItem, applyAll, rejectAll } = useReviewActions({ goal, copy, proposal, mode, open, onOpenChange: changeOpen });
   const revalidator = useRevalidator();
   useEffect(() => { if (!open || proposal?.status !== "Generating") return; const timer = window.setInterval(() => void revalidator.revalidate(), 2_000); return () => window.clearInterval(timer); }, [open, proposal?.status, revalidator]);
   const initial = mode === "initial";
-  return <Dialog open={open} onOpenChange={changeOpen}><DialogContent className="flex max-h-[88dvh] flex-col sm:max-w-3xl"><DialogHeader><DialogTitle>{initial ? copy.initialPlanTitle : copy.applyReview}</DialogTitle><DialogDescription>{initial ? copy.initialPlanDescription : copy.applyReviewDescription}</DialogDescription></DialogHeader><div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1"><ReviewStats goal={goal} copy={copy} /><ReviewBody goal={goal} proposal={proposal} copy={copy} description={initial ? copy.initialPlanDescription : copy.applyReviewDescription} pending={pending} progressText={progressText} generate={generate} onApplyItem={(item) => applyItem(item, true)} onRejectItem={(item) => applyItem(item, false)} />{error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}</div><ReviewFooter copy={copy} proposal={proposal} pending={pending} onClose={() => changeOpen(false)} onApplyAll={() => applyAll()} onRejectAll={() => rejectAll()} /></DialogContent></Dialog>;
+  return <Dialog open={open} onOpenChange={changeOpen}><DialogContent className="flex max-h-[88dvh] flex-col sm:max-w-3xl"><DialogHeader><DialogTitle>{initial ? copy.initialPlanTitle : copy.applyReview}</DialogTitle><DialogDescription>{initial ? copy.initialPlanDescription : copy.applyReviewDescription}</DialogDescription></DialogHeader><div className="min-h-0 flex-1 space-y-4 overflow-y-auto pr-1"><ReviewStats goal={goal} copy={copy} /><ReviewBody goal={goal} proposal={proposal} copy={copy} description={initial ? copy.initialPlanDescription : copy.applyReviewDescription} pending={pending} progressText={progressText} generate={generate} answer={answer} retry={retry} onApplyItem={(item) => applyItem(item, true)} onRejectItem={(item) => applyItem(item, false)} />{error ? <p role="alert" className="text-sm text-destructive">{copy.reviewActionFailed}</p> : null}</div><ReviewFooter copy={copy} proposal={proposal} pending={pending} onClose={() => changeOpen(false)} onApplyAll={applyAll} onRejectAll={rejectAll} /></DialogContent></Dialog>;
 }
 
 function ReviewStats({ goal, copy }: Pick<DialogProps, "goal" | "copy">) { return <div className="grid gap-2 rounded-xl border bg-muted/20 p-4 text-sm sm:grid-cols-3"><span>{goal.outcome.criteria.filter((criterion) => criterion.satisfied).length}/{goal.outcome.criteria.length} {copy.successCriteria}</span><span>{goal.workbench.focus.newResults.length} {copy.newResults}</span><span>{goal.acceptedResults.length} {copy.acceptedResults}</span></div>; }
-function ReviewBody({ goal, proposal, copy, description, pending, progressText, generate, onApplyItem, onRejectItem }: { goal: GoalData; proposal: Proposal; copy: GoalCopy; description: string; pending: boolean; progressText: string; generate: () => void; onApplyItem: (item: ReviewItem) => void; onRejectItem: (item: ReviewItem) => void }) {
+function ReviewBody({ goal, proposal, copy, description, pending, progressText, generate, answer, retry, onApplyItem, onRejectItem }: { goal: GoalData; proposal: Proposal; copy: GoalCopy; description: string; pending: boolean; progressText: string; generate: () => void; answer: (answers: Array<{ questionId: string; answer: AiJsonValue }>) => void; retry: () => void; onApplyItem: (item: ReviewItem) => void; onRejectItem: (item: ReviewItem) => void }) {
   if (!proposal) return <ReviewGenerateCard copy={copy} description={description} pending={pending} progressText={progressText} generate={generate} />;
   if (proposal.status === "Generating") return <Card><CardContent className="flex items-center gap-3 p-5 text-sm"><RefreshCw className="size-4 animate-spin" /><div><p className="font-medium" role="status">{progressText}</p><p className="text-muted-foreground">{copy.proposalSource} · AI</p></div></CardContent></Card>;
-  if (proposal.status === "Failed") return <ReviewFailedCard copy={copy} pending={pending} progressText={progressText} generate={generate} />;
+  if (proposal.status === "NeedsInput") return <ReviewAnswerCard copy={copy} proposal={proposal} pending={pending} answer={answer} />;
+  if (proposal.status === "CannotComplete") return <ReviewCannotCompleteCard copy={copy} pending={pending} retry={retry} />;
+  if (proposal.status === "Failed") return <ReviewFailedCard copy={copy} pending={pending} retry={retry} />;
   return <ReviewItems goal={goal} proposal={proposal} copy={copy} pending={pending} onApplyItem={onApplyItem} onRejectItem={onRejectItem} />;
 }
 function ReviewGenerateCard({ copy, description, pending, progressText, generate }: { copy: GoalCopy; description: string; pending: boolean; progressText: string; generate: () => void }) { return <Card><CardContent className="space-y-3 p-5"><p className="font-medium">{copy.reviewSummary}</p><p className="text-sm text-muted-foreground">{description}</p>{pending ? <p className="flex items-center gap-2 text-sm text-muted-foreground" role="status"><RefreshCw className="size-4 animate-spin" />{progressText}</p> : null}<Button disabled={pending} onClick={generate}><RefreshCw className={pending ? "size-4 animate-spin" : "size-4"} />{pending ? progressText : copy.generateReview}</Button></CardContent></Card>; }
-function ReviewFailedCard({ copy, pending, progressText, generate }: { copy: GoalCopy; pending: boolean; progressText: string; generate: () => void }) {
-  return <div role={pending ? undefined : "alert"} className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm"><p className="font-medium text-destructive">{copy.proposalFailed}</p>{pending ? <p className="mt-3 flex items-center gap-2 font-medium text-foreground" role="status"><RefreshCw className="size-4 animate-spin" />{progressText}</p> : null}<Button className="mt-3" variant="outline" disabled={pending} onClick={generate}><RefreshCw className={pending ? "size-4 animate-spin" : "hidden"} />{pending ? progressText : copy.generateReview}</Button></div>;
+function ReviewFailedCard({ copy, pending, retry }: { copy: GoalCopy; pending: boolean; retry: () => void }) { return <div role={pending ? undefined : "alert"} className="rounded-xl border border-destructive/30 bg-destructive/5 p-4 text-sm"><p className="font-medium text-destructive">{copy.proposalFailed}</p><Button className="mt-3" variant="outline" disabled={pending} onClick={retry}><RefreshCw className={pending ? "size-4 animate-spin" : "size-4"} />{copy.retryReview}</Button></div>; }
+function ReviewCannotCompleteCard({ copy, pending, retry }: { copy: GoalCopy; pending: boolean; retry: () => void }) { return <div role="alert" className="rounded-xl border border-warning/30 bg-warning/5 p-4 text-sm"><p className="font-medium">{copy.reviewCannotComplete}</p><Button className="mt-3" variant="outline" disabled={pending} onClick={retry}><RefreshCw className={pending ? "size-4 animate-spin" : "size-4"} />{copy.retryReview}</Button></div>; }
+export function parseGoalReviewAnswer(raw: string, answerSchema: Record<string, unknown>): AiJsonValue | undefined {
+  const candidates = Array.isArray(answerSchema.enum) ? answerSchema.enum : null;
+  if (candidates) {
+    const candidate = candidates.find((value) =>
+      (typeof value === "string" && value === raw) || JSON.stringify(value) === raw,
+    );
+    return aiJsonValueSchema.safeParse(candidate).success ? candidate as AiJsonValue : undefined;
+  }
+  if (answerSchema.type === "string") return raw;
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    return aiJsonValueSchema.safeParse(parsed).success ? parsed as AiJsonValue : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function ReviewAnswerCard({ copy, proposal, pending, answer }: { copy: GoalCopy; proposal: NonNullable<Proposal>; pending: boolean; answer: (answers: Array<{ questionId: string; answer: AiJsonValue }>) => void }) {
+  const [answers, setAnswers] = useState<Record<string, string>>({});
+  const parsedAnswers = proposal.questions.map((question) => ({
+    questionId: question.questionId,
+    answer: parseGoalReviewAnswer(answers[question.questionId] ?? "", question.answerSchema),
+  }));
+  const canSubmit = parsedAnswers.every((item) => item.answer !== undefined);
+  return <Card><CardContent className="space-y-4 p-5"><div><p className="font-medium">{copy.reviewNeedsInput}</p><p className="text-sm text-muted-foreground">{copy.reviewNeedsInputDescription}</p></div>{proposal.questions.map((question) => <label key={question.questionId} className="block space-y-2 text-sm font-medium"><span>{question.prompt}</span><span className="block text-xs font-normal text-muted-foreground">{question.reason}</span><textarea className="w-full rounded-md border bg-background p-2 font-mono text-sm" value={answers[question.questionId] ?? ""} onChange={(event) => setAnswers((current) => ({ ...current, [question.questionId]: event.target.value }))} /></label>)}<Button disabled={pending || !canSubmit} onClick={() => answer(parsedAnswers.map((item) => ({ questionId: item.questionId, answer: item.answer! })))}>{copy.submitReviewAnswers}</Button></CardContent></Card>;
 }
 function ReviewItems({ goal, proposal, copy, pending, onApplyItem, onRejectItem }: { goal: GoalData; proposal: NonNullable<Proposal>; copy: GoalCopy; pending: boolean; onApplyItem: (item: ReviewItem) => void; onRejectItem: (item: ReviewItem) => void }) {
   if (proposal.items.length === 0) return <p className="rounded-xl border bg-muted/20 p-4 text-sm text-muted-foreground">{copy.proposalNoItems}</p>;

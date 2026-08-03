@@ -134,8 +134,7 @@ function registerClientCreateRoutes(app: Hono, engine: ChronaEngine) {
           });
           return json(c, { ok: true, ...result });
         } catch (cause) {
-          const message = cause instanceof Error ? cause.message : "Failed to test client";
-          return json(c, { ok: false, available: false, reason: message, error: message }, 500);
+          return internalServerError(c, "POST /api/ai/clients/test", cause, "Failed to test AI client");
         }
       },
     );

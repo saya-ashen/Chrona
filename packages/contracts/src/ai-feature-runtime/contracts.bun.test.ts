@@ -22,7 +22,7 @@ const ref = { id: "goal.overview", version: 1 };
 const now = "2026-03-20T12:00:00.000Z";
 const hash = `sha256:${"a".repeat(64)}`;
 
-const manifest = {
+const manifest: z.input<typeof aiFeatureManifestSchema> = {
   schemaVersion: 1,
   feature: { id: "goal.review", version: 2 },
   description: "Review a goal from its frozen observations.",
@@ -209,7 +209,7 @@ describe("AI feature runtime contracts", () => {
     ).toBeFalse();
   });
 
-  it("requires an object root for answers and validates generic output and partial schemas independently", () => {
+  it("supports bounded JSON answer roots and validates generic output and partial schemas independently", () => {
     expect(
       userQuestionSchema.safeParse({
         questionId: "audience",
@@ -217,7 +217,15 @@ describe("AI feature runtime contracts", () => {
         answerSchema: { type: "string" },
         reason: "Needed for a useful answer.",
       }).success,
-    ).toBeFalse();
+    ).toBeTrue();
+    expect(
+      userQuestionSchema.safeParse({
+        questionId: "priorities",
+        prompt: "Which priorities matter?",
+        answerSchema: { type: "array", items: { type: "string" } },
+        reason: "Needed for prioritization.",
+      }).success,
+    ).toBeTrue();
     expect(
       evidenceReferenceSchema.safeParse({ observationId: "observation-1", path: "summary" }).success,
     ).toBeFalse();

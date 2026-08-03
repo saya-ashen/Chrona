@@ -11,7 +11,7 @@ import {
   normalizeDebugProviderProfile,
 } from "@chrona/providers-debug";
 import { db } from "@chrona/db";
-import type { AgentProviderClient } from "@chrona/providers-foundation";
+import type { AgentProviderClient, ProviderCapabilities } from "@chrona/providers-foundation";
 import type {
   AgentProviderClientConfig,
   AiClientRecord,
@@ -182,7 +182,6 @@ async function refreshAiClientRegistry() {
   if (!defaultClientId && records[0]) defaultClientId = records[0].id;
 
   const bindings = await db.aiFeatureBinding.findMany({
-    where: { clientId: { in: [...clients.keys()] } },
     orderBy: { createdAt: "asc" },
   });
 
@@ -206,7 +205,7 @@ async function getAiClient(clientId?: string | null): Promise<EngineAiClient | n
 async function getAiClientForFeature(feature: AiFeature): Promise<EngineAiClient | null> {
   await ensureAiClientRegistryLoaded();
   const clientId = featureClientIds.get(feature);
-  return clientId ? (clients.get(clientId) ?? getAiClient()) : getAiClient();
+  return clientId ? (clients.get(clientId) ?? null) : getAiClient();
 }
 
 function requireProviderClient(client: EngineAiClient): EngineProviderClient {
@@ -221,6 +220,13 @@ function requireLlmClient(client: EngineAiClient): EngineLlmClient {
     throw new AiClientError("LLM client is required", client.record.type, "internal");
   }
   return client as EngineLlmClient;
+}
+
+async function inspectAiClientProviderCapabilities(clientId: string): Promise<ProviderCapabilities | null> {
+  const stored = await db.aiClient.findUnique({ where: { id: clientId } });
+  if (!stored) return null;
+  const providerClient = createProviderClient(toAiClientRecord(stored));
+  return providerClient ? await providerClient.getCapabilities() : null;
 }
 
 async function listRegisteredAiClients(): Promise<AiClientRecord[]> {
@@ -239,6 +245,10 @@ export class AiClientRegistry {
 
   getForFeature(feature: AiFeature) {
     return getAiClientForFeature(feature);
+  }
+
+  inspectProviderCapabilities(clientId: string) {
+    return inspectAiClientProviderCapabilities(clientId);
   }
 
   requireProviderClient(client: EngineAiClient) {

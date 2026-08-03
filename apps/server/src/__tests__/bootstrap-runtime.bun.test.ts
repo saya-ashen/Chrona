@@ -4,10 +4,12 @@ import type { TaskOrchestrator } from "@chrona/engine";
 import { createServerRuntimeBootstrap } from "../runtime-bootstrap";
 
 describe("server runtime bootstrap", () => {
-  it("starts once and stops the retained task orchestrator", async () => {
+  it("starts once and stops the retained task and AI Feature recovery workers", async () => {
     const stop = mock(async () => undefined);
+    const stopFeatureRecovery = mock(async () => undefined);
     const startTaskOrchestrator = mock(() => ({ stop } as unknown as TaskOrchestrator));
-    const bootstrapServerRuntime = createServerRuntimeBootstrap({ startTaskOrchestrator });
+    const startAiFeatureRecoveryWorker = mock(() => ({ stop: stopFeatureRecovery }));
+    const bootstrapServerRuntime = createServerRuntimeBootstrap({ startTaskOrchestrator, startAiFeatureRecoveryWorker });
 
     const first = bootstrapServerRuntime();
     const second = bootstrapServerRuntime();
@@ -16,5 +18,7 @@ describe("server runtime bootstrap", () => {
     expect(first).toBe(second);
     expect(startTaskOrchestrator).toHaveBeenCalledTimes(1);
     expect(stop).toHaveBeenCalledTimes(1);
+    expect(startAiFeatureRecoveryWorker).toHaveBeenCalledTimes(1);
+    expect(stopFeatureRecovery).toHaveBeenCalledTimes(1);
   });
 });

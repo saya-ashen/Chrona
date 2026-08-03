@@ -1,4 +1,5 @@
 import { aiClientsApi } from "../browser-api";
+import { providerCapabilityMatrix } from "@chrona/contracts";
 import type {
   AiClientInfo,
   AiClientType,
@@ -26,15 +27,15 @@ const PROVIDER_SORT_RANK: Record<string, number> = {
   hermes: 99,
 };
 const RECOMMENDED_FEATURE_ORDER = ["task.plan", "task.execution", "dashboard.brief"];
+const DURABLE_RUNTIME_FEATURES = new Set(["goal.review", "task.plan"]);
 const FEATURE_COPY: Record<string, { label: string; description: string }> = {
   suggest: { label: "Smart Suggestions", description: "Generate task and schedule suggestions." },
-  generate_plan: { label: "Task Plan Generation", description: "Generate structured task plans." },
-  generatePlan: { label: "Task Plan Generation", description: "Generate structured task plans." },
   conflicts: { label: "Conflict Analysis", description: "Analyze schedule conflicts." },
   timeslots: { label: "Timeslot Recommendations", description: "Recommend scheduling windows." },
   chat: { label: "Chat / Plan Generation", description: "Answer task planning chat prompts." },
   "dashboard.brief": { label: "Dashboard Brief", description: "Generate dashboard summaries and focus recommendations." },
   "task.plan": { label: "Task Planning", description: "Generate or refine task plans." },
+  "goal.review": { label: "Goal Review", description: "Generate grounded Goal review proposals." },
   "task.execution": { label: "Task Execution", description: "Execute approved task steps." },
 };
 
@@ -110,7 +111,10 @@ export function isDebugProviderVisible(): boolean {
 }
 
 export function getProviderFeatures(providers: RuntimeProviderOption[], type: AiClientType): string[] {
-  return (providers.find((provider) => provider.key === type)?.features ?? []).filter((feature) => feature !== "suggest");
+  const durableRuntimeCapable = providerCapabilityMatrix.find((entry) => entry.provider === type)?.recovery.crossProcessDurable === true;
+  return (providers.find((provider) => provider.key === type)?.features ?? []).filter(
+    (feature) => feature !== "suggest" && (durableRuntimeCapable || !DURABLE_RUNTIME_FEATURES.has(feature)),
+  );
 }
 
 export function getFeatureCopy(feature: string): { label: string; description: string } {

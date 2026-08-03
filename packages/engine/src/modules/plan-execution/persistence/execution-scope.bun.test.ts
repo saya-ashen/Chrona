@@ -1,9 +1,8 @@
 import { afterAll, beforeEach, describe, expect, it } from "bun:test";
 
 import { db } from "@/lib/db";
-import type { PlanBlueprint } from "@chrona/contracts";
-
-import { materializeGeneratedTaskPlan } from "@/modules/plans/materialize-generated-task-plan";
+import { upgradeBlueprintToEditable, type PlanBlueprint } from "@chrona/contracts";
+import { compilePlanBlueprint } from "@chrona/domain";
 import {
   getAcceptedCompiledPlan,
   saveCompiledPlan,
@@ -31,6 +30,7 @@ async function resetDb() {
   await db.taskPlan.deleteMany();
   await db.event.deleteMany();
   await db.taskProjection.deleteMany();
+  await db.taskOccurrence.deleteMany();
   await db.workBlock.deleteMany();
   await db.taskSession.deleteMany();
   await db.task.deleteMany();
@@ -65,30 +65,29 @@ async function createTaskWithWorkBlock() {
   return { workspace, task, workBlock };
 }
 
-/** Materialize a plan scoped to the work block and accept it at that scope. */
+/** Compile and accept a plan scoped to the work block. */
 async function acceptPlanAtWorkBlock(input: {
   taskId: string;
   workspaceId: string;
   workBlockId: string;
 }) {
-  await materializeGeneratedTaskPlan({
+  const candidate = blueprint("Occurrence plan");
+  const { compiledPlan, planId } = compilePlanBlueprint({
     taskId: input.taskId,
-    workspaceId: input.workspaceId,
-    workBlockId: input.workBlockId,
-    blueprint: blueprint("Occurrence plan"),
-  });
-  const row = await db.taskPlan.findFirstOrThrow({
-    where: { taskId: input.taskId, workBlockId: input.workBlockId },
+    blueprint: candidate,
+    planId: `plan_${input.workBlockId}`,
+    generatedBy: "test",
+    source: "ai",
   });
   await saveCompiledPlan({
     workspaceId: input.workspaceId,
     taskId: input.taskId,
     workBlockId: input.workBlockId,
-    compiledPlan: row.compiledPlan as never,
-    editablePlan: row.editablePlan as never,
+    compiledPlan,
+    editablePlan: upgradeBlueprintToEditable(candidate, planId, 1),
     status: "accepted",
   });
-  return row.planId;
+  return planId;
 }
 
 describe("resolveExecutionScope", () => {
@@ -153,7 +152,7 @@ describe("resolveExecutionScope", () => {
     expect(scope.executionSessionId).not.toBeNull();
   });
 
-  it("lets an explicit concrete workBlockId hint win", async () => {
+  it("lets an explicitly owned concrete workBlockId hint win", async () => {
     const { workspace, task, workBlock } = await createTaskWithWorkBlock();
     const planId = await acceptPlanAtWorkBlock({ taskId: task.id, workspaceId: workspace.id, workBlockId: workBlock.id });
     await db.executionSession.create({
@@ -168,8 +167,22 @@ describe("resolveExecutionScope", () => {
       },
     });
 
-    const scope = await resolveExecutionScope(task.id, { workBlockId: "explicit-block" });
-    expect(scope.workBlockId).toBe("explicit-block");
+    const scope = await resolveExecutionScope(task.id, { workBlockId: workBlock.id });
+    expect(scope.workBlockId).toBe(workBlock.id);
+  });
+
+  it("fails closed when an explicit work block belongs to another task", async () => {
+    const { task } = await createTaskWithWorkBlock();
+    const { workBlock: foreignWorkBlock } = await createTaskWithWorkBlock();
+
+    const scope = await resolveExecutionScope(task.id, { workBlockId: foreignWorkBlock.id });
+
+    expect(scope).toEqual({
+      occurrenceId: null,
+      workBlockId: null,
+      planId: null,
+      executionSessionId: null,
+    });
   });
 
   it("resolves an explicit occurrence without inventing a WorkBlock", async () => {

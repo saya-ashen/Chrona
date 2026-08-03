@@ -8,10 +8,6 @@ import { createLogger } from "@chrona/logging";
 import { createHash, randomUUID } from "node:crypto";
 import { z } from "zod";
 import {
-  CHRONA_PLAN_GENERATE_INTERNAL_TOOL_NAME,
-  CHRONA_PLAN_GENERATE_TOOL_DESCRIPTION,
-  CHRONA_PLAN_GENERATE_TOOL_NAME,
-  CHRONA_PLAN_GENERATE_TOOL_TITLE,
   chronaPublicToolPayloadSchemas,
   chronaToolInputSchema,
   type ChronaToolName,
@@ -102,23 +98,11 @@ const externalTools = {
     description: "Read accepted plan state through AI-visible refs.",
     inputSchema: publicToolSchema(chronaPublicToolPayloadSchemas["chrona.plan.read"]),
   },
-  [CHRONA_PLAN_GENERATE_TOOL_NAME]: {
-    internalName: CHRONA_PLAN_GENERATE_INTERNAL_TOOL_NAME,
-    title: CHRONA_PLAN_GENERATE_TOOL_TITLE,
-    description: CHRONA_PLAN_GENERATE_TOOL_DESCRIPTION,
-    inputSchema: publicToolSchema(chronaPublicToolPayloadSchemas["chrona.plan.generate"]),
-  },
   chrona_node_read: {
     internalName: "chrona.node.read",
     title: "Chrona Node Read",
     description: "Read current execution node state through AI-visible refs.",
     inputSchema: publicToolSchema(chronaPublicToolPayloadSchemas["chrona.node.read"]),
-  },
-  chrona_dashboard_brief: {
-    internalName: "chrona.dashboard.brief",
-    title: "Chrona Dashboard Brief",
-    description: "Submit Dashboard AI summary as { summaryText, spec }. Chrona validates and stores the compact dashboard brief spec; use only Stack, Card, Heading, Text, Alert, Badge, Separator, Table.",
-    inputSchema: publicToolSchema(chronaPublicToolPayloadSchemas["chrona.dashboard.brief"]),
   },
   chrona_node_complete: {
     internalName: "chrona.node.complete",

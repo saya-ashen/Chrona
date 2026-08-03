@@ -1,4 +1,8 @@
 import { z } from "zod";
+import {
+  aiJsonValueSchema,
+  userQuestionSchema,
+} from "../ai-feature-runtime";
 
 import { workspaceId } from "./common";
 
@@ -69,12 +73,8 @@ export const createGoalTaskBodySchema = z.object({
   expectedOutcome: z.string().trim().min(1).optional(),
 });
 
-export const applyGoalReviewBodySchema = z.object({
-  summary: z.string().trim().min(1).max(5_000),
-  nextReviewAt: z.string().datetime().nullable().optional(),
-  brief: goalOperationalBriefSchema.optional(),
-  tasks: z.array(createGoalTaskBodySchema).max(12).default([]),
-});
+export const goalReviewOperationIdSchema = z.string().uuid();
+export const goalReviewExpectedVersionSchema = z.number().int().nonnegative();
 
 export const goalTaskParamSchema = z.object({
   goalId: z.string().trim().min(1),
@@ -130,6 +130,8 @@ export const goalActionBodySchema = z.discriminatedUnion("action", [
 export const goalReviewProposalStatusSchema = z.enum([
   "Generating",
   "Ready",
+  "NeedsInput",
+  "CannotComplete",
   "PartiallyApplied",
   "Applied",
   "Rejected",
@@ -218,12 +220,15 @@ export const goalReviewResultSchema = z.object({
 
 export const generateGoalReviewBodySchema = z.object({
   idempotencyKey: z.string().trim().min(1).max(128),
-  progressId: z.string().uuid().optional(),
+  operationId: goalReviewOperationIdSchema,
   mode: z.enum(["initial", "progress"]).default("progress"),
 });
 
 export const applyGoalReviewProposalBodySchema = z.object({
   idempotencyKey: z.string().trim().min(1).max(128),
+  expectedVersion: goalReviewExpectedVersionSchema,
+  expectedGoalUpdatedAt: z.string().datetime(),
+  dependencyHashes: z.record(z.string().trim().min(1), z.string().trim().min(1)),
   decisions: z.array(z.object({
     itemId: z.string().trim().min(1),
     action: z.enum(["accept", "reject", "convert_to_task", "ignore"]),
@@ -232,6 +237,29 @@ export const applyGoalReviewProposalBodySchema = z.object({
 
 export const rejectGoalReviewProposalBodySchema = z.object({
   idempotencyKey: z.string().trim().min(1).max(128),
+});
+export const goalReviewQuestionSchema = userQuestionSchema;
+
+export const answerGoalReviewProposalBodySchema = z.object({
+  operationId: goalReviewOperationIdSchema,
+  expectedVersion: goalReviewExpectedVersionSchema,
+  answers: z.array(z.object({
+    questionId: z.string().trim().min(1),
+    answer: aiJsonValueSchema,
+  })).min(1).max(16),
+});
+
+export const retryGoalReviewProposalBodySchema = z.object({
+  operationId: goalReviewOperationIdSchema,
+  expectedVersion: goalReviewExpectedVersionSchema,
+});
+
+export const goalReviewProgressEventSchema = z.object({
+  proposalId: z.string().trim().min(1),
+  status: goalReviewProposalStatusSchema,
+  version: goalReviewExpectedVersionSchema,
+  message: z.string().trim().min(1).max(2_000).optional(),
+  errorCode: z.string().trim().min(1).max(128).optional(),
 });
 
 export const promoteTaskToGoalParamSchema = z.object({
@@ -259,7 +287,6 @@ export type CreateGoalTaskRequest = z.infer<typeof createGoalTaskBodySchema>;
 export type ProcessGoalResultRequest = z.infer<typeof processGoalResultBodySchema>;
 export type ConfirmGoalCriterionRequest = z.infer<typeof confirmGoalCriterionBodySchema>;
 export type ReviewGoalCriterionRequest = z.infer<typeof reviewGoalCriterionBodySchema>;
-export type ApplyGoalReviewRequest = z.infer<typeof applyGoalReviewBodySchema>;
 export type GoalReviewProposalStatus = z.infer<typeof goalReviewProposalStatusSchema>;
 export type GoalReviewProposalItemKind = z.infer<typeof goalReviewProposalItemKindSchema>;
 export type GoalReviewProposalItemDecision = z.infer<typeof goalReviewProposalItemDecisionSchema>;
@@ -268,5 +295,9 @@ export type GoalReviewResult = z.infer<typeof goalReviewResultSchema>;
 export type GenerateGoalReviewRequest = z.infer<typeof generateGoalReviewBodySchema>;
 export type ApplyGoalReviewProposalRequest = z.infer<typeof applyGoalReviewProposalBodySchema>;
 export type RejectGoalReviewProposalRequest = z.infer<typeof rejectGoalReviewProposalBodySchema>;
+export type GoalReviewQuestion = z.infer<typeof goalReviewQuestionSchema>;
+export type AnswerGoalReviewProposalRequest = z.infer<typeof answerGoalReviewProposalBodySchema>;
+export type RetryGoalReviewProposalRequest = z.infer<typeof retryGoalReviewProposalBodySchema>;
+export type GoalReviewProgressEvent = z.infer<typeof goalReviewProgressEventSchema>;
 export type GoalOperationalBrief = z.infer<typeof goalOperationalBriefSchema>;
 export type UpdateGoalBriefRequest = z.infer<typeof updateGoalBriefBodySchema>;

@@ -367,6 +367,7 @@ export class HermesProviderClient implements AgentProviderClient {
           choice: toHermesApprovalChoice(input.choice),
           resolve_all: input.resolveAll === true,
         }),
+        idempotencyKey: input.idempotencyKey,
         signal: input.signal,
       },
     );

@@ -55,6 +55,7 @@ export {
   type StartRunControlInput,
   type StreamRunInput,
   assertProviderStartSupported,
+  supportsDurableFeatureRuntime,
   createSessionInputSchema,
   existingRunStreamInputSchema,
   getRunInputSchema,

@@ -93,7 +93,7 @@ function CreateGoalDialog({ copy }: { copy: GoalCopy }) {
         });
         goalId = created.id;
       }
-      setProgressText(copy.aiProgress.queued);
+      setProgressText(copy.generatingReview);
       try {
         await generateGoalReview(goalId, { idempotencyKey: uuidv4(), mode: "initial" }, { onProgress: (event) => setProgressText(goalAiProgressText(copy, event)) });
       } catch {

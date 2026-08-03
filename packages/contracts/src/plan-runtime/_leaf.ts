@@ -160,7 +160,12 @@ export type PlanExecutionResult = {
   ui?: {
     currentOperationSpec?: UiDocument | null;
   };
-  errorDetails?: unknown;
+};
+
+export type PublicExecutionCheckpoint = Omit<ExecutionCheckpoint, "sessionId" | "planRunId">;
+export type PublicPlanExecutionResult = Omit<PlanExecutionResult, "mainSessionId" | "executionSessionId" | "planRunId" | "checkpoint"> & {
+  executionScope: string | null;
+  checkpoint: PublicExecutionCheckpoint | null;
 };
 
 // ─── Graph compiled/effective (originally from graph.ts) ─────────────

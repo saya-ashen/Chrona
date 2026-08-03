@@ -1,9 +1,7 @@
-import { Prisma } from "@/generated/prisma/client";
+import { Prisma, TaskPlanStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { SYNC_STALE_MS } from "../../constants";
 import { deriveScheduleState, deriveTaskState } from "@chrona/domain";
-import { resolveScopeWorkBlockId } from "@/modules/plan-execution/persistence/execution-scope";
-import { getLatestCompiledPlan } from "@/modules/plan-execution/persistence/compiled-plan-store";
 import { appendTaskWorkspaceEvent } from "./task-projection-events";
 
 
@@ -28,7 +26,77 @@ function pickProjectionWorkBlock(workBlocks: ProjectionWorkBlock[], now: Date) {
 
   return workBlocks.find((block) => block.status === "Completed") ?? null;
 }
+
+type ProjectionClient = typeof db | Prisma.TransactionClient;
+
+function toProjectionPlanStatus(status: TaskPlanStatus) {
+  switch (status) {
+    case TaskPlanStatus.Draft:
+      return "draft" as const;
+    case TaskPlanStatus.Accepted:
+      return "accepted" as const;
+    case TaskPlanStatus.Superseded:
+      return "superseded" as const;
+    case TaskPlanStatus.Archived:
+      return "archived" as const;
+  }
+}
+
+async function resolveProjectionScopeWorkBlockId(taskId: string, client: ProjectionClient) {
+  const acceptedScope = await client.taskPlan.findFirst({
+    where: { taskId, status: TaskPlanStatus.Accepted },
+    orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
+    select: { workBlockId: true },
+  });
+  if (acceptedScope) return acceptedScope.workBlockId;
+
+  const latestScope = await client.taskPlan.findFirst({
+    where: { taskId },
+    orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
+    select: { workBlockId: true },
+  });
+  if (latestScope) return latestScope.workBlockId;
+
+  const focusedOccurrence = await client.taskOccurrence.findFirst({
+    where: {
+      taskId,
+      status: { in: ["Running", "WaitingForInput", "WaitingForApproval", "Ready", "Scheduled"] },
+    },
+    orderBy: [{ startedAt: "desc" }, { eligibleAt: "asc" }],
+    select: { workBlockId: true },
+  });
+  return focusedOccurrence?.workBlockId ?? null;
+}
+
+async function getLatestProjectionPlan(
+  taskId: string,
+  workBlockId: string | null,
+  client: ProjectionClient,
+) {
+  const plan = await client.taskPlan.findFirst({
+    where: { taskId, workBlockId },
+    orderBy: [{ updatedAt: "desc" }, { createdAt: "desc" }],
+    select: { status: true, updatedAt: true },
+  });
+  return plan
+    ? { status: toProjectionPlanStatus(plan.status), updatedAt: plan.updatedAt }
+    : null;
+}
 export async function rebuildTaskProjection(taskId: string) {
+  return rebuildTaskProjectionWithClient(taskId, db);
+}
+
+export async function rebuildTaskProjectionInTransaction(
+  taskId: string,
+  tx: Prisma.TransactionClient,
+) {
+  return rebuildTaskProjectionWithClient(taskId, tx);
+}
+
+async function rebuildTaskProjectionWithClient(
+  taskId: string,
+  client: ProjectionClient,
+) {
   // The canonical occurrence this projection is about. Recurring tasks share a
   // single Task row across many work-block occurrences; runs/sessions/approvals
   // are scoped to this work block so a failed (or cancelled) occurrence never
@@ -38,16 +106,16 @@ export async function rebuildTaskProjection(taskId: string) {
   // in any state — Active/Paused/Completed/Abandoned — is the authoritative
   // record of what ran). Before any run exists we fall back to the plan scope so
   // a freshly-generated/accepted plan still projects against its work block.
-  const latestSession = await db.executionSession.findFirst({
+  const latestSession = await client.executionSession.findFirst({
     where: { taskId },
     orderBy: [{ updatedAt: "desc" }, { startedAt: "desc" }],
     select: { workBlockId: true },
   });
   const scopeWorkBlockId = latestSession
     ? latestSession.workBlockId
-    : await resolveScopeWorkBlockId(taskId);
+    : await resolveProjectionScopeWorkBlockId(taskId, client);
 
-  const task = await db.task.findUniqueOrThrow({
+  const task = await client.task.findUniqueOrThrow({
     where: { id: taskId },
     include: {
       runs: { where: { workBlockId: scopeWorkBlockId }, orderBy: { updatedAt: "desc" } },
@@ -89,7 +157,7 @@ export async function rebuildTaskProjection(taskId: string) {
   const currentWorkBlock = pickProjectionWorkBlock(task.workBlocks, now);
   const latestEvent = task.events[0] ?? null;
   const currentNode = session?.currentNodeId && session.planId
-    ? await db.taskPlanRun.findFirst({
+    ? await client.taskPlanRun.findFirst({
         where: {
           taskId: task.id,
           planId: session.planId,
@@ -108,7 +176,7 @@ export async function rebuildTaskProjection(taskId: string) {
   // cannot mask a failed-run block on the canonical one. The draft-plan
   // recover branch in deriveTaskState reads this to clear stale Blocked
   // when the user regenerates a plan to retry.
-  const latestPlan = await getLatestCompiledPlan(taskId, scopeWorkBlockId);
+  const latestPlan = await getLatestProjectionPlan(taskId, scopeWorkBlockId, client);
   const pendingApprovals = [
     ...task.approvals,
     ...task.taskPlanProviderApprovals.map((approval) => ({
@@ -132,7 +200,7 @@ export async function rebuildTaskProjection(taskId: string) {
     latestPlan: latestPlan
       ? {
           status: latestPlan.status,
-          updatedAt: new Date(latestPlan.updatedAt),
+          updatedAt: latestPlan.updatedAt,
         }
       : null,
   });
@@ -180,12 +248,12 @@ export async function rebuildTaskProjection(taskId: string) {
     updateData.blockReason = Prisma.DbNull;
   }
 
-  await db.task.update({
+  await client.task.update({
     where: { id: task.id },
     data: updateData as never,
   });
 
-  const projection = await db.taskProjection.upsert({
+  const projection = await client.taskProjection.upsert({
     where: { taskId: task.id },
     update: {
       workspaceId: task.workspaceId,

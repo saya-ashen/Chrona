@@ -158,9 +158,6 @@ export function TaskPlanGenerationPanel({
     error,
     phase,
     statusMessage,
-    partialText,
-    toolCalls,
-    toolResults,
     requestGeneration,
     stopGeneration,
   } = useTaskPlanGeneration({
@@ -255,9 +252,9 @@ export function TaskPlanGenerationPanel({
       <TaskPlanGenerationProgress
         phase={progressPhase}
         statusMessage={statusMessage}
-        partialText={partialText}
-        toolCalls={toolCalls}
-        toolResults={toolResults}
+        partialText=""
+        toolCalls={[]}
+        toolResults={[]}
         taskId={taskId}
         isStoppingGeneration={isStoppingGeneration}
         stopGenerationError={stopGenerationError}

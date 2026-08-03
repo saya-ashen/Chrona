@@ -11,6 +11,7 @@ async function task(workspaceId: string, title: string) {
   return db.task.create({ data: { workspaceId, title, status: "Ready", priority: "Medium", executionRuntime: "hermes", executionConfig: {} } });
 }
 
+
 async function postEmail(app: ReturnType<typeof createApiRouter>, secret: string, body: Record<string, unknown>, signatureSecret = secret) {
   const rawBody = JSON.stringify(body);
   const timestamp = new Date(String(body.timestamp));
@@ -24,25 +25,47 @@ describe("Task triggers and occurrence authority", () => {
   it("materializes versioned schedule occurrences and rejects unknown kinds", async () => {
     const { workspaceId } = await seedWorkspace();
     const target = await task(workspaceId, "Scheduled definition");
+    const fireAt = new Date(Date.now() + 14 * 86_400_000).toISOString();
     const engine = createChronaEngine();
-    await engine.triggers.create({ taskId: target.id, command: { workspaceId, definition: { kind: "schedule", config: { mode: "once", fireAt: "2026-08-01T09:00:00.000Z", timezone: "UTC", durationMs: 3_600_000 } } } });
+    await engine.triggers.create({ taskId: target.id, command: { workspaceId, definition: { kind: "schedule", config: { mode: "once", fireAt, timezone: "UTC", durationMs: 3_600_000 } } } });
     const occurrences = await engine.triggers.listOccurrences({ taskId: target.id, workspaceId });
     expect(occurrences.occurrences).toHaveLength(1);
-    expect(occurrences.occurrences[0]).toMatchObject({ occurrenceKey: "schedule:v1:2026-08-01T09:00:00.000Z", triggerVersion: 1, status: "Scheduled" });
+    expect(occurrences.occurrences[0]).toMatchObject({ occurrenceKey: `schedule:v1:${fireAt}`, triggerVersion: 1, status: "Scheduled" });
     expect(() => (engine.triggers.create as unknown as (input: unknown) => unknown)({ taskId: target.id, command: { workspaceId, definition: { kind: "webhook", config: {} } } })).toThrow();
   });
 
-  it("cancels only unstarted future occurrences when a trigger version changes", async () => {
+  it("preserves started occurrences and materializes a distinct work block for the next trigger version", async () => {
     const { workspaceId } = await seedWorkspace();
     const target = await task(workspaceId, "Versioned schedule");
+    const fireAt = new Date(Date.now() + 14 * 86_400_000).toISOString();
     const engine = createChronaEngine();
-    const trigger = await engine.triggers.create({ taskId: target.id, command: { workspaceId, definition: { kind: "schedule", config: { mode: "once", fireAt: "2026-08-01T09:00:00.000Z", timezone: "UTC" } } } });
-    const first = await db.taskOccurrence.findFirstOrThrow({ where: { taskId: target.id } });
+    const trigger = await engine.triggers.create({ taskId: target.id, command: { workspaceId, definition: { kind: "schedule", config: { mode: "once", fireAt, timezone: "UTC" } } } });
+    const first = await db.taskOccurrence.findFirstOrThrow({ where: { taskId: target.id }, include: { workBlock: true } });
     await db.taskOccurrence.update({ where: { id: first.id }, data: { status: "Running", startedAt: new Date() } });
+    await db.workBlock.update({ where: { id: first.workBlockId! }, data: { status: "Active", startedAt: new Date() } });
 
-    await engine.triggers.update({ taskId: target.id, triggerId: trigger.id, command: { workspaceId, expectedVersion: 1, definition: { kind: "schedule", config: { mode: "once", fireAt: "2026-08-02T09:00:00.000Z", timezone: "UTC" } } } });
+    await engine.triggers.update({ taskId: target.id, triggerId: trigger.id, command: { workspaceId, expectedVersion: 1, definition: { kind: "schedule", config: { mode: "once", fireAt, timezone: "UTC" } } } });
+    const second = await db.taskOccurrence.findFirstOrThrow({ where: { taskId: target.id, triggerVersion: 2 }, include: { workBlock: true } });
     expect((await db.taskOccurrence.findUniqueOrThrow({ where: { id: first.id } })).status).toBe("Running");
-    expect(await db.taskOccurrence.count({ where: { taskId: target.id, triggerVersion: 2, status: "Scheduled" } })).toBe(1);
+    expect(second).toMatchObject({ occurrenceKey: `schedule:v2:${fireAt}`, status: "Scheduled" });
+    expect(second.workBlockId).not.toBe(first.workBlockId);
+    expect(second.workBlock?.recurrenceKey).toBe(`schedule:v2:${fireAt}`);
+  });
+
+  it("cancels only the replaced version's unstarted occurrence and work block", async () => {
+    const { workspaceId } = await seedWorkspace();
+    const target = await task(workspaceId, "Cancelled versioned schedule");
+    const fireAt = new Date(Date.now() + 14 * 86_400_000).toISOString();
+    const engine = createChronaEngine();
+    const trigger = await engine.triggers.create({ taskId: target.id, command: { workspaceId, definition: { kind: "schedule", config: { mode: "once", fireAt, timezone: "UTC" } } } });
+    const first = await db.taskOccurrence.findFirstOrThrow({ where: { taskId: target.id }, include: { workBlock: true } });
+
+    await engine.triggers.update({ taskId: target.id, triggerId: trigger.id, command: { workspaceId, expectedVersion: 1, definition: { kind: "schedule", config: { mode: "once", fireAt, timezone: "UTC" } } } });
+    const second = await db.taskOccurrence.findFirstOrThrow({ where: { taskId: target.id, triggerVersion: 2 }, include: { workBlock: true } });
+    expect((await db.taskOccurrence.findUniqueOrThrow({ where: { id: first.id } })).status).toBe("Cancelled");
+    expect((await db.workBlock.findUniqueOrThrow({ where: { id: first.workBlockId! } })).status).toBe("Cancelled");
+    expect(second).toMatchObject({ occurrenceKey: `schedule:v2:${fireAt}`, status: "Scheduled" });
+    expect(second.workBlockId).not.toBe(first.workBlockId);
   });
 
   it("activates filtered accepted-result events once with bounded normalized input", async () => {

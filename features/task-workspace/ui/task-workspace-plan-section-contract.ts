@@ -1,7 +1,7 @@
 import type { ReactNode } from "react";
 import type {
   ExecutionActionInput,
-  PlanExecutionResult,
+  PublicPlanExecutionResult,
   SubmitCheckpointActionInput,
   TaskPlanReadModel,
 } from "@chrona/contracts";
@@ -24,7 +24,7 @@ export type TaskWorkspacePlanSectionProps = {
   runtimeEvents: WorkspaceRuntimeEvent[];
   commandCenter?: NonNullable<TaskPageData["commandCenter"]> | null;
   liveActivity?: WorkspaceActivityItem[];
-  currentExecution?: PlanExecutionResult | null;
+  currentExecution?: PublicPlanExecutionResult | null;
   generationUserInstruction?: string | null;
   onGeneratePlan: (request?: PlanGenerationRequest) => void;
   onApplyPlan: (result: TaskPlanReadModel) => Promise<void>;

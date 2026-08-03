@@ -7,6 +7,7 @@ import type {
 } from "@chrona/contracts/ai";
 import type {
   ExecutionActionWithContinuation,
+  ExecutionDispatchContext,
   PlanExecutionObserver,
 } from "../../types";
 import type { ExecutionSessionRow } from "../../persistence/execution-session-store";
@@ -21,6 +22,7 @@ export type ContinuePlanExecution = (input: {
   sessionId?: string;
   nodeId?: string;
   workBlockId?: string | null;
+  idempotencyKey?: string;
 } & PlanExecutionObserver) => Promise<PlanExecutionResult>;
 
 export type ResumeWithApproval = (input: {
@@ -30,11 +32,13 @@ export type ResumeWithApproval = (input: {
   approved: boolean;
   feedback?: string;
   workBlockId?: string | null;
+  idempotencyKey?: string;
 } & PlanExecutionObserver) => Promise<PlanExecutionResult>;
 
 export type DispatchExecutionAction = (input: {
   taskId: string;
   action: ExecutionActionWithContinuation;
+  commandContext?: ExecutionDispatchContext;
 } & PlanExecutionObserver) => Promise<PlanExecutionResult>;
 
 export type ResolveCheckpointTransitionInput = {
@@ -43,6 +47,7 @@ export type ResolveCheckpointTransitionInput = {
   planRunId: string;
   mainSession: { id: string; taskId: string; sessionKey: string };
   executionSession: ExecutionSessionRow;
+  idempotencyKey?: string;
   checkpoint: ExecutionCheckpoint;
   transition: CheckpointTransition;
   action: string;

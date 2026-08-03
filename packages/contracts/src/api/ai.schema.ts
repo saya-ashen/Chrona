@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { AI_FEATURES } from "../ai-feature-types";
 
 const aiClientTypeSchema = z.string().trim().min(1, "type is required");
 
@@ -34,9 +35,11 @@ export const deleteAiClientParamSchema = z.object({ clientId: z.string().min(1) 
 
 // ── PUT /ai/clients/:clientId/bindings ──
 export const updateAiBindingsParamSchema = z.object({ clientId: z.string().min(1) });
-export const updateAiBindingsBodySchema = z.object({
-  features: z.array(z.string()),
-});
+export const updateAiBindingsBodySchema = z
+  .object({
+    features: z.array(z.enum(AI_FEATURES)),
+  })
+  .strict();
 
 // ── POST /ai/auto-complete ──
 export const autoCompleteBodySchema = z.object({
@@ -59,36 +62,3 @@ export const taskWorkspaceChatSchema = z.object({
     )
     .optional(),
 });
-
-// ── GET /ai/runs/:operationId/events ──
-export const aiRunProgressOperationParamSchema = z.object({
-  operationId: z.string().trim().min(1, "operationId is required").max(200),
-});
-
-export const aiRunProgressPhaseSchema = z.enum([
-  "queued",
-  "connecting",
-  "thinking",
-  "responding",
-  "using_tool",
-  "validating",
-  "saving",
-  "completed",
-  "failed",
-]);
-
-export const aiRunProgressEventSchema = z
-  .object({
-    operationId: z.string().trim().min(1).max(200),
-    feature: z.string().trim().min(1).max(100),
-    sequence: z.number().int().nonnegative(),
-    occurredAt: z.string().datetime(),
-    phase: aiRunProgressPhaseSchema,
-    toolName: z.string().trim().min(1).max(120).optional(),
-    error: z.string().trim().min(1).max(240).optional(),
-  })
-  .strict();
-
-export type AiRunProgressOperationParam = z.infer<typeof aiRunProgressOperationParamSchema>;
-export type AiRunProgressPhase = z.infer<typeof aiRunProgressPhaseSchema>;
-export type AiRunProgressEvent = z.infer<typeof aiRunProgressEventSchema>;

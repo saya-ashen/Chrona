@@ -12,9 +12,8 @@ import { createMemoryRouter, RouterProvider } from "react-router-dom";
 import { GoalListPage } from "./goal-list-page";
 import { GoalWorkspacePage } from "./goal-workspace-page";
 import { CreateGoalFromResultDialog } from "./create-goal-from-result-dialog";
+import { parseGoalReviewAnswer } from "./goal-workspace-review-apply";
 import type { GoalArtifactData, GoalCopy, GoalData } from "../model/goal-types";
-import type { AiRunProgressEvent, GenerateGoalReviewRequest } from "@chrona/contracts";
-
 const {
   apiJsonMock,
   promoteTaskToGoalMock,
@@ -23,13 +22,17 @@ const {
   uuidv4Mock,
   applyGoalReviewProposalMock,
   rejectGoalReviewProposalMock,
+  answerGoalReviewMock,
+  retryGoalReviewMock,
 } = vi.hoisted(() => ({
   apiJsonMock: vi.fn(async () => ({ id: "workspace-default" })),
   promoteTaskToGoalMock: vi.fn(async () => ({ id: "goal-promoted" })),
   createGoalWithFirstTaskMock: vi.fn(async () => ({ goal: { id: "goal-created" }, taskId: "task-created" })),
-  generateGoalReviewMock: vi.fn(async (_goalId?: string, _command?: GenerateGoalReviewRequest, _options?: { onProgress?: (event: AiRunProgressEvent) => void }) => ({ proposalId: "proposal-created", status: "Generating" })),
+  generateGoalReviewMock: vi.fn(async () => ({ proposalId: "proposal-created", status: "Generating", version: 0 })),
   applyGoalReviewProposalMock: vi.fn(async () => ({})),
   rejectGoalReviewProposalMock: vi.fn(async () => ({})),
+  answerGoalReviewMock: vi.fn(async () => ({})),
+  retryGoalReviewMock: vi.fn(async () => ({})),
   uuidv4Mock: vi.fn(() => "goal-idempotency-key"),
 }));
 vi.mock("uuid", () => ({ v4: uuidv4Mock }));
@@ -39,6 +42,8 @@ vi.mock("../browser-api", () => ({
   createGoalTask: vi.fn(async () => ({ taskId: "task-created", goal: {} })),
   createGoalWithFirstTask: createGoalWithFirstTaskMock,
   generateGoalReview: generateGoalReviewMock,
+  answerGoalReview: answerGoalReviewMock,
+  retryGoalReview: retryGoalReviewMock,
   applyGoalReviewProposal: applyGoalReviewProposalMock,
   rejectGoalReviewProposal: rejectGoalReviewProposalMock,
   promoteTaskToGoal: promoteTaskToGoalMock,
@@ -117,18 +122,6 @@ const copy: GoalCopy = {
   expectedOutcomePlaceholder: "Observable result",
   generateReview: "Generate AI review",
   generatingReview: "Generating review proposal…",
-  aiProgress: {
-    queued: "Preparing AI review…",
-    connecting: "Connecting to AI…",
-    thinking: "AI is thinking…",
-    responding: "AI is preparing the review…",
-    using_tool: "AI is using a tool…",
-    validating: "Validating the review…",
-    saving: "Saving the review…",
-    completed: "Review ready",
-    failed: "Review generation failed",
-  },
-  aiToolEvent: "AI is using tool: {tool}",
   rejectProposal: "Reject proposal",
   proposalFailed: "Review generation failed",
   proposalPending: "Pending decision",
@@ -177,7 +170,14 @@ const copy: GoalCopy = {
   createTaskReviewItem: "Create task: {title}",
   resolveEvidenceReviewItem: "Close evidence gap: {title}",
   currentReviewValue: "Current",
-  suggestedReviewValue: "Suggested change",
+  suggestedReviewValue: "Suggested",
+  reviewProgress: { queued: "Preparing review…", running: "Reviewing goal…" },
+  reviewNeedsInput: "Your input is needed",
+  reviewNeedsInputDescription: "Answer these questions",
+  submitReviewAnswers: "Continue review",
+  reviewCannotComplete: "Review needs more context",
+  retryReview: "Try again",
+  reviewActionFailed: "The review action could not be completed. Try again.",
   reviewReason: "Why this suggestion",
   evidenceReferences: "Evidence references",
   reviewWarnings: "Warnings",
@@ -1141,155 +1141,64 @@ describe("Goal pages", () => {
     expect(submit).toBeEnabled();
   });
 
-  it("shows paused state with a reversible primary action", () => {
-    const goal: GoalData = {
-      ...baseGoal,
-      status: "Paused",
-      projection: { ...baseGoal.projection, lifecycle: "Paused", nextAction: "resume" },
-      primaryAction: { kind: "resume", taskId: null },
-    };
-    renderInRouter(<GoalWorkspacePage goal={goal} copy={copy} />);
-    expect(screen.getByText("Paused")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Resume Goal" })).toBeInTheDocument();
-  });
-
-  it("opens and retries the initial planning proposal from the creation deep link", async () => {
+  it("opens the initial-plan deep link and starts a v2 review operation", async () => {
     generateGoalReviewMock.mockClear();
     const { router } = renderInRouter(<GoalWorkspacePage goal={baseGoal} copy={copy} />, "/en/goals/goal-1?review=initial");
-    expect(screen.getByRole("dialog")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Review AI initial plan" })).toBeInTheDocument();
-
     fireEvent.click(screen.getByRole("button", { name: "Generate AI review" }));
-    await waitFor(() =>
-      expect(generateGoalReviewMock).toHaveBeenCalledWith("goal-1", {
-        idempotencyKey: "goal-idempotency-key",
-        mode: "initial",
-      }, expect.anything()),
-    );
-
+    await waitFor(() => expect(generateGoalReviewMock).toHaveBeenCalledWith("goal-1", {
+      idempotencyKey: "goal-idempotency-key",
+      mode: "initial",
+    }, expect.anything()));
     fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
     await waitFor(() => expect(router.state.location.search).toBe(""));
   });
 
-  it("renders live AI review progress without exposing generated content", async () => {
-    const deferred = Promise.withResolvers<{ proposalId: string; status: string }>();
-    let onProgress: ((event: AiRunProgressEvent) => void) | undefined;
-    generateGoalReviewMock.mockImplementationOnce(async (_goalId, _command, options) => {
-      onProgress = options?.onProgress;
-      return deferred.promise;
-    });
-    renderInRouter(<GoalWorkspacePage goal={baseGoal} copy={copy} />, "/en/goals/goal-1?review=initial");
-    fireEvent.click(screen.getByRole("button", { name: "Generate AI review" }));
-    await waitFor(() => expect(onProgress).toBeDefined());
-    onProgress?.({ operationId: "goal-idempotency-key", feature: "goal.review", sequence: 1, occurredAt: new Date().toISOString(), phase: "connecting" });
-    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("Connecting to AI…"));
-    onProgress?.({ operationId: "goal-idempotency-key", feature: "goal.review", sequence: 2, occurredAt: new Date().toISOString(), phase: "thinking" });
-    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("AI is thinking…"));
-    onProgress?.({ operationId: "goal-idempotency-key", feature: "goal.review", sequence: 3, occurredAt: new Date().toISOString(), phase: "using_tool", toolName: "goal_snapshot_read" });
-    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("AI is using tool: goal_snapshot_read"));
-    deferred.resolve({ proposalId: "proposal-created", status: "Generating" });
-    await waitFor(() => expect(screen.getByRole("button", { name: "Generate AI review" })).toBeEnabled());
-  });
-
-  it("shows queued and live AI events immediately while retrying a failed review", async () => {
-    const deferred = Promise.withResolvers<{ proposalId: string; status: string }>();
-    let onProgress: ((event: AiRunProgressEvent) => void) | undefined;
-    generateGoalReviewMock.mockImplementationOnce(async (_goalId, _command, options) => {
-      onProgress = options?.onProgress;
-      return deferred.promise;
-    });
-    const failedGoal: GoalData = {
+  it("uses the safe retry action for a failed v2 review without rendering the runtime failure", async () => {
+    retryGoalReviewMock.mockClear();
+    const failedGoal = {
       ...baseGoal,
       primaryAction: { kind: "review", taskId: null },
       projection: { ...baseGoal.projection, nextAction: "review" },
       reviewProposals: [{
-        id: "proposal-failed",
-        mode: "progress",
-        status: "Failed",
-        sourceTaskId: null,
-        sourceRunId: null,
-        sourceTask: null,
-        inputSnapshotHash: "sha256:failed",
-        schemaVersion: 1,
-        providerName: "debug",
-        modelName: null,
-        summary: null,
-        generationError: "internal provider detail",
-        appliedAt: null,
-        rejectedAt: null,
-        createdAt: "2026-07-22T00:00:00.000Z",
-        updatedAt: "2026-07-22T00:00:00.000Z",
-        items: [],
+        id: "proposal-failed", mode: "progress", status: "Failed", version: 3,
+        sourceTaskId: null, sourceRunId: null, sourceTask: null, inputSnapshotHash: "sha256:failed",
+        schemaVersion: 2, providerName: null, modelName: null, summary: null,
+        generationError: "provider internals", questions: [], partialOutput: null,
+        cannotCompleteReason: null, missingObservations: null, appliedAt: null, rejectedAt: null,
+        createdAt: "2026-07-22T00:00:00.000Z", updatedAt: "2026-07-22T00:00:00.000Z", items: [],
       }],
-    };
+    } as GoalData;
     renderInRouter(<GoalWorkspacePage goal={failedGoal} copy={copy} />);
     fireEvent.click(screen.getByRole("button", { name: "Start Goal review" }));
-    expect(screen.queryByText("internal provider detail")).not.toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole("button", { name: "Generate AI review" }));
-    expect(screen.getByRole("status")).toHaveTextContent("Preparing AI review…");
-    await waitFor(() => expect(onProgress).toBeDefined());
-    onProgress?.({ operationId: "retry-operation", feature: "goal.review", sequence: 1, occurredAt: new Date().toISOString(), phase: "thinking" });
-    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("AI is thinking…"));
-    onProgress?.({ operationId: "retry-operation", feature: "goal.review", sequence: 2, occurredAt: new Date().toISOString(), phase: "using_tool", toolName: "goal_snapshot_read" });
-    await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent("AI is using tool: goal_snapshot_read"));
-
-    deferred.resolve({ proposalId: "proposal-failed", status: "Generating" });
-    await waitFor(() => expect(screen.getByRole("button", { name: "Generate AI review" })).toBeEnabled());
+    expect(screen.queryByText("provider internals")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Try again" }));
+    await waitFor(() => expect(retryGoalReviewMock).toHaveBeenCalledWith("goal-1", "proposal-failed", { expectedVersion: 3 }));
   });
-  it("starts clean after the latest review was discarded instead of reviving an older failure", () => {
-    const reviewProposals: GoalData["reviewProposals"] = [
-      {
-        id: "proposal-discarded",
-        mode: "progress",
-        status: "Rejected",
-        sourceTaskId: "review-task-discarded",
-        sourceRunId: "review-run-discarded",
-        sourceTask: null,
-        inputSnapshotHash: "sha256:discarded",
-        schemaVersion: 1,
-        providerName: "debug",
-        modelName: null,
-        summary: "Discarded review",
-        generationError: null,
-        appliedAt: null,
-        rejectedAt: "2026-07-23T00:00:00.000Z",
-        createdAt: "2026-07-23T00:00:00.000Z",
-        updatedAt: "2026-07-23T00:00:00.000Z",
-        items: [],
-      },
-      {
-        id: "proposal-old-failure",
-        mode: "progress",
-        status: "Failed",
-        sourceTaskId: null,
-        sourceRunId: null,
-        sourceTask: null,
-        inputSnapshotHash: "sha256:old-failure",
-        schemaVersion: 1,
-        providerName: "debug",
-        modelName: null,
-        summary: null,
-        generationError: "old failure",
-        appliedAt: null,
-        rejectedAt: null,
-        createdAt: "2026-07-22T00:00:00.000Z",
-        updatedAt: "2026-07-22T00:00:00.000Z",
-        items: [],
-      },
-    ];
-    const goal: GoalData = {
+
+  it("collects runtime questions as bounded JSON answers", async () => {
+    answerGoalReviewMock.mockClear();
+    const inputGoal = {
       ...baseGoal,
       primaryAction: { kind: "review", taskId: null },
       projection: { ...baseGoal.projection, nextAction: "review" },
-      reviewProposals,
-    };
-    renderInRouter(<GoalWorkspacePage goal={goal} copy={copy} />);
+      reviewProposals: [{
+        id: "proposal-input", mode: "progress", status: "NeedsInput", version: 4,
+        sourceTaskId: null, sourceRunId: null, sourceTask: null, inputSnapshotHash: "sha256:input",
+        schemaVersion: 2, providerName: null, modelName: null, summary: null, generationError: null,
+        questions: [{ questionId: "audience", prompt: "Who is the audience?", answerSchema: { type: "string" }, reason: "It affects the review." }],
+        partialOutput: null, cannotCompleteReason: null, missingObservations: null, appliedAt: null,
+        rejectedAt: null, createdAt: "2026-07-22T00:00:00.000Z", updatedAt: "2026-07-22T00:00:00.000Z", items: [],
+      }],
+    } as GoalData;
+    renderInRouter(<GoalWorkspacePage goal={inputGoal} copy={copy} />);
     fireEvent.click(screen.getByRole("button", { name: "Start Goal review" }));
-
-    expect(screen.queryByText("Review generation failed")).not.toBeInTheDocument();
-    expect(screen.getByText("Review conclusion")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Generate AI review" })).toBeEnabled();
+    fireEvent.change(screen.getByRole("textbox"), { target: { value: "Hiring managers" } });
+    fireEvent.click(screen.getByRole("button", { name: "Continue review" }));
+    await waitFor(() => expect(answerGoalReviewMock).toHaveBeenCalledWith("goal-1", "proposal-input", {
+      expectedVersion: 4,
+      answers: [{ questionId: "audience", answer: "Hiring managers" }],
+    }));
   });
 
 
@@ -1305,69 +1214,27 @@ describe("Goal pages", () => {
           id: "proposal-1",
           mode: "progress",
           status: "Ready",
+          version: 2,
           sourceTaskId: "review-task-1",
           sourceRunId: "review-run-1",
-          sourceTask: {
-            id: "review-task-1",
-            title: "Review Goal: Reach durable outcome",
-            status: "Completed",
-            latestRunId: "review-run-1",
-            latestRun: {
-              id: "review-run-1",
-              status: "Completed",
-              errorSummary: null,
-            },
-          },
+          sourceTask: { id: "review-task-1", title: "Review Goal", status: "Completed", latestRunId: "review-run-1", latestRun: { id: "review-run-1", status: "Completed", errorSummary: null } },
           inputSnapshotHash: "sha256:snapshot",
-          schemaVersion: 1,
+          schemaVersion: 2,
           providerName: "debug",
           modelName: null,
           summary: "One focused change is ready for review.",
           generationError: null,
+          questions: [],
+          partialOutput: null,
+          cannotCompleteReason: null,
+          missingObservations: null,
           appliedAt: null,
           rejectedAt: null,
           createdAt: "2026-07-22T00:00:00.000Z",
           updatedAt: "2026-07-22T00:00:00.000Z",
           items: [
-            {
-              id: "proposal-item-1",
-              itemId: "current-focus",
-              kind: "brief_field",
-              payload: { field: "currentFocus", value: "Verify the next outcome" },
-              rationale: "Accepted evidence supports a narrower next step.",
-              evidenceRefs: [{ type: "artifact", id: "internal-artifact-id", label: "Actionable opportunity table" }],
-              warnings: ["Verify the deadline on the official page."],
-              dependencyHash: "sha256:dependency",
-              decision: "Pending",
-              decisionReason: null,
-              appliedObjectType: null,
-              appliedObjectId: null,
-              decidedAt: null,
-            },
-            {
-              id: "proposal-item-2",
-              itemId: "evidence-gap",
-              kind: "evidence_gap",
-              payload: {
-                criterionId: "criterion-1",
-                title: "Verify the admissions path",
-                description: "Confirm that the supervisor can admit candidates.",
-                suggestedTask: {
-                  title: "Verify admissions path",
-                  description: "Check the official program and lab pages.",
-                  expectedOutcome: "The application route is confirmed.",
-                },
-              },
-              rationale: "The supervisor list needs an official admissions check.",
-              evidenceRefs: [],
-              warnings: [],
-              dependencyHash: "sha256:evidence-gap",
-              decision: "Pending",
-              decisionReason: null,
-              appliedObjectType: null,
-              appliedObjectId: null,
-              decidedAt: null,
-            },
+            { id: "proposal-item-1", itemId: "current-focus", kind: "brief_field", payload: { field: "currentFocus", value: "Verify the next outcome" }, rationale: "Accepted evidence supports a narrower next step.", evidenceRefs: [{ type: "artifact", id: "internal-artifact-id", label: "Actionable opportunity table" }], warnings: ["Verify the deadline on the official page."], dependencyHash: "sha256:dependency", decision: "Pending", decisionReason: null, appliedObjectType: null, appliedObjectId: null, decidedAt: null },
+            { id: "proposal-item-2", itemId: "evidence-gap", kind: "evidence_gap", payload: { criterionId: "criterion-1", title: "Verify the admissions path", description: "Confirm that the supervisor can admit candidates.", suggestedTask: { title: "Verify admissions path", description: "Check the official program and lab pages.", expectedOutcome: "The application route is confirmed." } }, rationale: "Evidence is needed before confirming the criterion.", evidenceRefs: [], warnings: [], dependencyHash: "sha256:evidence-gap", decision: "Pending", decisionReason: null, appliedObjectType: null, appliedObjectId: null, decidedAt: null },
           ],
         },
       ],
@@ -1388,15 +1255,15 @@ describe("Goal pages", () => {
     expect(screen.getByRole("button", { name: "Create suggested task: Verify the admissions path" })).toBeEnabled();
 
     fireEvent.click(screen.getByRole("button", { name: "Apply this item: Current focus" }));
-    await waitFor(() => expect(applyGoalReviewProposalMock).toHaveBeenCalledWith("goal-1", "proposal-1", {
+    await waitFor(() => expect(applyGoalReviewProposalMock).toHaveBeenCalledWith("goal-1", "proposal-1", expect.objectContaining({
       idempotencyKey: "goal-idempotency-key",
+      expectedVersion: 2,
+      expectedGoalUpdatedAt: baseGoal.updatedAt,
+      dependencyHashes: { "current-focus": "sha256:dependency", "evidence-gap": "sha256:evidence-gap" },
       decisions: [{ itemId: "current-focus", action: "accept" }],
-    }));
+    })));
     fireEvent.click(screen.getByRole("button", { name: "Reject this item: Verify the admissions path" }));
-    await waitFor(() => expect(applyGoalReviewProposalMock).toHaveBeenLastCalledWith("goal-1", "proposal-1", {
-      idempotencyKey: "goal-idempotency-key",
-      decisions: [{ itemId: "evidence-gap", action: "reject" }],
-    }));
+    await waitFor(() => expect(applyGoalReviewProposalMock).toHaveBeenLastCalledWith("goal-1", "proposal-1", expect.objectContaining({ decisions: [{ itemId: "evidence-gap", action: "reject" }] })));
   });
 
   it("applies or rejects every pending review item without selection", async () => {
@@ -1407,46 +1274,25 @@ describe("Goal pages", () => {
       primaryAction: { kind: "review", taskId: null },
       projection: { ...baseGoal.projection, nextAction: "review" },
       reviewProposals: [{
-        id: "proposal-bulk",
-        mode: "progress",
-        status: "Ready",
-        sourceTaskId: "review-task-1",
-        sourceRunId: "review-run-1",
-        sourceTask: null,
-        inputSnapshotHash: "sha256:snapshot",
-        schemaVersion: 1,
-        providerName: "debug",
-        modelName: null,
-        summary: "Ready.",
-        generationError: null,
-        appliedAt: null,
-        rejectedAt: null,
-        createdAt: "2026-07-22T00:00:00.000Z",
-        updatedAt: "2026-07-22T00:00:00.000Z",
-        items: [{
-          id: "proposal-item-bulk",
-          itemId: "current-focus",
-          kind: "brief_field",
-          payload: { field: "currentFocus", value: "Submit applications" },
-          rationale: "Research is complete.",
-          evidenceRefs: [],
-          warnings: [],
-          dependencyHash: "sha256:dependency",
-          decision: "Pending",
-          decisionReason: null,
-          appliedObjectType: null,
-          appliedObjectId: null,
-          decidedAt: null,
-        }],
+        id: "proposal-bulk", mode: "progress", status: "Ready", version: 5,
+        sourceTaskId: "review-task-1", sourceRunId: "review-run-1", sourceTask: null,
+        inputSnapshotHash: "sha256:snapshot", schemaVersion: 2, providerName: "debug", modelName: null,
+        summary: "Ready.", generationError: null, questions: [], partialOutput: null,
+        cannotCompleteReason: null, missingObservations: null, appliedAt: null, rejectedAt: null,
+        createdAt: "2026-07-22T00:00:00.000Z", updatedAt: "2026-07-22T00:00:00.000Z",
+        items: [{ id: "proposal-item-bulk", itemId: "current-focus", kind: "brief_field", payload: { field: "currentFocus", value: "Submit applications" }, rationale: "Research is complete.", evidenceRefs: [], warnings: [], dependencyHash: "sha256:dependency", decision: "Pending", decisionReason: null, appliedObjectType: null, appliedObjectId: null, decidedAt: null }],
       }],
     };
     const first = renderInRouter(<GoalWorkspacePage goal={proposalGoal} copy={copy} />);
     fireEvent.click(screen.getByRole("button", { name: "Start Goal review" }));
     fireEvent.click(screen.getByRole("button", { name: "Apply all" }));
-    await waitFor(() => expect(applyGoalReviewProposalMock).toHaveBeenCalledWith("goal-1", "proposal-bulk", {
+    await waitFor(() => expect(applyGoalReviewProposalMock).toHaveBeenCalledWith("goal-1", "proposal-bulk", expect.objectContaining({
       idempotencyKey: "goal-idempotency-key",
+      expectedVersion: 5,
+      expectedGoalUpdatedAt: baseGoal.updatedAt,
+      dependencyHashes: { "current-focus": "sha256:dependency" },
       decisions: [{ itemId: "current-focus", action: "accept" }],
-    }));
+    })));
     first.unmount();
 
     renderInRouter(<GoalWorkspacePage goal={proposalGoal} copy={copy} />);
@@ -1493,5 +1339,15 @@ describe("Goal pages", () => {
     await waitFor(() =>
       expect(router.state.location.pathname).toBe("/en/goals/goal-promoted"),
     );
+  });
+});
+
+describe("Goal Review answer parsing", () => {
+  it("preserves scalar, array, and object answer semantics", () => {
+    expect(parseGoalReviewAnswer("Hiring managers", { type: "string" })).toBe("Hiring managers");
+    expect(parseGoalReviewAnswer("true", { type: "boolean" })).toBe(true);
+    expect(parseGoalReviewAnswer("[\"quality\",\"speed\"]", { type: "array", items: { type: "string" } })).toEqual(["quality", "speed"]);
+    expect(parseGoalReviewAnswer("{\"audience\":\"Hiring managers\"}", { type: "object" })).toEqual({ audience: "Hiring managers" });
+    expect(parseGoalReviewAnswer("not-json", { type: "array" })).toBeUndefined();
   });
 });

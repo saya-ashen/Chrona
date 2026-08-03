@@ -8,9 +8,9 @@ export {
   ensureDefaultTaskSession,
   ensureWorkBlockTaskSession,
   ensureWorkBlockPlanTaskSession,
-  ensurePlanGenerationTaskSession,
   ensurePlanExecutionTaskSession,
   updateTaskSessionStateFromRun,
+  updateTaskSessionStateFromRunInTransaction,
 } from "./task-sessions";
 export {
   getRuntimeAdapterDefinition,

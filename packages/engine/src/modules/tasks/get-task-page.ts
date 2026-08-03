@@ -224,7 +224,7 @@ export async function getTaskPage(input: { taskId: string; workBlockId?: string 
   ];
   const savedPlan = latestSavedPlan;
   const aiPlanGenerationStatus: TaskPlanGenerationStatus =
-    isTaskPlanGenerationRunning({ taskId, workBlockId: selectedWorkBlockId })
+    await isTaskPlanGenerationRunning({ taskId, workBlockId: selectedWorkBlockId })
       ? "generating"
       : savedPlan !== null && savedPlan.status === "accepted"
         ? "accepted"

@@ -7,6 +7,7 @@ import {
   automationTimingOffsetMs,
   normalizeAutomationTiming,
 } from "@chrona/contracts";
+import { assertSchedulerWorkOwnership, type SchedulerWorkContext } from "@/modules/orchestration/scheduler-lease-repository";
 
 const MAX_AUTOMATION_TIMING_OFFSET_MS = Math.max(
   ...AUTOMATION_TIMING_PRESETS.map((preset) => automationTimingOffsetMs(preset)),
@@ -47,6 +48,7 @@ export type AutoGenerateScheduledPlanResult = {
 
 export async function autoGenerateScheduledPlanTasks(input?: {
   now?: Date;
+  workContext?: SchedulerWorkContext;
 }): Promise<AutoGenerateScheduledPlanResult> {
   const now = input?.now ?? new Date();
   const result: AutoGenerateScheduledPlanResult = {
@@ -56,8 +58,8 @@ export async function autoGenerateScheduledPlanTasks(input?: {
   };
   const fired = new Set<string>();
 
-  await runScheduledPass({ now, result, fired });
-  await runNoScheduleFallbackPass({ now, result, fired });
+  await runScheduledPass({ now, result, fired, workContext: input?.workContext });
+  await runNoScheduleFallbackPass({ now, result, fired, workContext: input?.workContext });
 
   return result;
 }
@@ -66,9 +68,10 @@ type PassContext = {
   now: Date;
   result: AutoGenerateScheduledPlanResult;
   fired: Set<string>;
+  workContext?: SchedulerWorkContext;
 };
 
-async function runScheduledPass({ now, result, fired }: PassContext): Promise<void> {
+async function runScheduledPass({ now, result, fired, workContext }: PassContext): Promise<void> {
   const windowUpperBound = new Date(now.getTime() + MAX_AUTOMATION_TIMING_OFFSET_MS);
   const dueWorkBlocks = await db.workBlock.findMany({
     where: {
@@ -96,6 +99,7 @@ async function runScheduledPass({ now, result, fired }: PassContext): Promise<vo
   });
 
   for (const block of dueWorkBlocks) {
+    await assertSchedulerWorkOwnership(workContext);
     const task = block.task;
     const firedKey = `${task.id}:${block.id}`;
     if (fired.has(firedKey)) continue;
@@ -126,7 +130,7 @@ async function runScheduledPass({ now, result, fired }: PassContext): Promise<vo
     // same (task, workBlock) and `startTaskPlanGeneration` throws
     // `TaskPlanGenerationInFlightError` for every subsequent tick until
     // the in-flight stream finishes.
-    if (isTaskPlanGenerationRunning({ taskId: task.id, workBlockId: block.id })) {
+    if (await isTaskPlanGenerationRunning({ taskId: task.id, workBlockId: block.id })) {
       result.skipped.push({ taskId: task.id, workBlockId: block.id, reason: "generation_in_flight" });
       continue;
     }
@@ -134,13 +138,20 @@ async function runScheduledPass({ now, result, fired }: PassContext): Promise<vo
       result.skipped.push({ taskId: task.id, workBlockId: block.id, reason: "plan_generation_failed" });
       continue;
     }
-    await generateAndAcceptTaskPlan({ taskId: task.id, workBlockId: block.id, accept: task.autoExecute });
+    await assertSchedulerWorkOwnership(workContext);
+    await generateAndAcceptTaskPlan({
+      taskId: task.id,
+      workBlockId: block.id,
+      accept: task.autoExecute,
+      workContext,
+    });
+    await assertSchedulerWorkOwnership(workContext);
     fired.add(firedKey);
     result.triggered.push({ taskId: task.id, workBlockId: block.id, reason: "scheduled" });
   }
 }
 
-async function runNoScheduleFallbackPass({ now, result, fired }: PassContext): Promise<void> {
+async function runNoScheduleFallbackPass({ now, result, fired, workContext }: PassContext): Promise<void> {
   const graceCutoff = new Date(now.getTime() - NO_SCHEDULE_GRACE_MS);
   const unscheduledTasks = await db.task.findMany({
     where: {
@@ -158,6 +169,7 @@ async function runNoScheduleFallbackPass({ now, result, fired }: PassContext): P
   });
 
   for (const task of unscheduledTasks) {
+    await assertSchedulerWorkOwnership(workContext);
     if (fired.has(task.id)) continue;
     const timing = normalizeAutomationTiming(task.autoPlanGenerationTiming);
 
@@ -174,7 +186,7 @@ async function runNoScheduleFallbackPass({ now, result, fired }: PassContext): P
     // same task and `startTaskPlanGeneration` throws
     // `TaskPlanGenerationInFlightError` for every subsequent tick until
     // the in-flight stream finishes.
-    if (isTaskPlanGenerationRunning({ taskId: task.id, workBlockId: null })) {
+    if (await isTaskPlanGenerationRunning({ taskId: task.id, workBlockId: null })) {
       result.skipped.push({ taskId: task.id, workBlockId: null, reason: "generation_in_flight" });
       continue;
     }
@@ -182,7 +194,14 @@ async function runNoScheduleFallbackPass({ now, result, fired }: PassContext): P
       result.skipped.push({ taskId: task.id, workBlockId: null, reason: "plan_generation_failed" });
       continue;
     }
-    await generateAndAcceptTaskPlan({ taskId: task.id, workBlockId: null, accept: task.autoExecute });
+    await assertSchedulerWorkOwnership(workContext);
+    await generateAndAcceptTaskPlan({
+      taskId: task.id,
+      workBlockId: null,
+      accept: task.autoExecute,
+      workContext,
+    });
+    await assertSchedulerWorkOwnership(workContext);
     fired.add(task.id);
     result.triggered.push({ taskId: task.id, workBlockId: null, reason: "no_schedule_fallback" });
   }

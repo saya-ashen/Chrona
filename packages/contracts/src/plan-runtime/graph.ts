@@ -214,4 +214,5 @@ export interface ResolveEffectivePlanGraphInput {
   graph: PlanGraph;
   attempts?: NodeAttempt[];
   results?: NodeResult[];
+  resolvedAt?: string;
 }

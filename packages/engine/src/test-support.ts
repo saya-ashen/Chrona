@@ -12,14 +12,10 @@ export {
   aiChat,
   dispatchStream,
   extractJSON,
-  generatePlanStream,
   llmCall,
   runProviderRequest,
 } from "./modules/ai";
-export type {
-  EngineAiClient,
-  ProviderFeatureRequest,
-} from "./modules/ai";
+export type { EngineAiClient } from "./modules/ai";
 export {
   archiveExpiredEventRecords,
   readEventRetentionConfig,

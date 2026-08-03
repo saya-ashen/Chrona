@@ -66,12 +66,13 @@ export const workProjectionParamSchema = z.object({
 });
 
 const workspaceCommandBaseSchema = z.object({
-  idempotencyKey: z.string().min(1).optional(),
+  idempotencyKey: z.string().min(1),
 });
 
 export const workCommandBodySchema = z.union([
-  workspaceCommandBaseSchema.extend({
+  z.object({
     type: z.literal("plan.generate"),
+    idempotencyKey: z.string().min(1),
     forceRefresh: z.boolean().optional(),
     workBlockId: z.string().min(1).nullable().optional(),
     userInstruction: z.string().optional().nullable(),
@@ -82,10 +83,12 @@ export const workCommandBodySchema = z.union([
     type: z.literal("plan.stop_generation"),
     workBlockId: z.string().min(1).nullable().optional(),
   }),
-  workspaceCommandBaseSchema.extend({
+  z.object({
     type: z.literal("plan.accept"),
+    idempotencyKey: z.string().min(1),
     planId: z.string().min(1),
     workBlockId: z.string().min(1).nullable().optional(),
+    expectedHeadStateVersion: z.number().int().nonnegative(),
   }),
   executionActionBodySchema.and(workspaceCommandBaseSchema.extend({
     type: z.literal("execution.action"),

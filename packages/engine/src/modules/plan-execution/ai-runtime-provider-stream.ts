@@ -1,4 +1,4 @@
-import { assertProviderStartSupported, type AgentProviderClient, type ProviderRunEvent, type ProviderRunRef, type ProviderRunSnapshot, type StartRunInput } from "@chrona/providers-foundation";
+import { assertProviderStartSupported, ProviderOperationError, type AgentProviderClient, type ProviderCapabilities, type ProviderRunEvent, type ProviderRunRef, type ProviderRunSnapshot, type StartRunInput } from "@chrona/providers-foundation";
 import { collectProviderRunSnapshot } from "./ai-runtime-stream-collection";
 import { persistRuntimeRunRef, updateProviderRunRecord } from "./ai-runtime-persistence";
 import { toStartRunInput, type ExecutionProviderRequest } from "./ai-runtime-request";
@@ -14,6 +14,8 @@ type ProviderRunRequestOptions = {
   idempotencyKey?: string;
   clientOperationId?: string;
   providerRunRecordId?: string;
+  providerRunIdentity?: "created" | "existing";
+  existingRunRef?: ProviderRunRef;
   onRuntimeEvent?: (event: ProviderRunEvent) => Promise<void> | void;
   terminalToolName?: string;
   eventPersistence?: RuntimeEventPersistenceContext;
@@ -27,8 +29,10 @@ export async function runProviderRequest(
   request: ExecutionProviderRequest,
   options: ProviderRunRequestOptions = {},
 ): Promise<ProviderRunSnapshot> {
-  const run = await startProviderRun(providerClient, request, options);
-  const cancel = () => cancelProviderRun(providerClient, run, options.providerRunRecordId);
+  const run = options.providerRunIdentity === "existing"
+    ? await attachProviderRun(providerClient, request, options)
+    : await startProviderRun(providerClient, request, options);
+  const cancel = () => cancelProviderRun(providerClient, run, options.providerRunRecordId, options.eventPersistence);
   if (options.signal?.aborted) return cancel();
   try {
     const snapshot = await streamProviderRun(providerClient, run, options);
@@ -37,6 +41,47 @@ export async function runProviderRequest(
     if (!isTransientProviderError(error)) throw error;
     return resumeOrReconcileProviderRun(providerClient, run, options, cancel);
   }
+}
+
+async function attachProviderRun(providerClient: ProviderClient, request: ExecutionProviderRequest, options: ProviderRunRequestOptions): Promise<ProviderRunRef> {
+  const run = options.existingRunRef ?? await lookupExistingProviderRun(providerClient, request, options);
+  await persistAttachedProviderRun(run, options);
+  return run;
+}
+
+async function lookupExistingProviderRun(providerClient: ProviderClient, request: ExecutionProviderRequest, options: ProviderRunRequestOptions): Promise<ProviderRunRef> {
+  const capabilities = await providerClient.getCapabilities();
+  const clientOperationId = options.clientOperationId ?? options.runId ?? request.clientOperationId;
+  if (!canLookupClientOperation(capabilities) || !providerClient.findRunByClientOperationId) {
+    throw new ProviderOperationError({
+      code: "provider_start_outcome_unknown",
+      provider: providerClient.provider,
+      message: `${providerClient.provider} cannot repair an existing provider run without a persisted provider run ref.`,
+    });
+  }
+  const run = await providerClient.findRunByClientOperationId({ clientOperationId, signal: options.signal });
+  if (!run) {
+    throw new ProviderOperationError({
+      code: "provider_start_outcome_unknown",
+      provider: providerClient.provider,
+      message: `${providerClient.provider} has no provider run for clientOperationId ${clientOperationId}.`,
+    });
+  }
+  return run;
+}
+
+function canLookupClientOperation(capabilities: ProviderCapabilities): boolean {
+  return capabilities.startIdempotency === "client_operation_id" || capabilities.lookupByClientOperationId === true;
+}
+
+async function persistAttachedProviderRun(run: ProviderRunRef, options: ProviderRunRequestOptions): Promise<void> {
+  await persistRuntimeRunRef(options.runId, run, options.eventPersistence);
+  await options.onRunStarted?.(run);
+  await updateProviderRunRecord(options.providerRunRecordId, {
+    providerRunRef: run.nativeRunId ?? run.runId,
+    nativeRunId: run.nativeRunId ?? null,
+    status: run.status ?? "running",
+  }, options.eventPersistence);
 }
 
 async function startProviderRun(providerClient: ProviderClient, request: ExecutionProviderRequest, options: ProviderRunRequestOptions): Promise<ProviderRunRef> {
@@ -49,14 +94,23 @@ async function startProviderRun(providerClient: ProviderClient, request: Executi
     signal: options.signal,
     control: controlForRun(providerClient.provider, options.controlRunToken),
   });
-  await persistRuntimeRunRef(options.runId, run);
-  await options.onRunStarted?.(run);
-  await updateProviderRunRecord(options.providerRunRecordId, {
-    providerRunRef: run.nativeRunId ?? run.runId,
-    nativeRunId: run.nativeRunId ?? null,
-    status: run.status ?? "running",
-  });
-  return run;
+  try {
+    await persistRuntimeRunRef(options.runId, run, options.eventPersistence);
+    await options.onRunStarted?.(run);
+    await updateProviderRunRecord(options.providerRunRecordId, {
+      providerRunRef: run.nativeRunId ?? run.runId,
+      nativeRunId: run.nativeRunId ?? null,
+      status: run.status ?? "running",
+    }, options.eventPersistence);
+    return run;
+  } catch (error) {
+    await providerClient.cancelRun({
+      runId: run.runId,
+      sessionId: run.sessionId,
+      reason: "Durable execution ownership was lost",
+    }).catch(() => null);
+    throw error;
+  }
 }
 
 function controlForRun(provider: string, token: string | null | undefined) {
@@ -89,9 +143,19 @@ async function resumeOrReconcileProviderRun(
   }
 }
 
-async function cancelProviderRun(providerClient: ProviderClient, run: ProviderRunRef, providerRunRecordId: string | undefined): Promise<ProviderRunSnapshot> {
+async function cancelProviderRun(
+  providerClient: ProviderClient,
+  run: ProviderRunRef,
+  providerRunRecordId: string | undefined,
+  scope: RuntimeEventPersistenceContext | undefined,
+): Promise<ProviderRunSnapshot> {
   const snapshot = await providerClient.cancelRun({ runId: run.runId, sessionId: run.sessionId, reason: "Execution stopped" }).catch(() => null);
-  await updateProviderRunRecord(providerRunRecordId, { status: "cancelled", finishedAt: new Date() });
+  await updateProviderRunRecord(
+    providerRunRecordId,
+    { status: "cancelled", finishedAt: new Date() },
+    scope,
+    { providerRunStatuses: ["running", "waiting_for_approval", "completed", "failed", "cancelled"] },
+  );
   return { ...(snapshot ?? cancelledSnapshot(providerClient.provider, run)), status: "cancelled", error: snapshot?.error ?? null };
 }
 

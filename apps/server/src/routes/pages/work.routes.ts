@@ -3,7 +3,6 @@ import { createLogger } from "@chrona/logging";
 
 import { streamSSE } from "hono/streaming";
 import { zValidator } from "@hono/zod-validator";
-import { randomUUID } from "node:crypto";
 import { appendTaskWorkspaceEvent, subscribeToTaskProjectionEvents, type ChronaEngine, type TaskProjectionEvent } from "@chrona/engine";
 import { workCommandBodySchema, workProjectionParamSchema } from "@chrona/contracts/api";
 import { buildTaskWorkspaceStateSnapshot, dispatchTaskWorkspaceCommand, getTaskWorkspaceId } from "@features/task-workspace/server";
@@ -97,7 +96,7 @@ export function createWorkRoutes(engine: ChronaEngine) {
         try {
           const { taskId } = c.req.valid("param");
           const command = c.req.valid("json");
-          const commandId = command.idempotencyKey ?? randomUUID();
+          const commandId = command.idempotencyKey;
           const workspaceId = await getTaskWorkspaceId(engine, taskId);
 
           if (command.type === "execution.action") {

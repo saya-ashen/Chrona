@@ -1,30 +1,157 @@
 import { createHash } from "node:crypto";
+import { z } from "zod";
 import { db, Prisma } from "@chrona/db";
 import {
   applyGoalAssetOwnershipBodySchema,
-  buildGoalAssetOwnershipFeatureSpec,
-  goalAssetOwnershipResultSchema,
   type ApplyGoalAssetOwnershipRequest,
   type GenerateGoalAssetOwnershipRequest,
-  type GoalAssetOwnershipResult,
   type ResolveGoalInboxCandidateRequest,
 } from "@chrona/contracts";
+import type { ProviderJsonValue } from "@chrona/providers-foundation";
 import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
 import {
-  dispatchPreparedFeaturePayload,
   getAiClientForFeature,
+  runProviderRequest,
+  type ProviderFeatureRequest,
 } from "../ai";
 import { resolveGoalInboxCandidate } from "./goal-workbench";
 
+const providerJsonValueSchema: z.ZodType<ProviderJsonValue> = z.lazy(() =>
+  z.union([
+    z.string(),
+    z.number(),
+    z.boolean(),
+    z.null(),
+    z.array(providerJsonValueSchema),
+    z.record(z.string(), providerJsonValueSchema),
+  ]),
+);
 const SCHEMA_VERSION = 1;
+const goalAssetOwnershipResultCommonSchema = z.object({
+  schemaVersion: z.literal(SCHEMA_VERSION),
+  proposedLabel: z.string().trim().min(1).max(200),
+  rationale: z.string().trim().min(1).max(8_000),
+  differenceSummary: z.string().trim().min(1).max(8_000),
+  certainty: z.enum(["low", "medium", "high"]),
+  evidence: z.array(z.string().trim().min(1).max(2_000)).min(1).max(20),
+  counterEvidence: z.array(z.string().trim().min(1).max(2_000)).max(20).default([]),
+}).strict();
+const goalAssetOwnershipResultSchema = z.discriminatedUnion("decision", [
+  goalAssetOwnershipResultCommonSchema.extend({
+    decision: z.literal("create_asset"),
+    targetAssetId: z.null(),
+  }),
+  goalAssetOwnershipResultCommonSchema.extend({
+    decision: z.literal("append_version"),
+    targetAssetId: z.string().trim().min(1).max(256),
+  }),
+  goalAssetOwnershipResultCommonSchema.extend({
+    decision: z.literal("separate_asset"),
+    targetAssetId: z.null(),
+  }),
+]);
+const goalAssetOwnershipInputSchema = z
+  .object({
+    schemaVersion: z.literal(SCHEMA_VERSION),
+    snapshotHash: z.string().regex(/^sha256:[a-f0-9]{64}$/),
+    snapshot: z.object({
+      candidate: z.object({
+        id: z.string().min(1).max(256),
+        goalId: z.string().min(1).max(256),
+        kind: z.enum(["document", "form", "page", "file", "data_table", "structured_result"]),
+        label: z.string().min(1).max(200),
+        content: providerJsonValueSchema,
+        contentHash: z.string().min(1).max(256),
+        ruleRecommendation: z.object({
+          action: z.string().min(1).max(128),
+          targetAssetId: z.string().min(1).max(256).nullable(),
+          reason: z.string().min(1).max(2_000),
+        }).strict(),
+      }).strict(),
+      provenance: z.object({
+        acceptedTaskId: z.string().min(1).max(256),
+        acceptedTaskTitle: z.string().min(1).max(512),
+        acceptedRunId: z.string().min(1).max(256),
+        artifactId: z.string().min(1).max(256).nullable(),
+        artifactTitle: z.string().min(1).max(512).nullable(),
+        artifactType: z.string().min(1).max(128).nullable(),
+        artifactContentPreview: z.string().max(20_000).nullable(),
+      }).strict(),
+      candidateAssets: z.array(z.object({
+        assetId: z.string().min(1).max(256),
+        label: z.string().min(1).max(200),
+        kind: z.enum(["document", "form", "page", "file", "data_table", "structured_result"]),
+        currentVersionId: z.string().min(1).max(256),
+        currentVersion: z.number().int().positive(),
+        contentHash: z.string().min(1).max(256),
+      }).strict()).max(128),
+    }).strict(),
+  })
+  .strict();
+type GoalAssetOwnershipResult = z.infer<typeof goalAssetOwnershipResultSchema>;
+
+const GOAL_ASSET_OWNERSHIP_INSTRUCTIONS =
+  "You classify one accepted task result into a frozen set of Goal asset candidates. Use only the supplied snapshot. Return one discrete ownership decision with evidence and counter-evidence. Never create, modify, archive, or publish assets.";
+
+function ownershipProviderRequest(input: z.infer<typeof goalAssetOwnershipInputSchema>): ProviderFeatureRequest {
+  const clientOperationId = `goal-asset-ownership:${input.snapshot.candidate.id}:${input.snapshotHash}`;
+  return z.object({
+    clientOperationId: z.string(),
+    sessionId: z.string(),
+    sessionKey: z.string(),
+    instructions: z.string(),
+    input: z.record(z.string(), providerJsonValueSchema),
+    structuredOutputSchema: z.object({
+      name: z.string(),
+      description: z.string(),
+      schema: z.record(z.string(), providerJsonValueSchema),
+    }).strict(),
+    toolPolicy: z.literal("read_only"),
+    stream: z.literal(true),
+  }).strict().parse({
+    clientOperationId,
+    sessionId: clientOperationId,
+    sessionKey: clientOperationId,
+    instructions: GOAL_ASSET_OWNERSHIP_INSTRUCTIONS,
+    input,
+    structuredOutputSchema: {
+      name: "goal_asset_ownership_result",
+      description: "A bounded recommendation for the ownership of one Goal Inbox candidate.",
+      schema: z.record(z.string(), providerJsonValueSchema).parse(
+        z.toJSONSchema(goalAssetOwnershipResultSchema, {
+          target: "draft-07",
+          unrepresentable: "any",
+        }),
+      ),
+    },
+    toolPolicy: "read_only",
+    stream: true,
+  });
+}
+
+function ownershipProviderPayload(payload: unknown): GoalAssetOwnershipResult {
+  const providerPayload = providerJsonValueSchema.safeParse(payload);
+  const envelope = z.object({ parsed: goalAssetOwnershipResultSchema }).passthrough().safeParse(
+    providerPayload.success ? providerPayload.data : undefined,
+  );
+  if (!envelope.success) {
+    throw new Error(`Asset Ownership returned an invalid structured result: ${envelope.error.issues.map((issue) => `${issue.path.join(".")}: ${issue.message}`).join("; ")}`);
+  }
+  return envelope.data.parsed;
+}
+export const __goalAssetOwnershipTestHooks = {
+  parseInput: (value: unknown) => goalAssetOwnershipInputSchema.parse(value),
+  parsePayload: ownershipProviderPayload,
+};
+// Provider payloads are parsed through the local contract before proposal persistence.
 
 type OwnershipSnapshot = {
   candidate: {
     id: string;
+    content: ProviderJsonValue;
     goalId: string;
     kind: "document" | "form" | "page" | "file" | "data_table" | "structured_result";
     label: string;
-    content: unknown;
     contentHash: string;
     ruleRecommendation: {
       action: string;
@@ -65,8 +192,20 @@ function hashValue(value: unknown) {
   return `sha256:${createHash("sha256").update(JSON.stringify(stableValue(value))).digest("hex")}`;
 }
 
+function asPrismaJson(value: ProviderJsonValue): Prisma.InputJsonValue | null {
+  if (value === null || typeof value === "string" || typeof value === "number" || typeof value === "boolean") return value;
+  if (Array.isArray(value)) return value.map(asPrismaJson);
+  return Object.fromEntries(
+    Object.entries(value).map(([key, nested]) => [key, asPrismaJson(nested)]),
+  );
+}
+
 function asJsonObject(value: unknown): Prisma.InputJsonObject {
-  return JSON.parse(JSON.stringify(value)) as Prisma.InputJsonObject;
+  const parsed = providerJsonValueSchema.parse(value);
+  if (parsed === null || Array.isArray(parsed) || typeof parsed !== "object") throw new Error("Expected a bounded JSON object for persistence.");
+  return Object.fromEntries(
+    Object.entries(parsed).map(([key, nested]) => [key, asPrismaJson(nested)]),
+  );
 }
 
 function record(value: unknown): Record<string, unknown> | null {
@@ -116,7 +255,7 @@ async function snapshotCandidate(input: {
       goalId: candidate.goalId,
       kind: candidate.kind,
       label: candidate.label,
-      content: candidate.content,
+      content: providerJsonValueSchema.parse(candidate.content),
       contentHash: candidate.contentHash,
       ruleRecommendation: {
         action: candidate.proposedAction,
@@ -250,32 +389,26 @@ export async function runGoalAssetOwnershipGeneration(input: {
     if (!client) {
       throw new Error("No AI client is configured for Asset Ownership");
     }
-    const featureSpec = buildGoalAssetOwnershipFeatureSpec();
-    featureSpec.inputText = JSON.stringify(
-      {
-        snapshot: proposal.inputSnapshot,
-        snapshotHash: proposal.inputHash,
-        schemaVersion: SCHEMA_VERSION,
-      },
-      null,
-      2,
+    if (!client.providerClient) {
+      throw new Error("Configured Asset Ownership client does not support provider execution");
+    }
+    const requestInput = goalAssetOwnershipInputSchema.parse({
+      snapshot: proposal.inputSnapshot,
+      snapshotHash: proposal.inputHash,
+      schemaVersion: SCHEMA_VERSION,
+    });
+    const invocation = await runProviderRequest(
+      client.providerClient,
+      ownershipProviderRequest(requestInput),
     );
-    const invocation = await dispatchPreparedFeaturePayload<GoalAssetOwnershipResult>(
-      client,
-      featureSpec,
-      `goal-asset-ownership:${proposal.id}`,
-      { toolPolicy: "read_only" },
-    );
-    const parsed = goalAssetOwnershipResultSchema.safeParse(invocation.parsed);
-    if (!parsed.success) {
+    if (invocation.error || invocation.status !== "completed") {
       throw new Error(
-        `Asset Ownership returned an invalid structured result: ${parsed.error.issues
-          .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
-          .join("; ")}`,
+        invocation.error ?? `Asset Ownership provider ended with status ${invocation.status}`,
       );
     }
-    const snapshot = proposal.inputSnapshot as unknown as OwnershipSnapshot;
-    validateReferences(snapshot, parsed.data);
+    const parsed = ownershipProviderPayload(invocation.structuredPayload);
+    const snapshot = requestInput.snapshot;
+    validateReferences(snapshot, parsed);
     const config = record(client.record.config);
     await db.$transaction(
       async (tx) => {
@@ -288,9 +421,9 @@ export async function runGoalAssetOwnershipGeneration(input: {
           where: { id: proposal.id },
           data: {
             status: "Ready",
-            result: asJsonObject(parsed.data),
-            decision: parsed.data.decision,
-            targetAssetId: parsed.data.targetAssetId,
+            result: asJsonObject(parsed),
+            decision: parsed.decision,
+            targetAssetId: parsed.targetAssetId,
             providerType: client.record.type,
             model: typeof config?.model === "string" ? config.model : null,
             generationError: null,
@@ -308,11 +441,11 @@ export async function runGoalAssetOwnershipGeneration(input: {
               goal_id: proposal.goalId,
               candidate_id: proposal.inboxCandidateId,
               proposal_id: proposal.id,
-              decision: parsed.data.decision,
+              decision: parsed.decision,
               provider_client_id: client.record.id,
-              provider_run_id: invocation.debug?.runId ?? null,
+              provider_run_id: invocation.nativeRunId ?? invocation.runId,
             },
-            summary: parsed.data.rationale,
+            summary: parsed.rationale,
             dedupeKey: `goal.asset_ownership_proposal_ready:${proposal.id}`,
             ingestSequence: 0,
           },
@@ -398,7 +531,11 @@ async function resolveCommand(
     };
   }
 
-  const snapshot = proposal.inputSnapshot as unknown as OwnershipSnapshot;
+  const snapshot = goalAssetOwnershipInputSchema.parse({
+    snapshot: proposal.inputSnapshot,
+    snapshotHash: "sha256:0000000000000000000000000000000000000000000000000000000000000000",
+    schemaVersion: SCHEMA_VERSION,
+  }).snapshot;
   if (result.decision === "append_version") {
     const target = snapshot.candidateAssets.find(
       (candidate) => candidate.assetId === result.targetAssetId,

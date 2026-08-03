@@ -947,9 +947,6 @@ describe("GoalAssetWorkbench", () => {
           status: "Ready",
           sourceTaskId: "ownership-task",
           sourceRunId: "ownership-run",
-          providerType: "debug",
-          model: "provider/default",
-          generationError: null,
           result: {
             schemaVersion: 1,
             decision: "create_asset",
@@ -974,7 +971,7 @@ describe("GoalAssetWorkbench", () => {
     expect(
       screen.getByText(candidate.ownershipProposals![0]!.result!.rationale),
     ).toBeInTheDocument();
-    expect(screen.getByText(/debug/)).toBeInTheDocument();
+    expect(screen.getAllByText(/AI/).length).toBeGreaterThan(0);
     expect(mocks.applyGoalAssetOwnership).not.toHaveBeenCalled();
 
     await userEvent.click(

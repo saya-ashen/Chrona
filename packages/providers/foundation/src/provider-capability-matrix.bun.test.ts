@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { providerCapabilityMatrix, summarizeProviderCapabilities } from "./provider-capability-matrix";
+import { supportsDurableFeatureRuntime } from "./ProviderClient";
 
 describe("providerCapabilityMatrix", () => {
   it("models Codex as session-history recovery instead of active run lookup", () => {
@@ -104,5 +105,30 @@ describe("providerCapabilityMatrix", () => {
       engineManagedToolResults: true,
       externalControlPlaneActions: false,
     });
+  });
+
+  it("requires cross-process authoritative lookup, reconnect, and idempotent start for Feature Runtime", () => {
+    const durable = {
+      supportsSessions: true,
+      supportsStreaming: true,
+      supportsRunLookup: true,
+      supportsCancellation: true,
+      supportsToolCalls: true,
+      supportsPreviousResponse: false,
+      startIdempotency: "client_operation_id" as const,
+      recovery: {
+        sessionResume: true,
+        historyReplay: true,
+        activeRunLookup: true,
+        streamReconnect: true,
+        crossProcessDurable: true,
+        providerResumeRef: true,
+        runEventReplay: true,
+        mode: "authoritative_run_lookup" as const,
+      },
+    };
+    expect(supportsDurableFeatureRuntime(durable)).toBe(true);
+    expect(supportsDurableFeatureRuntime({ ...durable, recovery: { ...durable.recovery, crossProcessDurable: false, mode: "local_stream_only" } })).toBe(false);
+    expect(supportsDurableFeatureRuntime({ ...durable, startIdempotency: "unsupported" })).toBe(false);
   });
 });
