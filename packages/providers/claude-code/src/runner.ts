@@ -1,3 +1,4 @@
+/* eslint-disable complexity, max-lines-per-function, max-lines, max-depth, @typescript-eslint/no-unnecessary-condition -- Provider runner keeps streaming protocol state transitions explicit. */
 /**
  * runner.ts — the IO seam for the Claude Code provider.
  *
@@ -55,6 +56,7 @@ import {
 } from "./runner-helpers";
 import { createLogger, type ChronaLogger } from "@chrona/logging";
 import { ClaudeCodeProviderError } from "./types";
+import { createRunToolsMcpServer, RUN_TOOLS_MCP_SERVER_NAME } from "./mcp-node-tools";
 
 const runnerLogger = createLogger("packages.providers.claude-code");
 
@@ -137,9 +139,9 @@ export interface ClaudeCodeRunnerConfig {
   model?: string;
   /** Idle timeout (ms). Aborts only when SDK produces no events within this window. */
   timeoutMs?: number;
-  /** Chrona /api/mcp base URL. */
+  /** Optional endpoint configuration retained for constructor compatibility. */
   mcpBaseUrl: string;
-  /** Per-run Bearer token sent in the MCP `Authorization` header. */
+  /** Optional endpoint credential retained for constructor compatibility. */
   mcpRunToken: string;
 
   /** CWD for the spawned process. Default: `process.cwd()`. */
@@ -154,7 +156,7 @@ export interface ClaudeCodeRunnerConfig {
    * Mirrors Hermes's `CHRONA_HERMES_STRICT_UNKNOWN_EVENTS`.
    */
   strictUnknownEvents?: boolean;
-  /** Advanced SDK option overrides for isolated tests / embedders. Core Chrona transport options still win. */
+  /** Advanced SDK option overrides for isolated tests / embedders. Core transport options still win. */
   sdkOptions?: Partial<SdkQueryOptions>;
   /** Optional Claude binary override. Hidden from normal UI. */
   binaryPath?: string;
@@ -226,6 +228,7 @@ interface SdkHandle {
   };
   pendingEvents?: ProviderRunEvent[];
   cancelRequested: boolean;
+  terminalToolAccepted?: boolean;
 }
 
 interface ReplayHandle {
@@ -242,8 +245,8 @@ export type ClaudeCodeRunHandle = {
   normalizer: NormalizerContext;
   /** Optional path of the NDJSON tape we are writing to (real-driver record mode). */
   recordPath?: string;
-  /** AbortSignal forwarded from `StartRunInput.signal` (best-effort). */
-  chronaSessionId: string;
+  /** Caller-owned session id used to associate SDK resume state. */
+  runSessionId: string;
   logger: ChronaLogger;
   externalSignal?: AbortSignal;
   diagnostics?: ClaudeCodeRunnerDiagnostics;
@@ -266,7 +269,7 @@ export interface ClaudeCodeRunner {
 const DEFAULT_MODEL = "claude-opus-4-8";
 const DEFAULT_TIMEOUT_MS = 120 * 1000;
 const HEALTH_PROBE_TIMEOUT_MS = 15_000;
-const HEALTH_PROBE_PROMPT = "Reply with exactly `chrona-ok`. Do not use tools.";
+const HEALTH_PROBE_PROMPT = "Reply with exactly `ready`. Do not use tools.";
 const HEALTH_PROBE_FAILURE = "Claude Code SDK connectivity probe failed";
 
 
@@ -365,7 +368,7 @@ class ReplayRunner implements ClaudeCodeRunner {
     const handle: ClaudeCodeRunHandle = {
       runId,
       ref,
-      chronaSessionId: ref.sessionId,
+      runSessionId: ref.sessionId,
       internal: {
         kind: "replay",
         records: tape.records,
@@ -476,10 +479,8 @@ export async function probeClaudeCodeSdk(input: {
 
 /**
  * Thrown by `probeMcpServer` when the MCP transport the SDK is about to
- * register is unreachable, unauthorized, or returns a tool list we don't
- * expect. Surfaced as a start()-time error so callers see the real cause
- * (token mismatch, wrong base URL, server offline) instead of a generic
- * "Provider completed without calling chrona_plan_generate" downstream.
+ * register is unreachable, unauthorized, or returns an unexpected tool list.
+ * Surfaced as a start()-time error so callers see the real transport cause.
  */
 export class McpProbeError extends Error {
   readonly mcpBaseUrl: string;
@@ -504,32 +505,20 @@ const MCP_PROBE_TIMEOUT_MS = 5_000;
 const MCP_PROBE_PROTOCOL_VERSION = "2025-03-26";
 
 /**
- * Probe the Chrona MCP transport the SDK is about to register. Sends a
- * single `initialize` request (MCP Streamable HTTP) and:
- *   - 401/403 → throws `McpProbeError` ("MCP server rejected the Bearer
- *     token. Set CHRONA_API_KEY to the server's API_KEY, or pass
- *     `mcpRunToken` in the client config.")
- *   - non-2xx → throws `McpProbeError` with status + body excerpt
- *   - 2xx but no tools → throws (the agent would have nothing to call)
- *   - 2xx with tools → returns the tool name list for diagnostics
- *
- * Cheap: one POST, no streaming, no session reuse. Runs before the SDK
- * spawns `claude` so a broken MCP config is the first thing the caller
- * sees, not the last.
+ * Probe an external MCP endpoint. This retained diagnostic helper is
+ * transport-only; declared run tools are registered through the SDK-local
+ * MCP server in `SdkRunner.start`.
  */
 export async function probeMcpServer(input: {
   baseUrl: string;
   token: string;
   runId: string;
 }): Promise<{ toolNames: string[]; status: number; sessionId: string | null }> {
-  const { baseUrl, token, runId } = input;
-  // An empty token is NOT a client-side error: when the server runs without
-  // `API_KEY` set, `apiKeyAuth()` passes every request through and no Bearer
-  // is required (local dev). We therefore probe WITHOUT an Authorization
-  // header and let the server's response decide — a server that DOES require
-  // auth answers 401/403, which the branches below map to the actionable
-  // "set CHRONA_API_KEY" error. This avoids rejecting a request the server
-  // would have accepted.
+  // An empty token is not a client-side error: an endpoint may accept
+  // unauthenticated requests. We send no Authorization header and let the
+  // endpoint response determine whether credentials are needed.
+  const baseUrl = stripTrailingSlash(input.baseUrl);
+  const { runId, token } = input;
   const url = `${baseUrl}/api/mcp`;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), MCP_PROBE_TIMEOUT_MS).unref();
@@ -540,7 +529,7 @@ export async function probeMcpServer(input: {
     params: {
       protocolVersion: MCP_PROBE_PROTOCOL_VERSION,
       capabilities: {},
-      clientInfo: { name: "chrona-claude-code-preflight", version: "0.0.0" },
+      clientInfo: { name: "claude-code-provider-preflight", version: "0.0.0" },
     },
   });
   let response: Response;
@@ -611,10 +600,9 @@ export async function probeMcpServer(input: {
     });
   }
   // MCP initialize succeeds server-side; tool registration happens
-  // separately. Issue a follow-up `tools/list` to confirm the tool group
-  // we expect (`mcp__chrona__*`) actually has entries. Streamable HTTP
-  // returns JSON when the server is configured with
-  // `enableJsonResponse: true`; otherwise SSE — we accept both.
+  // separately. Issue a follow-up `tools/list` to confirm the endpoint
+  // exposes at least one tool. Streamable HTTP returns JSON when configured
+  // with `enableJsonResponse: true`; otherwise SSE — accept both.
   const tools = await probeMcpToolsList({ baseUrl, token, sessionId, runId });
   if (tools.length === 0) {
     runnerLogger.error("claude_code.mcp_probe_failed", {
@@ -623,7 +611,7 @@ export async function probeMcpServer(input: {
       reason: "no_tools",
     });
     throw new McpProbeError({
-      message: `MCP server at ${url} returned 0 tools. The agent will have no \`mcp__chrona__*\` tool to call.`,
+      message: `MCP server at ${url} returned 0 tools.`,
       mcpBaseUrl: baseUrl,
       status,
       toolCount: 0,
@@ -860,7 +848,7 @@ function armIdleTimeout(
 }
 
 class SdkRunner implements ClaudeCodeRunner {
-  private readonly sdkSessionByChronaSessionId = new Map<string, string>();
+  private readonly sdkSessionByRunSessionId = new Map<string, string>();
 
   private readonly cfg: ClaudeCodeRunnerConfig;
   constructor(cfg: ClaudeCodeRunnerConfig) {
@@ -877,40 +865,29 @@ class SdkRunner implements ClaudeCodeRunner {
   async start(input: StartRunInput): Promise<{ handle: ClaudeCodeRunHandle }> {
     const cfg = this.cfg;
     const model = cfg.model ?? DEFAULT_MODEL;
-    const mcpBaseUrl = stripTrailingSlash(cfg.mcpBaseUrl);
-    const mcpUrl = mcpUrlForSession(mcpBaseUrl, input.sessionKey ?? input.sessionId);
-    const mcpServers = {
-      chrona: {
-        type: "http" as const,
-        url: mcpUrl,
-        // Omit the Authorization header entirely when no token is
-        // configured: a server running without `API_KEY` accepts
-        // unauthenticated requests, and sending `Bearer ` (empty)
-        // would be a malformed header rather than "no auth".
-        headers: cfg.mcpRunToken ? { Authorization: `Bearer ${cfg.mcpRunToken}` } : {},
-      },
-    };
     const readOnly = input.toolPolicy === "read_only";
-    // Fail-fast: the agent model needs the `mcp__chrona__*` tool group
-    // to be reachable BEFORE it can call `mcp__chrona__chrona_plan_generate`.
-    // The 401 we keep hitting in dev comes from this transport being
-    // registered with a stale/invalid token — the agent would only
-    // notice mid-session (wasting model turn). Probe MCP server once
-    // here so a bad token / wrong URL is reported at start() time.
-    if (!readOnly) {
-      await probeMcpServer({
-        baseUrl: mcpBaseUrl,
-        token: cfg.mcpRunToken,
-        runId: "preflight",
-      });
-    }
+    const tools = readOnly ? [] : input.tools ?? [];
     const abortController = new AbortController();
+    const sdkHandle = {} as SdkHandle;
+    const mcpServers = tools.length > 0
+      ? {
+          [RUN_TOOLS_MCP_SERVER_NAME]: createRunToolsMcpServer({
+            tools,
+            onToolAccepted: (toolName) => {
+              if (toolName === input.terminalToolName) {
+                if (sdkHandle) sdkHandle.terminalToolAccepted = true;
+                queueMicrotask(() => abortController.abort());
+              }
+            },
+          }),
+        }
+      : undefined;
     const runId = `claude-sdk-${crypto.randomUUID()}`;
     // Prefer the live in-process capture (same process, mid-conversation);
     // fall back to the engine-supplied `resumeSessionRef` so a restarted
     // process can still resume the prior SDK session from persisted state.
     const resumedSdkSessionId =
-      this.sdkSessionByChronaSessionId.get(input.sessionId) ?? validClaudeCodeResumeSessionRef(input.resumeSessionRef);
+      this.sdkSessionByRunSessionId.get(input.sessionId) ?? validClaudeCodeResumeSessionRef(input.resumeSessionRef);
     const log = runnerLogger.child({
       runId,
       sessionId: input.sessionId,
@@ -923,7 +900,7 @@ class SdkRunner implements ClaudeCodeRunner {
     const options = {
       ...(cfg.sdkOptions ?? {}),
       model,
-      ...(readOnly ? {} : { mcpServers }),
+      ...(mcpServers ? { mcpServers } : {}),
       permissionMode: readOnly ? "dontAsk" : "bypassPermissions",
       ...(readOnly
         ? { allowedTools: [], disallowedTools: ["Bash", "Edit", "Write", "NotebookEdit", "WebFetch", "WebSearch", "Task"] }
@@ -941,7 +918,7 @@ class SdkRunner implements ClaudeCodeRunner {
 
     const prompt = renderPrompt(input) ?? "";
     log.info("claude_code.run_start", {
-      controlPlane: "mcp",
+      controlPlane: mcpServers ? "declared_tools" : "none",
       hasDebugFile: Boolean(debugFile),
       resumedSdkSessionId: resumedSdkSessionId ?? null,
     });
@@ -949,8 +926,8 @@ class SdkRunner implements ClaudeCodeRunner {
       cwd: cfg.cwd,
       timeoutMs: cfg.timeoutMs ?? DEFAULT_TIMEOUT_MS,
       timeoutMode: "idle",
-      mcpBaseUrl,
-      mcpUrl,
+      mcpServerName: mcpServers ? RUN_TOOLS_MCP_SERVER_NAME : undefined,
+      declaredToolNames: tools.map((tool) => tool.name),
       options,
     });
     logProviderDebug(log, "claude_code.prompt", { prompt });
@@ -969,16 +946,18 @@ class SdkRunner implements ClaudeCodeRunner {
       startedAt: new Date().toISOString(),
       stream: { supported: true, reconnectable: true },
     };
+    Object.assign(sdkHandle, {
+      kind: "sdk",
+      query: queryObj as unknown as SdkHandle["query"],
+      pendingEvents: [],
+      cancelRequested: false,
+      terminalToolAccepted: false,
+    });
     const handle: ClaudeCodeRunHandle = {
       runId,
       ref,
-      chronaSessionId: input.sessionId,
-      internal: {
-        kind: "sdk",
-        query: queryObj as unknown as SdkHandle["query"],
-        pendingEvents: [],
-        cancelRequested: false,
-      },
+      runSessionId: input.sessionId,
+      internal: sdkHandle,
       normalizer: createNormalizerContext(),
       logger: log,
       externalSignal: input.signal,
@@ -1064,7 +1043,7 @@ class SdkRunner implements ClaudeCodeRunner {
       pushRecentRaw(handle, summarizeSdkRawEvent(result.value));
       const sdkSessionId = extractSdkSessionId(result.value);
       if (sdkSessionId) {
-        this.sdkSessionByChronaSessionId.set(handle.chronaSessionId, sdkSessionId);
+        this.sdkSessionByRunSessionId.set(handle.runSessionId, sdkSessionId);
         updateHandleSdkSession(handle, sdkSessionId);
       }
       const events = mapClaudeCodeStreamItems(
@@ -1104,7 +1083,9 @@ class SdkRunner implements ClaudeCodeRunner {
       status:
         handle.internal.kind === "sdk" && handle.internal.cancelRequested
           ? "cancelled"
-          : "running",
+          : handle.internal.kind === "sdk" && handle.internal.terminalToolAccepted
+            ? "completed"
+            : "running",
     };
   }
 

@@ -6,8 +6,6 @@ export type WorkspaceActivityGroup = {
 export type WorkspaceActivityTimelineItem = {
   id: string;
   kind:
-    | "assistant_message"
-    | "reasoning"
     | "tool_started"
     | "tool_progress"
     | "tool_completed"
@@ -16,8 +14,7 @@ export type WorkspaceActivityTimelineItem = {
     | "node"
     | "task"
     | "artifact"
-    | "schedule"
-    | "raw";
+    | "schedule";
   title: string;
   summary: string;
   description: string;
@@ -27,31 +24,15 @@ export type WorkspaceActivityTimelineItem = {
   sourceNodeTitle?: string;
   provider?: string;
   runtimeName?: string;
-  runId?: string;
-  nativeRunId?: string;
+  executionScope?: string;
   sequence?: number;
-  rawEventType?: string;
-  executionSessionId?: string;
-  executionEpoch?: number;
   executionTrigger?: "initial" | "restart";
   activityGroup?: WorkspaceActivityGroup;
   tool?: {
     name?: string;
-    label?: string;
-    callId?: string;
-    resultPreview?: string;
-    preview?: string;
-    inputSummary?: string;
     durationMs?: number;
-    error?: string;
     state: "started" | "progress" | "completed" | "failed";
   };
-  assistant?: {
-    text: string;
-    isReasoning: boolean;
-    isPartial?: boolean;
-  };
-  raw?: unknown;
 };
 
 export type TaskActivityEvent = {
@@ -144,15 +125,12 @@ export function executionActivityMetadata(payload: unknown) {
   const executionSessionId = typeof correlation?.executionSessionId === "string"
     ? correlation.executionSessionId
     : undefined;
-  const executionEpoch = typeof record?.executionEpoch === "number"
-    ? record.executionEpoch
-    : undefined;
   const executionTrigger = record?.command === "restart_from_beginning"
     ? "restart" as const
     : executionSessionId
       ? "initial" as const
       : undefined;
-  return { executionSessionId, executionEpoch, executionTrigger };
+  return { executionTrigger };
 }
 
 export function compactParts(parts: Array<string | null | undefined>) {

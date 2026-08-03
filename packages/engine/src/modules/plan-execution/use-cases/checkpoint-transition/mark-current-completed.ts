@@ -11,7 +11,6 @@ export async function markCurrentCompletedTransition(
     ...input,
     executionAction: {
       action: "complete_manual_node",
-      sessionId: input.executionSession.id,
       nodeId: checkpointNodeId({
         checkpoint: input.checkpoint,
         reason: "Checkpoint completion requires a node.",
@@ -19,7 +18,9 @@ export async function markCurrentCompletedTransition(
       summary: input.payloadText ?? "Checkpoint marked completed",
       output: input.transition.output,
       continueExecution: true,
+      idempotencyKey: input.idempotencyKey,
     },
+    commandContext: { sessionId: input.executionSession.id },
     dispatchExecutionAction: input.dispatchExecutionAction,
     ...observerCallbacks(input),
   });

@@ -1,3 +1,4 @@
+/* eslint-disable complexity -- Capability negotiation intentionally enumerates each provider contract combination. */
 import type { ProviderCapabilities } from "./ProviderClient";
 import type { ProviderCapabilityName } from "@chrona/contracts";
 
@@ -25,6 +26,7 @@ export function summarizeProviderCapabilities(capabilities: ProviderCapabilities
     historyReplay: recovery?.historyReplay ?? capabilities.supportsRunLookup,
     activeRunLookup: recovery?.activeRunLookup ?? capabilities.supportsRunLookup,
     streamReconnect: recovery?.streamReconnect ?? capabilities.supportsRunLookup,
+    crossProcessDurable: recovery?.crossProcessDurable ?? false,
     clientOperationLookup: capabilities.lookupByClientOperationId ?? false,
     providerResumeRef: recovery?.providerResumeRef ?? false,
     runEventReplay: recovery?.runEventReplay ?? false,

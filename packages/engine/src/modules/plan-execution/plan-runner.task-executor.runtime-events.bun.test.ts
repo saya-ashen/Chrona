@@ -56,6 +56,7 @@ describe("plan-runner task executor runtime events", () => {
     expect(result.currentNodeId).toBe("task_node");
     expect(runtimeEvents).toEqual([
       {
+        executionScope: expect.any(String),
         nodeId: "task_node",
         nodeTitle: "Execute mocked task node",
         runtimeName: "hermes",

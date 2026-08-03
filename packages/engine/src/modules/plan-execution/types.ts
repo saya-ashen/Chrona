@@ -11,6 +11,7 @@ import type {
 export type OrchestratorTrigger = "manual" | "scheduler" | "system" | "auto";
 
 export type PlanExecutionRuntimeEvent = {
+  executionScope: string;
   nodeId: string;
   nodeTitle: string;
   runtimeName: string;
@@ -50,6 +51,10 @@ export type PlanGraphCommandContext = {
   nodeAttemptId?: string | null;
   providerRunId?: string | null;
   toolInvocationId?: string | null;
+  runtimeRunRef?: string | null;
+  idempotencyKey?: string | null;
+  sessionId?: string | null;
+
   causationEventId?: string | null;
   causationRawEventId?: string | null;
 };
@@ -90,6 +95,9 @@ export type PlanGraphCommandEnvelope<TCommand = AdvanceRuntimeCommand | { type: 
 export type SyncPlanRunRuntimeResultInput = {
   taskId: string;
   runtimeRunRef: string;
+  expectedAttemptId?: string;
+  workBlockId?: string | null;
+  providerRunId?: string;
   status: "Completed" | "Failed" | "Cancelled";
   summary?: string | null;
   error?: string | null;
@@ -136,5 +144,13 @@ export type ExecutionActionWithContinuation =
   | (Extract<ExecutionActionInput, { action: "complete_manual_node" }> & {
       continueExecution?: boolean;
     });
+
+export type SubmitNodeResultAction = Extract<ExecutionActionWithContinuation, {
+  action: "complete_manual_node" | "block_current_node" | "fail_current_node";
+}>;
+
+export type SubmitNodeResultActionWithSession = SubmitNodeResultAction & {
+  sessionId?: string | null;
+};
 
 export type ExecutionDispatchContext = PlanGraphCommandContext;

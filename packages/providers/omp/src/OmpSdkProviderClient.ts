@@ -1,3 +1,4 @@
+/* eslint-disable complexity, max-lines, max-lines-per-function -- OMP protocol adaptation explicitly handles every SDK event and recovery variant. */
 import { resolve } from "node:path";
 import { randomUUID } from "node:crypto";
 
@@ -14,16 +15,6 @@ import {
   type CustomTool,
   type ProviderConfigInput,
 } from "@oh-my-pi/pi-coding-agent";
-import {
-  acceptedPlanGenerateToolResult,
-  CHRONA_PLAN_GENERATE_TOOL_DESCRIPTION,
-  CHRONA_PLAN_GENERATE_TOOL_NAME,
-  planGenerateToolPayloadSchema,
-} from "@chrona/contracts/ai";
-import {
-  agentControlActionPayloadSchemas,
-  type AgentControlActionBody,
-} from "@chrona/contracts/api";
 import {
   BoundedTerminalRunSnapshots,
   assertProviderStartSupported,
@@ -247,16 +238,10 @@ function renderProviderInput(input: ProviderRunInput): string {
 }
 
 function terminalToolInstruction(input: StartRunInput): string | undefined {
-  if (!input.terminalToolName) return undefined;
-  if (input.terminalToolName === CHRONA_PLAN_GENERATE_TOOL_NAME) {
-    return [
-      `When the plan is ready, call the custom tool \`${CHRONA_PLAN_GENERATE_TOOL_NAME}\` with the complete PlanBlueprint object.`,
-      "Do not answer only in text; the plan is not submitted until that custom tool call succeeds.",
-      "After the tool returns success, stop immediately.",
-    ].join("\n");
-  }
+  const terminalToolName = input.terminalToolName;
+  if (!terminalToolName || !input.tools?.some((tool) => tool.name === terminalToolName)) return undefined;
   return [
-    `When finished, call the custom tool \`${input.terminalToolName}\` with the final structured payload required by the current Chrona instructions.`,
+    `When finished, call the declared custom tool \`${terminalToolName}\` with its required final payload.`,
     "Do not treat this instruction itself as evidence that the tool has run.",
   ].join("\n");
 }
@@ -312,142 +297,109 @@ function eventBase(handle: SdkRunHandle, rawEventType?: string) {
   };
 }
 
-const looseObjectSchema = z.object({}).catchall(z.unknown());
+type JsonSchema = Record<string, unknown>;
 
+function jsonSchemaToZod(schema: unknown): z.ZodType {
+  const definition = asRecord(schema) as JsonSchema;
+  const type = typeof definition.type === "string"
+    ? definition.type
+    : "properties" in definition
+      ? "object"
+      : "items" in definition
+        ? "array"
+        : undefined;
+  const enumValues = Array.isArray(definition.enum) ? definition.enum : undefined;
+  let result: z.ZodType;
 
-type NodeRuntimeToolName =
-  | "chrona_node_complete"
-  | "chrona_condition_select"
-  | "chrona_wait_complete"
-  | "chrona_node_request_input"
-  | "chrona_node_block"
-  | "chrona_node_fail";
-
-function isTerminalRuntimeTool(toolName: string): boolean {
-  return toolName === "chrona_node_complete" || toolName === "chrona_condition_select" || toolName === "chrona_wait_complete" || toolName === "chrona_node_request_input" || toolName === "chrona_node_block" || toolName === "chrona_node_fail";
-}
-
-const NODE_RUNTIME_TOOL_SET_BY_TERMINAL: Record<string, readonly NodeRuntimeToolName[]> = {
-  chrona_node_complete: ["chrona_node_complete", "chrona_node_request_input", "chrona_node_block", "chrona_node_fail"],
-  chrona_condition_select: ["chrona_condition_select", "chrona_node_block", "chrona_node_fail"],
-  chrona_wait_complete: ["chrona_wait_complete", "chrona_node_block", "chrona_node_fail"],
-  chrona_node_request_input: ["chrona_node_request_input", "chrona_node_block", "chrona_node_fail"],
-  chrona_node_block: ["chrona_node_block", "chrona_node_fail"],
-  chrona_node_fail: ["chrona_node_block", "chrona_node_fail"],
-};
-
-type NodeRuntimeToolDefinition = {
-  kind: AgentControlActionBody["kind"];
-  description: string;
-  parameters: CustomTool["parameters"];
-};
-
-const NODE_RUNTIME_TOOL_DEFINITIONS: Partial<Record<string, NodeRuntimeToolDefinition>> = {
-  chrona_node_complete: {
-    kind: "complete",
-    description: "Complete the current Chrona task node with semantic result contributions and declared deliverables after its objective is satisfied.",
-    parameters: agentControlActionPayloadSchemas.complete,
-  },
-  chrona_condition_select: {
-    kind: "condition_select",
-    description: "Select exactly one branchRef for the current Chrona condition node.",
-    parameters: agentControlActionPayloadSchemas.condition_select,
-  },
-  chrona_wait_complete: {
-    kind: "wait_complete",
-    description: "Mark the current Chrona wait node complete when the wait condition is satisfied by evidence.",
-    parameters: agentControlActionPayloadSchemas.wait_complete,
-  },
-  chrona_node_request_input: {
-    kind: "request_input",
-    description: "Pause the current Chrona node for normal structured user input. Use semantic text, choice, or boolean fields; choice.selection selects single or multiple values.",
-    parameters: agentControlActionPayloadSchemas.request_input,
-  },
-  chrona_node_block: {
-    kind: "block",
-    description: "Block the current Chrona node only when an exceptional external blocker such as missing access or unavailable capability prevents safe completion.",
-    parameters: agentControlActionPayloadSchemas.block,
-  },
-  chrona_node_fail: {
-    kind: "fail",
-    description: "Fail the current Chrona node for an unrecoverable error.",
-    parameters: agentControlActionPayloadSchemas.fail,
-  },
-};
-
-function stripTrailingSlashes(value: string): string {
-  let end = value.length;
-  while (end > 0 && value.charCodeAt(end - 1) === 47) end -= 1;
-  return end === value.length ? value : value.slice(0, end);
-}
-
-function sdkToolNamesForTerminal(terminalToolName: string | undefined): string[] {
-  if (!terminalToolName) return [];
-  if (terminalToolName === CHRONA_PLAN_GENERATE_TOOL_NAME) return [CHRONA_PLAN_GENERATE_TOOL_NAME];
-  return [...(NODE_RUNTIME_TOOL_SET_BY_TERMINAL[terminalToolName] ?? [terminalToolName as NodeRuntimeToolName])];
-}
-
-async function postControlAction(input: {
-  control: NonNullable<StartRunInput["control"]>;
-  body: AgentControlActionBody;
-  signal?: AbortSignal;
-}) {
-  const response = await fetch(`${stripTrailingSlashes(input.control.baseUrl)}/agent/control`, {
-    method: "POST",
-    headers: {
-      authorization: `Bearer ${input.control.runToken}`,
-      "content-type": "application/json",
-    },
-    body: JSON.stringify({ body: input.body }),
-    signal: input.signal,
-  });
-  const text = await response.text();
-  if (!response.ok) {
-    throw new Error(`Chrona control request failed (${response.status}): ${text || response.statusText}`);
+  switch (type) {
+    case "object": {
+      const properties = Object.fromEntries(
+        Object.entries(asRecord(definition.properties)).map(([name, value]) => [name, jsonSchemaToZod(value)]),
+      ) as Record<string, z.ZodType>;
+      const required = new Set(
+        Array.isArray(definition.required)
+          ? definition.required.filter((name): name is string => typeof name === "string")
+          : [],
+      );
+      const shape = Object.fromEntries(
+        Object.entries(properties).map(([name, value]) => [name, required.has(name) ? value : value.optional()]),
+      );
+      result = definition.additionalProperties === false
+        ? z.object(shape).strict()
+        : z.object(shape).catchall(z.unknown());
+      break;
+    }
+    case "array":
+      result = z.array(jsonSchemaToZod(definition.items));
+      break;
+    case "string":
+      result = z.string();
+      break;
+    case "number":
+      result = z.number();
+      break;
+    case "integer":
+      result = z.number().int();
+      break;
+    case "boolean":
+      result = z.boolean();
+      break;
+    case "null":
+      result = z.null();
+      break;
+    default:
+      result = z.unknown();
+      break;
   }
-  return text ? JSON.parse(text) as unknown : { ok: true };
+
+  return enumValues
+    ? result.refine((value) => enumValues.some((candidate) => Object.is(candidate, value)))
+    : result;
 }
 
-function acceptedNodeToolResult(details: Record<string, unknown> = { accepted: true }) {
+function isDeclaredTerminalTool(
+  terminalToolName: string | undefined,
+  tools: StartRunInput["tools"],
+  toolName: string,
+): boolean {
+  return terminalToolName === toolName && tools?.some((tool) => tool.name === toolName) === true;
+}
+
+function acceptedToolResult() {
   return {
     content: [{ type: "text" as const, text: "accepted" }],
-    details,
+    details: { accepted: true },
   };
 }
 
-function createTerminalTool(toolName: string, control?: StartRunInput["control"], onTerminalAccepted?: () => void): CustomTool {
-  if (toolName === CHRONA_PLAN_GENERATE_TOOL_NAME) {
-    return {
-      name: toolName,
-      label: toolName,
-      strict: true,
-      description: CHRONA_PLAN_GENERATE_TOOL_DESCRIPTION,
-      parameters: planGenerateToolPayloadSchema,
-      async execute() {
-        return acceptedPlanGenerateToolResult();
+function createDeclaredTool(
+  definition: NonNullable<StartRunInput["tools"]>[number],
+  terminalToolName: string | undefined,
+  onTerminalAccepted?: () => void,
+): CustomTool {
+  return {
+    name: definition.name,
+    label: definition.name,
+    strict: true,
+    description: definition.description ?? `Execute ${definition.name}.`,
+    parameters: jsonSchemaToZod(definition.inputSchema),
+    async execute(_toolCallId, _params, _onUpdate, ctx) {
+      if (definition.name === terminalToolName) {
+        onTerminalAccepted?.();
+        queueMicrotask(() => ctx.abort());
       }
-    };
-  }
-
-  const definition = NODE_RUNTIME_TOOL_DEFINITIONS[toolName];
-  return {
-    name: toolName,
-    label: toolName,
-    strict: Boolean(definition),
-    description: definition?.description ?? "Submit the final structured payload required by the current Chrona instructions.",
-    parameters: definition?.parameters ?? looseObjectSchema,
-    async execute(_toolCallId, params, _onUpdate, ctx, signal) {
-      if (!definition || !control) return acceptedNodeToolResult();
-      const body = { kind: definition.kind, payload: params } as AgentControlActionBody;
-      const result = await postControlAction({ control, body, signal });
-      if (isTerminalRuntimeTool(toolName)) { onTerminalAccepted?.(); queueMicrotask(() => ctx.abort()); }
-      return acceptedNodeToolResult({ accepted: true, control: result });
-    }
+      return acceptedToolResult();
+    },
   };
 }
-function sdkToolOptionsForTerminal(terminalToolName: string | undefined, control?: StartRunInput["control"], onTerminalAccepted?: () => void): { customTools: CustomTool[] } {
+
+function sdkToolOptions(
+  tools: StartRunInput["tools"],
+  terminalToolName: string | undefined,
+  onTerminalAccepted?: () => void,
+): { customTools: CustomTool[] } {
   return {
-    customTools: sdkToolNamesForTerminal(terminalToolName).map((toolName) => createTerminalTool(toolName, control, onTerminalAccepted)),
+    customTools: (tools ?? []).map((tool) => createDeclaredTool(tool, terminalToolName, onTerminalAccepted)),
   };
 }
 
@@ -514,10 +466,14 @@ function agentEndOutcome(event: Extract<AgentSessionEvent, { type: "agent_end" }
   const error = agentEndFailure(event);
   return error ? { status: "failed", error } : { status: "completed" };
 }
-function terminalNodeToolFromSnapshot(input: { raw?: unknown }) {
+function terminalToolFromSnapshot(input: {
+  raw?: unknown;
+  terminalToolName?: string;
+  tools?: StartRunInput["tools"];
+}) {
   const terminal = asRecord(asRecord(input.raw).terminalTool);
   const name = terminal.name;
-  if (typeof name !== "string" || !isTerminalRuntimeTool(name)) return null;
+  if (typeof name !== "string" || !isDeclaredTerminalTool(input.terminalToolName, input.tools, name)) return null;
   return {
     name,
     input: asRecord(terminal.input),
@@ -528,7 +484,7 @@ function terminalNodeToolFromSnapshot(input: { raw?: unknown }) {
 function sdkModelPatternForSession(modelPattern: string | undefined, resumeSessionRef: string | undefined) {
   // A resumed OMP session already persists its concrete model selection. Let
   // the SDK restore that model from session history, then verify it against
-  // Chrona's task pin. Passing the pin again turns restoration into a fresh
+  // the requested model. Passing it again turns restoration into a fresh
   // deferred lookup and can resolve to no model when the provider is supplied
   // by the resumed session's extension/config context.
   return resumeSessionRef ? undefined : modelPattern;
@@ -548,16 +504,16 @@ function sdkReadOnlyToolOptions(toolPolicy: StartRunInput["toolPolicy"]) {
 }
 
 export const __ompSdkProviderTestHooks = {
-  sdkToolNamesForTerminal,
-  sdkToolOptionsForTerminal,
+  jsonSchemaToZod,
+  sdkToolOptions,
   sdkReadOnlyToolOptions,
   sdkToolErrorMessage,
-  isTerminalRuntimeTool,
+  isDeclaredTerminalTool,
   agentEndFailure,
   agentEndOutcome,
   toolCallPreview,
   textContentPreview,
-  terminalNodeToolFromSnapshot,
+  terminalToolFromSnapshot,
   sdkLifecycleSummary,
   assertExpectedModel,
   sdkModelPatternForSession,
@@ -635,14 +591,12 @@ export class OmpSdkProviderClient implements AgentProviderClient {
       ?? nonEmpty(this.config.configDirectory);
     const setup = await createSdkModelSetup(this.config, environment);
     const settings = await loadSdkSettings(environment, cwd);
-    const terminalTools = sdkToolOptionsForTerminal("chrona_node_complete");
     const { session, mcpManager } = await createAgentSession({
       cwd,
       agentDir: configuredAgentDirectory,
       modelPattern: setup.modelPattern,
       ...(setup.authStorage ? { authStorage: setup.authStorage } : {}),
       ...(setup.modelRegistry ? { modelRegistry: setup.modelRegistry } : {}),
-      ...terminalTools,
       settings,
       sessionManager: SessionManager.inMemory(cwd),
       skipPythonPreflight: true,
@@ -694,7 +648,7 @@ export class OmpSdkProviderClient implements AgentProviderClient {
       supportsCancellation: true,
       supportsToolCalls: true,
       supportsPreviousResponse: false,
-      actionInvocation: "external_control_plane",
+      actionInvocation: "unsupported",
       startIdempotency: "unsupported",
       lookupByClientOperationId: false,
       recovery: {
@@ -702,11 +656,12 @@ export class OmpSdkProviderClient implements AgentProviderClient {
         historyReplay: true,
         activeRunLookup: false,
         streamReconnect: false,
+        crossProcessDurable: false,
         mode: "session_history",
         providerResumeRef: true,
         runEventReplay: false,
       },
-      reason: "Oh My Pi SDK custom tools run in-process for structured Chrona callbacks.",
+      reason: "Oh My Pi SDK custom tools run in-process from request-declared definitions.",
     };
   }
 
@@ -1002,7 +957,7 @@ export class OmpSdkProviderClient implements AgentProviderClient {
       ...(setup.authStorage ? { authStorage: setup.authStorage } : {}),
       ...(setup.modelRegistry ? { modelRegistry: setup.modelRegistry } : {}),
       settings,
-      ...sdkToolOptionsForTerminal(terminalToolName, handle.input.control, () => { handle.terminalActionAccepted = true; }),
+      ...sdkToolOptions(handle.input.tools, terminalToolName, () => { handle.terminalActionAccepted = true; }),
       ...readOnlyToolOptions,
       sessionManager,
       skipPythonPreflight: true,
@@ -1077,7 +1032,7 @@ export class OmpSdkProviderClient implements AgentProviderClient {
         break;
       }
       case "tool_execution_start":
-        if (isTerminalRuntimeTool(event.toolName)) {
+        if (isDeclaredTerminalTool(handle.input.terminalToolName, handle.input.tools, event.toolName)) {
           handle.terminalAction = {
             name: event.toolName,
             input: asRecord(event.args),
@@ -1161,7 +1116,13 @@ export class OmpSdkProviderClient implements AgentProviderClient {
           output: { text: handle.outputText },
           structuredPayload: parseStructuredPayload(handle.outputText),
           usage: null,
-          raw: handle.terminalAction ? { ...asRecord(event), terminalTool: handle.terminalAction } : event,
+          raw: terminalToolFromSnapshot({
+            raw: handle.terminalAction ? { terminalTool: handle.terminalAction } : undefined,
+            terminalToolName: handle.input.terminalToolName,
+            tools: handle.input.tools,
+          })
+            ? { ...asRecord(event), terminalTool: handle.terminalAction }
+            : event,
         });
         this.finish(handle, queue);
         break;

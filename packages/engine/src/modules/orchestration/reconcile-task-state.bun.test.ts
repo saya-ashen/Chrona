@@ -93,7 +93,7 @@ describe("reconcileTaskState", () => {
 
   it("surfaces degraded state with retry action and contract-safe node status", () => {
     const graph = makeGraph([
-      makeNode({ id: "sync", status: "degraded", lastError: "Runtime sync timed out" }),
+      makeNode({ id: "sync", status: "degraded", lastError: "private provider timeout", blockedReason: "Execution synchronization needs attention." }),
       makeNode({ id: "finish", status: "pending", dependencies: ["sync"] }),
     ]);
 
@@ -103,13 +103,14 @@ describe("reconcileTaskState", () => {
       executionState: "degraded",
       currentNodeId: "sync",
       primaryAction: { type: "retry_sync", enabled: true },
-      degraded: { reason: "Runtime sync timed out", retryAt: null },
+      degraded: { reason: "Execution synchronization needs attention.", retryAt: null },
     });
     expect(result.nodes.find((node) => node.id === "sync")).toMatchObject({
       status: "blocked",
       current: true,
-      stateReason: "Runtime sync timed out",
+      stateReason: "Execution synchronization needs attention.",
     });
+    expect(JSON.stringify(result)).not.toContain("private provider timeout");
   });
 
   it("uses task block reason when persisted node state has not caught up", () => {

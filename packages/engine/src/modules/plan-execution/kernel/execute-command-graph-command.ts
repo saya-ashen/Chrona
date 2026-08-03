@@ -67,22 +67,64 @@ function resolveSubmittedNodeRef(nodeId: string, effective: EffectivePlanGraph):
   return buildSemanticRefHistory(effective).nodeRefs.find((candidate) => candidate.ref === nodeId)?.nodeId ?? nodeId;
 }
 
-function resolveRuntimeResultNodeId(state: GraphExecutionState, runtimeRunRef: string): string | null {
-  const result = state.results.find((candidate) => candidate.evidence?.runtimeRunRef === runtimeRunRef);
-  if (result?.nodeId) return result.nodeId;
-  return [...state.attempts].reverse().find((attempt) => attempt.status === "running")?.nodeId ?? null;
+function runtimeRunRefFromAttempt(attempt: GraphExecutionState["attempts"][number]): string | null {
+  const output = attempt.runtimeSnapshot?.output;
+  if (!output || typeof output !== "object") return null;
+  const record = output as Record<string, unknown>;
+  return typeof record.runtimeRunRef === "string" ? record.runtimeRunRef : null;
 }
 
-function resolveSubmitNodeId(
+function exactAttemptForRuntimeRun(state: GraphExecutionState, runtimeRunRef: string) {
+  const matches = state.attempts.filter((attempt) => runtimeRunRefFromAttempt(attempt) === runtimeRunRef);
+  if (matches.length !== 1) return null;
+  const [attempt] = matches;
+  return attempt.status === "running" ? attempt : null;
+}
+
+function exactCurrentAttemptForNode(state: GraphExecutionState, nodeId: string) {
+  const currentResult = [...state.results].reverse().find(
+    (result) => result.nodeId === nodeId && result.status === "current",
+  );
+  return [...state.attempts].reverse().find(
+    (attempt) =>
+      attempt.nodeId === nodeId &&
+      (attempt.status === "running" || (currentResult?.attemptId === attempt.id && currentResult.waitKind)),
+  ) ?? null;
+}
+
+export function resolveSubmitAttempt(
   command: Extract<ExecutionCommand, { type: "submit_node_result" }>,
   state: GraphExecutionState,
   effective: EffectivePlanGraph,
-): string | null {
-  if (command.nodeId) return resolveSubmittedNodeRef(command.nodeId, effective);
-  if (command.runtimeRunRef) return resolveRuntimeResultNodeId(state, command.runtimeRunRef);
-  return effective.nodes.find((node) => node.status === "running")?.id
-    ?? waitingNode(effective)?.id
-    ?? effective.readyNodeIds[0];
+) {
+  if (command.expectedAttemptId) {
+    const nodeId = command.nodeId ? resolveSubmittedNodeRef(command.nodeId, effective) : undefined;
+    const attempt = state.attempts.find((candidate) => candidate.id === command.expectedAttemptId) ?? null;
+    if (!attempt || (nodeId && attempt.nodeId !== nodeId)) return null;
+    if (command.runtimeRunRef && runtimeRunRefFromAttempt(attempt) !== command.runtimeRunRef) return null;
+    return attempt;
+  }
+  if (command.runtimeRunRef) return exactAttemptForRuntimeRun(state, command.runtimeRunRef);
+  return null;
+}
+
+
+function withSubmissionIdentity<T extends GraphSubmittedNodeResult>(
+  result: T,
+  command: Pick<Extract<ExecutionCommand, { type: "submit_node_result" }>, "expectedAttemptId" | "runtimeRunRef" | "providerRunId">,
+  attemptId: string,
+): T {
+  return {
+    ...result,
+    expectedAttemptId: attemptId,
+    ...(command.runtimeRunRef ?? result.evidence?.runtimeRunRef ? { runtimeRunRef: command.runtimeRunRef ?? result.evidence?.runtimeRunRef } : {}),
+    ...(command.providerRunId ? { providerRunId: command.providerRunId } : {}),
+  };
+}
+
+function withDirectCommandIdentity<T extends GraphSubmittedNodeResult>(result: T, state: GraphExecutionState): T {
+  const attempt = exactCurrentAttemptForNode(state, result.nodeId);
+  return attempt ? { ...result, expectedAttemptId: attempt.id } : result;
 }
 
 export function isDeliverableDeclaration(
@@ -99,12 +141,8 @@ function resolveSelectedBranch(
   if (result.selectedBranch || !result.branchRef || !effective) return result.selectedBranch;
   const conditionNode = effective.nodes.find((node) => node.id === nodeId);
   if (!conditionNode) return undefined;
-  try {
-    const binding = branchBindingForRef({ plan: effective, node: conditionNode, branchRef: result.branchRef });
-    return { ref: binding.ref, label: binding.label, nextNodeId: binding.nextNodeId!, source: "ai" as const };
-  } catch {
-    return undefined;
-  }
+  const binding = branchBindingForRef({ plan: effective, node: conditionNode, branchRef: result.branchRef });
+  return { ref: binding.ref, label: binding.label, nextNodeId: binding.nextNodeId!, source: "ai" as const };
 }
 
 function doneNodeResult(
@@ -114,9 +152,6 @@ function doneNodeResult(
 ): GraphSubmittedNodeResult {
   const deliverables = result.deliverables?.filter((deliverable): deliverable is NodeDeliverable =>
     !isDeliverableDeclaration(deliverable));
-  if (deliverables?.length !== result.deliverables?.length) {
-    throw new Error("Node result deliverables must be registered before graph submission");
-  }
   return {
     nodeId,
     status: "done",
@@ -189,12 +224,16 @@ function approvalResumeCommand(input: GraphCommandInput): GraphRuntimeCommand | 
 function resultCommand(input: GraphCommandInput): GraphRuntimeCommand | null {
   const { command, state, effective } = input;
   if (command.type === "submit_node_result") {
-    const nodeId = resolveSubmitNodeId(command, state, effective);
-    if (!nodeId) return null;
+    const attempt = resolveSubmitAttempt(command, state, effective);
+    if (!attempt) return null;
     return {
       type: "submit_node_result",
       ...graphCommandBase(input),
-      nodeResult: toSubmittedNodeResult(nodeId, command.result, effective),
+      nodeResult: withSubmissionIdentity(
+        toSubmittedNodeResult(attempt.nodeId, command.result, effective),
+        command,
+        attempt.id,
+      ),
       continueExecution: command.continueExecution ?? true,
     };
   }
@@ -202,12 +241,16 @@ function resultCommand(input: GraphCommandInput): GraphRuntimeCommand | null {
   const nodeId = command.nodeId ?? currentNode(effective)?.id;
   if (!nodeId) return null;
   if (command.type === "fail_node") {
-    return { type: "submit_node_result", ...graphCommandBase(input), nodeResult: { nodeId, status: "failed", error: command.error } };
+    return {
+      type: "submit_node_result",
+      ...graphCommandBase(input),
+      nodeResult: withDirectCommandIdentity({ nodeId, status: "failed", error: command.error }, state),
+    };
   }
   return {
     type: "submit_node_result",
     ...graphCommandBase(input),
-    nodeResult: { nodeId, status: "blocked", reason: command.reason, actionForm: command.actionForm },
+    nodeResult: withDirectCommandIdentity({ nodeId, status: "blocked", reason: command.reason, actionForm: command.actionForm }, state),
   };
 }
 

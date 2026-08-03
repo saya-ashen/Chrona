@@ -1,6 +1,6 @@
 import "@testing-library/jest-dom/vitest";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import {
@@ -123,9 +123,8 @@ describe("TaskWorkspaceExecutionOverview", () => {
     });
 
     expect(screen.getByRole("alert")).toHaveTextContent("Run had a failure");
-    expect(screen.getByRole("alert")).toHaveTextContent(
-      "Provider run was cancelled before recording a Chrona terminal result action",
-    );
+    expect(screen.getByRole("alert")).toHaveTextContent("Find matching PhD roles failed.");
+    expect(screen.getByRole("alert")).not.toHaveTextContent("Provider run was cancelled");
   });
 
   it("does not promote a recovered tool failure after execution completes", () => {
@@ -254,8 +253,7 @@ describe("TaskWorkspaceExecutionOverview", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("shows tool input, intent, progress, and result in the completed transcript", async () => {
-    const user = userEvent.setup();
+  it("shows safe tool lifecycle status in live activity", () => {
     const view = createTaskWorkspaceExecutionConsoleView(
       executionMonitoringWorkspaceFixtures.approvalNeeded,
     );
@@ -264,45 +262,33 @@ describe("TaskWorkspaceExecutionOverview", () => {
         {
           type: "runtime_event",
           action: "start_manual",
-          runtimeName: "omp",
-          provider: "omp",
-          runId: "run-1",
+          executionScope: "scope-1",
+          runtime: { category: "runtime", label: "Execution runtime" },
+          provider: { category: "ai_provider", label: "AI provider" },
           sequence: 1,
           timestamp: "2026-05-12T10:00:00.000Z",
-          event: { type: "tool_started", toolName: "read", callId: "call-1", label: "Read", inputSummary: '{\n  "path": "src/app.ts"\n}', preview: "Inspect application source" },
+          event: { type: "tool_started", tool: { category: "tool", label: "Runtime tool" }, label: "Read" },
         },
         {
           type: "runtime_event",
           action: "start_manual",
-          runtimeName: "omp",
-          provider: "omp",
-          runId: "run-1",
+          executionScope: "scope-1",
+          runtime: { category: "runtime", label: "Execution runtime" },
+          provider: { category: "ai_provider", label: "AI provider" },
           sequence: 2,
-          timestamp: "2026-05-12T10:00:01.000Z",
-          event: { type: "tool_progress", toolName: "read", callId: "call-1", label: "Read", preview: "Loaded 42 lines" },
-        },
-        {
-          type: "runtime_event",
-          action: "start_manual",
-          runtimeName: "omp",
-          provider: "omp",
-          runId: "run-1",
-          sequence: 3,
           timestamp: "2026-05-12T10:00:02.000Z",
-          event: { type: "tool_completed", toolName: "read", callId: "call-1", label: "Read", preview: "export const ready = true;" },
+          event: { type: "tool_completed", tool: { category: "tool", label: "Runtime tool" }, label: "Read", durationMs: 42 },
         },
-      ],
-    });
+      ] satisfies WorkspaceRuntimeEvent[],
+      currentExecution: { status: "running" },
+      isExecutionRunning: true,
+    }
+    );
 
-    await user.click(screen.getByRole("button", { name: /Open Agent transcript/ }));
-    const dialog = screen.getByRole("dialog", { name: "Agent transcript" });
-    expect(within(dialog).getByText(/src\/app\.ts/)).toBeInTheDocument();
-    expect(within(dialog).getByText("Inspect application source")).toBeInTheDocument();
-    expect(within(dialog).getByRole("button", { name: "View all technical details" })).toBeInTheDocument();
-    await user.click(within(dialog).getByRole("button", { name: "View all technical details" }));
-    expect(within(dialog).getByText("Loaded 42 lines")).toBeInTheDocument();
-    expect(within(dialog).getAllByText("export const ready = true;").length).toBeGreaterThan(0);
-    expect(within(dialog).getByRole("button", { name: "Show less" })).toBeInTheDocument();
+    expect(screen.getAllByText("Read").length).toBeGreaterThan(0);
+    expect(screen.queryByText("src/app.ts")).not.toBeInTheDocument();
+    expect(screen.queryByText("Inspect application source")).not.toBeInTheDocument();
+    expect(screen.queryByText("Loaded 42 lines")).not.toBeInTheDocument();
   });
 
   it("makes running Activity primary with responsive tabs and a desktop timeline", () => {
@@ -430,21 +416,19 @@ describe("TaskWorkspaceExecutionOverview", () => {
     const liveEvent = {
       type: "runtime_event" as const,
       action: "start_manual" as const,
+      executionScope: "scope-1",
       nodeId: "execute",
       nodeTitle: "Generate report",
-      runtimeName: "hermes",
-      provider: "hermes",
-      runId: "run-1",
+      runtime: { category: "runtime", label: "Execution runtime" },
+      provider: { category: "ai_provider", label: "AI provider" },
       sequence: 1,
       timestamp: "2026-05-12T10:01:00.000Z",
       event: {
         type: "tool_started" as const,
-        toolName: "chrona_report_write",
+        tool: { category: "tool", label: "Runtime tool" },
         label: "Writing report",
-        preview: "Generating report sections",
-        inputSummary: '{"section":"architecture"}',
       },
-    };
+    } satisfies WorkspaceRuntimeEvent;
 
     renderOverview(view, {
       commandCenter: {
@@ -469,12 +453,14 @@ describe("TaskWorkspaceExecutionOverview", () => {
     });
 
     const results = screen.getByRole("region", { name: "Stage results" });
-    expect(within(results).queryByRole("status", { name: "Execution is producing output" })).not.toBeInTheDocument();
+    expect(within(results).getByRole("status", { name: "Execution is producing output" })).toBeInTheDocument();
+    expect(results.querySelector(".animate-spin")).toBeInTheDocument();
     expect(within(results).queryByText("Writing report")).not.toBeInTheDocument();
-    expect(screen.getAllByText("Generating report sections").length).toBeGreaterThan(0);
+    expect(screen.getAllByText("Writing report").length).toBeGreaterThan(0);
+    expect(screen.queryByText("Generating report sections")).not.toBeInTheDocument();
   });
 
-  it("renders the complete live tool process in Activity", () => {
+  it("renders safe live tool lifecycle activity", () => {
     const view = createTaskWorkspaceExecutionConsoleView(
       executionMonitoringWorkspaceFixtures.running,
     );
@@ -483,167 +469,64 @@ describe("TaskWorkspaceExecutionOverview", () => {
         {
           type: "runtime_event",
           action: "start_manual",
+          executionScope: "scope-1",
           nodeId: "execute",
           nodeTitle: "Review architecture",
-          runtimeName: "hermes",
-          provider: "omp",
-          runId: "run-1",
+          runtime: { category: "runtime", label: "Execution runtime" },
+          provider: { category: "ai_provider", label: "AI provider" },
           sequence: 1,
           timestamp: "2026-05-12T10:01:00.000Z",
-          event: { type: "tool_started", toolName: "task", label: "task", preview: "Parallelizing audit tracks" },
+          event: { type: "tool_started", tool: { category: "tool", label: "Runtime tool" }, label: "Review architecture" },
         },
         {
           type: "runtime_event",
           action: "start_manual",
+          executionScope: "scope-1",
           nodeId: "execute",
           nodeTitle: "Review architecture",
-          runtimeName: "hermes",
-          provider: "omp",
-          runId: "run-1",
+          runtime: { category: "runtime", label: "Execution runtime" },
+          provider: { category: "ai_provider", label: "AI provider" },
           sequence: 2,
           timestamp: "2026-05-12T10:01:01.000Z",
-          event: { type: "tool_progress", toolName: "task", label: "task", preview: "Reviewer is inspecting persistence boundaries" },
-        },
-        {
-          type: "runtime_event",
-          action: "start_manual",
-          nodeId: "execute",
-          nodeTitle: "Review architecture",
-          runtimeName: "omp",
-          provider: "omp",
-          runId: "run-1",
-          sequence: 3,
-          timestamp: "2026-05-12T10:01:02.000Z",
-          event: { type: "raw_event", rawEventType: "turn_start", message: "Agent turn started." },
+          event: { type: "tool_progress", tool: { category: "tool", label: "Runtime tool" }, label: "Review architecture" },
         },
       ],
       currentExecution: { status: "running" },
       isExecutionRunning: true,
     });
 
-    expect(screen.getAllByText("Reviewer is inspecting persistence boundaries").length).toBeGreaterThan(0);
-    expect(screen.queryByText("Agent turn started.")).not.toBeInTheDocument();
+    expect(screen.getAllByText("Review architecture").length).toBeGreaterThan(0);
     expect(screen.getByRole("tab", { name: "Activity" })).toHaveAttribute("data-state", "active");
   });
 
-  it("updates stage results from assistant output while execution is running", () => {
+  it("keeps stage results pending without provider text output", () => {
     const view = createTaskWorkspaceExecutionConsoleView(
       executionMonitoringWorkspaceFixtures.running,
     );
 
     renderOverview(view, {
-      commandCenter: {
-        documents: {
-          now: nowDocument("Execution running"),
-          output: nowDocument("Output"),
-          trail: buildCommandCenterTrailSpec({
-            activity: [],
-            savedCount: 0,
-            toolLabels: {
-              tool: "Tool",
-              input: "Input",
-              preview: "Preview",
-              duration: "Duration",
-              error: "Error",
-            },
-          }),
-        },
-      },
-      runtimeEvents: [
-        {
-          type: "runtime_event",
-          action: "start_manual",
-          nodeId: "execute",
-          nodeTitle: "Generate report",
-          runtimeName: "hermes",
-          provider: "hermes",
-          runId: "run-1",
-          sequence: 1,
-          timestamp: "2026-05-12T10:01:00.000Z",
-          event: { type: "assistant_text_delta", text: "First paragraph. " },
-        },
-        {
-          type: "runtime_event",
-          action: "start_manual",
-          nodeId: "execute",
-          nodeTitle: "Generate report",
-          runtimeName: "hermes",
-          provider: "hermes",
-          runId: "run-1",
-          sequence: 2,
-          timestamp: "2026-05-12T10:01:01.000Z",
-          event: { type: "assistant_text_delta", text: "Second paragraph." },
-        },
-      ],
+      runtimeEvents: [{
+        type: "runtime_event",
+        action: "start_manual",
+        executionScope: "scope-1",
+        nodeId: "execute",
+        nodeTitle: "Generate report",
+        runtime: { category: "runtime", label: "Execution runtime" },
+        provider: { category: "ai_provider", label: "AI provider" },
+        sequence: 1,
+        timestamp: "2026-05-12T10:01:00.000Z",
+        event: { type: "tool_started", tool: { category: "tool", label: "Runtime tool" }, label: "Write report" },
+      }],
       currentExecution: { status: "running" },
       isExecutionRunning: true,
       executionResultState: "waiting",
     });
 
     const results = screen.getByRole("region", { name: "Stage results" });
-    expect(results).toHaveTextContent("First paragraph. Second paragraph.");
-    expect(results).toHaveTextContent("Results available");
-    expect(screen.queryByRole("note", { name: "Current step result pending" })).not.toBeInTheDocument();
+    expect(results).not.toHaveTextContent("First paragraph.");
   });
 
 
-  it("buffers rapid assistant deltas instead of repainting every token", async () => {
-    vi.useFakeTimers();
-    const view = createTaskWorkspaceExecutionConsoleView(
-      executionMonitoringWorkspaceFixtures.running,
-    );
-    const firstEvent = {
-      type: "runtime_event" as const,
-      action: "start_manual" as const,
-      nodeId: "execute",
-      nodeTitle: "Generate report",
-      runtimeName: "hermes",
-      provider: "hermes",
-      runId: "run-1",
-      sequence: 1,
-      timestamp: "2026-05-12T10:01:00.000Z",
-      event: { type: "assistant_text_delta" as const, text: "First" },
-    };
-    const { rerender } = renderOverview(view, {
-      runtimeEvents: [firstEvent],
-      currentExecution: { status: "running" },
-      isExecutionRunning: true,
-    });
-    const renderAgain = (runtimeEvents: WorkspaceRuntimeEvent[]) => rerender(
-      <TaskWorkspaceExecutionOverview
-        taskId="task-1"
-        progress={view.progress}
-        readiness={view.readiness}
-        latestResult={view.latestResult}
-        attention={view.attention}
-        nodes={view.graphPlan?.nodes ?? []}
-        latestCompletedNode={view.latestCompletedNode}
-        artifacts={view.artifacts}
-        activity={view.activity}
-        runtimeEvents={runtimeEvents}
-        currentExecution={{ status: "running" }}
-        isExecutionRunning
-      />,
-    );
-    const secondEvent = {
-      ...firstEvent,
-      sequence: 2,
-      event: { type: "assistant_text_delta" as const, text: " second" },
-    };
-    const thirdEvent = {
-      ...firstEvent,
-      sequence: 3,
-      event: { type: "assistant_text_delta" as const, text: " third" },
-    };
-
-    renderAgain([firstEvent, secondEvent]);
-    renderAgain([firstEvent, secondEvent, thirdEvent]);
-    expect(screen.getByRole("region", { name: "Stage results" })).toHaveTextContent("First");
-    expect(screen.getByRole("region", { name: "Stage results" })).not.toHaveTextContent("second");
-
-    await act(async () => vi.advanceTimersByTimeAsync(100));
-    expect(screen.getByRole("region", { name: "Stage results" })).toHaveTextContent("First second third");
-  });
 
   it("explains that stage results are pending while activity stays live", () => {
     const view = createTaskWorkspaceExecutionConsoleView(
@@ -675,9 +558,9 @@ describe("TaskWorkspaceExecutionOverview", () => {
 
     const results = screen.getByRole("region", { name: "Stage results" });
     expect(results).toHaveTextContent("Waiting for output");
-    expect(within(results).queryByRole("status", { name: "Execution is producing output" })).not.toBeInTheDocument();
-    expect(within(results).queryByText("Current activity")).not.toBeInTheDocument();
-    expect(results.querySelector(".animate-spin")).not.toBeInTheDocument();
+    const status = within(results).getByRole("status", { name: "Execution is producing output" });
+    expect(status).toHaveTextContent("Waiting for output");
+    expect(status.querySelector(".animate-spin")).toBeInTheDocument();
   });
 
   it("hides live status strip after completion even when stale activity looks active", () => {
@@ -750,19 +633,19 @@ describe("TaskWorkspaceExecutionOverview", () => {
     const liveEvent = {
       type: "runtime_event" as const,
       action: "start_manual" as const,
+      executionScope: "scope-1",
       nodeId: "execute",
       nodeTitle: "execute",
-      runtimeName: "hermes",
-      provider: "hermes",
-      runId: "run-1",
+      runtime: { category: "runtime", label: "Execution runtime" },
+      provider: { category: "ai_provider", label: "AI provider" },
       sequence: 1,
       timestamp: "2026-05-12T10:01:00.000Z",
       event: {
         type: "tool_started" as const,
-        toolName: "chrona_plan_read",
+        tool: { category: "tool", label: "Runtime tool" },
         label: "正在读取计划",
       },
-    };
+    } satisfies WorkspaceRuntimeEvent;
 
     const { rerender } = renderOverview(view, {
       commandCenter,

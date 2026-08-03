@@ -1,3 +1,4 @@
+/* eslint-disable max-lines-per-function, complexity -- Task updates keep recurrence authority and task mutation in one transaction. */
 import { Prisma, TaskPriority, TaskStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { appendCanonicalEvent } from "@/modules/events";
@@ -66,54 +67,114 @@ function mergeSessionStrategyIntoExecutionConfig(
   return Object.keys(nextConfig).length > 0 ? nextConfig : null;
 }
 
-async function materializeTaskRecurrence(input: {
-  taskId: string;
-  workspaceId: string;
-  title: string;
-  recurrenceRule: string;
-  startsAt: Date;
-  endsAt: Date;
-  runtimeName: string;
-}) {
-  const durationMs = input.endsAt.getTime() - input.startsAt.getTime();
-  const windowTo = new Date(
-    input.startsAt.getTime() + SELF_SERIES_WINDOW_DAYS * 24 * 60 * 60 * 1000,
-  );
-  const occurrences = expandRecurrenceRule(input.recurrenceRule, input.startsAt, durationMs, {
-    from: input.startsAt,
-    to: windowTo,
-    maxOccurrences: SELF_SERIES_MAX_OCCURRENCES,
+async function synchronizeTaskRecurrenceAuthority(
+  tx: Prisma.TransactionClient,
+  input: {
+    taskId: string;
+    workspaceId: string;
+    title: string;
+    recurrenceRule: string | null;
+    startsAt: Date | null;
+    endsAt: Date | null;
+    runtimeName: string;
+  },
+) {
+  const now = new Date();
+  const currentTrigger = await tx.taskTrigger.findUnique({
+    where: { taskId_kind: { taskId: input.taskId, kind: "schedule" } },
   });
-  const nextKeys = new Set(occurrences.map((occurrence) => occurrence.startsAt.toISOString()));
-  await db.workBlock.updateMany({
+
+  if (currentTrigger) {
+    await tx.taskOccurrence.updateMany({
+      where: {
+        triggerId: currentTrigger.id,
+        status: { in: ["Scheduled", "Ready"] },
+        startedAt: null,
+      },
+      data: { status: "Cancelled", completedAt: now },
+    });
+  }
+  await tx.workBlock.updateMany({
     where: {
       taskId: input.taskId,
       status: "Scheduled",
       recurrenceKey: { not: null },
-      NOT: { recurrenceKey: { in: [...nextKeys] } },
     },
-    data: { status: "Cancelled", completedAt: new Date() },
+    data: { status: "Cancelled", completedAt: now },
+  });
+
+  if (!input.recurrenceRule) {
+    if (currentTrigger) {
+      await tx.taskTrigger.update({
+        where: { id: currentTrigger.id },
+        data: { state: "Retired", version: { increment: 1 } },
+      });
+    }
+    return;
+  }
+  if (!input.startsAt || !input.endsAt) {
+    throw new EngineError(
+      ENGINE_ERROR_CODES.VALIDATION_FAILED,
+      "recurrenceAnchorStartAt and recurrenceAnchorEndAt are required when recurrenceRule is set",
+    );
+  }
+
+  const durationMs = input.endsAt.getTime() - input.startsAt.getTime();
+  const windowUntil = new Date(
+    input.startsAt.getTime() + SELF_SERIES_WINDOW_DAYS * 24 * 60 * 60 * 1000,
+  );
+  const config = {
+    mode: "recurring",
+    rrule: input.recurrenceRule,
+    anchorStartAt: input.startsAt.toISOString(),
+    timezone: "UTC",
+    durationMs,
+    windowUntil: windowUntil.toISOString(),
+  } satisfies Prisma.InputJsonObject;
+  const trigger = currentTrigger
+    ? await tx.taskTrigger.update({
+        where: { id: currentTrigger.id },
+        data: { config, state: "Enabled", version: { increment: 1 } },
+      })
+    : await tx.taskTrigger.create({
+        data: {
+          workspaceId: input.workspaceId,
+          taskId: input.taskId,
+          kind: "schedule",
+          state: "Enabled",
+          config,
+        },
+      });
+  const occurrences = expandRecurrenceRule(input.recurrenceRule, input.startsAt, durationMs, {
+    from: input.startsAt,
+    to: windowUntil,
+    maxOccurrences: SELF_SERIES_MAX_OCCURRENCES,
   });
 
   for (const occurrence of occurrences) {
-    const recurrenceKey = occurrence.startsAt.toISOString();
-    const workBlock = await db.workBlock.upsert({
-      where: { taskId_recurrenceKey: { taskId: input.taskId, recurrenceKey } },
-      create: {
+    const occurrenceKey = `schedule:v${trigger.version}:${occurrence.startsAt.toISOString()}`;
+    const workBlock = await tx.workBlock.create({
+      data: {
         workspaceId: input.workspaceId,
         taskId: input.taskId,
-        recurrenceKey,
+        recurrenceKey: occurrenceKey,
         title: input.title,
         status: "Scheduled",
         scheduledStartAt: occurrence.startsAt,
         scheduledEndAt: occurrence.endsAt,
-        trigger: "manual",
-      },
-      update: {
-        title: input.title,
-        scheduledStartAt: occurrence.startsAt,
-        scheduledEndAt: occurrence.endsAt,
-        trigger: "manual",
+        trigger: "scheduled",
+        occurrence: {
+          create: {
+            workspaceId: input.workspaceId,
+            taskId: input.taskId,
+            triggerId: trigger.id,
+            occurrenceKey,
+            triggerVersion: trigger.version,
+            source: { kind: "trigger", triggerId: trigger.id },
+            status: occurrence.startsAt > now ? "Scheduled" : "Ready",
+            eligibleAt: occurrence.startsAt,
+          },
+        },
       },
       select: { id: true, sessionId: true },
     });
@@ -124,7 +185,7 @@ async function materializeTaskRecurrence(input: {
       workBlockId: workBlock.id,
       sessionId: workBlock.sessionId,
       label: `${input.title} · Work block session`,
-    });
+    }, tx);
   }
 }
 
@@ -237,12 +298,6 @@ export async function updateTask(
     ? currentTask.recurrenceRule
     : input.recurrenceRule?.trim() || null;
   const recurrenceChanged = input.recurrenceRule !== undefined;
-  const shouldMaterializeRecurrence = Boolean(
-    recurrenceChanged &&
-    nextRecurrenceRule &&
-    input.recurrenceAnchorStartAt &&
-    input.recurrenceAnchorEndAt,
-  );
   const recurrenceAnchorStartAt = input.recurrenceAnchorStartAt
     ? new Date(input.recurrenceAnchorStartAt)
     : null;
@@ -286,84 +341,86 @@ export async function updateTask(
     input.aiClientId !== undefined ? "aiClientId" : null,
   ].filter((field): field is string => field !== null);
 
-  const task = await db.task.update({
-    where: { id: input.taskId },
-    data: {
-      title,
-      description,
-      priority: input.priority ? TaskPriority[input.priority] : undefined,
-      autoPlanGeneration:
-        input.autoPlanGeneration !== undefined || input.autoExecute === true
-          ? nextAutoPlanGeneration
+  const task = await db.$transaction(async (tx) => {
+    const updatedTask = await tx.task.update({
+      where: { id: input.taskId },
+      data: {
+        title,
+        description,
+        priority: input.priority ? TaskPriority[input.priority] : undefined,
+        autoPlanGeneration:
+          input.autoPlanGeneration !== undefined || input.autoExecute === true
+            ? nextAutoPlanGeneration
+            : undefined,
+        autoExecute: input.autoExecute,
+        autoPlanGenerationTiming:
+          input.autoPlanGenerationTiming !== undefined
+            ? nextAutoPlanGenerationTiming
+            : undefined,
+        autoExecuteTiming:
+          input.autoExecuteTiming !== undefined ? nextAutoExecuteTiming : undefined,
+        executionRuntime: shouldPersistResolvedRuntimeConfig
+          ? validatedRuntimeConfig.executionRuntime
           : undefined,
-      autoExecute: input.autoExecute,
-      autoPlanGenerationTiming:
-        input.autoPlanGenerationTiming !== undefined
-          ? nextAutoPlanGenerationTiming
-          : undefined,
-      autoExecuteTiming:
-        input.autoExecuteTiming !== undefined ? nextAutoExecuteTiming : undefined,
-      executionRuntime: shouldPersistResolvedRuntimeConfig
-        ? validatedRuntimeConfig.executionRuntime
-        : undefined,
-      executionConfig: shouldPersistResolvedRuntimeConfig
-        ? (validatedRuntimeConfig.executionConfig as Prisma.InputJsonObject)
-        : executionConfig,
-      pinnedModel: modelRoutingChanged ? (nextConfiguredModel || null) : undefined,
-      pinnedModelSource: modelRoutingChanged ? (nextConfiguredModel ? "user" : null) : undefined,
-      status: nextStatus,
-      recurrenceRule: input.recurrenceRule !== undefined ? nextRecurrenceRule : undefined,
-      kind: input.recurrenceRule !== undefined ? (nextRecurrenceRule ? "recurring" : "single") : undefined,
-      recurrenceAnchorStartAt: input.recurrenceRule !== undefined ? recurrenceAnchorStartAt : undefined,
-      recurrenceAnchorEndAt: input.recurrenceRule !== undefined ? recurrenceAnchorEndAt : undefined,
-      recurrenceWindowUntil: input.recurrenceRule !== undefined && recurrenceAnchorStartAt
-        ? new Date(recurrenceAnchorStartAt.getTime() + SELF_SERIES_WINDOW_DAYS * 24 * 60 * 60 * 1000)
-        : input.recurrenceRule !== undefined
-          ? null
-          : undefined,
-      seriesExternalUid: input.recurrenceRule !== undefined ? null : undefined,
-      aiClientId: input.aiClientId !== undefined ? input.aiClientId : undefined,
-    },
+        executionConfig: shouldPersistResolvedRuntimeConfig
+          ? (validatedRuntimeConfig.executionConfig as Prisma.InputJsonObject)
+          : executionConfig,
+        pinnedModel: modelRoutingChanged ? (nextConfiguredModel || null) : undefined,
+        pinnedModelSource: modelRoutingChanged ? (nextConfiguredModel ? "user" : null) : undefined,
+        status: nextStatus,
+        recurrenceRule: input.recurrenceRule !== undefined ? nextRecurrenceRule : undefined,
+        kind: input.recurrenceRule !== undefined ? (nextRecurrenceRule ? "recurring" : "single") : undefined,
+        recurrenceAnchorStartAt: input.recurrenceRule !== undefined ? recurrenceAnchorStartAt : undefined,
+        recurrenceAnchorEndAt: input.recurrenceRule !== undefined ? recurrenceAnchorEndAt : undefined,
+        recurrenceWindowUntil: input.recurrenceRule !== undefined && recurrenceAnchorStartAt
+          ? new Date(recurrenceAnchorStartAt.getTime() + SELF_SERIES_WINDOW_DAYS * 24 * 60 * 60 * 1000)
+          : input.recurrenceRule !== undefined
+            ? null
+            : undefined,
+        seriesExternalUid: input.recurrenceRule !== undefined ? null : undefined,
+        aiClientId: input.aiClientId !== undefined ? input.aiClientId : undefined,
+      },
+    });
+
+    if (shouldCancelOpenWorkBlocks) {
+      const completedAt = new Date();
+      await tx.workBlock.updateMany({
+        where: {
+          taskId: updatedTask.id,
+          status: { in: ["Scheduled", "Active"] },
+        },
+        data: { status: "Cancelled", completedAt },
+      });
+      await tx.taskOccurrence.updateMany({
+        where: {
+          taskId: updatedTask.id,
+          status: { notIn: ["Completed", "Failed", "Cancelled"] },
+        },
+        data: { status: "Cancelled", completedAt },
+      });
+      await synchronizeTaskRecurrenceAuthority(tx, {
+        taskId: updatedTask.id,
+        workspaceId: updatedTask.workspaceId,
+        title: updatedTask.title,
+        recurrenceRule: null,
+        startsAt: null,
+        endsAt: null,
+        runtimeName: validatedRuntimeConfig.executionRuntime,
+      });
+    } else if (recurrenceChanged) {
+      await synchronizeTaskRecurrenceAuthority(tx, {
+        taskId: updatedTask.id,
+        workspaceId: updatedTask.workspaceId,
+        title: updatedTask.title,
+        recurrenceRule: nextRecurrenceRule,
+        startsAt: recurrenceAnchorStartAt,
+        endsAt: recurrenceAnchorEndAt,
+        runtimeName: validatedRuntimeConfig.executionRuntime,
+      });
+    }
+
+    return updatedTask;
   });
-
-  if (shouldCancelOpenWorkBlocks) {
-    await db.workBlock.updateMany({
-      where: {
-        taskId: task.id,
-        status: { in: ["Scheduled", "Active"] },
-      },
-      data: {
-        status: "Cancelled",
-        completedAt: new Date(),
-      },
-    });
-  }
-
-  if (!shouldCancelOpenWorkBlocks && recurrenceChanged && !nextRecurrenceRule) {
-    await db.workBlock.updateMany({
-      where: {
-        taskId: task.id,
-        status: "Scheduled",
-        recurrenceKey: { not: null },
-      },
-      data: {
-        status: "Cancelled",
-        completedAt: new Date(),
-      },
-    });
-  }
-
-  if (!shouldCancelOpenWorkBlocks && shouldMaterializeRecurrence && recurrenceAnchorStartAt && recurrenceAnchorEndAt && nextRecurrenceRule) {
-    await materializeTaskRecurrence({
-      taskId: task.id,
-      workspaceId: task.workspaceId,
-      title: task.title,
-      recurrenceRule: nextRecurrenceRule,
-      startsAt: recurrenceAnchorStartAt,
-      endsAt: recurrenceAnchorEndAt,
-      runtimeName: validatedRuntimeConfig.executionRuntime,
-    });
-  }
   await appendCanonicalEvent({
     eventType: "task.updated",
     workspaceId: task.workspaceId,

@@ -185,6 +185,7 @@ describe("graph-runtime execution", () => {
       context: null,
       nodeResult: {
         nodeId: "choose",
+        expectedAttemptId: "external_attempt_1",
         status: "done",
         summary: "External run completed",
         evidence: { runId: "run_1" },
@@ -237,7 +238,7 @@ describe("graph-runtime execution", () => {
       ],
       results: [
         {
-          id: "result_pending_external",
+          id: `result_${graph.id}_choose_${new Date(tick).toISOString()}`,
           taskId: "task_1",
           graphId: graph.id,
           nodeId: "choose",
@@ -265,6 +266,7 @@ describe("graph-runtime execution", () => {
       continueExecution: false,
       nodeResult: {
         nodeId: "choose",
+        expectedAttemptId: "external_attempt_1",
         status: "done",
         summary: "External run completed",
         selectedBranch: { label: "yes", nextNodeId: "done", source: "system" },
@@ -276,6 +278,7 @@ describe("graph-runtime execution", () => {
       ["choose", "stale"],
       ["choose", "current"],
     ]);
+    expect(new Set(result.state.results.map((entry) => entry.id)).size).toBe(2);
     expect(result.events.map((event) => event.type)).toEqual([
       "command_received",
       "node_result_submitted",
@@ -388,7 +391,7 @@ describe("graph-runtime execution", () => {
     });
 
     const leftNode = effective.nodes.find((node) => node.id === "left");
-    expect(leftNode?.status).toBe("completed");
+    expect(leftNode?.status).toBe("ready");
     expect(leftNode?.result).toBeUndefined();
   });
 
@@ -507,5 +510,156 @@ describe("graph-runtime execution", () => {
     expect(second.state.attempts).toHaveLength(1);
     expect(second.effective.readyNodeIds).toEqual([]);
     expect(second.effective.runningNodeIds).toHaveLength(1);
+  });
+  it("rejects a late terminal result from an obsolete attempt without completing its retry", async () => {
+    const graph = createPlanGraphFromCompiledPlan({
+      taskId: "task_1",
+      compiledPlan: makeBranchingPlan(),
+      now: "2026-01-01T00:00:00.000Z",
+    });
+    const layerId = graph.nodes[0]?.layers[0]?.id ?? "choose_layer";
+    const state: GraphExecutionState = {
+      graph,
+      attempts: [
+        {
+          id: "attempt-a",
+          taskId: "task_1",
+          graphId: graph.id,
+          nodeId: "choose",
+          nodeLayerId: layerId,
+          executionContextSnapshotId: "ctx-a",
+          idempotencyKey: "attempt-a",
+          attemptNumber: 1,
+          status: "failed",
+          startedAt: "2026-01-01T00:00:00.000Z",
+          runtimeSnapshot: { status: "failed", output: { runtimeRunRef: "run-a" } },
+        },
+        {
+          id: "attempt-b",
+          taskId: "task_1",
+          graphId: graph.id,
+          nodeId: "choose",
+          nodeLayerId: layerId,
+          executionContextSnapshotId: "ctx-b",
+          idempotencyKey: "attempt-b",
+          attemptNumber: 2,
+          status: "running",
+          startedAt: "2026-01-01T00:00:02.000Z",
+          runtimeSnapshot: { status: "running", output: { runtimeRunRef: "run-b" } },
+        },
+      ],
+      results: [{
+        id: "result-b-running",
+        taskId: "task_1",
+        graphId: graph.id,
+        nodeId: "choose",
+        attemptId: "attempt-b",
+        status: "current",
+        waitKind: "external_dependency",
+        outputSummary: "Retry is running",
+      }],
+      executionContextSnapshots: [],
+    };
+    let tick = 900;
+    const runtime = createGraphRuntime({ taskId: "task_1", runtimeName: "test", now: () => tick++ });
+
+    const late = await runtime.dispatch({
+      type: "submit_node_result",
+      state,
+      context: null,
+      continueExecution: false,
+      nodeResult: {
+        nodeId: "choose",
+        expectedAttemptId: "attempt-a",
+        runtimeRunRef: "run-a",
+        status: "done",
+        summary: "Late attempt A",
+        selectedBranch: { label: "yes", nextNodeId: "done", source: "system" },
+      },
+    });
+    expect(late.state.attempts.find((attempt) => attempt.id === "attempt-b")?.status).toBe("running");
+    expect(late.state.results.at(-1)).toMatchObject({ attemptId: "attempt-a", status: "stale" });
+
+    const exact = await runtime.dispatch({
+      type: "submit_node_result",
+      state: late.state,
+      context: null,
+      continueExecution: false,
+      nodeResult: {
+        nodeId: "choose",
+        expectedAttemptId: "attempt-b",
+        runtimeRunRef: "run-b",
+        status: "done",
+        summary: "Exact attempt B",
+        selectedBranch: { label: "yes", nextNodeId: "done", source: "system" },
+      },
+    });
+    expect(exact.state.attempts.find((attempt) => attempt.id === "attempt-b")?.status).toBe("succeeded");
+    expect(exact.state.results.at(-1)).toMatchObject({ attemptId: "attempt-b", status: "current" });
+  });
+
+  it("accepts an exact active checkpoint result without reopening its terminal attempt", async () => {
+    const graph = createPlanGraphFromCompiledPlan({
+      taskId: "task_1",
+      compiledPlan: makeLinearPlan(),
+      now: "2026-01-01T00:00:00.000Z",
+    });
+    const manualNode = graph.nodes.find((node) => node.id === "second")!;
+    const state: GraphExecutionState = {
+      graph,
+      attempts: [{
+        id: "attempt-manual",
+        taskId: "task_1",
+        graphId: graph.id,
+        nodeId: "second",
+        nodeLayerId: manualNode.layers[0]?.id ?? "second_layer",
+        executionContextSnapshotId: "ctx-manual",
+        idempotencyKey: "attempt-manual",
+        attemptNumber: 1,
+        status: "failed",
+        startedAt: "2026-01-01T00:00:00.000Z",
+        finishedAt: "2026-01-01T00:00:01.000Z",
+        error: { code: "NODE_BLOCKED", message: "Manual completion required" },
+      }],
+      results: [{
+        id: "result-manual-wait",
+        taskId: "task_1",
+        graphId: graph.id,
+        nodeId: "second",
+        nodeLayerId: manualNode.layers[0]?.id,
+        attemptId: "attempt-manual",
+        status: "current",
+        waitKind: "manual_action",
+        error: "Manual completion required",
+      }],
+      executionContextSnapshots: [],
+    };
+    const runtime = createGraphRuntime({ taskId: "task_1", runtimeName: "test", now: () => 1_000 });
+
+    const outcome = await runtime.dispatch({
+      type: "submit_node_result",
+      state,
+      context: null,
+      continueExecution: false,
+      nodeResult: {
+        nodeId: "second",
+        expectedAttemptId: "attempt-manual",
+        status: "done",
+        summary: "Manual review completed",
+      },
+    });
+
+    expect(outcome.state.attempts[0]).toMatchObject({
+      id: "attempt-manual",
+      status: "failed",
+      finishedAt: "2026-01-01T00:00:01.000Z",
+      error: { code: "NODE_BLOCKED", message: "Manual completion required" },
+    });
+    expect(outcome.state.results.at(-1)).toMatchObject({
+      attemptId: "attempt-manual",
+      status: "current",
+      outputSummary: "Manual review completed",
+    });
+    expect(outcome.effective.nodes.find((node) => node.id === "second")?.status).toBe("completed");
   });
 });

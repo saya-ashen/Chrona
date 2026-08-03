@@ -217,7 +217,7 @@ export async function createTask(input: CreateTaskInput, client: Prisma.Transact
         data: {
           workspaceId: task.workspaceId,
           taskId: task.id,
-          recurrenceKey: occurrence.startsAt.toISOString(),
+          recurrenceKey: `schedule:v${scheduleTrigger!.version}:${occurrence.startsAt.toISOString()}`,
           title: task.title,
           status: "Scheduled",
           scheduledStartAt: occurrence.startsAt,

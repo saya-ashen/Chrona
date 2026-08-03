@@ -1,3 +1,4 @@
+/* eslint-disable complexity, max-lines -- Runtime contracts explicitly validate every persisted protocol variant. */
 import { z } from "zod";
 
 /** Shared, explicitly bounded primitives for serializable AI feature contracts. */
@@ -81,7 +82,7 @@ export const aiObjectiveSchema = z
   })
   .strict();
 
-type AiJsonValue =
+export type AiJsonValue =
   | null
   | boolean
   | number
@@ -105,7 +106,43 @@ function hasBoundedJsonValue(value: unknown, depth = 0, state = { elements: 0 })
   );
 }
 
-const aiJsonValueSchema: z.ZodType<AiJsonValue> = z.lazy(() =>
+/** Iterative preflight for untrusted persisted/provider payloads before recursive schema work. */
+export function isBoundedAiJsonObject(value: unknown): value is { [key: string]: AiJsonValue } {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return false;
+  const seen = new WeakSet<object>();
+  const stack: Array<{ value: unknown; depth: number }> = [{ value, depth: 0 }];
+  let elements = 0;
+  while (stack.length > 0) {
+    const current = stack.pop()!;
+    if (current.depth > AI_FEATURE_RUNTIME_LIMITS.jsonDepth || ++elements > AI_FEATURE_RUNTIME_LIMITS.jsonElements) return false;
+    if (current.value === null || typeof current.value === "boolean") continue;
+    if (typeof current.value === "number") {
+      if (!Number.isFinite(current.value)) return false;
+      continue;
+    }
+    if (typeof current.value === "string") {
+      if (current.value.length > AI_FEATURE_RUNTIME_LIMITS.jsonString) return false;
+      continue;
+    }
+    if (typeof current.value !== "object" || seen.has(current.value)) return false;
+    seen.add(current.value);
+    if (Array.isArray(current.value)) {
+      if (current.value.length > AI_FEATURE_RUNTIME_LIMITS.jsonElements) return false;
+      for (const item of current.value) stack.push({ value: item, depth: current.depth + 1 });
+      continue;
+    }
+    if (Object.getPrototypeOf(current.value) !== Object.prototype && Object.getPrototypeOf(current.value) !== null) return false;
+    const entries = Object.entries(current.value);
+    if (entries.length > AI_FEATURE_RUNTIME_LIMITS.jsonElements) return false;
+    for (const [key, item] of entries) {
+      if (key.length === 0 || key.length > AI_FEATURE_RUNTIME_LIMITS.jsonKey) return false;
+      stack.push({ value: item, depth: current.depth + 1 });
+    }
+  }
+  return true;
+}
+
+export const aiJsonValueSchema: z.ZodType<AiJsonValue> = z.lazy(() =>
   z.union([
     z.null(),
     z.boolean(),
@@ -127,8 +164,7 @@ export const aiJsonObjectSchema = z
       });
     }
   });
-
-const aiSupportedJsonSchemaSchema: z.ZodType = z.lazy(() =>
+export const aiSupportedJsonSchemaSchema: z.ZodType = z.lazy(() =>
   z
     .object({
       type: z.enum(["object", "array", "string", "number", "integer", "boolean", "null"]).optional(),
@@ -145,7 +181,7 @@ const aiSupportedJsonSchemaSchema: z.ZodType = z.lazy(() =>
     .strict(),
 );
 
-/** JSON Schema answer documents use the supported closed subset and require an object root. */
+/** JSON Schema answer documents may use any root type in the supported closed subset. */
 export const aiJsonObjectRootSchema = z
   .object({
     type: z.literal("object"),
@@ -196,6 +232,7 @@ export const actionExecutionSemanticsSchema = z.enum([
   "domain_idempotent",
   "read_only",
   "idempotent_external",
+  "at_most_once",
 ]);
 
 export const actionBindingSchema = z.discriminatedUnion("mode", [
@@ -300,12 +337,12 @@ export const producedArtifactReferenceSchema = z
   })
   .strict();
 
-/** JSON Schema is carried as data, but UI answers must always start with an object. */
+/** A user-visible question with a bounded JSON Schema answer contract. */
 export const userQuestionSchema = z
   .object({
     questionId: aiRuntimeIdSchema,
     prompt: z.string().trim().min(1).max(AI_FEATURE_RUNTIME_LIMITS.text),
-    answerSchema: aiJsonObjectRootSchema,
+    answerSchema: aiSupportedJsonSchemaSchema,
     reason: z.string().trim().min(1).max(AI_FEATURE_RUNTIME_LIMITS.text),
   })
   .strict();
@@ -402,6 +439,7 @@ export const aiFeatureRuntimeErrorCodeSchema = z.enum([
   "action_input_invalid",
   "action_capability_unsupported",
   "action_outcome_unknown",
+  "action_output_invalid",
   "result_invalid",
   "output_invalid",
   "evidence_invalid",
@@ -445,6 +483,7 @@ export const aiFeatureRunActionStatusSchema = z.enum([
   "executing",
   "completed",
   "failed",
+  "outcome_unknown",
   "proposed",
 ]);
 

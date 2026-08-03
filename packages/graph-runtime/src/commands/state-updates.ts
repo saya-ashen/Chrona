@@ -1,3 +1,4 @@
+/* eslint-disable max-lines-per-function, complexity, @typescript-eslint/no-unnecessary-condition -- Graph state updates enumerate immutable attempt and stale-result transitions. */
 import { appendCurrentResult, updateAttemptStatus } from "../execution-state";
 import { normalizeResultEvidence } from "../evidence";
 import { resolveEffectivePlanGraph } from "../resolve";
@@ -67,7 +68,7 @@ export function retryNodeState(input: {
   return {
     ...input.state,
     attempts: input.state.attempts.map((attempt) =>
-      attempt.nodeId === input.nodeId && attempt.status !== "cancelled"
+      attempt.nodeId === input.nodeId && attempt.status === "running"
         ? {
             ...attempt,
             status: "cancelled",
@@ -119,6 +120,79 @@ export function cancelSessionState(input: {
     ),
   };
 }
+function staleSubmittedNodeResult(input: {
+  taskId: string;
+  state: GraphExecutionState;
+  nodeResult: GraphSubmittedNodeResult;
+  submittedAt: string;
+  nodeLayerId?: string;
+  reason: string;
+}): GraphExecutionState {
+  const staleResult: NodeResult = {
+    id: `result_${input.state.graph.id}_${input.nodeResult.nodeId}_${input.submittedAt}_stale_${input.state.results.length}`,
+    taskId: input.taskId,
+    graphId: input.state.graph.id,
+    nodeId: input.nodeResult.nodeId,
+    nodeLayerId: input.nodeLayerId,
+    attemptId: input.nodeResult.expectedAttemptId,
+    status: "stale",
+    outputSummary:
+      input.nodeResult.status === "done"
+        ? input.nodeResult.summary
+        : undefined,
+    error: input.nodeResult.status === "failed"
+      ? input.nodeResult.error
+      : input.nodeResult.status === "cancelled" || input.nodeResult.status === "blocked"
+        ? input.nodeResult.reason
+        : input.reason,
+    evidence: normalizeResultEvidence(input.nodeResult.evidence),
+    selectedBranch: input.nodeResult.status === "done" ? input.nodeResult.selectedBranch : undefined,
+    ...(input.nodeResult.status === "done"
+      ? {
+          deliverables: input.nodeResult.deliverables,
+          findings: input.nodeResult.findings,
+          decisions: input.nodeResult.decisions,
+          caveats: input.nodeResult.caveats,
+          nextActions: input.nodeResult.nextActions,
+          resultEvidence: input.nodeResult.resultEvidence,
+        }
+      : {}),
+  };
+  return {
+    ...input.state,
+    results: [...input.state.results, staleResult],
+  };
+}
+
+function runtimeRunRefFromAttempt(attempt: NodeAttempt): string | null {
+  const output = attempt.runtimeSnapshot?.output;
+  if (!output || typeof output !== "object") return null;
+  const record = output as Record<string, unknown>;
+  return typeof record.runtimeRunRef === "string" ? record.runtimeRunRef : null;
+}
+
+function resolveCurrentSubmittedAttempt(input: {
+  state: GraphExecutionState;
+  nodeResult: GraphSubmittedNodeResult;
+  currentResult?: NodeResult;
+}) {
+  const expectedAttemptId = input.nodeResult.expectedAttemptId;
+  if (!expectedAttemptId) return { attempt: null, reason: "missing_attempt_identity" };
+  const attempt = input.state.attempts.find((candidate) => candidate.id === expectedAttemptId);
+  if (!attempt) return { attempt: null, reason: "unknown_attempt_identity" };
+  if (attempt.nodeId !== input.nodeResult.nodeId) return { attempt: null, reason: "node_attempt_mismatch" };
+  if (input.nodeResult.runtimeRunRef && runtimeRunRefFromAttempt(attempt) !== input.nodeResult.runtimeRunRef) {
+    return { attempt: null, reason: "runtime_run_mismatch" };
+  }
+  if (
+    attempt.status !== "running" &&
+    !(input.currentResult?.attemptId === attempt.id && input.currentResult.waitKind)
+  ) {
+    return { attempt: null, reason: "stale_attempt_identity" };
+  }
+  return { attempt, reason: null };
+}
+
 
 export function submitNodeResultState(input: {
   taskId: string;
@@ -141,53 +215,23 @@ export function submitNodeResultState(input: {
         result.nodeId === input.nodeResult.nodeId &&
         result.status === "current",
     );
-  const currentAttempt = [...input.state.attempts]
-    .reverse()
-    .find(
-      (attempt) =>
-        attempt.nodeId === input.nodeResult.nodeId &&
-        (
-          attempt.status === "running" ||
-          (currentResult?.attemptId === attempt.id && currentResult.waitKind)
-        ),
-    );
+  const { attempt: currentAttempt, reason: staleReason } = resolveCurrentSubmittedAttempt({
+    state: input.state,
+    nodeResult: input.nodeResult,
+    currentResult,
+  });
   if (!currentAttempt) {
-    const staleResult: NodeResult = {
-      id: `result_${input.state.graph.id}_${input.nodeResult.nodeId}_${input.submittedAt}_stale`,
+    return staleSubmittedNodeResult({
       taskId: input.taskId,
-      graphId: input.state.graph.id,
-      nodeId: input.nodeResult.nodeId,
+      state: input.state,
+      nodeResult: input.nodeResult,
+      submittedAt: input.submittedAt,
       nodeLayerId: node?.activeLayerId ?? undefined,
-      status: "stale",
-      outputSummary:
-        input.nodeResult.status === "done"
-          ? input.nodeResult.summary
-          : undefined,
-      error: input.nodeResult.status === "failed"
-        ? input.nodeResult.error
-        : input.nodeResult.status === "cancelled" || input.nodeResult.status === "blocked"
-          ? input.nodeResult.reason
-          : undefined,
-      evidence: normalizeResultEvidence(input.nodeResult.evidence),
-      selectedBranch: input.nodeResult.status === "done" ? input.nodeResult.selectedBranch : undefined,
-      ...(input.nodeResult.status === "done"
-        ? {
-            deliverables: input.nodeResult.deliverables,
-            findings: input.nodeResult.findings,
-            decisions: input.nodeResult.decisions,
-            caveats: input.nodeResult.caveats,
-            nextActions: input.nodeResult.nextActions,
-            resultEvidence: input.nodeResult.resultEvidence,
-          }
-        : {}),
-    };
-    return {
-      ...input.state,
-      results: [...input.state.results, staleResult],
-    };
+      reason: staleReason ?? "stale_attempt_identity",
+    });
   }
   const baseResult = {
-    id: `result_${input.state.graph.id}_${input.nodeResult.nodeId}_${input.submittedAt}`,
+    id: `result_${input.state.graph.id}_${input.nodeResult.nodeId}_${input.submittedAt}_submitted_${input.state.results.length}`,
     taskId: input.taskId,
     graphId: input.state.graph.id,
     nodeId: input.nodeResult.nodeId,
@@ -274,15 +318,16 @@ export function submitNodeResultState(input: {
       break;
   }
 
+  const preserveTerminalAttempt = currentAttempt.status !== "running";
   return {
     ...input.state,
     attempts:
       updateAttemptStatus({
         attempts: input.state.attempts,
         attemptId: currentAttempt.id,
-        status: attemptStatus,
-        finishedAt: input.submittedAt,
-        error: attemptError,
+        status: preserveTerminalAttempt ? currentAttempt.status : attemptStatus,
+        finishedAt: preserveTerminalAttempt ? currentAttempt.finishedAt : input.submittedAt,
+        error: preserveTerminalAttempt ? currentAttempt.error : attemptError,
       }),
     results: appendCurrentResult({
       results: input.state.results,

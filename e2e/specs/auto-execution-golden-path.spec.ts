@@ -3,7 +3,7 @@
  *
  * Positive case: task with autoExecute=true + autoPlanGeneration=true +
  * executionRuntime="debug" → orchestrator tick drives auto-plan-gen →
- * plan auto-accepted → execution auto-started → debug plan gates resolved
+ * plan auto-accepted → execution auto-started → deterministic execution gates resolved
  * deterministically → task reaches Completed → Work page Badge shows "completed".
  *
  * Negative case: task with autoExecute=true, executionRuntime="debug", NO
@@ -17,8 +17,8 @@
  *   - Orchestrator auto-interval disabled via CHRONA_TASK_ORCHESTRATOR_INTERVAL_MS=600000.
  *
  * §1.3-vs-code gap (documented, not a regression):
- *   The spec §1.3 says "Inbox item" should appear for each debug plan gate.
- *   In practice the debug plan blueprint does NOT produce db.approval rows
+ *   The spec §1.3 says "Inbox item" should appear for each execution gate.
+ *   In practice the durable mock plan blueprint does NOT produce db.approval rows
  *   (checkpoints resolved inline by the runtime), so the Inbox never surfaces
  *   these gates.  The positive case therefore resolves gates via the
  *   execution/current checkpoint surface rather than the Inbox.  This is a
@@ -27,6 +27,7 @@
 
 import { expect, test, type APIRequestContext } from "@playwright/test";
 import { createTaskWorkspaceTask, triggerOrchestratorTick } from "./task-workspace-test-helpers";
+import { bindTaskPlanProvider, startMockTaskPlanProvider } from "./mock-task-plan-provider";
 
 // ─── shared types (kept inline — E2E specs avoid cross-package imports) ───────
 
@@ -83,7 +84,6 @@ async function setupDebugAiClient(
   const bindRes = await request.put(`/api/ai/clients/${clientId}/bindings`, {
     data: {
       features: [
-        "generate_plan",
         "execute_task_node",
         "evaluate_condition_node",
         "review_checkpoint_node",
@@ -215,6 +215,7 @@ async function postCheckpointAction(
     type: "checkpoint.action",
     checkpointId,
     action,
+    idempotencyKey: `e2e-checkpoint-${checkpointId}-${action}`,
   };
   if (payload !== undefined) body.payload = payload;
 
@@ -250,17 +251,17 @@ async function tickUntil(
 }
 
 /**
- * Resolve the three debug plan gates in order:
+ * Resolve the three deterministic execution gates in order:
  *   1. input checkpoint  → submit_input
  *   2. approval checkpoint → approve_result
  *   3. manual node → mark_node_completed
  */
-async function resolveDebugPlanGates(
+async function resolveExecutionGates(
   request: APIRequestContext,
   taskId: string,
   workBlockId: string,
 ): Promise<void> {
-  // Gate 1: input checkpoint — execution already waiting_for_user after tickUntil
+  let inputCheckpointId: string | undefined;
   await test.step("Resolve input checkpoint (submit_input)", async () => {
     const execRes = await request.get(
       `/api/tasks/${taskId}/execution/current?workBlockId=${workBlockId}`,
@@ -269,18 +270,30 @@ async function resolveDebugPlanGates(
     const exec = (await execRes.json()) as ExecutionCurrentBody;
     expect(exec.status).toBe("waiting_for_user");
     expect(exec.checkpoint?.id).toBeTruthy();
-    await postCheckpointAction(request, taskId, exec.checkpoint!.id!, "submit_input", {
+    inputCheckpointId = exec.checkpoint!.id!;
+    await postCheckpointAction(request, taskId, inputCheckpointId, "submit_input", {
       inputFields: { scenario_label: "fast", include_slow_wait: false, priority: "normal" },
     });
   });
 
-  // Gate 2 may be user-visible or provider-resolved depending on runtime policy.
+  await test.step("Resolve condition branch (submit_input)", async () => {
+    const exec = await pollExecution(
+      request, taskId, workBlockId,
+      (body) => body.status === "waiting_for_user"
+        && !!body.checkpoint?.id
+        && body.checkpoint.id !== inputCheckpointId,
+      30_000,
+    );
+    await postCheckpointAction(request, taskId, exec.checkpoint!.id!, "submit_input", {
+      inputFields: { selected_route: "fast path" },
+    });
+  });
+
   await test.step("Resolve approval checkpoint (approve_result)", async () => {
     const exec = await pollExecution(
       request, taskId, workBlockId,
-      (b) => (b.status === "waiting_for_approval" || b.status === "blocked") && !!b.checkpoint?.id,
+      (body) => (body.status === "waiting_for_approval" || body.status === "blocked") && !!body.checkpoint?.id,
       30_000,
-      true,
     );
     if (exec.status === "waiting_for_approval") {
       await postCheckpointAction(request, taskId, exec.checkpoint!.id!, "approve_result", {
@@ -289,13 +302,11 @@ async function resolveDebugPlanGates(
     }
   });
 
-  // Gate 3: manual node is reached by graph advancement after approval resumes.
   await test.step("Resolve manual node (mark_node_completed)", async () => {
     const exec = await pollExecution(
       request, taskId, workBlockId,
-      (b) => b.status === "blocked" && !!b.checkpoint?.id,
+      (body) => body.status === "blocked" && !!body.checkpoint?.id,
       30_000,
-      true,
     );
     await postCheckpointAction(request, taskId, exec.checkpoint!.id!, "mark_node_completed", {
       root: "root",
@@ -308,7 +319,7 @@ async function resolveDebugPlanGates(
 
 test.describe("Auto-execution golden path (§1.3)", () => {
   test(
-    "positive: autoExecute+autoPlanGeneration drives task to Completed via debug plan gates",
+    "positive: autoExecute+autoPlanGeneration drives task to Completed via deterministic gates",
     async ({ page, request }) => {
       // Plan gen takes ~18 ticks async; gate resolution adds more wall-clock time.
       test.setTimeout(180_000);
@@ -319,8 +330,11 @@ test.describe("Auto-execution golden path (§1.3)", () => {
       });
       const { taskId, workspaceId } = task;
 
-      // ── 2. Bind debug AI client ─────────────────────────────────────────────
-      await setupDebugAiClient(request, taskId);
+      // ── 2. Bind separate durable-planning and debug-execution clients ──────
+      const provider = await startMockTaskPlanProvider();
+      try {
+        await bindTaskPlanProvider(request, taskId, provider.baseUrl, ["task.plan", "task.result_finalization"]);
+        await setupDebugAiClient(request, taskId);
       // ── 3. Enable autoExecute + autoPlanGeneration + executionRuntime=debug ─
       await enableAutoExecution(request, taskId);
 
@@ -372,8 +386,8 @@ test.describe("Auto-execution golden path (§1.3)", () => {
         expect(scheduleItem?.autoStartReason).toBe("invalid_task_status");
       });
 
-      // ── 7-9. Resolve the three debug plan gates ────────────────────────────
-      await resolveDebugPlanGates(request, taskId, workBlockId);
+      // ── 7-9. Resolve the three deterministic execution gates ───────────────
+      await resolveExecutionGates(request, taskId, workBlockId);
 
       // ── 10. Poll /api/work/:taskId until current run is completed ──
       await test.step("Task run reaches Completed status", async () => {
@@ -405,6 +419,9 @@ test.describe("Auto-execution golden path (§1.3)", () => {
         ).toBeVisible({ timeout: 15_000 });
       });
 
+      } finally {
+        await provider.stop();
+      }
     },
   );
 

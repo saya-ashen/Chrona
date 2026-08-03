@@ -28,13 +28,12 @@ import { mergeWorkspaceActivity, workspaceEventToWorkspaceActivity } from "../mo
 import type { TaskData, TaskPageData, WorkspaceActivityItem } from "../model/task-workspace-types";
 import { stopTaskPlanGenerationSession, useTaskPlanGenerationSession, type TaskPlanSessionState } from "./task-plan-generation-session-store";
 import type { TaskWorkspaceSseEvent } from "./use-task-workspace-page-state";
-import type { ExecutionActionInput, ExecutionCheckpoint, PlanExecutionResult, PlanExecutionSSEEvent, SubmitCheckpointActionInput, TaskPlanReadModel } from "@chrona/contracts";
+import type { ExecutionActionInput, PublicExecutionCheckpoint, PublicPlanExecutionResult, PlanExecutionSSEEvent, SubmitCheckpointActionInput, TaskPlanReadModel } from "@chrona/contracts";
 
 const STARTING_NODE_STATUS_LABEL = "Starting";
 const STARTING_NODE_NEXT_ACTION = "Starting execution...";
 
 export type WorkspaceRuntimeEvent = Extract<PlanExecutionSSEEvent, { type: "runtime_event" }>;
-type WorkspaceRuntimeTextEvent = WorkspaceRuntimeEvent & { event: Extract<WorkspaceRuntimeEvent["event"], { type: "assistant_text_delta" | "reasoning_delta" }> };
 type WorkspaceExecutionRuntimeSseEvent = TaskWorkspaceSseEvent & Omit<WorkspaceRuntimeEvent, "type"> & { type: "execution.runtime_event" };
 export type PlanGenerationRequest = { userInstruction?: string | null; selectedNodeId?: string | null; replaceActiveExecution?: boolean };
 
@@ -44,59 +43,21 @@ function compactActivityText(value: string) {
 
 function getRuntimeActivity(event: WorkspaceRuntimeEvent | undefined) {
   if (!event) return null;
-
   const value = event.event;
   switch (value.type) {
-    case "assistant_text_delta":
-    case "reasoning_delta":
-      return compactActivityText(value.text);
     case "tool_started":
-      return compactActivityText(`Running ${value.label}`);
     case "tool_progress":
-      return compactActivityText(value.preview ?? `Running ${value.label}`);
+      return compactActivityText(`Running ${value.label}`);
     case "tool_completed":
       return compactActivityText(value.error ? `${value.label} failed` : `${value.label} completed`);
     case "approval_required":
       return "Approval required";
     case "run_status":
-      return compactActivityText(value.message ?? value.status);
-    case "raw_event":
-      return compactActivityText(value.message ?? value.rawEventType ?? "Runtime event");
+      return compactActivityText(value.status);
   }
-}
-
-function isRuntimeTextDelta(event: WorkspaceRuntimeEvent): event is WorkspaceRuntimeTextEvent {
-  return event.event.type === "assistant_text_delta" || event.event.type === "reasoning_delta";
-}
-
-function runtimeTextMergeKey(event: WorkspaceRuntimeEvent) {
-  return [
-    event.event.type,
-    event.action,
-    event.runId ?? "run",
-    event.nodeId ?? "node",
-    event.runtimeName,
-    event.provider,
-  ].join(":");
 }
 
 export function appendRuntimeEvent(events: WorkspaceRuntimeEvent[], event: WorkspaceRuntimeEvent) {
-  const previous = events.at(-1);
-  if (previous && isRuntimeTextDelta(previous) && isRuntimeTextDelta(event) && runtimeTextMergeKey(previous) === runtimeTextMergeKey(event)) {
-    return [
-      ...events.slice(0, -1),
-      {
-        ...event,
-        sequence: previous.sequence,
-        timestamp: event.timestamp ?? previous.timestamp,
-        event: {
-          ...event.event,
-          text: `${previous.event.text}${event.event.text}`,
-        },
-      } satisfies WorkspaceRuntimeEvent,
-    ];
-  }
-
   return [...events, event];
 }
 
@@ -105,10 +66,12 @@ function isFullRuntimeSseEvent(event: TaskWorkspaceSseEvent): event is Workspace
     && "event" in event
     && typeof event.event === "object"
     && event.event !== null
-    && "runtimeName" in event
-    && typeof event.runtimeName === "string"
+    && "runtime" in event
+    && typeof event.runtime === "object"
+    && event.runtime !== null
     && "provider" in event
-    && typeof event.provider === "string";
+    && typeof event.provider === "object"
+    && event.provider !== null;
 }
 
 function shouldRefreshExecutionSnapshot(event: TaskWorkspaceSseEvent) {
@@ -117,6 +80,11 @@ function shouldRefreshExecutionSnapshot(event: TaskWorkspaceSseEvent) {
     || event.type === "checkpoint.result"
     || event.type === "task_workspace_updated"
     || event.type === "task_projection_updated";
+}
+
+function isPlanGenerationCompletionEvent(event: TaskWorkspaceSseEvent) {
+  return event.type === "task_workspace_updated"
+    && event.reason === "plan_generation.completed";
 }
 
 function activitySummaryFromPhase(phase: TaskPlanSessionState["phase"]): string {
@@ -205,20 +173,20 @@ function selectWorkspacePlan(
   return planStatePlan;
 }
 
-function checkpointActionEmphasis(style: ExecutionCheckpoint["availableActions"][number]["style"]) {
+function checkpointActionEmphasis(style: PublicExecutionCheckpoint["availableActions"][number]["style"]) {
   if (style === "primary") return "primary" as const;
   if (style === "danger") return "danger" as const;
   return "default" as const;
 }
 
-function checkpointActionKind(actionId: ExecutionCheckpoint["availableActions"][number]["id"]) {
+function checkpointActionKind(actionId: PublicExecutionCheckpoint["availableActions"][number]["id"]) {
   if (actionId === "retry_node") return "retry" as const;
   if (actionId === "resume_after_unblock") return "resolve" as const;
   if (actionId === "cancel_session" || actionId === "fail_task") return "trigger" as const;
   return "input" as const;
 }
 
-function checkpointFormFields(checkpoint: ExecutionCheckpoint) {
+function checkpointFormFields(checkpoint: PublicExecutionCheckpoint) {
   return checkpoint.form?.inputFields.map((field) => {
     const legacy = !("kind" in field);
     const control = legacy
@@ -245,7 +213,7 @@ function checkpointFormFields(checkpoint: ExecutionCheckpoint) {
   }) ?? [];
 }
 
-function withCanonicalExecutionActions(graphPlan: TaskPlanGraphPlan | null, checkpoint: ExecutionCheckpoint | null) {
+function withCanonicalExecutionActions(graphPlan: TaskPlanGraphPlan | null, checkpoint: PublicExecutionCheckpoint | null) {
   if (!graphPlan) return graphPlan;
 
   const clearNode = (node: TaskPlanGraphPlan["nodes"][number]) => ({
@@ -293,11 +261,11 @@ function withCanonicalExecutionActions(graphPlan: TaskPlanGraphPlan | null, chec
   } satisfies TaskPlanGraphPlan;
 }
 
-function hasExecutionStartEvidence(currentExecution: PlanExecutionResult) {
-  return Boolean(currentExecution.executionSessionId || currentExecution.planRunId);
+function hasExecutionStartEvidence(currentExecution: PublicPlanExecutionResult) {
+  return Boolean(currentExecution.executionScope);
 }
 
-function withStartingReadyNode(graphPlan: TaskPlanGraphPlan | null, currentExecution: PlanExecutionResult | null) {
+function withStartingReadyNode(graphPlan: TaskPlanGraphPlan | null, currentExecution: PublicPlanExecutionResult | null) {
   if (!graphPlan || !currentExecution) return graphPlan;
   if (currentExecution.status !== "running" && currentExecution.status !== "started") return graphPlan;
   if (!hasExecutionStartEvidence(currentExecution)) return graphPlan;
@@ -424,6 +392,9 @@ export function useTaskWorkspacePlanState(
   // honour it on the very first render after the refresh, before the SSE
   // snapshot or session-store hydrate has a chance to fire.
   const generationSession = useTaskPlanGenerationSession(task.id, selectedWorkBlockId);
+  const planHeadStateVersion = generationSession.headStateVersion
+    ?? planStateQuery.data.generationSession?.headStateVersion
+    ?? null;
   const hasTerminalGenerationSession = generationSession.sessionStatus === "completed"
     || generationSession.sessionStatus === "failed"
     || generationSession.sessionStatus === "cancelled";
@@ -510,19 +481,9 @@ export function useTaskWorkspacePlanState(
         setLiveActivity((current) => mergeWorkspaceActivity([activityItem, ...current]));
       }
 
-      // `command.accepted` / `command.failed` flow through the
-      // `useTaskPlanGenerationSession` store. `plan.generation.event` still
-      // needs a workspace-plan refetch here because the session store
-      // surfaces the activity summary and final `result`, while the
-      // workspace plan / plan-state pair on the server is the source of
-      // truth for the rendered plan graph and the plan-state query used
-      // by callers (e.g. the editor). Without the refetch, a generated
-      // plan that finishes outside the AI panel would never appear in
-      // the workspace.
-      if (event.type === "plan.generation.event") {
-        void planStateQuery.refetch();
-        return;
-      }
+      // Durable generation progress is mirrored into the bound state store.
+      // The completed event reloads the canonical saved plan for every
+      // surface, including generations started outside the AI panel.
 
       if (event.type === "execution.runtime_event") {
         if (isFullRuntimeSseEvent(event)) {
@@ -533,6 +494,11 @@ export function useTaskWorkspacePlanState(
           setRuntimeEvents((current) => appendRuntimeEvent(current, runtimeEvent));
         }
         void currentExecutionQuery.refetch();
+        continue;
+      }
+
+      if (isPlanGenerationCompletionEvent(event)) {
+        void planStateQuery.refetch();
         continue;
       }
 
@@ -606,15 +572,26 @@ export function useTaskWorkspacePlanState(
   }, [currentExecutionQuery, planStateQuery, refreshWorkspace]);
 
   const acceptPlanById = useCallback(async (planId: string) => {
+    if (planHeadStateVersion === null) {
+      const message = "Plan generation version is unavailable. Refresh before accepting the plan.";
+      setPlanFlow((current) => failPlanAccept(current, planId, message));
+      return;
+    }
     setPlanFlow((current) => startPlanAccept(clearPlanFlowError(current), planId));
     try {
-      await dispatchWorkspaceCommand(task.id, { type: "plan.accept", planId, workBlockId: selectedWorkBlockId });
+      await dispatchWorkspaceCommand(task.id, {
+        type: "plan.accept",
+        planId,
+        workBlockId: selectedWorkBlockId,
+        expectedHeadStateVersion: planHeadStateVersion,
+        idempotencyKey: crypto.randomUUID(),
+      });
       setPlanFlow(completePlanAccept(plan));
       void refreshExecutionQueries();
     } catch (cause) {
       setPlanFlow((current) => failPlanAccept(current, planId, cause instanceof Error ? cause.message : "Failed to accept plan"));
     }
-  }, [plan, refreshExecutionQueries, selectedWorkBlockId, task.id]);
+  }, [plan, planHeadStateVersion, refreshExecutionQueries, selectedWorkBlockId, task.id]);
 
   const handleAcceptPlan = useCallback(async () => {
     if (!plan?.id) return;
@@ -626,7 +603,15 @@ export function useTaskWorkspacePlanState(
     const userInstruction = request?.userInstruction?.trim() || null;
     const selectedNodeId = request?.selectedNodeId?.trim() || null;
     setGenerationUserInstruction(userInstruction);
-    void dispatchWorkspaceCommand(task.id, { type: "plan.generate", forceRefresh: true, workBlockId: selectedWorkBlockId, userInstruction, selectedNodeId, replaceActiveExecution: request?.replaceActiveExecution ?? false });
+    void dispatchWorkspaceCommand(task.id, {
+      type: "plan.generate",
+      idempotencyKey: crypto.randomUUID(),
+      forceRefresh: true,
+      workBlockId: selectedWorkBlockId,
+      userInstruction,
+      selectedNodeId,
+      replaceActiveExecution: request?.replaceActiveExecution ?? false,
+    });
   }, [isGeneratingPlan, selectedWorkBlockId, task.id]);
 
   const handleStopPlanGeneration = useCallback(async () => {
@@ -745,6 +730,7 @@ export function useTaskWorkspacePlanState(
     plan,
     setPlan,
     fetchPlan,
+    planHeadStateVersion,
     planGenerationStatus,
     planFlowStatus: planFlow.status,
     graphPlan,

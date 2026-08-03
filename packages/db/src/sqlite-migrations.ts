@@ -236,9 +236,50 @@ function baselineReleasedSchema(
   for (const migration of migrations.slice(0, end + 1)) baselineMigration(db, migration);
 }
 
+const PIN_TASK_EXECUTION_MIGRATION = "20260728000000_pin_task_execution_model";
+
+function assertPinTaskExecutionUpgradeReady(db: Database, migration: Migration): void {
+  if (migration.name !== PIN_TASK_EXECUTION_MIGRATION) return;
+  const table = db.query(
+    `SELECT 1 AS present FROM sqlite_master WHERE type = 'table' AND name = 'TaskPlanRun'`,
+  ).get() as { present: number } | null;
+  if (!table) return;
+  const columns = db.query(`PRAGMA table_info("TaskPlanRun")`).all() as Array<{ name: string }>;
+  if (columns.some((column) => column.name === "workBlockScopeKey")) return;
+  if (!columns.some((column) => column.name === "workBlockId")) return;
+  const duplicate = db.query(
+    `SELECT "taskId", "planId", COALESCE("workBlockId", '') AS "scopeKey", COUNT(*) AS "count"
+       FROM "TaskPlanRun"
+      GROUP BY "taskId", "planId", COALESCE("workBlockId", '')
+     HAVING COUNT(*) > 1
+      LIMIT 1`,
+  ).get() as { taskId: string; planId: string; scopeKey: string; count: number } | null;
+  if (!duplicate) return;
+  throw new Error(
+    `Cannot apply ${PIN_TASK_EXECUTION_MIGRATION}: duplicate legacy TaskPlanRun scope ${duplicate.taskId}/${duplicate.planId}/${duplicate.scopeKey || "<task>"} requires operator cleanup before migration.`,
+  );
+}
+
+type ForeignKeyViolation = {
+  table: string;
+  rowid: number | null;
+  parent: string;
+  fkid: number;
+};
+
+function assertNoForeignKeyViolations(db: Database, migration: Migration): void {
+  const violation = db.query("PRAGMA foreign_key_check").get() as ForeignKeyViolation | null;
+  if (!violation) return;
+  throw new Error(
+    `Cannot apply ${migration.name}: foreign key violation in ${violation.table} row ${violation.rowid ?? "<without rowid>"} referencing ${violation.parent} (constraint ${violation.fkid}).`,
+  );
+}
+
 function applyMigration(db: Database, migration: Migration): void {
   const apply = db.transaction(() => {
+    assertPinTaskExecutionUpgradeReady(db, migration);
     if (hasExecutableStatement(migration.sql)) db.run(migration.sql);
+    assertNoForeignKeyViolations(db, migration);
     db.run(
       `INSERT INTO "_prisma_migrations" (id, checksum, migration_name, finished_at, applied_steps_count)
        VALUES (?, ?, ?, ?, ?)`,

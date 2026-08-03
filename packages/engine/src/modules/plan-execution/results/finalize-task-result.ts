@@ -1,4 +1,6 @@
-import { db } from "@/lib/db";
+/* eslint-disable complexity, max-lines-per-function, max-statements, max-lines -- Result finalization keeps artifact, plan output, and canonical outcome authority atomic. */
+import { z } from "zod";
+import type { Prisma } from "@/generated/prisma/client";
 import { resolveEffectivePlanGraph } from "@chrona/graph-runtime";
 import type {
   NodeDeliverableDeclaration,
@@ -7,16 +9,29 @@ import type {
   ResultManifest,
 } from "@chrona/contracts/ai";
 import { agentControlActionBodySchema } from "@chrona/contracts/api";
-import { buildResultFinalizationFeatureSpec } from "@chrona/contracts";
-import { validateChronaSpec, type UiDocument } from "@chrona/ui-protocol";
-import { getAiClientForTask, runProviderRequest } from "../../ai";
+import { chronaResultSpecJsonSchema, validateChronaSpec, type UiDocument } from "@chrona/ui-protocol";
+import { getAiClientForTask, runProviderRequest, type ProviderFeatureRequest } from "../../ai";
+import type { ProviderJsonValue } from "@chrona/providers-foundation";
 import { submitNodeResultActionFromControl } from "../../agent-tools/node-result-action";
 import { getPlanRun, savePlanRunGuarded } from "../persistence/plan-run-store";
+import { schedulerWorkSignal, withPlanExecutionDurability } from "../persistence/scheduler-durability";
 import { getAcceptedCompiledPlanForTask } from "../persistence/execution-scope";
 import { registerNodeDeliverables } from "../use-cases/register-generated-plan-output-artifacts";
 import { aggregateResultManifest } from "./result-manifest";
 import { buildSemanticRefHistory } from "../runtime/node-runtime-refs";
 
+type LoadedPlanRun = NonNullable<Awaited<ReturnType<typeof getPlanRun>>>;
+
+const providerJsonValueSchema: z.ZodType<ProviderJsonValue> = z.lazy(() =>
+  z.union([
+    z.string(),
+    z.number(),
+    z.boolean(),
+    z.null(),
+    z.array(providerJsonValueSchema),
+    z.record(z.string(), providerJsonValueSchema),
+  ]),
+);
 const HOST_ONLY_KEYS: Readonly<Record<string, true>> = {
   downloadHref: true,
   accessTaskId: true,
@@ -30,29 +45,84 @@ const HOST_ONLY_KEYS: Readonly<Record<string, true>> = {
 };
 const ARTIFACT_REF_PATTERN = /^AF[A-F0-9]{12}$/;
 const BACKEND_ID_PATTERN = /^c[a-z0-9]{20,}$/;
+const FINALIZED_RESULT_INSTRUCTIONS = [
+  "You are Chrona's restricted result finalizer.",
+  "Transform the supplied immutable ResultManifest into one concise, operational Chrona result workspace. The manifest is semantic source material, not a page outline. Do not reproduce it as a linear report or map its arrays one-to-one into sections.",
+  "Do not invent facts, numbers, paths, URLs, artifact identities, task IDs, run IDs, provider data, execution status, or readiness. Every statement and metric must be directly supported by the manifest.",
+  "Return one complete validated Spec. Do not call tools, request input, emit actions, or use dynamic state bindings.",
+  "Choose the information architecture from the user's likely result task: reading, comparing, deciding, inspecting data, applying a deliverable, reviewing changes, following a timeline, or a justified mixture. This intent guides composition but never selects a fixed template. The root may be any container that owns the whole composition.",
+  "Use ResultOverview for the editorial lead in ordinary results. Legacy ResultHero is allowed only when readiness itself is the result's dominant message, not as the default first block. Keep the overview title under 96 characters and synthesize its summary from manifest.outcome rather than copying a long node summary into the title.",
+  "If readiness is ready_with_caveats, partial, or blocked, render ResultReadiness as its own visible component wherever the limitation affects interpretation or action. Do not hide non-ready semantics inside a hero badge or evidence appendix.",
+  "Use ResultSection to create meaningful regions with stack, grid, split, or rail layout. Use ResultComparison for bounded option trade-offs, ResultTimeline for dates or ordered milestones, ResultChecklist for operational steps, ResultMetricGrid only for exact manifest-supported values, and ResultChangeSummary for concrete code, configuration, or document changes.",
+  "Use ResultDeliverable only for current deliverables worth featuring in the narrative and set artifactRef to its opaque manifest artifactRef. At most one may have role primary and at most three deliverables may appear in the Spec. The host independently exposes all generated Artifacts, so omit supporting files that add no decision value. Never repeat artifactRefs or expose paths as prose.",
+  "Legacy ResultInsight, ResultActionPlan, ResultCaveats, ResultEvidence, and ResultHero exist for persisted result compatibility. Prefer ResultSection, ResultComparison, ResultTimeline, ResultChecklist, ResultReadiness, and CollapsibleBlock in newly finalized results. Do not emit more than two legacy ResultInsight blocks, and do not recreate the sequence Hero → Deliverables → Insights → ActionPlan → Caveats → Evidence.",
+  "Use RichMarkdown, Table, JsonView, Card, Heading, Text, Badge, Alert, Separator, FileRef, ResultSummary, CollapsibleText, and CollapsibleBlock when their semantics fit. Do not wrap every item in a card and do not generate more than two consecutive isomorphic blocks when a comparison, collection, or synthesis is clearer.",
+  "Every element that states, transforms, or summarizes manifest content MUST set sourceKeys to the exact manifest keys it covers. Valid keys are deliverableKey values plus finding, decision, caveat, nextAction, and evidence keys. Elements containing only manifest.outcome or manifest.readiness may omit sourceKeys.",
+  "Preserve material caveats visibly before any affected recommendation or action. If readiness is ready_with_caveats, partial, or blocked, never describe the result as unconditionally ready. Evidence and raw diagnostic detail should normally be collapsed and subordinate.",
+  "Keep the first viewport useful: a concise outcome, the main decision/content/deliverable, and any limitation needed to use it safely. Keep the complete Spec under 48 elements, nesting at most five levels, and avoid long prose when a comparison, checklist, timeline, metric group, or Artifact preview expresses the result better.",
+  "Examples of valid variation: a research result may lead with ResultOverview, a ResultComparison of the strongest findings, and one primary document; a shortlist may lead with ResultComparison and ResultTimeline; a code task may lead with ResultChangeSummary and ResultChecklist; a data task may lead with ResultMetricGrid and a file-backed Table; a media task may lead with selected deliverables. These are examples, not templates.",
+].join("\n");
+const finalizationInputSchema = z.object({ manifest: providerJsonValueSchema }).strict();
+const finalizationProviderPayloadSchema = z.object({ parsed: providerJsonValueSchema }).passthrough();
 
-function parsedProviderPayload(payload: unknown): unknown {
-  if (
-    !payload ||
-    typeof payload !== "object" ||
-    !("parsed" in payload)
-  ) {
-    throw new Error("Result finalization provider did not return a parsed payload");
-  }
-  return payload.parsed;
+function finalizationProviderRequest(input: {
+  planRunId: string;
+  workBlockId: string | null;
+  executionEpoch: number;
+  taskId: string;
+  sourceRevision: number;
+  attempt: number;
+  manifest: ResultManifest;
+}): ProviderFeatureRequest {
+  const clientOperationId = [
+    "result-finalization",
+    input.taskId,
+    input.planRunId,
+    input.workBlockId ?? "task-scope",
+    input.executionEpoch,
+    input.sourceRevision,
+    input.attempt,
+  ].join(":");
+  return {
+    clientOperationId,
+    sessionId: clientOperationId,
+    sessionKey: clientOperationId,
+    instructions: FINALIZED_RESULT_INSTRUCTIONS,
+    input: finalizationInputSchema.parse({ manifest: input.manifest }),
+    structuredOutputSchema: {
+      name: "chrona_finalized_result_spec",
+      description: "One complete Chrona json-render result workspace.",
+      schema: z.record(z.string(), providerJsonValueSchema).parse(
+        chronaResultSpecJsonSchema,
+      ),
+    },
+    toolPolicy: "read_only",
+    stream: true,
+  };
 }
 
-function stripHostOnly(value: unknown): unknown {
+function parsedProviderPayload(payload: unknown): ProviderJsonValue {
+  const providerPayload = providerJsonValueSchema.safeParse(payload);
+  const parsed = finalizationProviderPayloadSchema.safeParse(
+    providerPayload.success ? providerPayload.data : undefined,
+  );
+  if (!parsed.success) {
+    throw new Error("Result finalization provider did not return a parsed payload");
+  }
+  return parsed.data.parsed;
+}
+
+function stripHostOnly(value: ProviderJsonValue): ProviderJsonValue {
   if (Array.isArray(value)) return value.map(stripHostOnly);
   if (!value || typeof value !== "object") return value;
-  const result: Record<string, unknown> = {};
-  for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+  const result: Record<string, ProviderJsonValue> = {};
+  for (const [key, child] of Object.entries(value)) {
     if (!(key in HOST_ONLY_KEYS)) result[key] = stripHostOnly(child);
   }
   return result;
 }
 
-function forbiddenValue(value: unknown): string | null {
+function forbiddenValue(value: ProviderJsonValue): string | null {
   if (typeof value === "string") {
     if (value.startsWith("generated://")) return "generated file URI";
     if (value.startsWith("/") || /^[A-Za-z]:[\\/]/.test(value))
@@ -68,27 +138,28 @@ function forbiddenValue(value: unknown): string | null {
     return null;
   }
   if (!value || typeof value !== "object") return null;
-  for (const child of Object.values(value as Record<string, unknown>)) {
+  for (const child of Object.values(value)) {
     const forbidden = forbiddenValue(child);
     if (forbidden) return forbidden;
   }
   return null;
 }
 
-function artifactRefs(value: unknown): string[] {
+function artifactRefs(value: ProviderJsonValue): string[] {
   const refs: string[] = [];
-  const visit = (candidate: unknown) => {
+  const visit = (candidate: ProviderJsonValue) => {
     if (Array.isArray(candidate)) return void candidate.forEach(visit);
     if (!candidate || typeof candidate !== "object") return;
-    for (const [key, child] of Object.entries(
-      candidate as Record<string, unknown>,
-    )) {
-      if (
-        (key === "path" || key === "uri" || key === "artifactRef") &&
-        typeof child === "string" &&
-        child.startsWith("AF")
-      )
+    for (const [key, child] of Object.entries(candidate)) {
+      if (key === "artifactRef" && typeof child === "string") {
         refs.push(child);
+      } else if (
+        (key === "path" || key === "uri")
+        && typeof child === "string"
+        && child.startsWith("AF")
+      ) {
+        refs.push(child);
+      }
       visit(child);
     }
   };
@@ -215,7 +286,8 @@ function validateFinalizedResultSpec(input: {
   manifest: ResultManifest;
   payload: unknown;
 }): UiDocument {
-  const stripped = stripHostOnly(input.payload);
+  const payload = providerJsonValueSchema.parse(input.payload);
+  const stripped = stripHostOnly(payload);
   const forbidden = forbiddenValue(stripped);
   if (forbidden) {
     throw new Error(`Finalized result contains a forbidden ${forbidden}`);
@@ -248,20 +320,26 @@ async function restoreRecordedTerminalResults(input: {
   accepted: NonNullable<
     Awaited<ReturnType<typeof getAcceptedCompiledPlanForTask>>
   >;
-  persisted: NonNullable<Awaited<ReturnType<typeof getPlanRun>>>;
-}) {
-  if (!input.persisted.graph) return input.persisted;
-  const actions = await db.taskPlanTerminalAction.findMany({
+  persisted: LoadedPlanRun;
+}, suppliedTx?: Prisma.TransactionClient): Promise<LoadedPlanRun> {
+  if (!suppliedTx) {
+    return withPlanExecutionDurability((tx) => restoreRecordedTerminalResults(input, tx));
+  }
+  const tx = suppliedTx;
+  const persistedGraph = input.persisted.graph;
+  if (!persistedGraph) throw new Error("No persisted execution graph is available");
+  const actions = await tx.taskPlanTerminalAction.findMany({
     where: {
       taskId: input.taskId,
       kind: "complete",
       nodeAttemptId: { not: null },
+      nodeAttempt: { planRunId: input.persisted.id },
     },
     orderBy: { recordedAt: "asc" },
   });
   const semanticRefs = buildSemanticRefHistory(
     resolveEffectivePlanGraph({
-      graph: input.persisted.graph,
+      graph: persistedGraph,
       attempts: input.persisted.attempts,
       results: input.persisted.results,
     }),
@@ -281,13 +359,16 @@ async function restoreRecordedTerminalResults(input: {
       results.push(result);
       continue;
     }
-    const parsed = submitNodeResultActionFromControl({
+    const parsedWithSession = submitNodeResultActionFromControl({
       body: agentControlActionBodySchema.parse({
         kind: action.kind,
         payload: action.payload,
       }),
       sessionId: action.taskSessionId ?? undefined,
     });
+    const parsed = parsedWithSession
+      ? (({ sessionId: _sessionId, ...action }) => action)(parsedWithSession)
+      : null;
     if (parsed?.action !== "complete_manual_node") {
       results.push(result);
       continue;
@@ -301,11 +382,13 @@ async function restoreRecordedTerminalResults(input: {
       ? await registerNodeDeliverables({
           workspaceId: input.accepted.workspaceId,
           taskId: input.taskId,
+          taskSessionId: action.taskSessionId,
+          workBlockId: input.accepted.workBlockId,
           runId: action.runId,
           sourceNodeId,
           sourceNodeRef,
           declarations: parsed.deliverables as NodeDeliverableDeclaration[],
-        })
+        }, tx)
       : result.deliverables;
     const restored: NodeResult = {
       ...result,
@@ -353,18 +436,19 @@ async function restoreRecordedTerminalResults(input: {
     expectedEpoch: input.persisted.executionEpoch,
     run: input.persisted.planRun,
     compiledPlan: input.accepted.compiledPlan,
-    graph: input.persisted.graph,
+    graph: persistedGraph,
     attempts: input.persisted.attempts,
     results,
     executionContextSnapshots: input.persisted.executionContextSnapshots,
     planOutput,
-  });
+  }, tx);
   if (!saved.committed)
     throw new Error("Recorded terminal results changed concurrently");
   return (await getPlanRun(
     input.taskId,
     input.accepted.compiledPlan.editablePlanId,
     input.accepted.workBlockId,
+    tx,
   ))!;
 }
 export const __resultFinalizationTestHooks = {
@@ -372,6 +456,7 @@ export const __resultFinalizationTestHooks = {
   validateFinalizedSpec: validateFinalizedResultSpec,
   restoreRecordedTerminalResults,
   validateSemanticComposition,
+  createProviderRequest: finalizationProviderRequest,
 };
 
 export async function finalizeTaskResult(input: {
@@ -396,6 +481,7 @@ export async function finalizeTaskResult(input: {
     accepted,
     persisted: initial,
   });
+  if (!persisted.graph) throw new Error("No persisted execution graph is available after result restoration");
   const sourceRevision = persisted.planOutput.manifest.sourceRevision;
   if (
     persisted.planOutput.finalization.status === "Ready" &&
@@ -432,6 +518,7 @@ export async function finalizeTaskResult(input: {
   });
   if (!runningSave.committed)
     throw new Error("Result finalization changed concurrently");
+  const claimedExecutionEpoch = persisted.executionEpoch + 1;
 
   try {
     const client = await getAiClientForTask({
@@ -441,19 +528,18 @@ export async function finalizeTaskResult(input: {
     if (!client?.providerClient) {
       throw new Error("No AI client is configured for result finalization");
     }
-    const featureSpec = buildResultFinalizationFeatureSpec({
-      manifest: running.manifest,
-    });
-    const response = await runProviderRequest(client.providerClient, {
-      clientOperationId: `result-finalization:${input.taskId}:${sourceRevision}:${attempt}`,
-      sessionId: `result-finalization:${input.taskId}:${sourceRevision}:${attempt}`,
-      sessionKey: `result-finalization:${input.taskId}:${sourceRevision}:${attempt}`,
-      instructions: featureSpec.instructions,
-      input: { manifest: running.manifest },
-      structuredOutputSchema: featureSpec.structuredOutputSchema,
-      toolPolicy: "read_only",
-      stream: true,
-    });
+    const response = await runProviderRequest(
+      client.providerClient,
+      { ...finalizationProviderRequest({
+        taskId: input.taskId,
+        planRunId: persisted.id,
+        workBlockId: accepted.workBlockId,
+        executionEpoch: claimedExecutionEpoch,
+        sourceRevision,
+        attempt,
+        manifest: running.manifest,
+      }), signal: schedulerWorkSignal() },
+    );
     if (response.error || response.status !== "completed") {
       throw new Error(
         response.error ??
@@ -469,11 +555,16 @@ export async function finalizeTaskResult(input: {
       accepted.compiledPlan.editablePlanId,
       accepted.workBlockId,
     );
+    const finalization = latest?.planOutput.finalization;
     if (
-      !latest?.graph ||
-      latest.planOutput.manifest.sourceRevision !== sourceRevision
+      !latest?.graph
+      || latest.executionEpoch !== claimedExecutionEpoch
+      || latest.planOutput.manifest.sourceRevision !== sourceRevision
+      || finalization?.status !== "Running"
+      || finalization.sourceRevision !== sourceRevision
+      || finalization.attempt !== attempt
     ) {
-      throw new Error("Result manifest changed during finalization");
+      throw new Error("Result finalization changed while the provider was running");
     }
     const finalizedAt = new Date().toISOString();
     const ready: PlanOutputState = {
@@ -491,7 +582,7 @@ export async function finalizeTaskResult(input: {
       taskId: input.taskId,
       planId: accepted.compiledPlan.editablePlanId,
       workBlockId: accepted.workBlockId,
-      expectedEpoch: latest.executionEpoch,
+      expectedEpoch: claimedExecutionEpoch,
       run: latest.planRun,
       compiledPlan: accepted.compiledPlan,
       graph: latest.graph,
@@ -504,17 +595,61 @@ export async function finalizeTaskResult(input: {
       throw new Error("Result finalization changed concurrently");
     return ready;
   } catch (error) {
-    const latest = await getPlanRun(
+    let latest = await getPlanRun(
       input.taskId,
       accepted.compiledPlan.editablePlanId,
       accepted.workBlockId,
     );
-    if (
-      latest?.graph &&
-      latest.planOutput.manifest.sourceRevision === sourceRevision
-    ) {
+    let failureRecorded = false;
+    for (let retry = 0; retry < 2; retry += 1) {
+      if (
+        !latest?.graph
+        || latest.executionEpoch !== claimedExecutionEpoch
+        || latest.planOutput.manifest.sourceRevision !== sourceRevision
+      ) {
+        failureRecorded = true;
+        break;
+      }
+      const finalization = latest.planOutput.finalization;
+      if (
+        (finalization.status === "Ready" || finalization.status === "Failed")
+        && finalization.sourceRevision === sourceRevision
+      ) {
+        failureRecorded = true;
+        break;
+      }
+      if (
+        finalization.status !== "Running"
+        || finalization.sourceRevision !== sourceRevision
+        || finalization.attempt !== attempt
+      ) {
+        failureRecorded = true;
+        break;
+      }
       const failedAt = new Date().toISOString();
-      await savePlanRunGuarded({
+      const failureOutput: PlanOutputState = latest.planOutput.finalizedResult
+        ? {
+            ...latest.planOutput,
+            finalization: {
+              status: "Ready",
+              sourceRevision,
+              attempt,
+              finalizedAt: latest.planOutput.finalizedResult.finalizedAt,
+            },
+          }
+        : {
+            ...latest.planOutput,
+            finalizedResult: null,
+            finalization: {
+              status: "Failed",
+              sourceRevision,
+              attempt,
+              failedAt,
+              errorCode: "RESULT_FINALIZATION_FAILED",
+              errorMessage: "Result finalization failed",
+            },
+          };
+      const failedSave = await savePlanRunGuarded({
         workspaceId: accepted.workspaceId,
         taskId: input.taskId,
         planId: accepted.compiledPlan.editablePlanId,
@@ -526,30 +661,20 @@ export async function finalizeTaskResult(input: {
         attempts: latest.attempts,
         results: latest.results,
         executionContextSnapshots: latest.executionContextSnapshots,
-        planOutput: latest.planOutput.finalizedResult
-          ? {
-              ...latest.planOutput,
-              finalization: {
-                status: "Ready",
-                sourceRevision,
-                attempt,
-                finalizedAt: latest.planOutput.finalizedResult.finalizedAt,
-              },
-            }
-          : {
-              ...latest.planOutput,
-              finalizedResult: null,
-              finalization: {
-                status: "Failed",
-                sourceRevision,
-                attempt,
-                failedAt,
-                errorCode: "RESULT_FINALIZATION_FAILED",
-                errorMessage:
-                  error instanceof Error ? error.message : String(error),
-              },
-            },
+        planOutput: failureOutput,
       });
+      if (failedSave.committed) {
+        failureRecorded = true;
+        break;
+      }
+      latest = await getPlanRun(
+        input.taskId,
+        accepted.compiledPlan.editablePlanId,
+        accepted.workBlockId,
+      );
+    }
+    if (!failureRecorded) {
+      throw new Error("Result finalization failure changed concurrently", { cause: error });
     }
     throw error;
   }

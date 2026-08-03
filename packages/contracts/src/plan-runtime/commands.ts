@@ -53,7 +53,6 @@ export type ExecutionActionInput =
     }
   | {
       action: "resume_with_input";
-      sessionId?: string;
       nodeId?: string;
       inputFields: CheckpointInputFields;
       workBlockId?: string;
@@ -61,7 +60,6 @@ export type ExecutionActionInput =
     }
   | {
       action: "resume_with_approval";
-      sessionId?: string;
       nodeId?: string;
       decision: "approve" | "reject" | "request_changes";
       feedback?: string;
@@ -71,7 +69,6 @@ export type ExecutionActionInput =
     }
   | {
       action: "resume_after_unblock";
-      sessionId?: string;
       nodeId?: string;
       note?: string;
       workBlockId?: string;
@@ -79,7 +76,9 @@ export type ExecutionActionInput =
     }
   | {
       action: "complete_manual_node";
-      sessionId?: string;
+      expectedAttemptId?: string;
+      runtimeRunRef?: string;
+      providerRunId?: string;
       nodeId?: string;
       summary?: string;
       output?: unknown;
@@ -103,7 +102,9 @@ export type ExecutionActionInput =
     }
   | {
       action: "block_current_node";
-      sessionId?: string;
+      expectedAttemptId?: string;
+      runtimeRunRef?: string;
+      providerRunId?: string;
       nodeId?: string;
       reason: string;
       actionForm?: NodeActionForm;
@@ -111,27 +112,26 @@ export type ExecutionActionInput =
     }
   | {
       action: "fail_current_node";
-      sessionId?: string;
+      expectedAttemptId?: string;
+      runtimeRunRef?: string;
+      providerRunId?: string;
       nodeId?: string;
       error: string;
       idempotencyKey?: string;
     }
   | {
       action: "retry_node";
-      sessionId?: string;
       nodeId: string;
       prompt?: string;
       idempotencyKey?: string;
     }
   | {
       action: "pause_session";
-      sessionId?: string;
       reason?: string;
       idempotencyKey?: string;
     }
   | {
       action: "cancel_session";
-      sessionId?: string;
       reason?: string;
       idempotencyKey?: string;
     };

@@ -27,7 +27,7 @@ function NodeActionList({ node }: { node: Node }) {
 }
 
 function NodeDecisionList({ node }: { node: Node }) {
-  const options = [...(node.options ?? []), ...(node.branchLabels ?? [])];
+  const options = [...(node.options ?? [])];
   return options.length ? <div className="space-y-1.5 rounded-lg border border-border/55 bg-muted/25 p-2" data-ui-surface-kind="runtime-control"><p className="text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">Decision options</p><div className="flex flex-wrap gap-1.5">{options.map((option) => <Badge key={option} variant="outline">{option}</Badge>)}</div></div> : null;
 }
 

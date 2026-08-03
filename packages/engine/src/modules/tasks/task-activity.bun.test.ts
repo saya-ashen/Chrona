@@ -7,10 +7,7 @@ import {
 
 type ActivityEventInput = Parameters<typeof buildActivityTimeline>[0][number];
 
-function activity(
-  id: string,
-  raw?: unknown,
-): WorkspaceActivityTimelineItem {
+function activity(id: string): WorkspaceActivityTimelineItem {
   return {
     id,
     kind: "node",
@@ -18,45 +15,34 @@ function activity(
     summary: id,
     description: id,
     tone: "info",
-    raw,
   };
 }
 
 describe("deduplicateProjectedActivity", () => {
-  it("keeps the canonical event and removes its timeline projection", () => {
+  it("removes duplicate activity items by ID", () => {
+    const duplicate = activity("event-1");
     const canonical = activity("event-1");
-    const projection = activity("timeline-1", {
-      metadata: { projection: true },
-      eventId: "event-1",
-    });
 
     expect(
-      deduplicateProjectedActivity([projection, canonical]).map(
-        (item) => item.id,
-      ),
+      deduplicateProjectedActivity([duplicate, canonical]).map((item) => item.id),
     ).toEqual(["event-1"]);
-  });
-
-  it("keeps a timeline projection when the canonical event is unavailable", () => {
-    const projection = activity("timeline-1", { eventId: "event-1" });
-
-    expect(deduplicateProjectedActivity([projection])).toEqual([projection]);
   });
 });
 
 describe("buildActivityTimeline", () => {
   it("keeps only the latest progress update for one tool call", () => {
-    const providerEvent = (id: string, sequence: number): ActivityEventInput => ({
+    const providerEvent = (id: string, sequence: number, executionScope = "scope-1"): ActivityEventInput => ({
       id,
       eventType: "provider.tool_progress",
       source: "provider",
       payload: {
-        provider: "omp",
-        runtimeName: "omp",
+        executionScope,
+        providerLabel: "AI provider",
+        runtimeLabel: "Execution runtime",
         runId: "run-1",
         event: {
           type: "tool_progress",
-          toolName: "job",
+          toolLabel: "Runtime tool",
           callId: "job-call-1",
           sequence,
         },
@@ -78,8 +64,46 @@ describe("buildActivityTimeline", () => {
     expect(timeline[0]).toMatchObject({
       id: "progress-3",
       kind: "tool_progress",
-      raw: { sequence: 12 },
-      tool: { name: "job", callId: "job-call-1", state: "progress" },
+      tool: { name: "Runtime tool", state: "progress" },
+      executionScope: "scope-1",
     });
+    expect(JSON.stringify(timeline)).not.toContain("job-call-1");
+    expect(JSON.stringify(timeline)).not.toContain("run-1");
+
+    const separateScopes = buildActivityTimeline([
+      providerEvent("scope-a-progress", 1, "scope-a"),
+      providerEvent("scope-b-progress", 1, "scope-b"),
+    ]);
+    expect(separateScopes.map((item) => item.executionScope)).toEqual(["scope-a", "scope-b"]);
+  });
+
+
+  it("does not expose plan prompts or provider diagnostics", () => {
+    const occurredAt = new Date("2026-07-19T03:41:00.000Z");
+    const event = (id: string, eventType: string, payload: Record<string, unknown>): ActivityEventInput => ({
+      id,
+      eventType,
+      source: "plan_generation",
+      payload,
+      occurredAt,
+      createdAt: occurredAt,
+      ingestSequence: 20,
+      nodeId: null,
+      nodeTitle: null,
+    });
+
+    const timeline = buildActivityTimeline([
+      event("started", "plan_generation.started", { instruction: "secret planning prompt" }),
+      event("status", "plan_generation.status", { message: "provider reasoning and /private/path" }),
+      event("failed", "plan_generation.failed", { message: "token=secret", code: "native_error" }),
+      event("tool", "plan_generation.tool_called", { tool: "native_tool", input: { token: "secret" } }),
+    ]);
+
+    expect(timeline.map((item) => item.description)).toEqual([
+      "Generating a task plan.",
+      "Plan generation progressed.",
+      "Plan generation failed.",
+    ]);
+    expect(JSON.stringify(timeline)).not.toMatch(/secret|reasoning|private|native_tool|native_error/);
   });
 });

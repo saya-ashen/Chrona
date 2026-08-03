@@ -119,7 +119,7 @@ function createMockProviderClient(input: {
         runId: input.runStarted === false ? "mock-failed-run" : `mock-run-ref-${Date.now()}`,
         nativeRunId: input.runStarted === false ? undefined : `mock-run-ref-${Date.now()}`,
         sessionId: request.sessionKey ?? "mock-session-key",
-        status: input.runStarted === false ? "failed" : "completed",
+        status: "running",
       };
       return latestRun;
     },
@@ -389,6 +389,7 @@ function createRecoverableHermesClient() {
 }
 
 const realGetAiClient = aiClientRegistry.get.bind(aiClientRegistry);
+const realGetAiClientForFeature = aiClientRegistry.getForFeature.bind(aiClientRegistry);
 
 function installMockRegistryClient(
   providerClient: TestProviderResponseClient,
@@ -406,6 +407,7 @@ function installMockRegistryClient(
     providerClient,
   } satisfies EngineAiClient;
   aiClientRegistry.get = async () => client;
+  aiClientRegistry.getForFeature = async () => client;
 }
 
 function extractUserText(request: Parameters<AgentProviderClient["startRun"]>[0]): string {
@@ -419,7 +421,36 @@ function extractUserText(request: Parameters<AgentProviderClient["startRun"]>[0]
 }
 
 function createAiRuntimeInvoker() {
-  return new AiRuntimeInvoker();
+  class FixtureAiRuntimeInvoker extends AiRuntimeInvoker {
+    override async invoke(input: Parameters<AiRuntimeInvoker["invoke"]>[0]) {
+      const [executionSession, planRun] = await Promise.all([
+        db.executionSession.findFirstOrThrow({
+          where: {
+            taskId: input.taskId,
+            planId: input.nodeAttempt?.graphId,
+            status: "Active",
+            activeScopeKey: "active",
+          },
+          select: { id: true },
+        }),
+        db.taskPlanRun.findFirstOrThrow({
+          where: {
+            taskId: input.taskId,
+            planId: input.nodeAttempt?.graphId,
+            workBlockId: input.workBlockId ?? null,
+          },
+          select: { executionEpoch: true },
+        }),
+      ]);
+      return super.invoke({
+        ...input,
+        expectedExecutionSessionId: executionSession.id,
+        expectedExecutionEpoch: planRun.executionEpoch,
+      });
+    }
+  }
+
+  return new FixtureAiRuntimeInvoker();
 }
 
 function expectStreamedRunIds(
@@ -556,12 +587,13 @@ async function seedFullSetup() {
       compiledPlan: planGraph,
     },
   });
-  await db.taskPlanRun.create({
+  const planRun = await db.taskPlanRun.create({
     data: {
       workspaceId,
       taskId,
       planId: memory.id,
       workBlockScopeKey: "",
+      executionEpoch: 1,
       planRun: {
         id: `plan_run_${memory.id}`,
         compiledPlanId: memory.id,
@@ -582,6 +614,36 @@ async function seedFullSetup() {
       },
     },
   });
+  const attempt = createNodeAttempt({ taskId, planId: memory.id, nodeId: node.id });
+  await db.taskPlanNodeAttempt.create({
+    data: {
+      id: attempt.id,
+      workspaceId,
+      taskId,
+      planId: memory.id,
+      planRunId: planRun.id,
+      nodeId: attempt.nodeId,
+      nodeLayerId: attempt.nodeLayerId,
+      executionContextSnapshotId: attempt.executionContextSnapshotId,
+      idempotencyKey: attempt.idempotencyKey,
+      attemptNumber: attempt.attemptNumber,
+      executionEpoch: planRun.executionEpoch,
+      status: attempt.status,
+      startedAt: new Date(attempt.startedAt),
+    },
+  });
+  const executionSession = await db.executionSession.create({
+    data: {
+      workspaceId,
+      taskId,
+      planId: memory.id,
+      status: "Active",
+      activeScopeKey: "active",
+      currentNodeId: node.id,
+      currentNodeAttemptId: attempt.id,
+      completedNodeIds: "[]",
+    },
+  });
 
   return {
     workspaceId,
@@ -589,6 +651,9 @@ async function seedFullSetup() {
     planId: memory.id,
     sessionId: session.id,
     sessionKey: session.sessionKey,
+    executionSessionId: executionSession.id,
+    executionEpoch: planRun.executionEpoch,
+    attempt,
     planGraph,
   };
 }
@@ -600,11 +665,12 @@ describe("executeTaskNodeCapability output persistence", () => {
 
   afterEach(() => {
     aiClientRegistry.get = realGetAiClient;
+    aiClientRegistry.getForFeature = realGetAiClientForFeature;
   });
 
   it("persists assistant output as conversationEntry records in main_session execution", async () => {
     const outputContent = "Hello from the mock runtime! The task has been completed successfully.";
-    const { taskId, planId, sessionId, sessionKey, planGraph } = await seedFullSetup();
+    const { taskId, planId, sessionId, sessionKey, executionSessionId, executionEpoch, attempt, planGraph } = await seedFullSetup();
     const node = planGraph.nodes[0];
     const { client: providerClient } = createMockProviderClient({
       outputMessages: [outputContent],
@@ -616,7 +682,9 @@ describe("executeTaskNodeCapability output persistence", () => {
       mainSession: { id: sessionId, taskId, sessionKey },
       node: node as any,
       plan: planGraph as any,
-      attempt: createNodeAttempt({ taskId, planId, nodeId: node.id }),
+      executionSessionId,
+      executionEpoch,
+      attempt,
       runtimeName: "test-provider",
       aiRuntimeInvoker: createAiRuntimeInvoker(),
     });
@@ -662,6 +730,35 @@ describe("executeTaskNodeCapability output persistence", () => {
     expect(session.lastRunStatus).toBe(RunStatus.Running);
     expect(projection.persistedStatus).toBe("Running");
     expect(projection.latestRunStatus).toBe(RunStatus.Running);
+    const [executionSession, planRun, nodeAttempt, providerRun] = await Promise.all([
+      db.executionSession.findUniqueOrThrow({
+        where: { id: executionSessionId },
+        select: { status: true, currentNodeId: true, currentNodeAttemptId: true },
+      }),
+      db.taskPlanRun.findFirstOrThrow({
+        where: { taskId, planId },
+        select: { id: true, executionEpoch: true },
+      }),
+      db.taskPlanNodeAttempt.findFirstOrThrow({
+        where: { id: attempt.id },
+        select: { id: true, planRunId: true, executionEpoch: true, status: true },
+      }),
+      db.taskPlanProviderRun.findFirstOrThrow({
+        where: { taskId, planId },
+        select: { planRunId: true, nodeAttemptId: true },
+      }),
+    ]);
+    expect(executionSession).toMatchObject({
+      status: "Active",
+      currentNodeId: node.id,
+      currentNodeAttemptId: nodeAttempt.id,
+    });
+    expect(nodeAttempt).toMatchObject({
+      planRunId: planRun.id,
+      executionEpoch: planRun.executionEpoch,
+      status: "running",
+    });
+    expect(providerRun).toEqual({ planRunId: planRun.id, nodeAttemptId: nodeAttempt.id });
     const providerEvents = await db.event.findMany({
       where: { runId: result.evidence?.runId },
       orderBy: { ingestSequence: "asc" },
@@ -676,8 +773,8 @@ describe("executeTaskNodeCapability output persistence", () => {
     });
   });
 
-  it("pins the first effective model and reuses it after the provider default changes", async () => {
-    const { taskId, planId, sessionId, sessionKey, planGraph } = await seedFullSetup();
+  it("pins the first effective model and idempotently attaches the same immutable attempt after defaults change", async () => {
+    const { taskId, sessionId, sessionKey, executionSessionId, executionEpoch, attempt, planGraph } = await seedFullSetup();
     const node = planGraph.nodes[0];
     const first = createMockProviderClient({
       outputMessages: ["First run complete"],
@@ -690,7 +787,9 @@ describe("executeTaskNodeCapability output persistence", () => {
       mainSession: { id: sessionId, taskId, sessionKey },
       node,
       plan: planGraph,
-      attempt: createNodeAttempt({ taskId, planId, nodeId: node.id }),
+      executionSessionId,
+      executionEpoch,
+      attempt,
       runtimeName: "test-provider",
       aiRuntimeInvoker: createAiRuntimeInvoker(),
     });
@@ -712,17 +811,23 @@ describe("executeTaskNodeCapability output persistence", () => {
       mainSession: { id: sessionId, taskId, sessionKey },
       node,
       plan: planGraph,
-      attempt: createNodeAttempt({ taskId, planId, nodeId: node.id }),
+      executionSessionId,
+      executionEpoch,
+      attempt,
       runtimeName: "test-provider",
       aiRuntimeInvoker: createAiRuntimeInvoker(),
     });
 
     expect(second.calls.getRuntimeDiagnostics).toBe(0);
-    expect(second.calls.startRun[0].runtimeConfiguration?.model).toBe("OmniRoute/gpt-5.6-sol");
+    expect(second.calls.startRun).toHaveLength(0);
+    expect(await db.task.findUniqueOrThrow({ where: { id: taskId } })).toMatchObject({
+      pinnedModel: "OmniRoute/gpt-5.6-sol",
+      pinnedModelSource: "automatic",
+    });
   });
 
   it("uses a user-configured model without consulting the provider default", async () => {
-    const { taskId, planId, sessionId, sessionKey, planGraph } = await seedFullSetup();
+    const { taskId, sessionId, sessionKey, executionSessionId, executionEpoch, attempt, planGraph } = await seedFullSetup();
     await db.task.update({
       where: { id: taskId },
       data: { executionConfig: { model: "OpenRouter/gpt-5.6" } },
@@ -738,7 +843,9 @@ describe("executeTaskNodeCapability output persistence", () => {
       mainSession: { id: sessionId, taskId, sessionKey },
       node: planGraph.nodes[0],
       plan: planGraph,
-      attempt: createNodeAttempt({ taskId, planId, nodeId: planGraph.nodes[0].id }),
+      executionSessionId,
+      executionEpoch,
+      attempt,
       runtimeName: "test-provider",
       aiRuntimeInvoker: createAiRuntimeInvoker(),
     });
@@ -752,8 +859,8 @@ describe("executeTaskNodeCapability output persistence", () => {
   });
 
 
-  it("rebuilds projection when provider setup fails after run creation", async () => {
-    const { taskId, planId, sessionId, sessionKey, planGraph } = await seedFullSetup();
+  it("keeps the domain projection active when provider setup fails before graph outcome commit", async () => {
+    const { taskId, sessionId, sessionKey, executionSessionId, executionEpoch, attempt, planGraph } = await seedFullSetup();
     installMockRegistryClient(createThrowingProviderClient());
 
     const result = await executeTaskNodeCapability({
@@ -761,7 +868,9 @@ describe("executeTaskNodeCapability output persistence", () => {
       mainSession: { id: sessionId, taskId, sessionKey },
       node: planGraph.nodes[0],
       plan: planGraph,
-      attempt: createNodeAttempt({ taskId, planId, nodeId: planGraph.nodes[0].id }),
+      executionSessionId,
+      executionEpoch,
+      attempt,
       runtimeName: "test-provider",
       aiRuntimeInvoker: createAiRuntimeInvoker(),
     });
@@ -783,17 +892,17 @@ describe("executeTaskNodeCapability output persistence", () => {
       where: { taskId },
       select: { persistedStatus: true, latestRunStatus: true, blockType: true, actionRequired: true },
     });
-    expect(run.status).toBe(RunStatus.Failed);
+    expect(run.status).toBe(RunStatus.Running);
     expect(task.latestRunId).toBe(run.id);
-    expect(session.activeRunId).toBeNull();
-    expect(session.lastRunStatus).toBe(RunStatus.Failed);
-    expect(projection.persistedStatus).toBe("Blocked");
-    expect(projection.latestRunStatus).toBe(RunStatus.Failed);
-    expect(projection.blockType).toBe("run_failed");
-    expect(projection.actionRequired).toBe("Retry Run");
+    expect(session.activeRunId).toBe(run.id);
+    expect(session.lastRunStatus).toBe(RunStatus.Running);
+    expect(projection.persistedStatus).toBe("Running");
+    expect(projection.latestRunStatus).toBe(RunStatus.Pending);
+    expect(projection.blockType).toBeNull();
+    expect(projection.actionRequired).toBeNull();
   });
   it("keeps the node running when the provider produces no output", async () => {
-    const { taskId, planId, sessionId, sessionKey, planGraph } = await seedFullSetup();
+    const { taskId, sessionId, sessionKey, executionSessionId, executionEpoch, attempt, planGraph } = await seedFullSetup();
     const { client: providerClient } = createMockProviderClient({
       outputMessages: [],
     });
@@ -804,7 +913,9 @@ describe("executeTaskNodeCapability output persistence", () => {
       mainSession: { id: sessionId, taskId, sessionKey },
       node: planGraph.nodes[0] as any,
       plan: planGraph as any,
-      attempt: createNodeAttempt({ taskId, planId, nodeId: planGraph.nodes[0].id }),
+      executionSessionId,
+      executionEpoch,
+      attempt,
       runtimeName: "test-provider",
       aiRuntimeInvoker: createAiRuntimeInvoker(),
     });
@@ -825,7 +936,7 @@ describe("executeTaskNodeCapability output persistence", () => {
   });
 
   it("does not require structured output when text output is empty", async () => {
-    const { taskId, planId, sessionId, sessionKey, planGraph } = await seedFullSetup();
+    const { taskId, sessionId, sessionKey, executionSessionId, executionEpoch, attempt, planGraph } = await seedFullSetup();
     const { client: providerClient } = createMockProviderClient({
       outputMessages: [],
     });
@@ -836,7 +947,9 @@ describe("executeTaskNodeCapability output persistence", () => {
       mainSession: { id: sessionId, taskId, sessionKey },
       node: planGraph.nodes[0] as any,
       plan: planGraph as any,
-      attempt: createNodeAttempt({ taskId, planId, nodeId: planGraph.nodes[0].id }),
+      executionSessionId,
+      executionEpoch,
+      attempt,
       runtimeName: "test-provider",
       aiRuntimeInvoker: createAiRuntimeInvoker(),
     });
@@ -858,7 +971,7 @@ describe("executeTaskNodeCapability output persistence", () => {
   });
 
   it("derives task running state from the active provider run", async () => {
-    const { taskId, planId, sessionId, sessionKey, planGraph } = await seedFullSetup();
+    const { taskId, sessionId, sessionKey, executionSessionId, executionEpoch, attempt, planGraph } = await seedFullSetup();
     const { client: providerClient } = createMockProviderClient({
       outputMessages: [],
     });
@@ -869,7 +982,9 @@ describe("executeTaskNodeCapability output persistence", () => {
       mainSession: { id: sessionId, taskId, sessionKey },
       node: planGraph.nodes[0],
       plan: planGraph,
-      attempt: createNodeAttempt({ taskId, planId, nodeId: planGraph.nodes[0].id }),
+      executionSessionId,
+      executionEpoch,
+      attempt,
       runtimeName: "test-provider",
       aiRuntimeInvoker: createAiRuntimeInvoker(),
     });
@@ -881,7 +996,7 @@ describe("executeTaskNodeCapability output persistence", () => {
   });
 
   it("sets run status to Failed when the provider refuses to start", async () => {
-    const { taskId, planId, sessionId, sessionKey, planGraph } = await seedFullSetup();
+    const { taskId, sessionId, sessionKey, executionSessionId, executionEpoch, attempt, planGraph } = await seedFullSetup();
     const { client: providerClient } = createMockProviderClient({
       outputMessages: [],
       runStarted: false,
@@ -893,7 +1008,9 @@ describe("executeTaskNodeCapability output persistence", () => {
       mainSession: { id: sessionId, taskId, sessionKey },
       node: planGraph.nodes[0] as any,
       plan: planGraph as any,
-      attempt: createNodeAttempt({ taskId, planId, nodeId: planGraph.nodes[0].id }),
+      executionSessionId,
+      executionEpoch,
+      attempt,
       runtimeName: "test-provider",
       aiRuntimeInvoker: createAiRuntimeInvoker(),
     });
@@ -903,7 +1020,7 @@ describe("executeTaskNodeCapability output persistence", () => {
   });
 
   it("persists the final provider response when a response has multiple deltas", async () => {
-    const { taskId, planId, sessionId, sessionKey, planGraph } = await seedFullSetup();
+    const { taskId, sessionId, sessionKey, executionSessionId, executionEpoch, attempt, planGraph } = await seedFullSetup();
     const node = planGraph.nodes[0];
     const { client: providerClient } = createMockProviderClient({
       outputMessages: [
@@ -919,7 +1036,9 @@ describe("executeTaskNodeCapability output persistence", () => {
       mainSession: { id: sessionId, taskId, sessionKey },
       node: node as any,
       plan: planGraph as any,
-      attempt: createNodeAttempt({ taskId, planId, nodeId: node.id }),
+      executionSessionId,
+      executionEpoch,
+      attempt,
       runtimeName: "test-provider",
       aiRuntimeInvoker: createAiRuntimeInvoker(),
     });
@@ -939,7 +1058,7 @@ describe("executeTaskNodeCapability output persistence", () => {
 
   it("starts Hermes runs before streaming run events", async () => {
     const outputContent = "Hermes completed the task.";
-    const { taskId, planId, sessionId, sessionKey, planGraph } = await seedFullSetup();
+    const { taskId, sessionId, sessionKey, executionSessionId, executionEpoch, attempt, planGraph } = await seedFullSetup();
     const { client, calls } = createMockHermesClient({
       outputContent,
     });
@@ -950,7 +1069,9 @@ describe("executeTaskNodeCapability output persistence", () => {
       mainSession: { id: sessionId, taskId, sessionKey },
       node: planGraph.nodes[0] as any,
       plan: planGraph as any,
-      attempt: createNodeAttempt({ taskId, planId, nodeId: planGraph.nodes[0].id }),
+      executionSessionId,
+      executionEpoch,
+      attempt,
       runtimeName: "hermes",
       aiRuntimeInvoker: createAiRuntimeInvoker(),
     });
@@ -961,7 +1082,7 @@ describe("executeTaskNodeCapability output persistence", () => {
   });
 
   it("recovers transient Hermes stream failures by reading the existing run first", async () => {
-    const { taskId, planId, sessionId, sessionKey, planGraph } = await seedFullSetup();
+    const { taskId, sessionId, sessionKey, executionSessionId, executionEpoch, attempt, planGraph } = await seedFullSetup();
     const { client, calls } = createRecoverableHermesClient();
     installMockRegistryClient(client, "hermes");
 
@@ -970,7 +1091,9 @@ describe("executeTaskNodeCapability output persistence", () => {
       mainSession: { id: sessionId, taskId, sessionKey },
       node: planGraph.nodes[0] as any,
       plan: planGraph as any,
-      attempt: createNodeAttempt({ taskId, planId, nodeId: planGraph.nodes[0].id }),
+      executionSessionId,
+      executionEpoch,
+      attempt,
       runtimeName: "hermes",
       aiRuntimeInvoker: createAiRuntimeInvoker(),
     });
@@ -982,14 +1105,14 @@ describe("executeTaskNodeCapability output persistence", () => {
     expect(result.status).toBe("started");
     expect((result as { summary: string }).summary).toBe("Recovered from existing Hermes run");
     expect(calls.startRun).toHaveLength(1);
-    expect((calls.startRun[0] as { idempotencyKey?: string }).idempotencyKey).toStartWith("provider-run:");
+    expect(calls.startRun[0].clientOperationId).toStartWith("node-capability:execute:");
     expectStreamedRunIds(calls.streamRun, ["hermes-run-recoverable", "hermes-run-recoverable"]);
     expect(persistedRun.runtimeRunRef).toBe("hermes-run-recoverable");
   });
 
   it("does not require structured tool result for Hermes task execution", async () => {
     const outputContent = "Hermes advanced the node through Chrona MCP.";
-    const { taskId, planId, sessionId, sessionKey, planGraph } = await seedFullSetup();
+    const { taskId, sessionId, sessionKey, executionSessionId, executionEpoch, attempt, planGraph } = await seedFullSetup();
     const { client, calls } = createMockHermesClient({
       outputContent,
     });
@@ -1000,7 +1123,9 @@ describe("executeTaskNodeCapability output persistence", () => {
       mainSession: { id: sessionId, taskId, sessionKey },
       node: planGraph.nodes[0] as any,
       plan: planGraph as any,
-      attempt: createNodeAttempt({ taskId, planId, nodeId: planGraph.nodes[0].id }),
+      executionSessionId,
+      executionEpoch,
+      attempt,
       runtimeName: "hermes",
       aiRuntimeInvoker: createAiRuntimeInvoker(),
     });
@@ -1013,7 +1138,7 @@ describe("executeTaskNodeCapability output persistence", () => {
   });
 
   it("does not require legacy condition structured output for Hermes condition execution", async () => {
-    const { taskId, planId, sessionId, sessionKey, planGraph } = await seedFullSetup();
+    const { taskId, sessionId, sessionKey, executionSessionId, executionEpoch, attempt, planGraph } = await seedFullSetup();
     const { client, calls } = createMockHermesClient({
       outputContent: "Hermes will select the branch through Chrona MCP.",
     });
@@ -1034,7 +1159,9 @@ describe("executeTaskNodeCapability output persistence", () => {
       mainSession: { id: sessionId, taskId, sessionKey },
       node: conditionNode as any,
       plan: planGraph as any,
-      attempt: createNodeAttempt({ taskId, planId, nodeId: conditionNode.id }),
+      executionSessionId,
+      executionEpoch,
+      attempt,
       runtimeName: "hermes",
       aiRuntimeInvoker: createAiRuntimeInvoker(),
     });
@@ -1047,7 +1174,7 @@ describe("executeTaskNodeCapability output persistence", () => {
   });
 
   it("does not require legacy checkpoint structured output for Hermes checkpoint execution", async () => {
-    const { taskId, planId, sessionId, sessionKey, planGraph } = await seedFullSetup();
+    const { taskId, sessionId, sessionKey, executionSessionId, executionEpoch, attempt, planGraph } = await seedFullSetup();
     const { client, calls } = createMockHermesClient({
       outputContent: "Hermes will review the checkpoint through Chrona MCP.",
     });
@@ -1068,7 +1195,9 @@ describe("executeTaskNodeCapability output persistence", () => {
       mainSession: { id: sessionId, taskId, sessionKey },
       node: checkpointNode as any,
       plan: planGraph as any,
-      attempt: createNodeAttempt({ taskId, planId, nodeId: checkpointNode.id }),
+      executionSessionId,
+      executionEpoch,
+      attempt,
       runtimeName: "hermes",
       aiRuntimeInvoker: createAiRuntimeInvoker(),
     });

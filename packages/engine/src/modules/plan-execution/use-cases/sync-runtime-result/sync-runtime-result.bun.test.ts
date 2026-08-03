@@ -1,9 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import type { NodeAttempt } from "@chrona/contracts/ai";
-import type { EngineAiClient } from "@/modules/ai";
-import type { AgentProviderClient } from "@chrona/providers-foundation";
 import { attemptForRuntimeRun, runningAttemptForRuntimeRun, runtimeRunRefFromAttempt } from "./attempts";
-import { selectRecoveryProviderClient, shouldReconcileTerminalProviderRun } from "./reconcile-stale-runtime-runs";
+import { shouldReconcileTerminalProviderRun } from "./reconcile-stale-runtime-runs";
 import { nodeResultForRuntimeRun } from "./node-result";
 
 const runningAttempt = {
@@ -73,54 +71,6 @@ describe("nodeResultForRuntimeRun", () => {
   });
 });
 
-function recoveryClient(id: string, type: string, provider: string): EngineAiClient {
-  return {
-    record: {
-      id,
-      name: id,
-      type,
-      config: {},
-      isDefault: false,
-      enabled: true,
-    },
-    providerClient: { provider } as AgentProviderClient,
-  };
-}
-
-describe("recovery provider client selection", () => {
-  const ompClient = recoveryClient("omp-client", "omp", "omp");
-  const codexClient = recoveryClient("codex-client", "codex", "codex");
-
-  it("uses persisted provider identity instead of the Chrona execution runtime name", () => {
-    expect(selectRecoveryProviderClient({
-      runtimeName: "hermes",
-      providerName: "omp",
-      taskClient: null,
-      defaultClient: ompClient,
-      enabledClients: [ompClient],
-    })).toBe(ompClient.providerClient);
-  });
-
-  it("prefers the persisted provider over a different task or default client", () => {
-    expect(selectRecoveryProviderClient({
-      runtimeName: "hermes",
-      providerName: "omp",
-      taskClient: codexClient,
-      defaultClient: codexClient,
-      enabledClients: [codexClient, ompClient],
-    })).toBe(ompClient.providerClient);
-  });
-
-  it("does not recover through the wrong provider when persisted identity is known", () => {
-    expect(selectRecoveryProviderClient({
-      runtimeName: "hermes",
-      providerName: "omp",
-      taskClient: codexClient,
-      defaultClient: codexClient,
-      enabledClients: [codexClient],
-    })).toBeNull();
-  });
-});
 
 describe("terminal provider Run convergence", () => {
   it("repairs an active canonical Run after its provider record becomes terminal", () => {

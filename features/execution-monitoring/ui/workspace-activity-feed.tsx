@@ -1,4 +1,3 @@
-import { useState } from "react";
 import { CalendarClock, Radio } from "lucide-react";
 import { Button } from "@shared/ui";
 import { taskWorkspaceActivityMessages } from "@chrona/i18n";
@@ -9,21 +8,7 @@ import {
   type WorkspaceActivityItem,
 } from "@features/task-workspace/public/workspace-integration";
 import type { WorkspaceRuntimeEvent } from "../model/workspace-runtime-events";
-type ActivityLayer = "Progress" | "Decisions" | "Results" | "Tools" | "Diagnostics";
 
-function activityLayer(item: WorkspaceActivityItem): ActivityLayer {
-  if (item.kind === "approval") return "Decisions";
-  if (item.kind === "artifact") return "Results";
-  if (item.kind === "tool_started" || item.kind === "tool_completed") return "Tools";
-  if (item.kind === "raw" || item.kind === "reasoning") return "Diagnostics";
-  return "Progress";
-}
-
-function isGroupedDiagnostic(item: WorkspaceActivityItem) {
-  return item.activityGroup?.kind === "plan_generation"
-    || item.activityGroup?.kind === "provider_run"
-    || item.rawEventType?.startsWith("plan_generation.") === true;
-}
 
 
 function ActivityFeedHeader({
@@ -112,11 +97,9 @@ export function WorkspaceActivityFeed({
   density?: "compact" | "detailed" | "rail";
   active?: boolean;
 }) {
-  const [showDiagnostics, setShowDiagnostics] = useState(false);
   const items = mergeWorkspaceActivity([...runtimeEventsToWorkspaceActivity(runtimeEvents, limit), ...activity], limit);
-  const primaryItems = items.filter((item) => activityLayer(item) !== "Diagnostics" || isGroupedDiagnostic(item));
-  const diagnosticItems = items.filter((item) => activityLayer(item) === "Diagnostics" && !isGroupedDiagnostic(item));
-  const latestProvider = runtimeEvents.at(-1)?.provider;
+  const primaryItems = items;
+  const latestProvider = runtimeEvents.at(-1)?.provider.label;
   const liveCount = runtimeEvents.length;
   const persistedCount = activity.length;
 
@@ -130,12 +113,6 @@ export function WorkspaceActivityFeed({
           <ActivityTimeline items={primaryItems} density={density} active={active} />
         </div>
       )}
-      {diagnosticItems.length > 0 ? (
-        <div className="mt-4 rounded-xl border border-border/60 bg-muted/20 p-3">
-          <button type="button" className="cursor-pointer text-xs font-medium text-muted-foreground" aria-expanded={showDiagnostics} onClick={() => setShowDiagnostics((value) => !value)}>Diagnostics ({diagnosticItems.length})</button>
-          {showDiagnostics ? <div className="mt-3"><ActivityTimeline items={diagnosticItems} density="compact" active={false} /></div> : null}
-        </div>
-      ) : null}
       <LoadOlderActivityButton visible={hasOlderActivity} loading={isLoadingOlder} onClick={onLoadOlder} />
     </section>
   );

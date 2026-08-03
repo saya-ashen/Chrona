@@ -149,7 +149,7 @@ export function TaskWorkspaceExecutionOverview({
       isLive={activityState.executionIsLive}
       activityItems={activityState.activityItems}
       activitySummary={activityState.activitySummary}
-      provider={runtimeEvents.at(-1)?.provider}
+      provider={runtimeEvents.at(-1)?.provider.label}
     />
   );
 }

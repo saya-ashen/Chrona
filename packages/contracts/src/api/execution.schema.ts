@@ -3,7 +3,6 @@ import { isoDateOrNull, taskIdParam, taskPriorityEnum } from "./common";
 import { nodeDeliverableSchema, resultContributionSchema, resultEvidenceSchema } from "./result.schema";
 
 const nodeIdSchema = z.string().min(1, "nodeId is required");
-const sessionIdSchema = z.string().min(1, "sessionId is required");
 const workBlockIdSchema = z.string().min(1, "workBlockId is required");
 const idempotencyKeySchema = z.string().min(1, "idempotencyKey is required");
 const nodeActionFormFieldSchema = z
@@ -40,28 +39,24 @@ export const providerApprovalRiskLevelSchema = z.enum([
   "critical",
   "unknown",
 ]);
+export const publicProviderDescriptorSchema = z
+  .object({
+    category: z.enum(["ai_provider", "runtime", "tool", "system", "unknown"]),
+    label: z.string().min(1),
+  })
+  .strict();
+
 
 export const providerApprovalReadModelSchema = z
   .object({
     id: z.string().min(1),
-    taskId: taskIdParam,
-    workBlockId: z.string().min(1).nullable().optional(),
-    planId: z.string().min(1),
-    planRunId: z.string().min(1),
-    nodeId: z.string().min(1).nullable().optional(),
     nodeTitle: z.string().min(1).nullable().optional(),
-    provider: z.string().min(1),
-    runtimeName: z.string().min(1).nullable().optional(),
-    nativeRunId: z.string().min(1).nullable().optional(),
-    kind: z.string().min(1),
-    providerKind: z.string().min(1).nullable().optional(),
+    provider: publicProviderDescriptorSchema,
     title: z.string().min(1),
     summary: z.string().min(1),
     description: z.string().min(1).nullable().optional(),
     riskLevel: providerApprovalRiskLevelSchema,
-    subject: z.unknown().optional(),
     choices: z.array(providerApprovalChoiceSchema).min(1),
-    scopePolicy: z.unknown().optional(),
     status: z.string().min(1),
     requestedAt: z.string().min(1),
     resolvedAt: z.string().min(1).nullable().optional(),
@@ -72,6 +67,8 @@ export const providerApprovalReadModelSchema = z
 
 export const providerApprovalListQuerySchema = z
   .object({
+    workBlockId: workBlockIdSchema.nullable().optional(),
+    executionScope: z.string().min(1, "executionScope is required").max(128),
     status: z
       .enum([
         "pending",
@@ -99,21 +96,22 @@ export const providerApprovalResolveParamSchema = z.object({
 
 export const providerApprovalResolveBodySchema = z
   .object({
+    workBlockId: workBlockIdSchema.nullable().optional(),
+
+    executionScope: z.string().min(1, "executionScope is required").max(128),
     choice: providerApprovalChoiceSchema,
     resolveAll: z.boolean().optional(),
     note: z.string().optional(),
-    idempotencyKey: idempotencyKeySchema.optional(),
+    idempotencyKey: idempotencyKeySchema,
   })
   .strict();
 
 export const providerApprovalResolveResponseSchema = z
   .object({
     approval: providerApprovalReadModelSchema,
-    provider: z.string().min(1),
-    runId: z.string().min(1),
     choice: providerApprovalChoiceSchema,
     resolved: z.number().int().nonnegative(),
-    status: z.enum(["resolved", "not_pending", "not_active"]),
+    status: z.enum(["resolved", "not_pending", "not_active", "failed", "in_flight"]),
   })
   .strict();
 export const executionActionParamSchema = z.object({ taskId: taskIdParam });
@@ -123,22 +121,21 @@ export const executionActionBodySchema = z.discriminatedUnion("action", [
     action: z.literal("start_manual"),
     prompt: z.string().optional(),
     workBlockId: workBlockIdSchema.optional(),
-    idempotencyKey: idempotencyKeySchema.optional(),
+    idempotencyKey: idempotencyKeySchema,
   }),
   z.object({
     action: z.literal("restart_from_beginning"),
     prompt: z.string().optional(),
     workBlockId: workBlockIdSchema.optional(),
-    idempotencyKey: idempotencyKeySchema.optional(),
+    idempotencyKey: idempotencyKeySchema,
   }),
   z.object({
     action: z.literal("start_scheduled"),
     workBlockId: workBlockIdSchema.optional(),
-    idempotencyKey: idempotencyKeySchema.optional(),
+    idempotencyKey: idempotencyKeySchema,
   }),
   z.object({
     action: z.literal("resume_with_input"),
-    sessionId: sessionIdSchema.optional(),
     nodeId: nodeIdSchema.optional(),
     inputFields: z
       .record(z.string(), z.string())
@@ -146,27 +143,24 @@ export const executionActionBodySchema = z.discriminatedUnion("action", [
         (value) => Object.values(value).some((item) => item.trim()),
         "inputFields must include at least one value",
       ),
-    idempotencyKey: idempotencyKeySchema.optional(),
+    idempotencyKey: idempotencyKeySchema,
   }),
   z.object({
     action: z.literal("resume_with_approval"),
-    sessionId: sessionIdSchema.optional(),
     nodeId: nodeIdSchema.optional(),
     decision: z.enum(["approve", "reject", "request_changes"]),
     feedback: z.string().optional(),
     editedContent: z.string().optional(),
-    idempotencyKey: idempotencyKeySchema.optional(),
+    idempotencyKey: idempotencyKeySchema,
   }),
   z.object({
     action: z.literal("resume_after_unblock"),
-    sessionId: sessionIdSchema.optional(),
     nodeId: nodeIdSchema.optional(),
     note: z.string().optional(),
-    idempotencyKey: idempotencyKeySchema.optional(),
+    idempotencyKey: idempotencyKeySchema,
   }),
   z.object({
     action: z.literal("complete_manual_node"),
-    sessionId: sessionIdSchema.optional(),
     nodeId: nodeIdSchema.optional(),
     summary: z.string().optional(),
     output: z.unknown().optional(),
@@ -192,41 +186,36 @@ export const executionActionBodySchema = z.discriminatedUnion("action", [
         source: z.enum(["user", "ai", "system", "default"]),
       })
       .optional(),
-    idempotencyKey: idempotencyKeySchema.optional(),
+    idempotencyKey: idempotencyKeySchema,
   }),
   z.object({
     action: z.literal("block_current_node"),
-    sessionId: sessionIdSchema.optional(),
     nodeId: nodeIdSchema.optional(),
     reason: z.string().min(1, "reason is required"),
     actionForm: nodeActionFormSchema.optional(),
-    idempotencyKey: idempotencyKeySchema.optional(),
+    idempotencyKey: idempotencyKeySchema,
   }),
   z.object({
     action: z.literal("fail_current_node"),
-    sessionId: sessionIdSchema.optional(),
     nodeId: nodeIdSchema.optional(),
     error: z.string().min(1, "error is required"),
-    idempotencyKey: idempotencyKeySchema.optional(),
+    idempotencyKey: idempotencyKeySchema,
   }),
   z.object({
     action: z.literal("retry_node"),
-    sessionId: sessionIdSchema.optional(),
     nodeId: nodeIdSchema,
     prompt: z.string().optional(),
-    idempotencyKey: idempotencyKeySchema.optional(),
+    idempotencyKey: idempotencyKeySchema,
   }),
   z.object({
     action: z.literal("pause_session"),
-    sessionId: sessionIdSchema.optional(),
     reason: z.string().optional(),
-    idempotencyKey: idempotencyKeySchema.optional(),
+    idempotencyKey: idempotencyKeySchema,
   }),
   z.object({
     action: z.literal("cancel_session"),
-    sessionId: sessionIdSchema.optional(),
     reason: z.string().optional(),
-    idempotencyKey: idempotencyKeySchema.optional(),
+    idempotencyKey: idempotencyKeySchema,
   }),
 ]);
 
@@ -255,7 +244,7 @@ export const checkpointActionBodySchema = z
   .object({
     action: checkpointActionKindSchema,
     payload: z.unknown().optional(),
-    idempotencyKey: idempotencyKeySchema.optional(),
+    idempotencyKey: idempotencyKeySchema,
   })
   .strict();
 
@@ -367,6 +356,7 @@ const graphMutationOperationSchema = z.discriminatedUnion("type", [
 
 export const planMutationParamSchema = z.object({ taskId: taskIdParam });
 export const planMutationBodySchema = z.object({
+  expectedHeadStateVersion: z.number().int().nonnegative(),
   expectedGraphId: z.string().optional(),
   expectedRevision: z.number().int().nonnegative().optional(),
   reason: z.string().min(1, "reason is required"),

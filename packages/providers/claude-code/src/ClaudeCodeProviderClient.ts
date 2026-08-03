@@ -1,3 +1,4 @@
+/* eslint-disable complexity, max-lines -- Claude protocol adaptation explicitly handles every SDK event variant. */
 /**
  * ClaudeCodeProviderClient — implements `AgentProviderClient` for Claude Code.
  *
@@ -78,12 +79,7 @@ export interface ClaudeCodeProviderConfig {
   model?: string;
   timeoutMs?: number;
   mcpBaseUrl?: string;
-  /**
-   * Static Bearer token for the MCP server at `/api/mcp`. Usually
-   * omitted — `CHRONA_API_KEY` / `CHRONA_MCP_BEARER_TOKEN` env vars are
-   * the canonical sources. Required only if the operator wants the
-   * token baked into the config object instead of the env.
-   */
+  /** Optional endpoint credential retained for backward-compatible construction. */
   mcpRunToken?: string;
   apiKey?: string;
   cwd?: string;
@@ -95,7 +91,7 @@ export interface ClaudeCodeProviderConfig {
   /** Reserved named profile selector. */
   profileName?: string;
 
-  /** Advanced SDK option overrides for isolated tests / embedders. Core Chrona transport options still win. */
+  /** Advanced SDK option overrides for isolated tests / embedders. Core transport options still win. */
   sdkOptions?: ClaudeCodeRunnerConfig["sdkOptions"];
 }
 
@@ -108,12 +104,8 @@ function readEnv(name: string): string | undefined {
 }
 
 /**
- * Default MCP base URL when neither `config.mcpBaseUrl` nor
- * `CHRONA_MCP_BASE_URL` is set. The provider runs in-process with the engine
- * and HTTP server, so the server's own `PORT` (default 3101, see
- * apps/server/src/config/env.ts) points at the live `/api/mcp` route. Deriving
- * from `PORT` keeps the two in lockstep instead of hardcoding a port that
- * drifts from the server default.
+ * Default endpoint URL retained for backward-compatible configuration.
+ * Declared run tools are registered through the SDK-local MCP transport.
  */
 function defaultMcpBaseUrl(): string {
   const port = readEnv("PORT") ?? "3101";
@@ -123,44 +115,43 @@ function defaultMcpBaseUrl(): string {
 const SDK_ABORTED_BY_USER_MESSAGE = "Claude Code process aborted by user";
 
 interface ProviderFailureContext {
-  sawNodeCompleteCall: boolean;
-  sawNodeCompleteResult: boolean;
+  terminalToolName?: string;
+  sawTerminalToolCall: boolean;
+  sawTerminalToolResult: boolean;
   lastEventType?: ProviderRunEvent["type"];
   lastTool?: string;
   lastText?: string;
 }
 
-function isChronaTool(tool: string | undefined, toolName: string): boolean {
-  return tool !== undefined && (tool === toolName || tool === `mcp__chrona__${toolName}` || tool.endsWith(`_${toolName}`));
+function isTerminalTool(tool: string | undefined, terminalToolName: string | undefined): boolean {
+  if (!tool || !terminalToolName) return false;
+  return tool === terminalToolName || tool.endsWith(`__${terminalToolName}`);
 }
 
 function noteProviderEvent(ctx: ProviderFailureContext, event: ProviderRunEvent): void {
   ctx.lastEventType = event.type;
   if (event.type === "text_delta") ctx.lastText = event.text;
-  if (event.type === "tool_call") {
+  if (event.type === "tool_call" || event.type === "tool_result") {
     ctx.lastTool = event.tool;
-    if (isChronaTool(event.tool, "chrona_node_complete")) ctx.sawNodeCompleteCall = true;
-  }
-  if (event.type === "tool_result") {
-    ctx.lastTool = event.tool;
-    if (isChronaTool(event.tool, "chrona_node_complete")) ctx.sawNodeCompleteResult = true;
+    if (isTerminalTool(event.tool, ctx.terminalToolName)) {
+      if (event.type === "tool_call") ctx.sawTerminalToolCall = true;
+      else ctx.sawTerminalToolResult = true;
+    }
   }
 }
 
-function newProviderFailureContext(): ProviderFailureContext {
-  return {
-    sawNodeCompleteCall: false,
-    sawNodeCompleteResult: false,
-  };
+function newProviderFailureContext(terminalToolName?: string): ProviderFailureContext {
+  return { terminalToolName, sawTerminalToolCall: false, sawTerminalToolResult: false };
 }
 
 function providerFailureDiagnostic(ctx: ProviderFailureContext) {
   return {
-    stage: ctx.sawNodeCompleteResult
-      ? "after_node_complete_accepted"
-      : ctx.sawNodeCompleteCall
-        ? "during_node_complete_submission"
-        : "before_node_complete_submission",
+    stage: ctx.sawTerminalToolResult
+      ? "after_terminal_tool_result"
+      : ctx.sawTerminalToolCall
+        ? "during_terminal_tool_call"
+        : "before_terminal_tool_call",
+    terminalToolName: ctx.terminalToolName,
     lastEventType: ctx.lastEventType,
     lastTool: ctx.lastTool,
     lastText: ctx.lastText,
@@ -173,9 +164,9 @@ function formatTimeout(timeoutMs?: number): string {
 }
 
 function providerAbortMessage(ctx: ProviderFailureContext): string {
-  if (ctx.sawNodeCompleteResult) return "Claude Code process aborted after node completion was accepted";
-  if (ctx.sawNodeCompleteCall) return "Claude Code process aborted while submitting node completion";
-  return "Claude Code process aborted before Chrona received node completion";
+  if (ctx.sawTerminalToolResult) return "Claude Code process aborted after the terminal tool result";
+  if (ctx.sawTerminalToolCall) return "Claude Code process aborted while calling the terminal tool";
+  return "Claude Code process aborted before the terminal tool completed";
 }
 
 function providerFailureMessage(err: unknown, ctx?: ProviderFailureContext, handle?: ClaudeCodeRunHandle): string {
@@ -240,7 +231,8 @@ export class ClaudeCodeProviderClient implements AgentProviderClient {
         historyReplay: true,
         activeRunLookup: true,
         streamReconnect: false,
-        mode: "authoritative_run_lookup",
+        crossProcessDurable: false,
+        mode: "local_stream_only",
         providerResumeRef: true,
         runEventReplay: true,
       },
@@ -291,8 +283,8 @@ export class ClaudeCodeProviderClient implements AgentProviderClient {
     });
     const newSession = await runClaudeConversationTurn({
       prompt: [
-        "The following is a handoff from a completed Chrona task.",
-        "Keep it as context for the next task. Do not execute work yet; wait for the plan or execution prompt.",
+        "The following is a handoff from a completed session.",
+        "Keep it as context for the next session. Do not execute work yet; wait for the next prompt.",
         "",
         summaryTurn.outputText,
       ].join("\n"),
@@ -397,7 +389,7 @@ export class ClaudeCodeProviderClient implements AgentProviderClient {
   async *streamRun(input: StreamRunInput): AsyncIterable<ProviderRunEvent> {
     const runner = await this.ensureRunner();
     const handle = await this.resolveStreamHandle(runner, input);
-    const failureContext = newProviderFailureContext();
+    const failureContext = newProviderFailureContext(this.runs.get(handle.runId)?.input.terminalToolName);
     try {
       for await (const event of this.iterateRunEvents(runner, handle)) {
         noteProviderEvent(failureContext, event);
@@ -421,6 +413,15 @@ export class ClaudeCodeProviderClient implements AgentProviderClient {
         };
         await this.recordFinalSnapshot(handle, cancelledEvent);
         yield cancelledEvent;
+        return;
+      }
+      if (postSnap.status === "completed") {
+        const completedEvent: ProviderRunEvent = {
+          type: "run_completed",
+          run: this.snapshotAsRef(postSnap, handle),
+        };
+        await this.recordFinalSnapshot(handle, completedEvent);
+        yield completedEvent;
         return;
       }
       if (postSnap.status === "failed") {
@@ -447,6 +448,15 @@ export class ClaudeCodeProviderClient implements AgentProviderClient {
         };
         await this.recordFinalSnapshot(handle, cancelledEvent);
         yield cancelledEvent;
+        return;
+      }
+      if (postSnap?.status === "completed") {
+        const completedEvent: ProviderRunEvent = {
+          type: "run_completed",
+          run: this.snapshotAsRef(postSnap, handle),
+        };
+        await this.recordFinalSnapshot(handle, completedEvent);
+        yield completedEvent;
         return;
       }
       // Otherwise it is a genuine LLM/runtime error (4xx, network, JSON
@@ -484,14 +494,11 @@ export class ClaudeCodeProviderClient implements AgentProviderClient {
     runner: ClaudeCodeRunner,
     input: StreamRunInput,
   ): Promise<ClaudeCodeRunHandle> {
-    const hasExistingRunId =
-      "runId" in input && (input as { runId?: string }).runId != null;
-    if (hasExistingRunId) {
-      const runId = (input as { runId: string }).runId;
-      const existing = this.runs.get(runId);
+    if ("runId" in input && input.runId) {
+      const existing = this.runs.get(input.runId);
       if (!existing) {
         throw new ClaudeCodeProviderError(
-          `streamRun: unknown runId "${runId}"`,
+          `streamRun: unknown runId "${input.runId}"`,
           { retryable: false },
         );
       }
@@ -499,12 +506,13 @@ export class ClaudeCodeProviderClient implements AgentProviderClient {
     }
     // Start branch: build a new handle and remember it so getRun/cancelRun
     // can find it later by `ref.runId`.
-    const started = await runner.start(input as unknown as StartRunInput);
+    const startInput = input as Exclude<StreamRunInput, { runId: string }>;
+    const started = await runner.start(startInput);
     const handle = started.handle;
     this.runs.set(handle.runId, {
       handle,
       startedAt: handle.ref.startedAt ?? new Date().toISOString(),
-      input: input as unknown as StartRunInput,
+      input: startInput,
     });
     return handle;
   }

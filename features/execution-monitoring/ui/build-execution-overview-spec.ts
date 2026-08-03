@@ -288,22 +288,15 @@ function compactRuntimeText(value: string) {
 function describeRuntimeEvent(event: WorkspaceRuntimeEvent): { label: string; detail: string } {
   const value = event.event;
   switch (value.type) {
-    case "assistant_text_delta":
-      return { label: "Assistant", detail: compactRuntimeText(value.text) };
-    case "reasoning_delta":
-      return { label: "Reasoning", detail: compactRuntimeText(value.text) };
     case "tool_started":
-      return { label: "Tool", detail: compactRuntimeText(value.label) };
     case "tool_progress":
-      return { label: "Tool", detail: compactRuntimeText(value.preview ?? value.label) };
+      return { label: "Tool", detail: compactRuntimeText(value.label) };
     case "tool_completed":
       return { label: "Tool", detail: compactRuntimeText(value.error ? `${value.label} failed` : `${value.label} completed`) };
     case "approval_required":
       return { label: "Approval", detail: "Approval required" };
     case "run_status":
-      return { label: "Status", detail: compactRuntimeText(value.message ?? value.status) };
-    case "raw_event":
-      return { label: "Event", detail: compactRuntimeText(value.rawEventType ?? "Runtime event") };
+      return { label: "Status", detail: compactRuntimeText(value.status) };
   }
 }
 
@@ -549,14 +542,19 @@ export function buildCommandCenterTrailTabSpec(input: {
   const children: string[] = [];
   elements.root = { type: "Stack", props: { gap: "sm" }, children };
   if (latestProvider) {
-    elements.provider = { type: "Badge", props: { label: latestProvider, variant: "secondary" } };
+    elements.provider = { type: "Badge", props: { label: latestProvider.label, variant: "secondary" } };
     children.push("provider");
   }
   if (items.length === 0) {
     elements.empty = { type: "Alert", props: { title: input.copy.activityEmpty ?? "Activity will appear after planning or execution starts.", type: "info" } };
     children.push("empty");
   } else {
-    appendDocument(elements, children, "activity", buildActivitySpec(items, input.toolLabels));
+    const activityItems = items.map(({ provider, runtime, ...item }) => ({
+      ...item,
+      ...(provider ? { provider: provider.label } : {}),
+      ...(runtime ? { runtimeName: runtime.label } : {}),
+    }));
+    appendDocument(elements, children, "activity", buildActivitySpec(activityItems, input.toolLabels));
   }
   return { root: "root", elements };
 }

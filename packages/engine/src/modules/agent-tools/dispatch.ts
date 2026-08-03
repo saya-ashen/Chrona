@@ -1,11 +1,9 @@
-import { parsePlanGenerateToolPayload, type ChronaToolOperation } from "@chrona/contracts";
-import { validateDashboardSummarySpec } from "@chrona/ui-protocol";
+import type { ChronaToolOperation } from "@chrona/contracts";
 import { db } from "@/lib/db";
 import type { AgentToolOperationsDeps, ToolAuditContext } from "./types";
-import { requireTaskId, requireWorkspaceId } from "./input-guards";
+import { requireIdempotencyKey, requireTaskId, requireWorkspaceId } from "./input-guards";
 import { readAiExecutionView } from "./ai-execution-view";
 import { submitNodeResultActionFromTool } from "./node-result-action";
-import { executePlanGenerateTool } from "./plan-generate-tool";
 
 export function toolCommandContext(operation: ChronaToolOperation, audit?: ToolAuditContext | null) {
   return {
@@ -61,13 +59,18 @@ export async function executeValidatedTool(
     }
     case "chrona.plan.read":
       return readAiExecutionView(await deps.plan.getState({ taskId: requireTaskId(input) }));
-    case "chrona.plan.generate":
-      return generatePlanForTool(deps, input, payload);
-    case "chrona.plan.mutate":
+    case "chrona.plan.mutate": {
+      const body = payload as Parameters<typeof deps.plan.mutate>[0]["mutation"] & {
+        expectedHeadStateVersion: number;
+      };
+      const { expectedHeadStateVersion, ...mutation } = body;
       return deps.plan.mutate({
         taskId: requireTaskId(input),
-        mutation: payload as Parameters<typeof deps.plan.mutate>[0]["mutation"],
+        expectedHeadStateVersion,
+        idempotencyKey: requireIdempotencyKey(input),
+        mutation,
       });
+    }
     case "chrona.schedule.read":
       return deps.tasks.getPage({ taskId: requireTaskId(input) });
     case "chrona.schedule.propose": {
@@ -115,14 +118,6 @@ export async function executeValidatedTool(
       });
     case "chrona.node.read":
       return readAiExecutionView(await deps.tasks.getPage({ taskId: requireTaskId(input) }));
-    case "chrona.dashboard.brief": {
-      const body = payload as { summaryText?: string; spec: unknown };
-      const validation = validateDashboardSummarySpec(body.spec);
-      if (!validation.ok) {
-        throw new Error(`Generated dashboard brief spec invalid: ${validation.issues[0]?.message ?? "unknown issue"}`);
-      }
-      return { summaryText: body.summaryText ?? null, spec: validation.spec };
-    }
     case "chrona.node.complete":
     case "chrona.node.condition_select":
     case "chrona.node.wait_complete":
@@ -135,10 +130,11 @@ export async function executeValidatedTool(
         payload,
       });
       if (!action) break;
+      const { sessionId, ...publicAction } = action;
       return deps.execution.submitNodeResult({
         taskId: requireTaskId(input),
-        commandContext: toolCommandContext(operation, audit),
-        action,
+        commandContext: { ...toolCommandContext(operation, audit), sessionId: sessionId ?? undefined },
+        action: publicAction,
       });
     }
   }
@@ -173,17 +169,4 @@ async function createTaskForTool(
     }
   }
   return result;
-}
-
-async function generatePlanForTool(
-  deps: AgentToolOperationsDeps,
-  input: ChronaToolOperation["input"],
-  payload: unknown,
-) {
-  const blueprint = parsePlanGenerateToolPayload(payload);
-  return executePlanGenerateTool({
-    context: input,
-    blueprint,
-    materialize: deps.plan.materialize,
-  });
 }

@@ -462,7 +462,7 @@ describe("getSchedulePage", () => {
       revision: 1,
       summary: "Plan summary",
       updatedAt: expect.any(String),
-      generatedBy: "generate-task-plan",
+      generatedBy: "AI",
     });
     expect(JSON.stringify(item?.savedPlan)).not.toContain("blueprint");
     expect(JSON.stringify(item?.savedPlan)).not.toContain("compiledPlan");
@@ -544,7 +544,7 @@ describe("getSchedulePage", () => {
       revision: 1,
       summary: "Occurrence plan summary",
       updatedAt: expect.any(String),
-      generatedBy: "generate-task-plan",
+      generatedBy: "AI",
     });
     expect(item?.aiPlanGenerationStatus).toBe("accepted");
   });

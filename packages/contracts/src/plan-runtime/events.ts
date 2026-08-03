@@ -1,7 +1,6 @@
-import type { PlanBlueprint } from "../ai-plan-blueprint";
 import type { ExecutionActionType } from "./commands";
-import type { EffectivePlanGraph } from "./_leaf";
-import type { PlanExecutionResult, TaskPlanReadModel } from "./execution-state";
+import type { PublicEffectivePlanGraph } from "./public-effective-plan";
+import type { PublicPlanExecutionResult } from "./execution-state";
 import type {
   GeneratePlanStatusPhase,
   GeneratePlanErrorCode,
@@ -14,22 +13,22 @@ export type {
 
 export type ProviderApprovalChoice = "approve_once" | "approve_session" | "approve_always" | "deny";
 
+export type PublicProviderDescriptor = {
+  category: "ai_provider" | "runtime" | "tool" | "system" | "unknown";
+  label: string;
+};
+
 export type ProviderApprovalReadModel = {
   id?: string;
-  provider: string;
-  runId: string;
-  nativeRunId?: string;
-  sessionId?: string;
+  provider: PublicProviderDescriptor;
   kind: string;
-  providerKind?: string;
   title: string;
   summary: string;
   description?: string;
   riskLevel: "low" | "medium" | "high" | "critical" | "unknown";
   subject?: {
-    type: "command" | "tool" | "url" | "file" | "provider_raw";
+    type: "command" | "tool" | "url" | "file";
     label: string;
-    preview?: string;
     language?: string;
   };
   choices: ProviderApprovalChoice[];
@@ -41,41 +40,25 @@ export type ProviderApprovalReadModel = {
     supportsAlways: boolean;
     supportsResolveAll: boolean;
   };
-  raw?: unknown;
 };
 
 export type PlanExecutionRuntimeDisplayEvent =
   | {
-      type: "assistant_text_delta";
-      text: string;
-    }
-  | {
-      type: "reasoning_delta";
-      text: string;
-    }
-  | {
       type: "tool_started";
-      toolName: string;
-      callId?: string;
+      tool: PublicProviderDescriptor;
       label: string;
-      preview?: string;
-      inputSummary?: string;
     }
   | {
       type: "tool_progress";
-      toolName: string;
-      callId?: string;
+      tool: PublicProviderDescriptor;
       label: string;
-      preview?: string;
     }
   | {
       type: "tool_completed";
-      toolName?: string;
-      callId?: string;
+      tool?: PublicProviderDescriptor;
       label: string;
-      preview?: string;
       durationMs?: number;
-      error?: { message: string; code?: string };
+      error?: { code?: string };
     }
   | {
       type: "approval_required";
@@ -84,12 +67,6 @@ export type PlanExecutionRuntimeDisplayEvent =
   | {
       type: "run_status";
       status: "started" | "completed" | "failed" | "cancelled";
-      message?: string;
-    }
-  | {
-      type: "raw_event";
-      rawEventType?: string;
-      message?: string;
     };
 
 
@@ -109,25 +86,23 @@ export type PlanExecutionSSEEvent =
     }
   | {
       type: "state";
-      effectivePlan: EffectivePlanGraph;
+      effectivePlan: PublicEffectivePlanGraph;
     }
   | {
       type: "runtime_event";
       action: ExecutionActionType;
+      executionScope: string;
       nodeId?: string;
       nodeTitle?: string;
-      runtimeName: string;
-      provider: string;
-      runId?: string;
-      nativeRunId?: string;
+      runtime: PublicProviderDescriptor;
+      provider: PublicProviderDescriptor;
       sequence?: number;
       timestamp?: string;
-      rawEventType?: string;
       event: PlanExecutionRuntimeDisplayEvent;
     }
   | {
       type: "result";
-      result: PlanExecutionResult;
+      result: PublicPlanExecutionResult;
     }
   | {
       type: "error";
@@ -137,28 +112,24 @@ export type PlanExecutionSSEEvent =
   | {
       type: "done";
     };
-
 export interface GeneratePlanStatusEvent {
   type: "status";
   phase: GeneratePlanStatusPhase;
   message: string;
 }
 
-export interface GeneratePlanPartialEvent {
-  type: "partial";
-  text: string;
+export interface GeneratePlanCommittedEvent {
+  type: "committed";
+  planId: string;
+  headStateVersion: number;
 }
 
-export interface GeneratePlanToolCallEvent {
-  type: "tool_call";
-  tool: "chrona_plan_generate";
-  input: PlanBlueprint;
-}
-
-export interface GeneratePlanResultEvent {
-  type: "result";
-  result: TaskPlanReadModel;
-  taskSessionKey?: string;
+export interface GeneratePlanStaleEvent {
+  type: "stale";
+  code: "STALE_GENERATION";
+  /** Stable durable-runtime error code for diagnostics; absent for legacy events. */
+  persistedCode?: string;
+  message: string;
 }
 
 export interface GeneratePlanCancelledEvent {
@@ -166,11 +137,11 @@ export interface GeneratePlanCancelledEvent {
 }
 
 export interface GeneratePlanErrorEvent {
-  type: "error";
+  type: "failed";
   code: GeneratePlanErrorCode;
+  /** Stable durable-runtime error code for diagnostics; absent for legacy events. */
+  persistedCode?: string;
   message: string;
-  rawText?: string;
-  diagnostics?: Record<string, unknown>;
 }
 
 export interface GeneratePlanDoneEvent {
@@ -179,9 +150,8 @@ export interface GeneratePlanDoneEvent {
 
 export type GeneratePlanSSEEvent =
   | GeneratePlanStatusEvent
-  | GeneratePlanPartialEvent
-  | GeneratePlanToolCallEvent
-  | GeneratePlanResultEvent
+  | GeneratePlanCommittedEvent
+  | GeneratePlanStaleEvent
   | GeneratePlanCancelledEvent
   | GeneratePlanErrorEvent
   | GeneratePlanDoneEvent;

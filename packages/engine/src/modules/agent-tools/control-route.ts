@@ -138,13 +138,16 @@ export async function handleControlAction(input: HandleControlActionInput): Prom
   if (!activeScope) {
     throw new ControlRouteError("token_invalid", 401, "Run token is missing, expired, or revoked");
   }
+  const { sessionId, ...publicAction } = action;
   const result = await submitTerminalNodeResult({
     taskId: scope.taskId,
     commandContext: {
+      sessionId: sessionId ?? undefined,
       runId: scope.runId,
       nodeAttemptId: scope.nodeAttemptId,
+      providerRunId: scope.providerRunId,
     },
-    action,
+    action: publicAction,
   });
   return {
     ok: true,

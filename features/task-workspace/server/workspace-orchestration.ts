@@ -1,3 +1,4 @@
+/* eslint-disable complexity, max-lines-per-function, max-statements, max-depth, max-lines -- Workspace orchestration keeps exact execution authority transitions colocated. */
 import {
   appendTaskWorkspaceEvent,
   getCurrentExecution,
@@ -99,9 +100,9 @@ export async function buildTaskWorkspaceStateSnapshot(
     "/plan/saved/status": state.savedPlan?.status ?? null,
     "/plan/saved/revision": state.savedPlan?.revision ?? null,
     "/plan/generation/id": session?.generationId ?? null,
+    "/plan/generation/head-state-version": session?.headStateVersion ?? null,
     "/plan/generation/status": session?.status ?? null,
     "/plan/generation/phase": session?.phase ?? null,
-    "/plan/generation/partialText": session?.partialText ?? "",
     "/plan/generation/statusMessage": session?.statusMessage ?? null,
     "/plan/generation/error/message": session?.error?.message ?? null,
     "/plan/generation/error/code": session?.error?.code ?? null,
@@ -164,29 +165,30 @@ function planGenerationStateUpdate(event: GeneratePlanSSEEvent): Record<string, 
         "/plan/generation/phase": event.phase,
         "/plan/generation/statusMessage": event.message,
       };
-    case "tool_call":
+    case "committed":
       return {
-        "/plan/status": "generating",
-        "/plan/generation/status": "running",
-        "/plan/generation/lastTool": event.tool,
-        "/plan/generation/lastToolAt": new Date().toISOString(),
-      };
-    case "partial":
-      return { "/plan/status": "generating", "/plan/generation/status": "running", "/plan/generation/partialText": event.text };
-    case "result":
-      return {
-        "/plan/saved/id": event.result.id,
-        "/plan/saved/status": event.result.status,
-        "/plan/saved/revision": event.result.revision,
-        "/execution/has-plan": true,
-        "/execution/has-accepted-plan": false,
-        "/execution/show-accept-plan": true,
-        "/execution/show-generate-plan": false,
-        "/execution/can-start": false,
-        "/execution/start-disabled": true,
-        "/execution/start-disabled-reason": "Accept the generated plan before starting execution.",
+        "/plan/saved/id": event.planId,
         "/plan/status": "waiting_acceptance",
         "/plan/generation/status": "completed",
+        "/plan/generation/head-state-version": event.headStateVersion,
+        "/plan/generation/is-running": false,
+        "/plan/generation/header-action-disabled": false,
+      };
+    case "stale":
+      return {
+        "/plan/status": "idle",
+        "/plan/generation/status": "failed",
+        "/plan/generation/error/code": event.code,
+        "/plan/generation/error/message": event.message,
+        "/plan/generation/is-running": false,
+        "/plan/generation/header-action-disabled": false,
+      };
+    case "failed":
+      return {
+        "/plan/status": "idle",
+        "/plan/generation/status": "failed",
+        "/plan/generation/error/code": event.code,
+        "/plan/generation/error/message": event.message,
         "/plan/generation/is-running": false,
         "/plan/generation/header-action-disabled": false,
       };
@@ -202,21 +204,6 @@ function planGenerationStateUpdate(event: GeneratePlanSSEEvent): Record<string, 
         "/plan/generation/is-running": false,
         "/plan/generation/header-action-disabled": false,
       };
-    case "error": {
-      const retryable = event.code !== "TASK_NOT_FOUND";
-      return {
-        "/plan/status": "idle",
-        "/plan/generation/error/code": event.code,
-        "/plan/generation/error/message": event.message,
-        "/plan/generation/error/buttonRetry": retryable,
-        "/plan/generation/error/buttonEditInstruction": true,
-        "/plan/generation/error/buttonCancel": false,
-        "/plan/generation/is-running": false,
-        "/plan/generation/header-action-disabled": false,
-      };
-    }
-    default:
-      return null;
   }
 }
 
@@ -253,9 +240,10 @@ export async function dispatchTaskWorkspaceCommand(engine: ChronaEngine, input: 
         if (!["completed", "cancelled", "failed"].includes(current.status)) {
           await engine.tasks.execution.dispatch({
             taskId,
-            action: {
-              action: "cancel_session",
+            action: { action: "cancel_session" },
+            commandContext: {
               sessionId: current.mainSessionId ?? undefined,
+              idempotencyKey: `${command.idempotencyKey}:cancel-active-execution`,
             },
           });
         }
@@ -277,28 +265,32 @@ export async function dispatchTaskWorkspaceCommand(engine: ChronaEngine, input: 
           "/plan/generation/stop-disabled": false,
         },
       });
-      const generation = engine.tasks.plan.generate({
+      const generation = await engine.tasks.plan.generate({
         taskId,
         workBlockId: command.workBlockId ?? null,
         forceRefresh: command.forceRefresh ?? true,
         userInstruction: command.userInstruction ?? undefined,
         selectedNodeId: command.selectedNodeId ?? null,
+        idempotencyKey: command.idempotencyKey,
       });
-      for await (const event of generation.events) {
-        generation.emit(event);
-        const stateUpdate = planGenerationStateUpdate(event);
-        if (stateUpdate) {
-          publishTaskStateUpdate({ taskId, workspaceId, workBlockId, updates: stateUpdate });
+      try {
+        for await (const event of generation.events) {
+          generation.emit(event);
+          const stateUpdate = planGenerationStateUpdate(event);
+          if (stateUpdate) {
+            publishTaskStateUpdate({ taskId, workspaceId, workBlockId, updates: stateUpdate });
+          }
         }
+      } finally {
+        generation.finish();
       }
-      generation.finish();
       resetPlanGenerationHeaderState({ taskId, workspaceId, workBlockId });
       appendTaskWorkspaceEvent({
         type: "task_workspace_updated",
         taskId,
         workspaceId,
         workBlockId,
-        reason: "plan.generation.finished",
+        reason: "plan_generation.completed",
         updatedAt: new Date().toISOString(),
       });
       return;
@@ -306,7 +298,7 @@ export async function dispatchTaskWorkspaceCommand(engine: ChronaEngine, input: 
 
     if (command.type === "plan.stop_generation") {
       const workBlockId = commandWorkBlockId(command);
-      engine.tasks.plan.stopGeneration({ taskId, workBlockId });
+      await engine.tasks.plan.stopGeneration({ taskId, workBlockId });
       resetPlanGenerationHeaderState({ taskId, workspaceId, workBlockId });
       appendTaskWorkspaceEvent({
         type: "task_workspace_updated",
@@ -320,7 +312,13 @@ export async function dispatchTaskWorkspaceCommand(engine: ChronaEngine, input: 
     }
 
     if (command.type === "plan.accept") {
-      await engine.tasks.plan.accept({ taskId, planId: command.planId, workBlockId: command.workBlockId ?? null });
+      await engine.tasks.plan.accept({
+        taskId,
+        planId: command.planId,
+        workBlockId: command.workBlockId ?? null,
+        expectedHeadStateVersion: command.expectedHeadStateVersion,
+        idempotencyKey: command.idempotencyKey,
+      });
       const headerStateUpdate = await buildHeaderExecutionStateUpdate({
         engine,
         taskId,
@@ -378,7 +376,10 @@ export async function dispatchTaskWorkspaceCommand(engine: ChronaEngine, input: 
           });
         },
         onRuntimeEvent(event) {
-          const { type: _runtimeType, ...runtimePayload } = summarizeRuntimeEvent(action.action, event);
+          const summary = summarizeRuntimeEvent(action.action, event);
+          if (!summary) return;
+          const { type: _runtimeType, provider, runtime, event: runtimeEvent, ...runtimePayload } = summary;
+          const tool = "tool" in runtimeEvent ? runtimeEvent.tool : undefined;
           publishWorkspaceTrigger({
             taskId,
             workspaceId,
@@ -386,6 +387,9 @@ export async function dispatchTaskWorkspaceCommand(engine: ChronaEngine, input: 
             workBlockId,
             type: "execution.runtime_event",
             eventKind: event.event.type,
+            providerLabel: provider.label,
+            runtimeLabel: runtime.label,
+            ...(tool ? { event: { ...runtimeEvent, toolLabel: tool.label } } : { event: runtimeEvent }),
             ...runtimePayload,
           });
         },
@@ -446,14 +450,20 @@ export async function dispatchTaskWorkspaceCommand(engine: ChronaEngine, input: 
         });
       },
       onRuntimeEvent(event) {
-        const { type: _runtimeType, ...runtimePayload } = summarizeRuntimeEvent(checkpointActionToExecutionAction(command.action), event);
+        const summary = summarizeRuntimeEvent(checkpointActionToExecutionAction(command.action), event);
+        if (!summary) return;
+        const { type: _runtimeType, provider, runtime, event: runtimeEvent, ...runtimePayload } = summary;
+        const tool = "tool" in runtimeEvent ? runtimeEvent.tool : undefined;
         publishWorkspaceTrigger({
           taskId,
           workspaceId,
-          workBlockId,
           commandId,
+          workBlockId,
           type: "execution.runtime_event",
           eventKind: event.event.type,
+          providerLabel: provider.label,
+          runtimeLabel: runtime.label,
+          ...(tool ? { event: { ...runtimeEvent, toolLabel: tool.label } } : { event: runtimeEvent }),
           ...runtimePayload,
         });
       },

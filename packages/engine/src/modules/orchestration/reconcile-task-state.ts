@@ -1,18 +1,21 @@
-import type {
-  GraphNodeState,
-  ReconciliationResult,
-  TaskAction,
-  TaskExecutionState,
-  TaskExecutionSummary,
-  TaskNodeState,
+import {
+  projectPublicEffectivePlanGraph,
+  type GraphNodeState,
+  type PublicEffectivePlanGraph,
+  type PublicEffectivePlanNode,
+  type ReconciliationResult,
+  type TaskAction,
+  type TaskExecutionState,
+  type TaskExecutionSummary,
+  type TaskNodeState,
 } from "@chrona/contracts";
-import type { EffectivePlanGraph, EffectivePlanNode } from "@chrona/graph-runtime";
+import type { EffectivePlanGraph } from "@chrona/graph-runtime";
 import { deriveTaskExecutionState } from "@chrona/domain";
 import { deriveRepairActions, detectReconciliationIssues } from "./reconcile-invariants";
 
 type ReconcileTaskStateInput = {
   taskId: string;
-  graph: EffectivePlanGraph;
+  graph: EffectivePlanGraph | PublicEffectivePlanGraph;
   runnable?: boolean;
   readinessReason?: string | null;
   taskStatus?: string | null;
@@ -37,24 +40,25 @@ export type ReconciledTaskState = {
 const noAction: TaskAction = { type: "none", enabled: false, label: "No action available" };
 
 export function reconcileTaskState(input: ReconcileTaskStateInput): ReconciledTaskState {
-  const currentNode = pickCurrentNode(input.graph, input.blockReason);
-  const executionState = deriveExecutionState(input.graph, input.blockReason, input.taskStatus, input.hasActiveRun);
-  const progress = deriveProgress(input.graph);
+  const graph = toPublicReconciliationGraph(input.graph);
+  const currentNode = pickCurrentNode(graph, input.blockReason);
+  const executionState = deriveExecutionState(graph, input.blockReason, input.taskStatus, input.hasActiveRun);
+  const progress = deriveProgress(graph);
+  const issues = detectReconciliationIssues(graph);
+  const repairActions = deriveRepairActions(issues);
   const primaryAction = derivePrimaryAction({
     state: executionState,
     runnable: input.runnable ?? true,
     blockReason: input.blockReason,
     targetNodeId: currentNode?.id ?? input.blockReason?.nodeId ?? null,
   });
-  const issues = detectReconciliationIssues(input.graph);
-  const repairActions = deriveRepairActions(issues);
 
   const summary: TaskExecutionSummary = {
     taskId: input.taskId,
     executionState,
     stateLabel: formatStateLabel(executionState),
-    stateReason: currentNode?.blockedReason ?? currentNode?.lastError ?? null,
-    graphVersion: input.graph.resolvedVersion,
+    stateReason: nodeStateReason(currentNode),
+    graphVersion: graph.resolvedVersion,
     currentNodeId: currentNode?.id ?? null,
     primaryAction,
     progress,
@@ -62,18 +66,18 @@ export function reconcileTaskState(input: ReconcileTaskStateInput): ReconciledTa
       runnable: input.runnable ?? true,
       reason: input.readinessReason ?? null,
     },
-    degraded: firstDegradedReason(input.graph),
-    blocking: firstReason(input.graph, input.graph.blockedNodeIds),
-    waiting: firstReason(input.graph, input.graph.waitingNodeIds),
+    degraded: firstDegradedReason(graph),
+    blocking: firstReason(graph, graph.blockedNodeIds),
+    waiting: firstReason(graph, graph.waitingNodeIds),
     recoveryActions: repairActions,
   };
 
   return {
     summary,
-    nodes: input.graph.nodes.map((node) => toGraphNodeState(node, currentNode?.id ?? null)),
+    nodes: graph.nodes.map((node) => toGraphNodeState(node, currentNode?.id ?? null)),
     reconciliation: {
       taskId: input.taskId,
-      graphVersion: input.graph.resolvedVersion,
+      graphVersion: graph.resolvedVersion,
       executionState,
       currentNodeId: currentNode?.id ?? null,
       primaryAction,
@@ -86,7 +90,7 @@ export function reconcileTaskState(input: ReconcileTaskStateInput): ReconciledTa
 }
 
 function deriveExecutionState(
-  graph: EffectivePlanGraph,
+  graph: PublicEffectivePlanGraph,
   blockReason?: TaskBlockReason | null,
   taskStatus?: string | null,
   hasActiveRun?: boolean,
@@ -94,7 +98,7 @@ function deriveExecutionState(
   return deriveTaskExecutionState({ graph, blockReason, taskStatus, hasActiveRun });
 }
 
-function pickCurrentNode(graph: EffectivePlanGraph, blockReason?: TaskBlockReason | null) {
+function pickCurrentNode(graph: PublicEffectivePlanGraph, blockReason?: TaskBlockReason | null) {
   const currentId = [
     blockReason?.nodeId,
     ...graph.runningNodeIds,
@@ -174,7 +178,7 @@ function normalizeBlockType(blockReason?: TaskBlockReason | null) {
   return blockReason?.blockType?.trim().toLowerCase() ?? "";
 }
 
-function deriveProgress(graph: EffectivePlanGraph) {
+function deriveProgress(graph: PublicEffectivePlanGraph) {
   const total = graph.nodes.filter((node) => node.reachable).length;
   const completed = graph.nodes.filter(
     (node) => node.reachable && (node.status === "completed" || node.status === "skipped"),
@@ -186,7 +190,7 @@ function deriveProgress(graph: EffectivePlanGraph) {
   };
 }
 
-function toGraphNodeState(node: EffectivePlanNode, currentNodeId: string | null): GraphNodeState {
+function toGraphNodeState(node: PublicEffectivePlanNode, currentNodeId: string | null): GraphNodeState {
   const status = toTaskNodeState(node.status);
 
   return {
@@ -197,28 +201,47 @@ function toGraphNodeState(node: EffectivePlanNode, currentNodeId: string | null)
     current: node.id === currentNodeId,
     requiresAction: node.status.startsWith("waiting_") || node.status === "blocked" || node.status === "failed" || node.status === "degraded",
     result: node.result ?? null,
-    stateReason: node.blockedReason ?? node.lastError ?? null,
+    stateReason: nodeStateReason(node),
     invalidatedByMutationId: null,
   };
 }
 
-function toTaskNodeState(status: EffectivePlanNode["status"]): TaskNodeState {
+function toTaskNodeState(status: PublicEffectivePlanNode["status"]): TaskNodeState {
   return status === "degraded" || status === "waiting" ? "blocked" : status;
 }
 
-function firstDegradedReason(graph: EffectivePlanGraph) {
+function firstDegradedReason(graph: PublicEffectivePlanGraph) {
   const reason = firstReason(graph, graph.degradedNodeIds);
   return reason ? { reason: reason.reason, retryAt: null } : null;
 }
 
-function firstReason(graph: EffectivePlanGraph, nodeIds: string[]) {
+function firstReason(graph: PublicEffectivePlanGraph, nodeIds: string[]) {
   const nodeId = nodeIds[0];
   if (!nodeId) return null;
   const node = graph.nodes.find((candidate) => candidate.id === nodeId);
   return {
-    reason: node?.blockedReason ?? node?.lastError ?? node?.title ?? "Action required",
+    reason: nodeStateReason(node) ?? node?.title ?? "Action required",
     nodeId,
   };
+}
+
+function nodeStateReason(node: PublicEffectivePlanNode | null | undefined) {
+  return node?.blockedReason
+    ?? (node?.status === "failed" ? "Node execution failed." : null);
+}
+
+function toPublicReconciliationGraph(
+  graph: EffectivePlanGraph | PublicEffectivePlanGraph,
+): PublicEffectivePlanGraph {
+  return isInternalEffectivePlanGraph(graph)
+    ? projectPublicEffectivePlanGraph(graph)
+    : graph;
+}
+
+function isInternalEffectivePlanGraph(
+  graph: EffectivePlanGraph | PublicEffectivePlanGraph,
+): graph is EffectivePlanGraph {
+  return Object.prototype.hasOwnProperty.call(graph, "activeLayerId");
 }
 
 

@@ -11,13 +11,14 @@ export async function failTaskTransition(
     ...input,
     executionAction: {
       action: "fail_current_node",
-      sessionId: input.executionSession.id,
       nodeId: checkpointNodeId({
         checkpoint: input.checkpoint,
         reason: "Checkpoint failure requires a node.",
       }),
       error: input.transition.reason,
+      idempotencyKey: input.idempotencyKey,
     },
+    commandContext: { sessionId: input.executionSession.id },
     dispatchExecutionAction: input.dispatchExecutionAction,
     ...observerCallbacks(input),
   });

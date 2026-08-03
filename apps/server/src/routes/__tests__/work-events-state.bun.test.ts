@@ -123,6 +123,7 @@ function makeFakeEngine(): ChronaEngine {
           onRuntimeEvent?: (event: {
             nodeId: string;
             nodeTitle: string;
+            executionScope: string;
             runtimeName: string;
             event: {
               type: "tool_started";
@@ -140,6 +141,7 @@ function makeFakeEngine(): ChronaEngine {
           input.onRuntimeEvent?.({
             nodeId: "node-1",
             nodeTitle: "Execute launch",
+            executionScope: "scope-work-event",
             runtimeName: "default",
             event: {
               type: "tool_started",
@@ -258,6 +260,8 @@ describe("POST /work/:taskId/commands — action refresh events", () => {
     const response = await postCommand(taskId, {
       type: "plan.accept",
       planId: "plan-1",
+      expectedHeadStateVersion: 2,
+      idempotencyKey: "accept-plan-1",
     });
     expect(response.status).toBe(202);
 
@@ -363,11 +367,12 @@ describe("POST /work/:taskId/commands — action refresh events", () => {
         expect.objectContaining({
           workBlockId: null,
           eventKind: "tool_started",
-          provider: "omp",
-          runtimeName: "default",
+          executionScope: "scope-work-event",
+          providerLabel: "AI provider",
+          runtimeLabel: "Execution runtime",
           event: expect.objectContaining({
             type: "tool_started",
-            label: "browser",
+            label: "Runtime tool",
           }),
         }),
       ]),
@@ -519,8 +524,8 @@ describe("GET /work/:taskId/events — state.snapshot on connect", () => {
   });
 });
 
-describe("POST /work/:taskId/commands plan.generate — state.update alongside plan.generation.event", () => {
-  it("emits a state.update per plan stream event in addition to the legacy trigger", async () => {
+describe("POST /work/:taskId/commands plan.generate — durable state updates", () => {
+  it("emits a state.update for each durable generation event", async () => {
     const taskId = "task-1";
     const stateUpdates: Array<Record<string, unknown>> = [];
 
@@ -545,7 +550,7 @@ describe("POST /work/:taskId/commands plan.generate — state.update alongside p
       const res = await honoApp.request(`http://local/api/work/${taskId}/commands`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: "plan.generate", forceRefresh: true }),
+        body: JSON.stringify({ type: "plan.generate", forceRefresh: true, idempotencyKey: "generation-state-1" }),
       });
       expect(res.status).toBe(202);
 
@@ -566,45 +571,15 @@ describe("POST /work/:taskId/commands plan.generate — state.update alongside p
 
       const stream = state.currentStream!;
       stream.emit({ type: "status", phase: "requesting_provider", message: "Contacting LLM" });
-      stream.emit({
-        type: "tool_call",
-        tool: "chrona_plan_generate",
-        input: {
-          title: "Test plan",
-          goal: "Test plan",
-          nodes: [],
-          edges: [],
-        },
-      });
-      stream.emit({ type: "partial", text: "drafting plan" });
-      stream.emit({
-        type: "result",
-        result: {
-          id: "plan-test",
-          taskId: "task-1",
-          status: "draft",
-          revision: 1,
-          summary: "Test plan",
-          prompt: "Test plan",
-          blueprint: {
-            title: "Test plan",
-            goal: "Test plan",
-            nodes: [],
-            edges: [],
-          },
-          generatedBy: null,
-          generatedAt: "2026-06-10T00:00:00.000Z",
-          updatedAt: "2026-06-10T00:00:00.000Z",
-          compiledPlan: null,
-        } as unknown as Extract<GeneratePlanSSEEvent, { type: "result" }>["result"],
-      });
+      stream.emit({ type: "status", phase: "compiling", message: "Compiling plan" });
+      stream.emit({ type: "committed", planId: "plan-test", headStateVersion: 2 });
       stream.emit({ type: "done" });
       stream.finish();
 
       await terminalReceived;
 
-      // Verify state.update fired per stream event.
-      expect(stateUpdates.length).toBeGreaterThanOrEqual(4);
+      // Verify state.update fired for every durable stream event.
+      expect(stateUpdates.length).toBeGreaterThanOrEqual(3);
       const phases = stateUpdates.flatMap((updates) => {
         const v = updates["/plan/generation/phase"];
         return typeof v === "string" ? [v] : [];
@@ -616,19 +591,15 @@ describe("POST /work/:taskId/commands plan.generate — state.update alongside p
       expect(runningUpdate!["/plan/generation/status"]).toBe("running");
 
 
-      // Result event must carry both saved-plan fields and header action
-      // visibility. Without the /execution flags, the client receives the
-      // generated plan but keeps rendering Generate Plan until refresh.
-      const resultUpdate = stateUpdates.find((updates) =>
+      // A committed event identifies the durable saved-plan head. Header state
+      // is refreshed from the canonical state snapshot after the terminal event.
+      const committedUpdate = stateUpdates.find((updates) =>
         typeof updates["/plan/saved/id"] === "string"
       );
-      expect(resultUpdate).toBeDefined();
-      expect(resultUpdate!["/plan/saved/id"]).toBe("plan-test");
-      expect(resultUpdate!["/plan/generation/status"]).toBe("completed");
-      expect(resultUpdate!["/plan/status"]).toBe("waiting_acceptance");
-      expect(resultUpdate!["/execution/show-accept-plan"]).toBe(true);
-      expect(resultUpdate!["/execution/show-generate-plan"]).toBe(false);
-      expect(resultUpdate!["/execution/can-start"]).toBe(false);
+      expect(committedUpdate).toBeDefined();
+      expect(committedUpdate!["/plan/saved/id"]).toBe("plan-test");
+      expect(committedUpdate!["/plan/generation/status"]).toBe("completed");
+      expect(committedUpdate!["/plan/status"]).toBe("waiting_acceptance");
       const doneUpdate = stateUpdates.at(-1);
       expect(doneUpdate?.["/plan/status"]).toBeUndefined();
       expect(doneUpdate?.["/plan/generation/is-running"]).toBe(false);
@@ -650,7 +621,7 @@ describe("POST /work/:taskId/commands plan.generate — event volume", () => {
       const res = await honoApp.request(`http://local/api/work/${taskId}/commands`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: "plan.generate", forceRefresh: true }),
+        body: JSON.stringify({ type: "plan.generate", forceRefresh: true, idempotencyKey: "generation-volume-1" }),
       });
       expect(res.status).toBe(202);
 
@@ -664,24 +635,8 @@ describe("POST /work/:taskId/commands plan.generate — event volume", () => {
 
       const stream = state.currentStream!;
       stream.emit({ type: "status", phase: "requesting_provider", message: "Contacting LLM" });
-      stream.emit({ type: "tool_call", tool: "chrona_plan_generate", input: { title: "T", goal: "G", nodes: [], edges: [] } });
-      stream.emit({ type: "partial", text: "draft" });
-      stream.emit({
-        type: "result",
-        result: {
-          id: "plan-test",
-          taskId: "task-1",
-          status: "draft",
-          revision: 1,
-          summary: "T",
-          prompt: "T",
-          blueprint: { title: "T", goal: "G", nodes: [], edges: [] },
-          generatedBy: null,
-          generatedAt: "2026-06-10T00:00:00.000Z",
-          updatedAt: "2026-06-10T00:00:00.000Z",
-          compiledPlan: null,
-        } as unknown as Extract<GeneratePlanSSEEvent, { type: "result" }>["result"],
-      });
+      stream.emit({ type: "status", phase: "compiling", message: "Compiling plan" });
+      stream.emit({ type: "committed", planId: "plan-test", headStateVersion: 2 });
       stream.emit({ type: "done" });
       stream.finish();
 
@@ -699,10 +654,10 @@ describe("POST /work/:taskId/commands plan.generate — event volume", () => {
       expect(workspaceUpdates).toHaveLength(1);
       expect(workspaceUpdates[0]).toBe("task_workspace_updated");
 
-      // `state.update` is the primary state-push channel — one per
-      // significant stream event.
+      // `state.update` is the primary state-push channel — one per durable
+      // generation event that changes projection state.
       const stateUpdates = allEvents.filter((type) => type === "state.update");
-      expect(stateUpdates.length).toBeGreaterThanOrEqual(4);
+      expect(stateUpdates.length).toBeGreaterThanOrEqual(3);
     } finally {
       sub.unsubscribe();
     }
@@ -739,7 +694,7 @@ describe("POST /work/:taskId/commands plan.generate — error state.update", () 
       const res = await honoApp.request(`http://local/api/work/${taskId}/commands`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: "plan.generate", forceRefresh: true }),
+        body: JSON.stringify({ type: "plan.generate", forceRefresh: true, idempotencyKey: "generation-error-1" }),
       });
       expect(res.status).toBe(202);
 
@@ -754,9 +709,9 @@ describe("POST /work/:taskId/commands plan.generate — error state.update", () 
       const stream = state.currentStream!;
       stream.emit({ type: "status", phase: "requesting_provider", message: "Contacting LLM" });
       stream.emit({
-        type: "error",
+        type: "failed",
         code: "PROVIDER_ERROR",
-        message: "chrona_plan_generate failed: provider returned 502",
+        message: "provider returned 502",
       });
       stream.finish();
 
@@ -764,11 +719,11 @@ describe("POST /work/:taskId/commands plan.generate — error state.update", () 
 
       const errorUpdate = stateUpdates.find((updates) => updates["/plan/generation/error/code"] === "PROVIDER_ERROR");
       expect(errorUpdate).toBeDefined();
-      expect(errorUpdate!["/plan/generation/error/message"]).toBe("chrona_plan_generate failed: provider returned 502");
+      expect(errorUpdate!["/plan/generation/error/message"]).toBe("provider returned 502");
       expect(errorUpdate!["/plan/status"]).toBe("idle");
-      expect(errorUpdate!["/plan/generation/error/buttonRetry"]).toBe(true);
-      expect(errorUpdate!["/plan/generation/error/buttonEditInstruction"]).toBe(true);
-      expect(errorUpdate!["/plan/generation/error/buttonCancel"]).toBe(false);
+      expect(errorUpdate).not.toHaveProperty("/plan/generation/error/buttonRetry");
+      expect(errorUpdate).not.toHaveProperty("/plan/generation/error/buttonEditInstruction");
+      expect(errorUpdate).not.toHaveProperty("/plan/generation/error/buttonCancel");
       expect(workspaceUpdates).toHaveLength(1);
     } finally {
       trigger!.unsubscribe();
@@ -788,7 +743,7 @@ describe("POST /work/:taskId/commands plan.generate — error state.update", () 
       const res = await honoApp.request(`http://local/api/work/${taskId}/commands`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: "plan.generate", forceRefresh: true }),
+        body: JSON.stringify({ type: "plan.generate", forceRefresh: true, idempotencyKey: "generation-error-2" }),
       });
       expect(res.status).toBe(202);
 
@@ -802,7 +757,7 @@ describe("POST /work/:taskId/commands plan.generate — error state.update", () 
 
       const stream = state.currentStream!;
       stream.emit({ type: "status", phase: "loading_task", message: "Loading task context" });
-      stream.emit({ type: "error", code: "TASK_NOT_FOUND", message: "Task not found" });
+      stream.emit({ type: "failed", code: "TASK_NOT_FOUND", message: "Task not found" });
       stream.finish();
 
       // Give the route handler time to publish the terminal state.update.
@@ -810,8 +765,8 @@ describe("POST /work/:taskId/commands plan.generate — error state.update", () 
 
       const errorUpdate = stateUpdates.find((updates) => updates["/plan/generation/error/code"] === "TASK_NOT_FOUND");
       expect(errorUpdate).toBeDefined();
-      expect(errorUpdate!["/plan/generation/error/buttonRetry"]).toBe(false);
-      expect(errorUpdate!["/plan/generation/error/buttonEditInstruction"]).toBe(true);
+      expect(errorUpdate).not.toHaveProperty("/plan/generation/error/buttonRetry");
+      expect(errorUpdate).not.toHaveProperty("/plan/generation/error/buttonEditInstruction");
     } finally {
       trigger.unsubscribe();
     }

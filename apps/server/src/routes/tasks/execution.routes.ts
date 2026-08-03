@@ -12,16 +12,25 @@ import {
   providerApprovalResolveBodySchema,
   providerApprovalResolveParamSchema,
 } from "@chrona/contracts/api";
-import type { PlanExecutionSSEEvent } from "@chrona/contracts";
-import type { EffectivePlanGraph } from "@chrona/contracts/ai";
+import type { EffectivePlanGraph, PlanExecutionResult, PlanExecutionSSEEvent, PublicPlanExecutionResult } from "@chrona/contracts";
+import { projectPublicEffectivePlanGraph, publicProviderDescriptor } from "@chrona/contracts";
 import type {
   GraphExecutionEvent,
   PlanExecutionRuntimeEvent,
 } from "@chrona/engine";
 
-import { error, toHttpError } from "../../lib/http";
+import { error, HttpError, internalServerError, toHttpError } from "../../lib/http";
+
 import { startSseHeartbeat } from "../../lib/sse-heartbeat";
 import { checkpointActionToExecutionAction, summarizeRuntimeEvent } from "@features/execution-monitoring/server";
+function executionStreamError(cause: unknown, fallback: string): Extract<PlanExecutionSSEEvent, { type: "error" }> {
+  const httpError = toHttpError(cause);
+  return {
+    type: "error",
+    code: "INTERNAL_ERROR",
+    message: httpError?.status === 409 ? httpError.message : fallback,
+  };
+}
 
 type SseStream = Parameters<typeof streamSSE>[1] extends (stream: infer T) => Promise<unknown> ? T : never;
 const HERMES_DEFAULT_APPROVAL_TIMEOUT_MS = 60_000;
@@ -31,10 +40,16 @@ function toJsonInput(value: unknown) {
   return JSON.parse(JSON.stringify(value));
 }
 
-async function reconcileTimedOutProviderApprovals(taskId: string) {
+async function reconcileTimedOutProviderApprovals(input: {
+  taskId: string;
+  workBlockId: string | null;
+  planRunId: string;
+}) {
   const pendingApprovals = await db.taskPlanProviderApproval.findMany({
     where: {
-      taskId,
+      taskId: input.taskId,
+      workBlockId: input.workBlockId,
+      planRunId: input.planRunId,
       status: "pending",
     },
     select: {
@@ -64,6 +79,9 @@ async function reconcileTimedOutProviderApprovals(taskId: string) {
     await db.taskPlanProviderApproval.updateMany({
       where: {
         id: approval.id,
+        taskId: input.taskId,
+        workBlockId: input.workBlockId,
+        planRunId: input.planRunId,
         status: "pending",
       },
       data: {
@@ -86,12 +104,12 @@ async function reconcileTimedOutProviderApprovals(taskId: string) {
 function summarizeGraphEvent(event: GraphExecutionEvent): Extract<PlanExecutionSSEEvent, { type: "graph_event" }> {
   if ("node" in event) {
     const result = "result" in event ? event.result : null;
-    const message = result && "summary" in result
-      ? result.summary
+    const message = result && "summary" in result && typeof result.summary === "string"
+      ? result.summary.slice(0, 500)
       : result && "error" in result
-        ? result.error
+        ? "Node execution failed."
         : result && "reason" in result
-          ? result.reason
+          ? "Node execution requires attention."
           : undefined;
     return {
       type: "graph_event",
@@ -110,6 +128,57 @@ function writeExecutionEvent(stream: SseStream, event: PlanExecutionSSEEvent) {
   return stream.writeSSE({ event: event.type, data: JSON.stringify(event) });
 }
 
+function publicExecutionMessage(status: PlanExecutionResult["status"]): string {
+  switch (status) {
+    case "started": return "Plan execution started.";
+    case "running": return "Plan execution is running.";
+    case "waiting_for_user": return "Plan execution is waiting for user input.";
+    case "waiting_for_approval": return "Plan execution is waiting for approval.";
+    case "blocked": return "Plan execution requires attention.";
+    case "failed": return "Plan execution failed.";
+    case "completed": return "Plan execution completed.";
+    case "cancelled": return "Plan execution cancelled.";
+    case "no_plan": return "No accepted plan is available.";
+  }
+}
+
+async function toPublicExecutionResult(result: PlanExecutionResult): Promise<PublicPlanExecutionResult> {
+  const {
+    mainSessionId: _mainSessionId,
+    executionSessionId: _executionSessionId,
+    planRunId,
+    checkpoint,
+    ...publicResult
+  } = result;
+  const safePublicResult = { ...publicResult, message: publicExecutionMessage(publicResult.status) };
+  const planRun = planRunId
+    ? await db.taskPlanRun.findUnique({ where: { id: planRunId }, select: { executionScopeId: true } })
+    : null;
+  const executionScope = planRun?.executionScopeId ?? null;
+  if (!checkpoint) return { ...safePublicResult, executionScope, checkpoint: null };
+  const {
+    sessionId: _sessionId,
+    planRunId: _checkpointPlanRunId,
+    ...publicCheckpoint
+  } = checkpoint;
+  return { ...safePublicResult, executionScope, checkpoint: publicCheckpoint };
+}
+
+async function resolveExecutionScope(input: {
+  taskId: string;
+  workBlockId: string | null;
+  executionScope: string;
+}): Promise<string> {
+  const planRun = await db.taskPlanRun.findUnique({
+    where: { executionScopeId: input.executionScope },
+    select: { id: true, taskId: true, workBlockId: true },
+  });
+  if (!planRun || planRun.taskId !== input.taskId || planRun.workBlockId !== (input.workBlockId ?? null)) {
+    throw new HttpError(404, "Execution scope not found");
+  }
+  return planRun.id;
+}
+
 export function createExecutionRoutes(engine: ChronaEngine) {
   return new Hono().get(
     "/tasks/:taskId/execution/current",
@@ -119,13 +188,10 @@ export function createExecutionRoutes(engine: ChronaEngine) {
         const { taskId } = c.req.valid("param");
         const workBlockId = c.req.query("workBlockId") || null;
         const result = await engine.tasks.execution.current({ taskId, workBlockId });
-        return c.json(result);
+        return c.json(await toPublicExecutionResult(result));
       } catch (cause) {
         const httpError = toHttpError(cause);
-        if (httpError) {
-          return error(c, httpError.message, httpError.status);
-        }
-        return error(c, cause instanceof Error ? cause.message : "Failed to load current execution state", 500);
+        return error(c, "Failed to load current execution state", httpError?.status ?? 500);
       }
     },
   ).post(
@@ -163,25 +229,21 @@ export function createExecutionRoutes(engine: ChronaEngine) {
                 void writeEvent(summarizeGraphEvent(event));
               },
               onRuntimeEvent(event: PlanExecutionRuntimeEvent) {
-                void writeEvent(summarizeRuntimeEvent(action.action, event));
+                const summary = summarizeRuntimeEvent(action.action, event);
+                if (summary) void writeEvent(summary);
               },
               onStateChange(effectivePlan: EffectivePlanGraph) {
                 void writeEvent({
                   type: "state",
-                  effectivePlan,
+                  effectivePlan: projectPublicEffectivePlanGraph(effectivePlan),
                 });
               },
             });
 
-            await writeEvent({ type: "result", result });
+            await writeEvent({ type: "result", result: await toPublicExecutionResult(result) });
             await writeEvent({ type: "done" });
           } catch (cause) {
-            const httpError = toHttpError(cause);
-            await writeEvent({
-              type: "error",
-              code: "INTERNAL_ERROR",
-              message: httpError?.message ?? (cause instanceof Error ? cause.message : "Failed to dispatch execution action"),
-            });
+            await writeEvent(executionStreamError(cause, "Failed to dispatch execution action"));
             await writeEvent({ type: "done" });
           } finally {
             await writeQueue;
@@ -190,10 +252,7 @@ export function createExecutionRoutes(engine: ChronaEngine) {
         });
       } catch (cause) {
         const httpError = toHttpError(cause);
-        if (httpError) {
-          return error(c, httpError.message, httpError.status);
-        }
-        return error(c, cause instanceof Error ? cause.message : "Failed to dispatch execution action", 500);
+        return error(c, "Failed to dispatch execution action", httpError?.status ?? 500);
       }
     },
   ).post(
@@ -232,25 +291,21 @@ export function createExecutionRoutes(engine: ChronaEngine) {
                 void writeEvent(summarizeGraphEvent(event));
               },
               onRuntimeEvent(event: PlanExecutionRuntimeEvent) {
-                void writeEvent(summarizeRuntimeEvent(executionAction, event));
+                const summary = summarizeRuntimeEvent(executionAction, event);
+                if (summary) void writeEvent(summary);
               },
               onStateChange(effectivePlan: EffectivePlanGraph) {
                 void writeEvent({
                   type: "state",
-                  effectivePlan,
+                  effectivePlan: projectPublicEffectivePlanGraph(effectivePlan),
                 });
               },
             });
 
-            await writeEvent({ type: "result", result: result.execution });
+            await writeEvent({ type: "result", result: await toPublicExecutionResult(result.execution) });
             await writeEvent({ type: "done" });
           } catch (cause) {
-            const httpError = toHttpError(cause);
-            await writeEvent({
-              type: "error",
-              code: "INTERNAL_ERROR",
-              message: httpError?.message ?? (cause instanceof Error ? cause.message : "Failed to submit checkpoint action"),
-            });
+            await writeEvent(executionStreamError(cause, "Failed to submit checkpoint action"));
             await writeEvent({ type: "done" });
           } finally {
             await writeQueue;
@@ -259,10 +314,7 @@ export function createExecutionRoutes(engine: ChronaEngine) {
         });
       } catch (cause) {
         const httpError = toHttpError(cause);
-        if (httpError) {
-          return error(c, httpError.message, httpError.status);
-        }
-        return error(c, cause instanceof Error ? cause.message : "Failed to submit checkpoint action", 500);
+        return error(c, "Failed to submit checkpoint action", httpError?.status ?? 500);
       }
     },
   ).get(
@@ -272,13 +324,17 @@ export function createExecutionRoutes(engine: ChronaEngine) {
     async (c) => {
       try {
         const { taskId } = c.req.valid("param");
-        const { status = "pending" } = c.req.valid("query");
+        const { workBlockId, executionScope, status = "pending" } = c.req.valid("query");
+        const normalizedWorkBlockId = workBlockId ?? null;
+        const planRunId = await resolveExecutionScope({ taskId, workBlockId: normalizedWorkBlockId, executionScope });
         if (status === "pending" || status === "all") {
-          await reconcileTimedOutProviderApprovals(taskId);
+          await reconcileTimedOutProviderApprovals({ taskId, workBlockId: normalizedWorkBlockId, planRunId });
         }
         const approvals = await db.taskPlanProviderApproval.findMany({
           where: {
             taskId,
+            workBlockId: normalizedWorkBlockId,
+            planRunId,
             ...(status === "all" ? {} : { status }),
           },
           orderBy: { requestedAt: "desc" },
@@ -289,7 +345,7 @@ export function createExecutionRoutes(engine: ChronaEngine) {
         if (httpError) {
           return error(c, httpError.message, httpError.status);
         }
-        return error(c, cause instanceof Error ? cause.message : "Failed to load provider approvals", 500);
+        return internalServerError(c, "GET /api/tasks/:taskId/provider-approvals", cause, "Failed to load provider approvals");
       }
     },
   ).post(
@@ -300,17 +356,24 @@ export function createExecutionRoutes(engine: ChronaEngine) {
       try {
         const { taskId, approvalId } = c.req.valid("param");
         const body = c.req.valid("json");
+        const planRunId = await resolveExecutionScope({
+          taskId,
+          workBlockId: body.workBlockId ?? null,
+          executionScope: body.executionScope,
+        });
         const result = await engine.tasks.execution.resolveProviderApproval({
           taskId,
           approvalId,
+          workBlockId: body.workBlockId ?? null,
+
+          planRunId,
           choice: body.choice,
           resolveAll: body.resolveAll,
           note: body.note,
+          idempotencyKey: body.idempotencyKey,
         });
         return c.json({
           approval: toApprovalReadModel(result.approval),
-          provider: result.provider,
-          runId: result.runId,
           choice: result.choice,
           resolved: result.resolved,
           status: result.status,
@@ -320,7 +383,7 @@ export function createExecutionRoutes(engine: ChronaEngine) {
         if (httpError) {
           return error(c, httpError.message, httpError.status);
         }
-        return error(c, cause instanceof Error ? cause.message : "Failed to resolve provider approval", 500);
+        return internalServerError(c, "POST /api/tasks/:taskId/provider-approvals/:approvalId/resolve", cause, "Failed to resolve provider approval");
       }
     },
   );
@@ -331,24 +394,13 @@ type ProviderApprovalRecord = Awaited<ReturnType<typeof db.taskPlanProviderAppro
 function toApprovalReadModel(approval: NonNullable<ProviderApprovalRecord>) {
   return {
     id: approval.id,
-    taskId: approval.taskId,
-    workBlockId: approval.workBlockId,
-    planId: approval.planId,
-    planRunId: approval.planRunId,
-    nodeId: approval.nodeId,
     nodeTitle: approval.nodeTitle,
-    provider: approval.provider,
-    runtimeName: approval.runtimeName,
-    nativeRunId: approval.nativeRunId,
-    kind: approval.kind,
-    providerKind: approval.providerKind,
+    provider: publicProviderDescriptor(approval.provider),
     title: approval.title,
     summary: approval.summary,
     description: approval.description,
     riskLevel: approval.riskLevel,
-    subject: approval.subject,
     choices: approval.choices,
-    scopePolicy: approval.scopePolicy,
     status: approval.status,
     requestedAt: approval.requestedAt.toISOString(),
     resolvedAt: approval.resolvedAt?.toISOString() ?? null,

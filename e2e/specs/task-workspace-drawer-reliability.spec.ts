@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import {
   createTaskWorkspaceTask,
-  generateDebugTaskWorkspacePlan,
+  generateTaskWorkspacePlan,
   type TaskWorkspaceViewport,
 } from "./task-workspace-test-helpers";
 
@@ -28,7 +28,7 @@ test.describe("Task workspace node drawer reliability", () => {
       title: `E2E Drawer Reliability ${viewport}`,
       description: "Verify task workspace node drawer open, close, and reopen reliability.",
     });
-    await generateDebugTaskWorkspacePlan(request, task.taskId);
+    await generateTaskWorkspacePlan(request, task.taskId);
     await page.goto(`/en/tasks/${task.taskId}`);
 
     await expect(page.getByRole("heading", { name: `E2E Drawer Reliability ${viewport}` })).toBeVisible();

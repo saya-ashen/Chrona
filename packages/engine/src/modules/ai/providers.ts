@@ -14,6 +14,7 @@ import {
   type ProviderRunInput,
   type ProviderRunEvent,
   type ProviderRunSnapshot,
+  type ProviderStructuredOutputSchema,
   type StartRunInput,
 } from "@chrona/providers-foundation";
 import type {
@@ -24,14 +25,9 @@ import type {
   OmpClientConfig,
   HermesClientConfig,
   LLMClientConfig,
-  PreparedAiFeatureSpec,
-  StructuredDebugInfo,
   DebugClientConfig,
 } from "@chrona/contracts";
-import {
-  AiClientError,
-  validatePreparedFeaturePayload,
-} from "@chrona/contracts";
+import { AiClientError } from "@chrona/contracts";
 import type { EngineAiClient } from "./runtime/client-registry";
 import { aiClientRegistry } from "./runtime/client-registry";
 import { createProviderStreamEventBoundary } from "./provider-stream-contract";
@@ -274,23 +270,13 @@ export function extractJSON(text: string): Record<string, unknown> | null {
   return null;
 }
 
-export type ProviderFeatureRequest = {
-  sessionId: string;
-  clientOperationId: string;
-  sessionKey: string;
-  instructions: string;
-  input: unknown;
-  structuredOutputSchema?: PreparedAiFeatureSpec["structuredOutputSchema"];
-  terminalToolName?: string;
-  toolPolicy?: "full" | "read_only";
-  stream: boolean;
-  maxOutputTokens?: number;
-  timeoutSeconds?: number;
-};
+
+
+export type ProviderFeatureRequest = StartRunInput;
 
 async function providerFeaturePayload(
   client: EngineAiClient,
-  request: ProviderFeatureRequest,
+  request: StartRunInput,
 ): Promise<string> {
   const providerClient =
     aiClientRegistry.requireProviderClient(client).providerClient;
@@ -301,23 +287,6 @@ async function providerFeaturePayload(
   return result.outputText ?? "";
 }
 
-function toStartRunInput(request: ProviderFeatureRequest): StartRunInput {
-  return {
-    clientOperationId: request.clientOperationId,
-    sessionId: request.sessionId,
-    sessionKey: request.sessionKey,
-    instructions: request.instructions,
-    input: request.input as ProviderRunInput,
-    structuredOutputSchema: request.structuredOutputSchema,
-    terminalToolName: request.terminalToolName,
-    toolPolicy: request.toolPolicy,
-    maxOutputTokens: request.maxOutputTokens,
-    timeoutMs: request.timeoutSeconds
-      ? request.timeoutSeconds * 1000
-      : undefined,
-    stream: true,
-  };
-}
 
 export type ProviderRunRequestOptions = {
   onEvent?: (event: ProviderRunEvent) => void | Promise<void>;
@@ -325,11 +294,11 @@ export type ProviderRunRequestOptions = {
 
 export async function runProviderRequest(
   providerClient: NonNullable<EngineAiClient["providerClient"]>,
-  request: ProviderFeatureRequest,
+  request: StartRunInput,
   options?: ProviderRunRequestOptions,
 ): Promise<ProviderRunSnapshot> {
-  assertProviderStartSupported(await providerClient.getCapabilities(), toStartRunInput(request), providerClient.provider);
-  const run = await providerClient.startRun(toStartRunInput(request));
+  assertProviderStartSupported(await providerClient.getCapabilities(), request, providerClient.provider);
+  const run = await providerClient.startRun(request);
   let finalSnapshot: ProviderRunSnapshot | null = null;
   const boundary = createProviderStreamEventBoundary(run);
   try {
@@ -343,6 +312,7 @@ export async function runProviderRequest(
         finalSnapshot = providerRunCompletedSnapshot(
           providerClient.provider,
           event,
+          request,
         );
       }
       if (event.type === "run_failed") {
@@ -368,9 +338,27 @@ export async function runProviderRequest(
   return finalSnapshot;
 }
 
+function completedStructuredPayload(
+  event: Extract<ProviderRunEvent, { type: "run_completed" }>,
+  request: StartRunInput,
+): ProviderRunSnapshot["structuredPayload"] {
+  if (event.structuredPayload !== undefined) return event.structuredPayload;
+  if (!request.structuredOutputSchema || event.outputText === undefined) return undefined;
+  try {
+    const parsed = JSON.parse(event.outputText) as unknown;
+    if (parsed && typeof parsed === "object" && !Array.isArray(parsed) && "parsed" in parsed) {
+      return parsed as ProviderRunSnapshot["structuredPayload"];
+    }
+    return { parsed } as ProviderRunSnapshot["structuredPayload"];
+  } catch {
+    return undefined;
+  }
+}
+
 function providerRunCompletedSnapshot(
   provider: AiClientRecord["type"],
   event: Extract<ProviderRunEvent, { type: "run_completed" }>,
+  request: StartRunInput,
 ): ProviderRunSnapshot {
   return {
     provider,
@@ -379,7 +367,7 @@ function providerRunCompletedSnapshot(
     sessionId: event.run.sessionId,
     status: event.run.status ?? "completed",
     outputText: event.outputText,
-    structuredPayload: event.structuredPayload,
+    structuredPayload: completedStructuredPayload(event, request),
     usage: event.usage,
     error: null,
     raw: event.raw,
@@ -388,7 +376,7 @@ function providerRunCompletedSnapshot(
 
 function providerRunFailedSnapshot(
   provider: AiClientRecord["type"],
-  request: ProviderFeatureRequest,
+  request: StartRunInput,
   event: Extract<ProviderRunEvent, { type: "run_failed" }>,
 ): ProviderRunSnapshot {
   return {
@@ -454,12 +442,7 @@ async function llmFeaturePayload(
   return json.choices?.[0]?.message?.content ?? "";
 }
 
-export async function providerCall(
-  client: EngineAiClient,
-  request: ProviderFeatureRequest,
-): Promise<string> {
-  return providerFeaturePayload(client, request);
-}
+
 
 export async function llmCall(
   config: LLMClientConfig,
@@ -475,61 +458,38 @@ export async function llmCall(
   );
 }
 
-export function buildPreparedFeatureRequest(input: unknown): {
-  input: Record<string, unknown>;
-  instructions: string;
-  inputText: string;
-} {
-  const inputObj =
-    typeof input === "string" ? { input } : (input as Record<string, unknown>);
-  const inputText =
-    typeof input === "string"
-      ? input
-      : typeof inputObj.title === "string"
-        ? inputObj.title
-        : JSON.stringify(inputObj);
-
-  return {
-    input: inputObj,
-    instructions: inputText,
-    inputText,
-  };
-}
 
 export function buildProviderFeatureRequest(input: {
   sessionKey: string;
-  input: unknown;
+  input: ProviderRunInput;
   instructions?: string;
-  featureSpec?: PreparedAiFeatureSpec;
-  timeoutSeconds?: number;
-  stream: boolean;
+  timeoutMs?: number;
+  stream?: boolean;
   maxOutputTokens?: number;
   terminalToolName?: string;
+  structuredOutputSchema?: ProviderStructuredOutputSchema;
   toolPolicy?: "full" | "read_only";
-}): ProviderFeatureRequest {
-  const fallbackInstructions =
+  signal?: AbortSignal;
+}): StartRunInput {
+  const instructions =
     input.instructions ??
     (typeof input.input === "string"
       ? input.input
       : JSON.stringify(input.input));
 
-  const providerInput = input.featureSpec?.inputText
-    ? { type: "text" as const, text: input.featureSpec.inputText }
-    : input.input;
-
   return {
     clientOperationId: `chrona-feature:${input.sessionKey}`,
     sessionId: input.sessionKey,
     sessionKey: input.sessionKey,
-    instructions: input.featureSpec?.instructions ?? fallbackInstructions,
-    input: providerInput,
-    structuredOutputSchema: input.featureSpec?.structuredOutputSchema,
-    terminalToolName:
-      input.terminalToolName ?? input.featureSpec?.terminalToolName,
+    instructions,
+    input: input.input,
+    structuredOutputSchema: input.structuredOutputSchema,
+    terminalToolName: input.terminalToolName,
     toolPolicy: input.toolPolicy,
     stream: input.stream,
     maxOutputTokens: input.maxOutputTokens,
-    timeoutSeconds: input.timeoutSeconds,
+    timeoutMs: input.timeoutMs,
+    signal: input.signal,
   };
 }
 
@@ -537,17 +497,27 @@ export function buildProviderFeatureRequest(input: {
 // Dispatch helpers (used by feature-normalizers)
 // ────────────────────────────────────────────────────────────────────
 
+type ProviderPayloadDebug = {
+  rawOutput?: string;
+  error?: string | null;
+  source?: string;
+  feature?: string | null;
+  toolName?: string | null;
+  sessionId?: string;
+  runId?: string;
+  validationIssues?: unknown[];
+};
+
 type FeaturePayloadResult<T> = {
   parsed: T;
   rawText: string;
-  debug?: StructuredDebugInfo;
+  debug?: ProviderPayloadDebug;
 };
 
 async function providerFeaturePayloadFull<T>(
   client: EngineAiClient,
   feature: AiFeature,
-  request: ProviderFeatureRequest,
-  featureSpec?: PreparedAiFeatureSpec,
+  request: StartRunInput,
   options?: ProviderRunRequestOptions,
 ): Promise<FeaturePayloadResult<T>> {
   const providerClient =
@@ -558,13 +528,13 @@ async function providerFeaturePayloadFull<T>(
     throw new AiClientError(result.error, client.record.type, "internal");
   }
 
-  const structuredPayload = unknownRecord(result.structuredPayload);
-  const parsedStructuredPayload =
-    structuredPayload && "parsed" in structuredPayload
-      ? structuredPayload.parsed
-      : structuredPayload;
+  const providerPayload = unknownRecord(result.structuredPayload);
+  const parsedPayload =
+    providerPayload && "parsed" in providerPayload
+      ? providerPayload.parsed
+      : providerPayload;
   const rawPayload =
-    parsedStructuredPayload ??
+    parsedPayload ??
     unknownRecord(unknownRecord(result.raw)?.terminalTool)?.input ??
     extractJSON(result.outputText ?? "");
 
@@ -576,116 +546,49 @@ async function providerFeaturePayloadFull<T>(
     );
   }
 
-  if (featureSpec) {
-    const validation = validatePreparedFeaturePayload(featureSpec, rawPayload);
-    if (!validation.ok) {
-      throw new AiClientError(
-        validation.error,
-        client.record.type,
-        "invalid_response",
-      );
-    }
-  }
 
   return {
     parsed: rawPayload as T,
     rawText: result.outputText ?? "",
     debug: {
       rawOutput:
-        getStructuredString(result.structuredPayload, "rawOutput") ??
+        getPayloadString(result.structuredPayload, "rawOutput") ??
         result.outputText,
       error:
-        getStructuredString(result.structuredPayload, "error") ?? result.error,
-      source: getStructuredString(
-        result.structuredPayload,
-        "source",
-      ) as StructuredDebugInfo["source"],
-      feature:
-        getStructuredString(result.structuredPayload, "feature") ??
-        featureSpec?.feature ??
-        null,
+        getPayloadString(result.structuredPayload, "error") ?? result.error,
+      source: getPayloadString(result.structuredPayload, "source"),
+      feature: getPayloadString(result.structuredPayload, "feature") ?? feature,
       toolName:
-        getStructuredString(result.structuredPayload, "toolName") ??
-        featureSpec?.structuredOutputSchema?.name ??
-        null,
+        getPayloadString(result.structuredPayload, "toolName") ?? null,
       sessionId:
-        getStructuredString(result.structuredPayload, "sessionId") ??
+        getPayloadString(result.structuredPayload, "sessionId") ??
         result.sessionId,
       runId:
-        getStructuredString(result.structuredPayload, "runId") ?? result.runId,
-      validationIssues: getStructuredValidationIssues(result.structuredPayload),
+        getPayloadString(result.structuredPayload, "runId") ?? result.runId,
+      validationIssues: getPayloadIssues(result.structuredPayload),
     },
   };
 }
-export async function dispatchPreparedFeaturePayload<T = unknown>(
-  client: EngineAiClient,
-  featureSpec: PreparedAiFeatureSpec,
-  scope: string,
-  options?: {
-    toolPolicy?: "full" | "read_only";
-    timeoutSeconds?: number;
-    maxOutputTokens?: number;
-    onEvent?: ProviderRunRequestOptions["onEvent"];
-  },
-): Promise<FeaturePayloadResult<T>> {
-  if (client.providerClient) {
-    return providerFeaturePayloadFull<T>(
-      client,
-      featureSpec.feature,
-      buildProviderFeatureRequest({
-        sessionKey: scope,
-        input: featureSpec.inputText,
-        featureSpec,
-        stream: false,
-        toolPolicy: options?.toolPolicy,
-        timeoutSeconds: options?.timeoutSeconds,
-        maxOutputTokens: options?.maxOutputTokens,
-      }),
-      featureSpec,
-      { onEvent: options?.onEvent },
-    );
-  }
 
-  const llmClient = aiClientRegistry.requireLlmClient(client);
-  const text = await llmCall(
-    llmClient.record.config,
-    featureSpec.instructions,
-    featureSpec.inputText ?? "",
-    { jsonMode: true },
-  );
-  const parsed = extractJSON(text);
-  const validation = validatePreparedFeaturePayload(featureSpec, parsed);
-  if (!validation.ok) {
-    throw new AiClientError(
-      validation.error,
-      client.record.type,
-      "invalid_response",
-    );
-  }
-  return { parsed: parsed as T, rawText: text };
-}
-
-function getStructuredField(payload: unknown, field: string): unknown {
+function getPayloadField(payload: unknown, field: string): unknown {
   return payload && typeof payload === "object" && field in payload
     ? (payload as Record<string, unknown>)[field]
     : undefined;
 }
 
-function getStructuredString(
+function getPayloadString(
   payload: unknown,
   field: string,
 ): string | undefined {
-  const value = getStructuredField(payload, field);
+  const value = getPayloadField(payload, field);
   return typeof value === "string" ? value : undefined;
 }
 
-function getStructuredValidationIssues(
+function getPayloadIssues(
   payload: unknown,
-): StructuredDebugInfo["validationIssues"] {
-  const value = getStructuredField(payload, "validationIssues");
-  return Array.isArray(value)
-    ? (value as StructuredDebugInfo["validationIssues"])
-    : undefined;
+): unknown[] | undefined {
+  const value = getPayloadField(payload, "validationIssues");
+  return Array.isArray(value) ? value : undefined;
 }
 
 export async function dispatch(
@@ -695,14 +598,12 @@ export async function dispatch(
   scope = "default",
 ): Promise<string> {
   if (client.providerClient) {
-    return providerFeaturePayload(client, {
-      ...buildProviderFeatureRequest({
-        sessionKey: scope,
-        instructions: `Feature: ${feature}`,
-        input,
-        stream: false,
-      }),
-    });
+    return providerFeaturePayload(client, buildProviderFeatureRequest({
+      sessionKey: scope,
+      instructions: `Feature: ${feature}`,
+      input: input as ProviderRunInput,
+      stream: true,
+    }));
   }
   const llmClient = aiClientRegistry.requireLlmClient(client);
   const userMessage = typeof input === "string" ? input : JSON.stringify(input);
@@ -718,14 +619,12 @@ export async function dispatchFeaturePayload<T = unknown>(
   scope = "default",
 ): Promise<FeaturePayloadResult<T>> {
   if (client.providerClient) {
-    return providerFeaturePayloadFull<T>(client, feature, {
-      ...buildProviderFeatureRequest({
-        sessionKey: scope,
-        instructions: `Feature: ${feature}`,
-        input,
-        stream: false,
-      }),
-    });
+    return providerFeaturePayloadFull<T>(client, feature, buildProviderFeatureRequest({
+      sessionKey: scope,
+      instructions: `Feature: ${feature}`,
+      input: input as ProviderRunInput,
+      stream: true,
+    }));
   }
 
   const llmClient = aiClientRegistry.requireLlmClient(client);

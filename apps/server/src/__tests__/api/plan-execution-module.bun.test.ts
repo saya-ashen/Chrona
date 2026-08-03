@@ -31,6 +31,7 @@ type RuntimeInput = {
 };
 
 const realGetAiClient = aiClientRegistry.get.bind(aiClientRegistry);
+const realGetAiClientForFeature = aiClientRegistry.getForFeature.bind(aiClientRegistry);
 
 function app() {
   const server = new Hono();
@@ -375,7 +376,7 @@ function createScriptedProviderClient() {
       const runId = `module-provider-run-${runCounter}`;
       const runtimeInput = runtimeInputFromRequest(request);
       calls.startRun.push(request);
-      calls.nodeTitles.push(String(runtimeInput.node?.title ?? "Unknown node"));
+      if (typeof runtimeInput.node?.title === "string") calls.nodeTitles.push(runtimeInput.node.title);
       requestsByRunId.set(runId, request);
       return {
         provider: "hermes",
@@ -409,7 +410,7 @@ function createScriptedProviderClient() {
       const outputText = outputForNode(nodeTitle);
       const structuredPayload = structuredPayloadForRequest(startRequest);
 
-      yield { type: "run_started", provider: "hermes", runId: run.runId, nativeRunId: run.nativeRunId, sessionId: run.sessionId, sequence: 1, timestamp, run };
+      yield { type: "run_started", provider: "hermes", runId: run.runId, nativeRunId: run.nativeRunId, sessionId: run.sessionId, sequence: 1, timestamp, run: { ...run, status: "running" } };
       yield { type: "text_delta", provider: "hermes", runId: run.runId, nativeRunId: run.nativeRunId, sessionId: run.sessionId, sequence: 2, timestamp, text: outputText };
       yield { type: "tool_completed", provider: "hermes", runId: run.runId, nativeRunId: run.nativeRunId, sessionId: run.sessionId, sequence: 3, timestamp, toolName: startRequest.terminalToolName };
       yield {
@@ -450,9 +451,10 @@ function createScriptedProviderClient() {
 function installMockRegistryClient(providerClient: AgentProviderClient) {
   aiClientRegistry.get = (async () =>
     ({
-      record: { type: "hermes" },
+      record: { id: "module-provider", name: "Module provider", type: "hermes", config: {}, isDefault: true, enabled: true },
       providerClient,
     }) as any) as typeof aiClientRegistry.get;
+  aiClientRegistry.getForFeature = aiClientRegistry.get;
 }
 
 async function postExecutionAction(server: Hono, taskId: string, body: Record<string, unknown>) {
@@ -462,7 +464,7 @@ async function postExecutionAction(server: Hono, taskId: string, body: Record<st
       "Content-Type": "application/json",
       Accept: "text/event-stream",
     },
-    body: JSON.stringify(body),
+    body: JSON.stringify({ idempotencyKey: `execution:${taskId}:${String(body.action ?? "action")}`, ...body }),
   });
   expect(response.status).toBe(200);
   return parseSseEvents(await response.text());
@@ -482,7 +484,7 @@ async function postCheckpointAction(
         "Content-Type": "application/json",
         Accept: "text/event-stream",
       },
-      body: JSON.stringify(body),
+      body: JSON.stringify({ idempotencyKey: `checkpoint:${checkpointId}:${String(body.action ?? "action")}`, ...body }),
     },
   );
   expect(response.status).toBe(200);
@@ -492,7 +494,7 @@ async function postCheckpointAction(
 function resultFrom(events: SseEntry[]) {
   const result = events.find((entry) => entry.event === "result")?.data.result;
   expect(result).toBeDefined();
-  return result as { status: string; currentNodeId: string | null; checkpoint?: { id: string; kind: string; nodeId: string | null; form?: unknown } | null };
+  return result as { status: string; currentNodeId: string | null; executionScope: string | null; checkpoint?: { id: string; kind: string; nodeId: string | null; form?: unknown } | null };
 }
 
 function expectExecutionSse(events: SseEntry[], expectedStatus: string) {
@@ -500,7 +502,16 @@ function expectExecutionSse(events: SseEntry[], expectedStatus: string) {
   expect(events.map((entry) => entry.event)).toContain("state");
   expect(events.map((entry) => entry.event)).toContain("result");
   expect(events.at(-1)?.event).toBe("done");
-  expect(resultFrom(events).status).toBe(expectedStatus);
+  const result = resultFrom(events);
+  expect(result).toMatchObject({ status: expectedStatus });
+  expect(result).not.toHaveProperty("mainSessionId");
+  expect(result).not.toHaveProperty("executionSessionId");
+  expect(result).not.toHaveProperty("planRunId");
+  expect(result.executionScope).toEqual(expect.any(String));
+  if (result.checkpoint) {
+    expect(result.checkpoint).not.toHaveProperty("sessionId");
+    expect(result.checkpoint).not.toHaveProperty("planRunId");
+  }
 
   const state = events.find((entry) => entry.event === "state")?.data;
   expect(state).toMatchObject({
@@ -512,13 +523,14 @@ function expectExecutionSse(events: SseEntry[], expectedStatus: string) {
 function expectRuntimeSseForNodes(events: SseEntry[], nodeIds: string[]) {
   const runtimeEvents = events
     .filter((entry) => entry.event === "runtime_event")
-    .map((entry) => entry.data as { nodeId?: string; event?: { type?: string; status?: string; text?: string } });
+    .map((entry) => entry.data as { nodeId?: string; event?: { type?: string; status?: string } });
   expect(runtimeEvents.length).toBeGreaterThan(0);
 
   for (const nodeId of nodeIds) {
     const nodeEvents = runtimeEvents.filter((entry) => entry.nodeId === nodeId);
-    expect(nodeEvents.map((entry) => entry.event?.type)).toContain("assistant_text_delta");
+    expect(nodeEvents).toContainEqual(expect.objectContaining({ event: expect.objectContaining({ type: "run_status", status: "started" }) }));
     expect(nodeEvents).toContainEqual(expect.objectContaining({ event: expect.objectContaining({ type: "run_status", status: "completed" }) }));
+    expect(JSON.stringify(nodeEvents)).not.toContain("completed by module provider");
   }
 }
 
@@ -550,6 +562,42 @@ async function expectProviderEvents(taskId: string, nodeIds: string[]) {
     ]));
     expect(nodeEvents.every((event: Event) => event.nodeTitle && event.runId)).toBe(true);
   }
+  const [executionSession, planRun, attempts, providerRuns] = await Promise.all([
+    db.executionSession.findFirstOrThrow({
+      where: { taskId },
+      orderBy: { createdAt: "desc" },
+      select: { id: true, planId: true, status: true },
+    }),
+    db.taskPlanRun.findFirstOrThrow({
+      where: { taskId },
+      select: { id: true, planId: true, executionEpoch: true },
+    }),
+    db.taskPlanNodeAttempt.findMany({
+      where: { taskId, nodeId: { in: nodeIds } },
+      select: { id: true, nodeId: true, planRunId: true, executionEpoch: true, status: true },
+    }),
+    db.taskPlanProviderRun.findMany({
+      where: { taskId, nodeAttempt: { nodeId: { in: nodeIds } } },
+      select: { planRunId: true, nodeAttemptId: true },
+    }),
+  ]);
+  expect(executionSession.planId).toBe(planRun.planId);
+  expect(attempts).toHaveLength(nodeIds.length);
+  expect(attempts.map((attempt) => attempt.nodeId).toSorted()).toEqual(nodeIds.toSorted());
+  expect(attempts.every((attempt) => attempt.planRunId === planRun.id)).toBe(true);
+  expect(attempts.every((attempt) => attempt.executionEpoch <= planRun.executionEpoch)).toBe(true);
+  expect(providerRuns).toHaveLength(nodeIds.length);
+  expect(providerRuns).toEqual(expect.arrayContaining(attempts.map((attempt) => ({
+    planRunId: planRun.id,
+    nodeAttemptId: attempt.id,
+  }))));
+  const scopedEvents = events.filter((event: Event) => event.nodeId && nodeIds.includes(event.nodeId));
+  expect(scopedEvents.every((event: Event) =>
+    event.executionSessionId === executionSession.id
+    && event.planRunId === planRun.id
+    && event.nodeAttemptId !== null
+    && event.providerRunId !== null,
+  )).toBe(true);
 }
 
 async function expectNoProviderEventsForNode(taskId: string, nodeId: string) {
@@ -578,7 +626,7 @@ async function expectConversationHistory(taskId: string, expectedAssistantTexts:
 async function getCurrentExecution(server: Hono, taskId: string) {
   const response = await server.request(`http://local/api/tasks/${taskId}/execution/current`);
   expect(response.status).toBe(200);
-  return json<{ status: string; currentNodeId: string | null; checkpoint: unknown | null; executionSessionId?: string | null; message?: string; ui?: { currentOperationSpec?: unknown | null } }>(response);
+  return json<{ status: string; currentNodeId: string | null; executionScope: string | null; checkpoint: unknown | null; message?: string; ui?: { currentOperationSpec?: unknown | null } }>(response);
 }
 
 async function setupModuleExecutionTest(compiledPlan: CompiledPlan, title: string) {
@@ -597,6 +645,7 @@ describe("task execution module API integration", () => {
 
   afterEach(() => {
     aiClientRegistry.get = realGetAiClient;
+    aiClientRegistry.getForFeature = realGetAiClientForFeature;
   });
 
   it("reports accepted plans as ready to start before any execution session exists", async () => {
@@ -611,9 +660,12 @@ describe("task execution module API integration", () => {
       status: "started",
       currentNodeId: "task_node",
       checkpoint: null,
-      message: "No active execution session.",
+      message: "Plan execution started.",
     });
-    expect(current.executionSessionId ?? null).toBeNull();
+    expect(current).not.toHaveProperty("mainSessionId");
+    expect(current).not.toHaveProperty("executionSessionId");
+    expect(current).not.toHaveProperty("planRunId");
+    expect(current.executionScope).toBeNull();
     expect(provider.calls.startRun).toHaveLength(0);
   });
 

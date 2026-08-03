@@ -4,7 +4,7 @@
   "lastReleasedMigration": "20260728000000_pin_task_execution_model",
   "lastReleasedSchemaFingerprint": "bd07a3f482d388236fb2fbbdcbdd709c425571196089504a4571878d81656079",
   "mutableReleaseLineMigration": "20260729000000_add_ai_feature_runtime_persistence",
-  "releaseLineSchemaFingerprint": "a4770712e83d21e656b3dc08ea82b7bc920576197c6c48aaba3f7311299bb337",
+  "releaseLineSchemaFingerprint": "81f756b0af4ebd66ad87f14eb758f870831a0c31cb60050dc016b9f0bd92484c",
   "previousReleaseFixture": {
     "path": "fixtures/20260728000000.sqlite",
     "sha256": "8c2c2521987daa35649987d48fbee3590e28d1f5020c9e556183e0097a5a8612"

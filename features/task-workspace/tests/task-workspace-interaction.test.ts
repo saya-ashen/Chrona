@@ -657,21 +657,12 @@ describe("task workspace interaction model", () => {
           {
             type: "runtime_event",
             action: "start_manual",
-            runtimeName: "omp",
-            provider: "omp",
-            event: {
-              type: "reasoning_delta",
-              text: "private transient reasoning",
-            },
-          },
-          {
-            type: "runtime_event",
-            action: "start_manual",
-            runtimeName: "omp",
-            provider: "omp",
+            executionScope: "scope-1",
+            runtime: { category: "runtime", label: "Execution runtime" },
+            provider: { category: "ai_provider", label: "AI provider" },
             event: {
               type: "tool_started",
-              toolName: "browser",
+              tool: { category: "tool", label: "Runtime tool" },
               label: "Reading GitHub Trending",
             },
           },

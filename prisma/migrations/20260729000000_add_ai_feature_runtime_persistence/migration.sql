@@ -29,6 +29,7 @@ CREATE TABLE "AiFeatureRun" (
   "providerResumeRef" TEXT,
   "terminalCandidate" JSONB,
   "terminalResult" JSONB,
+  "proposedActions" JSONB,
   "completionReport" JSONB,
   "commitStatus" TEXT,
   "commitReference" JSONB,
@@ -193,4 +194,267 @@ FROM (
 )
 WHERE "rowNumber" = 1;
 
-PRAGMA foreign_key_check;
+
+-- Migrate recurrence ownership to durable schedule triggers and one versioned key format.
+INSERT INTO "TaskTrigger" (
+  "id", "workspaceId", "taskId", "kind", "state", "config", "version", "createdAt", "updatedAt"
+)
+SELECT
+  lower(hex(randomblob(16))),
+  t."workspaceId",
+  t."id",
+  'schedule',
+  'Enabled',
+  json_patch(
+    json_object(
+      'mode', 'recurring',
+      'rrule', t."recurrenceRule",
+      'anchorStartAt', CASE
+        WHEN typeof(t."recurrenceAnchorStartAt") IN ('integer', 'real')
+          THEN strftime('%Y-%m-%dT%H:%M:%fZ', t."recurrenceAnchorStartAt" / 1000.0, 'unixepoch')
+        ELSE strftime('%Y-%m-%dT%H:%M:%fZ', t."recurrenceAnchorStartAt")
+      END,
+      'timezone', 'UTC',
+      'durationMs', CASE
+        WHEN typeof(t."recurrenceAnchorStartAt") IN ('integer', 'real')
+          THEN CAST(t."recurrenceAnchorEndAt" - t."recurrenceAnchorStartAt" AS INTEGER)
+        ELSE CAST((julianday(t."recurrenceAnchorEndAt") - julianday(t."recurrenceAnchorStartAt")) * 86400000 AS INTEGER)
+      END
+    ),
+    CASE WHEN t."recurrenceWindowUntil" IS NULL THEN json_object() ELSE json_object(
+      'windowUntil', CASE
+        WHEN typeof(t."recurrenceWindowUntil") IN ('integer', 'real')
+          THEN strftime('%Y-%m-%dT%H:%M:%fZ', t."recurrenceWindowUntil" / 1000.0, 'unixepoch')
+        ELSE strftime('%Y-%m-%dT%H:%M:%fZ', t."recurrenceWindowUntil")
+      END
+    ) END
+  ),
+  1,
+  CURRENT_TIMESTAMP,
+  CURRENT_TIMESTAMP
+FROM "Task" t
+WHERE t."recurrenceRule" IS NOT NULL
+  AND t."recurrenceAnchorStartAt" IS NOT NULL
+  AND t."recurrenceAnchorEndAt" IS NOT NULL
+  AND NOT EXISTS (
+    SELECT 1 FROM "TaskTrigger" tt WHERE tt."taskId" = t."id" AND tt."kind" = 'schedule'
+  );
+
+-- Legacy updateTask materialized bare ISO recurrence keys without TaskOccurrence rows.
+-- Bind those blocks to the exact schedule-trigger version before normalizing their keys.
+WITH "legacyRecurrenceBlocks" AS (
+  SELECT
+    wb."id" AS "workBlockId",
+    wb."workspaceId",
+    wb."taskId",
+    wb."recurrenceKey",
+    wb."status" AS "workBlockStatus",
+    wb."scheduledStartAt",
+    wb."startedAt",
+    wb."completedAt",
+    tt."id" AS "triggerId",
+    tt."version" AS "triggerVersion",
+    CASE
+      WHEN typeof(wb."scheduledStartAt") IN ('integer', 'real')
+        THEN strftime('%Y-%m-%dT%H:%M:%fZ', wb."scheduledStartAt" / 1000.0, 'unixepoch')
+      ELSE strftime('%Y-%m-%dT%H:%M:%fZ', wb."scheduledStartAt")
+    END AS "normalizedStartAt"
+  FROM "WorkBlock" wb
+  JOIN "Task" t ON t."id" = wb."taskId"
+  JOIN "TaskTrigger" tt ON tt."taskId" = wb."taskId" AND tt."kind" = 'schedule'
+  WHERE t."recurrenceRule" IS NOT NULL
+    AND wb."recurrenceKey" IS NOT NULL
+    AND wb."recurrenceKey" NOT LIKE 'schedule:v%:%'
+    AND NOT EXISTS (
+      SELECT 1 FROM "TaskOccurrence" existing WHERE existing."workBlockId" = wb."id"
+    )
+)
+INSERT INTO "TaskOccurrence" (
+  "id", "workspaceId", "taskId", "triggerId", "workBlockId",
+  "occurrenceKey", "triggerVersion", "source", "status", "eligibleAt",
+  "startedAt", "completedAt", "executionEpoch"
+)
+SELECT
+  'legacy-schedule-occurrence:' || legacy."workBlockId",
+  legacy."workspaceId",
+  legacy."taskId",
+  legacy."triggerId",
+  legacy."workBlockId",
+  'schedule:v' || legacy."triggerVersion" || ':' || legacy."normalizedStartAt",
+  legacy."triggerVersion",
+  json_object('kind', 'trigger', 'triggerId', legacy."triggerId", 'migration', 'legacy_recurrence_block'),
+  CASE legacy."workBlockStatus"
+    WHEN 'Active' THEN 'Running'
+    WHEN 'Completed' THEN 'Completed'
+    WHEN 'Cancelled' THEN 'Cancelled'
+    WHEN 'Blocked' THEN 'Blocked'
+    WHEN 'Failed' THEN 'Failed'
+    WHEN 'Ready' THEN 'Ready'
+    ELSE CASE WHEN julianday(legacy."scheduledStartAt") > julianday(CURRENT_TIMESTAMP) THEN 'Scheduled' ELSE 'Ready' END
+  END,
+  legacy."scheduledStartAt",
+  legacy."startedAt",
+  legacy."completedAt",
+  1
+FROM "legacyRecurrenceBlocks" legacy
+WHERE legacy."normalizedStartAt" IS NOT NULL
+  AND legacy."recurrenceKey" = legacy."normalizedStartAt";
+
+UPDATE "WorkBlock"
+SET "recurrenceKey" = (
+  SELECT o."occurrenceKey" FROM "TaskOccurrence" o WHERE o."workBlockId" = "WorkBlock"."id"
+)
+WHERE EXISTS (
+  SELECT 1 FROM "TaskOccurrence" o
+  WHERE o."workBlockId" = "WorkBlock"."id" AND o."occurrenceKey" <> "WorkBlock"."recurrenceKey"
+);
+
+
+-- Make provider-event scope durable and keep latest pointers monotonic.
+ALTER TABLE "RawEventLog" ADD COLUMN "workBlockId" TEXT REFERENCES "WorkBlock"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "RawEventLog" ADD COLUMN "occurrenceId" TEXT REFERENCES "TaskOccurrence"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "Event" ADD COLUMN "occurrenceId" TEXT REFERENCES "TaskOccurrence"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+CREATE INDEX "Event_occurrenceId_ingestSequence_idx" ON "Event"("occurrenceId", "ingestSequence");
+ALTER TABLE "Task" ADD COLUMN "latestEventSequence" INTEGER;
+ALTER TABLE "TaskPlanRun" ADD COLUMN "latestEventSequence" INTEGER;
+ALTER TABLE "TaskPlanRun" ADD COLUMN "executionScopeId" TEXT;
+UPDATE "TaskPlanRun" SET "executionScopeId" = 'ES' || lower(hex(randomblob(16))) WHERE "executionScopeId" IS NULL;
+CREATE UNIQUE INDEX "TaskPlanRun_executionScopeId_key" ON "TaskPlanRun"("executionScopeId");
+ALTER TABLE "WorkBlock" ADD COLUMN "latestEventId" TEXT;
+ALTER TABLE "WorkBlock" ADD COLUMN "latestRawEventId" TEXT;
+ALTER TABLE "WorkBlock" ADD COLUMN "latestEventSequence" INTEGER;
+
+CREATE TABLE "EventIngestSequence" (
+  "id" TEXT NOT NULL PRIMARY KEY,
+  "value" INTEGER NOT NULL,
+  "updatedAt" DATETIME NOT NULL
+);
+
+CREATE INDEX "RawEventLog_workBlockId_receivedAt_idx" ON "RawEventLog"("workBlockId", "receivedAt");
+CREATE INDEX "RawEventLog_occurrenceId_receivedAt_idx" ON "RawEventLog"("occurrenceId", "receivedAt");
+
+-- Fence task-orchestrator ownership across lease takeovers.
+ALTER TABLE "SchedulerLease" ADD COLUMN "epoch" INTEGER NOT NULL DEFAULT 1;
+
+
+-- Preserve command replay identity beyond the most recently claimed command.
+CREATE TABLE "TaskPlanCommandReceipt" (
+  "id" TEXT NOT NULL PRIMARY KEY,
+  "planRunId" TEXT NOT NULL,
+  "commandKey" TEXT NOT NULL,
+  "commandDigest" TEXT NOT NULL,
+  "canonicalizer" TEXT NOT NULL,
+  "canonicalizerVersion" INTEGER NOT NULL,
+  "status" TEXT NOT NULL DEFAULT 'claimed',
+  "result" JSONB,
+  "executionEpoch" INTEGER NOT NULL,
+  "leaseOwnerId" TEXT,
+  "leaseExpiresAt" DATETIME,
+  "claimVersion" INTEGER NOT NULL DEFAULT 1,
+  "completedAt" DATETIME,
+  "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "TaskPlanCommandReceipt_planRunId_fkey" FOREIGN KEY ("planRunId") REFERENCES "TaskPlanRun" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+CREATE UNIQUE INDEX "TaskPlanCommandReceipt_planRunId_commandKey_key" ON "TaskPlanCommandReceipt"("planRunId", "commandKey");
+CREATE INDEX "TaskPlanCommandReceipt_planRunId_executionEpoch_idx" ON "TaskPlanCommandReceipt"("planRunId", "executionEpoch");
+CREATE INDEX "TaskPlanCommandReceipt_planRunId_commandDigest_idx" ON "TaskPlanCommandReceipt"("planRunId", "commandDigest");
+CREATE INDEX "TaskPlanCommandReceipt_planRunId_status_idx" ON "TaskPlanCommandReceipt"("planRunId", "status");
+CREATE INDEX "TaskPlanCommandReceipt_planRunId_status_leaseExpiresAt_idx" ON "TaskPlanCommandReceipt"("planRunId", "status", "leaseExpiresAt");
+
+-- Durable provider approval resolution claims keep human decisions replayable without exposing runtime refs publicly.
+CREATE TABLE "TaskPlanProviderApprovalResolution" (
+  "id" TEXT NOT NULL PRIMARY KEY,
+  "workspaceId" TEXT NOT NULL,
+  "taskId" TEXT NOT NULL,
+  "approvalId" TEXT NOT NULL,
+  "activeClaimKey" TEXT,
+  "providerRunId" TEXT NOT NULL,
+  "nodeAttemptId" TEXT NOT NULL,
+  "planRunId" TEXT NOT NULL,
+  "resolutionKey" TEXT NOT NULL,
+  "resolutionDigest" TEXT NOT NULL,
+  "canonicalizer" TEXT NOT NULL,
+  "canonicalizerVersion" INTEGER NOT NULL,
+  "status" TEXT NOT NULL DEFAULT 'claimed',
+  "leaseOwner" TEXT,
+  "leaseExpiresAt" DATETIME,
+  "canonicalResult" JSONB,
+  "completedAt" DATETIME,
+  "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" DATETIME NOT NULL,
+  CONSTRAINT "TaskPlanProviderApprovalResolution_workspaceId_fkey" FOREIGN KEY ("workspaceId") REFERENCES "Workspace" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT "TaskPlanProviderApprovalResolution_taskId_fkey" FOREIGN KEY ("taskId") REFERENCES "Task" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT "TaskPlanProviderApprovalResolution_approvalId_fkey" FOREIGN KEY ("approvalId") REFERENCES "TaskPlanProviderApproval" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT "TaskPlanProviderApprovalResolution_providerRunId_fkey" FOREIGN KEY ("providerRunId") REFERENCES "TaskPlanProviderRun" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT "TaskPlanProviderApprovalResolution_nodeAttemptId_fkey" FOREIGN KEY ("nodeAttemptId") REFERENCES "TaskPlanNodeAttempt" ("id") ON DELETE CASCADE ON UPDATE CASCADE,
+  CONSTRAINT "TaskPlanProviderApprovalResolution_planRunId_fkey" FOREIGN KEY ("planRunId") REFERENCES "TaskPlanRun" ("id") ON DELETE CASCADE ON UPDATE CASCADE
+);
+CREATE UNIQUE INDEX "TaskPlanProviderApprovalResolution_planRunId_approvalId_resolutionKey_key"
+  ON "TaskPlanProviderApprovalResolution"("planRunId", "approvalId", "resolutionKey");
+CREATE UNIQUE INDEX "TaskPlanProviderApprovalResolution_activeClaimKey_key"
+  ON "TaskPlanProviderApprovalResolution"("activeClaimKey");
+CREATE INDEX "TaskPlanProviderApprovalResolution_approvalId_status_idx"
+  ON "TaskPlanProviderApprovalResolution"("approvalId", "status");
+CREATE INDEX "TaskPlanProviderApprovalResolution_planRunId_resolutionDigest_idx"
+  ON "TaskPlanProviderApprovalResolution"("planRunId", "resolutionDigest");
+CREATE INDEX "TaskPlanProviderApprovalResolution_providerRunId_status_idx"
+  ON "TaskPlanProviderApprovalResolution"("providerRunId", "status");
+
+-- Bind provider audit state to the exact canonical runtime Run. Historical rows
+-- are backfilled only when both sides are unambiguous; ambiguous legacy rows
+-- remain unbound and recovery fails closed.
+ALTER TABLE "TaskPlanProviderRun" ADD COLUMN "aiClientId" TEXT;
+ALTER TABLE "TaskPlanProviderRun" ADD COLUMN "aiClientConfigDigest" TEXT;
+CREATE INDEX "TaskPlanProviderRun_aiClientId_idx" ON "TaskPlanProviderRun"("aiClientId");
+
+ALTER TABLE "TaskPlanProviderRun" ADD COLUMN "runId" TEXT REFERENCES "Run"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+UPDATE "TaskPlanProviderRun" AS "providerRun"
+SET "runId" = (
+  SELECT "run"."id"
+  FROM "Run" AS "run"
+  WHERE "run"."taskId" = "providerRun"."taskId"
+    AND "run"."runtimeRunRef" = "providerRun"."providerRunRef"
+)
+WHERE "providerRun"."providerRunRef" IS NOT NULL
+  AND 1 = (
+    SELECT COUNT(*) FROM "Run" AS "run"
+    WHERE "run"."taskId" = "providerRun"."taskId"
+      AND "run"."runtimeRunRef" = "providerRun"."providerRunRef"
+  )
+  AND 1 = (
+    SELECT COUNT(*) FROM "TaskPlanProviderRun" AS "peer"
+    WHERE "peer"."taskId" = "providerRun"."taskId"
+      AND "peer"."providerRunRef" = "providerRun"."providerRunRef"
+  );
+CREATE INDEX "TaskPlanProviderRun_runId_idx" ON "TaskPlanProviderRun"("runId");
+
+-- Bind every new canonical runtime Run directly to its immutable node attempt.
+-- Historical rows are backfilled only through an already exact ProviderRun FK.
+ALTER TABLE "Run" ADD COLUMN "nodeAttemptId" TEXT REFERENCES "TaskPlanNodeAttempt"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+UPDATE "Run" AS "run"
+SET "nodeAttemptId" = (
+  SELECT "providerRun"."nodeAttemptId"
+  FROM "TaskPlanProviderRun" AS "providerRun"
+  WHERE "providerRun"."runId" = "run"."id"
+)
+WHERE 1 = (
+  SELECT COUNT(*) FROM "TaskPlanProviderRun" AS "providerRun"
+  WHERE "providerRun"."runId" = "run"."id"
+)
+AND 1 = (
+  SELECT COUNT(DISTINCT "peer"."runId")
+  FROM "TaskPlanProviderRun" AS "peer"
+  WHERE "peer"."nodeAttemptId" = (
+    SELECT "providerRun"."nodeAttemptId"
+    FROM "TaskPlanProviderRun" AS "providerRun"
+    WHERE "providerRun"."runId" = "run"."id"
+  )
+    AND "peer"."runId" IS NOT NULL
+);
+CREATE UNIQUE INDEX "Run_nodeAttemptId_key" ON "Run"("nodeAttemptId");
+
+-- Bind provider control callbacks to the exact durable provider run.
+ALTER TABLE "RunToken" ADD COLUMN "providerRunId" TEXT;
+CREATE INDEX "RunToken_providerRunId_idx" ON "RunToken"("providerRunId");
+
+ALTER TABLE "TaskPlanRun" DROP COLUMN "executionCommandKey";

@@ -21,10 +21,6 @@ export const DEFAULT_COMMAND_CENTER_COPY: CommandCenterCopy = {
 
 export const TRAIL_ACTIVITY_LIMIT = 300;
 
-export type LiveResult = {
-  content: string;
-  ownerNodeId: string | null;
-};
 
 export type ExecutionActivityState = {
   activityItems: WorkspaceActivityItem[];
@@ -66,34 +62,12 @@ export function buildNodeResultContentSpec(
   return buildResultSpec([{ kind: "markdown", title: node?.title, content: summary }]);
 }
 
-function isAssistantTextEvent(
-  runtimeEvent: WorkspaceRuntimeEvent,
-): runtimeEvent is WorkspaceRuntimeEvent & {
-  event: Extract<WorkspaceRuntimeEvent["event"], { type: "assistant_text_delta" }>;
-} {
-  return runtimeEvent.event.type === "assistant_text_delta";
-}
 
-export function collectLiveResult(runtimeEvents: WorkspaceRuntimeEvent[]): LiveResult | null {
-  let text = "";
-  let ownerNodeId: string | null = null;
-  for (const runtimeEvent of runtimeEvents) {
-    if (!isAssistantTextEvent(runtimeEvent)) continue;
-    text += runtimeEvent.event.text;
-    ownerNodeId = runtimeEvent.nodeId ?? null;
-  }
-  const content = text.trim();
-  return content ? { content, ownerNodeId } : null;
-}
-
-export function sameLiveResult(left: LiveResult | null, right: LiveResult | null) {
-  return left?.content === right?.content && left?.ownerNodeId === right?.ownerNodeId;
-}
 
 function isSameToolActivity(left: WorkspaceActivityItem, right: WorkspaceActivityItem) {
   return left.sourceNodeId === right.sourceNodeId
-    && left.runId === right.runId
-    && left.nativeRunId === right.nativeRunId
+    && left.provider?.label === right.provider?.label
+    && left.runtime?.label === right.runtime?.label
     && left.tool?.name === right.tool?.name;
 }
 
@@ -106,7 +80,6 @@ function hasCompletedToolActivity(item: WorkspaceActivityItem, items: WorkspaceA
 
 function isRunningActivity(item: WorkspaceActivityItem, items: WorkspaceActivityItem[]) {
   if (item.tool?.state === "started") return !hasCompletedToolActivity(item, items);
-  if (item.rawEventType === "turn_start" || item.rawEventType === "turn_end") return false;
   return item.kind === "provider_run" && item.tone === "info";
 }
 
@@ -123,7 +96,7 @@ function buildActivityHeartbeat(runtimeEvents: WorkspaceRuntimeEvent[]): Workspa
     sourceNodeId: latestRuntime?.nodeId,
     sourceNodeTitle: latestRuntime?.nodeTitle,
     provider: latestRuntime?.provider,
-    runtimeName: latestRuntime?.runtimeName,
+    runtime: latestRuntime?.runtime,
   };
 }
 
@@ -134,9 +107,7 @@ function deriveExecutionState(status: string | undefined, isExecutionRunning: bo
 }
 
 function failedNodeError(node: PlanNodeDataModel | undefined) {
-  return node?.result?.error?.trim()
-    || (typeof node?.metadata?.error === "string" ? node.metadata.error.trim() : "")
-    || null;
+  return node?.result?.error?.message ?? null;
 }
 
 function activitySummary(activityItems: WorkspaceActivityItem[], executionIsLive: boolean) {

@@ -642,7 +642,7 @@ describe("getTaskPage orchestrator read model", () => {
         actorType: "runtime",
         actorId: "hermes",
         source: "provider",
-        payload: { runtimeName: "hermes", provider: "anthropic", runId: "run-1", nativeRunId: "native-run-1", event: { type: "run_started" } },
+        payload: { executionScope: "scope-activity", providerLabel: "AI provider", runtimeLabel: "Execution runtime", runtimeName: "hermes", provider: "anthropic", runId: "run-1", nativeRunId: "native-run-1", event: { type: "run_started" } },
         dedupeKey: "activity-run-started",
         occurredAt: new Date("2026-05-21T00:00:01.000Z"),
         ingestSequence: 1,
@@ -698,7 +698,7 @@ describe("getTaskPage orchestrator read model", () => {
         actorType: "runtime",
         actorId: "hermes",
         source: "provider",
-        payload: { runtimeName: "hermes", provider: "anthropic", runId: "run-1", event: { type: "approval_required" } },
+        payload: { executionScope: "scope-activity", providerLabel: "AI provider", runtimeLabel: "Execution runtime", runtimeName: "hermes", provider: "anthropic", runId: "run-1", event: { type: "approval_required" } },
         dedupeKey: "activity-approval",
         occurredAt: new Date("2026-05-21T00:00:05.000Z"),
         ingestSequence: 5,
@@ -724,28 +724,14 @@ describe("getTaskPage orchestrator read model", () => {
     expect(page.activityTimeline).toContainEqual(expect.objectContaining({
       kind: "provider_run",
       title: "Provider run started",
-      provider: "anthropic",
-      runtimeName: "hermes",
-      runId: "run-1",
-      nativeRunId: "native-run-1",
+      provider: "AI provider",
+      runtimeName: "Execution runtime",
+      executionScope: "scope-activity",
       sourceNodeId: "prepare",
       sourceNodeTitle: "Prepare context",
-      rawEventType: "run_started",
     }));
-    expect(page.activityTimeline).toContainEqual(expect.objectContaining({
+    expect(page.activityTimeline).not.toContainEqual(expect.objectContaining({
       kind: "assistant_message",
-      title: "Assistant response",
-      summary: "Hello world",
-      assistant: { text: "Hello world", isReasoning: false, isPartial: true },
-      sourceNodeId: "prepare",
-    }));
-    expect(page.activityTimeline.filter((item) => item.kind === "assistant_message")).toHaveLength(1);
-    expect(page.activityTimeline).toContainEqual(expect.objectContaining({
-      kind: "reasoning",
-      title: "Reasoning",
-      summary: "Thinking",
-      assistant: { text: "Thinking", isReasoning: true, isPartial: true },
-      sourceNodeId: "answer",
     }));
     expect(page.activityTimeline).toContainEqual(expect.objectContaining({
       kind: "approval",
@@ -753,14 +739,13 @@ describe("getTaskPage orchestrator read model", () => {
       tone: "warning",
       sourceNodeId: "answer",
     }));
-    expect(page.activityTimeline).not.toContainEqual(expect.objectContaining({
-      kind: "raw",
-      title: "Provider event",
-      rawEventType: "provider.opaque",
-    }));
+    const returnedActivity = JSON.stringify(page.activityTimeline);
+    for (const sensitiveValue of ["native-run-1", "run-1", "Thinking", "provider.opaque"]) {
+      expect(returnedActivity).not.toContain(sensitiveValue);
+    }
   });
 
-  it("preserves provider tool details and failure tone", async () => {
+  it("preserves provider tool lifecycle status without details", async () => {
     const { workspace, task } = await seedTask("Tool activity task");
 
     await db.event.createMany({
@@ -772,7 +757,7 @@ describe("getTaskPage orchestrator read model", () => {
         actorType: "runtime",
         actorId: "hermes",
         source: "provider",
-        payload: { runtimeName: "omp", provider: "omp", runId: "run-1", event: { type: "tool_started", toolName: "read", callId: "call-1", label: "Read source", input: { path: "src/app.ts", apiKey: "secret-value" }, preview: "Inspect application source" } },
+        payload: { executionScope: "scope-tool", providerLabel: "AI provider", runtimeLabel: "Execution runtime", runtimeName: "omp", provider: "omp", runId: "run-1", event: { type: "tool_started", toolLabel: "Runtime tool", toolName: "read", callId: "call-1", label: "Read source", input: { path: "src/app.ts", apiKey: "secret-value" }, preview: "Inspect application source" } },
         dedupeKey: "tool-started-details",
         occurredAt: new Date("2026-05-21T00:01:00.000Z"),
         ingestSequence: 1,
@@ -784,7 +769,7 @@ describe("getTaskPage orchestrator read model", () => {
         actorType: "runtime",
         actorId: "hermes",
         source: "provider",
-        payload: { runtimeName: "omp", provider: "omp", runId: "run-1", event: { type: "tool_completed", toolName: "read", callId: "call-1", durationMs: 42, result: { content: [{ type: "text", text: "export const ready = true;" }] } } },
+        payload: { executionScope: "scope-tool", providerLabel: "AI provider", runtimeLabel: "Execution runtime", runtimeName: "omp", provider: "omp", runId: "run-1", event: { type: "tool_completed", toolLabel: "Runtime tool", toolName: "read", callId: "call-1", durationMs: 42, result: { content: [{ type: "text", text: "export const ready = true;" }] } } },
         dedupeKey: "tool-completed-details",
         occurredAt: new Date("2026-05-21T00:01:01.000Z"),
         ingestSequence: 2,
@@ -795,17 +780,26 @@ describe("getTaskPage orchestrator read model", () => {
 
     expect(page.activityTimeline).toContainEqual(expect.objectContaining({
       kind: "tool_started",
-      tool: expect.objectContaining({ label: "Read source", callId: "call-1", inputSummary: expect.stringContaining("src/app.ts"), preview: "Inspect application source", state: "started" }),
+      tool: expect.objectContaining({ name: "Runtime tool", state: "started" }),
     }));
     expect(page.activityTimeline).toContainEqual(expect.objectContaining({
       kind: "tool_completed",
       tone: "success",
-      tool: expect.objectContaining({ name: "read", callId: "call-1", durationMs: 42, resultPreview: expect.stringContaining("export const ready = true;"), state: "completed" }),
+      tool: expect.objectContaining({ name: "Runtime tool", durationMs: 42, state: "completed" }),
     }));
-    expect(JSON.stringify(page.activityTimeline)).not.toContain("secret-value");
+    const returnedActivity = JSON.stringify(page.activityTimeline);
+    for (const sensitiveValue of [
+      "call-1",
+      "src/app.ts",
+      "secret-value",
+      "Inspect application source",
+      "export const ready = true;",
+    ]) {
+      expect(returnedActivity).not.toContain(sensitiveValue);
+    }
   });
 
-  it("filters paged node activity only by explicit source node", async () => {
+  it("filters unsafe provider text events from paged node activity", async () => {
     const { workspace, task } = await seedTask("Explicit node activity task");
 
     await db.event.createMany({
@@ -820,24 +814,14 @@ describe("getTaskPage orchestrator read model", () => {
         nodeTitle: "Prepare",
         payload: { runtimeName: "hermes", provider: "anthropic", runId: "run-1", event: { type: "text_delta", text: "Prepare text" } },
         dedupeKey: "explicit-node-prepare",
-          occurredAt: new Date("2026-05-21T00:02:00.000Z"),
+        occurredAt: new Date("2026-05-21T00:02:00.000Z"),
         ingestSequence: 1,
-      }, {
-        eventType: "provider.text_delta",
-        workspaceId: workspace.id,
-        taskId: task.id,
-        actorType: "runtime",
-        actorId: "hermes",
-        source: "provider",
-        payload: { runtimeName: "hermes", provider: "anthropic", runId: "run-1", event: { type: "text_delta", text: "Unscoped nearby text" } },
-        dedupeKey: "explicit-node-unscoped",
-          occurredAt: new Date("2026-05-21T00:02:01.000Z"),
-        ingestSequence: 2,
       }],
     });
 
     const page = await getTaskActivityPage({ taskId: task.id, scope: "node", nodeId: "prepare", limit: 10 });
 
-    expect(page.items).toEqual([expect.objectContaining({ summary: "Prepare text", sourceNodeId: "prepare" })]);
+    expect(page.items).toEqual([]);
+    expect(JSON.stringify(page.items)).not.toContain("Prepare text");
   });
 });

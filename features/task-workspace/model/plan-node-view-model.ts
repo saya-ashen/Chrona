@@ -2,9 +2,8 @@ import type {
   CheckpointActionKind,
   CheckpointInputFields,
   ExecutionActionInput,
-  ExecutionCheckpoint,
-  NodeResult,
-  NodeResultEvidence,
+  PublicExecutionCheckpoint,
+  PublicEffectivePlanNodeResult,
 } from "@chrona/contracts";
 
 export type PlanNodeKind = "task" | "checkpoint" | "condition" | "wait" | "step" | "user_input";
@@ -92,15 +91,14 @@ export type PlanNodeDataModel = {
   requiredInfo?: string[];
   nextAction?: string | null;
   completionSummary?: string | null;
-  result?: NodeResult | null;
+  result?: PublicEffectivePlanNodeResult | null;
   inputFields?: CheckpointInputFields;
-  resultEvidence?: NodeResultEvidence | null;
-  branchLabels?: string[];
+  resultEvidence?: PublicEffectivePlanNodeResult["resultEvidence"] | null;
   options?: string[];
   active?: boolean;
   blocked?: boolean;
   actionable?: boolean;
-  checkpoint?: ExecutionCheckpoint | null;
+  checkpoint?: PublicExecutionCheckpoint | null;
   interactiveFields?: PlanNodeField[];
   availableActions?: PlanNodeAction[];
   metadata?: Record<string, unknown>;

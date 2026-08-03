@@ -1,6 +1,7 @@
 import type {
   AiClientRecord,
   GraphNodeState,
+  PublicProviderDescriptor,
   ReconciliationResult,
   TaskExecutionSummary,
   TaskPlanReadModel,
@@ -265,8 +266,6 @@ export type WorkspaceArtifactItem = {
 };
 
 export type WorkspaceActivityKind =
-  | "assistant_message"
-  | "reasoning"
   | "tool_started"
   | "tool_progress"
   | "tool_completed"
@@ -275,27 +274,15 @@ export type WorkspaceActivityKind =
   | "node"
   | "task"
   | "artifact"
-  | "schedule"
-  | "raw";
+  | "schedule";
 
 export type WorkspaceActivityTone = "neutral" | "info" | "success" | "warning" | "danger";
 
 export type WorkspaceToolActivity = {
   name?: string;
   label?: string;
-  callId?: string;
-  resultPreview?: string;
-  preview?: string;
-  inputSummary?: string;
   durationMs?: number;
-  error?: string;
   state: "started" | "progress" | "completed" | "failed";
-};
-
-export type WorkspaceAssistantActivity = {
-  text: string;
-  isReasoning: boolean;
-  isPartial?: boolean;
 };
 
 export type WorkspaceActivityGroup = {
@@ -313,19 +300,13 @@ export type WorkspaceActivityItem = {
   timestamp?: string | null;
   sourceNodeId?: string;
   sourceNodeTitle?: string;
-  provider?: string;
-  runtimeName?: string;
-  runId?: string;
-  nativeRunId?: string;
+  provider?: PublicProviderDescriptor;
+  runtime?: PublicProviderDescriptor;
+  executionScope?: string;
   sequence?: number;
-  rawEventType?: string;
-  executionSessionId?: string;
-  executionEpoch?: number;
   executionTrigger?: "initial" | "restart";
   activityGroup?: WorkspaceActivityGroup;
   tool?: WorkspaceToolActivity;
-  assistant?: WorkspaceAssistantActivity;
-  raw?: unknown;
 };
 
 export type WorkspaceActivityPage = {

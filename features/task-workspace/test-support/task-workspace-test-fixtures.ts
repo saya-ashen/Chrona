@@ -39,9 +39,8 @@ export function createTaskWorkspaceFixtureNode(
     executionMode: input.executionMode,
     estimatedMinutes: input.estimatedMinutes,
     priority: input.priority,
-    branchLabels: input.branchLabels,
-    options: input.options,
     metadata: input.metadata,
+    options: input.options,
   };
 }
 

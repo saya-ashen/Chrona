@@ -20,6 +20,7 @@ import { createApiRouter } from "../../routes/api";
 import { resetTestDb, seedTask, seedWorkspace } from "../bun-test-helpers";
 
 const realGetAiClient = aiClientRegistry.get.bind(aiClientRegistry);
+const realGetAiClientForFeature = aiClientRegistry.getForFeature.bind(aiClientRegistry);
 
 type ResultEvent = { event: string; data: Record<string, unknown> };
 
@@ -135,9 +136,10 @@ function createMalformedProviderClient(message: string) {
 
 function installProviderClient(providerClient: AgentProviderClient) {
   aiClientRegistry.get = (async () => ({
-    record: { type: "hermes" },
+    record: { id: "malformed-provider", name: "Malformed provider", type: "hermes", config: {}, isDefault: true, enabled: true },
     providerClient,
   }) as any) as typeof aiClientRegistry.get;
+  aiClientRegistry.getForFeature = aiClientRegistry.get;
 }
 
 async function seedAcceptedPlan() {
@@ -162,6 +164,7 @@ describe("provider bridge malformed response workflow", () => {
 
   afterEach(() => {
     aiClientRegistry.get = realGetAiClient;
+    aiClientRegistry.getForFeature = realGetAiClientForFeature;
   });
 
   it("surfaces malformed provider failures through execution SSE without completing the task", async () => {
@@ -172,14 +175,21 @@ describe("provider bridge malformed response workflow", () => {
     const response = await app().request(`http://local/api/tasks/${taskId}/execution/actions`, {
       method: "POST",
       headers: { "Content-Type": "application/json", Accept: "text/event-stream" },
-      body: JSON.stringify({ action: "start_manual" }),
+      body: JSON.stringify({ action: "start_manual", idempotencyKey: "malformed-provider-start" }),
     });
     const events = parseSseEvents(await response.text());
-    const result = events.find((entry) => entry.event === "result")?.data.result as { status?: string; error?: string } | undefined;
+    const result = events.find((entry) => entry.event === "result")?.data.result as {
+      status?: string;
+      message?: string;
+      details?: unknown;
+    } | undefined;
 
     expect(response.status).toBe(200);
-    expect(result).toMatchObject({ status: "failed" });
-    expect(JSON.stringify(result)).toContain("malformed provider payload");
+    expect(result).toMatchObject({ status: "failed", message: "Plan execution failed." });
+    expect(result?.details).toBeUndefined();
+    expect(JSON.stringify(result)).not.toContain("malformed provider payload");
+    expect(JSON.stringify(result)).not.toContain("malformed-provider-run");
+    expect(JSON.stringify(result)).not.toContain("native-malformed-provider-run");
     expect(provider.calls.startRun).toHaveLength(1);
     expect(provider.calls.streamRun).toHaveLength(1);
 

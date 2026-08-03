@@ -1,16 +1,16 @@
 import type { PlanBlueprint } from "../ai-plan-blueprint";
+import type { PublicEffectivePlanGraph } from "./public-effective-plan";
 import type { WaitKind } from "./node";
 import type { ArtifactRef } from "./node-result";
 import type {
   CheckpointResponse,
   CompiledPlan,
-  EffectivePlanGraph,
   PlanGraphStatus,
   NodeExecutionAttempt,
   GeneratePlanErrorCode,
   GeneratePlanStatusPhase,
 } from "./_leaf";
-export type { PlanExecutionResult, PlanExecutionStatus } from "./_leaf";
+export type { PlanExecutionResult, PlanExecutionStatus, PublicExecutionCheckpoint, PublicPlanExecutionResult } from "./_leaf";
 
 export type PlanRunStatus = "pending" | "running" | "paused" | "completed" | "failed" | "cancelled";
 
@@ -260,22 +260,21 @@ export interface TaskPlanReadModel {
   generatedBy: string | null;
   blueprint: PlanBlueprint;
   compiledPlan: CompiledPlan;
-  effectivePlan: EffectivePlanGraph;
+  effectivePlan: PublicEffectivePlanGraph;
 }
 
 export interface TaskPlanGenerationSessionReadModel {
   generationId: string;
   taskId: string;
+  headStateVersion: number;
   status: "running" | "completed" | "failed" | "cancelled";
   phase: GeneratePlanStatusPhase | null;
   statusMessage: string | null;
-  partialText: string;
-  result: TaskPlanReadModel | null;
   error: {
-    code: GeneratePlanErrorCode;
+    code: GeneratePlanErrorCode | "STALE_GENERATION";
+    /** Stable durable-runtime error code; it is not a feature-run identifier. */
+    persistedCode?: string;
     message: string;
-    rawText?: string;
-    diagnostics?: Record<string, unknown>;
   } | null;
   startedAt: string;
   finishedAt: string | null;

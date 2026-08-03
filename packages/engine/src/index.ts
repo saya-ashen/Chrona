@@ -68,9 +68,23 @@ export {
   testAiClientAvailability,
   getAiClientForFeature,
   suggestStream,
+  stableJsonHash,
 } from "./modules/ai";
-export { startAiRunProgress, subscribeToAiRunProgress } from "./modules/ai";
-export type { AiRunProgressReporter, AiRunProgressSubscription } from "./modules/ai";
+export {
+  defineAiFeature,
+  runAiFeatureWithRuntime,
+  startAiFeatureWithRuntime,
+  resumeAiFeatureRun,
+  recoverAiFeatureRuns,
+  readAiFeatureRunPublic,
+  AiFeatureDefinitionRegistry,
+} from "./modules/ai";
+export type {
+  DefaultAiFeatureRunInput,
+  AiFeatureDefinition,
+  AiFeatureRunPublicRead,
+  ReadAiFeatureRunPublicInput,
+} from "./modules/ai";
 export type {
   DebugProfiledProviderClient,
   EngineAiClient,

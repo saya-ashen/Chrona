@@ -227,10 +227,10 @@ describe("task workspace console read data", () => {
     const response = await app().request(`/api/tasks/${taskId}/command-center`);
     expect(response.status).toBe(200);
 
-    const body = await json<{ documents: { trail: { state?: { trail?: { items?: Array<{ title?: string; description?: string; rawEventType?: string; activityGroup?: { kind?: string; id?: string } }> } } } } }>(response);
+    const body = await json<{ documents: { trail: { state?: { trail?: { items?: Array<{ title?: string; description?: string; activityGroup?: { kind?: string; id?: string } }> } } } } }>(response);
     const items = body.documents.trail.state?.trail?.items ?? [];
-    expect(items).toContainEqual(expect.objectContaining({ title: "Plan generation started", description: "Make a plan", rawEventType: "plan_generation.started", activityGroup: { kind: "plan_generation", id: "generation-command-center" } }));
-    expect(items).toContainEqual(expect.objectContaining({ title: "Plan generation update", description: "Requesting AI provider...", rawEventType: "plan_generation.status", activityGroup: { kind: "plan_generation", id: "generation-command-center" } }));
+    expect(items).toContainEqual(expect.objectContaining({ title: "Plan generation started", description: "Generating a task plan.", activityGroup: { kind: "plan_generation", id: "generation-command-center" } }));
+    expect(items).toContainEqual(expect.objectContaining({ title: "Plan generation update", description: "Plan generation progressed.", activityGroup: { kind: "plan_generation", id: "generation-command-center" } }));
   });
 
 
@@ -258,9 +258,12 @@ describe("task workspace console read data", () => {
         actorId: "hermes",
         source: "provider",
         payload: {
+          executionScope: "scope-console",
+          providerLabel: "AI provider",
+          runtimeLabel: "Execution runtime",
           runtimeName: "hermes",
           provider: "hermes",
-          event: { type: "tool_started", toolName: "chrona_plan_read" },
+          event: { type: "tool_started", toolLabel: "Runtime tool", toolName: "chrona_plan_read" },
         },
         dedupeKey: "provider-runtime-test-event",
         occurredAt: new Date("2026-05-12T12:01:00.000Z"),
@@ -386,32 +389,22 @@ describe("task workspace console read data", () => {
     expect(page.activityTimeline).toContainEqual(expect.objectContaining({
       kind: "tool_started",
       title: "Tool started",
-      summary: "chrona_plan_read",
-      description: "chrona_plan_read",
+      summary: "Provider tool started.",
+      description: "Provider tool started.",
       tone: "info",
       timestamp: "2026-05-12T12:01:00.000Z",
-      provider: "hermes",
-      runtimeName: "hermes",
-      tool: expect.objectContaining({ name: "chrona_plan_read", state: "started" }),
+      provider: "AI provider",
+      runtimeName: "Execution runtime",
+      executionScope: "scope-console",
+      tool: expect.objectContaining({ name: "Runtime tool", state: "started" }),
     }));
-    expect(page.activityTimeline).toContainEqual(expect.objectContaining({
+    expect(page.activityTimeline).not.toContainEqual(expect.objectContaining({
       kind: "assistant_message",
-      title: "Assistant response",
-      summary: "Hello world",
-      description: "Hello world",
-      tone: "info",
-      timestamp: "2026-05-12T12:01:02.000Z",
-      assistant: { text: "Hello world", isReasoning: false, isPartial: true },
     }));
-    expect(page.activityTimeline.filter((item) => item.title === "Assistant response")).toHaveLength(1);
-    expect(page.activityTimeline).toContainEqual(expect.objectContaining({
-      kind: "reasoning",
-      title: "Reasoning",
-      summary: "Thinking",
-      description: "Thinking",
-      tone: "neutral",
-      assistant: { text: "Thinking", isReasoning: true, isPartial: true },
-    }));
+    const returnedActivity = JSON.stringify(page.activityTimeline);
+    for (const sensitiveValue of ["Hello world", "Thinking", "Make a plan", "Requesting AI provider..."]) {
+      expect(returnedActivity).not.toContain(sensitiveValue);
+    }
     expect(page.activityTimeline).toContainEqual(expect.objectContaining({
       kind: "task",
       title: "Task updated",
@@ -428,12 +421,12 @@ describe("task workspace console read data", () => {
     }));
     expect(page.activityTimeline).toContainEqual(expect.objectContaining({
       title: "Plan generation started",
-      description: "Make a plan",
+      description: "Generating a task plan.",
       tone: "info",
     }));
     expect(page.activityTimeline).toContainEqual(expect.objectContaining({
       title: "Plan generation update",
-      description: "Requesting AI provider...",
+      description: "Plan generation progressed.",
       tone: "info",
     }));
     expect(page.activityTimeline).toContainEqual(expect.objectContaining({

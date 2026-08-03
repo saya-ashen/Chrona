@@ -1,10 +1,11 @@
+/* eslint-disable complexity, @typescript-eslint/no-unnecessary-condition -- Recovery defensively validates every persisted terminal candidate identity. */
 import { RunStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { submitNodeResultActionFromControl } from "@/modules/agent-tools/node-result-action";
 import { submitTerminalNodeResult } from "./submit-terminal-node-result";
-import { syncTaskRunState } from "../persistence/task-execution-store";
 import { agentControlActionBodySchema } from "@chrona/contracts/api";
 import { createLogger } from "@chrona/logging";
+import { assertSchedulerWorkOwnership, type SchedulerWorkContext } from "@/modules/orchestration/scheduler-lease-repository";
 
 const logger = createLogger("engine.plan-execution.terminal-action-recovery");
 
@@ -37,7 +38,6 @@ async function findRecoverableTerminalActions(input: {
       nodeAttemptId: { not: null },
       nodeAttempt: {
         status: "running",
-        providerRuns: { some: { status: "running" } },
       },
       run: { status: { in: ACTIVE_RUN_STATUSES } },
       task: { latestRunId: { not: null } },
@@ -45,7 +45,25 @@ async function findRecoverableTerminalActions(input: {
     include: {
       task: { select: { latestRunId: true } },
       run: { select: { id: true, taskSessionId: true, runtimeRunRef: true } },
-      nodeAttempt: { select: { id: true, nodeId: true } },
+      nodeAttempt: {
+        select: {
+          id: true,
+          nodeId: true,
+          planRun: {
+            select: {
+              planId: true,
+              workBlockId: true,
+              occurrenceId: true,
+            },
+          },
+          providerRuns: {
+            where: { status: "running" },
+            orderBy: { startedAt: "desc" },
+            take: 2,
+            select: { id: true, runId: true, providerRunRef: true },
+          },
+        },
+      },
     },
     orderBy: { recordedAt: "asc" },
     take: input.limit ?? 25,
@@ -61,6 +79,7 @@ function terminalRunStatusFor(action: { action: string }) {
 
 async function recoverTerminalAction(
   candidate: RecoverableTerminalAction,
+  workContext?: SchedulerWorkContext,
 ): Promise<TerminalActionRecoveryOutcome> {
   const nodeAttempt = candidate.nodeAttempt;
   if (
@@ -71,21 +90,57 @@ async function recoverTerminalAction(
     return "skipped";
   }
 
+  const executionSession = await db.executionSession.findFirst({
+    where: {
+      taskId: candidate.taskId,
+      planId: nodeAttempt.planRun.planId,
+      workBlockId: nodeAttempt.planRun.workBlockId,
+      occurrenceId: nodeAttempt.planRun.occurrenceId,
+      activeScopeKey: "active",
+      status: { in: ["Active", "Paused"] },
+    },
+    select: { id: true, currentNodeAttemptId: true },
+  });
+  if (
+    !executionSession
+    || (executionSession.currentNodeAttemptId && executionSession.currentNodeAttemptId !== nodeAttempt.id)
+  ) return "skipped";
+
   const body = agentControlActionBodySchema.parse({
     kind: candidate.kind,
     payload: candidate.payload,
   });
   const action = submitNodeResultActionFromControl({
     body,
-    sessionId: candidate.taskSessionId ?? candidate.run.taskSessionId ?? undefined,
+    sessionId: executionSession.id,
   });
   if (!action) {
     return "skipped";
   }
 
+  const [providerRun] = nodeAttempt.providerRuns;
+  if (nodeAttempt.providerRuns.length > 1) return "skipped";
+  const preProviderFailure = candidate.kind === "fail"
+    && !providerRun
+    && !candidate.run.runtimeRunRef;
+  if (
+    !preProviderFailure
+    && (
+      !providerRun
+      || providerRun.runId !== candidate.run.id
+      || !candidate.run.runtimeRunRef
+    )
+  ) return "skipped";
+  const { sessionId, ...publicAction } = action;
   await submitTerminalNodeResult({
     taskId: candidate.taskId,
     commandContext: {
+      sessionId: sessionId ?? undefined,
+      runId: candidate.run.id,
+      nodeAttemptId: nodeAttempt.id,
+      ...(providerRun ? { providerRunId: providerRun.id } : {}),
+      ...(candidate.run.runtimeRunRef ? { runtimeRunRef: candidate.run.runtimeRunRef } : {}),
+      idempotencyKey: `terminal-action:${candidate.id}`,
       actor: {
         type: "system",
         service: "restart-recovery",
@@ -93,32 +148,26 @@ async function recoverTerminalAction(
       },
       origin: { channel: "internal" },
     },
-    action: { ...action, nodeId: nodeAttempt.nodeId },
+    action: { ...publicAction, nodeId: nodeAttempt.nodeId },
+    workContext,
   });
-
-  const now = new Date();
-  const runStatus = terminalRunStatusFor(action);
-  await db.run.updateMany({
-    where: { id: candidate.run.id, status: { in: ACTIVE_RUN_STATUSES } },
-    data: {
-      status: runStatus,
-      endedAt: now,
-      errorSummary: action.action === "fail_current_node" ? action.error : null,
-      retryable: false,
-      resumeSupported: false,
-      pendingInputPrompt: null,
-      lastSyncedAt: now,
-      syncStatus: "healthy",
-      mappingPartial: false,
-    },
+  const finalizedAttempt = await db.taskPlanNodeAttempt.findUnique({
+    where: { id: nodeAttempt.id },
+    select: { status: true },
   });
-  await syncTaskRunState({
-    taskId: candidate.taskId,
-    taskSessionId: candidate.run.taskSessionId,
-    runId: candidate.run.id,
-    runStatus,
-    runtimeRunRef: candidate.run.runtimeRunRef,
+  if (!finalizedAttempt || finalizedAttempt.status === "running") {
+    throw new Error("Recorded terminal action did not finalize its exact node attempt");
+  }
+  await assertSchedulerWorkOwnership(workContext);
+  const expectedRunStatus = terminalRunStatusFor(action);
+  const finalizedRun = await db.run.findUnique({
+    where: { id: candidate.run.id },
+    select: { status: true },
   });
+  if (finalizedRun?.status !== expectedRunStatus) {
+    throw new Error("Recorded terminal action was accepted without authoritative Run terminalization");
+  }
+  await assertSchedulerWorkOwnership(workContext);
   return "recovered";
 }
 
@@ -140,6 +189,7 @@ function recordRecoveryFailure(candidate: RecoverableTerminalAction, error: unkn
 export async function recoverRecordedTerminalActions(input: {
   taskId?: string;
   limit?: number;
+  workContext?: SchedulerWorkContext;
 } = {}): Promise<RecoverRecordedTerminalActionsResult> {
   const candidates = await findRecoverableTerminalActions(input);
   const result: RecoverRecordedTerminalActionsResult = {
@@ -150,8 +200,10 @@ export async function recoverRecordedTerminalActions(input: {
   };
 
   for (const candidate of candidates) {
+    await assertSchedulerWorkOwnership(input.workContext);
     try {
-      result[await recoverTerminalAction(candidate)] += 1;
+      result[await recoverTerminalAction(candidate, input.workContext)] += 1;
+      await assertSchedulerWorkOwnership(input.workContext);
     } catch (error) {
       result.failed += 1;
       recordRecoveryFailure(candidate, error);

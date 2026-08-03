@@ -70,6 +70,27 @@ describe("finalized result provider payload", () => {
     ).toThrow("did not return a parsed payload");
   });
 });
+describe("finalized result provider request", () => {
+  it("owns a stable operation identity and bounded local protocol", () => {
+    expect(
+      __resultFinalizationTestHooks.createProviderRequest({
+        taskId: "task-1",
+        planRunId: "plan-run-1",
+        workBlockId: "work-block-1",
+        executionEpoch: 7,
+        sourceRevision: 3,
+        attempt: 2,
+        manifest,
+      }),
+    ).toMatchObject({
+      clientOperationId: "result-finalization:task-1:plan-run-1:work-block-1:7:3:2",
+      sessionId: "result-finalization:task-1:plan-run-1:work-block-1:7:3:2",
+      sessionKey: "result-finalization:task-1:plan-run-1:work-block-1:7:3:2",
+      toolPolicy: "read_only",
+      input: { manifest },
+    });
+  });
+});
 describe("finalized result validation", () => {
   it("accepts only declared opaque Artifact refs and strips host provenance", () => {
     const spec = resultSpec() as Record<string, unknown>;
@@ -109,6 +130,12 @@ describe("finalized result validation", () => {
         payload: resultSpec("AFnot-opaque"),
       }),
     ).toThrow("undeclared artifact AFnot-opaque");
+    expect(() =>
+      __resultFinalizationTestHooks.validateFinalizedSpec({
+        manifest,
+        payload: resultSpec("artifact-not-opaque"),
+      }),
+    ).toThrow("undeclared artifact artifact-not-opaque");
   });
 
   it("rejects generated URIs, POSIX and Windows absolute paths, and backend IDs", () => {

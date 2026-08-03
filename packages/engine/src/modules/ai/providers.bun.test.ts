@@ -1,6 +1,6 @@
 import { describe, expect, it, mock } from "bun:test";
-import type { AgentProviderClient } from "@chrona/providers-foundation";
-import { runProviderRequest, type ProviderFeatureRequest } from "@chrona/engine/test-support";
+import type { AgentProviderClient, StartRunInput } from "@chrona/providers-foundation";
+import { runProviderRequest } from "@chrona/engine/test-support";
 const providerCapabilities = {
   supportsSessions: true,
   supportsStreaming: true,
@@ -23,13 +23,13 @@ const providerCapabilities = {
 };
 
 
-const request: ProviderFeatureRequest = {
+const request: StartRunInput = {
   clientOperationId: "providers-test-operation",
   sessionId: "session-key",
   sessionKey: "session-key",
   instructions: "Answer from the accepted result",
   input: { type: "text", text: "How many results?" },
-  stream: false,
+  stream: true,
 };
 
 describe("runProviderRequest", () => {
@@ -167,5 +167,46 @@ describe("runProviderRequest", () => {
     await expect(runProviderRequest(provider, request, { onEvent: observer }))
       .rejects.toMatchObject({ code: "internal" });
     expect(observer).not.toHaveBeenCalled();
+  });
+
+  it("wraps JSON output for a requested structured response when the provider returns text", async () => {
+    const provider = {
+      provider: "test",
+      getCapabilities: async () => providerCapabilities,
+      startRun: async () => ({
+        provider: "test",
+        sessionId: "provider-session",
+        runId: "provider-run",
+      }),
+      streamRun: async function* () {
+        yield {
+          type: "run_completed" as const,
+          provider: "test",
+          runId: "provider-run",
+          sessionId: "provider-session",
+          sequence: 0,
+          run: {
+            provider: "test",
+            sessionId: "provider-session",
+            runId: "provider-run",
+            status: "completed" as const,
+          },
+          outputText: JSON.stringify({ root: "root", elements: {} }),
+        };
+      },
+    } as unknown as AgentProviderClient;
+
+    const result = await runProviderRequest(provider, {
+      ...request,
+      structuredOutputSchema: {
+        name: "structured_result",
+        description: "One structured result",
+        schema: { type: "object" },
+      },
+    });
+
+    expect(result.structuredPayload).toEqual({
+      parsed: { root: "root", elements: {} },
+    });
   });
 });

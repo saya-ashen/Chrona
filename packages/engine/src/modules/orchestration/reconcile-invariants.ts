@@ -1,7 +1,16 @@
 import type { ReconciliationResult } from "@chrona/contracts";
-import type { EffectivePlanGraph, EffectivePlanNode } from "@chrona/graph-runtime";
 
-export function detectReconciliationIssues(graph: EffectivePlanGraph): ReconciliationResult["issues"] {
+type ReconciliationGraphInput = {
+  terminalNodeIds: string[];
+  nodes: Array<{
+    id: string;
+    status: string;
+    dependencies: string[];
+    reachable: boolean;
+  }>;
+};
+
+export function detectReconciliationIssues(graph: ReconciliationGraphInput): ReconciliationResult["issues"] {
   const terminalWithPendingPrereq = graph.terminalNodeIds.some((terminalId) => {
     const terminal = graph.nodes.find((node) => node.id === terminalId);
     if (!terminal || terminal.status !== "completed") return false;
@@ -29,6 +38,6 @@ export function deriveRepairActions(issues: ReconciliationResult["issues"]): Rec
     : [];
 }
 
-function isTerminalStatus(status: EffectivePlanNode["status"]) {
+function isTerminalStatus(status: string) {
   return status === "completed" || status === "skipped" || status === "invalidated" || status === "cancelled";
 }

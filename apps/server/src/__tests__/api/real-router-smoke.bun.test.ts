@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "bun:test";
 import { Hono } from "hono";
-import { db } from "@chrona/db";
+import { db, TaskPlanGenerationHeadStatus } from "@chrona/db";
 import { createChronaEngine, subscribeToTaskProjectionEvents, type TaskProjectionEvent } from "@chrona/engine";
 import { saveCompiledPlan } from "@chrona/engine/test-support";
 import type { CompiledPlan, ConditionConfig } from "@chrona/contracts/ai";
@@ -18,6 +18,37 @@ function app() {
   const server = new Hono();
   server.route("/api", createApiRouter(createChronaEngine()));
   return server;
+}
+
+async function seedPlanAcceptanceHead(input: {
+  workspaceId: string;
+  taskId: string;
+  planId: string;
+  workBlockId?: string | null;
+}) {
+  await db.taskPlanGenerationHead.upsert({
+    where: {
+      taskId_workBlockScopeKey: {
+        taskId: input.taskId,
+        workBlockScopeKey: input.workBlockId ?? "",
+      },
+    },
+    create: {
+      workspaceId: input.workspaceId,
+      taskId: input.taskId,
+      workBlockScopeKey: input.workBlockId ?? "",
+      currentPlanId: input.planId,
+      currentPlanStatus: "Draft",
+      status: TaskPlanGenerationHeadStatus.Current,
+      stateVersion: 0,
+    },
+    update: {
+      currentPlanId: input.planId,
+      currentPlanStatus: "Draft",
+      status: TaskPlanGenerationHeadStatus.Current,
+      stateVersion: 0,
+    },
+  });
 }
 
 function makeSmokeCompiledPlan(planId: string): CompiledPlan {
@@ -287,11 +318,12 @@ describe("Real router smoke", () => {
       summary: compiledPlan.goal,
       generatedBy: "real-router-smoke",
     });
+    await seedPlanAcceptanceHead({ workspaceId, taskId, planId: compiledPlan.editablePlanId });
 
     const acceptRes = await app().request(`http://local/api/tasks/${taskId}/plan/accept`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ planId: compiledPlan.editablePlanId, workspaceId }),
+      body: JSON.stringify({ planId: compiledPlan.editablePlanId, workspaceId, expectedHeadStateVersion: 0, idempotencyKey: "real-router-plan-accept" }),
     });
     expect(acceptRes.status).toBe(200);
 
@@ -320,7 +352,7 @@ describe("Real router smoke", () => {
         trigger: "manual",
       },
     });
-    const neighboringBlock = await db.workBlock.create({
+    await db.workBlock.create({
       data: {
         workspaceId,
         taskId,
@@ -343,11 +375,17 @@ describe("Real router smoke", () => {
       summary: compiledPlan.goal,
       generatedBy: "real-router-smoke",
     });
+    await seedPlanAcceptanceHead({
+      workspaceId,
+      taskId,
+      planId: compiledPlan.editablePlanId,
+      workBlockId: sourceBlock.id,
+    });
 
     const acceptRes = await app().request(`http://local/api/tasks/${taskId}/plan/accept`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ planId: compiledPlan.editablePlanId, workspaceId, workBlockId: neighboringBlock.id }),
+      body: JSON.stringify({ planId: compiledPlan.editablePlanId, workspaceId, workBlockId: sourceBlock.id, expectedHeadStateVersion: 0, idempotencyKey: "real-router-scoped-plan-accept" }),
     });
 
     expect(acceptRes.status).toBe(200);
@@ -370,7 +408,7 @@ describe("Real router smoke", () => {
         trigger: "manual",
       },
     });
-    const neighboringBlock = await db.workBlock.create({
+    await db.workBlock.create({
       data: {
         workspaceId,
         taskId,
@@ -396,11 +434,17 @@ describe("Real router smoke", () => {
         summary: compiledPlan.goal,
         generatedBy: "real-router-smoke",
       });
+      await seedPlanAcceptanceHead({
+        workspaceId,
+        taskId,
+        planId: compiledPlan.editablePlanId,
+        workBlockId: sourceBlock.id,
+      });
 
       const commandRes = await app().request(`http://local/api/work/${taskId}/commands`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ type: "plan.accept", planId: compiledPlan.editablePlanId, workBlockId: neighboringBlock.id }),
+        body: JSON.stringify({ type: "plan.accept", planId: compiledPlan.editablePlanId, workBlockId: sourceBlock.id, expectedHeadStateVersion: 0, idempotencyKey: "real-router-async-scoped-plan-accept" }),
       });
 
       expect(commandRes.status).toBe(202);
@@ -441,7 +485,7 @@ describe("Real router smoke", () => {
         "Content-Type": "application/json",
         Accept: "text/event-stream",
       },
-      body: JSON.stringify({ action: "start_manual" }),
+      body: JSON.stringify({ action: "start_manual", idempotencyKey: "router-smoke-start" }),
     });
 
     expect(streamRes.status).toBe(200);

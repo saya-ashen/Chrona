@@ -10,9 +10,10 @@ export async function cancelSessionTransition(
     ...input,
     executionAction: {
       action: "cancel_session",
-      sessionId: input.executionSession.id,
       reason: input.transition.reason,
+      idempotencyKey: input.idempotencyKey,
     },
+    commandContext: { sessionId: input.executionSession.id },
     dispatchExecutionAction: input.dispatchExecutionAction,
     ...observerCallbacks(input),
   });

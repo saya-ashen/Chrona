@@ -4,12 +4,12 @@ import {
   savePlanRun,
 } from "./plan-run-store";
 import { Prisma } from "@/generated/prisma/client";
-import { db } from "@/lib/db";
-import { getAcceptedCompiledPlanForTask } from "./execution-scope";
-import { graphStatusForExecutionStatus, planRunStatusForExecutionStatus } from "../execution-state-machine";
+import { getAcceptedCompiledPlan } from "./compiled-plan-store";
+import { getAcceptedCompiledPlanForTask, resolveScopeWorkBlockId } from "./execution-scope";
+import { withPlanExecutionDurability } from "./scheduler-durability";
+import { planRunStatusForExecutionStatus } from "../execution-state-machine";
 import type {
   CompiledPlan,
-  EffectivePlanGraph,
   ExecutionContextSnapshot,
   CheckpointInputFields,
   NodeAttempt,
@@ -23,6 +23,13 @@ import type {
 import { toEffectivePlanGraph } from "../projection/execution-graph-selectors";
 
 export type PersistedPlanRun = NonNullable<Awaited<ReturnType<typeof getPlanRun>>>;
+
+export class PlanRuntimeStateChangedError extends Error {
+  constructor() {
+    super("Plan runtime state changed before intermediate persistence");
+    this.name = "PlanRuntimeStateChangedError";
+  }
+}
 
 export function createPlanRunFromCompiledPlan(compiled: CompiledPlan): PlanRun {
   const createdAt = new Date().toISOString();
@@ -170,21 +177,28 @@ export type NativePlanRuntime = {
   planSummary: string | null;
 };
 
-export async function ensureNativePlanRun(taskId: string, workBlockId?: string | null): Promise<NativePlanRuntime | null> {
-  const savedCompiled = await getAcceptedCompiledPlanForTask(taskId, { workBlockId });
+export async function ensureNativePlanRun(
+  taskId: string,
+  workBlockId?: string | null,
+  options?: { resolveScope?: boolean },
+): Promise<NativePlanRuntime | null> {
+  const executionWorkBlockId = options?.resolveScope === false
+    ? workBlockId ?? null
+    : await resolveScopeWorkBlockId(taskId, { workBlockId });
+  const savedCompiled = options?.resolveScope === false
+    ? await getAcceptedCompiledPlan(taskId, executionWorkBlockId)
+    : await getAcceptedCompiledPlanForTask(taskId, { workBlockId: executionWorkBlockId });
   if (!savedCompiled) {
     return null;
   }
 
   const { compiledPlan, workspaceId } = savedCompiled;
   const planId = compiledPlan.editablePlanId;
-  // The runtime row is keyed to the accepted plan's own work block, which is the
-  // authoritative scope that getAcceptedCompiledPlan just matched on.
-  const planWorkBlockId = savedCompiled.workBlockId;
+  const planWorkBlockId = executionWorkBlockId;
   let persisted = await getPlanRun(taskId, planId, planWorkBlockId);
 
   if (!persisted?.graph) {
-    await savePlanRun({
+    await withPlanExecutionDurability((tx) => savePlanRun({
       workspaceId,
       taskId,
       planId,
@@ -198,7 +212,7 @@ export async function ensureNativePlanRun(taskId: string, workBlockId?: string |
       attempts: persisted?.attempts ?? [],
       results: persisted?.results ?? [],
       executionContextSnapshots: persisted?.executionContextSnapshots ?? [],
-    });
+    }, tx));
     persisted = await getPlanRun(taskId, planId, planWorkBlockId);
   }
 
@@ -222,103 +236,97 @@ export async function persistRuntimeState(input: {
   workspaceId: string;
   taskId: string;
   workBlockId?: string | null;
+  executionSessionId?: string;
   planId: string;
   compiledPlan: CompiledPlan;
   graph: PlanGraph;
+  expectedExecutionEpoch: number;
   attempts: NodeAttempt[];
   results: NodeResult[];
   executionContextSnapshots: ExecutionContextSnapshot[];
   existingRun?: PlanRun;
-}) {
-  await savePlanRun({
-    workspaceId: input.workspaceId,
-    taskId: input.taskId,
-    workBlockId: input.workBlockId,
-    planId: input.planId,
-    run: derivePlanRunFromRuntime(input),
-    compiledPlan: input.compiledPlan,
-    graph: input.graph,
-    attempts: input.attempts,
-    results: input.results,
-    executionContextSnapshots: input.executionContextSnapshots,
-  });
-  await syncNormalizedRuntimeState({
-    workspaceId: input.workspaceId,
-    taskId: input.taskId,
-    planId: input.planId,
-    attempts: input.attempts,
-    results: input.results,
-  });
-}
-
-export async function persistTerminalRuntimeState(input: {
-  workspaceId: string;
-  taskId: string;
-  workBlockId?: string | null;
-  planId: string;
-  compiledPlan: CompiledPlan;
-  persisted: PersistedPlanRun;
-  effective: EffectivePlanGraph;
-  status: PlanExecutionStatus;
-}) {
-  const graph = input.persisted.graph
-    ? {
-        ...input.persisted.graph,
-        status: graphStatusForExecutionStatus(input.status),
-        updatedAt: new Date().toISOString(),
-      }
-    : null;
-  if (!graph) return;
-
-  await savePlanRun({
-    workspaceId: input.workspaceId,
-    taskId: input.taskId,
-    workBlockId: input.workBlockId,
-    planId: input.planId,
-    run: derivePlanRunFromRuntime({
-      existingRun: input.persisted.planRun,
+}, suppliedTx?: Prisma.TransactionClient) {
+  return withPlanExecutionDurability(async (tx) => {
+    const claimed = await tx.taskPlanRun.updateMany({
+      where: {
+        taskId: input.taskId,
+        planId: input.planId,
+        workBlockScopeKey: input.workBlockId ?? "",
+        executionEpoch: input.expectedExecutionEpoch,
+      },
+      data: { executionEpoch: input.expectedExecutionEpoch },
+    });
+    if (claimed.count !== 1) {
+      throw new PlanRuntimeStateChangedError();
+    }
+    await savePlanRun({
+      workspaceId: input.workspaceId,
+      taskId: input.taskId,
+      workBlockId: input.workBlockId,
+      planId: input.planId,
+      run: derivePlanRunFromRuntime(input),
       compiledPlan: input.compiledPlan,
-      graph,
-      attempts: input.persisted.attempts,
-      results: input.persisted.results,
-      executionContextSnapshots: input.persisted.executionContextSnapshots,
-      status: input.status,
-    }),
-    compiledPlan: input.compiledPlan,
-    graph,
-    attempts: input.persisted.attempts,
-    results: input.persisted.results,
-    executionContextSnapshots: input.persisted.executionContextSnapshots,
-  });
-  await syncNormalizedRuntimeState({
-    workspaceId: input.workspaceId,
-    taskId: input.taskId,
-    planId: input.planId,
-    attempts: input.persisted.attempts,
-    results: input.persisted.results,
-  });
+      graph: input.graph,
+      attempts: input.attempts,
+      results: input.results,
+      executionContextSnapshots: input.executionContextSnapshots,
+    }, tx);
+    await syncNormalizedRuntimeStateInTransaction(input, tx);
+    if (input.executionSessionId) {
+      const currentAttempt = [...input.attempts].reverse().find((attempt) => attempt.status === "running");
+      if (currentAttempt) {
+        const sessionClaim = await tx.executionSession.updateMany({
+          where: {
+            id: input.executionSessionId,
+            taskId: input.taskId,
+            planId: input.planId,
+            workBlockId: input.workBlockId ?? null,
+            currentNodeId: currentAttempt.nodeId,
+            status: "Active",
+          },
+          data: { currentNodeAttemptId: currentAttempt.id },
+        });
+        if (sessionClaim.count !== 1) throw new PlanRuntimeStateChangedError();
+      }
+    }
+  }, suppliedTx);
 }
+
 
 export async function syncNormalizedRuntimeState(input: {
+  workBlockId?: string | null;
   workspaceId: string;
   taskId: string;
   planId: string;
   attempts: NodeAttempt[];
   results: NodeResult[];
-}) {
+}, suppliedTx?: Prisma.TransactionClient) {
+  return withPlanExecutionDurability((tx) => syncNormalizedRuntimeStateInTransaction(input, tx), suppliedTx);
+}
+
+async function syncNormalizedRuntimeStateInTransaction(input: {
+  workBlockId?: string | null;
+  workspaceId: string;
+  taskId: string;
+  planId: string;
+  attempts: NodeAttempt[];
+  results: NodeResult[];
+}, tx: Prisma.TransactionClient) {
   if (input.attempts.length === 0) return;
-  const planRun = await db.taskPlanRun.findFirst({
-    where: { taskId: input.taskId, planId: input.planId },
+  const planRun = await tx.taskPlanRun.findUnique({
+    where: {
+      taskId_planId_workBlockScopeKey: {
+        taskId: input.taskId,
+        planId: input.planId,
+        workBlockScopeKey: input.workBlockId ?? "",
+      },
+    },
     select: { id: true, executionEpoch: true },
   });
   if (!planRun) return;
-
   const currentResultsByNodeId = new Map(
-    input.results
-      .filter((result) => result.status === "current")
-      .map((result) => [result.nodeId, result]),
+    input.results.filter((result) => result.status === "current").map((result) => [result.nodeId, result]),
   );
-
   for (const attempt of input.attempts) {
     await syncNormalizedAttempt({
       ...input,
@@ -326,8 +334,8 @@ export async function syncNormalizedRuntimeState(input: {
       executionEpoch: planRun.executionEpoch,
       attempt,
       result: currentResultsByNodeId.get(attempt.nodeId),
-    });
-    await syncProviderRunsForAttempt(attempt);
+    }, tx);
+    await syncProviderRunsForAttempt(attempt, tx);
   }
 }
 
@@ -339,7 +347,7 @@ async function syncNormalizedAttempt(input: {
   executionEpoch: number;
   attempt: NodeAttempt;
   result?: NodeResult;
-}) {
+}, tx: Prisma.TransactionClient) {
   const mutableFields = {
     status: input.attempt.status,
     finishedAt: dateOrNull(input.attempt.finishedAt),
@@ -348,10 +356,45 @@ async function syncNormalizedAttempt(input: {
     selectedBranchRef: input.result?.selectedBranch?.ref ?? null,
     selectedNextNodeId: input.result?.selectedBranch?.nextNodeId ?? null,
   };
-  await db.taskPlanNodeAttempt.upsert({
+  const existing = await tx.taskPlanNodeAttempt.findUnique({
     where: { idempotencyKey: input.attempt.idempotencyKey },
-    update: mutableFields,
-    create: {
+    select: {
+      id: true,
+      taskId: true,
+      planId: true,
+      planRunId: true,
+      nodeId: true,
+      nodeLayerId: true,
+      executionContextSnapshotId: true,
+      attemptNumber: true,
+      executionEpoch: true,
+      status: true,
+      startedAt: true,
+    },
+  });
+  if (existing) {
+    if (
+      existing.id !== input.attempt.id
+      || existing.taskId !== input.taskId
+      || existing.planId !== input.planId
+      || existing.planRunId !== input.planRunId
+      || existing.nodeId !== input.attempt.nodeId
+      || existing.nodeLayerId !== input.attempt.nodeLayerId
+      || existing.executionContextSnapshotId !== input.attempt.executionContextSnapshotId
+      || existing.attemptNumber !== input.attempt.attemptNumber
+      || existing.startedAt.getTime() !== new Date(input.attempt.startedAt).getTime()
+      || existing.executionEpoch > input.executionEpoch
+    ) {
+      throw new Error("Node attempt idempotency key belongs to another execution scope");
+    }
+    if (["succeeded", "failed", "cancelled"].includes(existing.status) && existing.status !== input.attempt.status) {
+      throw new Error("Terminal node attempt cannot be reopened");
+    }
+    await tx.taskPlanNodeAttempt.update({ where: { id: existing.id }, data: mutableFields });
+    return;
+  }
+  await tx.taskPlanNodeAttempt.create({
+    data: {
       id: input.attempt.id,
       workspaceId: input.workspaceId,
       taskId: input.taskId,
@@ -370,14 +413,11 @@ async function syncNormalizedAttempt(input: {
   });
 }
 
-async function syncProviderRunsForAttempt(attempt: NodeAttempt) {
+async function syncProviderRunsForAttempt(attempt: NodeAttempt, tx: Prisma.TransactionClient) {
   if (attempt.status === "running") return;
-  await db.taskPlanProviderRun.updateMany({
+  await tx.taskPlanProviderRun.updateMany({
     where: { nodeAttemptId: attempt.id, status: "running" },
-    data: {
-      status: providerRunStatusForAttempt(attempt.status),
-      finishedAt: dateOrNull(attempt.finishedAt) ?? new Date(),
-    },
+    data: { status: providerRunStatusForAttempt(attempt.status), finishedAt: dateOrNull(attempt.finishedAt) ?? new Date() },
   });
 }
 

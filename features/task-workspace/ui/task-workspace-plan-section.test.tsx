@@ -497,11 +497,12 @@ describe("TaskWorkspacePlanSection", () => {
           {
             type: "runtime_event",
             action: "start_manual",
-            runtimeName: "local",
-            provider: "provider",
+            executionScope: "scope-1",
+            runtime: { category: "runtime", label: "Execution runtime" },
+            provider: { category: "ai_provider", label: "AI provider" },
             event: {
               type: "tool_started",
-              toolName: "chrona_execution_dispatch",
+              tool: { category: "tool", label: "Runtime tool" },
               label: "Starting plan",
             },
           },
@@ -1101,11 +1102,11 @@ describe("TaskWorkspacePlanSection", () => {
     const stageResults = screen.getByRole("region", { name: "Stage results" });
     expect(stageResults).toHaveTextContent("Waiting for output");
     expect(
-      within(stageResults).queryByRole("status", {
+      within(stageResults).getByRole("status", {
         name: "Execution is producing output",
       }),
-    ).not.toBeInTheDocument();
-    expect(stageResults.querySelector(".animate-spin")).not.toBeInTheDocument();
+    ).toHaveTextContent("Waiting for output");
+    expect(stageResults.querySelector(".animate-spin")).toBeInTheDocument();
     expect(
       screen.queryByRole("region", { name: "Current operation" }),
     ).not.toBeInTheDocument();
@@ -1659,7 +1660,7 @@ describe("TaskWorkspacePlanSection", () => {
         currentExecution={{
           taskId: "task-1",
           planId: "plan-1",
-          mainSessionId: "session-1",
+          executionScope: "scope-1",
           status: "completed",
           currentNodeId: null,
           executedNodeIds: ["weather-script"],

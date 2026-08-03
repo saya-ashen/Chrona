@@ -75,9 +75,10 @@ describe("plan-runner task executor approval state", () => {
     const compiledPlan = makeSingleTaskPlan("graph_task_resume_approval");
     await seedAcceptedCompiledPlan(workspace.id, task.id, compiledPlan);
 
-    await taskPlanExecution.dispatch({
+    const started = await taskPlanExecution.dispatch({
       taskId: task.id,
       action: { action: "start_manual" },
+      commandContext: { idempotencyKey: "approval-start" },
     });
 
     const resumed = await taskPlanExecution.dispatch({
@@ -86,6 +87,10 @@ describe("plan-runner task executor approval state", () => {
         action: "resume_with_approval",
         decision: "approve",
         feedback: "approved in test",
+      },
+      commandContext: {
+        idempotencyKey: "approval-resume",
+        sessionId: started.executionSessionId ?? undefined,
       },
     });
 

@@ -1,4 +1,4 @@
-import { Activity, TerminalSquare } from "lucide-react";
+import { Activity, LoaderCircle, TerminalSquare } from "lucide-react";
 import type { ReactNode } from "react";
 import type { UiDocument } from "@chrona/ui-protocol";
 import {
@@ -40,6 +40,7 @@ type ResultStatusInfoProps = {
   status: ResultStatus;
   hasAvailableResult: boolean;
   copy: WorkspaceCopy;
+  isProducingOutput: boolean;
 };
 
 function resultStatusLabel(status: ResultStatus, hasAvailableResult: boolean, copy: WorkspaceCopy) {
@@ -70,13 +71,19 @@ function resultStatusClassName(status: ResultStatus) {
   return "bg-violet-500/10 text-violet-700 dark:text-violet-200";
 }
 
-function ResultStatusInfo({ status, hasAvailableResult, copy }: ResultStatusInfoProps) {
+function ResultStatusInfo({ status, hasAvailableResult, copy, isProducingOutput }: ResultStatusInfoProps) {
   return (
     <div className="min-w-0 space-y-1">
       <h3 id="task-workspace-results-heading" className="font-heading text-base font-semibold text-foreground">
         {resultStatusTitle(status, copy)}
       </h3>
       <div className="flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+        {status === "active" && isProducingOutput ? (
+          <span role="status" aria-label="Execution is producing output" className="inline-flex items-center">
+            <LoaderCircle className="size-3.5 animate-spin" aria-hidden />
+            {!hasAvailableResult ? <span className="sr-only">{resultStatusLabel(status, false, copy)}</span> : null}
+          </span>
+        ) : null}
         <Badge variant="outline" className={resultStatusClassName(status)}>{resultStatusLabel(status, hasAvailableResult, copy)}</Badge>
         <span>{resultStatusDescription(status, hasAvailableResult, copy)}</span>
       </div>
@@ -146,6 +153,7 @@ type ExecutionResultsProps = {
   workspaceCopy: WorkspaceCopy;
   active: boolean;
   status: ResultStatus;
+  isLive: boolean;
   hasAvailableResult: boolean;
   finalizationRetryError: string | null | undefined;
   onRetryFinalization: (() => Promise<void> | void) | undefined;
@@ -160,12 +168,12 @@ type ExecutionResultsProps = {
 };
 
 function ExecutionResults(props: ExecutionResultsProps) {
-  const { taskId, workspaceCopy, active, status, hasAvailableResult, finalizationRetryError, onRetryFinalization, isRetryingFinalization, nodeOptions, selectedNodeId, onSelectedNodeIdChange, onCollapseCommand, outputSpec, handlers, resultCollapseCommand } = props;
+  const { taskId, workspaceCopy, active, status, hasAvailableResult, isLive, finalizationRetryError, onRetryFinalization, isRetryingFinalization, nodeOptions, selectedNodeId, onSelectedNodeIdChange, onCollapseCommand, outputSpec, handlers, resultCollapseCommand } = props;
   return (
     <section aria-label={active ? (workspaceCopy.stageResultsTitle ?? "Stage results") : (workspaceCopy.finalResultTitle ?? "Final result")} className="min-h-0 flex-1 overflow-y-auto">
       <div className="mb-3 flex flex-wrap items-start justify-between gap-3 border-b border-border/70 pb-3">
         <div className="min-w-0 space-y-1">
-          <ResultStatusInfo status={status} hasAvailableResult={hasAvailableResult} copy={workspaceCopy} />
+          <ResultStatusInfo status={status} hasAvailableResult={hasAvailableResult} copy={workspaceCopy} isProducingOutput={isLive} />
           {status === "failed" ? <FinalizationRetry copy={workspaceCopy} error={finalizationRetryError} isRetrying={isRetryingFinalization} onRetry={onRetryFinalization} /> : null}
         </div>
         <ResultsToolbar copy={workspaceCopy} nodeOptions={nodeOptions} selectedNodeId={selectedNodeId} onSelectedNodeIdChange={onSelectedNodeIdChange} onCollapseCommand={onCollapseCommand} />

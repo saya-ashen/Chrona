@@ -1,49 +1,29 @@
-import type { PlanExecutionSSEEvent } from "@chrona/contracts";
-import type { CheckpointActionKind, ExecutionActionType } from "@chrona/contracts";
+import type { CheckpointActionKind, ExecutionActionType, PlanExecutionSSEEvent } from "@chrona/contracts";
+import { publicProviderDescriptor, publicRuntimeDescriptor, publicToolDescriptor } from "@chrona/contracts";
 import type { PlanExecutionRuntimeEvent } from "@chrona/engine";
 
-type RuntimeSummaryBase = Omit<Extract<PlanExecutionSSEEvent, { type: "runtime_event" }>, "event">;
-
-function toolLabel(toolName?: string): string {
-  switch (toolName) {
-    case "chrona_execution_dispatch":
-      return "Updating execution state";
-    case "chrona_plan_read":
-      return "Reading plan";
-    case "chrona_plan_mutate":
-      return "Updating plan";
-    case "chrona_task_read":
-      return "Reading task";
-    case undefined:
-      return "Running tool";
-    default:
-      return toolName;
-  }
-}
 
 export function summarizeRuntimeEvent(
   action: ExecutionActionType,
   event: PlanExecutionRuntimeEvent,
-): Extract<PlanExecutionSSEEvent, { type: "runtime_event" }> {
+): Extract<PlanExecutionSSEEvent, { type: "runtime_event" }> | null {
   const providerEvent = event.event;
-  const provider = providerEvent.provider ?? "provider";
-  const base: RuntimeSummaryBase = {
-    type: "runtime_event" as const,
+  const provider = publicProviderDescriptor(providerEvent.provider);
+  const displayEvent = summarizeProviderRuntimePayload(providerEvent);
+  if (!displayEvent) return null;
+  return {
+    type: "runtime_event",
     action,
+    executionScope: event.executionScope,
     nodeId: event.nodeId,
     nodeTitle: event.nodeTitle,
-    runtimeName: event.runtimeName,
+    runtime: publicRuntimeDescriptor(event.runtimeName),
     provider,
-    runId: providerEvent.runId,
-    nativeRunId: providerEvent.nativeRunId,
     sequence: providerEvent.sequence,
     timestamp: providerEvent.timestamp ?? new Date().toISOString(),
-    rawEventType: providerEvent.rawEventType,
+    event: displayEvent,
   };
-
-  return { ...base, event: summarizeProviderRuntimePayload(providerEvent) };
 }
-
 export function checkpointActionToExecutionAction(action: CheckpointActionKind): ExecutionActionType {
   switch (action) {
     case "submit_input":
@@ -69,145 +49,47 @@ export function checkpointActionToExecutionAction(action: CheckpointActionKind):
   }
 }
 
-function recordValue(value: unknown) {
-  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
-}
-
-function stringValue(record: Record<string, unknown> | null, key: string) {
-  const value = record?.[key];
-  return typeof value === "string" && value.trim() ? value.trim() : undefined;
-}
-
-function numberValue(record: Record<string, unknown> | null, key: string) {
-  const value = record?.[key];
-  return typeof value === "number" ? value : undefined;
-}
-
-function latestWorkflowProgress(raw: Record<string, unknown>) {
-  const progress = Array.isArray(raw.workflow_progress) ? raw.workflow_progress : [];
-  for (const item of [...progress].reverse()) {
-    const record = recordValue(item);
-    if (record) return record;
-  }
-  return null;
-}
-
-function directRawMessage(raw: unknown) {
-  const record = recordValue(raw);
-  return stringValue(record, "message");
-}
-
-function taskProgressMessage(raw: unknown) {
-  const record = recordValue(raw);
-  if (!record || record.type !== "system" || record.subtype !== "task_progress") return undefined;
-
-  const progress = latestWorkflowProgress(record);
-  const usage = recordValue(record.usage);
-  const toolName = stringValue(progress, "lastToolName") ?? stringValue(record, "last_tool_name");
-  const toolSummary = stringValue(progress, "lastToolSummary");
-  const toolUses = numberValue(usage, "tool_uses");
-  const parts = [
-    stringValue(record, "description"),
-    toolSummary ? `${toolName ?? "Tool"}: ${toolSummary}` : undefined,
-    toolUses !== undefined ? `${toolUses} tool uses` : undefined,
-  ].filter((part): part is string => Boolean(part));
-
-  return parts.join(" · ") || stringValue(record, "summary");
-}
-
-function compactJson(value: unknown, maxLength = 4_000) {
-  if (value === undefined) return undefined;
-  const seen = new WeakSet<object>();
-  const serialized = JSON.stringify(value, (key, nested) => {
-    if (/token|secret|credential|password|api.?key|authorization|cookie/i.test(key)) return "[redacted]";
-    if (nested && typeof nested === "object") {
-      if (seen.has(nested)) return "[circular]";
-      seen.add(nested);
-    }
-    return nested;
-  }, 2);
-  if (!serialized) return undefined;
-  return serialized.length > maxLength ? `${serialized.slice(0, maxLength - 3)}...` : serialized;
-}
-
-function toolResultPreview(value: unknown) {
-  if (value && typeof value === "object" && !Array.isArray(value) && "content" in value) {
-    const content = (value as { content?: unknown }).content;
-    if (Array.isArray(content)) {
-      const text = content.flatMap((item) => item && typeof item === "object" && "text" in item && typeof item.text === "string" ? [item.text] : []).join("\n").trim();
-      if (text) return text.length > 4_000 ? `${text.slice(0, 3_997)}...` : text;
-    }
-  }
-  return compactJson(value);
-}
-
 function summarizeProviderRuntimePayload(
   providerEvent: PlanExecutionRuntimeEvent["event"],
-): Extract<PlanExecutionSSEEvent, { type: "runtime_event" }>["event"] {
+): Extract<PlanExecutionSSEEvent, { type: "runtime_event" }> ["event"] | null {
   switch (providerEvent.type) {
-    case "text_delta":
-      return { type: "assistant_text_delta", text: providerEvent.text };
-    case "reasoning_delta":
-      return { type: "reasoning_delta", text: providerEvent.text };
     case "tool_call":
-      return {
-        type: "tool_started",
-        toolName: providerEvent.tool,
-        callId: providerEvent.callId,
-        label: toolLabel(providerEvent.tool),
-        inputSummary: compactJson(providerEvent.input),
-        preview: typeof providerEvent.preview === "string" ? providerEvent.preview : compactJson(providerEvent.preview),
-      };
-    case "tool_progress":
-      return {
-        type: "tool_progress",
-        toolName: providerEvent.toolName,
-        callId: providerEvent.callId,
-        label: toolLabel(providerEvent.toolName),
-        preview: providerEvent.preview,
-      };
+      return { type: "tool_started", tool: publicToolDescriptor(providerEvent.tool), label: publicToolDescriptor(providerEvent.tool).label };
     case "tool_started":
-      return {
-        type: "tool_started",
-        toolName: providerEvent.toolName,
-        label: toolLabel(providerEvent.toolName),
-        preview: typeof providerEvent.preview === "string" ? providerEvent.preview : compactJson(providerEvent.preview),
-        inputSummary: compactJson(providerEvent.input),
-      };
+      return { type: "tool_started", tool: publicToolDescriptor(providerEvent.toolName), label: publicToolDescriptor(providerEvent.toolName).label };
+    case "tool_progress":
+      return { type: "tool_progress", tool: publicToolDescriptor(providerEvent.toolName), label: publicToolDescriptor(providerEvent.toolName).label };
     case "tool_result":
-      return {
-        type: "tool_completed",
-        toolName: providerEvent.tool,
-        callId: providerEvent.callId,
-        label: toolLabel(providerEvent.tool),
-        preview: toolResultPreview(providerEvent.result),
-      };
+      return { type: "tool_completed", tool: publicToolDescriptor(providerEvent.tool), label: publicToolDescriptor(providerEvent.tool).label };
     case "tool_completed":
       return {
         type: "tool_completed",
-        toolName: providerEvent.toolName,
-        label: toolLabel(providerEvent.toolName),
-        preview: providerEvent.error ? undefined : toolResultPreview(providerEvent.raw),
+        tool: publicToolDescriptor(providerEvent.toolName),
+        label: publicToolDescriptor(providerEvent.toolName).label,
         durationMs: providerEvent.durationMs,
-        error: providerEvent.error
-          ? {
-              message: providerEvent.error.message,
-              code: providerEvent.error.code,
-            }
-          : undefined,
+        ...(providerEvent.error ? { error: { code: providerEvent.error.code } } : {}),
       };
-    case "approval_required":
-      return { type: "approval_required", approval: providerEvent.approval };
-    case "run_started":
-      return { type: "run_status", status: "started", message: "Provider run started." };
-    case "run_completed":
-      return { type: "run_status", status: "completed", message: "Provider run finished. Chrona state sync is authoritative." };
-    case "run_failed":
-      return { type: "run_status", status: "failed", message: providerEvent.error };
-    case "run_cancelled":
-      return { type: "run_status", status: "cancelled", message: "Provider run cancelled." };
-    case "raw_event":
-      return { type: "raw_event", rawEventType: providerEvent.rawEventType, message: directRawMessage(providerEvent.raw) ?? taskProgressMessage(providerEvent.raw) };
-
+    case "approval_required": {
+      const { id, riskLevel, choices, defaultChoice, recommendedChoice } = providerEvent.approval;
+      return {
+        type: "approval_required",
+        approval: {
+          id,
+          provider: publicProviderDescriptor(providerEvent.approval.provider),
+          kind: "execution_approval",
+          title: "Approval required",
+          summary: "Execution is waiting for confirmation.",
+          riskLevel,
+          choices,
+          defaultChoice,
+          recommendedChoice,
+        },
+      };
+    }
+    case "run_started": return { type: "run_status", status: "started" };
+    case "run_completed": return { type: "run_status", status: "completed" };
+    case "run_failed": return { type: "run_status", status: "failed" };
+    case "run_cancelled": return { type: "run_status", status: "cancelled" };
+    default: return null;
   }
 }

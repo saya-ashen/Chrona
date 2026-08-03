@@ -1,29 +1,113 @@
-import { RunStatus } from "@/generated/prisma/client";
+import { z } from "zod";
 import { latestRecordedTerminalAction } from "./agent-control-store";
 import { submitNodeResultActionFromControl } from "@/modules/agent-tools/node-result-action";
-import { db } from "@/lib/db";
 import {
   type CheckpointInputFields,
   type EffectivePlanGraph,
   type EffectivePlanNode,
   type NodeAttempt,
   type PlanOutputState,
-  type PreparedAiFeatureSpec,
 } from "@chrona/contracts/ai";
 import { agentControlActionBodySchema } from "@chrona/contracts/api";
 import { usesChronaControlPlane, type AiRuntimeInvocation, type AiRuntimeInvoker } from "../ai-runtime-invoker";
 import type { NodeExecutionPlanContext, NodeExecutionResult, NodeExecutionRunContext } from "../node-executors/types";
-import type { ProviderRunEvent, ProviderRunSnapshot } from "@chrona/providers-foundation";
+import type { ProviderJsonValue, ProviderRunEvent, ProviderRunSnapshot } from "@chrona/providers-foundation";
 import { buildNodeRuntimePrompt, NODE_RUNTIME_TERMINAL_TOOLS } from "./node-runtime-prompts";
 import { branchBindingForRef } from "./node-runtime-refs";
-import { syncTaskRunState } from "../persistence/task-execution-store";
 
 type NodeExecutionEvidence = NonNullable<
   Extract<NodeExecutionResult, { evidence?: unknown }>["evidence"]
 >;
+const providerJsonValueSchema: z.ZodType<ProviderJsonValue> = z.lazy(() =>
+  z.union([
+    z.string(),
+    z.number(),
+    z.boolean(),
+    z.null(),
+    z.array(providerJsonValueSchema),
+    z.record(z.string(), providerJsonValueSchema),
+  ]),
+);
+const nodeCapabilityKindSchema = z.enum(["execute", "evaluate", "review"]);
+const nodeCapabilityRequestSchema = z.object({
+  protocolVersion: z.literal(1),
+  kind: nodeCapabilityKindSchema,
+  clientOperationId: z.string().trim().min(1).max(512),
+  instructions: z.string().trim().min(1).max(100_000),
+  runtimeInput: z.record(z.string(), providerJsonValueSchema),
+  terminalToolName: z.string().trim().min(1).max(128),
+}).strict();
+const nodeCapabilityResponseSchema = z.object({
+  status: z.enum(["pending", "running", "completed", "failed", "cancelled"]),
+  runId: z.string().trim().min(1).max(512),
+  outputText: z.string().nullable().optional(),
+  provider: z.string().trim().min(1).max(128),
+  structuredPayload: providerJsonValueSchema.optional(),
+  terminalTool: z.object({
+    name: z.string().trim().min(1).max(128),
+    input: z.record(z.string(), providerJsonValueSchema),
+  }).optional(),
+  error: z.string().nullable().optional(),
+}).strict();
+export type NodeCapabilityRequest = z.infer<typeof nodeCapabilityRequestSchema>;
+type NodeCapabilityResponse = z.infer<typeof nodeCapabilityResponseSchema>;
+type NodeRuntimePrompt = {
+  instructions: string;
+  runtimeInput: Record<string, ProviderJsonValue>;
+};
 
+function nodeCapabilityRequest(input: {
+  kind: z.infer<typeof nodeCapabilityKindSchema>;
+  attempt: NodeAttempt;
+  runtime: NodeRuntimePrompt;
+  node: EffectivePlanNode;
+}): NodeCapabilityRequest {
+  return nodeCapabilityRequestSchema.parse({
+    protocolVersion: 1,
+    kind: input.kind,
+    clientOperationId: `node-capability:${input.kind}:${input.attempt.idempotencyKey}`,
+    instructions: input.runtime.instructions,
+    runtimeInput: input.runtime.runtimeInput,
+    terminalToolName: defaultTerminalToolName(input.node.type),
+  });
+}
+
+function nodeCapabilityResponse(response: ProviderRunSnapshot): NodeCapabilityResponse {
+  const raw = providerJsonValueSchema.safeParse(response.raw);
+  const structuredPayload = providerJsonValueSchema.safeParse(
+    response.structuredPayload,
+  );
+  const rawRecord = raw.success ? asRecord(raw.data) : undefined;
+  const terminal = asRecord(recordValue(rawRecord, "terminalTool"))
+    ?? asRecord(recordValue(rawRecord, "terminal_tool"));
+  const name = recordValue(terminal, "name")
+    ?? recordValue(rawRecord, "terminalToolName")
+    ?? recordValue(rawRecord, "terminal_tool_name")
+    ?? recordValue(
+      asRecord(structuredPayload.success ? structuredPayload.data : undefined),
+      "terminalToolName",
+    );
+  return nodeCapabilityResponseSchema.parse({
+    provider: response.provider,
+    status: response.status,
+    runId: response.runId,
+    outputText: response.outputText,
+    structuredPayload: structuredPayload.success ? structuredPayload.data : undefined,
+    terminalTool: typeof name === "string" && name.trim()
+      ? { name: name.trim(), input: asRecord(recordValue(terminal, "input")) ?? {} }
+      : undefined,
+    error: response.error,
+  });
+}
+
+export const __nodeAiCapabilityTestHooks = {
+  parseRequest: (value: unknown) => nodeCapabilityRequestSchema.parse(value),
+  parseResponse: (value: unknown) => nodeCapabilityResponseSchema.parse(value),
+};
 export type NodeAiCapabilityInput = {
   taskId: string;
+  executionEpoch?: number;
+  executionSessionId?: string;
   workBlockId?: string | null;
   mainSession: {
     id: string;
@@ -44,42 +128,39 @@ export type NodeAiCapabilityInput = {
   signal?: AbortSignal;
 };
 
-function recordValue(input: Record<string, unknown> | undefined, key: string): unknown {
-  return input && Object.prototype.hasOwnProperty.call(input, key) ? input[key] : undefined;
-}
-
-function structuredPayload(input: AiRuntimeInvocation): Record<string, unknown> | undefined {
-  const value = input.response.structuredPayload;
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? value as Record<string, unknown>
+function recordValue(
+  input: Record<string, ProviderJsonValue> | undefined,
+  key: string,
+): ProviderJsonValue | undefined {
+  return input && Object.prototype.hasOwnProperty.call(input, key)
+    ? input[key]
     : undefined;
 }
-
-
-function terminalToolNameFromSnapshot(response: ProviderRunSnapshot): string | undefined {
-  const raw = asRecord(response.raw);
-  const toolName = recordValue(asRecord(recordValue(raw, "terminalTool")), "name")
-    ?? recordValue(asRecord(recordValue(raw, "terminal_tool")), "name")
-    ?? recordValue(raw, "terminalToolName")
-    ?? recordValue(raw, "terminal_tool_name")
-    ?? recordValue(response.structuredPayload && typeof response.structuredPayload === "object"
-      ? response.structuredPayload as Record<string, unknown>
-      : undefined, "terminalToolName");
-  return typeof toolName === "string" && toolName.trim() ? toolName : undefined;
+function structuredPayload(
+  response: NodeCapabilityResponse,
+): Record<string, ProviderJsonValue> | undefined {
+  return asRecord(response.structuredPayload);
 }
 
-function terminalToolInputFromSnapshot(response: ProviderRunSnapshot): Record<string, unknown> {
-  const raw = asRecord(response.raw);
-  const terminal = asRecord(recordValue(raw, "terminalTool"))
-    ?? asRecord(recordValue(raw, "terminal_tool"));
-  return asRecord(recordValue(terminal, "input")) ?? {};
+
+function terminalToolNameFromSnapshot(
+  response: NodeCapabilityResponse,
+): string | undefined {
+  return response.terminalTool?.name;
 }
 
-function asRecord(value: unknown): Record<string, unknown> | undefined {
-  return value && typeof value === "object" && !Array.isArray(value)
-    ? value as Record<string, unknown>
-    : undefined;
+function terminalToolInputFromSnapshot(
+  response: NodeCapabilityResponse,
+): Record<string, ProviderJsonValue> {
+  return response.terminalTool?.input ?? {};
 }
+
+function asRecord(
+  value: ProviderJsonValue | undefined,
+): Record<string, ProviderJsonValue> | undefined {
+  return value && typeof value === "object" && !Array.isArray(value) ? value : undefined;
+}
+
 function requiresAiDefinedInput(node: EffectivePlanNode) {
   if (node.type !== "checkpoint") return false;
   const config = node.config as { required?: boolean; interaction?: { schemaSource?: string } };
@@ -89,7 +170,7 @@ function requiresAiDefinedInput(node: EffectivePlanNode) {
 
 function blockedReasonFromSnapshot(input: {
   response: ProviderRunSnapshot;
-  structured: Record<string, unknown> | undefined;
+  structured: Record<string, ProviderJsonValue> | undefined;
   summary?: string;
 }) {
   const structuredReason = recordValue(input.structured, "reason");
@@ -101,7 +182,7 @@ function blockedReasonFromSnapshot(input: {
 
 function failedErrorFromSnapshot(input: {
   response: ProviderRunSnapshot;
-  structured: Record<string, unknown> | undefined;
+  structured: Record<string, ProviderJsonValue> | undefined;
   summary?: string;
 }) {
   const structuredError = recordValue(input.structured, "error");
@@ -113,7 +194,7 @@ function failedErrorFromSnapshot(input: {
 
 function completionOverrideFromStructured(input: {
   response: ProviderRunSnapshot;
-  structured: Record<string, unknown> | undefined;
+  structured: Record<string, ProviderJsonValue> | undefined;
   summary?: string;
   evidence: NodeExecutionEvidence;
 }): NodeExecutionResult | null {
@@ -141,11 +222,13 @@ function terminalNodeResultFromSnapshot(input: {
   node: EffectivePlanNode;
   plan: EffectivePlanGraph;
   evidence: NodeExecutionEvidence;
-  structured: Record<string, unknown> | undefined;
+  structured: Record<string, ProviderJsonValue> | undefined;
   summary?: string;
   inputFields?: CheckpointInputFields;
 }): NodeExecutionResult | undefined {
-  const terminalToolName = terminalToolNameFromSnapshot(input.invocation.response);
+  const terminalToolName = terminalToolNameFromSnapshot(
+    nodeCapabilityResponse(input.invocation.response),
+  );
   switch (terminalToolName) {
     case "chrona_condition_select":
       return conditionSelectionResultFromSnapshot(input);
@@ -185,7 +268,9 @@ function terminalNodeResultFromSnapshot(input: {
           evidence: input.evidence,
         };
       }
-      const terminalInput = terminalToolInputFromSnapshot(input.invocation.response);
+      const terminalInput = terminalToolInputFromSnapshot(
+        nodeCapabilityResponse(input.invocation.response),
+      );
       return {
         status: "done",
         summary:
@@ -230,7 +315,7 @@ function conditionSelectionResultFromSnapshot(input: {
   node: EffectivePlanNode;
   plan: EffectivePlanGraph;
   evidence: NodeExecutionEvidence;
-  structured: Record<string, unknown> | undefined;
+  structured: Record<string, ProviderJsonValue> | undefined;
   summary?: string;
 }): NodeExecutionResult {
   const branchRef = recordValue(input.structured, "branchRef");
@@ -295,7 +380,7 @@ async function resolveTerminalNodeResult(input: {
   node: EffectivePlanNode;
   plan: EffectivePlanGraph;
   evidence: NodeExecutionEvidence;
-  structured: Record<string, unknown> | undefined;
+  structured: Record<string, ProviderJsonValue> | undefined;
   summary?: string;
   inputFields?: CheckpointInputFields;
 }): Promise<NodeExecutionResult | undefined> {
@@ -310,14 +395,14 @@ async function resolveTerminalNodeResult(input: {
   });
 }
 export async function runTaskNodeFeature(
-  input: NodeAiCapabilityInput & {
-    featureSpec: PreparedAiFeatureSpec;
-    providerInput: Record<string, unknown>;
-  },
+  input: NodeAiCapabilityInput & { request: NodeCapabilityRequest },
 ): Promise<NodeExecutionResult> {
   try {
+    const request = nodeCapabilityRequestSchema.parse(input.request);
     const invocation = await input.aiRuntimeInvoker.invoke({
       taskId: input.taskId,
+      expectedExecutionEpoch: input.executionEpoch ?? -1,
+      expectedExecutionSessionId: input.executionSessionId ?? "",
       workBlockId: input.workBlockId ?? null,
       taskSessionId: input.mainSession.id,
       runtimeName: input.runtimeName,
@@ -326,16 +411,16 @@ export async function runTaskNodeFeature(
         nodeId: input.node.id,
         nodeTitle: input.node.title,
       },
-      nodeAttemptId: input.attempt.id,
       nodeAttempt: input.attempt,
-      providerRunIdempotencyKey: `provider-run:${input.attempt.idempotencyKey}`,
-      runtimeInput: input.providerInput,
-      instructions: input.featureSpec.instructions,
-      featureSpec: input.featureSpec,
-      triggeredBy: "system",
+      clientOperationId: request.clientOperationId,
+      runtimeInput: request.runtimeInput,
+      instructions: request.instructions,
+      terminalToolName: request.terminalToolName,
+      toolPolicy: "full",
       onRuntimeEvent: input.onRuntimeEvent,
       signal: input.signal,
     });
+    const response = nodeCapabilityResponse(invocation.response);
 
     const evidence: NodeExecutionEvidence = {
       sessionId: input.mainSession.id,
@@ -355,10 +440,13 @@ export async function runTaskNodeFeature(
         kind: recordedTerminalAction.kind,
         payload: recordedTerminalAction.payload,
       });
-      const recordedAction = submitNodeResultActionFromControl({
+      const recordedActionWithSession = submitNodeResultActionFromControl({
         body: parsedAction,
         sessionId: input.mainSession.id,
       });
+      const recordedAction = recordedActionWithSession
+        ? (({ sessionId: _sessionId, ...action }) => action)(recordedActionWithSession)
+        : null;
       if (recordedAction?.action === "complete_manual_node") {
         const selectedBranch = recordedAction.branchRef
           ? branchBindingForRef({ plan: input.plan, node: input.node, branchRef: recordedAction.branchRef })
@@ -369,7 +457,6 @@ export async function runTaskNodeFeature(
             error: `Required AI-defined checkpoint ${input.node.id} completed without chrona_node_request_input`,
             evidence,
           };
-          await updateInvocationRunFromNodeResult(invocation, protocolFailure);
           return protocolFailure;
         }
         const completedResult: NodeExecutionResult = {
@@ -391,7 +478,6 @@ export async function runTaskNodeFeature(
             sourceNodeRef: "",
           })),
         };
-        await updateInvocationRunFromNodeResult(invocation, completedResult);
         return completedResult;
       }
       if (parsedAction.kind === "request_input" && recordedAction?.action === "block_current_node") {
@@ -402,7 +488,6 @@ export async function runTaskNodeFeature(
           evidence,
           actionForm: recordedAction.actionForm,
         };
-        await updateInvocationRunFromNodeResult(invocation, waitingResult);
         return waitingResult;
       }
       if (recordedAction?.action === "block_current_node") {
@@ -411,7 +496,6 @@ export async function runTaskNodeFeature(
           reason: recordedAction.reason,
           evidence,
         };
-        await updateInvocationRunFromNodeResult(invocation, blockedResult);
         return blockedResult;
       }
       if (recordedAction?.action === "fail_current_node") {
@@ -420,22 +504,21 @@ export async function runTaskNodeFeature(
           error: recordedAction.error,
           evidence,
         };
-        await updateInvocationRunFromNodeResult(invocation, failedResult);
         return failedResult;
       }
     }
 
-    const structured = structuredPayload(invocation);
+    const structured = structuredPayload(response);
     const output = {
       runtimeName: input.runtimeName,
       provider: invocation.providerName,
-      outputText: invocation.response.outputText,
-      structuredPayload: invocation.response.structuredPayload,
+      outputText: response.outputText ?? undefined,
+      structuredPayload: response.structuredPayload,
     };
     const structuredSummary = recordValue(structured, "summary");
-    const summary = invocation.response.outputText?.trim() ||
+    const summary = response.outputText?.trim() ||
       (typeof structuredSummary === "string" ? structuredSummary.trim() : undefined);
-    if (invocation.response.status === "cancelled") {
+    if (response.status === "cancelled") {
       const message = `Provider cancelled runtime run ${invocation.runtimeRunRef ?? invocation.runId}`;
       const cancelledResult: NodeExecutionResult = {
         status: "failed",
@@ -449,12 +532,11 @@ export async function runTaskNodeFeature(
           message,
         }),
       };
-      await updateInvocationRunFromNodeResult(invocation, cancelledResult);
       return cancelledResult;
     }
 
-    if (invocation.response.status === "failed") {
-      const errorMessage = invocation.response.error
+    if (response.status === "failed") {
+      const errorMessage = response.error
         || `Provider run ${invocation.runtimeRunRef ?? invocation.runId} failed`;
       const failedResult: NodeExecutionResult = {
         status: "failed",
@@ -468,14 +550,20 @@ export async function runTaskNodeFeature(
           message: errorMessage,
         }),
       };
-      await updateInvocationRunFromNodeResult(invocation, failedResult);
       return failedResult;
     }
 
     const requiresTerminalAction = usesChronaControlPlane(invocation.providerName);
-    const terminalNodeResult = invocation.response.status === "completed"
+    const terminalNodeResult = response.status === "completed"
       ? await resolveTerminalNodeResult({
-          invocation,
+          invocation: {
+            ...invocation,
+            response: {
+              ...invocation.response,
+              ...response,
+              outputText: response.outputText ?? undefined,
+            },
+          },
           node: input.node,
           plan: input.plan,
           evidence,
@@ -484,7 +572,7 @@ export async function runTaskNodeFeature(
           inputFields: input.inputFields,
         })
       : undefined;
-    const nodeResult: NodeExecutionResult = terminalNodeResult ?? (invocation.response.status === "completed" && requiresTerminalAction
+    const nodeResult: NodeExecutionResult = terminalNodeResult ?? (response.status === "completed" && requiresTerminalAction
       ? missingTerminalToolResult({
           invocation,
           node: input.node,
@@ -499,7 +587,6 @@ export async function runTaskNodeFeature(
           evidence,
           output,
         });
-    await updateInvocationRunFromNodeResult(invocation, nodeResult);
     return nodeResult;
   } catch (error) {
     const message =
@@ -526,68 +613,16 @@ export async function runTaskNodeFeature(
   }
 }
 
-async function updateInvocationRunFromNodeResult(
-  invocation: AiRuntimeInvocation,
-  result: NodeExecutionResult,
-) {
-  const status = runStatusFromNodeResult(result);
-  const run = await db.run.update({
-    where: { id: invocation.runId },
-    data: {
-      status,
-      endedAt: status === RunStatus.Completed || status === RunStatus.Cancelled || status === RunStatus.Failed ? new Date() : null,
-      errorSummary: errorSummaryFromNodeResult(result),
-    },
-    select: { taskId: true, taskSessionId: true, runtimeRunRef: true },
-  });
-  await syncTaskRunState({
-    taskId: run.taskId,
-    taskSessionId: run.taskSessionId,
-    runId: invocation.runId,
-    runStatus: status,
-    runtimeRunRef: run.runtimeRunRef,
-  });
-}
 
-function runStatusFromNodeResult(result: NodeExecutionResult): RunStatus {
-  switch (result.status) {
-    case "done":
-      return RunStatus.Completed;
-    case "started":
-      return RunStatus.Running;
-    case "waiting_for_user":
-      return RunStatus.WaitingForInput;
-    case "waiting_for_approval":
-      return RunStatus.WaitingForApproval;
-    case "blocked":
-    case "failed":
-    case "replan_required":
-      return RunStatus.Failed;
-  }
-}
 
-function errorSummaryFromNodeResult(result: NodeExecutionResult): string | null {
-  switch (result.status) {
-    case "failed":
-      return result.error;
-    case "blocked":
-    case "replan_required":
-      return result.reason;
-    case "waiting_for_user":
-    case "waiting_for_approval":
-    case "done":
-    case "started":
-    default:
-      return null;
-  }
-}
 
 function defaultTerminalToolName(nodeType: EffectivePlanNode["type"]): string {
   return nodeType === "task" ? "chrona_node_complete" : NODE_RUNTIME_TERMINAL_TOOLS[nodeType][0];
 }
 
-export async function executeTaskNodeCapability(
+async function runNodeCapability(
   input: NodeAiCapabilityInput,
+  kind: z.infer<typeof nodeCapabilityKindSchema>,
 ): Promise<NodeExecutionResult> {
   const runtime = buildNodeRuntimePrompt({
     plan: input.plan,
@@ -598,35 +633,36 @@ export async function executeTaskNodeCapability(
     userInput: input.userInput,
     inputFields: input.inputFields,
   });
-  const featureSpec: PreparedAiFeatureSpec = {
-    feature: input.node.type === "condition"
-      ? "evaluate_condition_node"
-      : input.node.type === "checkpoint"
-        ? "review_checkpoint_node"
-        : "execute_task_node",
-    instructions: runtime.instructions,
-    inputText: JSON.stringify(runtime.runtimeInput, null, 2),
-    terminalToolName: defaultTerminalToolName(input.node.type),
-  };
-
   return runTaskNodeFeature({
     ...input,
-    featureSpec: {
-      ...featureSpec,
-      structuredOutputSchema: undefined,
-    },
-    providerInput: runtime.runtimeInput as unknown as Record<string, unknown>,
+    request: nodeCapabilityRequest({
+      kind,
+      attempt: input.attempt,
+      runtime: {
+        instructions: runtime.instructions,
+        runtimeInput: z.record(z.string(), providerJsonValueSchema).parse(
+          JSON.parse(JSON.stringify(runtime.runtimeInput)),
+        ),
+      },
+      node: input.node,
+    }),
   });
 }
 
-export async function evaluateConditionNodeCapability(
-  input: NodeAiCapabilityInput,
-): Promise<NodeExecutionResult> {
-  return executeTaskNodeCapability(input);
+export async function executeTaskNodeCapability(input: NodeAiCapabilityInput): Promise<NodeExecutionResult> {
+  return runNodeCapability(input, "execute");
 }
 
-export async function reviewCheckpointNodeCapability(
-  input: NodeAiCapabilityInput,
-): Promise<NodeExecutionResult> {
-  return executeTaskNodeCapability(input);
+export async function evaluateConditionNodeCapability(input: NodeAiCapabilityInput): Promise<NodeExecutionResult> {
+  if (input.node.type !== "condition") {
+    throw new Error(`Condition capability requires a condition node, received ${input.node.type}`);
+  }
+  return runNodeCapability(input, "evaluate");
+}
+
+export async function reviewCheckpointNodeCapability(input: NodeAiCapabilityInput): Promise<NodeExecutionResult> {
+  if (input.node.type !== "checkpoint") {
+    throw new Error(`Checkpoint capability requires a checkpoint node, received ${input.node.type}`);
+  }
+  return runNodeCapability(input, "review");
 }

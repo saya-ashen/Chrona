@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { Bot, Check, ChevronDown, ChevronUp, Circle, FileText, GitBranch, ListTree, Sparkles, TriangleAlert, Wrench } from "lucide-react";
+import { Check, ChevronDown, ChevronUp, Circle, FileText, GitBranch, ListTree, Sparkles, TriangleAlert, Wrench } from "lucide-react";
 import { Button, cn } from "@shared/ui";
 import type { WorkspaceActivityItem, WorkspaceActivityTone } from "../model/task-workspace-types";
 
@@ -16,7 +16,7 @@ type RenderEntry =
   | { type: "execution_header"; key: string };
 
 function isPlanGenerationEvent(item: WorkspaceActivityItem) {
-  return item.rawEventType?.startsWith("plan_generation.") || item.id.includes("plan_generation.");
+  return item.activityGroup?.kind === "plan_generation" || item.id.includes("plan_generation.");
 }
 
 function planGenerationGroupKey(item: WorkspaceActivityItem) {
@@ -24,7 +24,7 @@ function planGenerationGroupKey(item: WorkspaceActivityItem) {
   return "plan-generation";
 }
 function isPlanGenerationMilestone(item: WorkspaceActivityItem) {
-  const text = `${item.rawEventType ?? ""} ${item.title} ${item.summary}`.toLowerCase();
+  const text = `${item.title} ${item.summary}`.toLowerCase();
   return item.tone === "success" || text.includes("plan generated") || text.includes("generated");
 }
 
@@ -49,13 +49,10 @@ function collectPlanGenerationGroup(items: WorkspaceActivityItem[], startIndex: 
 }
 
 function isSameToolActivity(left: WorkspaceActivityItem, right: WorkspaceActivityItem) {
-  const leftCallId = left.tool?.callId;
-  const rightCallId = right.tool?.callId;
-  if (leftCallId && rightCallId) return leftCallId === rightCallId;
   const sameName = left.tool?.name === right.tool?.name || !left.tool?.name;
   return left.sourceNodeId === right.sourceNodeId
-    && left.runId === right.runId
-    && left.nativeRunId === right.nativeRunId
+    && left.provider?.label === right.provider?.label
+    && left.runtime?.label === right.runtime?.label
     && sameName;
 }
 
@@ -89,54 +86,36 @@ function hasToolProgress(items: WorkspaceActivityItem[], item: WorkspaceActivity
   );
 }
 
-const TRANSCRIPT_HIDDEN_EVENTS = new Set([
-  "plan_generation.status",
-  "plan_execution.executable_path_computed",
-  "plan_execution.plan_output_updated",
-  "turn_start",
-  "turn_end",
-]);
 
 
-function executionSessionId(item: WorkspaceActivityItem) {
-  return item.executionSessionId;
-}
-
-function executionSessionOrder(items: WorkspaceActivityItem[]) {
-  const sessions: string[] = [];
-  for (const item of [...items].reverse()) {
-    const sessionId = executionSessionId(item);
-    if (sessionId && !sessions.includes(sessionId)) sessions.push(sessionId);
-  }
-  return sessions;
+function executionStartOrder(items: WorkspaceActivityItem[]) {
+  return [...items]
+    .reverse()
+    .filter((item) => item.executionTrigger)
+    .map((item) => item.id);
 }
 /**
  * Flattens items into a render list, grouping plan and tool lifecycles.
  */
 export function buildRenderList(items: WorkspaceActivityItem[], transcript = false): RenderEntry[] {
-  const visibleItems = transcript
-    ? items.filter((item) => !TRANSCRIPT_HIDDEN_EVENTS.has(item.rawEventType ?? ""))
-    : items;
+  const visibleItems = items;
   const result: RenderEntry[] = [];
   let lastNodeId: string | undefined = undefined;
   const groupedPlanGenerationKeys = new Set<string>();
-  const sessionOrder = executionSessionOrder(visibleItems);
-  let previousSessionId: string | undefined;
-  let executionHeaderSessionId: string | undefined;
+  const executionStarts = executionStartOrder(visibleItems);
+  let executionHeaderAdded = false;
 
   for (let i = 0; i < visibleItems.length; i++) {
     const item = visibleItems[i];
-    const sessionId = executionSessionId(item);
-    if (sessionId && sessionId !== previousSessionId) {
-      const runNumber = sessionOrder.indexOf(sessionId) + 1;
+    if (item.executionTrigger) {
+      const runNumber = executionStarts.indexOf(item.id) + 1;
       result.push({
         type: "run_divider",
-        key: `run:${sessionId}`,
+        key: `run:${item.id}`,
         runNumber,
         restarted: item.executionTrigger === "restart" || runNumber > 1,
         timestamp: item.timestamp,
       });
-      previousSessionId = sessionId;
       lastNodeId = undefined;
     }
     lastNodeId = pushNodeHeader(result, item, lastNodeId);
@@ -150,9 +129,9 @@ export function buildRenderList(items: WorkspaceActivityItem[], transcript = fal
       continue;
     }
 
-    if (transcript && executionHeaderSessionId !== sessionId) {
-      result.push({ type: "execution_header", key: `execution-phase:${sessionId ?? "unscoped"}:${item.id}` });
-      executionHeaderSessionId = sessionId;
+    if (transcript && !executionHeaderAdded && executionStarts.length > 0) {
+      result.push({ type: "execution_header", key: `execution-phase:${item.id}` });
+      executionHeaderAdded = true;
     }
     if (transcript && item.kind === "tool_completed") {
       const startedTool = findStartedTool(visibleItems, item);
@@ -214,7 +193,6 @@ function entryIcon(kind: string | undefined, tone: Tone) {
   if (kind === "node") return GitBranch;
   if (kind === "provider_run") return Sparkles;
   if (kind?.startsWith("tool_")) return Wrench;
-  if (kind === "assistant_message" || kind === "reasoning") return Bot;
   if (kind === "artifact") return FileText;
   if (tone === "success") return Check;
   return Circle;
@@ -328,14 +306,13 @@ function SingleEventRow({ item, isLast, compact }: { item: WorkspaceActivityItem
   const tone = item.tone as Tone;
   const Icon = entryIcon(item.kind, tone);
   const time = formatActivityTime(item.timestamp);
-  const text = item.kind === "provider_run" && item.summary === item.provider
+  const text = item.kind === "provider_run" && item.summary === item.provider?.label
     ? undefined
-    : item.assistant?.text ?? (item.summary && item.summary !== item.title ? item.summary : undefined);
+    : item.summary && item.summary !== item.title ? item.summary : undefined;
   const isNodeEvent = item.kind === "node";
   const iconTone: Tone = isNodeEvent ? "info" : tone;
   const tool = item.tool;
   const toolState = tool?.state;
-  const hasToolDetails = !compact && !!(tool?.inputSummary || tool?.preview || tool?.error);
 
   return (
     <article className="relative grid grid-cols-[1.5rem_minmax(0,1fr)] gap-x-2">
@@ -363,31 +340,9 @@ function SingleEventRow({ item, isLast, compact }: { item: WorkspaceActivityItem
           )}
         </div>
         {item.provider && item.kind === "provider_run" ? (
-          <p className="mt-0.5 text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">{item.provider}</p>
+          <p className="mt-0.5 text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">{item.provider.label}</p>
         ) : null}
-        {text && <CollapsibleText text={text} compact={compact || (item.kind !== "assistant_message" && item.kind !== "reasoning")} />}
-        {hasToolDetails && (
-          <dl className="mt-1.5 space-y-1.5 rounded-xl border border-border/50 bg-muted/35 p-2 text-xs">
-            {tool?.inputSummary && (
-              <div className="grid gap-1 sm:grid-cols-[4rem_minmax(0,1fr)]">
-                <dt className="font-semibold text-muted-foreground">Input</dt>
-                <dd className="min-w-0 break-words text-foreground/80">{tool.inputSummary}</dd>
-              </div>
-            )}
-            {tool?.preview && (
-              <div className="grid gap-1 sm:grid-cols-[4rem_minmax(0,1fr)]">
-                <dt className="font-semibold text-muted-foreground">Preview</dt>
-                <dd className="min-w-0 break-words text-foreground/80">{tool.preview}</dd>
-              </div>
-            )}
-            {tool?.error && (
-              <div className="grid gap-1 sm:grid-cols-[4rem_minmax(0,1fr)]">
-                <dt className="font-semibold text-destructive/70">Error</dt>
-                <dd className="min-w-0 break-words text-destructive/80">{tool.error}</dd>
-              </div>
-            )}
-          </dl>
-        )}
+        {text && <CollapsibleText text={text} compact={compact} />}
       </div>
     </article>
   );
@@ -400,7 +355,7 @@ function ToolPairRow({
   progress,
   completed,
   isLast,
-  compact,
+  compact: _compact,
 }: {
   started: WorkspaceActivityItem;
   progress: WorkspaceActivityItem[];
@@ -410,19 +365,10 @@ function ToolPairRow({
 }) {
   const tool = completed?.tool ?? started.tool;
   const failed = completed?.tone === "danger" || tool?.state === "failed";
-  const [detailsOpen, setDetailsOpen] = useState(failed);
   const done = !!completed;
   const duration = fmtDuration(tool?.durationMs);
   const time = formatActivityTime(started.timestamp);
   const iconTone: Tone = failed ? "danger" : done ? "success" : "neutral";
-  const latestUpdate = progress.findLast((item) => item.tool?.preview)?.tool?.preview;
-  const detailPreviews = [
-    { label: "Intent", value: started.tool?.preview },
-    { label: "Input", value: started.tool?.inputSummary },
-    { label: "Update", value: latestUpdate },
-    { label: failed ? "Error" : "Result", value: tool?.error ?? tool?.resultPreview },
-  ].filter((detail): detail is { label: string; value: string } => !!detail.value).slice(0, 2);
-  const hasDetails = !compact && detailPreviews.length > 0;
 
   return (
     <article className="relative grid grid-cols-[1.5rem_minmax(0,1fr)] gap-x-2">
@@ -456,62 +402,7 @@ function ToolPairRow({
             {progress.at(-1)?.summary ?? started.summary}
           </p>
         ) : null}
-        {hasDetails && (
-          <div className="mt-2 rounded-xl border border-border/50 bg-muted/25 p-2">
-            {!detailsOpen ? (
-              <dl className="space-y-1 text-[11px]">
-                {detailPreviews.map((detail) => (
-                  <div key={detail.label} className="grid gap-1 sm:grid-cols-[4rem_minmax(0,1fr)]">
-                    <dt className="font-semibold text-muted-foreground">{detail.label}</dt>
-                    <dd className="min-w-0 truncate font-mono text-foreground/75">{detail.value}</dd>
-                  </div>
-                ))}
-              </dl>
-            ) : (
-              <dl className="space-y-1.5 text-xs">
-                {started.tool?.inputSummary && (
-                  <div className="grid gap-1 sm:grid-cols-[4rem_minmax(0,1fr)]">
-                    <dt className="font-semibold text-muted-foreground">Input</dt>
-                    <dd className="min-w-0 whitespace-pre-wrap break-words font-mono text-[11px] text-foreground/80">{started.tool.inputSummary}</dd>
-                  </div>
-                )}
-                {tool?.resultPreview && (
-                  <div className="grid gap-1 sm:grid-cols-[4rem_minmax(0,1fr)]">
-                    <dt className="font-semibold text-muted-foreground">Result</dt>
-                    <dd className="min-w-0 whitespace-pre-wrap break-words font-mono text-[11px] text-foreground/80">{tool.resultPreview}</dd>
-                  </div>
-                )}
-                {started.tool?.preview && (
-                  <div className="grid gap-1 sm:grid-cols-[4rem_minmax(0,1fr)]">
-                    <dt className="font-semibold text-muted-foreground">Intent</dt>
-                    <dd className="min-w-0 break-words text-foreground/80">{started.tool.preview}</dd>
-                  </div>
-                )}
-                {progress.map((item) => item.tool?.preview ? (
-                  <div key={item.id} className="grid gap-1 sm:grid-cols-[4rem_minmax(0,1fr)]">
-                    <dt className="font-semibold text-muted-foreground">Update</dt>
-                    <dd className="min-w-0 whitespace-pre-wrap break-words text-foreground/80">{item.tool.preview}</dd>
-                  </div>
-                ) : null)}
-                {tool?.error && (
-                  <div className="grid gap-1 sm:grid-cols-[4rem_minmax(0,1fr)]">
-                    <dt className="font-semibold text-destructive/70">Error</dt>
-                    <dd className="min-w-0 break-words text-destructive/80">{tool.error}</dd>
-                  </div>
-                )}
-              </dl>
-            )}
-            <button
-              type="button"
-              className="mt-1.5 flex min-h-7 items-center gap-1 rounded-md px-1 text-[10px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              onClick={() => setDetailsOpen((value) => !value)}
-              aria-expanded={detailsOpen}
-            >
-              {detailsOpen ? <ChevronUp className="size-3" /> : <ChevronDown className="size-3" />}
-              {detailsOpen ? "Show less" : "View all technical details"}
-            </button>
-          </div>
-        )}
+
       </div>
     </article>
   );
@@ -549,7 +440,7 @@ function PlanPhaseEvent({ item, compact }: { item: WorkspaceActivityItem; compac
 }
 
 function getPlanPhaseEventText(item: WorkspaceActivityItem) {
-  return item.assistant?.text ?? (item.summary && item.summary !== item.title ? item.summary : item.title);
+  return item.summary && item.summary !== item.title ? item.summary : item.title;
 }
 
 function getPlanPhaseEventDetail(item: WorkspaceActivityItem, text: string, milestone: boolean, compact: boolean) {
@@ -689,7 +580,7 @@ function railDetail(entry: RenderEntry) {
         return duration ? `done · ${duration}` : "done";
       }
       if (item.tool?.state === "started" || item.tool?.state === "progress") return item.summary || "running";
-      return item.assistant?.text ?? (item.summary && item.summary !== item.title ? item.summary : item.provider ?? formatActivityTime(item.timestamp));
+      return item.summary && item.summary !== item.title ? item.summary : item.provider?.label ?? formatActivityTime(item.timestamp);
     }
   }
 }

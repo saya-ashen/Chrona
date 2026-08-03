@@ -11,13 +11,14 @@ export async function rerunCurrentNodeTransition(
     ...input,
     executionAction: {
       action: "retry_node",
-      sessionId: input.executionSession.id,
       nodeId: checkpointNodeId({
         checkpoint: input.checkpoint,
         reason: "Checkpoint retry requires a node.",
       }),
       prompt: input.payloadText,
+      idempotencyKey: input.idempotencyKey,
     },
+    commandContext: { sessionId: input.executionSession.id },
     dispatchExecutionAction: input.dispatchExecutionAction,
     ...observerCallbacks(input),
   });
