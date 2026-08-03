@@ -124,6 +124,7 @@ function projectContribution(item: NonNullable<NodeResult["findings"]>[number]):
   };
 }
 
+// eslint-disable-next-line complexity -- The public projection explicitly allowlists each optional result field.
 export function projectPublicEffectivePlanNodeResult(
   result: NodeResult | null | undefined,
 ): PublicEffectivePlanNodeResult | undefined {
@@ -176,6 +177,7 @@ export function projectPublicEffectivePlanNodeResult(
   };
 }
 
+// eslint-disable-next-line complexity -- The public projection explicitly allowlists each optional node field.
 export function projectPublicEffectivePlanNode(node: EffectivePlanNode): PublicEffectivePlanNode {
   const result = projectPublicEffectivePlanNodeResult(node.result);
   return {

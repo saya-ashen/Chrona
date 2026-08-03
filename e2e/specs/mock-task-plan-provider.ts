@@ -172,6 +172,7 @@ export async function startMockTaskPlanProvider(): Promise<MockTaskPlanProvider>
   const runs = new Map<string, ProviderRun>();
   let nextRunId = 1;
 
+  // eslint-disable-next-line complexity -- The protocol mock intentionally dispatches the complete Hermes route surface in one local handler.
   const server = createServer(async (request, response) => {
     const url = new URL(request.url ?? "/", "http://127.0.0.1");
     try {
