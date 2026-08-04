@@ -74,6 +74,10 @@ type SdkRunHandle = {
   mcpManager?: MCPManager;
 };
 
+function sdkRunStopped(handle: Pick<SdkRunHandle, "done" | "status">): boolean {
+  return handle.done || handle.status !== "running";
+}
+
 export type OmpSdkProviderOptions = {
   config?: OmpProviderConfig;
 };
@@ -459,14 +463,24 @@ async function invokeChronaTerminalControl(
   if (!response.ok) {
     throw new Error(`Chrona rejected terminal action '${input.kind}' (HTTP ${response.status}): ${responseText.slice(0, 300)}`);
   }
-  let details: unknown = { accepted: true };
+  let details: unknown;
   try {
     details = JSON.parse(responseText);
   } catch {
-    // Preserve a successful non-JSON response as AI-visible text.
+    throw new Error(`Chrona returned an invalid terminal acknowledgement for '${input.kind}'`);
+  }
+  const acknowledgement = details && typeof details === "object"
+    ? details as Record<string, unknown>
+    : null;
+  if (
+    acknowledgement?.ok !== true
+    || acknowledgement.kind !== input.kind
+    || (acknowledgement.recorded !== true && acknowledgement.alreadyAccepted !== true)
+  ) {
+    throw new Error(`Chrona did not durably acknowledge terminal action '${input.kind}'`);
   }
   return {
-    content: [{ type: "text" as const, text: responseText || "accepted" }],
+    content: [{ type: "text" as const, text: responseText }],
     details,
   };
 }
@@ -550,7 +564,13 @@ function sdkRunToolOptions(
   control: ConnectedChronaMcpControl | undefined,
 ) {
   const declared = sdkToolOptions(tools, terminalToolName, onTerminalAccepted);
-  if (!control) return declared;
+  if (!control) {
+    const ungovernedTerminalTool = declared.customTools.find((tool) => Object.hasOwn(CHRONA_TERMINAL_CONTROL_KINDS, tool.name));
+    if (ungovernedTerminalTool) {
+      throw new Error(`Chrona terminal tool '${ungovernedTerminalTool.name}' requires run-scoped control authorization.`);
+    }
+    return declared;
+  }
   const controlledDeclaredTools = declared.customTools.map((tool) =>
     useChronaTerminalControl(tool, control.connection, onTerminalAccepted));
   const controlledMcpTools = control.tools.map((tool) =>
@@ -670,6 +690,7 @@ export const __ompSdkProviderTestHooks = {
   chronaMcpUrl,
   connectChronaMcpControl,
   sdkRunToolOptions,
+  sdkRunStopped,
   chronaAgentControlUrl,
   invokeChronaTerminalControl,
   sdkReadOnlyToolOptions,
@@ -1096,6 +1117,20 @@ export class OmpSdkProviderClient implements AgentProviderClient {
   }
 
   private async startSdkTurn(handle: SdkRunHandle, queue: AsyncEventQueue) {
+    if (handle.input.signal) {
+      const abort = () => {
+        if (handle.status !== "running") return;
+        handle.status = "cancelled";
+        handle.abort.abort();
+        handle.session?.abort();
+        queue.push({ ...eventBase(handle, "cancelled"), type: "run_cancelled", run: runRef(handle, "cancelled") });
+        void this.finish(handle, queue);
+      };
+      handle.inputAbortListener = abort;
+      handle.input.signal.addEventListener("abort", abort, { once: true });
+      if (handle.input.signal.aborted) abort();
+    }
+    if (sdkRunStopped(handle)) return;
     const environment = applySdkEnvironment(this.config, handle.ref.runId);
     const cwd = nonEmpty(this.config.cwd) ?? process.cwd();
     const agentDir = nonEmpty(this.config.codingAgentDirectory) ?? nonEmpty(this.config.configDirectory);
@@ -1108,7 +1143,9 @@ export class OmpSdkProviderClient implements AgentProviderClient {
         : {}),
     };
     const setup = await createSdkModelSetup(runConfig, environment);
+    if (sdkRunStopped(handle)) return;
     const settings = await loadSdkSettings(environment, cwd);
+    if (sdkRunStopped(handle)) return;
     const resumeSessionRef = nonEmpty(handle.input.resumeSessionRef);
     const sessionManager = resumeSessionRef
       ? await SessionManager.open(resumeSessionRef, undefined, undefined, {
@@ -1117,12 +1154,18 @@ export class OmpSdkProviderClient implements AgentProviderClient {
         })
       : SessionManager.create(cwd);
     const readOnlyToolOptions = sdkReadOnlyToolOptions(handle.input.toolPolicy);
+    if (sdkRunStopped(handle)) return;
     const control = await connectChronaMcpControl({
       control: handle.input.control,
       sessionId: handle.input.sessionKey ?? handle.input.sessionId,
       cwd,
     });
     handle.mcpManager = control?.manager;
+    if (sdkRunStopped(handle)) {
+      await control?.manager.disconnectAll().catch(() => undefined);
+      delete handle.mcpManager;
+      return;
+    }
     const { session } = await createAgentSession({
       cwd,
       agentDir,
@@ -1136,6 +1179,11 @@ export class OmpSdkProviderClient implements AgentProviderClient {
       skipPythonPreflight: true,
       hasUI: false,
     });
+    handle.session = session;
+    if (sdkRunStopped(handle)) {
+      await session.dispose().catch(() => undefined);
+      return;
+    }
     const expectedModel = nonEmpty(handle.input.runtimeConfiguration?.model);
     const actualModel = session.model ? `${session.model.provider}/${session.model.id}` : null;
     try {
@@ -1144,22 +1192,9 @@ export class OmpSdkProviderClient implements AgentProviderClient {
       await session.dispose();
       throw error;
     }
-    handle.session = session;
     const persistedSessionRef = session.sessionManager.getSessionFile();
     if (persistedSessionRef) handle.nativeSessionId = persistedSessionRef;
     handle.unsubscribe = session.subscribe((event) => this.onSessionEvent(handle, queue, event));
-    if (handle.input.signal) {
-      const abort = () => {
-        if (handle.status !== "running") return;
-        handle.status = "cancelled";
-        handle.abort.abort();
-        session.abort();
-        queue.push({ ...eventBase(handle, "cancelled"), type: "run_cancelled", run: runRef(handle, "cancelled") });
-        this.finish(handle, queue);
-      };
-      handle.inputAbortListener = abort;
-      handle.input.signal.addEventListener("abort", abort, { once: true });
-    }
     if (this.config.timeoutMs) {
       handle.timer = setTimeout(() => {
         if (handle.status !== "running") return;
@@ -1172,7 +1207,7 @@ export class OmpSdkProviderClient implements AgentProviderClient {
     }
 
     const ran = await session.prompt(prompt, { expandPromptTemplates: false });
-    if (!ran && handle.status === "running") {
+    if (!ran && !sdkRunStopped(handle)) {
       handle.status = "completed";
       queue.push({
         ...eventBase(handle, "completed"),

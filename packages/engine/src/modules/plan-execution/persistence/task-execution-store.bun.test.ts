@@ -151,6 +151,7 @@ describe("task execution store occurrence scope", () => {
         "chrona.node.condition_select",
         "chrona.node.block",
         "chrona.node.fail",
+        "chrona.node.request_input",
         "chrona.node.wait_complete",
       ]),
     });

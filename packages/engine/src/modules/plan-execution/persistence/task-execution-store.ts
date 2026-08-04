@@ -14,6 +14,7 @@ const PLAN_EXECUTION_ALLOWED_TOOL_NAMES = [
   "chrona.node.condition_select",
   "chrona.node.block",
   "chrona.node.fail",
+  "chrona.node.request_input",
   "chrona.node.wait_complete",
 ] as const satisfies readonly ChronaToolName[];
 const PLAN_EXECUTION_ALLOWED_TOOL_NAMES_JSON = JSON.stringify(PLAN_EXECUTION_ALLOWED_TOOL_NAMES);

@@ -257,6 +257,60 @@ describe("OmpSdkProviderClient declared runtime tools", () => {
     expect(result.details).toEqual({ ok: true, kind: "complete", recorded: true });
   });
 
+  it("rejects a 2xx response without a durable terminal acknowledgement", async () => {
+    const fetcher = (async (_input: string | URL | Request, _init?: RequestInit) => new Response(JSON.stringify({
+      ok: false,
+      kind: "complete",
+      recorded: false,
+    }), { status: 200 })) as typeof fetch;
+
+    await expect(__ompSdkProviderTestHooks.invokeChronaTerminalControl({
+      connection: { baseUrl: "http://chrona.test", runToken: "run-token" },
+      kind: "complete",
+      payload: { summary: "Done" },
+    }, fetcher)).rejects.toThrow("did not durably acknowledge");
+  });
+
+  it("accepts an idempotently replayed terminal acknowledgement", async () => {
+    const fetcher = (async (_input: string | URL | Request, _init?: RequestInit) => new Response(JSON.stringify({
+      ok: true,
+      kind: "complete",
+      recorded: false,
+      alreadyAccepted: true,
+    }), { status: 200 })) as typeof fetch;
+
+    const result = await __ompSdkProviderTestHooks.invokeChronaTerminalControl({
+      connection: { baseUrl: "http://chrona.test", runToken: "revoked-run-token" },
+      kind: "complete",
+      payload: { summary: "Done" },
+    }, fetcher);
+    expect(result.details).toMatchObject({ ok: true, kind: "complete", alreadyAccepted: true });
+  });
+
+  it("rejects every declared Chrona terminal tool without run-scoped control", () => {
+    const terminalToolNames = [
+      "chrona_node_complete",
+      "chrona_condition_select",
+      "chrona_wait_complete",
+      "chrona_node_request_input",
+      "chrona_node_block",
+      "chrona_node_fail",
+    ];
+    for (const name of terminalToolNames) {
+      expect(() => __ompSdkProviderTestHooks.sdkRunToolOptions([{
+        name,
+        description: "Mutate the current execution node.",
+        inputSchema: { type: "object", properties: {} },
+      }], name, undefined, undefined)).toThrow("requires run-scoped control authorization");
+    }
+  });
+
+  it("stops SDK startup after cancellation is observed", () => {
+    expect(__ompSdkProviderTestHooks.sdkRunStopped({ done: true, status: "running" })).toBe(true);
+    expect(__ompSdkProviderTestHooks.sdkRunStopped({ done: false, status: "cancelled" })).toBe(true);
+    expect(__ompSdkProviderTestHooks.sdkRunStopped({ done: false, status: "running" })).toBe(false);
+  });
+
   it("routes declared request-input terminal tools through run-token control", async () => {
     const originalFetch = globalThis.fetch;
     let requestedBody: unknown;
