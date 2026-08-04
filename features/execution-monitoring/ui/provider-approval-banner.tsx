@@ -1,5 +1,6 @@
 /* eslint-disable complexity -- Approval presentation intentionally enumerates all durable resolution states. */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { v4 as uuidv4 } from "uuid";
 import { apiJson } from "@shared/http";
 import { Button, Card, CardContent, CardHeader, CardTitle } from "@shared/ui";
 import type { PublicProviderDescriptor } from "@chrona/contracts";
@@ -70,7 +71,7 @@ export function ProviderApprovalBanner({
       `/api/tasks/${taskId}/provider-approvals/${input.approvalId}/resolve`,
       {
         method: "POST",
-        body: JSON.stringify({ workBlockId, executionScope, choice: input.choice, idempotencyKey: crypto.randomUUID() }),
+        body: JSON.stringify({ workBlockId, executionScope, choice: input.choice, idempotencyKey: uuidv4() }),
       },
     ),
     onSuccess: async () => {

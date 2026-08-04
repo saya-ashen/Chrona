@@ -1,4 +1,5 @@
 import { apiJson } from "@shared/http";
+import { v4 as uuidv4 } from "uuid";
 import {
   appendTaskPrimaryNodeAction,
   graphNodeIdForTaskAction,
@@ -681,7 +682,7 @@ export async function dispatchTaskExecutionAction(
   action: ExecutionActionInput,
   workBlockId?: string | null,
 ): Promise<TaskWorkspaceCommandAck> {
-  const idempotencyKey = action.idempotencyKey ?? crypto.randomUUID();
+  const idempotencyKey = action.idempotencyKey ?? uuidv4();
   const scopedAction = workBlockId ? { ...action, workBlockId, idempotencyKey } : { ...action, idempotencyKey };
   const ack = await apiJson<Omit<TaskWorkspaceCommandAck, "message">>(
     `/api/work/${encodeURIComponent(taskId)}/commands`,
@@ -695,7 +696,7 @@ export async function submitTaskCheckpointAction(
   action: SubmitCheckpointActionInput,
   workBlockId?: string | null,
 ): Promise<TaskWorkspaceCommandAck> {
-  const idempotencyKey = action.idempotencyKey ?? crypto.randomUUID();
+  const idempotencyKey = action.idempotencyKey ?? uuidv4();
   const scopedAction = workBlockId ? { ...action, workBlockId, idempotencyKey } : { ...action, idempotencyKey };
   const ack = await apiJson<Omit<TaskWorkspaceCommandAck, "message">>(
     `/api/work/${encodeURIComponent(taskId)}/commands`,

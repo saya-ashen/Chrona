@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef } from "react";
+import { v4 as uuidv4 } from "uuid";
 import type { TaskPlanReadModel } from "@chrona/contracts"
 import {
   startTaskPlanGenerationSession,
@@ -42,7 +43,7 @@ export function useTaskPlanGeneration({
         forceRefresh: input?.forceRefresh ?? true,
         userInstruction: input?.userInstruction,
         selectedNodeId: input?.selectedNodeId,
-        idempotencyKey: crypto.randomUUID(),
+        idempotencyKey: uuidv4(),
       });
     },
     [taskId, workBlockId],
@@ -64,7 +65,7 @@ export function useTaskPlanGeneration({
       taskId,
       workBlockId,
       forceRefresh,
-      idempotencyKey: crypto.randomUUID(),
+      idempotencyKey: uuidv4(),
     });
   }, [autoRequest, forceRefresh, state.hydrated, state.result, state.sessionStatus, taskId, workBlockId]);
 

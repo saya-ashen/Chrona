@@ -207,6 +207,35 @@ describe("B. Accept plan — happy path", () => {
     expect(mocks.commandCalls[0]?.body).toMatchObject({ type: "plan.accept", planId: "plan-1" });
     expect(result.current.isAcceptingPlan).toBe(false);
   });
+
+  it("B3. accepts a plan when the browser does not expose crypto.randomUUID", async () => {
+    const originalRandomUuid = globalThis.crypto.randomUUID;
+    Object.defineProperty(globalThis.crypto, "randomUUID", { configurable: true, value: undefined });
+    mocks.nextResponse = { kind: "success", body: { commandId: "c-3", taskId: "task-1", acceptedAt: "2026-06-10T00:00:02.000Z" } };
+
+    try {
+      const initialPage = taskWorkspacePlanStateFixtures.planWaitingAcceptance.pageData as TaskPageData;
+      const refreshWorkspace = vi.fn();
+      const { result } = renderHook(
+        () => useTaskWorkspacePlanState(initialPage.task, refreshWorkspace, []),
+        { wrapper },
+      );
+      await waitFor(() => expect(result.current.planHeadStateVersion).toBe(2));
+
+      await act(async () => {
+        await result.current.handleAcceptPlan();
+      });
+
+      expect(mocks.commandCalls[0]?.body).toMatchObject({
+        type: "plan.accept",
+        planId: "plan-1",
+        idempotencyKey: expect.any(String),
+      });
+      expect(result.current.acceptPlanError).toBeNull();
+    } finally {
+      Object.defineProperty(globalThis.crypto, "randomUUID", { configurable: true, value: originalRandomUuid });
+    }
+  });
 });
 
 /* ------------------------------------------------------------------------- */

@@ -1,4 +1,5 @@
 import { useCallback, useState } from "react";
+import { v4 as uuidv4 } from "uuid";
 import { useMutation } from "@tanstack/react-query";
 import { apiJson } from "@shared/http";
 import type { TaskWorkspaceUpdateProposal } from "@chrona/contracts"
@@ -100,7 +101,7 @@ export function useTaskWorkspaceProposalFlow({
               body: JSON.stringify({
                 ...patch,
                 expectedHeadStateVersion,
-                idempotencyKey: crypto.randomUUID(),
+                idempotencyKey: uuidv4(),
                 summary: proposal.planPatch.rationale ?? `Apply ${operation.op}`,
               }),
             });

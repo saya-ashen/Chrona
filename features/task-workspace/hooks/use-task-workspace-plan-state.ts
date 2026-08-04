@@ -1,4 +1,5 @@
 import { startTransition, useCallback, useEffect, useRef, useState, type SetStateAction } from "react";
+import { v4 as uuidv4 } from "uuid";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiJson } from "@shared/http";
 import { taskPlanReadModelToGraphPlan } from "../plan/task-plan-view-model";
@@ -584,7 +585,7 @@ export function useTaskWorkspacePlanState(
         planId,
         workBlockId: selectedWorkBlockId,
         expectedHeadStateVersion: planHeadStateVersion,
-        idempotencyKey: crypto.randomUUID(),
+        idempotencyKey: uuidv4(),
       });
       setPlanFlow(completePlanAccept(plan));
       void refreshExecutionQueries();
@@ -605,7 +606,7 @@ export function useTaskWorkspacePlanState(
     setGenerationUserInstruction(userInstruction);
     void dispatchWorkspaceCommand(task.id, {
       type: "plan.generate",
-      idempotencyKey: crypto.randomUUID(),
+      idempotencyKey: uuidv4(),
       forceRefresh: true,
       workBlockId: selectedWorkBlockId,
       userInstruction,

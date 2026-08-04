@@ -17,6 +17,7 @@ import {
   type ReactNode,
 } from "react";
 import { useLocation, useNavigate, useRevalidator } from "react-router-dom";
+import { v4 as uuidv4 } from "uuid";
 import { createScheduledTask, TaskCreateDialog, type SchedulePageData } from "@features/schedule";
 import { createGoalWithFirstTask } from "@features/goals";
 import { apiJson } from "@shared/http";
@@ -428,7 +429,7 @@ export function ControlPlaneShell({
                 firstTaskTitle: input.firstTaskTitle!,
                 additionalContext: input.description || null,
                 priority: input.priority,
-                idempotencyKey: crypto.randomUUID(),
+                idempotencyKey: uuidv4(),
               });
               setCreatedOnboardingTaskId(created.taskId);
               await revalidate();
