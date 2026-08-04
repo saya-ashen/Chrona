@@ -141,11 +141,27 @@ describe("task execution store occurrence scope", () => {
       status: "idle",
       activeRunId: null,
       lastRunStatus: RunStatus.Completed,
+      capabilityScope: "plan_execution",
+      allowedToolNames: JSON.stringify([
+        "chrona.execution.read",
+        "chrona.goal.results.read",
+        "chrona.plan.read",
+        "chrona.node.read",
+        "chrona.node.complete",
+        "chrona.node.condition_select",
+        "chrona.node.block",
+        "chrona.node.fail",
+        "chrona.node.wait_complete",
+      ]),
     });
     expect(await db.taskSession.findUniqueOrThrow({ where: { id: second.session.id } })).toMatchObject({
       status: "running",
       activeRunId: second.run.id,
       lastRunStatus: RunStatus.Running,
+    });
+    expect(await db.taskSession.findUniqueOrThrow({ where: { id: second.session.id } })).toMatchObject({
+      capabilityScope: "unknown",
+      allowedToolNames: "[]",
     });
   });
 

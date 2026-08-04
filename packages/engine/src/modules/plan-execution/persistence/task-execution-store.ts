@@ -3,6 +3,20 @@ import { rebuildTaskProjectionInTransaction } from "@/modules/projections/rebuil
 import { updateTaskSessionStateFromRunInTransaction } from "@/modules/execution-runtime";
 import { terminalizePlanRunScopeInTransaction } from "./plan-run-terminalizer";
 import { withPlanExecutionDurability } from "./scheduler-durability";
+import type { ChronaToolName } from "@chrona/contracts";
+
+const PLAN_EXECUTION_ALLOWED_TOOL_NAMES = [
+  "chrona.execution.read",
+  "chrona.goal.results.read",
+  "chrona.plan.read",
+  "chrona.node.read",
+  "chrona.node.complete",
+  "chrona.node.condition_select",
+  "chrona.node.block",
+  "chrona.node.fail",
+  "chrona.node.wait_complete",
+] as const satisfies readonly ChronaToolName[];
+const PLAN_EXECUTION_ALLOWED_TOOL_NAMES_JSON = JSON.stringify(PLAN_EXECUTION_ALLOWED_TOOL_NAMES);
 
 export const ACTIVE_RUN_STATUSES: readonly RunStatus[] = [
   RunStatus.Pending,
@@ -45,6 +59,15 @@ export async function syncPersistedRunStateInTransaction(
     runStatus: run.status,
     runtimeRunRef: run.runtimeRunRef,
   }, tx);
+  if (run.taskSessionId) {
+    await tx.taskSession.update({
+      where: { id: run.taskSessionId },
+      data: {
+        capabilityScope: "plan_execution",
+        allowedToolNames: PLAN_EXECUTION_ALLOWED_TOOL_NAMES_JSON,
+      },
+    });
+  }
   if (!ACTIVE_RUN_STATUSES.includes(run.status)) {
     await tx.runToken.updateMany({ where: { runId: input.runId, revokedAt: null }, data: { revokedAt: new Date() } });
   }

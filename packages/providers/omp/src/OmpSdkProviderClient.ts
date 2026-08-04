@@ -15,6 +15,7 @@ import {
   type CustomTool,
   type ProviderConfigInput,
 } from "@oh-my-pi/pi-coding-agent";
+import { MCPManager } from "@oh-my-pi/pi-coding-agent/mcp";
 import {
   BoundedTerminalRunSnapshots,
   assertProviderStartSupported,
@@ -70,6 +71,7 @@ type SdkRunHandle = {
   inputAbortListener?: () => void;
   terminalActionAccepted?: boolean;
   terminalAction?: { name: string; input: Record<string, unknown> };
+  mcpManager?: MCPManager;
 };
 
 export type OmpSdkProviderOptions = {
@@ -403,6 +405,165 @@ function sdkToolOptions(
   };
 }
 
+const CHRONA_MCP_SERVER_NAME = "chrona";
+
+type ChronaControlConnection = NonNullable<StartRunInput["control"]>;
+
+type ConnectedChronaMcpControl = {
+  manager: MCPManager;
+  tools: CustomTool[];
+  connection: ChronaControlConnection;
+};
+
+function chronaMcpUrl(baseUrl: string, sessionId: string): string {
+  const trimmedBaseUrl = baseUrl.trim().replace(/\/+$/, "");
+  const apiBaseUrl = trimmedBaseUrl.endsWith("/api") ? trimmedBaseUrl : `${trimmedBaseUrl}/api`;
+  const url = new URL(`${apiBaseUrl}/mcp`);
+  if (sessionId.trim()) url.searchParams.set("session_id", sessionId.trim());
+  return url.toString();
+}
+
+function chronaAgentControlUrl(baseUrl: string): string {
+  const trimmedBaseUrl = baseUrl.trim().replace(/\/+$/, "");
+  const apiBaseUrl = trimmedBaseUrl.endsWith("/api") ? trimmedBaseUrl : `${trimmedBaseUrl}/api`;
+  return `${apiBaseUrl}/agent/control`;
+}
+
+const CHRONA_TERMINAL_CONTROL_KINDS = {
+  chrona_node_complete: "complete",
+  chrona_condition_select: "condition_select",
+  chrona_wait_complete: "wait_complete",
+  chrona_node_block: "block",
+  chrona_node_fail: "fail",
+  chrona_node_request_input: "request_input",
+} as const;
+
+type ChronaTerminalControlKind = typeof CHRONA_TERMINAL_CONTROL_KINDS[keyof typeof CHRONA_TERMINAL_CONTROL_KINDS];
+async function invokeChronaTerminalControl(
+  input: {
+    connection: ChronaControlConnection;
+    kind: ChronaTerminalControlKind;
+    payload: unknown;
+  },
+  fetcher: typeof fetch = fetch,
+) {
+  const response = await fetcher(chronaAgentControlUrl(input.connection.baseUrl), {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${input.connection.runToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ body: { kind: input.kind, payload: input.payload } }),
+  });
+  const responseText = await response.text();
+  if (!response.ok) {
+    throw new Error(`Chrona rejected terminal action '${input.kind}' (HTTP ${response.status}): ${responseText.slice(0, 300)}`);
+  }
+  let details: unknown = { accepted: true };
+  try {
+    details = JSON.parse(responseText);
+  } catch {
+    // Preserve a successful non-JSON response as AI-visible text.
+  }
+  return {
+    content: [{ type: "text" as const, text: responseText || "accepted" }],
+    details,
+  };
+}
+
+function useChronaTerminalControl(
+  tool: CustomTool,
+  connection: ChronaControlConnection,
+  onTerminalAccepted?: () => void,
+): CustomTool {
+  const kind = (CHRONA_TERMINAL_CONTROL_KINDS as Partial<Record<string, ChronaTerminalControlKind>>)[tool.name];
+  if (!kind) return tool;
+  return {
+    ...tool,
+    async execute(_toolCallId, params, _onUpdate, ctx) {
+      const result = await invokeChronaTerminalControl({ connection, kind, payload: params });
+      onTerminalAccepted?.();
+      queueMicrotask(() => ctx.abort());
+      return result;
+    },
+  };
+}
+
+function exposeChronaMcpTool(tool: CustomTool): CustomTool {
+  const name = tool.name.startsWith("mcp__") ? tool.name.slice("mcp__".length) : tool.name;
+  return {
+    ...tool,
+    name,
+    label: name,
+    execute: tool.execute.bind(tool),
+  };
+}
+
+async function connectChronaMcpControl(
+  input: { control: StartRunInput["control"]; sessionId: string; cwd: string },
+  managerFactory: (cwd: string) => MCPManager = (cwd) => new MCPManager(cwd),
+): Promise<ConnectedChronaMcpControl | undefined> {
+  if (!input.control) return undefined;
+  const manager = managerFactory(input.cwd);
+  const result = await manager.connectServers(
+    {
+      [CHRONA_MCP_SERVER_NAME]: {
+        type: "http",
+        url: chronaMcpUrl(input.control.baseUrl, input.sessionId),
+        headers: { Authorization: `Bearer ${input.control.runToken}` },
+      },
+    },
+    {
+      [CHRONA_MCP_SERVER_NAME]: {
+        provider: "chrona-control-plane",
+        providerName: "Chrona control plane",
+        path: resolve(input.cwd, ".chrona-runtime-control"),
+        level: "native",
+      },
+    },
+  );
+  const immediateError = result.errors.get(CHRONA_MCP_SERVER_NAME) ?? [...result.errors.values()][0];
+  if (immediateError) {
+    await manager.disconnectAll().catch(() => undefined);
+    throw new Error(`Oh My Pi could not connect to the Chrona control plane: ${immediateError}`);
+  }
+  try {
+    await manager.waitForConnection(CHRONA_MCP_SERVER_NAME);
+    await manager.refreshServerTools(CHRONA_MCP_SERVER_NAME);
+  } catch (cause) {
+    await manager.disconnectAll().catch(() => undefined);
+    const detail = cause instanceof Error ? cause.message.trim() : String(cause).trim();
+    throw new Error(`Oh My Pi could not connect to the Chrona control plane${detail ? `: ${detail}` : "."}`);
+  }
+  const tools = (manager.getTools() as CustomTool[]).map(exposeChronaMcpTool);
+  if (!manager.getConnectedServers().includes(CHRONA_MCP_SERVER_NAME) || tools.length === 0) {
+    await manager.disconnectAll().catch(() => undefined);
+    throw new Error("Oh My Pi connected to the Chrona control plane without receiving its tools.");
+  }
+  return { manager, tools, connection: input.control };
+}
+
+function sdkRunToolOptions(
+  tools: StartRunInput["tools"],
+  terminalToolName: string | undefined,
+  onTerminalAccepted: (() => void) | undefined,
+  control: ConnectedChronaMcpControl | undefined,
+) {
+  const declared = sdkToolOptions(tools, terminalToolName, onTerminalAccepted);
+  if (!control) return declared;
+  const controlledDeclaredTools = declared.customTools.map((tool) =>
+    useChronaTerminalControl(tool, control.connection, onTerminalAccepted));
+  const controlledMcpTools = control.tools.map((tool) =>
+    useChronaTerminalControl(tool, control.connection, onTerminalAccepted));
+  const mcpToolNames = new Set(controlledMcpTools.map((tool) => tool.name));
+  return {
+    customTools: [
+      ...controlledDeclaredTools.filter((tool) => !mcpToolNames.has(tool.name)),
+      ...controlledMcpTools,
+    ],
+  };
+}
+
 function toolCallPreview(
   event: Extract<AgentSessionEvent, { type: "tool_execution_start" }>,
 ): string | undefined {
@@ -506,6 +667,11 @@ function sdkReadOnlyToolOptions(toolPolicy: StartRunInput["toolPolicy"]) {
 export const __ompSdkProviderTestHooks = {
   jsonSchemaToZod,
   sdkToolOptions,
+  chronaMcpUrl,
+  connectChronaMcpControl,
+  sdkRunToolOptions,
+  chronaAgentControlUrl,
+  invokeChronaTerminalControl,
   sdkReadOnlyToolOptions,
   sdkToolErrorMessage,
   isDeclaredTerminalTool,
@@ -951,6 +1117,12 @@ export class OmpSdkProviderClient implements AgentProviderClient {
         })
       : SessionManager.create(cwd);
     const readOnlyToolOptions = sdkReadOnlyToolOptions(handle.input.toolPolicy);
+    const control = await connectChronaMcpControl({
+      control: handle.input.control,
+      sessionId: handle.input.sessionKey ?? handle.input.sessionId,
+      cwd,
+    });
+    handle.mcpManager = control?.manager;
     const { session } = await createAgentSession({
       cwd,
       agentDir,
@@ -958,7 +1130,7 @@ export class OmpSdkProviderClient implements AgentProviderClient {
       ...(setup.authStorage ? { authStorage: setup.authStorage } : {}),
       ...(setup.modelRegistry ? { modelRegistry: setup.modelRegistry } : {}),
       settings,
-      ...sdkToolOptions(handle.input.tools, terminalToolName, () => { handle.terminalActionAccepted = true; }),
+      ...sdkRunToolOptions(handle.input.tools, terminalToolName, () => { handle.terminalActionAccepted = true; }, control),
       ...readOnlyToolOptions,
       sessionManager,
       skipPythonPreflight: true,
@@ -1159,6 +1331,11 @@ export class OmpSdkProviderClient implements AgentProviderClient {
       await handle.session?.dispose();
     } catch (error) {
       console.error("OMP SDK session disposal failed", error);
+    }
+    try {
+      await handle.mcpManager?.disconnectAll();
+    } catch (error) {
+      console.error("OMP SDK Chrona MCP disposal failed", error);
     }
     queue.push({ type: "end" });
   }

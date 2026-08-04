@@ -170,6 +170,159 @@ describe("OmpSdkProviderClient declared runtime tools", () => {
     expect(__ompSdkProviderTestHooks.sdkReadOnlyToolOptions("full")).toEqual({});
   });
 
+  it("connects the run-scoped Chrona MCP server and exposes its tools", async () => {
+    let seenServers: Record<string, unknown> | undefined;
+    let seenSources: Record<string, unknown> | undefined;
+    let disconnects = 0;
+    let waits = 0;
+    let refreshes = 0;
+    const manager = {
+      connectServers: async (servers: Record<string, unknown>, sources: Record<string, unknown>) => {
+        seenServers = servers;
+        seenSources = sources;
+        return {
+          tools: [],
+          errors: new Map<string, string>(),
+          connectedServers: [],
+          exaApiKeys: [],
+        };
+      },
+      waitForConnection: async () => { waits += 1; return {} as never; },
+      refreshServerTools: async () => { refreshes += 1; },
+      getConnectedServers: () => ["chrona"],
+      getTools: () => [{ name: "mcp__chrona_node_complete", execute: async () => ({ content: [], details: {} }) }],
+      disconnectAll: async () => { disconnects += 1; },
+    };
+
+    const control = await __ompSdkProviderTestHooks.connectChronaMcpControl(
+      {
+        control: { baseUrl: "http://chrona.test/api/", runToken: "run-token" },
+        sessionId: "chrona:task:task-1:execute:plan-1",
+        cwd: "/tmp/workspace",
+      },
+      () => manager as never,
+    );
+
+    expect(seenServers).toEqual({
+      chrona: {
+        type: "http",
+        url: "http://chrona.test/api/mcp?session_id=chrona%3Atask%3Atask-1%3Aexecute%3Aplan-1",
+        headers: { Authorization: "Bearer run-token" },
+      },
+    });
+    expect(seenSources).toMatchObject({
+      chrona: { provider: "chrona-control-plane", providerName: "Chrona control plane", level: "native" },
+    });
+    expect(__ompSdkProviderTestHooks.sdkRunToolOptions(runtimeTools, "runtime_complete", undefined, control)
+      .customTools.map((tool) => tool.name)).toEqual([
+      "runtime_complete",
+      "runtime_lookup",
+      "chrona_node_complete",
+    ]);
+    await control?.manager.disconnectAll();
+    expect(disconnects).toBe(1);
+    expect(waits).toBe(1);
+    expect(refreshes).toBe(1);
+  });
+
+  it("posts terminal MCP tool payloads through the run-token control endpoint", async () => {
+    let requestedUrl = "";
+    let requestedInit: RequestInit | undefined;
+    const fetcher = (async (url: string | URL | Request, init?: RequestInit) => {
+      requestedUrl = String(url);
+      requestedInit = init;
+      return new Response(JSON.stringify({ ok: true, kind: "complete", recorded: true }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    }) as typeof fetch;
+
+    const result = await __ompSdkProviderTestHooks.invokeChronaTerminalControl({
+      connection: { baseUrl: "http://chrona.test/api/", runToken: "run-token" },
+      kind: "complete",
+      payload: { i: "submit result", summary: "Done" },
+    }, fetcher);
+
+    expect(requestedUrl).toBe("http://chrona.test/api/agent/control");
+    expect(requestedInit?.headers).toEqual({
+      Authorization: "Bearer run-token",
+      "Content-Type": "application/json",
+    });
+    expect(JSON.parse(String(requestedInit?.body))).toEqual({
+      body: {
+        kind: "complete",
+        payload: { i: "submit result", summary: "Done" },
+      },
+    });
+    expect(result.details).toEqual({ ok: true, kind: "complete", recorded: true });
+  });
+
+  it("routes declared request-input terminal tools through run-token control", async () => {
+    const originalFetch = globalThis.fetch;
+    let requestedBody: unknown;
+    let terminalAccepted = 0;
+    let aborts = 0;
+    globalThis.fetch = (async (_url: string | URL | Request, init?: RequestInit) => {
+      requestedBody = JSON.parse(String(init?.body));
+      return new Response(JSON.stringify({ ok: true, kind: "request_input", recorded: true }), { status: 200 });
+    }) as typeof fetch;
+    try {
+      const tools = __ompSdkProviderTestHooks.sdkRunToolOptions([{
+        name: "chrona_node_request_input",
+        description: "Request structured input.",
+        inputSchema: {
+          type: "object",
+          properties: { title: { type: "string" }, instructions: { type: "string" } },
+          required: ["title", "instructions"],
+        },
+      }], "chrona_node_request_input", () => { terminalAccepted += 1; }, {
+        manager: { disconnectAll: async () => undefined },
+        connection: { baseUrl: "http://chrona.test/api", runToken: "run-token" },
+        tools: [],
+      } as never).customTools;
+
+      await tools[0]!.execute("request-input", {
+        title: "Choose source",
+        instructions: "Select one source.",
+      }, undefined, { abort: () => { aborts += 1; } } as never, undefined);
+      await Promise.resolve();
+
+      expect(requestedBody).toEqual({
+        body: {
+          kind: "request_input",
+          payload: { title: "Choose source", instructions: "Select one source." },
+        },
+      });
+      expect(terminalAccepted).toBe(1);
+      expect(aborts).toBe(1);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
+
+  it("fails the run when the Chrona MCP control plane cannot connect", async () => {
+    let disconnects = 0;
+    const manager = {
+      connectServers: async () => ({
+        tools: [],
+        errors: new Map([["chrona", "HTTP 401"]]),
+        connectedServers: [],
+        exaApiKeys: [],
+      }),
+      disconnectAll: async () => { disconnects += 1; },
+    };
+
+    await expect(__ompSdkProviderTestHooks.connectChronaMcpControl(
+      {
+        control: { baseUrl: "http://chrona.test", runToken: "expired-token" },
+        sessionId: "chrona:session",
+        cwd: "/tmp/workspace",
+      },
+      () => manager as never,
+    )).rejects.toThrow("Oh My Pi could not connect to the Chrona control plane: HTTP 401");
+    expect(disconnects).toBe(1);
+  });
+
   it("accepts and aborts only after the declared terminal tool runs", async () => {
     let terminalAccepted = 0;
     let aborts = 0;

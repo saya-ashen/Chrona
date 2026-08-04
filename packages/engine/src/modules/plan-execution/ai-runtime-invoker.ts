@@ -27,6 +27,7 @@ import { mintRunToken } from "./runtime/agent-control-store";
 import { ACTIVE_RUN_STATUSES, syncPersistedRunStateInTransaction } from "./persistence/task-execution-store";
 import { assertCurrentPlanExecutionOwnership, schedulerWorkSignal, withPlanExecutionDurability } from "./persistence/scheduler-durability";
 import { assertRuntimeExecutionScope } from "./persistence/runtime-execution-scope";
+import { generatedFilesRoot } from "@/modules/tasks/result-file-access";
 type RuntimeProviderClient = AgentProviderClient;
 
 export type AiRuntimeInvocationInput = {
@@ -216,7 +217,7 @@ async function invokeProviderForRuntime(input: AiRuntimeInvocationInput, task: R
   const baseRequest = await createProviderRequest(input, task, client.providerClient);
   const request = {
     ...baseRequest,
-    instructions: `${baseRequest.instructions}\nStore every generated deliverable under generated://${run.id}/ and return only URIs inside that Run scope.`,
+    instructions: `${baseRequest.instructions}\nStore every generated deliverable in ${generatedFilesRoot()}/${run.id}/ and return it as generated://${run.id}/<filename>. Do not claim a generated URI for a file stored elsewhere.`,
   };
   const providerRun = await ensureProviderRunRecord({
     taskId: input.taskId,
