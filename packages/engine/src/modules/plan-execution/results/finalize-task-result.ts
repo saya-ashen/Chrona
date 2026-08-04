@@ -10,7 +10,7 @@ import type {
 } from "@chrona/contracts/ai";
 import { agentControlActionBodySchema } from "@chrona/contracts/api";
 import { chronaResultSpecJsonSchema, validateChronaSpec, type UiDocument } from "@chrona/ui-protocol";
-import { getAiClientForTask, runProviderRequest, type ProviderFeatureRequest } from "../../ai";
+import { extractJSON, getAiClientForTask, runProviderRequest, type ProviderFeatureRequest } from "../../ai";
 import type { ProviderJsonValue } from "@chrona/providers-foundation";
 import { submitNodeResultActionFromControl } from "../../agent-tools/node-result-action";
 import { getPlanRun, savePlanRunGuarded } from "../persistence/plan-run-store";
@@ -101,15 +101,23 @@ function finalizationProviderRequest(input: {
   };
 }
 
-function parsedProviderPayload(payload: unknown): ProviderJsonValue {
+function parsedProviderPayload(payload: unknown, outputText = ""): ProviderJsonValue {
   const providerPayload = providerJsonValueSchema.safeParse(payload);
-  const parsed = finalizationProviderPayloadSchema.safeParse(
-    providerPayload.success ? providerPayload.data : undefined,
-  );
-  if (!parsed.success) {
+  if (
+    providerPayload.success
+    && providerPayload.data !== null
+    && typeof providerPayload.data === "object"
+    && !Array.isArray(providerPayload.data)
+  ) {
+    const envelope = finalizationProviderPayloadSchema.safeParse(providerPayload.data);
+    if (!envelope.success) return providerPayload.data;
+    if (envelope.data.parsed !== null) return envelope.data.parsed;
+  }
+  const extracted = extractJSON(outputText);
+  if (!extracted) {
     throw new Error("Result finalization provider did not return a parsed payload");
   }
-  return parsed.data.parsed;
+  return providerJsonValueSchema.parse(extracted);
 }
 
 function stripHostOnly(value: ProviderJsonValue): ProviderJsonValue {
@@ -548,7 +556,7 @@ export async function finalizeTaskResult(input: {
     }
     const spec = validateFinalizedResultSpec({
       manifest: running.manifest,
-      payload: parsedProviderPayload(response.structuredPayload),
+      payload: parsedProviderPayload(response.structuredPayload, response.outputText),
     });
     const latest = await getPlanRun(
       input.taskId,

@@ -64,9 +64,59 @@ describe("finalized result provider payload", () => {
     ).toEqual(resultSpec());
   });
 
-  it("rejects a structured payload without the parsed envelope", () => {
-    expect(() =>
+  it("accepts a provider-native structured payload", () => {
+    expect(
       __resultFinalizationTestHooks.parsedProviderPayload(resultSpec()),
+    ).toEqual(resultSpec());
+  });
+
+  it("extracts JSON output when the provider adapter omits structured payload", () => {
+    expect(
+      __resultFinalizationTestHooks.parsedProviderPayload(
+        undefined,
+        `Result:\n\`\`\`json\n${JSON.stringify(resultSpec())}\n\`\`\``,
+      ),
+    ).toEqual(resultSpec());
+  });
+
+  it("falls back to JSON output when structured payload is null", () => {
+    expect(
+      __resultFinalizationTestHooks.parsedProviderPayload(
+        null,
+        JSON.stringify(resultSpec()),
+      ),
+    ).toEqual(resultSpec());
+  });
+
+  it("falls back to JSON output when an envelope has a null parsed value", () => {
+    expect(
+      __resultFinalizationTestHooks.parsedProviderPayload(
+        { parsed: null, rawOutput: "provider output" },
+        JSON.stringify(resultSpec()),
+      ),
+    ).toEqual(resultSpec());
+  });
+
+  it("falls back to JSON output for scalar, array, and malformed payloads", () => {
+    for (const payload of ["ignored", [], { parsed: undefined }]) {
+      expect(
+        __resultFinalizationTestHooks.parsedProviderPayload(
+          payload,
+          JSON.stringify(resultSpec()),
+        ),
+      ).toEqual(resultSpec());
+    }
+  });
+
+  it("rejects invalid text fallback for a scalar payload", () => {
+    expect(() =>
+      __resultFinalizationTestHooks.parsedProviderPayload("ignored", "text only"),
+    ).toThrow("did not return a parsed payload");
+  });
+
+  it("rejects output without a structured payload or JSON object", () => {
+    expect(() =>
+      __resultFinalizationTestHooks.parsedProviderPayload(undefined, "text only"),
     ).toThrow("did not return a parsed payload");
   });
 });
