@@ -122,6 +122,7 @@ export function reviewProposalReadModel(proposal: GoalWithDetails["reviewProposa
     id: proposal.id,
     mode: (recordValue(proposal.inputSnapshot)?.mode === "initial" ? "initial" : "progress") as "initial" | "progress",
     status: proposal.status,
+    version: proposal.stateVersion,
     sourceTaskId: proposal.sourceTaskId,
     sourceRunId: proposal.sourceRunId,
     sourceTask: proposal.sourceTask

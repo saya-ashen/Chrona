@@ -332,6 +332,8 @@ export const providerCapabilitiesSchema = z
     actionInvocation: providerActionInvocationModeSchema.optional(),
     /** Whether repeating startRun with the same clientOperationId attaches instead of starting again. */
     startIdempotency: providerStartIdempotencySchema.optional(),
+    /** Allows one side-effect-free read-only start; interrupted starts must fail closed instead of replaying. */
+    readOnlySingleAttempt: z.boolean().optional(),
     /** Whether a prior accepted start can be found by clientOperationId after ref persistence is interrupted. */
     lookupByClientOperationId: z.boolean().optional(),
     reason: z.string().optional(),

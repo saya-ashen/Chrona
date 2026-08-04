@@ -761,6 +761,7 @@ describe("Goal API", () => {
     expect(refreshed.workbench.brief?.currentFocus).toBe("Review the next bounded outcome");
     expect(refreshed.reviewProposals[0]?.status).toBe("Applied");
     expect(refreshed.reviewProposals[0]?.items[0]?.decision).toBe("Accepted");
+    expect(refreshed.reviewProposals[0]?.version).toBe((await db.goalReviewProposal.findUniqueOrThrow({ where: { id: proposal.id } })).stateVersion);
 
     const replay = await requestJson(app, `/goals/${goal.id}/review-proposals/${proposal.id}/apply`, applyCommand);
     expect(replay.status).toBe(200);

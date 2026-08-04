@@ -1,7 +1,7 @@
 import { describe, expect, it, mock } from "bun:test";
 import type { AgentProviderClient } from "@chrona/providers-foundation";
 import type { CompiledAiFeatureRequest } from "../../feature-runtime";
-import { FoundationProviderRuntime } from "./foundation-provider-runtime";
+import { createFoundationFeatureStartInput, FoundationProviderRuntime } from "./foundation-provider-runtime";
 
 const request: CompiledAiFeatureRequest = {
   feature: "test.feature",
@@ -66,7 +66,7 @@ describe("FoundationProviderRuntime recovery references", () => {
       providerRunRef: "provider-run-1",
       providerResumeRef: "provider-resume-1",
     });
-    expect(runtime.capabilities).toMatchObject({ supportsClientOperationId: true, supportsResume: true });
+    expect(runtime.capabilities).toMatchObject({ startRecovery: "durable_attach" });
   });
 
   it("does not reinterpret an opaque resume ref as a provider session ID", async () => {
@@ -87,4 +87,38 @@ describe("FoundationProviderRuntime recovery references", () => {
       providerResumeRef: "provider-resume-1",
     });
   });
+  it("maps explicitly safe adapters to one read-only start and disables provider-native tools", async () => {
+    const client = {
+      provider: "read-only-fake",
+      async getCapabilities() {
+        return {
+          supportsSessions: true,
+          supportsStreaming: true,
+          supportsRunLookup: true,
+          supportsCancellation: true,
+          supportsToolCalls: true,
+          supportsPreviousResponse: false,
+          actionInvocation: "unsupported" as const,
+          startIdempotency: "unsupported" as const,
+          readOnlySingleAttempt: true,
+          recovery: {
+            sessionResume: true,
+            historyReplay: true,
+            activeRunLookup: false,
+            streamReconnect: false,
+            crossProcessDurable: false,
+            providerResumeRef: true,
+            runEventReplay: false,
+            mode: "session_history" as const,
+          },
+        };
+      },
+    } as unknown as AgentProviderClient;
+    const runtime = await new FoundationProviderRuntime("test.feature", client).initialize();
+    const startInput = createFoundationFeatureStartInput(request);
+
+    expect(runtime.capabilities).toEqual({ startRecovery: "single_attempt_read_only", actionInvocation: "unsupported" });
+    expect(startInput.toolPolicy).toBe("read_only");
+  });
+
 });

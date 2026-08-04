@@ -47,7 +47,7 @@ export function ClientForm({ initial, onSave, onCancel, copy, providers, forceDe
     try { const result = await testClientAvailability(buildClientPayload(values)); setTestStatus(result.status); setTestReason(result.reason); }
     catch (error) { setTestStatus("unavailable"); setTestReason(error instanceof Error ? error.message : copy.reasonUnknown); }
   };
-  const readiness = readinessItems({ copy, type: values.type, configured: hasBasicConfig(values.type, values), enabled: true, testStatus, testReason, bindings: values.bindings });
+  const readiness = readinessItems({ copy, type: values.type, configured: hasBasicConfig(values.type, values), enabled: true, testStatus, testReason, bindings: values.bindings, isDefault: forceDefault || values.isDefault });
 
   return <Card size="sm"><CardContent><form className="flex flex-col gap-4" onSubmit={(event) => void form.handleSubmit(submit)(event)}><FieldGroup className="gap-4">
     <ClientIdentity form={form} copy={copy} providers={providers} placeholder={getDefaultClientName(values.type, providers)} />

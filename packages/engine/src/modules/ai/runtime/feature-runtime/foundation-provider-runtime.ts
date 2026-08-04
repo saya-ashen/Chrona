@@ -14,8 +14,11 @@ import { stableJsonHash } from "../../feature-runtime/stable-json";
 
 function providerCapabilities(capabilities: Awaited<ReturnType<AgentProviderClient["getCapabilities"]>>): AiFeatureProviderCapabilities {
   return {
-    supportsClientOperationId: capabilities.startIdempotency === "client_operation_id",
-    supportsResume: supportsDurableFeatureRuntime(capabilities),
+    startRecovery: supportsDurableFeatureRuntime(capabilities)
+      ? "durable_attach"
+      : capabilities.readOnlySingleAttempt === true
+        ? "single_attempt_read_only"
+        : "unsupported",
     actionInvocation: capabilities.actionInvocation ?? "unsupported",
   };
 }
@@ -23,6 +26,24 @@ function providerCapabilities(capabilities: Awaited<ReturnType<AgentProviderClie
 function toolDefinitions(request: CompiledAiFeatureRequest) {
   return request.tools.map(({ name, description, inputSchema }) => ({ name, ...(description ? { description } : {}), inputSchema }));
 }
+export function createFoundationFeatureStartInput(request: CompiledAiFeatureRequest): StartRunInput {
+  return {
+    clientOperationId: request.clientOperationId,
+    sessionId: request.clientOperationId,
+    sessionKey: request.clientOperationId,
+    instructions: request.instructions,
+    input: request.input,
+    tools: toolDefinitions(request),
+    structuredOutputSchema: {
+      name: `${request.feature}.result`,
+      description: `Terminal result contract for ${request.feature}.`,
+      schema: request.structuredOutputSchema,
+    },
+    toolPolicy: "read_only",
+    stream: true,
+  };
+}
+
 
 function terminalCandidate(event: Extract<ProviderRunEvent, { type: "run_completed" }>): unknown {
   if (event.structuredPayload !== undefined) return event.structuredPayload;
@@ -43,8 +64,7 @@ export type FoundationProviderBinding = {
 /** Concrete adapter from the provider foundation protocol to the pure feature runtime port. */
 export class FoundationProviderRuntime implements AiFeatureProviderPort {
   capabilities: AiFeatureProviderCapabilities = {
-    supportsClientOperationId: false,
-    supportsResume: false,
+    startRecovery: "unsupported",
     actionInvocation: "unsupported",
   };
 
@@ -114,7 +134,7 @@ export class FoundationProviderRuntime implements AiFeatureProviderPort {
       );
       return { ...turn, providerRunRef: existingProviderRunRef, providerResumeRef };
     }
-    const run = await provider.startRun(this.startInput(request));
+    const run = await provider.startRun(createFoundationFeatureStartInput(request));
     if (run.provider !== provider.provider) {
       throw new Error(`Provider start returned a run for a different provider authority.`);
     }
@@ -153,22 +173,6 @@ export class FoundationProviderRuntime implements AiFeatureProviderPort {
     return this.provider;
   }
 
-  private startInput(request: CompiledAiFeatureRequest): StartRunInput {
-    return {
-      clientOperationId: request.clientOperationId,
-      sessionId: request.clientOperationId,
-      sessionKey: request.clientOperationId,
-      instructions: request.instructions,
-      input: request.input,
-      tools: toolDefinitions(request),
-      structuredOutputSchema: {
-        name: `${request.feature}.result`,
-        description: `Terminal result contract for ${request.feature}.`,
-        schema: request.structuredOutputSchema,
-      },
-      stream: true,
-    };
-  }
 
   private parseOutput(outputText: string | undefined): unknown {
     if (!outputText) return {};

@@ -21,7 +21,7 @@ function operationalBrief(value: unknown): GoalOperationalBrief | null { const p
 function lineage(value: unknown): GoalReviewFeatureInput["answerLineage"] { const parsed = z.array(z.object({ questionId: z.string(), answer: aiJsonValueSchema, answeredAt: z.string().datetime() })).safeParse(record(value)?.answerLineage ?? []); return parsed.success ? parsed.data : []; }
 function eventFor<T extends { id: string; status: GoalReviewProposalStatus; stateVersion: number; generationError: string | null; questions: unknown; cannotCompleteReason: unknown }>(proposal: T): ReviewEvent {
   const status: GoalReviewProposalStatus = Array.isArray(proposal.questions) ? "NeedsInput" : proposal.cannotCompleteReason ? "CannotComplete" : proposal.status;
-  return { proposalId: proposal.id, status, version: proposal.stateVersion, ...(proposal.generationError ? { message: "Goal review generation failed.", errorCode: "goal_review_failed" } : {}) };
+  return { proposalId: proposal.id, status, version: proposal.stateVersion, ...(proposal.generationError ? { message: proposal.generationError, errorCode: "goal_review_failed" } : {}) };
 }
 function matchesAnswerSchema(value: unknown, schema: unknown): boolean {
   const rule = record(schema);
@@ -106,12 +106,17 @@ async function linkQueuedReviewRun(
   });
   throw new EngineError(ENGINE_ERROR_CODES.CONFLICT, "Goal Review Proposal changed before its queued run could be linked");
 }
-async function failGeneratingReview(proposalId: string, runId: string) {
+function goalReviewFailureMessage(code: string | undefined): string {
+  if (code === "provider_start_outcome_unknown") return "The AI provider start outcome is unknown. Chrona did not replay it; try again to start a new review.";
+  if (code?.startsWith("provider_")) return "The AI provider could not complete Goal review.";
+  return "Goal review generation failed.";
+}
+async function failGeneratingReview(proposalId: string, runId: string, errorCode?: string) {
   await db.goalReviewProposal.updateMany({
     where: { id: proposalId, status: "Generating", aiFeatureRunId: runId },
     data: {
       status: "Failed",
-      generationError: "Goal review generation failed.",
+      generationError: goalReviewFailureMessage(errorCode),
       stateVersion: { increment: 1 },
     },
   });
@@ -126,7 +131,7 @@ async function executeReview(proposalId: string) {
   }
   const run = await resumeReviewRun(proposal.aiFeatureRunId);
   if (!run || run.status === "failed" || run.status === "cancelled") {
-    await failGeneratingReview(proposal.id, proposal.aiFeatureRunId);
+    await failGeneratingReview(proposal.id, proposal.aiFeatureRunId, run?.error?.code);
   }
   return eventFor(await db.goalReviewProposal.findUniqueOrThrow({ where: { id: proposal.id } }));
 }

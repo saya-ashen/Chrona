@@ -28,6 +28,7 @@ export function summarizeProviderCapabilities(capabilities: ProviderCapabilities
     streamReconnect: recovery?.streamReconnect ?? capabilities.supportsRunLookup,
     crossProcessDurable: recovery?.crossProcessDurable ?? false,
     clientOperationLookup: capabilities.lookupByClientOperationId ?? false,
+    readOnlySingleAttempt: capabilities.readOnlySingleAttempt ?? false,
     providerResumeRef: recovery?.providerResumeRef ?? false,
     runEventReplay: recovery?.runEventReplay ?? false,
     engineManagedToolResults: capabilities.actionInvocation === "engine_managed",

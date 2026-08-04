@@ -122,12 +122,22 @@ export async function startTaskPlanGenerationDurably(input: {
         data: {
           status: TaskPlanGenerationHeadStatus.Generating,
           currentAiFeatureRunId: started.runId,
-          stateVersion: { increment: 1 },
         },
       });
       if (claimed.count !== 1) throw new TaskPlanHeadConflictError();
     });
   } catch (cause) {
+    try {
+      const linkedHead = await db.taskPlanGenerationHead.findUnique({
+        where: { taskId_workBlockScopeKey: { taskId: input.taskId, workBlockScopeKey: scopeKey(snapshot.workBlockId) } },
+        select: { currentAiFeatureRunId: true },
+      });
+      if (linkedHead?.currentAiFeatureRunId === started.runId) {
+        return { generationId, featureRunId: started.runId, snapshot };
+      }
+    } catch {
+      throw cause;
+    }
     await withSchedulerWorkOwnership(input.workContext, async (tx) => {
       await tx.aiFeatureRun.updateMany({
         where: { id: started.runId, stateVersion: 0, status: AiFeatureRunStatus.Queued },

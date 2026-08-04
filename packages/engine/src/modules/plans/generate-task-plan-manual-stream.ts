@@ -4,6 +4,7 @@ import { captureTaskPlanGenerationSnapshot, type TaskPlanGenerationSnapshot } fr
 import { resumeTaskPlanGenerateFeature, runTaskPlanGenerateFeature } from "./ai/task-plan-generate-run";
 import { currentSchedulerWorkContext } from "@/modules/orchestration/scheduler-work-context";
 import { withSchedulerWorkOwnership } from "@/modules/orchestration/scheduler-lease-repository";
+import { projectTaskPlanGenerationFailure } from "./task-plan-generation-registry";
 
 async function recordPlanGenerationEvent(input: {
   type: "started" | "status" | "completed" | "failed" | "cancelled";
@@ -77,9 +78,9 @@ export async function* generateTaskPlanManualStream(input: {
       : await runTaskPlanGenerateFeature({ generationId, snapshot, userInstruction, selectedNodeId });
     if (!featureRun) throw new Error("Durable task plan feature run was not found.");
     if (featureRun.status !== "completed") {
-      const message = "Plan generation did not complete.";
-      await recordPlanGenerationEvent({ type: "failed", task, workBlockId: snapshot.workBlockId, generationId, payload: { code: "INTERNAL_ERROR", message }, dedupeSuffix: "terminal" });
-      yield { type: "failed", code: "INTERNAL_ERROR", message };
+      const failure = projectTaskPlanGenerationFailure(featureRun.error?.code);
+      await recordPlanGenerationEvent({ type: "failed", task, workBlockId: snapshot.workBlockId, generationId, payload: { code: failure.code, persisted_code: failure.persistedCode, message: failure.message }, dedupeSuffix: "terminal" });
+      yield failure;
       return;
     }
     const receipt = featureRun.commitReference as { planId?: unknown; headStateVersion?: unknown } | undefined;

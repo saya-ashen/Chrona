@@ -16,6 +16,7 @@ export type ProviderRecoveryCapabilityName =
   | "activeRunLookup"
   | "streamReconnect"
   | "clientOperationLookup"
+  | "readOnlySingleAttempt"
   | "providerResumeRef"
   | "runEventReplay";
 
@@ -55,6 +56,7 @@ const UI_BEHAVIOR: Record<ProviderCapabilityName, string> = {
   streamReconnect: "Workspace can reconnect to an active provider run stream.",
   crossProcessDurable: "Provider run lookup and stream reattachment remain authoritative after a process restart.",
   clientOperationLookup: "Engine can repair a missing provider run ref by stable client operation id.",
+  readOnlySingleAttempt: "Engine can issue one tool-isolated read-only request and fails closed if its outcome is interrupted.",
   providerResumeRef: "Engine can persist a provider-private resume reference for recovery.",
   runEventReplay: "Engine can replay or reattach provider run events after interruption.",
 };
@@ -72,6 +74,7 @@ function matrixEntry(
       streamReconnect: input.recovery.streamReconnect,
       crossProcessDurable: input.recovery.crossProcessDurable,
       clientOperationLookup: input.recovery.clientOperationLookup,
+      readOnlySingleAttempt: input.recovery.readOnlySingleAttempt,
       providerResumeRef: input.recovery.providerResumeRef,
       runEventReplay: input.recovery.runEventReplay,
       engineManagedToolResults: input.execution.engineManagedToolResults,
@@ -104,6 +107,7 @@ export const providerCapabilityMatrix = [
       crossProcessDurable: true,
       mode: "authoritative_run_lookup",
       clientOperationLookup: false,
+      readOnlySingleAttempt: false,
       providerResumeRef: true,
       runEventReplay: true,
     },
@@ -130,6 +134,7 @@ export const providerCapabilityMatrix = [
       crossProcessDurable: false,
       mode: "local_stream_only",
       clientOperationLookup: false,
+      readOnlySingleAttempt: false,
       providerResumeRef: true,
       runEventReplay: true,
     },
@@ -156,6 +161,7 @@ export const providerCapabilityMatrix = [
       crossProcessDurable: false,
       mode: "session_history",
       clientOperationLookup: false,
+      readOnlySingleAttempt: false,
       providerResumeRef: true,
       runEventReplay: false,
     },
@@ -182,6 +188,7 @@ export const providerCapabilityMatrix = [
       crossProcessDurable: false,
       mode: "session_history",
       clientOperationLookup: false,
+      readOnlySingleAttempt: true,
       providerResumeRef: true,
       runEventReplay: false,
     },
@@ -207,6 +214,7 @@ export const providerCapabilityMatrix = [
       streamReconnect: true,
       crossProcessDurable: false,
       clientOperationLookup: true,
+      readOnlySingleAttempt: false,
       providerResumeRef: true,
       runEventReplay: true,
       mode: "local_stream_only",

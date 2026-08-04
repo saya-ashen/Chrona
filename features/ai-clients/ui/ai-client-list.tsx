@@ -21,12 +21,18 @@ export function AiClientList({ clients, copy, cardTestStates, diagnostics, diagn
   onInspect: (id: string) => void;
   renderEditor: (client: AiClientInfo) => React.ReactNode;
 }) {
-  return <>{clients.map((client) => editingId === client.id ? <Card key={client.id} size="sm">{renderEditor(client)}</Card> : <ClientCard key={client.id} client={client} copy={copy} testResult={cardTestStates[client.id] ?? { status: "idle", reason: null }} diagnostics={diagnostics[client.id]} loadingDiagnostics={diagnosticsLoading[client.id] === true} onEdit={onEdit} onDelete={onDelete} onMakeDefault={onMakeDefault} onToggleEnabled={onToggleEnabled} onTest={onTest} onInspect={onInspect} />)}</>;
+  return <>{clients.map((client) => editingId === client.id ? <Card key={client.id} size="sm">{renderEditor(client)}</Card> : <ClientCard key={client.id} client={client} clients={clients} copy={copy} testResult={cardTestStates[client.id] ?? { status: "idle", reason: null }} diagnostics={diagnostics[client.id]} loadingDiagnostics={diagnosticsLoading[client.id] === true} onEdit={onEdit} onDelete={onDelete} onMakeDefault={onMakeDefault} onToggleEnabled={onToggleEnabled} onTest={onTest} onInspect={onInspect} />)}</>;
 }
 
-function ClientCard({ client, copy, testResult, diagnostics, loadingDiagnostics, onEdit, onDelete, onMakeDefault, onToggleEnabled, onTest, onInspect }: {
+export function isFeatureAssignedToClient(client: Pick<AiClientInfo, "id" | "isDefault" | "bindings">, clients: Array<Pick<AiClientInfo, "id" | "bindings">>, feature: string): boolean {
+  if (client.bindings.includes(feature)) return true;
+  return client.isDefault && !clients.some((candidate) => candidate.id !== client.id && candidate.bindings.includes(feature));
+}
+
+function ClientCard({ client, clients, copy, testResult, diagnostics, loadingDiagnostics, onEdit, onDelete, onMakeDefault, onToggleEnabled, onTest, onInspect }: {
   client: AiClientInfo;
   copy: Record<string, string>;
+  clients: AiClientInfo[];
   testResult: TestResult;
   diagnostics: RuntimeDiagnostics | undefined;
   loadingDiagnostics: boolean;
@@ -37,7 +43,18 @@ function ClientCard({ client, copy, testResult, diagnostics, loadingDiagnostics,
   onTest: (client: AiClientInfo) => void;
   onInspect: (id: string) => void;
 }) {
-  const readiness = readinessItems({ copy, type: client.type, configured: true, enabled: client.enabled, testStatus: testResult.status, testReason: testResult.reason, bindings: client.bindings });
+  const readiness = readinessItems({
+    copy,
+    type: client.type,
+    configured: true,
+    enabled: client.enabled,
+    testStatus: testResult.status,
+    testReason: testResult.reason,
+    bindings: client.bindings,
+    isDefault: client.isDefault,
+    assignedToPlanning: isFeatureAssignedToClient(client, clients, "task.plan"),
+    assignedToExecution: isFeatureAssignedToClient(client, clients, "task.execution"),
+  });
   return <Card size="sm"><CardHeader className="gap-3 sm:grid-cols-[1fr_auto]"><div className="flex min-w-0 flex-col gap-2"><div className="flex flex-wrap items-center gap-2"><CardTitle>{client.name}</CardTitle><Badge variant="secondary">{client.type}</Badge>{client.isDefault ? <Badge variant="default">{copy.defaultBadge}</Badge> : null}</div><CardDescription><ClientDescription client={client} /><ClientBindings bindings={client.bindings} /></CardDescription><div className="flex flex-wrap items-center gap-2 text-xs"><Button type="button" variant="outline" size="xs" onClick={() => onTest(client)}>{copy.testAvailability}</Button><Badge variant={getStatusVariant(testResult.status)}>{getStatusLabel(copy, testResult.status)}</Badge><span className="text-muted-foreground">{testResult.reason ?? copy.reasonUnknown}</span></div><ReadinessChecklist items={readiness} />{diagnostics ? <DiagnosticsView diagnostics={diagnostics} copy={copy} clientId={client.id} /> : null}</div><ClientActions client={client} copy={copy} loadingDiagnostics={loadingDiagnostics} onEdit={onEdit} onDelete={onDelete} onMakeDefault={onMakeDefault} onToggleEnabled={onToggleEnabled} onInspect={onInspect} /></CardHeader></Card>;
 }
 

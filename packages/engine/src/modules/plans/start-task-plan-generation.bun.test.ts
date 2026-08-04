@@ -6,6 +6,7 @@ import { AiFeatureRuntimeError } from "@/modules/ai";
 
 import { startTaskPlanGenerationDurably } from "./start-task-plan-generation";
 import { TaskPlanHeadConflictError } from "./task-plan-generation-persistence";
+import { projectTaskPlanGenerationFailure } from "./task-plan-generation-registry";
 
 const createdWorkspaceIds = new Set<string>();
 
@@ -197,6 +198,65 @@ describe("startTaskPlanGenerationDurably", () => {
     expect(orphan?.finishedAt).toBeInstanceOf(Date);
   });
 
+  it("reclaims a terminal generation head without invalidating the frozen head version", async () => {
+    const { task } = await createTaskFixture("terminal-retry");
+    const first = await startTaskPlanGenerationDurably({
+      taskId: task.id,
+      idempotencyKey: `terminal-owner-${crypto.randomUUID()}`,
+    });
+    await db.$transaction([
+      db.aiFeatureRun.update({
+        where: { id: first.featureRunId },
+        data: { status: AiFeatureRunStatus.Failed, stateVersion: { increment: 1 }, finishedAt: new Date() },
+      }),
+      db.taskPlanGenerationHead.update({
+        where: { taskId_workBlockScopeKey: { taskId: task.id, workBlockScopeKey: "" } },
+        data: { status: TaskPlanGenerationHeadStatus.Idle, stateVersion: { increment: 1 } },
+      }),
+    ]);
+
+    const retry = await startTaskPlanGenerationDurably({
+      taskId: task.id,
+      idempotencyKey: `terminal-retry-${crypto.randomUUID()}`,
+    });
+
+    expect(retry.snapshot.head.stateVersion).toBe(1);
+    expect(await generationHead(task.id)).toEqual({
+      currentAiFeatureRunId: retry.featureRunId,
+      stateVersion: 1,
+      status: TaskPlanGenerationHeadStatus.Generating,
+    });
+  });
+
+  it("preserves a run when the head claim commits before the transaction reports failure", async () => {
+    const { task } = await createTaskFixture("ambiguous-head-claim");
+    const transactionClient = db as unknown as { $transaction: (...args: unknown[]) => Promise<unknown> };
+    const originalTransaction = transactionClient.$transaction.bind(db);
+    let transactionCount = 0;
+    transactionClient.$transaction = async (...args) => {
+      const result = await originalTransaction(...args);
+      transactionCount += 1;
+      if (transactionCount === 2) throw new Error("connection closed after commit");
+      return result;
+    };
+
+    try {
+      const started = await startTaskPlanGenerationDurably({
+        taskId: task.id,
+        idempotencyKey: `ambiguous-head-${crypto.randomUUID()}`,
+      });
+
+      expect(await generationHead(task.id)).toEqual({
+        currentAiFeatureRunId: started.featureRunId,
+        stateVersion: 0,
+        status: TaskPlanGenerationHeadStatus.Generating,
+      });
+      expect(await db.aiFeatureRun.findUniqueOrThrow({ where: { id: started.featureRunId }, select: { status: true } })).toEqual({ status: AiFeatureRunStatus.Queued });
+    } finally {
+      transactionClient.$transaction = originalTransaction;
+    }
+  });
+
   it("rejects a work block owned by another task before creating durable generation state", async () => {
     const { task } = await createTaskFixture("foreign-work-block-target");
     const foreign = await createTaskFixture("foreign-work-block-owner");
@@ -221,5 +281,16 @@ describe("startTaskPlanGenerationDurably", () => {
     expect(await db.aiFeatureRun.count({ where: { subjectId: task.id } })).toBe(0);
     expect(await db.taskPlanGenerationHead.count({ where: { taskId: task.id } })).toBe(0);
     expect(await db.taskPlan.count({ where: { taskId: task.id } })).toBe(0);
+  });
+});
+
+describe("task plan generation failure projection", () => {
+  it("projects an ambiguous single-attempt provider start as an actionable provider error", () => {
+    expect(projectTaskPlanGenerationFailure("provider_start_outcome_unknown")).toEqual({
+      type: "failed",
+      code: "PROVIDER_ERROR",
+      persistedCode: "provider_start_outcome_unknown",
+      message: "The AI provider could not complete plan generation.",
+    });
   });
 });

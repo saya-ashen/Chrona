@@ -37,6 +37,7 @@ describe("providerCapabilityMatrix", () => {
       activeRunLookup: false,
       streamReconnect: false,
       mode: "session_history",
+      readOnlySingleAttempt: true,
     });
   });
 
@@ -102,6 +103,7 @@ describe("providerCapabilityMatrix", () => {
       clientOperationLookup: true,
       providerResumeRef: true,
       runEventReplay: true,
+      readOnlySingleAttempt: false,
       engineManagedToolResults: true,
       externalControlPlaneActions: false,
     });

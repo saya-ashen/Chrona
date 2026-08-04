@@ -650,6 +650,7 @@ export class OmpSdkProviderClient implements AgentProviderClient {
       supportsPreviousResponse: false,
       actionInvocation: "unsupported",
       startIdempotency: "unsupported",
+      readOnlySingleAttempt: true,
       lookupByClientOperationId: false,
       recovery: {
         sessionResume: true,

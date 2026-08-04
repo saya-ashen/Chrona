@@ -129,7 +129,7 @@ export const taskPlanGenerateFeature = defineAiFeature({
     return [
       objective.statement,
       "Use only the frozen observations below.",
-      "Return a completed terminal result whose output is { blueprint }, and exactly one task.plan.blueprint.propose action with the same blueprint.",
+      "Return a completed terminal result whose output is { blueprint }, and exactly one task.plan.blueprint.propose action whose input is exactly { blueprint } with no taskId, expectedStateVersion, or other fields.",
       "Every node must be reachable from an entry node; use only task, checkpoint, condition, or wait nodes with their required configuration.",
       JSON.stringify(observations),
     ].join("\n");

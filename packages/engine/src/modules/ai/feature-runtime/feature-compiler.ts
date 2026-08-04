@@ -45,7 +45,10 @@ export function compileAiFeatureRequest(input: {
   });
   return {
     feature: manifest.feature.id,
-    instructions,
+    instructions: [
+      instructions,
+      "Evidence references must use an observationId from the frozen observations. An optional path is a JSON Pointer relative to that observation's data value; omit path to cite the entire observation. Never prefix a path with /data.",
+    ].join("\n"),
     clientOperationId,
     tools,
     structuredOutputSchema: z.toJSONSchema(

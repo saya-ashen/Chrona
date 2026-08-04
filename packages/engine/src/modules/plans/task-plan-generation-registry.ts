@@ -46,7 +46,7 @@ export class TaskPlanGenerationInFlightError extends Error {
 }
 
 function projectError(code: string | null): GeneratePlanErrorCode {
-  if (code === "provider_timeout" || code === "provider_protocol_error" || code === "provider_invalid_json" || code === "provider_run_unrecoverable" || code === "provider_capability_mismatch") {
+  if (code === "provider_timeout" || code === "provider_protocol_error" || code === "provider_invalid_json" || code === "provider_start_outcome_unknown" || code === "provider_run_unrecoverable" || code === "provider_capability_mismatch") {
     return "PROVIDER_ERROR";
   }
   if (code === "input_invalid" || code === "output_invalid" || code === "result_invalid" || code === "evidence_invalid" || code === "completion_invalid") {
@@ -62,6 +62,15 @@ function publicErrorMessage(code: string | null): string {
   if (projected === "INVALID_TOOL_PAYLOAD") return "The generated plan did not satisfy the required contract.";
   if (projected === "PLAN_GENERATION_IN_FLIGHT") return "A plan generation is already active for this task.";
   return "Plan generation did not complete.";
+}
+export function projectTaskPlanGenerationFailure(code: string | null | undefined): Extract<GeneratePlanSSEEvent, { type: "failed" }> {
+  const persistedCode = code ?? null;
+  return {
+    type: "failed",
+    code: projectError(persistedCode),
+    ...(persistedCode ? { persistedCode } : {}),
+    message: publicErrorMessage(persistedCode),
+  };
 }
 
 

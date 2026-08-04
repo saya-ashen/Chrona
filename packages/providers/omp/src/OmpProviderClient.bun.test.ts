@@ -97,6 +97,10 @@ describe("OmpSdkProviderClient recovery capabilities", () => {
       runEventReplay: false,
       mode: "session_history",
     });
+    expect(client.getCapabilities()).toMatchObject({
+      startIdempotency: "unsupported",
+      readOnlySingleAttempt: true,
+    });
   });
 });
 

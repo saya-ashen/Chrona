@@ -18,7 +18,10 @@ type ReadinessInput = {
   enabled: boolean;
   testStatus: TestStatus;
   testReason: string | null;
+  isDefault: boolean;
   bindings: string[];
+  assignedToPlanning?: boolean;
+  assignedToExecution?: boolean;
 };
 
 const EXECUTION_CAPABILITY_CHECKS: ProviderCapabilityName[] = ["healthCheck", "startRun", "streamEvents", "cancelActiveRun", "toolTraces", "structuredOutput"];
@@ -40,6 +43,10 @@ function hasBinding(bindings: string[], candidates: string[]): boolean {
   return bindings.some((binding) => candidates.includes(binding));
 }
 
+function featureAssigned(input: ReadinessInput, assigned: boolean | undefined, feature: string): boolean {
+  return assigned ?? (input.isDefault || hasBinding(input.bindings, [feature]));
+}
+
 function executionReadiness(matrix: ProviderCapabilityMatrixEntry | undefined, copy: Record<string, string>): ReadinessItem {
   const missing = matrix ? EXECUTION_CAPABILITY_CHECKS.filter((capability) => !matrix.capabilities[capability]) : [];
   const state = matrix && missing.length === 0 ? "ready" : "warning";
@@ -52,13 +59,16 @@ export function hasBasicConfig(type: AiClientType, values: Pick<ClientFormValues
 }
 
 function overallReadiness(input: ReadinessInput): ReadinessItem {
+  const matrix = providerMatrixEntry(input.type);
+  const assignedToPlanning = featureAssigned(input, input.assignedToPlanning, "task.plan");
+  const assignedToExecution = featureAssigned(input, input.assignedToExecution, "task.execution");
   const readiness = deriveAutomationReadiness({
     providerId: input.configured ? input.type : null,
     providerConfigured: input.configured && input.enabled,
-    providerTested: input.testStatus !== "idle",
+    providerTested: input.testStatus === "available" || input.testStatus === "unavailable",
     providerReachable: input.testStatus === "available",
-    planningCapable: hasBinding(input.bindings, ["task.plan"]) && providerMatrixEntry(input.type)?.recovery.crossProcessDurable === true,
-    executionCapable: hasBinding(input.bindings, ["task.execution"]),
+    planningCapable: assignedToPlanning && (matrix?.recovery.crossProcessDurable === true || matrix?.recovery.readOnlySingleAttempt === true),
+    executionCapable: assignedToExecution,
     requiresPlanning: true, autoExecute: true, hasAcceptedPlan: true, scheduledStartAt: new Date(0),
   });
   return { key: "overall", label: readiness.readiness === "ready" ? input.copy.ready : input.copy.needsAttention, state: readiness.readiness === "ready" ? "ready" : "pending", detail: readiness.disabledReason ?? input.copy.readinessCapabilityDetail };

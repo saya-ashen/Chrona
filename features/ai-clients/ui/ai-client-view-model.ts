@@ -111,9 +111,10 @@ export function isDebugProviderVisible(): boolean {
 }
 
 export function getProviderFeatures(providers: RuntimeProviderOption[], type: AiClientType): string[] {
-  const durableRuntimeCapable = providerCapabilityMatrix.find((entry) => entry.provider === type)?.recovery.crossProcessDurable === true;
+  const recovery = providerCapabilityMatrix.find((entry) => entry.provider === type)?.recovery;
+  const proposalRuntimeCapable = recovery?.crossProcessDurable === true || recovery?.readOnlySingleAttempt === true;
   return (providers.find((provider) => provider.key === type)?.features ?? []).filter(
-    (feature) => feature !== "suggest" && (durableRuntimeCapable || !DURABLE_RUNTIME_FEATURES.has(feature)),
+    (feature) => feature !== "suggest" && (proposalRuntimeCapable || !DURABLE_RUNTIME_FEATURES.has(feature)),
   );
 }
 

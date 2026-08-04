@@ -173,12 +173,21 @@ function fakeRuns(): AiFeatureRunRepositoryPort & {
 const request = (definition = testFeature()) => ({ workspaceId: "workspace-1", definition, subject: { type: "test.subject", id: "subject-1", revision: "r1" }, operation: { kind: "generate", operationId: "operation-1" }, input: { topic: "the subject" } });
 const terminal = () => ({ kind: "terminal" as const, candidate: { status: "completed", output: { answer: "Done" }, artifacts: [], proposedActions: [], evidence: [{ observationId: "observation-1" }] } });
 const durableProvider = (turns: (() => { kind: "terminal"; candidate: unknown } | { kind: "invoke_action"; action: { id: string; version: number }; callId: string; input: { topic: string } })[]): AiFeatureProviderPort & { starts: number; resumes: number; submitted: number } => ({
-  capabilities: { supportsClientOperationId: true, supportsResume: true, actionInvocation: "engine_managed" },
+  capabilities: { startRecovery: "durable_attach", actionInvocation: "engine_managed" },
   starts: 0, resumes: 0, submitted: 0,
   async startOrAttach() { const turn = turns.shift(); if (!turn) throw new Error("No fake provider turn."); this.starts += 1; return { ...turn(), providerRunRef: "provider-run-1", providerResumeRef: "resume-1" }; },
   async resume() { const turn = turns.shift(); if (!turn) throw new Error("No fake provider turn."); this.resumes += 1; return turn(); },
   async submitActionResult() { const turn = turns.shift(); if (!turn) throw new Error("No fake provider turn."); this.submitted += 1; return turn(); },
 });
+const singleAttemptProvider = (start: () => ReturnType<typeof terminal> | Promise<ReturnType<typeof terminal>> = terminal): AiFeatureProviderPort & { starts: number; resumes: number } => ({
+  capabilities: { startRecovery: "single_attempt_read_only", actionInvocation: "unsupported" },
+  starts: 0,
+  resumes: 0,
+  async startOrAttach() { this.starts += 1; return { ...await start(), providerRunRef: "read-only-run-1", providerResumeRef: "read-only-resume-1" }; },
+  async resume() { this.resumes += 1; throw new Error("Single-attempt read-only providers cannot resume."); },
+  async submitActionResult() { throw new Error("Single-attempt read-only providers cannot submit actions."); },
+});
+
 
 function manualHeartbeatScheduler() {
   const callbacks: (() => void)[] = [];
@@ -199,6 +208,75 @@ describe("runAiFeature durable lifecycle", () => {
     expect(runs.releases).toEqual(runs.claims);
     expect(provider.starts).toBe(1);
   });
+  it("allows one read-only provider start for a proposal-only feature", async () => {
+    const runs = fakeRuns();
+    const provider = singleAttemptProvider();
+    const result = await runAiFeature(request(), { runs, provider, clock: () => new Date(at), ids: { next: () => "run-read-only" } });
+    expect(result.status).toBe("completed");
+    expect(provider.starts).toBe(1);
+    expect(provider.resumes).toBe(0);
+  });
+
+  it("tells providers that evidence pointers are relative to frozen observation data", async () => {
+    const runs = fakeRuns();
+    let instructions = "";
+    const provider: AiFeatureProviderPort = {
+      capabilities: { startRecovery: "single_attempt_read_only", actionInvocation: "unsupported" },
+      async startOrAttach(providerRequest) {
+        instructions = providerRequest.instructions;
+        return { ...terminal(), providerRunRef: "evidence-guidance-run", providerResumeRef: "evidence-guidance-resume" };
+      },
+      async resume() { throw new Error("Single-attempt read-only providers cannot resume."); },
+      async submitActionResult() { throw new Error("Single-attempt read-only providers cannot submit actions."); },
+    };
+
+    await runAiFeature(request(), { runs, provider, clock: () => new Date(at), ids: { next: () => "run-evidence-guidance" } });
+
+    expect(instructions).toContain("relative to that observation's data value");
+    expect(instructions).toContain("Never prefix a path with /data");
+  });
+
+  it("fails an interrupted single-attempt start closed without another provider call", async () => {
+    const runs = fakeRuns();
+    const definition = testFeature();
+    const queued = await startOrAttachAiFeatureRun(request(definition), { runs, ids: { next: () => "run-interrupted-read-only" } });
+    runs.records.set(queued.id, { ...queued, status: "starting_provider", stateVersion: queued.stateVersion + 1, startedAt: at, observations: [observation("observation-1", { source: "fake" })] });
+    const provider = singleAttemptProvider();
+    const result = await executeAiFeatureRunById({ definition, runId: queued.id }, { runs, provider, clock: () => new Date(at), ids: { next: () => "recovery-owner" } });
+    expect(result).toMatchObject({ status: "failed", error: { code: "provider_start_outcome_unknown" } });
+    expect(provider.starts).toBe(0);
+    expect(provider.resumes).toBe(0);
+  });
+
+  it("fails a single-attempt provider exception closed and never replays it", async () => {
+    const runs = fakeRuns();
+    const provider = singleAttemptProvider(async () => { throw new Error("connection closed after dispatch"); });
+    const first = await runAiFeature(request(), { runs, provider, clock: () => new Date(at), ids: { next: () => "run-ambiguous-read-only" } });
+    expect(first).toMatchObject({ status: "failed", error: { code: "provider_start_outcome_unknown" } });
+    const second = await executeAiFeatureRunById({ definition: testFeature(), runId: first.id }, { runs, provider, clock: () => new Date(at), ids: { next: () => "retry-owner" } });
+    expect(second.status).toBe("failed");
+    expect(provider.starts).toBe(1);
+  });
+
+  it("recovers observation preparation before authorizing the first read-only start", async () => {
+    const runs = fakeRuns();
+    const definition = testFeature();
+    const queued = await startOrAttachAiFeatureRun(request(definition), { runs, ids: { next: () => "run-preparing-read-only" } });
+    runs.records.set(queued.id, { ...queued, status: "preparing_observations", stateVersion: queued.stateVersion + 1 });
+    const provider = singleAttemptProvider();
+    const result = await executeAiFeatureRunById({ definition, runId: queued.id }, { runs, provider, clock: () => new Date(at), ids: { next: () => "preparation-recovery-owner" } });
+    expect(result.status).toBe("completed");
+    expect(provider.starts).toBe(1);
+  });
+
+  it("rejects invoke actions before starting a single-attempt read-only provider", async () => {
+    const runs = fakeRuns();
+    const provider = singleAttemptProvider();
+    const result = await runAiFeature(request(testFeature({ invoke: true })), { runs, provider, clock: () => new Date(at), ids: { next: () => "run-read-only-invoke" } });
+    expect(result).toMatchObject({ status: "failed", error: { code: "provider_capability_mismatch" } });
+    expect(provider.starts).toBe(0);
+  });
+
 
   it("starts or attaches a validated durable run before any provider call", async () => {
     const runs = fakeRuns();
@@ -219,7 +297,7 @@ describe("runAiFeature durable lifecycle", () => {
   it("does not fall back to an unsafe provider run call when start outcome is unknown", async () => {
     const runs = fakeRuns();
     const provider: AiFeatureProviderPort = {
-      capabilities: { supportsClientOperationId: true, supportsResume: true, actionInvocation: "engine_managed" },
+      capabilities: { startRecovery: "durable_attach", actionInvocation: "engine_managed" },
       async startOrAttach() { throw new Error("connection closed"); },
       async resume() { throw new Error("unreachable"); },
       async submitActionResult() { throw new Error("unreachable"); },
@@ -388,7 +466,7 @@ describe("runAiFeature durable lifecycle", () => {
   it("re-reads durable state after an ambiguous provider start before returning", async () => {
     const runs = fakeRuns();
     const provider: AiFeatureProviderPort = {
-      capabilities: { supportsClientOperationId: true, supportsResume: true, actionInvocation: "engine_managed" },
+      capabilities: { startRecovery: "durable_attach", actionInvocation: "engine_managed" },
       async startOrAttach() { throw new Error("connection closed"); },
       async resume() { throw new Error("unreachable"); },
       async submitActionResult() { throw new Error("unreachable"); },

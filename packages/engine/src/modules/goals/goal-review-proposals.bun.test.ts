@@ -59,8 +59,10 @@ describe("Goal Review proposal lifecycle source contract", () => {
     const execute = bodyAfter("async function executeReview");
 
     expect(execute).toContain('run.status === "failed" || run.status === "cancelled"');
-    expect(execute).toContain("await failGeneratingReview(proposal.id, proposal.aiFeatureRunId)");
+    expect(execute).toContain("await failGeneratingReview(proposal.id, proposal.aiFeatureRunId, run?.error?.code)");
     expect(execute).toContain("void executeReview(proposal.id).catch");
+    expect(source).toContain('code === "provider_start_outcome_unknown"');
+    expect(source).toContain("Chrona did not replay it");
   });
 
   it("marks stale items without applying mutations and guards apply with a proposal CAS", () => {

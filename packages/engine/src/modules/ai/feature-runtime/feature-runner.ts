@@ -16,7 +16,7 @@ import type { AiFeatureActionExecutionPort, AiFeatureRunRecord, AiFeatureRunRepo
 import { executeAiFeatureAction, type AiFeatureLeaseGuard } from "./action-execution";
 import { validateAiFeatureResult } from "./result-validator";
 import { freezeCanonical, stableJsonHash } from "./stable-json";
-import { validateProviderCapabilities } from "./provider-capabilities";
+import { usesSingleAttemptReadOnly, validateProviderCapabilities } from "./provider-capabilities";
 
 const DEFAULT_LEASE_MS = 30_000;
 export type AiFeatureLeaseHeartbeatScheduler = {
@@ -229,24 +229,35 @@ export async function executeAiFeatureRunById(input: ExecuteAiFeatureRunByIdInpu
     }
   };
 
+  const singleAttemptReadOnly = usesSingleAttemptReadOnly(ports.provider.capabilities);
+  let singleAttemptStartAuthorized = false;
   try {
     const capabilityError = validateProviderCapabilities(run.manifest, ports.provider.capabilities);
     if (capabilityError) return await failAndRead(runtimeError("provider_capability_mismatch", capabilityError));
 
     if (run.status === "queued") {
       run = await transition(ports.runs, run, leaseOwner, "preparing_observations");
+    }
+    if (run.status === "preparing_observations") {
       const built = await buildSeedObservations({ definition: input.definition, context: { workspaceId: run.workspaceId, subject: run.subject, input: run.input } });
       if (!built.ok) return await failAndRead(runtimeError(built.error.code, built.error.message));
       run = await transition(ports.runs, run, leaseOwner, "starting_provider", { observations: freezeCanonical(built.observations), startedAt: run.startedAt ?? now(ports.clock) });
+      singleAttemptStartAuthorized = singleAttemptReadOnly;
     }
 
     let turn: AiFeatureProviderTurn;
     if (run.status === "starting_provider") {
+      if (singleAttemptReadOnly && !singleAttemptStartAuthorized) {
+        return await failAndRead(runtimeError("provider_start_outcome_unknown", "The interrupted read-only provider start was not replayed. Start a new operation to try again."));
+      }
       const started = await lease.await(() => ports.provider.startOrAttach(compileProviderRequest(), run.providerRunRef));
       if (!started) return await releaseAndRead(run);
       run = await transition(ports.runs, run, leaseOwner, "running", { providerRunRef: started.providerRunRef, providerResumeRef: started.providerResumeRef });
       turn = started;
     } else if (run.status === "running") {
+      if (singleAttemptReadOnly) {
+        return await failAndRead(runtimeError("provider_start_outcome_unknown", "The interrupted read-only provider run was not resumed. Start a new operation to try again."));
+      }
       if (!run.providerRunRef || !run.providerResumeRef) return await failAndRead(runtimeError("provider_run_unrecoverable", "Provider run has no durable recovery reference."));
       const resumed = await lease.await(() => ports.provider.resume({ providerRunRef: run.providerRunRef!, providerResumeRef: run.providerResumeRef!, clientOperationId: run.id, request: compileProviderRequest() }));
       if (!resumed) return await releaseAndRead(run);
@@ -259,7 +270,6 @@ export async function executeAiFeatureRunById(input: ExecuteAiFeatureRunByIdInpu
     } else {
       return await failAndRead(runtimeError("provider_run_unrecoverable", "Run has no recoverable provider state."));
     }
-
     while (turn.kind === "invoke_action") {
       const actionTurn = turn;
       await persistTurnRefs(turn);
@@ -329,6 +339,9 @@ export async function executeAiFeatureRunById(input: ExecuteAiFeatureRunByIdInpu
   } catch (cause) {
     if (leaseLost) return await releaseAndRead(run);
     if (cause instanceof AiFeatureRuntimeError) return await failAndRead(cause.detail);
+    if (singleAttemptReadOnly && (run.status === "starting_provider" || run.status === "running")) {
+      return await failAndRead(runtimeError("provider_start_outcome_unknown", "The read-only provider start outcome is unknown and was not replayed. Start a new operation to try again."));
+    }
     return await releaseAndRead(run);
   } finally {
     if (leaseHeld) await ports.runs.releaseLease({ runId: run.id, expectedStateVersion: run.stateVersion, leaseOwner });

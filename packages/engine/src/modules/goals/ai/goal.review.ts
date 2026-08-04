@@ -12,7 +12,16 @@ function record(value: unknown): Record<string, unknown> | null {
 
 type ProposalAction = z.infer<typeof proposedActionSchema>;
 const actionSharedInputSchema = z.object({ findingId: z.string().trim().min(1).max(128), evidenceRefs: z.array(legacyEvidenceRefSchema).min(1).max(32) }).strict();
-const guidanceActionInputSchema = actionSharedInputSchema.extend({ field: z.enum(["outcome", "currentFocus", "strategy", "constraints"]), value: z.union([z.string().min(1).max(2_000), z.array(z.string().min(1).max(500)).max(32)]) }).strict();
+const guidanceActionInputSchema = z.discriminatedUnion("field", [
+  actionSharedInputSchema.extend({
+    field: z.enum(["outcome", "currentFocus", "strategy"]),
+    value: z.string().min(1).max(2_000),
+  }).strict(),
+  actionSharedInputSchema.extend({
+    field: z.literal("constraints"),
+    value: z.array(z.string().min(1).max(500)).min(1).max(32),
+  }).strict(),
+]);
 const taskActionInputSchema = actionSharedInputSchema.extend({ title: z.string().min(1).max(200), description: z.string().min(1).max(5_000), expectedOutcome: z.string().min(1).max(2_000) }).strict();
 const scheduleActionInputSchema = actionSharedInputSchema.extend({ nextReviewAt: z.string().datetime() }).strict();
 function mappedAction(action: ProposalAction) {
@@ -162,7 +171,14 @@ export const goalReviewFeature = defineAiFeature({
     successCriteria: ["Every proposed change is supported by the frozen snapshot observation."],
     constraints: ["Read-only analysis.", "Do not fabricate evidence.", "Do not mutate Goal state."],
   }),
-  buildInstructions: ({ input, observations }) => `You are a governed Goal-review feature. Return exactly one terminal result envelope: completed, needs_input, or cannot_complete. A completed output must be GoalReviewOutputV2. Each finding must have exactly one proposed action with matching proposalId/findingId, rationale, and frozen observation evidence. Action input must include findingId and evidenceRefs selected only from the frozen snapshot evidence catalog. Never mutate data. Frozen snapshot hash: ${input.snapshotHash}. Frozen observation IDs: ${observations.map(({ observationId }) => observationId).join(", ")}.`,
+  buildInstructions: ({ input, observations }) => [
+    "You are a governed Goal-review feature. Return exactly one terminal result envelope: completed, needs_input, or cannot_complete.",
+    "A completed output must be GoalReviewOutputV2. Each finding must have exactly one proposed action whose proposalId and input.findingId equal finding.findingId, whose rationale copies finding.rationale verbatim, and whose evidence copies finding.evidence exactly in the same order.",
+    "The only allowed action refs are goal.guidance.update version 1, task.create_for_goal version 1, and goal.review.schedule version 1. Do not invent other action IDs; no success-criterion mutation action is available.",
+    "Each action input must have no extra fields and must be exactly one of: { findingId, evidenceRefs, field, value } for goal.guidance.update, where field is outcome, currentFocus, or strategy with a string value, or constraints with a non-empty string-array value; { findingId, evidenceRefs, title, description, expectedOutcome } for task.create_for_goal; or { findingId, evidenceRefs, nextReviewAt } for goal.review.schedule.",
+    "Every input evidenceRefs item is a frozen snapshot catalog reference shaped exactly as { type, id }, where type is goal, criterion, task, result, or artifact. The proposed action's own evidence field instead uses frozen observation references.",
+    `Never mutate data. Frozen snapshot hash: ${input.snapshotHash}. Frozen observation IDs: ${observations.map(({ observationId }) => observationId).join(", ")}.`,
+  ].join(" "),
   observations: [
     { binding: { observation: { id: "goal.review.overview", version: 3 } }, build: ({ input }) => observation("goal.review.overview", input, { goal: { id: input.snapshot.goal.id, title: input.snapshot.goal.title, description: input.snapshot.goal.description } }) },
     { binding: { observation: { id: "goal.review.guidance", version: 3 } }, build: ({ input }) => observation("goal.review.guidance", input, { operationalBrief: input.snapshot.goal.operationalBrief, nextReviewAt: input.snapshot.goal.nextReviewAt }) },

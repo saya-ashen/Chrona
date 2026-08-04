@@ -104,6 +104,8 @@ describe("Goal Review v3 feature contract", () => {
     const fabricated = validateGoalReviewCompletedTerminal({ output, proposedActions: [action()], observations: [], snapshot: input.snapshot });
     const unallowed = validateGoalReviewCompletedTerminal({ output, proposedActions: [action({ action: { id: "goal.delete", version: 1 } })], observations: evidence, snapshot: input.snapshot });
     const malformed = validateGoalReviewCompletedTerminal({ output, proposedActions: [action({ input: { findingId: "finding-1" } })], observations: evidence, snapshot: input.snapshot });
+    const invalidConstraints = validateGoalReviewCompletedTerminal({ output, proposedActions: [action({ input: { ...action().input, field: "constraints", value: "No external writes" } })], observations: evidence, snapshot: input.snapshot });
+    const validConstraints = validateGoalReviewCompletedTerminal({ output, proposedActions: [action({ input: { ...action().input, field: "constraints", value: ["No external writes"] } })], observations: evidence, snapshot: input.snapshot });
     const staleCatalog = validateGoalReviewCompletedTerminal({ output, proposedActions: [action({ input: { ...action().input, evidenceRefs: [{ type: "artifact", id: "not-frozen" }] } })], observations: evidence, snapshot: input.snapshot });
     const missing = validateGoalReviewCompletedTerminal({ output, proposedActions: [], observations: evidence, snapshot: input.snapshot });
 
@@ -111,6 +113,8 @@ describe("Goal Review v3 feature contract", () => {
     expect(fabricated.issues).toEqual(expect.arrayContaining([expect.objectContaining({ code: "finding_evidence_invalid" })]));
     expect(unallowed.issues).toEqual(expect.arrayContaining([expect.objectContaining({ code: "action_not_allowed" })]));
     expect(malformed.issues).toEqual(expect.arrayContaining([expect.objectContaining({ code: "action_not_allowed" })]));
+    expect(invalidConstraints.issues).toEqual(expect.arrayContaining([expect.objectContaining({ code: "action_not_allowed" })]));
+    expect(validConstraints).toEqual({ valid: true, issues: [] });
     expect(staleCatalog.issues).toEqual(expect.arrayContaining([expect.objectContaining({ code: "action_evidence_invalid" })]));
     expect(missing.issues).toEqual(expect.arrayContaining([expect.objectContaining({ code: "finding_action_alignment" })]));
   });
