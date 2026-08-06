@@ -207,14 +207,28 @@ export async function stopTaskPlanGenerationSession(taskId: string, workBlockId?
 
   patchState(key, (state) => ({
     ...state,
+    sessionStatus: "cancelled",
     isLoading: false,
+    phase: "idle",
     connected: false,
   }));
 
   const query = workBlockId ? `?workBlockId=${encodeURIComponent(workBlockId)}` : "";
-  await apiJson(`/api/tasks/${taskId}/plan/generations/stop${query}`, {
-    method: "POST",
-  });
+  try {
+    await apiJson(`/api/tasks/${taskId}/plan/generations/stop${query}`, {
+      method: "POST",
+    });
+  } catch (error) {
+    patchState(key, (state) => ({
+      ...state,
+      sessionStatus: "running",
+      isLoading: true,
+      phase: "streaming",
+      connected: true,
+      error: error instanceof Error ? error.message : "Failed to stop generation",
+    }));
+    throw error;
+  }
 }
 
 export function useTaskPlanGenerationSession(taskId?: string, workBlockIdOrOptions?: string | null | { hydrate?: boolean }, maybeOptions?: { hydrate?: boolean }) {

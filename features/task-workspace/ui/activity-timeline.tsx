@@ -183,7 +183,14 @@ export function buildRenderList(items: WorkspaceActivityItem[], transcript = fal
     result.push({ type: "single", key: item.id, item });
   }
 
-  return result;
+  const keyCounts = new Map<string, number>();
+  return result.map((entry) => {
+    const occurrence = keyCounts.get(entry.key) ?? 0;
+    keyCounts.set(entry.key, occurrence + 1);
+    return occurrence === 0
+      ? entry
+      : { ...entry, key: `${entry.key}:${occurrence}` };
+  });
 }
 
 // ─── Visual helpers ────────────────────────────────────────────────────────────

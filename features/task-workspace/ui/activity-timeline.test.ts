@@ -35,6 +35,16 @@ describe("formatActivityTime", () => {
 });
 
 describe("ActivityTimeline execution runs", () => {
+  it("disambiguates duplicate activity ids before rendering", () => {
+    const entries = buildRenderList([
+      activity({ id: "duplicate", kind: "node" }),
+      activity({ id: "duplicate", kind: "artifact" }),
+    ]);
+
+    const keys = entries.map((entry) => entry.key);
+    expect(new Set(keys).size).toBe(keys.length);
+  });
+
   it("adds one ordered divider for each public execution start marker", () => {
     const entries = buildRenderList([
       activity({

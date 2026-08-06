@@ -13,6 +13,14 @@ type ScheduleViewHrefBuilder = (
   taskId?: string,
 ) => string;
 
+export function getScheduleQuickCreateTimes(day: Date | null | undefined) {
+  const start = new Date(day ?? new Date());
+  start.setHours(9, 0, 0, 0);
+  const end = new Date(start);
+  end.setHours(10, 0, 0, 0);
+  return { start, end };
+}
+
 export function SchedulePageDialogs({
   showQuickAddDialog,
   isPending,
@@ -50,7 +58,6 @@ export function SchedulePageDialogs({
 }) {
 
   void data;
-  void viewModel;
   void activeView;
   void workspaceId;
   void routerPush;
@@ -59,11 +66,14 @@ export function SchedulePageDialogs({
   void buildScheduleViewHref;
   void actionFailedMessage;
 
+  const { start: initialStartAt, end: initialEndAt } =
+    getScheduleQuickCreateTimes(viewModel.activeGroup?.date);
+
   return (
     <TaskCreateDialog
       isOpen={showQuickAddDialog}
-      initialStartAt={new Date(new Date().setHours(9, 0, 0, 0))}
-      initialEndAt={new Date(new Date().setHours(10, 0, 0, 0))}
+      initialStartAt={initialStartAt}
+      initialEndAt={initialEndAt}
       isPending={isPending}
       availableAiClients={availableAiClients ?? data.availableAiClients}
       onClose={onCloseQuickAdd}

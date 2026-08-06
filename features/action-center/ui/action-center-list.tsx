@@ -368,7 +368,8 @@ export function ActionCenterList({
                 size="sm"
                 className="h-10 shrink-0 rounded-md px-3 text-xs sm:h-9"
                 onClick={() => setFilter(value)}
-                aria-pressed={filter === value}
+                aria-selected={filter === value}
+                role="tab"
               >
                 {label}
               </Button>

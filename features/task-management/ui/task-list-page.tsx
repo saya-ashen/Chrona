@@ -13,7 +13,7 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { Link, useNavigate, useSearchParams } from "react-router";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { localizeHref, useLocale, type Messages } from "@chrona/i18n";
 import { Badge } from "@shared/ui";
 import { Button } from "@shared/ui";
@@ -208,8 +208,19 @@ function canStartTask(task: TaskItem): boolean {
   return task.stateView.primaryActionId === "start_execution";
 }
 
-function canCompleteTask(task: TaskItem): boolean {
-  return !["result_ready", "done", "cancelled"].includes(task.stateView.state);
+export function canCompleteTask(task: TaskItem): boolean {
+  if (["result_ready", "done", "cancelled"].includes(task.stateView.state)) {
+    return false;
+  }
+
+  const runStatuses = [
+    task.result?.runStatus,
+    task.projection?.runStatus,
+    task.projection?.latestRunStatus,
+  ];
+  return runStatuses.some(
+    (status) => status?.toLowerCase() === "completed",
+  );
 }
 
 function canReopenTask(task: TaskItem): boolean {

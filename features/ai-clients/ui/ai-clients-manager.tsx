@@ -10,6 +10,50 @@ import { AiClientList } from "./ai-client-list";
 import type { AiClientInfo, ClientSaveData, RuntimeProviderOption, TestResult } from "./ai-client-types";
 import { isDebugProviderVisible, normalizeRuntimeProviders, testClientAvailability } from "./ai-client-view-model";
 
+type StoredTestState = TestResult & { checkedAt: number };
+
+const READINESS_STORAGE_KEY = "chrona:ai-client-readiness";
+const READINESS_MAX_AGE_MS = 24 * 60 * 60 * 1000;
+
+function loadStoredTestStates(): Record<string, TestResult> {
+  if (typeof window === "undefined") return {};
+  try {
+    const parsed = JSON.parse(window.localStorage.getItem(READINESS_STORAGE_KEY) ?? "null") as Record<string, StoredTestState> | null;
+    if (!parsed || typeof parsed !== "object") return {};
+    const now = Date.now();
+    return Object.fromEntries(
+      Object.entries(parsed)
+        .filter(([, value]) => value && now - value.checkedAt <= READINESS_MAX_AGE_MS)
+        .map(([id, value]) => [id, { status: value.status, reason: value.reason }]),
+    );
+  } catch {
+    return {};
+  }
+}
+
+function storeTestState(clientId: string, result: TestResult) {
+  if (typeof window === "undefined" || result.status === "idle" || result.status === "testing") return;
+  try {
+    const current = JSON.parse(window.localStorage.getItem(READINESS_STORAGE_KEY) ?? "{}") as Record<string, StoredTestState>;
+    window.localStorage.setItem(
+      READINESS_STORAGE_KEY,
+      JSON.stringify({ ...current, [clientId]: { ...result, checkedAt: Date.now() } }),
+    );
+  } catch {
+    // Readiness is a UI cache; storage failures must not block testing.
+  }
+}
+
+function clearStoredTestState(clientId: string) {
+  if (typeof window === "undefined") return;
+  try {
+    const current = JSON.parse(window.localStorage.getItem(READINESS_STORAGE_KEY) ?? "{}") as Record<string, StoredTestState>;
+    delete current[clientId];
+    window.localStorage.setItem(READINESS_STORAGE_KEY, JSON.stringify(current));
+  } catch {
+    // Ignore storage failures; the server remains the source of truth.
+  }
+}
 type RuntimeDiagnostics = NonNullable<AiClientDiagnosticsResponse["diagnostics"]>;
 
 const DEFAULTS: Record<string, string> = {
@@ -102,7 +146,7 @@ export function AiClientsManager() {
   const [showForm, setShowForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
-  const [cardTestStates, setCardTestStates] = useState<Record<string, TestResult>>({});
+  const [cardTestStates, setCardTestStates] = useState<Record<string, TestResult>>(() => loadStoredTestStates());
   const [diagnostics, setDiagnostics] = useState<Record<string, RuntimeDiagnostics>>({});
   const [diagnosticsLoading, setDiagnosticsLoading] = useState<Record<string, boolean>>({});
 
@@ -117,11 +161,18 @@ export function AiClientsManager() {
 
   const refresh = () => { notifyAiClientsChanged(); void fetchClients(); };
   const saveNew = async (data: ClientSaveData) => { const result = await aiClientsApi.create(data.payload); if (result.client?.id) await aiClientsApi.updateBindings(result.client.id, data.bindings); setShowForm(false); refresh(); };
-  const saveExisting = async (id: string, data: ClientSaveData) => { await aiClientsApi.update(id, data.payload); await aiClientsApi.updateBindings(id, data.bindings); setEditingId(null); refresh(); };
+  const saveExisting = async (id: string, data: ClientSaveData) => { await aiClientsApi.update(id, data.payload); await aiClientsApi.updateBindings(id, data.bindings); clearStoredTestState(id); setCardTestStates((current) => { const next = { ...current }; delete next[id]; return next; }); setEditingId(null); refresh(); };
   const testExisting = async (client: AiClientInfo) => {
     setCardTestStates((current) => ({ ...current, [client.id]: { status: "testing", reason: null } }));
-    try { const result = await testClientAvailability({ name: client.name, type: client.type, config: client.config, isDefault: client.isDefault }); setCardTestStates((current) => ({ ...current, [client.id]: result })); }
-    catch (error) { setCardTestStates((current) => ({ ...current, [client.id]: { status: "unavailable", reason: error instanceof Error ? error.message : copy.reasonUnknown } })); }
+    try {
+      const result = await testClientAvailability({ name: client.name, type: client.type, config: client.config, isDefault: client.isDefault });
+      storeTestState(client.id, result);
+      setCardTestStates((current) => ({ ...current, [client.id]: result }));
+    } catch (error) {
+      const result = { status: "unavailable" as const, reason: error instanceof Error ? error.message : copy.reasonUnknown };
+      storeTestState(client.id, result);
+      setCardTestStates((current) => ({ ...current, [client.id]: result }));
+    }
   };
   const inspect = async (id: string) => {
     setDiagnosticsLoading((current) => ({ ...current, [id]: true }));
@@ -138,7 +189,7 @@ export function AiClientsManager() {
   return <div className="flex flex-col gap-5"><header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between"><div className="flex flex-col gap-1"><h2 className="text-xl font-semibold tracking-tight">{copy.title}</h2><p className="text-sm text-muted-foreground">{copy.subtitle}</p><p className="text-sm text-muted-foreground">{copy.hermesIntro}</p></div><Button type="button" disabled={showForm} onClick={() => setShowForm(true)}>{copy.addClient}</Button></header>
     {showForm ? <ClientForm onSave={saveNew} onCancel={() => setShowForm(false)} copy={copy} providers={providers} forceDefault={!clients.length} /> : null}
     {!clients.length && !showForm ? <EmptyState copy={copy} onAdd={() => setShowForm(true)} /> : null}
-    <AiClientList clients={clients} copy={copy} cardTestStates={cardTestStates} diagnostics={diagnostics} diagnosticsLoading={diagnosticsLoading} editingId={editingId} onEdit={setEditingId} onDelete={async (id) => { await aiClientsApi.delete(id); refresh(); }} onMakeDefault={async (id) => { await aiClientsApi.update(id, { isDefault: true }); refresh(); }} onToggleEnabled={async (id, enabled) => { await aiClientsApi.update(id, { enabled }); refresh(); }} onTest={(client) => void testExisting(client)} onInspect={(id) => void inspect(id)} renderEditor={(client) => <ClientForm initial={client} onSave={(data) => void saveExisting(client.id, data)} onCancel={() => setEditingId(null)} copy={copy} providers={providers} />} />
+    <AiClientList clients={clients} copy={copy} cardTestStates={cardTestStates} diagnostics={diagnostics} diagnosticsLoading={diagnosticsLoading} editingId={editingId} onEdit={setEditingId} onDelete={async (id) => { await aiClientsApi.delete(id); clearStoredTestState(id); setCardTestStates((current) => { const next = { ...current }; delete next[id]; return next; }); refresh(); }} onMakeDefault={async (id) => { await aiClientsApi.update(id, { isDefault: true }); refresh(); }} onToggleEnabled={async (id, enabled) => { await aiClientsApi.update(id, { enabled }); clearStoredTestState(id); setCardTestStates((current) => { const next = { ...current }; delete next[id]; return next; }); refresh(); }} onTest={(client) => void testExisting(client)} onInspect={(id) => void inspect(id)} renderEditor={(client) => <ClientForm initial={client} onSave={(data) => void saveExisting(client.id, data)} onCancel={() => setEditingId(null)} copy={copy} providers={providers} />} />
   </div>;
 }
 

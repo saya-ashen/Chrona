@@ -406,6 +406,14 @@ export function useTaskWorkspacePlanState(
     if (!hasTerminalGenerationSession) return;
     void planStateQuery.refetch();
   }, [hasTerminalGenerationSession, planStateQuery.refetch]);
+
+  useEffect(() => {
+    if (!isGeneratingPlan) return;
+    const interval = window.setInterval(() => {
+      void planStateQuery.refetch();
+    }, 5000);
+    return () => window.clearInterval(interval);
+  }, [isGeneratingPlan, planStateQuery.refetch]);
   const generationActivitySummary = isGeneratingPlan
     ? (generationSession.statusMessage ?? activitySummaryFromPhase(generationSession.phase))
     : null;
