@@ -10,6 +10,7 @@ import {
   getWorkspaceActionDisabledReason,
   pickDefaultWorkspaceAction,
 } from "./task-workspace-model";
+import { deleteTask } from "../model/task-actions-client";
 
 const originalFetch = globalThis.fetch;
 
@@ -248,5 +249,58 @@ describe("task workspace actions", () => {
     globalThis.fetch = vi.fn().mockResolvedValue(new Response(JSON.stringify({ error: "No activity" }), { status: 404 })) as unknown as typeof fetch;
 
     await expect(loadWorkspaceActivityPage({ taskId: "missing" })).rejects.toThrow("No activity");
+  });
+
+  it("deletes through the reviewed task impact contract", async () => {
+    const impact = {
+      taskIds: ["task/1", "child-1"],
+      taskCount: 2,
+      assets: [{ id: "asset-1", label: "Report", goalId: "goal-1" }],
+    };
+    const fetchMock = vi.fn().mockImplementation(async (input: RequestInfo | URL) => {
+      if (String(input).includes("/delete-impact?")) {
+        return new Response(JSON.stringify(impact), {
+          status: 200,
+          headers: { "Content-Type": "application/json" },
+        });
+      }
+      return new Response(JSON.stringify({ success: true }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      });
+    });
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    await deleteTask({ taskId: "task/1", workspaceId: "workspace 1" });
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(String(fetchMock.mock.calls[0]?.[0])).toBe(
+      "/api/tasks/task%2F1/delete-impact?workspaceId=workspace%201",
+    );
+    expect(String(fetchMock.mock.calls[1]?.[0])).toBe(
+      "/api/tasks/task%2F1?workspaceId=workspace%201",
+    );
+    expect(fetchMock.mock.calls[1]?.[1]).toMatchObject({ method: "DELETE" });
+    expect(JSON.parse(String(fetchMock.mock.calls[1]?.[1]?.body))).toEqual({
+      expectedTaskIds: ["task/1", "child-1"],
+      expectedAssetIds: ["asset-1"],
+    });
+  });
+
+  it("reuses an already reviewed impact without fetching it again", async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({ success: true }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    }));
+    globalThis.fetch = fetchMock as unknown as typeof fetch;
+
+    await deleteTask({
+      taskId: "task-1",
+      workspaceId: "workspace-1",
+      impact: { taskIds: ["task-1"], taskCount: 1, assets: [] },
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock.mock.calls[0]?.[1]).toMatchObject({ method: "DELETE" });
   });
 });

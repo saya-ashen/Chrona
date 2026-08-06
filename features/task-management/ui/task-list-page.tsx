@@ -511,7 +511,7 @@ type PendingDelete =
 
 export function TaskListPage({
   tasks,
-  workspaceId: _workspaceId,
+  workspaceId,
   copy,
   total,
   page,
@@ -671,7 +671,7 @@ export function TaskListPage({
     setIsPending(true);
     setActionMessage(null);
     try {
-      await Promise.all(deleteIds.map((taskId) => deleteTask({ taskId })));
+      await Promise.all(deleteIds.map((taskId) => deleteTask({ taskId, workspaceId })));
       setSelectedIds((current) => {
         const next = new Set(current);
         for (const taskId of deleteIds) next.delete(taskId);

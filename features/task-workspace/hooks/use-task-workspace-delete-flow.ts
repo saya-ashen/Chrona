@@ -2,7 +2,7 @@ import { useCallback, useState } from "react";
 import { localizeHref, useLocale } from "@chrona/i18n";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { apiJson } from "@shared/http";
-import type { TaskDeleteImpact } from "@chrona/contracts";
+import { deleteTask, getTaskDeleteImpact } from "../model/task-actions-client";
 
 type UseTaskWorkspaceDeleteFlowInput = {
   taskId: string;
@@ -17,22 +17,14 @@ export function useTaskWorkspaceDeleteFlow({ taskId, workspaceId, goalId, setSav
   const locale = useLocale();
   const deleteImpactQuery = useQuery({
     queryKey: ["task-delete-impact", taskId, workspaceId],
-    queryFn: () => apiJson<TaskDeleteImpact>(
-      `/api/tasks/${encodeURIComponent(taskId)}/delete-impact?workspaceId=${encodeURIComponent(workspaceId)}`,
-    ),
+    queryFn: () => getTaskDeleteImpact({ taskId, workspaceId }),
     enabled: showDeleteConfirm,
   });
 
   const deleteTaskMutation = useMutation({
     mutationFn: async () => {
       if (!deleteImpactQuery.data) throw new Error("Deletion impact is not available");
-      await apiJson(`/api/tasks/${encodeURIComponent(taskId)}?workspaceId=${encodeURIComponent(workspaceId)}`, {
-        method: "DELETE",
-        body: JSON.stringify({
-          expectedTaskIds: deleteImpactQuery.data.taskIds,
-          expectedAssetIds: deleteImpactQuery.data.assets.map((asset) => asset.id),
-        }),
-      });
+      await deleteTask({ taskId, workspaceId, impact: deleteImpactQuery.data });
     },
     onSuccess: () => {
       window.location.href = goalId

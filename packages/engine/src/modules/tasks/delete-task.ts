@@ -107,12 +107,12 @@ export async function deleteTaskTreeRecords(
   await tx.graphVersion.deleteMany({ where: { taskId: currentTaskId } });
   await tx.executionSession.deleteMany({ where: { taskId: currentTaskId } });
   await tx.workBlock.deleteMany({ where: { taskId: currentTaskId } });
+  await tx.approval.deleteMany({ where: { taskId: currentTaskId } });
+  await tx.artifact.deleteMany({ where: { taskId: currentTaskId } });
   await tx.taskPlanLayer.deleteMany({ where: { taskId: currentTaskId } });
   await tx.taskPlanRun.deleteMany({ where: { taskId: currentTaskId } });
   await tx.taskPlan.deleteMany({ where: { taskId: currentTaskId } });
   await tx.taskProjection.deleteMany({ where: { taskId: currentTaskId } });
-  await tx.approval.deleteMany({ where: { taskId: currentTaskId } });
-  await tx.artifact.deleteMany({ where: { taskId: currentTaskId } });
   await tx.memory.deleteMany({ where: { taskId: currentTaskId } });
   await tx.taskTimelineItem.deleteMany({ where: { taskId: currentTaskId } });
   await tx.event.deleteMany({ where: { taskId: currentTaskId } });

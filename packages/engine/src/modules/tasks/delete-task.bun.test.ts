@@ -118,6 +118,81 @@ describe("deleteTask", () => {
     expect(await db.schedulerEvent.count()).toBe(0);
   });
 
+  it("deletes plan-linked runs that have durable artifacts", async () => {
+    const workspace = await db.workspace.create({
+      data: { name: "Delete plan-linked run", status: "Active", defaultRuntime: "hermes" },
+    });
+    const task = await db.task.create({
+      data: {
+        workspaceId: workspace.id,
+        title: "Plan-linked task",
+        executionRuntime: "hermes",
+        executionConfig: {},
+        status: "Completed",
+        priority: "Medium",
+      },
+    });
+    const plan = await db.taskPlan.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        planId: "delete-plan-linked-run",
+        revision: 1,
+        status: "Accepted",
+        compiledPlan: {},
+      },
+    });
+    const planRun = await db.taskPlanRun.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        planId: plan.planId,
+        planRun: {},
+      },
+    });
+    const attempt = await db.taskPlanNodeAttempt.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        planId: plan.planId,
+        planRunId: planRun.id,
+        nodeId: "node-1",
+        nodeLayerId: "layer-1",
+        idempotencyKey: "delete-plan-linked-attempt",
+        attemptNumber: 1,
+        status: "completed",
+        executionEpoch: 0,
+      },
+    });
+    const run = await db.run.create({
+      data: {
+        taskId: task.id,
+        nodeAttemptId: attempt.id,
+        runtimeName: "hermes",
+        status: "Completed",
+        triggeredBy: "user",
+      },
+    });
+    await db.artifact.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        runId: run.id,
+        type: "report",
+        title: "Durable result",
+        uri: "generated://durable-result.md",
+      },
+    });
+
+    await deleteTask(task.id, { expectedTaskIds: [task.id], expectedAssetIds: [] });
+
+    expect(await db.task.count()).toBe(0);
+    expect(await db.taskPlanRun.count()).toBe(0);
+    expect(await db.taskPlanNodeAttempt.count()).toBe(0);
+    expect(await db.run.count()).toBe(0);
+    expect(await db.artifact.count()).toBe(0);
+  });
+
   it("previews and deletes Goal assets produced by the task tree", async () => {
     const workspace = await db.workspace.create({
       data: { name: "Delete assets", status: "Active", defaultRuntime: "hermes" },

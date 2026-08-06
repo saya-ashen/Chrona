@@ -108,11 +108,6 @@ export function updateTaskConfigFromSchedule(input: {
   });
 }
 
-export function deleteTask(input: { taskId: string }) {
-  return apiJson(`/api/tasks/${encodeURIComponent(input.taskId)}`, {
-    method: "DELETE",
-  });
-}
 
 export function applySchedule(input: {
   taskId: string;

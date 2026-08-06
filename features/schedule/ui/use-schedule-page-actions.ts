@@ -20,7 +20,7 @@ import {
 } from "./schedule-page-actions";
 import type { SchedulePageCopy } from "./schedule-page-copy";
 import type { TaskConfigFormInput } from "./forms/task-config-form";
-import { deleteTask } from "./schedule-actions";
+import { deleteTask } from "@features/task-workspace";
 
 type DraggedTask = {
   kind: "queue" | "scheduled";
@@ -167,7 +167,7 @@ export function useSchedulePageActions({
   async function handleDeleteTask(taskId: string) {
     await runSchedulePageAction({
       action: async () => {
-        await deleteTask({ taskId });
+        await deleteTask({ taskId, workspaceId });
       },
       setIsPending,
       setErrorMessage,

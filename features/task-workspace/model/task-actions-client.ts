@@ -1,5 +1,5 @@
 import { apiJson } from "@shared/http";
-import type { AutomationTimingPreset } from "@chrona/contracts";
+import type { AutomationTimingPreset, TaskDeleteImpact } from "@chrona/contracts";
 import type { ExecutionActionInput } from "@chrona/contracts";
 
 export type CreateTaskFromScheduleInput = {
@@ -98,10 +98,30 @@ export function updateTaskConfigFromSchedule(input: {
   });
 }
 
-export function deleteTask(input: { taskId: string }) {
-  return apiJson<unknown>(`/api/tasks/${encodeURIComponent(input.taskId)}`, {
-    method: "DELETE",
-  });
+export type DeleteTaskInput = {
+  taskId: string;
+  workspaceId: string;
+  impact?: TaskDeleteImpact;
+};
+
+export function getTaskDeleteImpact(input: Pick<DeleteTaskInput, "taskId" | "workspaceId">) {
+  return apiJson<TaskDeleteImpact>(
+    `/api/tasks/${encodeURIComponent(input.taskId)}/delete-impact?workspaceId=${encodeURIComponent(input.workspaceId)}`,
+  );
+}
+
+export async function deleteTask(input: DeleteTaskInput) {
+  const impact = input.impact ?? await getTaskDeleteImpact(input);
+  return apiJson<unknown>(
+    `/api/tasks/${encodeURIComponent(input.taskId)}?workspaceId=${encodeURIComponent(input.workspaceId)}`,
+    {
+      method: "DELETE",
+      body: JSON.stringify({
+        expectedTaskIds: impact.taskIds,
+        expectedAssetIds: impact.assets.map((asset) => asset.id),
+      }),
+    },
+  );
 }
 
 export function applySchedule(input: {

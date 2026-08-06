@@ -25,6 +25,7 @@ export {
   createTaskFromSchedule,
   decideScheduleProposal,
   deleteTask,
+  getTaskDeleteImpact,
   dispatchExecutionAction,
   markTaskDone,
   moveWorkBlock,

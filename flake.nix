@@ -282,7 +282,7 @@
           ++ playwrightLibs;
 
         shellHook = ''
-          export PLAYWRIGHT_BROWSERS_PATH="''${PLAYWRIGHT_BROWSERS_PATH:-$HOME/.cache/ms-playwright}"
+          export PLAYWRIGHT_BROWSERS_PATH="$HOME/.cache/ms-playwright"
           export PRISMA_SCHEMA_ENGINE_BINARY="${pkgs.prisma-engines}/bin/schema-engine"
           export LD_LIBRARY_PATH="${pkgs.lib.makeLibraryPath playwrightLibs}:''${LD_LIBRARY_PATH:-}"
         '';
