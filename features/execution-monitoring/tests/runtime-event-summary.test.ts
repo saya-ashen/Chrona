@@ -35,7 +35,7 @@ describe("summarizeRuntimeEvent", () => {
     expect(JSON.stringify(event)).not.toContain("Read task");
   });
 
-  it("keeps safe completion status and duration without result content", () => {
+  it("preserves provider completion output and duration for the live trace", () => {
     const event = summarizeRuntimeEvent("start_manual", {
       nodeId: "node-a",
       executionScope: "scope-a",
@@ -54,14 +54,13 @@ describe("summarizeRuntimeEvent", () => {
 
     expect(event?.event).toMatchObject({
       type: "tool_completed",
-      tool: { category: "tool", label: "Runtime tool" },
       durationMs: 42,
+      raw: { text: "export const secret = true" },
     });
-    expect(JSON.stringify(event)).not.toContain("run-1");
-    expect(JSON.stringify(event)).not.toContain("export const secret");
+    expect(JSON.stringify(event)).toContain("export const secret");
   });
 
-  it("projects a generic failed tool status without provider error text", () => {
+  it("preserves provider error details for the live trace", () => {
     const event = summarizeRuntimeEvent("start_manual", {
       nodeId: "node-a",
       executionScope: "scope-a",
@@ -77,8 +76,54 @@ describe("summarizeRuntimeEvent", () => {
       },
     } satisfies PlanExecutionRuntimeEvent);
 
-    expect(event?.event).toMatchObject({ type: "tool_completed", error: { code: "permission_denied" } });
-    expect(JSON.stringify(event)).not.toContain("credential leaked");
+    expect(event?.event).toMatchObject({
+      type: "tool_completed",
+      error: { code: "permission_denied", message: "credential leaked" },
+    });
+    expect(JSON.stringify(event)).toContain("credential leaked");
+  });
+
+  it("projects the actual provider request and response payloads", () => {
+    const request = summarizeRuntimeEvent("start_manual", {
+      nodeId: "node-a",
+      executionScope: "scope-a",
+      nodeTitle: "Node A",
+      runtimeName: "hermes",
+      event: {
+        type: "raw_event",
+        provider: "anthropic",
+        runId: "run-1",
+        raw: {
+          kind: "provider_request",
+          input: { instructions: "Inspect the repository", input: { target: "src" } },
+        },
+      },
+    } satisfies PlanExecutionRuntimeEvent);
+    const response = summarizeRuntimeEvent("start_manual", {
+      nodeId: "node-a",
+      executionScope: "scope-a",
+      nodeTitle: "Node A",
+      runtimeName: "hermes",
+      event: {
+        type: "run_completed",
+        provider: "anthropic",
+        runId: "run-1",
+        run: { provider: "anthropic", runId: "run-1", sessionId: "session-1", status: "completed" },
+        outputText: "Repository inspected",
+        structuredPayload: { files: 12 },
+      },
+    } satisfies PlanExecutionRuntimeEvent);
+
+    expect(request?.event).toMatchObject({
+      type: "run_status",
+      status: "started",
+      input: { instructions: "Inspect the repository", input: { target: "src" } },
+    });
+    expect(response?.event).toMatchObject({
+      type: "run_status",
+      status: "completed",
+      output: { text: "Repository inspected", structuredPayload: { files: 12 } },
+    });
   });
 
   it("drops text, reasoning, and raw provider events", () => {

@@ -57,6 +57,12 @@ function renderOverview(
   );
 }
 
+async function openAgentTranscript() {
+  const user = userEvent.setup();
+  await user.click(screen.getByRole("button", { name: /Open Agent transcript/ }));
+  return screen.findByRole("dialog", { name: /Agent transcript/ });
+}
+
 function nowDocument(title = "Current operation"): UiDocument {
   return {
     root: "root",
@@ -244,13 +250,65 @@ describe("TaskWorkspaceExecutionOverview", () => {
     expect(transcriptButton).toHaveAccessibleName(new RegExp(`${view.activity.length} events`));
     expect(transcriptButton).toHaveClass("fixed", "right-0");
     await user.click(transcriptButton);
-    expect(screen.getByRole("dialog", { name: "Agent transcript" })).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: /Agent transcript/ })).toBeInTheDocument();
     expect(screen.getByText(/Intent, tool calls, results/)).toBeInTheDocument();
     expect(screen.getByText("Output")).toBeInTheDocument();
     expect(screen.getByText("AI generated")).toBeInTheDocument();
     expect(
       screen.queryByRole("region", { name: "Execution progress" }),
     ).not.toBeInTheDocument();
+  });
+
+  it("shows backend provider input and output in the running result surface", () => {
+    const view = createTaskWorkspaceExecutionConsoleView(
+      executionMonitoringWorkspaceFixtures.running,
+    );
+    renderOverview(view, {
+      runtimeEvents: [
+        {
+          type: "runtime_event",
+          action: "start_manual",
+          executionScope: "scope-1",
+          nodeId: "execute",
+          nodeTitle: "Inspect repository",
+          runtime: { category: "runtime", label: "Execution runtime" },
+          provider: { category: "ai_provider", label: "AI provider" },
+          sequence: 1,
+          event: {
+            type: "tool_started",
+            tool: { category: "tool", label: "Runtime tool" },
+            label: "Read source",
+            input: { path: "src/app.ts" },
+          },
+        },
+        {
+          type: "runtime_event",
+          action: "start_manual",
+          executionScope: "scope-1",
+          nodeId: "execute",
+          nodeTitle: "Inspect repository",
+          runtime: { category: "runtime", label: "Execution runtime" },
+          provider: { category: "ai_provider", label: "AI provider" },
+          sequence: 2,
+          event: {
+            type: "tool_completed",
+            tool: { category: "tool", label: "Runtime tool" },
+            label: "Read source",
+            output: { lines: 42, status: "ok" },
+          },
+        },
+      ],
+      currentExecution: { status: "running" },
+      isExecutionRunning: true,
+    });
+
+    const results = screen.getByRole("region", { name: "Stage results" });
+    const trace = within(results).getByRole("region", { name: "Provider execution trace" });
+    expect(trace).toHaveTextContent("Provider input");
+    expect(trace).toHaveTextContent("src/app.ts");
+    expect(trace).toHaveTextContent("Provider output");
+    expect(trace).toHaveTextContent('"lines": 42');
+    expect(screen.queryByRole("tab", { name: "Activity" })).not.toBeInTheDocument();
   });
 
   it("shows safe tool lifecycle status in live activity", () => {
@@ -291,7 +349,7 @@ describe("TaskWorkspaceExecutionOverview", () => {
     expect(screen.queryByText("Loaded 42 lines")).not.toBeInTheDocument();
   });
 
-  it("makes running Activity primary with responsive tabs and a desktop timeline", () => {
+  it("keeps the running transcript in the collapsible side sheet", async () => {
     const view = createTaskWorkspaceExecutionConsoleView(
       executionMonitoringWorkspaceFixtures.running,
     );
@@ -332,14 +390,17 @@ describe("TaskWorkspaceExecutionOverview", () => {
       isExecutionRunning: true,
     });
 
-    expect(screen.getByRole("tab", { name: "Activity" })).toHaveAttribute("data-state", "active");
+    expect(screen.queryByRole("tab", { name: "Activity" })).not.toBeInTheDocument();
+    const transcriptButton = screen.getByRole("button", { name: /Open Agent transcript/ });
+    expect(transcriptButton).toHaveClass("fixed", "right-0");
+    expect(screen.getByText("Output")).toBeInTheDocument();
+    await openAgentTranscript();
     expect(screen.getAllByText(/events · live/).length).toBeGreaterThan(0);
     expect(screen.getAllByText("Read plan").length).toBeGreaterThan(0);
-    expect(screen.getByText("Output")).toBeInTheDocument();
     expect(screen.getAllByText("Agent transcript").length).toBeGreaterThan(0);
   });
 
-  it("renders persisted server-driven Trail items once", () => {
+  it("renders persisted server-driven Trail items once in the side sheet", async () => {
     const view = createTaskWorkspaceExecutionConsoleView(
       executionMonitoringWorkspaceFixtures.running,
     );
@@ -377,7 +438,8 @@ describe("TaskWorkspaceExecutionOverview", () => {
       isExecutionRunning: true,
     });
 
-    expect(screen.getByRole("tab", { name: "Activity" })).toHaveAttribute("data-state", "active");
+    expect(screen.queryByRole("tab", { name: "Activity" })).not.toBeInTheDocument();
+    await openAgentTranscript();
     expect(screen.getAllByText("Plan generation update").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Requesting AI provider...").length).toBeGreaterThan(0);
   });
@@ -455,8 +517,8 @@ describe("TaskWorkspaceExecutionOverview", () => {
     const results = screen.getByRole("region", { name: "Stage results" });
     expect(within(results).getByRole("status", { name: "Execution is producing output" })).toBeInTheDocument();
     expect(results.querySelector(".animate-spin")).toBeInTheDocument();
-    expect(within(results).queryByText("Writing report")).not.toBeInTheDocument();
-    expect(screen.getAllByText("Writing report").length).toBeGreaterThan(0);
+    expect(within(results).getByText("Writing report")).toBeInTheDocument();
+    expect(within(results).getByRole("region", { name: "Provider execution trace" })).toBeInTheDocument();
     expect(screen.queryByText("Generating report sections")).not.toBeInTheDocument();
   });
 
@@ -496,7 +558,8 @@ describe("TaskWorkspaceExecutionOverview", () => {
     });
 
     expect(screen.getAllByText("Review architecture").length).toBeGreaterThan(0);
-    expect(screen.getByRole("tab", { name: "Activity" })).toHaveAttribute("data-state", "active");
+    expect(screen.queryByRole("tab", { name: "Activity" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Open Agent transcript/ })).toBeInTheDocument();
   });
 
   it("keeps stage results pending without provider text output", () => {
@@ -609,7 +672,7 @@ describe("TaskWorkspaceExecutionOverview", () => {
       screen.queryByLabelText("Latest activity running"),
     ).not.toBeInTheDocument();
   });
-  it("streams live runtime events into a server-driven Trail document", () => {
+  it("streams live runtime events into an open transcript side sheet", async () => {
     const view = createTaskWorkspaceExecutionConsoleView(
       executionMonitoringWorkspaceFixtures.running,
     );
@@ -652,8 +715,9 @@ describe("TaskWorkspaceExecutionOverview", () => {
       runtimeEvents: [],
       currentExecution: { status: "running" },
     });
-    expect(screen.getByRole("tab", { name: "Activity" })).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Activity" })).not.toBeInTheDocument();
     expect(screen.queryByText("正在读取计划")).not.toBeInTheDocument();
+    await openAgentTranscript();
 
     rerender(
       <TaskWorkspaceExecutionOverview
@@ -670,14 +734,14 @@ describe("TaskWorkspaceExecutionOverview", () => {
         runtimeEvents={[liveEvent]}
       />,
     );
-    expect(screen.getByRole("tab", { name: "Activity" })).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Activity" })).not.toBeInTheDocument();
 
     return waitFor(() =>
       expect(screen.getAllByText("正在读取计划").length).toBeGreaterThan(0),
     );
   });
 
-  it("streams live workspace events into a server-driven Trail document", () => {
+  it("streams live workspace events into an open transcript side sheet", async () => {
     const view = createTaskWorkspaceExecutionConsoleView(
       executionMonitoringWorkspaceFixtures.running,
     );
@@ -715,7 +779,8 @@ describe("TaskWorkspaceExecutionOverview", () => {
       currentExecution: { status: "running" },
       isExecutionRunning: true,
     });
-    expect(screen.getByRole("tab", { name: "Activity" })).toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Activity" })).not.toBeInTheDocument();
+    await openAgentTranscript();
 
     expect(screen.getAllByText("Plan generation update").length).toBeGreaterThan(0);
     expect(screen.getAllByText("Requesting AI provider...").length).toBeGreaterThan(0);

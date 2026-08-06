@@ -701,7 +701,9 @@ export function DayTimeline({
       >
         <div className="relative h-full min-h-[40rem] rounded-2xl border border-border/75 bg-background shadow-[inset_0_0_0_1px_rgba(15,23,42,0.04),0_16px_38px_rgba(15,23,42,0.08)]">
           {selectedDay === getTodayKey() ? (
-            <span className="sr-only" aria-label="Current time marker" />
+            <span role="status" aria-label={copy.currentTimeLabel} className="sr-only">
+              {copy.currentTimeLabel}
+            </span>
           ) : null}
           <div className="sr-only">
             {items.map((item) => (

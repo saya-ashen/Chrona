@@ -29,6 +29,7 @@ export const DEFAULT_SCHEDULE_PAGE_COPY = {
   quickCreateQueueTitlePlaceholder: "Add a task to the queue",
   quickCreateStartLabel: "Start",
   quickCreateStartNowLabel: "Now",
+  currentTimeLabel: "Current time",
   quickCreateStartMorningLabel: "Morning",
   quickCreateStartAfternoonLabel: "Afternoon",
   quickCreateStartEveningLabel: "Evening",

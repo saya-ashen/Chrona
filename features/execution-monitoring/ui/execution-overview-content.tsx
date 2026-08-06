@@ -7,6 +7,7 @@ import {
   type WorkspaceActivityItem,
 } from "@features/task-workspace/public/workspace-integration";
 import type { ResultNodeFilter, ResultNodeOption } from "./build-execution-overview-spec";
+import type { WorkspaceRuntimeEvent } from "../model/workspace-runtime-events";
 import {
   Badge,
   Button,
@@ -25,10 +26,6 @@ import {
   SheetHeader,
   SheetTitle,
   SheetTrigger,
-  Tabs,
-  TabsContent,
-  TabsList,
-  TabsTrigger,
 } from "@shared/ui";
 type CommandCenterCopy = Record<string, string | undefined>;
 
@@ -165,10 +162,72 @@ type ExecutionResultsProps = {
   outputSpec: UiDocument;
   handlers: Record<string, (params: Record<string, unknown>) => void>;
   resultCollapseCommand: ResultCollapseCommand;
+  runtimeEvents: WorkspaceRuntimeEvent[];
 };
 
+function formatProviderPayload(value: unknown) {
+  if (typeof value === "string") return value;
+  try {
+    return JSON.stringify(value, null, 2) ?? String(value);
+  } catch {
+    return String(value);
+  }
+}
+
+function ProviderPayloadBlock({ label, value }: { label: string; value: unknown }) {
+  if (value === undefined) return null;
+  return (
+    <div className="rounded-lg border border-border/60 bg-muted/30 p-2">
+      <p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.12em] text-muted-foreground">{label}</p>
+      <pre className="max-h-56 overflow-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed text-foreground">{formatProviderPayload(value)}</pre>
+    </div>
+  );
+}
+
+function ProviderRuntimeTrace({ events, isLive }: { events: WorkspaceRuntimeEvent[]; isLive: boolean }) {
+  const visibleEvents = events.slice(-80).reverse();
+  if (visibleEvents.length === 0) return null;
+
+  return (
+    <section className="mb-4 rounded-xl border border-primary/25 bg-primary/5 p-3" aria-label="Provider execution trace" data-testid="provider-execution-trace">
+      <div className="mb-3 flex items-center justify-between gap-2">
+        <div>
+          <h4 className="text-sm font-semibold text-foreground">Provider execution</h4>
+          <p className="mt-0.5 text-xs text-muted-foreground">The live request and response payloads received from the backend provider.</p>
+        </div>
+        {isLive ? <Badge variant="default"><LoaderCircle className="mr-1 size-3 animate-spin" />Live</Badge> : <Badge variant="secondary">Recorded</Badge>}
+      </div>
+      <div className="space-y-2">
+        {visibleEvents.map((event, index) => {
+          const payload = event.event as { input?: unknown; output?: unknown; raw?: unknown; error?: unknown; label?: unknown; status?: unknown };
+          const title = typeof payload.label === "string"
+            ? payload.label
+            : typeof payload.status === "string"
+              ? `Run ${payload.status}`
+              : event.event.type.replaceAll("_", " ");
+          const output = payload.output ?? payload.error;
+          return (
+            <details key={`${event.executionScope}-${event.sequence ?? index}-${event.event.type}`} open={isLive && index === 0} className="rounded-lg border border-border/60 bg-background/75">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 text-xs font-medium text-foreground">
+                <span className="capitalize">{title}</span>
+                <span className="shrink-0 text-[10px] text-muted-foreground">{event.provider.label}{event.nodeTitle ? ` · ${event.nodeTitle}` : ""}</span>
+              </summary>
+              <div className="space-y-2 border-t border-border/60 p-3">
+                <ProviderPayloadBlock label="Provider input" value={payload.input} />
+                <ProviderPayloadBlock label="Provider output" value={output} />
+                <ProviderPayloadBlock label="Raw provider event" value={payload.raw} />
+                {payload.input === undefined && output === undefined && payload.raw === undefined ? <p className="text-xs text-muted-foreground">No payload was attached to this provider event.</p> : null}
+              </div>
+            </details>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 function ExecutionResults(props: ExecutionResultsProps) {
-  const { taskId, workspaceCopy, active, status, hasAvailableResult, isLive, finalizationRetryError, onRetryFinalization, isRetryingFinalization, nodeOptions, selectedNodeId, onSelectedNodeIdChange, onCollapseCommand, outputSpec, handlers, resultCollapseCommand } = props;
+  const { taskId, workspaceCopy, active, status, hasAvailableResult, isLive, finalizationRetryError, onRetryFinalization, isRetryingFinalization, nodeOptions, selectedNodeId, onSelectedNodeIdChange, onCollapseCommand, outputSpec, handlers, resultCollapseCommand, runtimeEvents } = props;
   return (
     <section aria-label={active ? (workspaceCopy.stageResultsTitle ?? "Stage results") : (workspaceCopy.finalResultTitle ?? "Final result")} className="min-h-0 flex-1 overflow-y-auto">
       <div className="mb-3 flex flex-wrap items-start justify-between gap-3 border-b border-border/70 pb-3">
@@ -178,6 +237,7 @@ function ExecutionResults(props: ExecutionResultsProps) {
         </div>
         <ResultsToolbar copy={workspaceCopy} nodeOptions={nodeOptions} selectedNodeId={selectedNodeId} onSelectedNodeIdChange={onSelectedNodeIdChange} onCollapseCommand={onCollapseCommand} />
       </div>
+      {active ? <ProviderRuntimeTrace events={runtimeEvents} isLive={isLive} /> : null}
       <SpecRenderer spec={outputSpec} handlers={handlers} resultCollapseCommand={resultCollapseCommand} resultCollapseStorageKey={`task:${taskId}:execution-result`} />
     </section>
   );
@@ -185,7 +245,6 @@ function ExecutionResults(props: ExecutionResultsProps) {
 
 type TranscriptProps = {
   copy: CommandCenterCopy;
-  active: boolean;
   waitingForHuman: boolean;
   isLive: boolean;
   activityItems: WorkspaceActivityItem[];
@@ -193,36 +252,39 @@ type TranscriptProps = {
   provider: string | null | undefined;
 };
 
-function Transcript({ copy, active, waitingForHuman, isLive, activityItems, activitySummary, provider }: TranscriptProps) {
+function Transcript({ waitingForHuman, isLive, activityItems, activitySummary, provider }: TranscriptProps) {
   const activityContent = <ActivityTimeline items={activityItems} density="detailed" active={isLive} transcript />;
   const statusLabel = isLive ? "Live" : waitingForHuman ? "Paused" : "Completed";
-  const header = (
-    <div className="border-b border-border/60 pb-4">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2"><TerminalSquare className="size-4 text-primary" aria-hidden /><h3 className="font-heading text-base font-semibold text-foreground">Agent transcript</h3><Badge variant={isLive ? "default" : "secondary"}>{statusLabel}</Badge></div>
-          <p className="mt-1 text-xs text-muted-foreground">{activitySummary}</p>
-        </div>
-        {provider ? <span className="text-xs font-medium text-muted-foreground">{provider}</span> : null}
-      </div>
-    </div>
+  return (
+    <CompletedTranscriptSheet
+      count={activityItems.length}
+      content={activityContent}
+      statusLabel={statusLabel}
+      isLive={isLive}
+      activitySummary={activitySummary}
+      provider={provider}
+    />
   );
-  if (!active) return <CompletedTranscriptSheet count={activityItems.length} content={activityContent} />;
-  return <section aria-label={copy.trailTab} className="flex min-h-0 flex-col overflow-hidden rounded-xl border border-border/60 bg-background/70"><div className="z-10 shrink-0 bg-background/95 p-4 pb-0 backdrop-blur supports-[backdrop-filter]:bg-background/85">{header}</div><div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4 pt-3">{activityContent}</div></section>;
 }
 
-function CompletedTranscriptSheet({ count, content }: { count: number; content: ReactNode }) {
+function CompletedTranscriptSheet({ count, content, statusLabel, isLive, activitySummary, provider }: { count: number; content: ReactNode; statusLabel: string; isLive: boolean; activitySummary: string; provider?: string | null }) {
   return (
     <Sheet>
       <SheetTrigger render={<Button type="button" variant="outline" size="sm" className="fixed right-0 top-1/2 z-40 h-auto min-w-11 -translate-y-1/2 touch-manipulation rounded-r-none border-r-0 bg-background/95 px-2.5 py-3 shadow-lg backdrop-blur transition-colors supports-[backdrop-filter]:bg-background/85" aria-label={`Open Agent transcript · ${count} events`} />}>
-        <span className="flex flex-col items-center gap-2"><Activity className="size-4 text-primary" aria-hidden /><span className="[writing-mode:vertical-rl] text-[10px] font-semibold tracking-[0.08em]">Agent transcript</span><Badge variant="secondary" className="h-5 min-w-5 px-1.5 text-[10px]">{count}</Badge></span>
+        <span className="flex flex-col items-center gap-2"><Activity className="size-4 text-primary" aria-hidden /><span className="[writing-mode:vertical-rl] text-[10px] font-semibold tracking-[0.08em]">Agent transcript</span><Badge variant={isLive ? "default" : "secondary"} className="h-5 min-w-5 px-1.5 text-[10px]">{count}</Badge><span className="sr-only">{statusLabel}</span></span>
       </SheetTrigger>
-      <SheetContent className="w-[92vw] max-w-[62rem] gap-0 overflow-hidden data-[side=right]:w-[92vw] data-[side=right]:sm:w-[72vw] data-[side=right]:sm:max-w-[62rem]"><SheetHeader className="z-10 shrink-0 border-b border-border/60 bg-popover/95 backdrop-blur supports-[backdrop-filter]:bg-popover/85"><SheetTitle>Agent transcript</SheetTitle><SheetDescription>Intent, tool calls, results, and execution state. Latest activity appears first.</SheetDescription></SheetHeader><div className="min-h-0 flex-1 overflow-y-auto px-5 pb-8 pt-4"><div className="mt-1">{content}</div></div></SheetContent>
+      <SheetContent className="w-[92vw] max-w-[62rem] gap-0 overflow-hidden data-[side=right]:w-[92vw] data-[side=right]:sm:w-[72vw] data-[side=right]:sm:max-w-[62rem]">
+        <SheetHeader className="z-10 shrink-0 border-b border-border/60 bg-popover/95 backdrop-blur supports-[backdrop-filter]:bg-popover/85">
+          <SheetTitle className="flex items-center gap-2"><TerminalSquare className="size-4 text-primary" aria-hidden />Agent transcript<Badge variant={isLive ? "default" : "secondary"}>{statusLabel}</Badge>{provider ? <span className="ml-auto text-xs font-medium text-muted-foreground">{provider}</span> : null}</SheetTitle>
+          <SheetDescription>Intent, tool calls, results, and execution state. Latest activity appears first.{activitySummary ? ` ${activitySummary}` : ""}</SheetDescription>
+        </SheetHeader>
+        <div className="min-h-0 flex-1 overflow-y-auto px-5 pb-8 pt-4"><div className="mt-1">{content}</div></div>
+      </SheetContent>
     </Sheet>
   );
 }
 
-export type ExecutionOverviewContentProps = Omit<ExecutionResultsProps, "active" | "workspaceCopy"> & Omit<TranscriptProps, "active"> & {
+export type ExecutionOverviewContentProps = Omit<ExecutionResultsProps, "active" | "workspaceCopy"> & TranscriptProps & {
   failureAlert: ReactNode;
   executionIsActive: boolean;
   workspaceCopy: WorkspaceCopy;
@@ -230,6 +292,6 @@ export type ExecutionOverviewContentProps = Omit<ExecutionResultsProps, "active"
 
 export function ExecutionOverviewContent({ failureAlert, executionIsActive, workspaceCopy, ...props }: ExecutionOverviewContentProps) {
   const results = <ExecutionResults {...props} workspaceCopy={workspaceCopy} active={executionIsActive} />;
-  const transcript = <Transcript {...props} active={executionIsActive} />;
-  return <section aria-label={workspaceCopy.executionOverviewAria} className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">{failureAlert}{executionIsActive ? <Tabs defaultValue="activity" className="min-h-0 flex-1 xl:hidden"><TabsList className="grid w-full grid-cols-2"><TabsTrigger value="results">{props.copy.outputTab}</TabsTrigger><TabsTrigger value="activity">{props.copy.trailTab}</TabsTrigger></TabsList><TabsContent value="results" className="min-h-0 overflow-y-auto pt-3">{results}</TabsContent><TabsContent value="activity" className="min-h-0 overflow-y-auto pt-3">{transcript}</TabsContent></Tabs> : null}<div className={executionIsActive ? "hidden min-h-0 flex-1 xl:grid xl:grid-cols-[minmax(0,1.15fr)_minmax(24rem,0.85fr)] xl:gap-4" : "min-h-0 flex-1"}>{results}{transcript}</div></section>;
+  const transcript = <Transcript {...props} />;
+  return <section aria-label={workspaceCopy.executionOverviewAria} className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">{failureAlert}<div className="min-h-0 flex-1">{results}</div>{transcript}</section>;
 }

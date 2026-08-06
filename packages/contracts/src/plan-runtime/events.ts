@@ -47,26 +47,42 @@ export type PlanExecutionRuntimeDisplayEvent =
       type: "tool_started";
       tool: PublicProviderDescriptor;
       label: string;
+      /** The exact provider payload sent with this tool invocation. */
+      input?: unknown;
+      /** The provider's raw event, when available. */
+      raw?: unknown;
     }
   | {
       type: "tool_progress";
       tool: PublicProviderDescriptor;
       label: string;
+      /** The exact provider progress payload. */
+      output?: unknown;
+      raw?: unknown;
     }
   | {
       type: "tool_completed";
       tool?: PublicProviderDescriptor;
       label: string;
       durationMs?: number;
-      error?: { code?: string };
+      /** The exact provider result returned for this tool call. */
+      output?: unknown;
+      raw?: unknown;
+      error?: { code?: string; message?: string; raw?: unknown };
     }
   | {
       type: "approval_required";
       approval: ProviderApprovalReadModel;
+      raw?: unknown;
     }
   | {
       type: "run_status";
       status: "started" | "completed" | "failed" | "cancelled";
+      /** Provider-level request/response data for the run lifecycle event. */
+      input?: unknown;
+      output?: unknown;
+      error?: string;
+      raw?: unknown;
     };
 
 

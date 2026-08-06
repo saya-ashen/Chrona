@@ -2,7 +2,7 @@ import { assertProviderStartSupported, ProviderOperationError, type AgentProvide
 import { collectProviderRunSnapshot } from "./ai-runtime-stream-collection";
 import { persistRuntimeRunRef, updateProviderRunRecord } from "./ai-runtime-persistence";
 import { toStartRunInput, type ExecutionProviderRequest } from "./ai-runtime-request";
-import type { RuntimeEventPersistenceContext } from "./ai-runtime-event-persistence";
+import { persistProviderRuntimeEvent, type RuntimeEventPersistenceContext } from "./ai-runtime-event-persistence";
 
 const TRANSIENT_PROVIDER_ERROR_CODES = new Set(["aborted", "network_error", "provider_error", "rate_limited", "incomplete_stream"]);
 const PROVIDER_RETRY_BACKOFF_MS = 1_000;
@@ -34,13 +34,16 @@ export async function runProviderRequest(
     : await startProviderRun(providerClient, request, options);
   const cancel = () => cancelProviderRun(providerClient, run, options.providerRunRecordId, options.eventPersistence);
   if (options.signal?.aborted) return cancel();
+  let snapshot: ProviderRunSnapshot;
   try {
-    const snapshot = await streamProviderRun(providerClient, run, options);
-    return options.signal?.aborted ? cancel() : snapshot;
+    snapshot = await streamProviderRun(providerClient, run, options);
+    if (options.signal?.aborted) snapshot = await cancel();
   } catch (error) {
     if (!isTransientProviderError(error)) throw error;
-    return resumeOrReconcileProviderRun(providerClient, run, options, cancel);
+    snapshot = await resumeOrReconcileProviderRun(providerClient, run, options, cancel);
   }
+  await publishProviderResponseEvent(providerClient.provider, run, snapshot, options);
+  return snapshot;
 }
 
 async function attachProviderRun(providerClient: ProviderClient, request: ExecutionProviderRequest, options: ProviderRunRequestOptions): Promise<ProviderRunRef> {
@@ -97,6 +100,7 @@ async function startProviderRun(providerClient: ProviderClient, request: Executi
   try {
     await persistRuntimeRunRef(options.runId, run, options.eventPersistence);
     await options.onRunStarted?.(run);
+    await publishProviderRequestEvent(providerClient.provider, run, input, options);
     await updateProviderRunRecord(options.providerRunRecordId, {
       providerRunRef: run.nativeRunId ?? run.runId,
       nativeRunId: run.nativeRunId ?? null,
@@ -111,6 +115,51 @@ async function startProviderRun(providerClient: ProviderClient, request: Executi
     }).catch(() => null);
     throw error;
   }
+}
+
+async function publishProviderRequestEvent(
+  provider: string,
+  run: ProviderRunRef,
+  input: StartRunInput,
+  options: ProviderRunRequestOptions,
+) {
+  const event: ProviderRunEvent = {
+    type: "raw_event",
+    provider,
+    runId: run.runId,
+    nativeRunId: run.nativeRunId,
+    sessionId: run.sessionId,
+    nativeSessionId: run.nativeSessionId,
+    timestamp: new Date().toISOString(),
+    raw: {
+      kind: "provider_request",
+      input,
+    },
+  };
+  await options.onRuntimeEvent?.(event);
+  await persistProviderRuntimeEvent({ context: options.eventPersistence, event, fallbackIndex: 0 });
+}
+
+async function publishProviderResponseEvent(
+  provider: string,
+  run: ProviderRunRef,
+  output: ProviderRunSnapshot,
+  options: ProviderRunRequestOptions,
+) {
+  const event: ProviderRunEvent = {
+    type: "raw_event",
+    provider,
+    runId: run.runId,
+    nativeRunId: run.nativeRunId,
+    sessionId: run.sessionId,
+    nativeSessionId: run.nativeSessionId,
+    timestamp: new Date().toISOString(),
+    raw: {
+      kind: "provider_response",
+      output,
+    },
+  };
+  await options.onRuntimeEvent?.(event);
 }
 
 function controlForRun(provider: string, token: string | null | undefined) {

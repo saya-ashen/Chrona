@@ -28,6 +28,9 @@ export type WorkspaceActivityTimelineItem = {
   sequence?: number;
   executionTrigger?: "initial" | "restart";
   activityGroup?: WorkspaceActivityGroup;
+  providerInput?: unknown;
+  providerOutput?: unknown;
+  providerRaw?: unknown;
   tool?: {
     name?: string;
     durationMs?: number;

@@ -10,6 +10,17 @@ import {
   stringPayloadValue,
 } from "./task-activity-types";
 
+const SENSITIVE_PROVIDER_KEY = /api[-_]?key|token|secret|password|authorization|credential/i;
+
+function exposeProviderPayload(value: unknown, key?: string): unknown {
+  if (key && SENSITIVE_PROVIDER_KEY.test(key)) return "[redacted]";
+  if (Array.isArray(value)) return value.map((item) => exposeProviderPayload(item));
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value as Record<string, unknown>).map(([entryKey, entryValue]) => [entryKey, exposeProviderPayload(entryValue, entryKey)]));
+  }
+  return value;
+}
+
 function optionalStringEventValue(event: Record<string, unknown>, key: string) {
   return typeof event[key] === "string" && event[key].trim()
     ? (event[key] as string)
@@ -27,7 +38,11 @@ function providerActivityEventType(event: TaskActivityEvent, payloadEvent: Recor
 }
 
 
-export function isDisplayableProviderEvent(eventType: string) {
+export function isDisplayableProviderEvent(eventType: string, payload?: Record<string, unknown> | null) {
+  if (eventType === "raw_event") {
+    const raw = payload?.raw;
+    return Boolean(raw && typeof raw === "object" && ["provider_request", "provider_response"].includes((raw as { kind?: unknown }).kind as string));
+  }
   return new Set([
     "run_started", "tool_call", "tool_progress", "tool_started", "tool_completed",
     "approval_required", "run_completed", "run_failed", "run_cancelled",
@@ -60,7 +75,19 @@ type ProviderItemInput = {
 };
 
 function providerItem(event: TaskActivityEvent, input: ProviderItemInput) {
-  const { base, timestamp } = providerBase(event);
+  const { base, timestamp, payload } = providerBase(event);
+  const raw = payloadRecord(payload.raw);
+  const providerInput = payload.input !== undefined
+    ? exposeProviderPayload(payload.input)
+    : raw?.kind === "provider_request" ? exposeProviderPayload(raw.input) : undefined;
+  const providerOutput = exposeProviderPayload(
+    payload.output
+      ?? payload.result
+      ?? payload.outputText
+      ?? payload.structuredPayload
+      ?? (typeof payload.error === "string" ? payload.error : undefined)
+      ?? (raw?.kind === "provider_response" ? raw.output : undefined),
+  );
   return {
     id: event.id,
     kind: input.kind,
@@ -70,6 +97,9 @@ function providerItem(event: TaskActivityEvent, input: ProviderItemInput) {
     tone: input.tone,
     timestamp,
     ...input.extras,
+    ...(providerInput !== undefined ? { providerInput } : {}),
+    ...(providerOutput !== undefined ? { providerOutput } : {}),
+    ...(payload.raw !== undefined ? { providerRaw: exposeProviderPayload(payload.raw) } : {}),
     ...base,
   };
 }
@@ -102,10 +132,15 @@ function toolItem(event: TaskActivityEvent, state: "started" | "progress" | "com
 }
 
 export function mapProviderEventToActivity(event: TaskActivityEvent): WorkspaceActivityTimelineItem {
-  const { eventType, base } = providerBase(event);
+  const { eventType, base, payload } = providerBase(event);
   switch (eventType) {
     case "run_started": return providerItem(event, { kind: "provider_run", title: "Provider run started", description: base.provider, tone: "info" });
-    case "tool_call":
+    case "raw_event": {
+      const raw = payloadRecord(payload.raw);
+      if (raw?.kind === "provider_request") return providerItem(event, { kind: "provider_run", title: "Provider request sent", description: base.provider, tone: "info" });
+      if (raw?.kind === "provider_response") return providerItem(event, { kind: "provider_run", title: "Provider response received", description: base.provider, tone: "success" });
+      return providerItem(event, { kind: "provider_run", title: "Provider event received", description: base.provider, tone: "neutral" });
+    }
     case "tool_started": return toolItem(event, "started");
     case "tool_progress": return toolItem(event, "progress");
     case "tool_completed": return toolItem(event, "completed");
