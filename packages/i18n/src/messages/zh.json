@@ -1212,6 +1212,13 @@
     },
     "taskWorkspace": {
       "approvalNeeded": "等待审批",
+      "planSetupLabel": "计划设置",
+      "planSetupBriefTitle": "任务简述",
+      "planSetupEditBrief": "编辑任务简述",
+      "planSetupGoalLabel": "目标",
+      "planSetupDescriptionLabel": "描述",
+      "planSetupProviderLabel": "AI 提供方",
+      "planSetupNotAdded": "尚未添加",
       "externalSourceTitle": "同步自 {source}。标题和时间由日历来源管理。",
       "externalLockedHint": "同步自 {source}。标题和时间由日历来源管理。",
       "occurrenceWindowLabel": "本次循环",

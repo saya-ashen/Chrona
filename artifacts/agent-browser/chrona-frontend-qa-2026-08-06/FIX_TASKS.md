@@ -12,7 +12,7 @@
 
 ## 中优先级
 
-- [-] F-05 已补齐 common.close、Action Center input/approval/clear filters；Task Workspace、Schedule、Goals 等英文 fallback 仍待处理。
+- [-] F-05 已补齐 common.close、Action Center input/approval/clear filters、Task Workspace plan setup 的中英文文案；Schedule、Goals 等英文 fallback 仍待处理。
 - [-] F-06 已修复 Action Center tab 语义和 AI client enabled checkbox label；Schedule/Goals 的其余 axe critical 结构及颜色对比度待处理。
 - [x] F-07 持久化或重新加载 OMP client 后的 readiness 状态，避免健康检查结果回到“未测试”。
 - [x] F-09 修复 Agent transcript Close 按钮被标题层遮挡的问题。
@@ -32,5 +32,6 @@
 | 2026-08-06 | F-07 / F-09 / F-10 第二批修复 | 部分完成 | readiness localStorage 缓存、Sheet close z-index、ActivityTimeline duplicate-key 消歧；console error E2E gate 待补 |
 | 2026-08-06 | F-04 部分修复 | 处理中 | generation active 时每 5 秒 refetch plan state；Stop 成功后立即标记 cancelled，失败时恢复 running；workspace hooks Vitest 通过 |
 | 2026-08-06 | F-06 部分修复 | 处理中 | Action Center filter buttons 改为 role=tab/aria-selected，AI client enabled checkbox 增加 aria-label；Action Center 相关 Vitest 通过 |
+| 2026-08-06 | F-05 Task Workspace 文案部分修复 | 处理中 | Plan setup、Task brief、Edit task brief、Goal、Description、AI provider、Not added yet 增加中英文文案；plan-setup-panel Vitest 通过 |
 | 2026-08-06 | F-05 / F-08 部分修复 | 处理中 | i18n common.close 与 Action Center filters 增补中英文文案；follow-up 成功后 invalidate 源 workspace query；Vitest 相关集合通过 |
 | 2026-08-06 | 修复后真实 UI 回归 | 进行中 | agent-browser 复测 Schedule 2026-08-07 显示 Aug 7、Task actions 鼠标打开菜单、OMP readiness 刷新后保持 Ready；截图 30 已保存 |

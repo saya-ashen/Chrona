@@ -1212,6 +1212,13 @@
     },
     "taskWorkspace": {
       "approvalNeeded": "Approval needed",
+      "planSetupLabel": "Plan setup",
+      "planSetupBriefTitle": "Task brief",
+      "planSetupEditBrief": "Edit task brief",
+      "planSetupGoalLabel": "Goal",
+      "planSetupDescriptionLabel": "Description",
+      "planSetupProviderLabel": "AI provider",
+      "planSetupNotAdded": "Not added yet",
       "externalSourceTitle": "Synced from {source}. Title and time are managed by the calendar source.",
       "externalLockedHint": "Synced from {source}. Title and time are managed by the calendar source.",
       "occurrenceWindowLabel": "Occurrence",
