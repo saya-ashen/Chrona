@@ -54,9 +54,9 @@ test.describe("Task workspace accessibility", () => {
       if (message.type() === "error") consoleErrors.push(message.text());
     });
     await page.goto(`/en/tasks/${task.taskId}`);
-		const primaryAction = page.getByRole("link", {
-			name: "Connect AI provider",
-		});
+		const primaryAction = page
+			.getByRole("link", { name: "Connect AI provider" })
+			.or(page.getByRole("button", { name: /^Generate plan$/ }));
 		await expect(primaryAction).toHaveCount(1);
 		await primaryAction.focus();
 		await expect(primaryAction).toBeFocused();

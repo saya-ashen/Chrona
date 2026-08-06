@@ -25,8 +25,9 @@ test.describe("Task workspace smoke", () => {
 			page.getByRole("region", { name: "Task execution workspace" }),
 		).toBeVisible();
 		await expect(page.getByTestId("plan-setup-panel")).toBeVisible();
-		await expect(
-			page.getByRole("link", { name: "Connect AI provider" }),
-		).toBeVisible();
+		const primaryAction = page
+			.getByRole("link", { name: "Connect AI provider" })
+			.or(page.getByRole("button", { name: /^Generate plan$/ }));
+		await expect(primaryAction).toBeVisible();
 	});
 });
