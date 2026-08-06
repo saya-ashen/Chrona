@@ -20,7 +20,8 @@ export function PlanSetupPanel({
 }: PlanSetupPanelProps) {
   const locale = useLocale();
   const { messages } = useI18n();
-  const copy = messages.components.taskWorkspace as typeof messages.components.taskWorkspace & PlanSetupCopy;
+  const copy = messages.components
+    .taskWorkspace as typeof messages.components.taskWorkspace & PlanSetupCopy;
   const presentation = getPlanSetupPresentation({ readiness, pageData, copy });
 
   return (
@@ -46,10 +47,12 @@ export function PlanSetupPanel({
                 Create draft plan
               </p>
               <p className="text-lg font-semibold text-foreground">
-                {presentation.requiredReady}/{presentation.requiredTotal} required checks ready
+                {presentation.requiredReady}/{presentation.requiredTotal}{" "}
+                required checks ready
               </p>
               <p className="text-sm leading-6 text-muted-foreground">
-                Creating a plan only prepares a draft. Nothing runs until the plan is reviewed and accepted.
+                Creating a plan only prepares a draft. Nothing runs until the
+                plan is reviewed and accepted.
               </p>
             </div>
             <div className="space-y-2">
@@ -60,16 +63,28 @@ export function PlanSetupPanel({
                   </Link>
                 </Button>
               ) : (
-                <Button type="button" size="lg" className="w-full" onClick={onGeneratePlan}>
+                <Button
+                  type="button"
+                  size="lg"
+                  className="w-full"
+                  onClick={onGeneratePlan}
+                >
                   Generate plan
                 </Button>
               )}
-              <Button type="button" variant="outline" className="w-full" onClick={onEditBrief}>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={onEditBrief}
+              >
                 Edit task brief
               </Button>
             </div>
             <div className="border-t border-border/70 pt-4">
-              <p className="text-sm font-medium text-foreground">You stay in control</p>
+              <p className="text-sm font-medium text-foreground">
+                You stay in control
+              </p>
               <ul className="mt-2 space-y-2 text-xs leading-5 text-muted-foreground">
                 <li>Review every proposed step.</li>
                 <li>Check human stops and expected output.</li>

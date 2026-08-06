@@ -46,11 +46,14 @@ import {
   getTodayKey,
   snapMinuteToGrid,
 } from "../schedule-page-utils";
-import { type TaskConfigAiClient, type TaskConfigExecutionRuntime } from "../forms/task-config-form";
+import {
+  type TaskConfigAiClient,
+  type TaskConfigExecutionRuntime,
+} from "../forms/task-config-form";
 import { CalendarDays } from "lucide-react";
-import { Badge } from "@shared/ui"
-import { useI18n, useLocale } from "@chrona/i18n"
-import { externalCalendarMessages } from "@chrona/i18n"
+import { Badge } from "@shared/ui";
+import { useI18n, useLocale } from "@chrona/i18n";
+import { externalCalendarMessages } from "@chrona/i18n";
 import { cn } from "@shared/ui";
 
 const TIMELINE_HOUR_HEIGHT = 56;
@@ -71,7 +74,13 @@ function fullCalendarTime(hour: number, minute = 0) {
   return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}:00`;
 }
 
-function AutoStartReasonNote({ item, copy }: { item: ScheduledItem; copy: ReturnType<typeof getSchedulePageCopy> }) {
+function AutoStartReasonNote({
+  item,
+  copy,
+}: {
+  item: ScheduledItem;
+  copy: ReturnType<typeof getSchedulePageCopy>;
+}) {
   // `not_due` is the normal steady state, so it stays in the data but is
   // suppressed from the card surface.
   const reasonCopy =
@@ -93,7 +102,11 @@ function AutoStartReasonNote({ item, copy }: { item: ScheduledItem; copy: Return
   );
 }
 
-function buildDragItem(item: ScheduledItem, startAt: Date, endAt: Date): TimelineDragItem {
+function buildDragItem(
+  item: ScheduledItem,
+  startAt: Date,
+  endAt: Date,
+): TimelineDragItem {
   return {
     kind: "scheduled",
     taskId: item.taskId,
@@ -101,7 +114,10 @@ function buildDragItem(item: ScheduledItem, startAt: Date, endAt: Date): Timelin
     title: item.title,
     dueAt: item.dueAt,
     durationMinutes: Math.max(
-      getBlockDurationMinutes({ scheduledStartAt: startAt, scheduledEndAt: endAt }),
+      getBlockDurationMinutes({
+        scheduledStartAt: startAt,
+        scheduledEndAt: endAt,
+      }),
       TIMELINE_SLOT_MINUTES,
     ),
   };
@@ -204,8 +220,10 @@ export function DayTimeline({
   );
   const calendarRef = useRef<FullCalendar | null>(null);
   const dropZoneRef = useRef<HTMLDivElement | null>(null);
-  const [composerDraft, setComposerDraft] = useState<TimelinePlacementPreview | null>(null);
-  const [dragPreview, setDragPreview] = useState<TimelinePlacementPreview | null>(null);
+  const [composerDraft, setComposerDraft] =
+    useState<TimelinePlacementPreview | null>(null);
+  const [dragPreview, setDragPreview] =
+    useState<TimelinePlacementPreview | null>(null);
   const [hiddenTaskId, setHiddenTaskId] = useState<string | null>(null);
   const [timelineScrollTop, setTimelineScrollTop] = useState(0);
   const [timelinePixelsPerMinute, setTimelinePixelsPerMinute] = useState(
@@ -229,62 +247,86 @@ export function DayTimeline({
     endMinute: number,
     source: TimelinePlacementPreview["source"],
     taskId?: string,
-  ) => buildTimelinePlacementPreview({
-    selectedDay,
-    startMinute,
-    endMinute,
-    compressedTimeline: { mapMinuteToY },
-    items,
-    taskId,
-    source,
-  });
+  ) =>
+    buildTimelinePlacementPreview({
+      selectedDay,
+      startMinute,
+      endMinute,
+      compressedTimeline: { mapMinuteToY },
+      items,
+      taskId,
+      source,
+    });
 
-  const calendarEvents = useMemo<EventInput[]>(() => [
-    ...items.map((item) => {
-    const start = item.scheduledStartAt ?? dateForMinute(dayDate, 9 * 60);
-    const end = item.scheduledEndAt ?? dateForMinute(
+  const calendarEvents = useMemo<EventInput[]>(
+    () => [
+      ...items.map((item) => {
+        const start = item.scheduledStartAt ?? dateForMinute(dayDate, 9 * 60);
+        const end =
+          item.scheduledEndAt ??
+          dateForMinute(
+            dayDate,
+            minutesFromDate(start) + DEFAULT_SCHEDULE_BLOCK_MINUTES,
+          );
+        const isCurrent =
+          selectedDay === getTodayKey() &&
+          start.getTime() <= Date.now() &&
+          end.getTime() >= Date.now();
+        const isPast =
+          selectedDay === getTodayKey() && end.getTime() < Date.now();
+        const hasConflict = conflictTaskIds?.has(item.taskId) ?? false;
+
+        return {
+          id: item.workBlockId ?? item.taskId,
+          title: item.title,
+          start,
+          end,
+          editable: !isPending,
+          durationEditable: !isPending,
+          startEditable: !isPending,
+          classNames: [
+            "chrona-calendar-event",
+            selectedTaskId === (item.workBlockId ?? item.taskId) ||
+            selectedTaskId === item.taskId
+              ? "chrona-calendar-event-selected"
+              : "",
+            isCurrent ? "chrona-calendar-event-current" : "",
+            isPast ? "chrona-calendar-event-past" : "",
+            hasConflict ? "chrona-calendar-event-conflict" : "",
+            hiddenTaskId === item.taskId ? "chrona-calendar-event-hidden" : "",
+          ].filter(Boolean),
+          extendedProps: { item, hasConflict, isCurrent },
+        };
+      }),
+      ...externalEvents.map((event) => ({
+        id: `external-${event.id}`,
+        title: event.title,
+        start: event.startsAt,
+        end: event.endsAt,
+        allDay: false,
+        editable: false,
+        durationEditable: false,
+        startEditable: false,
+        classNames: [
+          "chrona-calendar-external-event",
+          event.overlapsScheduledTask
+            ? "chrona-calendar-external-event-overlap"
+            : "",
+        ].filter(Boolean),
+        extendedProps: { externalEvent: event },
+      })),
+    ],
+    [
+      conflictTaskIds,
+      externalEvents,
       dayDate,
-      minutesFromDate(start) + DEFAULT_SCHEDULE_BLOCK_MINUTES,
-    );
-    const isCurrent = selectedDay === getTodayKey() && start.getTime() <= Date.now() && end.getTime() >= Date.now();
-    const isPast = selectedDay === getTodayKey() && end.getTime() < Date.now();
-    const hasConflict = conflictTaskIds?.has(item.taskId) ?? false;
-
-    return {
-      id: item.workBlockId ?? item.taskId,
-      title: item.title,
-      start,
-      end,
-      editable: !isPending,
-      durationEditable: !isPending,
-      startEditable: !isPending,
-      classNames: [
-        "chrona-calendar-event",
-        selectedTaskId === (item.workBlockId ?? item.taskId) || selectedTaskId === item.taskId ? "chrona-calendar-event-selected" : "",
-        isCurrent ? "chrona-calendar-event-current" : "",
-        isPast ? "chrona-calendar-event-past" : "",
-        hasConflict ? "chrona-calendar-event-conflict" : "",
-        hiddenTaskId === item.taskId ? "chrona-calendar-event-hidden" : "",
-      ].filter(Boolean),
-      extendedProps: { item, hasConflict, isCurrent },
-    };
-    }),
-    ...externalEvents.map((event) => ({
-      id: `external-${event.id}`,
-      title: event.title,
-      start: event.startsAt,
-      end: event.endsAt,
-      allDay: false,
-      editable: false,
-      durationEditable: false,
-      startEditable: false,
-      classNames: [
-        "chrona-calendar-external-event",
-        event.overlapsScheduledTask ? "chrona-calendar-external-event-overlap" : "",
-      ].filter(Boolean),
-      extendedProps: { externalEvent: event },
-    })),
-  ], [conflictTaskIds, externalEvents, dayDate, hiddenTaskId, isPending, items, selectedDay, selectedTaskId]);
+      hiddenTaskId,
+      isPending,
+      items,
+      selectedDay,
+      selectedTaskId,
+    ],
+  );
 
   function closeComposer() {
     setComposerDraft(null);
@@ -299,7 +341,8 @@ export function DayTimeline({
       snapMinuteToGrid(minutesFromDate(date)),
     );
     const endMinute = Math.min(
-      snappedStartMinute + (draggedItem.durationMinutes ?? DEFAULT_SCHEDULE_BLOCK_MINUTES),
+      snappedStartMinute +
+        (draggedItem.durationMinutes ?? DEFAULT_SCHEDULE_BLOCK_MINUTES),
       24 * 60,
     );
 
@@ -325,7 +368,10 @@ export function DayTimeline({
       return dateForMinute(dayDate, 9 * 60);
     }
 
-    const minute = (Math.min(Math.max(clientY - rect.top, 0), rect.height) / rect.height) * 24 * 60;
+    const minute =
+      (Math.min(Math.max(clientY - rect.top, 0), rect.height) / rect.height) *
+      24 *
+      60;
     return dateForMinute(dayDate, minute);
   }
 
@@ -336,7 +382,9 @@ export function DayTimeline({
 
     event.preventDefault();
     event.dataTransfer.dropEffect = "move";
-    setDragPreview(getDragPreviewFromDate(getDragDateFromClientY(event.clientY)));
+    setDragPreview(
+      getDragPreviewFromDate(getDragDateFromClientY(event.clientY)),
+    );
   }
 
   async function handleDrop(event: DragEvent<HTMLDivElement>) {
@@ -345,7 +393,9 @@ export function DayTimeline({
     }
 
     event.preventDefault();
-    const preview = getDragPreviewFromDate(getDragDateFromClientY(event.clientY)) ?? dragPreview;
+    const preview =
+      getDragPreviewFromDate(getDragDateFromClientY(event.clientY)) ??
+      dragPreview;
     setDragPreview(null);
 
     if (!preview || preview.hasConflict) {
@@ -360,8 +410,13 @@ export function DayTimeline({
       return;
     }
 
-    const startMinute = clampScheduledStartMinute(snapMinuteToGrid(minutesFromDate(info.date)));
-    const endMinute = Math.min(startMinute + DEFAULT_SCHEDULE_BLOCK_MINUTES, 24 * 60);
+    const startMinute = clampScheduledStartMinute(
+      snapMinuteToGrid(minutesFromDate(info.date)),
+    );
+    const endMinute = Math.min(
+      startMinute + DEFAULT_SCHEDULE_BLOCK_MINUTES,
+      24 * 60,
+    );
     setComposerDraft(buildPlacementPreview(startMinute, endMinute, "create"));
   }
 
@@ -371,7 +426,9 @@ export function DayTimeline({
     }
 
     const calendarApi = calendarRef.current?.getApi();
-    const startMinute = clampScheduledStartMinute(snapMinuteToGrid(minutesFromDate(info.start)));
+    const startMinute = clampScheduledStartMinute(
+      snapMinuteToGrid(minutesFromDate(info.start)),
+    );
     const rawEndMinute = minutesFromDate(info.end);
     const endMinute = clampScheduledEndMinute(
       startMinute,
@@ -382,23 +439,37 @@ export function DayTimeline({
     setComposerDraft(buildPlacementPreview(startMinute, endMinute, "create"));
   }
 
-  async function handleKeyboardAdjust(item: ScheduledItem, key: "ArrowUp" | "ArrowDown") {
+  async function handleKeyboardAdjust(
+    item: ScheduledItem,
+    key: "ArrowUp" | "ArrowDown",
+  ) {
     if (!item.scheduledStartAt || isPending || draggedItem) {
       return;
     }
 
-    const step = key === "ArrowUp" ? -TIMELINE_SLOT_MINUTES : TIMELINE_SLOT_MINUTES;
+    const step =
+      key === "ArrowUp" ? -TIMELINE_SLOT_MINUTES : TIMELINE_SLOT_MINUTES;
     const currentStartMinute = minutesFromDate(item.scheduledStartAt);
     const currentEndMinute = item.scheduledEndAt
       ? minutesFromDate(item.scheduledEndAt)
       : currentStartMinute + DEFAULT_SCHEDULE_BLOCK_MINUTES;
-    const duration = Math.max(currentEndMinute - currentStartMinute, TIMELINE_SLOT_MINUTES);
-    const nextStartMinute = clampScheduledStartMinute(currentStartMinute + step);
+    const duration = Math.max(
+      currentEndMinute - currentStartMinute,
+      TIMELINE_SLOT_MINUTES,
+    );
+    const nextStartMinute = clampScheduledStartMinute(
+      currentStartMinute + step,
+    );
     const nextEndMinute = clampScheduledEndMinute(
       nextStartMinute,
       nextStartMinute + duration,
     );
-    const preview = buildPlacementPreview(nextStartMinute, nextEndMinute, "resize", item.taskId);
+    const preview = buildPlacementPreview(
+      nextStartMinute,
+      nextEndMinute,
+      "resize",
+      item.taskId,
+    );
 
     if (preview.hasConflict) {
       return;
@@ -435,7 +506,12 @@ export function DayTimeline({
           startMinute,
           currentEndMinute - TIMELINE_SLOT_MINUTES,
         );
-        const preview = buildPlacementPreview(startMinute, nextEndMinute, "resize", item.taskId);
+        const preview = buildPlacementPreview(
+          startMinute,
+          nextEndMinute,
+          "resize",
+          item.taskId,
+        );
 
         if (preview.hasConflict) {
           return;
@@ -469,10 +545,12 @@ export function DayTimeline({
       return;
     }
 
-    const safeEndAt = endAt ?? dateForMinute(
-      startAt,
-      minutesFromDate(startAt) + getBlockDurationMinutes(item),
-    );
+    const safeEndAt =
+      endAt ??
+      dateForMinute(
+        startAt,
+        minutesFromDate(startAt) + getBlockDurationMinutes(item),
+      );
     const preview = buildPlacementPreview(
       minutesFromDate(startAt),
       minutesFromDate(safeEndAt),
@@ -485,7 +563,11 @@ export function DayTimeline({
       return;
     }
 
-    await onScheduleDrop(buildDragItem(item, startAt, safeEndAt), startAt, safeEndAt);
+    await onScheduleDrop(
+      buildDragItem(item, startAt, safeEndAt),
+      startAt,
+      safeEndAt,
+    );
   }
 
   async function handleEventDrop(info: EventDropArg) {
@@ -495,7 +577,12 @@ export function DayTimeline({
       return;
     }
 
-    await commitScheduledMove(item, info.event.start, info.event.end, info.revert);
+    await commitScheduledMove(
+      item,
+      info.event.start,
+      info.event.end,
+      info.revert,
+    );
   }
 
   async function handleEventResize(info: EventResizeDoneArg) {
@@ -505,7 +592,12 @@ export function DayTimeline({
       return;
     }
 
-    await commitScheduledMove(item, info.event.start, info.event.end, info.revert);
+    await commitScheduledMove(
+      item,
+      info.event.start,
+      info.event.end,
+      info.revert,
+    );
   }
 
   const handleEventAllow: AllowFunc = (span, movingEvent) => {
@@ -518,14 +610,23 @@ export function DayTimeline({
 
     const startMinute = minutesFromDate(span.start);
     const endMinute = minutesFromDate(span.end);
-    const preview = buildPlacementPreview(startMinute, endMinute, "drag", taskId);
+    const preview = buildPlacementPreview(
+      startMinute,
+      endMinute,
+      "drag",
+      taskId,
+    );
     setDragPreview(preview);
     return !preview.hasConflict;
   };
 
   function syncTimelineScrollTop() {
-    const calendarScroller = dropZoneRef.current?.querySelector(".fc-scroller") as HTMLElement | null;
-    const slats = dropZoneRef.current?.querySelector(".fc-timegrid-slots") as HTMLElement | null;
+    const calendarScroller = dropZoneRef.current?.querySelector(
+      ".fc-scroller",
+    ) as HTMLElement | null;
+    const slats = dropZoneRef.current?.querySelector(
+      ".fc-timegrid-slots",
+    ) as HTMLElement | null;
     const slatsHeight = slats?.getBoundingClientRect().height ?? 0;
 
     if (slatsHeight > 0) {
@@ -537,18 +638,27 @@ export function DayTimeline({
 
   function handleDatesSet(_info: DatesSetArg) {
     window.requestAnimationFrame(() => {
-      const calendarScroller = dropZoneRef.current?.querySelector(".fc-scroller") as HTMLElement | null;
-      const slats = dropZoneRef.current?.querySelector(".fc-timegrid-slots") as HTMLElement | null;
+      const calendarScroller = dropZoneRef.current?.querySelector(
+        ".fc-scroller",
+      ) as HTMLElement | null;
+      const slats = dropZoneRef.current?.querySelector(
+        ".fc-timegrid-slots",
+      ) as HTMLElement | null;
       const slatsHeight = slats?.getBoundingClientRect().height ?? 0;
-      const pixelsPerMinute = slatsHeight > 0
-        ? slatsHeight / (24 * 60)
-        : DEFAULT_TIMELINE_PIXELS_PER_MINUTE;
+      const pixelsPerMinute =
+        slatsHeight > 0
+          ? slatsHeight / (24 * 60)
+          : DEFAULT_TIMELINE_PIXELS_PER_MINUTE;
 
       if (slatsHeight > 0) {
         setTimelinePixelsPerMinute(pixelsPerMinute);
       }
 
-      if (calendarScroller && calendarScroller.scrollTop < WORKDAY_START_HOUR * 60 * pixelsPerMinute * 0.75) {
+      if (
+        calendarScroller &&
+        calendarScroller.scrollTop <
+          WORKDAY_START_HOUR * 60 * pixelsPerMinute * 0.75
+      ) {
         calendarScroller.scrollTop = WORKDAY_START_HOUR * 60 * pixelsPerMinute;
       }
 
@@ -557,12 +667,18 @@ export function DayTimeline({
   }
 
   function renderEventContent(info: EventContentArg) {
-    const externalEvent = info.event.extendedProps.externalEvent as PlanningBusyBlock | undefined;
+    const externalEvent = info.event.extendedProps.externalEvent as
+      PlanningBusyBlock | undefined;
     if (externalEvent) {
       return (
         <ExternalCalendarEventBlock
           event={externalEvent}
-          timeRange={formatTimeRange(info.event.start, info.event.end, locale, copy)}
+          timeRange={formatTimeRange(
+            info.event.start,
+            info.event.end,
+            locale,
+            copy,
+          )}
         />
       );
     }
@@ -581,10 +697,13 @@ export function DayTimeline({
           backgroundColor: `${sourceManaged.sourceColor}18`,
         }
       : undefined;
-    const autoStartReasonCopy = item.autoStartEligible === false && item.autoStartReason !== "not_due"
-      ? getAutoStartReasonCopy(copy, item.autoStartReason)
-      : null;
-    const autoStartReasonTitle = autoStartReasonCopy ? `${copy.autoStartReasonLabel}: ${autoStartReasonCopy}` : undefined;
+    const autoStartReasonCopy =
+      item.autoStartEligible === false && item.autoStartReason !== "not_due"
+        ? getAutoStartReasonCopy(copy, item.autoStartReason)
+        : null;
+    const autoStartReasonTitle = autoStartReasonCopy
+      ? `${copy.autoStartReasonLabel}: ${autoStartReasonCopy}`
+      : undefined;
 
     return (
       <div
@@ -598,7 +717,11 @@ export function DayTimeline({
         )}
         style={sourceStyle}
         title={autoStartReasonTitle}
-        aria-label={autoStartReasonTitle ? `${info.event.title}. ${autoStartReasonTitle}` : info.event.title}
+        aria-label={
+          autoStartReasonTitle
+            ? `${info.event.title}. ${autoStartReasonTitle}`
+            : info.event.title
+        }
         draggable={!isPending}
         onDragStart={() => {
           setHiddenTaskId(item.taskId);
@@ -610,12 +733,22 @@ export function DayTimeline({
         }}
       >
         <div
-          className={cn("w-1 shrink-0 rounded-full", !sourceManaged && (isCurrent ? "bg-primary" : getPriorityAccent(item.priority)))}
-          style={sourceManaged ? { backgroundColor: sourceManaged.sourceColor } : undefined}
+          className={cn(
+            "w-1 shrink-0 rounded-full",
+            !sourceManaged &&
+              (isCurrent ? "bg-primary" : getPriorityAccent(item.priority)),
+          )}
+          style={
+            sourceManaged
+              ? { backgroundColor: sourceManaged.sourceColor }
+              : undefined
+          }
         />
         <div className="min-w-0 flex-1 space-y-1">
           <div className="flex min-w-0 items-start justify-between gap-2">
-            <p className="line-clamp-1 text-sm font-medium text-foreground">{info.event.title}</p>
+            <p className="line-clamp-1 text-sm font-medium text-foreground">
+              {info.event.title}
+            </p>
             <div className="flex shrink-0 items-center gap-1">
               {sourceManaged ? (
                 <Badge
@@ -624,7 +757,9 @@ export function DayTimeline({
                   title={externalCalendarMessages.readOnlyLabel}
                 >
                   <CalendarDays className="size-3" />
-                  <span className="max-w-20 truncate">{sourceManaged.sourceName}</span>
+                  <span className="max-w-20 truncate">
+                    {sourceManaged.sourceName}
+                  </span>
                 </Badge>
               ) : null}
               <Badge variant="secondary" className="px-2 py-0 text-[10px]">
@@ -648,11 +783,19 @@ export function DayTimeline({
               <span className="truncate">{sourceManaged.sourceName}</span>
             </span>
           ) : null}
-          {hasConflict || item.scheduleStatus === "Overdue" || item.approvalPendingCount ? (
+          {hasConflict ||
+          item.scheduleStatus === "Overdue" ||
+          item.approvalPendingCount ? (
             <div className="flex flex-wrap gap-1 text-[10px]">
-              {hasConflict ? <Badge variant="destructive">{copy.conflictPreviewLabel}</Badge> : null}
-              {item.scheduleStatus === "Overdue" ? <Badge variant="destructive">{copy.overdue}</Badge> : null}
-              {item.approvalPendingCount ? <Badge variant="secondary">{copy.approvalPending}</Badge> : null}
+              {hasConflict ? (
+                <Badge variant="destructive">{copy.conflictPreviewLabel}</Badge>
+              ) : null}
+              {item.scheduleStatus === "Overdue" ? (
+                <Badge variant="destructive">{copy.overdue}</Badge>
+              ) : null}
+              {item.approvalPendingCount ? (
+                <Badge variant="secondary">{copy.approvalPending}</Badge>
+              ) : null}
             </div>
           ) : null}
           <AutoStartReasonNote item={item} copy={copy} />
@@ -669,8 +812,9 @@ export function DayTimeline({
             {formatDayHeading(dayDate, locale, copy)}
           </h3>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            <DayTimelineSummary items={items} dayDate={dayDate} /> · {" "}
-            {items.length} {items.length === 1 ? copy.blockSingular : copy.blockPlural}
+            <DayTimelineSummary items={items} dayDate={dayDate} /> ·{" "}
+            {items.length}{" "}
+            {items.length === 1 ? copy.blockSingular : copy.blockPlural}
           </p>
         </div>
         <div className="rounded-full border border-border/45 bg-card/75 px-2.5 py-1 text-right text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
@@ -691,7 +835,9 @@ export function DayTimeline({
         onDragOver={handleDragOver}
         onScrollCapture={syncTimelineScrollTop}
         onDragLeave={(event) => {
-          if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
+          if (
+            !event.currentTarget.contains(event.relatedTarget as Node | null)
+          ) {
             setDragPreview(null);
           }
         }}
@@ -701,13 +847,23 @@ export function DayTimeline({
       >
         <div className="relative h-full min-h-[40rem] rounded-2xl border border-border/75 bg-background shadow-[inset_0_0_0_1px_rgba(15,23,42,0.04),0_16px_38px_rgba(15,23,42,0.08)]">
           {selectedDay === getTodayKey() ? (
-            <span className="sr-only" aria-label="Current time marker" />
+            <span
+              role="status"
+              aria-label={copy.currentTimeLabel}
+              className="sr-only"
+            >
+              {copy.currentTimeLabel}
+            </span>
           ) : null}
           <div className="sr-only">
             {items.map((item) => (
               <div key={item.workBlockId ?? item.taskId}>
                 <a
-                  href={buildScheduleHref(selectedDay, item.taskId, item.workBlockId)}
+                  href={buildScheduleHref(
+                    selectedDay,
+                    item.taskId,
+                    item.workBlockId,
+                  )}
                   onClick={(event) => {
                     event.preventDefault();
                     onSelectTask(item.workBlockId ?? item.taskId);
@@ -722,7 +878,9 @@ export function DayTimeline({
                   }}
                 >
                   {item.title}
-                  {item.sourceManaged ? ` · ${item.sourceManaged.sourceName} · ${externalCalendarMessages.readOnlyLabel}` : null}
+                  {item.sourceManaged
+                    ? ` · ${item.sourceManaged.sourceName} · ${externalCalendarMessages.readOnlyLabel}`
+                    : null}
                 </a>
                 <button
                   type="button"
@@ -735,9 +893,12 @@ export function DayTimeline({
             {externalEvents.map((event) => (
               <div key={event.id}>
                 <span>
-                  {event.title} · {event.sourceName} · {externalCalendarMessages.readOnlyLabel}
+                  {event.title} · {event.sourceName} ·{" "}
+                  {externalCalendarMessages.readOnlyLabel}
                 </span>
-                {event.overlapsScheduledTask ? <span> · {externalCalendarMessages.overlapsTaskLabel}</span> : null}
+                {event.overlapsScheduledTask ? (
+                  <span> · {externalCalendarMessages.overlapsTaskLabel}</span>
+                ) : null}
               </div>
             ))}
           </div>
@@ -773,7 +934,11 @@ export function DayTimeline({
             eventClick={(info) => {
               info.jsEvent.preventDefault();
               const clicked = selectedItemById.get(info.event.id);
-              onSelectTask(clicked ? clicked.workBlockId ?? clicked.taskId : info.event.id);
+              onSelectTask(
+                clicked
+                  ? (clicked.workBlockId ?? clicked.taskId)
+                  : info.event.id,
+              );
             }}
             eventDragStart={(info) => setHiddenTaskId(info.event.id)}
             eventDragStop={() => {
@@ -791,7 +956,10 @@ export function DayTimeline({
           />
 
           <div className="pointer-events-none absolute inset-x-[70px] top-0 h-full sm:inset-x-[82px]">
-            <ScheduleGhostBlockLayer preview={ghostPreview} mapMinuteToY={mapMinuteToY} />
+            <ScheduleGhostBlockLayer
+              preview={ghostPreview}
+              mapMinuteToY={mapMinuteToY}
+            />
             {draggedItem && dragPreview ? (
               <TimelinePlacementCard
                 preview={dragPreview}

@@ -1,6 +1,10 @@
 import type { PlanNodeDataModel, TaskPlanGraphPlan } from "../contract";
-import { buildTaskHeaderSpec, type TaskHeaderActionInput, type UiDocument } from "@chrona/ui-protocol";
-import type { TaskPlanReadModel } from "@chrona/contracts"
+import {
+  buildTaskHeaderSpec,
+  type TaskHeaderActionInput,
+  type UiDocument,
+} from "@chrona/ui-protocol";
+import type { TaskPlanReadModel } from "@chrona/contracts";
 import type { TaskPageData } from "../model/task-workspace-types";
 
 type TaskWorkspaceFixturePageOverrides = Omit<Partial<TaskPageData>, "task"> & {
@@ -8,7 +12,10 @@ type TaskWorkspaceFixturePageOverrides = Omit<Partial<TaskPageData>, "task"> & {
 };
 
 export function createTaskWorkspaceFixtureNode(
-  input: Partial<PlanNodeDataModel> & { id: string; status: PlanNodeDataModel["status"] },
+  input: Partial<PlanNodeDataModel> & {
+    id: string;
+    status: PlanNodeDataModel["status"];
+  },
 ): PlanNodeDataModel {
   return {
     id: input.id,
@@ -62,12 +69,25 @@ export function createTaskWorkspaceFixtureGraph(
     analytics: {
       entryNodeIds: nodes[0] ? [nodes[0].id] : [],
       terminalNodeIds: nodes.at(-1) ? [nodes.at(-1)!.id] : [],
-      activeNodeIds: nodes.filter((node) => node.status === "active" || node.status === "in_progress").map((node) => node.id),
+      activeNodeIds: nodes
+        .filter(
+          (node) => node.status === "active" || node.status === "in_progress",
+        )
+        .map((node) => node.id),
       reachableFromActiveIds: [],
       criticalPathNodeIds: nodes.map((node) => node.id),
-      attentionNodeIds: nodes.filter((node) => node.status === "waiting_for_user" || node.status === "blocked").map((node) => node.id),
-      blockedNodeIds: nodes.filter((node) => node.status === "blocked").map((node) => node.id),
-      rankByNodeId: Object.fromEntries(nodes.map((node, index) => [node.id, index])),
+      attentionNodeIds: nodes
+        .filter(
+          (node) =>
+            node.status === "waiting_for_user" || node.status === "blocked",
+        )
+        .map((node) => node.id),
+      blockedNodeIds: nodes
+        .filter((node) => node.status === "blocked")
+        .map((node) => node.id),
+      rankByNodeId: Object.fromEntries(
+        nodes.map((node, index) => [node.id, index]),
+      ),
       laneByNodeId: Object.fromEntries(nodes.map((node) => [node.id, 0])),
       upstreamByNodeId: {},
       downstreamByNodeId: {},
@@ -75,12 +95,23 @@ export function createTaskWorkspaceFixtureGraph(
   };
 }
 
-function createFixtureCommandCenter(): NonNullable<TaskPageData["commandCenter"]> {
+function createFixtureCommandCenter(): NonNullable<
+  TaskPageData["commandCenter"]
+> {
   return {
     documents: {
-      now: { root: "root", elements: { root: { type: "Text", props: { text: "Now" } } } },
-      output: { root: "root", elements: { root: { type: "Text", props: { text: "Output" } } } },
-      trail: { root: "root", elements: { root: { type: "Text", props: { text: "Trail" } } } },
+      now: {
+        root: "root",
+        elements: { root: { type: "Text", props: { text: "Now" } } },
+      },
+      output: {
+        root: "root",
+        elements: { root: { type: "Text", props: { text: "Output" } } },
+      },
+      trail: {
+        root: "root",
+        elements: { root: { type: "Text", props: { text: "Trail" } } },
+      },
     },
   };
 }
@@ -90,14 +121,17 @@ function createFixtureCommandCenter(): NonNullable<TaskPageData["commandCenter"]
 // needs a `UiDocument` for the header (page mock, header-card render,
 // plan section, etc.) routes through here. Keeps the builder import
 // in one place — the engine `getHeaderSpec` is the only other caller.
-export function createHeaderSpecFixture(input: {
-  title: string;
-  status?: "waiting" | "running" | "completed" | "blocked" | "approval-needed";
-  priority?: "Low" | "Medium" | "High" | "Urgent";
-  progressLabel?: string;
-  occurrenceLabel?: string | null;
-  actions?: TaskHeaderActionInput[];
-} = { title: "Launch task" }): UiDocument {
+export function createHeaderSpecFixture(
+  input: {
+    title: string;
+    status?:
+      "waiting" | "running" | "completed" | "blocked" | "approval-needed";
+    priority?: "Low" | "Medium" | "High" | "Urgent";
+    progressLabel?: string;
+    occurrenceLabel?: string | null;
+    actions?: TaskHeaderActionInput[];
+  } = { title: "Launch task" },
+): UiDocument {
   const status = input.status ?? "waiting";
   const priority = input.priority ?? "High";
   const statusLabel = status.charAt(0).toUpperCase() + status.slice(1);
@@ -107,7 +141,12 @@ export function createHeaderSpecFixture(input: {
     statusLabel,
     progressLabel: input.progressLabel ?? "0 steps · 0 accepted · 0%",
     priorityLabel: priority,
-    priorityTone: priority === "Urgent" ? "danger" : priority === "High" ? "warning" : "neutral",
+    priorityTone:
+      priority === "Urgent"
+        ? "danger"
+        : priority === "High"
+          ? "warning"
+          : "neutral",
     occurrenceLabel: input.occurrenceLabel ?? null,
     actions: input.actions ?? [
       { id: "generate-plan", label: "Generate plan" },
@@ -117,28 +156,46 @@ export function createHeaderSpecFixture(input: {
   });
 }
 
-function createFixtureHeader(task: Partial<TaskPageData["task"]> = {}): NonNullable<TaskPageData["header"]> {
+function createFixtureHeader(
+  task: Partial<TaskPageData["task"]> = {},
+): NonNullable<TaskPageData["header"]> {
   const title = task.title ?? "Launch task";
   const isRunning = task.status === "Running";
   return {
     spec: createHeaderSpecFixture({
       title,
-      status: isRunning ? "running" : task.status === "Completed" ? "completed" : "waiting",
-      priority: task.priority === "Low" || task.priority === "Medium" || task.priority === "High" || task.priority === "Urgent"
-        ? task.priority
-        : "High",
+      status: isRunning
+        ? "running"
+        : task.status === "Completed"
+          ? "completed"
+          : "waiting",
+      priority:
+        task.priority === "Low" ||
+        task.priority === "Medium" ||
+        task.priority === "High" ||
+        task.priority === "Urgent"
+          ? task.priority
+          : "High",
       actions: isRunning
-        ? [{ id: "pause", label: "Pause" }, { id: "stop", label: "Stop" }, { id: "edit", label: "Edit" }, { id: "delete", label: "Delete Task" }]
+        ? [
+            { id: "pause", label: "Pause" },
+            { id: "stop", label: "Stop" },
+            { id: "edit", label: "Edit" },
+            { id: "delete", label: "Delete Task" },
+          ]
         : undefined,
     }),
   };
 }
-export function createTaskWorkspaceFixturePageData(overrides: TaskWorkspaceFixturePageOverrides = {}): TaskPageData {
+export function createTaskWorkspaceFixturePageData(
+  overrides: TaskWorkspaceFixturePageOverrides = {},
+): TaskPageData {
   const { task: taskOverrides = {}, ...pageOverrides } = overrides;
 
   return {
     defaultExecutionRuntime: "local",
     executionRuntimes: [],
+    availableAiClients: [{ id: "ai-1", name: "Debug provider", enabled: true }],
     task: {
       id: "task-1",
       workspaceId: "workspace-1",
@@ -176,25 +233,62 @@ export function createTaskWorkspaceFixturePageData(overrides: TaskWorkspaceFixtu
 
 export const taskWorkspaceStateFixtures = {
   running: {
-    pageData: createTaskWorkspaceFixturePageData({ task: { status: "Running" } }),
-    graphPlan: createTaskWorkspaceFixtureGraph([
-      createTaskWorkspaceFixtureNode({ id: "research", status: "done", completionSummary: "Research complete" }),
-      createTaskWorkspaceFixtureNode({ id: "execute", status: "active", statusLabel: "Running" }),
-    ], "execute"),
+    pageData: createTaskWorkspaceFixturePageData({
+      task: { status: "Running" },
+    }),
+    graphPlan: createTaskWorkspaceFixtureGraph(
+      [
+        createTaskWorkspaceFixtureNode({
+          id: "research",
+          status: "done",
+          completionSummary: "Research complete",
+        }),
+        createTaskWorkspaceFixtureNode({
+          id: "execute",
+          status: "active",
+          statusLabel: "Running",
+        }),
+      ],
+      "execute",
+    ),
   },
   waiting: {
-    pageData: createTaskWorkspaceFixturePageData({ task: { status: "Queued", scheduleStatus: "Scheduled" } }),
-    graphPlan: createTaskWorkspaceFixtureGraph([
-      createTaskWorkspaceFixtureNode({ id: "queued", status: "waiting", nextAction: "Wait for dependency" }),
-    ], "queued"),
+    pageData: createTaskWorkspaceFixturePageData({
+      task: { status: "Queued", scheduleStatus: "Scheduled" },
+    }),
+    graphPlan: createTaskWorkspaceFixtureGraph(
+      [
+        createTaskWorkspaceFixtureNode({
+          id: "queued",
+          status: "waiting",
+          nextAction: "Wait for dependency",
+        }),
+      ],
+      "queued",
+    ),
   },
   approvalNeeded: {
     pageData: createTaskWorkspaceFixturePageData({
-      approvals: [{ id: "approval-1", title: "Approve result", status: "Pending", requestedAt: "2026-05-12T11:00:00.000Z" }],
+      approvals: [
+        {
+          id: "approval-1",
+          title: "Approve result",
+          status: "Pending",
+          requestedAt: "2026-05-12T11:00:00.000Z",
+        },
+      ],
     }),
-    graphPlan: createTaskWorkspaceFixtureGraph([
-      createTaskWorkspaceFixtureNode({ id: "approval", status: "waiting_for_user", requiresHumanInput: true, nextAction: "Approve result" }),
-    ], "approval"),
+    graphPlan: createTaskWorkspaceFixtureGraph(
+      [
+        createTaskWorkspaceFixtureNode({
+          id: "approval",
+          status: "waiting_for_user",
+          requiresHumanInput: true,
+          nextAction: "Approve result",
+        }),
+      ],
+      "approval",
+    ),
   },
   blocked: {
     pageData: createTaskWorkspaceFixturePageData({
@@ -202,36 +296,79 @@ export const taskWorkspaceStateFixtures = {
         status: "Blocked",
         isRunnable: false,
         runnabilitySummary: "Resolve blocker before running",
-        blockReason: { blockType: "blocked", actionRequired: "Review provider timeout" },
+        blockReason: {
+          blockType: "blocked",
+          actionRequired: "Review provider timeout",
+        },
       },
     }),
-    graphPlan: createTaskWorkspaceFixtureGraph([
-      createTaskWorkspaceFixtureNode({ id: "blocked", status: "blocked", nextAction: "Review provider timeout" }),
-    ], "blocked"),
+    graphPlan: createTaskWorkspaceFixtureGraph(
+      [
+        createTaskWorkspaceFixtureNode({
+          id: "blocked",
+          status: "blocked",
+          nextAction: "Review provider timeout",
+        }),
+      ],
+      "blocked",
+    ),
   },
   completed: {
     pageData: createTaskWorkspaceFixturePageData({ task: { status: "Done" } }),
-    graphPlan: createTaskWorkspaceFixtureGraph([
-      createTaskWorkspaceFixtureNode({ id: "complete", status: "done", completionSummary: "Workspace complete" }),
-    ], "complete"),
+    graphPlan: createTaskWorkspaceFixtureGraph(
+      [
+        createTaskWorkspaceFixtureNode({
+          id: "complete",
+          status: "done",
+          completionSummary: "Workspace complete",
+        }),
+      ],
+      "complete",
+    ),
   },
   failed: {
-    pageData: createTaskWorkspaceFixturePageData({ task: { status: "Failed", runnabilitySummary: "Retry is available" } }),
-    graphPlan: createTaskWorkspaceFixtureGraph([
-      createTaskWorkspaceFixtureNode({ id: "failed", status: "blocked", statusLabel: "Failed", nextAction: "Retry failed node" }),
-    ], "failed"),
+    pageData: createTaskWorkspaceFixturePageData({
+      task: { status: "Failed", runnabilitySummary: "Retry is available" },
+    }),
+    graphPlan: createTaskWorkspaceFixtureGraph(
+      [
+        createTaskWorkspaceFixtureNode({
+          id: "failed",
+          status: "blocked",
+          statusLabel: "Failed",
+          nextAction: "Retry failed node",
+        }),
+      ],
+      "failed",
+    ),
   },
   idle: {
     pageData: createTaskWorkspaceFixturePageData(),
-    graphPlan: createTaskWorkspaceFixtureGraph([
-      createTaskWorkspaceFixtureNode({ id: "ready", status: "ready", nextAction: "Start execution when ready" }),
-    ], "ready"),
+    graphPlan: createTaskWorkspaceFixtureGraph(
+      [
+        createTaskWorkspaceFixtureNode({
+          id: "ready",
+          status: "ready",
+          nextAction: "Start execution when ready",
+        }),
+      ],
+      "ready",
+    ),
   },
   loading: {
-    pageData: createTaskWorkspaceFixturePageData({ task: { status: "Planning" } }),
-    graphPlan: createTaskWorkspaceFixtureGraph([
-      createTaskWorkspaceFixtureNode({ id: "loading", status: "pending", statusLabel: "Loading" }),
-    ], "loading"),
+    pageData: createTaskWorkspaceFixturePageData({
+      task: { status: "Planning" },
+    }),
+    graphPlan: createTaskWorkspaceFixtureGraph(
+      [
+        createTaskWorkspaceFixtureNode({
+          id: "loading",
+          status: "pending",
+          statusLabel: "Loading",
+        }),
+      ],
+      "loading",
+    ),
   },
   empty: {
     pageData: createTaskWorkspaceFixturePageData(),
@@ -239,56 +376,101 @@ export const taskWorkspaceStateFixtures = {
   },
   artifactPresent: {
     pageData: createTaskWorkspaceFixturePageData({
-      artifacts: [{ id: "artifact-1", title: "Report", type: "markdown", uri: "file://report.md" }],
+      artifacts: [
+        {
+          id: "artifact-1",
+          title: "Report",
+          type: "markdown",
+          uri: "file://report.md",
+        },
+      ],
     }),
-    graphPlan: createTaskWorkspaceFixtureGraph([
-      createTaskWorkspaceFixtureNode({
-        id: "done",
-        status: "done",
-      }),
-    ], "done"),
+    graphPlan: createTaskWorkspaceFixtureGraph(
+      [
+        createTaskWorkspaceFixtureNode({
+          id: "done",
+          status: "done",
+        }),
+      ],
+      "done",
+    ),
   },
   staleError: {
     pageData: createTaskWorkspaceFixturePageData({
-      task: { status: "Blocked", isRunnable: false, runnabilitySummary: "Execution data is stale" },
+      task: {
+        status: "Blocked",
+        isRunnable: false,
+        runnabilitySummary: "Execution data is stale",
+      },
     }),
-    graphPlan: createTaskWorkspaceFixtureGraph([
-      createTaskWorkspaceFixtureNode({ id: "blocked", status: "blocked", nextAction: "Retry refresh" }),
-    ], "blocked"),
+    graphPlan: createTaskWorkspaceFixtureGraph(
+      [
+        createTaskWorkspaceFixtureNode({
+          id: "blocked",
+          status: "blocked",
+          nextAction: "Retry refresh",
+        }),
+      ],
+      "blocked",
+    ),
   },
   permissionLimited: {
     pageData: createTaskWorkspaceFixturePageData({
-      task: { status: "Ready", isRunnable: false, runnabilitySummary: "You can view this task, but cannot run it" },
+      task: {
+        status: "Ready",
+        isRunnable: false,
+        runnabilitySummary: "You can view this task, but cannot run it",
+      },
     }),
-    graphPlan: createTaskWorkspaceFixtureGraph([
-      createTaskWorkspaceFixtureNode({ id: "view-only", status: "ready", availableActions: [] }),
-    ], "view-only"),
+    graphPlan: createTaskWorkspaceFixtureGraph(
+      [
+        createTaskWorkspaceFixtureNode({
+          id: "view-only",
+          status: "ready",
+          availableActions: [],
+        }),
+      ],
+      "view-only",
+    ),
   },
   longContentMobile: {
     pageData: createTaskWorkspaceFixturePageData({
       task: {
-        title: "Coordinate launch readiness across compliance-review-security-and-operations-without-losing-current-execution-context",
-        description: "Long mobile-safe task content used to verify workspace panels wrap instead of forcing horizontal overflow.",
-        runnabilitySummary: "Ready to run after compliance-review-security-and-operations sign off",
+        title:
+          "Coordinate launch readiness across compliance-review-security-and-operations-without-losing-current-execution-context",
+        description:
+          "Long mobile-safe task content used to verify workspace panels wrap instead of forcing horizontal overflow.",
+        runnabilitySummary:
+          "Ready to run after compliance-review-security-and-operations sign off",
       },
-      artifacts: [{
-        id: "artifact-long-title",
-        title: "Extremely long artifact title that should wrap inside the execution overview instead of widening the viewport",
-        type: "markdown-report-with-long-classification",
-        uri: "file://long-report.md",
-      }],
+      artifacts: [
+        {
+          id: "artifact-long-title",
+          title:
+            "Extremely long artifact title that should wrap inside the execution overview instead of widening the viewport",
+          type: "markdown-report-with-long-classification",
+          uri: "file://long-report.md",
+        },
+      ],
     }),
-    graphPlan: createTaskWorkspaceFixtureGraph([
-      createTaskWorkspaceFixtureNode({
-        id: "long-current-node",
-        title: "Review cross-functional launch evidence and decide whether the workspace can continue safely",
-        objective: "Keep active node identity visible on narrow screens with long content.",
-        summary: "Long current-node summary should wrap across several lines without hiding actions or causing horizontal scroll.",
-        status: "waiting_for_user",
-        requiresHumanInput: true,
-        nextAction: "Confirm evidence and provide launch approval notes before continuing.",
-      }),
-    ], "long-current-node"),
+    graphPlan: createTaskWorkspaceFixtureGraph(
+      [
+        createTaskWorkspaceFixtureNode({
+          id: "long-current-node",
+          title:
+            "Review cross-functional launch evidence and decide whether the workspace can continue safely",
+          objective:
+            "Keep active node identity visible on narrow screens with long content.",
+          summary:
+            "Long current-node summary should wrap across several lines without hiding actions or causing horizontal scroll.",
+          status: "waiting_for_user",
+          requiresHumanInput: true,
+          nextAction:
+            "Confirm evidence and provide launch approval notes before continuing.",
+        }),
+      ],
+      "long-current-node",
+    ),
   },
 };
 
@@ -351,9 +533,10 @@ export const taskWorkspacePlanStateFixtures = {
         ),
       },
     }),
-    graphPlan: createTaskWorkspaceFixtureGraph([
-      createTaskWorkspaceFixtureNode({ id: "n1", status: "pending" }),
-    ], "n1"),
+    graphPlan: createTaskWorkspaceFixtureGraph(
+      [createTaskWorkspaceFixtureNode({ id: "n1", status: "pending" })],
+      "n1",
+    ),
   },
   planAccepted: {
     pageData: createTaskWorkspaceFixturePageData({
@@ -365,8 +548,9 @@ export const taskWorkspacePlanStateFixtures = {
         ),
       },
     }),
-    graphPlan: createTaskWorkspaceFixtureGraph([
-      createTaskWorkspaceFixtureNode({ id: "n1", status: "pending" }),
-    ], "n1"),
+    graphPlan: createTaskWorkspaceFixtureGraph(
+      [createTaskWorkspaceFixtureNode({ id: "n1", status: "pending" })],
+      "n1",
+    ),
   },
 };

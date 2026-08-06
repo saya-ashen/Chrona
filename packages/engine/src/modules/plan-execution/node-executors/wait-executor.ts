@@ -1,5 +1,9 @@
 import type { EffectivePlanNode, WaitConfig } from "@chrona/contracts/ai";
-import type { NodeExecutor, NodeExecutorInput, NodeExecutionResult } from "./types";
+import type {
+  NodeExecutor,
+  NodeExecutorInput,
+  NodeExecutionResult,
+} from "./types";
 
 export class WaitNodeExecutor implements NodeExecutor {
   readonly nodeType = "wait" as const;
@@ -19,6 +23,21 @@ export class WaitNodeExecutor implements NodeExecutor {
       };
     }
 
+    const hasInputFields = Boolean(
+      input.inputFields && Object.keys(input.inputFields).length > 0,
+    );
+    const hasUserInput = Boolean(input.userInput?.trim());
+    if (hasInputFields || hasUserInput) {
+      return {
+        status: "done",
+        summary: `Wait condition completed: ${config.waitFor}`,
+        output: {
+          ...(hasInputFields ? { inputFields: input.inputFields } : {}),
+          ...(hasUserInput ? { userInput: input.userInput?.trim() } : {}),
+        },
+        evidence: { sessionId: input.mainSession.id },
+      };
+    }
     if (config.timeout?.onTimeout === "continue") {
       return {
         status: "done",

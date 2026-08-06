@@ -10,17 +10,19 @@ import {
   Inbox,
   Search,
 } from "lucide-react";
-import { Badge } from "@shared/ui"
-import { Button } from "@shared/ui"
-import { Card, CardContent } from "@shared/ui"
-import { Input } from "@shared/ui"
+import { Badge } from "@shared/ui";
+import { Button } from "@shared/ui";
+import { Card, CardContent } from "@shared/ui";
+import { Input } from "@shared/ui";
 import { LocalizedLink } from "./localized-link";
-import { Select,
-SelectContent,
-SelectItem,
-SelectTrigger,
-SelectValue, } from "@shared/ui"
-import { cn } from "@shared/ui"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@shared/ui";
+import { cn } from "@shared/ui";
 
 type ActionCenterPresentationItem = ActionCenterItem & {
   stateView?: WorkStateView;
@@ -445,7 +447,7 @@ export function ActionCenterList({
               >
                 <h2
                   id={`action-center-${group}`}
-                  className="text-xs font-semibold uppercase text-muted-foreground"
+                  className="bg-background text-xs font-semibold uppercase text-foreground"
                 >
                   {title}
                 </h2>
@@ -493,7 +495,8 @@ export function ActionCenterList({
                                     ? item.summary
                                     : item.consequence || item.summary}
                                 </p>
-                                {item.kind === "auto_execution_skipped" && item.consequence ? (
+                                {item.kind === "auto_execution_skipped" &&
+                                item.consequence ? (
                                   <p className="break-words text-xs text-muted-foreground">
                                     {item.consequence}
                                   </p>

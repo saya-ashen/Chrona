@@ -68,7 +68,9 @@ export function getPlanSetupPresentation({
   };
 }
 
-function getRecommendedImprovements(readiness: PlanSetupPanelProps["readiness"]) {
+function getRecommendedImprovements(
+  readiness: PlanSetupPanelProps["readiness"],
+) {
   return readiness.checks.filter(
     (check) => check.level === "recommended" && check.state !== "passed",
   );
@@ -78,11 +80,17 @@ function getStatusPresentation(
   status: PlanSetupPanelProps["readiness"]["status"],
   improvementCount: number,
   copy: PlanSetupCopy = {},
-): Pick<SetupPresentation, "title" | "description" | "badgeLabel" | "badgeVariant"> {
+): Pick<
+  SetupPresentation,
+  "title" | "description" | "badgeLabel" | "badgeVariant"
+> {
   if (status === "blocked") {
     return {
-      title: copy.planSetupBlockedTitle ?? "Connect an AI provider to create a plan",
-      description: copy.planSetupBlockedDescription ?? "Your task brief is saved. Connect an AI provider, then return here to create a draft plan.",
+      title:
+        copy.planSetupBlockedTitle ?? "Connect an AI provider to create a plan",
+      description:
+        copy.planSetupBlockedDescription ??
+        "Your task brief is saved. Connect an AI provider, then return here to create a draft plan.",
       badgeLabel: copy.planSetupActionRequired ?? "Action required",
       badgeVariant: "destructive",
     };
@@ -90,25 +98,31 @@ function getStatusPresentation(
   if (status === "ready") {
     return {
       title: copy.planSetupReadyTitle ?? "Ready to create a plan",
-      description: copy.planSetupReadyDescription ?? "Chrona has enough information to propose reviewable steps for this task.",
+      description:
+        copy.planSetupReadyDescription ??
+        "Chrona has enough information to propose reviewable steps for this task.",
       badgeLabel: copy.planSetupReadyBadge ?? "Ready",
       badgeVariant: "secondary",
     };
   }
   return {
     title: copy.planSetupNowTitle ?? "You can create a plan now",
-    description: improvementCount > 0
-      ? copy.planSetupNowDescriptionWithDetails ?? "Chrona has enough information for a draft. Adding the details below will make the plan easier to review."
-      : copy.planSetupNowDescription ?? "Chrona has enough information to propose reviewable steps for this task.",
+    description:
+      improvementCount > 0
+        ? (copy.planSetupNowDescriptionWithDetails ??
+          "Chrona has enough information for a draft. Adding the details below will make the plan easier to review.")
+        : (copy.planSetupNowDescription ??
+          "Chrona has enough information to propose reviewable steps for this task."),
     badgeLabel: copy.planSetupOptionalBadge ?? "Optional details",
     badgeVariant: "outline",
   };
 }
 
 function getProviderName(pageData: TaskPageData) {
-  const provider = pageData.availableAiClients?.find(
-    (client) => client.id === pageData.task.aiClientId,
-  ) ?? pageData.availableAiClients?.[0];
+  const provider =
+    pageData.availableAiClients?.find(
+      (client) => client.id === pageData.task.aiClientId,
+    ) ?? pageData.availableAiClients?.[0];
   return provider?.name ?? pageData.task.executionRuntime ?? "Not connected";
 }
 
@@ -120,7 +134,11 @@ function countRequiredChecks(
     (check) => check.level === "required" && (!state || check.state === state),
   ).length;
 }
-export function PlanSetupHeader({ presentation }: { presentation: SetupPresentation }) {
+export function PlanSetupHeader({
+  presentation,
+}: {
+  presentation: SetupPresentation;
+}) {
   const { messages } = useI18n();
   const copy = messages.components.taskWorkspace;
   return (
@@ -137,7 +155,9 @@ export function PlanSetupHeader({ presentation }: { presentation: SetupPresentat
             {presentation.description}
           </p>
         </div>
-        <Badge variant={presentation.badgeVariant}>{presentation.badgeLabel}</Badge>
+        <Badge variant={presentation.badgeVariant}>
+          {presentation.badgeLabel}
+        </Badge>
       </div>
     </header>
   );
@@ -156,7 +176,10 @@ export function PlanSetupBrief({
     <div className="min-w-0 space-y-7 px-5 py-6 lg:px-7 lg:py-7 xl:border-r xl:border-border/70">
       <section aria-labelledby="plan-setup-brief-heading">
         <div className="flex items-center justify-between gap-3">
-          <h3 id="plan-setup-brief-heading" className="text-sm font-semibold text-foreground">
+          <h3
+            id="plan-setup-brief-heading"
+            className="text-sm font-semibold text-foreground"
+          >
             {copy.planSetupBriefTitle ?? "Task brief"}
           </h3>
           <Button type="button" size="sm" variant="ghost" onClick={onEditBrief}>
@@ -164,16 +187,30 @@ export function PlanSetupBrief({
           </Button>
         </div>
         <dl className="mt-3 grid overflow-hidden rounded-xl border border-border/70 bg-background/60 lg:grid-cols-2">
-          <BriefDetail label={copy.planSetupGoalLabel ?? "Goal"} className="border-b border-border/60 px-4 py-4 lg:col-span-2">
-            <span className="text-base font-medium text-foreground">{pageData.task.title}</span>
-          </BriefDetail>
-          <BriefDetail label={copy.planSetupDescriptionLabel ?? "Description"} className="border-b border-border/60 px-4 py-4 lg:border-b-0 lg:border-r">
-            <span className="line-clamp-4 text-sm leading-6 text-foreground">
-              {pageData.task.description?.trim() || (copy.planSetupNotAdded ?? "Not added yet")}
+          <BriefDetail
+            label={copy.planSetupGoalLabel ?? "Goal"}
+            className="border-b border-border/60 px-4 py-4 lg:col-span-2"
+          >
+            <span className="text-base font-medium text-foreground">
+              {pageData.task.title}
             </span>
           </BriefDetail>
-          <BriefDetail label={copy.planSetupProviderLabel ?? "AI provider"} className="px-4 py-4">
-            <span className="text-sm font-medium text-foreground">{presentation.providerName}</span>
+          <BriefDetail
+            label={copy.planSetupDescriptionLabel ?? "Description"}
+            className="border-b border-border/60 px-4 py-4 lg:border-b-0 lg:border-r"
+          >
+            <span className="line-clamp-4 text-sm leading-6 text-foreground">
+              {pageData.task.description?.trim() ||
+                (copy.planSetupNotAdded ?? "Not added yet")}
+            </span>
+          </BriefDetail>
+          <BriefDetail
+            label={copy.planSetupProviderLabel ?? "AI provider"}
+            className="px-4 py-4"
+          >
+            <span className="text-sm font-medium text-foreground">
+              {presentation.providerName}
+            </span>
           </BriefDetail>
         </dl>
       </section>
@@ -212,10 +249,14 @@ function PlanQualityImprovements({
   onEditBrief: () => void;
 }) {
   const { messages } = useI18n();
-  const copy = messages.components.taskWorkspace as typeof messages.components.taskWorkspace & PlanSetupCopy;
+  const copy = messages.components
+    .taskWorkspace as typeof messages.components.taskWorkspace & PlanSetupCopy;
   return (
     <section aria-labelledby="plan-quality-heading">
-      <h3 id="plan-quality-heading" className="text-sm font-semibold text-foreground">
+      <h3
+        id="plan-quality-heading"
+        className="text-sm font-semibold text-foreground"
+      >
         {copy.planSetupImproveQuality ?? "Improve plan quality"}
       </h3>
       <div className="mt-3 grid gap-3 lg:grid-cols-2">
@@ -225,12 +266,20 @@ function PlanQualityImprovements({
             className="flex min-h-28 flex-col justify-between gap-4 rounded-xl border border-border/70 bg-background/50 p-4"
           >
             <div>
-              <p className="text-sm font-medium text-foreground">{check.label}</p>
+              <p className="text-sm font-medium text-foreground">
+                {check.label}
+              </p>
               <p className="mt-1 text-xs leading-5 text-muted-foreground">
                 {check.helperText}
               </p>
             </div>
-            <Button type="button" size="sm" variant="outline" className="self-start" onClick={onEditBrief}>
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              className="self-start"
+              onClick={onEditBrief}
+            >
               {copy.planSetupAddDetail ?? "Add detail"}
             </Button>
           </div>
@@ -241,7 +290,8 @@ function PlanQualityImprovements({
 }
 export function PlanSetupNextSteps() {
   const { messages } = useI18n();
-  const copy = messages.components.taskWorkspace as typeof messages.components.taskWorkspace & PlanSetupCopy;
+  const copy = messages.components
+    .taskWorkspace as typeof messages.components.taskWorkspace & PlanSetupCopy;
   return (
     <details className="border-t border-border/70 px-5 py-4 lg:px-7">
       <summary className="cursor-pointer text-sm font-medium text-foreground">
@@ -249,9 +299,17 @@ export function PlanSetupNextSteps() {
       </summary>
       <ol className="mt-3 grid gap-2 text-sm text-muted-foreground sm:grid-cols-2 xl:grid-cols-4">
         <li>1. {copy.planSetupDraftStep ?? "Chrona creates a draft plan."}</li>
-        <li>2. {copy.planSetupReviewStep ?? "You review steps and checkpoints."}</li>
-        <li>3. {copy.planSetupNoRunStep ?? "Nothing runs before plan acceptance."}</li>
-        <li>4. {copy.planSetupExecutionStep ?? "Execution follows the task automation settings."}</li>
+        <li>
+          2. {copy.planSetupReviewStep ?? "You review steps and checkpoints."}
+        </li>
+        <li>
+          3. {copy.planSetupNoRunStep ?? "Nothing runs before plan acceptance."}
+        </li>
+        <li>
+          4.{" "}
+          {copy.planSetupExecutionStep ??
+            "Execution follows the task automation settings."}
+        </li>
       </ol>
     </details>
   );

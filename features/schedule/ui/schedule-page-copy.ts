@@ -29,6 +29,7 @@ export const DEFAULT_SCHEDULE_PAGE_COPY = {
   quickCreateQueueTitlePlaceholder: "Add a task to the queue",
   quickCreateStartLabel: "Start",
   quickCreateStartNowLabel: "Now",
+  currentTimeLabel: "Current time",
   quickCreateStartMorningLabel: "Morning",
   quickCreateStartAfternoonLabel: "Afternoon",
   quickCreateStartEveningLabel: "Evening",
@@ -49,7 +50,8 @@ export const DEFAULT_SCHEDULE_PAGE_COPY = {
   dropToMoveBlock: "Drop to move block",
   overdue: "Overdue",
   approvalPending: "Approval pending",
-  conflictPreviewLabel: "Conflict — resolve overlap before committing this block.",
+  conflictPreviewLabel:
+    "Conflict — resolve overlap before committing this block.",
   resizePreviewLabel: "Resize block",
   adjustBlock: "Adjust block",
   resizeHandleLabel: "Resize",
@@ -57,7 +59,8 @@ export const DEFAULT_SCHEDULE_PAGE_COPY = {
   quickCreateSubmit: "Add block",
   quickCreateHint:
     "Examples: 'Write weekly report @ 14:30 for 90m !high' or just type a title for the next open slot.",
-  quickCreateUnsafeAiInput: "AI could not safely interpret this input. Add a clearer task description and try again. Local parser fallback was not used.",
+  quickCreateUnsafeAiInput:
+    "AI could not safely interpret this input. Add a clearer task description and try again. Local parser fallback was not used.",
   closeTaskDetails: "Close task details",
   taskDetails: "Task Details",
   taskDetailsDescription:
@@ -102,19 +105,25 @@ export const DEFAULT_SCHEDULE_PAGE_COPY = {
   cockpitQueueHint: "Tasks that are ready to be placed next.",
   cockpitRisksHint: "Items that need review before the plan feels safe.",
   cockpitSuggestions: "AI suggestions",
-  cockpitSuggestionsHint: "Automation and proposal opportunities waiting for review.",
+  cockpitSuggestionsHint:
+    "Automation and proposal opportunities waiting for review.",
   automationTitle: "Automation",
   automationDescription: "Backend-capable execution and scheduling actions.",
   automationEmpty: "No automation candidates right now.",
   automationRunNow: "Run now",
-  automationUnsupportedRuntime: "This runtime cannot be auto-executed from Chrona.",
-  automationBackendOnlyHint: "Chrona only sends execution requests to backend-managed runtimes.",
+  automationUnsupportedRuntime:
+    "This runtime cannot be auto-executed from Chrona.",
+  automationBackendOnlyHint:
+    "Chrona only sends execution requests to backend-managed runtimes.",
   cockpitReviewSuggestions: "Review suggestions",
-  cockpitReviewSuggestionsHint: "Switch to the list view to triage tasks and pending proposals.",
+  cockpitReviewSuggestionsHint:
+    "Switch to the list view to triage tasks and pending proposals.",
   cockpitCreateTask: "Create task",
-  cockpitCreateTaskHint: "Add the first task or time block directly from Schedule.",
+  cockpitCreateTaskHint:
+    "Add the first task or time block directly from Schedule.",
   cockpitConnectAi: "Connect AI",
-  cockpitConnectAiHint: "Open AI Clients and connect a provider to unlock planning and execution.",
+  cockpitConnectAiHint:
+    "Open AI Clients and connect a provider to unlock planning and execution.",
   cockpitSummaryTemplate:
     "{scheduled} scheduled · {queue} queued next · {risks} risks to review · {automation} automation candidates",
   cockpitViewsLabel: "Views",
@@ -146,18 +155,24 @@ export const DEFAULT_SCHEDULE_PAGE_COPY = {
   scheduleTaskAction: "Schedule task",
   dayWorkspaceTitle: "Day schedule",
   dayEmptyTitle: "Nothing scheduled for this day",
-  dayEmptyWithQueueDescription: "Choose a ready task or create a new scheduled block.",
-  dayEmptyDescription: "Create a task block when you are ready to plan this day.",
+  dayEmptyWithQueueDescription:
+    "Choose a ready task or create a new scheduled block.",
+  dayEmptyDescription:
+    "Create a task block when you are ready to plan this day.",
   dayScheduledSummaryTemplate: "{count} scheduled · {duration}",
-  dayPlanningSummaryTemplate: "{queue} ready to schedule · {risks} needing attention",
+  dayPlanningSummaryTemplate:
+    "{queue} ready to schedule · {risks} needing attention",
   planningDrawerLabel: "Planning drawer",
   readyToSchedule: "Ready to schedule",
-  readyToScheduleDescription: "Choose a task to place on the selected day. Dragging remains available for precise placement.",
+  readyToScheduleDescription:
+    "Choose a task to place on the selected day. Dragging remains available for precise placement.",
   needsAttentionTab: "Needs attention",
   scheduleAction: "Schedule",
-  scheduleTaskHint: "Choose a suggested time or open task details to adjust duration and timing.",
+  scheduleTaskHint:
+    "Choose a suggested time or open task details to adjust duration and timing.",
   noAttentionItems: "No scheduling risks need attention.",
-  attentionDescription: "Resolve work that may make this day unsafe or incomplete.",
+  attentionDescription:
+    "Resolve work that may make this day unsafe or incomplete.",
   openTask: "Open task",
   noAgendaItems: "No scheduled items for this day.",
   selectedDayAgenda: "Selected day agenda",
@@ -193,12 +208,15 @@ export const DEFAULT_SCHEDULE_PAGE_COPY = {
   firstRunCreateTask: "Create first task",
   firstRunOpenCreatedTask: "Open created task",
   firstRunStepConnectAiTitle: "Connect AI",
-  firstRunStepConnectAi: "Add Claude Code or Codex as the AI client Chrona will use.",
+  firstRunStepConnectAi:
+    "Add Claude Code or Codex as the AI client Chrona will use.",
   firstRunStepConnectAiDone: "AI client connected. Next, create a real task.",
   firstRunStepCreateTaskTitle: "Create a task",
-  firstRunStepCreateTask: "Describe the goal, constraints, and context in one task.",
+  firstRunStepCreateTask:
+    "Describe the goal, constraints, and context in one task.",
   firstRunStepReviewPlanTitle: "Review the plan",
-  firstRunStepReviewPlan: "Chrona previews AI suggestions first; you decide what to accept or run.",
+  firstRunStepReviewPlan:
+    "Chrona previews AI suggestions first; you decide what to accept or run.",
   focusOverdue: "Overdue",
   focusAtRisk: "At risk",
   focusWaitingForInput: "Waiting for input",
@@ -264,7 +282,10 @@ export function getAutoStartReasonCopy(
   if (!reason || !(reason in AUTO_START_REASON_COPY_KEYS)) {
     return null;
   }
-  const key = AUTO_START_REASON_COPY_KEYS[reason as keyof typeof AUTO_START_REASON_COPY_KEYS];
+  const key =
+    AUTO_START_REASON_COPY_KEYS[
+      reason as keyof typeof AUTO_START_REASON_COPY_KEYS
+    ];
   return copy[key];
 }
 

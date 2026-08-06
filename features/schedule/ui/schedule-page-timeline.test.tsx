@@ -1,4 +1,10 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@chrona/i18n/react", async () => {
@@ -10,7 +16,11 @@ vi.mock("@chrona/i18n/react", async () => {
 });
 
 vi.mock("@/components/i18n/localized-link", () => ({
-  LocalizedLink: ({ children, href, ...props }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => (
+  LocalizedLink: ({
+    children,
+    href,
+    ...props
+  }: React.AnchorHTMLAttributes<HTMLAnchorElement>) => (
     <a href={typeof href === "string" ? href : "#"} {...props}>
       {children}
     </a>
@@ -20,7 +30,9 @@ vi.mock("@/components/i18n/localized-link", () => ({
 import { DayTimeline } from "./timeline/schedule-page-timeline";
 import type { ScheduledItem } from "./schedule-page-types";
 
-function createScheduledItem(overrides: Partial<ScheduledItem> = {}): ScheduledItem {
+function createScheduledItem(
+  overrides: Partial<ScheduledItem> = {},
+): ScheduledItem {
   return {
     taskId: overrides.taskId ?? "task-1",
     workspaceId: overrides.workspaceId ?? "workspace-1",
@@ -34,8 +46,10 @@ function createScheduledItem(overrides: Partial<ScheduledItem> = {}): ScheduledI
     scheduleStatus: overrides.scheduleStatus ?? "Scheduled",
     scheduleSource: overrides.scheduleSource ?? "human",
     dueAt: overrides.dueAt ?? null,
-    scheduledStartAt: overrides.scheduledStartAt ?? new Date(2026, 3, 15, 9, 0, 0, 0),
-    scheduledEndAt: overrides.scheduledEndAt ?? new Date(2026, 3, 15, 10, 0, 0, 0),
+    scheduledStartAt:
+      overrides.scheduledStartAt ?? new Date(2026, 3, 15, 9, 0, 0, 0),
+    scheduledEndAt:
+      overrides.scheduledEndAt ?? new Date(2026, 3, 15, 10, 0, 0, 0),
     latestRunStatus: overrides.latestRunStatus ?? null,
     scheduleProposalCount: overrides.scheduleProposalCount ?? 0,
     lastActivityAt: overrides.lastActivityAt ?? null,
@@ -84,7 +98,9 @@ describe("DayTimeline", () => {
       />,
     );
 
-    const dropZone = screen.getByRole("region", { name: /schedule drop zone/i });
+    const dropZone = screen.getByRole("region", {
+      name: /schedule drop zone/i,
+    });
     fireEvent.dragOver(dropZone, {
       clientY: 36,
       dataTransfer: { dropEffect: "move" },
@@ -96,7 +112,7 @@ describe("DayTimeline", () => {
     expect(screen.queryByText(/conflict/i)).not.toBeInTheDocument();
   });
 
-  it("shows a current-time marker when the selected day is today", () => {
+  it("shows a current-time marker when the selected day is today", async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date(2026, 3, 15, 9, 45, 0, 0));
 
@@ -116,7 +132,9 @@ describe("DayTimeline", () => {
       />,
     );
 
-    expect(screen.getByLabelText(/current time/i)).toBeInTheDocument();
+    expect(
+      screen.getByRole("status", { name: "Current time" }),
+    ).toBeInTheDocument();
   });
 
   it("does not show a current-time marker for a non-today day", () => {
@@ -139,7 +157,7 @@ describe("DayTimeline", () => {
       />,
     );
 
-    expect(screen.queryByLabelText(/current time/i)).not.toBeInTheDocument();
+    expect(screen.queryByText("Now")).not.toBeInTheDocument();
   });
 
   it("marks source-managed calendar tasks with source name and color", async () => {
@@ -207,7 +225,9 @@ describe("DayTimeline", () => {
       />,
     );
 
-    const dropZone = screen.getByRole("region", { name: /schedule drop zone/i });
+    const dropZone = screen.getByRole("region", {
+      name: /schedule drop zone/i,
+    });
     vi.spyOn(dropZone, "getBoundingClientRect").mockReturnValue({
       x: 0,
       y: 0,
@@ -220,7 +240,9 @@ describe("DayTimeline", () => {
       toJSON: () => ({}),
     });
 
-    const handle = screen.getByRole("button", { name: /resize resizable task/i });
+    const handle = screen.getByRole("button", {
+      name: /resize resizable task/i,
+    });
     fireEvent.mouseDown(handle, { clientY: 270 });
     fireEvent.mouseMove(window, { clientY: 281 });
     fireEvent.mouseUp(window, { clientY: 281 });
@@ -308,11 +330,23 @@ describe("DayTimeline", () => {
   const autoStartReasonCases: Array<{ reason: string; copy: RegExp }> = [
     { reason: "no_accepted_plan", copy: /Review and approve a plan/i },
     { reason: "no_runtime_config", copy: /Connect an execution runtime/i },
-    { reason: "invalid_task_status", copy: /Prepare this task before it can start/i },
+    {
+      reason: "invalid_task_status",
+      copy: /Prepare this task before it can start/i,
+    },
     { reason: "already_running", copy: /Already running/i },
-    { reason: "requires_human_input", copy: /Input needed before this can start/i },
-    { reason: "requires_approval", copy: /Approval needed before this can start/i },
-    { reason: "runtime_unsupported", copy: /Choose a runtime that supports automatic start/i },
+    {
+      reason: "requires_human_input",
+      copy: /Input needed before this can start/i,
+    },
+    {
+      reason: "requires_approval",
+      copy: /Approval needed before this can start/i,
+    },
+    {
+      reason: "runtime_unsupported",
+      copy: /Choose a runtime that supports automatic start/i,
+    },
     { reason: "not_scheduled", copy: /Not on a schedule block yet/i },
   ];
 
@@ -372,7 +406,9 @@ describe("DayTimeline", () => {
     await waitFor(() => {
       expect(screen.getAllByText(/Future block/i).length).toBeGreaterThan(0);
     });
-    expect(screen.queryByText(/Scheduled, not due yet/i)).not.toBeInTheDocument();
+    expect(
+      screen.queryByText(/Scheduled, not due yet/i),
+    ).not.toBeInTheDocument();
   });
 
   it("does not show an auto-start reason when the block is eligible", async () => {

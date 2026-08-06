@@ -15,7 +15,10 @@ import {
   type SubmitCheckpointActionInput,
 } from "@chrona/contracts";
 import { toHttpError } from "@shared/http/server";
-import { checkpointActionToExecutionAction, summarizeRuntimeEvent } from "@features/execution-monitoring/server";
+import {
+  checkpointActionToExecutionAction,
+  summarizeRuntimeEvent,
+} from "@features/execution-monitoring/server";
 
 export async function getTaskWorkspaceId(engine: ChronaEngine, taskId: string) {
   const page = await engine.tasks.getBootstrap({ taskId });
@@ -42,15 +45,22 @@ function publishCommandEvent(input: {
   });
 }
 
-function commandWorkBlockId(command: ReturnType<typeof workCommandBodySchema.parse>) {
-  return "workBlockId" in command ? command.workBlockId ?? null : null;
+function commandWorkBlockId(
+  command: ReturnType<typeof workCommandBodySchema.parse>,
+) {
+  return "workBlockId" in command ? (command.workBlockId ?? null) : null;
 }
 
 function publishWorkspaceTrigger(input: {
   taskId: string;
   workspaceId: string;
   commandId: string;
-  type: "plan.generation.event" | "execution.runtime_event" | "execution.state.updated" | "execution.result" | "checkpoint.result";
+  type:
+    | "plan.generation.event"
+    | "execution.runtime_event"
+    | "execution.state.updated"
+    | "execution.result"
+    | "checkpoint.result";
   eventKind?: string;
   [key: string]: unknown;
 }) {
@@ -82,7 +92,10 @@ export async function buildTaskWorkspaceStateSnapshot(
       taskId: input.taskId,
       workBlockId: input.workBlockId,
     }),
-    getCurrentExecution({ taskId: input.taskId, workBlockId: input.workBlockId }),
+    getCurrentExecution({
+      taskId: input.taskId,
+      workBlockId: input.workBlockId,
+    }),
   ]);
   const session = state.generationSession;
   const hasPlan = Boolean(state.savedPlan);
@@ -92,7 +105,11 @@ export async function buildTaskWorkspaceStateSnapshot(
     hasPlan,
     hasAcceptedPlan,
     isRunnable: currentExecution.status !== "no_plan",
-    startDisabledReason: deriveStartDisabledReason(currentExecution.status, hasPlan, hasAcceptedPlan),
+    startDisabledReason: deriveStartDisabledReason(
+      currentExecution.status,
+      hasPlan,
+      hasAcceptedPlan,
+    ),
   });
   return {
     "/plan/status": state.aiPlanGenerationStatus,
@@ -119,10 +136,15 @@ function deriveStartDisabledReason(
   hasAcceptedPlan: boolean,
 ): string | null {
   if (!hasPlan) return "Generate and accept a plan before starting execution.";
-  if (!hasAcceptedPlan) return "Accept the generated plan before starting execution.";
-  if (executionStatus === "no_plan") return "Generate and accept a plan before starting execution.";
+  if (!hasAcceptedPlan)
+    return "Accept the generated plan before starting execution.";
+  if (executionStatus === "no_plan")
+    return "Generate and accept a plan before starting execution.";
   if (executionStatus === "running") return "Task is already running.";
-  if (executionStatus === "waiting_for_user" || executionStatus === "waiting_for_approval") {
+  if (
+    executionStatus === "waiting_for_user" ||
+    executionStatus === "waiting_for_approval"
+  ) {
     return "Task is waiting for checkpoint input.";
   }
   if (executionStatus === "blocked" || executionStatus === "failed") {
@@ -151,12 +173,18 @@ async function buildHeaderExecutionStateUpdate(input: {
     hasPlan,
     hasAcceptedPlan,
     isRunnable: input.executionStatus !== "no_plan",
-    startDisabledReason: deriveStartDisabledReason(input.executionStatus, hasPlan, hasAcceptedPlan),
+    startDisabledReason: deriveStartDisabledReason(
+      input.executionStatus,
+      hasPlan,
+      hasAcceptedPlan,
+    ),
   });
   return headerExecutionStateToStatePaths(executionState);
 }
 
-function planGenerationStateUpdate(event: GeneratePlanSSEEvent): Record<string, unknown> | null {
+function planGenerationStateUpdate(
+  event: GeneratePlanSSEEvent,
+): Record<string, unknown> | null {
   switch (event.type) {
     case "status":
       return {
@@ -207,19 +235,29 @@ function planGenerationStateUpdate(event: GeneratePlanSSEEvent): Record<string, 
   }
 }
 
-function optimisticExecutionStatusForAction(action: ExecutionActionInput["action"]): string | null {
-  if (action === "start_manual" || action === "restart_from_beginning" || action === "retry_node") return "running";
+function optimisticExecutionStatusForAction(
+  action: ExecutionActionInput["action"],
+): string | null {
+  if (
+    action === "start_manual" ||
+    action === "restart_from_beginning" ||
+    action === "retry_node"
+  )
+    return "running";
   if (action === "pause_session") return "waiting_for_user";
   if (action === "cancel_session") return "cancelled";
   return null;
 }
 
-export async function dispatchTaskWorkspaceCommand(engine: ChronaEngine, input: {
-  taskId: string;
-  workspaceId: string;
-  commandId: string;
-  command: ReturnType<typeof workCommandBodySchema.parse>;
-}) {
+export async function dispatchTaskWorkspaceCommand(
+  engine: ChronaEngine,
+  input: {
+    taskId: string;
+    workspaceId: string;
+    commandId: string;
+    command: ReturnType<typeof workCommandBodySchema.parse>;
+  },
+) {
   const { taskId, workspaceId, commandId, command } = input;
   publishCommandEvent({
     taskId,
@@ -242,7 +280,10 @@ export async function dispatchTaskWorkspaceCommand(engine: ChronaEngine, input: 
             taskId,
             action: { action: "cancel_session" },
             commandContext: {
-              sessionId: current.mainSessionId ?? undefined,
+              sessionId:
+                current.executionSessionId ??
+                current.mainSessionId ??
+                undefined,
               idempotencyKey: `${command.idempotencyKey}:cancel-active-execution`,
             },
           });
@@ -278,7 +319,12 @@ export async function dispatchTaskWorkspaceCommand(engine: ChronaEngine, input: 
           generation.emit(event);
           const stateUpdate = planGenerationStateUpdate(event);
           if (stateUpdate) {
-            publishTaskStateUpdate({ taskId, workspaceId, workBlockId, updates: stateUpdate });
+            publishTaskStateUpdate({
+              taskId,
+              workspaceId,
+              workBlockId,
+              updates: stateUpdate,
+            });
           }
         }
       } finally {
@@ -343,9 +389,20 @@ export async function dispatchTaskWorkspaceCommand(engine: ChronaEngine, input: 
     }
 
     if (command.type === "execution.action") {
-      const action = { ...command, action: command.action } as ExecutionActionInput;
+      const action = {
+        ...command,
+        action: command.action,
+      } as ExecutionActionInput;
       const workBlockId = commandWorkBlockId(command);
-      const optimisticStatus = optimisticExecutionStatusForAction(action.action);
+      const currentExecution =
+        action.action === "start_manual" ||
+        action.action === "start_scheduled" ||
+        action.action === "restart_from_beginning"
+          ? null
+          : await engine.tasks.execution.current({ taskId, workBlockId });
+      const optimisticStatus = optimisticExecutionStatusForAction(
+        action.action,
+      );
       if (optimisticStatus) {
         const optimisticHeaderState = await buildHeaderExecutionStateUpdate({
           engine,
@@ -365,6 +422,13 @@ export async function dispatchTaskWorkspaceCommand(engine: ChronaEngine, input: 
       const result = await engine.tasks.execution.dispatch({
         taskId,
         action,
+        commandContext: {
+          sessionId:
+            currentExecution?.executionSessionId ??
+            currentExecution?.mainSessionId ??
+            undefined,
+          idempotencyKey: action.idempotencyKey,
+        },
         onGraphEvent(event) {
           publishWorkspaceTrigger({
             taskId,
@@ -378,7 +442,13 @@ export async function dispatchTaskWorkspaceCommand(engine: ChronaEngine, input: 
         onRuntimeEvent(event) {
           const summary = summarizeRuntimeEvent(action.action, event);
           if (!summary) return;
-          const { type: _runtimeType, provider, runtime, event: runtimeEvent, ...runtimePayload } = summary;
+          const {
+            type: _runtimeType,
+            provider,
+            runtime,
+            event: runtimeEvent,
+            ...runtimePayload
+          } = summary;
           const tool = "tool" in runtimeEvent ? runtimeEvent.tool : undefined;
           publishWorkspaceTrigger({
             taskId,
@@ -389,7 +459,9 @@ export async function dispatchTaskWorkspaceCommand(engine: ChronaEngine, input: 
             eventKind: event.event.type,
             providerLabel: provider.label,
             runtimeLabel: runtime.label,
-            ...(tool ? { event: { ...runtimeEvent, toolLabel: tool.label } } : { event: runtimeEvent }),
+            ...(tool
+              ? { event: { ...runtimeEvent, toolLabel: tool.label } }
+              : { event: runtimeEvent }),
             ...runtimePayload,
           });
         },
@@ -450,9 +522,18 @@ export async function dispatchTaskWorkspaceCommand(engine: ChronaEngine, input: 
         });
       },
       onRuntimeEvent(event) {
-        const summary = summarizeRuntimeEvent(checkpointActionToExecutionAction(command.action), event);
+        const summary = summarizeRuntimeEvent(
+          checkpointActionToExecutionAction(command.action),
+          event,
+        );
         if (!summary) return;
-        const { type: _runtimeType, provider, runtime, event: runtimeEvent, ...runtimePayload } = summary;
+        const {
+          type: _runtimeType,
+          provider,
+          runtime,
+          event: runtimeEvent,
+          ...runtimePayload
+        } = summary;
         const tool = "tool" in runtimeEvent ? runtimeEvent.tool : undefined;
         publishWorkspaceTrigger({
           taskId,
@@ -463,7 +544,9 @@ export async function dispatchTaskWorkspaceCommand(engine: ChronaEngine, input: 
           eventKind: event.event.type,
           providerLabel: provider.label,
           runtimeLabel: runtime.label,
-          ...(tool ? { event: { ...runtimeEvent, toolLabel: tool.label } } : { event: runtimeEvent }),
+          ...(tool
+            ? { event: { ...runtimeEvent, toolLabel: tool.label } }
+            : { event: runtimeEvent }),
           ...runtimePayload,
         });
       },
@@ -510,7 +593,9 @@ export async function dispatchTaskWorkspaceCommand(engine: ChronaEngine, input: 
       commandType: command.type,
       type: "command.failed",
       workBlockId,
-      message: httpError?.message ?? (cause instanceof Error ? cause.message : "Workspace command failed"),
+      message:
+        httpError?.message ??
+        (cause instanceof Error ? cause.message : "Workspace command failed"),
     });
     if (command.type === "plan.generate") {
       resetPlanGenerationHeaderState({ taskId, workspaceId, workBlockId });

@@ -111,13 +111,13 @@
   --secondary: #f1f1ee;
   --secondary-foreground: #3f3f46;
   --muted: #f1f1ee;
-  --muted-foreground: #71717a;
+  --muted-foreground: #52525b;
   --accent: #fff0e9;
   --accent-foreground: #8f3f25;
-  --destructive: #cf3f4f;
+  --destructive: #a92f3e;
   --success: #258451;
   --success-foreground: #ffffff;
-  --warning: #b76a00;
+  --warning: #875000;
   --warning-foreground: #ffffff;
   --info: #2970a6;
   --info-foreground: #ffffff;
