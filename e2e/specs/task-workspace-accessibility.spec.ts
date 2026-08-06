@@ -49,7 +49,11 @@ test.describe("Task workspace accessibility", () => {
 			description: "Verify keyboard access, focus, and accessible structure.",
 		});
 
-		await page.goto(`/en/tasks/${task.taskId}`);
+    const consoleErrors: string[] = [];
+    page.on("console", (message) => {
+      if (message.type() === "error") consoleErrors.push(message.text());
+    });
+    await page.goto(`/en/tasks/${task.taskId}`);
 		const primaryAction = page.getByRole("link", {
 			name: "Connect AI provider",
 		});
@@ -68,6 +72,7 @@ test.describe("Task workspace accessibility", () => {
 		await expect(editTask).toBeFocused();
 
 		const { violations } = await scanPageAccessibility(page);
+		expect(consoleErrors).toEqual([]);
 		const blocking = violations.filter(
 			(violation) =>
 				violation.impact === "critical" || violation.impact === "serious",

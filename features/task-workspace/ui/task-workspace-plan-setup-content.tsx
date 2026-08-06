@@ -14,6 +14,26 @@ export type PlanSetupPanelProps = {
   onEditBrief: () => void;
 };
 
+export type PlanSetupCopy = {
+  planSetupBlockedTitle?: string;
+  planSetupBlockedDescription?: string;
+  planSetupActionRequired?: string;
+  planSetupReadyTitle?: string;
+  planSetupReadyDescription?: string;
+  planSetupReadyBadge?: string;
+  planSetupNowTitle?: string;
+  planSetupNowDescriptionWithDetails?: string;
+  planSetupNowDescription?: string;
+  planSetupOptionalBadge?: string;
+  planSetupImproveQuality?: string;
+  planSetupAddDetail?: string;
+  planSetupWhatHappensNext?: string;
+  planSetupDraftStep?: string;
+  planSetupReviewStep?: string;
+  planSetupNoRunStep?: string;
+  planSetupExecutionStep?: string;
+};
+
 type SetupPresentation = {
   title: string;
   description: string;
@@ -25,9 +45,19 @@ type SetupPresentation = {
   improvements: TaskWorkspaceDisplayState["readiness"]["checks"];
 };
 
-export function getPlanSetupPresentation({ readiness, pageData }: Pick<PlanSetupPanelProps, "readiness" | "pageData">): SetupPresentation {
+export function getPlanSetupPresentation({
+  readiness,
+  pageData,
+  copy,
+}: Pick<PlanSetupPanelProps, "readiness" | "pageData"> & {
+  copy?: PlanSetupCopy;
+}): SetupPresentation {
   const improvements = getRecommendedImprovements(readiness);
-  const statusPresentation = getStatusPresentation(readiness.status, improvements.length);
+  const statusPresentation = getStatusPresentation(
+    readiness.status,
+    improvements.length,
+    copy,
+  );
 
   return {
     ...statusPresentation,
@@ -47,29 +77,30 @@ function getRecommendedImprovements(readiness: PlanSetupPanelProps["readiness"])
 function getStatusPresentation(
   status: PlanSetupPanelProps["readiness"]["status"],
   improvementCount: number,
+  copy: PlanSetupCopy = {},
 ): Pick<SetupPresentation, "title" | "description" | "badgeLabel" | "badgeVariant"> {
   if (status === "blocked") {
     return {
-      title: "Connect an AI provider to create a plan",
-      description: "Your task brief is saved. Connect an AI provider, then return here to create a draft plan.",
-      badgeLabel: "Action required",
+      title: copy.planSetupBlockedTitle ?? "Connect an AI provider to create a plan",
+      description: copy.planSetupBlockedDescription ?? "Your task brief is saved. Connect an AI provider, then return here to create a draft plan.",
+      badgeLabel: copy.planSetupActionRequired ?? "Action required",
       badgeVariant: "destructive",
     };
   }
   if (status === "ready") {
     return {
-      title: "Ready to create a plan",
-      description: "Chrona has enough information to propose reviewable steps for this task.",
-      badgeLabel: "Ready",
+      title: copy.planSetupReadyTitle ?? "Ready to create a plan",
+      description: copy.planSetupReadyDescription ?? "Chrona has enough information to propose reviewable steps for this task.",
+      badgeLabel: copy.planSetupReadyBadge ?? "Ready",
       badgeVariant: "secondary",
     };
   }
   return {
-    title: "You can create a plan now",
+    title: copy.planSetupNowTitle ?? "You can create a plan now",
     description: improvementCount > 0
-      ? "Chrona has enough information for a draft. Adding the details below will make the plan easier to review."
-      : "Chrona has enough information to propose reviewable steps for this task.",
-    badgeLabel: "Optional details",
+      ? copy.planSetupNowDescriptionWithDetails ?? "Chrona has enough information for a draft. Adding the details below will make the plan easier to review."
+      : copy.planSetupNowDescription ?? "Chrona has enough information to propose reviewable steps for this task.",
+    badgeLabel: copy.planSetupOptionalBadge ?? "Optional details",
     badgeVariant: "outline",
   };
 }
@@ -180,10 +211,12 @@ function PlanQualityImprovements({
   checks: TaskWorkspaceDisplayState["readiness"]["checks"];
   onEditBrief: () => void;
 }) {
+  const { messages } = useI18n();
+  const copy = messages.components.taskWorkspace as typeof messages.components.taskWorkspace & PlanSetupCopy;
   return (
     <section aria-labelledby="plan-quality-heading">
       <h3 id="plan-quality-heading" className="text-sm font-semibold text-foreground">
-        Improve plan quality
+        {copy.planSetupImproveQuality ?? "Improve plan quality"}
       </h3>
       <div className="mt-3 grid gap-3 lg:grid-cols-2">
         {checks.map((check) => (
@@ -198,7 +231,7 @@ function PlanQualityImprovements({
               </p>
             </div>
             <Button type="button" size="sm" variant="outline" className="self-start" onClick={onEditBrief}>
-              Add detail
+              {copy.planSetupAddDetail ?? "Add detail"}
             </Button>
           </div>
         ))}
@@ -206,18 +239,19 @@ function PlanQualityImprovements({
     </section>
   );
 }
-
 export function PlanSetupNextSteps() {
+  const { messages } = useI18n();
+  const copy = messages.components.taskWorkspace as typeof messages.components.taskWorkspace & PlanSetupCopy;
   return (
     <details className="border-t border-border/70 px-5 py-4 lg:px-7">
       <summary className="cursor-pointer text-sm font-medium text-foreground">
-        What happens next
+        {copy.planSetupWhatHappensNext ?? "What happens next"}
       </summary>
       <ol className="mt-3 grid gap-2 text-sm text-muted-foreground sm:grid-cols-2 xl:grid-cols-4">
-        <li>1. Chrona creates a draft plan.</li>
-        <li>2. You review steps and checkpoints.</li>
-        <li>3. Nothing runs before plan acceptance.</li>
-        <li>4. Execution follows the task automation settings.</li>
+        <li>1. {copy.planSetupDraftStep ?? "Chrona creates a draft plan."}</li>
+        <li>2. {copy.planSetupReviewStep ?? "You review steps and checkpoints."}</li>
+        <li>3. {copy.planSetupNoRunStep ?? "Nothing runs before plan acceptance."}</li>
+        <li>4. {copy.planSetupExecutionStep ?? "Execution follows the task automation settings."}</li>
       </ol>
     </details>
   );

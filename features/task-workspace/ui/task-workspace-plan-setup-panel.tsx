@@ -1,6 +1,6 @@
 "use client";
 
-import { useLocale } from "@chrona/i18n";
+import { useI18n, useLocale } from "@chrona/i18n";
 import { Button } from "@shared/ui";
 import { Link } from "react-router-dom";
 import {
@@ -9,6 +9,7 @@ import {
   PlanSetupHeader,
   PlanSetupNextSteps,
   type PlanSetupPanelProps,
+  type PlanSetupCopy,
 } from "./task-workspace-plan-setup-content";
 
 export function PlanSetupPanel({
@@ -18,7 +19,9 @@ export function PlanSetupPanel({
   onEditBrief,
 }: PlanSetupPanelProps) {
   const locale = useLocale();
-  const presentation = getPlanSetupPresentation({ readiness, pageData });
+  const { messages } = useI18n();
+  const copy = messages.components.taskWorkspace as typeof messages.components.taskWorkspace & PlanSetupCopy;
+  const presentation = getPlanSetupPresentation({ readiness, pageData, copy });
 
   return (
     <div

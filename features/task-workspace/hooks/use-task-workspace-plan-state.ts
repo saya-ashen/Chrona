@@ -779,6 +779,14 @@ export function useTaskWorkspacePlanState(
 		]);
 	}, [currentExecutionQuery, planStateQuery, refreshWorkspace]);
 
+	const refreshResultProjection = useCallback(async () => {
+		await refreshExecutionQueries();
+		await queryClient.refetchQueries({
+			queryKey: taskWorkspaceQueryKeys.page(task.id, selectedWorkBlockId),
+			type: "active",
+		});
+	}, [queryClient, refreshExecutionQueries, selectedWorkBlockId, task.id]);
+
 	const acceptPlanById = useCallback(
 		async (planId: string) => {
 			if (planHeadStateVersion === null) {
@@ -905,7 +913,7 @@ export function useTaskWorkspacePlanState(
 		setIsRetryingFinalization(true);
 		try {
 			await retryTaskResultFinalization(task.id);
-			await refreshExecutionQueries();
+			await refreshResultProjection();
 		} catch (cause) {
 			setFinalizationRetryError(
 				cause instanceof Error
@@ -916,7 +924,7 @@ export function useTaskWorkspacePlanState(
 		} finally {
 			setIsRetryingFinalization(false);
 		}
-	}, [currentExecutionQuery, refreshExecutionQueries, task.id]);
+	}, [refreshResultProjection, currentExecutionQuery, task.id]);
 
 	const handleAcceptResult = useCallback(async () => {
 		setAcceptResultError(null);
@@ -944,7 +952,7 @@ export function useTaskWorkspacePlanState(
 							}
 						: current,
 			);
-			await refreshExecutionQueries();
+			await refreshResultProjection();
 		} catch (cause) {
 			setAcceptResultError(
 				cause instanceof Error ? cause.message : "Failed to accept task result",
@@ -952,7 +960,7 @@ export function useTaskWorkspacePlanState(
 		} finally {
 			setIsAcceptingResult(false);
 		}
-	}, [queryClient, refreshExecutionQueries, selectedWorkBlockId, task.id]);
+	}, [queryClient, refreshResultProjection, selectedWorkBlockId, task.id]);
 
 	const assistantBuildCurrentPlan = useCallback(() => {
 		if (!plan?.compiledPlan) return null;
