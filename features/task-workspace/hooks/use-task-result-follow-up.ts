@@ -1,4 +1,6 @@
 import { useCallback, useEffect, useReducer } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { taskWorkspaceQueryKeys } from "../model/task-workspace-query";
 import { v4 as uuidv4 } from "uuid";
 import {
   continueFromTaskResult,
@@ -12,6 +14,7 @@ import {
 
 
 export function useTaskResultFollowUp(taskId: string, enabled: boolean) {
+  const queryClient = useQueryClient();
   const [state, dispatch] = useReducer(
     reduceTaskResultFollowUpState,
     initialTaskResultFollowUpState,
@@ -68,6 +71,7 @@ export function useTaskResultFollowUp(taskId: string, enabled: boolean) {
           : {}),
       });
       dispatch({ type: "submit_succeeded", entry });
+      void queryClient.invalidateQueries({ queryKey: taskWorkspaceQueryKeys.page(taskId) });
       return entry;
     } catch (cause) {
       dispatch({
@@ -75,7 +79,7 @@ export function useTaskResultFollowUp(taskId: string, enabled: boolean) {
         error: cause instanceof Error ? cause.message : String(cause),
       });
     }
-  }, [state, taskId]);
+  }, [queryClient, state, taskId]);
 
   return { state, setMode, setDraft, submit, reload: load };
 }

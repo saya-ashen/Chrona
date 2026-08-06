@@ -22,7 +22,8 @@
     "startWork": "Start Work",
     "work": "Work",
     "taskSingular": "task",
-    "taskPlural": "tasks"
+    "taskPlural": "tasks",
+    "close": "Close"
   },
   "metadata": {
     "title": "Chrona",
@@ -194,6 +195,9 @@
       "resolvedToday": "Resolved today",
       "allFilter": "All",
       "criticalFilter": "Critical",
+      "inputFilter": "Provide input",
+      "approvalFilter": "Approvals",
+      "clearFilters": "Clear filters",
       "reviewFilter": "Review results",
       "waitingFilter": "Waiting input",
       "recoveryFilter": "Recovery",

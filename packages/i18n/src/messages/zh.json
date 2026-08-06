@@ -22,7 +22,8 @@
     "startWork": "开始执行",
     "work": "执行",
     "taskSingular": "个任务",
-    "taskPlural": "个任务"
+    "taskPlural": "个任务",
+    "close": "关闭"
   },
   "metadata": {
     "title": "Chrona",
@@ -194,6 +195,9 @@
       "resolvedToday": "今日已解决",
       "allFilter": "全部",
       "criticalFilter": "紧急",
+      "inputFilter": "提供输入",
+      "approvalFilter": "审批",
+      "clearFilters": "清除筛选",
       "reviewFilter": "查看结果",
       "waitingFilter": "等待输入",
       "recoveryFilter": "恢复",
