@@ -7,7 +7,7 @@
 - [x] F-01 修复 Schedule 中“安排任务”弹窗没有使用当前 URL `day` 的问题，并补充回归测试。
 - [x] F-02 修复 Task 列表行级更多操作的鼠标触发问题，并补充键盘/鼠标回归测试。
 - [x] F-03 对非法“标记完成”状态进行前端约束，并显示服务端错误反馈。
-- [-] F-04 已加入计划生成期间的 5 秒兜底轮询，并修复停止后的 session 状态；provider readiness 前置检查待处理。
+- [x] F-04 已加入计划生成期间的 5 秒兜底轮询、修复停止后的 session 状态，并加入 provider readiness 前置检查。
 - [-] F-08 follow-up 成功后主动 invalidate 源 Task workspace page；retry 后 accepted result projection 一致性仍待处理。
 
 ## 中优先级
@@ -22,7 +22,7 @@
 
 - [~] 使用较长 OMP 任务验证 Pause / Resume / Stop / Retry 的完整生命周期。
 - [~] 使用真实 Artifact 输出验证 Promote result to Goal。
-- [-] 补充修复后的 agent-browser 真实回归测试；已现场复测 F-01、F-02、F-07，F-08/F-04 provider readiness 等剩余流程待继续。
+- [-] 补充修复后的 agent-browser 真实回归测试；F-01、F-02、F-04 provider guard、F-07 已现场/自动化复测通过，F-08 及长任务/Artifact fixture 流程待继续。
 
 ## 修复记录
 
@@ -34,4 +34,6 @@
 | 2026-08-06 | F-06 部分修复 | 处理中 | Action Center filter buttons 改为 role=tab/aria-selected，AI client enabled checkbox 增加 aria-label；Action Center 相关 Vitest 通过 |
 | 2026-08-06 | F-05 Task Workspace 文案部分修复 | 处理中 | Plan setup、Task brief、Edit task brief、Goal、Description、AI provider、Not added yet 增加中英文文案；plan-setup-panel Vitest 通过 |
 | 2026-08-06 | F-05 / F-08 部分修复 | 处理中 | i18n common.close 与 Action Center filters 增补中英文文案；follow-up 成功后 invalidate 源 workspace query；Vitest 相关集合通过 |
+| 2026-08-06 | F-04 部分修复 | 处理中 | generation active 时每 5 秒 refetch plan state；Stop 成功后立即标记 cancelled，失败时恢复 running；workspace hooks Vitest 通过 |
+| 2026-08-06 | F-04 provider readiness 前置检查与 smoke/accessibility 回归 | 已完成 | 无 provider 时显示 Connect AI provider 且不发送 plan.generate；Playwright task-workspace-smoke 与 task-workspace-accessibility 均通过 |
 | 2026-08-06 | 修复后真实 UI 回归 | 进行中 | agent-browser 复测 Schedule 2026-08-07 显示 Aug 7、Task actions 鼠标打开菜单、OMP readiness 刷新后保持 Ready；截图 30 已保存 |
