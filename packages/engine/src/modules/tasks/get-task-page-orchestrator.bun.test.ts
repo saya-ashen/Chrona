@@ -745,7 +745,7 @@ describe("getTaskPage orchestrator read model", () => {
     }
   });
 
-  it("preserves provider tool lifecycle status without details", async () => {
+  it("preserves provider tool input and output with credentials redacted", async () => {
     const { workspace, task } = await seedTask("Tool activity task");
 
     await db.event.createMany({
@@ -788,15 +788,11 @@ describe("getTaskPage orchestrator read model", () => {
       tool: expect.objectContaining({ name: "Runtime tool", durationMs: 42, state: "completed" }),
     }));
     const returnedActivity = JSON.stringify(page.activityTimeline);
-    for (const sensitiveValue of [
-      "call-1",
-      "src/app.ts",
-      "secret-value",
-      "Inspect application source",
-      "export const ready = true;",
-    ]) {
-      expect(returnedActivity).not.toContain(sensitiveValue);
-    }
+    expect(returnedActivity).toContain("src/app.ts");
+    expect(returnedActivity).toContain("export const ready = true;");
+    expect(returnedActivity).not.toContain("secret-value");
+    expect(returnedActivity).not.toContain("call-1");
+    expect(returnedActivity).not.toContain("Inspect application source");
   });
 
   it("filters unsafe provider text events from paged node activity", async () => {

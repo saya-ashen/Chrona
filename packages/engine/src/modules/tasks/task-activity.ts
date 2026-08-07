@@ -43,8 +43,9 @@ type ActivityTimelineState = {
 function shouldSkipProviderEvent(
   event: TaskActivityEvent,
   eventType: string,
+  payloadEvent: Record<string, unknown> | null,
 ) {
-  return event.source === "provider" && !isDisplayableProviderEvent(eventType);
+  return event.source === "provider" && !isDisplayableProviderEvent(eventType, payloadEvent);
 }
 
 function replaceToolProgress(
@@ -75,7 +76,7 @@ export function buildActivityTimeline(events: TaskActivityEvent[]) {
   for (const event of events) {
     const payloadEvent = runtimePayloadEvent(event.payload);
     const eventType = providerActivityEventType(event, payloadEvent);
-    if (shouldSkipProviderEvent(event, eventType)) continue;
+    if (shouldSkipProviderEvent(event, eventType, payloadEvent)) continue;
     if (replaceToolProgress(state, event, eventType, payloadEvent)) continue;
     const activity = mapTaskEventToActivity(event);
     if (activity) state.items.push(activity);

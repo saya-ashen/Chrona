@@ -173,6 +173,8 @@ export function runtimeEventToWorkspaceActivity(event: WorkspaceRuntimeEvent, in
       description: "Provider tool started.",
       tone: "info",
       tool: { name: value.tool.label, label: value.label, state: "started" },
+      providerInput: value.input,
+      providerRaw: value.raw,
     };
   }
 
@@ -185,6 +187,8 @@ export function runtimeEventToWorkspaceActivity(event: WorkspaceRuntimeEvent, in
       description: "Provider tool is running.",
       tone: "info",
       tool: { name: value.tool.label, label: value.label, state: "progress" },
+      providerOutput: value.output,
+      providerRaw: value.raw,
     };
   }
 
@@ -203,6 +207,8 @@ export function runtimeEventToWorkspaceActivity(event: WorkspaceRuntimeEvent, in
         durationMs: value.durationMs,
         state: failed ? "failed" : "completed",
       },
+      providerOutput: value.output ?? value.error,
+      providerRaw: value.raw,
     };
   }
 
@@ -225,6 +231,9 @@ export function runtimeEventToWorkspaceActivity(event: WorkspaceRuntimeEvent, in
       summary: value.status,
       description: value.status,
       tone: value.status === "failed" ? "danger" : value.status === "completed" ? "success" : "info",
+      providerInput: value.input,
+      providerOutput: value.output ?? value.error,
+      providerRaw: value.raw,
     };
   }
 

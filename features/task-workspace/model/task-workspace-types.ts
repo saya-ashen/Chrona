@@ -307,6 +307,10 @@ export type WorkspaceActivityItem = {
   executionTrigger?: "initial" | "restart";
   activityGroup?: WorkspaceActivityGroup;
   tool?: WorkspaceToolActivity;
+  /** Exact provider payloads surfaced in the live execution trace. */
+  providerInput?: unknown;
+  providerOutput?: unknown;
+  providerRaw?: unknown;
 };
 
 export type WorkspaceActivityPage = {

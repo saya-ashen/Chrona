@@ -150,6 +150,7 @@ export function TaskWorkspaceExecutionOverview({
       activityItems={activityState.activityItems}
       activitySummary={activityState.activitySummary}
       provider={runtimeEvents.at(-1)?.provider.label}
+      runtimeEvents={runtimeEvents}
     />
   );
 }

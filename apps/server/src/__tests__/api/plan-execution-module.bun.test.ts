@@ -530,7 +530,7 @@ function expectRuntimeSseForNodes(events: SseEntry[], nodeIds: string[]) {
     const nodeEvents = runtimeEvents.filter((entry) => entry.nodeId === nodeId);
     expect(nodeEvents).toContainEqual(expect.objectContaining({ event: expect.objectContaining({ type: "run_status", status: "started" }) }));
     expect(nodeEvents).toContainEqual(expect.objectContaining({ event: expect.objectContaining({ type: "run_status", status: "completed" }) }));
-    expect(JSON.stringify(nodeEvents)).not.toContain("completed by module provider");
+    expect(JSON.stringify(nodeEvents)).toContain("completed by module provider");
   }
 }
 
