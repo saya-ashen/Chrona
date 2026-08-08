@@ -13,6 +13,17 @@ export {
   mergeWorkspaceActivity,
   runtimeEventsToWorkspaceActivity,
 } from "../model/task-workspace-activity";
+export {
+  taskRuntimeToolForLabel,
+  taskRuntimeToolLabel,
+  workspaceActivitiesToTaskRuntimeActivity,
+  workspaceActivityToTaskRuntimeActivity,
+} from "../model/task-runtime-activity";
+export type {
+  TaskRuntimeActivity,
+  TaskRuntimeTool,
+  TaskRuntimeToolStatus,
+} from "../model/task-runtime-activity";
 export { createTaskWorkspaceExecutionConsoleView } from "../model/task-workspace-query";
 export type { PlanNodeDataModel } from "../model/plan-node-view-model";
 export type { TaskExecutionDispatchResult } from "../model/task-workspace-query";

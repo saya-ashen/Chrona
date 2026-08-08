@@ -1,4 +1,5 @@
 import {
+	assertProviderStartSupported,
 	BoundedTerminalRunSnapshots,
 	readProviderReplayTape,
 	terminalSnapshotFromEvents,
@@ -331,6 +332,11 @@ export class ChronaDebugProviderClient implements AgentProviderClient {
 	}
 
 	async startRun(input: StartRunInput): Promise<ProviderRunRef> {
+		assertProviderStartSupported(
+			await this.getCapabilities(),
+			input,
+			this.provider,
+		);
 		const attached = this.runsByClientOperation.get(input.clientOperationId);
 		if (attached)
 			return providerRunRef(this.provider, attached, attached.status);
@@ -470,6 +476,9 @@ export class ChronaDebugProviderClient implements AgentProviderClient {
 		await pause(signal);
 
 		const terminalToolName = startInput?.terminalToolName;
+		let terminalToolCall:
+			| { name: string; callId: string; input: Record<string, unknown> }
+			| undefined;
 		if (terminalToolName) {
 			const terminalTool = startInput.tools?.find(
 				(tool) => tool.name === terminalToolName,
@@ -477,6 +486,7 @@ export class ChronaDebugProviderClient implements AgentProviderClient {
 			const callId = `debug-terminal-${sequence}`;
 			const synthesizedInput = synthesizeJsonSchema(terminalTool?.inputSchema);
 			const toolInput = asJsonSchema(synthesizedInput) ?? {};
+			terminalToolCall = { name: terminalToolName, callId, input: toolInput };
 			yield {
 				...eventBase(this.provider, run, sequence++),
 				type: "tool_call",
@@ -512,6 +522,7 @@ export class ChronaDebugProviderClient implements AgentProviderClient {
 			run: providerRunRef(this.provider, run, "completed"),
 			outputText,
 			output: { text: outputText },
+			terminalToolCall,
 			structuredPayload,
 			usage: { inputTokens: 1, outputTokens: 1, totalTokens: 2 },
 			raw: { debugProvider: true, profile: this.profile },
