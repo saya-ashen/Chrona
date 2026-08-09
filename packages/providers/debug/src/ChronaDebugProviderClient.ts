@@ -98,8 +98,8 @@ export function normalizeDebugProviderProfile(
 		: DEFAULT_DEBUG_PROVIDER_PROFILE;
 }
 
-const MAX_SCHEMA_DEPTH = 4;
-const MAX_SCHEMA_ELEMENTS = 16;
+const MAX_SCHEMA_DEPTH = 8;
+const MAX_SCHEMA_ELEMENTS = 64;
 const MAX_ARRAY_ITEMS = 4;
 const MAX_OBJECT_PROPERTIES = 12;
 const NO_SCHEMA_VALUE = Symbol("no-schema-value");
@@ -233,10 +233,9 @@ function synthesizeJsonSchema(
 		const required = Array.isArray(schema.required)
 			? schema.required.filter((key): key is string => typeof key === "string")
 			: [];
-		const keys = [...new Set([...required, ...Object.keys(properties)])].slice(
-			0,
-			MAX_OBJECT_PROPERTIES,
-		);
+		const candidateKeys =
+			required.length > 0 ? required : Object.keys(properties);
+		const keys = [...new Set(candidateKeys)].slice(0, MAX_OBJECT_PROPERTIES);
 		const result: Record<string, unknown> = {};
 		for (const key of keys) {
 			if (state.remaining <= 0) break;

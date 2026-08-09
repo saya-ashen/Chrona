@@ -181,7 +181,6 @@ async function refreshAiClientRegistry() {
 
 	for (const client of records) {
 		const record = toAiClientRecord(client);
-		if (record.type === "hermes") continue;
 		clients.set(record.id, {
 			record,
 			providerClient: createProviderClient(record),

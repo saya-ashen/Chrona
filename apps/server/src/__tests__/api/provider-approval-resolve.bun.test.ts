@@ -182,8 +182,13 @@ async function seedHermesApprovalClient(baseUrl = "http://provider.test") {
       isDefault: true,
     },
   });
-  approvalClientIdentity = { id: client.id, configDigest: stableJsonHash(config) };
   await aiClientRegistry.refresh();
+  const registeredClient = await aiClientRegistry.get(client.id);
+  if (!registeredClient) throw new Error("Expected registered Hermes approval client");
+  approvalClientIdentity = {
+    id: client.id,
+    configDigest: stableJsonHash(registeredClient.record.config),
+  };
 }
 
 function jsonProviderResponse(body: unknown) {
