@@ -318,9 +318,10 @@ export function ControlPlaneShell({
 
 						{assistantSummary?.value ? (
 							<div className="flex min-w-0 flex-1 items-center justify-center">
-								<div
+								<button
+									type="button"
+									disabled
 									data-assistant-surface-header-drawer-button="true"
-									role="status"
 									aria-label={t("components.assistantSurface.entryLabel")}
 									className="group inline-flex h-9 max-w-[520px] items-center gap-2 overflow-hidden rounded-full border border-border/60 bg-muted/40 px-2.5 text-sm text-muted-foreground"
 								>
@@ -332,7 +333,7 @@ export function ControlPlaneShell({
 											{assistantSummary.value}
 										</span>
 									</span>
-								</div>
+								</button>
 							</div>
 						) : (
 							<div className="min-w-0 flex-1" aria-hidden />
