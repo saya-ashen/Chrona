@@ -1,474 +1,752 @@
 import { describe, expect, test } from "bun:test";
-import { chronaCatalog, chronaResultCatalog, chronaResultElementJsonSchema, chronaResultSpecSchema, validateChronaSpec, validateDashboardSummarySpec, type ValidateResult } from "../index";
+import {
+	chronaCatalog,
+	chronaResultCatalog,
+	chronaResultElementJsonSchema,
+	chronaResultSpecSchema,
+	validateChronaSpec,
+	validateDashboardSummarySpec,
+	type ValidateResult,
+} from "../index";
 import type { UiDocument } from "./document";
 
 function expectIssue(result: ValidateResult, fragment: string) {
-  expect(result.ok).toBe(false);
-  if (result.ok) return;
-  expect(
-    result.issues.some((issue) => `${issue.path} ${issue.message}`.includes(fragment)),
-  ).toBe(true);
+	expect(result.ok).toBe(false);
+	if (result.ok) return;
+	expect(
+		result.issues.some((issue) =>
+			`${issue.path} ${issue.message}`.includes(fragment),
+		),
+	).toBe(true);
 }
 
 describe("validateChronaSpec", () => {
-  test("accepts a well-formed spec mixing shadcn + custom components", () => {
-    const spec: UiDocument = {
-      root: "root",
-      elements: {
-        root: { type: "Stack", props: { gap: "md" }, children: ["title", "md"] },
-        title: { type: "Text", props: { text: "Result", variant: "muted" }, children: [] },
-        md: { type: "RichMarkdown", props: { content: "# hello" }, children: [] },
-      },
-    };
-    expect(validateChronaSpec(spec).ok).toBe(true);
-  });
+	test("accepts a well-formed spec mixing shadcn + custom components", () => {
+		const spec: UiDocument = {
+			root: "root",
+			elements: {
+				root: {
+					type: "Stack",
+					props: { gap: "md" },
+					children: ["title", "md"],
+				},
+				title: {
+					type: "Text",
+					props: { text: "Result", variant: "muted" },
+					children: [],
+				},
+				md: {
+					type: "RichMarkdown",
+					props: { content: "# hello" },
+					children: [],
+				},
+			},
+		};
+		expect(validateChronaSpec(spec).ok).toBe(true);
+	});
 
-  test("normalizes lowercase report components and repairs missing root", () => {
-    const spec = {
-      root: "github_trending_report",
-      elements: {
-        heading: { type: "heading", props: { text: "GitHub Trending" } },
-        summary_text: { type: "paragraph", props: { text: "Daily report" } },
-        table: { type: "table", props: { path: ".chrona/outputs/N20260706-01/trending.json", columns: ["Repo"] } },
-        trend_analysis: { type: "section", props: {}, children: ["raw_data_path"] },
-        raw_data_path: { type: "paragraph", props: { text: "data.json" } },
-      },
-    };
+	test("normalizes lowercase report components and repairs missing root", () => {
+		const spec = {
+			root: "github_trending_report",
+			elements: {
+				heading: { type: "heading", props: { text: "GitHub Trending" } },
+				summary_text: { type: "paragraph", props: { text: "Daily report" } },
+				table: {
+					type: "table",
+					props: {
+						path: ".chrona/outputs/N20260706-01/trending.json",
+						columns: ["Repo"],
+					},
+				},
+				trend_analysis: {
+					type: "section",
+					props: {},
+					children: ["raw_data_path"],
+				},
+				raw_data_path: { type: "paragraph", props: { text: "data.json" } },
+			},
+		};
 
-    const result = validateChronaSpec(spec);
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-    expect(result.spec.root).toBe("github_trending_report");
-    expect(result.spec.elements.github_trending_report).toMatchObject({ type: "Stack" });
-  });
+		const result = validateChronaSpec(spec);
+		expect(result.ok).toBe(true);
+		if (!result.ok) return;
+		expect(result.spec.root).toBe("github_trending_report");
+		expect(result.spec.elements.github_trending_report).toMatchObject({
+			type: "Stack",
+		});
+	});
 
-  test("catalog prompt requires file-backed Table specs", () => {
-    const prompt = chronaCatalog.prompt();
+	test("catalog prompt requires file-backed Table specs", () => {
+		const prompt = chronaCatalog.prompt();
 
-    expect(prompt).toContain("Table:");
-    expect(prompt).toContain("File-backed data table");
-    expect(prompt).toContain("do not inline rows");
-    expect(prompt).toContain("hrefKey");
-    expect(prompt).toContain("Prefer pageSize 10");
-    expect(prompt).toContain("do not set pageSize equal to total rows");
-    expect(prompt).toContain("threshold MUST be a JSON number such as 800");
-  });
+		expect(prompt).toContain("Table:");
+		expect(prompt).toContain("File-backed data table");
+		expect(prompt).toContain("do not inline rows");
+		expect(prompt).toContain("hrefKey");
+		expect(prompt).toContain("Prefer pageSize 10");
+		expect(prompt).toContain("do not set pageSize equal to total rows");
+		expect(prompt).toContain("threshold MUST be a JSON number such as 800");
+	});
 
+	test("allows omitting optional/nullable props", () => {
+		const spec: UiDocument = {
+			root: "t",
+			elements: { t: { type: "Text", props: { text: "hi" }, children: [] } },
+		};
+		expect(validateChronaSpec(spec).ok).toBe(true);
+	});
 
+	test("rejects a non-spec structure", () => {
+		expectIssue(validateChronaSpec({ foo: 1 }), "not a spec");
+	});
 
-  test("allows omitting optional/nullable props", () => {
-    const spec: UiDocument = {
-      root: "t",
-      elements: { t: { type: "Text", props: { text: "hi" }, children: [] } },
-    };
-    expect(validateChronaSpec(spec).ok).toBe(true);
-  });
+	test("rejects an unknown component", () => {
+		const spec = {
+			root: "r",
+			elements: { r: { type: "ScriptTag", props: {}, children: [] } },
+		};
+		expectIssue(validateChronaSpec(spec), "unknown component");
+	});
 
-  test("rejects a non-spec structure", () => {
-    expectIssue(validateChronaSpec({ foo: 1 }), "not a spec");
-  });
+	test("rejects a present prop with the wrong type", () => {
+		const spec = {
+			root: "r",
+			elements: { r: { type: "Text", props: { text: 42 }, children: [] } },
+		};
+		expectIssue(validateChronaSpec(spec), "elements.r.props.text");
+	});
 
-  test("rejects an unknown component", () => {
-    const spec = { root: "r", elements: { r: { type: "ScriptTag", props: {}, children: [] } } };
-    expectIssue(validateChronaSpec(spec), "unknown component");
-  });
+	test("rejects a dangling child reference", () => {
+		const spec = {
+			root: "r",
+			elements: { r: { type: "Stack", props: {}, children: ["nope"] } },
+		};
+		expectIssue(validateChronaSpec(spec), "");
+	});
 
-  test("rejects a present prop with the wrong type", () => {
-    const spec = {
-      root: "r",
-      elements: { r: { type: "Text", props: { text: 42 }, children: [] } },
-    };
-    expectIssue(validateChronaSpec(spec), "elements.r.props.text");
-  });
+	test("rejects a descendant duplicated in the root child list", () => {
+		expectIssue(
+			validateChronaSpec({
+				root: "root",
+				elements: {
+					root: { type: "Stack", props: {}, children: ["section", "table"] },
+					section: {
+						type: "ResultSection",
+						props: { title: "Scope" },
+						children: ["table"],
+					},
+					table: {
+						type: "ResultComparison",
+						props: {
+							title: "Comparison",
+							columns: [{ key: "value", label: "Value" }],
+							rows: [{ label: "Item", values: { value: "ok" } }],
+						},
+					},
+				},
+			}),
+			"referenced more than once",
+		);
+	});
 
-  test("rejects a dangling child reference", () => {
-    const spec = {
-      root: "r",
-      elements: { r: { type: "Stack", props: {}, children: ["nope"] } },
-    };
-    expectIssue(validateChronaSpec(spec), "");
-  });
+	test("validates a form built from shadcn primitives", () => {
+		const spec: UiDocument = {
+			root: "form",
+			elements: {
+				form: {
+					type: "Stack",
+					props: { gap: "sm" },
+					children: ["field", "submit"],
+				},
+				field: {
+					type: "Select",
+					props: {
+						name: "decision",
+						label: "Decision",
+						options: ["Approve", "Reject"],
+					},
+					children: [],
+				},
+				submit: { type: "Button", props: { label: "Send" }, children: [] },
+			},
+		};
+		expect(validateChronaSpec(spec).ok).toBe(true);
+	});
 
-  test("validates a form built from shadcn primitives", () => {
-    const spec: UiDocument = {
-      root: "form",
-      elements: {
-        form: { type: "Stack", props: { gap: "sm" }, children: ["field", "submit"] },
-        field: {
-          type: "Select",
-          props: { name: "decision", label: "Decision", options: ["Approve", "Reject"] },
-          children: [],
-        },
-        submit: { type: "Button", props: { label: "Send" }, children: [] },
-      },
-    };
-    expect(validateChronaSpec(spec).ok).toBe(true);
-  });
+	test("accepts dynamic expressions on typed string props (repeat + $item)", () => {
+		// The catalog prompt teaches the AI to use repeat + $item for lists. This
+		// is the exact shape that was wrongly rejected as "expected string,
+		// received object" before expression-aware stripping.
+		const spec: UiDocument = {
+			root: "list",
+			elements: {
+				list: {
+					type: "Stack",
+					props: { direction: "vertical", gap: "sm" },
+					repeat: { statePath: "/repos", key: "fullName" },
+					children: ["title"],
+				},
+				title: {
+					type: "Link",
+					props: { label: { $item: "fullName" }, href: { $item: "url" } },
+					children: [],
+				},
+			},
+			state: { repos: [{ fullName: "a/b", url: "https://example.com" }] },
+		};
+		expect(validateChronaSpec(spec).ok).toBe(true);
+	});
 
-  test("accepts dynamic expressions on typed string props (repeat + $item)", () => {
-    // The catalog prompt teaches the AI to use repeat + $item for lists. This
-    // is the exact shape that was wrongly rejected as "expected string,
-    // received object" before expression-aware stripping.
-    const spec: UiDocument = {
-      root: "list",
-      elements: {
-        list: {
-          type: "Stack",
-          props: { direction: "vertical", gap: "sm" },
-          repeat: { statePath: "/repos", key: "fullName" },
-          children: ["title"],
-        },
-        title: { type: "Link", props: { label: { $item: "fullName" }, href: { $item: "url" } }, children: [] },
-      },
-      state: { repos: [{ fullName: "a/b", url: "https://example.com" }] },
-    };
-    expect(validateChronaSpec(spec).ok).toBe(true);
-  });
+	test("accepts $state, $template, and $cond expressions where literals are typed", () => {
+		for (const text of [
+			{ $state: "/title" },
+			{ $template: "Hi ${/name}" },
+			{ $cond: { $state: "/flag" }, $then: "yes", $else: "no" },
+		]) {
+			const spec = {
+				root: "h",
+				elements: {
+					h: { type: "Heading", props: { text, level: "h2" }, children: [] },
+				},
+				state: { title: "x", name: "y", flag: true },
+			};
+			expect(validateChronaSpec(spec).ok).toBe(true);
+		}
+	});
 
-  test("accepts $state, $template, and $cond expressions where literals are typed", () => {
-    for (const text of [
-      { $state: "/title" },
-      { $template: "Hi ${/name}" },
-      { $cond: { $state: "/flag" }, $then: "yes", $else: "no" },
-    ]) {
-      const spec = {
-        root: "h",
-        elements: { h: { type: "Heading", props: { text, level: "h2" }, children: [] } },
-        state: { title: "x", name: "y", flag: true },
-      };
-      expect(validateChronaSpec(spec).ok).toBe(true);
-    }
-  });
+	test("accepts a dynamic expression on a typed enum prop", () => {
+		const spec = {
+			root: "h",
+			elements: {
+				h: {
+					type: "Heading",
+					props: { text: "x", level: { $state: "/level" } },
+					children: [],
+				},
+			},
+			state: { level: "h2" },
+		};
+		expect(validateChronaSpec(spec).ok).toBe(true);
+	});
 
-  test("accepts a dynamic expression on a typed enum prop", () => {
-    const spec = {
-      root: "h",
-      elements: { h: { type: "Heading", props: { text: "x", level: { $state: "/level" } }, children: [] } },
-      state: { level: "h2" },
-    };
-    expect(validateChronaSpec(spec).ok).toBe(true);
-  });
+	test("still rejects a genuine invalid enum value (gap outside the documented set)", () => {
+		const spec = {
+			root: "s",
+			elements: { s: { type: "Stack", props: { gap: "xs" }, children: [] } },
+		};
+		expectIssue(validateChronaSpec(spec), "elements.s.props.gap");
+	});
 
-  test("still rejects a genuine invalid enum value (gap outside the documented set)", () => {
-    const spec = {
-      root: "s",
-      elements: { s: { type: "Stack", props: { gap: "xs" }, children: [] } },
-    };
-    expectIssue(validateChronaSpec(spec), "elements.s.props.gap");
-  });
+	test("rejects a literal type error even when a sibling prop is a dynamic expression", () => {
+		const spec = {
+			root: "s",
+			elements: {
+				s: {
+					type: "Stack",
+					props: { gap: "xs", direction: { $state: "/d" } },
+					children: [],
+				},
+			},
+			state: { d: "vertical" },
+		};
+		const result = validateChronaSpec(spec);
+		expectIssue(result, "elements.s.props.gap");
+		if (result.ok) return;
+		// The dynamic sibling must NOT produce a spurious issue.
+		expect(result.issues.some((i) => i.path.includes("direction"))).toBe(false);
+	});
 
-  test("rejects a literal type error even when a sibling prop is a dynamic expression", () => {
-    const spec = {
-      root: "s",
-      elements: { s: { type: "Stack", props: { gap: "xs", direction: { $state: "/d" } }, children: [] } },
-      state: { d: "vertical" },
-    };
-    const result = validateChronaSpec(spec);
-    expectIssue(result, "elements.s.props.gap");
-    if (result.ok) return;
-    // The dynamic sibling must NOT produce a spurious issue.
-    expect(result.issues.some((i) => i.path.includes("direction"))).toBe(false);
-  });
+	test("accepts file-backed Table specs", () => {
+		expect(
+			validateChronaSpec({
+				root: "table",
+				elements: {
+					table: {
+						type: "Table",
+						props: {
+							path: ".chrona/outputs/N20260706-01/trending.json",
+							columns: [
+								{ key: "repo", label: "Repo" },
+								{ key: "url", label: "URL", type: "link" },
+							],
+							pageSize: 20,
+						},
+						children: [],
+					},
+				},
+			}).ok,
+		).toBe(true);
+	});
 
-  test("accepts file-backed Table specs", () => {
-    expect(validateChronaSpec({
-      root: "table",
-      elements: {
-        table: {
-          type: "Table",
-          props: {
-            path: ".chrona/outputs/N20260706-01/trending.json",
-            columns: [{ key: "repo", label: "Repo" }, { key: "url", label: "URL", type: "link" }],
-            pageSize: 20,
-          },
-          children: [],
-        },
-      },
-    }).ok).toBe(true);
-  });
+	test("rejects missing child, cycle, invalid table, activity, and action payload structures", () => {
+		expectIssue(
+			validateChronaSpec({
+				root: "root",
+				elements: {
+					root: { type: "Stack", props: {}, children: ["missing-child"] },
+				},
+			}),
+			"missing-child",
+		);
 
-  test("rejects missing child, cycle, invalid table, activity, and action payload structures", () => {
-    expectIssue(validateChronaSpec({
-      root: "root",
-      elements: { root: { type: "Stack", props: {}, children: ["missing-child"] } },
-    }), "missing-child");
+		expectIssue(
+			validateChronaSpec({
+				root: "root",
+				elements: {
+					root: { type: "Stack", props: {}, children: ["child"] },
+					child: { type: "Stack", props: {}, children: ["root"] },
+				},
+			}),
+			"cycle",
+		);
 
-    expectIssue(validateChronaSpec({
-      root: "root",
-      elements: {
-        root: { type: "Stack", props: {}, children: ["child"] },
-        child: { type: "Stack", props: {}, children: ["root"] },
-      },
-    }), "cycle");
+		expectIssue(
+			validateChronaSpec({
+				root: "table",
+				elements: {
+					table: {
+						type: "Table",
+						props: { columns: ["Repo"], rows: [["chrona"]] },
+						children: [],
+					},
+				},
+			}),
+			"rows",
+		);
 
-    expectIssue(validateChronaSpec({
-      root: "table",
-      elements: { table: { type: "Table", props: { columns: ["Repo"], rows: [["chrona"]] }, children: [] } },
-    }), "rows");
+		expectIssue(
+			validateChronaSpec({
+				root: "activity",
+				elements: {
+					activity: {
+						type: "ActivityStream",
+						props: {
+							items: [
+								{ id: "event-1", title: 42, summary: "Ran", tone: "info" },
+							],
+						},
+						children: [],
+					},
+				},
+			}),
+			"elements.activity.props.items",
+		);
 
-    expectIssue(validateChronaSpec({
-      root: "activity",
-      elements: { activity: { type: "ActivityStream", props: { items: [{ id: "event-1", title: 42, summary: "Ran", tone: "info" }] }, children: [] } },
-    }), "elements.activity.props.items");
+		expectIssue(
+			validateChronaSpec({
+				root: "button",
+				elements: {
+					button: {
+						type: "Button",
+						props: { label: "Run" },
+						on: {
+							press: { action: "dispatch-execution", params: { actionId: "" } },
+						},
+						children: [],
+					},
+				},
+			}),
+			"elements.button.on.press.params.actionId",
+		);
+	});
 
-    expectIssue(validateChronaSpec({
-      root: "button",
-      elements: { button: { type: "Button", props: { label: "Run" }, on: { press: { action: "dispatch-execution", params: { actionId: "" } } }, children: [] } },
-    }), "elements.button.on.press.params.actionId");
-  });
+	test("accepts component-level collapse props and host node sections", () => {
+		const spec: UiDocument = {
+			root: "root",
+			elements: {
+				root: { type: "Stack", props: { gap: "md" }, children: ["section"] },
+				section: {
+					type: "NodeResultSection",
+					props: {
+						nodeId: "node-1",
+						nodeTitle: "Collect data",
+						defaultCollapsed: true,
+						itemCount: 1,
+					},
+					children: ["file"],
+				},
+				file: {
+					type: "FileRef",
+					props: {
+						path: ".chrona/outputs/node-1/result.json",
+						title: "Raw data",
+						collapsible: true,
+						defaultCollapsed: true,
+						collapseTitle: "Raw data file",
+						collapsedSummary: "Large generated artifact",
+					},
+					children: [],
+				},
+			},
+		};
 
-  test("accepts component-level collapse props and host node sections", () => {
-    const spec: UiDocument = {
-      root: "root",
-      elements: {
-        root: { type: "Stack", props: { gap: "md" }, children: ["section"] },
-        section: {
-          type: "NodeResultSection",
-          props: { nodeId: "node-1", nodeTitle: "Collect data", defaultCollapsed: true, itemCount: 1 },
-          children: ["file"],
-        },
-        file: {
-          type: "FileRef",
-          props: {
-            path: ".chrona/outputs/node-1/result.json",
-            title: "Raw data",
-            collapsible: true,
-            defaultCollapsed: true,
-            collapseTitle: "Raw data file",
-            collapsedSummary: "Large generated artifact",
-          },
-          children: [],
-        },
-      },
-    };
+		expect(validateChronaSpec(spec).ok).toBe(true);
+	});
 
-    expect(validateChronaSpec(spec).ok).toBe(true);
-  });
+	test("keeps NodeResultSection host-owned while allowing result collapse metadata", () => {
+		expect("NodeResultSection" in chronaResultCatalog.data.components).toBe(
+			false,
+		);
+		expect("NodeResultSection" in chronaCatalog.data.components).toBe(true);
 
-  test("keeps NodeResultSection host-owned while allowing result collapse metadata", () => {
-    expect("NodeResultSection" in chronaResultCatalog.data.components).toBe(false);
-    expect("NodeResultSection" in chronaCatalog.data.components).toBe(true);
+		const outputSpec = chronaResultSpecSchema.safeParse({
+			root: "root",
+			elements: {
+				root: {
+					type: "Stack",
+					props: { gap: "md" },
+					children: ["answer", "details", "json", "file"],
+				},
+				answer: {
+					type: "ResultSummary",
+					props: { title: "Answer", summary: "Primary answer stays visible." },
+				},
+				details: {
+					type: "Card",
+					props: { title: "Evidence", defaultCollapsed: true },
+					children: ["json"],
+				},
+				json: {
+					type: "JsonView",
+					props: {
+						title: "Payload",
+						value: { ok: true },
+						defaultCollapsed: true,
+					},
+				},
+				file: {
+					type: "FileRef",
+					props: {
+						path: "AF111111111111",
+						defaultCollapsed: true,
+						collapseTitle: "Raw artifact",
+					},
+				},
+			},
+		});
 
-    const outputSpec = chronaResultSpecSchema.safeParse({
-      root: "root",
-      elements: {
-        root: { type: "Stack", props: { gap: "md" }, children: ["answer", "details", "json", "file"] },
-        answer: { type: "ResultSummary", props: { title: "Answer", summary: "Primary answer stays visible." } },
-        details: { type: "Card", props: { title: "Evidence", defaultCollapsed: true }, children: ["json"] },
-        json: { type: "JsonView", props: { title: "Payload", value: { ok: true }, defaultCollapsed: true } },
-        file: { type: "FileRef", props: { path: "AF111111111111", defaultCollapsed: true, collapseTitle: "Raw artifact" } },
-      },
-    });
+		expect(outputSpec.success).toBe(true);
+	});
 
-    expect(outputSpec.success).toBe(true);
-  });
+	test("exposes component-specific props in finalized-result JSON Schema", () => {
+		const schema = chronaResultElementJsonSchema() as {
+			oneOf?: Array<{
+				properties?: {
+					type?: { enum?: string[] };
+					props?: { properties?: Record<string, unknown> };
+				};
+			}>;
+		};
+		const evidence = schema.oneOf?.find((variant) =>
+			variant.properties?.type?.enum?.includes("ResultEvidence"),
+		);
 
-  test("exposes component-specific props in finalized-result JSON Schema", () => {
-    const schema = chronaResultElementJsonSchema() as {
-      oneOf?: Array<{
-        properties?: {
-          type?: { enum?: string[] };
-          props?: { properties?: Record<string, unknown> };
-        };
-      }>;
-    };
-    const evidence = schema.oneOf?.find((variant) =>
-      variant.properties?.type?.enum?.includes("ResultEvidence"),
-    );
+		expect(evidence?.properties?.props?.properties).toHaveProperty("summary");
+		expect(evidence?.properties?.props?.properties).not.toHaveProperty(
+			"collapsedSummary",
+		);
+	});
+	test("rejects the same cross-component prop before provider output is saved", () => {
+		const spec = {
+			root: "evidence",
+			elements: {
+				evidence: {
+					type: "ResultEvidence",
+					props: {
+						items: ["Official source checked"],
+						collapsedSummary: "Evidence",
+					},
+				},
+			},
+		};
 
-    expect(evidence?.properties?.props?.properties).toHaveProperty("summary");
-    expect(evidence?.properties?.props?.properties).not.toHaveProperty(
-      "collapsedSummary",
-    );
-  });
-  test("rejects the same cross-component prop before provider output is saved", () => {
-    const spec = {
-      root: "evidence",
-      elements: {
-        evidence: {
-          type: "ResultEvidence",
-          props: { items: ["Official source checked"], collapsedSummary: "Evidence" },
-        },
-      },
-    };
+		expect(validateChronaSpec(spec).ok).toBe(false);
+		const schema = chronaResultElementJsonSchema();
+		expect(schema).toHaveProperty("oneOf");
+		expect(JSON.stringify(schema)).not.toContain('"collapsedSummary"');
+	});
 
-    expect(validateChronaSpec(spec).ok).toBe(false);
-    const schema = chronaResultElementJsonSchema();
-    expect(schema).toHaveProperty("oneOf");
-    expect(JSON.stringify(schema)).not.toContain('"collapsedSummary"');
-  });
+	test("accepts the bounded finalized-result domain composition", () => {
+		const result = chronaResultSpecSchema.safeParse({
+			root: "root",
+			elements: {
+				root: {
+					type: "Stack",
+					props: { gap: "lg" },
+					children: [
+						"hero",
+						"primary",
+						"supporting",
+						"insight",
+						"actions",
+						"caveats",
+						"evidence",
+					],
+				},
+				hero: {
+					type: "ResultHero",
+					props: {
+						title: "Research package ready",
+						summary: "Verified sources and an operating guide are assembled.",
+						readiness: "ready_with_caveats",
+						readinessSummary: "Confirm one access-limited source.",
+						metrics: [{ label: "Deliverables", value: "2" }],
+					},
+				},
+				primary: {
+					type: "ResultDeliverable",
+					props: {
+						title: "Operating guide",
+						summary: "Primary workflow",
+						artifactRef: "AF111111111111",
+						role: "primary",
+						kind: "document",
+					},
+				},
+				supporting: {
+					type: "ResultDeliverable",
+					props: {
+						title: "Source table",
+						artifactRef: "AF222222222222",
+						role: "supporting",
+						kind: "table",
+					},
+				},
+				insight: {
+					type: "ResultInsight",
+					props: {
+						title: "Use official sources for confirmation",
+						summary:
+							"Discovery networks provide early signals but are not final authority.",
+						emphasis: "lead",
+						points: ["Discover", "Verify"],
+					},
+				},
+				actions: {
+					type: "ResultActionPlan",
+					props: {
+						title: "Recommended route",
+						phases: [
+							{
+								timeframe: "now",
+								title: "Confirm constraints",
+								actions: ["Choose target regions"],
+							},
+						],
+					},
+				},
+				caveats: {
+					type: "ResultCaveats",
+					props: { items: ["One source requires manual verification"] },
+				},
+				evidence: {
+					type: "ResultEvidence",
+					props: { items: ["Official source checked"], defaultCollapsed: true },
+				},
+			},
+		});
 
+		expect(result.success).toBe(true);
+	});
 
-  test("accepts the bounded finalized-result domain composition", () => {
-    const result = chronaResultSpecSchema.safeParse({
-      root: "root",
-      elements: {
-        root: {
-          type: "Stack",
-          props: { gap: "lg" },
-          children: ["hero", "primary", "supporting", "insight", "actions", "caveats", "evidence"],
-        },
-        hero: {
-          type: "ResultHero",
-          props: {
-            title: "Research package ready",
-            summary: "Verified sources and an operating guide are assembled.",
-            readiness: "ready_with_caveats",
-            readinessSummary: "Confirm one access-limited source.",
-            metrics: [{ label: "Deliverables", value: "2" }],
-          },
-        },
-        primary: {
-          type: "ResultDeliverable",
-          props: {
-            title: "Operating guide",
-            summary: "Primary workflow",
-            artifactRef: "AF111111111111",
-            role: "primary",
-            kind: "document",
-          },
-        },
-        supporting: {
-          type: "ResultDeliverable",
-          props: {
-            title: "Source table",
-            artifactRef: "AF222222222222",
-            role: "supporting",
-            kind: "table",
-          },
-        },
-        insight: {
-          type: "ResultInsight",
-          props: {
-            title: "Use official sources for confirmation",
-            summary: "Discovery networks provide early signals but are not final authority.",
-            emphasis: "lead",
-            points: ["Discover", "Verify"],
-          },
-        },
-        actions: {
-          type: "ResultActionPlan",
-          props: {
-            title: "Recommended route",
-            phases: [{ timeframe: "now", title: "Confirm constraints", actions: ["Choose target regions"] }],
-          },
-        },
-        caveats: {
-          type: "ResultCaveats",
-          props: { items: ["One source requires manual verification"] },
-        },
-        evidence: {
-          type: "ResultEvidence",
-          props: { items: ["Official source checked"], defaultCollapsed: true },
-        },
-      },
-    });
+	test("bounds result metrics, caveats, and action phases", () => {
+		expect(
+			chronaResultSpecSchema.safeParse({
+				root: "hero",
+				elements: {
+					hero: {
+						type: "ResultHero",
+						props: {
+							title: "Result",
+							summary: "Summary",
+							readiness: "ready",
+							readinessSummary: "Ready",
+							metrics: Array.from({ length: 5 }, (_, index) => ({
+								label: `Metric ${index}`,
+								value: String(index),
+							})),
+						},
+					},
+				},
+			}).success,
+		).toBe(false);
 
-    expect(result.success).toBe(true);
-  });
+		expect(
+			chronaResultSpecSchema.safeParse({
+				root: "caveats",
+				elements: {
+					caveats: {
+						type: "ResultCaveats",
+						props: { items: ["1", "2", "3", "4"] },
+					},
+				},
+			}).success,
+		).toBe(false);
 
-  test("bounds result metrics, caveats, and action phases", () => {
-    expect(chronaResultSpecSchema.safeParse({
-      root: "hero",
-      elements: {
-        hero: {
-          type: "ResultHero",
-          props: {
-            title: "Result",
-            summary: "Summary",
-            readiness: "ready",
-            readinessSummary: "Ready",
-            metrics: Array.from({ length: 5 }, (_, index) => ({ label: `Metric ${index}`, value: String(index) })),
-          },
-        },
-      },
-    }).success).toBe(false);
+		expect(
+			chronaResultSpecSchema.safeParse({
+				root: "actions",
+				elements: {
+					actions: {
+						type: "ResultActionPlan",
+						props: {
+							phases: ["now", "this_week", "later", "later"].map(
+								(timeframe, index) => ({
+									timeframe,
+									title: `Phase ${index}`,
+									actions: ["Act"],
+								}),
+							),
+						},
+					},
+				},
+			}).success,
+		).toBe(false);
+	});
 
-    expect(chronaResultSpecSchema.safeParse({
-      root: "caveats",
-      elements: {
-        caveats: { type: "ResultCaveats", props: { items: ["1", "2", "3", "4"] } },
-      },
-    }).success).toBe(false);
+	describe("validateDashboardSummarySpec", () => {
+		test("accepts only compact dashboard summary components", () => {
+			const result = validateDashboardSummarySpec({
+				root: "root",
+				elements: {
+					root: {
+						type: "Stack",
+						props: { gap: "md" },
+						children: ["title", "summary", "risk"],
+					},
+					title: {
+						type: "Heading",
+						props: { text: "AI summary", level: "h3" },
+						children: [],
+					},
+					summary: {
+						type: "Text",
+						props: { text: "Two tasks completed; one needs review." },
+						children: [],
+					},
+					risk: {
+						type: "Alert",
+						props: {
+							title: "Needs review",
+							description: "Approval blocks next run.",
+						},
+						children: [],
+					},
+				},
+			});
 
-    expect(chronaResultSpecSchema.safeParse({
-      root: "actions",
-      elements: {
-        actions: {
-          type: "ResultActionPlan",
-          props: {
-            phases: ["now", "this_week", "later", "later"].map((timeframe, index) => ({
-              timeframe,
-              title: `Phase ${index}`,
-              actions: ["Act"],
-            })),
-          },
-        },
-      },
-    }).success).toBe(false);
-  });
+			expect(result.ok).toBe(true);
+		});
 
-describe("validateDashboardSummarySpec", () => {
-  test("accepts only compact dashboard summary components", () => {
-    const result = validateDashboardSummarySpec({
-      root: "root",
-      elements: {
-        root: { type: "Stack", props: { gap: "md" }, children: ["title", "summary", "risk"] },
-        title: { type: "Heading", props: { text: "AI summary", level: "h3" }, children: [] },
-        summary: { type: "Text", props: { text: "Two tasks completed; one needs review." }, children: [] },
-        risk: { type: "Alert", props: { title: "Needs review", description: "Approval blocks next run." }, children: [] },
-      },
-    });
+		test("normalizes dashboard-only prop aliases before catalog validation", () => {
+			const result = validateDashboardSummarySpec({
+				root: "root",
+				elements: {
+					root: {
+						type: "Stack",
+						props: { gap: "md" },
+						children: ["summary", "state", "risk"],
+					},
+					summary: {
+						type: "Text",
+						props: { content: "Review two active tasks.", variant: "small" },
+						children: [],
+					},
+					state: {
+						type: "Badge",
+						props: { label: "Needs review", variant: "warning" },
+						children: [],
+					},
+					risk: {
+						type: "Alert",
+						props: {
+							title: "Approval needed",
+							description: "One run waits for review.",
+							variant: "destructive",
+						},
+						children: [],
+					},
+				},
+			});
 
-    expect(result.ok).toBe(true);
-  });
+			expect(result.ok).toBe(true);
+			if (!result.ok) return;
+			expect(result.spec.elements.summary?.props).toEqual({
+				text: "Review two active tasks.",
+				variant: "caption",
+			});
+			expect(result.spec.elements.state?.props).toEqual({
+				text: "Needs review",
+				variant: "secondary",
+			});
+			expect(result.spec.elements.risk?.props).toEqual({
+				title: "Approval needed",
+				message: "One run waits for review.",
+				type: "error",
+			});
+		});
 
-  test("normalizes dashboard-only prop aliases before catalog validation", () => {
-    const result = validateDashboardSummarySpec({
-      root: "root",
-      elements: {
-        root: { type: "Stack", props: { gap: "md" }, children: ["summary", "state", "risk"] },
-        summary: { type: "Text", props: { content: "Review two active tasks.", variant: "small" }, children: [] },
-        state: { type: "Badge", props: { label: "Needs review", variant: "warning" }, children: [] },
-        risk: { type: "Alert", props: { title: "Approval needed", description: "One run waits for review.", variant: "destructive" }, children: [] },
-      },
-    });
+		test("rejects interactive or broad workspace components", () => {
+			expectIssue(
+				validateDashboardSummarySpec({
+					root: "button",
+					elements: {
+						button: {
+							type: "Button",
+							props: { label: "Approve" },
+							children: [],
+						},
+					},
+				}),
+				"Invalid discriminator value",
+			);
 
-    expect(result.ok).toBe(true);
-    if (!result.ok) return;
-    expect(result.spec.elements.summary?.props).toEqual({ text: "Review two active tasks.", variant: "caption" });
-    expect(result.spec.elements.state?.props).toEqual({ text: "Needs review", variant: "secondary" });
-    expect(result.spec.elements.risk?.props).toEqual({ title: "Approval needed", message: "One run waits for review.", type: "error" });
-  });
+			expectIssue(
+				validateDashboardSummarySpec({
+					root: "activity",
+					elements: {
+						activity: {
+							type: "ActivityStream",
+							props: { items: [] },
+							children: [],
+						},
+					},
+				}),
+				"Invalid discriminator value",
+			);
+		});
 
-  test("rejects interactive or broad workspace components", () => {
-    expectIssue(validateDashboardSummarySpec({
-      root: "button",
-      elements: { button: { type: "Button", props: { label: "Approve" }, children: [] } },
-    }), "Invalid discriminator value");
+		test("rejects dynamic expressions and unknown props", () => {
+			expectIssue(
+				validateDashboardSummarySpec({
+					root: "root",
+					elements: {
+						root: { type: "Stack", props: { gap: "md" }, children: ["title"] },
+						title: {
+							type: "Heading",
+							props: { text: { $state: "/title" }, level: "h3" },
+							children: [],
+						},
+					},
+					state: { title: "Injected" },
+				}),
+				"Invalid input",
+			);
 
-    expectIssue(validateDashboardSummarySpec({
-      root: "activity",
-      elements: { activity: { type: "ActivityStream", props: { items: [] }, children: [] } },
-    }), "Invalid discriminator value");
-  });
-
-  test("rejects dynamic expressions and unknown props", () => {
-    expectIssue(validateDashboardSummarySpec({
-      root: "root",
-      elements: {
-        root: { type: "Stack", props: { gap: "md" }, children: ["title"] },
-        title: { type: "Heading", props: { text: { $state: "/title" }, level: "h3" }, children: [] },
-      },
-      state: { title: "Injected" },
-    }), "Invalid input");
-
-    expectIssue(validateDashboardSummarySpec({
-      root: "root",
-      elements: {
-        root: { type: "Stack", props: { gap: "md" }, repeat: { statePath: "/items" }, children: [] },
-      },
-    }), "Unrecognized key");
-  });
-});
+			expectIssue(
+				validateDashboardSummarySpec({
+					root: "root",
+					elements: {
+						root: {
+							type: "Stack",
+							props: { gap: "md" },
+							repeat: { statePath: "/items" },
+							children: [],
+						},
+					},
+				}),
+				"Unrecognized key",
+			);
+		});
+	});
 });

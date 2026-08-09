@@ -138,8 +138,8 @@ function createSurfaceState(context: AiSidebarPageContextSummary, actions: AiSid
   const messages = getAssistantSurfaceMessages(locale);
   const summaries = sortAssistantSummaries(context.highlights.map((highlight, index) => ({
     id: `${context.type}-${index}-${highlight.label}`,
-    label: highlight.label,
-    value: highlight.value,
+    label: highlight.label === "Next" ? messages.nextHighlightLabel : highlight.label,
+    value: highlight.value === "Accept result or request changes" ? messages.acceptResultHighlight : highlight.value,
     severity: severityFromTone(highlight.tone),
   })));
 

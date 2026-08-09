@@ -5,6 +5,35 @@ import {
 	stringField,
 	stringProp,
 } from "./workspace-registry-utilities";
+import { safeExternalHref } from "./workspace-table-data";
+
+function ComparisonValue({ value }: { value: string | undefined }) {
+	const text = value ?? "—";
+	const href = safeExternalHref(text);
+	if (!href)
+		return <span className="break-words [overflow-wrap:anywhere]">{text}</span>;
+	return (
+		<a
+			href={href}
+			target="_blank"
+			rel="noreferrer"
+			className="break-all font-medium text-primary underline-offset-4 hover:underline"
+		>
+			{text}
+		</a>
+	);
+}
+
+function comparisonRowHeaderLabel(props: Record<string, unknown>) {
+	const explicit = stringProp(props.rowHeaderLabel);
+	if (explicit) return explicit;
+	const title = stringProp(props.title)?.toLowerCase() ?? "";
+	if (/筛选|口径/.test(title)) return "维度";
+	if (/scope|snapshot/.test(title)) return "Dimension";
+	if (/新增|仓库/.test(title)) return "仓库";
+	if (/stars|trending|repo/.test(title)) return "Repository";
+	return "Item";
+}
 
 export function ResultComparison({
 	props,
@@ -35,6 +64,7 @@ export function ResultComparison({
 				},
 			)
 		: [];
+	const rowHeaderLabel = comparisonRowHeaderLabel(props);
 	return (
 		<section className="min-w-0 overflow-hidden rounded-2xl border border-border/70 bg-background">
 			<div className="p-4 sm:p-5">
@@ -51,11 +81,11 @@ export function ResultComparison({
 				role="region"
 				aria-label={`${stringProp(props.title) ?? "Comparison"} table`}
 			>
-				<table className="w-full min-w-[40rem] border-collapse text-left text-sm">
-					<thead>
+				<table className="w-full border-collapse text-left text-sm sm:min-w-[40rem] sm:table-fixed">
+					<thead className="hidden sm:table-header-group">
 						<tr className="border-y border-border/60 bg-muted/35">
 							<th scope="col" className="px-4 py-3 font-semibold">
-								Rank
+								{rowHeaderLabel}
 							</th>
 							{columns.map((column) => (
 								<th key={column.key} className="px-4 py-3 font-semibold">
@@ -64,24 +94,30 @@ export function ResultComparison({
 							))}
 						</tr>
 					</thead>
-					<tbody>
+					<tbody className="block space-y-3 p-3 sm:table-row-group sm:space-y-0 sm:p-0">
 						{rows.map((row) => (
 							<tr
 								key={row.label}
 								className={cn(
-									"border-b border-border/50 last:border-b-0",
+									"block rounded-xl border border-border/60 sm:table-row sm:rounded-none sm:border-x-0 sm:border-t-0",
 									row.emphasis === "recommended" && "bg-success/5",
 									row.emphasis === "warning" && "bg-warning/5",
 									row.emphasis === "muted" && "text-muted-foreground",
 								)}
 							>
-								<th className="px-4 py-3 font-medium">{row.label}</th>
+								<th
+									scope="row"
+									className="block px-3 pb-2 pt-3 font-semibold text-foreground sm:table-cell sm:px-4 sm:py-3 sm:font-medium"
+								>
+									{row.label}
+								</th>
 								{columns.map((column) => (
 									<td
 										key={column.key}
-										className="px-4 py-3 align-top leading-5"
+										data-label={column.label}
+										className="grid grid-cols-[minmax(0,7rem)_minmax(0,1fr)] gap-3 px-3 py-2 align-top leading-5 before:text-muted-foreground before:content-[attr(data-label)] last:pb-3 sm:table-cell sm:px-4 sm:py-3 sm:before:content-none"
 									>
-										{row.values[column.key] ?? "—"}
+										<ComparisonValue value={row.values[column.key]} />
 									</td>
 								))}
 							</tr>

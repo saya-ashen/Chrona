@@ -30,6 +30,25 @@ function hideHeaderActions(spec: UiDocument, input: { generatePlan?: boolean; ac
     },
   };
 }
+function localizeHeaderResultStatus(spec: UiDocument, copy: Record<string, string | undefined>): UiDocument {
+  const defaultStatus = "Execution complete, awaiting review";
+  const localizedStatus = copy.resultReadyTitle ?? defaultStatus;
+  if (localizedStatus === defaultStatus) return spec;
+  return {
+    ...spec,
+    elements: Object.fromEntries(Object.entries(spec.elements).map(([key, element]) => {
+      if (!element.props || typeof element.props !== "object") return [key, element];
+      const props = element.props as Record<string, unknown>;
+      const localizedProps = {
+        ...props,
+        ...(props.text === defaultStatus ? { text: localizedStatus } : {}),
+        ...(props.statusLabel === defaultStatus ? { statusLabel: localizedStatus } : {}),
+      };
+      return [key, localizedProps.text !== props.text || localizedProps.statusLabel !== props.statusLabel ? { ...element, props: localizedProps } : element];
+    })),
+  };
+}
+
 
 type HeaderActionId = TaskHeaderAction["id"];
 
@@ -246,7 +265,7 @@ export function TaskWorkspaceHeaderCard({
               .replace("{read}", String(task.goalKnowledge.read.length))}
           </p>
         ) : null}
-        <SpecRenderer spec={hideHeaderActions(spec, { generatePlan: hideGeneratePlan, acceptPlan: hideAcceptPlan })} handlers={handlers} store={store} />
+        <SpecRenderer spec={localizeHeaderResultStatus(hideHeaderActions(spec, { generatePlan: hideGeneratePlan, acceptPlan: hideAcceptPlan }), copy)} handlers={handlers} store={store} />
       </header>
       <p className="sr-only" role="status" aria-live="polite">
         {actionStatus ?? ""}

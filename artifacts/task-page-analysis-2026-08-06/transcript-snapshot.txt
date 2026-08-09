@@ -1,0 +1,84 @@
+- generic
+  - generic [ref=e1] clickable [onclick]
+    - main
+      - status
+  - dialog "Agent transcript Completed"
+    - heading "Agent transcript Completed" [level=2, ref=e2]
+      - StaticText "Agent transcript"
+      - StaticText "Completed"
+    - paragraph
+      - StaticText "Intent, tool calls, results, and execution state. Latest activity appears first. 100 events"
+    - article
+      - generic
+      - time
+      - paragraph
+      - paragraph
+    - article
+      - generic
+      - time
+      - paragraph
+      - paragraph
+    - article
+      - generic
+      - time
+      - paragraph
+    - article
+      - generic
+      - time
+      - paragraph
+        - StaticText "输出今日摘要: node_completed"
+      - paragraph
+    - article
+      - generic
+      - time
+      - paragraph
+        - StaticText "输出今日摘要: node_started"
+      - paragraph
+    - article
+      - generic
+      - time
+      - paragraph
+    - article
+      - generic
+      - time
+      - paragraph
+        - StaticText "整理 Trending 结果: node_completed"
+      - paragraph
+    - article
+      - generic
+      - time
+      - paragraph
+        - StaticText "整理 Trending 结果: node_started"
+      - paragraph
+    - article
+      - generic
+      - time
+      - paragraph
+    - article
+      - generic
+      - time
+      - paragraph
+        - StaticText "收集热门项目: node_completed"
+      - paragraph
+    - article
+      - generic
+      - time
+      - paragraph
+        - StaticText "收集热门项目: node_started"
+      - paragraph
+    - article
+      - generic
+      - time
+      - paragraph
+    - article
+      - generic
+      - time
+      - paragraph
+        - StaticText "打开 GitHub Trending: node_completed"
+      - paragraph
+    - article
+      - generic
+      - time
+      - paragraph
+        - StaticText "打开 GitHub Trending: node_started"
+    - button "Close" [ref=e3]

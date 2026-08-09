@@ -70,6 +70,7 @@ export function TaskWorkspacePlanSectionView({
 				<StageBarCard
 					stage={displayState.stage}
 					displayMode={displayState.mode}
+					copy={copy}
 				/>
 			) : null}
 			<PlanSectionBody props={props} runtime={runtime} />
@@ -269,7 +270,9 @@ function ResultInspector({ props, runtime }: PlanSectionViewProps) {
 				spec={finalizedSpec}
 				handlers={runtime.commandCenterActionHandlers}
 				resultCollapseStorageKey={`task:${props.pageData.task.id}:final-result`}
+				resultPresentation
 			/>
+			<ResultArtifactRail props={props} runtime={runtime} />
 			{hasExecutionEvidence ? (
 				<details className="mt-8 border-t border-border/60 pt-5">
 					<summary className="cursor-pointer select-none text-sm font-semibold text-muted-foreground hover:text-foreground">
@@ -289,6 +292,103 @@ function ResultInspector({ props, runtime }: PlanSectionViewProps) {
 				</details>
 			) : null}
 		</article>
+	);
+}
+
+function featuredResultTitles(spec: unknown) {
+	if (!spec || typeof spec !== "object" || Array.isArray(spec))
+		return new Set<string>();
+	const elements = (spec as { elements?: unknown }).elements;
+	if (!elements || typeof elements !== "object" || Array.isArray(elements)) {
+		return new Set<string>();
+	}
+	return new Set(
+		Object.values(elements).flatMap((element) => {
+			if (!element || typeof element !== "object" || Array.isArray(element))
+				return [];
+			const record = element as { type?: unknown; props?: unknown };
+			if (
+				record.type !== "ResultDeliverable" ||
+				!record.props ||
+				typeof record.props !== "object" ||
+				Array.isArray(record.props)
+			)
+				return [];
+			const title = (record.props as { title?: unknown }).title;
+			return typeof title === "string" ? [title] : [];
+		}),
+	);
+}
+
+function ResultArtifactRail({ props, runtime }: PlanSectionViewProps) {
+	const artifactCopy = runtime.copy as Record<string, string | undefined>;
+	const finalizedSpec =
+		props.commandCenter?.documents.output ??
+		props.currentExecution?.planOutput?.finalizedResult?.spec ??
+		null;
+	const featuredTitles = featuredResultTitles(finalizedSpec);
+	const artifacts = props.pageData.artifacts.filter(
+		(artifact, index, all) =>
+			!featuredTitles.has(artifact.title) &&
+			all.findIndex((item) => item.id === artifact.id) === index,
+	);
+	if (artifacts.length === 0) return null;
+	return (
+		<section
+			className="mt-8 rounded-2xl border border-border/70 bg-muted/20 p-4 sm:p-5"
+			data-testid="result-artifact-rail"
+			aria-label={artifactCopy.resultArtifactsTitle ?? "Deliverables"}
+		>
+			<div className="flex flex-wrap items-baseline justify-between gap-2">
+				<div>
+					<h2 className="font-heading text-lg font-semibold text-foreground">
+						{artifactCopy.resultArtifactsTitle ?? "Deliverables"}
+					</h2>
+					<p className="mt-1 text-sm text-muted-foreground">
+						{artifactCopy.resultArtifactsDescription ??
+							"All files produced by this execution."}
+					</p>
+				</div>
+				<span className="rounded-full border border-border/70 bg-background px-2.5 py-1 text-xs font-medium text-muted-foreground">
+					{artifacts.length}
+				</span>
+			</div>
+			<div className="mt-4 grid gap-2 sm:grid-cols-2">
+				{artifacts.map((artifact) => {
+					const downloadHref = artifact.uri
+						? `/api/tasks/${encodeURIComponent(props.pageData.task.id)}/result-files/download?path=${encodeURIComponent(artifact.uri)}`
+						: null;
+					const artifactTypeLabel =
+						artifact.type === "file"
+							? (artifactCopy.resultArtifactTypeFile ?? "File")
+							: artifact.type;
+					return (
+						<article
+							key={artifact.id}
+							className="min-w-0 rounded-xl border border-border/70 bg-background p-3"
+						>
+							<div className="min-w-0">
+								<h3 className="break-words text-sm font-semibold text-foreground">
+									{artifact.title}
+								</h3>
+								<p className="mt-1 text-xs text-muted-foreground">
+									{artifactTypeLabel}
+								</p>
+							</div>
+							{downloadHref ? (
+								<a
+									href={downloadHref}
+									download
+									className="mt-3 inline-flex text-xs font-semibold text-primary underline-offset-4 hover:underline"
+								>
+									{artifactCopy.downloadArtifact ?? "Download"}
+								</a>
+							) : null}
+						</article>
+					);
+				})}
+			</div>
+		</section>
 	);
 }
 

@@ -36,26 +36,26 @@
 
 截图均由 agent-browser 在真实运行页面采集：
 
-- [01-initial.png](</home/saya/workspace/Chrona/artifacts/task-page-analysis-2026-08-06/screenshots/01-initial.png>)：桌面首屏，1280×633
-- [02-result-mid.png](</home/saya/workspace/Chrona/artifacts/task-page-analysis-2026-08-06/screenshots/02-result-mid.png>)：结果中段
-- [03-result-table.png](</home/saya/workspace/Chrona/artifacts/task-page-analysis-2026-08-06/screenshots/03-result-table.png>)：12 项目结果表格
-- [04-result-bottom.png](</home/saya/workspace/Chrona/artifacts/task-page-analysis-2026-08-06/screenshots/04-result-bottom.png>)：补充视图和口径/来源
-- [05-mobile-top.png](</home/saya/workspace/Chrona/artifacts/task-page-analysis-2026-08-06/screenshots/05-mobile-top.png>)：移动端 390×844 首屏
-- [06-desktop-final-top.png](</home/saya/workspace/Chrona/artifacts/task-page-analysis-2026-08-06/screenshots/06-desktop-final-top.png>)：桌面最终首屏复采
-- [07-transcript-drawer.png](</home/saya/workspace/Chrona/artifacts/task-page-analysis-2026-08-06/screenshots/07-transcript-drawer.png>)：打开 Agent transcript 抽屉
-- [08-result-options.png](</home/saya/workspace/Chrona/artifacts/task-page-analysis-2026-08-06/screenshots/08-result-options.png>)：结果选项菜单
-- [09-request-changes.png](</home/saya/workspace/Chrona/artifacts/task-page-analysis-2026-08-06/screenshots/09-request-changes.png>)：要求修改态
+- [01-initial.png](<artifacts/task-page-analysis-2026-08-06/screenshots/01-initial.png>)：桌面首屏，1280×633
+- [02-result-mid.png](<artifacts/task-page-analysis-2026-08-06/screenshots/02-result-mid.png>)：结果中段
+- [03-result-table.png](<artifacts/task-page-analysis-2026-08-06/screenshots/03-result-table.png>)：12 项目结果表格
+- [04-result-bottom.png](<artifacts/task-page-analysis-2026-08-06/screenshots/04-result-bottom.png>)：补充视图和口径/来源
+- [05-mobile-top.png](<artifacts/task-page-analysis-2026-08-06/screenshots/05-mobile-top.png>)：移动端 390×844 首屏
+- [06-desktop-final-top.png](<artifacts/task-page-analysis-2026-08-06/screenshots/06-desktop-final-top.png>)：桌面最终首屏复采
+- [07-transcript-drawer.png](<artifacts/task-page-analysis-2026-08-06/screenshots/07-transcript-drawer.png>)：打开 Agent transcript 抽屉
+- [08-result-options.png](<artifacts/task-page-analysis-2026-08-06/screenshots/08-result-options.png>)：结果选项菜单
+- [09-request-changes.png](<artifacts/task-page-analysis-2026-08-06/screenshots/09-request-changes.png>)：要求修改态
 
 辅助证据文件：
 
-- [initial-snapshot.txt](</home/saya/workspace/Chrona/artifacts/task-page-analysis-2026-08-06/initial-snapshot.txt>)：桌面页面 accessibility tree
-- [mobile-snapshot.txt](</home/saya/workspace/Chrona/artifacts/task-page-analysis-2026-08-06/mobile-snapshot.txt>)：移动页面 accessibility tree
-- [layout-evidence.json](</home/saya/workspace/Chrona/artifacts/task-page-analysis-2026-08-06/layout-evidence.json>)：桌面布局、元素几何、滚动容器
-- [desktop-scroll-hierarchy.json](</home/saya/workspace/Chrona/artifacts/task-page-analysis-2026-08-06/desktop-scroll-hierarchy.json>)：桌面滚动层级
-- [a11y-desktop.json](</home/saya/workspace/Chrona/artifacts/task-page-analysis-2026-08-06/a11y-desktop.json>)：桌面 axe 结果
-- [a11y-mobile.json](</home/saya/workspace/Chrona/artifacts/task-page-analysis-2026-08-06/a11y-mobile.json>)：移动 axe 结果
-- [request-changes-snapshot.txt](</home/saya/workspace/Chrona/artifacts/task-page-analysis-2026-08-06/request-changes-snapshot.txt>)：要求修改交互态
-- [transcript-snapshot.txt](</home/saya/workspace/Chrona/artifacts/task-page-analysis-2026-08-06/transcript-snapshot.txt>)：执行记录抽屉内容
+- [initial-snapshot.txt](<artifacts/task-page-analysis-2026-08-06/initial-snapshot.txt>)：桌面页面 accessibility tree
+- [mobile-snapshot.txt](<artifacts/task-page-analysis-2026-08-06/mobile-snapshot.txt>)：移动页面 accessibility tree
+- [layout-evidence.json](<artifacts/task-page-analysis-2026-08-06/layout-evidence.json>)：桌面布局、元素几何、滚动容器
+- [desktop-scroll-hierarchy.json](<artifacts/task-page-analysis-2026-08-06/desktop-scroll-hierarchy.json>)：桌面滚动层级
+- [a11y-desktop.json](<artifacts/task-page-analysis-2026-08-06/a11y-desktop.json>)：桌面 axe 结果
+- [a11y-mobile.json](<artifacts/task-page-analysis-2026-08-06/a11y-mobile.json>)：移动 axe 结果
+- [request-changes-snapshot.txt](<artifacts/task-page-analysis-2026-08-06/request-changes-snapshot.txt>)：要求修改交互态
+- [transcript-snapshot.txt](<artifacts/task-page-analysis-2026-08-06/transcript-snapshot.txt>)：执行记录抽屉内容
 
 ### 2. 真实页面结构数据
 
@@ -85,7 +85,7 @@
 
 ### A. 桌面首屏：结果没有成为首屏主角
 
-[01-initial.png](</home/saya/workspace/Chrona/artifacts/task-page-analysis-2026-08-06/screenshots/01-initial.png>) 反映出：
+[01-initial.png](<artifacts/task-page-analysis-2026-08-06/screenshots/01-initial.png>) 反映出：
 
 - 顶部全局 Header、任务 Header、五阶段栏、结果审核卡、最终结果卡层层叠加；
 - 工作区从 y=219 才开始，结果主体从 y=569 才开始，首屏底部只够露出结果概览顶部；
@@ -97,7 +97,7 @@
 
 ### B. 结果中段：内容层级正确了一半，但信息重复
 
-[02-result-mid.png](</home/saya/workspace/Chrona/artifacts/task-page-analysis-2026-08-06/screenshots/02-result-mid.png>) 对应结果概览、注意事项和核心结果：
+[02-result-mid.png](<artifacts/task-page-analysis-2026-08-06/screenshots/02-result-mid.png>) 对应结果概览、注意事项和核心结果：
 
 - 结果概览有一个不错的主标题、短摘要和四个指标，具备摘要层；
 - 但“有注意事项，可使用”后面直接跟三条很长的限制说明，注意事项视觉权重接近正文，削弱了“可以直接看结论”的感觉；
@@ -113,7 +113,7 @@
 
 ### C. 表格段：适合桌面，但不适合作为移动端默认内容
 
-[03-result-table.png](</home/saya/workspace/Chrona/artifacts/task-page-analysis-2026-08-06/screenshots/03-result-table.png>) 的 12 行表格包含仓库、语言、总 stars、今日新增、简介五列。问题不是表格本身，而是：
+[03-result-table.png](<artifacts/task-page-analysis-2026-08-06/screenshots/03-result-table.png>) 的 12 行表格包含仓库、语言、总 stars、今日新增、简介五列。问题不是表格本身，而是：
 
 - 对用户来说“今日新增”是主要排序字段，应该被视觉突出；当前列权重没有明显告诉用户哪个字段最重要；
 - 官方仓库的长 URL 和简介会制造很宽的内容需求；
@@ -125,7 +125,7 @@
 
 ### D. 底部：来源是必要证据，但不应与结果正文同等展开
 
-[04-result-bottom.png](</home/saya/workspace/Chrona/artifacts/task-page-analysis-2026-08-06/screenshots/04-result-bottom.png>) 显示补充视图、数据源与排序口径、折叠的原始读取依据。它们对可信度有价值，但不是首次验收的主路径：
+[04-result-bottom.png](<artifacts/task-page-analysis-2026-08-06/screenshots/04-result-bottom.png>) 显示补充视图、数据源与排序口径、折叠的原始读取依据。它们对可信度有价值，但不是首次验收的主路径：
 
 - “主题覆盖”又把项目按分类重新列了一遍，增加了二次阅读成本；
 - “口径与依据”实际是 audit/evidence 区，应视觉上从结果主体退到证据区；
@@ -133,11 +133,11 @@
 
 ### E. 交互态：操作存在，但语义仍偏内部工具
 
-[07-transcript-drawer.png](</home/saya/workspace/Chrona/artifacts/task-page-analysis-2026-08-06/screenshots/07-transcript-drawer.png>) 显示固定的“Agent transcript”入口会打开一个大抽屉，里面有 100 events。它适合调试和审计，但不应在结果页作为高权重的常驻视觉元素。
+[07-transcript-drawer.png](<artifacts/task-page-analysis-2026-08-06/screenshots/07-transcript-drawer.png>) 显示固定的“Agent transcript”入口会打开一个大抽屉，里面有 100 events。它适合调试和审计，但不应在结果页作为高权重的常驻视觉元素。
 
-[08-result-options.png](</home/saya/workspace/Chrona/artifacts/task-page-analysis-2026-08-06/screenshots/08-result-options.png>) 的“全部收起/全部展开”是合理的批量操作，但“结果选项”只解决渲染控制，没有解决结果导航：用户还需要知道哪些区块是结论、交付物、限制和证据。
+[08-result-options.png](<artifacts/task-page-analysis-2026-08-06/screenshots/08-result-options.png>) 的“全部收起/全部展开”是合理的批量操作，但“结果选项”只解决渲染控制，没有解决结果导航：用户还需要知道哪些区块是结论、交付物、限制和证据。
 
-[09-request-changes.png](</home/saya/workspace/Chrona/artifacts/task-page-analysis-2026-08-06/screenshots/09-request-changes.png>) 显示“要求修改结果”区域会插入到审核区下方、结果内容上方，这是正确的交互位置；但应在提交前明确“将重跑哪一步、是否可能重复外部副作用”，不能由系统静默猜测。
+[09-request-changes.png](<artifacts/task-page-analysis-2026-08-06/screenshots/09-request-changes.png>) 显示“要求修改结果”区域会插入到审核区下方、结果内容上方，这是正确的交互位置；但应在提交前明确“将重跑哪一步、是否可能重复外部副作用”，不能由系统静默猜测。
 
 ## 三、前端内容/信息架构分析
 
@@ -395,19 +395,19 @@
 
 ## 九、相关代码和规范索引
 
-- 页面总装配：[task-workspace-page.tsx](</home/saya/workspace/Chrona/features/task-workspace/ui/task-workspace-page.tsx:195>)
-- 状态/布局规则：[task-workspace-interaction.ts](</home/saya/workspace/Chrona/features/task-workspace/model/task-workspace-interaction.ts:218>)
-- 结果焦点视图：[task-workspace-plan-section-view.tsx](</home/saya/workspace/Chrona/features/task-workspace/ui/task-workspace-plan-section-view.tsx:22>)
-- 结果审核面板：[task-workspace-result-lifecycle-panel.tsx](</home/saya/workspace/Chrona/features/task-workspace/ui/task-workspace-result-lifecycle-panel.tsx:20>)
-- 结果和执行记录：[execution-overview-content.tsx](</home/saya/workspace/Chrona/features/execution-monitoring/ui/execution-overview-content.tsx:590>)
-- Inspector：[task-workspace-inspector.tsx](</home/saya/workspace/Chrona/features/execution-monitoring/ui/task-workspace-inspector.tsx:40>)
-- 结果 spec 合并：[build-execution-overview-spec.ts](</home/saya/workspace/Chrona/features/execution-monitoring/ui/build-execution-overview-spec.ts:575>)
-- 结果输出 hook：[execution-overview-hooks.ts](</home/saya/workspace/Chrona/features/execution-monitoring/ui/execution-overview-hooks.ts:104>)
-- Header builder：[build-task-header-spec.ts](</home/saya/workspace/Chrona/packages/ui-protocol/src/builders/build-task-header-spec.ts:1>)
-- Header read model：[get-task-header.ts](</home/saya/workspace/Chrona/packages/engine/src/modules/tasks/get-task-header.ts:339>)
-- Loader：[loaders.ts](</home/saya/workspace/Chrona/apps/web/src/loaders.ts:143>)
-- 目标 UX 规范：[task-workspace-mission-control.md](</home/saya/workspace/Chrona/docs/ux/task-workspace-mission-control.md:1>)
-- 已有结果交互方案：[task-workspace-interaction-improvements.md](</home/saya/workspace/Chrona/docs/zh/task-workspace-interaction-improvements.md:1>)
+- 页面总装配：[task-workspace-page.tsx](<features/task-workspace/ui/task-workspace-page.tsx:195>)
+- 状态/布局规则：[task-workspace-interaction.ts](<features/task-workspace/model/task-workspace-interaction.ts:218>)
+- 结果焦点视图：[task-workspace-plan-section-view.tsx](<features/task-workspace/ui/task-workspace-plan-section-view.tsx:22>)
+- 结果审核面板：[task-workspace-result-lifecycle-panel.tsx](<features/task-workspace/ui/task-workspace-result-lifecycle-panel.tsx:20>)
+- 结果和执行记录：[execution-overview-content.tsx](<features/execution-monitoring/ui/execution-overview-content.tsx:590>)
+- Inspector：[task-workspace-inspector.tsx](<features/execution-monitoring/ui/task-workspace-inspector.tsx:40>)
+- 结果 spec 合并：[build-execution-overview-spec.ts](<features/execution-monitoring/ui/build-execution-overview-spec.ts:575>)
+- 结果输出 hook：[execution-overview-hooks.ts](<features/execution-monitoring/ui/execution-overview-hooks.ts:104>)
+- Header builder：[build-task-header-spec.ts](<packages/ui-protocol/src/builders/build-task-header-spec.ts:1>)
+- Header read model：[get-task-header.ts](<packages/engine/src/modules/tasks/get-task-header.ts:339>)
+- Loader：[loaders.ts](<apps/web/src/loaders.ts:143>)
+- 目标 UX 规范：[task-workspace-mission-control.md](<docs/ux/task-workspace-mission-control.md:1>)
+- 已有结果交互方案：[task-workspace-interaction-improvements.md](<docs/zh/task-workspace-interaction-improvements.md:1>)
 
 ## 十、建议实施顺序
 

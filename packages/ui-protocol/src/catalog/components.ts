@@ -196,12 +196,13 @@ const resultSectionComponentDefinition = {
 			summary: z.string().optional(),
 			layout: z.enum(["stack", "grid", "split", "rail"]).optional(),
 			tone: z.enum(["default", "subtle", "accent"]).optional(),
+			density: z.enum(["compact", "comfortable"]).optional(),
 			defaultCollapsed: z.boolean().optional(),
 		})
 		.strict(),
 	slots: ["default"],
 	description:
-		"Semantic result section whose children may use a stack, responsive grid, two-column split, or horizontal rail. Choose sections from the result's information architecture rather than a fixed report outline.",
+		"Semantic result section whose children may use a stack, responsive grid, two-column split, or horizontal rail. Choose sections from the result's information architecture rather than a fixed report outline. Compact density removes redundant framing for short supporting blocks.",
 };
 
 const resultMetricItemSchema = resultMetricSchema.extend({
@@ -237,13 +238,14 @@ const resultComparisonComponentDefinition = {
 		.object({
 			title: z.string(),
 			summary: z.string().optional(),
+			rowHeaderLabel: z.string().optional(),
 			columns: z.array(resultComparisonColumnSchema).min(1).max(6),
 			rows: z.array(resultComparisonRowSchema).min(1).max(12),
 			...resultSourceProps,
 		})
 		.strict(),
 	description:
-		"Inline comparison matrix for a bounded set of options. Keep cells concise; use a file-backed Table for large datasets.",
+		"Inline comparison matrix for a bounded set of options. Keep cells concise; use a file-backed Table for large datasets. Set rowHeaderLabel to the semantic label for the first row-header column; never assume it is a rank.",
 };
 
 const resultTimelineItemSchema = z

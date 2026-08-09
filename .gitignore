@@ -122,3 +122,6 @@ Thumbs.db
 # ralph scratch notes
 progress.txt
 /.chrona
+/.pi/hindsight
+/.pi-subagents/
+prisma/*.sync-conflict-*.db*

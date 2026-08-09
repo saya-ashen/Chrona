@@ -9,6 +9,12 @@ import {
 	CardContent,
 	CardHeader,
 	CardTitle,
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
 	Textarea,
 } from "@shared/ui";
 import { TaskResultFollowUpPanel } from "./task-result-follow-up-panel";
@@ -51,6 +57,7 @@ function ResultLifecyclePanel({
 }) {
 	const isAccepted = review.phase === "accepted";
 	const [isAcceptedExpanded, setIsAcceptedExpanded] = useState(false);
+	const [isAcceptDialogOpen, setIsAcceptDialogOpen] = useState(false);
 	const [acceptedFollowUpMode, setAcceptedFollowUpMode] = useState<
 		"ask" | "create_task"
 	>("ask");
@@ -252,7 +259,7 @@ function ResultLifecyclePanel({
 							<Button
 								type="button"
 								size="lg"
-								onClick={() => void onAcceptResult?.()}
+								onClick={() => setIsAcceptDialogOpen(true)}
 								disabled={acceptDisabled}
 								aria-describedby={
 									disabledReason ? "accept-result-disabled-reason" : undefined
@@ -275,6 +282,37 @@ function ResultLifecyclePanel({
 						/>
 					</div>
 				) : null}
+				<Dialog open={isAcceptDialogOpen} onOpenChange={setIsAcceptDialogOpen}>
+					<DialogContent className="sm:max-w-md">
+						<DialogHeader>
+							<DialogTitle>
+								{copy.acceptResultConfirmTitle ?? "确认接受结果"}
+							</DialogTitle>
+							<DialogDescription>
+								{copy.acceptResultConfirmDescription ??
+									"接受后，该结果会作为已确认结果用于后续追问、后续任务和目标知识。"}
+							</DialogDescription>
+						</DialogHeader>
+						<DialogFooter>
+							<Button
+								type="button"
+								variant="outline"
+								onClick={() => setIsAcceptDialogOpen(false)}
+							>
+								{copy.acceptResultConfirmCancel ?? "取消"}
+							</Button>
+							<Button
+								type="button"
+								onClick={() => {
+									setIsAcceptDialogOpen(false);
+									void onAcceptResult?.();
+								}}
+							>
+								{copy.acceptResultConfirmSubmit ?? "确认接受"}
+							</Button>
+						</DialogFooter>
+					</DialogContent>
+				</Dialog>
 			</div>
 		</header>
 	);
