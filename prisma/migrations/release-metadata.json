@@ -7,7 +7,7 @@
   "releaseLineSchemaFingerprint": "81f756b0af4ebd66ad87f14eb758f870831a0c31cb60050dc016b9f0bd92484c",
   "previousReleaseFixture": {
     "path": "fixtures/20260728000000.sqlite",
-    "sha256": "8c2c2521987daa35649987d48fbee3590e28d1f5020c9e556183e0097a5a8612"
+    "sha256": "7001da28052eb74ea5ddbb97f810c3171885e4acac93314ad1bb2b813693ec03"
   },
   "releasedMigrationChecksums": {
     "0001_initial": "f86136e580c85369d11e86b4f8a8fd4b3f0d96e5d974ae2855b4da1819d3f924",
@@ -17,6 +17,6 @@
     "20260720010000_add_goal_workbench": "a87d20868d1f0bd5c1623f323f09c562e072abd74de69f401ec0fe68246342fe",
     "20260722000000_add_goal_review_proposals": "a4feeab7c6d0e20ff6eb5f2ba8a1cedb0ec3fe5002cc0967a1c726f99dedcb64",
     "20260723000000_automatic_goal_context": "d640cc335cbbbed0e6695189507a4fa38f0689f3cdc67df76dd4248ab1ca00d8",
-    "20260728000000_pin_task_execution_model": "cc95a12763cd9ddfaba9c9a68cac35d775bf93a4a5275a690755d257014e8137"
+    "20260728000000_pin_task_execution_model": "0947a09c645a95cd4e42b7a719d45e9b950b3279c38e542b848fc4eee4af8715"
   }
 }

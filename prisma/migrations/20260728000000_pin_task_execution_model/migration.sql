@@ -9,7 +9,9 @@ WHERE "description" IS NULL;
 
 -- Normalize nullable work-block scope and prevent duplicate plan runs.
 ALTER TABLE "TaskPlanRun" ADD COLUMN "workBlockScopeKey" TEXT NOT NULL DEFAULT '';
-UPDATE "TaskPlanRun" SET "workBlockScopeKey" = COALESCE("workBlockId", '');
+UPDATE "TaskPlanRun"
+SET "workBlockScopeKey" = COALESCE("workBlockId", '')
+WHERE "workBlockScopeKey" = '';
 ALTER TABLE "TaskPlanRun" ADD COLUMN "executionCommandKey" TEXT;
 DROP INDEX IF EXISTS "TaskPlanRun_taskId_planId_workBlockId_key";
 CREATE UNIQUE INDEX "TaskPlanRun_taskId_planId_workBlockScopeKey_key" ON "TaskPlanRun"("taskId", "planId", "workBlockScopeKey");
