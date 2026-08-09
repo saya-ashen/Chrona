@@ -1,4 +1,5 @@
 import { mkdtemp, mkdir, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 const ROOT = import.meta.dir + "/..";
@@ -11,9 +12,7 @@ interface EntryPoint {
 }
 
 async function makeTempDir(): Promise<string> {
-	return mkdtemp(
-		join(process.env.TMPDIR ?? "/tmp", "chrona-entrypoint-smoke-"),
-	);
+	return mkdtemp(join(tmpdir(), "chrona-entrypoint-smoke-"));
 }
 
 async function waitForReadiness(
