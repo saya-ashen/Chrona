@@ -456,9 +456,9 @@ test.describe("Task create → plan → run → result", () => {
 				await page.goto(WORK_URL(task.taskId));
 				await dismissTaskEditorIfOpen(page);
 				await expect(
-					page
-						.locator('[data-slot="badge"]')
-						.filter({ hasText: /^result ready$/i }),
+					page.locator('[data-slot="badge"]').filter({
+						hasText: /^Execution complete, awaiting review$/i,
+					}),
 				).toBeVisible({ timeout: 15_000 });
 				await expect(
 					page.getByRole("button", { name: /^Accept result$/ }),
@@ -472,6 +472,13 @@ test.describe("Task create → plan → run → result", () => {
 						response.request().method() === "POST",
 				);
 				await page.getByRole("button", { name: /^Accept result$/ }).click();
+				const acceptDialog = page.getByRole("dialog", {
+					name: "Confirm result acceptance",
+				});
+				await expect(acceptDialog).toBeVisible();
+				await acceptDialog
+					.getByRole("button", { name: "Confirm acceptance" })
+					.click();
 				const response = await acceptResponse;
 				expect(response.ok()).toBeTruthy();
 				const acceptBody = (await response.json()) as {

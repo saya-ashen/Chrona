@@ -474,8 +474,14 @@ type ConnectedChronaMcpControl = {
 	connection: ChronaControlConnection;
 };
 
+function trimTrailingSlashes(value: string): string {
+	let end = value.length;
+	while (end > 0 && value.charCodeAt(end - 1) === 47) end -= 1;
+	return value.slice(0, end);
+}
+
 function chronaMcpUrl(baseUrl: string, sessionId: string): string {
-	const trimmedBaseUrl = baseUrl.trim().replace(/\/+$/, "");
+	const trimmedBaseUrl = trimTrailingSlashes(baseUrl.trim());
 	const apiBaseUrl = trimmedBaseUrl.endsWith("/api")
 		? trimmedBaseUrl
 		: `${trimmedBaseUrl}/api`;
@@ -489,7 +495,7 @@ function chronaMcpUrl(baseUrl: string, sessionId: string): string {
 }
 
 function chronaAgentControlUrl(baseUrl: string): string {
-	const trimmedBaseUrl = baseUrl.trim().replace(/\/+$/, "");
+	const trimmedBaseUrl = trimTrailingSlashes(baseUrl.trim());
 	const apiBaseUrl = trimmedBaseUrl.endsWith("/api")
 		? trimmedBaseUrl
 		: `${trimmedBaseUrl}/api`;

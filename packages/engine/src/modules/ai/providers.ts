@@ -32,6 +32,8 @@ import type { EngineAiClient } from "./runtime/client-registry";
 import { aiClientRegistry } from "./runtime/client-registry";
 import { createProviderStreamEventBoundary } from "./provider-stream-contract";
 
+/* eslint-disable max-lines -- Provider adapters share one normalized protocol surface. */
+
 function unknownRecord(value: unknown): Record<string, unknown> | null {
 	return value && typeof value === "object" && !Array.isArray(value)
 		? (value as Record<string, unknown>)
@@ -80,6 +82,7 @@ function hermesCapabilityReason(missing: string[]): string {
 	].join(" ");
 }
 
+// eslint-disable-next-line max-lines-per-function, complexity -- Health checks intentionally normalize each provider's distinct readiness contract.
 async function checkClientHealth(
 	client: AiClientRecord,
 ): Promise<{ available: boolean; reason: string }> {
@@ -233,6 +236,7 @@ export async function testAiClientAvailability(input: {
 	});
 }
 
+// eslint-disable-next-line complexity -- JSON extraction handles provider prose, fenced payloads, and malformed fallbacks.
 export function extractJSON(text: string): Record<string, unknown> | null {
 	const trimmed = text.trim();
 	if (!trimmed) return null;
@@ -331,7 +335,6 @@ export async function runProviderRequest(
 				finalSnapshot = providerRunCompletedSnapshot(
 					providerClient.provider,
 					event,
-					request,
 				);
 			}
 			if (event.type === "run_failed") {
@@ -359,11 +362,11 @@ export async function runProviderRequest(
 
 function completedStructuredPayload(
 	event: Extract<ProviderRunEvent, { type: "run_completed" }>,
-	request: StartRunInput,
 ): ProviderRunSnapshot["structuredPayload"] {
 	if (event.terminalToolCall) {
 		const input = event.terminalToolCall.input;
 		const parsed =
+			// eslint-disable-next-line @typescript-eslint/no-unnecessary-condition -- provider payloads may be null at runtime.
 			input &&
 			typeof input === "object" &&
 			!Array.isArray(input) &&
@@ -372,14 +375,12 @@ function completedStructuredPayload(
 				: input;
 		return { parsed } as ProviderRunSnapshot["structuredPayload"];
 	}
-	if (!request.structuredOutputSchema) return event.structuredPayload;
-	return undefined;
+	return event.structuredPayload;
 }
 
 function providerRunCompletedSnapshot(
 	provider: AiClientRecord["type"],
 	event: Extract<ProviderRunEvent, { type: "run_completed" }>,
-	request: StartRunInput,
 ): ProviderRunSnapshot {
 	return {
 		provider,
@@ -388,7 +389,7 @@ function providerRunCompletedSnapshot(
 		sessionId: event.run.sessionId,
 		status: event.run.status ?? "completed",
 		outputText: event.outputText,
-		structuredPayload: completedStructuredPayload(event, request),
+		structuredPayload: completedStructuredPayload(event),
 		terminalToolCall: event.terminalToolCall,
 		usage: event.usage,
 		error: null,
@@ -412,6 +413,7 @@ function providerRunFailedSnapshot(
 	};
 }
 
+// eslint-disable-next-line complexity -- LLM feature payloads preserve provider-specific request and response contracts.
 async function llmFeaturePayload(
 	client: AiClientRecord,
 	systemPrompt: string,

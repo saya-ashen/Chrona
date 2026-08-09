@@ -640,11 +640,13 @@ describe("HermesProviderClient", () => {
 
 		const client = new HermesProviderClient();
 
-		await expect(async () => {
-			for await (const _event of client.streamRun({ runId: "run-1" })) {
-				// Unknown events should abort before yielding.
-			}
-		}).toThrow(/Unknown Hermes stream event type: run\.mystery/);
+		await expect(
+			(async () => {
+				for await (const _event of client.streamRun({ runId: "run-1" })) {
+					// Unknown events should abort before yielding.
+				}
+			})(),
+		).rejects.toThrow(/Unknown Hermes stream event type: run\.mystery/);
 	});
 
 	it("allows unknown stream events when strict handling is disabled", async () => {

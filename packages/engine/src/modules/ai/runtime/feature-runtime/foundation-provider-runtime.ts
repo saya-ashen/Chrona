@@ -83,7 +83,9 @@ function terminalPayload(input: unknown): unknown {
 function terminalCandidate(
 	event: Extract<ProviderRunEvent, { type: "run_completed" }>,
 ): unknown {
-	return terminalPayload(event.terminalToolCall?.input);
+	return terminalPayload(
+		event.terminalToolCall?.input ?? event.structuredPayload,
+	);
 }
 
 export type FoundationProviderBinding = {
@@ -287,6 +289,7 @@ export class FoundationProviderRuntime implements AiFeatureProviderPort {
 		return this.provider;
 	}
 
+	// eslint-disable-next-line complexity -- One provider turn must handle terminal, action, failure, and stream-close protocol variants.
 	private async nextTurn(
 		provider: AgentProviderClient,
 		run: ProviderRunRef,

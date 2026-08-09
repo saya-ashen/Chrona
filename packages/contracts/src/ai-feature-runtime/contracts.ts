@@ -23,7 +23,7 @@ export const AI_FEATURE_RUNTIME_LIMITS = {
 const stableContractIdPattern = /^[a-z][a-z0-9]*(?:[._-][a-z0-9]+)*$/;
 const runtimeIdPattern = /^[A-Za-z0-9][A-Za-z0-9._:-]*$/;
 const stableCodePattern = /^[a-z][a-z0-9]*(?:_[a-z0-9]+)*$/;
-const jsonPointerPattern = /^(?:|(?:\/(?:[^~/]|~[01])*)+)$/;
+const jsonPointerPattern = /^(?:\/(?:[^~/]|~[01])*)*$/;
 const sha256HashPattern = /^sha256:[a-f0-9]{64}$/;
 
 export const aiContractIdSchema = z
