@@ -8,9 +8,13 @@
  */
 export {
   acquireSchedulerLease,
+  completeSchedulerLeaseWork,
+  withSchedulerWorkOwnership,
   releaseSchedulerLease,
   renewSchedulerLease,
 } from "./scheduler-lease-repository";
+export { currentSchedulerWorkContext, runWithSchedulerWorkContext } from "./scheduler-work-context";
+export type { SchedulerWorkContext } from "./scheduler-lease-repository";
 export { listSchedulerEvents, recordSchedulerEvent } from "./scheduler-event-repository";
 export { recordOrchestratorEvent } from "./scheduler-events";
 export type { SchedulerEventDetails, SchedulerEventType } from "./scheduler-events";
@@ -39,6 +43,7 @@ export {
 export type {
   TaskOrchestrator,
   TaskOrchestratorOptions,
+  TaskOrchestratorWorkerContext,
   TaskOrchestratorWorker,
 } from "./task-orchestrator";
 export { reconcileTaskState } from "./reconcile-task-state";

@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "bun:test";
 
 import { db } from "@/lib/db";
 import { aiClientRegistry } from "@/modules/ai";
-import { buildDashboardBriefPromptInput, dashboardBriefFromTool, fingerprintDashboardBriefInput, generateDashboardBrief, parseDashboardBriefPayload, type DashboardFingerprintInput } from "./dashboard-ai-surface";
+import { buildDashboardBriefPromptInput, fingerprintDashboardBriefInput, generateDashboardBrief, parseDashboardBriefPayload, type DashboardFingerprintInput } from "./dashboard-ai-surface";
 import { getDashboard } from "./get-dashboard";
 
 async function seedDefaultClient() {
@@ -383,43 +383,5 @@ describe("dashboard AI brief payload parsing", () => {
       summaryText: "Needs review",
       spec: dashboardBriefSpec,
     })).toMatchObject({ summaryText: "Needs review" });
-  });
-});
-
-describe("dashboard brief tool audit result lookup", () => {
-  it("reads accepted chrona_dashboard_brief result by session scope", async () => {
-    const { workspaceId } = await seedWorkspace("Dashboard brief test");
-    const scope = `workspace:${workspaceId}:dashboard.brief:fingerprint`;
-    const correlationId = "dashboard-brief-operation";
-    await db.rawEventLog.create({
-      data: {
-        workspaceId,
-        taskSessionId: scope,
-        source: "chrona_tool",
-        direction: "inbound",
-        rawType: "chrona.dashboard.brief",
-        payloadHash: "dashboard-brief-input-hash",
-        correlationId,
-      },
-    });
-    await db.toolInvocation.create({
-      data: {
-        workspaceId,
-        toolName: "chrona.dashboard.brief",
-        status: "accepted",
-        correlationId,
-        outputPayload: {
-          state: {
-            result: { summaryText: "Needs review", spec: dashboardBriefSpec },
-          },
-        },
-      },
-    });
-
-    await expect(dashboardBriefFromTool(scope)).resolves.toEqual({ summaryText: "Needs review", spec: dashboardBriefSpec });
-  });
-
-  it("ignores assistant text when accepted tool result is missing", async () => {
-    await expect(dashboardBriefFromTool("workspace:missing:dashboard.brief:fingerprint")).resolves.toBeNull();
   });
 });

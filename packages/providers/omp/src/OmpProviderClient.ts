@@ -5,6 +5,7 @@ import type {
   GetRunInput,
   HealthCheckInput,
   StartRunInput,
+  ProviderCapabilities,
   StreamRunInput,
 } from "@chrona/providers-foundation";
 import type {
@@ -27,8 +28,14 @@ export class OmpProviderClient implements AgentProviderClient {
     this.sdk = opts.sdkClient ?? new OmpSdkProviderClient({ config: opts.config ?? {} });
   }
 
-  getCapabilities() {
-    return this.sdk.getCapabilities();
+  async getCapabilities(): Promise<ProviderCapabilities> {
+    const inherited = await this.sdk.getCapabilities();
+    return {
+      ...inherited,
+      actionInvocation: "external_control_plane",
+      startIdempotency: "unsupported",
+      lookupByClientOperationId: false,
+    };
   }
 
   getRuntimeDiagnostics() {

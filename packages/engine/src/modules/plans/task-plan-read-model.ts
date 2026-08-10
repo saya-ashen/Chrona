@@ -1,3 +1,4 @@
+/* eslint-disable complexity -- Plan read projection explicitly handles all durable generation states. */
 import type {
   CheckpointConfig,
   CompiledPlan,
@@ -17,10 +18,12 @@ import type {
   ConditionEvaluator,
   WaitTimeoutAction,
 } from "@chrona/contracts";
+import { projectPublicEffectivePlanGraph } from "@chrona/contracts";
 import { resolveEffectivePlanGraph } from "@chrona/graph-runtime";
 import { getAcceptedCompiledPlan, getLatestCompiledPlan, type SavedCompiledPlan } from "@/modules/plan-execution/persistence/compiled-plan-store";
 import { resolveScopeWorkBlockId } from "@/modules/plan-execution/persistence/execution-scope";
 import { createPlanGraphFromCompiledPlan, getPlanRun } from "@/modules/plan-execution/persistence/plan-run-store";
+import { db } from "@/lib/db";
 
 /**
  * Builds the canonical frontend-facing read model from persisted plan data.
@@ -43,11 +46,16 @@ export function buildTaskPlanReadModel(input: {
     prompt: input.prompt,
     summary: input.summary,
     updatedAt: input.updatedAt,
-    generatedBy: input.generatedBy,
+    generatedBy: publicGeneratedBy(input.generatedBy),
     blueprint: input.blueprint,
     compiledPlan: input.compiledPlan,
-    effectivePlan: input.effectivePlanGraph,
+    effectivePlan: projectPublicEffectivePlanGraph(input.effectivePlanGraph),
   };
+}
+
+function publicGeneratedBy(generatedBy: string | null) {
+  if (!generatedBy) return null;
+  return generatedBy === "user" ? "User" : "AI";
 }
 
 function editablePlanToBlueprint(editablePlan: EditablePlan): PlanBlueprint {
@@ -219,6 +227,7 @@ export async function resolveSavedPlanEffectiveGraph(
       graph: persistedRun.graph,
       attempts: persistedRun.attempts,
       results: persistedRun.results,
+      resolvedAt: savedPlan.updatedAt,
     });
   }
 
@@ -227,6 +236,7 @@ export async function resolveSavedPlanEffectiveGraph(
       taskId: savedPlan.taskId,
       compiledPlan: savedPlan.compiledPlan,
     }),
+    resolvedAt: savedPlan.updatedAt,
   });
 }
 
@@ -254,15 +264,38 @@ export async function getLatestTaskPlanReadModel(
   workBlockId?: string | null,
 ): Promise<TaskPlanReadModel | null> {
   const scopedWorkBlockId = await resolveScopeWorkBlockId(taskId, { workBlockId });
+  const head = await db.taskPlanGenerationHead.findUnique({
+    where: {
+      taskId_workBlockScopeKey: {
+        taskId,
+        workBlockScopeKey: scopedWorkBlockId ?? "",
+      },
+    },
+    include: { currentPlan: true },
+  });
+  if (head) {
+    if (!head.currentPlan) return null;
+    return buildSavedTaskPlanReadModel({
+      recordId: head.currentPlan.id,
+      workspaceId: head.currentPlan.workspaceId,
+      taskId: head.currentPlan.taskId,
+      workBlockId: head.currentPlan.workBlockId,
+      compiledPlan: head.currentPlan.compiledPlan as unknown as CompiledPlan,
+      editablePlan: (head.currentPlan.editablePlan as unknown as EditablePlan | null) ?? null,
+      status: head.currentPlan.status === "Accepted" ? "accepted" : head.currentPlan.status === "Draft" ? "draft" : head.currentPlan.status === "Superseded" ? "superseded" : "archived",
+      prompt: head.currentPlan.prompt,
+      summary: head.currentPlan.summary,
+      generatedBy: head.currentPlan.generatedBy,
+      changeSummary: null,
+      createdAt: head.currentPlan.createdAt.toISOString(),
+      updatedAt: head.currentPlan.updatedAt.toISOString(),
+    });
+  }
+
   const savedPlan =
     (await getAcceptedCompiledPlan(taskId, scopedWorkBlockId))
     ?? (await getLatestCompiledPlan(taskId, scopedWorkBlockId))
     ?? (scopedWorkBlockId ? (await getAcceptedCompiledPlan(taskId, null)) : null)
     ?? (scopedWorkBlockId ? (await getLatestCompiledPlan(taskId, null)) : null);
-
-  if (!savedPlan) {
-    return null;
-  }
-
-  return buildSavedTaskPlanReadModel(savedPlan);
+  return savedPlan ? buildSavedTaskPlanReadModel(savedPlan) : null;
 }

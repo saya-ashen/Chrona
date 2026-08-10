@@ -1,5 +1,5 @@
 import type { UiDocument } from "@chrona/ui-protocol";
-import { SpecRenderer, type ExecutionOverviewCard } from "@features/task-workspace";
+import { SpecRenderer, type ExecutionOverviewCard } from "@features/task-workspace/ui";
 import type { WorkspaceRuntimeEvent } from "../model/workspace-runtime-events";
 import { buildCommandCenterNowSpec } from "./build-execution-overview-spec";
 import { ProviderApprovalBanner } from "./provider-approval-banner";
@@ -16,6 +16,8 @@ import type { CommandCenterPrimaryAction } from "./task-workspace-execution-over
  */
 export function TaskWorkspaceActionRail({
   taskId,
+  workBlockId,
+  executionScope,
   serverNowSpec,
   primaryAction,
   readiness,
@@ -25,6 +27,8 @@ export function TaskWorkspaceActionRail({
   copy,
 }: {
   taskId: string;
+  workBlockId?: string | null;
+  executionScope?: string | null;
   serverNowSpec: UiDocument | null;
   primaryAction?: CommandCenterPrimaryAction | null;
   readiness: ExecutionOverviewCard;
@@ -66,12 +70,11 @@ export function TaskWorkspaceActionRail({
       ((serverNowSpec || primaryAction) && !isPassive),
   );
 
-  // The provider-approval banner self-gates (renders null when empty), so it
-  // always mounts; only the action spec is conditionally shown. When neither
-  // has content the wrapper collapses to nothing and takes no vertical space.
+  // Provider approvals require a concrete occurrence and plan-run scope; the
+  // banner self-gates when that scoped request has no pending approvals.
   return (
     <div className="shrink-0 empty:hidden [&:not(:empty)]:mb-2.5 [&:not(:empty)]:space-y-2">
-      <ProviderApprovalBanner taskId={taskId} />
+      {workBlockId && executionScope ? <ProviderApprovalBanner taskId={taskId} workBlockId={workBlockId} executionScope={executionScope} /> : null}
       {hasActionContent ? (
         <SpecRenderer
           key={serverNowSpec ? "now-server" : (primaryAction?.kind ?? "now")}

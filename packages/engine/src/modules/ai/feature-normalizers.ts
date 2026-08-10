@@ -12,6 +12,7 @@ import type {
   StructuredDebugInfo,
 } from "@chrona/contracts";
 import { AiClientError } from "@chrona/contracts";
+import { parseJsonServerEventStream } from "@chrona/providers-foundation";
 import { dispatch, extractJSON } from "./providers";
 import type { EngineAiClient } from "./runtime/client-registry";
 import { aiClientRegistry } from "./runtime/client-registry";
@@ -112,8 +113,7 @@ export async function chat(
     );
   }
 
-  const reader = res.body?.getReader();
-  if (!reader) {
+  if (!res.body) {
     throw new AiClientError(
       "No response body for streaming",
       "llm",
@@ -121,31 +121,19 @@ export async function chat(
     );
   }
 
-  const decoder = new TextDecoder();
   const contentChunks: string[] = [];
-  let sseBuffer = "";
-
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    sseBuffer += decoder.decode(value, { stream: true });
-    const lines = sseBuffer.split("\n");
-    sseBuffer = lines.pop() ?? "";
-    for (const line of lines) {
-      const trimmed = line.trim();
-      if (!trimmed.startsWith("data: ")) continue;
-      const data = trimmed.slice(6);
-      if (data === "[DONE]") continue;
-      try {
-        const parsed = JSON.parse(data) as {
-          choices?: Array<{ delta?: { content?: string } }>;
-        };
-        const content = parsed.choices?.[0]?.delta?.content;
-        if (content) contentChunks.push(content);
-      } catch {
-        // ignore malformed SSE lines
-      }
+  try {
+    for await (const value of parseJsonServerEventStream(res.body, { doneSentinel: "[DONE]" })) {
+      const parsed = value as { choices?: Array<{ delta?: { content?: string } }> };
+      const content = parsed.choices?.[0]?.delta?.content;
+      if (content) contentChunks.push(content);
     }
+  } catch (error) {
+    throw new AiClientError(
+      error instanceof Error ? error.message : "LLM event stream failed",
+      "llm",
+      "invalid_response",
+    );
   }
 
   const content = contentChunks.join("");

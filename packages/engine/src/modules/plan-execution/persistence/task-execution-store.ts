@@ -1,136 +1,219 @@
-import { RunStatus } from "@/generated/prisma/client";
-import { db } from "@/lib/db";
-import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
-import { updateTaskSessionStateFromRun } from "@/modules/execution-runtime";
+import { Prisma, RunStatus, TaskOccurrenceStatus } from "@/generated/prisma/client";
+import { rebuildTaskProjectionInTransaction } from "@/modules/projections/rebuild-task-projection";
+import { updateTaskSessionStateFromRunInTransaction } from "@/modules/execution-runtime";
+import { terminalizePlanRunScopeInTransaction } from "./plan-run-terminalizer";
+import { withPlanExecutionDurability } from "./scheduler-durability";
+import type { ChronaToolName } from "@chrona/contracts";
 
-const ACTIVE_RUN_STATUSES = [
+const PLAN_EXECUTION_ALLOWED_TOOL_NAMES = [
+  "chrona.execution.read",
+  "chrona.goal.results.read",
+  "chrona.plan.read",
+  "chrona.node.read",
+  "chrona.node.complete",
+  "chrona.node.condition_select",
+  "chrona.node.block",
+  "chrona.node.fail",
+  "chrona.node.request_input",
+  "chrona.node.wait_complete",
+] as const satisfies readonly ChronaToolName[];
+const PLAN_EXECUTION_ALLOWED_TOOL_NAMES_JSON = JSON.stringify(PLAN_EXECUTION_ALLOWED_TOOL_NAMES);
+
+export const ACTIVE_RUN_STATUSES: readonly RunStatus[] = [
   RunStatus.Pending,
   RunStatus.Running,
   RunStatus.WaitingForApproval,
   RunStatus.WaitingForInput,
-] as const;
+];
+const TERMINAL_OCCURRENCE_STATUSES: TaskOccurrenceStatus[] = [
+  TaskOccurrenceStatus.Completed,
+  TaskOccurrenceStatus.Cancelled,
+  TaskOccurrenceStatus.Failed,
+];
 
 
-export async function syncTaskRunState(input: {
+export async function syncPersistedRunState(input: {
   taskId: string;
-  taskSessionId?: string | null;
   runId: string;
-  runStatus: RunStatus;
-  runtimeRunRef?: string | null;
   setAsLatest?: boolean;
   rebuildProjection?: boolean;
 }) {
-  if (input.setAsLatest) {
-    await db.task.update({
-      where: { id: input.taskId },
-      data: { latestRunId: input.runId },
-    });
-  }
-  await updateTaskSessionStateFromRun({
-    taskSessionId: input.taskSessionId,
-    runId: input.runId,
-    runStatus: input.runStatus,
-    runtimeRunRef: input.runtimeRunRef,
+  return withPlanExecutionDurability((tx) => syncPersistedRunStateInTransaction(input, tx));
+}
+
+/** Scheduler recovery must supply its existing fenced transaction. */
+export async function syncPersistedRunStateInTransaction(
+  input: { taskId: string; runId: string; setAsLatest?: boolean; rebuildProjection?: boolean },
+  tx: Prisma.TransactionClient,
+) {
+  const run = await tx.run.findFirst({
+    where: { id: input.runId, taskId: input.taskId },
+    select: { occurrenceId: true, runtimeRunRef: true, status: true, taskSessionId: true },
   });
-  const occurrence = await db.run.findUnique({ where: { id: input.runId }, select: { occurrenceId: true } });
-  if (occurrence?.occurrenceId) {
-    const terminal = input.runStatus === RunStatus.Completed || input.runStatus === RunStatus.Cancelled || input.runStatus === RunStatus.Failed;
-    const occurrenceStatus = input.runStatus === RunStatus.Completed
-      ? "Completed"
-      : input.runStatus === RunStatus.Cancelled
-        ? "Cancelled"
-        : input.runStatus === RunStatus.Failed
-          ? "Failed"
-          : input.runStatus === RunStatus.WaitingForInput
-            ? "WaitingForInput"
-            : input.runStatus === RunStatus.WaitingForApproval
-              ? "WaitingForApproval"
-              : "Running";
-    await db.taskOccurrence.update({
-      where: { id: occurrence.occurrenceId },
+  if (!run) return;
+  if (input.setAsLatest) {
+    await tx.task.updateMany({ where: { id: input.taskId, runs: { some: { id: input.runId } } }, data: { latestRunId: input.runId } });
+  }
+  await updateTaskSessionStateFromRunInTransaction({
+    taskSessionId: run.taskSessionId,
+    runId: input.runId,
+    runStatus: run.status,
+    runtimeRunRef: run.runtimeRunRef,
+  }, tx);
+  if (run.taskSessionId) {
+    await tx.taskSession.update({
+      where: { id: run.taskSessionId },
       data: {
-        status: occurrenceStatus,
-        startedAt: terminal ? undefined : new Date(),
-        completedAt: terminal ? new Date() : null,
+        capabilityScope: "plan_execution",
+        allowedToolNames: PLAN_EXECUTION_ALLOWED_TOOL_NAMES_JSON,
       },
     });
   }
+  if (!ACTIVE_RUN_STATUSES.includes(run.status)) {
+    await tx.runToken.updateMany({ where: { runId: input.runId, revokedAt: null }, data: { revokedAt: new Date() } });
+  }
+  if (run.occurrenceId) {
+    await syncOccurrenceStateFromRunInTransaction({ occurrenceId: run.occurrenceId, runStatus: run.status }, tx);
+  }
   if (input.rebuildProjection !== false) {
-    await rebuildTaskProjection(input.taskId);
+    await rebuildTaskProjectionInTransaction(input.taskId, tx);
   }
 }
+
+async function syncOccurrenceStateFromRunInTransaction(
+  input: { occurrenceId: string; runStatus: RunStatus },
+  tx: Prisma.TransactionClient,
+) {
+  const terminal = input.runStatus === RunStatus.Completed || input.runStatus === RunStatus.Cancelled || input.runStatus === RunStatus.Failed;
+  const status: TaskOccurrenceStatus = input.runStatus === RunStatus.Completed ? TaskOccurrenceStatus.Completed : input.runStatus === RunStatus.Cancelled ? TaskOccurrenceStatus.Cancelled : input.runStatus === RunStatus.Failed ? TaskOccurrenceStatus.Failed : input.runStatus === RunStatus.WaitingForInput ? TaskOccurrenceStatus.WaitingForInput : input.runStatus === RunStatus.WaitingForApproval ? TaskOccurrenceStatus.WaitingForApproval : TaskOccurrenceStatus.Running;
+  await tx.taskOccurrence.updateMany({
+    where: terminal
+      ? { id: input.occurrenceId, status: { notIn: TERMINAL_OCCURRENCE_STATUSES } }
+      : { id: input.occurrenceId, status: { notIn: TERMINAL_OCCURRENCE_STATUSES }, completedAt: null },
+    data: terminal ? { status, completedAt: new Date() } : { status, startedAt: new Date() },
+  });
+}
+
 export async function markExecutionNodeActive(input: {
   taskId: string;
-  sessionId?: string | null;
+  sessionId: string;
+  planId: string;
+  workBlockId: string | null;
+  expectedExecutionEpoch: number;
   currentNodeId: string | null;
   completedNodeIds?: string[];
-}) {
+}): Promise<boolean> {
+  return withPlanExecutionDurability(async (tx) => {
+    const claimedPlanRun = await tx.taskPlanRun.updateMany({
+      where: {
+        taskId: input.taskId,
+        planId: input.planId,
+        workBlockScopeKey: input.workBlockId ?? "",
+        executionEpoch: input.expectedExecutionEpoch,
+      },
+      data: { executionEpoch: input.expectedExecutionEpoch },
+    });
+    if (claimedPlanRun.count !== 1) return false;
+
+    const now = new Date();
+    const sessionUpdate = await tx.executionSession.updateMany({
+      where: {
+        id: input.sessionId,
+        taskId: input.taskId,
+        planId: input.planId,
+        workBlockId: input.workBlockId,
+        status: { in: ["Active", "Paused"] },
+      },
+      data: {
+        status: "Active",
+        currentNodeId: input.currentNodeId,
+        pauseReason: null,
+        completedNodeIds: input.completedNodeIds ? JSON.stringify(input.completedNodeIds) : undefined,
+        pausedAt: null,
+        completedAt: null,
+        updatedAt: now,
+      },
+    });
+    if (sessionUpdate.count !== 1) return false;
+    await rebuildTaskProjectionInTransaction(input.taskId, tx);
+    return true;
+  });
+}
+
+export async function completeActiveRunsForExecutionScope(input: {
+  taskId: string;
+  taskSessionId: string;
+  occurrenceId?: string | null;
+  workBlockId?: string | null;
+  planRunId?: string;
+}, tx?: Prisma.TransactionClient) {
+  return withPlanExecutionDurability(
+    (client) => updateActiveRunsForExecutionScope({ ...input, status: RunStatus.Completed }, client),
+    tx,
+  );
+}
+
+export async function cancelActiveRunsForExecutionScope(
+  input: {
+    taskId: string;
+    taskSessionId: string;
+    occurrenceId?: string | null;
+    workBlockId?: string | null;
+    planRunId?: string;
+    reason?: string | null;
+  },
+  tx?: Prisma.TransactionClient,
+) {
+  return withPlanExecutionDurability(
+    (client) => updateActiveRunsForExecutionScope({ ...input, status: RunStatus.Cancelled }, client),
+    tx,
+  );
+}
+
+async function updateActiveRunsForExecutionScope(input: {
+  taskId: string;
+  taskSessionId: string;
+  occurrenceId?: string | null;
+  workBlockId?: string | null;
+  planRunId?: string;
+  status: Extract<RunStatus, "Completed" | "Cancelled">;
+  reason?: string | null;
+}, tx: Prisma.TransactionClient) {
   const now = new Date();
-  const sessionUpdate = input.sessionId
-    ? await db.executionSession.updateMany({
-        where: {
-          id: input.sessionId,
-          status: { notIn: ["Completed", "Abandoned"] },
-        },
-        data: {
-          status: "Active",
-          currentNodeId: input.currentNodeId,
-          pauseReason: null,
-          completedNodeIds: input.completedNodeIds
-            ? JSON.stringify(input.completedNodeIds)
-            : undefined,
-          pausedAt: null,
-          completedAt: null,
-          updatedAt: now,
-        },
-      })
-    : { count: 0 };
-  // The session transition to Active is the authoritative execution fact.
-  // rebuildTaskProjection is the single authority that derives Running and
-  // clears the block from it — we never write Task.status/blockReason here.
-  if (sessionUpdate.count > 0) {
-    await rebuildTaskProjection(input.taskId);
+  await tx.run.updateMany({
+    where: {
+      taskId: input.taskId,
+      taskSessionId: input.taskSessionId,
+      status: { in: [...ACTIVE_RUN_STATUSES] },
+      ...(input.occurrenceId
+        ? { occurrenceId: input.occurrenceId }
+        : { workBlockId: input.workBlockId ?? null }),
+    },
+    data: {
+      status: input.status,
+      endedAt: now,
+      errorSummary: input.status === RunStatus.Cancelled ? input.reason ?? null : null,
+      retryable: false,
+      resumeSupported: false,
+      pendingInputPrompt: null,
+      lastSyncedAt: now,
+      syncStatus: "healthy",
+      mappingPartial: false,
+    },
+  });
+  if (input.planRunId) {
+    await terminalizePlanRunScopeInTransaction({
+      taskId: input.taskId,
+      workBlockId: input.workBlockId ?? null,
+      planRunId: input.planRunId,
+      occurrenceId: input.occurrenceId ?? null,
+      status: input.status,
+    }, tx);
   }
-}
-
-export async function completeActiveRunsForTask(taskId: string) {
-  const now = new Date();
-  await db.run.updateMany({
-    where: {
-      taskId,
-      status: { in: [...ACTIVE_RUN_STATUSES] },
-    },
-    data: {
-      status: RunStatus.Completed,
-      endedAt: now,
-      errorSummary: null,
-      retryable: false,
-      resumeSupported: false,
-      pendingInputPrompt: null,
-      lastSyncedAt: now,
-      syncStatus: "healthy",
-      mappingPartial: false,
-    },
-  });
-}
-
-export async function cancelActiveRunsForTask(taskId: string, reason?: string | null) {
-  const now = new Date();
-  await db.run.updateMany({
-    where: {
-      taskId,
-      status: { in: [...ACTIVE_RUN_STATUSES] },
-    },
-    data: {
-      status: RunStatus.Cancelled,
-      endedAt: now,
-      errorSummary: reason ?? null,
-      retryable: false,
-      resumeSupported: false,
-      pendingInputPrompt: null,
-      lastSyncedAt: now,
-      syncStatus: "healthy",
-      mappingPartial: false,
-    },
-  });
+  if (input.occurrenceId) {
+    await syncOccurrenceStateFromRunInTransaction({
+      occurrenceId: input.occurrenceId,
+      runStatus: input.status,
+    }, tx);
+  }
 }

@@ -79,7 +79,7 @@ Source anchors:
 - `done`
 - `heartbeat`
 
-The generation module calls the configured AI client for the `generate_plan` feature and persists the resulting plan graph.
+The generation module runs the domain-owned `task.plan.generate` Feature through the configured `task.plan` AI client binding and atomically persists the resulting plan graph with its Runtime provenance.
 
 Source anchors:
 

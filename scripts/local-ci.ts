@@ -33,7 +33,7 @@ export async function runLocalCi() {
 
   try {
     await $`bun run scripts/init-sqlite-db.ts --reset ${environment.databasePath}`.env(env);
-    await $`bun run check`.env(env);
+    await $`bun run analyze`.env(env);
     await $`bun run test:ci`.env(env);
     await $`bun run test:e2e:desktop`.env(env);
   } finally {

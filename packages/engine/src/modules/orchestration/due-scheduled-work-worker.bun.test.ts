@@ -99,6 +99,30 @@ describe("runDueScheduledWorkWorker", () => {
     });
   });
 
+  it("does not report a due-work outcome after its lease is lost", async () => {
+    const { task } = await createTask();
+    const controller = new AbortController();
+    const startDueWork = mock(async () => ({
+      started: [{ taskId: task.id, workBlockId: "block_started", runId: "plan_1" }],
+      skipped: [],
+      failed: [],
+      now: "2026-05-17T00:00:00.000Z",
+    }));
+    const recordEvent = mock(async () => undefined);
+
+    await expect(runDueScheduledWorkWorker({
+      workContext: {
+        signal: controller.signal,
+        lease: { name: "task-orchestrator", ownerId: "stale-owner", epoch: 1 },
+        isLeaseCurrent: () => false,
+      },
+      deps: { recordEvent, startDueWork },
+    })).rejects.toThrow("Scheduler lease ownership was lost.");
+
+    expect(startDueWork).not.toHaveBeenCalled();
+    expect(recordEvent).not.toHaveBeenCalled();
+  });
+
   it("does not persist non-actionable scheduler skips", async () => {
     const { task } = await createTask();
     const startDueWork = mock(async () => ({

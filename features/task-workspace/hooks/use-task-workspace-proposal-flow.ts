@@ -1,4 +1,5 @@
 import { useCallback, useState } from "react";
+import { v4 as uuidv4 } from "uuid";
 import { useMutation } from "@tanstack/react-query";
 import { apiJson } from "@shared/http";
 import type { TaskWorkspaceUpdateProposal } from "@chrona/contracts"
@@ -16,6 +17,7 @@ import type { CurrentProposalState, EditableTask, TaskData } from "../model/task
 type UseTaskWorkspaceProposalFlowInput = {
   task: TaskData;
   plan: TaskData["savedPlan"] | null;
+  planHeadStateVersion: number | null;
   draftEditableTask: EditableTask;
   setTask: (value: React.SetStateAction<TaskData>) => void;
   setSaveError: (value: string | null) => void;
@@ -26,6 +28,7 @@ type UseTaskWorkspaceProposalFlowInput = {
 export function useTaskWorkspaceProposalFlow({
   task,
   plan,
+  planHeadStateVersion,
   draftEditableTask,
   setTask,
   setSaveError,
@@ -72,13 +75,38 @@ export function useTaskWorkspaceProposalFlow({
 
       if (proposal.planPatch && plan) {
         try {
-          await apiJson(`/api/tasks/${encodeURIComponent(task.id)}/plan`, {
-            method: "POST",
-            body: JSON.stringify({
-              operation: "batch",
-              operations: proposal.planPatch.operations.map((op) => JSON.stringify(op)),
-            }),
-          });
+          if (planHeadStateVersion === null) {
+            throw new Error("Plan generation version is unavailable. Refresh before applying the proposal.");
+          }
+          let expectedHeadStateVersion = planHeadStateVersion;
+          for (const operation of proposal.planPatch.operations) {
+            const patch = (() => {
+              switch (operation.op) {
+                case "add_node":
+                  return { operation: "add_node", nodes: [operation.node] };
+                case "update_node":
+                  return { operation: "update_node", nodePatches: [{ id: operation.nodeId, ...operation.patch }] };
+                case "delete_node":
+                  return { operation: "delete_node", deletedNodeIds: [operation.nodeId] };
+                case "add_edge":
+                  return { operation: "update_dependencies", edges: [{ fromNodeId: operation.edge.from, toNodeId: operation.edge.to }] };
+                case "update_plan":
+                case "delete_edge":
+                case "replace_subgraph":
+                  throw new Error(`Unsupported plan proposal operation: ${operation.op}`);
+              }
+            })();
+            await apiJson(`/api/tasks/${encodeURIComponent(task.id)}/plan`, {
+              method: "POST",
+              body: JSON.stringify({
+                ...patch,
+                expectedHeadStateVersion,
+                idempotencyKey: uuidv4(),
+                summary: proposal.planPatch.rationale ?? `Apply ${operation.op}`,
+              }),
+            });
+            expectedHeadStateVersion += 1;
+          }
         } catch (cause) {
           errors.push(`Plan update error: ${cause instanceof Error ? cause.message : "Unknown"}`);
         }

@@ -13,7 +13,7 @@ import {
   resolveExecutionRuntime,
   validateRuntimeTaskConfig,
   validateTaskRuntimeConfig,
-} from "@chrona/engine/modules/execution-runtime";
+} from "@chrona/engine/test-support";
 
 // execution-runtime — engine-layer unit for the runtime registry
 // + session key builders. The DB-touching ensure* functions are

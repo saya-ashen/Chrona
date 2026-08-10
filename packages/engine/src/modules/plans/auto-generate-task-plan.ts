@@ -1,41 +1,56 @@
 import { createLogger } from "@chrona/logging";
-import { getLatestCompiledPlan } from "@/modules/plan-execution/persistence/compiled-plan-store";
 import { taskPlanning } from "./task-planning";
 import { TaskPlanGenerationInFlightError } from "./task-plan-generation-registry";
+import { assertSchedulerWorkOwnership, type SchedulerWorkContext } from "@/modules/orchestration/scheduler-lease-repository";
+import { runWithSchedulerWorkContext } from "@/modules/orchestration/scheduler-work-context";
 
 const logger = createLogger("engine.plans.auto-generate");
 
-export async function generateAndAcceptTaskPlan(input: { taskId: string; workBlockId?: string | null; accept?: boolean }) {
-  const workBlockId = input.workBlockId ?? null;
-  const generation = taskPlanning.generate({ taskId: input.taskId, workBlockId });
-  let acceptedPlanId: string | null = null;
+export async function generateAndAcceptTaskPlan(input: {
+  taskId: string;
+  workBlockId?: string | null;
+  accept?: boolean;
+  workContext?: SchedulerWorkContext;
+}) {
+  return runWithSchedulerWorkContext(input.workContext, async () => {
+    const workBlockId = input.workBlockId ?? null;
+    await assertSchedulerWorkOwnership(input.workContext);
+    const generation = await taskPlanning.generate({
+      taskId: input.taskId,
+      workBlockId,
+      idempotencyKey: `auto-plan:${input.taskId}:${workBlockId ?? "default"}`,
+      workContext: input.workContext,
+    });
+    let committed: { planId: string; headStateVersion: number } | null = null;
+    let acceptedPlanId: string | null = null;
 
-  try {
-    for await (const event of generation.events) {
-      generation.emit(event);
-
-      if (event.type === "result") {
-        if (input.accept ?? true) {
-          const planId = event.result.id;
-          const latest = await getLatestCompiledPlan(input.taskId, workBlockId)
-            ?? await getLatestCompiledPlan(input.taskId, null);
-          const effectiveWorkBlockId = latest?.workBlockId ?? null;
-          await taskPlanning.accept({ taskId: input.taskId, planId, workBlockId: effectiveWorkBlockId });
-          acceptedPlanId = planId;
+    try {
+      for await (const event of generation.events) {
+        await assertSchedulerWorkOwnership(input.workContext);
+        if (event.type === "committed") {
+          committed = { planId: event.planId, headStateVersion: event.headStateVersion };
         }
-
-        break;
+        if (event.type === "failed" || event.type === "stale" || event.type === "cancelled") break;
       }
 
-      if (event.type === "error" || event.type === "cancelled") {
-        break;
+      if (committed && input.accept === true) {
+        await taskPlanning.accept({
+          taskId: input.taskId,
+          planId: committed.planId,
+          workBlockId,
+          expectedHeadStateVersion: committed.headStateVersion,
+          idempotencyKey: `auto-accept:${generation.generationId}`,
+          workContext: input.workContext,
+        });
+        acceptedPlanId = committed.planId;
       }
+    } finally {
+      generation.finish();
     }
-  } finally {
-    generation.finish();
-  }
 
-  return { taskId: input.taskId, acceptedPlanId };
+    await assertSchedulerWorkOwnership(input.workContext);
+    return { taskId: input.taskId, acceptedPlanId };
+  });
 }
 
 export function startAutoPlanGenerationForTask(input: { taskId: string; workBlockId?: string | null; accept?: boolean }) {

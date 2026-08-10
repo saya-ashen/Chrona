@@ -1,4 +1,4 @@
-import type { ExecutionActionWithContinuation } from "../../types";
+import type { ExecutionActionWithContinuation, ExecutionDispatchContext } from "../../types";
 import { checkpointPayloadFields } from "../../execution-actions";
 import { observerCallbacks } from "./observer";
 import type {
@@ -9,6 +9,7 @@ import type {
 export async function dispatchCheckpointAction(input: {
   taskId: string;
   executionAction: ExecutionActionWithContinuation;
+  commandContext?: ExecutionDispatchContext;
   dispatchExecutionAction: DispatchExecutionAction;
 } & Omit<CheckpointTransitionHandlerInput, "action">) {
   const action = input.executionAction.action === "resume_with_input"
@@ -21,6 +22,7 @@ export async function dispatchCheckpointAction(input: {
   return input.dispatchExecutionAction({
     taskId: input.taskId,
     action,
+    commandContext: input.commandContext,
     ...observerCallbacks(input),
   });
 }

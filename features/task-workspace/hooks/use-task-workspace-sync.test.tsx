@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type * as SharedHttp from "@shared/http";
 import type * as TaskPlanGenerationSessionStore from "./task-plan-generation-session-store";
-import type { PlanExecutionResult, TaskPlanReadModel } from "@chrona/contracts"
+import type { PublicPlanExecutionResult, TaskPlanReadModel } from "@chrona/contracts"
 import { useTaskWorkspacePageState, type TaskWorkspaceSseEvent } from "./use-task-workspace-page-state";
 import { useTaskWorkspacePlanState } from "./use-task-workspace-plan-state";
 import type { TaskPageData } from "@features/task-workspace"
@@ -29,7 +29,7 @@ const mocks = vi.hoisted(() => ({
   commandResponses: [] as Array<{ commandId: string; taskId: string; acceptedAt: string }>,
   commandCalls: [] as Array<{ taskId: string; json: Record<string, unknown> }>,
   fetchCalls: [] as Array<{ input: string; init?: RequestInit }>,
-  currentExecutionResponse: null as PlanExecutionResult | null,
+  currentExecutionResponse: null as PublicPlanExecutionResult | null,
   currentExecutionFetchCount: 0,
   eventHandlers: new Map<string, JsonEventHandler>(),
   eventStreamAttempts: 0,
@@ -38,6 +38,7 @@ const mocks = vi.hoisted(() => ({
   generationSession: {
     taskId: "task-1",
     generationId: null as string | null,
+    headStateVersion: null as number | null,
     sessionStatus: "idle" as "idle" | "running" | "completed" | "failed" | "cancelled",
     result: null as TaskPlanReadModel | null,
     isLoading: false,
@@ -283,11 +284,11 @@ function recurringPageData(input: Parameters<typeof pageData>[0] & { workBlockId
   };
 }
 
-function executionResult(input: Partial<PlanExecutionResult> = {}): PlanExecutionResult {
+function executionResult(input: Partial<PublicPlanExecutionResult> = {}): PublicPlanExecutionResult {
   return {
     taskId: "task-1",
     planId: "plan-1",
-    mainSessionId: "session-1",
+    executionScope: "scope-1",
     status: "running",
     currentNodeId: "node-1",
     executedNodeIds: [],
@@ -318,6 +319,27 @@ function nextWorkspaceEvent(input: TaskWorkspaceSseEvent) {
     sequence: input.sequence ?? ++mocks.workspaceEventSequence,
   } satisfies TaskWorkspaceSseEvent;
 }
+function completedGenerationSession(result: TaskPlanReadModel | null = null) {
+  return {
+    taskId: "task-1",
+    generationId: "generation-1",
+    headStateVersion: 2,
+    sessionStatus: "completed" as const,
+    result,
+    isLoading: false,
+    error: null,
+    errorCode: null,
+    phase: "done",
+    statusMessage: null,
+    partialText: "",
+    toolCalls: [] as unknown[],
+    toolResults: [] as unknown[],
+    startedAt: "2026-06-10T00:00:00.000Z",
+    finishedAt: "2026-06-10T00:00:00.000Z",
+    connected: false,
+    hydrated: true,
+  };
+}
 
 
 afterEach(() => {
@@ -341,6 +363,7 @@ afterEach(() => {
   mocks.generationSession = {
     ...mocks.generationSession,
     generationId: null,
+    headStateVersion: null,
     sessionStatus: "idle",
     result: null,
     isLoading: false,
@@ -378,10 +401,10 @@ describe("task workspace page synchronization", () => {
       action: "start_manual",
       nodeId: "node-1",
       nodeTitle: "First node",
-      runtimeName: "hermes",
-      provider: "hermes",
+      runtime: { category: "runtime", label: "Execution runtime" },
+      provider: { category: "ai_provider", label: "AI provider" },
       runId: "run-1",
-      event: { type: "assistant_text_delta", text: "First occurrence activity" },
+      event: { type: "tool_started", tool: { category: "tool", label: "Runtime tool" }, label: "First occurrence activity" },
     })];
 
     await act(async () => {
@@ -390,7 +413,7 @@ describe("task workspace page synchronization", () => {
 
     expect(result.current.plan?.id).toBe("plan-first");
     expect(result.current.planGenerationStatus).toBe("waiting_acceptance");
-    expect(result.current.latestActivitySummary).toBe("First occurrence activity");
+    expect(result.current.latestActivitySummary).toBe("Running First occurrence activity");
 
     task = recurringPageData({
       taskStatus: "Ready",
@@ -427,10 +450,10 @@ describe("task workspace page synchronization", () => {
           action: "start_manual",
           nodeId: "node-1",
           nodeTitle: "Other node",
-          runtimeName: "hermes",
-          provider: "hermes",
+          runtime: { category: "runtime", label: "Execution runtime" },
+          provider: { category: "ai_provider", label: "AI provider" },
           runId: "run-other",
-          event: { type: "assistant_text_delta", text: "Other occurrence activity" },
+          event: { type: "tool_started", tool: { category: "tool", label: "Runtime tool" }, label: "Other occurrence activity" },
         }),
       ]),
       { wrapper: createQueryWrapper() },
@@ -452,10 +475,10 @@ describe("task workspace page synchronization", () => {
       action: "start_manual",
       nodeId: "node-1",
       nodeTitle: "First node",
-      runtimeName: "hermes",
-      provider: "hermes",
+      runtime: { category: "runtime", label: "Execution runtime" },
+      provider: { category: "ai_provider", label: "AI provider" },
       runId: "run-first",
-      event: { type: "assistant_text_delta", text: "First occurrence activity" },
+      event: { type: "tool_started", tool: { category: "tool", label: "Runtime tool" }, label: "First occurrence activity" },
     })];
 
     const { result, rerender } = renderHook(
@@ -463,7 +486,7 @@ describe("task workspace page synchronization", () => {
       { wrapper: createQueryWrapper() },
     );
 
-    await waitFor(() => expect(result.current.latestActivitySummary).toBe("First occurrence activity"));
+    await waitFor(() => expect(result.current.latestActivitySummary).toBe("Running First occurrence activity"));
 
     task = recurringPageData({ taskStatus: "Running", plan: secondPlan, runStatus: "Running", workBlockId: "block-second" }).task;
     workspaceEvents = [];
@@ -533,7 +556,7 @@ describe("task workspace page synchronization", () => {
     mocks.currentExecutionResponse = {
       taskId: "task-1",
       planId: "plan-1",
-      mainSessionId: "session-1",
+      executionScope: "scope-1",
       status: "running",
       currentNodeId: "node-1",
       executedNodeIds: [],
@@ -588,13 +611,12 @@ describe("task workspace page synchronization", () => {
           action: "start_manual",
           nodeId: "node-1",
           nodeTitle: "Execute launch",
-          runtimeName: "default",
-          provider: "omp",
-          runId: "run-1",
+          runtime: { category: "runtime", label: "Execution runtime" },
+          provider: { category: "ai_provider", label: "AI provider" },
           timestamp: "2026-05-17T00:00:02.000Z",
           event: {
             type: "tool_started",
-            toolName: "browser",
+            tool: { category: "tool", label: "Runtime tool" },
             label: "browser",
           },
         },
@@ -731,15 +753,13 @@ describe("task workspace page synchronization", () => {
     await waitFor(() => expect(result.current.plan.graphPlan?.nodes[0]?.checkpoint?.id).toBe(checkpoint.id));
     expect(result.current.plan.graphPlan?.nodes[0]?.availableActions).toHaveLength(1);
   });
-
-  it("shows a ready node as starting while an execution session is active", async () => {
+  it("shows a ready node as starting while public execution evidence is active", async () => {
     const initialPlan = planReadModel({ id: "plan-1", status: "ready", title: "Prepare launch" });
     const initialPage = pageData({ taskStatus: "Running", plan: initialPlan, runStatus: "Running" });
     mocks.planResponses = [{ taskId: "task-1", aiPlanGenerationStatus: "accepted", savedPlan: initialPlan }];
     mocks.currentExecutionResponse = executionResult({
       status: "running",
       currentNodeId: "node-1",
-      executionSessionId: "execution-session-1",
       message: "Current execution state.",
     });
 
@@ -760,15 +780,14 @@ describe("task workspace page synchronization", () => {
     expect(node?.metadata?.launchState).toBe("starting");
   });
 
-  it("does not show a ready node as starting when current execution has no session evidence", async () => {
+  it("does not show a ready node as starting without public execution evidence", async () => {
     const initialPlan = planReadModel({ id: "plan-1", status: "ready", title: "Prepare launch" });
     const initialPage = pageData({ taskStatus: "Ready", plan: initialPlan });
     mocks.planResponses = [{ taskId: "task-1", aiPlanGenerationStatus: "accepted", savedPlan: initialPlan }];
     mocks.currentExecutionResponse = executionResult({
       status: "running",
       currentNodeId: "node-1",
-      executionSessionId: null,
-      planRunId: undefined,
+      executionScope: null,
       message: "No active execution session.",
     });
 
@@ -787,22 +806,6 @@ describe("task workspace page synchronization", () => {
     expect(node?.metadata?.launchState).toBeUndefined();
   });
 
-  it("does not refresh the workspace page for plan-only progress events", async () => {
-    const initialPlan = planReadModel({ id: "plan-1", status: "ready", title: "Old plan" });
-    const initialPage = pageData({ taskStatus: "Ready", plan: initialPlan, aiPlanGenerationStatus: "generating" });
-    mocks.pageResponses = [pageData({ taskStatus: "Ready", plan: initialPlan })];
-
-    renderHook(() => useTaskWorkspacePageState(initialPage), { wrapper: createQueryWrapper() });
-
-    await waitFor(() => expect(mocks.eventHandlers.has("/api/work/task-1/events")).toBe(true));
-    await act(async () => {
-      emitWorkspaceEvent(nextWorkspaceEvent({ type: "plan.generation.event", eventKind: "tool_call" }));
-      emitWorkspaceEvent(nextWorkspaceEvent({ type: "plan.generation.event", eventKind: "result" }));
-    });
-
-    expect(mocks.pageFetchCount).toBe(0);
-    expect(mocks.pageResponses).toHaveLength(1);
-  });
 
   it("does not refresh the workspace page for ready or heartbeat events", async () => {
     const initialPlan = planReadModel({ id: "plan-1", status: "running", title: "Execute launch" });
@@ -870,7 +873,7 @@ describe("task workspace page synchronization", () => {
     visibilitySpy.mockRestore();
   });
 
-  it("refreshes only plan state when a plan generation result event arrives", async () => {
+  it("refreshes only plan state when plan generation completes", async () => {
     const initialPlan = planReadModel({ id: "plan-1", status: "ready", title: "Old plan" });
     const generatedPlan = planReadModel({ id: "plan-2", status: "ready", title: "Generated plan" });
     const initialPage = pageData({ taskStatus: "Ready", plan: initialPlan, aiPlanGenerationStatus: "generating" });
@@ -886,14 +889,14 @@ describe("task workspace page synchronization", () => {
 
     await waitFor(() => expect(mocks.eventHandlers.has("/api/work/task-1/events")).toBe(true));
     await act(async () => {
-      emitWorkspaceEvent(nextWorkspaceEvent({ type: "plan.generation.event", eventKind: "result" }));
+      emitWorkspaceEvent(nextWorkspaceEvent({ type: "task_workspace_updated", reason: "plan_generation.completed" }));
     });
 
     expect(mocks.pageFetchCount).toBe(0);
     await waitFor(() => expect(result.current.plan.graphPlan?.nodes[0]?.title).toBe("Generated plan"));
   });
 
-  it("refreshes recurring plan generation events for the selected work block", async () => {
+  it("refreshes the selected recurring work block when plan generation completes", async () => {
     const initialPlan = planReadModel({ id: "plan-first", status: "ready", title: "Old recurring plan" });
     const generatedPlan = planReadModel({ id: "plan-generated", status: "draft", title: "Generated recurring plan" });
     const initialPage = recurringPageData({
@@ -918,8 +921,8 @@ describe("task workspace page synchronization", () => {
     });
     await act(async () => {
       emitWorkspaceEvent(nextWorkspaceEvent({
-        type: "plan.generation.event",
-        eventKind: "result",
+        type: "task_workspace_updated",
+        reason: "plan_generation.completed",
         workBlockId: "block-first",
       }));
     });
@@ -941,33 +944,26 @@ describe("task workspace page synchronization", () => {
       phase: "streaming",
     };
 
-    const { result } = renderHook(() => {
+    const { result, rerender } = renderHook(() => {
       const workspace = useTaskWorkspacePageState(initialPage);
       const plan = useTaskWorkspacePlanState(workspace.pageData.task, workspace.refreshWorkspace, workspace.workspaceEvents);
       return { workspace, plan };
     }, { wrapper: createQueryWrapper() });
 
-    await waitFor(() => expect(mocks.eventHandlers.has("/api/work/task-1/events")).toBe(true));
-    await act(async () => {
-      mocks.generationSession = { ...mocks.generationSession, statusMessage: "Running tool" };
-      emitWorkspaceEvent(nextWorkspaceEvent({ type: "plan.generation.event", eventKind: "tool_call" }));
-    });
-
     expect(result.current.plan.latestActivitySummary).toBe("Running tool");
 
-    await act(async () => {
-      mocks.generationSession = { ...mocks.generationSession, statusMessage: "Generating plan" };
-      emitWorkspaceEvent(nextWorkspaceEvent({ type: "plan.generation.event", eventKind: "status" }));
-    });
+    mocks.generationSession = { ...mocks.generationSession, statusMessage: "Generating plan" };
+    rerender();
 
     expect(result.current.plan.latestActivitySummary).toBe("Generating plan");
   });
 
-  it("uses a completed generation event result even when the AI panel is not mounted", async () => {
+  it("refreshes the canonical saved plan after a completed generation event even without the AI panel", async () => {
     const initialPlan = planReadModel({ id: "plan-1", status: "ready", title: "Old plan" });
+    const generatedPlan = planReadModel({ id: "plan-2", status: "draft", title: "Generated plan" });
     const initialPage = pageData({ taskStatus: "Ready", plan: initialPlan, aiPlanGenerationStatus: "generating" });
     mocks.planResponses = [
-      { taskId: "task-1", aiPlanGenerationStatus: "waiting_acceptance", savedPlan: initialPlan },
+      { taskId: "task-1", aiPlanGenerationStatus: "waiting_acceptance", savedPlan: generatedPlan },
     ];
 
     const { result } = renderHook(() => {
@@ -977,15 +973,14 @@ describe("task workspace page synchronization", () => {
     }, { wrapper: createQueryWrapper() });
 
     await waitFor(() => expect(result.current.plan.graphPlan?.nodes[0]?.title).toBe("Old plan"));
-
     await waitFor(() => expect(mocks.eventHandlers.has("/api/work/task-1/events")).toBe(true));
     await act(async () => {
-      emitWorkspaceEvent(nextWorkspaceEvent({ type: "plan.generation.event", eventKind: "result" }));
+      emitWorkspaceEvent(nextWorkspaceEvent({ type: "task_workspace_updated", reason: "plan_generation.completed" }));
     });
 
     expect(mocks.pageFetchCount).toBe(0);
-    expect(result.current.plan.graphPlan?.nodes[0]?.title).toBe("Old plan");
-    expect(result.current.plan.planGenerationStatus).toBe("accepted");
+    await waitFor(() => expect(result.current.plan.graphPlan?.nodes[0]?.title).toBe("Generated plan"));
+    expect(result.current.plan.planGenerationStatus).toBe("waiting_acceptance");
   });
 
   it("leaves generating state and refreshes the saved plan when the generation session completes", async () => {
@@ -1010,13 +1005,7 @@ describe("task workspace page synchronization", () => {
 
     expect(result.current.plan.planGenerationStatus).toBe("generating");
 
-    mocks.generationSession = {
-      ...mocks.generationSession,
-      sessionStatus: "completed",
-      result: generatedPlan,
-      isLoading: false,
-      phase: "done",
-    };
+    mocks.generationSession = completedGenerationSession(generatedPlan);
     rerender();
 
     await waitFor(() => expect(result.current.plan.planGenerationStatus).toBe("waiting_acceptance"));
@@ -1027,6 +1016,7 @@ describe("task workspace page synchronization", () => {
     const draftPlan = planReadModel({ id: "plan-1", status: "draft", title: "Draft plan" });
     const acceptedPlan = planReadModel({ id: "plan-1", status: "accepted", title: "Accepted plan" });
     const refreshWorkspace = vi.fn(async () => undefined);
+    mocks.generationSession = completedGenerationSession();
     mocks.planResponses = [
       { taskId: "task-1", aiPlanGenerationStatus: "accepted", savedPlan: acceptedPlan },
     ];
@@ -1042,6 +1032,16 @@ describe("task workspace page synchronization", () => {
     await act(async () => {
       await result.current.acceptPlanById("plan-1");
     });
+    expect(mocks.commandCalls).toContainEqual(expect.objectContaining({
+      taskId: "task-1",
+      json: expect.objectContaining({
+        type: "plan.accept",
+        planId: "plan-1",
+        workBlockId: null,
+        expectedHeadStateVersion: 2,
+        idempotencyKey: expect.any(String),
+      }),
+    }));
 
     await waitFor(() => expect(result.current.plan?.status).toBe("accepted"));
     expect(result.current.plan?.summary).toBe("Accepted plan");
@@ -1097,9 +1097,22 @@ describe("task workspace page synchronization", () => {
     await act(async () => {
       result.current.handleGeneratePlanFromHeader();
     });
+    expect(mocks.commandCalls).toContainEqual(expect.objectContaining({
+      taskId: "task-1",
+      json: expect.objectContaining({
+        type: "plan.generate",
+        forceRefresh: true,
+        workBlockId: null,
+        userInstruction: null,
+        selectedNodeId: null,
+        idempotencyKey: expect.any(String),
+      }),
+    }));
 
     mocks.generationSession = {
       ...mocks.generationSession,
+      generationId: "generation-1",
+      headStateVersion: 2,
       sessionStatus: "running",
       phase: "starting",
       statusMessage: "Generating plan",
@@ -1109,12 +1122,7 @@ describe("task workspace page synchronization", () => {
     await waitFor(() => expect(result.current.planGenerationStatus).toBe("generating"));
 
     mocks.planResponses = [{ taskId: "task-1", aiPlanGenerationStatus: "waiting_acceptance", savedPlan: generatedPlan }];
-    mocks.generationSession = {
-      ...mocks.generationSession,
-      sessionStatus: "completed",
-      result: generatedPlan,
-      phase: "completed",
-    };
+    mocks.generationSession = completedGenerationSession(generatedPlan);
     rerender();
 
     await waitFor(() => expect(result.current.graphPlan?.nodes[0]?.title).toBe("Generated launch plan"));
@@ -1126,6 +1134,16 @@ describe("task workspace page synchronization", () => {
     await act(async () => {
       await result.current.acceptPlanById("plan-1");
     });
+    expect(mocks.commandCalls).toContainEqual(expect.objectContaining({
+      taskId: "task-1",
+      json: expect.objectContaining({
+        type: "plan.accept",
+        planId: "plan-1",
+        workBlockId: null,
+        expectedHeadStateVersion: 2,
+        idempotencyKey: expect.any(String),
+      }),
+    }));
 
     await waitFor(() => expect(result.current.plan?.status).toBe("accepted"));
     expect(result.current.canAcceptPlan).toBe(false);
@@ -1151,10 +1169,10 @@ describe("task workspace page synchronization", () => {
       action: "start_manual",
       nodeId: "node-1",
       nodeTitle: "Launch plan",
-      runtimeName: "hermes",
-      provider: "hermes",
+      runtime: { category: "runtime", label: "Execution runtime" },
+      provider: { category: "ai_provider", label: "AI provider" },
       runId: "run-1",
-      event: { type: "assistant_text_delta", text: "Running" },
+      event: { type: "tool_started", tool: { category: "tool", label: "Runtime tool" }, label: "Task" },
     }));
     await pushWorkspaceEvent(nextWorkspaceEvent({
       type: "execution.state.updated",
@@ -1169,7 +1187,7 @@ describe("task workspace page synchronization", () => {
       await dispatchPromise;
     });
 
-    expect(result.current.latestActivitySummary).toBe("Running");
+    expect(result.current.latestActivitySummary).toBe("Running Task");
     expect(result.current.runtimeEvents).toHaveLength(1);
     await waitFor(() => expect(result.current.graphPlan?.nodes[0]?.status).toBe("active"));
     expect(result.current.graphPlan?.nodes[0]?.title).toBe("Waiting for user input");
@@ -1191,14 +1209,14 @@ describe("task workspace page synchronization", () => {
 
     await pushWorkspaceEvent(nextWorkspaceEvent({
       type: "execution.runtime_event",
-      eventKind: "tool_started",
+      eventKind: "tool_completed",
       action: "resume_with_input",
       nodeId: "node-1",
       nodeTitle: "Waiting for user input",
-      runtimeName: "hermes",
-      provider: "hermes",
+      runtime: { category: "runtime", label: "Execution runtime" },
+      provider: { category: "ai_provider", label: "AI provider" },
       runId: "run-1",
-      event: { type: "assistant_text_delta", text: "Done" },
+      event: { type: "tool_completed", tool: { category: "tool", label: "Runtime tool" }, label: "Task", durationMs: 100 },
     }));
     await pushWorkspaceEvent(nextWorkspaceEvent({
       type: "execution.state.updated",
@@ -1213,7 +1231,7 @@ describe("task workspace page synchronization", () => {
       await checkpointPromise;
     });
 
-    expect(result.current.latestActivitySummary).toBe("Done");
+    expect(result.current.latestActivitySummary).toBe("Task completed");
     await waitFor(() => expect(result.current.graphPlan?.nodes[0]?.title).toBe("Completed launch plan"));
     expect(result.current.graphPlan?.nodes[0]?.status).toBe("done");
     expect(result.current.currentExecution?.status).toBe("completed");

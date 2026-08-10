@@ -2,7 +2,10 @@ import type { AgentControlActionBody, PlanExecutionResult } from "@chrona/contra
 import { submitTerminalNodeResult } from "@/modules/plan-execution/use-cases/submit-terminal-node-result";
 import {
   ConflictingTerminalActionError,
+  latestRecordedTerminalAction,
   recordTerminalAction,
+  revokeRunToken,
+  validateRevokedRunToken,
   validateRunToken,
   type RunTokenScope,
 } from "@/modules/plan-execution/runtime/agent-control-store";
@@ -35,11 +38,19 @@ export type HandleControlActionResult = {
   alreadyAccepted: boolean;
 };
 
-export async function handleControlAction(input: HandleControlActionInput): Promise<HandleControlActionResult> {
-  const scope = await validateRunToken(input.token);
-  if (!scope) {
+async function resolveControlScope(input: HandleControlActionInput): Promise<{
+  activeScope: RunTokenScope | null;
+  scope: RunTokenScope;
+}> {
+  const activeScope = await validateRunToken(input.token);
+  const scope = activeScope ?? await validateRevokedRunToken(input.token);
+  if (!scope || scope.workspaceId !== input.workspaceId) {
     throw new ControlRouteError("token_invalid", 401, "Run token is missing, expired, or revoked");
   }
+  return { activeScope, scope };
+}
+
+function actionFromControl(input: HandleControlActionInput, scope: RunTokenScope) {
   const action = submitNodeResultActionFromControl({
     body: input.body,
     sessionId: scope.taskSessionId ?? undefined,
@@ -58,51 +69,86 @@ export async function handleControlAction(input: HandleControlActionInput): Prom
       `Control kind '${input.body.kind}' is not a node action`,
     );
   }
+  return action;
+}
 
-  const isRecordedTerminal = isTerminalControlKind(input.body.kind) && Boolean(scope.nodeAttemptId);
-  let recorded = false;
-  let alreadyAccepted = false;
-  if (isRecordedTerminal) {
-    try {
-      const terminalRecord = await recordTerminalAction({
-        scope: omitToken(scope),
-        kind: input.body.kind,
-        payload: input.body.payload ?? {},
-        workspaceId: input.workspaceId,
-      });
-      recorded = terminalRecord.recorded;
-      alreadyAccepted = !terminalRecord.recorded;
-    } catch (error) {
-      if (error instanceof ConflictingTerminalActionError) {
-        throw new ControlRouteError(
-          "conflicting_terminal_action",
-          409,
-          error.message,
-        );
-      }
-      throw error;
-    }
+async function replayRecordedTerminalAction(
+  input: HandleControlActionInput,
+  scope: RunTokenScope,
+): Promise<HandleControlActionResult> {
+  const existing = await latestRecordedTerminalAction({
+    runId: scope.runId,
+    nodeAttemptId: scope.nodeAttemptId,
+  });
+  if (!existing) {
+    throw new ControlRouteError("token_invalid", 401, "Run token is missing, expired, or revoked");
   }
+  if (existing.kind !== input.body.kind) {
+    throw new ControlRouteError(
+      "conflicting_terminal_action",
+      409,
+      `Terminal action '${existing.kind}' was already recorded for this node attempt; cannot record '${input.body.kind}'`,
+    );
+  }
+  return {
+    ok: true,
+    result: null,
+    kind: input.body.kind,
+    recorded: false,
+    alreadyAccepted: true,
+  };
+}
 
-  if (isRecordedTerminal) {
+async function recordTerminalActionAndRevoke(
+  input: HandleControlActionInput,
+  scope: RunTokenScope,
+): Promise<HandleControlActionResult> {
+  try {
+    const terminalRecord = await recordTerminalAction({
+      scope: omitToken(scope),
+      kind: input.body.kind,
+      payload: input.body.payload,
+      workspaceId: input.workspaceId,
+    });
+    await revokeRunToken(input.token);
     return {
       ok: true,
       result: null,
       kind: input.body.kind,
-      recorded,
-      alreadyAccepted,
+      recorded: terminalRecord.recorded,
+      alreadyAccepted: !terminalRecord.recorded,
     };
+  } catch (error) {
+    if (error instanceof ConflictingTerminalActionError) {
+      throw new ControlRouteError("conflicting_terminal_action", 409, error.message);
+    }
+    throw error;
   }
+}
 
+export async function handleControlAction(input: HandleControlActionInput): Promise<HandleControlActionResult> {
+  const { activeScope, scope } = await resolveControlScope(input);
+  const action = actionFromControl(input, scope);
+  const isRecordedTerminal = isTerminalControlKind(input.body.kind) && Boolean(scope.nodeAttemptId);
+  if (isRecordedTerminal) {
+    return activeScope
+      ? recordTerminalActionAndRevoke(input, scope)
+      : replayRecordedTerminalAction(input, scope);
+  }
+  if (!activeScope) {
+    throw new ControlRouteError("token_invalid", 401, "Run token is missing, expired, or revoked");
+  }
+  const { sessionId, ...publicAction } = action;
   const result = await submitTerminalNodeResult({
     taskId: scope.taskId,
     commandContext: {
+      sessionId: sessionId ?? undefined,
       runId: scope.runId,
       nodeAttemptId: scope.nodeAttemptId,
+      providerRunId: scope.providerRunId,
     },
-    action,
+    action: publicAction,
   });
-
   return {
     ok: true,
     result,

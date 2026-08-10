@@ -4,7 +4,7 @@ import type { UiDocument } from "../document/document";
 export type TaskHeaderTaskStatus = "completed" | "running" | "waiting" | "approval-needed" | "blocked" | "cancelled";
 
 export type TaskHeaderActionInput = {
-  id: "start" | "pause" | "stop" | "restart" | "accept-plan" | "generate-plan" | "edit" | "delete";
+  id: "start" | "pause" | "stop" | "restart" | "accept-plan" | "generate-plan" | "rebuild" | "edit" | "delete";
   label: string;
   disabled?: boolean;
   disabledReason?: string;
@@ -205,7 +205,7 @@ export function buildTaskHeaderSpec(input: TaskHeaderSpecInput): UiDocument {
   appendAction(elements, actionChildren, "accept-plan", "Accept plan");
   appendAction(elements, actionChildren, "generate-plan", "Generate plan");
   appendStopPlanGenerationAction(elements, actionChildren);
-  appendOverflowMenu(elements, actionChildren, input.actions.filter((action) => action.id === "restart" || action.id === "edit" || action.id === "delete"));
+  appendOverflowMenu(elements, actionChildren, input.actions.filter((action) => action.id === "restart" || action.id === "rebuild" || action.id === "edit" || action.id === "delete"));
 
   elements.root = {
     type: "Stack",
@@ -214,14 +214,14 @@ export function buildTaskHeaderSpec(input: TaskHeaderSpecInput): UiDocument {
   };
   elements.layout = {
     type: "Stack",
-    props: { direction: "horizontal", gap: "sm", align: "center", justify: "between", className: "min-w-0 flex-nowrap" },
+    props: { direction: "horizontal", gap: "sm", align: "center", justify: "between", className: "children-intrinsic min-w-0 flex-wrap sm:flex-nowrap" },
     children: ["identity", "actions"],
   };
   elements.identity = { type: "Stack", props: { gap: "xs", className: "min-w-0 flex-1 basis-0 w-auto" }, children: ["title-row", "detail-row"] };
   elements["title-row"] = { type: "Stack", props: { className: "min-w-0" }, children: ["title"] };
   elements.title = { type: "Heading", props: { text: input.title, level: "h1" } };
   elements["detail-row"] = { type: "Stack", props: { direction: "horizontal", gap: "sm", align: "center", className: "no-scrollbar min-w-0 flex-nowrap overflow-x-auto" }, children: [...statusChildren, ...detailChildren] };
-  elements.actions = { type: "Stack", props: { direction: "horizontal", gap: "sm", align: "center", justify: "end", className: "w-auto shrink-0 flex-nowrap" }, children: actionChildren };
+  elements.actions = { type: "Stack", props: { direction: "horizontal", gap: "sm", align: "center", justify: "end", className: "children-intrinsic ml-auto w-auto shrink-0 flex-nowrap [&_[data-variant=destructive]]:border-destructive/35 [&_[data-variant=destructive]]:bg-destructive/10 [&_[data-variant=destructive]]:text-destructive [&_[data-variant=destructive]]:shadow-none [&_[data-variant=destructive]:hover]:bg-destructive/15" }, children: actionChildren };
 
   // Inline error banner. Visibility + content are driven by `state.update`
   // pushes on `/plan/generation/error/*` from the workspace SSE bus. The

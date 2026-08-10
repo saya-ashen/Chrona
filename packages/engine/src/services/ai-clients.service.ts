@@ -40,7 +40,7 @@ export function createAiClientsService() {
       try {
         return await aiClientManagement.updateBindings(input);
       } catch (cause) {
-        throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.AI_CLIENT_NOT_FOUND, "Failed to update feature bindings");
+        throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.VALIDATION_FAILED, "Failed to update feature bindings");
       }
     },
   };

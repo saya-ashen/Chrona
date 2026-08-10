@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it } from "bun:test";
 import { db } from "@/lib/db";
 
-import { appendCanonicalEvent, appendRawEventLog } from "./append-canonical-event";
+import { appendCanonicalEvent, appendRawEventLog } from "@chrona/engine/test-support";
 
 async function resetDb() {
   await db.importedCalendarEvent.deleteMany();
@@ -52,6 +52,27 @@ describe("appendRawEventLog", () => {
         status: "Active",
       },
     });
+    await db.task.create({
+      data: {
+        id: "task_event_context",
+        workspaceId: "ws_event_context",
+        title: "Event context task",
+        executionRuntime: "debug",
+        executionConfig: {},
+        status: "Ready",
+        priority: "Medium",
+      },
+    });
+    await db.workBlock.create({
+      data: {
+        id: "wb_context_only",
+        workspaceId: "ws_event_context",
+        taskId: "task_event_context",
+        title: "Event context block",
+        scheduledStartAt: new Date("2026-05-21T00:00:00.000Z"),
+        scheduledEndAt: new Date("2026-05-21T01:00:00.000Z"),
+      },
+    });
 
     const rawEvent = await appendRawEventLog({
       workspaceId: "ws_event_context",
@@ -64,6 +85,7 @@ describe("appendRawEventLog", () => {
     });
 
     expect(rawEvent.workspaceId).toBe("ws_event_context");
+    expect(rawEvent.workBlockId).toBe("wb_context_only");
     expect(rawEvent.source).toBe("graph_runtime");
     expect(rawEvent.externalRef).toBe("plan_execution:execution_started:test");
   });
@@ -101,5 +123,26 @@ describe("appendCanonicalEvent", () => {
     expect(event.workBlockId).toBeNull();
     expect(event.runId).toBeNull();
     expect(event.rawEventId).toBeNull();
+  });
+
+  it("allocates distinct monotonically increasing ingest sequences under concurrent writes", async () => {
+    await db.workspace.create({
+      data: { id: "ws_event_sequence", name: "Sequence workspace", defaultRuntime: "debug", status: "Active" },
+    });
+
+    const events = await Promise.all(
+      Array.from({ length: 8 }, (_, index) => appendCanonicalEvent({
+        workspaceId: "ws_event_sequence",
+        eventType: "provider.text_delta",
+        actorType: "runtime",
+        source: "provider",
+        payload: { index },
+        dedupeKey: `concurrent-event-${index}`,
+      })),
+    );
+
+    const sequences = events.map((event) => event.ingestSequence).sort((left, right) => left - right);
+    expect(new Set(sequences).size).toBe(8);
+    expect(sequences).toEqual(sequences.map((_, index) => sequences[0]! + index));
   });
 });

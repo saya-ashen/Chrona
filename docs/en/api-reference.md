@@ -71,6 +71,15 @@ available to planning and execution sessions through bounded
 execution-session, provider-session, approval, and Result state; later Goal
 edits or accepted results cannot mutate the snapshot.
 
+### POST /api/tasks/:taskId/actions/rebuild-with-latest-goal-assets
+
+Destructively replaces a Goal-linked Task with a new canonical Task using the
+same definition and the Goal's current approved, unarchived asset versions.
+The old Task tree, Plan, Runs, execution history, Artifacts, and Results are
+deleted atomically; the replacement starts Ready without a Plan or execution
+progress. Standalone Tasks are rejected. The response identifies both the new
+`taskId` and `replacedTaskId`; callers must navigate to the new Task.
+
 ### GET /api/goals/:goalId/artifacts/:artifactId
 
 Returns a Goal-owned Artifact read model and supported open/copy/download
@@ -525,7 +534,6 @@ Public tool names:
 | --- | --- |
 | `chrona_execution_read` | Read execution session state and supported next actions |
 | `chrona_plan_read` | Read accepted plan state through AI-visible refs |
-| `chrona_plan_generate` | Generate a draft plan for the session task from a complete plan blueprint |
 | `chrona_node_read` | Read current execution node state through AI-visible refs |
 | `chrona_node_output` | Submit a json-render node output spec before completing the current task node |
 | `chrona_node_complete` | Complete the current task node after required outputs have been submitted |

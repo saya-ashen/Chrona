@@ -1,12 +1,15 @@
+/* eslint-disable max-lines-per-function, complexity -- Artifact registration validates all declarations before authoritative commit. */
 import { createHash } from "node:crypto";
-import { readFile, realpath, stat } from "node:fs/promises";
+import { constants } from "node:fs";
+import { open, realpath, stat } from "node:fs/promises";
 import { extname, relative, resolve, sep } from "node:path";
 import type {
   AiArtifactRef,
   NodeDeliverable,
   NodeDeliverableDeclaration,
 } from "@chrona/contracts/ai";
-import { db } from "@/lib/db";
+import type { Prisma } from "@/generated/prisma/client";
+import { withPlanExecutionDurability } from "../persistence/scheduler-durability";
 import { generatedFilesRoot, resolveGeneratedFileReference } from "../../tasks/result-file-access";
 import { ENGINE_ERROR_CODES, EngineError } from "../../../errors";
 
@@ -39,7 +42,7 @@ export function aiArtifactRef(artifactId: string): AiArtifactRef {
     .toUpperCase()}`;
 }
 
-async function inspectGeneratedFile(uri: string) {
+async function inspectGeneratedFile(uri: string, runId: string) {
   const resolved = resolveGeneratedFileReference(uri);
   if (!resolved) {
     throw new EngineError(
@@ -62,27 +65,87 @@ async function inspectGeneratedFile(uri: string) {
       "Generated deliverable escapes the generated-files root.",
     );
   }
-  const fileStat = await stat(canonicalPath);
-  if (!fileStat.isFile()) {
+
+  let handle;
+  try {
+    handle = await open(canonicalPath, constants.O_RDONLY | constants.O_NOFOLLOW);
+  } catch {
     throw new EngineError(
       ENGINE_ERROR_CODES.VALIDATION_FAILED,
-      "Generated deliverable must be a regular file.",
+      "Generated deliverable changed before it could be opened safely.",
     );
   }
-  const content = await readFile(canonicalPath);
-  const extension = extname(canonicalPath).toLowerCase();
-  const relativePath = relative(resolve(generatedFilesRoot()), canonicalPath)
-    .split(sep)
-    .join("/");
-  return {
-    uri: `generated://${relativePath}`,
-    checksum: createHash("sha256").update(content).digest("hex"),
-    size: fileStat.size,
-    mimeType: MIME_TYPES[extension] ?? "application/octet-stream",
-    contentPreview: TEXT_EXTENSIONS.has(extension)
-      ? content.subarray(0, PREVIEW_BYTES).toString("utf8")
-      : null,
-  };
+  try {
+    const fileStat = await handle.stat();
+    const openedCanonicalPath = await realpath(canonicalPath);
+    const openedPathStat = await stat(openedCanonicalPath);
+    if (
+      !fileStat.isFile()
+      || !openedPathStat.isFile()
+      || fileStat.dev !== openedPathStat.dev
+      || fileStat.ino !== openedPathStat.ino
+    ) {
+      throw new EngineError(
+        ENGINE_ERROR_CODES.VALIDATION_FAILED,
+        "Generated deliverable must remain the same regular file while it is inspected.",
+      );
+    }
+    if (!isWithinGeneratedRoot(openedCanonicalPath)) {
+      throw new EngineError(
+        ENGINE_ERROR_CODES.VALIDATION_FAILED,
+        "Generated deliverable escapes the generated-files root.",
+      );
+    }
+
+    const relativePath = relative(resolve(generatedFilesRoot()), openedCanonicalPath)
+      .split(sep)
+      .join("/");
+    if (relativePath.split("/")[0] !== runId) {
+      throw new EngineError(
+        ENGINE_ERROR_CODES.VALIDATION_FAILED,
+        "Generated deliverable must be stored under its canonical Run scope.",
+      );
+    }
+
+    const extension = extname(openedCanonicalPath).toLowerCase();
+    const checksum = createHash("sha256");
+    const previewChunks: Buffer[] = [];
+    let previewSize = 0;
+    for await (const chunk of handle.createReadStream({ autoClose: false })) {
+      const bytes = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      checksum.update(bytes);
+      if (TEXT_EXTENSIONS.has(extension) && previewSize < PREVIEW_BYTES) {
+        const preview = bytes.subarray(0, PREVIEW_BYTES - previewSize);
+        previewChunks.push(preview);
+        previewSize += preview.length;
+      }
+    }
+    const completedStat = await handle.stat();
+    if (
+      completedStat.dev !== fileStat.dev
+      || completedStat.ino !== fileStat.ino
+      || completedStat.size !== fileStat.size
+      || completedStat.mtimeMs !== fileStat.mtimeMs
+      || completedStat.ctimeMs !== fileStat.ctimeMs
+    ) {
+      throw new EngineError(
+        ENGINE_ERROR_CODES.VALIDATION_FAILED,
+        "Generated deliverable changed while it was inspected.",
+      );
+    }
+
+    return {
+      uri: `generated://${relativePath}`,
+      checksum: checksum.digest("hex"),
+      size: fileStat.size,
+      mimeType: MIME_TYPES[extension] ?? "application/octet-stream",
+      contentPreview: TEXT_EXTENSIONS.has(extension)
+        ? Buffer.concat(previewChunks).toString("utf8")
+        : null,
+    };
+  } finally {
+    await handle.close();
+  }
 }
 
 async function artifactFromRef(input: {
@@ -90,8 +153,8 @@ async function artifactFromRef(input: {
   taskId: string;
   runId: string;
   ref: AiArtifactRef;
-}) {
-  const artifacts = await db.artifact.findMany({
+}, client: Prisma.TransactionClient) {
+  const artifacts = await client.artifact.findMany({
     where: {
       workspaceId: input.workspaceId,
       taskId: input.taskId,
@@ -117,7 +180,7 @@ async function registerDeclaration(input: {
   occurrenceId: string | null;
   sourceNodeId: string;
   declaration: NodeDeliverableDeclaration;
-}): Promise<NodeDeliverable> {
+}, client: Prisma.TransactionClient): Promise<NodeDeliverable> {
   let artifactId: string;
   if (input.declaration.source.type === "existing_artifact") {
     artifactId = (
@@ -126,10 +189,10 @@ async function registerDeclaration(input: {
         taskId: input.taskId,
         runId: input.runId,
         ref: input.declaration.source.artifactRef,
-      })
+      }, client)
     ).id;
   } else {
-    const file = await inspectGeneratedFile(input.declaration.source.uri);
+    const file = await inspectGeneratedFile(input.declaration.source.uri, input.runId);
     const registrationKey = createHash("sha256")
       .update(
         [
@@ -150,7 +213,7 @@ async function registerDeclaration(input: {
       sourceNodeId: input.sourceNodeId,
       deliverableKey: input.declaration.deliverableKey,
     };
-    const existing = await db.artifact.findFirst({
+    const existing = await client.artifact.findFirst({
       where: {
         workspaceId: input.workspaceId,
         taskId: input.taskId,
@@ -170,7 +233,7 @@ async function registerDeclaration(input: {
       artifactId = existing.id;
     } else {
       artifactId = (
-        await db.artifact.create({
+        await client.artifact.create({
           data: {
             workspaceId: input.workspaceId,
             taskId: input.taskId,
@@ -209,20 +272,50 @@ async function registerDeclaration(input: {
 export async function registerNodeDeliverables(input: {
   workspaceId: string;
   taskId: string;
+  taskSessionId: string | null;
+  workBlockId: string | null;
   runId: string | null | undefined;
   sourceNodeId: string;
   sourceNodeRef?: string;
   declarations: NodeDeliverableDeclaration[];
-}): Promise<NodeDeliverable[]> {
+}, suppliedTx?: Prisma.TransactionClient): Promise<NodeDeliverable[]> {
+  if (!suppliedTx) {
+    return withPlanExecutionDurability((tx) => registerNodeDeliverables(input, tx));
+  }
+  const client = suppliedTx;
   if (input.declarations.length === 0) return [];
+  if (input.workBlockId) {
+    const ownedWorkBlock = await client.workBlock.findFirst({
+      where: { id: input.workBlockId, taskId: input.taskId },
+      select: { id: true },
+    });
+    if (!ownedWorkBlock) {
+      throw new EngineError(
+        ENGINE_ERROR_CODES.VALIDATION_FAILED,
+        "Deliverable work block does not belong to the task.",
+      );
+    }
+  }
+  const occurrence = input.workBlockId
+    ? await client.taskOccurrence.findFirst({
+        where: { taskId: input.taskId, workBlockId: input.workBlockId },
+        select: { id: true },
+      })
+    : null;
+  const runScope = {
+    taskSessionId: input.taskSessionId,
+    workBlockId: input.workBlockId,
+    occurrenceId: occurrence?.id ?? null,
+  };
   const run = input.runId
-    ? await db.run.findFirst({
-        where: { id: input.runId, taskId: input.taskId },
+    ? await client.run.findFirst({
+        where: { id: input.runId, taskId: input.taskId, ...runScope },
         select: { id: true, occurrenceId: true },
       })
-    : await db.run.findFirst({
+    : await client.run.findFirst({
         where: {
           taskId: input.taskId,
+          ...runScope,
           status: { in: ["Pending", "Running", "WaitingForApproval", "WaitingForInput"] },
         },
         orderBy: { startedAt: "desc" },
@@ -244,7 +337,7 @@ export async function registerNodeDeliverables(input: {
         occurrenceId: run.occurrenceId,
         sourceNodeId: input.sourceNodeId,
         declaration,
-      }).then((deliverable) => ({
+      }, client).then((deliverable) => ({
         ...deliverable,
         sourceNodeRef: input.sourceNodeRef ?? deliverable.sourceNodeRef,
       })),

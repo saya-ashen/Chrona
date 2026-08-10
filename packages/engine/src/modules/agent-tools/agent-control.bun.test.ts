@@ -185,6 +185,7 @@ describe("terminal action recording", () => {
       runtimeSessionKey: "sess",
       nodeId: attempt.nodeId,
       nodeAttemptId: attempt.id,
+      providerRunId: null,
     };
     const first = await recordTerminalAction({ scope, kind: "complete", payload: { summary: "ok" }, workspaceId: workspace.id });
     const retry = await recordTerminalAction({ scope, kind: "complete", payload: { summary: "again" }, workspaceId: workspace.id });
@@ -215,6 +216,38 @@ describe("terminal action recording", () => {
     })).rejects.toMatchObject({
       code: "conflicting_terminal_action",
       status: 409,
+    } satisfies Partial<ControlRouteError>);
+    expect(await validateRunToken(token)).toBeNull();
+    await expect(handleControlAction({
+      token,
+      workspaceId: workspace.id,
+      body: { kind: "complete", payload: { summary: "replayed after revocation" } },
+    })).resolves.toMatchObject({
+      ok: true,
+      kind: "complete",
+      recorded: false,
+      alreadyAccepted: true,
+      result: null,
+    });
+    await expect(handleControlAction({
+      token,
+      workspaceId: workspace.id,
+      body: { kind: "fail", payload: { error: "conflicting after revocation" } },
+    })).rejects.toMatchObject({
+      code: "conflicting_terminal_action",
+      status: 409,
+    } satisfies Partial<ControlRouteError>);
+    const expiredToken = await mintRunToken({
+      ...scope,
+      expiresAt: new Date(Date.now() - 1),
+    });
+    await expect(handleControlAction({
+      token: expiredToken,
+      workspaceId: workspace.id,
+      body: { kind: "complete", payload: { summary: "expired replay" } },
+    })).rejects.toMatchObject({
+      code: "token_invalid",
+      status: 401,
     } satisfies Partial<ControlRouteError>);
     await db.runToken.deleteMany({ where: { runId: run.id } });
 

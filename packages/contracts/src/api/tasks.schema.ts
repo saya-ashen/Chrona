@@ -226,9 +226,8 @@ export const taskNodeActivityParamSchema = z.object({
 });
 
 export const workspaceActivityKindSchema = z.enum([
-  "assistant_message",
-  "reasoning",
   "tool_started",
+  "tool_progress",
   "tool_completed",
   "provider_run",
   "approval",
@@ -236,7 +235,6 @@ export const workspaceActivityKindSchema = z.enum([
   "task",
   "artifact",
   "schedule",
-  "raw",
 ]);
 
 export const workspaceActivityToneSchema = z.enum([
@@ -249,21 +247,10 @@ export const workspaceActivityToneSchema = z.enum([
 
 export const workspaceToolActivitySchema = z.object({
   name: z.string().optional(),
-  label: z.string().optional(),
-  callId: z.string().optional(),
-  resultPreview: z.string().optional(),
-  preview: z.string().optional(),
-  inputSummary: z.string().optional(),
   durationMs: z.number().nonnegative().optional(),
-  error: z.string().optional(),
   state: z.enum(["started", "progress", "completed", "failed"]),
 });
 
-export const workspaceAssistantActivitySchema = z.object({
-  text: z.string(),
-  isReasoning: z.boolean(),
-  isPartial: z.boolean().optional(),
-});
 
 export const workspaceActivityItemSchema = z.object({
   id: z.string().min(1),
@@ -277,16 +264,10 @@ export const workspaceActivityItemSchema = z.object({
   sourceNodeTitle: z.string().optional(),
   provider: z.string().optional(),
   runtimeName: z.string().optional(),
-  runId: z.string().optional(),
-  nativeRunId: z.string().optional(),
+  executionScope: z.string().min(1).max(128).optional(),
   sequence: z.number().optional(),
-  rawEventType: z.string().optional(),
-  executionSessionId: z.string().optional(),
-  executionEpoch: z.number().int().nonnegative().optional(),
   executionTrigger: z.enum(["initial", "restart"]).optional(),
   tool: workspaceToolActivitySchema.optional(),
-  assistant: workspaceAssistantActivitySchema.optional(),
-  raw: z.unknown().optional(),
 });
 
 export const workspaceActivityPageQuerySchema = z.object({
@@ -321,3 +302,20 @@ export const deleteTaskParamSchema = z.object({
 export const deleteTaskQuerySchema = z.object({
   workspaceId: z.string().optional(),
 });
+
+export const deleteTaskBodySchema = z.object({
+  expectedTaskIds: z.array(z.string()).min(1),
+  expectedAssetIds: z.array(z.string()),
+});
+
+export const taskDeleteImpactSchema = z.object({
+  taskIds: z.array(z.string()),
+  taskCount: z.number().int().nonnegative(),
+  assets: z.array(z.object({
+    id: z.string(),
+    label: z.string(),
+    goalId: z.string(),
+  })),
+});
+
+export type TaskDeleteImpact = z.infer<typeof taskDeleteImpactSchema>;

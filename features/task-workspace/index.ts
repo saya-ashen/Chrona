@@ -15,6 +15,7 @@ export { TaskWorkspacePage } from "./ui/task-workspace-page";
 export { TaskWorkspaceHeaderCard } from "./ui/task-workspace-header-card";
 export { SpecRenderer } from "./ui/catalog/spec-renderer";
 export { workspaceRegistry } from "./ui/catalog/workspace-registry";
+export { parseTablePreview, VirtualizedCsvPreview } from "./ui/catalog/workspace-registry";
 export { ActivityTimeline } from "./ui/activity-timeline";
 export {
   acceptTaskActionResult,
@@ -24,6 +25,7 @@ export {
   createTaskFromSchedule,
   decideScheduleProposal,
   deleteTask,
+  getTaskDeleteImpact,
   dispatchExecutionAction,
   markTaskDone,
   moveWorkBlock,
@@ -50,7 +52,6 @@ export { useTaskWorkspacePlanState, type PlanGenerationRequest, type WorkspaceRu
 export { useTaskWorkspaceProposalFlow } from "./hooks/use-task-workspace-proposal-flow";
 export {
   bindTaskPlanSessionToStateStore,
-  hydrateTaskPlanGenerationSession,
   startTaskPlanGenerationSession,
   stopTaskPlanGenerationSession,
   useTaskPlanGenerationSession,

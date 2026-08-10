@@ -5,21 +5,113 @@ import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
 
 const GOAL_CONTEXT_RESULT_LIMIT = 8;
 const GOAL_CONTEXT_SUMMARY_LIMIT = 400;
-const GOAL_CONTEXT_ASSET_CONTENT_LIMIT = 2_000;
+const GOAL_CONTEXT_ASSET_TITLE_LIMIT = 160;
+const GOAL_CONTEXT_ASSET_DESCRIPTION_LIMIT = 400;
 
 type GoalContextClient = Prisma.TransactionClient | typeof db;
 
 type GoalContextExtra = Prisma.InputJsonObject | undefined;
+type FormalAssetCatalogInput = {
+  assets: Array<{
+    id: string;
+    label: string;
+    kind: string;
+    role: string;
+    description: string | null;
+    updatedAt: Date;
+    versions: Array<{ version: number }>;
+  }>;
+};
+export type FrozenGoalAsset = {
+  ref: string;
+  title: string;
+  description: string;
+  kind: string;
+  role: string;
+  version: number;
+  updatedAt: string;
+};
 
+export type FrozenGoalAcceptedResult = {
+  ref: string;
+  taskTitle: string;
+  acceptedAt: string | null;
+  summary: string;
+  artifactCount: number;
+};
+
+export type FrozenGoalTaskContext = {
+  assets: FrozenGoalAsset[];
+  acceptedResults: FrozenGoalAcceptedResult[];
+};
+
+const GOAL_ASSET_REF_PATTERN = /^GA[0-9A-F]{12}$/;
+const GOAL_RESULT_REF_PATTERN = /^GR[0-9A-F]{12}$/;
+
+export function parseFrozenGoalTaskContext(value: unknown): FrozenGoalTaskContext {
+  const context = record(value);
+  const assets = Array.isArray(context?.assets)
+    ? context.assets.flatMap((item): FrozenGoalAsset[] => {
+        const asset = record(item);
+        if (
+          !asset
+          || typeof asset.ref !== "string"
+          || !GOAL_ASSET_REF_PATTERN.test(asset.ref)
+          || typeof asset.title !== "string"
+          || typeof asset.description !== "string"
+          || typeof asset.kind !== "string"
+          || typeof asset.role !== "string"
+          || !Number.isInteger(asset.version)
+          || (asset.version as number) < 1
+          || typeof asset.updatedAt !== "string"
+        ) return [];
+        return [{
+          ref: asset.ref,
+          title: asset.title,
+          description: asset.description,
+          kind: asset.kind,
+          role: asset.role,
+          version: asset.version as number,
+          updatedAt: asset.updatedAt,
+        }];
+      })
+    : [];
+  const acceptedResults = Array.isArray(context?.acceptedResults)
+    ? context.acceptedResults.flatMap((item): FrozenGoalAcceptedResult[] => {
+        const result = record(item);
+        if (
+          !result
+          || typeof result.ref !== "string"
+          || !GOAL_RESULT_REF_PATTERN.test(result.ref)
+          || typeof result.taskTitle !== "string"
+          || typeof result.summary !== "string"
+          || typeof result.artifactCount !== "number"
+        ) return [];
+        return [{
+          ref: result.ref,
+          taskTitle: result.taskTitle,
+          acceptedAt: typeof result.acceptedAt === "string" ? result.acceptedAt : null,
+          summary: result.summary,
+          artifactCount: result.artifactCount,
+        }];
+      })
+    : [];
+  return { assets, acceptedResults };
+}
 function record(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value)
     ? value as Record<string, unknown>
     : null;
 }
-
 function boundedText(value: string, limit: number) {
-  return value.length <= limit ? value : `${value.slice(0, limit).trimEnd()}…`;
+  return value.length <= limit ? value : `${value.slice(0, limit - 1).trimEnd()}…`;
 }
+function assetDescription(description: string | null) {
+  return description
+    ? boundedText(description, GOAL_CONTEXT_ASSET_DESCRIPTION_LIMIT)
+    : "";
+}
+
 
 export function goalAcceptedResultRef(runId: string) {
   return `GR${createHash("sha256").update(runId).digest("hex").slice(0, 12).toUpperCase()}`;
@@ -29,27 +121,24 @@ export function goalAssetRef(assetId: string) {
   return `GA${createHash("sha256").update(assetId).digest("hex").slice(0, 12).toUpperCase()}`;
 }
 
-function formalAssetText(content: unknown) {
-  if (typeof content === "string") return content;
-  const value = record(content);
-  if (value?.format === "chrona-json-render" && record(value.spec)) {
-    return extractAcceptedResultText(value.spec);
-  }
-  return JSON.stringify(content);
-}
 
-function formalAssetCatalog(goal: NonNullable<Awaited<ReturnType<typeof loadGoalContext>>>) {
+function formalAssetCatalog(goal: FormalAssetCatalogInput) {
   return goal.assets.map((asset) => {
-    const version = asset.versions[0];
-    const content = version ? formalAssetText(version.content) : asset.currentArtifact.contentPreview ?? "";
+    const version = asset.versions[0]?.version;
+    if (typeof version !== "number") {
+      throw new EngineError(
+        ENGINE_ERROR_CODES.VALIDATION_FAILED,
+        "Approved Goal asset is missing a formal version",
+      );
+    }
     return {
       ref: goalAssetRef(asset.id),
-      label: asset.label,
+      title: boundedText(asset.label, GOAL_CONTEXT_ASSET_TITLE_LIMIT),
+      description: assetDescription(asset.description),
       kind: asset.kind,
       role: asset.role,
-      version: version?.version ?? null,
+      version,
       updatedAt: asset.updatedAt.toISOString(),
-      content: boundedText(content, GOAL_CONTEXT_ASSET_CONTENT_LIMIT),
     };
   });
 }
@@ -106,18 +195,17 @@ function loadGoalContext(goalId: string, client: GoalContextClient) {
       assets: {
         where: { status: "Approved", archivedAt: null },
         orderBy: [{ updatedAt: "desc" as const }, { id: "asc" as const }],
-        take: GOAL_CONTEXT_RESULT_LIMIT,
         select: {
           id: true,
           label: true,
           kind: true,
           role: true,
           updatedAt: true,
-          currentArtifact: { select: { contentPreview: true } },
+          description: true,
           versions: {
             orderBy: { version: "desc" as const },
             take: 1,
-            select: { version: true, content: true },
+            select: { version: true },
           },
         },
       },

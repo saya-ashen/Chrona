@@ -6,17 +6,26 @@ import {
 } from "./node-result-action";
 
 describe("node result action mapping", () => {
-  it("maps MCP terminal tool and control kind through the same submit action", () => {
+  it("maps MCP terminal tool and control kind through the same public submit action while retaining private session", () => {
     const payload = { summary: "done" };
 
-    expect(submitNodeResultActionFromTool({
+    const fromTool = submitNodeResultActionFromTool({
       toolName: "chrona.node.complete",
       sessionId: "session-1",
       payload,
-    })).toEqual(submitNodeResultActionFromControl({
+    });
+    const fromControl = submitNodeResultActionFromControl({
       sessionId: "session-1",
       body: { kind: "complete", payload },
-    }));
+    });
+    expect(fromTool).not.toBeNull();
+    expect(fromControl).not.toBeNull();
+    const { sessionId: toolSessionId, ...toolAction } = fromTool!;
+    const { sessionId: controlSessionId, ...controlAction } = fromControl!;
+
+    expect(toolAction).toEqual(controlAction);
+    expect(toolSessionId).toBe("session-1");
+    expect(controlSessionId).toBe("session-1");
   });
 
   it("maps every terminal control kind to its MCP tool", () => {

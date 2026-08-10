@@ -1,4 +1,5 @@
 import { expect, type APIRequestContext, type Page, type TestInfo } from "@playwright/test";
+import { bindTaskPlanProvider, startMockTaskPlanProvider } from "./mock-task-plan-provider";
 
 export type TaskWorkspaceViewport = "desktop" | "tablet" | "mobile";
 
@@ -21,17 +22,19 @@ export type WorkspaceCommand =
     forceRefresh?: boolean;
     workBlockId?: string | null;
     userInstruction?: string | null;
-    idempotencyKey?: string;
+    idempotencyKey: string;
   }
   | {
     type: "plan.accept";
     planId: string;
     workBlockId?: string | null;
-    idempotencyKey?: string;
+    expectedHeadStateVersion: number;
+    idempotencyKey: string;
   }
   | {
     type: "execution.action";
     action: string | Record<string, unknown>;
+    idempotencyKey: string;
     [key: string]: unknown;
   }
   | {
@@ -40,7 +43,7 @@ export type WorkspaceCommand =
     action: string;
     payload?: Record<string, unknown>;
     workBlockId?: string | null;
-    idempotencyKey?: string;
+    idempotencyKey: string;
   };
 
 export type WorkspaceCommandAck = {
@@ -58,16 +61,19 @@ export async function createTaskWorkspaceTask(
   request: APIRequestContext,
   input: { title: string; description: string },
 ): Promise<CreatedTaskWorkspaceTask> {
-  const workspaceResponse = await request.get("/api/workspaces/default");
-  expect(workspaceResponse.ok()).toBeTruthy();
-
-  const workspaceBody = (await workspaceResponse.json()) as {
-    id?: string;
-    workspace?: { id?: string };
-    workspaceId?: string;
-  };
-  const workspaceId = workspaceBody.workspaceId ?? workspaceBody.id ?? workspaceBody.workspace?.id;
-  expect(workspaceId).toBeTruthy();
+  let workspaceId: string | undefined;
+  await expect.poll(async () => {
+    const workspaceResponse = await request.get("/api/workspaces/default");
+    if (!workspaceResponse.ok()) return null;
+    const workspaceBody = (await workspaceResponse.json()) as {
+      id?: string;
+      workspace?: { id?: string };
+      workspaceId?: string;
+    };
+    workspaceId = workspaceBody.workspaceId ?? workspaceBody.id ?? workspaceBody.workspace?.id;
+    return workspaceId ?? null;
+  }, { timeout: 15_000, intervals: [200, 500, 1_000] }).not.toBeNull();
+  if (!workspaceId) throw new Error("The seeded E2E workspace did not become available.");
 
   const createTaskResponse = await request.post("/api/tasks", {
     data: {
@@ -85,53 +91,77 @@ export async function createTaskWorkspaceTask(
   return createdTask;
 }
 
-export async function generateDebugTaskWorkspacePlan(
+export type GeneratedTaskWorkspaceDraft = {
+  planId: string;
+  expectedHeadStateVersion: number;
+};
+
+export async function generateTaskWorkspaceDraftPlan(
   request: APIRequestContext,
   taskId: string,
-) {
-  const createResponse = await request.post("/api/ai/clients", {
+): Promise<GeneratedTaskWorkspaceDraft> {
+  const provider = await startMockTaskPlanProvider();
+  try {
+    await bindTaskPlanProvider(request, taskId, provider.baseUrl);
+
+    const generationResponse = await request.post(`/api/tasks/${taskId}/plan/generations`, {
+      data: {
+        forceRefresh: true,
+        idempotencyKey: `e2e-plan-generate-${taskId}`,
+      },
+    });
+    if (!generationResponse.ok()) {
+      throw new Error(`Task-plan generation failed: HTTP ${generationResponse.status()} ${await generationResponse.text()}`);
+    }
+
+    await expect.poll(async () => {
+      const planResponse = await request.get(`/api/tasks/${taskId}/plan`);
+      if (!planResponse.ok()) return null;
+      const state = await planResponse.json() as {
+        savedPlan?: { id?: string; status?: string } | null;
+        generationSession?: { status?: string; headStateVersion?: number } | null;
+      };
+      return state.savedPlan?.status === "draft"
+        && state.generationSession?.status === "completed"
+        && typeof state.generationSession.headStateVersion === "number"
+        ? state.savedPlan.id ?? null
+        : null;
+    }, { timeout: 20_000 }).not.toBeNull();
+
+    const planResponse = await request.get(`/api/tasks/${taskId}/plan`);
+    if (!planResponse.ok()) {
+      throw new Error(`Task-plan read failed: HTTP ${planResponse.status()} ${await planResponse.text()}`);
+    }
+    const state = await planResponse.json() as {
+      savedPlan?: { id?: string } | null;
+      generationSession?: { headStateVersion?: number } | null;
+    };
+    const planId = state.savedPlan?.id;
+    const expectedHeadStateVersion = state.generationSession?.headStateVersion;
+    if (!planId || typeof expectedHeadStateVersion !== "number") {
+      throw new Error("Durable task-plan generation completed without an exact plan head receipt.");
+    }
+    return { planId, expectedHeadStateVersion };
+  } finally {
+    await provider.stop();
+  }
+}
+
+export async function generateTaskWorkspacePlan(
+  request: APIRequestContext,
+  taskId: string,
+): Promise<void> {
+  const draft = await generateTaskWorkspaceDraftPlan(request, taskId);
+  const acceptResponse = await request.post(`/api/tasks/${taskId}/plan/accept`, {
     data: {
-      name: `E2E Debug Plan Client ${taskId}`,
-      type: "debug",
-      config: { profile: "deterministic" },
-      isDefault: true,
+      planId: draft.planId,
+      expectedHeadStateVersion: draft.expectedHeadStateVersion,
+      idempotencyKey: `e2e-plan-accept-${taskId}`,
     },
   });
-  expect(createResponse.ok()).toBeTruthy();
-
-  const created = (await createResponse.json()) as { client: { id?: string } };
-  const clientId = created.client.id;
-  expect(clientId).toBeTruthy();
-
-  const bindResponse = await request.put(`/api/ai/clients/${clientId}/bindings`, {
-    data: { features: ["generate_plan"] },
-  });
-  expect(bindResponse.ok()).toBeTruthy();
-
-  const generationResponse = await request.post(`/api/tasks/${taskId}/plan/generations`, {
-    data: { forceRefresh: true },
-    headers: { accept: "text/event-stream" },
-  });
-  expect(generationResponse.ok()).toBeTruthy();
-  await generationResponse.text();
-
-  await expect.poll(async () => {
-    const planResponse = await request.get(`/api/tasks/${taskId}/plan`);
-    if (!planResponse.ok()) return null;
-    const planBody = (await planResponse.json()) as { savedPlan?: { id?: string; status?: string } | null };
-    return planBody.savedPlan?.id && planBody.savedPlan.status === "draft" ? planBody.savedPlan.id : null;
-  }, { timeout: 20_000 }).not.toBeNull();
-
-  const planResponse = await request.get(`/api/tasks/${taskId}/plan`);
-  expect(planResponse.ok()).toBeTruthy();
-  const planBody = (await planResponse.json()) as { savedPlan?: { id?: string } | null };
-  const planId = planBody.savedPlan?.id;
-  expect(planId).toBeTruthy();
-
-  const acceptResponse = await request.post(`/api/tasks/${taskId}/plan/accept`, {
-    data: { planId },
-  });
-  expect(acceptResponse.ok()).toBeTruthy();
+  if (!acceptResponse.ok()) {
+    throw new Error(`Task-plan acceptance failed: HTTP ${acceptResponse.status()} ${await acceptResponse.text()}`);
+  }
 }
 
 export function taskWorkspaceScreenshotName(testInfo: TestInfo, label: string) {

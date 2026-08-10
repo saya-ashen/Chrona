@@ -29,6 +29,7 @@ Use this directory as the stable product and developer documentation set. Time-p
 | 查看已发布与计划中的产品区域 | [路线图](./zh/roadmap.md) |
 | 运行测试 | [测试指南](./zh/testing.md) |
 | 理解 Goal Workbench 资产使用区的目标设计 | [Goal Workbench 产品设计](./zh/goal-workbench-product-design.md) |
+| 设计 AI Feature 的 Observation、Action、Result 与 Completion | [AI Feature Runtime 架构与实施规范](./zh/ai-feature-runtime-architecture.md) |
 
 ## Shared/generated docs
 

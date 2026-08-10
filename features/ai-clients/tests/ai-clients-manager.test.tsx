@@ -67,32 +67,32 @@ const providersResponse = {
     {
       key: "hermes",
       label: "Hermes",
-      features: ["suggest", "generatePlan", "conflicts", "timeslots", "chat", "dashboard.brief", "task.plan", "task.execution"],
+      features: ["suggest", "conflicts", "timeslots", "chat", "dashboard.brief", "task.plan", "task.execution"],
     },
     {
       key: "llm",
       label: "LLM (OpenAI Compatible)",
-      features: ["suggest", "generatePlan", "conflicts", "timeslots", "chat", "dashboard.brief", "task.plan", "task.execution"],
+      features: ["suggest", "conflicts", "timeslots", "chat", "dashboard.brief", "task.plan", "task.execution"],
     },
     {
       key: "claude_code",
       label: "Claude Code",
-      features: ["generatePlan", "chat", "task.plan", "task.execution"],
+      features: ["chat", "task.plan", "task.execution"],
     },
     {
       key: "codex",
       label: "Codex",
-      features: ["generatePlan", "chat", "task.plan", "task.execution"],
+      features: ["chat", "task.plan", "task.execution"],
     },
     {
       key: "omp",
       label: "Oh My Pi",
-      features: ["generatePlan", "chat", "task.plan", "task.execution"],
+      features: ["chat", "task.plan", "task.execution"],
     },
     {
       key: "debug",
       label: "Debug Provider",
-      features: ["suggest", "generatePlan", "chat", "dashboard.brief", "task.plan", "task.execution"],
+      features: ["suggest", "chat", "dashboard.brief", "task.plan", "task.execution"],
     },
   ],
 };
@@ -343,7 +343,7 @@ describe("AiClientsManager", () => {
     expect(payload.config).not.toHaveProperty("binaryPath");
 
     const bindingsCall = fetchMock.mock.calls.find((call) => call[0] === "/api/ai/clients/client_codex/bindings" && call[1]?.method === "PUT");
-    expect(JSON.parse(bindingsCall?.[1]?.body as string)).toEqual({ features: ["task.plan", "task.execution"] });
+    expect(JSON.parse(bindingsCall?.[1]?.body as string)).toEqual({ features: ["task.execution"] });
   });
 
 

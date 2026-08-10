@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "bun:test";
 import { db } from "@chrona/db";
-import { decideScheduleProposal } from "@chrona/engine/modules/scheduling/decide-schedule-proposal";
+import { decideScheduleProposal } from "@chrona/engine/test-support";
 import { resetTestDb, seedScheduleProposal, seedTask, seedWorkspace } from "../bun-test-helpers";
 
 // decideScheduleProposal — engine-layer unit for the accept/reject

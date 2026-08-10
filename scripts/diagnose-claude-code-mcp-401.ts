@@ -5,17 +5,15 @@
  * Reads `CHRONA_API_KEY` and `CHRONA_MCP_BASE_URL` (default
  * http://localhost:3000) from the environment, issues the same
  * `initialize` + `tools/list` handshake the SDK would, and prints the
- * server's response status + tool list. If the agent model keeps
- * stopping without calling `mcp__chrona__chrona_plan_generate`, run
- * this script first:
+ * server's response status + tool list. If the agent model stops before using
+ * its required MCP tool, run this script first:
  *
  *   CHRONA_API_KEY=$(grep '^API_KEY=' apps/server/.env | cut -d= -f2-) \
  *     bun run scripts/diagnose-claude-code-mcp-401.ts
  *
  * Expected:
  *   - HTTP 200 on initialize
- *   - tools/list returns ≥1 tool (chrona_plan_generate, etc.)
- *
+ *   - tools/list returns at least one tool
  * If the script reports 401, the operator has the wrong CHRONA_API_KEY
  * (or the server's apps/server/.env `API_KEY` has changed). The Claude
  * Code provider's `SdkRunner.start` will now fail-fast with the same
@@ -92,14 +90,12 @@ const toolNames = toolsMatch.map((m) => m.match(/"name"\s*:\s*"([^"]+)"/)?.[1] ?
 console.log(`tools/list → HTTP ${toolsRes.status}, ${toolNames.length} tool(s):`);
 for (const name of toolNames) console.log(`  - ${name}`);
 
-if (!toolNames.includes("chrona_plan_generate")) {
-  console.error("\nchrona_plan_generate is missing from the tool list. The agent will be");
-  console.error("unable to call it. Check apps/server/src/routes/mcp/mcp.routes.ts and");
-  console.error("packages/engine/src/modules/agent-tools/registry.ts for the registration.");
+if (!toolsRes.ok || toolNames.length === 0) {
+  console.error("\nMCP tools/list did not return any usable tools.");
   process.exit(1);
 }
 
-console.log("\nOK: MCP transport is healthy and chrona_plan_generate is registered.");
-console.log("Next step: trigger a real plan generation run in the UI and watch");
+console.log("\nOK: MCP transport is healthy and tools are registered.");
+console.log("Next step: trigger a provider run in the UI and watch");
 console.log("  /tmp/chrona-claude-*.log for the SDK session log.");
 await sleep(50);

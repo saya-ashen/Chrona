@@ -34,16 +34,17 @@ describe("chrona command runner", () => {
   });
 
   it("keeps the aggregate check limited to working quality gates", () => {
-    expect(resolveCommand(["check"])).toMatchObject({
-      description: "Typecheck, lint, boundaries, and UI foundation",
-      steps: [
-        { label: "typecheck" },
-        { label: "e2e typecheck" },
-        { label: "lint" },
-        { label: "boundaries" },
-        { label: "ui foundation" },
-      ],
-    });
+    const command = resolveCommand(["check"]);
+    if (!command) throw new Error("Expected aggregate check command");
+
+    expect(command.description).toBe("Typecheck, lint, boundaries, and UI foundation");
+    expect(command.steps.map(({ label }) => label)).toEqual([
+      "typecheck",
+      "e2e typecheck",
+      "lint ratchet",
+      "boundaries",
+      "ui foundation",
+    ]);
   });
 
   it("runs boundary checks across apps packages features shared", () => {

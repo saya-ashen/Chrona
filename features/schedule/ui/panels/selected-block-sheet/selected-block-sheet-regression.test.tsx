@@ -1,6 +1,7 @@
 import "@testing-library/jest-dom/vitest";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { MemoryRouter } from "react-router-dom";
 import { SelectedBlockSheet } from "./selected-block-sheet";
 import type { ScheduleRecord } from "../../schedule-page-types";
 import type { TaskConfigExecutionRuntime } from "../../forms/task-config-form";
@@ -133,17 +134,19 @@ describe("SelectedBlockSheet regressions", () => {
     const onSaveTaskConfigAction = vi.fn().mockResolvedValue(undefined);
 
     render(
-      <SelectedBlockSheet
-        item={item()}
-        selectedDay="2026-05-28"
-        executionRuntimes={runtimes}
-        defaultExecutionRuntime="hermes"
-        isPending={false}
-        onClose={onClose}
-        onSaveTaskConfigAction={onSaveTaskConfigAction}
-        onMutatedAction={vi.fn().mockResolvedValue(undefined)}
-        buildScheduleHref={(day: string, taskId?: string) => `/en/schedule?day=${day}${taskId ? `&task=${taskId}` : ""}`}
-      />,
+      <MemoryRouter>
+        <SelectedBlockSheet
+          item={item()}
+          selectedDay="2026-05-28"
+          executionRuntimes={runtimes}
+          defaultExecutionRuntime="hermes"
+          isPending={false}
+          onClose={onClose}
+          onSaveTaskConfigAction={onSaveTaskConfigAction}
+          onMutatedAction={vi.fn().mockResolvedValue(undefined)}
+          buildScheduleHref={(day: string, taskId?: string) => `/en/schedule?day=${day}${taskId ? `&task=${taskId}` : ""}`}
+        />
+      </MemoryRouter>,
     );
 
     expect(screen.getByRole("dialog")).toBeInTheDocument();

@@ -72,15 +72,16 @@ const PAGE_REFRESH_WORKSPACE_EVENTS = new Set([
   "checkpoint.result",
 ]);
 
-function shouldRefreshWorkspacePageForEvent(event: string) {
-  if (STREAM_NOOP_EVENTS.has(event)) return false;
-  if (event === "spec.patch") return false;
-  if (PAGE_REFRESH_WORKSPACE_EVENTS.has(event)) return true;
+function shouldRefreshWorkspacePageForEvent(event: TaskWorkspaceSseEvent) {
+  if (STREAM_NOOP_EVENTS.has(event.type)) return false;
+  if (event.type === "spec.patch") return false;
+  if (event.type === "task_workspace_updated" && event.reason === "plan_generation.completed") return false;
+  if (PAGE_REFRESH_WORKSPACE_EVENTS.has(event.type)) return true;
 
-  return !event.startsWith("plan.")
-    && !event.startsWith("execution.")
-    && !event.startsWith("checkpoint.")
-    && !event.startsWith("command.");
+  return !event.type.startsWith("plan.")
+    && !event.type.startsWith("execution.")
+    && !event.type.startsWith("checkpoint.")
+    && !event.type.startsWith("command.");
 }
 
 function isWorkspaceActive(pageData: TaskPageData) {
@@ -257,7 +258,7 @@ function useTaskWorkspaceEventStream(
           return;
         }
         onWorkspaceEvent(envelope);
-        if (shouldRefreshWorkspacePageForEvent(event)) {
+        if (shouldRefreshWorkspacePageForEvent(envelope)) {
           void refreshQueries();
         }
       },

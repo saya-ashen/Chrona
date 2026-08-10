@@ -85,14 +85,7 @@ function normalizeStatusMessage(message: string | null, planningLabel: string, c
 }
 
 function summarizeToolName(tool: string, copy: TaskPlanGenerationProgressCopy) {
-  switch (tool) {
-    case "chrona_plan_generate":
-      return copy.toolPlanGenerate;
-    case "skill_view":
-      return copy.toolSkillView;
-    default:
-      return tool;
-  }
+  return tool === "skill_view" ? copy.toolSkillView : tool;
 }
 
 function getPrepareStepState(hasProviderActivity: boolean, isSaving: boolean, isDone: boolean) {

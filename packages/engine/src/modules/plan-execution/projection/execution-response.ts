@@ -20,11 +20,15 @@ export function buildExecutionResponse(input: {
   currentNodeId: string | null;
   executedNodeIds: string[];
   message: string;
-  errorDetails?: unknown;
   waitKind?: WaitKind;
   checkpoint?: ExecutionCheckpoint | null;
   planOutput?: Pick<PlanOutputState, "manifest" | "finalizedResult" | "finalization" | "revision" | "updatedAt" | "updatedByNodeId">;
 }): PlanExecutionResult {
+  const publicMessage = input.status === "failed"
+    ? "Plan execution failed."
+    : input.status === "cancelled"
+      ? "Plan execution cancelled."
+      : input.message;
   const checkpoint = input.checkpoint ?? (
     input.planRunId || input.effective.waitingNodeIds.length > 0
       ? deriveExecutionCheckpoint({
@@ -35,7 +39,7 @@ export function buildExecutionResponse(input: {
           effective: input.effective,
           currentNodeId: input.currentNodeId,
           waitKind: input.waitKind,
-          message: input.message,
+          message: publicMessage,
         })
       : null
   );
@@ -57,7 +61,6 @@ export function buildExecutionResponse(input: {
     checkpoint,
     planOutput: input.planOutput,
     ui: { currentOperationSpec },
-    message: input.message,
-    ...(input.errorDetails ? { errorDetails: input.errorDetails } : {}),
+    message: publicMessage,
   };
 }

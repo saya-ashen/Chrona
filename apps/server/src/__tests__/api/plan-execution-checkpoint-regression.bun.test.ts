@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test";
 import {
   assertNoLegacyCheckpointResultError,
   LEGACY_CHECKPOINT_RESULT_ERROR,
-} from "@chrona/engine/modules/plan-execution/checkpoint-regression-assertions";
+} from "@chrona/engine/test-support";
 import { SAMPLE_CHECKPOINT_RESULT_CASES } from "./plan-execution-fixtures";
 
 describe("plan execution checkpoint regression", () => {

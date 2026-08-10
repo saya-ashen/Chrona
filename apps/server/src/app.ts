@@ -1,4 +1,5 @@
 import { Hono } from "hono";
+import { bodyLimit } from "hono/body-limit";
 import { createChronaEngine } from "@chrona/engine";
 
 import { defaultLocale, getApiMessages, getPreferredLocale, hasLocale } from "@chrona/i18n";
@@ -12,18 +13,20 @@ import {
 } from "./static/spa";
 import { createLogger } from "@chrona/logging";
 import { apiKeyAuth } from "./middleware/auth";
-import { readEnv, resolveAllowedOrigins } from "./config/env";
+import { isTrustedRequestOrigin, readEnv, resolveAllowedOrigins } from "./config/env";
 
 const log = createLogger("apps.server");
+const MAX_HTTP_BODY_BYTES = 1_048_576;
+
 
 function getAllowedOrigins() {
   return resolveAllowedOrigins(readEnv());
 }
 
 function resolveOrigin(origin: string | undefined, allowed: string[]) {
+  if (!origin) return null;
   if (allowed.includes("*")) return "*";
-  if (origin && allowed.includes(origin)) return origin;
-  return null;
+  return allowed.includes(origin) ? origin : null;
 }
 
 function wantsHtml(acceptHeader: string | undefined) {
@@ -46,26 +49,43 @@ export async function createServerApp() {
   const spaAvailable = await hasSpaDist();
   const allowedOrigins = getAllowedOrigins();
 
-  app.use("/api/*", apiKeyAuth());
-
-  app.use("*", async (c, next) => {
-    const origin = resolveOrigin(c.req.header("origin"), allowedOrigins);
-    if (origin) {
-      c.header("Access-Control-Allow-Origin", origin);
+  app.use("/api/*", async (c, next) => {
+    const origin = c.req.header("origin");
+    if (!isTrustedRequestOrigin(c.req.url, origin, allowedOrigins)) {
+      return c.json({ error: "Cross-origin API requests are not allowed" }, 403);
     }
 
-    c.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
-    c.header(
-      "Access-Control-Allow-Methods",
-      "GET,POST,PATCH,PUT,DELETE,OPTIONS",
-    );
+    const corsOrigin = resolveOrigin(origin, allowedOrigins);
+    if (corsOrigin) {
+      c.header("Access-Control-Allow-Origin", corsOrigin);
+      c.header("Vary", "Origin");
+      c.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
+      c.header("Access-Control-Allow-Methods", "GET,POST,PATCH,PUT,DELETE,OPTIONS");
+    }
 
+    if (c.req.method === "OPTIONS") return c.body(null, 204);
     await next();
   });
-
-  app.options("*", (c) => c.body(null, 204));
+  app.use("/api/*", apiKeyAuth());
+  app.use(
+    "/api/*",
+    bodyLimit({
+      maxSize: MAX_HTTP_BODY_BYTES,
+      onError: (context) => {
+        log.warn("request.body_too_large", {
+          method: context.req.method,
+          path: new URL(context.req.url).pathname,
+        });
+        return context.json({ error: "Request body exceeds the 1 MiB limit." }, 413);
+      },
+    }),
+  );
 
   app.get("/health", (c) => c.json({ status: "ok", server: "chrona-hono" }));
+  app.get("/ready", async (c) => {
+    const readiness = await engine.runtime.getReadiness();
+    return c.json(readiness, readiness.status === "ready" ? 200 : 503);
+  });
 
   app.route("/api", api);
 

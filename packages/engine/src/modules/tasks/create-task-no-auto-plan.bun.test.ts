@@ -55,33 +55,35 @@ describe("createTask auto plan generation", () => {
     expect(autoPlanGenerationMock).not.toHaveBeenCalled();
   });
 
-  it("starts and accepts automatic plan generation when auto-execute is enabled", async () => {
+  it("does not start planning or execution during creation when auto-execute is enabled", async () => {
     const workspace = await db.workspace.create({
       data: { name: "Auto Plan Workspace", status: "Active", defaultRuntime: "hermes" },
     });
 
     const result = await createTask({
       workspaceId: workspace.id,
-      title: "Create task with auto plan",
-      description: "Plan generation should start in the background.",
+      title: "Create task with deferred automation",
+      description: "Creation must not start plan generation or execution.",
       autoExecute: true,
       autoPlanGenerationTiming: "immediate",
       executionRuntime: "hermes",
       executionConfig: { prompt: "Do it" },
     });
 
-    expect(autoPlanGenerationMock).toHaveBeenCalledWith({ taskId: result.taskId, workBlockId: null, accept: true });
+    expect(result.autoPlanGeneration).toBe(true);
+    expect(result.autoExecute).toBe(true);
+    expect(autoPlanGenerationMock).not.toHaveBeenCalled();
   });
 
-  it("starts draft plan generation when only auto-plan is enabled", async () => {
+  it("persists auto-plan preference without starting generation during creation", async () => {
     const workspace = await db.workspace.create({
       data: { name: "Auto Draft Plan Workspace", status: "Active", defaultRuntime: "hermes" },
     });
 
     const result = await createTask({
       workspaceId: workspace.id,
-      title: "Create task with auto draft plan",
-      description: "Plan generation should start without accepting the plan.",
+      title: "Create task with deferred draft plan",
+      description: "Plan generation must be requested by a later command.",
       autoPlanGeneration: true,
       autoExecute: false,
       autoPlanGenerationTiming: "immediate",
@@ -95,12 +97,12 @@ describe("createTask auto plan generation", () => {
     expect(result.autoExecute).toBe(false);
     expect(persisted.autoPlanGeneration).toBe(true);
     expect(persisted.autoExecute).toBe(false);
-    expect(autoPlanGenerationMock).toHaveBeenCalledWith({ taskId: result.taskId, workBlockId: null, accept: false });
+    expect(autoPlanGenerationMock).not.toHaveBeenCalled();
   });
 
-  it("persists and returns the explicit task auto-execute choice", async () => {
+  it("persists explicit automation choices without triggering creation side effects", async () => {
     const workspace = await db.workspace.create({
-      data: { name: "Auto Execute Workspace", status: "Active", defaultRuntime: "hermes" },
+      data: { name: "Automation Preferences Workspace", status: "Active", defaultRuntime: "hermes" },
     });
 
     const enabled = await createTask({
@@ -133,9 +135,10 @@ describe("createTask auto plan generation", () => {
     expect(persistedById.get(enabled.taskId)?.autoExecute).toBe(true);
     expect(persistedById.get(disabled.taskId)?.autoPlanGeneration).toBe(false);
     expect(persistedById.get(disabled.taskId)?.autoExecute).toBe(false);
-    expect(autoPlanGenerationMock).toHaveBeenCalledTimes(1);
-    expect(autoPlanGenerationMock).toHaveBeenCalledWith({ taskId: enabled.taskId, workBlockId: null, accept: true });
+    expect(autoPlanGenerationMock).not.toHaveBeenCalled();
   });
+
+
 
 
   it("keeps one task entry when workspace edit enables recurrence", async () => {
@@ -165,10 +168,49 @@ describe("createTask auto plan generation", () => {
     expect(tasks[0]?.seriesExternalUid).toBeNull();
     expect(tasks[0]?.recurrenceRule).toBe("FREQ=DAILY;COUNT=3");
     expect(tasks[0]?.workBlocks.map((block) => block.recurrenceKey)).toEqual([
-      "2026-06-01T09:00:00.000Z",
-      "2026-06-02T09:00:00.000Z",
-      "2026-06-03T09:00:00.000Z",
+      "schedule:v1:2026-06-01T09:00:00.000Z",
+      "schedule:v1:2026-06-02T09:00:00.000Z",
+      "schedule:v1:2026-06-03T09:00:00.000Z",
     ]);
+
+    const firstTrigger = await db.taskTrigger.findUniqueOrThrow({
+      where: { taskId_kind: { taskId: result.taskId, kind: "schedule" } },
+    });
+    const firstOccurrences = await db.taskOccurrence.findMany({
+      where: { taskId: result.taskId, triggerVersion: 1 },
+      include: { workBlock: true },
+    });
+    expect(firstTrigger).toMatchObject({ version: 1, state: "Enabled" });
+    expect(firstOccurrences).toHaveLength(3);
+    expect(firstOccurrences.every((occurrence) => occurrence.workBlock?.recurrenceKey === occurrence.occurrenceKey)).toBe(true);
+
+    await updateTask({
+      taskId: result.taskId,
+      recurrenceRule: "FREQ=WEEKLY;COUNT=2",
+      recurrenceAnchorStartAt: "2026-06-01T09:00:00.000Z",
+      recurrenceAnchorEndAt: "2026-06-01T10:00:00.000Z",
+    });
+
+    const updatedTrigger = await db.taskTrigger.findUniqueOrThrow({
+      where: { taskId_kind: { taskId: result.taskId, kind: "schedule" } },
+    });
+    const updatedOccurrences = await db.taskOccurrence.findMany({
+      where: { taskId: result.taskId },
+      include: { workBlock: true },
+      orderBy: { occurrenceKey: "asc" },
+    });
+    expect(updatedTrigger).toMatchObject({
+      version: 2,
+      state: "Enabled",
+      config: expect.objectContaining({ rrule: "FREQ=WEEKLY;COUNT=2" }),
+    });
+    expect(updatedOccurrences.filter((occurrence) => occurrence.triggerVersion === 1).every((occurrence) => occurrence.status === "Cancelled")).toBe(true);
+    const currentOccurrences = updatedOccurrences.filter((occurrence) => occurrence.triggerVersion === 2);
+    expect(currentOccurrences.map((occurrence) => occurrence.occurrenceKey)).toEqual([
+      "schedule:v2:2026-06-01T09:00:00.000Z",
+      "schedule:v2:2026-06-08T09:00:00.000Z",
+    ]);
+    expect(currentOccurrences.every((occurrence) => occurrence.workBlock?.recurrenceKey === occurrence.occurrenceKey)).toBe(true);
   });
 
   it("cancels open work blocks when a recurring task is cancelled", async () => {
@@ -197,5 +239,7 @@ describe("createTask auto plan generation", () => {
     expect(rootBlocks).toHaveLength(3);
     expect(rootBlocks.every((block) => block.status === "Cancelled")).toBe(true);
     expect(rootBlocks.every((block) => block.completedAt instanceof Date)).toBe(true);
+    expect(await db.taskTrigger.findUniqueOrThrow({ where: { taskId_kind: { taskId: result.taskId, kind: "schedule" } } })).toMatchObject({ state: "Retired", version: 2 });
+    expect(await db.taskOccurrence.count({ where: { taskId: result.taskId, status: { not: "Cancelled" } } })).toBe(0);
   });
 });

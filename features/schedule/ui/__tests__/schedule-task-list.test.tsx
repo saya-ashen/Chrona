@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { ScheduleTaskList, type ScheduleTaskListItem } from "../schedule-task-list";
 import { MemoryRouter } from "react-router-dom";
 import type { ComponentProps } from "react";
+import type * as SharedUi from "@shared/ui";
 
 vi.mock("@chrona/i18n/react", () => ({
   useI18n: () => ({ t: (key: string) => key, messages: {} }),
@@ -13,7 +14,8 @@ vi.mock("@chrona/i18n", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@chrona/i18n")>()),
   localizeHref: (_: string, href: string) => href,
 }));
-vi.mock("@shared/ui", () => ({
+vi.mock("@shared/ui", async (importOriginal) => ({
+  ...(await importOriginal<typeof SharedUi>()),
   Badge: ({ children }: { children: React.ReactNode }) => <span data-testid="status-badge">{children}</span>,
   Button: ({ children, asChild, ...props }: React.PropsWithChildren<{ asChild?: boolean }>) => asChild ? <>{children}</> : <button {...props}>{children}</button>,
   Card: ({ children }: React.PropsWithChildren) => <div>{children}</div>,
@@ -21,7 +23,7 @@ vi.mock("@shared/ui", () => ({
   CardHeader: ({ children }: React.PropsWithChildren) => <div>{children}</div>,
   CardTitle: ({ children }: React.PropsWithChildren) => <h3>{children}</h3>,
 }));
-vi.mock("@features/task-workspace", () => ({ TaskContextLinks: () => null }));
+vi.mock("@features/task-workspace/public/workspace-integration", () => ({ TaskContextLinks: () => null }));
 vi.mock("../forms/task-config-form", () => ({
   TaskConfigForm: () => <div data-testid="task-config-form" />,
 }));

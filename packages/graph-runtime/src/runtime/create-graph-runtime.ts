@@ -1,6 +1,7 @@
 import { runGraphExecution } from "../execution/run-graph-execution";
 import { createRegistryExecutor } from "../registry/executor-registry";
-import type { GraphExecutionCallbacks, GraphExecutionEvent } from "../execution/types";
+import type { GraphExecutionCallbacks } from "../types/callbacks";
+import type { GraphExecutionEvent } from "../types/events";
 import { approveCurrentNodeCommand } from "../commands/approve-current-node";
 import { applyMutationCommand } from "../commands/apply-mutation";
 import { cancelSessionCommand } from "../commands/cancel-session";

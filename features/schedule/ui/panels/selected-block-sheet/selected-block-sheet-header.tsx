@@ -3,7 +3,7 @@
 import type { SchedulePageCopy } from "../../schedule-page-copy";
 import type { ScheduleRecord } from "../../schedule-page-types";
 import { formatDateTime, formatTimeRange } from "../../schedule-page-utils";
-import { TaskContextLinks } from "@features/task-workspace";
+import { TaskContextLinks } from "@features/task-workspace/public/workspace-integration";
 import { Button } from "@shared/ui"
 import { X } from "lucide-react";
 

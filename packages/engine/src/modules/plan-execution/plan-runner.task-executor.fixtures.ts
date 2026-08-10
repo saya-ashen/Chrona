@@ -1,3 +1,4 @@
+/* eslint-disable max-lines-per-function, max-lines -- Shared execution fixtures keep graph builders and exact identity seeders together. */
 import { afterAll, beforeEach, mock } from "bun:test";
 import { TaskStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
@@ -477,10 +478,61 @@ export function makeFullExecutionPlan(editablePlanId: string): CompiledPlan {
   };
 }
 
-export async function seedAcceptedCompiledPlan(workspaceId: string, taskId: string, compiledPlan: CompiledPlan) {
+export async function seedRuntimeSyncIdentity(taskId: string, runtimeRunRef: string) {
+  const session = await db.executionSession.findFirstOrThrow({
+    where: { taskId, status: "Active", currentNodeAttemptId: { not: null } },
+    orderBy: { createdAt: "desc" },
+    select: { id: true, workBlockId: true, occurrenceId: true, currentNodeAttemptId: true },
+  });
+  const attempt = await db.taskPlanNodeAttempt.findUniqueOrThrow({
+    where: { id: session.currentNodeAttemptId! },
+    include: { planRun: true },
+  });
+  const taskSession = await db.taskSession.findFirst({
+    where: { taskId },
+    orderBy: { createdAt: "desc" },
+    select: { id: true },
+  });
+  const run = await db.run.create({
+    data: {
+      taskId,
+      workBlockId: session.workBlockId,
+      occurrenceId: session.occurrenceId,
+      nodeAttemptId: attempt.id,
+      taskSessionId: taskSession?.id ?? null,
+      runtimeName: "test-runtime",
+      runtimeRunRef,
+      status: "Running",
+      startedAt: new Date(),
+      triggeredBy: "system",
+    },
+  });
+  const providerRun = await db.taskPlanProviderRun.create({
+    data: {
+      workspaceId: attempt.workspaceId,
+      taskId,
+      planId: attempt.planId,
+      planRunId: attempt.planRunId,
+      nodeAttemptId: attempt.id,
+      runId: run.id,
+      idempotencyKey: `test-provider:${attempt.id}:${runtimeRunRef}`,
+      providerRunRef: runtimeRunRef,
+      runtimeName: "test-runtime",
+      status: "running",
+    },
+  });
+  return {
+    executionSessionId: session.id,
+    expectedAttemptId: attempt.id,
+    providerRunId: providerRun.id,
+  };
+}
+
+export async function seedAcceptedCompiledPlan(workspaceId: string, taskId: string, compiledPlan: CompiledPlan, workBlockId?: string | null) {
   await saveCompiledPlan({
     workspaceId,
     taskId,
+    workBlockId,
     compiledPlan,
     status: "accepted",
     prompt: compiledPlan.title,

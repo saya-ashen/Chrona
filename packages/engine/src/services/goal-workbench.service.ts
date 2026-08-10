@@ -1,7 +1,10 @@
 import {
   archiveGoalAsset,
+  createAssetUseTask,
+  createGoalAssetReview,
   createAssetModificationTask,
   createGoalAssetJob,
+  discardGoalAssetDraft,
   createGoalFormSubmission,
   getGoalAsset,
   listGoalAssets,
@@ -29,6 +32,7 @@ export function createGoalWorkbenchService() {
     renameAsset: renameGoalAsset,
     saveDraft: saveGoalAssetDraft,
     submitDraft: submitGoalAssetDraft,
+    discardDraft: discardGoalAssetDraft,
     restoreVersion: restoreGoalAssetVersion,
     archiveAsset: archiveGoalAsset,
     listInbox: listGoalInbox,
@@ -39,5 +43,7 @@ export function createGoalWorkbenchService() {
     createSubmission: createGoalFormSubmission,
     createJob: createGoalAssetJob,
     createModificationTask: createAssetModificationTask,
+    createUseTask: createAssetUseTask,
+    createReview: createGoalAssetReview,
   };
 }

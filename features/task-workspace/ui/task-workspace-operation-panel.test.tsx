@@ -1,4 +1,6 @@
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { ReactElement, ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { deriveWorkStateView } from "@chrona/domain";
@@ -13,6 +15,21 @@ vi.mock("@features/execution-monitoring", () => ({
 }));
 
 afterEach(() => cleanup());
+
+function renderWithQueryClient(ui: ReactElement) {
+  const queryClient = new QueryClient({
+    defaultOptions: {
+      queries: { retry: false },
+      mutations: { retry: false },
+    },
+  });
+
+  return render(ui, {
+    wrapper: ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    ),
+  });
+}
 
 const operationStateBase = {
   status: "execution-failed",
@@ -30,6 +47,8 @@ const operationState = operationStateBase as unknown as TaskWorkspaceOperationSt
 
 const commonProps = {
   taskId: "task-1",
+  workBlockId: null,
+  executionScope: null,
   state: operationState,
   copy: {},
   onGeneratePlan: vi.fn(),
@@ -40,7 +59,7 @@ const commonProps = {
 
 describe("TaskWorkspaceOperationPanel recovery", () => {
   it("keeps technical detail collapsed while explaining retained progress and retry risk", () => {
-    render(
+    renderWithQueryClient(
       <TaskWorkspaceOperationPanel
         {...commonProps}
         workState={{
@@ -63,7 +82,7 @@ describe("TaskWorkspaceOperationPanel recovery", () => {
   });
 
   it("distinguishes input from approval recovery", () => {
-    const { rerender } = render(
+    const { rerender } = renderWithQueryClient(
       <TaskWorkspaceOperationPanel
         {...commonProps}
         workState={deriveWorkStateView({
@@ -88,7 +107,7 @@ describe("TaskWorkspaceOperationPanel recovery", () => {
 
   it("offers a new draft after a completed task instead of only rerunning the accepted plan", async () => {
     const onRegeneratePlan = vi.fn();
-    render(
+    renderWithQueryClient(
       <TaskWorkspaceOperationPanel
         {...commonProps}
         state={{
@@ -115,7 +134,7 @@ describe("TaskWorkspaceOperationPanel recovery", () => {
   });
 
   it("offers plan regeneration before the accepted plan has started", () => {
-    render(
+    renderWithQueryClient(
       <TaskWorkspaceOperationPanel
         {...commonProps}
         state={{

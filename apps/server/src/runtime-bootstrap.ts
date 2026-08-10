@@ -1,18 +1,27 @@
 import type { TaskOrchestrator } from "@chrona/engine";
 
 type RuntimeBootstrapPort = {
-  startTaskOrchestrator: () => TaskOrchestrator | void;
+  startTaskOrchestrator: () => TaskOrchestrator;
+  startAiFeatureRecoveryWorker: () => { stop(): Promise<void> };
+};
+
+export type ServerRuntimeLifecycle = {
+  stop: () => Promise<void>;
 };
 
 export function createServerRuntimeBootstrap(runtime: RuntimeBootstrapPort) {
-  let orchestratorStarted = false;
+  let lifecycle: ServerRuntimeLifecycle | null = null;
 
-  return function bootstrapServerRuntime() {
-    if (orchestratorStarted) {
-      return;
-    }
+  return function bootstrapServerRuntime(): ServerRuntimeLifecycle {
+    if (lifecycle) return lifecycle;
 
-    runtime.startTaskOrchestrator();
-    orchestratorStarted = true;
+    const orchestrator = runtime.startTaskOrchestrator();
+    const featureRecovery = runtime.startAiFeatureRecoveryWorker();
+    lifecycle = {
+      async stop() {
+        await Promise.all([orchestrator.stop(), featureRecovery.stop()]);
+      },
+    };
+    return lifecycle;
   };
 }

@@ -1,3 +1,5 @@
+export type { TaskDeleteImpact } from "./api/tasks.schema";
+
 export {
   STRUCTURED_RESULT_FORMAT,
   STRUCTURED_RESULT_SCHEMA_VERSION,
@@ -194,31 +196,36 @@ export {
   type ActionCenterProjection,
 } from "./api/projections.schema";
 export {
+  answerGoalReviewProposalBodySchema,
   applyGoalReviewProposalBodySchema,
   generateGoalReviewBodySchema,
+  goalReviewProgressEventSchema,
   goalReviewResultSchema,
   rejectGoalReviewProposalBodySchema,
+  retryGoalReviewProposalBodySchema,
 } from "./api/goals.schema";
 export type {
-  CreateGoalTaskRequest,
-  ApplyGoalReviewRequest,
+  AnswerGoalReviewProposalRequest,
   ApplyGoalReviewProposalRequest,
+  ConfirmGoalCriterionRequest,
+  CreateGoalRequest,
+  CreateGoalTaskRequest,
+  CreateGoalWithFirstTaskRequest,
   GenerateGoalReviewRequest,
+  GoalActionRequest,
+  GoalOperationalBrief,
   GoalReviewEvidenceRef,
+  GoalReviewProgressEvent,
   GoalReviewProposalItemDecision,
   GoalReviewProposalItemKind,
   GoalReviewProposalStatus,
   GoalReviewResult,
-  RejectGoalReviewProposalRequest,
-  ConfirmGoalCriterionRequest,
-  CreateGoalRequest,
-  CreateGoalWithFirstTaskRequest,
-  ProcessGoalResultRequest,
-  GoalActionRequest,
-  GoalOperationalBrief,
   GoalStatus,
   GoalSuccessCriterion,
+  ProcessGoalResultRequest,
   PromoteTaskToGoalRequest,
+  RejectGoalReviewProposalRequest,
+  RetryGoalReviewProposalRequest,
   ReviewGoalCriterionRequest,
 } from "./api/goals.schema";
 export {
@@ -295,20 +302,6 @@ export {
   planPatchSchema,
   upgradeBlueprintToEditable,
 } from "./ai-plan-blueprint";
-export type { PlanGenerateToolPayload } from "./plan-generate-tool";
-
-export {
-  CHRONA_PLAN_GENERATE_CLAUDE_CODE_TOOL_NAME,
-  CHRONA_PLAN_GENERATE_INTERNAL_TOOL_NAME,
-  CHRONA_PLAN_GENERATE_TOOL_DESCRIPTION,
-  CHRONA_PLAN_GENERATE_TOOL_NAME,
-  CHRONA_PLAN_GENERATE_TOOL_TITLE,
-  acceptedPlanGenerateToolResult,
-  isChronaPlanGenerateToolName,
-  parsePlanGenerateToolPayload,
-  planGenerateToolPayloadSchema,
-  safeParsePlanGenerateToolPayload,
-} from "./plan-generate-tool";
 
 
 // Runtime / compiled types
@@ -385,15 +378,21 @@ export type {
   ExecutionActionInput,
   PlanExecutionStatus,
   PlanExecutionResult,
+  PublicExecutionCheckpoint,
+  PublicPlanExecutionResult,
   PlanExecutionSSEEvent,
+  PublicEffectivePlanGraph,
+  PublicEffectivePlanNode,
+  PublicEffectivePlanNodeResult,
+  PublicProviderDescriptor,
   GraphMutationRequest,
   TaskPlanReadModel,
   TaskPlanGenerationSessionReadModel,
   GeneratePlanStatusPhase,
   GeneratePlanStatusEvent,
-  GeneratePlanPartialEvent,
-  GeneratePlanToolCallEvent,
-  GeneratePlanResultEvent,
+  GeneratePlanCommittedEvent,
+  GeneratePlanStaleEvent,
+  GeneratePlanCancelledEvent,
   GeneratePlanErrorCode,
   GeneratePlanErrorEvent,
   GeneratePlanDoneEvent,
@@ -402,18 +401,16 @@ export type {
   WaitKind,
 } from "./plan-runtime";
 
-// AI feature specs
-export type {
-  AiFeatureStructuredOutputSchema,
-  StructuredAiFeature,
-  PreparedAiFeatureSpec,
-} from "./ai-feature-specs";
-
-export type { AiFeatureToolSpec } from "./ai-feature-specs";
 export {
-  buildGoalAssetOwnershipFeatureSpec,
-  buildResultFinalizationFeatureSpec,
-} from "./ai-feature-specs";
+  projectPublicEffectivePlanGraph,
+  projectPublicEffectivePlanNode,
+  projectPublicEffectivePlanNodeResult,
+  publicProviderDescriptor,
+  publicRuntimeDescriptor,
+  publicToolDescriptor,
+} from "./plan-runtime";
+
+// AI feature specs
 
 export type { StructuredSuggestion } from "./ai-shared-types";
 
@@ -432,18 +429,6 @@ export type {
   TimeslotSuggestionResult,
 } from "./ai-shared-types";
 
-export {
-  GENERATE_PLAN_SYSTEM_PROMPT,
-  SUGGEST_SYSTEM_PROMPT,
-  SUGGEST_TASK_COMPLETIONS_TOOL_NAME,
-  GENERATE_PLAN_BLUEPRINT_TOOL_DESCRIPTION,
-  GENERATE_PLAN_BLUEPRINT_TOOL_NAME,
-  buildGeneratePlanFeatureInputText,
-  buildGeneratePlanFeatureSpec,
-  buildSuggestFeatureSpec,
-  suggestTaskCompletionsToolSpec,
-  validatePreparedFeaturePayload,
-} from "./ai";
 
 export type {
   AiClientRecord,
@@ -521,12 +506,16 @@ export * from "./provider-capability-matrix";
 export type {
   ApplyGoalAssetOwnershipRequest,
   CreateAssetModificationTaskRequest,
+  CreateAssetUseTaskRequest,
+  CreateGoalAssetReviewRequest,
+  DiscardGoalAssetDraftRequest,
   CreateGoalAssetJobRequest,
   GenerateGoalAssetOwnershipRequest,
   GoalAssetOwnershipCandidate,
   GoalAssetOwnershipDecision,
   GoalAssetOwnershipProposalStatus,
   GoalAssetOwnershipResult,
+  GoalDataTableContent,
   CreateGoalFormSubmissionRequest,
   ResolveGoalInboxCandidateRequest,
   SaveGoalAssetDraftRequest,
@@ -540,4 +529,10 @@ export {
   goalAssetOwnershipProposalParamSchema,
   goalAssetOwnershipProposalStatusSchema,
   goalAssetOwnershipResultSchema,
+  createAssetUseTaskBodySchema,
+  createGoalAssetReviewBodySchema,
+  goalDataTableContentSchema,
 } from "./api/goal-workbench.schema";
+
+// AI feature runtime contracts
+export * from "./ai-feature-runtime";

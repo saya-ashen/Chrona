@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { PropsWithChildren, ReactNode } from "react";
-import type { TaskPlanReadModel } from "@chrona/contracts"
+import type { TaskPlanGenerationSessionReadModel, TaskPlanReadModel } from "@chrona/contracts"
 
 import { TaskWorkspacePage } from "../ui/task-workspace-page";
 import { createTaskWorkspaceFixturePageData } from "@features/task-workspace/test";
@@ -27,7 +27,7 @@ const mocks = vi.hoisted(() => ({
     taskId: string;
     aiPlanGenerationStatus: "idle" | "generating" | "waiting_acceptance" | "accepted";
     savedPlan: TaskPlanReadModel | null;
-    generationSession: null;
+    generationSession: TaskPlanGenerationSessionReadModel | null;
   } | null,
   currentExecution: { status: "no_plan" } as Record<string, unknown>,
   setPageContext: vi.fn(),
@@ -143,6 +143,20 @@ function idlePlanState() {
   };
 }
 
+function completedGenerationSession(headStateVersion = 2): TaskPlanGenerationSessionReadModel {
+  return {
+    generationId: "generation-1",
+    taskId: "task-1",
+    headStateVersion,
+    status: "completed",
+    phase: null,
+    statusMessage: null,
+    error: null,
+    startedAt: "2026-06-10T00:00:00.000Z",
+    finishedAt: "2026-06-10T00:00:00.000Z",
+  };
+}
+
 function draftPlan(): TaskPlanReadModel {
   return {
     id: "plan-1",
@@ -158,8 +172,14 @@ function draftPlan(): TaskPlanReadModel {
   };
 }
 
-function renderWorkspace(input: { savedPlan?: TaskPlanReadModel | null; planStatus?: "idle" | "waiting_acceptance" | "accepted"; executionStatus?: string } = {}) {
+function renderWorkspace(input: {
+  savedPlan?: TaskPlanReadModel | null;
+  planStatus?: "idle" | "waiting_acceptance" | "accepted";
+  executionStatus?: string;
+  generationSession?: TaskPlanGenerationSessionReadModel | null;
+} = {}) {
   const savedPlan = input.savedPlan ?? null;
+  const generationSession = input.generationSession ?? null;
   mocks.pageData = createTaskWorkspaceFixturePageData({
     task: {
       savedPlan,
@@ -170,7 +190,7 @@ function renderWorkspace(input: { savedPlan?: TaskPlanReadModel | null; planStat
     taskId: "task-1",
     aiPlanGenerationStatus: input.planStatus ?? (savedPlan ? "waiting_acceptance" : "idle"),
     savedPlan,
-    generationSession: null,
+    generationSession,
   };
   mocks.currentExecution = { status: input.executionStatus ?? (savedPlan ? "started" : "no_plan") };
 
@@ -215,7 +235,14 @@ describe("TaskWorkspacePage Generate Plan live header action", () => {
     const generate = await screen.findByRole("button", { name: "Generate plan" });
     fireEvent.click(generate);
 
-    await waitFor(() => expect(mocks.commandCalls[0]?.body).toMatchObject({ type: "plan.generate" }));
+    await waitFor(() => expect(mocks.commandCalls[0]?.body).toMatchObject({
+      type: "plan.generate",
+      forceRefresh: true,
+      workBlockId: null,
+      userInstruction: null,
+      selectedNodeId: null,
+      idempotencyKey: expect.any(String),
+    }));
 
     await act(async () => {
       pushEvent("state.update", {
@@ -252,6 +279,19 @@ describe("TaskWorkspacePage Generate Plan live header action", () => {
       });
     });
 
+    mocks.planState = {
+      taskId: "task-1",
+      aiPlanGenerationStatus: "waiting_acceptance",
+      savedPlan: draftPlan(),
+      generationSession: completedGenerationSession(),
+    };
+    await act(async () => {
+      pushEvent("task_workspace_updated", {
+        type: "task_workspace_updated",
+        reason: "plan_generation.completed",
+      });
+    });
+
     await waitFor(() => expect(screen.queryByRole("button", { name: "Generate plan..." })).not.toBeInTheDocument());
     expect(screen.getByRole("button", { name: "Accept plan" })).toBeEnabled();
   });
@@ -261,7 +301,12 @@ describe("TaskWorkspacePage Generate Plan live header action", () => {
 describe("TaskWorkspacePage Accept Plan live header action", () => {
 
   it("updates Accept Plan to Start from real click plus workspace state.update", async () => {
-    renderWorkspace({ savedPlan: draftPlan(), planStatus: "waiting_acceptance", executionStatus: "idle" });
+    renderWorkspace({
+      savedPlan: draftPlan(),
+      planStatus: "waiting_acceptance",
+      executionStatus: "idle",
+      generationSession: completedGenerationSession(),
+    });
     await waitFor(() => expect(mocks.streamOpened).toBe(true));
     await act(async () => {
       pushEvent("state.snapshot", {
@@ -305,7 +350,13 @@ describe("TaskWorkspacePage Accept Plan live header action", () => {
     const accept = await screen.findByRole("button", { name: "Accept plan" });
     fireEvent.click(accept);
 
-    await waitFor(() => expect(mocks.commandCalls[0]?.body).toMatchObject({ type: "plan.accept", planId: "plan-1" }));
+    await waitFor(() => expect(mocks.commandCalls[0]?.body).toMatchObject({
+      type: "plan.accept",
+      planId: "plan-1",
+      workBlockId: null,
+      expectedHeadStateVersion: 2,
+      idempotencyKey: expect.any(String),
+    }));
 
     await act(async () => {
       pushEvent("state.update", {

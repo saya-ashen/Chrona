@@ -3,189 +3,199 @@ import { summarizeRuntimeEvent } from "@features/execution-monitoring/server";
 import type { PlanExecutionRuntimeEvent } from "@chrona/engine/modules/plan-execution";
 
 describe("summarizeRuntimeEvent", () => {
-  it("keeps full tool runtime payload for workspace activity", () => {
-    const event = summarizeRuntimeEvent("start_manual", {
-      nodeId: "node-a",
-      nodeTitle: "Node A",
-      runtimeName: "hermes",
-      event: {
-        type: "tool_started",
-        provider: "anthropic",
-        runId: "run-1",
-        nativeRunId: "native-1",
-        sequence: 7,
-        timestamp: "2026-05-22T00:00:03.000Z",
-        rawEventType: "tool_use",
-        toolName: "chrona_task_read",
-        preview: "Read task",
-        input: "task id",
-      },
-    } satisfies PlanExecutionRuntimeEvent);
+	it("projects a safe tool lifecycle event", () => {
+		const event = summarizeRuntimeEvent("start_manual", {
+			nodeId: "node-a",
+			executionScope: "scope-a",
+			nodeTitle: "Node A",
+			runtimeName: "hermes",
+			event: {
+				type: "tool_started",
+				provider: "anthropic",
+				runId: "run-1",
+				nativeRunId: "native-1",
+				sequence: 7,
+				timestamp: "2026-05-22T00:00:03.000Z",
+				toolName: "chrona_task_read",
+				preview: "Read task",
+				input: "task id",
+			},
+		} satisfies PlanExecutionRuntimeEvent);
 
-    expect(event).toMatchObject({
-      type: "runtime_event",
-      action: "start_manual",
-      nodeId: "node-a",
-      nodeTitle: "Node A",
-      runtimeName: "hermes",
-      provider: "anthropic",
-      runId: "run-1",
-      nativeRunId: "native-1",
-      sequence: 7,
-      timestamp: "2026-05-22T00:00:03.000Z",
-      rawEventType: "tool_use",
-      event: {
-        type: "tool_started",
-        toolName: "chrona_task_read",
-        label: "Reading task",
-        preview: "Read task",
-        inputSummary: '"task id"',
-      },
-    });
-  });
+		expect(event).toMatchObject({
+			type: "runtime_event",
+			nodeId: "node-a",
+			executionScope: "scope-a",
+			runtime: { category: "runtime", label: "Execution runtime" },
+			provider: { category: "ai_provider", label: "AI provider" },
+			sequence: 7,
+			event: {
+				type: "tool_started",
+				tool: { category: "tool", label: "Runtime tool" },
+				label: "Runtime tool",
+			},
+		});
+		expect(JSON.stringify(event)).not.toContain("run-1");
+		expect(JSON.stringify(event)).not.toContain("Read task");
+	});
 
-  it("keeps tool-call intent visible as live activity preview", () => {
-    const event = summarizeRuntimeEvent("start_manual", {
-      nodeId: "node-a",
-      nodeTitle: "Review architecture",
-      runtimeName: "hermes",
-      event: {
-        type: "tool_call",
-        provider: "omp",
-        runId: "run-1",
-        callId: "call-1",
-        tool: "mcp__codegraph_explore",
-        input: {},
-        status: "pending",
-        preview: "Mapping architectural risk",
-      },
-    } satisfies PlanExecutionRuntimeEvent);
+	it("preserves provider completion output and duration for the live trace", () => {
+		const event = summarizeRuntimeEvent("start_manual", {
+			nodeId: "node-a",
+			executionScope: "scope-a",
+			nodeTitle: "Inspect repository",
+			runtimeName: "omp",
+			event: {
+				type: "tool_completed",
+				provider: "omp",
+				runId: "run-1",
+				sequence: 8,
+				toolName: "read",
+				durationMs: 42,
+				raw: { text: "export const secret = true" },
+			},
+		} satisfies PlanExecutionRuntimeEvent);
 
-    expect(event.event).toMatchObject({
-      type: "tool_started",
-      label: "mcp__codegraph_explore",
-      callId: "call-1",
-      inputSummary: "{}",
-      preview: "Mapping architectural risk",
-    });
-  });
+		expect(event?.event).toMatchObject({
+			type: "tool_completed",
+			durationMs: 42,
+			raw: { text: "export const secret = true" },
+		});
+		expect(JSON.stringify(event)).toContain("export const secret");
+	});
 
-  it("keeps incremental tool progress visible", () => {
-    const event = summarizeRuntimeEvent("start_manual", {
-      nodeId: "node-a",
-      nodeTitle: "Review architecture",
-      runtimeName: "hermes",
-      event: {
-        type: "tool_progress",
-        provider: "omp",
-        runId: "run-1",
-        callId: "call-1",
-        toolName: "task",
-        preview: "Reviewer is inspecting persistence boundaries",
-      },
-    } satisfies PlanExecutionRuntimeEvent);
+	it("preserves provider error details for the live trace", () => {
+		const event = summarizeRuntimeEvent("start_manual", {
+			nodeId: "node-a",
+			executionScope: "scope-a",
+			nodeTitle: "Inspect repository",
+			runtimeName: "omp",
+			event: {
+				type: "tool_completed",
+				provider: "omp",
+				runId: "run-1",
+				sequence: 9,
+				toolName: "read",
+				error: { message: "credential leaked", code: "permission_denied" },
+			},
+		} satisfies PlanExecutionRuntimeEvent);
 
-    expect(event.event).toEqual({
-      type: "tool_progress",
-      toolName: "task",
-      callId: "call-1",
-      label: "task",
-      preview: "Reviewer is inspecting persistence boundaries",
-    });
-  });
+		expect(event?.event).toMatchObject({
+			type: "tool_completed",
+			error: { code: "permission_denied", message: "credential leaked" },
+		});
+		expect(JSON.stringify(event)).toContain("credential leaked");
+	});
 
-  it("redacts secrets and exposes tool results for the transcript", () => {
-    const started = summarizeRuntimeEvent("start_manual", {
-      nodeId: "node-a",
-      nodeTitle: "Inspect repository",
-      runtimeName: "omp",
-      event: {
-        type: "tool_call",
-        provider: "omp",
-        runId: "run-1",
-        callId: "call-1",
-        tool: "read",
-        input: { path: "src/app.ts", apiKey: "secret-value", nested: { authorization: "Bearer secret" } },
-        status: "pending",
-      },
-    } satisfies PlanExecutionRuntimeEvent);
-    const completed = summarizeRuntimeEvent("start_manual", {
-      nodeId: "node-a",
-      nodeTitle: "Inspect repository",
-      runtimeName: "omp",
-      event: {
-        type: "tool_result",
-        provider: "omp",
-        runId: "run-1",
-        callId: "call-1",
-        tool: "read",
-        result: { content: [{ type: "text", text: "export const ready = true;" }] },
-      },
-    } satisfies PlanExecutionRuntimeEvent);
+	it("projects the actual provider request and response payloads", () => {
+		const request = summarizeRuntimeEvent("start_manual", {
+			nodeId: "node-a",
+			executionScope: "scope-a",
+			nodeTitle: "Node A",
+			runtimeName: "hermes",
+			event: {
+				type: "raw_event",
+				provider: "anthropic",
+				runId: "run-1",
+				raw: {
+					kind: "provider_request",
+					input: {
+						instructions: "Inspect the repository",
+						input: { target: "src" },
+					},
+				},
+			},
+		} satisfies PlanExecutionRuntimeEvent);
+		const response = summarizeRuntimeEvent("start_manual", {
+			nodeId: "node-a",
+			executionScope: "scope-a",
+			nodeTitle: "Node A",
+			runtimeName: "hermes",
+			event: {
+				type: "run_completed",
+				provider: "anthropic",
+				runId: "run-1",
+				run: {
+					provider: "anthropic",
+					runId: "run-1",
+					sessionId: "session-1",
+					status: "completed",
+				},
+				outputText: "Repository inspected",
+				structuredPayload: { files: 12 },
+			},
+		} satisfies PlanExecutionRuntimeEvent);
 
-    expect(started.event).toMatchObject({
-      type: "tool_started",
-      callId: "call-1",
-      inputSummary: expect.stringContaining('"apiKey": "[redacted]"'),
-    });
-    expect(JSON.stringify(started.event)).not.toContain("secret-value");
-    expect(JSON.stringify(started.event)).not.toContain("Bearer secret");
-    expect(completed.event).toMatchObject({
-      type: "tool_completed",
-      callId: "call-1",
-      preview: "export const ready = true;",
-    });
-  });
+		expect(request?.event).toMatchObject({
+			type: "run_status",
+			status: "started",
+			input: {
+				instructions: "Inspect the repository",
+				input: { target: "src" },
+			},
+		});
+		expect(response?.event).toMatchObject({
+			type: "run_status",
+			status: "completed",
+			output: {
+				text: "Repository inspected",
+				structuredPayload: { files: 12 },
+			},
+		});
+	});
 
-  it("backfills the receipt time when the provider omits a timestamp", () => {
-    const before = Date.now();
-    const event = summarizeRuntimeEvent("start_manual", {
-      nodeId: "node-a",
-      nodeTitle: "Node A",
-      runtimeName: "hermes",
-      event: {
-        type: "text_delta",
-        provider: "anthropic",
-        runId: "run-1",
-        text: "partial output",
-      },
-    } satisfies PlanExecutionRuntimeEvent);
-    const after = Date.now();
+	it("preserves text, reasoning, and raw provider events", () => {
+		const runtimeBase = {
+			nodeId: "node-a",
+			executionScope: "scope-a",
+			nodeTitle: "Node A",
+			runtimeName: "hermes",
+		};
 
-    expect(event.timestamp).toBeDefined();
-    const stamped = Date.parse(event.timestamp as string);
-    expect(Number.isNaN(stamped)).toBe(false);
-    expect(stamped).toBeGreaterThanOrEqual(before);
-    expect(stamped).toBeLessThanOrEqual(after);
-  });
-  it("summarizes provider task progress raw events", () => {
-    const event = summarizeRuntimeEvent("start_manual", {
-      nodeId: "node-a",
-      nodeTitle: "Search jobs",
-      runtimeName: "hermes",
-      event: {
-        type: "raw_event",
-        provider: "claude_code",
-        rawEventType: "system",
-        raw: {
-          type: "system",
-          subtype: "task_progress",
-          description: "Search: AI PhD jobs",
-          usage: { tool_uses: 84 },
-          workflow_progress: [
-            { lastToolName: "WebSearch", lastToolSummary: "euraxess funded AI" },
-          ],
-        },
-      },
-    } satisfies PlanExecutionRuntimeEvent);
+		const text = summarizeRuntimeEvent("start_manual", {
+			...runtimeBase,
+			event: {
+				type: "text_delta",
+				provider: "anthropic",
+				runId: "run-1",
+				text: "original response token",
+			},
+		});
+		expect(text?.event).toEqual({
+			type: "text_delta",
+			text: "original response token",
+		});
 
-    expect(event).toMatchObject({
-      event: {
-        type: "raw_event",
-        rawEventType: "system",
-        message: "Search: AI PhD jobs · WebSearch: euraxess funded AI · 84 tool uses",
-      },
-    });
-  });
+		const reasoning = summarizeRuntimeEvent("start_manual", {
+			...runtimeBase,
+			event: {
+				type: "reasoning_delta",
+				provider: "anthropic",
+				runId: "run-1",
+				text: "inspect the repository",
+				raw: { channel: "analysis" },
+			},
+		});
+		expect(reasoning?.event).toEqual({
+			type: "reasoning_delta",
+			text: "inspect the repository",
+			raw: { channel: "analysis" },
+		});
 
+		const raw = summarizeRuntimeEvent("start_manual", {
+			...runtimeBase,
+			event: {
+				type: "raw_event",
+				provider: "anthropic",
+				runId: "run-1",
+				rawEventType: "turn.started",
+				raw: { phase: "analysis" },
+			},
+		});
+		expect(raw?.event).toEqual({
+			type: "raw_event",
+			rawEventType: "turn.started",
+			raw: { phase: "analysis" },
+		});
+	});
 });

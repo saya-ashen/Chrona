@@ -1,6 +1,8 @@
 import { ENGINE_ERROR_CODES, engineErrorFromUnknown } from "../errors";
 import { tasks } from "../modules/tasks";
 
+// The service exposes the complete task facade while normalizing every module error consistently.
+// eslint-disable-next-line max-lines-per-function
 export function createTasksService() {
   return {
     async create(input: Parameters<typeof tasks.create>[0]) {
@@ -17,11 +19,27 @@ export function createTasksService() {
         throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.VALIDATION_FAILED, "Failed to update task");
       }
     },
-    async delete(input: { taskId: string; workspaceId?: string }) {
+    async getDeleteImpact(input: Parameters<typeof tasks.getDeleteImpact>[0]) {
+      try {
+        return await tasks.getDeleteImpact(input);
+      } catch (cause) {
+        throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.TASK_NOT_FOUND, "Failed to inspect task deletion");
+      }
+    },
+    async delete(input: Parameters<typeof tasks.delete>[0]) {
       try {
         return await tasks.delete(input);
       } catch (cause) {
         throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.TASK_NOT_FOUND, "Failed to delete task");
+      }
+    },
+    async rebuildWithLatestGoalAssets(
+      input: Parameters<typeof tasks.rebuildWithLatestGoalAssets>[0],
+    ) {
+      try {
+        return await tasks.rebuildWithLatestGoalAssets(input);
+      } catch (cause) {
+        throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.VALIDATION_FAILED, "Failed to rebuild task with latest Goal assets");
       }
     },
     async getPage(input: Parameters<typeof tasks.getPage>[0]) {

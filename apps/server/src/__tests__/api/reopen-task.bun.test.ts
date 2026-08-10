@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "bun:test";
 import { db } from "@chrona/db";
-import { reopenTask } from "@chrona/engine/modules/tasks/reopen-task";
+import { reopenTask } from "@chrona/engine/test-support";
 import { resetTestDb, seedTask, seedWorkspace } from "../bun-test-helpers";
 
 // reopenTask — engine-layer unit for the task-reopen primitive.

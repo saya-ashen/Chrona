@@ -89,6 +89,10 @@ export type ExecutionCommand =
       result: SubmittedNodeResult;
       /** Set when the result arrives out-of-band from a provider run. */
       runtimeRunRef?: string;
+      /** Durable node attempt this terminal result is allowed to complete. */
+      expectedAttemptId?: string;
+      /** Optional durable provider-run row identity for provider callbacks. */
+      providerRunId?: string;
       /** Whether to continue execution after applying this result.
        * Defaults to false — callers opt into automatic continuation. */
       continueExecution?: boolean;
@@ -106,6 +110,9 @@ export type ExecutionCommand =
   | { type: "cancel"; reason?: string };
 
 export type ExecutionCommandContext = {
+  runId?: string | null;
+  nodeAttemptId?: string | null;
+  providerRunId?: string | null;
   trigger?: ExecutionTrigger;
   sessionId?: string | null;
   workBlockId?: string | null;

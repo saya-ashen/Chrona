@@ -1,0 +1,121 @@
+[
+  {
+    "aria": "任务执行工作区",
+    "client": 388,
+    "cls": "relative flex flex-col overflow-visible rounded-3xl border border-border/80 bg-muted/45 xl:min-h-0 xl:flex-1 xl:overflow-y-auto",
+    "overflowY": "auto",
+    "rect": {
+      "h": 390,
+      "w": 960,
+      "x": 280,
+      "y": 219
+    },
+    "role": null,
+    "scroll": 3076,
+    "scrollTop": 0,
+    "tag": "section",
+    "testid": null
+  },
+  {
+    "aria": null,
+    "client": 32,
+    "cls": "no-scrollbar min-w-0 overflow-x-auto",
+    "overflowY": "auto",
+    "rect": {
+      "h": 32,
+      "w": 360,
+      "x": 297,
+      "y": 232
+    },
+    "role": null,
+    "scroll": 32,
+    "scrollTop": 0,
+    "tag": "div",
+    "testid": null
+  },
+  {
+    "aria": null,
+    "client": 331,
+    "cls": "min-h-[560px] flex-1 p-3 xl:min-h-0",
+    "overflowY": "visible",
+    "rect": {
+      "h": 331,
+      "w": 958,
+      "x": 281,
+      "y": 277
+    },
+    "role": null,
+    "scroll": 3019,
+    "scrollTop": 0,
+    "tag": "div",
+    "testid": null
+  },
+  {
+    "aria": "最终结果",
+    "client": 2847,
+    "cls": "min-h-0 flex-1 overflow-y-auto",
+    "overflowY": "auto",
+    "rect": {
+      "h": 2847,
+      "w": 900,
+      "x": 310,
+      "y": 432
+    },
+    "role": null,
+    "scroll": 2847,
+    "scrollTop": 0,
+    "tag": "section",
+    "testid": null
+  },
+  {
+    "aria": null,
+    "client": 1025,
+    "cls": "overflow-x-auto",
+    "overflowY": "auto",
+    "rect": {
+      "h": 1025,
+      "w": 898,
+      "x": 311,
+      "y": 1469
+    },
+    "role": null,
+    "scroll": 1025,
+    "scrollTop": 0,
+    "tag": "div",
+    "testid": null
+  },
+  {
+    "aria": null,
+    "client": 300,
+    "cls": "overflow-x-auto",
+    "overflowY": "auto",
+    "rect": {
+      "h": 300,
+      "w": 858,
+      "x": 331,
+      "y": 2652
+    },
+    "role": null,
+    "scroll": 300,
+    "scrollTop": 0,
+    "tag": "div",
+    "testid": null
+  },
+  {
+    "aria": null,
+    "client": 1,
+    "cls": "sr-only",
+    "overflowY": "hidden",
+    "rect": {
+      "h": 1,
+      "w": 1,
+      "x": 1254,
+      "y": 244
+    },
+    "role": null,
+    "scroll": 20,
+    "scrollTop": 0,
+    "tag": "span",
+    "testid": null
+  }
+]

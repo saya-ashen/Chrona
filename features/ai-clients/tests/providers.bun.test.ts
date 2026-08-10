@@ -58,16 +58,15 @@ afterEach(() => {
   }
 });
 describe("provider feature request input", () => {
-  it("uses feature inputText as the canonical provider input", () => {
+  it("preserves the direct provider protocol input", () => {
     const request = buildProviderFeatureRequest({
       sessionKey: "scope-1",
-      input: { title: "Raw title", extra: "raw" },
-      featureSpec: {
-        feature: "generate_plan",
-        instructions: "System instructions",
-        inputText: "Create a concise plan.\nTitle: 查询并总结今天的github trendings",
+      instructions: "System instructions",
+      input: {
+        type: "text",
+        text: "Create a concise plan.\nTitle: 查询并总结今天的github trendings",
       },
-      stream: false,
+      stream: true,
     });
 
     expect(request.instructions).toBe("System instructions");

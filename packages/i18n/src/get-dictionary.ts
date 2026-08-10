@@ -1,4 +1,4 @@
-import type { Locale } from "./locale";
+import type { Locale } from "./locale-core";
 import type { Messages } from "./messages";
 
 const dictionaries = {

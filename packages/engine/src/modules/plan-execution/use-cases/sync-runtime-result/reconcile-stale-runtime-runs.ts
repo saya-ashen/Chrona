@@ -1,12 +1,14 @@
 import { RunStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
-import { aiClientRegistry } from "@/modules/ai";
+import { aiClientRegistry, stableJsonHash } from "@/modules/ai";
 import type { ProviderRunSnapshot } from "@chrona/providers-foundation";
 import { syncPlanRunRuntimeResult } from "../../kernel/sync-runtime-result";
-import { syncTaskRunState } from "../../persistence/task-execution-store";
+import { syncPersistedRunStateInTransaction } from "../../persistence/task-execution-store";
+import { assertSchedulerWorkOwnership, withSchedulerWorkOwnership, type SchedulerWorkContext } from "@/modules/orchestration/scheduler-lease-repository";
 
 type ReconcileOutcome = "synced" | "left_running" | "skipped";
 const TERMINAL_FINALIZATION_GRACE_MS = 60_000;
+const RECONCILING_SYNC_STATUSES: string[] = ["reconciling_healthy", "reconciling_degraded"];
 
 export type ReconcileStaleRuntimeRunsResult = {
   checked: number;
@@ -17,11 +19,10 @@ export type ReconcileStaleRuntimeRunsResult = {
 
 type RunningProviderRun = Awaited<ReturnType<typeof findRunningProviderRuns>>[number];
 type CanonicalRun = NonNullable<Awaited<ReturnType<typeof db.run.findUnique>>>;
-type TerminalRunStatus = "Completed" | "Failed" | "Cancelled";
-
 export async function reconcileStaleRuntimeRuns(input: {
   taskId?: string;
   limit?: number;
+  workContext?: SchedulerWorkContext;
 } = {}): Promise<ReconcileStaleRuntimeRunsResult> {
   const providerRuns = await findRunningProviderRuns(input);
   const result: ReconcileStaleRuntimeRunsResult = {
@@ -32,7 +33,9 @@ export async function reconcileStaleRuntimeRuns(input: {
   };
 
   for (const providerRun of providerRuns) {
-    const outcome = await reconcileProviderRun(providerRun);
+    await assertSchedulerWorkOwnership(input.workContext);
+    const outcome = await reconcileProviderRun(providerRun, input.workContext);
+    await assertSchedulerWorkOwnership(input.workContext);
     if (outcome === "synced") result.synced += 1;
     if (outcome === "left_running") result.leftRunning += 1;
     if (outcome === "skipped") result.skipped += 1;
@@ -48,6 +51,7 @@ async function findRunningProviderRuns(input: { taskId?: string; limit?: number 
       providerRunRef: { not: null },
       taskId: input.taskId,
       nodeAttempt: { terminalActions: { none: {} } },
+      runId: { not: null },
       OR: [
         {
           status: "running",
@@ -58,10 +62,13 @@ async function findRunningProviderRuns(input: { taskId?: string; limit?: number 
           status: { in: ["completed", "failed", "cancelled"] },
           finishedAt: { lte: finalizationCutoff },
         },
+        {
+          task: { runs: { some: { syncStatus: { in: RECONCILING_SYNC_STATUSES } } } },
+        },
       ],
     },
     include: {
-      task: { select: { executionRuntime: true, defaultSessionId: true, latestRunId: true, status: true } },
+      task: { select: { executionRuntime: true, defaultSessionId: true, latestRunId: true, status: true, aiClientId: true } },
       nodeAttempt: { select: { nodeId: true } },
     },
     orderBy: { updatedAt: "asc" },
@@ -83,62 +90,83 @@ export function shouldReconcileTerminalProviderRun(input: {
     && input.taskStatus !== "Cancelled";
 }
 
-async function reconcileProviderRun(providerRun: RunningProviderRun): Promise<ReconcileOutcome> {
-  const runtimeRunRef = providerRun.providerRunRef?.trim();
-  if (!runtimeRunRef) return "skipped";
-
-  const run = await db.run.findUnique({ where: { runtimeRunRef } });
-  if (!run) return "skipped";
+async function reconcileProviderRun(
+  providerRun: RunningProviderRun,
+  workContext?: SchedulerWorkContext,
+): Promise<ReconcileOutcome> {
+  const providerRunRef = providerRun.providerRunRef?.trim();
+  if (!providerRunRef || !providerRun.runId) return "skipped";
+  const run = await db.run.findFirst({
+    where: { id: providerRun.runId, taskId: providerRun.taskId, providerRuns: { some: { id: providerRun.id } } },
+  });
+  if (!run?.runtimeRunRef) return "skipped";
+  const runtimeRunRef = run.runtimeRunRef;
+  if (isReconciliationProjectionPending(run.syncStatus)) {
+    await syncCanonicalRunProjection(run, run.status, reconciliationTargetSyncStatus(run.syncStatus), workContext);
+    return "synced";
+  }
   if (providerRun.status !== "running") {
-    if (!shouldReconcileTerminalProviderRun({
-      providerStatus: providerRun.status,
-      runStatus: run.status,
-      runId: run.id,
-      latestRunId: providerRun.task.latestRunId,
-      taskStatus: providerRun.task.status,
-    })) return "skipped";
-    return reconcileTerminalProviderRecord({ providerRun, run, runtimeRunRef });
+    if (!shouldReconcileTerminalProviderRun({ providerStatus: providerRun.status, runStatus: run.status, runId: run.id, latestRunId: providerRun.task.latestRunId, taskStatus: providerRun.task.status })) return "skipped";
+    return reconcileTerminalProviderRecord({ providerRun, run, runtimeRunRef, workContext });
   }
   if (run.status !== RunStatus.Running) return "skipped";
   const runtimeName = providerRun.runtimeName ?? run.runtimeName;
-  const client = await providerClientForRuntime(runtimeName);
+  const providerName = await persistedProviderName(providerRun);
+  await assertSchedulerWorkOwnership(workContext);
+  const client = await providerClientForRecovery({
+    providerName,
+    aiClientId: providerRun.aiClientId,
+    aiClientConfigDigest: providerRun.aiClientConfigDigest,
+  });
+  await assertSchedulerWorkOwnership(workContext);
   if (!client) {
-    return "skipped";
-  }
-
-  const capabilities = typeof client.getCapabilities === "function" ? await client.getCapabilities() : undefined;
-  if (capabilities?.recovery?.activeRunLookup === false) {
-    const reason = `Runtime run ${runtimeRunRef} was interrupted. Provider recovery mode ${capabilities.recovery.mode} cannot query active run snapshots; retry can resume from saved provider session history.`;
-    await markRunFailed({ run, reason, retryable: true });
+    const reason = `Runtime run ${runtimeRunRef} was interrupted, but no enabled AI client can recover provider ${providerName ?? runtimeName}.`;
     await syncPlanRunRuntimeResult({
       taskId: providerRun.taskId,
       runtimeRunRef,
+      expectedAttemptId: providerRun.nodeAttemptId,
+      providerRunId: providerRun.id,
       status: "Failed",
       error: reason,
+      workContext,
     });
-    await syncCanonicalRunProjection(run, RunStatus.Failed);
+    await syncCanonicalRunProjection(run, RunStatus.Failed, "degraded", workContext);
     return "synced";
   }
-
-
-  try {
-    const snapshot = await client.getRun({
-      runId: runtimeRunRef,
-      sessionId: run.runtimeSessionRef ?? undefined,
-    });
-    return reconcileSnapshot({ providerRun, run, runtimeRunRef, snapshot });
-  } catch (error) {
-    if (!isTerminalMissingRun(error)) return "left_running";
-
-    const reason = await missingRunReason({ providerRun, runtimeName, runtimeRunRef, error });
-    await markRunFailed({ run, reason });
+  const capabilities = typeof client.getCapabilities === "function" ? await client.getCapabilities() : undefined;
+  await assertSchedulerWorkOwnership(workContext);
+  if (capabilities?.recovery?.activeRunLookup === false) {
+    const reason = `Runtime run ${runtimeRunRef} was interrupted. Provider recovery mode ${capabilities.recovery.mode} cannot query active run snapshots; retry can resume from saved provider session history.`;
     await syncPlanRunRuntimeResult({
       taskId: providerRun.taskId,
       runtimeRunRef,
+      expectedAttemptId: providerRun.nodeAttemptId,
+      providerRunId: providerRun.id,
       status: "Failed",
       error: reason,
+      workContext,
     });
-    await syncCanonicalRunProjection(run, RunStatus.Failed);
+    await syncCanonicalRunProjection(run, RunStatus.Failed, "degraded", workContext);
+    return "synced";
+  }
+  try {
+    const snapshot = await client.getRun({ runId: providerRunRef, sessionId: run.runtimeSessionRef ?? undefined });
+    await assertSchedulerWorkOwnership(workContext);
+    return reconcileSnapshot({ providerRun, run, runtimeRunRef, snapshot, workContext });
+  } catch (error) {
+    if (!isTerminalMissingRun(error)) return "left_running";
+    const reason = await missingRunReason({ providerRun, runtimeName, runtimeRunRef, error });
+    await assertSchedulerWorkOwnership(workContext);
+    await syncPlanRunRuntimeResult({
+      taskId: providerRun.taskId,
+      runtimeRunRef,
+      expectedAttemptId: providerRun.nodeAttemptId,
+      providerRunId: providerRun.id,
+      status: "Failed",
+      error: reason,
+      workContext,
+    });
+    await syncCanonicalRunProjection(run, RunStatus.Failed, "degraded", workContext);
     return "synced";
   }
 }
@@ -147,51 +175,57 @@ async function reconcileTerminalProviderRecord(input: {
   providerRun: RunningProviderRun;
   run: CanonicalRun;
   runtimeRunRef: string;
+  workContext?: SchedulerWorkContext;
 }): Promise<ReconcileOutcome> {
-  if (input.providerRun.status === "cancelled") {
-    const reason = "Provider run was cancelled before recording a Chrona terminal result action";
-    await persistCanonicalRunTerminalState({
-      run: input.run,
-      status: RunStatus.Failed,
-      errorSummary: reason,
-      syncStatus: "degraded",
-    });
-    await syncPlanRunRuntimeResult({
-      taskId: input.providerRun.taskId,
-      runtimeRunRef: input.runtimeRunRef,
-      status: "Failed",
-      error: reason,
-    });
-    await syncCanonicalRunProjection(input.run, RunStatus.Failed);
-    return "synced";
-  }
-
-  const reason = input.providerRun.status === "completed"
-    ? "Provider run completed without recording a Chrona terminal result action"
-    : "Provider run failed before recording a Chrona terminal result action";
-  await markRunFailed({ run: input.run, reason });
+  const reason = input.providerRun.status === "cancelled"
+    ? "Provider run was cancelled before recording a Chrona terminal result action"
+    : input.providerRun.status === "completed"
+      ? "Provider run completed without recording a Chrona terminal result action"
+      : "Provider run failed before recording a Chrona terminal result action";
   await syncPlanRunRuntimeResult({
     taskId: input.providerRun.taskId,
     runtimeRunRef: input.runtimeRunRef,
+    expectedAttemptId: input.providerRun.nodeAttemptId,
+    providerRunId: input.providerRun.id,
     status: "Failed",
     error: reason,
+    workContext: input.workContext,
   });
-  await syncCanonicalRunProjection(input.run, RunStatus.Failed);
+  await syncCanonicalRunProjection(input.run, RunStatus.Failed, "degraded", input.workContext);
   return "synced";
 }
 
-async function providerClientForRuntime(runtimeName: string) {
-  const defaultClient = await aiClientRegistry.get();
-  if (defaultClient?.record.type === runtimeName && defaultClient.providerClient) {
-    return defaultClient.providerClient;
+async function persistedProviderName(providerRun: RunningProviderRun): Promise<string | null> {
+  if (providerRun.lastRawEventId) {
+    const lastEvent = await db.rawEventLog.findUnique({
+      where: { id: providerRun.lastRawEventId },
+      select: { provider: true },
+    });
+    if (lastEvent?.provider?.trim()) return lastEvent.provider.trim();
   }
 
-  const clients = await aiClientRegistry.list();
-  const matchingClient = clients.find((client) => client.type === runtimeName && client.enabled);
-  if (!matchingClient) return null;
+  const providerEvent = await db.rawEventLog.findFirst({
+    where: { providerRunId: providerRun.id, provider: { not: null } },
+    orderBy: { occurredAt: "desc" },
+    select: { provider: true },
+  });
+  return providerEvent?.provider?.trim() || null;
+}
 
-  const resolvedClient = await aiClientRegistry.get(matchingClient.id);
-  return resolvedClient?.providerClient ?? null;
+
+async function providerClientForRecovery(input: {
+  providerName: string | null;
+  aiClientId: string | null;
+  aiClientConfigDigest: string | null;
+}) {
+  if (!input.aiClientId || !input.aiClientConfigDigest) return null;
+  const client = await aiClientRegistry.get(input.aiClientId);
+  if (!client?.record.enabled || !client.providerClient) return null;
+  if (stableJsonHash(client.record.config) !== input.aiClientConfigDigest) return null;
+  if (input.providerName && client.providerClient.provider !== input.providerName && client.record.type !== input.providerName) {
+    return null;
+  }
+  return client.providerClient;
 }
 
 async function reconcileSnapshot(input: {
@@ -199,50 +233,40 @@ async function reconcileSnapshot(input: {
   run: CanonicalRun;
   runtimeRunRef: string;
   snapshot: ProviderRunSnapshot;
+  workContext?: SchedulerWorkContext;
 }): Promise<ReconcileOutcome> {
   if (isActiveProviderStatus(input.snapshot.status)) {
     return "left_running";
   }
 
   if (input.snapshot.status === "completed") {
-    await persistCanonicalRunTerminalState({
-      run: input.run,
-      status: RunStatus.Completed,
-      errorSummary: null,
-      syncStatus: "healthy",
-    });
     await syncPlanRunRuntimeResult({
       taskId: input.providerRun.taskId,
       runtimeRunRef: input.runtimeRunRef,
+      expectedAttemptId: input.providerRun.nodeAttemptId,
+      providerRunId: input.providerRun.id,
       status: "Completed",
-      summary: input.snapshot.outputText,
-      output: input.snapshot.structuredPayload ?? input.snapshot.output ?? input.snapshot.raw,
+      summary: input.snapshot.outputText ?? input.snapshot.output?.text,
+      output: input.snapshot.output,
+      workContext: input.workContext,
     });
-    await syncCanonicalRunProjection(input.run, RunStatus.Completed);
+    await syncCanonicalRunProjection(input.run, RunStatus.Completed, "healthy", input.workContext);
     return "synced";
   }
 
-  const providerCancelled = input.snapshot.status === "cancelled";
   const status = RunStatus.Failed;
   const reason = input.snapshot.error
-    ?? (providerCancelled
-      ? "Provider run was cancelled before recording a Chrona terminal result action"
-      : `Runtime run ${input.runtimeRunRef} ${input.snapshot.status}`);
-  await persistCanonicalRunTerminalState({
-    run: input.run,
-    status,
-    errorSummary: reason,
-    syncStatus: providerCancelled ? "degraded" : "healthy",
-  });
+    ?? (input.snapshot.status === "cancelled" ? "Provider run was cancelled" : "Provider run failed");
   await syncPlanRunRuntimeResult({
     taskId: input.providerRun.taskId,
     runtimeRunRef: input.runtimeRunRef,
+    expectedAttemptId: input.providerRun.nodeAttemptId,
+    providerRunId: input.providerRun.id,
     status: "Failed",
     error: reason,
-    summary: input.snapshot.outputText,
-    output: input.snapshot.structuredPayload ?? input.snapshot.output ?? input.snapshot.raw,
+    workContext: input.workContext,
   });
-  await syncCanonicalRunProjection(input.run, status);
+  await syncCanonicalRunProjection(input.run, status, "degraded", input.workContext);
   return "synced";
 }
 
@@ -269,52 +293,29 @@ async function missingRunReason(input: {
   return `Runtime run ${input.runtimeRunRef} is no longer available from provider ${input.runtimeName} (HTTP ${status ?? "unknown"}).${lastEvent} Marking the node failed so execution does not remain running.`;
 }
 
-async function markRunFailed(input: {
-  run: CanonicalRun;
-  reason: string;
-  retryable?: boolean;
-}) {
-  await persistCanonicalRunTerminalState({
-    run: input.run,
-    status: RunStatus.Failed,
-    errorSummary: input.reason,
-    syncStatus: "degraded",
-    retryable: input.retryable,
-  });
-}
 
-async function persistCanonicalRunTerminalState(input: {
-  run: CanonicalRun;
-  status: TerminalRunStatus;
-  errorSummary: string | null;
-  syncStatus: "healthy" | "degraded";
-  retryable?: boolean;
-}) {
-  await db.run.update({
-    where: { id: input.run.id },
-    data: {
-      status: input.status,
-      endedAt: new Date(),
-      errorSummary: input.errorSummary,
-      syncStatus: input.syncStatus,
-      lastSyncedAt: new Date(),
-      retryable: input.retryable ?? false,
-      pendingInputPrompt: null,
-    },
-  });
-}
 
 async function syncCanonicalRunProjection(
   run: CanonicalRun,
   status: RunStatus,
+  syncStatus: "healthy" | "degraded",
+  workContext?: SchedulerWorkContext,
 ) {
-  await syncTaskRunState({
-    taskId: run.taskId,
-    taskSessionId: run.taskSessionId,
-    runId: run.id,
-    runStatus: status,
-    runtimeRunRef: run.runtimeRunRef,
+  await withSchedulerWorkOwnership(workContext, async (tx) => {
+    await syncPersistedRunStateInTransaction({ taskId: run.taskId, runId: run.id }, tx);
+    await tx.run.updateMany({
+      where: { id: run.id, syncStatus: { in: RECONCILING_SYNC_STATUSES } },
+      data: { syncStatus, lastSyncedAt: new Date() },
+    });
   });
+}
+
+function isReconciliationProjectionPending(syncStatus: string) {
+  return RECONCILING_SYNC_STATUSES.includes(syncStatus);
+}
+
+function reconciliationTargetSyncStatus(syncStatus: string): "healthy" | "degraded" {
+  return syncStatus === "reconciling_degraded" ? "degraded" : "healthy";
 }
 
 function isTerminalMissingRun(error: unknown) {

@@ -1,221 +1,244 @@
-import type {
-  GeneratePlanSSEEvent,
-  TaskPlanGenerationSessionReadModel,
-} from "@chrona/contracts";
-import { randomUUID } from "node:crypto";
+import { AiFeatureRunStatus, TaskPlanGenerationHeadStatus } from "@/generated/prisma/client";
+import { db } from "@/lib/db";
+import type { GeneratePlanErrorCode, GeneratePlanSSEEvent, TaskPlanGenerationSessionReadModel } from "@chrona/contracts";
+import { appendCanonicalEvent } from "@/modules/events";
+
+const scopeKey = (workBlockId?: string | null) => workBlockId ?? "";
+const POLL_INTERVAL_MS = 400;
+const activeStatuses: AiFeatureRunStatus[] = [
+  AiFeatureRunStatus.Queued,
+  AiFeatureRunStatus.PreparingObservations,
+  AiFeatureRunStatus.StartingProvider,
+  AiFeatureRunStatus.Running,
+  AiFeatureRunStatus.Validating,
+  AiFeatureRunStatus.CommittingResult,
+];
+const terminalStatuses: ReadonlySet<AiFeatureRunStatus> = new Set([
+  AiFeatureRunStatus.Completed,
+  AiFeatureRunStatus.NeedsInput,
+  AiFeatureRunStatus.CannotComplete,
+  AiFeatureRunStatus.Failed,
+  AiFeatureRunStatus.Cancelled,
+]);
+
+type PersistedRun = {
+  operationId: string;
+  headStateVersion: number;
+  status: AiFeatureRunStatus;
+  errorCode: string | null;
+  errorMessage: string | null;
+  commitReference: unknown;
+  createdAt: Date;
+  startedAt: Date | null;
+  finishedAt: Date | null;
+};
 
 export class TaskPlanGenerationInFlightError extends Error {
   readonly taskId: string;
   readonly workBlockId: string | null;
+
   constructor(input: { taskId: string; workBlockId?: string | null }) {
-    super(
-      `A task plan generation job is already running for task ${input.taskId}${
-        input.workBlockId ? ` (work block ${input.workBlockId})` : ""
-      }. Stop the current generation before starting a new one.`,
-    );
+    super(`A task plan generation job is already running for task ${input.taskId}${input.workBlockId ? ` (work block ${input.workBlockId})` : ""}.`);
     this.name = "TaskPlanGenerationInFlightError";
     this.taskId = input.taskId;
     this.workBlockId = input.workBlockId ?? null;
   }
 }
 
-type Subscriber = (event: GeneratePlanSSEEvent) => void;
-function generationKey(taskId: string, workBlockId?: string | null) {
-  return workBlockId ? `${taskId}:${workBlockId}` : taskId;
+function projectError(code: string | null): GeneratePlanErrorCode {
+  if (code === "provider_timeout" || code === "provider_protocol_error" || code === "provider_invalid_json" || code === "provider_start_outcome_unknown" || code === "provider_run_unrecoverable" || code === "provider_capability_mismatch") {
+    return "PROVIDER_ERROR";
+  }
+  if (code === "input_invalid" || code === "output_invalid" || code === "result_invalid" || code === "evidence_invalid" || code === "completion_invalid") {
+    return "INVALID_TOOL_PAYLOAD";
+  }
+  if (code === "idempotency_conflict") return "PLAN_GENERATION_IN_FLIGHT";
+  return "INTERNAL_ERROR";
 }
-
-
-type SessionStatus = "running" | "completed" | "failed" | "cancelled";
-
-type SessionSnapshot = TaskPlanGenerationSessionReadModel;
-
-type SessionRecord = {
-  generationId: string;
-  taskId: string;
-  key: string;
-  workBlockId: string | null;
-  controller: AbortController;
-  subscribers: Set<Subscriber>;
-  done: boolean;
-  snapshot: SessionSnapshot;
-  cleanupTimer: ReturnType<typeof setTimeout> | null;
-};
-
-const sessionsByKey = new Map<string, SessionRecord>();
-const sessionsByGenerationId = new Map<string, SessionRecord>();
-
-function finishSession(session: SessionRecord, status: SessionStatus) {
-  session.done = true;
-  session.snapshot.status = status;
-  session.snapshot.finishedAt = new Date().toISOString();
-  sessionsByKey.delete(session.key);
-  session.subscribers.clear();
-  if (!session.cleanupTimer) {
-    session.cleanupTimer = setTimeout(() => {
-      sessionsByGenerationId.delete(session.generationId);
-    }, 5 * 60 * 1000);
-  }
+function publicErrorMessage(code: string | null): string {
+  if (code === "stale_plan_baseline") return "Task plan changed while generation was running.";
+  const projected = projectError(code);
+  if (projected === "PROVIDER_ERROR") return "The AI provider could not complete plan generation.";
+  if (projected === "INVALID_TOOL_PAYLOAD") return "The generated plan did not satisfy the required contract.";
+  if (projected === "PLAN_GENERATION_IN_FLIGHT") return "A plan generation is already active for this task.";
+  return "Plan generation did not complete.";
 }
-
-function broadcast(session: SessionRecord, event: GeneratePlanSSEEvent) {
-  switch (event.type) {
-    case "status":
-      session.snapshot.phase = event.phase;
-      session.snapshot.statusMessage = event.message;
-      break;
-    case "partial":
-      session.snapshot.partialText += event.text;
-      break;
-    case "result":
-      session.snapshot.result = event.result;
-      session.snapshot.status = "completed";
-      break;
-    case "error":
-      session.snapshot.error = {
-        code: event.code,
-        message: event.message,
-        rawText: event.rawText,
-        diagnostics: event.diagnostics,
-      };
-      session.snapshot.status = "failed";
-      break;
-    case "cancelled":
-      session.snapshot.status = "cancelled";
-      break;
-    case "done":
-      if (session.snapshot.status === "running") {
-        session.snapshot.status = session.snapshot.result ? "completed" : "cancelled";
-      }
-      break;
-    case "tool_call":
-      break;
-  }
-
-  for (const subscriber of session.subscribers) {
-    subscriber(event);
-  }
-
-  if (event.type === "error") {
-    finishSession(session, "failed");
-  } else if (event.type === "cancelled") {
-    finishSession(session, "cancelled");
-  } else if (event.type === "done") {
-    finishSession(session, session.snapshot.status);
-  }
-}
-
-function cloneSnapshot(snapshot: SessionSnapshot): SessionSnapshot {
+export function projectTaskPlanGenerationFailure(code: string | null | undefined): Extract<GeneratePlanSSEEvent, { type: "failed" }> {
+  const persistedCode = code ?? null;
   return {
-    ...snapshot,
-    error: snapshot.error ? { ...snapshot.error } : null,
-    result: snapshot.result,
+    type: "failed",
+    code: projectError(persistedCode),
+    ...(persistedCode ? { persistedCode } : {}),
+    message: publicErrorMessage(persistedCode),
   };
 }
 
-export function startTaskPlanGeneration(input: { taskId: string; workBlockId?: string | null }) {
-  const key = generationKey(input.taskId, input.workBlockId ?? null);
-  const existing = sessionsByKey.get(key);
-  if (existing && !existing.controller.signal.aborted && !existing.done) {
-    throw new TaskPlanGenerationInFlightError({
-      taskId: input.taskId,
-      workBlockId: input.workBlockId ?? null,
+
+function committedEvent(run: PersistedRun): GeneratePlanSSEEvent | null {
+  if (!run.commitReference || typeof run.commitReference !== "object") return null;
+  const receipt = run.commitReference as { planId?: unknown; headStateVersion?: unknown };
+  return typeof receipt.planId === "string" && typeof receipt.headStateVersion === "number"
+    ? { type: "committed", planId: receipt.planId, headStateVersion: receipt.headStateVersion }
+    : null;
+}
+
+function terminalEvents(run: PersistedRun): GeneratePlanSSEEvent[] | null {
+  if (!terminalStatuses.has(run.status)) return null;
+  if (run.status === AiFeatureRunStatus.Completed) {
+    const committed = committedEvent(run);
+    return committed
+      ? [committed, { type: "done" }]
+      : [{ type: "failed", code: "INTERNAL_ERROR", persistedCode: "commit_receipt_missing", message: "Plan generation completed without an atomic commit receipt." }, { type: "done" }];
+  }
+  if (run.status === AiFeatureRunStatus.Cancelled || run.errorCode === "cancelled") {
+    return [{ type: "cancelled" }, { type: "done" }];
+  }
+  const message = publicErrorMessage(run.errorCode);
+  if (run.errorCode === "stale_plan_baseline") {
+    return [{ type: "stale", code: "STALE_GENERATION", persistedCode: run.errorCode, message }, { type: "done" }];
+  }
+  return [{ type: "failed", code: projectError(run.errorCode), ...(run.errorCode ? { persistedCode: run.errorCode } : {}), message }, { type: "done" }];
+}
+
+function runningStatus(run: PersistedRun): Extract<GeneratePlanSSEEvent, { type: "status" }> {
+  const phase = run.status === AiFeatureRunStatus.Queued || run.status === AiFeatureRunStatus.PreparingObservations
+    ? "starting"
+    : run.status === AiFeatureRunStatus.StartingProvider
+      ? "requesting_provider"
+      : "streaming";
+  return { type: "status", phase, message: "Task plan generation is still running." };
+}
+
+function toSession(taskId: string, run: PersistedRun): TaskPlanGenerationSessionReadModel {
+  const status = run.status === AiFeatureRunStatus.Completed
+    ? "completed"
+    : run.status === AiFeatureRunStatus.Cancelled
+      ? "cancelled"
+      : terminalStatuses.has(run.status)
+        ? "failed"
+        : "running";
+  return {
+    generationId: run.operationId,
+    headStateVersion: run.headStateVersion,
+    taskId,
+    status,
+    phase: status === "running" ? runningStatus(run).phase : null,
+    statusMessage: status === "running" ? runningStatus(run).message : null,
+    error: run.errorCode && status === "failed"
+      ? { code: run.errorCode === "stale_plan_baseline" ? "STALE_GENERATION" : projectError(run.errorCode), persistedCode: run.errorCode, message: publicErrorMessage(run.errorCode) }
+      : null,
+    startedAt: (run.startedAt ?? run.createdAt).toISOString(),
+    finishedAt: run.finishedAt?.toISOString() ?? null,
+  };
+}
+
+async function currentRun(taskId: string, workBlockId?: string | null) {
+  const head = await db.taskPlanGenerationHead.findUnique({
+    where: { taskId_workBlockScopeKey: { taskId, workBlockScopeKey: scopeKey(workBlockId) } },
+    include: { currentAiFeatureRun: true },
+  });
+  return head?.currentAiFeatureRun
+    ? { ...head.currentAiFeatureRun, headStateVersion: head.stateVersion }
+    : null;
+}
+
+/** Reads only the feature run associated with this task/work-block generation head. */
+export async function getTaskPlanGenerationSession(input: { taskId: string; workBlockId?: string | null }) {
+  const run = await currentRun(input.taskId, input.workBlockId);
+  return run ? toSession(input.taskId, run) : null;
+}
+
+export async function stopTaskPlanGeneration(input: { taskId: string; workBlockId?: string | null }) {
+  const cancelled = await db.$transaction(async (tx) => {
+    const head = await tx.taskPlanGenerationHead.findUnique({
+      where: { taskId_workBlockScopeKey: { taskId: input.taskId, workBlockScopeKey: scopeKey(input.workBlockId) } },
     });
-  }
-  const generationId = randomUUID();
-  const session: SessionRecord = {
-    generationId,
+    if (!head?.currentAiFeatureRunId) return null;
+    const stopped = await tx.aiFeatureRun.updateMany({
+      where: { id: head.currentAiFeatureRunId, status: { in: activeStatuses } },
+      data: {
+        status: AiFeatureRunStatus.Cancelled,
+        errorCode: "cancelled",
+        errorMessage: "Task plan generation was cancelled.",
+        finishedAt: new Date(),
+        leaseOwner: null,
+        leaseExpiresAt: null,
+        stateVersion: { increment: 1 },
+      },
+    });
+    if (stopped.count !== 1) return null;
+    const headUpdate = await tx.taskPlanGenerationHead.updateMany({
+      where: { id: head.id, stateVersion: head.stateVersion, currentAiFeatureRunId: head.currentAiFeatureRunId },
+      data: {
+        status: head.currentPlanId ? TaskPlanGenerationHeadStatus.Current : TaskPlanGenerationHeadStatus.Idle,
+        stateVersion: { increment: 1 },
+      },
+    });
+    if (headUpdate.count !== 1) return null;
+    return {
+      workspaceId: head.workspaceId,
+      generationId: (await tx.aiFeatureRun.findUnique({ where: { id: head.currentAiFeatureRunId }, select: { operationId: true } }))?.operationId ?? null,
+    };
+  });
+  if (!cancelled) return false;
+  await appendCanonicalEvent({
+    eventType: "plan_generation.cancelled",
+    workspaceId: cancelled.workspaceId,
     taskId: input.taskId,
-    key,
     workBlockId: input.workBlockId ?? null,
-    controller: new AbortController(),
-    subscribers: new Set(),
-    done: false,
-    cleanupTimer: null,
-    snapshot: {
-      generationId,
-      taskId: input.taskId,
-      status: "running",
-      phase: "starting",
-      statusMessage: null,
-      partialText: "",
-      result: null,
-      error: null,
-      startedAt: new Date().toISOString(),
-      finishedAt: null,
-    },
-  };
-
-  sessionsByKey.set(key, session);
-  sessionsByGenerationId.set(generationId, session);
-
-  return {
-    generationId,
-    signal: session.controller.signal,
-    emit(event: GeneratePlanSSEEvent) {
-      broadcast(session, event);
-    },
-    finish() {
-      if (!session.done) {
-        broadcast(session, { type: "done" });
-      }
-    },
-  };
-}
-
-export function subscribeTaskPlanGeneration(input: { taskId: string; workBlockId?: string | null }, subscriber: Subscriber) {
-  const session = sessionsByKey.get(generationKey(input.taskId, input.workBlockId ?? null));
-  if (!session) {
-    return null;
-  }
-
-  session.subscribers.add(subscriber);
-  return {
-    generationId: session.generationId,
-    unsubscribe() {
-      session.subscribers.delete(subscriber);
-    },
-  };
-}
-
-export function subscribeTaskPlanGenerationById(generationId: string, subscriber: Subscriber) {
-  const session = sessionsByGenerationId.get(generationId);
-  if (!session) {
-    return null;
-  }
-
-  session.subscribers.add(subscriber);
-  return {
-    taskId: session.taskId,
-    unsubscribe() {
-      session.subscribers.delete(subscriber);
-    },
-  };
-}
-
-export function stopTaskPlanGeneration(input: { taskId: string; workBlockId?: string | null }) {
-  const session = sessionsByKey.get(generationKey(input.taskId, input.workBlockId ?? null));
-  if (!session) {
-    return false;
-  }
-
-  session.controller.abort();
-  if (!session.done) {
-    broadcast(session, { type: "cancelled" });
-  }
+    actorType: "system",
+    actorId: "plan-generator",
+    source: "plan_generation",
+    payload: { generation_id: cancelled.generationId },
+    occurredAt: new Date(),
+    dedupeKey: ["plan_generation", input.taskId, cancelled.generationId, "cancelled"].filter(Boolean).join(":"),
+  });
   return true;
 }
 
-export function isTaskPlanGenerationRunning(input: { taskId: string; workBlockId?: string | null }) {
-  const session = sessionsByKey.get(generationKey(input.taskId, input.workBlockId ?? null));
-  return Boolean(session && !session.controller.signal.aborted && !session.done);
+export async function isTaskPlanGenerationRunning(input: { taskId: string; workBlockId?: string | null }) {
+  const run = await currentRun(input.taskId, input.workBlockId);
+  return Boolean(run && !terminalStatuses.has(run.status));
 }
 
-export function getTaskPlanGenerationSession(input: { taskId: string; workBlockId?: string | null }) {
-  const snapshot = sessionsByKey.get(generationKey(input.taskId, input.workBlockId ?? null))?.snapshot;
-  return snapshot ? cloneSnapshot(snapshot) : null;
-}
-
-export function getTaskPlanGenerationSessionById(generationId: string) {
-  const snapshot = sessionsByGenerationId.get(generationId)?.snapshot;
-  return snapshot ? cloneSnapshot(snapshot) : null;
+/**
+ * Durable task/work-block-scoped replay. It deliberately has no process-local
+ * ownership: every delivery is reconstructed from the generation head and its
+ * persisted feature run, so reconnects and competing application instances are safe.
+ */
+export function subscribeTaskPlanGeneration(input: { taskId: string; workBlockId?: string | null }, subscriber: (event: GeneratePlanSSEEvent) => void) {
+  let stopped = false;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let lastFingerprint: string | null = null;
+  const publish = (event: GeneratePlanSSEEvent) => {
+    if (!stopped) subscriber(event);
+  };
+  const poll = async () => {
+    let terminal = false;
+    try {
+      const run = await currentRun(input.taskId, input.workBlockId);
+      if (!run) {
+        publish({ type: "done" });
+        terminal = true;
+        return;
+      }
+      const terminalEventsForRun = terminalEvents(run);
+      const fingerprint = `${run.operationId}:${run.stateVersion}:${run.status}:${run.errorCode ?? ""}:${run.finishedAt?.toISOString() ?? ""}`;
+      if (fingerprint !== lastFingerprint) {
+        lastFingerprint = fingerprint;
+        publish({ type: "status", phase: "starting", message: "Reconnected to durable task plan generation." });
+        for (const event of terminalEventsForRun ?? [runningStatus(run)]) publish(event);
+      }
+      terminal = terminalEventsForRun !== null;
+    } finally {
+      if (!stopped && !terminal) timer = setTimeout(() => void poll(), POLL_INTERVAL_MS);
+    }
+  };
+  void poll();
+  return {
+    unsubscribe() {
+      stopped = true;
+      if (timer !== null) clearTimeout(timer);
+    },
+  };
 }

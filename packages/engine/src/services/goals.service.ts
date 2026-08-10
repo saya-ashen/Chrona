@@ -1,6 +1,6 @@
 import { ENGINE_ERROR_CODES, engineErrorFromUnknown } from "../errors";
 import {
-  applyGoalReview,
+  answerReviewProposal,
   applyGoalReviewProposal,
   confirmGoalCriterion,
   actOnGoal,
@@ -10,12 +10,15 @@ import {
   generateGoalReview,
   getGoal,
   getGoalArtifact,
+  getReviewProgress,
   listGoals,
-  readGoalAcceptedResults,
   processGoalResult,
   promoteTaskToGoal,
-  reviewGoalCriterion,
+  readGoalAcceptedResults,
   rejectGoalReviewProposal,
+  retryReviewProposal,
+  reviewGoalCriterion,
+  subscribeReviewProgress,
   updateGoal,
   updateGoalBrief,
 } from "../modules/goals/goals";
@@ -110,13 +113,6 @@ export function createGoalsService() {
         throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.INVALID_TASK_STATE, "Failed to review Goal criterion");
       }
     },
-    async applyReview(input: Parameters<typeof applyGoalReview>[0]) {
-      try {
-        return await applyGoalReview(input);
-      } catch (cause) {
-        throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.INVALID_TASK_STATE, "Failed to apply Goal review");
-      }
-    },
     async generateReview(input: Parameters<typeof generateGoalReview>[0]) {
       try {
         return await generateGoalReview(input);
@@ -129,6 +125,34 @@ export function createGoalsService() {
         return await applyGoalReviewProposal(input);
       } catch (cause) {
         throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.INVALID_TASK_STATE, "Failed to apply Goal review proposal");
+      }
+    },
+    async answerReviewProposal(input: Parameters<typeof answerReviewProposal>[0]) {
+      try {
+        return await answerReviewProposal(input);
+      } catch (cause) {
+        throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.VALIDATION_FAILED, "Failed to answer Goal review questions");
+      }
+    },
+    async retryReviewProposal(input: Parameters<typeof retryReviewProposal>[0]) {
+      try {
+        return await retryReviewProposal(input);
+      } catch (cause) {
+        throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.INVALID_TASK_STATE, "Failed to retry Goal review proposal");
+      }
+    },
+    async getReviewProgress(input: Parameters<typeof getReviewProgress>[0]) {
+      try {
+        return await getReviewProgress(input);
+      } catch (cause) {
+        throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.TASK_NOT_FOUND, "Goal review proposal not found");
+      }
+    },
+    async subscribeReviewProgress(input: Parameters<typeof subscribeReviewProgress>[0]) {
+      try {
+        return await subscribeReviewProgress(input);
+      } catch (cause) {
+        throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.TASK_NOT_FOUND, "Goal review proposal not found");
       }
     },
     async rejectReviewProposal(input: Parameters<typeof rejectGoalReviewProposal>[0]) {

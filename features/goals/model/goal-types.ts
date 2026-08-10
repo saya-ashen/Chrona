@@ -99,17 +99,33 @@ export type GoalReviewProposalItemData = {
   decidedAt: string | null;
 };
 
+export type GoalReviewQuestionData = {
+  questionId: string;
+  prompt: string;
+  answerSchema: Record<string, unknown>;
+  reason: string;
+};
+
+export type GoalReviewCannotCompleteReason = {
+  code: string;
+  message: string;
+};
+
 export type GoalReviewProposalData = {
+  mode: "initial" | "progress";
   id: string;
   status:
     | "Generating"
     | "Ready"
+    | "NeedsInput"
+    | "CannotComplete"
     | "PartiallyApplied"
     | "Applied"
     | "Rejected"
     | "Superseded"
     | "Failed";
-  sourceTaskId: string;
+  version: number;
+  sourceTaskId: string | null;
   sourceRunId: string | null;
   sourceTask: {
     id: string;
@@ -121,19 +137,35 @@ export type GoalReviewProposalData = {
       status: string;
       errorSummary: string | null;
     } | null;
-  };
+  } | null;
   inputSnapshotHash: string;
   schemaVersion: number;
   providerName: string | null;
   modelName: string | null;
   summary: string | null;
   generationError: string | null;
+  questions: GoalReviewQuestionData[];
+  partialOutput: unknown;
+  cannotCompleteReason: GoalReviewCannotCompleteReason | null;
+  missingObservations: unknown;
   appliedAt: string | null;
   rejectedAt: string | null;
   createdAt: string;
   updatedAt: string;
   items: GoalReviewProposalItemData[];
 };
+
+export type GoalReviewProgressEvent = {
+  proposalId: string;
+  status: string;
+  version: number;
+  message?: string;
+  errorCode?: string;
+};
+
+export function goalAiProgressText(copy: GoalCopy, event: GoalReviewProgressEvent): string {
+  return event.message ?? copy.reviewProgress[event.status] ?? copy.generatingReview;
+}
 export type GoalData = {
   id: string;
   workspaceId: string;
@@ -196,6 +228,12 @@ export type GoalCopy = {
   startFirstTaskDescription: string;
   firstTaskLabel: string;
   firstTaskPlaceholder: string;
+  optional: string;
+  firstTaskOptionalHelp: string;
+  createGoalOnly: string;
+  createGoalAndTask: string;
+  initialCriterionTitle: string;
+  initialCriterionDescription: string;
   attentionGoalsDescription: string;
   progressGoalsDescription: string;
   quietGoals: string;
@@ -267,16 +305,46 @@ export type GoalCopy = {
   criterionEvidenceNote: string;
   applyReview: string;
   applyReviewDescription: string;
+  initialPlanTitle: string;
+  initialPlanDescription: string;
   reviewSummary: string;
   reviewTaskSuggestion: string;
+  proposedChange: string;
+  updateReviewField: string;
+  createTaskReviewItem: string;
+  resolveEvidenceReviewItem: string;
+  currentReviewValue: string;
+  suggestedReviewValue: string;
+  reviewReason: string;
+  evidenceReferences: string;
+  reviewWarnings: string;
   generateReview: string;
   generatingReview: string;
+  reviewProgress: Record<string, string>;
+  reviewNeedsInput: string;
+  reviewNeedsInputDescription: string;
+  submitReviewAnswers: string;
+  reviewCannotComplete: string;
+  retryReview: string;
+  reviewActionFailed: string;
   rejectProposal: string;
   proposalFailed: string;
   proposalPending: string;
   proposalStale: string;
   proposalSource: string;
   proposalNoItems: string;
+  applyReviewItem: string;
+  createReviewTask: string;
+  rejectReviewItem: string;
+  applyAllReview: string;
+  rejectAllReview: string;
+  reviewEvidenceCount: string;
+  reviewWarningCount: string;
+  reviewItemCannotApply: string;
+  proposalAccepted: string;
+  proposalRejected: string;
+  proposalConverted: string;
+  proposalIgnored: string;
   assets: string;
   nextReview: string;
   noReview: string;
@@ -397,6 +465,27 @@ export type GoalCopy = {
   assetWorkbench: {
     title: string;
     description: string;
+    readyTitle: string;
+    readyDescription: string;
+    inboxActionTitle: string;
+    inboxActionDescription: string;
+    draftActionTitle: string;
+    draftActionDescription: string;
+    reviewInbox: string;
+    continueEditing: string;
+    descriptionLabel: string;
+    purpose: string;
+    futureTaskImpact: string;
+    activeVersionImpact: string;
+    draftVersionImpact: string;
+    roleWorkingDocument: string;
+    roleReference: string;
+    roleEvidence: string;
+    roleSubmission: string;
+    roleTemplate: string;
+    usageHistory: string;
+    usageHistoryEmpty: string;
+    usageHistoryEntry: string;
     library: string;
     inbox: string;
     allAssets: string;
@@ -411,6 +500,7 @@ export type GoalCopy = {
     pages: string;
     files: string;
     structuredResults: string;
+    dataTables: string;
     allSources: string;
     allStatuses: string;
     draft: string;
@@ -440,6 +530,12 @@ export type GoalCopy = {
     createAsset: string;
     appendVersion: string;
     rejectCandidate: string;
+    candidateGroupTitle: string;
+    candidateGroupDescription: string;
+    candidateProgress: string;
+    createAssetDescription: string;
+    updateVersionDescription: string;
+    hideDetails: string;
     candidateUpdateFailed: string;
     pageSafetyWarning: string;
     genericFileDescription: string;
@@ -457,6 +553,40 @@ export type GoalCopy = {
     downloadSubmission: string;
     documentContent: string;
     structuredResultContent: string;
+    documentViewMode: string;
+    previewMode: string;
+    editMode: string;
+    markdownSourceMode: string;
+    markdownRichMode: string;
+    csvPreview: string;
+    dataTableSummary: string;
+    resultFromTask: string;
+    missingAssetDescription: string;
+    reviewDueSoon: string;
+    reviewOverdue: string;
+    reviewCurrent: string;
+    freshness: string;
+    lastVerified: string;
+    nextReview: string;
+    noReview: string;
+    verifyNow: string;
+    reviewSummary: string;
+    reviewSummaryPlaceholder: string;
+    markVerified: string;
+    reviewSaved: string;
+    useForTask: string;
+    useTaskTitle: string;
+    taskInstruction: string;
+    taskInstructionPlaceholder: string;
+    expectedOutcomeLabel: string;
+    createTask: string;
+    useTaskCreated: string;
+    tableViewMode: string;
+    tableEditMode: string;
+    addRow: string;
+    deleteRow: string;
+    dataTableInvalid: string;
+
     draftAutosaved: string;
     draftSaved: string;
     publishVersion: string;
@@ -501,16 +631,39 @@ export type GoalCopy = {
     currentVersion: string;
     draftAvailable: string;
     noDraft: string;
+    draftChangedAt: string;
+    discardDraft: string;
+    discardDraftTitle: string;
+    discardDraftDescription: string;
+    discardDraftCancel: string;
+    draftDiscarded: string;
     originalFilename: string;
     mimeType: string;
     updated: string;
     archiveAsset: string;
     restoreAsset: string;
     aiModificationDescription: string;
+    overview: string;
+    activity: string;
+    cancel: string;
+    editAssetInfo: string;
+    editAssetInfoDescription: string;
+    moreAssetActions: string;
+    modifyWithAi: string;
+    newTasksUseCurrentVersion: string;
+    existingTasksKeepVersion: string;
+    useTaskDescription: string;
+    taskTitleLabel: string;
+    aiModificationDialogDescription: string;
+    recordVerification: string;
+    updateVerification: string;
+    recordVerificationDescription: string;
+    restoreAsNewVersion: string;
     documentKind: string;
     formKind: string;
     pageKind: string;
     fileKind: string;
+    dataTableKind: string;
     manualSource: string;
     aiTaskSource: string;
     inboxSource: string;

@@ -1,5 +1,6 @@
 import { createTask } from "./create-task";
-import { deleteTask } from "./delete-task";
+import { deleteTask, getTaskDeleteImpact } from "./delete-task";
+import { rebuildTaskWithLatestGoalAssets } from "./rebuild-task-with-latest-goal-assets";
 import { getTaskPage } from "./get-task-page";
 import { getTaskBootstrap } from "./get-task-bootstrap";
 import { getTaskCommandCenter } from "./get-task-command-center";
@@ -36,11 +37,30 @@ export class Tasks {
     return updateTask(taskInput);
   }
 
-  async delete(input: { taskId: string; workspaceId?: string }) {
+  async getDeleteImpact(input: { taskId: string; workspaceId?: string }) {
     if (input.workspaceId) {
       await ensureTaskInWorkspace(input.taskId, input.workspaceId);
     }
-    return deleteTask(input.taskId);
+    return getTaskDeleteImpact(input.taskId);
+  }
+
+  async delete(input: { taskId: string; workspaceId?: string; expectedTaskIds?: string[]; expectedAssetIds?: string[] }) {
+    if (input.workspaceId) {
+      await ensureTaskInWorkspace(input.taskId, input.workspaceId);
+    }
+    const impact = input.expectedTaskIds && input.expectedAssetIds
+      ? { expectedTaskIds: input.expectedTaskIds, expectedAssetIds: input.expectedAssetIds }
+      : await getTaskDeleteImpact(input.taskId).then((value) => ({
+        expectedTaskIds: value.taskIds,
+        expectedAssetIds: value.assets.map((asset) => asset.id),
+      }));
+    return deleteTask(input.taskId, impact);
+  }
+  async rebuildWithLatestGoalAssets(input: { taskId: string; workspaceId?: string }) {
+    if (input.workspaceId) {
+      await ensureTaskInWorkspace(input.taskId, input.workspaceId);
+    }
+    return rebuildTaskWithLatestGoalAssets(input);
   }
 
   getPage(input: { taskId: string; workBlockId?: string | null }) {

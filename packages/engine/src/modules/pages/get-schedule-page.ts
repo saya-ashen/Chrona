@@ -515,7 +515,7 @@ export async function getSchedulePage(workspaceId: string) {
       }
       planStatuses.set(
         item.taskId,
-        isTaskPlanGenerationRunning({ taskId: item.taskId, workBlockId: null })
+        await isTaskPlanGenerationRunning({ taskId: item.taskId, workBlockId: null })
           ? "generating"
           : savedPlan?.status === "accepted"
             ? "accepted"
@@ -667,7 +667,7 @@ export async function getSchedulePage(workspaceId: string) {
       const snapshot = savedPlan
         ? mapScheduleTaskPlanSnapshot(savedPlan)
         : null;
-      const aiPlanGenerationStatus = isTaskPlanGenerationRunning({
+      const aiPlanGenerationStatus = await isTaskPlanGenerationRunning({
         taskId: item.taskId,
         workBlockId: item.workBlockId,
       })

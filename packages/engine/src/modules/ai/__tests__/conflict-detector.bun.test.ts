@@ -4,7 +4,7 @@ import {
   detectOverload,
   detectFragmentation,
   detectDependencyConflicts,
-} from "../conflict-detector";
+} from "@chrona/engine/test-support";
 import type { ScheduledTaskInfo } from "@chrona/contracts/ai";
 
 describe("conflict-detector", () => {

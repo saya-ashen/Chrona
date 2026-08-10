@@ -2,7 +2,7 @@ import { describe, expect, it } from "bun:test";
 import {
   requireTaskId,
   requireWorkspaceId,
-} from "@chrona/engine/modules/agent-tools/input-guards";
+} from "@chrona/engine/test-support";
 
 // agent-tools input-guards — pure validation primitives used by
 // the agent-tool dispatch pipeline. These are the lowest-level

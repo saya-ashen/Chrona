@@ -15,6 +15,7 @@ import { UI_ACTION, type UiDocument } from "@chrona/ui-protocol";
 import { SpecRenderer } from "./catalog/spec-renderer";
 import { LocalizedLink } from "./localized-link";
 import type { TaskData, TaskHeaderAction } from "../model/task-workspace-types";
+import type { TaskDeleteImpact } from "@chrona/contracts";
 
 function hideHeaderActions(spec: UiDocument, input: { generatePlan?: boolean; acceptPlan?: boolean }): UiDocument {
   const generateAction = spec.elements["action:generate-plan"];
@@ -29,11 +30,30 @@ function hideHeaderActions(spec: UiDocument, input: { generatePlan?: boolean; ac
     },
   };
 }
+function localizeHeaderResultStatus(spec: UiDocument, copy: Record<string, string | undefined>): UiDocument {
+  const defaultStatus = "Execution complete, awaiting review";
+  const localizedStatus = copy.resultReadyTitle ?? defaultStatus;
+  if (localizedStatus === defaultStatus) return spec;
+  return {
+    ...spec,
+    elements: Object.fromEntries(Object.entries(spec.elements).map(([key, element]) => {
+      if (!element.props || typeof element.props !== "object") return [key, element];
+      const props = element.props as Record<string, unknown>;
+      const localizedProps = {
+        ...props,
+        ...(props.text === defaultStatus ? { text: localizedStatus } : {}),
+        ...(props.statusLabel === defaultStatus ? { statusLabel: localizedStatus } : {}),
+      };
+      return [key, localizedProps.text !== props.text || localizedProps.statusLabel !== props.statusLabel ? { ...element, props: localizedProps } : element];
+    })),
+  };
+}
+
 
 type HeaderActionId = TaskHeaderAction["id"];
 
 type TaskWorkspaceHeaderCardProps = {
-  task: Pick<TaskData, "title" | "goal">;
+  task: Pick<TaskData, "title" | "goal" | "goalKnowledge">;
   spec: UiDocument;
   store: StateStore;
   onAction: (action: TaskHeaderAction) => void | Promise<void>;
@@ -44,7 +64,15 @@ type TaskWorkspaceHeaderCardProps = {
   onStopPlanGeneration: () => void | Promise<void>;
   onRestartPlan: () => void | Promise<void>;
   onEdit: () => void;
+  showRebuildConfirm: boolean;
+  isRebuilding: boolean;
+  onStartRebuildConfirm: () => void;
+  onCancelRebuildConfirm: () => void;
+  onRebuild: () => void;
   showDeleteConfirm: boolean;
+  deleteImpact: TaskDeleteImpact | null;
+  isLoadingDeleteImpact: boolean;
+  deleteImpactError: string | null;
   isDeleting: boolean;
   onStartDeleteConfirm: () => void;
   onCancelDeleteConfirm: () => void;
@@ -61,6 +89,8 @@ function findActionLabel(spec: UiDocument, actionId: HeaderActionId) {
   return label ?? actionId;
 }
 
+// The header owns one cohesive set of runtime actions and their destructive confirmations.
+// eslint-disable-next-line max-lines-per-function, complexity
 export function TaskWorkspaceHeaderCard({
   task,
   spec,
@@ -73,7 +103,15 @@ export function TaskWorkspaceHeaderCard({
   onStopPlanGeneration,
   onRestartPlan,
   onEdit,
+  showRebuildConfirm,
+  isRebuilding,
+  onStartRebuildConfirm,
+  onCancelRebuildConfirm,
+  onRebuild,
   showDeleteConfirm,
+  deleteImpact,
+  isLoadingDeleteImpact,
+  deleteImpactError,
   isDeleting,
   onStartDeleteConfirm,
   onCancelDeleteConfirm,
@@ -87,6 +125,7 @@ export function TaskWorkspaceHeaderCard({
   const [pendingActionId, setPendingActionId] = useState<HeaderActionId | null>(null);
   const [actionStatus, setActionStatus] = useState<string | null>(null);
   const [restartConfirmOpen, setRestartConfirmOpen] = useState(false);
+  const [deleteConfirmationStep, setDeleteConfirmationStep] = useState<1 | 2>(1);
 
   // Refs so that the handlers object (passed to ActionProvider which stores it in
   // useState on mount and never re-syncs prop updates) always reads the current
@@ -97,6 +136,7 @@ export function TaskWorkspaceHeaderCard({
     onStopPlanGeneration,
     onRestartPlan,
     onEdit,
+    onStartRebuildConfirm,
     onStartDeleteConfirm,
     onAction,
     onRecoveryRetry,
@@ -113,6 +153,7 @@ export function TaskWorkspaceHeaderCard({
     onStopPlanGeneration,
     onRestartPlan,
     onEdit,
+    onStartRebuildConfirm,
     onStartDeleteConfirm,
     onAction,
     onRecoveryRetry,
@@ -137,6 +178,11 @@ export function TaskWorkspaceHeaderCard({
       if (actionId === "restart") {
         ref.current.store.set("/headerOverflowAction", "");
         setRestartConfirmOpen(true);
+        return;
+      }
+      if (actionId === "rebuild") {
+        ref.current.onStartRebuildConfirm();
+        ref.current.store.set("/headerOverflowAction", "");
         return;
       }
       if (actionId === "edit") {
@@ -188,7 +234,7 @@ export function TaskWorkspaceHeaderCard({
 
   return (
     <>
-      <header className="relative z-30 min-w-0 overflow-hidden border-y border-panel-border bg-muted/70 px-4 py-3 before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-primary [&_h1]:w-full [&_h1]:min-w-0 [&_h1]:break-words [&_h1]:text-xl [&_h1]:font-semibold [&_h1]:tracking-tight sm:px-5 sm:py-3.5 sm:[&_h1]:text-2xl">
+      <header className="relative z-30 min-w-0 overflow-hidden border-y border-panel-border bg-muted/70 px-4 py-2.5 before:absolute before:inset-y-0 before:left-0 before:w-1 before:bg-primary [&_h1]:w-full [&_h1]:min-w-0 [&_h1]:break-words [&_h1]:text-xl [&_h1]:font-semibold [&_h1]:tracking-tight sm:px-5 sm:py-3 sm:[&_h1]:text-2xl">
         <nav aria-label={task.goal ? messages.components.taskWorkspace.owningGoal : messages.components.taskWorkspace.backToTasks} className="mb-0.5">
           <Button asChild variant="ghost" size="sm" className="-ml-2 h-7 max-w-full justify-start px-2 text-xs text-muted-foreground hover:text-foreground">
             {task.goal ? (
@@ -209,7 +255,17 @@ export function TaskWorkspaceHeaderCard({
             )}
           </Button>
         </nav>
-        <SpecRenderer spec={hideHeaderActions(spec, { generatePlan: hideGeneratePlan, acceptPlan: hideAcceptPlan })} handlers={handlers} store={store} />
+        {task.goalKnowledge ? (
+          <p
+            className="mb-1 text-xs text-muted-foreground"
+            title={messages.components.taskWorkspace.goalKnowledgeCapturedHint}
+          >
+            {messages.components.taskWorkspace.goalKnowledgeCaptured
+              .replace("{captured}", String(task.goalKnowledge.captured.length))
+              .replace("{read}", String(task.goalKnowledge.read.length))}
+          </p>
+        ) : null}
+        <SpecRenderer spec={localizeHeaderResultStatus(hideHeaderActions(spec, { generatePlan: hideGeneratePlan, acceptPlan: hideAcceptPlan }), copy)} handlers={handlers} store={store} />
       </header>
       <p className="sr-only" role="status" aria-live="polite">
         {actionStatus ?? ""}
@@ -245,34 +301,86 @@ export function TaskWorkspaceHeaderCard({
         </DialogContent>
       </Dialog>
       <Dialog
+        open={showRebuildConfirm}
+        onOpenChange={(open) => {
+          if (!open) onCancelRebuildConfirm();
+        }}
+      >
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{copy.rebuildTaskTitle}</DialogTitle>
+            <DialogDescription>{copy.rebuildTaskDescription}</DialogDescription>
+          </DialogHeader>
+          <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-sm text-muted-foreground">
+            <p>{copy.rebuildTaskReplacementWarning}</p>
+            <p className="mt-2 font-medium text-destructive">{copy.rebuildTaskIrreversibleWarning}</p>
+          </div>
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={onCancelRebuildConfirm} disabled={isRebuilding}>
+              {copy.cancel}
+            </Button>
+            <Button type="button" variant="destructive" onClick={onRebuild} disabled={isRebuilding}>
+              {isRebuilding ? copy.rebuildingTask : copy.rebuildTask}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      <Dialog
         open={showDeleteConfirm}
         onOpenChange={(open) => {
-          if (!open) onCancelDeleteConfirm();
+          if (!open) {
+            setDeleteConfirmationStep(1);
+            onCancelDeleteConfirm();
+          }
         }}
       >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle>{copy.deleteConfirmTitlePrefix} &ldquo;{task.title}&rdquo;{copy.deleteConfirmTitleSuffix}</DialogTitle>
             <DialogDescription>
-              {copy.deleteConfirmDescription}
+              {deleteConfirmationStep === 1 ? copy.deleteConfirmDescription : copy.deleteFinalConfirmDescription}
             </DialogDescription>
           </DialogHeader>
+          {deleteConfirmationStep === 2 ? (
+            <div className="space-y-3 rounded-lg border border-destructive/30 bg-destructive/5 p-3 text-sm">
+              {isLoadingDeleteImpact ? <p>{copy.deleteImpactLoading}</p> : null}
+              {deleteImpactError ? <p className="text-destructive">{deleteImpactError}</p> : null}
+              {deleteImpact ? (
+                <>
+                  <p className="font-medium">
+                    {copy.deleteImpactSummary
+                      .replace("{tasks}", String(deleteImpact.taskCount))
+                      .replace("{assets}", String(deleteImpact.assets.length))}
+                  </p>
+                  {deleteImpact.assets.length > 0 ? (
+                    <ul className="max-h-48 list-disc space-y-1 overflow-y-auto pl-5" aria-label={copy.deleteAssetListLabel}>
+                      {deleteImpact.assets.map((asset) => <li key={asset.id}>{asset.label}</li>)}
+                    </ul>
+                  ) : <p className="text-muted-foreground">{copy.deleteNoAssets}</p>}
+                  <p className="font-medium text-destructive">{copy.deletePermanentWarning}</p>
+                </>
+              ) : null}
+            </div>
+          ) : null}
           <DialogFooter>
             <Button
               type="button"
-              onClick={onCancelDeleteConfirm}
+              onClick={() => {
+                if (deleteConfirmationStep === 2) setDeleteConfirmationStep(1);
+                else onCancelDeleteConfirm();
+              }}
               variant="outline"
               disabled={isDeleting}
             >
-              {copy.cancel}
+              {deleteConfirmationStep === 2 ? copy.back : copy.cancel}
             </Button>
             <Button
               type="button"
-              onClick={onDelete}
+              onClick={deleteConfirmationStep === 1 ? () => setDeleteConfirmationStep(2) : onDelete}
               variant="destructive"
-              disabled={isDeleting}
+              disabled={isDeleting || (deleteConfirmationStep === 2 && (!deleteImpact || isLoadingDeleteImpact || Boolean(deleteImpactError)))}
             >
-              {isDeleting ? copy.deleting : copy.deleteTask}
+              {isDeleting ? copy.deleting : deleteConfirmationStep === 1 ? copy.reviewDeleteImpact : copy.deleteTaskConfirm}
             </Button>
           </DialogFooter>
         </DialogContent>

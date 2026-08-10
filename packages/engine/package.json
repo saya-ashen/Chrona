@@ -20,6 +20,7 @@
     "@chrona/ui-protocol": "workspace:*"
   },
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./test-support": "./src/test-support.ts"
   }
 }

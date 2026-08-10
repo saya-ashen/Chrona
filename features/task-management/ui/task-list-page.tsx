@@ -2,6 +2,7 @@
 
 import { useState, type ComponentProps } from "react";
 import {
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   CalendarDays,
@@ -12,25 +13,29 @@ import {
   Trash2,
   X,
 } from "lucide-react";
-import { Link, useNavigate, useSearchParams } from "react-router";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { localizeHref, useLocale, type Messages } from "@chrona/i18n";
-import { Badge } from "@shared/ui"
-import { Button } from "@shared/ui"
-import { PageFrame } from "@shared/ui"
-import { PageHeader } from "@shared/ui"
-import { Checkbox } from "@shared/ui"
-import { Dialog,
-DialogContent,
-DialogDescription,
-DialogFooter,
-DialogHeader,
-DialogTitle, } from "@shared/ui"
-import { Input } from "@shared/ui"
-import { Select,
-SelectContent,
-SelectItem,
-SelectTrigger,
-SelectValue, } from "@shared/ui"
+import { Badge } from "@shared/ui";
+import { Button } from "@shared/ui";
+import { PageFrame } from "@shared/ui";
+import { PageHeader } from "@shared/ui";
+import { Checkbox } from "@shared/ui";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@shared/ui";
+import { Input } from "@shared/ui";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@shared/ui";
 import {
   TaskActionsMenu,
   type TaskActionsMenuItem,
@@ -203,8 +208,19 @@ function canStartTask(task: TaskItem): boolean {
   return task.stateView.primaryActionId === "start_execution";
 }
 
-function canCompleteTask(task: TaskItem): boolean {
-  return !["result_ready", "done", "cancelled"].includes(task.stateView.state);
+export function canCompleteTask(task: TaskItem): boolean {
+  if (["result_ready", "done", "cancelled"].includes(task.stateView.state)) {
+    return false;
+  }
+
+  const runStatuses = [
+    task.result?.runStatus,
+    task.projection?.runStatus,
+    task.projection?.latestRunStatus,
+  ];
+  return runStatuses.some(
+    (status) => status?.toLowerCase() === "completed",
+  );
 }
 
 function canReopenTask(task: TaskItem): boolean {
@@ -216,12 +232,15 @@ function TaskListHero({
   copy,
   activeFilterLabel,
   counts,
+  onNeedsMe,
 }: {
   title: string;
   copy: TaskListCopy;
   activeFilterLabel: string;
   counts: TaskCounts;
+  onNeedsMe: () => void;
 }) {
+  const [showStatusGuide, setShowStatusGuide] = useState(false);
   return (
     <PageHeader
       className="-mx-3 -mt-3 sm:-mx-4 sm:-mt-4"
@@ -235,11 +254,17 @@ function TaskListHero({
       actions={
         <div className="flex shrink-0 flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
           <TaskStat label={copy.statTotal} value={counts.all} />
-          <TaskStat
-            label={copy.statNeeds}
-            value={counts.needsMe}
-            className="text-warning-foreground"
-          />
+          <button
+            type="button"
+            onClick={onNeedsMe}
+            className="rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <TaskStat
+              label={copy.statNeeds}
+              value={counts.needsMe}
+              className="text-warning-foreground"
+            />
+          </button>
           <TaskStat
             label={copy.statReady}
             value={counts.ready}
@@ -248,9 +273,27 @@ function TaskListHero({
         </div>
       }
       toolbar={
-        <p className="text-[11px] text-muted-foreground">
-          Needs you: input, approval, or review required · Ready: can start now · Running: active execution · Failed: execution stopped and needs recovery
-        </p>
+        <div className="space-y-2">
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="h-7 gap-1 px-2 text-xs text-muted-foreground"
+            aria-expanded={showStatusGuide}
+            onClick={() => setShowStatusGuide((current) => !current)}
+          >
+            {copy.statusGuide}
+            <ChevronDown
+              className={`size-3.5 transition-transform ${showStatusGuide ? "rotate-180" : ""}`}
+              aria-hidden
+            />
+          </Button>
+          {showStatusGuide ? (
+            <p className="max-w-3xl text-xs leading-5 text-muted-foreground">
+              {copy.statusGuideDescription}
+            </p>
+          ) : null}
+        </div>
       }
     />
   );
@@ -320,6 +363,7 @@ function TaskRow({
   copy,
   checked,
   isPending,
+  selectionMode,
   onToggleSelected,
   onAction,
   onDelete,
@@ -328,6 +372,7 @@ function TaskRow({
   copy: TaskListCopy;
   checked: boolean;
   isPending: boolean;
+  selectionMode: boolean;
   onToggleSelected: (taskId: string, checked: boolean) => void;
   onAction: (action: TaskListAction, task: TaskItem) => void;
   onDelete: (task: TaskItem) => void;
@@ -383,37 +428,43 @@ function TaskRow({
         aria-hidden="true"
       />
       <div className="flex flex-wrap items-center justify-between gap-3 pl-4">
-        <Checkbox
-          aria-label={copy.selectTask.replace("{title}", task.title)}
-          checked={checked}
-          disabled={isPending}
-          onCheckedChange={(value) => onToggleSelected(task.id, value === true)}
-          className="mt-1"
-        />
+        {selectionMode ? (
+          <Checkbox
+            aria-label={copy.selectTask.replace("{title}", task.title)}
+            checked={checked}
+            disabled={isPending}
+            onCheckedChange={(value) =>
+              onToggleSelected(task.id, value === true)
+            }
+            className="mt-1"
+          />
+        ) : null}
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
-            <h3 className="truncate text-sm font-semibold text-foreground">
+            <h3 className="min-w-0 flex-1 truncate text-sm font-semibold text-foreground">
               {task.title}
             </h3>
             <Badge variant={statusTone(task.stateView)}>
               {task.stateView.label}
             </Badge>
-            <Badge variant={priorityTone(task.priority)}>{task.priority}</Badge>
-            <Badge
-              variant={
-                task.autoExecute
-                  ? "info"
-                  : task.autoPlanGeneration
-                    ? "secondary"
-                    : "outline"
-              }
-            >
-              {taskAutomationLabel(task, copy)}
-            </Badge>
-            {task.source?.source === "external_calendar" && (
-              <Badge
-                variant="outline"
-                className="gap-1"
+          </div>
+          <p className="mt-1 text-xs font-medium text-foreground/80">
+            {task.stateView.nextActionLabel}
+          </p>
+          {task.description && (
+            <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
+              {toPreviewText(task.description)}
+            </p>
+          )}
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
+            {task.priority === "Urgent" || task.priority === "High" ? (
+              <Badge variant={priorityTone(task.priority)}>
+                {task.priority}
+              </Badge>
+            ) : null}
+            {task.source?.source === "external_calendar" ? (
+              <span
+                className="inline-flex items-center gap-1"
                 title={copy.externalSourceTitle.replace(
                   "{source}",
                   task.source.sourceName,
@@ -422,25 +473,17 @@ function TaskRow({
                 <span
                   className="size-2 rounded-full"
                   style={{ backgroundColor: task.source.sourceColor }}
-                  aria-hidden="true"
+                  aria-hidden
                 />
-                <CalendarDays className="size-3" />
+                <CalendarDays className="size-3" aria-hidden />
                 {task.source.sourceName}
-              </Badge>
-            )}
-            <Badge variant="outline">{task.stateView.nextActionLabel}</Badge>
-          </div>
-          {task.description && (
-            <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
-              {toPreviewText(task.description)}
-            </p>
-          )}
-          <div className="mt-2 flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
-            {task.dueAt && (
+              </span>
+            ) : null}
+            {task.dueAt ? (
               <span>
                 {copy.duePrefix}: {new Date(task.dueAt).toLocaleDateString()}
               </span>
-            )}
+            ) : null}
             <span>
               {copy.updatedPrefix}: {formatRelativeTime(task.updatedAt, copy)}
             </span>
@@ -458,10 +501,12 @@ function TaskRow({
               <span>{copy.viewDetails}</span>
             </LocalizedLink>
           </Button>
-          <TaskActionsMenu
-            label={copy.moreActions.replace("{title}", task.title)}
-            items={actionItems}
-          />
+          {!selectionMode ? (
+            <TaskActionsMenu
+              label={copy.moreActions.replace("{title}", task.title)}
+              items={actionItems}
+            />
+          ) : null}
         </div>
       </div>
     </div>
@@ -477,7 +522,7 @@ type PendingDelete =
 
 export function TaskListPage({
   tasks,
-  workspaceId: _workspaceId,
+  workspaceId,
   copy,
   total,
   page,
@@ -637,7 +682,7 @@ export function TaskListPage({
     setIsPending(true);
     setActionMessage(null);
     try {
-      await Promise.all(deleteIds.map((taskId) => deleteTask({ taskId })));
+      await Promise.all(deleteIds.map((taskId) => deleteTask({ taskId, workspaceId })));
       setSelectedIds((current) => {
         const next = new Set(current);
         for (const taskId of deleteIds) next.delete(taskId);
@@ -662,25 +707,41 @@ export function TaskListPage({
           copy={taskCopy}
           activeFilterLabel={activeFilterLabel}
           counts={counts}
-        />
-        <TaskFilterBar
-          filter={filter}
-          counts={counts}
-          copy={taskCopy}
-          onFilterChange={setFilter}
+          onNeedsMe={() => {
+            setParam("view", "");
+            setFilter("needs_me");
+          }}
         />
         <div
-          className="flex w-fit gap-1 rounded-xl border border-border/70 bg-background p-1"
+          className="flex w-fit max-w-full gap-1 overflow-x-auto rounded-xl border border-border/70 bg-background p-1"
           role="group"
-          aria-label="Tasks view"
+          aria-label={taskCopy.viewLabel}
         >
           <Button
             type="button"
             size="sm"
-            variant={view === "tasks" ? "default" : "ghost"}
-            onClick={() => setParam("view", "")}
+            variant={
+              view === "tasks" && filter === "needs_me" ? "default" : "ghost"
+            }
+            onClick={() => {
+              setParam("view", "");
+              setFilter("needs_me");
+            }}
           >
-            Work
+            {taskCopy.viewNeedsAttention}
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={
+              view === "tasks" && filter === "running" ? "default" : "ghost"
+            }
+            onClick={() => {
+              setParam("view", "");
+              setFilter("running");
+            }}
+          >
+            {taskCopy.viewInProgress}
           </Button>
           <Button
             type="button"
@@ -688,14 +749,32 @@ export function TaskListPage({
             variant={view === "results" ? "default" : "ghost"}
             onClick={() => setParam("view", "results")}
           >
-            Results
+            {taskCopy.viewResults}
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant={view === "tasks" && filter === "all" ? "default" : "ghost"}
+            onClick={() => {
+              setParam("view", "");
+              setFilter("all");
+            }}
+          >
+            {taskCopy.viewAll}
           </Button>
         </div>
-        {view === "results" ? (
+        {view === "tasks" ? (
+          <TaskFilterBar
+            filter={filter}
+            counts={counts}
+            copy={taskCopy}
+            onFilterChange={setFilter}
+          />
+        ) : (
           <div
             className="flex items-center gap-2 overflow-x-auto pb-1"
             role="group"
-            aria-label="Result filters"
+            aria-label={taskCopy.resultFiltersLabel}
           >
             <Select
               value={resultDate}
@@ -703,13 +782,17 @@ export function TaskListPage({
                 setParam("resultDate", value === "all" ? "" : value)
               }
             >
-              <SelectTrigger size="sm" className="w-40 shrink-0" aria-label="Result date">
+              <SelectTrigger
+                size="sm"
+                className="w-40 shrink-0"
+                aria-label={taskCopy.resultDateLabel}
+              >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Any date</SelectItem>
-                <SelectItem value="7d">Last 7 days</SelectItem>
-                <SelectItem value="30d">Last 30 days</SelectItem>
+                <SelectItem value="all">{taskCopy.resultDateAny}</SelectItem>
+                <SelectItem value="7d">{taskCopy.resultDate7d}</SelectItem>
+                <SelectItem value="30d">{taskCopy.resultDate30d}</SelectItem>
               </SelectContent>
             </Select>
             <Select
@@ -718,37 +801,25 @@ export function TaskListPage({
                 setParam("resultStatus", value === "all" ? "" : value)
               }
             >
-              <SelectTrigger size="sm" className="w-40 shrink-0" aria-label="Result status">
+              <SelectTrigger
+                size="sm"
+                className="w-40 shrink-0"
+                aria-label={taskCopy.resultStatusLabel}
+              >
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Any status</SelectItem>
-                <SelectItem value="accepted">Accepted</SelectItem>
-                <SelectItem value="needs-review">Needs review</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select
-              value={resultSource}
-              onValueChange={(value) =>
-                setParam("resultSource", value === "all" ? "" : value)
-              }
-            >
-              <SelectTrigger size="sm" className="w-48 shrink-0" aria-label="Source task">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Any source task</SelectItem>
-                {tasks
-                  .filter((task) => task.result)
-                  .map((task) => (
-                    <SelectItem key={task.id} value={task.id}>
-                      {task.title}
-                    </SelectItem>
-                  ))}
+                <SelectItem value="all">{taskCopy.resultStatusAny}</SelectItem>
+                <SelectItem value="accepted">
+                  {taskCopy.resultAccepted}
+                </SelectItem>
+                <SelectItem value="needs-review">
+                  {taskCopy.resultNeedsReview}
+                </SelectItem>
               </SelectContent>
             </Select>
           </div>
-        ) : null}
+        )}
 
         <div className="flex flex-wrap items-center gap-2 rounded-2xl border border-border bg-background px-3 py-2">
           <form
@@ -827,6 +898,19 @@ export function TaskListPage({
           </Select>
           <Button
             type="button"
+            variant={hasSelection ? "secondary" : "outline"}
+            size="sm"
+            className="h-8 rounded-lg text-xs"
+            disabled={tasks.length === 0 || isPending}
+            onClick={() => {
+              if (hasSelection) setSelectedIds(new Set());
+              else toggleVisibleSelection(true);
+            }}
+          >
+            {hasSelection ? taskCopy.bulkClear : taskCopy.selectVisible}
+          </Button>
+          <Button
+            type="button"
             variant="outline"
             size="sm"
             className="h-8 rounded-lg text-xs"
@@ -888,8 +972,39 @@ export function TaskListPage({
         ) : null}
 
         {visibleTasks.length === 0 ? (
-          <div className="rounded-3xl border border-dashed border-border bg-background/70 p-10 text-center text-sm text-muted-foreground">
-            {taskCopy.emptyFiltered}
+          <div className="rounded-3xl border border-dashed border-border bg-background/70 p-10 text-center">
+            <h2 className="text-sm font-semibold text-foreground">
+              {total === 0
+                ? taskCopy.emptyTitle
+                : view === "results"
+                  ? taskCopy.emptyResultsTitle
+                  : taskCopy.emptyFilteredTitle}
+            </h2>
+            <p className="mx-auto mt-2 max-w-md text-sm text-muted-foreground">
+              {total === 0
+                ? taskCopy.emptyDescription
+                : view === "results"
+                  ? taskCopy.emptyResultsDescription
+                  : taskCopy.emptyFiltered}
+            </p>
+            {total > 0 ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                className="mt-4"
+                onClick={() => {
+                  setParam("view", "");
+                  setFilter("all");
+                  setSearchDraft("");
+                  setParam("search", "");
+                }}
+              >
+                {view === "results"
+                  ? taskCopy.emptyResultsAction
+                  : taskCopy.clearFilters}
+              </Button>
+            ) : null}
           </div>
         ) : (
           <div className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
@@ -900,7 +1015,7 @@ export function TaskListPage({
                   className="rounded-2xl border border-border/70 bg-card p-4 shadow-xs"
                 >
                   <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div className="min-w-0 space-y-1">
+                    <div className="min-w-0 space-y-2">
                       <div className="flex flex-wrap items-center gap-2">
                         <h3 className="font-semibold text-foreground">
                           {task.result?.artifact?.title ?? task.title}
@@ -913,42 +1028,30 @@ export function TaskListPage({
                           }
                         >
                           {task.stateView.state === "result_ready"
-                            ? "Needs review"
-                            : "Accepted"}
+                            ? taskCopy.resultNeedsReview
+                            : taskCopy.resultAccepted}
                         </Badge>
-                        {task.result?.artifact ? (
-                          <Badge variant="outline">
-                            {task.result.artifact.type}
-                          </Badge>
-                        ) : null}
-                        {task.result?.occurrenceId ? (
-                          <Badge variant="outline">
-                            Occurrence {task.result.occurrenceId}
-                          </Badge>
-                        ) : null}
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        Source task: {task.title}
+                        {taskCopy.resultSourcePrefix}: {task.title} ·{" "}
                         {task.result?.executedAt
-                          ? ` · Executed ${new Date(task.result.executedAt).toLocaleString()}`
-                          : ` · Updated ${formatRelativeTime(task.updatedAt, taskCopy)}`}
-                        {task.result?.provider
-                          ? ` · AI ${task.result.provider}`
-                          : ""}
-                        {task.result?.runId
-                          ? ` · Run ${task.result.runId}`
-                          : ""}
+                          ? new Date(task.result.executedAt).toLocaleString()
+                          : formatRelativeTime(task.updatedAt, taskCopy)}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {task.stateView.state === "result_ready"
+                          ? taskCopy.resultPendingLifecycle
+                          : taskCopy.resultAcceptedLifecycle}
                       </p>
                       {!task.result?.artifact ? (
                         <p className="text-xs text-warning-foreground">
-                          The run has no saved artifact. Open the task to
-                          inspect its output and recovery options.
+                          {taskCopy.resultNoArtifact}
                         </p>
                       ) : null}
                     </div>
                     <Button asChild size="sm">
                       <LocalizedLink href={`/tasks/${task.id}`}>
-                        Open result
+                        {taskCopy.openResult}
                       </LocalizedLink>
                     </Button>
                   </div>
@@ -960,6 +1063,7 @@ export function TaskListPage({
                   copy={taskCopy}
                   checked={selectedIds.has(task.id)}
                   isPending={isPending}
+                  selectionMode={hasSelection}
                   onToggleSelected={updateSelection}
                   onAction={(action, actionTask) =>
                     void runTaskAction(action, actionTask)

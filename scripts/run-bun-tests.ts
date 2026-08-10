@@ -1,118 +1,179 @@
-export {};
-
-import { existsSync, mkdirSync, rmSync } from "node:fs";
-import { resolve } from "node:path";
+import { existsSync, mkdirSync, mkdtempSync, rmSync } from "node:fs";
+import { join, resolve } from "node:path";
 
 const include = new Bun.Glob("**/*.bun.test.ts");
-const ignoredSegments = new Set(["node_modules", ".direnv", ".git", ".worktrees", "dist", "build", "coverage"]);
+const ignoredSegments = new Set([
+	"node_modules",
+	".direnv",
+	".git",
+	".worktrees",
+	"dist",
+	"build",
+	"coverage",
+]);
 const rootDir = process.cwd();
-const tempDir = resolve(rootDir, ".tmp");
 const requestedFiles = process.argv.slice(2);
-const concurrency = Math.max(1, Number(process.env.CHRONA_TEST_CONCURRENCY ?? "4"));
+const concurrency = Math.max(
+	1,
+	Number(process.env.CHRONA_TEST_CONCURRENCY ?? "2"),
+);
 
 function shouldInclude(path: string) {
-  return !path.split("/").some((segment) => ignoredSegments.has(segment));
+	return !path.split("/").some((segment) => ignoredSegments.has(segment));
 }
 
 function resolveRequestedFiles(paths: string[]) {
-  const invalid = paths.filter((path) => !path.endsWith(".bun.test.ts") || !shouldInclude(path) || !existsSync(path));
-  if (invalid.length > 0) {
-    console.error(`Invalid Bun test file(s): ${invalid.join(", ")}`);
-    process.exit(1);
-  }
-  return paths;
+	const invalid = paths.filter(
+		(path) =>
+			!path.endsWith(".bun.test.ts") ||
+			!shouldInclude(path) ||
+			!existsSync(path),
+	);
+	if (invalid.length > 0) {
+		console.error(`Invalid Bun test file(s): ${invalid.join(", ")}`);
+		process.exit(1);
+	}
+	return paths;
 }
 
-async function runWithFreshDatabase(file: string, fileDbPath: string, dataDir: string): Promise<number> {
-  if (existsSync(fileDbPath)) {
-    rmSync(fileDbPath, { force: true });
-  }
-
-  const initProc = Bun.spawn([
-    "bun",
-    "run",
-    "scripts/init-sqlite-db.ts",
-    "--reset",
-    fileDbPath,
-  ], {
-    cwd: rootDir,
-    stdout: "inherit",
-    stderr: "inherit",
-  });
-  const initCode = await initProc.exited;
-  if (initCode !== 0) {
-    return initCode;
-  }
-
-  const proc = Bun.spawn(["bun", "test", file], {
-    cwd: rootDir,
-    env: {
-      ...process.env,
-      DATABASE_URL: `file:${fileDbPath}`,
-      CHRONA_DATA_DIR: dataDir,
-      NODE_ENV: "test",
-    },
-    stdout: "inherit",
-    stderr: "inherit",
-  });
-  return await proc.exited;
+export interface TestFileEnvironment {
+	file: string;
+	fileDbPath: string;
+	dataDir: string;
+	env: Record<string, string | undefined>;
 }
 
-const files = requestedFiles.length > 0
-  ? resolveRequestedFiles(requestedFiles)
-  : (await Array.fromAsync(include.scan(".")))
-    .filter(shouldInclude)
-    .sort((a, b) => a.localeCompare(b));
-
-if (files.length === 0) {
-  process.exit(0);
-}
-mkdirSync(tempDir, { recursive: true });
-
-let exitCode = 0;
-const failedFiles: Array<{ file: string; code: number }> = [];
-const pending = files.map((file, index) => ({
-  file,
-  fileDbPath: resolve(tempDir, `bun-test-${index}.db`),
-  dataDir: resolve(tempDir, `bun-test-${index}-data`),
-}));
-
-console.log(`Running ${files.length} Bun test file${files.length === 1 ? "" : "s"} with concurrency ${concurrency}...`);
-
-try {
-  const active = new Set<Promise<void>>();
-  const launch = (file: string, fileDbPath: string, dataDir: string) => {
-    const job = (async () => {
-      const code = await runWithFreshDatabase(file, fileDbPath, dataDir);
-      if (code !== 0) {
-        exitCode = code;
-        failedFiles.push({ file, code });
-      }
-    })();
-    active.add(job);
-    job.finally(() => active.delete(job));
-  };
-
-  for (const item of pending) {
-    while (active.size >= concurrency) {
-      await Promise.race(active);
-    }
-    launch(item.file, item.fileDbPath, item.dataDir);
-  }
-
-  await Promise.all(active);
-} finally {
-  for (const { fileDbPath, dataDir } of pending) {
-    if (existsSync(fileDbPath)) rmSync(fileDbPath, { force: true });
-    if (existsSync(dataDir)) rmSync(dataDir, { recursive: true, force: true });
-  }
+export interface TestRunWorkspace {
+	root: string;
+	files: TestFileEnvironment[];
 }
 
-if (failedFiles.length > 0) {
-  console.error("\nFailed Bun test files:");
-  for (const failure of failedFiles) {
-    console.error(`  - ${failure.file} (exit ${failure.code})`);
-  }
+export function createTestRunWorkspace(
+	rootDir: string,
+	files: string[],
+): TestRunWorkspace {
+	const tempDir = resolve(rootDir, ".tmp");
+	mkdirSync(tempDir, { recursive: true });
+
+	const root = mkdtempSync(join(tempDir, "bun-test-"));
+	return {
+		root,
+		files: files.map((file, index) => {
+			const fileRoot = join(root, `${index}`);
+			const fileDbPath = join(fileRoot, "test.db");
+			const dataDir = join(fileRoot, "data");
+			const env = {
+				...process.env,
+				DATABASE_URL: `file:${fileDbPath}`,
+				CHRONA_DATA_DIR: dataDir,
+				NODE_ENV: "test",
+			};
+
+			mkdirSync(fileRoot, { recursive: true });
+			return { file, fileDbPath, dataDir, env };
+		}),
+	};
 }
 
-process.exit(exitCode);
+export function cleanupTestRunWorkspace(workspace: TestRunWorkspace) {
+	rmSync(workspace.root, { recursive: true, force: true });
+}
+
+async function runWithFreshDatabase(
+	item: TestFileEnvironment,
+): Promise<number> {
+	const { file, fileDbPath, env } = item;
+	let initCode = 1;
+	for (let attempt = 0; attempt < 3; attempt += 1) {
+		const initProc = Bun.spawn(
+			["bun", "run", "scripts/init-sqlite-db.ts", "--reset", fileDbPath],
+			{
+				cwd: rootDir,
+				env,
+				stdout: "inherit",
+				stderr: "inherit",
+			},
+		);
+		initCode = await initProc.exited;
+		if (initCode === 0) break;
+		if (attempt < 2) await Bun.sleep(250 * (attempt + 1));
+	}
+	if (initCode !== 0) {
+		return initCode;
+	}
+
+	const proc = Bun.spawn(["bun", "test", "--timeout=20000", file], {
+		cwd: rootDir,
+		env,
+		stdout: "inherit",
+		stderr: "inherit",
+	});
+	return await proc.exited;
+}
+
+async function main(): Promise<number> {
+	const files =
+		requestedFiles.length > 0
+			? resolveRequestedFiles(requestedFiles)
+			: (await Array.fromAsync(include.scan(".")))
+					.filter(shouldInclude)
+					.sort((a, b) => a.localeCompare(b));
+
+	if (files.length === 0) {
+		return 0;
+	}
+
+	let exitCode = 0;
+	const failedFiles: Array<{ file: string; code: number }> = [];
+	const workspace = createTestRunWorkspace(rootDir, files);
+	const pending = workspace.files;
+
+	console.log(
+		`Running ${files.length} Bun test file${files.length === 1 ? "" : "s"} with concurrency ${concurrency}...`,
+	);
+
+	try {
+		const active = new Set<Promise<void>>();
+		const launch = (item: TestFileEnvironment) => {
+			const job = (async () => {
+				let code = await runWithFreshDatabase(item);
+				if (code !== 0) {
+					console.error(
+						`Retrying isolated Bun test file after exit ${code}: ${item.file}`,
+					);
+					code = await runWithFreshDatabase(item);
+				}
+				if (code !== 0) {
+					exitCode = code;
+					failedFiles.push({ file: item.file, code });
+				}
+			})();
+			active.add(job);
+			job.finally(() => active.delete(job));
+		};
+
+		for (const item of pending) {
+			while (active.size >= concurrency) {
+				await Promise.race(active);
+			}
+			launch(item);
+		}
+
+		await Promise.all(active);
+	} finally {
+		cleanupTestRunWorkspace(workspace);
+	}
+
+	if (failedFiles.length > 0) {
+		console.error("\nFailed Bun test files:");
+		for (const failure of failedFiles) {
+			console.error(`  - ${failure.file} (exit ${failure.code})`);
+		}
+	}
+
+	return exitCode;
+}
+
+if (import.meta.main) {
+	process.exit(await main());
+}

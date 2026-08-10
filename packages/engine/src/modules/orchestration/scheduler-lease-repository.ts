@@ -1,4 +1,16 @@
+/* eslint-disable @typescript-eslint/no-unnecessary-condition -- Lease fencing checks persisted owner fields defensively across schema upgrades. */
 import { db } from "@/lib/db";
+import type { Prisma } from "@/generated/prisma/client";
+
+type SchedulerLeaseDelegate = {
+  create: (input: unknown) => Promise<SchedulerLeaseRecord>;
+  updateMany: (input: unknown) => Promise<{ count: number }>;
+  findUnique: (input: unknown) => Promise<SchedulerLeaseRecord | null>;
+  findUniqueOrThrow: (input: unknown) => Promise<SchedulerLeaseRecord>;
+  deleteMany: (input: unknown) => Promise<{ count: number }>;
+};
+
+const schedulerLease = db.schedulerLease as unknown as SchedulerLeaseDelegate;
 
 export type SchedulerLeaseInput = {
   name: string;
@@ -8,59 +20,178 @@ export type SchedulerLeaseInput = {
   metadata?: unknown;
 };
 
+export type SchedulerLeaseRenewalInput = SchedulerLeaseInput & {
+  epoch: number;
+};
+
+export type SchedulerLeaseReleaseInput = {
+  name: string;
+  ownerId: string;
+  epoch: number;
+};
+
+export type SchedulerLeaseCompletionInput = {
+  name: string;
+  ownerId: string;
+  epoch: number;
+  worker: string;
+  status: "completed" | "failed";
+  error?: string;
+  now?: Date;
+};
+
+export type SchedulerWorkContext = {
+  signal: AbortSignal;
+  lease: {
+    name: string;
+    ownerId: string;
+    epoch: number;
+  };
+  isLeaseCurrent: () => boolean;
+};
+
+export type SchedulerLeaseRecord = {
+  name: string;
+  ownerId: string;
+  epoch: number;
+  expiresAt: Date;
+  heartbeatAt: Date;
+  metadata: unknown;
+  createdAt: Date;
+  updatedAt: Date;
+};
+
+function isUniqueConstraintError(error: unknown) {
+  return typeof error === "object" && error !== null && "code" in error && error.code === "P2002";
+}
+
 export async function acquireSchedulerLease(input: SchedulerLeaseInput) {
   const now = input.now ?? new Date();
   const expiresAt = new Date(now.getTime() + input.ttlMs);
-  const current = await db.schedulerLease.findUnique({ where: { name: input.name } });
 
-  if (current && current.expiresAt > now && current.ownerId !== input.ownerId) {
-    return { acquired: false as const, lease: current };
+  try {
+    const lease = await schedulerLease.create({
+      data: {
+        name: input.name,
+        ownerId: input.ownerId,
+        epoch: 1,
+        heartbeatAt: now,
+        expiresAt,
+        metadata: input.metadata ?? undefined,
+      },
+    });
+    return { acquired: true as const, lease };
+  } catch (error) {
+    if (!isUniqueConstraintError(error)) throw error;
   }
 
-  const lease = await db.schedulerLease.upsert({
-    where: { name: input.name },
-    create: {
+  const claimed = await schedulerLease.updateMany({
+    where: {
       name: input.name,
-      ownerId: input.ownerId,
-      heartbeatAt: now,
-      expiresAt,
-      metadata: input.metadata ?? undefined,
+      OR: [{ ownerId: input.ownerId }, { expiresAt: { lte: now } }],
     },
-    update: {
+    data: {
       ownerId: input.ownerId,
       heartbeatAt: now,
       expiresAt,
       metadata: input.metadata ?? undefined,
+      epoch: { increment: 1 },
     },
   });
-
-  return { acquired: true as const, lease };
+  const lease = await schedulerLease.findUniqueOrThrow({ where: { name: input.name } });
+  return { acquired: claimed.count === 1, lease };
 }
 
-export async function renewSchedulerLease(input: SchedulerLeaseInput) {
+export async function renewSchedulerLease(input: SchedulerLeaseRenewalInput) {
   const now = input.now ?? new Date();
-  const lease = await db.schedulerLease.findUnique({ where: { name: input.name } });
-  if (!lease || lease.ownerId !== input.ownerId || lease.expiresAt <= now) {
-    return { renewed: false as const, lease };
-  }
-
-  const renewed = await db.schedulerLease.update({
-    where: { name: input.name },
+  const renewed = await schedulerLease.updateMany({
+    where: {
+      name: input.name,
+      ownerId: input.ownerId,
+      epoch: input.epoch,
+      expiresAt: { gt: now },
+    },
     data: {
       heartbeatAt: now,
       expiresAt: new Date(now.getTime() + input.ttlMs),
-      metadata: input.metadata ?? undefined,
     },
   });
-
-  return { renewed: true as const, lease: renewed };
+  const lease = await schedulerLease.findUnique({ where: { name: input.name } });
+  return { renewed: renewed.count === 1, lease };
 }
 
-export async function releaseSchedulerLease(name: string, ownerId: string) {
-  const lease = await db.schedulerLease.findUnique({ where: { name } });
-  if (!lease || lease.ownerId !== ownerId) {
-    return false;
+export async function assertSchedulerWorkOwnership(
+  context: SchedulerWorkContext | undefined,
+  ttlMs = 30_000,
+) {
+  if (!context) return;
+  if (context.signal.aborted || !context.isLeaseCurrent()) {
+    throw context.signal.reason ?? new Error("Scheduler lease ownership was lost.");
   }
-  await db.schedulerLease.delete({ where: { name } });
-  return true;
+  const renewal = await renewSchedulerLease({
+    name: context.lease.name,
+    ownerId: context.lease.ownerId,
+    epoch: context.lease.epoch,
+    ttlMs,
+  });
+  if (!renewal.renewed || context.signal.aborted || !context.isLeaseCurrent()) {
+    throw context.signal.reason ?? new Error("Scheduler lease ownership was lost.");
+  }
+}
+
+export async function withSchedulerWorkOwnership<T>(
+  context: SchedulerWorkContext | undefined,
+  mutate: (tx: Prisma.TransactionClient) => Promise<T>,
+): Promise<T> {
+  await assertSchedulerWorkOwnership(context);
+  return db.$transaction(async (tx) => {
+    if (context) {
+      const lease = await (tx.schedulerLease as unknown as SchedulerLeaseDelegate).updateMany({
+        where: {
+          name: context.lease.name,
+          ownerId: context.lease.ownerId,
+          epoch: context.lease.epoch,
+          expiresAt: { gt: new Date() },
+        },
+        data: { heartbeatAt: new Date() },
+      });
+      if (lease.count !== 1) {
+        throw context.signal.reason ?? new Error("Scheduler lease ownership was lost.");
+      }
+    }
+    return mutate(tx);
+  });
+}
+
+export async function releaseSchedulerLease(input: SchedulerLeaseReleaseInput) {
+  const released = await schedulerLease.deleteMany({
+    where: { name: input.name, ownerId: input.ownerId, epoch: input.epoch },
+  });
+  return released.count === 1;
+}
+
+
+/**
+ * Persists a worker terminal outcome only while its owner/epoch lease remains live.
+ * Callers must treat false as an unknown outcome and never report the worker result.
+ */
+export async function completeSchedulerLeaseWork(input: SchedulerLeaseCompletionInput) {
+  const completedAt = input.now ?? new Date();
+  const completed = await schedulerLease.updateMany({
+    where: {
+      name: input.name,
+      ownerId: input.ownerId,
+      epoch: input.epoch,
+      expiresAt: { gt: completedAt },
+    },
+    data: {
+      metadata: {
+        worker: input.worker,
+        status: input.status,
+        error: input.error ?? null,
+        completedAt: completedAt.toISOString(),
+      } as Prisma.InputJsonValue,
+    },
+  });
+  return completed.count === 1;
 }

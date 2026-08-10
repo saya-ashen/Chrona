@@ -100,6 +100,7 @@ export function createExecutionContextSnapshot(input: {
   nodeLayerId: string;
   graphVersion: number;
   runtimeName: string;
+  identity: string;
   userInput?: string;
   inputFields?: CheckpointInputFields;
   now?: number;
@@ -107,7 +108,7 @@ export function createExecutionContextSnapshot(input: {
   const now = input.now ?? Date.now();
   const createdAt = new Date(now).toISOString();
   return {
-    id: `ctx_${input.graphId}_${input.nodeId}_${now}`,
+    id: `ctx_${input.graphId}_${input.nodeId}_${now}_${input.identity}`,
     graphId: input.graphId,
     nodeId: input.nodeId,
     nodeLayerId: input.nodeLayerId,

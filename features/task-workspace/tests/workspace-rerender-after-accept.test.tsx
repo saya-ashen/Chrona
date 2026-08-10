@@ -25,7 +25,7 @@ const mocks = vi.hoisted(() => ({
       generatedAt: "2026-06-13T00:00:00.000Z",
       updatedAt: "2026-06-13T00:00:00.000Z",
     },
-    generationSession: null,
+    generationSession: { generationId: "generation-1", taskId: "task-1", headStateVersion: 2, status: "completed" as const, phase: null, statusMessage: null, error: null, startedAt: "2026-06-10T00:00:00.000Z", finishedAt: "2026-06-10T00:00:00.000Z" },
   },
   commandCalls: [] as Array<{ taskId: string; body: Record<string, unknown> }>,
   currentExecution: {} as Record<string, unknown>,
@@ -121,7 +121,7 @@ beforeEach(() => {
       generatedAt: "2026-06-13T00:00:00.000Z",
       updatedAt: "2026-06-13T00:00:00.000Z",
     },
-    generationSession: null,
+    generationSession: { generationId: "generation-1", taskId: "task-1", headStateVersion: 2, status: "completed" as const, phase: null, statusMessage: null, error: null, startedAt: "2026-06-10T00:00:00.000Z", finishedAt: "2026-06-10T00:00:00.000Z" },
   };
 });
 

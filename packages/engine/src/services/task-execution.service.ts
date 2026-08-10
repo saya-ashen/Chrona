@@ -1,4 +1,5 @@
 import { ENGINE_ERROR_CODES, engineErrorFromUnknown } from "../errors";
+import { resolveProviderApproval } from "../modules/plan-execution/use-cases/resolve-provider-approval";
 import { taskPlanExecution } from "../modules/plan-execution";
 
 export function createTaskExecutionService() {
@@ -42,5 +43,7 @@ export function createTaskExecutionService() {
         throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.INVALID_TASK_STATE, "Failed to sync execution runtime result");
       }
     },
+
+    resolveProviderApproval,
   };
 }

@@ -1,12 +1,15 @@
 import { createHash } from "node:crypto";
 import { spawn } from "node:child_process";
+import { existsSync, readdirSync } from "node:fs";
 import { mkdir, writeFile } from "node:fs/promises";
+import { homedir } from "node:os";
 import path from "node:path";
 import { getChronaGeneratedFilesDir } from "@chrona/shared/data-paths";
 
 import { db, Prisma } from "@chrona/db";
 import {
   CATALOG_VERSION,
+  chronaResultCatalog,
   validateChronaSpec,
   type UiDocument,
 } from "@chrona/ui-protocol";
@@ -15,6 +18,8 @@ import {
   STRUCTURED_RESULT_SCHEMA_VERSION,
   isStructuredResultAssetContent,
   type CreateAssetModificationTaskRequest,
+  type CreateAssetUseTaskRequest,
+  type CreateGoalAssetReviewRequest,
   type CreateGoalAssetJobRequest,
   type CreateGoalFormSubmissionRequest,
   type ResolveGoalInboxCandidateRequest,
@@ -26,6 +31,7 @@ import {
 import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
 import { createTask } from "../tasks/create-task";
 import { getAcceptedResultContext } from "../tasks/accepted-result-context";
+import { goalAssetRef } from "./goal-task-context";
 import { requestResultFileAccess, resolveGeneratedFileReference } from "../tasks/result-file-access";
 import { goalAssetContentToMarkdown } from "./goal-asset-export";
 
@@ -36,6 +42,26 @@ function hash(value: unknown) {
 function record(value: unknown): Record<string, unknown> | null {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
 }
+function boundedDescription(value: unknown) {
+  return typeof value === "string" && value.trim()
+    ? value.trim().slice(0, 400)
+    : null;
+}
+
+function artifactDescription(metadata: unknown) {
+  const value = record(metadata);
+  return boundedDescription(value?.description ?? value?.summary);
+}
+
+function candidateDescription(candidate: {
+  changeSummary: string;
+  content: unknown;
+  sourceArtifact: { metadata: unknown } | null;
+}) {
+  return artifactDescription(candidate.sourceArtifact?.metadata)
+    ?? boundedDescription(record(candidate.content)?.summary)
+    ?? boundedDescription(candidate.changeSummary);
+}
 
 function declaredAssetKind(value: unknown) {
   const kinds: Record<string, true> = {
@@ -43,44 +69,27 @@ function declaredAssetKind(value: unknown) {
     form: true,
     page: true,
     file: true,
+    data_table: true,
     structured_result: true,
   };
   return typeof value === "string" && value in kinds
-    ? value as "document" | "form" | "page" | "file" | "structured_result"
+    ? value as "document" | "form" | "page" | "file" | "data_table" | "structured_result"
     : null;
 }
 
+// Artifact classification intentionally keeps precedence across declared kind, MIME, extension, and artifact type explicit.
+// eslint-disable-next-line complexity
 function artifactKind(artifact: { type: string; uri: string; metadata: unknown }) {
   const metadata = record(artifact.metadata);
   const declared = declaredAssetKind(metadata?.assetKind);
   if (declared) return declared;
   const extension = artifact.uri.toLowerCase().split(".").at(-1);
+  const mimeType = typeof metadata?.mimeType === "string" ? metadata.mimeType.toLowerCase() : "";
+  if (extension === "csv" || mimeType === "text/csv") return "data_table" as const;
   if (artifact.type === "report" || extension === "md" || extension === "txt") return "document" as const;
   if (extension === "html" || extension === "htm") return "page" as const;
   return metadata?.formSchema ? "form" as const : "file" as const;
 }
-const STRUCTURED_RESULT_COMPONENTS: Readonly<Record<string, true>> = {
-  Stack: true,
-  Card: true,
-  Heading: true,
-  Text: true,
-  RichMarkdown: true,
-  Alert: true,
-  Badge: true,
-  ResultSummary: true,
-  Table: true,
-  JsonView: true,
-  FileRef: true,
-  ResultHero: true,
-  ResultDeliverable: true,
-  ResultInsight: true,
-  ResultActionPlan: true,
-  ResultCaveats: true,
-  ResultEvidence: true,
-  FileView: true,
-  Separator: true,
-  CollapsibleBlock: true,
-};
 
 function stripHostActions(spec: UiDocument): UiDocument {
   return {
@@ -88,7 +97,7 @@ function stripHostActions(spec: UiDocument): UiDocument {
     elements: Object.fromEntries(
       Object.entries(spec.elements).map(([key, element]) => {
         const { on: _on, ...readOnlyElement } = element as typeof element & { on?: unknown };
-        if (!(readOnlyElement.type in STRUCTURED_RESULT_COMPONENTS)) {
+        if (!(readOnlyElement.type in chronaResultCatalog.data.components)) {
           throw new EngineError(ENGINE_ERROR_CODES.VALIDATION_FAILED, `Structured result component is not allowed in Goal Workbench: ${readOnlyElement.type}`);
         }
         const props = record(readOnlyElement.props);
@@ -299,21 +308,55 @@ async function assetOrThrow(goalId: string, assetId: string, workspaceId?: strin
       currentArtifact: true,
       submissions: { orderBy: { createdAt: "desc" }, take: 20 },
       jobs: { orderBy: { createdAt: "desc" }, take: 20 },
+      reviews: { orderBy: { verifiedAt: "desc" }, take: 50 },
     },
   });
   if (!asset) throw new EngineError(ENGINE_ERROR_CODES.TASK_NOT_FOUND, "Goal asset not found");
   return asset;
 }
 
+async function assetUsageHistory(asset: Awaited<ReturnType<typeof assetOrThrow>>) {
+  const ref = `GA${createHash("sha256").update(asset.id).digest("hex").slice(0, 12).toUpperCase()}`;
+  const invocations = await db.toolInvocation.findMany({
+    where: {
+      toolName: "chrona.goal.results.read",
+      status: "accepted",
+      task: { goalId: asset.goalId, workspaceId: asset.workspaceId },
+    },
+    select: {
+      inputPayload: true,
+      completedAt: true,
+      task: { select: { title: true, goalContext: true } },
+    },
+    orderBy: { completedAt: "desc" },
+    take: 200,
+  });
+  return invocations.flatMap((invocation) => {
+    const input = record(invocation.inputPayload);
+    if (input?.ref !== ref || !invocation.task || !invocation.completedAt) return [];
+    const snapshot = record(invocation.task.goalContext);
+    const assets = Array.isArray(snapshot?.assets) ? snapshot.assets : [];
+    const frozen = assets.map(record).find((candidate) => candidate?.ref === ref);
+    if (typeof frozen?.version !== "number") return [];
+    return [{
+      taskTitle: invocation.task.title,
+      version: frozen.version,
+      completedAt: invocation.completedAt.toISOString(),
+    }];
+  }).slice(0, 20);
+}
+
 async function assetReadModel(asset: Awaited<ReturnType<typeof assetOrThrow>>) {
   return {
     ...asset,
+    usageHistory: await assetUsageHistory(asset),
     linkedAssets: await linkedAssetsForStructuredResult(asset),
     archivedAt: asset.archivedAt?.toISOString() ?? null,
     lastOpenedAt: asset.lastOpenedAt?.toISOString() ?? null,
     createdAt: asset.createdAt.toISOString(),
     updatedAt: asset.updatedAt.toISOString(),
     versions: asset.versions.map((version) => ({ ...version, createdAt: version.createdAt.toISOString() })),
+    reviews: asset.reviews.map((review) => ({ ...review, verifiedAt: review.verifiedAt.toISOString(), nextReviewAt: review.nextReviewAt?.toISOString() ?? null, createdAt: review.createdAt.toISOString() })),
     drafts: asset.drafts.map((draft) => ({ ...draft, createdAt: draft.createdAt.toISOString(), updatedAt: draft.updatedAt.toISOString() })),
     submissions: asset.submissions.map((item) => ({ ...item, createdAt: item.createdAt.toISOString() })),
     jobs: asset.jobs.map((item) => ({ ...item, createdAt: item.createdAt.toISOString(), updatedAt: item.updatedAt.toISOString() })),
@@ -350,7 +393,7 @@ export async function listGoalAssets(input: {
   goalId: string;
   workspaceId: string;
   query?: string;
-  kind?: "document" | "form" | "page" | "file" | "structured_result";
+  kind?: "document" | "form" | "page" | "file" | "data_table" | "structured_result";
   sourceTaskId?: string;
   state: "active" | "draft" | "running" | "failed" | "archived";
   sort: "updated_desc" | "updated_asc" | "name_asc";
@@ -376,6 +419,7 @@ export async function listGoalAssets(input: {
       drafts: { where: { status: { in: ["Active", "Conflict"] } }, orderBy: { updatedAt: "desc" } },
       jobs: { orderBy: { createdAt: "desc" }, take: 5 },
       submissions: { orderBy: { createdAt: "desc" }, take: 5 },
+      reviews: { orderBy: { verifiedAt: "desc" }, take: 50 },
     },
   });
   for (const asset of assets) if (asset.versions.length === 0) await ensureAssetVersion(asset.id);
@@ -400,9 +444,22 @@ export async function getGoalAsset(input: { goalId: string; assetId: string }) {
   return assetReadModel(await assetOrThrow(input.goalId, input.assetId));
 }
 
-export async function renameGoalAsset(input: { goalId: string; assetId: string; label: string }) {
+export async function renameGoalAsset(input: {
+  goalId: string;
+  assetId: string;
+  label: string;
+  description?: string | null;
+}) {
   await assetOrThrow(input.goalId, input.assetId);
-  await db.goalAsset.update({ where: { id: input.assetId }, data: { label: input.label } });
+  await db.goalAsset.update({
+    where: { id: input.assetId },
+    data: {
+      label: input.label,
+      ...(input.description !== undefined
+        ? { description: input.description || null }
+        : {}),
+    },
+  });
   return getGoalAsset(input);
 }
 
@@ -440,6 +497,13 @@ export async function submitGoalAssetDraft(input: { goalId: string; assetId: str
     await tx.goalAsset.update({ where: { id: asset.id }, data: { status: "Approved" } });
     return version;
   });
+}
+
+export async function discardGoalAssetDraft(input: { goalId: string; assetId: string; workspaceId: string; draftId: string }) {
+  const asset = await assetOrThrow(input.goalId, input.assetId, input.workspaceId);
+  const draft = await db.goalAssetDraft.findFirst({ where: { id: input.draftId, assetId: asset.id, status: "Active" } });
+  if (!draft) throw new EngineError(ENGINE_ERROR_CODES.VALIDATION_FAILED, "Active draft not found");
+  return db.goalAssetDraft.update({ where: { id: draft.id }, data: { status: "Discarded" } });
 }
 
 export async function restoreGoalAssetVersion(input: { goalId: string; assetId: string; versionId: string; workspaceId: string; changeSummary: string }) {
@@ -616,7 +680,42 @@ export async function listGoalInbox(input: { goalId: string }) {
       },
     },
   });
-  return { candidates: candidates.map((candidate) => ({ ...candidate, createdAt: candidate.createdAt.toISOString(), updatedAt: candidate.updatedAt.toISOString() })) };
+  return {
+    candidates: candidates.map((candidate) => ({
+      id: candidate.id,
+      sourceTaskId: candidate.sourceTaskId,
+      sourceRunId: candidate.sourceRunId,
+      kind: candidate.kind,
+      label: candidate.label,
+      proposedAction: candidate.proposedAction,
+      proposedTargetAssetId: candidate.proposedTargetAssetId,
+      content: candidate.content,
+      reason: candidate.reason,
+      changeSummary: candidate.changeSummary,
+      confidence: candidate.confidence,
+      sourceArtifact: candidate.sourceArtifact
+        ? {
+            id: candidate.sourceArtifact.id,
+            title: candidate.sourceArtifact.title,
+            uri: candidate.sourceArtifact.uri,
+            contentPreview: candidate.sourceArtifact.contentPreview,
+          }
+        : null,
+      sourceTask: { title: candidate.sourceTask.title },
+      proposedTargetAsset: candidate.proposedTargetAsset
+        ? { id: candidate.proposedTargetAsset.id, label: candidate.proposedTargetAsset.label }
+        : null,
+      ownershipProposals: candidate.ownershipProposals.map((proposal) => ({
+        id: proposal.id,
+        status: proposal.status,
+        sourceTaskId: proposal.sourceTaskId,
+        sourceRunId: proposal.sourceRunId,
+        result: proposal.result,
+        sourceTask: proposal.sourceTask,
+        targetAsset: proposal.targetAsset,
+      })),
+    })),
+  };
 }
 
 async function createLinkedFileAssets(
@@ -667,6 +766,7 @@ async function createLinkedFileAssets(
         role: "working_document",
         status: "Approved",
         label: artifact.title,
+        description: artifactDescription(artifact.metadata),
       },
     });
     const metadata = record(artifact.metadata);
@@ -745,7 +845,7 @@ export async function resolveGoalInboxCandidate(input: { goalId: string; candida
         }
         assetId = existing.id;
       } else {
-        const asset = await tx.goalAsset.create({ data: { workspaceId: candidate.workspaceId, goalId: candidate.goalId, sourceArtifactId, currentArtifactId: sourceArtifactId, kind: candidate.kind, role: "working_document", status: "Approved", label: command.label } });
+        const asset = await tx.goalAsset.create({ data: { workspaceId: candidate.workspaceId, goalId: candidate.goalId, sourceArtifactId, currentArtifactId: sourceArtifactId, kind: candidate.kind, role: "working_document", status: "Approved", label: command.label, description: candidateDescription(candidate) } });
         assetId = asset.id;
         await tx.goalAssetVersion.create({ data: { workspaceId: candidate.workspaceId, goalId: candidate.goalId, assetId: asset.id, artifactId: sourceArtifactId, version: 1, source: "inbox", content: candidate.content as Prisma.InputJsonValue, contentHash: candidate.contentHash, mimeType: candidate.kind === "structured_result" ? "application/vnd.chrona.structured-result+json" : record(candidate.sourceArtifact?.metadata)?.mimeType as string | undefined, originalFilename: record(candidate.sourceArtifact?.metadata)?.filename as string | undefined, sourceTaskId: candidate.sourceTaskId, sourceRunId: candidate.sourceRunId, sourceResultId: candidate.sourceRunId, selector: candidate.selector as Prisma.InputJsonValue, authorType: "user", authorId: "server-action", changeSummary: candidate.changeSummary } });
       }
@@ -829,11 +929,26 @@ function pdfHtml(title: string, markdown: string) {
 }
 
 function chromiumExecutable() {
-  return (
-    process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ??
-    process.env.CHROMIUM_PATH ??
-    "chromium"
-  );
+  const explicit = process.env.PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH ?? process.env.CHROMIUM_PATH;
+  if (explicit) return explicit;
+
+  const browserRoots = [
+    process.env.PLAYWRIGHT_BROWSERS_PATH,
+    path.join(homedir(), ".cache", "ms-playwright"),
+  ].filter((root): root is string => Boolean(root));
+  for (const browserRoot of browserRoots) {
+    if (!existsSync(browserRoot)) continue;
+    const releases = readdirSync(browserRoot, { withFileTypes: true })
+      .filter((entry) => entry.isDirectory() && /^chromium-\d+$/.test(entry.name))
+      .sort((left, right) => right.name.localeCompare(left.name, undefined, { numeric: true }));
+    for (const release of releases) {
+      for (const relativePath of ["chrome-linux64/chrome", "chrome-linux/chrome"]) {
+        const candidate = path.join(browserRoot, release.name, relativePath);
+        if (existsSync(candidate)) return candidate;
+      }
+    }
+  }
+  return "chromium";
 }
 
 async function writePdf(outputPath: string, title: string, content: string) {
@@ -918,6 +1033,29 @@ export async function openGoalStructuredArtifact(input: { goalId: string; assetI
 }
 
 
+export async function createGoalAssetReview(input: { goalId: string; assetId: string; command: CreateGoalAssetReviewRequest }) {
+  const asset = await assetOrThrow(input.goalId, input.assetId, input.command.workspaceId);
+  const version = await db.goalAssetVersion.findFirst({ where: { id: input.command.versionId, assetId: asset.id } });
+  if (!version) throw new EngineError(ENGINE_ERROR_CODES.VALIDATION_FAILED, "Asset version not found");
+  const verifiedAt = new Date(input.command.verifiedAt);
+  const nextReviewAt = input.command.nextReviewAt ? new Date(input.command.nextReviewAt) : null;
+  if (Number.isNaN(verifiedAt.getTime()) || (nextReviewAt && Number.isNaN(nextReviewAt.getTime()))) {
+    throw new EngineError(ENGINE_ERROR_CODES.VALIDATION_FAILED, "Review dates are invalid");
+  }
+  if (nextReviewAt && nextReviewAt <= verifiedAt) {
+    throw new EngineError(ENGINE_ERROR_CODES.VALIDATION_FAILED, "Next review must be after verification");
+  }
+  return db.goalAssetReview.create({ data: { workspaceId: asset.workspaceId, goalId: asset.goalId, assetId: asset.id, versionId: version.id, verifiedAt, nextReviewAt, summary: input.command.summary || null, authorType: "user" } });
+}
+
+export async function createAssetUseTask(input: { goalId: string; assetId: string; command: CreateAssetUseTaskRequest }) {
+  const asset = await assetOrThrow(input.goalId, input.assetId, input.command.workspaceId);
+  const version = await db.goalAssetVersion.findFirst({ where: { id: input.command.versionId, assetId: asset.id } });
+  if (!version) throw new EngineError(ENGINE_ERROR_CODES.VALIDATION_FAILED, "Asset version not found");
+  const description = `${input.command.instruction.trim()}\n\nUse the Goal asset “${asset.label}” (${goalAssetRef(asset.id)}) at captured version v${version.version}. Read it with chrona_goal_results_read when its full content is needed; do not assume the asset body is embedded in this Task description.`;
+  return createTask({ workspaceId: asset.workspaceId, goalId: asset.goalId, title: input.command.title, description, priority: "Medium", autoPlanGeneration: false, autoExecute: false, goalContext: { expectedOutcome: input.command.expectedOutcome } });
+}
+
 export async function createAssetModificationTask(input: { goalId: string; assetId: string; command: CreateAssetModificationTaskRequest }) {
   const asset = await assetOrThrow(input.goalId, input.assetId, input.command.workspaceId);
   const version = await db.goalAssetVersion.findFirst({ where: { id: input.command.versionId, assetId: asset.id } });
@@ -926,12 +1064,11 @@ export async function createAssetModificationTask(input: { goalId: string; asset
     workspaceId: asset.workspaceId,
     goalId: asset.goalId,
     title: `Modify ${asset.label}`,
-    description: input.command.instruction,
+    description: `${input.command.instruction.trim()}\n\nModify the Goal asset “${asset.label}” (${goalAssetRef(asset.id)}) at captured version v${version.version}. Read it with chrona_goal_results_read when its full content is needed. Produce the proposed replacement through the Goal Inbox; do not assume the asset body is embedded in this Task description.`,
     priority: "Medium",
     autoPlanGeneration: false,
     autoExecute: false,
     goalContext: {
-      asset: { label: asset.label, version: version.version, contentHash: version.contentHash },
       expectedOutcome: input.command.expectedOutcome,
     },
   });

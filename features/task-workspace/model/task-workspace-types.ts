@@ -1,8 +1,24 @@
-import type { TaskConfigAiClient, TaskConfigExecutionRuntime } from "@features/schedule";
-import type { PlanNodeDataModel, TaskPlanGraphPlan } from "./plan-node-view-model";
-import type { TaskPlanReadModel, TaskWorkspaceUpdateProposal } from "@chrona/contracts"
-import type { GraphNodeState, ReconciliationResult, TaskExecutionSummary } from "@chrona/contracts";
+import type {
+  AiClientRecord,
+  GraphNodeState,
+  PublicProviderDescriptor,
+  ReconciliationResult,
+  TaskExecutionSummary,
+  TaskPlanReadModel,
+  TaskWorkspaceUpdateProposal,
+} from "@chrona/contracts";
+import type { RuntimeTaskConfigSpec } from "@chrona/runtime-core";
 import type { UiDocument } from "@chrona/ui-protocol";
+import type { PlanNodeDataModel, TaskPlanGraphPlan } from "./plan-node-view-model";
+
+export type TaskConfigExecutionRuntime = {
+  key: string;
+  label: string;
+  spec: RuntimeTaskConfigSpec;
+};
+
+export type TaskConfigAiClient = Pick<AiClientRecord, "id" | "name" | "enabled">;
+
 
 export type TaskPlanGenerationStatus = "idle" | "generating" | "waiting_acceptance" | "accepted";
 
@@ -11,6 +27,18 @@ export type TaskData = {
   workspaceId: string;
   goalId?: string | null;
   goal?: { id: string; title: string } | null;
+  goalKnowledge?: {
+    captured: Array<{
+      ref: string;
+      title: string;
+      version: number;
+    }>;
+    read: Array<{
+      ref: string;
+      title: string;
+      version: number;
+    }>;
+  };
   title: string;
   description: string | null;
   executionRuntime: string;
@@ -238,8 +266,6 @@ export type WorkspaceArtifactItem = {
 };
 
 export type WorkspaceActivityKind =
-  | "assistant_message"
-  | "reasoning"
   | "tool_started"
   | "tool_progress"
   | "tool_completed"
@@ -248,27 +274,15 @@ export type WorkspaceActivityKind =
   | "node"
   | "task"
   | "artifact"
-  | "schedule"
-  | "raw";
+  | "schedule";
 
 export type WorkspaceActivityTone = "neutral" | "info" | "success" | "warning" | "danger";
 
 export type WorkspaceToolActivity = {
   name?: string;
   label?: string;
-  callId?: string;
-  resultPreview?: string;
-  preview?: string;
-  inputSummary?: string;
   durationMs?: number;
-  error?: string;
   state: "started" | "progress" | "completed" | "failed";
-};
-
-export type WorkspaceAssistantActivity = {
-  text: string;
-  isReasoning: boolean;
-  isPartial?: boolean;
 };
 
 export type WorkspaceActivityGroup = {
@@ -286,19 +300,17 @@ export type WorkspaceActivityItem = {
   timestamp?: string | null;
   sourceNodeId?: string;
   sourceNodeTitle?: string;
-  provider?: string;
-  runtimeName?: string;
-  runId?: string;
-  nativeRunId?: string;
+  provider?: PublicProviderDescriptor;
+  runtime?: PublicProviderDescriptor;
+  executionScope?: string;
   sequence?: number;
-  rawEventType?: string;
-  executionSessionId?: string;
-  executionEpoch?: number;
   executionTrigger?: "initial" | "restart";
   activityGroup?: WorkspaceActivityGroup;
   tool?: WorkspaceToolActivity;
-  assistant?: WorkspaceAssistantActivity;
-  raw?: unknown;
+  /** Exact provider payloads surfaced in the live execution trace. */
+  providerInput?: unknown;
+  providerOutput?: unknown;
+  providerRaw?: unknown;
 };
 
 export type WorkspaceActivityPage = {

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { PlanNodeDataModel, TaskPlanGraphPlan } from "../model/plan-node-view-model";
+import type { WorkspaceActivityItem } from "../model/task-workspace-types";
 import {
   buildProgressSummary,
   createTaskWorkspaceExecutionConsoleView,
@@ -221,7 +222,7 @@ describe("task workspace execution console view model", () => {
     expect(view.readiness).toMatchObject({ title: "Current work", statusLabel: "Running", tone: "info", actionNodeId: "active" });
     expect(view.latestResult).toMatchObject({ title: "Latest run" });
     expect(view.artifacts).toContainEqual(expect.objectContaining({ id: "artifact-1" }));
-    expect(view.activity.some((item) => item.id === "run-run-1")).toBe(false);
+    expect(view.activity.some((item: WorkspaceActivityItem) => item.id === "run-run-1")).toBe(false);
   });
 
   it("uses execution display status for latest run card copy", () => {
@@ -266,7 +267,7 @@ describe("task workspace execution console view model", () => {
     });
 
     expect(view.activity[0]).toMatchObject({ id: "provider-event-1", title: "Tool started", sourceNodeId: "active", sourceNodeTitle: "Active node" });
-    expect(view.activity.some((item) => item.id === "run-run-1")).toBe(false);
+    expect(view.activity.some((item: WorkspaceActivityItem) => item.id === "run-run-1")).toBe(false);
   });
 
   it("surfaces pending schedule proposals as readiness and activity", () => {
@@ -291,7 +292,7 @@ describe("task workspace execution console view model", () => {
       title: "Ready to schedule",
       tone: "warning",
     });
-    expect(view.activity.some((item) => item.id === "schedule-proposal-proposal-1")).toBe(false);
+    expect(view.activity.some((item: WorkspaceActivityItem) => item.id === "schedule-proposal-proposal-1")).toBe(false);
   });
 
   it("surfaces blocked task or waiting node as attention", () => {
@@ -408,9 +409,9 @@ describe("task workspace execution console view model", () => {
     });
     expect(view.nodeDetail.currentNode?.id).toBe("input");
     expect(view.artifacts).toContainEqual(expect.objectContaining({ id: "artifact-1", title: "Release notes" }));
-    expect(view.activity.some((item) => item.id === "approval-approval-1")).toBe(false);
-    expect(view.activity.some((item) => item.id === "artifact-artifact-1")).toBe(false);
-    expect(view.activity.some((item) => item.id === "node-input")).toBe(false);
+    expect(view.activity.some((item: WorkspaceActivityItem) => item.id === "approval-approval-1")).toBe(false);
+    expect(view.activity.some((item: WorkspaceActivityItem) => item.id === "artifact-artifact-1")).toBe(false);
+    expect(view.activity.some((item: WorkspaceActivityItem) => item.id === "node-input")).toBe(false);
   });
 
   it("uses orchestrator execution summary for primary workspace state", () => {
@@ -487,7 +488,7 @@ describe("task workspace execution console view model", () => {
       ], "failed-node"),
     });
 
-    const targetNode = view.graphPlan?.nodes.find((item) => item.id === "failed-node");
+    const targetNode = view.graphPlan?.nodes.find((item: PlanNodeDataModel) => item.id === "failed-node");
     expect(targetNode?.availableActions?.[0]).toMatchObject({
       id: "task-primary:retry_sync:failed-node",
       label: "Retry Run",

@@ -6,6 +6,7 @@ import {
   makeTwoTaskPlan,
   seedAcceptedCompiledPlan,
   seedWorkspaceAndTask,
+  seedRuntimeSyncIdentity,
   setupPlanRunnerTaskExecutorTest,
   taskPlanExecution,
 } from "../plan-runner.task-executor.fixtures";
@@ -26,10 +27,12 @@ describe("stop and pause regressions", () => {
     await seedAcceptedCompiledPlan(workspace.id, task.id, compiledPlan);
 
     await taskPlanExecution.dispatch({ taskId: task.id, action: { action: "start_manual" } });
-    await taskPlanExecution.dispatch({ taskId: task.id, action: { action: "pause_session", reason: "User pause" } });
+    const identity = await seedRuntimeSyncIdentity(task.id, "runtime-first-task");
+    await taskPlanExecution.dispatch({ taskId: task.id, commandContext: { sessionId: identity.executionSessionId }, action: { action: "pause_session", reason: "User pause" } });
     await taskPlanExecution.syncRuntimeResult({
       taskId: task.id,
       runtimeRunRef: "runtime-first-task",
+      ...identity,
       status: "Completed",
       summary: "Late completion",
     });
@@ -52,10 +55,12 @@ describe("stop and pause regressions", () => {
     await seedAcceptedCompiledPlan(workspace.id, task.id, compiledPlan);
 
     await taskPlanExecution.dispatch({ taskId: task.id, action: { action: "start_manual" } });
-    await taskPlanExecution.dispatch({ taskId: task.id, action: { action: "cancel_session", reason: "User stop" } });
+    const identity = await seedRuntimeSyncIdentity(task.id, "runtime-first-task");
+    await taskPlanExecution.dispatch({ taskId: task.id, commandContext: { sessionId: identity.executionSessionId }, action: { action: "cancel_session", reason: "User stop" } });
     await taskPlanExecution.syncRuntimeResult({
       taskId: task.id,
       runtimeRunRef: "runtime-first-task",
+      ...identity,
       status: "Completed",
       summary: "Late completion",
     });

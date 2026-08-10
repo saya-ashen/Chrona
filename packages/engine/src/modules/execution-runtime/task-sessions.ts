@@ -1,4 +1,5 @@
 import { RunStatus } from "@/generated/prisma/client";
+import type { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 
 type EnsureDefaultTaskSessionInput = {
@@ -175,14 +176,16 @@ export async function ensureDefaultTaskSession(
 
 export async function ensureWorkBlockTaskSession(
   input: EnsureWorkBlockTaskSessionInput,
+  tx?: Prisma.TransactionClient,
 ) {
+  const client = tx ?? db;
   const expectedSessionKey = buildWorkBlockTaskSessionKey({
     taskId: input.taskId,
     workBlockId: input.workBlockId,
   });
 
   if (input.sessionId) {
-    const existingSession = await db.taskSession.findUnique({
+    const existingSession = await client.taskSession.findUnique({
       where: { id: input.sessionId },
     });
     if (existingSession?.sessionKey === expectedSessionKey) {
@@ -190,7 +193,7 @@ export async function ensureWorkBlockTaskSession(
     }
   }
 
-  const existingSession = await db.taskSession.findFirst({
+  const existingSession = await client.taskSession.findFirst({
     where: {
       taskId: input.taskId,
       sessionKey: expectedSessionKey,
@@ -199,14 +202,14 @@ export async function ensureWorkBlockTaskSession(
   });
 
   if (existingSession) {
-    await db.workBlock.update({
+    await client.workBlock.update({
       where: { id: input.workBlockId },
       data: { sessionId: existingSession.id },
     });
     return existingSession;
   }
 
-  const createdSession = await db.taskSession.create({
+  const createdSession = await client.taskSession.create({
     data: {
       taskId: input.taskId,
       runtimeName: input.runtimeName,
@@ -218,7 +221,7 @@ export async function ensureWorkBlockTaskSession(
     },
   });
 
-  await db.workBlock.update({
+  await client.workBlock.update({
     where: { id: input.workBlockId },
     data: { sessionId: createdSession.id },
   });
@@ -379,6 +382,28 @@ export async function updateTaskSessionStateFromRun(input: {
       ...(input.runtimeRunRef !== undefined
         ? { lastRunRef: input.runtimeRunRef }
         : {}),
+    },
+  });
+}
+
+export async function updateTaskSessionStateFromRunInTransaction(
+  input: {
+    taskSessionId?: string | null;
+    runId: string;
+    runStatus: RunStatus;
+    runtimeRunRef?: string | null;
+  },
+  tx: Prisma.TransactionClient,
+) {
+  if (!input.taskSessionId) return;
+  const status = toTaskSessionStatus(input.runStatus);
+  await tx.taskSession.update({
+    where: { id: input.taskSessionId },
+    data: {
+      status,
+      lastRunStatus: input.runStatus,
+      activeRunId: status === "idle" ? null : input.runId,
+      ...(input.runtimeRunRef !== undefined ? { lastRunRef: input.runtimeRunRef } : {}),
     },
   });
 }

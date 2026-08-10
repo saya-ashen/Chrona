@@ -3,10 +3,13 @@
 ## Unreleased
 
 ### Fixed
+- Kept OMP provider stream identities stable after SDK session persistence, while storing the native session reference separately for cross-process resume.
+- Pinned each Task to its first resolved execution model, reused that model for retries and later nodes, honored explicit user model changes, and rejected OMP cross-provider model drift instead of silently falling back.
 - Aligned result-finalizer provider schemas with Chrona's strict per-component contracts, surfaced finalization failures with retry controls, prevented acceptance of failed finalizations, and removed duplicate artifact fallback lists.
 - Compacted finalized-result readiness into the primary summary flow and corrected light-theme warning text contrast across result caveats and warning surfaces.
 - Moved finalized-result content previews into a bounded Workbench-style Sheet dialog, promoted the key strategy into a single editorial feature surface, and reduced evidence/source boundaries to a compact collapsible footnote.
 - Deduplicated finalized deliverables from their underlying run Artifact rows, while preserving complete Artifact fallback on finalization failure and collapsing only unreferenced extras as secondary generated files.
+- Unified CSV and structured data-table preview and Draft editing in Univer with the documented read-only configuration for previews, a single header edit/preview toggle, a full-height Workbench canvas without duplicate source-download actions, full spreadsheet controls in edit mode, stable Chrona row/column identity, and quoted-field-safe CSV serialization; rebuilt Markdown preview, CodeMirror source editing, optional MDXEditor rich/diff editing, and immutable structured-result reports on consistent full-height internally scrolling canvases, while retaining Markdown as the authoritative stored content and immutable version publishing.
 
 ## 0.1.9 — Alpha public-readiness polish
 

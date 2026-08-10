@@ -14,3 +14,10 @@ export function requireWorkspaceId(input: ChronaToolOperation["input"]) {
   }
   return input.workspaceId;
 }
+
+export function requireIdempotencyKey(input: ChronaToolOperation["input"]) {
+  if (!input.idempotencyKey) {
+    throw new EngineError(ENGINE_ERROR_CODES.VALIDATION_FAILED, "idempotencyKey is required");
+  }
+  return input.idempotencyKey;
+}

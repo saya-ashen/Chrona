@@ -2,8 +2,8 @@
  * Internal types for the Claude Code provider. Public surface lives in
  * `index.ts`; the engine imports only from `index.ts` / contracts.
  *
- * No Chrona task / plan / schedule semantics here — this is the protocol
- * adaptation layer (milestone §5 rule 3).
+ * No domain task, plan, or schedule semantics live here — this is the
+ * protocol adaptation layer.
  */
 
 
@@ -13,13 +13,9 @@ export interface ClaudeCodeProviderConfig {
   model?: string;
   /** Total run timeout (ms). Overall wall-clock bound on the SDK run. */
   timeoutMs?: number;
-  /** Chrona /api/mcp base URL. Defaults to the hosting server. */
+  /** Endpoint configuration retained for backward-compatible construction. */
   mcpBaseUrl: string;
-  /**
-   * Static Bearer token presented to the MCP server at `/api/mcp`. MUST
-   * equal the server's `API_KEY` (or be supplied via the
-   * `CHRONA_API_KEY` / `CHRONA_MCP_BEARER_TOKEN` env vars).
-   */
+  /** Endpoint credential retained for backward-compatible construction. */
   mcpRunToken: string;
   apiKey?: string;
   /** Pass-through env for the Claude Code subprocess / SDK call. */
@@ -33,7 +29,7 @@ export interface ClaudeCodeProviderConfig {
   /** Resolved at construction: which runner back-end to use. */
   mode?: ClaudeCodeRunnerMode;
 
-  /** Advanced SDK option overrides for isolated tests / embedders. Core Chrona transport options still win. */
+  /** Advanced SDK option overrides for isolated tests / embedders. Core transport options still win. */
   sdkOptions?: Partial<import("@anthropic-ai/claude-agent-sdk").Options>;
 }
 

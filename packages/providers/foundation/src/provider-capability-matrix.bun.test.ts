@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { providerCapabilityMatrix, summarizeProviderCapabilities } from "./provider-capability-matrix";
+import { supportsDurableFeatureRuntime } from "./ProviderClient";
 
 describe("providerCapabilityMatrix", () => {
   it("models Codex as session-history recovery instead of active run lookup", () => {
@@ -36,6 +37,7 @@ describe("providerCapabilityMatrix", () => {
       activeRunLookup: false,
       streamReconnect: false,
       mode: "session_history",
+      readOnlySingleAttempt: true,
     });
   });
 
@@ -62,5 +64,73 @@ describe("providerCapabilityMatrix", () => {
       activeRunLookup: false,
       streamReconnect: false,
     });
+  });
+
+  it("models the debug adapter as the only engine-managed operation bridge", () => {
+    const debug = providerCapabilityMatrix.find((entry) => entry.provider === "debug");
+    expect(debug?.execution).toMatchObject({
+      engineManagedToolResults: true,
+      externalControlPlaneActions: false,
+    });
+    expect(debug?.recovery).toMatchObject({
+      clientOperationLookup: true,
+      providerResumeRef: true,
+      runEventReplay: true,
+    });
+  });
+
+  it("summarizes invocation and operation recovery capabilities", () => {
+    expect(summarizeProviderCapabilities({
+      supportsSessions: true,
+      supportsStreaming: true,
+      supportsRunLookup: true,
+      supportsCancellation: true,
+      supportsToolCalls: true,
+      supportsPreviousResponse: false,
+      actionInvocation: "engine_managed",
+      startIdempotency: "client_operation_id",
+      lookupByClientOperationId: true,
+      recovery: {
+        sessionResume: true,
+        historyReplay: true,
+        activeRunLookup: true,
+        streamReconnect: true,
+        providerResumeRef: true,
+        runEventReplay: true,
+        mode: "authoritative_run_lookup",
+      },
+    })).toMatchObject({
+      clientOperationLookup: true,
+      providerResumeRef: true,
+      runEventReplay: true,
+      readOnlySingleAttempt: false,
+      engineManagedToolResults: true,
+      externalControlPlaneActions: false,
+    });
+  });
+
+  it("requires cross-process authoritative lookup, reconnect, and idempotent start for Feature Runtime", () => {
+    const durable = {
+      supportsSessions: true,
+      supportsStreaming: true,
+      supportsRunLookup: true,
+      supportsCancellation: true,
+      supportsToolCalls: true,
+      supportsPreviousResponse: false,
+      startIdempotency: "client_operation_id" as const,
+      recovery: {
+        sessionResume: true,
+        historyReplay: true,
+        activeRunLookup: true,
+        streamReconnect: true,
+        crossProcessDurable: true,
+        providerResumeRef: true,
+        runEventReplay: true,
+        mode: "authoritative_run_lookup" as const,
+      },
+    };
+    expect(supportsDurableFeatureRuntime(durable)).toBe(true);
+    expect(supportsDurableFeatureRuntime({ ...durable, recovery: { ...durable.recovery, crossProcessDurable: false, mode: "local_stream_only" } })).toBe(false);
+    expect(supportsDurableFeatureRuntime({ ...durable, startIdempotency: "unsupported" })).toBe(false);
   });
 });

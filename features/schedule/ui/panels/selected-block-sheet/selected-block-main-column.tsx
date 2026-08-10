@@ -12,10 +12,7 @@ import {
   type TaskConfigExecutionRuntime,
   type TaskConfigFormInput,
 } from "../../forms/task-config-form";
-import {
-  TaskAiPlanPanel,
-  TaskEditPanel,
-} from "@features/task-workspace";
+import { TaskAiPlanPanel, TaskEditPanel } from "@features/task-workspace/public/workspace-integration";
 import { Button, Tabs, TabsContent, TabsList, TabsTrigger } from "@shared/ui";
 import type { TaskPlanReadModel } from "@chrona/contracts"
 import type { SavedTaskPlan } from "./use-selected-block-plan-state";

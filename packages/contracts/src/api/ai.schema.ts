@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { AI_FEATURES } from "../ai-feature-types";
 
 const aiClientTypeSchema = z.string().trim().min(1, "type is required");
 
@@ -34,9 +35,11 @@ export const deleteAiClientParamSchema = z.object({ clientId: z.string().min(1) 
 
 // ── PUT /ai/clients/:clientId/bindings ──
 export const updateAiBindingsParamSchema = z.object({ clientId: z.string().min(1) });
-export const updateAiBindingsBodySchema = z.object({
-  features: z.array(z.string()),
-});
+export const updateAiBindingsBodySchema = z
+  .object({
+    features: z.array(z.enum(AI_FEATURES)),
+  })
+  .strict();
 
 // ── POST /ai/auto-complete ──
 export const autoCompleteBodySchema = z.object({

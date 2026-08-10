@@ -9,6 +9,7 @@ import type { CompiledPlan, ConditionConfig, TaskConfig } from "@chrona/contract
 import { resolveEffectivePlanGraph } from "@chrona/graph-runtime";
 import type { NodeExecutionResult } from "./node-executors/types";
 import { buildSemanticRefHistory } from "./runtime/node-runtime-refs";
+import { recoverRecordedTerminalActions } from "./use-cases/recover-recorded-terminal-actions";
 import {
   executeTaskNodeCapabilityMock,
   evaluateConditionNodeCapabilityMock,
@@ -36,6 +37,7 @@ describe("plan-runner task executor external results", () => {
         taskId: input.taskId,
         action: {
           action: "complete_manual_node",
+          expectedAttemptId: input.attempt.id,
           summary: "Hermes completed externally",
           output: {
             root: "root",
@@ -43,6 +45,10 @@ describe("plan-runner task executor external results", () => {
               root: { type: "JsonView", props: { value: { source: "hermes" } } },
             },
           },
+        },
+        commandContext: {
+          sessionId: activeSession.id,
+          idempotencyKey: "external-result-first",
         },
       });
       expect(submittedResult.status).toBe("completed");
@@ -95,10 +101,16 @@ describe("plan-runner task executor external results", () => {
     const projection = await db.taskProjection.findUniqueOrThrow({ where: { taskId: task.id } });
     expect(projection.persistedStatus).toBe(TaskStatus.Completed);
 
+    const taskSession = await db.taskSession.findFirstOrThrow({
+      where: { taskId: task.id },
+      orderBy: { createdAt: "desc" },
+    });
     const staleRunningRun = await db.run.create({
       data: {
         taskId: task.id,
-        taskSessionId: task.defaultSessionId,
+        taskSessionId: taskSession.id,
+        workBlockId: session.workBlockId,
+        occurrenceId: session.occurrenceId,
         runtimeName: "hermes",
         status: "Running",
         triggeredBy: "system",
@@ -145,9 +157,14 @@ describe("plan-runner task executor external results", () => {
         taskId: input.taskId,
         action: {
           action: "complete_manual_node",
+          expectedAttemptId: input.attempt.id,
           summary: "Task wrapped up",
           findings: [{ key: "final-finding", content: "Final semantic finding" }],
           decisions: [{ key: "publish", content: "Publish the result" }],
+        },
+        commandContext: {
+          sessionId: input.executionSessionId,
+          idempotencyKey: "semantic-result-first",
         },
       });
       expect(submittedResult.status).toBe("completed");
@@ -240,7 +257,7 @@ describe("plan-runner task executor external results", () => {
         triggeredBy: "system",
       },
     });
-    const scope = `runtime-artifact-test-${task.id}`;
+    const scope = run.id;
     const directory = join(getChronaGeneratedFilesDir(), scope);
     const path = join(directory, "report.md");
     await mkdir(directory, { recursive: true });
@@ -249,17 +266,20 @@ describe("plan-runner task executor external results", () => {
     const compiledPlan = makeSingleTaskPlan("graph_task_runtime_artifact_registration");
     await seedAcceptedCompiledPlan(workspace.id, task.id, compiledPlan);
 
-    executeTaskNodeCapabilityMock.mockImplementationOnce(async (input) => ({
-      status: "done",
-      summary: "Generated runtime report",
-      evidence: { sessionId: input.mainSession.id, runId: run.id },
-      deliverables: [{
-        deliverableKey: "runtime-report",
-        title: "Runtime report",
-        kind: "document",
-        source: { type: "generated_file", uri },
-      }],
-    } satisfies NodeExecutionResult));
+    executeTaskNodeCapabilityMock.mockImplementationOnce(async (input) => {
+      await db.run.update({ where: { id: run.id }, data: { taskSessionId: input.mainSession.id } });
+      return {
+        status: "done",
+        summary: "Generated runtime report",
+        evidence: { sessionId: input.mainSession.id, runId: run.id },
+        deliverables: [{
+          deliverableKey: "runtime-report",
+          title: "Runtime report",
+          kind: "document",
+          source: { type: "generated_file", uri },
+        }],
+      } satisfies NodeExecutionResult;
+    });
 
     try {
       const result = await taskPlanExecution.dispatch({
@@ -296,7 +316,7 @@ describe("plan-runner task executor external results", () => {
         triggeredBy: "system",
       },
     });
-    const scope = `artifact-test-${task.id}`;
+    const scope = run.id;
     const directory = join(getChronaGeneratedFilesDir(), scope);
     const path = join(directory, "report.md");
     await mkdir(directory, { recursive: true });
@@ -306,9 +326,16 @@ describe("plan-runner task executor external results", () => {
     await seedAcceptedCompiledPlan(workspace.id, task.id, compiledPlan);
 
     executeTaskNodeCapabilityMock.mockImplementationOnce(async (input) => {
+      await db.run.update({
+        where: { id: run.id },
+        data: {
+          taskSessionId: input.mainSession.id,
+          nodeAttemptId: input.attempt.id,
+        },
+      });
       const action = {
         action: "complete_manual_node" as const,
-        sessionId: input.mainSession.id,
+        expectedAttemptId: input.attempt.id,
         summary: "Generated report",
         deliverables: [{
           deliverableKey: "report",
@@ -317,10 +344,26 @@ describe("plan-runner task executor external results", () => {
           source: { type: "generated_file" as const, uri: uri as `generated://${string}` },
         }],
       };
-      await taskPlanExecution.submitNodeResult({ taskId: input.taskId, commandContext: { runId: run.id }, action });
+      await taskPlanExecution.submitNodeResult({
+        taskId: input.taskId,
+        commandContext: {
+          runId: run.id,
+          sessionId: input.executionSessionId,
+          idempotencyKey: "artifact-result-submit",
+        },
+        action,
+      });
       await taskPlanExecution.dispatch({
         taskId: input.taskId,
-        action: { action: "complete_manual_node", summary: "Done" },
+        action: {
+          action: "complete_manual_node",
+          expectedAttemptId: input.attempt.id,
+          summary: "Done",
+        },
+        commandContext: {
+          sessionId: input.executionSessionId,
+          idempotencyKey: "artifact-result-replay",
+        },
       });
       return {
         status: "started",
@@ -356,9 +399,13 @@ describe("plan-runner task executor external results", () => {
       .mockImplementationOnce(async (input) => {
         await taskPlanExecution.submitNodeResult({
           taskId: input.taskId,
+          commandContext: {
+            sessionId: input.executionSessionId,
+            idempotencyKey: "manifest-first-result",
+          },
           action: {
             action: "complete_manual_node",
-            sessionId: input.mainSession.id,
+            expectedAttemptId: input.attempt.id,
             summary: "First task completed",
             findings: [{ key: "first-finding", content: "First finding" }],
           },
@@ -403,9 +450,13 @@ describe("plan-runner task executor external results", () => {
       .mockImplementationOnce(async (input) => {
         const submittedResult = await taskPlanExecution.submitNodeResult({
           taskId: input.taskId,
+          commandContext: {
+            sessionId: input.executionSessionId,
+            idempotencyKey: "downstream-first-result",
+          },
           action: {
             action: "complete_manual_node",
-            sessionId: "provider-runtime-session",
+            expectedAttemptId: input.attempt.id,
             summary: "Runtime tool completed first task",
             output: {
               root: "root",
@@ -422,7 +473,7 @@ describe("plan-runner task executor external results", () => {
           orderBy: { updatedAt: "desc" },
         });
         expect(activeSession.id).not.toBe("provider-runtime-session");
-        expect(activeSession.currentNodeId).toBeNull();
+        expect(activeSession.currentNodeId).toBe("second_task");
 
         return {
           status: "started",
@@ -488,9 +539,13 @@ describe("plan-runner task executor external results", () => {
       .mockImplementationOnce(async (input) => {
         await taskPlanExecution.submitNodeResult({
           taskId: input.taskId,
+          commandContext: {
+            sessionId: input.executionSessionId,
+            idempotencyKey: "normalized-first-result",
+          },
           action: {
             action: "complete_manual_node",
-            sessionId: input.mainSession.id,
+            expectedAttemptId: input.attempt.id,
             summary: "First task completed through terminal tool",
           },
         });
@@ -505,9 +560,13 @@ describe("plan-runner task executor external results", () => {
       .mockImplementationOnce(async (input) => {
         await taskPlanExecution.submitNodeResult({
           taskId: input.taskId,
+          commandContext: {
+            sessionId: input.executionSessionId,
+            idempotencyKey: "normalized-second-result",
+          },
           action: {
             action: "complete_manual_node",
-            sessionId: input.mainSession.id,
+            expectedAttemptId: input.attempt.id,
             summary: "Second task completed through terminal tool",
           },
         });
@@ -578,6 +637,11 @@ describe("plan-runner task executor external results", () => {
       (binding) => binding.nodeId === "manual_task",
     )!.ref;
 
+    const activeSession = await db.executionSession.findFirstOrThrow({
+      where: { taskId: task.id },
+      orderBy: { createdAt: "desc" },
+    });
+
     const branchSelected = await taskPlanExecution.dispatch({
       taskId: task.id,
       action: {
@@ -587,6 +651,10 @@ describe("plan-runner task executor external results", () => {
         branchRef,
         summary: "Condition selected continue branch",
         continueExecution: false,
+      },
+      commandContext: {
+        sessionId: activeSession.id,
+        idempotencyKey: "condition-branch-result",
       },
     });
 
@@ -662,10 +730,15 @@ describe("plan-runner task executor external results", () => {
         taskId: input.taskId,
         action: {
           action: "complete_manual_node",
+          expectedAttemptId: input.attempt.id,
           terminalKind: "condition",
           branchRef,
           summary: "AI selected command branch",
-          continueExecution: false,
+          continueExecution: true,
+        },
+        commandContext: {
+          sessionId: input.executionSessionId,
+          idempotencyKey: "ai-condition-result",
         },
       });
 
@@ -728,11 +801,16 @@ describe("plan-runner task executor external results", () => {
         taskId: input.taskId,
         action: {
           action: "block_current_node",
+          expectedAttemptId: input.attempt.id,
           reason: "Hermes blocked externally",
           actionForm: {
             instructions: "Provide missing Hermes credentials.",
             inputFields: [{ name: "hermesToken", label: "Hermes token", type: "text", required: true }],
           },
+        },
+        commandContext: {
+          sessionId: input.executionSessionId,
+          idempotencyKey: "external-block-result",
         },
       });
       expect(submittedResult.status).toBe("blocked");
@@ -816,13 +894,9 @@ describe("plan-runner task executor external results", () => {
     });
 
     expect(result.status).toBe("failed");
-    expect(result.message).toContain("Gateway refused the run");
-    expect(result.errorDetails).toMatchObject({
-      runtimeName: "hermes",
-      runtimeRunRef: "resp_failed",
-      runId: "run_failed",
-      errorSummary: "Gateway refused the run",
-    });
+    expect(result.message).toBe("Plan execution failed.");
+    expect("errorDetails" in result).toBe(false);
+    expect(JSON.stringify(result)).not.toMatch(/Gateway refused|resp_failed|run_failed/);
 
     const persisted = await getPlanRun(task.id, compiledPlan.editablePlanId);
     expect(persisted?.attempts[0]?.error).toMatchObject({
@@ -867,7 +941,7 @@ describe("plan-runner task executor external results", () => {
     });
 
     expect(result.status).toBe("failed");
-    expect(result.message).toContain("Provider cancelled runtime run codex-run-cancelled");
+    expect(result.message).toBe("Plan execution failed.");
 
     const persisted = await getPlanRun(task.id, compiledPlan.editablePlanId);
     expect(persisted?.attempts[0]).toMatchObject({
@@ -906,11 +980,20 @@ describe("plan-runner task executor external results", () => {
 
     expect(completed.status).toBe("completed");
 
+    const completedSession = await db.executionSession.findFirstOrThrow({
+      where: { taskId: task.id },
+      orderBy: { createdAt: "desc" },
+    });
+
     const lateBlocked = await taskPlanExecution.dispatch({
       taskId: task.id,
       action: {
         action: "block_current_node",
         reason: "MCP session binding fallback after verified completion",
+      },
+      commandContext: {
+        sessionId: completedSession.id,
+        idempotencyKey: "late-blocked-result",
       },
     });
 
@@ -926,6 +1009,96 @@ describe("plan-runner task executor external results", () => {
     expect(updatedTask.status).toBe(TaskStatus.Completed);
     expect(updatedTask.blockReason).toBeNull();
   });
+  it("replays a recorded terminal action after process loss and completes the task exactly once", async () => {
+    executeTaskNodeCapabilityMock.mockResolvedValueOnce({
+      status: "started",
+      summary: "Provider run remains active until its terminal action is committed",
+      evidence: { sessionId: "provider-session", runId: "provider-run" },
+      output: { runtimeRunRef: "runtime-interrupted-terminal" },
+    });
+
+    const { workspace, task } = await seedWorkspaceAndTask("Recorded terminal restart recovery");
+    const compiledPlan = makeSingleTaskPlan("graph_recorded_terminal_restart_recovery");
+    await seedAcceptedCompiledPlan(workspace.id, task.id, compiledPlan);
+
+    const started = await taskPlanExecution.dispatch({
+      taskId: task.id,
+      action: { action: "start_manual" },
+    });
+    expect(started.status).toBe("running");
+
+    const attempt = await db.taskPlanNodeAttempt.findFirstOrThrow({
+      where: { taskId: task.id, nodeId: "task_node", status: "running" },
+    });
+    const run = await db.run.create({
+      data: {
+        taskId: task.id,
+        taskSessionId: (await db.taskSession.findFirstOrThrow({
+          where: { taskId: task.id },
+          orderBy: { createdAt: "desc" },
+        })).id,
+        nodeAttemptId: attempt.id,
+        runtimeName: "hermes",
+        runtimeRunRef: "runtime-interrupted-terminal",
+        status: "Running",
+        startedAt: new Date(),
+        triggeredBy: "system",
+        syncStatus: "healthy",
+      },
+    });
+    const mainSession = await db.taskSession.findFirstOrThrow({
+      where: { taskId: task.id },
+      orderBy: { createdAt: "desc" },
+    });
+    await db.task.update({
+      where: { id: task.id },
+      data: { latestRunId: run.id },
+    });
+    await db.taskPlanProviderRun.create({
+      data: {
+        runId: run.id,
+        workspaceId: workspace.id,
+        taskId: task.id,
+        planId: compiledPlan.editablePlanId,
+        planRunId: attempt.planRunId,
+        nodeAttemptId: attempt.id,
+        idempotencyKey: `provider-run:${attempt.id}`,
+        providerRunRef: "runtime-interrupted-terminal",
+        runtimeName: "hermes",
+        status: "running",
+      },
+    });
+    await db.taskPlanTerminalAction.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        runId: run.id,
+        taskSessionId: mainSession.id,
+        runtimeSessionKey: mainSession.sessionKey,
+        nodeId: "task_node",
+        nodeAttemptId: attempt.id,
+        kind: "complete",
+        payload: { summary: "Recovered durable completion" },
+      },
+    });
+
+    const first = await recoverRecordedTerminalActions({ taskId: task.id });
+    const second = await recoverRecordedTerminalActions({ taskId: task.id });
+
+    expect(first).toEqual({ checked: 1, recovered: 1, skipped: 0, failed: 0 });
+    expect(second).toEqual({ checked: 0, recovered: 0, skipped: 0, failed: 0 });
+    expect((await db.task.findUniqueOrThrow({ where: { id: task.id } })).status).toBe("Completed");
+    expect((await db.executionSession.findFirstOrThrow({ where: { taskId: task.id } })).status).toBe("Completed");
+    expect((await db.run.findUniqueOrThrow({ where: { id: run.id } })).status).toBe("Completed");
+    expect((await db.taskPlanNodeAttempt.findUniqueOrThrow({ where: { id: attempt.id } })).status).toBe("succeeded");
+    expect((await db.taskPlanProviderRun.findFirstOrThrow({ where: { nodeAttemptId: attempt.id } })).status).toBe("completed");
+    const persisted = await getPlanRun(task.id, compiledPlan.editablePlanId);
+    expect(persisted?.results.find((result) => result.nodeId === "task_node")).toMatchObject({
+      status: "current",
+      outputSummary: "Recovered durable completion",
+    });
+  });
+
 });
 
 async function waitForTaskNodeCalls(expectedNodeIds: string[]) {

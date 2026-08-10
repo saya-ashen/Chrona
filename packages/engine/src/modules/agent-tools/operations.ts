@@ -19,7 +19,7 @@ import {
 import { affectedFrom, summarizeUnknownState } from "./state-summary";
 import { ENGINE_ERROR_CODES, isEngineError } from "../../errors";
 import { createLogger } from "@chrona/logging";
-import type { AgentToolOperationsDeps } from "./types";
+import type { AgentToolOperationsDeps, ToolAuditContext } from "./types";
 import { requireTaskId } from "./input-guards";
 import { startToolAudit, finishToolAudit } from "./audit";
 import { executeValidatedTool } from "./dispatch";
@@ -29,9 +29,8 @@ const toolDescriptions: Record<ChronaToolName, string> = {
   "chrona.task.read": "Read task lifecycle state.",
   "chrona.task.create": "Create a task through Chrona validation.",
   "chrona.task.update": "Update task fields through Chrona validation.",
-  "chrona.goal.results.read": "Search current approved Goal assets and accepted-result history.",
+  "chrona.goal.results.read": "Search bounded Goal knowledge metadata or read approved asset content by opaque ref.",
   "chrona.plan.read": "Read accepted plan state.",
-  "chrona.plan.generate": "Generate a draft plan for the session task.",
   "chrona.plan.mutate": "Apply a plan graph mutation.",
   "chrona.schedule.read": "Read task schedule state.",
   "chrona.schedule.propose": "Create a schedule proposal.",
@@ -40,7 +39,6 @@ const toolDescriptions: Record<ChronaToolName, string> = {
   "chrona.execution.read": "Read execution state summary.",
   "chrona.execution.dispatch": "Dispatch an execution lifecycle action.",
   "chrona.node.read": "Read current execution node state.",
-  "chrona.dashboard.brief": "Submit validated dashboard AI summary spec.",
   "chrona.node.complete": "Complete the current task node.",
   "chrona.node.condition_select": "Select the current condition node branch.",
   "chrona.node.block": "Block the current execution node.",
@@ -52,6 +50,68 @@ const toolDescriptions: Record<ChronaToolName, string> = {
 const idempotentResults = new Map<string, ChronaToolResult>();
 const logger = createLogger("engine.agent-tools");
 
+type PersistedMutationIdentity = {
+  workspaceId: string;
+  taskScopeKey: string;
+  taskSessionScopeKey: string;
+  runScopeKey: string;
+  nodeScopeKey: string;
+  toolName: ChronaToolName;
+  idempotencyKey: string;
+};
+
+type PersistedMutationFlight = {
+  key: string;
+  promise: Promise<ChronaToolResult>;
+  resolve: (result: ChronaToolResult) => void;
+};
+
+const persistedMutationFlights = new Map<string, PersistedMutationFlight>();
+
+function persistedMutationIdentity(
+  scope: PersistedCapabilityScope,
+  operation: ChronaToolOperation,
+): PersistedMutationIdentity {
+  return {
+    workspaceId: scope.workspaceId,
+    taskScopeKey: scope.taskId,
+    taskSessionScopeKey: scope.taskSessionId,
+    runScopeKey: scope.runId,
+    nodeScopeKey: scope.nodeId ?? "",
+    toolName: operation.toolName,
+    idempotencyKey: operation.input.idempotencyKey!,
+  };
+}
+
+function persistedMutationFlightKey(identity: PersistedMutationIdentity) {
+  return [
+    identity.workspaceId,
+    identity.taskScopeKey,
+    identity.taskSessionScopeKey,
+    identity.runScopeKey,
+    identity.nodeScopeKey,
+    identity.toolName,
+    identity.idempotencyKey,
+  ].join(":");
+}
+
+function createPersistedMutationFlight(key: string): PersistedMutationFlight {
+  let resolve!: (result: ChronaToolResult) => void;
+  const promise = new Promise<ChronaToolResult>((complete) => {
+    resolve = complete;
+  });
+  return { key, promise, resolve };
+}
+
+function settlePersistedMutationFlight(flight: PersistedMutationFlight | null, result: ChronaToolResult) {
+  if (!flight) return;
+  persistedMutationFlights.delete(flight.key);
+  flight.resolve(result);
+}
+
+export function resetAgentToolMutationFlightsForTest() {
+  persistedMutationFlights.clear();
+}
 function operationId() {
   return crypto.randomUUID();
 }
@@ -65,6 +125,236 @@ function asInputRecord(input: unknown): Record<string, unknown> {
   return input && typeof input === "object" && !Array.isArray(input)
     ? (input as Record<string, unknown>)
     : {};
+}
+
+type PersistedCapabilityScope = {
+  workspaceId: string;
+  taskId: string;
+  taskSessionId: string;
+  runId: string;
+  nodeId: string | null;
+};
+
+type CapabilityTaskSession = {
+  activeRunId: string | null;
+  allowedToolNames: string;
+  capabilityScope: string;
+  createdByFramework: boolean;
+  id: string;
+  sessionKey: string;
+  status: string;
+  task: { id: string; workspaceId: string };
+};
+
+type CapabilityRun = {
+  id: string;
+  status: string;
+  taskId: string;
+  taskSessionId: string | null;
+};
+
+type PersistedMutationClaim =
+  | { state: "claimed"; id: string; flight: PersistedMutationFlight }
+  | { state: "completed"; result: ChronaToolResult }
+  | { state: "pending" };
+
+function isActiveRunStatus(status: string) {
+  return status === "Pending" || status === "Running" || status === "WaitingForInput" || status === "WaitingForApproval";
+}
+
+function allowedToolNames(value: string) {
+  try {
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) && parsed.every((name) => typeof name === "string")
+      ? new Set(parsed)
+      : new Set<string>();
+  } catch {
+    return new Set<string>();
+  }
+}
+
+function isUniqueConstraintError(error: unknown) {
+  return Boolean(error && typeof error === "object" && "code" in error && error.code === "P2002");
+}
+function requirePersistedCapabilitySession(
+  taskSession: CapabilityTaskSession | null,
+  input: ChronaToolOperation["input"],
+  toolName: ChronaToolName,
+): CapabilityTaskSession {
+  if (!taskSession || !taskSession.createdByFramework) {
+    throw new Error(`${toolName} requires a Chrona-owned capability session.`);
+  }
+  if (input.taskId && input.taskId !== taskSession.task.id) {
+    throw new Error("Supplied taskId does not match the persisted capability session.");
+  }
+  if (input.workspaceId && input.workspaceId !== taskSession.task.workspaceId) {
+    throw new Error("Supplied workspaceId does not match the persisted capability session.");
+  }
+  if (taskSession.capabilityScope === "unknown" || !allowedToolNames(taskSession.allowedToolNames).has(toolName)) {
+    throw new Error(`${toolName} is not granted by the persisted capability session.`);
+  }
+  if (taskSession.status === "idle" || !taskSession.activeRunId) {
+    throw new Error(`${toolName} requires an active task session and run.`);
+  }
+  return taskSession;
+}
+
+async function findCapabilityTaskSession(sessionId: string, toolName: ChronaToolName): Promise<CapabilityTaskSession | null> {
+  const taskSession = await db.taskSession.findUnique({
+    where: { id: sessionId },
+    include: { task: { select: { id: true, workspaceId: true } } },
+  });
+  if (taskSession) return taskSession;
+
+  const taskSessions = await db.taskSession.findMany({
+    where: { sessionKey: sessionId },
+    include: { task: { select: { id: true, workspaceId: true } } },
+    take: 2,
+  });
+  if (taskSessions.length > 1) {
+    throw new Error(`${toolName} capability session identifier is ambiguous.`);
+  }
+  return taskSessions[0] ?? null;
+}
+
+async function resolveCapabilityRun(
+  taskSession: CapabilityTaskSession,
+  toolName: ChronaToolName,
+): Promise<CapabilityRun> {
+  const run = await db.run.findUnique({
+    where: { id: taskSession.activeRunId! },
+    select: { id: true, taskId: true, taskSessionId: true, status: true },
+  });
+  if (!run || run.taskId !== taskSession.task.id || run.taskSessionId !== taskSession.id || !isActiveRunStatus(run.status)) {
+    throw new Error(`${toolName} capability session no longer owns an active run.`);
+  }
+  return run;
+}
+
+async function resolveActiveNodeId(
+  input: ChronaToolOperation["input"],
+  taskSession: CapabilityTaskSession,
+  toolName: ChronaToolName,
+): Promise<string | null> {
+  if (!toolName.startsWith("chrona.node.")) return null;
+  const executionSession = await db.executionSession.findFirst({
+    where: {
+      workspaceId: taskSession.task.workspaceId,
+      taskId: taskSession.task.id,
+      status: { in: ["Active", "Paused"] },
+    },
+    orderBy: { updatedAt: "desc" },
+    select: { currentNodeId: true },
+  });
+  const nodeId = executionSession?.currentNodeId;
+  if (!nodeId) throw new Error(`${toolName} requires an active execution node.`);
+  const payload = input.payload as Record<string, unknown> | undefined;
+  const requestedNodeId = typeof payload?.nodeId === "string" ? payload.nodeId : input.expectedState?.nodeId;
+  if (requestedNodeId && requestedNodeId !== nodeId) {
+    throw new Error("Supplied nodeId does not match the active execution node.");
+  }
+  return nodeId;
+}
+
+async function resolvePersistedCapabilityScope(
+  input: ChronaToolOperation["input"],
+  toolName: ChronaToolName,
+  resolvedTaskSession?: CapabilityTaskSession | null,
+): Promise<PersistedCapabilityScope> {
+  const suppliedSessionId = input.sessionId?.trim();
+  if (!suppliedSessionId) {
+    throw new Error(`${toolName} requires a persisted capability session.`);
+  }
+  const taskSession = requirePersistedCapabilitySession(
+    resolvedTaskSession ?? await findCapabilityTaskSession(suppliedSessionId, toolName),
+    input,
+    toolName,
+  );
+  const [run, nodeId] = await Promise.all([
+    resolveCapabilityRun(taskSession, toolName),
+    resolveActiveNodeId(input, taskSession, toolName),
+  ]);
+  return {
+    workspaceId: taskSession.task.workspaceId,
+    taskId: taskSession.task.id,
+    taskSessionId: taskSession.id,
+    runId: run.id,
+    nodeId,
+  };
+}
+
+async function claimPersistedMutation(
+  scope: PersistedCapabilityScope,
+  operation: ChronaToolOperation,
+): Promise<PersistedMutationClaim> {
+  const where = persistedMutationIdentity(scope, operation);
+  const existing = await db.agentToolMutation.findFirst({
+    where,
+    select: { result: true },
+  });
+  if (existing?.result && typeof existing.result === "object") {
+    return { state: "completed", result: existing.result as unknown as ChronaToolResult };
+  }
+  if (existing) return { state: "pending" };
+
+  const key = persistedMutationFlightKey(where);
+  const activeFlight = persistedMutationFlights.get(key);
+  if (activeFlight) {
+    return { state: "completed", result: await activeFlight.promise };
+  }
+
+  const flight = createPersistedMutationFlight(key);
+  persistedMutationFlights.set(key, flight);
+  try {
+    const claimed = await db.agentToolMutation.create({
+      data: {
+        ...where,
+        taskId: scope.taskId,
+        taskSessionId: scope.taskSessionId,
+        runId: scope.runId,
+      },
+      select: { id: true },
+    });
+    return { state: "claimed", id: claimed.id, flight };
+  } catch (error) {
+    persistedMutationFlights.delete(key);
+    if (!isUniqueConstraintError(error)) throw error;
+    return { state: "pending" };
+  }
+}
+async function completePersistedMutation(id: string, result: ChronaToolResult) {
+  await db.agentToolMutation.update({
+    where: { id },
+    data: { status: result.status, result: result as object },
+  });
+}
+
+async function completePersistedMutationIfClaimed(
+  claim: PersistedMutationClaim | null,
+  result: ChronaToolResult,
+) {
+  if (claim?.state !== "claimed") return;
+  try {
+    await completePersistedMutation(claim.id, result);
+  } finally {
+    settlePersistedMutationFlight(claim.flight, result);
+  }
+}
+
+function replayPersistedMutation(input: {
+  operationId: string;
+  toolName: ChronaToolName;
+  original: ChronaToolResult;
+}) {
+  return duplicateOperationToolResult({
+    operationId: input.operationId,
+    toolName: input.toolName,
+    message: "Duplicate operation replayed without new side effects.",
+    affected: input.original.affected,
+    state: input.original.state,
+    auditRef: input.original.auditRef,
+    recovery: input.original.recovery,
+  });
 }
 
 function ensureExpectedRevision(operation: ChronaToolOperation, state: Record<string, unknown>) {
@@ -95,9 +385,7 @@ function taskIdFromResult(result: unknown) {
 }
 
 function acceptedStateFor(toolName: ChronaToolName, state: Record<string, unknown>, result: unknown) {
-  return toolName === "chrona.dashboard.brief" || toolName === "chrona.goal.results.read"
-    ? { ...state, result }
-    : state;
+  return toolName === "chrona.goal.results.read" ? { ...state, result } : state;
 }
 
 function ensureExpectedState(operation: ChronaToolOperation, state: Record<string, unknown>) {
@@ -156,6 +444,122 @@ function rejectionDiagnostics(cause: unknown) {
     evidence: undefined,
   };
 }
+type PreparedMutation =
+  | { key: string; persistedClaim: PersistedMutationClaim | null }
+  | { result: ChronaToolResult };
+
+function missingIdempotencyResult(
+  operationId: string,
+  operation: ChronaToolOperation,
+  audit: ToolAuditContext | null,
+) {
+  const { toolName, input } = operation;
+  return validationErrorToolResult({
+    operationId,
+    toolName,
+    message: "idempotencyKey is required for mutating Chrona tool calls.",
+    affected: affectedFrom(input),
+    auditRef: audit?.invocationId ?? audit?.inputRawEventId ?? operationId,
+    recovery: { nextTool: toolName, details: { required: "idempotencyKey" } },
+    evidence: operationEvidence(input),
+  });
+}
+
+function inMemoryReplayResult(
+  operationId: string,
+  toolName: ChronaToolName,
+  key: string,
+) {
+  const original = idempotentResults.get(key);
+  return original ? replayPersistedMutation({ operationId, toolName, original }) : null;
+}
+
+function pendingMutationResult(
+  operationId: string,
+  operation: ChronaToolOperation,
+  audit: ToolAuditContext | null,
+) {
+  const { toolName, input } = operation;
+  return rejectedToolResult({
+    operationId,
+    toolName,
+    reasonCode: "CONFLICT",
+    message: "An identical mutation is still in progress.",
+    affected: affectedFrom(input),
+    auditRef: audit?.invocationId ?? audit?.inputRawEventId ?? operationId,
+    recovery: { nextTool: readToolFor(toolName) },
+  });
+}
+
+function unauthorizedMutationResult(
+  operationId: string,
+  operation: ChronaToolOperation,
+  audit: ToolAuditContext | null,
+  cause: unknown,
+) {
+  const { toolName, input } = operation;
+  return rejectedToolResult({
+    operationId,
+    toolName,
+    reasonCode: "UNAUTHORIZED",
+    message: cause instanceof Error ? cause.message : "Capability verification failed.",
+    affected: affectedFrom(input),
+    auditRef: audit?.invocationId ?? audit?.inputRawEventId ?? operationId,
+    recovery: { nextTool: readToolFor(toolName) },
+  });
+}
+async function claimPersistentMutation(
+  operationId: string,
+  operation: ChronaToolOperation,
+  audit: ToolAuditContext | null,
+  key: string,
+): Promise<PreparedMutation> {
+  const { toolName, input } = operation;
+  try {
+    const persistedClaim = await claimPersistedMutation(
+      await resolvePersistedCapabilityScope(input, toolName),
+      operation,
+    );
+    if (persistedClaim.state === "completed") {
+      const result = replayPersistedMutation({ operationId, toolName, original: persistedClaim.result });
+      await finishToolAudit(audit, operation, result, "duplicate");
+      return { result };
+    }
+    if (persistedClaim.state === "pending") {
+      const result = pendingMutationResult(operationId, operation, audit);
+      await finishToolAudit(audit, operation, result, "rejected");
+      return { result };
+    }
+    return { key, persistedClaim };
+  } catch (cause) {
+    const result = unauthorizedMutationResult(operationId, operation, audit, cause);
+    await finishToolAudit(audit, operation, result, "rejected");
+    return { result };
+  }
+}
+
+async function prepareMutation(
+  operationId: string,
+  operation: ChronaToolOperation,
+  audit: ToolAuditContext | null,
+): Promise<PreparedMutation> {
+  const { toolName, input } = operation;
+  const mutates = isChronaToolMutating(toolName);
+  if (mutates && !input.idempotencyKey) {
+    const result = missingIdempotencyResult(operationId, operation, audit);
+    await finishToolAudit(audit, operation, result, "validation_error");
+    return { result };
+  }
+
+  const key = duplicateKey(operation);
+  const replay = mutates ? inMemoryReplayResult(operationId, toolName, key) : null;
+  if (replay) {
+    await finishToolAudit(audit, operation, replay, "duplicate");
+    return { result: replay };
+  }
+  if (!mutates || !input.sessionId) return { key, persistedClaim: null };
+  return claimPersistentMutation(operationId, operation, audit, key);
+}
 
 export function createAgentToolOperationsService(deps: AgentToolOperationsDeps) {
   return {
@@ -169,10 +573,33 @@ export function createAgentToolOperationsService(deps: AgentToolOperationsDeps) 
       };
     },
 
-    async resolveInputContext(input: unknown) {
+    async resolveInputContext(input: unknown, toolName?: ChronaToolName) {
       const raw = asInputRecord(input);
       const rawSessionId = typeof raw.sessionId === "string" ? raw.sessionId.trim() : "";
       const sessionId = rawSessionId;
+      const session = sessionId
+        ? await findCapabilityTaskSession(sessionId, toolName ?? "chrona.execution.read")
+        : null;
+      if (session && toolName) {
+        const parsed = chronaToolInputSchema.parse(raw);
+        const scope = await resolvePersistedCapabilityScope(parsed, toolName, session);
+        return chronaToolInputSchema.parse({
+          ...raw,
+          workspaceId: scope.workspaceId,
+          taskId: scope.taskId,
+          sessionId: scope.taskSessionId,
+        });
+      }
+      if (toolName && isChronaToolMutating(toolName)) {
+        const parsed = chronaToolInputSchema.parse(raw);
+        const scope = await resolvePersistedCapabilityScope(parsed, toolName);
+        return chronaToolInputSchema.parse({
+          ...raw,
+          workspaceId: scope.workspaceId,
+          taskId: scope.taskId,
+          sessionId: scope.taskSessionId,
+        });
+      }
       if (!sessionId && raw.taskId) {
         logger.info("context.resolve.explicit_task", {
           toolName: typeof raw.toolName === "string" ? raw.toolName : undefined,
@@ -182,16 +609,6 @@ export function createAgentToolOperationsService(deps: AgentToolOperationsDeps) 
         return chronaToolInputSchema.parse(raw);
       }
 
-      const session = sessionId
-        ? await db.taskSession.findFirst({
-            where: {
-              OR: [{ id: sessionId }, { sessionKey: sessionId }],
-            },
-            include: {
-              task: { select: { id: true, workspaceId: true } },
-            },
-          })
-        : null;
       const runtimeRun = !session && sessionId
         ? await db.run.findFirst({
             where: {
@@ -248,35 +665,9 @@ export function createAgentToolOperationsService(deps: AgentToolOperationsDeps) 
       const mutates = isChronaToolMutating(toolName);
       const audit = await startToolAudit({ operationId: id, operation }).catch(() => null);
 
-      if (mutates && !input.idempotencyKey) {
-        const result = validationErrorToolResult({
-          operationId: id,
-          toolName,
-          message: "idempotencyKey is required for mutating Chrona tool calls.",
-          affected: affectedFrom(input),
-          auditRef: audit?.invocationId ?? audit?.inputRawEventId ?? id,
-          recovery: { nextTool: toolName, details: { required: "idempotencyKey" } },
-          evidence: operationEvidence(input),
-        });
-        await finishToolAudit(audit, operation, result, "validation_error");
-        return result;
-      }
-
-      const key = duplicateKey(operation);
-      if (mutates && idempotentResults.has(key)) {
-        const original = idempotentResults.get(key)!;
-        const result = duplicateOperationToolResult({
-          operationId: id,
-          toolName,
-          message: "Duplicate operation replayed without new side effects.",
-          affected: original.affected,
-          state: original.state,
-          auditRef: original.auditRef,
-          recovery: original.recovery,
-        });
-        await finishToolAudit(audit, operation, result, "duplicate");
-        return result;
-      }
+      const mutation = await prepareMutation(id, operation, audit);
+      if ("result" in mutation) return mutation.result;
+      const { key, persistedClaim } = mutation;
 
       let payload: unknown;
       try {
@@ -290,6 +681,7 @@ export function createAgentToolOperationsService(deps: AgentToolOperationsDeps) 
           auditRef: audit?.invocationId ?? audit?.inputRawEventId ?? id,
           evidence: operationEvidence(input),
         });
+        await completePersistedMutationIfClaimed(persistedClaim, result);
         await finishToolAudit(audit, operation, result, "validation_error");
         return result;
       }
@@ -310,6 +702,7 @@ export function createAgentToolOperationsService(deps: AgentToolOperationsDeps) 
             recovery: { nextTool: readToolFor(toolName), details: staleBeforeMutation.stale },
             evidence: operationEvidence(input),
           });
+          await completePersistedMutationIfClaimed(persistedClaim, result);
           await finishToolAudit(audit, operation, result, "rejected");
           return result;
         }
@@ -318,7 +711,7 @@ export function createAgentToolOperationsService(deps: AgentToolOperationsDeps) 
         const state = summarizeUnknownState(result);
         const stale = mutates ? null : ensureExpectedState(operation, state);
         if (stale) {
-          const result = rejectedToolResult({
+          const rejected = rejectedToolResult({
             operationId: id,
             toolName,
             reasonCode: "STALE_STATE",
@@ -329,8 +722,9 @@ export function createAgentToolOperationsService(deps: AgentToolOperationsDeps) 
             recovery: { nextTool: readToolFor(toolName), details: stale },
             evidence: operationEvidence(input),
           });
-          await finishToolAudit(audit, operation, result, "rejected");
-          return result;
+          await completePersistedMutationIfClaimed(persistedClaim, rejected);
+          await finishToolAudit(audit, operation, rejected, "rejected");
+          return rejected;
         }
 
         const accepted = acceptedToolResult({
@@ -348,11 +742,12 @@ export function createAgentToolOperationsService(deps: AgentToolOperationsDeps) 
         if (mutates) {
           idempotentResults.set(key, accepted);
         }
+        await completePersistedMutationIfClaimed(persistedClaim, accepted);
         await finishToolAudit(audit, operation, accepted, "accepted");
         return accepted;
       } catch (cause) {
         const diagnostics = rejectionDiagnostics(cause);
-        const result = rejectedToolResult({
+        const rejected = rejectedToolResult({
           operationId: id,
           toolName,
           reasonCode: reasonCodeFromError(cause),
@@ -362,8 +757,9 @@ export function createAgentToolOperationsService(deps: AgentToolOperationsDeps) 
           recovery: { nextTool: readToolFor(toolName), details: diagnostics.details },
           evidence: { ...operationEvidence(input), ...diagnostics.evidence },
         });
-        await finishToolAudit(audit, operation, result, "rejected");
-        return result;
+        await completePersistedMutationIfClaimed(persistedClaim, rejected);
+        await finishToolAudit(audit, operation, rejected, "rejected");
+        return rejected;
       }
     },
   };

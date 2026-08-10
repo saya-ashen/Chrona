@@ -5,7 +5,7 @@ import { getChronaGeneratedFilesDir } from "@chrona/shared/data-paths";
 import { createHash } from "node:crypto";
 import { db } from "@chrona/db";
 import { aiClientRegistry, createChronaEngine, waitForGoalAssetOwnershipGeneration } from "@chrona/engine";
-import { acceptTaskResult } from "@chrona/engine/modules/tasks/accept-task-result";
+import { acceptTaskResult } from "@chrona/engine/test-support";
 import { createApiRouter, type ApiRouter } from "../../routes/api";
 import { resetTestDb, seedWorkspace } from "../bun-test-helpers";
 
@@ -32,8 +32,59 @@ async function seedStructuredGoalResultWithoutArtifacts() {
   const plan = await db.taskPlan.create({ data: { workspaceId, taskId: task.id, planId: "structured-result-plan", revision: 1, status: "Accepted", compiledPlan: {} } });
   const now = new Date().toISOString();
   const spec = {
-    root: "summary",
+    root: "workspace",
     elements: {
+      workspace: {
+        type: "Stack",
+        props: { gap: "lg" },
+        children: [
+          "overview",
+          "readiness",
+          "section",
+          "metrics",
+          "comparison",
+          "timeline",
+          "checklist",
+          "changes",
+          "summary",
+        ],
+      },
+      overview: {
+        type: "ResultOverview",
+        props: { title: "Destination selected", summary: "推荐日照＋临沂沂蒙山" },
+      },
+      readiness: {
+        type: "ResultReadiness",
+        props: { status: "ready", summary: "Ready" },
+      },
+      section: {
+        type: "ResultSection",
+        props: { title: "Recommendation", layout: "stack" },
+      },
+      metrics: {
+        type: "ResultMetricGrid",
+        props: { items: [{ label: "Stops", value: "2" }] },
+      },
+      comparison: {
+        type: "ResultComparison",
+        props: {
+          title: "Options",
+          columns: [{ key: "route", label: "Route" }],
+          rows: [{ label: "日照", values: { route: "Coastal route" } }],
+        },
+      },
+      timeline: {
+        type: "ResultTimeline",
+        props: { title: "Weekend", items: [{ label: "Day 1", title: "Arrive in 日照" }] },
+      },
+      checklist: {
+        type: "ResultChecklist",
+        props: { title: "Before departure", items: [{ label: "Book hotel", status: "todo" }] },
+      },
+      changes: {
+        type: "ResultChangeSummary",
+        props: { title: "Plan changes", items: [{ path: "itinerary.md", summary: "Added 沂蒙山", status: "modified" }] },
+      },
       summary: {
         type: "ResultSummary",
         props: { text: "推荐日照＋临沂沂蒙山，路线完整且适合周末出行。" },
@@ -53,16 +104,33 @@ async function seedStructuredGoalResultWithoutArtifacts() {
     nextActions: [],
     evidence: [],
   };
+  const compiledPlan = {
+    id: "compiled-structured",
+    editablePlanId: plan.planId,
+    sourceVersion: 1,
+    title: "Select destination",
+    goal: "Plan a trip",
+    assumptions: [],
+    nodes: [],
+    edges: [],
+    entryNodeIds: [],
+    terminalNodeIds: [],
+    topologicalOrder: [],
+    completionPolicy: { type: "all_tasks_completed" },
+    validationWarnings: [],
+  };
+  await db.taskPlan.update({ where: { id: plan.id }, data: { compiledPlan } });
   await db.taskPlanRun.create({
     data: {
       workspaceId,
       taskId: task.id,
       planId: plan.planId,
+      workBlockScopeKey: "",
       planRun: {
         planRun: {
           id: "structured-result-run",
-          compiledPlanId: "compiled-structured",
-          editablePlanId: "structured-result-plan",
+          compiledPlanId: compiledPlan.id,
+          editablePlanId: compiledPlan.editablePlanId,
           sourceVersion: 1,
           status: "completed",
           nodeStates: {},
@@ -130,8 +198,7 @@ describe("Goal Workbench API", () => {
       status: "Pending",
       groupKey: "structured-result:1",
       content: {
-        format: "chrona-json-render",
-        spec: { root: "summary" },
+        spec: { root: "workspace" },
       },
     });
     expect(await db.goalAsset.count({ where: { goalId: seeded.goal.id } })).toBe(0);
@@ -143,13 +210,12 @@ describe("Goal Workbench API", () => {
     const extracted = await post(app, `/goals/${seeded.goal.id}/inbox/extract`, { taskId: seeded.task.id, runId: seeded.run.id });
     expect(extracted.status).toBe(200);
     const { candidates } = await extracted.json() as { candidates: Array<{ id: string; kind: string; content: { format: string; summary: string; spec: unknown } }> };
-    expect(candidates).toHaveLength(1);
-    expect(candidates[0]).toMatchObject({ kind: "structured_result", content: { format: "chrona-json-render", summary: expect.stringContaining("日照＋临沂沂蒙山"), spec: { root: "summary" } } });
+    expect(candidates[0]).toMatchObject({ kind: "structured_result", content: { format: "chrona-json-render", summary: expect.stringContaining("日照＋临沂沂蒙山"), spec: { root: "workspace" } } });
 
     const resolved = await post(app, `/goals/${seeded.goal.id}/inbox/${candidates[0]!.id}/resolve`, { workspaceId: seeded.workspaceId, action: "create_asset", label: "Selected destination" });
     expect(resolved.status).toBe(200);
     const version = await db.goalAssetVersion.findFirstOrThrow({ where: { goalId: seeded.goal.id } });
-    expect(version.content).toMatchObject({ format: "chrona-json-render", spec: { root: "summary" } });
+    expect(version.content).toMatchObject({ format: "chrona-json-render", spec: { root: "workspace" } });
     expect((await db.goalAsset.findFirstOrThrow({ where: { goalId: seeded.goal.id } })).kind).toBe("structured_result");
 
     const planRun = await db.taskPlanRun.findFirstOrThrow({ where: { taskId: seeded.task.id } });
@@ -239,7 +305,7 @@ describe("Goal Workbench API", () => {
       include: { versions: true },
     });
     expect(linkedAsset.id).toBe(linkedAssets[0]!.assetId);
-    expect(linkedAsset.kind).toBe("file");
+    expect(linkedAsset.kind).toBe("data_table");
     expect(linkedAsset.versions).toHaveLength(1);
     const assetResponse = await app.request(`/goals/${seeded.goal.id}/assets/${assetId}`);
     expect(assetResponse.status).toBe(200);
@@ -375,17 +441,21 @@ describe("Goal Workbench API", () => {
     const { candidates } = await extracted.json() as { candidates: Array<{ id: string }> };
     const candidateId = candidates[0]!.id;
 
+    const taskCountBefore = await db.task.count();
     const generated = await post(app, `/goals/${seeded.goal.id}/inbox/${candidateId}/ownership-proposals`, {
       workspaceId: seeded.workspaceId,
       idempotencyKey: "asset-ownership-generate-1",
     });
     expect(generated.status).toBe(202);
-    const started = await generated.json() as { proposalId: string; sourceTaskId: string };
+    const started = await generated.json() as { proposalId: string };
     await waitForGoalAssetOwnershipGeneration(started.proposalId);
     const proposal = await db.goalAssetOwnershipProposal.findUniqueOrThrow({ where: { id: started.proposalId } });
     expect(proposal.status).toBe("Ready");
     expect(proposal.providerType).toBe("debug");
     expect(proposal.decision).toBe("create_asset");
+    expect(proposal.sourceTaskId).toBeNull();
+    expect(proposal.sourceRunId).toBeNull();
+    expect(await db.task.count()).toBe(taskCountBefore);
     expect(await db.goalAsset.count({ where: { goalId: seeded.goal.id } })).toBe(0);
 
     const applied = await post(app, `/goals/${seeded.goal.id}/inbox/${candidateId}/ownership-proposals/${proposal.id}/apply`, {
@@ -437,6 +507,26 @@ describe("Goal Workbench API", () => {
     expect((await post(app, `/goals/${seeded.goal.id}/inbox/${candidates[0]!.id}/resolve`, command)).status).toBe(404);
     expect(await db.goalAsset.count({ where: { goalId: seeded.goal.id } })).toBe(1);
     expect(await db.goalAssetVersion.count({ where: { goalId: seeded.goal.id } })).toBe(1);
+  });
+
+  it("discards only the active draft for the requested asset", async () => {
+    const seeded = await seedGoalResult();
+    const firstAsset = await db.goalAsset.create({ data: { workspaceId: seeded.workspaceId, goalId: seeded.goal.id, sourceArtifactId: seeded.artifact.id, currentArtifactId: seeded.artifact.id, kind: "document", role: "working_document", status: "Approved", label: "First brief" } });
+    const secondArtifact = await db.artifact.create({ data: { workspaceId: seeded.workspaceId, taskId: seeded.task.id, runId: seeded.run.id, type: "report", title: "Second brief source", uri: "generated://tests/second-brief.md", contentPreview: "formal two" } });
+    const secondAsset = await db.goalAsset.create({ data: { workspaceId: seeded.workspaceId, goalId: seeded.goal.id, sourceArtifactId: secondArtifact.id, currentArtifactId: secondArtifact.id, kind: "document", role: "working_document", status: "Approved", label: "Second brief" } });
+    const firstVersion = await db.goalAssetVersion.create({ data: { workspaceId: seeded.workspaceId, goalId: seeded.goal.id, assetId: firstAsset.id, artifactId: seeded.artifact.id, version: 1, source: "inbox", content: "formal one", contentHash: "formal-one", authorType: "user" } });
+    const secondVersion = await db.goalAssetVersion.create({ data: { workspaceId: seeded.workspaceId, goalId: seeded.goal.id, assetId: secondAsset.id, artifactId: secondArtifact.id, version: 1, source: "inbox", content: "formal two", contentHash: "formal-two", authorType: "user" } });
+    const firstDraft = await db.goalAssetDraft.create({ data: { workspaceId: seeded.workspaceId, goalId: seeded.goal.id, assetId: firstAsset.id, baseVersionId: firstVersion.id, content: "draft one", contentHash: "draft-one", authorType: "user", authorId: "test" } });
+    const secondDraft = await db.goalAssetDraft.create({ data: { workspaceId: seeded.workspaceId, goalId: seeded.goal.id, assetId: secondAsset.id, baseVersionId: secondVersion.id, content: "draft two", contentHash: "draft-two", authorType: "user", authorId: "test" } });
+    const app = createApiRouter(createChronaEngine());
+
+    const discarded = await post(app, `/goals/${seeded.goal.id}/assets/${firstAsset.id}/drafts/discard`, { workspaceId: seeded.workspaceId, draftId: firstDraft.id });
+    expect(discarded.status).toBe(200);
+    expect((await db.goalAssetDraft.findUniqueOrThrow({ where: { id: firstDraft.id } })).status).toBe("Discarded");
+    expect((await db.goalAssetDraft.findUniqueOrThrow({ where: { id: secondDraft.id } })).status).toBe("Active");
+
+    const replay = await post(app, `/goals/${seeded.goal.id}/assets/${firstAsset.id}/drafts/discard`, { workspaceId: seeded.workspaceId, draftId: firstDraft.id });
+    expect(replay.status).toBe(400);
   });
 
   it("detects optimistic conflicts and recovers old versions as new versions", async () => {
@@ -508,23 +598,42 @@ describe("Goal Workbench API", () => {
     }
   });
 
-  it("creates a bounded AI modification Task with an immutable asset version snapshot", async () => {
+  it("creates bounded metadata-only asset Tasks", async () => {
     const seeded = await seedGoalResult();
     const asset = await db.goalAsset.create({ data: { workspaceId: seeded.workspaceId, goalId: seeded.goal.id, sourceArtifactId: seeded.artifact.id, currentArtifactId: seeded.artifact.id, kind: "document", role: "working_document", status: "Approved", label: "Launch brief" } });
-    const version = await db.goalAssetVersion.create({ data: { workspaceId: seeded.workspaceId, goalId: seeded.goal.id, assetId: asset.id, artifactId: seeded.artifact.id, version: 1, source: "inbox", content: "Immutable base", contentHash: "base-v1", authorType: "user" } });
+    const version = await db.goalAssetVersion.create({ data: { workspaceId: seeded.workspaceId, goalId: seeded.goal.id, assetId: asset.id, artifactId: seeded.artifact.id, version: 1, source: "inbox", content: "SECRET ASSET BODY", contentHash: "base-v1", authorType: "user" } });
     const app = createApiRouter(createChronaEngine());
 
-    const response = await post(app, `/goals/${seeded.goal.id}/assets/${asset.id}/ai-modification-task`, { workspaceId: seeded.workspaceId, versionId: version.id, instruction: "Clarify the recommendation", expectedOutcome: "A reviewed clearer brief" });
+    for (const route of ["ai-modification-task", "use-task"]) {
+      const body = route === "ai-modification-task"
+        ? { workspaceId: seeded.workspaceId, versionId: version.id, instruction: "Clarify the recommendation", expectedOutcome: "A reviewed clearer brief" }
+        : { workspaceId: seeded.workspaceId, versionId: version.id, title: "Use launch brief", instruction: "Prepare the next decision", expectedOutcome: "A decision memo" };
+      const response = await post(app, `/goals/${seeded.goal.id}/assets/${asset.id}/${route}`, body);
+      expect(response.status).toBe(200);
+      const { taskId } = await response.json() as { taskId: string };
+      const created = await db.task.findUniqueOrThrow({ where: { id: taskId } });
+      expect(created.goalId).toBe(seeded.goal.id);
+      expect(created.autoExecute).toBe(false);
+      expect(created.description).toContain("chrona_goal_results_read");
+      expect(created.description).toMatch(/GA[A-F0-9]{12}/);
+      expect(created.description).toContain("captured version v1");
+      expect(created.description).not.toContain("SECRET ASSET BODY");
+      expect(JSON.stringify(created.goalContext)).not.toContain("SECRET ASSET BODY");
+      expect(JSON.stringify(created.goalContext)).not.toContain(asset.id);
+      expect(JSON.stringify(created.goalContext)).not.toContain(version.id);
+    }
+  });
 
+  it("records append-only version-specific asset verification", async () => {
+    const seeded = await seedGoalResult();
+    const asset = await db.goalAsset.create({ data: { workspaceId: seeded.workspaceId, goalId: seeded.goal.id, sourceArtifactId: seeded.artifact.id, currentArtifactId: seeded.artifact.id, kind: "document", role: "reference", status: "Approved", label: "Reference" } });
+    const version = await db.goalAssetVersion.create({ data: { workspaceId: seeded.workspaceId, goalId: seeded.goal.id, assetId: asset.id, version: 1, source: "manual", content: "Reference", contentHash: "reference-v1", authorType: "user" } });
+    const app = createApiRouter(createChronaEngine());
+    const response = await post(app, `/goals/${seeded.goal.id}/assets/${asset.id}/reviews`, { workspaceId: seeded.workspaceId, versionId: version.id, verifiedAt: "2026-07-29T10:00:00.000Z", nextReviewAt: "2026-08-29T10:00:00.000Z", summary: "Checked source links" });
     expect(response.status).toBe(200);
-    const { taskId } = await response.json() as { taskId: string };
-    const created = await db.task.findUniqueOrThrow({ where: { id: taskId } });
-    expect(created.goalId).toBe(seeded.goal.id);
-    expect(created.autoExecute).toBe(false);
-    expect(created.goalContext).toMatchObject({ asset: { label: "Launch brief", version: 1, contentHash: "base-v1" }, expectedOutcome: "A reviewed clearer brief" });
-
-    await db.goalAssetVersion.create({ data: { workspaceId: seeded.workspaceId, goalId: seeded.goal.id, assetId: asset.id, version: 2, parentVersionId: version.id, source: "manual", content: "Newer content", contentHash: "base-v2", authorType: "user" } });
-    expect((await db.task.findUniqueOrThrow({ where: { id: taskId } })).goalContext).toMatchObject({ asset: { version: 1, contentHash: "base-v1" } });
+    const review = await response.json() as { assetId: string; versionId: string; summary: string };
+    expect(review).toMatchObject({ assetId: asset.id, versionId: version.id, summary: "Checked source links" });
+    expect(await db.goalAssetReview.count({ where: { assetId: asset.id } })).toBe(1);
   });
 
   it("rejects appending an Inbox candidate when the selected base version is stale", async () => {

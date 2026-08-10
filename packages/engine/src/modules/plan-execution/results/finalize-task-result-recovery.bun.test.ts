@@ -59,6 +59,8 @@ async function seedRecoveryFixture() {
       triggeredBy: "system",
     },
   });
+  await mkdir(join(dataDir, "generated", run.id), { recursive: true });
+  await writeFile(join(dataDir, "generated", run.id, "report.md"), "# Recovered report\n");
   const taskPlan = await db.taskPlan.create({
     data: {
       workspaceId: workspace.id,
@@ -134,7 +136,7 @@ async function seedRecoveryFixture() {
           deliverableKey: "report",
           title: "Recovered report",
           kind: "document",
-          source: { type: "generated_file", uri: "generated://report.md" },
+          source: { type: "generated_file", uri: `generated://${run.id}/report.md` },
         }],
         findings: [{ key: "finding", content: "Recovered finding" }],
         decisions: [{ key: "decision", content: "Recovered decision" }],
@@ -168,7 +170,6 @@ beforeEach(async () => {
   dataDir = await mkdtemp(join(tmpdir(), "chrona-result-recovery-"));
   process.env.CHRONA_DATA_DIR = dataDir;
   await mkdir(join(dataDir, "generated"), { recursive: true });
-  await writeFile(join(dataDir, "generated", "report.md"), "# Recovered report\n");
 });
 
 afterEach(async () => {

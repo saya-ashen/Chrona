@@ -15,7 +15,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@shared/ui";
-import { TaskContextLinks } from "@features/task-workspace";
+import { TaskContextLinks } from "@features/task-workspace/public/workspace-integration";
 import { localizeHref } from "@chrona/i18n";
 import { useI18n, useLocale } from "@chrona/i18n"
 import { deriveWorkStateView, type WorkStateTone } from "@chrona/domain";

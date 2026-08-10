@@ -1,10 +1,10 @@
 import { beforeEach, describe, expect, it } from "bun:test";
 import { db } from "@chrona/db";
-import { runRecurringWorkBlockExpansionWorker } from "@chrona/engine/modules/orchestration/recurring-work-block-expansion-worker";
-import { getLatestTaskPlanReadModel } from "@chrona/engine/modules/plans/task-plan-read-model";
-import { saveCompiledPlan } from "@chrona/engine/modules/plan-execution/persistence/compiled-plan-store";
-import { getCurrentExecution } from "@chrona/engine/modules/plan-execution/use-cases/get-current-execution";
-import { getTaskHeaderSpec } from "@chrona/engine/modules/tasks/get-task-header";
+import { runRecurringWorkBlockExpansionWorker } from "@chrona/engine/test-support";
+import { getLatestTaskPlanReadModel } from "@chrona/engine/test-support";
+import { saveCompiledPlan } from "@chrona/engine/test-support";
+import { getCurrentExecution } from "@chrona/engine/test-support";
+import { getTaskHeaderSpec } from "@chrona/engine/test-support";
 import type { CompiledPlan } from "@chrona/contracts/ai";
 import { resetTestDb, seedWorkspace } from "../bun-test-helpers";
 
@@ -73,6 +73,21 @@ async function createRecurringDailySeries(input: {
       recurrenceRule: `FREQ=DAILY;COUNT=${input.count}`,
       recurrenceAnchorStartAt: anchor,
       recurrenceAnchorEndAt: new Date(anchor.getTime() + 30 * 60 * 1000),
+    },
+  });
+  await db.taskTrigger.create({
+    data: {
+      workspaceId: input.workspaceId,
+      taskId: task.id,
+      kind: "schedule",
+      state: "Enabled",
+      config: {
+        mode: "recurring",
+        rrule: `FREQ=DAILY;COUNT=${input.count}`,
+        anchorStartAt: anchor.toISOString(),
+        timezone: "UTC",
+        durationMs: 30 * 60 * 1000,
+      },
     },
   });
   await runRecurringWorkBlockExpansionWorker({ now: anchor });

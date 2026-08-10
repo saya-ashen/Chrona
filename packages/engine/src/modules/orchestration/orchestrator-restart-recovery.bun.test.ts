@@ -122,6 +122,12 @@ describe("runRestartRecoveryWorker", () => {
         leftRunning: 0,
         skipped: 0,
       },
+      terminalActionRecovery: {
+        checked: 0,
+        recovered: 0,
+        skipped: 0,
+        failed: 0,
+      },
     });
     expect(await db.schedulerLease.count()).toBe(0);
     const events = await db.schedulerEvent.findMany({ where: { taskId: task.id } });
@@ -440,6 +446,12 @@ describe("runRestartRecoveryWorker", () => {
         synced: 0,
         leftRunning: 0,
         skipped: 0,
+      },
+      terminalActionRecovery: {
+        checked: 0,
+        recovered: 0,
+        skipped: 0,
+        failed: 0,
       },
     });
     expect(await db.schedulerEvent.count()).toBe(0);

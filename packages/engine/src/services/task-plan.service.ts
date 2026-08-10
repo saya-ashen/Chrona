@@ -1,6 +1,5 @@
 import type {
   GeneratePlanSSEEvent,
-  PlanBlueprint,
   TaskPlanGenerationSessionReadModel,
   TaskPlanReadModel,
 } from "@chrona/contracts";
@@ -10,7 +9,6 @@ import {
   engineErrorFromUnknown,
 } from "../errors";
 import { taskPlanning } from "../modules/plans";
-import { materializeGeneratedTaskPlan } from "../modules/plans/materialize-generated-task-plan";
 import { TaskPlanGenerationInFlightError } from "../modules/plans/task-plan-generation-registry";
 
 export type TaskPlanService = {
@@ -24,45 +22,40 @@ export type TaskPlanService = {
     savedPlan: TaskPlanReadModel | null;
     generationSession: TaskPlanGenerationSessionReadModel | null;
   }>;
-  getActiveGeneration(input: { taskId: string; workBlockId?: string | null }): {
+  getActiveGeneration(input: { taskId: string; workBlockId?: string | null }): Promise<{
     generationSession: TaskPlanGenerationSessionReadModel | null;
-  };
-  getGenerationSession(input: { generationId: string }): {
-    generationSession: TaskPlanGenerationSessionReadModel | null;
-  };
+  }>;
   subscribeToActiveGeneration(input: {
     taskId: string;
     workBlockId?: string | null;
     onEvent: (event: GeneratePlanSSEEvent) => void;
   }): ReturnType<typeof taskPlanning.subscribeToActiveGeneration>;
-  subscribeToGeneration(input: {
-    generationId: string;
-    onEvent: (event: GeneratePlanSSEEvent) => void;
-  }): ReturnType<typeof taskPlanning.subscribeToGeneration>;
   accept(input: {
     taskId: string;
     planId: string;
     workBlockId?: string | null;
     workspaceId?: string;
+    expectedHeadStateVersion: number;
+    idempotencyKey: string;
   }): Promise<{ savedPlan: TaskPlanReadModel | null }>;
-  generate(input: { taskId: string; workBlockId?: string | null; forceRefresh?: boolean; userInstruction?: string | null; selectedNodeId?: string | null }): {
+  generate(input: {
+    taskId: string;
+    workBlockId?: string | null;
+    forceRefresh?: boolean;
+    userInstruction?: string | null;
+    selectedNodeId?: string | null;
+    idempotencyKey: string;
+  }): Promise<{
     generationId: string;
     events: AsyncGenerator<GeneratePlanSSEEvent>;
     emit: (event: GeneratePlanSSEEvent) => void;
     finish: () => void;
-  };
-  materialize(input: {
-    taskId: string;
-    workspaceId: string;
-    workBlockId?: string | null;
-    blueprint: PlanBlueprint;
-    userInstruction?: string | null;
-    generatedBy?: string | null;
-  }): Promise<TaskPlanReadModel>;
-  stopGeneration(input: { taskId: string; workBlockId?: string | null }): {
+  }>;
+  // Generated plans are persisted solely by commitTaskPlanGeneration.
+  stopGeneration(input: { taskId: string; workBlockId?: string | null }): Promise<{
     taskId: string;
     stopped: boolean;
-  };
+  }>;
   patch(
     input: Parameters<typeof taskPlanning.patch>[0],
   ): ReturnType<typeof taskPlanning.patch>;
@@ -84,77 +77,49 @@ export function createTaskPlanService(): TaskPlanService {
         );
       }
     },
-    getActiveGeneration(input: { taskId: string }) {
+    async getActiveGeneration(input: { taskId: string; workBlockId?: string | null }) {
       return taskPlanning.getActiveGeneration(input);
-    },
-    getGenerationSession(input: { generationId: string }) {
-      return taskPlanning.getGenerationSession(input);
     },
     subscribeToActiveGeneration(input: {
       taskId: string;
+      workBlockId?: string | null;
       onEvent: (event: GeneratePlanSSEEvent) => void;
     }) {
       return taskPlanning.subscribeToActiveGeneration(input);
-    },
-    subscribeToGeneration(input: {
-      generationId: string;
-      onEvent: (event: GeneratePlanSSEEvent) => void;
-    }) {
-      return taskPlanning.subscribeToGeneration(input);
     },
     async accept(input: {
       taskId: string;
       planId: string;
       workBlockId?: string | null;
       workspaceId?: string;
+      expectedHeadStateVersion: number;
+      idempotencyKey: string;
     }) {
       try {
         return await taskPlanning.accept(input);
       } catch (cause) {
-        throw engineErrorFromUnknown(
-          cause,
-          ENGINE_ERROR_CODES.PLAN_NOT_FOUND,
-          "Failed to accept task AI plan",
-        );
+        throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.PLAN_NOT_FOUND, "Failed to accept task AI plan");
       }
     },
-    generate(input: { taskId: string; workBlockId?: string | null; forceRefresh?: boolean; userInstruction?: string | null; selectedNodeId?: string | null }) {
-      try {
-        return taskPlanning.generate(input);
-      } catch (cause) {
-        if (cause instanceof TaskPlanGenerationInFlightError) {
-          throw new EngineError(
-            ENGINE_ERROR_CODES.PLAN_GENERATION_IN_FLIGHT,
-            cause.message,
-            { cause },
-          );
-        }
-        throw engineErrorFromUnknown(
-          cause,
-          ENGINE_ERROR_CODES.VALIDATION_FAILED,
-          "Failed to generate task plan",
-        );
-      }
-    },
-    async materialize(input: {
+    async generate(input: {
       taskId: string;
-      workspaceId: string;
-      blueprint: PlanBlueprint;
       workBlockId?: string | null;
+      forceRefresh?: boolean;
       userInstruction?: string | null;
-      generatedBy?: string | null;
+      selectedNodeId?: string | null;
+      idempotencyKey: string;
     }) {
       try {
-        return await materializeGeneratedTaskPlan(input);
+        return await taskPlanning.generate(input);
       } catch (cause) {
-        throw engineErrorFromUnknown(
-          cause,
-          ENGINE_ERROR_CODES.VALIDATION_FAILED,
-          "Failed to persist generated task plan",
-        );
+        if (cause instanceof TaskPlanGenerationInFlightError) {
+          throw new EngineError(ENGINE_ERROR_CODES.PLAN_GENERATION_IN_FLIGHT, cause.message, { cause });
+        }
+        throw engineErrorFromUnknown(cause, ENGINE_ERROR_CODES.VALIDATION_FAILED, "Failed to generate task plan");
       }
     },
-    stopGeneration(input: { taskId: string }) {
+    // Generated plans are persisted solely by commitTaskPlanGeneration.
+    async stopGeneration(input: { taskId: string; workBlockId?: string | null }) {
       return taskPlanning.stopGeneration(input);
     },
     async patch(input: Parameters<typeof taskPlanning.patch>[0]) {

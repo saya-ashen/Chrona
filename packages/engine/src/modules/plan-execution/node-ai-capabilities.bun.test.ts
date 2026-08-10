@@ -2,8 +2,22 @@ import { afterAll, beforeEach, describe, expect, it } from "bun:test";
 import { TaskStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import type { EffectivePlanGraph, EffectivePlanNode, NodeAttempt } from "@chrona/contracts/ai";
-import { executeTaskNodeCapability, runTaskNodeFeature } from "./runtime/node-ai-capabilities";
+import { __nodeAiCapabilityTestHooks, executeTaskNodeCapability, runTaskNodeFeature } from "./runtime/node-ai-capabilities";
 import type { AiRuntimeInvoker } from "./ai-runtime-invoker";
+function nodeRequest(input: {
+  kind: "execute" | "evaluate" | "review";
+  attempt: NodeAttempt;
+  terminalToolName: string;
+}) {
+  return {
+    protocolVersion: 1 as const,
+    kind: input.kind,
+    clientOperationId: `node-capability:${input.kind}:${input.attempt.idempotencyKey}`,
+    instructions: "Execute the current node.",
+    runtimeInput: {},
+    terminalToolName: input.terminalToolName,
+  };
+}
 
 function makeTaskNode(): EffectivePlanNode {
   return {
@@ -150,6 +164,32 @@ async function resetNodeAiCapabilitiesDb() {
   await db.task.deleteMany();
   await db.workspace.deleteMany();
 }
+describe("node capability protocol", () => {
+  it("requires a versioned request and stable client operation identity", () => {
+    expect(__nodeAiCapabilityTestHooks.parseRequest({
+      protocolVersion: 1,
+      kind: "execute",
+      clientOperationId: "node-capability:execute:graph-1:node-1:1",
+      instructions: "Execute the current node.",
+      runtimeInput: {},
+      terminalToolName: "chrona_node_complete",
+    })).toMatchObject({
+      kind: "execute",
+      clientOperationId: "node-capability:execute:graph-1:node-1:1",
+    });
+    expect(() => __nodeAiCapabilityTestHooks.parseRequest({
+      protocolVersion: 1,
+      kind: "execute",
+      instructions: "Execute the current node.",
+      runtimeInput: {},
+      terminalToolName: "chrona_node_complete",
+    })).toThrow();
+  });
+
+  it("rejects malformed provider response status before node result persistence", () => {
+    expect(() => __nodeAiCapabilityTestHooks.parseResponse({ status: "unknown" })).toThrow();
+  });
+});
 
 describe("runTaskNodeFeature", () => {
   beforeEach(async () => {
@@ -160,7 +200,7 @@ describe("runTaskNodeFeature", () => {
     await resetNodeAiCapabilitiesDb();
   });
 
-  it("fails a completed provider snapshot that did not use a Chrona terminal tool", async () => {
+  it("returns a failed node candidate without terminalizing the Run when the provider omitted the Chrona terminal tool", async () => {
     const workspace = await db.workspace.create({
       data: {
         name: "Node AI capabilities workspace",
@@ -225,14 +265,11 @@ describe("runTaskNodeFeature", () => {
       attempt: makeAttempt({ taskId: "task-1", graphId: plan.graphId, nodeId: node.id }),
       runtimeName: "hermes",
       aiRuntimeInvoker: aiRuntimeInvoker as AiRuntimeInvoker,
-      featureSpec: {
-        feature: "execute_task_node",
-        instructions: "Execute the current task node.",
-        inputText: "{}",
+      request: nodeRequest({
+        kind: "execute",
+        attempt: makeAttempt({ taskId: "task-1", graphId: plan.graphId, nodeId: node.id }),
         terminalToolName: "chrona_node_complete",
-        structuredOutputSchema: undefined,
-      },
-      providerInput: {},
+      }),
     });
 
     expect(result).toMatchObject({
@@ -250,13 +287,13 @@ describe("runTaskNodeFeature", () => {
 
     const run = await db.run.findUniqueOrThrow({ where: { id: "local-run-1" } });
     expect(run).toMatchObject({
-      status: "Failed",
-      errorSummary: "Runtime run runtime-first-entry completed without a Chrona terminal result action for node first_entry: Chrona 节点结果提交失败：taskId is required. 节点工作本身已完成。",
+      status: "Running",
+      errorSummary: null,
+      endedAt: null,
     });
-    expect(run.endedAt).not.toBeNull();
   });
 
-  it("marks unexpected provider cancellation as a failed Run", async () => {
+  it("returns provider cancellation as a failed node candidate without terminalizing the Run", async () => {
     const workspace = await db.workspace.create({
       data: { name: "Node AI cancelled workspace", status: "Active", defaultRuntime: "hermes" },
     });
@@ -313,14 +350,11 @@ describe("runTaskNodeFeature", () => {
       attempt: makeAttempt({ taskId: task.id, graphId: plan.graphId, nodeId: node.id }),
       runtimeName: "hermes",
       aiRuntimeInvoker: aiRuntimeInvoker as AiRuntimeInvoker,
-      featureSpec: {
-        feature: "execute_task_node",
-        instructions: "Execute the current task node.",
-        inputText: "{}",
+      request: nodeRequest({
+        kind: "execute",
+        attempt: makeAttempt({ taskId: task.id, graphId: plan.graphId, nodeId: node.id }),
         terminalToolName: "chrona_node_complete",
-        structuredOutputSchema: undefined,
-      },
-      providerInput: {},
+      }),
     });
 
     expect(result).toMatchObject({
@@ -328,9 +362,9 @@ describe("runTaskNodeFeature", () => {
       error: "Provider cancelled runtime run runtime-cancelled",
     });
     const run = await db.run.findUniqueOrThrow({ where: { id: "local-run-cancelled" } });
-    expect(run.status).toBe("Failed");
-    expect(run.endedAt).toBeInstanceOf(Date);
-    expect(run.errorSummary).toBe("Provider cancelled runtime run runtime-cancelled");
+    expect(run.status).toBe("Running");
+    expect(run.endedAt).toBeNull();
+    expect(run.errorSummary).toBeNull();
   });
 
   it("sends non-null accumulated plan output to the runtime invoker", async () => {
@@ -423,9 +457,15 @@ describe("runTaskNodeFeature", () => {
       caveatKeys: [],
       nextActionKeys: [],
     };
-    const invocation = invocations[0] as { runtimeInput: { context: { resultManifest: unknown } }; instructions: string; featureSpec: { inputText: string } };
+    const invocation = invocations[0] as {
+      clientOperationId: string;
+      runtimeInput: { context: { resultManifest: unknown } };
+      instructions: string;
+      terminalToolName: string;
+    };
+    expect(invocation.clientOperationId).toBe(`node-capability:execute:${plan.graphId}:${node.id}:1`);
     expect(invocation.runtimeInput.context.resultManifest).toEqual(expectedResultManifest);
-    expect(JSON.parse(invocation.featureSpec.inputText).context.resultManifest).toEqual(expectedResultManifest);
+    expect(invocation.terminalToolName).toBe("chrona_node_complete");
     expect(invocation.instructions).toContain('"sourceRevision": 1');
     expect(invocation.instructions).not.toContain('"spec":');
   });
@@ -497,14 +537,11 @@ describe("runTaskNodeFeature", () => {
       attempt: makeAttempt({ taskId: task.id, graphId: plan.graphId, nodeId: node.id }),
       runtimeName: "hermes",
       aiRuntimeInvoker: aiRuntimeInvoker as AiRuntimeInvoker,
-      featureSpec: {
-        feature: "execute_task_node",
-        instructions: "Execute the current task node.",
-        inputText: "{}",
+      request: nodeRequest({
+        kind: "execute",
+        attempt: makeAttempt({ taskId: task.id, graphId: plan.graphId, nodeId: node.id }),
         terminalToolName: "chrona_node_complete",
-        structuredOutputSchema: undefined,
-      },
-      providerInput: {},
+      }),
     });
 
     expect(result).toMatchObject({
@@ -584,14 +621,11 @@ describe("runTaskNodeFeature", () => {
       attempt: makeAttempt({ taskId: task.id, graphId: plan.graphId, nodeId: node.id }),
       runtimeName: "hermes",
       aiRuntimeInvoker: aiRuntimeInvoker as AiRuntimeInvoker,
-      featureSpec: {
-        feature: "execute_task_node",
-        instructions: "Execute the current task node.",
-        inputText: "{}",
+      request: nodeRequest({
+        kind: "execute",
+        attempt: makeAttempt({ taskId: task.id, graphId: plan.graphId, nodeId: node.id }),
         terminalToolName: "chrona_node_complete",
-        structuredOutputSchema: undefined,
-      },
-      providerInput: {},
+      }),
     });
 
     expect(result).toMatchObject({
@@ -670,14 +704,11 @@ describe("runTaskNodeFeature", () => {
       attempt: makeAttempt({ taskId: task.id, graphId: plan.graphId, nodeId: condition.id }),
       runtimeName: "hermes",
       aiRuntimeInvoker: aiRuntimeInvoker as AiRuntimeInvoker,
-      featureSpec: {
-        feature: "evaluate_condition_node",
-        instructions: "Evaluate the current condition node.",
-        inputText: "{}",
+      request: nodeRequest({
+        kind: "evaluate",
+        attempt: makeAttempt({ taskId: task.id, graphId: plan.graphId, nodeId: condition.id }),
         terminalToolName: "chrona_condition_select",
-        structuredOutputSchema: undefined,
-      },
-      providerInput: {},
+      }),
     });
 
     expect(result).toMatchObject({
@@ -759,14 +790,11 @@ describe("runTaskNodeFeature", () => {
       attempt: makeAttempt({ taskId: task.id, graphId: plan.graphId, nodeId: condition.id }),
       runtimeName: "hermes",
       aiRuntimeInvoker: aiRuntimeInvoker as AiRuntimeInvoker,
-      featureSpec: {
-        feature: "evaluate_condition_node",
-        instructions: "Evaluate the current condition node.",
-        inputText: "{}",
+      request: nodeRequest({
+        kind: "evaluate",
+        attempt: makeAttempt({ taskId: task.id, graphId: plan.graphId, nodeId: condition.id }),
         terminalToolName: "chrona_condition_select",
-        structuredOutputSchema: undefined,
-      },
-      providerInput: {},
+      }),
     });
 
     expect(result).toMatchObject({
@@ -848,14 +876,11 @@ describe("runTaskNodeFeature", () => {
       attempt: makeAttempt({ taskId: task.id, graphId: plan.graphId, nodeId: condition.id }),
       runtimeName: "hermes",
       aiRuntimeInvoker: aiRuntimeInvoker as AiRuntimeInvoker,
-      featureSpec: {
-        feature: "evaluate_condition_node",
-        instructions: "Evaluate the current condition node.",
-        inputText: "{}",
+      request: nodeRequest({
+        kind: "evaluate",
+        attempt: makeAttempt({ taskId: task.id, graphId: plan.graphId, nodeId: condition.id }),
         terminalToolName: "chrona_condition_select",
-        structuredOutputSchema: undefined,
-      },
-      providerInput: {},
+      }),
     });
 
     expect(result).toMatchObject({

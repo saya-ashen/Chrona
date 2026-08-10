@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent, type ReactNode, type WheelEvent } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode, type WheelEvent } from "react";
 import { Maximize2, Minus, Plus, Scan, LocateFixed } from "lucide-react";
-import { PanOnScrollMode, ReactFlow, type NodeMouseHandler, type ReactFlowInstance } from "@xyflow/react";
+import { PanOnScrollMode, ReactFlow, type NodeMouseHandler, type OnNodeDrag, type ReactFlowInstance } from "@xyflow/react";
 import { Button } from "@shared/ui"
 import { cn } from "@shared/ui"
 import { edgeTypes } from "./edge";
@@ -58,9 +58,9 @@ export function TaskPlanGraphFrame({
   overview?: ReactNode;
   handleNodeClick: NodeMouseHandler<FlowGraphNode>;
   handlePaneClick: () => void;
-  handleNodeDragStart: (event: MouseEvent<Element>) => void;
-  handleNodeDrag: (event: MouseEvent<Element>) => void;
-  handleNodeDragStop: (event: MouseEvent<Element>) => void;
+  handleNodeDragStart: OnNodeDrag<FlowGraphNode>;
+  handleNodeDrag: OnNodeDrag<FlowGraphNode>;
+  handleNodeDragStop: OnNodeDrag<FlowGraphNode>;
   onCenterCurrentNode: () => void;
   onExpandGraph: () => void;
   onFitGraph: () => void;

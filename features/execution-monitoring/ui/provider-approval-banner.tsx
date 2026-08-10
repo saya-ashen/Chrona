@@ -1,19 +1,20 @@
+/* eslint-disable complexity -- Approval presentation intentionally enumerates all durable resolution states. */
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { v4 as uuidv4 } from "uuid";
 import { apiJson } from "@shared/http";
 import { Button, Card, CardContent, CardHeader, CardTitle } from "@shared/ui";
+import type { PublicProviderDescriptor } from "@chrona/contracts";
 
 type ProviderApprovalChoice = "approve_once" | "approve_session" | "approve_always" | "deny";
 
 type ProviderApprovalReadModel = {
   id: string;
-  taskId: string;
   nodeTitle?: string | null;
-  provider: string;
+  provider: PublicProviderDescriptor;
   title: string;
   summary: string;
   description?: string | null;
   riskLevel: "low" | "medium" | "high" | "critical" | "unknown";
-  subject?: unknown;
   choices: ProviderApprovalChoice[];
   requestedAt: string;
 };
@@ -24,24 +25,11 @@ type ProviderApprovalListResponse = {
 
 type ProviderApprovalResolveResponse = {
   approval: ProviderApprovalReadModel;
-  status: "resolved" | "not_pending" | "not_active";
+  status: "resolved" | "not_pending" | "not_active" | "failed" | "in_flight";
 };
 
-type ProviderApprovalSubject = {
-  type?: string;
-  label?: string;
-  preview?: string;
-  language?: string;
-};
 
-function approvalQueryKey(taskId: string) {
-  return ["task", taskId, "provider-approvals", "pending"] as const;
-}
 
-function asSubject(value: unknown): ProviderApprovalSubject | null {
-  if (!value || typeof value !== "object") return null;
-  return value as ProviderApprovalSubject;
-}
 
 function choiceLabel(choice: ProviderApprovalChoice) {
   switch (choice) {
@@ -56,11 +44,24 @@ function choiceLabel(choice: ProviderApprovalChoice) {
   }
 }
 
-export function ProviderApprovalBanner({ taskId }: { taskId: string }) {
+export function ProviderApprovalBanner({
+  taskId,
+  workBlockId,
+  executionScope,
+}: {
+  taskId: string;
+  workBlockId: string | null;
+  executionScope: string | null | undefined;
+}) {
   const queryClient = useQueryClient();
+  const isScoped = Boolean(workBlockId && executionScope);
+  const scope = isScoped
+    ? new URLSearchParams({ workBlockId: workBlockId!, executionScope: executionScope! }).toString()
+    : null;
   const { data } = useQuery({
-    queryKey: approvalQueryKey(taskId),
-    queryFn: () => apiJson<ProviderApprovalListResponse>(`/api/tasks/${taskId}/provider-approvals?status=pending`),
+    queryKey: ["task", taskId, "provider-approvals", workBlockId ?? "__unscoped__", executionScope ?? "__unscoped__", "pending"],
+    queryFn: () => apiJson<ProviderApprovalListResponse>(`/api/tasks/${taskId}/provider-approvals?${scope}`),
+    enabled: isScoped,
     refetchInterval: 5_000,
   });
   const approvals = Array.isArray(data?.approvals) ? data.approvals : [];
@@ -70,18 +71,19 @@ export function ProviderApprovalBanner({ taskId }: { taskId: string }) {
       `/api/tasks/${taskId}/provider-approvals/${input.approvalId}/resolve`,
       {
         method: "POST",
-        body: JSON.stringify({ choice: input.choice }),
+        body: JSON.stringify({ workBlockId, executionScope, choice: input.choice, idempotencyKey: uuidv4() }),
       },
     ),
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: approvalQueryKey(taskId) });
+      await queryClient.invalidateQueries({
+        queryKey: ["task", taskId, "provider-approvals", workBlockId ?? "__unscoped__", executionScope ?? "__unscoped__", "pending"],
+      });
       await queryClient.invalidateQueries({ queryKey: ["task-workspace"] });
     },
   });
 
   if (!approval) return null;
 
-  const subject = asSubject(approval.subject);
   const quickChoices = approval.choices.filter((choice) => choice !== "approve_always");
 
   return (
@@ -90,7 +92,7 @@ export function ProviderApprovalBanner({ taskId }: { taskId: string }) {
         <div className="space-y-1">
           <CardTitle>{approval.title}</CardTitle>
           <p className="text-sm text-amber-900/80 dark:text-amber-100/80">
-            {approval.nodeTitle ? `${approval.provider} needs approval for “${approval.nodeTitle}”.` : `${approval.provider} needs approval.`}
+            {approval.nodeTitle ? `${approval.provider.label} needs approval for "${approval.nodeTitle}".` : `${approval.provider.label} needs approval.`}
           </p>
         </div>
         <div className="flex flex-wrap gap-2 sm:justify-end">
@@ -109,11 +111,6 @@ export function ProviderApprovalBanner({ taskId }: { taskId: string }) {
       </CardHeader>
       <CardContent className="space-y-3">
         <p className="text-sm">{approval.description ?? approval.summary}</p>
-        {subject?.preview ? (
-          <pre className="max-h-44 overflow-auto rounded-md bg-background/80 p-3 text-xs text-foreground ring-1 ring-foreground/10">
-            <code>{subject.preview}</code>
-          </pre>
-        ) : null}
         {approval.choices.includes("approve_always") ? (
           <Button
             size="sm"

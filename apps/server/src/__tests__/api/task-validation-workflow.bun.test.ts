@@ -3,8 +3,8 @@ import { Hono } from "hono";
 
 import { db } from "@chrona/db";
 import { createTaskBodySchema, updateTaskBodySchema } from "@chrona/contracts/api";
-import { createTask } from "@chrona/engine/modules/tasks/create-task";
-import { updateTask } from "@chrona/engine/modules/tasks/update-task";
+import { createTask } from "@chrona/engine/test-support";
+import { updateTask } from "@chrona/engine/test-support";
 import { error, internalServerError, toHttpError } from "../../lib/http";
 import { expectTaskExists, resetTestDb, seedTask, seedWorkspace } from "../bun-test-helpers";
 

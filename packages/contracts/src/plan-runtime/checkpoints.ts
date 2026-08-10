@@ -1,5 +1,4 @@
-import type { PlanExecutionResult } from "./execution-state";
-import type { CheckpointActionKind } from "./_leaf";
+import type { CheckpointActionKind, PlanExecutionResult } from "./_leaf";
 
 export type {
   CheckpointResponse,

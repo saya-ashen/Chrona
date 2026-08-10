@@ -10,6 +10,7 @@ import {
   updateTaskBodySchemaForSupportedRuntimes,
   deleteTaskParamSchema,
   deleteTaskQuerySchema,
+  deleteTaskBodySchema,
   workspaceActivityPageQuerySchema,
   resultFileAccessApproveBodySchema,
   resultFileAccessParamSchema,
@@ -195,6 +196,7 @@ export function createTasksRoutes(engine: ChronaEngine) {
         taskContextResponse(c, "GET /api/tasks/:taskId/runtime-context", () =>
           engine.tasks.getRuntimeContext({
             taskId: c.req.valid("param").taskId,
+            workBlockId: c.req.query("workBlockId") ?? null,
           }),
         ),
     )
@@ -205,6 +207,7 @@ export function createTasksRoutes(engine: ChronaEngine) {
         taskContextResponse(c, "GET /api/tasks/:taskId/review-context", () =>
           engine.tasks.getReviewContext({
             taskId: c.req.valid("param").taskId,
+            workBlockId: c.req.query("workBlockId") ?? null,
           }),
         ),
     )
@@ -229,9 +232,9 @@ export function createTasksRoutes(engine: ChronaEngine) {
             taskId: c.req.valid("param").taskId,
             requestedPath: c.req.valid("query").path,
           });
-          return new Response(result.file, {
+          return new Response(result.stream, {
             headers: {
-              "Content-Type": result.file.type || "application/octet-stream",
+              "Content-Type": result.contentType,
               "Content-Disposition": `attachment; filename*=UTF-8''${encodeURIComponent(result.filename)}`,
               "X-Content-Type-Options": "nosniff",
             },
@@ -364,15 +367,57 @@ export function createTasksRoutes(engine: ChronaEngine) {
         }
       },
     )
-    .delete(
-      "/tasks/:taskId",
+    .post(
+      "/tasks/:taskId/actions/rebuild-with-latest-goal-assets",
+      zValidator("param", taskDetailParamSchema),
+      async (c) => {
+        try {
+          const { taskId } = c.req.valid("param");
+          return json(c, await engine.tasks.rebuildWithLatestGoalAssets({ taskId }));
+        } catch (cause) {
+          const httpError = toHttpError(cause);
+          if (httpError) return error(c, httpError.message, httpError.status);
+          return internalServerError(
+            c,
+            "POST /api/tasks/:taskId/actions/rebuild-with-latest-goal-assets",
+            cause,
+            "Failed to rebuild task with latest Goal assets",
+          );
+        }
+      },
+    )
+    .get(
+      "/tasks/:taskId/delete-impact",
       zValidator("param", deleteTaskParamSchema),
       zValidator("query", deleteTaskQuerySchema),
       async (c) => {
         try {
           const { taskId } = c.req.valid("param");
           const { workspaceId } = c.req.valid("query");
-          return json(c, await engine.tasks.delete({ taskId, workspaceId }));
+          return json(c, await engine.tasks.getDeleteImpact({ taskId, workspaceId }));
+        } catch (cause) {
+          const httpError = toHttpError(cause);
+          if (httpError) return error(c, httpError.message, httpError.status);
+          return internalServerError(
+            c,
+            "GET /api/tasks/:taskId/delete-impact",
+            cause,
+            "Failed to inspect task deletion",
+          );
+        }
+      },
+    )
+    .delete(
+      "/tasks/:taskId",
+      zValidator("param", deleteTaskParamSchema),
+      zValidator("query", deleteTaskQuerySchema),
+      zValidator("json", deleteTaskBodySchema),
+      async (c) => {
+        try {
+          const { taskId } = c.req.valid("param");
+          const { workspaceId } = c.req.valid("query");
+          const { expectedTaskIds, expectedAssetIds } = c.req.valid("json");
+          return json(c, await engine.tasks.delete({ taskId, workspaceId, expectedTaskIds, expectedAssetIds }));
         } catch (cause) {
           const httpError = toHttpError(cause);
           if (httpError) {

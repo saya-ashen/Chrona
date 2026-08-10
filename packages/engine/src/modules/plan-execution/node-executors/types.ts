@@ -128,6 +128,8 @@ export interface NodeExecutor {
 
 export interface NodeExecutorInput {
   taskId: string;
+  executionEpoch?: number;
+  executionSessionId?: string;
   workBlockId?: string | null;
   mainSession: {
     id: string;

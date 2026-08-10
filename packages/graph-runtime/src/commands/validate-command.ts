@@ -1,7 +1,8 @@
 import { resolveEffectivePlanGraph } from "../resolve";
 import { validatePlanGraph } from "../validation";
 import type { GraphDispatchOutcome, GraphRuntimeCommand } from "./types";
-import type { GraphExecutionEvent, GraphExecutionState } from "../execution/types";
+import type { GraphExecutionState } from "../types/dispatch-core";
+import type { GraphExecutionEvent } from "../types/events";
 
 function validationFailureOutcome(input: {
   command: GraphRuntimeCommand;

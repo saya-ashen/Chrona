@@ -1,17 +1,23 @@
+/* eslint-disable complexity -- Review context projection explicitly redacts and normalizes every source variant. */
 import { db } from "@/lib/db";
 import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
 import { aiArtifactRef } from "../plan-execution/use-cases/register-generated-plan-output-artifacts";
 
-export async function getTaskReviewContext(input: { taskId: string }) {
+export async function getTaskReviewContext(input: { taskId: string; workBlockId?: string | null }) {
   const task = await db.task.findUnique({
     where: { id: input.taskId },
     select: {
       artifacts: {
+        where: { run: { workBlockId: input.workBlockId ?? null } },
         orderBy: { createdAt: "desc" },
         take: 5,
         select: { id: true, title: true, type: true, uri: true },
       },
-      approvals: { orderBy: { requestedAt: "desc" }, take: 5 },
+      approvals: {
+        where: { run: { workBlockId: input.workBlockId ?? null } },
+        orderBy: { requestedAt: "desc" },
+        take: 5,
+      },
       scheduleProposals: {
         where: { status: "Pending" },
         orderBy: { createdAt: "desc" },
@@ -22,9 +28,18 @@ export async function getTaskReviewContext(input: { taskId: string }) {
   if (!task) {
     throw new EngineError(ENGINE_ERROR_CODES.TASK_NOT_FOUND, "Task not found");
   }
+  if (input.workBlockId) {
+    const ownedWorkBlock = await db.workBlock.findFirst({
+      where: { id: input.workBlockId, taskId: input.taskId },
+      select: { id: true },
+    });
+    if (!ownedWorkBlock) {
+      throw new EngineError(ENGINE_ERROR_CODES.TASK_NOT_FOUND, "Work block not found");
+    }
+  }
 
   const latestRun = await db.run.findFirst({
-    where: { taskId: input.taskId },
+    where: { taskId: input.taskId, workBlockId: input.workBlockId ?? null },
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
   });
   const acceptance = latestRun

@@ -28,6 +28,10 @@ export type ApiRouter = Hono;
 export function createApiRouter(engine: ChronaEngine, options: ApiRouterOptions = {}) {
   const router = new Hono()
     .get("/health", (c) => json(c, { status: "ok" }))
+    .get("/ready", async (c) => {
+      const readiness = await engine.runtime.getReadiness();
+      return json(c, readiness, readiness.status === "ready" ? 200 : 503);
+    })
     .route("/", createTaskRoutes(engine))
     .route("/", createPageRoutes(engine))
     .route("/", createWorkspacesRoutes(engine))

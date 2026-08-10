@@ -1,39 +1,13 @@
-export const locales = ["en", "zh"] as const;
+import { resolveLocale, type Locale } from "./locale-core";
 
-export type Locale = (typeof locales)[number];
-
-export const defaultLocale: Locale = "en";
-
-export function hasLocale(locale: string): locale is Locale {
-  return locales.includes(locale as Locale);
-}
-
-export function resolveLocale(locale?: string | null): Locale {
-  return locale && hasLocale(locale) ? locale : defaultLocale;
-}
-
-export function getPreferredLocale(acceptLanguage: string | null | undefined): Locale {
-  if (!acceptLanguage) {
-    return defaultLocale;
-  }
-
-  const languages = acceptLanguage
-    .split(",")
-    .map((part) => part.trim().split(";")[0]?.toLowerCase())
-    .filter((part): part is string => Boolean(part));
-
-  for (const language of languages) {
-    if (language === "zh" || language.startsWith("zh-")) {
-      return "zh";
-    }
-
-    if (language === "en" || language.startsWith("en-")) {
-      return "en";
-    }
-  }
-
-  return defaultLocale;
-}
+export {
+  defaultLocale,
+  getPreferredLocale,
+  hasLocale,
+  locales,
+  resolveLocale,
+} from "./locale-core";
+export type { Locale } from "./locale-core";
 
 const assistantSurfaceMessages = {
   en: {
@@ -46,6 +20,8 @@ const assistantSurfaceMessages = {
     nonMutatingGuidance: "Get non-mutating guidance for the current page.",
     scheduleUnavailable: "Schedule state is supplied by the active page projection.",
     taskUnavailable: "Task state is supplied by the active workspace projection.",
+    nextHighlightLabel: "Next",
+    acceptResultHighlight: "Accept result or request changes",
     workbenchUnavailable: "Workbench result actions are available from execution result context.",
     unsupportedUnavailable: "This page does not expose assistant actions yet.",
     actionRequestDescription: "Assistant action request",
@@ -88,6 +64,8 @@ const assistantSurfaceMessages = {
     informationalGuidance: "获取当前页面的信息性指导。",
     nonMutatingGuidance: "获取当前页面的非变更性指导。",
     scheduleUnavailable: "日程状态由当前页面投影提供。",
+    nextHighlightLabel: "下一步",
+    acceptResultHighlight: "接受结果或要求修改",
     taskUnavailable: "任务状态由当前工作区投影提供。",
     workbenchUnavailable: "执行结果操作可在执行结果上下文中使用。",
     unsupportedUnavailable: "当前页面尚未开放助手操作。",

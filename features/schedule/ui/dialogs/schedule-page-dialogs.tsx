@@ -5,6 +5,21 @@ import type {
   TimelineCreateInput,
 } from "../schedule-page-types";
 import type { SchedulePageViewModel } from "../schedule-page-view-model";
+import type { Locale } from "@chrona/i18n";
+
+type ScheduleViewHrefBuilder = (
+  day: string,
+  view: ScheduleViewMode,
+  taskId?: string,
+) => string;
+
+export function getScheduleQuickCreateTimes(day: Date | null | undefined) {
+  const start = new Date(day ?? new Date());
+  start.setHours(9, 0, 0, 0);
+  const end = new Date(start);
+  end.setHours(10, 0, 0, 0);
+  return { start, end };
+}
 
 export function SchedulePageDialogs({
   showQuickAddDialog,
@@ -33,11 +48,9 @@ export function SchedulePageDialogs({
   activeView: ScheduleViewMode;
   workspaceId: string;
   routerPush: (href: string) => void;
-  locale: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  localizeHref: (locale: any, href: string) => string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-buildScheduleViewHref: (...args: any[]) => string;
+  locale: Locale;
+  localizeHref: (locale: Locale | undefined, href: string) => string;
+  buildScheduleViewHref: ScheduleViewHrefBuilder;
   actionFailedMessage: string;
   onCloseQuickAdd: () => void;
   handleCreateTaskBlock: (input: TimelineCreateInput) => Promise<void>;
@@ -45,7 +58,6 @@ buildScheduleViewHref: (...args: any[]) => string;
 }) {
 
   void data;
-  void viewModel;
   void activeView;
   void workspaceId;
   void routerPush;
@@ -54,11 +66,14 @@ buildScheduleViewHref: (...args: any[]) => string;
   void buildScheduleViewHref;
   void actionFailedMessage;
 
+  const { start: initialStartAt, end: initialEndAt } =
+    getScheduleQuickCreateTimes(viewModel.activeGroup?.date);
+
   return (
     <TaskCreateDialog
       isOpen={showQuickAddDialog}
-      initialStartAt={new Date(new Date().setHours(9, 0, 0, 0))}
-      initialEndAt={new Date(new Date().setHours(10, 0, 0, 0))}
+      initialStartAt={initialStartAt}
+      initialEndAt={initialEndAt}
       isPending={isPending}
       availableAiClients={availableAiClients ?? data.availableAiClients}
       onClose={onCloseQuickAdd}

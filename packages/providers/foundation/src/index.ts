@@ -1,9 +1,19 @@
 export {
+  parseJsonServerEventStream,
+  parseServerEventStream,
+  parseTypedJsonServerEventStream,
+  ServerEventStreamParseError,
+  type ParseServerEventStreamOptions,
+  type ServerEventFrame,
+} from "./server-event-stream";
+
+export {
   type AgentProviderClient,
   type CancelRunInput,
   type CreateSessionInput,
   type ExistingRunStreamInput,
   type GetRunInput,
+  type FindRunByClientOperationInput,
   type HealthCheckInput,
   type ProviderApprovalCapability,
   type ProviderApprovalChoice,
@@ -13,8 +23,11 @@ export {
   type ProviderApprovalScopePolicy,
   type ProviderApprovalSubject,
   type ProviderCapabilities,
+  type ProviderActionInvocationMode,
   type ProviderRecoveryCapability,
   type ProviderConfigurationCapabilities,
+  type ProviderOutcomeCode,
+  type ProviderStartIdempotency,
   type ProviderRuntimeDiagnostics,
   type ProviderConfig,
   type ProviderHealth,
@@ -32,15 +45,21 @@ export {
   type ProviderConversationTurnInput,
   type ProviderConversationTurnResult,
   type ProviderStructuredOutputSchema,
+  type ProviderToolDefinition,
+  type ProviderToolResultInput,
+  type ProviderToolResultOutcome,
   type ProviderUsage,
   type ResolveProviderApprovalInput,
   type StartRunInput,
   type StartRunInputWithControl,
   type StartRunControlInput,
   type StreamRunInput,
+  assertProviderStartSupported,
+  supportsDurableFeatureRuntime,
   createSessionInputSchema,
   existingRunStreamInputSchema,
   getRunInputSchema,
+  findRunByClientOperationInputSchema,
   healthCheckInputSchema,
   providerApprovalCapabilitySchema,
   providerApprovalChoiceSchema,
@@ -52,6 +71,12 @@ export {
   providerCapabilitiesSchema,
   providerConfigurationCapabilitiesSchema,
   providerRuntimeDiagnosticsSchema,
+  providerActionInvocationModeSchema,
+  providerOutcomeCodeSchema,
+  providerStartIdempotencySchema,
+  providerToolDefinitionSchema,
+  providerToolResultInputSchema,
+  providerToolResultOutcomeSchema,
   providerRecoveryCapabilitySchema,
   providerHealthSchema,
   providerRunInputSchema,
@@ -65,6 +90,7 @@ export {
   resolveProviderApprovalInputSchema,
   startRunInputSchema,
   streamRunInputSchema,
+  ProviderOperationError,
 } from "./ProviderClient";
 
 export {
@@ -89,3 +115,5 @@ export {
   type ProviderRecoveryCapabilityName,
   type ProviderRecoveryMode,
 } from "./provider-capability-matrix";
+
+export { BoundedTerminalRunSnapshots } from "./bounded-terminal-run-snapshots";

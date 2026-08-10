@@ -6,6 +6,7 @@ type EventContext = {
   workspaceId: string;
   taskId?: string | null;
   workBlockId?: string | null;
+  occurrenceId?: string | null;
   runId?: string | null;
   taskSessionId?: string | null;
   executionSessionId?: string | null;
@@ -67,64 +68,65 @@ export type AppendTaskTimelineItemInput = EventContext & {
   metadata?: Record<string, unknown> | null;
 };
 
-export async function appendRawEventLog(input: AppendRawEventLogInput) {
+export async function appendRawEventLog(input: AppendRawEventLogInput, client: Prisma.TransactionClient = db) {
   const payloadHash = hashEventPayload({
     rawPayload: input.rawPayload ?? null,
     rawText: input.rawText ?? null,
     metadata: input.metadata ?? null,
   });
-  const contextRefs = await resolveRawEventContextRefs(input);
-
+  const contextRefs = await resolveRawEventContextRefs(input, client);
   const createData = {
-      workspaceId: input.workspaceId,
-      taskId: contextRefs.taskId,
-      runId: contextRefs.runId,
-      taskSessionId: input.taskSessionId ?? null,
-      executionSessionId: input.executionSessionId ?? null,
-      planId: input.planId ?? null,
-      planRunId: input.planRunId ?? null,
-      nodeAttemptId: input.nodeAttemptId ?? null,
-      providerRunId: input.providerRunId ?? null,
-      nodeId: input.nodeId ?? null,
-      nodeTitle: input.nodeTitle ?? null,
-      source: input.source,
-      direction: input.direction,
-      rawType: input.rawType,
-      provider: input.provider ?? null,
-      runtimeName: input.runtimeName ?? null,
-      rawPayload: toJsonInput(input.rawPayload),
-      rawText: input.rawText ?? null,
-      metadata: toJsonInput(input.metadata),
-      nativeRunId: input.nativeRunId ?? null,
-      nativeEventId: input.nativeEventId ?? null,
-      nativeToolCallId: input.nativeToolCallId ?? null,
-      externalRef: input.externalRef ?? null,
-      sequence: input.sequence ?? null,
-      correlationId: input.correlationId ?? null,
-      parentRawEventId: input.parentRawEventId ?? null,
-      causationRawEventId: input.causationRawEventId ?? null,
-      payloadHash,
-      occurredAt: input.occurredAt ?? null,
+    workspaceId: input.workspaceId,
+    taskId: contextRefs.taskId,
+    workBlockId: input.workBlockId ?? null,
+    occurrenceId: input.occurrenceId ?? null,
+    runId: contextRefs.runId,
+    taskSessionId: input.taskSessionId ?? null,
+    executionSessionId: input.executionSessionId ?? null,
+    planId: input.planId ?? null,
+    planRunId: input.planRunId ?? null,
+    nodeAttemptId: input.nodeAttemptId ?? null,
+    providerRunId: input.providerRunId ?? null,
+    nodeId: input.nodeId ?? null,
+    nodeTitle: input.nodeTitle ?? null,
+    source: input.source,
+    direction: input.direction,
+    rawType: input.rawType,
+    provider: input.provider ?? null,
+    runtimeName: input.runtimeName ?? null,
+    rawPayload: toJsonInput(input.rawPayload),
+    rawText: input.rawText ?? null,
+    metadata: toJsonInput(input.metadata),
+    nativeRunId: input.nativeRunId ?? null,
+    nativeEventId: input.nativeEventId ?? null,
+    nativeToolCallId: input.nativeToolCallId ?? null,
+    externalRef: input.externalRef ?? null,
+    sequence: input.sequence ?? null,
+    correlationId: input.correlationId ?? null,
+    parentRawEventId: input.parentRawEventId ?? null,
+    causationRawEventId: input.causationRawEventId ?? null,
+    payloadHash,
+    occurredAt: input.occurredAt ?? null,
   };
 
   if (input.externalRef) {
-    return db.rawEventLog.upsert({
+    return client.rawEventLog.upsert({
       where: { source_externalRef: { source: input.source, externalRef: input.externalRef } },
       update: {},
       create: createData,
     });
   }
 
-  return db.rawEventLog.create({ data: createData });
+  return client.rawEventLog.create({ data: createData });
 }
 
-async function resolveRawEventContextRefs(input: AppendRawEventLogInput) {
+async function resolveRawEventContextRefs(input: AppendRawEventLogInput, client: Prisma.TransactionClient) {
   const [task, run] = await Promise.all([
     input.taskId
-      ? db.task.findUnique({ where: { id: input.taskId }, select: { id: true } })
+      ? client.task.findUnique({ where: { id: input.taskId }, select: { id: true } })
       : Promise.resolve(null),
     input.runId
-      ? db.run.findUnique({ where: { id: input.runId }, select: { id: true } })
+      ? client.run.findUnique({ where: { id: input.runId }, select: { id: true } })
       : Promise.resolve(null),
   ]);
 
@@ -134,10 +136,25 @@ async function resolveRawEventContextRefs(input: AppendRawEventLogInput) {
   };
 }
 
-export async function appendCanonicalEvent(input: AppendCanonicalEventInput) {
-  const [latest, contextRefs] = await Promise.all([
-    db.event.aggregate({ _max: { ingestSequence: true } }),
-    resolveCanonicalEventContextRefs(input),
+export async function appendCanonicalEvent(input: AppendCanonicalEventInput, client?: Prisma.TransactionClient) {
+  if (client) return appendCanonicalEventInTransaction(input, client);
+  return db.$transaction((tx) => appendCanonicalEventInTransaction(input, tx));
+}
+
+async function appendCanonicalEventInTransaction(input: AppendCanonicalEventInput, client: Prisma.TransactionClient) {
+  if (input.dedupeKey) {
+    const existing = await client.event.findUnique({ where: { dedupeKey: input.dedupeKey } });
+    if (existing) return existing;
+  }
+
+  const [sequence, contextRefs] = await Promise.all([
+    client.eventIngestSequence.upsert({
+      where: { id: "global" },
+      update: { value: { increment: 1 } },
+      create: { id: "global", value: 1 },
+      select: { value: true },
+    }),
+    resolveCanonicalEventContextRefs(input, client),
   ]);
   const createData = {
     eventType: input.eventType,
@@ -145,7 +162,9 @@ export async function appendCanonicalEvent(input: AppendCanonicalEventInput) {
     workspaceId: input.workspaceId,
     taskId: contextRefs.taskId,
     workBlockId: contextRefs.workBlockId,
+    occurrenceId: input.occurrenceId ?? null,
     runId: contextRefs.runId,
+    taskSessionId: input.taskSessionId ?? null,
     executionSessionId: input.executionSessionId ?? null,
     planId: input.planId ?? null,
     planRunId: input.planRunId ?? null,
@@ -165,33 +184,30 @@ export async function appendCanonicalEvent(input: AppendCanonicalEventInput) {
     severity: input.severity ?? null,
     dedupeKey: input.dedupeKey ?? null,
     occurredAt: input.occurredAt ?? null,
-    ingestSequence: (latest._max.ingestSequence ?? 0) + 1,
+    ingestSequence: sequence.value,
   };
 
-  if (!input.dedupeKey) {
-    return db.event.create({ data: createData });
-  }
-
-  return db.event.upsert({
+  if (!input.dedupeKey) return client.event.create({ data: createData });
+  return client.event.upsert({
     where: { dedupeKey: input.dedupeKey },
     update: {},
     create: createData,
   });
 }
 
-async function resolveCanonicalEventContextRefs(input: AppendCanonicalEventInput) {
+async function resolveCanonicalEventContextRefs(input: AppendCanonicalEventInput, client: Prisma.TransactionClient) {
   const [task, workBlock, run, rawEvent] = await Promise.all([
     input.taskId
-      ? db.task.findUnique({ where: { id: input.taskId }, select: { id: true } })
+      ? client.task.findUnique({ where: { id: input.taskId }, select: { id: true } })
       : Promise.resolve(null),
     input.workBlockId
-      ? db.workBlock.findUnique({ where: { id: input.workBlockId }, select: { id: true } })
+      ? client.workBlock.findUnique({ where: { id: input.workBlockId }, select: { id: true } })
       : Promise.resolve(null),
     input.runId
-      ? db.run.findUnique({ where: { id: input.runId }, select: { id: true } })
+      ? client.run.findUnique({ where: { id: input.runId }, select: { id: true } })
       : Promise.resolve(null),
     input.rawEventId
-      ? db.rawEventLog.findUnique({ where: { id: input.rawEventId }, select: { id: true } })
+      ? client.rawEventLog.findUnique({ where: { id: input.rawEventId }, select: { id: true } })
       : Promise.resolve(null),
   ]);
 
@@ -203,8 +219,11 @@ async function resolveCanonicalEventContextRefs(input: AppendCanonicalEventInput
   };
 }
 
-export async function appendTaskTimelineItem(input: AppendTaskTimelineItemInput) {
-  return db.taskTimelineItem.create({
+export async function appendTaskTimelineItem(
+  input: AppendTaskTimelineItemInput,
+  client: Prisma.TransactionClient = db,
+) {
+  return client.taskTimelineItem.create({
     data: {
       workspaceId: input.workspaceId,
       taskId: input.taskId,

@@ -104,9 +104,24 @@ export function useAutoComplete(title: string | null, debounceMs = 500) {
           async onNonStreamResponse(response) {
             handledNonStreamResponse = true;
             const data = (await response.json().catch(() => ({}))) as {
+              error?: string;
+              message?: string;
               suggestions?: StructuredSuggestion[];
             };
             if (!isActiveRequest()) return;
+            if (!response.ok) {
+              setError(
+                typeof data.error === "string"
+                  ? data.error
+                  : typeof data.message === "string"
+                    ? data.message
+                    : `Request failed (${response.status})`,
+              );
+              setStructuredSuggestions([]);
+              setIsLoading(false);
+              setPhase("error");
+              return;
+            }
             setStructuredSuggestions(data.suggestions ?? []);
             setIsLoading(false);
             setPhase("done");

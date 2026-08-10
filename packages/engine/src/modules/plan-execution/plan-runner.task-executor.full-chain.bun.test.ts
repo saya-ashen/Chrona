@@ -40,9 +40,11 @@ describe("plan-runner task executor full execution chain", () => {
     expect(initial.currentNodeId).toBe("route_condition");
     expect(initial.executedNodeIds).toEqual(["prepare_task"]);
     expect(executeTaskNodeCapabilityMock).toHaveBeenCalledTimes(1);
+    const executionSession = await db.executionSession.findFirstOrThrow({ where: { taskId: task.id } });
 
     const afterBranchSelection = await taskPlanExecution.dispatch({
       taskId: task.id,
+      commandContext: { sessionId: executionSession.id },
       action: { action: "resume_with_input", inputFields: { decision: "approve" } },
     });
 
@@ -53,6 +55,7 @@ describe("plan-runner task executor full execution chain", () => {
 
     const completed = await taskPlanExecution.dispatch({
       taskId: task.id,
+      commandContext: { sessionId: executionSession.id },
       action: {
         action: "resume_with_approval",
         decision: "approve",

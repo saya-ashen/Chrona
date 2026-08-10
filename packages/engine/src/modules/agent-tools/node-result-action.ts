@@ -5,9 +5,9 @@ import type {
   NodeDeliverableDeclaration,
   ResultContribution,
 } from "@chrona/contracts";
-import type { AgentToolOperationsDeps } from "./types";
+import type { SubmitNodeResultActionWithSession } from "../plan-execution/types";
 
-export type SubmitNodeResultAction = Parameters<AgentToolOperationsDeps["execution"]["submitNodeResult"]>[0]["action"];
+export type SubmitNodeResultAction = SubmitNodeResultActionWithSession;
 
 export function submitNodeResultActionFromTool(input: {
   toolName: ChronaToolName;

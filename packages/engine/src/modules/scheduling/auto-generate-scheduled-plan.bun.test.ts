@@ -73,7 +73,7 @@ async function recordPlanGenerationFailure(input: { workspaceId: string; taskId:
     payload: {
       generation_id: `failed-${input.taskId}`,
       code: "INVALID_TOOL_PAYLOAD",
-      message: "Provider completed without calling chrona_plan_generate.",
+      message: "Provider completed without a task plan blueprint."
     },
   });
 }

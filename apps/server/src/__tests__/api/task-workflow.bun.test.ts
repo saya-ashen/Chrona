@@ -17,9 +17,9 @@ import {
   createTaskBodySchema,
   updateTaskBodySchema,
 } from "@chrona/contracts/api";
-import { createTask } from "@chrona/engine/modules/tasks/create-task";
-import { updateTask } from "@chrona/engine/modules/tasks/update-task";
-import { appendCanonicalEvent } from "@chrona/engine/modules/events/append-canonical-event";
+import { createTask } from "@chrona/engine/test-support";
+import { updateTask } from "@chrona/engine/test-support";
+import { appendCanonicalEvent } from "@chrona/engine/test-support";
 import { resetTestDb, seedWorkspace, seedTask, expectTaskExists, expectTaskNotFound } from "../bun-test-helpers";
 import { json, error, internalServerError, parseLimit, toHttpError, HttpError } from "../../lib/http";
 

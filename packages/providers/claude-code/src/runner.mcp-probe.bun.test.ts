@@ -76,7 +76,7 @@ describe("probeMcpServer", () => {
         body: JSON.stringify({
           jsonrpc: "2.0",
           id: 2,
-          result: { tools: [{ name: "chrona_plan_generate" }, { name: "chrona_node_complete" }] },
+          result: { tools: [{ name: "fixture_echo" }, { name: "fixture_status" }] },
         }),
       }),
     ]);
@@ -88,7 +88,7 @@ describe("probeMcpServer", () => {
     });
     expect(result.status).toBe(200);
     expect(result.sessionId).toBe("sess-abc");
-    expect(result.toolNames).toEqual(["chrona_plan_generate", "chrona_node_complete"]);
+    expect(result.toolNames).toEqual(["fixture_echo", "fixture_status"]);
   });
 
   it("throws McpProbeError on 401 with a hint about CHRONA_API_KEY", async () => {
@@ -151,7 +151,7 @@ describe("probeMcpServer", () => {
         return new Response("", { status: 200, headers: { "mcp-session-id": "sess-noauth" } });
       }
       return new Response(
-        JSON.stringify({ jsonrpc: "2.0", id: 2, result: { tools: [{ name: "chrona_plan_generate" }] } }),
+        JSON.stringify({ jsonrpc: "2.0", id: 2, result: { tools: [{ name: "fixture_echo" }] } }),
         { status: 200 },
       );
     }) as unknown as typeof fetch;
@@ -161,7 +161,7 @@ describe("probeMcpServer", () => {
       token: "",
       runId: "preflight",
     });
-    expect(result.toolNames).toEqual(["chrona_plan_generate"]);
+    expect(result.toolNames).toEqual(["fixture_echo"]);
     // Neither the initialize nor the tools/list request carried an Authorization header.
     expect(authHeaders).toEqual([null, null]);
   });
@@ -201,7 +201,7 @@ describe("probeMcpServer", () => {
       `data: ${JSON.stringify({
         jsonrpc: "2.0",
         id: 2,
-        result: { tools: [{ name: "chrona_plan_generate" }] },
+        result: { tools: [{ name: "fixture_echo" }] },
       })}\n\n`;
     globalThis.fetch = makeFetchStub([
       () => ({ status: 200, headers: { "mcp-session-id": "sess-sse" } }),
@@ -213,6 +213,6 @@ describe("probeMcpServer", () => {
       token: "tok",
       runId: "preflight",
     });
-    expect(result.toolNames).toEqual(["chrona_plan_generate"]);
+    expect(result.toolNames).toEqual(["fixture_echo"]);
   });
 });

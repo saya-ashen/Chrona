@@ -12,8 +12,8 @@ import { db } from "@chrona/db";
 import { ScheduleSource } from "@chrona/db/generated/prisma/client";
 import type { ScheduleProposal } from "@chrona/db/generated/prisma/client";
 import { scheduleProposalBodySchema } from "@chrona/contracts/api";
-import { decideScheduleProposal } from "@chrona/engine/modules/scheduling/decide-schedule-proposal";
-import { proposeSchedule } from "@chrona/engine/modules/scheduling/propose-schedule";
+import { decideScheduleProposal } from "@chrona/engine/test-support";
+import { proposeSchedule } from "@chrona/engine/test-support";
 import { resetTestDb, seedTask, seedWorkspace } from "../bun-test-helpers";
 
 function err(c: Context, message: string, status = 400) {

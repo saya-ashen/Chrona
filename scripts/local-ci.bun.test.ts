@@ -1,7 +1,9 @@
 import { afterEach, describe, expect, it } from "bun:test";
-import { existsSync, mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+
+import { cleanupTestRunWorkspace, createTestRunWorkspace } from "./run-bun-tests";
 
 import { shouldInstallGitHooks } from "./install-git-hooks";
 import { createLocalCiEnvironment } from "./local-ci";
@@ -39,5 +41,21 @@ describe("local CI Git hook support", () => {
 
     environment.cleanup();
     expect(existsSync(directory)).toBe(false);
+  });
+
+  it("creates unique database and data paths and cleans all SQLite sidecars", () => {
+    const workspace = createTestRunWorkspace(process.cwd(), ["first.bun.test.ts", "second.bun.test.ts"]);
+    const [first, second] = workspace.files;
+
+    expect(first.fileDbPath).not.toBe(second.fileDbPath);
+    expect(first.dataDir).not.toBe(second.dataDir);
+    expect(first.env.DATABASE_URL).toBe(`file:${first.fileDbPath}`);
+    expect(first.env.CHRONA_DATA_DIR).toBe(first.dataDir);
+    expect(existsSync(first.fileDbPath.slice(0, first.fileDbPath.lastIndexOf("/")))).toBe(true);
+
+    writeFileSync(`${first.fileDbPath}-wal`, "sidecar");
+    cleanupTestRunWorkspace(workspace);
+
+    expect(existsSync(workspace.root)).toBe(false);
   });
 });

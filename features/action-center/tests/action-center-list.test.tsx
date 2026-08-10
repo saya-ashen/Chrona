@@ -91,7 +91,7 @@ describe("ActionCenterList", () => {
     const user = userEvent.setup();
     render(<ActionCenterList items={[completedItem, recoveryItem]} />);
 
-    await user.click(screen.getByRole("button", { name: "Recover" }));
+    await user.click(screen.getByRole("tab", { name: "Recover" }));
 
     expect(screen.getByText("Collect PhD positions")).toBeInTheDocument();
     expect(screen.queryByText("Draft report")).not.toBeInTheDocument();

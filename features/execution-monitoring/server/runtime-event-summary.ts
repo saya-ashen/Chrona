@@ -1,213 +1,251 @@
-import type { PlanExecutionSSEEvent } from "@chrona/contracts";
-import type { CheckpointActionKind, ExecutionActionType } from "@chrona/contracts";
+import type {
+	CheckpointActionKind,
+	ExecutionActionType,
+	PlanExecutionSSEEvent,
+} from "@chrona/contracts";
+import {
+	publicProviderDescriptor,
+	publicRuntimeDescriptor,
+	publicToolDescriptor,
+} from "@chrona/contracts";
 import type { PlanExecutionRuntimeEvent } from "@chrona/engine";
 
-type RuntimeSummaryBase = Omit<Extract<PlanExecutionSSEEvent, { type: "runtime_event" }>, "event">;
+const SENSITIVE_PROVIDER_KEY =
+	/api[-_]?key|token|secret|password|authorization|credential/i;
 
-function toolLabel(toolName?: string): string {
-  switch (toolName) {
-    case "chrona_execution_dispatch":
-      return "Updating execution state";
-    case "chrona_plan_read":
-      return "Reading plan";
-    case "chrona_plan_mutate":
-      return "Updating plan";
-    case "chrona_task_read":
-      return "Reading task";
-    case undefined:
-      return "Running tool";
-    default:
-      return toolName;
-  }
+function exposeProviderPayload(value: unknown, key?: string): unknown {
+	if (key && SENSITIVE_PROVIDER_KEY.test(key)) return "[redacted]";
+	if (Array.isArray(value))
+		return value.map((item) => exposeProviderPayload(item));
+	if (value && typeof value === "object") {
+		return Object.fromEntries(
+			Object.entries(value as Record<string, unknown>).map(
+				([entryKey, entryValue]) => [
+					entryKey,
+					exposeProviderPayload(entryValue, entryKey),
+				],
+			),
+		);
+	}
+	return value;
+}
+
+function sanitizeProviderDisplayEvent(
+	event: Extract<PlanExecutionSSEEvent, { type: "runtime_event" }>["event"],
+) {
+	return exposeProviderPayload(event) as Extract<
+		PlanExecutionSSEEvent,
+		{ type: "runtime_event" }
+	>["event"];
 }
 
 export function summarizeRuntimeEvent(
-  action: ExecutionActionType,
-  event: PlanExecutionRuntimeEvent,
-): Extract<PlanExecutionSSEEvent, { type: "runtime_event" }> {
-  const providerEvent = event.event;
-  const provider = providerEvent.provider ?? "provider";
-  const base: RuntimeSummaryBase = {
-    type: "runtime_event" as const,
-    action,
-    nodeId: event.nodeId,
-    nodeTitle: event.nodeTitle,
-    runtimeName: event.runtimeName,
-    provider,
-    runId: providerEvent.runId,
-    nativeRunId: providerEvent.nativeRunId,
-    sequence: providerEvent.sequence,
-    timestamp: providerEvent.timestamp ?? new Date().toISOString(),
-    rawEventType: providerEvent.rawEventType,
-  };
-
-  return { ...base, event: summarizeProviderRuntimePayload(providerEvent) };
+	action: ExecutionActionType,
+	event: PlanExecutionRuntimeEvent,
+): Extract<PlanExecutionSSEEvent, { type: "runtime_event" }> | null {
+	const providerEvent = event.event;
+	const provider = publicProviderDescriptor(providerEvent.provider);
+	const displayEvent = summarizeProviderRuntimePayload(providerEvent);
+	if (!displayEvent) return null;
+	return {
+		type: "runtime_event",
+		action,
+		executionScope: event.executionScope,
+		nodeId: event.nodeId,
+		nodeTitle: event.nodeTitle,
+		runtime: publicRuntimeDescriptor(event.runtimeName),
+		provider,
+		sequence: providerEvent.sequence,
+		timestamp: providerEvent.timestamp ?? new Date().toISOString(),
+		event: sanitizeProviderDisplayEvent(displayEvent),
+	};
 }
-
-export function checkpointActionToExecutionAction(action: CheckpointActionKind): ExecutionActionType {
-  switch (action) {
-    case "submit_input":
-      return "resume_with_input";
-    case "approve_result":
-    case "reject_result":
-    case "request_changes":
-    case "accept_replan":
-    case "reject_replan":
-    case "request_replan":
-      return "resume_with_approval";
-    case "retry_node":
-      return "retry_node";
-    case "resume_after_unblock":
-      return "resume_after_unblock";
-    case "mark_node_completed":
-    case "mark_node_skipped":
-      return "complete_manual_node";
-    case "fail_task":
-      return "fail_current_node";
-    case "cancel_session":
-      return "cancel_session";
-  }
-}
-
-function recordValue(value: unknown) {
-  return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : null;
-}
-
-function stringValue(record: Record<string, unknown> | null, key: string) {
-  const value = record?.[key];
-  return typeof value === "string" && value.trim() ? value.trim() : undefined;
-}
-
-function numberValue(record: Record<string, unknown> | null, key: string) {
-  const value = record?.[key];
-  return typeof value === "number" ? value : undefined;
-}
-
-function latestWorkflowProgress(raw: Record<string, unknown>) {
-  const progress = Array.isArray(raw.workflow_progress) ? raw.workflow_progress : [];
-  for (const item of [...progress].reverse()) {
-    const record = recordValue(item);
-    if (record) return record;
-  }
-  return null;
-}
-
-function directRawMessage(raw: unknown) {
-  const record = recordValue(raw);
-  return stringValue(record, "message");
-}
-
-function taskProgressMessage(raw: unknown) {
-  const record = recordValue(raw);
-  if (!record || record.type !== "system" || record.subtype !== "task_progress") return undefined;
-
-  const progress = latestWorkflowProgress(record);
-  const usage = recordValue(record.usage);
-  const toolName = stringValue(progress, "lastToolName") ?? stringValue(record, "last_tool_name");
-  const toolSummary = stringValue(progress, "lastToolSummary");
-  const toolUses = numberValue(usage, "tool_uses");
-  const parts = [
-    stringValue(record, "description"),
-    toolSummary ? `${toolName ?? "Tool"}: ${toolSummary}` : undefined,
-    toolUses !== undefined ? `${toolUses} tool uses` : undefined,
-  ].filter((part): part is string => Boolean(part));
-
-  return parts.join(" · ") || stringValue(record, "summary");
-}
-
-function compactJson(value: unknown, maxLength = 4_000) {
-  if (value === undefined) return undefined;
-  const seen = new WeakSet<object>();
-  const serialized = JSON.stringify(value, (key, nested) => {
-    if (/token|secret|credential|password|api.?key|authorization|cookie/i.test(key)) return "[redacted]";
-    if (nested && typeof nested === "object") {
-      if (seen.has(nested)) return "[circular]";
-      seen.add(nested);
-    }
-    return nested;
-  }, 2);
-  if (!serialized) return undefined;
-  return serialized.length > maxLength ? `${serialized.slice(0, maxLength - 3)}...` : serialized;
-}
-
-function toolResultPreview(value: unknown) {
-  if (value && typeof value === "object" && !Array.isArray(value) && "content" in value) {
-    const content = (value as { content?: unknown }).content;
-    if (Array.isArray(content)) {
-      const text = content.flatMap((item) => item && typeof item === "object" && "text" in item && typeof item.text === "string" ? [item.text] : []).join("\n").trim();
-      if (text) return text.length > 4_000 ? `${text.slice(0, 3_997)}...` : text;
-    }
-  }
-  return compactJson(value);
+export function checkpointActionToExecutionAction(
+	action: CheckpointActionKind,
+): ExecutionActionType {
+	switch (action) {
+		case "submit_input":
+			return "resume_with_input";
+		case "approve_result":
+		case "reject_result":
+		case "request_changes":
+		case "accept_replan":
+		case "reject_replan":
+		case "request_replan":
+			return "resume_with_approval";
+		case "retry_node":
+			return "retry_node";
+		case "resume_after_unblock":
+			return "resume_after_unblock";
+		case "mark_node_completed":
+		case "mark_node_skipped":
+			return "complete_manual_node";
+		case "fail_task":
+			return "fail_current_node";
+		case "cancel_session":
+			return "cancel_session";
+	}
 }
 
 function summarizeProviderRuntimePayload(
-  providerEvent: PlanExecutionRuntimeEvent["event"],
-): Extract<PlanExecutionSSEEvent, { type: "runtime_event" }>["event"] {
-  switch (providerEvent.type) {
-    case "text_delta":
-      return { type: "assistant_text_delta", text: providerEvent.text };
-    case "reasoning_delta":
-      return { type: "reasoning_delta", text: providerEvent.text };
-    case "tool_call":
-      return {
-        type: "tool_started",
-        toolName: providerEvent.tool,
-        callId: providerEvent.callId,
-        label: toolLabel(providerEvent.tool),
-        inputSummary: compactJson(providerEvent.input),
-        preview: typeof providerEvent.preview === "string" ? providerEvent.preview : compactJson(providerEvent.preview),
-      };
-    case "tool_progress":
-      return {
-        type: "tool_progress",
-        toolName: providerEvent.toolName,
-        callId: providerEvent.callId,
-        label: toolLabel(providerEvent.toolName),
-        preview: providerEvent.preview,
-      };
-    case "tool_started":
-      return {
-        type: "tool_started",
-        toolName: providerEvent.toolName,
-        label: toolLabel(providerEvent.toolName),
-        preview: typeof providerEvent.preview === "string" ? providerEvent.preview : compactJson(providerEvent.preview),
-        inputSummary: compactJson(providerEvent.input),
-      };
-    case "tool_result":
-      return {
-        type: "tool_completed",
-        toolName: providerEvent.tool,
-        callId: providerEvent.callId,
-        label: toolLabel(providerEvent.tool),
-        preview: toolResultPreview(providerEvent.result),
-      };
-    case "tool_completed":
-      return {
-        type: "tool_completed",
-        toolName: providerEvent.toolName,
-        label: toolLabel(providerEvent.toolName),
-        preview: providerEvent.error ? undefined : toolResultPreview(providerEvent.raw),
-        durationMs: providerEvent.durationMs,
-        error: providerEvent.error
-          ? {
-              message: providerEvent.error.message,
-              code: providerEvent.error.code,
-            }
-          : undefined,
-      };
-    case "approval_required":
-      return { type: "approval_required", approval: providerEvent.approval };
-    case "run_started":
-      return { type: "run_status", status: "started", message: "Provider run started." };
-    case "run_completed":
-      return { type: "run_status", status: "completed", message: "Provider run finished. Chrona state sync is authoritative." };
-    case "run_failed":
-      return { type: "run_status", status: "failed", message: providerEvent.error };
-    case "run_cancelled":
-      return { type: "run_status", status: "cancelled", message: "Provider run cancelled." };
-    case "raw_event":
-      return { type: "raw_event", rawEventType: providerEvent.rawEventType, message: directRawMessage(providerEvent.raw) ?? taskProgressMessage(providerEvent.raw) };
-
-  }
+	providerEvent: PlanExecutionRuntimeEvent["event"],
+): Extract<PlanExecutionSSEEvent, { type: "runtime_event" }>["event"] | null {
+	switch (providerEvent.type) {
+		case "text_delta":
+			return {
+				type: "text_delta",
+				text: providerEvent.text,
+			};
+		case "reasoning_delta":
+			return {
+				type: "reasoning_delta",
+				text: providerEvent.text,
+				...(providerEvent.raw !== undefined ? { raw: providerEvent.raw } : {}),
+			};
+		case "tool_call":
+			return {
+				type: "tool_started",
+				tool: publicToolDescriptor(providerEvent.tool),
+				label: publicToolDescriptor(providerEvent.tool).label,
+				input: providerEvent.input,
+				...(providerEvent.preview !== undefined
+					? { raw: providerEvent.preview }
+					: {}),
+			};
+		case "tool_started":
+			return {
+				type: "tool_started",
+				tool: publicToolDescriptor(providerEvent.toolName),
+				label: publicToolDescriptor(providerEvent.toolName).label,
+				...(providerEvent.input !== undefined
+					? { input: providerEvent.input }
+					: {}),
+				...(providerEvent.raw !== undefined ? { raw: providerEvent.raw } : {}),
+			};
+		case "tool_progress":
+			return {
+				type: "tool_progress",
+				tool: publicToolDescriptor(providerEvent.toolName),
+				label: publicToolDescriptor(providerEvent.toolName).label,
+				...(providerEvent.preview !== undefined
+					? { output: providerEvent.preview }
+					: {}),
+				...(providerEvent.raw !== undefined ? { raw: providerEvent.raw } : {}),
+			};
+		case "tool_result":
+			return {
+				type: "tool_completed",
+				tool: providerEvent.tool
+					? publicToolDescriptor(providerEvent.tool)
+					: undefined,
+				label: providerEvent.tool
+					? publicToolDescriptor(providerEvent.tool).label
+					: "Tool result",
+				output: providerEvent.result,
+			};
+		case "tool_completed":
+			return {
+				type: "tool_completed",
+				tool: publicToolDescriptor(providerEvent.toolName),
+				label: publicToolDescriptor(providerEvent.toolName).label,
+				durationMs: providerEvent.durationMs,
+				...(providerEvent.error
+					? {
+							error: {
+								code: providerEvent.error.code,
+								message: providerEvent.error.message,
+								raw: providerEvent.error.raw,
+							},
+						}
+					: {}),
+				...(providerEvent.raw !== undefined ? { raw: providerEvent.raw } : {}),
+			};
+		case "approval_required": {
+			const { id, riskLevel, choices, defaultChoice, recommendedChoice } =
+				providerEvent.approval;
+			return {
+				type: "approval_required",
+				approval: {
+					id,
+					provider: publicProviderDescriptor(providerEvent.approval.provider),
+					kind: "execution_approval",
+					title: "Approval required",
+					summary: "Execution is waiting for confirmation.",
+					riskLevel,
+					choices,
+					defaultChoice,
+					recommendedChoice,
+				},
+				...(providerEvent.raw !== undefined ? { raw: providerEvent.raw } : {}),
+			};
+		}
+		case "run_started":
+			return { type: "run_status", status: "started", raw: providerEvent.run };
+		case "run_completed":
+			return {
+				type: "run_status",
+				status: "completed",
+				output: {
+					...(providerEvent.outputText !== undefined
+						? { text: providerEvent.outputText }
+						: {}),
+					...(providerEvent.output !== undefined
+						? { output: providerEvent.output }
+						: {}),
+					...(providerEvent.structuredPayload !== undefined
+						? { structuredPayload: providerEvent.structuredPayload }
+						: {}),
+				},
+				...(providerEvent.raw !== undefined ? { raw: providerEvent.raw } : {}),
+			};
+		case "run_failed":
+			return {
+				type: "run_status",
+				status: "failed",
+				error: providerEvent.error,
+				...(providerEvent.raw !== undefined ? { raw: providerEvent.raw } : {}),
+			};
+		case "run_cancelled":
+			return {
+				type: "run_status",
+				status: "cancelled",
+				...(providerEvent.raw !== undefined ? { raw: providerEvent.raw } : {}),
+			};
+		case "raw_event": {
+			const raw = providerEvent.raw;
+			const kind =
+				raw && typeof raw === "object"
+					? (raw as { kind?: unknown }).kind
+					: undefined;
+			if (kind === "provider_request") {
+				return {
+					type: "run_status",
+					status: "started",
+					input: (raw as { input?: unknown }).input,
+					raw,
+				};
+			}
+			if (kind !== "provider_response") {
+				return {
+					type: "raw_event",
+					raw,
+					...(providerEvent.rawEventType
+						? { rawEventType: providerEvent.rawEventType }
+						: {}),
+				};
+			}
+			const output = (raw as { output?: { status?: unknown } }).output;
+			const status =
+				output?.status === "failed"
+					? "failed"
+					: output?.status === "cancelled"
+						? "cancelled"
+						: output?.status === "completed"
+							? "completed"
+							: "started";
+			return { type: "run_status", status, output, raw };
+		}
+		default:
+			return null;
+	}
 }

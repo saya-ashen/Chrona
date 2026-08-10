@@ -1,6 +1,7 @@
 "use client";
 
 import type { ComponentProps } from "react";
+import { useState } from "react";
 import type { LucideIcon } from "lucide-react";
 import { Ellipsis } from "lucide-react";
 import { Link } from "react-router-dom";
@@ -34,11 +35,14 @@ function LocalizedLink({ href, ...props }: LocalizedLinkProps) {
 }
 
 export function TaskActionsMenu({ label, items, buttonClassName }: TaskActionsMenuProps) {
+  const [open, setOpen] = useState(false);
+
   return (
-    <DropdownMenu>
+    <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger
         render={
           <Button
+        onClick={() => setOpen(true)}
             type="button"
             aria-label={label}
             variant="ghost"

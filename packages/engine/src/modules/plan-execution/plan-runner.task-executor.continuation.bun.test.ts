@@ -11,6 +11,7 @@ import {
   makeTwoTaskPlan,
   seedAcceptedCompiledPlan,
   seedWorkspaceAndTask,
+  seedRuntimeSyncIdentity,
   setupPlanRunnerTaskExecutorTest,
   taskPlanExecution,
 } from "./plan-runner.task-executor.fixtures";
@@ -270,9 +271,23 @@ describe("plan-runner task executor continuation", () => {
         trigger: "scheduled",
       },
     });
+    const occurrenceKey = "schedule:v1:2026-06-01T09:00:00.000Z";
+    await db.taskOccurrence.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        workBlockId: firstBlock.id,
+        occurrenceKey,
+        triggerVersion: 1,
+        source: { kind: "system", reason: "scheduled occurrence test" },
+        status: "Ready",
+        eligibleAt: new Date("2026-06-01T09:00:00.000Z"),
+      },
+    });
+    await db.workBlock.update({ where: { id: firstBlock.id }, data: { recurrenceKey: occurrenceKey } });
 
     const compiledPlan = makeSingleTaskPlan("graph_recurring_occurrence");
-    await seedAcceptedCompiledPlan(workspace.id, task.id, compiledPlan);
+    await seedAcceptedCompiledPlan(workspace.id, task.id, compiledPlan, firstBlock.id);
 
     const result = await taskPlanExecution.start({
       taskId: task.id,
@@ -307,12 +322,14 @@ describe("plan-runner task executor continuation", () => {
       action: { action: "start_manual" },
     });
 
+    const identity = await seedRuntimeSyncIdentity(task.id, "runtime-first-missing-terminal");
     expect(started.status).toBe("running");
     expect(started.currentNodeId).toBe("first_task");
 
     await taskPlanExecution.syncRuntimeResult({
       taskId: task.id,
       runtimeRunRef: "runtime-first-missing-terminal",
+      ...identity,
       status: "Completed",
       summary: "Provider finished without calling Chrona terminal tools",
     });
@@ -364,12 +381,14 @@ describe("plan-runner task executor continuation", () => {
     });
 
     expect(started.status).toBe("running");
+    const identity = await seedRuntimeSyncIdentity(task.id, "runtime-first");
     expect(started.currentNodeId).toBe("first_task");
     expect(executeTaskNodeCapabilityMock).toHaveBeenCalledTimes(1);
 
     await taskPlanExecution.syncRuntimeResult({
       taskId: task.id,
       runtimeRunRef: "runtime-first",
+      ...identity,
       status: "Completed",
       summary: "First task complete",
       output: { root: "root", elements: { root: { type: "JsonView", props: { value: { requirements: "ready" } } } } },
@@ -417,12 +436,14 @@ describe("plan-runner task executor continuation", () => {
     });
 
     expect(started.status).toBe("running");
+    const identity = await seedRuntimeSyncIdentity(task.id, "runtime-first-entry");
     expect(started.currentNodeId).toBe("first_entry");
     expect(executeTaskNodeCapabilityMock).toHaveBeenCalledTimes(1);
 
     await taskPlanExecution.syncRuntimeResult({
       taskId: task.id,
       runtimeRunRef: "runtime-first-entry",
+      ...identity,
       status: "Completed",
       summary: "First entry complete",
       output: { root: "root", elements: { root: { type: "JsonView", props: { value: { architectureFacts: "ready" } } } } },
@@ -508,11 +529,13 @@ describe("plan-runner task executor continuation", () => {
       action: { action: "start_manual" },
     });
     expect(started.status).toBe("running");
+    const identity = await seedRuntimeSyncIdentity(task.id, "runtime-first-restart");
     expect(started.currentNodeId).toBe("first_task");
 
     await taskPlanExecution.syncRuntimeResult({
       taskId: task.id,
       runtimeRunRef: "runtime-first-restart",
+      ...identity,
       status: "Completed",
       summary: "First task complete before restart",
       output: { root: "root", elements: { root: { type: "JsonView", props: { value: { restart: "safe" } } } } },
@@ -524,7 +547,7 @@ describe("plan-runner task executor continuation", () => {
     });
 
     expect(restarted.status).toBe("running");
-    expect(restarted.message).toBe("Execution running: no ready nodes");
+    expect(restarted.message).toBe("Current execution state.");
     expect(executeTaskNodeCapabilityMock.mock.calls.map((call) => call[0].node.id)).toEqual([
       "first_task",
       "second_task",
@@ -549,7 +572,7 @@ describe("plan-runner task executor continuation", () => {
       select: { status: true, currentNodeId: true, currentNodeAttemptId: true },
     });
     expect(sessions).toEqual([
-      { status: "Active", currentNodeId: null, currentNodeAttemptId: null },
+      { status: "Active", currentNodeId: "second_task", currentNodeAttemptId: persisted!.attempts.at(-1)!.id },
     ]);
   });
 

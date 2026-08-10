@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "bun:test";
 import { db } from "@chrona/db";
-import { applySchedule } from "@chrona/engine/modules/scheduling/apply-schedule";
+import { applySchedule } from "@chrona/engine/test-support";
 import { resetTestDb, seedTask, seedWorkspace } from "../bun-test-helpers";
 
 // applySchedule — engine-layer unit for the schedule-application

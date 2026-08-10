@@ -1,3 +1,4 @@
+/* eslint-disable max-lines-per-function, complexity -- Execution facade explicitly maps every private action and recovery authority variant. */
 import { db } from "@/lib/db";
 import { resolveEffectivePlanGraph } from "@chrona/graph-runtime";
 import { executionStatusFromEffectiveGraph } from "./execution-state-machine";
@@ -23,11 +24,15 @@ import type {
 } from "./types";
 import type { SubmittedNodeResult } from "@chrona/contracts/plan-runtime/execution-command";
 import { ensureNativePlanRun } from "./persistence/plan-runtime-store";
+import { getPlanRun } from "./persistence/plan-run-store";
 import { ensurePlanMainSession } from "./persistence/plan-state-store";
 import { currentNodeFromEffective } from "./projection/execution-graph-selectors";
 import { executeCommand } from "./kernel/execute-command";
 import { resolveCheckpointTransition } from "./use-cases/checkpoint-transition/resolve-checkpoint-transition";
+import { getCurrentExecution as readCurrentExecution } from "./use-cases/get-current-execution";
 import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
+import { assertSchedulerWorkOwnership, type SchedulerWorkContext } from "@/modules/orchestration/scheduler-lease-repository";
+import { runWithSchedulerWorkContext } from "@/modules/orchestration/scheduler-work-context";
 
 export { getCurrentExecution } from "./use-cases/get-current-execution";
 export { submitTerminalNodeResult } from "./use-cases/submit-terminal-node-result";
@@ -51,15 +56,22 @@ export async function startPlanExecution(
     trigger: OrchestratorTrigger;
     prompt?: string;
     workBlockId?: string | null;
+    workContext?: SchedulerWorkContext;
   } & PlanExecutionObserver,
 ): Promise<PlanExecutionResult> {
-  return executeCommand({
-    taskId: input.taskId,
-    command: { type: "start", trigger: input.trigger, prompt: input.prompt },
-    context: { trigger: input.trigger, workBlockId: input.workBlockId ?? null },
-    onGraphEvent: input.onGraphEvent,
-    onRuntimeEvent: input.onRuntimeEvent,
-    onStateChange: input.onStateChange,
+  return runWithSchedulerWorkContext(input.workContext, async () => {
+    await assertSchedulerWorkOwnership(input.workContext);
+    const execution = await executeCommand({
+      taskId: input.taskId,
+      command: { type: "start", trigger: input.trigger, prompt: input.prompt },
+      context: { trigger: input.trigger, ...(Object.hasOwn(input, "workBlockId") ? { workBlockId: input.workBlockId ?? null } : {}) },
+      workContext: input.workContext,
+      onGraphEvent: input.onGraphEvent,
+      onRuntimeEvent: input.onRuntimeEvent,
+      onStateChange: input.onStateChange,
+    });
+    await assertSchedulerWorkOwnership(input.workContext);
+    return execution;
   });
 }
 
@@ -73,6 +85,7 @@ export async function continuePlanExecution(
     nodeId?: string;
     resumeReadyNode?: boolean;
     workBlockId?: string | null;
+    idempotencyKey?: string;
   } & PlanExecutionObserver,
 ): Promise<PlanExecutionResult> {
   const command: ExecutionCommand =
@@ -82,7 +95,7 @@ export async function continuePlanExecution(
   return executeCommand({
     taskId: input.taskId,
     command,
-    context: { sessionId: input.sessionId, workBlockId: input.workBlockId ?? null },
+    context: { sessionId: input.sessionId, ...(Object.hasOwn(input, "workBlockId") ? { workBlockId: input.workBlockId ?? null } : {}), idempotencyKey: input.idempotencyKey },
     onGraphEvent: input.onGraphEvent,
     onRuntimeEvent: input.onRuntimeEvent,
     onStateChange: input.onStateChange,
@@ -97,6 +110,7 @@ export async function resumePlanExecutionWithApproval(
     workBlockId?: string | null;
     approved: boolean;
     feedback?: string;
+    idempotencyKey?: string;
   } & PlanExecutionObserver,
 ): Promise<PlanExecutionResult> {
   return executeCommand({
@@ -107,19 +121,22 @@ export async function resumePlanExecutionWithApproval(
       approved: input.approved,
       feedback: input.feedback,
     },
-    context: { sessionId: input.sessionId, workBlockId: input.workBlockId ?? null },
+    context: { sessionId: input.sessionId, ...(Object.hasOwn(input, "workBlockId") ? { workBlockId: input.workBlockId ?? null } : {}), idempotencyKey: input.idempotencyKey },
     onGraphEvent: input.onGraphEvent,
     onRuntimeEvent: input.onRuntimeEvent,
     onStateChange: input.onStateChange,
   });
 }
-
 function commandForExecutionAction(
   action: ExecutionActionWithContinuation,
+  contextSessionId?: string | null,
 ): { command: ExecutionCommand; context: ExecutionCommandContext } {
-  const sessionId = "sessionId" in action ? action.sessionId : undefined;
-  const workBlockId = "workBlockId" in action ? action.workBlockId ?? null : null;
-  const context: ExecutionCommandContext = { sessionId, workBlockId };
+  const sessionId = contextSessionId ?? undefined;
+  const context: ExecutionCommandContext = {
+    sessionId,
+    ...("workBlockId" in action ? { workBlockId: action.workBlockId ?? null } : {}),
+    idempotencyKey: action.idempotencyKey,
+  };
 
   switch (action.action) {
     case "start_manual":
@@ -162,7 +179,7 @@ function commandForExecutionAction(
         kind: "done",
         summary: action.summary,
         output: action.output,
-        evidence: action.sessionId ? { sessionId: action.sessionId } : undefined,
+        evidence: sessionId ? { sessionId } : undefined,
         selectedBranch: action.selectedBranch,
         branchRef: action.branchRef,
         deliverables: action.deliverables,
@@ -179,6 +196,9 @@ function commandForExecutionAction(
         command: {
           type: "submit_node_result",
           nodeId: action.nodeId,
+          expectedAttemptId: action.expectedAttemptId,
+          runtimeRunRef: action.runtimeRunRef,
+          providerRunId: action.providerRunId,
           result,
           continueExecution: action.continueExecution ?? true,
         },
@@ -188,18 +208,28 @@ function commandForExecutionAction(
     case "block_current_node":
       return {
         command: {
-          type: "block_node",
+          type: "submit_node_result",
           nodeId: action.nodeId,
-          reason: action.reason,
-          actionForm: action.actionForm,
+          expectedAttemptId: action.expectedAttemptId,
+          runtimeRunRef: action.runtimeRunRef,
+          providerRunId: action.providerRunId,
+          result: { kind: "blocked", reason: action.reason, actionForm: action.actionForm },
         },
         context,
       };
     case "fail_current_node":
       return {
-        command: { type: "fail_node", nodeId: action.nodeId, error: action.error },
+        command: {
+          type: "submit_node_result",
+          nodeId: action.nodeId,
+          expectedAttemptId: action.expectedAttemptId,
+          runtimeRunRef: action.runtimeRunRef,
+          providerRunId: action.providerRunId,
+          result: { kind: "failed", error: action.error },
+        },
         context,
       };
+
     case "retry_node":
       return {
         command: {
@@ -224,6 +254,84 @@ function commandForExecutionAction(
   }
 }
 
+async function bindCurrentTerminalAttempt(
+  taskId: string,
+  command: ExecutionCommand,
+  context: ExecutionCommandContext,
+): Promise<ExecutionCommand> {
+  if (command.type !== "submit_node_result" || command.expectedAttemptId || command.runtimeRunRef) return command;
+  const terminalCommand = command;
+  const session = context.sessionId
+    ? await db.executionSession.findFirst({
+        where: {
+          id: context.sessionId,
+          taskId,
+        },
+        select: {
+          currentNodeAttemptId: true,
+          currentNodeId: true,
+          planId: true,
+          status: true,
+          workBlockId: true,
+        },
+      })
+    : await db.executionSession.findFirst({
+        where: {
+          taskId,
+          workBlockId: context.workBlockId ?? null,
+          activeScopeKey: "active",
+          status: { in: ["Active", "Paused"] },
+        },
+        select: {
+          currentNodeAttemptId: true,
+          currentNodeId: true,
+          planId: true,
+          workBlockId: true,
+          status: true,
+        },
+      });
+  if (context.sessionId && !session) {
+    throw new EngineError(ENGINE_ERROR_CODES.CONFLICT, "Execution session does not exist for this terminal action");
+  }
+  if (context.sessionId && session && !["Active", "Paused"].includes(session.status)) {
+    const current = await readCurrentExecution({ taskId, workBlockId: session.workBlockId });
+    if (current.status === "completed" || current.status === "cancelled") return command;
+    throw new EngineError(ENGINE_ERROR_CODES.CONFLICT, "Execution session is not active for this terminal action");
+  }
+  if (session && context.workBlockId !== undefined && context.workBlockId !== session.workBlockId) {
+    throw new EngineError(ENGINE_ERROR_CODES.CONFLICT, "Execution session does not match the terminal action scope");
+  }
+  if (!session?.planId) return command;
+  const runtime = await getPlanRun(taskId, session.planId, session.workBlockId);
+  const checkpointResult = [...(runtime?.results ?? [])].reverse().find((result) =>
+    result.nodeId === session.currentNodeId
+    && result.status === "current"
+    && result.waitKind
+    && result.attemptId
+  );
+  const attemptId = session.currentNodeAttemptId ?? checkpointResult?.attemptId;
+  if (!attemptId) return command;
+  const attempt = await db.taskPlanNodeAttempt.findFirst({
+    where: {
+      id: attemptId,
+      taskId,
+      planRun: { workBlockId: session.workBlockId },
+    },
+    select: { id: true, nodeId: true, status: true },
+  });
+  if (!attempt) return command;
+  if (["succeeded", "failed", "cancelled"].includes(attempt.status)) {
+    const exactCheckpoint = [...(runtime?.results ?? [])].reverse().find((result) =>
+      result.nodeId === attempt.nodeId
+      && result.attemptId === attempt.id
+      && result.status === "current"
+      && result.waitKind
+    );
+    if (!exactCheckpoint) return command;
+  }
+  return { ...terminalCommand, expectedAttemptId: attempt.id };
+}
+
 export async function dispatchExecutionAction(
   input: {
     taskId: string;
@@ -231,12 +339,15 @@ export async function dispatchExecutionAction(
     commandContext?: ExecutionDispatchContext;
   } & PlanExecutionObserver,
 ): Promise<PlanExecutionResult> {
-  const { command, context } = commandForExecutionAction(input.action);
+  const { command: requestedCommand, context } = commandForExecutionAction(input.action, input.commandContext?.sessionId);
+  const command = await bindCurrentTerminalAttempt(input.taskId, requestedCommand, context);
   return executeCommand({
     taskId: input.taskId,
     command,
     context: {
       ...context,
+      sessionId: context.sessionId ?? input.commandContext?.sessionId ?? undefined,
+      idempotencyKey: context.idempotencyKey ?? input.commandContext?.idempotencyKey ?? undefined,
       actor: input.commandContext?.actor,
       origin: input.commandContext?.origin,
     },
@@ -319,6 +430,7 @@ export async function submitCheckpointAction(
   return resolveCheckpointTransition({
     taskId: input.taskId,
     planId: runtime.planId,
+    idempotencyKey: input.action.idempotencyKey,
     planRunId: runtime.persisted.id,
     mainSession,
     executionSession,
@@ -330,10 +442,25 @@ export async function submitCheckpointAction(
     effective,
     currentNodeId,
     continuePlanExecution: (continueInput) =>
-      continuePlanExecution({ ...continueInput, workBlockId: executionSession.workBlockId }),
+      continuePlanExecution({
+        ...continueInput,
+        workBlockId: executionSession.workBlockId,
+        idempotencyKey: continueInput.idempotencyKey ?? input.action.idempotencyKey,
+      }),
     resumePlanExecutionWithApproval: (approvalInput) =>
-      resumePlanExecutionWithApproval({ ...approvalInput, workBlockId: executionSession.workBlockId }),
-    dispatchExecutionAction,
+      resumePlanExecutionWithApproval({
+        ...approvalInput,
+        workBlockId: executionSession.workBlockId,
+        idempotencyKey: approvalInput.idempotencyKey ?? input.action.idempotencyKey,
+      }),
+    dispatchExecutionAction: (dispatchInput) =>
+      dispatchExecutionAction({
+        ...dispatchInput,
+        commandContext: {
+          ...dispatchInput.commandContext,
+          idempotencyKey: dispatchInput.commandContext?.idempotencyKey ?? input.action.idempotencyKey,
+        },
+      }),
     onGraphEvent: input.onGraphEvent,
     onRuntimeEvent: input.onRuntimeEvent,
     onStateChange: input.onStateChange,

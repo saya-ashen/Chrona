@@ -23,6 +23,7 @@ export type KernelCallbacksInput = {
   workBlockId: string | null;
   planId: string;
   compiledPlan: CompiledPlan;
+  executionEpoch: number;
   persisted: PersistedPlanRun;
   planSummary?: string | null;
   goalContext?: import("../node-executors/types").NodeExecutionPlanContext["goalContext"];
@@ -32,6 +33,7 @@ export type KernelCallbacksInput = {
 
 export type PlanExecutionRuntimeEvent = {
   nodeId: string;
+  executionScope: string;
   nodeTitle: string;
   runtimeName: string;
   event: ProviderRunEvent;

@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "bun:test";
 import { db } from "@chrona/db";
-import { getActionCenter } from "@chrona/engine/modules/pages/get-action-center";
+import { getActionCenter } from "@chrona/engine/test-support";
 import { resetTestDb, seedTask, seedWorkspace } from "../bun-test-helpers";
 
 // getActionCenter — engine-layer unit for the action center read-model.

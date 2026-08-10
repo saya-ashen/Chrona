@@ -7,9 +7,11 @@ import {
   makeTwoTaskPlan,
   seedAcceptedCompiledPlan,
   seedWorkspaceAndTask,
+  seedRuntimeSyncIdentity,
   setupPlanRunnerTaskExecutorTest,
   taskPlanExecution,
 } from "./plan-runner.task-executor.fixtures";
+import { executeCommand } from "./kernel/execute-command";
 
 function jsonViewOutput(value: Record<string, unknown>) {
   return { root: "root", elements: { root: { type: "JsonView", props: { value } } } };
@@ -34,14 +36,17 @@ describe("plan-runner task executor interruption", () => {
       taskId: task.id,
       action: { action: "start_manual" },
     });
+    const identity = await seedRuntimeSyncIdentity(task.id, "runtime-first-task");
     await taskPlanExecution.dispatch({
       taskId: task.id,
+      commandContext: { sessionId: identity.executionSessionId },
       action: { action: "pause_session", reason: "Pause requested" },
     });
 
     await taskPlanExecution.syncRuntimeResult({
       taskId: task.id,
       runtimeRunRef: "runtime-first-task",
+      ...identity,
       status: "Completed",
       summary: "Late first task complete",
       output: jsonViewOutput({ requirements: "ready" }),
@@ -68,14 +73,17 @@ describe("plan-runner task executor interruption", () => {
       taskId: task.id,
       action: { action: "start_manual" },
     });
+    const identity = await seedRuntimeSyncIdentity(task.id, "runtime-first-task");
     await taskPlanExecution.dispatch({
       taskId: task.id,
+      commandContext: { sessionId: identity.executionSessionId },
       action: { action: "cancel_session", reason: "Stop requested" },
     });
 
     await taskPlanExecution.syncRuntimeResult({
       taskId: task.id,
       runtimeRunRef: "runtime-first-task",
+      ...identity,
       status: "Completed",
       summary: "Late first task complete",
       output: jsonViewOutput({ requirements: "ready" }),
@@ -111,10 +119,13 @@ describe("plan-runner task executor interruption", () => {
       taskId: task.id,
       action: { action: "start_manual" },
     });
-    await taskPlanExecution.dispatch({
+    const executionSession = await db.executionSession.findFirstOrThrow({ where: { taskId: task.id, status: "Active" } });
+    const cancelled = await taskPlanExecution.dispatch({
       taskId: task.id,
+      commandContext: { sessionId: executionSession.id },
       action: { action: "cancel_session", reason: "Stop requested" },
     });
+    expect(cancelled.status).toBe("cancelled");
 
     const persisted = await getPlanRun(task.id, compiledPlan.editablePlanId);
     expect(persisted?.results.map((result) => [result.nodeId, result.status, result.outputSummary])).toEqual([
@@ -149,14 +160,19 @@ describe("plan-runner task executor interruption", () => {
       taskId: task.id,
       action: { action: "start_manual" },
     });
-    await taskPlanExecution.dispatch({
+    const executionSession = await db.executionSession.findFirstOrThrow({ where: { taskId: task.id, status: "Active" } });
+    const paused = await taskPlanExecution.dispatch({
       taskId: task.id,
+      commandContext: { sessionId: executionSession.id },
       action: { action: "pause_session", reason: "Review before continuing" },
     });
-    await taskPlanExecution.dispatch({
+    expect(paused.status).toBe("blocked");
+    const cancelled = await taskPlanExecution.dispatch({
       taskId: task.id,
+      commandContext: { sessionId: executionSession.id },
       action: { action: "cancel_session", reason: "Stop after review" },
     });
+    expect(cancelled.status).toBe("cancelled");
 
     const persisted = await getPlanRun(task.id, compiledPlan.editablePlanId);
     expect(persisted?.results.map((result) => [result.nodeId, result.status, result.outputSummary])).toEqual([
@@ -191,9 +207,19 @@ describe("plan-runner task executor interruption", () => {
       taskId: task.id,
       action: { action: "start_manual" },
     });
-    await taskPlanExecution.dispatch({
+    const beforeRetry = await getPlanRun(task.id, compiledPlan.editablePlanId);
+    const firstAttempt = beforeRetry?.attempts.find((attempt) => attempt.nodeId === "task_node");
+    expect(firstAttempt).toMatchObject({ status: "succeeded", attemptNumber: 1 });
+
+    await executeCommand({
       taskId: task.id,
-      action: { action: "retry_node", nodeId: "task_node", prompt: "Verify updated input" },
+      command: { type: "retry_node", nodeId: "task_node", reason: "Verify updated input", userInput: "Verify updated input" },
+      context: { workBlockId: null, idempotencyKey: "explicit-retry-replay" },
+    });
+    await executeCommand({
+      taskId: task.id,
+      command: { type: "retry_node", nodeId: "task_node", reason: "Verify updated input", userInput: "Verify updated input" },
+      context: { workBlockId: null, idempotencyKey: "explicit-retry-replay" },
     });
 
     const persisted = await getPlanRun(task.id, compiledPlan.editablePlanId);
@@ -207,9 +233,25 @@ describe("plan-runner task executor interruption", () => {
       status: "current",
       outputSummary: "First task retried successfully",
     });
-    expect(persisted?.attempts.map((attempt) => [attempt.nodeId, attempt.status])).toEqual([
-      ["task_node", "cancelled"],
-      ["task_node", "succeeded"],
+    expect(persisted?.attempts.map((attempt) => [attempt.nodeId, attempt.status, attempt.attemptNumber])).toEqual([
+      ["task_node", "succeeded", 1],
+      ["task_node", "succeeded", 2],
     ]);
+    const retriedAttempt = persisted?.attempts.find((attempt) => attempt.attemptNumber === 2);
+    expect(retriedAttempt).toMatchObject({ nodeId: "task_node", status: "succeeded" });
+    expect(retriedAttempt?.id).not.toBe(firstAttempt?.id);
+    expect(retriedAttempt?.idempotencyKey).not.toBe(firstAttempt?.idempotencyKey);
+    expect(retriedAttempt?.executionContextSnapshotId).not.toBe(firstAttempt?.executionContextSnapshotId);
+    const durableAttempts = await db.taskPlanNodeAttempt.findMany({
+      where: { taskId: task.id, planId: compiledPlan.editablePlanId, nodeId: "task_node" },
+      orderBy: { attemptNumber: "asc" },
+      select: { id: true, idempotencyKey: true, executionEpoch: true, status: true },
+    });
+    expect(durableAttempts).toEqual([
+      expect.objectContaining({ id: firstAttempt?.id, idempotencyKey: firstAttempt?.idempotencyKey, status: "succeeded" }),
+      expect.objectContaining({ id: retriedAttempt?.id, idempotencyKey: retriedAttempt?.idempotencyKey, status: "succeeded" }),
+    ]);
+    expect(durableAttempts[1]?.executionEpoch).toBeGreaterThan(durableAttempts[0]?.executionEpoch ?? -1);
+    expect(executeTaskNodeCapabilityMock).toHaveBeenCalledTimes(2);
   });
 });

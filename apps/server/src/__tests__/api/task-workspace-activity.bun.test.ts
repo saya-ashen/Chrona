@@ -102,23 +102,26 @@ describe("task workspace activity endpoint", () => {
     expect(body.items.every((item) => item.sourceNodeId === "node-a")).toBe(true);
   });
 
-  it("uses provider as the visible provider label when runtimeName differs", async () => {
+  it("uses fixed public descriptors when provider implementation differs from runtime", async () => {
     const { workspaceId } = await seedWorkspace("Workspace Provider Labeling");
     const { taskId } = await seedTask(workspaceId, { title: "Provider labeling" });
 
     await db.event.create({
       data: {
-        eventType: "provider.text_delta",
+        eventType: "provider.run_started",
         workspaceId,
         taskId,
         actorType: "runtime",
         actorId: "hermes",
         source: "provider",
         payload: {
+          executionScope: "scope-provider-label",
+          providerLabel: "AI provider",
+          runtimeLabel: "Execution runtime",
           runtimeName: "hermes",
           provider: "claude_code",
           runId: "run-1",
-          event: { type: "text_delta", text: "Hello" },
+          event: { type: "run_started" },
         },
         dedupeKey: "activity-provider-label",
         occurredAt: new Date("2026-05-22T00:00:05.000Z"),
@@ -130,10 +133,10 @@ describe("task workspace activity endpoint", () => {
     const body = await json<{ items: Array<{ provider?: string; runtimeName?: string; summary: string }> }>(res);
 
     expect(res.status).toBe(200);
-    expect(body.items[0]).toMatchObject({ provider: "claude_code", runtimeName: "hermes", summary: "Hello" });
+    expect(body.items[0]).toMatchObject({ provider: "AI provider", runtimeName: "Execution runtime", summary: "AI provider", executionScope: "scope-provider-label" });
   });
 
-  it("uses top-level provider tool fields when persisted payload has no nested event", async () => {
+  it("projects top-level provider tool lifecycle without tool content", async () => {
     const { workspaceId } = await seedWorkspace("Workspace Top Level Tool Payload");
     const { taskId } = await seedTask(workspaceId, { title: "Top-level tool payload" });
 
@@ -146,10 +149,14 @@ describe("task workspace activity endpoint", () => {
         actorId: "hermes",
         source: "provider",
         payload: {
+          executionScope: "scope-tool",
+          providerLabel: "AI provider",
+          runtimeLabel: "Execution runtime",
+          toolLabel: "Runtime tool",
           runtimeName: "hermes",
           provider: "codex",
           runId: "run-1",
-          toolName: "bash: python3 -c fetch trending",
+          toolName: "bash",
           preview: "python3 -c fetch trending",
           rawEventType: "tool_call_update",
         },
@@ -160,14 +167,15 @@ describe("task workspace activity endpoint", () => {
     });
 
     const res = await app().request(`/api/tasks/${taskId}/activity?limit=10`);
-    const body = await json<{ items: Array<{ tool?: { label?: string; resultPreview?: string; state?: string } }> }>(res);
+    const body = await json<{ items: Array<{ tool?: { name?: string; state?: string } }> }>(res);
 
     expect(res.status).toBe(200);
     expect(body.items[0]?.tool).toMatchObject({
-      label: "bash: python3 -c fetch trending",
-      resultPreview: "python3 -c fetch trending",
+      name: "Runtime tool",
       state: "completed",
     });
+    expect(JSON.stringify(body.items)).not.toContain("run-1");
+    expect(JSON.stringify(body.items)).not.toContain("python3 -c fetch trending");
   });
 
 
@@ -207,7 +215,7 @@ describe("task workspace activity endpoint", () => {
 
     await db.event.createMany({
       data: [{
-        eventType: "provider.text_delta",
+        eventType: "provider.run_started",
         workspaceId,
         taskId,
         actorType: "runtime",
@@ -215,23 +223,23 @@ describe("task workspace activity endpoint", () => {
         source: "provider",
         nodeId: "node-a",
         nodeTitle: "Node A",
-        payload: { runtimeName: "hermes", provider: "anthropic", runId: "run-1", event: { type: "text_delta", text: "Node A" } },
+        payload: { executionScope: "scope-node-a", providerLabel: "AI provider", runtimeLabel: "Execution runtime", runtimeName: "hermes", provider: "anthropic", runId: "run-1", event: { type: "run_started" } },
         dedupeKey: "activity-node-a",
         occurredAt: new Date("2026-05-22T00:00:01.000Z"),
         ingestSequence: 1,
       }, {
-        eventType: "provider.text_delta",
+        eventType: "provider.run_started",
         workspaceId,
         taskId,
         actorType: "runtime",
         actorId: "hermes",
         source: "provider",
-        payload: { runtimeName: "hermes", provider: "anthropic", runId: "run-1", event: { type: "text_delta", text: "No node" } },
+        payload: { executionScope: "scope-task", providerLabel: "AI provider", runtimeLabel: "Execution runtime", runtimeName: "hermes", provider: "anthropic", runId: "run-1", event: { type: "run_started" } },
         dedupeKey: "activity-no-node",
         occurredAt: new Date("2026-05-22T00:00:02.000Z"),
         ingestSequence: 2,
       }, {
-        eventType: "provider.text_delta",
+        eventType: "provider.run_started",
         workspaceId,
         taskId,
         actorType: "runtime",
@@ -239,7 +247,7 @@ describe("task workspace activity endpoint", () => {
         source: "provider",
         nodeId: "node-b",
         nodeTitle: "Node B",
-        payload: { runtimeName: "hermes", provider: "anthropic", runId: "run-1", event: { type: "text_delta", text: "Node B" } },
+        payload: { executionScope: "scope-node-b", providerLabel: "AI provider", runtimeLabel: "Execution runtime", runtimeName: "hermes", provider: "anthropic", runId: "run-1", event: { type: "run_started" } },
         dedupeKey: "activity-node-b",
         occurredAt: new Date("2026-05-22T00:00:03.000Z"),
         ingestSequence: 3,
@@ -251,6 +259,6 @@ describe("task workspace activity endpoint", () => {
 
     expect(res.status).toBe(200);
     expect(body.scope).toMatchObject({ type: "node", nodeId: "node-a" });
-    expect(body.items).toEqual([expect.objectContaining({ sourceNodeId: "node-a", summary: "Node A" })]);
+    expect(body.items).toEqual([expect.objectContaining({ sourceNodeId: "node-a", summary: "AI provider", executionScope: "scope-node-a" })]);
   });
 });

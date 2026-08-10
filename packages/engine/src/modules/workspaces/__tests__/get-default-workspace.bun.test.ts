@@ -5,7 +5,7 @@ import {
   DEFAULT_WORKSPACE_ID,
   DefaultWorkspaceError,
   getDefaultWorkspace,
-} from "@/modules/workspaces/get-default-workspace";
+} from "@chrona/engine/test-support";
 
 async function resetDb() {
   await db.scheduleProposal.deleteMany();

@@ -164,26 +164,28 @@ export async function runGraphExecution<TContext = unknown>(
       }
 
       const now = input.now?.() ?? Date.now();
+      const identity = crypto.randomUUID();
       const snapshot = createExecutionContextSnapshot({
         graphId: state.graph.id,
         nodeId: nextNodeId,
         nodeLayerId: node.activeLayerId,
         graphVersion: state.graph.mutations.length,
         runtimeName: input.runtimeName,
+        identity,
         userInput: nodeUserInput,
         inputFields: nodeInputFields,
         now,
       });
 
       const attempt: NodeAttempt = {
-        id: `attempt_${state.graph.id}_${nextNodeId}_${now}`,
+        id: `attempt_${state.graph.id}_${nextNodeId}_${now}_${identity}`,
         taskId: input.taskId,
         graphId: state.graph.id,
         nodeId: nextNodeId,
         nodeLayerId: node.activeLayerId,
         executionContextSnapshotId: snapshot.id,
         status: "running",
-        idempotencyKey: `${state.graph.id}:${nextNodeId}:${now}`,
+        idempotencyKey: `${state.graph.id}:${nextNodeId}:${now}:${identity}`,
         attemptNumber:
           state.attempts.filter((candidate) => candidate.nodeId === nextNodeId)
             .length + 1,
@@ -368,6 +370,20 @@ export async function runGraphExecution<TContext = unknown>(
           waitKind,
           message: getResultMessage(result),
         };
+      }
+      if (result.status === "done") {
+        const candidateEffective = resolveEffectivePlanGraph(state);
+        const candidateNode = candidateEffective.nodes.find((candidate) => candidate.id === nextNodeId);
+        if (candidateNode?.status !== "completed") {
+          return {
+            status: "running",
+            currentNodeId: nextNodeId,
+            executedNodeIds,
+            effective: candidateEffective,
+            state,
+            message: "Node completion is waiting for an authoritative terminal result.",
+          };
+        }
       }
 
       executedNodeIds.push(nextNodeId);

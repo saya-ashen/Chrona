@@ -136,7 +136,7 @@ describe("task API schemas", () => {
   });
 
   it("validates structured workspace activity items", () => {
-    expect(workspaceActivityItemSchema.parse({
+    const activity = workspaceActivityItemSchema.parse({
       id: "event-1",
       kind: "tool_completed",
       title: "Tool completed",
@@ -148,27 +148,23 @@ describe("task API schemas", () => {
       sourceNodeTitle: "Read plan",
       provider: "hermes",
       runtimeName: "hermes",
-      runId: "run-1",
-      nativeRunId: "native-1",
-      sequence: 7,
-      rawEventType: "tool_completed",
       executionSessionId: "execution-session-2",
       executionEpoch: 2,
       executionTrigger: "restart",
       tool: {
         name: "chrona_plan_read",
-        label: "Read plan",
         durationMs: 24,
         state: "completed",
       },
-    })).toMatchObject({
+    });
+    expect(activity).toMatchObject({
       kind: "tool_completed",
       tone: "success",
-      executionSessionId: "execution-session-2",
-      executionEpoch: 2,
       executionTrigger: "restart",
       tool: { state: "completed" },
     });
+    expect(activity).not.toHaveProperty("executionSessionId");
+    expect(activity).not.toHaveProperty("executionEpoch");
 
     expect(() => workspaceActivityItemSchema.parse({
       id: "event-2",
@@ -187,13 +183,12 @@ describe("task API schemas", () => {
 
     expect(workspaceActivityPageSchema.parse({
       items: [{
-        id: "assistant-1",
-        kind: "assistant_message",
-        title: "Assistant response",
-        summary: "Done",
-        description: "Done",
+        id: "task-1",
+        kind: "task",
+        title: "Task updated",
+        summary: "Task fields changed.",
+        description: "Task fields changed.",
         tone: "info",
-        assistant: { text: "Done", isReasoning: false },
       }],
       nextCursor: "cursor-2",
       scope: { type: "task", taskId: "task-1", limit: 100 },

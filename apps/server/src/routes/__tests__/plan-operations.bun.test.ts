@@ -2,8 +2,8 @@ import { beforeEach, describe, expect, it } from "bun:test";
 import { Hono } from "hono";
 import { db } from "@chrona/db";
 import { createChronaEngine } from "@chrona/engine";
-import { saveCompiledPlan } from "@chrona/engine/modules/plan-execution/persistence/compiled-plan-store";
-import { getLatestTaskPlanReadModel } from "@chrona/engine/modules/plans/task-plan-read-model";
+import { saveCompiledPlan } from "@chrona/engine/test-support";
+import { getLatestTaskPlanReadModel } from "@chrona/engine/test-support";
 import { createPlansRoutes } from "../tasks/plan.routes";
 import type { CompiledPlan } from "@chrona/contracts/ai";
 
@@ -130,15 +130,35 @@ async function seedPlan() {
     summary: "Linear A→B→C→D flow",
     generatedBy: "graph-planner",
   });
+  await db.taskPlanGenerationHead.create({
+    data: {
+      workspaceId: workspace.id,
+      taskId: task.id,
+      workBlockScopeKey: "",
+      currentPlanId: compiledPlan.editablePlanId,
+      currentPlanRevision: compiledPlan.sourceVersion,
+      currentPlanStatus: "Accepted",
+      stateVersion: 0,
+      status: "Current",
+    },
+  });
 
   return { workspaceId: workspace.id, taskId: task.id, planId: compiledPlan.editablePlanId };
 }
 
 async function patchPlan(taskId: string, patch: Record<string, unknown>) {
+  const head = await db.taskPlanGenerationHead.findUnique({
+    where: { taskId_workBlockScopeKey: { taskId, workBlockScopeKey: "" } },
+    select: { stateVersion: true },
+  });
   return app().request(`http://local/api/tasks/${taskId}/plan`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(patch),
+    body: JSON.stringify({
+      ...patch,
+      expectedHeadStateVersion: head?.stateVersion ?? 0,
+      idempotencyKey: `plan-route-test:${crypto.randomUUID()}`,
+    }),
   });
 }
 

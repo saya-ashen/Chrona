@@ -5,7 +5,7 @@ import {
   resetTestDb,
   seedTask,
   seedWorkspace,
-} from "../../../../../apps/server/src/__tests__/bun-test-helpers";
+} from "@chrona/db/test-support";
 import { createTask } from "./create-task";
 import type { ContinueFromTaskResultDeps } from "./continue-from-task-result";
 

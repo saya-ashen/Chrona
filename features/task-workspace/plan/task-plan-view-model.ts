@@ -3,7 +3,7 @@ import type { CheckpointConfig,
 CompiledPlan,
 CompiledNode,
 ConditionConfig,
-EffectivePlanNode,
+PublicEffectivePlanNode,
 NodeConfig,
 TaskConfig,
 TaskPlanReadModel,
@@ -40,7 +40,7 @@ type PlanMetadata = {
   userInteraction?: TaskConfig["userInteraction"];
 };
 
-type NodeResultActionForm = NonNullable<EffectivePlanNode["result"]>["actionForm"];
+type NodeResultActionForm = NonNullable<PublicEffectivePlanNode["result"]>["actionForm"];
 
 export type TaskPlanViewModelCopy = {
   statusActive: string;
@@ -118,30 +118,30 @@ function normalizePlanNodeKind(rawType: unknown): PlanNodeKind {
   }
 }
 
-function normalizeStatus(status: EffectivePlanNode["status"] | null | undefined): PlanNodeStatus {
+function normalizeStatus(status: PublicEffectivePlanNode["status"] | null | undefined): PlanNodeStatus {
   return webPlanNodeStatusForRuntimeStatus(status);
 }
 
 function isManualActionBlocked(node: {
-  status?: EffectivePlanNode["status"] | null;
+  status?: PublicEffectivePlanNode["status"] | null;
   blockedReason?: string | null;
-  lastError?: string | null;
-  result?: EffectivePlanNode["result"] | null;
+  error?: { present: true; message: string } | null;
+  result?: PublicEffectivePlanNode["result"] | null;
 }) {
   if (node.status !== "waiting") return false;
-  return Boolean(node.blockedReason?.trim() || node.lastError?.trim() || node.result?.waitKind === "manual_action");
+  return Boolean(node.blockedReason?.trim() || node.error || node.result?.waitKind === "manual_action");
 }
 
 function resolveBlockedNodeAction(node: {
   nextAction?: string | null;
   blockedReason?: string | null;
-  lastError?: string | null;
-  result?: EffectivePlanNode["result"] | null;
+  error?: { present: true; message: string } | null;
+  result?: PublicEffectivePlanNode["result"] | null;
 }) {
   return node.nextAction?.trim()
     || node.blockedReason?.trim()
-    || node.lastError?.trim()
-    || node.result?.error?.trim()
+    || node.error?.message
+    || node.result?.error?.message
     || "Resolve the blocker before continuing execution.";
 }
 
@@ -523,12 +523,11 @@ function toPlanNode(node: {
   priority?: string | null;
   dependencies?: string[];
   requiredInfo?: string[];
-  status?: EffectivePlanNode["status"] | null;
-  blockedReason?: string | null;
-  lastError?: string | null;
+  status?: PublicEffectivePlanNode["status"] | null;
+  error?: { present: true; message: string } | null;
   ready?: boolean;
   reachable?: boolean;
-  result?: EffectivePlanNode["result"] | null;
+  result?: PublicEffectivePlanNode["result"] | null;
   nextAction?: string | null;
   config: NodeConfig;
   copy: TaskPlanViewModelCopy;
@@ -585,8 +584,7 @@ function toPlanNode(node: {
     completionSummary: node.result?.outputSummary ?? null,
     result: node.result ?? null,
     inputFields: node.result?.inputFields,
-    resultEvidence: node.result?.evidence ?? null,
-    branchLabels: metadata.branches?.map((branch, index) => branch.label ?? `${node.copy.branchLabelPrefix} ${index + 1}`) ?? [],
+    resultEvidence: node.result?.resultEvidence ?? null,
     options: metadata.options ?? [],
     active: status === "active",
     blocked: isAttentionPlanStatus(status),
@@ -608,8 +606,8 @@ function toPlanNode(node: {
     metadata: {
       ...(metadata as Record<string, unknown>),
       ...(userInteraction ? { userInteraction } : {}),
-      ...(node.result?.error ? { error: node.result.error } : {}),
-      ...(node.result?.errorDetails ? { errorDetails: node.result.errorDetails } : {}),
+      ...(node.result?.error ? { error: node.result.error.message } : {}),
+      ...(node.error ? { error: node.error.message } : {}),
     },
   };
 }
@@ -908,12 +906,12 @@ export function taskPlanReadModelToGraphPlan(
 
   const copy = resolveViewModelCopy(copyOverrides);
 
-  const readRuntimeArray = (node: EffectivePlanNode, key: string) => {
+  const readRuntimeArray = (node: PublicEffectivePlanNode, key: string) => {
     const value = (node as unknown as Record<string, unknown>)[key];
     return Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
   };
 
-  const readRuntimeString = (node: EffectivePlanNode, key: string) => {
+  const readRuntimeString = (node: PublicEffectivePlanNode, key: string) => {
     const value = (node as unknown as Record<string, unknown>)[key];
     return typeof value === "string" ? value : null;
   };
@@ -924,7 +922,7 @@ export function taskPlanReadModelToGraphPlan(
     revision: `r${readModel.revision}`,
     generatedBy: readModel.generatedBy,
     updatedAt: readModel.updatedAt,
-    nodes: readModel.effectivePlan.nodes.map((node: EffectivePlanNode) =>
+    nodes: readModel.effectivePlan.nodes.map((node: PublicEffectivePlanNode) =>
       toPlanNode({
         id: node.id,
         title: node.title,
@@ -938,8 +936,7 @@ export function taskPlanReadModelToGraphPlan(
         dependencies: node.dependencies,
         requiredInfo: readRuntimeArray(node, "requiredInfo"),
         status: node.status,
-        blockedReason: node.blockedReason,
-        lastError: node.lastError,
+        error: node.error ?? null,
         ready: node.ready,
         reachable: node.reachable,
         result: node.result,

@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it } from "bun:test";
 import { Hono } from "hono";
 import { db } from "@chrona/db";
 import { createChronaEngine } from "@chrona/engine";
-import { runRecurringWorkBlockExpansionWorker } from "@chrona/engine/modules/orchestration/recurring-work-block-expansion-worker";
+import { runRecurringWorkBlockExpansionWorker } from "@chrona/engine/test-support";
 import { createApiRouter } from "../../routes/api";
 import { resetTestDb, seedWorkspace } from "../bun-test-helpers";
 
@@ -43,6 +43,21 @@ async function createRecurringTaskWithOccurrences(input: {
       recurrenceRule: input.rrule,
       recurrenceAnchorStartAt: input.anchor,
       recurrenceAnchorEndAt: new Date(input.anchor.getTime() + 30 * 60 * 1000),
+    },
+  });
+  await db.taskTrigger.create({
+    data: {
+      workspaceId: input.workspaceId,
+      taskId: task.id,
+      kind: "schedule",
+      state: "Enabled",
+      config: {
+        mode: "recurring",
+        rrule: input.rrule,
+        anchorStartAt: input.anchor.toISOString(),
+        timezone: "UTC",
+        durationMs: 30 * 60 * 1000,
+      },
     },
   });
   await runRecurringWorkBlockExpansionWorker({ now: input.anchor });

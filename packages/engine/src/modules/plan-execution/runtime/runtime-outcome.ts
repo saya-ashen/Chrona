@@ -1,12 +1,6 @@
 import type { GraphDispatchOutcome } from "@chrona/graph-runtime";
 import type { WaitKind } from "@chrona/contracts/ai";
 
-export function errorDetailsFromOutcome(outcome: GraphDispatchOutcome): unknown {
-  const failedAttempt = outcome.state.attempts.find(
-    (attempt) => attempt.status === "failed" && attempt.error?.details,
-  );
-  return failedAttempt?.error?.details;
-}
 
 export function waitKindFromOutcome(outcome: GraphDispatchOutcome): WaitKind {
   if (outcome.waitKind) return outcome.waitKind;

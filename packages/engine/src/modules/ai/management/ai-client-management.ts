@@ -3,6 +3,8 @@ import { randomUUID } from "node:crypto";
 import { db, type Prisma } from "@chrona/db";
 import type { AiClientType } from "@chrona/contracts";
 import { testAiClientAvailability } from "../providers";
+import { supportsDurableFeatureRuntime } from "@chrona/providers-foundation";
+import { ENGINE_ERROR_CODES, EngineError } from "../../../errors";
 import { aiClientRegistry } from "../runtime/client-registry";
 
 type AiClientStore = Pick<typeof db, "aiClient">;
@@ -153,9 +155,22 @@ async function deleteAiClient(clientId: string) {
 async function updateAiClientBindings(input: UpdateBindingsInput) {
   const { clientId, features, validFeatureSet } = input;
   const client = await db.aiClient.findUnique({ where: { id: clientId } });
-  if (!client) throw new Error("Client not found");
-
+  if (!client) throw new EngineError(ENGINE_ERROR_CODES.AI_CLIENT_NOT_FOUND, "Client not found");
+  const invalidFeatures = [...new Set(features.filter((feature) => !validFeatureSet.has(feature)))];
+  if (invalidFeatures.length > 0) {
+    throw new EngineError(ENGINE_ERROR_CODES.VALIDATION_FAILED, `Unknown AI feature bindings: ${invalidFeatures.join(", ")}`);
+  }
   const validFeatures = [...new Set(features.filter((feature) => validFeatureSet.has(feature)))];
+  const durableFeatures = validFeatures.filter((feature) => feature === "goal.review" || feature === "task.plan");
+  if (durableFeatures.length > 0) {
+    const capabilities = await aiClientRegistry.inspectProviderCapabilities(clientId);
+    if (!capabilities || !supportsDurableFeatureRuntime(capabilities)) {
+      throw new EngineError(
+        ENGINE_ERROR_CODES.VALIDATION_FAILED,
+        `AI client does not support durable Feature Runtime bindings: ${durableFeatures.join(", ")}`,
+      );
+    }
+  }
   await db.$transaction(async (tx) => {
     if (validFeatures.length > 0) {
       await tx.aiFeatureBinding.deleteMany({ where: { feature: { in: validFeatures } } });

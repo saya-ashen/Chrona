@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "bun:test";
 import { db } from "@chrona/db";
-import { acceptTaskResult } from "@chrona/engine/modules/tasks/accept-task-result";
+import { acceptTaskResult } from "@chrona/engine/test-support";
 import { resetTestDb, seedTask, seedWorkspace } from "../bun-test-helpers";
 
 // acceptTaskResult — engine-layer unit for the task-result-accept

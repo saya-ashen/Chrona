@@ -5,8 +5,11 @@ import {
   archiveGoalAssetBodySchema,
   applyGoalAssetOwnershipBodySchema,
   createAssetModificationTaskBodySchema,
+  createAssetUseTaskBodySchema,
+  createGoalAssetReviewBodySchema,
   createGoalAssetJobBodySchema,
   createGoalFormSubmissionBodySchema,
+  discardGoalAssetDraftBodySchema,
   generateGoalAssetOwnershipBodySchema,
   listGoalAssetsQuerySchema,
   resolveGoalInboxCandidateBodySchema,
@@ -69,6 +72,10 @@ export function createGoalWorkbenchRoutes(engine: ChronaEngine) {
       try { return json(c, await engine.goals.workbench.submitDraft({ ...c.req.valid("param"), command: c.req.valid("json") })); }
       catch (cause) { return fail(c, "POST /api/goals/:goalId/assets/:assetId/drafts/submit", cause); }
     })
+    .post("/goals/:goalId/assets/:assetId/drafts/discard", zValidator("param", assetParam), zValidator("json", discardGoalAssetDraftBodySchema), async (c) => {
+      try { return json(c, await engine.goals.workbench.discardDraft({ ...c.req.valid("param"), ...c.req.valid("json") })); }
+      catch (cause) { return fail(c, "POST /api/goals/:goalId/assets/:assetId/drafts/discard", cause); }
+    })
     .post("/goals/:goalId/assets/:assetId/versions/:versionId/restore", zValidator("param", versionParam), zValidator("json", restoreGoalAssetVersionBodySchema), async (c) => {
       try { return json(c, await engine.goals.workbench.restoreVersion({ ...c.req.valid("param"), ...c.req.valid("json") })); }
       catch (cause) { return fail(c, "POST /api/goals/:goalId/assets/:assetId/versions/:versionId/restore", cause); }
@@ -108,5 +115,13 @@ export function createGoalWorkbenchRoutes(engine: ChronaEngine) {
     .post("/goals/:goalId/assets/:assetId/ai-modification-task", zValidator("param", assetParam), zValidator("json", createAssetModificationTaskBodySchema), async (c) => {
       try { return json(c, await engine.goals.workbench.createModificationTask({ ...c.req.valid("param"), command: c.req.valid("json") })); }
       catch (cause) { return fail(c, "POST /api/goals/:goalId/assets/:assetId/ai-modification-task", cause); }
+    })
+    .post("/goals/:goalId/assets/:assetId/reviews", zValidator("param", assetParam), zValidator("json", createGoalAssetReviewBodySchema), async (c) => {
+      try { return json(c, await engine.goals.workbench.createReview({ ...c.req.valid("param"), command: c.req.valid("json") })); }
+      catch (cause) { return fail(c, "POST /api/goals/:goalId/assets/:assetId/reviews", cause); }
+    })
+    .post("/goals/:goalId/assets/:assetId/use-task", zValidator("param", assetParam), zValidator("json", createAssetUseTaskBodySchema), async (c) => {
+      try { return json(c, await engine.goals.workbench.createUseTask({ ...c.req.valid("param"), command: c.req.valid("json") })); }
+      catch (cause) { return fail(c, "POST /api/goals/:goalId/assets/:assetId/use-task", cause); }
     });
 }

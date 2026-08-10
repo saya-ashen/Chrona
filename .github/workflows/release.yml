@@ -29,13 +29,16 @@ jobs:
 
       - run: bun install --frozen-lockfile
 
+      - name: Audit high and critical dependencies
+        run: bun run audit:security
+
       - run: bunx prisma generate
 
       - run: bunx prisma db push
         env:
           DATABASE_URL: "file:./prisma/dev.db"
 
-      - run: bun run check
+      - run: bun run analyze
 
       - name: Run release tests
         run: bun run test:ci

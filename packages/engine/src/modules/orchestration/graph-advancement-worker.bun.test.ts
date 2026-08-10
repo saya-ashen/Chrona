@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
 import { db } from "@/lib/db";
+import { acquireSchedulerLease } from "./scheduler-lease-repository";
 import { runGraphAdvancementWorker } from "./graph-advancement-worker";
 
 async function resetDb() {
@@ -11,6 +12,7 @@ async function resetDb() {
     await db.conversationEntry.deleteMany();
     await db.runtimeCursor.deleteMany();
     await db.schedulerEvent.deleteMany();
+    await db.schedulerLease.deleteMany();
     await db.reconciliationEvent.deleteMany();
     await db.graphMutationRecord.deleteMany();
     await db.graphVersion.deleteMany();
@@ -27,6 +29,7 @@ async function resetDb() {
     await db.taskDependency.deleteMany();
     await db.memory.deleteMany();
     await db.task.deleteMany();
+    await db.schedulerLease.deleteMany();
     await db.workspace.deleteMany();
   } finally {
     await db.$executeRaw`PRAGMA foreign_keys = ON`;
@@ -230,5 +233,69 @@ describe("runGraphAdvancementWorker", () => {
 
     expect(result.advanced).toEqual([]);
     expect(startExecution).not.toHaveBeenCalled();
+  });
+  it("does not report graph advancement after its lease is taken over during start", async () => {
+    const workspace = await db.workspace.create({
+      data: { name: "Stale graph worker", status: "Active", defaultRuntime: "hermes" },
+    });
+    const task = await db.task.create({
+      data: {
+        workspaceId: workspace.id,
+        title: "Takeover task",
+        status: "Queued",
+        priority: "High",
+        executionRuntime: "hermes",
+        executionConfig: { prompt: "Run" },
+      },
+    });
+    await db.taskPlan.create({
+      data: { workspaceId: workspace.id, taskId: task.id, planId: "takeover_plan", revision: 1, status: "Accepted", compiledPlan: {} },
+    });
+    await db.taskPlanRun.create({
+      data: { workspaceId: workspace.id, taskId: task.id, planId: "takeover_plan", planRun: {} },
+    });
+    const acquired = await acquireSchedulerLease({
+      name: "graph-takeover",
+      ownerId: "owner-a",
+      ttlMs: 30_000,
+    });
+    const controller = new AbortController();
+    const startExecution = mock(async () => {
+      const takeover = await acquireSchedulerLease({
+        name: "graph-takeover",
+        ownerId: "owner-b",
+        ttlMs: 30_000,
+        now: new Date(Date.now() + 60_000),
+      });
+      expect(takeover.acquired).toBe(true);
+      return {
+        taskId: task.id,
+        planId: "takeover_plan",
+        mainSessionId: "session_1",
+        status: "running" as const,
+        currentNodeId: "node_1",
+        executedNodeIds: [],
+        waitingNodeIds: [],
+        blockedNodeIds: [],
+        checkpoint: null,
+        message: "Running",
+      };
+    });
+
+    await expect(runGraphAdvancementWorker({
+      workContext: {
+        signal: controller.signal,
+        lease: {
+          name: acquired.lease.name,
+          ownerId: acquired.lease.ownerId,
+          epoch: acquired.lease.epoch,
+        },
+        isLeaseCurrent: () => true,
+      },
+      deps: { startExecution },
+    })).rejects.toThrow("Scheduler lease ownership was lost.");
+
+    expect(startExecution).toHaveBeenCalledTimes(1);
+    expect(await db.schedulerEvent.count({ where: { taskId: task.id } })).toBe(0);
   });
 });

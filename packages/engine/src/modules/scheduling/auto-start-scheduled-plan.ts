@@ -12,6 +12,7 @@ import {
   AUTOMATION_TIMING_PRESETS,
   automationTimingOffsetMs,
 } from "@chrona/contracts";
+import { assertSchedulerWorkOwnership, withSchedulerWorkOwnership, type SchedulerWorkContext } from "@/modules/orchestration/scheduler-lease-repository";
 import { automationOccurrenceKey } from "@chrona/domain";
 
 const MAX_AUTOMATION_TIMING_OFFSET_MS = Math.max(
@@ -35,6 +36,7 @@ export type AutoStartScheduledPlanResult = {
 
 export async function autoStartScheduledPlanTasks(input?: {
   now?: Date;
+  workContext?: SchedulerWorkContext;
 }): Promise<AutoStartScheduledPlanResult> {
   const now = input?.now ?? new Date();
   const windowUpperBound = new Date(
@@ -77,6 +79,7 @@ export async function autoStartScheduledPlanTasks(input?: {
   };
 
   for (const block of dueWorkBlocks) {
+    await assertSchedulerWorkOwnership(input?.workContext);
     const task = block.task;
     try {
       const activeRun = await db.run.findFirst({
@@ -117,23 +120,26 @@ export async function autoStartScheduledPlanTasks(input?: {
           continue;
         }
 
-        await appendCanonicalEvent({
-          eventType: "task.auto_start.skipped",
-          workspaceId: task.workspaceId,
-          taskId: task.id,
-          workBlockId: block.id,
-          actorType: "system",
-          actorId: "auto-start-scheduler",
-          source: "scheduler",
-          payload: {
-            reason: eligibility.reason,
-            disabledReason: eligibility.disabledReason,
+        await withSchedulerWorkOwnership(input?.workContext, async (tx) => {
+          await appendCanonicalEvent({
+            eventType: "task.auto_start.skipped",
+            workspaceId: task.workspaceId,
+            taskId: task.id,
             workBlockId: block.id,
-            scheduledStartAt: block.scheduledStartAt?.toISOString() ?? null,
-          },
-          dedupeKey: `task.auto_start.skipped:${task.id}:${now.toISOString().slice(0, 13)}`,
+            actorType: "system",
+            actorId: "auto-start-scheduler",
+            source: "scheduler",
+            payload: {
+              reason: eligibility.reason,
+              disabledReason: eligibility.disabledReason,
+              workBlockId: block.id,
+              scheduledStartAt: block.scheduledStartAt?.toISOString() ?? null,
+            },
+            dedupeKey: `task.auto_start.skipped:${task.id}:${now.toISOString().slice(0, 13)}`,
+          }, tx);
         });
 
+        await assertSchedulerWorkOwnership(input?.workContext);
         publishTaskWorkspaceUpdatedEvent({
           taskId: task.id,
           workspaceId: task.workspaceId,
@@ -143,9 +149,32 @@ export async function autoStartScheduledPlanTasks(input?: {
         continue;
       }
 
-      const claim = await db.workBlock.updateMany({
-        where: { id: block.id, status: "Scheduled" },
-        data: { status: "Active", startedAt: now },
+      const occurrenceKey = automationOccurrenceKey({
+        taskId: task.id,
+        workBlockId: block.id,
+        scheduledStartAt: block.scheduledStartAt,
+      });
+      const claim = await withSchedulerWorkOwnership(input?.workContext, async (tx) => {
+        const claimed = await tx.workBlock.updateMany({
+          where: { id: block.id, status: "Scheduled" },
+          data: { status: "Active", startedAt: now },
+        });
+        if (claimed.count !== 1) return claimed;
+        await appendCanonicalEvent({
+          eventType: "task.auto_start.triggered",
+          workspaceId: task.workspaceId,
+          taskId: task.id,
+          workBlockId: block.id,
+          actorType: "system",
+          actorId: "auto-start-scheduler",
+          source: "scheduler",
+          payload: {
+            occurrenceKey,
+            scheduledStartAt: block.scheduledStartAt?.toISOString() ?? null,
+          },
+          dedupeKey: `task.auto_start.triggered:${occurrenceKey ?? block.id}`,
+        }, tx);
+        return claimed;
       });
       if (claim.count !== 1) {
         result.skipped.push({
@@ -158,31 +187,14 @@ export async function autoStartScheduledPlanTasks(input?: {
         continue;
       }
 
-      const occurrenceKey = automationOccurrenceKey({
-        taskId: task.id,
-        workBlockId: block.id,
-        scheduledStartAt: block.scheduledStartAt,
-      });
-      await appendCanonicalEvent({
-        eventType: "task.auto_start.triggered",
-        workspaceId: task.workspaceId,
-        taskId: task.id,
-        workBlockId: block.id,
-        actorType: "system",
-        actorId: "auto-start-scheduler",
-        source: "scheduler",
-        payload: {
-          occurrenceKey,
-          scheduledStartAt: block.scheduledStartAt?.toISOString() ?? null,
-        },
-        dedupeKey: `task.auto_start.triggered:${occurrenceKey ?? block.id}`,
-      });
-
+      await assertSchedulerWorkOwnership(input?.workContext);
       const startedRun = await taskPlanExecution.start({
         taskId: task.id,
         trigger: "scheduler",
         workBlockId: block.id,
+        workContext: input?.workContext,
       });
+      await assertSchedulerWorkOwnership(input?.workContext);
       result.started.push({
         taskId: task.id,
         workBlockId: block.id,

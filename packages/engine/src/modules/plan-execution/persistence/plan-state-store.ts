@@ -1,8 +1,8 @@
 import { db } from "@/lib/db";
+import type { Prisma } from "@/generated/prisma/client";
 import {
   buildLegacyPlanExecutionTaskSessionKey,
   buildPlanExecutionTaskSessionKey,
-  ensurePlanExecutionTaskSession,
 } from "@/modules/execution-runtime";
 import {
   appendCanonicalEvent,
@@ -11,6 +11,7 @@ import {
 } from "@/modules/events";
 import { publishTaskWorkspaceUpdatedEvent } from "@/modules/projections/task-projection-events";
 import type { PlanGraphCommandEnvelope } from "../types";
+import { withPlanExecutionDurability } from "./scheduler-durability";
 
 type MainSessionEventType =
   | "execution_started"
@@ -37,29 +38,42 @@ export async function ensurePlanMainSession(input: {
   taskId: string;
   planId: string;
   runtimeName?: string;
-}) {
-  const task = await db.task.findUniqueOrThrow({
-    where: { id: input.taskId },
-    select: { title: true, workspaceId: true },
-  });
-
-  const session = await ensurePlanExecutionTaskSession({
-    taskId: input.taskId,
-    taskTitle: task.title,
-    runtimeName: input.runtimeName ?? "default",
-    planId: input.planId,
-    label: `${task.title} · Plan execution main session`,
-  });
-
-  return {
-    id: session.id,
-    taskId: session.taskId,
-    sessionKey: session.sessionKey,
-    runtimeName: session.runtimeName,
-    status: session.status,
-    label: session.label,
-    workspaceId: task.workspaceId,
-  };
+}, suppliedTx?: Prisma.TransactionClient) {
+  return withPlanExecutionDurability(async (tx) => {
+    const task = await tx.task.findUniqueOrThrow({
+      where: { id: input.taskId },
+      select: { title: true, workspaceId: true },
+    });
+    const expectedSessionKey = buildPlanExecutionTaskSessionKey({ taskId: input.taskId, planId: input.planId });
+    const legacySessionKey = buildLegacyPlanExecutionTaskSessionKey({ taskId: input.taskId, planId: input.planId });
+    const existing = await tx.taskSession.findFirst({
+      where: { taskId: input.taskId, sessionKey: { in: [expectedSessionKey, legacySessionKey] } },
+      orderBy: { createdAt: "asc" },
+    });
+    const session = existing
+      ? await tx.taskSession.update({
+          where: { id: existing.id },
+          data: existing.sessionKey === expectedSessionKey ? {} : { sessionKey: expectedSessionKey },
+        })
+      : await tx.taskSession.create({
+          data: {
+            taskId: input.taskId,
+            runtimeName: input.runtimeName ?? "default",
+            sessionKey: expectedSessionKey,
+            label: `${task.title} · Plan execution main session`,
+            createdByFramework: true,
+          },
+        });
+    return {
+      id: session.id,
+      taskId: session.taskId,
+      sessionKey: session.sessionKey,
+      runtimeName: session.runtimeName,
+      status: session.status,
+      label: session.label,
+      workspaceId: task.workspaceId,
+    };
+  }, suppliedTx);
 }
 
 async function _findPlanMainSession(input: {
@@ -105,8 +119,26 @@ export async function appendMainSessionEvent(input: {
   payload: MainSessionEventPayload;
   rawEvent?: unknown;
   envelope?: PlanGraphCommandEnvelope;
-}) {
-  const task = await db.task.findUniqueOrThrow({
+}, suppliedTx?: Prisma.TransactionClient) {
+  return withPlanExecutionDurability(
+    (tx) => appendMainSessionEventInTransaction(input, tx),
+    suppliedTx,
+  );
+}
+
+async function appendMainSessionEventInTransaction(input: {
+  taskId: string;
+  planId: string;
+  sessionId: string;
+  workBlockId?: string | null;
+  eventType: MainSessionEventType;
+  nodeId?: string | null;
+  nodeTitle?: string | null;
+  payload: MainSessionEventPayload;
+  rawEvent?: unknown;
+  envelope?: PlanGraphCommandEnvelope;
+}, tx: Prisma.TransactionClient) {
+  const task = await tx.task.findUniqueOrThrow({
     where: { id: input.taskId },
     select: { workspaceId: true },
   });
@@ -138,7 +170,7 @@ export async function appendMainSessionEvent(input: {
     externalRef: planExecutionEventKey(input),
     correlationId: input.sessionId,
     occurredAt,
-  });
+  }, tx);
 
   const event = await appendCanonicalEvent({
     eventType: `plan_execution.${input.eventType}`,
@@ -168,7 +200,7 @@ export async function appendMainSessionEvent(input: {
     summary: timelineTitle(input.eventType, input.nodeTitle),
     severity: input.eventType === "node_blocked" ? "warning" : "info",
     occurredAt,
-  });
+  }, tx);
 
   await appendTaskTimelineItem({
     workspaceId: task.workspaceId,
@@ -194,9 +226,9 @@ export async function appendMainSessionEvent(input: {
       origin: input.envelope?.origin,
       correlation: input.envelope?.correlation,
     },
-  });
+  }, tx);
 
-  await db.task.update({
+  await tx.task.update({
     where: { id: input.taskId },
     data: {
       latestEventId: event.id,

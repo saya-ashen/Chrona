@@ -120,7 +120,7 @@ export const COMMANDS: Record<string, CommandGroup> = {
       steps: [
         bunStep("typecheck", ["x", "tsc", "--noEmit", "--pretty", "false"]),
         bunStep("e2e typecheck", ["x", "tsc", "--project", "e2e/tsconfig.json", "--noEmit", "--pretty", "false"]),
-        bunStep("lint", ["x", "eslint", ".", "--max-warnings", "724"]),
+        bunStep("lint ratchet", ["run", "scripts/lint-ratchet.ts"]),
         dependencyCruiserStep("boundaries"),
         bunStep("ui foundation", ["run", "scripts/check-ui-foundation.mjs"]),
       ],
@@ -132,7 +132,7 @@ export const COMMANDS: Record<string, CommandGroup> = {
         bunStep("e2e typecheck", ["x", "tsc", "--project", "e2e/tsconfig.json", "--noEmit", "--pretty", "false"]),
       ],
     },
-    lint: { description: "ESLint warning ratchet", steps: [bunStep("lint", ["x", "eslint", ".", "--max-warnings", "724"], true)] },
+    lint: { description: "ESLint changed-file zero-warning ratchet", steps: [bunStep("lint ratchet", ["run", "scripts/lint-ratchet.ts"], true)] },
     boundaries: { description: "Package and feature boundary checks", steps: [dependencyCruiserStep("boundaries", true)] },
     ui: { description: "UI foundation rules", steps: [bunStep("ui foundation", ["run", "scripts/check-ui-foundation.mjs"], true)] },
   },

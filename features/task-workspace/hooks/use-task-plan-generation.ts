@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef } from "react";
+import { v4 as uuidv4 } from "uuid";
 import type { TaskPlanReadModel } from "@chrona/contracts"
 import {
   startTaskPlanGenerationSession,
@@ -31,7 +32,7 @@ export function useTaskPlanGeneration({
   }, [onPlanLoaded]);
 
   const requestGeneration = useCallback(
-    (input?: { forceRefresh?: boolean; userInstruction?: string | null }) => {
+    (input?: { forceRefresh?: boolean; userInstruction?: string | null; selectedNodeId?: string | null }) => {
       if (!taskId) {
         return;
       }
@@ -41,6 +42,8 @@ export function useTaskPlanGeneration({
         workBlockId,
         forceRefresh: input?.forceRefresh ?? true,
         userInstruction: input?.userInstruction,
+        selectedNodeId: input?.selectedNodeId,
+        idempotencyKey: uuidv4(),
       });
     },
     [taskId, workBlockId],
@@ -55,13 +58,15 @@ export function useTaskPlanGeneration({
   }, [taskId, workBlockId]);
 
   useEffect(() => {
-    if (!autoRequest || !taskId) {
+    if (!autoRequest || !taskId || !state.hydrated || state.sessionStatus !== "idle" || state.result) {
       return;
     }
-
-    if (state.hydrated && state.sessionStatus === "idle" && !state.result) {
-      void startTaskPlanGenerationSession({ taskId, workBlockId, forceRefresh });
-    }
+    void startTaskPlanGenerationSession({
+      taskId,
+      workBlockId,
+      forceRefresh,
+      idempotencyKey: uuidv4(),
+    });
   }, [autoRequest, forceRefresh, state.hydrated, state.result, state.sessionStatus, taskId, workBlockId]);
 
   useEffect(() => {
@@ -78,9 +83,6 @@ export function useTaskPlanGeneration({
     error: state.error,
     phase: state.phase,
     statusMessage: state.statusMessage,
-    partialText: state.partialText,
-    toolCalls: state.toolCalls,
-    toolResults: state.toolResults,
     requestGeneration,
     stopGeneration,
   };

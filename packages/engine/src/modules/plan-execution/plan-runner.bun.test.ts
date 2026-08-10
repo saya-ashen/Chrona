@@ -372,9 +372,11 @@ describe("plan-runner native execution actions", () => {
       action: { action: "start_manual" },
     });
     expect(initial.status).toBe("waiting_for_user");
+    const executionSession = await db.executionSession.findFirstOrThrow({ where: { taskId: task.id } });
 
     const resumed = await taskPlanExecution.dispatch({
       taskId: task.id,
+      commandContext: { sessionId: executionSession.id },
       action: { action: "resume_with_input", inputFields: { decision: "yes" } },
     });
 
@@ -578,11 +580,16 @@ describe("plan-runner native execution actions", () => {
       where: { taskId: task.id },
       orderBy: { createdAt: "desc" },
     });
+    const taskSession = await db.taskSession.findFirstOrThrow({
+      where: { taskId: task.id },
+      orderBy: { createdAt: "desc" },
+    });
 
     const liveRun = await db.run.create({
       data: {
         taskId: task.id,
         runtimeName: "hermes",
+        taskSessionId: taskSession.id,
         status: RunStatus.Running,
         triggeredBy: "test",
         runtimeRunRef: "provider-run-cancel-session",
@@ -592,9 +599,9 @@ describe("plan-runner native execution actions", () => {
 
     const cancelled = await taskPlanExecution.dispatch({
       taskId: task.id,
+      commandContext: { sessionId: existingSession.id },
       action: {
         action: "cancel_session",
-        sessionId: existingSession.id,
         reason: "user cancelled from test",
       },
     });
@@ -602,7 +609,7 @@ describe("plan-runner native execution actions", () => {
     expect(cancelled.status).toBe("cancelled");
     expect(cancelled.currentNodeId).toBeNull();
     expect(cancelled.mainSessionId).toBe(existingSession.id);
-    expect(cancelled.message).toBe("user cancelled from test");
+    expect(cancelled.message).toBe("Plan execution cancelled.");
 
     const session = await db.executionSession.findUniqueOrThrow({
       where: { id: existingSession.id },
@@ -618,6 +625,7 @@ describe("plan-runner native execution actions", () => {
     const cancelledRun = await db.run.findUniqueOrThrow({ where: { id: liveRun.id } });
     expect(cancelledRun.status).toBe(RunStatus.Cancelled);
     expect(cancelledRun.endedAt).toBeInstanceOf(Date);
+    expect(cancelledRun.errorSummary).toBe("user cancelled from test");
 
     const projection = await db.taskProjection.findUniqueOrThrow({ where: { taskId: task.id } });
     expect(projection.persistedStatus).toBe(TaskStatus.Cancelled);
@@ -665,7 +673,7 @@ describe("plan-runner native execution actions", () => {
       ["cond_blocked", "current", "manual_action"],
     ]);
     expect(persisted?.attempts).toHaveLength(2);
-    expect(persisted?.attempts.map((attempt) => attempt.status)).toEqual(["cancelled", "failed"]);
+    expect(persisted?.attempts.map((attempt) => attempt.status)).toEqual(["failed", "failed"]);
     expect(persisted?.executionContextSnapshots).toHaveLength(2);
     expect(
       persisted?.executionContextSnapshots.some(
@@ -691,9 +699,11 @@ describe("plan-runner native execution actions", () => {
     });
     expect(waiting.status).toBe("waiting_for_user");
     expect(waiting.waitingNodeIds).toContain("checkpoint_input");
+    const inputExecutionSession = await db.executionSession.findFirstOrThrow({ where: { taskId: inputFlow.task.id } });
 
     const completed = await taskPlanExecution.dispatch({
       taskId: inputFlow.task.id,
+      commandContext: { sessionId: inputExecutionSession.id },
       action: { action: "resume_with_input", nodeId: "checkpoint_input", inputFields: { theme: "matrix" } },
     });
     expect(completed.status).toBe("completed");
@@ -737,7 +747,8 @@ describe("plan-runner native execution actions", () => {
     });
     const cancelled = await taskPlanExecution.dispatch({
       taskId: cancelFlow.task.id,
-      action: { action: "cancel_session", sessionId: cancelSession.id, reason: "matrix cancel" },
+      commandContext: { sessionId: cancelSession.id },
+      action: { action: "cancel_session", reason: "matrix cancel" },
     });
     expect(cancelled.status).toBe("cancelled");
 
