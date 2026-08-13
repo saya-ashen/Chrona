@@ -149,4 +149,66 @@ describe("FoundationProviderRuntime recovery references", () => {
 		expect(startInput.terminalToolName).toBe("chrona_feature_complete");
 		expect(startInput.tools).toHaveLength(1);
 	});
+
+	it("classifies an observed provider run failure as a known protocol error", async () => {
+		const run = {
+			provider: "read-only-fake",
+			runId: "provider-run-failed",
+			sessionId: "provider-session-failed",
+			providerResumeRef: "provider-run-failed",
+			status: "running" as const,
+			startedAt: "2026-08-10T06:11:02.000Z",
+			stream: { supported: true, reconnectable: false },
+		};
+		const client = {
+			provider: run.provider,
+			async getCapabilities() {
+				return {
+					supportsSessions: true,
+					supportsStreaming: true,
+					supportsRunLookup: false,
+					supportsCancellation: true,
+					supportsToolCalls: true,
+					supportsPreviousResponse: false,
+					actionInvocation: "unsupported" as const,
+					startIdempotency: "unsupported" as const,
+					readOnlySingleAttempt: true,
+					recovery: {
+						sessionResume: true,
+						historyReplay: true,
+						activeRunLookup: false,
+						streamReconnect: false,
+						crossProcessDurable: false,
+						providerResumeRef: true,
+						runEventReplay: false,
+						mode: "session_history" as const,
+					},
+				};
+			},
+			async startRun() {
+				return run;
+			},
+			async *streamRun() {
+				yield {
+					type: "run_failed" as const,
+					provider: run.provider,
+					runId: run.runId,
+					sessionId: run.sessionId,
+					sequence: 0,
+					run: { ...run, status: "failed" as const },
+					error: "Provider response stream closed before completion.",
+				};
+			},
+		} as unknown as AgentProviderClient;
+		const runtime = await new FoundationProviderRuntime(
+			"test.feature",
+			client,
+		).initialize();
+
+		await expect(runtime.startOrAttach(request)).rejects.toMatchObject({
+			name: "AiFeatureProviderError",
+			code: "provider_protocol_error",
+			message: "Provider response stream closed before completion.",
+		});
+	});
 });

@@ -10,7 +10,12 @@ import type {
 } from "@chrona/contracts/ai-feature-runtime";
 import { aiFeatureOperationSchema, aiFeatureSubjectSchema, aiJsonObjectSchema, aiObjectiveSchema, aiRuntimeIdSchema, isBoundedAiJsonObject } from "@chrona/contracts/ai-feature-runtime";
 import type { AiFeatureDefinition } from "./define-feature";
-import { compileAiFeatureRequest, type AiFeatureProviderPort, type AiFeatureProviderTurn } from "./feature-compiler";
+import {
+	AiFeatureProviderError,
+	compileAiFeatureRequest,
+	type AiFeatureProviderPort,
+	type AiFeatureProviderTurn,
+} from "./feature-compiler";
 import { buildSeedObservations } from "./observation-registry";
 import type { AiFeatureActionExecutionPort, AiFeatureRunRecord, AiFeatureRunRepositoryPort } from "./run-repository";
 import { executeAiFeatureAction, type AiFeatureLeaseGuard } from "./action-execution";
@@ -339,6 +344,7 @@ export async function executeAiFeatureRunById(input: ExecuteAiFeatureRunByIdInpu
   } catch (cause) {
     if (leaseLost) return await releaseAndRead(run);
     if (cause instanceof AiFeatureRuntimeError) return await failAndRead(cause.detail);
+    if (cause instanceof AiFeatureProviderError) return await failAndRead(runtimeError(cause.code, cause.message));
     if (singleAttemptReadOnly && (run.status === "starting_provider" || run.status === "running")) {
       return await failAndRead(runtimeError("provider_start_outcome_unknown", "The read-only provider start outcome is unknown and was not replayed. Start a new operation to try again."));
     }

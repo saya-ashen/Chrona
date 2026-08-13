@@ -7,6 +7,7 @@ import {
   type AiFeatureManifest,
 } from "@chrona/contracts/ai-feature-runtime";
 import {
+  AiFeatureProviderError,
   defineAiFeature,
   executeAiFeatureRunById,
   startOrAttachAiFeatureRun,
@@ -19,7 +20,7 @@ import {
   type AiFeatureRunActionRecord,
   type AiFeatureRunRecord,
   type AiFeatureRunRepositoryPort,
-} from "@/modules/ai";
+} from "./index";
 
 
 const at = "2026-03-15T12:00:00.000Z";
@@ -255,6 +256,30 @@ describe("runAiFeature durable lifecycle", () => {
     expect(first).toMatchObject({ status: "failed", error: { code: "provider_start_outcome_unknown" } });
     const second = await executeAiFeatureRunById({ definition: testFeature(), runId: first.id }, { runs, provider, clock: () => new Date(at), ids: { next: () => "retry-owner" } });
     expect(second.status).toBe("failed");
+    expect(provider.starts).toBe(1);
+  });
+
+  it("preserves a known read-only provider terminal failure", async () => {
+    const runs = fakeRuns();
+    const provider = singleAttemptProvider(async () => {
+      throw new AiFeatureProviderError(
+        "provider_protocol_error",
+        "Provider response stream closed before completion.",
+      );
+    });
+    const result = await runAiFeature(request(), {
+      runs,
+      provider,
+      clock: () => new Date(at),
+      ids: { next: () => "run-known-provider-failure" },
+    });
+    expect(result).toMatchObject({
+      status: "failed",
+      error: {
+        code: "provider_protocol_error",
+        message: "Provider response stream closed before completion.",
+      },
+    });
     expect(provider.starts).toBe(1);
   });
 
