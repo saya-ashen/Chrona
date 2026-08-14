@@ -6,11 +6,12 @@ import {
 	type ProviderRunRef,
 	type StartRunInput,
 } from "@chrona/providers-foundation";
-import type {
-	AiFeatureProviderPort,
-	AiFeatureProviderStart,
-	AiFeatureProviderTurn,
-	CompiledAiFeatureRequest,
+import {
+	AiFeatureProviderError,
+	type AiFeatureProviderPort,
+	type AiFeatureProviderStart,
+	type AiFeatureProviderTurn,
+	type CompiledAiFeatureRequest,
 } from "../../feature-runtime/feature-compiler";
 import type { AiFeatureProviderCapabilities } from "../../feature-runtime/provider-capabilities";
 import { getAiClientForFeature } from "../client-resolution";
@@ -333,15 +334,24 @@ export class FoundationProviderRuntime implements AiFeatureProviderPort {
 					providerResumeRef: run.providerResumeRef ?? run.runId,
 				};
 			}
-			if (event.type === "run_failed" || event.type === "run_cancelled")
-				throw new Error(
-					event.type === "run_failed"
-						? event.error
-						: "Provider run was cancelled.",
+			if (event.type === "run_failed") {
+				throw new AiFeatureProviderError(
+					/timed? out|timeout/i.test(event.error)
+						? "provider_timeout"
+						: "provider_protocol_error",
+					event.error,
 				);
+			}
+			if (event.type === "run_cancelled") {
+				throw new AiFeatureProviderError(
+					"cancelled",
+					"Provider run was cancelled.",
+				);
+			}
 		}
 		boundary.finish();
-		throw new Error(
+		throw new AiFeatureProviderError(
+			"provider_protocol_error",
 			"Provider stream ended before a terminal result or action request.",
 		);
 	}

@@ -111,6 +111,22 @@ export function compileAiFeatureRequest(input: {
 	};
 }
 
+export type AiFeatureProviderErrorCode =
+	| "provider_protocol_error"
+	| "provider_timeout"
+	| "cancelled";
+
+/** Known provider terminal failure, distinct from an ambiguous start outcome. */
+export class AiFeatureProviderError extends Error {
+	constructor(
+		public readonly code: AiFeatureProviderErrorCode,
+		message: string,
+	) {
+		super(message);
+		this.name = "AiFeatureProviderError";
+	}
+}
+
 /** A provider turn is either terminal or a single engine-managed invoke request. */
 export type AiFeatureProviderTurn =
 	| {
