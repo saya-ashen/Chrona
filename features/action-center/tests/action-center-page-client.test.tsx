@@ -168,7 +168,7 @@ describe("ActionCenterPageClient", () => {
 		).not.toBeInTheDocument();
 	});
 
-	it("accepts and rejects schedule proposals without leaving action center", async () => {
+	it("[ACTION-007] rejects schedule proposals and links to Schedule", async () => {
 		const user = userEvent.setup();
 
 		render(
@@ -194,14 +194,19 @@ describe("ActionCenterPageClient", () => {
 			/>,
 		);
 
-		await user.click(screen.getByRole("button", { name: "Accept Proposal" }));
+		expect(screen.getByRole("link", { name: "Open Schedule" })).toHaveAttribute(
+			"href",
+			"/en/schedule",
+		);
+		await user.click(screen.getByRole("button", { name: "Reject Proposal" }));
 
 		await waitFor(() =>
 			expect(decideScheduleProposal).toHaveBeenCalledWith({
 				proposalId: "proposal_1",
-				decision: "Accepted",
+				decision: "Rejected",
 			}),
 		);
+		expect(screen.queryByText("Move launch prep to tomorrow")).not.toBeInTheDocument();
 	});
 
 	it("shows the concrete auto-execution skip reason before generic consequence copy", () => {

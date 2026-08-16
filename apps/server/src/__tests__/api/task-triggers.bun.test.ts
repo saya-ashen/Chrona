@@ -75,6 +75,9 @@ describe("Task triggers and occurrence authority", () => {
     const engine = createChronaEngine();
     await engine.triggers.create({ taskId: target.id, command: { workspaceId, definition: { kind: "event", config: { topic: "task.result.accepted", filter: { path: "taskId", operator: "eq", value: source.id } } } } });
     const run = await db.run.create({ data: { taskId: source.id, runtimeName: "hermes", status: "Completed", triggeredBy: "user" } });
+    const nonmatching = await engine.triggers.activateEvent({ workspaceId, topic: "task.result.accepted", causationId: `${run.id}:other`, normalizedInput: { taskId: target.id, runId: run.id } });
+    expect(nonmatching).toBe(0);
+    expect(await db.taskOccurrence.count({ where: { taskId: target.id } })).toBe(0);
     const first = await engine.triggers.activateEvent({ workspaceId, topic: "task.result.accepted", causationId: run.id, normalizedInput: { taskId: source.id, runId: run.id } });
     const duplicate = await engine.triggers.activateEvent({ workspaceId, topic: "task.result.accepted", causationId: run.id, normalizedInput: { taskId: source.id, runId: run.id } });
     expect(first).toBe(1);
@@ -92,6 +95,9 @@ describe("Task triggers and occurrence authority", () => {
     const app = createApiRouter(engine);
     const delivery = { timestamp: new Date().toISOString(), workspaceId, deliveryId: "mail-1", recipient: "launch-inbox", from: "owner@example.test", subject: "Launch readiness", text: "Review final evidence", receivedAt: new Date().toISOString() };
 
+    expect((await postEmail(app, "test-email-trigger-secret", { ...delivery, recipient: undefined })).status).toBe(400);
+    expect((await postEmail(app, "test-email-trigger-secret", { ...delivery, deliveryId: "oversized", text: "x".repeat(50_001) })).status).toBe(400);
+    expect(await db.taskOccurrence.count({ where: { taskId: target.id } })).toBe(0);
     expect((await postEmail(app, "wrong-secret", delivery)).status).toBe(401);
     expect((await postEmail(app, "test-email-trigger-secret", delivery, "wrong-signature-secret")).status).toBe(401);
     expect((await postEmail(app, "test-email-trigger-secret", { ...delivery, timestamp: new Date(Date.now() - 6 * 60_000).toISOString(), deliveryId: "expired" })).status).toBe(401);
@@ -113,8 +119,13 @@ describe("Task triggers and occurrence authority", () => {
     const engine = createChronaEngine();
     await engine.triggers.create({ taskId: target.id, command: { workspaceId, definition: { kind: "event", config: { topic: "goal.review_due" } } } });
     const goal = await db.goal.create({ data: { workspaceId, title: "Quarterly launch", description: "Review due", successCriteria: [], status: "Active", nextReviewAt: new Date("2026-07-01T00:00:00.000Z") } });
-    expect(await runGoalReviewDueWorker({ now: new Date("2026-07-02T00:00:00.000Z") })).toBe(1);
+    const futureGoal = await db.goal.create({ data: { workspaceId, title: "Future launch", description: "Review later", successCriteria: [], status: "Active", nextReviewAt: new Date("2026-07-03T00:00:00.000Z") } });
+    const now = new Date("2026-07-02T00:00:00.000Z");
+    expect(await runGoalReviewDueWorker({ now })).toBe(1);
+    expect(await runGoalReviewDueWorker({ now })).toBe(0);
     const occurrence = await db.taskOccurrence.findFirstOrThrow({ where: { taskId: target.id, occurrenceKey: { startsWith: "event:goal.review_due" } } });
     expect(occurrence.normalizedInput).toMatchObject({ goalId: goal.id, activationDepth: 0 });
+    expect(JSON.stringify(occurrence.normalizedInput)).not.toContain(futureGoal.id);
+    expect(await db.taskOccurrence.count({ where: { taskId: target.id } })).toBe(1);
   });
 });

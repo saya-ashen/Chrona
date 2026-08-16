@@ -24,6 +24,7 @@ const {
 	rejectGoalReviewProposalMock,
 	answerGoalReviewMock,
 	retryGoalReviewMock,
+	runGoalActionMock,
 } = vi.hoisted(() => ({
 	apiJsonMock: vi.fn(async () => ({ id: "workspace-default" })),
 	promoteTaskToGoalMock: vi.fn(async () => ({ id: "goal-promoted" })),
@@ -40,12 +41,13 @@ const {
 	rejectGoalReviewProposalMock: vi.fn(async () => ({})),
 	answerGoalReviewMock: vi.fn(async () => ({})),
 	retryGoalReviewMock: vi.fn(async () => ({})),
+	runGoalActionMock: vi.fn(async () => ({})),
 	uuidv4Mock: vi.fn(() => "goal-idempotency-key"),
 }));
 vi.mock("uuid", () => ({ v4: uuidv4Mock }));
 vi.mock("@shared/http", () => ({ apiJson: apiJsonMock }));
 vi.mock("../browser-api", () => ({
-	runGoalAction: vi.fn(async () => ({})),
+	runGoalAction: runGoalActionMock,
 	createGoalTask: vi.fn(async () => ({ taskId: "task-created", goal: {} })),
 	createGoalWithFirstTask: createGoalWithFirstTaskMock,
 	generateGoalReview: generateGoalReviewMock,
@@ -1138,7 +1140,42 @@ describe("Goal pages", () => {
 		expect(screen.queryByText(/AI-generated Goal/i)).not.toBeInTheDocument();
 	});
 
-	it("requires confirmation and retained evidence before achievement", () => {
+	it("pauses and resumes a Goal through visible lifecycle actions", async () => {
+		runGoalActionMock.mockClear();
+		const user = userEvent.setup();
+		const active = renderInRouter(<GoalWorkspacePage goal={baseGoal} copy={copy} />);
+		const actions = screen.getByRole("button", { name: "Goal actions" });
+		actions.focus();
+		await user.keyboard("{ArrowDown}");
+		await user.click(await screen.findByText("Pause Goal"));
+		await waitFor(() =>
+			expect(runGoalActionMock).toHaveBeenCalledWith("goal-1", {
+				action: "pause",
+			}),
+		);
+		active.unmount();
+
+		const pausedGoal: GoalData = {
+			...baseGoal,
+			status: "Paused",
+			projection: {
+				...baseGoal.projection,
+				lifecycle: "Paused",
+				nextAction: "resume",
+			},
+			primaryAction: { kind: "resume", taskId: null },
+		};
+		renderInRouter(<GoalWorkspacePage goal={pausedGoal} copy={copy} />);
+		await user.click(screen.getByRole("button", { name: "Resume Goal" }));
+		await waitFor(() =>
+			expect(runGoalActionMock).toHaveBeenCalledWith("goal-1", {
+				action: "resume",
+			}),
+		);
+	});
+
+	it("requires confirmation and retained evidence before achievement", async () => {
+		runGoalActionMock.mockClear();
 		const goal: GoalData = {
 			...baseGoal,
 			outcome: {
@@ -1164,6 +1201,14 @@ describe("Goal pages", () => {
 		expect(submit).toBeDisabled();
 		fireEvent.click(screen.getByRole("checkbox", { name: /Final result/ }));
 		expect(submit).toBeEnabled();
+		fireEvent.click(submit);
+		await waitFor(() =>
+			expect(runGoalActionMock).toHaveBeenCalledWith("goal-1", {
+				action: "achieve",
+				confirmation: "Outcome evidence confirmed",
+				evidenceArtifactIds: [artifact.id],
+			}),
+		);
 	});
 
 	it("opens the initial-plan deep link and starts a v2 review operation", async () => {
