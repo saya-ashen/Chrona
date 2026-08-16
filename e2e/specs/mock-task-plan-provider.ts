@@ -319,16 +319,21 @@ export async function bindTaskPlanProvider(
 	request: APIRequestContext,
 	taskId: string,
 	baseUrl: string,
-	features: readonly ("task.plan" | "task.result_finalization")[] = [
-		"task.plan",
-	],
+	features: readonly (
+		| "task.plan"
+		| "task.result_finalization"
+		| "execute_task_node"
+		| "evaluate_condition_node"
+		| "review_checkpoint_node"
+	)[] = ["task.plan"],
+	isDefault = false,
 ): Promise<void> {
 	const createResponse = await request.post("/api/ai/clients", {
 		data: {
 			name: `E2E Durable Plan Client ${taskId}`,
 			type: "hermes",
 			config: { baseUrl, apiKey: "e2e-task-plan-key", timeoutMs: 120_000 },
-			isDefault: false,
+			isDefault,
 		},
 	});
 	if (!createResponse.ok()) {

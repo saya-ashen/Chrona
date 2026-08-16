@@ -882,6 +882,95 @@ test.describe("Task create → plan → run → result", () => {
 		}
 	});
 
+	test("[RUN-014] shows provider failure, failed node, and retry action", async ({
+		page,
+		request,
+	}, testInfo) => {
+		test.skip(
+			testInfo.project.name !== "chromium",
+			"Focused provider-failure regression runs on desktop only.",
+		);
+		test.setTimeout(120_000);
+
+		await bindTaskPlanProvider(
+			request,
+			"run-014-provider-failure",
+			"http://127.0.0.1:1",
+			[
+				"execute_task_node",
+				"evaluate_condition_node",
+				"review_checkpoint_node",
+			],
+			true,
+		);
+		const task = await createTaskWorkspaceTask(request, {
+			title: `E2E Provider Failure ${Date.now()}`,
+			description: "Expose a deterministic provider failure in the workspace.",
+		});
+		await generateTaskWorkspacePlan(request, task.taskId);
+		await dispatchWorkspaceCommand(request, task.taskId, {
+			type: "execution.action",
+			action: "start_manual",
+			prompt: "Start the provider-failure regression.",
+			idempotencyKey: `failure-start-${task.taskId}`,
+		});
+		const firstPause = await pollExecution(
+			request,
+			task.taskId,
+			(body) =>
+				body.status === "waiting_for_user" && Boolean(body.checkpoint?.id),
+		);
+		await postCheckpointAction(
+			request,
+			task.taskId,
+			firstPause.checkpoint!.id!,
+			"submit_input",
+			{
+				inputFields: {
+					scenario_label: "fast",
+					include_slow_wait: false,
+					priority: "normal",
+				},
+			},
+		);
+		const branchPause = await pollExecution(
+			request,
+			task.taskId,
+			(body) =>
+				body.status === "waiting_for_user" &&
+				body.checkpoint?.id !== firstPause.checkpoint?.id,
+		);
+		await postCheckpointAction(
+			request,
+			task.taskId,
+			branchPause.checkpoint!.id!,
+			"submit_input",
+			{ inputFields: { selected_route: "fast path" } },
+		);
+		const failed = await pollExecution(
+			request,
+			task.taskId,
+			(body) =>
+				(body.status === "failed" || body.status === "blocked") &&
+				body.currentNodeId !== firstPause.currentNodeId,
+		);
+		expect(failed.currentNodeId).toBeTruthy();
+
+		await page.goto(TASK_URL(task.taskId));
+		await dismissTaskEditorIfOpen(page);
+		const operation = page.getByRole("region", { name: "Current operation" });
+		await expect(operation).toContainText("Failed", { timeout: 20_000 });
+		await expect(operation).toContainText(
+			/Failed to execute AI capability.*Unable to connect/i,
+		);
+		await expect(
+			page.getByText("Execute deterministic work").first(),
+		).toBeVisible();
+		await expect(
+			operation.getByRole("button", { name: /Retry (Run|node)/i }),
+		).toBeVisible();
+	});
+
 	test("[RUN-015] keeps pause, resume, retry, and stop projections stable", async ({
 		page,
 		request,
