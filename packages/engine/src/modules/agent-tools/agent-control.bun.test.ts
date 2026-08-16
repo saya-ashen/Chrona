@@ -1,14 +1,14 @@
 import { describe, expect, it, beforeAll } from "bun:test";
 import { createHash } from "node:crypto";
-import { db } from "@/lib/db";
+import { db } from "@chrona/db";
 import {
   ConflictingTerminalActionError,
   mintRunToken,
   recordTerminalAction,
   validateRunToken,
   revokeRunToken,
-} from "@/modules/plan-execution/runtime/agent-control-store";
-import { handleControlAction, ControlRouteError } from "./control-route";
+} from "../plan-execution/runtime/agent-control-store";
+import { handleControlAction, type ControlRouteError } from "./control-route";
 import {
   isTerminalControlKind,
   submitNodeResultActionFromControl,
@@ -123,7 +123,7 @@ describe("run token mint/validate round-trip", () => {
 });
 
 describe("terminal action recording", () => {
-  it("records one terminal action, accepts same-kind retries, and rejects conflicting kinds", async () => {
+  it("[MCP-007] records one terminal action, replays same-kind retries, and rejects conflicting kinds", async () => {
     const workspace = await db.workspace.create({ data: { name: "ws-rec", defaultRuntime: "claude_code", status: "Active" } });
     const task = await db.task.create({
       data: {

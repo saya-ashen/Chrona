@@ -1,5 +1,5 @@
 import { afterAll, beforeEach, describe, expect, it } from "bun:test";
-import { db } from "@/lib/db";
+import { db } from "@chrona/db";
 import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
 import { createAgentToolOperationsService, resetAgentToolMutationFlightsForTest } from "./operations";
 

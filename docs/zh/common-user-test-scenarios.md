@@ -1,8 +1,8 @@
 # Chrona 常用用户测试场景树
 
-> 状态：已完成首轮全量场景审计。本文 276 个唯一场景均已获得终态：`通过`、`部分通过` 或 `阻塞`。`阻塞`表示当前没有直接可执行证据，已记录缺口，不表示功能失败。
+> 状态：已完成当前可执行场景收敛。本文包含 276 个唯一场景：`224 通过`、`52 部分通过`、`0 阻塞`。`部分通过`表示已有直接证据，但仍存在产品语义、外部基础设施或无界横向矩阵缺口，不表示现有断言失败。
 >
-> 基线：`1683ca4c66a2100fd60b998c505221dc33d8f789`，并考虑当前工作区未提交状态。
+> 基线：`fix/durable-plan-generation-recovery` 当前验证批次；场景证据已通过连续 checkpoint commits 固化。
 >
 > 执行证据：`outputs/common-user-test-scenarios/report.md`、`outputs/common-user-test-scenarios/results.json`；稳定回归固化于现有 Bun/Vitest/Playwright 测试。
 
