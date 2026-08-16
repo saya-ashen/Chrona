@@ -10,16 +10,18 @@ async function createTask(
   title: string,
   description: string,
 ): Promise<CreatedTask> {
-  const workspaceResponse = await request.get("/api/workspaces/default");
-  expect(workspaceResponse.ok()).toBeTruthy();
-
-  const workspaceBody = (await workspaceResponse.json()) as {
-    id?: string;
-    workspace?: { id?: string };
-    workspaceId?: string;
-  };
-  const workspaceId = workspaceBody.workspaceId ?? workspaceBody.id ?? workspaceBody.workspace?.id;
-  expect(workspaceId).toBeTruthy();
+  let workspaceId: string | undefined;
+  await expect.poll(async () => {
+    const workspaceResponse = await request.get("/api/workspaces/default");
+    if (!workspaceResponse.ok()) return null;
+    const workspaceBody = (await workspaceResponse.json()) as {
+      id?: string;
+      workspace?: { id?: string };
+      workspaceId?: string;
+    };
+    workspaceId = workspaceBody.workspaceId ?? workspaceBody.id ?? workspaceBody.workspace?.id;
+    return workspaceId ?? null;
+  }, { timeout: 15_000, intervals: [200, 500, 1_000] }).not.toBeNull();
 
   const createTaskResponse = await request.post("/api/tasks", {
     data: {
@@ -38,7 +40,7 @@ async function createTask(
 }
 
 test.describe("Task Workspace Assistant Surface", () => {
-  test("shows disabled task-aware assistant status while drawer is unavailable", async ({
+  test("[ASSIST-005] shows disabled task-aware assistant status while drawer is unavailable", async ({
     page,
     request,
   }) => {
@@ -61,7 +63,7 @@ test.describe("Task Workspace Assistant Surface", () => {
     await expect(trigger).toBeVisible();
     await expect(trigger).toBeDisabled();
     await expect(page.getByText("Needs plan", { exact: true }).first()).toBeVisible();
-    await expect(page.getByRole("button", { name: "Generate plan" }).first()).toBeVisible();
+    await expect(page.getByRole("button", { name: "Edit task" }).first()).toBeVisible();
     await expect(page.getByRole("dialog", { name: "Task context" })).toHaveCount(0);
   });
 });

@@ -20,7 +20,7 @@ async function clickPlanNode(page: Page) {
 }
 
 test.describe("Task workspace node drawer reliability", () => {
-  test("opens, collapses, and reopens selected node drawer", async ({ page, request }, testInfo) => {
+  test("[WORK-006] reopens the correct node detail after refresh", async ({ page, request }, testInfo) => {
     const viewport = (testInfo.project.name === "tablet" || testInfo.project.name === "mobile")
       ? testInfo.project.name
       : "desktop" satisfies TaskWorkspaceViewport;
@@ -38,9 +38,13 @@ test.describe("Task workspace node drawer reliability", () => {
     await expect(page.getByText("Inspecting step: Collect boundary context", { exact: true })).toBeVisible();
     await expect(page.getByTestId("accepted-plan-surface")).toBeVisible();
 
-    await clickPlanNode(page);
-    await expect(page.getByText("Inspecting step: Collect boundary context", { exact: true })).toBeVisible();
+    await page.reload();
     await expect(page.getByTestId("accepted-plan-surface")).toBeVisible();
+    const secondNode = page.getByRole("button", { name: /Route execution/ });
+    await expect(secondNode).toBeVisible();
+    await secondNode.click();
+    await expect(page.getByText("Inspecting step: Route execution", { exact: true })).toBeVisible();
+    await expect(page.getByText("Inspecting step: Collect boundary context", { exact: true })).toHaveCount(0);
 
     if (viewport === "mobile") {
       await expectNoHorizontalScroll(page);

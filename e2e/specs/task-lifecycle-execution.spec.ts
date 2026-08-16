@@ -982,7 +982,7 @@ test.describe("Task create → plan → run → result", () => {
 		).toBeVisible();
 	});
 
-	test("[RUN-015] keeps pause, resume, retry, and stop projections stable", async ({
+	test("[RUN-012/RUN-015] keeps pause, resume, retry, and stop projections stable", async ({
 		page,
 		request,
 	}, testInfo) => {
