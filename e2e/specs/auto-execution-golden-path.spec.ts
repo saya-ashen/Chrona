@@ -377,7 +377,7 @@ async function resolveExecutionGates(
 // ─── tests ────────────────────────────────────────────────────────────────────
 
 test.describe("Auto-execution golden path (§1.3)", () => {
-	test("positive: autoExecute+autoPlanGeneration drives task to Completed via deterministic gates", async ({
+	test("[AUTO-001] positive: autoExecute+autoPlanGeneration drives task to Completed via deterministic gates", async ({
 		page,
 		request,
 	}) => {

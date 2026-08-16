@@ -1,4 +1,4 @@
-import { createBrowserRouter, Navigate } from "react-router-dom";
+import { createBrowserRouter, Navigate, useLocation } from "react-router-dom";
 
 import { defaultLocale, hasLocale } from "@chrona/i18n";
 
@@ -28,22 +28,37 @@ import {
   loadTaskListData,
   loadTaskPageData,
 } from "./loaders";
-function redirectToDefaultLocale(pathname: string, search: string, hash: string) {
-  return `${window.location.origin}/${defaultLocale}${pathname}${search}${hash}`;
+function DefaultLocaleRedirect() {
+  const { search, hash } = useLocation();
+  return <Navigate to={`/${defaultLocale}${search}${hash}`} replace />;
+}
+
+function redirectToDefaultLocale(
+  pathname: string,
+  search: string,
+  hash: string,
+  invalidLocale: string,
+) {
+  const invalidPrefix = `/${invalidLocale}`;
+  const localizedPath = pathname === invalidPrefix ? "" : pathname.slice(invalidPrefix.length);
+  return `${window.location.origin}/${defaultLocale}${localizedPath}${search}${hash}`;
 }
 
 export function createAppRouter() {
   return createBrowserRouter([
     {
       path: "/",
-      element: <Navigate to={`/${defaultLocale}`} replace />,
+      element: <DefaultLocaleRedirect />,
     },
     {
       path: "/:lang",
       loader: ({ params, request }) => {
         if (!params.lang || !hasLocale(params.lang)) {
           const url = new URL(request.url);
-          throw Response.redirect(redirectToDefaultLocale(url.pathname, url.search, url.hash), 302);
+          throw Response.redirect(
+            redirectToDefaultLocale(url.pathname, url.search, url.hash, params.lang ?? ""),
+            302,
+          );
         }
         return loadAppBootData({ params, request } as Parameters<typeof loadAppBootData>[0]);
       },

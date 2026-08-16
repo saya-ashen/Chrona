@@ -1819,7 +1819,8 @@
           "dirty": "AI 简报可更新",
           "failed": "AI 简报更新失败",
           "unconfigured": "未配置 Dashboard AI 提供方",
-          "regenerate": "重新生成"
+          "regenerate": "重新生成",
+          "updatedAt": "更新于 {time}"
         }
       },
       "feed": {

@@ -123,7 +123,9 @@ type AiPlanGenerationStatus =
 	| "idle"
 	| "waiting_acceptance";
 
-function isSessionStatus(value: unknown): value is TaskPlanSessionState["sessionStatus"] {
+function isSessionStatus(
+	value: unknown,
+): value is TaskPlanSessionState["sessionStatus"] {
 	return (
 		value === "idle" ||
 		value === "running" ||
@@ -133,7 +135,9 @@ function isSessionStatus(value: unknown): value is TaskPlanSessionState["session
 	);
 }
 
-function isGenerationPhase(value: unknown): value is TaskPlanSessionState["phase"] {
+function isGenerationPhase(
+	value: unknown,
+): value is TaskPlanSessionState["phase"] {
 	return (
 		value === "idle" ||
 		value === "connecting" ||

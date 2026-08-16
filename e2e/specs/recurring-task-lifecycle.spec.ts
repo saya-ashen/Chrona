@@ -85,24 +85,28 @@ async function expectNoHorizontalScroll(page: Page) {
  * without pinning the previous header spec / state store.
  */
 async function navigateToWorkBlock(page: Page, workBlockId: string) {
-  await page.evaluate((id) => {
-    const next = new URL(window.location.href);
-    next.searchParams.set("workBlockId", id);
-    window.history.pushState({}, "", next.toString());
-    window.dispatchEvent(new PopStateEvent("popstate"));
-  }, workBlockId);
+  try {
+    await page.evaluate((id) => {
+      const next = new URL(window.location.href);
+      next.searchParams.set("workBlockId", id);
+      window.history.pushState({}, "", next.toString());
+      window.dispatchEvent(new PopStateEvent("popstate"));
+    }, workBlockId);
+  } catch (cause) {
+    throw new Error(`Failed to navigate to occurrence ${workBlockId}`, { cause });
+  }
 }
 
 test.describe("Recurring task lifecycle", () => {
-  test("expands a daily series and switches occurrences without a page refresh", async ({
+  test("[RECUR-005] expands a daily series and switches occurrences without a page refresh", async ({
     page,
     request,
   }, testInfo) => {
     const workspaceId = await fetchDefaultWorkspaceId(request);
 
     // Anchor on a stable future date so the spec survives any clock drift.
-    const anchorStart = "2026-06-15T09:00:00.000Z";
-    const anchorEnd = "2026-06-15T09:30:00.000Z";
+    const anchorStart = "2099-06-15T09:00:00.000Z";
+    const anchorEnd = "2099-06-15T09:30:00.000Z";
     const task = await createRecurringTask(request, {
       workspaceId,
       title: `E2E Recurring ${testInfo.project.name} ${Date.now()}`,

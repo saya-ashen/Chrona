@@ -1819,7 +1819,8 @@
           "dirty": "AI brief ready to update",
           "failed": "AI brief update failed",
           "unconfigured": "Dashboard AI provider not configured",
-          "regenerate": "Regenerate"
+          "regenerate": "Regenerate",
+          "updatedAt": "Updated {time}"
         }
       },
       "feed": {

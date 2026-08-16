@@ -14,78 +14,92 @@ import { db } from "@chrona/db";
 import type { PrismaClient } from "@chrona/db/generated/prisma/client";
 import { TaskStatus } from "@chrona/db/generated/prisma/client";
 import {
-  createTaskBodySchema,
-  updateTaskBodySchema,
+	createTaskBodySchema,
+	updateTaskBodySchema,
 } from "@chrona/contracts/api";
 import { createTask } from "@chrona/engine/test-support";
 import { updateTask } from "@chrona/engine/test-support";
 import { appendCanonicalEvent } from "@chrona/engine/test-support";
-import { resetTestDb, seedWorkspace, seedTask, expectTaskExists, expectTaskNotFound } from "../bun-test-helpers";
-import { json, error, internalServerError, parseLimit, toHttpError, HttpError } from "../../lib/http";
+import {
+	resetTestDb,
+	seedWorkspace,
+	seedTask,
+	expectTaskExists,
+	expectTaskNotFound,
+} from "../bun-test-helpers";
+import {
+	json,
+	error,
+	internalServerError,
+	parseLimit,
+	toHttpError,
+	HttpError,
+} from "../../lib/http";
 
 const VALID_TASK_STATUSES = new Set(Object.values(TaskStatus));
 type TransactionClient = Omit<
-  PrismaClient,
-  "$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends"
+	PrismaClient,
+	"$connect" | "$disconnect" | "$on" | "$transaction" | "$use" | "$extends"
 >;
 
 async function deleteTaskWithRelations(taskId: string, workspaceId?: string) {
-  const task = await db.task.findUnique({
-    where: { id: taskId },
-    select: { id: true, workspaceId: true, title: true },
-  });
+	const task = await db.task.findUnique({
+		where: { id: taskId },
+		select: { id: true, workspaceId: true, title: true },
+	});
 
-  if (!task) throw new HttpError(404, "Task not found");
-  if (workspaceId && task.workspaceId !== workspaceId) throw new HttpError(404, "Task not found");
+	if (!task) throw new HttpError(404, "Task not found");
+	if (workspaceId && task.workspaceId !== workspaceId)
+		throw new HttpError(404, "Task not found");
 
-  await appendCanonicalEvent({
-    eventType: "task.deleted",
-    workspaceId: task.workspaceId,
-    taskId: task.id,
-    actorType: "user",
-    actorId: "server-action",
-    source: "ui",
-    payload: { title: task.title },
-    dedupeKey: `task.deleted:${task.id}`,
-  });
+	await appendCanonicalEvent({
+		eventType: "task.deleted",
+		workspaceId: task.workspaceId,
+		taskId: task.id,
+		actorType: "user",
+		actorId: "server-action",
+		source: "ui",
+		payload: { title: task.title },
+		dedupeKey: `task.deleted:${task.id}`,
+	});
 
-  await db.$transaction(async (tx: TransactionClient) => {
-    await tx.taskProjection.deleteMany({ where: { taskId } });
-    await tx.run.deleteMany({ where: { taskId } });
-    await tx.taskSession.deleteMany({ where: { taskId } });
-    await tx.approval.deleteMany({ where: { taskId } });
-    await tx.artifact.deleteMany({ where: { taskId } });
-    await tx.memory.deleteMany({ where: { taskId } });
-    await tx.event.deleteMany({ where: { taskId } });
-    await tx.taskDependency.deleteMany({
-      where: { OR: [{ taskId }, { dependsOnTaskId: taskId }] },
-    });
-    await tx.scheduleProposal.deleteMany({ where: { taskId } });
+	await db.$transaction(async (tx: TransactionClient) => {
+		await tx.taskProjection.deleteMany({ where: { taskId } });
+		await tx.run.deleteMany({ where: { taskId } });
+		await tx.taskSession.deleteMany({ where: { taskId } });
+		await tx.approval.deleteMany({ where: { taskId } });
+		await tx.artifact.deleteMany({ where: { taskId } });
+		await tx.memory.deleteMany({ where: { taskId } });
+		await tx.event.deleteMany({ where: { taskId } });
+		await tx.taskDependency.deleteMany({
+			where: { OR: [{ taskId }, { dependsOnTaskId: taskId }] },
+		});
+		await tx.scheduleProposal.deleteMany({ where: { taskId } });
 
-    const childTasks = await tx.task.findMany({
-      where: { parentTaskId: taskId },
-      select: { id: true },
-    });
+		const childTasks = await tx.task.findMany({
+			where: { parentTaskId: taskId },
+			select: { id: true },
+		});
 
-    for (const child of childTasks) {
-      await tx.taskProjection.deleteMany({ where: { taskId: child.id } });
-      await tx.run.deleteMany({ where: { taskId: child.id } });
-      await tx.taskSession.deleteMany({ where: { taskId: child.id } });
-      await tx.approval.deleteMany({ where: { taskId: child.id } });
-      await tx.artifact.deleteMany({ where: { taskId: child.id } });
-      await tx.memory.deleteMany({ where: { taskId: child.id } });
-      await tx.event.deleteMany({ where: { taskId: child.id } });
-      await tx.taskDependency.deleteMany({
-        where: { OR: [{ taskId: child.id }, { dependsOnTaskId: child.id }] },
-      });
-      await tx.scheduleProposal.deleteMany({ where: { taskId: child.id } });
-      await tx.task.delete({ where: { id: child.id } });
-    }
+		for (const child of childTasks) {
+			await tx.taskProjection.deleteMany({ where: { taskId: child.id } });
+			await tx.run.deleteMany({ where: { taskId: child.id } });
+			await tx.taskSession.deleteMany({ where: { taskId: child.id } });
+			await tx.approval.deleteMany({ where: { taskId: child.id } });
+			await tx.artifact.deleteMany({ where: { taskId: child.id } });
+			await tx.memory.deleteMany({ where: { taskId: child.id } });
+			await tx.event.deleteMany({ where: { taskId: child.id } });
+			await tx.taskDependency.deleteMany({
+				where: { OR: [{ taskId: child.id }, { dependsOnTaskId: child.id }] },
+			});
+			await tx.scheduleProposal.deleteMany({ where: { taskId: child.id } });
+			await tx.task.delete({ where: { id: child.id } });
+		}
 
-    await tx.task.delete({ where: { id: taskId } });
-  });
+		await tx.task.delete({ where: { id: taskId } });
+	});
 
-  return { success: true, taskId };
+	return { success: true, taskId };
 }
 
 // ---------------------------------------------------------------------------
@@ -97,135 +111,190 @@ async function deleteTaskWithRelations(taskId: string, workspaceId?: string) {
 // ---------------------------------------------------------------------------
 
 function createTaskRouter() {
-  const api = new Hono();
+	const api = new Hono();
 
-  api.get("/tasks", async (c) => {
-    try {
-      const workspaceId = c.req.query("workspaceId");
-      if (!workspaceId) return error(c, "workspaceId query parameter is required", 400);
+	api.get("/tasks", async (c) => {
+		try {
+			const workspaceId = c.req.query("workspaceId");
+			if (!workspaceId)
+				return error(c, "workspaceId query parameter is required", 400);
 
-      const status = c.req.query("status");
-      const limit = parseLimit(c.req.query("limit"), 50, 200);
+			const status = c.req.query("status");
+			const limit = parseLimit(c.req.query("limit"), 50, 200);
 
-      if (status && !VALID_TASK_STATUSES.has(status as TaskStatus)) {
-        return error(c, `Invalid status. Valid values: ${[...VALID_TASK_STATUSES].join(", ")}`, 400);
-      }
+			if (status && !VALID_TASK_STATUSES.has(status as TaskStatus)) {
+				return error(
+					c,
+					`Invalid status. Valid values: ${[...VALID_TASK_STATUSES].join(", ")}`,
+					400,
+				);
+			}
 
-      const tasks = await db.task.findMany({
-        where: { workspaceId, ...(status ? { status: status as TaskStatus } : {}) },
-        include: { projection: true },
-        orderBy: { updatedAt: "desc" },
-        take: limit,
-      });
+			const tasks = await db.task.findMany({
+				where: {
+					workspaceId,
+					...(status ? { status: status as TaskStatus } : {}),
+				},
+				include: { projection: true },
+				orderBy: { updatedAt: "desc" },
+				take: limit,
+			});
 
-      return json(c, { tasks, count: tasks.length });
-    } catch (cause) {
-      const httpError = toHttpError(cause);
-      if (httpError) return error(c, httpError.message, httpError.status);
-      return internalServerError(c, "GET /api/tasks", cause, "Failed to list tasks");
-    }
-  });
+			return json(c, { tasks, count: tasks.length });
+		} catch (cause) {
+			const httpError = toHttpError(cause);
+			if (httpError) return error(c, httpError.message, httpError.status);
+			return internalServerError(
+				c,
+				"GET /api/tasks",
+				cause,
+				"Failed to list tasks",
+			);
+		}
+	});
 
-  api.post("/tasks", async (c) => {
-    try {
-      const body = await c.req.json();
-      const parsed = createTaskBodySchema.safeParse(body);
+	api.post("/tasks", async (c) => {
+		try {
+			const body = await c.req.json();
+			const parsed = createTaskBodySchema.safeParse(body);
 
-      if (!parsed.success) {
-        return error(c, parsed.error.issues.map((issue) => issue.message).join("; "), 400);
-      }
+			if (!parsed.success) {
+				return error(
+					c,
+					parsed.error.issues.map((issue) => issue.message).join("; "),
+					400,
+				);
+			}
 
-      const { workspaceId, title } = parsed.data;
+			const { workspaceId, title } = parsed.data;
 
-      if (!title.trim()) {
-        return error(c, "title is required", 400);
-      }
+			if (!title.trim()) {
+				return error(c, "title is required", 400);
+			}
 
-      const workspace = await db.workspace.findUnique({
-        where: { id: workspaceId },
-        select: { id: true },
-      });
+			const workspace = await db.workspace.findUnique({
+				where: { id: workspaceId },
+				select: { id: true },
+			});
 
-      if (!workspace) return error(c, "Workspace not found", 404);
+			if (!workspace) return error(c, "Workspace not found", 404);
 
-      const result = await createTask({
-        workspaceId,
-        title: title.trim(),
-        description: parsed.data.description,
-        priority: parsed.data.priority,
-        autoExecute: parsed.data.autoExecute,
-        executionRuntime: parsed.data.executionRuntime,
-        executionConfig: parsed.data.executionConfig,
-      });
+			const result = await createTask({
+				workspaceId,
+				title: title.trim(),
+				description: parsed.data.description,
+				priority: parsed.data.priority,
+				autoExecute: parsed.data.autoExecute,
+				executionRuntime: parsed.data.executionRuntime,
+				executionConfig: parsed.data.executionConfig,
+			});
 
-      return json(c, result, 201);
-    } catch (cause) {
-      return internalServerError(c, "POST /api/tasks", cause, "Failed to create task");
-    }
-  });
+			return json(c, result, 201);
+		} catch (cause) {
+			return internalServerError(
+				c,
+				"POST /api/tasks",
+				cause,
+				"Failed to create task",
+			);
+		}
+	});
 
-  api.get("/tasks/:taskId", async (c) => {
-    try {
-      const taskId = c.req.param("taskId");
-      const workspaceId = c.req.query("workspaceId");
-      const task = await db.task.findUnique({
-        where: { id: taskId },
-        include: { projection: true, runs: { orderBy: { startedAt: "desc" }, take: 5 } },
-      });
-      if (!task) return error(c, "Task not found", 404);
-      if (workspaceId && task.workspaceId !== workspaceId) return error(c, "Task not found", 404);
-      return json(c, { task });
-    } catch (cause) {
-      return internalServerError(c, "GET /api/tasks/:taskId", cause, "Failed to get task");
-    }
-  });
+	api.get("/tasks/:taskId", async (c) => {
+		try {
+			const taskId = c.req.param("taskId");
+			const workspaceId = c.req.query("workspaceId");
+			const task = await db.task.findUnique({
+				where: { id: taskId },
+				include: {
+					projection: true,
+					runs: { orderBy: { startedAt: "desc" }, take: 5 },
+				},
+			});
+			if (!task) return error(c, "Task not found", 404);
+			if (workspaceId && task.workspaceId !== workspaceId)
+				return error(c, "Task not found", 404);
+			return json(c, { task });
+		} catch (cause) {
+			return internalServerError(
+				c,
+				"GET /api/tasks/:taskId",
+				cause,
+				"Failed to get task",
+			);
+		}
+	});
 
-  api.patch("/tasks/:taskId", async (c) => {
-    try {
-      const taskId = c.req.param("taskId");
-      const body = await c.req.json();
-      const parsed = updateTaskBodySchema.safeParse(body);
+	api.patch("/tasks/:taskId", async (c) => {
+		try {
+			const taskId = c.req.param("taskId");
+			const body = await c.req.json();
+			const parsed = updateTaskBodySchema.safeParse(body);
 
-      if (!parsed.success) {
-        return error(c, parsed.error.issues.map((issue) => issue.message).join("; "), 400);
-      }
+			if (!parsed.success) {
+				return error(
+					c,
+					parsed.error.issues.map((issue) => issue.message).join("; "),
+					400,
+				);
+			}
 
-      const result = await updateTask({
-        taskId,
-        title: parsed.data.title,
-        description: parsed.data.description,
-        priority: parsed.data.priority,
-        status: parsed.data.status,
-        executionRuntime: parsed.data.executionRuntime,
-        executionConfig: parsed.data.executionConfig,
-      });
-      return json(c, result);
-    } catch (cause) {
-      const message = cause instanceof Error ? cause.message : "Failed to update task";
-      if (message.includes("Record to update not found") || message.includes("not found")) {
-        return error(c, "Task not found", 404);
-      }
-      return internalServerError(c, "PATCH /api/tasks/:taskId", cause, "Failed to update task");
-    }
-  });
+			const result = await updateTask({
+				taskId,
+				title: parsed.data.title,
+				description: parsed.data.description,
+				priority: parsed.data.priority,
+				status: parsed.data.status,
+				executionRuntime: parsed.data.executionRuntime,
+				executionConfig: parsed.data.executionConfig,
+			});
+			return json(c, result);
+		} catch (cause) {
+			const message =
+				cause instanceof Error ? cause.message : "Failed to update task";
+			if (
+				message.includes("Record to update not found") ||
+				message.includes("not found")
+			) {
+				return error(c, "Task not found", 404);
+			}
+			return internalServerError(
+				c,
+				"PATCH /api/tasks/:taskId",
+				cause,
+				"Failed to update task",
+			);
+		}
+	});
 
-  api.delete("/tasks/:taskId", async (c) => {
-    try {
-      return json(c, await deleteTaskWithRelations(c.req.param("taskId"), c.req.query("workspaceId")));
-    } catch (cause) {
-      const httpError = toHttpError(cause);
-      if (httpError) return error(c, httpError.message, httpError.status);
-      return internalServerError(c, "DELETE /api/tasks/:taskId", cause, "Failed to delete task");
-    }
-  });
+	api.delete("/tasks/:taskId", async (c) => {
+		try {
+			return json(
+				c,
+				await deleteTaskWithRelations(
+					c.req.param("taskId"),
+					c.req.query("workspaceId"),
+				),
+			);
+		} catch (cause) {
+			const httpError = toHttpError(cause);
+			if (httpError) return error(c, httpError.message, httpError.status);
+			return internalServerError(
+				c,
+				"DELETE /api/tasks/:taskId",
+				cause,
+				"Failed to delete task",
+			);
+		}
+	});
 
-  return api;
+	return api;
 }
 
 function app() {
-  const a = new Hono();
-  a.route("/api", createTaskRouter());
-  return a;
+	const a = new Hono();
+	a.route("/api", createTaskRouter());
+	return a;
 }
 
 // ---------------------------------------------------------------------------
@@ -233,344 +302,421 @@ function app() {
 // ---------------------------------------------------------------------------
 
 describe("Task CRUD workflow", () => {
-  let workspaceId: string;
-
-  beforeEach(async () => {
-    await resetTestDb();
-    const ws = await seedWorkspace("Task CRUD Workspace");
-    workspaceId = ws.workspaceId;
-  });
-
-  // -----------------------------------------------------------------------
-  // Happy path: create → list → detail → update → detail → delete → 404
-  // -----------------------------------------------------------------------
-
-  it("creates a task and returns 201 with task data", async () => {
-    const res = await app().request("http://local/api/tasks", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        workspaceId,
-        title: "My workflow task",
-        description: "A task for workflow testing",
-        priority: "High",
-      }),
-    });
-
-    expect(res.status).toBe(201);
-    const body = await res.json() as any;
-    expect(body.taskId).toBeDefined();
-    expect(typeof body.taskId).toBe("string");
-    expect(body.workspaceId).toBe(workspaceId);
-  });
-
-  it("returns and persists explicit auto-execute values from task creation", async () => {
-    const enabledResponse = await app().request("http://local/api/tasks", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        workspaceId,
-        title: "Auto execute enabled",
-        autoExecute: true,
-      }),
-    });
-    const disabledResponse = await app().request("http://local/api/tasks", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        workspaceId,
-        title: "Auto execute disabled",
-        autoExecute: false,
-      }),
-    });
-
-    expect(enabledResponse.status).toBe(201);
-    expect(disabledResponse.status).toBe(201);
-    const enabled = await enabledResponse.json() as any;
-    const disabled = await disabledResponse.json() as any;
-
-    expect(enabled.autoExecute).toBe(true);
-    expect(disabled.autoExecute).toBe(false);
-
-    const persisted = await db.task.findMany({
-      where: { id: { in: [enabled.taskId, disabled.taskId] } },
-      select: { id: true, autoExecute: true },
-    });
-    const persistedById = new Map(persisted.map((task) => [task.id, task.autoExecute]));
-    expect(persistedById.get(enabled.taskId)).toBe(true);
-    expect(persistedById.get(disabled.taskId)).toBe(false);
-  });
-
-  it("lists tasks for a workspace", async () => {
-    // Seed a task first
-    await seedTask(workspaceId, { title: "Listed Task A" });
-    await seedTask(workspaceId, { title: "Listed Task B" });
-
-    const res = await app().request(
-      `http://local/api/tasks?workspaceId=${workspaceId}`,
-    );
-
-    expect(res.status).toBe(200);
-    const body = await res.json() as any;
-    expect(body.tasks).toBeDefined();
-    expect(body.tasks.length).toBe(2);
-    expect(body.count).toBe(2);
-  });
-
-  it("lists tasks filtered by status", async () => {
-    await seedTask(workspaceId, { title: "Ready Task", status: "Ready" });
-    await seedTask(workspaceId, { title: "Draft Task", status: "Draft" });
-
-    const res = await app().request(
-      `http://local/api/tasks?workspaceId=${workspaceId}&status=Draft`,
-    );
-
-    expect(res.status).toBe(200);
-    const body = await res.json() as any;
-    expect(body.tasks).toBeDefined();
-    expect(body.tasks.length).toBe(1);
-    expect(body.tasks[0].title).toBe("Draft Task");
-  });
-
-  it("gets task detail by ID", async () => {
-    const { taskId } = await seedTask(workspaceId, { title: "Single Task" });
-
-    const res = await app().request(`http://local/api/tasks/${taskId}`);
-
-    expect(res.status).toBe(200);
-    const body = await res.json() as any;
-    expect(body.task).toBeDefined();
-    expect(body.task.id).toBe(taskId);
-    expect(body.task.title).toBe("Single Task");
-    expect(body.task.workspaceId).toBe(workspaceId);
-  });
-
-  it("updates a task and returns updated data", async () => {
-    const { taskId } = await seedTask(workspaceId, { title: "Old Title", priority: "Low" });
-
-    const res = await app().request(`http://local/api/tasks/${taskId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        title: "Updated Title",
-        priority: "Urgent",
-        description: "Updated description",
-      }),
-    });
-
-    expect(res.status).toBe(200);
-    const body = await res.json() as any;
-    expect(body.taskId).toBe(taskId);
-    expect(body.workspaceId).toBe(workspaceId);
-  });
-
-  it("updates task status", async () => {
-    const { taskId } = await seedTask(workspaceId, { title: "Status Task", status: "Ready" });
-
-    const res = await app().request(`http://local/api/tasks/${taskId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        status: "Blocked",
-      }),
-    });
-
-    expect(res.status).toBe(200);
-    const task = await expectTaskExists(taskId);
-    expect(task.status).toBe("Blocked");
-  });
-
-  it("detail-after-update reflects changes", async () => {
-    const { taskId } = await seedTask(workspaceId, { title: "Before Update" });
-
-    await app().request(`http://local/api/tasks/${taskId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title: "After Update", priority: "High" }),
-    });
-
-    const res = await app().request(`http://local/api/tasks/${taskId}`);
-    expect(res.status).toBe(200);
-    const body = await res.json() as any;
-    expect(body.task.title).toBe("After Update");
-    expect(body.task.priority).toBe("High");
-  });
-
-  it("deletes a task and returns success", async () => {
-    const { taskId } = await seedTask(workspaceId, { title: "To Be Deleted" });
-
-    const res = await app().request(`http://local/api/tasks/${taskId}`, {
-      method: "DELETE",
-    });
-
-    expect(res.status).toBe(200);
-    const body = await res.json() as any;
-    expect(body.success).toBe(true);
-    expect(body.taskId).toBe(taskId);
-  });
-
-  it("returns 404 when getting detail for a deleted task", async () => {
-    const { taskId } = await seedTask(workspaceId, { title: "Delete Me" });
-
-    await app().request(`http://local/api/tasks/${taskId}`, { method: "DELETE" });
-
-    const res = await app().request(`http://local/api/tasks/${taskId}`);
-    expect(res.status).toBe(404);
-  });
-
-  it("cascading delete removes child tasks", async () => {
-    const { taskId } = await seedTask(workspaceId, { title: "Parent Task" });
-    const { taskId: childId } = await seedTask(workspaceId, {
-      title: "Child Task",
-      parentTaskId: taskId,
-    });
-
-    await app().request(`http://local/api/tasks/${taskId}`, { method: "DELETE" });
-
-    // Both should be gone
-    await expectTaskNotFound(taskId);
-    await expectTaskNotFound(childId);
-  });
-
-  // -----------------------------------------------------------------------
-  // Negative cases
-  // -----------------------------------------------------------------------
-
-  it("returns 400 when creating a task without workspaceId", async () => {
-    const res = await app().request("http://local/api/tasks", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title: "No workspace" }),
-    });
-
-    expect(res.status).toBe(400);
-    const body = await res.json() as any;
-    expect(body.error).toBeDefined();
-  });
-
-  it("returns 400 when creating a task without title", async () => {
-    const res = await app().request("http://local/api/tasks", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ workspaceId }),
-    });
-
-    expect(res.status).toBe(400);
-  });
-
-  it("returns 400 when creating a task with empty title", async () => {
-    const res = await app().request("http://local/api/tasks", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ workspaceId, title: "   " }),
-    });
-
-    expect(res.status).toBe(400);
-  });
-
-  it("returns 404 when creating a task for a missing workspace", async () => {
-    const res = await app().request("http://local/api/tasks", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ workspaceId: "missing-workspace", title: "Ghost task" }),
-    });
-
-    expect(res.status).toBe(404);
-    const body = await res.json() as any;
-    expect(body.error).toBe("Workspace not found");
-  });
-
-  it("creates task records without schedule state", async () => {
-    const res = await app().request("http://local/api/tasks", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        workspaceId,
-        title: "Unscheduled task",
-      }),
-    });
-
-    expect(res.status).toBe(201);
-    const body = await res.json() as any;
-    const task = await expectTaskExists(body.taskId);
-    const projection = await db.taskProjection.findUnique({ where: { taskId: body.taskId } });
-
-    expect(task.dueAt).toBeNull();
-    expect(projection).not.toBeNull();
-    expect(projection!.scheduleStatus).toBe("Unscheduled");
-    expect(projection!.scheduledStartAt).toBeNull();
-    expect(projection!.scheduledEndAt).toBeNull();
-  });
-
-  it("rejects unsupported status updates", async () => {
-    const { taskId } = await seedTask(workspaceId, { title: "Invalid status target" });
-
-    const res = await app().request(`http://local/api/tasks/${taskId}`, {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ status: "NotAStatus" }),
-    });
-
-    expect(res.status).toBe(400);
-    const task = await expectTaskExists(taskId);
-    expect(task.status).not.toBe("NotAStatus");
-  });
-
-  it("returns 404 when task detail workspace isolation query does not match", async () => {
-    const other = await seedWorkspace("Other Workspace");
-    const { taskId } = await seedTask(workspaceId, { title: "Isolated task" });
-
-    const res = await app().request(
-      `http://local/api/tasks/${taskId}?workspaceId=${other.workspaceId}`,
-    );
-
-    expect(res.status).toBe(404);
-  });
-
-  it("returns 404 when delete workspace isolation query does not match", async () => {
-    const other = await seedWorkspace("Delete Isolation Workspace");
-    const { taskId } = await seedTask(workspaceId, { title: "Protected task" });
-
-    const res = await app().request(
-      `http://local/api/tasks/${taskId}?workspaceId=${other.workspaceId}`,
-      { method: "DELETE" },
-    );
-
-    expect(res.status).toBe(404);
-    await expectTaskExists(taskId);
-  });
-
-  it("returns 404 when getting detail for a nonexistent task", async () => {
-    const res = await app().request("http://local/api/tasks/nonexistent-task-id");
-
-    expect(res.status).toBe(404);
-    const body = await res.json() as any;
-    expect(body.error).toBe("Task not found");
-  });
-
-  it("returns 404 when updating a nonexistent task", async () => {
-    const res = await app().request("http://local/api/tasks/nonexistent-id", {
-      method: "PATCH",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ title: "Ghost" }),
-    });
-
-    expect(res.status).toBe(404);
-  });
-
-  it("returns 404 when deleting a nonexistent task", async () => {
-    const res = await app().request("http://local/api/tasks/nonexistent-id", {
-      method: "DELETE",
-    });
-
-    expect(res.status).toBe(404);
-  });
-
-  it("returns 400 for invalid status filter", async () => {
-    const res = await app().request(
-      `http://local/api/tasks?workspaceId=${workspaceId}&status=InvalidStatus`,
-    );
-
-    expect(res.status).toBe(400);
-  });
+	let workspaceId: string;
+
+	beforeEach(async () => {
+		await resetTestDb();
+		const ws = await seedWorkspace("Task CRUD Workspace");
+		workspaceId = ws.workspaceId;
+	});
+
+	// -----------------------------------------------------------------------
+	// Happy path: create → list → detail → update → detail → delete → 404
+	// -----------------------------------------------------------------------
+
+	it("creates a task and returns 201 with task data", async () => {
+		const res = await app().request("http://local/api/tasks", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				workspaceId,
+				title: "My workflow task",
+				description: "A task for workflow testing",
+				priority: "High",
+			}),
+		});
+
+		expect(res.status).toBe(201);
+		const body = (await res.json()) as any;
+		expect(body.taskId).toBeDefined();
+		expect(typeof body.taskId).toBe("string");
+		expect(body.workspaceId).toBe(workspaceId);
+	});
+
+	it("returns and persists explicit auto-execute values from task creation", async () => {
+		const enabledResponse = await app().request("http://local/api/tasks", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				workspaceId,
+				title: "Auto execute enabled",
+				autoExecute: true,
+			}),
+		});
+		const disabledResponse = await app().request("http://local/api/tasks", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				workspaceId,
+				title: "Auto execute disabled",
+				autoExecute: false,
+			}),
+		});
+
+		expect(enabledResponse.status).toBe(201);
+		expect(disabledResponse.status).toBe(201);
+		const enabled = (await enabledResponse.json()) as any;
+		const disabled = (await disabledResponse.json()) as any;
+
+		expect(enabled.autoExecute).toBe(true);
+		expect(disabled.autoExecute).toBe(false);
+
+		const persisted = await db.task.findMany({
+			where: { id: { in: [enabled.taskId, disabled.taskId] } },
+			select: { id: true, autoExecute: true },
+		});
+		const persistedById = new Map(
+			persisted.map((task: { id: string; autoExecute: boolean }) => [
+				task.id,
+				task.autoExecute,
+			]),
+		);
+		expect(persistedById.get(enabled.taskId)).toBe(true);
+		expect(persistedById.get(disabled.taskId)).toBe(false);
+	});
+
+	it("lists tasks for a workspace", async () => {
+		// Seed a task first
+		await seedTask(workspaceId, { title: "Listed Task A" });
+		await seedTask(workspaceId, { title: "Listed Task B" });
+
+		const res = await app().request(
+			`http://local/api/tasks?workspaceId=${workspaceId}`,
+		);
+
+		expect(res.status).toBe(200);
+		const body = (await res.json()) as any;
+		expect(body.tasks).toBeDefined();
+		expect(body.tasks.length).toBe(2);
+		expect(body.count).toBe(2);
+	});
+
+	it("lists tasks filtered by status", async () => {
+		await seedTask(workspaceId, { title: "Ready Task", status: "Ready" });
+		await seedTask(workspaceId, { title: "Draft Task", status: "Draft" });
+
+		const res = await app().request(
+			`http://local/api/tasks?workspaceId=${workspaceId}&status=Draft`,
+		);
+
+		expect(res.status).toBe(200);
+		const body = (await res.json()) as any;
+		expect(body.tasks).toBeDefined();
+		expect(body.tasks.length).toBe(1);
+		expect(body.tasks[0].title).toBe("Draft Task");
+	});
+
+	it("gets task detail by ID", async () => {
+		const { taskId } = await seedTask(workspaceId, { title: "Single Task" });
+
+		const res = await app().request(`http://local/api/tasks/${taskId}`);
+
+		expect(res.status).toBe(200);
+		const body = (await res.json()) as any;
+		expect(body.task).toBeDefined();
+		expect(body.task.id).toBe(taskId);
+		expect(body.task.title).toBe("Single Task");
+		expect(body.task.workspaceId).toBe(workspaceId);
+	});
+
+	it("updates a task and returns updated data", async () => {
+		const { taskId } = await seedTask(workspaceId, {
+			title: "Old Title",
+			priority: "Low",
+		});
+
+		const res = await app().request(`http://local/api/tasks/${taskId}`, {
+			method: "PATCH",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				title: "Updated Title",
+				priority: "Urgent",
+				description: "Updated description",
+			}),
+		});
+
+		expect(res.status).toBe(200);
+		const body = (await res.json()) as any;
+		expect(body.taskId).toBe(taskId);
+		expect(body.workspaceId).toBe(workspaceId);
+	});
+
+	it("updates task status", async () => {
+		const { taskId } = await seedTask(workspaceId, {
+			title: "Status Task",
+			status: "Ready",
+		});
+
+		const res = await app().request(`http://local/api/tasks/${taskId}`, {
+			method: "PATCH",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				status: "Blocked",
+			}),
+		});
+
+		expect(res.status).toBe(200);
+		const task = await expectTaskExists(taskId);
+		expect(task.status).toBe("Blocked");
+	});
+
+	it("detail-after-update reflects changes", async () => {
+		const { taskId } = await seedTask(workspaceId, { title: "Before Update" });
+
+		await app().request(`http://local/api/tasks/${taskId}`, {
+			method: "PATCH",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ title: "After Update", priority: "High" }),
+		});
+
+		const res = await app().request(`http://local/api/tasks/${taskId}`);
+		expect(res.status).toBe(200);
+		const body = (await res.json()) as any;
+		expect(body.task.title).toBe("After Update");
+		expect(body.task.priority).toBe("High");
+	});
+
+	it("[TASK-012] serializes rapid saves without duplicate events or partial state", async () => {
+		const { taskId } = await seedTask(workspaceId, { title: "Rapid original" });
+		const updates = [
+			{ title: "Rapid first", description: "First save", priority: "Low" },
+			{ title: "Rapid second", description: "Second save", priority: "High" },
+		];
+
+		const responses = await Promise.all(
+			updates.map((body) =>
+				app().request(`http://local/api/tasks/${taskId}`, {
+					method: "PATCH",
+					headers: { "Content-Type": "application/json" },
+					body: JSON.stringify(body),
+				}),
+			),
+		);
+		expect(responses.map((response) => response.status)).toEqual([200, 200]);
+
+		const detail = await app().request(`http://local/api/tasks/${taskId}`);
+		expect(detail.status).toBe(200);
+		expect((await detail.json()) as unknown).toMatchObject({
+			task: {
+				title: "Rapid second",
+				description: "Second save",
+				priority: "High",
+			},
+		});
+		expect(
+			await db.event.count({ where: { taskId, eventType: "task.updated" } }),
+		).toBe(2);
+	});
+
+	it("deletes a task and returns success", async () => {
+		const { taskId } = await seedTask(workspaceId, { title: "To Be Deleted" });
+
+		const res = await app().request(`http://local/api/tasks/${taskId}`, {
+			method: "DELETE",
+		});
+
+		expect(res.status).toBe(200);
+		const body = (await res.json()) as any;
+		expect(body.success).toBe(true);
+		expect(body.taskId).toBe(taskId);
+	});
+
+	it("[TASK-047] returns 404 when deleting a nonexistent or already deleted task", async () => {
+		const missing = await app().request(
+			"http://local/api/tasks/nonexistent-task-id",
+			{
+				method: "DELETE",
+			},
+		);
+		expect(missing.status).toBe(404);
+
+		const { taskId } = await seedTask(workspaceId, { title: "Delete Once" });
+		const first = await app().request(`http://local/api/tasks/${taskId}`, {
+			method: "DELETE",
+		});
+		expect(first.status).toBe(200);
+
+		const second = await app().request(`http://local/api/tasks/${taskId}`, {
+			method: "DELETE",
+		});
+		expect(second.status).toBe(404);
+	});
+
+	it("returns 404 when getting detail for a deleted task", async () => {
+		const { taskId } = await seedTask(workspaceId, { title: "Delete Me" });
+
+		await app().request(`http://local/api/tasks/${taskId}`, {
+			method: "DELETE",
+		});
+
+		const res = await app().request(`http://local/api/tasks/${taskId}`);
+		expect(res.status).toBe(404);
+	});
+
+	it("cascading delete removes child tasks", async () => {
+		const { taskId } = await seedTask(workspaceId, { title: "Parent Task" });
+		const { taskId: childId } = await seedTask(workspaceId, {
+			title: "Child Task",
+			parentTaskId: taskId,
+		});
+
+		await app().request(`http://local/api/tasks/${taskId}`, {
+			method: "DELETE",
+		});
+
+		// Both should be gone
+		await expectTaskNotFound(taskId);
+		await expectTaskNotFound(childId);
+	});
+
+	// -----------------------------------------------------------------------
+	// Negative cases
+	// -----------------------------------------------------------------------
+
+	it("returns 400 when creating a task without workspaceId", async () => {
+		const res = await app().request("http://local/api/tasks", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ title: "No workspace" }),
+		});
+
+		expect(res.status).toBe(400);
+		const body = (await res.json()) as any;
+		expect(body.error).toBeDefined();
+	});
+
+	it("returns 400 when creating a task without title", async () => {
+		const res = await app().request("http://local/api/tasks", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ workspaceId }),
+		});
+
+		expect(res.status).toBe(400);
+	});
+
+	it("returns 400 when creating a task with empty title", async () => {
+		const res = await app().request("http://local/api/tasks", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ workspaceId, title: "   " }),
+		});
+
+		expect(res.status).toBe(400);
+	});
+
+	it("returns 404 when creating a task for a missing workspace", async () => {
+		const res = await app().request("http://local/api/tasks", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				workspaceId: "missing-workspace",
+				title: "Ghost task",
+			}),
+		});
+
+		expect(res.status).toBe(404);
+		const body = (await res.json()) as any;
+		expect(body.error).toBe("Workspace not found");
+	});
+
+	it("creates task records without schedule state", async () => {
+		const res = await app().request("http://local/api/tasks", {
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({
+				workspaceId,
+				title: "Unscheduled task",
+			}),
+		});
+
+		expect(res.status).toBe(201);
+		const body = (await res.json()) as any;
+		const task = await expectTaskExists(body.taskId);
+		const projection = await db.taskProjection.findUnique({
+			where: { taskId: body.taskId },
+		});
+
+		expect(task.dueAt).toBeNull();
+		expect(projection).not.toBeNull();
+		expect(projection!.scheduleStatus).toBe("Unscheduled");
+		expect(projection!.scheduledStartAt).toBeNull();
+		expect(projection!.scheduledEndAt).toBeNull();
+	});
+
+	it("rejects unsupported status updates", async () => {
+		const { taskId } = await seedTask(workspaceId, {
+			title: "Invalid status target",
+		});
+
+		const res = await app().request(`http://local/api/tasks/${taskId}`, {
+			method: "PATCH",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ status: "NotAStatus" }),
+		});
+
+		expect(res.status).toBe(400);
+		const task = await expectTaskExists(taskId);
+		expect(task.status).not.toBe("NotAStatus");
+	});
+
+	it("returns 404 when task detail workspace isolation query does not match", async () => {
+		const other = await seedWorkspace("Other Workspace");
+		const { taskId } = await seedTask(workspaceId, { title: "Isolated task" });
+
+		const res = await app().request(
+			`http://local/api/tasks/${taskId}?workspaceId=${other.workspaceId}`,
+		);
+
+		expect(res.status).toBe(404);
+	});
+
+	it("returns 404 when delete workspace isolation query does not match", async () => {
+		const other = await seedWorkspace("Delete Isolation Workspace");
+		const { taskId } = await seedTask(workspaceId, { title: "Protected task" });
+
+		const res = await app().request(
+			`http://local/api/tasks/${taskId}?workspaceId=${other.workspaceId}`,
+			{ method: "DELETE" },
+		);
+
+		expect(res.status).toBe(404);
+		await expectTaskExists(taskId);
+	});
+
+	it("returns 404 when getting detail for a nonexistent task", async () => {
+		const res = await app().request(
+			"http://local/api/tasks/nonexistent-task-id",
+		);
+
+		expect(res.status).toBe(404);
+		const body = (await res.json()) as any;
+		expect(body.error).toBe("Task not found");
+	});
+
+	it("returns 404 when updating a nonexistent task", async () => {
+		const res = await app().request("http://local/api/tasks/nonexistent-id", {
+			method: "PATCH",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ title: "Ghost" }),
+		});
+
+		expect(res.status).toBe(404);
+	});
+
+	it("returns 404 when deleting a nonexistent task", async () => {
+		const res = await app().request("http://local/api/tasks/nonexistent-id", {
+			method: "DELETE",
+		});
+
+		expect(res.status).toBe(404);
+	});
+
+	it("returns 400 for invalid status filter", async () => {
+		const res = await app().request(
+			`http://local/api/tasks?workspaceId=${workspaceId}&status=InvalidStatus`,
+		);
+
+		expect(res.status).toBe(400);
+	});
 });

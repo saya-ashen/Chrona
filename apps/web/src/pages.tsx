@@ -1,6 +1,7 @@
 import {
   Navigate,
   useLoaderData,
+  useLocation,
   useOutletContext,
   useParams,
   useSearchParams,
@@ -120,9 +121,10 @@ export type TaskListRouteData = {
 
 export function LocaleLandingPage() {
   const params = useParams();
+  const { search, hash } = useLocation();
   return (
     <Navigate
-      to={localizeHref(resolveLocale(params.lang), "/dashboard")}
+      to={`${localizeHref(resolveLocale(params.lang), "/dashboard")}${search}${hash}`}
       replace
     />
   );

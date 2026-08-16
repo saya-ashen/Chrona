@@ -334,6 +334,253 @@ test.describe("Task create → plan → run → result", () => {
 			.toEqual(expect.arrayContaining([expect.stringMatching(/stop/i)]));
 	});
 
+	test("[GOAL-020] drives task result into a Goal and follow-up through visible controls", async ({
+		page,
+		request,
+	}, testInfo) => {
+		test.skip(
+			testInfo.project.name !== "chromium",
+			"Webwright-derived browser journey runs on desktop only.",
+		);
+		test.setTimeout(180_000);
+		await setTaskWorkspaceViewport(page, "desktop");
+
+		const taskTitle = `E2E Browser Golden Path ${Date.now()}`;
+		const consoleErrors: string[] = [];
+		page.on("console", (message) => {
+			if (message.type() === "error") consoleErrors.push(message.text());
+		});
+		page.on("pageerror", (error) => consoleErrors.push(error.message));
+
+		const taskId =
+			await test.step("Create a task through the Tasks UI", async () => {
+				await page.goto("/en/tasks");
+				await page.getByRole("button", { name: "New Task" }).click();
+				const dialog = page.getByRole("dialog", { name: "Add task" });
+				await dialog.getByRole("textbox", { name: "Title" }).fill(taskTitle);
+				await dialog.getByRole("radio", { name: /Save as task/ }).check();
+				await dialog
+					.getByRole("textbox", { name: "Add description" })
+					.fill(
+						"Generate, review, run, and accept a deterministic result through the Chrona workspace.",
+					);
+				const createResponsePromise = page.waitForResponse(
+					(response) =>
+						response.url().endsWith("/api/tasks") &&
+						response.request().method() === "POST",
+				);
+				await dialog.getByRole("button", { name: "Save", exact: true }).click();
+				const createResponse = await createResponsePromise;
+				expect(createResponse.ok()).toBeTruthy();
+				const created = (await createResponse.json()) as { taskId?: string };
+				expect(created.taskId).toBeTruthy();
+				const createdTaskId = created.taskId!;
+				const taskLink = page.locator(`a[href="/en/tasks/${createdTaskId}"]`);
+				await expect(taskLink).toBeVisible();
+				await taskLink.click();
+				await expect(
+					page.getByRole("heading", { name: taskTitle, level: 1 }).first(),
+				).toBeVisible();
+				return createdTaskId;
+			});
+
+		const provider = await startMockTaskPlanProvider();
+		try {
+			await test.step("Generate and accept a plan through the workspace UI", async () => {
+				await bindTaskPlanProvider(request, taskId, provider.baseUrl, [
+					"task.plan",
+					"task.result_finalization",
+				]);
+				await bindAllDebugFeatures(request, taskId);
+				await page.reload();
+
+				await page.getByRole("button", { name: /^Generate plan$/ }).click();
+				await expect(
+					page.getByRole("heading", {
+						name: "E2E durable execution plan",
+					}),
+				).toBeVisible({ timeout: 40_000 });
+				await expect(
+					page.getByText("Plan ready for review", { exact: true }),
+				).toBeVisible();
+				await page.getByRole("button", { name: "Accept", exact: true }).click();
+				await expect(
+					page.getByRole("button", { name: "Start", exact: true }),
+				).toBeEnabled();
+				await expect(
+					page.getByRole("region", { name: "Accepted plan" }),
+				).toBeVisible();
+			});
+
+			await test.step("Run and resolve every visible execution gate", async () => {
+				await page.getByRole("button", { name: "Start", exact: true }).click();
+				let inputPanel = page.getByRole("tabpanel", { name: "Provide input" });
+				await expect(
+					inputPanel.getByRole("textbox", { name: "Scenario label" }),
+				).toBeVisible({ timeout: 30_000 });
+				await inputPanel
+					.getByRole("textbox", { name: "Scenario label" })
+					.fill("fast");
+				await inputPanel
+					.getByRole("textbox", { name: "Include slow wait path" })
+					.fill("false");
+				await inputPanel.getByRole("combobox").click();
+				await page.getByRole("option", { name: "normal", exact: true }).click();
+				await inputPanel.getByRole("button", { name: "Submit input" }).click();
+
+				inputPanel = page.getByRole("tabpanel", { name: "Provide input" });
+				await expect(
+					inputPanel.getByRole("textbox", { name: "Submit input" }),
+				).toBeVisible({ timeout: 30_000 });
+				await inputPanel
+					.getByRole("textbox", { name: "Submit input" })
+					.fill("fast path");
+				await inputPanel.getByRole("button", { name: "Submit input" }).click();
+
+				const approveResult = page.getByRole("button", {
+					name: "Approve result",
+				});
+				await expect(approveResult).toBeVisible({ timeout: 30_000 });
+				await approveResult.click();
+				const manualResult = page.getByRole("textbox", {
+					name: "Mark completed",
+				});
+				await expect(manualResult).toBeVisible({ timeout: 30_000 });
+				await manualResult.fill("Manual review completed by browser E2E");
+				await page.getByRole("button", { name: "Mark completed" }).click();
+
+				await expect(
+					page.getByRole("heading", {
+						name: "Execution complete, awaiting review",
+					}),
+				).toBeVisible({ timeout: 40_000 });
+				await expect(
+					page.getByRole("button", { name: "Accept result" }),
+				).toBeVisible();
+			});
+
+			let acceptedRunId: string | undefined;
+			await test.step("Accept the final result through the workspace UI", async () => {
+				const acceptResponsePromise = page.waitForResponse(
+					(response) =>
+						response.url().includes(`/api/tasks/${taskId}/result/accept`) &&
+						response.request().method() === "POST",
+				);
+				await page.getByRole("button", { name: "Accept result" }).click();
+				const acceptDialog = page.getByRole("dialog", {
+					name: "Confirm result acceptance",
+				});
+				await expect(acceptDialog).toBeVisible();
+				await acceptDialog
+					.getByRole("button", { name: "Confirm acceptance" })
+					.click();
+				const acceptResponse = await acceptResponsePromise;
+				expect(acceptResponse.ok()).toBeTruthy();
+				const accepted = (await acceptResponse.json()) as { runId?: string };
+				expect(accepted.runId).toBeTruthy();
+				acceptedRunId = accepted.runId;
+				await expect(
+					page.getByRole("heading", { name: "Result accepted" }),
+				).toBeVisible();
+				expect((await getCurrentExecution(request, taskId)).status).toBe(
+					"completed",
+				);
+			});
+
+			const goalId =
+				await test.step("Promote the accepted result to a Goal", async () => {
+					const artifactResponse = await request.post(
+						`/api/test/tasks/${taskId}/artifact`,
+					);
+					expect(artifactResponse.ok()).toBeTruthy();
+					const seeded = (await artifactResponse.json()) as {
+						artifact?: { id?: string; title?: string; runId?: string };
+					};
+					expect(seeded.artifact?.id).toBeTruthy();
+					expect(seeded.artifact?.runId).toBe(acceptedRunId);
+					await page.reload();
+					const promoteButton = page.getByRole("button", {
+						name: "Create Goal and continue",
+					});
+					await expect(promoteButton).toBeVisible();
+					await promoteButton.click();
+					const promotionDialog = page.getByRole("dialog", {
+						name: "Continue this result as a Goal",
+					});
+					await expect(promotionDialog).toBeVisible();
+					await expect(promotionDialog.getByRole("checkbox")).toBeChecked();
+					if (seeded.artifact?.title) {
+						await expect(
+							promotionDialog.getByText(seeded.artifact.title, { exact: true }),
+						).toBeVisible();
+					}
+					const promotionResponsePromise = page.waitForResponse(
+						(response) =>
+							response
+								.url()
+								.includes(`/api/tasks/${taskId}/actions/promote-to-goal`) &&
+							response.request().method() === "POST",
+					);
+					await promotionDialog
+						.getByRole("button", { name: "Create Goal and continue" })
+						.click();
+					const promotionResponse = await promotionResponsePromise;
+					expect(promotionResponse.ok()).toBeTruthy();
+					const goal = (await promotionResponse.json()) as { id?: string };
+					expect(goal.id).toBeTruthy();
+					await page.waitForURL(`/en/goals/${goal.id}`);
+					await expect(
+						page.getByRole("heading", { name: taskTitle, level: 1 }),
+					).toBeVisible();
+					return goal.id!;
+				});
+
+			await test.step("Create a follow-up task from the Goal", async () => {
+				const primaryAddTask = page
+					.getByRole("button", { name: "Add task" })
+					.first();
+				if (await primaryAddTask.isVisible().catch(() => false)) {
+					await primaryAddTask.click();
+				} else {
+					await page.getByRole("button", { name: "Goal actions" }).click();
+					await page.getByRole("menuitem", { name: "Add task" }).click();
+				}
+				const taskDialog = page.getByRole("dialog", {
+					name: "Add bounded task",
+				});
+				await expect(taskDialog).toBeVisible();
+				const followUpTitle = `E2E Goal Follow-up ${Date.now()}`;
+				await taskDialog
+					.getByRole("textbox", { name: "Task title" })
+					.fill(followUpTitle);
+				await taskDialog
+					.getByRole("textbox", { name: "Task instructions" })
+					.fill("Continue the accepted result with bounded follow-up work.");
+				await taskDialog
+					.getByRole("textbox", { name: "Expected outcome" })
+					.fill("A concrete next action linked to the promoted Goal.");
+				const taskResponsePromise = page.waitForResponse(
+					(response) =>
+						response.url().endsWith(`/api/goals/${goalId}/tasks`) &&
+						response.request().method() === "POST",
+				);
+				await taskDialog.getByRole("button", { name: "Create task" }).click();
+				const taskResponse = await taskResponsePromise;
+				expect(taskResponse.ok()).toBeTruthy();
+				const followUp = (await taskResponse.json()) as { taskId?: string };
+				expect(followUp.taskId).toBeTruthy();
+				await page.waitForURL(`/en/tasks/${followUp.taskId}`);
+				await expect(
+					page.getByRole("heading", { name: followUpTitle, level: 1 }).first(),
+				).toBeVisible();
+			});
+		} finally {
+			await provider.stop();
+		}
+
+		expect(consoleErrors).toEqual([]);
+	});
+
 	test("drives the full lifecycle from creation through accepted result", async ({
 		page,
 		request,
@@ -487,10 +734,24 @@ test.describe("Task create → plan → run → result", () => {
 				};
 				expect(acceptBody.taskId).toBe(task.taskId);
 				expect(acceptBody.runId).toBeTruthy();
+				await expect(
+					page
+						.locator('[data-slot="badge"]')
+						.filter({ hasText: /^Result accepted$/ }),
+				).toBeVisible({
+					timeout: 15_000,
+				});
+				await expect(
+					page.locator('[data-slot="badge"]').filter({
+						hasText: /^(Execution complete, awaiting review|Waiting)$/,
+					}),
+				).toHaveCount(0);
 
 				await page.goto(WORK_URL(task.taskId));
 				await dismissTaskEditorIfOpen(page);
-				await expect(page.getByText(/^Result accepted$/)).toBeVisible({
+				await expect(
+					page.getByRole("heading", { name: "Result accepted" }),
+				).toBeVisible({
 					timeout: 15_000,
 				});
 				expect((await getCurrentExecution(request, task.taskId)).status).toBe(

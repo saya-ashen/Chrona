@@ -279,6 +279,56 @@ describe("TaskPlanGenerationPanel", () => {
 		expect(await screen.findByText(/AI is planning task/i)).toBeInTheDocument();
 	});
 
+	it("[PLAN-009] requires saving or cancelling unsaved task edits before regeneration", async () => {
+		const fetchMock = vi
+			.fn()
+			.mockResolvedValue(
+				createJsonResponse({ commandId: "command-regenerate" }, 202),
+			);
+		vi.stubGlobal("fetch", fetchMock as unknown as typeof fetch);
+		const saveBeforeRegenerate = vi.fn().mockResolvedValue(undefined);
+		const user = userEvent.setup();
+
+		render(
+			<TaskPlanGenerationPanel
+				{...defaultProps}
+				taskId="task_unsaved"
+				savedPlan={sampleReadModel}
+				hasUnsavedConfigChanges
+				onSaveConfigBeforeRegenerate={saveBeforeRegenerate}
+			/>,
+		);
+
+		await user.click(screen.getByRole("button", { name: /Regenerate/i }));
+		expect(
+			screen.getByRole("heading", {
+				name: "Save changes before regenerating?",
+			}),
+		).toBeInTheDocument();
+		expect(fetchMock).not.toHaveBeenCalled();
+
+		await user.click(screen.getByRole("button", { name: "Cancel" }));
+		expect(
+			screen.queryByRole("heading", {
+				name: "Save changes before regenerating?",
+			}),
+		).not.toBeInTheDocument();
+		expect(saveBeforeRegenerate).not.toHaveBeenCalled();
+
+		await user.click(screen.getByRole("button", { name: /Regenerate/i }));
+		await user.click(
+			screen.getByRole("button", { name: "Save and regenerate" }),
+		);
+
+		await waitFor(() => expect(saveBeforeRegenerate).toHaveBeenCalledOnce());
+		await waitFor(() =>
+			expect(fetchMock).toHaveBeenCalledWith(
+				"/api/work/task_unsaved/commands",
+				expect.objectContaining({ method: "POST" }),
+			),
+		);
+	});
+
 	it("stops an active generation job", async () => {
 		const fetchMock = vi
 			.fn()
@@ -286,7 +336,7 @@ describe("TaskPlanGenerationPanel", () => {
 		vi.stubGlobal("fetch", fetchMock as unknown as typeof fetch);
 		const user = userEvent.setup();
 
-		render(
+		const { rerender } = render(
 			<TaskPlanGenerationPanel
 				{...defaultProps}
 				generationStatus="generating"
@@ -301,5 +351,12 @@ describe("TaskPlanGenerationPanel", () => {
 				expect.objectContaining({ method: "POST" }),
 			);
 		});
+
+		rerender(
+			<TaskPlanGenerationPanel {...defaultProps} generationStatus="idle" />,
+		);
+		expect(
+			screen.getByRole("button", { name: /Generate plan/i }),
+		).toBeEnabled();
 	});
 });
