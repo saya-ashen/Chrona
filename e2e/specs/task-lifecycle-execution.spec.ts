@@ -334,7 +334,7 @@ test.describe("Task create → plan → run → result", () => {
 			.toEqual(expect.arrayContaining([expect.stringMatching(/stop/i)]));
 	});
 
-	test("[GOAL-020] drives task result into a Goal and follow-up through visible controls", async ({
+	test("[ACTION-002/RUN-008/GOAL-020] drives input, approval, result, Goal, and follow-up through visible controls", async ({
 		page,
 		request,
 	}, testInfo) => {
@@ -418,6 +418,9 @@ test.describe("Task create → plan → run → result", () => {
 				await expect(
 					inputPanel.getByRole("textbox", { name: "Scenario label" }),
 				).toBeVisible({ timeout: 30_000 });
+				await expect
+					.poll(async () => (await getCurrentExecution(request, taskId)).status)
+					.toBe("waiting_for_user");
 				await inputPanel
 					.getByRole("textbox", { name: "Scenario label" })
 					.fill("fast");
@@ -432,6 +435,9 @@ test.describe("Task create → plan → run → result", () => {
 				await expect(
 					inputPanel.getByRole("textbox", { name: "Submit input" }),
 				).toBeVisible({ timeout: 30_000 });
+				await expect
+					.poll(async () => (await getCurrentExecution(request, taskId)).status)
+					.toBe("waiting_for_user");
 				await inputPanel
 					.getByRole("textbox", { name: "Submit input" })
 					.fill("fast path");
@@ -441,11 +447,17 @@ test.describe("Task create → plan → run → result", () => {
 					name: "Approve result",
 				});
 				await expect(approveResult).toBeVisible({ timeout: 30_000 });
+				await expect
+					.poll(async () => (await getCurrentExecution(request, taskId)).status)
+					.toBe("waiting_for_approval");
 				await approveResult.click();
 				const manualResult = page.getByRole("textbox", {
 					name: "Mark completed",
 				});
 				await expect(manualResult).toBeVisible({ timeout: 30_000 });
+				await expect
+					.poll(async () => (await getCurrentExecution(request, taskId)).status)
+					.toBe("blocked");
 				await manualResult.fill("Manual review completed by browser E2E");
 				await page.getByRole("button", { name: "Mark completed" }).click();
 
@@ -870,7 +882,8 @@ test.describe("Task create → plan → run → result", () => {
 		}
 	});
 
-	test("keeps pause, resume, retry, and stop projections stable", async ({
+	test("[RUN-015] keeps pause, resume, retry, and stop projections stable", async ({
+		page,
 		request,
 	}, testInfo) => {
 		test.skip(
@@ -971,15 +984,20 @@ test.describe("Task create → plan → run → result", () => {
 			(body) => body.status === "blocked" && body.currentNodeId !== firstNodeId,
 		);
 
-		const retryCommandKey = `e2e-checkpoint-${blocked.checkpoint!.id!}-retry_node`;
-		await postCheckpointAction(
-			request,
-			task.taskId,
-			blocked.checkpoint!.id!,
-			"retry_node",
-			{ prompt: "Retry after the deterministic blocked node." },
+		await page.goto(TASK_URL(task.taskId));
+		await dismissTaskEditorIfOpen(page);
+		const retryNode = page.getByRole("button", { name: "Retry node" });
+		await expect(retryNode).toBeVisible({ timeout: 20_000 });
+		const retryResponsePromise = page.waitForResponse(
+			(response) =>
+				response.url().includes(`/api/work/${task.taskId}/commands`) &&
+				response.request().method() === "POST" &&
+				response.request().postData()?.includes('"action":"retry_node"') ===
+					true,
 		);
-		await waitForCommandReceipt(request, task.taskId, retryCommandKey);
+		await retryNode.click();
+		const retryResponse = await retryResponsePromise;
+		expect(retryResponse.ok()).toBeTruthy();
 		await pollExecution(
 			request,
 			task.taskId,

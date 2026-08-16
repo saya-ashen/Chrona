@@ -1,8 +1,17 @@
+/* eslint-disable max-lines -- Header owns one cohesive runtime action and confirmation surface. */
 import { useMemo, useRef, useState } from "react";
 import { type StateStore } from "@json-render/react";
 import { useI18n } from "@chrona/i18n";
 import { ArrowLeft, Target } from "lucide-react";
-import { Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@shared/ui";
+import {
+	Button,
+	Dialog,
+	DialogContent,
+	DialogDescription,
+	DialogFooter,
+	DialogHeader,
+	DialogTitle,
+} from "@shared/ui";
 import { UI_ACTION, type UiDocument } from "@chrona/ui-protocol";
 import { SpecRenderer } from "./catalog/spec-renderer";
 import { LocalizedLink } from "./localized-link";

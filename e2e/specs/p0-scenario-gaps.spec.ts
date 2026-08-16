@@ -180,14 +180,69 @@ test.describe("P0 scenario gaps", () => {
 		await expect(page).toHaveURL(/\/en\/action-center$/);
 	});
 
-	test("GOAL-020 goal workbench and RUN-014 failure surface", async ({
+	test("[GOAL-004] exposes the complete Active Goal control plane", async ({
 		page,
+		request,
 	}) => {
-		await page.goto("/en/goals");
+		const id = await workspaceId(request);
+		const goalTitle = `P0 active Goal ${crypto.randomUUID()}`;
+		const criterion = `Confirm P0 outcome ${crypto.randomUUID()}`;
+		const goalResponse = await request.post("/api/goals", {
+			data: {
+				workspaceId: id,
+				title: goalTitle,
+				description: "Reach a durable P0 outcome",
+				successCriteria: [
+					{
+						id: "p0-outcome",
+						kind: "user_confirmed",
+						description: criterion,
+						satisfied: false,
+						confirmedAt: null,
+					},
+				],
+			},
+		});
+		expect(goalResponse.status()).toBe(201);
+		const goal = (await goalResponse.json()) as { id?: string };
+		expect(goal.id).toBeTruthy();
+
+		const taskTitle = `P0 bounded work ${crypto.randomUUID()}`;
+		const taskResponse = await request.post(`/api/goals/${goal.id}/tasks`, {
+			data: {
+				title: taskTitle,
+				description: "Advance the active Goal",
+				kind: "task",
+				priority: "High",
+			},
+		});
+		expect(taskResponse.status()).toBe(201);
+
+		await page.goto(`/en/goals/${goal.id}`);
 		await expectApp(page);
-		await expect(page.getByRole("main")).toBeVisible();
-		await page.goto("/en/tasks");
-		await expectApp(page);
+		await expect(
+			page.getByRole("heading", { name: goalTitle, level: 1 }),
+		).toBeVisible();
+		await expect(
+			page.getByRole("navigation", { name: "Goal Control Plane" }),
+		).toBeVisible();
+		await expect(
+			page.getByRole("heading", { name: "Current focus" }),
+		).toBeVisible();
+		await expect(
+			page.getByRole("textbox", { name: "Intended outcome" }),
+		).toBeVisible();
+
+		await page.getByRole("tab", { name: "Work", exact: true }).click();
+		await expect(page.getByText(taskTitle, { exact: true })).toBeVisible();
+		await page.getByRole("tab", { name: "Success criteria" }).click();
+		await expect(page.getByText(criterion, { exact: true })).toBeVisible();
+		await page.getByRole("tab", { name: "History" }).click();
+		await expect(
+			page.getByRole("heading", {
+				name: "A durable outcome advanced through bounded tasks, accepted results, and deliberate reviews.",
+			}),
+		).toBeVisible();
 	});
 
 	test("[TASK-008/009] edits a task and cancels unsaved changes", async ({
