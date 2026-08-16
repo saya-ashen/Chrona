@@ -105,6 +105,32 @@ test.describe("P0 scenario gaps", () => {
 		}
 	});
 
+	test("[TASK-001] creates from Schedule, projects to Tasks, and opens workspace", async ({
+		page,
+	}) => {
+		const title = `P0 schedule quick create ${crypto.randomUUID()}`;
+		await page.goto("/en/schedule");
+		await expectApp(page);
+		await page.getByRole("button", { name: "New Task" }).click();
+		await page.getByPlaceholder("Add title").fill(title);
+		const createdResponse = page.waitForResponse(
+			(response) =>
+				response.url().includes("/api/tasks") &&
+				response.request().method() === "POST" &&
+				response.ok(),
+		);
+		await page.getByRole("button", { name: "Save" }).click();
+		const created = (await (await createdResponse).json()) as { taskId?: string };
+		expect(created.taskId).toBeTruthy();
+
+		await page.goto("/en/tasks");
+		await expect(page.getByRole("heading", { name: title, exact: true })).toHaveCount(1);
+		await page.goto(`/en/tasks/${created.taskId}`);
+		await expect(
+			page.getByRole("heading", { name: title, level: 1 }).first(),
+		).toBeVisible();
+	});
+
 	test("TASK-002 task fields and TASK-020 All view", async ({ page }) => {
 		await page.goto("/en/tasks");
 		await expectApp(page);

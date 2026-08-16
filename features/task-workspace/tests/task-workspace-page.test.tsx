@@ -421,7 +421,7 @@ describe("TaskWorkspacePage", () => {
     expect(screen.getByText("primary-action:Pause")).toBeInTheDocument();
   });
 
-  it("keeps generated plans reviewable before acceptance", () => {
+  it("[PLAN-020] keeps generated plans reviewable before acceptance", () => {
     mocks.planGenerationStatus = "waiting_acceptance";
     mocks.plan = { id: "plan-1", status: "draft" };
     mocks.graphPlan = graphPlan("waiting_acceptance");

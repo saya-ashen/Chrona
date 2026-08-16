@@ -458,6 +458,34 @@ describe("MCP routes", () => {
     }
   });
 
+  it("[MCP-001] returns bounded execution, plan, and current-node state to the model", async () => {
+    const visibleState = {
+      taskStatus: "Running",
+      executionStatus: "waiting_for_input",
+      planRef: "PL20260816-01",
+      currentNodeRef: "N20260816-03",
+      currentNodeTitle: "Collect boundary context",
+    };
+
+    for (const toolName of [
+      "chrona.execution.read",
+      "chrona.plan.read",
+      "chrona.node.read",
+    ] as const) {
+      const result = await callTool(toolName, {
+        _meta: { sessionId: "chrona:task:task-1:execute" },
+      }, { resultOverride: { state: visibleState } });
+      expect(expectStructuredContent(result)).toMatchObject({
+        status: "accepted",
+        state: visibleState,
+      });
+      const serialized = JSON.stringify(expectStructuredContent(result));
+      expect(serialized).not.toContain("workspaceId");
+      expect(serialized).not.toContain("taskId");
+      expect(serialized).not.toContain("sessionId");
+    }
+  });
+
   it("resolves injected sessionId before dispatching Chrona tools", async () => {
     const result = await callTool("chrona.execution.read", {
       _meta: { sessionId: "chrona:task:task-1:execute" },

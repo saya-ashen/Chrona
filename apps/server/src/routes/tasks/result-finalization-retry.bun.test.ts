@@ -4,7 +4,7 @@ import type { ChronaEngine } from "@chrona/engine";
 import { createTaskResultRoutes } from "./result.routes";
 
 describe("task result finalization retry route", () => {
-	it("[RESULT-002] retries failed finalization and returns the new ready result", async () => {
+	it("[RESULT-001/RESULT-002] retries finalization with one canonical ready revision", async () => {
 		const retryFinalization = mock(async ({ taskId }: { taskId: string }) => ({
 			taskId,
 			finalizedResult: {
@@ -34,10 +34,17 @@ describe("task result finalization retry route", () => {
 		expect(retryFinalization).toHaveBeenCalledWith({
 			taskId: "task-finalization",
 		});
-		expect(await response.json()).toMatchObject({
+		const body = (await response.json()) as {
+			taskId: string;
+			finalizedResult: { sourceRevision: number; manifest: { sourceRevision: number } };
+			finalization: { status: string; sourceRevision: number; attempt: number };
+		};
+		expect(body).toMatchObject({
 			taskId: "task-finalization",
 			finalizedResult: { sourceRevision: 3 },
 			finalization: { status: "Ready", attempt: 2 },
 		});
+		expect(body.finalization.sourceRevision).toBe(body.finalizedResult.sourceRevision);
+		expect(body.finalizedResult.manifest.sourceRevision).toBe(body.finalizedResult.sourceRevision);
 	});
 });

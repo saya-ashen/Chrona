@@ -334,7 +334,7 @@ test.describe("Task create → plan → run → result", () => {
 			.toEqual(expect.arrayContaining([expect.stringMatching(/stop/i)]));
 	});
 
-	test("[ACTION-002/RUN-008/GOAL-020] drives input, approval, result, Goal, and follow-up through visible controls", async ({
+	test("[ACTION-002/RUN-008/RESULT-012/GOAL-020] drives input, approval, result, Goal, and follow-up through visible controls", async ({
 		page,
 		request,
 	}, testInfo) => {
@@ -843,6 +843,17 @@ test.describe("Task create → plan → run → result", () => {
 				expect(
 					promoted.tasks?.some((goalTask) => goalTask.id === task.taskId),
 				).toBe(true);
+				const promotedGoalResponse = await request.get(`/api/goals/${promoted.id}`);
+				expect(promotedGoalResponse.ok()).toBeTruthy();
+				const promotedGoal = (await promotedGoalResponse.json()) as {
+					assets?: Array<{ provenance?: { sourceArtifactId?: string } }>;
+				};
+				expect(
+					promotedGoal.assets?.some(
+						(asset) =>
+							asset.provenance?.sourceArtifactId === seededArtifact.artifact!.id,
+					),
+				).toBe(true);
 				expect(consoleErrors).toEqual([]);
 				const replayResponse = await request.post(
 					`/api/tasks/${task.taskId}/actions/promote-to-goal`,
@@ -1120,7 +1131,7 @@ test.describe("Task create → plan → run → result", () => {
 		});
 	});
 
-	test("drives plan persistence across page navigations", async ({
+	test("[WORK-003/CROSS-007] preserves canonical plan across deep link, reload, back, and forward", async ({
 		page,
 		request,
 	}) => {
@@ -1151,11 +1162,23 @@ test.describe("Task create → plan → run → result", () => {
 		// Navigate away to the task list, then back. The accepted plan must still
 		// render — proves the workspace re-hydrates from the REST snapshot
 		// when the SSE connection is severed and re-established.
+		await page.reload();
+		await dismissTaskEditorIfOpen(page);
+		await expect(page.getByTestId("accepted-plan-surface")).toBeVisible({
+			timeout: 20_000,
+		});
 		await page.goto("/en/tasks");
 		await expect(
 			page.getByRole("heading", { name: /tasks/i }).first(),
 		).toBeVisible();
-		await page.goto(TASK_URL(task.taskId));
+		await page.goBack();
+		await dismissTaskEditorIfOpen(page);
+		await expect(page.getByTestId("accepted-plan-surface")).toBeVisible({
+			timeout: 20_000,
+		});
+		await page.goForward();
+		await expect(page).toHaveURL(/\/en\/tasks$/);
+		await page.goBack();
 		await dismissTaskEditorIfOpen(page);
 		await expect(page.getByTestId("accepted-plan-surface")).toBeVisible({
 			timeout: 20_000,
