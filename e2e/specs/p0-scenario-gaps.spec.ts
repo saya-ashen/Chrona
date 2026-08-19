@@ -82,7 +82,7 @@ test.describe("P0 scenario gaps", () => {
 		).toBeVisible();
 	});
 
-	test("DASH-001/002 dashboard states and primary navigation", async ({
+	test("[DASH-001] opens dashboard and app routes", async ({
 		page,
 	}) => {
 		await page.goto("/en/dashboard");
