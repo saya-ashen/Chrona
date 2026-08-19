@@ -75,6 +75,7 @@ export const chronaToolReasonCodeSchema = z.enum([
   "NOT_FOUND",
   "STALE_STATE",
   "INVALID_TRANSITION",
+  "INTERNAL_ERROR",
   "CONFLICT",
   "DUPLICATE_OPERATION",
   "PROVIDER_UNSUPPORTED",

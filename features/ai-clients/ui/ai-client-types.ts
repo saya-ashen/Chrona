@@ -25,7 +25,9 @@ export type ClientFormValues = {
   timeoutSeconds: string;
   baseUrl: string;
   apiKey: string;
+  provider: string;
   model: string;
+  api: OmpApiType;
   configDirectory: string;
   homeDirectory: string;
   codingAgentDirectory: string;
@@ -36,6 +38,11 @@ export type ClientFormValues = {
 };
 
 export type HermesClientScope = "local" | "remote";
+export type OmpApiType =
+  | "openai-responses"
+  | "openai-completions"
+  | "anthropic-messages"
+  | "openrouter";
 export type DebugProviderProfile = "deterministic" | "tool-submit" | "hermes-like";
 export type TestStatus = "idle" | "testing" | "available" | "unavailable";
 export type TestResult = { status: TestStatus; reason: string | null };

@@ -218,9 +218,7 @@ export function canCompleteTask(task: TaskItem): boolean {
     task.projection?.runStatus,
     task.projection?.latestRunStatus,
   ];
-  return runStatuses.some(
-    (status) => status?.toLowerCase() === "completed",
-  );
+  return runStatuses.some((status) => status?.toLowerCase() === "completed");
 }
 
 function canReopenTask(task: TaskItem): boolean {
@@ -427,7 +425,7 @@ function TaskRow({
         className={`absolute inset-y-3 left-3 w-1 rounded-full bg-gradient-to-b ${taskAccentClass(task)}`}
         aria-hidden="true"
       />
-      <div className="flex flex-wrap items-center justify-between gap-3 pl-4">
+      <div className="flex flex-col items-stretch gap-3 pl-4 sm:flex-row sm:items-center sm:justify-between">
         {selectionMode ? (
           <Checkbox
             aria-label={copy.selectTask.replace("{title}", task.title)}
@@ -682,7 +680,9 @@ export function TaskListPage({
     setIsPending(true);
     setActionMessage(null);
     try {
-      await Promise.all(deleteIds.map((taskId) => deleteTask({ taskId, workspaceId })));
+      await Promise.all(
+        deleteIds.map((taskId) => deleteTask({ taskId, workspaceId })),
+      );
       setSelectedIds((current) => {
         const next = new Set(current);
         for (const taskId of deleteIds) next.delete(taskId);

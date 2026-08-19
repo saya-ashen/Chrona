@@ -8,6 +8,7 @@ import {
 } from "@chrona/providers-foundation";
 import {
 	AiFeatureProviderError,
+	classifyAiFeatureProviderError,
 	type AiFeatureProviderPort,
 	type AiFeatureProviderStart,
 	type AiFeatureProviderTurn,
@@ -106,6 +107,7 @@ export class FoundationProviderRuntime implements AiFeatureProviderPort {
 	constructor(
 		private readonly feature: string,
 		private provider: AgentProviderClient | null = null,
+		private readonly signal?: AbortSignal,
 	) {}
 
 	async initialize(expected?: FoundationProviderBinding): Promise<this> {
@@ -195,9 +197,10 @@ export class FoundationProviderRuntime implements AiFeatureProviderPort {
 				providerResumeRef,
 			};
 		}
-		const run = await provider.startRun(
-			createFoundationFeatureStartInput(request),
-		);
+		const run = await provider.startRun({
+			...createFoundationFeatureStartInput(request),
+			signal: this.signal,
+		});
 		if (run.provider !== provider.provider) {
 			throw new Error(
 				`Provider start returned a run for a different provider authority.`,
@@ -290,7 +293,6 @@ export class FoundationProviderRuntime implements AiFeatureProviderPort {
 		return this.provider;
 	}
 
-	// eslint-disable-next-line complexity -- One provider turn must handle terminal, action, failure, and stream-close protocol variants.
 	private async nextTurn(
 		provider: AgentProviderClient,
 		run: ProviderRunRef,
@@ -300,6 +302,7 @@ export class FoundationProviderRuntime implements AiFeatureProviderPort {
 		for await (const value of provider.streamRun({
 			runId: run.runId,
 			sessionId: run.sessionId,
+			signal: this.signal,
 		})) {
 			const event = boundary.accept(value);
 			if (event.type === "tool_call" && event.status === "pending") {
@@ -336,9 +339,7 @@ export class FoundationProviderRuntime implements AiFeatureProviderPort {
 			}
 			if (event.type === "run_failed") {
 				throw new AiFeatureProviderError(
-					/timed? out|timeout/i.test(event.error)
-						? "provider_timeout"
-						: "provider_protocol_error",
+					classifyAiFeatureProviderError(event.error),
 					event.error,
 				);
 			}

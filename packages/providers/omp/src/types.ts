@@ -1,7 +1,7 @@
 export interface OmpProviderConfig {
-  /** Active OMP model override. Omitted means OMP profile default. */
+  /** OMP model ID. With provider set this remains opaque and may contain '/'; otherwise it may be a provider/model selector. */
   model?: string;
-  /** Optional provider id for direct SDK credential/base URL overrides. Defaults to the provider prefix in model, then chrona. */
+  /** Optional OMP provider namespace for the model and direct connection overrides. */
   provider?: string;
   /** Optional direct API key for OMP SDK runs. */
   apiKey?: string;

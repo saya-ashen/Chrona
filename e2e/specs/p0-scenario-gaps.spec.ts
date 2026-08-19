@@ -87,9 +87,7 @@ test.describe("P0 scenario gaps", () => {
 	}) => {
 		await page.goto("/en/dashboard");
 		await expectApp(page);
-		await expect(
-			page.getByRole("link", { name: "Tasks" }).first(),
-		).toBeVisible();
+		await expect(page.getByRole("link", { name: "Tasks" }).first()).toBeVisible();
 		for (const route of [
 			"/en/schedule",
 			"/en/tasks",
@@ -99,9 +97,7 @@ test.describe("P0 scenario gaps", () => {
 		]) {
 			await page.goto(route);
 			await expectApp(page);
-			await expect(page).toHaveURL(
-				new RegExp(route.replaceAll("/", "\\/") + "$"),
-			);
+			await expect(page).toHaveURL(new RegExp(route.replaceAll("/", "\\/") + "$"));
 		}
 	});
 
@@ -120,27 +116,77 @@ test.describe("P0 scenario gaps", () => {
 				response.ok(),
 		);
 		await page.getByRole("button", { name: "Save" }).click();
-		const created = (await (await createdResponse).json()) as { taskId?: string };
+		const created = (await (await createdResponse).json()) as {
+			taskId?: string;
+		};
 		expect(created.taskId).toBeTruthy();
 
 		await page.goto("/en/tasks");
-		await expect(page.getByRole("heading", { name: title, exact: true })).toHaveCount(1);
+		await expect(
+			page.getByRole("heading", { name: title, exact: true }),
+		).toHaveCount(1);
 		await page.goto(`/en/tasks/${created.taskId}`);
 		await expect(
 			page.getByRole("heading", { name: title, level: 1 }).first(),
 		).toBeVisible();
 	});
 
-	test("TASK-002 task fields and TASK-020 All view", async ({ page }) => {
+	test("[TASK-002/TASK-020] saves task fields and reflects them in All and workspace", async ({
+		page,
+	}) => {
+		const title = `P0 configured task ${crypto.randomUUID()}`;
+		const description = "Configured through the complete task creation flow";
+		const dueAt = "2026-12-18T17:30";
+
 		await page.goto("/en/tasks");
 		await expectApp(page);
 		await page.getByRole("button", { name: /new task/i }).click();
 		const dialog = page.getByRole("dialog");
 		await expect(dialog).toBeVisible();
-		await expect(dialog.getByRole("textbox").first()).toBeVisible();
-		await page.keyboard.press("Escape");
+		await dialog.getByPlaceholder("Add title").fill(title);
+		await dialog.getByPlaceholder("Add description").fill(description);
+		await dialog.getByRole("button", { name: "High" }).click();
+		await dialog.getByLabel("Due date (optional)").fill(dueAt);
+		const runtime = dialog.getByRole("combobox");
+		await expect(runtime).toBeVisible();
+		await expect(runtime).not.toHaveText("");
+
+		const createdResponse = page.waitForResponse(
+			(response) =>
+				response.url().includes("/api/tasks") &&
+				response.request().method() === "POST" &&
+				response.ok(),
+		);
+		await dialog.getByRole("button", { name: "Save" }).click();
+		const created = (await (await createdResponse).json()) as {
+			taskId?: string;
+		};
+		expect(created.taskId).toBeTruthy();
+
+		await page.goto("/en/tasks");
 		await page.getByRole("button", { name: /All tasks$/ }).click();
 		await expect(page).toHaveURL(/\/en\/tasks(?:\?.*)?$/);
+		const taskHeading = page.getByRole("heading", { name: title, exact: true });
+		await expect(taskHeading).toBeVisible();
+		const taskCard = taskHeading.locator("xpath=../../..");
+		await expect(taskCard.getByText(description, { exact: true })).toBeVisible();
+		await expect(taskCard.getByText("High", { exact: true })).toBeVisible();
+
+		await page.goto(`/en/tasks/${created.taskId}`);
+		await expectApp(page);
+		const editor = page.getByRole("dialog", { name: "Edit task" });
+		if (!(await editor.isVisible().catch(() => false))) {
+			await page.getByRole("button", { name: "Edit task" }).first().click();
+		}
+		await expect(editor).toBeVisible();
+		await expect(editor.locator('input[name="title"]')).toHaveValue(title);
+		await expect(editor.locator('textarea[name="description"]')).toHaveValue(
+			description,
+		);
+		await expect(editor.locator('input[name="dueAt"]')).toHaveValue(dueAt);
+		await expect(
+			editor.locator('input[name="executionRuntime"]'),
+		).not.toHaveValue("");
 	});
 
 	test("TASK-045 cancel delete and TASK-046 confirm delete", async ({
@@ -163,10 +209,8 @@ test.describe("P0 scenario gaps", () => {
 			page.getByRole("heading", { name: /P0 delete cancel/ }),
 		).toHaveCount(1);
 
-		const confirm = await createTask(
-			request,
-			`P0 delete confirm ${crypto.randomUUID()}`,
-		);
+		const confirmTitle = `P0 delete confirm ${crypto.randomUUID()}`;
+		const confirm = await createTask(request, confirmTitle);
 		await page.reload();
 		await openTaskActions(page, /^More actions for P0 delete confirm/);
 		await page.getByRole("menuitem", { name: /delete/i }).click();
@@ -175,34 +219,23 @@ test.describe("P0 scenario gaps", () => {
 			.getByRole("button", { name: /delete/i })
 			.click();
 		await expect(
-			page.getByRole("heading", { name: /Delete "P0 delete confirm/ }),
-		).not.toBeVisible();
-		void cancel;
-		void confirm;
+			page.getByRole("heading", { name: confirmTitle, exact: true }),
+		).toHaveCount(0);
+		expect((await request.get(`/api/tasks/${confirm.taskId}`)).status()).toBe(404);
+		expect((await request.get(`/api/tasks/${cancel.taskId}`)).status()).toBe(200);
 	});
 
-	test("SCHED-001/004 schedule surface and task placement entry", async ({
-		page,
-		request,
-	}) => {
-		await createTask(request, `P0 schedule fixture ${crypto.randomUUID()}`, {
-			dueAt: new Date(Date.now() + 86400000).toISOString(),
-		});
+	test("[SCHED-001] opens the schedule workspace", async ({ page }) => {
 		await page.goto("/en/schedule");
 		await expectApp(page);
 		await expect(page.getByRole("main")).toBeVisible();
 		await expect(page).toHaveURL(/\/en\/schedule$/);
 	});
 
-	test("ACTION-002/003/008 action center decision surface", async ({
-		page,
-	}) => {
+	test("[ACTION-002] opens the action center workspace", async ({ page }) => {
 		await page.goto("/en/action-center");
 		await expectApp(page);
 		await expect(page.getByRole("main")).toBeVisible();
-		await expect(page.getByRole("tab").first())
-			.toBeVisible()
-			.catch(() => undefined);
 		await expect(page).toHaveURL(/\/en\/action-center$/);
 	});
 
@@ -266,7 +299,8 @@ test.describe("P0 scenario gaps", () => {
 		await page.getByRole("tab", { name: "History" }).click();
 		await expect(
 			page.getByRole("heading", {
-				name: "A durable outcome advanced through bounded tasks, accepted results, and deliberate reviews.",
+				name:
+					"A durable outcome advanced through bounded tasks, accepted results, and deliberate reviews.",
 			}),
 		).toBeVisible();
 	});
@@ -310,23 +344,7 @@ test.describe("P0 scenario gaps", () => {
 		await expect(dialog).not.toBeVisible();
 		await page.reload();
 		await expect(page.getByText("Persisted workspace edit")).toBeVisible();
-		await expect(page.getByText("Unsaved edit must be discarded")).toHaveCount(
-			0,
-		);
+		await expect(page.getByText("Unsaved edit must be discarded")).toHaveCount(0);
 	});
 
-	test("RECUR-005 occurrence workspace and AUTO-001 route readiness", async ({
-		page,
-		request,
-	}) => {
-		const task = await createTask(
-			request,
-			`P0 occurrence ${crypto.randomUUID()}`,
-		);
-		await page.goto(`/en/tasks/${task.taskId}`);
-		await expectApp(page);
-		await expect(page.getByRole("heading").first()).toBeVisible();
-		await page.goto("/en/dashboard");
-		await expectApp(page);
-	});
 });

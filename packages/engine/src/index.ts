@@ -62,6 +62,7 @@ export type {
 export {
 	mintRunToken,
 	validateRunToken,
+	validateRevokedRunToken,
 	revokeRunToken,
 	revokeRunTokensForRun,
 	recordTerminalAction,

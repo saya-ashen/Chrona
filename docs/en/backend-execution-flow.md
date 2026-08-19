@@ -218,7 +218,7 @@ Result previews follow two paths:
 - Files inside the node-scoped generated-files root are previewed directly after canonical-path and symlink containment checks.
 - Other local files are never read implicitly. The result surface first requests metadata, shows the canonical path and size, and requires an explicit one-time approval before the server reads a bounded preview.
 
-The access grant is task-bound, path-bound, short-lived, single-use, and kept in process memory. Requests reject directories, device files, sockets, unsafe special files, missing files, and files above the configured size limit. Preview reads remain bounded after approval.
+The access grant is task-bound, path-bound, short-lived, single-use, and kept in process memory. Requests reject directories, device files, sockets, unsafe special files, missing files, and files above the 64 MiB result-file size limit. Preview reads remain bounded after approval.
 
 ## Completion
 

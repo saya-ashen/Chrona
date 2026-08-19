@@ -84,6 +84,7 @@ vi.mock("@features/schedule", () => ({
 			recurrenceAnchorStartAt: string | null;
 			recurrenceAnchorEndAt: string | null;
 			aiClientId: string | null;
+			executionRuntime: string;
 		}) => Promise<void>;
 	}) =>
 		isOpen ? (
@@ -106,6 +107,7 @@ vi.mock("@features/schedule", () => ({
 							recurrenceAnchorStartAt: "2026-04-15T09:00:00.000Z",
 							recurrenceAnchorEndAt: "2026-04-15T10:00:00.000Z",
 							aiClientId: "client-1",
+							executionRuntime: "local",
 						})
 					}
 				>

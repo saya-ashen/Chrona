@@ -46,62 +46,56 @@ export type ProviderApprovalReadModel = {
 export type PlanExecutionRuntimeDisplayEvent =
 	| {
 			type: "text_delta";
-			/** Exact assistant output chunk emitted by the provider. */
+			/** Redacted assistant output chunk emitted by the provider. */
 			text: string;
-			raw?: unknown;
 	  }
 	| {
 			type: "reasoning_delta";
-			/** Exact provider reasoning chunk emitted by the provider. */
+			/** Redacted provider reasoning chunk emitted by the provider. */
 			text: string;
-			raw?: unknown;
 	  }
 	| {
 			type: "raw_event";
-			/** Provider event that has no more specific public display shape. */
-			raw: unknown;
+			/** Lifecycle label for a provider event without a richer public shape. */
 			rawEventType?: string;
 	  }
 	| {
 			type: "tool_started";
 			tool: PublicProviderDescriptor;
 			label: string;
-			/** The exact provider payload sent with this tool invocation. */
+			callId?: string;
+			/** Bounded, allowlisted tool parameters safe for display. */
 			input?: unknown;
-			/** The provider's raw event, when available. */
-			raw?: unknown;
 	  }
 	| {
 			type: "tool_progress";
 			tool: PublicProviderDescriptor;
 			label: string;
-			/** The exact provider progress payload. */
+			callId?: string;
+			/** Bounded, allowlisted progress data safe for display. */
 			output?: unknown;
-			raw?: unknown;
 	  }
 	| {
 			type: "tool_completed";
 			tool?: PublicProviderDescriptor;
 			label: string;
+			callId?: string;
 			durationMs?: number;
-			/** The exact provider result returned for this tool call. */
+			/** Bounded, allowlisted result data safe for display. */
 			output?: unknown;
-			raw?: unknown;
-			error?: { code?: string; message?: string; raw?: unknown };
+			error?: { code?: string; message?: string };
 	  }
 	| {
 			type: "approval_required";
 			approval: ProviderApprovalReadModel;
-			raw?: unknown;
 	  }
 	| {
 			type: "run_status";
 			status: "started" | "completed" | "failed" | "cancelled";
-			/** Provider-level request/response data for the run lifecycle event. */
+			/** Bounded, allowlisted lifecycle data safe for display. */
 			input?: unknown;
 			output?: unknown;
 			error?: string;
-			raw?: unknown;
 	  };
 
 export type PlanExecutionSSEEvent =
@@ -173,6 +167,7 @@ export interface GeneratePlanCancelledEvent {
 export interface GeneratePlanErrorEvent {
 	type: "failed";
 	code: GeneratePlanErrorCode;
+	title?: string;
 	/** Stable durable-runtime error code for diagnostics; absent for legacy events. */
 	persistedCode?: string;
 	message: string;

@@ -15,6 +15,7 @@ import {
 	projectTaskPlanGenerationFailure,
 	releaseTaskPlanGenerationHead,
 } from "./task-plan-generation-registry";
+import { registerActiveTaskPlanGeneration } from "./active-task-plan-generations";
 
 async function recordPlanGenerationEvent(input: {
 	type: "started" | "status" | "completed" | "failed" | "cancelled";
@@ -86,8 +87,12 @@ async function* emitTerminalFailure(input: {
 	generationId: string;
 	featureRunId: string;
 	code: string | null | undefined;
+	errorMessage?: string | null;
 }): AsyncGenerator<GeneratePlanSSEEvent> {
-	const failure = projectTaskPlanGenerationFailure(input.code);
+	const failure = projectTaskPlanGenerationFailure(
+		input.code,
+		input.errorMessage,
+	);
 	await releaseGenerationHead({
 		taskId: input.task.id,
 		workBlockId: input.workBlockId,
@@ -100,6 +105,7 @@ async function* emitTerminalFailure(input: {
 		generationId: input.generationId,
 		payload: {
 			code: failure.code,
+			title: failure.title,
 			persisted_code: failure.persistedCode,
 			message: failure.message,
 		},
@@ -175,17 +181,36 @@ export async function* generateTaskPlanManualStream(input: {
 	}
 
 	yield* status("requesting_provider", "Requesting AI provider...");
+	const activeGeneration = input.featureRunId
+		? registerActiveTaskPlanGeneration(input.featureRunId)
+		: null;
 	try {
 		const featureRun = input.featureRunId
-			? await resumeTaskPlanGenerateFeature(input.featureRunId)
-			: await runTaskPlanGenerateFeature({
-					generationId,
-					snapshot,
-					userInstruction,
-					selectedNodeId,
-				});
+			? await resumeTaskPlanGenerateFeature(
+					input.featureRunId,
+					activeGeneration?.signal,
+				)
+			: await runTaskPlanGenerateFeature(
+					{
+						generationId,
+						snapshot,
+						userInstruction,
+						selectedNodeId,
+					},
+					activeGeneration?.signal,
+				);
 		if (!featureRun)
 			throw new Error("Durable task plan feature run was not found.");
+		if (featureRun.status === "cancelled") {
+			await recordPlanGenerationEvent({
+				type: "cancelled",
+				task,
+				workBlockId: snapshot.workBlockId,
+				generationId,
+			});
+			yield { type: "cancelled" };
+			return;
+		}
 		if (featureRun.status !== "completed") {
 			yield* emitTerminalFailure({
 				task,
@@ -193,6 +218,7 @@ export async function* generateTaskPlanManualStream(input: {
 				generationId,
 				featureRunId: featureRun.id,
 				code: featureRun.error?.code,
+				errorMessage: featureRun.error?.message,
 			});
 			return;
 		}
@@ -238,6 +264,16 @@ export async function* generateTaskPlanManualStream(input: {
 		};
 		yield { type: "done" };
 	} catch (cause) {
+		if (activeGeneration?.signal.aborted) {
+			await recordPlanGenerationEvent({
+				type: "cancelled",
+				task,
+				workBlockId: snapshot.workBlockId,
+				generationId,
+			});
+			yield { type: "cancelled" };
+			return;
+		}
 		const runtimeCode = getRuntimeErrorCode(cause);
 		const stale = runtimeCode === "stale_plan_baseline";
 		const message = stale
@@ -261,5 +297,7 @@ export async function* generateTaskPlanManualStream(input: {
 		yield stale
 			? { type: "stale", code: "STALE_GENERATION", message }
 			: { type: "failed", code: "INTERNAL_ERROR", message };
+	} finally {
+		activeGeneration?.dispose();
 	}
 }

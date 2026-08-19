@@ -245,7 +245,7 @@ const resultComparisonComponentDefinition = {
 		})
 		.strict(),
 	description:
-		"Inline comparison matrix for a bounded set of options. Keep cells concise; use a file-backed Table for large datasets. Set rowHeaderLabel to the semantic label for the first row-header column; never assume it is a rank.",
+		"Inline comparison matrix for a bounded set of options. Use the smallest complete field set needed to identify and understand each row; never omit an available description, purpose, rationale, or other interpretation-critical field merely to maximize metric density. Drop lower-value secondary metrics first when column space is limited. Use a file-backed Table for large datasets. Set rowHeaderLabel to the semantic label for the first row-header column; never assume it is a rank.",
 };
 
 const resultTimelineItemSchema = z

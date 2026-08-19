@@ -125,6 +125,7 @@ function buildDragItem(
 
 function TimelineComposer({
 	draft,
+	executionRuntimes,
 	defaultExecutionRuntime,
 	availableAiClients,
 	isPending,
@@ -132,6 +133,7 @@ function TimelineComposer({
 	onCreate,
 }: {
 	draft: TimelinePlacementPreview;
+	executionRuntimes: TaskConfigExecutionRuntime[];
 	defaultExecutionRuntime: string;
 	availableAiClients?: TaskConfigAiClient[];
 	isPending: boolean;
@@ -145,6 +147,8 @@ function TimelineComposer({
 			initialEndAt={draft.endAt}
 			isPending={isPending}
 			availableAiClients={availableAiClients}
+			executionRuntimes={executionRuntimes}
+			defaultExecutionRuntime={defaultExecutionRuntime}
 			onClose={onClose}
 			onSubmit={async (input) => {
 				await onCreate({
@@ -156,7 +160,7 @@ function TimelineComposer({
 					autoPlanGenerationTiming: input.autoPlanGenerationTiming,
 					autoExecuteTiming: input.autoExecuteTiming,
 					dueAt: input.dueAt,
-					executionRuntime: defaultExecutionRuntime,
+					executionRuntime: input.executionRuntime,
 					executionConfig: {},
 					scheduledStartAt: input.scheduledStartAt,
 					scheduledEndAt: input.scheduledEndAt,
@@ -179,7 +183,7 @@ export function DayTimeline({
 	ghostPreview = null,
 	draggedItem,
 	externalEvents = [],
-	executionRuntimes: _executionRuntimes,
+	executionRuntimes,
 	defaultExecutionRuntime,
 	availableAiClients,
 	isPending,
@@ -272,8 +276,7 @@ export function DayTimeline({
 					selectedDay === getTodayKey() &&
 					start.getTime() <= Date.now() &&
 					end.getTime() >= Date.now();
-				const isPast =
-					selectedDay === getTodayKey() && end.getTime() < Date.now();
+				const isPast = selectedDay === getTodayKey() && end.getTime() < Date.now();
 				const hasConflict = conflictTaskIds?.has(item.taskId) ?? false;
 
 				return {
@@ -382,9 +385,7 @@ export function DayTimeline({
 
 		event.preventDefault();
 		event.dataTransfer.dropEffect = "move";
-		setDragPreview(
-			getDragPreviewFromDate(getDragDateFromClientY(event.clientY)),
-		);
+		setDragPreview(getDragPreviewFromDate(getDragDateFromClientY(event.clientY)));
 	}
 
 	async function handleDrop(event: DragEvent<HTMLDivElement>) {
@@ -394,8 +395,7 @@ export function DayTimeline({
 
 		event.preventDefault();
 		const preview =
-			getDragPreviewFromDate(getDragDateFromClientY(event.clientY)) ??
-			dragPreview;
+			getDragPreviewFromDate(getDragDateFromClientY(event.clientY)) ?? dragPreview;
 		setDragPreview(null);
 
 		if (!preview || preview.hasConflict) {
@@ -457,9 +457,7 @@ export function DayTimeline({
 			currentEndMinute - currentStartMinute,
 			TIMELINE_SLOT_MINUTES,
 		);
-		const nextStartMinute = clampScheduledStartMinute(
-			currentStartMinute + step,
-		);
+		const nextStartMinute = clampScheduledStartMinute(currentStartMinute + step);
 		const nextEndMinute = clampScheduledEndMinute(
 			nextStartMinute,
 			nextStartMinute + duration,
@@ -610,12 +608,7 @@ export function DayTimeline({
 
 		const startMinute = minutesFromDate(span.start);
 		const endMinute = minutesFromDate(span.end);
-		const preview = buildPlacementPreview(
-			startMinute,
-			endMinute,
-			"drag",
-			taskId,
-		);
+		const preview = buildPlacementPreview(startMinute, endMinute, "drag", taskId);
 		setDragPreview(preview);
 		return !preview.hasConflict;
 	};
@@ -674,12 +667,7 @@ export function DayTimeline({
 			return (
 				<ExternalCalendarEventBlock
 					event={externalEvent}
-					timeRange={formatTimeRange(
-						info.event.start,
-						info.event.end,
-						locale,
-						copy,
-					)}
+					timeRange={formatTimeRange(info.event.start, info.event.end, locale, copy)}
 				/>
 			);
 		}
@@ -740,9 +728,7 @@ export function DayTimeline({
 							(isCurrent ? "bg-primary" : getPriorityAccent(item.priority)),
 					)}
 					style={
-						sourceManaged
-							? { backgroundColor: sourceManaged.sourceColor }
-							: undefined
+						sourceManaged ? { backgroundColor: sourceManaged.sourceColor } : undefined
 					}
 				/>
 				<div className="min-w-0 flex-1 space-y-1">
@@ -758,9 +744,7 @@ export function DayTimeline({
 									title={externalCalendarMessages.readOnlyLabel}
 								>
 									<CalendarDays className="size-3" />
-									<span className="max-w-20 truncate">
-										{sourceManaged.sourceName}
-									</span>
+									<span className="max-w-20 truncate">{sourceManaged.sourceName}</span>
 								</Badge>
 							) : null}
 							<Badge variant="secondary" className="px-2 py-0 text-[10px]">
@@ -813,8 +797,7 @@ export function DayTimeline({
 						{formatDayHeading(dayDate, locale, copy)}
 					</h3>
 					<p className="mt-0.5 text-xs text-muted-foreground">
-						<DayTimelineSummary items={items} dayDate={dayDate} /> ·{" "}
-						{items.length}{" "}
+						<DayTimelineSummary items={items} dayDate={dayDate} /> · {items.length}{" "}
 						{items.length === 1 ? copy.blockSingular : copy.blockPlural}
 					</p>
 				</div>
@@ -836,9 +819,7 @@ export function DayTimeline({
 				onDragOver={handleDragOver}
 				onScrollCapture={syncTimelineScrollTop}
 				onDragLeave={(event) => {
-					if (
-						!event.currentTarget.contains(event.relatedTarget as Node | null)
-					) {
+					if (!event.currentTarget.contains(event.relatedTarget as Node | null)) {
 						setDragPreview(null);
 					}
 				}}
@@ -860,11 +841,7 @@ export function DayTimeline({
 						{items.map((item) => (
 							<div key={item.workBlockId ?? item.taskId}>
 								<a
-									href={buildScheduleHref(
-										selectedDay,
-										item.taskId,
-										item.workBlockId,
-									)}
+									href={buildScheduleHref(selectedDay, item.taskId, item.workBlockId)}
 									onClick={(event) => {
 										event.preventDefault();
 										onSelectTask(item.workBlockId ?? item.taskId);
@@ -929,6 +906,17 @@ export function DayTimeline({
 						eventOverlap={false}
 						eventAllow={handleEventAllow}
 						eventResizableFromStart={false}
+						viewDidMount={({ el }) => {
+							el.querySelectorAll<HTMLElement>(".fc-scroller").forEach((scroller) => {
+								scroller.tabIndex = 0;
+							});
+							// FullCalendar's grid roles do not match its wrapper-heavy DOM.
+							el
+								.querySelectorAll<HTMLElement>(
+									".fc-scrollgrid[role], .fc-scrollgrid [role]",
+								)
+								.forEach((node) => node.removeAttribute("role"));
+						}}
 						datesSet={handleDatesSet}
 						dateClick={handleDateClick}
 						select={handleDateSelect}
@@ -936,9 +924,7 @@ export function DayTimeline({
 							info.jsEvent.preventDefault();
 							const clicked = selectedItemById.get(info.event.id);
 							onSelectTask(
-								clicked
-									? (clicked.workBlockId ?? clicked.taskId)
-									: info.event.id,
+								clicked ? (clicked.workBlockId ?? clicked.taskId) : info.event.id,
 							);
 						}}
 						eventDragStart={(info) => setHiddenTaskId(info.event.id)}
@@ -982,6 +968,7 @@ export function DayTimeline({
 				{composerDraft ? (
 					<TimelineComposer
 						draft={composerDraft}
+						executionRuntimes={executionRuntimes}
 						defaultExecutionRuntime={defaultExecutionRuntime}
 						availableAiClients={availableAiClients}
 						isPending={isPending}

@@ -1,5 +1,8 @@
 import { z } from "zod";
-import { checkpointActionKindSchema, executionActionBodySchema } from "./execution.schema";
+import {
+  checkpointActionKindSchema,
+  executionActionBodySchema,
+} from "./execution.schema";
 import { isoDateString, workspaceId } from "./common";
 
 // ── GET /schedule ──
@@ -36,6 +39,8 @@ export const actionCenterItemSchema = z.object({
   sourceTaskId: z.string(),
   workspaceId: z.string(),
   currentRunLabel: z.string().nullable(),
+  currentNodeId: z.string().nullable().optional(),
+  workBlockId: z.string().nullable().optional(),
   detail: z.string().nullable(),
   summary: z.string(),
   consequence: z.string(),
@@ -44,7 +49,9 @@ export const actionCenterItemSchema = z.object({
 export const actionCenterProjectionSchema = z.array(actionCenterItemSchema);
 
 export type ActionCenterItem = z.infer<typeof actionCenterItemSchema>;
-export type ActionCenterProjection = z.infer<typeof actionCenterProjectionSchema>;
+export type ActionCenterProjection = z.infer<
+  typeof actionCenterProjectionSchema
+>;
 
 // ── GET /dashboard ──
 export const dashboardProjectionQuerySchema = z.object({
@@ -90,9 +97,12 @@ export const workCommandBodySchema = z.union([
     workBlockId: z.string().min(1).nullable().optional(),
     expectedHeadStateVersion: z.number().int().nonnegative(),
   }),
-  executionActionBodySchema.and(workspaceCommandBaseSchema.extend({
-    type: z.literal("execution.action"),
-  })),
+  executionActionBodySchema.and(
+    workspaceCommandBaseSchema.extend({
+      type: z.literal("execution.action"),
+      workBlockId: z.string().min(1).nullable().optional(),
+    }),
+  ),
   workspaceCommandBaseSchema.extend({
     type: z.literal("checkpoint.action"),
     checkpointId: z.string().min(1),

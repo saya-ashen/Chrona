@@ -1,5 +1,8 @@
 import { apiJson } from "@shared/http";
-import type { AutomationTimingPreset, TaskDeleteImpact } from "@chrona/contracts";
+import type {
+  AutomationTimingPreset,
+  TaskDeleteImpact,
+} from "@chrona/contracts";
 import type { ExecutionActionInput } from "@chrona/contracts";
 
 export type CreateTaskFromScheduleInput = {
@@ -104,14 +107,16 @@ export type DeleteTaskInput = {
   impact?: TaskDeleteImpact;
 };
 
-export function getTaskDeleteImpact(input: Pick<DeleteTaskInput, "taskId" | "workspaceId">) {
+export function getTaskDeleteImpact(
+  input: Pick<DeleteTaskInput, "taskId" | "workspaceId">,
+) {
   return apiJson<TaskDeleteImpact>(
     `/api/tasks/${encodeURIComponent(input.taskId)}/delete-impact?workspaceId=${encodeURIComponent(input.workspaceId)}`,
   );
 }
 
 export async function deleteTask(input: DeleteTaskInput) {
-  const impact = input.impact ?? await getTaskDeleteImpact(input);
+  const impact = input.impact ?? (await getTaskDeleteImpact(input));
   return apiJson<unknown>(
     `/api/tasks/${encodeURIComponent(input.taskId)}?workspaceId=${encodeURIComponent(input.workspaceId)}`,
     {
@@ -185,13 +190,18 @@ export function decideScheduleProposal(input: {
 }
 
 function executionAction(taskId: string, action: Record<string, unknown>) {
-  return apiJson<unknown>(
-    `/api/tasks/${encodeURIComponent(taskId)}/execution/actions`,
-    {
-      method: "POST",
-      body: JSON.stringify(action),
-    },
-  );
+  const idempotencyKey =
+    typeof action.idempotencyKey === "string" && action.idempotencyKey
+      ? action.idempotencyKey
+      : `web-${crypto.randomUUID()}`;
+  return apiJson<unknown>(`/api/work/${encodeURIComponent(taskId)}/commands`, {
+    method: "POST",
+    body: JSON.stringify({
+      type: "execution.action",
+      ...action,
+      idempotencyKey,
+    }),
+  });
 }
 
 export function startExecution(input: {
@@ -294,8 +304,7 @@ export function continueFromTaskResult(input: {
         instruction: input.instruction,
         ...(input.intent === "create_task"
           ? {
-              sessionStrategy:
-                input.sessionStrategy ?? "handoff_compact",
+              sessionStrategy: input.sessionStrategy ?? "handoff_compact",
             }
           : {}),
       }),

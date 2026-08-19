@@ -40,10 +40,8 @@ async function findRecoverableTerminalActions(input: {
         status: "running",
       },
       run: { status: { in: ACTIVE_RUN_STATUSES } },
-      task: { latestRunId: { not: null } },
     },
     include: {
-      task: { select: { latestRunId: true } },
       run: { select: { id: true, taskSessionId: true, runtimeRunRef: true } },
       nodeAttempt: {
         select: {
@@ -73,8 +71,11 @@ async function findRecoverableTerminalActions(input: {
 type RecoverableTerminalAction = Awaited<ReturnType<typeof findRecoverableTerminalActions>>[number];
 type TerminalActionRecoveryOutcome = "recovered" | "skipped";
 
-function terminalRunStatusFor(action: { action: string }) {
-  return action.action === "complete_manual_node" ? RunStatus.Completed : RunStatus.Failed;
+export function terminalRunStatusForAttempt(status: string) {
+  if (status === "succeeded") return RunStatus.Completed;
+  if (status === "failed") return RunStatus.Failed;
+  if (status === "cancelled") return RunStatus.Cancelled;
+  return null;
 }
 
 async function recoverTerminalAction(
@@ -84,7 +85,6 @@ async function recoverTerminalAction(
   const nodeAttempt = candidate.nodeAttempt;
   if (
     !nodeAttempt
-    || candidate.task.latestRunId !== candidate.run.id
     || candidate.nodeAttemptId !== nodeAttempt.id
   ) {
     return "skipped";
@@ -159,12 +159,12 @@ async function recoverTerminalAction(
     throw new Error("Recorded terminal action did not finalize its exact node attempt");
   }
   await assertSchedulerWorkOwnership(workContext);
-  const expectedRunStatus = terminalRunStatusFor(action);
+  const expectedRunStatus = terminalRunStatusForAttempt(finalizedAttempt.status);
   const finalizedRun = await db.run.findUnique({
     where: { id: candidate.run.id },
     select: { status: true },
   });
-  if (finalizedRun?.status !== expectedRunStatus) {
+  if (!expectedRunStatus || finalizedRun?.status !== expectedRunStatus) {
     throw new Error("Recorded terminal action was accepted without authoritative Run terminalization");
   }
   await assertSchedulerWorkOwnership(workContext);

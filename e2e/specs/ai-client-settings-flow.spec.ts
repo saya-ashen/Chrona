@@ -13,16 +13,11 @@ async function fillAdvancedConnectionSettings(
 	baseUrl: string,
 	apiKey: string,
 ) {
-	await page
-		.locator("summary")
-		.filter({ hasText: "Advanced settings" })
-		.click();
+	await page.locator("summary").filter({ hasText: "Advanced settings" }).click();
 	await page
 		.getByRole("textbox", { name: "Base URL", exact: true })
 		.fill(baseUrl);
-	await page
-		.getByRole("textbox", { name: "API Key", exact: true })
-		.fill(apiKey);
+	await page.getByRole("textbox", { name: "API Key", exact: true }).fill(apiKey);
 }
 
 test.describe("AI Client Settings", () => {
@@ -54,6 +49,10 @@ test.describe("AI Client Settings", () => {
 			await page.getByRole("link", { name: "Manage AI clients" }).click();
 			const dialog = page.getByRole("dialog");
 			await expect(dialog).toBeVisible();
+			for (let index = 0; index < 8; index += 1) {
+				await page.keyboard.press("Tab");
+				await expect(dialog.locator(":focus")).toHaveCount(1);
+			}
 			const dialogBox = await dialog.boundingBox();
 			expect(dialogBox).not.toBeNull();
 			expect(
@@ -96,9 +95,7 @@ test.describe("AI Client Settings", () => {
 		await test.step("2. Create a new AI client", async () => {
 			await page.getByRole("button", { name: /add client/i }).click();
 			await selectHermesProvider(page);
-			await page
-				.getByPlaceholder("My Hermes Client")
-				.fill("E2E Settings Client");
+			await page.getByPlaceholder("My Hermes Client").fill("E2E Settings Client");
 			await fillAdvancedConnectionSettings(
 				page,
 				"https://api.mock.ai/v1",
@@ -107,8 +104,7 @@ test.describe("AI Client Settings", () => {
 
 			const createResp = page.waitForResponse(
 				(res) =>
-					res.url().includes("/api/ai/clients") &&
-					res.request().method() === "POST",
+					res.url().includes("/api/ai/clients") && res.request().method() === "POST",
 			);
 			await page.getByRole("button", { name: /^save$/i }).click();
 			await createResp;
@@ -133,9 +129,7 @@ test.describe("AI Client Settings", () => {
 			await page.getByRole("button", { name: /^save$/i }).click();
 			await updateResp;
 
-			await expect(
-				page.getByText("E2E Settings Client (Updated)"),
-			).toBeVisible();
+			await expect(page.getByText("E2E Settings Client (Updated)")).toBeVisible();
 		});
 
 		await test.step("4. Test availability shows result", async () => {
@@ -325,8 +319,7 @@ test.describe("AI Client Settings", () => {
 
 		const respA = page.waitForResponse(
 			(res) =>
-				res.url().includes("/api/ai/clients") &&
-				res.request().method() === "POST",
+				res.url().includes("/api/ai/clients") && res.request().method() === "POST",
 		);
 		await page.getByRole("button", { name: /^save$/i }).click();
 		await respA;
@@ -342,8 +335,7 @@ test.describe("AI Client Settings", () => {
 
 		const respB = page.waitForResponse(
 			(res) =>
-				res.url().includes("/api/ai/clients") &&
-				res.request().method() === "POST",
+				res.url().includes("/api/ai/clients") && res.request().method() === "POST",
 		);
 		await page.getByRole("button", { name: /^save$/i }).click();
 		await respB;
@@ -356,8 +348,7 @@ test.describe("AI Client Settings", () => {
 
 		const patchResp = page.waitForResponse(
 			(res) =>
-				res.url().includes("/api/ai/clients") &&
-				res.request().method() === "PATCH",
+				res.url().includes("/api/ai/clients") && res.request().method() === "PATCH",
 		);
 		await page.getByRole("button", { name: /^save$/i }).click();
 		await patchResp;

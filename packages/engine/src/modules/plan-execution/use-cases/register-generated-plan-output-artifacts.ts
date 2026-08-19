@@ -8,9 +8,12 @@ import type {
   NodeDeliverable,
   NodeDeliverableDeclaration,
 } from "@chrona/contracts/ai";
-import type { Prisma } from "@/generated/prisma/client";
+import type { Prisma } from "@chrona/db";
 import { withPlanExecutionDurability } from "../persistence/scheduler-durability";
-import { generatedFilesRoot, resolveGeneratedFileReference } from "../../tasks/result-file-access";
+import {
+  generatedFilesRoot,
+  resolveGeneratedFileReference,
+} from "../../tasks/result-file-access";
 import { ENGINE_ERROR_CODES, EngineError } from "../../../errors";
 
 const PREVIEW_BYTES = 64 * 1024;
@@ -68,7 +71,10 @@ async function inspectGeneratedFile(uri: string, runId: string) {
 
   let handle;
   try {
-    handle = await open(canonicalPath, constants.O_RDONLY | constants.O_NOFOLLOW);
+    handle = await open(
+      canonicalPath,
+      constants.O_RDONLY | constants.O_NOFOLLOW,
+    );
   } catch {
     throw new EngineError(
       ENGINE_ERROR_CODES.VALIDATION_FAILED,
@@ -80,10 +86,10 @@ async function inspectGeneratedFile(uri: string, runId: string) {
     const openedCanonicalPath = await realpath(canonicalPath);
     const openedPathStat = await stat(openedCanonicalPath);
     if (
-      !fileStat.isFile()
-      || !openedPathStat.isFile()
-      || fileStat.dev !== openedPathStat.dev
-      || fileStat.ino !== openedPathStat.ino
+      !fileStat.isFile() ||
+      !openedPathStat.isFile() ||
+      fileStat.dev !== openedPathStat.dev ||
+      fileStat.ino !== openedPathStat.ino
     ) {
       throw new EngineError(
         ENGINE_ERROR_CODES.VALIDATION_FAILED,
@@ -97,7 +103,10 @@ async function inspectGeneratedFile(uri: string, runId: string) {
       );
     }
 
-    const relativePath = relative(resolve(generatedFilesRoot()), openedCanonicalPath)
+    const relativePath = relative(
+      resolve(generatedFilesRoot()),
+      openedCanonicalPath,
+    )
       .split(sep)
       .join("/");
     if (relativePath.split("/")[0] !== runId) {
@@ -122,11 +131,11 @@ async function inspectGeneratedFile(uri: string, runId: string) {
     }
     const completedStat = await handle.stat();
     if (
-      completedStat.dev !== fileStat.dev
-      || completedStat.ino !== fileStat.ino
-      || completedStat.size !== fileStat.size
-      || completedStat.mtimeMs !== fileStat.mtimeMs
-      || completedStat.ctimeMs !== fileStat.ctimeMs
+      completedStat.dev !== fileStat.dev ||
+      completedStat.ino !== fileStat.ino ||
+      completedStat.size !== fileStat.size ||
+      completedStat.mtimeMs !== fileStat.mtimeMs ||
+      completedStat.ctimeMs !== fileStat.ctimeMs
     ) {
       throw new EngineError(
         ENGINE_ERROR_CODES.VALIDATION_FAILED,
@@ -148,12 +157,15 @@ async function inspectGeneratedFile(uri: string, runId: string) {
   }
 }
 
-async function artifactFromRef(input: {
-  workspaceId: string;
-  taskId: string;
-  runId: string;
-  ref: AiArtifactRef;
-}, client: Prisma.TransactionClient) {
+async function artifactFromRef(
+  input: {
+    workspaceId: string;
+    taskId: string;
+    runId: string;
+    ref: AiArtifactRef;
+  },
+  client: Prisma.TransactionClient,
+) {
   const artifacts = await client.artifact.findMany({
     where: {
       workspaceId: input.workspaceId,
@@ -163,7 +175,9 @@ async function artifactFromRef(input: {
     },
     select: { id: true },
   });
-  const artifact = artifacts.find((candidate) => aiArtifactRef(candidate.id) === input.ref);
+  const artifact = artifacts.find(
+    (candidate) => aiArtifactRef(candidate.id) === input.ref,
+  );
   if (!artifact) {
     throw new EngineError(
       ENGINE_ERROR_CODES.VALIDATION_FAILED,
@@ -173,26 +187,35 @@ async function artifactFromRef(input: {
   return artifact;
 }
 
-async function registerDeclaration(input: {
-  workspaceId: string;
-  taskId: string;
-  runId: string;
-  occurrenceId: string | null;
-  sourceNodeId: string;
-  declaration: NodeDeliverableDeclaration;
-}, client: Prisma.TransactionClient): Promise<NodeDeliverable> {
+async function registerDeclaration(
+  input: {
+    workspaceId: string;
+    taskId: string;
+    runId: string;
+    occurrenceId: string | null;
+    sourceNodeId: string;
+    declaration: NodeDeliverableDeclaration;
+  },
+  client: Prisma.TransactionClient,
+): Promise<NodeDeliverable> {
   let artifactId: string;
   if (input.declaration.source.type === "existing_artifact") {
     artifactId = (
-      await artifactFromRef({
-        workspaceId: input.workspaceId,
-        taskId: input.taskId,
-        runId: input.runId,
-        ref: input.declaration.source.artifactRef,
-      }, client)
+      await artifactFromRef(
+        {
+          workspaceId: input.workspaceId,
+          taskId: input.taskId,
+          runId: input.runId,
+          ref: input.declaration.source.artifactRef,
+        },
+        client,
+      )
     ).id;
   } else {
-    const file = await inspectGeneratedFile(input.declaration.source.uri, input.runId);
+    const file = await inspectGeneratedFile(
+      input.declaration.source.uri,
+      input.runId,
+    );
     const registrationKey = createHash("sha256")
       .update(
         [
@@ -223,7 +246,10 @@ async function registerDeclaration(input: {
       select: { id: true, metadata: true },
     });
     if (existing) {
-      const existingMetadata = existing.metadata as Record<string, unknown> | null;
+      const existingMetadata = existing.metadata as Record<
+        string,
+        unknown
+      > | null;
       if (existingMetadata?.checksum !== file.checksum) {
         throw new EngineError(
           ENGINE_ERROR_CODES.CONFLICT,
@@ -257,10 +283,13 @@ async function registerDeclaration(input: {
     artifactRef: aiArtifactRef(artifactId),
     status: "current",
     sourceNodeRef: input.sourceNodeId,
-    ...(input.declaration.summary ? { summary: input.declaration.summary } : {}),
+    ...(input.declaration.summary
+      ? { summary: input.declaration.summary }
+      : {}),
     presentation: input.declaration.presentation ?? {
       primary:
-        input.declaration.kind === "table" || input.declaration.kind === "dataset"
+        input.declaration.kind === "table" ||
+        input.declaration.kind === "dataset"
           ? "table"
           : "file",
       allowDownload: true,
@@ -269,18 +298,23 @@ async function registerDeclaration(input: {
   };
 }
 
-export async function registerNodeDeliverables(input: {
-  workspaceId: string;
-  taskId: string;
-  taskSessionId: string | null;
-  workBlockId: string | null;
-  runId: string | null | undefined;
-  sourceNodeId: string;
-  sourceNodeRef?: string;
-  declarations: NodeDeliverableDeclaration[];
-}, suppliedTx?: Prisma.TransactionClient): Promise<NodeDeliverable[]> {
+export async function registerNodeDeliverables(
+  input: {
+    workspaceId: string;
+    taskId: string;
+    taskSessionId: string | null;
+    workBlockId: string | null;
+    runId: string | null | undefined;
+    sourceNodeId: string;
+    sourceNodeRef?: string;
+    declarations: NodeDeliverableDeclaration[];
+  },
+  suppliedTx?: Prisma.TransactionClient,
+): Promise<NodeDeliverable[]> {
   if (!suppliedTx) {
-    return withPlanExecutionDurability((tx) => registerNodeDeliverables(input, tx));
+    return withPlanExecutionDurability((tx) =>
+      registerNodeDeliverables(input, tx),
+    );
   }
   const client = suppliedTx;
   if (input.declarations.length === 0) return [];
@@ -316,7 +350,9 @@ export async function registerNodeDeliverables(input: {
         where: {
           taskId: input.taskId,
           ...runScope,
-          status: { in: ["Pending", "Running", "WaitingForApproval", "WaitingForInput"] },
+          status: {
+            in: ["Pending", "Running", "WaitingForApproval", "WaitingForInput"],
+          },
         },
         orderBy: { startedAt: "desc" },
         select: { id: true, occurrenceId: true },
@@ -330,14 +366,17 @@ export async function registerNodeDeliverables(input: {
   const registered: NodeDeliverable[] = [];
   for (const declaration of input.declarations) {
     registered.push(
-      await registerDeclaration({
-        workspaceId: input.workspaceId,
-        taskId: input.taskId,
-        runId: run.id,
-        occurrenceId: run.occurrenceId,
-        sourceNodeId: input.sourceNodeId,
-        declaration,
-      }, client).then((deliverable) => ({
+      await registerDeclaration(
+        {
+          workspaceId: input.workspaceId,
+          taskId: input.taskId,
+          runId: run.id,
+          occurrenceId: run.occurrenceId,
+          sourceNodeId: input.sourceNodeId,
+          declaration,
+        },
+        client,
+      ).then((deliverable) => ({
         ...deliverable,
         sourceNodeRef: input.sourceNodeRef ?? deliverable.sourceNodeRef,
       })),

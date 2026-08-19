@@ -82,7 +82,9 @@ describe("resolveFilePreview", () => {
       await Bun.write(path, "# Approved");
 
       expect(
-        await resolveFilePreview(path, { allowedAbsolutePath: path }),
+        await resolveFilePreview("relative-request.md", {
+          allowedAbsolutePath: path,
+        }),
       ).toMatchObject({
         displayPath: path,
         contentKind: "markdown",

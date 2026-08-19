@@ -26,7 +26,7 @@ vi.mock("@features/schedule", () => ({
 }));
 
 vi.mock("@features/task-workspace", () => ({
-	dispatchExecutionAction: (...args: unknown[]) =>
+	dispatchTaskExecutionAction: (...args: unknown[]) =>
 		dispatchExecutionAction(...args),
 }));
 
@@ -65,6 +65,8 @@ function renderSingleItem(
 		sourceTaskTitle: string;
 		sourceTaskId: string;
 		currentRunLabel: string | null;
+		currentNodeId?: string | null;
+		workBlockId?: string | null;
 		summary: string;
 		stateView?: { state: string };
 	},
@@ -87,7 +89,19 @@ function renderSingleItem(
 }
 
 describe("ActionCenterPageClient", () => {
-	it("submits approval decisions directly from action center approval cards", async () => {
+	it("[ACTION-001] renders the empty Action Center state", () => {
+		render(
+			<ActionCenterPageClient workspaceId="ws_1" copy={copy} initialData={[]} />,
+		);
+
+		expect(screen.getByText("You're all caught up")).toBeInTheDocument();
+		expect(screen.getByRole("link", { name: "View tasks" })).toHaveAttribute(
+			"href",
+			"/en/tasks",
+		);
+	});
+
+	it("[ACTION-003] approves an item and removes it from Action Center", async () => {
 		const user = userEvent.setup();
 
 		render(
@@ -104,6 +118,7 @@ describe("ActionCenterPageClient", () => {
 						sourceTaskId: "task_1",
 						workspaceId: "ws_1",
 						currentRunLabel: "run_projection",
+						workBlockId: "block_1",
 						detail: "command approval",
 						summary: "Approve the file patch",
 						consequence: "Blocks deployment until approved",
@@ -115,14 +130,16 @@ describe("ActionCenterPageClient", () => {
 		await user.click(screen.getByRole("button", { name: "Approve" }));
 
 		await waitFor(() =>
-			expect(dispatchExecutionAction).toHaveBeenCalledWith({
-				taskId: "task_1",
-				action: { action: "resume_with_approval", decision: "approve" },
-			}),
+			expect(dispatchExecutionAction).toHaveBeenCalledWith(
+				"task_1",
+				{
+					action: "resume_with_approval",
+					decision: "approve",
+				},
+				"block_1",
+			),
 		);
-		expect(
-			screen.queryByText("Approve the file patch"),
-		).not.toBeInTheDocument();
+		expect(screen.queryByText("Approve the file patch")).not.toBeInTheDocument();
 	});
 
 	it.each([
@@ -154,13 +171,10 @@ describe("ActionCenterPageClient", () => {
 		await user.click(screen.getByRole("button", { name: button }));
 
 		await waitFor(() =>
-			expect(dispatchExecutionAction).toHaveBeenCalledWith({
-				taskId: "task_approval",
-				action: {
-					action: "resume_with_approval",
-					decision,
-					feedback,
-				},
+			expect(dispatchExecutionAction).toHaveBeenCalledWith("task_approval", {
+				action: "resume_with_approval",
+				decision,
+				feedback,
 			}),
 		);
 		expect(
@@ -206,7 +220,9 @@ describe("ActionCenterPageClient", () => {
 				decision: "Rejected",
 			}),
 		);
-		expect(screen.queryByText("Move launch prep to tomorrow")).not.toBeInTheDocument();
+		expect(
+			screen.queryByText("Move launch prep to tomorrow"),
+		).not.toBeInTheDocument();
 	});
 
 	it("shows the concrete auto-execution skip reason before generic consequence copy", () => {
@@ -232,7 +248,7 @@ describe("ActionCenterPageClient", () => {
 		);
 	});
 
-	it("retries a failed recovery item via start_manual", async () => {
+	it("[ACTION-008] retries a failed recovery item and removes it", async () => {
 		const user = userEvent.setup();
 		renderSingleItem(
 			{
@@ -243,6 +259,7 @@ describe("ActionCenterPageClient", () => {
 				sourceTaskTitle: "Build site",
 				sourceTaskId: "task_3",
 				currentRunLabel: "run_failed",
+				currentNodeId: "failed_node",
 				summary: "The latest run stopped before finishing.",
 			},
 			{ retry: "Retry" },
@@ -251,10 +268,34 @@ describe("ActionCenterPageClient", () => {
 		await user.click(screen.getByRole("button", { name: "Retry" }));
 
 		await waitFor(() =>
-			expect(dispatchExecutionAction).toHaveBeenCalledWith({
-				taskId: "task_3",
-				action: { action: "start_manual" },
+			expect(dispatchExecutionAction).toHaveBeenCalledWith("task_3", {
+				action: "retry_node",
+				nodeId: "failed_node",
 			}),
+		);
+		expect(screen.queryByText("Build site")).not.toBeInTheDocument();
+	});
+
+	it("[ACTION-010] links completed execution to the correct Task Result", () => {
+		renderSingleItem(
+			{
+				id: "run_completed",
+				kind: "execution_completed",
+				actionType: "Execution completed",
+				riskLevel: "low",
+				sourceTaskTitle: "Draft report",
+				sourceTaskId: "task_result",
+				currentRunLabel: "run_completed",
+				workBlockId: "block result/1",
+				summary: "Results are ready for review.",
+				stateView: { state: "result_ready" },
+			},
+			{ reviewResults: "Review results" },
+		);
+
+		expect(screen.getByRole("link", { name: "Review results" })).toHaveAttribute(
+			"href",
+			"/en/tasks/task_result?workBlockId=block%20result%2F1",
 		);
 	});
 
@@ -277,9 +318,8 @@ describe("ActionCenterPageClient", () => {
 		await user.click(screen.getByRole("button", { name: "Resume" }));
 
 		await waitFor(() =>
-			expect(dispatchExecutionAction).toHaveBeenCalledWith({
-				taskId: "task_4",
-				action: { action: "resume_after_unblock" },
+			expect(dispatchExecutionAction).toHaveBeenCalledWith("task_4", {
+				action: "resume_after_unblock",
 			}),
 		);
 	});
@@ -316,6 +356,7 @@ describe("ActionCenterPageClient", () => {
 				sourceTaskTitle: "Generate report",
 				sourceTaskId: "task_6",
 				currentRunLabel: "run_cancelled",
+				stateView: { state: "cancelled" },
 				summary:
 					"The latest run was cancelled and needs operator review before restarting.",
 			},
@@ -325,9 +366,8 @@ describe("ActionCenterPageClient", () => {
 		await user.click(screen.getByRole("button", { name: "Retry" }));
 
 		await waitFor(() =>
-			expect(dispatchExecutionAction).toHaveBeenCalledWith({
-				taskId: "task_6",
-				action: { action: "start_manual" },
+			expect(dispatchExecutionAction).toHaveBeenCalledWith("task_6", {
+				action: "start_manual",
 			}),
 		);
 	});
@@ -359,6 +399,12 @@ describe("ActionCenterPageClient", () => {
 			),
 		).toBeInTheDocument();
 		expect(screen.getByText("Deploy service")).toBeInTheDocument();
+
+		await user.click(screen.getByRole("button", { name: "Resume" }));
+		await waitFor(() =>
+			expect(screen.queryByText("Deploy service")).not.toBeInTheDocument(),
+		);
+		expect(dispatchExecutionAction).toHaveBeenCalledTimes(2);
 	});
 
 	it("[ACTION-012] suppresses stale recovery actions when canonical state is completed", () => {

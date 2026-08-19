@@ -32,6 +32,7 @@ type TextFieldProps = {
 	name:
 		| "baseUrl"
 		| "apiKey"
+		| "provider"
 		| "model"
 		| "configDirectory"
 		| "homeDirectory"
@@ -235,20 +236,57 @@ function CodexSettings({
 	);
 }
 
+function OmpApiTypeField({ form }: Pick<AdvancedSettingsProps, "form">) {
+	return (
+		<Field>
+			<FieldLabel htmlFor="ai-client-api">API type</FieldLabel>
+			<Controller
+				name="api"
+				control={form.control}
+				render={({ field }) => (
+					<Select value={field.value} onValueChange={field.onChange}>
+						<SelectTrigger id="ai-client-api" className="w-full" aria-label="API type">
+							<SelectValue />
+						</SelectTrigger>
+						<SelectContent>
+							<SelectGroup>
+								<SelectItem value="openai-responses">openai-responses</SelectItem>
+								<SelectItem value="openai-completions">openai-completions</SelectItem>
+								<SelectItem value="anthropic-messages">anthropic-messages</SelectItem>
+								<SelectItem value="openrouter">openrouter</SelectItem>
+							</SelectGroup>
+						</SelectContent>
+					</Select>
+				)}
+			/>
+		</Field>
+	);
+}
+
 function OmpSettings({
 	form,
 	copy,
 }: Pick<AdvancedSettingsProps, "form" | "copy">) {
 	return (
 		<>
-			<TextField
-				form={form}
-				name="model"
-				id="ai-client-model"
-				label="Model"
-				placeholder="optional OMP model override"
-			/>
 			<div className="grid gap-4 md:grid-cols-2">
+				<TextField
+					form={form}
+					name="provider"
+					id="ai-client-provider"
+					label="Provider"
+					placeholder="for example nrouter"
+				/>
+				<TextField
+					form={form}
+					name="model"
+					id="ai-client-model"
+					label="Model"
+					placeholder="for example cx/gpt-5.6-sol"
+				/>
+			</div>
+			<div className="grid gap-4 md:grid-cols-2">
+				<OmpApiTypeField form={form} />
 				<TextField
 					form={form}
 					name="baseUrl"
@@ -256,15 +294,15 @@ function OmpSettings({
 					label="OMP Base URL"
 					placeholder="optional OMP provider base URL"
 				/>
-				<TextField
-					form={form}
-					name="apiKey"
-					id="ai-client-api-key"
-					label="OMP API Key"
-					password
-					placeholder="fallback to OMP credentials if empty"
-				/>
 			</div>
+			<TextField
+				form={form}
+				name="apiKey"
+				id="ai-client-api-key"
+				label="OMP API Key"
+				password
+				placeholder="fallback to OMP credentials if empty"
+			/>
 			<div className="grid gap-4 md:grid-cols-2">
 				<TextField
 					form={form}

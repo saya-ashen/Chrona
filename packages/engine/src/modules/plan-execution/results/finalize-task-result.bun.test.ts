@@ -89,6 +89,28 @@ describe("finalized result provider request", () => {
 			manifest,
 			artifactContext: [],
 		});
+		expect(request.instructions).toContain("direct-answer test");
+		expect(request.instructions).toContain(
+			"Use ResultComparison for bounded collections",
+		);
+		expect(request.instructions).toContain(
+			"Design bounded collection rows for user comprehension",
+		);
+		expect(request.instructions).toContain(
+			"drop lower-value secondary metrics before explanatory",
+		);
+		expect(request.instructions).toContain(
+			"Do not place ResultDeliverable before a structured direct answer",
+		);
+		expect(request.instructions).toContain(
+			"Omit a next action when it asks the user or agent",
+		);
+		expect(request.instructions).toContain(
+			"Workflow-stage variants of the same result are not distinct user capabilities",
+		);
+		expect(request.instructions).toContain(
+			"one canonical human-readable deliverable",
+		);
 		expect(request).toMatchObject({
 			clientOperationId:
 				"result-finalization:compose:task-1:plan-run-1:work-block-1:7:3:2",
@@ -106,6 +128,9 @@ describe("finalized result provider request", () => {
 			),
 		});
 		expect(request.input).toMatchObject({ manifest, artifactContext: [] });
+		expect(JSON.stringify(request.input)).toContain(
+			"never omit an available description, purpose, rationale",
+		);
 		const review = __resultFinalizationTestHooks.createProviderRequest({
 			taskId: "task-1",
 			planRunId: "plan-run-1",
@@ -120,6 +145,33 @@ describe("finalized result provider request", () => {
 		});
 		expect(review.clientOperationId).toContain(":review:");
 		expect(review.instructions).toContain("result composition reviewer");
+		expect(
+			review.instructions.includes(
+				"Treat candidateSpec as structurally unacceptable and reconstruct it",
+			),
+		).toBe(true);
+		expect(
+			review.instructions.includes(
+				"a bounded collection is summarized but its useful rows are not visible",
+			),
+		).toBe(true);
+		expect(
+			review.instructions.includes(
+				"Preserve facts and sourceKeys, not the candidate's layout",
+			),
+		).toBe(true);
+		expect(review.instructions).toContain(
+			"Audit bounded collections field by field against artifactContext",
+		);
+		expect(review.instructions).toContain(
+			"omit an available description, summary, purpose, rationale, status",
+		);
+		expect(review.instructions).toContain(
+			"Audit downloads by user capability, not artifact identity or filename",
+		);
+		expect(review.instructions).toContain(
+			"substantially overlapping copies as peer deliverables",
+		);
 		expect(review.input).toMatchObject({
 			manifest,
 			artifactContext: [],

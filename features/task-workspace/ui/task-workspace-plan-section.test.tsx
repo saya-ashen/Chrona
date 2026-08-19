@@ -92,6 +92,7 @@ vi.mock("../panels/task-plan-graph-panel", () => ({
 }));
 
 import type { TaskPlanReadModel } from "@chrona/contracts";
+import type { UiDocument } from "@chrona/ui-protocol";
 import {
 	createTaskWorkspaceFixtureGraph,
 	createTaskWorkspaceFixtureNode,
@@ -122,9 +123,7 @@ function renderWithQueryClient(ui: ReactElement) {
 	return render(ui, {
 		wrapper: ({ children }: { children: ReactNode }) => (
 			<MemoryRouter initialEntries={["/en/tasks/task-1"]}>
-				<QueryClientProvider client={queryClient}>
-					{children}
-				</QueryClientProvider>
+				<QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
 			</MemoryRouter>
 		),
 	});
@@ -346,9 +345,7 @@ describe("TaskWorkspacePlanSection", () => {
 			screen.getByRole("button", { name: /Generated plan node/ }),
 		).toBeInTheDocument();
 		expect(screen.getByRole("button", { name: "Accept" })).toBeInTheDocument();
-		fireEvent.click(
-			screen.getByRole("button", { name: /Generated plan node/ }),
-		);
+		fireEvent.click(screen.getByRole("button", { name: /Generated plan node/ }));
 		expect(
 			screen.queryByRole("dialog", { name: "Selected node details" }),
 		).not.toBeInTheDocument();
@@ -655,9 +652,7 @@ describe("TaskWorkspacePlanSection", () => {
 		);
 
 		const setup = screen.getByTestId("plan-setup-panel");
-		fireEvent.click(
-			within(setup).getByRole("button", { name: "Generate plan" }),
-		);
+		fireEvent.click(within(setup).getByRole("button", { name: "Generate plan" }));
 
 		expect(onGeneratePlan).toHaveBeenCalledTimes(1);
 	});
@@ -732,8 +727,7 @@ describe("TaskWorkspacePlanSection", () => {
 							taskId: "task-1",
 							executionState: "failed",
 							stateLabel: "Failed",
-							stateReason:
-								"Runtime provider failed while executing the current node.",
+							stateReason: "Runtime provider failed while executing the current node.",
 							graphVersion: 1,
 							currentNodeId: "node-failed",
 							primaryAction: {
@@ -745,8 +739,7 @@ describe("TaskWorkspacePlanSection", () => {
 							readiness: { runnable: true, reason: null },
 							degraded: null,
 							blocking: {
-								reason:
-									"Runtime provider failed while executing the current node.",
+								reason: "Runtime provider failed while executing the current node.",
 								nodeId: "node-failed",
 							},
 							waiting: null,
@@ -981,9 +974,7 @@ describe("TaskWorkspacePlanSection", () => {
 		expect(
 			within(executionFlow).getByRole("button", { name: "Use compact brief" }),
 		).toHaveAttribute("aria-pressed", "false");
-		fireEvent.click(
-			within(executionFlow).getByRole("button", { name: "Flow" }),
-		);
+		fireEvent.click(within(executionFlow).getByRole("button", { name: "Flow" }));
 		expect(
 			within(executionFlow).getByTestId("task-plan-graph-panel"),
 		).toHaveAttribute("data-fill-height", "false");
@@ -999,9 +990,7 @@ describe("TaskWorkspacePlanSection", () => {
 		expect(
 			within(executionFlow).queryByText("Two-step plan ready for review."),
 		).not.toBeInTheDocument();
-		fireEvent.click(
-			within(executionFlow).getByRole("button", { name: "Steps" }),
-		);
+		fireEvent.click(within(executionFlow).getByRole("button", { name: "Steps" }));
 		expect(
 			within(executionFlow).getByRole("button", { name: "Show full brief" }),
 		).toBeInTheDocument();
@@ -1284,9 +1273,7 @@ describe("TaskWorkspacePlanSection", () => {
 			/>,
 		);
 
-		expect(screen.getByTestId("accepted-plan-surface")).toHaveClass(
-			"xl:h-full",
-		);
+		expect(screen.getByTestId("accepted-plan-surface")).toHaveClass("xl:h-full");
 		expect(
 			document.querySelector('[data-plan-graph-height-contract="fill"]'),
 		).toHaveClass("min-h-[32rem]", "flex-1");
@@ -1302,7 +1289,7 @@ describe("TaskWorkspacePlanSection", () => {
 		);
 	});
 
-	it("adds checkpoint controls as the current operation after execution starts", async () => {
+	it("[RUN-006/RUN-007] validates checkpoint input before continuing", async () => {
 		const onDispatchExecutionAction = vi
 			.fn()
 			.mockResolvedValue({ message: "Input sent" });
@@ -1365,12 +1352,18 @@ describe("TaskWorkspacePlanSection", () => {
 		const operationPanel = screen.getByRole("region", {
 			name: "Current operation",
 		});
-		fireEvent.change(within(operationPanel).getByLabelText(/City/), {
+		const submitInput = within(operationPanel).getByRole("button", {
+			name: "Send Submit input",
+		});
+		expect(submitInput).toBeDisabled();
+		const cityInput = within(operationPanel).getByLabelText(/City/);
+		fireEvent.blur(cityInput);
+		expect(within(operationPanel).getByText("City is required")).toBeVisible();
+		fireEvent.change(cityInput, {
 			target: { value: "Shanghai" },
 		});
-		fireEvent.click(
-			within(operationPanel).getByRole("button", { name: "Send Submit input" }),
-		);
+		expect(submitInput).toBeEnabled();
+		fireEvent.click(submitInput);
 
 		await waitFor(() => {
 			expect(onSubmitCheckpointAction).toHaveBeenCalledWith({
@@ -1666,6 +1659,144 @@ describe("TaskWorkspacePlanSection", () => {
 		});
 	});
 
+	it("shows only finalizer-selected downloads when intermediate Artifacts exist", () => {
+		const node = createTaskWorkspaceFixtureNode({
+			id: "result-node",
+			title: "Create final result",
+			status: "done",
+			nextAction: "Result complete",
+			availableActions: [],
+		});
+		const graphPlan = createTaskWorkspaceFixtureGraph([node], "result-node");
+		const finalizedSpec: UiDocument = {
+			root: "root",
+			elements: {
+				root: {
+					type: "Stack",
+					props: {},
+					children: ["report"],
+				},
+				report: {
+					type: "ResultDeliverable",
+					props: {
+						artifactRef: "AF111111111111",
+						title: "Canonical result report",
+						role: "primary",
+						kind: "document",
+						sourceKeys: ["report"],
+					},
+				},
+			},
+		};
+		const manifest = {
+			schemaVersion: 1 as const,
+			sourceRevision: 1,
+			outcome: { title: "Result", summary: "Result complete." },
+			readiness: { status: "ready" as const, summary: "Ready for review." },
+			deliverables: [
+				{
+					deliverableKey: "report",
+					title: "Canonical result report",
+					kind: "document" as const,
+					artifactRef: "AF111111111111" as const,
+					status: "current" as const,
+					sourceNodeRef: "N1" as const,
+					presentation: { primary: "file" as const, allowDownload: true },
+					placement: "primary" as const,
+				},
+			],
+			findings: [],
+			decisions: [],
+			caveats: [],
+			nextActions: [],
+			evidence: [],
+		};
+
+		renderWithQueryClient(
+			<TaskWorkspacePlanSection
+				label="Plan"
+				graphPlan={graphPlan}
+				isGraphPlanPending={false}
+				pageData={createTaskWorkspaceFixturePageData({
+					task: { status: "Completed" },
+					artifacts: [
+						{
+							id: "artifact-report",
+							artifactRef: "AF111111111111",
+							title: "Canonical result report",
+							type: "file",
+							uri: "generated://run/report.md",
+						},
+						{
+							id: "artifact-intermediate",
+							title: "Intermediate verified data",
+							type: "file",
+							uri: "generated://run/verified.json",
+						},
+					],
+					commandCenter: {
+						documents: {
+							now: finalizedSpec,
+							output: finalizedSpec,
+							trail: finalizedSpec,
+						},
+					},
+				})}
+				plan={
+					{
+						id: "plan-1",
+						status: "accepted",
+						revision: 1,
+						updatedAt: "2026-05-18T00:00:00.000Z",
+					} as TaskPlanReadModel
+				}
+				planGenerationStatus="idle"
+				acceptPlanError={null}
+				runtimeEvents={[]}
+				currentExecution={{
+					taskId: "task-1",
+					planId: "plan-1",
+					executionScope: "scope-1",
+					status: "completed",
+					currentNodeId: null,
+					executedNodeIds: ["result-node"],
+					waitingNodeIds: [],
+					blockedNodeIds: [],
+					message: "Execution completed",
+					checkpoint: null,
+					planOutput: {
+						manifest,
+						finalizedResult: {
+							sourceRevision: 1,
+							manifest,
+							spec: finalizedSpec,
+							finalizedAt: "2026-05-18T00:00:00.000Z",
+						},
+						finalization: {
+							status: "Ready",
+							sourceRevision: 1,
+							attempt: 1,
+							finalizedAt: "2026-05-18T00:00:00.000Z",
+						},
+						revision: 1,
+						updatedAt: "2026-05-18T00:00:00.000Z",
+						updatedByNodeId: "result-node",
+					},
+				}}
+				onGeneratePlan={vi.fn()}
+				onApplyPlan={vi.fn()}
+				onDispatchExecutionAction={vi.fn()}
+			/>,
+		);
+
+		expect(screen.getByText("Canonical result report")).toBeInTheDocument();
+		expect(screen.getByTestId("result-lifecycle-panel")).toHaveTextContent(
+			"1 deliverables",
+		);
+		expect(screen.queryByTestId("result-artifact-rail")).not.toBeInTheDocument();
+		expect(screen.queryByText("Intermediate verified data")).not.toBeInTheDocument();
+	});
+
 	it("puts result review before the final result and submits explicit change feedback", async () => {
 		const node = createTaskWorkspaceFixtureNode({
 			id: "weather-script",
@@ -1749,9 +1880,7 @@ describe("TaskWorkspacePlanSection", () => {
 		const finalResult = screen.getByTestId("final-result-surface");
 
 		expect(workspace).toHaveAttribute("data-workspace-layout", "result_focus");
-		expect(reviewHeader).toHaveTextContent(
-			"Execution complete, awaiting review",
-		);
+		expect(reviewHeader).toHaveTextContent("Execution complete, awaiting review");
 		expect(
 			reviewHeader.compareDocumentPosition(finalResult) &
 				Node.DOCUMENT_POSITION_FOLLOWING,

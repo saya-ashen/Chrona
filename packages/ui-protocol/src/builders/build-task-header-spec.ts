@@ -255,7 +255,7 @@ function appendErrorRegion(elements: MutableElements) {
   elements["error-alert"] = {
     type: "Alert",
     props: {
-      title: { $state: "/plan/generation/error/code" },
+      title: { $state: "/plan/generation/error/title" },
       message: { $state: "/plan/generation/error/message" },
       type: "error",
     },

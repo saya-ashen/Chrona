@@ -236,7 +236,6 @@ describe("workspace activity helpers", () => {
 					event: {
 						type: "reasoning_delta",
 						text: "provider reasoning",
-						raw: { channel: "analysis" },
 					},
 				}),
 			),
@@ -245,7 +244,6 @@ describe("workspace activity helpers", () => {
 			title: "Provider reasoning",
 			summary: "provider reasoning",
 			providerOutput: "provider reasoning",
-			providerRaw: { channel: "analysis" },
 		});
 
 		expect(
@@ -254,14 +252,12 @@ describe("workspace activity helpers", () => {
 					event: {
 						type: "raw_event",
 						rawEventType: "turn.started",
-						raw: { phase: "analysis" },
 					},
 				}),
 			),
 		).toMatchObject({
 			kind: "provider_run",
 			title: "Provider event: turn.started",
-			providerRaw: { phase: "analysis" },
 		});
 	});
 

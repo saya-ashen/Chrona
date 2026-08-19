@@ -5,10 +5,10 @@ import type { ActionCenterItem } from "@chrona/contracts";
 import { deriveUserFacingFailure, type WorkStateView } from "@chrona/domain";
 
 import { LocalizedLink } from "./localized-link";
-import { Button } from "@shared/ui"
+import { Button } from "@shared/ui";
 import { ActionCenterList } from "./action-center-list";
 import { decideScheduleProposal } from "@features/schedule";
-import { dispatchExecutionAction } from "@features/task-workspace";
+import { dispatchTaskExecutionAction } from "@features/task-workspace";
 
 type ActionCenterCopy = Partial<
   Record<
@@ -51,7 +51,10 @@ function getActionError(error: unknown) {
 }
 
 function taskHref(item: ActionCenterPageItem) {
-  return `/tasks/${item.sourceTaskId}`;
+  const query = item.workBlockId
+    ? `?workBlockId=${encodeURIComponent(item.workBlockId)}`
+    : "";
+  return `/tasks/${item.sourceTaskId}${query}`;
 }
 
 function TaskLink({
@@ -85,6 +88,17 @@ export function ActionCenterPageClient({
     setPendingItemId(item.id);
     setActionError(null);
 
+    const dispatchExecution = (
+      executionAction: Parameters<typeof dispatchTaskExecutionAction>[1],
+    ) =>
+      item.workBlockId
+        ? dispatchTaskExecutionAction(
+            item.sourceTaskId,
+            executionAction,
+            item.workBlockId,
+          )
+        : dispatchTaskExecutionAction(item.sourceTaskId, executionAction);
+
     try {
       if (item.kind === "schedule_proposal") {
         await decideScheduleProposal({
@@ -92,29 +106,24 @@ export function ActionCenterPageClient({
           decision: action === "reject" ? "Rejected" : "Accepted",
         });
       } else if (item.kind === "approval") {
-        await dispatchExecutionAction({
-          taskId: item.sourceTaskId,
-          action: {
-            action: "resume_with_approval",
-            decision:
-              action === "reject"
-                ? "reject"
-                : action === "edit"
-                  ? "request_changes"
-                  : "approve",
-            feedback: action === "edit" ? copy.editPlaceholder : undefined,
-          },
+        await dispatchExecution({
+          action: "resume_with_approval",
+          decision:
+            action === "reject"
+              ? "reject"
+              : action === "edit"
+                ? "request_changes"
+                : "approve",
+          feedback: action === "edit" ? copy.editPlaceholder : undefined,
         });
       } else if (item.kind === "recovery") {
-        await dispatchExecutionAction({
-          taskId: item.sourceTaskId,
-          action: { action: "start_manual" },
-        });
+        await dispatchExecution(
+          item.currentNodeId
+            ? { action: "retry_node", nodeId: item.currentNodeId }
+            : { action: "start_manual" },
+        );
       } else if (item.kind === "blocked") {
-        await dispatchExecutionAction({
-          taskId: item.sourceTaskId,
-          action: { action: "resume_after_unblock" },
-        });
+        await dispatchExecution({ action: "resume_after_unblock" });
       } else {
         return;
       }
@@ -216,7 +225,9 @@ export function ActionCenterPageClient({
 
     if (
       item.kind === "recovery" &&
-      (!canonicalState || canonicalState === "failed")
+      (!canonicalState ||
+        canonicalState === "failed" ||
+        canonicalState === "cancelled")
     ) {
       return {
         primaryAction: (

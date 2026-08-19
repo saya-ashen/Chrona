@@ -13,6 +13,7 @@ import {
   isTerminalControlKind,
   submitNodeResultActionFromControl,
 } from "./node-result-action";
+import { abortActiveRuntimeInvocations } from "@/modules/plan-execution/runtime/active-runtime-invocations";
 
 export class ControlRouteError extends Error {
   readonly code: string;
@@ -90,6 +91,7 @@ async function replayRecordedTerminalAction(
       `Terminal action '${existing.kind}' was already recorded for this node attempt; cannot record '${input.body.kind}'`,
     );
   }
+  abortTerminalInvocation(scope);
   return {
     ok: true,
     result: null,
@@ -111,6 +113,7 @@ async function recordTerminalActionAndRevoke(
       workspaceId: input.workspaceId,
     });
     await revokeRunToken(input.token);
+    abortTerminalInvocation(scope);
     return {
       ok: true,
       result: null,
@@ -128,7 +131,6 @@ async function recordTerminalActionAndRevoke(
 
 export async function handleControlAction(input: HandleControlActionInput): Promise<HandleControlActionResult> {
   const { activeScope, scope } = await resolveControlScope(input);
-  const action = actionFromControl(input, scope);
   const isRecordedTerminal = isTerminalControlKind(input.body.kind) && Boolean(scope.nodeAttemptId);
   if (isRecordedTerminal) {
     return activeScope
@@ -138,6 +140,7 @@ export async function handleControlAction(input: HandleControlActionInput): Prom
   if (!activeScope) {
     throw new ControlRouteError("token_invalid", 401, "Run token is missing, expired, or revoked");
   }
+  const action = actionFromControl(input, scope);
   const { sessionId, ...publicAction } = action;
   const result = await submitTerminalNodeResult({
     taskId: scope.taskId,
@@ -156,6 +159,14 @@ export async function handleControlAction(input: HandleControlActionInput): Prom
     recorded: false,
     alreadyAccepted: false,
   };
+}
+
+function abortTerminalInvocation(scope: RunTokenScope) {
+  if (!scope.nodeAttemptId) return;
+  abortActiveRuntimeInvocations({
+    runId: scope.runId,
+    nodeAttemptId: scope.nodeAttemptId,
+  });
 }
 
 function omitToken(scope: RunTokenScope): Omit<RunTokenScope, "token"> {

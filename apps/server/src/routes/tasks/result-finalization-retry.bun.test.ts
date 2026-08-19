@@ -36,7 +36,10 @@ describe("task result finalization retry route", () => {
 		});
 		const body = (await response.json()) as {
 			taskId: string;
-			finalizedResult: { sourceRevision: number; manifest: { sourceRevision: number } };
+			finalizedResult: {
+				sourceRevision: number;
+				manifest: { sourceRevision: number };
+			};
 			finalization: { status: string; sourceRevision: number; attempt: number };
 		};
 		expect(body).toMatchObject({
@@ -44,7 +47,11 @@ describe("task result finalization retry route", () => {
 			finalizedResult: { sourceRevision: 3 },
 			finalization: { status: "Ready", attempt: 2 },
 		});
-		expect(body.finalization.sourceRevision).toBe(body.finalizedResult.sourceRevision);
-		expect(body.finalizedResult.manifest.sourceRevision).toBe(body.finalizedResult.sourceRevision);
+		expect(body.finalization.sourceRevision).toBe(
+			body.finalizedResult.sourceRevision,
+		);
+		expect(body.finalizedResult.manifest.sourceRevision).toBe(
+			body.finalizedResult.sourceRevision,
+		);
 	});
 });

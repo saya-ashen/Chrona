@@ -1,4 +1,4 @@
-import { mkdir, readdir, rm } from "node:fs/promises";
+import { mkdir, readdir, rm, symlink, truncate } from "node:fs/promises";
 import { createHash, randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
@@ -9,7 +9,10 @@ import {
 	seedTask,
 	seedWorkspace,
 } from "../../../../db/src/test-support";
-import { generatedFilesRoot } from "./result-file-access";
+import {
+	MAX_RESULT_FILE_BYTES,
+	generatedFilesRoot,
+} from "./result-file-access";
 import { openTaskResultFile } from "./open-task-result-file";
 import { aiArtifactRef } from "../plan-execution/use-cases/register-generated-plan-output-artifacts";
 
@@ -91,6 +94,30 @@ describe("openTaskResultFile", () => {
 					},
 				},
 			});
+			const directoryReference = `generated://${fixtureScope}/node`;
+			const symlinkReference = `generated://${fixtureScope}/node/escape.md`;
+			await symlink(
+				join(tmpdir(), "chrona-result-secret.md"),
+				join(fixtureRoot, "node", "escape.md"),
+			);
+			for (const uri of [directoryReference, symlinkReference]) {
+				await db.artifact.create({
+					data: {
+						workspaceId,
+						taskId,
+						runId: run.id,
+						type: "file",
+						title: "Boundary fixture",
+						uri,
+						metadata: {
+							checksumAlgorithm: "sha256",
+							checksum: "0".repeat(64),
+							size: 0,
+							mimeType: "text/plain",
+						},
+					},
+				});
+			}
 			await db.event.create({
 				data: {
 					workspaceId,
@@ -150,9 +177,7 @@ describe("openTaskResultFile", () => {
 					snapshotsBeforeCancel.length + 1,
 				);
 				await cancelled.stream.cancel();
-				expect(await resultSnapshotDirectories()).toEqual(
-					snapshotsBeforeCancel,
-				);
+				expect(await resultSnapshotDirectories()).toEqual(snapshotsBeforeCancel);
 
 				const supportingResult = await openTaskResultFile({
 					taskId,
@@ -162,6 +187,19 @@ describe("openTaskResultFile", () => {
 				expect(await new Response(supportingResult.stream).text()).toBe(
 					'{"ok":true}',
 				);
+
+				await expect(
+					openTaskResultFile({ taskId, requestedPath: directoryReference }),
+				).rejects.toThrow("regular files");
+				await expect(
+					openTaskResultFile({ taskId, requestedPath: symlinkReference }),
+				).rejects.toThrow("Symbolic links");
+
+				await truncate(filePath, MAX_RESULT_FILE_BYTES + 1);
+				await expect(
+					openTaskResultFile({ taskId, requestedPath: reference }),
+				).rejects.toThrow("maximum allowed result size");
+				await Bun.write(filePath, "# Report");
 
 				await Bun.write(filePath, "# Tampered report");
 				await expect(
@@ -174,6 +212,11 @@ describe("openTaskResultFile", () => {
 						requestedPath: `generated://${fixtureScope}/node/unreferenced.md`,
 					}),
 				).rejects.toThrow(/not a registered task result Artifact/i);
+				await expect(
+					openTaskResultFile({ taskId, requestedPath: filePath }),
+				).rejects.toThrow(
+					"Only generated task result files can be downloaded directly",
+				);
 			} finally {
 				await rm(fixtureRoot, {
 					recursive: true,

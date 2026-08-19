@@ -19,6 +19,7 @@ import {
 	buildResultNodeOptions,
 	commandCenterTrailItems,
 	hasCommandCenterOutput,
+	RESULT_FINALIZATION_STALE_MS,
 	TRAIL_ACTIVITY_LIMIT,
 } from "./execution-overview-model";
 
@@ -66,6 +67,20 @@ export function useExecutionOverviewActivity({
 		() => runtimeEventsToWorkspaceActivity(runtimeEvents, TRAIL_ACTIVITY_LIMIT),
 		[runtimeEvents],
 	);
+	const finalization = currentExecution?.planOutput?.finalization;
+	const finalizationStartedAt =
+		finalization?.status === "Running" ? finalization.startedAt : undefined;
+	const [finalizationNow, setFinalizationNow] = useState(() => Date.now());
+	useEffect(() => {
+		if (!finalizationStartedAt) return;
+		const startedAtMs = Date.parse(finalizationStartedAt);
+		if (!Number.isFinite(startedAtMs)) return;
+		const timeout = setTimeout(
+			() => setFinalizationNow(Date.now()),
+			Math.max(0, startedAtMs + RESULT_FINALIZATION_STALE_MS - Date.now()),
+		);
+		return () => clearTimeout(timeout);
+	}, [finalizationStartedAt]);
 	const executionActivity = useMemo(
 		() =>
 			buildExecutionActivityState({
@@ -76,11 +91,13 @@ export function useExecutionOverviewActivity({
 				runtimeEvents,
 				executionStatus: currentExecution?.status,
 				isExecutionRunning,
-				finalizationStatus: currentExecution?.planOutput?.finalization?.status,
+				finalization,
+				nowMs: finalizationNow,
 			}),
 		[
-			currentExecution?.planOutput?.finalization?.status,
 			currentExecution?.status,
+			finalization,
+			finalizationNow,
 			isExecutionRunning,
 			liveActivity,
 			liveRuntimeActivity,

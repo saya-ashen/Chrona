@@ -1,7 +1,13 @@
 import "@testing-library/jest-dom/vitest";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { MemoryRouter } from "react-router-dom";
+import {
+	MemoryRouter,
+	Route,
+	Routes,
+	useLocation,
+	useNavigate,
+} from "react-router-dom";
 import { afterEach, describe, expect, it } from "vitest";
 import { fallbackMessages as en } from "@chrona/i18n/messages";
 
@@ -50,34 +56,57 @@ function task(
 	} as never;
 }
 
-function renderResults() {
+function LocationProbe() {
+	const location = useLocation();
+	return (
+		<output data-testid="location">
+			{location.pathname}
+			{location.search}
+		</output>
+	);
+}
+
+function ResultDetail() {
+	const navigate = useNavigate();
+	return (
+		<button type="button" onClick={() => navigate(-1)}>
+			Back to results
+		</button>
+	);
+}
+
+function renderResults(initialEntry = "/en/tasks?view=results") {
 	render(
-		<MemoryRouter initialEntries={["/en/tasks?view=results"]}>
-			<TaskListPage
-				tasks={[
-					task("older", "Weekly report", "done", "2026-06-24T10:00:00.000Z"),
-					task(
-						"newer",
-						"Daily report",
-						"result_ready",
-						new Date().toISOString(),
-					),
-				]}
-				workspaceId="workspace-1"
-				copy={copy}
-				total={2}
-				page={1}
-				pageSize={20}
-				pageCount={1}
-				counts={{
-					all: 2,
-					needsMe: 1,
-					ready: 0,
-					running: 0,
-					completed: 2,
-					failed: 0,
-				}}
-			/>
+		<MemoryRouter initialEntries={[initialEntry]}>
+			<LocationProbe />
+			<Routes>
+				<Route
+					path="/en/tasks"
+					element={
+						<TaskListPage
+							tasks={[
+								task("older", "Weekly report", "done", "2026-06-24T10:00:00.000Z"),
+								task("newer", "Daily report", "result_ready", new Date().toISOString()),
+							]}
+							workspaceId="workspace-1"
+							copy={copy}
+							total={2}
+							page={1}
+							pageSize={20}
+							pageCount={1}
+							counts={{
+								all: 2,
+								needsMe: 1,
+								ready: 0,
+								running: 0,
+								completed: 2,
+								failed: 0,
+							}}
+						/>
+					}
+				/>
+				<Route path="/en/tasks/:taskId" element={<ResultDetail />} />
+			</Routes>
 		</MemoryRouter>,
 	);
 }
@@ -144,9 +173,7 @@ describe("TaskListPage results filters", () => {
 		expect(screen.getByText("Daily report report")).toBeInTheDocument();
 
 		await user.click(screen.getByRole("combobox", { name: "Result status" }));
-		await user.click(
-			screen.getByRole("option", { name: "Awaiting acceptance" }),
-		);
+		await user.click(screen.getByRole("option", { name: "Awaiting acceptance" }));
 		expect(screen.queryByText("Weekly report report")).not.toBeInTheDocument();
 		expect(screen.getByText("Daily report report")).toBeInTheDocument();
 
@@ -154,6 +181,25 @@ describe("TaskListPage results filters", () => {
 		await user.click(screen.getByRole("option", { name: "Accepted result" }));
 		expect(screen.getByText("Weekly report report")).toBeInTheDocument();
 		expect(screen.queryByText("Daily report report")).not.toBeInTheDocument();
+	});
+
+	it("[RESULT-014] preserves result filters and page context after returning", async () => {
+		const user = userEvent.setup();
+		const resultContext =
+			"/en/tasks?view=results&resultStatus=needs-review&page=2&pageSize=1";
+		renderResults(resultContext);
+
+		expect(screen.getByText("Daily report report")).toBeInTheDocument();
+		expect(screen.queryByText("Weekly report report")).not.toBeInTheDocument();
+		await user.click(screen.getByRole("link", { name: "Open result" }));
+		expect(screen.getByTestId("location")).toHaveTextContent("/en/tasks/newer");
+		await user.click(screen.getByRole("button", { name: "Back to results" }));
+
+		expect(screen.getByTestId("location")).toHaveTextContent(resultContext);
+		expect(
+			screen.getByRole("combobox", { name: "Result status" }),
+		).toHaveTextContent("Awaiting acceptance");
+		expect(screen.getByText("Daily report report")).toBeInTheDocument();
 	});
 
 	it("filters historical results by execution date", async () => {

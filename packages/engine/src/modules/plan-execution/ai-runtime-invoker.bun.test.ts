@@ -6,9 +6,20 @@ import type {
   ProviderRunSnapshot,
 } from "@chrona/providers-foundation";
 import type { NodeAttempt } from "@chrona/contracts/ai";
-import { db } from "@/lib/db";
-import { RunStatus, TaskPlanStatus, TaskPriority, TaskStatus, type TaskPlanNodeAttempt } from "@/generated/prisma/client";
-import { finalizeRuntimeInvocationForTest, persistProviderRuntimeEvent, runProviderRequest, setAfterRawEventPersistedForTest } from "./ai-runtime-invoker";
+import {
+  db,
+  RunStatus,
+  TaskPlanStatus,
+  TaskPriority,
+  TaskStatus,
+  type TaskPlanNodeAttempt,
+} from "@chrona/db";
+import {
+  finalizeRuntimeInvocationForTest,
+  persistProviderRuntimeEvent,
+  runProviderRequest,
+  setAfterRawEventPersistedForTest,
+} from "./ai-runtime-invoker";
 import { ensureProviderRunRecord } from "./ai-runtime-persistence";
 import type { ExecutionProviderRequest } from "./ai-runtime-request";
 
@@ -35,21 +46,33 @@ function runRef(overrides: Partial<ProviderRunRef> = {}): ProviderRunRef {
 
 let eventSequence = 0;
 
-function providerEvent(event: Record<string, unknown>, fallbackRun = runRef()): ProviderRunEvent {
+function providerEvent(
+  event: Record<string, unknown>,
+  fallbackRun = runRef(),
+): ProviderRunEvent {
   const terminalRun = event.run;
-  const identity = terminalRun && typeof terminalRun === "object"
-    ? { ...fallbackRun, ...terminalRun, provider: fallbackRun.provider }
-    : fallbackRun;
-  const normalizedTerminalRun = terminalRun && typeof terminalRun === "object"
-    ? { ...terminalRun, provider: identity.provider, runId: identity.runId, sessionId: identity.sessionId }
-    : terminalRun;
+  const identity =
+    terminalRun && typeof terminalRun === "object"
+      ? { ...fallbackRun, ...terminalRun, provider: fallbackRun.provider }
+      : fallbackRun;
+  const normalizedTerminalRun =
+    terminalRun && typeof terminalRun === "object"
+      ? {
+          ...terminalRun,
+          provider: identity.provider,
+          runId: identity.runId,
+          sessionId: identity.sessionId,
+        }
+      : terminalRun;
   return {
     ...event,
     provider: identity.provider,
     runId: identity.runId,
     sessionId: identity.sessionId,
     sequence: ++eventSequence,
-    ...(normalizedTerminalRun === undefined ? {} : { run: normalizedTerminalRun }),
+    ...(normalizedTerminalRun === undefined
+      ? {}
+      : { run: normalizedTerminalRun }),
   } as ProviderRunEvent;
 }
 function incompleteStream(run = runRef()): AsyncIterable<ProviderRunEvent> {
@@ -82,7 +105,6 @@ function providerCapabilities() {
   };
 }
 
-
 async function resetDb() {
   await db.artifact.deleteMany();
   await db.approval.deleteMany();
@@ -95,32 +117,78 @@ async function resetDb() {
 
 async function seedRunPair() {
   const workspace = await db.workspace.create({
-    data: { name: "Runtime ref workspace", status: "Active", defaultRuntime: "hermes" },
+    data: {
+      name: "Runtime ref workspace",
+      status: "Active",
+      defaultRuntime: "hermes",
+    },
   });
   const task = await db.task.create({
-    data: { workspaceId: workspace.id, title: "Runtime ref task", executionRuntime: "hermes", executionConfig: {}, status: TaskStatus.Running, priority: TaskPriority.Medium },
+    data: {
+      workspaceId: workspace.id,
+      title: "Runtime ref task",
+      executionRuntime: "hermes",
+      executionConfig: {},
+      status: TaskStatus.Running,
+      priority: TaskPriority.Medium,
+    },
   });
   const first = await db.run.create({
-    data: { taskId: task.id, runtimeName: "hermes", runtimeRunRef: "provider-run-1", runtimeSessionRef: "provider-session-1", status: RunStatus.Running, triggeredBy: "system" },
+    data: {
+      taskId: task.id,
+      runtimeName: "hermes",
+      runtimeRunRef: "provider-run-1",
+      runtimeSessionRef: "provider-session-1",
+      status: RunStatus.Running,
+      triggeredBy: "system",
+    },
   });
   const second = await db.run.create({
-    data: { taskId: task.id, runtimeName: "hermes", status: RunStatus.Pending, triggeredBy: "system" },
+    data: {
+      taskId: task.id,
+      runtimeName: "hermes",
+      status: RunStatus.Pending,
+      triggeredBy: "system",
+    },
   });
   return { first, second };
 }
 
 async function seedProviderRunChain() {
   const workspace = await db.workspace.create({
-    data: { name: "Provider audit workspace", status: "Active", defaultRuntime: "hermes" },
+    data: {
+      name: "Provider audit workspace",
+      status: "Active",
+      defaultRuntime: "hermes",
+    },
   });
   const task = await db.task.create({
-    data: { workspaceId: workspace.id, title: "Provider audit task", executionRuntime: "hermes", executionConfig: {}, status: TaskStatus.Running, priority: TaskPriority.Medium },
+    data: {
+      workspaceId: workspace.id,
+      title: "Provider audit task",
+      executionRuntime: "hermes",
+      executionConfig: {},
+      status: TaskStatus.Running,
+      priority: TaskPriority.Medium,
+    },
   });
   const plan = await db.taskPlan.create({
-    data: { workspaceId: workspace.id, taskId: task.id, planId: "plan-1", revision: 1, status: TaskPlanStatus.Accepted, compiledPlan: {} },
+    data: {
+      workspaceId: workspace.id,
+      taskId: task.id,
+      planId: "plan-1",
+      revision: 1,
+      status: TaskPlanStatus.Accepted,
+      compiledPlan: {},
+    },
   });
   const planRun = await db.taskPlanRun.create({
-    data: { workspaceId: workspace.id, taskId: task.id, planId: plan.planId, planRun: {} },
+    data: {
+      workspaceId: workspace.id,
+      taskId: task.id,
+      planId: plan.planId,
+      planRun: {},
+    },
   });
   const attempt = await db.taskPlanNodeAttempt.create({
     data: {
@@ -148,7 +216,11 @@ async function seedProviderRunChain() {
     },
   });
   const taskSession = await db.taskSession.create({
-    data: { taskId: task.id, runtimeName: "hermes", sessionKey: "provider-audit-session" },
+    data: {
+      taskId: task.id,
+      runtimeName: "hermes",
+      sessionKey: "provider-audit-session",
+    },
   });
   await db.executionSession.create({
     data: {
@@ -165,11 +237,30 @@ async function seedProviderRunChain() {
     },
   });
   const run = await db.run.create({
-    data: { taskId: task.id, nodeAttemptId: attempt.id, taskSessionId: taskSession.id, runtimeName: "hermes", status: RunStatus.Pending, triggeredBy: "system" },
+    data: {
+      taskId: task.id,
+      nodeAttemptId: attempt.id,
+      taskSessionId: taskSession.id,
+      runtimeName: "hermes",
+      status: RunStatus.Pending,
+      triggeredBy: "system",
+    },
   });
-  await db.taskPlanProviderRun.update({ where: { id: providerRun.id }, data: { runId: run.id } });
+  await db.taskPlanProviderRun.update({
+    where: { id: providerRun.id },
+    data: { runId: run.id },
+  });
   eventSequence = 0;
-  return { workspace, task, plan, planRun, attempt, providerRun, run, taskSession };
+  return {
+    workspace,
+    task,
+    plan,
+    planRun,
+    attempt,
+    providerRun,
+    run,
+    taskSession,
+  };
 }
 
 function asRuntimeAttempt(attempt: TaskPlanNodeAttempt): NodeAttempt {
@@ -186,7 +277,6 @@ function asRuntimeAttempt(attempt: TaskPlanNodeAttempt): NodeAttempt {
     startedAt: attempt.startedAt.toISOString(),
   };
 }
-
 
 beforeEach(async () => {
   setAfterRawEventPersistedForTest();
@@ -222,7 +312,15 @@ describe("runProviderRequest stream-interruption fallback", () => {
         actionInvocation: "unsupported" as const,
         startIdempotency: "unsupported" as const,
         lookupByClientOperationId: false,
-        recovery: { sessionResume: true, historyReplay: true, activeRunLookup: true, streamReconnect: true, providerResumeRef: true, runEventReplay: true, mode: "authoritative_run_lookup" as const },
+        recovery: {
+          sessionResume: true,
+          historyReplay: true,
+          activeRunLookup: true,
+          streamReconnect: true,
+          providerResumeRef: true,
+          runEventReplay: true,
+          mode: "authoritative_run_lookup" as const,
+        },
       })),
       startRun,
       streamRun,
@@ -238,6 +336,29 @@ describe("runProviderRequest stream-interruption fallback", () => {
     expect(getRun).toHaveBeenCalledTimes(1);
     expect(snapshot.status).toBe("running");
     expect(snapshot.error).toBeNull();
+  });
+
+  it("[RUN-021] rejects a malformed provider stream event before completion", async () => {
+    const malformedStream =
+      async function* (): AsyncIterable<ProviderRunEvent> {
+        yield {
+          provider: "hermes",
+          runId: "run-1",
+          sessionId: "session-1",
+          sequence: 1,
+          type: "malformed",
+        } as unknown as ProviderRunEvent;
+      };
+    const client = {
+      provider: "hermes",
+      getCapabilities: mock(providerCapabilities),
+      startRun: mock(async () => runRef()),
+      streamRun: mock(() => malformedStream()),
+    } as unknown as AgentProviderClient;
+
+    await expect(runProviderRequest(client, request)).rejects.toThrow(
+      "Provider stream event failed schema validation",
+    );
   });
 
   it("finalizes from the provider snapshot when the run completed while the stream was severed", async () => {
@@ -265,7 +386,15 @@ describe("runProviderRequest stream-interruption fallback", () => {
         actionInvocation: "unsupported" as const,
         startIdempotency: "unsupported" as const,
         lookupByClientOperationId: false,
-        recovery: { sessionResume: true, historyReplay: true, activeRunLookup: true, streamReconnect: true, providerResumeRef: true, runEventReplay: true, mode: "authoritative_run_lookup" as const },
+        recovery: {
+          sessionResume: true,
+          historyReplay: true,
+          activeRunLookup: true,
+          streamReconnect: true,
+          providerResumeRef: true,
+          runEventReplay: true,
+          mode: "authoritative_run_lookup" as const,
+        },
       })),
       startRun: mock(async () => runRef()),
       streamRun,
@@ -296,7 +425,15 @@ describe("runProviderRequest stream-interruption fallback", () => {
         actionInvocation: "unsupported" as const,
         startIdempotency: "unsupported" as const,
         lookupByClientOperationId: false,
-        recovery: { sessionResume: true, historyReplay: true, activeRunLookup: true, streamReconnect: true, providerResumeRef: true, runEventReplay: true, mode: "authoritative_run_lookup" as const },
+        recovery: {
+          sessionResume: true,
+          historyReplay: true,
+          activeRunLookup: true,
+          streamReconnect: true,
+          providerResumeRef: true,
+          runEventReplay: true,
+          mode: "authoritative_run_lookup" as const,
+        },
       })),
       startRun: mock(async () => runRef()),
       streamRun: mock(() => incompleteStream()),
@@ -358,11 +495,12 @@ describe("runProviderRequest stream-interruption fallback", () => {
     const getRun = mock(async () => {
       throw new Error("should not be called");
     });
-    const streamRun = mock((): AsyncIterable<ProviderRunEvent> =>
-      (async function* () {
-        yield* [];
-        throw new Error("fatal misconfiguration");
-      })(),
+    const streamRun = mock(
+      (): AsyncIterable<ProviderRunEvent> =>
+        (async function* () {
+          yield* [];
+          throw new Error("fatal misconfiguration");
+        })(),
     );
 
     const client = {
@@ -387,18 +525,27 @@ describe("runProviderRequest runtime ref persistence", () => {
     const client = {
       provider: "hermes",
       getCapabilities: () => providerCapabilities(),
-      startRun: mock(async () => ({
-        provider: "hermes",
-        runId: "provider-run-1",
-        nativeRunId: "provider-run-1",
-        sessionId: "provider-session-1",
-        status: "running",
-      } satisfies ProviderRunRef)),
+      startRun: mock(
+        async () =>
+          ({
+            provider: "hermes",
+            runId: "provider-run-1",
+            nativeRunId: "provider-run-1",
+            sessionId: "provider-session-1",
+            status: "running",
+          }) satisfies ProviderRunRef,
+      ),
       streamRun: mock(() =>
         (async function* () {
           yield providerEvent({
             type: "run_completed",
-            run: { provider: "hermes", runId: "provider-run-1", nativeRunId: "provider-run-1", sessionId: "provider-session-1", status: "completed" },
+            run: {
+              provider: "hermes",
+              runId: "provider-run-1",
+              nativeRunId: "provider-run-1",
+              sessionId: "provider-session-1",
+              status: "completed",
+            },
             outputText: "ok",
           });
         })(),
@@ -407,7 +554,10 @@ describe("runProviderRequest runtime ref persistence", () => {
 
     await runProviderRequest(client, request, { runId: second.id });
 
-    const runs = await db.run.findMany({ orderBy: { createdAt: "asc" }, select: { id: true, runtimeRunRef: true } });
+    const runs = await db.run.findMany({
+      orderBy: { createdAt: "asc" },
+      select: { id: true, runtimeRunRef: true },
+    });
     expect(runs).toEqual([
       { id: first.id, runtimeRunRef: "provider-run-1" },
       { id: second.id, runtimeRunRef: `provider-run-1:${second.id}` },
@@ -428,12 +578,18 @@ describe("runProviderRequest runtime ref persistence", () => {
       startRun: mock(async () => providerRun),
       streamRun: mock(() =>
         (async function* () {
-          yield providerEvent({ type: "run_started", run: providerRun }, providerRun);
-          yield providerEvent({
-            type: "run_completed",
-            run: { ...providerRun, status: "completed" },
-            outputText: "ok",
-          }, providerRun);
+          yield providerEvent(
+            { type: "run_started", run: providerRun },
+            providerRun,
+          );
+          yield providerEvent(
+            {
+              type: "run_completed",
+              run: { ...providerRun, status: "completed" },
+              outputText: "ok",
+            },
+            providerRun,
+          );
         })(),
       ),
     } as unknown as AgentProviderClient;
@@ -456,13 +612,16 @@ describe("runProviderRequest runtime ref persistence", () => {
     const client = {
       provider: "hermes",
       getCapabilities: () => providerCapabilities(),
-      startRun: mock(async () => ({
-        provider: "hermes",
-        runId: "provider-run-started",
-        nativeRunId: "provider-run-started",
-        sessionId: "provider-session-started",
-        status: "running",
-      } satisfies ProviderRunRef)),
+      startRun: mock(
+        async () =>
+          ({
+            provider: "hermes",
+            runId: "provider-run-started",
+            nativeRunId: "provider-run-started",
+            sessionId: "provider-session-started",
+            status: "running",
+          }) satisfies ProviderRunRef,
+      ),
       streamRun: mock(() =>
         (async function* () {
           yield providerEvent({
@@ -479,7 +638,10 @@ describe("runProviderRequest runtime ref persistence", () => {
       ),
     } as unknown as AgentProviderClient;
 
-    await runProviderRequest(client, request, { runId: second.id, onRunStarted });
+    await runProviderRequest(client, request, {
+      runId: second.id,
+      onRunStarted,
+    });
 
     expect(onRunStarted).toHaveBeenCalledTimes(1);
     expect(onRunStarted).toHaveBeenCalledWith(
@@ -489,7 +651,9 @@ describe("runProviderRequest runtime ref persistence", () => {
         status: "running",
       }),
     );
-    expect(await db.run.findUniqueOrThrow({ where: { id: second.id } })).toMatchObject({
+    expect(
+      await db.run.findUniqueOrThrow({ where: { id: second.id } }),
+    ).toMatchObject({
       status: RunStatus.Running,
       runtimeSessionRef: "provider-session-started",
     });
@@ -500,47 +664,68 @@ describe("runProviderRequest runtime ref persistence", () => {
     const client = {
       provider: "hermes",
       getCapabilities: () => providerCapabilities(),
-      startRun: mock(async () => ({
-        provider: "hermes",
-        runId: "provider-run-1",
-        nativeRunId: "provider-run-1",
-        sessionId: "provider-session-1",
-        status: "running",
-      } satisfies ProviderRunRef)),
+      startRun: mock(
+        async () =>
+          ({
+            provider: "hermes",
+            runId: "provider-run-1",
+            nativeRunId: "provider-run-1",
+            sessionId: "provider-session-1",
+            status: "running",
+          }) satisfies ProviderRunRef,
+      ),
       streamRun: mock(() =>
         (async function* () {
           yield providerEvent({
             type: "run_completed",
-            run: { provider: "hermes", runId: "provider-run-1", nativeRunId: "provider-run-1", sessionId: "provider-session-1", status: "running" },
+            run: {
+              provider: "hermes",
+              runId: "provider-run-1",
+              nativeRunId: "provider-run-1",
+              sessionId: "provider-session-1",
+              status: "running",
+            },
             outputText: "ok",
           });
         })(),
       ),
     } as unknown as AgentProviderClient;
 
-    const snapshot = await runProviderRequest(client, request, { runId: second.id });
+    const snapshot = await runProviderRequest(client, request, {
+      runId: second.id,
+    });
 
     expect(snapshot.status).toBe("completed");
     expect(snapshot.outputText).toBe("ok");
   });
 
   it("closes provider audit rows from terminal run_completed events", async () => {
-    const { workspace, task, plan, planRun, providerRun, run, taskSession } = await seedProviderRunChain();
+    const { workspace, task, plan, planRun, providerRun, run, taskSession } =
+      await seedProviderRunChain();
     const client = {
       provider: "hermes",
       getCapabilities: () => providerCapabilities(),
-      startRun: mock(async () => ({
-        provider: "hermes",
-        runId: "provider-run-1",
-        nativeRunId: "provider-run-1",
-        sessionId: "provider-session-1",
-        status: "running",
-      } satisfies ProviderRunRef)),
+      startRun: mock(
+        async () =>
+          ({
+            provider: "hermes",
+            runId: "provider-run-1",
+            nativeRunId: "provider-run-1",
+            sessionId: "provider-session-1",
+            status: "running",
+          }) satisfies ProviderRunRef,
+      ),
       streamRun: mock(() =>
         (async function* () {
           yield providerEvent({
             type: "run_completed",
-            run: { provider: "hermes", runId: "provider-run-1", nativeRunId: "provider-run-1", sessionId: "provider-session-1", status: "running" },
+            run: {
+              provider: "hermes",
+              runId: "provider-run-1",
+              nativeRunId: "provider-run-1",
+              sessionId: "provider-session-1",
+              status: "running",
+            },
             outputText: "ok",
           });
         })(),
@@ -569,7 +754,12 @@ describe("runProviderRequest runtime ref persistence", () => {
 
     const reloaded = await db.taskPlanProviderRun.findUniqueOrThrow({
       where: { id: providerRun.id },
-      select: { status: true, finishedAt: true, completedByEventId: true, failedByEventId: true },
+      select: {
+        status: true,
+        finishedAt: true,
+        completedByEventId: true,
+        failedByEventId: true,
+      },
     });
     expect(reloaded.status).toBe("completed");
     expect(reloaded.finishedAt).toBeInstanceOf(Date);
@@ -586,7 +776,13 @@ describe("runProviderRequest runtime ref persistence", () => {
         (async function* () {
           yield providerEvent({
             type: "run_completed",
-            run: { provider: "hermes", runId: "run-1", nativeRunId: "run-1", sessionId: "session-1", status: "completed" },
+            run: {
+              provider: "hermes",
+              runId: "run-1",
+              nativeRunId: "run-1",
+              sessionId: "session-1",
+              status: "completed",
+            },
             outputText: "done",
           });
         })(),
@@ -616,7 +812,13 @@ describe("runProviderRequest runtime ref persistence", () => {
           });
           yield providerEvent({
             type: "run_completed",
-            run: { provider: "hermes", runId: "run-1", nativeRunId: "run-1", sessionId: "session-1", status: "completed" },
+            run: {
+              provider: "hermes",
+              runId: "run-1",
+              nativeRunId: "run-1",
+              sessionId: "session-1",
+              status: "completed",
+            },
             outputText: "done",
           });
         })(),
@@ -625,26 +827,38 @@ describe("runProviderRequest runtime ref persistence", () => {
 
     const snapshot = await runProviderRequest(client, request);
 
-    expect(snapshot.raw).toMatchObject({ terminalToolName: "chrona_node_complete" });
+    expect(snapshot.raw).toMatchObject({
+      terminalToolName: "chrona_node_complete",
+    });
   });
 
   it("returns cancelled snapshot and closes provider audit rows from run_cancelled events", async () => {
-    const { workspace, task, plan, planRun, providerRun, run, taskSession } = await seedProviderRunChain();
+    const { workspace, task, plan, planRun, providerRun, run, taskSession } =
+      await seedProviderRunChain();
     const client = {
       provider: "hermes",
       getCapabilities: () => providerCapabilities(),
-      startRun: mock(async () => ({
-        provider: "hermes",
-        runId: "provider-run-1",
-        nativeRunId: "provider-run-1",
-        sessionId: "provider-session-1",
-        status: "running",
-      } satisfies ProviderRunRef)),
+      startRun: mock(
+        async () =>
+          ({
+            provider: "hermes",
+            runId: "provider-run-1",
+            nativeRunId: "provider-run-1",
+            sessionId: "provider-session-1",
+            status: "running",
+          }) satisfies ProviderRunRef,
+      ),
       streamRun: mock(() =>
         (async function* () {
           yield providerEvent({
             type: "run_cancelled",
-            run: { provider: "hermes", runId: "provider-run-1", nativeRunId: "provider-run-1", sessionId: "provider-session-1", status: "cancelled" },
+            run: {
+              provider: "hermes",
+              runId: "provider-run-1",
+              nativeRunId: "provider-run-1",
+              sessionId: "provider-session-1",
+              status: "cancelled",
+            },
             raw: { reason: "interrupted" },
           });
         })(),
@@ -668,13 +882,18 @@ describe("runProviderRequest runtime ref persistence", () => {
         planId: plan.planId,
         planRunId: providerRun.planRunId,
         executionScope: planRun.executionScopeId,
-      }
+      },
     });
 
     expect(snapshot.status).toBe("cancelled");
     const reloaded = await db.taskPlanProviderRun.findUniqueOrThrow({
       where: { id: providerRun.id },
-      select: { status: true, finishedAt: true, completedByEventId: true, failedByEventId: true },
+      select: {
+        status: true,
+        finishedAt: true,
+        completedByEventId: true,
+        failedByEventId: true,
+      },
     });
     expect(reloaded.status).toBe("cancelled");
     expect(reloaded.finishedAt).toBeInstanceOf(Date);
@@ -684,31 +903,50 @@ describe("runProviderRequest runtime ref persistence", () => {
 
   it("cancels the provider run when the execution signal aborts during streaming", async () => {
     const controller = new AbortController();
-    const { workspace, task, plan, planRun, providerRun, run, taskSession } = await seedProviderRunChain();
-    const cancelRun = mock(async (): Promise<ProviderRunSnapshot> => ({
-      provider: "hermes",
-      runId: "provider-run-1",
-      nativeRunId: "provider-run-1",
-      sessionId: "provider-session-1",
-      status: "cancelled",
-      error: null,
-    }));
-    const client = {
-      provider: "hermes",
-      getCapabilities: () => providerCapabilities(),
-      startRun: mock(async () => ({
+    const { workspace, task, plan, planRun, providerRun, run, taskSession } =
+      await seedProviderRunChain();
+    const cancelRun = mock(
+      async (): Promise<ProviderRunSnapshot> => ({
         provider: "hermes",
         runId: "provider-run-1",
         nativeRunId: "provider-run-1",
         sessionId: "provider-session-1",
-        status: "running",
-      } satisfies ProviderRunRef)),
+        status: "cancelled",
+        error: null,
+      }),
+    );
+    const client = {
+      provider: "hermes",
+      getCapabilities: () => providerCapabilities(),
+      startRun: mock(
+        async () =>
+          ({
+            provider: "hermes",
+            runId: "provider-run-1",
+            nativeRunId: "provider-run-1",
+            sessionId: "provider-session-1",
+            status: "running",
+          }) satisfies ProviderRunRef,
+      ),
       streamRun: mock(() =>
         (async function* () {
-          yield providerEvent({ type: "text_delta", text: "started" }, runRef({ runId: "provider-run-1", nativeRunId: "provider-run-1", sessionId: "provider-session-1" }));
+          yield providerEvent(
+            { type: "text_delta", text: "started" },
+            runRef({
+              runId: "provider-run-1",
+              nativeRunId: "provider-run-1",
+              sessionId: "provider-session-1",
+            }),
+          );
           yield providerEvent({
             type: "run_completed",
-            run: { provider: "hermes", runId: "provider-run-1", nativeRunId: "provider-run-1", sessionId: "provider-session-1", status: "completed" },
+            run: {
+              provider: "hermes",
+              runId: "provider-run-1",
+              nativeRunId: "provider-run-1",
+              sessionId: "provider-session-1",
+              status: "completed",
+            },
             outputText: "late completion",
           });
         })(),
@@ -740,7 +978,12 @@ describe("runProviderRequest runtime ref persistence", () => {
       },
     });
 
-    expect(cancelRun).toHaveBeenCalledWith(expect.objectContaining({ runId: "provider-run-1", sessionId: "provider-session-1" }));
+    expect(cancelRun).toHaveBeenCalledWith(
+      expect.objectContaining({
+        runId: "provider-run-1",
+        sessionId: "provider-session-1",
+      }),
+    );
     expect(snapshot.status).toBe("cancelled");
     expect(snapshot.outputText).toBeUndefined();
 
@@ -751,19 +994,25 @@ describe("runProviderRequest runtime ref persistence", () => {
     expect(reloaded.status).toBe("completed");
     expect(reloaded.finishedAt).toBeInstanceOf(Date);
   });
-
 });
 describe("runProviderRequest provider attach-first", () => {
   it("streams an existing persisted ref without calling startRun", async () => {
-    const existing = runRef({ runId: "existing-run", nativeRunId: "native-existing-run", sessionId: "existing-session" });
+    const existing = runRef({
+      runId: "existing-run",
+      nativeRunId: "native-existing-run",
+      sessionId: "existing-session",
+    });
     const startRun = mock(async () => runRef({ runId: "should-not-start" }));
     const streamRun = mock(() =>
       (async function* () {
-        yield providerEvent({
-          type: "run_completed",
-          run: { ...existing, status: "completed" },
-          outputText: "attached",
-        }, existing);
+        yield providerEvent(
+          {
+            type: "run_completed",
+            run: { ...existing, status: "completed" },
+            outputText: "attached",
+          },
+          existing,
+        );
       })(),
     );
     const client = {
@@ -779,36 +1028,65 @@ describe("runProviderRequest provider attach-first", () => {
     });
 
     expect(startRun).not.toHaveBeenCalled();
-    expect(streamRun).toHaveBeenCalledWith(expect.objectContaining({ runId: "existing-run", sessionId: "existing-session" }));
-    expect(snapshot).toMatchObject({ status: "completed", outputText: "attached" });
+    expect(streamRun).toHaveBeenCalledWith(
+      expect.objectContaining({
+        runId: "existing-run",
+        sessionId: "existing-session",
+      }),
+    );
+    expect(snapshot).toMatchObject({
+      status: "completed",
+      outputText: "attached",
+    });
   });
 
   it("looks up an existing record without a persisted ref and attaches", async () => {
-    const lookedUp = runRef({ runId: "lookup-run", nativeRunId: "native-lookup-run", sessionId: "lookup-session" });
+    const lookedUp = runRef({
+      runId: "lookup-run",
+      nativeRunId: "native-lookup-run",
+      sessionId: "lookup-session",
+    });
     const startRun = mock(async () => runRef({ runId: "should-not-start" }));
     const findRunByClientOperationId = mock(async () => lookedUp);
     const streamRun = mock(() =>
       (async function* () {
-        yield providerEvent({
-          type: "run_completed",
-          run: { ...lookedUp, status: "completed" },
-          outputText: "lookup attached",
-        }, lookedUp);
+        yield providerEvent(
+          {
+            type: "run_completed",
+            run: { ...lookedUp, status: "completed" },
+            outputText: "lookup attached",
+          },
+          lookedUp,
+        );
       })(),
     );
     const client = {
       provider: "hermes",
-      getCapabilities: () => ({ ...providerCapabilities(), startIdempotency: "client_operation_id" as const, lookupByClientOperationId: true }),
+      getCapabilities: () => ({
+        ...providerCapabilities(),
+        startIdempotency: "client_operation_id" as const,
+        lookupByClientOperationId: true,
+      }),
       startRun,
       findRunByClientOperationId,
       streamRun,
     } as unknown as AgentProviderClient;
 
-    const snapshot = await runProviderRequest(client, request, { providerRunIdentity: "existing", clientOperationId: "operation-lookup" });
+    const snapshot = await runProviderRequest(client, request, {
+      providerRunIdentity: "existing",
+      clientOperationId: "operation-lookup",
+    });
 
     expect(startRun).not.toHaveBeenCalled();
-    expect(findRunByClientOperationId).toHaveBeenCalledWith(expect.objectContaining({ clientOperationId: "operation-lookup" }));
-    expect(streamRun).toHaveBeenCalledWith(expect.objectContaining({ runId: "lookup-run", sessionId: "lookup-session" }));
+    expect(findRunByClientOperationId).toHaveBeenCalledWith(
+      expect.objectContaining({ clientOperationId: "operation-lookup" }),
+    );
+    expect(streamRun).toHaveBeenCalledWith(
+      expect.objectContaining({
+        runId: "lookup-run",
+        sessionId: "lookup-session",
+      }),
+    );
     expect(snapshot.outputText).toBe("lookup attached");
   });
 
@@ -816,22 +1094,40 @@ describe("runProviderRequest provider attach-first", () => {
     const startRun = mock(async () => runRef({ runId: "should-not-start" }));
     const client = {
       provider: "hermes",
-      getCapabilities: () => ({ ...providerCapabilities(), startIdempotency: "unsupported" as const, lookupByClientOperationId: false }),
+      getCapabilities: () => ({
+        ...providerCapabilities(),
+        startIdempotency: "unsupported" as const,
+        lookupByClientOperationId: false,
+      }),
       startRun,
       streamRun: mock(() => incompleteStream()),
     } as unknown as AgentProviderClient;
 
-    await expect(runProviderRequest(client, request, { providerRunIdentity: "existing" })).rejects.toThrow(/cannot repair an existing provider run/);
+    await expect(
+      runProviderRequest(client, request, { providerRunIdentity: "existing" }),
+    ).rejects.toThrow(/cannot repair an existing provider run/);
     expect(startRun).not.toHaveBeenCalled();
   });
 
   it("starts only new records", async () => {
-    const startRun = mock(async () => runRef({ runId: "new-run", nativeRunId: "native-new-run", sessionId: "new-session" }));
+    const startRun = mock(async () =>
+      runRef({
+        runId: "new-run",
+        nativeRunId: "native-new-run",
+        sessionId: "new-session",
+      }),
+    );
     const streamRun = mock(() =>
       (async function* () {
         yield providerEvent({
           type: "run_completed",
-          run: { provider: "hermes", runId: "new-run", nativeRunId: "native-new-run", sessionId: "new-session", status: "completed" },
+          run: {
+            provider: "hermes",
+            runId: "new-run",
+            nativeRunId: "native-new-run",
+            sessionId: "new-session",
+            status: "completed",
+          },
           outputText: "new",
         });
       })(),
@@ -843,17 +1139,30 @@ describe("runProviderRequest provider attach-first", () => {
       streamRun,
     } as unknown as AgentProviderClient;
 
-    await runProviderRequest(client, request, { providerRunIdentity: "created" });
-    await runProviderRequest(client, request, { providerRunIdentity: "existing", existingRunRef: runRef({ runId: "new-run", nativeRunId: "native-new-run", sessionId: "new-session" }) });
+    await runProviderRequest(client, request, {
+      providerRunIdentity: "created",
+    });
+    await runProviderRequest(client, request, {
+      providerRunIdentity: "existing",
+      existingRunRef: runRef({
+        runId: "new-run",
+        nativeRunId: "native-new-run",
+        sessionId: "new-session",
+      }),
+    });
 
     expect(startRun).toHaveBeenCalledTimes(1);
   });
 });
 describe("ensureProviderRunRecord attach-first identity", () => {
   it("returns existing persisted provider identity for an immutable attempt replay after a later command epoch", async () => {
-    const { workspace, task, planRun, attempt, providerRun, run, taskSession } = await seedProviderRunChain();
+    const { workspace, task, planRun, attempt, providerRun, run, taskSession } =
+      await seedProviderRunChain();
     const replayEpoch = planRun.executionEpoch + 2;
-    await db.taskPlanRun.update({ where: { id: planRun.id }, data: { executionEpoch: replayEpoch } });
+    await db.taskPlanRun.update({
+      where: { id: planRun.id },
+      data: { executionEpoch: replayEpoch },
+    });
     const originalRun = await db.run.update({
       where: { id: run.id },
       data: {
@@ -910,22 +1219,36 @@ describe("ensureProviderRunRecord attach-first identity", () => {
       runtimeSessionRef: "provider-session-replay",
       providerSessionRef: "native-session-replay",
     });
-    expect(await db.taskPlanProviderRun.count({ where: { idempotencyKey: providerRun.idempotencyKey } })).toBe(1);
+    expect(
+      await db.taskPlanProviderRun.count({
+        where: { idempotencyKey: providerRun.idempotencyKey },
+      }),
+    ).toBe(1);
     expect(originalRun.runtimeRunRef).toBe("provider-run-replay");
   });
 });
 
-
 describe("runProviderRequest resume threading", () => {
   it("forwards request.resumeSessionRef to the provider startRun for cross-process resume", async () => {
-    const startRun = mock(async () => runRef({ provider: "claude_code", sessionId: "sdk-session-1" }));
+    const startRun = mock(async () =>
+      runRef({ provider: "claude_code", sessionId: "sdk-session-1" }),
+    );
     const streamRun = mock(() =>
       (async function* () {
-        yield providerEvent({
-          type: "run_completed",
-          run: { provider: "claude_code", runId: "run-1", nativeRunId: "run-1", sessionId: "sdk-session-1", status: "completed" },
-          outputText: "ok",
-        }, runRef({ provider: "claude_code", sessionId: "sdk-session-1" }));
+        yield providerEvent(
+          {
+            type: "run_completed",
+            run: {
+              provider: "claude_code",
+              runId: "run-1",
+              nativeRunId: "run-1",
+              sessionId: "sdk-session-1",
+              status: "completed",
+            },
+            outputText: "ok",
+          },
+          runRef({ provider: "claude_code", sessionId: "sdk-session-1" }),
+        );
       })(),
     );
 
@@ -949,14 +1272,25 @@ describe("runProviderRequest resume threading", () => {
   });
 
   it("does not forward synthetic Claude Code run ids as cross-process resume refs", async () => {
-    const startRun = mock(async () => runRef({ provider: "claude_code", sessionId: "sdk-session-1" }));
+    const startRun = mock(async () =>
+      runRef({ provider: "claude_code", sessionId: "sdk-session-1" }),
+    );
     const streamRun = mock(() =>
       (async function* () {
-        yield providerEvent({
-          type: "run_completed",
-          run: { provider: "claude_code", runId: "run-1", nativeRunId: "run-1", sessionId: "sdk-session-1", status: "completed" },
-          outputText: "ok",
-        }, runRef({ provider: "claude_code", sessionId: "sdk-session-1" }));
+        yield providerEvent(
+          {
+            type: "run_completed",
+            run: {
+              provider: "claude_code",
+              runId: "run-1",
+              nativeRunId: "run-1",
+              sessionId: "sdk-session-1",
+              status: "completed",
+            },
+            outputText: "ok",
+          },
+          runRef({ provider: "claude_code", sessionId: "sdk-session-1" }),
+        );
       })(),
     );
 
@@ -978,14 +1312,25 @@ describe("runProviderRequest resume threading", () => {
   });
 
   it("omits resumeSessionRef when the request has no prior provider session", async () => {
-    const startRun = mock(async () => runRef({ provider: "claude_code", sessionId: "sdk-session-1" }));
+    const startRun = mock(async () =>
+      runRef({ provider: "claude_code", sessionId: "sdk-session-1" }),
+    );
     const streamRun = mock(() =>
       (async function* () {
-        yield providerEvent({
-          type: "run_completed",
-          run: { provider: "claude_code", runId: "run-1", nativeRunId: "run-1", sessionId: "sdk-session-1", status: "completed" },
-          outputText: "ok",
-        }, runRef({ provider: "claude_code", sessionId: "sdk-session-1" }));
+        yield providerEvent(
+          {
+            type: "run_completed",
+            run: {
+              provider: "claude_code",
+              runId: "run-1",
+              nativeRunId: "run-1",
+              sessionId: "sdk-session-1",
+              status: "completed",
+            },
+            outputText: "ok",
+          },
+          runRef({ provider: "claude_code", sessionId: "sdk-session-1" }),
+        );
       })(),
     );
 
@@ -1006,14 +1351,25 @@ describe("runProviderRequest resume threading", () => {
 
 describe("runProviderRequest runtime model threading", () => {
   it("forwards the task-pinned model to provider startRun", async () => {
-    const startRun = mock(async () => runRef({ provider: "omp", sessionId: "sdk-session-1" }));
+    const startRun = mock(async () =>
+      runRef({ provider: "omp", sessionId: "sdk-session-1" }),
+    );
     const streamRun = mock(() =>
       (async function* () {
-        yield providerEvent({
-          type: "run_completed",
-          run: { provider: "omp", runId: "run-1", nativeRunId: "run-1", sessionId: "sdk-session-1", status: "completed" },
-          outputText: "ok",
-        }, runRef({ provider: "omp", sessionId: "sdk-session-1" }));
+        yield providerEvent(
+          {
+            type: "run_completed",
+            run: {
+              provider: "omp",
+              runId: "run-1",
+              nativeRunId: "run-1",
+              sessionId: "sdk-session-1",
+              status: "completed",
+            },
+            outputText: "ok",
+          },
+          runRef({ provider: "omp", sessionId: "sdk-session-1" }),
+        );
       })(),
     );
     const client = {
@@ -1046,14 +1402,25 @@ describe("runProviderRequest Chrona control handoff", () => {
   it("passes run-token control config to the OMP provider", async () => {
     const previousBaseUrl = process.env.CHRONA_BASE_URL;
     process.env.CHRONA_BASE_URL = "http://127.0.0.1:3101/api";
-    const startRun = mock(async () => runRef({ provider: "omp", sessionId: "sdk-session-1" }));
+    const startRun = mock(async () =>
+      runRef({ provider: "omp", sessionId: "sdk-session-1" }),
+    );
     const streamRun = mock(() =>
       (async function* () {
-        yield providerEvent({
-          type: "run_completed",
-          run: { provider: "omp", runId: "run-1", nativeRunId: "run-1", sessionId: "sdk-session-1", status: "completed" },
-          outputText: "ok",
-        }, runRef({ provider: "omp", sessionId: "sdk-session-1" }));
+        yield providerEvent(
+          {
+            type: "run_completed",
+            run: {
+              provider: "omp",
+              runId: "run-1",
+              nativeRunId: "run-1",
+              sessionId: "sdk-session-1",
+              status: "completed",
+            },
+            outputText: "ok",
+          },
+          runRef({ provider: "omp", sessionId: "sdk-session-1" }),
+        );
       })(),
     );
 
@@ -1065,7 +1432,9 @@ describe("runProviderRequest Chrona control handoff", () => {
     } as unknown as AgentProviderClient;
 
     try {
-      await runProviderRequest(client, request, { controlRunToken: "run-token-1" });
+      await runProviderRequest(client, request, {
+        controlRunToken: "run-token-1",
+      });
     } finally {
       if (previousBaseUrl === undefined) delete process.env.CHRONA_BASE_URL;
       else process.env.CHRONA_BASE_URL = previousBaseUrl;
@@ -1086,14 +1455,25 @@ describe("runProviderRequest Chrona control handoff", () => {
     const previousPort = process.env.PORT;
     delete process.env.CHRONA_BASE_URL;
     process.env.PORT = "3199";
-    const startRun = mock(async () => runRef({ provider: "omp", sessionId: "sdk-session-1" }));
+    const startRun = mock(async () =>
+      runRef({ provider: "omp", sessionId: "sdk-session-1" }),
+    );
     const streamRun = mock(() =>
       (async function* () {
-        yield providerEvent({
-          type: "run_completed",
-          run: { provider: "omp", runId: "run-1", nativeRunId: "run-1", sessionId: "sdk-session-1", status: "completed" },
-          outputText: "ok",
-        }, runRef({ provider: "omp", sessionId: "sdk-session-1" }));
+        yield providerEvent(
+          {
+            type: "run_completed",
+            run: {
+              provider: "omp",
+              runId: "run-1",
+              nativeRunId: "run-1",
+              sessionId: "sdk-session-1",
+              status: "completed",
+            },
+            outputText: "ok",
+          },
+          runRef({ provider: "omp", sessionId: "sdk-session-1" }),
+        );
       })(),
     );
 
@@ -1105,7 +1485,9 @@ describe("runProviderRequest Chrona control handoff", () => {
     } as unknown as AgentProviderClient;
 
     try {
-      await runProviderRequest(client, request, { controlRunToken: "run-token-1" });
+      await runProviderRequest(client, request, {
+        controlRunToken: "run-token-1",
+      });
     } finally {
       if (previousBaseUrl === undefined) delete process.env.CHRONA_BASE_URL;
       else process.env.CHRONA_BASE_URL = previousBaseUrl;
@@ -1144,32 +1526,39 @@ describe("provider attempt epoch fencing", () => {
       startedAt: "2026-05-22T00:00:00.000Z",
     };
 
-    await expect(ensureProviderRunRecord({
-      workspaceId: workspace.id,
-      taskId: task.id,
-      expectedExecutionEpoch: 1,
-      expectedExecutionSessionId: "stale-execution-session",
-      workBlockId: null,
-      occurrenceId: null,
-      runId: "stale-runtime-run",
-      nodeAttempt: staleAttempt,
-      providerRunIdempotencyKey: "stale-prepared-provider-key",
-      aiClientId: "ai-client-test",
-      aiClientConfigDigest: "config-digest",
-    })).rejects.toThrow(/Execution session changed/);
+    await expect(
+      ensureProviderRunRecord({
+        workspaceId: workspace.id,
+        taskId: task.id,
+        expectedExecutionEpoch: 1,
+        expectedExecutionSessionId: "stale-execution-session",
+        workBlockId: null,
+        occurrenceId: null,
+        runId: "stale-runtime-run",
+        nodeAttempt: staleAttempt,
+        providerRunIdempotencyKey: "stale-prepared-provider-key",
+        aiClientId: "ai-client-test",
+        aiClientConfigDigest: "config-digest",
+      }),
+    ).rejects.toThrow(/Execution session changed/);
 
-    expect(await db.taskPlanNodeAttempt.count({
-      where: { idempotencyKey: staleAttempt.idempotencyKey },
-    })).toBe(0);
-    expect(await db.taskPlanProviderRun.count({
-      where: { idempotencyKey: "stale-prepared-provider-key" },
-    })).toBe(0);
+    expect(
+      await db.taskPlanNodeAttempt.count({
+        where: { idempotencyKey: staleAttempt.idempotencyKey },
+      }),
+    ).toBe(0);
+    expect(
+      await db.taskPlanProviderRun.count({
+        where: { idempotencyKey: "stale-prepared-provider-key" },
+      }),
+    ).toBe(0);
   });
 });
 
 describe("provider runtime event persistence integrity", () => {
   it("retries one logical provider event idempotently and advances its task pointer by ingest order", async () => {
-    const { workspace, task, plan, planRun, providerRun, run, taskSession } = await seedProviderRunChain();
+    const { workspace, task, plan, planRun, providerRun, run, taskSession } =
+      await seedProviderRunChain();
     const context = {
       workspaceId: workspace.id,
       taskId: task.id,
@@ -1185,15 +1574,39 @@ describe("provider runtime event persistence integrity", () => {
       planRunId: planRun.id,
       executionScope: planRun.executionScopeId,
     };
-    const newer = providerEvent({ type: "text_delta", text: "newer", sequence: 2 });
-    const older = providerEvent({ type: "text_delta", text: "older", sequence: 1 });
+    const newer = providerEvent({
+      type: "text_delta",
+      text: "newer",
+      sequence: 2,
+    });
+    const older = providerEvent({
+      type: "text_delta",
+      text: "older",
+      sequence: 1,
+    });
 
-    await persistProviderRuntimeEvent({ context, event: newer, fallbackIndex: 2 });
-    await persistProviderRuntimeEvent({ context, event: newer, fallbackIndex: 2 });
-    await persistProviderRuntimeEvent({ context, event: older, fallbackIndex: 1 });
+    await persistProviderRuntimeEvent({
+      context,
+      event: newer,
+      fallbackIndex: 2,
+    });
+    await persistProviderRuntimeEvent({
+      context,
+      event: newer,
+      fallbackIndex: 2,
+    });
+    await persistProviderRuntimeEvent({
+      context,
+      event: older,
+      fallbackIndex: 1,
+    });
 
-    expect(await db.rawEventLog.count({ where: { providerRunId: providerRun.id } })).toBe(2);
-    expect(await db.event.count({ where: { providerRunId: providerRun.id } })).toBe(2);
+    expect(
+      await db.rawEventLog.count({ where: { providerRunId: providerRun.id } }),
+    ).toBe(2);
+    expect(
+      await db.event.count({ where: { providerRunId: providerRun.id } }),
+    ).toBe(2);
     const canonical = await db.event.findFirstOrThrow({
       where: { providerRunId: providerRun.id },
       orderBy: { ingestSequence: "desc" },
@@ -1202,15 +1615,32 @@ describe("provider runtime event persistence integrity", () => {
       where: { id: task.id },
       select: { latestEventId: true, latestEventSequence: true },
     });
-    expect(reloaded).toEqual({ latestEventId: canonical.id, latestEventSequence: canonical.ingestSequence });
-    const raw = await db.rawEventLog.findFirstOrThrow({ where: { providerRunId: providerRun.id } });
-    expect(raw).toMatchObject({ occurrenceId: null, workBlockId: null, planRunId: planRun.id, taskSessionId: taskSession.id });
-    expect(canonical).toMatchObject({ occurrenceId: null, taskSessionId: taskSession.id, planRunId: planRun.id });
-    expect(canonical.payload).toMatchObject({ executionScope: planRun.executionScopeId });
+    expect(reloaded).toEqual({
+      latestEventId: canonical.id,
+      latestEventSequence: canonical.ingestSequence,
+    });
+    const raw = await db.rawEventLog.findFirstOrThrow({
+      where: { providerRunId: providerRun.id },
+    });
+    expect(raw).toMatchObject({
+      occurrenceId: null,
+      workBlockId: null,
+      planRunId: planRun.id,
+      taskSessionId: taskSession.id,
+    });
+    expect(canonical).toMatchObject({
+      occurrenceId: null,
+      taskSessionId: taskSession.id,
+      planRunId: planRun.id,
+    });
+    expect(canonical.payload).toMatchObject({
+      executionScope: planRun.executionScopeId,
+    });
   });
 
   it("rejects provider events after their execution session is abandoned", async () => {
-    const { workspace, task, plan, planRun, providerRun, run, taskSession } = await seedProviderRunChain();
+    const { workspace, task, plan, planRun, providerRun, run, taskSession } =
+      await seedProviderRunChain();
     await db.executionSession.update({
       where: { id: `execution-session-${task.id}` },
       data: { status: "Abandoned", activeScopeKey: null },
@@ -1231,16 +1661,21 @@ describe("provider runtime event persistence integrity", () => {
       executionScope: planRun.executionScopeId,
     };
 
-    await expect(persistProviderRuntimeEvent({
-      context,
-      event: providerEvent({ type: "text_delta", text: "late" }),
-      fallbackIndex: 1,
-    })).rejects.toThrow(/scope no longer matches active execution/);
-    expect(await db.rawEventLog.count({ where: { providerRunId: providerRun.id } })).toBe(0);
+    await expect(
+      persistProviderRuntimeEvent({
+        context,
+        event: providerEvent({ type: "text_delta", text: "late" }),
+        fallbackIndex: 1,
+      }),
+    ).rejects.toThrow(/scope no longer matches active execution/);
+    expect(
+      await db.rawEventLog.count({ where: { providerRunId: providerRun.id } }),
+    ).toBe(0);
   });
 
   it("surfaces persistence failures and permits a clean idempotent retry without partial records", async () => {
-    const { workspace, task, plan, planRun, providerRun, run, taskSession } = await seedProviderRunChain();
+    const { workspace, task, plan, planRun, providerRun, run, taskSession } =
+      await seedProviderRunChain();
     const context = {
       workspaceId: workspace.id,
       taskId: task.id,
@@ -1256,21 +1691,39 @@ describe("provider runtime event persistence integrity", () => {
       planRunId: planRun.id,
       executionScope: planRun.executionScopeId,
     };
-    setAfterRawEventPersistedForTest(() => { throw new Error("injected post-raw failure"); });
-    const event = { ...providerEvent({ type: "text_delta", text: "retry" }), sequence: 7 } as ProviderRunEvent;
+    setAfterRawEventPersistedForTest(() => {
+      throw new Error("injected post-raw failure");
+    });
+    const event = {
+      ...providerEvent({ type: "text_delta", text: "retry" }),
+      sequence: 7,
+    } as ProviderRunEvent;
 
-    await expect(persistProviderRuntimeEvent({ context, event, fallbackIndex: 7 })).rejects.toThrow("injected post-raw failure");
-    expect(await db.rawEventLog.count({ where: { providerRunId: providerRun.id } })).toBe(0);
-    expect(await db.event.count({ where: { providerRunId: providerRun.id } })).toBe(0);
+    await expect(
+      persistProviderRuntimeEvent({ context, event, fallbackIndex: 7 }),
+    ).rejects.toThrow("injected post-raw failure");
+    expect(
+      await db.rawEventLog.count({ where: { providerRunId: providerRun.id } }),
+    ).toBe(0);
+    expect(
+      await db.event.count({ where: { providerRunId: providerRun.id } }),
+    ).toBe(0);
 
     setAfterRawEventPersistedForTest();
-    await expect(persistProviderRuntimeEvent({ context, event, fallbackIndex: 7 })).resolves.toBeUndefined();
-    expect(await db.rawEventLog.count({ where: { providerRunId: providerRun.id } })).toBe(1);
-    expect(await db.event.count({ where: { providerRunId: providerRun.id } })).toBe(1);
+    await expect(
+      persistProviderRuntimeEvent({ context, event, fallbackIndex: 7 }),
+    ).resolves.toBeUndefined();
+    expect(
+      await db.rawEventLog.count({ where: { providerRunId: providerRun.id } }),
+    ).toBe(1);
+    expect(
+      await db.event.count({ where: { providerRunId: providerRun.id } }),
+    ).toBe(1);
   });
 
   it("keeps the first provider terminal candidate authoritative for its audit row", async () => {
-    const { workspace, task, plan, planRun, providerRun, run, taskSession } = await seedProviderRunChain();
+    const { workspace, task, plan, planRun, providerRun, run, taskSession } =
+      await seedProviderRunChain();
     const context = {
       workspaceId: workspace.id,
       taskId: task.id,
@@ -1322,16 +1775,33 @@ describe("provider runtime event persistence integrity", () => {
       sequence: 11,
     } as ProviderRunEvent;
 
-    await persistProviderRuntimeEvent({ context, event: completed, fallbackIndex: 10 });
-    await expect(persistProviderRuntimeEvent({ context, event: conflictingFailure, fallbackIndex: 11 }))
-      .rejects.toThrow("scope no longer matches active execution");
+    await persistProviderRuntimeEvent({
+      context,
+      event: completed,
+      fallbackIndex: 10,
+    });
+    await expect(
+      persistProviderRuntimeEvent({
+        context,
+        event: conflictingFailure,
+        fallbackIndex: 11,
+      }),
+    ).rejects.toThrow("scope no longer matches active execution");
 
-    expect(await db.taskPlanProviderRun.findUniqueOrThrow({ where: { id: providerRun.id } })).toMatchObject({
+    expect(
+      await db.taskPlanProviderRun.findUniqueOrThrow({
+        where: { id: providerRun.id },
+      }),
+    ).toMatchObject({
       status: "completed",
       completedByEventId: expect.any(String),
       failedByEventId: null,
     });
-    expect(await db.taskPlanProviderApproval.findUniqueOrThrow({ where: { id: approval.id } })).toMatchObject({
+    expect(
+      await db.taskPlanProviderApproval.findUniqueOrThrow({
+        where: { id: approval.id },
+      }),
+    ).toMatchObject({
       status: "superseded",
       resolvedAt: expect.any(Date),
       resolvedBy: "provider",
@@ -1366,9 +1836,19 @@ describe("provider runtime event persistence integrity", () => {
       },
     });
     const secondRun = await db.run.create({
-      data: { taskId: first.task.id, nodeAttemptId: secondAttempt.id, taskSessionId: first.taskSession.id, runtimeName: "hermes", status: RunStatus.Pending, triggeredBy: "system" },
+      data: {
+        taskId: first.task.id,
+        nodeAttemptId: secondAttempt.id,
+        taskSessionId: first.taskSession.id,
+        runtimeName: "hermes",
+        status: RunStatus.Pending,
+        triggeredBy: "system",
+      },
     });
-    await db.taskPlanProviderRun.update({ where: { id: secondProviderRun.id }, data: { runId: secondRun.id } });
+    await db.taskPlanProviderRun.update({
+      where: { id: secondProviderRun.id },
+      data: { runId: secondRun.id },
+    });
     const firstContext = {
       workspaceId: first.workspace.id,
       taskId: first.task.id,
@@ -1384,22 +1864,58 @@ describe("provider runtime event persistence integrity", () => {
       planRunId: first.planRun.id,
       executionScope: first.planRun.executionScopeId,
     };
-    const secondContext = { ...firstContext, runId: secondRun.id, providerRunId: secondProviderRun.id, nodeAttemptId: secondAttempt.id };
+    const secondContext = {
+      ...firstContext,
+      runId: secondRun.id,
+      providerRunId: secondProviderRun.id,
+      nodeAttemptId: secondAttempt.id,
+    };
 
-    await persistProviderRuntimeEvent({ context: firstContext, event: { ...providerEvent({ type: "text_delta", text: "first" }), sequence: 9 } as ProviderRunEvent, fallbackIndex: 9 });
+    await persistProviderRuntimeEvent({
+      context: firstContext,
+      event: {
+        ...providerEvent({ type: "text_delta", text: "first" }),
+        sequence: 9,
+      } as ProviderRunEvent,
+      fallbackIndex: 9,
+    });
     await db.executionSession.update({
       where: { id: `execution-session-${first.task.id}` },
-      data: { currentNodeId: secondAttempt.nodeId, currentNodeAttemptId: secondAttempt.id },
+      data: {
+        currentNodeId: secondAttempt.nodeId,
+        currentNodeAttemptId: secondAttempt.id,
+      },
     });
-    await persistProviderRuntimeEvent({ context: secondContext, event: { ...providerEvent({ type: "text_delta", text: "second" }), sequence: 1 } as ProviderRunEvent, fallbackIndex: 1 });
+    await persistProviderRuntimeEvent({
+      context: secondContext,
+      event: {
+        ...providerEvent({ type: "text_delta", text: "second" }),
+        sequence: 1,
+      } as ProviderRunEvent,
+      fallbackIndex: 1,
+    });
 
-    const latest = await db.task.findUniqueOrThrow({ where: { id: first.task.id }, select: { latestEventId: true } });
-    const secondEvent = await db.event.findFirstOrThrow({ where: { providerRunId: secondProviderRun.id } });
+    const latest = await db.task.findUniqueOrThrow({
+      where: { id: first.task.id },
+      select: { latestEventId: true },
+    });
+    const secondEvent = await db.event.findFirstOrThrow({
+      where: { providerRunId: secondProviderRun.id },
+    });
     expect(latest.latestEventId).toBe(secondEvent.id);
   });
 
   it("persists a provider terminal candidate without terminalizing the canonical Run", async () => {
-    const { workspace, task, plan, planRun, providerRun, run, taskSession, attempt } = await seedProviderRunChain();
+    const {
+      workspace,
+      task,
+      plan,
+      planRun,
+      providerRun,
+      run,
+      taskSession,
+      attempt,
+    } = await seedProviderRunChain();
     const executionSessionId = `execution-session-${task.id}`;
 
     await finalizeRuntimeInvocationForTest({
@@ -1445,12 +1961,18 @@ describe("provider runtime event persistence integrity", () => {
       },
     });
 
-    expect(await db.run.findUniqueOrThrow({ where: { id: run.id } })).toMatchObject({
+    expect(
+      await db.run.findUniqueOrThrow({ where: { id: run.id } }),
+    ).toMatchObject({
       status: RunStatus.Running,
       runtimeRunRef: "provider-terminal-candidate",
       endedAt: null,
     });
-    expect(await db.taskPlanProviderRun.findUniqueOrThrow({ where: { id: providerRun.id } })).toMatchObject({
+    expect(
+      await db.taskPlanProviderRun.findUniqueOrThrow({
+        where: { id: providerRun.id },
+      }),
+    ).toMatchObject({
       status: "completed",
       providerRunRef: "provider-terminal-candidate",
     });
@@ -1458,7 +1980,10 @@ describe("provider runtime event persistence integrity", () => {
 
   it("does not write conversation history when a late terminal snapshot loses the active-run guard", async () => {
     const { task, run, attempt } = await seedProviderRunChain();
-    await db.run.update({ where: { id: run.id }, data: { status: RunStatus.Cancelled } });
+    await db.run.update({
+      where: { id: run.id },
+      data: { status: RunStatus.Cancelled },
+    });
 
     const invocation = await finalizeRuntimeInvocationForTest({
       input: {
@@ -1488,65 +2013,83 @@ describe("provider runtime event persistence integrity", () => {
     });
 
     expect(invocation.conversationEntryIds).toEqual([]);
-    expect(await db.conversationEntry.count({ where: { runId: run.id } })).toBe(0);
+    expect(await db.conversationEntry.count({ where: { runId: run.id } })).toBe(
+      0,
+    );
   });
 
   it("rejects a late terminal snapshot after its execution session is abandoned", async () => {
-    const { workspace, task, plan, planRun, providerRun, run, taskSession, attempt } = await seedProviderRunChain();
+    const {
+      workspace,
+      task,
+      plan,
+      planRun,
+      providerRun,
+      run,
+      taskSession,
+      attempt,
+    } = await seedProviderRunChain();
     const executionSessionId = `execution-session-${task.id}`;
     await db.executionSession.update({
       where: { id: executionSessionId },
       data: { status: "Abandoned", activeScopeKey: null },
     });
 
-    await expect(finalizeRuntimeInvocationForTest({
-      input: {
-        taskId: task.id,
-        expectedExecutionEpoch: planRun.executionEpoch,
-        expectedExecutionSessionId: executionSessionId,
-        taskSessionId: taskSession.id,
-        runtimeName: "hermes",
-        runtimeSessionKey: "provider-session",
-        nodeAttempt: asRuntimeAttempt(attempt),
-        clientOperationId: "late-abandoned-terminal",
-        runtimeInput: { kind: "task" },
-        instructions: "late response",
-      },
-      runId: run.id,
-      providerName: "hermes",
-      request,
-      response: {
-        provider: "hermes",
-        runId: "late-abandoned-provider-run",
-        nativeRunId: "late-abandoned-provider-run",
-        sessionId: "provider-session",
-        status: "completed",
-        outputText: "must not persist",
-        error: null,
-      },
-      providerRunRecordId: providerRun.id,
-      scope: {
-        workspaceId: workspace.id,
-        taskId: task.id,
-        workBlockId: run.workBlockId,
-        occurrenceId: run.occurrenceId,
+    await expect(
+      finalizeRuntimeInvocationForTest({
+        input: {
+          taskId: task.id,
+          expectedExecutionEpoch: planRun.executionEpoch,
+          expectedExecutionSessionId: executionSessionId,
+          taskSessionId: taskSession.id,
+          runtimeName: "hermes",
+          runtimeSessionKey: "provider-session",
+          nodeAttempt: asRuntimeAttempt(attempt),
+          clientOperationId: "late-abandoned-terminal",
+          runtimeInput: { kind: "task" },
+          instructions: "late response",
+        },
         runId: run.id,
-        runtimeName: "hermes",
-        taskSessionId: taskSession.id,
-        executionSessionId,
-        nodeAttemptId: providerRun.nodeAttemptId,
-        providerRunId: providerRun.id,
-        planId: plan.planId,
-        planRunId: planRun.id,
-        executionScope: planRun.executionScopeId,
-      },
-    })).rejects.toThrow("Provider runtime scope no longer matches active execution");
+        providerName: "hermes",
+        request,
+        response: {
+          provider: "hermes",
+          runId: "late-abandoned-provider-run",
+          nativeRunId: "late-abandoned-provider-run",
+          sessionId: "provider-session",
+          status: "completed",
+          outputText: "must not persist",
+          error: null,
+        },
+        providerRunRecordId: providerRun.id,
+        scope: {
+          workspaceId: workspace.id,
+          taskId: task.id,
+          workBlockId: run.workBlockId,
+          occurrenceId: run.occurrenceId,
+          runId: run.id,
+          runtimeName: "hermes",
+          taskSessionId: taskSession.id,
+          executionSessionId,
+          nodeAttemptId: providerRun.nodeAttemptId,
+          providerRunId: providerRun.id,
+          planId: plan.planId,
+          planRunId: planRun.id,
+          executionScope: planRun.executionScopeId,
+        },
+      }),
+    ).rejects.toThrow(
+      "Provider runtime scope no longer matches active execution",
+    );
 
-    expect(await db.conversationEntry.count({ where: { runId: run.id } })).toBe(0);
+    expect(await db.conversationEntry.count({ where: { runId: run.id } })).toBe(
+      0,
+    );
   });
 
   it("rejects an event whose occurrence scope no longer matches without accepting partial records", async () => {
-    const { workspace, task, plan, planRun, providerRun, run, taskSession } = await seedProviderRunChain();
+    const { workspace, task, plan, planRun, providerRun, run, taskSession } =
+      await seedProviderRunChain();
     const otherOccurrence = await db.taskOccurrence.create({
       data: {
         workspaceId: workspace.id,
@@ -1558,27 +2101,33 @@ describe("provider runtime event persistence integrity", () => {
       },
     });
 
-    await expect(persistProviderRuntimeEvent({
-      context: {
-        workspaceId: workspace.id,
-        taskId: task.id,
-        workBlockId: null,
-        occurrenceId: otherOccurrence.id,
-        runId: run.id,
-        runtimeName: "hermes",
-        taskSessionId: taskSession.id,
-        executionSessionId: `execution-session-${task.id}`,
-        nodeAttemptId: providerRun.nodeAttemptId,
-        providerRunId: providerRun.id,
-        planId: plan.planId,
-        planRunId: planRun.id,
-        executionScope: planRun.executionScopeId,
-      },
-      event: providerEvent({ type: "text_delta", text: "cross-occurrence" }),
-      fallbackIndex: 1,
-    })).rejects.toThrow("scope no longer matches");
+    await expect(
+      persistProviderRuntimeEvent({
+        context: {
+          workspaceId: workspace.id,
+          taskId: task.id,
+          workBlockId: null,
+          occurrenceId: otherOccurrence.id,
+          runId: run.id,
+          runtimeName: "hermes",
+          taskSessionId: taskSession.id,
+          executionSessionId: `execution-session-${task.id}`,
+          nodeAttemptId: providerRun.nodeAttemptId,
+          providerRunId: providerRun.id,
+          planId: plan.planId,
+          planRunId: planRun.id,
+          executionScope: planRun.executionScopeId,
+        },
+        event: providerEvent({ type: "text_delta", text: "cross-occurrence" }),
+        fallbackIndex: 1,
+      }),
+    ).rejects.toThrow("scope no longer matches");
 
-    expect(await db.rawEventLog.count({ where: { providerRunId: providerRun.id } })).toBe(0);
-    expect(await db.event.count({ where: { providerRunId: providerRun.id } })).toBe(0);
+    expect(
+      await db.rawEventLog.count({ where: { providerRunId: providerRun.id } }),
+    ).toBe(0);
+    expect(
+      await db.event.count({ where: { providerRunId: providerRun.id } }),
+    ).toBe(0);
   });
 });

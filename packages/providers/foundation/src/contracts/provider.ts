@@ -649,6 +649,7 @@ export const providerRunEventSchema = z.discriminatedUnion("type", [
 			...providerRunEventMetadataShape,
 			type: z.literal("tool_started"),
 			toolName: z.string().min(1),
+			callId: z.string().min(1).optional(),
 			preview: z.unknown().optional(),
 			input: z.unknown().optional(),
 			raw: z.unknown().optional(),
@@ -669,6 +670,7 @@ export const providerRunEventSchema = z.discriminatedUnion("type", [
 			...providerRunEventMetadataShape,
 			type: z.literal("tool_completed"),
 			toolName: z.string().min(1).optional(),
+			callId: z.string().min(1).optional(),
 			error: z
 				.object({
 					message: z.string().min(1),

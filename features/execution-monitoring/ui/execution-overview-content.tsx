@@ -44,7 +44,13 @@ import {
 type CommandCenterCopy = Record<string, string | undefined>;
 
 type WorkspaceCopy = Record<string, string | undefined>;
-type ResultStatus = "active" | "failed" | "running" | "ready" | "unavailable";
+type ResultStatus =
+	| "active"
+	| "failed"
+	| "stalled"
+	| "running"
+	| "ready"
+	| "unavailable";
 type ResultCollapseCommand = {
 	mode: "collapse" | "expand";
 	revision: number;
@@ -57,21 +63,53 @@ type ResultStatusInfoProps = {
 	isProducingOutput: boolean;
 };
 
+type InactiveResultStatus = Exclude<ResultStatus, "active">;
+
+function inactiveResultStatusLabel(
+	status: InactiveResultStatus,
+	copy: WorkspaceCopy,
+) {
+	return {
+		failed: copy.finalizationFailedBadge ?? "Finalization failed",
+		stalled: copy.finalizationStalledBadge ?? "Finalization interrupted",
+		running: copy.finalizationRunningBadge ?? "Preparing",
+		ready: copy.aiGeneratedBadge ?? "AI generated",
+		unavailable: copy.finalizationUnavailableBadge ?? "Artifacts only",
+	}[status];
+}
+
 function resultStatusLabel(
 	status: ResultStatus,
 	hasAvailableResult: boolean,
 	copy: WorkspaceCopy,
 ) {
-	if (status === "active")
-		return hasAvailableResult
-			? (copy.resultsAvailableBadge ?? "Results available")
-			: (copy.resultsPendingBadge ?? "No result yet");
-	if (status === "failed")
-		return copy.finalizationFailedBadge ?? "Finalization failed";
-	if (status === "running") return copy.finalizationRunningBadge ?? "Preparing";
-	return status === "ready"
-		? (copy.aiGeneratedBadge ?? "AI generated")
-		: (copy.finalizationUnavailableBadge ?? "Artifacts only");
+	if (status !== "active") return inactiveResultStatusLabel(status, copy);
+	return hasAvailableResult
+		? (copy.resultsAvailableBadge ?? "Results available")
+		: (copy.resultsPendingBadge ?? "No result yet");
+}
+
+function inactiveResultStatusDescription(
+	status: InactiveResultStatus,
+	copy: WorkspaceCopy,
+) {
+	return {
+		failed:
+			copy.finalizationFailedDescription ??
+			"Chrona could not assemble the final result. Generated files remain available below.",
+		stalled:
+			copy.finalizationStalledDescription ??
+			"Finalization stopped before completion. Generated files remain available; retry to continue.",
+		running:
+			copy.finalizationRunningDescription ??
+			"Chrona is assembling and validating the final result.",
+		ready:
+			copy.validatedOutputDescription ??
+			"Validated output from task execution.",
+		unavailable:
+			copy.finalizationUnavailableDescription ??
+			"The final result is unavailable. Generated files are shown below.",
+	}[status];
 }
 
 function resultStatusDescription(
@@ -79,33 +117,20 @@ function resultStatusDescription(
 	hasAvailableResult: boolean,
 	copy: WorkspaceCopy,
 ) {
-	if (status === "active")
-		return hasAvailableResult
-			? (copy.resultsAvailableDescription ??
-					"Current output and completed step results collected during this run.")
-			: (copy.resultsPendingDescription ??
-					"The current step has not produced viewable output yet. Follow execution activity for live progress.");
-	if (status === "failed")
-		return (
-			copy.finalizationFailedDescription ??
-			"Chrona could not assemble the final result. Generated files remain available below."
-		);
-	if (status === "running")
-		return (
-			copy.finalizationRunningDescription ??
-			"Chrona is assembling and validating the final result."
-		);
-	return status === "ready"
-		? (copy.validatedOutputDescription ??
-				"Validated output from task execution.")
-		: (copy.finalizationUnavailableDescription ??
-				"The final result is unavailable. Generated files are shown below.");
+	if (status !== "active") return inactiveResultStatusDescription(status, copy);
+	return hasAvailableResult
+		? (copy.resultsAvailableDescription ??
+				"Current output and completed step results collected during this run.")
+		: (copy.resultsPendingDescription ??
+				"The current step has not produced viewable output yet. Follow execution activity for live progress.");
 }
 
 function resultStatusTitle(status: ResultStatus, copy: WorkspaceCopy) {
 	if (status === "active") return copy.stageResultsTitle ?? "Stage results";
 	if (status === "failed")
 		return copy.finalizationFailedTitle ?? "Final result unavailable";
+	if (status === "stalled")
+		return copy.finalizationStalledTitle ?? "Finalization interrupted";
 	if (status === "running")
 		return copy.finalizationRunningTitle ?? "Preparing final result";
 	return copy.finalResultTitle ?? "Final result";
@@ -116,6 +141,8 @@ function resultStatusClassName(status: ResultStatus) {
 		return "bg-sky-500/10 text-sky-700 dark:text-sky-200";
 	if (status === "failed")
 		return "border-destructive/30 bg-destructive/10 text-destructive";
+	if (status === "stalled")
+		return "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-200";
 	if (status === "running")
 		return "bg-amber-500/10 text-amber-700 dark:text-amber-200";
 	return "bg-violet-500/10 text-violet-700 dark:text-violet-200";
@@ -351,6 +378,7 @@ type ProviderChatItem =
 			nodeTitle?: string;
 			tool: TaskRuntimeTool;
 			label: string;
+			callId?: string;
 			state: "started" | "progress" | "completed" | "failed";
 			path?: string;
 			command?: string;
@@ -358,7 +386,6 @@ type ProviderChatItem =
 			input?: unknown;
 			output?: unknown;
 			diff?: string;
-			raw?: unknown;
 			startedAt?: string;
 			completedAt?: string;
 	  }
@@ -402,14 +429,29 @@ function appendProviderTool(
 	const normalized = workspaceActivityToTaskRuntimeActivity(activity);
 	if (normalized.kind !== "tool") return;
 
+	const callId = value.callId;
+	const last = items.at(-1);
 	const existing = items.findLast(
-		(item): item is Extract<ProviderChatItem, { kind: "tool" }> =>
-			item.kind === "tool" &&
-			item.tool === normalized.tool &&
-			item.nodeTitle === event.nodeTitle &&
-			(item.state === "started" || item.state === "progress"),
-	);
-	const state =
+		(item): item is Extract<ProviderChatItem, { kind: "tool" }> => {
+			if (
+				item.kind !== "tool" ||
+				item.tool !== normalized.tool ||
+				item.nodeTitle !== event.nodeTitle
+			)
+				return false;
+			if (callId) return item.callId === callId;
+			return item.state === "started" || item.state === "progress";
+		},
+	) ??
+		(value.type === "tool_completed" &&
+		last?.kind === "tool" &&
+		last.tool === normalized.tool &&
+		last.nodeTitle === event.nodeTitle &&
+		(last.state === "completed" || last.state === "failed") &&
+		last.output === undefined
+			? last
+			: undefined);
+	const eventState =
 		value.type === "tool_completed"
 			? value.error
 				? "failed"
@@ -417,15 +459,16 @@ function appendProviderTool(
 			: value.type === "tool_progress"
 				? "progress"
 				: "started";
+	const state = existing?.state === "failed" ? "failed" : eventState;
 	const update = {
 		state,
+		callId,
 		path: normalized.path,
 		command: normalized.command,
 		cwd: normalized.cwd,
 		input: normalized.input,
 		output: normalized.output,
 		diff: normalized.diff,
-		raw: value.raw,
 		startedAt: value.type === "tool_started" ? event.timestamp : undefined,
 		completedAt: value.type === "tool_completed" ? event.timestamp : undefined,
 	} satisfies Partial<Extract<ProviderChatItem, { kind: "tool" }>>;
@@ -444,6 +487,7 @@ function appendProviderTool(
 		key: `${event.executionScope}-${event.sequence ?? index}-${value.type}`,
 		nodeTitle: event.nodeTitle,
 		tool: normalized.tool,
+		...(callId ? { callId } : {}),
 		label:
 			normalized.tool === "generic"
 				? normalized.title
@@ -455,6 +499,7 @@ function appendProviderTool(
 
 function providerChatItems(
 	events: WorkspaceRuntimeEvent[],
+	copy: WorkspaceCopy,
 ): ProviderChatItem[] {
 	const items: ProviderChatItem[] = [];
 	for (const [index, event] of events.entries()) {
@@ -488,7 +533,8 @@ function providerChatItems(
 				items.push({
 					kind: "status",
 					key,
-					label: "Waiting for approval",
+					label:
+						copy.providerWaitingForApproval ?? "Waiting for approval",
 					tone: "warning",
 				});
 				break;
@@ -497,14 +543,14 @@ function providerChatItems(
 					items.push({
 						kind: "status",
 						key,
-						label: value.error ?? "Provider run failed",
+						label: value.error ?? copy.providerRunFailed ?? "Provider run failed",
 						tone: "danger",
 					});
 				if (value.status === "cancelled")
 					items.push({
 						kind: "status",
 						key,
-						label: "Run cancelled",
+						label: copy.providerRunCancelled ?? "Run cancelled",
 						tone: "warning",
 					});
 				if (value.status === "completed") {
@@ -565,6 +611,7 @@ function LiveExecutionStream({
 			item.kind === "tool" &&
 			(item.state === "started" || item.state === "progress"),
 	)?.key;
+	const latestItemKey = items.at(-1)?.key;
 
 	if (items.length === 0) {
 		return (
@@ -597,24 +644,33 @@ function LiveExecutionStream({
 				}
 
 				if (item.kind === "reasoning") {
+					const isActive = isLive && item.key === latestItemKey;
 					return (
 						<li
 							key={item.key}
-							className="flex items-center gap-3 px-4 py-2.5 text-xs text-muted-foreground"
+							data-reasoning-state={isActive ? "active" : "complete"}
+							className="flex items-start gap-3 px-4 py-2.5 text-xs text-muted-foreground"
 						>
 							<span
-								className="flex size-5 shrink-0 items-center justify-center rounded-full bg-violet-100 text-violet-700 dark:bg-violet-950/50 dark:text-violet-300"
+								className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-violet-100 text-violet-700 dark:bg-violet-950/50 dark:text-violet-300"
 								aria-hidden
 							>
-								{isLive ? (
-									<LoaderCircle className="size-3 animate-spin" />
+								{isActive ? (
+									<LoaderCircle
+										className="size-3 animate-spin motion-reduce:animate-none"
+									/>
 								) : (
-									"·"
+									<Check className="size-3" />
 								)}
 							</span>
-							<span>
-								{copy.runtimeTranscriptThinking ?? "Analyzing context"}
-							</span>
+							<div className="min-w-0 flex-1">
+								<span className="font-medium">
+									{copy.runtimeTranscriptThinking ?? "Analyzing context"}
+								</span>
+								<pre className="mt-1 whitespace-pre-wrap break-words font-sans text-xs leading-relaxed text-foreground/80">
+									{item.text}
+								</pre>
+							</div>
 						</li>
 					);
 				}
@@ -650,8 +706,9 @@ function LiveExecutionStream({
 				const tool = item;
 				const isCurrent = tool.key === latestActiveKey;
 				const duration = formatToolDuration(tool);
+				const inputPreview = compactProviderPreview(tool.input);
 				const preview = compactProviderPreview(tool.output ?? tool.diff);
-				const hasDetails = Boolean(tool.command || preview);
+				const hasDetails = Boolean(tool.command || inputPreview || preview);
 				const stateLabel =
 					tool.state === "failed"
 						? "Failed"
@@ -697,6 +754,11 @@ function LiveExecutionStream({
 									{tool.nodeTitle}
 								</p>
 							) : null}
+							{inputPreview ? (
+								<code className="mt-0.5 block truncate text-[11px] text-muted-foreground">
+									{inputPreview}
+								</code>
+							) : null}
 						</div>
 						<span className="shrink-0 text-[11px] text-muted-foreground">
 							{duration ?? stateLabel}
@@ -726,10 +788,37 @@ function LiveExecutionStream({
 										{tool.command}
 									</code>
 								) : null}
+								{inputPreview ? (
+									<div
+										className={
+											tool.command
+												? "mt-2 border-t border-border/60 pt-2"
+												: ""
+										}
+									>
+										<p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+											{copy.runtimeTranscriptInput ?? "Input"}
+										</p>
+										<pre className="max-h-28 overflow-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed text-foreground">
+											{inputPreview}
+										</pre>
+									</div>
+								) : null}
 								{preview ? (
-									<pre className="mt-2 max-h-28 overflow-auto whitespace-pre-wrap break-words border-t border-border/60 pt-2 font-mono text-[11px] leading-relaxed text-muted-foreground">
-										{preview}
-									</pre>
+									<div
+										className={
+											tool.command || inputPreview
+												? "mt-2 border-t border-border/60 pt-2"
+												: ""
+										}
+									>
+										<p className="mb-1 text-[10px] font-semibold uppercase tracking-[0.1em] text-muted-foreground">
+											{copy.runtimeTranscriptResult ?? "Result"}
+										</p>
+										<pre className="max-h-28 overflow-auto whitespace-pre-wrap break-words font-mono text-[11px] leading-relaxed text-muted-foreground">
+											{preview}
+										</pre>
+									</div>
 								) : null}
 							</div>
 						</details>
@@ -751,7 +840,7 @@ function ProviderChatTranscript({
 	copy: WorkspaceCopy;
 	embedded?: boolean;
 }) {
-	const items = providerChatItems(events);
+	const items = providerChatItems(events, copy);
 	const latestActiveKey = items.findLast(
 		(item): item is Extract<ProviderChatItem, { kind: "tool" }> =>
 			item.kind === "tool" &&
@@ -1017,13 +1106,6 @@ function ProviderChatTranscript({
 										{item.diff}
 									</pre>
 								) : null}
-								<ProviderPayloadBlock
-									label={
-										copy.runtimeTranscriptProviderDetails ?? "Provider details"
-									}
-									value={item.raw}
-									embedded={embedded}
-								/>
 							</div>
 						</details>
 					);
@@ -1048,7 +1130,7 @@ function LiveExecutionFeed({
 	activitySummary: string;
 	copy: WorkspaceCopy;
 }) {
-	const streamItems = providerChatItems(runtimeEvents);
+	const streamItems = providerChatItems(runtimeEvents, copy);
 	const hasProviderStream = streamItems.length > 0;
 	const latestNodeTitle = runtimeEvents.findLast(
 		(event) => event.nodeTitle,
@@ -1213,7 +1295,7 @@ function ExecutionResults(props: ExecutionResultsProps) {
 						copy={workspaceCopy}
 						isProducingOutput={isLive}
 					/>
-					{status === "failed" ? (
+					{status === "failed" || status === "stalled" ? (
 						<FinalizationRetry
 							copy={workspaceCopy}
 							error={finalizationRetryError}
@@ -1247,7 +1329,7 @@ function ExecutionResults(props: ExecutionResultsProps) {
 				>
 					<div className="mb-3 flex items-center gap-3">
 						<span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-muted-foreground">
-							Result output
+							{workspaceCopy.resultOutputLabel ?? "Result output"}
 						</span>
 						<div className="h-px flex-1 bg-border/60" />
 					</div>

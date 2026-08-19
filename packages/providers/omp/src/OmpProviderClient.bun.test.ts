@@ -105,6 +105,88 @@ describe("OmpSdkProviderClient recovery capabilities", () => {
 });
 
 describe("OmpSdkProviderClient direct config", () => {
+  it("keeps a slash-containing model ID opaque when provider is explicit", async () => {
+    expect(__ompSdkProviderTestHooks.resolveSdkModelSelection({
+      provider: "nrouter",
+      model: "cx/gpt-5.6-sol",
+    })).toEqual({
+      provider: "nrouter",
+      modelId: "cx/gpt-5.6-sol",
+      modelPattern: "nrouter/cx/gpt-5.6-sol",
+    });
+    expect(__ompSdkProviderTestHooks.resolveSdkModelSelection({
+      model: "nrouter/cx/gpt-5.6-sol",
+    })).toEqual({
+      provider: "nrouter",
+      modelId: "cx/gpt-5.6-sol",
+      modelPattern: "nrouter/cx/gpt-5.6-sol",
+    });
+  });
+
+  it("does not prepend the provider twice for an execution-pinned model", () => {
+    const runConfig = __ompSdkProviderTestHooks.withSdkRuntimeModel(
+      { provider: "9router", model: "cx/gpt-5.6-sol" },
+      "9router/cx/gpt-5.6-sol",
+    );
+
+    expect(runConfig).toMatchObject({
+      provider: "9router",
+      model: "cx/gpt-5.6-sol",
+    });
+    expect(__ompSdkProviderTestHooks.resolveSdkModelSelection(runConfig)).toEqual({
+      provider: "9router",
+      modelId: "cx/gpt-5.6-sol",
+      modelPattern: "9router/cx/gpt-5.6-sol",
+    });
+  });
+
+  it("registers a complete custom provider model configuration", async () => {
+    const agentDir = await mkdtemp(join(tmpdir(), "chrona-omp-direct-model-"));
+    const suffix = crypto.randomUUID().replaceAll("-", "_").toUpperCase();
+    const apiKeyEnvName = `CHRONA_OMP_TEST_KEY_${suffix}`;
+    const baseUrlEnvName = `CHRONA_OMP_TEST_URL_${suffix}`;
+    process.env[apiKeyEnvName] = "sk-direct-omp";
+    process.env[baseUrlEnvName] = "https://llm.example.test/v1";
+    try {
+      const setup = await __ompSdkProviderTestHooks.createSdkModelSetup(
+        {
+          provider: "nrouter",
+          model: "cx/gpt-5.6-sol",
+          api: "openai-responses",
+          apiKey: "sk-direct-omp",
+          baseUrl: "https://llm.example.test/v1",
+        },
+        { agentDir, apiKeyEnvName, baseUrlEnvName },
+      );
+
+      expect(setup.modelPattern).toBe("nrouter/cx/gpt-5.6-sol");
+      expect(setup.modelRegistry?.find("nrouter", "cx/gpt-5.6-sol")).toMatchObject({
+        provider: "nrouter",
+        id: "cx/gpt-5.6-sol",
+        api: "openai-responses",
+        baseUrl: "https://llm.example.test/v1",
+        supportsTools: true,
+      });
+      await expect(setup.authStorage?.getApiKey("nrouter")).resolves.toBe("sk-direct-omp");
+
+      const diagnostics = await new OmpSdkProviderClient({
+        config: {
+          provider: "nrouter",
+          model: "cx/gpt-5.6-sol",
+          api: "openai-responses",
+          apiKey: "sk-direct-omp",
+          baseUrl: "https://llm.example.test/v1",
+          codingAgentDirectory: agentDir,
+        },
+      }).getRuntimeDiagnostics();
+      expect(diagnostics.model).toBe("nrouter/cx/gpt-5.6-sol");
+    } finally {
+      delete process.env[apiKeyEnvName];
+      delete process.env[baseUrlEnvName];
+      await rm(agentDir, { recursive: true, force: true });
+    }
+  });
+
   it("copies configured API key and base URL into SDK environment variables", async () => {
     const client = new OmpSdkProviderClient({
       config: {
@@ -309,6 +391,68 @@ describe("OmpSdkProviderClient declared runtime tools", () => {
     expect(__ompSdkProviderTestHooks.sdkRunStopped({ done: true, status: "running" })).toBe(true);
     expect(__ompSdkProviderTestHooks.sdkRunStopped({ done: false, status: "cancelled" })).toBe(true);
     expect(__ompSdkProviderTestHooks.sdkRunStopped({ done: false, status: "running" })).toBe(false);
+  });
+
+  it("removes queue abort listeners after every wakeup", async () => {
+    let listener: (() => void) | undefined;
+    let added = 0;
+    let removed = 0;
+    const signal = {
+      aborted: false,
+      addEventListener: (_type: string, callback: () => void) => {
+        added += 1;
+        listener = callback;
+      },
+      removeEventListener: (_type: string, callback: () => void) => {
+        if (listener === callback) listener = undefined;
+        removed += 1;
+      },
+    } as unknown as AbortSignal;
+    const handle = {
+      done: false,
+      queue: [],
+      waiters: [],
+    };
+    const queue = new __ompSdkProviderTestHooks.AsyncEventQueue(handle as never);
+
+    const first = queue.next(signal);
+    queue.push({ type: "end" });
+    await first;
+    const second = queue.next(signal);
+    queue.push({ type: "end" });
+    await second;
+
+    expect(added).toBe(2);
+    expect(removed).toBe(2);
+    expect(listener).toBeUndefined();
+    expect(handle.waiters).toHaveLength(0);
+  });
+
+  it("stops the SDK session with an explicit terminal-action reason", async () => {
+    let abortReason: unknown;
+    const handle = {
+      terminalActionAccepted: false,
+      session: {
+        abort: (input: unknown) => {
+          abortReason = input;
+        },
+      },
+    };
+
+    __ompSdkProviderTestHooks.acceptTerminalAction(handle as never);
+    await Promise.resolve();
+
+    expect(handle.terminalActionAccepted).toBe(true);
+    expect(abortReason).toEqual({ reason: "Chrona terminal action recorded" });
+    expect(
+      __ompSdkProviderTestHooks.isRunTerminalTool(
+        {
+          ...startInput("chrona_node_complete"),
+          control: { baseUrl: "http://chrona.test", runToken: "run-token" },
+        },
+        "chrona_node_complete",
+      ),
+    ).toBe(true);
   });
 
   it("routes declared request-input terminal tools through run-token control", async () => {

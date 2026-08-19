@@ -1,9 +1,17 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+  within,
+} from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactElement, ReactNode } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { deriveWorkStateView } from "@chrona/domain";
+import { ExecutionFocusHeader } from "./task-workspace-execution-navigation";
 import { TaskWorkspaceOperationPanel } from "./task-workspace-operation-panel";
 import type { TaskWorkspaceOperationState } from "../model/task-workspace-operation-machine";
 
@@ -43,7 +51,8 @@ const operationStateBase = {
   selectedNode: null,
   currentNode: null,
 };
-const operationState = operationStateBase as unknown as TaskWorkspaceOperationState;
+const operationState =
+  operationStateBase as unknown as TaskWorkspaceOperationState;
 
 const commonProps = {
   taskId: "task-1",
@@ -62,47 +71,84 @@ describe("TaskWorkspaceOperationPanel recovery", () => {
     renderWithQueryClient(
       <TaskWorkspaceOperationPanel
         {...commonProps}
-        workState={{
-          ...deriveWorkStateView({
-            taskStatus: "Failed",
-            executionStatus: "Failed",
-          }),
-          blocker: {
-            reason: "Provider timeout after an external write may have completed.",
-            scope: "provider",
-          },
-        } as never}
+        workState={
+          {
+            ...deriveWorkStateView({
+              taskStatus: "Failed",
+              executionStatus: "Failed",
+            }),
+            blocker: {
+              reason:
+                "Provider timeout after an external write may have completed.",
+              scope: "provider",
+            },
+          } as never
+        }
       />,
     );
 
     expect(screen.getByText("Retained")).toBeInTheDocument();
     expect(screen.getByText("Retry from")).toBeInTheDocument();
     expect(screen.getByText("Before retrying")).toBeInTheDocument();
-    expect(screen.getByText("Diagnostics").closest("details")).not.toHaveAttribute("open");
+    expect(
+      screen.getByText("Diagnostics").closest("details"),
+    ).not.toHaveAttribute("open");
   });
 
-  it("distinguishes input from approval recovery", () => {
-    const { rerender } = renderWithQueryClient(
-      <TaskWorkspaceOperationPanel
-        {...commonProps}
-        workState={deriveWorkStateView({
-          taskStatus: "InProgress",
-          executionStatus: "WaitingForInput",
-        })}
-      />,
-    );
-    expect(screen.getByText("input")).toBeInTheDocument();
+  it.each([
+    ["WaitingForInput", "Input needed"],
+    ["WaitingForApproval", "Approval needed"],
+    ["Blocked", "Blocked"],
+    ["Failed", "Failed"],
+    ["Cancelled", "Cancelled"],
+  ])(
+    "[RUN-011/CROSS-012] renders distinct %s recovery copy",
+    (executionStatus, label) => {
+      renderWithQueryClient(
+        <TaskWorkspaceOperationPanel
+          {...commonProps}
+          workState={deriveWorkStateView({
+            taskStatus: executionStatus,
+            executionStatus,
+          })}
+        />,
+      );
 
-    rerender(
-      <TaskWorkspaceOperationPanel
-        {...commonProps}
-        workState={deriveWorkStateView({
-          taskStatus: "InProgress",
-          executionStatus: "WaitingForApproval",
-        })}
+      expect(
+        within(screen.getByTestId("current-operation-decision-card")).getByText(
+          label,
+        ),
+      ).toBeInTheDocument();
+    },
+  );
+
+  it.each([
+    ["Completed", "Result ready"],
+    ["Done", "Task done"],
+  ])("[CROSS-012] renders distinct %s terminal copy", (taskStatus, label) => {
+    render(
+      <ExecutionFocusHeader
+        view={
+          {
+            currentStep: null,
+            progress: {
+              total: 0,
+              completed: 0,
+              active: 0,
+              waiting: 0,
+              blocked: 0,
+              remaining: 0,
+            },
+          } as never
+        }
+        workState={deriveWorkStateView({ taskStatus })}
+        copy={{}}
       />,
     );
-    expect(screen.getByText("approval")).toBeInTheDocument();
+
+    expect(
+      within(screen.getByTestId("execution-focus-header")).getByText(label),
+    ).toBeInTheDocument();
   });
 
   it("offers a new draft after a completed task instead of only rerunning the accepted plan", async () => {
@@ -110,12 +156,14 @@ describe("TaskWorkspaceOperationPanel recovery", () => {
     renderWithQueryClient(
       <TaskWorkspaceOperationPanel
         {...commonProps}
-        state={{
-          ...operationStateBase,
-          status: "execution-completed",
-          tone: "success",
-          title: "Execution completed",
-        } as never}
+        state={
+          {
+            ...operationStateBase,
+            status: "execution-completed",
+            tone: "success",
+            title: "Execution completed",
+          } as never
+        }
         workState={deriveWorkStateView({
           taskStatus: "Completed",
           executionStatus: "Completed",
@@ -126,24 +174,34 @@ describe("TaskWorkspaceOperationPanel recovery", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Generate a new plan" }));
-    expect(screen.getByRole("dialog", { name: "Choose how to recover this task" })).toBeInTheDocument();
-    const generateButtons = screen.getAllByRole("button", { name: /Generate a new plan/ });
+    fireEvent.click(
+      screen.getByRole("button", { name: "Generate a new plan" }),
+    );
+    expect(
+      screen.getByRole("dialog", { name: "Choose how to recover this task" }),
+    ).toBeInTheDocument();
+    const generateButtons = screen.getAllByRole("button", {
+      name: /Generate a new plan/,
+    });
     fireEvent.click(generateButtons[generateButtons.length - 1]!);
-    await waitFor(() => expect(onRegeneratePlan).toHaveBeenCalledWith(undefined));
+    await waitFor(() =>
+      expect(onRegeneratePlan).toHaveBeenCalledWith(undefined),
+    );
   });
 
   it("offers plan regeneration before the accepted plan has started", () => {
     renderWithQueryClient(
       <TaskWorkspaceOperationPanel
         {...commonProps}
-        state={{
-          ...operationStateBase,
-          status: "plan-ready-to-run",
-          tone: "neutral",
-          title: "Plan ready",
-          hasGraphExecutionStarted: false,
-        } as never}
+        state={
+          {
+            ...operationStateBase,
+            status: "plan-ready-to-run",
+            tone: "neutral",
+            title: "Plan ready",
+            hasGraphExecutionStarted: false,
+          } as never
+        }
         workState={deriveWorkStateView({ taskStatus: "Planned" })}
         hasAcceptedPlan
         onRestartPlan={vi.fn()}
@@ -151,6 +209,8 @@ describe("TaskWorkspaceOperationPanel recovery", () => {
       />,
     );
 
-    expect(screen.getByRole("button", { name: "Generate a new plan" })).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: "Generate a new plan" }),
+    ).toBeInTheDocument();
   });
 });

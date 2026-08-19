@@ -112,9 +112,64 @@ export function compileAiFeatureRequest(input: {
 }
 
 export type AiFeatureProviderErrorCode =
+	| "provider_authentication_error"
+	| "provider_configuration_error"
+	| "provider_permission_error"
+	| "provider_quota_exceeded"
+	| "provider_rate_limited"
+	| "provider_request_error"
+	| "provider_unavailable"
+	| "provider_network_error"
 	| "provider_protocol_error"
 	| "provider_timeout"
 	| "cancelled";
+
+const PROVIDER_ERROR_PATTERNS: ReadonlyArray<
+	readonly [AiFeatureProviderErrorCode, RegExp]
+> = [
+	["provider_timeout", /\b(?:408|etimedout)\b|timed? out|timeout/i],
+	[
+		"provider_quota_exceeded",
+		/\b402\b|billing|balance|credit(?:s)?|insufficient funds|payment required|quota/i,
+	],
+	[
+		"provider_authentication_error",
+		/\b401\b|api key required|invalid api key|missing api key|unauthenticated|unauthorized|authentication failed/i,
+	],
+	[
+		"provider_configuration_error",
+		/no model selected|select a model|no provider configured|provider (?:is )?not configured|configuration (?:is )?incomplete/i,
+	],
+	[
+		"provider_permission_error",
+		/\b403\b|forbidden|permission denied|access denied/i,
+	],
+	[
+		"provider_rate_limited",
+		/\b429\b|rate.?limit|too many requests/i,
+	],
+	[
+		"provider_request_error",
+		/\b(?:400|404)\b|bad request|invalid request|model (?:is )?(?:not found|unavailable|unsupported)|unknown model/i,
+	],
+	[
+		"provider_unavailable",
+		/\b(?:500|502|503|504)\b|service unavailable|temporarily unavailable|provider overloaded|upstream error/i,
+	],
+	[
+		"provider_network_error",
+		/\b(?:econnrefused|econnreset|enotfound|enetunreach)\b|connection (?:closed|ended|reset|refused)|fetch failed|network error|socket hang up/i,
+	],
+];
+
+export function classifyAiFeatureProviderError(
+	message: string,
+): AiFeatureProviderErrorCode {
+	return (
+		PROVIDER_ERROR_PATTERNS.find(([, pattern]) => pattern.test(message))?.[0] ??
+		"provider_protocol_error"
+	);
+}
 
 /** Known provider terminal failure, distinct from an ambiguous start outcome. */
 export class AiFeatureProviderError extends Error {

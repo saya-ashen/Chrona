@@ -12,22 +12,53 @@ import {
 
 const SENSITIVE_PROVIDER_KEY =
 	/api[-_]?key|token|secret|password|authorization|credential/i;
+const SAFE_TOOL_DISPLAY_KEYS = new Set([
+	"action", "alreadyAccepted", "args", "call", "code", "command",
+	"count", "cwd", "end", "file", "filename", "format", "intent",
+	"kind", "language", "limit", "line", "message", "method", "offset",
+	"ok", "options", "params", "path", "pattern", "query", "queries",
+	"recorded", "result", "scope", "selector", "start", "status",
+	"summary", "target", "title", "tool", "url",
+]);
 
-function exposeProviderPayload(value: unknown, key?: string): unknown {
-	if (key && SENSITIVE_PROVIDER_KEY.test(key)) return "[redacted]";
+function redactSensitiveText(value: string) {
+	return value
+		.replace(/(authorization\s*:\s*bearer\s+)[^\s]+/gi, "$1[redacted]")
+		.replace(
+			/(["']?(?:api[-_]?key|token|secret|password|credential)["']?\s*[:=]\s*["']?)[^"',\s}&]+/gi,
+			"$1[redacted]",
+		)
+		.replace(
+			/((?:--)(?:api[-_]?key|token|secret|password|credential)(?:\s+|=))[^\s'"]+/gi,
+			"$1[redacted]",
+		)
+		.replace(/(https?:\/\/[^:/\s]+:)[^@\s]+@/gi, "$1[redacted]@");
+}
+
+function safeDisplayText(value: string) {
+	const redacted = redactSensitiveText(value);
+	return redacted.length > 500 ? `${redacted.slice(0, 500)}…` : redacted;
+}
+
+function safeToolDisplayPayload(value: unknown, depth = 0): unknown {
+	if (depth > 4) return "[omitted]";
+	if (typeof value === "string") return safeDisplayText(value);
 	if (Array.isArray(value))
-		return value.map((item) => exposeProviderPayload(item));
-	if (value && typeof value === "object") {
-		return Object.fromEntries(
-			Object.entries(value as Record<string, unknown>).map(
-				([entryKey, entryValue]) => [
-					entryKey,
-					exposeProviderPayload(entryValue, entryKey),
-				],
-			),
-		);
-	}
-	return value;
+		return value.slice(0, 20).map((item) => safeToolDisplayPayload(item, depth + 1));
+	if (!value || typeof value !== "object") return value;
+	return Object.fromEntries(
+		Object.entries(value as Record<string, unknown>)
+			.filter(
+				([key]) =>
+					SAFE_TOOL_DISPLAY_KEYS.has(key) || SENSITIVE_PROVIDER_KEY.test(key),
+			)
+			.map(([key, entry]) => [
+				key,
+				SENSITIVE_PROVIDER_KEY.test(key)
+					? "[redacted]"
+					: safeToolDisplayPayload(entry, depth + 1),
+			]),
+	);
 }
 
 function optionalStringEventValue(event: Record<string, unknown>, key: string) {
@@ -103,21 +134,13 @@ type ProviderItemInput = {
 
 function providerItem(event: TaskActivityEvent, input: ProviderItemInput) {
 	const { base, timestamp, payload } = providerBase(event);
-	const raw = payloadRecord(payload.raw);
-	const providerInput =
-		payload.input !== undefined
-			? exposeProviderPayload(payload.input)
-			: raw?.kind === "provider_request"
-				? exposeProviderPayload(raw.input)
-				: undefined;
-	const providerOutput = exposeProviderPayload(
+	const providerInput = payload.input !== undefined
+		? safeToolDisplayPayload(payload.input)
+		: undefined;
+	const providerOutput = safeToolDisplayPayload(
 		payload.output ??
 			payload.result ??
-			payload.outputText ??
-			payload.text ??
-			payload.structuredPayload ??
-			(typeof payload.error === "string" ? payload.error : undefined) ??
-			(raw?.kind === "provider_response" ? raw.output : undefined),
+			(typeof payload.error === "string" ? { message: payload.error } : undefined),
 	);
 	return {
 		id: event.id,
@@ -130,9 +153,6 @@ function providerItem(event: TaskActivityEvent, input: ProviderItemInput) {
 		...input.extras,
 		...(providerInput !== undefined ? { providerInput } : {}),
 		...(providerOutput !== undefined ? { providerOutput } : {}),
-		...(payload.raw !== undefined
-			? { providerRaw: exposeProviderPayload(payload.raw) }
-			: {}),
 		...base,
 	};
 }
@@ -151,6 +171,15 @@ function toolPresentation(
 	return failed
 		? { title: "Tool failed", description: "Provider tool failed." }
 		: { title: "Tool completed", description: "Provider tool completed." };
+}
+
+function providerToolName(payload: Record<string, unknown>) {
+	return (
+		optionalStringEventValue(payload, "tool") ??
+		optionalStringEventValue(payload, "toolName") ??
+		optionalStringEventValue(payload, "toolLabel") ??
+		"Runtime tool"
+	);
 }
 
 function toolItem(
@@ -175,7 +204,7 @@ function toolItem(
 		tone: failed ? "danger" : state === "completed" ? "success" : "info",
 		extras: {
 			tool: {
-				name: optionalStringEventValue(payload, "toolLabel") ?? "Runtime tool",
+				name: providerToolName(payload),
 				...(state === "completed"
 					? { durationMs: optionalNumberEventValue(payload, "durationMs") }
 					: {}),
@@ -194,18 +223,20 @@ export function mapProviderEventToActivity(
 			return providerItem(event, {
 				kind: "provider_run",
 				title: "Assistant output",
-				description:
+				description: safeDisplayText(
 					optionalStringEventValue(payload, "text") ??
-					"Assistant output chunk.",
+						"Assistant output chunk.",
+				),
 				tone: "info",
 			});
 		case "reasoning_delta":
 			return providerItem(event, {
 				kind: "provider_run",
 				title: "Provider reasoning",
-				description:
+				description: safeDisplayText(
 					optionalStringEventValue(payload, "text") ??
-					"Provider reasoning chunk.",
+						"Provider reasoning chunk.",
+				),
 				tone: "neutral",
 			});
 		case "tool_result":
@@ -308,6 +339,23 @@ export function providerActivityMergeKey(
 		stringPayloadValue(event.payload, "runtimeName") ?? "runtime",
 		stringPayloadValue(event.payload, "provider") ?? "provider",
 		event.nodeId ?? "task",
+		event.nodeAttemptId ??
+			stringPayloadValue(event.payload, "nodeAttemptId") ??
+			"attempt",
+		event.providerRunId ??
+			stringPayloadValue(event.payload, "providerRunId") ??
+			"provider-run",
+	].join(":");
+}
+
+function providerToolCallMergeKey(
+	event: TaskActivityEvent,
+	payloadEvent: Record<string, unknown>,
+	fallback: string,
+) {
+	return [
+		providerActivityMergeKey(event, "tool_call"),
+		optionalStringEventValue(payloadEvent, "callId") ?? fallback,
 	].join(":");
 }
 
@@ -315,10 +363,35 @@ export function providerToolProgressMergeKey(
 	event: TaskActivityEvent,
 	payloadEvent: Record<string, unknown>,
 ) {
-	return [
-		providerActivityMergeKey(event, "tool_progress"),
+	return providerToolCallMergeKey(
+		event,
+		payloadEvent,
 		optionalStringEventValue(payloadEvent, "toolName") ?? "tool",
-	].join(":");
+	);
+}
+
+export function providerToolCompletionMergeKey(
+	event: TaskActivityEvent,
+	payloadEvent: Record<string, unknown>,
+) {
+	const rawEventType = optionalStringEventValue(payloadEvent, "rawEventType");
+	const sequence = optionalNumberEventValue(payloadEvent, "sequence");
+	if (
+		sequence !== undefined &&
+		(rawEventType === "tool_execution_end" ||
+			rawEventType === "tool_execution_end:result")
+	) {
+		const sourceSequence =
+			rawEventType === "tool_execution_end:result" ? sequence - 1 : sequence;
+		return [
+			providerActivityMergeKey(event, "tool_call"),
+			providerToolName(payloadEvent),
+			sourceSequence,
+		].join(":");
+	}
+	return optionalStringEventValue(payloadEvent, "callId")
+		? providerToolCallMergeKey(event, payloadEvent, "tool")
+		: null;
 }
 
 export { providerActivityEventType };

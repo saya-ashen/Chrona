@@ -1,36 +1,71 @@
 import "@testing-library/jest-dom/vitest";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
 import { TaskPlanGraph } from "./task-plan-graph";
+import { buildCompactViewModel } from "./task-plan-graph/compact-view";
 import { DEFAULT_GRAPH_COPY } from "./task-plan-graph/constants";
 import { buildFlowLayout } from "./task-plan-graph/layout";
 import type { TaskPlanGraphPlan } from "./task-plan-graph";
 
-function testPlan(input: Omit<TaskPlanGraphPlan, "nodes" | "analytics">): TaskPlanGraphPlan {
+function testPlan(
+  input: Omit<TaskPlanGraphPlan, "nodes" | "analytics">,
+): TaskPlanGraphPlan {
   return {
     ...input,
     nodes: input.steps,
     analytics: {
       entryNodeIds: input.steps.slice(0, 1).map((node) => node.id),
       terminalNodeIds: input.steps.slice(-1).map((node) => node.id),
-      activeNodeIds: input.steps.filter((node) => node.status === "active" || node.status === "in_progress").map((node) => node.id),
+      activeNodeIds: input.steps
+        .filter(
+          (node) => node.status === "active" || node.status === "in_progress",
+        )
+        .map((node) => node.id),
       reachableFromActiveIds: input.steps.map((node) => node.id),
       criticalPathNodeIds: input.steps.map((node) => node.id),
-      attentionNodeIds: input.steps.filter((node) => node.status === "waiting" || node.status === "waiting_for_user").map((node) => node.id),
-      blockedNodeIds: input.steps.filter((node) => node.status === "blocked").map((node) => node.id),
-      rankByNodeId: Object.fromEntries(input.steps.map((node, index) => [node.id, index])),
+      attentionNodeIds: input.steps
+        .filter(
+          (node) =>
+            node.status === "waiting" || node.status === "waiting_for_user",
+        )
+        .map((node) => node.id),
+      blockedNodeIds: input.steps
+        .filter((node) => node.status === "blocked")
+        .map((node) => node.id),
+      rankByNodeId: Object.fromEntries(
+        input.steps.map((node, index) => [node.id, index]),
+      ),
       laneByNodeId: Object.fromEntries(input.steps.map((node) => [node.id, 0])),
-      upstreamByNodeId: Object.fromEntries(input.steps.map((node) => [node.id, []])),
-      downstreamByNodeId: Object.fromEntries(input.steps.map((node) => [node.id, []])),
+      upstreamByNodeId: Object.fromEntries(
+        input.steps.map((node) => [node.id, []]),
+      ),
+      downstreamByNodeId: Object.fromEntries(
+        input.steps.map((node) => [node.id, []]),
+      ),
     },
   };
 }
 
 function expectNoNodeOverlap(
-  nodes: Array<{ id: string; position: { x: number; y: number }; width?: number; height?: number }>,
+  nodes: Array<{
+    id: string;
+    position: { x: number; y: number };
+    width?: number;
+    height?: number;
+  }>,
 ) {
   for (let leftIndex = 0; leftIndex < nodes.length; leftIndex += 1) {
-    for (let rightIndex = leftIndex + 1; rightIndex < nodes.length; rightIndex += 1) {
+    for (
+      let rightIndex = leftIndex + 1;
+      rightIndex < nodes.length;
+      rightIndex += 1
+    ) {
       const left = nodes[leftIndex];
       const right = nodes[rightIndex];
       const overlaps =
@@ -44,14 +79,20 @@ function expectNoNodeOverlap(
 }
 
 vi.mock("@chrona/i18n/react", () => ({
-  useI18n: () => ({ messages: { components: { taskWorkspace: {} } }, t: (key: string) => key }),
+  useI18n: () => ({
+    messages: { components: { taskWorkspace: {} } },
+    t: (key: string) => key,
+  }),
 }));
 
 beforeAll(() => {
   class ResizeObserverMock {
     observe(target?: Element) {
       if (target) {
-        const width = Number.parseInt((target as HTMLElement).style.width || "0", 10);
+        const width = Number.parseInt(
+          (target as HTMLElement).style.width || "0",
+          10,
+        );
         Object.defineProperty(target, "clientWidth", {
           configurable: true,
           value: width || 960,
@@ -147,13 +188,20 @@ describe("TaskPlanGraph", () => {
             },
           ],
           edges: [
-            { id: "edge-1", fromNodeId: "node-pending", toNodeId: "node-accepted", type: "sequential" },
+            {
+              id: "edge-1",
+              fromNodeId: "node-pending",
+              toNodeId: "node-accepted",
+              type: "sequential",
+            },
           ],
         })}
       />,
     );
 
-    const pendingNode = await screen.findByTestId("task-plan-node-node-pending");
+    const pendingNode = await screen.findByTestId(
+      "task-plan-node-node-pending",
+    );
     const acceptedNode = screen.getByTestId("task-plan-node-node-accepted");
     expect(pendingNode).toHaveTextContent("Ready");
     expect(pendingNode).toHaveAttribute("data-node-current", "true");
@@ -195,15 +243,23 @@ describe("TaskPlanGraph", () => {
       />,
     );
 
-    const pendingNode = await screen.findByTestId("task-plan-node-node-pending");
+    const pendingNode = await screen.findByTestId(
+      "task-plan-node-node-pending",
+    );
     onSelectedNodeChange.mockClear();
 
     fireEvent.click(pendingNode);
-    expect(onSelectedNodeChange).toHaveBeenCalledWith(plan.nodes[0], plan.nodes);
+    expect(onSelectedNodeChange).toHaveBeenCalledWith(
+      plan.nodes[0],
+      plan.nodes,
+    );
 
     onSelectedNodeChange.mockClear();
     fireEvent.click(pendingNode);
-    expect(onSelectedNodeChange).toHaveBeenCalledWith(plan.nodes[0], plan.nodes);
+    expect(onSelectedNodeChange).toHaveBeenCalledWith(
+      plan.nodes[0],
+      plan.nodes,
+    );
   });
 
   it("maps user-facing execution states to stable node markers", async () => {
@@ -268,20 +324,46 @@ describe("TaskPlanGraph", () => {
       />,
     );
 
-    expect(await screen.findByTestId("task-plan-node-node-completed")).toHaveAttribute("data-node-execution-status", "completed");
-    expect(screen.getByTestId("task-plan-node-node-completed")).toHaveAttribute("data-node-has-artifacts", "false");
-    expect(screen.getByTestId("task-plan-node-node-running")).toHaveAttribute("data-node-execution-status", "running");
-    expect(screen.getByTestId("task-plan-node-node-waiting")).toHaveAttribute("data-node-execution-status", "waiting");
-    expect(screen.getByTestId("task-plan-node-node-approval")).toHaveAttribute("data-node-execution-status", "approval-needed");
-    expect(screen.getByTestId("task-plan-node-node-approval")).toHaveAttribute("data-node-requires-action", "true");
-    expect(screen.getByTestId("task-plan-node-node-blocked")).toHaveAttribute("data-node-execution-status", "blocked");
-    expect(screen.getByTestId("task-plan-node-node-blocked")).toHaveAttribute("data-node-requires-action", "true");
+    expect(
+      await screen.findByTestId("task-plan-node-node-completed"),
+    ).toHaveAttribute("data-node-execution-status", "completed");
+    expect(screen.getByTestId("task-plan-node-node-completed")).toHaveAttribute(
+      "data-node-has-artifacts",
+      "false",
+    );
+    expect(screen.getByTestId("task-plan-node-node-running")).toHaveAttribute(
+      "data-node-execution-status",
+      "running",
+    );
+    expect(screen.getByTestId("task-plan-node-node-waiting")).toHaveAttribute(
+      "data-node-execution-status",
+      "waiting",
+    );
+    expect(screen.getByTestId("task-plan-node-node-approval")).toHaveAttribute(
+      "data-node-execution-status",
+      "approval-needed",
+    );
+    expect(screen.getByTestId("task-plan-node-node-approval")).toHaveAttribute(
+      "data-node-requires-action",
+      "true",
+    );
+    expect(screen.getByTestId("task-plan-node-node-blocked")).toHaveAttribute(
+      "data-node-execution-status",
+      "blocked",
+    );
+    expect(screen.getByTestId("task-plan-node-node-blocked")).toHaveAttribute(
+      "data-node-requires-action",
+      "true",
+    );
   });
 
   it("keeps long titles, generated plan text, and error summaries contained in graph surfaces", async () => {
-    const longTitle = "Investigate an unusually long generated execution node title that should stay clipped inside the graph card without hiding controls";
-    const longObjective = "Generated plan text: collect logs, compare checkpoints, write a diagnostic summary, and include enough detail to reproduce the blocked execution state without expanding the node beyond the graph viewport.";
-    const longError = "Provider timeout while waiting for checkpoint review output after multiple retries; keep this error visible in the inspector without overflowing the modal.";
+    const longTitle =
+      "Investigate an unusually long generated execution node title that should stay clipped inside the graph card without hiding controls";
+    const longObjective =
+      "Generated plan text: collect logs, compare checkpoints, write a diagnostic summary, and include enough detail to reproduce the blocked execution state without expanding the node beyond the graph viewport.";
+    const longError =
+      "Provider timeout while waiting for checkpoint review output after multiple retries; keep this error visible in the inspector without overflowing the modal.";
 
     render(
       <TaskPlanGraph
@@ -298,7 +380,8 @@ describe("TaskPlanGraph", () => {
               phase: "diagnostics",
               status: "blocked",
               statusLabel: "Retry needed after provider timeout",
-              nextAction: "Retry after checking checkpoint evidence and provider logs",
+              nextAction:
+                "Retry after checking checkpoint evidence and provider logs",
               type: "checkpoint",
               displayType: "checkpoint",
               metadata: { error: longError },
@@ -317,9 +400,10 @@ describe("TaskPlanGraph", () => {
 
     fireEvent.click(node);
     expect(node).toHaveAttribute("data-node-selected", "true");
-    expect(screen.queryByTestId("task-plan-node-overlay")).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("task-plan-node-overlay"),
+    ).not.toBeInTheDocument();
   });
-
 
   it("renders a compact read-only React Flow graph that pans the canvas instead of dragging nodes", async () => {
     render(
@@ -332,7 +416,8 @@ describe("TaskPlanGraph", () => {
             {
               id: "node-current",
               title: "当前执行节点",
-              objective: "这是一个比较长的说明，用来验证未展开时会被收敛成真正像节点的卡片，而不是把全部正文都摊开。",
+              objective:
+                "这是一个比较长的说明，用来验证未展开时会被收敛成真正像节点的卡片，而不是把全部正文都摊开。",
               phase: "checkpoint",
               status: "waiting_for_user",
               requiresHumanInput: true,
@@ -342,7 +427,10 @@ describe("TaskPlanGraph", () => {
               linkedTaskId: null,
               estimatedMinutes: 20,
               priority: "High",
-              metadata: { checkpointType: "input", prompt: "你希望调整哪些参数？" },
+              metadata: {
+                checkpointType: "input",
+                prompt: "你希望调整哪些参数？",
+              },
             },
             {
               id: "node-child",
@@ -360,7 +448,12 @@ describe("TaskPlanGraph", () => {
             },
           ],
           edges: [
-            { id: "edge-1", fromNodeId: "node-current", toNodeId: "node-child", type: "sequential" },
+            {
+              id: "edge-1",
+              fromNodeId: "node-current",
+              toNodeId: "node-child",
+              type: "sequential",
+            },
           ],
         })}
       />,
@@ -378,17 +471,52 @@ describe("TaskPlanGraph", () => {
     expect(graph.querySelector(".react-flow")).not.toBeNull();
     expect(graph.querySelector(".react-flow__pane.draggable")).not.toBeNull();
     expect(graph.querySelector(".react-flow__edges")).not.toBeNull();
-    const currentFlowNode = graph.querySelector(".react-flow__node[data-id='node-current']") as HTMLElement | null;
-    expect(currentFlowNode?.querySelector("[data-handleid='bottom-source']")).not.toBeNull();
-    expect(currentFlowNode?.querySelector<HTMLElement>("[data-handleid='bottom-source']")?.style.opacity).toBe("0");
-    expect(currentFlowNode?.querySelector<HTMLElement>("[data-handleid='bottom-center-source']")?.style.left).toBe("50%");
-    expect(currentFlowNode?.querySelector<HTMLElement>("[data-handleid='top-center-target']")?.style.left).toBe("50%");
-    expect(currentFlowNode?.querySelector<HTMLElement>("[data-handleid='bottom-source']")?.style.left).toBe("56%");
-    expect(currentFlowNode?.querySelector<HTMLElement>("[data-handleid='bottom-target']")?.style.left).toBe("44%");
-    expect(currentFlowNode?.querySelector<HTMLElement>("[data-handleid='right-source']")?.style.top).toBe("56%");
-    expect(currentFlowNode?.querySelector<HTMLElement>("[data-handleid='right-target']")?.style.top).toBe("44%");
+    const currentFlowNode = graph.querySelector(
+      ".react-flow__node[data-id='node-current']",
+    ) as HTMLElement | null;
+    expect(
+      currentFlowNode?.querySelector("[data-handleid='bottom-source']"),
+    ).not.toBeNull();
+    expect(
+      currentFlowNode?.querySelector<HTMLElement>(
+        "[data-handleid='bottom-source']",
+      )?.style.opacity,
+    ).toBe("0");
+    expect(
+      currentFlowNode?.querySelector<HTMLElement>(
+        "[data-handleid='bottom-center-source']",
+      )?.style.left,
+    ).toBe("50%");
+    expect(
+      currentFlowNode?.querySelector<HTMLElement>(
+        "[data-handleid='top-center-target']",
+      )?.style.left,
+    ).toBe("50%");
+    expect(
+      currentFlowNode?.querySelector<HTMLElement>(
+        "[data-handleid='bottom-source']",
+      )?.style.left,
+    ).toBe("56%");
+    expect(
+      currentFlowNode?.querySelector<HTMLElement>(
+        "[data-handleid='bottom-target']",
+      )?.style.left,
+    ).toBe("44%");
+    expect(
+      currentFlowNode?.querySelector<HTMLElement>(
+        "[data-handleid='right-source']",
+      )?.style.top,
+    ).toBe("56%");
+    expect(
+      currentFlowNode?.querySelector<HTMLElement>(
+        "[data-handleid='right-target']",
+      )?.style.top,
+    ).toBe("44%");
     expect(graph.querySelector("marker")).not.toBeNull();
-    expect(graph.querySelector(".react-flow__edgelabel-renderer")?.childElementCount ?? 0).toBe(0);
+    expect(
+      graph.querySelector(".react-flow__edgelabel-renderer")
+        ?.childElementCount ?? 0,
+    ).toBe(0);
 
     const legend = within(graph).getByTestId("task-plan-graph-legend");
     expect(legend).toHaveTextContent("Sequential");
@@ -397,7 +525,9 @@ describe("TaskPlanGraph", () => {
     expect(legend).toHaveTextContent("Waiting");
     expect(legend).toHaveTextContent("Ready");
     expect(legend).toHaveTextContent("Blocked");
-    expect(within(legend).getByTestId("task-plan-graph-node-legend")).toBeInTheDocument();
+    expect(
+      within(legend).getByTestId("task-plan-graph-node-legend"),
+    ).toBeInTheDocument();
     const legendOverlay = legend.parentElement as HTMLElement | null;
     expect(legendOverlay).not.toBeNull();
     expect(legendOverlay?.className).toContain("absolute");
@@ -410,13 +540,19 @@ describe("TaskPlanGraph", () => {
     expect(scrollShell.contains(legend)).toBe(false);
 
     const canvas = within(graph).getByTestId("task-plan-graph-canvas");
-    expect(Number.parseInt(scrollShell.style.height, 10)).toBeGreaterThanOrEqual(260);
-    expect(Number.parseInt(scrollShell.style.height, 10)).toBeLessThanOrEqual(620);
+    expect(
+      Number.parseInt(scrollShell.style.height, 10),
+    ).toBeGreaterThanOrEqual(260);
+    expect(Number.parseInt(scrollShell.style.height, 10)).toBeLessThanOrEqual(
+      620,
+    );
     expect(canvas.style.height).toBe("100%");
     expect(canvas.style.minWidth).toBe("100%");
 
     const wheelHint = within(graph).getByTestId("task-plan-graph-wheel-hint");
-    expect(wheelHint).toHaveTextContent("Hold Ctrl/Cmd and scroll to zoom the canvas");
+    expect(wheelHint).toHaveTextContent(
+      "Hold Ctrl/Cmd and scroll to zoom the canvas",
+    );
     expect(wheelHint.className).toContain("opacity-0");
     fireEvent.wheel(scrollShell, { deltaY: 120 });
     expect(wheelHint.className).toContain("opacity-100");
@@ -425,7 +561,9 @@ describe("TaskPlanGraph", () => {
     expect(currentNode.getAttribute("data-node-current")).toBe("true");
     expect(currentNode.getAttribute("data-node-selected")).toBe("false");
     expect(currentNode.getAttribute("data-node-shape")).toBe("parallelogram");
-    expect(currentNode.getAttribute("data-node-display-type")).toBe("checkpoint");
+    expect(currentNode.getAttribute("data-node-display-type")).toBe(
+      "checkpoint",
+    );
     expect(currentNode).toHaveTextContent("Checkpoint");
     expect(currentNode).not.toHaveTextContent("你希望调整哪些参数？");
 
@@ -462,7 +600,14 @@ describe("TaskPlanGraph", () => {
               displayType: "task",
             },
           ],
-          edges: [{ id: "edge-1", fromNodeId: "node-current", toNodeId: "node-next", type: "sequential" }],
+          edges: [
+            {
+              id: "edge-1",
+              fromNodeId: "node-current",
+              toNodeId: "node-next",
+              type: "sequential",
+            },
+          ],
         })}
       />,
     );
@@ -473,22 +618,115 @@ describe("TaskPlanGraph", () => {
     expect(selectedNode).toHaveAttribute("data-node-selected", "true");
 
     const controls = screen.getByTestId("task-plan-graph-controls");
-    expect(within(controls).getByRole("button", { name: "Zoom in" })).toBeEnabled();
-    expect(within(controls).getByRole("button", { name: "Zoom out" })).toBeEnabled();
-    expect(within(controls).getByRole("button", { name: "Fit graph" })).toBeEnabled();
-    expect(within(controls).getByRole("button", { name: "Center current node" })).toBeEnabled();
-    expect(within(controls).getByRole("button", { name: "Expand graph" })).toBeEnabled();
+    expect(
+      within(controls).getByRole("button", { name: "Zoom in" }),
+    ).toBeEnabled();
+    expect(
+      within(controls).getByRole("button", { name: "Zoom out" }),
+    ).toBeEnabled();
+    expect(
+      within(controls).getByRole("button", { name: "Fit graph" }),
+    ).toBeEnabled();
+    expect(
+      within(controls).getByRole("button", { name: "Center current node" }),
+    ).toBeEnabled();
+    expect(
+      within(controls).getByRole("button", { name: "Expand graph" }),
+    ).toBeEnabled();
 
     fireEvent.click(within(controls).getByRole("button", { name: "Zoom in" }));
     fireEvent.click(within(controls).getByRole("button", { name: "Zoom out" }));
-    fireEvent.click(within(controls).getByRole("button", { name: "Fit graph" }));
-    fireEvent.click(within(controls).getByRole("button", { name: "Center current node" }));
+    fireEvent.click(
+      within(controls).getByRole("button", { name: "Fit graph" }),
+    );
+    fireEvent.click(
+      within(controls).getByRole("button", { name: "Center current node" }),
+    );
 
     expect(selectedNode).toHaveAttribute("data-node-selected", "true");
 
-    fireEvent.click(within(controls).getByRole("button", { name: "Expand graph" }));
+    fireEvent.click(
+      within(controls).getByRole("button", { name: "Expand graph" }),
+    );
     const dialog = screen.getByRole("dialog", { name: "Full execution graph" });
-    expect(within(dialog).getByTestId("task-plan-node-node-next")).toHaveAttribute("data-node-selected", "true");
+    expect(
+      within(dialog).getByTestId("task-plan-node-node-next"),
+    ).toHaveAttribute("data-node-selected", "true");
+  });
+
+  it("[WORK-007] preserves done, current, and waiting tones between full and compact modes", async () => {
+    const plan = testPlan({
+      state: "ready",
+      currentStepId: "node-current",
+      steps: [
+        {
+          id: "node-done",
+          title: "Done node",
+          objective: "Completed work",
+          phase: "execution",
+          status: "done",
+          type: "task",
+          displayType: "task",
+        },
+        {
+          id: "node-current",
+          title: "Current node",
+          objective: "Running work",
+          phase: "execution",
+          status: "active",
+          type: "task",
+          displayType: "task",
+        },
+        {
+          id: "node-waiting",
+          title: "Waiting node",
+          objective: "Needs input",
+          phase: "checkpoint",
+          status: "waiting_for_user",
+          type: "checkpoint",
+          displayType: "checkpoint",
+        },
+      ],
+      edges: [
+        {
+          id: "edge-1",
+          fromNodeId: "node-done",
+          toNodeId: "node-current",
+          type: "sequential",
+        },
+        {
+          id: "edge-2",
+          fromNodeId: "node-current",
+          toNodeId: "node-waiting",
+          type: "sequential",
+        },
+      ],
+    });
+    const { rerender } = render(<TaskPlanGraph mode="full" plan={plan} />);
+    const nodeIds = ["node-done", "node-current", "node-waiting"];
+    const fullTones = Object.fromEntries(
+      await Promise.all(
+        nodeIds.map(async (id) => [
+          id,
+          (await screen.findByTestId(`task-plan-node-${id}`)).getAttribute(
+            "data-node-tone",
+          ),
+        ]),
+      ),
+    );
+
+    const compactTones = Object.fromEntries(
+      buildCompactViewModel(plan, DEFAULT_GRAPH_COPY).focusItems.map((item) => [
+        item.id,
+        item.tone,
+      ]),
+    );
+    expect(compactTones).toEqual(fullTones);
+
+    rerender(<TaskPlanGraph mode="compact" plan={plan} />);
+    for (const id of nodeIds) {
+      expect(screen.getByTestId(`task-plan-outline-node-${id}`)).toBeVisible();
+    }
   });
 
   it("keeps nodes clickable in read-only mode and keeps the expanded node above others within the visible graph frame", async () => {
@@ -526,7 +764,8 @@ describe("TaskPlanGraph", () => {
             {
               id: "node-deliverable",
               title: "产出说明文档",
-              objective: "整理最终交付物，包含较长内容以验证展开后才显示完整详情。",
+              objective:
+                "整理最终交付物，包含较长内容以验证展开后才显示完整详情。",
               phase: "delivery",
               status: "pending",
               requiresHumanInput: false,
@@ -539,15 +778,27 @@ describe("TaskPlanGraph", () => {
             },
           ],
           edges: [
-            { id: "edge-1", fromNodeId: "node-top", toNodeId: "node-current", type: "sequential" },
-            { id: "edge-2", fromNodeId: "node-current", toNodeId: "node-deliverable", type: "sequential" },
+            {
+              id: "edge-1",
+              fromNodeId: "node-top",
+              toNodeId: "node-current",
+              type: "sequential",
+            },
+            {
+              id: "edge-2",
+              fromNodeId: "node-current",
+              toNodeId: "node-deliverable",
+              type: "sequential",
+            },
           ],
         })}
-      />
+      />,
     );
 
     const graph = await screen.findByLabelText("Task plan graph");
-    const deliverableNode = await screen.findByTestId("task-plan-node-node-deliverable");
+    const deliverableNode = await screen.findByTestId(
+      "task-plan-node-node-deliverable",
+    );
 
     fireEvent.click(deliverableNode);
 
@@ -562,7 +813,9 @@ describe("TaskPlanGraph", () => {
     expect(deliverableNode).not.toHaveTextContent("child-9");
     expect(deliverableNode).not.toHaveTextContent("详细说明");
 
-    const flowNodeWrapper = graph.querySelector(".react-flow__node[data-id='node-deliverable']") as HTMLElement | null;
+    const flowNodeWrapper = graph.querySelector(
+      ".react-flow__node[data-id='node-deliverable']",
+    ) as HTMLElement | null;
     expect(flowNodeWrapper).not.toBeNull();
     expect(flowNodeWrapper?.style.zIndex).toBe("1000");
 
@@ -594,7 +847,11 @@ describe("TaskPlanGraph", () => {
               displayType: "condition",
               executionMode: "manual",
               linkedTaskId: null,
-              metadata: { condition: "范围是否大于 100 项？", evaluationBy: "user", branches: [{ label: "是" }, { label: "否" }] },
+              metadata: {
+                condition: "范围是否大于 100 项？",
+                evaluationBy: "user",
+                branches: [{ label: "是" }, { label: "否" }],
+              },
             },
             {
               id: "node-task",
@@ -623,20 +880,41 @@ describe("TaskPlanGraph", () => {
             },
           ],
           edges: [
-            { id: "edge-1", fromNodeId: "node-condition", toNodeId: "node-task", type: "depends_on" },
-            { id: "edge-2", fromNodeId: "node-task", toNodeId: "node-checkpoint", type: "sequential" },
+            {
+              id: "edge-1",
+              fromNodeId: "node-condition",
+              toNodeId: "node-task",
+              type: "depends_on",
+            },
+            {
+              id: "edge-2",
+              fromNodeId: "node-task",
+              toNodeId: "node-checkpoint",
+              type: "sequential",
+            },
           ],
         })}
       />,
     );
 
-    const conditionNode = await screen.findByTestId("task-plan-node-node-condition");
+    const conditionNode = await screen.findByTestId(
+      "task-plan-node-node-condition",
+    );
     expect(conditionNode).toHaveAttribute("data-node-shape", "diamond");
-    expect(screen.getByTestId("task-plan-node-node-task")).toHaveAttribute("data-node-shape", "rounded");
+    expect(screen.getByTestId("task-plan-node-node-task")).toHaveAttribute(
+      "data-node-shape",
+      "rounded",
+    );
     const checkpointNode = screen.getByTestId("task-plan-node-node-checkpoint");
     expect(checkpointNode).toHaveAttribute("data-node-shape", "parallelogram");
-    expect(conditionNode.querySelector('polygon[points="16,1 84,1 99,50 84,99 16,99 1,50"]')).not.toBeNull();
-    expect(checkpointNode.querySelector('polygon[points="10,1 99,1 90,99 1,99"]')).not.toBeNull();
+    expect(
+      conditionNode.querySelector(
+        'polygon[points="16,1 84,1 99,50 84,99 16,99 1,50"]',
+      ),
+    ).not.toBeNull();
+    expect(
+      checkpointNode.querySelector('polygon[points="10,1 99,1 90,99 1,99"]'),
+    ).not.toBeNull();
   });
 
   it("uses hybrid lanes for branch and sidecar nodes instead of a single vertical rail", async () => {
@@ -694,15 +972,47 @@ describe("TaskPlanGraph", () => {
         },
       ],
       edges: [
-        { id: "edge-start-choice", fromNodeId: "start", toNodeId: "choice", type: "sequential" },
-        { id: "edge-choice-left", fromNodeId: "choice", toNodeId: "branch-left", type: "branch_true" },
-        { id: "edge-choice-right", fromNodeId: "choice", toNodeId: "branch-right", type: "branch_false" },
-        { id: "edge-choice-approval", fromNodeId: "choice", toNodeId: "approval", type: "dependency" },
+        {
+          id: "edge-start-choice",
+          fromNodeId: "start",
+          toNodeId: "choice",
+          type: "sequential",
+        },
+        {
+          id: "edge-choice-left",
+          fromNodeId: "choice",
+          toNodeId: "branch-left",
+          type: "branch_true",
+        },
+        {
+          id: "edge-choice-right",
+          fromNodeId: "choice",
+          toNodeId: "branch-right",
+          type: "branch_false",
+        },
+        {
+          id: "edge-choice-approval",
+          fromNodeId: "choice",
+          toNodeId: "approval",
+          type: "dependency",
+        },
       ],
     });
     plan.analytics.criticalPathNodeIds = ["start", "choice"];
-    plan.analytics.rankByNodeId = { start: 0, choice: 1, "branch-left": 2, "branch-right": 2, approval: 2 };
-    plan.analytics.laneByNodeId = { start: 0, choice: 0, "branch-left": -1, "branch-right": 1, approval: 2 };
+    plan.analytics.rankByNodeId = {
+      start: 0,
+      choice: 1,
+      "branch-left": 2,
+      "branch-right": 2,
+      approval: 2,
+    };
+    plan.analytics.laneByNodeId = {
+      start: 0,
+      choice: 0,
+      "branch-left": -1,
+      "branch-right": 1,
+      approval: 2,
+    };
 
     const layout = await buildFlowLayout({
       plan,
@@ -716,18 +1026,24 @@ describe("TaskPlanGraph", () => {
     const left = nodeById.get("branch-left");
     const right = nodeById.get("branch-right");
     const approval = nodeById.get("approval");
-    const leftEdge = layout.edges.find((edge) => edge.id === "edge-choice-left");
-    const rightEdge = layout.edges.find((edge) => edge.id === "edge-choice-right");
+    const leftEdge = layout.edges.find(
+      (edge) => edge.id === "edge-choice-left",
+    );
+    const rightEdge = layout.edges.find(
+      (edge) => edge.id === "edge-choice-right",
+    );
 
     expect(choice?.data.layoutRole).toBe("primary");
     expect(left?.data.layoutRole).toBe("branch");
     expect(right?.data.layoutRole).toBe("branch");
     expect(approval?.data.layoutRole).toBe("sidecar");
-    expect((left?.position.x ?? 0)).toBeLessThan(right?.position.x ?? 0);
+    expect(left?.position.x ?? 0).toBeLessThan(right?.position.x ?? 0);
     expect(approval?.position.x ?? 0).toBeGreaterThan(choice?.position.x ?? 0);
     expect(approval?.position.y ?? 0).toBeGreaterThan(choice?.position.y ?? 0);
     expect(left?.position.x).not.toBeCloseTo(right?.position.x ?? 0, 0);
-    expect(Math.abs((right?.position.x ?? 0) - (left?.position.x ?? 0))).toBeGreaterThan(260);
+    expect(
+      Math.abs((right?.position.x ?? 0) - (left?.position.x ?? 0)),
+    ).toBeGreaterThan(260);
     expect(approval?.position.x).not.toBeCloseTo(choice?.position.x ?? 0, 0);
     expect(leftEdge?.data?.orientation).toBe("vertical");
     expect(rightEdge?.data?.orientation).toBe("vertical");
@@ -739,13 +1055,54 @@ describe("TaskPlanGraph", () => {
       state: "ready",
       currentStepId: "branch-selected",
       steps: [
-        { id: "choice", title: "Choose path", objective: "Pick branch", phase: "decision", status: "done", type: "condition", displayType: "condition" },
-        { id: "branch-selected", title: "Selected branch", objective: "Run this path", phase: "run", status: "active", type: "task", displayType: "task", reachable: true },
-        { id: "branch-skipped", title: "Skipped branch", objective: "Not selected", phase: "skip", status: "skipped", type: "task", displayType: "task", reachable: false },
+        {
+          id: "choice",
+          title: "Choose path",
+          objective: "Pick branch",
+          phase: "decision",
+          status: "done",
+          type: "condition",
+          displayType: "condition",
+        },
+        {
+          id: "branch-selected",
+          title: "Selected branch",
+          objective: "Run this path",
+          phase: "run",
+          status: "active",
+          type: "task",
+          displayType: "task",
+          reachable: true,
+        },
+        {
+          id: "branch-skipped",
+          title: "Skipped branch",
+          objective: "Not selected",
+          phase: "skip",
+          status: "skipped",
+          type: "task",
+          displayType: "task",
+          reachable: false,
+        },
       ],
       edges: [
-        { id: "edge-selected", fromNodeId: "choice", toNodeId: "branch-selected", kind: "branch_option", label: "是", active: true },
-        { id: "edge-skipped", fromNodeId: "choice", toNodeId: "branch-skipped", kind: "branch_option", label: "否", active: false, emphasis: "inactive" },
+        {
+          id: "edge-selected",
+          fromNodeId: "choice",
+          toNodeId: "branch-selected",
+          kind: "branch_option",
+          label: "是",
+          active: true,
+        },
+        {
+          id: "edge-skipped",
+          fromNodeId: "choice",
+          toNodeId: "branch-skipped",
+          kind: "branch_option",
+          label: "否",
+          active: false,
+          emphasis: "inactive",
+        },
       ],
     });
     plan.analytics.reachableFromActiveIds = ["choice", "branch-selected"];
@@ -758,7 +1115,9 @@ describe("TaskPlanGraph", () => {
     });
     const edgeById = new Map(layout.edges.map((edge) => [edge.id, edge]));
     const skippedEdge = edgeById.get("edge-skipped");
-    const skippedNode = layout.nodes.find((node) => node.id === "branch-skipped");
+    const skippedNode = layout.nodes.find(
+      (node) => node.id === "branch-skipped",
+    );
 
     expect(skippedEdge).toBeDefined();
     expect(skippedEdge?.animated).toBe(false);
@@ -775,7 +1134,7 @@ describe("TaskPlanGraph", () => {
       title: `Step ${index + 1}`,
       objective: "Linear work",
       phase: "execute",
-      status: index === 0 ? "active" as const : "pending" as const,
+      status: index === 0 ? ("active" as const) : ("pending" as const),
       type: "task" as const,
       displayType: "task" as const,
     }));
@@ -802,38 +1161,167 @@ describe("TaskPlanGraph", () => {
     expect(layout.layoutDirection).toBe("TB");
     expect(nodeById.get("node-1")?.sourcePosition).toBe("bottom");
     expect(nodeById.get("node-2")?.targetPosition).toBe("top");
-    expect(nodeById.get("node-2")?.position.y ?? 0).toBeGreaterThan((nodeById.get("node-1")?.position.y ?? 0) + 100);
-    expect(nodeById.get("node-6")?.position.y ?? 0).toBeGreaterThan((nodeById.get("node-1")?.position.y ?? 0) + 500);
+    expect(nodeById.get("node-2")?.position.y ?? 0).toBeGreaterThan(
+      (nodeById.get("node-1")?.position.y ?? 0) + 100,
+    );
+    expect(nodeById.get("node-6")?.position.y ?? 0).toBeGreaterThan(
+      (nodeById.get("node-1")?.position.y ?? 0) + 500,
+    );
     expectNoNodeOverlap(layout.nodes);
-    expect(layout.edges.some((edge) => edge.sourceHandle === "bottom-center-source" && edge.targetHandle === "top-center-target")).toBe(true);
-    expect(layout.edges.some((edge) => edge.data?.orientation === "vertical")).toBe(true);
+    expect(
+      layout.edges.some(
+        (edge) =>
+          edge.sourceHandle === "bottom-center-source" &&
+          edge.targetHandle === "top-center-target",
+      ),
+    ).toBe(true);
+    expect(
+      layout.edges.some((edge) => edge.data?.orientation === "vertical"),
+    ).toBe(true);
   });
 
   it("keeps condition branches and completed checkpoints separated with ELK", async () => {
     const steps = [
-      { id: "need", title: "Confirm need", objective: "Scope", phase: "plan", status: "done" as const, type: "checkpoint" as const, displayType: "checkpoint" as const },
-      { id: "design", title: "Design script", objective: "Plan", phase: "plan", status: "done" as const, type: "task" as const, displayType: "task" as const },
-      { id: "build", title: "Build script", objective: "Implement", phase: "work", status: "done" as const, type: "task" as const, displayType: "task" as const },
-      { id: "verify", title: "Verify script", objective: "Test", phase: "verify", status: "done" as const, type: "task" as const, displayType: "task" as const },
-      { id: "choice", title: "Check result", objective: "Branch", phase: "decision", status: "done" as const, type: "condition" as const, displayType: "condition" as const },
-      { id: "blocked-summary", title: "Summarize blockers", objective: "Skipped", phase: "skip", status: "skipped" as const, type: "task" as const, displayType: "task" as const, reachable: false },
-      { id: "deliver", title: "Prepare delivery", objective: "Package", phase: "deliver", status: "done" as const, type: "task" as const, displayType: "task" as const },
-      { id: "confirm-write", title: "Confirm write scope", objective: "Manual checkpoint", phase: "review", status: "done" as const, requiresHumanInput: true, type: "checkpoint" as const, displayType: "checkpoint" as const },
-      { id: "write", title: "Write file", objective: "Persist", phase: "write", status: "done" as const, type: "task" as const, displayType: "task" as const },
+      {
+        id: "need",
+        title: "Confirm need",
+        objective: "Scope",
+        phase: "plan",
+        status: "done" as const,
+        type: "checkpoint" as const,
+        displayType: "checkpoint" as const,
+      },
+      {
+        id: "design",
+        title: "Design script",
+        objective: "Plan",
+        phase: "plan",
+        status: "done" as const,
+        type: "task" as const,
+        displayType: "task" as const,
+      },
+      {
+        id: "build",
+        title: "Build script",
+        objective: "Implement",
+        phase: "work",
+        status: "done" as const,
+        type: "task" as const,
+        displayType: "task" as const,
+      },
+      {
+        id: "verify",
+        title: "Verify script",
+        objective: "Test",
+        phase: "verify",
+        status: "done" as const,
+        type: "task" as const,
+        displayType: "task" as const,
+      },
+      {
+        id: "choice",
+        title: "Check result",
+        objective: "Branch",
+        phase: "decision",
+        status: "done" as const,
+        type: "condition" as const,
+        displayType: "condition" as const,
+      },
+      {
+        id: "blocked-summary",
+        title: "Summarize blockers",
+        objective: "Skipped",
+        phase: "skip",
+        status: "skipped" as const,
+        type: "task" as const,
+        displayType: "task" as const,
+        reachable: false,
+      },
+      {
+        id: "deliver",
+        title: "Prepare delivery",
+        objective: "Package",
+        phase: "deliver",
+        status: "done" as const,
+        type: "task" as const,
+        displayType: "task" as const,
+      },
+      {
+        id: "confirm-write",
+        title: "Confirm write scope",
+        objective: "Manual checkpoint",
+        phase: "review",
+        status: "done" as const,
+        requiresHumanInput: true,
+        type: "checkpoint" as const,
+        displayType: "checkpoint" as const,
+      },
+      {
+        id: "write",
+        title: "Write file",
+        objective: "Persist",
+        phase: "write",
+        status: "done" as const,
+        type: "task" as const,
+        displayType: "task" as const,
+      },
     ];
     const plan = testPlan({
       state: "ready",
       currentStepId: "write",
       steps,
       edges: [
-        { id: "edge-need-design", fromNodeId: "need", toNodeId: "design", type: "sequential" },
-        { id: "edge-design-build", fromNodeId: "design", toNodeId: "build", type: "sequential" },
-        { id: "edge-build-verify", fromNodeId: "build", toNodeId: "verify", type: "sequential" },
-        { id: "edge-verify-choice", fromNodeId: "verify", toNodeId: "choice", type: "sequential" },
-        { id: "edge-choice-blocked", fromNodeId: "choice", toNodeId: "blocked-summary", kind: "branch_option", active: false, emphasis: "inactive" },
-        { id: "edge-choice-deliver", fromNodeId: "choice", toNodeId: "deliver", kind: "branch_option", active: true },
-        { id: "edge-deliver-confirm", fromNodeId: "deliver", toNodeId: "confirm-write", type: "sequential" },
-        { id: "edge-confirm-write", fromNodeId: "confirm-write", toNodeId: "write", type: "sequential" },
+        {
+          id: "edge-need-design",
+          fromNodeId: "need",
+          toNodeId: "design",
+          type: "sequential",
+        },
+        {
+          id: "edge-design-build",
+          fromNodeId: "design",
+          toNodeId: "build",
+          type: "sequential",
+        },
+        {
+          id: "edge-build-verify",
+          fromNodeId: "build",
+          toNodeId: "verify",
+          type: "sequential",
+        },
+        {
+          id: "edge-verify-choice",
+          fromNodeId: "verify",
+          toNodeId: "choice",
+          type: "sequential",
+        },
+        {
+          id: "edge-choice-blocked",
+          fromNodeId: "choice",
+          toNodeId: "blocked-summary",
+          kind: "branch_option",
+          active: false,
+          emphasis: "inactive",
+        },
+        {
+          id: "edge-choice-deliver",
+          fromNodeId: "choice",
+          toNodeId: "deliver",
+          kind: "branch_option",
+          active: true,
+        },
+        {
+          id: "edge-deliver-confirm",
+          fromNodeId: "deliver",
+          toNodeId: "confirm-write",
+          type: "sequential",
+        },
+        {
+          id: "edge-confirm-write",
+          fromNodeId: "confirm-write",
+          toNodeId: "write",
+          type: "sequential",
+        },
       ],
     });
 
@@ -847,16 +1335,33 @@ describe("TaskPlanGraph", () => {
 
     expectNoNodeOverlap(layout.nodes);
     expect(nodeById.get("confirm-write")?.data.layoutRole).toBe("primary");
-    expect(layout.edges.find((edge) => edge.id === "edge-choice-blocked")?.style?.strokeDasharray).toBe("3 6");
+    expect(
+      layout.edges.find((edge) => edge.id === "edge-choice-blocked")?.style
+        ?.strokeDasharray,
+    ).toBe("3 6");
   });
 
   it("keeps wide task fan-out flowing top-to-bottom through branch nodes", async () => {
-    const branchIds = ["branch-a", "branch-b", "branch-c", "branch-d", "branch-e"];
+    const branchIds = [
+      "branch-a",
+      "branch-b",
+      "branch-c",
+      "branch-d",
+      "branch-e",
+    ];
     const plan = testPlan({
       state: "ready",
       currentStepId: "start",
       steps: [
-        { id: "start", title: "Start", objective: "Begin", phase: "start", status: "done", type: "task", displayType: "task" },
+        {
+          id: "start",
+          title: "Start",
+          objective: "Begin",
+          phase: "start",
+          status: "done",
+          type: "task",
+          displayType: "task",
+        },
         ...branchIds.map((id) => ({
           id,
           title: id,
@@ -866,11 +1371,29 @@ describe("TaskPlanGraph", () => {
           type: "task" as const,
           displayType: "task" as const,
         })),
-        { id: "join", title: "Join", objective: "Merge", phase: "join", status: "pending", type: "checkpoint", displayType: "checkpoint" },
+        {
+          id: "join",
+          title: "Join",
+          objective: "Merge",
+          phase: "join",
+          status: "pending",
+          type: "checkpoint",
+          displayType: "checkpoint",
+        },
       ],
       edges: [
-        ...branchIds.map((id) => ({ id: `edge-start-${id}`, fromNodeId: "start", toNodeId: id, type: "sequential" })),
-        ...branchIds.map((id) => ({ id: `edge-${id}-join`, fromNodeId: id, toNodeId: "join", type: "resume" })),
+        ...branchIds.map((id) => ({
+          id: `edge-start-${id}`,
+          fromNodeId: "start",
+          toNodeId: id,
+          type: "sequential",
+        })),
+        ...branchIds.map((id) => ({
+          id: `edge-${id}-join`,
+          fromNodeId: id,
+          toNodeId: "join",
+          type: "resume",
+        })),
       ],
     });
 
@@ -883,8 +1406,12 @@ describe("TaskPlanGraph", () => {
 
     expectNoNodeOverlap(layout.nodes);
     for (const id of branchIds) {
-      const incoming = layout.edges.find((edge) => edge.id === `edge-start-${id}`);
-      const outgoing = layout.edges.find((edge) => edge.id === `edge-${id}-join`);
+      const incoming = layout.edges.find(
+        (edge) => edge.id === `edge-start-${id}`,
+      );
+      const outgoing = layout.edges.find(
+        (edge) => edge.id === `edge-${id}-join`,
+      );
       expect(incoming?.sourceHandle).toBe("bottom-center-source");
       expect(incoming?.targetHandle).toBe("top-center-target");
       expect(outgoing?.sourceHandle).toBe("bottom-center-source");
@@ -898,17 +1425,80 @@ describe("TaskPlanGraph", () => {
       state: "ready",
       currentStepId: "start",
       steps: [
-        { id: "start", title: "Start", objective: "Begin", phase: "start", status: "done", type: "task", displayType: "task" },
-        { id: "api", title: "API", objective: "Implement API", phase: "branch", status: "pending", type: "task", displayType: "task" },
-        { id: "ui", title: "UI", objective: "Implement UI", phase: "branch", status: "pending", type: "task", displayType: "task" },
-        { id: "docs", title: "Docs", objective: "Update docs", phase: "branch", status: "pending", type: "task", displayType: "task" },
-        { id: "join", title: "Join", objective: "Review", phase: "join", status: "pending", type: "checkpoint", displayType: "checkpoint" },
-        { id: "ship", title: "Ship", objective: "Release", phase: "ship", status: "pending", type: "task", displayType: "task" },
+        {
+          id: "start",
+          title: "Start",
+          objective: "Begin",
+          phase: "start",
+          status: "done",
+          type: "task",
+          displayType: "task",
+        },
+        {
+          id: "api",
+          title: "API",
+          objective: "Implement API",
+          phase: "branch",
+          status: "pending",
+          type: "task",
+          displayType: "task",
+        },
+        {
+          id: "ui",
+          title: "UI",
+          objective: "Implement UI",
+          phase: "branch",
+          status: "pending",
+          type: "task",
+          displayType: "task",
+        },
+        {
+          id: "docs",
+          title: "Docs",
+          objective: "Update docs",
+          phase: "branch",
+          status: "pending",
+          type: "task",
+          displayType: "task",
+        },
+        {
+          id: "join",
+          title: "Join",
+          objective: "Review",
+          phase: "join",
+          status: "pending",
+          type: "checkpoint",
+          displayType: "checkpoint",
+        },
+        {
+          id: "ship",
+          title: "Ship",
+          objective: "Release",
+          phase: "ship",
+          status: "pending",
+          type: "task",
+          displayType: "task",
+        },
       ],
       edges: [
-        ...laneIds.map((id) => ({ id: `edge-start-${id}`, fromNodeId: "start", toNodeId: id, type: "sequential" })),
-        ...laneIds.map((id) => ({ id: `edge-${id}-join`, fromNodeId: id, toNodeId: "join", type: "resume" })),
-        { id: "edge-join-ship", fromNodeId: "join", toNodeId: "ship", type: "sequential" },
+        ...laneIds.map((id) => ({
+          id: `edge-start-${id}`,
+          fromNodeId: "start",
+          toNodeId: id,
+          type: "sequential",
+        })),
+        ...laneIds.map((id) => ({
+          id: `edge-${id}-join`,
+          fromNodeId: id,
+          toNodeId: "join",
+          type: "resume",
+        })),
+        {
+          id: "edge-join-ship",
+          fromNodeId: "join",
+          toNodeId: "ship",
+          type: "sequential",
+        },
       ],
     });
 
@@ -921,8 +1511,12 @@ describe("TaskPlanGraph", () => {
 
     expectNoNodeOverlap(layout.nodes);
     for (const id of laneIds) {
-      const incoming = layout.edges.find((edge) => edge.id === `edge-start-${id}`);
-      const outgoing = layout.edges.find((edge) => edge.id === `edge-${id}-join`);
+      const incoming = layout.edges.find(
+        (edge) => edge.id === `edge-start-${id}`,
+      );
+      const outgoing = layout.edges.find(
+        (edge) => edge.id === `edge-${id}-join`,
+      );
       expect(incoming?.sourceHandle).toBe("bottom-center-source");
       expect(incoming?.targetHandle).toBe("top-center-target");
       expect(incoming?.data?.orientation).toBe("vertical");
@@ -930,7 +1524,9 @@ describe("TaskPlanGraph", () => {
       expect(outgoing?.targetHandle).toBe("top-center-target");
       expect(outgoing?.data?.orientation).toBe("vertical");
     }
-    expect(layout.edges.find((edge) => edge.id === "edge-join-ship")?.sourceHandle).toBe("bottom-center-source");
+    expect(
+      layout.edges.find((edge) => edge.id === "edge-join-ship")?.sourceHandle,
+    ).toBe("bottom-center-source");
   });
 
   it("keeps branched plans vertical while preserving branch roles", async () => {
@@ -938,28 +1534,141 @@ describe("TaskPlanGraph", () => {
       state: "ready",
       currentStepId: "start",
       steps: [
-        { id: "start", title: "Start", objective: "Begin", phase: "setup", status: "done", type: "task", displayType: "task" },
-        { id: "branch-a", title: "Branch A", objective: "Parallel", phase: "check", status: "done", type: "task", displayType: "task" },
-        { id: "branch-b", title: "Branch B", objective: "Parallel", phase: "check", status: "done", type: "task", displayType: "task" },
-        { id: "join", title: "Join", objective: "Merge", phase: "merge", status: "done", type: "checkpoint", displayType: "checkpoint" },
-        { id: "tail-1", title: "Tail 1", objective: "Linear", phase: "run", status: "pending", type: "task", displayType: "task" },
-        { id: "tail-2", title: "Tail 2", objective: "Linear", phase: "run", status: "pending", type: "task", displayType: "task" },
-        { id: "tail-3", title: "Tail 3", objective: "Linear", phase: "run", status: "pending", type: "task", displayType: "task" },
-        { id: "tail-4", title: "Tail 4", objective: "Linear", phase: "run", status: "pending", type: "task", displayType: "task" },
+        {
+          id: "start",
+          title: "Start",
+          objective: "Begin",
+          phase: "setup",
+          status: "done",
+          type: "task",
+          displayType: "task",
+        },
+        {
+          id: "branch-a",
+          title: "Branch A",
+          objective: "Parallel",
+          phase: "check",
+          status: "done",
+          type: "task",
+          displayType: "task",
+        },
+        {
+          id: "branch-b",
+          title: "Branch B",
+          objective: "Parallel",
+          phase: "check",
+          status: "done",
+          type: "task",
+          displayType: "task",
+        },
+        {
+          id: "join",
+          title: "Join",
+          objective: "Merge",
+          phase: "merge",
+          status: "done",
+          type: "checkpoint",
+          displayType: "checkpoint",
+        },
+        {
+          id: "tail-1",
+          title: "Tail 1",
+          objective: "Linear",
+          phase: "run",
+          status: "pending",
+          type: "task",
+          displayType: "task",
+        },
+        {
+          id: "tail-2",
+          title: "Tail 2",
+          objective: "Linear",
+          phase: "run",
+          status: "pending",
+          type: "task",
+          displayType: "task",
+        },
+        {
+          id: "tail-3",
+          title: "Tail 3",
+          objective: "Linear",
+          phase: "run",
+          status: "pending",
+          type: "task",
+          displayType: "task",
+        },
+        {
+          id: "tail-4",
+          title: "Tail 4",
+          objective: "Linear",
+          phase: "run",
+          status: "pending",
+          type: "task",
+          displayType: "task",
+        },
       ],
       edges: [
-        { id: "edge-start-a", fromNodeId: "start", toNodeId: "branch-a", type: "branch_true" },
-        { id: "edge-start-b", fromNodeId: "start", toNodeId: "branch-b", type: "branch_false" },
-        { id: "edge-a-join", fromNodeId: "branch-a", toNodeId: "join", type: "resume" },
-        { id: "edge-b-join", fromNodeId: "branch-b", toNodeId: "join", type: "resume" },
-        { id: "edge-join-tail-1", fromNodeId: "join", toNodeId: "tail-1", type: "sequential" },
-        { id: "edge-tail-1-tail-2", fromNodeId: "tail-1", toNodeId: "tail-2", type: "sequential" },
-        { id: "edge-tail-2-tail-3", fromNodeId: "tail-2", toNodeId: "tail-3", type: "sequential" },
-        { id: "edge-tail-3-tail-4", fromNodeId: "tail-3", toNodeId: "tail-4", type: "sequential" },
+        {
+          id: "edge-start-a",
+          fromNodeId: "start",
+          toNodeId: "branch-a",
+          type: "branch_true",
+        },
+        {
+          id: "edge-start-b",
+          fromNodeId: "start",
+          toNodeId: "branch-b",
+          type: "branch_false",
+        },
+        {
+          id: "edge-a-join",
+          fromNodeId: "branch-a",
+          toNodeId: "join",
+          type: "resume",
+        },
+        {
+          id: "edge-b-join",
+          fromNodeId: "branch-b",
+          toNodeId: "join",
+          type: "resume",
+        },
+        {
+          id: "edge-join-tail-1",
+          fromNodeId: "join",
+          toNodeId: "tail-1",
+          type: "sequential",
+        },
+        {
+          id: "edge-tail-1-tail-2",
+          fromNodeId: "tail-1",
+          toNodeId: "tail-2",
+          type: "sequential",
+        },
+        {
+          id: "edge-tail-2-tail-3",
+          fromNodeId: "tail-2",
+          toNodeId: "tail-3",
+          type: "sequential",
+        },
+        {
+          id: "edge-tail-3-tail-4",
+          fromNodeId: "tail-3",
+          toNodeId: "tail-4",
+          type: "sequential",
+        },
       ],
     });
     plan.analytics.criticalPathNodeIds = ["start", "join"];
-    plan.analytics.rankByNodeId = { start: 0, "branch-a": 1, "branch-b": 1, join: 2, "tail-1": 3, "tail-2": 4, "tail-3": 5, "tail-4": 6 };
+    plan.analytics.rankByNodeId = {
+      start: 0,
+      "branch-a": 1,
+      "branch-b": 1,
+      join: 2,
+      "tail-1": 3,
+      "tail-2": 4,
+      "tail-3": 5,
+      "tail-4": 6,
+    };
 
     const layout = await buildFlowLayout({
       plan,
@@ -973,8 +1682,17 @@ describe("TaskPlanGraph", () => {
     expect(nodeById.get("branch-a")?.data.layoutRole).toBe("branch");
     expect(nodeById.get("branch-b")?.data.layoutRole).toBe("branch");
     expect(nodeById.get("tail-1")?.data.layoutRole).toBe("chain");
-    expect(layout.edges.find((edge) => edge.id === "edge-join-tail-1")?.data?.orientation).toBe("vertical");
-    expect(layout.edges.some((edge) => edge.sourceHandle === "bottom-center-source" && edge.targetHandle === "top-center-target")).toBe(true);
+    expect(
+      layout.edges.find((edge) => edge.id === "edge-join-tail-1")?.data
+        ?.orientation,
+    ).toBe("vertical");
+    expect(
+      layout.edges.some(
+        (edge) =>
+          edge.sourceHandle === "bottom-center-source" &&
+          edge.targetHandle === "top-center-target",
+      ),
+    ).toBe(true);
   });
 
   it("automatically switches to full mode when enough width is available", async () => {
@@ -982,7 +1700,7 @@ describe("TaskPlanGraph", () => {
       <div style={{ width: "960px" }} data-testid="wide-graph-host">
         <TaskPlanGraph
           mode="auto"
-            plan={testPlan({
+          plan={testPlan({
             state: "ready",
             currentStepId: "node-current",
             steps: [
@@ -1012,15 +1730,23 @@ describe("TaskPlanGraph", () => {
               },
             ],
             edges: [
-              { id: "edge-1", fromNodeId: "node-current", toNodeId: "node-child", type: "sequential" },
+              {
+                id: "edge-1",
+                fromNodeId: "node-current",
+                toNodeId: "node-child",
+                type: "sequential",
+              },
             ],
-            })}
+          })}
         />
-      </div>
+      </div>,
     );
 
     const host = screen.getByTestId("wide-graph-host");
-    Object.defineProperty(host, "clientWidth", { configurable: true, value: 960 });
+    Object.defineProperty(host, "clientWidth", {
+      configurable: true,
+      value: 960,
+    });
 
     const graph = await screen.findByLabelText("Task plan graph");
     expect(graph).toHaveAttribute("data-graph-mode", "full");
@@ -1086,18 +1812,32 @@ describe("TaskPlanGraph", () => {
             },
           ],
           edges: [
-            { id: "edge-1", fromNodeId: "node-current", toNodeId: "node-child", type: "sequential" },
-            { id: "edge-2", fromNodeId: "node-child", toNodeId: "node-deliverable", type: "sequential" },
+            {
+              id: "edge-1",
+              fromNodeId: "node-current",
+              toNodeId: "node-child",
+              type: "sequential",
+            },
+            {
+              id: "edge-2",
+              fromNodeId: "node-child",
+              toNodeId: "node-deliverable",
+              type: "sequential",
+            },
           ],
         })}
-      />
+      />,
     );
 
     const graph = screen.getByLabelText("Task plan graph");
     expect(graph).toHaveAttribute("data-graph-mode", "compact");
     expect(graph.querySelector(".react-flow")).toBeNull();
-    expect(screen.queryByTestId("task-plan-graph-legend")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("task-plan-graph-scroll")).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("task-plan-graph-legend"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("task-plan-graph-scroll"),
+    ).not.toBeInTheDocument();
 
     expect(screen.getByText("Stage map")).toBeInTheDocument();
     expect(screen.getByRole("img", { name: "Stage map" })).toBeInTheDocument();
@@ -1106,20 +1846,30 @@ describe("TaskPlanGraph", () => {
     expect(screen.queryByText("Current progress")).not.toBeInTheDocument();
     expect(screen.queryByText("Next summary")).not.toBeInTheDocument();
 
-    const currentOutlineNode = screen.getByTestId("task-plan-outline-node-node-current");
+    const currentOutlineNode = screen.getByTestId(
+      "task-plan-outline-node-node-current",
+    );
     expect(currentOutlineNode.getAttribute("data-node-current")).toBe("true");
     expect(currentOutlineNode).toHaveTextContent("Current node");
 
-    const waitingOutlineNode = screen.getByTestId("task-plan-outline-node-node-waiting");
+    const waitingOutlineNode = screen.getByTestId(
+      "task-plan-outline-node-node-waiting",
+    );
     expect(waitingOutlineNode.getAttribute("data-node-tone")).toBe("waiting");
     expect(waitingOutlineNode).toHaveTextContent("Needs action");
 
-    const childOutlineNode = screen.getByTestId("task-plan-outline-node-node-child");
+    const childOutlineNode = screen.getByTestId(
+      "task-plan-outline-node-node-child",
+    );
     expect(childOutlineNode).toHaveTextContent("Linked task");
     expect(childOutlineNode).toHaveTextContent("1 upstream");
     expect(childOutlineNode).toHaveTextContent("1 downstream");
 
-    expect(screen.queryByRole("button", { name: "Open full graph" })).not.toBeInTheDocument();
-    expect(screen.queryByRole("dialog", { name: "Full execution graph" })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: "Open full graph" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("dialog", { name: "Full execution graph" }),
+    ).not.toBeInTheDocument();
   });
 });

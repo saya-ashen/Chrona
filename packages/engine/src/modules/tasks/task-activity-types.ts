@@ -30,7 +30,6 @@ export type WorkspaceActivityTimelineItem = {
   activityGroup?: WorkspaceActivityGroup;
   providerInput?: unknown;
   providerOutput?: unknown;
-  providerRaw?: unknown;
   tool?: {
     name?: string;
     durationMs?: number;
@@ -42,6 +41,8 @@ export type TaskActivityEvent = {
   id: string;
   eventType: string;
   source: string;
+  nodeAttemptId?: string | null;
+  providerRunId?: string | null;
   nodeId: string | null;
   nodeTitle: string | null;
   payload: unknown;

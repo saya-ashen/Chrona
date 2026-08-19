@@ -2,6 +2,7 @@ import {
 	expect,
 	test,
 	type APIRequestContext,
+	type Locator,
 	type Page,
 } from "@playwright/test";
 import {
@@ -21,10 +22,25 @@ import {
 const TASK_URL = (taskId: string) => `/en/tasks/${taskId}`;
 const WORK_URL = TASK_URL;
 
+async function expectDialogFocusContained(page: Page, dialog: Locator) {
+	for (let index = 0; index < 8; index += 1) {
+		await page.keyboard.press("Tab");
+		await expect(dialog.locator(":focus")).toHaveCount(1);
+	}
+}
+
 type ExecutionCurrentBody = {
 	status?: string;
 	currentNodeId?: string | null;
 	checkpoint?: { id?: string; type?: string } | null;
+	planOutput?: {
+		manifest?: { sourceRevision?: number };
+		finalizedResult?: {
+			sourceRevision?: number;
+			manifest?: { sourceRevision?: number };
+		} | null;
+		finalization?: { status?: string; sourceRevision?: number };
+	};
 };
 
 async function expectNoHorizontalScroll(page: Page) {
@@ -32,8 +48,7 @@ async function expectNoHorizontalScroll(page: Page) {
 		.poll(async () =>
 			page.evaluate(() => ({
 				bodyOverflow: document.body.scrollWidth > window.innerWidth,
-				documentOverflow:
-					document.documentElement.scrollWidth > window.innerWidth,
+				documentOverflow: document.documentElement.scrollWidth > window.innerWidth,
 			})),
 		)
 		.toEqual({ bodyOverflow: false, documentOverflow: false });
@@ -42,8 +57,7 @@ async function expectNoHorizontalScroll(page: Page) {
 function selectViewport(testInfo: {
 	project: { name: string };
 }): TaskWorkspaceViewport {
-	return testInfo.project.name === "tablet" ||
-		testInfo.project.name === "mobile"
+	return testInfo.project.name === "tablet" || testInfo.project.name === "mobile"
 		? testInfo.project.name
 		: "desktop";
 }
@@ -310,13 +324,10 @@ test.describe("Task create → plan → run → result", () => {
 
 		await page.getByRole("button", { name: /^start$/i }).click();
 		await expect
-			.poll(
-				async () => (await getCurrentExecution(request, task.taskId)).status,
-				{
-					timeout: 30_000,
-					intervals: [300, 500, 1_000],
-				},
-			)
+			.poll(async () => (await getCurrentExecution(request, task.taskId)).status, {
+				timeout: 30_000,
+				intervals: [300, 500, 1_000],
+			})
 			.not.toBe("started");
 
 		await expect
@@ -325,13 +336,80 @@ test.describe("Task create → plan → run → result", () => {
 					page
 						.getByRole("button")
 						.evaluateAll((buttons) =>
-							buttons
-								.map((button) => button.textContent?.trim())
-								.filter(Boolean),
+							buttons.map((button) => button.textContent?.trim()).filter(Boolean),
 						),
 				{ timeout: 20_000, intervals: [300, 500, 1_000] },
 			)
 			.toEqual(expect.arrayContaining([expect.stringMatching(/stop/i)]));
+	});
+
+	test("[RUN-020] restores active execution across navigation and reload", async ({
+		page,
+		request,
+	}, testInfo) => {
+		test.skip(
+			testInfo.project.name !== "chromium",
+			"Active execution recovery runs on desktop only.",
+		);
+		test.setTimeout(120_000);
+		await setTaskWorkspaceViewport(page, "desktop");
+
+		const task = await createTaskWorkspaceTask(request, {
+			title: `E2E Active Recovery ${Date.now()}`,
+			description:
+				"Keep the active checkpoint stable across navigation and reload.",
+		});
+		await bindAllDebugFeatures(request, task.taskId);
+		await generateTaskWorkspacePlan(request, task.taskId);
+		await page.goto(TASK_URL(task.taskId));
+		await dismissTaskEditorIfOpen(page);
+		await expect(page.getByTestId("accepted-plan-surface")).toBeVisible({
+			timeout: 20_000,
+		});
+
+		await dispatchWorkspaceCommand(request, task.taskId, {
+			type: "execution.action",
+			action: "start_manual",
+			idempotencyKey: `run-020-start-${task.taskId}`,
+		});
+		await pollExecution(
+			request,
+			task.taskId,
+			(body) => body.status === "waiting_for_user",
+			40_000,
+			true,
+		);
+		await page.reload();
+		await dismissTaskEditorIfOpen(page);
+		await expect(
+			page.getByRole("tabpanel", { name: "Provide input" }).getByRole("textbox", {
+				name: "Scenario label",
+			}),
+		).toBeVisible();
+
+		await page.goto("/en/tasks");
+		await expect(page.getByRole("main")).toBeVisible();
+		await page.goBack();
+		await expect(page).toHaveURL(TASK_URL(task.taskId));
+		await page.reload();
+		await dismissTaskEditorIfOpen(page);
+
+		const inputPanel = page.getByRole("tabpanel", { name: "Provide input" });
+		await expect(
+			inputPanel.getByRole("textbox", { name: "Scenario label" }),
+		).toBeVisible();
+		await expect(
+			inputPanel.getByRole("button", { name: "Submit input" }),
+		).toBeVisible();
+		await expect(
+			page.getByText("Input needed", { exact: true }).first(),
+		).toBeVisible();
+		await page.getByRole("tab", { name: "Results" }).click();
+		await expect(
+			page.getByRole("button", {
+				name: /^Open Agent transcript · [1-9]\d* events$/,
+			}),
+		).toBeVisible();
 	});
 
 	test("[ACTION-002/RUN-008/RESULT-012/GOAL-020] drives input, approval, result, Goal, and follow-up through visible controls", async ({
@@ -421,6 +499,30 @@ test.describe("Task create → plan → run → result", () => {
 				await expect
 					.poll(async () => (await getCurrentExecution(request, taskId)).status)
 					.toBe("waiting_for_user");
+				await page.goto("/en/action-center");
+				await expect(page.getByRole("main")).toBeVisible();
+				await expect(
+					page.getByRole("heading", { name: taskTitle, level: 3 }),
+				).toBeVisible();
+				const taskActionCard = page
+					.getByRole("heading", { name: taskTitle, level: 3 })
+					.locator("xpath=../../..");
+				const openTaskLink = taskActionCard.getByRole("link", {
+					name: "Open Task",
+				});
+				await expect(openTaskLink).toHaveAttribute(
+					"href",
+					new RegExp(`^/en/tasks/${taskId}\\?workBlockId=.+$`),
+				);
+				await openTaskLink.click();
+				await expect(page).toHaveURL(
+					new RegExp(`/en/tasks/${taskId}\\?workBlockId=.+$`),
+				);
+				inputPanel = page.getByRole("tabpanel", { name: "Provide input" });
+				await expect(
+					inputPanel.getByRole("textbox", { name: "Scenario label" }),
+				).toBeVisible();
+
 				await inputPanel
 					.getByRole("textbox", { name: "Scenario label" })
 					.fill("fast");
@@ -443,14 +545,35 @@ test.describe("Task create → plan → run → result", () => {
 					.fill("fast path");
 				await inputPanel.getByRole("button", { name: "Submit input" }).click();
 
-				const approveResult = page.getByRole("button", {
-					name: "Approve result",
-				});
-				await expect(approveResult).toBeVisible({ timeout: 30_000 });
+				await expect(
+					page.getByRole("button", { name: "Approve result" }),
+				).toBeVisible({ timeout: 30_000 });
 				await expect
 					.poll(async () => (await getCurrentExecution(request, taskId)).status)
 					.toBe("waiting_for_approval");
-				await approveResult.click();
+
+				await page.goto("/en/action-center");
+				const approvalHeading = page.getByRole("heading", {
+					name: taskTitle,
+					level: 3,
+				});
+				await expect(approvalHeading).toBeVisible({ timeout: 20_000 });
+				const approvalCard = approvalHeading.locator("xpath=../../..");
+				const approvalResponsePromise = page.waitForResponse(
+					(response) =>
+						response.url().includes(`/api/work/${taskId}/commands`) &&
+						response.request().method() === "POST" &&
+						response.request().postData()?.includes('"resume_with_approval"') ===
+							true,
+				);
+				await approvalCard
+					.getByRole("button", { name: "Approve", exact: true })
+					.click();
+				expect((await approvalResponsePromise).ok()).toBeTruthy();
+				await expect(approvalHeading).toHaveCount(0);
+
+				await page.goto(TASK_URL(taskId));
+				await dismissTaskEditorIfOpen(page);
 				const manualResult = page.getByRole("textbox", {
 					name: "Mark completed",
 				});
@@ -469,6 +592,52 @@ test.describe("Task create → plan → run → result", () => {
 				await expect(
 					page.getByRole("button", { name: "Accept result" }),
 				).toBeVisible();
+				const completed = await getCurrentExecution(request, taskId);
+				expect(completed.planOutput).toMatchObject({
+					manifest: { sourceRevision: expect.any(Number) },
+					finalizedResult: {
+						sourceRevision: expect.any(Number),
+						manifest: { sourceRevision: expect.any(Number) },
+					},
+					finalization: {
+						status: "Ready",
+						sourceRevision: expect.any(Number),
+					},
+				});
+				const sourceRevision = completed.planOutput!.manifest!.sourceRevision;
+				expect(completed.planOutput!.finalizedResult!.sourceRevision).toBe(
+					sourceRevision,
+				);
+				expect(
+					completed.planOutput!.finalizedResult!.manifest!.sourceRevision,
+				).toBe(sourceRevision);
+				expect(completed.planOutput!.finalization!.sourceRevision).toBe(
+					sourceRevision,
+				);
+
+				await page.goto("/en/action-center");
+				const completedHeading = page.getByRole("heading", {
+					name: taskTitle,
+					level: 3,
+				});
+				await expect(completedHeading).toBeVisible({ timeout: 20_000 });
+				const completedCard = completedHeading.locator("xpath=../../..");
+				const reviewResults = completedCard.getByRole("link", {
+					name: "Review results",
+				});
+				await expect(reviewResults).toHaveAttribute(
+					"href",
+					new RegExp(`^/en/tasks/${taskId}\\?workBlockId=.+$`),
+				);
+				await reviewResults.click();
+				await expect(page).toHaveURL(
+					new RegExp(`/en/tasks/${taskId}\\?workBlockId=.+$`),
+				);
+				await expect(
+					page.getByRole("heading", {
+						name: "Execution complete, awaiting review",
+					}),
+				).toBeVisible();
 			});
 
 			let acceptedRunId: string | undefined;
@@ -483,6 +652,7 @@ test.describe("Task create → plan → run → result", () => {
 					name: "Confirm result acceptance",
 				});
 				await expect(acceptDialog).toBeVisible();
+				await expectDialogFocusContained(page, acceptDialog);
 				await acceptDialog
 					.getByRole("button", { name: "Confirm acceptance" })
 					.click();
@@ -533,6 +703,7 @@ test.describe("Task create → plan → run → result", () => {
 								.includes(`/api/tasks/${taskId}/actions/promote-to-goal`) &&
 							response.request().method() === "POST",
 					);
+					await expectDialogFocusContained(page, promotionDialog);
 					await promotionDialog
 						.getByRole("button", { name: "Create Goal and continue" })
 						.click();
@@ -689,6 +860,12 @@ test.describe("Task create → plan → run → result", () => {
 					idempotencyKey: `e2e-start-${task.taskId}`,
 				});
 				expect(ack.commandId).toBeTruthy();
+				await expect(
+					page.getByRole("tabpanel", { name: "Provide input" }),
+				).toBeVisible({ timeout: 30_000 });
+				await expect(
+					page.getByRole("textbox", { name: "Scenario label" }),
+				).toBeVisible();
 
 				await resolveDebugPlanGates(request, task.taskId);
 
@@ -725,9 +902,7 @@ test.describe("Task create → plan → run → result", () => {
 
 				const acceptResponse = page.waitForResponse(
 					(response) =>
-						response
-							.url()
-							.includes(`/api/tasks/${task.taskId}/result/accept`) &&
+						response.url().includes(`/api/tasks/${task.taskId}/result/accept`) &&
 						response.request().method() === "POST",
 				);
 				await page.getByRole("button", { name: /^Accept result$/ }).click();
@@ -735,6 +910,7 @@ test.describe("Task create → plan → run → result", () => {
 					name: "Confirm result acceptance",
 				});
 				await expect(acceptDialog).toBeVisible();
+				await expectDialogFocusContained(page, acceptDialog);
 				await acceptDialog
 					.getByRole("button", { name: "Confirm acceptance" })
 					.click();
@@ -801,11 +977,12 @@ test.describe("Task create → plan → run → result", () => {
 				await page
 					.getByRole("button", { name: "Create Goal and continue" })
 					.click();
-				await expect(
-					page.getByRole("dialog", { name: "Continue this result as a Goal" }),
-				).toBeVisible();
-				await page
-					.getByRole("dialog", { name: "Continue this result as a Goal" })
+				const promotionDialog = page.getByRole("dialog", {
+					name: "Continue this result as a Goal",
+				});
+				await expect(promotionDialog).toBeVisible();
+				await expectDialogFocusContained(page, promotionDialog);
+				await promotionDialog
 					.getByRole("button", { name: "Create Goal and continue" })
 					.click();
 				await expect(page).toHaveURL(/\/en\/goals\/[^/]+$/);
@@ -823,8 +1000,7 @@ test.describe("Task create → plan → run → result", () => {
 								{
 									id: "outcome-confirmed",
 									kind: "user_confirmed",
-									description:
-										"The deterministic lifecycle result is retained.",
+									description: "The deterministic lifecycle result is retained.",
 									satisfied: false,
 									confirmedAt: null,
 									proposalStatus: "proposed",
@@ -868,8 +1044,7 @@ test.describe("Task create → plan → run → result", () => {
 								{
 									id: "outcome-confirmed",
 									kind: "user_confirmed",
-									description:
-										"The deterministic lifecycle result is retained.",
+									description: "The deterministic lifecycle result is retained.",
 									satisfied: false,
 									confirmedAt: null,
 									proposalStatus: "proposed",
@@ -893,7 +1068,86 @@ test.describe("Task create → plan → run → result", () => {
 		}
 	});
 
-	test("[RUN-014] shows provider failure, failed node, and retry action", async ({
+	test("[RESULT-002] retries finalization without rerunning the Plan", async ({
+		page,
+		request,
+	}, testInfo) => {
+		test.skip(
+			testInfo.project.name !== "chromium",
+			"Focused result-finalization retry runs on desktop only.",
+		);
+		test.setTimeout(120_000);
+
+		await bindTaskPlanProvider(
+			request,
+			"result-finalization-failure",
+			"http://127.0.0.1:1",
+			["task.result_finalization"],
+			true,
+		);
+		const task = await createTaskWorkspaceTask(request, {
+			title: `E2E Finalization Retry ${Date.now()}`,
+			description: "Retry only final result composition after provider failure.",
+		});
+		await bindAllDebugFeatures(request, task.taskId);
+		await generateTaskWorkspacePlan(request, task.taskId);
+		await dispatchWorkspaceCommand(request, task.taskId, {
+			type: "execution.action",
+			action: "start_manual",
+			prompt: "Complete execution before finalization retry.",
+			idempotencyKey: `finalization-start-${task.taskId}`,
+		});
+		await resolveDebugPlanGates(request, task.taskId);
+		const failed = await pollExecution(
+			request,
+			task.taskId,
+			(body) =>
+				body.status === "completed" &&
+				body.planOutput?.finalization?.status === "Failed",
+		);
+		const sourceRevision = failed.planOutput!.manifest!.sourceRevision;
+		expect(sourceRevision).toEqual(expect.any(Number));
+
+		const provider = await startMockTaskPlanProvider();
+		try {
+			await bindTaskPlanProvider(request, task.taskId, provider.baseUrl, [
+				"task.result_finalization",
+			]);
+			await page.goto(TASK_URL(task.taskId));
+			await dismissTaskEditorIfOpen(page);
+			await expect(
+				page.getByRole("heading", { name: "Final result unavailable" }),
+			).toBeVisible({ timeout: 20_000 });
+			const retryResponsePromise = page.waitForResponse(
+				(response) =>
+					response
+						.url()
+						.includes(`/api/tasks/${task.taskId}/result/finalization/retry`) &&
+					response.request().method() === "POST",
+			);
+			await page.getByRole("button", { name: "Retry finalization" }).click();
+			expect((await retryResponsePromise).ok()).toBeTruthy();
+
+			const ready = await pollExecution(
+				request,
+				task.taskId,
+				(body) => body.planOutput?.finalization?.status === "Ready",
+			);
+			expect(ready.status).toBe("completed");
+			expect(ready.currentNodeId).toBeNull();
+			expect(ready.planOutput?.manifest?.sourceRevision).toBe(sourceRevision);
+			expect(ready.planOutput?.finalizedResult?.sourceRevision).toBe(
+				sourceRevision,
+			);
+			await expect(
+				page.getByRole("button", { name: "Accept result" }),
+			).toBeVisible({ timeout: 20_000 });
+		} finally {
+			await provider.stop();
+		}
+	});
+
+	test("[RUN-014/ACTION-008] recovers a failed run from Action Center", async ({
 		page,
 		request,
 	}, testInfo) => {
@@ -907,15 +1161,12 @@ test.describe("Task create → plan → run → result", () => {
 			request,
 			"run-014-provider-failure",
 			"http://127.0.0.1:1",
-			[
-				"execute_task_node",
-				"evaluate_condition_node",
-				"review_checkpoint_node",
-			],
+			["execute_task_node", "evaluate_condition_node", "review_checkpoint_node"],
 			true,
 		);
+		const taskTitle = `E2E Provider Failure ${Date.now()}`;
 		const task = await createTaskWorkspaceTask(request, {
-			title: `E2E Provider Failure ${Date.now()}`,
+			title: taskTitle,
 			description: "Expose a deterministic provider failure in the workspace.",
 		});
 		await generateTaskWorkspacePlan(request, task.taskId);
@@ -928,8 +1179,7 @@ test.describe("Task create → plan → run → result", () => {
 		const firstPause = await pollExecution(
 			request,
 			task.taskId,
-			(body) =>
-				body.status === "waiting_for_user" && Boolean(body.checkpoint?.id),
+			(body) => body.status === "waiting_for_user" && Boolean(body.checkpoint?.id),
 		);
 		await postCheckpointAction(
 			request,
@@ -980,6 +1230,31 @@ test.describe("Task create → plan → run → result", () => {
 		await expect(
 			operation.getByRole("button", { name: /Retry (Run|node)/i }),
 		).toBeVisible();
+
+		await bindAllDebugFeatures(request, task.taskId);
+		await page.goto("/en/action-center");
+		const failedHeading = page.getByRole("heading", {
+			name: taskTitle,
+			level: 3,
+		});
+		await expect(failedHeading).toBeVisible({ timeout: 20_000 });
+		const failedCard = failedHeading.locator("xpath=../../..");
+		const recoverResponsePromise = page.waitForResponse(
+			(response) =>
+				response.url().includes(`/api/work/${task.taskId}/commands`) &&
+				response.request().method() === "POST" &&
+				response.request().postData()?.includes('"retry_node"') === true,
+		);
+		await failedCard.getByRole("button", { name: /Recover run|Retry/i }).click();
+		const recoverResponse = await recoverResponsePromise;
+		expect(recoverResponse.ok()).toBeTruthy();
+		expect(await recoverResponse.json()).toMatchObject({
+			commandId: expect.any(String),
+		});
+		await expect(failedHeading).toHaveCount(0);
+		await expect
+			.poll(async () => (await getCurrentExecution(request, task.taskId)).status)
+			.not.toBe("failed");
 	});
 
 	test("[RUN-012/RUN-015] keeps pause, resume, retry, and stop projections stable", async ({
@@ -1009,8 +1284,7 @@ test.describe("Task create → plan → run → result", () => {
 		const firstPause = await pollExecution(
 			request,
 			task.taskId,
-			(body) =>
-				body.status === "waiting_for_user" && Boolean(body.checkpoint?.id),
+			(body) => body.status === "waiting_for_user" && Boolean(body.checkpoint?.id),
 		);
 		const firstCheckpointId = firstPause.checkpoint!.id!;
 		const firstNodeId = firstPause.currentNodeId;
@@ -1092,8 +1366,7 @@ test.describe("Task create → plan → run → result", () => {
 			(response) =>
 				response.url().includes(`/api/work/${task.taskId}/commands`) &&
 				response.request().method() === "POST" &&
-				response.request().postData()?.includes('"action":"retry_node"') ===
-					true,
+				response.request().postData()?.includes('"action":"retry_node"') === true,
 		);
 		await retryNode.click();
 		const retryResponse = await retryResponsePromise;
@@ -1102,8 +1375,7 @@ test.describe("Task create → plan → run → result", () => {
 			request,
 			task.taskId,
 			(body) =>
-				body.status === "blocked" &&
-				body.currentNodeId === blocked.currentNodeId,
+				body.status === "blocked" && body.currentNodeId === blocked.currentNodeId,
 		);
 
 		const cancelCommandKey = `controls-stop-${task.taskId}`;
@@ -1115,9 +1387,7 @@ test.describe("Task create → plan → run → result", () => {
 		});
 		await waitForCommandReceipt(request, task.taskId, cancelCommandKey);
 		await expect
-			.poll(
-				async () => (await getCurrentExecution(request, task.taskId)).status,
-			)
+			.poll(async () => (await getCurrentExecution(request, task.taskId)).status)
 			.toBe("cancelled");
 		expect((await getCurrentExecution(request, task.taskId)).status).toBe(
 			"cancelled",

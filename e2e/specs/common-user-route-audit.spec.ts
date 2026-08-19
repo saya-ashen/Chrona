@@ -123,17 +123,20 @@ test.describe("Common user route audit", () => {
 	}) => {
 		await page.goto("/en/dashboard");
 		await expect(
-			page.getByRole("link", { name: "Dashboard" }).first(),
+			page.getByRole("link", { name: "Dashboard", exact: true }).first(),
 		).toHaveAttribute("aria-current", "page");
-		await page.getByRole("link", { name: "Schedule" }).first().click();
+		await page
+			.getByRole("link", { name: "Schedule", exact: true })
+			.first()
+			.click();
 		await expect(page).toHaveURL(/\/en\/schedule$/);
 		await expect(
-			page.getByRole("link", { name: "Schedule" }).first(),
+			page.getByRole("link", { name: "Schedule", exact: true }).first(),
 		).toHaveAttribute("aria-current", "page");
 		await page.goBack();
 		await expect(page).toHaveURL(/\/en\/dashboard$/);
 		await expect(
-			page.getByRole("link", { name: "Dashboard" }).first(),
+			page.getByRole("link", { name: "Dashboard", exact: true }).first(),
 		).toHaveAttribute("aria-current", "page");
 	});
 

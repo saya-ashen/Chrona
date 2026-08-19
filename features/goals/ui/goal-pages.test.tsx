@@ -1143,7 +1143,9 @@ describe("Goal pages", () => {
 	it("pauses and resumes a Goal through visible lifecycle actions", async () => {
 		runGoalActionMock.mockClear();
 		const user = userEvent.setup();
-		const active = renderInRouter(<GoalWorkspacePage goal={baseGoal} copy={copy} />);
+		const active = renderInRouter(
+			<GoalWorkspacePage goal={baseGoal} copy={copy} />,
+		);
 		const actions = screen.getByRole("button", { name: "Goal actions" });
 		actions.focus();
 		await user.keyboard("{ArrowDown}");

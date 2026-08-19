@@ -54,7 +54,7 @@ function TaskDescriptionSection({ compact, copy, form, sourceDescription, source
   );
 }
 
-function TaskScheduleSection({ copy, form, isScheduleLocked, lockedFieldsHint }: Pick<FormSectionProps, "copy" | "form" | "isScheduleLocked" | "lockedFieldsHint">) {
+function TaskScheduleSection({ copy, form, isPending, isScheduleLocked, lockedFieldsHint }: Pick<FormSectionProps, "copy" | "form" | "isPending" | "isScheduleLocked" | "lockedFieldsHint">) {
   const { formState, scheduleDurationLabel, setValue } = form;
   const setScheduleValue = (name: "scheduledDate" | "scheduledStartTime" | "scheduledEndTime", value: string) => {
     if (!isScheduleLocked) setValue(name, value, { shouldDirty: true });
@@ -62,6 +62,16 @@ function TaskScheduleSection({ copy, form, isScheduleLocked, lockedFieldsHint }:
   return (
     <TaskConfigSection title={copy.schedule} info={isScheduleLocked ? lockedFieldsHint : undefined} actions={scheduleDurationLabel ? <span className="rounded-full border border-primary/15 bg-primary/8 px-2.5 py-1 text-xs font-medium text-primary">{scheduleDurationLabel}</span> : null}>
       <p className="text-xs text-muted-foreground">{copy.scheduleHint}</p>
+      <TaskConfigField label={copy.dueDate} htmlFor="task-config-due-at" className="text-xs text-foreground">
+        <Input
+          id="task-config-due-at"
+          name="dueAt"
+          type="datetime-local"
+          value={formState.dueAt}
+          disabled={isPending}
+          onChange={(event) => setValue("dueAt", event.target.value, { shouldDirty: true })}
+        />
+      </TaskConfigField>
       <FieldGroup className="grid gap-2 sm:grid-cols-3">
         <TaskConfigField label={copy.scheduleDate} className="text-xs text-foreground"><TaskConfigDatePicker name="scheduledDate" value={formState.scheduledDate} placeholder={copy.scheduleDate} disabled={isScheduleLocked} onValueChange={(value) => setScheduleValue("scheduledDate", value)} /></TaskConfigField>
         <TaskConfigField label={copy.scheduleStart} className="text-xs text-foreground"><TaskConfigSelect name="scheduledStartTime" value={formState.scheduledStartTime} placeholder="--" options={TIME_OPTIONS.map((time) => ({ value: time, label: time }))} disabled={isScheduleLocked} onValueChange={(value) => setScheduleValue("scheduledStartTime", value)} /></TaskConfigField>
@@ -83,15 +93,20 @@ function TaskAutomationSectionGroup({ compact = false, copy, form, isPending, av
   return { automation, provider };
 }
 
+function TaskExecutionRuntimeSection({ copy, form, isPending, executionRuntimes }: Pick<FormSectionProps, "copy" | "form" | "isPending"> & Pick<TaskConfigFormProps, "executionRuntimes">) {
+  if (executionRuntimes.length === 0) return null;
+  return <TaskConfigSection title={copy.adapter}><TaskConfigField label={copy.adapter} htmlFor="task-config-execution-runtime" hideTitle className="text-xs text-foreground"><TaskConfigSelect name="executionRuntime" id="task-config-execution-runtime" value={form.formState.executionRuntime} options={executionRuntimes.map((runtime) => ({ value: runtime.key, label: runtime.label }))} disabled={isPending} onValueChange={(value) => form.setValue("executionRuntime", value, { shouldDirty: true })} /></TaskConfigField></TaskConfigSection>;
+}
+
 function TaskExecutionModelSection({ form, isPending }: Pick<FormSectionProps, "form" | "isPending">) {
   const { formState, setValue } = form;
   const setConfigValue = (name: "model" | "contextStrategy", value: string | undefined) => setValue("fieldExecutionConfig", { ...formState.fieldExecutionConfig, [name]: value }, { shouldDirty: true });
   return <TaskConfigSection title="Execution model" info="Overrides are applied only when the selected provider advertises support."><TaskConfigField label="Model override" hint="Leave empty to use the provider default." className="text-xs text-foreground"><Input name="executionModel" value={typeof formState.fieldExecutionConfig.model === "string" ? formState.fieldExecutionConfig.model : ""} placeholder="Provider default" disabled={isPending} onChange={(event) => setConfigValue("model", event.target.value || undefined)} /></TaskConfigField><TaskConfigField label="Context strategy" hint="Artifact-backed and bounded strategies require provider support." className="text-xs text-foreground"><TaskConfigSelect name="contextStrategy" value={typeof formState.fieldExecutionConfig.contextStrategy === "string" ? formState.fieldExecutionConfig.contextStrategy : "provider_default"} options={[{ value: "provider_default", label: "Provider default" }, { value: "auto_compact", label: "Automatic compaction" }, { value: "bounded_tool_results", label: "Bounded tool results" }, { value: "artifact_backed", label: "Artifact-backed results" }]} disabled={isPending} onValueChange={(value) => setConfigValue("contextStrategy", value)} /></TaskConfigField></TaskConfigSection>;
 }
 
-export function TaskConfigFormSections(props: FormSectionProps & Pick<TaskConfigFormProps, "availableAiClients" | "disableAiClientSelection" | "aiClientSelectionDisabledHint">) {
+export function TaskConfigFormSections(props: FormSectionProps & Pick<TaskConfigFormProps, "availableAiClients" | "disableAiClientSelection" | "aiClientSelectionDisabledHint" | "executionRuntimes">) {
   const automationAndProvider = TaskAutomationSectionGroup(props);
-  return <><TaskBasicsSection {...props} />{!props.compact ? <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_300px] xl:items-start"><div className="flex flex-col gap-3"><TaskDescriptionSection {...props} /><TaskScheduleSection {...props} /></div><div className="flex flex-col gap-3">{automationAndProvider.automation}{automationAndProvider.provider ? <TaskConfigSection title={props.copy.aiProvider} info={props.aiClientSelectionDisabledHint}>{automationAndProvider.provider}</TaskConfigSection> : null}<TaskExecutionModelSection {...props} /></div></div> : null}<RuntimeFieldList fields={props.compact ? props.form.requiredRuntimeFields : props.form.visibleStandardFields} runtimeInput={props.form.formState.fieldExecutionConfig} compact={props.compact} onUpdate={props.form.updateRuntimeField} />{props.compact ? <details className="rounded-2xl border border-border/60 bg-background/70 px-3 py-3"><summary className="cursor-pointer text-sm font-medium text-foreground">{props.copy.moreOptions}</summary><FieldGroup className="mt-3 gap-3"><TaskDescriptionSection {...props} />{automationAndProvider.automation}{automationAndProvider.provider}<RuntimeFieldList fields={props.form.optionalRuntimeFields} runtimeInput={props.form.formState.fieldExecutionConfig} compact onUpdate={props.form.updateRuntimeField} /></FieldGroup></details> : null}</>;
+  return <><TaskBasicsSection {...props} />{!props.compact ? <div className="grid gap-3 xl:grid-cols-[minmax(0,1fr)_300px] xl:items-start"><div className="flex flex-col gap-3"><TaskDescriptionSection {...props} /><TaskScheduleSection {...props} /></div><div className="flex flex-col gap-3"><TaskExecutionRuntimeSection {...props} />{automationAndProvider.automation}{automationAndProvider.provider ? <TaskConfigSection title={props.copy.aiProvider} info={props.aiClientSelectionDisabledHint}>{automationAndProvider.provider}</TaskConfigSection> : null}<TaskExecutionModelSection {...props} /></div></div> : null}<RuntimeFieldList fields={props.compact ? props.form.requiredRuntimeFields : props.form.visibleStandardFields} runtimeInput={props.form.formState.fieldExecutionConfig} compact={props.compact} onUpdate={props.form.updateRuntimeField} />{props.compact ? <details className="rounded-2xl border border-border/60 bg-background/70 px-3 py-3"><summary className="cursor-pointer text-sm font-medium text-foreground">{props.copy.moreOptions}</summary><FieldGroup className="mt-3 gap-3"><TaskDescriptionSection {...props} />{automationAndProvider.automation}{automationAndProvider.provider}<RuntimeFieldList fields={props.form.optionalRuntimeFields} runtimeInput={props.form.formState.fieldExecutionConfig} compact onUpdate={props.form.updateRuntimeField} /></FieldGroup></details> : null}</>;
 }
 
 export function TaskConfigFormPresets({ compact, isPending, presets, onApply }: { compact: boolean; isPending: boolean; presets: TaskConfigPreset[] | undefined; onApply: (preset: TaskConfigPreset) => void }) {

@@ -48,6 +48,27 @@ export type NodeRuntimePlanContext = NodeRuntimeInput["context"]["plan"] & {
 };
 export type NodeRuntimeRunContext = NonNullable<NodeRuntimeInput["context"]["run"]>;
 
+type RuntimeNodeViewSource = Pick<
+  EffectivePlanNode,
+  "config" | "description" | "title" | "type"
+> & {
+  definition?: Pick<EffectivePlanNode["definition"], "objective">;
+};
+
+type SemanticRefPlanNode = Pick<
+  EffectivePlanNode,
+  "config" | "id" | "localId" | "nodeId" | "title" | "type"
+> & {
+  activeLayerId?: string | null;
+};
+
+type SemanticRefPlan = Pick<
+  EffectivePlanGraph,
+  "basePlanId" | "graphId" | "resolvedAt"
+> & {
+  nodes: SemanticRefPlanNode[];
+};
+
 function defaultPlanContext(): NodeRuntimePlanContext {
   return {
     title: "Untitled plan",
@@ -73,13 +94,14 @@ function branchKey(index: number): string {
   return `B${index + 1}`;
 }
 
-function nodeObjective(node: EffectivePlanNode): string | undefined {
+function nodeObjective(node: RuntimeNodeViewSource): string | undefined {
   const config = node.config as Record<string, unknown>;
   if (typeof config.objective === "string" && config.objective.trim()) {
     return config.objective;
   }
-  if (typeof node.definition.objective === "string" && node.definition.objective.trim()) {
-    return node.definition.objective;
+  const definitionObjective = node.definition?.objective;
+  if (typeof definitionObjective === "string" && definitionObjective.trim()) {
+    return definitionObjective;
   }
   return node.description ?? node.title;
 }
@@ -102,7 +124,10 @@ function matchesDependency(candidate: EffectivePlanNode, ids: Set<string>): bool
   return ids.has(candidate.id) || ids.has(candidate.nodeId) || ids.has(candidate.localId);
 }
 
-function runtimeNode(node: EffectivePlanNode, ref: string): NodeRuntimeInput["node"] {
+export function buildRuntimeNodeView(
+  node: RuntimeNodeViewSource,
+  ref: string,
+): NodeRuntimeInput["node"] {
   switch (node.type) {
     case "task": {
       const config = node.config as TaskConfig & Record<string, unknown>;
@@ -238,13 +263,16 @@ function compactPreviousResults(input: {
   };
 }
 
-function resolveBranchTarget(plan: EffectivePlanGraph, nextNodeId: string): EffectivePlanNode | undefined {
+function resolveBranchTarget(
+  plan: SemanticRefPlan,
+  nextNodeId: string,
+): SemanticRefPlanNode | undefined {
   return plan.nodes.find((node) =>
     node.id === nextNodeId || node.localId === nextNodeId || node.nodeId === nextNodeId,
   );
 }
 
-export function buildSemanticRefHistory(plan: EffectivePlanGraph): SemanticRefHistory {
+export function buildSemanticRefHistory(plan: SemanticRefPlan): SemanticRefHistory {
   const token = dateToken(plan.resolvedAt);
   const taskRef: AiVisibleRefBinding = {
     ref: `T${token}-01`,
@@ -358,7 +386,7 @@ export function buildNodeRuntimeInput(input: {
     : undefined;
 
   return {
-    node: runtimeNode(input.node, currentRef.ref),
+    node: buildRuntimeNodeView(input.node, currentRef.ref),
     context: compactPreviousResults({ plan: input.plan, history, node: input.node, planOutput: input.planOutput, planContext: input.planContext, runContext: input.runContext, userInput: input.userInput, inputFields: input.inputFields }),
     branchOptions,
   };

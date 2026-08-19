@@ -178,9 +178,7 @@ export function workspaceActivityToTaskRuntimeActivity(
 			cwd: payloadString(input, ["cwd", "workingDirectory", "workdir"]),
 			input,
 			output,
-			diff:
-				payloadString(output, ["diff", "patch", "unifiedDiff"]) ??
-				payloadString(item.providerRaw, ["diff", "patch", "unifiedDiff"]),
+			diff: payloadString(output, ["diff", "patch", "unifiedDiff"]),
 			durationMs: item.tool?.durationMs,
 			timestamp: item.timestamp,
 			nodeTitle: item.sourceNodeTitle,

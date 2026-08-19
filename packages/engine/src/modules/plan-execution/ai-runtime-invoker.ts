@@ -28,6 +28,7 @@ import { ACTIVE_RUN_STATUSES, syncPersistedRunStateInTransaction } from "./persi
 import { assertCurrentPlanExecutionOwnership, schedulerWorkSignal, withPlanExecutionDurability } from "./persistence/scheduler-durability";
 import { assertRuntimeExecutionScope } from "./persistence/runtime-execution-scope";
 import { generatedFilesRoot } from "@/modules/tasks/result-file-access";
+import { registerActiveRuntimeInvocation } from "./runtime/active-runtime-invocations";
 type RuntimeProviderClient = AgentProviderClient;
 
 export type AiRuntimeInvocationInput = {
@@ -67,11 +68,21 @@ export function usesChronaControlPlane(providerName: string) {
 export class AiRuntimeInvoker {
   async invoke(input: AiRuntimeInvocationInput): Promise<AiRuntimeInvocation> {
     const { task, run } = await createRuntimeRun(input);
+    const active = registerActiveRuntimeInvocation({
+      runId: run.id,
+      nodeAttemptId: input.nodeAttempt.id,
+    });
+    const signal = input.signal
+      ? AbortSignal.any([input.signal, active.controller.signal])
+      : active.controller.signal;
+    const scopedInput = { ...input, signal };
     try {
-      return await invokeProviderForRuntime(input, task, run);
+      return await invokeProviderForRuntime(scopedInput, task, run);
     } catch (error) {
-      await recordRuntimeInvocationFailure(input, run.id, error);
+      await recordRuntimeInvocationFailure(scopedInput, run.id, error);
       throw error;
+    } finally {
+      active.dispose();
     }
   }
 }

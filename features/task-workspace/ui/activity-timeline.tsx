@@ -397,9 +397,7 @@ function CollapsibleText({
 function ActivityPayloadDetails({ items }: { items: WorkspaceActivityItem[] }) {
 	const payloadItems = items.filter(
 		(item) =>
-			item.providerInput !== undefined ||
-			item.providerOutput !== undefined ||
-			item.providerRaw !== undefined,
+			item.providerInput !== undefined || item.providerOutput !== undefined,
 	);
 	if (payloadItems.length === 0) return null;
 
@@ -415,7 +413,7 @@ function ActivityPayloadDetails({ items }: { items: WorkspaceActivityItem[] }) {
 	return (
 		<details className="mt-1 rounded-lg border border-border/60 bg-muted/20 px-2 py-1.5">
 			<summary className="cursor-pointer text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-				Provider payload
+				Tool details
 			</summary>
 			<div className="mt-2 space-y-2">
 				{payloadItems.map((item) => (
@@ -433,11 +431,6 @@ function ActivityPayloadDetails({ items }: { items: WorkspaceActivityItem[] }) {
 						{item.providerOutput !== undefined ? (
 							<pre className="max-h-72 overflow-auto whitespace-pre-wrap break-words rounded bg-background/70 p-2 font-mono text-[10px] text-foreground">
 								Output: {format(item.providerOutput)}
-							</pre>
-						) : null}
-						{item.providerRaw !== undefined ? (
-							<pre className="max-h-72 overflow-auto whitespace-pre-wrap break-words rounded bg-background/70 p-2 font-mono text-[10px] text-foreground">
-								Raw: {format(item.providerRaw)}
 							</pre>
 						) : null}
 					</div>

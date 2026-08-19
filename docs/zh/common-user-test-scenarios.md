@@ -1,10 +1,10 @@
 # Chrona 常用用户测试场景树
 
-> 状态：已完成当前可执行场景收敛。本文包含 276 个唯一场景：`224 通过`、`52 部分通过`、`0 阻塞`。`部分通过`表示已有直接证据，但仍存在产品语义、外部基础设施或无界横向矩阵缺口，不表示现有断言失败。
+> 状态：已完成当前可执行场景收敛。本文包含 276 个唯一场景：`245 通过`、`31 部分通过`、`0 阻塞`。`部分通过`表示已有直接证据，但仍存在产品语义、外部基础设施或无界横向矩阵缺口，不表示现有断言失败。当前 5 个 P0 场景已闭合：`RESULT-007`、`CROSS-001`、`CROSS-003`、`CROSS-004`、`CROSS-010`。
 >
-> 基线：`fix/durable-plan-generation-recovery` 当前验证批次；场景证据已通过连续 checkpoint commits 固化。
+> 基线：当前分支验证批次；场景证据已通过连续 checkpoint commits 固化。
 >
-> 执行证据：`outputs/common-user-test-scenarios/report.md`、`outputs/common-user-test-scenarios/results.json`；稳定回归固化于现有 Bun/Vitest/Playwright 测试。
+> 执行证据：`outputs/common-user-test-scenarios/results.json`；稳定回归固化于现有 Bun/Vitest/Playwright 测试。`outputs/common-user-test-scenarios/report.md` 是历史快照，不用于当前计数。
 
 ## 已记录缺陷
 
@@ -476,7 +476,7 @@ flowchart LR
 | ASSIST-004 | P1 UI | Assistant 返回任务修改 proposal → 预览 → Apply | proposal 标记 applied；任务只按确认内容更新 |
 | ASSIST-005 | P1 UI | Assistant drawer 不可用 | 主任务流程仍可操作；disabled reason 可见 |
 | MCP-001 | P0 AGENT | 外部 agent 读取 execution/plan/current node | 只返回 AI-visible refs，不泄露私有 DB ID |
-| MCP-002 | P0 AGENT | task node 提交 `chrona_node_output` → `chrona_node_complete` | Spec 先验证；节点只完成一次 |
+| MCP-002 | P0 AGENT | task node 一次提交 `chrona_node_complete`（summary、findings、deliverables、evidenceItems） | Public spec 先验证；一次 dispatch；节点只完成一次 |
 | MCP-003 | P1 AGENT | condition node → `chrona_condition_select` | branchRef 合法性验证；只执行选中分支 |
 | MCP-004 | P1 AGENT | node → `chrona_node_block`/`chrona_node_fail` | UI 显示原因和下一动作 |
 | MCP-005 | P1 AGENT | wait node → `chrona_wait_complete` | 仅当前 wait node 可完成 |
@@ -556,10 +556,17 @@ flowchart LR
 
 - AI client 创建、编辑、删除、默认切换和空名称校验。
 - 新增 `e2e/specs/common-user-route-audit.spec.ts`：根路径/非法 locale 重定向、query/hash 保留、Not Found 恢复、主路由、三 viewport、横向溢出、console/page/server error 检查。
-- 新增 `e2e/specs/p0-scenario-gaps.spec.ts`：补齐 18 个 P0 缺口的直接浏览器证据，desktop/tablet/mobile 共 24/24 通过；未完整覆盖的 API 故障注入和深层状态维度仍保留为 `partial`。
+- 新增 `e2e/specs/p0-scenario-gaps.spec.ts`：补充可直接断言的 P0 浏览器证据；未执行实际队列决策、排期放置、重复 occurrence 或自动 Plan 的分支不计为通过，继续保留为 `partial`。
 - 全量台账：276 个场景，`outputs/common-user-test-scenarios/results.json`。
-- 汇总报告：`outputs/common-user-test-scenarios/report.md`。
-- 结果统计：110 个直接通过，135 个部分通过，31 个阻塞。部分通过表示已有下层或局部证据，仍缺场景声明的完整 UI/API 维度。
+- 当前分支验证批次：`245 通过 / 31 部分 / 0 阻塞`。该计数已回写并逐项核对 `outputs/common-user-test-scenarios/results.json`；旧 `report.md` 仍是历史快照，不作为当前分支状态依据。
+- 本轮 P0 证据：`RESULT-007` 使用结果文件授权 UI、bounded preview、路径安全 Bun tests；`CROSS-001` 使用三 viewport lifecycle 状态/当前节点断言；`CROSS-003` 使用 keyboard-only lifecycle E2E；`CROSS-004` 使用任务、结果、Goal、AI client、外部日历 dialog focus-trap 断言；`CROSS-010` 使用 API-only network、DOM、console、pageerror、截图 capture audit，并保留 logger/MCP redaction tests。
+- 本轮 Result 证据：`RESULT-001` 在完整 lifecycle 中断言 Ready finalization、canonical Manifest 与 finalized Manifest 使用同一 source revision；`RESULT-002` 注入 finalization provider 失败，显示 Retry，切换可用 provider 后只重试 composition，并保持 completed execution 与 Manifest revision 不变；`RESULT-003` 验证 acceptance event 绑定 completed Run 且 Task 保持 Completed；`RESULT-004` 验证重复接受返回同一 receipt 且只写一个 canonical event；`RESULT-005` 覆盖 catalog validation 与 markdown/table/comparison/timeline/checklist 可读渲染；`RESULT-006` 覆盖 generated-file preview/download、可见格式和大小、registered Artifact 完整性；`RESULT-008` 使用 `result-file-access`、`open-task-result-file` 与 task workspace route Bun tests 覆盖目录、符号链接逃逸、设备文件、Unix socket、64 MiB 超限文件，以及 HTTP 下载和本地授权路由拒绝；FileRef UI test 验证拒绝错误可见且不渲染文件内容；`RESULT-014` 验证打开结果再返回时保留 Results 筛选和分页 query。
+- 本轮工作台证据：`WORK-007` 验证 compact/full graph 切换时 done、current、waiting 节点共用同一视觉 tone。
+- 本轮 Action Center 证据：`ACTION-001` 覆盖空投影与明确空状态；`ACTION-003` 将 persisted plan-run approval 投影到队列，并通过三 viewport lifecycle 直接 Approve、继续当前执行、移除 item；`ACTION-008` 投影 failed node ID，通过 command rail 发出 `retry_node`，移除 item 并恢复 canonical state；`ACTION-010` 从 completed item 打开正确 Task Result；`ACTION-011` 覆盖失败保留、安全错误和成功重试；`ACTION-013` 覆盖只移除目标 item 并保持其余队列顺序。
+- 本轮 accessibility 证据：`CROSS-005` 对 Dashboard、Schedule、Tasks、Action Center、Goals、Settings 在 desktop/tablet/mobile 执行 axe；FullCalendar scroller 可聚焦并恢复原生 table semantics，三视口无 serious/critical violation。
+- 本轮自动执行证据：`AUTO-006` 在自动完成后逐页验证 Dashboard、Tasks Results、Schedule 与 Task Result 投影一致可见。
+- 本轮 Goal 证据：`GOAL-003` 使用 production router 的并发 `app.request` 与同一 idempotency key，验证只创建一个 Goal 和一个首任务。
+- 本轮执行门证据：`RUN-006` 覆盖两类有效输入和后续节点推进；`RUN-007` 覆盖缺失必填值时禁用提交、blur 后显示字段级原因、有效值恢复提交；`RUN-008` 覆盖独立 approval copy、Action Center/keyboard 操作和不重跑已接受输出；`RUN-009`/`ACTION-004` 覆盖拒绝、反馈持久化、保持暂停及不重跑输出；`RUN-011` 覆盖 wait 条件未满足时保持等待、输入满足后只继续一次；`RUN-014` 覆盖 provider 连接失败、可读错误、Retry prominence 和恢复；`RUN-020` 覆盖 active checkpoint 跨页面导航和刷新后的当前节点、状态、Activity 与主动作恢复；`RUN-021` 覆盖空输出拒绝成功、多 delta 合并渲染和畸形 provider 事件失败；`CROSS-012` 覆盖 WaitingForInput、WaitingForApproval、Blocked、Failed、Cancelled、Completed 与 Done 的模型和渲染文案区分。
 
 - 任务创建到 accepted result 的完整生命周期。
 - Plan 接受后无需刷新即可 Start。

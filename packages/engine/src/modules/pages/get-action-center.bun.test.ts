@@ -1,6 +1,6 @@
 import { afterAll, beforeEach, describe, expect, it } from "bun:test";
-import { db } from "@/lib/db";
-import { getActionCenter } from "@/modules/pages/get-action-center";
+import { db } from "@chrona/db";
+import { getActionCenter } from "@chrona/engine/test-support";
 
 async function resetDb() {
   await db.taskTimelineItem.deleteMany();
@@ -13,6 +13,8 @@ async function resetDb() {
   await db.approval.deleteMany();
   await db.artifact.deleteMany();
   await db.taskProjection.deleteMany();
+  await db.taskPlanRun.deleteMany();
+  await db.taskPlan.deleteMany();
   await db.run.deleteMany();
   await db.taskDependency.deleteMany();
   await db.memory.deleteMany();
@@ -96,13 +98,13 @@ describe("getActionCenter actionable states", () => {
       },
     });
 
-    // WaitingForInput -> latest run waiting (kind:"input").
+    // WaitingForInput task can retain a Running canonical Run while its graph waits.
     const inputTask = await seedTask(
       workspace.id,
       "Input task",
       "WaitingForInput",
     );
-    const inputRun = await seedRun(inputTask.id, "WaitingForInput", {
+    const inputRun = await seedRun(inputTask.id, "Running", {
       runtimeRunRef: "run-input",
       pendingInputPrompt: "Which environment should I target?",
     });
@@ -194,6 +196,148 @@ describe("getActionCenter actionable states", () => {
     expect(blockedItems[0]?.sourceTaskId).toBe(blockedTask.id);
   });
 
+  it("projects a persisted plan-run approval without a legacy Approval row", async () => {
+    const workspace = await db.workspace.create({
+      data: {
+        name: "Action Center plan-run approval",
+        status: "Active",
+        defaultRuntime: "hermes",
+      },
+    });
+    const task = await seedTask(
+      workspace.id,
+      "Approve generated output",
+      "WaitingForApproval",
+      { dueAt: new Date() },
+    );
+    const run = await seedRun(task.id, "Completed", {
+      runtimeRunRef: "run-waiting-for-approval",
+    });
+    await db.task.update({
+      where: { id: task.id },
+      data: { latestRunId: run.id },
+    });
+    await db.taskPlan.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        planId: "plan-action-center-approval",
+        revision: 1,
+        status: "Accepted",
+        compiledPlan: {},
+      },
+    });
+    const planRun = await db.taskPlanRun.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        planId: "plan-action-center-approval",
+        planRun: {
+          mutableGraph: {
+            results: [
+              {
+                nodeId: "review-output",
+                status: "current",
+                waitKind: "approval",
+                review: { required: true, status: "pending" },
+                error: "Approve the generated output before publishing.",
+              },
+            ],
+          },
+        },
+      },
+    });
+
+    const items = await getActionCenter(workspace.id);
+    const taskItems = items.filter((item) => item.sourceTaskId === task.id);
+
+    expect(taskItems).toHaveLength(1);
+    expect(taskItems[0]).toMatchObject({
+      id: planRun.id,
+      kind: "approval",
+      actionType: "Approval needed",
+      riskLevel: "high",
+      currentRunLabel: planRun.id,
+      summary: "Approve the generated output before publishing.",
+      consequence: "Approve or reject the current execution checkpoint",
+    });
+  });
+
+  it("does not resurrect waiting plan-run actions for Completed, Done, or Cancelled tasks", async () => {
+    const workspace = await db.workspace.create({
+      data: {
+        name: "Action Center closed task plan runs",
+        status: "Active",
+        defaultRuntime: "hermes",
+      },
+    });
+
+    for (const [index, status] of ["Completed", "Done", "Cancelled"].entries()) {
+      const task = await seedTask(
+        workspace.id,
+        `Closed task ${status}`,
+        status,
+      );
+      const staleApprovalRun = await seedRun(task.id, "WaitingForApproval");
+      await db.approval.create({
+        data: {
+          workspaceId: workspace.id,
+          taskId: task.id,
+          runId: staleApprovalRun.id,
+          type: "stale_closed_task",
+          title: "Stale approval",
+          summary: "This stale approval must stay hidden.",
+          riskLevel: "high",
+          status: "Pending",
+          requestedAt: new Date(),
+        },
+      });
+      await db.scheduleProposal.create({
+        data: {
+          workspaceId: workspace.id,
+          taskId: task.id,
+          source: "ai",
+          status: "Pending",
+          proposedBy: "agent:test",
+          summary: "This stale proposal must stay hidden.",
+        },
+      });
+
+      const planId = `plan-closed-${index}`;
+      await db.taskPlan.create({
+        data: {
+          workspaceId: workspace.id,
+          taskId: task.id,
+          planId,
+          revision: 1,
+          status: "Accepted",
+          compiledPlan: {},
+        },
+      });
+      await db.taskPlanRun.create({
+        data: {
+          workspaceId: workspace.id,
+          taskId: task.id,
+          planId,
+          planRun: {
+            mutableGraph: {
+              results: [
+                {
+                  nodeId: "stale-input",
+                  status: "current",
+                  waitKind: "user_input",
+                  error: "This stale action must stay hidden.",
+                },
+              ],
+            },
+          },
+        },
+      });
+    }
+
+    expect(await getActionCenter(workspace.id)).toEqual([]);
+  });
+
   it("does not double-count a Blocked task whose latest run already produced a recovery item", async () => {
     const workspace = await db.workspace.create({
       data: {
@@ -222,12 +366,171 @@ describe("getActionCenter actionable states", () => {
       where: { id: task.id },
       data: { latestRunId: run.id },
     });
+    await db.taskPlan.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        planId: "plan-action-center-recovery",
+        revision: 1,
+        status: "Accepted",
+        compiledPlan: {},
+      },
+    });
+    await db.taskPlanRun.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        planId: "plan-action-center-recovery",
+        planRun: {
+          planRun: {
+            status: "failed",
+            nodeStates: {
+              retry_node: { nodeId: "retry_node", status: "failed" },
+            },
+          },
+        },
+      },
+    });
 
     const items = await getActionCenter(workspace.id);
     const forTask = items.filter((item) => item.sourceTaskId === task.id);
 
     expect(forTask).toHaveLength(1);
-    expect(forTask[0]?.kind).toBe("recovery");
+    expect(forTask[0]).toMatchObject({
+      kind: "recovery",
+      currentNodeId: "retry_node",
+    });
+  });
+
+  it("keeps recurring occurrence actions and failed nodes scoped to their work block", async () => {
+    const workspace = await db.workspace.create({
+      data: {
+        name: "Action Center recurring scopes",
+        status: "Active",
+        defaultRuntime: "hermes",
+      },
+    });
+    const task = await seedTask(workspace.id, "Recurring task", "Blocked", {
+      blockReason: { blockType: "run_failed", scope: "run" },
+    });
+    const scheduledStartAt = new Date("2030-01-01T09:00:00.000Z");
+    const scheduledEndAt = new Date("2030-01-01T10:00:00.000Z");
+    const blockA = await db.workBlock.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        recurrenceKey: "occurrence-a",
+        title: "Occurrence A",
+        scheduledStartAt,
+        scheduledEndAt,
+      },
+    });
+    const blockB = await db.workBlock.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        recurrenceKey: "occurrence-b",
+        title: "Occurrence B",
+        scheduledStartAt,
+        scheduledEndAt,
+      },
+    });
+    const failedRun = await seedRun(task.id, "Failed", {
+      runtimeRunRef: "run-occurrence-a",
+      workBlockId: blockA.id,
+    });
+    await db.task.update({
+      where: { id: task.id },
+      data: { latestRunId: failedRun.id },
+    });
+
+    await db.taskPlan.createMany({
+      data: [
+        {
+          workspaceId: workspace.id,
+          taskId: task.id,
+          workBlockId: blockA.id,
+          planId: "plan-occurrence-a",
+          revision: 1,
+          status: "Accepted",
+          compiledPlan: {},
+        },
+        {
+          workspaceId: workspace.id,
+          taskId: task.id,
+          workBlockId: blockB.id,
+          planId: "plan-occurrence-b",
+          revision: 1,
+          status: "Accepted",
+          compiledPlan: {},
+        },
+      ],
+    });
+    await db.taskPlanRun.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        workBlockId: blockA.id,
+        workBlockScopeKey: blockA.id,
+        planId: "plan-occurrence-a",
+        planRun: {
+          planRun: {
+            status: "failed",
+            nodeStates: {
+              node_a: { nodeId: "node_a", status: "failed" },
+            },
+          },
+        },
+      },
+    });
+    const waitingRun = await db.taskPlanRun.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        workBlockId: blockB.id,
+        workBlockScopeKey: blockB.id,
+        planId: "plan-occurrence-b",
+        planRun: {
+          planRun: {
+            status: "failed",
+            nodeStates: {
+              node_b: { nodeId: "node_b", status: "failed" },
+            },
+          },
+          mutableGraph: {
+            results: [
+              {
+                nodeId: "input_b",
+                status: "current",
+                waitKind: "user_input",
+                error: "Provide input for occurrence B.",
+              },
+            ],
+          },
+        },
+      },
+    });
+
+    const items = (await getActionCenter(workspace.id)).filter(
+      (item) => item.sourceTaskId === task.id,
+    );
+
+    expect(items).toHaveLength(2);
+    expect(items).toContainEqual(
+      expect.objectContaining({
+        kind: "recovery",
+        currentNodeId: "node_a",
+        workBlockId: blockA.id,
+      }),
+    );
+    expect(items).toContainEqual(
+      expect.objectContaining({
+        id: waitingRun.id,
+        kind: "input",
+        workBlockId: blockB.id,
+        summary: "Provide input for occurrence B.",
+      }),
+    );
   });
 
   it("falls back to a sensible reason when blockReason shape is unexpected", async () => {
@@ -349,6 +652,16 @@ describe("getActionCenter actionable states", () => {
       "Completed run task",
       "Completed",
     );
+    const completedBlock = await db.workBlock.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: completedTask.id,
+        recurrenceKey: "completed-occurrence",
+        title: "Completed occurrence",
+        scheduledStartAt: minutesFromNow(-30),
+        scheduledEndAt: minutesFromNow(30),
+      },
+    });
     await seedRun(completedTask.id, "Completed", {
       runtimeRunRef: "run-old-completed",
       endedAt: minutesFromNow(-50),
@@ -356,6 +669,7 @@ describe("getActionCenter actionable states", () => {
     });
     const latestCompletedRun = await seedRun(completedTask.id, "Completed", {
       runtimeRunRef: "run-new-completed",
+      workBlockId: completedBlock.id,
       endedAt: minutesFromNow(-5),
       updatedAt: minutesFromNow(-5),
     });
@@ -434,6 +748,7 @@ describe("getActionCenter actionable states", () => {
     expect(byTask(autoSkippedTask.id)).toHaveLength(1);
     expect(byTask(autoSkippedTask.id)[0]).toMatchObject({
       kind: "auto_execution_skipped",
+      workBlockId: "block-actionable",
       summary: "Accept a plan before automatic execution can start.",
       detail: "no_accepted_plan",
     });
@@ -445,6 +760,7 @@ describe("getActionCenter actionable states", () => {
     expect(byTask(completedTask.id)[0]).toMatchObject({
       kind: "execution_completed",
       currentRunLabel: latestCompletedRun.runtimeRunRef,
+      workBlockId: completedBlock.id,
     });
     expect(
       items.some((item) => item.sourceTaskId === oldCompletedTask.id),

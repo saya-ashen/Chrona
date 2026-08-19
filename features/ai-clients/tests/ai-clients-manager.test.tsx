@@ -363,9 +363,13 @@ describe("AiClientsManager", () => {
     });
     await user.click(screen.getByRole("combobox", { name: "Type" }));
     await user.click(within(screen.getByRole("listbox")).getByText("Oh My Pi"));
-    fireEvent.change(screen.getByLabelText("Model"), {
-      target: { value: "openai/gpt-5.3-codex" },
+    fireEvent.change(screen.getByLabelText("Provider"), {
+      target: { value: "nrouter" },
     });
+    fireEvent.change(screen.getByLabelText("Model"), {
+      target: { value: "cx/gpt-5.6-sol" },
+    });
+    expect(screen.getByRole("combobox", { name: "API type" })).toHaveTextContent("openai-responses");
     fireEvent.change(screen.getByLabelText("OMP Base URL"), {
       target: { value: "https://llm.internal/v1" },
     });
@@ -401,7 +405,9 @@ describe("AiClientsManager", () => {
       name: "Local OMP",
       type: "omp",
       config: {
-        model: "openai/gpt-5.3-codex",
+        provider: "nrouter",
+        model: "cx/gpt-5.6-sol",
+        api: "openai-responses",
         apiKey: "sk-omp",
         baseUrl: "https://llm.internal/v1",
         homeDirectory: "/home/chrona-omp",

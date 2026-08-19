@@ -1,7 +1,27 @@
-import type { EffectivePlanGraph, EffectivePlanNode } from "@chrona/contracts/ai";
-import { buildNodeRuntimeInput, buildSemanticRefHistory, refForNode } from "@/modules/plan-execution/runtime/node-runtime-refs";
+import type {
+  PublicEffectivePlanGraph,
+  PublicEffectivePlanNode,
+} from "@chrona/contracts/ai";
+import {
+  buildRuntimeNodeView,
+  buildSemanticRefHistory,
+  refForNode,
+} from "@/modules/plan-execution/runtime/node-runtime-refs";
 
-function effectivePlanFrom(value: unknown): EffectivePlanGraph | null {
+function isPublicEffectivePlanGraph(value: unknown): value is PublicEffectivePlanGraph {
+  if (!value || typeof value !== "object") return false;
+  const record = value as Record<string, unknown>;
+  return typeof record.graphId === "string"
+    && typeof record.basePlanId === "string"
+    && typeof record.resolvedAt === "string"
+    && Array.isArray(record.nodes)
+    && Array.isArray(record.readyNodeIds)
+    && Array.isArray(record.runningNodeIds)
+    && Array.isArray(record.blockedNodeIds)
+    && Array.isArray(record.completedNodeIds);
+}
+
+function effectivePlanFrom(value: unknown): PublicEffectivePlanGraph | null {
   if (!value || typeof value !== "object") return null;
   const record = value as Record<string, unknown>;
   const savedPlan = record.savedPlan && typeof record.savedPlan === "object"
@@ -9,12 +29,12 @@ function effectivePlanFrom(value: unknown): EffectivePlanGraph | null {
     : record.task && typeof record.task === "object"
       ? ((record.task as Record<string, unknown>).savedPlan as Record<string, unknown> | undefined)
       : null;
-  const effectivePlan = savedPlan?.effectivePlan;
-  if (!effectivePlan || typeof effectivePlan !== "object") return null;
-  return effectivePlan as EffectivePlanGraph;
+  return isPublicEffectivePlanGraph(savedPlan?.effectivePlan)
+    ? savedPlan.effectivePlan
+    : null;
 }
 
-function currentNodeFromEffective(plan: EffectivePlanGraph): EffectivePlanNode | null {
+function currentNodeFromEffective(plan: PublicEffectivePlanGraph): PublicEffectivePlanNode | null {
   return plan.nodes.find((node) => node.status === "running") ??
     plan.nodes.find((node) =>
       node.status === "waiting_for_user" ||
@@ -24,6 +44,24 @@ function currentNodeFromEffective(plan: EffectivePlanGraph): EffectivePlanNode |
     ) ??
     plan.nodes.find((node) => plan.readyNodeIds.includes(node.id)) ??
     null;
+}
+
+function runtimeNodeView(
+  plan: PublicEffectivePlanGraph,
+  node: PublicEffectivePlanNode,
+) {
+  const history = buildSemanticRefHistory(plan);
+  const runtimeNode = buildRuntimeNodeView(node, refForNode(history, node.id).ref);
+  const branchOptions = node.type === "condition"
+    ? history.branchRefs
+      .filter((branch) => branch.nodeId === node.id && !branch.retiredAt)
+      .map((branch) => ({
+        ref: branch.ref,
+        key: branch.branchKey ?? branch.ref,
+        label: branch.label,
+      }))
+    : undefined;
+  return { runtimeNode, branchOptions };
 }
 
 export function readAiExecutionView(value: unknown) {
@@ -56,10 +94,7 @@ export function readAiExecutionView(value: unknown) {
     },
     execution: {
       currentNode: currentNode
-        ? buildNodeRuntimeInput({
-            plan,
-            node: currentNode,
-          }).node
+        ? runtimeNodeView(plan, currentNode).runtimeNode
         : null,
       readyNodeRefs: plan.readyNodeIds.map((nodeId) => refForNode(history, nodeId).ref),
       runningNodeRefs: plan.runningNodeIds.map((nodeId) => refForNode(history, nodeId).ref),
@@ -67,21 +102,18 @@ export function readAiExecutionView(value: unknown) {
       completedNodeRefs: plan.completedNodeIds.map((nodeId) => refForNode(history, nodeId).ref),
     },
     nodes: plan.nodes.map((node) => {
-      const runtime = buildNodeRuntimeInput({
-        plan,
-        node,
-      });
+      const runtime = runtimeNodeView(plan, node);
       return {
-        ref: runtime.node.ref,
-        title: runtime.node.title,
-        type: runtime.node.type,
+        ref: runtime.runtimeNode.ref,
+        title: runtime.runtimeNode.title,
+        type: runtime.runtimeNode.type,
         status: node.status,
-        objective: runtime.node.objective,
-        expectedOutput: runtime.node.expectedOutput,
-        completionCriteria: runtime.node.completionCriteria,
-        condition: runtime.node.condition,
-        checkpoint: runtime.node.checkpoint,
-        wait: runtime.node.wait,
+        objective: runtime.runtimeNode.objective,
+        expectedOutput: runtime.runtimeNode.expectedOutput,
+        completionCriteria: runtime.runtimeNode.completionCriteria,
+        condition: runtime.runtimeNode.condition,
+        checkpoint: runtime.runtimeNode.checkpoint,
+        wait: runtime.runtimeNode.wait,
         branchOptions: runtime.branchOptions,
       };
     }),

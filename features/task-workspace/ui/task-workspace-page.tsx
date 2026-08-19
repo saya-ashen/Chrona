@@ -412,6 +412,7 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
 						// the next `state.update` will repopulate error fields if it
 						// fails again.
 						headerStore.set("/plan/generation/error/code", null);
+						headerStore.set("/plan/generation/error/title", null);
 						headerStore.set("/plan/generation/error/message", null);
 						headerStore.set("/plan/generation/error/buttonRetry", false);
 						headerStore.set(
@@ -423,6 +424,7 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
 					}}
 					onRecoveryEditInstruction={() => {
 						headerStore.set("/plan/generation/error/code", null);
+						headerStore.set("/plan/generation/error/title", null);
 						headerStore.set("/plan/generation/error/message", null);
 						headerStore.set("/plan/generation/error/buttonRetry", false);
 						headerStore.set(
@@ -436,6 +438,7 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
 					}}
 					onRecoveryCancel={() => {
 						headerStore.set("/plan/generation/error/code", null);
+						headerStore.set("/plan/generation/error/title", null);
 						headerStore.set("/plan/generation/error/message", null);
 						headerStore.set("/plan/generation/error/buttonRetry", false);
 						headerStore.set(

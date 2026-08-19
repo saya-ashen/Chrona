@@ -96,6 +96,7 @@ export type TaskConfigCopy = {
   basics: string;
   titlePlaceholder: string;
   priority: string;
+  dueDate: string;
   schedule: string;
   scheduleHint: string;
   scheduleDate: string;

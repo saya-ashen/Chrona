@@ -1,6 +1,11 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { handleControlAction, ControlRouteError, validateRunToken } from "@chrona/engine";
+import {
+  handleControlAction,
+  ControlRouteError,
+  validateRevokedRunToken,
+  validateRunToken,
+} from "@chrona/engine";
 import { agentControlActionBodySchema } from "@chrona/contracts";
 import { error, internalServerError, json, toHttpError } from "@shared/http/server";
 
@@ -29,7 +34,7 @@ export function createAgentControlRoutes() {
     }
 
     try {
-      const scope = await validateRunToken(token);
+      const scope = await validateRunToken(token) ?? await validateRevokedRunToken(token);
       if (!scope) {
         return error(c, "Invalid or expired run token", 401);
       }

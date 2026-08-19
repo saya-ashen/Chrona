@@ -16,12 +16,13 @@ import type {
   TaskConfigPreset,
 } from "./task-config-form-types";
 
-export function formatDateTimeInput(value?: Date | null) {
-  return value ? value.toISOString().slice(0, 16) : "";
-}
-
 function padDatePart(value: number) {
   return String(value).padStart(2, "0");
+}
+
+export function formatDateTimeInput(value?: Date | null) {
+  if (!value) return "";
+  return `${value.getFullYear()}-${padDatePart(value.getMonth() + 1)}-${padDatePart(value.getDate())}T${padDatePart(value.getHours())}:${padDatePart(value.getMinutes())}`;
 }
 
 export function formatLocalDateInput(value?: Date | null) {
