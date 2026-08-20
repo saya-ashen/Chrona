@@ -76,6 +76,8 @@ export function SchedulePageDialogs({
       initialEndAt={initialEndAt}
       isPending={isPending}
       availableAiClients={availableAiClients ?? data.availableAiClients}
+      executionRuntimes={data.executionRuntimes}
+      defaultExecutionRuntime={dialogDefaults.executionRuntime}
       onClose={onCloseQuickAdd}
       onSubmit={async (input) => {
         await handleCreateTaskBlock({
@@ -87,7 +89,7 @@ export function SchedulePageDialogs({
           autoPlanGenerationTiming: input.autoPlanGenerationTiming,
           autoExecuteTiming: input.autoExecuteTiming,
           dueAt: input.dueAt,
-          executionRuntime: dialogDefaults.executionRuntime,
+          executionRuntime: input.executionRuntime,
           executionConfig: {},
           scheduledStartAt: input.scheduledStartAt,
           scheduledEndAt: input.scheduledEndAt,

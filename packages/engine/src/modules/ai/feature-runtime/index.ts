@@ -13,7 +13,10 @@ export { AiFeatureDefinitionRegistry } from "./definition-registry";
 export { runAiFeature, startOrAttachAiFeatureRun, executeAiFeatureRunById, AiFeatureRuntimeError } from "./feature-runner";
 export type { AiFeatureRunnerPorts, AiFeatureLeaseHeartbeatScheduler, ExecuteAiFeatureRunByIdInput, RunAiFeatureInput } from "./feature-runner";
 export { stableJsonHash, stableJsonStringify } from "./stable-json";
-export { AiFeatureProviderError } from "./feature-compiler";
+export {
+  AiFeatureProviderError,
+  classifyAiFeatureProviderError,
+} from "./feature-compiler";
 export type { AiFeatureProviderErrorCode, AiFeatureProviderPort, AiFeatureProviderStart, CompiledAiFeatureRequest } from "./feature-compiler";
 export type {
   CreateAiFeatureRunInput,

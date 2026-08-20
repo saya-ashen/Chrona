@@ -82,6 +82,15 @@ function sdkRunStopped(handle: Pick<SdkRunHandle, "done" | "status">): boolean {
 	return handle.done || handle.status !== "running";
 }
 
+function acceptTerminalAction(
+	handle: Pick<SdkRunHandle, "session" | "terminalActionAccepted">,
+) {
+	handle.terminalActionAccepted = true;
+	queueMicrotask(() => {
+		void handle.session?.abort({ reason: "Chrona terminal action recorded" });
+	});
+}
+
 export type OmpSdkProviderOptions = {
 	config?: OmpProviderConfig;
 };
@@ -102,9 +111,17 @@ class AsyncEventQueue {
 			if (item) return item;
 			if (this.handle.done) return { type: "end" };
 			await new Promise<void>((resolve) => {
-				const abort = () => resolve();
-				this.handle.waiters.push(resolve);
-				signal?.addEventListener("abort", abort, { once: true });
+				let settled = false;
+				const wake = () => {
+					if (settled) return;
+					settled = true;
+					const index = this.handle.waiters.indexOf(wake);
+					if (index >= 0) this.handle.waiters.splice(index, 1);
+					signal?.removeEventListener("abort", wake);
+					resolve();
+				};
+				this.handle.waiters.push(wake);
+				signal?.addEventListener("abort", wake, { once: true });
 			});
 			if (signal?.aborted) return { type: "end" };
 		}
@@ -137,7 +154,6 @@ interface ModelSelectorParts {
 	modelId?: string;
 }
 
-const DIRECT_CONFIG_SOURCE_ID = "chrona-omp-direct-config";
 const DIRECT_CONFIG_PROVIDER = "chrona";
 
 function sdkEnvName(name: string, runId: string) {
@@ -156,13 +172,36 @@ function splitModelSelector(model?: string): ModelSelectorParts {
 	};
 }
 
-function directConfigProvider(
+function resolveSdkModelSelection(config: OmpProviderConfig) {
+	const model = nonEmpty(config.model);
+	const configuredProvider = nonEmpty(config.provider);
+	if (configuredProvider) {
+		return {
+			provider: configuredProvider,
+			modelId: model,
+			modelPattern: model ? `${configuredProvider}/${model}` : undefined,
+		};
+	}
+	const selector = splitModelSelector(model);
+	return {
+		provider: selector.provider ?? DIRECT_CONFIG_PROVIDER,
+		modelId: selector.modelId,
+		modelPattern: model,
+	};
+}
+
+function withSdkRuntimeModel(
 	config: OmpProviderConfig,
-	selector: ModelSelectorParts,
-): string {
-	return (
-		nonEmpty(config.provider) ?? selector.provider ?? DIRECT_CONFIG_PROVIDER
-	);
+	runtimeModel: string | undefined,
+): OmpProviderConfig {
+	const model = nonEmpty(runtimeModel);
+	if (!model) return config;
+	const selector = splitModelSelector(model);
+	return {
+		...config,
+		...(selector.provider ? { provider: selector.provider } : {}),
+		model: selector.modelId,
+	};
 }
 
 function directConfigApi(
@@ -185,66 +224,53 @@ async function createSdkModelSetup(
 	config: OmpProviderConfig,
 	environment: SdkEnvironment,
 ): Promise<SdkModelSetup> {
-	const model = nonEmpty(config.model);
-	if (!hasDirectProviderConfig(config)) return { modelPattern: model };
+	const selection = resolveSdkModelSelection(config);
+	if (!hasDirectProviderConfig(config))
+		return { modelPattern: selection.modelPattern };
 
 	const authStorage = await discoverAuthStorage(environment.agentDir);
 	const modelRegistry = new ModelRegistry(authStorage);
-	const selector = splitModelSelector(model);
-	const provider = directConfigProvider(config, selector);
 	const api = directConfigApi(config);
 	const baseUrl = environment.baseUrlEnvName
 		? nonEmpty(process.env[environment.baseUrlEnvName])
 		: undefined;
 	const apiKey = environment.apiKeyEnvName;
 	const apiOverride = nonEmpty(config.api) ? { api } : {};
-
-	if (selector.provider || nonEmpty(config.provider)) {
-		modelRegistry.registerProvider(
-			provider,
-			{ baseUrl, apiKey, ...apiOverride },
-			DIRECT_CONFIG_SOURCE_ID,
-		);
-		return { authStorage, modelRegistry, modelPattern: model };
-	}
-
-	if (selector.modelId) {
-		modelRegistry.registerProvider(
-			provider,
-			{
-				baseUrl,
-				apiKey,
-				api,
-				models: [
-					{
-						id: selector.modelId,
-						name: selector.modelId,
-						api,
-						baseUrl,
-						reasoning: true,
-						input: ["text"],
-						supportsTools: true,
-						contextWindow: 200_000,
-						maxTokens: 64_000,
-						cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-					},
-				],
-			},
-			DIRECT_CONFIG_SOURCE_ID,
-		);
-		return {
-			authStorage,
-			modelRegistry,
-			modelPattern: `${provider}/${selector.modelId}`,
-		};
-	}
+	const existingModel = selection.modelId
+		? modelRegistry.find(selection.provider, selection.modelId)
+		: undefined;
 
 	modelRegistry.registerProvider(
-		provider,
-		{ baseUrl, apiKey, ...apiOverride },
-		DIRECT_CONFIG_SOURCE_ID,
+		selection.provider,
+		selection.modelId && !existingModel
+			? {
+					baseUrl,
+					apiKey,
+					api,
+					models: [
+						{
+							id: selection.modelId,
+							name: selection.modelId,
+							api,
+							baseUrl,
+							reasoning: true,
+							input: ["text"],
+							supportsTools: true,
+							contextWindow: 200_000,
+							maxTokens: 64_000,
+							cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
+						},
+					],
+				}
+			: { baseUrl, apiKey, ...apiOverride },
 	);
-	return { authStorage, modelRegistry, modelPattern: model };
+	return {
+		authStorage,
+		modelRegistry,
+		modelPattern: selection.modelId
+			? `${selection.provider}/${selection.modelId}`
+			: selection.modelPattern,
+	};
 }
 
 function renderProviderInput(input: ProviderRunInput): string {
@@ -513,6 +539,15 @@ const CHRONA_TERMINAL_CONTROL_KINDS = {
 
 type ChronaTerminalControlKind =
 	(typeof CHRONA_TERMINAL_CONTROL_KINDS)[keyof typeof CHRONA_TERMINAL_CONTROL_KINDS];
+
+function isRunTerminalTool(input: StartRunInput, toolName: string) {
+	return (
+		isDeclaredTerminalTool(input.terminalToolName, input.tools, toolName) ||
+		(Boolean(input.control) &&
+			Object.hasOwn(CHRONA_TERMINAL_CONTROL_KINDS, toolName))
+	);
+}
+
 async function invokeChronaTerminalControl(
 	input: {
 		connection: ChronaControlConnection;
@@ -646,6 +681,7 @@ async function connectChronaMcpControl(
 			cause instanceof Error ? cause.message.trim() : String(cause).trim();
 		throw new Error(
 			`Oh My Pi could not connect to the Chrona control plane${detail ? `: ${detail}` : "."}`,
+			{ cause },
 		);
 	}
 	const tools = (manager.getTools() as CustomTool[]).map(exposeChronaMcpTool);
@@ -831,12 +867,15 @@ function sdkReadOnlyToolOptions(toolPolicy: StartRunInput["toolPolicy"]) {
 }
 
 export const __ompSdkProviderTestHooks = {
+	AsyncEventQueue,
 	jsonSchemaToZod,
 	sdkToolOptions,
 	chronaMcpUrl,
 	connectChronaMcpControl,
 	sdkRunToolOptions,
 	sdkRunStopped,
+	acceptTerminalAction,
+	isRunTerminalTool,
 	chronaAgentControlUrl,
 	invokeChronaTerminalControl,
 	sdkReadOnlyToolOptions,
@@ -850,6 +889,9 @@ export const __ompSdkProviderTestHooks = {
 	sdkLifecycleSummary,
 	assertExpectedModel,
 	sdkModelPatternForSession,
+	resolveSdkModelSelection,
+	withSdkRuntimeModel,
+	createSdkModelSetup,
 	loadSdkSettings,
 };
 
@@ -1355,12 +1397,10 @@ export class OmpSdkProviderClient implements AgentProviderClient {
 			nonEmpty(this.config.configDirectory);
 		const terminalToolName = nonEmpty(handle.input.terminalToolName);
 		const prompt = inputToPrompt(handle.input);
-		const runConfig: OmpProviderConfig = {
-			...this.config,
-			...(nonEmpty(handle.input.runtimeConfiguration?.model)
-				? { model: nonEmpty(handle.input.runtimeConfiguration?.model) }
-				: {}),
-		};
+		const runConfig = withSdkRuntimeModel(
+			this.config,
+			handle.input.runtimeConfiguration?.model,
+		);
 		const setup = await createSdkModelSetup(runConfig, environment);
 		if (sdkRunStopped(handle)) return;
 		const settings = await loadSdkSettings(environment, cwd);
@@ -1398,9 +1438,7 @@ export class OmpSdkProviderClient implements AgentProviderClient {
 			...sdkRunToolOptions(
 				handle.input.tools,
 				terminalToolName,
-				() => {
-					handle.terminalActionAccepted = true;
-				},
+				() => acceptTerminalAction(handle),
 				control,
 			),
 			...readOnlyToolOptions,
@@ -1490,13 +1528,7 @@ export class OmpSdkProviderClient implements AgentProviderClient {
 				break;
 			}
 			case "tool_execution_start":
-				if (
-					isDeclaredTerminalTool(
-						handle.input.terminalToolName,
-						handle.input.tools,
-						event.toolName,
-					)
-				) {
+				if (isRunTerminalTool(handle.input, event.toolName)) {
 					handle.terminalAction = {
 						name: event.toolName,
 						callId: event.toolCallId,
@@ -1527,6 +1559,7 @@ export class OmpSdkProviderClient implements AgentProviderClient {
 					...eventBase(handle, event.type),
 					type: "tool_completed",
 					toolName: event.toolName,
+					callId: event.toolCallId,
 					error: event.isError
 						? { message: sdkToolErrorMessage(event.result), raw: event.result }
 						: undefined,

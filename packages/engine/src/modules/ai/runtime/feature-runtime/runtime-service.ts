@@ -24,12 +24,19 @@ export async function startAiFeatureWithRuntime(
   return { runId: run.id };
 }
 
-export async function runAiFeatureWithRuntime(input: DefaultAiFeatureRunInput): Promise<AiFeatureRunRecord> {
+export async function runAiFeatureWithRuntime(
+  input: DefaultAiFeatureRunInput,
+  options: { signal?: AbortSignal } = {},
+): Promise<AiFeatureRunRecord> {
   const { runId } = await startAiFeatureWithRuntime(input);
   const runs = new PrismaAiFeatureRunStore();
   const persisted = await runs.getById(runId);
   if (!persisted) throw new Error(`AI Feature Run '${runId}' does not exist.`);
-  const provider = await new FoundationProviderRuntime(input.definition.providerBindingFeature).initialize(persistedProviderBinding(persisted) ?? undefined);
+  const provider = await new FoundationProviderRuntime(
+    input.definition.providerBindingFeature,
+    undefined,
+    options.signal,
+  ).initialize(persistedProviderBinding(persisted) ?? undefined);
   await runs.pinProviderBinding({ runId, ...provider.providerBinding() });
   return executeAiFeatureRunById({ definition: input.definition, runId }, { runs, provider, ids: { next: randomUUID } });
 }
@@ -49,7 +56,11 @@ function persistedProviderBinding(run: AiFeatureRunRecord): FoundationProviderBi
   }
   return null;
 }
-export async function resumeAiFeatureRun(input: { runId: string; definitions: AiFeatureDefinitionRegistry }): Promise<AiFeatureRunRecord | null> {
+export async function resumeAiFeatureRun(input: {
+  runId: string;
+  definitions: AiFeatureDefinitionRegistry;
+  signal?: AbortSignal;
+}): Promise<AiFeatureRunRecord | null> {
   const runs = new PrismaAiFeatureRunStore();
   const run = await runs.getById(input.runId);
   if (!run || !activeStatuses.has(run.status)) return run;
@@ -59,7 +70,11 @@ export async function resumeAiFeatureRun(input: { runId: string; definitions: Ai
   if (run.providerRunRef && !expectedBinding) {
     throw new Error(`AI Feature Run '${run.id}' cannot recover without its original provider binding.`);
   }
-  const provider = await new FoundationProviderRuntime(definition.providerBindingFeature).initialize(expectedBinding ?? undefined);
+  const provider = await new FoundationProviderRuntime(
+    definition.providerBindingFeature,
+    undefined,
+    input.signal,
+  ).initialize(expectedBinding ?? undefined);
   await runs.pinProviderBinding({ runId: run.id, ...provider.providerBinding() });
   return executeAiFeatureRunById({ definition, runId: run.id }, { runs, provider, ids: { next: randomUUID } });
 }

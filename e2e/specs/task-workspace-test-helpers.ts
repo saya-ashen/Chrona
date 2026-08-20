@@ -1,13 +1,52 @@
-import { expect, type APIRequestContext, type Page, type TestInfo } from "@playwright/test";
-import { bindTaskPlanProvider, startMockTaskPlanProvider } from "./mock-task-plan-provider";
+import {
+  expect,
+  type APIRequestContext,
+  type Page,
+  type TestInfo,
+} from "@playwright/test";
+import {
+  bindTaskPlanProvider,
+  startMockTaskPlanProvider,
+} from "./mock-task-plan-provider";
 
 export type TaskWorkspaceViewport = "desktop" | "tablet" | "mobile";
-
 
 export type CreatedTaskWorkspaceTask = {
   taskId: string;
   workspaceId: string;
 };
+
+export async function bindTaskDebugExecutionFeatures(
+  request: APIRequestContext,
+  taskId: string,
+): Promise<void> {
+  const createResponse = await request.post("/api/ai/clients", {
+    data: {
+      name: `E2E Debug Client ${taskId}`,
+      type: "debug",
+      config: { profile: "deterministic" },
+      isDefault: true,
+    },
+  });
+  expect(createResponse.ok()).toBeTruthy();
+  const created = (await createResponse.json()) as { client?: { id?: string } };
+  const clientId = created.client?.id;
+  expect(clientId).toBeTruthy();
+
+  const bindResponse = await request.put(
+    `/api/ai/clients/${clientId}/bindings`,
+    {
+      data: {
+        features: [
+          "execute_task_node",
+          "evaluate_condition_node",
+          "review_checkpoint_node",
+        ],
+      },
+    },
+  );
+  expect(bindResponse.ok()).toBeTruthy();
+}
 
 /**
  * Mirror of the discriminated union accepted by
@@ -18,33 +57,33 @@ export type CreatedTaskWorkspaceTask = {
  */
 export type WorkspaceCommand =
   | {
-    type: "plan.generate";
-    forceRefresh?: boolean;
-    workBlockId?: string | null;
-    userInstruction?: string | null;
-    idempotencyKey: string;
-  }
+      type: "plan.generate";
+      forceRefresh?: boolean;
+      workBlockId?: string | null;
+      userInstruction?: string | null;
+      idempotencyKey: string;
+    }
   | {
-    type: "plan.accept";
-    planId: string;
-    workBlockId?: string | null;
-    expectedHeadStateVersion: number;
-    idempotencyKey: string;
-  }
+      type: "plan.accept";
+      planId: string;
+      workBlockId?: string | null;
+      expectedHeadStateVersion: number;
+      idempotencyKey: string;
+    }
   | {
-    type: "execution.action";
-    action: string | Record<string, unknown>;
-    idempotencyKey: string;
-    [key: string]: unknown;
-  }
+      type: "execution.action";
+      action: string | Record<string, unknown>;
+      idempotencyKey: string;
+      [key: string]: unknown;
+    }
   | {
-    type: "checkpoint.action";
-    checkpointId: string;
-    action: string;
-    payload?: Record<string, unknown>;
-    workBlockId?: string | null;
-    idempotencyKey: string;
-  };
+      type: "checkpoint.action";
+      checkpointId: string;
+      action: string;
+      payload?: Record<string, unknown>;
+      workBlockId?: string | null;
+      idempotencyKey: string;
+    };
 
 export type WorkspaceCommandAck = {
   commandId: string;
@@ -62,18 +101,27 @@ export async function createTaskWorkspaceTask(
   input: { title: string; description: string },
 ): Promise<CreatedTaskWorkspaceTask> {
   let workspaceId: string | undefined;
-  await expect.poll(async () => {
-    const workspaceResponse = await request.get("/api/workspaces/default");
-    if (!workspaceResponse.ok()) return null;
-    const workspaceBody = (await workspaceResponse.json()) as {
-      id?: string;
-      workspace?: { id?: string };
-      workspaceId?: string;
-    };
-    workspaceId = workspaceBody.workspaceId ?? workspaceBody.id ?? workspaceBody.workspace?.id;
-    return workspaceId ?? null;
-  }, { timeout: 15_000, intervals: [200, 500, 1_000] }).not.toBeNull();
-  if (!workspaceId) throw new Error("The seeded E2E workspace did not become available.");
+  await expect
+    .poll(
+      async () => {
+        const workspaceResponse = await request.get("/api/workspaces/default");
+        if (!workspaceResponse.ok()) return null;
+        const workspaceBody = (await workspaceResponse.json()) as {
+          id?: string;
+          workspace?: { id?: string };
+          workspaceId?: string;
+        };
+        workspaceId =
+          workspaceBody.workspaceId ??
+          workspaceBody.id ??
+          workspaceBody.workspace?.id;
+        return workspaceId ?? null;
+      },
+      { timeout: 15_000, intervals: [200, 500, 1_000] },
+    )
+    .not.toBeNull();
+  if (!workspaceId)
+    throw new Error("The seeded E2E workspace did not become available.");
 
   const createTaskResponse = await request.post("/api/tasks", {
     data: {
@@ -85,7 +133,8 @@ export async function createTaskWorkspaceTask(
   });
   expect(createTaskResponse.ok()).toBeTruthy();
 
-  const createdTask = (await createTaskResponse.json()) as CreatedTaskWorkspaceTask;
+  const createdTask =
+    (await createTaskResponse.json()) as CreatedTaskWorkspaceTask;
   expect(createdTask.taskId).toBeTruthy();
   expect(createdTask.workspaceId).toBeTruthy();
   return createdTask;
@@ -94,7 +143,18 @@ export async function createTaskWorkspaceTask(
 export type GeneratedTaskWorkspaceDraft = {
   planId: string;
   expectedHeadStateVersion: number;
+  workBlockId: string | null;
 };
+
+async function taskWorkBlockId(request: APIRequestContext, taskId: string) {
+  const response = await request.get(`/api/tasks/${taskId}`);
+  if (!response.ok()) return null;
+  const body = (await response.json()) as {
+    task?: { currentWorkBlock?: { id?: string } | null };
+    currentWorkBlock?: { id?: string } | null;
+  };
+  return body.task?.currentWorkBlock?.id ?? body.currentWorkBlock?.id ?? null;
+}
 
 export async function generateTaskWorkspaceDraftPlan(
   request: APIRequestContext,
@@ -103,45 +163,72 @@ export async function generateTaskWorkspaceDraftPlan(
   const provider = await startMockTaskPlanProvider();
   try {
     await bindTaskPlanProvider(request, taskId, provider.baseUrl);
+    const workBlockId = await taskWorkBlockId(request, taskId);
 
-    const generationResponse = await request.post(`/api/tasks/${taskId}/plan/generations`, {
-      data: {
-        forceRefresh: true,
-        idempotencyKey: `e2e-plan-generate-${taskId}`,
+    const generationResponse = await request.post(
+      `/api/tasks/${taskId}/plan/generations`,
+      {
+        data: {
+          forceRefresh: true,
+          ...(workBlockId ? { workBlockId } : {}),
+          idempotencyKey: `e2e-plan-generate-${taskId}`,
+        },
       },
-    });
+    );
     if (!generationResponse.ok()) {
-      throw new Error(`Task-plan generation failed: HTTP ${generationResponse.status()} ${await generationResponse.text()}`);
+      throw new Error(
+        `Task-plan generation failed: HTTP ${generationResponse.status()} ${await generationResponse.text()}`,
+      );
     }
 
-    await expect.poll(async () => {
-      const planResponse = await request.get(`/api/tasks/${taskId}/plan`);
-      if (!planResponse.ok()) return null;
-      const state = await planResponse.json() as {
-        savedPlan?: { id?: string; status?: string } | null;
-        generationSession?: { status?: string; headStateVersion?: number } | null;
-      };
-      return state.savedPlan?.status === "draft"
-        && state.generationSession?.status === "completed"
-        && typeof state.generationSession.headStateVersion === "number"
-        ? state.savedPlan.id ?? null
-        : null;
-    }, { timeout: 20_000 }).not.toBeNull();
+    await expect
+      .poll(
+        async () => {
+          const planResponse = await request.get(`/api/tasks/${taskId}/plan`, {
+            params: workBlockId ? { workBlockId } : undefined,
+          });
+          if (!planResponse.ok()) return null;
+          const state = (await planResponse.json()) as {
+            savedPlan?: { id?: string; status?: string } | null;
+            generationSession?: {
+              status?: string;
+              headStateVersion?: number;
+            } | null;
+          };
+          const savedPlanReady =
+            state.savedPlan?.status?.toLowerCase() === "draft" ||
+            state.savedPlan?.status === "waiting_acceptance";
+          const generationFinished =
+            !state.generationSession ||
+            state.generationSession.status === "completed";
+          return savedPlanReady && generationFinished && state.savedPlan?.id
+            ? state.savedPlan.id
+            : null;
+        },
+        { timeout: 20_000 },
+      )
+      .not.toBeNull();
 
-    const planResponse = await request.get(`/api/tasks/${taskId}/plan`);
+    const planResponse = await request.get(`/api/tasks/${taskId}/plan`, {
+      params: workBlockId ? { workBlockId } : undefined,
+    });
     if (!planResponse.ok()) {
-      throw new Error(`Task-plan read failed: HTTP ${planResponse.status()} ${await planResponse.text()}`);
+      throw new Error(
+        `Task-plan read failed: HTTP ${planResponse.status()} ${await planResponse.text()}`,
+      );
     }
-    const state = await planResponse.json() as {
+    const state = (await planResponse.json()) as {
       savedPlan?: { id?: string } | null;
       generationSession?: { headStateVersion?: number } | null;
     };
     const planId = state.savedPlan?.id;
     const expectedHeadStateVersion = state.generationSession?.headStateVersion;
     if (!planId || typeof expectedHeadStateVersion !== "number") {
-      throw new Error("Durable task-plan generation completed without an exact plan head receipt.");
+      throw new Error(
+        "Durable task-plan generation completed without an exact plan head receipt.",
+      );
     }
-    return { planId, expectedHeadStateVersion };
+    return { planId, expectedHeadStateVersion, workBlockId };
   } finally {
     await provider.stop();
   }
@@ -152,15 +239,21 @@ export async function generateTaskWorkspacePlan(
   taskId: string,
 ): Promise<void> {
   const draft = await generateTaskWorkspaceDraftPlan(request, taskId);
-  const acceptResponse = await request.post(`/api/tasks/${taskId}/plan/accept`, {
-    data: {
-      planId: draft.planId,
-      expectedHeadStateVersion: draft.expectedHeadStateVersion,
-      idempotencyKey: `e2e-plan-accept-${taskId}`,
+  const acceptResponse = await request.post(
+    `/api/tasks/${taskId}/plan/accept`,
+    {
+      data: {
+        planId: draft.planId,
+        workBlockId: draft.workBlockId,
+        expectedHeadStateVersion: draft.expectedHeadStateVersion,
+        idempotencyKey: `e2e-plan-accept-${taskId}`,
+      },
     },
-  });
+  );
   if (!acceptResponse.ok()) {
-    throw new Error(`Task-plan acceptance failed: HTTP ${acceptResponse.status()} ${await acceptResponse.text()}`);
+    throw new Error(
+      `Task-plan acceptance failed: HTTP ${acceptResponse.status()} ${await acceptResponse.text()}`,
+    );
   }
 }
 
@@ -180,28 +273,41 @@ export async function triggerOrchestratorTick(request: APIRequestContext) {
   const response = await request.post("/api/test/orchestrator/tick");
   if (!response.ok()) {
     const body = await response.text().catch(() => "<no body>");
-    throw new Error(`triggerOrchestratorTick failed: HTTP ${response.status()} body=${body.slice(0, 300)}`);
+    throw new Error(
+      `triggerOrchestratorTick failed: HTTP ${response.status()} body=${body.slice(0, 300)}`,
+    );
   }
   const body = (await response.json()) as { ok?: boolean };
   expect(body.ok).toBe(true);
 }
 
-export async function setTaskWorkspaceViewport(page: Page, viewport: TaskWorkspaceViewport) {
-  const size = viewport === "desktop"
-    ? { width: 1440, height: 900 }
-    : viewport === "tablet"
-      ? { width: 1024, height: 768 }
-      : { width: 390, height: 844 };
+export async function setTaskWorkspaceViewport(
+  page: Page,
+  viewport: TaskWorkspaceViewport,
+) {
+  const size =
+    viewport === "desktop"
+      ? { width: 1440, height: 900 }
+      : viewport === "tablet"
+        ? { width: 1024, height: 768 }
+        : { width: 390, height: 844 };
   await page.setViewportSize(size);
 }
 
-export async function gotoSeededTaskWorkspace(page: Page, workspaceId: string, taskId: string) {
+export async function gotoSeededTaskWorkspace(
+  page: Page,
+  workspaceId: string,
+  taskId: string,
+) {
   void workspaceId;
   await page.goto(`/en/tasks/${taskId}`);
   await expect(page.getByRole("heading", { name: /.+/ }).first()).toBeVisible();
 }
 
-export function getPrimaryTaskWorkspaceAction(page: Page, name: RegExp | string) {
+export function getPrimaryTaskWorkspaceAction(
+  page: Page,
+  name: RegExp | string,
+) {
   return page.getByRole("button", { name }).first();
 }
 
@@ -209,7 +315,11 @@ export async function captureTaskWorkspaceState(page: Page) {
   return {
     title: await page.title(),
     visibleText: await page.locator("body").innerText(),
-    primaryActions: await page.getByRole("button").evaluateAll((buttons) => buttons.map((button) => button.textContent?.trim()).filter(Boolean)),
+    primaryActions: await page
+      .getByRole("button")
+      .evaluateAll((buttons) =>
+        buttons.map((button) => button.textContent?.trim()).filter(Boolean),
+      ),
   };
 }
 
@@ -317,7 +427,10 @@ export async function collectWorkspaceEvents(
     if (!resolved) {
       // Surface the error to the caller by rethrowing; keep the events we did
       // collect attached via a synthetic "error" event for diagnostics.
-      collected.push({ type: "collect.error", message: cause instanceof Error ? cause.message : String(cause) });
+      collected.push({
+        type: "collect.error",
+        message: cause instanceof Error ? cause.message : String(cause),
+      });
     }
   } finally {
     clearTimeout(timer);
@@ -336,7 +449,10 @@ function parseSseFrame(frame: string): WorkspaceStreamEvent | null {
     if (!line || line.startsWith(":")) continue;
     const separatorIndex = line.indexOf(":");
     const field = separatorIndex === -1 ? line : line.slice(0, separatorIndex);
-    const value = separatorIndex === -1 ? "" : line.slice(separatorIndex + 1).replace(/^ /, "");
+    const value =
+      separatorIndex === -1
+        ? ""
+        : line.slice(separatorIndex + 1).replace(/^ /, "");
     if (field === "event") {
       eventName = value || "message";
     } else if (field === "data") {

@@ -111,31 +111,6 @@ function resultBranchKeys(
 	];
 }
 
-function resultBranchPriority(
-	key: string,
-	elements: UiDocument["elements"],
-): number {
-	const types = new Set(
-		resultBranchKeys(key, elements).map(
-			(branchKey) => elements[branchKey]?.type,
-		),
-	);
-	if (types.has("ResultOverview") || types.has("ResultSummary")) return 0;
-	if (types.has("ResultReadiness")) return 1;
-	if (types.has("ResultCaveats")) return 2;
-	if (types.has("ResultDeliverable")) return 3;
-	if (
-		types.has("ResultComparison") ||
-		types.has("ResultMetricGrid") ||
-		types.has("ResultChecklist") ||
-		types.has("ResultChangeSummary")
-	)
-		return 4;
-	if (types.has("ResultInsight")) return 5;
-	if (types.has("ResultEvidence")) return 6;
-	return 4;
-}
-
 function normalizeMetricValue(value: string): string {
 	const normalized = value.toLowerCase().replace(/,/g, "").trim();
 	const ratio = normalized.match(/\d+(?:\/\d+)?/u)?.[0];
@@ -253,28 +228,18 @@ function applyResultSectionPresentation(
 }
 
 /**
- * This only reorders root branches; it never changes element ownership.
+ * Preserve Finalizer composition order. Runtime presentation may remove proven
+ * duplicate metrics or tighten section density, but must not rewrite hierarchy.
  */
 export function prioritizeResultSpec(spec: UiDocument): UiDocument {
 	const normalized = normalizeSpecTree(spec);
 	const root = normalized.elements[normalized.root];
 	if (!root?.children || root.children.length < 2) return normalized;
 	const children = [...root.children];
-	const ordered = children
-		.map((key, index) => ({
-			key,
-			index,
-			priority: resultBranchPriority(key, normalized.elements),
-		}))
-		.sort(
-			(left, right) =>
-				left.priority - right.priority || left.index - right.index,
-		)
-		.map((item) => item.key);
-	const overviewKey = ordered.find(
+	const overviewKey = children.find(
 		(key) => normalized.elements[key]?.type === "ResultOverview",
 	);
-	const visibleOrdered = ordered.filter(
+	const visibleOrdered = children.filter(
 		(key) => !isRedundantMetricGrid(key, overviewKey, normalized.elements),
 	);
 	const optimizedElements = { ...normalized.elements };

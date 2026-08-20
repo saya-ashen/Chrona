@@ -411,7 +411,7 @@ describe("POST /work/:taskId/commands — action refresh events", () => {
 					runtime: { category: "runtime", label: "Execution runtime" },
 					event: expect.objectContaining({
 						type: "tool_started",
-						label: "Runtime tool",
+						label: "browser",
 					}),
 				}),
 			]),
@@ -562,8 +562,8 @@ describe("GET /work/:taskId/events — state.snapshot on connect", () => {
 		const snapshotEvent = events.find(
 			(event) => event.event === "state.snapshot",
 		);
-		expect(snapshotEvent).toBeDefined();
-		const payload = JSON.parse(snapshotEvent!.data) as TaskProjectionEvent & {
+		if (!snapshotEvent) throw new Error("Missing state.snapshot event");
+		const payload = JSON.parse(snapshotEvent.data) as TaskProjectionEvent & {
 			state: Record<string, unknown>;
 		};
 		expect(payload.type).toBe("state.snapshot");
@@ -576,7 +576,7 @@ describe("GET /work/:taskId/events — state.snapshot on connect", () => {
 });
 
 describe("POST /work/:taskId/commands plan.generate — durable state updates", () => {
-	it("emits a state.update for each durable generation event", async () => {
+	it("[PLAN-001] emits a state.update for each durable generation event", async () => {
 		const taskId = "task-1";
 		const stateUpdates: Array<Record<string, unknown>> = [];
 
@@ -832,8 +832,9 @@ describe("POST /work/:taskId/commands plan.generate — error state.update", () 
 			});
 			stream.emit({
 				type: "failed",
-				code: "PROVIDER_ERROR",
-				message: "provider returned 502",
+				code: "PROVIDER_AUTHENTICATION_ERROR",
+				title: "Provider authentication failed",
+				message: "The AI provider rejected its credentials.",
 			});
 			stream.finish();
 
@@ -841,11 +842,15 @@ describe("POST /work/:taskId/commands plan.generate — error state.update", () 
 
 			const errorUpdate = stateUpdates.find(
 				(updates) =>
-					updates["/plan/generation/error/code"] === "PROVIDER_ERROR",
+					updates["/plan/generation/error/code"] ===
+					"PROVIDER_AUTHENTICATION_ERROR",
 			);
 			expect(errorUpdate).toBeDefined();
+			expect(errorUpdate!["/plan/generation/error/title"]).toBe(
+				"Provider authentication failed",
+			);
 			expect(errorUpdate!["/plan/generation/error/message"]).toBe(
-				"provider returned 502",
+				"The AI provider rejected its credentials.",
 			);
 			expect(errorUpdate!["/plan/status"]).toBe("idle");
 			expect(errorUpdate).not.toHaveProperty(

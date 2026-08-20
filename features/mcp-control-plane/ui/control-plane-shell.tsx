@@ -66,6 +66,17 @@ type StartWithChronaPreferenceResponse = {
 	completedAt?: string | null;
 };
 
+type TaskCreateConfig = Pick<
+	SchedulePageData,
+	"availableAiClients" | "defaultExecutionRuntime" | "executionRuntimes"
+>;
+
+const EMPTY_TASK_CREATE_CONFIG: TaskCreateConfig = {
+	availableAiClients: [],
+	defaultExecutionRuntime: "hermes",
+	executionRuntimes: [],
+};
+
 function startWithChronaPreferencePath(workspaceId: string) {
 	return `/api/workspaces/${encodeURIComponent(workspaceId)}/preferences/start-with-chrona`;
 }
@@ -91,10 +102,9 @@ export function ControlPlaneShell({
 		useLocation().pathname.replace(/^\/(?:en|zh)(?=\/|$)/, "") || "/";
 	const [showCreateTaskDialog, setShowCreateTaskDialog] = useState(false);
 	const [isCreatingTask, setIsCreatingTask] = useState(false);
-	const [taskCreateConfig, setTaskCreateConfig] = useState<Pick<
-		SchedulePageData,
-		"availableAiClients" | "defaultExecutionRuntime"
-	> | null>(null);
+	const [taskCreateConfig, setTaskCreateConfig] = useState<TaskCreateConfig>(
+		EMPTY_TASK_CREATE_CONFIG,
+	);
 	const [createdOnboardingTaskId, setCreatedOnboardingTaskId] = useState<
 		string | null
 	>(null);
@@ -133,13 +143,16 @@ export function ControlPlaneShell({
 		let cancelled = false;
 
 		apiJson<
-			Pick<SchedulePageData, "availableAiClients" | "defaultExecutionRuntime">
+			Pick<
+				SchedulePageData,
+				"availableAiClients" | "defaultExecutionRuntime" | "executionRuntimes"
+			>
 		>(`/api/schedule?workspaceId=${encodeURIComponent(_defaultWorkspace.id)}`)
 			.then((payload) => {
 				if (!cancelled) setTaskCreateConfig(payload);
 			})
 			.catch(() => {
-				if (!cancelled) setTaskCreateConfig(null);
+				if (!cancelled) setTaskCreateConfig(EMPTY_TASK_CREATE_CONFIG);
 			});
 
 		return () => {
@@ -415,16 +428,16 @@ export function ControlPlaneShell({
 						? t("components.schedulePage.firstRunSafeDemoDescription")
 						: ""
 				}
-				initialAutoPlanGenerationEnabled={
-					useSafeDemoDefaults ? true : undefined
-				}
+				initialAutoPlanGenerationEnabled={useSafeDemoDefaults ? true : undefined}
 				initialAutoExecute={useSafeDemoDefaults ? false : undefined}
 				allowGoalMode
 				isOpen={showCreateTaskDialog}
 				initialStartAt={taskDialogDefaults.initialStartAt}
 				initialEndAt={taskDialogDefaults.initialEndAt}
 				isPending={isCreatingTask}
-				availableAiClients={taskCreateConfig?.availableAiClients}
+				availableAiClients={taskCreateConfig.availableAiClients}
+				executionRuntimes={taskCreateConfig.executionRuntimes}
+				defaultExecutionRuntime={taskCreateConfig.defaultExecutionRuntime}
 				onClose={() => {
 					setShowCreateTaskDialog(false);
 					setUseSafeDemoDefaults(false);
@@ -451,12 +464,11 @@ export function ControlPlaneShell({
 							title: input.title,
 							description: input.description || null,
 							priority: input.priority,
-							autoPlanGeneration:
-								input.autoPlanGenerationEnabled || input.autoExecute,
+							autoPlanGeneration: input.autoPlanGenerationEnabled || input.autoExecute,
 							autoExecute: input.autoExecute,
 							autoPlanGenerationTiming: input.autoPlanGenerationTiming,
 							autoExecuteTiming: input.autoExecuteTiming,
-							executionRuntime: taskCreateConfig?.defaultExecutionRuntime,
+							executionRuntime: input.executionRuntime,
 							executionConfig: {},
 							aiClientId: input.aiClientId,
 							dueAt: input.dueAt,

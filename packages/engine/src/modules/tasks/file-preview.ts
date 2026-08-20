@@ -93,9 +93,7 @@ export async function resolveFilePreview(
   const rootDir = explicitRoot ?? resolve(getChronaGeneratedFilesDir());
   const resolvedPath =
     generatedPath ??
-    (allowedAbsolutePath &&
-    isAbsolute(uri) &&
-    resolve(uri) === allowedAbsolutePath
+    (allowedAbsolutePath
       ? allowedAbsolutePath
       : explicitRoot && relativePath
         ? resolve(explicitRoot, relativePath)

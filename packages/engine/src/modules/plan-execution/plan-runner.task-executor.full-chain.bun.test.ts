@@ -1,7 +1,6 @@
 import { describe, expect, it } from "bun:test";
-import { TaskStatus } from "@/generated/prisma/client";
-import { db } from "@/lib/db";
-import { getPlanRun } from "@/modules/plan-execution/persistence/plan-run-store";
+import { db, TaskStatus } from "@chrona/db";
+import { getPlanRun } from "./persistence/plan-run-store";
 import {
   executeTaskNodeCapabilityMock,
   makeFullExecutionPlan,
@@ -14,7 +13,7 @@ import {
 describe("plan-runner task executor full execution chain", () => {
   setupPlanRunnerTaskExecutorTest();
 
-  it("runs a full plan execution chain through task, user condition, approval, wait, and final task", async () => {
+  it("[RUN-011] keeps an unmet wait paused, then resumes it exactly once", async () => {
     executeTaskNodeCapabilityMock
       .mockResolvedValueOnce({
         status: "done",
@@ -27,7 +26,9 @@ describe("plan-runner task executor full execution chain", () => {
         evidence: { sessionId: "main-session", runId: "run_final" },
       });
 
-    const { workspace, task } = await seedWorkspaceAndTask("Runner full execution chain");
+    const { workspace, task } = await seedWorkspaceAndTask(
+      "Runner full execution chain",
+    );
     const compiledPlan = makeFullExecutionPlan("graph_full_execution_chain");
     await seedAcceptedCompiledPlan(workspace.id, task.id, compiledPlan);
 
@@ -40,12 +41,17 @@ describe("plan-runner task executor full execution chain", () => {
     expect(initial.currentNodeId).toBe("route_condition");
     expect(initial.executedNodeIds).toEqual(["prepare_task"]);
     expect(executeTaskNodeCapabilityMock).toHaveBeenCalledTimes(1);
-    const executionSession = await db.executionSession.findFirstOrThrow({ where: { taskId: task.id } });
+    const executionSession = await db.executionSession.findFirstOrThrow({
+      where: { taskId: task.id },
+    });
 
     const afterBranchSelection = await taskPlanExecution.dispatch({
       taskId: task.id,
       commandContext: { sessionId: executionSession.id },
-      action: { action: "resume_with_input", inputFields: { decision: "approve" } },
+      action: {
+        action: "resume_with_input",
+        inputFields: { decision: "approve" },
+      },
     });
 
     expect(afterBranchSelection.status).toBe("waiting_for_approval");
@@ -53,7 +59,7 @@ describe("plan-runner task executor full execution chain", () => {
     expect(afterBranchSelection.executedNodeIds).toEqual(["route_condition"]);
     expect(executeTaskNodeCapabilityMock).toHaveBeenCalledTimes(1);
 
-    const completed = await taskPlanExecution.dispatch({
+    const waiting = await taskPlanExecution.dispatch({
       taskId: task.id,
       commandContext: { sessionId: executionSession.id },
       action: {
@@ -63,51 +69,123 @@ describe("plan-runner task executor full execution chain", () => {
       },
     });
 
+    expect(waiting.status).toBe("waiting_for_user");
+    expect(waiting.currentNodeId).toBe("cooldown_wait");
+    expect(waiting.executedNodeIds).toEqual(["approval_checkpoint"]);
+    expect(executeTaskNodeCapabilityMock).toHaveBeenCalledTimes(1);
+
+    const completed = await taskPlanExecution.dispatch({
+      taskId: task.id,
+      commandContext: { sessionId: executionSession.id },
+      action: {
+        action: "resume_with_input",
+        nodeId: "cooldown_wait",
+        inputFields: { external_readiness: true },
+      },
+    });
+
     expect(completed.status).toBe("completed");
     expect(completed.currentNodeId).toBeNull();
-    expect(completed.executedNodeIds).toEqual([
-      "approval_checkpoint",
-      "cooldown_wait",
-      "final_task",
-    ]);
+    expect(completed.executedNodeIds).toEqual(["cooldown_wait", "final_task"]);
     expect(completed.executedNodeIds).not.toContain("skipped_task");
     expect(executeTaskNodeCapabilityMock).toHaveBeenCalledTimes(2);
 
     const persisted = await getPlanRun(task.id, compiledPlan.editablePlanId);
-    expect(persisted?.results.map((item) => [
-      item.nodeId,
-      item.status,
-      item.waitKind,
-      item.review?.status,
-      item.selectedBranch?.label,
-      item.outputSummary,
-    ])).toEqual([
-      ["prepare_task", "current", undefined, undefined, undefined, "Preparation complete"],
-      ["route_condition", "obsolete", "user_input", undefined, undefined, undefined],
-      ["route_condition", "current", undefined, undefined, "approve", "Condition resolved to branch: approve"],
-      ["approval_checkpoint", "obsolete", undefined, "accepted", undefined, undefined],
-      ["cooldown_wait", "current", undefined, undefined, undefined, "Wait condition noted: external readiness signal"],
-      ["final_task", "current", undefined, undefined, undefined, "Final result produced"],
+    expect(
+      persisted?.results.map((item) => [
+        item.nodeId,
+        item.status,
+        item.waitKind,
+        item.review?.status,
+        item.selectedBranch?.label,
+        item.outputSummary,
+      ]),
+    ).toEqual([
+      [
+        "prepare_task",
+        "current",
+        undefined,
+        undefined,
+        undefined,
+        "Preparation complete",
+      ],
+      [
+        "route_condition",
+        "obsolete",
+        "user_input",
+        undefined,
+        undefined,
+        undefined,
+      ],
+      [
+        "route_condition",
+        "current",
+        undefined,
+        undefined,
+        "approve",
+        "Condition resolved to branch: approve",
+      ],
+      [
+        "approval_checkpoint",
+        "obsolete",
+        undefined,
+        "accepted",
+        undefined,
+        undefined,
+      ],
+      [
+        "cooldown_wait",
+        "obsolete",
+        "user_input",
+        undefined,
+        undefined,
+        undefined,
+      ],
+      [
+        "cooldown_wait",
+        "current",
+        undefined,
+        undefined,
+        undefined,
+        "Wait condition completed: external readiness signal",
+      ],
+      [
+        "final_task",
+        "current",
+        undefined,
+        undefined,
+        undefined,
+        "Final result produced",
+      ],
     ]);
-    expect(persisted?.attempts.map((attempt) => [attempt.nodeId, attempt.status])).toEqual([
+    expect(
+      persisted?.attempts.map((attempt) => [attempt.nodeId, attempt.status]),
+    ).toEqual([
       ["prepare_task", "succeeded"],
       ["route_condition", "succeeded"],
       ["route_condition", "succeeded"],
       ["approval_checkpoint", "succeeded"],
       ["cooldown_wait", "succeeded"],
+      ["cooldown_wait", "succeeded"],
       ["final_task", "succeeded"],
     ]);
-    expect(persisted?.executionContextSnapshots.map((snapshot) => snapshot.nodeId)).toEqual([
+    expect(
+      persisted?.executionContextSnapshots.map((snapshot) => snapshot.nodeId),
+    ).toEqual([
       "prepare_task",
       "route_condition",
       "route_condition",
       "approval_checkpoint",
       "cooldown_wait",
+      "cooldown_wait",
       "final_task",
     ]);
     expect(
       persisted?.executionContextSnapshots.some(
-        (snapshot) => snapshot.nodeId === "route_condition" && (snapshot.refs?.inputFields as Record<string, string> | undefined)?.decision === "approve",
+        (snapshot) =>
+          snapshot.nodeId === "route_condition" &&
+          (snapshot.refs?.inputFields as Record<string, string> | undefined)
+            ?.decision === "approve",
       ),
     ).toBe(true);
 
@@ -118,15 +196,19 @@ describe("plan-runner task executor full execution chain", () => {
     expect(session.status).toBe("Completed");
     expect(session.currentNodeId).toBeNull();
     expect(session.pauseReason).toBeNull();
-    expect(session.completedNodeIds).toBe(JSON.stringify([
-      "prepare_task",
-      "route_condition",
-      "approval_checkpoint",
-      "cooldown_wait",
-      "final_task",
-    ]));
+    expect(session.completedNodeIds).toBe(
+      JSON.stringify([
+        "prepare_task",
+        "route_condition",
+        "approval_checkpoint",
+        "cooldown_wait",
+        "final_task",
+      ]),
+    );
 
-    const updatedTask = await db.task.findUniqueOrThrow({ where: { id: task.id } });
+    const updatedTask = await db.task.findUniqueOrThrow({
+      where: { id: task.id },
+    });
     expect(updatedTask.status).toBe(TaskStatus.Completed);
     expect(updatedTask.blockReason).toBeNull();
   });

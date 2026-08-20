@@ -12,7 +12,9 @@ import { TaskPlanHeadConflictError } from "./task-plan-generation-persistence";
 import {
 	projectTaskPlanGenerationFailure,
 	releaseTaskPlanGenerationHead,
+	stopTaskPlanGeneration,
 } from "./task-plan-generation-registry";
+import { registerActiveTaskPlanGeneration } from "./active-task-plan-generations";
 
 const createdWorkspaceIds = new Set<string>();
 
@@ -182,6 +184,26 @@ describe("startTaskPlanGenerationDurably", () => {
 		expect(head.currentAiFeatureRunId).toBe(started.featureRunId);
 	});
 
+	it("aborts active provider work when durable generation is stopped", async () => {
+		const { task } = await createTaskFixture("active-stop");
+		const started = await startTaskPlanGenerationDurably({
+			taskId: task.id,
+			idempotencyKey: `active-stop-${crypto.randomUUID()}`,
+		});
+		const active = registerActiveTaskPlanGeneration(started.featureRunId);
+
+		expect(active.signal.aborted).toBe(false);
+		expect(await stopTaskPlanGeneration({ taskId: task.id })).toBe(true);
+		expect(active.signal.aborted).toBe(true);
+		expect(
+			await db.aiFeatureRun.findUniqueOrThrow({
+				where: { id: started.featureRunId },
+				select: { status: true },
+			}),
+		).toEqual({ status: AiFeatureRunStatus.Cancelled });
+		active.dispose();
+	});
+
 	it("cancels an unlinked queued run when an active generation owns the head", async () => {
 		const { task } = await createTaskFixture("orphan-cancellation");
 		const owner = await startTaskPlanGenerationDurably({
@@ -336,30 +358,91 @@ describe("startTaskPlanGenerationDurably", () => {
 });
 
 describe("task plan generation failure projection", () => {
-	it("projects an ambiguous single-attempt provider start as an actionable provider error", () => {
+	it("projects common provider failures to distinct public types and reasons", () => {
+		const cases = [
+			{
+				persistedCode: "provider_protocol_error",
+				errorMessage: "401 API key required for remote API access",
+				code: "PROVIDER_AUTHENTICATION_ERROR",
+				title: "Provider authentication failed",
+				message:
+					"The AI provider rejected its credentials. Check the configured API key or sign-in.",
+			},
+			{
+				persistedCode: "provider_protocol_error",
+				errorMessage: "No model selected. Use /model to select a model.",
+				code: "PROVIDER_CONFIGURATION_ERROR",
+				title: "Provider configuration incomplete",
+				message:
+					"No AI model is selected, or the provider setup is incomplete. Choose a model and verify the provider configuration.",
+			},
+			{
+				persistedCode: "provider_protocol_error",
+				errorMessage: "403 permission denied",
+				code: "PROVIDER_PERMISSION_ERROR",
+				title: "Provider access denied",
+				message:
+					"The AI provider denied access. Check account permissions and the selected model.",
+			},
+			{
+				persistedCode: "provider_protocol_error",
+				errorMessage: "Balance billing is disabled for this key",
+				code: "PROVIDER_QUOTA_EXCEEDED",
+				title: "Provider quota reached",
+				message:
+					"The AI provider quota or billing limit was reached. Check account balance or plan.",
+			},
+			{
+				persistedCode: "provider_protocol_error",
+				errorMessage: "429 too many requests",
+				code: "PROVIDER_RATE_LIMITED",
+				title: "Provider rate limit reached",
+				message:
+					"The AI provider is rate limiting requests. Wait briefly, then retry.",
+			},
+			{
+				persistedCode: "provider_protocol_error",
+				errorMessage: "503 service unavailable",
+				code: "PROVIDER_UNAVAILABLE",
+				title: "Provider unavailable",
+				message: "The AI provider is temporarily unavailable. Retry later.",
+			},
+			{
+				persistedCode: "provider_timeout",
+				errorMessage: null,
+				code: "PROVIDER_TIMEOUT",
+				title: "Provider request timed out",
+				message:
+					"The AI provider did not finish plan generation before the timeout.",
+			},
+		] as const;
+
+		for (const input of cases) {
+			expect(
+				projectTaskPlanGenerationFailure(
+					input.persistedCode,
+					input.errorMessage,
+				),
+			).toEqual({
+				type: "failed",
+				code: input.code,
+				title: input.title,
+				persistedCode: input.persistedCode,
+				message: input.message,
+			});
+		}
+	});
+
+	it("keeps unknown provider starts separate from confirmed terminal failures", () => {
 		expect(
 			projectTaskPlanGenerationFailure("provider_start_outcome_unknown"),
 		).toEqual({
 			type: "failed",
 			code: "PROVIDER_ERROR",
+			title: "Provider result unknown",
 			persistedCode: "provider_start_outcome_unknown",
-			message: "The AI provider could not complete plan generation.",
-		});
-	});
-
-	it("describes known provider terminal failures without calling them ambiguous starts", () => {
-		expect(projectTaskPlanGenerationFailure("provider_protocol_error")).toEqual({
-			type: "failed",
-			code: "PROVIDER_ERROR",
-			persistedCode: "provider_protocol_error",
 			message:
-				"The AI provider connection ended before plan generation completed.",
-		});
-		expect(projectTaskPlanGenerationFailure("provider_timeout")).toEqual({
-			type: "failed",
-			code: "PROVIDER_ERROR",
-			persistedCode: "provider_timeout",
-			message: "The AI provider timed out while generating the plan.",
+				"The AI provider could not confirm whether plan generation started.",
 		});
 	});
 });

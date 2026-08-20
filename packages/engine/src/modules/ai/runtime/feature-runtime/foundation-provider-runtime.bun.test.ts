@@ -1,6 +1,9 @@
 import { describe, expect, it, mock } from "bun:test";
 import type { AgentProviderClient } from "@chrona/providers-foundation";
-import type { CompiledAiFeatureRequest } from "../../feature-runtime";
+import {
+	classifyAiFeatureProviderError,
+	type CompiledAiFeatureRequest,
+} from "../../feature-runtime";
 import {
 	createFoundationFeatureStartInput,
 	FoundationProviderRuntime,
@@ -65,6 +68,27 @@ function provider() {
 	} as unknown as AgentProviderClient;
 	return { client, lookups };
 }
+
+describe("provider error classification", () => {
+	it("classifies common provider failures from bounded error text", () => {
+		const cases = [
+			["401 API key required for remote API access", "provider_authentication_error"],
+			["No model selected. Use /model to select a model.", "provider_configuration_error"],
+			["403 permission denied", "provider_permission_error"],
+			["balance billing is disabled for this key", "provider_quota_exceeded"],
+			["429 too many requests", "provider_rate_limited"],
+			["404 model not found", "provider_request_error"],
+			["503 service unavailable", "provider_unavailable"],
+			["ECONNRESET while reading provider response", "provider_network_error"],
+			["provider request timed out", "provider_timeout"],
+			["terminal tool payload was incomplete", "provider_protocol_error"],
+		] as const;
+
+		for (const [message, expected] of cases) {
+			expect(classifyAiFeatureProviderError(message)).toBe(expected);
+		}
+	});
+});
 
 describe("FoundationProviderRuntime recovery references", () => {
 	it("looks up a persisted run by run ID and preserves the provider-native resume ref", async () => {
@@ -150,7 +174,78 @@ describe("FoundationProviderRuntime recovery references", () => {
 		expect(startInput.tools).toHaveLength(1);
 	});
 
-	it("classifies an observed provider run failure as a known protocol error", async () => {
+	it("forwards cancellation to provider start and stream", async () => {
+		const controller = new AbortController();
+		const startInputs: unknown[] = [];
+		const streamInputs: unknown[] = [];
+		const run = {
+			provider: "abortable-fake",
+			runId: "provider-run-abortable",
+			sessionId: "provider-session-abortable",
+			providerResumeRef: "provider-run-abortable",
+			status: "running" as const,
+			startedAt: "2026-08-10T06:11:02.000Z",
+			stream: { supported: true, reconnectable: false },
+		};
+		const client = {
+			provider: run.provider,
+			async getCapabilities() {
+				return {
+					supportsSessions: true,
+					supportsStreaming: true,
+					supportsRunLookup: false,
+					supportsCancellation: true,
+					supportsToolCalls: true,
+					supportsPreviousResponse: false,
+					actionInvocation: "unsupported" as const,
+					startIdempotency: "unsupported" as const,
+					readOnlySingleAttempt: true,
+					recovery: {
+						sessionResume: true,
+						historyReplay: true,
+						activeRunLookup: false,
+						streamReconnect: false,
+						crossProcessDurable: false,
+						providerResumeRef: true,
+						runEventReplay: false,
+						mode: "session_history" as const,
+					},
+				};
+			},
+			async startRun(input: unknown) {
+				startInputs.push(input);
+				return run;
+			},
+			async *streamRun(input: unknown) {
+				streamInputs.push(input);
+				yield {
+					type: "run_completed" as const,
+					provider: run.provider,
+					runId: run.runId,
+					sessionId: run.sessionId,
+					sequence: 0,
+					run: { ...run, status: "completed" as const },
+					structuredPayload: { result: { status: "completed" } },
+				};
+			},
+		} as unknown as AgentProviderClient;
+		const runtime = await new FoundationProviderRuntime(
+			"test.feature",
+			client,
+			controller.signal,
+		).initialize();
+
+		await runtime.startOrAttach(request);
+
+		expect(startInputs).toContainEqual(
+			expect.objectContaining({ signal: controller.signal }),
+		);
+		expect(streamInputs).toContainEqual(
+			expect.objectContaining({ signal: controller.signal }),
+		);
+	});
+
+	it("preserves a classified provider failure in the feature runtime", async () => {
 		const run = {
 			provider: "read-only-fake",
 			runId: "provider-run-failed",
@@ -196,7 +291,7 @@ describe("FoundationProviderRuntime recovery references", () => {
 					sessionId: run.sessionId,
 					sequence: 0,
 					run: { ...run, status: "failed" as const },
-					error: "Provider response stream closed before completion.",
+					error: "401 API key required for remote API access",
 				};
 			},
 		} as unknown as AgentProviderClient;
@@ -207,8 +302,8 @@ describe("FoundationProviderRuntime recovery references", () => {
 
 		await expect(runtime.startOrAttach(request)).rejects.toMatchObject({
 			name: "AiFeatureProviderError",
-			code: "provider_protocol_error",
-			message: "Provider response stream closed before completion.",
+			code: "provider_authentication_error",
+			message: "401 API key required for remote API access",
 		});
 	});
 });

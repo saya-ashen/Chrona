@@ -55,14 +55,21 @@ export async function startTaskPlanGenerateFeature(
 }
 
 /** Starts and executes immediately for callers that do not require an SSE handoff. */
-export async function runTaskPlanGenerateFeature(input: TaskPlanGenerationFeatureInput) {
-  return runAiFeatureWithRuntime(featureRequest(input));
+export async function runTaskPlanGenerateFeature(
+  input: TaskPlanGenerationFeatureInput,
+  signal?: AbortSignal,
+) {
+  return runAiFeatureWithRuntime(featureRequest(input), { signal });
 }
 
 /** Resumes an already-persisted task plan generation without rebuilding observations. */
-export async function resumeTaskPlanGenerateFeature(runId: string) {
+export async function resumeTaskPlanGenerateFeature(
+  runId: string,
+  signal?: AbortSignal,
+) {
   return resumeAiFeatureRun({
     runId,
     definitions: new AiFeatureDefinitionRegistry([taskPlanGenerateFeature]),
+    signal,
   });
 }

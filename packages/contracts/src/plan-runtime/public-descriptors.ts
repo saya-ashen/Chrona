@@ -21,5 +21,8 @@ export function publicRuntimeDescriptor(value: string | null | undefined): Publi
 }
 
 export function publicToolDescriptor(value: string | null | undefined): PublicProviderDescriptor {
-  return publicProviderDescriptor(value, "tool");
+  const label = value?.trim();
+  return label
+    ? { category: "tool", label }
+    : publicProviderDescriptor(value, "tool");
 }

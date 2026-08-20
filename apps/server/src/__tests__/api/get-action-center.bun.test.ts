@@ -238,7 +238,10 @@ describe("getActionCenter (engine)", () => {
 
   it("recent completed latest run surfaces as kind=execution_completed", async () => {
     const { workspaceId } = await seedWorkspace("Action Center completed notification");
-    const { taskId } = await seedTask(workspaceId, { title: "Completed task" });
+    const { taskId } = await seedTask(workspaceId, {
+      title: "Completed task",
+      status: "Completed",
+    });
     const run = await seedRun(taskId, "Completed");
     await linkLatestRun(taskId, run.id);
 

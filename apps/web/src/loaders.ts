@@ -26,8 +26,16 @@ async function resolveRouteLocale(params: Params<string>): Promise<Locale> {
   return resolveLocale(params.lang);
 }
 
+function getRequestUrl(request: Request) {
+  try {
+    return new URL(request.url);
+  } catch {
+    throw new Response("Invalid request URL", { status: 400 });
+  }
+}
+
 function getOrigin(request: Request) {
-  return new URL(request.url).origin;
+  return getRequestUrl(request).origin;
 }
 
 export async function loadAppBootData({ params, request }: LoaderFunctionArgs): Promise<AppBootData> {
@@ -89,7 +97,7 @@ export async function loadTaskListData({ params, request }: LoaderFunctionArgs):
   );
   const workspaceId = workspace.id;
 
-  const requestUrl = new URL(request.url);
+  const requestUrl = getRequestUrl(request);
   const query = new URLSearchParams({ workspaceId });
   for (const key of ["filter", "priority", "search", "sort", "order", "page", "pageSize", "view", "resultDate"] as const) {
     const value = requestUrl.searchParams.get(key);
@@ -131,7 +139,7 @@ export async function loadGoalWorkspaceData({ params, request }: LoaderFunctionA
   const origin = getOrigin(request);
   const goal = await apiJson<GoalData>(`${origin}/api/goals/${encodeURIComponent(params.goalId)}`);
   const assetQuery = new URLSearchParams({ workspaceId: goal.workspaceId, state: "active" });
-  const requestedAssetView = new URL(request.url).searchParams.get("assetView");
+  const requestedAssetView = getRequestUrl(request).searchParams.get("assetView");
   if (requestedAssetView === "archived") assetQuery.set("state", "archived");
   const [assets, inbox] = await Promise.all([
     apiJson<{ assets: GoalWorkspaceRouteData["assets"]; recent: GoalWorkspaceRouteData["recentAssets"] }>(`${origin}/api/goals/${encodeURIComponent(params.goalId)}/assets?${assetQuery}`),
@@ -149,19 +157,25 @@ export async function loadTaskPageData({ params, request }: LoaderFunctionArgs):
     throw new Response("Task id is required", { status: 400 });
   }
 
-  const requestUrl = new URL(request.url);
-  const query = new URLSearchParams();
-  const workBlockId = requestUrl.searchParams.get("workBlockId");
-  if (workBlockId) query.set("workBlockId", workBlockId);
-  const suffix = query.size ? `?${query.toString()}` : "";
+  const requestUrl = getRequestUrl(request);
+  const requestedWorkBlockId = requestUrl.searchParams.get("workBlockId");
+  const bootstrapQuery = new URLSearchParams();
+  if (requestedWorkBlockId) bootstrapQuery.set("workBlockId", requestedWorkBlockId);
+  const bootstrapSuffix = bootstrapQuery.size ? `?${bootstrapQuery.toString()}` : "";
 
   const taskPath = `${origin}/api/tasks/${params.taskId}`;
-  const [bootstrap, runtimeContext, reviewContext, commandCenter, header] = await Promise.all([
-    apiJson<TaskWorkspaceBootstrapData>(`${taskPath}${suffix}`),
-    apiJson<TaskWorkspaceRuntimeContextData>(`${taskPath}/runtime-context${suffix}`),
-    apiJson<TaskWorkspaceReviewContextData>(`${taskPath}/review-context${suffix}`),
-    apiJson<TaskWorkspaceCommandCenterData>(`${taskPath}/command-center${suffix}`),
-    apiJson<TaskWorkspaceHeaderData>(`${taskPath}/workspace/header${suffix}`),
+  const bootstrap = await apiJson<TaskWorkspaceBootstrapData>(`${taskPath}${bootstrapSuffix}`);
+
+  // Bootstrap selects the implicit occurrence; use it for every split read model.
+  const workBlockId = requestedWorkBlockId ?? bootstrap.task.currentWorkBlock?.id ?? null;
+  const contextQuery = new URLSearchParams();
+  if (workBlockId) contextQuery.set("workBlockId", workBlockId);
+  const contextSuffix = contextQuery.size ? `?${contextQuery.toString()}` : "";
+  const [runtimeContext, reviewContext, commandCenter, header] = await Promise.all([
+    apiJson<TaskWorkspaceRuntimeContextData>(`${taskPath}/runtime-context${contextSuffix}`),
+    apiJson<TaskWorkspaceReviewContextData>(`${taskPath}/review-context${contextSuffix}`),
+    apiJson<TaskWorkspaceCommandCenterData>(`${taskPath}/command-center${contextSuffix}`),
+    apiJson<TaskWorkspaceHeaderData>(`${taskPath}/workspace/header${contextSuffix}`),
   ]);
 
   return {

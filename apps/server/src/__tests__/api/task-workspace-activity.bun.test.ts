@@ -171,7 +171,7 @@ describe("task workspace activity endpoint", () => {
 
     expect(res.status).toBe(200);
     expect(body.items[0]?.tool).toMatchObject({
-      name: "Runtime tool",
+      name: "bash",
       state: "completed",
     });
     expect(JSON.stringify(body.items)).not.toContain("run-1");

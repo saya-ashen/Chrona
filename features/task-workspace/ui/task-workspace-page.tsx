@@ -29,6 +29,7 @@ type Props = {
 
 type TaskWorkspaceHeaderEditorProps = {
 	task: Parameters<typeof TaskWorkspaceHeaderCard>[0]["task"];
+	resultAccepted?: boolean;
 	spec: Parameters<typeof TaskWorkspaceHeaderCard>[0]["spec"];
 	store: StateStore;
 	onAction: Parameters<typeof TaskWorkspaceHeaderCard>[0]["onAction"];
@@ -112,6 +113,7 @@ const DEFAULT_COPY = {
 };
 function TaskWorkspaceHeaderEditor({
 	task,
+	resultAccepted,
 	spec,
 	store,
 	onAction,
@@ -145,6 +147,7 @@ function TaskWorkspaceHeaderEditor({
 		<>
 			<TaskWorkspaceHeaderCard
 				task={task}
+				resultAccepted={resultAccepted}
 				spec={spec}
 				store={store}
 				onAction={onAction}
@@ -257,6 +260,7 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
 		workspaceEvents,
 		pageData.availableAiClients,
 	);
+
 	const goalPromotionAction =
 		pageData.resultReview?.status === "accepted" &&
 		!task.goalId &&
@@ -364,6 +368,7 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
 			<div className="shrink-0">
 				<TaskWorkspaceHeaderEditor
 					task={consoleView.task}
+					resultAccepted={pageData.resultReview?.status === "accepted"}
 					spec={headerSpec}
 					store={headerStore}
 					onAcceptPlan={() =>
@@ -407,6 +412,7 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
 						// the next `state.update` will repopulate error fields if it
 						// fails again.
 						headerStore.set("/plan/generation/error/code", null);
+						headerStore.set("/plan/generation/error/title", null);
 						headerStore.set("/plan/generation/error/message", null);
 						headerStore.set("/plan/generation/error/buttonRetry", false);
 						headerStore.set(
@@ -418,6 +424,7 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
 					}}
 					onRecoveryEditInstruction={() => {
 						headerStore.set("/plan/generation/error/code", null);
+						headerStore.set("/plan/generation/error/title", null);
 						headerStore.set("/plan/generation/error/message", null);
 						headerStore.set("/plan/generation/error/buttonRetry", false);
 						headerStore.set(
@@ -431,6 +438,7 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
 					}}
 					onRecoveryCancel={() => {
 						headerStore.set("/plan/generation/error/code", null);
+						headerStore.set("/plan/generation/error/title", null);
 						headerStore.set("/plan/generation/error/message", null);
 						headerStore.set("/plan/generation/error/buttonRetry", false);
 						headerStore.set(

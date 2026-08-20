@@ -1,14 +1,21 @@
 /* eslint-disable max-lines-per-function, max-lines -- Shared execution fixtures keep graph builders and exact identity seeders together. */
 import { afterAll, beforeEach, mock } from "bun:test";
-import { TaskStatus } from "@/generated/prisma/client";
-import { db } from "@/lib/db";
-import { saveCompiledPlan } from "@/modules/plan-execution/persistence/compiled-plan-store";
-import type { CheckpointConfig, CompiledPlan, ConditionConfig, TaskConfig, WaitConfig } from "@chrona/contracts/ai";
+import type {
+  CheckpointConfig,
+  CompiledPlan,
+  ConditionConfig,
+  TaskConfig,
+  WaitConfig,
+} from "@chrona/contracts/ai";
+import { db, TaskStatus } from "@chrona/db";
+import { saveCompiledPlan } from "./persistence/compiled-plan-store";
 import { runTaskNodeFeature } from "./runtime/node-ai-capabilities";
 import type { NodeAiCapabilityInput } from "./runtime/node-ai-capabilities";
 import type { NodeExecutionResult } from "./node-executors/types";
 
-type NodeCapabilityMock = (input: NodeAiCapabilityInput) => Promise<NodeExecutionResult>;
+type NodeCapabilityMock = (
+  input: NodeAiCapabilityInput,
+) => Promise<NodeExecutionResult>;
 
 export const executeTaskNodeCapabilityMock = mock<NodeCapabilityMock>();
 export const reviewCheckpointNodeCapabilityMock = mock<NodeCapabilityMock>();
@@ -21,7 +28,7 @@ mock.module("@/modules/plan-execution/runtime/node-ai-capabilities", () => ({
   runTaskNodeFeature,
 }));
 
-export const { taskPlanExecution } = await import("@/modules/plan-execution");
+export const { taskPlanExecution } = await import("./index");
 
 export function setupPlanRunnerTaskExecutorTest() {
   beforeEach(async () => {
@@ -138,7 +145,9 @@ export function makeTwoTaskPlan(editablePlanId: string): CompiledPlan {
         type: "task",
         title: "Collect script requirements",
         description: "First runtime-backed task executor",
-        config: { expectedOutput: "Requirements collected" } satisfies TaskConfig,
+        config: {
+          expectedOutput: "Requirements collected",
+        } satisfies TaskConfig,
         dependencies: [],
         dependents: ["second_task"],
         mode: "auto",
@@ -150,14 +159,18 @@ export function makeTwoTaskPlan(editablePlanId: string): CompiledPlan {
         type: "task",
         title: "Finalize script specification",
         description: "Should run after the first provider run completes",
-        config: { expectedOutput: "Executable script specification" } satisfies TaskConfig,
+        config: {
+          expectedOutput: "Executable script specification",
+        } satisfies TaskConfig,
         dependencies: ["first_task"],
         dependents: [],
         mode: "auto",
         executor: "ai",
       },
     ],
-    edges: [{ id: "edge_first_to_second", from: "first_task", to: "second_task" }],
+    edges: [
+      { id: "edge_first_to_second", from: "first_task", to: "second_task" },
+    ],
     entryNodeIds: ["first_task"],
     terminalNodeIds: ["second_task"],
     topologicalOrder: ["first_task", "second_task"],
@@ -181,7 +194,9 @@ export function makeTwoEntryTaskPlan(editablePlanId: string): CompiledPlan {
         type: "task",
         title: "Collect architecture facts",
         description: "First independent runtime-backed task executor",
-        config: { expectedOutput: "Architecture facts collected" } satisfies TaskConfig,
+        config: {
+          expectedOutput: "Architecture facts collected",
+        } satisfies TaskConfig,
         dependencies: [],
         dependents: [],
         mode: "auto",
@@ -193,7 +208,9 @@ export function makeTwoEntryTaskPlan(editablePlanId: string): CompiledPlan {
         type: "task",
         title: "Collect documentation facts",
         description: "Second independent runtime-backed task executor",
-        config: { expectedOutput: "Documentation facts collected" } satisfies TaskConfig,
+        config: {
+          expectedOutput: "Documentation facts collected",
+        } satisfies TaskConfig,
         dependencies: [],
         dependents: [],
         mode: "auto",
@@ -209,7 +226,9 @@ export function makeTwoEntryTaskPlan(editablePlanId: string): CompiledPlan {
   };
 }
 
-export function makeIndependentBranchesAfterManualPlan(editablePlanId: string): CompiledPlan {
+export function makeIndependentBranchesAfterManualPlan(
+  editablePlanId: string,
+): CompiledPlan {
   return {
     id: `compiled_${editablePlanId}`,
     editablePlanId,
@@ -223,7 +242,8 @@ export function makeIndependentBranchesAfterManualPlan(editablePlanId: string): 
         localId: "manual_gate",
         type: "condition",
         title: "Manual branch gate",
-        description: "Agent-submitted branch result unlocks independent branches",
+        description:
+          "Agent-submitted branch result unlocks independent branches",
         config: {
           condition: "Continue to independent branches",
           evaluationBy: "user",
@@ -305,7 +325,9 @@ export function makeManualThenTaskPlan(editablePlanId: string): CompiledPlan {
         executor: "ai",
       },
     ],
-    edges: [{ id: "edge_manual_to_auto", from: "manual_task", to: "auto_task" }],
+    edges: [
+      { id: "edge_manual_to_auto", from: "manual_task", to: "auto_task" },
+    ],
     entryNodeIds: ["manual_task"],
     terminalNodeIds: ["auto_task"],
     topologicalOrder: ["manual_task", "auto_task"],
@@ -314,7 +336,9 @@ export function makeManualThenTaskPlan(editablePlanId: string): CompiledPlan {
   };
 }
 
-export function makeInputCheckpointThenTaskPlan(editablePlanId: string): CompiledPlan {
+export function makeInputCheckpointThenTaskPlan(
+  editablePlanId: string,
+): CompiledPlan {
   return {
     id: `compiled_${editablePlanId}`,
     editablePlanId,
@@ -334,8 +358,18 @@ export function makeInputCheckpointThenTaskPlan(editablePlanId: string): Compile
           prompt: "Confirm script requirements",
           required: true,
           inputFields: [
-            { name: "location_scope", label: "Location scope", type: "text", required: true },
-            { name: "output_format", label: "Output format", type: "text", required: true },
+            {
+              name: "location_scope",
+              label: "Location scope",
+              type: "text",
+              required: true,
+            },
+            {
+              name: "output_format",
+              label: "Output format",
+              type: "text",
+              required: true,
+            },
           ],
         } satisfies CheckpointConfig,
         dependencies: [],
@@ -349,7 +383,8 @@ export function makeInputCheckpointThenTaskPlan(editablePlanId: string): Compile
         description: "Should run after checkpoint input is submitted",
         config: {
           expectedOutput: "Executable script specification",
-          completionCriteria: "Scope, input, output, and constraints are documented",
+          completionCriteria:
+            "Scope, input, output, and constraints are documented",
         } satisfies TaskConfig,
         dependencies: ["requirements_checkpoint"],
         dependents: [],
@@ -357,7 +392,13 @@ export function makeInputCheckpointThenTaskPlan(editablePlanId: string): Compile
         executor: "ai",
       },
     ],
-    edges: [{ id: "edge_checkpoint_to_spec", from: "requirements_checkpoint", to: "spec_task" }],
+    edges: [
+      {
+        id: "edge_checkpoint_to_spec",
+        from: "requirements_checkpoint",
+        to: "spec_task",
+      },
+    ],
     entryNodeIds: ["requirements_checkpoint"],
     terminalNodeIds: ["spec_task"],
     topologicalOrder: ["requirements_checkpoint", "spec_task"],
@@ -423,10 +464,10 @@ export function makeFullExecutionPlan(editablePlanId: string): CompiledPlan {
         localId: "cooldown_wait",
         type: "wait",
         title: "Wait for external readiness",
-        description: "Wait node that completes in the main execution path",
+        description:
+          "Wait node that pauses until external readiness is confirmed",
         config: {
           waitFor: "external readiness signal",
-          timeout: { minutes: 0, onTimeout: "continue" },
         } satisfies WaitConfig,
         dependencies: ["approval_checkpoint"],
         dependents: ["final_task"],
@@ -448,7 +489,8 @@ export function makeFullExecutionPlan(editablePlanId: string): CompiledPlan {
         localId: "skipped_task",
         type: "task",
         title: "Skipped alternate branch",
-        description: "This node should not execute when approval branch is selected",
+        description:
+          "This node should not execute when approval branch is selected",
         config: { expectedOutput: "Should not run" } satisfies TaskConfig,
         dependencies: ["route_condition"],
         dependents: [],
@@ -457,10 +499,28 @@ export function makeFullExecutionPlan(editablePlanId: string): CompiledPlan {
       },
     ],
     edges: [
-      { id: "edge_prepare_to_condition", from: "prepare_task", to: "route_condition" },
-      { id: "edge_condition_to_approval", from: "route_condition", to: "approval_checkpoint", label: "approve" },
-      { id: "edge_condition_to_skipped", from: "route_condition", to: "skipped_task", label: "skip" },
-      { id: "edge_approval_to_wait", from: "approval_checkpoint", to: "cooldown_wait" },
+      {
+        id: "edge_prepare_to_condition",
+        from: "prepare_task",
+        to: "route_condition",
+      },
+      {
+        id: "edge_condition_to_approval",
+        from: "route_condition",
+        to: "approval_checkpoint",
+        label: "approve",
+      },
+      {
+        id: "edge_condition_to_skipped",
+        from: "route_condition",
+        to: "skipped_task",
+        label: "skip",
+      },
+      {
+        id: "edge_approval_to_wait",
+        from: "approval_checkpoint",
+        to: "cooldown_wait",
+      },
       { id: "edge_wait_to_final", from: "cooldown_wait", to: "final_task" },
     ],
     entryNodeIds: ["prepare_task"],
@@ -478,11 +538,19 @@ export function makeFullExecutionPlan(editablePlanId: string): CompiledPlan {
   };
 }
 
-export async function seedRuntimeSyncIdentity(taskId: string, runtimeRunRef: string) {
+export async function seedRuntimeSyncIdentity(
+  taskId: string,
+  runtimeRunRef: string,
+) {
   const session = await db.executionSession.findFirstOrThrow({
     where: { taskId, status: "Active", currentNodeAttemptId: { not: null } },
     orderBy: { createdAt: "desc" },
-    select: { id: true, workBlockId: true, occurrenceId: true, currentNodeAttemptId: true },
+    select: {
+      id: true,
+      workBlockId: true,
+      occurrenceId: true,
+      currentNodeAttemptId: true,
+    },
   });
   const attempt = await db.taskPlanNodeAttempt.findUniqueOrThrow({
     where: { id: session.currentNodeAttemptId! },
@@ -528,7 +596,12 @@ export async function seedRuntimeSyncIdentity(taskId: string, runtimeRunRef: str
   };
 }
 
-export async function seedAcceptedCompiledPlan(workspaceId: string, taskId: string, compiledPlan: CompiledPlan, workBlockId?: string | null) {
+export async function seedAcceptedCompiledPlan(
+  workspaceId: string,
+  taskId: string,
+  compiledPlan: CompiledPlan,
+  workBlockId?: string | null,
+) {
   await saveCompiledPlan({
     workspaceId,
     taskId,

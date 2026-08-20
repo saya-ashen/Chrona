@@ -1,4 +1,4 @@
-import { db } from "@/lib/db";
+import { db } from "@chrona/db/db";
 import {
   buildCommandCenterArtifactsSpec,
   buildCommandCenterNowSpec,
@@ -17,6 +17,19 @@ import { getCurrentExecution } from "../plan-execution/use-cases/get-current-exe
 import { hydrateFilePreviewSpec, resolveFilePreview } from "./file-preview";
 import { aiArtifactRef } from "../plan-execution/use-cases/register-generated-plan-output-artifacts";
 
+function isResultArtifactElement(element: UiDocument["elements"][string]) {
+  switch (element.type) {
+    case "FileView":
+    case "FileRef":
+    case "ResultDeliverable":
+    case "WorkspaceArtifactItem":
+    case "Table":
+      return true;
+    default:
+      return false;
+  }
+}
+
 function materializeResultArtifactRefs(
   spec: UiDocument,
   artifacts: Array<{ id: string; uri: string }>,
@@ -28,22 +41,19 @@ function materializeResultArtifactRefs(
     ...spec,
     elements: Object.fromEntries(
       Object.entries(spec.elements).map(([key, element]) => {
-        if (
-          element.type !== "FileView" &&
-          element.type !== "FileRef" &&
-          element.type !== "ResultDeliverable" &&
-          element.type !== "WorkspaceArtifactItem" &&
-          element.type !== "Table"
-        ) return [key, element];
+        if (!isResultArtifactElement(element)) return [key, element];
         const props = element.props as Record<string, unknown>;
-        const opaqueRef = typeof props.artifactRef === "string"
-          ? props.artifactRef
-          : typeof props.path === "string" && props.path.startsWith("AF")
-            ? props.path
-            : typeof props.uri === "string" && props.uri.startsWith("AF")
-              ? props.uri
-              : null;
-        const uri = opaqueRef ? uriByRef.get(opaqueRef as AiArtifactRef) : undefined;
+        const opaqueRef =
+          typeof props.artifactRef === "string"
+            ? props.artifactRef
+            : typeof props.path === "string" && props.path.startsWith("AF")
+              ? props.path
+              : typeof props.uri === "string" && props.uri.startsWith("AF")
+                ? props.uri
+                : null;
+        const uri = opaqueRef
+          ? uriByRef.get(opaqueRef as AiArtifactRef)
+          : undefined;
         return uri
           ? [key, { ...element, props: { ...props, path: uri } }]
           : [key, element];
@@ -131,22 +141,31 @@ export async function getTaskCommandCenter(input: {
     throw new EngineError(ENGINE_ERROR_CODES.TASK_NOT_FOUND, "Task not found");
   }
   const artifacts = await Promise.all(
-    task.artifacts.map(async (artifact) => ({
-      id: artifact.id,
-      title: artifact.title,
-      type: artifact.type,
-      uri: artifact.uri,
-      ...(await resolveFilePreview(artifact.uri, { taskId: input.taskId })),
-    })),
+    task.artifacts.map(
+      async (artifact: {
+        id: string;
+        title: string;
+        type: string;
+        uri: string;
+      }) => ({
+        id: artifact.id,
+        title: artifact.title,
+        type: artifact.type,
+        uri: artifact.uri,
+        ...(await resolveFilePreview(artifact.uri, { taskId: input.taskId })),
+      }),
+    ),
   );
-  const activityTimeline = orderActivityNewestFirst(deduplicateProjectedActivity(
-    task.timelineItems.length > 0
-      ? [
-          ...task.timelineItems.map(mapTimelineItemToActivity),
-          ...buildActivityTimeline([...task.events].reverse()),
-        ]
-      : buildActivityTimeline([...task.events].reverse()),
-  )).slice(0, 100);
+  const activityTimeline = orderActivityNewestFirst(
+    deduplicateProjectedActivity(
+      task.timelineItems.length > 0
+        ? [
+            ...task.timelineItems.map(mapTimelineItemToActivity),
+            ...buildActivityTimeline([...task.events].reverse()),
+          ]
+        : buildActivityTimeline([...task.events].reverse()),
+    ),
+  ).slice(0, 100);
 
   return {
     documents: {

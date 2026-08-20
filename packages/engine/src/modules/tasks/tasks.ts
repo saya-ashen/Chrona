@@ -10,7 +10,10 @@ import { getTaskActivityPage } from "./task-activity";
 import { getTaskRuntimeContext } from "./get-task-runtime-context";
 import { listTasksByWorkspace } from "./list-tasks";
 import { acceptTaskResult } from "./accept-task-result";
-import { continueFromTaskResult, getTaskResultFollowUpState } from "./continue-from-task-result";
+import {
+  continueFromTaskResult,
+  getTaskResultFollowUpState,
+} from "./continue-from-task-result";
 import {
   approveResultFileAccess,
   requestResultFileAccess,
@@ -44,19 +47,33 @@ export class Tasks {
     return getTaskDeleteImpact(input.taskId);
   }
 
-  async delete(input: { taskId: string; workspaceId?: string; expectedTaskIds?: string[]; expectedAssetIds?: string[] }) {
+  async delete(input: {
+    taskId: string;
+    workspaceId?: string;
+    expectedTaskIds?: string[];
+    expectedAssetIds?: string[];
+  }) {
     if (input.workspaceId) {
       await ensureTaskInWorkspace(input.taskId, input.workspaceId);
     }
-    const impact = input.expectedTaskIds && input.expectedAssetIds
-      ? { expectedTaskIds: input.expectedTaskIds, expectedAssetIds: input.expectedAssetIds }
-      : await getTaskDeleteImpact(input.taskId).then((value) => ({
-        expectedTaskIds: value.taskIds,
-        expectedAssetIds: value.assets.map((asset) => asset.id),
-      }));
+    const impact =
+      input.expectedTaskIds && input.expectedAssetIds
+        ? {
+            expectedTaskIds: input.expectedTaskIds,
+            expectedAssetIds: input.expectedAssetIds,
+          }
+        : await getTaskDeleteImpact(input.taskId).then((value) => ({
+            expectedTaskIds: value.taskIds,
+            expectedAssetIds: value.assets.map(
+              (asset: { id: string }) => asset.id,
+            ),
+          }));
     return deleteTask(input.taskId, impact);
   }
-  async rebuildWithLatestGoalAssets(input: { taskId: string; workspaceId?: string }) {
+  async rebuildWithLatestGoalAssets(input: {
+    taskId: string;
+    workspaceId?: string;
+  }) {
     if (input.workspaceId) {
       await ensureTaskInWorkspace(input.taskId, input.workspaceId);
     }

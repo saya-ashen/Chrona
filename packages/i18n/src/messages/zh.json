@@ -1625,6 +1625,9 @@
       "finalizationRunningTitle": "正在准备最终结果",
       "finalizationRunningBadge": "正在编排",
       "finalizationRunningDescription": "Chrona 正在编排并验证最终结果。",
+      "finalizationStalledTitle": "结果编排已中断",
+      "finalizationStalledBadge": "编排已中断",
+      "finalizationStalledDescription": "结果编排未能完成。已生成的文件仍然可用，请重试以继续。",
       "finalizationUnavailableBadge": "仅有文件",
       "finalizationUnavailableDescription": "最终结果不可用。下方仅展示已生成的文件。",
       "stageResultsTitle": "阶段结果",
@@ -1637,6 +1640,10 @@
       "resultsPendingMessage": "运行时开始返回当前步骤的输出后，内容会立即显示在这里。",
       "executionProducingOutputAria": "执行正在产生输出",
       "executionWorkingFallback": "AI 正在处理",
+      "providerWaitingForApproval": "等待审批",
+      "providerRunFailed": "Provider 运行失败",
+      "providerRunCancelled": "运行已取消",
+      "resultOutputLabel": "结果输出",
       "artifactPreview": "预览",
       "artifactHidePreview": "收起预览",
       "resultContentPreview": "内容预览",
@@ -1819,7 +1826,8 @@
           "dirty": "AI 简报可更新",
           "failed": "AI 简报更新失败",
           "unconfigured": "未配置 Dashboard AI 提供方",
-          "regenerate": "重新生成"
+          "regenerate": "重新生成",
+          "updatedAt": "更新于 {time}"
         }
       },
       "feed": {

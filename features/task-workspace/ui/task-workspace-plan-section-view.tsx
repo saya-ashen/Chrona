@@ -6,6 +6,7 @@ import {
 	TaskWorkspaceInspector,
 } from "@features/execution-monitoring/ui";
 import { SpecRenderer } from "@features/task-workspace/public/workspace-integration";
+import { finalizedResultDeliverableCount } from "../model/task-workspace-interaction";
 import { TaskWorkspacePlanContent } from "./task-workspace-plan-content";
 import { TaskWorkspaceOperationPanel } from "./task-workspace-operation-panel";
 import {
@@ -295,41 +296,15 @@ function ResultInspector({ props, runtime }: PlanSectionViewProps) {
 	);
 }
 
-function featuredResultTitles(spec: unknown) {
-	if (!spec || typeof spec !== "object" || Array.isArray(spec))
-		return new Set<string>();
-	const elements = (spec as { elements?: unknown }).elements;
-	if (!elements || typeof elements !== "object" || Array.isArray(elements)) {
-		return new Set<string>();
-	}
-	return new Set(
-		Object.values(elements).flatMap((element) => {
-			if (!element || typeof element !== "object" || Array.isArray(element))
-				return [];
-			const record = element as { type?: unknown; props?: unknown };
-			if (
-				record.type !== "ResultDeliverable" ||
-				!record.props ||
-				typeof record.props !== "object" ||
-				Array.isArray(record.props)
-			)
-				return [];
-			const title = (record.props as { title?: unknown }).title;
-			return typeof title === "string" ? [title] : [];
-		}),
-	);
-}
-
 function ResultArtifactRail({ props, runtime }: PlanSectionViewProps) {
 	const artifactCopy = runtime.copy as Record<string, string | undefined>;
 	const finalizedSpec =
 		props.commandCenter?.documents.output ??
 		props.currentExecution?.planOutput?.finalizedResult?.spec ??
 		null;
-	const featuredTitles = featuredResultTitles(finalizedSpec);
+	if (finalizedResultDeliverableCount(finalizedSpec) > 0) return null;
 	const artifacts = props.pageData.artifacts.filter(
 		(artifact, index, all) =>
-			!featuredTitles.has(artifact.title) &&
 			all.findIndex((item) => item.id === artifact.id) === index,
 	);
 	if (artifacts.length === 0) return null;

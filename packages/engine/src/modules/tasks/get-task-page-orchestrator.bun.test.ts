@@ -876,7 +876,6 @@ describe("getTaskPage orchestrator read model", () => {
 				kind: "provider_run",
 				title: "Assistant output",
 				summary: "Hello ",
-				providerOutput: "Hello ",
 			}),
 		);
 		expect(page.activityTimeline).toContainEqual(
@@ -884,7 +883,6 @@ describe("getTaskPage orchestrator read model", () => {
 				kind: "provider_run",
 				title: "Provider reasoning",
 				summary: "Thinking",
-				providerOutput: "Thinking",
 			}),
 		);
 		expect(page.activityTimeline).toContainEqual(
@@ -901,7 +899,7 @@ describe("getTaskPage orchestrator read model", () => {
 		}
 	});
 
-	it("preserves provider tool input and output with credentials redacted", async () => {
+	it("preserves allowlisted tool details without raw output or credentials", async () => {
 		const { workspace, task } = await seedTask("Tool activity task");
 
 		await db.event.createMany({
@@ -974,7 +972,7 @@ describe("getTaskPage orchestrator read model", () => {
 			expect.objectContaining({
 				kind: "tool_started",
 				tool: expect.objectContaining({
-					name: "Runtime tool",
+					name: "read",
 					state: "started",
 				}),
 			}),
@@ -984,7 +982,7 @@ describe("getTaskPage orchestrator read model", () => {
 				kind: "tool_completed",
 				tone: "success",
 				tool: expect.objectContaining({
-					name: "Runtime tool",
+					name: "read",
 					durationMs: 42,
 					state: "completed",
 				}),
@@ -992,7 +990,7 @@ describe("getTaskPage orchestrator read model", () => {
 		);
 		const returnedActivity = JSON.stringify(page.activityTimeline);
 		expect(returnedActivity).toContain("src/app.ts");
-		expect(returnedActivity).toContain("export const ready = true;");
+		expect(returnedActivity).not.toContain("export const ready = true;");
 		expect(returnedActivity).not.toContain("secret-value");
 		expect(returnedActivity).not.toContain("call-1");
 		expect(returnedActivity).not.toContain("Inspect application source");
@@ -1037,7 +1035,6 @@ describe("getTaskPage orchestrator read model", () => {
 				kind: "provider_run",
 				title: "Assistant output",
 				summary: "Prepare text",
-				providerOutput: "Prepare text",
 			}),
 		);
 	});

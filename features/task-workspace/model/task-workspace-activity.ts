@@ -232,7 +232,6 @@ export function runtimeEventToWorkspaceActivity(
 			description: value.text,
 			tone: "neutral",
 			providerOutput: value.text,
-			providerRaw: value.raw,
 		};
 	}
 
@@ -246,7 +245,6 @@ export function runtimeEventToWorkspaceActivity(
 			summary: "Provider event received.",
 			description: "Provider event received.",
 			tone: "neutral",
-			providerRaw: value.raw,
 		};
 	}
 
@@ -260,7 +258,6 @@ export function runtimeEventToWorkspaceActivity(
 			tone: "info",
 			tool: { name: value.tool.label, label: value.label, state: "started" },
 			providerInput: value.input,
-			providerRaw: value.raw,
 		};
 	}
 
@@ -274,7 +271,6 @@ export function runtimeEventToWorkspaceActivity(
 			tone: "info",
 			tool: { name: value.tool.label, label: value.label, state: "progress" },
 			providerOutput: value.output,
-			providerRaw: value.raw,
 		};
 	}
 
@@ -296,7 +292,6 @@ export function runtimeEventToWorkspaceActivity(
 				state: failed ? "failed" : "completed",
 			},
 			providerOutput: value.output ?? value.error,
-			providerRaw: value.raw,
 		};
 	}
 
@@ -326,7 +321,6 @@ export function runtimeEventToWorkspaceActivity(
 						: "info",
 			providerInput: value.input,
 			providerOutput: value.output ?? value.error,
-			providerRaw: value.raw,
 		};
 	}
 

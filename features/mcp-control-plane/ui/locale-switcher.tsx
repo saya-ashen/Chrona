@@ -7,7 +7,7 @@ import {
 	stripLocalePrefix,
 	useI18n,
 } from "@chrona/i18n";
-import { Button, cn } from "@shared/ui";
+import { Button } from "@shared/ui";
 import { LocalizedLink } from "./localized-link";
 
 export function LocaleSwitcher() {
@@ -30,10 +30,7 @@ export function LocaleSwitcher() {
 						asChild
 						variant={isActive ? "secondary" : "ghost"}
 						size="sm"
-						className={cn(
-							"h-8 px-2 text-xs",
-							!isActive && "hidden sm:inline-flex",
-						)}
+						className="h-8 px-2 text-xs"
 					>
 						<LocalizedLink href={localizeHref(candidate, route)}>
 							<span>{t(`locale.${candidate}`)}</span>

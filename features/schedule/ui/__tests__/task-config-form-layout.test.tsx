@@ -100,12 +100,23 @@ describe("TaskConfigForm – field layout", () => {
     expect(screen.queryByText(/does not update the calendar source/i)).not.toBeInTheDocument();
   });
 
-  it("renders priority and due date in main section (non-compact)", () => {
-    render(<TaskConfigForm {...defaultProps} />);
+  it("renders and restores priority, due date, and execution runtime", () => {
+    const dueAt = new Date(2026, 3, 15, 17, 30);
+    render(
+      <TaskConfigForm
+        {...defaultProps}
+        initialValues={{ dueAt, executionRuntime: "hermes" }}
+      />,
+    );
 
-    // Priority select should be visible
-    const prioritySelect = screen.getByRole("combobox", { name: /priority/i }) || screen.getByDisplayValue("Medium");
-    expect(prioritySelect).toBeInTheDocument();
+    expect(screen.getByRole("combobox", { name: /priority/i })).toBeInTheDocument();
+    expect(screen.getByLabelText("Due date")).toHaveValue("2026-04-15T17:30");
+    expect(screen.getByRole("combobox", { name: "Adapter" })).toHaveTextContent(
+      "Hermes",
+    );
+    expect(document.querySelector('input[name="executionRuntime"]')).toHaveValue(
+      "hermes",
+    );
   });
 
   it("hides advanced fields in non-compact mode", () => {

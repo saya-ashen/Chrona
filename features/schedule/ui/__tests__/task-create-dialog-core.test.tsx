@@ -181,7 +181,36 @@ describe("TaskCreateDialog – Core functionality", () => {
     const user = userEvent.setup();
     const onSubmit = vi.fn().mockResolvedValue(undefined);
     const onClose = vi.fn();
-    render(<TaskCreateDialog {...defaultProps} onSubmit={onSubmit} onClose={onClose} />);
+    render(
+      <TaskCreateDialog
+        {...defaultProps}
+        onSubmit={onSubmit}
+        onClose={onClose}
+        executionRuntimes={[
+          {
+            key: "hermes",
+            label: "Hermes",
+            spec: {
+              runtime: "hermes",
+              version: "hermes-v1",
+              fields: [],
+              runnability: { requiredPaths: [] },
+            },
+          },
+          {
+            key: "local",
+            label: "Local runtime",
+            spec: {
+              runtime: "local",
+              version: "local-v1",
+              fields: [],
+              runnability: { requiredPaths: [] },
+            },
+          },
+        ]}
+        defaultExecutionRuntime="hermes"
+      />,
+    );
 
     const titleInput = screen.getByPlaceholderText("Add title");
     await user.type(titleInput, "My task");
@@ -191,6 +220,11 @@ describe("TaskCreateDialog – Core functionality", () => {
 
     // Click High priority
     await user.click(screen.getByRole("button", { name: "High" }));
+    fireEvent.change(screen.getByLabelText("Due date (optional)"), {
+      target: { value: "2026-04-20T17:30" },
+    });
+    await user.click(screen.getByRole("combobox"));
+    await user.click(screen.getByRole("option", { name: "Local runtime" }));
     await user.click(screen.getByRole("radio", { name: /run on a schedule/i }));
 
     const saveButton = screen.getByText("Save");
@@ -207,7 +241,8 @@ describe("TaskCreateDialog – Core functionality", () => {
     expect(call.priority).toBe("High");
     expect(call.autoExecute).toBe(true);
     expect(call.autoPlanGenerationEnabled).toBe(true);
-    expect(call.dueAt).toBeNull();
+    expect(call.dueAt).toEqual(new Date(2026, 3, 20, 17, 30));
+    expect(call.executionRuntime).toBe("local");
     expect(call.scheduledStartAt).toBeInstanceOf(Date);
     expect(call.scheduledEndAt).toBeInstanceOf(Date);
 

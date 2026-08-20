@@ -125,3 +125,5 @@ progress.txt
 /.pi/hindsight
 /.pi-subagents/
 prisma/*.sync-conflict-*.db*
+/.pi/subagents
+/outputs

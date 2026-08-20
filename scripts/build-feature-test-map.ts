@@ -56,8 +56,11 @@ function exists(rel: string): boolean {
 }
 
 // ---- file enumeration -----------------------------------------------------
-function listTrackedFiles(): string[] {
-  return execSync("git ls-files", { cwd: ROOT, encoding: "utf8" })
+function listRepoFiles(): string[] {
+  return execSync("git ls-files --cached --others --exclude-standard", {
+    cwd: ROOT,
+    encoding: "utf8",
+  })
     .split("\n")
     .filter(Boolean);
 }
@@ -320,11 +323,11 @@ function buildModel(graph: Graph, tests: string[], cov: Coverage): MapModel {
 // ---- main -----------------------------------------------------------------
 function main(): void {
   const check = process.argv.includes("--check");
-  const tracked = listTrackedFiles().filter(
+  const repoFiles = listRepoFiles().filter(
     (f) => isTsFile(f) && !isGenerated(f) && exists(f) && inScope(f),
   );
-  const src = tracked.filter((f) => !isTestFile(f) && !f.startsWith("e2e/"));
-  const tests = tracked.filter((f) => isTestFile(f));
+  const src = repoFiles.filter((f) => !isTestFile(f) && !f.startsWith("e2e/"));
+  const tests = repoFiles.filter((f) => isTestFile(f));
 
   const resolver = new Resolver(loadAliases(), new Set(src));
   const graph = buildSourceGraph(src, resolver);

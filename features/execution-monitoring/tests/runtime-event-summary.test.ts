@@ -17,8 +17,14 @@ describe("summarizeRuntimeEvent", () => {
 				sequence: 7,
 				timestamp: "2026-05-22T00:00:03.000Z",
 				toolName: "chrona_task_read",
+				callId: "call-safe-1",
 				preview: "Read task",
-				input: "task id",
+				input: {
+					taskId: "task-1",
+					apiKey: "sk-secret",
+					path: "README.md",
+					message: '{"apiKey":"sk-live"}',
+				},
 			},
 		} satisfies PlanExecutionRuntimeEvent);
 
@@ -31,15 +37,24 @@ describe("summarizeRuntimeEvent", () => {
 			sequence: 7,
 			event: {
 				type: "tool_started",
-				tool: { category: "tool", label: "Runtime tool" },
-				label: "Runtime tool",
+				tool: { category: "tool", label: "chrona_task_read" },
+				label: "chrona_task_read",
+				callId: expect.any(String),
+				input: {
+					apiKey: "[redacted]",
+					path: "README.md",
+					message: '{"apiKey":"[redacted]"}',
+				},
 			},
 		});
 		expect(JSON.stringify(event)).not.toContain("run-1");
+		expect(JSON.stringify(event)).not.toContain("call-safe-1");
 		expect(JSON.stringify(event)).not.toContain("Read task");
+		expect(JSON.stringify(event)).not.toContain("sk-secret");
+		expect(JSON.stringify(event)).not.toContain("sk-live");
 	});
 
-	it("preserves provider completion output and duration for the live trace", () => {
+	it("preserves completion metadata without raw provider output", () => {
 		const event = summarizeRuntimeEvent("start_manual", {
 			nodeId: "node-a",
 			executionScope: "scope-a",
@@ -51,6 +66,7 @@ describe("summarizeRuntimeEvent", () => {
 				runId: "run-1",
 				sequence: 8,
 				toolName: "read",
+				callId: "call-safe-2",
 				durationMs: 42,
 				raw: { text: "export const secret = true" },
 			},
@@ -58,10 +74,11 @@ describe("summarizeRuntimeEvent", () => {
 
 		expect(event?.event).toMatchObject({
 			type: "tool_completed",
+			callId: expect.any(String),
 			durationMs: 42,
-			raw: { text: "export const secret = true" },
 		});
-		expect(JSON.stringify(event)).toContain("export const secret");
+		expect(JSON.stringify(event)).not.toContain("export const secret");
+		expect(JSON.stringify(event)).not.toContain("call-safe-2");
 	});
 
 	it("preserves provider error details for the live trace", () => {
@@ -76,18 +93,24 @@ describe("summarizeRuntimeEvent", () => {
 				runId: "run-1",
 				sequence: 9,
 				toolName: "read",
-				error: { message: "credential leaked", code: "permission_denied" },
+				error: {
+					message: "Authorization: Bearer top-secret",
+					code: "permission_denied",
+				},
 			},
 		} satisfies PlanExecutionRuntimeEvent);
 
 		expect(event?.event).toMatchObject({
 			type: "tool_completed",
-			error: { code: "permission_denied", message: "credential leaked" },
+			error: {
+				code: "permission_denied",
+				message: "Authorization: Bearer [redacted]",
+			},
 		});
-		expect(JSON.stringify(event)).toContain("credential leaked");
+		expect(JSON.stringify(event)).not.toContain("top-secret");
 	});
 
-	it("projects the actual provider request and response payloads", () => {
+	it("projects lifecycle status without provider request or structured response payloads", () => {
 		const request = summarizeRuntimeEvent("start_manual", {
 			nodeId: "node-a",
 			executionScope: "scope-a",
@@ -126,25 +149,19 @@ describe("summarizeRuntimeEvent", () => {
 			},
 		} satisfies PlanExecutionRuntimeEvent);
 
-		expect(request?.event).toMatchObject({
+		expect(request?.event).toEqual({
 			type: "run_status",
 			status: "started",
-			input: {
-				instructions: "Inspect the repository",
-				input: { target: "src" },
-			},
 		});
 		expect(response?.event).toMatchObject({
 			type: "run_status",
 			status: "completed",
-			output: {
-				text: "Repository inspected",
-				structuredPayload: { files: 12 },
-			},
+			output: { text: "Repository inspected" },
 		});
+		expect(JSON.stringify(response)).not.toContain("files");
 	});
 
-	it("preserves text, reasoning, and raw provider events", () => {
+	it("preserves text and reasoning while dropping raw provider events", () => {
 		const runtimeBase = {
 			nodeId: "node-a",
 			executionScope: "scope-a",
@@ -179,7 +196,6 @@ describe("summarizeRuntimeEvent", () => {
 		expect(reasoning?.event).toEqual({
 			type: "reasoning_delta",
 			text: "inspect the repository",
-			raw: { channel: "analysis" },
 		});
 
 		const raw = summarizeRuntimeEvent("start_manual", {
@@ -195,7 +211,6 @@ describe("summarizeRuntimeEvent", () => {
 		expect(raw?.event).toEqual({
 			type: "raw_event",
 			rawEventType: "turn.started",
-			raw: { phase: "analysis" },
 		});
 	});
 });

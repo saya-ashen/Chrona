@@ -8,6 +8,7 @@ import type {
   DebugProviderProfile,
   HermesClientScope,
   HermesIntegrationResult,
+  OmpApiType,
   RuntimeProviderInput,
   RuntimeProviderOption,
   TestResult,
@@ -18,6 +19,12 @@ export const DEFAULT_PROVIDER_RUN_TIMEOUT_MS = 60 * 60 * 1000;
 export const LOCAL_HERMES_BASE_URL = "http://127.0.0.1:8642";
 
 const DEBUG_PROVIDER_PROFILES = ["deterministic", "tool-submit", "hermes-like"] as const;
+const OMP_API_TYPES: OmpApiType[] = [
+  "openai-responses",
+  "openai-completions",
+  "anthropic-messages",
+  "openrouter",
+];
 const PROVIDER_SORT_RANK: Record<string, number> = {
   claude_code: 0,
   codex: 1,
@@ -73,7 +80,8 @@ function buildCodexConfig(input: ClientFormValues): Record<string, unknown> {
 
 function buildOmpConfig(input: ClientFormValues): Record<string, unknown> {
   return {
-    model: nonEmpty(input.model), apiKey: nonEmpty(input.apiKey), baseUrl: nonEmpty(input.baseUrl),
+    provider: nonEmpty(input.provider), model: nonEmpty(input.model), api: input.api,
+    apiKey: nonEmpty(input.apiKey), baseUrl: nonEmpty(input.baseUrl),
     homeDirectory: nonEmpty(input.homeDirectory), configDirectory: nonEmpty(input.configDirectory),
     codingAgentDirectory: nonEmpty(input.codingAgentDirectory), timeoutMs: timeoutMs(input.timeoutSeconds),
   };
@@ -168,7 +176,9 @@ type StoredClientConfig = {
   timeoutMs?: number;
   baseUrl?: string;
   apiKey?: string;
+  provider?: string;
   model?: string;
+  api?: string;
   configDirectory?: string;
   homeDirectory?: string;
   codingAgentDirectory?: string;
@@ -189,12 +199,18 @@ function initialClientType(initial: AiClientInfo | undefined, providers: Runtime
   return initial && providers.some((provider) => provider.key === initial.type) ? initial.type : fallback;
 }
 
+function normalizeOmpApi(input: unknown): OmpApiType {
+  return OMP_API_TYPES.includes(input as OmpApiType) ? input as OmpApiType : "openai-responses";
+}
+
 function defaultFormConfig(config: StoredClientConfig): Omit<ClientFormValues, "name" | "type" | "isDefault" | "bindings"> {
   return {
     timeoutSeconds: String(config.timeoutSeconds ?? (config.timeoutMs ?? DEFAULT_PROVIDER_RUN_TIMEOUT_MS) / 1000),
     baseUrl: configValue(config, "baseUrl", ["ANTHROPIC_BASE_URL"]),
     apiKey: configValue(config, "apiKey", ["ANTHROPIC_AUTH_TOKEN"]),
+    provider: configValue(config, "provider"),
     model: configValue(config, "model", ["ANTHROPIC_MODEL"]),
+    api: normalizeOmpApi(config.api),
     configDirectory: configValue(config, "configDirectory", ["CLAUDE_CONFIG_DIR", "CODEX_HOME", "PI_CONFIG_DIR"]),
     homeDirectory: configValue(config, "homeDirectory", ["HOME"]),
     codingAgentDirectory: configValue(config, "codingAgentDirectory", ["PI_CODING_AGENT_DIR"]),

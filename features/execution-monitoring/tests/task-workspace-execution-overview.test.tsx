@@ -56,9 +56,7 @@ function renderOverview(
 		/>,
 		{
 			wrapper: ({ children }: { children: React.ReactNode }) => (
-				<QueryClientProvider client={queryClient}>
-					{children}
-				</QueryClientProvider>
+				<QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
 			),
 		},
 	);
@@ -228,9 +226,53 @@ describe("TaskWorkspaceExecutionOverview", () => {
 		expect(
 			screen.queryByText("Validated output from task execution."),
 		).not.toBeInTheDocument();
-		await user.click(
-			screen.getByRole("button", { name: "Retry finalization" }),
+		await user.click(screen.getByRole("button", { name: "Retry finalization" }));
+		expect(retry).toHaveBeenCalledOnce();
+	});
+
+	it("offers recovery when result finalization stops making progress", async () => {
+		const user = userEvent.setup();
+		const retry = vi.fn();
+		const view = createTaskWorkspaceExecutionConsoleView(
+			executionMonitoringWorkspaceFixtures.artifactPresent,
 		);
+
+		renderOverview(view, {
+			currentExecution: {
+				status: "completed",
+				planOutput: {
+					manifest: {
+						schemaVersion: 1,
+						sourceRevision: 3,
+						outcome: { title: "", summary: "" },
+						readiness: { status: "ready", summary: "" },
+						deliverables: [],
+						findings: [],
+						decisions: [],
+						caveats: [],
+						nextActions: [],
+						evidence: [],
+					},
+					finalizedResult: null,
+					revision: 3,
+					updatedAt: null,
+					updatedByNodeId: null,
+					finalization: {
+						status: "Running",
+						sourceRevision: 3,
+						attempt: 1,
+						startedAt: "2020-01-01T00:00:00.000Z",
+					},
+				},
+			},
+			onRetryFinalization: retry,
+		});
+
+		expect(
+			screen.getByRole("heading", { name: "Finalization interrupted" }),
+		).toBeInTheDocument();
+		expect(screen.getAllByText("Finalization interrupted")).not.toHaveLength(0);
+		await user.click(screen.getByRole("button", { name: "Retry finalization" }));
 		expect(retry).toHaveBeenCalledOnce();
 	});
 
@@ -276,9 +318,9 @@ describe("TaskWorkspaceExecutionOverview", () => {
 			},
 		});
 
-		expect(
-			screen.getAllByLabelText("Execution overview").length,
-		).toBeGreaterThan(0);
+		expect(screen.getAllByLabelText("Execution overview").length).toBeGreaterThan(
+			0,
+		);
 		expect(screen.queryByRole("tab", { name: "Now" })).not.toBeInTheDocument();
 		expect(
 			screen.queryByRole("tab", { name: "Results" }),
@@ -305,7 +347,7 @@ describe("TaskWorkspaceExecutionOverview", () => {
 		).not.toBeInTheDocument();
 	});
 
-	it("shows backend provider input and output in the running result surface", () => {
+	it("shows allowlisted tool details in the running result surface", () => {
 		const view = createTaskWorkspaceExecutionConsoleView(
 			executionMonitoringWorkspaceFixtures.running,
 		);
@@ -340,7 +382,7 @@ describe("TaskWorkspaceExecutionOverview", () => {
 						type: "tool_completed",
 						tool: { category: "tool", label: "Runtime tool" },
 						label: "Read source",
-						output: { lines: 42, status: "ok" },
+						output: { status: "ok" },
 					},
 				},
 			],
@@ -352,10 +394,10 @@ describe("TaskWorkspaceExecutionOverview", () => {
 		const trace = within(results).getByRole("region", {
 			name: "Live execution activity",
 		});
-		expect(trace).not.toHaveTextContent("Input");
+		expect(trace).toHaveTextContent("Input");
 		expect(trace).toHaveTextContent("src/app.ts");
-		expect(trace).not.toHaveTextContent("Result");
-		expect(trace).toHaveTextContent('"lines": 42');
+		expect(trace).toHaveTextContent("Result");
+		expect(trace).toHaveTextContent('"status": "ok"');
 		expect(
 			screen.queryByTestId("execution-result-output"),
 		).not.toBeInTheDocument();
@@ -364,7 +406,7 @@ describe("TaskWorkspaceExecutionOverview", () => {
 		).not.toBeInTheDocument();
 	});
 
-	it("shows streamed assistant tokens and provider reasoning in the results trace", () => {
+	it("[RUN-021] merges streamed assistant deltas in the results trace", () => {
 		const view = createTaskWorkspaceExecutionConsoleView(
 			executionMonitoringWorkspaceFixtures.running,
 		);
@@ -379,7 +421,10 @@ describe("TaskWorkspaceExecutionOverview", () => {
 					runtime: { category: "runtime", label: "Execution runtime" },
 					provider: { category: "ai_provider", label: "AI provider" },
 					sequence: 1,
-					event: { type: "text_delta", text: "first token" },
+					event: {
+						type: "reasoning_delta",
+						text: "inspect tool result",
+					},
 				},
 				{
 					type: "runtime_event",
@@ -390,11 +435,18 @@ describe("TaskWorkspaceExecutionOverview", () => {
 					runtime: { category: "runtime", label: "Execution runtime" },
 					provider: { category: "ai_provider", label: "AI provider" },
 					sequence: 2,
-					event: {
-						type: "reasoning_delta",
-						text: "inspect tool result",
-						raw: { source: "provider" },
-					},
+					event: { type: "text_delta", text: "Hello " },
+				},
+				{
+					type: "runtime_event",
+					action: "start_manual",
+					executionScope: "scope-1",
+					nodeId: "execute",
+					nodeTitle: "Inspect repository",
+					runtime: { category: "runtime", label: "Execution runtime" },
+					provider: { category: "ai_provider", label: "AI provider" },
+					sequence: 3,
+					event: { type: "text_delta", text: "world" },
 				},
 			] satisfies WorkspaceRuntimeEvent[],
 			currentExecution: { status: "running" },
@@ -404,12 +456,15 @@ describe("TaskWorkspaceExecutionOverview", () => {
 		const trace = screen.getByRole("region", {
 			name: "Live execution activity",
 		});
-		expect(trace).toHaveTextContent("first token");
+		expect(trace).toHaveTextContent("Hello world");
 		expect(trace).toHaveTextContent(/Analyzing context|Thinking/);
-		expect(trace).not.toHaveTextContent("inspect tool result");
+		const reasoning = within(trace)
+			.getByText("inspect tool result")
+			.closest("li");
+		expect(reasoning).toHaveAttribute("data-reasoning-state", "complete");
 		expect(trace).not.toHaveTextContent("Assistant");
 	});
-	it("shows safe tool lifecycle status in live activity", () => {
+	it("shows exact tool names and sanitized parameters in live activity", () => {
 		const view = createTaskWorkspaceExecutionConsoleView(
 			executionMonitoringWorkspaceFixtures.approvalNeeded,
 		);
@@ -425,8 +480,9 @@ describe("TaskWorkspaceExecutionOverview", () => {
 					timestamp: "2026-05-12T10:00:00.000Z",
 					event: {
 						type: "tool_started",
-						tool: { category: "tool", label: "Runtime tool" },
-						label: "Read",
+						tool: { category: "tool", label: "eval" },
+						label: "eval",
+						input: { language: "javascript", code: "console.log(1)" },
 					},
 				},
 				{
@@ -439,8 +495,8 @@ describe("TaskWorkspaceExecutionOverview", () => {
 					timestamp: "2026-05-12T10:00:02.000Z",
 					event: {
 						type: "tool_completed",
-						tool: { category: "tool", label: "Runtime tool" },
-						label: "Read",
+						tool: { category: "tool", label: "eval" },
+						label: "eval",
 						durationMs: 42,
 					},
 				},
@@ -449,7 +505,13 @@ describe("TaskWorkspaceExecutionOverview", () => {
 			isExecutionRunning: true,
 		});
 
-		expect(screen.getAllByText("Read").length).toBeGreaterThan(0);
+		expect(screen.getAllByText("eval").length).toBeGreaterThan(0);
+		expect(
+			screen.getAllByText(/"language": "javascript"/).length,
+		).toBeGreaterThan(0);
+		expect(
+			screen.getAllByText(/"code": "console.log\(1\)"/).length,
+		).toBeGreaterThan(0);
 		expect(screen.queryByText("src/app.ts")).not.toBeInTheDocument();
 		expect(
 			screen.queryByText("Inspect application source"),
@@ -554,9 +616,9 @@ describe("TaskWorkspaceExecutionOverview", () => {
 			screen.queryByRole("tab", { name: "Activity" }),
 		).not.toBeInTheDocument();
 		await openAgentTranscript();
-		expect(
-			screen.getAllByText("Plan generation update").length,
-		).toBeGreaterThan(0);
+		expect(screen.getAllByText("Plan generation update").length).toBeGreaterThan(
+			0,
+		);
 		expect(
 			screen.getAllByText("Requesting AI provider...").length,
 		).toBeGreaterThan(0);
@@ -693,9 +755,7 @@ describe("TaskWorkspaceExecutionOverview", () => {
 			isExecutionRunning: true,
 		});
 
-		expect(screen.getAllByText("Review architecture").length).toBeGreaterThan(
-			0,
-		);
+		expect(screen.getAllByText("Review architecture").length).toBeGreaterThan(0);
 		const liveFeed = screen.getByTestId("live-execution-feed");
 		const executionEvents = within(liveFeed).getByLabelText("Execution events");
 		expect(executionEvents).toHaveAttribute(
@@ -713,9 +773,69 @@ describe("TaskWorkspaceExecutionOverview", () => {
 		expect(
 			screen.getByRole("region", { name: "Agent transcript" }),
 		).toBeInTheDocument();
-		expect(screen.getAllByText("Review architecture").length).toBeGreaterThan(
-			1,
+		expect(screen.getAllByText("Review architecture").length).toBeGreaterThan(1);
+	});
+
+	it("merges duplicate provider completion events by call ID", async () => {
+		const view = createTaskWorkspaceExecutionConsoleView(
+			executionMonitoringWorkspaceFixtures.running,
 		);
+		const eventBase = {
+			type: "runtime_event" as const,
+			action: "start_manual" as const,
+			executionScope: "scope-1",
+			nodeId: "execute",
+			nodeTitle: "Review architecture",
+			runtime: { category: "runtime" as const, label: "Execution runtime" },
+			provider: { category: "ai_provider" as const, label: "AI provider" },
+		};
+		renderOverview(view, {
+			runtimeEvents: [
+				{
+					...eventBase,
+					sequence: 1,
+					timestamp: "2026-05-12T10:01:00.000Z",
+					event: {
+						type: "tool_started",
+						tool: { category: "tool", label: "read" },
+						label: "read",
+						callId: "call-1",
+						input: { path: "README.md" },
+					},
+				},
+				{
+					...eventBase,
+					sequence: 2,
+					timestamp: "2026-05-12T10:01:01.000Z",
+					event: {
+						type: "tool_completed",
+						tool: { category: "tool", label: "read" },
+						label: "read",
+						callId: "call-1",
+						error: { message: "Read failed" },
+					},
+				},
+				{
+					...eventBase,
+					sequence: 3,
+					timestamp: "2026-05-12T10:01:01.001Z",
+					event: {
+						type: "tool_completed",
+						tool: { category: "tool", label: "read" },
+						label: "read",
+						callId: "call-1",
+						output: { message: "Read failed" },
+					},
+				},
+			],
+			currentExecution: { status: "running" },
+			isExecutionRunning: true,
+		});
+
+		const transcript = await openAgentTranscript();
+		expect(within(transcript).getAllByText("read")).toHaveLength(2);
+		expect(within(transcript).getAllByText("failed")).toHaveLength(1);
+		expect(within(transcript).getAllByText(/Read failed/).length).toBeGreaterThan(0);
 	});
 
 	it("pauses live-feed auto-follow while the user reads older events", async () => {
@@ -1014,9 +1134,9 @@ describe("TaskWorkspaceExecutionOverview", () => {
 		).not.toBeInTheDocument();
 		await openAgentTranscript();
 
-		expect(
-			screen.getAllByText("Plan generation update").length,
-		).toBeGreaterThan(0);
+		expect(screen.getAllByText("Plan generation update").length).toBeGreaterThan(
+			0,
+		);
 		expect(
 			screen.getAllByText("Requesting AI provider...").length,
 		).toBeGreaterThan(0);
@@ -1283,9 +1403,7 @@ describe("TaskWorkspaceExecutionOverview", () => {
 			nodeTitle: "Alpha node",
 			defaultCollapsed: false,
 		});
-		expect(outputSpec.elements[sections[0]]?.children).toEqual([
-			"output:alpha",
-		]);
+		expect(outputSpec.elements[sections[0]]?.children).toEqual(["output:alpha"]);
 		expect(outputSpec.elements[sections[1]]?.props).toMatchObject({
 			nodeId: "node-b",
 			nodeTitle: "Beta node",
@@ -1436,14 +1554,10 @@ describe("TaskWorkspaceExecutionOverview", () => {
 				.getByRole("button", { name: /Secondary evidence/ })
 				.closest("section"),
 		).toHaveClass("w-full");
-		expect(
-			container.querySelector('[data-slot="card"]'),
-		).not.toBeInTheDocument();
+		expect(container.querySelector('[data-slot="card"]')).not.toBeInTheDocument();
 		expect(screen.getByText("Visible details")).toBeInTheDocument();
 
-		await user.click(
-			screen.getByRole("button", { name: /Secondary evidence/ }),
-		);
+		await user.click(screen.getByRole("button", { name: /Secondary evidence/ }));
 
 		expect(screen.getByText("Evidence details")).toBeInTheDocument();
 
@@ -1520,9 +1634,7 @@ describe("TaskWorkspaceExecutionOverview", () => {
 		).toHaveAttribute("aria-expanded", "true");
 		expect(screen.getByText("Remembered body")).toBeInTheDocument();
 
-		await user.click(
-			screen.getByRole("button", { name: /Persistent details/ }),
-		);
+		await user.click(screen.getByRole("button", { name: /Persistent details/ }));
 		expect(
 			screen.getByRole("button", { name: /Persistent details/ }),
 		).toHaveAttribute("aria-expanded", "false");
@@ -1765,8 +1877,7 @@ describe("TaskWorkspaceExecutionOverview", () => {
 			runtimeEvents: [],
 			copy: {
 				activityTitle: "Execution activity",
-				activityEmpty:
-					"Activity will appear after planning or execution starts.",
+				activityEmpty: "Activity will appear after planning or execution starts.",
 			},
 			toolLabels: {
 				tool: "Tool",

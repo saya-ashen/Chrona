@@ -2,14 +2,17 @@ import { describe, expect, it } from "bun:test";
 import { mkdir, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { getChronaGeneratedFilesDir } from "@chrona/shared/data-paths";
-import { TaskStatus } from "@/generated/prisma/client";
+import { RunStatus, TaskStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { getPlanRun } from "@/modules/plan-execution/persistence/plan-run-store";
 import type { CompiledPlan, ConditionConfig, TaskConfig } from "@chrona/contracts/ai";
 import { resolveEffectivePlanGraph } from "@chrona/graph-runtime";
 import type { NodeExecutionResult } from "./node-executors/types";
 import { buildSemanticRefHistory } from "./runtime/node-runtime-refs";
-import { recoverRecordedTerminalActions } from "./use-cases/recover-recorded-terminal-actions";
+import {
+  recoverRecordedTerminalActions,
+  terminalRunStatusForAttempt,
+} from "./use-cases/recover-recorded-terminal-actions";
 import {
   executeTaskNodeCapabilityMock,
   evaluateConditionNodeCapabilityMock,
@@ -24,6 +27,15 @@ import {
 
 describe("plan-runner task executor external results", () => {
   setupPlanRunnerTaskExecutorTest();
+
+  it.each([
+    ["succeeded", RunStatus.Completed],
+    ["failed", RunStatus.Failed],
+    ["cancelled", RunStatus.Cancelled],
+    ["running", null],
+  ] as const)("maps recovered attempt status %s to canonical Run status", (status, expected) => {
+    expect(terminalRunStatusForAttempt(status)).toBe(expected);
+  });
 
   it("does not let a provider started result overwrite an external node result", async () => {
     executeTaskNodeCapabilityMock.mockImplementationOnce(async (input) => {
@@ -1009,7 +1021,7 @@ describe("plan-runner task executor external results", () => {
     expect(updatedTask.status).toBe(TaskStatus.Completed);
     expect(updatedTask.blockReason).toBeNull();
   });
-  it("replays a recorded terminal action after process loss and completes the task exactly once", async () => {
+  it("recovers the exact terminal attempt without overwriting a newer Run projection", async () => {
     executeTaskNodeCapabilityMock.mockResolvedValueOnce({
       status: "started",
       summary: "Provider run remains active until its terminal action is committed",
@@ -1081,13 +1093,29 @@ describe("plan-runner task executor external results", () => {
         payload: { summary: "Recovered durable completion" },
       },
     });
+    const newerRun = await db.run.create({
+      data: {
+        taskId: task.id,
+        taskSessionId: mainSession.id,
+        runtimeName: "hermes",
+        status: "Failed",
+        startedAt: new Date(),
+        endedAt: new Date(),
+        triggeredBy: "system",
+        syncStatus: "healthy",
+      },
+    });
+    await db.task.update({
+      where: { id: task.id },
+      data: { latestRunId: newerRun.id },
+    });
 
     const first = await recoverRecordedTerminalActions({ taskId: task.id });
     const second = await recoverRecordedTerminalActions({ taskId: task.id });
 
     expect(first).toEqual({ checked: 1, recovered: 1, skipped: 0, failed: 0 });
     expect(second).toEqual({ checked: 0, recovered: 0, skipped: 0, failed: 0 });
-    expect((await db.task.findUniqueOrThrow({ where: { id: task.id } })).status).toBe("Completed");
+    expect((await db.task.findUniqueOrThrow({ where: { id: task.id } })).status).toBe("Blocked");
     expect((await db.executionSession.findFirstOrThrow({ where: { taskId: task.id } })).status).toBe("Completed");
     expect((await db.run.findUniqueOrThrow({ where: { id: run.id } })).status).toBe("Completed");
     expect((await db.taskPlanNodeAttempt.findUniqueOrThrow({ where: { id: attempt.id } })).status).toBe("succeeded");

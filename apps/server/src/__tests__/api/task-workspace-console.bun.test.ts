@@ -1,3 +1,6 @@
+import { mkdtemp, rm, symlink, truncate } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { beforeEach, describe, expect, it } from "bun:test";
 import {
 	ApprovalStatus,
@@ -486,7 +489,7 @@ describe("task workspace console read data", () => {
 				runtimeName: "Execution runtime",
 				executionScope: "scope-console",
 				tool: expect.objectContaining({
-					name: "Runtime tool",
+					name: "chrona_plan_read",
 					state: "started",
 				}),
 			}),
@@ -496,7 +499,6 @@ describe("task workspace console read data", () => {
 				kind: "provider_run",
 				title: "Assistant output",
 				summary: "world",
-				providerOutput: "world",
 			}),
 		);
 		expect(page.activityTimeline).toContainEqual(
@@ -504,10 +506,10 @@ describe("task workspace console read data", () => {
 				kind: "provider_run",
 				title: "Provider reasoning",
 				summary: "Thinking",
-				providerOutput: "Thinking",
 			}),
 		);
 		const returnedActivity = JSON.stringify(page.activityTimeline);
+		expect(returnedActivity).not.toContain("providerOutput");
 		for (const sensitiveValue of ["Make a plan", "Requesting AI provider..."]) {
 			expect(returnedActivity).not.toContain(sensitiveValue);
 		}
@@ -525,8 +527,7 @@ describe("task workspace console read data", () => {
 				kind: "schedule",
 				title: "Schedule changed",
 				summary: "2026-05-13T09:00:00.000Z · 2026-05-13T10:00:00.000Z · manual",
-				description:
-					"2026-05-13T09:00:00.000Z · 2026-05-13T10:00:00.000Z · manual",
+				description: "2026-05-13T09:00:00.000Z · 2026-05-13T10:00:00.000Z · manual",
 				tone: "info",
 			}),
 		);
@@ -559,9 +560,7 @@ describe("task workspace console read data", () => {
 			title: "Header doc task",
 		});
 
-		const response = await app().request(
-			`/api/tasks/${taskId}/workspace/header`,
-		);
+		const response = await app().request(`/api/tasks/${taskId}/workspace/header`);
 		expect(response.status).toBe(200);
 
 		const body = await json<Record<string, unknown>>(response);
@@ -580,13 +579,70 @@ describe("task workspace console read data", () => {
 		expect(response.status).toBe(404);
 	});
 
+	it("rejects direct absolute paths on the result-file download route", async () => {
+		const { workspaceId } = await seedWorkspace("Result File Download");
+		const { taskId } = await seedTask(workspaceId, {
+			title: "Reject unsafe download",
+		});
+		const query = new URLSearchParams({ path: "/etc/passwd" });
+
+		const response = await app().request(
+			`/api/tasks/${taskId}/result-files/download?${query.toString()}`,
+		);
+
+		expect(response.status).toBe(400);
+		expect(await response.json()).toEqual({
+			error: "Only generated task result files can be downloaded directly",
+		});
+	});
+
+	it("rejects unsafe local result files without reading their contents", async () => {
+		const { workspaceId } = await seedWorkspace("Result File Access");
+		const { taskId } = await seedTask(workspaceId, {
+			title: "Reject unsafe local files",
+		});
+		const dir = await mkdtemp(join(tmpdir(), "chrona-result-route-"));
+		const outsidePath = join(tmpdir(), `chrona-result-canary-${taskId}.txt`);
+		const symlinkPath = join(dir, "escape.txt");
+		const oversizedPath = join(dir, "oversized.txt");
+		await Bun.write(outsidePath, "RESULT_FILE_CONTENT_CANARY");
+		await symlink(outsidePath, symlinkPath);
+		await Bun.write(oversizedPath, "RESULT_FILE_CONTENT_CANARY");
+		await truncate(oversizedPath, 64 * 1024 * 1024 + 1);
+
+		try {
+			for (const [path, error] of [
+				[dir, "Only regular files can be opened from task results"],
+				[symlinkPath, "Symbolic links cannot be opened from task results"],
+				["/dev/null", "This sensitive path cannot be opened from task results"],
+				[oversizedPath, "File exceeds the maximum allowed result size"],
+			] as const) {
+				const response = await app().request(
+					`/api/tasks/${taskId}/result-files/access-requests`,
+					{
+						method: "POST",
+						headers: { "content-type": "application/json" },
+						body: JSON.stringify({ path }),
+					},
+				);
+				const body = await json<{ error: string }>(response);
+
+				expect(response.status).toBe(400);
+				expect(body).toEqual({ error });
+				expect(JSON.stringify(body)).not.toContain(path);
+				expect(JSON.stringify(body)).not.toContain("RESULT_FILE_CONTENT_CANARY");
+			}
+		} finally {
+			await rm(dir, { recursive: true, force: true });
+			await rm(outsidePath, { force: true });
+		}
+	});
+
 	it("scopes the header spec to the requested work block", async () => {
 		const { workspaceId } = await seedWorkspace("Workspace Header Scoped");
 		const { taskId } = await seedTask(workspaceId, { title: "Scoped header" });
 
-		const unscoped = await app().request(
-			`/api/tasks/${taskId}/workspace/header`,
-		);
+		const unscoped = await app().request(`/api/tasks/${taskId}/workspace/header`);
 		const scoped = await app().request(
 			`/api/tasks/${taskId}/workspace/header?workBlockId=missing`,
 		);

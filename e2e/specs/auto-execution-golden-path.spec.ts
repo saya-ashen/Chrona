@@ -144,9 +144,7 @@ async function getWorkBlockId(
 	await expect
 		.poll(
 			async () => {
-				const res = await request.get(
-					`/api/schedule?workspaceId=${workspaceId}`,
-				);
+				const res = await request.get(`/api/schedule?workspaceId=${workspaceId}`);
 				if (!res.ok()) return null;
 				const body = (await res.json()) as ScheduleBody;
 				const item = (body.scheduled ?? []).find((s) => s.taskId === taskId);
@@ -259,9 +257,7 @@ async function tickUntil(
 	}
 	// one final check
 	if (await predicate()) return maxTicks;
-	const suffix = describeLastState
-		? `; last state: ${describeLastState()}`
-		: "";
+	const suffix = describeLastState ? `; last state: ${describeLastState()}` : "";
 	throw new Error(
 		`tickUntil: predicate did not pass after ${maxTicks} ticks${suffix}`,
 	);
@@ -377,15 +373,16 @@ async function resolveExecutionGates(
 // ─── tests ────────────────────────────────────────────────────────────────────
 
 test.describe("Auto-execution golden path (§1.3)", () => {
-	test("positive: autoExecute+autoPlanGeneration drives task to Completed via deterministic gates", async ({
+	test("[AUTO-001/AUTO-006] auto execution completes and stays visible across projections", async ({
 		page,
 		request,
 	}) => {
 		// Plan gen takes ~18 ticks async; gate resolution adds more wall-clock time.
 		test.setTimeout(180_000);
 		// ── 1. Create task ──────────────────────────────────────────────────────
+		const taskTitle = `Auto-Exec Golden Path ${Date.now()}`;
 		const task = await createTaskWorkspaceTask(request, {
-			title: `Auto-Exec Golden Path ${Date.now()}`,
+			title: taskTitle,
 			description:
 				"Drive auto-plan-gen + auto-start + debug gate resolution to Completed.",
 		});
@@ -442,11 +439,7 @@ test.describe("Auto-execution golden path (§1.3)", () => {
 					})
 					.not.toBeNull();
 
-				const scheduleItem = await getScheduleItem(
-					request,
-					workspaceId,
-					taskId,
-				);
+				const scheduleItem = await getScheduleItem(request, workspaceId, taskId);
 				expect(scheduleItem).toMatchObject({
 					taskId,
 					workBlockId,
@@ -490,6 +483,24 @@ test.describe("Auto-execution golden path (§1.3)", () => {
 						.locator('[data-slot="badge"]')
 						.filter({ hasText: /^Execution complete, awaiting review$/i }),
 				).toBeVisible({ timeout: 15_000 });
+			});
+
+			await test.step("[AUTO-006] completed task stays visible across projections", async () => {
+				await page.goto("/en");
+				await expect(
+					page.getByText(taskTitle, { exact: true }).first(),
+				).toBeVisible();
+
+				await page.goto("/en/tasks");
+				await page.getByRole("button", { name: "Results" }).click();
+				await expect(
+					page.getByRole("heading", { name: taskTitle, exact: true }),
+				).toBeVisible();
+
+				await page.goto("/en/schedule");
+				await expect(
+					page.getByText(taskTitle, { exact: true }).first(),
+				).toBeVisible();
 			});
 		} finally {
 			await provider.stop();

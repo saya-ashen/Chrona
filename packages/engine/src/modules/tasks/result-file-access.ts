@@ -6,6 +6,7 @@ import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
 
 const GRANT_TTL_MS = 5 * 60 * 1000;
 const MAX_GRANTS = 256;
+export const MAX_RESULT_FILE_BYTES = 64 * 1024 * 1024;
 const DENIED_ROOTS = ["/proc", "/sys", "/dev"] as const;
 const DENIED_SEGMENT_PATTERN =
   /(^\.env(?:\..*)?$|secret|secrets|token|tokens|credential|credentials|keychain|\.ssh|\.gnupg)/i;
@@ -99,6 +100,12 @@ async function canonicalFile(requestedPath: string) {
     );
   }
   const stat = await lstat(canonicalPath, { bigint: true });
+  if (stat.size > BigInt(MAX_RESULT_FILE_BYTES)) {
+    throw new EngineError(
+      ENGINE_ERROR_CODES.VALIDATION_FAILED,
+      "File exceeds the maximum allowed result size",
+    );
+  }
   return { canonicalPath, stat };
 }
 

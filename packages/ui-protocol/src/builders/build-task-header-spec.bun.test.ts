@@ -41,6 +41,28 @@ describe("buildTaskHeaderSpec", () => {
     });
   });
 
+  it("renders plan generation error title and reason from live state", () => {
+    const spec = buildTaskHeaderSpec({
+      title: "Launch task",
+      status: "blocked",
+      statusLabel: "Blocked",
+      progressLabel: "No plan",
+      actions: [{ id: "generate-plan", label: "Generate plan" }],
+    });
+
+    expect(spec.elements["error-alert"]).toMatchObject({
+      type: "Alert",
+      props: {
+        title: { $state: "/plan/generation/error/title" },
+        message: { $state: "/plan/generation/error/message" },
+        type: "error",
+      },
+    });
+    expect(spec.elements["error-region"]?.visible).toEqual({
+      $state: "/plan/generation/error/code",
+    });
+  });
+
   it("places plan generation stop action in header actions", () => {
     const spec = buildTaskHeaderSpec({
       title: "Launch task",

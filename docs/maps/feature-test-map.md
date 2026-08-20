@@ -16,28 +16,28 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 
 | Metric | Value |
 | --- | --- |
-| Source files | 564 |
-| Test files | 272 |
-| Directly covered files | 204 (36%) |
-| Transitively covered files | 496 (88%) |
+| Source files | 566 |
+| Test files | 283 |
+| Directly covered files | 213 (38%) |
+| Transitively covered files | 498 (88%) |
 | Uncovered files (no test reaches) | 68 (12%) |
-| Exported symbols | 1527 |
-| Symbols referenced by a direct test | 348 (23%) |
+| Exported symbols | 1544 |
+| Symbols referenced by a direct test | 363 (24%) |
 
 ## Workflow coverage summary
 
 | Workflow | Files | Direct | Transitive | Uncovered |
 | --- | --- | --- | --- | --- |
-| Task workspace plan execution (workspace UI / graph / runner controls) | 103 | 47 (46%) | 100 (97%) | 3 |
+| Task workspace plan execution (workspace UI / graph / runner controls) | 103 | 50 (49%) | 100 (97%) | 3 |
 | Task management (create/edit/complete/relate) | 43 | 24 (56%) | 43 (100%) | 0 |
-| Plan generation (AI draft / review / accept / materialize) | 51 | 15 (29%) | 47 (92%) | 4 |
+| Plan generation (AI draft / review / accept / materialize) | 51 | 16 (31%) | 47 (92%) | 4 |
 | Plan execution (task/checkpoint/condition/wait nodes) | 51 | 6 (12%) | 50 (98%) | 1 |
-| Schedule cockpit (time blocks / conflicts / proposals / auto-start) | 20 | 15 (75%) | 20 (100%) | 0 |
+| Schedule cockpit (time blocks / conflicts / proposals / auto-start) | 20 | 14 (70%) | 20 (100%) | 0 |
 | External calendar (sources / import / sync) | 10 | 3 (30%) | 7 (70%) | 3 |
 | Providers / runtime boundary | 40 | 20 (50%) | 39 (98%) | 1 |
-| Contracts (schemas / DTOs / MCP tool specs) | 42 | 11 (26%) | 42 (100%) | 0 |
-| Platform (server routing, db, cli, i18n, shared, ui-protocol) | 86 | 38 (44%) | 74 (86%) | 12 |
-| Unmapped (no workflow bucket) | 118 | 25 (21%) | 74 (63%) | 44 |
+| Contracts (schemas / DTOs / MCP tool specs) | 44 | 14 (32%) | 44 (100%) | 0 |
+| Platform (server routing, db, cli, i18n, shared, ui-protocol) | 86 | 40 (47%) | 74 (86%) | 12 |
+| Unmapped (no workflow bucket) | 118 | 26 (22%) | 74 (63%) | 44 |
 
 ## Drill-down
 
@@ -47,23 +47,23 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/engine/src/modules/orchestration/due-auto-plan-generation-worker.ts` | 0 | 69 | 0/1 | _(transitive only)_ |
-| `packages/engine/src/modules/orchestration/due-scheduled-work-worker.ts` | 1 | 70 | 1/1 | `due-scheduled-work-worker.bun.test.ts` |
-| `packages/engine/src/modules/orchestration/goal-review-due-worker.ts` | 0 | 69 | 0/1 | _(transitive only)_ |
-| `packages/engine/src/modules/orchestration/graph-advancement-worker.ts` | 1 | 70 | 1/1 | `graph-advancement-worker.bun.test.ts` |
-| `packages/engine/src/modules/orchestration/graph-mutation-repository.ts` | 1 | 66 | 3/3 | `graph-mutation-repository.bun.test.ts` |
-| `packages/engine/src/modules/orchestration/graph-version-repository.ts` | 1 | 66 | 2/3 | `graph-mutation-repository.bun.test.ts` |
-| `packages/engine/src/modules/orchestration/index.ts` | 0 | 65 | &mdash; | _(transitive only)_ |
-| `packages/engine/src/modules/orchestration/orchestrator-config.ts` | 2 | 69 | 0/2 | `scheduler-ownership.integration.bun.test.ts`<br>`task-orchestrator.bun.test.ts` |
-| `packages/engine/src/modules/orchestration/reconcile-invariants.ts` | 0 | 70 | 0/2 | _(transitive only)_ |
-| `packages/engine/src/modules/orchestration/reconcile-task-state.ts` | 2 | 70 | 1/1 | `reconcile-impossible-state.bun.test.ts`<br>`reconcile-task-state.bun.test.ts` |
-| `packages/engine/src/modules/orchestration/recurring-work-block-expansion-worker.ts` | 1 | 70 | 1/1 | `recurring-work-block-expansion-worker.bun.test.ts` |
-| `packages/engine/src/modules/orchestration/restart-recovery-worker.ts` | 1 | 70 | 1/1 | `orchestrator-restart-recovery.bun.test.ts` |
-| `packages/engine/src/modules/orchestration/scheduler-event-repository.ts` | 1 | 73 | 2/2 | `scheduler-event-repository.bun.test.ts` |
-| `packages/engine/src/modules/orchestration/scheduler-events.ts` | 1 | 72 | 1/1 | `due-scheduled-work-worker.bun.test.ts` |
-| `packages/engine/src/modules/orchestration/scheduler-lease-repository.ts` | 5 | 122 | 6/6 | `graph-advancement-worker.bun.test.ts`<br>`recurring-work-block-expansion-worker.bun.test.ts`<br>`scheduler-lease-repository.bun.test.ts`<br>`task-orchestrator.bun.test.ts`<br>`task-execution-store.bun.test.ts` |
-| `packages/engine/src/modules/orchestration/scheduler-work-context.ts` | 0 | 118 | 0/2 | _(transitive only)_ |
-| `packages/engine/src/modules/orchestration/task-orchestrator.ts` | 2 | 70 | 2/5 | `scheduler-ownership.integration.bun.test.ts`<br>`task-orchestrator.bun.test.ts` |
+| `packages/engine/src/modules/orchestration/due-auto-plan-generation-worker.ts` | 0 | 73 | 0/1 | _(transitive only)_ |
+| `packages/engine/src/modules/orchestration/due-scheduled-work-worker.ts` | 1 | 74 | 1/1 | `due-scheduled-work-worker.bun.test.ts` |
+| `packages/engine/src/modules/orchestration/goal-review-due-worker.ts` | 0 | 73 | 0/1 | _(transitive only)_ |
+| `packages/engine/src/modules/orchestration/graph-advancement-worker.ts` | 1 | 74 | 1/1 | `graph-advancement-worker.bun.test.ts` |
+| `packages/engine/src/modules/orchestration/graph-mutation-repository.ts` | 1 | 70 | 3/3 | `graph-mutation-repository.bun.test.ts` |
+| `packages/engine/src/modules/orchestration/graph-version-repository.ts` | 1 | 70 | 2/3 | `graph-mutation-repository.bun.test.ts` |
+| `packages/engine/src/modules/orchestration/index.ts` | 0 | 69 | &mdash; | _(transitive only)_ |
+| `packages/engine/src/modules/orchestration/orchestrator-config.ts` | 2 | 73 | 0/2 | `scheduler-ownership.integration.bun.test.ts`<br>`task-orchestrator.bun.test.ts` |
+| `packages/engine/src/modules/orchestration/reconcile-invariants.ts` | 0 | 74 | 0/2 | _(transitive only)_ |
+| `packages/engine/src/modules/orchestration/reconcile-task-state.ts` | 2 | 74 | 1/1 | `reconcile-impossible-state.bun.test.ts`<br>`reconcile-task-state.bun.test.ts` |
+| `packages/engine/src/modules/orchestration/recurring-work-block-expansion-worker.ts` | 1 | 74 | 1/1 | `recurring-work-block-expansion-worker.bun.test.ts` |
+| `packages/engine/src/modules/orchestration/restart-recovery-worker.ts` | 1 | 74 | 1/1 | `orchestrator-restart-recovery.bun.test.ts` |
+| `packages/engine/src/modules/orchestration/scheduler-event-repository.ts` | 1 | 77 | 2/2 | `scheduler-event-repository.bun.test.ts` |
+| `packages/engine/src/modules/orchestration/scheduler-events.ts` | 1 | 76 | 1/1 | `due-scheduled-work-worker.bun.test.ts` |
+| `packages/engine/src/modules/orchestration/scheduler-lease-repository.ts` | 5 | 126 | 6/6 | `graph-advancement-worker.bun.test.ts`<br>`recurring-work-block-expansion-worker.bun.test.ts`<br>`scheduler-lease-repository.bun.test.ts`<br>`task-orchestrator.bun.test.ts`<br>`task-execution-store.bun.test.ts` |
+| `packages/engine/src/modules/orchestration/scheduler-work-context.ts` | 0 | 122 | 0/2 | _(transitive only)_ |
+| `packages/engine/src/modules/orchestration/task-orchestrator.ts` | 2 | 74 | 2/5 | `scheduler-ownership.integration.bun.test.ts`<br>`task-orchestrator.bun.test.ts` |
 
 <details><summary><code>packages/engine/src/modules/orchestration/due-scheduled-work-worker.ts</code> &mdash; 1 exported symbol(s)</summary>
 
@@ -176,95 +176,95 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 
 </details>
 
-#### engine :: plan-execution  _(86 files, 35 direct-covered)_
+#### engine :: plan-execution  _(86 files, 38 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/engine/src/modules/plan-execution/ai-runtime-event-persistence.ts` | 0 | 86 | 0/2 | _(transitive only)_ |
-| `packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts` | 3 | 89 | 1/2 | `ai-runtime-invoker.bun.test.ts`<br>`node-ai-capabilities.bun.test.ts`<br>`condition-executor.bun.test.ts` |
-| `packages/engine/src/modules/plan-execution/ai-runtime-persistence.ts` | 1 | 86 | 1/9 | `ai-runtime-invoker.bun.test.ts` |
-| `packages/engine/src/modules/plan-execution/ai-runtime-provider-stream.ts` | 0 | 86 | 0/1 | _(transitive only)_ |
-| `packages/engine/src/modules/plan-execution/ai-runtime-request.ts` | 1 | 86 | 0/3 | `ai-runtime-invoker.bun.test.ts` |
-| `packages/engine/src/modules/plan-execution/ai-runtime-stream-collection.ts` | 0 | 85 | 0/2 | _(transitive only)_ |
-| `packages/engine/src/modules/plan-execution/checkpoint-regression-assertions.ts` | 1 | 42 | 2/3 | `plan-runner.checkpoints.bun.test.ts` |
-| `packages/engine/src/modules/plan-execution/execution-actions.ts` | 1 | 87 | 1/3 | `execution-actions.bun.test.ts` |
-| `packages/engine/src/modules/plan-execution/execution-checkpoint.ts` | 1 | 91 | 1/2 | `execution-checkpoint.bun.test.ts` |
-| `packages/engine/src/modules/plan-execution/execution-state-machine.ts` | 0 | 95 | 0/7 | _(transitive only)_ |
-| `packages/engine/src/modules/plan-execution/facade/task-plan-execution.facade.ts` | 1 | 86 | 1/2 | `plan-runner.bun.test.ts` |
-| `packages/engine/src/modules/plan-execution/index.ts` | 0 | 83 | &mdash; | _(transitive only)_ |
-| `packages/engine/src/modules/plan-execution/kernel/command-receipts.ts` | 0 | 102 | 0/8 | _(transitive only)_ |
-| `packages/engine/src/modules/plan-execution/kernel/execute-command-deliverables.ts` | 0 | 84 | 0/2 | _(transitive only)_ |
-| `packages/engine/src/modules/plan-execution/kernel/execute-command-dispatch.ts` | 0 | 87 | 0/1 | _(transitive only)_ |
-| `packages/engine/src/modules/plan-execution/kernel/execute-command-finalization.ts` | 0 | 8 | 0/2 | _(transitive only)_ |
-| `packages/engine/src/modules/plan-execution/kernel/execute-command-goal-context.ts` | 0 | 84 | 0/1 | _(transitive only)_ |
-| `packages/engine/src/modules/plan-execution/kernel/execute-command-graph-command.ts` | 0 | 84 | 0/5 | _(transitive only)_ |
-| `packages/engine/src/modules/plan-execution/kernel/execute-command-outcome.ts` | 0 | 84 | 0/1 | _(transitive only)_ |
-| `packages/engine/src/modules/plan-execution/kernel/execute-command-restart.ts` | 0 | 87 | 0/1 | _(transitive only)_ |
-| `packages/engine/src/modules/plan-execution/kernel/execute-command-setup.ts` | 1 | 87 | 1/1 | `execute-command.smoke.bun.test.ts` |
-| `packages/engine/src/modules/plan-execution/kernel/execute-command.ts` | 2 | 88 | 1/1 | `execute-command.smoke.bun.test.ts`<br>`plan-runner.task-executor.interruption.bun.test.ts` |
-| `packages/engine/src/modules/plan-execution/kernel/graph-callbacks.ts` | 0 | 84 | 0/1 | _(transitive only)_ |
-| `packages/engine/src/modules/plan-execution/kernel/kernel-types.ts` | 0 | 87 | 0/1 | _(transitive only)_ |
-| `packages/engine/src/modules/plan-execution/kernel/runtime-result-sync-errors.ts` | 0 | 87 | 0/2 | _(transitive only)_ |
-| `packages/engine/src/modules/plan-execution/kernel/sync-runtime-result.ts` | 0 | 87 | 0/2 | _(transitive only)_ |
-| `packages/engine/src/modules/plan-execution/node-executors/checkpoint-executor.ts` | 0 | 6 | 0/1 | _(transitive only)_ |
-| `packages/engine/src/modules/plan-execution/node-executors/condition-executor.ts` | 1 | 7 | 1/1 | `condition-executor.bun.test.ts` |
-| `packages/engine/src/modules/plan-execution/node-executors/task-executor.ts` | 0 | 6 | 0/1 | _(transitive only)_ |
-| `packages/engine/src/modules/plan-execution/node-executors/types.ts` | 2 | 90 | &mdash; | `plan-runner.task-executor.external-results.bun.test.ts`<br>`plan-runner.task-executor.runtime-events.bun.test.ts` |
-| `packages/engine/src/modules/plan-execution/node-executors/wait-executor.ts` | 0 | 6 | 0/1 | _(transitive only)_ |
-| `packages/engine/src/modules/plan-execution/persistence/compiled-plan-store.ts` | 9 | 104 | 2/6 | `get-schedule-page-auto-start-reason.bun.test.ts`<br>`get-schedule-page.bun.test.ts`<br>`execution-scope.bun.test.ts`<br>`plan-runner.bun.test.ts`<br>`plan-runner.task-executor.runtime-events.bun.test.ts`<br>`auto-generate-scheduled-plan.bun.test.ts`<br>`auto-start-scheduled-plan.bun.test.ts`<br>`command-chain.bun.test.ts`<br>`get-task-page-orchestrator.bun.test.ts` |
-| `packages/engine/src/modules/plan-execution/persistence/execution-scope.ts` | 1 | 104 | 2/3 | `execution-scope.bun.test.ts` |
-| `packages/engine/src/modules/plan-execution/persistence/execution-session-store.ts` | 0 | 104 | 0/5 | _(transitive only)_ |
-| `packages/engine/src/modules/plan-execution/persistence/plan-run-store.ts` | 13 | 102 | 5/9 | `duplicate-execution-regression.bun.test.ts`<br>`serial-branch-result-regression.bun.test.ts`<br>`stop-pause-regression.bun.test.ts`<br>`execute-command.smoke.bun.test.ts`<br>`plan-runner.bun.test.ts`<br>`plan-runner.task-executor.approval.bun.test.ts`<br>`plan-runner.task-executor.concurrency.bun.test.ts`<br>`plan-runner.task-executor.continuation.bun.test.ts`<br>`plan-runner.task-executor.external-results.bun.test.ts`<br>`plan-runner.task-executor.full-chain.bun.test.ts`<br>`plan-runner.task-executor.interruption.bun.test.ts`<br>`finalize-task-result-recovery.bun.test.ts`<br>`get-task-page-orchestrator.bun.test.ts` |
-| `packages/engine/src/modules/plan-execution/persistence/plan-run-terminalizer.ts` | 1 | 91 | 1/2 | `plan-run-terminalizer.bun.test.ts` |
-| `packages/engine/src/modules/plan-execution/persistence/plan-runtime-store.ts` | 2 | 95 | 3/6 | `execute-command.smoke.bun.test.ts`<br>`plan-runner.task-executor.continuation.bun.test.ts` |
-| `packages/engine/src/modules/plan-execution/persistence/plan-state-store.ts` | 0 | 90 | 0/2 | _(transitive only)_ |
-| `packages/engine/src/modules/plan-execution/persistence/runtime-event-store.ts` | 0 | 8 | 0/1 | _(transitive only)_ |
-| `packages/engine/src/modules/plan-execution/persistence/runtime-execution-scope.ts` | 0 | 86 | 0/1 | _(transitive only)_ |
-| `packages/engine/src/modules/plan-execution/persistence/scheduler-durability.ts` | 0 | 109 | 0/3 | _(transitive only)_ |
-| `packages/engine/src/modules/plan-execution/persistence/task-execution-store.ts` | 1 | 91 | 4/6 | `task-execution-store.bun.test.ts` |
-| `packages/engine/src/modules/plan-execution/persistence/task-runtime-store.ts` | 0 | 84 | 0/1 | _(transitive only)_ |
-| `packages/engine/src/modules/plan-execution/persistence/work-block-store.ts` | 0 | 84 | 0/3 | _(transitive only)_ |
+| `packages/engine/src/modules/plan-execution/ai-runtime-event-persistence.ts` | 0 | 91 | 0/2 | _(transitive only)_ |
+| `packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts` | 3 | 94 | 1/2 | `ai-runtime-invoker.bun.test.ts`<br>`node-ai-capabilities.bun.test.ts`<br>`condition-executor.bun.test.ts` |
+| `packages/engine/src/modules/plan-execution/ai-runtime-persistence.ts` | 1 | 91 | 1/9 | `ai-runtime-invoker.bun.test.ts` |
+| `packages/engine/src/modules/plan-execution/ai-runtime-provider-stream.ts` | 0 | 91 | 0/1 | _(transitive only)_ |
+| `packages/engine/src/modules/plan-execution/ai-runtime-request.ts` | 1 | 91 | 0/3 | `ai-runtime-invoker.bun.test.ts` |
+| `packages/engine/src/modules/plan-execution/ai-runtime-stream-collection.ts` | 0 | 90 | 0/2 | _(transitive only)_ |
+| `packages/engine/src/modules/plan-execution/checkpoint-regression-assertions.ts` | 1 | 43 | 2/3 | `plan-runner.checkpoints.bun.test.ts` |
+| `packages/engine/src/modules/plan-execution/execution-actions.ts` | 1 | 92 | 1/3 | `execution-actions.bun.test.ts` |
+| `packages/engine/src/modules/plan-execution/execution-checkpoint.ts` | 1 | 96 | 1/2 | `execution-checkpoint.bun.test.ts` |
+| `packages/engine/src/modules/plan-execution/execution-state-machine.ts` | 0 | 100 | 0/7 | _(transitive only)_ |
+| `packages/engine/src/modules/plan-execution/facade/task-plan-execution.facade.ts` | 1 | 91 | 1/2 | `plan-runner.bun.test.ts` |
+| `packages/engine/src/modules/plan-execution/index.ts` | 0 | 88 | &mdash; | _(transitive only)_ |
+| `packages/engine/src/modules/plan-execution/kernel/command-receipts.ts` | 1 | 107 | 3/8 | `execute-command-receipts.focused.bun.test.ts` |
+| `packages/engine/src/modules/plan-execution/kernel/execute-command-deliverables.ts` | 0 | 89 | 0/2 | _(transitive only)_ |
+| `packages/engine/src/modules/plan-execution/kernel/execute-command-dispatch.ts` | 0 | 92 | 0/1 | _(transitive only)_ |
+| `packages/engine/src/modules/plan-execution/kernel/execute-command-finalization.ts` | 0 | 9 | 0/2 | _(transitive only)_ |
+| `packages/engine/src/modules/plan-execution/kernel/execute-command-goal-context.ts` | 0 | 89 | 0/1 | _(transitive only)_ |
+| `packages/engine/src/modules/plan-execution/kernel/execute-command-graph-command.ts` | 0 | 89 | 0/5 | _(transitive only)_ |
+| `packages/engine/src/modules/plan-execution/kernel/execute-command-outcome.ts` | 0 | 89 | 0/1 | _(transitive only)_ |
+| `packages/engine/src/modules/plan-execution/kernel/execute-command-restart.ts` | 0 | 92 | 0/1 | _(transitive only)_ |
+| `packages/engine/src/modules/plan-execution/kernel/execute-command-setup.ts` | 1 | 92 | 1/1 | `execute-command.smoke.bun.test.ts` |
+| `packages/engine/src/modules/plan-execution/kernel/execute-command.ts` | 3 | 93 | 1/1 | `execute-command-receipts.focused.bun.test.ts`<br>`execute-command.smoke.bun.test.ts`<br>`plan-runner.task-executor.interruption.bun.test.ts` |
+| `packages/engine/src/modules/plan-execution/kernel/graph-callbacks.ts` | 0 | 89 | 0/1 | _(transitive only)_ |
+| `packages/engine/src/modules/plan-execution/kernel/kernel-types.ts` | 0 | 92 | 0/1 | _(transitive only)_ |
+| `packages/engine/src/modules/plan-execution/kernel/runtime-result-sync-errors.ts` | 0 | 92 | 0/2 | _(transitive only)_ |
+| `packages/engine/src/modules/plan-execution/kernel/sync-runtime-result.ts` | 1 | 92 | 1/2 | `execute-command-receipts.focused.bun.test.ts` |
+| `packages/engine/src/modules/plan-execution/node-executors/checkpoint-executor.ts` | 0 | 7 | 0/1 | _(transitive only)_ |
+| `packages/engine/src/modules/plan-execution/node-executors/condition-executor.ts` | 1 | 8 | 1/1 | `condition-executor.bun.test.ts` |
+| `packages/engine/src/modules/plan-execution/node-executors/task-executor.ts` | 0 | 7 | 0/1 | _(transitive only)_ |
+| `packages/engine/src/modules/plan-execution/node-executors/types.ts` | 3 | 96 | &mdash; | `wait-executor.bun.test.ts`<br>`plan-runner.task-executor.external-results.bun.test.ts`<br>`plan-runner.task-executor.runtime-events.bun.test.ts` |
+| `packages/engine/src/modules/plan-execution/node-executors/wait-executor.ts` | 1 | 8 | 1/1 | `wait-executor.bun.test.ts` |
+| `packages/engine/src/modules/plan-execution/persistence/compiled-plan-store.ts` | 9 | 109 | 2/6 | `get-schedule-page-auto-start-reason.bun.test.ts`<br>`get-schedule-page.bun.test.ts`<br>`execution-scope.bun.test.ts`<br>`plan-runner.bun.test.ts`<br>`plan-runner.task-executor.runtime-events.bun.test.ts`<br>`auto-generate-scheduled-plan.bun.test.ts`<br>`auto-start-scheduled-plan.bun.test.ts`<br>`command-chain.bun.test.ts`<br>`get-task-page-orchestrator.bun.test.ts` |
+| `packages/engine/src/modules/plan-execution/persistence/execution-scope.ts` | 1 | 109 | 2/3 | `execution-scope.bun.test.ts` |
+| `packages/engine/src/modules/plan-execution/persistence/execution-session-store.ts` | 0 | 109 | 0/5 | _(transitive only)_ |
+| `packages/engine/src/modules/plan-execution/persistence/plan-run-store.ts` | 14 | 107 | 7/9 | `duplicate-execution-regression.bun.test.ts`<br>`serial-branch-result-regression.bun.test.ts`<br>`stop-pause-regression.bun.test.ts`<br>`execute-command-receipts.focused.bun.test.ts`<br>`execute-command.smoke.bun.test.ts`<br>`plan-runner.bun.test.ts`<br>`plan-runner.task-executor.approval.bun.test.ts`<br>`plan-runner.task-executor.concurrency.bun.test.ts`<br>`plan-runner.task-executor.continuation.bun.test.ts`<br>`plan-runner.task-executor.external-results.bun.test.ts`<br>`plan-runner.task-executor.full-chain.bun.test.ts`<br>`plan-runner.task-executor.interruption.bun.test.ts`<br>`finalize-task-result-recovery.bun.test.ts`<br>`get-task-page-orchestrator.bun.test.ts` |
+| `packages/engine/src/modules/plan-execution/persistence/plan-run-terminalizer.ts` | 1 | 96 | 1/2 | `plan-run-terminalizer.bun.test.ts` |
+| `packages/engine/src/modules/plan-execution/persistence/plan-runtime-store.ts` | 3 | 100 | 3/6 | `execute-command-receipts.focused.bun.test.ts`<br>`execute-command.smoke.bun.test.ts`<br>`plan-runner.task-executor.continuation.bun.test.ts` |
+| `packages/engine/src/modules/plan-execution/persistence/plan-state-store.ts` | 0 | 95 | 0/2 | _(transitive only)_ |
+| `packages/engine/src/modules/plan-execution/persistence/runtime-event-store.ts` | 0 | 9 | 0/1 | _(transitive only)_ |
+| `packages/engine/src/modules/plan-execution/persistence/runtime-execution-scope.ts` | 0 | 91 | 0/1 | _(transitive only)_ |
+| `packages/engine/src/modules/plan-execution/persistence/scheduler-durability.ts` | 0 | 114 | 0/3 | _(transitive only)_ |
+| `packages/engine/src/modules/plan-execution/persistence/task-execution-store.ts` | 1 | 96 | 4/6 | `task-execution-store.bun.test.ts` |
+| `packages/engine/src/modules/plan-execution/persistence/task-runtime-store.ts` | 0 | 89 | 0/1 | _(transitive only)_ |
+| `packages/engine/src/modules/plan-execution/persistence/work-block-store.ts` | 0 | 89 | 0/3 | _(transitive only)_ |
 | `packages/engine/src/modules/plan-execution/plan-graph-test-fixtures.ts` | 4 | 4 | 2/4 | `plan-runner.checkpoints.bun.test.ts`<br>`plan-runner.complex-graphs.bun.test.ts`<br>`plan-runner.failure-recovery.bun.test.ts`<br>`plan-runner.invalid-graphs.bun.test.ts` |
-| `packages/engine/src/modules/plan-execution/plan-runner.task-executor.fixtures.ts` | 12 | 12 | 13/15 | `duplicate-execution-regression.bun.test.ts`<br>`serial-branch-result-regression.bun.test.ts`<br>`stop-pause-regression.bun.test.ts`<br>`execute-command.smoke.bun.test.ts`<br>`task-execution-store.bun.test.ts`<br>`plan-runner.task-executor.approval.bun.test.ts`<br>`plan-runner.task-executor.concurrency.bun.test.ts`<br>`plan-runner.task-executor.continuation.bun.test.ts`<br>`plan-runner.task-executor.external-results.bun.test.ts`<br>`plan-runner.task-executor.full-chain.bun.test.ts`<br>`plan-runner.task-executor.interruption.bun.test.ts`<br>`plan-runner.task-executor.runtime-events.bun.test.ts` |
-| `packages/engine/src/modules/plan-execution/projection/execution-graph-selectors.ts` | 0 | 95 | 0/6 | _(transitive only)_ |
-| `packages/engine/src/modules/plan-execution/projection/execution-response.ts` | 1 | 91 | 1/1 | `execution-checkpoint.bun.test.ts` |
-| `packages/engine/src/modules/plan-execution/results/finalize-task-result.ts` | 2 | 90 | 1/2 | `finalize-task-result-recovery.bun.test.ts`<br>`finalize-task-result.bun.test.ts` |
-| `packages/engine/src/modules/plan-execution/results/result-manifest.ts` | 1 | 103 | 2/2 | `result-manifest.bun.test.ts` |
-| `packages/engine/src/modules/plan-execution/runtime/agent-control-store.ts` | 1 | 87 | 5/9 | `agent-control.bun.test.ts` |
+| `packages/engine/src/modules/plan-execution/plan-runner.task-executor.fixtures.ts` | 13 | 13 | 13/15 | `duplicate-execution-regression.bun.test.ts`<br>`serial-branch-result-regression.bun.test.ts`<br>`stop-pause-regression.bun.test.ts`<br>`execute-command-receipts.focused.bun.test.ts`<br>`execute-command.smoke.bun.test.ts`<br>`task-execution-store.bun.test.ts`<br>`plan-runner.task-executor.approval.bun.test.ts`<br>`plan-runner.task-executor.concurrency.bun.test.ts`<br>`plan-runner.task-executor.continuation.bun.test.ts`<br>`plan-runner.task-executor.external-results.bun.test.ts`<br>`plan-runner.task-executor.full-chain.bun.test.ts`<br>`plan-runner.task-executor.interruption.bun.test.ts`<br>`plan-runner.task-executor.runtime-events.bun.test.ts` |
+| `packages/engine/src/modules/plan-execution/projection/execution-graph-selectors.ts` | 0 | 100 | 0/6 | _(transitive only)_ |
+| `packages/engine/src/modules/plan-execution/projection/execution-response.ts` | 1 | 96 | 1/1 | `execution-checkpoint.bun.test.ts` |
+| `packages/engine/src/modules/plan-execution/results/finalize-task-result.ts` | 2 | 95 | 1/2 | `finalize-task-result-recovery.bun.test.ts`<br>`finalize-task-result.bun.test.ts` |
+| `packages/engine/src/modules/plan-execution/results/result-manifest.ts` | 1 | 108 | 2/2 | `result-manifest.bun.test.ts` |
+| `packages/engine/src/modules/plan-execution/runtime/agent-control-store.ts` | 1 | 92 | 5/9 | `agent-control.bun.test.ts` |
 | `packages/engine/src/modules/plan-execution/runtime/command-envelope.ts` | 0 | 0 | 0/3 | **none** |
-| `packages/engine/src/modules/plan-execution/runtime/committed-state.ts` | 0 | 8 | 0/3 | _(transitive only)_ |
+| `packages/engine/src/modules/plan-execution/runtime/committed-state.ts` | 0 | 9 | 0/3 | _(transitive only)_ |
 | `packages/engine/src/modules/plan-execution/runtime/execution-control-registry.ts` | 0 | 0 | 0/4 | **none** |
 | `packages/engine/src/modules/plan-execution/runtime/execution-events.ts` | 0 | 0 | 0/1 | **none** |
-| `packages/engine/src/modules/plan-execution/runtime/graph-state.ts` | 0 | 84 | 0/1 | _(transitive only)_ |
-| `packages/engine/src/modules/plan-execution/runtime/node-ai-capabilities.ts` | 1 | 85 | 3/5 | `node-ai-capabilities.bun.test.ts` |
-| `packages/engine/src/modules/plan-execution/runtime/node-executor-registry.ts` | 0 | 8 | 0/2 | _(transitive only)_ |
-| `packages/engine/src/modules/plan-execution/runtime/node-runtime-prompts.ts` | 1 | 86 | 1/2 | `node-runtime-refs.bun.test.ts` |
-| `packages/engine/src/modules/plan-execution/runtime/node-runtime-refs.ts` | 2 | 94 | 3/4 | `node-runtime-refs.bun.test.ts`<br>`plan-runner.task-executor.external-results.bun.test.ts` |
-| `packages/engine/src/modules/plan-execution/runtime/runtime-outcome.ts` | 0 | 6 | 0/1 | _(transitive only)_ |
+| `packages/engine/src/modules/plan-execution/runtime/graph-state.ts` | 0 | 89 | 0/1 | _(transitive only)_ |
+| `packages/engine/src/modules/plan-execution/runtime/node-ai-capabilities.ts` | 1 | 90 | 3/5 | `node-ai-capabilities.bun.test.ts` |
+| `packages/engine/src/modules/plan-execution/runtime/node-executor-registry.ts` | 0 | 9 | 0/2 | _(transitive only)_ |
+| `packages/engine/src/modules/plan-execution/runtime/node-runtime-prompts.ts` | 1 | 91 | 1/2 | `node-runtime-refs.bun.test.ts` |
+| `packages/engine/src/modules/plan-execution/runtime/node-runtime-refs.ts` | 2 | 99 | 3/4 | `node-runtime-refs.bun.test.ts`<br>`plan-runner.task-executor.external-results.bun.test.ts` |
+| `packages/engine/src/modules/plan-execution/runtime/runtime-outcome.ts` | 0 | 7 | 0/1 | _(transitive only)_ |
 | `packages/engine/src/modules/plan-execution/runtime/terminal-command.ts` | 1 | 1 | 3/3 | `terminal-command.bun.test.ts` |
-| `packages/engine/src/modules/plan-execution/session-policy.ts` | 2 | 4 | 1/1 | `execution-state-invariants.bun.test.ts`<br>`session-policy.bun.test.ts` |
-| `packages/engine/src/modules/plan-execution/task-plan-execution.ts` | 0 | 86 | 0/5 | _(transitive only)_ |
-| `packages/engine/src/modules/plan-execution/types.ts` | 0 | 108 | &mdash; | _(transitive only)_ |
-| `packages/engine/src/modules/plan-execution/use-cases/checkpoint-transition/cancel-session.ts` | 0 | 85 | 0/1 | _(transitive only)_ |
-| `packages/engine/src/modules/plan-execution/use-cases/checkpoint-transition/continue-next-ready.ts` | 0 | 85 | 0/1 | _(transitive only)_ |
-| `packages/engine/src/modules/plan-execution/use-cases/checkpoint-transition/dispatch-action.ts` | 0 | 82 | 0/1 | _(transitive only)_ |
-| `packages/engine/src/modules/plan-execution/use-cases/checkpoint-transition/fail-task.ts` | 0 | 85 | 0/1 | _(transitive only)_ |
-| `packages/engine/src/modules/plan-execution/use-cases/checkpoint-transition/mark-current-completed.ts` | 0 | 85 | 0/1 | _(transitive only)_ |
-| `packages/engine/src/modules/plan-execution/use-cases/checkpoint-transition/node.ts` | 0 | 82 | 0/1 | _(transitive only)_ |
-| `packages/engine/src/modules/plan-execution/use-cases/checkpoint-transition/observer.ts` | 0 | 82 | 0/1 | _(transitive only)_ |
-| `packages/engine/src/modules/plan-execution/use-cases/checkpoint-transition/rerun-current-node.ts` | 0 | 85 | 0/1 | _(transitive only)_ |
-| `packages/engine/src/modules/plan-execution/use-cases/checkpoint-transition/resolve-checkpoint-transition.ts` | 0 | 86 | 0/1 | _(transitive only)_ |
-| `packages/engine/src/modules/plan-execution/use-cases/checkpoint-transition/resume-current-node.ts` | 0 | 85 | 0/1 | _(transitive only)_ |
-| `packages/engine/src/modules/plan-execution/use-cases/checkpoint-transition/stay-paused.ts` | 0 | 85 | 0/1 | _(transitive only)_ |
-| `packages/engine/src/modules/plan-execution/use-cases/checkpoint-transition/types.ts` | 0 | 85 | &mdash; | _(transitive only)_ |
-| `packages/engine/src/modules/plan-execution/use-cases/get-current-execution.ts` | 1 | 90 | 1/3 | `get-current-execution.bun.test.ts` |
-| `packages/engine/src/modules/plan-execution/use-cases/recover-recorded-terminal-actions.ts` | 1 | 71 | 1/1 | `plan-runner.task-executor.external-results.bun.test.ts` |
-| `packages/engine/src/modules/plan-execution/use-cases/register-generated-plan-output-artifacts.ts` | 2 | 92 | 2/2 | `register-generated-plan-output-artifacts.bun.test.ts`<br>`open-task-result-file.bun.test.ts` |
-| `packages/engine/src/modules/plan-execution/use-cases/resolve-provider-approval.ts` | 1 | 84 | 1/2 | `resolve-provider-approval.bun.test.ts` |
-| `packages/engine/src/modules/plan-execution/use-cases/submit-terminal-node-result.ts` | 0 | 87 | 0/1 | _(transitive only)_ |
+| `packages/engine/src/modules/plan-execution/session-policy.ts` | 2 | 5 | 1/1 | `execution-state-invariants.bun.test.ts`<br>`session-policy.bun.test.ts` |
+| `packages/engine/src/modules/plan-execution/task-plan-execution.ts` | 0 | 91 | 0/5 | _(transitive only)_ |
+| `packages/engine/src/modules/plan-execution/types.ts` | 0 | 113 | &mdash; | _(transitive only)_ |
+| `packages/engine/src/modules/plan-execution/use-cases/checkpoint-transition/cancel-session.ts` | 0 | 90 | 0/1 | _(transitive only)_ |
+| `packages/engine/src/modules/plan-execution/use-cases/checkpoint-transition/continue-next-ready.ts` | 0 | 90 | 0/1 | _(transitive only)_ |
+| `packages/engine/src/modules/plan-execution/use-cases/checkpoint-transition/dispatch-action.ts` | 0 | 87 | 0/1 | _(transitive only)_ |
+| `packages/engine/src/modules/plan-execution/use-cases/checkpoint-transition/fail-task.ts` | 0 | 90 | 0/1 | _(transitive only)_ |
+| `packages/engine/src/modules/plan-execution/use-cases/checkpoint-transition/mark-current-completed.ts` | 0 | 90 | 0/1 | _(transitive only)_ |
+| `packages/engine/src/modules/plan-execution/use-cases/checkpoint-transition/node.ts` | 0 | 87 | 0/1 | _(transitive only)_ |
+| `packages/engine/src/modules/plan-execution/use-cases/checkpoint-transition/observer.ts` | 0 | 87 | 0/1 | _(transitive only)_ |
+| `packages/engine/src/modules/plan-execution/use-cases/checkpoint-transition/rerun-current-node.ts` | 0 | 90 | 0/1 | _(transitive only)_ |
+| `packages/engine/src/modules/plan-execution/use-cases/checkpoint-transition/resolve-checkpoint-transition.ts` | 0 | 91 | 0/1 | _(transitive only)_ |
+| `packages/engine/src/modules/plan-execution/use-cases/checkpoint-transition/resume-current-node.ts` | 0 | 90 | 0/1 | _(transitive only)_ |
+| `packages/engine/src/modules/plan-execution/use-cases/checkpoint-transition/stay-paused.ts` | 0 | 90 | 0/1 | _(transitive only)_ |
+| `packages/engine/src/modules/plan-execution/use-cases/checkpoint-transition/types.ts` | 0 | 90 | &mdash; | _(transitive only)_ |
+| `packages/engine/src/modules/plan-execution/use-cases/get-current-execution.ts` | 1 | 95 | 1/3 | `get-current-execution.bun.test.ts` |
+| `packages/engine/src/modules/plan-execution/use-cases/recover-recorded-terminal-actions.ts` | 1 | 75 | 1/1 | `plan-runner.task-executor.external-results.bun.test.ts` |
+| `packages/engine/src/modules/plan-execution/use-cases/register-generated-plan-output-artifacts.ts` | 2 | 97 | 2/2 | `register-generated-plan-output-artifacts.bun.test.ts`<br>`open-task-result-file.bun.test.ts` |
+| `packages/engine/src/modules/plan-execution/use-cases/resolve-provider-approval.ts` | 1 | 89 | 1/2 | `resolve-provider-approval.bun.test.ts` |
+| `packages/engine/src/modules/plan-execution/use-cases/submit-terminal-node-result.ts` | 0 | 92 | 0/1 | _(transitive only)_ |
 | `packages/engine/src/modules/plan-execution/use-cases/sync-runtime-result/attempts.ts` | 1 | 1 | 3/3 | `sync-runtime-result.bun.test.ts` |
 | `packages/engine/src/modules/plan-execution/use-cases/sync-runtime-result/node-result.ts` | 1 | 1 | 1/1 | `sync-runtime-result.bun.test.ts` |
-| `packages/engine/src/modules/plan-execution/use-cases/sync-runtime-result/reconcile-stale-runtime-runs.ts` | 1 | 87 | 1/2 | `sync-runtime-result.bun.test.ts` |
+| `packages/engine/src/modules/plan-execution/use-cases/sync-runtime-result/reconcile-stale-runtime-runs.ts` | 1 | 92 | 1/2 | `sync-runtime-result.bun.test.ts` |
 | `packages/engine/src/modules/plan-execution/use-cases/sync-runtime-result/types.ts` | 0 | 1 | &mdash; | _(transitive only)_ |
 
 <details><summary><code>packages/engine/src/modules/plan-execution/ai-runtime-invoker.ts</code> &mdash; 2 exported symbol(s)</summary>
@@ -340,6 +340,21 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 
 </details>
 
+<details><summary><code>packages/engine/src/modules/plan-execution/kernel/command-receipts.ts</code> &mdash; 8 exported symbol(s)</summary>
+
+| Symbol | Kind | Tests referencing it |
+| --- | --- | --- |
+| `EXECUTION_COMMAND_CANONICALIZER` | const | `execute-command-receipts.focused.bun.test.ts` |
+| `EXECUTION_COMMAND_CANONICALIZER_VERSION` | const | `execute-command-receipts.focused.bun.test.ts` |
+| `canonicalJsonString` | function | **none** |
+| `canonicalExecutionCommand` | function | **none** |
+| `executionCommandDigest` | function | `execute-command-receipts.focused.bun.test.ts` |
+| `canonicalReceiptResult` | function | **none** |
+| `markAuthoritativeExecutionResult` | function | **none** |
+| `isAuthoritativeExecutionResult` | function | **none** |
+
+</details>
+
 <details><summary><code>packages/engine/src/modules/plan-execution/kernel/execute-command-setup.ts</code> &mdash; 1 exported symbol(s)</summary>
 
 | Symbol | Kind | Tests referencing it |
@@ -352,7 +367,16 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 
 | Symbol | Kind | Tests referencing it |
 | --- | --- | --- |
-| `executeCommand` | function | `execute-command.smoke.bun.test.ts`<br>`plan-runner.task-executor.interruption.bun.test.ts` |
+| `executeCommand` | function | `execute-command-receipts.focused.bun.test.ts`<br>`execute-command.smoke.bun.test.ts`<br>`plan-runner.task-executor.interruption.bun.test.ts` |
+
+</details>
+
+<details><summary><code>packages/engine/src/modules/plan-execution/kernel/sync-runtime-result.ts</code> &mdash; 2 exported symbol(s)</summary>
+
+| Symbol | Kind | Tests referencing it |
+| --- | --- | --- |
+| `runtimeSyncIdempotencyKey` | function | `execute-command-receipts.focused.bun.test.ts` |
+| `syncPlanRunRuntimeResult` | function | **none** |
 
 </details>
 
@@ -361,6 +385,14 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 | Symbol | Kind | Tests referencing it |
 | --- | --- | --- |
 | `ConditionNodeExecutor` | class | `condition-executor.bun.test.ts` |
+
+</details>
+
+<details><summary><code>packages/engine/src/modules/plan-execution/node-executors/wait-executor.ts</code> &mdash; 1 exported symbol(s)</summary>
+
+| Symbol | Kind | Tests referencing it |
+| --- | --- | --- |
+| `WaitNodeExecutor` | class | `wait-executor.bun.test.ts` |
 
 </details>
 
@@ -395,11 +427,11 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 | `createEmptyPlanOutput` | function | `finalize-task-result-recovery.bun.test.ts` |
 | `savePlanRun` | function | `finalize-task-result-recovery.bun.test.ts`<br>`get-task-page-orchestrator.bun.test.ts` |
 | `savePlanRunGuarded` | function | **none** |
-| `claimPlanRunCommand` | function | `execute-command.smoke.bun.test.ts` |
-| `completePlanRunCommandReceipt` | function | **none** |
-| `renewPlanRunCommandReceipt` | function | **none** |
+| `claimPlanRunCommand` | function | `execute-command-receipts.focused.bun.test.ts`<br>`execute-command.smoke.bun.test.ts` |
+| `completePlanRunCommandReceipt` | function | `execute-command-receipts.focused.bun.test.ts` |
+| `renewPlanRunCommandReceipt` | function | `execute-command-receipts.focused.bun.test.ts` |
 | `completePlanRunCommandReceiptInTransaction` | function | **none** |
-| `getPlanRun` | function | `duplicate-execution-regression.bun.test.ts`<br>`serial-branch-result-regression.bun.test.ts`<br>`stop-pause-regression.bun.test.ts`<br>`execute-command.smoke.bun.test.ts`<br>`plan-runner.bun.test.ts`<br>`plan-runner.task-executor.approval.bun.test.ts`<br>`plan-runner.task-executor.concurrency.bun.test.ts`<br>`plan-runner.task-executor.continuation.bun.test.ts`<br>`plan-runner.task-executor.external-results.bun.test.ts`<br>`plan-runner.task-executor.full-chain.bun.test.ts`<br>`plan-runner.task-executor.interruption.bun.test.ts`<br>`finalize-task-result-recovery.bun.test.ts` |
+| `getPlanRun` | function | `duplicate-execution-regression.bun.test.ts`<br>`serial-branch-result-regression.bun.test.ts`<br>`stop-pause-regression.bun.test.ts`<br>`execute-command-receipts.focused.bun.test.ts`<br>`execute-command.smoke.bun.test.ts`<br>`plan-runner.bun.test.ts`<br>`plan-runner.task-executor.approval.bun.test.ts`<br>`plan-runner.task-executor.concurrency.bun.test.ts`<br>`plan-runner.task-executor.continuation.bun.test.ts`<br>`plan-runner.task-executor.external-results.bun.test.ts`<br>`plan-runner.task-executor.full-chain.bun.test.ts`<br>`plan-runner.task-executor.interruption.bun.test.ts`<br>`finalize-task-result-recovery.bun.test.ts` |
 
 </details>
 
@@ -419,7 +451,7 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 | `PlanRuntimeStateChangedError` | class | **none** |
 | `createPlanRunFromCompiledPlan` | function | **none** |
 | `derivePlanRunFromRuntime` | function | `plan-runner.task-executor.continuation.bun.test.ts` |
-| `ensureNativePlanRun` | function | `execute-command.smoke.bun.test.ts` |
+| `ensureNativePlanRun` | function | `execute-command-receipts.focused.bun.test.ts`<br>`execute-command.smoke.bun.test.ts` |
 | `persistRuntimeState` | function | `execute-command.smoke.bun.test.ts` |
 | `syncNormalizedRuntimeState` | function | **none** |
 
@@ -453,21 +485,21 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 
 | Symbol | Kind | Tests referencing it |
 | --- | --- | --- |
-| `executeTaskNodeCapabilityMock` | const | `duplicate-execution-regression.bun.test.ts`<br>`serial-branch-result-regression.bun.test.ts`<br>`stop-pause-regression.bun.test.ts`<br>`execute-command.smoke.bun.test.ts`<br>`plan-runner.task-executor.approval.bun.test.ts`<br>`plan-runner.task-executor.concurrency.bun.test.ts`<br>`plan-runner.task-executor.continuation.bun.test.ts`<br>`plan-runner.task-executor.external-results.bun.test.ts`<br>`plan-runner.task-executor.full-chain.bun.test.ts`<br>`plan-runner.task-executor.interruption.bun.test.ts`<br>`plan-runner.task-executor.runtime-events.bun.test.ts` |
+| `executeTaskNodeCapabilityMock` | const | `duplicate-execution-regression.bun.test.ts`<br>`serial-branch-result-regression.bun.test.ts`<br>`stop-pause-regression.bun.test.ts`<br>`execute-command-receipts.focused.bun.test.ts`<br>`execute-command.smoke.bun.test.ts`<br>`plan-runner.task-executor.approval.bun.test.ts`<br>`plan-runner.task-executor.concurrency.bun.test.ts`<br>`plan-runner.task-executor.continuation.bun.test.ts`<br>`plan-runner.task-executor.external-results.bun.test.ts`<br>`plan-runner.task-executor.full-chain.bun.test.ts`<br>`plan-runner.task-executor.interruption.bun.test.ts`<br>`plan-runner.task-executor.runtime-events.bun.test.ts` |
 | `reviewCheckpointNodeCapabilityMock` | const | **none** |
 | `evaluateConditionNodeCapabilityMock` | const | `plan-runner.task-executor.external-results.bun.test.ts` |
-| `setupPlanRunnerTaskExecutorTest` | function | `duplicate-execution-regression.bun.test.ts`<br>`serial-branch-result-regression.bun.test.ts`<br>`stop-pause-regression.bun.test.ts`<br>`execute-command.smoke.bun.test.ts`<br>`plan-runner.task-executor.approval.bun.test.ts`<br>`plan-runner.task-executor.concurrency.bun.test.ts`<br>`plan-runner.task-executor.continuation.bun.test.ts`<br>`plan-runner.task-executor.external-results.bun.test.ts`<br>`plan-runner.task-executor.full-chain.bun.test.ts`<br>`plan-runner.task-executor.interruption.bun.test.ts`<br>`plan-runner.task-executor.runtime-events.bun.test.ts` |
+| `setupPlanRunnerTaskExecutorTest` | function | `duplicate-execution-regression.bun.test.ts`<br>`serial-branch-result-regression.bun.test.ts`<br>`stop-pause-regression.bun.test.ts`<br>`execute-command-receipts.focused.bun.test.ts`<br>`execute-command.smoke.bun.test.ts`<br>`plan-runner.task-executor.approval.bun.test.ts`<br>`plan-runner.task-executor.concurrency.bun.test.ts`<br>`plan-runner.task-executor.continuation.bun.test.ts`<br>`plan-runner.task-executor.external-results.bun.test.ts`<br>`plan-runner.task-executor.full-chain.bun.test.ts`<br>`plan-runner.task-executor.interruption.bun.test.ts`<br>`plan-runner.task-executor.runtime-events.bun.test.ts` |
 | `resetDb` | function | `task-execution-store.bun.test.ts` |
-| `seedWorkspaceAndTask` | function | `duplicate-execution-regression.bun.test.ts`<br>`serial-branch-result-regression.bun.test.ts`<br>`stop-pause-regression.bun.test.ts`<br>`execute-command.smoke.bun.test.ts`<br>`task-execution-store.bun.test.ts`<br>`plan-runner.task-executor.approval.bun.test.ts`<br>`plan-runner.task-executor.concurrency.bun.test.ts`<br>`plan-runner.task-executor.continuation.bun.test.ts`<br>`plan-runner.task-executor.external-results.bun.test.ts`<br>`plan-runner.task-executor.full-chain.bun.test.ts`<br>`plan-runner.task-executor.interruption.bun.test.ts`<br>`plan-runner.task-executor.runtime-events.bun.test.ts` |
-| `makeSingleTaskPlan` | function | `plan-runner.task-executor.approval.bun.test.ts`<br>`plan-runner.task-executor.continuation.bun.test.ts`<br>`plan-runner.task-executor.external-results.bun.test.ts`<br>`plan-runner.task-executor.interruption.bun.test.ts`<br>`plan-runner.task-executor.runtime-events.bun.test.ts` |
-| `makeTwoTaskPlan` | function | `duplicate-execution-regression.bun.test.ts`<br>`stop-pause-regression.bun.test.ts`<br>`execute-command.smoke.bun.test.ts`<br>`plan-runner.task-executor.concurrency.bun.test.ts`<br>`plan-runner.task-executor.continuation.bun.test.ts`<br>`plan-runner.task-executor.external-results.bun.test.ts`<br>`plan-runner.task-executor.interruption.bun.test.ts` |
+| `seedWorkspaceAndTask` | function | `duplicate-execution-regression.bun.test.ts`<br>`serial-branch-result-regression.bun.test.ts`<br>`stop-pause-regression.bun.test.ts`<br>`execute-command-receipts.focused.bun.test.ts`<br>`execute-command.smoke.bun.test.ts`<br>`task-execution-store.bun.test.ts`<br>`plan-runner.task-executor.approval.bun.test.ts`<br>`plan-runner.task-executor.concurrency.bun.test.ts`<br>`plan-runner.task-executor.continuation.bun.test.ts`<br>`plan-runner.task-executor.external-results.bun.test.ts`<br>`plan-runner.task-executor.full-chain.bun.test.ts`<br>`plan-runner.task-executor.interruption.bun.test.ts`<br>`plan-runner.task-executor.runtime-events.bun.test.ts` |
+| `makeSingleTaskPlan` | function | `execute-command-receipts.focused.bun.test.ts`<br>`plan-runner.task-executor.approval.bun.test.ts`<br>`plan-runner.task-executor.continuation.bun.test.ts`<br>`plan-runner.task-executor.external-results.bun.test.ts`<br>`plan-runner.task-executor.interruption.bun.test.ts`<br>`plan-runner.task-executor.runtime-events.bun.test.ts` |
+| `makeTwoTaskPlan` | function | `duplicate-execution-regression.bun.test.ts`<br>`stop-pause-regression.bun.test.ts`<br>`execute-command-receipts.focused.bun.test.ts`<br>`execute-command.smoke.bun.test.ts`<br>`plan-runner.task-executor.concurrency.bun.test.ts`<br>`plan-runner.task-executor.continuation.bun.test.ts`<br>`plan-runner.task-executor.external-results.bun.test.ts`<br>`plan-runner.task-executor.interruption.bun.test.ts` |
 | `makeTwoEntryTaskPlan` | function | `serial-branch-result-regression.bun.test.ts`<br>`plan-runner.task-executor.concurrency.bun.test.ts`<br>`plan-runner.task-executor.continuation.bun.test.ts` |
 | `makeIndependentBranchesAfterManualPlan` | function | **none** |
 | `makeManualThenTaskPlan` | function | `plan-runner.task-executor.external-results.bun.test.ts` |
 | `makeInputCheckpointThenTaskPlan` | function | `plan-runner.task-executor.continuation.bun.test.ts` |
 | `makeFullExecutionPlan` | function | `plan-runner.task-executor.full-chain.bun.test.ts` |
 | `seedRuntimeSyncIdentity` | function | `stop-pause-regression.bun.test.ts`<br>`plan-runner.task-executor.continuation.bun.test.ts`<br>`plan-runner.task-executor.interruption.bun.test.ts` |
-| `seedAcceptedCompiledPlan` | function | `duplicate-execution-regression.bun.test.ts`<br>`serial-branch-result-regression.bun.test.ts`<br>`stop-pause-regression.bun.test.ts`<br>`execute-command.smoke.bun.test.ts`<br>`plan-runner.task-executor.approval.bun.test.ts`<br>`plan-runner.task-executor.concurrency.bun.test.ts`<br>`plan-runner.task-executor.continuation.bun.test.ts`<br>`plan-runner.task-executor.external-results.bun.test.ts`<br>`plan-runner.task-executor.full-chain.bun.test.ts`<br>`plan-runner.task-executor.interruption.bun.test.ts`<br>`plan-runner.task-executor.runtime-events.bun.test.ts` |
+| `seedAcceptedCompiledPlan` | function | `duplicate-execution-regression.bun.test.ts`<br>`serial-branch-result-regression.bun.test.ts`<br>`stop-pause-regression.bun.test.ts`<br>`execute-command-receipts.focused.bun.test.ts`<br>`execute-command.smoke.bun.test.ts`<br>`plan-runner.task-executor.approval.bun.test.ts`<br>`plan-runner.task-executor.concurrency.bun.test.ts`<br>`plan-runner.task-executor.continuation.bun.test.ts`<br>`plan-runner.task-executor.external-results.bun.test.ts`<br>`plan-runner.task-executor.full-chain.bun.test.ts`<br>`plan-runner.task-executor.interruption.bun.test.ts`<br>`plan-runner.task-executor.runtime-events.bun.test.ts` |
 
 </details>
 
@@ -632,17 +664,17 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/domain/src/task/derive-attention-descriptor.ts` | 1 | 120 | 1/1 | `derive-attention-descriptor.bun.test.ts` |
-| `packages/domain/src/task/derive-automation-policy-preview.ts` | 1 | 120 | 1/4 | `derive-automation-policy-preview.bun.test.ts` |
-| `packages/domain/src/task/derive-schedule-state.ts` | 0 | 119 | 0/1 | _(transitive only)_ |
-| `packages/domain/src/task/derive-task-execution-state.ts` | 1 | 120 | 2/2 | `derive-task-execution-state.bun.test.ts` |
-| `packages/domain/src/task/derive-task-occurrence.ts` | 1 | 120 | 4/5 | `derive-task-occurrence.bun.test.ts` |
-| `packages/domain/src/task/derive-task-runnability.ts` | 0 | 119 | 0/1 | _(transitive only)_ |
-| `packages/domain/src/task/derive-task-state.ts` | 2 | 121 | 1/1 | `derive-task-state.bun.test.ts`<br>`task-state-boundaries.bun.test.ts` |
-| `packages/domain/src/task/derive-task-static-state.ts` | 1 | 120 | 1/1 | `derive-task-static-state.bun.test.ts` |
-| `packages/domain/src/task/derive-user-facing-failure.ts` | 1 | 120 | 1/1 | `derive-user-facing-failure.bun.test.ts` |
-| `packages/domain/src/task/derive-work-state-view.ts` | 3 | 122 | 1/1 | `derive-attention-descriptor.bun.test.ts`<br>`derive-work-state-view-consistency.bun.test.ts`<br>`derive-work-state-view.bun.test.ts` |
-| `packages/domain/src/task/validate-schedule-window.ts` | 0 | 119 | 0/1 | _(transitive only)_ |
+| `packages/domain/src/task/derive-attention-descriptor.ts` | 1 | 124 | 1/1 | `derive-attention-descriptor.bun.test.ts` |
+| `packages/domain/src/task/derive-automation-policy-preview.ts` | 1 | 124 | 1/4 | `derive-automation-policy-preview.bun.test.ts` |
+| `packages/domain/src/task/derive-schedule-state.ts` | 0 | 123 | 0/1 | _(transitive only)_ |
+| `packages/domain/src/task/derive-task-execution-state.ts` | 1 | 124 | 2/2 | `derive-task-execution-state.bun.test.ts` |
+| `packages/domain/src/task/derive-task-occurrence.ts` | 1 | 124 | 4/5 | `derive-task-occurrence.bun.test.ts` |
+| `packages/domain/src/task/derive-task-runnability.ts` | 0 | 123 | 0/1 | _(transitive only)_ |
+| `packages/domain/src/task/derive-task-state.ts` | 2 | 125 | 1/1 | `derive-task-state.bun.test.ts`<br>`task-state-boundaries.bun.test.ts` |
+| `packages/domain/src/task/derive-task-static-state.ts` | 1 | 124 | 1/1 | `derive-task-static-state.bun.test.ts` |
+| `packages/domain/src/task/derive-user-facing-failure.ts` | 1 | 124 | 1/1 | `derive-user-facing-failure.bun.test.ts` |
+| `packages/domain/src/task/derive-work-state-view.ts` | 3 | 126 | 1/1 | `derive-attention-descriptor.bun.test.ts`<br>`derive-work-state-view-consistency.bun.test.ts`<br>`derive-work-state-view.bun.test.ts` |
+| `packages/domain/src/task/validate-schedule-window.ts` | 0 | 123 | 0/1 | _(transitive only)_ |
 
 <details><summary><code>packages/domain/src/task/derive-attention-descriptor.ts</code> &mdash; 1 exported symbol(s)</summary>
 
@@ -720,17 +752,17 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/engine/src/modules/events/append-canonical-event.ts` | 0 | 107 | 0/4 | _(transitive only)_ |
-| `packages/engine/src/modules/events/event-retention.ts` | 0 | 107 | 0/2 | _(transitive only)_ |
-| `packages/engine/src/modules/events/index.ts` | 2 | 107 | &mdash; | `auto-generate-scheduled-plan.bun.test.ts`<br>`continue-from-task-result.bun.test.ts` |
+| `packages/engine/src/modules/events/append-canonical-event.ts` | 0 | 113 | 0/4 | _(transitive only)_ |
+| `packages/engine/src/modules/events/event-retention.ts` | 0 | 113 | 0/2 | _(transitive only)_ |
+| `packages/engine/src/modules/events/index.ts` | 2 | 113 | &mdash; | `auto-generate-scheduled-plan.bun.test.ts`<br>`continue-from-task-result.bun.test.ts` |
 
 #### engine :: projections  _(3 files, 1 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/engine/src/modules/projections/index.ts` | 0 | 35 | &mdash; | _(transitive only)_ |
-| `packages/engine/src/modules/projections/rebuild-task-projection.ts` | 3 | 103 | 1/2 | `get-schedule-page.bun.test.ts`<br>`rebuild-task-projection.occurrence-isolation.bun.test.ts`<br>`get-task-page-orchestrator.bun.test.ts` |
-| `packages/engine/src/modules/projections/task-projection-events.ts` | 0 | 106 | 0/6 | _(transitive only)_ |
+| `packages/engine/src/modules/projections/index.ts` | 0 | 38 | &mdash; | _(transitive only)_ |
+| `packages/engine/src/modules/projections/rebuild-task-projection.ts` | 3 | 108 | 1/2 | `get-schedule-page.bun.test.ts`<br>`rebuild-task-projection.occurrence-isolation.bun.test.ts`<br>`get-task-page-orchestrator.bun.test.ts` |
+| `packages/engine/src/modules/projections/task-projection-events.ts` | 0 | 111 | 0/6 | _(transitive only)_ |
 
 <details><summary><code>packages/engine/src/modules/projections/rebuild-task-projection.ts</code> &mdash; 2 exported symbol(s)</summary>
 
@@ -745,32 +777,32 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/engine/src/modules/tasks/accept-task-result.ts` | 0 | 66 | 0/1 | _(transitive only)_ |
-| `packages/engine/src/modules/tasks/accepted-result-context.ts` | 1 | 78 | 1/2 | `accepted-result-context.bun.test.ts` |
-| `packages/engine/src/modules/tasks/continue-from-task-result.ts` | 1 | 67 | 1/2 | `continue-from-task-result.bun.test.ts` |
-| `packages/engine/src/modules/tasks/create-task.ts` | 5 | 72 | 1/1 | `auto-start-scheduled-plan.bun.test.ts`<br>`command-chain.bun.test.ts`<br>`continue-from-task-result.bun.test.ts`<br>`create-task-no-auto-plan.bun.test.ts`<br>`rebuild-task-with-latest-goal-assets.bun.test.ts` |
-| `packages/engine/src/modules/tasks/delete-task.ts` | 1 | 68 | 2/3 | `delete-task.bun.test.ts` |
-| `packages/engine/src/modules/tasks/file-preview.ts` | 1 | 67 | 2/2 | `file-preview.bun.test.ts` |
-| `packages/engine/src/modules/tasks/get-task-bootstrap.ts` | 1 | 67 | 1/1 | `get-task-page-orchestrator.bun.test.ts` |
-| `packages/engine/src/modules/tasks/get-task-command-center.ts` | 0 | 66 | 0/1 | _(transitive only)_ |
-| `packages/engine/src/modules/tasks/get-task-header.ts` | 1 | 67 | 4/6 | `get-task-header.bun.test.ts` |
-| `packages/engine/src/modules/tasks/get-task-page.ts` | 2 | 68 | 1/1 | `external-task-description-echo.bun.test.ts`<br>`get-task-page-orchestrator.bun.test.ts` |
-| `packages/engine/src/modules/tasks/get-task-review-context.ts` | 0 | 66 | 0/1 | _(transitive only)_ |
-| `packages/engine/src/modules/tasks/get-task-runtime-context.ts` | 0 | 66 | 0/1 | _(transitive only)_ |
-| `packages/engine/src/modules/tasks/index.ts` | 0 | 66 | &mdash; | _(transitive only)_ |
-| `packages/engine/src/modules/tasks/list-tasks.ts` | 0 | 66 | 0/1 | _(transitive only)_ |
-| `packages/engine/src/modules/tasks/mark-task-done.ts` | 0 | 66 | 0/1 | _(transitive only)_ |
-| `packages/engine/src/modules/tasks/open-task-result-file.ts` | 1 | 67 | 1/1 | `open-task-result-file.bun.test.ts` |
-| `packages/engine/src/modules/tasks/provider-activity.ts` | 0 | 68 | 0/4 | _(transitive only)_ |
-| `packages/engine/src/modules/tasks/rebuild-task-with-latest-goal-assets.ts` | 1 | 67 | 1/1 | `rebuild-task-with-latest-goal-assets.bun.test.ts` |
-| `packages/engine/src/modules/tasks/reopen-task.ts` | 1 | 67 | 1/1 | `command-chain.bun.test.ts` |
-| `packages/engine/src/modules/tasks/result-file-access.ts` | 2 | 92 | 4/6 | `open-task-result-file.bun.test.ts`<br>`result-file-access.bun.test.ts` |
-| `packages/engine/src/modules/tasks/task-activity-mapper.ts` | 0 | 68 | 0/1 | _(transitive only)_ |
-| `packages/engine/src/modules/tasks/task-activity-types.ts` | 0 | 68 | 0/10 | _(transitive only)_ |
-| `packages/engine/src/modules/tasks/task-activity.ts` | 2 | 69 | 3/5 | `get-task-page-orchestrator.bun.test.ts`<br>`task-activity.bun.test.ts` |
-| `packages/engine/src/modules/tasks/task-by-id.ts` | 0 | 73 | 0/1 | _(transitive only)_ |
-| `packages/engine/src/modules/tasks/tasks.ts` | 0 | 66 | 0/2 | _(transitive only)_ |
-| `packages/engine/src/modules/tasks/update-task.ts` | 2 | 68 | 1/1 | `command-chain.bun.test.ts`<br>`create-task-no-auto-plan.bun.test.ts` |
+| `packages/engine/src/modules/tasks/accept-task-result.ts` | 0 | 70 | 0/1 | _(transitive only)_ |
+| `packages/engine/src/modules/tasks/accepted-result-context.ts` | 1 | 82 | 1/2 | `accepted-result-context.bun.test.ts` |
+| `packages/engine/src/modules/tasks/continue-from-task-result.ts` | 1 | 71 | 1/2 | `continue-from-task-result.bun.test.ts` |
+| `packages/engine/src/modules/tasks/create-task.ts` | 5 | 76 | 1/1 | `auto-start-scheduled-plan.bun.test.ts`<br>`command-chain.bun.test.ts`<br>`continue-from-task-result.bun.test.ts`<br>`create-task-no-auto-plan.bun.test.ts`<br>`rebuild-task-with-latest-goal-assets.bun.test.ts` |
+| `packages/engine/src/modules/tasks/delete-task.ts` | 1 | 72 | 2/3 | `delete-task.bun.test.ts` |
+| `packages/engine/src/modules/tasks/file-preview.ts` | 1 | 94 | 2/2 | `file-preview.bun.test.ts` |
+| `packages/engine/src/modules/tasks/get-task-bootstrap.ts` | 1 | 71 | 1/1 | `get-task-page-orchestrator.bun.test.ts` |
+| `packages/engine/src/modules/tasks/get-task-command-center.ts` | 0 | 70 | 0/1 | _(transitive only)_ |
+| `packages/engine/src/modules/tasks/get-task-header.ts` | 1 | 71 | 4/6 | `get-task-header.bun.test.ts` |
+| `packages/engine/src/modules/tasks/get-task-page.ts` | 2 | 72 | 1/1 | `external-task-description-echo.bun.test.ts`<br>`get-task-page-orchestrator.bun.test.ts` |
+| `packages/engine/src/modules/tasks/get-task-review-context.ts` | 0 | 70 | 0/1 | _(transitive only)_ |
+| `packages/engine/src/modules/tasks/get-task-runtime-context.ts` | 0 | 70 | 0/1 | _(transitive only)_ |
+| `packages/engine/src/modules/tasks/index.ts` | 0 | 70 | &mdash; | _(transitive only)_ |
+| `packages/engine/src/modules/tasks/list-tasks.ts` | 0 | 70 | 0/1 | _(transitive only)_ |
+| `packages/engine/src/modules/tasks/mark-task-done.ts` | 0 | 70 | 0/1 | _(transitive only)_ |
+| `packages/engine/src/modules/tasks/open-task-result-file.ts` | 1 | 71 | 1/1 | `open-task-result-file.bun.test.ts` |
+| `packages/engine/src/modules/tasks/provider-activity.ts` | 0 | 72 | 0/4 | _(transitive only)_ |
+| `packages/engine/src/modules/tasks/rebuild-task-with-latest-goal-assets.ts` | 1 | 71 | 1/1 | `rebuild-task-with-latest-goal-assets.bun.test.ts` |
+| `packages/engine/src/modules/tasks/reopen-task.ts` | 1 | 71 | 1/1 | `command-chain.bun.test.ts` |
+| `packages/engine/src/modules/tasks/result-file-access.ts` | 2 | 101 | 5/7 | `open-task-result-file.bun.test.ts`<br>`result-file-access.bun.test.ts` |
+| `packages/engine/src/modules/tasks/task-activity-mapper.ts` | 0 | 72 | 0/1 | _(transitive only)_ |
+| `packages/engine/src/modules/tasks/task-activity-types.ts` | 0 | 72 | 0/10 | _(transitive only)_ |
+| `packages/engine/src/modules/tasks/task-activity.ts` | 2 | 73 | 3/5 | `get-task-page-orchestrator.bun.test.ts`<br>`task-activity.bun.test.ts` |
+| `packages/engine/src/modules/tasks/task-by-id.ts` | 0 | 77 | 0/1 | _(transitive only)_ |
+| `packages/engine/src/modules/tasks/tasks.ts` | 0 | 70 | 0/2 | _(transitive only)_ |
+| `packages/engine/src/modules/tasks/update-task.ts` | 2 | 72 | 1/1 | `command-chain.bun.test.ts`<br>`create-task-no-auto-plan.bun.test.ts` |
 
 <details><summary><code>packages/engine/src/modules/tasks/accepted-result-context.ts</code> &mdash; 2 exported symbol(s)</summary>
 
@@ -870,10 +902,11 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 
 </details>
 
-<details><summary><code>packages/engine/src/modules/tasks/result-file-access.ts</code> &mdash; 6 exported symbol(s)</summary>
+<details><summary><code>packages/engine/src/modules/tasks/result-file-access.ts</code> &mdash; 7 exported symbol(s)</summary>
 
 | Symbol | Kind | Tests referencing it |
 | --- | --- | --- |
+| `MAX_RESULT_FILE_BYTES` | const | `open-task-result-file.bun.test.ts`<br>`result-file-access.bun.test.ts` |
 | `generatedFilesRoot` | function | `open-task-result-file.bun.test.ts` |
 | `generatedFileReference` | function | **none** |
 | `resolveGeneratedFileReference` | function | **none** |
@@ -909,11 +942,11 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/domain/src/plan/compile.ts` | 2 | 120 | 1/1 | `plan-state-boundaries.bun.test.ts`<br>`plan.bun.test.ts` |
-| `packages/domain/src/plan/index.ts` | 0 | 119 | &mdash; | _(transitive only)_ |
-| `packages/domain/src/plan/patch.ts` | 1 | 118 | 1/1 | `plan.bun.test.ts` |
-| `packages/domain/src/plan/plan-blueprint-compiler.ts` | 1 | 118 | 1/1 | `plan-blueprint-compiler.bun.test.ts` |
-| `packages/domain/src/plan/validate.ts` | 2 | 120 | 1/1 | `plan-state-boundaries.bun.test.ts`<br>`plan.bun.test.ts` |
+| `packages/domain/src/plan/compile.ts` | 2 | 124 | 1/1 | `plan-state-boundaries.bun.test.ts`<br>`plan.bun.test.ts` |
+| `packages/domain/src/plan/index.ts` | 0 | 123 | &mdash; | _(transitive only)_ |
+| `packages/domain/src/plan/patch.ts` | 1 | 122 | 1/1 | `plan.bun.test.ts` |
+| `packages/domain/src/plan/plan-blueprint-compiler.ts` | 1 | 122 | 1/1 | `plan-blueprint-compiler.bun.test.ts` |
+| `packages/domain/src/plan/validate.ts` | 2 | 124 | 1/1 | `plan-state-boundaries.bun.test.ts`<br>`plan.bun.test.ts` |
 
 <details><summary><code>packages/domain/src/plan/compile.ts</code> &mdash; 1 exported symbol(s)</summary>
 
@@ -951,38 +984,38 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/engine/src/modules/ai/conflict-analyzer.ts` | 0 | 103 | 0/2 | _(transitive only)_ |
-| `packages/engine/src/modules/ai/conflict-detector.ts` | 0 | 103 | 0/4 | _(transitive only)_ |
-| `packages/engine/src/modules/ai/feature-normalizers.ts` | 0 | 103 | 0/2 | _(transitive only)_ |
-| `packages/engine/src/modules/ai/feature-runtime/action-execution.ts` | 0 | 96 | 0/1 | _(transitive only)_ |
-| `packages/engine/src/modules/ai/feature-runtime/action-registry.ts` | 0 | 82 | 0/2 | _(transitive only)_ |
+| `packages/engine/src/modules/ai/conflict-analyzer.ts` | 0 | 107 | 0/2 | _(transitive only)_ |
+| `packages/engine/src/modules/ai/conflict-detector.ts` | 0 | 107 | 0/4 | _(transitive only)_ |
+| `packages/engine/src/modules/ai/feature-normalizers.ts` | 0 | 107 | 0/2 | _(transitive only)_ |
+| `packages/engine/src/modules/ai/feature-runtime/action-execution.ts` | 0 | 101 | 0/1 | _(transitive only)_ |
+| `packages/engine/src/modules/ai/feature-runtime/action-registry.ts` | 0 | 86 | 0/2 | _(transitive only)_ |
 | `packages/engine/src/modules/ai/feature-runtime/completion-validator.ts` | 0 | 0 | 0/1 | **none** |
-| `packages/engine/src/modules/ai/feature-runtime/define-feature.ts` | 0 | 103 | 0/1 | _(transitive only)_ |
-| `packages/engine/src/modules/ai/feature-runtime/definition-registry.ts` | 0 | 103 | 0/1 | _(transitive only)_ |
-| `packages/engine/src/modules/ai/feature-runtime/feature-compiler.ts` | 0 | 103 | 0/1 | _(transitive only)_ |
-| `packages/engine/src/modules/ai/feature-runtime/feature-runner.ts` | 0 | 103 | 0/4 | _(transitive only)_ |
-| `packages/engine/src/modules/ai/feature-runtime/identifiers.ts` | 0 | 96 | 0/2 | _(transitive only)_ |
-| `packages/engine/src/modules/ai/feature-runtime/index.ts` | 2 | 105 | &mdash; | `foundation-provider-runtime.bun.test.ts`<br>`prisma-run-store.bun.test.ts` |
-| `packages/engine/src/modules/ai/feature-runtime/observation-registry.ts` | 0 | 96 | 0/3 | _(transitive only)_ |
-| `packages/engine/src/modules/ai/feature-runtime/provider-capabilities.ts` | 0 | 103 | 0/1 | _(transitive only)_ |
+| `packages/engine/src/modules/ai/feature-runtime/define-feature.ts` | 0 | 108 | 0/1 | _(transitive only)_ |
+| `packages/engine/src/modules/ai/feature-runtime/definition-registry.ts` | 0 | 108 | 0/1 | _(transitive only)_ |
+| `packages/engine/src/modules/ai/feature-runtime/feature-compiler.ts` | 0 | 108 | 0/2 | _(transitive only)_ |
+| `packages/engine/src/modules/ai/feature-runtime/feature-runner.ts` | 0 | 108 | 0/4 | _(transitive only)_ |
+| `packages/engine/src/modules/ai/feature-runtime/identifiers.ts` | 0 | 101 | 0/2 | _(transitive only)_ |
+| `packages/engine/src/modules/ai/feature-runtime/index.ts` | 3 | 110 | &mdash; | `feature-runner.bun.test.ts`<br>`foundation-provider-runtime.bun.test.ts`<br>`prisma-run-store.bun.test.ts` |
+| `packages/engine/src/modules/ai/feature-runtime/observation-registry.ts` | 0 | 101 | 0/3 | _(transitive only)_ |
+| `packages/engine/src/modules/ai/feature-runtime/provider-capabilities.ts` | 0 | 108 | 0/2 | _(transitive only)_ |
 | `packages/engine/src/modules/ai/feature-runtime/public-progress.ts` | 0 | 0 | 0/2 | **none** |
-| `packages/engine/src/modules/ai/feature-runtime/result-validator.ts` | 0 | 96 | 0/1 | _(transitive only)_ |
-| `packages/engine/src/modules/ai/feature-runtime/run-repository.ts` | 0 | 103 | &mdash; | _(transitive only)_ |
-| `packages/engine/src/modules/ai/feature-runtime/stable-json.ts` | 0 | 103 | 0/4 | _(transitive only)_ |
-| `packages/engine/src/modules/ai/index.ts` | 5 | 105 | &mdash; | `provider-response-parsing.bun.test.ts`<br>`streaming.bun.test.ts`<br>`feature-runner.bun.test.ts`<br>`dashboard-ai-surface.bun.test.ts`<br>`start-task-plan-generation.bun.test.ts` |
-| `packages/engine/src/modules/ai/management/ai-client-management.ts` | 1 | 104 | 1/2 | `ai-client-management.bun.test.ts` |
+| `packages/engine/src/modules/ai/feature-runtime/result-validator.ts` | 0 | 101 | 0/1 | _(transitive only)_ |
+| `packages/engine/src/modules/ai/feature-runtime/run-repository.ts` | 0 | 108 | &mdash; | _(transitive only)_ |
+| `packages/engine/src/modules/ai/feature-runtime/stable-json.ts` | 0 | 108 | 0/4 | _(transitive only)_ |
+| `packages/engine/src/modules/ai/index.ts` | 4 | 109 | &mdash; | `provider-response-parsing.bun.test.ts`<br>`streaming.bun.test.ts`<br>`dashboard-ai-surface.bun.test.ts`<br>`start-task-plan-generation.bun.test.ts` |
+| `packages/engine/src/modules/ai/management/ai-client-management.ts` | 1 | 108 | 1/2 | `ai-client-management.bun.test.ts` |
 | `packages/engine/src/modules/ai/management/index.ts` | 0 | 0 | &mdash; | **none** |
-| `packages/engine/src/modules/ai/provider-stream-contract.ts` | 0 | 105 | 0/2 | _(transitive only)_ |
-| `packages/engine/src/modules/ai/providers.ts` | 0 | 104 | 0/7 | _(transitive only)_ |
-| `packages/engine/src/modules/ai/runtime/ai-service.ts` | 0 | 103 | 0/1 | _(transitive only)_ |
-| `packages/engine/src/modules/ai/runtime/client-registry.ts` | 1 | 105 | 1/3 | `ai-client-management.bun.test.ts` |
-| `packages/engine/src/modules/ai/runtime/client-resolution.ts` | 1 | 105 | 1/4 | `ai-client-management.bun.test.ts` |
-| `packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.ts` | 1 | 104 | 1/1 | `foundation-provider-runtime.bun.test.ts` |
-| `packages/engine/src/modules/ai/runtime/feature-runtime/prisma-run-store.ts` | 1 | 104 | 1/2 | `prisma-run-store.bun.test.ts` |
-| `packages/engine/src/modules/ai/runtime/feature-runtime/public-query.ts` | 0 | 103 | 0/1 | _(transitive only)_ |
-| `packages/engine/src/modules/ai/runtime/feature-runtime/runtime-service.ts` | 0 | 103 | 0/5 | _(transitive only)_ |
-| `packages/engine/src/modules/ai/session.ts` | 0 | 101 | 0/1 | _(transitive only)_ |
-| `packages/engine/src/modules/ai/streaming.ts` | 0 | 103 | 0/3 | _(transitive only)_ |
+| `packages/engine/src/modules/ai/provider-stream-contract.ts` | 0 | 109 | 0/2 | _(transitive only)_ |
+| `packages/engine/src/modules/ai/providers.ts` | 0 | 108 | 0/9 | _(transitive only)_ |
+| `packages/engine/src/modules/ai/runtime/ai-service.ts` | 0 | 107 | 0/1 | _(transitive only)_ |
+| `packages/engine/src/modules/ai/runtime/client-registry.ts` | 1 | 109 | 1/3 | `ai-client-management.bun.test.ts` |
+| `packages/engine/src/modules/ai/runtime/client-resolution.ts` | 1 | 109 | 1/4 | `ai-client-management.bun.test.ts` |
+| `packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.ts` | 1 | 108 | 2/2 | `foundation-provider-runtime.bun.test.ts` |
+| `packages/engine/src/modules/ai/runtime/feature-runtime/prisma-run-store.ts` | 1 | 108 | 1/2 | `prisma-run-store.bun.test.ts` |
+| `packages/engine/src/modules/ai/runtime/feature-runtime/public-query.ts` | 0 | 107 | 0/1 | _(transitive only)_ |
+| `packages/engine/src/modules/ai/runtime/feature-runtime/runtime-service.ts` | 0 | 107 | 0/5 | _(transitive only)_ |
+| `packages/engine/src/modules/ai/session.ts` | 0 | 105 | 0/1 | _(transitive only)_ |
+| `packages/engine/src/modules/ai/streaming.ts` | 0 | 107 | 0/3 | _(transitive only)_ |
 
 <details><summary><code>packages/engine/src/modules/ai/management/ai-client-management.ts</code> &mdash; 2 exported symbol(s)</summary>
 
@@ -1014,10 +1047,11 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 
 </details>
 
-<details><summary><code>packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.ts</code> &mdash; 1 exported symbol(s)</summary>
+<details><summary><code>packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.ts</code> &mdash; 2 exported symbol(s)</summary>
 
 | Symbol | Kind | Tests referencing it |
 | --- | --- | --- |
+| `createFoundationFeatureStartInput` | function | `foundation-provider-runtime.bun.test.ts` |
 | `FoundationProviderRuntime` | class | `foundation-provider-runtime.bun.test.ts` |
 
 </details>
@@ -1031,24 +1065,24 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 
 </details>
 
-#### engine :: plans  _(14 files, 4 direct-covered)_
+#### engine :: plans  _(14 files, 5 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/engine/src/modules/plans/ai/task-plan-generate-run.ts` | 0 | 73 | 0/3 | _(transitive only)_ |
-| `packages/engine/src/modules/plans/ai/task.plan.generate.ts` | 0 | 73 | 0/6 | _(transitive only)_ |
-| `packages/engine/src/modules/plans/apply-plan-patch-command.ts` | 1 | 73 | 1/2 | `apply-plan-patch-command.bun.test.ts` |
-| `packages/engine/src/modules/plans/auto-generate-task-plan.ts` | 0 | 73 | 0/2 | _(transitive only)_ |
-| `packages/engine/src/modules/plans/generate-task-plan-manual-stream.ts` | 0 | 73 | 0/1 | _(transitive only)_ |
-| `packages/engine/src/modules/plans/index.ts` | 0 | 36 | &mdash; | _(transitive only)_ |
-| `packages/engine/src/modules/plans/plan-in-workspace.ts` | 0 | 73 | 0/1 | _(transitive only)_ |
-| `packages/engine/src/modules/plans/start-task-plan-generation.ts` | 1 | 74 | 1/1 | `start-task-plan-generation.bun.test.ts` |
-| `packages/engine/src/modules/plans/task-plan-blueprint-validation.ts` | 0 | 73 | 0/1 | _(transitive only)_ |
-| `packages/engine/src/modules/plans/task-plan-generation-persistence.ts` | 1 | 74 | 1/5 | `start-task-plan-generation.bun.test.ts` |
-| `packages/engine/src/modules/plans/task-plan-generation-registry.ts` | 0 | 79 | 0/5 | _(transitive only)_ |
+| `packages/engine/src/modules/plans/ai/task-plan-generate-run.ts` | 0 | 77 | 0/3 | _(transitive only)_ |
+| `packages/engine/src/modules/plans/ai/task.plan.generate.ts` | 0 | 77 | 0/6 | _(transitive only)_ |
+| `packages/engine/src/modules/plans/apply-plan-patch-command.ts` | 1 | 77 | 1/2 | `apply-plan-patch-command.bun.test.ts` |
+| `packages/engine/src/modules/plans/auto-generate-task-plan.ts` | 0 | 77 | 0/2 | _(transitive only)_ |
+| `packages/engine/src/modules/plans/generate-task-plan-manual-stream.ts` | 0 | 77 | 0/1 | _(transitive only)_ |
+| `packages/engine/src/modules/plans/index.ts` | 0 | 39 | &mdash; | _(transitive only)_ |
+| `packages/engine/src/modules/plans/plan-in-workspace.ts` | 0 | 77 | 0/1 | _(transitive only)_ |
+| `packages/engine/src/modules/plans/start-task-plan-generation.ts` | 1 | 78 | 1/1 | `start-task-plan-generation.bun.test.ts` |
+| `packages/engine/src/modules/plans/task-plan-blueprint-validation.ts` | 0 | 77 | 0/1 | _(transitive only)_ |
+| `packages/engine/src/modules/plans/task-plan-generation-persistence.ts` | 1 | 78 | 1/5 | `start-task-plan-generation.bun.test.ts` |
+| `packages/engine/src/modules/plans/task-plan-generation-registry.ts` | 1 | 84 | 2/7 | `start-task-plan-generation.bun.test.ts` |
 | `packages/engine/src/modules/plans/task-plan-graph.ts` | 0 | 0 | 0/2 | **none** |
-| `packages/engine/src/modules/plans/task-plan-read-model.ts` | 0 | 80 | 0/3 | _(transitive only)_ |
-| `packages/engine/src/modules/plans/task-planning.ts` | 1 | 74 | 1/2 | `apply-plan-patch-command.bun.test.ts` |
+| `packages/engine/src/modules/plans/task-plan-read-model.ts` | 0 | 84 | 0/3 | _(transitive only)_ |
+| `packages/engine/src/modules/plans/task-planning.ts` | 1 | 78 | 1/2 | `apply-plan-patch-command.bun.test.ts` |
 
 <details><summary><code>packages/engine/src/modules/plans/apply-plan-patch-command.ts</code> &mdash; 2 exported symbol(s)</summary>
 
@@ -1079,6 +1113,20 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 
 </details>
 
+<details><summary><code>packages/engine/src/modules/plans/task-plan-generation-registry.ts</code> &mdash; 7 exported symbol(s)</summary>
+
+| Symbol | Kind | Tests referencing it |
+| --- | --- | --- |
+| `TaskPlanGenerationInFlightError` | class | **none** |
+| `projectTaskPlanGenerationFailure` | function | `start-task-plan-generation.bun.test.ts` |
+| `getTaskPlanGenerationSession` | function | **none** |
+| `releaseTaskPlanGenerationHead` | function | `start-task-plan-generation.bun.test.ts` |
+| `stopTaskPlanGeneration` | function | **none** |
+| `isTaskPlanGenerationRunning` | function | **none** |
+| `subscribeTaskPlanGeneration` | function | **none** |
+
+</details>
+
 <details><summary><code>packages/engine/src/modules/plans/task-planning.ts</code> &mdash; 2 exported symbol(s)</summary>
 
 | Symbol | Kind | Tests referencing it |
@@ -1094,18 +1142,18 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/engine/src/modules/agent-tools/ai-execution-view.ts` | 0 | 36 | 0/1 | _(transitive only)_ |
-| `packages/engine/src/modules/agent-tools/audit.ts` | 0 | 36 | 0/2 | _(transitive only)_ |
-| `packages/engine/src/modules/agent-tools/control-route.ts` | 1 | 36 | 2/2 | `agent-control.bun.test.ts` |
-| `packages/engine/src/modules/agent-tools/dispatch.ts` | 0 | 36 | 0/2 | _(transitive only)_ |
-| `packages/engine/src/modules/agent-tools/index.ts` | 0 | 35 | &mdash; | _(transitive only)_ |
-| `packages/engine/src/modules/agent-tools/input-guards.ts` | 0 | 66 | 0/3 | _(transitive only)_ |
-| `packages/engine/src/modules/agent-tools/node-result-action.ts` | 2 | 92 | 4/5 | `agent-control.bun.test.ts`<br>`node-result-action.bun.test.ts` |
-| `packages/engine/src/modules/agent-tools/operations.ts` | 1 | 36 | 2/2 | `operations.bun.test.ts` |
+| `packages/engine/src/modules/agent-tools/ai-execution-view.ts` | 0 | 39 | 0/1 | _(transitive only)_ |
+| `packages/engine/src/modules/agent-tools/audit.ts` | 0 | 39 | 0/2 | _(transitive only)_ |
+| `packages/engine/src/modules/agent-tools/control-route.ts` | 1 | 39 | 2/2 | `agent-control.bun.test.ts` |
+| `packages/engine/src/modules/agent-tools/dispatch.ts` | 0 | 39 | 0/2 | _(transitive only)_ |
+| `packages/engine/src/modules/agent-tools/index.ts` | 0 | 38 | &mdash; | _(transitive only)_ |
+| `packages/engine/src/modules/agent-tools/input-guards.ts` | 0 | 70 | 0/3 | _(transitive only)_ |
+| `packages/engine/src/modules/agent-tools/node-result-action.ts` | 2 | 97 | 4/5 | `agent-control.bun.test.ts`<br>`node-result-action.bun.test.ts` |
+| `packages/engine/src/modules/agent-tools/operations.ts` | 1 | 39 | 2/2 | `operations.bun.test.ts` |
 | `packages/engine/src/modules/agent-tools/plan-generate-tool.ts` | 0 | 0 | 0/1 | **none** |
-| `packages/engine/src/modules/agent-tools/state-summary.ts` | 0 | 36 | 0/2 | _(transitive only)_ |
-| `packages/engine/src/modules/agent-tools/tool-result.ts` | 1 | 37 | 4/6 | `tool-result.bun.test.ts` |
-| `packages/engine/src/modules/agent-tools/types.ts` | 0 | 36 | &mdash; | _(transitive only)_ |
+| `packages/engine/src/modules/agent-tools/state-summary.ts` | 0 | 39 | 0/2 | _(transitive only)_ |
+| `packages/engine/src/modules/agent-tools/tool-result.ts` | 1 | 40 | 4/6 | `tool-result.bun.test.ts` |
+| `packages/engine/src/modules/agent-tools/types.ts` | 0 | 39 | &mdash; | _(transitive only)_ |
 
 <details><summary><code>packages/engine/src/modules/agent-tools/control-route.ts</code> &mdash; 2 exported symbol(s)</summary>
 
@@ -1154,49 +1202,49 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/graph-runtime/src/builtin-nodes.ts` | 0 | 118 | 0/1 | _(transitive only)_ |
+| `packages/graph-runtime/src/builtin-nodes.ts` | 0 | 123 | 0/1 | _(transitive only)_ |
 
 #### graph-runtime :: commands  _(10 files, 0 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/graph-runtime/src/commands/apply-mutation.ts` | 0 | 117 | 0/1 | _(transitive only)_ |
-| `packages/graph-runtime/src/commands/approve-current-node.ts` | 0 | 117 | 0/1 | _(transitive only)_ |
-| `packages/graph-runtime/src/commands/cancel-session.ts` | 0 | 117 | 0/1 | _(transitive only)_ |
-| `packages/graph-runtime/src/commands/command-core.ts` | 0 | 117 | &mdash; | _(transitive only)_ |
-| `packages/graph-runtime/src/commands/pause-session.ts` | 0 | 117 | 0/1 | _(transitive only)_ |
-| `packages/graph-runtime/src/commands/retry-node.ts` | 0 | 117 | 0/1 | _(transitive only)_ |
-| `packages/graph-runtime/src/commands/state-updates.ts` | 0 | 109 | 0/4 | _(transitive only)_ |
-| `packages/graph-runtime/src/commands/submit-node-result.ts` | 0 | 117 | 0/1 | _(transitive only)_ |
-| `packages/graph-runtime/src/commands/types.ts` | 0 | 118 | &mdash; | _(transitive only)_ |
-| `packages/graph-runtime/src/commands/validate-command.ts` | 0 | 117 | 0/1 | _(transitive only)_ |
+| `packages/graph-runtime/src/commands/apply-mutation.ts` | 0 | 122 | 0/1 | _(transitive only)_ |
+| `packages/graph-runtime/src/commands/approve-current-node.ts` | 0 | 122 | 0/1 | _(transitive only)_ |
+| `packages/graph-runtime/src/commands/cancel-session.ts` | 0 | 122 | 0/1 | _(transitive only)_ |
+| `packages/graph-runtime/src/commands/command-core.ts` | 0 | 122 | &mdash; | _(transitive only)_ |
+| `packages/graph-runtime/src/commands/pause-session.ts` | 0 | 122 | 0/1 | _(transitive only)_ |
+| `packages/graph-runtime/src/commands/retry-node.ts` | 0 | 122 | 0/1 | _(transitive only)_ |
+| `packages/graph-runtime/src/commands/state-updates.ts` | 0 | 114 | 0/4 | _(transitive only)_ |
+| `packages/graph-runtime/src/commands/submit-node-result.ts` | 0 | 122 | 0/1 | _(transitive only)_ |
+| `packages/graph-runtime/src/commands/types.ts` | 0 | 123 | &mdash; | _(transitive only)_ |
+| `packages/graph-runtime/src/commands/validate-command.ts` | 0 | 122 | 0/1 | _(transitive only)_ |
 
 #### graph-runtime :: evidence.ts  _(1 files, 0 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/graph-runtime/src/evidence.ts` | 0 | 118 | 0/1 | _(transitive only)_ |
+| `packages/graph-runtime/src/evidence.ts` | 0 | 123 | 0/1 | _(transitive only)_ |
 
 #### graph-runtime :: execution  _(4 files, 0 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/graph-runtime/src/execution/guards.ts` | 0 | 117 | 0/3 | _(transitive only)_ |
-| `packages/graph-runtime/src/execution/result-normalization.ts` | 0 | 117 | 0/5 | _(transitive only)_ |
-| `packages/graph-runtime/src/execution/run-graph-execution.ts` | 0 | 118 | 0/1 | _(transitive only)_ |
-| `packages/graph-runtime/src/execution/types.ts` | 0 | 118 | &mdash; | _(transitive only)_ |
+| `packages/graph-runtime/src/execution/guards.ts` | 0 | 122 | 0/3 | _(transitive only)_ |
+| `packages/graph-runtime/src/execution/result-normalization.ts` | 0 | 122 | 0/5 | _(transitive only)_ |
+| `packages/graph-runtime/src/execution/run-graph-execution.ts` | 0 | 123 | 0/1 | _(transitive only)_ |
+| `packages/graph-runtime/src/execution/types.ts` | 0 | 123 | &mdash; | _(transitive only)_ |
 
 #### graph-runtime :: execution-state.ts  _(1 files, 0 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/graph-runtime/src/execution-state.ts` | 0 | 118 | 0/6 | _(transitive only)_ |
+| `packages/graph-runtime/src/execution-state.ts` | 0 | 123 | 0/6 | _(transitive only)_ |
 
 #### graph-runtime :: graph-builder.ts  _(1 files, 0 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/graph-runtime/src/graph-builder.ts` | 0 | 118 | 0/2 | _(transitive only)_ |
+| `packages/graph-runtime/src/graph-builder.ts` | 0 | 123 | 0/2 | _(transitive only)_ |
 
 #### graph-runtime :: graph-runtime.test-fixtures.ts  _(1 files, 1 direct-covered)_
 
@@ -1221,71 +1269,71 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/graph-runtime/src/index.ts` | 12 | 118 | &mdash; | `reconcile-impossible-state.bun.test.ts`<br>`reconcile-task-state.bun.test.ts`<br>`plan-runner.task-executor.concurrency.bun.test.ts`<br>`plan-runner.task-executor.external-results.bun.test.ts`<br>`graph-runtime.dispatch.bun.test.ts`<br>`graph-runtime.execution-guards.bun.test.ts`<br>`graph-runtime.execution.bun.test.ts`<br>`graph-runtime.invalid-transitions.bun.test.ts`<br>`graph-runtime.mutation.bun.test.ts`<br>`graph-runtime.selection.bun.test.ts`<br>`graph-runtime.validation.bun.test.ts`<br>`resolve-state-semantics.bun.test.ts` |
+| `packages/graph-runtime/src/index.ts` | 12 | 123 | &mdash; | `reconcile-impossible-state.bun.test.ts`<br>`reconcile-task-state.bun.test.ts`<br>`plan-runner.task-executor.concurrency.bun.test.ts`<br>`plan-runner.task-executor.external-results.bun.test.ts`<br>`graph-runtime.dispatch.bun.test.ts`<br>`graph-runtime.execution-guards.bun.test.ts`<br>`graph-runtime.execution.bun.test.ts`<br>`graph-runtime.invalid-transitions.bun.test.ts`<br>`graph-runtime.mutation.bun.test.ts`<br>`graph-runtime.selection.bun.test.ts`<br>`graph-runtime.validation.bun.test.ts`<br>`resolve-state-semantics.bun.test.ts` |
 
 #### graph-runtime :: invalidation.ts  _(1 files, 0 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/graph-runtime/src/invalidation.ts` | 0 | 118 | 0/2 | _(transitive only)_ |
+| `packages/graph-runtime/src/invalidation.ts` | 0 | 123 | 0/2 | _(transitive only)_ |
 
 #### graph-runtime :: mutations.ts  _(1 files, 0 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/graph-runtime/src/mutations.ts` | 0 | 118 | 0/3 | _(transitive only)_ |
+| `packages/graph-runtime/src/mutations.ts` | 0 | 123 | 0/3 | _(transitive only)_ |
 
 #### graph-runtime :: registry  _(1 files, 0 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/graph-runtime/src/registry/executor-registry.ts` | 0 | 117 | 0/1 | _(transitive only)_ |
+| `packages/graph-runtime/src/registry/executor-registry.ts` | 0 | 122 | 0/1 | _(transitive only)_ |
 
 #### graph-runtime :: resolve.ts  _(1 files, 0 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/graph-runtime/src/resolve.ts` | 0 | 118 | 0/2 | _(transitive only)_ |
+| `packages/graph-runtime/src/resolve.ts` | 0 | 123 | 0/2 | _(transitive only)_ |
 
 #### graph-runtime :: runtime  _(1 files, 0 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/graph-runtime/src/runtime/create-graph-runtime.ts` | 0 | 118 | 0/1 | _(transitive only)_ |
+| `packages/graph-runtime/src/runtime/create-graph-runtime.ts` | 0 | 123 | 0/1 | _(transitive only)_ |
 
 #### graph-runtime :: status.ts  _(1 files, 0 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/graph-runtime/src/status.ts` | 0 | 118 | 0/2 | _(transitive only)_ |
+| `packages/graph-runtime/src/status.ts` | 0 | 123 | 0/2 | _(transitive only)_ |
 
 #### graph-runtime :: transitions.ts  _(1 files, 0 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/graph-runtime/src/transitions.ts` | 0 | 118 | 0/7 | _(transitive only)_ |
+| `packages/graph-runtime/src/transitions.ts` | 0 | 123 | 0/7 | _(transitive only)_ |
 
 #### graph-runtime :: types  _(11 files, 0 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/graph-runtime/src/types/callbacks.ts` | 0 | 117 | &mdash; | _(transitive only)_ |
-| `packages/graph-runtime/src/types/dispatch-core.ts` | 0 | 117 | &mdash; | _(transitive only)_ |
-| `packages/graph-runtime/src/types/dispatch-primitives.ts` | 0 | 117 | &mdash; | _(transitive only)_ |
-| `packages/graph-runtime/src/types/dispatch.ts` | 0 | 117 | &mdash; | _(transitive only)_ |
-| `packages/graph-runtime/src/types/events.ts` | 0 | 117 | &mdash; | _(transitive only)_ |
-| `packages/graph-runtime/src/types/execution.ts` | 0 | 117 | &mdash; | _(transitive only)_ |
-| `packages/graph-runtime/src/types/graph.ts` | 0 | 117 | &mdash; | _(transitive only)_ |
-| `packages/graph-runtime/src/types/index.ts` | 0 | 118 | &mdash; | _(transitive only)_ |
-| `packages/graph-runtime/src/types/layers.ts` | 0 | 117 | &mdash; | _(transitive only)_ |
-| `packages/graph-runtime/src/types/runtime.ts` | 0 | 118 | 0/2 | _(transitive only)_ |
-| `packages/graph-runtime/src/types/transitions.ts` | 0 | 117 | &mdash; | _(transitive only)_ |
+| `packages/graph-runtime/src/types/callbacks.ts` | 0 | 122 | &mdash; | _(transitive only)_ |
+| `packages/graph-runtime/src/types/dispatch-core.ts` | 0 | 122 | &mdash; | _(transitive only)_ |
+| `packages/graph-runtime/src/types/dispatch-primitives.ts` | 0 | 122 | &mdash; | _(transitive only)_ |
+| `packages/graph-runtime/src/types/dispatch.ts` | 0 | 122 | &mdash; | _(transitive only)_ |
+| `packages/graph-runtime/src/types/events.ts` | 0 | 122 | &mdash; | _(transitive only)_ |
+| `packages/graph-runtime/src/types/execution.ts` | 0 | 122 | &mdash; | _(transitive only)_ |
+| `packages/graph-runtime/src/types/graph.ts` | 0 | 122 | &mdash; | _(transitive only)_ |
+| `packages/graph-runtime/src/types/index.ts` | 0 | 123 | &mdash; | _(transitive only)_ |
+| `packages/graph-runtime/src/types/layers.ts` | 0 | 122 | &mdash; | _(transitive only)_ |
+| `packages/graph-runtime/src/types/runtime.ts` | 0 | 123 | 0/2 | _(transitive only)_ |
+| `packages/graph-runtime/src/types/transitions.ts` | 0 | 122 | &mdash; | _(transitive only)_ |
 
 #### graph-runtime :: validation.ts  _(1 files, 0 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/graph-runtime/src/validation.ts` | 0 | 118 | 0/3 | _(transitive only)_ |
+| `packages/graph-runtime/src/validation.ts` | 0 | 123 | 0/3 | _(transitive only)_ |
 
 ### Schedule cockpit (time blocks / conflicts / proposals / auto-start)
 
@@ -1293,8 +1341,8 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/domain/src/calendar/normalize-imported-events.ts` | 1 | 120 | 1/1 | `normalize-imported-events.bun.test.ts` |
-| `packages/domain/src/calendar/planning-busy-blocks.ts` | 1 | 120 | 1/1 | `planning-busy-blocks.bun.test.ts` |
+| `packages/domain/src/calendar/normalize-imported-events.ts` | 1 | 124 | 1/1 | `normalize-imported-events.bun.test.ts` |
+| `packages/domain/src/calendar/planning-busy-blocks.ts` | 1 | 124 | 1/1 | `planning-busy-blocks.bun.test.ts` |
 
 <details><summary><code>packages/domain/src/calendar/normalize-imported-events.ts</code> &mdash; 1 exported symbol(s)</summary>
 
@@ -1312,17 +1360,17 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 
 </details>
 
-#### engine :: pages  _(7 files, 4 direct-covered)_
+#### engine :: pages  _(7 files, 3 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/engine/src/modules/pages/dashboard-ai-surface.ts` | 1 | 66 | 4/7 | `dashboard-ai-surface.bun.test.ts` |
-| `packages/engine/src/modules/pages/get-action-center.ts` | 1 | 66 | 1/1 | `get-action-center.bun.test.ts` |
-| `packages/engine/src/modules/pages/get-dashboard.ts` | 1 | 66 | 1/1 | `dashboard-ai-surface.bun.test.ts` |
-| `packages/engine/src/modules/pages/get-memory-console.ts` | 0 | 65 | 0/1 | _(transitive only)_ |
-| `packages/engine/src/modules/pages/get-schedule-page.ts` | 3 | 68 | 1/1 | `get-schedule-page-auto-start-reason.bun.test.ts`<br>`get-schedule-page-runnable-state.bun.test.ts`<br>`get-schedule-page.bun.test.ts` |
-| `packages/engine/src/modules/pages/index.ts` | 0 | 65 | &mdash; | _(transitive only)_ |
-| `packages/engine/src/modules/pages/page-query.ts` | 0 | 65 | 0/2 | _(transitive only)_ |
+| `packages/engine/src/modules/pages/dashboard-ai-surface.ts` | 1 | 70 | 4/7 | `dashboard-ai-surface.bun.test.ts` |
+| `packages/engine/src/modules/pages/get-action-center.ts` | 0 | 69 | 0/1 | _(transitive only)_ |
+| `packages/engine/src/modules/pages/get-dashboard.ts` | 1 | 70 | 1/1 | `dashboard-ai-surface.bun.test.ts` |
+| `packages/engine/src/modules/pages/get-memory-console.ts` | 0 | 69 | 0/1 | _(transitive only)_ |
+| `packages/engine/src/modules/pages/get-schedule-page.ts` | 3 | 72 | 1/1 | `get-schedule-page-auto-start-reason.bun.test.ts`<br>`get-schedule-page-runnable-state.bun.test.ts`<br>`get-schedule-page.bun.test.ts` |
+| `packages/engine/src/modules/pages/index.ts` | 0 | 69 | &mdash; | _(transitive only)_ |
+| `packages/engine/src/modules/pages/page-query.ts` | 0 | 69 | 0/2 | _(transitive only)_ |
 
 <details><summary><code>packages/engine/src/modules/pages/dashboard-ai-surface.ts</code> &mdash; 7 exported symbol(s)</summary>
 
@@ -1335,14 +1383,6 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 | `dashboardAiBriefDisabledState` | function | **none** |
 | `getDashboardAiBriefState` | function | **none** |
 | `generateDashboardBrief` | function | `dashboard-ai-surface.bun.test.ts` |
-
-</details>
-
-<details><summary><code>packages/engine/src/modules/pages/get-action-center.ts</code> &mdash; 1 exported symbol(s)</summary>
-
-| Symbol | Kind | Tests referencing it |
-| --- | --- | --- |
-| `getActionCenter` | function | `get-action-center.bun.test.ts` |
 
 </details>
 
@@ -1366,17 +1406,17 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/engine/src/modules/scheduling/apply-schedule.ts` | 1 | 68 | 1/1 | `schedule-commands.bun.test.ts` |
-| `packages/engine/src/modules/scheduling/auto-generate-scheduled-plan.ts` | 1 | 70 | 1/1 | `auto-generate-scheduled-plan.bun.test.ts` |
-| `packages/engine/src/modules/scheduling/auto-start-runner.ts` | 1 | 68 | 2/2 | `auto-start-runner.bun.test.ts` |
-| `packages/engine/src/modules/scheduling/auto-start-scheduled-plan.ts` | 1 | 71 | 1/1 | `auto-start-scheduled-plan.bun.test.ts` |
-| `packages/engine/src/modules/scheduling/clear-schedule.ts` | 1 | 68 | 1/1 | `schedule-commands.bun.test.ts` |
-| `packages/engine/src/modules/scheduling/decide-schedule-proposal.ts` | 1 | 68 | 1/1 | `schedule-commands.bun.test.ts` |
-| `packages/engine/src/modules/scheduling/derive-auto-start-eligibility.ts` | 2 | 76 | 1/3 | `derive-auto-start-eligibility.bun.test.ts`<br>`derive-auto-start-eligibility.bun.test.ts` |
-| `packages/engine/src/modules/scheduling/index.ts` | 0 | 66 | &mdash; | _(transitive only)_ |
-| `packages/engine/src/modules/scheduling/move-work-block.ts` | 0 | 67 | 0/1 | _(transitive only)_ |
-| `packages/engine/src/modules/scheduling/propose-schedule.ts` | 1 | 68 | 1/1 | `schedule-commands.bun.test.ts` |
-| `packages/engine/src/modules/scheduling/task-scheduling.ts` | 1 | 67 | 1/2 | `auto-start-scheduled-plan.bun.test.ts` |
+| `packages/engine/src/modules/scheduling/apply-schedule.ts` | 1 | 72 | 1/1 | `schedule-commands.bun.test.ts` |
+| `packages/engine/src/modules/scheduling/auto-generate-scheduled-plan.ts` | 1 | 74 | 1/1 | `auto-generate-scheduled-plan.bun.test.ts` |
+| `packages/engine/src/modules/scheduling/auto-start-runner.ts` | 1 | 72 | 2/2 | `auto-start-runner.bun.test.ts` |
+| `packages/engine/src/modules/scheduling/auto-start-scheduled-plan.ts` | 1 | 75 | 1/1 | `auto-start-scheduled-plan.bun.test.ts` |
+| `packages/engine/src/modules/scheduling/clear-schedule.ts` | 1 | 72 | 1/1 | `schedule-commands.bun.test.ts` |
+| `packages/engine/src/modules/scheduling/decide-schedule-proposal.ts` | 1 | 72 | 1/1 | `schedule-commands.bun.test.ts` |
+| `packages/engine/src/modules/scheduling/derive-auto-start-eligibility.ts` | 2 | 80 | 1/3 | `derive-auto-start-eligibility.bun.test.ts`<br>`derive-auto-start-eligibility.bun.test.ts` |
+| `packages/engine/src/modules/scheduling/index.ts` | 0 | 70 | &mdash; | _(transitive only)_ |
+| `packages/engine/src/modules/scheduling/move-work-block.ts` | 0 | 71 | 0/1 | _(transitive only)_ |
+| `packages/engine/src/modules/scheduling/propose-schedule.ts` | 1 | 72 | 1/1 | `schedule-commands.bun.test.ts` |
+| `packages/engine/src/modules/scheduling/task-scheduling.ts` | 1 | 71 | 1/2 | `auto-start-scheduled-plan.bun.test.ts` |
 
 <details><summary><code>packages/engine/src/modules/scheduling/apply-schedule.ts</code> &mdash; 1 exported symbol(s)</summary>
 
@@ -1460,7 +1500,7 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/contracts/src/external-calendar.ts` | 1 | 163 | 3/20 | `external-calendar.bun.test.ts` |
+| `packages/contracts/src/external-calendar.ts` | 1 | 168 | 3/20 | `external-calendar.bun.test.ts` |
 
 <details><summary><code>packages/contracts/src/external-calendar.ts</code> &mdash; 20 exported symbol(s)</summary>
 
@@ -1493,7 +1533,7 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/db/src/external-calendar.ts` | 2 | 111 | 7/8 | `external-calendar-management.bun.test.ts`<br>`external-calendar.bun.test.ts` |
+| `packages/db/src/external-calendar.ts` | 2 | 133 | 7/8 | `external-calendar-management.bun.test.ts`<br>`external-calendar.bun.test.ts` |
 
 <details><summary><code>packages/db/src/external-calendar.ts</code> &mdash; 8 exported symbol(s)</summary>
 
@@ -1514,18 +1554,18 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/i18n/src/external-calendar-messages.ts` | 0 | 46 | 0/1 | _(transitive only)_ |
+| `packages/i18n/src/external-calendar-messages.ts` | 0 | 49 | 0/1 | _(transitive only)_ |
 
 #### integrations :: calendar  _(7 files, 1 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
 | `packages/integrations/src/calendar/feed-client.ts` | 0 | 0 | &mdash; | **none** |
-| `packages/integrations/src/calendar/feed-fetcher.ts` | 0 | 76 | 0/4 | _(transitive only)_ |
-| `packages/integrations/src/calendar/normalizer.ts` | 0 | 76 | 0/1 | _(transitive only)_ |
+| `packages/integrations/src/calendar/feed-fetcher.ts` | 0 | 80 | 0/4 | _(transitive only)_ |
+| `packages/integrations/src/calendar/normalizer.ts` | 0 | 80 | 0/1 | _(transitive only)_ |
 | `packages/integrations/src/calendar/parse-feed.ts` | 0 | 0 | &mdash; | **none** |
-| `packages/integrations/src/calendar/recurrence.ts` | 0 | 76 | 0/1 | _(transitive only)_ |
-| `packages/integrations/src/calendar/source-url.ts` | 1 | 77 | 4/4 | `source-url.bun.test.ts` |
+| `packages/integrations/src/calendar/recurrence.ts` | 0 | 80 | 0/1 | _(transitive only)_ |
+| `packages/integrations/src/calendar/source-url.ts` | 1 | 81 | 4/4 | `source-url.bun.test.ts` |
 | `packages/integrations/src/calendar/test-fixtures.ts` | 0 | 0 | 0/1 | **none** |
 
 <details><summary><code>packages/integrations/src/calendar/source-url.ts</code> &mdash; 4 exported symbol(s)</summary>
@@ -1545,7 +1585,7 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/providers/acp/src/AcpProviderClient.ts` | 1 | 95 | 1/2 | `AcpProviderClient.bun.test.ts` |
+| `packages/providers/acp/src/AcpProviderClient.ts` | 1 | 98 | 1/2 | `AcpProviderClient.bun.test.ts` |
 
 <details><summary><code>packages/providers/acp/src/AcpProviderClient.ts</code> &mdash; 2 exported symbol(s)</summary>
 
@@ -1560,13 +1600,13 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/providers/acp/src/index.ts` | 1 | 99 | &mdash; | `CodexProviderClient.bun.test.ts` |
+| `packages/providers/acp/src/index.ts` | 1 | 102 | &mdash; | `CodexProviderClient.bun.test.ts` |
 
 #### providers/acp :: types.ts  _(1 files, 1 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/providers/acp/src/types.ts` | 1 | 95 | 0/2 | `AcpProviderClient.bun.test.ts` |
+| `packages/providers/acp/src/types.ts` | 1 | 98 | 0/2 | `AcpProviderClient.bun.test.ts` |
 
 <details><summary><code>packages/providers/acp/src/types.ts</code> &mdash; 2 exported symbol(s)</summary>
 
@@ -1581,7 +1621,7 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/providers/claude-code/src/ClaudeCodeProviderClient.ts` | 1 | 114 | 1/1 | `ClaudeCodeProviderClient.bun.test.ts` |
+| `packages/providers/claude-code/src/ClaudeCodeProviderClient.ts` | 1 | 118 | 1/1 | `ClaudeCodeProviderClient.bun.test.ts` |
 
 <details><summary><code>packages/providers/claude-code/src/ClaudeCodeProviderClient.ts</code> &mdash; 1 exported symbol(s)</summary>
 
@@ -1620,13 +1660,13 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/providers/claude-code/src/index.ts` | 0 | 116 | 0/1 | _(transitive only)_ |
+| `packages/providers/claude-code/src/index.ts` | 0 | 120 | 0/1 | _(transitive only)_ |
 
 #### providers/claude-code :: mcp-node-tools.ts  _(1 files, 0 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/providers/claude-code/src/mcp-node-tools.ts` | 0 | 104 | 0/2 | _(transitive only)_ |
+| `packages/providers/claude-code/src/mcp-node-tools.ts` | 0 | 107 | 0/2 | _(transitive only)_ |
 
 #### providers/claude-code :: mcp-test-server.ts  _(1 files, 1 direct-covered)_
 
@@ -1646,13 +1686,13 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/providers/claude-code/src/normalizer-builders.ts` | 0 | 100 | 0/6 | _(transitive only)_ |
+| `packages/providers/claude-code/src/normalizer-builders.ts` | 0 | 103 | 0/6 | _(transitive only)_ |
 
 #### providers/claude-code :: normalizers.ts  _(1 files, 1 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/providers/claude-code/src/normalizers.ts` | 2 | 105 | 2/2 | `ClaudeCodeProviderClient.bun.test.ts`<br>`normalizers.result.bun.test.ts` |
+| `packages/providers/claude-code/src/normalizers.ts` | 2 | 108 | 2/2 | `ClaudeCodeProviderClient.bun.test.ts`<br>`normalizers.result.bun.test.ts` |
 
 <details><summary><code>packages/providers/claude-code/src/normalizers.ts</code> &mdash; 2 exported symbol(s)</summary>
 
@@ -1667,7 +1707,7 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/providers/claude-code/src/runner-helpers.ts` | 1 | 105 | 1/4 | `runner-helpers.bun.test.ts` |
+| `packages/providers/claude-code/src/runner-helpers.ts` | 1 | 108 | 1/4 | `runner-helpers.bun.test.ts` |
 
 <details><summary><code>packages/providers/claude-code/src/runner-helpers.ts</code> &mdash; 4 exported symbol(s)</summary>
 
@@ -1684,7 +1724,7 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/providers/claude-code/src/runner.ts` | 4 | 117 | 8/10 | `ClaudeCodeProviderClient.bun.test.ts`<br>`runner.mcp-probe.bun.test.ts`<br>`runner.mcp-url.bun.test.ts`<br>`runner.skill-env.bun.test.ts` |
+| `packages/providers/claude-code/src/runner.ts` | 4 | 121 | 8/10 | `ClaudeCodeProviderClient.bun.test.ts`<br>`runner.mcp-probe.bun.test.ts`<br>`runner.mcp-url.bun.test.ts`<br>`runner.skill-env.bun.test.ts` |
 
 <details><summary><code>packages/providers/claude-code/src/runner.ts</code> &mdash; 10 exported symbol(s)</summary>
 
@@ -1707,13 +1747,13 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/providers/claude-code/src/types.ts` | 0 | 117 | 0/1 | _(transitive only)_ |
+| `packages/providers/claude-code/src/types.ts` | 0 | 121 | 0/1 | _(transitive only)_ |
 
 #### providers/codex :: CodexProviderClient.ts  _(1 files, 1 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/providers/codex/src/CodexProviderClient.ts` | 1 | 112 | 1/1 | `CodexProviderClient.bun.test.ts` |
+| `packages/providers/codex/src/CodexProviderClient.ts` | 1 | 116 | 1/1 | `CodexProviderClient.bun.test.ts` |
 
 <details><summary><code>packages/providers/codex/src/CodexProviderClient.ts</code> &mdash; 1 exported symbol(s)</summary>
 
@@ -1727,13 +1767,13 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/providers/codex/src/index.ts` | 0 | 116 | 0/1 | _(transitive only)_ |
+| `packages/providers/codex/src/index.ts` | 0 | 120 | 0/1 | _(transitive only)_ |
 
 #### providers/codex :: types.ts  _(1 files, 1 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/providers/codex/src/types.ts` | 1 | 112 | 2/2 | `CodexProviderClient.bun.test.ts` |
+| `packages/providers/codex/src/types.ts` | 1 | 116 | 2/2 | `CodexProviderClient.bun.test.ts` |
 
 <details><summary><code>packages/providers/codex/src/types.ts</code> &mdash; 2 exported symbol(s)</summary>
 
@@ -1748,7 +1788,7 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/providers/debug/src/ChronaDebugProviderClient.ts` | 1 | 112 | 2/4 | `ChronaDebugProviderClient.bun.test.ts` |
+| `packages/providers/debug/src/ChronaDebugProviderClient.ts` | 1 | 116 | 2/4 | `ChronaDebugProviderClient.bun.test.ts` |
 
 <details><summary><code>packages/providers/debug/src/ChronaDebugProviderClient.ts</code> &mdash; 4 exported symbol(s)</summary>
 
@@ -1765,33 +1805,35 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/providers/debug/src/index.ts` | 0 | 116 | &mdash; | _(transitive only)_ |
+| `packages/providers/debug/src/index.ts` | 0 | 120 | &mdash; | _(transitive only)_ |
 
 #### providers/foundation :: ProviderClient.ts  _(1 files, 1 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/providers/foundation/src/ProviderClient.ts` | 1 | 136 | &mdash; | `provider-capability-matrix.bun.test.ts` |
+| `packages/providers/foundation/src/ProviderClient.ts` | 1 | 141 | &mdash; | `provider-capability-matrix.bun.test.ts` |
 
 #### providers/foundation :: bounded-terminal-run-snapshots.ts  _(1 files, 0 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/providers/foundation/src/bounded-terminal-run-snapshots.ts` | 0 | 135 | 0/1 | _(transitive only)_ |
+| `packages/providers/foundation/src/bounded-terminal-run-snapshots.ts` | 0 | 140 | 0/1 | _(transitive only)_ |
 
 #### providers/foundation :: contracts  _(1 files, 1 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/providers/foundation/src/contracts/provider.ts` | 1 | 132 | 6/41 | `provider-session-identity.bun.test.ts` |
+| `packages/providers/foundation/src/contracts/provider.ts` | 1 | 137 | 6/43 | `provider-session-identity.bun.test.ts` |
 
-<details><summary><code>packages/providers/foundation/src/contracts/provider.ts</code> &mdash; 41 exported symbol(s)</summary>
+<details><summary><code>packages/providers/foundation/src/contracts/provider.ts</code> &mdash; 43 exported symbol(s)</summary>
 
 | Symbol | Kind | Tests referencing it |
 | --- | --- | --- |
 | `providerRunInputSchema` | const | **none** |
 | `providerUsageSchema` | const | **none** |
 | `providerStructuredOutputSchemaSchema` | const | **none** |
+| `providerToolPolicySchema` | const | **none** |
+| `providerTerminalToolCallSchema` | const | **none** |
 | `providerApprovalChoiceSchema` | const | **none** |
 | `providerApprovalRiskLevelSchema` | const | **none** |
 | `providerApprovalSubjectSchema` | const | **none** |
@@ -1837,13 +1879,13 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/providers/foundation/src/index.ts` | 18 | 136 | &mdash; | `plan-execution-module.bun.test.ts`<br>`plan-execution-output.bun.test.ts`<br>`provider-bridge-malformed-workflow.bun.test.ts`<br>`provider-fixture-replay-regression.bun.test.ts`<br>`provider-response-parsing.bun.test.ts`<br>`streaming.bun.test.ts`<br>`providers.bun.test.ts`<br>`foundation-provider-runtime.bun.test.ts`<br>`ai-runtime-invoker.bun.test.ts`<br>`llm-fixture-recorder.bun.test.ts`<br>`AcpProviderClient.bun.test.ts`<br>`ClaudeCodeProviderClient.bun.test.ts`<br>`claude-code-aimock-extra-live.bun.test.ts`<br>`claude-code-aimock-live.bun.test.ts`<br>`runner.mcp-url.bun.test.ts`<br>`CodexProviderClient.bun.test.ts`<br>`HermesProviderClient.bun.test.ts`<br>`OmpProviderClient.bun.test.ts` |
+| `packages/providers/foundation/src/index.ts` | 18 | 141 | &mdash; | `plan-execution-module.bun.test.ts`<br>`plan-execution-output.bun.test.ts`<br>`provider-bridge-malformed-workflow.bun.test.ts`<br>`provider-fixture-replay-regression.bun.test.ts`<br>`provider-response-parsing.bun.test.ts`<br>`streaming.bun.test.ts`<br>`providers.bun.test.ts`<br>`foundation-provider-runtime.bun.test.ts`<br>`ai-runtime-invoker.bun.test.ts`<br>`llm-fixture-recorder.bun.test.ts`<br>`AcpProviderClient.bun.test.ts`<br>`ClaudeCodeProviderClient.bun.test.ts`<br>`claude-code-aimock-extra-live.bun.test.ts`<br>`claude-code-aimock-live.bun.test.ts`<br>`runner.mcp-url.bun.test.ts`<br>`CodexProviderClient.bun.test.ts`<br>`HermesProviderClient.bun.test.ts`<br>`OmpProviderClient.bun.test.ts` |
 
 #### providers/foundation :: provider-capability-matrix.ts  _(1 files, 1 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/providers/foundation/src/provider-capability-matrix.ts` | 1 | 136 | 1/1 | `provider-capability-matrix.bun.test.ts` |
+| `packages/providers/foundation/src/provider-capability-matrix.ts` | 1 | 141 | 1/1 | `provider-capability-matrix.bun.test.ts` |
 
 <details><summary><code>packages/providers/foundation/src/provider-capability-matrix.ts</code> &mdash; 1 exported symbol(s)</summary>
 
@@ -1857,31 +1899,31 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/providers/foundation/src/replay.ts` | 0 | 131 | 0/5 | _(transitive only)_ |
+| `packages/providers/foundation/src/replay.ts` | 0 | 136 | 0/5 | _(transitive only)_ |
 
 #### providers/foundation :: server-event-stream.ts  _(1 files, 0 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/providers/foundation/src/server-event-stream.ts` | 0 | 135 | 0/4 | _(transitive only)_ |
+| `packages/providers/foundation/src/server-event-stream.ts` | 0 | 140 | 0/4 | _(transitive only)_ |
 
 #### providers/hermes :: HermesProviderClient.ts  _(1 files, 0 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/providers/hermes/src/HermesProviderClient.ts` | 0 | 114 | 0/1 | _(transitive only)_ |
+| `packages/providers/hermes/src/HermesProviderClient.ts` | 0 | 118 | 0/1 | _(transitive only)_ |
 
 #### providers/hermes :: http.ts  _(1 files, 0 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/providers/hermes/src/http.ts` | 0 | 101 | 0/3 | _(transitive only)_ |
+| `packages/providers/hermes/src/http.ts` | 0 | 105 | 0/3 | _(transitive only)_ |
 
 #### providers/hermes :: index.ts  _(1 files, 1 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/providers/hermes/src/index.ts` | 1 | 118 | 0/1 | `HermesProviderClient.bun.test.ts` |
+| `packages/providers/hermes/src/index.ts` | 1 | 122 | 0/1 | `HermesProviderClient.bun.test.ts` |
 
 <details><summary><code>packages/providers/hermes/src/index.ts</code> &mdash; 1 exported symbol(s)</summary>
 
@@ -1895,25 +1937,25 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/providers/hermes/src/normalizers.ts` | 0 | 101 | 0/7 | _(transitive only)_ |
+| `packages/providers/hermes/src/normalizers.ts` | 0 | 105 | 0/7 | _(transitive only)_ |
 
 #### providers/hermes :: sse.ts  _(1 files, 0 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/providers/hermes/src/sse.ts` | 0 | 101 | 0/1 | _(transitive only)_ |
+| `packages/providers/hermes/src/sse.ts` | 0 | 105 | 0/1 | _(transitive only)_ |
 
 #### providers/hermes :: types.ts  _(1 files, 0 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/providers/hermes/src/types.ts` | 0 | 114 | 0/1 | _(transitive only)_ |
+| `packages/providers/hermes/src/types.ts` | 0 | 118 | 0/1 | _(transitive only)_ |
 
 #### providers/omp :: OmpProviderClient.ts  _(1 files, 1 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/providers/omp/src/OmpProviderClient.ts` | 1 | 112 | 1/1 | `OmpProviderClient.bun.test.ts` |
+| `packages/providers/omp/src/OmpProviderClient.ts` | 1 | 116 | 1/1 | `OmpProviderClient.bun.test.ts` |
 
 <details><summary><code>packages/providers/omp/src/OmpProviderClient.ts</code> &mdash; 1 exported symbol(s)</summary>
 
@@ -1927,7 +1969,7 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/providers/omp/src/OmpSdkProviderClient.ts` | 1 | 112 | 2/2 | `OmpProviderClient.bun.test.ts` |
+| `packages/providers/omp/src/OmpSdkProviderClient.ts` | 1 | 116 | 2/2 | `OmpProviderClient.bun.test.ts` |
 
 <details><summary><code>packages/providers/omp/src/OmpSdkProviderClient.ts</code> &mdash; 2 exported symbol(s)</summary>
 
@@ -1942,37 +1984,37 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/providers/omp/src/index.ts` | 0 | 116 | 0/1 | _(transitive only)_ |
+| `packages/providers/omp/src/index.ts` | 0 | 120 | 0/1 | _(transitive only)_ |
 
 #### providers/omp :: types.ts  _(1 files, 0 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/providers/omp/src/types.ts` | 0 | 112 | &mdash; | _(transitive only)_ |
+| `packages/providers/omp/src/types.ts` | 0 | 116 | &mdash; | _(transitive only)_ |
 
 #### runtime-core :: config-spec.ts  _(1 files, 0 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/runtime-core/src/config-spec.ts` | 0 | 112 | 0/6 | _(transitive only)_ |
+| `packages/runtime-core/src/config-spec.ts` | 0 | 116 | 0/6 | _(transitive only)_ |
 
 #### runtime-core :: contracts.ts  _(1 files, 0 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/runtime-core/src/contracts.ts` | 0 | 112 | &mdash; | _(transitive only)_ |
+| `packages/runtime-core/src/contracts.ts` | 0 | 116 | &mdash; | _(transitive only)_ |
 
 #### runtime-core :: index.ts  _(1 files, 1 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/runtime-core/src/index.ts` | 1 | 123 | &mdash; | `config-spec.bun.test.ts` |
+| `packages/runtime-core/src/index.ts` | 1 | 127 | &mdash; | `config-spec.bun.test.ts` |
 
 #### runtime-core :: types.ts  _(1 files, 0 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/runtime-core/src/types.ts` | 0 | 107 | &mdash; | _(transitive only)_ |
+| `packages/runtime-core/src/types.ts` | 0 | 110 | &mdash; | _(transitive only)_ |
 
 ### Contracts (schemas / DTOs / MCP tool specs)
 
@@ -1980,61 +2022,61 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/contracts/src/ai-dispatch-types.ts` | 0 | 166 | 0/6 | _(transitive only)_ |
+| `packages/contracts/src/ai-dispatch-types.ts` | 0 | 171 | 0/6 | _(transitive only)_ |
 
 #### contracts :: ai-feature-runtime  _(2 files, 1 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/contracts/src/ai-feature-runtime/contracts.ts` | 0 | 167 | 0/46 | _(transitive only)_ |
-| `packages/contracts/src/ai-feature-runtime/index.ts` | 4 | 169 | &mdash; | `contracts.bun.test.ts`<br>`feature-runner.bun.test.ts`<br>`prisma-run-store.bun.test.ts`<br>`goal.review.bun.test.ts` |
+| `packages/contracts/src/ai-feature-runtime/contracts.ts` | 0 | 172 | 0/46 | _(transitive only)_ |
+| `packages/contracts/src/ai-feature-runtime/index.ts` | 4 | 174 | &mdash; | `contracts.bun.test.ts`<br>`feature-runner.bun.test.ts`<br>`prisma-run-store.bun.test.ts`<br>`goal.review.bun.test.ts` |
 
 #### contracts :: ai-feature-types.ts  _(1 files, 0 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/contracts/src/ai-feature-types.ts` | 0 | 166 | 0/3 | _(transitive only)_ |
+| `packages/contracts/src/ai-feature-types.ts` | 0 | 171 | 0/3 | _(transitive only)_ |
 
 #### contracts :: ai-plan-blueprint.ts  _(1 files, 0 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/contracts/src/ai-plan-blueprint.ts` | 0 | 191 | 0/27 | _(transitive only)_ |
+| `packages/contracts/src/ai-plan-blueprint.ts` | 0 | 196 | 0/27 | _(transitive only)_ |
 
 #### contracts :: ai-shared-types.ts  _(1 files, 0 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/contracts/src/ai-shared-types.ts` | 0 | 186 | &mdash; | _(transitive only)_ |
+| `packages/contracts/src/ai-shared-types.ts` | 0 | 190 | &mdash; | _(transitive only)_ |
 
 #### contracts :: ai-sidebar.ts  _(1 files, 0 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/contracts/src/ai-sidebar.ts` | 0 | 162 | &mdash; | _(transitive only)_ |
+| `packages/contracts/src/ai-sidebar.ts` | 0 | 167 | &mdash; | _(transitive only)_ |
 
 #### contracts :: ai.ts  _(1 files, 1 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/contracts/src/ai.ts` | 33 | 153 | &mdash; | `plan-acceptance-edges.bun.test.ts`<br>`plan-execution-module.bun.test.ts`<br>`plan-execution-output.bun.test.ts`<br>`plan-lifecycle-edge-workflow.bun.test.ts`<br>`plan-lifecycle-workflow.bun.test.ts`<br>`provider-bridge-malformed-workflow.bun.test.ts`<br>`real-router-smoke.bun.test.ts`<br>`recurring-task-edge-cases.bun.test.ts`<br>`recurring-task-lifecycle.bun.test.ts`<br>`plan-operations.bun.test.ts`<br>`plan-state-boundaries.bun.test.ts`<br>`plan.bun.test.ts`<br>`conflict-analyzer-smart.bun.test.ts`<br>`conflict-detector.bun.test.ts`<br>`execution-state-invariants.bun.test.ts`<br>`ai-runtime-invoker.bun.test.ts`<br>`node-ai-capabilities.bun.test.ts`<br>`condition-executor.bun.test.ts`<br>`node-runtime-refs.bun.test.ts`<br>`plan-runner.bun.test.ts`<br>`plan-runner.task-executor.external-results.bun.test.ts`<br>`finalize-task-result-recovery.bun.test.ts`<br>`finalize-task-result.bun.test.ts`<br>`result-manifest.bun.test.ts`<br>`terminal-command.bun.test.ts`<br>`session-policy.bun.test.ts`<br>`get-current-execution.bun.test.ts`<br>`register-generated-plan-output-artifacts.bun.test.ts`<br>`sync-runtime-result.bun.test.ts`<br>`auto-start-scheduled-plan.bun.test.ts`<br>`command-chain.bun.test.ts`<br>`get-task-page-orchestrator.bun.test.ts`<br>`plan-blueprint-compiler.bun.test.ts` |
+| `packages/contracts/src/ai.ts` | 34 | 157 | &mdash; | `plan-acceptance-edges.bun.test.ts`<br>`plan-execution-module.bun.test.ts`<br>`plan-execution-output.bun.test.ts`<br>`plan-lifecycle-edge-workflow.bun.test.ts`<br>`plan-lifecycle-workflow.bun.test.ts`<br>`provider-bridge-malformed-workflow.bun.test.ts`<br>`real-router-smoke.bun.test.ts`<br>`recurring-task-edge-cases.bun.test.ts`<br>`recurring-task-lifecycle.bun.test.ts`<br>`plan-operations.bun.test.ts`<br>`plan-state-boundaries.bun.test.ts`<br>`plan.bun.test.ts`<br>`conflict-analyzer-smart.bun.test.ts`<br>`conflict-detector.bun.test.ts`<br>`execution-state-invariants.bun.test.ts`<br>`ai-runtime-invoker.bun.test.ts`<br>`node-ai-capabilities.bun.test.ts`<br>`condition-executor.bun.test.ts`<br>`wait-executor.bun.test.ts`<br>`node-runtime-refs.bun.test.ts`<br>`plan-runner.bun.test.ts`<br>`plan-runner.task-executor.external-results.bun.test.ts`<br>`finalize-task-result-recovery.bun.test.ts`<br>`finalize-task-result.bun.test.ts`<br>`result-manifest.bun.test.ts`<br>`terminal-command.bun.test.ts`<br>`session-policy.bun.test.ts`<br>`get-current-execution.bun.test.ts`<br>`register-generated-plan-output-artifacts.bun.test.ts`<br>`sync-runtime-result.bun.test.ts`<br>`auto-start-scheduled-plan.bun.test.ts`<br>`command-chain.bun.test.ts`<br>`get-task-page-orchestrator.bun.test.ts`<br>`plan-blueprint-compiler.bun.test.ts` |
 
-#### contracts :: api  _(12 files, 5 direct-covered)_
+#### contracts :: api  _(12 files, 6 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/contracts/src/api/ai.schema.ts` | 0 | 166 | 0/9 | _(transitive only)_ |
-| `packages/contracts/src/api/common.ts` | 0 | 168 | 0/9 | _(transitive only)_ |
-| `packages/contracts/src/api/execution.schema.ts` | 1 | 168 | 1/39 | `execution.schema.bun.test.ts` |
-| `packages/contracts/src/api/goal-workbench.schema.ts` | 0 | 166 | 0/30 | _(transitive only)_ |
-| `packages/contracts/src/api/goals.schema.ts` | 0 | 166 | 0/38 | _(transitive only)_ |
-| `packages/contracts/src/api/index.ts` | 8 | 127 | &mdash; | `ai-client-crud.bun.test.ts`<br>`goal-review-v2.bun.test.ts`<br>`schedule-proposal-conflict-workflow.bun.test.ts`<br>`schedule-proposal-workflow.bun.test.ts`<br>`task-validation-workflow.bun.test.ts`<br>`task-workflow.bun.test.ts`<br>`task-workspace-chat.bun.test.ts`<br>`mcp-routes.bun.test.ts` |
-| `packages/contracts/src/api/mcp-task-tools.schema.ts` | 1 | 167 | 4/31 | `mcp-task-tools.schema.bun.test.ts` |
-| `packages/contracts/src/api/plans.schema.ts` | 1 | 126 | 3/9 | `task-plan-boundaries.bun.test.ts` |
-| `packages/contracts/src/api/projections.schema.ts` | 0 | 166 | 0/13 | _(transitive only)_ |
-| `packages/contracts/src/api/result.schema.ts` | 0 | 166 | 0/3 | _(transitive only)_ |
-| `packages/contracts/src/api/task-triggers.schema.ts` | 0 | 125 | 0/12 | _(transitive only)_ |
-| `packages/contracts/src/api/tasks.schema.ts` | 2 | 169 | 8/28 | `task-plan-boundaries.bun.test.ts`<br>`tasks.schema.bun.test.ts` |
+| `packages/contracts/src/api/ai.schema.ts` | 0 | 171 | 0/9 | _(transitive only)_ |
+| `packages/contracts/src/api/common.ts` | 0 | 173 | 0/9 | _(transitive only)_ |
+| `packages/contracts/src/api/execution.schema.ts` | 1 | 173 | 1/39 | `execution.schema.bun.test.ts` |
+| `packages/contracts/src/api/goal-workbench.schema.ts` | 0 | 171 | 0/30 | _(transitive only)_ |
+| `packages/contracts/src/api/goals.schema.ts` | 0 | 171 | 0/38 | _(transitive only)_ |
+| `packages/contracts/src/api/index.ts` | 8 | 131 | &mdash; | `ai-client-crud.bun.test.ts`<br>`goal-review-v2.bun.test.ts`<br>`schedule-proposal-conflict-workflow.bun.test.ts`<br>`schedule-proposal-workflow.bun.test.ts`<br>`task-validation-workflow.bun.test.ts`<br>`task-workflow.bun.test.ts`<br>`task-workspace-chat.bun.test.ts`<br>`mcp-routes.bun.test.ts` |
+| `packages/contracts/src/api/mcp-task-tools.schema.ts` | 1 | 172 | 4/31 | `mcp-task-tools.schema.bun.test.ts` |
+| `packages/contracts/src/api/plans.schema.ts` | 1 | 130 | 3/9 | `task-plan-boundaries.bun.test.ts` |
+| `packages/contracts/src/api/projections.schema.ts` | 1 | 172 | 1/13 | `execution.schema.bun.test.ts` |
+| `packages/contracts/src/api/result.schema.ts` | 0 | 171 | 0/3 | _(transitive only)_ |
+| `packages/contracts/src/api/task-triggers.schema.ts` | 0 | 129 | 0/12 | _(transitive only)_ |
+| `packages/contracts/src/api/tasks.schema.ts` | 2 | 174 | 8/28 | `task-plan-boundaries.bun.test.ts`<br>`tasks.schema.bun.test.ts` |
 
 <details><summary><code>packages/contracts/src/api/execution.schema.ts</code> &mdash; 39 exported symbol(s)</summary>
 
@@ -2136,6 +2178,26 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 
 </details>
 
+<details><summary><code>packages/contracts/src/api/projections.schema.ts</code> &mdash; 13 exported symbol(s)</summary>
+
+| Symbol | Kind | Tests referencing it |
+| --- | --- | --- |
+| `scheduleProjectionQuerySchema` | const | **none** |
+| `actionCenterProjectionQuerySchema` | const | **none** |
+| `actionCenterItemKindSchema` | const | **none** |
+| `actionCenterItemSchema` | const | **none** |
+| `actionCenterProjectionSchema` | const | **none** |
+| `dashboardProjectionQuerySchema` | const | **none** |
+| `dashboardAiBriefGenerateBodySchema` | const | **none** |
+| `memoryProjectionQuerySchema` | const | **none** |
+| `workProjectionParamSchema` | const | **none** |
+| `workCommandBodySchema` | const | `execution.schema.bun.test.ts` |
+| `workspaceOverviewParamSchema` | const | **none** |
+| `startWithChronaPreferenceParamSchema` | const | **none** |
+| `startWithChronaPreferenceBodySchema` | const | **none** |
+
+</details>
+
 <details><summary><code>packages/contracts/src/api/tasks.schema.ts</code> &mdash; 28 exported symbol(s)</summary>
 
 | Symbol | Kind | Tests referencing it |
@@ -2175,56 +2237,68 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/contracts/src/assistant-surface.ts` | 1 | 163 | &mdash; | `assistant-surface.bun.test.ts` |
+| `packages/contracts/src/assistant-surface.ts` | 1 | 168 | &mdash; | `assistant-surface.bun.test.ts` |
 
 #### contracts :: automation-timing.ts  _(1 files, 0 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/contracts/src/automation-timing.ts` | 0 | 170 | 0/6 | _(transitive only)_ |
+| `packages/contracts/src/automation-timing.ts` | 0 | 175 | 0/6 | _(transitive only)_ |
 
 #### contracts :: goal-structured-result.ts  _(1 files, 0 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/contracts/src/goal-structured-result.ts` | 0 | 162 | 0/3 | _(transitive only)_ |
+| `packages/contracts/src/goal-structured-result.ts` | 0 | 167 | 0/3 | _(transitive only)_ |
 
 #### contracts :: index.ts  _(1 files, 1 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/contracts/src/index.ts` | 10 | 163 | &mdash; | `ai-feature-binding.bun.test.ts`<br>`work-commands-spec-patch.bun.test.ts`<br>`work-events-state.bun.test.ts`<br>`proposal-state.bun.test.ts`<br>`plan-blueprint-compiler.bun.test.ts`<br>`schedule-proposal-boundaries.bun.test.ts`<br>`provider-response-parsing.bun.test.ts`<br>`ai-client-management.bun.test.ts`<br>`execution-scope.bun.test.ts`<br>`dispatch-task-decision-parser.bun.test.ts` |
+| `packages/contracts/src/index.ts` | 10 | 167 | &mdash; | `ai-feature-binding.bun.test.ts`<br>`work-commands-spec-patch.bun.test.ts`<br>`work-events-state.bun.test.ts`<br>`proposal-state.bun.test.ts`<br>`plan-blueprint-compiler.bun.test.ts`<br>`schedule-proposal-boundaries.bun.test.ts`<br>`provider-response-parsing.bun.test.ts`<br>`ai-client-management.bun.test.ts`<br>`execution-scope.bun.test.ts`<br>`dispatch-task-decision-parser.bun.test.ts` |
 
-#### contracts :: plan-runtime  _(14 files, 1 direct-covered)_
+#### contracts :: plan-runtime  _(16 files, 3 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/contracts/src/plan-runtime/_leaf.ts` | 0 | 191 | &mdash; | _(transitive only)_ |
-| `packages/contracts/src/plan-runtime/attempts.ts` | 0 | 191 | &mdash; | _(transitive only)_ |
-| `packages/contracts/src/plan-runtime/checkpoints.ts` | 0 | 191 | &mdash; | _(transitive only)_ |
-| `packages/contracts/src/plan-runtime/commands.ts` | 0 | 191 | &mdash; | _(transitive only)_ |
-| `packages/contracts/src/plan-runtime/context.ts` | 0 | 191 | &mdash; | _(transitive only)_ |
-| `packages/contracts/src/plan-runtime/events.ts` | 0 | 191 | &mdash; | _(transitive only)_ |
-| `packages/contracts/src/plan-runtime/execution-command.ts` | 0 | 191 | &mdash; | _(transitive only)_ |
-| `packages/contracts/src/plan-runtime/execution-state.ts` | 0 | 191 | 0/7 | _(transitive only)_ |
-| `packages/contracts/src/plan-runtime/graph.ts` | 0 | 191 | &mdash; | _(transitive only)_ |
-| `packages/contracts/src/plan-runtime/index.ts` | 1 | 191 | &mdash; | `ai-plan-runtime-status.bun.test.ts` |
-| `packages/contracts/src/plan-runtime/node-core.ts` | 0 | 191 | &mdash; | _(transitive only)_ |
-| `packages/contracts/src/plan-runtime/node-result.ts` | 0 | 191 | &mdash; | _(transitive only)_ |
-| `packages/contracts/src/plan-runtime/node.ts` | 0 | 191 | &mdash; | _(transitive only)_ |
-| `packages/contracts/src/plan-runtime/result-contracts.ts` | 0 | 191 | 0/2 | _(transitive only)_ |
+| `packages/contracts/src/plan-runtime/_leaf.ts` | 1 | 196 | &mdash; | `public-effective-plan.bun.test.ts` |
+| `packages/contracts/src/plan-runtime/attempts.ts` | 0 | 195 | &mdash; | _(transitive only)_ |
+| `packages/contracts/src/plan-runtime/checkpoints.ts` | 0 | 195 | &mdash; | _(transitive only)_ |
+| `packages/contracts/src/plan-runtime/commands.ts` | 0 | 195 | &mdash; | _(transitive only)_ |
+| `packages/contracts/src/plan-runtime/context.ts` | 0 | 195 | &mdash; | _(transitive only)_ |
+| `packages/contracts/src/plan-runtime/events.ts` | 0 | 195 | &mdash; | _(transitive only)_ |
+| `packages/contracts/src/plan-runtime/execution-command.ts` | 0 | 195 | &mdash; | _(transitive only)_ |
+| `packages/contracts/src/plan-runtime/execution-state.ts` | 0 | 195 | 0/7 | _(transitive only)_ |
+| `packages/contracts/src/plan-runtime/graph.ts` | 0 | 195 | &mdash; | _(transitive only)_ |
+| `packages/contracts/src/plan-runtime/index.ts` | 1 | 195 | &mdash; | `ai-plan-runtime-status.bun.test.ts` |
+| `packages/contracts/src/plan-runtime/node-core.ts` | 0 | 196 | &mdash; | _(transitive only)_ |
+| `packages/contracts/src/plan-runtime/node-result.ts` | 0 | 196 | &mdash; | _(transitive only)_ |
+| `packages/contracts/src/plan-runtime/node.ts` | 0 | 195 | &mdash; | _(transitive only)_ |
+| `packages/contracts/src/plan-runtime/public-descriptors.ts` | 0 | 195 | 0/3 | _(transitive only)_ |
+| `packages/contracts/src/plan-runtime/public-effective-plan.ts` | 1 | 196 | 1/3 | `public-effective-plan.bun.test.ts` |
+| `packages/contracts/src/plan-runtime/result-contracts.ts` | 0 | 195 | 0/2 | _(transitive only)_ |
+
+<details><summary><code>packages/contracts/src/plan-runtime/public-effective-plan.ts</code> &mdash; 3 exported symbol(s)</summary>
+
+| Symbol | Kind | Tests referencing it |
+| --- | --- | --- |
+| `projectPublicEffectivePlanNodeResult` | function | **none** |
+| `projectPublicEffectivePlanNode` | function | **none** |
+| `projectPublicEffectivePlanGraph` | function | `public-effective-plan.bun.test.ts` |
+
+</details>
 
 #### contracts :: provider-capability-matrix.ts  _(1 files, 0 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/contracts/src/provider-capability-matrix.ts` | 0 | 162 | 0/1 | _(transitive only)_ |
+| `packages/contracts/src/provider-capability-matrix.ts` | 0 | 167 | 0/1 | _(transitive only)_ |
 
 #### contracts :: task-orchestrator.ts  _(1 files, 1 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/contracts/src/task-orchestrator.ts` | 1 | 163 | 3/14 | `task-orchestrator.bun.test.ts` |
+| `packages/contracts/src/task-orchestrator.ts` | 1 | 168 | 3/14 | `task-orchestrator.bun.test.ts` |
 
 <details><summary><code>packages/contracts/src/task-orchestrator.ts</code> &mdash; 14 exported symbol(s)</summary>
 
@@ -2251,13 +2325,13 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/contracts/src/task-workspace-state.ts` | 0 | 162 | &mdash; | _(transitive only)_ |
+| `packages/contracts/src/task-workspace-state.ts` | 0 | 167 | &mdash; | _(transitive only)_ |
 
 #### contracts :: task.ts  _(1 files, 0 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/contracts/src/task.ts` | 0 | 170 | 0/3 | _(transitive only)_ |
+| `packages/contracts/src/task.ts` | 0 | 175 | 0/3 | _(transitive only)_ |
 
 ### Platform (server routing, db, cli, i18n, shared, ui-protocol)
 
@@ -2339,13 +2413,13 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/db/src/db.ts` | 48 | 135 | 1/1 | `external-calendar-management.bun.test.ts`<br>`external-calendar.bun.test.ts`<br>`agent-control.bun.test.ts`<br>`operations.bun.test.ts`<br>`append-canonical-event.bun.test.ts`<br>`event-retention.bun.test.ts`<br>`due-scheduled-work-worker.bun.test.ts`<br>`graph-advancement-worker.bun.test.ts`<br>`graph-mutation-repository.bun.test.ts`<br>`orchestrator-restart-recovery.bun.test.ts`<br>`recurring-work-block-expansion-worker.bun.test.ts`<br>`scheduler-event-repository.bun.test.ts`<br>`scheduler-lease-repository.bun.test.ts`<br>`dashboard-ai-surface.bun.test.ts`<br>`get-action-center.bun.test.ts`<br>`get-schedule-page-auto-start-reason.bun.test.ts`<br>`get-schedule-page-runnable-state.bun.test.ts`<br>`get-schedule-page.bun.test.ts`<br>`stop-pause-regression.bun.test.ts`<br>`ai-runtime-invoker.bun.test.ts`<br>`execute-command.smoke.bun.test.ts`<br>`node-ai-capabilities.bun.test.ts`<br>`execution-scope.bun.test.ts`<br>`plan-run-terminalizer.bun.test.ts`<br>`task-execution-store.bun.test.ts`<br>`plan-runner.bun.test.ts`<br>`plan-runner.task-executor.approval.bun.test.ts`<br>`plan-runner.task-executor.continuation.bun.test.ts`<br>`plan-runner.task-executor.external-results.bun.test.ts`<br>`plan-runner.task-executor.full-chain.bun.test.ts`<br>`plan-runner.task-executor.interruption.bun.test.ts`<br>`plan-runner.task-executor.runtime-events.bun.test.ts`<br>`finalize-task-result-recovery.bun.test.ts`<br>`register-generated-plan-output-artifacts.bun.test.ts`<br>`apply-plan-patch-command.bun.test.ts`<br>`start-task-plan-generation.bun.test.ts`<br>`rebuild-task-projection.occurrence-isolation.bun.test.ts`<br>`schedule-commands.bun.test.ts`<br>`auto-generate-scheduled-plan.bun.test.ts`<br>`auto-start-scheduled-plan.bun.test.ts`<br>`command-chain.bun.test.ts`<br>`external-task-description-echo.bun.test.ts`<br>`create-task-no-auto-plan.bun.test.ts`<br>`delete-task.bun.test.ts`<br>`get-task-page-orchestrator.bun.test.ts`<br>`open-task-result-file.bun.test.ts`<br>`rebuild-task-with-latest-goal-assets.bun.test.ts`<br>`get-default-workspace.bun.test.ts` |
+| `packages/db/src/db.ts` | 42 | 138 | 1/1 | `external-calendar-management.bun.test.ts`<br>`external-calendar.bun.test.ts`<br>`append-canonical-event.bun.test.ts`<br>`event-retention.bun.test.ts`<br>`due-scheduled-work-worker.bun.test.ts`<br>`graph-advancement-worker.bun.test.ts`<br>`graph-mutation-repository.bun.test.ts`<br>`orchestrator-restart-recovery.bun.test.ts`<br>`recurring-work-block-expansion-worker.bun.test.ts`<br>`scheduler-event-repository.bun.test.ts`<br>`scheduler-lease-repository.bun.test.ts`<br>`dashboard-ai-surface.bun.test.ts`<br>`get-schedule-page-auto-start-reason.bun.test.ts`<br>`get-schedule-page-runnable-state.bun.test.ts`<br>`get-schedule-page.bun.test.ts`<br>`stop-pause-regression.bun.test.ts`<br>`execute-command-receipts.focused.bun.test.ts`<br>`execute-command.smoke.bun.test.ts`<br>`execution-scope.bun.test.ts`<br>`plan-run-terminalizer.bun.test.ts`<br>`task-execution-store.bun.test.ts`<br>`plan-runner.bun.test.ts`<br>`plan-runner.task-executor.approval.bun.test.ts`<br>`plan-runner.task-executor.continuation.bun.test.ts`<br>`plan-runner.task-executor.external-results.bun.test.ts`<br>`plan-runner.task-executor.interruption.bun.test.ts`<br>`plan-runner.task-executor.runtime-events.bun.test.ts`<br>`finalize-task-result-recovery.bun.test.ts`<br>`register-generated-plan-output-artifacts.bun.test.ts`<br>`apply-plan-patch-command.bun.test.ts`<br>`rebuild-task-projection.occurrence-isolation.bun.test.ts`<br>`schedule-commands.bun.test.ts`<br>`auto-generate-scheduled-plan.bun.test.ts`<br>`auto-start-scheduled-plan.bun.test.ts`<br>`command-chain.bun.test.ts`<br>`external-task-description-echo.bun.test.ts`<br>`create-task-no-auto-plan.bun.test.ts`<br>`delete-task.bun.test.ts`<br>`get-task-page-orchestrator.bun.test.ts`<br>`open-task-result-file.bun.test.ts`<br>`rebuild-task-with-latest-goal-assets.bun.test.ts`<br>`get-default-workspace.bun.test.ts` |
 
 <details><summary><code>packages/db/src/db.ts</code> &mdash; 1 exported symbol(s)</summary>
 
 | Symbol | Kind | Tests referencing it |
 | --- | --- | --- |
-| `db` | const | `external-calendar-management.bun.test.ts`<br>`external-calendar.bun.test.ts`<br>`agent-control.bun.test.ts`<br>`operations.bun.test.ts`<br>`append-canonical-event.bun.test.ts`<br>`event-retention.bun.test.ts`<br>`due-scheduled-work-worker.bun.test.ts`<br>`graph-advancement-worker.bun.test.ts`<br>`graph-mutation-repository.bun.test.ts`<br>`orchestrator-restart-recovery.bun.test.ts`<br>`recurring-work-block-expansion-worker.bun.test.ts`<br>`scheduler-event-repository.bun.test.ts`<br>`scheduler-lease-repository.bun.test.ts`<br>`dashboard-ai-surface.bun.test.ts`<br>`get-action-center.bun.test.ts`<br>`get-schedule-page-auto-start-reason.bun.test.ts`<br>`get-schedule-page-runnable-state.bun.test.ts`<br>`get-schedule-page.bun.test.ts`<br>`stop-pause-regression.bun.test.ts`<br>`ai-runtime-invoker.bun.test.ts`<br>`execute-command.smoke.bun.test.ts`<br>`node-ai-capabilities.bun.test.ts`<br>`execution-scope.bun.test.ts`<br>`plan-run-terminalizer.bun.test.ts`<br>`task-execution-store.bun.test.ts`<br>`plan-runner.bun.test.ts`<br>`plan-runner.task-executor.approval.bun.test.ts`<br>`plan-runner.task-executor.continuation.bun.test.ts`<br>`plan-runner.task-executor.external-results.bun.test.ts`<br>`plan-runner.task-executor.full-chain.bun.test.ts`<br>`plan-runner.task-executor.interruption.bun.test.ts`<br>`plan-runner.task-executor.runtime-events.bun.test.ts`<br>`finalize-task-result-recovery.bun.test.ts`<br>`register-generated-plan-output-artifacts.bun.test.ts`<br>`apply-plan-patch-command.bun.test.ts`<br>`start-task-plan-generation.bun.test.ts`<br>`rebuild-task-projection.occurrence-isolation.bun.test.ts`<br>`schedule-commands.bun.test.ts`<br>`auto-generate-scheduled-plan.bun.test.ts`<br>`auto-start-scheduled-plan.bun.test.ts`<br>`command-chain.bun.test.ts`<br>`external-task-description-echo.bun.test.ts`<br>`create-task-no-auto-plan.bun.test.ts`<br>`delete-task.bun.test.ts`<br>`get-task-page-orchestrator.bun.test.ts`<br>`open-task-result-file.bun.test.ts`<br>`rebuild-task-with-latest-goal-assets.bun.test.ts`<br>`get-default-workspace.bun.test.ts` |
+| `db` | const | `external-calendar-management.bun.test.ts`<br>`external-calendar.bun.test.ts`<br>`append-canonical-event.bun.test.ts`<br>`event-retention.bun.test.ts`<br>`due-scheduled-work-worker.bun.test.ts`<br>`graph-advancement-worker.bun.test.ts`<br>`graph-mutation-repository.bun.test.ts`<br>`orchestrator-restart-recovery.bun.test.ts`<br>`recurring-work-block-expansion-worker.bun.test.ts`<br>`scheduler-event-repository.bun.test.ts`<br>`scheduler-lease-repository.bun.test.ts`<br>`dashboard-ai-surface.bun.test.ts`<br>`get-schedule-page-auto-start-reason.bun.test.ts`<br>`get-schedule-page-runnable-state.bun.test.ts`<br>`get-schedule-page.bun.test.ts`<br>`stop-pause-regression.bun.test.ts`<br>`execute-command-receipts.focused.bun.test.ts`<br>`execute-command.smoke.bun.test.ts`<br>`execution-scope.bun.test.ts`<br>`plan-run-terminalizer.bun.test.ts`<br>`task-execution-store.bun.test.ts`<br>`plan-runner.bun.test.ts`<br>`plan-runner.task-executor.approval.bun.test.ts`<br>`plan-runner.task-executor.continuation.bun.test.ts`<br>`plan-runner.task-executor.external-results.bun.test.ts`<br>`plan-runner.task-executor.interruption.bun.test.ts`<br>`plan-runner.task-executor.runtime-events.bun.test.ts`<br>`finalize-task-result-recovery.bun.test.ts`<br>`register-generated-plan-output-artifacts.bun.test.ts`<br>`apply-plan-patch-command.bun.test.ts`<br>`rebuild-task-projection.occurrence-isolation.bun.test.ts`<br>`schedule-commands.bun.test.ts`<br>`auto-generate-scheduled-plan.bun.test.ts`<br>`auto-start-scheduled-plan.bun.test.ts`<br>`command-chain.bun.test.ts`<br>`external-task-description-echo.bun.test.ts`<br>`create-task-no-auto-plan.bun.test.ts`<br>`delete-task.bun.test.ts`<br>`get-task-page-orchestrator.bun.test.ts`<br>`open-task-result-file.bun.test.ts`<br>`rebuild-task-with-latest-goal-assets.bun.test.ts`<br>`get-default-workspace.bun.test.ts` |
 
 </details>
 
@@ -2353,13 +2427,13 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/db/src/execution-session-repository.ts` | 0 | 109 | 0/3 | _(transitive only)_ |
+| `packages/db/src/execution-session-repository.ts` | 0 | 131 | 0/3 | _(transitive only)_ |
 
 #### db :: index.ts  _(1 files, 1 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/db/src/index.ts` | 49 | 113 | &mdash; | `accept-task-result.bun.test.ts`<br>`activity-timeline.bun.test.ts`<br>`ai-client-crud.bun.test.ts`<br>`ai-feature-binding.bun.test.ts`<br>`ai-suggestions.bun.test.ts`<br>`apply-schedule.bun.test.ts`<br>`clear-schedule.bun.test.ts`<br>`dashboard-page.bun.test.ts`<br>`decide-schedule-proposal.bun.test.ts`<br>`external-calendar-events.bun.test.ts`<br>`external-calendar-source-management.bun.test.ts`<br>`external-calendar-sources.bun.test.ts`<br>`external-task-edit-roundtrip.bun.test.ts`<br>`get-action-center.bun.test.ts`<br>`get-memory-console.bun.test.ts`<br>`goal-workbench.bun.test.ts`<br>`goals.bun.test.ts`<br>`header-and-readmodels-ssr.bun.test.ts`<br>`mark-task-done.bun.test.ts`<br>`plan-acceptance-edges.bun.test.ts`<br>`plan-execution-module.bun.test.ts`<br>`plan-execution-output.bun.test.ts`<br>`plan-lifecycle-edge-workflow.bun.test.ts`<br>`propose-schedule.bun.test.ts`<br>`provider-approval-resolve.bun.test.ts`<br>`provider-bridge-malformed-workflow.bun.test.ts`<br>`real-router-smoke.bun.test.ts`<br>`recurring-task-edge-cases.bun.test.ts`<br>`recurring-task-lifecycle.bun.test.ts`<br>`reopen-task.bun.test.ts`<br>`schedule-proposal-accept-reject.bun.test.ts`<br>`schedule-proposal-conflict-workflow.bun.test.ts`<br>`schedule-proposal-regression.bun.test.ts`<br>`schedule-proposal-workflow.bun.test.ts`<br>`task-assistant-message.bun.test.ts`<br>`task-triggers.bun.test.ts`<br>`task-validation-workflow.bun.test.ts`<br>`task-workflow.bun.test.ts`<br>`task-workspace-activity.bun.test.ts`<br>`task-workspace-console.bun.test.ts`<br>`work-block-schedule.bun.test.ts`<br>`workspace-overview.bun.test.ts`<br>`workspace-preferences.bun.test.ts`<br>`mcp-routes.bun.test.ts`<br>`plan-operations.bun.test.ts`<br>`task-execution-closure.bun.test.ts`<br>`ai-client-management.bun.test.ts`<br>`prisma-run-store.bun.test.ts`<br>`continue-from-task-result.bun.test.ts` |
+| `packages/db/src/index.ts` | 58 | 131 | &mdash; | `accept-task-result.bun.test.ts`<br>`activity-timeline.bun.test.ts`<br>`ai-client-crud.bun.test.ts`<br>`ai-client-safety.bun.test.ts`<br>`ai-feature-binding.bun.test.ts`<br>`ai-suggestions.bun.test.ts`<br>`apply-schedule.bun.test.ts`<br>`clear-schedule.bun.test.ts`<br>`dashboard-page.bun.test.ts`<br>`decide-schedule-proposal.bun.test.ts`<br>`external-calendar-events.bun.test.ts`<br>`external-calendar-source-management.bun.test.ts`<br>`external-calendar-sources.bun.test.ts`<br>`external-task-edit-roundtrip.bun.test.ts`<br>`get-action-center.bun.test.ts`<br>`get-memory-console.bun.test.ts`<br>`goal-workbench.bun.test.ts`<br>`goals.bun.test.ts`<br>`header-and-readmodels-ssr.bun.test.ts`<br>`mark-task-done.bun.test.ts`<br>`plan-acceptance-edges.bun.test.ts`<br>`plan-execution-module.bun.test.ts`<br>`plan-execution-output.bun.test.ts`<br>`plan-lifecycle-edge-workflow.bun.test.ts`<br>`propose-schedule.bun.test.ts`<br>`provider-approval-resolve.bun.test.ts`<br>`provider-bridge-malformed-workflow.bun.test.ts`<br>`real-router-smoke.bun.test.ts`<br>`recurring-task-edge-cases.bun.test.ts`<br>`recurring-task-lifecycle.bun.test.ts`<br>`reopen-task.bun.test.ts`<br>`schedule-proposal-accept-reject.bun.test.ts`<br>`schedule-proposal-conflict-workflow.bun.test.ts`<br>`schedule-proposal-regression.bun.test.ts`<br>`schedule-proposal-workflow.bun.test.ts`<br>`task-assistant-message.bun.test.ts`<br>`task-triggers.bun.test.ts`<br>`task-validation-workflow.bun.test.ts`<br>`task-workflow.bun.test.ts`<br>`task-workspace-activity.bun.test.ts`<br>`task-workspace-console.bun.test.ts`<br>`work-block-schedule.bun.test.ts`<br>`workspace-overview.bun.test.ts`<br>`workspace-preferences.bun.test.ts`<br>`agent-control-routes.bun.test.ts`<br>`mcp-routes.bun.test.ts`<br>`plan-operations.bun.test.ts`<br>`task-execution-closure.bun.test.ts`<br>`agent-control.bun.test.ts`<br>`operations.bun.test.ts`<br>`ai-client-management.bun.test.ts`<br>`prisma-run-store.bun.test.ts`<br>`get-action-center.bun.test.ts`<br>`ai-runtime-invoker.bun.test.ts`<br>`node-ai-capabilities.bun.test.ts`<br>`plan-runner.task-executor.full-chain.bun.test.ts`<br>`start-task-plan-generation.bun.test.ts`<br>`continue-from-task-result.bun.test.ts` |
 
 #### db :: sqlite-backup.ts  _(1 files, 1 direct-covered)_
 
@@ -2380,7 +2454,7 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/db/src/sqlite-migrations.ts` | 1 | 137 | 4/4 | `sqlite-migrations.bun.test.ts` |
+| `packages/db/src/sqlite-migrations.ts` | 1 | 140 | 4/4 | `sqlite-migrations.bun.test.ts` |
 
 <details><summary><code>packages/db/src/sqlite-migrations.ts</code> &mdash; 4 exported symbol(s)</summary>
 
@@ -2397,7 +2471,7 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/db/src/sqlite-url.ts` | 1 | 142 | 5/9 | `sqlite-url.bun.test.ts` |
+| `packages/db/src/sqlite-url.ts` | 1 | 145 | 5/9 | `sqlite-url.bun.test.ts` |
 
 <details><summary><code>packages/db/src/sqlite-url.ts</code> &mdash; 9 exported symbol(s)</summary>
 
@@ -2419,7 +2493,7 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/db/src/test-support.ts` | 2 | 110 | 3/3 | `continue-from-task-result.bun.test.ts`<br>`open-task-result-file.bun.test.ts` |
+| `packages/db/src/test-support.ts` | 2 | 131 | 3/3 | `continue-from-task-result.bun.test.ts`<br>`open-task-result-file.bun.test.ts` |
 
 <details><summary><code>packages/db/src/test-support.ts</code> &mdash; 3 exported symbol(s)</summary>
 
@@ -2435,37 +2509,47 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/db/src/work-block-repository.ts` | 0 | 109 | 0/3 | _(transitive only)_ |
+| `packages/db/src/work-block-repository.ts` | 0 | 131 | 0/3 | _(transitive only)_ |
 
-#### i18n :: client.tsx  _(1 files, 0 direct-covered)_
+#### i18n :: client.tsx  _(1 files, 1 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/i18n/src/client.tsx` | 0 | 45 | 0/3 | _(transitive only)_ |
+| `packages/i18n/src/client.tsx` | 1 | 48 | 1/3 | `access-key-unlock.test.tsx` |
+
+<details><summary><code>packages/i18n/src/client.tsx</code> &mdash; 3 exported symbol(s)</summary>
+
+| Symbol | Kind | Tests referencing it |
+| --- | --- | --- |
+| `I18nProvider` | function | **none** |
+| `useI18n` | function | `access-key-unlock.test.tsx` |
+| `useLocale` | function | **none** |
+
+</details>
 
 #### i18n :: get-dictionary.ts  _(1 files, 0 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/i18n/src/get-dictionary.ts` | 0 | 46 | 0/1 | _(transitive only)_ |
+| `packages/i18n/src/get-dictionary.ts` | 0 | 49 | 0/1 | _(transitive only)_ |
 
 #### i18n :: index.ts  _(1 files, 1 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/i18n/src/index.ts` | 2 | 45 | &mdash; | `control-plane-shell.test.tsx`<br>`start-with-chrona.test.tsx` |
+| `packages/i18n/src/index.ts` | 2 | 47 | &mdash; | `control-plane-shell.test.tsx`<br>`start-with-chrona.test.tsx` |
 
 #### i18n :: locale-core.ts  _(1 files, 0 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/i18n/src/locale-core.ts` | 0 | 46 | 0/5 | _(transitive only)_ |
+| `packages/i18n/src/locale-core.ts` | 0 | 49 | 0/5 | _(transitive only)_ |
 
 #### i18n :: locale.ts  _(1 files, 1 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/i18n/src/locale.ts` | 1 | 46 | 0/2 | `locale-routing.bun.test.ts` |
+| `packages/i18n/src/locale.ts` | 1 | 49 | 0/2 | `locale-routing.bun.test.ts` |
 
 <details><summary><code>packages/i18n/src/locale.ts</code> &mdash; 2 exported symbol(s)</summary>
 
@@ -2480,13 +2564,13 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/i18n/src/messages.ts` | 0 | 46 | 0/1 | _(transitive only)_ |
+| `packages/i18n/src/messages.ts` | 0 | 49 | 0/1 | _(transitive only)_ |
 
 #### i18n :: routing.ts  _(1 files, 1 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/i18n/src/routing.ts` | 1 | 46 | 2/2 | `locale-routing.bun.test.ts` |
+| `packages/i18n/src/routing.ts` | 1 | 49 | 2/2 | `locale-routing.bun.test.ts` |
 
 <details><summary><code>packages/i18n/src/routing.ts</code> &mdash; 2 exported symbol(s)</summary>
 
@@ -2501,7 +2585,7 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/i18n/src/task-workspace-messages.ts` | 0 | 45 | 0/1 | _(transitive only)_ |
+| `packages/i18n/src/task-workspace-messages.ts` | 0 | 47 | 0/1 | _(transitive only)_ |
 
 #### server :: __tests__  _(4 files, 4 direct-covered)_
 
@@ -2509,8 +2593,8 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 | --- | --- | --- | --- | --- |
 | `apps/server/src/__tests__/api/plan-execution-fixtures.ts` | 1 | 1 | 1/20 | `plan-execution-checkpoint-regression.bun.test.ts` |
 | `apps/server/src/__tests__/api/task-flow-test-fixtures.ts` | 2 | 2 | 3/3 | `task-flow-diagnostics.bun.test.ts`<br>`task-flow-functional.bun.test.ts` |
-| `apps/server/src/__tests__/bun-test-helpers.ts` | 48 | 48 | 9/12 | `accept-task-result.bun.test.ts`<br>`action-center-memory-schedule-pages.bun.test.ts`<br>`activity-timeline.bun.test.ts`<br>`ai-client-crud.bun.test.ts`<br>`ai-feature-binding.bun.test.ts`<br>`ai-suggestions.bun.test.ts`<br>`apply-schedule.bun.test.ts`<br>`clear-schedule.bun.test.ts`<br>`dashboard-page.bun.test.ts`<br>`decide-schedule-proposal.bun.test.ts`<br>`execution-checkpoint.bun.test.ts`<br>`external-calendar-events.bun.test.ts`<br>`external-calendar-source-management.bun.test.ts`<br>`external-calendar-sources.bun.test.ts`<br>`external-task-edit-roundtrip.bun.test.ts`<br>`get-action-center.bun.test.ts`<br>`get-memory-console.bun.test.ts`<br>`goal-workbench.bun.test.ts`<br>`goals.bun.test.ts`<br>`header-and-readmodels-ssr.bun.test.ts`<br>`mark-task-done.bun.test.ts`<br>`plan-acceptance-edges.bun.test.ts`<br>`plan-execution-module.bun.test.ts`<br>`plan-execution-output.bun.test.ts`<br>`plan-lifecycle-edge-workflow.bun.test.ts`<br>`plan-lifecycle-workflow.bun.test.ts`<br>`propose-schedule.bun.test.ts`<br>`provider-approval-resolve.bun.test.ts`<br>`provider-bridge-malformed-workflow.bun.test.ts`<br>`real-router-smoke.bun.test.ts`<br>`recurring-task-edge-cases.bun.test.ts`<br>`recurring-task-lifecycle.bun.test.ts`<br>`reopen-task.bun.test.ts`<br>`schedule-proposal-accept-reject.bun.test.ts`<br>`schedule-proposal-conflict-workflow.bun.test.ts`<br>`schedule-proposal-regression.bun.test.ts`<br>`schedule-proposal-workflow.bun.test.ts`<br>`task-assistant-message.bun.test.ts`<br>`task-triggers.bun.test.ts`<br>`task-validation-workflow.bun.test.ts`<br>`task-workflow.bun.test.ts`<br>`task-workspace-activity.bun.test.ts`<br>`task-workspace-console.bun.test.ts`<br>`work-block-schedule.bun.test.ts`<br>`workspace-overview.bun.test.ts`<br>`workspace-preferences.bun.test.ts`<br>`mcp-routes.bun.test.ts`<br>`task-execution-closure.bun.test.ts` |
-| `apps/server/src/__tests__/test-database-safety.ts` | 1 | 49 | 1/2 | `test-database-safety.bun.test.ts` |
+| `apps/server/src/__tests__/bun-test-helpers.ts` | 50 | 50 | 9/12 | `accept-task-result.bun.test.ts`<br>`action-center-memory-schedule-pages.bun.test.ts`<br>`activity-timeline.bun.test.ts`<br>`ai-client-crud.bun.test.ts`<br>`ai-client-safety.bun.test.ts`<br>`ai-feature-binding.bun.test.ts`<br>`ai-suggestions.bun.test.ts`<br>`apply-schedule.bun.test.ts`<br>`clear-schedule.bun.test.ts`<br>`dashboard-page.bun.test.ts`<br>`decide-schedule-proposal.bun.test.ts`<br>`execution-checkpoint.bun.test.ts`<br>`external-calendar-events.bun.test.ts`<br>`external-calendar-source-management.bun.test.ts`<br>`external-calendar-sources.bun.test.ts`<br>`external-task-edit-roundtrip.bun.test.ts`<br>`get-action-center.bun.test.ts`<br>`get-memory-console.bun.test.ts`<br>`goal-workbench.bun.test.ts`<br>`goals.bun.test.ts`<br>`header-and-readmodels-ssr.bun.test.ts`<br>`mark-task-done.bun.test.ts`<br>`plan-acceptance-edges.bun.test.ts`<br>`plan-execution-module.bun.test.ts`<br>`plan-execution-output.bun.test.ts`<br>`plan-lifecycle-edge-workflow.bun.test.ts`<br>`plan-lifecycle-workflow.bun.test.ts`<br>`propose-schedule.bun.test.ts`<br>`provider-approval-resolve.bun.test.ts`<br>`provider-bridge-malformed-workflow.bun.test.ts`<br>`real-router-smoke.bun.test.ts`<br>`recurring-task-edge-cases.bun.test.ts`<br>`recurring-task-lifecycle.bun.test.ts`<br>`reopen-task.bun.test.ts`<br>`schedule-proposal-accept-reject.bun.test.ts`<br>`schedule-proposal-conflict-workflow.bun.test.ts`<br>`schedule-proposal-regression.bun.test.ts`<br>`schedule-proposal-workflow.bun.test.ts`<br>`task-assistant-message.bun.test.ts`<br>`task-triggers.bun.test.ts`<br>`task-validation-workflow.bun.test.ts`<br>`task-workflow.bun.test.ts`<br>`task-workspace-activity.bun.test.ts`<br>`task-workspace-console.bun.test.ts`<br>`work-block-schedule.bun.test.ts`<br>`workspace-overview.bun.test.ts`<br>`workspace-preferences.bun.test.ts`<br>`agent-control-routes.bun.test.ts`<br>`mcp-routes.bun.test.ts`<br>`task-execution-closure.bun.test.ts` |
+| `apps/server/src/__tests__/test-database-safety.ts` | 1 | 51 | 1/2 | `test-database-safety.bun.test.ts` |
 
 <details><summary><code>apps/server/src/__tests__/api/plan-execution-fixtures.ts</code> &mdash; 20 exported symbol(s)</summary>
 
@@ -2554,13 +2638,13 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 | Symbol | Kind | Tests referencing it |
 | --- | --- | --- |
 | `runLiveHermes` | const | **none** |
-| `resetTestDb` | function | `accept-task-result.bun.test.ts`<br>`action-center-memory-schedule-pages.bun.test.ts`<br>`activity-timeline.bun.test.ts`<br>`ai-client-crud.bun.test.ts`<br>`ai-feature-binding.bun.test.ts`<br>`ai-suggestions.bun.test.ts`<br>`apply-schedule.bun.test.ts`<br>`clear-schedule.bun.test.ts`<br>`dashboard-page.bun.test.ts`<br>`decide-schedule-proposal.bun.test.ts`<br>`execution-checkpoint.bun.test.ts`<br>`external-calendar-events.bun.test.ts`<br>`external-calendar-source-management.bun.test.ts`<br>`external-calendar-sources.bun.test.ts`<br>`external-task-edit-roundtrip.bun.test.ts`<br>`get-action-center.bun.test.ts`<br>`get-memory-console.bun.test.ts`<br>`goal-workbench.bun.test.ts`<br>`goals.bun.test.ts`<br>`header-and-readmodels-ssr.bun.test.ts`<br>`mark-task-done.bun.test.ts`<br>`plan-acceptance-edges.bun.test.ts`<br>`plan-execution-module.bun.test.ts`<br>`plan-execution-output.bun.test.ts`<br>`plan-lifecycle-edge-workflow.bun.test.ts`<br>`plan-lifecycle-workflow.bun.test.ts`<br>`propose-schedule.bun.test.ts`<br>`provider-approval-resolve.bun.test.ts`<br>`provider-bridge-malformed-workflow.bun.test.ts`<br>`real-router-smoke.bun.test.ts`<br>`recurring-task-edge-cases.bun.test.ts`<br>`recurring-task-lifecycle.bun.test.ts`<br>`reopen-task.bun.test.ts`<br>`schedule-proposal-accept-reject.bun.test.ts`<br>`schedule-proposal-conflict-workflow.bun.test.ts`<br>`schedule-proposal-regression.bun.test.ts`<br>`schedule-proposal-workflow.bun.test.ts`<br>`task-assistant-message.bun.test.ts`<br>`task-triggers.bun.test.ts`<br>`task-validation-workflow.bun.test.ts`<br>`task-workflow.bun.test.ts`<br>`task-workspace-activity.bun.test.ts`<br>`task-workspace-console.bun.test.ts`<br>`work-block-schedule.bun.test.ts`<br>`workspace-overview.bun.test.ts`<br>`workspace-preferences.bun.test.ts`<br>`mcp-routes.bun.test.ts`<br>`task-execution-closure.bun.test.ts` |
-| `seedWorkspace` | function | `accept-task-result.bun.test.ts`<br>`action-center-memory-schedule-pages.bun.test.ts`<br>`activity-timeline.bun.test.ts`<br>`ai-client-crud.bun.test.ts`<br>`ai-feature-binding.bun.test.ts`<br>`apply-schedule.bun.test.ts`<br>`clear-schedule.bun.test.ts`<br>`dashboard-page.bun.test.ts`<br>`decide-schedule-proposal.bun.test.ts`<br>`execution-checkpoint.bun.test.ts`<br>`external-calendar-events.bun.test.ts`<br>`external-calendar-source-management.bun.test.ts`<br>`external-calendar-sources.bun.test.ts`<br>`external-task-edit-roundtrip.bun.test.ts`<br>`get-action-center.bun.test.ts`<br>`get-memory-console.bun.test.ts`<br>`goal-workbench.bun.test.ts`<br>`goals.bun.test.ts`<br>`header-and-readmodels-ssr.bun.test.ts`<br>`mark-task-done.bun.test.ts`<br>`plan-acceptance-edges.bun.test.ts`<br>`plan-execution-module.bun.test.ts`<br>`plan-execution-output.bun.test.ts`<br>`plan-lifecycle-edge-workflow.bun.test.ts`<br>`plan-lifecycle-workflow.bun.test.ts`<br>`propose-schedule.bun.test.ts`<br>`provider-approval-resolve.bun.test.ts`<br>`provider-bridge-malformed-workflow.bun.test.ts`<br>`real-router-smoke.bun.test.ts`<br>`recurring-task-edge-cases.bun.test.ts`<br>`recurring-task-lifecycle.bun.test.ts`<br>`reopen-task.bun.test.ts`<br>`schedule-proposal-accept-reject.bun.test.ts`<br>`schedule-proposal-conflict-workflow.bun.test.ts`<br>`schedule-proposal-regression.bun.test.ts`<br>`schedule-proposal-workflow.bun.test.ts`<br>`task-assistant-message.bun.test.ts`<br>`task-triggers.bun.test.ts`<br>`task-validation-workflow.bun.test.ts`<br>`task-workflow.bun.test.ts`<br>`task-workspace-activity.bun.test.ts`<br>`task-workspace-console.bun.test.ts`<br>`work-block-schedule.bun.test.ts`<br>`workspace-overview.bun.test.ts`<br>`workspace-preferences.bun.test.ts`<br>`mcp-routes.bun.test.ts`<br>`task-execution-closure.bun.test.ts` |
-| `seedTask` | function | `accept-task-result.bun.test.ts`<br>`action-center-memory-schedule-pages.bun.test.ts`<br>`activity-timeline.bun.test.ts`<br>`apply-schedule.bun.test.ts`<br>`clear-schedule.bun.test.ts`<br>`dashboard-page.bun.test.ts`<br>`decide-schedule-proposal.bun.test.ts`<br>`execution-checkpoint.bun.test.ts`<br>`external-calendar-events.bun.test.ts`<br>`get-action-center.bun.test.ts`<br>`get-memory-console.bun.test.ts`<br>`goals.bun.test.ts`<br>`mark-task-done.bun.test.ts`<br>`plan-execution-module.bun.test.ts`<br>`plan-execution-output.bun.test.ts`<br>`plan-lifecycle-edge-workflow.bun.test.ts`<br>`plan-lifecycle-workflow.bun.test.ts`<br>`propose-schedule.bun.test.ts`<br>`provider-approval-resolve.bun.test.ts`<br>`provider-bridge-malformed-workflow.bun.test.ts`<br>`real-router-smoke.bun.test.ts`<br>`reopen-task.bun.test.ts`<br>`schedule-proposal-accept-reject.bun.test.ts`<br>`schedule-proposal-conflict-workflow.bun.test.ts`<br>`schedule-proposal-regression.bun.test.ts`<br>`schedule-proposal-workflow.bun.test.ts`<br>`task-assistant-message.bun.test.ts`<br>`task-validation-workflow.bun.test.ts`<br>`task-workflow.bun.test.ts`<br>`task-workspace-activity.bun.test.ts`<br>`task-workspace-console.bun.test.ts`<br>`work-block-schedule.bun.test.ts`<br>`workspace-overview.bun.test.ts`<br>`mcp-routes.bun.test.ts`<br>`task-execution-closure.bun.test.ts` |
+| `resetTestDb` | function | `accept-task-result.bun.test.ts`<br>`action-center-memory-schedule-pages.bun.test.ts`<br>`activity-timeline.bun.test.ts`<br>`ai-client-crud.bun.test.ts`<br>`ai-client-safety.bun.test.ts`<br>`ai-feature-binding.bun.test.ts`<br>`ai-suggestions.bun.test.ts`<br>`apply-schedule.bun.test.ts`<br>`clear-schedule.bun.test.ts`<br>`dashboard-page.bun.test.ts`<br>`decide-schedule-proposal.bun.test.ts`<br>`execution-checkpoint.bun.test.ts`<br>`external-calendar-events.bun.test.ts`<br>`external-calendar-source-management.bun.test.ts`<br>`external-calendar-sources.bun.test.ts`<br>`external-task-edit-roundtrip.bun.test.ts`<br>`get-action-center.bun.test.ts`<br>`get-memory-console.bun.test.ts`<br>`goal-workbench.bun.test.ts`<br>`goals.bun.test.ts`<br>`header-and-readmodels-ssr.bun.test.ts`<br>`mark-task-done.bun.test.ts`<br>`plan-acceptance-edges.bun.test.ts`<br>`plan-execution-module.bun.test.ts`<br>`plan-execution-output.bun.test.ts`<br>`plan-lifecycle-edge-workflow.bun.test.ts`<br>`plan-lifecycle-workflow.bun.test.ts`<br>`propose-schedule.bun.test.ts`<br>`provider-approval-resolve.bun.test.ts`<br>`provider-bridge-malformed-workflow.bun.test.ts`<br>`real-router-smoke.bun.test.ts`<br>`recurring-task-edge-cases.bun.test.ts`<br>`recurring-task-lifecycle.bun.test.ts`<br>`reopen-task.bun.test.ts`<br>`schedule-proposal-accept-reject.bun.test.ts`<br>`schedule-proposal-conflict-workflow.bun.test.ts`<br>`schedule-proposal-regression.bun.test.ts`<br>`schedule-proposal-workflow.bun.test.ts`<br>`task-assistant-message.bun.test.ts`<br>`task-triggers.bun.test.ts`<br>`task-validation-workflow.bun.test.ts`<br>`task-workflow.bun.test.ts`<br>`task-workspace-activity.bun.test.ts`<br>`task-workspace-console.bun.test.ts`<br>`work-block-schedule.bun.test.ts`<br>`workspace-overview.bun.test.ts`<br>`workspace-preferences.bun.test.ts`<br>`agent-control-routes.bun.test.ts`<br>`mcp-routes.bun.test.ts`<br>`task-execution-closure.bun.test.ts` |
+| `seedWorkspace` | function | `accept-task-result.bun.test.ts`<br>`action-center-memory-schedule-pages.bun.test.ts`<br>`activity-timeline.bun.test.ts`<br>`ai-client-crud.bun.test.ts`<br>`ai-client-safety.bun.test.ts`<br>`ai-feature-binding.bun.test.ts`<br>`apply-schedule.bun.test.ts`<br>`clear-schedule.bun.test.ts`<br>`dashboard-page.bun.test.ts`<br>`decide-schedule-proposal.bun.test.ts`<br>`execution-checkpoint.bun.test.ts`<br>`external-calendar-events.bun.test.ts`<br>`external-calendar-source-management.bun.test.ts`<br>`external-calendar-sources.bun.test.ts`<br>`external-task-edit-roundtrip.bun.test.ts`<br>`get-action-center.bun.test.ts`<br>`get-memory-console.bun.test.ts`<br>`goal-workbench.bun.test.ts`<br>`goals.bun.test.ts`<br>`header-and-readmodels-ssr.bun.test.ts`<br>`mark-task-done.bun.test.ts`<br>`plan-acceptance-edges.bun.test.ts`<br>`plan-execution-module.bun.test.ts`<br>`plan-execution-output.bun.test.ts`<br>`plan-lifecycle-edge-workflow.bun.test.ts`<br>`plan-lifecycle-workflow.bun.test.ts`<br>`propose-schedule.bun.test.ts`<br>`provider-approval-resolve.bun.test.ts`<br>`provider-bridge-malformed-workflow.bun.test.ts`<br>`real-router-smoke.bun.test.ts`<br>`recurring-task-edge-cases.bun.test.ts`<br>`recurring-task-lifecycle.bun.test.ts`<br>`reopen-task.bun.test.ts`<br>`schedule-proposal-accept-reject.bun.test.ts`<br>`schedule-proposal-conflict-workflow.bun.test.ts`<br>`schedule-proposal-regression.bun.test.ts`<br>`schedule-proposal-workflow.bun.test.ts`<br>`task-assistant-message.bun.test.ts`<br>`task-triggers.bun.test.ts`<br>`task-validation-workflow.bun.test.ts`<br>`task-workflow.bun.test.ts`<br>`task-workspace-activity.bun.test.ts`<br>`task-workspace-console.bun.test.ts`<br>`work-block-schedule.bun.test.ts`<br>`workspace-overview.bun.test.ts`<br>`workspace-preferences.bun.test.ts`<br>`agent-control-routes.bun.test.ts`<br>`mcp-routes.bun.test.ts`<br>`task-execution-closure.bun.test.ts` |
+| `seedTask` | function | `accept-task-result.bun.test.ts`<br>`action-center-memory-schedule-pages.bun.test.ts`<br>`activity-timeline.bun.test.ts`<br>`apply-schedule.bun.test.ts`<br>`clear-schedule.bun.test.ts`<br>`dashboard-page.bun.test.ts`<br>`decide-schedule-proposal.bun.test.ts`<br>`execution-checkpoint.bun.test.ts`<br>`external-calendar-events.bun.test.ts`<br>`get-action-center.bun.test.ts`<br>`get-memory-console.bun.test.ts`<br>`goals.bun.test.ts`<br>`mark-task-done.bun.test.ts`<br>`plan-execution-module.bun.test.ts`<br>`plan-execution-output.bun.test.ts`<br>`plan-lifecycle-edge-workflow.bun.test.ts`<br>`plan-lifecycle-workflow.bun.test.ts`<br>`propose-schedule.bun.test.ts`<br>`provider-approval-resolve.bun.test.ts`<br>`provider-bridge-malformed-workflow.bun.test.ts`<br>`real-router-smoke.bun.test.ts`<br>`reopen-task.bun.test.ts`<br>`schedule-proposal-accept-reject.bun.test.ts`<br>`schedule-proposal-conflict-workflow.bun.test.ts`<br>`schedule-proposal-regression.bun.test.ts`<br>`schedule-proposal-workflow.bun.test.ts`<br>`task-assistant-message.bun.test.ts`<br>`task-validation-workflow.bun.test.ts`<br>`task-workflow.bun.test.ts`<br>`task-workspace-activity.bun.test.ts`<br>`task-workspace-console.bun.test.ts`<br>`work-block-schedule.bun.test.ts`<br>`workspace-overview.bun.test.ts`<br>`agent-control-routes.bun.test.ts`<br>`mcp-routes.bun.test.ts`<br>`task-execution-closure.bun.test.ts` |
 | `seedDraftPlan` | function | **none** |
 | `seedAcceptedPlan` | function | `provider-bridge-malformed-workflow.bun.test.ts` |
 | `seedScheduleProposal` | function | `decide-schedule-proposal.bun.test.ts`<br>`schedule-proposal-accept-reject.bun.test.ts`<br>`schedule-proposal-regression.bun.test.ts`<br>`schedule-proposal-workflow.bun.test.ts`<br>`task-workspace-console.bun.test.ts` |
-| `json` | function | `action-center-memory-schedule-pages.bun.test.ts`<br>`activity-timeline.bun.test.ts`<br>`ai-client-crud.bun.test.ts`<br>`ai-feature-binding.bun.test.ts`<br>`dashboard-page.bun.test.ts`<br>`external-calendar-events.bun.test.ts`<br>`external-calendar-source-management.bun.test.ts`<br>`external-calendar-sources.bun.test.ts`<br>`external-task-edit-roundtrip.bun.test.ts`<br>`goal-workbench.bun.test.ts`<br>`goals.bun.test.ts`<br>`header-and-readmodels-ssr.bun.test.ts`<br>`plan-acceptance-edges.bun.test.ts`<br>`plan-execution-module.bun.test.ts`<br>`plan-lifecycle-edge-workflow.bun.test.ts`<br>`plan-lifecycle-workflow.bun.test.ts`<br>`provider-approval-resolve.bun.test.ts`<br>`real-router-smoke.bun.test.ts`<br>`recurring-task-lifecycle.bun.test.ts`<br>`schedule-proposal-conflict-workflow.bun.test.ts`<br>`schedule-proposal-workflow.bun.test.ts`<br>`task-assistant-message.bun.test.ts`<br>`task-triggers.bun.test.ts`<br>`task-validation-workflow.bun.test.ts`<br>`task-workflow.bun.test.ts`<br>`task-workspace-activity.bun.test.ts`<br>`task-workspace-console.bun.test.ts`<br>`work-block-schedule.bun.test.ts`<br>`workspace-overview.bun.test.ts`<br>`workspace-preferences.bun.test.ts`<br>`mcp-routes.bun.test.ts`<br>`task-execution-closure.bun.test.ts` |
+| `json` | function | `action-center-memory-schedule-pages.bun.test.ts`<br>`activity-timeline.bun.test.ts`<br>`ai-client-crud.bun.test.ts`<br>`ai-client-safety.bun.test.ts`<br>`ai-feature-binding.bun.test.ts`<br>`dashboard-page.bun.test.ts`<br>`external-calendar-events.bun.test.ts`<br>`external-calendar-source-management.bun.test.ts`<br>`external-calendar-sources.bun.test.ts`<br>`external-task-edit-roundtrip.bun.test.ts`<br>`goal-workbench.bun.test.ts`<br>`goals.bun.test.ts`<br>`header-and-readmodels-ssr.bun.test.ts`<br>`plan-acceptance-edges.bun.test.ts`<br>`plan-execution-module.bun.test.ts`<br>`plan-lifecycle-edge-workflow.bun.test.ts`<br>`plan-lifecycle-workflow.bun.test.ts`<br>`provider-approval-resolve.bun.test.ts`<br>`real-router-smoke.bun.test.ts`<br>`recurring-task-lifecycle.bun.test.ts`<br>`schedule-proposal-conflict-workflow.bun.test.ts`<br>`schedule-proposal-workflow.bun.test.ts`<br>`task-assistant-message.bun.test.ts`<br>`task-triggers.bun.test.ts`<br>`task-validation-workflow.bun.test.ts`<br>`task-workflow.bun.test.ts`<br>`task-workspace-activity.bun.test.ts`<br>`task-workspace-console.bun.test.ts`<br>`work-block-schedule.bun.test.ts`<br>`workspace-overview.bun.test.ts`<br>`workspace-preferences.bun.test.ts`<br>`mcp-routes.bun.test.ts`<br>`task-execution-closure.bun.test.ts` |
 | `expectApiError` | function | `ai-client-crud.bun.test.ts`<br>`ai-feature-binding.bun.test.ts`<br>`real-router-smoke.bun.test.ts`<br>`task-assistant-message.bun.test.ts` |
 | `expectTaskExists` | function | `task-validation-workflow.bun.test.ts`<br>`task-workflow.bun.test.ts` |
 | `expectTaskNotFound` | function | `task-workflow.bun.test.ts` |
@@ -2607,7 +2691,7 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `apps/server/src/config/env.ts` | 4 | 28 | 4/8 | `task-triggers.bun.test.ts`<br>`app.bun.test.ts`<br>`env.bun.test.ts`<br>`auth.bun.test.ts` |
+| `apps/server/src/config/env.ts` | 4 | 29 | 4/8 | `task-triggers.bun.test.ts`<br>`app.bun.test.ts`<br>`env.bun.test.ts`<br>`auth.bun.test.ts` |
 
 <details><summary><code>apps/server/src/config/env.ts</code> &mdash; 8 exported symbol(s)</summary>
 
@@ -2634,8 +2718,8 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `apps/server/src/lib/http.ts` | 6 | 39 | 1/1 | `ai-client-crud.bun.test.ts`<br>`ai-feature-binding.bun.test.ts`<br>`task-assistant-message.bun.test.ts`<br>`task-validation-workflow.bun.test.ts`<br>`task-workflow.bun.test.ts`<br>`task-workspace-chat.bun.test.ts` |
-| `apps/server/src/lib/sse-heartbeat.ts` | 0 | 29 | 0/2 | _(transitive only)_ |
+| `apps/server/src/lib/http.ts` | 6 | 41 | 1/1 | `ai-client-crud.bun.test.ts`<br>`ai-feature-binding.bun.test.ts`<br>`task-assistant-message.bun.test.ts`<br>`task-validation-workflow.bun.test.ts`<br>`task-workflow.bun.test.ts`<br>`task-workspace-chat.bun.test.ts` |
+| `apps/server/src/lib/sse-heartbeat.ts` | 0 | 30 | 0/2 | _(transitive only)_ |
 
 <details><summary><code>apps/server/src/lib/http.ts</code> &mdash; 1 exported symbol(s)</summary>
 
@@ -2659,46 +2743,46 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 
 </details>
 
-#### server :: routes  _(30 files, 7 direct-covered)_
+#### server :: routes  _(30 files, 8 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
 | `apps/server/src/routes/agent-control.routes.ts` | 0 | 0 | &mdash; | **none** |
-| `apps/server/src/routes/ai/clients.routes.ts` | 0 | 26 | 0/1 | _(transitive only)_ |
-| `apps/server/src/routes/ai/suggestions.routes.ts` | 0 | 26 | 0/1 | _(transitive only)_ |
-| `apps/server/src/routes/api.ts` | 25 | 26 | 1/1 | `action-center-memory-schedule-pages.bun.test.ts`<br>`activity-timeline.bun.test.ts`<br>`ai-suggestions.bun.test.ts`<br>`assistant-surface-actions.bun.test.ts`<br>`dashboard-page.bun.test.ts`<br>`execution-checkpoint.bun.test.ts`<br>`external-calendar-events.bun.test.ts`<br>`external-calendar-source-management.bun.test.ts`<br>`external-calendar-sources.bun.test.ts`<br>`external-task-edit-roundtrip.bun.test.ts`<br>`goal-workbench.bun.test.ts`<br>`goals.bun.test.ts`<br>`header-and-readmodels-ssr.bun.test.ts`<br>`plan-acceptance-edges.bun.test.ts`<br>`plan-execution-module.bun.test.ts`<br>`provider-approval-resolve.bun.test.ts`<br>`provider-bridge-malformed-workflow.bun.test.ts`<br>`real-router-smoke.bun.test.ts`<br>`recurring-task-lifecycle.bun.test.ts`<br>`runtime-providers.bun.test.ts`<br>`task-triggers.bun.test.ts`<br>`task-workspace-activity.bun.test.ts`<br>`task-workspace-console.bun.test.ts`<br>`work-block-schedule.bun.test.ts`<br>`workspace-overview.bun.test.ts` |
-| `apps/server/src/routes/assistant-surface.routes.ts` | 0 | 26 | 0/1 | _(transitive only)_ |
-| `apps/server/src/routes/email-trigger-adapter.routes.ts` | 0 | 26 | 0/1 | _(transitive only)_ |
-| `apps/server/src/routes/goal-workbench.routes.ts` | 0 | 26 | 0/1 | _(transitive only)_ |
-| `apps/server/src/routes/goals-core.routes.ts` | 0 | 27 | 0/1 | _(transitive only)_ |
-| `apps/server/src/routes/goals-review.routes.ts` | 0 | 27 | 0/1 | _(transitive only)_ |
-| `apps/server/src/routes/goals-route-support.ts` | 0 | 27 | 0/1 | _(transitive only)_ |
-| `apps/server/src/routes/goals-task.routes.ts` | 0 | 27 | 0/1 | _(transitive only)_ |
-| `apps/server/src/routes/goals.routes.ts` | 1 | 27 | 1/1 | `goal-review-v2.bun.test.ts` |
-| `apps/server/src/routes/helpers.ts` | 0 | 28 | 0/5 | _(transitive only)_ |
-| `apps/server/src/routes/integrations/hermes.routes.ts` | 0 | 26 | 0/1 | _(transitive only)_ |
+| `apps/server/src/routes/ai/clients.routes.ts` | 0 | 27 | 0/1 | _(transitive only)_ |
+| `apps/server/src/routes/ai/suggestions.routes.ts` | 0 | 27 | 0/1 | _(transitive only)_ |
+| `apps/server/src/routes/api.ts` | 26 | 27 | 1/1 | `action-center-memory-schedule-pages.bun.test.ts`<br>`activity-timeline.bun.test.ts`<br>`ai-client-safety.bun.test.ts`<br>`ai-suggestions.bun.test.ts`<br>`assistant-surface-actions.bun.test.ts`<br>`dashboard-page.bun.test.ts`<br>`execution-checkpoint.bun.test.ts`<br>`external-calendar-events.bun.test.ts`<br>`external-calendar-source-management.bun.test.ts`<br>`external-calendar-sources.bun.test.ts`<br>`external-task-edit-roundtrip.bun.test.ts`<br>`goal-workbench.bun.test.ts`<br>`goals.bun.test.ts`<br>`header-and-readmodels-ssr.bun.test.ts`<br>`plan-acceptance-edges.bun.test.ts`<br>`plan-execution-module.bun.test.ts`<br>`provider-approval-resolve.bun.test.ts`<br>`provider-bridge-malformed-workflow.bun.test.ts`<br>`real-router-smoke.bun.test.ts`<br>`recurring-task-lifecycle.bun.test.ts`<br>`runtime-providers.bun.test.ts`<br>`task-triggers.bun.test.ts`<br>`task-workspace-activity.bun.test.ts`<br>`task-workspace-console.bun.test.ts`<br>`work-block-schedule.bun.test.ts`<br>`workspace-overview.bun.test.ts` |
+| `apps/server/src/routes/assistant-surface.routes.ts` | 0 | 27 | 0/1 | _(transitive only)_ |
+| `apps/server/src/routes/email-trigger-adapter.routes.ts` | 0 | 27 | 0/1 | _(transitive only)_ |
+| `apps/server/src/routes/goal-workbench.routes.ts` | 0 | 27 | 0/1 | _(transitive only)_ |
+| `apps/server/src/routes/goals-core.routes.ts` | 0 | 28 | 0/1 | _(transitive only)_ |
+| `apps/server/src/routes/goals-review.routes.ts` | 0 | 28 | 0/1 | _(transitive only)_ |
+| `apps/server/src/routes/goals-route-support.ts` | 0 | 28 | 0/1 | _(transitive only)_ |
+| `apps/server/src/routes/goals-task.routes.ts` | 0 | 28 | 0/1 | _(transitive only)_ |
+| `apps/server/src/routes/goals.routes.ts` | 1 | 28 | 1/1 | `goal-review-v2.bun.test.ts` |
+| `apps/server/src/routes/helpers.ts` | 0 | 29 | 0/5 | _(transitive only)_ |
+| `apps/server/src/routes/integrations/hermes.routes.ts` | 0 | 27 | 0/1 | _(transitive only)_ |
 | `apps/server/src/routes/mcp/mcp.routes.ts` | 1 | 1 | &mdash; | `mcp-routes.bun.test.ts` |
-| `apps/server/src/routes/pages/action-center.routes.ts` | 0 | 26 | 0/1 | _(transitive only)_ |
-| `apps/server/src/routes/pages/dashboard.routes.ts` | 1 | 27 | 1/1 | `dashboard-ai-brief-generate.bun.test.ts` |
-| `apps/server/src/routes/pages/index.ts` | 0 | 26 | 0/1 | _(transitive only)_ |
-| `apps/server/src/routes/pages/memory.routes.ts` | 0 | 26 | 0/1 | _(transitive only)_ |
-| `apps/server/src/routes/pages/work.routes.ts` | 2 | 28 | 1/1 | `work-commands-spec-patch.bun.test.ts`<br>`work-events-state.bun.test.ts` |
-| `apps/server/src/routes/runtime.routes.ts` | 0 | 26 | 0/1 | _(transitive only)_ |
-| `apps/server/src/routes/task-triggers.routes.ts` | 0 | 26 | 0/1 | _(transitive only)_ |
-| `apps/server/src/routes/tasks/crud.routes.ts` | 0 | 26 | 0/1 | _(transitive only)_ |
-| `apps/server/src/routes/tasks/execution.routes.ts` | 0 | 26 | 0/1 | _(transitive only)_ |
-| `apps/server/src/routes/tasks/index.ts` | 0 | 26 | 0/1 | _(transitive only)_ |
-| `apps/server/src/routes/tasks/lifecycle.routes.ts` | 0 | 26 | 0/1 | _(transitive only)_ |
-| `apps/server/src/routes/tasks/plan.routes.ts` | 2 | 28 | 1/1 | `plan-operations.bun.test.ts`<br>`plan-accept-route.bun.test.ts` |
-| `apps/server/src/routes/tasks/result.routes.ts` | 0 | 26 | 0/1 | _(transitive only)_ |
-| `apps/server/src/routes/test-support.routes.ts` | 0 | 26 | 0/2 | _(transitive only)_ |
-| `apps/server/src/routes/workspaces.routes.ts` | 1 | 27 | 1/1 | `workspace-preferences.bun.test.ts` |
+| `apps/server/src/routes/pages/action-center.routes.ts` | 0 | 27 | 0/1 | _(transitive only)_ |
+| `apps/server/src/routes/pages/dashboard.routes.ts` | 1 | 28 | 1/1 | `dashboard-ai-brief-generate.bun.test.ts` |
+| `apps/server/src/routes/pages/index.ts` | 0 | 27 | 0/1 | _(transitive only)_ |
+| `apps/server/src/routes/pages/memory.routes.ts` | 0 | 27 | 0/1 | _(transitive only)_ |
+| `apps/server/src/routes/pages/work.routes.ts` | 2 | 29 | 1/1 | `work-commands-spec-patch.bun.test.ts`<br>`work-events-state.bun.test.ts` |
+| `apps/server/src/routes/runtime.routes.ts` | 0 | 27 | 0/1 | _(transitive only)_ |
+| `apps/server/src/routes/task-triggers.routes.ts` | 0 | 27 | 0/1 | _(transitive only)_ |
+| `apps/server/src/routes/tasks/crud.routes.ts` | 0 | 27 | 0/1 | _(transitive only)_ |
+| `apps/server/src/routes/tasks/execution.routes.ts` | 0 | 27 | 0/1 | _(transitive only)_ |
+| `apps/server/src/routes/tasks/index.ts` | 0 | 27 | 0/1 | _(transitive only)_ |
+| `apps/server/src/routes/tasks/lifecycle.routes.ts` | 0 | 27 | 0/1 | _(transitive only)_ |
+| `apps/server/src/routes/tasks/plan.routes.ts` | 2 | 29 | 1/1 | `plan-operations.bun.test.ts`<br>`plan-accept-route.bun.test.ts` |
+| `apps/server/src/routes/tasks/result.routes.ts` | 1 | 28 | 1/1 | `result-finalization-retry.bun.test.ts` |
+| `apps/server/src/routes/test-support.routes.ts` | 0 | 27 | 0/2 | _(transitive only)_ |
+| `apps/server/src/routes/workspaces.routes.ts` | 1 | 28 | 1/1 | `workspace-preferences.bun.test.ts` |
 
 <details><summary><code>apps/server/src/routes/api.ts</code> &mdash; 1 exported symbol(s)</summary>
 
 | Symbol | Kind | Tests referencing it |
 | --- | --- | --- |
-| `createApiRouter` | function | `action-center-memory-schedule-pages.bun.test.ts`<br>`activity-timeline.bun.test.ts`<br>`ai-suggestions.bun.test.ts`<br>`assistant-surface-actions.bun.test.ts`<br>`dashboard-page.bun.test.ts`<br>`execution-checkpoint.bun.test.ts`<br>`external-calendar-events.bun.test.ts`<br>`external-calendar-source-management.bun.test.ts`<br>`external-calendar-sources.bun.test.ts`<br>`external-task-edit-roundtrip.bun.test.ts`<br>`goal-workbench.bun.test.ts`<br>`goals.bun.test.ts`<br>`header-and-readmodels-ssr.bun.test.ts`<br>`plan-acceptance-edges.bun.test.ts`<br>`plan-execution-module.bun.test.ts`<br>`provider-approval-resolve.bun.test.ts`<br>`provider-bridge-malformed-workflow.bun.test.ts`<br>`real-router-smoke.bun.test.ts`<br>`recurring-task-lifecycle.bun.test.ts`<br>`runtime-providers.bun.test.ts`<br>`task-triggers.bun.test.ts`<br>`task-workspace-activity.bun.test.ts`<br>`task-workspace-console.bun.test.ts`<br>`work-block-schedule.bun.test.ts`<br>`workspace-overview.bun.test.ts` |
+| `createApiRouter` | function | `action-center-memory-schedule-pages.bun.test.ts`<br>`activity-timeline.bun.test.ts`<br>`ai-client-safety.bun.test.ts`<br>`ai-suggestions.bun.test.ts`<br>`assistant-surface-actions.bun.test.ts`<br>`dashboard-page.bun.test.ts`<br>`execution-checkpoint.bun.test.ts`<br>`external-calendar-events.bun.test.ts`<br>`external-calendar-source-management.bun.test.ts`<br>`external-calendar-sources.bun.test.ts`<br>`external-task-edit-roundtrip.bun.test.ts`<br>`goal-workbench.bun.test.ts`<br>`goals.bun.test.ts`<br>`header-and-readmodels-ssr.bun.test.ts`<br>`plan-acceptance-edges.bun.test.ts`<br>`plan-execution-module.bun.test.ts`<br>`provider-approval-resolve.bun.test.ts`<br>`provider-bridge-malformed-workflow.bun.test.ts`<br>`real-router-smoke.bun.test.ts`<br>`recurring-task-lifecycle.bun.test.ts`<br>`runtime-providers.bun.test.ts`<br>`task-triggers.bun.test.ts`<br>`task-workspace-activity.bun.test.ts`<br>`task-workspace-console.bun.test.ts`<br>`work-block-schedule.bun.test.ts`<br>`workspace-overview.bun.test.ts` |
 
 </details>
 
@@ -2734,6 +2818,14 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 
 </details>
 
+<details><summary><code>apps/server/src/routes/tasks/result.routes.ts</code> &mdash; 1 exported symbol(s)</summary>
+
+| Symbol | Kind | Tests referencing it |
+| --- | --- | --- |
+| `createTaskResultRoutes` | function | `result-finalization-retry.bun.test.ts` |
+
+</details>
+
 <details><summary><code>apps/server/src/routes/workspaces.routes.ts</code> &mdash; 1 exported symbol(s)</summary>
 
 | Symbol | Kind | Tests referencing it |
@@ -2766,14 +2858,14 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/shared/src/data-paths.ts` | 3 | 92 | 1/2 | `goal-workbench.bun.test.ts`<br>`execute-command.smoke.bun.test.ts`<br>`plan-runner.task-executor.external-results.bun.test.ts` |
+| `packages/shared/src/data-paths.ts` | 4 | 98 | 1/2 | `goal-workbench.bun.test.ts`<br>`execute-command-receipts.focused.bun.test.ts`<br>`execute-command.smoke.bun.test.ts`<br>`plan-runner.task-executor.external-results.bun.test.ts` |
 
 <details><summary><code>packages/shared/src/data-paths.ts</code> &mdash; 2 exported symbol(s)</summary>
 
 | Symbol | Kind | Tests referencing it |
 | --- | --- | --- |
 | `getChronaDataDir` | function | **none** |
-| `getChronaGeneratedFilesDir` | function | `goal-workbench.bun.test.ts`<br>`execute-command.smoke.bun.test.ts`<br>`plan-runner.task-executor.external-results.bun.test.ts` |
+| `getChronaGeneratedFilesDir` | function | `goal-workbench.bun.test.ts`<br>`execute-command-receipts.focused.bun.test.ts`<br>`execute-command.smoke.bun.test.ts`<br>`plan-runner.task-executor.external-results.bun.test.ts` |
 
 </details>
 
@@ -2787,7 +2879,7 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/shared/src/runtime-config.ts` | 1 | 138 | 3/4 | `runtime-config.bun.test.ts` |
+| `packages/shared/src/runtime-config.ts` | 1 | 141 | 3/4 | `runtime-config.bun.test.ts` |
 
 <details><summary><code>packages/shared/src/runtime-config.ts</code> &mdash; 4 exported symbol(s)</summary>
 
@@ -2804,17 +2896,17 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/ui-protocol/src/actions/actions.ts` | 0 | 195 | 0/12 | _(transitive only)_ |
+| `packages/ui-protocol/src/actions/actions.ts` | 0 | 200 | 0/12 | _(transitive only)_ |
 
 #### ui-protocol :: builders  _(6 files, 5 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/ui-protocol/src/builders/build-action-spec.ts` | 1 | 191 | 1/1 | `build-action-spec.bun.test.ts` |
-| `packages/ui-protocol/src/builders/build-activity-spec.ts` | 1 | 192 | 1/1 | `build-activity-spec.bun.test.ts` |
-| `packages/ui-protocol/src/builders/build-command-center-spec.ts` | 1 | 191 | 3/4 | `build-command-center-spec.bun.test.ts` |
-| `packages/ui-protocol/src/builders/build-result-spec.ts` | 1 | 191 | 1/1 | `build-result-spec.bun.test.ts` |
-| `packages/ui-protocol/src/builders/build-task-header-spec.ts` | 1 | 191 | 1/1 | `build-task-header-spec.bun.test.ts` |
+| `packages/ui-protocol/src/builders/build-action-spec.ts` | 1 | 196 | 1/1 | `build-action-spec.bun.test.ts` |
+| `packages/ui-protocol/src/builders/build-activity-spec.ts` | 1 | 197 | 1/1 | `build-activity-spec.bun.test.ts` |
+| `packages/ui-protocol/src/builders/build-command-center-spec.ts` | 1 | 196 | 3/4 | `build-command-center-spec.bun.test.ts` |
+| `packages/ui-protocol/src/builders/build-result-spec.ts` | 1 | 196 | 1/1 | `build-result-spec.bun.test.ts` |
+| `packages/ui-protocol/src/builders/build-task-header-spec.ts` | 1 | 196 | 1/1 | `build-task-header-spec.bun.test.ts` |
 | `packages/ui-protocol/src/builders/index.ts` | 0 | 0 | &mdash; | **none** |
 
 <details><summary><code>packages/ui-protocol/src/builders/build-action-spec.ts</code> &mdash; 1 exported symbol(s)</summary>
@@ -2864,22 +2956,22 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/ui-protocol/src/catalog/catalog-version.ts` | 0 | 190 | 0/2 | _(transitive only)_ |
-| `packages/ui-protocol/src/catalog/components.ts` | 0 | 195 | 0/7 | _(transitive only)_ |
+| `packages/ui-protocol/src/catalog/catalog-version.ts` | 0 | 195 | 0/2 | _(transitive only)_ |
+| `packages/ui-protocol/src/catalog/components.ts` | 0 | 200 | 0/8 | _(transitive only)_ |
 | `packages/ui-protocol/src/catalog/index.ts` | 0 | 0 | &mdash; | **none** |
 
 #### ui-protocol :: dashboard  _(1 files, 0 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/ui-protocol/src/dashboard/dashboard-summary-spec.ts` | 0 | 190 | 0/2 | _(transitive only)_ |
+| `packages/ui-protocol/src/dashboard/dashboard-summary-spec.ts` | 0 | 195 | 0/2 | _(transitive only)_ |
 
 #### ui-protocol :: document  _(2 files, 2 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/ui-protocol/src/document/document.ts` | 1 | 195 | &mdash; | `validate.bun.test.ts` |
-| `packages/ui-protocol/src/document/validate.ts` | 3 | 193 | 1/2 | `build-action-spec.bun.test.ts`<br>`build-activity-spec.bun.test.ts`<br>`build-result-spec.bun.test.ts` |
+| `packages/ui-protocol/src/document/document.ts` | 1 | 200 | &mdash; | `validate.bun.test.ts` |
+| `packages/ui-protocol/src/document/validate.ts` | 3 | 198 | 1/2 | `build-action-spec.bun.test.ts`<br>`build-activity-spec.bun.test.ts`<br>`build-result-spec.bun.test.ts` |
 
 <details><summary><code>packages/ui-protocol/src/document/validate.ts</code> &mdash; 2 exported symbol(s)</summary>
 
@@ -2894,13 +2986,13 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/ui-protocol/src/index.ts` | 1 | 193 | &mdash; | `validate.bun.test.ts` |
+| `packages/ui-protocol/src/index.ts` | 1 | 198 | &mdash; | `validate.bun.test.ts` |
 
 #### ui-protocol :: schema.ts  _(1 files, 0 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/ui-protocol/src/schema.ts` | 0 | 195 | 0/1 | _(transitive only)_ |
+| `packages/ui-protocol/src/schema.ts` | 0 | 200 | 0/1 | _(transitive only)_ |
 
 ### Unmapped (no workflow bucket)
 
@@ -2949,8 +3041,8 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/domain/src/ai-sidebar/proposal-state.ts` | 2 | 121 | 4/4 | `proposal-state.bun.test.ts`<br>`schedule-proposal-boundaries.bun.test.ts` |
-| `packages/domain/src/ai-sidebar/summarize-context.ts` | 1 | 120 | 2/2 | `summarize-context.bun.test.ts` |
+| `packages/domain/src/ai-sidebar/proposal-state.ts` | 2 | 125 | 4/4 | `proposal-state.bun.test.ts`<br>`schedule-proposal-boundaries.bun.test.ts` |
+| `packages/domain/src/ai-sidebar/summarize-context.ts` | 1 | 124 | 2/2 | `summarize-context.bun.test.ts` |
 
 <details><summary><code>packages/domain/src/ai-sidebar/proposal-state.ts</code> &mdash; 4 exported symbol(s)</summary>
 
@@ -2976,16 +3068,16 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/domain/src/assistant-surface/action-mapping.ts` | 0 | 120 | 0/4 | _(transitive only)_ |
+| `packages/domain/src/assistant-surface/action-mapping.ts` | 0 | 124 | 0/4 | _(transitive only)_ |
 | `packages/domain/src/assistant-surface/index.ts` | 1 | 1 | &mdash; | `assistant-surface.bun.test.ts` |
-| `packages/domain/src/assistant-surface/proposal-routing.ts` | 0 | 120 | 0/2 | _(transitive only)_ |
-| `packages/domain/src/assistant-surface/summary-priority.ts` | 0 | 120 | 0/3 | _(transitive only)_ |
+| `packages/domain/src/assistant-surface/proposal-routing.ts` | 0 | 124 | 0/2 | _(transitive only)_ |
+| `packages/domain/src/assistant-surface/summary-priority.ts` | 0 | 124 | 0/3 | _(transitive only)_ |
 
 #### domain :: goal  _(1 files, 1 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/domain/src/goal/derive-goal-projection.ts` | 1 | 120 | 1/1 | `derive-goal-projection.bun.test.ts` |
+| `packages/domain/src/goal/derive-goal-projection.ts` | 1 | 124 | 1/1 | `derive-goal-projection.bun.test.ts` |
 
 <details><summary><code>packages/domain/src/goal/derive-goal-projection.ts</code> &mdash; 1 exported symbol(s)</summary>
 
@@ -2999,38 +3091,38 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/domain/src/index.ts` | 5 | 121 | &mdash; | `derive-task-runnability.bun.test.ts`<br>`execution-scope.bun.test.ts`<br>`apply-plan-patch-command.bun.test.ts`<br>`task-state.bun.test.ts`<br>`plan-blueprint-compiler.bun.test.ts` |
+| `packages/domain/src/index.ts` | 5 | 125 | &mdash; | `derive-task-runnability.bun.test.ts`<br>`execution-scope.bun.test.ts`<br>`apply-plan-patch-command.bun.test.ts`<br>`task-state.bun.test.ts`<br>`plan-blueprint-compiler.bun.test.ts` |
 
 #### domain :: schedule  _(2 files, 0 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/domain/src/schedule/date.ts` | 0 | 119 | 0/10 | _(transitive only)_ |
-| `packages/domain/src/schedule/planning-summary.ts` | 0 | 119 | 0/1 | _(transitive only)_ |
+| `packages/domain/src/schedule/date.ts` | 0 | 123 | 0/10 | _(transitive only)_ |
+| `packages/domain/src/schedule/planning-summary.ts` | 0 | 123 | 0/1 | _(transitive only)_ |
 
 #### engine :: constants.ts  _(1 files, 0 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/engine/src/constants.ts` | 0 | 103 | 0/1 | _(transitive only)_ |
+| `packages/engine/src/constants.ts` | 0 | 108 | 0/1 | _(transitive only)_ |
 
 #### engine :: engine.ts  _(1 files, 0 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/engine/src/engine.ts` | 0 | 35 | 0/1 | _(transitive only)_ |
+| `packages/engine/src/engine.ts` | 0 | 38 | 0/1 | _(transitive only)_ |
 
 #### engine :: errors.ts  _(1 files, 1 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/engine/src/errors.ts` | 3 | 125 | 2/4 | `operations.bun.test.ts`<br>`ai-client-management.bun.test.ts`<br>`terminal-command.bun.test.ts` |
+| `packages/engine/src/errors.ts` | 4 | 129 | 2/4 | `operations.bun.test.ts`<br>`ai-client-management.bun.test.ts`<br>`execute-command-receipts.focused.bun.test.ts`<br>`terminal-command.bun.test.ts` |
 
 <details><summary><code>packages/engine/src/errors.ts</code> &mdash; 4 exported symbol(s)</summary>
 
 | Symbol | Kind | Tests referencing it |
 | --- | --- | --- |
-| `ENGINE_ERROR_CODES` | const | `operations.bun.test.ts`<br>`ai-client-management.bun.test.ts` |
+| `ENGINE_ERROR_CODES` | const | `operations.bun.test.ts`<br>`ai-client-management.bun.test.ts`<br>`execute-command-receipts.focused.bun.test.ts` |
 | `EngineError` | class | `operations.bun.test.ts`<br>`ai-client-management.bun.test.ts`<br>`terminal-command.bun.test.ts` |
 | `isEngineError` | function | **none** |
 | `engineErrorFromUnknown` | function | **none** |
@@ -3041,28 +3133,28 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/engine/src/modules/execution-runtime/index.ts` | 0 | 105 | &mdash; | _(transitive only)_ |
-| `packages/engine/src/modules/execution-runtime/registry.ts` | 0 | 105 | 0/6 | _(transitive only)_ |
-| `packages/engine/src/modules/execution-runtime/task-config.ts` | 0 | 105 | 0/1 | _(transitive only)_ |
-| `packages/engine/src/modules/execution-runtime/task-sessions.ts` | 0 | 105 | 0/15 | _(transitive only)_ |
+| `packages/engine/src/modules/execution-runtime/index.ts` | 0 | 110 | &mdash; | _(transitive only)_ |
+| `packages/engine/src/modules/execution-runtime/registry.ts` | 0 | 110 | 0/6 | _(transitive only)_ |
+| `packages/engine/src/modules/execution-runtime/task-config.ts` | 0 | 110 | 0/1 | _(transitive only)_ |
+| `packages/engine/src/modules/execution-runtime/task-sessions.ts` | 0 | 110 | 0/15 | _(transitive only)_ |
 
 #### engine :: goals  _(13 files, 3 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/engine/src/modules/goals/ai/goal.review.ts` | 1 | 37 | 6/7 | `goal.review.bun.test.ts` |
-| `packages/engine/src/modules/goals/goal-asset-export.ts` | 1 | 68 | 1/2 | `goal-asset-export.bun.test.ts` |
-| `packages/engine/src/modules/goals/goal-asset-ownership.ts` | 1 | 36 | 1/5 | `goal-asset-ownership.bun.test.ts` |
-| `packages/engine/src/modules/goals/goal-review-proposals.ts` | 0 | 36 | 0/11 | _(transitive only)_ |
-| `packages/engine/src/modules/goals/goal-task-context.ts` | 0 | 79 | 0/4 | _(transitive only)_ |
-| `packages/engine/src/modules/goals/goal-workbench.ts` | 0 | 67 | 0/19 | _(transitive only)_ |
-| `packages/engine/src/modules/goals/goals-assets.ts` | 0 | 36 | 0/3 | _(transitive only)_ |
-| `packages/engine/src/modules/goals/goals-implementation.ts` | 0 | 36 | &mdash; | _(transitive only)_ |
-| `packages/engine/src/modules/goals/goals-lifecycle.ts` | 0 | 36 | 0/4 | _(transitive only)_ |
-| `packages/engine/src/modules/goals/goals-read.ts` | 0 | 36 | 0/15 | _(transitive only)_ |
-| `packages/engine/src/modules/goals/goals-shared.ts` | 0 | 36 | 0/18 | _(transitive only)_ |
-| `packages/engine/src/modules/goals/goals-write.ts` | 0 | 36 | 0/6 | _(transitive only)_ |
-| `packages/engine/src/modules/goals/goals.ts` | 0 | 36 | &mdash; | _(transitive only)_ |
+| `packages/engine/src/modules/goals/ai/goal.review.ts` | 1 | 40 | 6/7 | `goal.review.bun.test.ts` |
+| `packages/engine/src/modules/goals/goal-asset-export.ts` | 1 | 72 | 1/2 | `goal-asset-export.bun.test.ts` |
+| `packages/engine/src/modules/goals/goal-asset-ownership.ts` | 1 | 39 | 1/5 | `goal-asset-ownership.bun.test.ts` |
+| `packages/engine/src/modules/goals/goal-review-proposals.ts` | 0 | 39 | 0/11 | _(transitive only)_ |
+| `packages/engine/src/modules/goals/goal-task-context.ts` | 0 | 83 | 0/4 | _(transitive only)_ |
+| `packages/engine/src/modules/goals/goal-workbench.ts` | 0 | 71 | 0/19 | _(transitive only)_ |
+| `packages/engine/src/modules/goals/goals-assets.ts` | 0 | 39 | 0/3 | _(transitive only)_ |
+| `packages/engine/src/modules/goals/goals-implementation.ts` | 0 | 39 | &mdash; | _(transitive only)_ |
+| `packages/engine/src/modules/goals/goals-lifecycle.ts` | 0 | 39 | 0/4 | _(transitive only)_ |
+| `packages/engine/src/modules/goals/goals-read.ts` | 0 | 39 | 0/15 | _(transitive only)_ |
+| `packages/engine/src/modules/goals/goals-shared.ts` | 0 | 39 | 0/18 | _(transitive only)_ |
+| `packages/engine/src/modules/goals/goals-write.ts` | 0 | 39 | 0/6 | _(transitive only)_ |
+| `packages/engine/src/modules/goals/goals.ts` | 0 | 39 | &mdash; | _(transitive only)_ |
 
 <details><summary><code>packages/engine/src/modules/goals/ai/goal.review.ts</code> &mdash; 7 exported symbol(s)</summary>
 
@@ -3103,31 +3195,31 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/engine/src/index.ts` | 34 | 35 | &mdash; | `action-center-memory-schedule-pages.bun.test.ts`<br>`activity-timeline.bun.test.ts`<br>`ai-suggestions.bun.test.ts`<br>`assistant-surface-actions.bun.test.ts`<br>`dashboard-ai-brief-generate.bun.test.ts`<br>`dashboard-page.bun.test.ts`<br>`execution-checkpoint.bun.test.ts`<br>`external-calendar-events.bun.test.ts`<br>`external-calendar-source-management.bun.test.ts`<br>`external-calendar-sources.bun.test.ts`<br>`external-task-edit-roundtrip.bun.test.ts`<br>`goal-review-v2.bun.test.ts`<br>`goal-workbench.bun.test.ts`<br>`goals.bun.test.ts`<br>`header-and-readmodels-ssr.bun.test.ts`<br>`plan-acceptance-edges.bun.test.ts`<br>`plan-execution-module.bun.test.ts`<br>`provider-approval-resolve.bun.test.ts`<br>`provider-bridge-malformed-workflow.bun.test.ts`<br>`real-router-smoke.bun.test.ts`<br>`recurring-task-lifecycle.bun.test.ts`<br>`runtime-providers.bun.test.ts`<br>`task-triggers.bun.test.ts`<br>`task-workspace-activity.bun.test.ts`<br>`task-workspace-console.bun.test.ts`<br>`work-block-schedule.bun.test.ts`<br>`workspace-overview.bun.test.ts`<br>`workspace-preferences.bun.test.ts`<br>`bootstrap-runtime.bun.test.ts`<br>`mcp-routes.bun.test.ts`<br>`plan-operations.bun.test.ts`<br>`work-commands-spec-patch.bun.test.ts`<br>`work-events-state.bun.test.ts`<br>`plan-accept-route.bun.test.ts` |
+| `packages/engine/src/index.ts` | 37 | 38 | &mdash; | `action-center-memory-schedule-pages.bun.test.ts`<br>`activity-timeline.bun.test.ts`<br>`ai-client-safety.bun.test.ts`<br>`ai-suggestions.bun.test.ts`<br>`assistant-surface-actions.bun.test.ts`<br>`dashboard-ai-brief-generate.bun.test.ts`<br>`dashboard-page.bun.test.ts`<br>`execution-checkpoint.bun.test.ts`<br>`external-calendar-events.bun.test.ts`<br>`external-calendar-source-management.bun.test.ts`<br>`external-calendar-sources.bun.test.ts`<br>`external-task-edit-roundtrip.bun.test.ts`<br>`goal-review-v2.bun.test.ts`<br>`goal-workbench.bun.test.ts`<br>`goals.bun.test.ts`<br>`header-and-readmodels-ssr.bun.test.ts`<br>`plan-acceptance-edges.bun.test.ts`<br>`plan-execution-module.bun.test.ts`<br>`provider-approval-resolve.bun.test.ts`<br>`provider-bridge-malformed-workflow.bun.test.ts`<br>`real-router-smoke.bun.test.ts`<br>`recurring-task-lifecycle.bun.test.ts`<br>`runtime-providers.bun.test.ts`<br>`task-triggers.bun.test.ts`<br>`task-workspace-activity.bun.test.ts`<br>`task-workspace-console.bun.test.ts`<br>`work-block-schedule.bun.test.ts`<br>`workspace-overview.bun.test.ts`<br>`workspace-preferences.bun.test.ts`<br>`bootstrap-runtime.bun.test.ts`<br>`agent-control-routes.bun.test.ts`<br>`mcp-routes.bun.test.ts`<br>`plan-operations.bun.test.ts`<br>`work-commands-spec-patch.bun.test.ts`<br>`work-events-state.bun.test.ts`<br>`plan-accept-route.bun.test.ts`<br>`result-finalization-retry.bun.test.ts` |
 
 #### engine :: ports.ts  _(1 files, 0 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/engine/src/ports.ts` | 0 | 35 | &mdash; | _(transitive only)_ |
+| `packages/engine/src/ports.ts` | 0 | 38 | &mdash; | _(transitive only)_ |
 
 #### engine :: services  _(13 files, 0 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/engine/src/services/ai-clients.service.ts` | 0 | 35 | 0/1 | _(transitive only)_ |
-| `packages/engine/src/services/goal-workbench.service.ts` | 0 | 35 | 0/1 | _(transitive only)_ |
-| `packages/engine/src/services/goals.service.ts` | 0 | 36 | 0/1 | _(transitive only)_ |
-| `packages/engine/src/services/pages.service.ts` | 0 | 35 | 0/1 | _(transitive only)_ |
-| `packages/engine/src/services/runtime.service.ts` | 0 | 35 | 0/1 | _(transitive only)_ |
-| `packages/engine/src/services/task-execution.service.ts` | 0 | 36 | 0/1 | _(transitive only)_ |
-| `packages/engine/src/services/task-lifecycle.service.ts` | 0 | 35 | 0/1 | _(transitive only)_ |
-| `packages/engine/src/services/task-plan.service.ts` | 0 | 36 | 0/1 | _(transitive only)_ |
-| `packages/engine/src/services/task-result.service.ts` | 0 | 35 | 0/1 | _(transitive only)_ |
-| `packages/engine/src/services/task-schedule.service.ts` | 0 | 36 | 0/1 | _(transitive only)_ |
-| `packages/engine/src/services/task-triggers.service.ts` | 0 | 35 | 0/1 | _(transitive only)_ |
-| `packages/engine/src/services/tasks.service.ts` | 0 | 36 | 0/1 | _(transitive only)_ |
-| `packages/engine/src/services/workspaces.service.ts` | 0 | 35 | 0/1 | _(transitive only)_ |
+| `packages/engine/src/services/ai-clients.service.ts` | 0 | 38 | 0/1 | _(transitive only)_ |
+| `packages/engine/src/services/goal-workbench.service.ts` | 0 | 38 | 0/1 | _(transitive only)_ |
+| `packages/engine/src/services/goals.service.ts` | 0 | 39 | 0/1 | _(transitive only)_ |
+| `packages/engine/src/services/pages.service.ts` | 0 | 38 | 0/1 | _(transitive only)_ |
+| `packages/engine/src/services/runtime.service.ts` | 0 | 38 | 0/1 | _(transitive only)_ |
+| `packages/engine/src/services/task-execution.service.ts` | 0 | 39 | 0/1 | _(transitive only)_ |
+| `packages/engine/src/services/task-lifecycle.service.ts` | 0 | 38 | 0/1 | _(transitive only)_ |
+| `packages/engine/src/services/task-plan.service.ts` | 0 | 39 | 0/1 | _(transitive only)_ |
+| `packages/engine/src/services/task-result.service.ts` | 0 | 38 | 0/1 | _(transitive only)_ |
+| `packages/engine/src/services/task-schedule.service.ts` | 0 | 39 | 0/1 | _(transitive only)_ |
+| `packages/engine/src/services/task-triggers.service.ts` | 0 | 38 | 0/1 | _(transitive only)_ |
+| `packages/engine/src/services/tasks.service.ts` | 0 | 39 | 0/1 | _(transitive only)_ |
+| `packages/engine/src/services/workspaces.service.ts` | 0 | 38 | 0/1 | _(transitive only)_ |
 
 #### engine :: test  _(2 files, 2 direct-covered)_
 
@@ -3162,24 +3254,24 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/engine/src/test-support.ts` | 41 | 41 | &mdash; | `accept-task-result.bun.test.ts`<br>`agent-tools-input-guards.bun.test.ts`<br>`apply-schedule.bun.test.ts`<br>`clear-schedule.bun.test.ts`<br>`decide-schedule-proposal.bun.test.ts`<br>`execution-runtime.bun.test.ts`<br>`get-action-center.bun.test.ts`<br>`get-memory-console.bun.test.ts`<br>`goal-workbench.bun.test.ts`<br>`header-and-readmodels-ssr.bun.test.ts`<br>`mark-task-done.bun.test.ts`<br>`plan-acceptance-edges.bun.test.ts`<br>`plan-execution-checkpoint-regression.bun.test.ts`<br>`plan-execution-module.bun.test.ts`<br>`plan-execution-output.bun.test.ts`<br>`plan-lifecycle-edge-workflow.bun.test.ts`<br>`plan-lifecycle-workflow.bun.test.ts`<br>`propose-schedule.bun.test.ts`<br>`provider-bridge-malformed-workflow.bun.test.ts`<br>`real-router-smoke.bun.test.ts`<br>`recurring-task-edge-cases.bun.test.ts`<br>`recurring-task-lifecycle.bun.test.ts`<br>`reopen-task.bun.test.ts`<br>`schedule-proposal-accept-reject.bun.test.ts`<br>`schedule-proposal-conflict-workflow.bun.test.ts`<br>`schedule-proposal-regression.bun.test.ts`<br>`schedule-proposal-workflow.bun.test.ts`<br>`task-triggers.bun.test.ts`<br>`task-validation-workflow.bun.test.ts`<br>`task-workflow.bun.test.ts`<br>`task-workspace-console.bun.test.ts`<br>`work-block-schedule.bun.test.ts`<br>`plan-operations.bun.test.ts`<br>`task-execution-closure.bun.test.ts`<br>`conflict-analyzer-smart.bun.test.ts`<br>`conflict-detector.bun.test.ts`<br>`provider-response-parsing.bun.test.ts`<br>`providers.bun.test.ts`<br>`append-canonical-event.bun.test.ts`<br>`event-retention.bun.test.ts`<br>`get-default-workspace.bun.test.ts` |
+| `packages/engine/src/test-support.ts` | 42 | 42 | &mdash; | `accept-task-result.bun.test.ts`<br>`agent-tools-input-guards.bun.test.ts`<br>`apply-schedule.bun.test.ts`<br>`clear-schedule.bun.test.ts`<br>`decide-schedule-proposal.bun.test.ts`<br>`execution-runtime.bun.test.ts`<br>`get-action-center.bun.test.ts`<br>`get-memory-console.bun.test.ts`<br>`goal-workbench.bun.test.ts`<br>`header-and-readmodels-ssr.bun.test.ts`<br>`mark-task-done.bun.test.ts`<br>`plan-acceptance-edges.bun.test.ts`<br>`plan-execution-checkpoint-regression.bun.test.ts`<br>`plan-execution-module.bun.test.ts`<br>`plan-execution-output.bun.test.ts`<br>`plan-lifecycle-edge-workflow.bun.test.ts`<br>`plan-lifecycle-workflow.bun.test.ts`<br>`propose-schedule.bun.test.ts`<br>`provider-bridge-malformed-workflow.bun.test.ts`<br>`real-router-smoke.bun.test.ts`<br>`recurring-task-edge-cases.bun.test.ts`<br>`recurring-task-lifecycle.bun.test.ts`<br>`reopen-task.bun.test.ts`<br>`schedule-proposal-accept-reject.bun.test.ts`<br>`schedule-proposal-conflict-workflow.bun.test.ts`<br>`schedule-proposal-regression.bun.test.ts`<br>`schedule-proposal-workflow.bun.test.ts`<br>`task-triggers.bun.test.ts`<br>`task-validation-workflow.bun.test.ts`<br>`task-workflow.bun.test.ts`<br>`task-workspace-console.bun.test.ts`<br>`work-block-schedule.bun.test.ts`<br>`plan-operations.bun.test.ts`<br>`task-execution-closure.bun.test.ts`<br>`conflict-analyzer-smart.bun.test.ts`<br>`conflict-detector.bun.test.ts`<br>`provider-response-parsing.bun.test.ts`<br>`providers.bun.test.ts`<br>`append-canonical-event.bun.test.ts`<br>`event-retention.bun.test.ts`<br>`get-action-center.bun.test.ts`<br>`get-default-workspace.bun.test.ts` |
 
 #### engine :: triggers  _(1 files, 0 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/engine/src/modules/triggers/task-triggers.ts` | 0 | 70 | 0/7 | _(transitive only)_ |
+| `packages/engine/src/modules/triggers/task-triggers.ts` | 0 | 74 | 0/7 | _(transitive only)_ |
 
 #### engine :: workspaces  _(6 files, 0 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/engine/src/modules/workspaces/get-default-workspace.ts` | 0 | 66 | 0/3 | _(transitive only)_ |
-| `packages/engine/src/modules/workspaces/get-workspace-overview.ts` | 0 | 66 | 0/1 | _(transitive only)_ |
-| `packages/engine/src/modules/workspaces/get-workspaces.ts` | 0 | 66 | 0/1 | _(transitive only)_ |
-| `packages/engine/src/modules/workspaces/index.ts` | 0 | 66 | &mdash; | _(transitive only)_ |
-| `packages/engine/src/modules/workspaces/start-with-chrona-preference.ts` | 0 | 66 | 0/3 | _(transitive only)_ |
-| `packages/engine/src/modules/workspaces/workspace-query.ts` | 0 | 66 | 0/2 | _(transitive only)_ |
+| `packages/engine/src/modules/workspaces/get-default-workspace.ts` | 0 | 70 | 0/3 | _(transitive only)_ |
+| `packages/engine/src/modules/workspaces/get-workspace-overview.ts` | 0 | 70 | 0/1 | _(transitive only)_ |
+| `packages/engine/src/modules/workspaces/get-workspaces.ts` | 0 | 70 | 0/1 | _(transitive only)_ |
+| `packages/engine/src/modules/workspaces/index.ts` | 0 | 70 | &mdash; | _(transitive only)_ |
+| `packages/engine/src/modules/workspaces/start-with-chrona-preference.ts` | 0 | 70 | 0/3 | _(transitive only)_ |
+| `packages/engine/src/modules/workspaces/workspace-query.ts` | 0 | 70 | 0/2 | _(transitive only)_ |
 
 #### integrations :: hermes  _(7 files, 0 direct-covered)_
 
@@ -3187,7 +3279,7 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 | --- | --- | --- | --- | --- |
 | `packages/integrations/src/hermes/detect.ts` | 0 | 0 | 0/1 | **none** |
 | `packages/integrations/src/hermes/env-file.ts` | 0 | 0 | 0/4 | **none** |
-| `packages/integrations/src/hermes/index.ts` | 0 | 26 | &mdash; | _(transitive only)_ |
+| `packages/integrations/src/hermes/index.ts` | 0 | 27 | &mdash; | _(transitive only)_ |
 | `packages/integrations/src/hermes/plan.ts` | 0 | 0 | 0/1 | **none** |
 | `packages/integrations/src/hermes/plugin.ts` | 0 | 0 | 0/15 | **none** |
 | `packages/integrations/src/hermes/setup-local.ts` | 0 | 0 | 0/3 | **none** |
@@ -3197,13 +3289,13 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/integrations/src/index.ts` | 3 | 76 | &mdash; | `external-calendar-source-management.bun.test.ts`<br>`external-calendar-sources.bun.test.ts`<br>`recurring-task-lifecycle.bun.test.ts` |
+| `packages/integrations/src/index.ts` | 3 | 80 | &mdash; | `external-calendar-source-management.bun.test.ts`<br>`external-calendar-sources.bun.test.ts`<br>`recurring-task-lifecycle.bun.test.ts` |
 
 #### logging :: index.ts  _(1 files, 0 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/logging/src/index.ts` | 0 | 122 | 0/3 | _(transitive only)_ |
+| `packages/logging/src/index.ts` | 0 | 126 | 0/3 | _(transitive only)_ |
 
 #### other :: apps/web  _(1 files, 0 direct-covered)_
 
@@ -3399,11 +3491,19 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 | --- | --- | --- | --- | --- |
 | `apps/web/src/components/access-key-route-error.tsx` | 0 | 0 | 0/1 | **none** |
 
-#### web/components :: access-key-unlock.tsx  _(1 files, 0 direct-covered)_
+#### web/components :: access-key-unlock.tsx  _(1 files, 1 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `apps/web/src/components/access-key-unlock.tsx` | 0 | 2 | 0/1 | _(transitive only)_ |
+| `apps/web/src/components/access-key-unlock.tsx` | 1 | 3 | 1/1 | `access-key-unlock.test.tsx` |
+
+<details><summary><code>apps/web/src/components/access-key-unlock.tsx</code> &mdash; 1 exported symbol(s)</summary>
+
+| Symbol | Kind | Tests referencing it |
+| --- | --- | --- |
+| `AccessKeyUnlock` | function | `access-key-unlock.test.tsx` |
+
+</details>
 
 #### web/components :: error-boundary.tsx  _(1 files, 0 direct-covered)_
 

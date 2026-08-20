@@ -1625,6 +1625,9 @@
       "finalizationRunningTitle": "Preparing final result",
       "finalizationRunningBadge": "Preparing",
       "finalizationRunningDescription": "Chrona is assembling and validating the final result.",
+      "finalizationStalledTitle": "Finalization interrupted",
+      "finalizationStalledBadge": "Finalization interrupted",
+      "finalizationStalledDescription": "Finalization stopped before completion. Generated files remain available; retry to continue.",
       "finalizationUnavailableBadge": "Artifacts only",
       "finalizationUnavailableDescription": "The final result is unavailable. Generated files are shown below.",
       "stageResultsTitle": "Stage results",
@@ -1637,6 +1640,10 @@
       "resultsPendingMessage": "Output from the current step will appear here as soon as the runtime provides it.",
       "executionProducingOutputAria": "Execution is producing output",
       "executionWorkingFallback": "AI is working",
+      "providerWaitingForApproval": "Waiting for approval",
+      "providerRunFailed": "Provider run failed",
+      "providerRunCancelled": "Run cancelled",
+      "resultOutputLabel": "Result output",
       "artifactPreview": "Preview",
       "artifactHidePreview": "Hide preview",
       "resultContentPreview": "Content preview",
@@ -1819,7 +1826,8 @@
           "dirty": "AI brief ready to update",
           "failed": "AI brief update failed",
           "unconfigured": "Dashboard AI provider not configured",
-          "regenerate": "Regenerate"
+          "regenerate": "Regenerate",
+          "updatedAt": "Updated {time}"
         }
       },
       "feed": {

@@ -412,7 +412,7 @@ function ensureExpectedState(operation: ChronaToolOperation, state: Record<strin
 
 function reasonCodeFromError(cause: unknown) {
   if (cause instanceof PlanCompileError) return "VALIDATION_ERROR" as const;
-  if (!isEngineError(cause)) return "INVALID_TRANSITION" as const;
+  if (!isEngineError(cause)) return "INTERNAL_ERROR" as const;
   switch (cause.code) {
     case ENGINE_ERROR_CODES.TASK_NOT_FOUND:
     case ENGINE_ERROR_CODES.WORKSPACE_NOT_FOUND:
@@ -559,6 +559,41 @@ async function prepareMutation(
   }
   if (!mutates || !input.sessionId) return { key, persistedClaim: null };
   return claimPersistentMutation(operationId, operation, audit, key);
+}
+
+async function rejectToolExecution(input: {
+  cause: unknown;
+  operationId: string;
+  operation: ChronaToolOperation;
+  audit: ToolAuditContext | null;
+  persistedClaim: PersistedMutationClaim | null;
+}) {
+  const { toolName } = input.operation;
+  const diagnostics = rejectionDiagnostics(input.cause);
+  const reasonCode = reasonCodeFromError(input.cause);
+  if (reasonCode === "INTERNAL_ERROR") {
+    logger.error("agent_tool.internal_error", {
+      toolName,
+      error: input.cause instanceof Error ? input.cause.message : String(input.cause),
+    });
+  }
+  const rejected = rejectedToolResult({
+    operationId: input.operationId,
+    toolName,
+    reasonCode,
+    message: reasonCode === "INTERNAL_ERROR"
+      ? "Chrona encountered an internal tool error."
+      : diagnostics.message,
+    affected: affectedFrom(input.operation.input),
+    auditRef: input.audit?.invocationId ?? input.audit?.inputRawEventId ?? input.operationId,
+    recovery: reasonCode === "INTERNAL_ERROR"
+      ? null
+      : { nextTool: readToolFor(toolName), details: diagnostics.details },
+    evidence: { ...operationEvidence(input.operation.input), ...diagnostics.evidence },
+  });
+  await completePersistedMutationIfClaimed(input.persistedClaim, rejected);
+  await finishToolAudit(input.audit, input.operation, rejected, "rejected");
+  return rejected;
 }
 
 export function createAgentToolOperationsService(deps: AgentToolOperationsDeps) {
@@ -746,20 +781,13 @@ export function createAgentToolOperationsService(deps: AgentToolOperationsDeps) 
         await finishToolAudit(audit, operation, accepted, "accepted");
         return accepted;
       } catch (cause) {
-        const diagnostics = rejectionDiagnostics(cause);
-        const rejected = rejectedToolResult({
+        return rejectToolExecution({
+          cause,
           operationId: id,
-          toolName,
-          reasonCode: reasonCodeFromError(cause),
-          message: diagnostics.message,
-          affected: affectedFrom(input),
-          auditRef: audit?.invocationId ?? audit?.inputRawEventId ?? id,
-          recovery: { nextTool: readToolFor(toolName), details: diagnostics.details },
-          evidence: { ...operationEvidence(input), ...diagnostics.evidence },
+          operation,
+          audit,
+          persistedClaim,
         });
-        await completePersistedMutationIfClaimed(persistedClaim, rejected);
-        await finishToolAudit(audit, operation, rejected, "rejected");
-        return rejected;
       }
     },
   };

@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
+import type { UiDocument } from "@chrona/ui-protocol";
 import type { TaskPlanGraphPlan } from "../model/plan-node-view-model";
 import type { TaskPageData } from "../model/task-workspace-types";
 import {
 	deriveRunningExecutionView,
 	deriveTaskWorkspaceDisplayState,
+	finalizedResultDeliverableCount,
 	derivePlanReviewSummary,
 	deriveResultReview,
 	deriveRunPreview,
@@ -103,6 +105,39 @@ function graphPlan(): TaskPlanGraphPlan {
 			laneByNodeId: {},
 			upstreamByNodeId: {},
 			downstreamByNodeId: {},
+		},
+	};
+}
+
+const emptyDocument: UiDocument = {
+	root: "root",
+	elements: { root: { type: "Stack", props: {} } },
+};
+
+function resultDocument(deliverables: Array<{ key: string; artifactRef: string }>): UiDocument {
+	return {
+		root: "root",
+		elements: {
+			root: {
+				type: "Stack",
+				props: {},
+				children: deliverables.map((item) => item.key),
+			},
+			...Object.fromEntries(
+				deliverables.map((item) => [
+					item.key,
+					{
+						type: "ResultDeliverable",
+						props: {
+							artifactRef: item.artifactRef,
+							title: item.key,
+							role: "supporting",
+							kind: "file",
+							sourceKeys: [item.key],
+						},
+					},
+				]),
+			),
 		},
 	};
 }
@@ -316,6 +351,63 @@ describe("task workspace interaction model", () => {
 				canRequestChanges: false,
 			},
 			continuation: { visible: true },
+		});
+	});
+
+	it.each([
+		{ name: "missing Spec", spec: null, expected: 0 },
+		{ name: "Spec without downloads", spec: emptyDocument, expected: 0 },
+		{
+			name: "selected downloads",
+			spec: resultDocument([
+				{ key: "report", artifactRef: "AF111111111111" },
+				{ key: "data", artifactRef: "AF222222222222" },
+			]),
+			expected: 2,
+		},
+		{
+			name: "repeated Artifact ref",
+			spec: resultDocument([
+				{ key: "report", artifactRef: "AF111111111111" },
+				{ key: "report-copy", artifactRef: "AF111111111111" },
+			]),
+			expected: 1,
+		},
+	])("counts $name by canonical Artifact ref", ({ spec, expected }) => {
+		expect(finalizedResultDeliverableCount(spec)).toBe(expected);
+	});
+
+	it("uses finalized download selections instead of intermediate Artifact count", () => {
+		const completedPage = pageData({
+			task: { ...pageData().task, status: "Completed" },
+			latestRunSummary: {
+				id: "run-1",
+				status: "Completed",
+				startedAt: "2026-05-18T00:00:00.000Z",
+				syncStatus: "healthy",
+			},
+			artifacts: Array.from({ length: 5 }, (_, index) => ({
+				id: `artifact-${index}`,
+				title: `Workflow output ${index}`,
+				type: "file",
+			})),
+			commandCenter: {
+				documents: {
+					now: emptyDocument,
+					trail: emptyDocument,
+					output: resultDocument([
+						{ key: "report", artifactRef: "AF111111111111" },
+						{ key: "data", artifactRef: "AF222222222222" },
+					]),
+				},
+			},
+		});
+
+		expect(
+			deriveResultReview({ pageData: completedPage, graphPlan: graphPlan() }),
+		).toMatchObject({
+			completion: { artifactCount: 2 },
+			content: { hasArtifacts: true, showResultTools: true },
 		});
 	});
 

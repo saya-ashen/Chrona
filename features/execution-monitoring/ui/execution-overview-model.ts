@@ -20,6 +20,12 @@ export const DEFAULT_COMMAND_CENTER_COPY: CommandCenterCopy = {
 };
 
 export const TRAIL_ACTIVITY_LIMIT = 300;
+export const RESULT_FINALIZATION_STALE_MS = 10 * 60 * 1000;
+
+type ResultFinalizationProjection = {
+  status: string;
+  startedAt?: string;
+};
 
 
 export type ExecutionActivityState = {
@@ -33,6 +39,7 @@ export type ExecutionActivityState = {
   finalizationFailed: boolean;
   finalizationReady: boolean;
   finalizationRunning: boolean;
+  finalizationStalled: boolean;
 };
 
 export function commandCenterTrailItems(
@@ -117,13 +124,45 @@ function activitySummary(activityItems: WorkspaceActivityItem[], executionIsLive
     : `${activityItems.length} events${failedActivityCount > 0 ? ` · ${failedActivityCount} failed` : ""}`;
 }
 
-function finalizationState(isExecutionActive: boolean, status: string | undefined) {
-  const inactive = !isExecutionActive;
+const EMPTY_FINALIZATION_STATE = {
+  finalizationFailed: false,
+  finalizationReady: false,
+  finalizationRunning: false,
+  finalizationStalled: false,
+};
+
+function runningFinalizationState(startedAt: string | undefined, nowMs: number) {
+  if (!startedAt) return { ...EMPTY_FINALIZATION_STATE, finalizationRunning: true };
+  const startedAtMs = Date.parse(startedAt);
+  if (!Number.isFinite(startedAtMs)) {
+    return { ...EMPTY_FINALIZATION_STATE, finalizationRunning: true };
+  }
+  if (nowMs - startedAtMs < RESULT_FINALIZATION_STALE_MS) {
+    return { ...EMPTY_FINALIZATION_STATE, finalizationRunning: true };
+  }
   return {
-    finalizationFailed: inactive && status === "Failed",
-    finalizationReady: inactive && status === "Ready",
-    finalizationRunning: inactive && status === "Running",
+    ...EMPTY_FINALIZATION_STATE,
+    finalizationFailed: true,
+    finalizationStalled: true,
   };
+}
+
+function finalizationState(
+  isExecutionActive: boolean,
+  finalization: ResultFinalizationProjection | undefined,
+  nowMs: number,
+) {
+  if (isExecutionActive || !finalization) return EMPTY_FINALIZATION_STATE;
+  if (finalization.status === "Running") {
+    return runningFinalizationState(finalization.startedAt, nowMs);
+  }
+  if (finalization.status === "Failed") {
+    return { ...EMPTY_FINALIZATION_STATE, finalizationFailed: true };
+  }
+  if (finalization.status === "Ready") {
+    return { ...EMPTY_FINALIZATION_STATE, finalizationReady: true };
+  }
+  return EMPTY_FINALIZATION_STATE;
 }
 
 export function buildExecutionActivityState({
@@ -134,7 +173,8 @@ export function buildExecutionActivityState({
   runtimeEvents,
   executionStatus,
   isExecutionRunning,
-  finalizationStatus,
+  finalization,
+  nowMs = Date.now(),
 }: {
   nodes: PlanNodeDataModel[];
   liveActivity: WorkspaceActivityItem[];
@@ -143,7 +183,8 @@ export function buildExecutionActivityState({
   runtimeEvents: WorkspaceRuntimeEvent[];
   executionStatus: string | undefined;
   isExecutionRunning: boolean;
-  finalizationStatus: string | undefined;
+  finalization: ResultFinalizationProjection | undefined;
+  nowMs?: number;
 }): ExecutionActivityState {
   const execution = deriveExecutionState(executionStatus, isExecutionRunning);
   const mergedActivity = mergeWorkspaceActivity(
@@ -166,7 +207,7 @@ export function buildExecutionActivityState({
     activitySummary: activitySummary(activityItems, execution.executionIsLive),
     executionHasFatalFailure,
     failureSummary,
-    ...finalizationState(execution.executionIsActive, finalizationStatus),
+    ...finalizationState(execution.executionIsActive, finalization, nowMs),
   };
 }
 
@@ -188,6 +229,7 @@ export function buildResultNodeOptions(
 
 export function resultStatusFor(activity: ExecutionActivityState) {
   if (activity.executionIsActive) return "active" as const;
+  if (activity.finalizationStalled) return "stalled" as const;
   if (activity.finalizationFailed) return "failed" as const;
   if (activity.finalizationRunning) return "running" as const;
   if (activity.finalizationReady) return "ready" as const;

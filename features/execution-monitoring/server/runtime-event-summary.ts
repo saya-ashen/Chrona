@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type {
 	CheckpointActionKind,
 	ExecutionActionType,
@@ -12,6 +13,14 @@ import type { PlanExecutionRuntimeEvent } from "@chrona/engine";
 
 const SENSITIVE_PROVIDER_KEY =
 	/api[-_]?key|token|secret|password|authorization|credential/i;
+const SAFE_TOOL_DISPLAY_KEYS = new Set([
+	"action", "alreadyAccepted", "args", "call", "code", "command",
+	"count", "cwd", "end", "file", "filename", "format", "intent",
+	"kind", "language", "limit", "line", "message", "method", "offset",
+	"ok", "options", "params", "path", "pattern", "query", "queries",
+	"recorded", "result", "scope", "selector", "start", "status",
+	"summary", "target", "title", "tool", "url",
+]);
 
 function exposeProviderPayload(value: unknown, key?: string): unknown {
 	if (key && SENSITIVE_PROVIDER_KEY.test(key)) return "[redacted]";
@@ -28,6 +37,52 @@ function exposeProviderPayload(value: unknown, key?: string): unknown {
 		);
 	}
 	return value;
+}
+
+function redactSensitiveText(value: string) {
+	return value
+		.replace(/(authorization\s*:\s*bearer\s+)[^\s]+/gi, "$1[redacted]")
+		.replace(
+			/(["']?(?:api[-_]?key|token|secret|password|credential)["']?\s*[:=]\s*["']?)[^"',\s}&]+/gi,
+			"$1[redacted]",
+		)
+		.replace(
+			/((?:--)(?:api[-_]?key|token|secret|password|credential)(?:\s+|=))[^\s'"]+/gi,
+			"$1[redacted]",
+		)
+		.replace(/(https?:\/\/[^:/\s]+:)[^@\s]+@/gi, "$1[redacted]@");
+}
+
+function safeDisplayText(value: string) {
+	const redacted = redactSensitiveText(value);
+	return redacted.length > 500 ? `${redacted.slice(0, 500)}…` : redacted;
+}
+
+function safeToolDisplayPayload(value: unknown, depth = 0): unknown {
+	if (depth > 4) return "[omitted]";
+	if (typeof value === "string") return safeDisplayText(value);
+	if (Array.isArray(value))
+		return value.slice(0, 20).map((item) => safeToolDisplayPayload(item, depth + 1));
+	if (!value || typeof value !== "object") return value;
+	return Object.fromEntries(
+		Object.entries(value as Record<string, unknown>)
+			.filter(
+				([key]) =>
+					SAFE_TOOL_DISPLAY_KEYS.has(key) || SENSITIVE_PROVIDER_KEY.test(key),
+			)
+			.map(([key, entry]) => [
+				key,
+				SENSITIVE_PROVIDER_KEY.test(key)
+					? "[redacted]"
+					: safeToolDisplayPayload(entry, depth + 1),
+			]),
+	);
+}
+
+function publicToolCallId(value: string | undefined) {
+	return value
+		? createHash("sha256").update(value).digest("hex").slice(0, 16)
+		: undefined;
 }
 
 function sanitizeProviderDisplayEvent(
@@ -94,71 +149,74 @@ function summarizeProviderRuntimePayload(
 		case "text_delta":
 			return {
 				type: "text_delta",
-				text: providerEvent.text,
+				text: safeDisplayText(providerEvent.text),
 			};
 		case "reasoning_delta":
 			return {
 				type: "reasoning_delta",
-				text: providerEvent.text,
-				...(providerEvent.raw !== undefined ? { raw: providerEvent.raw } : {}),
+				text: safeDisplayText(providerEvent.text),
 			};
 		case "tool_call":
 			return {
 				type: "tool_started",
 				tool: publicToolDescriptor(providerEvent.tool),
 				label: publicToolDescriptor(providerEvent.tool).label,
-				input: providerEvent.input,
-				...(providerEvent.preview !== undefined
-					? { raw: providerEvent.preview }
-					: {}),
+				callId: publicToolCallId(providerEvent.callId),
+				input: safeToolDisplayPayload(providerEvent.input),
 			};
 		case "tool_started":
 			return {
 				type: "tool_started",
 				tool: publicToolDescriptor(providerEvent.toolName),
 				label: publicToolDescriptor(providerEvent.toolName).label,
-				...(providerEvent.input !== undefined
-					? { input: providerEvent.input }
+				...(providerEvent.callId
+					? { callId: publicToolCallId(providerEvent.callId) }
 					: {}),
-				...(providerEvent.raw !== undefined ? { raw: providerEvent.raw } : {}),
+				...(providerEvent.input !== undefined
+					? { input: safeToolDisplayPayload(providerEvent.input) }
+					: {}),
 			};
 		case "tool_progress":
 			return {
 				type: "tool_progress",
 				tool: publicToolDescriptor(providerEvent.toolName),
 				label: publicToolDescriptor(providerEvent.toolName).label,
+				callId: publicToolCallId(providerEvent.callId),
 				...(providerEvent.preview !== undefined
-					? { output: providerEvent.preview }
+					? { output: safeToolDisplayPayload(providerEvent.preview) }
 					: {}),
-				...(providerEvent.raw !== undefined ? { raw: providerEvent.raw } : {}),
 			};
 		case "tool_result":
 			return {
 				type: "tool_completed",
+				...(providerEvent.callId
+					? { callId: publicToolCallId(providerEvent.callId) }
+					: {}),
 				tool: providerEvent.tool
 					? publicToolDescriptor(providerEvent.tool)
 					: undefined,
 				label: providerEvent.tool
 					? publicToolDescriptor(providerEvent.tool).label
 					: "Tool result",
-				output: providerEvent.result,
+				output: safeToolDisplayPayload(providerEvent.result),
 			};
 		case "tool_completed":
 			return {
 				type: "tool_completed",
 				tool: publicToolDescriptor(providerEvent.toolName),
 				label: publicToolDescriptor(providerEvent.toolName).label,
+				...(providerEvent.callId
+					? { callId: publicToolCallId(providerEvent.callId) }
+					: {}),
 				durationMs: providerEvent.durationMs,
 				...(providerEvent.error
 					? {
 							error: {
 								code: providerEvent.error.code,
-								message: providerEvent.error.message,
-								raw: providerEvent.error.raw,
+								message: safeDisplayText(providerEvent.error.message),
 							},
 						}
 					: {}),
-				...(providerEvent.raw !== undefined ? { raw: providerEvent.raw } : {}),
 			};
 		case "approval_required": {
 			const { id, riskLevel, choices, defaultChoice, recommendedChoice } =
@@ -176,40 +234,30 @@ function summarizeProviderRuntimePayload(
 					defaultChoice,
 					recommendedChoice,
 				},
-				...(providerEvent.raw !== undefined ? { raw: providerEvent.raw } : {}),
 			};
 		}
 		case "run_started":
-			return { type: "run_status", status: "started", raw: providerEvent.run };
+			return { type: "run_status", status: "started" };
 		case "run_completed":
 			return {
 				type: "run_status",
 				status: "completed",
 				output: {
 					...(providerEvent.outputText !== undefined
-						? { text: providerEvent.outputText }
-						: {}),
-					...(providerEvent.output !== undefined
-						? { output: providerEvent.output }
-						: {}),
-					...(providerEvent.structuredPayload !== undefined
-						? { structuredPayload: providerEvent.structuredPayload }
+						? { text: safeDisplayText(providerEvent.outputText) }
 						: {}),
 				},
-				...(providerEvent.raw !== undefined ? { raw: providerEvent.raw } : {}),
 			};
 		case "run_failed":
 			return {
 				type: "run_status",
 				status: "failed",
-				error: providerEvent.error,
-				...(providerEvent.raw !== undefined ? { raw: providerEvent.raw } : {}),
+				error: safeDisplayText(providerEvent.error),
 			};
 		case "run_cancelled":
 			return {
 				type: "run_status",
 				status: "cancelled",
-				...(providerEvent.raw !== undefined ? { raw: providerEvent.raw } : {}),
 			};
 		case "raw_event": {
 			const raw = providerEvent.raw;
@@ -218,20 +266,12 @@ function summarizeProviderRuntimePayload(
 					? (raw as { kind?: unknown }).kind
 					: undefined;
 			if (kind === "provider_request") {
-				return {
-					type: "run_status",
-					status: "started",
-					input: (raw as { input?: unknown }).input,
-					raw,
-				};
+				return { type: "run_status", status: "started" };
 			}
 			if (kind !== "provider_response") {
 				return {
 					type: "raw_event",
-					raw,
-					...(providerEvent.rawEventType
-						? { rawEventType: providerEvent.rawEventType }
-						: {}),
+					rawEventType: providerEvent.rawEventType ?? "provider_event",
 				};
 			}
 			const output = (raw as { output?: { status?: unknown } }).output;
@@ -243,7 +283,7 @@ function summarizeProviderRuntimePayload(
 						: output?.status === "completed"
 							? "completed"
 							: "started";
-			return { type: "run_status", status, output, raw };
+			return { type: "run_status", status };
 		}
 		default:
 			return null;

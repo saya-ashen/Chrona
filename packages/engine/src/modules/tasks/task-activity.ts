@@ -14,6 +14,7 @@ import {
   isDisplayableProviderEvent,
   mapProviderEventToActivity,
   providerActivityEventType,
+  providerToolCompletionMergeKey,
   providerToolProgressMergeKey,
 } from "./provider-activity";
 import { mapTaskEventToActivity } from "./task-activity-mapper";
@@ -36,6 +37,7 @@ export function deduplicateProjectedActivity(items: WorkspaceActivityTimelineIte
 
 type ActivityTimelineState = {
   items: WorkspaceActivityTimelineItem[];
+  toolCompletionIndexes: Map<string, number>;
   toolProgressIndexes: Map<string, number>;
 };
 
@@ -68,9 +70,41 @@ function replaceToolProgress(
 }
 
 
+function mergeToolCompletion(
+  state: ActivityTimelineState,
+  event: TaskActivityEvent,
+  eventType: string,
+  payloadEvent: Record<string, unknown> | null,
+) {
+  if (
+    event.source !== "provider" ||
+    !payloadEvent ||
+    (eventType !== "tool_completed" && eventType !== "tool_result")
+  ) return false;
+  const completionKey = providerToolCompletionMergeKey(event, payloadEvent);
+  if (!completionKey) return false;
+  const item = mapProviderEventToActivity(event);
+  const existingIndex = state.toolCompletionIndexes.get(completionKey);
+  if (existingIndex === undefined) {
+    state.toolCompletionIndexes.set(completionKey, state.items.length);
+    state.items.push(item);
+    return true;
+  }
+  const existing = state.items[existingIndex]!;
+  const preferred = eventType === "tool_completed" ? item : existing;
+  state.items[existingIndex] = {
+    ...preferred,
+    id: existing.id,
+    providerInput: item.providerInput ?? existing.providerInput,
+    providerOutput: item.providerOutput ?? existing.providerOutput,
+  };
+  return true;
+}
+
 export function buildActivityTimeline(events: TaskActivityEvent[]) {
   const state: ActivityTimelineState = {
     items: [],
+    toolCompletionIndexes: new Map(),
     toolProgressIndexes: new Map(),
   };
   for (const event of events) {
@@ -78,6 +112,7 @@ export function buildActivityTimeline(events: TaskActivityEvent[]) {
     const eventType = providerActivityEventType(event, payloadEvent);
     if (shouldSkipProviderEvent(event, eventType, payloadEvent)) continue;
     if (replaceToolProgress(state, event, eventType, payloadEvent)) continue;
+    if (mergeToolCompletion(state, event, eventType, payloadEvent)) continue;
     const activity = mapTaskEventToActivity(event);
     if (activity) state.items.push(activity);
   }

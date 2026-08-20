@@ -9,8 +9,13 @@ import type {
 	GeneratePlanSSEEvent,
 	TaskPlanGenerationSessionReadModel,
 } from "@chrona/contracts";
+import {
+	classifyAiFeatureProviderError,
+	type AiFeatureProviderErrorCode,
+} from "../ai";
 import { appendCanonicalEvent } from "../events";
 import { currentSchedulerWorkContext } from "../orchestration/scheduler-work-context";
+import { abortActiveTaskPlanGeneration } from "./active-task-plan-generations";
 import { withSchedulerWorkOwnership } from "../orchestration/scheduler-lease-repository";
 
 const scopeKey = (workBlockId?: string | null) => workBlockId ?? "";
@@ -57,16 +62,105 @@ export class TaskPlanGenerationInFlightError extends Error {
 	}
 }
 
-function projectError(code: string | null): GeneratePlanErrorCode {
-	if (
-		code === "provider_timeout" ||
-		code === "provider_protocol_error" ||
-		code === "provider_invalid_json" ||
-		code === "provider_start_outcome_unknown" ||
-		code === "provider_run_unrecoverable" ||
-		code === "provider_capability_mismatch"
-	) {
-		return "PROVIDER_ERROR";
+type FailurePresentation = {
+	code: GeneratePlanErrorCode;
+	title: string;
+	message: string;
+};
+
+const providerFailurePresentations: Record<
+	AiFeatureProviderErrorCode,
+	FailurePresentation
+> = {
+	provider_authentication_error: {
+		code: "PROVIDER_AUTHENTICATION_ERROR",
+		title: "Provider authentication failed",
+		message:
+			"The AI provider rejected its credentials. Check the configured API key or sign-in.",
+	},
+	provider_configuration_error: {
+		code: "PROVIDER_CONFIGURATION_ERROR",
+		title: "Provider configuration incomplete",
+		message:
+			"No AI model is selected, or the provider setup is incomplete. Choose a model and verify the provider configuration.",
+	},
+	provider_permission_error: {
+		code: "PROVIDER_PERMISSION_ERROR",
+		title: "Provider access denied",
+		message:
+			"The AI provider denied access. Check account permissions and the selected model.",
+	},
+	provider_quota_exceeded: {
+		code: "PROVIDER_QUOTA_EXCEEDED",
+		title: "Provider quota reached",
+		message:
+			"The AI provider quota or billing limit was reached. Check account balance or plan.",
+	},
+	provider_rate_limited: {
+		code: "PROVIDER_RATE_LIMITED",
+		title: "Provider rate limit reached",
+		message: "The AI provider is rate limiting requests. Wait briefly, then retry.",
+	},
+	provider_request_error: {
+		code: "PROVIDER_REQUEST_ERROR",
+		title: "Provider rejected request",
+		message:
+			"The AI provider rejected the request. Check the selected model and provider configuration.",
+	},
+	provider_unavailable: {
+		code: "PROVIDER_UNAVAILABLE",
+		title: "Provider unavailable",
+		message: "The AI provider is temporarily unavailable. Retry later.",
+	},
+	provider_network_error: {
+		code: "PROVIDER_CONNECTION_ERROR",
+		title: "Provider connection failed",
+		message:
+			"Chrona could not reach the AI provider, or the connection closed unexpectedly.",
+	},
+	provider_timeout: {
+		code: "PROVIDER_TIMEOUT",
+		title: "Provider request timed out",
+		message: "The AI provider did not finish plan generation before the timeout.",
+	},
+	provider_protocol_error: {
+		code: "PROVIDER_RESPONSE_ERROR",
+		title: "Invalid provider response",
+		message: "The AI provider returned an incomplete or invalid response.",
+	},
+	cancelled: {
+		code: "ABORTED",
+		title: "Plan generation cancelled",
+		message: "Plan generation was cancelled.",
+	},
+};
+
+function providerErrorCode(
+	code: string | null,
+	errorMessage?: string | null,
+): AiFeatureProviderErrorCode | null {
+	if (code === "provider_protocol_error")
+		return classifyAiFeatureProviderError(errorMessage ?? "");
+	if (code && code in providerFailurePresentations)
+		return code as AiFeatureProviderErrorCode;
+	if (code === "provider_invalid_json") return "provider_protocol_error";
+	if (code === "provider_capability_mismatch") return "provider_request_error";
+	if (code === "provider_run_unrecoverable") return "provider_network_error";
+	return null;
+}
+
+function projectFailure(
+	code: string | null,
+	errorMessage?: string | null,
+): FailurePresentation {
+	const providerCode = providerErrorCode(code, errorMessage);
+	if (providerCode) return providerFailurePresentations[providerCode];
+	if (code === "provider_start_outcome_unknown") {
+		return {
+			code: "PROVIDER_ERROR",
+			title: "Provider result unknown",
+			message: "The AI provider could not confirm whether plan generation started.",
+		};
 	}
 	if (
 		code === "input_invalid" ||
@@ -75,36 +169,35 @@ function projectError(code: string | null): GeneratePlanErrorCode {
 		code === "evidence_invalid" ||
 		code === "completion_invalid"
 	) {
-		return "INVALID_TOOL_PAYLOAD";
+		return {
+			code: "INVALID_TOOL_PAYLOAD",
+			title: "Generated plan is invalid",
+			message: "The generated plan did not satisfy the required contract.",
+		};
 	}
-	if (code === "idempotency_conflict") return "PLAN_GENERATION_IN_FLIGHT";
-	return "INTERNAL_ERROR";
+	if (code === "idempotency_conflict") {
+		return {
+			code: "PLAN_GENERATION_IN_FLIGHT",
+			title: "Plan generation already running",
+			message: "A plan generation is already active for this task.",
+		};
+	}
+	return {
+		code: "INTERNAL_ERROR",
+		title: "Plan generation failed",
+		message: "Plan generation did not complete.",
+	};
 }
-function publicErrorMessage(code: string | null): string {
-	if (code === "stale_plan_baseline")
-		return "Task plan changed while generation was running.";
-	if (code === "provider_timeout")
-		return "The AI provider timed out while generating the plan.";
-	if (code === "provider_protocol_error")
-		return "The AI provider connection ended before plan generation completed.";
-	const projected = projectError(code);
-	if (projected === "PROVIDER_ERROR")
-		return "The AI provider could not complete plan generation.";
-	if (projected === "INVALID_TOOL_PAYLOAD")
-		return "The generated plan did not satisfy the required contract.";
-	if (projected === "PLAN_GENERATION_IN_FLIGHT")
-		return "A plan generation is already active for this task.";
-	return "Plan generation did not complete.";
-}
+
 export function projectTaskPlanGenerationFailure(
 	code: string | null | undefined,
+	errorMessage?: string | null,
 ): Extract<GeneratePlanSSEEvent, { type: "failed" }> {
 	const persistedCode = code ?? null;
 	return {
 		type: "failed",
-		code: projectError(persistedCode),
+		...projectFailure(persistedCode, errorMessage),
 		...(persistedCode ? { persistedCode } : {}),
-		message: publicErrorMessage(persistedCode),
 	};
 }
 
@@ -148,25 +241,19 @@ function terminalEvents(run: PersistedRun): GeneratePlanSSEEvent[] | null {
 	) {
 		return [{ type: "cancelled" }, { type: "done" }];
 	}
-	const message = publicErrorMessage(run.errorCode);
 	if (run.errorCode === "stale_plan_baseline") {
 		return [
 			{
 				type: "stale",
 				code: "STALE_GENERATION",
 				persistedCode: run.errorCode,
-				message,
+				message: "Task plan changed while generation was running.",
 			},
 			{ type: "done" },
 		];
 	}
 	return [
-		{
-			type: "failed",
-			code: projectError(run.errorCode),
-			...(run.errorCode ? { persistedCode: run.errorCode } : {}),
-			message,
-		},
+		projectTaskPlanGenerationFailure(run.errorCode, run.errorMessage),
 		{ type: "done" },
 	];
 }
@@ -186,6 +273,22 @@ function runningStatus(
 		phase,
 		message: "Task plan generation is still running.",
 	};
+}
+
+function failedSessionError(run: PersistedRun) {
+	if (run.errorCode === "stale_plan_baseline") {
+		return {
+			code: "STALE_GENERATION" as const,
+			title: "Plan changed during generation",
+			persistedCode: run.errorCode,
+			message: "Task plan changed while generation was running.",
+		};
+	}
+	const { type: _type, ...error } = projectTaskPlanGenerationFailure(
+		run.errorCode,
+		run.errorMessage,
+	);
+	return error;
 }
 
 function toSession(
@@ -208,16 +311,7 @@ function toSession(
 		phase: status === "running" ? runningStatus(run).phase : null,
 		statusMessage: status === "running" ? runningStatus(run).message : null,
 		error:
-			run.errorCode && status === "failed"
-				? {
-						code:
-							run.errorCode === "stale_plan_baseline"
-								? "STALE_GENERATION"
-								: projectError(run.errorCode),
-						persistedCode: run.errorCode,
-						message: publicErrorMessage(run.errorCode),
-					}
-				: null,
+			run.errorCode && status === "failed" ? failedSessionError(run) : null,
 		startedAt: (run.startedAt ?? run.createdAt).toISOString(),
 		finishedAt: run.finishedAt?.toISOString() ?? null,
 	};
@@ -340,6 +434,7 @@ export async function stopTaskPlanGeneration(input: {
 			if (headUpdate.count !== 1) return null;
 			return {
 				workspaceId: head.workspaceId,
+				featureRunId: head.currentAiFeatureRunId,
 				generationId:
 					(
 						await tx.aiFeatureRun.findUnique({
@@ -351,6 +446,7 @@ export async function stopTaskPlanGeneration(input: {
 		},
 	);
 	if (!cancelled) return false;
+	abortActiveTaskPlanGeneration(cancelled.featureRunId);
 	await appendCanonicalEvent({
 		eventType: "plan_generation.cancelled",
 		workspaceId: cancelled.workspaceId,

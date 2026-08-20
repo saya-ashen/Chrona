@@ -61,6 +61,7 @@ export {
 	startOrAttachAiFeatureRun,
 	executeAiFeatureRunById,
 	AiFeatureRuntimeError,
+	classifyAiFeatureProviderError,
 	stableJsonHash,
 	stableJsonStringify,
 } from "./feature-runtime";
@@ -86,6 +87,7 @@ export type {
 	AiFeatureDefinition,
 	AiFeatureObservationDefinition,
 	AiFeatureRunnerPorts,
+	AiFeatureProviderErrorCode,
 	AiFeatureProviderPort,
 	AiFeatureProviderStart,
 	DefinedAiFeature,

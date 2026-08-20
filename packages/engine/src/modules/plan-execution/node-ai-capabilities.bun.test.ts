@@ -1,8 +1,15 @@
 import { afterAll, beforeEach, describe, expect, it } from "bun:test";
-import { TaskStatus } from "@/generated/prisma/client";
-import { db } from "@/lib/db";
-import type { EffectivePlanGraph, EffectivePlanNode, NodeAttempt } from "@chrona/contracts/ai";
-import { __nodeAiCapabilityTestHooks, executeTaskNodeCapability, runTaskNodeFeature } from "./runtime/node-ai-capabilities";
+import { db, TaskStatus } from "@chrona/db";
+import type {
+  EffectivePlanGraph,
+  EffectivePlanNode,
+  NodeAttempt,
+} from "@chrona/contracts/ai";
+import {
+  __nodeAiCapabilityTestHooks,
+  executeTaskNodeCapability,
+  runTaskNodeFeature,
+} from "./runtime/node-ai-capabilities";
 import type { AiRuntimeInvoker } from "./ai-runtime-invoker";
 function nodeRequest(input: {
   kind: "execute" | "evaluate" | "review";
@@ -71,7 +78,11 @@ function makeConditionNode(): EffectivePlanNode {
   };
 }
 
-function makeDownstreamNode(input: { id: string; localId: string; title: string }): EffectivePlanNode {
+function makeDownstreamNode(input: {
+  id: string;
+  localId: string;
+  title: string;
+}): EffectivePlanNode {
   return {
     ...makeTaskNode(),
     id: input.id,
@@ -125,15 +136,31 @@ function makeConditionPlan(input: {
     ...makePlan(input.condition),
     nodes: [input.condition, input.passed, input.fixes],
     edges: [
-      { id: "edge-passed", from: input.condition.id, to: input.passed.id, label: "Passed", active: true },
-      { id: "edge-fixes", from: input.condition.id, to: input.fixes.id, label: "Needs fixes", active: true },
+      {
+        id: "edge-passed",
+        from: input.condition.id,
+        to: input.passed.id,
+        label: "Passed",
+        active: true,
+      },
+      {
+        id: "edge-fixes",
+        from: input.condition.id,
+        to: input.fixes.id,
+        label: "Needs fixes",
+        active: true,
+      },
     ],
     terminalNodeIds: [input.passed.id, input.fixes.id],
     pendingNodeIds: [input.condition.id, input.passed.id, input.fixes.id],
   };
 }
 
-function makeAttempt(input: { taskId: string; graphId: string; nodeId: string }): NodeAttempt {
+function makeAttempt(input: {
+  taskId: string;
+  graphId: string;
+  nodeId: string;
+}): NodeAttempt {
   return {
     id: `attempt-${input.nodeId}`,
     taskId: input.taskId,
@@ -166,28 +193,34 @@ async function resetNodeAiCapabilitiesDb() {
 }
 describe("node capability protocol", () => {
   it("requires a versioned request and stable client operation identity", () => {
-    expect(__nodeAiCapabilityTestHooks.parseRequest({
-      protocolVersion: 1,
-      kind: "execute",
-      clientOperationId: "node-capability:execute:graph-1:node-1:1",
-      instructions: "Execute the current node.",
-      runtimeInput: {},
-      terminalToolName: "chrona_node_complete",
-    })).toMatchObject({
+    expect(
+      __nodeAiCapabilityTestHooks.parseRequest({
+        protocolVersion: 1,
+        kind: "execute",
+        clientOperationId: "node-capability:execute:graph-1:node-1:1",
+        instructions: "Execute the current node.",
+        runtimeInput: {},
+        terminalToolName: "chrona_node_complete",
+      }),
+    ).toMatchObject({
       kind: "execute",
       clientOperationId: "node-capability:execute:graph-1:node-1:1",
     });
-    expect(() => __nodeAiCapabilityTestHooks.parseRequest({
-      protocolVersion: 1,
-      kind: "execute",
-      instructions: "Execute the current node.",
-      runtimeInput: {},
-      terminalToolName: "chrona_node_complete",
-    })).toThrow();
+    expect(() =>
+      __nodeAiCapabilityTestHooks.parseRequest({
+        protocolVersion: 1,
+        kind: "execute",
+        instructions: "Execute the current node.",
+        runtimeInput: {},
+        terminalToolName: "chrona_node_complete",
+      }),
+    ).toThrow();
   });
 
   it("rejects malformed provider response status before node result persistence", () => {
-    expect(() => __nodeAiCapabilityTestHooks.parseResponse({ status: "unknown" })).toThrow();
+    expect(() =>
+      __nodeAiCapabilityTestHooks.parseResponse({ status: "unknown" }),
+    ).toThrow();
   });
 });
 
@@ -200,7 +233,7 @@ describe("runTaskNodeFeature", () => {
     await resetNodeAiCapabilitiesDb();
   });
 
-  it("returns a failed node candidate without terminalizing the Run when the provider omitted the Chrona terminal tool", async () => {
+  it("[RUN-021] does not treat empty provider output without the terminal tool as success", async () => {
     const workspace = await db.workspace.create({
       data: {
         name: "Node AI capabilities workspace",
@@ -246,7 +279,7 @@ describe("runTaskNodeFeature", () => {
           nativeRunId: "runtime-first-entry",
           sessionId: "main-session",
           status: "completed" as const,
-          outputText: "Chrona 节点结果提交失败：taskId is required. 节点工作本身已完成。",
+          outputText: "",
           error: null,
         },
       }),
@@ -262,19 +295,28 @@ describe("runTaskNodeFeature", () => {
       },
       node,
       plan,
-      attempt: makeAttempt({ taskId: "task-1", graphId: plan.graphId, nodeId: node.id }),
+      attempt: makeAttempt({
+        taskId: "task-1",
+        graphId: plan.graphId,
+        nodeId: node.id,
+      }),
       runtimeName: "hermes",
       aiRuntimeInvoker: aiRuntimeInvoker as AiRuntimeInvoker,
       request: nodeRequest({
         kind: "execute",
-        attempt: makeAttempt({ taskId: "task-1", graphId: plan.graphId, nodeId: node.id }),
+        attempt: makeAttempt({
+          taskId: "task-1",
+          graphId: plan.graphId,
+          nodeId: node.id,
+        }),
         terminalToolName: "chrona_node_complete",
       }),
     });
 
     expect(result).toMatchObject({
       status: "failed",
-      error: "Runtime run runtime-first-entry completed without a Chrona terminal result action for node first_entry: Chrona 节点结果提交失败：taskId is required. 节点工作本身已完成。",
+      error:
+        "Runtime run runtime-first-entry completed without a Chrona terminal result action for node first_entry",
       evidence: {
         sessionId: "main-session",
         runId: "local-run-1",
@@ -285,7 +327,9 @@ describe("runTaskNodeFeature", () => {
       },
     });
 
-    const run = await db.run.findUniqueOrThrow({ where: { id: "local-run-1" } });
+    const run = await db.run.findUniqueOrThrow({
+      where: { id: "local-run-1" },
+    });
     expect(run).toMatchObject({
       status: "Running",
       errorSummary: null,
@@ -293,9 +337,53 @@ describe("runTaskNodeFeature", () => {
     });
   });
 
+  it("[RUN-021] converts malformed provider stream events into a failed node result", async () => {
+    const node = makeTaskNode();
+    const plan = makePlan(node);
+    const attempt = makeAttempt({
+      taskId: "task-malformed-stream",
+      graphId: plan.graphId,
+      nodeId: node.id,
+    });
+    const aiRuntimeInvoker = {
+      invoke: async () => {
+        throw new Error("Provider stream event failed schema validation");
+      },
+    } satisfies Pick<AiRuntimeInvoker, "invoke">;
+
+    const result = await runTaskNodeFeature({
+      taskId: "task-malformed-stream",
+      mainSession: {
+        id: "main-session",
+        taskId: "task-malformed-stream",
+        sessionKey: "chrona:task:task-malformed-stream:plan-1",
+      },
+      node,
+      plan,
+      attempt,
+      runtimeName: "hermes",
+      aiRuntimeInvoker: aiRuntimeInvoker as AiRuntimeInvoker,
+      request: nodeRequest({
+        kind: "execute",
+        attempt,
+        terminalToolName: "chrona_node_complete",
+      }),
+    });
+
+    expect(result).toMatchObject({
+      status: "failed",
+      error:
+        "Failed to execute AI capability for node first_entry: Provider stream event failed schema validation",
+    });
+  });
+
   it("returns provider cancellation as a failed node candidate without terminalizing the Run", async () => {
     const workspace = await db.workspace.create({
-      data: { name: "Node AI cancelled workspace", status: "Active", defaultRuntime: "hermes" },
+      data: {
+        name: "Node AI cancelled workspace",
+        status: "Active",
+        defaultRuntime: "hermes",
+      },
     });
     const task = await db.task.create({
       data: {
@@ -344,15 +432,27 @@ describe("runTaskNodeFeature", () => {
     const plan = makePlan(node);
     const result = await runTaskNodeFeature({
       taskId: task.id,
-      mainSession: { id: "main-session", taskId: task.id, sessionKey: "chrona:task:task-cancelled-provider:plan-1" },
+      mainSession: {
+        id: "main-session",
+        taskId: task.id,
+        sessionKey: "chrona:task:task-cancelled-provider:plan-1",
+      },
       node,
       plan,
-      attempt: makeAttempt({ taskId: task.id, graphId: plan.graphId, nodeId: node.id }),
+      attempt: makeAttempt({
+        taskId: task.id,
+        graphId: plan.graphId,
+        nodeId: node.id,
+      }),
       runtimeName: "hermes",
       aiRuntimeInvoker: aiRuntimeInvoker as AiRuntimeInvoker,
       request: nodeRequest({
         kind: "execute",
-        attempt: makeAttempt({ taskId: task.id, graphId: plan.graphId, nodeId: node.id }),
+        attempt: makeAttempt({
+          taskId: task.id,
+          graphId: plan.graphId,
+          nodeId: node.id,
+        }),
         terminalToolName: "chrona_node_complete",
       }),
     });
@@ -361,7 +461,9 @@ describe("runTaskNodeFeature", () => {
       status: "failed",
       error: "Provider cancelled runtime run runtime-cancelled",
     });
-    const run = await db.run.findUniqueOrThrow({ where: { id: "local-run-cancelled" } });
+    const run = await db.run.findUniqueOrThrow({
+      where: { id: "local-run-cancelled" },
+    });
     expect(run.status).toBe("Running");
     expect(run.endedAt).toBeNull();
     expect(run.errorSummary).toBeNull();
@@ -369,7 +471,11 @@ describe("runTaskNodeFeature", () => {
 
   it("sends non-null accumulated plan output to the runtime invoker", async () => {
     const workspace = await db.workspace.create({
-      data: { name: "Node AI plan output workspace", status: "Active", defaultRuntime: "hermes" },
+      data: {
+        name: "Node AI plan output workspace",
+        status: "Active",
+        defaultRuntime: "hermes",
+      },
     });
     const task = await db.task.create({
       data: {
@@ -401,7 +507,13 @@ describe("runTaskNodeFeature", () => {
         readiness: { status: "partial" as const, summary: "More work remains" },
         sections: [],
         deliverables: [],
-        findings: [{ key: "first-finding", content: "First finding", sourceNodeRef: "N20260522-01" }],
+        findings: [
+          {
+            key: "first-finding",
+            content: "First finding",
+            sourceNodeRef: "N20260522-01",
+          },
+        ],
         decisions: [],
         caveats: [],
         nextActions: [],
@@ -439,11 +551,19 @@ describe("runTaskNodeFeature", () => {
 
     await executeTaskNodeCapability({
       taskId: task.id,
-      mainSession: { id: "main-session", taskId: task.id, sessionKey: "chrona:task:task-plan-output-context:plan-1" },
+      mainSession: {
+        id: "main-session",
+        taskId: task.id,
+        sessionKey: "chrona:task:task-plan-output-context:plan-1",
+      },
       node,
       plan,
       planOutput,
-      attempt: makeAttempt({ taskId: task.id, graphId: plan.graphId, nodeId: node.id }),
+      attempt: makeAttempt({
+        taskId: task.id,
+        graphId: plan.graphId,
+        nodeId: node.id,
+      }),
       runtimeName: "hermes",
       aiRuntimeInvoker: aiRuntimeInvoker as AiRuntimeInvoker,
     });
@@ -463,13 +583,16 @@ describe("runTaskNodeFeature", () => {
       instructions: string;
       terminalToolName: string;
     };
-    expect(invocation.clientOperationId).toBe(`node-capability:execute:${plan.graphId}:${node.id}:1`);
-    expect(invocation.runtimeInput.context.resultManifest).toEqual(expectedResultManifest);
+    expect(invocation.clientOperationId).toBe(
+      `node-capability:execute:${plan.graphId}:${node.id}:1`,
+    );
+    expect(invocation.runtimeInput.context.resultManifest).toEqual(
+      expectedResultManifest,
+    );
     expect(invocation.terminalToolName).toBe("chrona_node_complete");
     expect(invocation.instructions).toContain('"sourceRevision": 1');
     expect(invocation.instructions).not.toContain('"spec":');
   });
-
 
   it("accepts a completed task snapshot only when chrona_node_complete was used", async () => {
     const workspace = await db.workspace.create({
@@ -534,12 +657,20 @@ describe("runTaskNodeFeature", () => {
       },
       node,
       plan,
-      attempt: makeAttempt({ taskId: task.id, graphId: plan.graphId, nodeId: node.id }),
+      attempt: makeAttempt({
+        taskId: task.id,
+        graphId: plan.graphId,
+        nodeId: node.id,
+      }),
       runtimeName: "hermes",
       aiRuntimeInvoker: aiRuntimeInvoker as AiRuntimeInvoker,
       request: nodeRequest({
         kind: "execute",
-        attempt: makeAttempt({ taskId: task.id, graphId: plan.graphId, nodeId: node.id }),
+        attempt: makeAttempt({
+          taskId: task.id,
+          graphId: plan.graphId,
+          nodeId: node.id,
+        }),
         terminalToolName: "chrona_node_complete",
       }),
     });
@@ -618,12 +749,20 @@ describe("runTaskNodeFeature", () => {
       },
       node,
       plan,
-      attempt: makeAttempt({ taskId: task.id, graphId: plan.graphId, nodeId: node.id }),
+      attempt: makeAttempt({
+        taskId: task.id,
+        graphId: plan.graphId,
+        nodeId: node.id,
+      }),
       runtimeName: "hermes",
       aiRuntimeInvoker: aiRuntimeInvoker as AiRuntimeInvoker,
       request: nodeRequest({
         kind: "execute",
-        attempt: makeAttempt({ taskId: task.id, graphId: plan.graphId, nodeId: node.id }),
+        attempt: makeAttempt({
+          taskId: task.id,
+          graphId: plan.graphId,
+          nodeId: node.id,
+        }),
         terminalToolName: "chrona_node_complete",
       }),
     });
@@ -665,8 +804,16 @@ describe("runTaskNodeFeature", () => {
     });
 
     const condition = makeConditionNode();
-    const passed = makeDownstreamNode({ id: "passed_node", localId: "passed_node", title: "Passed" });
-    const fixes = makeDownstreamNode({ id: "fix_node", localId: "fix_node", title: "Needs fixes" });
+    const passed = makeDownstreamNode({
+      id: "passed_node",
+      localId: "passed_node",
+      title: "Passed",
+    });
+    const fixes = makeDownstreamNode({
+      id: "fix_node",
+      localId: "fix_node",
+      title: "Needs fixes",
+    });
     const plan = makeConditionPlan({ condition, passed, fixes });
     const aiRuntimeInvoker = {
       invoke: async () => ({
@@ -701,19 +848,28 @@ describe("runTaskNodeFeature", () => {
       },
       node: condition,
       plan,
-      attempt: makeAttempt({ taskId: task.id, graphId: plan.graphId, nodeId: condition.id }),
+      attempt: makeAttempt({
+        taskId: task.id,
+        graphId: plan.graphId,
+        nodeId: condition.id,
+      }),
       runtimeName: "hermes",
       aiRuntimeInvoker: aiRuntimeInvoker as AiRuntimeInvoker,
       request: nodeRequest({
         kind: "evaluate",
-        attempt: makeAttempt({ taskId: task.id, graphId: plan.graphId, nodeId: condition.id }),
+        attempt: makeAttempt({
+          taskId: task.id,
+          graphId: plan.graphId,
+          nodeId: condition.id,
+        }),
         terminalToolName: "chrona_condition_select",
       }),
     });
 
     expect(result).toMatchObject({
       status: "failed",
-      error: "Runtime run runtime-condition completed without a Chrona terminal result action for node condition_node: Needs fixes selected",
+      error:
+        "Runtime run runtime-condition completed without a Chrona terminal result action for node condition_node: Needs fixes selected",
     });
   });
 
@@ -749,8 +905,16 @@ describe("runTaskNodeFeature", () => {
     });
 
     const condition = makeConditionNode();
-    const passed = makeDownstreamNode({ id: "passed_node", localId: "passed_node", title: "Passed" });
-    const fixes = makeDownstreamNode({ id: "fix_node", localId: "fix_node", title: "Needs fixes" });
+    const passed = makeDownstreamNode({
+      id: "passed_node",
+      localId: "passed_node",
+      title: "Passed",
+    });
+    const fixes = makeDownstreamNode({
+      id: "fix_node",
+      localId: "fix_node",
+      title: "Needs fixes",
+    });
     const plan = makeConditionPlan({ condition, passed, fixes });
     const branchRef = "B20260522-01-B";
     const aiRuntimeInvoker = {
@@ -787,12 +951,20 @@ describe("runTaskNodeFeature", () => {
       },
       node: condition,
       plan,
-      attempt: makeAttempt({ taskId: task.id, graphId: plan.graphId, nodeId: condition.id }),
+      attempt: makeAttempt({
+        taskId: task.id,
+        graphId: plan.graphId,
+        nodeId: condition.id,
+      }),
       runtimeName: "hermes",
       aiRuntimeInvoker: aiRuntimeInvoker as AiRuntimeInvoker,
       request: nodeRequest({
         kind: "evaluate",
-        attempt: makeAttempt({ taskId: task.id, graphId: plan.graphId, nodeId: condition.id }),
+        attempt: makeAttempt({
+          taskId: task.id,
+          graphId: plan.graphId,
+          nodeId: condition.id,
+        }),
         terminalToolName: "chrona_condition_select",
       }),
     });
@@ -840,8 +1012,16 @@ describe("runTaskNodeFeature", () => {
     });
 
     const condition = makeConditionNode();
-    const passed = makeDownstreamNode({ id: "passed_node", localId: "passed_node", title: "Passed" });
-    const fixes = makeDownstreamNode({ id: "fix_node", localId: "fix_node", title: "Needs fixes" });
+    const passed = makeDownstreamNode({
+      id: "passed_node",
+      localId: "passed_node",
+      title: "Passed",
+    });
+    const fixes = makeDownstreamNode({
+      id: "fix_node",
+      localId: "fix_node",
+      title: "Needs fixes",
+    });
     const plan = makeConditionPlan({ condition, passed, fixes });
     const aiRuntimeInvoker = {
       invoke: async () => ({
@@ -873,12 +1053,20 @@ describe("runTaskNodeFeature", () => {
       },
       node: condition,
       plan,
-      attempt: makeAttempt({ taskId: task.id, graphId: plan.graphId, nodeId: condition.id }),
+      attempt: makeAttempt({
+        taskId: task.id,
+        graphId: plan.graphId,
+        nodeId: condition.id,
+      }),
       runtimeName: "hermes",
       aiRuntimeInvoker: aiRuntimeInvoker as AiRuntimeInvoker,
       request: nodeRequest({
         kind: "evaluate",
-        attempt: makeAttempt({ taskId: task.id, graphId: plan.graphId, nodeId: condition.id }),
+        attempt: makeAttempt({
+          taskId: task.id,
+          graphId: plan.graphId,
+          nodeId: condition.id,
+        }),
         terminalToolName: "chrona_condition_select",
       }),
     });

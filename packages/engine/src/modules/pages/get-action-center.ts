@@ -1,12 +1,15 @@
+import type { PrismaClient } from "@chrona/db/generated/prisma/client";
 import {
   ApprovalStatus,
   RunStatus,
   ScheduleProposalStatus,
   TaskStatus,
-} from "@/generated/prisma/client";
+} from "@chrona/db/generated/prisma/client";
+import { db as database } from "@chrona/db/db";
 import type { ActionCenterProjection } from "@chrona/contracts/api";
 import { deriveWorkStateView } from "@chrona/domain";
-import { db } from "@/lib/db";
+
+const db = database as PrismaClient;
 
 const DUE_NOW_WINDOW_MS = 15 * 60 * 1000;
 const DUE_SOON_WINDOW_MS = 24 * 60 * 60 * 1000;
@@ -21,6 +24,7 @@ const CLOSED_DUE_STATUSES = [
 
 type SortableActionCenterItem = ActionCenterProjection[number] & {
   sortAt: Date;
+  workBlockId?: string | null;
 };
 
 function buildDueItem(
@@ -104,6 +108,113 @@ const BLOCK_REASON_SUMMARIES: Record<string, string> = {
 function readString(value: unknown): string | null {
   return typeof value === "string" && value.trim() ? value.trim() : null;
 }
+
+function recordFromUnknown(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === "object" && !Array.isArray(value)
+    ? (value as Record<string, unknown>)
+    : null;
+}
+
+function waitingCheckpointFromPlanRun(
+  value: unknown,
+): { kind: "approval" | "input"; summary: string } | null {
+  const mutableGraph = recordFromUnknown(
+    recordFromUnknown(value)?.mutableGraph,
+  );
+  const results = mutableGraph?.results;
+  if (!Array.isArray(results)) return null;
+  const result = results.find((entry) => {
+    const record = recordFromUnknown(entry);
+    return (
+      record?.status === "current" &&
+      (record.waitKind === "user_input" || record.waitKind === "approval")
+    );
+  });
+  const record = recordFromUnknown(result);
+  if (!record) return null;
+  const actionForm = recordFromUnknown(record.actionForm);
+  const kind = record.waitKind === "approval" ? "approval" : "input";
+  return {
+    kind,
+    summary:
+      readString(actionForm?.instructions) ??
+      readString(record.error) ??
+      (kind === "approval"
+        ? "Approval is required before execution can continue."
+        : "Input is required before execution can continue."),
+  };
+}
+
+type WaitingPlanRunRecord = {
+  id: string;
+  taskId: string;
+  workBlockId: string | null;
+  planRun: unknown;
+  updatedAt: Date;
+  task: { title: string; workspaceId: string };
+};
+
+function failedNodeIdFromPlanRun(value: unknown): string | null {
+  const planRun = recordFromUnknown(recordFromUnknown(value)?.planRun);
+  const nodeStates = recordFromUnknown(planRun?.nodeStates);
+  if (!nodeStates) return null;
+  for (const [nodeId, value] of Object.entries(nodeStates)) {
+    const state = recordFromUnknown(value);
+    if (state?.status === "failed") return readString(state.nodeId) ?? nodeId;
+  }
+  return null;
+}
+
+function executionScopeKey(taskId: string, workBlockId: string | null) {
+  return `${taskId}:${workBlockId ?? "task"}`;
+}
+
+function failedNodeIdsByExecutionScope(runs: WaitingPlanRunRecord[]) {
+  const nodeIds = new Map<string, string>();
+  for (const run of runs) {
+    const scopeKey = executionScopeKey(run.taskId, run.workBlockId);
+    if (nodeIds.has(scopeKey)) continue;
+    const nodeId = failedNodeIdFromPlanRun(run.planRun);
+    if (nodeId) nodeIds.set(scopeKey, nodeId);
+  }
+  return nodeIds;
+}
+
+function buildPlanRunItems(
+  runs: WaitingPlanRunRecord[],
+  coveredExecutionScopes: Set<string>,
+): SortableActionCenterItem[] {
+  const items: SortableActionCenterItem[] = [];
+  for (const run of runs) {
+    const scopeKey = executionScopeKey(run.taskId, run.workBlockId);
+    if (coveredExecutionScopes.has(scopeKey)) continue;
+    const checkpoint = waitingCheckpointFromPlanRun(run.planRun);
+    if (!checkpoint) continue;
+    coveredExecutionScopes.add(scopeKey);
+    const approval = checkpoint.kind === "approval";
+    items.push({
+      id: run.id,
+      kind: checkpoint.kind,
+      actionType: approval ? "Approval needed" : "Input needed",
+      riskLevel: approval ? "high" : "medium",
+      sourceTaskTitle: run.task.title,
+      sourceTaskId: run.taskId,
+      workspaceId: run.task.workspaceId,
+      currentRunLabel: run.id,
+      workBlockId: run.workBlockId,
+      detail: approval
+        ? "Execution approval required"
+        : "Operator reply required",
+      summary: checkpoint.summary,
+      consequence: approval
+        ? "Approve or reject the current execution checkpoint"
+        : "Provide the requested input so execution can continue",
+      sortAt: run.updatedAt,
+    });
+  }
+  return items;
+}
+
 const LEGACY_NON_ACTIONABLE_SCHEDULER_REASONS: Record<string, true> = {
   "Automatic execution will start at the configured schedule time.": true,
   "A run is already active for this task.": true,
@@ -222,11 +333,13 @@ export async function getActionCenter(
     schedulerEvents,
     completedRuns,
     infoNotifications,
+    waitingPlanRuns,
   ] = await Promise.all([
     db.approval.findMany({
       where: {
         workspaceId,
         status: ApprovalStatus.Pending,
+        task: { status: { notIn: CLOSED_DUE_STATUSES } },
       },
       include: {
         task: true,
@@ -238,6 +351,7 @@ export async function getActionCenter(
       where: {
         workspaceId,
         status: ScheduleProposalStatus.Pending,
+        task: { status: { notIn: CLOSED_DUE_STATUSES } },
       },
       include: { task: true },
       orderBy: { createdAt: "desc" },
@@ -310,6 +424,20 @@ export async function getActionCenter(
       include: { task: true },
       orderBy: { sortTime: "desc" },
     }),
+    db.taskPlanRun.findMany({
+      where: {
+        workspaceId,
+        updatedAt: { gte: recentWindowStartsAt },
+        task: { status: { notIn: CLOSED_DUE_STATUSES } },
+      },
+      include: {
+        task: {
+          select: { id: true, title: true, workspaceId: true },
+        },
+      },
+      orderBy: { updatedAt: "desc" },
+      take: 100,
+    }),
   ]);
 
   const latestRunIds = tasksWithLatestRuns
@@ -322,6 +450,7 @@ export async function getActionCenter(
           id: { in: latestRunIds },
           status: {
             in: [
+              RunStatus.Running,
               RunStatus.WaitingForInput,
               RunStatus.Failed,
               RunStatus.Cancelled,
@@ -333,6 +462,7 @@ export async function getActionCenter(
           taskId: true,
           status: true,
           runtimeRunRef: true,
+          workBlockId: true,
           retryable: true,
           pendingInputPrompt: true,
           updatedAt: true,
@@ -355,13 +485,18 @@ export async function getActionCenter(
   const blockedRunLabels = blockedRunIds.length
     ? await db.run.findMany({
         where: { id: { in: blockedRunIds } },
-        select: { id: true, runtimeRunRef: true },
+        select: { id: true, runtimeRunRef: true, workBlockId: true },
       })
     : [];
 
   const runLabelByRunId = new Map(
     blockedRunLabels.map((run) => [run.id, run.runtimeRunRef ?? run.id]),
   );
+  const workBlockIdByRunId = new Map(
+    blockedRunLabels.map((run) => [run.id, run.workBlockId]),
+  );
+  const failedNodeIdByExecutionScope =
+    failedNodeIdsByExecutionScope(waitingPlanRuns);
 
   const approvalItems = approvals.map((approval) => {
     const payload =
@@ -377,6 +512,7 @@ export async function getActionCenter(
       sourceTaskId: approval.taskId,
       workspaceId: approval.workspaceId,
       currentRunLabel: approval.run.runtimeRunRef ?? approval.run.id,
+      workBlockId: approval.run.workBlockId,
       detail: approval.type,
       summary: approval.summary,
       consequence:
@@ -457,8 +593,23 @@ export async function getActionCenter(
         return null;
       }
 
-      const workState = runWorkState(run, task);
-      if (run.status === RunStatus.WaitingForInput) {
+      const taskIndicatesWaitingForInput =
+        task.status === TaskStatus.WaitingForInput ||
+        task.projection?.persistedStatus === "WaitingForInput" ||
+        task.projection?.displayState === "waiting_for_user";
+      const waitingForInput =
+        run.status === RunStatus.WaitingForInput ||
+        taskIndicatesWaitingForInput;
+
+      if (run.status === RunStatus.Running && !waitingForInput) return null;
+
+      const workState = waitingForInput
+        ? deriveWorkStateView({
+            taskStatus: task.projection?.persistedStatus ?? task.status,
+            executionStatus: "waiting_for_user",
+          })
+        : runWorkState(run, task);
+      if (waitingForInput) {
         return {
           id: run.id,
           kind: "input" as const,
@@ -468,6 +619,7 @@ export async function getActionCenter(
           sourceTaskId: task.id,
           workspaceId: task.workspaceId,
           currentRunLabel: run.runtimeRunRef ?? run.id,
+          workBlockId: run.workBlockId,
           detail: "Operator reply required",
           summary: run.pendingInputPrompt ?? workState.nextActionLabel,
           consequence: workState.nextActionLabel,
@@ -489,6 +641,11 @@ export async function getActionCenter(
         sourceTaskId: task.id,
         workspaceId: task.workspaceId,
         currentRunLabel: run.runtimeRunRef ?? run.id,
+        currentNodeId:
+          failedNodeIdByExecutionScope.get(
+            executionScopeKey(task.id, run.workBlockId),
+          ) ?? null,
+        workBlockId: run.workBlockId,
         detail: `Latest run ${run.status}`,
         summary:
           workState.blocker?.reason ??
@@ -501,14 +658,36 @@ export async function getActionCenter(
     })
     .filter((item): item is NonNullable<typeof item> => Boolean(item));
 
+  const planRunItems = buildPlanRunItems(
+    waitingPlanRuns,
+    new Set([
+      ...approvalItems.map((item) =>
+        executionScopeKey(item.sourceTaskId, item.workBlockId),
+      ),
+      ...runItems.map((item) =>
+        executionScopeKey(item.sourceTaskId, item.workBlockId),
+      ),
+    ]),
+  );
+
+  const coveredTaskIds = new Set<string>([
+    ...approvalItems.map((item) => item.sourceTaskId),
+    ...runItems.map((item) => item.sourceTaskId),
+    ...planRunItems.map((item) => item.sourceTaskId),
+  ]);
+  const blockedTaskIds = new Set(blockedTasks.map((task) => task.id));
   const dueItems = dueTasks
-    .filter((task): task is typeof task & { dueAt: Date } =>
-      Boolean(task.dueAt),
+    .filter(
+      (task): task is typeof task & { dueAt: Date } =>
+        Boolean(task.dueAt) &&
+        !coveredTaskIds.has(task.id) &&
+        !blockedTaskIds.has(task.id),
     )
     .map((task) => buildDueItem(task, now));
 
   const schedulerItems = latestSchedulerEvents(schedulerEvents).map((event) => {
     const isStart = event.eventType === "scheduler.start";
+    const payload = readSchedulerPayload(event.payload);
 
     return {
       id: `${isStart ? "auto-execution-started" : "auto-execution-skipped"}:${event.id}`,
@@ -521,7 +700,8 @@ export async function getActionCenter(
       sourceTaskId: event.taskId,
       workspaceId: event.workspaceId,
       currentRunLabel: null,
-      detail: readSchedulerPayload(event.payload).reasonCode ?? null,
+      workBlockId: payload.workBlockId ?? null,
+      detail: payload.reasonCode ?? null,
       summary: isStart
         ? "Scheduled automation started this task."
         : (event.reason ?? "Scheduled automation could not start this task."),
@@ -537,7 +717,11 @@ export async function getActionCenter(
     (typeof completedRuns)[number]
   >();
   for (const run of completedRuns) {
-    if (run.task.latestRunId !== run.id) continue;
+    if (
+      run.task.latestRunId !== run.id ||
+      run.task.status !== TaskStatus.Completed
+    )
+      continue;
     if (!latestCompletedRunByTask.has(run.taskId))
       latestCompletedRunByTask.set(run.taskId, run);
   }
@@ -552,6 +736,7 @@ export async function getActionCenter(
       sourceTaskId: run.taskId,
       workspaceId: run.task.workspaceId,
       currentRunLabel: run.runtimeRunRef ?? run.id,
+      workBlockId: run.workBlockId,
       detail: "Latest execution completed",
       summary: "Task execution completed recently.",
       consequence:
@@ -575,15 +760,7 @@ export async function getActionCenter(
     sortAt: notification.sortTime,
   }));
 
-  // A `Blocked` task whose latest run is Failed/Cancelled/WaitingForInput is
-  // already surfaced by `runItems`; emitting a separate blocked item would
-  // double-count it. Dedup by task so every blocked task yields exactly one
-  // actionable item.
-  const coveredTaskIds = new Set<string>([
-    ...approvalItems.map((item) => item.sourceTaskId),
-    ...runItems.map((item) => item.sourceTaskId),
-  ]);
-
+  // A primary execution action also suppresses a secondary blocked card.
   const blockedItems = blockedTasks
     .filter((task) => !coveredTaskIds.has(task.id))
     .map((task) => {
@@ -600,6 +777,9 @@ export async function getActionCenter(
         currentRunLabel: task.latestRunId
           ? (runLabelByRunId.get(task.latestRunId) ?? task.latestRunId)
           : null,
+        workBlockId: task.latestRunId
+          ? (workBlockIdByRunId.get(task.latestRunId) ?? null)
+          : null,
         detail: actionRequired,
         summary,
         consequence:
@@ -612,6 +792,7 @@ export async function getActionCenter(
     ...approvalItems,
     ...proposalItems,
     ...runItems,
+    ...planRunItems,
     ...dueItems,
     ...schedulerItems,
     ...completedItems,

@@ -1,5 +1,6 @@
-import { db } from "@/lib/db";
-import type { Prisma } from "@chrona/db";
+/* eslint-disable max-lines -- Dashboard projection remains one read-model boundary. */
+import { db as database } from "@chrona/db/db";
+import type { Prisma, PrismaClient } from "@chrona/db";
 import { deriveWorkStateView, type WorkStateView } from "@chrona/domain";
 import { isDashboardAiSummaryEnabled } from "@chrona/shared/runtime-config";
 import {
@@ -7,6 +8,8 @@ import {
   getDashboardAiBriefState,
   type DashboardAiBriefState,
 } from "./dashboard-ai-surface";
+
+const db = database as PrismaClient;
 
 /**
  * Dashboard "task news homepage" projection.
@@ -57,7 +60,11 @@ export type DashboardNextStep =
   | "review_result";
 
 export type DashboardAttentionKind =
-  "approval" | "input" | "blocked" | "failed" | "schedule_risk";
+  | "approval"
+  | "input"
+  | "blocked"
+  | "failed"
+  | "schedule_risk";
 
 /**
  * Editorial buckets for the "auto-completed" digest. Derived from the task's
@@ -66,7 +73,10 @@ export type DashboardAttentionKind =
  * needing to know the persistence-level `ArtifactType` enum.
  */
 export type DashboardCompletionCategory =
-  "report" | "research" | "code" | "automation";
+  | "report"
+  | "research"
+  | "code"
+  | "automation";
 
 export type DashboardOutput = {
   id: string;
@@ -314,7 +324,10 @@ function mapDashboardTask(
     scheduledStartAt: toIso(item.scheduledStartAt),
     scheduledEndAt: toIso(item.scheduledEndAt),
     dueAt: toIso(item.dueAt),
-    reason: reasonFor(item) ?? stateView.primaryActionDisabledReason ?? stateView.nextActionLabel,
+    reason:
+      reasonFor(item) ??
+      stateView.primaryActionDisabledReason ??
+      stateView.nextActionLabel,
     stage: item.currentNodeTitle,
     nextStep: nextStepFor(step),
     latestOutput: outputs.get(item.taskId) ?? null,
@@ -462,7 +475,10 @@ export async function getDashboard(workspaceId: string) {
         stateView,
         priority: item.task.priority,
         kind,
-        reason: reasonFor(item) ?? stateView.primaryActionDisabledReason ?? stateView.nextActionLabel,
+        reason:
+          reasonFor(item) ??
+          stateView.primaryActionDisabledReason ??
+          stateView.nextActionLabel,
         nextStep: nextStepFor(kind),
         latestOutput: outputs.get(item.taskId) ?? null,
         updatedAt: toIso(item.lastActivityAt),

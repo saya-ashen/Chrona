@@ -272,6 +272,7 @@ export interface TaskPlanGenerationSessionReadModel {
   statusMessage: string | null;
   error: {
     code: GeneratePlanErrorCode | "STALE_GENERATION";
+    title?: string;
     /** Stable durable-runtime error code; it is not a feature-run identifier. */
     persistedCode?: string;
     message: string;

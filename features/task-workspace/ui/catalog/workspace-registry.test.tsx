@@ -67,14 +67,14 @@ it("normalizes a descendant that is also listed beside its parent", () => {
 	expect(normalized.elements.section?.children).toEqual(["table"]);
 });
 
-it("moves primary deliverables ahead of secondary result branches", () => {
+it("preserves Finalizer branch order while optimizing secondary sections", () => {
 	const spec: UiDocument = {
 		root: "root",
 		elements: {
 			root: {
 				type: "Stack",
 				props: {},
-				children: ["insights", "deliverables", "overview"],
+				children: ["overview", "insights", "deliverables"],
 			},
 			overview: {
 				type: "ResultOverview",
@@ -110,8 +110,8 @@ it("moves primary deliverables ahead of secondary result branches", () => {
 
 	expect(prioritized.elements.root?.children).toEqual([
 		"overview",
-		"deliverables",
 		"insights",
+		"deliverables",
 	]);
 	expect(prioritized.elements.insights?.props.defaultCollapsed).toBe(true);
 });
@@ -236,6 +236,38 @@ it("requests and approves external file access inside FileRef", async () => {
 		await screen.findByRole("heading", { name: "Approved report" }),
 	).toBeInTheDocument();
 });
+
+it("shows unsafe file rejection without rendering file contents", async () => {
+	requestResultFileAccessMock.mockRejectedValueOnce(
+		new Error("Only regular files can be opened from task results"),
+	);
+	const spec: UiDocument = {
+		root: "file",
+		elements: {
+			file: {
+				type: "FileRef",
+				props: {
+					path: "/tmp/result-directory",
+					previewError: "permission_required",
+					accessTaskId: "task-1",
+					accessRequestedPath: "/tmp/result-directory",
+				},
+			},
+		},
+	};
+
+	render(<SpecRenderer spec={spec} />);
+	fireEvent.click(screen.getByRole("button", { name: "Request access" }));
+
+	expect(await screen.findByRole("alert")).toHaveTextContent(
+		"Only regular files can be opened from task results",
+	);
+	expect(
+		screen.queryByText("RESULT_FILE_CONTENT_CANARY"),
+	).not.toBeInTheDocument();
+	expect(approveResultFileAccessMock).not.toHaveBeenCalled();
+});
+
 it("renders generated FileRef downloads through the task-scoped API", () => {
 	const downloadHref =
 		"/api/tasks/task-1/result-files/download?path=generated%3A%2F%2Fscope%2Freport.md";
@@ -423,8 +455,7 @@ describe("workspace result registry", () => {
 							"Aarhus,https://phd.tech.au.dk/,Adaptive AI",
 						].join("\n"),
 						contentBytes: 128,
-						downloadHref:
-							"/api/tasks/task-1/result-files/download?path=sources.csv",
+						downloadHref: "/api/tasks/task-1/result-files/download?path=sources.csv",
 					},
 				},
 				insights: {
@@ -490,8 +521,7 @@ describe("workspace result registry", () => {
 		expect(
 			within(resultOverview).getByText("Confirm one access-limited source."),
 		).toBeInTheDocument();
-		const readinessBadge =
-			within(resultOverview).getByText("Ready with caveats");
+		const readinessBadge = within(resultOverview).getByText("Ready with caveats");
 		expect(readinessBadge).toHaveClass("text-warning");
 		expect(readinessBadge).not.toHaveClass("text-warning-foreground");
 		const primaryDeliverable = screen
@@ -501,10 +531,16 @@ describe("workspace result registry", () => {
 			"data-result-deliverable-role",
 			"primary",
 		);
-		expect(screen.getByText("Source table").closest("article")).toHaveAttribute(
+		const supportingDeliverable = screen
+			.getByText("Source table")
+			.closest("article");
+		expect(supportingDeliverable).toHaveAttribute(
 			"data-result-deliverable-role",
 			"supporting",
 		);
+		expect(
+			within(supportingDeliverable as HTMLElement).getByText(/128 B/),
+		).toBeVisible();
 		const deliverables = primaryDeliverable?.parentElement;
 		expect(deliverables).toHaveClass("flex-row");
 		expect(deliverables).toHaveClass("flex-wrap");
@@ -538,9 +574,7 @@ describe("workspace result registry", () => {
 			within(preview).getByRole("heading", { name: "Guide" }),
 		).toBeInTheDocument();
 		expect(
-			within(preview)
-				.getByRole("heading", { name: "Guide" })
-				.closest("article"),
+			within(preview).getByRole("heading", { name: "Guide" }).closest("article"),
 		).toHaveClass("text-base", "leading-7");
 		fireEvent.click(
 			within(preview).getByRole("button", { name: "Close preview" }),
@@ -594,9 +628,7 @@ describe("workspace result registry", () => {
 		).toBeInTheDocument();
 		const evidenceFootnote = screen.getByText("Result notes").parentElement;
 		expect(evidenceFootnote).toHaveAttribute("data-result-evidence-footnote");
-		expect(
-			screen.queryByText("Official source checked"),
-		).not.toBeInTheDocument();
+		expect(screen.queryByText("Official source checked")).not.toBeInTheDocument();
 		fireEvent.click(
 			screen.getByRole("button", { name: /evidence and source boundaries/i }),
 		);
@@ -762,9 +794,7 @@ describe("workspace result registry", () => {
 		expect(starsHeader.closest("th")).toHaveAttribute("aria-sort", "none");
 		expect(screen.getByText("Later row")).toHaveClass("whitespace-normal");
 		expect(screen.getByText("Later row")).toHaveClass("break-words");
-		expect(screen.getByText("Later row")).toHaveClass(
-			"[overflow-wrap:anywhere]",
-		);
+		expect(screen.getByText("Later row")).toHaveClass("[overflow-wrap:anywhere]");
 		expect(screen.getByRole("link", { name: "zeta/project" })).toHaveAttribute(
 			"href",
 			"https://github.com/zeta/project",

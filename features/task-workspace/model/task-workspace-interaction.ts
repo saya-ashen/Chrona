@@ -1,4 +1,5 @@
 import { deriveWorkStateView, type WorkStateView } from "@chrona/domain";
+import type { UiDocument } from "@chrona/ui-protocol";
 import type {
 	PlanNodeDataModel,
 	TaskPlanGraphPlan,
@@ -876,6 +877,23 @@ export function deriveRunPreview(input: {
 	};
 }
 
+export function finalizedResultDeliverableCount(
+	spec: UiDocument | null | undefined,
+): number {
+	if (!spec) return 0;
+	const deliverables = new Set<string>();
+	for (const [elementKey, element] of Object.entries(spec.elements)) {
+		if (element.type !== "ResultDeliverable") continue;
+		const artifactRef = element.props.artifactRef;
+		deliverables.add(
+			typeof artifactRef === "string" && artifactRef.length > 0
+				? artifactRef
+				: elementKey,
+		);
+	}
+	return deliverables.size;
+}
+
 export function deriveResultReview(input: {
 	pageData: TaskPageData;
 	graphPlan: TaskPlanGraphPlan | null;
@@ -898,7 +916,13 @@ export function deriveResultReview(input: {
 			(node) => node.status === "done" || node.status === "completed",
 		).length ?? 0;
 	const stepCount = graphPlan?.nodes.length ?? 0;
-	const artifactCount = pageData.artifacts.length;
+	const finalizedDeliverableCount = finalizedResultDeliverableCount(
+		pageData.commandCenter?.documents.output,
+	);
+	const artifactCount =
+		finalizedDeliverableCount > 0
+			? finalizedDeliverableCount
+			: pageData.artifacts.length;
 	const hasDiagnostics =
 		pageData.reconciliation?.issues.some(
 			(issue) => issue.severity === "error" || issue.severity === "warning",
