@@ -681,6 +681,7 @@ async function connectChronaMcpControl(
 			cause instanceof Error ? cause.message.trim() : String(cause).trim();
 		throw new Error(
 			`Oh My Pi could not connect to the Chrona control plane${detail ? `: ${detail}` : "."}`,
+			{ cause },
 		);
 	}
 	const tools = (manager.getTools() as CustomTool[]).map(exposeChronaMcpTool);
