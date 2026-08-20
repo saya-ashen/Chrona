@@ -428,6 +428,24 @@ describe("OmpSdkProviderClient declared runtime tools", () => {
     expect(handle.waiters).toHaveLength(0);
   });
 
+  it("delivers a queued terminal event before ending an aborted stream", async () => {
+    const controller = new AbortController();
+    const handle = {
+      done: false,
+      queue: [],
+      waiters: [],
+    };
+    const queue = new __ompSdkProviderTestHooks.AsyncEventQueue(handle as never);
+
+    const next = queue.next(controller.signal);
+    queue.push({ type: "run_cancelled" } as never);
+    controller.abort("Chrona terminal action recorded");
+
+    await expect(next).resolves.toEqual({ type: "run_cancelled" });
+    handle.done = true;
+    await expect(queue.next(controller.signal)).resolves.toEqual({ type: "end" });
+  });
+
   it("stops the SDK session with an explicit terminal-action reason", async () => {
     let abortReason: unknown;
     const handle = {

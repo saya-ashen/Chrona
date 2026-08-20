@@ -123,7 +123,8 @@ class AsyncEventQueue {
 				this.handle.waiters.push(wake);
 				signal?.addEventListener("abort", wake, { once: true });
 			});
-			if (signal?.aborted) return { type: "end" };
+			if (signal?.aborted && this.handle.queue.length === 0)
+				return { type: "end" };
 		}
 	}
 }
