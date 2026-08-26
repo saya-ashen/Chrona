@@ -35,11 +35,13 @@ describe("QueueCard", () => {
       />,
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Prepare customer review" }));
+    const detailsButton = screen.getByRole("button", { name: "Prepare customer review" });
+    fireEvent.click(detailsButton);
     expect(onOpenTaskDetails).toHaveBeenCalledWith("task-1");
 
     const scheduleButton = screen.getAllByRole("button").find((button) => button.textContent?.trim() === "Schedule");
     expect(scheduleButton).toBeDefined();
+    expect(detailsButton.contains(scheduleButton!)).toBe(false);
     fireEvent.click(scheduleButton!);
     expect(onScheduleTask).toHaveBeenCalledWith("task-1");
     expect(onOpenTaskDetails).toHaveBeenCalledTimes(1);
