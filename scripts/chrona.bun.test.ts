@@ -44,7 +44,14 @@ describe("chrona command runner", () => {
       "lint ratchet",
       "boundaries",
       "ui foundation",
+      "release consistency",
     ]);
+  });
+
+  it("exposes local release consistency validation", () => {
+    expect(resolveCommand(["check", "release"])).toMatchObject({
+      steps: [{ label: "release consistency" }],
+    });
   });
 
   it("runs boundary checks across apps packages features shared", () => {

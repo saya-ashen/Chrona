@@ -5,7 +5,11 @@ import { appendCanonicalEvent } from "@/modules/events";
 import { getAcceptedCompiledPlanForTask } from "@/modules/plan-execution/persistence/execution-scope";
 import { startAutoPlanGenerationForTask } from "@/modules/plans/auto-generate-task-plan";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
-import { validateTaskRuntimeConfig, ensureWorkBlockTaskSession, getRuntimeTaskConfigSpec } from "@/modules/execution-runtime";
+import { ensureWorkBlockTaskSession } from "@/modules/execution-runtime";
+import {
+  resolveTaskExecutionProviderSelection,
+  unresolvedTaskProviderName,
+} from "@/modules/ai";
 import { deriveTaskStaticState } from "@chrona/domain";
 import type { UpdateTaskInput } from "@chrona/contracts";
 import { normalizeAutomationTiming } from "@chrona/contracts";
@@ -77,6 +81,9 @@ async function synchronizeTaskRecurrenceAuthority(
     startsAt: Date | null;
     endsAt: Date | null;
     runtimeName: string;
+    providerClientId?: string;
+    providerName?: string;
+    providerConfigFingerprint?: string;
   },
 ) {
   const now = new Date();
@@ -182,6 +189,9 @@ async function synchronizeTaskRecurrenceAuthority(
       taskId: input.taskId,
       taskTitle: input.title,
       runtimeName: input.runtimeName,
+      providerClientId: input.providerClientId,
+      providerName: input.providerName,
+      providerConfigFingerprint: input.providerConfigFingerprint,
       workBlockId: workBlock.id,
       sessionId: workBlock.sessionId,
       label: `${input.title} · Work block session`,
@@ -204,11 +214,6 @@ export async function updateTask(
   );
   const currentTask = await db.task.findUniqueOrThrow({
     where: { id: input.taskId },
-    include: {
-      workspace: {
-        select: { defaultRuntime: true },
-      },
-    },
   });
   const importedCalendarEvent = await db.importedCalendarEvent.findFirst({
     where: { taskId: input.taskId },
@@ -224,35 +229,33 @@ export async function updateTask(
   const baseExecutionConfig =
     input.executionConfig === undefined
       ? currentTask.executionConfig
-      : input.executionConfig;
+      : executionConfig;
   const nextExecutionConfig = mergeSessionStrategyIntoExecutionConfig(
     baseExecutionConfig as Prisma.InputJsonObject | null | undefined,
     input.sessionStrategy,
   );
-  const validatedRuntimeConfig = validateTaskRuntimeConfig({
-    executionRuntime:
-      input.executionRuntime === undefined
-        ? currentTask.executionRuntime
-        : input.executionRuntime,
-    workspaceDefaultRuntime: currentTask.workspace.defaultRuntime,
-    executionConfig: nextExecutionConfig,
-  });
   const currentExecutionConfig = currentTask.executionConfig as Record<string, unknown>;
-  const nextExecutionConfigRecord = validatedRuntimeConfig.executionConfig as Record<string, unknown>;
+  const nextExecutionConfigRecord = (nextExecutionConfig ?? {}) as Record<string, unknown>;
   const currentConfiguredModel = typeof currentExecutionConfig.model === "string"
     ? currentExecutionConfig.model.trim()
     : "";
   const nextConfiguredModel = typeof nextExecutionConfigRecord.model === "string"
     ? nextExecutionConfigRecord.model.trim()
     : "";
-  const nextExecutionRuntime = input.executionRuntime === undefined
-    ? currentTask.executionRuntime
-    : input.executionRuntime;
   const nextAiClientId = input.aiClientId === undefined ? currentTask.aiClientId : input.aiClientId;
+  const providerSelection = await resolveTaskExecutionProviderSelection({
+    aiClientId: nextAiClientId,
+  });
+  if (nextAiClientId && !providerSelection) {
+    throw new EngineError(
+      ENGINE_ERROR_CODES.VALIDATION_FAILED,
+      "Selected AI provider is unavailable for task execution",
+    );
+  }
+  const runtimeName = providerSelection?.providerName ?? unresolvedTaskProviderName();
   const modelRoutingChanged = (
     input.executionConfig !== undefined && currentConfiguredModel !== nextConfiguredModel
-  ) || nextExecutionRuntime !== currentTask.executionRuntime
-    || nextAiClientId !== currentTask.aiClientId;
+  ) || nextAiClientId !== currentTask.aiClientId;
   const acceptedPlan = await getAcceptedCompiledPlanForTask(currentTask.id);
   const nextStatus = (() => {
     if (input.status) {
@@ -268,17 +271,13 @@ export async function updateTask(
     }
 
     const staticState = deriveTaskStaticState({
-      runtimeSpec: getRuntimeTaskConfigSpec(validatedRuntimeConfig.executionRuntime),
-      executionConfig: validatedRuntimeConfig.executionConfig,
       hasAcceptedPlan: acceptedPlan !== null,
     });
 
     return TaskStatus[staticState.persistedStatus];
   })();
-  const shouldPersistResolvedRuntimeConfig =
-    input.executionRuntime !== undefined ||
-    input.executionConfig !== undefined ||
-    input.sessionStrategy !== undefined;
+  const shouldPersistExecutionConfig =
+    input.executionConfig !== undefined || input.sessionStrategy !== undefined;
   const nextAutoExecute = input.autoExecute ?? currentTask.autoExecute;
   const nextAutoPlanGeneration = input.autoPlanGeneration !== undefined
     ? input.autoPlanGeneration
@@ -334,7 +333,6 @@ export async function updateTask(
     input.autoPlanGenerationTiming !== undefined ? "autoPlanGenerationTiming" : null,
     input.autoExecuteTiming !== undefined ? "autoExecuteTiming" : null,
     input.status !== undefined ? "status" : null,
-    input.executionRuntime !== undefined ? "executionRuntime" : null,
     input.executionConfig !== undefined ? "executionConfig" : null,
     input.sessionStrategy !== undefined ? "executionConfig" : null,
     input.recurrenceRule !== undefined ? "recurrenceRule" : null,
@@ -359,12 +357,9 @@ export async function updateTask(
             : undefined,
         autoExecuteTiming:
           input.autoExecuteTiming !== undefined ? nextAutoExecuteTiming : undefined,
-        executionRuntime: shouldPersistResolvedRuntimeConfig
-          ? validatedRuntimeConfig.executionRuntime
+        executionConfig: shouldPersistExecutionConfig
+          ? (nextExecutionConfigRecord as Prisma.InputJsonObject)
           : undefined,
-        executionConfig: shouldPersistResolvedRuntimeConfig
-          ? (validatedRuntimeConfig.executionConfig as Prisma.InputJsonObject)
-          : executionConfig,
         pinnedModel: modelRoutingChanged ? (nextConfiguredModel || null) : undefined,
         pinnedModelSource: modelRoutingChanged ? (nextConfiguredModel ? "user" : null) : undefined,
         status: nextStatus,
@@ -381,6 +376,19 @@ export async function updateTask(
         aiClientId: input.aiClientId !== undefined ? input.aiClientId : undefined,
       },
     });
+
+    if (modelRoutingChanged) {
+      await tx.taskSession.updateMany({
+        where: { taskId: updatedTask.id },
+        data: {
+          runtimeName,
+          providerClientId: providerSelection?.clientId ?? null,
+          providerName: providerSelection?.providerName ?? null,
+          providerConfigFingerprint: providerSelection?.configFingerprint ?? null,
+          providerSessionRef: null,
+        },
+      });
+    }
 
     if (shouldCancelOpenWorkBlocks) {
       const completedAt = new Date();
@@ -405,7 +413,10 @@ export async function updateTask(
         recurrenceRule: null,
         startsAt: null,
         endsAt: null,
-        runtimeName: validatedRuntimeConfig.executionRuntime,
+        runtimeName,
+        providerClientId: providerSelection?.clientId,
+        providerName: providerSelection?.providerName,
+        providerConfigFingerprint: providerSelection?.configFingerprint,
       });
     } else if (recurrenceChanged) {
       await synchronizeTaskRecurrenceAuthority(tx, {
@@ -415,7 +426,10 @@ export async function updateTask(
         recurrenceRule: nextRecurrenceRule,
         startsAt: recurrenceAnchorStartAt,
         endsAt: recurrenceAnchorEndAt,
-        runtimeName: validatedRuntimeConfig.executionRuntime,
+        runtimeName,
+        providerClientId: providerSelection?.clientId,
+        providerName: providerSelection?.providerName,
+        providerConfigFingerprint: providerSelection?.configFingerprint,
       });
     }
 

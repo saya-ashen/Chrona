@@ -132,12 +132,32 @@ describe("task workspace actions", () => {
       values: { "checkpoint:decision": "Needs changes" },
     })).toMatchObject({ checkpointId: checkpoint.id, action: "reject_result", payload: { feedback: "审批决策: Needs changes" } });
 
+    const manualCheckpoint = {
+      ...checkpoint,
+      kind: "manual_completion" as const,
+      form: {
+        revision: "sha256:manual-form",
+        source: "runtime_ai" as const,
+        validated: true,
+        instructions: "Record the result",
+        inputFields: [{ kind: "text" as const, name: "summary", label: "Summary", required: true }],
+      },
+    };
     expect(buildWorkspaceCheckpointActionInput({
-      node: node({ interactionType: "execute", executionMode: "manual", checkpoint }),
-      selectedAction: { id: "mark_node_completed", label: "Mark done", kind: "trigger", checkpointId: checkpoint.id, checkpointAction: "mark_node_completed" },
+      node: node({ interactionType: "input", executionMode: "manual", checkpoint: manualCheckpoint }),
+      selectedAction: { id: "mark_node_completed", label: "Complete and continue", kind: "input", checkpointId: checkpoint.id, checkpointAction: "mark_node_completed" },
       fields: [{ key: "summary", label: "Summary", value: "" }],
       values: { summary: "Completed outside Chrona" },
-    })).toMatchObject({ checkpointId: checkpoint.id, action: "mark_node_completed", payload: { summary: "Summary: Completed outside Chrona" } });
+    })).toEqual({
+      checkpointId: checkpoint.id,
+      action: "mark_node_completed",
+      payload: {
+        formRevision: "sha256:manual-form",
+        inputFields: { summary: "Completed outside Chrona" },
+        summary: "Summary: Completed outside Chrona",
+        output: "Summary: Completed outside Chrona",
+      },
+    });
   });
 
   it("maps resolve actions to resume_after_unblock without changing retry semantics", () => {

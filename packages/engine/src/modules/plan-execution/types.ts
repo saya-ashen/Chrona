@@ -117,6 +117,8 @@ export type AdvanceRuntimeCommand =
   | {
       type: "complete_manual_node";
       nodeId?: string;
+      formRevision?: string;
+      inputFields?: CheckpointInputFields;
       summary?: string;
       output?: unknown;
       selectedBranch?: NodeResult["selectedBranch"];

@@ -120,11 +120,6 @@ export async function replaceImportedCalendarEvents(
       automationPolicy: options?.automationPolicy ?? source.automationPolicy,
       now: options?.now ?? new Date(),
     };
-    const workspace = await tx.workspace.findUniqueOrThrow({
-      where: { id: source.workspaceId },
-      select: { defaultRuntime: true },
-    });
-
     const existingEvents = await tx.importedCalendarEvent.findMany({
       where: { calendarSourceId },
       orderBy: { updatedAt: "desc" },
@@ -183,7 +178,6 @@ export async function replaceImportedCalendarEvents(
         tx,
         importedEvent,
         seriesTaskIds,
-        workspace.defaultRuntime,
         syncOptions,
       );
       if (automationRequest) automationRequests.push(automationRequest);
@@ -202,7 +196,6 @@ export async function replaceImportedCalendarEvents(
         tx,
         cancelledEvent,
         seriesTaskIds,
-        workspace.defaultRuntime,
         syncOptions,
       );
     }
@@ -252,7 +245,6 @@ async function syncImportedCalendarOccurrence(
   tx: TransactionClient,
   occurrence: ImportedCalendarEvent,
   seriesTaskIds: Map<string, string>,
-  defaultRuntime: string,
   options: ImportedCalendarSyncOptions,
 ): Promise<ImportedCalendarAutomationRequest | null> {
   const syncedStatus = getImportedCalendarTaskStatus(occurrence, options);
@@ -302,7 +294,6 @@ async function syncImportedCalendarOccurrence(
         recurrenceAnchorEndAt: isRecurring ? occurrence.endsAt : null,
         recurrenceWindowUntil: isRecurring ? occurrence.startsAt : null,
         seriesExternalUid: null,
-        executionRuntime: defaultRuntime,
         executionConfig: {},
         priority: "Medium",
         autoPlanGeneration: automation.autoPlanGeneration,

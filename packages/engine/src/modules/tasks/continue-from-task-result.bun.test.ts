@@ -55,7 +55,6 @@ const acceptedContextMock = mock(async (taskId: string) => {
       title: task.title,
       goalId: task.goalId,
       priority: task.priority,
-      executionRuntime: task.executionRuntime,
       executionConfig: task.executionConfig as Record<string, unknown>,
       aiClientId: task.aiClientId,
     },

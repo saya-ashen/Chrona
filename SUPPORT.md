@@ -11,8 +11,8 @@ Chrona is alpha software. Support is best-effort and focused on reproducible bug
 
 ## Before opening an issue
 
-1. Check `README.md` and `docs/en/quick-start.md`.
-2. Run `chrona hermes doctor` for Hermes setup problems.
+1. Check `README.md`, `docs/en/quick-start.md`, and `docs/en/privacy.md`.
+2. Run `chrona doctor` for local database, lock, permissions, and bind safety; run `chrona hermes doctor` for Hermes setup problems.
 3. Confirm Bun version satisfies `package.json`.
 4. Remove secrets from logs and screenshots.
 

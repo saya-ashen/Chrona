@@ -1,6 +1,9 @@
 import { describe, expect, it } from "bun:test";
 import { providerCapabilityMatrix, summarizeProviderCapabilities } from "./provider-capability-matrix";
-import { supportsDurableFeatureRuntime } from "./ProviderClient";
+import {
+  supportsDurableFeatureRuntime,
+  supportsSafeTerminalOnlyFeatureRuntime,
+} from "./ProviderClient";
 
 describe("providerCapabilityMatrix", () => {
   it("models Codex as session-history recovery instead of active run lookup", () => {
@@ -21,7 +24,7 @@ describe("providerCapabilityMatrix", () => {
     });
   });
 
-  it("models Oh My Pi as an ACP session-history provider", () => {
+  it("models Oh My Pi as a stable SDK session-history provider with fail-closed single-attempt recovery", () => {
     const omp = providerCapabilityMatrix.find((entry) => entry.provider === "omp");
 
     expect(omp?.label).toBe("Oh My Pi");
@@ -132,5 +135,32 @@ describe("providerCapabilityMatrix", () => {
     expect(supportsDurableFeatureRuntime(durable)).toBe(true);
     expect(supportsDurableFeatureRuntime({ ...durable, recovery: { ...durable.recovery, crossProcessDurable: false, mode: "local_stream_only" } })).toBe(false);
     expect(supportsDurableFeatureRuntime({ ...durable, startIdempotency: "unsupported" })).toBe(false);
+  });
+
+  it("accepts only durable attach or explicit terminal-only single attempt recovery", () => {
+    const singleAttempt = {
+      supportsSessions: true,
+      supportsStreaming: true,
+      supportsRunLookup: false,
+      supportsCancellation: true,
+      supportsToolCalls: true,
+      supportsPreviousResponse: false,
+      startIdempotency: "unsupported" as const,
+      readOnlySingleAttempt: true,
+      recovery: {
+        sessionResume: true,
+        historyReplay: true,
+        activeRunLookup: false,
+        streamReconnect: false,
+        crossProcessDurable: false,
+        providerResumeRef: true,
+        runEventReplay: false,
+        mode: "session_history" as const,
+      },
+    };
+    expect(supportsDurableFeatureRuntime(singleAttempt)).toBe(false);
+    expect(supportsSafeTerminalOnlyFeatureRuntime(singleAttempt)).toBe(true);
+    expect(supportsSafeTerminalOnlyFeatureRuntime({ ...singleAttempt, readOnlySingleAttempt: false })).toBe(false);
+    expect(supportsSafeTerminalOnlyFeatureRuntime({ ...singleAttempt, supportsStreaming: false })).toBe(false);
   });
 });

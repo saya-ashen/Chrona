@@ -58,7 +58,7 @@ import {
 	snapshotFromRef,
 	stripTrailingSlash,
 } from "./runner-helpers";
-import { createLogger, type ChronaLogger } from "@chrona/logging";
+import { createLogger, redactSensitiveText, type ChronaLogger } from "@chrona/logging";
 import { ClaudeCodeProviderError } from "./types";
 import {
 	createRunToolsMcpServer,
@@ -610,7 +610,7 @@ export async function probeMcpServer(input: {
 			baseUrl,
 			reason: "auth_rejected",
 			status,
-			bodyExcerpt: body.slice(0, 200),
+			bodyExcerpt: redactSensitiveText(body, 200),
 		});
 		throw new McpProbeError({
 			message:
@@ -628,10 +628,10 @@ export async function probeMcpServer(input: {
 			baseUrl,
 			reason: "non_2xx",
 			status,
-			bodyExcerpt: body.slice(0, 200),
+			bodyExcerpt: redactSensitiveText(body, 200),
 		});
 		throw new McpProbeError({
-			message: `MCP server returned HTTP ${status} for initialize: ${body.slice(0, 200)}`,
+			message: `MCP server returned HTTP ${status} for initialize: ${redactSensitiveText(body, 200)}`,
 
 			mcpBaseUrl: baseUrl,
 			status,

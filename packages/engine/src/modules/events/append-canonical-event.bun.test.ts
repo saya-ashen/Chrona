@@ -48,7 +48,6 @@ describe("appendRawEventLog", () => {
       data: {
         id: "ws_event_context",
         name: "Event context workspace",
-        defaultRuntime: "debug",
         status: "Active",
       },
     });
@@ -57,7 +56,6 @@ describe("appendRawEventLog", () => {
         id: "task_event_context",
         workspaceId: "ws_event_context",
         title: "Event context task",
-        executionRuntime: "debug",
         executionConfig: {},
         status: "Ready",
         priority: "Medium",
@@ -101,7 +99,6 @@ describe("appendCanonicalEvent", () => {
       data: {
         id: "ws_event_context",
         name: "Event context workspace",
-        defaultRuntime: "debug",
         status: "Active",
       },
     });
@@ -127,7 +124,7 @@ describe("appendCanonicalEvent", () => {
 
   it("allocates distinct monotonically increasing ingest sequences under concurrent writes", async () => {
     await db.workspace.create({
-      data: { id: "ws_event_sequence", name: "Sequence workspace", defaultRuntime: "debug", status: "Active" },
+      data: { id: "ws_event_sequence", name: "Sequence workspace", status: "Active" },
     });
 
     const events = await Promise.all(

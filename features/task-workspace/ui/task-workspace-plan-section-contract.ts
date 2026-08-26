@@ -10,6 +10,7 @@ import type { TaskPlanGraphPlan } from "../plan/task-plan-graph/types";
 import type { PlanGenerationRequest, WorkspaceRuntimeEvent } from "../hooks/use-task-workspace-plan-state";
 import type { TaskExecutionDispatchResult } from "../model/task-workspace-query";
 import type { TaskPageData, TaskPlanGenerationStatus, WorkspaceActivityItem } from "../model/task-workspace-types";
+import type { PendingWorkspaceCommand } from "../model/task-workspace-settlement";
 
 export type TaskWorkspacePlanSectionProps = {
   label: string;
@@ -36,6 +37,7 @@ export type TaskWorkspacePlanSectionProps = {
   onRetryFinalization?: () => Promise<void> | void;
   isRetryingFinalization?: boolean;
   finalizationRetryError?: string | null;
+  pendingCommand?: PendingWorkspaceCommand | null;
   createGoalAction?: ReactNode;
   onEditBrief?: () => void;
 };

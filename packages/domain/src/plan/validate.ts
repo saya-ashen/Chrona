@@ -236,6 +236,19 @@ function validateNodeSpecific(
           message: "Task node must have a mode",
         });
       }
+      const isManual = node.executor === "user" || node.mode === "manual";
+      if (isManual && !node.completionForm) {
+        errors.push({
+          path: `nodes.${index}.completionForm`,
+          message: "Manual task node must define a completion form",
+        });
+      }
+      if (!isManual && node.completionForm) {
+        errors.push({
+          path: `nodes.${index}.completionForm`,
+          message: "Automatic task node must not define a completion form",
+        });
+      }
       break;
     }
     case "checkpoint": {

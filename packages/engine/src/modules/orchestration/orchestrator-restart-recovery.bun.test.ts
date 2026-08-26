@@ -41,7 +41,7 @@ describe("runRestartRecoveryWorker", () => {
 
   it("removes expired leases and records recovery scans", async () => {
     const workspace = await db.workspace.create({
-      data: { name: "Recovery Worker", status: "Active", defaultRuntime: "hermes" },
+      data: { name: "Recovery Worker", status: "Active" },
     });
     const task = await db.task.create({
       data: {
@@ -49,7 +49,6 @@ describe("runRestartRecoveryWorker", () => {
         title: "Recovery task",
         status: "Running",
         priority: "High",
-        executionRuntime: "hermes",
         executionConfig: { prompt: "Run" },
       },
     });
@@ -142,7 +141,7 @@ describe("runRestartRecoveryWorker", () => {
 
   it("abandons a crash-orphaned Active session and rebuilds its projection", async () => {
     const workspace = await db.workspace.create({
-      data: { name: "Orphan Abandon", status: "Active", defaultRuntime: "hermes" },
+      data: { name: "Orphan Abandon", status: "Active" },
     });
     const task = await db.task.create({
       data: {
@@ -150,7 +149,6 @@ describe("runRestartRecoveryWorker", () => {
         title: "Stuck running task",
         status: "Running",
         priority: "High",
-        executionRuntime: "hermes",
         executionConfig: { prompt: "Run" },
       },
     });
@@ -227,7 +225,7 @@ describe("runRestartRecoveryWorker", () => {
 
   it("does not abandon an Active session whose task still has a live run", async () => {
     const workspace = await db.workspace.create({
-      data: { name: "Live Guard", status: "Active", defaultRuntime: "hermes" },
+      data: { name: "Live Guard", status: "Active" },
     });
     const task = await db.task.create({
       data: {
@@ -235,7 +233,6 @@ describe("runRestartRecoveryWorker", () => {
         title: "Genuinely running task",
         status: "Running",
         priority: "High",
-        executionRuntime: "hermes",
         executionConfig: { prompt: "Run" },
       },
     });
@@ -306,7 +303,7 @@ describe("runRestartRecoveryWorker", () => {
   for (const liveStatus of ["WaitingForInput", "WaitingForApproval"] as const) {
     it(`preserves ${liveStatus} across restart recovery`, async () => {
       const workspace = await db.workspace.create({
-        data: { name: `Restart ${liveStatus}`, status: "Active", defaultRuntime: "hermes" },
+        data: { name: `Restart ${liveStatus}`, status: "Active" },
       });
       const task = await db.task.create({
         data: {
@@ -314,7 +311,6 @@ describe("runRestartRecoveryWorker", () => {
           title: `Task ${liveStatus}`,
           status: "Running",
           priority: "High",
-          executionRuntime: "hermes",
           executionConfig: { prompt: "Wait" },
         },
       });
@@ -370,7 +366,7 @@ describe("runRestartRecoveryWorker", () => {
 
   it("skips recovery records whose task was deleted", async () => {
     const workspace = await db.workspace.create({
-      data: { name: "Orphaned Recovery Worker", status: "Active", defaultRuntime: "hermes" },
+      data: { name: "Orphaned Recovery Worker", status: "Active" },
     });
     const task = await db.task.create({
       data: {
@@ -378,7 +374,6 @@ describe("runRestartRecoveryWorker", () => {
         title: "Deleted recovery task",
         status: "Running",
         priority: "High",
-        executionRuntime: "hermes",
         executionConfig: { prompt: "Run" },
       },
     });

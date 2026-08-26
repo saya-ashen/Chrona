@@ -84,7 +84,6 @@ vi.mock("@features/schedule", () => ({
 			recurrenceAnchorStartAt: string | null;
 			recurrenceAnchorEndAt: string | null;
 			aiClientId: string | null;
-			executionRuntime: string;
 		}) => Promise<void>;
 	}) =>
 		isOpen ? (
@@ -107,7 +106,6 @@ vi.mock("@features/schedule", () => ({
 							recurrenceAnchorStartAt: "2026-04-15T09:00:00.000Z",
 							recurrenceAnchorEndAt: "2026-04-15T10:00:00.000Z",
 							aiClientId: "client-1",
-							executionRuntime: "local",
 						})
 					}
 				>
@@ -153,8 +151,7 @@ beforeEach(() => {
 			return Promise.resolve({ completedAt: "2026-01-01T00:00:00.000Z" });
 		if (path === "/api/schedule?workspaceId=ws-1")
 			return Promise.resolve({
-				availableAiClients: [],
-				defaultExecutionRuntime: "local",
+				availableAiClients: []
 			});
 		return Promise.resolve({ clients: [], tasks: [], total: 0 });
 	});
@@ -231,7 +228,6 @@ describe("ControlPlaneShell", () => {
 					title: "Created from shell",
 					autoPlanGeneration: true,
 					autoExecute: true,
-					executionRuntime: "local",
 					recurrenceRule: "FREQ=WEEKLY",
 				}),
 			),

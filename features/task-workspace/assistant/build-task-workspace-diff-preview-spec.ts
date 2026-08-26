@@ -9,7 +9,6 @@ type EditableTask = {
   scheduledStartAt: string | null;
   scheduledEndAt: string | null;
   scheduleStatus: string;
-  executionRuntime: string;
   executionConfig: unknown;
 };
 
@@ -42,9 +41,6 @@ function computeTaskDiff(taskPatch: NonNullable<TaskWorkspaceUpdateProposal["tas
   }
   if (taskPatch.scheduleStatus !== undefined && taskPatch.scheduleStatus !== originalTask.scheduleStatus) {
     diffs.push({ label: "Schedule", key: "scheduleStatus", original: originalTask.scheduleStatus, proposed: taskPatch.scheduleStatus ?? "-" });
-  }
-  if (taskPatch.executionRuntime !== undefined && taskPatch.executionRuntime !== originalTask.executionRuntime) {
-    diffs.push({ label: "Execution Runtime", key: "executionRuntime", original: originalTask.executionRuntime || "-", proposed: taskPatch.executionRuntime ?? "-" });
   }
   if (taskPatch.executionConfig !== undefined && JSON.stringify(taskPatch.executionConfig) !== JSON.stringify(originalTask.executionConfig)) {
     diffs.push({ label: "Execution Config", key: "executionConfig", original: formatText(originalTask.executionConfig), proposed: formatText(taskPatch.executionConfig) });

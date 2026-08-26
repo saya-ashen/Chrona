@@ -41,7 +41,6 @@ describe("run token mint/validate round-trip", () => {
 		const workspace = await db.workspace.create({
 			data: {
 				name: "ws-token",
-				defaultRuntime: "claude_code",
 				status: "Active",
 			},
 		});
@@ -50,7 +49,6 @@ describe("run token mint/validate round-trip", () => {
 				workspaceId: workspace.id,
 				title: "t",
 				kind: "single",
-				executionRuntime: "claude_code",
 				executionConfig: {},
 				status: "Ready",
 				priority: "Medium",
@@ -88,14 +86,13 @@ describe("run token mint/validate round-trip", () => {
 
 	it("rejects expired and revoked tokens", async () => {
 		const workspace = await db.workspace.create({
-			data: { name: "ws-exp", defaultRuntime: "claude_code", status: "Active" },
+			data: { name: "ws-exp", status: "Active" },
 		});
 		const task = await db.task.create({
 			data: {
 				workspaceId: workspace.id,
 				title: "t2",
 				kind: "single",
-				executionRuntime: "claude_code",
 				executionConfig: {},
 				status: "Ready",
 				priority: "Medium",
@@ -138,14 +135,13 @@ describe("run token mint/validate round-trip", () => {
 describe("terminal action recording", () => {
 	it("[MCP-007] records one terminal action, replays same-kind retries, and rejects conflicting kinds", async () => {
 		const workspace = await db.workspace.create({
-			data: { name: "ws-rec", defaultRuntime: "claude_code", status: "Active" },
+			data: { name: "ws-rec", status: "Active" },
 		});
 		const task = await db.task.create({
 			data: {
 				workspaceId: workspace.id,
 				title: "t3",
 				kind: "single",
-				executionRuntime: "claude_code",
 				executionConfig: {},
 				status: "Ready",
 				priority: "Medium",

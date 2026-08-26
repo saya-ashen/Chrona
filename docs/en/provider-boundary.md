@@ -25,6 +25,17 @@ Provider code must not decide:
 
 Those decisions belong in `packages/engine`.
 
+## Stable local provider support matrix
+
+For the first stable local release, **OMP is the only Tier-1 provider**. This is limited to the evidence currently available: packaged OMP native assets and real local dogfood through planning, execution, manual completion, and result review. It is not a claim that every provider-native feature is universally supported.
+
+| Provider | Support level | Release claim |
+| --- | --- | --- |
+| `omp` | Tier-1 / Stable | Default local SDK path for planning, Goal review, result finalization, execution, dashboard briefs, and the documented five-minute golden path. Session history resumes where available; an uncertain terminal-only read-only start fails closed and requires explicit retry. |
+| `claude_code` | Beta | Adapter available; shared stable first-run conformance evidence pending |
+| `codex` | Beta | ACP adapter available; shared stable first-run conformance evidence pending |
+| `hermes` | Experimental | Existing gateway adapter; setup and conformance evidence incomplete |
+
 ## Current provider packages
 
 | Package | Role |
@@ -51,6 +62,24 @@ Integration packages are allowed to do side-effectful local setup work that prov
 
 Integration packages must keep these side effects behind explicit setup/diagnosis APIs. They should not run automatically during normal provider execution.
 
+## Feature Runtime recovery contract
+
+Feature Runtime bindings for side-effect-free, terminal-only AI features such as
+`task.plan` and `goal.review` require one of two provider contracts:
+
+1. authoritative cross-process attach: idempotent start plus active-run lookup
+   and stream reattachment; or
+2. explicit `readOnlySingleAttempt`: Chrona starts exactly one terminal-only,
+   tool-isolated request. If the start or stream outcome is uncertain, Chrona
+   never auto-replays it and the user starts a new operation explicitly.
+
+The second contract is bounded to terminal-only work. It does not permit
+engine-managed actions, and it does not weaken the authoritative attach
+requirements for action-invoking Feature Runtime work. OMP is Tier-1 within
+this bounded contract; its local SDK/model configuration check is not proof of
+remote credentials or model access. The five-minute demo provider request is
+that proof.
+
 ## Session ownership
 
 External runtimes often have native session/run IDs. The provider layer may store and translate provider-native continuity state such as:
@@ -72,7 +101,7 @@ Chrona business execution state stays above the provider boundary:
 
 Chrona also owns execution context segmentation. Providers may preserve or compress their own native conversation history, but provider compression is not a correctness boundary. The engine decides which plan nodes share a provider session, when to switch sessions, and which structured summary is handed to the next segment.
 
-The default long-task policy should be segment-scoped provider sessions: related nodes share one provider session, then Chrona summarizes that segment and starts the next segment with compact explicit context.
+The default long-task policy should be segment-scoped provider sessions: related nodes share one provider session, then Chrona summarizes that segment and starts the next segment with compact explicit context. Provider-native session identity must be persisted from the first trustworthy scoped event that exposes it; terminal-action cancellation must not replace a richer session-bearing snapshot with a poorer fallback. If resume is unavailable or compaction omits a required fact, Chrona marks recovery explicitly and exposes bounded prior-node semantic results through AI-visible refs.
 
 ## Standard provider responsibilities
 
@@ -129,6 +158,8 @@ Provider UI copy should describe product-level provider setup and capability rea
 ## Boundary with AI clients
 
 Settings / AI Clients stores configured clients and feature bindings in the database. The engine loads the selected client for a feature such as `generate_plan`, `suggest`, `chat`, or `dispatch_task`, then calls provider/foundation-facing abstractions. There is no generic bridge chat endpoint standing in for every product capability; feature-specific flows should have explicit contracts.
+
+Task execution has exactly one provider-selection source: an enabled `Task.aiClientId`, then the enabled `task.execution` feature binding, then the enabled default AI client. Tasks and Workspaces do not store a separate adapter/runtime selector. Provider adapter choice, provider name, capabilities, model routing, and persisted runtime provenance all derive from the resolved AI client. Internal provider packages remain protocol adapters, but adapter identity is never a user-editable task field.
 
 ## Boundary with MCP tools
 

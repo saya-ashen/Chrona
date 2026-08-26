@@ -135,6 +135,22 @@ describe("useTaskWorkspacePageState — state.snapshot / state.update dispatch",
     });
   });
 
+  it("ignores a state update from another work-block scope", async () => {
+    initialPageForTest = taskWorkspaceStateFixtures.idle.pageData;
+    const { result } = renderHook(() => useTaskWorkspacePageState(initialPageForTest), { wrapper });
+    await waitFor(() => expect(mocks.streamOpened).toBe(true));
+
+    await act(async () => {
+      pushEvent("state.update", {
+        type: "state.update",
+        workBlockId: "other-occurrence",
+        updates: { "/execution/status": "completed" },
+      });
+    });
+
+    expect(result.current.stateStore.get("/execution/status")).toBeUndefined();
+  });
+
   it("applies state.snapshot to seed the store and clears prior keys", async () => {
     initialPageForTest = taskWorkspaceStateFixtures.idle.pageData;
     const { result } = renderHook(() => useTaskWorkspacePageState(initialPageForTest), { wrapper });

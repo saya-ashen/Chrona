@@ -54,6 +54,7 @@ export function executionStatusFromWaitKind(waitKind: WaitKind | undefined): Pla
     case "capability_unavailable":
       return "blocked";
     case "user_input":
+    case "manual_completion":
       return "waiting_for_user";
     case "approval":
     case "review":
@@ -90,7 +91,6 @@ export function pauseReasonFromExecutionStatus(
     case "blocked":
       return "manual_action";
     case "failed":
-      return "manual_action";
     case "completed":
     case "running":
     case "cancelled":

@@ -5,7 +5,6 @@ import { Link } from "react-router-dom";
 import {
   TaskConfigForm,
   type TaskConfigFormInput,
-  type TaskConfigExecutionRuntime,
 } from "./forms/task-config-form";
 import {
   Badge,
@@ -52,7 +51,6 @@ export type ScheduleTaskListItem = {
     description: string | null;
     immutableFields: readonly ["title", "scheduledStartAt", "scheduledEndAt"];
   } | null;
-  executionRuntime: string;
   executionConfig: unknown;
   aiClientId?: string | null;
   isRunnable: boolean;
@@ -62,8 +60,6 @@ export type ScheduleTaskListItem = {
 
 type ScheduleTaskListProps = {
   items: ScheduleTaskListItem[];
-  executionRuntimes: TaskConfigExecutionRuntime[];
-  defaultExecutionRuntime: string;
   availableAiClients?: Parameters<
     typeof TaskConfigForm
   >[0]["availableAiClients"];
@@ -186,7 +182,6 @@ function toTaskConfigInitialValues(item: ScheduleTaskListItem) {
     title: item.title,
     description: item.description,
     priority: item.priority as TaskConfigFormInput["priority"],
-    executionRuntime: item.executionRuntime,
     executionConfig: item.executionConfig,
     dueAt: item.dueAt,
     scheduledStartAt: item.scheduledStartAt,
@@ -200,8 +195,6 @@ function toTaskConfigInitialValues(item: ScheduleTaskListItem) {
 
 export function ScheduleTaskList({
   items,
-  executionRuntimes,
-  defaultExecutionRuntime,
   availableAiClients,
   isPending,
   onSaveTaskConfigAction,
@@ -226,7 +219,6 @@ export function ScheduleTaskList({
     runPrefix: t("components.scheduleTaskList.runPrefix"),
     approvals: t("components.scheduleTaskList.approvals"),
     proposals: t("components.scheduleTaskList.proposals"),
-    noModel: t("components.scheduleTaskList.noModel"),
     closeQuickEdit: t("components.scheduleTaskList.closeQuickEdit"),
     quickEdit: t("components.scheduleTaskList.quickEdit"),
     saveTaskConfig: t("components.scheduleTaskList.saveTaskConfig"),
@@ -439,7 +431,6 @@ export function ScheduleTaskList({
                           {copy.proposals}: {item.scheduleProposalCount}
                         </Badge>
                       ) : null}
-                      <Badge>{item.executionRuntime || copy.noModel}</Badge>
                     </div>
                   </div>
 
@@ -462,8 +453,6 @@ export function ScheduleTaskList({
                 {isExpanded ? (
                   <div className="mt-4 rounded-2xl border border-border/60 bg-background/75 p-4">
                     <TaskConfigForm
-                      executionRuntimes={executionRuntimes}
-                      defaultExecutionRuntime={defaultExecutionRuntime}
                       initialValues={toTaskConfigInitialValues(item)}
                       availableAiClients={availableAiClients}
                       isPending={isPending}

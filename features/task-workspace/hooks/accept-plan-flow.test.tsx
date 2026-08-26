@@ -158,7 +158,7 @@ afterEach(async () => {
 /* ------------------------------------------------------------------------- */
 
 describe("B. Accept plan — happy path", () => {
-  it("B1. header-card click: dispatches once, flips waiting_acceptance → accepting → accepted", async () => {
+  it("B1. header-card click: keeps acceptance pending until durable state arrives", async () => {
     mocks.nextResponse = { kind: "success", body: { commandId: "c-1", taskId: "task-1", acceptedAt: "2026-06-10T00:00:00.000Z" } };
 
     const initialPage = taskWorkspacePlanStateFixtures.planWaitingAcceptance.pageData as TaskPageData;
@@ -177,13 +177,12 @@ describe("B. Accept plan — happy path", () => {
       await result.current.handleAcceptPlan();
     });
 
-    // Hook contract: the dispatch is the wire-level side effect. The
-    // `isAcceptingPlan: false` + `acceptPlanError: null` invariants
-    // confirm the in-flight window closed and the success branch ran
-    // (the catch branch would set `acceptPlanError` to a non-null value).
+    // A 202 acknowledges transport only. The flow remains accepting until
+    // the matching durable workspace event or snapshot confirms acceptance.
     expect(mocks.commandCalls).toHaveLength(1);
     expect(mocks.commandCalls[0]?.body).toMatchObject({ type: "plan.accept", planId: "plan-1" });
-    expect(result.current.isAcceptingPlan).toBe(false);
+    expect(result.current.isAcceptingPlan).toBe(true);
+    expect(result.current.pendingCommand).toMatchObject({ commandId: "c-1", status: "pending" });
     expect(result.current.acceptPlanError).toBeNull();
   });
 
@@ -205,7 +204,8 @@ describe("B. Accept plan — happy path", () => {
 
     expect(mocks.commandCalls).toHaveLength(1);
     expect(mocks.commandCalls[0]?.body).toMatchObject({ type: "plan.accept", planId: "plan-1" });
-    expect(result.current.isAcceptingPlan).toBe(false);
+    expect(result.current.isAcceptingPlan).toBe(true);
+    expect(result.current.pendingCommand).toMatchObject({ commandId: "c-2", status: "pending" });
   });
 
   it("B3. accepts a plan when the browser does not expose crypto.randomUUID", async () => {
@@ -367,13 +367,14 @@ describe("D. Accept plan — in-flight state and refresh behavior", () => {
     expect(result.current.canAcceptPlan).toBe(false);
     expect(mocks.commandCalls).toHaveLength(1);
 
-    // Resolve and let the success branch complete.
+    // Resolve the transport acknowledgement; durable state is still pending.
     await act(async () => {
       mocks.delayResolve?.();
       await acceptPromise;
     });
 
-    expect(result.current.isAcceptingPlan).toBe(false);
+    expect(result.current.isAcceptingPlan).toBe(true);
+    expect(result.current.pendingCommand).toMatchObject({ commandId: "c-1", status: "pending" });
   });
 
   it("D2. server 4xx: dispatches the accept command (catch branch runs; no optimistic-accepted)", async () => {

@@ -1,5 +1,7 @@
 # Chrona AI 日程软件排查与整改方案
 
+> Provider 选择更新：任务级 `executionRuntime` / Adapter 与 Workspace 默认 runtime 已移除。任务执行只使用 `Task.aiClientId`，未指定时依次解析 `task.execution` feature binding 与已启用默认 AI Client。本文后续出现的 `executionRuntime` 证据仅描述整改前状态，不再是目标架构。
+
 ## 0. 当前决策边界
 
 本方案基于当前产品事实，不再按泛 Agent Control Plane 或商业 SaaS 方向评估。

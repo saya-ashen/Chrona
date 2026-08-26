@@ -31,7 +31,6 @@ async function createRecurringTask(input: {
 			title: input.title,
 			status: "Ready",
 			priority: "Medium",
-			executionRuntime: "hermes",
 			executionConfig: {},
 			recurrenceRule: input.rrule,
 			recurrenceAnchorStartAt: input.anchorStart,

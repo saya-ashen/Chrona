@@ -160,6 +160,8 @@ const DEFAULTS: Record<string, string> = {
 	recoverySessionHistory:
 		"Session context is saved; if execution is interrupted, retry this step to continue.",
 	recoveryUnavailable: "Interrupted runs cannot be recovered automatically.",
+	ompRecoveryLimit:
+		"Terminal-only read-only starts run once. If interrupted, Chrona does not replay them; start a new operation explicitly.",
 	advancedSettings: "Advanced settings",
 	advancedSettingsHelp:
 		"Provider endpoints, model overrides, directories, timeouts, and capability assignment.",

@@ -116,6 +116,7 @@ export async function ensureProviderRunRecord(input: {
   providerRunIdempotencyKey: string;
   aiClientId: string;
   aiClientConfigDigest: string;
+  providerName: string;
 }): Promise<EnsuredProviderRunRecord> {
   return withPlanExecutionDurability(async (tx) => {
     const planRun = await tx.taskPlanRun.findFirst({
@@ -160,6 +161,7 @@ export async function ensureProviderRunRecord(input: {
         id: true,
         aiClientId: true,
         aiClientConfigDigest: true,
+        providerName: true,
         runId: true,
         taskId: true,
         planId: true,
@@ -175,6 +177,7 @@ export async function ensureProviderRunRecord(input: {
         existingProviderRun.taskId !== input.taskId
         || existingProviderRun.aiClientId !== input.aiClientId
         || existingProviderRun.aiClientConfigDigest !== input.aiClientConfigDigest
+        || existingProviderRun.providerName !== input.providerName
         || existingProviderRun.runId !== input.runId
         || existingProviderRun.planId !== input.nodeAttempt.graphId
         || existingProviderRun.planRunId !== planRun.id
@@ -225,6 +228,8 @@ export async function ensureProviderRunRecord(input: {
         nodeAttemptId: nodeAttempt.id,
         aiClientId: input.aiClientId,
         aiClientConfigDigest: input.aiClientConfigDigest,
+        providerName: input.providerName,
+        runtimeName: input.providerName,
         idempotencyKey: input.providerRunIdempotencyKey,
         status: "running",
       },

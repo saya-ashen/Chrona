@@ -352,7 +352,6 @@ model Workspace {
   id                        String                     @id @default(cuid())
   name                      String
   description               String?
-  defaultRuntime            String
   status                    WorkspaceStatus
   createdAt                 DateTime                   @default(now())
   updatedAt                 DateTime                   @updatedAt
@@ -632,7 +631,6 @@ model Task {
   recurrenceAnchorStartAt   DateTime?
   recurrenceAnchorEndAt     DateTime?
   recurrenceWindowUntil     DateTime?
-  executionRuntime          String
   executionConfig           Json
   pinnedModel                String?
   pinnedModelSource          String?
@@ -814,8 +812,11 @@ model TaskSession {
   lastRunStatus      String?
   activeRunId        String?
   lastRunRef         String?
-  providerSessionRef String?
-  capabilityScope    String     @default("unknown")
+  providerSessionRef        String?
+  providerClientId          String?
+  providerName              String?
+  providerConfigFingerprint String?
+  capabilityScope           String     @default("unknown")
   allowedToolNames   String     @default("[]") /// JSON array; empty denies all mutations.
   createdByFramework Boolean    @default(true)
   createdAt          DateTime   @default(now())
@@ -1031,6 +1032,7 @@ model TaskPlanProviderRun {
   nodeAttemptId      String
   aiClientId         String?
   aiClientConfigDigest String?
+  providerName        String?
   runId              String?
   idempotencyKey     String                     @unique
   providerRunRef     String?
@@ -1169,6 +1171,9 @@ model Run {
   nodeAttemptId         String?                  @unique
   taskSessionId         String?
   runtimeName           String
+  providerClientId      String?
+  providerName          String?
+  providerConfigFingerprint String?
   runtimeConfigSnapshot Json?
   runtimeConfigVersion  String?
   runtimeRunRef         String?                  @unique
@@ -1625,6 +1630,21 @@ enum ExecutionSessionStatus {
   Paused
   Completed
   Abandoned
+}
+
+/// Immutable audit records captured while retiring non-authoritative runtime selectors.
+/// Runtime provider resolution must never read this archive.
+model LegacyRuntimeSelectorArchive {
+  id              String   @id
+  entityType      String
+  entityId        String
+  workspaceId     String?
+  legacyRuntime   String
+  sourceMigration String
+  capturedAt      DateTime @default(now())
+
+  @@unique([entityType, entityId, sourceMigration])
+  @@index([workspaceId, capturedAt])
 }
 
 model WorkspaceUserPreference {

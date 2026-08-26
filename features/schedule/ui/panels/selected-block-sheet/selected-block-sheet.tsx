@@ -18,8 +18,6 @@ import {
 export function SelectedBlockSheet({
   item,
   selectedDay: _selectedDay,
-  executionRuntimes,
-  defaultExecutionRuntime,
   availableAiClients,
   isPending,
   onClose,
@@ -77,8 +75,6 @@ export function SelectedBlockSheet({
                 formId="selected-task-config-form"
                 item={item}
                 copy={copy}
-                executionRuntimes={executionRuntimes}
-                defaultExecutionRuntime={defaultExecutionRuntime}
                 availableAiClients={availableAiClients}
                 isPending={isPending}
                 planningTaskDraft={planningTaskDraft}

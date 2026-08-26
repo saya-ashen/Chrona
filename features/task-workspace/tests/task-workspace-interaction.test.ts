@@ -18,16 +18,21 @@ import type { TaskWorkspaceOperationState } from "../model/task-workspace-operat
 
 function pageData(overrides: Partial<TaskPageData> = {}): TaskPageData {
 	return {
-		defaultExecutionRuntime: "omp",
-		executionRuntimes: [],
-		availableAiClients: [{ id: "ai_1", name: "OMP", enabled: true }],
+		availableAiClients: [
+			{
+				id: "ai_1",
+				name: "OMP",
+				type: "omp",
+				isDefault: true,
+				enabled: true,
+			},
+		],
 		task: {
 			id: "task_1",
 			workspaceId: "workspace_1",
 			title: "Collect GitHub trending",
 			description:
 				"Return a summary report. Success means top projects are listed with links.",
-			executionRuntime: "omp",
 			executionConfig: null,
 			aiClientId: "ai_1",
 			autoPlanGeneration: false,
@@ -194,7 +199,6 @@ describe("task workspace interaction model", () => {
 			readiness: "ready",
 			startMode: "manual",
 			providerLabel: "OMP",
-			runtimeLabel: "omp",
 			firstStepLabel: "Fetch trending projects",
 			stepCount: 3,
 			estimatedMinutes: 10,
@@ -471,7 +475,6 @@ describe("task workspace interaction model", () => {
 			task: {
 				...pageData().task,
 				aiClientId: null,
-				executionRuntime: "",
 			},
 		});
 		const readiness = deriveTaskPlanningReadiness(input);
@@ -490,7 +493,15 @@ describe("task workspace interaction model", () => {
 		const baseTask = pageData().task;
 		for (const availableAiClients of [
 			[],
-			[{ id: "ai_1", name: "OMP", enabled: false }],
+			[
+				{
+					id: "ai_1",
+					name: "OMP",
+					type: "omp",
+					isDefault: true,
+					enabled: false,
+				},
+			],
 		]) {
 			const readiness = deriveTaskPlanningReadiness({
 				...pageData({ availableAiClients }),
@@ -511,7 +522,7 @@ describe("task workspace interaction model", () => {
 	it("does not treat an execution runtime as an AI provider", () => {
 		const readiness = deriveTaskPlanningReadiness({
 			...pageData({ availableAiClients: [] }),
-			task: { ...pageData().task, aiClientId: null, executionRuntime: "omp" },
+			task: { ...pageData().task, aiClientId: null },
 		});
 
 		expect(readiness.status).toBe("blocked");

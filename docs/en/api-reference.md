@@ -174,7 +174,7 @@ Returns lightweight task workspace header state.
 
 ### POST /api/tasks
 
-Creates a task. Important fields include `workspaceId`, `title`, `description`, `priority`, `executionRuntime`, `executionConfig`, and `parentTaskId`.
+Creates a task. Important fields include `workspaceId`, `title`, `description`, `priority`, `aiClientId`, `executionConfig`, and `parentTaskId`. `aiClientId` is the only task-level provider override; when omitted, Chrona resolves the `task.execution` feature binding and then the enabled default AI client.
 
 ### GET /api/tasks/:taskId
 
@@ -279,7 +279,7 @@ Common action values include:
 - `resume_with_approval`
 - `retry_node`
 - `resume_after_unblock`
-- `complete_manual_node`
+- `complete_manual_node` — for a `manual_completion` checkpoint, send the persisted `formRevision` and typed `inputFields`; the server revalidates both before advancing
 - `fail_current_node`
 - `cancel_session`
 
@@ -289,7 +289,7 @@ SSE event types include graph events, runtime events, state updates, result even
 
 Submits a checkpoint/input/approval action and streams the resulting execution progress over SSE.
 
-Common checkpoint actions include `submit_input`, `approve_result`, `reject_result`, `request_changes`, `accept_replan`, `reject_replan`, `request_replan`, `retry_node`, `resume_after_unblock`, `mark_node_completed`, `mark_node_skipped`, `fail_task`, and `cancel_session`.
+Common checkpoint actions include `submit_input`, `approve_result`, `reject_result`, `request_changes`, `accept_replan`, `reject_replan`, `request_replan`, `retry_node`, `resume_after_unblock`, `mark_node_completed`, `mark_node_skipped`, `fail_task`, and `cancel_session`. A normal manual step returns checkpoint kind `manual_completion`, a validated form with revision/source metadata, and primary action `mark_node_completed`; it does not expose blocker recovery actions. Stale revisions return a conflict and invalid field values leave the node waiting for input.
 
 ### GET /api/tasks/:taskId/provider-approvals
 

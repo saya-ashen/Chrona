@@ -97,6 +97,7 @@ export type NodeExecutionResult =
       status: "waiting_for_user";
       prompt: string;
       reason: string;
+      waitKind?: "user_input" | "manual_completion";
       evidence?: NodeExecutionEvidence;
       actionForm?: NodeActionForm;
     }

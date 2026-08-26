@@ -24,7 +24,6 @@ export function getScheduleQuickCreateTimes(day: Date | null | undefined) {
 export function SchedulePageDialogs({
   showQuickAddDialog,
   isPending,
-  dialogDefaults,
   data,
   viewModel,
   activeView,
@@ -40,9 +39,6 @@ export function SchedulePageDialogs({
 }: {
   showQuickAddDialog: boolean;
   isPending: boolean;
-  dialogDefaults: {
-    executionRuntime: string;
-  };
   data: SchedulePageData;
   viewModel: SchedulePageViewModel;
   activeView: ScheduleViewMode;
@@ -76,8 +72,6 @@ export function SchedulePageDialogs({
       initialEndAt={initialEndAt}
       isPending={isPending}
       availableAiClients={availableAiClients ?? data.availableAiClients}
-      executionRuntimes={data.executionRuntimes}
-      defaultExecutionRuntime={dialogDefaults.executionRuntime}
       onClose={onCloseQuickAdd}
       onSubmit={async (input) => {
         await handleCreateTaskBlock({
@@ -89,7 +83,6 @@ export function SchedulePageDialogs({
           autoPlanGenerationTiming: input.autoPlanGenerationTiming,
           autoExecuteTiming: input.autoExecuteTiming,
           dueAt: input.dueAt,
-          executionRuntime: input.executionRuntime,
           executionConfig: {},
           scheduledStartAt: input.scheduledStartAt,
           scheduledEndAt: input.scheduledEndAt,

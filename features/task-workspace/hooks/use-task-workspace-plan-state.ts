@@ -9,6 +9,7 @@ import {
 import { v4 as uuidv4 } from "uuid";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiJson } from "@shared/http";
+import { useI18n } from "@chrona/i18n";
 import { taskPlanReadModelToGraphPlan } from "../plan/task-plan-view-model";
 import type { TaskPlanGraphPlan } from "../plan/task-plan-graph/types";
 import {
@@ -24,7 +25,6 @@ import {
 import {
 	canAcceptPlanFromFlow,
 	clearPlanFlowError,
-	completePlanAccept,
 	createPlanFlowFromSnapshot,
 	failPlanAccept,
 	getAcceptPlanErrorFromFlow,
@@ -43,10 +43,17 @@ import type {
 	WorkspaceActivityItem,
 } from "../model/task-workspace-types";
 import {
+	reconcileTaskPlanGenerationSession,
 	stopTaskPlanGenerationSession,
 	useTaskPlanGenerationSession,
 	type TaskPlanSessionState,
 } from "./task-plan-generation-session-store";
+import {
+	settleWorkspaceCommand,
+	shouldPollExecutionFinalization,
+	shouldPollPlanSettlement,
+	type PendingWorkspaceCommand,
+} from "../model/task-workspace-settlement";
 import type { TaskWorkspaceSseEvent } from "./use-task-workspace-page-state";
 import type {
 	ExecutionActionInput,
@@ -57,8 +64,23 @@ import type {
 	TaskPlanReadModel,
 } from "@chrona/contracts";
 
+function fallbackManualFormMessage(key: string) {
+	return key === "pages.tasks.manualFormPreparing"
+		? "Preparing manual completion form"
+		: key === "pages.tasks.manualFormCompleteContinue"
+			? "Complete and continue"
+			: key === "pages.tasks.manualFormGenerate"
+				? "Generate completion form"
+				: key === "pages.tasks.manualFormRegenerate"
+					? "Regenerate form"
+					: key;
+}
+
 const STARTING_NODE_STATUS_LABEL = "Starting";
 const STARTING_NODE_NEXT_ACTION = "Starting execution...";
+export const FINALIZATION_POLL_MAX_ATTEMPTS = 6;
+const FINALIZATION_POLL_EXHAUSTED_MESSAGE =
+	"Result finalization is still pending. Retry finalization to check again.";
 
 export type WorkspaceRuntimeEvent = Extract<
 	PlanExecutionSSEEvent,
@@ -161,8 +183,9 @@ function activitySummaryFromPhase(
 function derivePlanStatus(
 	savedPlan: TaskData["savedPlan"] | null,
 	isGenerationRunning: boolean,
+	currentStatus?: TaskPlanState["aiPlanGenerationStatus"],
 ) {
-	if (isGenerationRunning) {
+	if (isGenerationRunning || currentStatus === "generating") {
 		return "generating" as const;
 	}
 
@@ -276,6 +299,8 @@ function checkpointFormFields(checkpoint: PublicExecutionCheckpoint) {
 			return {
 				key: field.name,
 				label: field.label,
+				description: "description" in field ? field.description : undefined,
+				placeholder: !legacy && field.kind === "text" ? field.placeholder : undefined,
 				value,
 				control,
 				required: "required" in field ? field.required : false,
@@ -294,6 +319,11 @@ function checkpointFormFields(checkpoint: PublicExecutionCheckpoint) {
 function withCanonicalExecutionActions(
 	graphPlan: TaskPlanGraphPlan | null,
 	checkpoint: PublicExecutionCheckpoint | null,
+	manualFormCopy: {
+		completeAndContinue: string;
+		generate: string;
+		regenerate: string;
+	},
 ) {
 	if (!graphPlan) return graphPlan;
 
@@ -318,7 +348,13 @@ function withCanonicalExecutionActions(
 		if (node.id !== checkpoint.nodeId) return clearedNode;
 		const actions = checkpoint.availableActions.map((action) => ({
 			id: action.id,
-			label: action.label,
+			label: action.id === "mark_node_completed"
+				? manualFormCopy.completeAndContinue
+				: action.id === "retry_node" && action.label === "Generate completion form"
+					? manualFormCopy.generate
+					: action.id === "retry_node" && action.label === "Regenerate form"
+						? manualFormCopy.regenerate
+						: action.label,
 			kind: checkpointActionKind(action.id),
 			emphasis: checkpointActionEmphasis(action.style),
 			checkpointId: checkpoint.id,
@@ -332,6 +368,17 @@ function withCanonicalExecutionActions(
 			interactiveFields: checkpointFormFields(checkpoint),
 			availableActions: actions,
 			actionable: actions.length > 0,
+			metadata: {
+				...node.metadata,
+				...(checkpoint.form
+					? {
+							manualCompletionFormSource: checkpoint.form.source,
+							manualCompletionFormValidated: checkpoint.form.validated,
+							formSurfaceKind: "ai-authored",
+							actionSurfaceKind: "runtime-control",
+						}
+					: {}),
+			},
 		};
 	};
 
@@ -468,6 +515,8 @@ export function useTaskWorkspacePlanState(
 	availableAiClients?: TaskConfigAiClient[],
 ) {
 	const queryClient = useQueryClient();
+	const i18n = useI18n();
+	const translate = typeof i18n.t === "function" ? i18n.t : fallbackManualFormMessage;
 	const selectedWorkBlockId = task.currentWorkBlock?.id ?? null;
 	const selectedWorkBlockKey = selectedWorkBlockId ?? "__task__";
 	const previousWorkBlockKeyRef = useRef(selectedWorkBlockKey);
@@ -480,6 +529,16 @@ export function useTaskWorkspacePlanState(
 		string | null
 	>(null);
 	const [isRetryingFinalization, setIsRetryingFinalization] = useState(false);
+	const [pendingCommand, setPendingCommand] =
+		useState<PendingWorkspaceCommand | null>(null);
+	const acceptingPlanCommandRef = useRef<{
+		commandId: string;
+		planId: string;
+	} | null>(null);
+	// A workspace SSE reconnect has no replayable command outcome. Once its
+	// durable snapshot is loaded, a draft plan proves an in-flight acceptance
+	// did not settle and must not leave the UI permanently accepting.
+	const reconcileAcceptingPlanFromSnapshotRef = useRef(false);
 
 	const planStateQuery = useQuery({
 		queryKey: taskWorkspaceQueryKeys.planState(task.id, selectedWorkBlockId),
@@ -521,27 +580,40 @@ export function useTaskWorkspacePlanState(
 		generationSession.headStateVersion ??
 		planStateQuery.data.generationSession?.headStateVersion ??
 		null;
-	const hasTerminalGenerationSession =
-		generationSession.sessionStatus === "completed" ||
-		generationSession.sessionStatus === "failed" ||
-		generationSession.sessionStatus === "cancelled";
-	const isGeneratingPlan =
-		generationSession.sessionStatus === "running" ||
-		(!hasTerminalGenerationSession &&
-			planState?.aiPlanGenerationStatus === "generating");
+	const shouldPollGeneration = shouldPollPlanSettlement(
+		planState ?? {},
+		generationSession.sessionStatus,
+	);
+	const isGeneratingPlan = Boolean(
+		shouldPollGeneration &&
+			(generationSession.sessionStatus === "running" ||
+				planState?.aiPlanGenerationStatus === "generating"),
+	);
+
+	// A durable snapshot is authoritative over an in-memory session that may
+	// have missed its terminal SSE event (for example after a browser sleep).
+	useEffect(() => {
+		if (!planState) return;
+		reconcileTaskPlanGenerationSession(task.id, selectedWorkBlockId, planState);
+	}, [planState, selectedWorkBlockId, task.id]);
 
 	useEffect(() => {
-		if (!hasTerminalGenerationSession) return;
+		if (
+			generationSession.sessionStatus !== "completed" &&
+			generationSession.sessionStatus !== "failed" &&
+			generationSession.sessionStatus !== "cancelled"
+		)
+			return;
 		void planStateQuery.refetch();
-	}, [hasTerminalGenerationSession, planStateQuery.refetch]);
+	}, [generationSession.sessionStatus, planStateQuery.refetch]);
 
 	useEffect(() => {
-		if (!isGeneratingPlan) return;
+		if (!shouldPollGeneration) return;
 		const interval = window.setInterval(() => {
 			void planStateQuery.refetch();
 		}, 5000);
 		return () => window.clearInterval(interval);
-	}, [isGeneratingPlan, planStateQuery.refetch]);
+	}, [planStateQuery.refetch, shouldPollGeneration]);
 	const generationActivitySummary = isGeneratingPlan
 		? (generationSession.statusMessage ??
 			activitySummaryFromPhase(generationSession.phase))
@@ -555,6 +627,7 @@ export function useTaskWorkspacePlanState(
 	const [liveActivity, setLiveActivity] = useState<WorkspaceActivityItem[]>([]);
 	const currentExecution = currentExecutionQuery.data ?? null;
 	const latestCheckpoint = currentExecution?.checkpoint ?? null;
+	const isFinalizationUnsettled = shouldPollExecutionFinalization(currentExecution);
 	const latestActivitySummary =
 		getRuntimeActivity(runtimeEvents.at(-1)) ?? generationActivitySummary;
 	const [graphPlan, setGraphPlan] = useState(() =>
@@ -569,6 +642,9 @@ export function useTaskWorkspacePlanState(
 		setGenerationUserInstruction(null);
 		setRuntimeEvents([]);
 		setLiveActivity([]);
+		setPendingCommand(null);
+		acceptingPlanCommandRef.current = null;
+		reconcileAcceptingPlanFromSnapshotRef.current = false;
 		setPlanFlow(createPlanFlowFromSnapshot(planStateQuery.data));
 	}, [planStateQuery.data, selectedWorkBlockKey]);
 
@@ -596,6 +672,7 @@ export function useTaskWorkspacePlanState(
 					aiPlanGenerationStatus: derivePlanStatus(
 						nextPlan,
 						previous.generationSession?.status === "running",
+						previous.aiPlanGenerationStatus,
 					),
 				} satisfies TaskPlanState;
 			},
@@ -618,12 +695,24 @@ export function useTaskWorkspacePlanState(
 		} satisfies TaskPlanState;
 		const nextPlanFlow = createPlanFlowFromSnapshot(nextPlanState);
 		setPlanFlow((current) => {
-			if (
-				current.status === "accepting" ||
-				samePlanFlowSnapshot(current, nextPlanFlow)
-			) {
+			if (current.status === "accepting") {
+				if (nextPlanFlow.savedPlan?.status === "accepted") {
+					acceptingPlanCommandRef.current = null;
+					reconcileAcceptingPlanFromSnapshotRef.current = false;
+					return nextPlanFlow;
+				}
+				if (reconcileAcceptingPlanFromSnapshotRef.current) {
+					reconcileAcceptingPlanFromSnapshotRef.current = false;
+					acceptingPlanCommandRef.current = null;
+					return failPlanAccept(
+						current,
+						current.planId,
+						"Plan acceptance did not complete. Review and try again.",
+					);
+				}
 				return current;
 			}
+			if (samePlanFlowSnapshot(current, nextPlanFlow)) return current;
 			return nextPlanFlow;
 		});
 	}, [isGeneratingPlan, planState, task.savedPlan]);
@@ -633,6 +722,56 @@ export function useTaskWorkspacePlanState(
 		? "generating"
 		: getPlanGenerationStatusFromFlow(planFlow);
 
+	useEffect(() => {
+		if (!isFinalizationUnsettled) return;
+		let cancelled = false;
+		let timeout: number | null = null;
+		let attempt = 0;
+		const poll = () => {
+			if (attempt >= FINALIZATION_POLL_MAX_ATTEMPTS) {
+				setFinalizationRetryError(FINALIZATION_POLL_EXHAUSTED_MESSAGE);
+				return;
+			}
+			const delay = Math.min(2_000 * 2 ** attempt, 10_000);
+			timeout = window.setTimeout(async () => {
+				await Promise.all([currentExecutionQuery.refetch(), refreshWorkspace()]);
+				if (cancelled) return;
+				attempt += 1;
+				poll();
+			}, delay);
+		};
+		poll();
+		return () => {
+			cancelled = true;
+			if (timeout !== null) window.clearTimeout(timeout);
+		};
+	}, [currentExecutionQuery.refetch, isFinalizationUnsettled, refreshWorkspace]);
+
+	useEffect(() => {
+		if (!isFinalizationUnsettled) setFinalizationRetryError(null);
+	}, [isFinalizationUnsettled]);
+
+	useEffect(() => {
+		if (!isFinalizationUnsettled) return;
+		const refreshOnVisible = () => {
+			if (document.visibilityState === "visible") {
+				void Promise.all([
+					currentExecutionQuery.refetch(),
+					planStateQuery.refetch(),
+					refreshWorkspace(),
+				]);
+			}
+		};
+		document.addEventListener("visibilitychange", refreshOnVisible);
+		return () => document.removeEventListener("visibilitychange", refreshOnVisible);
+	}, [
+		currentExecutionQuery.refetch,
+		isFinalizationUnsettled,
+		planStateQuery.refetch,
+		refreshWorkspace,
+	]);
+
+	// eslint-disable-next-line complexity -- one ordered event pass correlates receipt, activity, and durable snapshots.
 	useEffect(() => {
 		const nextEvents = workspaceEvents.filter(
 			(event) => (event.sequence ?? 0) > lastWorkspaceEventSequenceRef.current,
@@ -645,8 +784,59 @@ export function useTaskWorkspacePlanState(
 		);
 
 		for (const event of nextEvents) {
+			// A connection snapshot is already scoped by the SSE endpoint; refresh
+			// the currently selected durable plan even if its envelope omits a
+			// work-block ID.
+			if (event.type === "state.snapshot") {
+				const acceptingPlan = acceptingPlanCommandRef.current;
+				if (acceptingPlan) {
+					reconcileAcceptingPlanFromSnapshotRef.current = true;
+					void planStateQuery.refetch().then(({ data }) => {
+						if (data?.savedPlan?.status === "accepted") return;
+						reconcileAcceptingPlanFromSnapshotRef.current = false;
+						acceptingPlanCommandRef.current = null;
+						setPlanFlow((current) =>
+							current.status === "accepting" &&
+							current.planId === acceptingPlan.planId
+								? failPlanAccept(
+										current,
+										acceptingPlan.planId,
+										"Plan acceptance did not complete. Review and try again.",
+									)
+								: current,
+						);
+					});
+				}
+				continue;
+			}
 			if (!isWorkspaceEventInSelectedScope(event, selectedWorkBlockId))
 				continue;
+			const acceptingPlan = acceptingPlanCommandRef.current;
+			if (
+				acceptingPlan &&
+				acceptingPlan.commandId === event.commandId &&
+				event.type === "command.failed"
+			) {
+				acceptingPlanCommandRef.current = null;
+				reconcileAcceptingPlanFromSnapshotRef.current = false;
+				setPlanFlow((current) =>
+					failPlanAccept(
+						current,
+						acceptingPlan.planId,
+						event.message ?? "Failed to accept plan",
+					),
+				);
+			}
+			if (
+				acceptingPlan &&
+				acceptingPlan.commandId === event.commandId &&
+				event.type === "task_workspace_updated" &&
+				event.reason === "plan.accepted"
+			) {
+				acceptingPlanCommandRef.current = null;
+				reconcileAcceptingPlanFromSnapshotRef.current = false;
+			}
+			setPendingCommand((current) => settleWorkspaceCommand(current, event));
 			const activityItem = workspaceEventToWorkspaceActivity(
 				event,
 				event.sequence ?? 0,
@@ -677,6 +867,8 @@ export function useTaskWorkspacePlanState(
 			}
 
 			if (isPlanGenerationCompletionEvent(event)) {
+				// Page-state refreshes workspace/header; this refetch supplies the
+				// canonical durable plan without racing a duplicate plan request.
 				void planStateQuery.refetch();
 				continue;
 			}
@@ -707,8 +899,15 @@ export function useTaskWorkspacePlanState(
 		const timeoutId = window.setTimeout(() => {
 			const nextGraphPlan = withStartingReadyNode(
 				withCanonicalExecutionActions(
-					taskPlanReadModelToGraphPlan(plan),
+					taskPlanReadModelToGraphPlan(plan, {
+						preparingManualForm: translate("pages.tasks.manualFormPreparing"),
+					}),
 					latestCheckpoint,
+					{
+						completeAndContinue: translate("pages.tasks.manualFormCompleteContinue"),
+						generate: translate("pages.tasks.manualFormGenerate"),
+						regenerate: translate("pages.tasks.manualFormRegenerate"),
+					},
 				),
 				currentExecution,
 			);
@@ -723,7 +922,7 @@ export function useTaskWorkspacePlanState(
 			cancelled = true;
 			window.clearTimeout(timeoutId);
 		};
-	}, [currentExecution, latestCheckpoint, plan]);
+	}, [currentExecution, latestCheckpoint, plan, translate]);
 
 	const setPlan = useCallback(
 		(value: SetStateAction<TaskData["savedPlan"] | null>) => {
@@ -799,16 +998,23 @@ export function useTaskWorkspacePlanState(
 				startPlanAccept(clearPlanFlowError(current), planId),
 			);
 			try {
-				await dispatchWorkspaceCommand(task.id, {
+				const ack = await dispatchWorkspaceCommand(task.id, {
 					type: "plan.accept",
 					planId,
 					workBlockId: selectedWorkBlockId,
 					expectedHeadStateVersion: planHeadStateVersion,
 					idempotencyKey: uuidv4(),
 				});
-				setPlanFlow(completePlanAccept(plan));
-				void refreshExecutionQueries();
+				acceptingPlanCommandRef.current = { commandId: ack.commandId, planId };
+				reconcileAcceptingPlanFromSnapshotRef.current = false;
+				setPendingCommand({
+					commandId: ack.commandId,
+					message: "Plan acceptance was accepted. Waiting for the durable plan state.",
+					status: "pending",
+				});
 			} catch (cause) {
+				acceptingPlanCommandRef.current = null;
+				reconcileAcceptingPlanFromSnapshotRef.current = false;
 				setPlanFlow((current) =>
 					failPlanAccept(
 						current,
@@ -819,9 +1025,7 @@ export function useTaskWorkspacePlanState(
 			}
 		},
 		[
-			plan,
 			planHeadStateVersion,
-			refreshExecutionQueries,
 			selectedWorkBlockId,
 			task.id,
 		],
@@ -864,7 +1068,14 @@ export function useTaskWorkspacePlanState(
 				userInstruction,
 				selectedNodeId,
 				replaceActiveExecution: request?.replaceActiveExecution ?? false,
-			});
+			}).then((ack) => {
+				setPendingCommand({
+					commandId: ack.commandId,
+					message: "Plan generation was accepted. Waiting for the durable plan state.",
+					instruction: userInstruction,
+					status: "pending",
+				});
+			}).catch(() => undefined);
 		},
 		[
 			availableAiClients,
@@ -888,6 +1099,15 @@ export function useTaskWorkspacePlanState(
 				action,
 				selectedWorkBlockId,
 			);
+			setPendingCommand({
+				commandId: result.commandId,
+				message: result.message,
+				instruction:
+					"prompt" in action && typeof action.prompt === "string"
+						? action.prompt
+						: null,
+				status: "pending",
+			});
 			await refreshExecutionQueries();
 			return result;
 		},
@@ -902,6 +1122,11 @@ export function useTaskWorkspacePlanState(
 				action,
 				selectedWorkBlockId,
 			);
+			setPendingCommand({
+				commandId: result.commandId,
+				message: result.message,
+				status: "pending",
+			});
 			await refreshExecutionQueries();
 			return result;
 		},
@@ -1049,6 +1274,7 @@ export function useTaskWorkspacePlanState(
 		handleRetryFinalization,
 		isRetryingFinalization,
 		finalizationRetryError,
+		pendingCommand,
 		handleGeneratePlanFromHeader,
 		handleStopPlanGeneration,
 		assistantBuildCurrentPlan,

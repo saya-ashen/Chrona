@@ -85,6 +85,40 @@ describe("createChronaLogger", () => {
     });
   });
 
+  it("redacts nested errors, provider wire bodies, URLs, and bearer credentials from stdout", async () => {
+    const logs = await runLoggerSnippet(`
+      const { createChronaLogger, serializeSafeError } = await import("./packages/logging/src/index.ts");
+      const secret = "sk-" + "live-" + "example-" + "secret-" + "value";
+      const error = new Error("Bearer " + secret + " at https://user:pass@example.test/api?token=" + secret);
+      error.code = "provider_error";
+      error.cause = { response: { body: { apiKey: secret } }, nested: [{ password: secret }] };
+      console.log(JSON.stringify(serializeSafeError(error)));
+      createChronaLogger("test.adversarial").error("provider.cleanup.failed", {
+        request: { headers: { authorization: "Bearer " + secret } },
+        nested: [{ token: secret, endpoint: "https://user:pass@example.test/?api_key=" + secret }],
+      });
+    `, { CHRONA_LOG_LEVEL: "error" });
+    const rendered = JSON.stringify(logs);
+    expect(rendered).not.toContain("sk-" + "live-" + "example-" + "secret-" + "value");
+    expect(rendered).not.toContain("user:pass");
+    expect(rendered).toContain("provider_error");
+    expect(rendered).toContain("[Redacted]");
+  });
+
+  it("redacts JSON-style client_secret values and response excerpts", async () => {
+    const logs = await runLoggerSnippet(`
+      const { createChronaLogger, redactSensitiveText } = await import("./packages/logging/src/index.ts");
+      const secret = "response-client-secret-value";
+      console.log(JSON.stringify({ text: redactSensitiveText(JSON.stringify({ client_secret: secret })) }));
+      createChronaLogger("test.response-excerpt").error("provider.response.failed", {
+        bodyExcerpt: JSON.stringify({ client_secret: secret }),
+      });
+    `, { CHRONA_LOG_LEVEL: "error" });
+    const rendered = JSON.stringify(logs);
+    expect(rendered).not.toContain("response-client-secret-value");
+    expect(rendered).toContain("[Redacted]");
+  });
+
   it("defaults to silent during tests", async () => {
     const logs = await runLoggerSnippet(`
       const { createChronaLogger } = await import("./packages/logging/src/index.ts");

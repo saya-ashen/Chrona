@@ -42,7 +42,7 @@ Before the first start or after changing data/network settings, inspect the loca
 chrona doctor
 ```
 
-The command checks the database path and integrity plus localhost/API-key safety. A missing database before first start is expected; `chrona start` creates it.
+The command checks data/config directory permissions; the database, SQLite sidecars, locks, restore artifacts, and automatic backup permissions; integrity; runtime-lock ownership; backup readiness; and localhost/API-key safety. A missing database before first start is expected; `chrona start` creates it. If it reports a confirmed stale lock, run `chrona doctor --repair-stale-lock`; this quarantines only the stale lock and never deletes the database.
 
 Chrona stores local data under platform-specific application directories. You can override them when needed:
 
@@ -57,7 +57,9 @@ Back up local data before upgrading:
 chrona backup ./chrona-before-upgrade.db
 ```
 
-See [Backup, Restore, and Local Operations](./operations.md) for recovery and safe local deployment.
+On the next `chrona start`, a pending migration creates a verified automatic recovery point under the database's `backups/pre-upgrade/` directory before changing schema history. Chrona runs one process per database; stop Chrona before `restore`.
+
+See [Backup, Restore, and Local Operations](./operations.md) for recovery and safe local deployment, and [Local privacy and data handling](./privacy.md) before configuring external providers or sharing diagnostics.
 
 ## Option B: repository development
 
@@ -89,8 +91,8 @@ bun run test:api
 
 1. Open `http://localhost:3101`.
 2. Open Settings / AI Clients.
-3. Add an AI client when you want AI-backed planning or execution. Choose `Claude Code` or `Codex` for the primary local agent execution paths.
-4. Bind it to product features such as `task.plan`, `task.execution`, or `dashboard.brief`. Lower-level feature slots such as `generate_plan`, `suggest`, `chat`, and `dispatch_task` may also appear in developer-facing contexts.
+3. Add the default OMP AI client and run its configuration check. The check resolves configured local SDK/model settings; it is not a remote credential or model-access probe. The five-minute demo provider request is the remote credential/model proof.
+4. Bind only the feature slots shown for that provider. `task.plan` and `goal.review` accept either authoritative cross-process recovery or OMP's terminal-only read-only single-attempt contract. OMP fails closed after an uncertain interrupted start and requires an explicit new operation; lower-level feature slots such as `generate_plan`, `suggest`, `chat`, and `dispatch_task` may also appear in developer-facing contexts.
 5. Create a task with enough context to execute.
 6. Place the task on the schedule.
 7. Generate a plan from the task workspace.
@@ -102,11 +104,22 @@ bun run test:api
 
 Chrona stores AI clients and feature bindings in the database. Chrona does not ship a built-in model provider today; configure an external provider client before using AI-backed features.
 
-- `claude_code`: primary supported provider for Claude Code-backed plan generation and task execution through scoped MCP control tools.
-- `codex`: primary supported provider for Codex-backed plan generation and task execution through scoped MCP control tools.
-- `hermes`: adapter for existing Hermes gateway setups; provider docs/config flow has not been updated yet.
+- `omp`: Stable / Tier-1 in-process SDK adapter and default first-run provider. It supports `task.plan`, `task.execution`, `dashboard.brief`, and `goal.review`, plus local result finalization. Session history resumes where available. Its terminal-only read-only starts run once; an uncertain interruption is never auto-replayed and requires an explicit new operation. Its configuration check resolves SDK/model setup only; use the five-minute demo provider request to prove remote credentials and model access.
+- `claude_code`: Beta adapter; do not rely on it for the stable five-minute first-run path yet.
+- `codex`: Beta ACP adapter; do not rely on it for the stable five-minute first-run path yet.
+- `hermes`: Experimental adapter for existing gateway setups; its setup/config flow is not stable-release evidence yet.
 
 Feature bindings decide which client handles which capability. Product-oriented bindings include `task.plan`, `task.execution`, and `dashboard.brief`; lower-level feature slots such as `suggest`, `generate_plan`, `conflicts`, `timeslots`, `chat`, and `dispatch_task` remain available where needed.
+
+### OMP (Stable Tier-1 SDK adapter)
+
+1. Open **Settings → AI Clients → Add Client → OMP**. OMP is listed first and is the default first-run client type.
+2. Enter a model and credentials, or leave credentials empty to use local `~/.omp` credentials; save and run the configuration check.
+3. Bind the displayed product features: `task.plan`, `task.execution`, `dashboard.brief`, and `goal.review`.
+4. Use **Start with Chrona → Use safe demo** as the five-minute provider request. It proves remote credentials and model access without granting external tools or side effects.
+5. If a terminal-only read-only planning or review start is interrupted before Chrona records its outcome, Chrona does not replay it. Start a new operation explicitly. Session history can resume where the provider exposes it.
+
+The SDK configuration check validates local SDK/model resolution only. The five-minute demo provider request is the authority for remote credentials and model access.
 
 ### Claude Code
 

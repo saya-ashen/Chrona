@@ -55,6 +55,7 @@ export type SubmittedNodeResult =
       kind: "done";
       summary?: string;
       output?: unknown;
+      inputFields?: CheckpointInputFields;
       evidence?: SubmittedNodeEvidence;
       deliverables?: SubmittedNodeDeliverable[];
       findings?: ResultContribution[];

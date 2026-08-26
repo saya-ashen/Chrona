@@ -1,7 +1,46 @@
 import { expect, test } from "@playwright/test";
-import type { Page } from "@playwright/test";
+import type { APIRequestContext, Page } from "@playwright/test";
 
 const SETTINGS_URL = "/en/settings?panel=ai-clients";
+const MANAGED_CLIENT_NAMES = new Set([
+	"Default Client A",
+	"Default Client B",
+	"Diagnostics Client",
+]);
+
+type E2eAiClient = { id: string; name: string; isDefault: boolean };
+
+function isManagedClient(client: E2eAiClient): boolean {
+	return (
+		client.name.startsWith("E2E Settings Client") ||
+		MANAGED_CLIENT_NAMES.has(client.name)
+	);
+}
+
+async function listClients(request: APIRequestContext): Promise<E2eAiClient[]> {
+	let clients: E2eAiClient[] = [];
+	await expect
+		.poll(
+			async () => {
+				const response = await request.get("/api/ai/clients");
+				if (!response.ok()) return false;
+				clients =
+					((await response.json()) as { clients?: E2eAiClient[] }).clients ?? [];
+				return true;
+			},
+			{ timeout: 15_000, intervals: [200, 500, 1_000] },
+		)
+		.toBe(true);
+	return clients;
+}
+
+async function removeManagedClients(request: APIRequestContext): Promise<void> {
+	for (const client of await listClients(request)) {
+		if (!isManagedClient(client)) continue;
+		const response = await request.delete(`/api/ai/clients/${client.id}`);
+		expect(response.ok()).toBeTruthy();
+	}
+}
 
 async function selectHermesProvider(page: Page) {
 	await page.getByRole("combobox", { name: "Type" }).click();
@@ -21,7 +60,28 @@ async function fillAdvancedConnectionSettings(
 }
 
 test.describe("AI Client Settings", () => {
+	let originalDefaultClientId: string | null = null;
+
 	test.setTimeout(60_000);
+	test.beforeEach(async ({ request }) => {
+		await removeManagedClients(request);
+		originalDefaultClientId =
+			(await listClients(request)).find((client) => client.isDefault)?.id ?? null;
+	});
+	test.afterEach(async ({ request }) => {
+		await removeManagedClients(request);
+		if (originalDefaultClientId) {
+			const remaining = await listClients(request);
+			if (remaining.some((client) => client.id === originalDefaultClientId)) {
+				const response = await request.patch(
+					`/api/ai/clients/${originalDefaultClientId}`,
+					{ data: { isDefault: true } },
+				);
+				expect(response.ok()).toBeTruthy();
+			}
+		}
+		originalDefaultClientId = null;
+	});
 	test("keeps settings controls visible and the client dialog centered", async ({
 		page,
 	}) => {

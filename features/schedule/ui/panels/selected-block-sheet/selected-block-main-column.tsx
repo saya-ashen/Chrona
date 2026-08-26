@@ -9,7 +9,6 @@ import {
   TaskConfigForm,
   type TaskConfigDraftState,
   type TaskConfigFormDraft,
-  type TaskConfigExecutionRuntime,
   type TaskConfigFormInput,
 } from "../../forms/task-config-form";
 import { TaskAiPlanPanel, TaskEditPanel } from "@features/task-workspace/public/workspace-integration";
@@ -38,8 +37,6 @@ export function SelectedBlockMainColumn({
   formId = "selected-task-config-form",
   item,
   copy,
-  executionRuntimes,
-  defaultExecutionRuntime,
   availableAiClients,
   isPending,
   planningTaskDraft,
@@ -58,8 +55,6 @@ export function SelectedBlockMainColumn({
 }: {
   item: ScheduleRecord;
   copy: SchedulePageCopy;
-  executionRuntimes: TaskConfigExecutionRuntime[];
-  defaultExecutionRuntime: string;
   availableAiClients?: Parameters<typeof TaskConfigForm>[0]["availableAiClients"];
   isPending: boolean;
   planningTaskDraft: TaskConfigFormDraft;
@@ -105,8 +100,6 @@ export function SelectedBlockMainColumn({
               formId={formId}
               hideFooter
               compact
-              executionRuntimes={executionRuntimes}
-              defaultExecutionRuntime={defaultExecutionRuntime}
               isPending={isPending}
               initialValues={toTaskConfigInitialValues(item)}
               lockedFields={item.sourceManaged?.immutableFields}

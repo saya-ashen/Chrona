@@ -62,4 +62,108 @@ describe("deriveExecutionCheckpoint", () => {
     });
     expect(execution.ui?.currentOperationSpec).not.toBeNull();
   });
+
+  it("separates normal manual completion from recovery", () => {
+    const checkpoint = deriveExecutionCheckpoint({
+      taskId: "task-1",
+      sessionId: "session-1",
+      planRunId: "plan-1",
+      status: "waiting_for_user",
+      currentNodeId: "node-1",
+      waitKind: "manual_completion",
+      message: "Record the result",
+      effective: {
+        nodes: [{
+          id: "node-1",
+          type: "task",
+          title: "Inspect plants",
+          status: "waiting_for_user",
+          mode: "manual",
+          executor: "user",
+          result: {
+            waitKind: "manual_completion",
+            actionForm: {
+              instructions: "Record the result",
+              revision: "sha256:form",
+              source: "runtime_ai",
+              validated: true,
+              inputFields: [{ kind: "text", name: "result", label: "Result", required: true }],
+            },
+          },
+        }],
+        edges: [],
+      } as never,
+    });
+
+    expect(checkpoint).toMatchObject({
+      kind: "manual_completion",
+      form: { revision: "sha256:form", source: "runtime_ai", validated: true },
+    });
+    expect(checkpoint?.availableActions.map(({ id }) => id)).toEqual([
+      "mark_node_completed",
+      "request_replan",
+      "cancel_session",
+    ]);
+  });
+
+  it("offers form regeneration for a failed review without exposing provider details", () => {
+    const checkpoint = deriveExecutionCheckpoint({
+      taskId: "task-1",
+      sessionId: "session-1",
+      planRunId: "plan-1",
+      status: "failed",
+      currentNodeId: "node-1",
+      message: "Manual completion form preparation failed.",
+      effective: {
+        nodes: [{
+          id: "node-1",
+          type: "task",
+          title: "Inspect plants",
+          status: "failed",
+          result: {
+            error: "Manual completion form preparation failed.",
+            errorDetails: { code: "MANUAL_FORM_REVIEW_RESULT_INVALID", traceId: "run-1", raw: "secret" },
+          },
+        }],
+        edges: [],
+      } as never,
+    });
+
+    expect(checkpoint?.title).toBe("Form generation failed: Inspect plants");
+    expect(checkpoint?.availableActions.map(({ label }) => label)).toEqual([
+      "Regenerate form",
+      "Request replan",
+      "Cancel execution",
+    ]);
+  });
+
+  it("strictly upgrades only the legacy manual-only blocker", () => {
+    const checkpoint = deriveExecutionCheckpoint({
+      taskId: "task-1",
+      sessionId: "session-1",
+      planRunId: "plan-1",
+      status: "blocked",
+      currentNodeId: "node-1",
+      waitKind: "manual_action",
+      message: "Node node-1 execution mode is manual",
+      effective: {
+        nodes: [{
+          id: "node-1",
+          type: "task",
+          title: "Inspect plants",
+          status: "blocked",
+          mode: "manual",
+          executor: "user",
+          result: { waitKind: "manual_action", error: "Node node-1 execution mode is manual" },
+        }],
+        edges: [],
+      } as never,
+    });
+
+    expect(checkpoint?.availableActions.map(({ label }) => label)).toEqual([
+      "Generate completion form",
+      "Request replan",
+      "Cancel execution",
+    ]);
+  });
 });

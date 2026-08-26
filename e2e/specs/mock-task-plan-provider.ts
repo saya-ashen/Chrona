@@ -107,6 +107,19 @@ const GOLDEN_PATH_BLUEPRINT: PlanBlueprint = {
 			mode: "manual",
 			expectedOutput: "A reviewed final result.",
 			completionCriteria: "The user marks the review complete.",
+			completionForm: {
+				instructions: "Record the completed manual review.",
+				submitLabel: "Complete and continue",
+				inputFields: [
+					{
+						kind: "text",
+						name: "reviewSummary",
+						label: "Review summary",
+						multiline: true,
+						required: true,
+					},
+				],
+			},
 			estimatedMinutes: 5,
 		},
 	],
@@ -321,13 +334,14 @@ export async function bindTaskPlanProvider(
 	baseUrl: string,
 	features: readonly (
 		| "task.plan"
+		| "task.execution"
 		| "task.result_finalization"
 		| "execute_task_node"
 		| "evaluate_condition_node"
 		| "review_checkpoint_node"
 	)[] = ["task.plan"],
 	isDefault = false,
-): Promise<void> {
+): Promise<string> {
 	const createResponse = await request.post("/api/ai/clients", {
 		data: {
 			name: `E2E Durable Plan Client ${taskId}`,
@@ -355,4 +369,5 @@ export async function bindTaskPlanProvider(
 			`Task-plan client binding failed: HTTP ${bindResponse.status()} ${await bindResponse.text()}`,
 		);
 	}
+	return created.client.id!;
 }

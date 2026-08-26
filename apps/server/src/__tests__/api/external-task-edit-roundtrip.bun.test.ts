@@ -35,7 +35,6 @@ describe("External task edit roundtrip (PATCH config + schedule PUT)", () => {
         description: null,
         status: "Ready",
         priority: "Medium",
-        executionRuntime: "debug",
         executionConfig: {},
       },
     });

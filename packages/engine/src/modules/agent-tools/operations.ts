@@ -38,7 +38,7 @@ const toolDescriptions: Record<ChronaToolName, string> = {
   "chrona.schedule.clear": "Clear accepted schedule state.",
   "chrona.execution.read": "Read execution state summary.",
   "chrona.execution.dispatch": "Dispatch an execution lifecycle action.",
-  "chrona.node.read": "Read current execution node state.",
+  "chrona.node.read": "Read current node state or bounded semantic result content by AI-visible ref.",
   "chrona.node.complete": "Complete the current task node.",
   "chrona.node.condition_select": "Select the current condition node branch.",
   "chrona.node.block": "Block the current execution node.",
@@ -384,8 +384,15 @@ function taskIdFromResult(result: unknown) {
   return typeof task.id === "string" ? task.id : undefined;
 }
 
+const AI_VISIBLE_READ_RESULT_TOOLS = new Set<ChronaToolName>([
+  "chrona.goal.results.read",
+  "chrona.plan.read",
+  "chrona.execution.read",
+  "chrona.node.read",
+]);
+
 function acceptedStateFor(toolName: ChronaToolName, state: Record<string, unknown>, result: unknown) {
-  return toolName === "chrona.goal.results.read" ? { ...state, result } : state;
+  return AI_VISIBLE_READ_RESULT_TOOLS.has(toolName) ? { ...state, result } : state;
 }
 
 function ensureExpectedState(operation: ChronaToolOperation, state: Record<string, unknown>) {

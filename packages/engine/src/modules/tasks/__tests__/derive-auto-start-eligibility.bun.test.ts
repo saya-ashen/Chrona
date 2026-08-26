@@ -9,8 +9,10 @@ import {
 function makeTask(overrides: Partial<TaskLike> = {}): TaskLike {
   return {
     status: "Ready",
-    executionRuntime: "hermes",
     hasAcceptedPlan: true,
+    providerId: "provider-1",
+    providerName: "OMP",
+    providerConfigured: true,
     ...overrides,
   };
 }
@@ -83,7 +85,7 @@ describe("deriveAutoStartEligibility", () => {
       expect(result.ok).toBe(true);
     });
 
-    it("returns ok when task status is Draft but runtime and accepted plan are ready", () => {
+    it("returns ok when task status is Draft and provider plus accepted plan are ready", () => {
       const result = deriveAutoStartEligibility({
         task: makeTask({ status: "Draft" }),
         workBlock: makeWorkBlock(),
@@ -202,36 +204,15 @@ describe("deriveAutoStartEligibility", () => {
     });
   });
 
-  describe("not eligible — no_runtime_config", () => {
-    it("prioritizes a missing execution runtime over provider readiness", () => {
+  describe("not eligible — no_provider_config", () => {
+    it("rejects tasks without an AI provider", () => {
       const result = deriveAutoStartEligibility({
-        task: makeTask({ executionRuntime: null }),
+        task: makeTask({ providerId: null, providerName: null }),
         workBlock: makeWorkBlock(),
         now,
         activeRun: null,
       });
-      expect(result).toMatchObject({
-        ok: false,
-        reason: "no_runtime_config",
-        disabledReason: "Choose an execution runtime before automatic execution can start.",
-      });
-    });
-  });
-
-
-  describe("not eligible — no_runtime_config", () => {
-    it("rejects tasks without an execution runtime after provider readiness succeeds", () => {
-      const result = deriveAutoStartEligibility({
-        task: makeTask({
-          executionRuntime: null,
-          providerId: "provider-1",
-          providerName: "Hermes",
-        }),
-        workBlock: makeWorkBlock(),
-        now,
-        activeRun: null,
-      });
-      expect(result).toMatchObject({ ok: false, reason: "no_runtime_config" });
+      expect(result).toMatchObject({ ok: false, reason: "no_provider_config" });
     });
   });
 

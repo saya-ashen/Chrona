@@ -60,6 +60,25 @@ describe("AI client safety", () => {
 		).toContainEqual(expect.objectContaining({ key: "debug" }));
 	});
 
+	it("does not reflect query credentials from legacy Hermes records", async () => {
+		const legacy = await db.aiClient.create({
+			data: {
+				name: "Legacy Hermes",
+				type: "hermes",
+				config: { baseUrl: "https://hermes.example.test/?client_secret=do-not-return" },
+				enabled: true,
+				isDefault: false,
+			},
+		});
+
+		const response = await app().request("http://local/api/ai/clients");
+		expect(response.status).toBe(200);
+		const body = (await response.json()) as { clients: Array<{ id: string; config: Record<string, unknown> }> };
+		const client = body.clients.find((entry) => entry.id === legacy.id);
+		expect(client?.config.baseUrl).toBeUndefined();
+		expect(JSON.stringify(body)).not.toContain("do-not-return");
+	});
+
 	it("[AISET-011] deleting a bound default client promotes a fallback and removes bindings", async () => {
 		const defaultResponse = await createClient({
 			name: "Default client",

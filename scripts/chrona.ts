@@ -123,6 +123,7 @@ export const COMMANDS: Record<string, CommandGroup> = {
         bunStep("lint ratchet", ["run", "scripts/lint-ratchet.ts"]),
         dependencyCruiserStep("boundaries"),
         bunStep("ui foundation", ["run", "scripts/check-ui-foundation.mjs"]),
+        bunStep("release consistency", ["run", "scripts/check-release-consistency.ts"]),
       ],
     },
     types: {
@@ -135,6 +136,7 @@ export const COMMANDS: Record<string, CommandGroup> = {
     lint: { description: "ESLint changed-file zero-warning ratchet", steps: [bunStep("lint ratchet", ["run", "scripts/lint-ratchet.ts"], true)] },
     boundaries: { description: "Package and feature boundary checks", steps: [dependencyCruiserStep("boundaries", true)] },
     ui: { description: "UI foundation rules", steps: [bunStep("ui foundation", ["run", "scripts/check-ui-foundation.mjs"], true)] },
+    release: { description: "Release/tag/package/migration consistency", steps: [bunStep("release consistency", ["run", "scripts/check-release-consistency.ts"], true)] },
   },
   test: TEST_COMMANDS,
   db: {

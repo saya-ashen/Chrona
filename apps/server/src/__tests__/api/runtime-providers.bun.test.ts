@@ -39,13 +39,28 @@ describe("GET /api/runtime/providers", () => {
     expect(codex?.label).toBe("Codex");
   });
 
-  it("exposes Oh My Pi runtime with a human label", async () => {
+  it("lists OMP first as the stable provider with its safe terminal-only bindings", async () => {
     const res = await app().request("http://local/api/runtime/providers");
     expect(res.status).toBe(200);
-    const body = (await res.json()) as { providers: Array<{ key: string; label: string }> };
+    const body = (await res.json()) as {
+      providers: Array<{ key: string; label: string; tier: string; features: string[] }>;
+    };
     const omp = body.providers.find((p) => p.key === "omp");
-    expect(omp).toBeDefined();
-    expect(omp?.label).toBe("Oh My Pi");
+    expect(body.providers[0]?.key).toBe("omp");
+    expect(omp).toMatchObject({
+      label: "Oh My Pi",
+      tier: "stable",
+      features: expect.arrayContaining(["task.plan", "task.execution", "dashboard.brief", "goal.review"]),
+    });
+  });
+
+  it("hides planning and Goal review from providers without safe Feature Runtime recovery", async () => {
+    const res = await app().request("http://local/api/runtime/providers");
+    const body = (await res.json()) as { providers: Array<{ key: string; features: string[] }> };
+    for (const provider of body.providers.filter((entry) => entry.key === "claude_code" || entry.key === "codex")) {
+      expect(provider.features).not.toContain("task.plan");
+      expect(provider.features).not.toContain("goal.review");
+    }
   });
 
   it("hides the debug provider when no env flag is set", async () => {

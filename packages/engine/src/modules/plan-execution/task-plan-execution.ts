@@ -33,6 +33,7 @@ import { getCurrentExecution as readCurrentExecution } from "./use-cases/get-cur
 import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
 import { assertSchedulerWorkOwnership, type SchedulerWorkContext } from "@/modules/orchestration/scheduler-lease-repository";
 import { runWithSchedulerWorkContext } from "@/modules/orchestration/scheduler-work-context";
+import { validateManualCompletionSubmission } from "./manual-completion-submission";
 
 export { getCurrentExecution } from "./use-cases/get-current-execution";
 export { submitTerminalNodeResult } from "./use-cases/submit-terminal-node-result";
@@ -179,6 +180,7 @@ function commandForExecutionAction(
         kind: "done",
         summary: action.summary,
         output: action.output,
+        inputFields: action.inputFields,
         evidence: sessionId ? { sessionId } : undefined,
         selectedBranch: action.selectedBranch,
         branchRef: action.branchRef,
@@ -332,6 +334,35 @@ async function bindCurrentTerminalAttempt(
   return { ...terminalCommand, expectedAttemptId: attempt.id };
 }
 
+async function normalizeManualCompletionAction(
+  taskId: string,
+  action: ExecutionActionWithContinuation,
+  contextSessionId?: string | null,
+): Promise<ExecutionActionWithContinuation> {
+  if (action.action !== "complete_manual_node") return action;
+  const sessionScope = contextSessionId
+    ? await db.executionSession.findFirst({ where: { id: contextSessionId, taskId }, select: { workBlockId: true } })
+    : null;
+  const current = await readCurrentExecution({
+    taskId,
+    workBlockId: sessionScope?.workBlockId ?? null,
+  });
+  if (current.checkpoint?.kind !== "manual_completion") return action;
+  if (!current.checkpoint.form) {
+    throw new EngineError(ENGINE_ERROR_CODES.CONFLICT, "Manual completion checkpoint has no validated form");
+  }
+  const submission = validateManualCompletionSubmission({
+    form: current.checkpoint.form,
+    payload: { formRevision: action.formRevision, inputFields: action.inputFields },
+  });
+  return {
+    ...action,
+    summary: submission.summary,
+    inputFields: submission.inputFields,
+    output: { inputFields: submission.inputFields },
+  };
+}
+
 export async function dispatchExecutionAction(
   input: {
     taskId: string;
@@ -339,7 +370,12 @@ export async function dispatchExecutionAction(
     commandContext?: ExecutionDispatchContext;
   } & PlanExecutionObserver,
 ): Promise<PlanExecutionResult> {
-  const { command: requestedCommand, context } = commandForExecutionAction(input.action, input.commandContext?.sessionId);
+  const normalizedAction = await normalizeManualCompletionAction(
+    input.taskId,
+    input.action,
+    input.commandContext?.sessionId,
+  );
+  const { command: requestedCommand, context } = commandForExecutionAction(normalizedAction, input.commandContext?.sessionId);
   const command = await bindCurrentTerminalAttempt(input.taskId, requestedCommand, context);
   return executeCommand({
     taskId: input.taskId,

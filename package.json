@@ -44,6 +44,7 @@
     "smoke:entrypoints": "bun run scripts/smoke-entrypoints.ts",
     "map:check": "bun run scripts/build-feature-test-map.ts --check",
     "check:ui-foundation": "bun run scripts/check-ui-foundation.mjs",
+    "check:release-consistency": "bun run scripts/check-release-consistency.ts",
     "analyze": "bun run chrona check all",
     "test": "bun run chrona test all",
     "test:ci": "bun run chrona test ci",
@@ -67,6 +68,8 @@
     "ci:local": "bun run scripts/local-ci.ts",
     "hooks:install": "bun run scripts/install-git-hooks.ts",
     "build:smoke": "bun run chrona build smoke",
+    "release:upgrade-smoke": "bun run scripts/release-upgrade-smoke.ts",
+    "release:windows-acl-smoke": "bun run scripts/windows-private-storage-smoke.ts",
     "audit:security": "bun run scripts/audit-security.ts"
   },
   "dependencies": {

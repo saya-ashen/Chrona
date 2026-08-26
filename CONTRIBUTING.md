@@ -57,7 +57,6 @@ Chrona is a Vite + Hono monorepo:
 | `packages/db/` | Prisma bootstrap and repositories |
 | `packages/engine/` | Business use cases for tasks, plans, execution, scheduling, projections, and AI clients |
 | `packages/graph-runtime/` | Plan graph build, resolve, transition, and command execution primitives |
-| `packages/runtime-core/` | Shared runtime contracts and helpers |
 | `packages/providers/foundation/` | Provider-neutral client contracts |
 | `packages/providers/hermes/` | Hermes provider adapter |
 
@@ -176,7 +175,7 @@ include video recording, fixed viewports, long waits, or real AI calls — none 
 which belong in a CI pipeline that should be fast, deterministic, and
 self-contained.
 
-## Adding an AI Runtime Adapter
+## Adding an AI Provider Adapter
 
 1. Create provider code in a concrete package under `packages/providers/`.
 2. Keep protocol-specific transport and event normalization inside that package.

@@ -311,7 +311,6 @@ async function createNextTask(input: {
       artifactContext(input.context),
     ].join("\n").slice(0, 10_000),
     priority: input.context.task.priority,
-    executionRuntime: input.context.task.executionRuntime,
     executionConfig: input.context.task.executionConfig,
     aiClientId: input.context.task.aiClientId,
     parentTaskId: input.context.task.id,
@@ -475,7 +474,7 @@ export async function getTaskResultFollowUpState(taskId: string) {
     acceptedAt: context.acceptance.acceptedAt,
     sourceSession: {
       available,
-      provider: client?.record.type ?? context.task.executionRuntime,
+      provider: client?.record.type ?? "unconfigured",
       health,
       supportsFork: Boolean(available && capabilities?.fork),
       supportsHandoff: Boolean(

@@ -38,7 +38,6 @@ async function createRecurringTaskWithOccurrences(input: {
       title: "SSR scope probe",
       status: taskRowStatus,
       priority: "Medium",
-      executionRuntime: "hermes",
       executionConfig: {},
       recurrenceRule: input.rrule,
       recurrenceAnchorStartAt: input.anchor,

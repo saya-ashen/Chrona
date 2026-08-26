@@ -405,7 +405,6 @@ export async function runTaskNodeFeature(
       expectedExecutionSessionId: input.executionSessionId ?? "",
       workBlockId: input.workBlockId ?? null,
       taskSessionId: input.mainSession.id,
-      runtimeName: input.runtimeName,
       runtimeSessionKey: input.mainSession.sessionKey,
       nodeContext: {
         nodeId: input.node.id,

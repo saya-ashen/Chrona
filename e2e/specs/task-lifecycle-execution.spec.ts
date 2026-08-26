@@ -12,6 +12,7 @@ import {
 	generateTaskWorkspacePlan,
 	setTaskWorkspaceViewport,
 	triggerOrchestratorTick,
+	removeWorkspaceE2eAiClients,
 	type TaskWorkspaceViewport,
 } from "./task-workspace-test-helpers";
 import {
@@ -32,7 +33,12 @@ async function expectDialogFocusContained(page: Page, dialog: Locator) {
 type ExecutionCurrentBody = {
 	status?: string;
 	currentNodeId?: string | null;
-	checkpoint?: { id?: string; type?: string } | null;
+	checkpoint?: {
+		id?: string;
+		type?: string;
+		kind?: string;
+		form?: { revision?: string } | null;
+	} | null;
 	planOutput?: {
 		manifest?: { sourceRevision?: number };
 		finalizedResult?: {
@@ -88,7 +94,7 @@ async function bindAllDebugFeatures(
 	request: APIRequestContext,
 	taskId: string,
 	profile: "deterministic" | "tool-submit" = "deterministic",
-): Promise<void> {
+): Promise<string> {
 	const createRes = await request.post("/api/ai/clients", {
 		data: {
 			name: `E2E Lifecycle Debug Client ${taskId}`,
@@ -105,6 +111,7 @@ async function bindAllDebugFeatures(
 	const bindRes = await request.put(`/api/ai/clients/${clientId}/bindings`, {
 		data: {
 			features: [
+				"task.execution",
 				"execute_task_node",
 				"evaluate_condition_node",
 				"review_checkpoint_node",
@@ -112,6 +119,11 @@ async function bindAllDebugFeatures(
 		},
 	});
 	expect(bindRes.ok()).toBeTruthy();
+	const taskBinding = await request.patch(`/api/tasks/${taskId}`, {
+		data: { aiClientId: clientId },
+	});
+	expect(taskBinding.ok()).toBeTruthy();
+	return clientId!;
 }
 
 /** Poll execution/current until predicate passes, returning the matching body. */
@@ -194,11 +206,12 @@ async function postCheckpointAction(
  * status at each one. The durable mock plan deterministically yields:
  *   input checkpoint (waiting_for_user)
  *     → approval checkpoint (waiting_for_approval)
- *     → manual node (blocked)  → Completed.
+ *     → manual node (WaitingForInput/manual_completion) → Completed.
  */
 async function resolveDebugPlanGates(
 	request: APIRequestContext,
 	taskId: string,
+	beforeManualCompletion?: () => Promise<void>,
 ): Promise<void> {
 	let inputCheckpointId: string | undefined;
 	await test.step("Resolve input checkpoint (submit_input)", async () => {
@@ -266,10 +279,11 @@ async function resolveDebugPlanGates(
 	});
 
 	await test.step("Resolve manual node (mark_node_completed)", async () => {
+		await beforeManualCompletion?.();
 		const exec = await pollExecution(
 			request,
 			taskId,
-			(body) => body.status === "blocked" && !!body.checkpoint?.id,
+			(body) => body.status === "waiting_for_user" && body.checkpoint?.kind === "manual_completion" && !!body.checkpoint.form?.revision,
 			40_000,
 		);
 		await postCheckpointAction(
@@ -278,12 +292,9 @@ async function resolveDebugPlanGates(
 			exec.checkpoint!.id!,
 			"mark_node_completed",
 			{
-				root: "root",
-				elements: {
-					root: {
-						type: "Text",
-						props: { value: "Manual review completed by e2e lifecycle" },
-					},
+				formRevision: exec.checkpoint!.form!.revision,
+				inputFields: {
+					reviewSummary: "Manual review completed by e2e lifecycle",
 				},
 			},
 		);
@@ -291,6 +302,10 @@ async function resolveDebugPlanGates(
 }
 
 test.describe("Task create → plan → run → result", () => {
+	test.afterEach(async ({ request }) => {
+		await removeWorkspaceE2eAiClients(request);
+	});
+
 	test("updates header actions after clicking Accept plan and Start without reload", async ({
 		page,
 		request,
@@ -469,7 +484,18 @@ test.describe("Task create → plan → run → result", () => {
 					"task.plan",
 					"task.result_finalization",
 				]);
-				await bindAllDebugFeatures(request, taskId);
+				const debugClientId = await bindAllDebugFeatures(request, taskId);
+				const taskBinding = await request.patch(`/api/tasks/${taskId}`, {
+					data: { aiClientId: debugClientId },
+				});
+				expect(taskBinding.ok()).toBeTruthy();
+				// A stale global binding must not override this task's explicit client.
+				await bindTaskPlanProvider(
+					request,
+					"stale-unrelated-task-execution-binding",
+					"http://127.0.0.1:1",
+					["task.execution"],
+				);
 				await page.reload();
 
 				await page.getByRole("button", { name: /^Generate plan$/ }).click();
@@ -575,14 +601,21 @@ test.describe("Task create → plan → run → result", () => {
 				await page.goto(TASK_URL(taskId));
 				await dismissTaskEditorIfOpen(page);
 				const manualResult = page.getByRole("textbox", {
-					name: "Mark completed",
+					name: "Review summary",
 				});
 				await expect(manualResult).toBeVisible({ timeout: 30_000 });
 				await expect
 					.poll(async () => (await getCurrentExecution(request, taskId)).status)
-					.toBe("blocked");
+					.toBe("waiting_for_user");
+				// The explicit debug selection proved task execution cannot be hijacked;
+				// clear it before result finalization so the dedicated plan client owns
+				// that separate Feature Runtime capability.
+				const clearTaskExecutionClient = await request.patch(`/api/tasks/${taskId}`, {
+					data: { aiClientId: null },
+				});
+				expect(clearTaskExecutionClient.ok()).toBeTruthy();
 				await manualResult.fill("Manual review completed by browser E2E");
-				await page.getByRole("button", { name: "Mark completed" }).click();
+				await page.getByRole("button", { name: "Complete and continue" }).click();
 
 				await expect(
 					page.getByRole("heading", {
@@ -867,7 +900,13 @@ test.describe("Task create → plan → run → result", () => {
 					page.getByRole("textbox", { name: "Scenario label" }),
 				).toBeVisible();
 
-				await resolveDebugPlanGates(request, task.taskId);
+				await resolveDebugPlanGates(request, task.taskId, async () => {
+					const clearExecutionClient = await request.patch(
+						`/api/tasks/${task.taskId}`,
+						{ data: { aiClientId: null } },
+					);
+					expect(clearExecutionClient.ok()).toBeTruthy();
+				});
 
 				await expect
 					.poll(
@@ -888,7 +927,6 @@ test.describe("Task create → plan → run → result", () => {
 			await test.step("Accept the result through the workspace UI", async () => {
 				const beforeBody = await getCurrentExecution(request, task.taskId);
 				expect(beforeBody.status).toBe("completed");
-
 				await page.goto(WORK_URL(task.taskId));
 				await dismissTaskEditorIfOpen(page);
 				await expect(
@@ -1110,6 +1148,10 @@ test.describe("Task create → plan → run → result", () => {
 
 		const provider = await startMockTaskPlanProvider();
 		try {
+			const clearExecutionClient = await request.patch(`/api/tasks/${task.taskId}`, {
+				data: { aiClientId: null },
+			});
+			expect(clearExecutionClient.ok()).toBeTruthy();
 			await bindTaskPlanProvider(request, task.taskId, provider.baseUrl, [
 				"task.result_finalization",
 			]);
@@ -1157,18 +1199,26 @@ test.describe("Task create → plan → run → result", () => {
 		);
 		test.setTimeout(120_000);
 
-		await bindTaskPlanProvider(
+		const failedProviderClientId = await bindTaskPlanProvider(
 			request,
 			"run-014-provider-failure",
 			"http://127.0.0.1:1",
-			["execute_task_node", "evaluate_condition_node", "review_checkpoint_node"],
-			true,
+			[
+				"task.execution",
+				"execute_task_node",
+				"evaluate_condition_node",
+				"review_checkpoint_node",
+			],
 		);
 		const taskTitle = `E2E Provider Failure ${Date.now()}`;
 		const task = await createTaskWorkspaceTask(request, {
 			title: taskTitle,
 			description: "Expose a deterministic provider failure in the workspace.",
 		});
+		const failedTaskBinding = await request.patch(`/api/tasks/${task.taskId}`, {
+			data: { aiClientId: failedProviderClientId },
+		});
+		expect(failedTaskBinding.ok()).toBeTruthy();
 		await generateTaskWorkspacePlan(request, task.taskId);
 		await dispatchWorkspaceCommand(request, task.taskId, {
 			type: "execution.action",
@@ -1257,7 +1307,7 @@ test.describe("Task create → plan → run → result", () => {
 			.not.toBe("failed");
 	});
 
-	test("[RUN-012/RUN-015] keeps pause, resume, retry, and stop projections stable", async ({
+	test("[RUN-012/RUN-015] keeps pause, resume, manual-input, and stop projections stable", async ({
 		page,
 		request,
 	}, testInfo) => {
@@ -1352,31 +1402,17 @@ test.describe("Task create → plan → run → result", () => {
 			"approve_result",
 			{ feedback: "Approve before testing blocked-node retry." },
 		);
-		const blocked = await pollExecution(
+		const manualCompletion = await pollExecution(
 			request,
 			task.taskId,
-			(body) => body.status === "blocked" && body.currentNodeId !== firstNodeId,
+			(body) => body.status === "waiting_for_user" && body.checkpoint?.kind === "manual_completion" && body.currentNodeId !== firstNodeId,
 		);
 
 		await page.goto(TASK_URL(task.taskId));
 		await dismissTaskEditorIfOpen(page);
-		const retryNode = page.getByRole("button", { name: "Retry node" });
-		await expect(retryNode).toBeVisible({ timeout: 20_000 });
-		const retryResponsePromise = page.waitForResponse(
-			(response) =>
-				response.url().includes(`/api/work/${task.taskId}/commands`) &&
-				response.request().method() === "POST" &&
-				response.request().postData()?.includes('"action":"retry_node"') === true,
-		);
-		await retryNode.click();
-		const retryResponse = await retryResponsePromise;
-		expect(retryResponse.ok()).toBeTruthy();
-		await pollExecution(
-			request,
-			task.taskId,
-			(body) =>
-				body.status === "blocked" && body.currentNodeId === blocked.currentNodeId,
-		);
+		await expect(page.getByRole("button", { name: "Retry node" })).toHaveCount(0);
+		await expect(page.getByRole("button", { name: "Complete and continue" })).toBeVisible({ timeout: 20_000 });
+		expect(manualCompletion.currentNodeId).toBeTruthy();
 
 		const cancelCommandKey = `controls-stop-${task.taskId}`;
 		await dispatchWorkspaceCommand(request, task.taskId, {

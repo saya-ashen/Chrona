@@ -15,6 +15,7 @@
     "@chrona/db": "workspace:*",
     "@chrona/integrations": "workspace:*",
     "@chrona/logging": "workspace:*",
+    "@chrona/providers-foundation": "workspace:*",
     "@chrona/engine": "workspace:*"
   }
 }

@@ -19,7 +19,7 @@ export type CreatedTaskWorkspaceTask = {
 export async function bindTaskDebugExecutionFeatures(
   request: APIRequestContext,
   taskId: string,
-): Promise<void> {
+): Promise<string> {
   const createResponse = await request.post("/api/ai/clients", {
     data: {
       name: `E2E Debug Client ${taskId}`,
@@ -38,6 +38,7 @@ export async function bindTaskDebugExecutionFeatures(
     {
       data: {
         features: [
+          "task.execution",
           "execute_task_node",
           "evaluate_condition_node",
           "review_checkpoint_node",
@@ -46,6 +47,39 @@ export async function bindTaskDebugExecutionFeatures(
     },
   );
   expect(bindResponse.ok()).toBeTruthy();
+
+  const taskBinding = await request.patch(`/api/tasks/${taskId}`, {
+    data: { aiClientId: clientId },
+  });
+  expect(taskBinding.ok()).toBeTruthy();
+  return clientId!;
+}
+
+const E2E_AI_CLIENT_PREFIXES = [
+  "E2E Durable Plan Client ",
+  "E2E Debug Client ",
+  "E2E Lifecycle Debug Client ",
+  "E2E Auto-Exec Debug Client ",
+] as const;
+
+/** Remove provider records created by workspace E2E specs from the shared DB. */
+export async function removeWorkspaceE2eAiClients(
+  request: APIRequestContext,
+): Promise<void> {
+  const listResponse = await request.get("/api/ai/clients");
+  expect(listResponse.ok()).toBeTruthy();
+  const { clients = [] } = (await listResponse.json()) as {
+    clients?: Array<{ id?: string; name?: string }>;
+  };
+  for (const client of clients) {
+    if (
+      !client.id ||
+      !E2E_AI_CLIENT_PREFIXES.some((prefix) => client.name?.startsWith(prefix))
+    )
+      continue;
+    const deleteResponse = await request.delete(`/api/ai/clients/${client.id}`);
+    expect(deleteResponse.ok()).toBeTruthy();
+  }
 }
 
 /**
@@ -161,8 +195,9 @@ export async function generateTaskWorkspaceDraftPlan(
   taskId: string,
 ): Promise<GeneratedTaskWorkspaceDraft> {
   const provider = await startMockTaskPlanProvider();
+  let providerClientId: string | null = null;
   try {
-    await bindTaskPlanProvider(request, taskId, provider.baseUrl);
+    providerClientId = await bindTaskPlanProvider(request, taskId, provider.baseUrl);
     const workBlockId = await taskWorkBlockId(request, taskId);
 
     const generationResponse = await request.post(
@@ -231,6 +266,10 @@ export async function generateTaskWorkspaceDraftPlan(
     return { planId, expectedHeadStateVersion, workBlockId };
   } finally {
     await provider.stop();
+    if (providerClientId) {
+      const deleteResponse = await request.delete(`/api/ai/clients/${providerClientId}`);
+      expect(deleteResponse.ok()).toBeTruthy();
+    }
   }
 }
 

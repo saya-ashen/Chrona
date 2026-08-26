@@ -1,12 +1,18 @@
+import { chmodSync, mkdirSync, mkdtempSync, rmSync, statSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, expect, it } from "bun:test";
 
 import {
   assertSafeTestDatabaseUrl,
+  ensureSqliteParentDir,
   isInMemorySqliteUrl,
   isSafeTestDatabaseUrl,
   resolveRuntimeDatabaseUrl,
+  resolveSqliteAdapterUrl,
   sqlitePathFromFileUrl,
 } from "./sqlite-url";
+import { buildWindowsPrivateAclCommand, parseWindowsAclAudit, windowsAclIsPrivate } from "./windows-private-storage";
 
 describe("sqlite url helpers", () => {
   it("uses explicit DATABASE_URL first", () => {
@@ -47,6 +53,36 @@ describe("sqlite url helpers", () => {
     expect(sqlitePathFromFileUrl("file:./.tmp/bun-test.db?connection_limit=1")).toBe("./.tmp/bun-test.db");
     expect(sqlitePathFromFileUrl("file:/data/chrona.db")).toBe("/data/chrona.db");
     expect(sqlitePathFromFileUrl("postgres://localhost/db")).toBeNull();
+  });
+
+  it("normalizes file URL query parameters for the SQLite adapter", () => {
+    expect(resolveSqliteAdapterUrl("file:/data/chrona.db?connection_limit=1")).toBe("file:/data/chrona.db");
+    expect(resolveSqliteAdapterUrl("file::memory:")).toBe("file::memory:");
+  });
+
+  it("does not chmod an existing selected SQLite parent", () => {
+    const directory = mkdtempSync(join(tmpdir(), "chrona-sqlite-parent-"));
+    const selectedParent = join(directory, "existing");
+    try {
+      mkdirSync(selectedParent, { mode: 0o700 });
+      if (process.platform !== "win32") chmodSync(selectedParent, 0o755);
+
+      ensureSqliteParentDir(`file:${join(selectedParent, "chrona.db")}`);
+
+      if (process.platform !== "win32") expect(statSync(selectedParent).mode & 0o777).toBe(0o755);
+    } finally {
+      rmSync(directory, { recursive: true, force: true });
+    }
+  });
+
+  it("builds and validates locale-independent Windows owner-only ACL commands", () => {
+    expect(buildWindowsPrivateAclCommand("C:\\Chrona\\data", "S-1-5-21-100", true)).toEqual({
+      command: "icacls.exe",
+      args: ["C:\\Chrona\\data", "/inheritance:r", "/setowner", "*S-1-5-21-100", "/grant:r", "*S-1-5-21-100:(OI)(CI)(F)", "*S-1-5-18:(OI)(CI)(F)"],
+    });
+    const audit = parseWindowsAclAudit('{"owner":"S-1-5-21-100","currentUser":"S-1-5-21-100","rules":[{"sid":"S-1-5-21-100","accessType":"Allow","rights":2032127,"inherited":false},{"sid":"S-1-5-18","accessType":"Allow","rights":2032127,"inherited":false}]}');
+    expect(windowsAclIsPrivate(audit)).toBe(true);
+    expect(windowsAclIsPrivate({ ...audit, rules: [...audit.rules, { sid: "S-1-1-0", accessType: "Allow", rights: 1, inherited: false }] })).toBe(false);
   });
 
   it("detects in-memory urls", () => {

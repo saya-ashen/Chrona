@@ -113,6 +113,7 @@ describe("chrona CLI database recovery commands", () => {
     const directory = mkdtempSync(join(tmpdir(), "chrona-cli-recovery-"));
     const databasePath = join(directory, "chrona.db");
     const backupPath = join(directory, "backup.db");
+    const originalDatabaseUrl = process.env.DATABASE_URL;
     process.env.DATABASE_URL = `file:${databasePath}`;
 
     try {
@@ -133,6 +134,11 @@ describe("chrona CLI database recovery commands", () => {
       expect(restored.query('SELECT "value" FROM "Example"').get()).toEqual({ value: "before" });
       restored.close();
     } finally {
+      if (originalDatabaseUrl === undefined) {
+        delete process.env.DATABASE_URL;
+      } else {
+        process.env.DATABASE_URL = originalDatabaseUrl;
+      }
       rmSync(directory, { recursive: true, force: true });
     }
   });

@@ -43,7 +43,7 @@ describe("runGraphAdvancementWorker", () => {
 
   it("starts queued tasks without active runs and records advancement", async () => {
     const workspace = await db.workspace.create({
-      data: { name: "Advance Worker", status: "Active", defaultRuntime: "hermes" },
+      data: { name: "Advance Worker", status: "Active" },
     });
     const task = await db.task.create({
       data: {
@@ -51,7 +51,6 @@ describe("runGraphAdvancementWorker", () => {
         title: "Advance task",
         status: "Queued",
         priority: "High",
-        executionRuntime: "hermes",
         executionConfig: { prompt: "Run" },
       },
     });
@@ -96,7 +95,7 @@ describe("runGraphAdvancementWorker", () => {
 
   it("does not auto-advance blocked tasks awaiting manual action", async () => {
     const workspace = await db.workspace.create({
-      data: { name: "Blocked Advance Worker", status: "Active", defaultRuntime: "hermes" },
+      data: { name: "Blocked Advance Worker", status: "Active" },
     });
     const task = await db.task.create({
       data: {
@@ -104,7 +103,6 @@ describe("runGraphAdvancementWorker", () => {
         title: "Blocked task",
         status: "Running",
         priority: "High",
-        executionRuntime: "hermes",
         executionConfig: { prompt: "Run" },
       },
     });
@@ -140,7 +138,7 @@ describe("runGraphAdvancementWorker", () => {
 
   it("does not auto-advance stopped tasks", async () => {
     const workspace = await db.workspace.create({
-      data: { name: "Stopped Advance Worker", status: "Active", defaultRuntime: "hermes" },
+      data: { name: "Stopped Advance Worker", status: "Active" },
     });
     const task = await db.task.create({
       data: {
@@ -148,7 +146,6 @@ describe("runGraphAdvancementWorker", () => {
         title: "Stopped task",
         status: "Running",
         priority: "High",
-        executionRuntime: "hermes",
         executionConfig: { prompt: "Run" },
       },
     });
@@ -184,7 +181,7 @@ describe("runGraphAdvancementWorker", () => {
 
   it("does not auto-advance a task with an active execution owner", async () => {
     const workspace = await db.workspace.create({
-      data: { name: "Owned Advance Worker", status: "Active", defaultRuntime: "hermes" },
+      data: { name: "Owned Advance Worker", status: "Active" },
     });
     const task = await db.task.create({
       data: {
@@ -192,7 +189,6 @@ describe("runGraphAdvancementWorker", () => {
         title: "Owned task",
         status: "Running",
         priority: "High",
-        executionRuntime: "hermes",
         executionConfig: { prompt: "Run" },
       },
     });
@@ -236,7 +232,7 @@ describe("runGraphAdvancementWorker", () => {
   });
   it("does not report graph advancement after its lease is taken over during start", async () => {
     const workspace = await db.workspace.create({
-      data: { name: "Stale graph worker", status: "Active", defaultRuntime: "hermes" },
+      data: { name: "Stale graph worker", status: "Active" },
     });
     const task = await db.task.create({
       data: {
@@ -244,7 +240,6 @@ describe("runGraphAdvancementWorker", () => {
         title: "Takeover task",
         status: "Queued",
         priority: "High",
-        executionRuntime: "hermes",
         executionConfig: { prompt: "Run" },
       },
     });

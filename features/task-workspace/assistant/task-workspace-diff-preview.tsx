@@ -14,7 +14,6 @@ type EditableTask = {
   scheduledStartAt: string | null;
   scheduledEndAt: string | null;
   scheduleStatus: string;
-  executionRuntime: string;
   executionConfig: unknown;
 };
 

@@ -2,8 +2,12 @@ import type { ChronaToolOperation } from "@chrona/contracts";
 import { db } from "@/lib/db";
 import type { AgentToolOperationsDeps, ToolAuditContext } from "./types";
 import { requireIdempotencyKey, requireTaskId, requireWorkspaceId } from "./input-guards";
-import { readAiExecutionView } from "./ai-execution-view";
+import { readAiExecutionView, readAiNodeView, type AiNodeReadInput } from "./ai-execution-view";
 import { submitNodeResultActionFromTool } from "./node-result-action";
+import {
+  resolveTaskExecutionProviderSelection,
+  unresolvedTaskProviderName,
+} from "@/modules/ai";
 
 export function toolCommandContext(operation: ChronaToolOperation, audit?: ToolAuditContext | null) {
   return {
@@ -117,7 +121,10 @@ export async function executeValidatedTool(
         action: payload as Parameters<typeof deps.execution.dispatch>[0]["action"],
       });
     case "chrona.node.read":
-      return readAiExecutionView(await deps.tasks.getPage({ taskId: requireTaskId(input) }));
+      return readAiNodeView(
+        await deps.tasks.getPage({ taskId: requireTaskId(input) }),
+        payload as AiNodeReadInput,
+      );
     case "chrona.node.complete":
     case "chrona.node.condition_select":
     case "chrona.node.wait_complete":
@@ -140,6 +147,7 @@ export async function executeValidatedTool(
   }
 }
 
+// eslint-disable-next-line complexity -- Creation-session provenance must fail closed with task/provider ownership.
 async function createTaskForTool(
   deps: AgentToolOperationsDeps,
   input: ChronaToolOperation["input"],
@@ -155,12 +163,18 @@ async function createTaskForTool(
     if (!existingSession) {
       const task = await db.task.findUnique({
         where: { id: result.taskId },
-        select: { title: true, executionRuntime: true },
+        select: { title: true, aiClientId: true },
+      });
+      const provider = await resolveTaskExecutionProviderSelection({
+        aiClientId: task?.aiClientId,
       });
       await db.taskSession.create({
         data: {
           taskId: result.taskId,
-          runtimeName: task?.executionRuntime ?? "unknown",
+          runtimeName: provider?.providerName ?? unresolvedTaskProviderName(),
+          providerClientId: provider?.clientId ?? null,
+          providerName: provider?.providerName ?? null,
+          providerConfigFingerprint: provider?.configFingerprint ?? null,
           sessionKey: sessionId,
           label: `${task?.title ?? "Task"} · Creation session`,
           createdByFramework: true,

@@ -147,10 +147,6 @@ test.describe("P0 scenario gaps", () => {
 		await dialog.getByPlaceholder("Add description").fill(description);
 		await dialog.getByRole("button", { name: "High" }).click();
 		await dialog.getByLabel("Due date (optional)").fill(dueAt);
-		const runtime = dialog.getByRole("combobox");
-		await expect(runtime).toBeVisible();
-		await expect(runtime).not.toHaveText("");
-
 		const createdResponse = page.waitForResponse(
 			(response) =>
 				response.url().includes("/api/tasks") &&
@@ -186,7 +182,7 @@ test.describe("P0 scenario gaps", () => {
 		await expect(editor.locator('input[name="dueAt"]')).toHaveValue(dueAt);
 		await expect(
 			editor.locator('input[name="executionRuntime"]'),
-		).not.toHaveValue("");
+		).toHaveCount(0);
 	});
 
 	test("TASK-045 cancel delete and TASK-046 confirm delete", async ({

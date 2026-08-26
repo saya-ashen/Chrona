@@ -50,8 +50,8 @@ export function decideNodeExecutionSession(input: SessionPolicyInput): NodeSessi
 
   if (isUserTask(node)) {
     return {
-      kind: "wait_for_user",
-      reason: `Node ${node.id} requires human input: ${node.title}`,
+      kind: "manual_only",
+      reason: `Node ${node.id} is performed by the user`,
     };
   }
 

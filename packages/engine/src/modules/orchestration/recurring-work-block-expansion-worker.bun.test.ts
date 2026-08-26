@@ -24,7 +24,7 @@ describe("runRecurringWorkBlockExpansionWorker", () => {
 
   it("does not materialize recurring domain writes after ownership becomes stale mid-expansion", async () => {
     const workspace = await db.workspace.create({
-      data: { name: "Recurring expansion", status: "Active", defaultRuntime: "hermes" },
+      data: { name: "Recurring expansion", status: "Active" },
     });
     const task = await db.task.create({
       data: {
@@ -32,7 +32,6 @@ describe("runRecurringWorkBlockExpansionWorker", () => {
         title: "Daily task",
         status: "Ready",
         priority: "High",
-        executionRuntime: "hermes",
         executionConfig: { prompt: "Run" },
       },
     });
@@ -79,7 +78,7 @@ describe("runRecurringWorkBlockExpansionWorker", () => {
 
   it("materializes a new work block for the same recurrence after a trigger version changes", async () => {
     const workspace = await db.workspace.create({
-      data: { name: "Versioned recurring expansion", status: "Active", defaultRuntime: "hermes" },
+      data: { name: "Versioned recurring expansion", status: "Active" },
     });
     const task = await db.task.create({
       data: {
@@ -87,7 +86,6 @@ describe("runRecurringWorkBlockExpansionWorker", () => {
         title: "Versioned daily task",
         status: "Ready",
         priority: "High",
-        executionRuntime: "hermes",
         executionConfig: { prompt: "Run" },
       },
     });

@@ -28,6 +28,7 @@ function terminalResultCommand(action: SubmitNodeResultAction, sessionId?: strin
         kind: "done",
         summary: action.summary,
         output: action.output,
+        inputFields: action.inputFields,
         evidence: sessionId ? { sessionId } : undefined,
         selectedBranch: action.selectedBranch,
         branchRef: action.branchRef,

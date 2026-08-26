@@ -29,6 +29,42 @@ describe("getSchedulePage", () => {
     await resetDb();
   });
 
+  it("exposes configured AI clients without a task adapter catalog", async () => {
+    const workspace = await db.workspace.create({
+      data: {
+        name: "OMP runtime default",
+        status: "Active",
+      },
+    });
+    const ompClient = await db.aiClient.create({
+      data: {
+        name: "OMP",
+        type: "omp",
+        config: {},
+        isDefault: true,
+        enabled: true,
+      },
+    });
+
+    try {
+      const page = await getSchedulePage(workspace.id);
+
+      expect(page).not.toHaveProperty("defaultExecutionRuntime");
+      expect(page).not.toHaveProperty("executionRuntimes");
+      expect(page.availableAiClients).toEqual([
+        {
+          id: ompClient.id,
+          name: "OMP",
+          type: "omp",
+          isDefault: true,
+          enabled: true,
+        },
+      ]);
+    } finally {
+      await db.aiClient.delete({ where: { id: ompClient.id } });
+    }
+  });
+
   it("groups scheduled work, unscheduled work, pending AI proposals, and risks", async () => {
     const now = new Date();
     const startOfToday = new Date(now);
@@ -50,7 +86,6 @@ describe("getSchedulePage", () => {
       data: {
         name: "Schedule Query",
         status: "Active",
-        defaultRuntime: "hermes",
       },
     });
 
@@ -58,7 +93,6 @@ describe("getSchedulePage", () => {
       data: {
         name: "Other Workspace",
         status: "Active",
-        defaultRuntime: "hermes",
       },
     });
 
@@ -69,7 +103,6 @@ describe("getSchedulePage", () => {
         status: "Ready",
         priority: "High",
         dueAt: dayAfterTomorrowEighteen,
-        executionRuntime: "hermes",
         executionConfig: {},
       },
     });
@@ -81,7 +114,6 @@ describe("getSchedulePage", () => {
         status: "Ready",
         priority: "Medium",
         dueAt: todayTwenty,
-        executionRuntime: "hermes",
         executionConfig: {},
       },
     });
@@ -93,7 +125,6 @@ describe("getSchedulePage", () => {
         status: "Completed",
         priority: "Medium",
         completedAt: new Date("2026-04-15T12:30:00.000Z"),
-        executionRuntime: "hermes",
         executionConfig: {},
       },
     });
@@ -105,7 +136,6 @@ describe("getSchedulePage", () => {
         title: "Draft the follow-up outline",
         status: "Ready",
         priority: "Low",
-        executionRuntime: "hermes",
         executionConfig: {},
       },
     });
@@ -125,7 +155,6 @@ describe("getSchedulePage", () => {
         title: "Review launch checklist",
         status: "Ready",
         priority: "Low",
-        executionRuntime: "hermes",
         executionConfig: {},
       },
     });
@@ -137,7 +166,6 @@ describe("getSchedulePage", () => {
         status: "Blocked",
         priority: "Urgent",
         dueAt: todayEighteen,
-        executionRuntime: "hermes",
         executionConfig: {},
       },
     });
@@ -236,7 +264,6 @@ describe("getSchedulePage", () => {
         title: "Hidden schedule item",
         status: "Ready",
         priority: "Low",
-        executionRuntime: "hermes",
         executionConfig: {},
       },
     });
@@ -403,7 +430,6 @@ describe("getSchedulePage", () => {
       data: {
         name: "Schedule Plan Snapshot",
         status: "Active",
-        defaultRuntime: "hermes",
       },
     });
     const task = await db.task.create({
@@ -412,7 +438,6 @@ describe("getSchedulePage", () => {
         title: "Planned task",
         status: "Ready",
         priority: "High",
-        executionRuntime: "hermes",
         executionConfig: {},
       },
     });
@@ -471,7 +496,7 @@ describe("getSchedulePage", () => {
 
   it("includes occurrence-scoped saved plans on work block scheduled items", async () => {
     const workspace = await db.workspace.create({
-      data: { name: "Occurrence plan workspace", defaultRuntime: "debug", status: "Active" },
+      data: { name: "Occurrence plan workspace", status: "Active" },
     });
     const task = await db.task.create({
       data: {
@@ -479,7 +504,6 @@ describe("getSchedulePage", () => {
         title: "Recurring planning",
         status: "Ready",
         priority: "Medium",
-        executionRuntime: "debug",
         executionConfig: {},
         kind: "recurring",
         recurrenceRule: "FREQ=DAILY;COUNT=2",
@@ -554,7 +578,6 @@ describe("getSchedulePage", () => {
       data: {
         name: "Completed Schedule Visibility",
         status: "Active",
-        defaultRuntime: "hermes",
       },
     });
 
@@ -567,7 +590,6 @@ describe("getSchedulePage", () => {
         status: "Completed",
         priority: "High",
         completedAt: new Date("2026-05-27T10:05:00.000Z"),
-        executionRuntime: "hermes",
         executionConfig: {},
       },
     });
@@ -616,7 +638,7 @@ describe("getSchedulePage", () => {
 
   it("includes scheduled work blocks even when task projection has no scheduled window", async () => {
     const workspace = await db.workspace.create({
-      data: { name: "Recurring Workspace", status: "Active", defaultRuntime: "hermes" },
+      data: { name: "Recurring Workspace", status: "Active" },
     });
     const task = await db.task.create({
       data: {
@@ -624,7 +646,6 @@ describe("getSchedulePage", () => {
         title: "Recurring imported task",
         status: "Cancelled",
         priority: "Medium",
-        executionRuntime: "hermes",
         executionConfig: {},
         recurrenceRule: "FREQ=DAILY",
         seriesExternalUid: "series-1",

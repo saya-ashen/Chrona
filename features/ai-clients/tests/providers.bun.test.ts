@@ -164,7 +164,7 @@ describe("AI provider availability", () => {
     const result = await testAiClientAvailability({
       type: "hermes",
       config: {
-        baseUrl: "http://hermes.local",
+        baseUrl: "https://hermes.local",
         apiKey: "bad-token",
       },
     });
@@ -173,8 +173,8 @@ describe("AI provider availability", () => {
     expect(result.reason).toContain("401");
     expect(result.reason).toContain("token");
     expect(fetchMock.mock.calls.map((call) => String(call[0]))).toEqual([
-      "http://hermes.local/health/detailed",
-      "http://hermes.local/v1/capabilities",
+      "https://hermes.local/health/detailed",
+      "https://hermes.local/v1/capabilities",
     ]);
   });
 
@@ -203,7 +203,7 @@ describe("AI provider availability", () => {
     const result = await testAiClientAvailability({
       type: "hermes",
       config: {
-        baseUrl: "http://hermes.local",
+        baseUrl: "https://hermes.local",
         apiKey: "token",
       },
     });

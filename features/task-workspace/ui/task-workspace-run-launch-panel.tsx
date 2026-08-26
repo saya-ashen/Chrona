@@ -107,7 +107,7 @@ function RunLaunchPanel({
                 {copy.launchRunsWithLabel}
               </dt>
               <dd className="font-medium text-foreground">
-                {launch.providerLabel} · {launch.runtimeLabel}
+                {launch.providerLabel}
               </dd>
             </div>
             <div className="grid grid-cols-[7rem_minmax(0,1fr)] gap-3 py-2.5">

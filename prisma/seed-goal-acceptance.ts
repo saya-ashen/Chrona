@@ -109,7 +109,6 @@ async function upsertCompletedTask(input: CompletedTaskInput) {
       status: TaskStatus.Done,
       priority: input.priority,
       kind: input.kind ?? "single",
-      executionRuntime: "simulated-goal-acceptance",
       executionConfig: {
         simulated: true,
         purpose: "Retained Goal product acceptance evidence",
@@ -328,7 +327,6 @@ export async function seedCompletedGoalAcceptanceFixture() {
       id: GOAL_ACCEPTANCE_IDS.workspaceId,
       name: "Goal Acceptance Workspace",
       description: "Retained Goal acceptance evidence.",
-      defaultRuntime: "simulated-goal-acceptance",
       status: WorkspaceStatus.Active,
     },
   });
@@ -648,7 +646,6 @@ export async function seedActiveGoalWorkbenchFixture() {
       id: GOAL_ACCEPTANCE_IDS.workspaceId,
       name: "Goal Acceptance Workspace",
       description: "Retained Goal acceptance evidence.",
-      defaultRuntime: "simulated-goal-acceptance",
       status: WorkspaceStatus.Active,
     },
   });
@@ -712,7 +709,6 @@ export async function seedActiveGoalWorkbenchFixture() {
         description: input.description,
         status: input.status,
         priority: input.priority,
-        executionRuntime: "simulated-goal-acceptance",
         executionConfig: { simulated: true, purpose: "Active Goal Workbench acceptance" },
         autoPlanGeneration: false,
         autoExecute: false,
@@ -733,7 +729,6 @@ export async function seedActiveGoalWorkbenchFixture() {
         description: input.description,
         status: input.status,
         priority: input.priority,
-        executionRuntime: "simulated-goal-acceptance",
         executionConfig: { simulated: true, purpose: "Active Goal Workbench acceptance" },
         autoPlanGeneration: false,
         autoExecute: false,

@@ -38,7 +38,7 @@ const compiledPlan: CompiledPlan = {
 
 async function seedRecoveryFixture() {
   const workspace = await db.workspace.create({
-    data: { name: `Result recovery ${crypto.randomUUID()}`, status: "Active", defaultRuntime: "test" },
+    data: { name: `Result recovery ${crypto.randomUUID()}`, status: "Active" },
   });
   workspaceId = workspace.id;
   const task = await db.task.create({
@@ -46,7 +46,6 @@ async function seedRecoveryFixture() {
       workspaceId: workspace.id,
       title: "Recover semantic result",
       priority: "Medium",
-      executionRuntime: "test",
       executionConfig: {},
       status: "Completed",
     },

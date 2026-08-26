@@ -56,6 +56,7 @@ export {
   type StreamRunInput,
   assertProviderStartSupported,
   supportsDurableFeatureRuntime,
+  supportsSafeTerminalOnlyFeatureRuntime,
   createSessionInputSchema,
   existingRunStreamInputSchema,
   getRunInputSchema,
@@ -117,3 +118,4 @@ export {
 } from "./provider-capability-matrix";
 
 export { BoundedTerminalRunSnapshots } from "./bounded-terminal-run-snapshots";
+export { isExactLoopbackHost, normalizeNetworkHost, validateHermesEndpoint, type HermesEndpointValidation } from "./network-safety";

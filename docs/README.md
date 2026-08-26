@@ -9,6 +9,7 @@ Use this directory as the stable product and developer documentation set. Time-p
 | Need | Document |
 | --- | --- |
 | Install and run Chrona | [Quick Start](./en/quick-start.md) |
+| Understand local data, external providers, and deletion | [Privacy](./en/privacy.md) |
 | Understand the product surface | [Product Guide](./en/README.md) |
 | See shipped and planned product areas | [Roadmap](./en/roadmap.md) |
 | Integrate over HTTP or MCP | [API Reference](./en/api-reference.md) |
@@ -65,7 +66,7 @@ Chrona is a Bun/TypeScript monorepo:
 | Hermes plugin | `external-plugins/hermes` | Chrona tools exposed to Hermes Agent |
 
 This table is a curated subset. For the complete package list (including
-`domain`, `ui-protocol`, `runtime-core`, `i18n`, `shared`) and the placement
+`domain`, `ui-protocol`, `i18n`, `shared`) and the placement
 rules, see [Package Boundaries](./en/package-boundaries.md).
 
 ## Common commands for repository development

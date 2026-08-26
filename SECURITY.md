@@ -22,6 +22,8 @@ Include:
 
 Chrona binds to `127.0.0.1` by default. If you set `HOST=0.0.0.0`, configure `API_KEY` and put Chrona behind trusted network controls. Unsafe public bind without `API_KEY` requires explicit `CHRONA_UNSAFE_PUBLIC_BIND=1`.
 
+See [Local privacy and data handling](./docs/en/privacy.md) for local retention, external-provider context, deletion, backups, and diagnostics.
+
 Never share:
 
 - `.env` files

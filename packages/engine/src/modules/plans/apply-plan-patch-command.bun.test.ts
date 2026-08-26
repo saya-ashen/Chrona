@@ -23,7 +23,7 @@ async function resetDb() {
 
 async function seedCurrentPlan() {
   const workspace = await db.workspace.create({
-    data: { name: "Plan command CAS", status: "Active", defaultRuntime: "hermes" },
+    data: { name: "Plan command CAS", status: "Active" },
   });
   const task = await db.task.create({
     data: {
@@ -31,7 +31,6 @@ async function seedCurrentPlan() {
       title: "Plan command task",
       status: "Ready",
       priority: "Medium",
-      executionRuntime: "hermes",
       executionConfig: {},
     },
   });
@@ -177,7 +176,6 @@ describe("plan command CAS and idempotency", () => {
         title: "Other plan command task",
         status: "Ready",
         priority: "Medium",
-        executionRuntime: "hermes",
         executionConfig: {},
       },
     });

@@ -1,4 +1,13 @@
 import { z } from "zod";
+import { manualCompletionFormSchema } from "./manual-completion-form";
+export {
+  manualCompletionFormFieldSchema,
+  manualCompletionFormSchema,
+} from "./manual-completion-form";
+export type {
+  ManualCompletionForm,
+  ManualCompletionFormField,
+} from "./manual-completion-form";
 
 // ─── Node type constants ───
 
@@ -8,8 +17,8 @@ export const AI_PLAN_NODE_TYPES = [
   "condition",
   "wait",
 ] as const;
-export const AI_TASK_EXECUTORS = ["user", "ai", "system"] as const;
-export const AI_TASK_MODES = ["manual", "assist", "auto"] as const;
+export const AI_TASK_EXECUTORS = ["ai", "user", "system"] as const;
+export const AI_TASK_MODES = ["auto", "assist", "manual"] as const;
 export const AI_USER_INTERACTION_LEVELS = ["not_expected", "possible"] as const;
 export const AI_CHECKPOINT_SCHEMA_SOURCES = ["static", "ai"] as const;
 export const AI_CHECKPOINT_TYPES = [
@@ -198,11 +207,21 @@ export const planBlueprintTaskNodeSchema = z
     mode: z.enum(AI_TASK_MODES).optional().describe("How this task node is executed."),
     expectedOutput: z.string().optional().describe("What successful completion should produce."),
     completionCriteria: z.string().optional().describe("How to determine this node is done."),
+    completionForm: manualCompletionFormSchema.optional().describe("Required structured completion form for user/manual task nodes."),
     estimatedMinutes: z.number().positive().optional().describe("Best-effort duration estimate for this node."),
     userInteraction: taskUserInteractionSchema.optional().describe("Expected user participation. Omitted legacy plans are treated as not_expected."),
   })
-  .describe("Task node. Only task nodes may include executor/mode/output fields.")
-  .strict();
+  .strict()
+  .superRefine((node, context) => {
+    const isManual = node.executor === "user" || node.mode === "manual";
+    if (isManual && !node.completionForm) {
+      context.addIssue({ code: "custom", path: ["completionForm"], message: "manual task nodes must define a completionForm" });
+    }
+    if (!isManual && node.completionForm) {
+      context.addIssue({ code: "custom", path: ["completionForm"], message: "automatic task nodes must not define a completionForm" });
+    }
+  })
+  .describe("Task node. Only task nodes may include executor/mode/output fields.");
 
 export const planBlueprintCheckpointNodeSchema = z
   .object({
@@ -315,6 +334,7 @@ export const editableTaskNodeSchema = z
     mode: z.enum(AI_TASK_MODES),
     expectedOutput: z.string().optional(),
     completionCriteria: z.string().optional(),
+    completionForm: manualCompletionFormSchema.optional(),
     userInteraction: taskUserInteractionSchema,
     estimatedMinutes: z.number().positive().optional(),
   })

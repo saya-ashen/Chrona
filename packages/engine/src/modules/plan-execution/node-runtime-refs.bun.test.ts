@@ -370,7 +370,12 @@ describe("node runtime refs", () => {
 		expect(runtime.instructions).toContain(
 			"Do not call chrona_node_read or chrona_execution_read by default",
 		);
-		expect(runtime.instructions).toContain("Call chrona_node_read only when");
+		expect(runtime.instructions).toContain(
+			"call chrona_node_read with that entry's nodeRef",
+		);
+		expect(runtime.instructions).toContain(
+			"Never ask the user to re-enter a result already produced by an earlier node",
+		);
 		expect(runtime.instructions).toContain(
 			"Call chrona_execution_read only after",
 		);

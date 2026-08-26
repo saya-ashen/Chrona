@@ -19,7 +19,6 @@ This document explains where code belongs in Chrona's monorepo.
 | `packages/providers/*` | External AI/runtime protocol adapters |
 | `packages/integrations` | External calendar parsing/normalization and user-approved local/remote integration helpers |
 | `packages/ui-protocol` | Declarative UI document schema, builders, and action catalog (json-render) shared by server renderers and the web client |
-| `packages/runtime-core` | Runtime support types/utilities shared by engine/providers |
 | `packages/i18n` | Shared localization message infrastructure |
 | `packages/logging` | Shared logging setup and logger utilities |
 | `shared/http`, `shared/ui` | The only root shared directories: generic HTTP/browser infrastructure and UI primitives, never product workflow logic |
@@ -281,15 +280,6 @@ Do not put here:
 - React components or DOM rendering
 - HTTP handlers or provider calls
 - engine business orchestration
-
-## `packages/runtime-core`
-
-Put here:
-
-- backend-agnostic runtime support types and utilities
-- config specs shared by engine/providers
-
-Keep it small. If code answers “what should Chrona do next?”, it belongs in engine.
 
 ## `packages/cli`
 

@@ -4,9 +4,12 @@ import { db } from "@/lib/db";
 import { saveCompiledPlan } from "@/modules/plan-execution/persistence/compiled-plan-store";
 import { taskPlanExecution } from "@/modules/plan-execution/facade/task-plan-execution.facade";
 import { getPlanRun } from "@/modules/plan-execution/persistence/plan-run-store";
+import { aiClientRegistry } from "@/modules/ai";
 import type { CheckpointConfig, CompiledPlan, ConditionConfig } from "@chrona/contracts/ai";
 
 async function resetDb() {
+  await db.aiFeatureRun.deleteMany();
+  await db.aiFeatureBinding.deleteMany();
   await db.taskAssistantMessage.deleteMany();
   await db.scheduleProposal.deleteMany();
   await db.toolInvocation.deleteMany();
@@ -23,7 +26,9 @@ async function resetDb() {
   await db.taskDependency.deleteMany();
   await db.memory.deleteMany();
   await db.task.deleteMany();
+  await db.aiClient.deleteMany();
   await db.workspace.deleteMany();
+  await aiClientRegistry.refresh();
 }
 
 async function seedWorkspaceAndTask(title: string) {
@@ -31,7 +36,6 @@ async function seedWorkspaceAndTask(title: string) {
     data: {
       name: `${title} Workspace`,
       status: "Active",
-      defaultRuntime: "hermes",
     },
   });
 
@@ -41,7 +45,6 @@ async function seedWorkspaceAndTask(title: string) {
       title,
       status: TaskStatus.Ready,
       priority: "Medium",
-      executionRuntime: "hermes",
       executionConfig: {},
     },
   });
@@ -181,6 +184,43 @@ function makeSingleBlockedTaskPlan(): CompiledPlan {
     entryNodeIds: ["cond_blocked"],
     terminalNodeIds: ["cond_blocked"],
     topologicalOrder: ["cond_blocked"],
+    completionPolicy: { type: "all_tasks_completed" },
+    validationWarnings: [],
+  };
+}
+
+function makeSingleManualCompletionPlan(): CompiledPlan {
+  return {
+    id: "compiled_single_manual_completion",
+    editablePlanId: "graph_single_manual_completion",
+    sourceVersion: 1,
+    title: "Single manual completion task",
+    goal: "Collect a validated manual result",
+    assumptions: [],
+    nodes: [{
+      id: "manual_step",
+      localId: "manual_step",
+      type: "task",
+      title: "Inspect plants",
+      description: "Inspect soil and leaves",
+      executor: "user",
+      mode: "manual",
+      config: {
+        expectedOutput: "Per-plant inspection result",
+        completionCriteria: "Every plant has been checked",
+        completionForm: {
+          instructions: "Record the inspection result.",
+          submitLabel: "Complete and continue",
+          inputFields: [{ kind: "text", name: "inspection", label: "Inspection result", multiline: true, required: true }],
+        },
+      },
+      dependencies: [],
+      dependents: [],
+    }],
+    edges: [],
+    entryNodeIds: ["manual_step"],
+    terminalNodeIds: ["manual_step"],
+    topologicalOrder: ["manual_step"],
     completionPolicy: { type: "all_tasks_completed" },
     validationWarnings: [],
   };
@@ -362,7 +402,7 @@ describe("plan-runner native execution actions", () => {
     });
   });
 
-  it("resumes waiting node with input, obsoletes prior waiting result, and continues into blocked downstream node", async () => {
+  it("resumes waiting node with input and fails when the downstream manual form provider is unavailable", async () => {
     const { workspace, task } = await seedWorkspaceAndTask("Runner resumes waiting node");
     const compiledPlan = makeUserThenBlockedTaskPlan();
     await seedAcceptedCompiledPlan(workspace.id, task.id, compiledPlan);
@@ -380,11 +420,11 @@ describe("plan-runner native execution actions", () => {
       action: { action: "resume_with_input", inputFields: { decision: "yes" } },
     });
 
-    expect(resumed.status).toBe("blocked");
+    expect(resumed.status).toBe("failed");
     expect(resumed.currentNodeId).toBe("cond_system");
     expect(resumed.executedNodeIds).toContain("cond_user");
     expect(resumed.checkpoint).toMatchObject({
-      kind: "manual_recovery",
+      kind: "failed",
       nodeId: "cond_system",
     });
 
@@ -392,7 +432,7 @@ describe("plan-runner native execution actions", () => {
     expect(persisted?.results.map((item) => [item.nodeId, item.status, item.waitKind])).toEqual([
       ["cond_user", "obsolete", "user_input"],
       ["cond_user", "current", undefined],
-      ["cond_system", "current", "manual_action"],
+      ["cond_system", "rejected", undefined],
     ]);
     expect(persisted?.results[1]?.selectedBranch).toMatchObject({
       label: "yes",
@@ -418,7 +458,7 @@ describe("plan-runner native execution actions", () => {
     });
     expect(session.status).toBe("Paused");
     expect(session.currentNodeId).toBe("cond_system");
-    expect(session.pauseReason).toBe("manual_action");
+    expect(session.pauseReason).toBeNull();
     expect(session.completedNodeIds).toBe(JSON.stringify(["cond_user"]));
 
     const updatedTask = await db.task.findUniqueOrThrow({ where: { id: task.id } });
@@ -427,6 +467,81 @@ describe("plan-runner native execution actions", () => {
       blockType: "node_blocked",
       scope: "plan_node",
       actionRequired: "Check execution status",
+    });
+  });
+
+  it("reviews a manual form, waits normally, and persists structured completion input", async () => {
+    const { workspace, task } = await seedWorkspaceAndTask("Runner manual completion");
+    const client = await db.aiClient.create({
+      data: {
+        name: "Only configured provider",
+        type: "debug",
+        config: { profile: "deterministic" },
+        enabled: true,
+        isDefault: true,
+      },
+    });
+    await db.aiFeatureBinding.create({ data: { feature: "task.execution", clientId: client.id } });
+    await aiClientRegistry.refresh();
+    const compiledPlan = makeSingleManualCompletionPlan();
+    await seedAcceptedCompiledPlan(workspace.id, task.id, compiledPlan);
+
+    const waiting = await taskPlanExecution.dispatch({
+      taskId: task.id,
+      action: { action: "start_manual" },
+    });
+
+    expect(waiting.status).toBe("waiting_for_user");
+    expect(waiting.checkpoint).toMatchObject({
+      kind: "manual_completion",
+      nodeId: "manual_step",
+      form: { source: "plan", validated: true },
+    });
+    expect(waiting.checkpoint?.availableActions.map(({ id }) => id)).toEqual([
+      "mark_node_completed",
+      "request_replan",
+      "cancel_session",
+    ]);
+
+    await expect(taskPlanExecution.submitCheckpointAction({
+      taskId: task.id,
+      action: {
+        checkpointId: waiting.checkpoint!.id,
+        action: "mark_node_completed",
+        payload: {
+          formRevision: "sha256:stale",
+          inputFields: { inspection: "Basil dry; mint healthy" },
+        },
+      },
+    })).rejects.toThrow("form changed");
+    expect((await taskPlanExecution.current({ taskId: task.id })).status).toBe("waiting_for_user");
+
+    const completed = await taskPlanExecution.submitCheckpointAction({
+      taskId: task.id,
+      action: {
+        checkpointId: waiting.checkpoint!.id,
+        action: "mark_node_completed",
+        payload: {
+          formRevision: waiting.checkpoint!.form!.revision,
+          inputFields: { inspection: "Basil dry; mint healthy" },
+        },
+      },
+    });
+
+    expect(completed.execution.status).toBe("completed");
+    const persisted = await getPlanRun(task.id, compiledPlan.editablePlanId);
+    expect(persisted?.results.at(-1)).toMatchObject({
+      nodeId: "manual_step",
+      inputFields: { inspection: "Basil dry; mint healthy" },
+      outputSummary: "Inspection result: Basil dry; mint healthy",
+    });
+    const featureRun = await db.aiFeatureRun.findFirstOrThrow({
+      where: { featureId: "task.manual-completion-form.review", subjectId: persisted!.attempts[0]!.id },
+    });
+    expect(featureRun).toMatchObject({
+      providerClientId: client.id,
+      providerName: "debug",
+      status: "Completed",
     });
   });
 
@@ -632,7 +747,7 @@ describe("plan-runner native execution actions", () => {
     expect(projection.latestRunStatus).toBe(RunStatus.Cancelled);
   });
 
-  it("retries a blocked node by obsoleting prior result and creating a fresh blocked attempt", async () => {
+  it("retries manual form generation by obsoleting the failed result and creating a fresh attempt", async () => {
     const { workspace, task } = await seedWorkspaceAndTask("Runner retries blocked node");
     const compiledPlan = makeSingleBlockedTaskPlan();
     await seedAcceptedCompiledPlan(workspace.id, task.id, compiledPlan);
@@ -641,10 +756,10 @@ describe("plan-runner native execution actions", () => {
       taskId: task.id,
       action: { action: "start_manual" },
     });
-    expect(initial.status).toBe("blocked");
+    expect(initial.status).toBe("failed");
     expect(initial.currentNodeId).toBe("cond_blocked");
     expect(initial.checkpoint).toMatchObject({
-      kind: "manual_recovery",
+      kind: "failed",
       nodeId: "cond_blocked",
     });
     expect(initial.checkpoint?.availableActions.map((action) => action.id)).toContain("retry_node");
@@ -660,17 +775,17 @@ describe("plan-runner native execution actions", () => {
     expect(retryResult.transition.type).toBe("rerun_current_node");
     const retried = retryResult.execution;
 
-    expect(retried.status).toBe("blocked");
+    expect(retried.status).toBe("failed");
     expect(retried.currentNodeId).toBe("cond_blocked");
     expect(retried.checkpoint).toMatchObject({
-      kind: "manual_recovery",
+      kind: "failed",
       nodeId: "cond_blocked",
     });
 
     const persisted = await getPlanRun(task.id, compiledPlan.editablePlanId);
     expect(persisted?.results.map((item) => [item.nodeId, item.status, item.waitKind])).toEqual([
-      ["cond_blocked", "obsolete", "manual_action"],
-      ["cond_blocked", "current", "manual_action"],
+      ["cond_blocked", "obsolete", undefined],
+      ["cond_blocked", "rejected", undefined],
     ]);
     expect(persisted?.attempts).toHaveLength(2);
     expect(persisted?.attempts.map((attempt) => attempt.status)).toEqual(["failed", "failed"]);
@@ -723,10 +838,10 @@ describe("plan-runner native execution actions", () => {
       taskId: blockedFlow.task.id,
       action: { action: "start_manual" },
     });
-    expect(blocked.status).toBe("blocked");
+    expect(blocked.status).toBe("failed");
     expect(blocked.currentNodeId).toBe("cond_blocked");
     expect(blocked.checkpoint).toMatchObject({
-      kind: "manual_recovery",
+      kind: "failed",
       nodeId: "cond_blocked",
     });
 

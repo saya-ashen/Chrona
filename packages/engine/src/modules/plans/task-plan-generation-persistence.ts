@@ -38,7 +38,6 @@ export type TaskPlanGenerationSnapshot = {
     goalContext: FrozenGoalTaskContext | null;
     workBlockId: string | null;
     estimatedMinutes: number | null;
-    executionRuntime: string;
   };
   head: HeadSnapshot;
   workBlockId: string | null;
@@ -238,7 +237,6 @@ export async function captureTaskPlanGenerationSnapshot(input: {
       goalContext,
       workBlockId,
       estimatedMinutes: estimatedMinutes && estimatedMinutes > 0 ? estimatedMinutes : null,
-      executionRuntime: task.executionRuntime,
     },
     workBlockId,
     head: {

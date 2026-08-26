@@ -280,6 +280,7 @@ export function buildWorkspaceCheckpointActionInput(input: {
       inputFields,
       inputText,
       fallbackText: input.node.nextAction ?? undefined,
+      formRevision: input.node.checkpoint?.form?.revision,
     }),
   };
 }
@@ -315,6 +316,7 @@ function buildCheckpointActionPayload(input: {
   inputFields: CheckpointInputFields;
   inputText: string;
   fallbackText?: string;
+  formRevision?: string;
 }) {
   const message = input.inputText || input.fallbackText;
 
@@ -327,6 +329,8 @@ function buildCheckpointActionPayload(input: {
 
   if (input.action === "mark_node_completed") {
     return {
+      formRevision: input.formRevision,
+      inputFields: input.inputFields,
       summary: message,
       output: input.inputText || undefined,
     };

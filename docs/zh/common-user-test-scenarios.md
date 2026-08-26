@@ -248,7 +248,7 @@ flowchart LR
 | --- | --- | --- | --- |
 | RUN-001 | P0 UI | 创建任务 → 生成 Plan → Accept → Start → 完成 → 查看结果 | 完整黄金链；状态、当前节点、Activity、Result 一致 |
 | RUN-002 | P0 UI/API | 单 task 节点执行 | provider 启动一次；输出持久化；节点 Done |
-| RUN-003 | P1 API/UI | 依赖 task 节点链执行 | 严格按依赖顺序；后续节点收到前序结果 |
+| RUN-003 | P1 API/UI | 依赖 task 节点链执行 | 严格按依赖顺序；正常续接同一 Provider 上下文；续接丢失/压缩时可通过 AI-visible node ref 有界恢复前序语义结果 |
 | RUN-004 | P1 API/UI | 多个独立入口节点 | 每个执行一次；无重复 provider run |
 | RUN-005 | P1 API/UI | condition 节点选择分支 | 仅选中分支执行；未选分支标记 skipped |
 | RUN-006 | P0 UI | input checkpoint → 输入有效值 → Continue | `WaitingForInput` 与审批文案不同；继续正确节点 |

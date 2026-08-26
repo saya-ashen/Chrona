@@ -225,7 +225,7 @@ export const providerCapabilityMatrix = [
 			streamReconnect: true,
 			crossProcessDurable: false,
 			clientOperationLookup: true,
-			readOnlySingleAttempt: false,
+			readOnlySingleAttempt: true,
 			providerResumeRef: true,
 			runEventReplay: true,
 			mode: "local_stream_only",

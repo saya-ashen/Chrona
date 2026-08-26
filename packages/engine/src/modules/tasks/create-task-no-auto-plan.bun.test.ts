@@ -40,14 +40,13 @@ describe("createTask auto plan generation", () => {
 
   it("does not trigger plan generation when automation is disabled", async () => {
     const workspace = await db.workspace.create({
-      data: { name: "No Auto Plan Workspace", status: "Active", defaultRuntime: "hermes" },
+      data: { name: "No Auto Plan Workspace", status: "Active" },
     });
 
     const result = await createTask({
       workspaceId: workspace.id,
       title: "Create task without auto plan",
       description: "Plan generation must be explicitly requested via the SSE endpoint.",
-      executionRuntime: "hermes",
       executionConfig: { prompt: "Do it" },
     });
 
@@ -57,7 +56,7 @@ describe("createTask auto plan generation", () => {
 
   it("does not start planning or execution during creation when auto-execute is enabled", async () => {
     const workspace = await db.workspace.create({
-      data: { name: "Auto Plan Workspace", status: "Active", defaultRuntime: "hermes" },
+      data: { name: "Auto Plan Workspace", status: "Active" },
     });
 
     const result = await createTask({
@@ -66,7 +65,6 @@ describe("createTask auto plan generation", () => {
       description: "Creation must not start plan generation or execution.",
       autoExecute: true,
       autoPlanGenerationTiming: "immediate",
-      executionRuntime: "hermes",
       executionConfig: { prompt: "Do it" },
     });
 
@@ -77,7 +75,7 @@ describe("createTask auto plan generation", () => {
 
   it("persists auto-plan preference without starting generation during creation", async () => {
     const workspace = await db.workspace.create({
-      data: { name: "Auto Draft Plan Workspace", status: "Active", defaultRuntime: "hermes" },
+      data: { name: "Auto Draft Plan Workspace", status: "Active" },
     });
 
     const result = await createTask({
@@ -87,7 +85,6 @@ describe("createTask auto plan generation", () => {
       autoPlanGeneration: true,
       autoExecute: false,
       autoPlanGenerationTiming: "immediate",
-      executionRuntime: "hermes",
       executionConfig: { prompt: "Do it" },
     });
 
@@ -102,7 +99,7 @@ describe("createTask auto plan generation", () => {
 
   it("persists explicit automation choices without triggering creation side effects", async () => {
     const workspace = await db.workspace.create({
-      data: { name: "Automation Preferences Workspace", status: "Active", defaultRuntime: "hermes" },
+      data: { name: "Automation Preferences Workspace", status: "Active" },
     });
 
     const enabled = await createTask({
@@ -110,14 +107,12 @@ describe("createTask auto plan generation", () => {
       title: "Explicit auto execute enabled",
       autoExecute: true,
       autoPlanGenerationTiming: "immediate",
-      executionRuntime: "hermes",
       executionConfig: { prompt: "Do it" },
     });
     const disabled = await createTask({
       workspaceId: workspace.id,
       title: "Explicit auto execute disabled",
       autoExecute: false,
-      executionRuntime: "hermes",
       executionConfig: { prompt: "Do it" },
     });
 
@@ -143,12 +138,11 @@ describe("createTask auto plan generation", () => {
 
   it("keeps one task entry when workspace edit enables recurrence", async () => {
     const workspace = await db.workspace.create({
-      data: { name: "Workspace recurrence edit", status: "Active", defaultRuntime: "hermes" },
+      data: { name: "Workspace recurrence edit", status: "Active" },
     });
     const result = await createTask({
       workspaceId: workspace.id,
       title: "Review metrics",
-      executionRuntime: "hermes",
       executionConfig: { prompt: "Review" },
     });
 
@@ -215,7 +209,7 @@ describe("createTask auto plan generation", () => {
 
   it("cancels open work blocks when a recurring task is cancelled", async () => {
     const workspace = await db.workspace.create({
-      data: { name: "Cancel recurring workspace", status: "Active", defaultRuntime: "hermes" },
+      data: { name: "Cancel recurring workspace", status: "Active" },
     });
     const result = await createTask({
       workspaceId: workspace.id,
@@ -223,7 +217,6 @@ describe("createTask auto plan generation", () => {
       recurrenceRule: "FREQ=DAILY;COUNT=3",
       recurrenceAnchorStartAt: "2026-06-01T09:00:00.000Z",
       recurrenceAnchorEndAt: "2026-06-01T10:00:00.000Z",
-      executionRuntime: "hermes",
       executionConfig: { prompt: "Review" },
     });
 

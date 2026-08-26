@@ -17,7 +17,7 @@ async function reset() {
 
 async function createWorkspaceAndCalendarSource(name: string) {
   const workspace = await db.workspace.create({
-    data: { name, defaultRuntime: "debug", status: "Active" },
+    data: { name, status: "Active" },
   });
   const source = await createCalendarSource({
     workspaceId: workspace.id,
@@ -51,7 +51,7 @@ describe("external calendar repository", () => {
 
   it("handles source lifecycle, filtering, and event dedupe", async () => {
     const workspace = await db.workspace.create({
-      data: { name: "Calendar DB", defaultRuntime: "debug", status: "Active" },
+      data: { name: "Calendar DB", status: "Active" },
     });
     const source = await createCalendarSource({
       workspaceId: workspace.id,
@@ -131,7 +131,6 @@ describe("external calendar repository", () => {
           title: `legacy ${event.recurrenceId}`,
           status: "Ready",
           priority: "Medium",
-          executionRuntime: "debug",
           executionConfig: {},
           kind: "single",
           recurrenceRule: event.recurrenceRule,
@@ -167,7 +166,7 @@ describe("external calendar repository", () => {
 
   it("applies source sync policy to complete past imported tasks", async () => {
     const workspace = await db.workspace.create({
-      data: { name: "Calendar policy DB", defaultRuntime: "debug", status: "Active" },
+      data: { name: "Calendar policy DB", status: "Active" },
     });
     const source = await createCalendarSource({
       workspaceId: workspace.id,
@@ -210,7 +209,7 @@ describe("external calendar repository", () => {
 
   it("applies calendar automation policy to newly imported future tasks", async () => {
     const workspace = await db.workspace.create({
-      data: { name: "Calendar automation DB", defaultRuntime: "debug", status: "Active" },
+      data: { name: "Calendar automation DB", status: "Active" },
     });
     const source = await createCalendarSource({
       workspaceId: workspace.id,
@@ -247,7 +246,7 @@ describe("external calendar repository", () => {
 
   it("can import calendar tasks without automation", async () => {
     const workspace = await db.workspace.create({
-      data: { name: "Calendar manual DB", defaultRuntime: "debug", status: "Active" },
+      data: { name: "Calendar manual DB", status: "Active" },
     });
     const source = await createCalendarSource({
       workspaceId: workspace.id,
@@ -327,7 +326,7 @@ describe("external calendar repository", () => {
   });
   it("recreates imported event tasks when a stale taskId is left behind", async () => {
     const workspace = await db.workspace.create({
-      data: { name: "Calendar stale task DB", defaultRuntime: "debug", status: "Active" },
+      data: { name: "Calendar stale task DB", status: "Active" },
     });
     const source = await createCalendarSource({
       workspaceId: workspace.id,

@@ -27,8 +27,12 @@ function executionStreamError(cause: unknown, fallback: string): Extract<PlanExe
   const httpError = toHttpError(cause);
   return {
     type: "error",
-    code: "INTERNAL_ERROR",
-    message: httpError?.status === 409 ? httpError.message : fallback,
+    code: httpError?.status === 409
+      ? "CONFLICT"
+      : httpError?.status === 400
+        ? "VALIDATION_ERROR"
+        : "INTERNAL_ERROR",
+    message: httpError?.status === 409 || httpError?.status === 400 ? httpError.message : fallback,
   };
 }
 

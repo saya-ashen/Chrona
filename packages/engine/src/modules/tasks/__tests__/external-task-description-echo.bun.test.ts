@@ -14,7 +14,7 @@ async function resetDb() {
 
 async function seedExternalTask(taskDescription: string | null, eventDescription: string | null) {
   const workspace = await db.workspace.create({
-    data: { name: "External desc echo", status: "Active", defaultRuntime: "hermes" },
+    data: { name: "External desc echo", status: "Active" },
   });
   const task = await db.task.create({
     data: {
@@ -23,7 +23,6 @@ async function seedExternalTask(taskDescription: string | null, eventDescription
       description: taskDescription,
       status: "Ready",
       priority: "Medium",
-      executionRuntime: "hermes",
       executionConfig: {},
     },
   });

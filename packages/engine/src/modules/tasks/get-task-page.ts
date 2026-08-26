@@ -3,10 +3,6 @@ import { isTaskPlanGenerationRunning } from "@/modules/plans/task-plan-generatio
 import { getLatestTaskPlanReadModel } from "@/modules/plans/task-plan-read-model";
 import { reconcileTaskState } from "@/modules/orchestration/reconcile-task-state";
 import {
-  getRuntimeTaskConfigSpec,
-  listExecutionRuntimes,
-} from "@/modules/execution-runtime";
-import {
   deriveTaskExecutionState,
   deriveTaskRunnability,
   taskExecutionStateToRunStatus,
@@ -136,9 +132,6 @@ export async function getTaskPage(input: { taskId: string; workBlockId?: string 
         orderBy: { createdAt: "desc" },
         take: 5,
       },
-      workspace: {
-        select: { defaultRuntime: true },
-      },
       workBlocks: {
         where: { status: { in: ["Scheduled", "Active", "Completed"] } },
         orderBy: [
@@ -207,7 +200,7 @@ export async function getTaskPage(input: { taskId: string; workBlockId?: string 
     : null;
   const resultAcceptancePayload = resultAcceptance?.payload as { accepted_at?: unknown } | null;
   const currentWorkBlock = pickTaskPageWorkBlock(task.workBlocks, selectedWorkBlockId, new Date());
-  const importedEvent = task.importedCalendarEvents[0] ?? null;
+  const importedEvent = task.importedCalendarEvents.at(0) ?? null;
   const sourceManaged = importedEvent
     ? {
         source: "external_calendar" as const,
@@ -231,10 +224,7 @@ export async function getTaskPage(input: { taskId: string; workBlockId?: string 
         : savedPlan !== null
           ? "waiting_acceptance"
           : "idle";
-  const runnability = deriveTaskRunnability({
-    executionRuntime: task.executionRuntime || task.workspace.defaultRuntime,
-    executionConfig: task.executionConfig,
-  });
+  const runnability = deriveTaskRunnability();
   const orchestratorState = savedPlan?.effectivePlan
     ? reconcileTaskState({
         taskId,
@@ -272,7 +262,13 @@ export async function getTaskPage(input: { taskId: string; workBlockId?: string 
 
   const availableAiClients = await db.aiClient.findMany({
     where: { enabled: true },
-    select: { id: true, name: true, enabled: true },
+    select: {
+      id: true,
+      name: true,
+      type: true,
+      isDefault: true,
+      enabled: true,
+    },
     orderBy: { createdAt: "asc" },
   });
 
@@ -302,12 +298,6 @@ export async function getTaskPage(input: { taskId: string; workBlockId?: string 
     version: asset.version,
   }));
   return {
-    defaultExecutionRuntime: task.workspace.defaultRuntime,
-    executionRuntimes: listExecutionRuntimes().map((key) => ({
-      key,
-      label: key,
-      spec: getRuntimeTaskConfigSpec(key),
-    })),
     availableAiClients,
     task: {
       id: task.id,
@@ -323,7 +313,6 @@ export async function getTaskPage(input: { taskId: string; workBlockId?: string 
       title: task.title,
       description: task.description,
       sourceManaged,
-      executionRuntime: task.executionRuntime,
       executionConfig: task.executionConfig,
       aiClientId: task.aiClientId,
       autoPlanGeneration: task.autoPlanGeneration,

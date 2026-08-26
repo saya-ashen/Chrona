@@ -178,6 +178,9 @@ function rawToTaskNode(raw: Record<string, unknown>, id: string): EditableTaskNo
     userInteraction: raw.userInteraction && typeof raw.userInteraction === "object"
       ? raw.userInteraction as EditableTaskNode["userInteraction"]
       : { level: "not_expected" },
+    ...(raw.completionForm && typeof raw.completionForm === "object"
+      ? { completionForm: raw.completionForm as EditableTaskNode["completionForm"] }
+      : {}),
     ...(typeof raw.estimatedMinutes === "number" ? { estimatedMinutes: raw.estimatedMinutes } : {}),
     ...(typeof raw.objective === "string" ? { expectedOutput: raw.objective } : {}),
   };
@@ -237,6 +240,7 @@ function editableNodeToDefinition(node: EditableNode): NodeDefinition {
           mode: node.mode,
           metadata: {
             completionCriteria: node.completionCriteria,
+            completionForm: node.completionForm,
             userInteraction: node.userInteraction,
           },
         },

@@ -142,7 +142,7 @@ function useOperationAction(props: TaskWorkspacePlanSectionProps, currentOperati
   const hasCurrentOperationControls = Boolean(props.currentExecution?.checkpoint || (currentOperationNode?.checkpoint && hasNodeActionPayload(currentOperationNode) && !consoleView.nodeDetail.disabledActionReason));
   const currentOperationAction = useActionSpecRenderConfig({ node: currentOperationNode, disabledActionReason: consoleView.nodeDetail.disabledActionReason, onDispatchExecutionAction: props.onDispatchExecutionAction, onSubmitCheckpointAction: props.onSubmitCheckpointAction });
   const apiCurrentOperationSpec = props.currentExecution?.ui?.currentOperationSpec ?? null;
-  const commandCenterActionHandlers = useCheckpointActionHandlers(props.currentExecution?.checkpoint?.id, props.onSubmitCheckpointAction);
+  const commandCenterActionHandlers = useCheckpointActionHandlers(props.currentExecution?.checkpoint ?? null, props.onSubmitCheckpointAction);
   const currentOperationSpec = getCurrentOperationSpec(Boolean(props.currentExecution?.checkpoint), apiCurrentOperationSpec, hasCurrentOperationControls, currentOperationAction.spec);
   return { hasCurrentOperationControls, currentOperationAction, apiCurrentOperationSpec, commandCenterActionHandlers, currentOperationSpec };
 }
@@ -183,15 +183,25 @@ function shouldUsePrimaryAction(props: TaskWorkspacePlanSectionProps, state: Ret
   return Boolean(props.plan?.status === "accepted" && !state.hasTaskCompleted && action?.enabled && action.type !== "none" && action.type !== "start" && !props.currentExecution?.checkpoint);
 }
 
-function useCheckpointActionHandlers(checkpointId: string | undefined, onSubmitCheckpointAction: TaskWorkspacePlanSectionProps["onSubmitCheckpointAction"]) {
+function useCheckpointActionHandlers(
+  checkpoint: NonNullable<TaskWorkspacePlanSectionProps["currentExecution"]>["checkpoint"],
+  onSubmitCheckpointAction: TaskWorkspacePlanSectionProps["onSubmitCheckpointAction"],
+) {
   return useMemo(() => ({ "submit-checkpoint": async (params: Record<string, unknown>) => {
     if (!onSubmitCheckpointAction) throw new Error("Checkpoint actions are not available for this view.");
-    const resolvedCheckpointId = typeof params.checkpointId === "string" ? params.checkpointId : checkpointId;
+    const resolvedCheckpointId = typeof params.checkpointId === "string" ? params.checkpointId : checkpoint?.id;
     const actionId = typeof params.actionId === "string" ? params.actionId : null;
     if (!resolvedCheckpointId || !actionId) throw new Error("Checkpoint action payload is incomplete.");
     const values = filterCheckpointValues(params.values);
-    return onSubmitCheckpointAction({ checkpointId: resolvedCheckpointId, action: actionId as SubmitCheckpointActionInput["action"], ...(Object.keys(values).length > 0 ? { payload: values } : {}) });
-  } }), [checkpointId, onSubmitCheckpointAction]);
+    const payload = checkpoint?.kind === "manual_completion" && actionId === "mark_node_completed"
+      ? { formRevision: checkpoint.form?.revision, inputFields: values }
+      : values;
+    return onSubmitCheckpointAction({
+      checkpointId: resolvedCheckpointId,
+      action: actionId as SubmitCheckpointActionInput["action"],
+      ...(Object.keys(payload).length > 0 ? { payload } : {}),
+    });
+  } }), [checkpoint, onSubmitCheckpointAction]);
 }
 
 function filterCheckpointValues(rawValues: unknown): Record<string, unknown> {
@@ -206,7 +216,7 @@ function useResultChanges(props: TaskWorkspacePlanSectionProps, state: ReturnTyp
     if (!instruction) { state.setResultChangeError(copy.requestChangesRequired ?? "Describe the required change before starting the rerun."); return; }
     if (!lastCompletedResultNode) { state.setResultChangeError(copy.requestChangesUnavailable ?? "No completed result step is available to rerun."); return; }
     state.setResultChangeError(null); state.setIsSubmittingResultChanges(true);
-    try { await props.onDispatchExecutionAction({ action: "retry_node", nodeId: lastCompletedResultNode.id, prompt: instruction }); state.setIsRequestingResultChanges(false); state.setResultChangeInstruction(""); }
+    try { await props.onDispatchExecutionAction({ action: "retry_node", nodeId: lastCompletedResultNode.id, prompt: instruction }); }
     catch (error) { state.setResultChangeError(error instanceof Error ? error.message : String(error)); }
     finally { state.setIsSubmittingResultChanges(false); }
   };

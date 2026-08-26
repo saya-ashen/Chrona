@@ -17,6 +17,8 @@ async function resetDb() {
   await db.taskDependency.deleteMany();
   await db.memory.deleteMany();
   await db.task.deleteMany();
+  await db.aiFeatureBinding.deleteMany();
+  await db.aiClient.deleteMany();
   await db.workspace.deleteMany();
 }
 
@@ -28,7 +30,6 @@ const FUTURE_END = new Date(Date.now() + 25 * 60 * 60 * 1000);
 async function seedScheduledBlock(input: {
   workspaceId: string;
   status?: string;
-  executionRuntime?: string;
   scheduledStartAt?: Date;
   scheduledEndAt?: Date;
   accepted?: boolean;
@@ -39,7 +40,6 @@ async function seedScheduledBlock(input: {
       title: "Auto-start candidate",
       status: (input.status ?? "Ready") as never,
       priority: "Medium",
-      executionRuntime: input.executionRuntime ?? "hermes",
       executionConfig: {},
       autoExecute: true,
       autoExecuteTiming: "at_start",
@@ -110,6 +110,15 @@ function findBlock(page: Awaited<ReturnType<typeof getSchedulePage>>, taskId: st
 describe("getSchedulePage auto-start eligibility reason", () => {
   beforeEach(async () => {
     await resetDb();
+    await db.aiClient.create({
+      data: {
+        name: "OMP",
+        type: "omp",
+        config: {},
+        isDefault: true,
+        enabled: true,
+      },
+    });
   });
 
   afterAll(async () => {
@@ -118,7 +127,7 @@ describe("getSchedulePage auto-start eligibility reason", () => {
 
   it("reports no_accepted_plan when a due block lacks an accepted plan", async () => {
     const workspace = await db.workspace.create({
-      data: { name: "ws", status: "Active", defaultRuntime: "hermes" },
+      data: { name: "ws", status: "Active" },
     });
     const { task } = await seedScheduledBlock({ workspaceId: workspace.id });
 
@@ -128,25 +137,25 @@ describe("getSchedulePage auto-start eligibility reason", () => {
     expect(block?.autoStartReason).toBe("no_accepted_plan");
   });
 
-  it("reports no_runtime_config when the task has no runtime or provider configuration", async () => {
+  it("reports no_provider_config when the task has no AI provider", async () => {
+    await db.aiClient.deleteMany();
     const workspace = await db.workspace.create({
-      data: { name: "ws", status: "Active", defaultRuntime: "" },
+      data: { name: "ws", status: "Active" },
     });
     const { task } = await seedScheduledBlock({
       workspaceId: workspace.id,
-      executionRuntime: "",
       accepted: true,
     });
 
     const page = await getSchedulePage(workspace.id);
     const block = findBlock(page, task.id);
     expect(block?.autoStartEligible).toBe(false);
-    expect(block?.autoStartReason).toBe("no_runtime_config");
+    expect(block?.autoStartReason).toBe("no_provider_config");
   });
 
   it("reports already_running when the task has an active run", async () => {
     const workspace = await db.workspace.create({
-      data: { name: "ws", status: "Active", defaultRuntime: "hermes" },
+      data: { name: "ws", status: "Active" },
     });
     const { task } = await seedScheduledBlock({
       workspaceId: workspace.id,
@@ -169,7 +178,7 @@ describe("getSchedulePage auto-start eligibility reason", () => {
 
   it("reports not_due when the block is scheduled in the future", async () => {
     const workspace = await db.workspace.create({
-      data: { name: "ws", status: "Active", defaultRuntime: "hermes" },
+      data: { name: "ws", status: "Active" },
     });
     const { task } = await seedScheduledBlock({
       workspaceId: workspace.id,
@@ -186,7 +195,7 @@ describe("getSchedulePage auto-start eligibility reason", () => {
 
   it("reports invalid_task_status when the task status cannot auto-start", async () => {
     const workspace = await db.workspace.create({
-      data: { name: "ws", status: "Active", defaultRuntime: "hermes" },
+      data: { name: "ws", status: "Active" },
     });
     const { task } = await seedScheduledBlock({
       workspaceId: workspace.id,
@@ -202,7 +211,7 @@ describe("getSchedulePage auto-start eligibility reason", () => {
 
   it("returns ok with a null reason when the block is fully eligible", async () => {
     const workspace = await db.workspace.create({
-      data: { name: "ws", status: "Active", defaultRuntime: "hermes" },
+      data: { name: "ws", status: "Active" },
     });
     const { task } = await seedScheduledBlock({
       workspaceId: workspace.id,

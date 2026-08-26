@@ -1,14 +1,7 @@
-import {
-  deleteValueAtPath,
-  getValueAtPath,
-  setValueAtPath,
-  validateTaskConfigAgainstSpec,
-} from "@chrona/runtime-core";
-import type { RuntimeInput, RuntimeTaskConfigField, RuntimeTaskConfigSpec } from "@chrona/runtime-core";
 import { normalizeAutomationTiming } from "@chrona/contracts";
-import type { TaskConfigExecutionRuntime } from "@features/task-workspace/public/workspace-integration";
 import { recurrencePresetFromRule, recurrenceRuleFromState } from "../recurrence-presets";
 import type {
+  ExecutionConfigInput,
   TaskConfigCopy,
   TaskConfigFormInput,
   TaskConfigFormState,
@@ -68,15 +61,20 @@ export const TIME_OPTIONS = Array.from({ length: 24 * 4 }, (_, index) => {
   return `${padDatePart(Math.floor(totalMinutes / 60))}:${padDatePart(totalMinutes % 60)}`;
 });
 
-function isRuntimeInputObject(value: unknown): value is RuntimeInput {
+function isExecutionConfig(value: unknown): value is ExecutionConfigInput {
   return !!value && typeof value === "object" && !Array.isArray(value);
 }
 
-function formatRuntimeConfig(value: unknown) {
-  return value && typeof value === "object" && !Array.isArray(value) ? JSON.stringify(value, null, 2) : "";
+function formatExecutionConfig(value: unknown) {
+  return isExecutionConfig(value) && Object.keys(value).length > 0
+    ? JSON.stringify(value, null, 2)
+    : "";
 }
 
-function parseRuntimeConfig(value: string, copy: Pick<TaskConfigCopy, "errorInvalidJson" | "errorJsonObject">): RuntimeInput | null {
+function parseExecutionConfig(
+  value: string,
+  copy: Pick<TaskConfigCopy, "errorInvalidJson" | "errorJsonObject">,
+): ExecutionConfigInput | null {
   const trimmed = value.trim();
   if (!trimmed) return null;
   let parsed: unknown;
@@ -85,63 +83,28 @@ function parseRuntimeConfig(value: string, copy: Pick<TaskConfigCopy, "errorInva
   } catch {
     throw new Error(copy.errorInvalidJson);
   }
-  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) throw new Error(copy.errorJsonObject);
-  return parsed as RuntimeInput;
+  if (!isExecutionConfig(parsed)) throw new Error(copy.errorJsonObject);
+  return parsed;
 }
 
-export function cloneRuntimeInput(input: RuntimeInput) {
+export function cloneExecutionConfig(input: ExecutionConfigInput) {
   return structuredClone(input);
 }
 
-export function resolveExecutionRuntime(
-  executionRuntimes: TaskConfigExecutionRuntime[],
-  executionRuntime: string | null | undefined,
-  defaultExecutionRuntime: string,
-) {
-  const normalizedKey = executionRuntime?.trim() || defaultExecutionRuntime;
-  return executionRuntimes.find((runtime) => runtime.key === normalizedKey) ?? executionRuntimes[0];
-}
-
-function pickSpecFieldRuntimeInput(spec: RuntimeTaskConfigSpec, runtimeInput: RuntimeInput) {
-  const picked: RuntimeInput = {};
-  for (const field of spec.fields) {
-    const value = getValueAtPath(runtimeInput, field.path);
-    if (value !== undefined) setValueAtPath(picked, field.path, structuredClone(value));
-  }
-  return picked;
-}
-
-function pickExtraRuntimeInput(spec: RuntimeTaskConfigSpec, runtimeInput: RuntimeInput) {
-  const extra = cloneRuntimeInput(runtimeInput);
-  for (const field of spec.fields) deleteValueAtPath(extra, field.path);
-  return Object.keys(extra).length > 0 ? extra : null;
-}
-
-function stripDefaultRuntimeFieldValues(spec: RuntimeTaskConfigSpec, runtimeInput: RuntimeInput) {
-  const strippedRuntimeInput = cloneRuntimeInput(runtimeInput);
-  for (const field of spec.fields) {
-    const value = getValueAtPath(strippedRuntimeInput, field.path);
-    if (field.defaultValue !== undefined && value !== undefined && JSON.stringify(value) === JSON.stringify(field.defaultValue)) {
-      deleteValueAtPath(strippedRuntimeInput, field.path);
+function buildInitialExecutionState(executionConfig: unknown) {
+  const raw = isExecutionConfig(executionConfig)
+    ? cloneExecutionConfig(executionConfig)
+    : {};
+  const fieldExecutionConfig: ExecutionConfigInput = {};
+  for (const key of ["model", "contextStrategy"] as const) {
+    if (raw[key] !== undefined) {
+      fieldExecutionConfig[key] = raw[key];
+      delete raw[key];
     }
   }
-  return strippedRuntimeInput;
-}
-
-function buildInitialRuntimeState(input: {
-  executionRuntimes: TaskConfigExecutionRuntime[];
-  defaultExecutionRuntime: string;
-  executionRuntime?: string | null;
-  executionConfig?: unknown;
-}) {
-  const runtime = resolveExecutionRuntime(input.executionRuntimes, input.executionRuntime, input.defaultExecutionRuntime);
-  const rawExecutionConfig = isRuntimeInputObject(input.executionConfig) ? input.executionConfig : {};
-  const explicitExecutionConfig = validateTaskConfigAgainstSpec(runtime.spec, rawExecutionConfig, { applyDefaults: false });
-  const hydratedExecutionConfig = stripDefaultRuntimeFieldValues(runtime.spec, explicitExecutionConfig);
   return {
-    executionRuntime: runtime.key,
-    fieldExecutionConfig: pickSpecFieldRuntimeInput(runtime.spec, hydratedExecutionConfig),
-    extraExecutionConfig: formatRuntimeConfig(pickExtraRuntimeInput(runtime.spec, hydratedExecutionConfig)),
+    fieldExecutionConfig,
+    extraExecutionConfig: formatExecutionConfig(raw),
   };
 }
 
@@ -181,36 +144,34 @@ function initialRecurrenceFieldValues(initialValues: TaskConfigInitialValues | u
   };
 }
 
-export function toFormState(
-  initialValues: TaskConfigInitialValues | undefined,
-  executionRuntimes: TaskConfigExecutionRuntime[],
-  defaultExecutionRuntime: string,
-): TaskConfigFormState {
-  const runtimeState = buildInitialRuntimeState({
-    executionRuntimes,
-    defaultExecutionRuntime,
-    executionRuntime: initialValues?.executionRuntime,
-    executionConfig: initialValues?.executionConfig,
-  });
+export function toFormState(initialValues: TaskConfigInitialValues | undefined): TaskConfigFormState {
   return {
     ...initialTextValues(initialValues),
     ...initialScheduleValues(initialValues),
     ...initialAutomationValues(initialValues),
     ...initialRecurrenceFieldValues(initialValues),
-    ...runtimeState,
+    ...buildInitialExecutionState(initialValues?.executionConfig),
   };
 }
 
-function parseExtraRuntimeInput(formState: TaskConfigFormState, copy: Pick<TaskConfigCopy, "errorInvalidJson" | "errorJsonObject">, throwOnInvalidJson: boolean) {
+function parseExtraExecutionConfig(
+  formState: TaskConfigFormState,
+  copy: Pick<TaskConfigCopy, "errorInvalidJson" | "errorJsonObject">,
+  throwOnInvalidJson: boolean,
+) {
   try {
-    return parseRuntimeConfig(formState.extraExecutionConfig, copy);
+    return parseExecutionConfig(formState.extraExecutionConfig, copy);
   } catch (error) {
     if (throwOnInvalidJson) throw error;
     return undefined;
   }
 }
 
-function validateSchedule(formState: TaskConfigFormState, throwOnInvalidJson: boolean, copy: Pick<TaskConfigCopy, "errorIncompleteSchedule" | "errorInvalidScheduleRange">) {
+function validateSchedule(
+  formState: TaskConfigFormState,
+  throwOnInvalidJson: boolean,
+  copy: Pick<TaskConfigCopy, "errorIncompleteSchedule" | "errorInvalidScheduleRange">,
+) {
   const hasPartialSchedule = !!formState.scheduledDate || !!formState.scheduledStartTime || !!formState.scheduledEndTime;
   const scheduledStartAt = buildDateTimeFromLocalParts(formState.scheduledDate, formState.scheduledStartTime);
   const scheduledEndAt = buildDateTimeFromLocalParts(formState.scheduledDate, formState.scheduledEndTime);
@@ -228,20 +189,14 @@ function validateSchedule(formState: TaskConfigFormState, throwOnInvalidJson: bo
 
 export function buildTaskConfigFormInput(
   formState: TaskConfigFormState,
-  executionRuntimes: TaskConfigExecutionRuntime[],
   copy: Pick<TaskConfigCopy, "errorInvalidJson" | "errorJsonObject" | "errorIncompleteSchedule" | "errorInvalidScheduleRange">,
   options?: { throwOnInvalidJson?: boolean },
 ): TaskConfigFormInput | null {
   const throwOnInvalidJson = options?.throwOnInvalidJson ?? false;
-  const extraRuntimeInput = parseExtraRuntimeInput(formState, copy, throwOnInvalidJson);
-  if (extraRuntimeInput === undefined) return null;
+  const extraExecutionConfig = parseExtraExecutionConfig(formState, copy, throwOnInvalidJson);
+  if (extraExecutionConfig === undefined) return null;
   const schedule = validateSchedule(formState, throwOnInvalidJson, copy);
   if (!schedule) return null;
-  const executionRuntime = resolveExecutionRuntime(executionRuntimes, formState.executionRuntime, formState.executionRuntime);
-  const executionConfig = validateTaskConfigAgainstSpec(executionRuntime.spec, {
-    ...cloneRuntimeInput(formState.fieldExecutionConfig),
-    ...(extraRuntimeInput ?? {}),
-  }) as RuntimeInput;
   const recurrenceRule = recurrenceRuleFromState(formState.recurrenceMode, formState.recurrenceCustomRule);
   return {
     title: formState.title,
@@ -249,8 +204,10 @@ export function buildTaskConfigFormInput(
     priority: formState.priority,
     dueAt: formState.dueAt ? new Date(formState.dueAt) : null,
     ...schedule,
-    executionRuntime: executionRuntime.key,
-    executionConfig,
+    executionConfig: {
+      ...(extraExecutionConfig ?? {}),
+      ...cloneExecutionConfig(formState.fieldExecutionConfig),
+    },
     aiClientId: formState.aiClientId || null,
     autoPlanGeneration: formState.autoExecute || formState.autoPlanGeneration,
     autoExecute: formState.autoExecute,
@@ -265,12 +222,12 @@ export function buildTaskConfigFormInput(
 export function applyPresetValues(
   current: TaskConfigFormState,
   values: TaskConfigPreset["values"],
-  executionRuntimes: TaskConfigExecutionRuntime[],
-  defaultExecutionRuntime: string,
 ) {
   const next = applyPrimitivePresetValues(current, values);
   const withSchedule = applySchedulePresetValues(next, values);
-  return applyRuntimePresetValues(withSchedule, values, executionRuntimes, defaultExecutionRuntime);
+  return "executionConfig" in values
+    ? { ...withSchedule, ...buildInitialExecutionState(values.executionConfig) }
+    : withSchedule;
 }
 
 function presetValue<Key extends keyof TaskConfigFormInput, Value>(
@@ -307,43 +264,4 @@ function applySchedulePresetValues(current: TaskConfigFormState, values: TaskCon
     scheduledStartTime: formatLocalTimeInput(values.scheduledStartAt ?? null),
     scheduledEndTime: formatLocalTimeInput(values.scheduledEndAt ?? null),
   };
-}
-
-function applyRuntimePresetValues(
-  current: TaskConfigFormState,
-  values: TaskConfigPreset["values"],
-  executionRuntimes: TaskConfigExecutionRuntime[],
-  defaultExecutionRuntime: string,
-) {
-  if (!("executionRuntime" in values || "executionConfig" in values)) return current;
-  return {
-    ...current,
-    ...buildInitialRuntimeState({
-      executionRuntimes,
-      defaultExecutionRuntime,
-      executionRuntime: values.executionRuntime ?? current.executionRuntime,
-      executionConfig: values.executionConfig,
-    }),
-  };
-}
-
-export function readDisplayedFieldValue(field: RuntimeTaskConfigField, runtimeInput: RuntimeInput) {
-  const value = getValueAtPath(runtimeInput, field.path);
-  return value === undefined ? field.defaultValue : value;
-}
-
-export function isFieldVisible(field: RuntimeTaskConfigField, runtimeInput: RuntimeInput) {
-  if (!field.visibleWhen || field.visibleWhen.length === 0) return true;
-  return field.visibleWhen.every((rule) => {
-    const value = getValueAtPath(runtimeInput, rule.path);
-    return rule.op === "eq" ? value === rule.value : Array.isArray(rule.value) && rule.value.includes(value);
-  });
-}
-
-export function renderFieldValue(value: unknown) {
-  if (value === undefined || value === null) return "";
-  if (typeof value === "string") return value;
-  if (typeof value === "number") return String(value);
-  if (typeof value === "boolean") return value ? "true" : "false";
-  return JSON.stringify(value);
 }

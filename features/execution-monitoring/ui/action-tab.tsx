@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { CheckpointInputFields, ExecutionActionInput, SubmitCheckpointActionInput } from "@chrona/contracts";
 import { buildActionSpec, type ActionItemInput } from "@chrona/ui-protocol";
+import { Badge } from "@shared/ui";
+import { useI18n } from "@chrona/i18n";
 import {
   actionKindForNode,
   buildWorkspaceCheckpointActionInput,
@@ -9,6 +11,13 @@ import {
   type PlanNodeDataModel,
   type TaskExecutionDispatchResult,
 } from "@features/task-workspace/public/workspace-integration";
+
+function manualFormMessage(key: string) {
+  if (key === "pages.tasks.manualFormAiValidated") return "AI validated";
+  if (key === "pages.tasks.manualFormRuntimeRefined") return "Runtime-refined form";
+  if (key === "pages.tasks.manualFormPlanSource") return "Plan form";
+  return key;
+}
 
 function isTerminalStatus(status: PlanNodeDataModel["status"]) {
   return status === "done" || status === "skipped";
@@ -99,6 +108,8 @@ export function useActionSpecRenderConfig({
     fields: fields.map((field) => ({
       key: field.key,
       label: field.label,
+      description: field.description,
+      placeholder: field.placeholder,
       value: field.value,
       control: field.control,
       required: field.required,
@@ -149,6 +160,24 @@ export function useActionSpecRenderConfig({
 }
 
 export function ActionTab(props: Parameters<typeof useActionSpecRenderConfig>[0]) {
+  const i18n = useI18n();
+  const t = typeof i18n.t === "function" ? i18n.t : manualFormMessage;
   const { spec, handlers, onStateChange } = useActionSpecRenderConfig(props);
-  return <SpecRenderer spec={spec} handlers={handlers} onStateChange={onStateChange} />;
+  const hasReviewedManualForm = props.node?.checkpoint?.kind === "manual_completion";
+  return (
+    <div
+      data-ui-surface-kind={hasReviewedManualForm ? "ai-authored" : "runtime-control"}
+      data-runtime-control={hasReviewedManualForm ? "manual-completion" : undefined}
+    >
+      {hasReviewedManualForm ? (
+        <div className="mb-3 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+          <Badge variant="outline">{t("pages.tasks.manualFormAiValidated")}</Badge>
+          <span>{props.node?.checkpoint?.form?.source === "runtime_ai"
+            ? t("pages.tasks.manualFormRuntimeRefined")
+            : t("pages.tasks.manualFormPlanSource")}</span>
+        </div>
+      ) : null}
+      <SpecRenderer spec={spec} handlers={handlers} onStateChange={onStateChange} />
+    </div>
+  );
 }

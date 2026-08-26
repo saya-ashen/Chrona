@@ -4,6 +4,8 @@ import { ActionBindingSchema, type ActionBinding } from "@json-render/core";
 export interface ActionFieldInput {
   key: string;
   label: string;
+  description?: string;
+  placeholder?: string;
   value: string | boolean | string[];
   control?: "text" | "textarea" | "select" | "approval" | "choice" | "boolean";
   required?: boolean;
@@ -136,9 +138,16 @@ export function buildActionSpec(input: ActionSpecInput): UiDocument {
       label: field.label,
       name: field.key,
       value: boundValue,
+      ...(field.placeholder ? { placeholder: field.placeholder } : {}),
       ...(isReadOnly && { disabled: true }),
       ...(checks && { checks, validateOn: "blur" }),
     };
+
+    if (field.description) {
+      const descriptionKey = `${elemKey}:description`;
+      elements[descriptionKey] = { type: "Text", props: { text: field.description } };
+      rootChildren.push(descriptionKey);
+    }
 
     if (field.control === "choice") {
       elements[elemKey] = {

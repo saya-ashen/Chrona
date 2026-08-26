@@ -48,13 +48,12 @@ describe("deleteTask", () => {
 
   it("deletes execution and orchestration records for the task tree", async () => {
     const workspace = await db.workspace.create({
-      data: { name: "Delete Task", status: "Active", defaultRuntime: "hermes" },
+      data: { name: "Delete Task", status: "Active" },
     });
     const parent = await db.task.create({
       data: {
         workspaceId: workspace.id,
         title: "Parent",
-        executionRuntime: "hermes",
         executionConfig: {},
         status: "Running",
         priority: "Medium",
@@ -65,7 +64,6 @@ describe("deleteTask", () => {
         workspaceId: workspace.id,
         parentTaskId: parent.id,
         title: "Child",
-        executionRuntime: "hermes",
         executionConfig: {},
         status: "Running",
         priority: "Medium",
@@ -120,13 +118,12 @@ describe("deleteTask", () => {
 
   it("deletes plan-linked runs that have durable artifacts", async () => {
     const workspace = await db.workspace.create({
-      data: { name: "Delete plan-linked run", status: "Active", defaultRuntime: "hermes" },
+      data: { name: "Delete plan-linked run", status: "Active" },
     });
     const task = await db.task.create({
       data: {
         workspaceId: workspace.id,
         title: "Plan-linked task",
-        executionRuntime: "hermes",
         executionConfig: {},
         status: "Completed",
         priority: "Medium",
@@ -195,16 +192,16 @@ describe("deleteTask", () => {
 
   it("previews and deletes Goal assets produced by the task tree", async () => {
     const workspace = await db.workspace.create({
-      data: { name: "Delete assets", status: "Active", defaultRuntime: "hermes" },
+      data: { name: "Delete assets", status: "Active" },
     });
     const goal = await db.goal.create({
       data: { workspaceId: workspace.id, title: "Goal", status: "Active", successCriteria: [] },
     });
     const parent = await db.task.create({
-      data: { workspaceId: workspace.id, goalId: goal.id, title: "Parent", executionRuntime: "hermes", executionConfig: {}, status: "Completed", priority: "Medium" },
+      data: { workspaceId: workspace.id, goalId: goal.id, title: "Parent", executionConfig: {}, status: "Completed", priority: "Medium" },
     });
     const child = await db.task.create({
-      data: { workspaceId: workspace.id, goalId: goal.id, parentTaskId: parent.id, title: "Child", executionRuntime: "hermes", executionConfig: {}, status: "Completed", priority: "Medium" },
+      data: { workspaceId: workspace.id, goalId: goal.id, parentTaskId: parent.id, title: "Child", executionConfig: {}, status: "Completed", priority: "Medium" },
     });
     const run = await db.run.create({
       data: { taskId: child.id, runtimeName: "hermes", status: "Completed", triggeredBy: "user" },
@@ -244,10 +241,10 @@ describe("deleteTask", () => {
 
   it("rejects deletion when the confirmed impact is stale", async () => {
     const workspace = await db.workspace.create({
-      data: { name: "Stale delete", status: "Active", defaultRuntime: "hermes" },
+      data: { name: "Stale delete", status: "Active" },
     });
     const task = await db.task.create({
-      data: { workspaceId: workspace.id, title: "Task", executionRuntime: "hermes", executionConfig: {}, status: "Ready", priority: "Medium" },
+      data: { workspaceId: workspace.id, title: "Task", executionConfig: {}, status: "Ready", priority: "Medium" },
     });
 
     await expect(deleteTask(task.id, { expectedTaskIds: [task.id], expectedAssetIds: ["missing-asset"] }))

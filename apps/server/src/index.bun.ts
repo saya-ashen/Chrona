@@ -2,6 +2,8 @@ import { bootstrapServerRuntime } from "./bootstrap";
 import { createServerApp } from "./app";
 import { resolve } from "node:path";
 import { ensureSqliteDatabase } from "@chrona/db/sqlite-migrations";
+import { recoverInterruptedSqliteRestore } from "@chrona/db/sqlite-backup";
+import { acquireSqliteRuntimeLock } from "@chrona/db/sqlite-runtime-lock";
 import { createLogger } from "@chrona/logging";
 import { assertSafeBind, isUnsafePublicBindOverride, readEnv, resolveAllowedOrigins, resolvePort } from "./config/env";
 
@@ -16,13 +18,29 @@ export async function startBunServer() {
   const port = resolvePort(env);
 
   await assertSafeBind(env);
-  ensureSqliteDatabase({
-    databaseUrl: env.DATABASE_URL,
-    migrationsDir: process.env.CHRONA_MIGRATIONS_DIR ?? resolve("prisma", "migrations"),
-  });
+  const databaseLock = acquireSqliteRuntimeLock(env.DATABASE_URL);
+  // Covers normal process exits that do not arrive through SIGINT/SIGTERM.
+  process.once("exit", () => databaseLock.release());
+  try {
+    recoverInterruptedSqliteRestore(env.DATABASE_URL);
+    ensureSqliteDatabase({
+      databaseUrl: env.DATABASE_URL,
+      migrationsDir: process.env.CHRONA_MIGRATIONS_DIR ?? resolve("prisma", "migrations"),
+      log: (message) => log.info("database migration", { message }),
+    });
+  } catch (error) {
+    databaseLock.release();
+    throw error;
+  }
   const runtimeLifecycle = bootstrapServerRuntime();
-
-  const app = await createServerApp();
+  let app: Awaited<ReturnType<typeof createServerApp>>;
+  try {
+    app = await createServerApp();
+  } catch (error) {
+    await runtimeLifecycle.stop().catch(() => undefined);
+    databaseLock.release();
+    throw error;
+  }
   if (await isUnsafePublicBindOverride(env)) {
     log.warn("unsafe public bind enabled", {
       host,
@@ -79,6 +97,8 @@ export async function startBunServer() {
       await db.$disconnect();
     } catch (err) {
       log.error("db disconnect failed", { error: String(err) });
+    } finally {
+      databaseLock.release();
     }
 
     log.info("shutdown complete", { signal });

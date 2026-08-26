@@ -1,15 +1,15 @@
 import type { ReactNode } from "react";
 import type { AutomationTimingPreset } from "@chrona/contracts";
-import type { RuntimeInput } from "@chrona/runtime-core";
-import type { TaskConfigAiClient, TaskConfigExecutionRuntime } from "@features/task-workspace/public/workspace-integration";
+import type { TaskConfigAiClient } from "@features/task-workspace/public/workspace-integration";
 import type { RecurrencePreset } from "../recurrence-presets";
 
 export type { TaskConfigFormDraft } from "@features/task-workspace/public/task-config-draft";
 import type { TaskConfigFormDraft } from "@features/task-workspace/public/task-config-draft";
 
+export type ExecutionConfigInput = Record<string, unknown>;
+
 export type TaskConfigFormInput = TaskConfigFormDraft & {
-  executionRuntime: string;
-  executionConfig: RuntimeInput;
+  executionConfig: ExecutionConfigInput;
   aiClientId: string | null;
   autoPlanGeneration: boolean;
   autoExecute: boolean;
@@ -35,8 +35,7 @@ export type TaskConfigFormState = {
   scheduledDate: string;
   scheduledStartTime: string;
   scheduledEndTime: string;
-  executionRuntime: string;
-  fieldExecutionConfig: RuntimeInput;
+  fieldExecutionConfig: ExecutionConfigInput;
   extraExecutionConfig: string;
   aiClientId: string;
   autoPlanGeneration: boolean;
@@ -56,7 +55,6 @@ export type TaskConfigInitialValues = {
   dueAt?: Date | null;
   scheduledStartAt?: Date | null;
   scheduledEndAt?: Date | null;
-  executionRuntime?: string | null;
   executionConfig?: unknown;
   aiClientId?: string | null;
   autoPlanGeneration?: boolean;
@@ -67,8 +65,6 @@ export type TaskConfigInitialValues = {
 };
 
 export type TaskConfigFormProps = {
-  executionRuntimes: TaskConfigExecutionRuntime[];
-  defaultExecutionRuntime: string;
   compact?: boolean;
   formId?: string;
   hideFooter?: boolean;
@@ -109,7 +105,6 @@ export type TaskConfigCopy = {
   recurrencePresets: Record<RecurrencePreset, string>;
   recurrenceCustomLabel: string;
   recurrenceCustomPlaceholder: string;
-  adapter: string;
   aiProvider: string;
   defaultAiProvider: string;
   aiProviderHint: string;
@@ -137,4 +132,4 @@ export type TaskConfigCopy = {
   actionFailed: string;
 };
 
-export type { TaskConfigAiClient, TaskConfigExecutionRuntime };
+export type { TaskConfigAiClient };

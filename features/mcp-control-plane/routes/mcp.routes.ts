@@ -1,4 +1,4 @@
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { WebStandardStreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/webStandardStreamableHttp.js";
 import type {
@@ -7,8 +7,13 @@ import type {
 	ServerRequest,
 } from "@modelcontextprotocol/sdk/types.js";
 import type { RequestHandlerExtra } from "@modelcontextprotocol/sdk/shared/protocol.js";
-import type { ChronaEngine } from "@chrona/engine";
-import { createHash, randomUUID } from "node:crypto";
+import {
+	validateRevokedRunToken,
+	validateRunToken,
+	type ChronaEngine,
+	type RunTokenScope,
+} from "@chrona/engine";
+import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
 import { createLogger } from "@chrona/logging";
 import { z } from "zod";
 import {
@@ -20,10 +25,22 @@ import {
 
 const MAX_MCP_TRANSPORT_SESSIONS = 100;
 const MCP_TRANSPORT_IDLE_TTL_MS = 10 * 60 * 1_000;
+type McpRunTokenScope = Pick<
+	RunTokenScope,
+	"taskId" | "workspaceId" | "taskSessionId" | "runId" | "runtimeSessionKey"
+>;
+type McpAuthKind = "local" | "api-key" | "run-token";
+type McpAuthIdentity = {
+	kind: McpAuthKind;
+	credentialDigest: string;
+	runTokenScope?: McpRunTokenScope;
+};
 type ManagedTransport = {
 	transport: WebStandardStreamableHTTPServerTransport;
 	lastActivityAt: number;
+	auth: McpAuthIdentity;
 };
+type McpRouteOptions = { apiKey?: string };
 
 function closeManagedTransport(
 	transports: Map<string, ManagedTransport>,
@@ -56,6 +73,80 @@ function evictExpiredTransports(
 			closeManagedTransport(transports, sessionId, "idle");
 		}
 	}
+}
+
+function bearerToken(authorization: string | undefined): string | undefined {
+	const match = authorization?.match(/^Bearer\s+(.+)$/i);
+	return match?.[1]?.trim() || undefined;
+}
+
+function credentialDigest(value: string): string {
+	return createHash("sha256").update(value).digest("hex");
+}
+
+function sameMcpRunTokenScope(left: McpRunTokenScope, right: McpRunTokenScope): boolean {
+	return left.taskId === right.taskId
+		&& left.workspaceId === right.workspaceId
+		&& left.taskSessionId === right.taskSessionId
+		&& left.runId === right.runId
+		&& left.runtimeSessionKey === right.runtimeSessionKey;
+}
+
+function toMcpRunTokenScope(scope: RunTokenScope): McpRunTokenScope {
+	return {
+		taskId: scope.taskId,
+		workspaceId: scope.workspaceId,
+		taskSessionId: scope.taskSessionId,
+		runId: scope.runId,
+		runtimeSessionKey: scope.runtimeSessionKey,
+	};
+}
+
+function matchesCredential(provided: string | undefined, expected: string): boolean {
+	if (!provided) return false;
+	const left = Buffer.from(provided);
+	const right = Buffer.from(expected);
+	return left.byteLength === right.byteLength && timingSafeEqual(left, right);
+}
+
+async function resolveMcpAuthIdentity(
+	authorization: string | undefined,
+	apiKey: string | undefined,
+): Promise<McpAuthIdentity | undefined> {
+	const token = bearerToken(authorization);
+	if (apiKey && matchesCredential(token, apiKey)) {
+		return { kind: "api-key", credentialDigest: credentialDigest(apiKey) };
+	}
+	if (!token) return apiKey ? undefined : { kind: "local", credentialDigest: "local" };
+	const scope = await validateRunToken(token);
+	return scope
+		? {
+			kind: "run-token",
+			credentialDigest: credentialDigest(token),
+			runTokenScope: toMcpRunTokenScope(scope),
+		}
+		: undefined;
+}
+
+function sameMcpAuthIdentity(left: McpAuthIdentity, right: McpAuthIdentity): boolean {
+	return left.kind === right.kind
+		&& left.credentialDigest === right.credentialDigest
+		&& (left.kind !== "run-token"
+			|| (left.runTokenScope !== undefined
+				&& right.runTokenScope !== undefined
+				&& sameMcpRunTokenScope(left.runTokenScope, right.runTokenScope)));
+}
+
+async function isRevokedTransportClose(
+	method: string,
+	authorization: string | undefined,
+	auth: McpAuthIdentity,
+): Promise<boolean> {
+	if (method !== "DELETE" || auth.kind !== "run-token") return false;
+	const token = bearerToken(authorization);
+	if (!token || credentialDigest(token) !== auth.credentialDigest) return false;
+	const scope = await validateRevokedRunToken(token);
+	return Boolean(scope && auth.runTokenScope && sameMcpRunTokenScope(auth.runTokenScope, toMcpRunTokenScope(scope)));
 }
 
 type ExternalChronaToolName = keyof typeof externalTools;
@@ -123,7 +214,8 @@ const externalTools = {
 	chrona_node_read: {
 		internalName: "chrona.node.read",
 		title: "Chrona Node Read",
-		description: "Read current execution node state through AI-visible refs.",
+		description:
+			"Read current execution state, or read bounded semantic result content for one AI-visible node ref. Use offset and maxChars to continue long result reads.",
 		inputSchema: publicToolSchema(
 			chronaPublicToolPayloadSchemas["chrona.node.read"],
 		),
@@ -351,7 +443,13 @@ function aiVisibleToolResult(
 	};
 }
 
-function aiVisibleToolText(result: ChronaToolResult): string {
+function aiVisibleToolText(
+	toolName: ChronaToolName,
+	result: ChronaToolResult,
+): string {
+	if (result.status === "accepted" && toolName.endsWith(".read")) {
+		return JSON.stringify(aiVisibleToolResult(toolName, result));
+	}
 	const issues = Array.isArray(result.recovery?.details?.issues)
 		? result.recovery.details.issues
 		: [];
@@ -394,12 +492,7 @@ function toChronaInput(
 		meta.evidence && typeof meta.evidence === "object"
 			? (meta.evidence as Record<string, unknown>)
 			: undefined;
-	const validatedPayload =
-		toolName === "chrona.goal.results.read"
-			? chronaPublicToolPayloadSchemas[toolName].parse(payload)
-			: toolName.endsWith(".read") || toolName === "chrona.schedule.clear"
-				? {}
-				: chronaPublicToolPayloadSchemas[toolName].parse(payload);
+	const validatedPayload = chronaPublicToolPayloadSchemas[toolName].parse(payload);
 	return {
 		sessionId: sessionIdFrom(input, extra, requestSessionId),
 		actorType: "agent" as const,
@@ -464,7 +557,7 @@ async function callChronaTool(
 		input: resolvedInput,
 	});
 	return {
-		content: [{ type: "text", text: aiVisibleToolText(result) }],
+		content: [{ type: "text", text: aiVisibleToolText(toolName, result) }],
 		structuredContent: aiVisibleToolResult(toolName, result),
 		isError: result.status === "rejected",
 	};
@@ -547,23 +640,44 @@ export const __mcpRouteTestHooks = {
 	toChronaInput,
 };
 
-export function createMcpRoutes(engine: ChronaEngine) {
+async function handleExistingMcpTransport(
+	c: Context,
+	transports: Map<string, ManagedTransport>,
+	sessionId: string,
+	transport: ManagedTransport,
+	auth: McpAuthIdentity | undefined,
+): Promise<Response> {
+	if (!auth || !sameMcpAuthIdentity(transport.auth, auth)) {
+		if (await isRevokedTransportClose(c.req.method, c.req.header("authorization"), transport.auth)) {
+			closeManagedTransport(transports, sessionId, "closed");
+			return c.body(null, 204);
+		}
+		return c.json({ error: "MCP credentials do not own this session." }, 401);
+	}
+	transport.lastActivityAt = Date.now();
+	if (c.req.raw.signal.aborted) {
+		closeManagedTransport(transports, sessionId, "aborted");
+		return c.body(null, 408);
+	}
+	return transport.transport.handleRequest(c.req.raw);
+}
+
+export function createMcpRoutes(engine: ChronaEngine, options: McpRouteOptions = {}) {
 	const app = new Hono();
 	const transports = new Map<string, ManagedTransport>();
 
 	app.all("/mcp", async (c) => {
 		evictExpiredTransports(transports);
+		const auth = await resolveMcpAuthIdentity(c.req.header("authorization"), options.apiKey);
 		const mcpSessionId = c.req.header("mcp-session-id");
 		const existingTransport = mcpSessionId
 			? transports.get(mcpSessionId)
 			: undefined;
 		if (existingTransport) {
-			existingTransport.lastActivityAt = Date.now();
-			if (c.req.raw.signal.aborted) {
-				closeManagedTransport(transports, mcpSessionId!, "aborted");
-				return c.body(null, 408);
-			}
-			return existingTransport.transport.handleRequest(c.req.raw);
+			return handleExistingMcpTransport(c, transports, mcpSessionId!, existingTransport, auth);
+		}
+		if (!auth) {
+			return c.json({ error: "Missing or invalid MCP credentials." }, 401);
 		}
 		if (mcpSessionId) {
 			return c.json({ error: "Unknown or expired MCP session." }, 404);
@@ -578,12 +692,19 @@ export function createMcpRoutes(engine: ChronaEngine) {
 
 		const requestSessionId =
 			c.req.query("session_id") ?? c.req.query("sessionId") ?? undefined;
+		if (auth.kind === "run-token" && requestSessionId !== auth.runTokenScope?.runtimeSessionKey) {
+			return c.json({ error: "Run token does not own this MCP session." }, 401);
+		}
 		const terminalOnly = c.req.query("terminal_only") === "1";
 		const transport = new WebStandardStreamableHTTPServerTransport({
 			enableJsonResponse: true,
 			sessionIdGenerator: randomUUID,
 			onsessioninitialized: (sessionId) => {
-				transports.set(sessionId, { transport, lastActivityAt: Date.now() });
+				transports.set(sessionId, {
+					transport,
+					lastActivityAt: Date.now(),
+					auth,
+				});
 				logger.info("mcp.transport.opened", {
 					sessionId,
 					activeSessions: transports.size,

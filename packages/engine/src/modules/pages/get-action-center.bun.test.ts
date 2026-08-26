@@ -34,7 +34,6 @@ async function seedTask(
       title,
       status: status as never,
       priority: "Medium",
-      executionRuntime: "hermes",
       executionConfig: {},
       ...extra,
     },
@@ -71,7 +70,6 @@ describe("getActionCenter actionable states", () => {
       data: {
         name: "Action Center WS",
         status: "Active",
-        defaultRuntime: "hermes",
       },
     });
 
@@ -201,7 +199,6 @@ describe("getActionCenter actionable states", () => {
       data: {
         name: "Action Center plan-run approval",
         status: "Active",
-        defaultRuntime: "hermes",
       },
     });
     const task = await seedTask(
@@ -268,7 +265,6 @@ describe("getActionCenter actionable states", () => {
       data: {
         name: "Action Center closed task plan runs",
         status: "Active",
-        defaultRuntime: "hermes",
       },
     });
 
@@ -343,7 +339,6 @@ describe("getActionCenter actionable states", () => {
       data: {
         name: "Action Center dedup WS",
         status: "Active",
-        defaultRuntime: "hermes",
       },
     });
 
@@ -407,7 +402,6 @@ describe("getActionCenter actionable states", () => {
       data: {
         name: "Action Center recurring scopes",
         status: "Active",
-        defaultRuntime: "hermes",
       },
     });
     const task = await seedTask(workspace.id, "Recurring task", "Blocked", {
@@ -538,7 +532,6 @@ describe("getActionCenter actionable states", () => {
       data: {
         name: "Action Center fallback WS",
         status: "Active",
-        defaultRuntime: "hermes",
       },
     });
 
@@ -561,7 +554,6 @@ describe("getActionCenter actionable states", () => {
       data: {
         name: "Action Center notification WS",
         status: "Active",
-        defaultRuntime: "hermes",
       },
     });
 

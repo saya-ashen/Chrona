@@ -41,8 +41,16 @@ afterAll(async () => {
 });
 
 describe("AI Feature Runtime client bindings", () => {
-  it("rejects local-only providers without changing existing bindings", async () => {
-    const debug = await createClient("debug", { profile: "deterministic" });
+  it("rejects insecure or credential-bearing Hermes endpoints before persisting client configuration", async () => {
+    await expect(aiClientManagement.create({ name: "Remote Hermes", type: "hermes", config: { baseUrl: "http://192.168.1.12:8642", apiKey: "test-token" } }))
+      .rejects.toMatchObject({ code: ENGINE_ERROR_CODES.VALIDATION_FAILED });
+    await expect(aiClientManagement.create({ name: "Query credential", type: "hermes", config: { baseUrl: "https://hermes.example.test/?client_secret=not-stored" } }))
+      .rejects.toMatchObject({ code: ENGINE_ERROR_CODES.VALIDATION_FAILED });
+    expect(await db.aiClient.count()).toBe(0);
+  });
+
+  it("rejects providers with no safe terminal-only recovery without changing existing bindings", async () => {
+    const debug = await createClient("llm", {});
     await db.aiFeatureBinding.create({
       data: { id: "existing-binding", clientId: debug.id, feature: "chat" },
     });
@@ -59,6 +67,19 @@ describe("AI Feature Runtime client bindings", () => {
       .toEqual([{ feature: "chat" }]);
   });
 
+  it("accepts OMP only through terminal-only single-attempt recovery", async () => {
+    const omp = await createClient("omp", { model: "test-model" });
+
+    await expect(aiClientManagement.updateBindings({
+      clientId: omp.id,
+      features: ["goal.review", "task.plan"],
+      validFeatureSet,
+    })).resolves.toEqual(["goal.review", "task.plan"]);
+
+    expect(await db.aiFeatureBinding.findMany({ where: { clientId: omp.id }, orderBy: { feature: "asc" }, select: { feature: true } }))
+      .toEqual([{ feature: "goal.review" }, { feature: "task.plan" }]);
+  });
+
   it("accepts durable Hermes capabilities and stores canonical bindings", async () => {
     globalThis.fetch = mock(async () => new Response(JSON.stringify({
       features: {
@@ -68,7 +89,7 @@ describe("AI Feature Runtime client bindings", () => {
         run_stop: true,
       },
     }), { status: 200, headers: { "content-type": "application/json" } })) as unknown as typeof fetch;
-    const hermes = await createClient("hermes", { baseUrl: "http://hermes.test" });
+    const hermes = await createClient("hermes", { baseUrl: "https://hermes.test" });
 
     await expect(aiClientManagement.updateBindings({
       clientId: hermes.id,
@@ -87,13 +108,12 @@ describe("AI Feature Runtime client bindings", () => {
       data: { clientId: fallback.id, feature: "task.execution" },
     });
     const workspace = await db.workspace.create({
-      data: { name: "Task-bound provider", defaultRuntime: "debug", status: "Active" },
+      data: { name: "Task-bound provider", status: "Active" },
     });
     const task = await db.task.create({
       data: {
         workspaceId: workspace.id,
         title: "Pinned provider task",
-        executionRuntime: "debug",
         executionConfig: {},
         status: "Ready",
         priority: "Medium",
@@ -119,7 +139,7 @@ describe("AI Feature Runtime client bindings", () => {
 
   it("fails closed when Hermes capabilities cannot be verified", async () => {
     globalThis.fetch = mock(async () => { throw new Error("offline"); }) as unknown as typeof fetch;
-    const hermes = await createClient("hermes", { baseUrl: "http://offline.test" });
+    const hermes = await createClient("hermes", { baseUrl: "https://offline.test" });
 
     await expect(aiClientManagement.updateBindings({
       clientId: hermes.id,

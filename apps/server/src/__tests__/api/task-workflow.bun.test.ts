@@ -185,7 +185,6 @@ function createTaskRouter() {
 				description: parsed.data.description,
 				priority: parsed.data.priority,
 				autoExecute: parsed.data.autoExecute,
-				executionRuntime: parsed.data.executionRuntime,
 				executionConfig: parsed.data.executionConfig,
 			});
 
@@ -245,7 +244,6 @@ function createTaskRouter() {
 				description: parsed.data.description,
 				priority: parsed.data.priority,
 				status: parsed.data.status,
-				executionRuntime: parsed.data.executionRuntime,
 				executionConfig: parsed.data.executionConfig,
 			});
 			return json(c, result);

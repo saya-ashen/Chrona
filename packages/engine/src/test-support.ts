@@ -52,13 +52,6 @@ export {
   buildPlanGenerationTaskSessionKey,
   buildWorkBlockPlanTaskSessionKey,
   buildWorkBlockTaskSessionKey,
-  getRuntimeAdapterDefinition,
-  getRuntimeTaskConfigSpec,
-  isKnownExecutionRuntime,
-  listExecutionRuntimes,
-  resolveExecutionRuntime,
-  validateRuntimeTaskConfig,
-  validateTaskRuntimeConfig,
 } from "./modules/execution-runtime";
 export {
   getActionCenter,

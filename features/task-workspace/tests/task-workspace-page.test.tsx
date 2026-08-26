@@ -353,14 +353,11 @@ function testHeader(title: string): NonNullable<TaskPageData["header"]> {
 
 function taskData(): TaskPageData {
 	return {
-		defaultExecutionRuntime: "local",
-		executionRuntimes: [],
 		task: {
 			id: "task-1",
 			workspaceId: "workspace-1",
 			title: "Plan migration",
 			description: null,
-			executionRuntime: "local",
 			executionConfig: null,
 			autoPlanGeneration: false,
 			autoExecute: false,

@@ -16,7 +16,7 @@ async function resetDb() {
 
 async function seedScope(key: string) {
   const workspace = await db.workspace.create({
-    data: { name: `Terminalizer ${key}`, status: "Active", defaultRuntime: "hermes" },
+    data: { name: `Terminalizer ${key}`, status: "Active" },
   });
   const task = await db.task.create({
     data: {
@@ -24,7 +24,6 @@ async function seedScope(key: string) {
       title: `Terminalizer ${key}`,
       status: "Ready",
       priority: "Medium",
-      executionRuntime: "hermes",
       executionConfig: {},
     },
   });

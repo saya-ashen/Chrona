@@ -28,6 +28,7 @@ async function persistRuntimeEvent(context: RuntimeEventPersistenceContext, even
   const sequence = event.sequence ?? fallbackIndex;
   await withPlanExecutionDurability(async (tx) => {
     await assertRuntimeExecutionScope(tx, context);
+    await persistObservedProviderSessionRef(tx, context, event);
     const rawEvent = await appendRawEventLog(rawEventInput(context, event, sequence, occurredAt), tx);
     await afterRawEventPersistedForTest?.();
     const canonicalEvent = await appendCanonicalEvent(canonicalEventInput(context, event, rawEvent.id, sequence, occurredAt), tx);
@@ -37,6 +38,47 @@ async function persistRuntimeEvent(context: RuntimeEventPersistenceContext, even
   });
 }
 
+
+function observedProviderSessionRef(event: ProviderRunEvent): string | null {
+  const eventRef = event.nativeSessionId?.trim();
+  if (eventRef) return eventRef;
+  if (!("run" in event) || !event.run) return null;
+  return event.run.nativeSessionId?.trim() || null;
+}
+
+async function persistObservedProviderSessionRef(
+  tx: Prisma.TransactionClient,
+  context: RuntimeEventPersistenceContext,
+  event: ProviderRunEvent,
+) {
+  const providerSessionRef = observedProviderSessionRef(event);
+  if (
+    !providerSessionRef
+    || !context.providerClientId
+    || !context.providerConfigFingerprint
+  ) return;
+  await tx.taskSession.updateMany({
+    where: {
+      id: context.taskSessionId,
+      taskId: context.taskId,
+      providerClientId: context.providerClientId,
+      providerName: context.runtimeName,
+      providerConfigFingerprint: context.providerConfigFingerprint,
+    },
+    data: { providerSessionRef },
+  });
+  await tx.run.updateMany({
+    where: {
+      id: context.runId,
+      taskId: context.taskId,
+      taskSessionId: context.taskSessionId,
+      providerClientId: context.providerClientId,
+      providerName: context.runtimeName,
+      providerConfigFingerprint: context.providerConfigFingerprint,
+    },
+    data: { runtimeSessionRef: providerSessionRef },
+  });
+}
 
 function eventTime(timestamp: unknown): Date {
   const value = typeof timestamp === "string" ? new Date(timestamp) : new Date();

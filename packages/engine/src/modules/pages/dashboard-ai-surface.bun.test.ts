@@ -37,7 +37,7 @@ async function resetDb() {
 
 async function seedWorkspace(name: string) {
   const workspace = await db.workspace.create({
-    data: { name, status: "Active", defaultRuntime: "hermes" },
+    data: { name, status: "Active" },
   });
   return { workspaceId: workspace.id };
 }
@@ -49,7 +49,6 @@ async function seedTask(workspaceId: string, input: { title: string; status: "Bl
       title: input.title,
       status: input.status,
       priority: "High",
-      executionRuntime: "hermes",
       executionConfig: {},
     },
   });

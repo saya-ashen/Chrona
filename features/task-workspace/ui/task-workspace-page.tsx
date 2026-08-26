@@ -223,7 +223,6 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
 		saveSuccess,
 		taskConfigInitialValues,
 		draftEditableTask,
-		editSummary,
 		handleTaskConfigDraftStateChange,
 		persistTaskConfig,
 	} = useTaskWorkspaceEditorState(task, setTask);
@@ -252,6 +251,7 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
 		handleRetryFinalization,
 		isRetryingFinalization,
 		finalizationRetryError,
+		pendingCommand,
 		handleGeneratePlanFromHeader,
 		handleStopPlanGeneration,
 	} = useTaskWorkspacePlanState(
@@ -463,8 +463,6 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
 					onCancelDeleteConfirm={() => setShowDeleteConfirm(false)}
 					onDelete={() => void handleDelete()}
 					editSectionProps={{
-						executionRuntimes: data.executionRuntimes,
-						defaultExecutionRuntime: data.defaultExecutionRuntime,
 						isSaving,
 						taskConfigInitialValues,
 						availableAiClients: data.availableAiClients,
@@ -475,7 +473,6 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
 						sourceManaged: consoleView.task.sourceManaged,
 						saveSuccess,
 						saveError,
-						editSummary,
 						hasUnsavedConfigChanges,
 						currentProposal,
 						isApplying,
@@ -520,6 +517,7 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
 				onRetryFinalization={handleRetryFinalization}
 				isRetryingFinalization={isRetryingFinalization}
 				finalizationRetryError={finalizationRetryError}
+				pendingCommand={pendingCommand}
 				createGoalAction={goalPromotionAction}
 			/>
 		</div>

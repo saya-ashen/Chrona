@@ -81,6 +81,7 @@
         "@chrona/i18n": "workspace:*",
         "@chrona/integrations": "workspace:*",
         "@chrona/logging": "workspace:*",
+        "@chrona/providers-foundation": "workspace:*",
       },
     },
     "apps/web": {
@@ -89,7 +90,6 @@
         "@chrona/contracts": "workspace:*",
         "@chrona/domain": "workspace:*",
         "@chrona/i18n": "workspace:*",
-        "@chrona/runtime-core": "workspace:*",
         "@chrona/server": "workspace:*",
         "@chrona/shared": "workspace:*",
         "@chrona/ui-protocol": "workspace:*",
@@ -136,6 +136,7 @@
       "dependencies": {
         "@chrona-org/agent-cli": "workspace:*",
         "@chrona/integrations": "workspace:*",
+        "@chrona/providers-foundation": "workspace:*",
         "chalk": "^6.0.0",
         "cli-table3": "^0.6.5",
         "commander": "^15.0.0",
@@ -176,7 +177,6 @@
         "@chrona/logging": "workspace:*",
         "@chrona/providers-debug": "workspace:*",
         "@chrona/providers-foundation": "workspace:*",
-        "@chrona/runtime-core": "workspace:*",
         "@chrona/shared": "workspace:*",
         "@chrona/ui-protocol": "workspace:*",
       },
@@ -211,6 +211,7 @@
       "version": "0.1.0",
       "dependencies": {
         "@agentclientprotocol/sdk": "^1.3.0",
+        "@chrona/logging": "workspace:*",
         "@chrona/providers-foundation": "workspace:*",
       },
     },
@@ -264,13 +265,10 @@
       "version": "0.1.0",
       "dependencies": {
         "@chrona/contracts": "workspace:*",
+        "@chrona/logging": "workspace:*",
         "@chrona/providers-foundation": "workspace:*",
         "@oh-my-pi/pi-coding-agent": "^16.3.12",
       },
-    },
-    "packages/runtime-core": {
-      "name": "@chrona/runtime-core",
-      "version": "0.1.0",
     },
     "packages/shared": {
       "name": "@chrona/shared",
@@ -278,7 +276,6 @@
       "dependencies": {
         "@chrona/contracts": "workspace:*",
         "@chrona/providers-foundation": "workspace:*",
-        "@chrona/runtime-core": "workspace:*",
         "zod": "^4.4.3",
       },
     },
@@ -467,8 +464,6 @@
     "@chrona/providers-debug": ["@chrona/providers-debug@workspace:packages/providers/debug"],
 
     "@chrona/providers-foundation": ["@chrona/providers-foundation@workspace:packages/providers/foundation"],
-
-    "@chrona/runtime-core": ["@chrona/runtime-core@workspace:packages/runtime-core"],
 
     "@chrona/server": ["@chrona/server@workspace:apps/server"],
 

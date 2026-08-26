@@ -3,6 +3,11 @@ import { taskTriggerDefinitionSchema } from "@chrona/contracts/api";
 import { ensureWorkBlockTaskSession } from "@/modules/execution-runtime";
 import { expandRecurrenceRule } from "@chrona/integrations";
 import {
+  resolveTaskExecutionProviderSelection,
+  unresolvedTaskProviderName,
+  type TaskExecutionProviderSelection,
+} from "@/modules/ai";
+import {
   assertSchedulerWorkOwnership,
   type SchedulerWorkContext,
   withSchedulerWorkOwnership,
@@ -20,7 +25,7 @@ interface RecurringTask {
   id: string;
   workspaceId: string;
   title: string;
-  executionRuntime: string;
+  aiClientId: string | null;
   triggers: Array<{ id: string; kind: string; config: unknown; version: number }>;
 }
 
@@ -28,7 +33,7 @@ interface RecurringTask {
 function loadRecurringTasks() {
   return db.task.findMany({
     where: { definitionStatus: "Active", triggers: { some: { kind: "schedule", state: "Enabled" } } },
-    select: { id: true, workspaceId: true, title: true, executionRuntime: true, triggers: { where: { kind: "schedule", state: "Enabled" } } },
+    select: { id: true, workspaceId: true, title: true, aiClientId: true, triggers: { where: { kind: "schedule", state: "Enabled" } } },
   });
 }
 
@@ -39,6 +44,7 @@ async function materializeOccurrence(
   occurrence: { startsAt: Date; endsAt: Date },
   now: Date,
   existingKeys: Set<string | null>,
+  provider: TaskExecutionProviderSelection | null,
   workContext?: SchedulerWorkContext,
 ) {
   const occurrenceKey = `schedule:v${trigger.version}:${occurrence.startsAt.toISOString()}`;
@@ -78,7 +84,10 @@ async function materializeOccurrence(
     await ensureWorkBlockTaskSession({
       taskId: task.id,
       taskTitle: task.title,
-      runtimeName: task.executionRuntime,
+      runtimeName: provider?.providerName ?? unresolvedTaskProviderName(),
+      providerClientId: provider?.clientId,
+      providerName: provider?.providerName,
+      providerConfigFingerprint: provider?.configFingerprint,
       workBlockId: workBlock.id,
       sessionId: workBlock.sessionId,
       label: `${task.title} · Work block session`,
@@ -90,6 +99,9 @@ async function materializeOccurrence(
 
 async function expandTaskSchedule(task: RecurringTask, now: Date, lookaheadDate: Date, workContext?: SchedulerWorkContext) {
   let created = 0;
+  const provider = await resolveTaskExecutionProviderSelection({
+    aiClientId: task.aiClientId,
+  });
   for (const trigger of task.triggers) {
     const definition = taskTriggerDefinitionSchema.parse({ kind: trigger.kind, config: trigger.config });
     if (definition.kind !== "schedule" || definition.config.mode !== "recurring") continue;
@@ -100,7 +112,7 @@ async function expandTaskSchedule(task: RecurringTask, now: Date, lookaheadDate:
       select: { scheduledEndAt: true },
     });
     if (latestBlock?.scheduledEndAt && latestBlock.scheduledEndAt.getTime() >= lookaheadDate.getTime()) continue;
-    const expansionFrom = new Date(Math.max(latestBlock?.scheduledEndAt?.getTime() ?? anchorStartAt.getTime(), now.getTime()));
+    const expansionFrom = new Date(Math.max(latestBlock?.scheduledEndAt.getTime() ?? anchorStartAt.getTime(), now.getTime()));
     const expansionTo = definition.config.windowUntil ? new Date(Math.min(lookaheadDate.getTime(), new Date(definition.config.windowUntil).getTime())) : lookaheadDate;
     if (expansionTo <= expansionFrom) continue;
     const occurrences = expandRecurrenceRule(definition.config.rrule, anchorStartAt, definition.config.durationMs ?? 3_600_000, { from: expansionFrom, to: expansionTo, maxOccurrences: EXPANSION_MAX_OCCURRENCES });
@@ -109,7 +121,7 @@ async function expandTaskSchedule(task: RecurringTask, now: Date, lookaheadDate:
     await assertSchedulerWorkOwnership(workContext);
     for (const occurrence of occurrences) {
       await assertSchedulerWorkOwnership(workContext);
-      created += Number(await materializeOccurrence(task, trigger, occurrence, now, existingKeys, workContext));
+      created += Number(await materializeOccurrence(task, trigger, occurrence, now, existingKeys, provider, workContext));
     }
   }
   return created;

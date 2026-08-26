@@ -9,7 +9,7 @@ export type AutoStartSkipReason =
   | "not_due"
   | "already_running"
   | "invalid_task_status"
-  | "no_runtime_config"
+  | "no_provider_config"
   | "no_accepted_plan"
   | "requires_human_input"
   | "requires_approval"
@@ -42,7 +42,6 @@ type AutoStartEligibility =
 
 export type TaskLike = {
   status: string;
-  executionRuntime?: string | null;
   hasAcceptedPlan?: boolean;
   autoExecuteTiming?: string | null;
   providerId?: string | null;
@@ -82,8 +81,8 @@ const AUTO_START_DISABLED_REASONS: Record<AutoStartSkipReason, string> = {
   already_running: "A run is already active for this task.",
   invalid_task_status:
     "Only draft, ready, scheduled, or queued tasks can auto-start.",
-  no_runtime_config:
-    "Choose an execution runtime before automatic execution can start.",
+  no_provider_config:
+    "Connect an AI provider before automatic execution can start.",
   no_accepted_plan: "Accept a plan before automatic execution can start.",
   requires_human_input:
     "Automatic execution is paused until the requested input is provided.",
@@ -142,10 +141,6 @@ export function deriveAutoStartEligibility(input: {
     return blocked("already_running");
   }
 
-  if (!input.task.executionRuntime) {
-    return blocked("no_runtime_config");
-  }
-
   if (!input.task.hasAcceptedPlan) {
     return blocked("no_accepted_plan");
   }
@@ -155,8 +150,8 @@ export function deriveAutoStartEligibility(input: {
     autoPlanGeneration: true,
     autoExecute: true,
     hasAcceptedPlan: input.task.hasAcceptedPlan,
-    providerId: input.task.providerId ?? input.task.executionRuntime,
-    providerName: input.task.providerName ?? input.task.executionRuntime,
+    providerId: input.task.providerId,
+    providerName: input.task.providerName,
     providerConfigured: input.task.providerConfigured,
     providerTested: input.task.providerTested,
     providerReachable: input.task.providerReachable,
@@ -169,7 +164,9 @@ export function deriveAutoStartEligibility(input: {
   ) {
     return {
       ok: false,
-      reason: "automation_not_ready",
+      reason: policy.readiness === "provider_not_configured"
+        ? "no_provider_config"
+        : "automation_not_ready",
       disabledReason: policy.disabledReason,
     };
   }

@@ -8,7 +8,9 @@
     "agentdash": "./src/index.ts"
   },
   "dependencies": {
+    "@chrona/db": "workspace:*",
     "@chrona/integrations": "workspace:*",
+    "@chrona/providers-foundation": "workspace:*",
     "@chrona-org/agent-cli": "workspace:*",
     "commander": "^15.0.0",
     "chalk": "^6.0.0",

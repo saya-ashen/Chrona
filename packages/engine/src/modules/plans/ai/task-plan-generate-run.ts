@@ -24,7 +24,6 @@ function featureInput(input: TaskPlanGenerationFeatureInput) {
       goalContext: input.snapshot.task.goalContext,
       workBlockId: input.snapshot.workBlockId,
       estimatedMinutes: input.snapshot.task.estimatedMinutes,
-      executionRuntime: input.snapshot.task.executionRuntime,
     },
     currentHead: input.snapshot.head,
     userInstruction: input.userInstruction,

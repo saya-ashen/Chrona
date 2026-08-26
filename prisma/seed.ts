@@ -28,14 +28,12 @@ async function main() {
     update: {
       name: "My Chrona Workspace",
       description: "Example tasks that show planning, review, and AI-assisted execution.",
-      defaultRuntime: DEMO_RUNTIME,
       status: WorkspaceStatus.Active,
     },
     create: {
       id: "ws_demo",
       name: "My Chrona Workspace",
       description: "Example tasks that show planning, review, and AI-assisted execution.",
-      defaultRuntime: DEMO_RUNTIME,
       status: WorkspaceStatus.Active,
     },
   });
@@ -48,7 +46,6 @@ async function main() {
       description: "Turn this week's notes into a short team update with next steps.",
       status: TaskStatus.Running,
       priority: TaskPriority.High,
-      executionRuntime: DEMO_RUNTIME,
       executionConfig: {},
     },
     create: {
@@ -58,30 +55,27 @@ async function main() {
       description: "Turn this week's notes into a short team update with next steps.",
       status: TaskStatus.Running,
       priority: TaskPriority.High,
-      executionRuntime: DEMO_RUNTIME,
       executionConfig: {},
     },
   });
 
   const blockedTask = await prisma.task.upsert({
-    where: { id: "task_adapter" },
+    where: { id: "task_review" },
     update: {
       workspaceId: workspace.id,
       title: "Review AI draft before sending",
       description: "Check the proposed wording before Chrona applies or sends anything.",
       status: TaskStatus.Blocked,
       priority: TaskPriority.Urgent,
-      executionRuntime: DEMO_RUNTIME,
       executionConfig: {},
     },
     create: {
-      id: "task_adapter",
+      id: "task_review",
       workspaceId: workspace.id,
       title: "Review AI draft before sending",
       description: "Check the proposed wording before Chrona applies or sends anything.",
       status: TaskStatus.Blocked,
       priority: TaskPriority.Urgent,
-      executionRuntime: DEMO_RUNTIME,
       executionConfig: {},
     },
   });
@@ -95,7 +89,6 @@ async function main() {
       status: TaskStatus.Scheduled,
       priority: TaskPriority.Medium,
       dueAt: new Date("2026-04-17T18:00:00.000Z"),
-      executionRuntime: DEMO_RUNTIME,
       executionConfig: {},
     },
     create: {
@@ -106,7 +99,6 @@ async function main() {
       status: TaskStatus.Scheduled,
       priority: TaskPriority.Medium,
       dueAt: new Date("2026-04-17T18:00:00.000Z"),
-      executionRuntime: DEMO_RUNTIME,
       executionConfig: {},
     },
   });
@@ -120,7 +112,6 @@ async function main() {
       status: TaskStatus.Ready,
       priority: TaskPriority.Medium,
       dueAt: null,
-      executionRuntime: DEMO_RUNTIME,
       executionConfig: {},
     },
     create: {
@@ -130,7 +121,6 @@ async function main() {
       description: "Needs a planned slot before AI starts drafting the notes.",
       status: TaskStatus.Ready,
       priority: TaskPriority.Medium,
-      executionRuntime: DEMO_RUNTIME,
       executionConfig: {},
     },
   });
@@ -144,7 +134,6 @@ async function main() {
       status: TaskStatus.Running,
       priority: TaskPriority.High,
       dueAt: new Date("2026-04-15T18:00:00.000Z"),
-      executionRuntime: DEMO_RUNTIME,
       executionConfig: {},
     },
     create: {
@@ -155,7 +144,6 @@ async function main() {
       status: TaskStatus.Running,
       priority: TaskPriority.High,
       dueAt: new Date("2026-04-15T18:00:00.000Z"),
-      executionRuntime: DEMO_RUNTIME,
       executionConfig: {},
     },
   });
@@ -184,23 +172,23 @@ async function main() {
   });
 
   const blockedRun = await prisma.run.upsert({
-    where: { id: "run_adapter" },
+    where: { id: "run_review" },
     update: {
       taskId: blockedTask.id,
       runtimeName: DEMO_RUNTIME,
-      runtimeRunRef: `${DEMO_RUNTIME_REF_PREFIX}_run_adapter`,
-      runtimeSessionRef: `${DEMO_RUNTIME_REF_PREFIX}_session_adapter`,
+      runtimeRunRef: `${DEMO_RUNTIME_REF_PREFIX}_run_review`,
+      runtimeSessionRef: `${DEMO_RUNTIME_REF_PREFIX}_session_review`,
       status: RunStatus.WaitingForApproval,
       triggeredBy: "user",
       startedAt: new Date("2026-04-08T10:05:00.000Z"),
       resumeSupported: true,
     },
     create: {
-      id: "run_adapter",
+      id: "run_review",
       taskId: blockedTask.id,
       runtimeName: DEMO_RUNTIME,
-      runtimeRunRef: `${DEMO_RUNTIME_REF_PREFIX}_run_adapter`,
-      runtimeSessionRef: `${DEMO_RUNTIME_REF_PREFIX}_session_adapter`,
+      runtimeRunRef: `${DEMO_RUNTIME_REF_PREFIX}_run_review`,
+      runtimeSessionRef: `${DEMO_RUNTIME_REF_PREFIX}_session_review`,
       status: RunStatus.WaitingForApproval,
       triggeredBy: "user",
       startedAt: new Date("2026-04-08T10:05:00.000Z"),
@@ -228,7 +216,7 @@ async function main() {
   });
 
   await prisma.approval.upsert({
-    where: { id: "approval_adapter" },
+    where: { id: "approval_review" },
     update: {
       workspaceId: workspace.id,
       taskId: blockedTask.id,
@@ -241,7 +229,7 @@ async function main() {
       requestedAt: new Date("2026-04-08T10:06:00.000Z"),
     },
     create: {
-      id: "approval_adapter",
+      id: "approval_review",
       workspaceId: workspace.id,
       taskId: blockedTask.id,
       runId: blockedRun.id,

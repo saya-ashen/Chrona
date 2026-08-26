@@ -111,7 +111,6 @@ export async function getTaskBootstrap(input: { taskId: string; workBlockId?: st
         orderBy: { createdAt: "desc" },
         take: 1,
       },
-      workspace: { select: { defaultRuntime: true } },
       goal: { select: { id: true, title: true } },
       workBlocks: {
         where: { status: { in: ["Scheduled", "Active", "Completed"] } },
@@ -164,7 +163,7 @@ export async function getTaskBootstrap(input: { taskId: string; workBlockId?: st
   const currentWorkBlock = pickTaskPageWorkBlock(task.workBlocks, selectedWorkBlockId, new Date());
   const planWorkBlockId = selectedWorkBlockId ?? currentWorkBlock?.id ?? null;
   const latestSavedPlan = await getLatestTaskPlanReadModel(input.taskId, planWorkBlockId);
-  const importedEvent = task.importedCalendarEvents[0] ?? null;
+  const importedEvent = task.importedCalendarEvents.at(0) ?? null;
   const sourceManaged = importedEvent
     ? {
         source: "external_calendar" as const,
@@ -175,7 +174,7 @@ export async function getTaskBootstrap(input: { taskId: string; workBlockId?: st
         immutableFields: ["title", "scheduledStartAt", "scheduledEndAt"] as const,
       }
     : null;
-  const latestRun = task.runs[0] ?? null;
+  const latestRun = task.runs.at(0) ?? null;
   const recurrenceOccurrences = [
     { id: task.id, title: task.title, status: task.status, workBlocks: task.workBlocks },
     ...recurrenceSeriesTasks,
@@ -189,10 +188,7 @@ export async function getTaskBootstrap(input: { taskId: string; workBlockId?: st
         : savedPlan !== null
           ? "waiting_acceptance"
           : "idle";
-  const runnability = deriveTaskRunnability({
-    executionRuntime: task.executionRuntime || task.workspace.defaultRuntime,
-    executionConfig: task.executionConfig,
-  });
+  const runnability = deriveTaskRunnability();
   const orchestratorState = savedPlan?.effectivePlan
     ? reconcileTaskState({
         taskId: task.id,
@@ -214,7 +210,6 @@ export async function getTaskBootstrap(input: { taskId: string; workBlockId?: st
       title: task.title,
       description: task.description,
       sourceManaged,
-      executionRuntime: task.executionRuntime,
       executionConfig: task.executionConfig,
       aiClientId: task.aiClientId,
       autoPlanGeneration: task.autoPlanGeneration,

@@ -27,7 +27,7 @@ async function resetDb() {
 
 async function seedRecurringTask() {
   const workspace = await db.workspace.create({
-    data: { name: "Occurrence Isolation", status: "Active", defaultRuntime: "hermes" },
+    data: { name: "Occurrence Isolation", status: "Active" },
   });
   const task = await db.task.create({
     data: {
@@ -35,7 +35,6 @@ async function seedRecurringTask() {
       title: "Daily standup notes",
       status: "Running",
       priority: "Medium",
-      executionRuntime: "hermes",
       executionConfig: {},
       kind: "recurring",
       recurrenceRule: "FREQ=DAILY",

@@ -24,7 +24,7 @@ type FinalizeOutcomeInput = {
 };
 
 function pausedStatus(status: PlanExecutionStatus): boolean {
-  return ["waiting_for_user", "waiting_for_approval", "blocked", "failed"].includes(status);
+  return ["waiting_for_user", "waiting_for_approval", "blocked"].includes(status);
 }
 
 function outcomeCurrentNodeId(

@@ -51,7 +51,6 @@ export function useTaskWorkspaceProposalFlow({
           if (patch.dueAt !== undefined) body.dueAt = patch.dueAt ?? undefined;
           if (patch.scheduledStartAt !== undefined) body.scheduledStartAt = patch.scheduledStartAt ?? undefined;
           if (patch.scheduledEndAt !== undefined) body.scheduledEndAt = patch.scheduledEndAt ?? undefined;
-          if (patch.executionRuntime !== undefined) body.executionRuntime = patch.executionRuntime ?? undefined;
           if (patch.executionConfig !== undefined) body.executionConfig = patch.executionConfig ?? undefined;
 
           await apiJson(`/api/tasks/${encodeURIComponent(task.id)}`, {
@@ -65,7 +64,6 @@ export function useTaskWorkspaceProposalFlow({
           if (patch.dueAt !== undefined) patchedFields.dueAt = patch.dueAt;
           if (patch.scheduledStartAt !== undefined) patchedFields.scheduledStartAt = patch.scheduledStartAt;
           if (patch.scheduledEndAt !== undefined) patchedFields.scheduledEndAt = patch.scheduledEndAt;
-          if (patch.executionRuntime !== undefined) patchedFields.executionRuntime = patch.executionRuntime ?? undefined;
           if (patch.executionConfig !== undefined) patchedFields.executionConfig = patch.executionConfig;
           setTask((prev) => ({ ...prev, ...patchedFields }));
         } catch (cause) {

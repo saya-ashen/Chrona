@@ -13,7 +13,7 @@ async function resetExternalCalendarFixture() {
 }
 
 async function seedWorkspace(name: string) {
-  const workspace = await db.workspace.create({ data: { name, status: "Active", defaultRuntime: "hermes" } });
+  const workspace = await db.workspace.create({ data: { name, status: "Active" } });
   return { workspaceId: workspace.id };
 }
 

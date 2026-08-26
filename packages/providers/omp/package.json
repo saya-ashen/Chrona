@@ -5,6 +5,7 @@
   "type": "module",
   "dependencies": {
     "@chrona/contracts": "workspace:*",
+    "@chrona/logging": "workspace:*",
     "@chrona/providers-foundation": "workspace:*",
     "@oh-my-pi/pi-coding-agent": "^16.3.12"
   },

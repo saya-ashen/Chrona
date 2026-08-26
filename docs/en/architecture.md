@@ -42,7 +42,6 @@ flowchart TB
 | UI protocol      | `packages/ui-protocol`    | Declarative UI document schema + builders (json-render) shared by server and web                                         |
 | Integrations     | `packages/integrations/*` | User-approved local/remote setup, diagnosis, external plugin install, and restart helpers                                |
 | Database         | `packages/db` + `prisma`  | Prisma 7 + SQLite bootstrap, repositories, schema, migrations, seed                                                      |
-| Runtime core     | `packages/runtime-core`   | Backend-agnostic runtime support types/utilities shared by engine/providers                                              |
 | i18n             | `packages/i18n`           | Shared localization messages and helpers                                                                                 |
 | Shared browser/transport | `shared/http`, `shared/ui` | Generic browser/HTTP infrastructure and UI primitives; never product workflow logic                                  |
 | CLI              | `packages/cli`            | Packaged entry point for starting Chrona                                                                                 |
@@ -182,7 +181,7 @@ flowchart TD
   D -->|no ready nodes| L[complete execution]
 ```
 
-Execution nodes can be `task`, `checkpoint`, `condition`, or `wait`. Runtime events and graph events are streamed to the UI and persisted into task/work projections.
+Execution nodes can be `task`, `checkpoint`, `condition`, or `wait`. Runtime events and graph events are streamed to the UI and persisted into task/work projections. User/manual task nodes carry a planner-authored completion form. At activation, a durable structured AI feature reviews that form through the task's resolved Provider; success pauses with `manual_completion`/`WaitingForInput`, while review failure remains a retryable system failure rather than a manual-work blocker.
 
 ## Integration model
 

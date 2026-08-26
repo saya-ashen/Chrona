@@ -222,7 +222,6 @@ function pageData(input: {
     workspaceId: "workspace-1",
     title: "Launch task",
     description: null,
-    executionRuntime: "local",
     executionConfig: null,
     autoPlanGeneration: false,
     autoExecute: false,
@@ -243,8 +242,6 @@ function pageData(input: {
     dependencies: [],
   };
   return {
-    defaultExecutionRuntime: "local",
-    executionRuntimes: [],
     task,
     latestRunSummary: input.runStatus
       ? {
@@ -367,7 +364,16 @@ afterEach(() => {
     sessionStatus: "idle",
     result: null,
     isLoading: false,
+    error: null,
+    errorCode: null,
     phase: "idle",
+    statusMessage: null,
+    partialText: "",
+    toolCalls: [],
+    toolResults: [],
+    startedAt: null,
+    finishedAt: null,
+    connected: false,
     hydrated: true,
   };
 });
@@ -873,7 +879,7 @@ describe("task workspace page synchronization", () => {
     visibilitySpy.mockRestore();
   });
 
-  it("refreshes only plan state when plan generation completes", async () => {
+  it("refreshes plan state and full workspace when plan generation completes", async () => {
     const initialPlan = planReadModel({ id: "plan-1", status: "ready", title: "Old plan" });
     const generatedPlan = planReadModel({ id: "plan-2", status: "ready", title: "Generated plan" });
     const initialPage = pageData({ taskStatus: "Ready", plan: initialPlan, aiPlanGenerationStatus: "generating" });
@@ -892,7 +898,7 @@ describe("task workspace page synchronization", () => {
       emitWorkspaceEvent(nextWorkspaceEvent({ type: "task_workspace_updated", reason: "plan_generation.completed" }));
     });
 
-    expect(mocks.pageFetchCount).toBe(0);
+    await waitFor(() => expect(mocks.pageFetchCount).toBeGreaterThan(0));
     await waitFor(() => expect(result.current.plan.graphPlan?.nodes[0]?.title).toBe("Generated plan"));
   });
 
@@ -978,7 +984,7 @@ describe("task workspace page synchronization", () => {
       emitWorkspaceEvent(nextWorkspaceEvent({ type: "task_workspace_updated", reason: "plan_generation.completed" }));
     });
 
-    expect(mocks.pageFetchCount).toBe(0);
+    await waitFor(() => expect(mocks.pageFetchCount).toBeGreaterThan(0));
     await waitFor(() => expect(result.current.plan.graphPlan?.nodes[0]?.title).toBe("Generated plan"));
     expect(result.current.plan.planGenerationStatus).toBe("waiting_acceptance");
   });

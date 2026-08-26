@@ -653,14 +653,12 @@ async function resolveDefaultWorkspaceId() {
     update: {
       name: "Default Workspace",
       description: "Auto-created primary workspace for graph layout evaluation",
-      defaultRuntime: DEFAULT_RUNTIME,
       status: WorkspaceStatus.Active,
     },
     create: {
       id: DEFAULT_WORKSPACE_ID,
       name: "Default Workspace",
       description: "Auto-created primary workspace for graph layout evaluation",
-      defaultRuntime: DEFAULT_RUNTIME,
       status: WorkspaceStatus.Active,
     },
     select: { id: true },
@@ -696,7 +694,6 @@ async function seedFixture(fixture: Fixture, workspaceId: string) {
         description: fixture.description,
         status: TaskStatus.Ready,
         priority: TaskPriority.Low,
-        executionRuntime: DEFAULT_RUNTIME,
         executionConfig: {},
       },
       create: {
@@ -706,7 +703,6 @@ async function seedFixture(fixture: Fixture, workspaceId: string) {
         description: fixture.description,
         status: TaskStatus.Ready,
         priority: TaskPriority.Low,
-        executionRuntime: DEFAULT_RUNTIME,
         executionConfig: {},
       },
     });

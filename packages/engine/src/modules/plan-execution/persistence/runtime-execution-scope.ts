@@ -15,6 +15,8 @@ export type RuntimeExecutionScope = {
   executionScope: string;
   providerRunId: string;
   runtimeName: string;
+  providerClientId?: string;
+  providerConfigFingerprint?: string;
   nodeContext?: {
     nodeId: string;
     nodeTitle: string;
@@ -44,6 +46,16 @@ export async function assertRuntimeExecutionScope(
         taskSessionId: true,
         workBlockId: true,
         occurrenceId: true,
+        providerClientId: true,
+        providerName: true,
+        providerConfigFingerprint: true,
+        taskSession: {
+          select: {
+            providerClientId: true,
+            providerName: true,
+            providerConfigFingerprint: true,
+          },
+        },
         task: { select: { workspaceId: true } },
       },
     }),
@@ -55,6 +67,9 @@ export async function assertRuntimeExecutionScope(
         planId: true,
         planRunId: true,
         nodeAttemptId: true,
+        aiClientId: true,
+        aiClientConfigDigest: true,
+        providerName: true,
         nodeAttempt: { select: { status: true, executionEpoch: true } },
       },
     }),
@@ -86,10 +101,19 @@ export async function assertRuntimeExecutionScope(
     && run.taskSessionId === context.taskSessionId
     && run.workBlockId === context.workBlockId
     && run.occurrenceId === context.occurrenceId
+    && (!context.providerClientId || run.providerClientId === context.providerClientId)
+    && (!context.providerClientId || run.providerName === context.runtimeName)
+    && (!context.providerConfigFingerprint || run.providerConfigFingerprint === context.providerConfigFingerprint)
+    && (!context.providerClientId || run.taskSession?.providerClientId === context.providerClientId)
+    && (!context.providerClientId || run.taskSession?.providerName === context.runtimeName)
+    && (!context.providerConfigFingerprint || run.taskSession?.providerConfigFingerprint === context.providerConfigFingerprint)
     && providerRun.runId === context.runId
     && providerRun.planId === context.planId
     && providerRun.planRunId === context.planRunId
     && providerRun.nodeAttemptId === context.nodeAttemptId
+    && (!context.providerClientId || providerRun.aiClientId === context.providerClientId)
+    && (!context.providerConfigFingerprint || providerRun.aiClientConfigDigest === context.providerConfigFingerprint)
+    && (!context.providerClientId || providerRun.providerName === context.runtimeName)
     && planRun.planId === context.planId
     && planRun.executionScopeId === context.executionScope
     && planRun.workBlockId === context.workBlockId

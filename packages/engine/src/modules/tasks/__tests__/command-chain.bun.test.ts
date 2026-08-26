@@ -50,6 +50,8 @@ async function resetDb() {
   await db.taskDependency.deleteMany();
   await db.memory.deleteMany();
   await db.task.deleteMany();
+  await db.aiFeatureBinding.deleteMany();
+  await db.aiClient.deleteMany();
   await db.workspace.deleteMany();
 }
 
@@ -68,7 +70,6 @@ describe("createTask", () => {
       data: {
         name: "Create Commands",
         status: "Active",
-        defaultRuntime: "hermes",
       },
     });
 
@@ -77,7 +78,6 @@ describe("createTask", () => {
       title: "  Bootstrap task creation  ",
       description: "  Add the first real create flow  ",
       priority: "High",
-      executionRuntime: "hermes",
       executionConfig: {
         prompt: "  Add the first real create flow  ",
       },
@@ -95,7 +95,7 @@ describe("createTask", () => {
     expect(storedTask.title).toBe("Bootstrap task creation");
     expect(storedTask.description).toBe("Add the first real create flow");
     expect(storedTask.status).toBe("Draft");
-    expect(storedTask.executionRuntime).toBe("hermes");
+    expect(storedTask).not.toHaveProperty("executionRuntime");
     expect(storedTask.executionConfig).toEqual({
       prompt: "  Add the first real create flow  ",
     });
@@ -115,12 +115,45 @@ describe("createTask", () => {
     );
   });
 
-  it("rejects non-object adapter config values from the server command", async () => {
+  it("derives task session provenance from the selected AI provider", async () => {
+    const workspace = await db.workspace.create({
+      data: { name: "Provider-owned task", status: "Active" },
+    });
+    const provider = await db.aiClient.create({
+      data: {
+        name: "OMP",
+        type: "omp",
+        config: { model: "default" },
+        isDefault: true,
+        enabled: true,
+      },
+    });
+
+    const result = await createTask({
+      workspaceId: workspace.id,
+      title: "Use provider identity",
+      aiClientId: provider.id,
+    });
+    const task = await db.task.findUniqueOrThrow({
+      where: { id: result.taskId },
+      include: { sessions: true },
+    });
+
+    expect(task).not.toHaveProperty("executionRuntime");
+    expect(task.aiClientId).toBe(provider.id);
+    expect(task.sessions[0]).toMatchObject({
+      runtimeName: "omp",
+      providerClientId: provider.id,
+      providerName: "omp",
+    });
+    expect(task.sessions[0]?.providerConfigFingerprint).toBeString();
+  });
+
+  it("rejects non-object execution config values from the server command", async () => {
     const workspace = await db.workspace.create({
       data: {
         name: "Invalid Config",
         status: "Active",
-        defaultRuntime: "hermes",
       },
     });
 
@@ -128,49 +161,9 @@ describe("createTask", () => {
       createTask({
         workspaceId: workspace.id,
         title: "Invalid runtime config",
-        executionRuntime: "hermes",
         executionConfig: null as never,
       }),
     ).rejects.toThrow(/executionConfig must be an object/);
-  });
-
-  it("falls back to the registered runtime when workspace default is stale", async () => {
-    const workspace = await db.workspace.create({
-      data: {
-        name: "Legacy Runtime",
-        status: "Active",
-        defaultRuntime: "openclaw",
-      },
-    });
-
-    const result = await createTask({
-      workspaceId: workspace.id,
-      title: "Use fallback runtime",
-    });
-
-    const storedTask = await db.task.findUniqueOrThrow({
-      where: { id: result.taskId },
-    });
-
-    expect(storedTask.executionRuntime).toBe("hermes");
-  });
-
-  it("still rejects an explicitly unsupported runtime", async () => {
-    const workspace = await db.workspace.create({
-      data: {
-        name: "Unsupported Runtime",
-        status: "Active",
-        defaultRuntime: "hermes",
-      },
-    });
-
-    await expect(
-      createTask({
-        workspaceId: workspace.id,
-        title: "Use unsupported runtime",
-        executionRuntime: "openclaw",
-      }),
-    ).rejects.toThrow("Unknown runtime: openclaw");
   });
 
 });
@@ -185,14 +178,12 @@ describe("updateTask", () => {
       data: {
         name: "Update Commands",
         status: "Active",
-        defaultRuntime: "hermes",
       },
     });
     const task = await db.task.create({
       data: {
         workspaceId: workspace.id,
-        title: "Keep adapter config",
-        executionRuntime: "hermes",
+        title: "Keep execution config",
         executionConfig: {
           prompt: "Original prompt",
           temperature: 0.2,
@@ -229,14 +220,12 @@ describe("updateTask", () => {
       data: {
         name: "Model Pin Updates",
         status: "Active",
-        defaultRuntime: "omp",
       },
     });
     const task = await db.task.create({
       data: {
         workspaceId: workspace.id,
         title: "Pinned model task",
-        executionRuntime: "omp",
         executionConfig: { prompt: "Original prompt" },
         pinnedModel: "OmniRoute/gpt-5.6-sol",
         pinnedModelSource: "automatic",
@@ -275,14 +264,12 @@ describe("updateTask", () => {
       data: {
         name: "Promote Draft",
         status: "Active",
-        defaultRuntime: "hermes",
       },
     });
     const task = await db.task.create({
       data: {
         workspaceId: workspace.id,
         title: "Hermes draft",
-        executionRuntime: "hermes",
         executionConfig: {},
         status: "Draft",
         priority: "Medium",
@@ -303,14 +290,12 @@ describe("updateTask", () => {
       data: {
         name: "Promote With Plan",
         status: "Active",
-        defaultRuntime: "hermes",
       },
     });
     const task = await db.task.create({
       data: {
         workspaceId: workspace.id,
         title: "Draft with accepted plan",
-        executionRuntime: "hermes",
         executionConfig: {},
         status: "Draft",
         priority: "Medium",
@@ -333,14 +318,12 @@ describe("updateTask", () => {
       data: {
         name: "Auto Execute Update",
         status: "Active",
-        defaultRuntime: "hermes",
       },
     });
     const task = await db.task.create({
       data: {
         workspaceId: workspace.id,
         title: "Enable auto execute",
-        executionRuntime: "hermes",
         executionConfig: {},
         status: "Draft",
         priority: "Medium",
@@ -363,14 +346,12 @@ describe("updateTask", () => {
       data: {
         name: "Auto Plan Update",
         status: "Active",
-        defaultRuntime: "hermes",
       },
     });
     const task = await db.task.create({
       data: {
         workspaceId: workspace.id,
         title: "Enable auto plan",
-        executionRuntime: "hermes",
         executionConfig: {},
         status: "Draft",
         priority: "Medium",
@@ -400,14 +381,12 @@ describe("reopenTask", () => {
       data: {
         name: "Reopen Ready",
         status: "Active",
-        defaultRuntime: "hermes",
       },
     });
     const task = await db.task.create({
       data: {
         workspaceId: workspace.id,
         title: "Reopen me",
-        executionRuntime: "hermes",
         executionConfig: {},
         status: "Completed",
         priority: "Medium",
@@ -426,14 +405,12 @@ describe("reopenTask", () => {
       data: {
         name: "Reopen Ready",
         status: "Active",
-        defaultRuntime: "hermes",
       },
     });
     const task = await db.task.create({
       data: {
         workspaceId: workspace.id,
         title: "Reopen me with plan",
-        executionRuntime: "hermes",
         executionConfig: {},
         status: "Completed",
         priority: "Medium",

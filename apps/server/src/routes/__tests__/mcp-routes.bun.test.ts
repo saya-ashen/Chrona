@@ -451,7 +451,12 @@ describe("MCP routes", () => {
 				{ query: "research", offset: 0, maxChars: 12_000, limit: 3 },
 			],
 			["chrona.plan.read", executionSessionId, {}, {}],
-			["chrona.node.read", executionSessionId, {}, {}],
+			[
+				"chrona.node.read",
+				executionSessionId,
+				{},
+				{ offset: 0, maxChars: 12_000 },
+			],
 			[
 				"chrona.node.complete",
 				executionSessionId,
@@ -502,6 +507,65 @@ describe("MCP routes", () => {
 			});
 			expect(operations[0].input.payload).toEqual(expectedPayload);
 		}
+	});
+
+	it("[RUN-003] forwards bounded AI-visible node-result reads through MCP", async () => {
+		const operations: CapturedToolOperation[] = [];
+		await callTool(
+			"chrona.node.read",
+			{
+				ref: "N20260820-01",
+				offset: 120,
+				maxChars: 4_000,
+				_meta: { sessionId: "chrona:task:task-1:execute" },
+			},
+			{ operations },
+		);
+
+		expect(operations).toHaveLength(1);
+		expect(operations[0]).toMatchObject({
+			toolName: "chrona.node.read",
+			input: {
+				sessionId: "chrona:task:task-1:execute",
+				payload: {
+					ref: "N20260820-01",
+					offset: 120,
+					maxChars: 4_000,
+				},
+			},
+		});
+
+		const visible = await callTool(
+			"chrona.node.read",
+			{
+				ref: "N20260820-01",
+				_meta: { sessionId: "chrona:task:task-1:execute" },
+			},
+			{
+				resultOverride: {
+					state: {
+						result: {
+							node: { ref: "N20260820-01", title: "Prepare menu" },
+							result: {
+								content: '{"findings":[{"key":"dinner.menu"}]}',
+								nextOffset: null,
+							},
+						},
+					},
+				},
+			},
+		);
+		const text = visible.content[0]?.type === "text"
+			? visible.content[0].text
+			: "";
+		expect(JSON.parse(text)).toMatchObject({
+			state: {
+				result: {
+					node: { ref: "N20260820-01" },
+					result: { nextOffset: null },
+				},
+			},
+		});
 	});
 
 	it("generates idempotency keys for mutating tools without exposing them to the model", async () => {
@@ -557,7 +621,12 @@ describe("MCP routes", () => {
 		const cases = [
 			["chrona.execution.read", executionSessionId, {}, {}],
 			["chrona.plan.read", hiddenContextArguments.sessionId, {}, {}],
-			["chrona.node.read", executionSessionId, {}, {}],
+			[
+				"chrona.node.read",
+				executionSessionId,
+				{},
+				{ offset: 0, maxChars: 12_000 },
+			],
 			[
 				"chrona.node.complete",
 				executionSessionId,

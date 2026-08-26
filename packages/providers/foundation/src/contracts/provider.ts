@@ -391,6 +391,23 @@ export function supportsDurableFeatureRuntime(
 	);
 }
 
+/**
+ * True when a side-effect-free, terminal-only Feature Runtime request can be
+ * started safely. Providers either reattach authoritatively, or explicitly
+ * permit one read-only attempt that fails closed after an uncertain start.
+ * This does not authorize action-invoking features or weaken durable attach.
+ */
+export function supportsSafeTerminalOnlyFeatureRuntime(
+	capabilities: ProviderCapabilities,
+): boolean {
+	return (
+		supportsDurableFeatureRuntime(capabilities) ||
+		(capabilities.readOnlySingleAttempt === true &&
+			capabilities.supportsStreaming === true &&
+			capabilities.supportsToolCalls === true)
+	);
+}
+
 export const providerRecoveryCapabilitySchema = z
 	.object({
 		sessionResume: z.boolean(),

@@ -74,6 +74,7 @@ function editablePlanToBlueprint(editablePlan: EditablePlan): PlanBlueprint {
             mode: node.mode,
             expectedOutput: node.expectedOutput,
             completionCriteria: node.completionCriteria,
+            completionForm: node.completionForm,
             userInteraction: node.userInteraction,
             estimatedMinutes: node.estimatedMinutes,
           };
@@ -143,6 +144,7 @@ function compiledPlanToBlueprint(compiledPlan: CompiledPlan): PlanBlueprint {
             typeof config.completionCriteria === "string"
               ? config.completionCriteria
               : undefined,
+          completionForm: config.completionForm,
           userInteraction: config.userInteraction ?? { level: "not_expected" },
           estimatedMinutes: node.estimatedMinutes,
         } satisfies PlanBlueprintTaskNode;

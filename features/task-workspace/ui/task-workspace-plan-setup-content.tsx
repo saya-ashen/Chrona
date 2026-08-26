@@ -119,11 +119,13 @@ function getStatusPresentation(
 }
 
 function getProviderName(pageData: TaskPageData) {
-  const provider =
-    pageData.availableAiClients?.find(
-      (client) => client.id === pageData.task.aiClientId,
-    ) ?? pageData.availableAiClients?.[0];
-  return provider?.name ?? pageData.task.executionRuntime ?? "Not connected";
+  const provider = pageData.task.aiClientId
+    ? pageData.availableAiClients?.find(
+        (client) => client.id === pageData.task.aiClientId,
+      )
+    : pageData.availableAiClients?.find((client) => client.isDefault)
+      ?? pageData.availableAiClients?.[0];
+  return provider?.name ?? "Not connected";
 }
 
 function countRequiredChecks(

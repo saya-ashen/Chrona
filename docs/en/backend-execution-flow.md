@@ -103,11 +103,15 @@ Common actions:
 - `resume_with_approval`
 - `retry_node`
 - `resume_after_unblock`
-- `complete_manual_node`
+- `complete_manual_node` (manual completion submissions carry the persisted form revision and typed `inputFields`)
 - `fail_current_node`
 - `cancel_session`
 
 The engine owns idempotency, session state, graph advancement, node attempts, runtime dispatch, pause/resume behavior, and task status transitions.
+
+Manual task nodes use a distinct two-stage path. Chrona first runs the durable `task.manual-completion-form.review` AI feature with the task's resolved `task.execution` Provider. A valid plan form is either retained or fully replaced. The node then pauses with `manual_completion`, which projects as `WaitingForInput`, not as blocked recovery. The validated form, revision, and source are persisted in the node result. Form-review failures produce a failed node with safe error-code/trace metadata and a retry action; they never silently fall back to a generic form.
+
+Before provider dispatch, the engine resolves exactly one enabled execution client: explicit `Task.aiClientId`, then the `task.execution` feature binding, then the enabled default AI client. Tasks and Workspaces have no separate Adapter/runtime selector. New `Run`, `TaskSession`, and `TaskPlanProviderRun` provenance is snapshotted from the resolved client, and a provider session ref is resumed only when client id, provider name, and configuration fingerprint still match.
 
 Source anchors:
 
@@ -159,6 +163,8 @@ This avoids two failure modes:
 
 `WorkBlock` should remain the scheduling/time container. A `WorkBlock` can contain one or more context segments. Segment policy belongs in `packages/engine`, while providers only create, resume, or virtualize native sessions.
 
+The normal handoff between related nodes is the resumed provider context. Chrona persists a provider-native session ref as soon as a scoped runtime event exposes it and threads that ref into the next node request. If a prior run exists but no provider session can be resumed, the next runtime input is explicitly marked `context.run.contextContinuity.mode = recovery`; the worker must recover Chrona-owned facts through the supplied AI-visible prior-node refs instead of asking the user to re-enter them.
+
 ## Checkpoint actions
 
 `POST /api/tasks/:taskId/execution/checkpoint/:checkpointId/actions` maps checkpoint-level actions onto execution continuation actions. It supports input submission, result approval/rejection, replan decisions, retry, unblock, manual completion/skip, fail, and cancel.
@@ -179,7 +185,7 @@ Supported command categories include plan generation, plan acceptance, execution
 
 External agents use `POST /api/mcp` tools. Chrona injects hidden context such as session ID, task ID, expected revision, and idempotency key. Public tool inputs expose only the AI-safe payload, including node/branch refs where needed.
 
-Important rule: agents must not invent backend IDs. They should call read tools only when state is missing or stale, and submit final node outcomes with the appropriate Chrona tool.
+Important rule: agents must not invent backend IDs. They should call read tools only when state is missing or stale, and submit final node outcomes with the appropriate Chrona tool. `chrona.node.read` without a ref reads bounded execution/node state; with an AI-visible node ref it reads paginated semantic result content from that node. This is a recovery path for lost or compacted provider context, not the default cross-node transport.
 
 ## Canonical task-result flow
 

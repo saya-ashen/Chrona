@@ -39,7 +39,7 @@ async function resetDb() {
 
 async function createTaskWithWorkBlock() {
   const workspace = await db.workspace.create({
-    data: { name: "Execution scope", status: "Active", defaultRuntime: "hermes" },
+    data: { name: "Execution scope", status: "Active" },
   });
   const task = await db.task.create({
     data: {
@@ -47,7 +47,6 @@ async function createTaskWithWorkBlock() {
       title: "Recurring occurrence",
       status: "Ready",
       priority: "Medium",
-      executionRuntime: "hermes",
       executionConfig: {},
     },
   });

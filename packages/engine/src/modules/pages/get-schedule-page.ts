@@ -1,9 +1,7 @@
+/* eslint-disable complexity -- Schedule projection composes provider, plan, automation, and calendar state. */
 import { db } from "@/lib/db";
 import type { TaskPlanReadModel } from "@chrona/contracts";
-import { getRuntimeTaskConfigSpec, listExecutionRuntimes } from "@/modules/execution-runtime";
-import {
-  deriveTaskRunnability,
-} from "@chrona/domain";
+import { deriveTaskRunnability } from "@chrona/domain";
 import {
   buildPlanningSummary,
   deriveWorkStateView,
@@ -52,9 +50,7 @@ function mapProjectionItem(
       parentTaskId: string | null;
       title: string;
       description: string | null;
-      workspace: { defaultRuntime: string };
       priority: string;
-      executionRuntime: string;
       executionConfig: unknown;
       aiClientId: string | null;
       autoPlanGeneration: boolean;
@@ -126,9 +122,7 @@ function mapWorkBlockItem(
       description: string | null;
       status: string;
       dueAt: Date | null;
-      workspace: { defaultRuntime: string };
       priority: string;
-      executionRuntime: string;
       executionConfig: unknown;
       aiClientId: string | null;
       autoPlanGeneration: boolean;
@@ -185,7 +179,6 @@ function mapWorkBlockItem(
     autoExecuteTiming: block.task.autoExecuteTiming,
     aiClientId: block.task.aiClientId,
     aiClientName: block.task.aiClient?.name ?? null,
-    executionRuntimeLabel: block.task.executionRuntime,
     kind: block.task.kind,
     recurrenceRule: block.task.recurrenceRule,
     sourceManaged: importedEvent
@@ -206,20 +199,10 @@ function mapWorkBlockItem(
   };
 }
 
-function mapTaskRunnability(task: {
-  workspace: { defaultRuntime: string };
-  executionRuntime: string;
-  executionConfig: unknown;
-}) {
-  const executionRuntime =
-    task.executionRuntime || task.workspace.defaultRuntime;
-  const runnability = deriveTaskRunnability({
-    executionRuntime,
-    executionConfig: task.executionConfig,
-  });
+function mapTaskRunnability(task: { executionConfig: unknown }) {
+  const runnability = deriveTaskRunnability();
 
   return {
-    executionRuntime,
     executionConfig: task.executionConfig,
     isRunnable: runnability.isRunnable,
     runnabilityState: runnability.state,
@@ -441,17 +424,16 @@ async function buildAutomationCandidates(input: {
 }
 
 export async function getSchedulePage(workspaceId: string) {
-  const [workspace, projections, proposals] = await Promise.all([
+  const [, projections, proposals] = await Promise.all([
     db.workspace.findUniqueOrThrow({
       where: { id: workspaceId },
-      select: { defaultRuntime: true },
+      select: { id: true },
     }),
     db.taskProjection.findMany({
       where: { workspaceId },
       include: {
         task: {
           include: {
-            workspace: { select: { defaultRuntime: true } },
             importedCalendarEvents: {
               include: {
                 calendarSource: { select: { name: true, color: true } },
@@ -482,16 +464,26 @@ export async function getSchedulePage(workspaceId: string) {
       ],
     }),
   ]);
-  const executionRuntimes = listExecutionRuntimes().map((key) => ({
-    key,
-    label: key,
-    spec: getRuntimeTaskConfigSpec(key),
-  }));
-  const availableAiClients = await db.aiClient.findMany({
-    where: { enabled: true },
-    select: { id: true, name: true, enabled: true },
-    orderBy: { createdAt: "asc" },
-  });
+  const [availableAiClients, taskExecutionBinding] = await Promise.all([
+    db.aiClient.findMany({
+      where: { enabled: true },
+      select: {
+        id: true,
+        name: true,
+        type: true,
+        isDefault: true,
+        enabled: true,
+      },
+      orderBy: { createdAt: "asc" },
+    }),
+    db.aiFeatureBinding.findUnique({
+      where: { feature: "task.execution" },
+      select: { clientId: true },
+    }),
+  ]);
+  const defaultExecutionProvider = availableAiClients.find(
+    (client) => client.id === taskExecutionBinding?.clientId,
+  ) ?? availableAiClients.find((client) => client.isDefault) ?? availableAiClients[0];
 
   const listItems = projections
     .filter(hasTask)
@@ -584,12 +576,10 @@ export async function getSchedulePage(workspaceId: string) {
           workspaceId: true,
           status: true,
           dueAt: true,
-          workspace: { select: { defaultRuntime: true } },
           kind: true,
           title: true,
           description: true,
           priority: true,
-          executionRuntime: true,
           executionConfig: true,
           aiClientId: true,
           autoPlanGeneration: true,
@@ -677,12 +667,17 @@ export async function getSchedulePage(workspaceId: string) {
           : savedPlan
             ? ("waiting_acceptance" as const)
             : ("idle" as const);
+      const provider = availableAiClients.find(
+        (client) => client.id === item.aiClientId,
+      ) ?? (item.aiClientId ? undefined : defaultExecutionProvider);
       const eligibility = deriveAutoStartEligibility({
         task: {
           status: item.persistedStatus,
-          executionRuntime: item.executionRuntime,
           hasAcceptedPlan: savedPlan?.status === "accepted",
           autoExecuteTiming: item.autoExecuteTiming,
+          providerId: provider?.id,
+          providerName: provider?.name,
+          providerConfigured: provider !== undefined,
         },
         workBlock: { scheduledStartAt: item.scheduledStartAt },
         now: eligibilityNow,
@@ -733,8 +728,6 @@ export async function getSchedulePage(workspaceId: string) {
   });
 
   return {
-    defaultExecutionRuntime: workspace.defaultRuntime,
-    executionRuntimes,
     availableAiClients,
     summary: {
       scheduledCount: allScheduled.length,

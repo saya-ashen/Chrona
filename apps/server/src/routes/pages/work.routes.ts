@@ -17,6 +17,14 @@ function writeWorkEvent(stream: SseStream, event: TaskProjectionEvent) {
   return stream.writeSSE({ event: event.type, data: JSON.stringify(event) });
 }
 
+/** A work-block stream must never receive another occurrence's state snapshot. */
+export function isEventInWorkBlockScope(
+  event: Pick<TaskProjectionEvent, "workBlockId">,
+  workBlockId: string | null,
+) {
+  return (event.workBlockId ?? null) === workBlockId;
+}
+
 function createWorkEventStream(
   engine: ChronaEngine,
   taskId: string,
@@ -65,6 +73,7 @@ function createWorkEventStream(
       }
     };
     const subscription = subscribeToTaskProjectionEvents(taskId, (event) => {
+      if (!isEventInWorkBlockScope(event, workBlockId)) return;
       void writeEvent(event);
     });
     stream.onAbort(() => {
@@ -99,11 +108,9 @@ export function createWorkRoutes(engine: ChronaEngine) {
           const commandId = command.idempotencyKey;
           const workspaceId = await getTaskWorkspaceId(engine, taskId);
 
-          if (command.type === "execution.action") {
-            await dispatchTaskWorkspaceCommand(engine, { taskId, workspaceId, commandId, command });
-          } else {
-            void dispatchTaskWorkspaceCommand(engine, { taskId, workspaceId, commandId, command });
-          }
+          // Commands are asynchronous: returning 202 before dispatch prevents a
+          // terminal SSE event from racing ahead of the client's command receipt.
+          void dispatchTaskWorkspaceCommand(engine, { taskId, workspaceId, commandId, command });
 
           return json(c, {
             commandId,

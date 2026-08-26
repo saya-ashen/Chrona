@@ -3,6 +3,9 @@
 ## Unreleased
 
 ### Fixed
+- Replaced manual task nodes' false `Blocked/manual_action` state with Provider-reviewed completion forms, normal `WaitingForInput/manual_completion` pauses, revision-checked typed submissions, retryable form-generation failures, and strict legacy recovery for existing plans.
+- Removed the legacy task/workspace Adapter (`executionRuntime`) selector and runtime config registry; task execution now resolves one authoritative AI client/provider and persists provider-matched session provenance.
+- Added fingerprint-gated amendments for already-applied mutable release-line migrations, preserving local data instead of rejecting startup after unreleased migration SQL evolves.
 - Kept OMP provider stream identities stable after SDK session persistence, while storing the native session reference separately for cross-process resume.
 - Pinned each Task to its first resolved execution model, reused that model for retries and later nodes, honored explicit user model changes, and rejected OMP cross-provider model drift instead of silently falling back.
 - Aligned result-finalizer provider schemas with Chrona's strict per-component contracts, surfaced finalization failures with retry controls, prevented acceptance of failed finalizations, and removed duplicate artifact fallback lists.
@@ -10,6 +13,15 @@
 - Moved finalized-result content previews into a bounded Workbench-style Sheet dialog, promoted the key strategy into a single editorial feature surface, and reduced evidence/source boundaries to a compact collapsible footnote.
 - Deduplicated finalized deliverables from their underlying run Artifact rows, while preserving complete Artifact fallback on finalization failure and collapsing only unreferenced extras as secondary generated files.
 - Unified CSV and structured data-table preview and Draft editing in Univer with the documented read-only configuration for previews, a single header edit/preview toggle, a full-height Workbench canvas without duplicate source-download actions, full spreadsheet controls in edit mode, stable Chrona row/column identity, and quoted-field-safe CSV serialization; rebuilt Markdown preview, CodeMirror source editing, optional MDXEditor rich/diff editing, and immutable structured-result reports on consistent full-height internally scrolling canvases, while retaining Markdown as the authoritative stored content and immutable version publishing.
+
+## 0.2.0 — Public release
+
+Date: 2026-07-07
+
+### Release baseline
+- Published the v0.2.0 local binary release. Its immutable SQLite baseline is
+  `0001_initial` plus the historical no-op
+  `20260707000000_add_workspace_user_preferences` record.
 
 ## 0.1.9 — Alpha public-readiness polish
 

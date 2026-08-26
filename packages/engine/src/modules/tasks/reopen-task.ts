@@ -3,22 +3,14 @@ import { db } from "@/lib/db";
 import { appendCanonicalEvent } from "@/modules/events";
 import { getAcceptedCompiledPlanForTask } from "@/modules/plan-execution/persistence/execution-scope";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
-import { getRuntimeTaskConfigSpec } from "@/modules/execution-runtime";
 import { deriveTaskStaticState } from "@chrona/domain";
 
 export async function reopenTask(input: { taskId: string }) {
   const task = await db.task.findUniqueOrThrow({
     where: { id: input.taskId },
-    include: {
-      workspace: {
-        select: { defaultRuntime: true },
-      },
-    },
   });
   const acceptedPlan = await getAcceptedCompiledPlanForTask(task.id);
   const staticState = deriveTaskStaticState({
-    runtimeSpec: getRuntimeTaskConfigSpec(task.executionRuntime),
-    executionConfig: task.executionConfig,
     hasAcceptedPlan: acceptedPlan !== null,
   });
   const nextStatus = TaskStatus[staticState.persistedStatus];

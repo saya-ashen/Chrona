@@ -396,6 +396,7 @@ function deriveNodeStatus(input: {
 function mapWaitKindToNodeStatus(waitKind: WaitKind): EffectivePlanNode["status"] {
   switch (waitKind) {
     case "user_input":
+    case "manual_completion":
       return "waiting_for_user";
     case "approval":
     case "review":

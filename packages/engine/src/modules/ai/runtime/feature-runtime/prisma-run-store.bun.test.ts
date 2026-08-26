@@ -52,7 +52,6 @@ async function seedWorkspace() {
     create: {
       id: "workspace-runtime-store",
       name: "Runtime store test",
-      defaultRuntime: "debug",
       status: "Active",
     },
   });

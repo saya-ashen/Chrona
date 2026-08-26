@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 import { buildArtifacts, buildTargets, parseBuildTarget, type BuildTargetName } from "./manifest";
+import { smokePackagedUpgrade } from "../scripts/release-upgrade-smoke";
 
 const ROOT = resolve(import.meta.dirname, "..");
 const RUNTIME_TIMEOUT_MS = 20_000;
@@ -164,6 +165,7 @@ export async function smokeRelease(target: BuildTargetName, options: SmokeReleas
 
   if (options.runtime !== false) {
     await assertRuntimeStarts(binaryPath);
+    await smokePackagedUpgrade(target);
   }
 
   console.log(`✓ Release smoke passed for ${target}`);

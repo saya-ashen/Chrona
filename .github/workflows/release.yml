@@ -90,6 +90,10 @@ jobs:
       - name: Smoke test binary
         run: bun run chrona build smoke -- --target ${{ matrix.target }}
 
+      - name: Verify Windows owner-only storage
+        if: runner.os == 'Windows'
+        run: bun run release:windows-acl-smoke
+
       - name: Upload artifact
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:

@@ -54,7 +54,6 @@ describe("applySchedule", () => {
       data: {
         name: "Schedule Commands",
         status: "Active",
-        defaultRuntime: "hermes",
       },
     });
 
@@ -64,7 +63,6 @@ describe("applySchedule", () => {
         title: "Plan the adapter work",
         status: "Ready",
         priority: "High",
-        executionRuntime: "hermes",
         executionConfig: {},
       },
     });
@@ -116,7 +114,6 @@ describe("applySchedule", () => {
       data: {
         name: "Schedule Validation",
         status: "Active",
-        defaultRuntime: "hermes",
       },
     });
 
@@ -126,7 +123,6 @@ describe("applySchedule", () => {
         title: "Invalid window",
         status: "Ready",
         priority: "High",
-        executionRuntime: "hermes",
         executionConfig: {},
       },
     });
@@ -147,7 +143,6 @@ describe("applySchedule", () => {
       data: {
         name: "Schedule Clear",
         status: "Active",
-        defaultRuntime: "hermes",
       },
     });
 
@@ -158,7 +153,6 @@ describe("applySchedule", () => {
         status: "Ready",
         priority: "High",
         dueAt: new Date("2026-04-12T18:00:00.000Z"),
-        executionRuntime: "hermes",
         executionConfig: {},
       },
     });
@@ -210,7 +204,6 @@ describe("applySchedule", () => {
       data: {
         name: "Schedule Proposal",
         status: "Active",
-        defaultRuntime: "hermes",
       },
     });
 
@@ -220,7 +213,6 @@ describe("applySchedule", () => {
         title: "Review the timeline",
         status: "Ready",
         priority: "Medium",
-        executionRuntime: "hermes",
         executionConfig: {},
       },
     });
@@ -266,7 +258,6 @@ describe("applySchedule", () => {
       data: {
         name: "Schedule Accept",
         status: "Active",
-        defaultRuntime: "hermes",
       },
     });
 
@@ -276,7 +267,6 @@ describe("applySchedule", () => {
         title: "Adopt proposal",
         status: "Ready",
         priority: "High",
-        executionRuntime: "hermes",
         executionConfig: {},
       },
     });
@@ -334,7 +324,6 @@ describe("applySchedule", () => {
       data: {
         name: "Schedule Reject",
         status: "Active",
-        defaultRuntime: "hermes",
       },
     });
 
@@ -345,7 +334,6 @@ describe("applySchedule", () => {
         status: "Ready",
         priority: "Medium",
         dueAt: new Date("2026-04-15T18:00:00.000Z"),
-        executionRuntime: "hermes",
         executionConfig: {},
       },
     });
@@ -403,7 +391,6 @@ describe("applySchedule", () => {
       data: {
         name: "External Schedule Source",
         status: "Active",
-        defaultRuntime: "hermes",
       },
     });
 
@@ -413,7 +400,6 @@ describe("applySchedule", () => {
         title: "Imported standup",
         status: "Ready",
         priority: "Medium",
-        executionRuntime: "hermes",
         executionConfig: {},
         kind: "recurring",
         recurrenceRule: "FREQ=DAILY",

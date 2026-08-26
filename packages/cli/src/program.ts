@@ -3,7 +3,7 @@ import { buildControlPayload, sendControlAction, UsageError, ConfigError } from 
 import { join, resolve } from "node:path";
 import { backupSqliteDatabase, restoreSqliteDatabase } from "@chrona/db/sqlite-backup";
 import { getChronaDataDir } from "./start-server.js";
-import { inspectLocalChrona } from "./doctor.js";
+import { inspectLocalChrona, repairStaleRuntimeLock } from "./doctor.js";
 import { installHermesPlugin, type InstallHermesPluginOptions } from "./hermes-plugin.js";
 import {
   detectHermesEnvironment,
@@ -143,7 +143,12 @@ export function createProgram(options: CreateProgramOptions = {}): Command {
   program
     .command("doctor")
     .description("Inspect local database and network safety before starting Chrona")
-    .action(() => {
+    .option("--repair-stale-lock", "Quarantine a confirmed stale runtime lock; never removes the database")
+    .action((doctorOptions: { repairStaleLock?: boolean }) => {
+      if (doctorOptions.repairStaleLock) {
+        const quarantined = repairStaleRuntimeLock();
+        console.log(quarantined ? `Stale runtime lock quarantined: ${quarantined}` : "No runtime lock is present.");
+      }
       const checks = inspectLocalChrona();
       for (const check of checks) {
         console.log(`[${check.status}] ${check.key}: ${check.message}`);

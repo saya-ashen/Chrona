@@ -197,7 +197,8 @@ describe("OmpSdkProviderClient direct config", () => {
 
     const health = await client.checkHealth();
 
-    expect(health.ok).toBe(true);
+    expect(health.ok).toBe(false);
+    expect(health.reason).toBeTruthy();
     expect(process.env.CHRONA_OMP_API_KEY_HEALTH).toBe("sk-direct-omp");
     expect(process.env.CHRONA_OMP_BASE_URL_HEALTH).toBe("https://llm.example.test/v1");
   });
@@ -243,12 +244,18 @@ describe("OmpSdkProviderClient declared runtime tools", () => {
     expect(__ompSdkProviderTestHooks.isDeclaredTerminalTool("runtime_complete", undefined, "runtime_complete")).toBe(false);
   });
 
-  it("disables built-in tools, MCP, and LSP for read-only runs", () => {
-    expect(__ompSdkProviderTestHooks.sdkReadOnlyToolOptions("read_only")).toEqual({
+  it("disables built-in tools, MCP, and LSP for read-only and terminal-only runs", () => {
+    const isolatedToolOptions = {
       toolNames: [],
       enableMCP: false,
       enableLsp: false,
-    });
+    };
+    expect(__ompSdkProviderTestHooks.sdkReadOnlyToolOptions("read_only")).toEqual(
+      isolatedToolOptions,
+    );
+    expect(__ompSdkProviderTestHooks.sdkReadOnlyToolOptions("terminal_only")).toEqual(
+      isolatedToolOptions,
+    );
     expect(__ompSdkProviderTestHooks.sdkReadOnlyToolOptions("full")).toEqual({});
   });
 

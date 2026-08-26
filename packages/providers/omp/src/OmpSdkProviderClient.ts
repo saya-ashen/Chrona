@@ -16,6 +16,7 @@ import {
 	type ProviderConfigInput,
 } from "@oh-my-pi/pi-coding-agent";
 import { MCPManager } from "@oh-my-pi/pi-coding-agent/mcp";
+import { createLogger, serializeSafeError } from "@chrona/logging";
 import {
 	BoundedTerminalRunSnapshots,
 	assertProviderStartSupported,
@@ -47,6 +48,7 @@ import type { OmpProviderConfig } from "./types";
 
 const PROVIDER = "omp";
 const SDK_RUN_PREFIX = "omp-sdk";
+const log = createLogger("providers.omp");
 
 type Timer = Parameters<typeof clearTimeout>[0];
 type QueueItem = ProviderRunEvent | { type: "end" };
@@ -862,7 +864,7 @@ function assertExpectedModel(
 }
 
 function sdkReadOnlyToolOptions(toolPolicy: StartRunInput["toolPolicy"]) {
-	return toolPolicy === "read_only"
+	return toolPolicy === "read_only" || toolPolicy === "terminal_only"
 		? { toolNames: [] as string[], enableMCP: false, enableLsp: false }
 		: {};
 }
@@ -1081,13 +1083,25 @@ export class OmpSdkProviderClient implements AgentProviderClient {
 	async checkHealth(_input?: HealthCheckInput) {
 		const started = Date.now();
 		try {
-			applySdkEnvironment(this.config);
+			// Keep the health environment isolated and resolve the configured SDK
+			// model setup instead of treating package loading as provider readiness.
+			const environment = applySdkEnvironment(this.config, "health");
+			const setup = await createSdkModelSetup(this.config, environment);
+			if (!setup.modelPattern) {
+				return {
+					provider: PROVIDER,
+					ok: false,
+					checkedAt: now(),
+					latencyMs: Date.now() - started,
+					reason: "No OMP model could be resolved from this configuration.",
+				};
+			}
 			return {
 				provider: PROVIDER,
 				ok: true,
 				checkedAt: now(),
 				latencyMs: Date.now() - started,
-				message: "Oh My Pi SDK package loaded",
+				message: `Oh My Pi SDK resolved model ${setup.modelPattern}`,
 			};
 		} catch (error) {
 			return {
@@ -1687,12 +1701,12 @@ export class OmpSdkProviderClient implements AgentProviderClient {
 		try {
 			await handle.session?.dispose();
 		} catch (error) {
-			console.error("OMP SDK session disposal failed", error);
+			log.warn("sdk.session_disposal_failed", { error: serializeSafeError(error) });
 		}
 		try {
 			await handle.mcpManager?.disconnectAll();
 		} catch (error) {
-			console.error("OMP SDK Chrona MCP disposal failed", error);
+			log.warn("sdk.mcp_disposal_failed", { error: serializeSafeError(error) });
 		}
 		queue.push({ type: "end" });
 	}

@@ -6,6 +6,7 @@ import { persistProviderRuntimeEvent, type RuntimeEventPersistenceContext } from
 
 const TRANSIENT_PROVIDER_ERROR_CODES = new Set(["aborted", "network_error", "provider_error", "rate_limited", "incomplete_stream"]);
 const PROVIDER_RETRY_BACKOFF_MS = 1_000;
+const TERMINAL_ACTION_ABORT_REASON = "Chrona terminal action recorded";
 
 type ProviderClient = AgentProviderClient;
 
@@ -33,11 +34,13 @@ export async function runProviderRequest(
     ? await attachProviderRun(providerClient, request, options)
     : await startProviderRun(providerClient, request, options);
   const cancel = () => cancelProviderRun(providerClient, run, options.providerRunRecordId, options.eventPersistence);
-  if (options.signal?.aborted) return cancel();
+  if (options.signal?.aborted && !isTerminalActionAbort(options.signal)) return cancel();
   let snapshot: ProviderRunSnapshot;
   try {
     snapshot = await streamProviderRun(providerClient, run, options);
-    if (options.signal?.aborted) snapshot = await cancel();
+    if (options.signal?.aborted && !isTerminalActionAbort(options.signal)) {
+      snapshot = preserveProviderIdentity(await cancel(), snapshot);
+    }
   } catch (error) {
     if (!isTransientProviderError(error)) throw error;
     snapshot = await resumeOrReconcileProviderRun(providerClient, run, options, cancel);
@@ -185,7 +188,8 @@ async function resumeOrReconcileProviderRun(
   await delay(PROVIDER_RETRY_BACKOFF_MS);
   try {
     const snapshot = await streamProviderRun(providerClient, run, options);
-    return options.signal?.aborted ? cancel() : snapshot;
+    if (!options.signal?.aborted || isTerminalActionAbort(options.signal)) return snapshot;
+    return preserveProviderIdentity(await cancel(), snapshot);
   } catch (error) {
     if (!isTransientProviderError(error)) throw error;
     return reconcileInterruptedRun(providerClient, run, options.signal);
@@ -210,6 +214,23 @@ async function cancelProviderRun(
 
 function cancelledSnapshot(provider: string, run: ProviderRunRef): ProviderRunSnapshot {
   return { provider, runId: run.runId, nativeRunId: run.nativeRunId, sessionId: run.sessionId, nativeSessionId: run.nativeSessionId, status: "cancelled", error: null };
+}
+
+function isTerminalActionAbort(signal: AbortSignal): boolean {
+  return signal.aborted && signal.reason === TERMINAL_ACTION_ABORT_REASON;
+}
+
+function preserveProviderIdentity(
+  snapshot: ProviderRunSnapshot,
+  observed: ProviderRunSnapshot,
+): ProviderRunSnapshot {
+  return {
+    ...snapshot,
+    runId: snapshot.runId || observed.runId,
+    nativeRunId: snapshot.nativeRunId ?? observed.nativeRunId,
+    sessionId: snapshot.sessionId || observed.sessionId,
+    nativeSessionId: snapshot.nativeSessionId ?? observed.nativeSessionId,
+  };
 }
 
 async function reconcileInterruptedRun(providerClient: ProviderClient, run: ProviderRunRef, signal?: AbortSignal): Promise<ProviderRunSnapshot> {

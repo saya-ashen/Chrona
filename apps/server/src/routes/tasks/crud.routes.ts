@@ -3,11 +3,12 @@ import { zValidator } from "@hono/zod-validator";
 import type { ChronaEngine } from "@chrona/engine";
 import {
   listTasksQuerySchema,
-  createTaskBodySchemaForSupportedRuntimes,
+  createTaskBodySchema,
+  refineRecurrenceAnchors,
   taskDetailParamSchema,
   taskNodeActivityParamSchema,
   updateTaskParamSchema,
-  updateTaskBodySchemaForSupportedRuntimes,
+  updateTaskBodySchema,
   deleteTaskParamSchema,
   deleteTaskQuerySchema,
   deleteTaskBodySchema,
@@ -40,11 +41,7 @@ async function taskContextResponse(
   }
 }
 export function createTasksRoutes(engine: ChronaEngine) {
-  const supportedExecutionRuntimes = engine.runtime.listExecutionRuntimes();
-  const supportedCreateTaskBodySchema =
-    createTaskBodySchemaForSupportedRuntimes(supportedExecutionRuntimes);
-  const supportedUpdateTaskBodySchema =
-    updateTaskBodySchemaForSupportedRuntimes(supportedExecutionRuntimes);
+  const supportedCreateTaskBodySchema = refineRecurrenceAnchors(createTaskBodySchema);
 
   return new Hono()
     .get("/tasks", zValidator("query", listTasksQuerySchema), async (c) => {
@@ -103,7 +100,6 @@ export function createTasksRoutes(engine: ChronaEngine) {
             autoExecute: body.autoExecute,
             autoPlanGenerationTiming: body.autoPlanGenerationTiming,
             autoExecuteTiming: body.autoExecuteTiming,
-            executionRuntime: body.executionRuntime,
             executionConfig: body.executionConfig,
             aiClientId: body.aiClientId,
             recurrenceRule: body.recurrenceRule,
@@ -328,7 +324,7 @@ export function createTasksRoutes(engine: ChronaEngine) {
     .patch(
       "/tasks/:taskId",
       zValidator("param", updateTaskParamSchema),
-      zValidator("json", supportedUpdateTaskBodySchema),
+      zValidator("json", updateTaskBodySchema),
       async (c) => {
         try {
           const { taskId } = c.req.valid("param");
@@ -344,7 +340,6 @@ export function createTasksRoutes(engine: ChronaEngine) {
             autoPlanGenerationTiming: body.autoPlanGenerationTiming,
             autoExecuteTiming: body.autoExecuteTiming,
             status: body.status,
-            executionRuntime: body.executionRuntime,
             executionConfig: body.executionConfig,
             aiClientId: body.aiClientId,
             recurrenceRule: body.recurrenceRule,

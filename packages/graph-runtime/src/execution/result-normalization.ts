@@ -77,7 +77,7 @@ export function appendExecutionResult(input: {
         result: {
           ...base,
           status: "current",
-          waitKind: "user_input",
+          waitKind: input.result.waitKind ?? "user_input",
           error: input.result.reason,
           actionForm: input.result.actionForm,
           evidence,
@@ -141,7 +141,7 @@ export function appendExecutionResult(input: {
 export function getPauseKind(result: GraphNodeExecutionResult): WaitKind | null {
   switch (result.status) {
     case "waiting_for_user":
-      return "user_input";
+      return result.waitKind ?? "user_input";
     case "waiting_for_approval":
       return "approval";
     case "replan_required":

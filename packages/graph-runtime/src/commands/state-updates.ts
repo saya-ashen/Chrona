@@ -263,6 +263,7 @@ export function submitNodeResultState(input: {
           ...baseResult,
           status: "current",
           outputSummary: input.nodeResult.summary,
+          inputFields: input.nodeResult.inputFields,
           evidence,
           selectedBranch: input.nodeResult.selectedBranch,
           deliverables: input.nodeResult.deliverables,

@@ -55,14 +55,11 @@ function graph(nodes: PlanNodeDataModel[], currentStepId: string | null = null):
 
 function pageData(overrides: Partial<TaskPageData> = {}): TaskPageData {
   return {
-    defaultExecutionRuntime: "local",
-    executionRuntimes: [],
     task: {
       id: "task-1",
       workspaceId: "workspace-1",
       title: "Launch task",
       description: null,
-      executionRuntime: "local",
       executionConfig: null,
       autoPlanGeneration: false,
       autoExecute: false,

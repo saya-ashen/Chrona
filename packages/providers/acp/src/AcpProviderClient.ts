@@ -5,6 +5,7 @@ import type {
 	Writable as NodeWritable,
 } from "node:stream";
 import * as acp from "@agentclientprotocol/sdk";
+import { createLogger, serializeSafeError } from "@chrona/logging";
 import {
 	assertProviderStartSupported,
 	BoundedTerminalRunSnapshots,
@@ -49,6 +50,8 @@ import {
 	type AcpProviderConfig,
 	usageFromAcp,
 } from "./types";
+
+const log = createLogger("providers.acp");
 
 type Timer = Parameters<typeof clearTimeout>[0];
 
@@ -1365,7 +1368,7 @@ export class AcpProviderClient implements AgentProviderClient {
 			try {
 				await handle.session?.dispose();
 			} catch (error) {
-				console.error("ACP session disposal failed", error);
+				log.warn("session_disposal_failed", { error: serializeSafeError(error) });
 			}
 			await this.retainSnapshot(handle);
 		}

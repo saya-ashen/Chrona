@@ -75,7 +75,6 @@ export type RunLaunchView = {
 	readiness: "ready" | "blocked" | "scheduled";
 	startMode: "manual" | "automatic" | "scheduled";
 	providerLabel: string;
-	runtimeLabel: string;
 	planVersionLabel: string;
 	scheduledStartAt: string | null;
 	scheduledEndAt: string | null;
@@ -802,13 +801,12 @@ export function deriveRunPreview(input: {
 
 	const { task } = input.pageData;
 	const firstStep = firstActionableNode(input.graphPlan);
-	const runtimeLabel =
-		task.executionRuntime ||
-		input.pageData.defaultExecutionRuntime ||
-		"Default runtime";
-	const selectedClient = input.pageData.availableAiClients?.find(
-		(client) => client.id === task.aiClientId,
-	);
+	const selectedClient = task.aiClientId
+		? input.pageData.availableAiClients?.find(
+			(client) => client.id === task.aiClientId,
+		)
+		: input.pageData.availableAiClients?.find((client) => client.isDefault)
+			?? input.pageData.availableAiClients?.[0];
 	const providerLabel =
 		selectedClient?.name ?? task.aiClientId ?? "No AI provider";
 	const providerUnavailable = !selectedClient || !selectedClient.enabled;
@@ -854,7 +852,6 @@ export function deriveRunPreview(input: {
 				: "ready",
 		startMode,
 		providerLabel,
-		runtimeLabel,
 		planVersionLabel: task.savedPlan
 			? `Revision ${task.savedPlan.revision}`
 			: "Current accepted plan",

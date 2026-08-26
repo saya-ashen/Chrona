@@ -262,7 +262,7 @@ export class PrismaAiFeatureRunStore implements AiFeatureRunRepositoryPort {
     providerName: string;
     providerConfigFingerprint: string;
   }): Promise<AiFeatureRunRecord> {
-    return withSchedulerWorkOwnership(currentSchedulerWorkContext(), async (tx) => {
+    const pin = async (tx: typeof db | Prisma.TransactionClient) => {
       await tx.aiFeatureRun.updateMany({
         where: {
           id: input.runId,
@@ -286,7 +286,9 @@ export class PrismaAiFeatureRunStore implements AiFeatureRunRepositoryPort {
         throw new Error(`AI Feature Run '${input.runId}' is pinned to a different provider client.`);
       }
       return run;
-    });
+    };
+    if (this.client !== db) return pin(this.client);
+    return withSchedulerWorkOwnership(currentSchedulerWorkContext(), pin);
   }
   async createOrRead(input: CreateAiFeatureRunInput): Promise<CreateAiFeatureRunResult> {
     const existing = await this.client.aiFeatureRun.findFirst({

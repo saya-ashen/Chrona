@@ -57,6 +57,18 @@ const ACTIONS = {
     style: "primary",
     requiresPayload: false,
   },
+  generateCompletionForm: {
+    id: "retry_node",
+    label: "Generate completion form",
+    style: "primary",
+    requiresPayload: false,
+  },
+  regenerateCompletionForm: {
+    id: "retry_node",
+    label: "Regenerate form",
+    style: "primary",
+    requiresPayload: false,
+  },
   resumeAfterUnblock: {
     id: "resume_after_unblock",
     label: "Resume after fix",
@@ -65,8 +77,8 @@ const ACTIONS = {
   },
   markNodeCompleted: {
     id: "mark_node_completed",
-    label: "Mark completed",
-    style: "secondary",
+    label: "Complete and continue",
+    style: "primary",
     requiresPayload: true,
   },
   cancelSession: {
@@ -102,7 +114,7 @@ export function deriveExecutionCheckpoint(
     message: checkpointMessage({ message: input.message, kind, node }),
     severity: checkpointSeverity(kind),
     ...(checkpointForm(node) ? { form: checkpointForm(node) } : {}),
-    availableActions: checkpointActions(kind),
+    availableActions: checkpointActions(kind, node),
     createdAt: (input.now ?? new Date()).toISOString(),
   };
 }
@@ -141,7 +153,9 @@ function checkpointKind(input: {
   node: EffectivePlanNode | null;
 }): ExecutionCheckpointKind {
   const waitKind = input.waitKind ?? input.node?.waitKind ?? input.node?.result?.waitKind;
-  if (input.status === "waiting_for_user") return "user_input";
+  if (input.status === "waiting_for_user") {
+    return waitKind === "manual_completion" ? "manual_completion" : "user_input";
+  }
   if (input.status === "waiting_for_approval") return approvalCheckpointKind(waitKind);
   if (input.status === "failed") return "failed";
   return blockedCheckpointKind(waitKind);
@@ -159,11 +173,22 @@ function blockedCheckpointKind(waitKind: WaitKind | undefined): ExecutionCheckpo
   return "blocked";
 }
 
+function specialCheckpointTitle(node: EffectivePlanNode | null, nodeTitle: string) {
+  if (legacyManualCompletion(node)) return `Manual step needs a completion form: ${nodeTitle}`;
+  if (manualFormReviewFailure(node)) return `Form generation failed: ${nodeTitle}`;
+  return null;
+}
+
+// eslint-disable-next-line complexity -- Every public checkpoint kind has distinct user-facing copy.
 function checkpointTitle(kind: ExecutionCheckpointKind, node: EffectivePlanNode | null) {
   const nodeTitle = node?.title ?? "Execution";
+  const specialTitle = specialCheckpointTitle(node, nodeTitle);
+  if (specialTitle) return specialTitle;
   switch (kind) {
     case "user_input":
       return `Input required: ${nodeTitle}`;
+    case "manual_completion":
+      return `Manual step: ${nodeTitle}`;
     case "approval":
       return `Approval required: ${nodeTitle}`;
     case "review":
@@ -210,13 +235,49 @@ function checkpointForm(node: EffectivePlanNode | null): CheckpointForm | undefi
     instructions: actionForm.instructions,
     ...(actionForm.submitLabel ? { submitLabel: actionForm.submitLabel } : {}),
     inputFields: actionForm.inputFields,
+    ...(actionForm.revision ? { revision: actionForm.revision } : {}),
+    ...(actionForm.source ? { source: actionForm.source } : {}),
+    ...(actionForm.validated !== undefined ? { validated: actionForm.validated } : {}),
   };
 }
 
-function checkpointActions(kind: ExecutionCheckpointKind): CheckpointAction[] {
+function errorDetails(node: EffectivePlanNode | null): Record<string, unknown> | null {
+  const details = node?.result?.errorDetails;
+  return details && typeof details === "object" && !Array.isArray(details)
+    ? details as Record<string, unknown>
+    : null;
+}
+
+function manualFormReviewFailure(node: EffectivePlanNode | null) {
+  const code = errorDetails(node)?.code;
+  return typeof code === "string" && code.startsWith("MANUAL_FORM_");
+}
+
+function legacyManualCompletion(node: EffectivePlanNode | null) {
+  if (!node || node.type !== "task" || node.result?.waitKind !== "manual_action" || node.result.actionForm) return false;
+  if (node.mode !== "manual" && node.executor !== "user") return false;
+  const message = node.result.error ?? "";
+  return /execution mode is manual|is performed by the user/i.test(message);
+}
+
+function specialCheckpointActions(kind: ExecutionCheckpointKind, node: EffectivePlanNode | null) {
+  if (legacyManualCompletion(node)) {
+    return [ACTIONS.generateCompletionForm, ACTIONS.requestReplan, ACTIONS.cancelSession];
+  }
+  if (kind === "failed" && manualFormReviewFailure(node)) {
+    return [ACTIONS.regenerateCompletionForm, ACTIONS.requestReplan, ACTIONS.cancelSession];
+  }
+  return null;
+}
+
+function checkpointActions(kind: ExecutionCheckpointKind, node: EffectivePlanNode | null): CheckpointAction[] {
+  const specialActions = specialCheckpointActions(kind, node);
+  if (specialActions) return specialActions;
   switch (kind) {
     case "user_input":
       return [ACTIONS.submitInput, ACTIONS.cancelSession];
+    case "manual_completion":
+      return [ACTIONS.markNodeCompleted, ACTIONS.requestReplan, ACTIONS.cancelSession];
     case "approval":
     case "review":
       return [

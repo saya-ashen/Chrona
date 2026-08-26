@@ -89,7 +89,7 @@ export type {
   TaskCore,
   TaskPriority,
   TaskReadModel,
-  TaskRuntimeFields,
+  TaskExecutionFields,
   TaskScheduleFields,
   TaskStatus,
   UpdateTaskInput,
@@ -302,7 +302,7 @@ export {
   planPatchSchema,
   upgradeBlueprintToEditable,
 } from "./ai-plan-blueprint";
-
+export * from "./manual-completion-form";
 
 // Runtime / compiled types
 export type {

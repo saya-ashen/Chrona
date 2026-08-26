@@ -3,7 +3,7 @@ import type {
   PublicEffectivePlanGraph,
   PublicEffectivePlanNode,
 } from "@chrona/contracts/ai";
-import { readAiExecutionView } from "./ai-execution-view";
+import { readAiExecutionView, readAiNodeView } from "./ai-execution-view";
 
 function node(
   input: Pick<PublicEffectivePlanNode, "id" | "title" | "type"> &
@@ -137,5 +137,85 @@ describe("readAiExecutionView", () => {
     });
     expect(serialized).not.toContain("backend-");
     expect(serialized).not.toContain("definition");
+  });
+
+  it("reads bounded semantic result content through an AI-visible node ref", () => {
+    const completed = node({
+      id: "backend-menu-node",
+      title: "Prepare menu",
+      type: "task",
+      status: "completed",
+      result: {
+        outputSummary: "Menu prepared",
+        findings: [
+          {
+            key: "dinner.menu",
+            title: "Dinner menu",
+            content: "Chickpea stew for six with four cans of chickpeas.",
+            importance: "primary",
+          },
+        ],
+      },
+    });
+    const value = {
+      task: {
+        title: "Dinner task",
+        status: "Running",
+        priority: "Medium",
+        savedPlan: {
+          status: "accepted",
+          revision: 1,
+          summary: "Dinner plan",
+          effectivePlan: graph([completed]),
+        },
+      },
+    };
+
+    const read = readAiNodeView(value, { ref: "N20260819-01" }) as {
+      result: { content: string; nextOffset: number | null };
+    };
+    expect(JSON.parse(read.result.content)).toMatchObject({
+      summary: "Menu prepared",
+      findings: [
+        {
+          key: "dinner.menu",
+          content: "Chickpea stew for six with four cans of chickpeas.",
+        },
+      ],
+    });
+    expect(read.result.nextOffset).toBeNull();
+    expect(JSON.stringify(read)).not.toContain("backend-menu-node");
+  });
+
+  it("paginates node result content and rejects backend node identities", () => {
+    const completed = node({
+      id: "backend-long-node",
+      title: "Long result",
+      type: "task",
+      status: "completed",
+      result: {
+        outputSummary: "Long result ready",
+        findings: [{ key: "long", content: "x".repeat(200) }],
+      },
+    });
+    const value = {
+      task: {
+        savedPlan: {
+          status: "accepted",
+          revision: 1,
+          effectivePlan: graph([completed]),
+        },
+      },
+    };
+
+    const first = readAiNodeView(value, {
+      ref: "N20260819-01",
+      maxChars: 80,
+    }) as { result: { content: string; nextOffset: number | null } };
+    expect(first.result.content).toHaveLength(80);
+    expect(first.result.nextOffset).toBe(80);
+    expect(() => readAiNodeView(value, { ref: "backend-long-node" })).toThrow(
+      "Node ref",
+    );
   });
 });

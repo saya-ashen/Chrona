@@ -101,7 +101,7 @@ export const WORKFLOWS: Array<{ id: string; title: string; match: (pkg: string, 
   {
     id: "providers-runtime",
     title: "Providers / runtime boundary",
-    match: (p) => p.startsWith("providers") || p === "runtime-core",
+    match: (p) => p.startsWith("providers"),
   },
   {
     id: "contracts",

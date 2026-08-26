@@ -47,7 +47,6 @@ const taskSnapshotSchema = createAiJsonObjectSchema({
 	goalContext: frozenGoalTaskContextSchema.nullable(),
 	workBlockId: z.string().min(1).max(128).nullable(),
 	estimatedMinutes: z.number().int().positive().nullable(),
-	executionRuntime: z.string().trim().min(1).max(128),
 });
 
 const headSnapshotSchema = createAiJsonObjectSchema({
@@ -165,6 +164,8 @@ export const taskPlanGenerateFeature = defineAiFeature({
 			"Return a completed terminal result whose output is { blueprint }, and exactly one task.plan.blueprint.propose action whose input is exactly { blueprint } with no taskId, expectedStateVersion, or other fields.",
 			'Use proposalId "task-plan-proposal" exactly. proposalId is an internal ASCII runtime ID; never translate or localize it.',
 			"Every node must be reachable from an entry node; use only task, checkpoint, condition, or wait nodes with their required configuration.",
+			"Every task node with executor=user or mode=manual must include a complete completionForm whose fields collect the evidence needed by expectedOutput and completionCriteria. Automatic task nodes must not include completionForm.",
+			"Manual completion forms must never request passwords, API keys, tokens, credentials, permission decisions, or authorization decisions.",
 			JSON.stringify(observations),
 		].join("\n");
 	},
@@ -274,7 +275,6 @@ export const taskPlanGenerateFeature = defineAiFeature({
 					task: {
 						...featureInput.task,
 						workspaceId: context.workspaceId,
-						executionRuntime: "ai",
 					},
 					head: featureInput.currentHead,
 					workBlockId: featureInput.task.workBlockId,

@@ -23,7 +23,7 @@ async function resetDb() {
 
 async function createWorkspace() {
   return db.workspace.create({
-    data: { name: "Auto Plan Workspace", status: "Active", defaultRuntime: "hermes" },
+    data: { name: "Auto Plan Workspace", status: "Active" },
   });
 }
 
@@ -36,7 +36,6 @@ async function createTaskRow(workspaceId: string, overrides: Record<string, unkn
       priority: "High",
       autoPlanGeneration: true,
       autoExecute: false,
-      executionRuntime: "hermes",
       executionConfig: { prompt: "Run task", sessionStrategy: "per_subtask" },
       ...overrides,
     },

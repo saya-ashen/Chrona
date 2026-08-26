@@ -51,6 +51,7 @@ export type {
 export {
 	assertProviderStartSupported,
 	supportsDurableFeatureRuntime,
+	supportsSafeTerminalOnlyFeatureRuntime,
 	cancelRunInputSchema,
 	createSessionInputSchema,
 	existingRunStreamInputSchema,

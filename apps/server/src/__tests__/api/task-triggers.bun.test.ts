@@ -14,7 +14,6 @@ async function task(workspaceId: string, title: string) {
 			title,
 			status: "Ready",
 			priority: "Medium",
-			executionRuntime: "hermes",
 			executionConfig: {},
 		},
 	});

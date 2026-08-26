@@ -4,9 +4,12 @@ import { join } from "node:path";
 
 import { defineConfig, devices } from "@playwright/test";
 
-const E2E_DB_PATH =
-	process.env.CHRONA_E2E_DB_PATH ?? join(tmpdir(), "chrona-e2e.db");
+const E2E_DB_PATH = process.env.CHRONA_E2E_DB_PATH
+	?? join(tmpdir(), `chrona-e2e-${process.pid}-${Date.now()}.db`);
 const E2E_DATABASE_URL = `file:${E2E_DB_PATH}`;
+if (!process.env.CHRONA_E2E_DB_PATH) {
+	process.env.CHRONA_E2E_GENERATED_DB_PATH = E2E_DB_PATH;
+}
 const E2E_TEMPLATE_DB_PATH = process.env.CHRONA_E2E_TEMPLATE_DB_PATH;
 const E2E_TEMPLATE_ARG = E2E_TEMPLATE_DB_PATH
 	? ` --template "${E2E_TEMPLATE_DB_PATH}"`
@@ -41,6 +44,7 @@ const CHROMIUM_EXECUTABLE_PATH = findChromiumExecutable();
  */
 export default defineConfig({
 	testDir: "./e2e/specs",
+	globalTeardown: "./e2e/cleanup-e2e-db.ts",
 	fullyParallel: false,
 	workers: 1,
 	retries: process.env.CI ? 2 : 0,

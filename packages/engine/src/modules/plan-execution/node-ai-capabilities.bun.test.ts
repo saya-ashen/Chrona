@@ -238,7 +238,6 @@ describe("runTaskNodeFeature", () => {
       data: {
         name: "Node AI capabilities workspace",
         status: "Active",
-        defaultRuntime: "hermes",
       },
     });
     const task = await db.task.create({
@@ -248,7 +247,6 @@ describe("runTaskNodeFeature", () => {
         title: "Node AI capabilities task",
         status: TaskStatus.Running,
         priority: "Medium",
-        executionRuntime: "hermes",
         executionConfig: {},
       },
     });
@@ -382,7 +380,6 @@ describe("runTaskNodeFeature", () => {
       data: {
         name: "Node AI cancelled workspace",
         status: "Active",
-        defaultRuntime: "hermes",
       },
     });
     const task = await db.task.create({
@@ -392,7 +389,6 @@ describe("runTaskNodeFeature", () => {
         title: "Node AI cancelled task",
         status: TaskStatus.Running,
         priority: "Medium",
-        executionRuntime: "hermes",
         executionConfig: {},
       },
     });
@@ -474,7 +470,6 @@ describe("runTaskNodeFeature", () => {
       data: {
         name: "Node AI plan output workspace",
         status: "Active",
-        defaultRuntime: "hermes",
       },
     });
     const task = await db.task.create({
@@ -484,7 +479,6 @@ describe("runTaskNodeFeature", () => {
         title: "Node AI plan output task",
         status: TaskStatus.Running,
         priority: "Medium",
-        executionRuntime: "hermes",
         executionConfig: {},
       },
     });
@@ -599,7 +593,6 @@ describe("runTaskNodeFeature", () => {
       data: {
         name: "Node AI task terminal tool workspace",
         status: "Active",
-        defaultRuntime: "hermes",
       },
     });
     const task = await db.task.create({
@@ -609,7 +602,6 @@ describe("runTaskNodeFeature", () => {
         title: "Node AI task terminal tool task",
         status: TaskStatus.Running,
         priority: "Medium",
-        executionRuntime: "hermes",
         executionConfig: {},
       },
     });
@@ -686,7 +678,6 @@ describe("runTaskNodeFeature", () => {
       data: {
         name: "Node AI false complete workspace",
         status: "Active",
-        defaultRuntime: "hermes",
       },
     });
     const task = await db.task.create({
@@ -696,7 +687,6 @@ describe("runTaskNodeFeature", () => {
         title: "Node AI false complete task",
         status: TaskStatus.Running,
         priority: "Medium",
-        executionRuntime: "hermes",
         executionConfig: {},
       },
     });
@@ -777,7 +767,6 @@ describe("runTaskNodeFeature", () => {
       data: {
         name: "Node AI condition workspace",
         status: "Active",
-        defaultRuntime: "hermes",
       },
     });
     const task = await db.task.create({
@@ -787,7 +776,6 @@ describe("runTaskNodeFeature", () => {
         title: "Node AI condition task",
         status: TaskStatus.Running,
         priority: "Medium",
-        executionRuntime: "hermes",
         executionConfig: {},
       },
     });
@@ -878,7 +866,6 @@ describe("runTaskNodeFeature", () => {
       data: {
         name: "Node AI condition terminal tool workspace",
         status: "Active",
-        defaultRuntime: "hermes",
       },
     });
     const task = await db.task.create({
@@ -888,7 +875,6 @@ describe("runTaskNodeFeature", () => {
         title: "Node AI condition terminal tool task",
         status: TaskStatus.Running,
         priority: "Medium",
-        executionRuntime: "hermes",
         executionConfig: {},
       },
     });
@@ -985,7 +971,6 @@ describe("runTaskNodeFeature", () => {
       data: {
         name: "Node AI condition blocked workspace",
         status: "Active",
-        defaultRuntime: "hermes",
       },
     });
     const task = await db.task.create({
@@ -995,7 +980,6 @@ describe("runTaskNodeFeature", () => {
         title: "Node AI condition blocked task",
         status: TaskStatus.Running,
         priority: "Medium",
-        executionRuntime: "hermes",
         executionConfig: {},
       },
     });

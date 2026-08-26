@@ -38,7 +38,7 @@ async function resetDb() {
 
 async function createTask() {
   const workspace = await db.workspace.create({
-    data: { name: "Scheduler Event Workspace", status: "Active", defaultRuntime: "hermes" },
+    data: { name: "Scheduler Event Workspace", status: "Active" },
   });
   const task = await db.task.create({
     data: {
@@ -46,7 +46,6 @@ async function createTask() {
       title: "Run orchestrator",
       status: "Ready",
       priority: "High",
-      executionRuntime: "hermes",
       executionConfig: { prompt: "Run orchestrator" },
     },
   });

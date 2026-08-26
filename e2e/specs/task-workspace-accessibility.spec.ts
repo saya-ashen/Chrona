@@ -9,6 +9,7 @@ import {
 	generateTaskWorkspacePlan,
 	getPrimaryTaskWorkspaceAction,
 	setTaskWorkspaceViewport,
+	removeWorkspaceE2eAiClients,
 } from "./task-workspace-test-helpers";
 import {
 	bindTaskPlanProvider,
@@ -24,6 +25,10 @@ async function expectDialogFocusContained(page: Page, dialog: Locator) {
 }
 
 test.describe("Task workspace accessibility", () => {
+	test.afterEach(async ({ request }) => {
+		await removeWorkspaceE2eAiClients(request);
+	});
+
 	test("reaches primary schedule actions by keyboard and restores dialog focus", async ({
 		page,
 	}) => {
@@ -226,11 +231,17 @@ test.describe("Task workspace accessibility", () => {
 			await expect(approve).toBeVisible({ timeout: 30_000 });
 			await approve.focus();
 			await page.keyboard.press("Enter");
-			const manualInput = page.getByRole("textbox", { name: "Mark completed" });
+			const manualInput = page.getByRole("textbox", { name: "Review summary" });
 			await expect(manualInput).toBeVisible({ timeout: 30_000 });
 			await manualInput.focus();
 			await page.keyboard.type("Manual review completed by keyboard");
-			const markCompleted = page.getByRole("button", { name: "Mark completed" });
+			// The deterministic task binding owns execution only; release it before
+			// terminal completion so the dedicated finalization provider is used.
+			const clearExecutionClient = await request.patch(`/api/tasks/${created.taskId}`, {
+				data: { aiClientId: null },
+			});
+			expect(clearExecutionClient.ok()).toBeTruthy();
+			const markCompleted = page.getByRole("button", { name: "Complete and continue" });
 			await markCompleted.focus();
 			await page.keyboard.press("Enter");
 
