@@ -123,6 +123,7 @@ export const manualCompletionFormReviewFeature = defineAiFeature({
     build: ({ input }) => observation(manualCompletionFormReviewInputSchema.parse(input)),
   }],
   actions: [],
+  // eslint-disable-next-line complexity -- validation keeps every terminal contract check explicit.
   validateCompletion: ({ input, result, observations }): CompletionValidation => {
     const parsedInput = manualCompletionFormReviewInputSchema.safeParse(input);
     const parsedOutput = manualCompletionFormReviewOutputSchema.safeParse(result.output);
@@ -194,8 +195,8 @@ function reviewInput(input: NodeExecutorInput, task: { id: string; title: string
       description: bounded(task.description ?? undefined, 4_000),
     },
     plan: {
-      title: input.planContext?.title?.slice(0, 512) ?? input.plan.basePlanId.slice(0, 512),
-      goal: input.planContext?.goal?.slice(0, 4_000) ?? input.node.definition.objective.slice(0, 4_000),
+      title: input.planContext?.title.slice(0, 512) ?? input.plan.basePlanId.slice(0, 512),
+      goal: input.planContext?.goal.slice(0, 4_000) ?? input.node.definition.objective.slice(0, 4_000),
       assumptions: (input.planContext?.assumptions ?? []).slice(0, 64).map((value) => value.slice(0, 1_000)),
     },
     node: {
@@ -228,6 +229,7 @@ function errorCodeForRun(code: string | undefined): ManualCompletionFormReviewEr
   return "MANUAL_FORM_REVIEW_PROVIDER_FAILED";
 }
 
+// eslint-disable-next-line complexity -- provider resolution and fail-closed result validation are one use case.
 export async function reviewManualCompletionForm(input: NodeExecutorInput): Promise<NodeActionForm> {
   const task = await db.task.findUnique({
     where: { id: input.taskId },

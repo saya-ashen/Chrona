@@ -694,11 +694,20 @@ export function useTaskWorkspacePlanState(
 			),
 		} satisfies TaskPlanState;
 		const nextPlanFlow = createPlanFlowFromSnapshot(nextPlanState);
+		const settledAcceptanceCommand =
+			nextPlanFlow.savedPlan?.status === "accepted"
+				? acceptingPlanCommandRef.current
+				: null;
+		if (settledAcceptanceCommand) {
+			acceptingPlanCommandRef.current = null;
+			reconcileAcceptingPlanFromSnapshotRef.current = false;
+			setPendingCommand((current) =>
+				current?.commandId === settledAcceptanceCommand.commandId ? null : current,
+			);
+		}
 		setPlanFlow((current) => {
 			if (current.status === "accepting") {
 				if (nextPlanFlow.savedPlan?.status === "accepted") {
-					acceptingPlanCommandRef.current = null;
-					reconcileAcceptingPlanFromSnapshotRef.current = false;
 					return nextPlanFlow;
 				}
 				if (reconcileAcceptingPlanFromSnapshotRef.current) {
@@ -1012,6 +1021,10 @@ export function useTaskWorkspacePlanState(
 					message: "Plan acceptance was accepted. Waiting for the durable plan state.",
 					status: "pending",
 				});
+				// The command ACK proves only receipt. Explicitly refresh the durable
+				// plan/workspace snapshots so acceptance settles even if the SSE event
+				// is delayed or missed; snapshot reconciliation remains authoritative.
+				await refreshExecutionQueries();
 			} catch (cause) {
 				acceptingPlanCommandRef.current = null;
 				reconcileAcceptingPlanFromSnapshotRef.current = false;
@@ -1026,6 +1039,7 @@ export function useTaskWorkspacePlanState(
 		},
 		[
 			planHeadStateVersion,
+			refreshExecutionQueries,
 			selectedWorkBlockId,
 			task.id,
 		],

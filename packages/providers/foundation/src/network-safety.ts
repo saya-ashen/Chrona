@@ -17,6 +17,7 @@ export type HermesEndpointValidation = { ok: true; url: URL; local: boolean } | 
  * Hermes permits cleartext only to explicit loopback hosts. This validation runs
  * before any request headers are constructed, so invalid endpoints receive no bearer token.
  */
+// eslint-disable-next-line complexity -- endpoint policy rejects each unsafe URL feature explicitly.
 export function validateHermesEndpoint(value: string | undefined): HermesEndpointValidation {
   const trimmed = value?.trim() ?? "";
   if (!trimmed) {

@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
+import { deriveWorkStateView } from "@chrona/domain";
 import {
 	isDurablySettledPlan,
+	isLatestTaskResultAccepted,
 	preserveAcceptedResultReview,
+	settleAcceptedResultWorkState,
 	settleWorkspaceCommand,
 	shouldPollExecutionFinalization,
 	shouldPollPlanSettlement,
@@ -68,6 +71,79 @@ describe("task workspace durable settlement", () => {
 		};
 		expect(shouldPollPlanSettlement(snapshot, "failed")).toBe(true);
 		expect(shouldPollPlanSettlement(snapshot, "cancelled")).toBe(true);
+	});
+
+	it.each([
+		{
+			name: "accepted latest result on a completed task",
+			taskStatus: "Completed",
+			runId: "run-1",
+			runStatus: "Completed",
+			reviewStatus: "accepted",
+			reviewRunId: "run-1",
+			expected: true,
+		},
+		{
+			name: "accepted latest result while the task projection lags",
+			taskStatus: "Ready",
+			runId: "run-1",
+			runStatus: "Completed",
+			reviewStatus: "accepted",
+			reviewRunId: "run-1",
+			expected: true,
+		},
+		{
+			name: "acceptance for an older run",
+			taskStatus: "Completed",
+			runId: "run-2",
+			runStatus: "Completed",
+			reviewStatus: "accepted",
+			reviewRunId: "run-1",
+			expected: false,
+		},
+		{
+			name: "active latest run outranking stale acceptance",
+			taskStatus: "WaitingForApproval",
+			runId: "run-1",
+			runStatus: "WaitingForApproval",
+			reviewStatus: "accepted",
+			reviewRunId: "run-1",
+			expected: false,
+		},
+		{
+			name: "result still awaiting acceptance",
+			taskStatus: "Completed",
+			runId: "run-1",
+			runStatus: "Completed",
+			reviewStatus: "pending_acceptance",
+			reviewRunId: "run-1",
+			expected: false,
+		},
+	])("derives $name", ({
+		taskStatus,
+		runId,
+		runStatus,
+		reviewStatus,
+		reviewRunId,
+		expected,
+	}) => {
+		const pageData = {
+			task: { status: taskStatus },
+			latestRunSummary: { id: runId, status: runStatus },
+			resultReview: {
+				status: reviewStatus,
+				runId: reviewRunId,
+				acceptedAt: reviewStatus === "accepted" ? "2026-08-22T00:00:00.000Z" : null,
+			},
+		} as never;
+		const pending = deriveWorkStateView({
+			taskStatus: "Completed",
+			executionStatus: "completed",
+		});
+		expect(isLatestTaskResultAccepted(pageData)).toBe(expected);
+		expect(settleAcceptedResultWorkState(pageData, pending).state).toBe(
+			expected ? "done" : "result_ready",
+		);
 	});
 
 	it("does not regress an accepted result when a stale page revalidation arrives", () => {

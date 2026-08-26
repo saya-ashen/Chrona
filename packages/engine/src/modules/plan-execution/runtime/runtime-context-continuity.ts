@@ -35,7 +35,7 @@ export async function resolveRuntimeContextContinuity(
     && session.providerName === expectedProvider.providerName
     && session.providerConfigFingerprint === expectedProvider.providerConfigFingerprint;
 
-  if (providerMatches && session?.providerSessionRef?.trim()) {
+  if (providerMatches && session.providerSessionRef?.trim()) {
     return {
       mode: "resumed",
       recovery: "provider_context",

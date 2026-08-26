@@ -146,7 +146,9 @@ test.describe("P0 scenario gaps", () => {
 		await dialog.getByPlaceholder("Add title").fill(title);
 		await dialog.getByPlaceholder("Add description").fill(description);
 		await dialog.getByRole("button", { name: "High" }).click();
-		await dialog.getByLabel("Due date (optional)").fill(dueAt);
+		const dueAtInput = dialog.getByLabel("Due date (optional)");
+		await dueAtInput.fill(dueAt);
+		await expect(dueAtInput).toHaveValue(dueAt);
 		const createdResponse = page.waitForResponse(
 			(response) =>
 				response.url().includes("/api/tasks") &&
@@ -158,6 +160,9 @@ test.describe("P0 scenario gaps", () => {
 			taskId?: string;
 		};
 		expect(created.taskId).toBeTruthy();
+		// Task creation is followed by an awaited schedule PUT that persists dueAt.
+		// Do not navigate away after only the initial POST receipt.
+		await expect(dialog).not.toBeVisible();
 
 		await page.goto("/en/tasks");
 		await page.getByRole("button", { name: /All tasks$/ }).click();
@@ -189,31 +194,41 @@ test.describe("P0 scenario gaps", () => {
 		page,
 		request,
 	}) => {
-		const cancel = await createTask(
-			request,
-			`P0 delete cancel ${crypto.randomUUID()}`,
-		);
+		const cancelTitle = `P0 delete cancel ${crypto.randomUUID()}`;
+		const cancel = await createTask(request, cancelTitle);
 		await page.goto("/en/tasks");
 		await expectApp(page);
-		await openTaskActions(page, /^More actions for P0 delete cancel/);
+		await openTaskActions(
+			page,
+			new RegExp(`^More actions for ${cancelTitle}$`),
+		);
 		await page.getByRole("menuitem", { name: /delete/i }).click();
 		const dialog = page.getByRole("dialog");
 		await expect(dialog).toBeVisible();
 		await dialog.getByRole("button", { name: /cancel/i }).click();
 		await expect(dialog).not.toBeVisible();
 		await expect(
-			page.getByRole("heading", { name: /P0 delete cancel/ }),
+			page.getByRole("heading", { name: cancelTitle, exact: true }),
 		).toHaveCount(1);
 
 		const confirmTitle = `P0 delete confirm ${crypto.randomUUID()}`;
 		const confirm = await createTask(request, confirmTitle);
 		await page.reload();
-		await openTaskActions(page, /^More actions for P0 delete confirm/);
+		await openTaskActions(
+			page,
+			new RegExp(`^More actions for ${confirmTitle}$`),
+		);
 		await page.getByRole("menuitem", { name: /delete/i }).click();
+		const deletedResponse = page.waitForResponse(
+			(response) =>
+				new URL(response.url()).pathname === `/api/tasks/${confirm.taskId}` &&
+				response.request().method() === "DELETE",
+		);
 		await page
 			.getByRole("dialog")
 			.getByRole("button", { name: /delete/i })
 			.click();
+		expect((await deletedResponse).ok()).toBe(true);
 		await expect(
 			page.getByRole("heading", { name: confirmTitle, exact: true }),
 		).toHaveCount(0);

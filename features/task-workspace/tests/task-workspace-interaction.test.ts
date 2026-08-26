@@ -272,7 +272,9 @@ describe("task workspace interaction model", () => {
 		});
 
 		const acceptedPage = pageData({
-			task: { ...pageData().task, status: "Done" },
+			// Result acceptance is a separate review fact; the execution-owned Task
+			// status remains Completed.
+			task: { ...pageData().task, status: "Completed" },
 			latestRunSummary: completedPage.latestRunSummary,
 			resultReview: {
 				status: "accepted",
@@ -294,19 +296,33 @@ describe("task workspace interaction model", () => {
 			statusLabel: "Result ready",
 			nextActionLabel: "Accept result or request changes",
 		});
+		const acceptedOperation = operationState({
+			status: "execution-completed",
+			action: "none",
+		} as unknown as Partial<TaskWorkspaceOperationState>);
 		expect(
 			deriveTaskWorkspaceStage({
 				pageData: acceptedPage,
 				graphPlan: graphPlan(),
-				operationState: operationState({
-					status: "execution-completed",
-					action: "none",
-				} as unknown as Partial<TaskWorkspaceOperationState>),
+				operationState: acceptedOperation,
 			}),
 		).toMatchObject({
 			stage: "result",
 			statusLabel: "Task done",
 			nextActionLabel: "Ask a follow-up or create a next task",
+			primaryActionId: "ask_follow_up",
+		});
+		expect(
+			deriveTaskWorkspaceDisplayState({
+				pageData: acceptedPage,
+				graphPlan: graphPlan(),
+				operationState: acceptedOperation,
+				currentNode: null,
+			}),
+		).toMatchObject({
+			mode: "done",
+			primaryAction: "follow_up",
+			resultReview: { phase: "accepted" },
 		});
 		const waitingAcceptedPage = pageData({
 			task: { ...pageData().task, status: "WaitingForApproval" },

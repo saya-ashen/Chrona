@@ -1,4 +1,6 @@
 import type { PublicPlanExecutionResult } from "@chrona/contracts";
+import type { WorkStateView } from "@chrona/domain";
+import type { TaskPageData } from "./task-workspace-types";
 
 /**
  * Durable API snapshots win over browser-local stream state. This contract is
@@ -53,6 +55,51 @@ export function shouldPollExecutionFinalization(
 			execution.planOutput?.finalization.status ?? "",
 		),
 	);
+}
+
+type ResultSettlementPageData = Pick<
+	TaskPageData,
+	"latestRunSummary" | "resultReview" | "task"
+>;
+
+function normalizedStatus(value: string | null | undefined) {
+	return value?.trim().toLowerCase() ?? "";
+}
+
+export function isLatestTaskResultAccepted(pageData: ResultSettlementPageData) {
+	const taskStatus = normalizedStatus(pageData.task.status);
+	return (
+		pageData.resultReview?.status === "accepted" &&
+		pageData.resultReview.runId === pageData.latestRunSummary?.id &&
+		(taskStatus === "completed" ||
+			taskStatus === "done" ||
+			taskStatus === "complete" ||
+			normalizedStatus(pageData.latestRunSummary?.status) === "completed")
+	);
+}
+
+export function settleAcceptedResultWorkState(
+	pageData: ResultSettlementPageData,
+	derived: WorkStateView,
+): WorkStateView {
+	if (!isLatestTaskResultAccepted(pageData)) return derived;
+	return {
+		...derived,
+		state: "done",
+		stage: "result",
+		label: "Task done",
+		tone: "success",
+		nextActionLabel: "Ask a follow-up or create a next task",
+		primaryActionId: "ask_follow_up",
+		primaryActionDisabledReason: null,
+		currentNodeId: null,
+		currentNodeLabel: null,
+		blocker: null,
+		attentionRequired: false,
+		showLiveProgress: false,
+		canPause: false,
+		canStop: false,
+	};
 }
 
 export function preserveAcceptedResultReview<

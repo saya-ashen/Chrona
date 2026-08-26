@@ -105,6 +105,7 @@ export function inspectSqliteRuntimeLock(
  * checked before and after its atomic rename so live or malformed ownership is
  * never removed. The database itself is never touched.
  */
+// eslint-disable-next-line complexity -- each branch is a fail-closed lock ownership check.
 export function quarantineStaleSqliteRuntimeLock(
   databaseUrl: string,
   options: Pick<AcquireSqliteRuntimeLockOptions, "isProcessAlive" | "lockPath"> = {},

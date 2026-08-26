@@ -938,7 +938,7 @@ describe("task workspace page synchronization", () => {
   });
 
   it("exposes the latest plan generation activity summary", async () => {
-    const initialPlan = planReadModel({ id: "plan-1", status: "ready", title: "Old plan" });
+    const initialPlan = planReadModel({ id: "plan-1", status: "draft", title: "Old plan" });
     const initialPage = pageData({ taskStatus: "Ready", plan: initialPlan, aiPlanGenerationStatus: "generating" });
     // Plan generation runs in the shared `useTaskPlanGenerationSession`
     // store. The workspace hook surfaces its `statusMessage` / `phase`
@@ -990,7 +990,7 @@ describe("task workspace page synchronization", () => {
   });
 
   it("leaves generating state and refreshes the saved plan when the generation session completes", async () => {
-    const initialPlan = planReadModel({ id: "plan-1", status: "ready", title: "Old plan" });
+    const initialPlan = planReadModel({ id: "plan-1", status: "draft", title: "Old plan" });
     const generatedPlan = planReadModel({ id: "plan-2", status: "draft", title: "Generated plan" });
     const initialPage = pageData({ taskStatus: "Ready", plan: initialPlan, aiPlanGenerationStatus: "generating" });
     mocks.generationSession = {

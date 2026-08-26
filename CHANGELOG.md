@@ -3,6 +3,8 @@
 ## Unreleased
 
 ### Fixed
+- Settled accepted latest results consistently across the Task Workspace stage/header/assistant context and Action Center, preserving completed-step progress while replacing stale review actions with follow-up actions.
+- Hardened release verification around the attested previous-release database fixture, fixed the documented source server entrypoint, aligned Windows ACL privacy documentation with fail-closed enforcement, and restored green typecheck/lint/test gates.
 - Replaced manual task nodes' false `Blocked/manual_action` state with Provider-reviewed completion forms, normal `WaitingForInput/manual_completion` pauses, revision-checked typed submissions, retryable form-generation failures, and strict legacy recovery for existing plans.
 - Removed the legacy task/workspace Adapter (`executionRuntime`) selector and runtime config registry; task execution now resolves one authoritative AI client/provider and persists provider-matched session provenance.
 - Added fingerprint-gated amendments for already-applied mutable release-line migrations, preserving local data instead of rejecting startup after unreleased migration SQL evolves.

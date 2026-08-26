@@ -69,6 +69,7 @@ function choiceRules(field: NodeActionFormField) {
   return null;
 }
 
+// eslint-disable-next-line complexity -- choice cardinality and allowlist checks stay explicit.
 function validateChoice(field: NodeActionFormField, value: CheckpointInputFields[string] | undefined) {
   const rules = choiceRules(field);
   if (!rules || value === undefined || value === "" || (Array.isArray(value) && value.length === 0)) return;
@@ -96,6 +97,12 @@ function validateBoolean(field: NodeActionFormField, value: CheckpointInputField
 function displayValue(value: CheckpointInputFields[string]) {
   if (Array.isArray(value)) return value.join(", ");
   return typeof value === "boolean" ? (value ? "Yes" : "No") : value.trim();
+}
+
+function hasDisplayValue(value: CheckpointInputFields[string] | undefined) {
+  if (value === undefined) return false;
+  if (Array.isArray(value)) return value.length > 0;
+  return typeof value === "boolean" || value.length > 0;
 }
 
 export function validateManualCompletionSubmission(input: {
@@ -131,9 +138,9 @@ export function validateManualCompletionSubmission(input: {
   const summary = input.form.inputFields
     .flatMap((field) => {
       const value = inputFields[field.name];
-      return value === undefined || value === "" || (Array.isArray(value) && value.length === 0)
-        ? []
-        : [`${field.label}: ${displayValue(value)}`];
+      return hasDisplayValue(value)
+        ? [`${field.label}: ${displayValue(value)}`]
+        : [];
     })
     .join("\n")
     .slice(0, MAX_SUMMARY_LENGTH);

@@ -450,6 +450,58 @@ describe("task workspace execution console view model", () => {
     expect(view.attention).toMatchObject({ title: "Needs handling", tone: "critical", actionNodeId: "sync" });
   });
 
+  it("lets accepted latest-result settlement override a stale execution summary", () => {
+    const view = createTaskWorkspaceExecutionConsoleView({
+      pageData: pageData({
+        task: {
+          ...pageData().task,
+          status: "Completed",
+          executionSummary: {
+            taskId: "task-1",
+            executionState: "completed",
+            stateLabel: "Result ready",
+            stateReason: null,
+            graphVersion: 2,
+            currentNodeId: "done",
+            primaryAction: {
+              type: "none",
+              label: "Accept result or request changes",
+              enabled: true,
+            },
+            progress: { completed: 1, total: 1, percent: 100 },
+            readiness: { runnable: false, reason: "Execution completed" },
+            degraded: null,
+            blocking: null,
+            waiting: null,
+            recoveryActions: [],
+          },
+        },
+        latestRunSummary: {
+          id: "run-accepted",
+          status: "Completed",
+          startedAt: "2026-05-12T10:00:00.000Z",
+          syncStatus: "healthy",
+        },
+        resultReview: {
+          status: "accepted",
+          runId: "run-accepted",
+          acceptedAt: "2026-05-12T10:05:00.000Z",
+        },
+      }),
+      graphPlan: graph([node({ id: "done", status: "done" })], "done"),
+    });
+
+    expect(view.header).toMatchObject({
+      status: "completed",
+      completedSteps: 1,
+      totalSteps: 1,
+      progressPercent: 100,
+      primaryStateLabel: "Task done",
+      primaryActionLabel: "Ask a follow-up or create a next task",
+      currentNodeId: null,
+    });
+  });
+
   it("attaches the orchestrator recovery action to the target node", () => {
     const view = createTaskWorkspaceExecutionConsoleView({
       pageData: pageData({

@@ -6,6 +6,7 @@ import type {
 } from "./plan-node-view-model";
 import type { TaskPageData } from "./task-workspace-types";
 import type { TaskWorkspaceOperationState } from "./task-workspace-operation-machine";
+import { settleAcceptedResultWorkState } from "./task-workspace-settlement";
 
 export type TaskPlanningReadiness = {
 	status: "ready" | "warning" | "blocked";
@@ -549,7 +550,7 @@ export function deriveTaskWorkStateView(input: {
 		input.currentNode ??
 		input.operationState.currentNode ??
 		firstActionableNode(input.graphPlan);
-	return deriveWorkStateView({
+	const derived = deriveWorkStateView({
 		taskStatus: input.pageData.task.status,
 		executionStatus:
 			input.pageData.latestRunSummary?.executionState ??
@@ -574,6 +575,7 @@ export function deriveTaskWorkStateView(input: {
 		currentNodeLabel: currentNode?.title ?? null,
 		blockReason: input.pageData.task.blockReason,
 	});
+	return settleAcceptedResultWorkState(input.pageData, derived);
 }
 
 export function deriveTaskWorkspaceStage(input: {
@@ -582,18 +584,11 @@ export function deriveTaskWorkspaceStage(input: {
 	operationState: TaskWorkspaceOperationState;
 }): TaskWorkspaceStage {
 	const workState = deriveTaskWorkStateView(input);
-	const resultAccepted =
-		workState.state === "done" &&
-		input.pageData.resultReview?.runId ===
-			input.pageData.latestRunSummary?.id &&
-		input.pageData.resultReview?.status === "accepted";
 	return {
 		stage: workState.stage,
-		statusLabel: resultAccepted ? "Task done" : workState.label,
+		statusLabel: workState.label,
 		currentNodeLabel: workState.currentNodeLabel ?? undefined,
-		nextActionLabel: resultAccepted
-			? "Ask a follow-up or create a next task"
-			: workState.nextActionLabel,
+		nextActionLabel: workState.nextActionLabel,
 		primaryActionId: workState.primaryActionId ?? "none",
 		tone: toneFromWorkState(workState.tone),
 	};
@@ -603,9 +598,10 @@ function displayModeFor(input: {
 	pageData: TaskPageData;
 	operationState: TaskWorkspaceOperationState;
 	stage: TaskWorkspaceStage;
+	workState: WorkStateView;
 }): TaskWorkspaceDisplayMode {
 	const taskStatus = normalized(input.pageData.task.status);
-	if (taskStatus === "done") return "done";
+	if (input.workState.state === "done") return "done";
 	if (
 		input.operationState.status === "execution-blocked" ||
 		input.operationState.status === "execution-action" ||
@@ -728,6 +724,7 @@ export function deriveTaskWorkspaceDisplayState(input: {
 		pageData: input.pageData,
 		operationState: input.operationState,
 		stage,
+		workState,
 	});
 	const rule = TASK_WORKSPACE_DISPLAY_RULES[mode];
 	return {

@@ -46,16 +46,31 @@ export function parseWindowsAclAudit(output: string): WindowsAclAudit {
     .reverse()
     .find((line) => line.startsWith("{") && line.endsWith("}"));
   if (!json) throw new Error("Windows ACL audit produced no JSON result.");
-  const value = JSON.parse(json) as Partial<WindowsAclAudit>;
+  const parsed: unknown = JSON.parse(json);
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    throw new Error("Windows ACL audit returned an invalid result.");
+  }
+  const value = parsed as Record<string, unknown>;
   if (
     typeof value.owner !== "string"
     || typeof value.currentUser !== "string"
     || !Array.isArray(value.rules)
-    || value.rules.some((rule) => !rule || typeof rule.sid !== "string" || typeof rule.accessType !== "string" || typeof rule.rights !== "number" || typeof rule.inherited !== "boolean")
+    || value.rules.some((rule) => {
+      if (!rule || typeof rule !== "object" || Array.isArray(rule)) return true;
+      const candidate = rule as Record<string, unknown>;
+      return typeof candidate.sid !== "string"
+        || typeof candidate.accessType !== "string"
+        || typeof candidate.rights !== "number"
+        || typeof candidate.inherited !== "boolean";
+    })
   ) {
     throw new Error("Windows ACL audit returned an invalid result.");
   }
-  return value as WindowsAclAudit;
+  return {
+    owner: value.owner,
+    currentUser: value.currentUser,
+    rules: value.rules as WindowsAclRule[],
+  };
 }
 
 export function windowsAclIsPrivate(audit: WindowsAclAudit): boolean {
@@ -80,8 +95,8 @@ function execute(command: string, args: string[]): { status: number | null; stdo
   const result = spawnSync(command, args, { encoding: "utf8", windowsHide: true });
   return {
     status: result.status,
-    stdout: result.stdout ?? "",
-    stderr: result.stderr ?? "",
+    stdout: result.stdout,
+    stderr: result.stderr,
     error: result.error,
   };
 }

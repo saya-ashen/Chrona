@@ -119,7 +119,10 @@ async function assertRuntimeStarts(binaryPath: string) {
     proc.kill();
     await proc.exited.catch(() => undefined);
     const [stdout, stderr] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text()]);
-    throw new Error(`Runtime smoke failed: ${error instanceof Error ? error.message : String(error)}\nstdout:\n${stdout}\nstderr:\n${stderr}`);
+    throw new Error(
+      `Runtime smoke failed: ${error instanceof Error ? error.message : String(error)}\nstdout:\n${stdout}\nstderr:\n${stderr}`,
+      { cause: error },
+    );
   } finally {
     proc.kill();
     await proc.exited.catch(() => undefined);

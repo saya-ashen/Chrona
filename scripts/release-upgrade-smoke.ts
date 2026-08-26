@@ -7,19 +7,29 @@ import { Database } from "bun:sqlite";
 
 import { buildTargets, parseBuildTarget, type BuildTargetName } from "../build/manifest";
 import { schemaFingerprint } from "../packages/db/src/sqlite-schema-fingerprint";
+import { verifyMigrationReleaseMetadata } from "../packages/db/src/sqlite-migrations";
 
 const ROOT = resolve(import.meta.dirname, "..");
 const TIMEOUT_MS = 25_000;
-const metadata = await Bun.file(resolve(ROOT, "prisma/migrations/release-metadata.json")).json() as {
-  releaseLineSchemaFingerprint: string;
-  mutableReleaseLineMigration: string;
-  previousReleaseFixture: { path: string };
-};
+const MIGRATIONS_DIR = resolve(ROOT, "prisma/migrations");
+
+function loadReleaseMetadata() {
+  const value = verifyMigrationReleaseMetadata(MIGRATIONS_DIR);
+  if (!value) {
+    throw new Error(`Migration release metadata is missing from ${MIGRATIONS_DIR}.`);
+  }
+  return value;
+}
+
+const metadata = loadReleaseMetadata();
 
 async function freePort(): Promise<number> {
   const server = Bun.serve({ port: 0, fetch: () => new Response("ok") });
   const port = server.port;
   server.stop(true);
+  if (port === undefined) {
+    throw new Error("Bun did not allocate a port for the packaged upgrade smoke server.");
+  }
   return port;
 }
 
@@ -107,7 +117,10 @@ async function startAndStop(binary: string, env: NodeJS.ProcessEnv): Promise<voi
   } catch (error) {
     process.kill();
     await process.exited.catch(() => undefined);
-    throw new Error(`${error instanceof Error ? error.message : String(error)}\n${await new Response(process.stdout).text()}\n${await new Response(process.stderr).text()}`);
+    throw new Error(
+      `${error instanceof Error ? error.message : String(error)}\n${await new Response(process.stdout).text()}\n${await new Response(process.stderr).text()}`,
+      { cause: error },
+    );
   }
   process.kill();
   await process.exited.catch(() => undefined);
@@ -124,7 +137,7 @@ export async function smokePackagedUpgrade(target: BuildTargetName): Promise<voi
   try {
     mkdirSync(dataDir, { recursive: true });
     mkdirSync(configDir, { recursive: true });
-    copyFileSync(resolve(ROOT, "prisma/migrations", metadata.previousReleaseFixture.path), databasePath);
+    copyFileSync(resolve(MIGRATIONS_DIR, metadata.previousReleaseFixture.path), databasePath);
     seedRepresentativeLegacyRows(databasePath);
     const env = releaseEnvironment(dataDir, configDir, databasePath);
     await startAndStop(binary, env);

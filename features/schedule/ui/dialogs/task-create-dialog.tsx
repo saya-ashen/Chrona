@@ -328,6 +328,13 @@ export function TaskCreateDialog({
   /** Suppress auto-complete after applying a suggestion until next manual input */
   const suppressRef = useRef(false);
 
+  useEffect(() => () => {
+    if (blurTimeoutRef.current) {
+      clearTimeout(blurTimeoutRef.current);
+      blurTimeoutRef.current = null;
+    }
+  }, []);
+
   /* ---- AI hooks ---- */
   const {
     suggestions: autoCompleteSuggestions,
@@ -642,6 +649,7 @@ export function TaskCreateDialog({
                     }
                   }}
                   onBlur={() => {
+                    if (blurTimeoutRef.current) clearTimeout(blurTimeoutRef.current);
                     blurTimeoutRef.current = setTimeout(() => {
                       setShowAutoComplete(false);
                     }, 200);

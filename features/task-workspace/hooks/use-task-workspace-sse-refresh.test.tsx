@@ -180,7 +180,7 @@ describe("SSE-driven refetch of dependent queries", () => {
     });
     mocks.executionResponses.push({ taskId: "task-1", status: "running" });
     mocks.pageResponse = { task: { id: "task-1", status: "Running" }, artifacts: [], activityTimeline: [] };
-    await pushEvent("execution.state.updated", { eventKind: "running" });
+    await pushEvent("execution.state.updated", { eventKind: "running", workBlockId: "block-A" });
 
     await waitFor(() => {
       expect(fetchCallCount(/\/api\/tasks\/task-1(\?|$)/)).toBeGreaterThan(pageBefore);
@@ -202,7 +202,7 @@ describe("SSE-driven refetch of dependent queries", () => {
     // dropped on the floor in some tests.)
     const pageBeforePhase2 = fetchCallCount(/\/api\/tasks\/task-1(\?|$)/);
     mocks.pageResponse = { task: { id: "task-1", status: "Ready" }, artifacts: [], activityTimeline: [] };
-    await pushEvent("task_workspace_updated", { reason: "plan.accepted" });
+    await pushEvent("task_workspace_updated", { reason: "plan.accepted", workBlockId: "block-A" });
 
     await waitFor(() => {
       expect(fetchCallCount(/\/api\/tasks\/task-1(\?|$)/)).toBeGreaterThan(pageBeforePhase2);

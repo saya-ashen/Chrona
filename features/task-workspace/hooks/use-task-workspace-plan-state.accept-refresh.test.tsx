@@ -117,7 +117,7 @@ afterEach(async () => {
 });
 
 describe("useTaskWorkspacePlanState — accept plan", () => {
-  it("keeps plan acceptance pending after a 202 until durable state arrives", async () => {
+  it("settles plan acceptance when the post-ACK durable refresh is accepted", async () => {
     initialPageForTest = taskWorkspaceStateFixtures.idle.pageData;
     const { result } = renderHook(() => {
       const workspace = useTaskWorkspacePageState(initialPageForTest);
@@ -137,10 +137,10 @@ describe("useTaskWorkspacePlanState — accept plan", () => {
       await result.current.plan.acceptPlanById("plan-1");
     });
 
-    await waitFor(() => expect(result.current.plan.canAcceptPlan).toBe(false));
-    expect(result.current.plan.planGenerationStatus).toBe("waiting_acceptance");
-    expect(result.current.plan.planFlowStatus).toBe("accepting");
-    expect(result.current.plan.pendingCommand).toMatchObject({ commandId: "c-1", status: "pending" });
+    await waitFor(() => expect(result.current.plan.planFlowStatus).toBe("accepted"));
+    expect(result.current.plan.canAcceptPlan).toBe(false);
+    expect(result.current.plan.planGenerationStatus).toBe("accepted");
+    expect(result.current.plan.pendingCommand).toBeNull();
     expect(mocks.commandCalls[0]?.body).toMatchObject({ type: "plan.accept", planId: "plan-1" });
   });
 

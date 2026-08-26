@@ -546,6 +546,53 @@ describe("getActionCenter actionable states", () => {
     expect(blocked?.summary).toBeTruthy();
   });
 
+  it("removes a completed-result review item after the latest result is accepted", async () => {
+    const workspace = await db.workspace.create({
+      data: { name: "Accepted result Action Center", status: "Active" },
+    });
+    const task = await seedTask(
+      workspace.id,
+      "Accepted result task",
+      "Completed",
+    );
+    const run = await seedRun(task.id, "Completed", {
+      runtimeRunRef: "accepted-result-run",
+      endedAt: new Date(),
+      updatedAt: new Date(),
+    });
+    await db.task.update({
+      where: { id: task.id },
+      data: { latestRunId: run.id },
+    });
+
+    expect(
+      (await getActionCenter(workspace.id)).some(
+        (item) =>
+          item.sourceTaskId === task.id && item.kind === "execution_completed",
+      ),
+    ).toBe(true);
+
+    await db.event.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        runId: run.id,
+        eventType: "task.result_accepted",
+        actorType: "user",
+        source: "ui",
+        payload: { accepted_run_id: run.id },
+        ingestSequence: 1,
+      },
+    });
+
+    expect(
+      (await getActionCenter(workspace.id)).some(
+        (item) =>
+          item.sourceTaskId === task.id && item.kind === "execution_completed",
+      ),
+    ).toBe(false);
+  });
+
   it("emits bounded notification items for due tasks, scheduler events, completed runs, and info timeline", async () => {
     const now = new Date();
     const minutesFromNow = (minutes: number) =>

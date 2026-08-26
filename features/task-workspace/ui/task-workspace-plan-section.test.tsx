@@ -1996,6 +1996,15 @@ describe("TaskWorkspacePlanSection", () => {
 
 		const lifecyclePanel = screen.getByTestId("result-lifecycle-panel");
 		expect(lifecyclePanel).toHaveTextContent("Result accepted");
+		expect(screen.getByText("Task done", { exact: true })).toBeVisible();
+		expect(
+			screen.getByText("Ask a follow-up or create a next task", {
+				exact: true,
+			}),
+		).toBeVisible();
+		expect(
+			screen.queryByText("Execution complete, awaiting review", { exact: true }),
+		).not.toBeInTheDocument();
 		expect(
 			screen.queryByRole("button", { name: "Accept result" }),
 		).not.toBeInTheDocument();

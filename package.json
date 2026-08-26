@@ -25,7 +25,7 @@
   "scripts": {
     "chrona": "bun run scripts/chrona.ts",
     "dev": "bun run scripts/dev.ts",
-    "server:start": "bun run --cwd apps/server start",
+    "server:start": "bun run apps/server/src/index.bun.ts",
     "dev:web": "bun run --cwd apps/web dev",
     "build": "bun run chrona build",
     "start": "bun run server:start",

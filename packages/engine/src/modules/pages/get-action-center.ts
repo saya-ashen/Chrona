@@ -440,6 +440,22 @@ export async function getActionCenter(
     }),
   ]);
 
+  const acceptedCompletedRunIds = new Set(
+    completedRuns.length === 0
+      ? []
+      : (
+          await db.event.findMany({
+            where: {
+              eventType: "task.result_accepted",
+              runId: { in: completedRuns.map((run) => run.id) },
+            },
+            select: { runId: true },
+          })
+        )
+          .map((event) => event.runId)
+          .filter((runId): runId is string => Boolean(runId)),
+  );
+
   const latestRunIds = tasksWithLatestRuns
     .map((task) => task.latestRunId)
     .filter((runId): runId is string => Boolean(runId));
@@ -719,7 +735,8 @@ export async function getActionCenter(
   for (const run of completedRuns) {
     if (
       run.task.latestRunId !== run.id ||
-      run.task.status !== TaskStatus.Completed
+      run.task.status !== TaskStatus.Completed ||
+      acceptedCompletedRunIds.has(run.id)
     )
       continue;
     if (!latestCompletedRunByTask.has(run.taskId))

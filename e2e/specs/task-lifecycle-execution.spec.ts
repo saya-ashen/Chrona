@@ -697,9 +697,30 @@ test.describe("Task create → plan → run → result", () => {
 				await expect(
 					page.getByRole("heading", { name: "Result accepted" }),
 				).toBeVisible();
+				await expect(
+					page.getByText("Ask a follow-up or create a next task", {
+						exact: true,
+					}).first(),
+				).toBeVisible();
+				await expect(
+					page.getByRole("button", { name: "Open Chrona AI dropdown" }),
+				).toContainText("Ask a follow-up or create a next task");
+				await expect(
+					page.getByRole("button", { name: "Accept result" }),
+				).toHaveCount(0);
 				expect((await getCurrentExecution(request, taskId)).status).toBe(
 					"completed",
 				);
+
+				const acceptedWorkspaceUrl = page.url();
+				await page.goto("/en/action-center");
+				await expect(
+					page.getByRole("heading", { name: taskTitle, level: 3 }),
+				).toHaveCount(0);
+				await page.goto(acceptedWorkspaceUrl);
+				await expect(
+					page.getByRole("heading", { name: "Result accepted" }),
+				).toBeVisible();
 			});
 
 			const goalId =

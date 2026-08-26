@@ -1,7 +1,8 @@
 import { deriveWorkStateView } from "@chrona/domain";
 import type { AiSidebarPageContextSummary, AiSidebarQuickAction } from "@chrona/contracts";
 import type { GraphNodeState } from "@chrona/contracts";
-import type { TaskData } from "../model/task-workspace-types";
+import type { TaskData, TaskPageData } from "../model/task-workspace-types";
+import { settleAcceptedResultWorkState } from "../model/task-workspace-settlement";
 
 type TaskHighlight = AiSidebarPageContextSummary["highlights"][number];
 
@@ -170,13 +171,13 @@ function getTaskReviewState(task: TaskData) {
   return task.executionSummary?.waiting?.reason ?? null;
 }
 
-function getTaskPrimaryAction(task: TaskData) {
-  return deriveTaskWorkStateView(task).nextActionLabel;
+function getTaskPrimaryAction(task: TaskData, pageData?: TaskPageData) {
+  return deriveTaskWorkStateView(task, pageData).nextActionLabel;
 }
 
-function deriveTaskWorkStateView(task: TaskData) {
+function deriveTaskWorkStateView(task: TaskData, pageData?: TaskPageData) {
   const savedPlanStatus = task.savedPlan?.status ?? null;
-  return deriveWorkStateView({
+  const derived = deriveWorkStateView({
     taskStatus: task.status,
     executionStatus: task.executionSummary?.executionState ?? null,
     planStatus: savedPlanStatus,
@@ -189,9 +190,15 @@ function deriveTaskWorkStateView(task: TaskData) {
     currentNodeLabel: getPlanNodeTitle(task, task.executionSummary?.currentNodeId ?? null),
     blockReason: task.blockReason,
   });
+  return pageData
+    ? settleAcceptedResultWorkState(pageData, derived)
+    : derived;
 }
 
-export function createTaskAiSidebarContext(task: TaskData, options: { latestActivitySummary?: string | null } = {}): {
+export function createTaskAiSidebarContext(task: TaskData, options: {
+  latestActivitySummary?: string | null;
+  pageData?: TaskPageData;
+} = {}): {
   context: AiSidebarPageContextSummary;
   actions: AiSidebarQuickAction[];
 } {
@@ -200,8 +207,8 @@ export function createTaskAiSidebarContext(task: TaskData, options: { latestActi
   const activeNodeStatus = activeNode?.status ?? null;
   const blockReason = getTaskBlockReason(task);
   const reviewState = getTaskReviewState(task);
-  const primaryAction = getTaskPrimaryAction(task);
-  const workState = deriveTaskWorkStateView(task);
+  const primaryAction = getTaskPrimaryAction(task, options.pageData);
+  const workState = deriveTaskWorkStateView(task, options.pageData);
   return {
     context: createTaskContext({ task, activeNodeId, activeNodeStatus, blockReason, reviewState, primaryAction, latestActivitySummary: options.latestActivitySummary, workStateLabel: workState.label }),
     actions: createTaskActions({ hasPlan: Boolean(task.savedPlan), hasActiveNode: Boolean(activeNode), blockReason }),

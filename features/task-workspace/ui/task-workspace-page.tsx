@@ -327,18 +327,12 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
 		() =>
 			createTaskAiSidebarContext(task, {
 				latestActivitySummary: assistantActivitySummary,
+				pageData,
 			}),
 		[
 			assistantActivitySummary,
-			task.blockReason?.actionRequired,
-			task.blockReason?.blockType,
-			task.executionSummary?.waiting,
-			task.graphNodeStates,
-			task.id,
-			task.isRunnable,
-			task.savedPlan?.id,
-			task.status,
-			task.title,
+			pageData,
+			task,
 		],
 	);
 
