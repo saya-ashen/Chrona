@@ -1,0 +1,230 @@
+{
+  "schema_version": 1,
+  "diagram_type": "architecture",
+  "meta": {
+    "title": "Chrona 高层运行时架构",
+    "locale": "zh-CN",
+    "output": "chrona-runtime-architecture.html",
+    "quality_profile": "showcase",
+    "viewBox": [1360, 700],
+    "views": [
+      {
+        "id": "primary-execution-path",
+        "label": "主要执行路径",
+        "focus": ["user", "web", "api", "engine", "graph", "providers", "externalRuntime"],
+        "note": "从用户操作到外部 AI/Agent 运行时的主执行链。"
+      },
+      {
+        "id": "result-and-state",
+        "label": "结果与状态闭环",
+        "focus": ["externalRuntime", "mcp", "engine", "projection", "sqlite"],
+        "note": "MCP 回调进入执行内核，事实持久化后统一重建投影。"
+      }
+    ]
+  },
+  "components": [
+    {
+      "id": "user",
+      "type": "external",
+      "label": "用户",
+      "sublabel": "任务与审批",
+      "pos": [25, 245],
+      "size": [100, 64]
+    },
+    {
+      "id": "web",
+      "type": "frontend",
+      "label": "React SPA",
+      "sublabel": "Vite · React 19",
+      "pos": [185, 245],
+      "size": [125, 64]
+    },
+    {
+      "id": "api",
+      "type": "backend",
+      "label": "Hono API",
+      "sublabel": "REST · SSE · 校验",
+      "pos": [370, 245],
+      "size": [125, 64]
+    },
+    {
+      "id": "engine",
+      "type": "backend",
+      "label": "执行引擎",
+      "sublabel": "编排 · 节点执行",
+      "pos": [555, 245],
+      "size": [140, 64]
+    },
+    {
+      "id": "graph",
+      "type": "backend",
+      "label": "Graph Runtime",
+      "sublabel": "解析 · 选点 · 转移",
+      "pos": [755, 245],
+      "size": [140, 64]
+    },
+    {
+      "id": "providers",
+      "type": "backend",
+      "label": "Provider Bridge",
+      "sublabel": "会话 · 流事件 · 工具",
+      "pos": [955, 245],
+      "size": [145, 64]
+    },
+    {
+      "id": "externalRuntime",
+      "type": "external",
+      "label": "外部 AI / Agent 运行时",
+      "sublabel": "Hermes · ACP · CLI agents",
+      "pos": [1160, 242],
+      "size": [175, 70]
+    },
+    {
+      "id": "mcp",
+      "type": "security",
+      "label": "MCP 控制面",
+      "sublabel": "/api/mcp · AI-safe refs",
+      "pos": [955, 425],
+      "size": [145, 70]
+    },
+    {
+      "id": "projection",
+      "type": "backend",
+      "label": "状态提交与投影",
+      "sublabel": "事实 · 单一写入者",
+      "pos": [555, 555],
+      "size": [150, 70]
+    },
+    {
+      "id": "sqlite",
+      "type": "database",
+      "label": "Prisma + SQLite",
+      "sublabel": "计划 · Run · Session",
+      "pos": [775, 555],
+      "size": [145, 70]
+    }
+  ],
+  "boundaries": [
+    {
+      "kind": "security-group",
+      "label": "客户端边界 · 浏览器输入不受信任",
+      "wraps": ["user", "web"],
+      "pad": 24
+    },
+    {
+      "kind": "security-group",
+      "label": "Chrona 本地信任边界 · 默认 127.0.0.1",
+      "wraps": ["api", "engine", "graph", "providers", "mcp", "projection", "sqlite"],
+      "pad": 28
+    },
+    {
+      "kind": "security-group",
+      "label": "外部运行时边界 · 独立进程 / 第三方协议",
+      "wraps": ["externalRuntime"],
+      "pad": 18
+    }
+  ],
+  "connections": [
+    {
+      "id": "user-to-web",
+      "from": "user",
+      "to": "web",
+      "label": "操作",
+      "variant": "emphasis"
+    },
+    {
+      "id": "web-to-api",
+      "from": "web",
+      "to": "api",
+      "label": "REST · SSE",
+      "variant": "emphasis"
+    },
+    {
+      "id": "api-to-engine",
+      "from": "api",
+      "to": "engine",
+      "label": "校验命令",
+      "variant": "emphasis"
+    },
+    {
+      "id": "engine-to-graph",
+      "from": "engine",
+      "to": "graph",
+      "label": "解析 / 选点",
+      "variant": "emphasis"
+    },
+    {
+      "id": "graph-to-providers",
+      "from": "graph",
+      "to": "providers",
+      "label": "就绪节点",
+      "variant": "emphasis"
+    },
+    {
+      "id": "providers-to-runtime",
+      "from": "providers",
+      "to": "externalRuntime",
+      "label": "协议调用",
+      "variant": "emphasis"
+    },
+    {
+      "id": "runtime-to-mcp",
+      "from": "externalRuntime",
+      "to": "mcp",
+      "label": "MCP tool 回调",
+      "variant": "security",
+      "fromSide": "bottom",
+      "toSide": "right"
+    },
+    {
+      "id": "mcp-to-engine",
+      "from": "mcp",
+      "to": "engine",
+      "label": "结果 / 等待状态",
+      "variant": "security",
+      "fromSide": "left",
+      "labelDx": 110
+    },
+    {
+      "id": "engine-to-projection",
+      "from": "engine",
+      "to": "projection",
+      "label": "持久化事实 + 重建",
+      "fromSide": "bottom",
+      "toSide": "top",
+      "labelAt": [625, 335]
+    },
+    {
+      "id": "projection-to-sqlite",
+      "from": "projection",
+      "to": "sqlite",
+      "label": "Prisma 事务"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "主路径",
+      "items": [
+        "用户操作经 REST/SSE 进入 Hono；执行引擎解析计划图、选择就绪节点并通过 Provider Bridge 派发。",
+        "外部运行时用 MCP 工具提交结果或等待状态；UI 更新复用同一 HTTP/SSE 通道，不另画回线。"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "信任与权限",
+      "items": [
+        "服务默认绑定 127.0.0.1；配置 API_KEY 后使用 Bearer，公开绑定需显式开启不安全模式。",
+        "MCP 仅公开 AI-safe node/branch refs；session、task、revision、idempotency 等隐藏上下文由服务端注入。"
+      ]
+    },
+    {
+      "dot": "violet",
+      "title": "外部依赖与状态权威",
+      "items": [
+        "外部依赖集中在可配置 AI/Agent 运行时；Hermes 本地 CLI、插件和重启副作用由 integrations 层在用户确认后管理。",
+        "Run、ExecutionSession、计划与事件作为事实进入 SQLite；TaskProjection 只由 rebuildTaskProjection 统一派生。"
+      ]
+    }
+  ]
+}

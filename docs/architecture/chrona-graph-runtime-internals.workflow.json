@@ -1,0 +1,200 @@
+{
+  "schema_version": 1,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "Chrona Graph Runtime · L1 执行详图",
+    "locale": "zh-CN",
+    "output": "chrona-graph-runtime-internals.html",
+    "quality_profile": "showcase",
+    "viewBox": [760, 342],
+    "legend": {
+      "mode": "hidden"
+    },
+    "views": [
+      {
+        "id": "node-execution-roundtrip",
+        "label": "节点执行往返",
+        "focus": ["engineCommand", "dispatchGate", "resolveGraph", "selectNode", "createAttempt", "executorBoundary", "normalizeResult", "dispatchOutcome"],
+        "note": "跟随一个 GraphRuntimeCommand 完成解析、选点、执行、状态提交并返回结果。"
+      },
+      {
+        "id": "package-boundary",
+        "label": "包边界与回调",
+        "focus": ["engineCommand", "dispatchGate", "executorBoundary", "normalizeResult", "dispatchOutcome"],
+        "note": "Graph Runtime 持有图状态；外部执行与持久化通过 Engine callbacks 接入。"
+      }
+    ]
+  },
+  "lanes": [
+    {
+      "id": "engineBoundary",
+      "label": "包外 · Engine Kernel / Callback"
+    },
+    {
+      "id": "graphRuntime",
+      "label": "包内 · packages/graph-runtime"
+    }
+  ],
+  "mainPath": [
+    "engineCommand",
+    "dispatchGate",
+    "resolveGraph",
+    "selectNode",
+    "createAttempt",
+    "executorBoundary",
+    "normalizeResult",
+    "dispatchOutcome"
+  ],
+  "nodes": [
+    {
+      "id": "engineCommand",
+      "lane": "engineBoundary",
+      "col": 0,
+      "type": "external",
+      "label": "Engine 命令",
+      "sublabel": "start · resume"
+    },
+    {
+      "id": "dispatchGate",
+      "lane": "graphRuntime",
+      "col": 1,
+      "type": "security",
+      "label": "路由",
+      "width": 52
+    },
+    {
+      "id": "resolveGraph",
+      "lane": "graphRuntime",
+      "col": 2,
+      "type": "backend",
+      "label": "解析图",
+      "width": 52
+    },
+    {
+      "id": "selectNode",
+      "lane": "graphRuntime",
+      "col": 3,
+      "type": "backend",
+      "label": "选点",
+      "width": 42
+    },
+    {
+      "id": "createAttempt",
+      "lane": "graphRuntime",
+      "col": 4,
+      "type": "backend",
+      "label": "尝试",
+      "width": 42
+    },
+    {
+      "id": "executorBoundary",
+      "lane": "engineBoundary",
+      "col": 4,
+      "type": "external",
+      "label": "执行器边界",
+      "sublabel": "registry → callback"
+    },
+    {
+      "id": "normalizeResult",
+      "lane": "graphRuntime",
+      "col": 5,
+      "type": "backend",
+      "label": "规范化结果",
+      "sublabel": "attempt · result",
+      "width": 78
+    },
+    {
+      "id": "dispatchOutcome",
+      "lane": "engineBoundary",
+      "col": 5,
+      "type": "external",
+      "label": "返回 Outcome",
+      "sublabel": "status · events"
+    }
+  ],
+  "edges": [
+    {
+      "id": "command-to-dispatch",
+      "from": "engineCommand",
+      "to": "dispatchGate",
+      "label": "command",
+      "variant": "emphasis",
+      "role": "main"
+    },
+    {
+      "id": "dispatch-to-resolve",
+      "from": "dispatchGate",
+      "to": "resolveGraph",
+      "variant": "emphasis",
+      "role": "main"
+    },
+    {
+      "id": "resolve-to-select",
+      "from": "resolveGraph",
+      "to": "selectNode",
+      "variant": "emphasis",
+      "role": "main"
+    },
+    {
+      "id": "select-to-attempt",
+      "from": "selectNode",
+      "to": "createAttempt",
+      "variant": "emphasis",
+      "role": "main"
+    },
+    {
+      "id": "attempt-to-executor",
+      "from": "createAttempt",
+      "to": "executorBoundary",
+      "label": "executeNode",
+      "variant": "security",
+      "role": "main",
+      "route": "up-channel"
+    },
+    {
+      "id": "executor-to-normalize",
+      "from": "executorBoundary",
+      "to": "normalizeResult",
+      "label": "result",
+      "variant": "security",
+      "role": "return",
+      "fromSide": "bottom",
+      "toSide": "top"
+    },
+    {
+      "id": "normalize-to-outcome",
+      "from": "normalizeResult",
+      "to": "dispatchOutcome",
+      "label": "return",
+      "variant": "emphasis",
+      "role": "return",
+      "route": "up-channel"
+    }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "命令与主循环",
+      "items": [
+        "createGraphRuntime.dispatch 校验并路由 start、resume、approval、retry、pause、cancel、mutation 与 submit_node_result。",
+        "runGraphExecution 每轮重新解析 Effective Graph，选择 ready/forced 节点并创建带幂等键的 Snapshot 与 Attempt。"
+      ]
+    },
+    {
+      "dot": "amber",
+      "title": "状态与返回语义",
+      "items": [
+        "done 在同一循环进入下一轮解析；等待、阻塞、失败、运行中、完成和取消保持独立返回状态。",
+        "条件节点完成必须携带 selectedBranch；无执行器时返回 capability_unavailable，而不是静默跳过。"
+      ]
+    },
+    {
+      "dot": "rose",
+      "title": "信任与包边界",
+      "items": [
+        "Graph Runtime 的直接包依赖仅为 @chrona/contracts/ai，不直接访问 Prisma、SQLite 或 Provider。",
+        "执行、持久化和事件转发由 Engine callbacks 注入；辅助细节集中在卡片，不再增加回线。"
+      ]
+    }
+  ]
+}
