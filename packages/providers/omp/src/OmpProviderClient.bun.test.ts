@@ -202,6 +202,24 @@ describe("OmpSdkProviderClient direct config", () => {
     expect(process.env.CHRONA_OMP_API_KEY_HEALTH).toBe("sk-direct-omp");
     expect(process.env.CHRONA_OMP_BASE_URL_HEALTH).toBe("https://llm.example.test/v1");
   });
+
+  it("does not report a selector as healthy when the SDK cannot resolve a runtime model", async () => {
+    const agentDir = await mkdtemp(join(tmpdir(), "chrona-omp-health-no-model-"));
+    try {
+      const health = await new OmpSdkProviderClient({
+        config: {
+          codingAgentDirectory: agentDir,
+          provider: "openai-codex",
+          model: "gpt-5.6-sol",
+        },
+      }).checkHealth();
+
+      expect(health.ok).toBe(false);
+      expect(health.reason).toMatch(/runtime model|model/i);
+    } finally {
+      await rm(agentDir, { recursive: true, force: true });
+    }
+  });
 });
 
 describe("OmpSdkProviderClient declared runtime tools", () => {

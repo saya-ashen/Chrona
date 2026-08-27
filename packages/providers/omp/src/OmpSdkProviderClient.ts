@@ -1083,8 +1083,9 @@ export class OmpSdkProviderClient implements AgentProviderClient {
 	async checkHealth(_input?: HealthCheckInput) {
 		const started = Date.now();
 		try {
-			// Keep the health environment isolated and resolve the configured SDK
-			// model setup instead of treating package loading as provider readiness.
+			// Health must exercise the same SDK model resolution path as a real run.
+			// A non-empty selector only proves that configuration was typed; it does
+			// not prove that OMP can restore credentials and an executable model.
 			const environment = applySdkEnvironment(this.config, "health");
 			const setup = await createSdkModelSetup(this.config, environment);
 			if (!setup.modelPattern) {
@@ -1096,13 +1097,45 @@ export class OmpSdkProviderClient implements AgentProviderClient {
 					reason: "No OMP model could be resolved from this configuration.",
 				};
 			}
-			return {
-				provider: PROVIDER,
-				ok: true,
-				checkedAt: now(),
-				latencyMs: Date.now() - started,
-				message: `Oh My Pi SDK resolved model ${setup.modelPattern}`,
-			};
+			const cwd = nonEmpty(this.config.cwd) ?? process.cwd();
+			const agentDir =
+				nonEmpty(this.config.codingAgentDirectory) ??
+				nonEmpty(this.config.configDirectory);
+			const settings = await loadSdkSettings(environment, cwd);
+			const { session, mcpManager } = await createAgentSession({
+				cwd,
+				agentDir,
+				modelPattern: setup.modelPattern,
+				...(setup.authStorage ? { authStorage: setup.authStorage } : {}),
+				...(setup.modelRegistry ? { modelRegistry: setup.modelRegistry } : {}),
+				settings,
+				sessionManager: SessionManager.inMemory(cwd),
+				skipPythonPreflight: true,
+				hasUI: false,
+			});
+			try {
+				const model = session.model;
+				if (!model) {
+					return {
+						provider: PROVIDER,
+						ok: false,
+						checkedAt: now(),
+						latencyMs: Date.now() - started,
+						reason:
+							"OMP could not resolve an executable model. Check OMP login, model selection, and agent directory.",
+					};
+				}
+				return {
+					provider: PROVIDER,
+					ok: true,
+					checkedAt: now(),
+					latencyMs: Date.now() - started,
+					message: `Oh My Pi SDK resolved model ${model.provider}/${model.id}`,
+				};
+			} finally {
+				await session.dispose();
+				await mcpManager?.disconnectAll();
+			}
 		} catch (error) {
 			return {
 				provider: PROVIDER,

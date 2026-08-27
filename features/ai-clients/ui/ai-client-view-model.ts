@@ -75,13 +75,17 @@ function nonEmpty(value: string): string | undefined {
   return trimmed || undefined;
 }
 
+function clearable(value: string): string | null {
+  return nonEmpty(value) ?? null;
+}
+
 function timeoutMs(timeoutSeconds: string): number {
   return Number(timeoutSeconds) * 1000;
 }
 
 function buildClaudeCodeConfig(input: ClientFormValues): Record<string, unknown> {
   const model = nonEmpty(input.model);
-  const baseUrl = nonEmpty(input.baseUrl);
+  const baseUrl = clearable(input.baseUrl);
   const authToken = nonEmpty(input.apiKey);
   const configDirectory = nonEmpty(input.configDirectory);
   const env = Object.fromEntries([
@@ -89,14 +93,14 @@ function buildClaudeCodeConfig(input: ClientFormValues): Record<string, unknown>
     ["ANTHROPIC_BASE_URL", baseUrl],
     ["ANTHROPIC_AUTH_TOKEN", authToken],
     ["CLAUDE_CONFIG_DIR", configDirectory],
-  ].filter((entry): entry is [string, string] => entry[1] !== undefined));
+  ].filter((entry): entry is [string, string] => typeof entry[1] === "string"));
   return { model, timeoutMs: timeoutMs(input.timeoutSeconds), configDirectory, profileName: nonEmpty(input.profileName), env: Object.keys(env).length ? env : undefined };
 }
 
 function buildCodexConfig(input: ClientFormValues): Record<string, unknown> {
   const configDirectory = nonEmpty(input.configDirectory);
   return {
-    model: nonEmpty(input.model), baseUrl: nonEmpty(input.baseUrl), apiKey: nonEmpty(input.apiKey), configDirectory,
+    model: nonEmpty(input.model), baseUrl: clearable(input.baseUrl), apiKey: nonEmpty(input.apiKey), configDirectory,
     profileName: nonEmpty(input.profileName), env: configDirectory ? { CODEX_HOME: configDirectory } : undefined,
     timeoutMs: timeoutMs(input.timeoutSeconds),
   };
@@ -105,7 +109,7 @@ function buildCodexConfig(input: ClientFormValues): Record<string, unknown> {
 function buildOmpConfig(input: ClientFormValues): Record<string, unknown> {
   return {
     provider: nonEmpty(input.provider), model: nonEmpty(input.model), api: input.api,
-    apiKey: nonEmpty(input.apiKey), baseUrl: nonEmpty(input.baseUrl),
+    apiKey: nonEmpty(input.apiKey), baseUrl: clearable(input.baseUrl),
     homeDirectory: nonEmpty(input.homeDirectory), configDirectory: nonEmpty(input.configDirectory),
     codingAgentDirectory: nonEmpty(input.codingAgentDirectory), timeoutMs: timeoutMs(input.timeoutSeconds),
   };

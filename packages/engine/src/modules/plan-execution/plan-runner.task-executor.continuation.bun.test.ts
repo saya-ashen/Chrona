@@ -3,6 +3,7 @@ import { TaskStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import { createPlanGraphFromCompiledPlan, getPlanRun } from "@/modules/plan-execution/persistence/plan-run-store";
 import { derivePlanRunFromRuntime } from "@/modules/plan-execution/persistence/plan-runtime-store";
+import { acceptTaskResult } from "@/modules/tasks/accept-task-result";
 import {
   executeTaskNodeCapabilityMock,
   makeInputCheckpointThenTaskPlan,
@@ -87,6 +88,24 @@ describe("plan-runner task executor continuation", () => {
 
     const updatedTask = await db.task.findUniqueOrThrow({ where: { id: task.id } });
     expect(updatedTask.status).toBe(TaskStatus.Completed);
+    const completedPlanRun = await db.taskPlanRun.findFirstOrThrow({ where: { taskId: task.id } });
+    const completedPlanEnvelope = JSON.parse(JSON.stringify(completedPlanRun.planRun)) as Record<string, any>;
+    const completedMutableGraph = completedPlanEnvelope.mutableGraph as Record<string, any>;
+    completedMutableGraph.planOutput = {
+      ...(completedMutableGraph.planOutput as Record<string, unknown>),
+      finalization: { status: "Ready", sourceRevision: completedMutableGraph.planOutput?.revision ?? 1 },
+    };
+    await db.taskPlanRun.update({ where: { id: completedPlanRun.id }, data: { planRun: completedPlanEnvelope } });
+
+    const accepted = await acceptTaskResult({ taskId: task.id });
+    expect(accepted.runId).toBeTruthy();
+    expect(await db.run.findUnique({ where: { id: accepted.runId } })).toMatchObject({
+      taskId: task.id,
+      status: TaskStatus.Completed,
+    });
+    expect(await db.event.findFirst({ where: { taskId: task.id, eventType: "task.result_accepted" } })).toMatchObject({
+      runId: accepted.runId,
+    });
   });
   it("resumes the same dynamic task node with typed input and persists one response", async () => {
     executeTaskNodeCapabilityMock

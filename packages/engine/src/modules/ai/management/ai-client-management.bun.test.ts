@@ -67,6 +67,61 @@ describe("AI Feature Runtime client bindings", () => {
       .toEqual([{ feature: "chat" }]);
   });
 
+  it("honors an explicit null when clearing optional connection settings", async () => {
+    const omp = await createClient("omp", {
+      provider: "nrouter",
+      model: "test-model",
+      baseUrl: "https://old.example.test/v1",
+      apiKey: "stored-secret",
+    });
+
+    await aiClientManagement.update({
+      clientId: omp.id,
+      data: {
+        config: {
+          provider: "nrouter",
+          model: "test-model",
+          baseUrl: null,
+          apiKey: "",
+        },
+      },
+    });
+
+    expect(await db.aiClient.findUniqueOrThrow({ where: { id: omp.id }, select: { config: true } })).toMatchObject({
+      config: {
+        baseUrl: null,
+        apiKey: "stored-secret",
+      },
+    });
+  });
+
+  it("removes cleared base URLs from mirrored provider environment settings", async () => {
+    const client = await createClient("claude_code", {
+      model: "claude-sonnet",
+      baseUrl: "https://old.example.test/v1",
+      env: { ANTHROPIC_BASE_URL: "https://old.example.test/v1", ANTHROPIC_MODEL: "claude-sonnet" },
+    });
+
+    await aiClientManagement.update({
+      clientId: client.id,
+      data: {
+        config: {
+          model: "claude-sonnet",
+          baseUrl: null,
+          env: { ANTHROPIC_MODEL: "claude-sonnet" },
+        },
+      },
+    });
+
+    expect(await db.aiClient.findUniqueOrThrow({ where: { id: client.id }, select: { config: true } })).toMatchObject({
+      config: {
+        baseUrl: null,
+        env: { ANTHROPIC_MODEL: "claude-sonnet" },
+      },
+    });
+    expect((await db.aiClient.findUniqueOrThrow({ where: { id: client.id }, select: { config: true } })).config).not.toHaveProperty("env.ANTHROPIC_BASE_URL");
+  });
+
   it("accepts OMP only through terminal-only single-attempt recovery", async () => {
     const omp = await createClient("omp", { model: "test-model" });
 

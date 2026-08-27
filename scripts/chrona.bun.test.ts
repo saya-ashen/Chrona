@@ -48,6 +48,13 @@ describe("chrona command runner", () => {
     ]);
   });
 
+  it("exposes the packaged doctor command through the development runner", () => {
+    expect(resolveCommand(["doctor"])).toMatchObject({
+      description: "Inspect and repair local runtime state",
+      steps: [{ label: "doctor", acceptsExtraArgs: true }],
+    });
+  });
+
   it("exposes local release consistency validation", () => {
     expect(resolveCommand(["check", "release"])).toMatchObject({
       steps: [{ label: "release consistency" }],

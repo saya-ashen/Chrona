@@ -36,6 +36,9 @@ describe("buildTaskHeaderSpec", () => {
     expect(spec.elements.layout?.props).toMatchObject({
       className: expect.stringContaining("children-intrinsic"),
     });
+    expect(spec.elements["detail-row"]?.props).toMatchObject({
+      className: expect.stringContaining("children-intrinsic"),
+    });
     expect(spec.elements.actions?.props).toMatchObject({
       className: expect.stringContaining("w-auto"),
     });

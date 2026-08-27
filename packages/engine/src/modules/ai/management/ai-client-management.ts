@@ -111,6 +111,7 @@ const SECRET_CONFIG_KEYS = new Set([
   "password",
 ]);
 
+// eslint-disable-next-line complexity -- Secret preservation and explicit clear semantics are coupled at this boundary.
 function mergeExistingSecrets(
   existing: Prisma.JsonValue,
   next: Record<string, unknown>,
@@ -121,9 +122,18 @@ function mergeExistingSecrets(
     return next;
   }
 
-  const merged = { ...(existing as Record<string, unknown>), ...next };
+  const existingConfig = existing as Record<string, unknown>;
+  const merged = { ...existingConfig, ...next };
+  // Optional connection fields use null as an explicit deletion marker. Clear
+  // mirrored environment values as well, otherwise configValue() can restore
+  // the supposedly deleted endpoint from the legacy env object.
+  if (next.baseUrl === null && merged.env && typeof merged.env === "object" && !Array.isArray(merged.env)) {
+    const env = { ...(merged.env as Record<string, unknown>) };
+    for (const key of ["ANTHROPIC_BASE_URL", "OPENAI_BASE_URL"]) delete env[key];
+    merged.env = Object.keys(env).length > 0 ? env : undefined;
+  }
   for (const key of SECRET_CONFIG_KEYS) {
-    if (next[key] === "" && existing[key] !== undefined) merged[key] = existing[key];
+    if (next[key] === "" && existingConfig[key] !== undefined) merged[key] = existingConfig[key];
   }
   return merged;
 }

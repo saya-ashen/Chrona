@@ -151,7 +151,7 @@ type WaitingPlanRunRecord = {
   workBlockId: string | null;
   planRun: unknown;
   updatedAt: Date;
-  task: { title: string; workspaceId: string };
+  task: { title: string; workspaceId: string; status: TaskStatus };
 };
 
 function failedNodeIdFromPlanRun(value: unknown): string | null {
@@ -163,6 +163,15 @@ function failedNodeIdFromPlanRun(value: unknown): string | null {
     if (state?.status === "failed") return readString(state.nodeId) ?? nodeId;
   }
   return null;
+}
+
+function completedResultPlanRun(value: unknown): boolean {
+  const envelope = recordFromUnknown(value);
+  const planRun = recordFromUnknown(envelope?.planRun);
+  const mutableGraph = recordFromUnknown(envelope?.mutableGraph);
+  const planOutput = recordFromUnknown(mutableGraph?.planOutput);
+  const finalization = recordFromUnknown(planOutput?.finalization);
+  return planRun?.status === "completed" && finalization?.status === "Ready";
 }
 
 function executionScopeKey(taskId: string, workBlockId: string | null) {
@@ -186,6 +195,7 @@ function buildPlanRunItems(
 ): SortableActionCenterItem[] {
   const items: SortableActionCenterItem[] = [];
   for (const run of runs) {
+    if ([TaskStatus.Completed, TaskStatus.Done, TaskStatus.Cancelled].includes(run.task.status)) continue;
     const scopeKey = executionScopeKey(run.taskId, run.workBlockId);
     if (coveredExecutionScopes.has(scopeKey)) continue;
     const checkpoint = waitingCheckpointFromPlanRun(run.planRun);
@@ -428,11 +438,11 @@ export async function getActionCenter(
       where: {
         workspaceId,
         updatedAt: { gte: recentWindowStartsAt },
-        task: { status: { notIn: CLOSED_DUE_STATUSES } },
+        task: { status: { notIn: [TaskStatus.Done, TaskStatus.Cancelled] } },
       },
       include: {
         task: {
-          select: { id: true, title: true, workspaceId: true },
+          select: { id: true, title: true, workspaceId: true, status: true },
         },
       },
       orderBy: { updatedAt: "desc" },
@@ -440,20 +450,27 @@ export async function getActionCenter(
     }),
   ]);
 
+  const acceptedResultEvents = completedRuns.length > 0 || waitingPlanRuns.length > 0
+    ? await db.event.findMany({
+        where: {
+          eventType: "task.result_accepted",
+          OR: [
+            ...(completedRuns.length > 0 ? [{ runId: { in: completedRuns.map((run) => run.id) } }] : []),
+            ...(waitingPlanRuns.length > 0 ? [{ planRunId: { in: waitingPlanRuns.map((run) => run.id) } }] : []),
+          ],
+        },
+        select: { runId: true, planRunId: true },
+      })
+    : [];
   const acceptedCompletedRunIds = new Set(
-    completedRuns.length === 0
-      ? []
-      : (
-          await db.event.findMany({
-            where: {
-              eventType: "task.result_accepted",
-              runId: { in: completedRuns.map((run) => run.id) },
-            },
-            select: { runId: true },
-          })
-        )
-          .map((event) => event.runId)
-          .filter((runId): runId is string => Boolean(runId)),
+    acceptedResultEvents
+      .map((event) => event.runId)
+      .filter((runId): runId is string => Boolean(runId)),
+  );
+  const acceptedPlanRunIds = new Set(
+    acceptedResultEvents
+      .map((event) => event.planRunId)
+      .filter((planRunId): planRunId is string => Boolean(planRunId)),
   );
 
   const latestRunIds = tasksWithLatestRuns
@@ -762,6 +779,34 @@ export async function getActionCenter(
     }),
   );
 
+  const completedExecutionScopes = new Set(
+    completedItems.map((item) =>
+      executionScopeKey(item.sourceTaskId, item.workBlockId ?? null),
+    ),
+  );
+  const graphCompletedItems = waitingPlanRuns
+    .filter((run) =>
+      run.task.status === TaskStatus.Completed
+      && completedResultPlanRun(run.planRun)
+      && !acceptedPlanRunIds.has(run.id)
+      && !completedExecutionScopes.has(executionScopeKey(run.taskId, run.workBlockId)),
+    )
+    .map((run) => ({
+      id: `execution-completed:${run.id}`,
+      kind: "execution_completed" as const,
+      actionType: "Execution completed",
+      riskLevel: "low",
+      sourceTaskTitle: run.task.title,
+      sourceTaskId: run.taskId,
+      workspaceId: run.task.workspaceId,
+      currentRunLabel: run.id,
+      workBlockId: run.workBlockId,
+      detail: "Latest plan execution completed",
+      summary: "Task execution completed recently.",
+      consequence: "Open the task to review results or mark follow-up complete.",
+      sortAt: run.updatedAt,
+    }));
+
   const infoItems = infoNotifications.map((notification) => ({
     id: `notification-info:${notification.id}`,
     kind: "notification_info" as const,
@@ -813,6 +858,7 @@ export async function getActionCenter(
     ...dueItems,
     ...schedulerItems,
     ...completedItems,
+    ...graphCompletedItems,
     ...infoItems,
     ...blockedItems,
   ]

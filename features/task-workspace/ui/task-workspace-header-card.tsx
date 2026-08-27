@@ -51,6 +51,12 @@ function localizeHeaderResultStatus(
 	const localizedStatus = resultAccepted
 		? (copy.resultAcceptedTitle ?? "Result accepted")
 		: (copy.resultReadyTitle ?? defaultStatus);
+	const localizedPriorities: Record<string, string> = {
+		Low: copy.priorityLow ?? "Low",
+		Medium: copy.priorityMedium ?? "Medium",
+		High: copy.priorityHigh ?? "High",
+		Urgent: copy.priorityUrgent ?? "Urgent",
+	};
 	return {
 		...spec,
 		elements: Object.fromEntries(
@@ -60,6 +66,9 @@ function localizeHeaderResultStatus(
 				const props = element.props as Record<string, unknown>;
 				const localizedProps = {
 					...props,
+					...(key === "badge:priority" && typeof props.text === "string" && localizedPriorities[props.text]
+						? { text: localizedPriorities[props.text] }
+						: {}),
 					...(resultAccepted && key === "badge:primary-state"
 						? { text: localizedStatus, statusLabel: localizedStatus }
 						: {}),

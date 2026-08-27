@@ -1192,9 +1192,9 @@ export function useTaskWorkspacePlanState(
 						: current,
 			);
 			await refreshResultProjection();
-		} catch (cause) {
+		} catch {
 			setAcceptResultError(
-				cause instanceof Error ? cause.message : "Failed to accept task result",
+				translate("components.taskWorkspace.acceptResultError"),
 			);
 		} finally {
 			setIsAcceptingResult(false);

@@ -260,6 +260,49 @@ describe("getActionCenter actionable states", () => {
     });
   });
 
+  it("surfaces a completed graph result when no legacy Run row exists", async () => {
+    const workspace = await db.workspace.create({
+      data: { name: "Action Center graph result", status: "Active" },
+    });
+    const task = await seedTask(workspace.id, "Graph-only completed task", "Completed");
+    const planId = "plan-action-center-graph-result";
+    await db.taskPlan.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        planId,
+        revision: 1,
+        status: "Accepted",
+        compiledPlan: {},
+      },
+    });
+    const planRun = await db.taskPlanRun.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        planId,
+        planRun: {
+          planRun: { status: "completed" },
+          mutableGraph: {
+            planOutput: {
+              finalization: { status: "Ready" },
+            },
+          },
+        },
+      },
+    });
+
+    const taskItems = (await getActionCenter(workspace.id)).filter(
+      (item) => item.sourceTaskId === task.id,
+    );
+    expect(taskItems).toHaveLength(1);
+    expect(taskItems[0]).toMatchObject({
+      id: `execution-completed:${planRun.id}`,
+      kind: "execution_completed",
+      currentRunLabel: planRun.id,
+    });
+  });
+
   it("does not resurrect waiting plan-run actions for Completed, Done, or Cancelled tasks", async () => {
     const workspace = await db.workspace.create({
       data: {

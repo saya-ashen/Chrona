@@ -156,6 +156,9 @@ export const COMMANDS: Record<string, CommandGroup> = {
   plugin: {
     hermes: { description: "Install Hermes plugin", steps: [{ label: "install Hermes plugin", acceptsExtraArgs: true, run: async (extraArgs) => { await $`bash ${["external-plugins/hermes/install.sh", ...extraArgs]}`.cwd(ROOT); } }] },
   },
+  doctor: {
+    all: { description: "Inspect and repair local runtime state", steps: [bunStep("doctor", ["run", "packages/cli/src/bun-entry.ts", "doctor"], true)] },
+  },
 };
 
 function printHelp() {
@@ -253,12 +256,20 @@ export async function runCommand(command: Command, passthrough: string[]) {
 
 export async function main() {
   const { commandArgs, passthrough } = normalizeArgs(process.argv.slice(2));
-  const command = resolveCommand(commandArgs);
+  // Keep the ergonomic `chrona doctor --repair-stale-lock` form while
+  // retaining `--` passthrough for commands that have a named subcommand.
+  const inlinePassthrough = commandArgs[1]?.startsWith("-")
+    ? commandArgs.slice(1)
+    : [];
+  const lookupArgs = inlinePassthrough.length > 0
+    ? commandArgs.slice(0, 1)
+    : commandArgs;
+  const command = resolveCommand(lookupArgs);
   if (!command) {
     if (command === null) printHelp();
     return;
   }
-  await runCommand(command, passthrough);
+  await runCommand(command, [...inlinePassthrough, ...passthrough]);
 }
 
 if (import.meta.main) {
