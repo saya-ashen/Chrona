@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@agentclientprotocol/codex-acp": "^1.1.13",
+    "@agentclientprotocol/codex-acp": "^1.6.2",
     "@chrona/acp-provider": "workspace:*",
     "@chrona/providers-foundation": "workspace:*"
   },
