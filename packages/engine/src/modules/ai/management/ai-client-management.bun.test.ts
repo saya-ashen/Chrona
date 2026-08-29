@@ -122,6 +122,20 @@ describe("AI Feature Runtime client bindings", () => {
     expect((await db.aiClient.findUniqueOrThrow({ where: { id: client.id }, select: { config: true } })).config).not.toHaveProperty("env.ANTHROPIC_BASE_URL");
   });
 
+  it("tests an existing client from its persisted server-side configuration", async () => {
+    const debug = await createClient("debug", { profile: "hermes-like" });
+
+    await expect(
+      aiClientManagement.testExisting({ clientId: debug.id }),
+    ).resolves.toEqual({
+      available: true,
+      reason: "Chrona debug provider is local (hermes-like)",
+    });
+    await expect(
+      aiClientManagement.testExisting({ clientId: "missing-client" }),
+    ).rejects.toMatchObject({ code: ENGINE_ERROR_CODES.AI_CLIENT_NOT_FOUND });
+  });
+
   it("accepts OMP only through terminal-only single-attempt recovery", async () => {
     const omp = await createClient("omp", { model: "test-model" });
 

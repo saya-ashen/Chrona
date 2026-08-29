@@ -721,6 +721,12 @@ describe("AiClientsManager", () => {
 
     fireEvent.click(screen.getAllByRole("button", { name: "Test availability" })[0]);
 
+    await waitFor(() => {
+      expect(fetchMock).toHaveBeenLastCalledWith(
+        "/api/ai/clients/client_1/test",
+        expect.objectContaining({ method: "POST" }),
+      );
+    });
     await screen.findByText("Unavailable");
     expect(screen.getAllByText("Bridge health endpoint returned 503")).toHaveLength(2);
   });

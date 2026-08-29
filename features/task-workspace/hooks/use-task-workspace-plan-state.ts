@@ -78,7 +78,10 @@ function fallbackManualFormMessage(key: string) {
 
 const STARTING_NODE_STATUS_LABEL = "Starting";
 const STARTING_NODE_NEXT_ACTION = "Starting execution...";
-export const FINALIZATION_POLL_MAX_ATTEMPTS = 6;
+// Finalization performs bounded compose + review provider turns. Real OMP
+// responses can exceed the former ~44-second polling window, so keep the
+// durable snapshot reconciliation alive for roughly five minutes.
+export const FINALIZATION_POLL_MAX_ATTEMPTS = 30;
 const FINALIZATION_POLL_EXHAUSTED_MESSAGE =
 	"Result finalization is still pending. Retry finalization to check again.";
 

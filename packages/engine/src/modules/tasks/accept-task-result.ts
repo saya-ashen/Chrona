@@ -62,6 +62,11 @@ export async function acceptTaskResult(input: { taskId: string }) {
     );
   }
 
+  const alignAcceptedRunAsLatest = () => db.task.updateMany({
+    where: { id: task.id, latestRunId: { not: latestRun.id } },
+    data: { latestRunId: latestRun.id },
+  });
+
   const existingAcceptance = await db.event.findFirst({
     where: {
       taskId: task.id,
@@ -76,6 +81,9 @@ export async function acceptTaskResult(input: { taskId: string }) {
     const acceptedAt = typeof payload?.accepted_at === "string"
       ? payload.accepted_at
       : existingAcceptance.ingestedAt.toISOString();
+    // Result acceptance is task-level authority. Older plan executions may
+    // have left a node Run as latest after the plan-level Run was materialized.
+    await alignAcceptedRunAsLatest();
     if (task.goalId) {
       await splitAcceptedResultIntoCandidates({
         goalId: task.goalId,
@@ -110,6 +118,7 @@ export async function acceptTaskResult(input: { taskId: string }) {
     },
     dedupeKey: `task.result_accepted:${task.id}:${latestRun.id}`,
   });
+  await alignAcceptedRunAsLatest();
 
   if (task.goalId) {
     await splitAcceptedResultIntoCandidates({ goalId: task.goalId, taskId: task.id, runId: latestRun.id });

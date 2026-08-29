@@ -36,6 +36,17 @@ export function createAiClientsService() {
     async test(input: Parameters<typeof aiClientManagement.test>[0]) {
       return await aiClientManagement.test(input);
     },
+    async testExisting(input: Parameters<typeof aiClientManagement.testExisting>[0]) {
+      try {
+        return await aiClientManagement.testExisting(input);
+      } catch (cause) {
+        throw engineErrorFromUnknown(
+          cause,
+          ENGINE_ERROR_CODES.AI_CLIENT_NOT_FOUND,
+          "Failed to test AI client",
+        );
+      }
+    },
     async updateBindings(input: Parameters<typeof aiClientManagement.updateBindings>[0]) {
       try {
         return await aiClientManagement.updateBindings(input);

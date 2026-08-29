@@ -185,9 +185,19 @@ export function getStatusVariant(status: TestStatus): "default" | "secondary" | 
   return status === "available" ? "default" : status === "unavailable" ? "destructive" : status === "testing" ? "secondary" : "outline";
 }
 
+function testResult(data: { available?: boolean; reason?: string }): TestResult {
+  return {
+    status: data.available ? "available" : "unavailable",
+    reason: data.reason ?? null,
+  };
+}
+
 export async function testClientAvailability(payload: ClientFormPayload): Promise<TestResult> {
-  const data = await aiClientsApi.test(payload);
-  return { status: data.available ? "available" : "unavailable", reason: data.reason ?? null };
+  return testResult(await aiClientsApi.test(payload));
+}
+
+export async function testExistingClientAvailability(clientId: string): Promise<TestResult> {
+  return testResult(await aiClientsApi.testExisting(clientId));
 }
 
 export async function diagnoseHermes(values: ClientFormValues): Promise<HermesIntegrationResult> {

@@ -118,6 +118,10 @@ export const aiClientsApi = {
     method: "POST",
     body: JSON.stringify(payload),
   }),
+  testExisting: (clientId: string) => apiJson<AiClientTestResponse>(
+    `/api/ai/clients/${clientId}/test`,
+    { method: "POST" },
+  ),
   diagnoseHermes: (payload: HermesPayload) => apiJson<HermesIntegrationResponse>(
     "/api/integrations/hermes/diagnose",
     { method: "POST", body: JSON.stringify(payload) },

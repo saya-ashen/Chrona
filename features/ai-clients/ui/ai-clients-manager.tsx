@@ -15,7 +15,7 @@ import type {
 } from "./ai-client-types";
 import {
 	normalizeRuntimeProviders,
-	testClientAvailability,
+	testExistingClientAvailability,
 } from "./ai-client-view-model";
 
 type StoredTestState = TestResult & { checkedAt: number };
@@ -251,12 +251,7 @@ export function AiClientsManager() {
 			[client.id]: { status: "testing", reason: null },
 		}));
 		try {
-			const result = await testClientAvailability({
-				name: client.name,
-				type: client.type,
-				config: client.config,
-				isDefault: client.isDefault,
-			});
+			const result = await testExistingClientAvailability(client.id);
 			storeTestState(client.id, result);
 			setCardTestStates((current) => ({ ...current, [client.id]: result }));
 		} catch (error) {

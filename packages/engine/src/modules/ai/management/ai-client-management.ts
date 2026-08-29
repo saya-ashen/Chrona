@@ -237,6 +237,20 @@ export class AiClientManagement {
     return testAiClientAvailability(input);
   }
 
+  async testExisting(input: { clientId: string }) {
+    const client = await db.aiClient.findUnique({ where: { id: input.clientId } });
+    if (!client) {
+      throw new EngineError(
+        ENGINE_ERROR_CODES.AI_CLIENT_NOT_FOUND,
+        "Client not found",
+      );
+    }
+    return testAiClientAvailability({
+      type: client.type,
+      config: client.config as Record<string, unknown>,
+    });
+  }
+
   async updateBindings(input: UpdateBindingsInput) {
     const features = await updateAiClientBindings(input);
     await aiClientRegistry.refresh();

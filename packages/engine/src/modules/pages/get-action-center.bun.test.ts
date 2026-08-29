@@ -636,6 +636,80 @@ describe("getActionCenter actionable states", () => {
     ).toBe(false);
   });
 
+  it("removes a node-run review item when the canonical plan result is accepted", async () => {
+    const workspace = await db.workspace.create({
+      data: { name: "Accepted plan result Action Center", status: "Active" },
+    });
+    const task = await seedTask(
+      workspace.id,
+      "Accepted plan result task",
+      "Completed",
+    );
+    const nodeRun = await seedRun(task.id, "Completed", {
+      runtimeRunRef: "accepted-node-run",
+      endedAt: new Date(Date.now() - 60_000),
+      updatedAt: new Date(Date.now() - 60_000),
+    });
+    await db.task.update({
+      where: { id: task.id },
+      data: { latestRunId: nodeRun.id },
+    });
+    const planId = "plan-action-center-accepted-result";
+    await db.taskPlan.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        planId,
+        revision: 1,
+        status: "Accepted",
+        compiledPlan: {},
+      },
+    });
+    const planRun = await db.taskPlanRun.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        planId,
+        planRun: {
+          planRun: { status: "completed" },
+          mutableGraph: {
+            planOutput: { finalization: { status: "Ready" } },
+          },
+        },
+      },
+    });
+    const planExecutionRun = await seedRun(task.id, "Completed", {
+      id: `plan_execution_${planRun.id}`,
+      runtimeName: "chrona-plan",
+      runtimeRunRef: `chrona-plan:${planRun.id}`,
+      endedAt: new Date(),
+    });
+
+    await db.event.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        runId: planExecutionRun.id,
+        planRunId: planRun.id,
+        eventType: "task.result_accepted",
+        actorType: "user",
+        source: "ui",
+        payload: {
+          accepted_run_id: planExecutionRun.id,
+          accepted_plan_run_id: planRun.id,
+        },
+        ingestSequence: 1,
+      },
+    });
+
+    expect(
+      (await getActionCenter(workspace.id)).some(
+        (item) =>
+          item.sourceTaskId === task.id && item.kind === "execution_completed",
+      ),
+    ).toBe(false);
+  });
+
   it("emits bounded notification items for due tasks, scheduler events, completed runs, and info timeline", async () => {
     const now = new Date();
     const minutesFromNow = (minutes: number) =>

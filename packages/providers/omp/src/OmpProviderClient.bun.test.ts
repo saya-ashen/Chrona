@@ -220,6 +220,16 @@ describe("OmpSdkProviderClient direct config", () => {
       await rm(agentDir, { recursive: true, force: true });
     }
   });
+
+  it("requires an actual SDK provider turn before reporting health", async () => {
+    const failed = await __ompSdkProviderTestHooks.probeSdkSessionHealth({
+      subscribe: () => () => undefined,
+      prompt: () => Promise.reject(new Error("401 API key required")),
+      abort: () => Promise.resolve(),
+    } as never, { timeoutMs: 100 });
+
+    expect(failed).toEqual({ ok: false, reason: "401 API key required" });
+  });
 });
 
 describe("OmpSdkProviderClient declared runtime tools", () => {

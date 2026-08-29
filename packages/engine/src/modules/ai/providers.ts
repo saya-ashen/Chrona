@@ -202,7 +202,10 @@ async function checkClientHealth(
 			}
 			return {
 				available: true,
-				reason: `${health.reason ?? health.message ?? "Oh My Pi local SDK/model configuration resolved."} Run the five-minute demo provider request to verify remote credentials and model access.`,
+				reason:
+					health.reason ??
+					health.message ??
+					"Oh My Pi completed a provider connectivity request.",
 			};
 		}
 

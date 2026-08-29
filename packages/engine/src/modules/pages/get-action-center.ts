@@ -16,7 +16,7 @@ const DUE_SOON_WINDOW_MS = 24 * 60 * 60 * 1000;
 const OVERDUE_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 const RECENT_NOTIFICATION_WINDOW_MS = 24 * 60 * 60 * 1000;
 
-const CLOSED_DUE_STATUSES = [
+const CLOSED_DUE_STATUSES: TaskStatus[] = [
   TaskStatus.Completed,
   TaskStatus.Done,
   TaskStatus.Cancelled,
@@ -178,6 +178,13 @@ function executionScopeKey(taskId: string, workBlockId: string | null) {
   return `${taskId}:${workBlockId ?? "task"}`;
 }
 
+function resultWasAcceptedAfterRun(
+  acceptedAt: Date | undefined,
+  run: { endedAt: Date | null; updatedAt: Date },
+) {
+  return (acceptedAt?.getTime() ?? 0) >= (run.endedAt ?? run.updatedAt).getTime();
+}
+
 function failedNodeIdsByExecutionScope(runs: WaitingPlanRunRecord[]) {
   const nodeIds = new Map<string, string>();
   for (const run of runs) {
@@ -195,7 +202,7 @@ function buildPlanRunItems(
 ): SortableActionCenterItem[] {
   const items: SortableActionCenterItem[] = [];
   for (const run of runs) {
-    if ([TaskStatus.Completed, TaskStatus.Done, TaskStatus.Cancelled].includes(run.task.status)) continue;
+    if (CLOSED_DUE_STATUSES.includes(run.task.status)) continue;
     const scopeKey = executionScopeKey(run.taskId, run.workBlockId);
     if (coveredExecutionScopes.has(scopeKey)) continue;
     const checkpoint = waitingCheckpointFromPlanRun(run.planRun);
@@ -225,7 +232,7 @@ function buildPlanRunItems(
   return items;
 }
 
-const LEGACY_NON_ACTIONABLE_SCHEDULER_REASONS: Record<string, true> = {
+const LEGACY_NON_ACTIONABLE_SCHEDULER_REASONS: Partial<Record<string, true>> = {
   "Automatic execution will start at the configured schedule time.": true,
   "A run is already active for this task.": true,
   not_due: true,
@@ -256,10 +263,7 @@ function isActionableSchedulerSkip(event: {
 }): boolean {
   const payload = readSchedulerPayload(event.payload);
   if (payload.actionable !== undefined) return payload.actionable;
-  if (
-    payload.reasonCode &&
-    LEGACY_NON_ACTIONABLE_SCHEDULER_REASONS[payload.reasonCode]
-  ) {
+  if (LEGACY_NON_ACTIONABLE_SCHEDULER_REASONS[payload.reasonCode ?? ""]) {
     return false;
   }
   return (
@@ -459,7 +463,7 @@ export async function getActionCenter(
             ...(waitingPlanRuns.length > 0 ? [{ planRunId: { in: waitingPlanRuns.map((run) => run.id) } }] : []),
           ],
         },
-        select: { runId: true, planRunId: true },
+        select: { taskId: true, runId: true, planRunId: true, createdAt: true },
       })
     : [];
   const acceptedCompletedRunIds = new Set(
@@ -472,6 +476,14 @@ export async function getActionCenter(
       .map((event) => event.planRunId)
       .filter((planRunId): planRunId is string => Boolean(planRunId)),
   );
+  const latestAcceptedResultAtByTask = new Map<string, Date>();
+  for (const event of acceptedResultEvents) {
+    if (!event.taskId) continue;
+    const previous = latestAcceptedResultAtByTask.get(event.taskId);
+    if (!previous || previous < event.createdAt) {
+      latestAcceptedResultAtByTask.set(event.taskId, event.createdAt);
+    }
+  }
 
   const latestRunIds = tasksWithLatestRuns
     .map((task) => task.latestRunId)
@@ -753,7 +765,8 @@ export async function getActionCenter(
     if (
       run.task.latestRunId !== run.id ||
       run.task.status !== TaskStatus.Completed ||
-      acceptedCompletedRunIds.has(run.id)
+      acceptedCompletedRunIds.has(run.id) ||
+      resultWasAcceptedAfterRun(latestAcceptedResultAtByTask.get(run.taskId), run)
     )
       continue;
     if (!latestCompletedRunByTask.has(run.taskId))

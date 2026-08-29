@@ -177,6 +177,26 @@ function registerClientMutationRoutes(app: Hono, engine: ChronaEngine) {
         }
       },
     )
+    .post(
+      "/ai/clients/:clientId/test",
+      zValidator("param", updateAiClientParamSchema),
+      async (c) => {
+        try {
+          const { clientId } = c.req.valid("param");
+          return json(c, {
+            ok: true,
+            ...await engine.aiClients.testExisting({ clientId }),
+          });
+        } catch (cause) {
+          return mutationFailure(
+            c,
+            cause,
+            "POST /api/ai/clients/:clientId/test",
+            "Failed to test AI client",
+          );
+        }
+      },
+    )
     .delete(
       "/ai/clients/:clientId",
       zValidator("param", deleteAiClientParamSchema),

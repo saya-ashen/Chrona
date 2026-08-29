@@ -869,6 +869,79 @@ function sdkReadOnlyToolOptions(toolPolicy: StartRunInput["toolPolicy"]) {
 		: {};
 }
 
+type SdkHealthSession = Pick<AgentSession, "abort" | "prompt" | "subscribe">;
+type SdkHealthProbeResult =
+	| { ok: true }
+	| { ok: false; reason: string };
+
+async function probeSdkSessionHealth(
+	session: SdkHealthSession,
+	input: HealthCheckInput | undefined,
+): Promise<SdkHealthProbeResult> {
+	if (input?.signal?.aborted) {
+		return { ok: false, reason: "Oh My Pi health check was aborted" };
+	}
+	const timeoutMs = input?.timeoutMs ?? 60_000;
+	const { promise, resolve } = Promise.withResolvers<SdkHealthProbeResult>();
+	let settled = false;
+	const settle = (result: SdkHealthProbeResult) => {
+		if (settled) return;
+		settled = true;
+		resolve(result);
+	};
+	const unsubscribe = session.subscribe((event) => {
+		if (
+			event.type === "message_update" &&
+			event.assistantMessageEvent.type === "error"
+		) {
+			settle({ ok: false, reason: event.assistantMessageEvent.reason });
+			return;
+		}
+		if (event.type !== "agent_end") return;
+		const outcome = agentEndOutcome(event, false);
+		settle(
+			outcome.status === "completed"
+				? { ok: true }
+				: { ok: false, reason: outcome.error },
+		);
+	});
+	const abort = () => {
+		settle({ ok: false, reason: "Oh My Pi health check was aborted" });
+		void session.abort();
+	};
+	input?.signal?.addEventListener("abort", abort, { once: true });
+	const timer = setTimeout(() => {
+		settle({
+			ok: false,
+			reason: `Oh My Pi health check timed out after ${timeoutMs}ms`,
+		});
+		void session.abort();
+	}, timeoutMs);
+	const prompt = session
+		.prompt("Connectivity check. Reply with the single word pong.", {
+			expandPromptTemplates: false,
+		})
+		.then((ran) => {
+			if (!ran) {
+				settle({ ok: false, reason: "Oh My Pi health probe did not run" });
+			}
+		})
+		.catch((error: unknown) => {
+			settle({
+				ok: false,
+				reason: error instanceof Error ? error.message : String(error),
+			});
+		});
+	try {
+		return await promise;
+	} finally {
+		clearTimeout(timer);
+		input?.signal?.removeEventListener("abort", abort);
+		unsubscribe();
+		await prompt;
+	}
+}
+
 export const __ompSdkProviderTestHooks = {
 	AsyncEventQueue,
 	jsonSchemaToZod,
@@ -882,6 +955,7 @@ export const __ompSdkProviderTestHooks = {
 	chronaAgentControlUrl,
 	invokeChronaTerminalControl,
 	sdkReadOnlyToolOptions,
+	probeSdkSessionHealth,
 	sdkToolErrorMessage,
 	isDeclaredTerminalTool,
 	agentEndFailure,
@@ -1080,7 +1154,7 @@ export class OmpSdkProviderClient implements AgentProviderClient {
 		};
 	}
 
-	async checkHealth(_input?: HealthCheckInput) {
+	async checkHealth(input?: HealthCheckInput) {
 		const started = Date.now();
 		try {
 			// Health must exercise the same SDK model resolution path as a real run.
@@ -1110,6 +1184,9 @@ export class OmpSdkProviderClient implements AgentProviderClient {
 				...(setup.modelRegistry ? { modelRegistry: setup.modelRegistry } : {}),
 				settings,
 				sessionManager: SessionManager.inMemory(cwd),
+				toolNames: [],
+				enableMCP: false,
+				enableLsp: false,
 				skipPythonPreflight: true,
 				hasUI: false,
 			});
@@ -1125,12 +1202,22 @@ export class OmpSdkProviderClient implements AgentProviderClient {
 							"OMP could not resolve an executable model. Check OMP login, model selection, and agent directory.",
 					};
 				}
+				const probe = await probeSdkSessionHealth(session, input);
+				if (!probe.ok) {
+					return {
+						provider: PROVIDER,
+						ok: false,
+						checkedAt: now(),
+						latencyMs: Date.now() - started,
+						reason: probe.reason,
+					};
+				}
 				return {
 					provider: PROVIDER,
 					ok: true,
 					checkedAt: now(),
 					latencyMs: Date.now() - started,
-					message: `Oh My Pi SDK resolved model ${model.provider}/${model.id}`,
+					message: `Oh My Pi SDK reached model ${model.provider}/${model.id}`,
 				};
 			} finally {
 				await session.dispose();
