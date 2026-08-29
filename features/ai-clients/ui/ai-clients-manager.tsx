@@ -93,8 +93,6 @@ const DEFAULTS: Record<string, string> = {
 	emptyState:
 		"No AI client is connected yet. Connect one to unlock planning, suggestions, and execution previews.",
 	emptyStateCta: "Connect AI Client",
-	hermesIntro:
-		"Hermes is Chrona's local AI runtime. It generates task plans, proposes schedule changes, and only executes after your approval.",
 	loading: "Loading...",
 	defaultBadge: "Default",
 	enabled: "Enabled",
@@ -288,7 +286,6 @@ export function AiClientsManager() {
 				<div className="flex flex-col gap-1">
 					<h2 className="text-xl font-semibold tracking-tight">{copy.title}</h2>
 					<p className="text-sm text-muted-foreground">{copy.subtitle}</p>
-					<p className="text-sm text-muted-foreground">{copy.hermesIntro}</p>
 				</div>
 				<Button
 					type="button"

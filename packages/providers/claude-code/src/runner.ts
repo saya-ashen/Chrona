@@ -935,7 +935,8 @@ class SdkRunner implements ClaudeCodeRunner {
 							onToolAccepted: (toolName) => {
 								if (toolName === input.terminalToolName) {
 									if (sdkHandle) sdkHandle.terminalToolAccepted = true;
-									queueMicrotask(() => abortController.abort());
+									// Let the SDK serialize the MCP result before stopping the post-terminal turn.
+									setTimeout(() => abortController.abort(), 0);
 								}
 							},
 						}),

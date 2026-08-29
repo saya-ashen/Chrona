@@ -5,9 +5,9 @@ import { createApiRouter } from "../../routes/api";
 
 // GET /api/runtime/providers — execution runtime catalog.
 // Coverage audit gap: zero L1 coverage. The route returns the
-// list of registered runtimes (Hermes, optionally Debug) with
-// display labels. Pinned cases:
-//   - hermes is always exposed
+// list of released runtimes (optionally Debug) with display labels.
+// Pinned cases:
+//   - Hermes remains implemented but is hidden until certified
 //   - debug is hidden unless CHRONA_ENABLE_DEBUG_PROVIDER or
 //     NODE_ENV=development
 //   - shape: { providers: [{ key, label }] }
@@ -19,15 +19,12 @@ function app() {
 }
 
 describe("GET /api/runtime/providers", () => {
-  it("always exposes the hermes runtime with a human label", async () => {
+  it("hides Hermes until its runtime is release-certified", async () => {
     const res = await app().request("http://local/api/runtime/providers");
     expect(res.status).toBe(200);
     const body = (await res.json()) as { providers: Array<{ key: string; label: string }> };
     expect(Array.isArray(body.providers)).toBe(true);
-
-    const hermes = body.providers.find((p) => p.key === "hermes");
-    expect(hermes).toBeDefined();
-    expect(hermes?.label).toBe("Hermes");
+    expect(body.providers.some((provider) => provider.key === "hermes")).toBe(false);
   });
 
   it("exposes Codex runtime with a human label", async () => {

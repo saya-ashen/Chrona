@@ -2591,7 +2591,6 @@
       "addClient": "+ Add Client",
       "emptyState": "No AI client is connected yet. Connect one to unlock planning, suggestions, and execution previews.",
       "emptyStateCta": "Connect AI Client",
-      "hermesIntro": "Hermes is Chrona's local AI runtime. It generates task plans, proposes schedule changes, and only executes after your approval.",
       "loading": "Loading...",
       "defaultBadge": "Default",
       "enabled": "Enabled",

@@ -7,6 +7,7 @@ import { dirname, join, resolve } from "node:path";
 
 import {
 	providerCapabilityMatrix,
+	releasedProviderTypes,
 	type AiClientType,
 } from "@chrona/contracts";
 import { db } from "@chrona/db";
@@ -58,17 +59,19 @@ export type LiveProviderSmokeCliOptions = {
 	providers: LiveProviderType[];
 	timeoutMs: number;
 	allowMissing: boolean;
+	reuseOmpForClaude: boolean;
 	reuseOmpForCodex: boolean;
 	listOnly: boolean;
 	chronaBaseUrl: string;
 	reportPath: string;
 };
 
-const PROVIDER_ORDER: LiveProviderType[] = [
+const RELEASE_PROVIDER_ORDER: LiveProviderType[] = [
 	"debug",
-	"omp",
-	"claude_code",
-	"codex",
+	...releasedProviderTypes,
+];
+const PROVIDER_ORDER: LiveProviderType[] = [
+	...RELEASE_PROVIDER_ORDER,
 	"hermes",
 ];
 const DEFAULT_TIMEOUT_MS = 120_000;
@@ -98,6 +101,7 @@ export function parseLiveProviderSmokeArgs(
 	const providers: LiveProviderType[] = [];
 	let timeoutMs = DEFAULT_TIMEOUT_MS;
 	let allowMissing = false;
+	let reuseOmpForClaude = false;
 	let reuseOmpForCodex = false;
 	let listOnly = false;
 	let chronaBaseUrl =
@@ -143,6 +147,10 @@ export function parseLiveProviderSmokeArgs(
 			allowMissing = true;
 			continue;
 		}
+		if (arg === "--reuse-omp-for-claude") {
+			reuseOmpForClaude = true;
+			continue;
+		}
 		if (arg === "--reuse-omp-for-codex") {
 			reuseOmpForCodex = true;
 			continue;
@@ -167,9 +175,10 @@ export function parseLiveProviderSmokeArgs(
 		providers:
 			providers.length > 0
 				? PROVIDER_ORDER.filter((provider) => providers.includes(provider))
-				: [...PROVIDER_ORDER],
+				: [...RELEASE_PROVIDER_ORDER],
 		timeoutMs,
 		allowMissing,
+		reuseOmpForClaude,
 		reuseOmpForCodex,
 		listOnly,
 		chronaBaseUrl,
@@ -187,9 +196,10 @@ function usage(): string {
 		"",
 		"Options:",
 		"  --provider <types>       Comma-separated provider types.",
-		"  --all                    Test every provider in the capability matrix (default).",
+		"  --all                    Test every released provider plus the deterministic debug adapter (default).",
 		"  --allow-missing          Do not fail when a provider has no usable configuration.",
-		"  --reuse-omp-for-codex    Explicitly reuse a configured OMP gateway credential for Codex smoke.",
+		"  --reuse-omp-for-claude   Explicitly test an OMP gateway through its Anthropic-compatible endpoint.",
+		"  --reuse-omp-for-codex    Explicitly test an OMP gateway through its OpenAI Responses endpoint.",
 		"  --chrona-base-url <url>  Chrona API base used by ACP/Codex health. Default http://127.0.0.1:3101.",
 		"  --timeout-ms <number>    Per-stage timeout. Default 120000.",
 		"  --report <path>          Redacted JSON report. Default .chrona/provider-smoke/latest.json.",
@@ -405,6 +415,68 @@ function localTarget(input: {
 	};
 }
 
+export function sharedClaudeConfigFromOmp(
+	config: Record<string, unknown>,
+	configDirectory: string,
+): Record<string, unknown> {
+	const configuredAnthropicBaseUrl =
+		typeof config.anthropicBaseUrl === "string"
+			? config.anthropicBaseUrl.trim()
+			: "";
+	const openAiBaseUrl =
+		typeof config.baseUrl === "string" ? config.baseUrl.trim() : "";
+	const anthropicBaseUrl =
+		configuredAnthropicBaseUrl || openAiBaseUrl.replace(/\/v1\/?$/, "");
+	if (!anthropicBaseUrl) {
+		throw new Error(
+			"--reuse-omp-for-claude requires an OMP baseUrl or anthropicBaseUrl",
+		);
+	}
+	const apiKey = typeof config.apiKey === "string" ? config.apiKey : undefined;
+	const modelValue =
+		typeof config.anthropicModel === "string"
+			? config.anthropicModel
+			: config.model;
+	const model = typeof modelValue === "string" ? modelValue.trim() : "";
+	if (!model) {
+		throw new Error(
+			"--reuse-omp-for-claude requires an OMP model or anthropicModel",
+		);
+	}
+	return {
+		model,
+		apiKey,
+		configDirectory,
+		env: {
+			ANTHROPIC_BASE_URL: anthropicBaseUrl,
+			...(apiKey
+				? { ANTHROPIC_API_KEY: apiKey, ANTHROPIC_AUTH_TOKEN: apiKey }
+				: {}),
+			CLAUDE_CONFIG_DIR: configDirectory,
+			DISABLE_OMC: "1",
+			OMC_SKIP_HOOKS: "1",
+		},
+	};
+}
+
+export function sharedCodexConfigFromOmp(
+	config: Record<string, unknown>,
+): Record<string, unknown> {
+	const baseUrl =
+		typeof config.baseUrl === "string" ? config.baseUrl.trim() : "";
+	const model = typeof config.model === "string" ? config.model.trim() : "";
+	if (!baseUrl || !model) {
+		throw new Error(
+			"--reuse-omp-for-codex requires an OMP baseUrl and model",
+		);
+	}
+	return {
+		baseUrl,
+		model,
+		...(typeof config.apiKey === "string" ? { apiKey: config.apiKey } : {}),
+	};
+}
+
 async function loadTargets(
 	options: LiveProviderSmokeCliOptions,
 	tempRoot: string,
@@ -412,7 +484,9 @@ async function loadTargets(
 	const recordTypes = [
 		...new Set([
 			...options.providers,
-			...(options.reuseOmpForCodex ? (["omp"] as const) : []),
+			...(options.reuseOmpForClaude || options.reuseOmpForCodex
+				? (["omp"] as const)
+				: []),
 		]),
 	];
 	const records = (await db.aiClient.findMany({
@@ -434,19 +508,38 @@ async function loadTargets(
 				chronaBaseUrl: options.chronaBaseUrl,
 			});
 		}
-		if (provider === "codex" && options.reuseOmpForCodex) {
+		if (provider === "claude_code" && options.reuseOmpForClaude) {
 			const ompRecord = storedClientFor(records, "omp");
 			if (ompRecord) {
-				const omp = asConfig(ompRecord.config);
+				const configDirectory = join(cwd, ".claude-config");
+				mkdirSync(configDirectory, { recursive: true });
 				const target = targetFromStored({
 					provider,
 					record: {
 						...ompRecord,
-						config: {
-							baseUrl: omp.baseUrl,
-							apiKey: omp.apiKey,
-							model: omp.model,
-						},
+						config: sharedClaudeConfigFromOmp(
+							asConfig(ompRecord.config),
+							configDirectory,
+						),
+					},
+					cwd,
+					timeoutMs: options.timeoutMs,
+					chronaBaseUrl: options.chronaBaseUrl,
+				});
+				return {
+					...target,
+					source: `OMP gateway reused for Claude smoke: ${ompRecord.name}`,
+				};
+			}
+		}
+		if (provider === "codex" && options.reuseOmpForCodex) {
+			const ompRecord = storedClientFor(records, "omp");
+			if (ompRecord) {
+				const target = targetFromStored({
+					provider,
+					record: {
+						...ompRecord,
+						config: sharedCodexConfigFromOmp(asConfig(ompRecord.config)),
 					},
 					cwd,
 					timeoutMs: options.timeoutMs,

@@ -120,7 +120,7 @@ item for the same task, occurrence, and reason. Its HTTP wire path remains
 
 AI clients and feature bindings are database-backed. The old fallback-chain style is replaced by explicit configured clients and feature bindings.
 
-Hermes setup uses the integrations layer. Settings can diagnose local or remote Hermes clients, auto-configure a local Hermes gateway after explicit user action, and show manual instructions for remote gateways. Provider runtime code stays responsible for Hermes protocol calls; integration code owns local plugin/config/env/restart side effects.
+Hermes setup remains implemented through the integrations layer, but Hermes is hidden from the production provider catalog until its runtime is release-certified. Internal diagnostics can still inspect local or remote Hermes clients. Provider runtime code stays responsible for Hermes protocol calls; integration code owns local plugin/config/env/restart side effects.
 
 ## Core workflows
 

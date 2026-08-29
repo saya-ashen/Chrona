@@ -103,7 +103,7 @@ export interface CodexClientConfig {
   timeoutMs?: number;
   /** OpenAI/Codex API key. */
   apiKey?: string;
-  /** OpenAI-compatible base URL. */
+  /** OpenAI Responses-compatible base URL. */
   baseUrl?: string;
   /** Optional pass-through env vars for codex-acp. */
   env?: Record<string, string>;

@@ -789,15 +789,15 @@ function handlers(
 		},
 	};
 }
-async function checkAcpSessionHealth(
+async function openAcpHealthSession(
 	config: AcpProviderConfig,
 	context: ClientContext,
 	signal?: AbortSignal,
-) {
+): Promise<ActiveSession> {
 	const sessionId = `${config.provider}-health-${crypto.randomUUID()}`;
 	const sessionKey = `chrona:provider-health:${config.provider}`;
 	await probeChronaMcpTools({ config, sessionId: sessionKey, signal });
-	const session = await context
+	return context
 		.buildSession(
 			newSessionRequest(config, {
 				clientOperationId: `${config.provider}:health:${sessionId}`,
@@ -808,7 +808,47 @@ async function checkAcpSessionHealth(
 			}),
 		)
 		.start({ cancellationSignal: signal });
+}
+
+async function checkAcpSessionHealth(
+	config: AcpProviderConfig,
+	context: ClientContext,
+	signal?: AbortSignal,
+) {
+	const session = await openAcpHealthSession(config, context, signal);
 	session.dispose();
+}
+
+const ACP_HEALTH_MARKER = "CHRONA_ACP_HEALTH_OK";
+
+async function checkAcpPromptHealth(
+	config: AcpProviderConfig,
+	context: ClientContext,
+	signal?: AbortSignal,
+) {
+	const session = await openAcpHealthSession(config, context, signal);
+	let output = "";
+	try {
+		const prompt = session.prompt(
+			[{ type: "text", text: `Return only ${ACP_HEALTH_MARKER}` }],
+			{ cancellationSignal: signal },
+		);
+		for (;;) {
+			const message = await session.nextUpdate();
+			if (message.kind === "stop") break;
+			if (message.update.sessionUpdate === "agent_message_chunk") {
+				output += textFromContent(message.update.content) ?? "";
+			}
+		}
+		await prompt;
+		const streamFailure = completionStreamFailure(output);
+		if (streamFailure) throw new Error(streamFailure);
+		if (!output.includes(ACP_HEALTH_MARKER)) {
+			throw new Error("ACP model endpoint did not return the health marker");
+		}
+	} finally {
+		session.dispose();
+	}
 }
 
 async function initialize(
@@ -1026,12 +1066,19 @@ export class AcpProviderClient implements AgentProviderClient {
 						input.signal,
 					);
 					assertHttpMcp(this.config, init);
-					if (this.config.healthCheck === "session")
+					if (this.config.healthCheck === "prompt") {
+						await checkAcpPromptHealth(
+							this.config,
+							connection.context,
+							input.signal,
+						);
+					} else if (this.config.healthCheck === "session") {
 						await checkAcpSessionHealth(
 							this.config,
 							connection.context,
 							input.signal,
 						);
+					}
 				},
 			);
 			return {
@@ -1041,9 +1088,11 @@ export class AcpProviderClient implements AgentProviderClient {
 				latencyMs: Date.now() - started,
 				status: "ok",
 				reason:
-					this.config.healthCheck === "session"
-						? `${this.config.displayName ?? this.provider} ACP agent connected`
-						: `${this.config.displayName ?? this.provider} ACP agent initialized`,
+					this.config.healthCheck === "prompt"
+						? `${this.config.displayName ?? this.provider} model endpoint completed a prompt`
+						: this.config.healthCheck === "session"
+							? `${this.config.displayName ?? this.provider} ACP agent connected`
+							: `${this.config.displayName ?? this.provider} ACP agent initialized`,
 			};
 		} catch (error) {
 			return {

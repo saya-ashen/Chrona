@@ -23,7 +23,10 @@ type RequestRecord = { method: string; params: unknown };
 
 type FakeSession = {
   sessionId: string;
-  updates: Array<{ kind: "stop"; stopReason: string; response: unknown }>;
+  updates: Array<
+    | { kind: "session_update"; update: unknown }
+    | { kind: "stop"; stopReason: string; response: unknown }
+  >;
   prompt(input: unknown): Promise<unknown>;
   nextUpdate(): Promise<FakeSession["updates"][number] | undefined>;
   dispose(): void;
@@ -203,7 +206,7 @@ describe("codexAcpConfig", () => {
       timeoutMs: 120,
       mcpBaseUrl: "http://chrona.test",
       mcpRunToken: "token",
-      healthCheck: "session",
+      healthCheck: "prompt",
       auth: { useExisting: true },
     });
   });
@@ -231,7 +234,17 @@ describe("codexAcpConfig", () => {
 
 describe("CodexProviderClient", () => {
   it("delegates to generic ACP provider", async () => {
-    const transport = new FakeAcpTransport([{ kind: "stop", stopReason: "end_turn", response: { stopReason: "end_turn" } }]);
+    const transport = new FakeAcpTransport([
+      { kind: "stop", stopReason: "end_turn", response: { stopReason: "end_turn" } },
+      {
+        kind: "session_update",
+        update: {
+          sessionUpdate: "agent_message_chunk",
+          content: { type: "text", text: "CHRONA_ACP_HEALTH_OK" },
+        },
+      },
+      { kind: "stop", stopReason: "end_turn", response: { stopReason: "end_turn" } },
+    ]);
     const client = new CodexProviderClient({
       config: { mcpBaseUrl: "http://chrona.test", mcpRunToken: "run-token" },
       acp: { transport },
@@ -264,7 +277,7 @@ describe("CodexProviderClient", () => {
     await expect(client.checkHealth()).resolves.toMatchObject({
       provider: "codex",
       ok: true,
-      reason: "OpenAI Codex ACP agent connected",
+      reason: "OpenAI Codex model endpoint completed a prompt",
     });
   });
 

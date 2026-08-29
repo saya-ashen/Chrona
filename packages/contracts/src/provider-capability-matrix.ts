@@ -40,6 +40,9 @@ export type ProviderCapabilityMatrixEntry = {
 	uiBehavior: Record<ProviderCapabilityName, string>;
 };
 
+/** Provider adapters exposed in production settings. Hermes remains implemented but is hidden until certified. */
+export const releasedProviderTypes = ["omp", "claude_code", "codex"] as const;
+
 const UI_BEHAVIOR: Record<ProviderCapabilityName, string> = {
 	healthCheck: "Settings shows provider readiness.",
 	startRun: "Execution start action can be enabled when task state allows it.",

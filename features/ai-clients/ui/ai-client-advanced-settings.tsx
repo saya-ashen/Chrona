@@ -198,8 +198,8 @@ function CodexSettings({
 					form={form}
 					name="baseUrl"
 					id="ai-client-base-url"
-					label="Base URL"
-					placeholder="optional OpenAI-compatible base URL"
+					label="OpenAI Responses Base URL"
+					placeholder="optional OpenAI Responses-compatible base URL"
 				/>
 			</div>
 			<TextField

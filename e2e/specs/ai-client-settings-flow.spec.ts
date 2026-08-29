@@ -42,9 +42,9 @@ async function removeManagedClients(request: APIRequestContext): Promise<void> {
 	}
 }
 
-async function selectHermesProvider(page: Page) {
+async function selectOmpProvider(page: Page) {
 	await page.getByRole("combobox", { name: "Type" }).click();
-	await page.getByRole("option", { name: "Hermes" }).click();
+	await page.getByRole("option", { name: /Oh My Pi/ }).click();
 }
 
 async function fillAdvancedConnectionSettings(
@@ -54,9 +54,11 @@ async function fillAdvancedConnectionSettings(
 ) {
 	await page.locator("summary").filter({ hasText: "Advanced settings" }).click();
 	await page
-		.getByRole("textbox", { name: "Base URL", exact: true })
+		.getByRole("textbox", { name: "OMP Base URL", exact: true })
 		.fill(baseUrl);
-	await page.getByRole("textbox", { name: "API Key", exact: true }).fill(apiKey);
+	await page
+		.getByRole("textbox", { name: "OMP API Key", exact: true })
+		.fill(apiKey);
 }
 
 test.describe("AI Client Settings", () => {
@@ -154,8 +156,8 @@ test.describe("AI Client Settings", () => {
 
 		await test.step("2. Create a new AI client", async () => {
 			await page.getByRole("button", { name: /add client/i }).click();
-			await selectHermesProvider(page);
-			await page.getByPlaceholder("My Hermes Client").fill("E2E Settings Client");
+			await selectOmpProvider(page);
+			await page.getByRole("textbox", { name: "Name" }).fill("E2E Settings Client");
 			await fillAdvancedConnectionSettings(
 				page,
 				"https://api.mock.ai/v1",
@@ -177,7 +179,7 @@ test.describe("AI Client Settings", () => {
 			await page.getByRole("button", { name: "Edit" }).first().click();
 
 			// Change the name
-			const nameInput = page.getByPlaceholder("My Hermes Client");
+			const nameInput = page.getByRole("textbox", { name: "Name" });
 			await nameInput.clear();
 			await nameInput.fill("E2E Settings Client (Updated)");
 
@@ -262,8 +264,8 @@ test.describe("AI Client Settings", () => {
 
 		await page.goto(SETTINGS_URL);
 		await page.getByRole("button", { name: /add client/i }).click();
-		await selectHermesProvider(page);
-		await page.getByPlaceholder("My Hermes Client").fill("Diagnostics Client");
+		await selectOmpProvider(page);
+		await page.getByRole("textbox", { name: "Name" }).fill("Diagnostics Client");
 		await fillAdvancedConnectionSettings(
 			page,
 			"https://diagnostics.mock/v1",
@@ -287,71 +289,15 @@ test.describe("AI Client Settings", () => {
 		await expect(page.getByText(/read, write/)).toBeVisible();
 	});
 
-	test("[AISET-018/019/020] diagnoses, configures, and restarts local Hermes", async ({
+	test("[AISET-HERMES-HIDDEN] omits uncertified Hermes from provider choices", async ({
 		page,
 	}) => {
-		const integrationResult = {
-			maskedApiKey: "chrona-...oken",
-			changed: ["env:/tmp/hermes/.env"],
-			diagnostics: {
-				mode: "local",
-				restartRequired: true,
-				checks: [
-					{
-						key: "hermesEnvFile",
-						status: "warning",
-						message: "Hermes fixture check",
-					},
-				],
-			},
-			plan: {
-				summary: "Restart Hermes fixture.",
-				canRunAutomatically: false,
-				actions: [],
-			},
-		};
-		await page.route("**/api/integrations/hermes/diagnose", (route) =>
-			route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify(integrationResult),
-			}),
-		);
-		await page.route("**/api/integrations/hermes/setup-local", (route) =>
-			route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({
-					...integrationResult,
-					apiKey: "chrona-generated-token",
-				}),
-			}),
-		);
-		await page.route("**/api/integrations/hermes/restart-local", (route) =>
-			route.fulfill({
-				status: 200,
-				contentType: "application/json",
-				body: JSON.stringify({
-					ok: true,
-					exitCode: null,
-					message: "Hermes fixture restart requested.",
-				}),
-			}),
-		);
-
 		await page.goto(SETTINGS_URL);
 		await page.getByRole("button", { name: /add client/i }).click();
-		await selectHermesProvider(page);
-		await page.getByRole("button", { name: "Diagnose Hermes" }).click();
-		await expect(page.getByText("Hermes fixture check")).toBeVisible();
-		await page
-			.getByRole("button", { name: "Auto-configure local Hermes" })
-			.click();
-		await expect(page.getByText("Restart Hermes fixture.")).toBeVisible();
-		await page.getByRole("button", { name: "Restart Hermes gateway" }).click();
-		await expect(
-			page.getByText("Hermes fixture restart requested."),
-		).toBeVisible();
+		await page.getByRole("combobox", { name: "Type" }).click();
+
+		await expect(page.getByRole("option", { name: /Oh My Pi/ })).toBeVisible();
+		await expect(page.getByRole("option", { name: /Hermes/ })).toHaveCount(0);
 	});
 
 	test("sets a client as default and unsets previous default", async ({
@@ -373,8 +319,8 @@ test.describe("AI Client Settings", () => {
 
 		// Client A
 		await page.getByRole("button", { name: /add client/i }).click();
-		await selectHermesProvider(page);
-		await page.getByPlaceholder("My Hermes Client").fill("Default Client A");
+		await selectOmpProvider(page);
+		await page.getByRole("textbox", { name: "Name" }).fill("Default Client A");
 		await fillAdvancedConnectionSettings(page, "https://a.mock.ai/v1", "sk-a");
 
 		const respA = page.waitForResponse(
@@ -386,8 +332,8 @@ test.describe("AI Client Settings", () => {
 
 		// Client B
 		await page.getByRole("button", { name: /add client/i }).click();
-		await selectHermesProvider(page);
-		await page.getByPlaceholder("My Hermes Client").fill("Default Client B");
+		await selectOmpProvider(page);
+		await page.getByRole("textbox", { name: "Name" }).fill("Default Client B");
 		await fillAdvancedConnectionSettings(page, "https://b.mock.ai/v1", "sk-b");
 		await page
 			.getByRole("checkbox", { name: "Use as default AI client" })
@@ -429,7 +375,7 @@ test.describe("AI Client Settings", () => {
 
 		await page.goto(SETTINGS_URL);
 		await page.getByRole("button", { name: /add client/i }).click();
-		await selectHermesProvider(page);
+		await selectOmpProvider(page);
 
 		// Leave name empty, save should be blocked by frontend or show error
 		await fillAdvancedConnectionSettings(page, "https://mock.ai/v1", "sk-test");

@@ -58,6 +58,7 @@
     "test:e2e:tablet": "playwright test --project=tablet",
     "test:e2e:mobile": "playwright test --project=mobile",
     "test:llm:replay": "bun run chrona test llm:replay",
+    "test:providers:compat": "CHRONA_RUN_LIVE_OMP_TESTS=1 CHRONA_RUN_LIVE_CLAUDE_TESTS=1 CHRONA_RUN_LIVE_CODEX_TESTS=1 bun test packages/providers/omp/src/omp-aimock-live.bun.test.ts packages/providers/claude-code/src/claude-code-aimock-live.bun.test.ts packages/providers/claude-code/src/claude-code-aimock-extra-live.bun.test.ts packages/providers/codex/src/codex-aimock-live.bun.test.ts",
     "test:providers:live": "bun run scripts/live-provider-smoke.ts",
     "db:generate": "prisma generate",
     "postinstall": "prisma generate && bun run scripts/install-git-hooks.ts",

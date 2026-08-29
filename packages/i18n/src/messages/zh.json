@@ -2591,7 +2591,6 @@
       "addClient": "+ 添加客户端",
       "emptyState": "还没有连接 AI 客户端。连接一个客户端即可解锁规划、建议和执行预览。",
       "emptyStateCta": "连接 AI 客户端",
-      "hermesIntro": "Hermes 是 Chrona 的本地 AI 运行时，用于生成任务计划、提出日程建议，并且只会在你批准后执行。",
       "loading": "加载中...",
       "defaultBadge": "默认",
       "enabled": "启用",

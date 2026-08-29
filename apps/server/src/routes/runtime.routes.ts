@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import type { ChronaEngine } from "@chrona/engine";
-import { AI_FEATURES } from "@chrona/contracts";
+import { AI_FEATURES, releasedProviderTypes } from "@chrona/contracts";
 
 import { json } from "../lib/http";
 
@@ -20,7 +20,7 @@ function getRuntimeLabel(key: string) {
   return key;
 }
 
-const AI_PROVIDER_TYPES = ["omp", "claude_code", "codex", "hermes", "debug"] as const;
+const AI_PROVIDER_TYPES = [...releasedProviderTypes, "debug"] as const;
 const BINDABLE_PRODUCT_FEATURES = AI_FEATURES.filter((feature) =>
   ["goal.review", "dashboard.brief", "task.plan", "task.execution"].includes(feature),
 );
@@ -30,7 +30,6 @@ const NON_DURABLE_PRODUCT_FEATURES = BINDABLE_PRODUCT_FEATURES.filter(
 /** Matches binding validation: planning/review need durable attach or terminal-only single-attempt recovery. */
 const PROVIDER_BINDABLE_FEATURES = {
   omp: BINDABLE_PRODUCT_FEATURES,
-  hermes: BINDABLE_PRODUCT_FEATURES,
   claude_code: NON_DURABLE_PRODUCT_FEATURES,
   codex: NON_DURABLE_PRODUCT_FEATURES,
   debug: BINDABLE_PRODUCT_FEATURES,
@@ -39,7 +38,6 @@ const PROVIDER_SUPPORT_TIERS = {
   omp: "stable",
   claude_code: "beta",
   codex: "beta",
-  hermes: "experimental",
   debug: "experimental",
 } as const;
 

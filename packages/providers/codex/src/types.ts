@@ -11,7 +11,7 @@ export interface CodexProviderConfig {
   timeoutMs?: number;
   /** OpenAI/Codex API key. Passed as CODEX_API_KEY. */
   apiKey?: string;
-  /** OpenAI-compatible base URL passed through CODEX_CONFIG/default gateway auth. */
+  /** OpenAI Responses-compatible base URL passed through CODEX_CONFIG/default gateway auth. */
   baseUrl?: string;
   /** Working directory for Codex. Defaults to current process cwd. */
   cwd?: string;
@@ -49,7 +49,7 @@ export function codexAcpConfig(config: CodexProviderConfig): AcpProviderConfig {
     displayName: "OpenAI Codex",
     command: config.binaryPath?.trim() || codexAcpBinaryPath(),
     timeoutMs: config.timeoutMs,
-    healthCheck: "session",
+    healthCheck: "prompt",
     auth: codexAcpAuth(config),
     cwd: config.cwd,
     env: codexAcpEnv(config),

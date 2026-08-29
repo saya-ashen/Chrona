@@ -281,6 +281,76 @@ describe("AcpProviderClient", () => {
 		});
 	});
 
+	it("runs a model prompt when prompt health is requested", async () => {
+		stubMcpTools(["terminal_result", "plan_context"]);
+		const transport = new FakeAcpTransport({
+			updates: [
+				{
+					kind: "session_update",
+					update: {
+						sessionUpdate: "agent_message_chunk",
+						content: { type: "text", text: "CHRONA_ACP_HEALTH_OK" },
+					},
+				},
+				{
+					kind: "stop",
+					stopReason: "end_turn",
+					response: { stopReason: "end_turn" },
+				},
+			],
+		});
+		const client = new AcpProviderClient({
+			config: config({
+				healthCheck: "prompt",
+				mcpBaseUrl: "http://chrona.test",
+			}),
+			transport,
+		});
+
+		await expect(client.checkHealth()).resolves.toMatchObject({
+			ok: true,
+			reason: "test_acp model endpoint completed a prompt",
+		});
+		expect(transport.session.promptBlocks).toEqual([
+			{ type: "text", text: "Return only CHRONA_ACP_HEALTH_OK" },
+		]);
+	});
+
+	it("rejects transport diagnostics returned as prompt health text", async () => {
+		stubMcpTools(["terminal_result", "plan_context"]);
+		const transport = new FakeAcpTransport({
+			updates: [
+				{
+					kind: "session_update",
+					update: {
+						sessionUpdate: "agent_message_chunk",
+						content: {
+							type: "text",
+							text: "unexpected status 401 Unauthorized: invalid API key",
+						},
+					},
+				},
+				{
+					kind: "stop",
+					stopReason: "end_turn",
+					response: { stopReason: "end_turn" },
+				},
+			],
+		});
+		const client = new AcpProviderClient({
+			config: config({
+				healthCheck: "prompt",
+				mcpBaseUrl: "http://chrona.test",
+			}),
+			transport,
+		});
+
+		await expect(client.checkHealth()).resolves.toMatchObject({
+			ok: false,
+			reason: "ACP provider transport failed with HTTP 401 Unauthorized",
+		});
+	});
+
 	it("sends Chrona HTTP MCP server through ACP session setup", async () => {
 		const transport = new FakeAcpTransport({
 			updates: [
