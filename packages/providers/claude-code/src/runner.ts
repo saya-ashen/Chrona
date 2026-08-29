@@ -470,7 +470,11 @@ function healthProbeResult(message: SDKMessage): string | null | undefined {
 		"errors" in message && Array.isArray(message.errors)
 			? message.errors.join("; ")
 			: undefined;
-	return `${HEALTH_PROBE_FAILURE}: ${errors || message.subtype}`;
+	const result =
+		"result" in message && typeof message.result === "string"
+			? redactSensitiveText(message.result, 300)
+			: undefined;
+	return `${HEALTH_PROBE_FAILURE}: ${result || errors || message.subtype}`;
 }
 
 export async function probeClaudeCodeSdk(input: {

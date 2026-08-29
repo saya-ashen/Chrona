@@ -204,6 +204,20 @@ describe("codexAcpConfig", () => {
       mcpBaseUrl: "http://chrona.test",
       mcpRunToken: "token",
       healthCheck: "session",
+      auth: { useExisting: true },
+    });
+  });
+
+  it("selects ACP authentication from the configured credential source", () => {
+    expect(codexAcpConfig({}).auth).toEqual({ useExisting: true });
+    expect(codexAcpConfig({ apiKey: "sk-openai" }).auth).toEqual({
+      methodId: "api-key",
+    });
+    expect(
+      codexAcpConfig({ baseUrl: "https://gateway.example/v1" }).auth,
+    ).toEqual({ methodId: "gateway" });
+    expect(codexAcpConfig({ noBrowser: true }).auth).toEqual({
+      useExisting: true,
     });
   });
 

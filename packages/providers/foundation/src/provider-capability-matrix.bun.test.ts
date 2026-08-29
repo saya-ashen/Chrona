@@ -32,7 +32,7 @@ describe("providerCapabilityMatrix", () => {
       startRun: true,
       streamEvents: true,
       cancelActiveRun: true,
-      approvalBridge: true,
+      approvalBridge: false,
     });
     expect(omp?.recovery).toMatchObject({
       sessionResume: true,

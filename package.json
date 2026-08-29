@@ -58,6 +58,7 @@
     "test:e2e:tablet": "playwright test --project=tablet",
     "test:e2e:mobile": "playwright test --project=mobile",
     "test:llm:replay": "bun run chrona test llm:replay",
+    "test:providers:live": "bun run scripts/live-provider-smoke.ts",
     "db:generate": "prisma generate",
     "postinstall": "prisma generate && bun run scripts/install-git-hooks.ts",
     "setup": "bun run db:generate && bun run db:seed",

@@ -166,6 +166,35 @@ function providerErrorMessage(error: unknown, diagnostics = "") {
 	return message;
 }
 
+function completionStreamFailure(outputText: string): string | null {
+	const trimmed = outputText.trim();
+	if (/^stream disconnected before completion:/i.test(trimmed)) {
+		return "ACP provider stream disconnected before completion";
+	}
+	const status = trimmed.match(
+		/^(?:Warning: Falling back from WebSockets to HTTPS transport\.[\s\S]*?)?unexpected status:?[\s]+(\d{3})(?:[\s]+([A-Za-z ]+?))?(?=[:\n,{]|$)/i,
+	);
+	if (!status) return null;
+	const reason = status[2] ? status[2].trim() : "";
+	return `ACP provider transport failed with HTTP ${status[1]}${reason ? ` ${reason}` : ""}`;
+}
+
+function completionStreamFailureEvent(
+	config: AcpProviderConfig,
+	handle: AcpRunHandle,
+): ProviderRunEvent | null {
+	const error = completionStreamFailure(handle.outputText);
+	if (!error) return null;
+	handle.status = "failed";
+	handle.error = error;
+	return {
+		...eventBase(config, handle, "error"),
+		type: "run_failed",
+		run: providerRunRef(handle, "failed"),
+		error,
+	};
+}
+
 function statusReason(code: string, reason?: string) {
 	const trimmed = reason?.trim();
 	if (trimmed) return trimmed;
@@ -806,6 +835,7 @@ function chooseAuthMethod(
 	config: AcpProviderConfig,
 	init: InitializeResponse,
 ): string | null {
+	if (config.auth?.useExisting) return null;
 	const methods = (init.authMethods ?? []) as AdvertisedAuthMethod[];
 	if (methods.length === 0) return null;
 	const configured = config.auth?.methodId?.trim();
@@ -1307,6 +1337,11 @@ export class AcpProviderClient implements AgentProviderClient {
 							type: "run_cancelled",
 							run: providerRunRef(handle, "cancelled"),
 						};
+						return;
+					}
+					const failureEvent = completionStreamFailureEvent(this.config, handle);
+					if (failureEvent) {
+						yield failureEvent;
 						return;
 					}
 					handle.status = "completed";

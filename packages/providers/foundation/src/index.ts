@@ -118,4 +118,11 @@ export {
 } from "./provider-capability-matrix";
 
 export { BoundedTerminalRunSnapshots } from "./bounded-terminal-run-snapshots";
+export {
+  LIVE_PROVIDER_SMOKE_MARKER,
+  runLiveProviderSmoke,
+  type LiveProviderSmokeOptions,
+  type LiveProviderSmokeResult,
+  type LiveProviderSmokeStatus,
+} from "./live-provider-smoke";
 export { isExactLoopbackHost, normalizeNetworkHost, validateHermesEndpoint, type HermesEndpointValidation } from "./network-safety";

@@ -89,6 +89,10 @@ export const TEST_COMMANDS: CommandGroup = {
   mobile: { description: "Playwright mobile viewport", steps: [bunStep("playwright mobile", ["x", "playwright", "test", "--project=mobile"], true)] },
   "llm:record": { description: "Record LLM fixtures", steps: [bunStep("llm record", ["test", "packages/engine/src/test/llm-fixtures.bun.test.ts", "--record"], true)] },
   "llm:replay": { description: "Replay LLM fixtures", steps: [bunStep("llm replay", ["test", "packages/engine/src/test/llm-fixtures.bun.test.ts"], true)] },
+  "providers:live": {
+    description: "Opt-in real provider health, capability, and read-only turn smoke",
+    steps: [bunStep("live provider smoke", ["run", "scripts/live-provider-smoke.ts"], true)],
+  },
 };
 
 const BUILD_BINARY_COMMANDS = Object.fromEntries(

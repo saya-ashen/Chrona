@@ -185,7 +185,7 @@ export const providerCapabilityMatrix = [
 			startRun: true,
 			streamEvents: true,
 			cancelActiveRun: true,
-			approvalBridge: true,
+			approvalBridge: false,
 			toolTraces: true,
 			structuredOutput: true,
 			engineManagedToolResults: false,

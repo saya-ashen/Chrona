@@ -162,4 +162,20 @@ describe("Claude Code health probe", () => {
 
     await expect(probeClaudeCodeSdk({ config: { mcpBaseUrl: "http://unused.test", mcpRunToken: "" }, timeoutMs: 1000 })).resolves.toContain("invalid auth");
   });
+
+  test("surfaces a redacted provider error when the SDK labels it success", async () => {
+    nextQueryMessages = [{
+      type: "result",
+      subtype: "success",
+      is_error: true,
+      result: "Failed to authenticate with sk-live-sensitive-token: OAuth access token has been revoked.",
+    }];
+
+    const reason = await probeClaudeCodeSdk({
+      config: { mcpBaseUrl: "http://unused.test", mcpRunToken: "" },
+      timeoutMs: 1000,
+    });
+    expect(reason).toContain("access token has been revoked");
+    expect(reason).not.toContain("sk-live-sensitive-token");
+  });
 });
