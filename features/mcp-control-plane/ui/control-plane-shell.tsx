@@ -84,6 +84,26 @@ function completedAtFromPreference(
 		: null;
 }
 
+function hasEnabledPlanningClient(config: TaskCreateConfig): boolean {
+	return config.availableAiClients?.some(
+		(client) => client.enabled && client.type === "omp",
+	) === true;
+}
+
+async function requestInitialTaskPlan(taskId: string): Promise<void> {
+	await apiJson(`/api/work/${encodeURIComponent(taskId)}/commands`, {
+		method: "POST",
+		body: JSON.stringify({
+			type: "plan.generate",
+			forceRefresh: true,
+			idempotencyKey: uuidv4(),
+			userInstruction: null,
+			workBlockId: null,
+			selectedNodeId: null,
+		}),
+	});
+}
+
 export function ControlPlaneShell({
 	children,
 	defaultWorkspace: _defaultWorkspace,
@@ -469,6 +489,14 @@ export function ControlPlaneShell({
 						});
 						if (typeof created.taskId === "string") {
 							setCreatedOnboardingTaskId(created.taskId);
+							if (
+								hasEnabledPlanningClient(taskCreateConfig) &&
+								(input.autoPlanGenerationEnabled || input.autoExecute)
+							) {
+								// Creation already succeeded. Keep the task usable if command
+								// dispatch is interrupted; its workspace still exposes Generate.
+								await requestInitialTaskPlan(created.taskId).catch(() => undefined);
+							}
 						}
 						revalidate();
 					} finally {

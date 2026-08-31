@@ -332,6 +332,12 @@ export async function stopTaskPlanGenerationSession(
 		phase: "idle",
 		connected: false,
 	}));
+	storeBindingsByKey.get(key)?.store.update({
+		"/plan/status": "idle",
+		"/plan/generation/status": "cancelled",
+		"/plan/generation/is-running": false,
+		"/plan/generation/header-action-disabled": false,
+	});
 
 	const query = workBlockId
 		? `?workBlockId=${encodeURIComponent(workBlockId)}`
@@ -350,6 +356,12 @@ export async function stopTaskPlanGenerationSession(
 			error:
 				error instanceof Error ? error.message : "Failed to stop generation",
 		}));
+		storeBindingsByKey.get(key)?.store.update({
+			"/plan/status": "generating",
+			"/plan/generation/status": "running",
+			"/plan/generation/is-running": true,
+			"/plan/generation/header-action-disabled": true,
+		});
 		throw error;
 	}
 }

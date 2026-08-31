@@ -8,6 +8,7 @@ import type {
 } from "@modelcontextprotocol/sdk/types.js";
 import type { RequestHandlerExtra } from "@modelcontextprotocol/sdk/shared/protocol.js";
 import {
+	handleControlAction,
 	validateRevokedRunToken,
 	validateRunToken,
 	type ChronaEngine,
@@ -17,8 +18,10 @@ import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
 import { createLogger } from "@chrona/logging";
 import { z } from "zod";
 import {
+	agentControlActionBodySchema,
 	chronaPublicToolPayloadSchemas,
 	chronaToolInputSchema,
+	type AgentControlActionKind,
 	type ChronaToolName,
 	type ChronaToolResult,
 } from "@chrona/contracts";
@@ -247,6 +250,15 @@ const externalTools = {
 			chronaPublicToolPayloadSchemas["chrona.node.block"],
 		),
 	},
+	chrona_node_request_input: {
+		internalName: "chrona.node.request_input",
+		title: "Chrona Node Request Input",
+		description:
+			"Pause the current node for genuine missing user input. Chrona resolves the active node from the session.",
+		inputSchema: publicToolSchema(
+			chronaPublicToolPayloadSchemas["chrona.node.request_input"],
+		),
+	},
 	chrona_node_fail: {
 		internalName: "chrona.node.fail",
 		title: "Chrona Node Fail",
@@ -274,6 +286,28 @@ const externalTools = {
 		inputSchema: z.ZodObject;
 	}
 >;
+
+const TERMINAL_CONTROL_KINDS = {
+	"chrona.node.complete": "complete",
+	"chrona.node.condition_select": "condition_select",
+	"chrona.node.wait_complete": "wait_complete",
+	"chrona.node.block": "block",
+	"chrona.node.request_input": "request_input",
+	"chrona.node.fail": "fail",
+} as const satisfies Partial<Record<ChronaToolName, AgentControlActionKind>>;
+
+type RunTokenMcpControl = {
+	token: string;
+	workspaceId: string;
+};
+
+function terminalControlKind(
+	toolName: ChronaToolName,
+): AgentControlActionKind | undefined {
+	return TERMINAL_CONTROL_KINDS[
+		toolName as keyof typeof TERMINAL_CONTROL_KINDS
+	];
+}
 
 function sessionIdFrom(
 	input: Record<string, unknown>,
@@ -527,6 +561,41 @@ function toolNotAllowedResult(toolName: ChronaToolName): CallToolResult {
 	};
 }
 
+async function callRunTokenTerminalTool(input: {
+	toolName: ChronaToolName;
+	kind: AgentControlActionKind;
+	arguments: Record<string, unknown>;
+	control: RunTokenMcpControl;
+	extra?: RequestHandlerExtra<ServerRequest, ServerNotification>;
+	requestSessionId?: string;
+}): Promise<CallToolResult> {
+	const { payload } = toChronaInput(
+		input.toolName,
+		input.arguments,
+		input.extra,
+		input.requestSessionId,
+	);
+	const outcome = await handleControlAction({
+		token: input.control.token,
+		body: agentControlActionBodySchema.parse({ kind: input.kind, payload }),
+		workspaceId: input.control.workspaceId,
+	});
+	const message = outcome.alreadyAccepted
+		? `Chrona had already accepted the ${input.kind} terminal action.`
+		: `Chrona accepted the ${input.kind} terminal action.`;
+	return {
+		content: [{ type: "text", text: message }],
+		structuredContent: {
+			status: "accepted",
+			message,
+			next: "stop",
+			kind: outcome.kind,
+			recorded: outcome.recorded,
+			alreadyAccepted: outcome.alreadyAccepted,
+		},
+	};
+}
+
 async function callChronaTool(
 	engine: ChronaEngine,
 	toolName: ChronaToolName,
@@ -567,6 +636,7 @@ function createChronaMcpServer(
 	engine: ChronaEngine,
 	requestSessionId?: string,
 	terminalOnly = false,
+	runTokenControl?: RunTokenMcpControl,
 ) {
 	const server = new McpServer({ name: "chrona", version: "0.1.0" });
 
@@ -618,14 +688,26 @@ function createChronaMcpServer(
 			(
 				input: unknown,
 				extra: RequestHandlerExtra<ServerRequest, ServerNotification>,
-			) =>
-				callChronaTool(
+			) => {
+				const controlKind = terminalControlKind(toolName);
+				if (runTokenControl && controlKind) {
+					return callRunTokenTerminalTool({
+						toolName,
+						kind: controlKind,
+						arguments: input as Record<string, unknown>,
+						control: runTokenControl,
+						extra,
+						requestSessionId,
+					});
+				}
+				return callChronaTool(
 					engine,
 					toolName,
 					input as Record<string, unknown>,
 					extra,
 					requestSessionId,
-				),
+				);
+			},
 		);
 	}
 
@@ -660,6 +742,15 @@ async function handleExistingMcpTransport(
 		return c.body(null, 408);
 	}
 	return transport.transport.handleRequest(c.req.raw);
+}
+
+function runTokenMcpControl(
+	auth: McpAuthIdentity,
+	authorization: string | undefined,
+): RunTokenMcpControl | undefined {
+	if (auth.kind !== "run-token" || !auth.runTokenScope) return undefined;
+	const token = bearerToken(authorization);
+	return token ? { token, workspaceId: auth.runTokenScope.workspaceId } : undefined;
 }
 
 export function createMcpRoutes(engine: ChronaEngine, options: McpRouteOptions = {}) {
@@ -723,10 +814,15 @@ export function createMcpRoutes(engine: ChronaEngine, options: McpRouteOptions =
 				closeManagedTransport(transports, transport.sessionId, "aborted");
 		};
 		c.req.raw.signal.addEventListener("abort", abort, { once: true });
+		const runTokenControl = runTokenMcpControl(
+			auth,
+			c.req.header("authorization"),
+		);
 		const server = createChronaMcpServer(
 			engine,
 			requestSessionId,
 			terminalOnly,
+			runTokenControl,
 		);
 		await server.connect(transport);
 		return transport.handleRequest(c.req.raw);
