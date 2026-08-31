@@ -25,6 +25,7 @@ export const buildTargets = {
     releaseName: "chrona-linux-x64",
     binaryName: "chrona",
     executable: true,
+    linuxInterpreter: "/lib64/ld-linux-x86-64.so.2",
     nativePackage: "@oh-my-pi/pi-natives-linux-x64",
   },
   "linux-arm64": {
@@ -32,6 +33,7 @@ export const buildTargets = {
     releaseName: "chrona-linux-arm64",
     binaryName: "chrona",
     executable: true,
+    linuxInterpreter: "/lib/ld-linux-aarch64.so.1",
     nativePackage: "@oh-my-pi/pi-natives-linux-arm64",
   },
   "darwin-x64": {

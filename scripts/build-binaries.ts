@@ -5,6 +5,7 @@ import { chmod, cp, mkdir, readdir, rm, stat } from "node:fs/promises";
 import { basename, dirname, resolve } from "node:path";
 
 import { buildArtifacts, buildTargets, parseBuildTarget, type BuildTargetName, type ReleaseResource } from "../build/manifest";
+import { normalizeElfInterpreterFile } from "../build/portable-elf";
 
 const ROOT = resolve(import.meta.dirname, "..");
 
@@ -103,6 +104,15 @@ export async function buildBinary(target: BuildTargetName) {
 
   log("compile", "Compiling binary from TypeScript source...");
   await $`bun ${compileArgs(target, binaryPath)}`.cwd(ROOT);
+
+  if ("linuxInterpreter" in manifestTarget) {
+    const interpreter = await normalizeElfInterpreterFile(binaryPath, manifestTarget.linuxInterpreter);
+    if (interpreter.changed) {
+      log("portable", `Normalized ELF interpreter ${interpreter.previousInterpreter} → ${manifestTarget.linuxInterpreter}`);
+    } else {
+      log("portable", `ELF interpreter already portable: ${manifestTarget.linuxInterpreter}`);
+    }
+  }
 
   if (manifestTarget.executable) {
     await chmod(binaryPath, 0o755);
