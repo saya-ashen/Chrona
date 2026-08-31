@@ -66,6 +66,7 @@ export interface NodeRuntimeInput {
   };
   context: {
     taskTitle?: string;
+    taskDescription?: string;
     plan: {
       title: string;
       goal: string;

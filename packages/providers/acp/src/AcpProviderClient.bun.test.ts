@@ -374,6 +374,10 @@ describe("AcpProviderClient", () => {
 				sessionId: "chrona-session",
 				sessionKey: "chrona:task:task-1:plan-generation",
 				terminalToolName: "terminal_result",
+				control: {
+					baseUrl: "http://chrona.test/api",
+					runToken: "run-token",
+				},
 			}),
 		);
 		const streamed = [];
@@ -394,9 +398,17 @@ describe("AcpProviderClient", () => {
 				},
 			],
 		});
+		for (const event of streamed) {
+			expect(event).toMatchObject({
+				provider: "test_acp",
+				runId: run.runId,
+				sessionId: "chrona-session",
+			});
+		}
 		expect(streamed.at(-1)).toMatchObject({
 			type: "run_completed",
 			provider: "test_acp",
+			nativeSessionId: "native-acp-session-1",
 		});
 	});
 
@@ -481,10 +493,14 @@ describe("AcpProviderClient", () => {
 				},
 			],
 		});
-		expect(run.sessionId).toBe("native-acp-session-prior");
+		expect(run).toMatchObject({
+			sessionId: "chrona-session",
+			nativeSessionId: "native-acp-session-prior",
+		});
 		expect(streamed.at(-1)).toMatchObject({
 			type: "run_completed",
-			sessionId: "native-acp-session-prior",
+			sessionId: "chrona-session",
+			nativeSessionId: "native-acp-session-prior",
 		});
 	});
 
@@ -528,10 +544,14 @@ describe("AcpProviderClient", () => {
 		).toMatchObject({
 			sessionId: syntheticClaudeRef,
 		});
-		expect(run.sessionId).toBe(syntheticClaudeRef);
+		expect(run).toMatchObject({
+			sessionId: "chrona-session",
+			nativeSessionId: syntheticClaudeRef,
+		});
 		expect(streamed.at(-1)).toMatchObject({
 			type: "run_completed",
-			sessionId: syntheticClaudeRef,
+			sessionId: "chrona-session",
+			nativeSessionId: syntheticClaudeRef,
 		});
 	});
 
@@ -641,6 +661,60 @@ describe("AcpProviderClient", () => {
 					event.type === "tool_completed" && event.toolName === terminalTool,
 			),
 		).toBe(true);
+	});
+
+	it("completes when Chrona records the terminal action before aborting ACP", async () => {
+		const terminalTool = "chrona_node_complete";
+		const controller = new AbortController();
+		const transport = new FakeAcpTransport({
+			updates: [
+				{
+					kind: "session_update",
+					update: {
+						sessionUpdate: "tool_call_update",
+						toolCallId: "call-terminal",
+						title: terminalTool,
+						rawInput: {
+							server: "chrona",
+							tool: terminalTool,
+							arguments: { summary: "Done" },
+						},
+						status: "completed",
+					},
+				},
+				{
+					kind: "stop",
+					stopReason: "cancelled",
+					response: { stopReason: "cancelled" },
+				},
+			],
+		});
+		const client = new AcpProviderClient({ config: config(), transport });
+		const run = await client.startRun(
+			baseInput({ terminalToolName: terminalTool, signal: controller.signal }),
+		);
+		const streamed: ProviderRunEvent[] = [];
+
+		for await (const event of client.streamRun({ runId: run.runId })) {
+			streamed.push(event);
+			if (event.type === "tool_call" && event.tool === terminalTool) {
+				controller.abort("Chrona terminal action recorded");
+			}
+		}
+
+		expect(streamed.map((event) => event.type)).toEqual([
+			"run_started",
+			"tool_call",
+			"tool_completed",
+			"run_completed",
+		]);
+		expect(streamed.at(-1)).toMatchObject({
+			type: "run_completed",
+			terminalToolCall: {
+				name: terminalTool,
+				input: { summary: "Done" },
+			},
+		});
 	});
 
 	it("cancels known runs through ACP session cancel", async () => {

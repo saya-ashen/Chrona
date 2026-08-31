@@ -5,10 +5,10 @@ import { AI_FEATURES, releasedProviderTypes } from "@chrona/contracts";
 import { json } from "../lib/http";
 
 function isDebugProviderEnabled() {
-  return (
-    process.env.NODE_ENV === "development"
-    || process.env.CHRONA_ENABLE_DEBUG_PROVIDER === "true"
-  );
+  // Bun compile can fold NODE_ENV as development in a packaged binary. Keep
+  // the debug provider behind one explicit runtime opt-in so fresh releases
+  // never expose it accidentally.
+  return process.env.CHRONA_ENABLE_DEBUG_PROVIDER === "true";
 }
 
 function getRuntimeLabel(key: string) {

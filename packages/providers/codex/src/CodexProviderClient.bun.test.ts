@@ -300,9 +300,17 @@ describe("CodexProviderClient", () => {
     expect(transport.requests.find((request) => request.method === "session/load")?.params).toMatchObject({
       sessionId: syntheticLookingRef,
     });
-    expect(run.provider).toBe("codex");
-    expect(run.sessionId).toBe(syntheticLookingRef);
-    expect(streamed.at(-1)).toMatchObject({ type: "run_completed", provider: "codex", sessionId: syntheticLookingRef });
+    expect(run).toMatchObject({
+      provider: "codex",
+      sessionId: "codex-session-1",
+      nativeSessionId: syntheticLookingRef,
+    });
+    expect(streamed.at(-1)).toMatchObject({
+      type: "run_completed",
+      provider: "codex",
+      sessionId: "codex-session-1",
+      nativeSessionId: syntheticLookingRef,
+    });
   });
 
 

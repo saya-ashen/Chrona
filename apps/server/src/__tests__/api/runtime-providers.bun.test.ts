@@ -8,8 +8,7 @@ import { createApiRouter } from "../../routes/api";
 // list of released runtimes (optionally Debug) with display labels.
 // Pinned cases:
 //   - Hermes remains implemented but is hidden until certified
-//   - debug is hidden unless CHRONA_ENABLE_DEBUG_PROVIDER or
-//     NODE_ENV=development
+//   - debug is hidden unless CHRONA_ENABLE_DEBUG_PROVIDER=true
 //   - shape: { providers: [{ key, label }] }
 
 function app() {
@@ -64,7 +63,7 @@ describe("GET /api/runtime/providers", () => {
     const previous = process.env.CHRONA_ENABLE_DEBUG_PROVIDER;
     delete process.env.CHRONA_ENABLE_DEBUG_PROVIDER;
     const previousNodeEnv = process.env.NODE_ENV;
-    process.env.NODE_ENV = "test";
+    process.env.NODE_ENV = "development";
 
     try {
       const res = await app().request("http://local/api/runtime/providers");

@@ -3,6 +3,7 @@ import { collectProviderRunSnapshot } from "./ai-runtime-stream-collection";
 import { persistRuntimeRunRef, updateProviderRunRecord } from "./ai-runtime-persistence";
 import { toStartRunInput, type ExecutionProviderRequest } from "./ai-runtime-request";
 import { persistProviderRuntimeEvent, type RuntimeEventPersistenceContext } from "./ai-runtime-event-persistence";
+import { latestRecordedTerminalAction } from "./runtime/agent-control-store";
 
 const TRANSIENT_PROVIDER_ERROR_CODES = new Set(["aborted", "network_error", "provider_error", "rate_limited", "incomplete_stream"]);
 const PROVIDER_RETRY_BACKOFF_MS = 1_000;
@@ -42,11 +43,68 @@ export async function runProviderRequest(
       snapshot = preserveProviderIdentity(await cancel(), snapshot);
     }
   } catch (error) {
-    if (!isTransientProviderError(error)) throw error;
-    snapshot = await resumeOrReconcileProviderRun(providerClient, run, options, cancel);
+    snapshot = await recoverProviderRequest(providerClient, run, options, cancel, error);
   }
+  snapshot =
+    (await snapshotFromRecordedTerminalAction(providerClient.provider, run, options))
+    ?? snapshot;
   await publishProviderResponseEvent(providerClient.provider, run, snapshot, options);
   return snapshot;
+}
+
+async function recoverProviderRequest(
+  providerClient: ProviderClient,
+  run: ProviderRunRef,
+  options: ProviderRunRequestOptions,
+  cancel: () => Promise<ProviderRunSnapshot>,
+  error: unknown,
+): Promise<ProviderRunSnapshot> {
+  const recorded = await snapshotFromRecordedTerminalAction(
+    providerClient.provider,
+    run,
+    options,
+  );
+  if (recorded) return recorded;
+  if (!isTransientProviderError(error)) throw error;
+  return resumeOrReconcileProviderRun(providerClient, run, options, cancel);
+}
+
+async function snapshotFromRecordedTerminalAction(
+  provider: string,
+  run: ProviderRunRef,
+  options: ProviderRunRequestOptions,
+): Promise<ProviderRunSnapshot | null> {
+  if (!options.runId || !options.eventPersistence?.nodeAttemptId || !options.terminalToolName) {
+    return null;
+  }
+  const action = await latestRecordedTerminalAction({
+    runId: options.runId,
+    nodeAttemptId: options.eventPersistence.nodeAttemptId,
+  });
+  if (!action) return null;
+  const payload = action.payload && typeof action.payload === "object" && !Array.isArray(action.payload)
+    ? action.payload as Record<string, unknown>
+    : {};
+  const outputText = [payload.summary, payload.reason, payload.error]
+    .find((value): value is string => typeof value === "string" && value.trim().length > 0);
+  return {
+    provider,
+    runId: run.runId,
+    nativeRunId: run.nativeRunId,
+    sessionId: run.sessionId,
+    nativeSessionId: run.nativeSessionId,
+    status: "completed",
+    ...(outputText ? { outputText } : {}),
+    error: null,
+    raw: {
+      terminalActionRecorded: true,
+      terminalTool: {
+        name: options.terminalToolName,
+        callId: `recorded:${action.id}`,
+        input: payload,
+      },
+    },
+  };
 }
 
 async function attachProviderRun(providerClient: ProviderClient, request: ExecutionProviderRequest, options: ProviderRunRequestOptions): Promise<ProviderRunRef> {

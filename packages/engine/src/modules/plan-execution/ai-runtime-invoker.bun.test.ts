@@ -838,9 +838,128 @@ describe("runProviderRequest runtime ref persistence", () => {
 
     const snapshot = await runProviderRequest(client, request);
 
-    expect(snapshot.raw).toMatchObject({
+    expect(snapshot.raw).toEqual({
       terminalToolName: "chrona_node_complete",
     });
+  });
+
+  it("preserves terminal tool input carried by the provider terminal event", async () => {
+    const client = {
+      provider: "claude_code",
+      getCapabilities: () => providerCapabilities(),
+      startRun: mock(async () => runRef({ provider: "claude_code" })),
+      streamRun: mock(() =>
+        (async function* () {
+          yield providerEvent({
+            type: "run_completed",
+            provider: "claude_code",
+            runId: "run-1",
+            sessionId: "session-1",
+            run: {
+              provider: "claude_code",
+              runId: "run-1",
+              nativeRunId: "native-run-1",
+              sessionId: "session-1",
+              status: "completed",
+            },
+            outputText: "done",
+            terminalToolCall: {
+              name: "chrona_node_complete",
+              callId: "complete-1",
+              input: { summary: "done" },
+            },
+          }, runRef({ provider: "claude_code" }));
+        })(),
+      ),
+    } as unknown as AgentProviderClient;
+
+    const snapshot = await runProviderRequest(client, request);
+
+    expect(snapshot.raw).toEqual({
+      terminalTool: {
+        name: "chrona_node_complete",
+        callId: "complete-1",
+        input: { summary: "done" },
+      },
+    });
+  });
+
+  it("recovers a provider stream failure from the durable terminal action", async () => {
+    const { workspace, task, plan, planRun, attempt, providerRun, run, taskSession } =
+      await seedProviderRunChain();
+    await db.taskPlanTerminalAction.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        runId: run.id,
+        taskSessionId: taskSession.id,
+        runtimeSessionKey: taskSession.sessionKey,
+        nodeId: attempt.nodeId,
+        nodeAttemptId: attempt.id,
+        kind: "complete",
+        payload: { summary: "Durably recorded completion" },
+      },
+    });
+    const started = runRef({
+      provider: "codex",
+      runId: "codex-recorded-terminal-run",
+      sessionId: "codex-recorded-terminal-session",
+    });
+    const client = {
+      provider: "codex",
+      getCapabilities: () => providerCapabilities(),
+      startRun: mock(async () => started),
+      streamRun: mock(() =>
+        (async function* () {
+          for (const event of [] as ProviderRunEvent[]) yield event;
+          throw Object.assign(new Error("ACP stream aborted"), {
+            code: "aborted",
+            retryable: true,
+          });
+        })(),
+      ),
+    } as unknown as AgentProviderClient;
+
+    const snapshot = await runProviderRequest(client, {
+      ...request,
+      provider: "codex",
+      sessionId: started.sessionId,
+      sessionKey: started.sessionId,
+      terminalToolName: "chrona_node_complete",
+    }, {
+      runId: run.id,
+      providerRunRecordId: providerRun.id,
+      terminalToolName: "chrona_node_complete",
+      eventPersistence: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        workBlockId: null,
+        occurrenceId: null,
+        runId: run.id,
+        runtimeName: "codex",
+        taskSessionId: taskSession.id,
+        executionSessionId: `execution-session-${task.id}`,
+        nodeAttemptId: providerRun.nodeAttemptId,
+        providerRunId: providerRun.id,
+        planId: plan.planId,
+        planRunId: providerRun.planRunId,
+        executionScope: planRun.executionScopeId,
+      },
+    });
+
+    expect(snapshot).toMatchObject({
+      provider: "codex",
+      status: "completed",
+      outputText: "Durably recorded completion",
+      raw: {
+        terminalActionRecorded: true,
+        terminalTool: {
+          name: "chrona_node_complete",
+          input: { summary: "Durably recorded completion" },
+        },
+      },
+    });
+    expect(client.streamRun).toHaveBeenCalledTimes(1);
   });
 
   it("returns cancelled snapshot and closes provider audit rows from run_cancelled events", async () => {
@@ -1011,6 +1130,111 @@ describe("runProviderRequest runtime ref persistence", () => {
     expect(snapshot.nativeSessionId).toBe(nativeSessionId);
     expect(cancelRun).not.toHaveBeenCalled();
     expect(client.streamRun).toHaveBeenCalledTimes(1);
+  });
+
+  it("completes from a recorded terminal tool when provider streaming aborts", async () => {
+    const controller = new AbortController();
+    const initialRun = runRef({
+      provider: "codex",
+      runId: "codex-terminal-run",
+      nativeRunId: "codex-terminal-run",
+      sessionId: "logical-session",
+    });
+    const client = {
+      provider: "codex",
+      getCapabilities: () => providerCapabilities(),
+      startRun: mock(async () => initialRun),
+      streamRun: mock(() =>
+        (async function* () {
+          yield providerEvent({
+            type: "tool_call",
+            tool: "chrona_node_complete",
+            callId: "complete-codex",
+            input: { summary: "Codex complete" },
+            status: "completed",
+          }, initialRun);
+          controller.abort("Chrona terminal action recorded");
+          throw Object.assign(new Error("ACP stream aborted"), {
+            code: "aborted",
+            retryable: true,
+          });
+        })(),
+      ),
+    } as unknown as AgentProviderClient;
+
+    const snapshot = await runProviderRequest(client, {
+      ...request,
+      provider: "codex",
+      sessionId: "logical-session",
+      sessionKey: "logical-session",
+      terminalToolName: "chrona_node_complete",
+    }, {
+      signal: controller.signal,
+      terminalToolName: "chrona_node_complete",
+    });
+
+    expect(snapshot).toMatchObject({
+      provider: "codex",
+      status: "completed",
+      outputText: "Codex complete",
+      raw: {
+        terminalActionRecorded: true,
+        terminalTool: {
+          name: "chrona_node_complete",
+          input: { summary: "Codex complete" },
+        },
+      },
+    });
+  });
+
+  it("completes when a terminal-action-aborted provider stream ends without a terminal event", async () => {
+    const controller = new AbortController();
+    const initialRun = runRef({
+      provider: "codex",
+      runId: "codex-terminal-ended-run",
+      nativeRunId: "codex-terminal-ended-run",
+      sessionId: "logical-session",
+    });
+    const client = {
+      provider: "codex",
+      getCapabilities: () => providerCapabilities(),
+      startRun: mock(async () => initialRun),
+      streamRun: mock(() =>
+        (async function* () {
+          yield providerEvent({
+            type: "tool_call",
+            tool: "chrona_node_complete",
+            callId: "complete-codex-ended",
+            input: { summary: "Codex ended complete" },
+            status: "pending",
+          }, initialRun);
+          setTimeout(
+            () => controller.abort("Chrona terminal action recorded"),
+            10,
+          );
+        })(),
+      ),
+    } as unknown as AgentProviderClient;
+
+    const snapshot = await runProviderRequest(client, {
+      ...request,
+      provider: "codex",
+      sessionId: "logical-session",
+      sessionKey: "logical-session",
+      terminalToolName: "chrona_node_complete",
+    }, {
+      signal: controller.signal,
+      terminalToolName: "chrona_node_complete",
+    });
+
+    expect(snapshot).toMatchObject({
+      status: "completed",
+      outputText: "Codex ended complete",
+      raw: {
+        terminalActionRecorded: true,
+        terminalTool: { name: "chrona_node_complete" },
+      },
+    });
   });
 
   it("cancels the provider run when the execution signal aborts during streaming", async () => {

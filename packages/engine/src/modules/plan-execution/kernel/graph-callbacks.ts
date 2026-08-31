@@ -35,6 +35,10 @@ export function createKernelGraphCallbacks(
     title: compiledPlan.title,
     goal: compiledPlan.goal,
     assumptions: compiledPlan.assumptions,
+    taskTitle: input.taskContext.title,
+    ...(input.taskContext.description
+      ? { taskDescription: input.taskContext.description }
+      : {}),
     ...(input.planSummary ? { summary: input.planSummary } : {}),
     ...(input.goalContext ? { goalContext: input.goalContext } : {}),
   };

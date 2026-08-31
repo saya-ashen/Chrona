@@ -107,7 +107,7 @@ Chrona stores AI clients and feature bindings in the database. Chrona does not s
 - `omp`: Stable / Tier-1 in-process SDK adapter and default first-run provider. It supports `task.plan`, `task.execution`, `dashboard.brief`, and `goal.review`, plus local result finalization. Session history resumes where available. Its terminal-only read-only starts run once; an uncertain interruption is never auto-replayed and requires an explicit new operation. Its configuration check resolves SDK/model setup only; use the five-minute demo provider request to prove remote credentials and model access.
 - `claude_code`: Beta adapter; do not rely on it for the stable five-minute first-run path yet.
 - `codex`: Beta ACP adapter; do not rely on it for the stable five-minute first-run path yet.
-- `hermes`: Experimental adapter for existing gateway setups; its setup/config flow is not stable-release evidence yet.
+- `hermes`: Implemented internally but hidden from production Settings until its setup and conformance flow is release-certified.
 
 Feature bindings decide which client handles which capability. Product-oriented bindings include `task.plan`, `task.execution`, and `dashboard.brief`; lower-level feature slots such as `suggest`, `generate_plan`, `conflicts`, `timeslots`, `chat`, and `dispatch_task` remain available where needed.
 
@@ -147,7 +147,7 @@ Common fields:
 | --- | --- | --- |
 | Model | Codex model passed through provider config | Optional |
 | API key | OpenAI/Codex API key | Optional; also passed as `CODEX_API_KEY` and `OPENAI_API_KEY` for the provider process |
-| Base URL | OpenAI-compatible gateway URL | Optional |
+| Base URL | OpenAI Responses-compatible gateway URL | Optional |
 | Config directory | Codex home directory | Optional; empty means default user-level `CODEX_HOME` (`~/.codex`) |
 | Working directory | Filesystem scope for the run | Optional; defaults to the Chrona process working directory |
 | MCP base URL | Chrona `/api/mcp` server URL | Defaults to the current Chrona server |

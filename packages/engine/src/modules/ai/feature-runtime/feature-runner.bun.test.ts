@@ -237,6 +237,44 @@ describe("runAiFeature durable lifecycle", () => {
     expect(instructions).toContain("Never prefix a path with /data");
   });
 
+  it("accepts envelope-relative /data evidence paths as frozen-data aliases", async () => {
+    const runs = fakeRuns();
+    const provider: AiFeatureProviderPort = {
+      capabilities: { startRecovery: "single_attempt_read_only", actionInvocation: "unsupported" },
+      async startOrAttach() {
+        return {
+          kind: "terminal" as const,
+          providerRunRef: "envelope-relative-evidence-run",
+          providerResumeRef: "envelope-relative-evidence-resume",
+          candidate: {
+            status: "completed",
+            output: { answer: "Done" },
+            artifacts: [],
+            evidence: [{ observationId: "observation-1", path: "/data/source" }],
+            proposedActions: [{
+              proposalId: "proposal-1",
+              action: { id: "test.apply", version: 1 },
+              input: {},
+              rationale: "Use the frozen source.",
+              evidence: [{ observationId: "observation-1", path: "/data/source" }],
+            }],
+          },
+        };
+      },
+      async resume() { throw new Error("Single-attempt read-only providers cannot resume."); },
+      async submitActionResult() { throw new Error("Single-attempt read-only providers cannot submit actions."); },
+    };
+
+    const result = await runAiFeature(request(), {
+      runs,
+      provider,
+      clock: () => new Date(at),
+      ids: { next: () => "run-envelope-relative-evidence" },
+    });
+
+    expect(result.status).toBe("completed");
+  });
+
   it("fails an interrupted single-attempt start closed without another provider call", async () => {
     const runs = fakeRuns();
     const definition = testFeature();

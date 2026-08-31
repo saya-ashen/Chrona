@@ -183,6 +183,8 @@ describe("node runtime refs", () => {
 				goal: "Create a weather automation agent.",
 				assumptions: ["Use available public weather APIs."],
 				summary: "Build and verify the agent.",
+				taskTitle: "Summarize the supplied weather requirements",
+				taskDescription: "Use only London, Paris, and Berlin.",
 			},
 			runContext: {
 				planningPrompt: "Original user planning request",
@@ -206,6 +208,12 @@ describe("node runtime refs", () => {
 			assumptions: ["Use available public weather APIs."],
 			summary: "Build and verify the agent.",
 		});
+		expect(firstInput.context.taskTitle).toBe(
+			"Summarize the supplied weather requirements",
+		);
+		expect(firstInput.context.taskDescription).toBe(
+			"Use only London, Paris, and Berlin.",
+		);
 		expect(firstInput.context.run).toEqual({
 			planningPrompt: "Original user planning request",
 			startPrompt: "Start now",
@@ -378,6 +386,9 @@ describe("node runtime refs", () => {
 		);
 		expect(runtime.instructions).toContain(
 			"Call chrona_execution_read only after",
+		);
+		expect(runtime.instructions).toContain(
+			"context.taskTitle and context.taskDescription as the authoritative user request",
 		);
 		expect(runtime.instructions).toContain(
 			"complete metadata-only catalog captured when this Task was created",

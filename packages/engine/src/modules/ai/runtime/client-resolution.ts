@@ -22,6 +22,15 @@ export async function getAiClientForTask(input: {
     | "goal.asset_ownership"
     | "goal.review";
 }): Promise<EngineAiClient | null> {
+  // Planning and final result composition are durable Feature Runtime
+  // operations. Their providers are selected independently from the task's
+  // execution client. This lets a task execute with Claude Code or Codex while
+  // OMP produces the reviewable plan and validated result presentation, and it
+  // prevents execution-only clients from being invoked for unsupported roles.
+  if (input.purpose === "task.plan" || input.purpose === "task.result_finalization") {
+    return getAiClientForFeature(input.purpose);
+  }
+
   const task = await db.task.findUnique({ where: { id: input.taskId }, select: { aiClientId: true } });
   return task?.aiClientId ? getAiClient(task.aiClientId) : getAiClientForFeature(input.purpose);
 }

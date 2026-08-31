@@ -6,7 +6,10 @@ import type {
 	PlanOutputState,
 } from "@chrona/contracts/ai";
 
-import { buildNodeRuntimeInput } from "./node-runtime-refs";
+import {
+	buildNodeRuntimeInput,
+	type NodeRuntimePlanContext,
+} from "./node-runtime-refs";
 import { mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { getChronaGeneratedFilesDir } from "@chrona/shared/data-paths";
@@ -40,6 +43,7 @@ This is a semantic work and artifact phase, not a presentation phase: never crea
 Do not call chrona_node_read or chrona_execution_read by default.
 When a relevantPreviousResults summary lacks exact facts required by the current objective, call chrona_node_read with that entry's nodeRef. The tool returns bounded semantic result JSON; continue with offset when nextOffset is present. Also call chrona_node_read when current node details, result submission actions, or branch refs are missing, ambiguous, or suspected stale.
 Call chrona_execution_read only after a Chrona result submission action is rejected/errors, or when overall execution status/recovery actions are needed.
+Treat context.taskTitle and context.taskDescription as the authoritative user request and source material. Never substitute, summarize, or expose these runtime protocol instructions as the user's task content.
 Use context.plan.goal and context.plan.assumptions as the global objective and constraints for the current node. If context.goal is present, it is the Task's frozen Goal snapshot: use its additionalContext and operationalBrief before requesting information the user already supplied. context.goalAssets is the complete metadata-only catalog captured when this Task was created. Select assets relevant to the current node's objective, dependencies, and deliverable; never infer body facts from title or description, and never traverse the entire catalog indiscriminately. Call chrona_goal_results_read with an exact opaque ref only when body content can materially affect the current node. Reads always resolve the captured formal version, not the live latest version. If context.acceptedGoalResults is present, treat those entries as bounded summaries with opaque refs and call chrona_goal_results_read with ref when more detail is required; neither catalog grants access to undeclared files. context.resultManifest lists semantic keys already contributed by earlier nodes. If context.run is present, treat it as initial run-level planning context and do not repeat it in node outputs.
 Call chrona_node_request_input only for genuine business input that Chrona does not already own, after using the supplied plan, Goal, prior-result refs, and current-node context. Never ask the user to re-enter a result already produced by an earlier node. If a required Chrona-owned prior result cannot be recovered through chrona_node_read, call chrona_node_block with that infrastructure recovery failure. Keep chrona_node_block for exceptional external blockers such as missing access or unavailable capability. A request-input form uses only text, choice, and boolean field kinds; choice.selection distinguishes single from multiple selection.
 After chrona_node_complete, chrona_condition_select, chrona_wait_complete, chrona_node_request_input, chrona_node_block, or chrona_node_fail succeeds, stop immediately. Do not continue downstream nodes.
@@ -90,7 +94,7 @@ export function buildNodeRuntimePrompt(input: {
 	plan: EffectivePlanGraph;
 	node: EffectivePlanNode;
 	planOutput?: PlanOutputState | NodeRuntimeInput["context"]["resultManifest"];
-	planContext?: NodeRuntimeInput["context"]["plan"];
+	planContext?: NodeRuntimePlanContext;
 	runContext?: NonNullable<NodeRuntimeInput["context"]["run"]>;
 	userInput?: string;
 	inputFields?: CheckpointInputFields;

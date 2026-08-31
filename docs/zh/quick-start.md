@@ -73,8 +73,8 @@ bun run test:api
 
 1. 打开 `http://localhost:3101`。
 2. 打开 Settings / AI Clients。
-3. 需要 AI 计划生成或执行时，添加 AI client。主要本机 agent 执行路径选择 `Claude Code` 或 `Codex`。
-4. 将它绑定到 `task.plan`、`task.execution`、`dashboard.brief` 等产品功能。`generate_plan`、`suggest`、`chat`、`dispatch_task` 等较底层/旧 feature slot 仍可能出现在开发者语境中。
+3. 添加默认的 `OMP` AI client，并先运行可用性检查。OMP 是首个稳定版中唯一的 Tier-1 首次使用路径。
+4. 将 OMP 绑定到 `task.plan`；需要时可另配 `Claude Code` 或 `Codex` 负责 `task.execution`。任务选择的执行 client 不会替代独立的 Plan provider。
 5. 创建任务，并补充足够的执行上下文。
 6. 把任务放入日程。
 7. 在任务工作区生成计划。
@@ -86,9 +86,10 @@ bun run test:api
 
 Chrona 将 AI clients 与 feature bindings 存在数据库中。Chrona 当前没有内置模型 provider；使用 AI 功能前，需要先配置外部 provider client。
 
-- `claude_code`：主要支持 provider，通过作用域受限的 MCP control tools 进行 Claude Code 计划生成和任务执行。
-- `codex`：主要支持 provider，通过作用域受限的 MCP control tools 进行 Codex 计划生成和任务执行。
-- `hermes`：面向已有 Hermes gateway 配置的 adapter；provider 文档/配置流程还没有更新。
+- `omp`：Tier-1 / 稳定。负责文档中的首次使用路径、`task.plan`、`task.execution`、Goal review 与结果整理。
+- `claude_code`：Beta。当前作为 `task.execution` client 使用；Plan 仍由 `task.plan` 绑定的 provider 生成。
+- `codex`：Beta。当前作为 `task.execution` client 使用，要求 OpenAI Responses 兼容上游；Plan 仍由 `task.plan` 绑定的 provider 生成。
+- `hermes`：实现仍保留，但在生产 Settings 中隐藏，等待配置与一致性流程通过发布认证。
 
 Feature binding 决定哪个 client 处理哪个能力。产品功能包括 `task.plan`、`task.execution`、`dashboard.brief`；`suggest`、`generate_plan`、`conflicts`、`timeslots`、`chat`、`dispatch_task` 等较底层 feature slot 仍可在需要时使用。
 
@@ -118,7 +119,7 @@ Feature binding 决定哪个 client 处理哪个能力。产品功能包括 `tas
 | --- | --- | --- |
 | Model | 通过 provider config 传给 Codex 的模型 | 可选 |
 | API key | OpenAI/Codex API key | 可选；也会作为 `CODEX_API_KEY` 和 `OPENAI_API_KEY` 传给 provider 进程 |
-| Base URL | OpenAI-compatible gateway URL | 可选 |
+| Base URL | OpenAI Responses 兼容 gateway URL | 可选 |
 | Config directory | Codex home directory | 可选；留空表示使用默认用户级 `CODEX_HOME`（`~/.codex`） |
 | Working directory | 本次运行的文件系统作用域 | 可选；默认使用 Chrona 进程工作目录 |
 | MCP base URL | Chrona `/api/mcp` server URL | 默认使用当前 Chrona server |

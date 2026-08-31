@@ -156,7 +156,14 @@ export function stamp(
   const stamped: ProviderRunEvent = {
     ...event,
     provider: options.provider ?? "claude_code",
-    runId: options.baseRef?.runId,
+    ...(options.baseRef?.runId ? { runId: options.baseRef.runId } : {}),
+    ...(options.baseRef?.sessionId ? { sessionId: options.baseRef.sessionId } : {}),
+    ...(options.baseRef?.nativeRunId
+      ? { nativeRunId: options.baseRef.nativeRunId }
+      : {}),
+    ...(options.baseRef?.nativeSessionId
+      ? { nativeSessionId: options.baseRef.nativeSessionId }
+      : {}),
     sequence: ctx.sequence++,
   };
   const parsed = providerRunEventSchema.safeParse(stamped);

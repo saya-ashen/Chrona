@@ -87,6 +87,7 @@ export async function dispatchExecutionCommand(input: {
   const {
     trigger,
     runtime,
+    taskContext,
     goalContext,
     session,
     mainSession,
@@ -144,6 +145,7 @@ export async function dispatchExecutionCommand(input: {
       executionEpoch: runtime.persisted.executionEpoch,
       persisted: runtime.persisted,
       planSummary: runtime.planSummary,
+      taskContext,
       goalContext,
       initialRunContext: command.type === "start" || command.type === "restart_from_beginning"
         ? {

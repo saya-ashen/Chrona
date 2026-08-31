@@ -54,6 +54,10 @@ function executionReadiness(matrix: ProviderCapabilityMatrixEntry | undefined, c
   return { key: "execution", label: copy.readinessCapability, state, detail };
 }
 
+function requiresPlanningForAssignment(assignedToPlanning: boolean, assignedToExecution: boolean): boolean {
+  return assignedToPlanning || !assignedToExecution;
+}
+
 export function hasBasicConfig(type: AiClientType, values: Pick<ClientFormValues, "baseUrl" | "timeoutSeconds" | "hermesScope">): boolean {
   return type === "hermes" && values.hermesScope === "remote" ? Boolean(values.baseUrl.trim()) : Number(values.timeoutSeconds) > 0;
 }
@@ -69,7 +73,14 @@ function overallReadiness(input: ReadinessInput): ReadinessItem {
     providerReachable: input.testStatus === "available",
     planningCapable: assignedToPlanning && (matrix?.recovery.crossProcessDurable === true || matrix?.recovery.readOnlySingleAttempt === true),
     executionCapable: assignedToExecution,
-    requiresPlanning: true, autoExecute: true, hasAcceptedPlan: true, scheduledStartAt: new Date(0),
+    // Readiness follows the features this client actually owns. Execution-only
+    // clients rely on the separate task.plan binding and must not be marked
+    // broken merely because they cannot generate plans themselves. Keep an
+    // entirely unassigned client pending rather than presenting it as active.
+    requiresPlanning: requiresPlanningForAssignment(assignedToPlanning, assignedToExecution),
+    autoExecute: assignedToExecution,
+    hasAcceptedPlan: true,
+    scheduledStartAt: new Date(0),
   });
   return { key: "overall", label: readiness.readiness === "ready" ? input.copy.ready : input.copy.needsAttention, state: readiness.readiness === "ready" ? "ready" : "pending", detail: readiness.disabledReason ?? input.copy.readinessCapabilityDetail };
 }

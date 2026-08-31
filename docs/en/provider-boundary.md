@@ -32,9 +32,9 @@ For the first stable local release, **OMP is the only Tier-1 provider**. This is
 | Provider | Support level | Release claim |
 | --- | --- | --- |
 | `omp` | Tier-1 / Stable | Default local SDK path for planning, Goal review, result finalization, execution, dashboard briefs, and the documented five-minute golden path. Session history resumes where available; an uncertain terminal-only read-only start fails closed and requires explicit retry. |
-| `claude_code` | Beta | Adapter available; shared stable first-run conformance evidence pending |
-| `codex` | Beta | ACP adapter available; shared stable first-run conformance evidence pending |
-| `hermes` | Experimental | Existing gateway adapter; setup and conformance evidence incomplete |
+| `claude_code` | Beta | Execution adapter validated through the real Claude Agent SDK/binary; task planning remains owned by the separate `task.plan` binding. |
+| `codex` | Beta | Real Codex ACP/binary validated against a strict OpenAI Responses-compatible endpoint; task planning remains owned by the separate `task.plan` binding. |
+| `hermes` | Experimental / hidden | Existing gateway adapter remains internal and is omitted from production Settings until setup and conformance evidence is complete. |
 
 ## Current provider packages
 
@@ -43,6 +43,7 @@ For the first stable local release, **OMP is the only Tier-1 provider**. This is
 | `packages/providers/foundation` | Provider-neutral contracts and shared adapter shapes |
 | `packages/providers/hermes` | Hermes-specific transport, session, event, and tool-call adaptation |
 | `packages/providers/debug` | Development/debug execution runtime, hidden unless explicitly enabled |
+| `packages/providers/omp` | Tier-1 in-process OMP SDK transport across the supported selectable wire protocols |
 | `packages/providers/claude-code` | Claude Code CLI transport, session, stream, and tool-call adaptation |
 | `packages/providers/codex` | OpenAI Codex via ACP (`codex-acp`), session, stream, MCP, and tool-call adaptation. Codex is the first ACP-backed provider; future provider work may migrate other providers toward ACP where it fits. |
 
