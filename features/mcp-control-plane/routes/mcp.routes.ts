@@ -84,7 +84,7 @@ function bearerToken(authorization: string | undefined): string | undefined {
 	return match?.[1]?.trim() || undefined;
 }
 
-function credentialDigest(value: string): string {
+function runTokenFingerprint(value: string): string {
 	return createHmac("sha256", MCP_CREDENTIAL_FINGERPRINT_KEY).update(value).digest("hex");
 }
 
@@ -119,14 +119,14 @@ async function resolveMcpAuthIdentity(
 ): Promise<McpAuthIdentity | undefined> {
 	const token = bearerToken(authorization);
 	if (apiKey && matchesCredential(token, apiKey)) {
-		return { kind: "api-key", credentialDigest: credentialDigest(apiKey) };
+		return { kind: "api-key", credentialDigest: "configured-api-key" };
 	}
 	if (!token) return apiKey ? undefined : { kind: "local", credentialDigest: "local" };
 	const scope = await validateRunToken(token);
 	return scope
 		? {
 			kind: "run-token",
-			credentialDigest: credentialDigest(token),
+			credentialDigest: runTokenFingerprint(token),
 			runTokenScope: toMcpRunTokenScope(scope),
 		}
 		: undefined;
@@ -148,7 +148,7 @@ async function isRevokedTransportClose(
 ): Promise<boolean> {
 	if (method !== "DELETE" || auth.kind !== "run-token") return false;
 	const token = bearerToken(authorization);
-	if (!token || credentialDigest(token) !== auth.credentialDigest) return false;
+	if (!token || runTokenFingerprint(token) !== auth.credentialDigest) return false;
 	const scope = await validateRevokedRunToken(token);
 	return Boolean(scope && auth.runTokenScope && sameMcpRunTokenScope(auth.runTokenScope, toMcpRunTokenScope(scope)));
 }
