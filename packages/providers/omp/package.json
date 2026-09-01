@@ -7,7 +7,7 @@
     "@chrona/contracts": "workspace:*",
     "@chrona/logging": "workspace:*",
     "@chrona/providers-foundation": "workspace:*",
-    "@oh-my-pi/pi-coding-agent": "^16.3.12"
+    "@oh-my-pi/pi-coding-agent": "^18.0.10"
   },
   "exports": {
     ".": "./src/index.ts"
