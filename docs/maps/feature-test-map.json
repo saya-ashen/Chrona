@@ -2,13 +2,13 @@
   "generatedAt": "(regenerable; see git history)",
   "granularity": "function",
   "totals": {
-    "sourceFiles": 579,
+    "sourceFiles": 581,
     "testFiles": 298,
     "directCovered": 231,
     "transitiveCovered": 509,
-    "uncovered": 70,
-    "exportedSymbols": 1596,
-    "symbolsWithTest": 395
+    "uncovered": 72,
+    "exportedSymbols": 1609,
+    "symbolsWithTest": 400
   },
   "files": [
     {
@@ -22202,6 +22202,11 @@
           "tests": []
         },
         {
+          "name": "secureGeneratedSqliteSidecars",
+          "kind": "function",
+          "tests": []
+        },
+        {
           "name": "ensurePrivateDirectory",
           "kind": "function",
           "tests": []
@@ -22584,6 +22589,20 @@
           "tests": []
         },
         {
+          "name": "buildWindowsOwnerAclCommand",
+          "kind": "function",
+          "tests": [
+            "packages/db/src/sqlite-url.bun.test.ts"
+          ]
+        },
+        {
+          "name": "buildWindowsRemoveAclCommand",
+          "kind": "function",
+          "tests": [
+            "packages/db/src/sqlite-url.bun.test.ts"
+          ]
+        },
+        {
           "name": "buildWindowsPrivateAclCommand",
           "kind": "function",
           "tests": [
@@ -22605,9 +22624,18 @@
           ]
         },
         {
+          "name": "buildWindowsAclAuditCommand",
+          "kind": "function",
+          "tests": [
+            "packages/db/src/sqlite-url.bun.test.ts"
+          ]
+        },
+        {
           "name": "assertWindowsPrivateStorage",
           "kind": "function",
-          "tests": []
+          "tests": [
+            "packages/db/src/sqlite-url.bun.test.ts"
+          ]
         },
         {
           "name": "secureWindowsGeneratedStorage",
@@ -22617,7 +22645,9 @@
         {
           "name": "ensureWindowsPrivateDirectory",
           "kind": "function",
-          "tests": []
+          "tests": [
+            "packages/db/src/sqlite-url.bun.test.ts"
+          ]
         }
       ]
     },
@@ -77775,6 +77805,86 @@
         },
         {
           "name": "runLocalCi",
+          "kind": "function",
+          "tests": []
+        }
+      ]
+    },
+    {
+      "file": "scripts/readme-demo-fixtures.ts",
+      "pkg": "scripts",
+      "module": "(root)",
+      "workflow": "unmapped",
+      "directTests": [],
+      "transitiveTests": [],
+      "symbols": [
+        {
+          "name": "README_FIXTURE_GENERATED_BY",
+          "kind": "const",
+          "tests": []
+        },
+        {
+          "name": "ReadmeFixtureNode",
+          "kind": "type",
+          "tests": []
+        },
+        {
+          "name": "ReadmeFixtureEdge",
+          "kind": "type",
+          "tests": []
+        },
+        {
+          "name": "ReadmeFixture",
+          "kind": "type",
+          "tests": []
+        },
+        {
+          "name": "fixtureTaskTitle",
+          "kind": "function",
+          "tests": []
+        },
+        {
+          "name": "fixtureTaskStatus",
+          "kind": "function",
+          "tests": []
+        },
+        {
+          "name": "createFixturePlanRun",
+          "kind": "function",
+          "tests": []
+        },
+        {
+          "name": "createFixtureRuntimeEvidence",
+          "kind": "function",
+          "tests": []
+        },
+        {
+          "name": "createFixturePlanOutput",
+          "kind": "function",
+          "tests": []
+        },
+        {
+          "name": "createFixtureTimelineItems",
+          "kind": "function",
+          "tests": []
+        }
+      ]
+    },
+    {
+      "file": "scripts/readme-motion-capture.ts",
+      "pkg": "scripts",
+      "module": "(root)",
+      "workflow": "unmapped",
+      "directTests": [],
+      "transitiveTests": [],
+      "symbols": [
+        {
+          "name": "README_MOTION_ASSETS",
+          "kind": "const",
+          "tests": []
+        },
+        {
+          "name": "captureReadmeMotion",
           "kind": "function",
           "tests": []
         }

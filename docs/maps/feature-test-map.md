@@ -16,13 +16,13 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 
 | Metric | Value |
 | --- | --- |
-| Source files | 579 |
+| Source files | 581 |
 | Test files | 298 |
 | Directly covered files | 231 (40%) |
 | Transitively covered files | 509 (88%) |
-| Uncovered files (no test reaches) | 70 (12%) |
-| Exported symbols | 1596 |
-| Symbols referenced by a direct test | 395 (25%) |
+| Uncovered files (no test reaches) | 72 (12%) |
+| Exported symbols | 1609 |
+| Symbols referenced by a direct test | 400 (25%) |
 
 ## Workflow coverage summary
 
@@ -37,7 +37,7 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 | Providers / runtime boundary | 38 | 24 (63%) | 37 (97%) | 1 |
 | Contracts (schemas / DTOs / MCP tool specs) | 45 | 15 (33%) | 45 (100%) | 0 |
 | Platform (server routing, db, cli, i18n, shared, ui-protocol) | 90 | 42 (47%) | 78 (87%) | 12 |
-| Unmapped (no workflow bucket) | 121 | 28 (23%) | 75 (62%) | 46 |
+| Unmapped (no workflow bucket) | 123 | 28 (23%) | 75 (61%) | 48 |
 
 ## Drill-down
 
@@ -2661,9 +2661,9 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/db/src/sqlite-url.ts` | 1 | 153 | 7/13 | `sqlite-url.bun.test.ts` |
+| `packages/db/src/sqlite-url.ts` | 1 | 153 | 7/14 | `sqlite-url.bun.test.ts` |
 
-<details><summary><code>packages/db/src/sqlite-url.ts</code> &mdash; 13 exported symbol(s)</summary>
+<details><summary><code>packages/db/src/sqlite-url.ts</code> &mdash; 14 exported symbol(s)</summary>
 
 | Symbol | Kind | Tests referencing it |
 | --- | --- | --- |
@@ -2677,6 +2677,7 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 | `assertSqliteFileUrl` | function | **none** |
 | `assertPrivateStorageSupported` | function | **none** |
 | `secureGeneratedPrivateFile` | function | **none** |
+| `secureGeneratedSqliteSidecars` | function | **none** |
 | `ensurePrivateDirectory` | function | **none** |
 | `assertPrivateStoragePath` | function | **none** |
 | `ensureSqliteParentDir` | function | `sqlite-url.bun.test.ts` |
@@ -2703,18 +2704,21 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
-| `packages/db/src/windows-private-storage.ts` | 1 | 153 | 3/6 | `sqlite-url.bun.test.ts` |
+| `packages/db/src/windows-private-storage.ts` | 1 | 153 | 8/9 | `sqlite-url.bun.test.ts` |
 
-<details><summary><code>packages/db/src/windows-private-storage.ts</code> &mdash; 6 exported symbol(s)</summary>
+<details><summary><code>packages/db/src/windows-private-storage.ts</code> &mdash; 9 exported symbol(s)</summary>
 
 | Symbol | Kind | Tests referencing it |
 | --- | --- | --- |
+| `buildWindowsOwnerAclCommand` | function | `sqlite-url.bun.test.ts` |
+| `buildWindowsRemoveAclCommand` | function | `sqlite-url.bun.test.ts` |
 | `buildWindowsPrivateAclCommand` | function | `sqlite-url.bun.test.ts` |
 | `parseWindowsAclAudit` | function | `sqlite-url.bun.test.ts` |
 | `windowsAclIsPrivate` | function | `sqlite-url.bun.test.ts` |
-| `assertWindowsPrivateStorage` | function | **none** |
+| `buildWindowsAclAuditCommand` | function | `sqlite-url.bun.test.ts` |
+| `assertWindowsPrivateStorage` | function | `sqlite-url.bun.test.ts` |
 | `secureWindowsGeneratedStorage` | function | **none** |
-| `ensureWindowsPrivateDirectory` | function | **none** |
+| `ensureWindowsPrivateDirectory` | function | `sqlite-url.bun.test.ts` |
 
 </details>
 
@@ -3521,7 +3525,7 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 | --- | --- | --- | --- | --- |
 | `apps/web/vite.config.ts` | 0 | 0 | &mdash; | **none** |
 
-#### scripts :: (root)  _(24 files, 6 direct-covered)_
+#### scripts :: (root)  _(26 files, 6 direct-covered)_
 
 | Source file | Direct | Transitive | Symbols (tested/total) | Test names |
 | --- | --- | --- | --- | --- |
@@ -3541,6 +3545,8 @@ Drill-down: product workflow -> package -> module -> source file, annotated with
 | `scripts/lint-ratchet.ts` | 0 | 0 | &mdash; | **none** |
 | `scripts/live-provider-smoke.ts` | 1 | 1 | 3/4 | `live-provider-smoke.bun.test.ts` |
 | `scripts/local-ci.ts` | 1 | 1 | 1/2 | `local-ci.bun.test.ts` |
+| `scripts/readme-demo-fixtures.ts` | 0 | 0 | 0/7 | **none** |
+| `scripts/readme-motion-capture.ts` | 0 | 0 | 0/2 | **none** |
 | `scripts/record-llm-fixtures.ts` | 0 | 0 | &mdash; | **none** |
 | `scripts/release-upgrade-smoke.ts` | 0 | 0 | 0/1 | **none** |
 | `scripts/run-api-tests.ts` | 0 | 0 | &mdash; | **none** |
@@ -3848,6 +3854,8 @@ Files no test reaches even transitively. Entry points (`index`, `bootstrap`, rou
 | `scripts/lib/feature-test-map-model.ts` | scripts :: (root) |
 | `scripts/lib/feature-test-map-render.ts` | scripts :: (root) |
 | `scripts/lint-ratchet.ts` | scripts :: (root) |
+| `scripts/readme-demo-fixtures.ts` | scripts :: (root) |
+| `scripts/readme-motion-capture.ts` | scripts :: (root) |
 | `scripts/record-llm-fixtures.ts` | scripts :: (root) |
 | `scripts/release-upgrade-smoke.ts` | scripts :: (root) |
 | `scripts/run-api-tests.ts` | scripts :: (root) |

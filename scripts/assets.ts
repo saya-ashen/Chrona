@@ -13,6 +13,7 @@ import fs from "node:fs";
 import path from "node:path";
 import process from "node:process";
 import { chromium, type Browser, type Page } from "playwright";
+import { captureReadmeMotion, README_MOTION_ASSETS } from "./readme-motion-capture";
 
 const ROOT = process.cwd();
 const ASSET_DIR = path.join(ROOT, "docs", "assets");
@@ -52,7 +53,7 @@ const IMAGE_ASSETS = [
   },
 ] as const;
 
-type Command = "capture" | "import" | "optimize" | "check" | "all" | "help";
+type Command = "capture" | "capture-motion" | "import" | "optimize" | "check" | "all" | "help";
 
 type Options = {
   command: Command;
@@ -65,7 +66,7 @@ type Options = {
 };
 
 function usage() {
-  console.log(`Chrona asset pipeline\n\nUsage:\n  bun run scripts/assets.ts capture [--base-url URL] [--no-start] [--headed] [--skip-seed]\n  bun run scripts/assets.ts import\n  bun run scripts/assets.ts optimize [--update-readme]\n  bun run scripts/assets.ts check\n  bun run scripts/assets.ts all\n\nOutputs:\n  docs/assets/raw/*        captured screenshots\n  docs/assets/source/*     normalized inputs\n  docs/assets/generated/*  README-ready assets\n`);
+  console.log(`Chrona asset pipeline\n\nUsage:\n  bun run scripts/assets.ts capture [--base-url URL] [--no-start] [--headed] [--skip-seed]\n  bun run scripts/assets.ts capture-motion [--base-url URL] [--no-start] [--headed] [--skip-seed]\n  bun run scripts/assets.ts import\n  bun run scripts/assets.ts optimize [--update-readme]\n  bun run scripts/assets.ts check\n  bun run scripts/assets.ts all\n\nOutputs:\n  docs/assets/raw/*        captured screenshots\n  docs/assets/source/*     normalized screenshot inputs\n  docs/assets/generated/*  README-ready PNG and animated GIF assets\n`);
 }
 
 function parseArgs(argv: string[]): Options {
@@ -90,7 +91,7 @@ function parseArgs(argv: string[]): Options {
     else if (arg === "--update-readme") options.updateReadme = true;
     else fail(`Unknown argument: ${arg}`);
   }
-  if (!["capture", "import", "optimize", "check", "all", "help"].includes(command)) {
+  if (!["capture", "capture-motion", "import", "optimize", "check", "all", "help"].includes(command)) {
     fail(`Unknown command: ${command}`);
   }
   return options;
@@ -254,6 +255,17 @@ async function captureScreenshots(options: Options) {
   });
 }
 
+async function captureAnimations(options: Options) {
+  ensureDirs();
+  await withLocalServer(options, async (baseUrl) => {
+    await captureReadmeMotion({
+      baseUrl,
+      headed: options.headed,
+      executablePath: resolveChromiumExecutable(),
+    });
+  });
+}
+
 function importAssets() {
   ensureDirs();
   for (const asset of IMAGE_ASSETS) {
@@ -267,14 +279,24 @@ function importAssets() {
   }
 }
 
+function runImageMagickCommand(command: string, args: string[]) {
+  const result = spawnSync(command, args, { cwd: ROOT, encoding: "utf8" });
+  if ((result.error as NodeJS.ErrnoException | undefined)?.code === "ENOENT") return null;
+  if (result.status === 0) return result.stdout.trim();
+  if (result.stdout.trim()) console.error(result.stdout.trim());
+  if (result.stderr.trim()) console.error(result.stderr.trim());
+  fail(`ImageMagick failed: ${command} ${args.join(" ")}`);
+}
+
 function runMagick(args: string[]) {
-  const result = spawnSync("magick", args, { cwd: ROOT, encoding: "utf8" });
-  if (result.status !== 0) {
-    if (result.stdout.trim()) console.error(result.stdout.trim());
-    if (result.stderr.trim()) console.error(result.stderr.trim());
-    fail(`magick failed: magick ${args.join(" ")}`);
-  }
-  return result.stdout.trim();
+  const modern = runImageMagickCommand("magick", args);
+  if (modern !== null) return modern;
+  const [operation, ...rest] = args;
+  const command = operation === "identify" ? "identify" : "convert";
+  const legacyArgs = operation === "identify" ? rest : args;
+  const legacy = runImageMagickCommand(command, legacyArgs);
+  if (legacy !== null) return legacy;
+  fail("ImageMagick is required; install the magick command or legacy identify/convert tools");
 }
 
 function optimizeAssets(options: Options) {
@@ -299,8 +321,10 @@ function optimizeAssets(options: Options) {
 
 function updateReadmeReferences() {
   const replacements = new Map([
-    ["docs/assets/TaskWorkSpace.png", "docs/assets/generated/task-workspace.png"],
-    ["docs/assets/NodeDetail.png", "docs/assets/generated/node-detail.png"],
+    ["docs/assets/TaskWorkSpace.png", "docs/assets/generated/task-workflow.gif"],
+    ["docs/assets/NodeDetail.png", "docs/assets/generated/result-review.gif"],
+    ["docs/assets/generated/task-workspace.png", "docs/assets/generated/task-workflow.gif"],
+    ["docs/assets/generated/node-detail.png", "docs/assets/generated/result-review.gif"],
   ]);
   for (const file of ["README.md", "README.zh.md"]) {
     const abs = path.join(ROOT, file);
@@ -319,19 +343,22 @@ function imageInfo(file: string): ImageInfo {
   return { width, height, bytes: fs.statSync(file).size };
 }
 
+function animationInfo(file: string): ImageInfo & { frames: number } {
+  const stdout = runMagick(["identify", "-format", String.raw`%w %h\n`, file]);
+  const frames = stdout.split("\n").filter(Boolean);
+  const [width, height] = (frames[0] ?? "0 0").split(/\s+/).map(Number);
+  return { width, height, bytes: fs.statSync(file).size, frames: frames.length };
+}
 
-function checkAssets() {
-  ensureDirs();
-  const problems: string[] = [];
-  const rootDocs = ["README.md", "README.zh.md"].map((file) => path.join(ROOT, file));
-  const docs = rootDocs.filter((file) => fs.existsSync(file));
-
+function checkDocReferences(docs: string[], problems: string[]) {
   for (const file of docs) {
     const text = fs.readFileSync(file, "utf8");
     if (/docs\/assets\/(raw|source)\//.test(text)) problems.push(`${rel(file)} references raw/source assets`);
     if (/docs\/assets\/(TaskWorkSpace|NodeDetail)\.png/.test(text)) problems.push(`${rel(file)} references legacy root screenshots`);
   }
+}
 
+function checkStaticAssets(problems: string[]) {
   for (const asset of IMAGE_ASSETS) {
     const generated = path.join(GENERATED_DIR, asset.generated);
     if (!fs.existsSync(generated)) {
@@ -343,6 +370,37 @@ function checkAssets() {
     if (info.width > asset.maxWidth) problems.push(`${rel(generated)} width is ${info.width}, limit ${asset.maxWidth}`);
     console.log(`${rel(generated)}: ${info.bytes} bytes, ${info.width}x${info.height}`);
   }
+}
+
+function checkMotionAssets(docs: string[], problems: string[]) {
+  for (const asset of README_MOTION_ASSETS) {
+    const generated = path.join(GENERATED_DIR, asset.generated);
+    if (!fs.existsSync(generated)) {
+      problems.push(`missing generated motion asset ${rel(generated)}`);
+      continue;
+    }
+    const info = animationInfo(generated);
+    if (info.bytes > asset.maxBytes) problems.push(`${rel(generated)} is ${info.bytes} bytes, limit ${asset.maxBytes}`);
+    if (info.width > asset.maxWidth) problems.push(`${rel(generated)} width is ${info.width}, limit ${asset.maxWidth}`);
+    if (info.frames < 2) problems.push(`${rel(generated)} is not animated`);
+    for (const file of docs) {
+      if (!fs.readFileSync(file, "utf8").includes(`docs/assets/generated/${asset.generated}`)) {
+        problems.push(`${rel(file)} does not reference ${asset.generated}`);
+      }
+    }
+    console.log(`${rel(generated)}: ${info.bytes} bytes, ${info.width}x${info.height}, ${info.frames} frames`);
+  }
+}
+
+function checkAssets() {
+  ensureDirs();
+  const problems: string[] = [];
+  const docs = ["README.md", "README.zh.md"]
+    .map((file) => path.join(ROOT, file))
+    .filter((file) => fs.existsSync(file));
+  checkDocReferences(docs, problems);
+  checkStaticAssets(problems);
+  checkMotionAssets(docs, problems);
 
   if (problems.length > 0) {
     console.error("assets check failed");
@@ -358,6 +416,9 @@ async function main() {
     case "capture":
       await captureScreenshots(options);
       break;
+    case "capture-motion":
+      await captureAnimations(options);
+      break;
     case "import":
       importAssets();
       break;
@@ -371,6 +432,7 @@ async function main() {
       await captureScreenshots(options);
       importAssets();
       optimizeAssets({ ...options, updateReadme: true });
+      await captureAnimations(options);
       checkAssets();
       break;
     case "help":
