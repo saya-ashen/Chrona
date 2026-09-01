@@ -20,6 +20,7 @@ export type WindowsAclAudit = {
 export type WindowsAclCommand = {
   command: string;
   args: string[];
+  env?: Record<string, string>;
 };
 
 /** Build the locale-independent icacls invocation used for Chrona-owned paths. */
@@ -82,8 +83,11 @@ export function windowsAclIsPrivate(audit: WindowsAclAudit): boolean {
     && audit.rules.every((rule) => !rule.inherited && rule.accessType === "Allow" && allowed.has(rule.sid));
 }
 
+const ACL_AUDIT_PATH_ENV = "CHRONA_WINDOWS_ACL_AUDIT_PATH";
+
 const ACL_AUDIT_SCRIPT = [
-  "$p = $args[0]",
+  `$p = $env:${ACL_AUDIT_PATH_ENV}`,
+  "if ([string]::IsNullOrWhiteSpace($p)) { throw 'Missing Chrona ACL audit path.' }",
   "$identity = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value",
   "$acl = Get-Acl -LiteralPath $p -ErrorAction Stop",
   "$rules = @($acl.GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier]) | ForEach-Object { [pscustomobject]@{ sid = $_.IdentityReference.Value; accessType = $_.AccessControlType.ToString(); rights = [int]$_.FileSystemRights; inherited = $_.IsInherited } })",
@@ -91,8 +95,20 @@ const ACL_AUDIT_SCRIPT = [
   "[Console]::Out.Write(($result | ConvertTo-Json -Compress -Depth 3))",
 ].join("; ");
 
-function execute(command: string, args: string[]): { status: number | null; stdout: string; stderr: string; error?: Error } {
-  const result = spawnSync(command, args, { encoding: "utf8", windowsHide: true });
+export function buildWindowsAclAuditCommand(path: string): WindowsAclCommand {
+  return {
+    command: "powershell.exe",
+    args: ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", ACL_AUDIT_SCRIPT],
+    env: { [ACL_AUDIT_PATH_ENV]: path },
+  };
+}
+
+function execute(command: string, args: string[], env?: Record<string, string>): { status: number | null; stdout: string; stderr: string; error?: Error } {
+  const result = spawnSync(command, args, {
+    encoding: "utf8",
+    windowsHide: true,
+    ...(env ? { env: { ...process.env, ...env } } : {}),
+  });
   return {
     status: result.status,
     stdout: result.stdout,
@@ -102,7 +118,8 @@ function execute(command: string, args: string[]): { status: number | null; stdo
 }
 
 function windowsAclAudit(path: string): WindowsAclAudit {
-  const result = execute("powershell.exe", ["-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", ACL_AUDIT_SCRIPT, "--", path]);
+  const command = buildWindowsAclAuditCommand(path);
+  const result = execute(command.command, command.args, command.env);
   if (result.error || result.status !== 0) {
     throw new Error(`Chrona could not audit Windows owner-only ACLs for ${path}: ${result.stderr || result.error?.message || "PowerShell failed"}`);
   }
