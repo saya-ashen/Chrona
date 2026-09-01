@@ -1,9 +1,0 @@
-{
-  "fields": [
-    {
-      "id": "name",
-      "type": "text",
-      "required": true
-    }
-  ]
-}
