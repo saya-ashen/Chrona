@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+## 0.3.0 — Public release
+
+Date: 2026-09-01
+
+### Highlights
+- Shipped governed multi-provider planning and execution across OMP, Claude Code, and Codex, with first-run onboarding, capability checks, durable session provenance, and consistent recovery behavior.
+- Added durable Goal, TaskOccurrence, trigger-delivery, plan-generation, execution, and finalized-result lifecycles while keeping Chrona authoritative for runtime state and human review.
+- Reworked the Task Workspace around clear current state, node progress, blocking actions, reviewable finalized results, and safe accept/retry/recovery flows.
+- Hardened portable Linux, macOS, and Windows release binaries, previous-release SQLite upgrades, pre-upgrade backups, migration integrity, release smoke tests, and CI security/quality gates.
+
 ### Fixed
 - Settled accepted latest results consistently across the Task Workspace stage/header/assistant context and Action Center, preserving completed-step progress while replacing stale review actions with follow-up actions.
 - Hardened release verification around the attested previous-release database fixture, fixed the documented source server entrypoint, aligned Windows ACL privacy documentation with fail-closed enforcement, and restored green typecheck/lint/test gates.

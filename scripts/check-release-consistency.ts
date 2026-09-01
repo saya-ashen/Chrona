@@ -28,18 +28,22 @@ function gitShow(root: string, revisionPath: string): Uint8Array {
 	return result.stdout;
 }
 
-/** Verifies the locally available public tag, package, changelog, roadmap, immutable SQL, and fixture provenance agree. */
+/** Verifies the release candidate and its locally available previous-release migration baseline agree. */
 // eslint-disable-next-line complexity -- each condition guards a separate public release contract.
 export function checkReleaseConsistency(root = resolve(import.meta.dir, "..")): void {
 	const pkg = readJson(resolve(root, "package.json")) as PackageJson;
 	if (typeof pkg.version !== "string" || !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(pkg.version)) {
 		throw new Error("package.json must declare a semantic version");
 	}
+	const cliPkg = readJson(resolve(root, "packages/cli/package.json")) as PackageJson;
+	if (cliPkg.version !== pkg.version) {
+		throw new Error(`packages/cli/package.json version ${String(cliPkg.version)} does not match package.json version ${pkg.version}`);
+	}
 	const migrationsDir = resolve(root, "prisma/migrations");
 	const metadata = verifyMigrationReleaseMetadata(migrationsDir) as ReleaseMetadata | undefined;
 	if (!metadata) throw new Error("Migration release metadata is required");
-	if (metadata.lastReleasedVersion !== pkg.version) {
-		throw new Error(`package.json version ${pkg.version} does not match lastReleasedVersion ${metadata.lastReleasedVersion}`);
+	if (Bun.semver.order(pkg.version, metadata.lastReleasedVersion) < 0) {
+		throw new Error(`package.json version ${pkg.version} predates lastReleasedVersion ${metadata.lastReleasedVersion}`);
 	}
 
 	const changelog = readFileSync(resolve(root, "CHANGELOG.md"), "utf8");
