@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 import { buildTargets } from "../build/manifest";
+import { sqliteRuntimeLockPath } from "../packages/db/src/sqlite-runtime-lock";
 
 if (process.platform !== "win32") {
   console.log("Windows private-storage smoke skipped outside Windows.");
@@ -17,10 +18,11 @@ const root = mkdtempSync(join(tmpdir(), "chrona-windows-acl-"));
 const data = join(root, "data");
 const config = join(root, "config");
 const appdata = join(root, "appdata");
+const databaseUrl = `file:${join(data, "chrona.db")}`;
 const server = Bun.serve({ port: 0, fetch: () => new Response("ok") });
 const port = server.port;
 server.stop(true);
-const env = { ...process.env, APPDATA: appdata, CHRONA_DATA_DIR: data, CHRONA_CONFIG_DIR: config, CHRONA_NO_OPEN: "1" };
+const env = { ...process.env, APPDATA: appdata, CHRONA_DATA_DIR: data, CHRONA_CONFIG_DIR: config, CHRONA_NO_OPEN: "1", DATABASE_URL: databaseUrl };
 
 try {
   mkdirSync(appdata, { recursive: true });
@@ -35,6 +37,9 @@ try {
   if (Date.now() >= deadline) throw new Error("Windows packaged Chrona did not become healthy.");
   runtime.kill();
   await runtime.exited;
+  // Windows termination does not run the child exit hook. The smoke harness
+  // observed that exact process exit, so it can safely remove only its lock.
+  rmSync(sqliteRuntimeLockPath(databaseUrl), { force: true });
   const doctor = Bun.spawn([binary, "doctor"], { cwd: ROOT, env, stdout: "pipe", stderr: "pipe" });
   const code = await doctor.exited;
   const output = `${await new Response(doctor.stdout).text()}\n${await new Response(doctor.stderr).text()}`;

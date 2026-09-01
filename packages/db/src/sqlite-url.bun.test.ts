@@ -12,7 +12,19 @@ import {
   resolveSqliteAdapterUrl,
   sqlitePathFromFileUrl,
 } from "./sqlite-url";
-import { buildWindowsAclAuditCommand, buildWindowsPrivateAclCommand, parseWindowsAclAudit, windowsAclIsPrivate } from "./windows-private-storage";
+import {
+  assertWindowsPrivateStorage,
+  buildWindowsAclAuditCommand,
+  buildWindowsOwnerAclCommand,
+  buildWindowsPrivateAclCommand,
+  buildWindowsRemoveAclCommand,
+  ensureWindowsPrivateDirectory,
+  parseWindowsAclAudit,
+  windowsAclIsPrivate,
+} from "./windows-private-storage";
+
+const posixIt = process.platform === "win32" ? it.skip : it;
+const windowsIt = process.platform === "win32" ? it : it.skip;
 
 describe("sqlite url helpers", () => {
   it("uses explicit DATABASE_URL first", () => {
@@ -60,7 +72,7 @@ describe("sqlite url helpers", () => {
     expect(resolveSqliteAdapterUrl("file::memory:")).toBe("file::memory:");
   });
 
-  it("does not chmod an existing selected SQLite parent", () => {
+  posixIt("does not chmod an existing selected SQLite parent", () => {
     const directory = mkdtempSync(join(tmpdir(), "chrona-sqlite-parent-"));
     const selectedParent = join(directory, "existing");
     try {
@@ -77,19 +89,45 @@ describe("sqlite url helpers", () => {
 
   it("builds and validates locale-independent Windows owner-only ACL commands", () => {
     const path = "C:\\Chrona data\\user-selected";
+    expect(buildWindowsOwnerAclCommand("C:\\Chrona\\data", "S-1-5-21-100")).toEqual({
+      command: "icacls.exe",
+      args: ["C:\\Chrona\\data", "/setowner", "*S-1-5-21-100"],
+    });
+    expect(buildWindowsRemoveAclCommand("C:\\Chrona\\data", "S-1-5-32-544")).toEqual({
+      command: "icacls.exe",
+      args: ["C:\\Chrona\\data", "/remove", "*S-1-5-32-544"],
+    });
     expect(buildWindowsPrivateAclCommand("C:\\Chrona\\data", "S-1-5-21-100", true)).toEqual({
       command: "icacls.exe",
-      args: ["C:\\Chrona\\data", "/inheritance:r", "/setowner", "*S-1-5-21-100", "/grant:r", "*S-1-5-21-100:(OI)(CI)(F)", "*S-1-5-18:(OI)(CI)(F)"],
+      args: ["C:\\Chrona\\data", "/inheritance:r", "/grant:r", "*S-1-5-21-100:(OI)(CI)(F)", "*S-1-5-18:(OI)(CI)(F)"],
     });
     const auditCommand = buildWindowsAclAuditCommand(path);
     expect(auditCommand.command).toBe("powershell.exe");
     expect(auditCommand.args).not.toContain(path);
     expect(auditCommand.args.at(-2)).toBe("-Command");
+    expect(auditCommand.args.at(-1)).toContain("[System.IO.Directory]::GetAccessControl");
+    expect(auditCommand.args.at(-1)).toContain("$result | ConvertTo-Json");
+    expect(auditCommand.args.at(-1)).not.toContain("Get-Acl");
+    expect(auditCommand.args.at(-1)).not.toContain("[Console]::Out.Write");
     expect(Object.values(auditCommand.env ?? {})).toEqual([path]);
     const audit = parseWindowsAclAudit('{"owner":"S-1-5-21-100","currentUser":"S-1-5-21-100","rules":[{"sid":"S-1-5-21-100","accessType":"Allow","rights":2032127,"inherited":false},{"sid":"S-1-5-18","accessType":"Allow","rights":2032127,"inherited":false}]}');
     expect(windowsAclIsPrivate(audit)).toBe(true);
+    expect(windowsAclIsPrivate({ ...audit, rules: audit.rules.map((rule) => ({ ...rule, inherited: true })) })).toBe(true);
+    expect(windowsAclIsPrivate({ ...audit, rules: audit.rules.map((rule) => rule.sid === "S-1-5-18" ? { ...rule, rights: 1 } : rule) })).toBe(false);
+    expect(windowsAclIsPrivate({ ...audit, rules: audit.rules.map((rule) => rule.sid === "S-1-5-21-100" ? { ...rule, rights: 1 } : rule) })).toBe(false);
     expect(windowsAclIsPrivate({ ...audit, rules: [...audit.rules, { sid: "S-1-1-0", accessType: "Allow", rights: 1, inherited: false }] })).toBe(false);
   });
+
+  windowsIt("creates and audits a generated private Windows directory", () => {
+    const root = mkdtempSync(join(tmpdir(), "chrona-windows-acl-test-"));
+    const target = join(root, "private path");
+    try {
+      ensureWindowsPrivateDirectory(target);
+      expect(() => assertWindowsPrivateStorage(target)).not.toThrow();
+    } finally {
+      rmSync(root, { recursive: true, force: true });
+    }
+  }, 20_000);
 
   it("detects in-memory urls", () => {
     expect(isInMemorySqliteUrl("file::memory:")).toBe(true);

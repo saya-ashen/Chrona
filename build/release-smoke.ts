@@ -1,6 +1,6 @@
 #!/usr/bin/env bun
 
-import { mkdtemp, mkdir, readdir, rm, stat } from "node:fs/promises";
+import { mkdtemp, readdir, rm, stat } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
@@ -104,8 +104,6 @@ async function assertRuntimeStarts(binaryPath: string) {
   const tempRoot = await mkdtemp(join(tmpdir(), "chrona-release-smoke-"));
   const dataDir = join(tempRoot, "data");
   const configDir = join(tempRoot, "config");
-  await mkdir(dataDir, { recursive: true });
-  await mkdir(configDir, { recursive: true });
 
   const proc = Bun.spawn([binaryPath, "start", "--host", "127.0.0.1", "--port", String(port), "--no-open"], {
     cwd: ROOT,
