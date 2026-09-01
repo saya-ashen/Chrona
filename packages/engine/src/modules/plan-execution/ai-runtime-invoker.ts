@@ -1,7 +1,8 @@
+/* eslint-disable max-lines -- Provider invocation keeps durable run, provenance, continuity, and final persistence together. */
 import { RunStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
 import type { NodeAttempt } from "@chrona/contracts/ai";
-import type { ProviderJsonValue, ProviderRunEvent, ProviderRunSnapshot, AgentProviderClient } from "@chrona/providers-foundation";
+import type { ProviderJsonValue, ProviderRunEvent, ProviderRunSnapshot } from "@chrona/providers-foundation";
 import { getAiClientForTask, stableJsonHash } from "@/modules/ai";
 import {
   persistProviderRuntimeEvent,
@@ -10,7 +11,6 @@ import {
 } from "./ai-runtime-event-persistence";
 import {
   ensureProviderRunRecord,
-  readTaskSessionProviderRef,
   requireRuntimeSessionId,
   resolveTaskModel,
   uniqueRuntimeRunRef,
@@ -18,9 +18,13 @@ import {
 } from "./ai-runtime-persistence";
 import {
   createExecutionProviderRequest,
-  extractAssistantContent,
   type ExecutionProviderRequest,
 } from "./ai-runtime-request";
+import {
+  assistantMessage,
+  extractUserText,
+  isTerminalProviderSnapshot,
+} from "./ai-runtime-response";
 import { runProviderRequest } from "./ai-runtime-provider-stream";
 export { runProviderRequest } from "./ai-runtime-provider-stream";
 import { mintRunToken } from "./runtime/agent-control-store";
@@ -29,14 +33,16 @@ import { assertCurrentPlanExecutionOwnership, schedulerWorkSignal, withPlanExecu
 import { assertRuntimeExecutionScope } from "./persistence/runtime-execution-scope";
 import { generatedFilesRoot } from "@/modules/tasks/result-file-access";
 import { registerActiveRuntimeInvocation } from "./runtime/active-runtime-invocations";
-type RuntimeProviderClient = AgentProviderClient;
-
+import {
+  continuityInstructions,
+  resolveRuntimeContextContinuity,
+  withContextContinuity,
+} from "./runtime/runtime-context-continuity";
 export type AiRuntimeInvocationInput = {
   taskId: string;
   expectedExecutionEpoch: number;
   expectedExecutionSessionId: string;
   taskSessionId: string;
-  runtimeName: string;
   runtimeSessionKey: string;
   workBlockId?: string | null;
   nodeContext?: {
@@ -62,12 +68,13 @@ export type AiRuntimeInvocation = {
   providerName: string;
 };
 export function usesChronaControlPlane(providerName: string) {
-  return providerName === "claude_code" || providerName === "codex" || providerName === "omp";
+  return ["claude_code", "codex", "omp"].includes(providerName);
 }
 
 export class AiRuntimeInvoker {
   async invoke(input: AiRuntimeInvocationInput): Promise<AiRuntimeInvocation> {
-    const { task, run } = await createRuntimeRun(input);
+    const client = await requireRuntimeProviderClient(input.taskId);
+    const { task, run } = await createRuntimeRun(input, client);
     const active = registerActiveRuntimeInvocation({
       runId: run.id,
       nodeAttemptId: input.nodeAttempt.id,
@@ -77,7 +84,7 @@ export class AiRuntimeInvoker {
       : active.controller.signal;
     const scopedInput = { ...input, signal };
     try {
-      return await invokeProviderForRuntime(scopedInput, task, run);
+      return await invokeProviderForRuntime(scopedInput, task, run, client);
     } catch (error) {
       await recordRuntimeInvocationFailure(scopedInput, run.id, error);
       throw error;
@@ -94,13 +101,46 @@ type RuntimeTask = {
   pinnedModelSource: string | null;
 };
 
-async function createRuntimeRun(input: AiRuntimeInvocationInput): Promise<{ task: RuntimeTask; run: { id: string; workBlockId: string | null; occurrenceId: string | null } }> {
+type ResolvedRuntimeClient = Awaited<ReturnType<typeof requireRuntimeProviderClient>>;
+
+function runtimeProvenance(client: ResolvedRuntimeClient) {
+  return {
+    providerClientId: client.record.id,
+    providerName: client.providerClient.provider,
+    providerConfigFingerprint: stableJsonHash(client.record.config),
+  };
+}
+
+async function createRuntimeRun(input: AiRuntimeInvocationInput, client: ResolvedRuntimeClient): Promise<{ task: RuntimeTask; run: { id: string; workBlockId: string | null; occurrenceId: string | null } }> {
   const task = await db.task.findUniqueOrThrow({
     where: { id: input.taskId },
     select: { workspaceId: true, executionConfig: true, pinnedModel: true, pinnedModelSource: true },
   });
   const occurrence = await resolveRuntimeOccurrence(input);
+  const provenance = runtimeProvenance(client);
   const run = await withPlanExecutionDurability(async (tx) => {
+    const taskSession = await tx.taskSession.findFirst({
+      where: { id: input.taskSessionId, taskId: input.taskId },
+      select: {
+        id: true,
+        providerClientId: true,
+        providerName: true,
+        providerConfigFingerprint: true,
+      },
+    });
+    if (!taskSession) throw new Error("Task session is outside the task execution scope");
+    const sessionMatchesProvider =
+      taskSession.providerClientId === provenance.providerClientId
+      && taskSession.providerName === provenance.providerName
+      && taskSession.providerConfigFingerprint === provenance.providerConfigFingerprint;
+    await tx.taskSession.update({
+      where: { id: taskSession.id },
+      data: {
+        runtimeName: provenance.providerName,
+        ...provenance,
+        providerSessionRef: sessionMatchesProvider ? undefined : null,
+      },
+    });
     if (input.nodeAttempt) {
       const activePlanRun = await tx.taskPlanRun.findFirst({
         where: {
@@ -174,6 +214,9 @@ async function createRuntimeRun(input: AiRuntimeInvocationInput): Promise<{ task
           workBlockId: true,
           occurrenceId: true,
           runtimeName: true,
+          providerClientId: true,
+          providerName: true,
+          providerConfigFingerprint: true,
           status: true,
         },
       });
@@ -183,7 +226,10 @@ async function createRuntimeRun(input: AiRuntimeInvocationInput): Promise<{ task
           || existing.taskSessionId !== input.taskSessionId
           || existing.workBlockId !== (input.workBlockId ?? null)
           || existing.occurrenceId !== (occurrence?.id ?? null)
-          || existing.runtimeName !== input.runtimeName
+          || existing.runtimeName !== provenance.providerName
+          || existing.providerClientId !== provenance.providerClientId
+          || existing.providerName !== provenance.providerName
+          || existing.providerConfigFingerprint !== provenance.providerConfigFingerprint
           || !ACTIVE_RUN_STATUSES.includes(existing.status)
         ) {
           throw new Error("Canonical runtime Run belongs to another or inactive node attempt scope");
@@ -199,7 +245,8 @@ async function createRuntimeRun(input: AiRuntimeInvocationInput): Promise<{ task
         nodeAttemptId: input.nodeAttempt.id,
         occurrenceId: occurrence?.id ?? null,
         taskSessionId: input.taskSessionId,
-        runtimeName: input.runtimeName,
+        runtimeName: provenance.providerName,
+        ...provenance,
         runtimeSessionRef: input.runtimeSessionKey,
         status: RunStatus.Pending,
         triggeredBy: "system",
@@ -223,9 +270,8 @@ async function resolveRuntimeOccurrence(input: AiRuntimeInvocationInput): Promis
   });
 }
 
-async function invokeProviderForRuntime(input: AiRuntimeInvocationInput, task: RuntimeTask, run: { id: string; workBlockId: string | null; occurrenceId: string | null }): Promise<AiRuntimeInvocation> {
-  const client = await requireRuntimeProviderClient(input.taskId);
-  const baseRequest = await createProviderRequest(input, task, client.providerClient);
+async function invokeProviderForRuntime(input: AiRuntimeInvocationInput, task: RuntimeTask, run: { id: string; workBlockId: string | null; occurrenceId: string | null }, client: ResolvedRuntimeClient): Promise<AiRuntimeInvocation> {
+  const baseRequest = await createProviderRequest(input, task, client);
   const request = {
     ...baseRequest,
     instructions: `${baseRequest.instructions}\nStore every generated deliverable in ${generatedFilesRoot()}/${run.id}/ and return it as generated://${run.id}/<filename>. Do not claim a generated URI for a file stored elsewhere.`,
@@ -241,9 +287,10 @@ async function invokeProviderForRuntime(input: AiRuntimeInvocationInput, task: R
     nodeAttempt: input.nodeAttempt,
     aiClientId: client.record.id,
     aiClientConfigDigest: stableJsonHash(client.record.config),
+    providerName: client.providerClient.provider,
     providerRunIdempotencyKey: input.clientOperationId,
   });
-  const options = await providerRequestOptions(input, task, run, providerRun, client.providerClient.provider);
+  const options = await providerRequestOptions(input, task, run, providerRun, client);
   const response = await runProviderRequest(client.providerClient, request, options);
   return finalizeRuntimeInvocation({
     input,
@@ -266,26 +313,33 @@ async function requireRuntimeProviderClient(taskId: string) {
 async function createProviderRequest(
   input: AiRuntimeInvocationInput,
   task: RuntimeTask,
-  providerClient: RuntimeProviderClient,
+  client: ResolvedRuntimeClient,
 ): Promise<ExecutionProviderRequest> {
+  const providerClient = client.providerClient;
   const config = task.executionConfig as Record<string, unknown>;
-  const model = await resolveTaskModel({
-    taskId: input.taskId,
-    executionConfig: config,
-    pinnedModel: task.pinnedModel,
-    pinnedModelSource: task.pinnedModelSource,
-    providerClient,
-  });
+  const [model, continuity] = await Promise.all([
+    resolveTaskModel({
+      taskId: input.taskId,
+      executionConfig: config,
+      pinnedModel: task.pinnedModel,
+      pinnedModelSource: task.pinnedModelSource,
+      providerClient,
+    }),
+    resolveRuntimeContextContinuity(input.taskSessionId, runtimeProvenance(client)),
+  ]);
+  const recoveryInstructions = continuityInstructions(continuity);
   return createExecutionProviderRequest({
     provider: providerClient.provider,
     clientOperationId: input.clientOperationId,
     sessionId: input.runtimeSessionKey,
     sessionKey: input.runtimeSessionKey,
-    instructions: input.instructions,
-    input: input.runtimeInput,
+    instructions: recoveryInstructions
+      ? `${input.instructions}\n\n${recoveryInstructions}`
+      : input.instructions,
+    input: withContextContinuity(input.runtimeInput, continuity),
     terminalToolName: input.terminalToolName,
     toolPolicy: input.toolPolicy ?? "full",
-    resumeSessionRef: await readTaskSessionProviderRef(input.taskSessionId),
+    resumeSessionRef: continuity.providerSessionRef,
     runtimeConfiguration: runtimeConfiguration(config, model),
   });
 }
@@ -301,8 +355,10 @@ async function providerRequestOptions(
   task: RuntimeTask,
   run: { id: string; workBlockId: string | null; occurrenceId: string | null },
   providerRun: EnsuredProviderRunRecord,
-  providerName: string,
+  client: ResolvedRuntimeClient,
 ) {
+  const provenance = runtimeProvenance(client);
+  const providerName = client.providerClient.provider;
   const eventPersistence: RuntimeEventPersistenceContext | undefined = providerRun
     ? {
         workspaceId: task.workspaceId,
@@ -310,7 +366,9 @@ async function providerRequestOptions(
         workBlockId: run.workBlockId,
         occurrenceId: run.occurrenceId,
         runId: run.id,
-        runtimeName: input.runtimeName,
+        runtimeName: provenance.providerName,
+        providerClientId: provenance.providerClientId,
+        providerConfigFingerprint: provenance.providerConfigFingerprint,
         taskSessionId: input.taskSessionId,
         executionSessionId: input.expectedExecutionSessionId,
         nodeAttemptId: providerRun.nodeAttemptId,
@@ -398,7 +456,9 @@ async function persistFinalRuntimeState(value: FinalizeRuntimeInvocationInput & 
   runtimeRunRef: string | null;
   runtimeSessionKey: string;
 }): Promise<string[]> {
-  const persisted = await withPlanExecutionDurability(async (tx) => {
+  const persisted = await withPlanExecutionDurability(
+    // eslint-disable-next-line complexity -- Final persistence validates scope, session provenance, and terminal state atomically.
+    async (tx) => {
     const scopeOptions = {
       providerRunStatuses: ["running", "waiting_for_approval", "completed", "failed", "cancelled"],
     };
@@ -423,7 +483,19 @@ async function persistFinalRuntimeState(value: FinalizeRuntimeInvocationInput & 
       select: { id: true },
     })));
     if (value.runtimeSessionKey !== value.input.runtimeSessionKey) {
-      await tx.taskSession.update({ where: { id: value.input.taskSessionId }, data: { providerSessionRef: value.runtimeSessionKey } });
+      const sessionUpdate = await tx.taskSession.updateMany({
+        where: {
+          id: value.input.taskSessionId,
+          taskId: value.input.taskId,
+          providerClientId: value.scope?.providerClientId,
+          providerName: value.scope ? value.providerName : undefined,
+          providerConfigFingerprint: value.scope?.providerConfigFingerprint,
+        },
+        data: { providerSessionRef: value.runtimeSessionKey },
+      });
+      if (sessionUpdate.count !== 1) {
+        throw new Error("Provider session provenance changed before final persistence");
+      }
     }
     if (value.providerRunRecordId) {
       const terminalStatuses = ["completed", "failed", "cancelled"];
@@ -434,7 +506,8 @@ async function persistFinalRuntimeState(value: FinalizeRuntimeInvocationInput & 
         },
         data: {
           providerRunRef: value.response.nativeRunId ?? value.response.runId,
-          runtimeName: value.input.runtimeName,
+          runtimeName: value.providerName,
+          providerName: value.providerName,
           nativeRunId: value.response.nativeRunId ?? null,
           status: value.response.status === "completed" ? "completed" : value.response.error ? "failed" : value.response.status,
           finishedAt: isTerminalProviderSnapshot(value.response) ? new Date() : null,
@@ -445,8 +518,9 @@ async function persistFinalRuntimeState(value: FinalizeRuntimeInvocationInput & 
       { taskId: value.input.taskId, runId: value.runId, rebuildProjection: false },
       tx,
     );
-    return entries.map((entry) => entry.id);
-  });
+      return entries.map((entry) => entry.id);
+    },
+  );
   return persisted ?? [];
 }
 
@@ -494,27 +568,6 @@ async function recordRuntimeInvocationFailure(input: AiRuntimeInvocationInput, r
     await syncPersistedRunStateInTransaction({ taskId: input.taskId, runId, rebuildProjection: false }, tx);
     return true;
   });
-}
-
-
-function isTerminalProviderSnapshot(response: ProviderRunSnapshot): boolean {
-  return response.status === "completed" || response.status === "failed" || response.status === "cancelled" || Boolean(response.error);
-}
-
-
-
-function assistantMessage(response: ProviderRunSnapshot): Array<{ role: string; content: string }> {
-  const content = extractAssistantContent(response);
-  return content ? [{ role: "assistant", content }] : [];
-}
-
-
-function extractUserText(request: ExecutionProviderRequest): string {
-  try {
-    return [request.instructions, JSON.stringify(request.input, null, 2)].filter(Boolean).join("\n\n");
-  } catch {
-    return [request.instructions, String(request.input)].filter(Boolean).join("\n\n");
-  }
 }
 
 export { finalizeRuntimeInvocationForTest, persistProviderRuntimeEvent, setAfterRawEventPersistedForTest };

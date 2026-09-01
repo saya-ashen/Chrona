@@ -262,7 +262,7 @@ Important models:
 - `AiClient`
 - `AiFeatureBinding`
 
-Chrona stores AI client configuration in the database and binds clients to feature slots. `packages/engine/src/modules/ai` loads clients directly from this configuration; provider selection is not hard-coded in routes.
+Chrona stores AI client configuration in the database and binds clients to feature slots. `packages/engine/src/modules/ai` loads clients directly from this configuration; provider selection is not hard-coded in routes. Manual task-form review is persisted as an `AiFeatureRun` with subject type `task_node_attempt`; its operation id is the durable node-attempt id, so refresh/recovery reuses the completed review. The final validated form itself remains in existing plan/node-result JSON and requires no database schema change.
 
 ## Workspace and task-kind state
 
@@ -292,6 +292,12 @@ See [Long-Horizon Goals and Triggers](./long-horizon-goals-and-triggers.md).
 - Do not create a migration folder for every schema edit. Accumulate subsequent
   unreleased schema changes in the current release-line migration and keep it
   aligned with `prisma/schema.prisma`.
+- If an earlier checksum of that mutable migration has already been applied to
+  an unreleased development database, add a checksum-keyed SQL amendment inside
+  the same migration folder and register its source schema fingerprint in
+  `release-metadata.json`. Startup applies it only to that exact known source,
+  verifies the final release-line fingerprint, and updates migration history in
+  the same transaction.
 - After a public release ships, migrations in that release are immutable. Do not
   edit, rename, delete, or squash them; start the next release-line migration
   from the shipped release state.

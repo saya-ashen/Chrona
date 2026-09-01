@@ -16,6 +16,8 @@ export type NodeExecutionPlanContext = {
   goal: string;
   assumptions: string[];
   summary?: string;
+  taskTitle?: string;
+  taskDescription?: string;
   goalContext?: {
     goal: {
       title: string;
@@ -37,12 +39,12 @@ export type NodeExecutionPlanContext = {
     }>;
     assets?: Array<{
       ref: string;
-      label: string;
+      title: string;
+      description: string;
       kind: string;
       role: string;
-      version: number | null;
+      version: number;
       updatedAt: string;
-      content: string;
     }>;
   };
 };
@@ -97,6 +99,7 @@ export type NodeExecutionResult =
       status: "waiting_for_user";
       prompt: string;
       reason: string;
+      waitKind?: "user_input" | "manual_completion";
       evidence?: NodeExecutionEvidence;
       actionForm?: NodeActionForm;
     }

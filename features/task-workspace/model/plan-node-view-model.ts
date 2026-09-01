@@ -44,6 +44,8 @@ export type PlanNodeGroup = "active" | "attention" | "upcoming" | "done" | "idle
 export type PlanNodeField = {
   key: string;
   label: string;
+  description?: string;
+  placeholder?: string;
   value: string | boolean | string[];
   control?: "text" | "textarea" | "select" | "approval" | "choice" | "boolean";
   required?: boolean;

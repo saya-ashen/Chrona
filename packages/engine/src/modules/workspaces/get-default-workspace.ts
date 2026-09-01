@@ -1,6 +1,5 @@
 import { WorkspaceStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
-import { HERMES_EXECUTION_RUNTIME } from "@chrona/hermes";
 
 export const DEFAULT_WORKSPACE_ID = "ws_default";
 
@@ -8,7 +7,6 @@ type DefaultWorkspace = {
   id: string;
   name: string;
   description: string | null;
-  defaultRuntime: string;
   status: WorkspaceStatus;
 };
 
@@ -29,7 +27,6 @@ const defaultWorkspaceSelect = {
   id: true,
   name: true,
   description: true,
-  defaultRuntime: true,
   status: true,
 } as const;
 
@@ -59,7 +56,6 @@ export async function getDefaultWorkspace(): Promise<DefaultWorkspace> {
         id: DEFAULT_WORKSPACE_ID,
         name: "Default Workspace",
         description: "Auto-created primary workspace for the control plane.",
-        defaultRuntime: HERMES_EXECUTION_RUNTIME,
         status: WorkspaceStatus.Active,
       },
       select: defaultWorkspaceSelect,

@@ -131,6 +131,42 @@ describe("createTaskAiSidebarContext", () => {
     expect(approvalContext.primaryAction).toBe("Review the request, then approve, reject, or request changes");
     expect(approvalContext.nodeState).toBe("Approval needed");
   });
+  it("uses accepted-result follow-up copy instead of a stale execution summary", () => {
+    const data = createTaskWorkspaceFixturePageData({
+      task: {
+        status: "Completed",
+        executionSummary: createExecutionSummary({
+          executionState: "completed",
+          stateLabel: "Result ready",
+          currentNodeId: null,
+          primaryAction: {
+            type: "none",
+            enabled: true,
+            label: "Accept result or request changes",
+          },
+        }),
+      },
+      latestRunSummary: {
+        id: "run-accepted",
+        status: "Completed",
+        startedAt: "2026-05-22T00:00:00.000Z",
+        syncStatus: "healthy",
+      },
+      resultReview: {
+        status: "accepted",
+        runId: "run-accepted",
+        acceptedAt: "2026-05-22T00:05:00.000Z",
+      },
+    });
+
+    const { context } = createTaskAiSidebarContext(data.task, { pageData: data });
+
+    expect(context.type).toBe("task");
+    if (context.type !== "task") throw new Error("Expected task context");
+    expect(context.primaryAction).toBe("Ask a follow-up or create a next task");
+    expect(context.nodeState).toBe("Task done");
+  });
+
   it("uses result-review copy for completed tasks waiting on acceptance", () => {
     const data = createTaskWorkspaceFixturePageData({
       task: {

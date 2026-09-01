@@ -69,6 +69,34 @@ describe("Claude Code declared-tool registration", () => {
     expect(mcpServers?.run_tools?.name).toBe("run_tools");
   });
 
+  test("registers the run-scoped Chrona MCP control plane", async () => {
+    const runner = await createClaudeCodeRunner({
+      mcpBaseUrl: "http://unused.test/",
+      mcpRunToken: "",
+    });
+
+    await runner.start({
+      clientOperationId: "claude-code-chrona-control",
+      sessionId: "chrona:task:task-1:execute:plan-1",
+      instructions: "Complete the current Chrona node.",
+      input: { type: "text", text: "Return the requested result." },
+      terminalToolName: "chrona_node_complete",
+      control: {
+        baseUrl: "http://127.0.0.1:3101/api",
+        runToken: "run-token",
+      },
+    } satisfies StartRunInput);
+
+    const mcpServers = capturedOptions?.["mcpServers"] as
+      | { chrona?: { type?: string; url?: string; headers?: Record<string, string> } }
+      | undefined;
+    expect(mcpServers?.chrona).toEqual({
+      type: "http",
+      url: "http://127.0.0.1:3101/api/mcp?session_id=chrona%3Atask%3Atask-1%3Aexecute%3Aplan-1",
+      headers: { Authorization: "Bearer run-token" },
+    });
+  });
+
   test("does not pass synthetic Claude Code run ids to SDK resume", async () => {
     const runner = await createClaudeCodeRunner({
       mcpBaseUrl: "http://unused.test/",
@@ -161,5 +189,21 @@ describe("Claude Code health probe", () => {
     nextQueryMessages = [{ type: "result", subtype: "error_during_execution", is_error: true, errors: ["invalid auth"] }];
 
     await expect(probeClaudeCodeSdk({ config: { mcpBaseUrl: "http://unused.test", mcpRunToken: "" }, timeoutMs: 1000 })).resolves.toContain("invalid auth");
+  });
+
+  test("surfaces a redacted provider error when the SDK labels it success", async () => {
+    nextQueryMessages = [{
+      type: "result",
+      subtype: "success",
+      is_error: true,
+      result: "Failed to authenticate with sk-live-sensitive-token: OAuth access token has been revoked.",
+    }];
+
+    const reason = await probeClaudeCodeSdk({
+      config: { mcpBaseUrl: "http://unused.test", mcpRunToken: "" },
+      timeoutMs: 1000,
+    });
+    expect(reason).toContain("access token has been revoked");
+    expect(reason).not.toContain("sk-live-sensitive-token");
   });
 });

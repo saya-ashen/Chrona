@@ -89,6 +89,10 @@ export const TEST_COMMANDS: CommandGroup = {
   mobile: { description: "Playwright mobile viewport", steps: [bunStep("playwright mobile", ["x", "playwright", "test", "--project=mobile"], true)] },
   "llm:record": { description: "Record LLM fixtures", steps: [bunStep("llm record", ["test", "packages/engine/src/test/llm-fixtures.bun.test.ts", "--record"], true)] },
   "llm:replay": { description: "Replay LLM fixtures", steps: [bunStep("llm replay", ["test", "packages/engine/src/test/llm-fixtures.bun.test.ts"], true)] },
+  "providers:live": {
+    description: "Opt-in real provider health, capability, and read-only turn smoke",
+    steps: [bunStep("live provider smoke", ["run", "scripts/live-provider-smoke.ts"], true)],
+  },
 };
 
 const BUILD_BINARY_COMMANDS = Object.fromEntries(
@@ -123,6 +127,7 @@ export const COMMANDS: Record<string, CommandGroup> = {
         bunStep("lint ratchet", ["run", "scripts/lint-ratchet.ts"]),
         dependencyCruiserStep("boundaries"),
         bunStep("ui foundation", ["run", "scripts/check-ui-foundation.mjs"]),
+        bunStep("release consistency", ["run", "scripts/check-release-consistency.ts"]),
       ],
     },
     types: {
@@ -135,6 +140,7 @@ export const COMMANDS: Record<string, CommandGroup> = {
     lint: { description: "ESLint changed-file zero-warning ratchet", steps: [bunStep("lint ratchet", ["run", "scripts/lint-ratchet.ts"], true)] },
     boundaries: { description: "Package and feature boundary checks", steps: [dependencyCruiserStep("boundaries", true)] },
     ui: { description: "UI foundation rules", steps: [bunStep("ui foundation", ["run", "scripts/check-ui-foundation.mjs"], true)] },
+    release: { description: "Release/tag/package/migration consistency", steps: [bunStep("release consistency", ["run", "scripts/check-release-consistency.ts"], true)] },
   },
   test: TEST_COMMANDS,
   db: {
@@ -153,6 +159,9 @@ export const COMMANDS: Record<string, CommandGroup> = {
   },
   plugin: {
     hermes: { description: "Install Hermes plugin", steps: [{ label: "install Hermes plugin", acceptsExtraArgs: true, run: async (extraArgs) => { await $`bash ${["external-plugins/hermes/install.sh", ...extraArgs]}`.cwd(ROOT); } }] },
+  },
+  doctor: {
+    all: { description: "Inspect and repair local runtime state", steps: [bunStep("doctor", ["run", "packages/cli/src/bun-entry.ts", "doctor"], true)] },
   },
 };
 
@@ -251,12 +260,20 @@ export async function runCommand(command: Command, passthrough: string[]) {
 
 export async function main() {
   const { commandArgs, passthrough } = normalizeArgs(process.argv.slice(2));
-  const command = resolveCommand(commandArgs);
+  // Keep the ergonomic `chrona doctor --repair-stale-lock` form while
+  // retaining `--` passthrough for commands that have a named subcommand.
+  const inlinePassthrough = commandArgs[1]?.startsWith("-")
+    ? commandArgs.slice(1)
+    : [];
+  const lookupArgs = inlinePassthrough.length > 0
+    ? commandArgs.slice(0, 1)
+    : commandArgs;
+  const command = resolveCommand(lookupArgs);
   if (!command) {
     if (command === null) printHelp();
     return;
   }
-  await runCommand(command, passthrough);
+  await runCommand(command, [...inlinePassthrough, ...passthrough]);
 }
 
 if (import.meta.main) {

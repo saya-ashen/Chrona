@@ -130,9 +130,8 @@ Explore Chrona without connecting a real provider:
 
 Enable AI execution when you are ready:
 
-1. Go to `Settings -> AI Clients` and add a `Claude Code` or `Codex` client.
-2. Bind the client to features such as `task.plan`, `task.execution`, or
-   `dashboard.brief`.
+1. Go to `Settings -> AI Clients`, add the default OMP client, and run its configuration check. The check validates local SDK/model resolution only; the five-minute demo provider request is the proof of remote credentials and model access.
+2. Bind only the feature slots shown for that provider. OMP supports planning and Goal review through one terminal-only read-only attempt; an uncertain interrupted start fails closed and needs an explicit new operation.
 3. Generate a plan from the task workspace, review or edit the generated graph,
    then accept it.
 4. Start execution manually from the task workspace, or let Chrona move
@@ -166,12 +165,13 @@ providers as AI clients, then bind those clients to Chrona features.
 
 | Provider type | Status | Best for |
 | --- | --- | --- |
-| `claude_code` | Primary supported provider | Claude Code-backed plan generation and local task execution |
-| `codex` | Primary supported provider | Codex-backed plan generation and local task execution |
-| `hermes` | Pending update | Existing Hermes gateway setups for local or remote agent execution |
+| `omp` | Stable / Tier-1 | Default local SDK path for planning, Goal review, result finalization, execution, and dashboard briefs. Session history resumes where available; an uncertain terminal-only read-only start is never replayed automatically. |
+| `claude_code` | Beta | CLI adapter; stable first-run conformance evidence is not yet complete |
+| `codex` | Beta | ACP adapter; stable first-run conformance evidence is not yet complete |
+| `hermes` | Experimental | Existing gateway adapter; setup and stable conformance remain incomplete |
 
-Configure providers in `Settings -> AI Clients`, then bind the client to Chrona
-features such as `task.plan`, `task.execution`, or `dashboard.brief`.
+Configure providers in `Settings -> AI Clients`, then bind the client only to
+its displayed Chrona features. Planning/review accepts authoritative cross-process recovery or OMP's explicit terminal-only read-only single attempt; the latter fails closed instead of replaying an uncertain start.
 
 For provider fields, defaults, and troubleshooting, use the
 [full quick start](./docs/en/quick-start.md).
@@ -289,8 +289,7 @@ AI clients are configured in the web app under `Settings -> AI Clients`. See
 
 Yes. You can create tasks, schedule work, inspect the dashboard, and use task
 workspaces without an AI provider. Real AI plan generation and agent execution
-require a configured AI client. Use Claude Code or Codex for the primary local
-agent execution paths.
+require a configured AI client. Use OMP for the primary stable local planning and execution path; Claude Code and Codex remain Beta.
 
 ### Is Chrona production-ready?
 
@@ -347,6 +346,7 @@ schema-first contract rules, and testing expectations.
 | Provider boundary      | [docs/en/provider-boundary.md](./docs/en/provider-boundary.md)               |
 | Package boundaries     | [docs/en/package-boundaries.md](./docs/en/package-boundaries.md)             |
 | Roadmap                | [English](./docs/en/roadmap.md) / [中文](./docs/zh/roadmap.md)         |
+| Privacy and local data | [docs/en/privacy.md](./docs/en/privacy.md)                             |
 | Security               | [SECURITY.md](./SECURITY.md)                                           |
 | Code of Conduct        | [CODE_OF_CONDUCT.md](./CODE_OF_CONDUCT.md)                             |
 

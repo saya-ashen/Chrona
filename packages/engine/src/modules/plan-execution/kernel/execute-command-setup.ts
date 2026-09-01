@@ -22,6 +22,7 @@ type Runtime = NonNullable<Awaited<ReturnType<typeof ensureNativePlanRun>>>;
 export type PreparedCommandExecution = {
   trigger: ExecutionTrigger;
   runtime: Runtime;
+  taskContext: { title: string; description?: string };
   goalContext: ReturnType<typeof frozenGoalContext>;
   workBlockId: string | null;
   session: Awaited<ReturnType<typeof ensureExecutionSession>>;
@@ -253,13 +254,20 @@ export async function setupExecutionCommand(input: {
   const [mainSession, runtimeName, task] = await Promise.all([
     ensurePlanMainSession({ taskId, planId: runtime.planId }),
     getRuntimeName(taskId),
-    db.task.findUniqueOrThrow({ where: { id: taskId }, select: { goalContext: true } }),
+    db.task.findUniqueOrThrow({
+      where: { id: taskId },
+      select: { title: true, description: true, goalContext: true },
+    }),
   ]);
   return {
     kind: "ready",
     prepared: {
       trigger,
       runtime,
+      taskContext: {
+        title: task.title,
+        ...(task.description ? { description: task.description } : {}),
+      },
       goalContext: frozenGoalContext(task.goalContext),
       workBlockId: executionWorkBlockId,
       session,

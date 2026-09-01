@@ -68,7 +68,6 @@ async function createRecurringDailySeries(input: {
       title: "Recurring edge",
       status: "Ready",
       priority: "Medium",
-      executionRuntime: "hermes",
       executionConfig: {},
       recurrenceRule: `FREQ=DAILY;COUNT=${input.count}`,
       recurrenceAnchorStartAt: anchor,

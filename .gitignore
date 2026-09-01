@@ -122,8 +122,19 @@ Thumbs.db
 # ralph scratch notes
 progress.txt
 /.chrona
-/.pi/hindsight
+
+# local agent, dogfood, and generated review artifacts
+/.pi/
+/dogfood-output/
+/final_runs/
+/logs/
+/context.md
+/docs/architecture/
+
+# SQLite runtime sidecars are never release fixtures
+prisma/migrations/fixtures/*.sqlite-shm
+prisma/migrations/fixtures/*.sqlite-wal
+
 /.pi-subagents/
 prisma/*.sync-conflict-*.db*
-/.pi/subagents
 /outputs

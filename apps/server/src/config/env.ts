@@ -2,6 +2,7 @@ import { lookup } from "node:dns/promises";
 import { isIP } from "node:net";
 import { z } from "zod";
 import { applyChronaRuntimeConfigToEnv } from "@chrona/shared/runtime-config";
+import { isExactLoopbackHost, normalizeNetworkHost } from "@chrona/providers-foundation";
 
 
 const envSchema = z.object({
@@ -79,17 +80,10 @@ export function isTrustedRequestOrigin(
   return origin === new URL(requestUrl).origin;
 }
 
-function normalizeHost(host: string): string {
-  return host.trim().replace(/^\[/, "").replace(/\]$/, "").split("%")[0].toLowerCase();
-}
-
 function isLoopbackAddress(address: string): boolean {
-  const normalized = normalizeHost(address);
-  if (isIP(normalized) === 4) return normalized.startsWith("127.");
-  if (isIP(normalized) === 6) {
-    return normalized === "::1" || /^::ffff:127(?:\.\d{1,3}){3}$/.test(normalized);
-  }
-  return false;
+  const normalized = normalizeNetworkHost(address);
+  if (isExactLoopbackHost(normalized)) return true;
+  return isIP(normalized) === 6 && /^::ffff:127(?:\.\d{1,3}){3}$/.test(normalized);
 }
 
 /**
@@ -97,7 +91,7 @@ function isLoopbackAddress(address: string): boolean {
  * set is loopback. Resolution failures deliberately fail closed.
  */
 export async function isLoopbackBindHost(host: string): Promise<boolean> {
-  const normalized = normalizeHost(host);
+  const normalized = normalizeNetworkHost(host);
   if (isIP(normalized)) return isLoopbackAddress(normalized);
 
   try {

@@ -11,7 +11,6 @@ import {
   buildScheduleHref,
   buildScheduleViewHref,
 } from "./schedule-page-utils";
-import { getQuickCreateDefaults } from "./schedule-page-actions";
 import { buildSchedulePageViewModel } from "./schedule-page-view-model";
 import { SchedulePageHeader } from "./schedule-page-main-panel";
 import { SchedulePageMainPanel } from "./schedule-page-main-panel";
@@ -145,8 +144,6 @@ export function SchedulePage({
     activeGroupItems: viewModel.activeGroup?.items ?? [],
   });
 
-  const dialogDefaults = getQuickCreateDefaults(data);
-
   useEffect(() => {
     const { context, actions } = createScheduleAiSidebarContext({
       workspaceId,
@@ -263,8 +260,6 @@ export function SchedulePage({
               : null
           }
           externalEvents={externalEvents}
-          executionRuntimes={data.executionRuntimes}
-          defaultExecutionRuntime={data.defaultExecutionRuntime}
           readyCount={viewModel.display.planningDrawer.readyCount}
           onScheduleTask={() => setShowNewTaskDialog(true)}
           availableAiClients={data.availableAiClients}
@@ -311,8 +306,6 @@ export function SchedulePage({
         <SelectedBlockSheet
           item={viewModel.selectedItem}
           selectedDay={viewModel.activeDay}
-          executionRuntimes={data.executionRuntimes}
-          defaultExecutionRuntime={data.defaultExecutionRuntime}
           availableAiClients={data.availableAiClients}
           isPending={isPending}
           onClose={() => {
@@ -334,7 +327,6 @@ export function SchedulePage({
       <SchedulePageDialogs
         showQuickAddDialog={showNewTaskDialog}
         isPending={isPending}
-        dialogDefaults={dialogDefaults}
         data={data}
         viewModel={viewModel}
         activeView={activeView}

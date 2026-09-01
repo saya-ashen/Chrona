@@ -18,16 +18,21 @@ import type { TaskWorkspaceOperationState } from "../model/task-workspace-operat
 
 function pageData(overrides: Partial<TaskPageData> = {}): TaskPageData {
 	return {
-		defaultExecutionRuntime: "omp",
-		executionRuntimes: [],
-		availableAiClients: [{ id: "ai_1", name: "OMP", enabled: true }],
+		availableAiClients: [
+			{
+				id: "ai_1",
+				name: "OMP",
+				type: "omp",
+				isDefault: true,
+				enabled: true,
+			},
+		],
 		task: {
 			id: "task_1",
 			workspaceId: "workspace_1",
 			title: "Collect GitHub trending",
 			description:
 				"Return a summary report. Success means top projects are listed with links.",
-			executionRuntime: "omp",
 			executionConfig: null,
 			aiClientId: "ai_1",
 			autoPlanGeneration: false,
@@ -194,7 +199,6 @@ describe("task workspace interaction model", () => {
 			readiness: "ready",
 			startMode: "manual",
 			providerLabel: "OMP",
-			runtimeLabel: "omp",
 			firstStepLabel: "Fetch trending projects",
 			stepCount: 3,
 			estimatedMinutes: 10,
@@ -268,7 +272,9 @@ describe("task workspace interaction model", () => {
 		});
 
 		const acceptedPage = pageData({
-			task: { ...pageData().task, status: "Done" },
+			// Result acceptance is a separate review fact; the execution-owned Task
+			// status remains Completed.
+			task: { ...pageData().task, status: "Completed" },
 			latestRunSummary: completedPage.latestRunSummary,
 			resultReview: {
 				status: "accepted",
@@ -290,19 +296,33 @@ describe("task workspace interaction model", () => {
 			statusLabel: "Result ready",
 			nextActionLabel: "Accept result or request changes",
 		});
+		const acceptedOperation = operationState({
+			status: "execution-completed",
+			action: "none",
+		} as unknown as Partial<TaskWorkspaceOperationState>);
 		expect(
 			deriveTaskWorkspaceStage({
 				pageData: acceptedPage,
 				graphPlan: graphPlan(),
-				operationState: operationState({
-					status: "execution-completed",
-					action: "none",
-				} as unknown as Partial<TaskWorkspaceOperationState>),
+				operationState: acceptedOperation,
 			}),
 		).toMatchObject({
 			stage: "result",
 			statusLabel: "Task done",
 			nextActionLabel: "Ask a follow-up or create a next task",
+			primaryActionId: "ask_follow_up",
+		});
+		expect(
+			deriveTaskWorkspaceDisplayState({
+				pageData: acceptedPage,
+				graphPlan: graphPlan(),
+				operationState: acceptedOperation,
+				currentNode: null,
+			}),
+		).toMatchObject({
+			mode: "done",
+			primaryAction: "follow_up",
+			resultReview: { phase: "accepted" },
 		});
 		const waitingAcceptedPage = pageData({
 			task: { ...pageData().task, status: "WaitingForApproval" },
@@ -471,7 +491,6 @@ describe("task workspace interaction model", () => {
 			task: {
 				...pageData().task,
 				aiClientId: null,
-				executionRuntime: "",
 			},
 		});
 		const readiness = deriveTaskPlanningReadiness(input);
@@ -490,7 +509,15 @@ describe("task workspace interaction model", () => {
 		const baseTask = pageData().task;
 		for (const availableAiClients of [
 			[],
-			[{ id: "ai_1", name: "OMP", enabled: false }],
+			[
+				{
+					id: "ai_1",
+					name: "OMP",
+					type: "omp",
+					isDefault: true,
+					enabled: false,
+				},
+			],
 		]) {
 			const readiness = deriveTaskPlanningReadiness({
 				...pageData({ availableAiClients }),
@@ -511,7 +538,7 @@ describe("task workspace interaction model", () => {
 	it("does not treat an execution runtime as an AI provider", () => {
 		const readiness = deriveTaskPlanningReadiness({
 			...pageData({ availableAiClients: [] }),
-			task: { ...pageData().task, aiClientId: null, executionRuntime: "omp" },
+			task: { ...pageData().task, aiClientId: null },
 		});
 
 		expect(readiness.status).toBe("blocked");

@@ -3,7 +3,7 @@ import { Hono } from "hono";
 import { LATEST_PROTOCOL_VERSION } from "@modelcontextprotocol/sdk/types.js";
 import type { ChronaToolName } from "@chrona/contracts/api";
 import { db } from "@chrona/db";
-import { createChronaEngine } from "@chrona/engine";
+import { createChronaEngine, mintRunToken } from "@chrona/engine";
 import {
 	resetTestDb,
 	seedTask,
@@ -269,9 +269,109 @@ describe("MCP routes", () => {
 			"chrona_node_complete",
 			"chrona_node_fail",
 			"chrona_node_read",
+			"chrona_node_request_input",
 			"chrona_plan_read",
 			"chrona_wait_complete",
 		]);
+	});
+
+	it("records run-token terminal tools without re-entering graph execution", async () => {
+		const { workspaceId } = await seedWorkspace("MCP run-token terminal");
+		const { taskId } = await seedTask(workspaceId, { status: "Running" });
+		const run = await db.run.create({
+			data: {
+				taskId,
+				runtimeName: "codex",
+				runtimeSessionRef: "mcp-run-token-session",
+				status: "Running",
+				triggeredBy: "agent",
+			},
+		});
+		const plan = await db.taskPlan.create({
+			data: {
+				workspaceId,
+				taskId,
+				planId: "mcp-run-token-plan",
+				revision: 1,
+				status: "Accepted",
+				compiledPlan: {},
+			},
+		});
+		const planRun = await db.taskPlanRun.create({
+			data: { workspaceId, taskId, planId: plan.planId, planRun: {} },
+		});
+		const attempt = await db.taskPlanNodeAttempt.create({
+			data: {
+				workspaceId,
+				taskId,
+				planId: plan.planId,
+				planRunId: planRun.id,
+				nodeId: "node-1",
+				nodeLayerId: "layer-1",
+				idempotencyKey: "mcp-run-token-attempt",
+				attemptNumber: 1,
+				status: "running",
+				executionEpoch: 1,
+			},
+		});
+		const token = await mintRunToken({
+			taskId,
+			workspaceId,
+			runId: run.id,
+			runtimeSessionKey: "mcp-run-token-session",
+			nodeId: attempt.nodeId,
+			nodeAttemptId: attempt.id,
+		});
+		const testApp = app();
+		const headers = { ...mcpHeaders, authorization: `Bearer ${token}` };
+		const initResponse = await testApp.request(
+			"/api/mcp?session_id=mcp-run-token-session",
+			{
+				method: "POST",
+				headers,
+				body: JSON.stringify(rpc("initialize", {
+					protocolVersion: LATEST_PROTOCOL_VERSION,
+					capabilities: {},
+					clientInfo: { name: "codex-acp", version: "1.0.0" },
+				})),
+			},
+		);
+		const mcpSessionId = initResponse.headers.get("mcp-session-id");
+		const response = await testApp.request(
+			"/api/mcp?session_id=mcp-run-token-session",
+			{
+				method: "POST",
+				headers: {
+					...headers,
+					...(mcpSessionId ? { "mcp-session-id": mcpSessionId } : {}),
+				},
+				body: JSON.stringify(rpc("tools/call", {
+					name: "chrona_node_complete",
+					arguments: { summary: "Codex finished" },
+				}, 2)),
+			},
+		);
+
+		expect(response.status).toBe(200);
+		await expect(response.json()).resolves.toMatchObject({
+			result: {
+				structuredContent: {
+					status: "accepted",
+					kind: "complete",
+					recorded: true,
+					next: "stop",
+				},
+			},
+		});
+		expect(await db.taskPlanTerminalAction.findUnique({
+			where: { nodeAttemptId: attempt.id },
+		})).toMatchObject({
+			kind: "complete",
+			payload: { summary: "Codex finished" },
+		});
+		expect(await db.runToken.findFirst({
+			where: { runId: run.id, nodeAttemptId: attempt.id },
+		})).toMatchObject({ revokedAt: expect.any(Date) });
 	});
 
 	it("lists minimal external tool schemas with descriptions", () => {
@@ -451,7 +551,12 @@ describe("MCP routes", () => {
 				{ query: "research", offset: 0, maxChars: 12_000, limit: 3 },
 			],
 			["chrona.plan.read", executionSessionId, {}, {}],
-			["chrona.node.read", executionSessionId, {}, {}],
+			[
+				"chrona.node.read",
+				executionSessionId,
+				{},
+				{ offset: 0, maxChars: 12_000 },
+			],
 			[
 				"chrona.node.complete",
 				executionSessionId,
@@ -502,6 +607,65 @@ describe("MCP routes", () => {
 			});
 			expect(operations[0].input.payload).toEqual(expectedPayload);
 		}
+	});
+
+	it("[RUN-003] forwards bounded AI-visible node-result reads through MCP", async () => {
+		const operations: CapturedToolOperation[] = [];
+		await callTool(
+			"chrona.node.read",
+			{
+				ref: "N20260820-01",
+				offset: 120,
+				maxChars: 4_000,
+				_meta: { sessionId: "chrona:task:task-1:execute" },
+			},
+			{ operations },
+		);
+
+		expect(operations).toHaveLength(1);
+		expect(operations[0]).toMatchObject({
+			toolName: "chrona.node.read",
+			input: {
+				sessionId: "chrona:task:task-1:execute",
+				payload: {
+					ref: "N20260820-01",
+					offset: 120,
+					maxChars: 4_000,
+				},
+			},
+		});
+
+		const visible = await callTool(
+			"chrona.node.read",
+			{
+				ref: "N20260820-01",
+				_meta: { sessionId: "chrona:task:task-1:execute" },
+			},
+			{
+				resultOverride: {
+					state: {
+						result: {
+							node: { ref: "N20260820-01", title: "Prepare menu" },
+							result: {
+								content: '{"findings":[{"key":"dinner.menu"}]}',
+								nextOffset: null,
+							},
+						},
+					},
+				},
+			},
+		);
+		const text = visible.content[0]?.type === "text"
+			? visible.content[0].text
+			: "";
+		expect(JSON.parse(text)).toMatchObject({
+			state: {
+				result: {
+					node: { ref: "N20260820-01" },
+					result: { nextOffset: null },
+				},
+			},
+		});
 	});
 
 	it("generates idempotency keys for mutating tools without exposing them to the model", async () => {
@@ -557,7 +721,12 @@ describe("MCP routes", () => {
 		const cases = [
 			["chrona.execution.read", executionSessionId, {}, {}],
 			["chrona.plan.read", hiddenContextArguments.sessionId, {}, {}],
-			["chrona.node.read", executionSessionId, {}, {}],
+			[
+				"chrona.node.read",
+				executionSessionId,
+				{},
+				{ offset: 0, maxChars: 12_000 },
+			],
 			[
 				"chrona.node.complete",
 				executionSessionId,

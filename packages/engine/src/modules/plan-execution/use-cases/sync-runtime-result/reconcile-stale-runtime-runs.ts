@@ -68,7 +68,7 @@ async function findRunningProviderRuns(input: { taskId?: string; limit?: number 
       ],
     },
     include: {
-      task: { select: { executionRuntime: true, defaultSessionId: true, latestRunId: true, status: true, aiClientId: true } },
+      task: { select: { defaultSessionId: true, latestRunId: true, status: true, aiClientId: true } },
       nodeAttempt: { select: { nodeId: true } },
     },
     orderBy: { updatedAt: "asc" },

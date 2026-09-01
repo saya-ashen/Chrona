@@ -59,7 +59,7 @@ describe("plan-runner task executor runtime events", () => {
         executionScope: expect.any(String),
         nodeId: "task_node",
         nodeTitle: "Execute mocked task node",
-        runtimeName: "hermes",
+        runtimeName: "unconfigured",
         event: {
           type: "text_delta",
           provider: "hermes",

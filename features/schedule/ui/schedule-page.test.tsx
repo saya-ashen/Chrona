@@ -264,19 +264,6 @@ afterEach(() => {
 
 function createData(): SchedulePageData {
   return {
-    defaultExecutionRuntime: "hermes",
-    executionRuntimes: [
-      {
-        key: "hermes",
-        label: "Hermes",
-        spec: {
-          runtime: "hermes",
-          version: "hermes-v1",
-          fields: [],
-          runnability: { requiredPaths: [] },
-        },
-      },
-    ],
     summary: {
       scheduledCount: 1,
       unscheduledCount: 0,
@@ -337,7 +324,6 @@ function createData(): SchedulePageData {
         latestRunStatus: null,
         scheduleProposalCount: 0,
         lastActivityAt: null,
-        executionRuntime: "hermes",
         executionConfig: {
           approvalPolicy: "never",
           toolMode: "workspace-write",
@@ -590,7 +576,6 @@ describe("SchedulePage data display", () => {
         latestRunStatus: null,
         scheduleProposalCount: 0,
         lastActivityAt: null,
-        executionRuntime: "hermes",
         executionConfig: {},
         autoPlanGeneration: false,
         autoExecute: false,
@@ -642,7 +627,6 @@ describe("SchedulePage data display", () => {
         latestRunStatus: null,
         scheduleProposalCount: 0,
         lastActivityAt: null,
-        executionRuntime: "hermes",
         executionConfig: {},
         autoPlanGeneration: false,
         autoExecute: false,

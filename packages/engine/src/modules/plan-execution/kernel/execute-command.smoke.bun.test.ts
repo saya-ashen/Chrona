@@ -91,6 +91,8 @@ describe("kernel executeCommand (single-writer)", () => {
     await db.task.update({
       where: { id: task.id },
       data: {
+        title: "Find funded AI Agent PhD positions",
+        description: "Use my frozen Goal context and return a concise shortlist.",
         goalContext: {
           goal: {
             title: "Apply for an AI Agent PhD",
@@ -117,6 +119,10 @@ describe("kernel executeCommand (single-writer)", () => {
     });
 
     const call = executeTaskNodeCapabilityMock.mock.calls[0]?.[0];
+    expect(call?.planContext).toMatchObject({
+      taskTitle: "Find funded AI Agent PhD positions",
+      taskDescription: "Use my frozen Goal context and return a concise shortlist.",
+    });
     expect(call?.planContext?.goalContext).toEqual({
       goal: {
         title: "Apply for an AI Agent PhD",

@@ -3,6 +3,28 @@ import { validateChronaSpec } from "../document/validate";
 import { buildActionSpec } from "./build-action-spec";
 
 describe("buildActionSpec", () => {
+  it("preserves manual form guidance and placeholders", () => {
+    const spec = buildActionSpec({
+      fields: [{
+        key: "result",
+        label: "Result",
+        description: "Record what happened.",
+        placeholder: "Per-item results",
+        value: "",
+        control: "textarea",
+        required: true,
+      }],
+      actions: [],
+    });
+    expect(spec.elements["field:result:description"]).toMatchObject({
+      type: "Text",
+      props: { text: "Record what happened." },
+    });
+    expect(spec.elements["field:result"]).toMatchObject({
+      type: "Textarea",
+      props: { placeholder: "Per-item results" },
+    });
+  });
   it("single checkpoint action: Select field + Submit button bound to submit-checkpoint", () => {
     const spec = buildActionSpec({
       fields: [{ key: "decision", label: "Decision", value: "", control: "approval", required: true }],

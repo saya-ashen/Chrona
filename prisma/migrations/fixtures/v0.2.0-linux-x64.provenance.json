@@ -1,0 +1,13 @@
+{
+  "formatVersion": 1,
+  "releaseTag": "v0.2.0",
+  "releaseAsset": {
+    "url": "https://github.com/saya-ashen/Chrona/releases/download/v0.2.0/chrona-linux-x64.tar.gz",
+    "sha256": "4f5933d3b64aad7696d9b1509e6f2dfcfc3efb49b89770cafa9f7c426b988ddf"
+  },
+  "database": {
+    "path": "data/chrona.db",
+    "sha256": "62d74fcba6e430e295f1cb913d0c3086711d18ca88112c9cd9805833b44f9c63",
+    "schemaFingerprint": "8c2375e5c72c2f101d8ca843649656f9bf0114717f9d672e378ca86371250419"
+  }
+}

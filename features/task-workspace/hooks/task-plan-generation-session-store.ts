@@ -121,7 +121,9 @@ type AiPlanGenerationStatus =
 	| "accepted"
 	| "generating"
 	| "idle"
-	| "waiting_acceptance";
+	| "waiting_acceptance"
+	| "failed"
+	| "cancelled";
 
 function isSessionStatus(
 	value: unknown,
@@ -223,6 +225,45 @@ function applyStateSnapshotToSession(
 	});
 }
 
+/** Reconcile local SSE state with every durable `/plan` response. */
+export function reconcileTaskPlanGenerationSession(
+	taskId: string,
+	workBlockId: string | null | undefined,
+	snapshot: {
+		aiPlanGenerationStatus?: string | null;
+		generationSession?: {
+			id?: string | null;
+			status?: string | null;
+			headStateVersion?: number | null;
+			finishedAt?: string | null;
+		} | null;
+	},
+) {
+	const status = snapshot.aiPlanGenerationStatus ?? snapshot.generationSession?.status;
+	if (!status || status === "generating") return;
+	const sessionStatus =
+		status === "waiting_acceptance" || status === "accepted"
+			? "completed"
+			: status === "failed"
+				? "failed"
+				: status === "cancelled"
+					? "cancelled"
+					: null;
+	if (!sessionStatus) return;
+	patchState(sessionKey(taskId, workBlockId), (state) => ({
+		...state,
+		generationId: snapshot.generationSession?.id ?? state.generationId,
+		headStateVersion:
+			snapshot.generationSession?.headStateVersion ?? state.headStateVersion,
+		sessionStatus,
+		isLoading: false,
+		phase: sessionStatus === "completed" ? "done" : sessionStatus === "failed" ? "error" : "idle",
+		finishedAt: snapshot.generationSession?.finishedAt ?? state.finishedAt,
+		connected: false,
+		hydrated: true,
+	}));
+}
+
 export async function startTaskPlanGenerationSession(input: {
 	taskId: string;
 	workBlockId?: string | null;
@@ -291,6 +332,12 @@ export async function stopTaskPlanGenerationSession(
 		phase: "idle",
 		connected: false,
 	}));
+	storeBindingsByKey.get(key)?.store.update({
+		"/plan/status": "idle",
+		"/plan/generation/status": "cancelled",
+		"/plan/generation/is-running": false,
+		"/plan/generation/header-action-disabled": false,
+	});
 
 	const query = workBlockId
 		? `?workBlockId=${encodeURIComponent(workBlockId)}`
@@ -309,6 +356,12 @@ export async function stopTaskPlanGenerationSession(
 			error:
 				error instanceof Error ? error.message : "Failed to stop generation",
 		}));
+		storeBindingsByKey.get(key)?.store.update({
+			"/plan/status": "generating",
+			"/plan/generation/status": "running",
+			"/plan/generation/is-running": true,
+			"/plan/generation/header-action-disabled": true,
+		});
 		throw error;
 	}
 }

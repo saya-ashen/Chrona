@@ -1295,7 +1295,7 @@ function ExecutionResults(props: ExecutionResultsProps) {
 						copy={workspaceCopy}
 						isProducingOutput={isLive}
 					/>
-					{status === "failed" || status === "stalled" ? (
+					{status === "failed" || status === "stalled" || finalizationRetryError ? (
 						<FinalizationRetry
 							copy={workspaceCopy}
 							error={finalizationRetryError}

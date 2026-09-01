@@ -11,6 +11,7 @@ import type {
   OmpApiType,
   RuntimeProviderInput,
   RuntimeProviderOption,
+  RuntimeProviderSupportTier,
   TestResult,
   TestStatus,
 } from "./ai-client-types";
@@ -26,14 +27,16 @@ const OMP_API_TYPES: OmpApiType[] = [
   "openrouter",
 ];
 const PROVIDER_SORT_RANK: Record<string, number> = {
-  claude_code: 0,
-  codex: 1,
-  omp: 2,
+  omp: 0,
+  claude_code: 1,
+  codex: 2,
   llm: 3,
   debug: 4,
   hermes: 99,
 };
-const RECOMMENDED_FEATURE_ORDER = ["task.plan", "task.execution", "dashboard.brief"];
+// Durable bindings require a live capability inspection on save, so never
+// preselect them before the user has confirmed a healthy provider.
+const RECOMMENDED_FEATURE_ORDER = ["task.execution", "dashboard.brief"];
 const DURABLE_RUNTIME_FEATURES = new Set(["goal.review", "task.plan"]);
 const FEATURE_COPY: Record<string, { label: string; description: string }> = {
   suggest: { label: "Smart Suggestions", description: "Generate task and schedule suggestions." },
@@ -46,9 +49,34 @@ const FEATURE_COPY: Record<string, { label: string; description: string }> = {
   "task.execution": { label: "Task Execution", description: "Execute approved task steps." },
 };
 
+function isExactLoopbackHostname(hostname: string): boolean {
+  const normalized = hostname.trim().replace(/^\[/, "").replace(/\]$/, "").toLowerCase();
+  return normalized === "localhost" || normalized === "::1" || /^127(?:\.\d{1,3}){3}$/.test(normalized);
+}
+
+/** Browser mirror of Hermes transport validation; server revalidates before fetch. */
+export function validateHermesRemoteBaseUrl(value: string, requiredMessage: string): true | string {
+  const trimmed = value.trim();
+  if (!trimmed) return requiredMessage;
+  if (!/^https?:\/\//i.test(trimmed)) return "Use a full https:// URL for remote Hermes.";
+  try {
+    const url = new URL(trimmed);
+    if (url.username || url.password) return "Remote Hermes URL must not include credentials.";
+    if (!url.hostname) return "Remote Hermes URL must include a host.";
+    if (!isExactLoopbackHostname(url.hostname) && url.protocol !== "https:") return "Remote Hermes requires HTTPS.";
+    return true;
+  } catch {
+    return "Remote Hermes URL is malformed.";
+  }
+}
+
 function nonEmpty(value: string): string | undefined {
   const trimmed = value.trim();
   return trimmed || undefined;
+}
+
+function clearable(value: string): string | null {
+  return nonEmpty(value) ?? null;
 }
 
 function timeoutMs(timeoutSeconds: string): number {
@@ -57,7 +85,7 @@ function timeoutMs(timeoutSeconds: string): number {
 
 function buildClaudeCodeConfig(input: ClientFormValues): Record<string, unknown> {
   const model = nonEmpty(input.model);
-  const baseUrl = nonEmpty(input.baseUrl);
+  const baseUrl = clearable(input.baseUrl);
   const authToken = nonEmpty(input.apiKey);
   const configDirectory = nonEmpty(input.configDirectory);
   const env = Object.fromEntries([
@@ -65,14 +93,14 @@ function buildClaudeCodeConfig(input: ClientFormValues): Record<string, unknown>
     ["ANTHROPIC_BASE_URL", baseUrl],
     ["ANTHROPIC_AUTH_TOKEN", authToken],
     ["CLAUDE_CONFIG_DIR", configDirectory],
-  ].filter((entry): entry is [string, string] => entry[1] !== undefined));
+  ].filter((entry): entry is [string, string] => typeof entry[1] === "string"));
   return { model, timeoutMs: timeoutMs(input.timeoutSeconds), configDirectory, profileName: nonEmpty(input.profileName), env: Object.keys(env).length ? env : undefined };
 }
 
 function buildCodexConfig(input: ClientFormValues): Record<string, unknown> {
   const configDirectory = nonEmpty(input.configDirectory);
   return {
-    model: nonEmpty(input.model), baseUrl: nonEmpty(input.baseUrl), apiKey: nonEmpty(input.apiKey), configDirectory,
+    model: nonEmpty(input.model), baseUrl: clearable(input.baseUrl), apiKey: nonEmpty(input.apiKey), configDirectory,
     profileName: nonEmpty(input.profileName), env: configDirectory ? { CODEX_HOME: configDirectory } : undefined,
     timeoutMs: timeoutMs(input.timeoutSeconds),
   };
@@ -81,7 +109,7 @@ function buildCodexConfig(input: ClientFormValues): Record<string, unknown> {
 function buildOmpConfig(input: ClientFormValues): Record<string, unknown> {
   return {
     provider: nonEmpty(input.provider), model: nonEmpty(input.model), api: input.api,
-    apiKey: nonEmpty(input.apiKey), baseUrl: nonEmpty(input.baseUrl),
+    apiKey: nonEmpty(input.apiKey), baseUrl: clearable(input.baseUrl),
     homeDirectory: nonEmpty(input.homeDirectory), configDirectory: nonEmpty(input.configDirectory),
     codingAgentDirectory: nonEmpty(input.codingAgentDirectory), timeoutMs: timeoutMs(input.timeoutSeconds),
   };
@@ -110,7 +138,12 @@ export function normalizeRuntimeProviders(input: unknown): RuntimeProviderOption
   const providers = (input as { providers?: unknown[] }).providers ?? [];
   return providers
     .filter((provider): provider is RuntimeProviderInput & { key: AiClientType } => hasProviderKey(provider))
-    .map((provider) => ({ key: provider.key, label: typeof provider.label === "string" ? provider.label : provider.key, features: Array.isArray(provider.features) ? provider.features.filter((feature): feature is string => typeof feature === "string") : [] }))
+    .map((provider) => ({
+      key: provider.key,
+      label: typeof provider.label === "string" ? provider.label : provider.key,
+      features: Array.isArray(provider.features) ? provider.features.filter((feature): feature is string => typeof feature === "string") : [],
+      tier: (provider.tier === "stable" || provider.tier === "beta" || provider.tier === "experimental" ? provider.tier : "experimental") as RuntimeProviderSupportTier,
+    }))
     .sort((left, right) => (PROVIDER_SORT_RANK[left.key] ?? 50) - (PROVIDER_SORT_RANK[right.key] ?? 50));
 }
 
@@ -152,9 +185,19 @@ export function getStatusVariant(status: TestStatus): "default" | "secondary" | 
   return status === "available" ? "default" : status === "unavailable" ? "destructive" : status === "testing" ? "secondary" : "outline";
 }
 
+function testResult(data: { available?: boolean; reason?: string }): TestResult {
+  return {
+    status: data.available ? "available" : "unavailable",
+    reason: data.reason ?? null,
+  };
+}
+
 export async function testClientAvailability(payload: ClientFormPayload): Promise<TestResult> {
-  const data = await aiClientsApi.test(payload);
-  return { status: data.available ? "available" : "unavailable", reason: data.reason ?? null };
+  return testResult(await aiClientsApi.test(payload));
+}
+
+export async function testExistingClientAvailability(clientId: string): Promise<TestResult> {
+  return testResult(await aiClientsApi.testExisting(clientId));
 }
 
 export async function diagnoseHermes(values: ClientFormValues): Promise<HermesIntegrationResult> {
@@ -195,7 +238,7 @@ function configValue(config: StoredClientConfig, key: keyof StoredClientConfig, 
 }
 
 function initialClientType(initial: AiClientInfo | undefined, providers: RuntimeProviderOption[]): AiClientType {
-  const fallback = providers.find((provider) => provider.key === "claude_code")?.key ?? providers[0]?.key ?? "claude_code";
+  const fallback = providers.find((provider) => provider.key === "omp")?.key ?? providers[0]?.key ?? "omp";
   return initial && providers.some((provider) => provider.key === initial.type) ? initial.type : fallback;
 }
 

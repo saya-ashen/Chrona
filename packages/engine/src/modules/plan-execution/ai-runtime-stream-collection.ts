@@ -20,23 +20,61 @@ type SnapshotContext = {
   terminalToolName?: string;
 };
 
+type ProviderRunCollectionOptions = {
+  onRuntimeEvent?: (event: ProviderRunEvent) => Promise<void> | void;
+  eventPersistence?: RuntimeEventPersistenceContext;
+  terminalToolName?: string;
+  signal?: AbortSignal;
+};
+
+type ProviderRunCollection = {
+  snapshot: ProviderRunSnapshot | null;
+  terminalToolCall?: Extract<ProviderRunEvent, { type: "tool_call" }>;
+};
+
 export async function collectProviderRunSnapshot(
   provider: string,
   events: AsyncIterable<ProviderRunEvent>,
   fallbackSessionId: string,
   fallbackRun?: { runId: string; nativeRunId?: string; sessionId?: string; nativeSessionId?: string },
-  options: {
-    onRuntimeEvent?: (event: ProviderRunEvent) => Promise<void> | void;
-    eventPersistence?: RuntimeEventPersistenceContext;
-    terminalToolName?: string;
-  } = {},
+  options: ProviderRunCollectionOptions = {},
 ): Promise<ProviderRunSnapshot> {
   const boundary = createProviderStreamEventBoundary({
     provider,
     runId: fallbackRun?.runId ?? "",
     sessionId: fallbackRun?.sessionId ?? fallbackSessionId,
   });
-  let snapshot: ProviderRunSnapshot | null = null;
+  const context = { provider, fallbackSessionId, fallbackRun };
+  const collection: ProviderRunCollection = { snapshot: null };
+  try {
+    await consumeProviderEvents(events, boundary, context, options, collection);
+  } catch (error) {
+    const recorded = await recordedSnapshotAfterTerminalAction(
+      context,
+      options,
+      collection.terminalToolCall,
+    );
+    if (recorded) return recorded;
+    throw error;
+  }
+  const recorded = await recordedSnapshotAfterTerminalAction(
+    context,
+    options,
+    collection.terminalToolCall,
+  );
+  if (recorded) return recorded;
+  finishProviderEventBoundary(boundary);
+  if (!collection.snapshot) throw new IncompleteRunStreamError();
+  return collection.snapshot;
+}
+
+async function consumeProviderEvents(
+  events: AsyncIterable<ProviderRunEvent>,
+  boundary: ProviderStreamEventBoundary,
+  context: SnapshotContext,
+  options: ProviderRunCollectionOptions,
+  collection: ProviderRunCollection,
+): Promise<void> {
   let terminalToolName: string | undefined;
   let eventIndex = 0;
   for await (const value of events) {
@@ -44,12 +82,66 @@ export async function collectProviderRunSnapshot(
     eventIndex += 1;
     await options.onRuntimeEvent?.(event);
     await persistProviderRuntimeEvent({ context: options.eventPersistence, event, fallbackIndex: eventIndex });
-    snapshot = snapshotForProviderEvent(event, { provider, fallbackSessionId, fallbackRun, terminalToolName }) ?? snapshot;
+    collection.snapshot = snapshotForProviderEvent(event, { ...context, terminalToolName }) ?? collection.snapshot;
     terminalToolName = terminalToolForEvent(event, terminalToolName);
+    if (event.type === "tool_call" && event.tool === options.terminalToolName) {
+      collection.terminalToolCall = event;
+    }
   }
-  finishProviderEventBoundary(boundary);
-  if (!snapshot) throw new IncompleteRunStreamError();
-  return snapshot;
+}
+
+async function recordedSnapshotAfterTerminalAction(
+  context: SnapshotContext,
+  options: ProviderRunCollectionOptions,
+  terminalToolCall?: ProviderRunCollection["terminalToolCall"],
+): Promise<ProviderRunSnapshot | null> {
+  if (terminalToolCall && options.signal && !options.signal.aborted) {
+    await waitForTerminalAction(options.signal);
+  }
+  return recordedTerminalActionSnapshot({ ...context, signal: options.signal, terminalToolCall });
+}
+
+async function waitForTerminalAction(signal: AbortSignal): Promise<void> {
+  if (signal.aborted) return;
+  await Promise.race([
+    new Promise<void>((resolve) =>
+      signal.addEventListener("abort", () => resolve(), { once: true }),
+    ),
+    new Promise<void>((resolve) => setTimeout(resolve, 250)),
+  ]);
+}
+
+function recordedTerminalActionSnapshot(input: {
+  provider: string;
+  fallbackSessionId: string;
+  fallbackRun?: { runId: string; nativeRunId?: string; sessionId?: string; nativeSessionId?: string };
+  signal?: AbortSignal;
+  terminalToolCall?: Extract<ProviderRunEvent, { type: "tool_call" }>;
+}): ProviderRunSnapshot | null {
+  if (
+    !input.signal?.aborted ||
+    input.signal.reason !== "Chrona terminal action recorded" ||
+    !input.terminalToolCall
+  ) return null;
+  const summary = input.terminalToolCall.input.summary;
+  return {
+    provider: input.provider,
+    runId: input.fallbackRun?.runId ?? crypto.randomUUID(),
+    nativeRunId: input.fallbackRun?.nativeRunId,
+    sessionId: input.fallbackRun?.sessionId ?? input.fallbackSessionId,
+    nativeSessionId: input.fallbackRun?.nativeSessionId,
+    status: "completed",
+    ...(typeof summary === "string" ? { outputText: summary } : {}),
+    error: null,
+    raw: {
+      terminalActionRecorded: true,
+      terminalTool: {
+        name: input.terminalToolCall.tool,
+        callId: input.terminalToolCall.callId,
+        input: input.terminalToolCall.input,
+      },
+    },
+  };
 }
 
 function finishProviderEventBoundary(boundary: ProviderStreamEventBoundary) {
@@ -71,6 +163,17 @@ function snapshotForProviderEvent(event: ProviderRunEvent, context: SnapshotCont
 }
 
 function completedSnapshot(event: Extract<ProviderRunEvent, { type: "run_completed" }>, context: SnapshotContext): ProviderRunSnapshot {
+  const terminalToolName = event.terminalToolCall?.name ?? context.terminalToolName;
+  const raw = event.raw === undefined && terminalToolName === undefined
+    ? undefined
+    : {
+        ...(event.raw === undefined ? {} : { raw: event.raw }),
+        ...(event.terminalToolCall
+          ? { terminalTool: event.terminalToolCall }
+          : terminalToolName
+            ? { terminalToolName }
+            : {}),
+      };
   return {
     provider: context.provider,
     runId: event.run.runId,
@@ -82,7 +185,7 @@ function completedSnapshot(event: Extract<ProviderRunEvent, { type: "run_complet
     structuredPayload: event.structuredPayload,
     usage: event.usage,
     error: null,
-    raw: event.raw === undefined && context.terminalToolName === undefined ? undefined : { raw: event.raw, terminalToolName: context.terminalToolName },
+    raw,
   };
 }
 

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { renderHook, waitFor } from "@testing-library/react";
+import { cleanup, renderHook, waitFor } from "@testing-library/react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { PropsWithChildren } from "react";
 
@@ -100,7 +100,10 @@ function wrapper({ children }: PropsWithChildren) {
   return <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>;
 }
 
-afterEach(() => {
+afterEach(async () => {
+  cleanup();
+  // Flush React 19 scheduler callbacks before Vitest destroys jsdom.
+  await new Promise<void>((resolve) => setImmediate(resolve));
   mocks.eventHandler = null;
   mocks.streamOpened = false;
 });

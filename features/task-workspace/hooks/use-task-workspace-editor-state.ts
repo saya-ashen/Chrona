@@ -4,7 +4,6 @@ import type { TaskConfigFormInput } from "@features/schedule/ui";
 import { apiJson } from "@shared/http";
 import {
 	dateToIsoStringOrNull,
-	editableTaskToEditSummary,
 	editableTaskToPlanningDraft,
 	taskConfigInputToEditableTask,
 	taskToEditableTask,
@@ -36,7 +35,6 @@ export function useTaskWorkspaceEditorState(
 			task.dueAt,
 			task.scheduledStartAt,
 			task.scheduledEndAt,
-			task.executionRuntime,
 			task.executionConfig,
 			task.autoPlanGeneration,
 			task.autoExecute,
@@ -51,10 +49,6 @@ export function useTaskWorkspaceEditorState(
 				? taskConfigInputToEditableTask(taskConfigDraft, task.scheduleStatus)
 				: originalEditableTask,
 		[originalEditableTask, task.scheduleStatus, taskConfigDraft],
-	);
-	const editSummary = useMemo(
-		() => editableTaskToEditSummary(draftEditableTask),
-		[draftEditableTask],
 	);
 	const planningTaskDraft = useMemo(
 		() =>
@@ -79,7 +73,6 @@ export function useTaskWorkspaceEditorState(
 			scheduledStartAt: draftEditableTask.scheduledStartAt,
 			scheduledEndAt: draftEditableTask.scheduledEndAt,
 			scheduleStatus: draftEditableTask.scheduleStatus,
-			executionRuntime: draftEditableTask.executionRuntime,
 			executionConfig: draftEditableTask.executionConfig,
 			status: task.status,
 		}),
@@ -101,7 +94,6 @@ export function useTaskWorkspaceEditorState(
 				title: input.title,
 				description: input.description || undefined,
 				priority: input.priority,
-				executionRuntime: input.executionRuntime,
 				executionConfig: input.executionConfig,
 				aiClientId: input.aiClientId,
 				autoPlanGeneration: input.autoPlanGeneration,
@@ -149,7 +141,6 @@ export function useTaskWorkspaceEditorState(
 					scheduledStartAt: dateToIsoStringOrNull(input.scheduledStartAt),
 					scheduledEndAt: dateToIsoStringOrNull(input.scheduledEndAt),
 					scheduleStatus: prev.scheduleStatus,
-					executionRuntime: input.executionRuntime,
 					executionConfig: input.executionConfig,
 					aiClientId: input.aiClientId,
 					autoPlanGeneration: input.autoPlanGeneration,
@@ -185,7 +176,6 @@ export function useTaskWorkspaceEditorState(
 		setSaveSuccess,
 		taskConfigInitialValues,
 		draftEditableTask,
-		editSummary,
 		planningTaskDraft,
 		assistantBuildCurrentTask,
 		handleTaskConfigDraftStateChange,

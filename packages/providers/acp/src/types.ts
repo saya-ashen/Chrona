@@ -11,10 +11,10 @@ export type AcpProviderConfig = {
   args?: string[];
   /** Total prompt turn timeout in milliseconds. */
   timeoutMs?: number;
-  /** Health depth. "session" opens a provider session, so auth/backend setup is tested instead of process startup only. */
-  healthCheck?: "initialize" | "session";
-  /** Authentication strategy. "agent" uses an advertised agent-managed auth method such as local profile credentials. */
-  auth?: { methodId?: string; prefer?: "agent" | "env_var" | "terminal"; terminal?: boolean };
+  /** Health depth. "session" opens a session; "prompt" also verifies the configured model endpoint. */
+  healthCheck?: "initialize" | "session" | "prompt";
+  /** Authentication strategy. useExisting keeps the agent's current local profile without starting a new login. */
+  auth?: { methodId?: string; prefer?: "agent" | "env_var" | "terminal"; terminal?: boolean; useExisting?: boolean };
   /** Working directory for the ACP agent. Defaults to current process cwd. */
   cwd?: string;
   /** Pass-through environment for the ACP subprocess. */

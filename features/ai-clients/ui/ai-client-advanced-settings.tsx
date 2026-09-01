@@ -17,7 +17,7 @@ import type {
 	ClientFormValues,
 	RuntimeProviderOption,
 } from "./ai-client-types";
-import { getFeatureCopy, LOCAL_HERMES_BASE_URL } from "./ai-client-view-model";
+import { getFeatureCopy, getProviderFeatures, LOCAL_HERMES_BASE_URL, validateHermesRemoteBaseUrl } from "./ai-client-view-model";
 
 export type AdvancedSettingsProps = {
 	form: UseFormReturn<ClientFormValues>;
@@ -88,10 +88,7 @@ function StandardProviderSettings({
 	isLocalHermes,
 }: AdvancedSettingsProps) {
 	const validateRemote = (value: string) =>
-		type !== "hermes" ||
-		isLocalHermes ||
-		Boolean(value.trim()) ||
-		copy.remoteBaseUrlRequired;
+		type !== "hermes" || isLocalHermes || validateHermesRemoteBaseUrl(value, copy.remoteBaseUrlRequired);
 	return (
 		<>
 			<Field>
@@ -201,8 +198,8 @@ function CodexSettings({
 					form={form}
 					name="baseUrl"
 					id="ai-client-base-url"
-					label="Base URL"
-					placeholder="optional OpenAI-compatible base URL"
+					label="OpenAI Responses Base URL"
+					placeholder="optional OpenAI Responses-compatible base URL"
 				/>
 			</div>
 			<TextField
@@ -386,10 +383,7 @@ function FeatureBindings({
 	providers,
 	type,
 }: Pick<AdvancedSettingsProps, "form" | "providers" | "type">) {
-	const features =
-		providers
-			.find((provider) => provider.key === type)
-			?.features.filter((feature) => feature !== "suggest") ?? [];
+	const features = getProviderFeatures(providers, type);
 	if (!features.length) return null;
 	return (
 		<Field>

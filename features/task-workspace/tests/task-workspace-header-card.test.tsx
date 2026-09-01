@@ -36,7 +36,6 @@ const task = {
 	workspaceId: "ws-1",
 	title: "Scheduled draft task",
 	description: null,
-	executionRuntime: "hermes",
 	executionConfig: {},
 	autoPlanGeneration: false,
 	autoExecute: false,

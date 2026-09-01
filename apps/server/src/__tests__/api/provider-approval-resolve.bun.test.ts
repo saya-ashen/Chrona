@@ -214,7 +214,7 @@ async function resolveApproval(
 	);
 }
 
-async function seedHermesApprovalClient(baseUrl = "http://provider.test") {
+async function seedHermesApprovalClient(baseUrl = "https://provider.test") {
 	const config = { baseUrl };
 	const client = await db.aiClient.create({
 		data: {
@@ -857,7 +857,7 @@ describe("provider approval resolve", () => {
 		const { approval } = await seedPendingApproval(ws.workspaceId, taskId);
 		await db.aiClient.update({
 			where: { id: approvalClientIdentity.id },
-			data: { config: { baseUrl: "http://different-provider.test" } },
+			data: { config: { baseUrl: "https://different-provider.test" } },
 		});
 		await aiClientRegistry.refresh();
 		let rpcCount = 0;

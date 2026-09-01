@@ -21,6 +21,11 @@ export {
 	requireAiClient,
 } from "./runtime/client-resolution";
 export { aiChat } from "./runtime/ai-service";
+export {
+	resolveTaskExecutionProviderSelection,
+	unresolvedTaskProviderName,
+} from "./runtime/task-provider-selection";
+export type { TaskExecutionProviderSelection } from "./runtime/task-provider-selection";
 export { chat } from "./feature-normalizers";
 export { dispatchStream, suggestStream } from "./streaming";
 export {

@@ -158,6 +158,7 @@ function doneNodeResult(
     summary: result.summary ?? "",
     evidence: result.evidence,
     output: result.output,
+    inputFields: result.inputFields,
     selectedBranch: resolveSelectedBranch(nodeId, result, effective),
     deliverables,
     findings: result.findings,

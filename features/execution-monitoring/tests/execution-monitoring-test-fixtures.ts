@@ -48,14 +48,11 @@ function graph(nodes: PlanNodeDataModel[], currentStepId?: string): TaskPlanGrap
 function pageData(overrides: Partial<TaskPageData> = {}): TaskPageData {
   const taskOverrides = overrides.task ?? {};
   return {
-    defaultExecutionRuntime: "hermes",
-    executionRuntimes: [],
     task: {
       id: "task-1",
       workspaceId: "workspace-1",
       title: "Prepare launch brief",
       description: "Research the target user and deliver a concise launch brief.",
-      executionRuntime: "hermes",
       executionConfig: {},
       autoPlanGeneration: false,
       autoExecute: false,

@@ -18,10 +18,12 @@ import {
 import type { UiDocument } from "@chrona/ui-protocol";
 import type { TaskData, TaskPageData } from "../model/task-workspace-types";
 import { bindTaskPlanSessionToStateStore } from "./task-plan-generation-session-store";
+import { preserveAcceptedResultReview } from "../model/task-workspace-settlement";
 
 const logger = createLogger("web.task-workspace.page-state");
 type RefreshOptions = {
 	silent?: boolean;
+	skipPlanState?: boolean;
 };
 
 export type TaskWorkspaceSseEvent = {
@@ -85,7 +87,7 @@ function shouldRefreshWorkspacePageForEvent(event: TaskWorkspaceSseEvent) {
 		event.type === "task_workspace_updated" &&
 		event.reason === "plan_generation.completed"
 	)
-		return false;
+		return true;
 	if (PAGE_REFRESH_WORKSPACE_EVENTS.has(event.type)) return true;
 
 	return (
@@ -142,6 +144,13 @@ function isWorkspaceStateEvent(
 ): event is TaskWorkspaceSseEvent &
 	(StateSnapshotEnvelope | StateUpdateEnvelope) {
 	return event.type === "state.snapshot" || event.type === "state.update";
+}
+
+function isWorkspaceEventInStreamScope(
+	event: TaskWorkspaceSseEvent,
+	workBlockId: string | null | undefined,
+) {
+	return (event.workBlockId ?? null) === (workBlockId ?? null);
 }
 
 /**
@@ -208,7 +217,7 @@ function collectPointerPaths(node: unknown, prefix: string): string[] {
 
 function useTaskWorkspaceEventStream(
 	taskId: string,
-	refreshQueries: () => Promise<void>,
+	refreshQueries: (options?: RefreshOptions) => Promise<void>,
 	refreshPersistedActivity: () => Promise<void>,
 	onWorkspaceEvent: (event: TaskWorkspaceSseEvent) => void,
 	applyStateEvent: (event: TaskWorkspaceSseEvent) => void,
@@ -280,6 +289,9 @@ function useTaskWorkspaceEventStream(
 				}
 				if (STREAM_NOOP_EVENTS.has(event)) return;
 				const envelope = { type: event, ...data } as TaskWorkspaceSseEvent;
+				// The server filters scoped streams; keep this check as a client-side
+				// boundary so a stale or proxied event cannot replace this occurrence.
+				if (!isWorkspaceEventInStreamScope(envelope, workBlockId)) return;
 				if (isWorkspaceStateEvent(envelope)) {
 					applyStateEvent(envelope);
 					if (envelope.type === "state.update") {
@@ -289,7 +301,11 @@ function useTaskWorkspaceEventStream(
 				}
 				onWorkspaceEvent(envelope);
 				if (shouldRefreshWorkspacePageForEvent(envelope)) {
-					void refreshQueries();
+					void refreshQueries({
+						skipPlanState:
+							envelope.type === "task_workspace_updated" &&
+							envelope.reason === "plan_generation.completed",
+					});
 				}
 			},
 		})
@@ -378,8 +394,20 @@ export function useTaskWorkspacePageState(initialData: TaskPageData) {
 	);
 	const pageQuery = useQuery({
 		queryKey: pageQueryKey,
-		queryFn: () => fetchTaskWorkspacePage(taskId, selectedWorkBlockId),
+		queryFn: async () => {
+			const refreshed = await fetchTaskWorkspacePage(taskId, selectedWorkBlockId);
+			// Keep the last complete projection visible if a transport adapter
+			// returns no payload during a transient revalidation failure.
+			return refreshed?.task
+				? refreshed
+				: queryClient.getQueryData<TaskPageData>(pageQueryKey) ?? initialData;
+		},
 		initialData,
+		structuralSharing: (previous, incoming) =>
+			preserveAcceptedResultReview(
+				previous as TaskPageData | undefined,
+				incoming as TaskPageData,
+			),
 	});
 	const commandCenterQuery = useQuery({
 		queryKey: commandCenterQueryKey,
@@ -405,26 +433,33 @@ export function useTaskWorkspacePageState(initialData: TaskPageData) {
 	useEffect(() => {
 		if (initialDataRef.current === initialData) return;
 		initialDataRef.current = initialData;
-		queryClient.setQueryData(pageQueryKey, initialData);
+		queryClient.setQueryData(pageQueryKey, (current: TaskPageData | undefined) =>
+			preserveAcceptedResultReview(current, initialData),
+		);
 	}, [initialData, pageQueryKey, queryClient]);
 	const refreshWorkspace = useCallback(
-		async (_options: RefreshOptions = {}) => {
-			await Promise.all([
+		async (options: RefreshOptions = {}) => {
+			const refreshes = [
 				queryClient.invalidateQueries({ queryKey: pageQueryKey }),
 				queryClient.invalidateQueries({ queryKey: commandCenterQueryKey }),
-				queryClient.invalidateQueries({
-					queryKey: taskWorkspaceQueryKeys.planState(
-						taskId,
-						selectedWorkBlockId,
-					),
-				}),
 				queryClient.invalidateQueries({
 					queryKey: taskWorkspaceQueryKeys.currentExecution(
 						taskId,
 						selectedWorkBlockId,
 					),
 				}),
-			]);
+			];
+			if (!options.skipPlanState) {
+				refreshes.push(
+					queryClient.invalidateQueries({
+						queryKey: taskWorkspaceQueryKeys.planState(
+							taskId,
+							selectedWorkBlockId,
+						),
+					}),
+				);
+			}
+			await Promise.all(refreshes);
 		},
 		[
 			commandCenterQueryKey,

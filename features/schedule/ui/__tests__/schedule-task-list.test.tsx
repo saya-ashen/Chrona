@@ -45,7 +45,6 @@ function makeItem(overrides: Partial<ScheduleTaskListItem> & { taskId: string; t
     scheduleSource: null,
     scheduleProposalCount: 0,
     lastActivityAt: null,
-    executionRuntime: "hermes",
     executionConfig: {},
     autoPlanGeneration: false,
     autoExecute: false,
@@ -91,8 +90,6 @@ const mockItems: ScheduleTaskListItem[] = [failedItem, unscheduledItem, runningI
 
 const defaultProps = {
   items: mockItems,
-  executionRuntimes: [],
-  defaultExecutionRuntime: "hermes",
   isPending: false,
   onSaveTaskConfigAction: vi.fn().mockResolvedValue(undefined),
 };

@@ -106,6 +106,7 @@ describe("useTaskWorkspacePageState — occurrence switch resets header", () => 
         data: {
           type: "spec.patch",
           document: "header",
+          workBlockId: "block-A",
           patches: [
             { op: "replace", path: "/elements/action:generate-plan/props/disabled", value: true },
             { op: "replace", path: "/elements/action:generate-plan/props/label", value: "Generating plan..." },
@@ -153,6 +154,7 @@ describe("useTaskWorkspacePageState — occurrence switch resets header", () => 
         event: "state.update",
         data: {
           type: "state.update",
+          workBlockId: "block-A",
           updates: { "/plan/generation/phase": "connecting", "/plan/generation/error/message": "boom" },
         } as unknown as Record<string, unknown>,
         message: { data: "{}", event: "state.update" } as unknown,
@@ -190,6 +192,7 @@ describe("useTaskWorkspacePageState — occurrence switch resets header", () => 
         event: "state.update",
         data: {
           type: "state.update",
+          workBlockId: "block-A",
           updates: { "/plan/generation/phase": "connecting" },
         } as unknown as Record<string, unknown>,
         message: { data: "{}", event: "state.update" } as unknown,

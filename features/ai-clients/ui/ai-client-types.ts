@@ -1,4 +1,4 @@
-export type AiClientType = "llm" | "hermes" | "debug" | "claude_code" | "codex" | (string & {});
+export type AiClientType = "llm" | "hermes" | "debug" | "claude_code" | "codex" | "omp" | (string & {});
 
 export interface AiClientInfo {
   id: string;
@@ -51,12 +51,16 @@ export type RuntimeProviderInput = {
   key?: unknown;
   label?: string;
   features?: unknown;
+  tier?: unknown;
 };
+
+export type RuntimeProviderSupportTier = "stable" | "beta" | "experimental";
 
 export type RuntimeProviderOption = {
   key: AiClientType;
   label: string;
   features: string[];
+  tier?: RuntimeProviderSupportTier;
 };
 
 export type HermesCheck = {

@@ -84,7 +84,6 @@ vi.mock("@features/schedule", () => ({
 			recurrenceAnchorStartAt: string | null;
 			recurrenceAnchorEndAt: string | null;
 			aiClientId: string | null;
-			executionRuntime: string;
 		}) => Promise<void>;
 	}) =>
 		isOpen ? (
@@ -107,7 +106,6 @@ vi.mock("@features/schedule", () => ({
 							recurrenceAnchorStartAt: "2026-04-15T09:00:00.000Z",
 							recurrenceAnchorEndAt: "2026-04-15T10:00:00.000Z",
 							aiClientId: "client-1",
-							executionRuntime: "local",
 						})
 					}
 				>
@@ -153,8 +151,13 @@ beforeEach(() => {
 			return Promise.resolve({ completedAt: "2026-01-01T00:00:00.000Z" });
 		if (path === "/api/schedule?workspaceId=ws-1")
 			return Promise.resolve({
-				availableAiClients: [],
-				defaultExecutionRuntime: "local",
+				availableAiClients: [{
+					id: "omp-client",
+					name: "OMP",
+					type: "omp",
+					isDefault: true,
+					enabled: true,
+				}],
 			});
 		return Promise.resolve({ clients: [], tasks: [], total: 0 });
 	});
@@ -214,6 +217,30 @@ describe("ControlPlaneShell", () => {
 		).not.toBeInTheDocument();
 	});
 
+	it("does not dispatch initial plan generation without an enabled OMP client", async () => {
+		mocks.createScheduledTask.mockResolvedValue({ taskId: "manual-task" });
+		mocks.apiJson.mockImplementation((path: string) => {
+			if (path === "/api/workspaces/ws-1/preferences/start-with-chrona")
+				return Promise.resolve({ completedAt: "2026-01-01T00:00:00.000Z" });
+			if (path === "/api/schedule?workspaceId=ws-1")
+				return Promise.resolve({ availableAiClients: [] });
+			return Promise.resolve({ clients: [], tasks: [], total: 0 });
+		});
+		const user = userEvent.setup();
+		render(
+			<ControlPlaneShell defaultWorkspace={{ id: "ws-1", name: "Default" }}>
+				<div>Workspace body</div>
+			</ControlPlaneShell>,
+		);
+		await user.click(screen.getByRole("button", { name: "New Task" }));
+		await user.click(screen.getByRole("button", { name: "Submit task" }));
+		await waitFor(() => expect(mocks.createScheduledTask).toHaveBeenCalled());
+		expect(mocks.apiJson).not.toHaveBeenCalledWith(
+			"/api/work/manual-task/commands",
+			expect.anything(),
+		);
+	});
+
 	it("creates scheduled tasks through the schedule feature public action", async () => {
 		mocks.createScheduledTask.mockResolvedValue({ taskId: "created-task" });
 		const user = userEvent.setup();
@@ -231,10 +258,16 @@ describe("ControlPlaneShell", () => {
 					title: "Created from shell",
 					autoPlanGeneration: true,
 					autoExecute: true,
-					executionRuntime: "local",
 					recurrenceRule: "FREQ=WEEKLY",
 				}),
 			),
+		);
+		expect(mocks.apiJson).toHaveBeenCalledWith(
+			"/api/work/created-task/commands",
+			expect.objectContaining({
+				method: "POST",
+				body: expect.stringContaining('"type":"plan.generate"'),
+			}),
 		);
 	});
 });

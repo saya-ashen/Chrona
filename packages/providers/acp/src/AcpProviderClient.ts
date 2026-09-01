@@ -5,6 +5,7 @@ import type {
 	Writable as NodeWritable,
 } from "node:stream";
 import * as acp from "@agentclientprotocol/sdk";
+import { createLogger, serializeSafeError } from "@chrona/logging";
 import {
 	assertProviderStartSupported,
 	BoundedTerminalRunSnapshots,
@@ -49,6 +50,8 @@ import {
 	type AcpProviderConfig,
 	usageFromAcp,
 } from "./types";
+
+const log = createLogger("providers.acp");
 
 type Timer = Parameters<typeof clearTimeout>[0];
 
@@ -163,6 +166,35 @@ function providerErrorMessage(error: unknown, diagnostics = "") {
 	return message;
 }
 
+function completionStreamFailure(outputText: string): string | null {
+	const trimmed = outputText.trim();
+	if (/^stream disconnected before completion:/i.test(trimmed)) {
+		return "ACP provider stream disconnected before completion";
+	}
+	const status = trimmed.match(
+		/^(?:Warning: Falling back from WebSockets to HTTPS transport\.[\s\S]*?)?unexpected status:?[\s]+(\d{3})(?:[\s]+([A-Za-z ]+?))?(?=[:\n,{]|$)/i,
+	);
+	if (!status) return null;
+	const reason = status[2] ? status[2].trim() : "";
+	return `ACP provider transport failed with HTTP ${status[1]}${reason ? ` ${reason}` : ""}`;
+}
+
+function completionStreamFailureEvent(
+	config: AcpProviderConfig,
+	handle: AcpRunHandle,
+): ProviderRunEvent | null {
+	const error = completionStreamFailure(handle.outputText);
+	if (!error) return null;
+	handle.status = "failed";
+	handle.error = error;
+	return {
+		...eventBase(config, handle, "error"),
+		type: "run_failed",
+		run: providerRunRef(handle, "failed"),
+		error,
+	};
+}
+
 function statusReason(code: string, reason?: string) {
 	const trimmed = reason?.trim();
 	if (trimmed) return trimmed;
@@ -172,6 +204,7 @@ function statusReason(code: string, reason?: string) {
 }
 
 const MCP_PROBE_TIMEOUT_MS = 5_000;
+const TERMINAL_ACTION_ABORT_REASON = "Chrona terminal action recorded";
 const MCP_PROBE_PROTOCOL_VERSION = "2025-03-26";
 
 type ChronaMcpConnection = {
@@ -230,7 +263,7 @@ async function probeChronaMcpTools(input: {
 	const mcp = chronaMcpConnection(input.config, input.sessionId);
 	const controller = new AbortController();
 	const timeout = setTimeout(() => controller.abort(), MCP_PROBE_TIMEOUT_MS);
-	timeout.unref?.();
+	timeout.unref();
 	const abort = () => controller.abort(input.signal?.reason);
 	input.signal?.addEventListener("abort", abort, { once: true });
 
@@ -327,7 +360,8 @@ function mcpUrlForSession(
 	terminalOnly = false,
 ): string {
 	try {
-		const url = new URL(`${stripTrailingSlash(baseUrl)}/api/mcp`);
+		const base = stripTrailingSlash(baseUrl);
+		const url = new URL(base.endsWith("/api") ? `${base}/mcp` : `${base}/api/mcp`);
 		const trimmedSessionId =
 			typeof sessionId === "string" ? sessionId.trim() : "";
 		if (trimmedSessionId) url.searchParams.set("session_id", trimmedSessionId);
@@ -344,7 +378,8 @@ function providerRunRef(
 ): ProviderRunRef {
 	return {
 		...handle.ref,
-		sessionId: handle.sessionId,
+		nativeSessionId: handle.sessionId,
+		providerResumeRef: handle.sessionId,
 		status,
 	};
 }
@@ -358,11 +393,22 @@ function eventBase(
 		provider: config.provider,
 		runId: handle.ref.runId,
 		nativeRunId: handle.ref.nativeRunId,
-		sessionId: handle.sessionId,
+		sessionId: handle.ref.sessionId,
+		nativeSessionId: handle.sessionId,
 		sequence: handle.sequence++,
 		timestamp: now(),
 		rawEventType,
 	};
+}
+
+function terminalActionWasRecorded(handle: AcpRunHandle): boolean {
+	const inputSignal = handle.input.signal;
+	return Boolean(
+		handle.terminalToolCall &&
+		((inputSignal?.aborted && inputSignal.reason === TERMINAL_ACTION_ABORT_REASON) ||
+			(handle.abort.signal.aborted &&
+				handle.abort.signal.reason === TERMINAL_ACTION_ABORT_REASON)),
+	);
 }
 
 function renderProviderInput(input: ProviderRunInput): string {
@@ -481,6 +527,15 @@ function rememberToolLabel(
 	}
 	return handle.toolLabels.get(update.toolCallId) ?? tool;
 }
+
+function normalizedToolInput(
+	tool: string,
+	input: Record<string, unknown>,
+): Record<string, unknown> {
+	const nested = asRecord(input.arguments);
+	return input.tool === tool && Object.keys(nested).length > 0 ? nested : input;
+}
+
 function normalizeUpdate(
 	config: AcpProviderConfig,
 	handle: AcpRunHandle,
@@ -502,7 +557,7 @@ function normalizeUpdate(
 	}
 	if (update.sessionUpdate === "tool_call") {
 		const tool = rememberToolLabel(handle, update);
-		const input = asRecord(update.rawInput);
+		const input = normalizedToolInput(tool, asRecord(update.rawInput));
 		if (tool === handle.input.terminalToolName) {
 			handle.terminalToolCall = {
 				name: tool,
@@ -523,7 +578,7 @@ function normalizeUpdate(
 	}
 	if (update.sessionUpdate === "tool_call_update") {
 		const tool = rememberToolLabel(handle, update);
-		const input = asRecord(update.rawInput);
+		const input = normalizedToolInput(tool, asRecord(update.rawInput));
 		if (tool === handle.input.terminalToolName) {
 			handle.terminalToolCall = {
 				name: tool,
@@ -757,15 +812,15 @@ function handlers(
 		},
 	};
 }
-async function checkAcpSessionHealth(
+async function openAcpHealthSession(
 	config: AcpProviderConfig,
 	context: ClientContext,
 	signal?: AbortSignal,
-) {
+): Promise<ActiveSession> {
 	const sessionId = `${config.provider}-health-${crypto.randomUUID()}`;
 	const sessionKey = `chrona:provider-health:${config.provider}`;
 	await probeChronaMcpTools({ config, sessionId: sessionKey, signal });
-	const session = await context
+	return context
 		.buildSession(
 			newSessionRequest(config, {
 				clientOperationId: `${config.provider}:health:${sessionId}`,
@@ -776,7 +831,47 @@ async function checkAcpSessionHealth(
 			}),
 		)
 		.start({ cancellationSignal: signal });
+}
+
+async function checkAcpSessionHealth(
+	config: AcpProviderConfig,
+	context: ClientContext,
+	signal?: AbortSignal,
+) {
+	const session = await openAcpHealthSession(config, context, signal);
 	session.dispose();
+}
+
+const ACP_HEALTH_MARKER = "CHRONA_ACP_HEALTH_OK";
+
+async function checkAcpPromptHealth(
+	config: AcpProviderConfig,
+	context: ClientContext,
+	signal?: AbortSignal,
+) {
+	const session = await openAcpHealthSession(config, context, signal);
+	let output = "";
+	try {
+		const prompt = session.prompt(
+			[{ type: "text", text: `Return only ${ACP_HEALTH_MARKER}` }],
+			{ cancellationSignal: signal },
+		);
+		for (;;) {
+			const message = await session.nextUpdate();
+			if (message.kind === "stop") break;
+			if (message.update.sessionUpdate === "agent_message_chunk") {
+				output += textFromContent(message.update.content) ?? "";
+			}
+		}
+		await prompt;
+		const streamFailure = completionStreamFailure(output);
+		if (streamFailure) throw new Error(streamFailure);
+		if (!output.includes(ACP_HEALTH_MARKER)) {
+			throw new Error("ACP model endpoint did not return the health marker");
+		}
+	} finally {
+		session.dispose();
+	}
 }
 
 async function initialize(
@@ -803,6 +898,7 @@ function chooseAuthMethod(
 	config: AcpProviderConfig,
 	init: InitializeResponse,
 ): string | null {
+	if (config.auth?.useExisting) return null;
 	const methods = (init.authMethods ?? []) as AdvertisedAuthMethod[];
 	if (methods.length === 0) return null;
 	const configured = config.auth?.methodId?.trim();
@@ -993,12 +1089,19 @@ export class AcpProviderClient implements AgentProviderClient {
 						input.signal,
 					);
 					assertHttpMcp(this.config, init);
-					if (this.config.healthCheck === "session")
+					if (this.config.healthCheck === "prompt") {
+						await checkAcpPromptHealth(
+							this.config,
+							connection.context,
+							input.signal,
+						);
+					} else if (this.config.healthCheck === "session") {
 						await checkAcpSessionHealth(
 							this.config,
 							connection.context,
 							input.signal,
 						);
+					}
 				},
 			);
 			return {
@@ -1008,9 +1111,11 @@ export class AcpProviderClient implements AgentProviderClient {
 				latencyMs: Date.now() - started,
 				status: "ok",
 				reason:
-					this.config.healthCheck === "session"
-						? `${this.config.displayName ?? this.provider} ACP agent connected`
-						: `${this.config.displayName ?? this.provider} ACP agent initialized`,
+					this.config.healthCheck === "prompt"
+						? `${this.config.displayName ?? this.provider} model endpoint completed a prompt`
+						: this.config.healthCheck === "session"
+							? `${this.config.displayName ?? this.provider} ACP agent connected`
+							: `${this.config.displayName ?? this.provider} ACP agent initialized`,
 			};
 		} catch (error) {
 			return {
@@ -1247,7 +1352,8 @@ export class AcpProviderClient implements AgentProviderClient {
 					});
 					handle.session = session;
 					handle.sessionId = session.sessionId;
-					handle.ref.sessionId = session.sessionId;
+					handle.ref.nativeSessionId = session.sessionId;
+					handle.ref.providerResumeRef = session.sessionId;
 					resolveReady();
 					return session.prompt(inputToPrompt(input), {
 						cancellationSignal: abort.signal,
@@ -1290,8 +1396,27 @@ export class AcpProviderClient implements AgentProviderClient {
 					if (handle.abort.signal.aborted) break;
 					continue;
 				}
-				const message = next.message;
+				const message = next.message as typeof next.message | undefined;
 				if (!message) break;
+				const terminalActionCompleted = message.kind === "stop"
+					&& (message.stopReason === "cancelled" || handle.abort.signal.aborted)
+					&& terminalActionWasRecorded(handle);
+				if (terminalActionCompleted) {
+					clearTimeout(handle.timer);
+					handle.status = "completed";
+					yield {
+						...eventBase(this.config, handle, "completed"),
+						type: "run_completed",
+						run: providerRunRef(handle, "completed"),
+						outputText: handle.outputText,
+						output: { text: handle.outputText },
+						structuredPayload: parseStructuredPayload(handle.outputText),
+						terminalToolCall: handle.terminalToolCall,
+						usage: handle.usage,
+						raw: message.response,
+					};
+					return;
+				}
 				if (message.kind === "stop") {
 					clearTimeout(handle.timer);
 					if (
@@ -1304,6 +1429,11 @@ export class AcpProviderClient implements AgentProviderClient {
 							type: "run_cancelled",
 							run: providerRunRef(handle, "cancelled"),
 						};
+						return;
+					}
+					const failureEvent = completionStreamFailureEvent(this.config, handle);
+					if (failureEvent) {
+						yield failureEvent;
 						return;
 					}
 					handle.status = "completed";
@@ -1330,6 +1460,21 @@ export class AcpProviderClient implements AgentProviderClient {
 			await handle.prompt;
 		} catch (error) {
 			clearTimeout(handle.timer);
+			if (terminalActionWasRecorded(handle)) {
+				handle.status = "completed";
+				yield {
+					...eventBase(this.config, handle, "completed"),
+					type: "run_completed",
+					run: providerRunRef(handle, "completed"),
+					outputText: handle.outputText,
+					output: { text: handle.outputText },
+					structuredPayload: parseStructuredPayload(handle.outputText),
+					terminalToolCall: handle.terminalToolCall,
+					usage: handle.usage,
+					raw: { terminalActionRecorded: true },
+				};
+				return;
+			}
 			handle.status = handle.abort.signal.aborted ? "cancelled" : "failed";
 			if (handle.status === "cancelled") {
 				yield {
@@ -1365,7 +1510,7 @@ export class AcpProviderClient implements AgentProviderClient {
 			try {
 				await handle.session?.dispose();
 			} catch (error) {
-				console.error("ACP session disposal failed", error);
+				log.warn("session_disposal_failed", { error: serializeSafeError(error) });
 			}
 			await this.retainSnapshot(handle);
 		}
@@ -1383,7 +1528,9 @@ export class AcpProviderClient implements AgentProviderClient {
 			runId: handle.ref.runId,
 			nativeRunId: handle.ref.nativeRunId,
 			providerRunId: handle.ref.providerRunId,
-			sessionId: handle.sessionId,
+			providerResumeRef: handle.sessionId,
+			sessionId: handle.ref.sessionId,
+			nativeSessionId: handle.sessionId,
 			status: handle.status,
 			outputText: handle.outputText,
 			output: { text: handle.outputText },

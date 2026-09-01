@@ -3,7 +3,7 @@ import { randomUUID } from "node:crypto";
 import { db, type Prisma } from "@chrona/db";
 import type { AiClientType } from "@chrona/contracts";
 import { testAiClientAvailability } from "../providers";
-import { supportsDurableFeatureRuntime } from "@chrona/providers-foundation";
+import { supportsSafeTerminalOnlyFeatureRuntime, validateHermesEndpoint } from "@chrona/providers-foundation";
 import { ENGINE_ERROR_CODES, EngineError } from "../../../errors";
 import { aiClientRegistry } from "../runtime/client-registry";
 
@@ -70,7 +70,15 @@ async function ensureEnabledAiClientDefault(store: AiClientStore = db) {
   return fallbackDefault.id;
 }
 
+function assertSafeAiClientConfig(type: AiClientType, config: Record<string, unknown> | undefined): void {
+  if (type !== "hermes") return;
+  const baseUrl = typeof config?.baseUrl === "string" ? config.baseUrl : undefined;
+  const endpoint = validateHermesEndpoint(baseUrl);
+  if (!endpoint.ok) throw new EngineError(ENGINE_ERROR_CODES.VALIDATION_FAILED, endpoint.reason);
+}
+
 async function createAiClient(input: CreateAiClientInput) {
+  assertSafeAiClientConfig(input.type, input.config);
   const enabledClientCount = await db.aiClient.count({ where: { enabled: true } });
   const isDefault = input.isDefault === true || enabledClientCount === 0;
 
@@ -103,6 +111,7 @@ const SECRET_CONFIG_KEYS = new Set([
   "password",
 ]);
 
+// eslint-disable-next-line complexity -- Secret preservation and explicit clear semantics are coupled at this boundary.
 function mergeExistingSecrets(
   existing: Prisma.JsonValue,
   next: Record<string, unknown>,
@@ -113,9 +122,18 @@ function mergeExistingSecrets(
     return next;
   }
 
-  const merged = { ...(existing as Record<string, unknown>), ...next };
+  const existingConfig = existing as Record<string, unknown>;
+  const merged = { ...existingConfig, ...next };
+  // Optional connection fields use null as an explicit deletion marker. Clear
+  // mirrored environment values as well, otherwise configValue() can restore
+  // the supposedly deleted endpoint from the legacy env object.
+  if (next.baseUrl === null && merged.env && typeof merged.env === "object" && !Array.isArray(merged.env)) {
+    const env = { ...(merged.env as Record<string, unknown>) };
+    for (const key of ["ANTHROPIC_BASE_URL", "OPENAI_BASE_URL"]) delete env[key];
+    merged.env = Object.keys(env).length > 0 ? env : undefined;
+  }
   for (const key of SECRET_CONFIG_KEYS) {
-    if (next[key] === "" && existing[key] !== undefined) merged[key] = existing[key];
+    if (next[key] === "" && existingConfig[key] !== undefined) merged[key] = existingConfig[key];
   }
   return merged;
 }
@@ -131,6 +149,7 @@ async function updateAiClient(clientId: string, input: UpdateAiClientInput) {
   const nextConfig = input.config === undefined
     ? undefined
     : mergeExistingSecrets(existing.config, input.config, existing.type, input.type ?? existing.type);
+  assertSafeAiClientConfig(input.type ?? existing.type, nextConfig);
 
   const updated = await db.aiClient.update({
     where: { id: clientId },
@@ -164,10 +183,10 @@ async function updateAiClientBindings(input: UpdateBindingsInput) {
   const durableFeatures = validFeatures.filter((feature) => feature === "goal.review" || feature === "task.plan");
   if (durableFeatures.length > 0) {
     const capabilities = await aiClientRegistry.inspectProviderCapabilities(clientId);
-    if (!capabilities || !supportsDurableFeatureRuntime(capabilities)) {
+    if (!capabilities || !supportsSafeTerminalOnlyFeatureRuntime(capabilities)) {
       throw new EngineError(
         ENGINE_ERROR_CODES.VALIDATION_FAILED,
-        `AI client does not support durable Feature Runtime bindings: ${durableFeatures.join(", ")}`,
+        `AI client does not support safe terminal-only Feature Runtime bindings: ${durableFeatures.join(", ")}`,
       );
     }
   }
@@ -216,6 +235,20 @@ export class AiClientManagement {
 
   test(input: Parameters<typeof testAiClientAvailability>[0]) {
     return testAiClientAvailability(input);
+  }
+
+  async testExisting(input: { clientId: string }) {
+    const client = await db.aiClient.findUnique({ where: { id: input.clientId } });
+    if (!client) {
+      throw new EngineError(
+        ENGINE_ERROR_CODES.AI_CLIENT_NOT_FOUND,
+        "Client not found",
+      );
+    }
+    return testAiClientAvailability({
+      type: client.type,
+      config: client.config as Record<string, unknown>,
+    });
   }
 
   async updateBindings(input: UpdateBindingsInput) {

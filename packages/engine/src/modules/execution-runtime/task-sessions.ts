@@ -15,6 +15,9 @@ type EnsureWorkBlockTaskSessionInput = {
   taskId: string;
   taskTitle: string;
   runtimeName: string;
+  providerClientId?: string;
+  providerName?: string;
+  providerConfigFingerprint?: string;
   workBlockId: string;
   sessionId?: string | null;
   label?: string | null;
@@ -174,6 +177,7 @@ export async function ensureDefaultTaskSession(
   return createdSession;
 }
 
+// eslint-disable-next-line complexity -- Existing session reuse also validates immutable provider provenance.
 export async function ensureWorkBlockTaskSession(
   input: EnsureWorkBlockTaskSessionInput,
   tx?: Prisma.TransactionClient,
@@ -189,7 +193,20 @@ export async function ensureWorkBlockTaskSession(
       where: { id: input.sessionId },
     });
     if (existingSession?.sessionKey === expectedSessionKey) {
-      return existingSession;
+      const providerMatches =
+        existingSession.providerClientId === (input.providerClientId ?? null)
+        && existingSession.providerName === (input.providerName ?? null)
+        && existingSession.providerConfigFingerprint === (input.providerConfigFingerprint ?? null);
+      return client.taskSession.update({
+        where: { id: existingSession.id },
+        data: {
+          runtimeName: input.runtimeName,
+          providerClientId: input.providerClientId ?? null,
+          providerName: input.providerName ?? null,
+          providerConfigFingerprint: input.providerConfigFingerprint ?? null,
+          providerSessionRef: providerMatches ? undefined : null,
+        },
+      });
     }
   }
 
@@ -202,17 +219,34 @@ export async function ensureWorkBlockTaskSession(
   });
 
   if (existingSession) {
+    const providerMatches =
+      existingSession.providerClientId === (input.providerClientId ?? null)
+      && existingSession.providerName === (input.providerName ?? null)
+      && existingSession.providerConfigFingerprint === (input.providerConfigFingerprint ?? null);
+    const refreshedSession = await client.taskSession.update({
+      where: { id: existingSession.id },
+      data: {
+        runtimeName: input.runtimeName,
+        providerClientId: input.providerClientId ?? null,
+        providerName: input.providerName ?? null,
+        providerConfigFingerprint: input.providerConfigFingerprint ?? null,
+        providerSessionRef: providerMatches ? undefined : null,
+      },
+    });
     await client.workBlock.update({
       where: { id: input.workBlockId },
       data: { sessionId: existingSession.id },
     });
-    return existingSession;
+    return refreshedSession;
   }
 
   const createdSession = await client.taskSession.create({
     data: {
       taskId: input.taskId,
       runtimeName: input.runtimeName,
+      providerClientId: input.providerClientId ?? null,
+      providerName: input.providerName ?? null,
+      providerConfigFingerprint: input.providerConfigFingerprint ?? null,
       sessionKey: expectedSessionKey,
       label:
         input.label?.trim() ||

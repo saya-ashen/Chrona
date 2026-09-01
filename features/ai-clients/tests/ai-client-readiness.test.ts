@@ -49,6 +49,26 @@ describe("AI client readiness", () => {
     expect(items.find(({ key }) => key === "overall")?.state).toBe("pending");
   });
 
+  it("treats an available execution-only provider as ready for its assigned feature", () => {
+    const items = readinessItems({
+      copy,
+      type: "claude_code",
+      configured: true,
+      enabled: true,
+      testStatus: "available",
+      testReason: null,
+      isDefault: false,
+      bindings: ["task.execution"],
+      assignedToPlanning: false,
+      assignedToExecution: true,
+    });
+
+    expect(items.find(({ key }) => key === "overall")).toMatchObject({
+      state: "ready",
+      detail: "readinessCapabilityDetail",
+    });
+  });
+
   it("keeps overall readiness pending while availability is being tested", () => {
     const items = readinessItems({
       copy,

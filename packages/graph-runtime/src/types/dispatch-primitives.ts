@@ -16,7 +16,7 @@ export type GraphExecutionTrigger = "manual" | "scheduler" | "system" | "auto";
 export type GraphNodeExecutionResult =
   | { status: "started"; summary: string; evidence: GraphNodeExecutionEvidence; output?: unknown }
   | { status: "done"; summary: string; evidence: GraphNodeExecutionEvidence; output?: unknown; inputFields?: CheckpointInputFields; selectedBranch?: NodeResult["selectedBranch"]; deliverables?: NodeResult["deliverables"]; findings?: NodeResult["findings"]; decisions?: NodeResult["decisions"]; caveats?: NodeResult["caveats"]; nextActions?: NodeResult["nextActions"]; resultEvidence?: NodeResult["resultEvidence"] }
-  | { status: "waiting_for_user"; prompt: string; reason: string; evidence?: GraphNodeExecutionEvidence; actionForm?: NodeActionForm }
+  | { status: "waiting_for_user"; prompt: string; reason: string; waitKind?: Extract<WaitKind, "user_input" | "manual_completion">; evidence?: GraphNodeExecutionEvidence; actionForm?: NodeActionForm }
   | { status: "waiting_for_approval"; prompt: string; reason: string; evidence?: GraphNodeExecutionEvidence }
   | { status: "blocked"; reason: string; evidence?: GraphNodeExecutionEvidence; actionForm?: NodeResult["actionForm"] }
   | { status: "replan_required"; reason: string; evidence?: GraphNodeExecutionEvidence; proposedPatch?: unknown }
@@ -28,7 +28,7 @@ type GraphSubmittedNodeResultIdentity = {
 };
 
 export type GraphSubmittedNodeResult =
-  | ({ nodeId: string; status: "done"; summary: string; evidence?: GraphNodeExecutionEvidence; output?: unknown; selectedBranch?: NodeResult["selectedBranch"]; deliverables?: NodeResult["deliverables"]; findings?: NodeResult["findings"]; decisions?: NodeResult["decisions"]; caveats?: NodeResult["caveats"]; nextActions?: NodeResult["nextActions"]; resultEvidence?: NodeResult["resultEvidence"] } & GraphSubmittedNodeResultIdentity)
+  | ({ nodeId: string; status: "done"; summary: string; evidence?: GraphNodeExecutionEvidence; output?: unknown; inputFields?: CheckpointInputFields; selectedBranch?: NodeResult["selectedBranch"]; deliverables?: NodeResult["deliverables"]; findings?: NodeResult["findings"]; decisions?: NodeResult["decisions"]; caveats?: NodeResult["caveats"]; nextActions?: NodeResult["nextActions"]; resultEvidence?: NodeResult["resultEvidence"] } & GraphSubmittedNodeResultIdentity)
   | ({ nodeId: string; status: "failed"; error: string; evidence?: GraphNodeExecutionEvidence } & GraphSubmittedNodeResultIdentity)
   | ({ nodeId: string; status: "blocked"; reason: string; actionForm?: NodeResult["actionForm"]; evidence?: GraphNodeExecutionEvidence } & GraphSubmittedNodeResultIdentity)
   | ({ nodeId: string; status: "cancelled"; reason?: string; evidence?: GraphNodeExecutionEvidence } & GraphSubmittedNodeResultIdentity);

@@ -12,6 +12,7 @@ import {
 describe("runtime status model", () => {
   it("maps wait kinds to node-level runtime progress", () => {
     expect(runtimeProgressStatusForWaitKind("user_input")).toBe("waiting_for_user");
+    expect(runtimeProgressStatusForWaitKind("manual_completion")).toBe("waiting_for_user");
     expect(runtimeProgressStatusForWaitKind("approval")).toBe("waiting_for_approval");
     expect(runtimeProgressStatusForWaitKind("review")).toBe("waiting_for_approval");
     expect(runtimeProgressStatusForWaitKind("replan_required")).toBe("waiting_for_approval");

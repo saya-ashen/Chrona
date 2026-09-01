@@ -33,6 +33,14 @@ describe("chrona command runner", () => {
     });
   });
 
+  it("keeps real provider calls behind an explicit opt-in command", () => {
+    expect(resolveCommand(["test", "providers:live"])).toMatchObject({
+      description: "Opt-in real provider health, capability, and read-only turn smoke",
+      steps: [{ label: "live provider smoke", acceptsExtraArgs: true }],
+    });
+    expect(resolveCommand(["test"])).toBe(TEST_COMMANDS.all);
+  });
+
   it("keeps the aggregate check limited to working quality gates", () => {
     const command = resolveCommand(["check"]);
     if (!command) throw new Error("Expected aggregate check command");
@@ -44,7 +52,21 @@ describe("chrona command runner", () => {
       "lint ratchet",
       "boundaries",
       "ui foundation",
+      "release consistency",
     ]);
+  });
+
+  it("exposes the packaged doctor command through the development runner", () => {
+    expect(resolveCommand(["doctor"])).toMatchObject({
+      description: "Inspect and repair local runtime state",
+      steps: [{ label: "doctor", acceptsExtraArgs: true }],
+    });
+  });
+
+  it("exposes local release consistency validation", () => {
+    expect(resolveCommand(["check", "release"])).toMatchObject({
+      steps: [{ label: "release consistency" }],
+    });
   });
 
   it("runs boundary checks across apps packages features shared", () => {

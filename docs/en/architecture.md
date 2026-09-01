@@ -42,7 +42,6 @@ flowchart TB
 | UI protocol      | `packages/ui-protocol`    | Declarative UI document schema + builders (json-render) shared by server and web                                         |
 | Integrations     | `packages/integrations/*` | User-approved local/remote setup, diagnosis, external plugin install, and restart helpers                                |
 | Database         | `packages/db` + `prisma`  | Prisma 7 + SQLite bootstrap, repositories, schema, migrations, seed                                                      |
-| Runtime core     | `packages/runtime-core`   | Backend-agnostic runtime support types/utilities shared by engine/providers                                              |
 | i18n             | `packages/i18n`           | Shared localization messages and helpers                                                                                 |
 | Shared browser/transport | `shared/http`, `shared/ui` | Generic browser/HTTP infrastructure and UI primitives; never product workflow logic                                  |
 | CLI              | `packages/cli`            | Packaged entry point for starting Chrona                                                                                 |
@@ -121,7 +120,7 @@ item for the same task, occurrence, and reason. Its HTTP wire path remains
 
 AI clients and feature bindings are database-backed. The old fallback-chain style is replaced by explicit configured clients and feature bindings.
 
-Hermes setup uses the integrations layer. Settings can diagnose local or remote Hermes clients, auto-configure a local Hermes gateway after explicit user action, and show manual instructions for remote gateways. Provider runtime code stays responsible for Hermes protocol calls; integration code owns local plugin/config/env/restart side effects.
+Hermes setup remains implemented through the integrations layer, but Hermes is hidden from the production provider catalog until its runtime is release-certified. Internal diagnostics can still inspect local or remote Hermes clients. Provider runtime code stays responsible for Hermes protocol calls; integration code owns local plugin/config/env/restart side effects.
 
 ## Core workflows
 
@@ -182,7 +181,7 @@ flowchart TD
   D -->|no ready nodes| L[complete execution]
 ```
 
-Execution nodes can be `task`, `checkpoint`, `condition`, or `wait`. Runtime events and graph events are streamed to the UI and persisted into task/work projections.
+Execution nodes can be `task`, `checkpoint`, `condition`, or `wait`. Runtime events and graph events are streamed to the UI and persisted into task/work projections. User/manual task nodes carry a planner-authored completion form. At activation, a durable structured AI feature reviews that form through the task's resolved Provider; success pauses with `manual_completion`/`WaitingForInput`, while review failure remains a retryable system failure rather than a manual-work blocker.
 
 ## Integration model
 

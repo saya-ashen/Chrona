@@ -12,7 +12,6 @@ export type AcceptedResultContext = {
     title: string;
     goalId: string | null;
     priority: "Low" | "Medium" | "High" | "Urgent";
-    executionRuntime: string;
     executionConfig: Record<string, unknown>;
     aiClientId: string | null;
   };
@@ -116,7 +115,7 @@ export function extractAcceptedResultText(spec: unknown) {
     if (!element || element.visible === false) continue;
     const type = textValue(element.type);
     const props = recordValue(element.props) ?? {};
-    let text = "";
+    let text: string;
     switch (type) {
       case "ResultSummary":
         text = [
@@ -260,7 +259,6 @@ export async function getAcceptedResultContext(
       title: true,
       goalId: true,
       priority: true,
-      executionRuntime: true,
       executionConfig: true,
       aiClientId: true,
     },
@@ -330,7 +328,6 @@ export async function getAcceptedResultContext(
       title: task.title,
       goalId: task.goalId,
       priority: task.priority,
-      executionRuntime: task.executionRuntime,
       executionConfig: task.executionConfig as Record<string, unknown>,
       aiClientId: task.aiClientId,
     },

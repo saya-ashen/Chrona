@@ -36,7 +36,7 @@ async function resetDb() {
 
 async function createTask() {
   const workspace = await db.workspace.create({
-    data: { name: "Graph Mutation Workspace", status: "Active", defaultRuntime: "hermes" },
+    data: { name: "Graph Mutation Workspace", status: "Active" },
   });
   const task = await db.task.create({
     data: {
@@ -44,7 +44,6 @@ async function createTask() {
       title: "Mutate graph",
       status: "Ready",
       priority: "High",
-      executionRuntime: "hermes",
       executionConfig: { prompt: "Mutate graph" },
     },
   });

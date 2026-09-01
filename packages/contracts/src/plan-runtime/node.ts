@@ -66,6 +66,7 @@ export interface NodeRuntimeInput {
   };
   context: {
     taskTitle?: string;
+    taskDescription?: string;
     plan: {
       title: string;
       goal: string;
@@ -102,6 +103,11 @@ export interface NodeRuntimeInput {
     run?: {
       planningPrompt?: string;
       startPrompt?: string;
+      contextContinuity?: {
+        mode: "fresh" | "resumed" | "recovery";
+        reason?: "provider_session_unavailable";
+        recovery: "provider_context" | "chrona_result_refs";
+      };
       generatedFiles?: {
         directory: string;
         referenceBase: string;

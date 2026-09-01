@@ -45,7 +45,6 @@ export interface TaskWorkspaceChatRequest {
     scheduledStartAt: string | null;
     scheduledEndAt: string | null;
     scheduleStatus: string;
-    executionRuntime: string;
     executionConfig: unknown;
     status: string;
   };

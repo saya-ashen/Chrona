@@ -73,7 +73,7 @@ describe.skipIf(!HAS_CLAUDE)("ClaudeCodeProviderClient — live provider protoco
     llm.mock.on({ userMessage: /.*/ }, {
       error: { type: "invalid_request_error", message: "invalid fixture request" },
     });
-    live = await makeLiveClient({ mockUrl: llm.url });
+    live = await makeLiveClient({ mockUrl: llm.url, timeoutMs: 5_000 });
 
     const events = await collect(live.client.streamRun({
       clientOperationId: "claude-code-live-api-error",
@@ -82,7 +82,7 @@ describe.skipIf(!HAS_CLAUDE)("ClaudeCodeProviderClient — live provider protoco
       input: { type: "text", text: "error" },
     }));
 
-    expect(events.some((event) => event.type === "text_delta" || event.type === "run_failed")).toBe(true);
+    expect(events.at(-1)).toMatchObject({ type: "run_failed" });
   }, TEST_TIMEOUT_MS);
 
   test("reports a healthy SDK connection", async () => {

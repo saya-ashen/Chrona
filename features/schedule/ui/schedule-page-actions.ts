@@ -32,17 +32,6 @@ import type { Locale } from "@chrona/i18n";
 import { apiJson } from "@shared/http";
 import type { TaskConfigFormInput } from "./forms/task-config-form";
 
-export function getQuickCreateDefaults(data: SchedulePageData) {
-  const selectedRuntime =
-    data.executionRuntimes.find(
-      (runtime) => runtime.key === data.defaultExecutionRuntime,
-    ) ?? data.executionRuntimes[0];
-
-  return {
-    executionRuntime: selectedRuntime.key,
-  };
-}
-
 function getSuggestedDurationMinutes(
   value: unknown,
   fallback = DEFAULT_SCHEDULE_BLOCK_MINUTES,
@@ -389,7 +378,6 @@ export async function handleCreateTaskBlockAction({
       autoExecute: input.autoExecute,
       autoPlanGenerationTiming: input.autoPlanGenerationTiming,
       autoExecuteTiming: input.autoExecuteTiming,
-      executionRuntime: input.executionRuntime,
       executionConfig: input.executionConfig,
       aiClientId: input.aiClientId,
       dueAt: input.dueAt,
@@ -482,7 +470,6 @@ export async function handleTaskConfigSaveAction({
       title: input.title,
       description: input.description || null,
       priority: input.priority,
-      executionRuntime: input.executionRuntime,
       executionConfig: input.executionConfig,
       aiClientId: input.aiClientId,
       autoPlanGeneration: input.autoPlanGeneration,

@@ -33,7 +33,6 @@ export type {
 	ExecutionOverviewCard,
 	ProgressSummary,
 	TaskConfigAiClient,
-	TaskConfigExecutionRuntime,
 	WorkspaceActivityItem,
 	WorkspaceArtifactItem,
 } from "../model/task-workspace-types";

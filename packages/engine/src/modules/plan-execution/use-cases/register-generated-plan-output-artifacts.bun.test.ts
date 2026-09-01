@@ -11,7 +11,7 @@ const createdWorkspaceIds: string[] = [];
 
 async function seedRun() {
   const workspace = await db.workspace.create({
-    data: { name: `Deliverable test ${crypto.randomUUID()}`, status: "Active", defaultRuntime: "test" },
+    data: { name: `Deliverable test ${crypto.randomUUID()}`, status: "Active" },
   });
   createdWorkspaceIds.push(workspace.id);
   const task = await db.task.create({
@@ -19,7 +19,6 @@ async function seedRun() {
       workspaceId: workspace.id,
       title: "Register a generated deliverable",
       priority: "Medium",
-      executionRuntime: "test",
       executionConfig: {},
       status: "Running",
     },

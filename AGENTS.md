@@ -35,13 +35,20 @@ patterns.
   `prisma/schema.prisma`. Only create another migration folder after the current
   release ships, or when a release explicitly needs multiple independently
   reversible upgrade steps.
+- When an earlier checksum of the mutable migration has already been applied to
+  an unreleased development database, add a checksum-keyed amendment SQL file
+  under that same migration folder and register its source schema fingerprint
+  and file checksum in `release-metadata.json`. Never authorize unknown schema
+  drift or use this mechanism for a released migration.
 - Every release candidate must prove both paths: fresh install from empty SQLite
   and upgrade from the previous released database snapshot.
 
 Recommended workflow:
 
 1. During unreleased development: edit `prisma/schema.prisma`; update the
-   current mutable release-line migration; reset local test databases as needed.
+   current mutable release-line migration; reset disposable test databases as
+   needed. Preserve non-disposable local data with a registered amendment when
+   that mutable migration was already applied.
 2. Before first public release: regenerate `0001_initial/migration.sql` from the
    final schema and delete any intermediate development-only migration folders.
 3. After each public release: preserve all shipped migrations; on the next

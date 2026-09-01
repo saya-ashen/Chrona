@@ -140,6 +140,70 @@ export async function markExecutionNodeActive(input: {
   });
 }
 
+export async function ensurePlanExecutionRun(input: {
+  taskId: string;
+  planRunId: string;
+  workBlockId?: string | null;
+  occurrenceId?: string | null;
+  taskSessionId?: string | null;
+  status: RunStatus;
+  triggeredBy?: string;
+  setAsLatest?: boolean;
+}, tx?: Prisma.TransactionClient) {
+  return withPlanExecutionDurability(async (client) => {
+    const runId = `plan_execution_${input.planRunId}`;
+    const existing = await client.run.findUnique({ where: { id: runId } });
+    const terminal = input.status === RunStatus.Completed
+      || input.status === RunStatus.Cancelled
+      || input.status === RunStatus.Failed;
+    const run = existing
+      ? (ACTIVE_RUN_STATUSES.includes(existing.status) && terminal
+        ? await client.run.update({
+            where: { id: existing.id },
+            data: {
+              status: input.status,
+              endedAt: new Date(),
+              lastSyncedAt: new Date(),
+              syncStatus: "healthy",
+              retryable: false,
+              resumeSupported: false,
+              pendingInputPrompt: null,
+            },
+          })
+        : existing)
+      : await client.run.create({
+          data: {
+            id: runId,
+            taskId: input.taskId,
+            workBlockId: input.workBlockId ?? null,
+            occurrenceId: input.occurrenceId ?? null,
+            taskSessionId: input.taskSessionId ?? null,
+            runtimeName: "chrona-plan",
+            runtimeRunRef: `chrona-plan:${input.planRunId}`,
+            runtimeConfigSnapshot: {
+              canonical: "plan_execution",
+              planRunId: input.planRunId,
+            },
+            status: input.status,
+            startedAt: new Date(),
+            endedAt: terminal ? new Date() : null,
+            triggeredBy: input.triggeredBy ?? "system",
+            retryable: false,
+            resumeSupported: false,
+            syncStatus: "healthy",
+          },
+        });
+
+    await client.task.updateMany({
+      where: input.setAsLatest
+        ? { id: input.taskId }
+        : { id: input.taskId, latestRunId: null },
+      data: { latestRunId: run.id },
+    });
+    return run;
+  }, tx);
+}
+
 export async function completeActiveRunsForExecutionScope(input: {
   taskId: string;
   taskSessionId: string;

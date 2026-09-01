@@ -18,6 +18,10 @@ import { isTrustedRequestOrigin, readEnv, resolveAllowedOrigins } from "./config
 const log = createLogger("apps.server");
 const MAX_HTTP_BODY_BYTES = 1_048_576;
 
+function isRunTokenProtectedApiPath(path: string, method: string) {
+  // These exact endpoints validate their own narrower credentials. Prefixes stay API-key protected.
+  return (method === "POST" && path === "/api/agent/control") || path === "/api/mcp";
+}
 
 function getAllowedOrigins() {
   return resolveAllowedOrigins(readEnv());
@@ -45,7 +49,7 @@ function wantsHtml(acceptHeader: string | undefined) {
 export async function createServerApp() {
   const app = new Hono();
   const engine = createChronaEngine({ logger: log });
-  const api = createApiRouter(engine);
+  const api = createApiRouter(engine, { mcpApiKey: readEnv().API_KEY });
   const spaAvailable = await hasSpaDist();
   const allowedOrigins = getAllowedOrigins();
 
@@ -66,7 +70,7 @@ export async function createServerApp() {
     if (c.req.method === "OPTIONS") return c.body(null, 204);
     await next();
   });
-  app.use("/api/*", apiKeyAuth());
+  app.use("/api/*", apiKeyAuth({ isExempt: isRunTokenProtectedApiPath }));
   app.use(
     "/api/*",
     bodyLimit({
@@ -88,7 +92,6 @@ export async function createServerApp() {
   });
 
   app.route("/api", api);
-
   if (spaAvailable) {
     const serveSpaAsset = createSpaAssetMiddleware();
     const serveSpaIndex = createSpaIndexMiddleware();

@@ -157,15 +157,20 @@ function smallestSchemaBranch(schema: JsonSchema): JsonSchema | null {
 	const branches = [
 		...(Array.isArray(schema.oneOf) ? schema.oneOf : []),
 		...(Array.isArray(schema.anyOf) ? schema.anyOf : []),
-	];
-	return branches
+	]
 		.map(asJsonSchema)
-		.filter((branch): branch is JsonSchema => branch !== null)
-		.reduce<JsonSchema | null>(
-			(best, branch) =>
-				!best || schemaCost(branch) < schemaCost(best) ? branch : best,
-			null,
-		);
+		.filter((branch): branch is JsonSchema => branch !== null);
+	const completed = branches.find((branch) => {
+		const properties = asJsonSchema(branch.properties);
+		const status = asJsonSchema(properties?.status);
+		return status?.const === "completed";
+	});
+	if (completed) return completed;
+	return branches.reduce<JsonSchema | null>(
+		(best, branch) =>
+			!best || schemaCost(branch) < schemaCost(best) ? branch : best,
+		null,
+	);
 }
 
 function boundedJsonValue(
@@ -287,6 +292,7 @@ export class ChronaDebugProviderClient implements AgentProviderClient {
 			supportsRunLookup: true,
 			supportsCancellation: true,
 			supportsToolCalls: true,
+			readOnlySingleAttempt: true,
 			supportsPreviousResponse: false,
 			actionInvocation: "engine_managed",
 			startIdempotency: "client_operation_id",

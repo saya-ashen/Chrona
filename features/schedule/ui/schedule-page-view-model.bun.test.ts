@@ -30,8 +30,6 @@ function createData(scheduledStartAt: Date): SchedulePageData {
   scheduledEndAt.setHours(scheduledEndAt.getHours() + 1);
 
   return {
-    defaultExecutionRuntime: "hermes",
-    executionRuntimes: [],
     summary: {
       scheduledCount: 1,
       unscheduledCount: 0,
@@ -77,7 +75,6 @@ function createData(scheduledStartAt: Date): SchedulePageData {
         latestRunStatus: null,
         scheduleProposalCount: 0,
         lastActivityAt: null,
-        executionRuntime: "hermes",
         executionConfig: {},
         autoPlanGeneration: false,
         autoExecute: false,

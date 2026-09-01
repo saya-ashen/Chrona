@@ -4,7 +4,6 @@ import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { MemoryRouter } from "react-router-dom";
 import { SelectedBlockSheet } from "./selected-block-sheet";
 import type { ScheduleRecord } from "../../schedule-page-types";
-import type { TaskConfigExecutionRuntime } from "../../forms/task-config-form";
 
 vi.mock("@chrona/i18n/react", async () => {
   const { fallbackMessages } = await import("@chrona/i18n/messages");
@@ -59,7 +58,6 @@ vi.mock("./selected-block-main-column", () => ({
         type="button"
         onClick={() => onSaveTaskConfig({
           title: (document.getElementById("selected-block-title") as HTMLInputElement).value,
-          executionRuntime: item.executionRuntime,
         })}
       >
         Save task config
@@ -83,17 +81,6 @@ if (!HTMLElement.prototype.setPointerCapture) {
 if (!HTMLElement.prototype.releasePointerCapture) {
   HTMLElement.prototype.releasePointerCapture = () => undefined;
 }
-
-const runtimes: TaskConfigExecutionRuntime[] = [{
-  key: "hermes",
-  label: "Hermes",
-  spec: {
-    runtime: "hermes",
-    version: "hermes-v1",
-    fields: [],
-    runnability: { requiredPaths: [] },
-  },
-}];
 
 function item(overrides: Partial<ScheduleRecord> = {}): ScheduleRecord {
   return {
@@ -119,7 +106,6 @@ function item(overrides: Partial<ScheduleRecord> = {}): ScheduleRecord {
     autoPlanGenerationTiming: "at_start",
     autoExecuteTiming: "at_start",
     parentTaskId: null,
-    executionRuntime: "hermes",
     executionConfig: {},
     isRunnable: true,
     runnabilityState: "ready",
@@ -138,8 +124,6 @@ describe("SelectedBlockSheet regressions", () => {
         <SelectedBlockSheet
           item={item()}
           selectedDay="2026-05-28"
-          executionRuntimes={runtimes}
-          defaultExecutionRuntime="hermes"
           isPending={false}
           onClose={onClose}
           onSaveTaskConfigAction={onSaveTaskConfigAction}
@@ -156,7 +140,6 @@ describe("SelectedBlockSheet regressions", () => {
 
     expect(onSaveTaskConfigAction).toHaveBeenCalledWith("task-1", expect.objectContaining({
       title: "Updated scheduled task",
-      executionRuntime: "hermes",
     }));
     expect(onClose).not.toHaveBeenCalled();
     expect(screen.getByRole("dialog")).toBeInTheDocument();

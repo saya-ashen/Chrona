@@ -10,7 +10,6 @@ export function taskToEditableTask(task: TaskData): EditableTask {
     scheduledStartAt: task.scheduledStartAt,
     scheduledEndAt: task.scheduledEndAt,
     scheduleStatus: task.scheduleStatus,
-    executionRuntime: task.executionRuntime,
     executionConfig: task.executionConfig,
     aiClientId: task.aiClientId ?? null,
     autoPlanGeneration: task.autoPlanGeneration,
@@ -31,7 +30,6 @@ export function taskToTaskConfigInitialValues(task: TaskData) {
     dueAt: task.dueAt ? new Date(task.dueAt) : null,
     scheduledStartAt: task.scheduledStartAt ? new Date(task.scheduledStartAt) : null,
     scheduledEndAt: task.scheduledEndAt ? new Date(task.scheduledEndAt) : null,
-    executionRuntime: task.executionRuntime,
     executionConfig: task.executionConfig,
     aiClientId: task.aiClientId ?? null,
     autoPlanGeneration: task.autoPlanGeneration,
@@ -51,7 +49,6 @@ export function taskConfigInputToEditableTask(input: TaskConfigFormInput, schedu
     scheduledStartAt: dateToIsoStringOrNull(input.scheduledStartAt),
     scheduledEndAt: dateToIsoStringOrNull(input.scheduledEndAt),
     scheduleStatus,
-    executionRuntime: input.executionRuntime,
     executionConfig: input.executionConfig,
     aiClientId: input.aiClientId,
     autoPlanGeneration: input.autoPlanGeneration,
@@ -90,7 +87,6 @@ export function editableTaskToEditSummary(task: EditableTask) {
   const startTime = formatTaskTime(task.scheduledStartAt);
   const endTime = formatTaskTime(task.scheduledEndAt);
   const schedule = scheduleDate && startTime && endTime ? `${scheduleDate} ${startTime}-${endTime}` : "Unscheduled";
-  const model = task.executionRuntime?.trim() || "Default runtime";
   const description = task.description?.trim()
     ? task.description.trim().length > 140
       ? `${task.description.trim().slice(0, 137)}...`
@@ -99,7 +95,6 @@ export function editableTaskToEditSummary(task: EditableTask) {
 
   return {
     schedule,
-    model,
     description,
   };
 }

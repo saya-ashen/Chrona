@@ -45,6 +45,7 @@ import {
 	buildWorkspaceStateTreatment,
 	type WorkspaceStateTreatmentCopy,
 } from "./task-workspace-actions";
+import { settleAcceptedResultWorkState } from "./task-workspace-settlement";
 
 export type TaskWorkspaceCommandAck = {
 	commandId: string;
@@ -483,17 +484,44 @@ function buildActivity(pageData: TaskPageData): WorkspaceActivityItem[] {
 	return mergeWorkspaceActivity(pageData.activityTimeline ?? []);
 }
 
+function resolveTaskHeaderAuthority(
+	pageData: TaskPageData,
+	workState: ReturnType<typeof deriveWorkspaceWorkStateView>,
+) {
+	if (workState.state === "done") {
+		return {
+			stateLabel: workState.label,
+			actionLabel: workState.nextActionLabel,
+			currentNodeId: null,
+		};
+	}
+	return {
+		stateLabel: pageData.task.executionSummary?.stateLabel ?? workState.label,
+		actionLabel:
+			pageData.task.executionSummary?.primaryAction.label ??
+			workState.nextActionLabel,
+		currentNodeId:
+			pageData.task.executionSummary?.currentNodeId ?? workState.currentNodeId,
+	};
+}
+
 function buildTaskHeaderView(
 	pageData: TaskPageData,
 	progress: ProgressSummary,
 	currentNode: PlanNodeDataModel | null,
 	copy: TaskWorkspaceExecutionConsoleCopy,
 ): TaskHeaderView {
-	const workState = deriveWorkspaceWorkStateView({
-		task: pageData.task,
-		progress,
-		currentNode,
-	});
+	const workState = settleAcceptedResultWorkState(
+		pageData,
+		deriveWorkspaceWorkStateView({
+			task: pageData.task,
+			progress,
+			currentNode,
+		}),
+	);
+	const settled = workState.state === "done";
+	const showProgress = workState.showLiveProgress || settled;
+	const authority = resolveTaskHeaderAuthority(pageData, workState);
 	const actions = deriveHeaderActions({
 		task: pageData.task,
 		progress,
@@ -532,17 +560,13 @@ function buildTaskHeaderView(
 		title: pageData.task.title,
 		canEditTitle: true,
 		status: mapTaskWorkspaceStatus(workState.state),
-		completedSteps: workState.showLiveProgress ? progress.completedSteps : 0,
-		totalSteps: workState.showLiveProgress ? progress.totalSteps : 0,
-		progressPercent: workState.showLiveProgress ? progress.percentComplete : 0,
+		completedSteps: showProgress ? progress.completedSteps : 0,
+		totalSteps: showProgress ? progress.totalSteps : 0,
+		progressPercent: showProgress ? progress.percentComplete : 0,
 		actions: headerActions,
-		primaryStateLabel:
-			pageData.task.executionSummary?.stateLabel ?? workState.label,
-		primaryActionLabel:
-			pageData.task.executionSummary?.primaryAction.label ??
-			workState.nextActionLabel,
-		currentNodeId:
-			pageData.task.executionSummary?.currentNodeId ?? workState.currentNodeId,
+		primaryStateLabel: authority.stateLabel,
+		primaryActionLabel: authority.actionLabel,
+		currentNodeId: authority.currentNodeId,
 	};
 }
 

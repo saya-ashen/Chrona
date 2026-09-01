@@ -2,7 +2,7 @@ import { z } from "zod";
 import { AiFeatureRunStatus, db, Prisma } from "@chrona/db";
 import { type ApplyGoalReviewProposalRequest, type GenerateGoalReviewRequest, type GoalOperationalBrief, type GoalReviewProgressEvent, type GoalReviewProposalStatus, type RejectGoalReviewProposalRequest, type RetryGoalReviewProposalRequest } from "@chrona/contracts/api";
 import { aiJsonObjectSchema, aiJsonValueSchema, userQuestionSchema } from "@chrona/contracts/ai-feature-runtime";
-import { AiFeatureDefinitionRegistry, resumeAiFeatureRun, stableJsonHash, startAiFeatureWithRuntime } from "../ai";
+import { AiFeatureDefinitionRegistry, resolveTaskExecutionProviderSelection, resumeAiFeatureRun, stableJsonHash, startAiFeatureWithRuntime, unresolvedTaskProviderName } from "../ai";
 import { goalReviewFeature, goalReviewFeatureInput, goalReviewSnapshotHash, type GoalReviewFeatureInput, type GoalReviewSnapshot } from "./ai/goal.review";
 import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
 import { buildAutomaticGoalTaskContext } from "./goal-task-context";
@@ -410,6 +410,16 @@ export async function applyGoalReviewProposal(input: {
           sourceGoalReviewItemId: item.itemId,
         }),
       }, tx);
+      const sourceAiClientId = proposal.sourceTaskId
+        ? (await tx.task.findUniqueOrThrow({
+            where: { id: proposal.sourceTaskId },
+            select: { aiClientId: true },
+          })).aiClientId
+        : null;
+      const provider = await resolveTaskExecutionProviderSelection({
+        aiClientId: sourceAiClientId,
+        client: tx,
+      });
       const task = await tx.task.create({
         data: {
           workspaceId: goal.workspaceId,
@@ -419,10 +429,8 @@ export async function applyGoalReviewProposal(input: {
           priority: "High",
           kind: "single",
           status: "Ready",
-          executionRuntime: proposal.sourceTaskId
-            ? (await tx.task.findUniqueOrThrow({ where: { id: proposal.sourceTaskId }, select: { executionRuntime: true } })).executionRuntime
-            : "omp",
           executionConfig: {},
+          aiClientId: sourceAiClientId,
           autoPlanGeneration: false,
           autoExecute: false,
           goalContext,
@@ -431,7 +439,10 @@ export async function applyGoalReviewProposal(input: {
       await tx.taskSession.create({
         data: {
           taskId: task.id,
-          runtimeName: task.executionRuntime,
+          runtimeName: provider?.providerName ?? unresolvedTaskProviderName(),
+          providerClientId: provider?.clientId ?? null,
+          providerName: provider?.providerName ?? null,
+          providerConfigFingerprint: provider?.configFingerprint ?? null,
           sessionKey: `chrona:task:${task.id}:default`,
           label: `${task.title} · Default session`,
           createdByFramework: true,

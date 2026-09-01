@@ -20,6 +20,11 @@ import {
   runProviderRequest,
   setAfterRawEventPersistedForTest,
 } from "./ai-runtime-invoker";
+import {
+  continuityInstructions,
+  resolveRuntimeContextContinuity,
+  withContextContinuity,
+} from "./runtime/runtime-context-continuity";
 import { ensureProviderRunRecord } from "./ai-runtime-persistence";
 import type { ExecutionProviderRequest } from "./ai-runtime-request";
 
@@ -120,14 +125,12 @@ async function seedRunPair() {
     data: {
       name: "Runtime ref workspace",
       status: "Active",
-      defaultRuntime: "hermes",
     },
   });
   const task = await db.task.create({
     data: {
       workspaceId: workspace.id,
       title: "Runtime ref task",
-      executionRuntime: "hermes",
       executionConfig: {},
       status: TaskStatus.Running,
       priority: TaskPriority.Medium,
@@ -159,14 +162,12 @@ async function seedProviderRunChain() {
     data: {
       name: "Provider audit workspace",
       status: "Active",
-      defaultRuntime: "hermes",
     },
   });
   const task = await db.task.create({
     data: {
       workspaceId: workspace.id,
       title: "Provider audit task",
-      executionRuntime: "hermes",
       executionConfig: {},
       status: TaskStatus.Running,
       priority: TaskPriority.Medium,
@@ -211,6 +212,10 @@ async function seedProviderRunChain() {
       planId: plan.planId,
       planRunId: planRun.id,
       nodeAttemptId: attempt.id,
+      aiClientId: "ai-client-test",
+      aiClientConfigDigest: "config-digest",
+      providerName: "hermes",
+      runtimeName: "hermes",
       idempotencyKey: "provider-run-key-1",
       status: "running",
     },
@@ -219,6 +224,9 @@ async function seedProviderRunChain() {
     data: {
       taskId: task.id,
       runtimeName: "hermes",
+      providerClientId: "ai-client-test",
+      providerName: "hermes",
+      providerConfigFingerprint: "config-digest",
       sessionKey: "provider-audit-session",
     },
   });
@@ -242,6 +250,9 @@ async function seedProviderRunChain() {
       nodeAttemptId: attempt.id,
       taskSessionId: taskSession.id,
       runtimeName: "hermes",
+      providerClientId: "ai-client-test",
+      providerName: "hermes",
+      providerConfigFingerprint: "config-digest",
       status: RunStatus.Pending,
       triggeredBy: "system",
     },
@@ -827,9 +838,128 @@ describe("runProviderRequest runtime ref persistence", () => {
 
     const snapshot = await runProviderRequest(client, request);
 
-    expect(snapshot.raw).toMatchObject({
+    expect(snapshot.raw).toEqual({
       terminalToolName: "chrona_node_complete",
     });
+  });
+
+  it("preserves terminal tool input carried by the provider terminal event", async () => {
+    const client = {
+      provider: "claude_code",
+      getCapabilities: () => providerCapabilities(),
+      startRun: mock(async () => runRef({ provider: "claude_code" })),
+      streamRun: mock(() =>
+        (async function* () {
+          yield providerEvent({
+            type: "run_completed",
+            provider: "claude_code",
+            runId: "run-1",
+            sessionId: "session-1",
+            run: {
+              provider: "claude_code",
+              runId: "run-1",
+              nativeRunId: "native-run-1",
+              sessionId: "session-1",
+              status: "completed",
+            },
+            outputText: "done",
+            terminalToolCall: {
+              name: "chrona_node_complete",
+              callId: "complete-1",
+              input: { summary: "done" },
+            },
+          }, runRef({ provider: "claude_code" }));
+        })(),
+      ),
+    } as unknown as AgentProviderClient;
+
+    const snapshot = await runProviderRequest(client, request);
+
+    expect(snapshot.raw).toEqual({
+      terminalTool: {
+        name: "chrona_node_complete",
+        callId: "complete-1",
+        input: { summary: "done" },
+      },
+    });
+  });
+
+  it("recovers a provider stream failure from the durable terminal action", async () => {
+    const { workspace, task, plan, planRun, attempt, providerRun, run, taskSession } =
+      await seedProviderRunChain();
+    await db.taskPlanTerminalAction.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        runId: run.id,
+        taskSessionId: taskSession.id,
+        runtimeSessionKey: taskSession.sessionKey,
+        nodeId: attempt.nodeId,
+        nodeAttemptId: attempt.id,
+        kind: "complete",
+        payload: { summary: "Durably recorded completion" },
+      },
+    });
+    const started = runRef({
+      provider: "codex",
+      runId: "codex-recorded-terminal-run",
+      sessionId: "codex-recorded-terminal-session",
+    });
+    const client = {
+      provider: "codex",
+      getCapabilities: () => providerCapabilities(),
+      startRun: mock(async () => started),
+      streamRun: mock(() =>
+        (async function* () {
+          for (const event of [] as ProviderRunEvent[]) yield event;
+          throw Object.assign(new Error("ACP stream aborted"), {
+            code: "aborted",
+            retryable: true,
+          });
+        })(),
+      ),
+    } as unknown as AgentProviderClient;
+
+    const snapshot = await runProviderRequest(client, {
+      ...request,
+      provider: "codex",
+      sessionId: started.sessionId,
+      sessionKey: started.sessionId,
+      terminalToolName: "chrona_node_complete",
+    }, {
+      runId: run.id,
+      providerRunRecordId: providerRun.id,
+      terminalToolName: "chrona_node_complete",
+      eventPersistence: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        workBlockId: null,
+        occurrenceId: null,
+        runId: run.id,
+        runtimeName: "codex",
+        taskSessionId: taskSession.id,
+        executionSessionId: `execution-session-${task.id}`,
+        nodeAttemptId: providerRun.nodeAttemptId,
+        providerRunId: providerRun.id,
+        planId: plan.planId,
+        planRunId: providerRun.planRunId,
+        executionScope: planRun.executionScopeId,
+      },
+    });
+
+    expect(snapshot).toMatchObject({
+      provider: "codex",
+      status: "completed",
+      outputText: "Durably recorded completion",
+      raw: {
+        terminalActionRecorded: true,
+        terminalTool: {
+          name: "chrona_node_complete",
+          input: { summary: "Durably recorded completion" },
+        },
+      },
+    });
+    expect(client.streamRun).toHaveBeenCalledTimes(1);
   });
 
   it("returns cancelled snapshot and closes provider audit rows from run_cancelled events", async () => {
@@ -899,6 +1029,212 @@ describe("runProviderRequest runtime ref persistence", () => {
     expect(reloaded.finishedAt).toBeInstanceOf(Date);
     expect(reloaded.completedByEventId).toBeNull();
     expect(reloaded.failedByEventId).toBeNull();
+  });
+
+  it("preserves a late native session ref when a terminal action aborts the provider turn", async () => {
+    const controller = new AbortController();
+    const nativeSessionId = "/tmp/omp-terminal-session.jsonl";
+    const initialRun = runRef({
+      provider: "omp",
+      runId: "omp-terminal-run",
+      nativeRunId: "omp-terminal-run",
+      sessionId: "logical-session",
+      nativeSessionId: undefined,
+    });
+    const cancelRun = mock(async () => {
+      throw new Error("OMP run already finished");
+    });
+    const client = {
+      provider: "omp",
+      getCapabilities: () => providerCapabilities(),
+      startRun: mock(async () => initialRun),
+      streamRun: mock(() =>
+        (async function* () {
+          controller.abort("Chrona terminal action recorded");
+          yield providerEvent(
+            {
+              type: "run_cancelled",
+              run: {
+                ...initialRun,
+                nativeSessionId,
+                status: "cancelled",
+              },
+            },
+            initialRun,
+          );
+        })(),
+      ),
+      cancelRun,
+    } as unknown as AgentProviderClient;
+
+    const snapshot = await runProviderRequest(client, {
+      ...request,
+      provider: "omp",
+      sessionId: "logical-session",
+      sessionKey: "logical-session",
+    }, { signal: controller.signal });
+
+    expect(snapshot).toMatchObject({
+      status: "cancelled",
+      sessionId: "logical-session",
+      nativeSessionId,
+    });
+    expect(cancelRun).not.toHaveBeenCalled();
+  });
+
+  it("streams a queued terminal event when terminal abort wins the start-to-stream race", async () => {
+    const controller = new AbortController();
+    const nativeSessionId = "/tmp/omp-pre-stream-terminal-session.jsonl";
+    const initialRun = runRef({
+      provider: "omp",
+      runId: "omp-pre-stream-terminal-run",
+      nativeRunId: "omp-pre-stream-terminal-run",
+      sessionId: "logical-session",
+      nativeSessionId: undefined,
+    });
+    const cancelRun = mock(async () => {
+      throw new Error("terminal run must be drained instead of cancelled again");
+    });
+    const client = {
+      provider: "omp",
+      getCapabilities: () => providerCapabilities(),
+      startRun: mock(async () => {
+        controller.abort("Chrona terminal action recorded");
+        return initialRun;
+      }),
+      streamRun: mock(() =>
+        (async function* () {
+          yield providerEvent(
+            {
+              type: "run_cancelled",
+              run: {
+                ...initialRun,
+                nativeSessionId,
+                status: "cancelled",
+              },
+            },
+            initialRun,
+          );
+        })(),
+      ),
+      cancelRun,
+    } as unknown as AgentProviderClient;
+
+    const snapshot = await runProviderRequest(client, {
+      ...request,
+      provider: "omp",
+      sessionId: "logical-session",
+      sessionKey: "logical-session",
+    }, { signal: controller.signal });
+
+    expect(snapshot.nativeSessionId).toBe(nativeSessionId);
+    expect(cancelRun).not.toHaveBeenCalled();
+    expect(client.streamRun).toHaveBeenCalledTimes(1);
+  });
+
+  it("completes from a recorded terminal tool when provider streaming aborts", async () => {
+    const controller = new AbortController();
+    const initialRun = runRef({
+      provider: "codex",
+      runId: "codex-terminal-run",
+      nativeRunId: "codex-terminal-run",
+      sessionId: "logical-session",
+    });
+    const client = {
+      provider: "codex",
+      getCapabilities: () => providerCapabilities(),
+      startRun: mock(async () => initialRun),
+      streamRun: mock(() =>
+        (async function* () {
+          yield providerEvent({
+            type: "tool_call",
+            tool: "chrona_node_complete",
+            callId: "complete-codex",
+            input: { summary: "Codex complete" },
+            status: "completed",
+          }, initialRun);
+          controller.abort("Chrona terminal action recorded");
+          throw Object.assign(new Error("ACP stream aborted"), {
+            code: "aborted",
+            retryable: true,
+          });
+        })(),
+      ),
+    } as unknown as AgentProviderClient;
+
+    const snapshot = await runProviderRequest(client, {
+      ...request,
+      provider: "codex",
+      sessionId: "logical-session",
+      sessionKey: "logical-session",
+      terminalToolName: "chrona_node_complete",
+    }, {
+      signal: controller.signal,
+      terminalToolName: "chrona_node_complete",
+    });
+
+    expect(snapshot).toMatchObject({
+      provider: "codex",
+      status: "completed",
+      outputText: "Codex complete",
+      raw: {
+        terminalActionRecorded: true,
+        terminalTool: {
+          name: "chrona_node_complete",
+          input: { summary: "Codex complete" },
+        },
+      },
+    });
+  });
+
+  it("completes when a terminal-action-aborted provider stream ends without a terminal event", async () => {
+    const controller = new AbortController();
+    const initialRun = runRef({
+      provider: "codex",
+      runId: "codex-terminal-ended-run",
+      nativeRunId: "codex-terminal-ended-run",
+      sessionId: "logical-session",
+    });
+    const client = {
+      provider: "codex",
+      getCapabilities: () => providerCapabilities(),
+      startRun: mock(async () => initialRun),
+      streamRun: mock(() =>
+        (async function* () {
+          yield providerEvent({
+            type: "tool_call",
+            tool: "chrona_node_complete",
+            callId: "complete-codex-ended",
+            input: { summary: "Codex ended complete" },
+            status: "pending",
+          }, initialRun);
+          setTimeout(
+            () => controller.abort("Chrona terminal action recorded"),
+            10,
+          );
+        })(),
+      ),
+    } as unknown as AgentProviderClient;
+
+    const snapshot = await runProviderRequest(client, {
+      ...request,
+      provider: "codex",
+      sessionId: "logical-session",
+      sessionKey: "logical-session",
+      terminalToolName: "chrona_node_complete",
+    }, {
+      signal: controller.signal,
+      terminalToolName: "chrona_node_complete",
+    });
+
+    expect(snapshot).toMatchObject({
+      status: "completed",
+      outputText: "Codex ended complete",
+      raw: {
+        terminalActionRecorded: true,
+        terminalTool: { name: "chrona_node_complete" },
+      },
+    });
   });
 
   it("cancels the provider run when the execution signal aborts during streaming", async () => {
@@ -1182,6 +1518,7 @@ describe("ensureProviderRunRecord attach-first identity", () => {
         nativeRunId: "native-run-replay",
         aiClientId: "ai-client-test",
         aiClientConfigDigest: "config-digest",
+        providerName: "hermes",
       },
     });
 
@@ -1208,6 +1545,7 @@ describe("ensureProviderRunRecord attach-first identity", () => {
       providerRunIdempotencyKey: providerRun.idempotencyKey,
       aiClientId: "ai-client-test",
       aiClientConfigDigest: "config-digest",
+      providerName: "hermes",
     });
 
     expect(ensured).toMatchObject({
@@ -1225,6 +1563,77 @@ describe("ensureProviderRunRecord attach-first identity", () => {
       }),
     ).toBe(1);
     expect(originalRun.runtimeRunRef).toBe("provider-run-replay");
+  });
+});
+
+describe("runtime context continuity", () => {
+  it("[RUN-003] marks an unexpected missing provider session as explicit result-ref recovery", async () => {
+    const { task, taskSession } = await seedProviderRunChain();
+    const provider = {
+      providerClientId: "ai-client-test",
+      providerName: "hermes",
+      providerConfigFingerprint: "config-digest",
+    };
+    await db.taskSession.update({
+      where: { id: taskSession.id },
+      data: provider,
+    });
+
+    await expect(resolveRuntimeContextContinuity(taskSession.id, provider)).resolves.toEqual({
+      mode: "fresh",
+      recovery: "provider_context",
+    });
+
+    await db.run.create({
+      data: {
+        taskId: task.id,
+        taskSessionId: taskSession.id,
+        runtimeName: "hermes",
+        status: RunStatus.Completed,
+        triggeredBy: "system",
+      },
+    });
+    const recovery = await resolveRuntimeContextContinuity(taskSession.id, provider);
+    expect(recovery).toEqual({
+      mode: "recovery",
+      reason: "provider_session_unavailable",
+      recovery: "chrona_result_refs",
+    });
+    expect(continuityInstructions(recovery)).toContain("chrona_node_read");
+    expect(
+      withContextContinuity(
+        { context: { relevantPreviousResults: [] } },
+        recovery,
+      ),
+    ).toMatchObject({
+      context: {
+        run: {
+          contextContinuity: {
+            mode: "recovery",
+            reason: "provider_session_unavailable",
+            recovery: "chrona_result_refs",
+          },
+        },
+      },
+    });
+
+    await db.taskSession.update({
+      where: { id: taskSession.id },
+      data: { providerSessionRef: "/tmp/omp-resumable.jsonl" },
+    });
+    await expect(resolveRuntimeContextContinuity(taskSession.id, provider)).resolves.toEqual({
+      mode: "resumed",
+      recovery: "provider_context",
+      providerSessionRef: "/tmp/omp-resumable.jsonl",
+    });
+    await expect(resolveRuntimeContextContinuity(taskSession.id, {
+      ...provider,
+      providerClientId: "different-client",
+    })).resolves.toEqual({
+      mode: "recovery",
+      reason: "provider_identity_changed",
+      recovery: "chrona_result_refs",
+    });
   });
 });
 
@@ -1539,6 +1948,7 @@ describe("provider attempt epoch fencing", () => {
         providerRunIdempotencyKey: "stale-prepared-provider-key",
         aiClientId: "ai-client-test",
         aiClientConfigDigest: "config-digest",
+        providerName: "hermes",
       }),
     ).rejects.toThrow(/Execution session changed/);
 
@@ -1636,6 +2046,90 @@ describe("provider runtime event persistence integrity", () => {
     expect(canonical.payload).toMatchObject({
       executionScope: planRun.executionScopeId,
     });
+  });
+
+  it("persists the first provider-native session ref observed after run start", async () => {
+    const { workspace, task, plan, planRun, providerRun, run, taskSession } =
+      await seedProviderRunChain();
+    const nativeSessionId = "/tmp/omp-observed-session.jsonl";
+    const context = {
+      workspaceId: workspace.id,
+      taskId: task.id,
+      workBlockId: null,
+      occurrenceId: null,
+      runId: run.id,
+      runtimeName: "hermes",
+      providerClientId: "ai-client-test",
+      providerConfigFingerprint: "config-digest",
+      taskSessionId: taskSession.id,
+      executionSessionId: `execution-session-${task.id}`,
+      nodeAttemptId: providerRun.nodeAttemptId,
+      providerRunId: providerRun.id,
+      planId: plan.planId,
+      planRunId: planRun.id,
+      executionScope: planRun.executionScopeId,
+    };
+
+    await persistProviderRuntimeEvent({
+      context,
+      event: providerEvent({
+        type: "run_started",
+        run: {
+          provider: "omp",
+          runId: "omp-run",
+          nativeRunId: "omp-run",
+          sessionId: "logical-session",
+          nativeSessionId,
+          status: "running",
+        },
+      }),
+      fallbackIndex: 1,
+    });
+
+    expect(await db.taskSession.findUniqueOrThrow({
+      where: { id: taskSession.id },
+      select: { providerSessionRef: true },
+    })).toEqual({ providerSessionRef: nativeSessionId });
+    expect(await db.run.findUniqueOrThrow({
+      where: { id: run.id },
+      select: { runtimeSessionRef: true },
+    })).toEqual({ runtimeSessionRef: nativeSessionId });
+  });
+
+  it("rejects a late provider event after task-session provider provenance changes", async () => {
+    const { workspace, task, plan, planRun, providerRun, run, taskSession } =
+      await seedProviderRunChain();
+    await db.taskSession.update({
+      where: { id: taskSession.id },
+      data: {
+        providerClientId: "replacement-client",
+        providerName: "omp",
+        providerConfigFingerprint: "replacement-digest",
+        providerSessionRef: null,
+      },
+    });
+
+    await expect(persistProviderRuntimeEvent({
+      context: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        workBlockId: null,
+        occurrenceId: null,
+        runId: run.id,
+        runtimeName: "hermes",
+        providerClientId: "ai-client-test",
+        providerConfigFingerprint: "config-digest",
+        taskSessionId: taskSession.id,
+        executionSessionId: `execution-session-${task.id}`,
+        nodeAttemptId: providerRun.nodeAttemptId,
+        providerRunId: providerRun.id,
+        planId: plan.planId,
+        planRunId: planRun.id,
+        executionScope: planRun.executionScopeId,
+      },
+      event: providerEvent({ type: "text_delta", text: "late" }),
+      fallbackIndex: 1,
+    })).rejects.toThrow("scope no longer matches");
   });
 
   it("rejects provider events after their execution session is abandoned", async () => {
@@ -1924,7 +2418,6 @@ describe("provider runtime event persistence integrity", () => {
         expectedExecutionEpoch: planRun.executionEpoch,
         expectedExecutionSessionId: executionSessionId,
         taskSessionId: taskSession.id,
-        runtimeName: "hermes",
         runtimeSessionKey: "provider-session",
         nodeAttempt: asRuntimeAttempt(attempt),
         clientOperationId: "terminal-candidate-only",
@@ -1991,7 +2484,6 @@ describe("provider runtime event persistence integrity", () => {
         expectedExecutionEpoch: -1,
         expectedExecutionSessionId: "unused-execution-session",
         taskSessionId: "unused-session",
-        runtimeName: "hermes",
         runtimeSessionKey: "provider-session",
         nodeAttempt: asRuntimeAttempt(attempt),
         clientOperationId: "late-terminal",
@@ -2042,7 +2534,6 @@ describe("provider runtime event persistence integrity", () => {
           expectedExecutionEpoch: planRun.executionEpoch,
           expectedExecutionSessionId: executionSessionId,
           taskSessionId: taskSession.id,
-          runtimeName: "hermes",
           runtimeSessionKey: "provider-session",
           nodeAttempt: asRuntimeAttempt(attempt),
           clientOperationId: "late-abandoned-terminal",

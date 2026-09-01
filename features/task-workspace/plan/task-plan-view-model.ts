@@ -67,6 +67,7 @@ export type TaskPlanViewModelCopy = {
   submitInputAction: string;
   startPlanAction: string;
   continueRunAction: string;
+  preparingManualForm: string;
   branchLabelPrefix: string;
 };
 
@@ -95,6 +96,7 @@ const DEFAULT_VIEW_MODEL_COPY: TaskPlanViewModelCopy = {
   submitInputAction: "Submit input",
   startPlanAction: "Start plan",
   continueRunAction: "Continue run",
+  preparingManualForm: "Preparing manual completion form",
   branchLabelPrefix: "Branch",
 };
 
@@ -511,6 +513,23 @@ function buildNodeSummary(kind: PlanNodeKind, metadata: PlanMetadata, objective:
   return metadata.expectedOutput ?? objective;
 }
 
+function nextPlanNodeAction(input: {
+  kind: PlanNodeKind;
+  status: PlanNodeStatus;
+  mode?: string | null;
+  executor?: string | null;
+  actionForm: NodeResultActionForm | null;
+  preparingLabel: string;
+  node: Parameters<typeof resolveBlockedNodeAction>[0];
+}) {
+  const preparingManualForm = input.kind === "task"
+    && (input.status === "active" || input.status === "in_progress")
+    && (input.mode === "manual" || input.executor === "user");
+  if (preparingManualForm) return input.preparingLabel;
+  if (input.status === "blocked") return input.actionForm?.instructions ?? resolveBlockedNodeAction(input.node);
+  return input.node.nextAction ?? null;
+}
+
 function toPlanNode(node: {
   id: string;
   title: string;
@@ -541,7 +560,7 @@ function toPlanNode(node: {
   const status = isManualActionBlocked(node) ? "blocked" : normalizeStatus(node.status);
   const objective = node.description ?? node.title;
   const actionForm = node.result?.actionForm ?? null;
-  const nextAction = status === "blocked" ? (actionForm?.instructions ?? resolveBlockedNodeAction(node)) : (node.nextAction ?? null);
+  const nextAction = nextPlanNodeAction({ kind, status, mode: node.mode, executor: node.executor, actionForm, preparingLabel: node.copy.preparingManualForm, node });
   const requiredInfo = node.requiredInfo ?? [];
   const userInteraction = kind === "task" ? (metadata.userInteraction as TaskConfig["userInteraction"] | undefined) : undefined;
   const interactiveFields = buildInteractiveFields({ kind, metadata, requiredInfo, actionForm, copy: node.copy });

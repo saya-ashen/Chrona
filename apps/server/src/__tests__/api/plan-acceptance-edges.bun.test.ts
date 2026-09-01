@@ -95,7 +95,6 @@ describe("plan acceptance edges", () => {
 				title: "Idempotent accept",
 				status: "Ready",
 				priority: "Medium",
-				executionRuntime: "hermes",
 				executionConfig: {},
 			},
 		});
@@ -165,7 +164,6 @@ describe("plan acceptance edges", () => {
 				title: "Accept missing plan",
 				status: "Ready",
 				priority: "Medium",
-				executionRuntime: "hermes",
 				executionConfig: {},
 			},
 		});
@@ -205,7 +203,6 @@ describe("plan acceptance edges", () => {
 				title: "Done task",
 				status: "Ready",
 				priority: "Medium",
-				executionRuntime: "hermes",
 				executionConfig: {},
 			},
 		});
@@ -253,7 +250,6 @@ describe("plan acceptance edges", () => {
 				title: "Recurring plan accept",
 				status: "Ready",
 				priority: "Medium",
-				executionRuntime: "hermes",
 				executionConfig: {},
 				recurrenceRule: "FREQ=DAILY;COUNT=2",
 				recurrenceAnchorStartAt: anchor,
@@ -332,7 +328,6 @@ describe("plan acceptance edges", () => {
 				title: "Idle stop",
 				status: "Ready",
 				priority: "Medium",
-				executionRuntime: "hermes",
 				executionConfig: {},
 			},
 		});
@@ -358,7 +353,6 @@ describe("plan acceptance edges", () => {
 				title: "No active gen",
 				status: "Ready",
 				priority: "Medium",
-				executionRuntime: "hermes",
 				executionConfig: {},
 			},
 		});

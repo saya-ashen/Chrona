@@ -25,7 +25,6 @@ async function createTaskFixture(label: string) {
 			id: `start-plan-generation-workspace-${id}`,
 			name: `Start plan generation ${label} ${id}`,
 			status: "Active",
-			defaultRuntime: "hermes",
 		},
 	});
 	createdWorkspaceIds.add(workspace.id);
@@ -37,7 +36,6 @@ async function createTaskFixture(label: string) {
 			title: `Generate plan ${label}`,
 			status: "Ready",
 			priority: "Medium",
-			executionRuntime: "hermes",
 			executionConfig: {},
 		},
 	});

@@ -8,8 +8,10 @@ const MINUTE = 60_000;
 function task(overrides: Partial<TaskLike> = {}): TaskLike {
   return {
     status: "Ready",
-    executionRuntime: "hermes",
     hasAcceptedPlan: true,
+    providerId: "provider-1",
+    providerName: "OMP",
+    providerConfigured: true,
     ...overrides,
   };
 }
@@ -40,29 +42,28 @@ describe("deriveAutoStartEligibility reasons", () => {
   it("reports invalid_task_status before runtime and plan checks", () => {
     expect(
       deriveAutoStartEligibility({
-        task: task({ status: "Blocked", executionRuntime: null, hasAcceptedPlan: false }),
+        task: task({ status: "Blocked", hasAcceptedPlan: false }),
         workBlock: { scheduledStartAt: startAt(-MINUTE) },
         now: NOW,
       }),
     ).toMatchObject({ ok: false, reason: "invalid_task_status" });
   });
 
-  it("reports no_runtime_config before provider and accepted plan checks", () => {
+  it("reports no_provider_config when no AI provider is selected", () => {
     expect(
       deriveAutoStartEligibility({
-        task: task({ executionRuntime: null, hasAcceptedPlan: false }),
+        task: task({ providerId: null, providerName: null }),
         workBlock: { scheduledStartAt: startAt(-MINUTE) },
         now: NOW,
       }),
     ).toMatchObject({
       ok: false,
-      reason: "no_runtime_config",
-      disabledReason: "Choose an execution runtime before automatic execution can start.",
+      reason: "no_provider_config",
+      disabledReason: "Connect an AI before enabling automation.",
     });
-
   });
 
-  it("reports no_accepted_plan when runtime is configured", () => {
+  it("reports no_accepted_plan when a provider is configured", () => {
     expect(
       deriveAutoStartEligibility({
         task: task({ hasAcceptedPlan: false }),
@@ -72,23 +73,6 @@ describe("deriveAutoStartEligibility reasons", () => {
     ).toMatchObject({ ok: false, reason: "no_accepted_plan" });
   });
 
-  it("reports no_runtime_config after provider readiness succeeds", () => {
-    expect(
-      deriveAutoStartEligibility({
-        task: task({
-          executionRuntime: null,
-          providerId: "provider-1",
-          providerName: "Hermes",
-        }),
-        workBlock: { scheduledStartAt: startAt(-MINUTE) },
-        now: NOW,
-      }),
-    ).toMatchObject({
-      ok: false,
-      reason: "no_runtime_config",
-      disabledReason: "Choose an execution runtime before automatic execution can start.",
-    });
-  });
 });
 describe("deriveAutoStartEligibility timing offsets", () => {
   it("at_start: not_due while start is in the future", () => {

@@ -237,7 +237,6 @@ const mockItem: ScheduledItem = {
   latestRunStatus: null,
   scheduleProposalCount: 0,
   lastActivityAt: null,
-  executionRuntime: "hermes",
   executionConfig: {},
   autoPlanGeneration: false,
   autoExecute: false,
@@ -320,19 +319,6 @@ function makeSchedulePlanSnapshot(overrides: Partial<ScheduleTaskPlanSnapshot> =
 const defaultSheetProps = {
   item: mockItem,
   selectedDay: "2026-04-15",
-  executionRuntimes: [
-    {
-      key: "hermes",
-      label: "Hermes",
-      spec: {
-        runtime: "hermes",
-        version: "hermes-v1",
-        fields: [],
-        runnability: { requiredPaths: [] },
-      },
-    },
-  ],
-  defaultExecutionRuntime: "hermes",
   isPending: false,
   onClose: vi.fn(),
   onSaveTaskConfigAction: vi.fn(),
@@ -733,12 +719,17 @@ describe("SelectedBlockSheet – layout order", () => {
         description: "Unsaved draft description",
         priority: "Urgent",
         dueAt: new Date(2026, 3, 21, 13, 0),
-        runtimeAdapterKey: "hermes",
-        runtimeInput: {},
-        runtimeInputVersion: "hermes-v1",
-        runtimeModel: null,
-        prompt: null,
-        runtimeConfig: null,
+        scheduledStartAt: new Date(2026, 3, 21, 9, 0),
+        scheduledEndAt: new Date(2026, 3, 21, 10, 0),
+        executionConfig: {},
+        aiClientId: null,
+        autoPlanGeneration: false,
+        autoExecute: false,
+        autoPlanGenerationTiming: "at_start",
+        autoExecuteTiming: "at_start",
+        recurrenceRule: null,
+        recurrenceAnchorStartAt: null,
+        recurrenceAnchorEndAt: null,
       });
     });
 

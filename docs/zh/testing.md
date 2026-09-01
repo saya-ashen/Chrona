@@ -12,7 +12,7 @@ Chrona 测试基建由五层组成：
 | API Test | `bun run test:api` | Hono route/API 工作流 |
 | Playwright | `bun run test:e2e` | 浏览器端关键用户旅程 |
 
-默认测试不得访问真实 LLM、真实外网或开发者本机数据。真实 provider 数据只能通过显式 fixture record 命令生成。
+默认测试不得访问真实 LLM、真实外网或开发者本机数据。真实 provider 数据只能通过显式 fixture record 命令或显式 live provider smoke 命令生成。live smoke 不属于默认 CI，可能消耗真实 provider 配额。
 
 ## 新增工具
 
@@ -36,7 +36,38 @@ bun run test:e2e:tablet
 bun run test:e2e:mobile
 CHRONA_LLM_FIXTURE_MODE=replay bun run test:llm:replay
 CHRONA_LLM_FIXTURE_MODE=record bun run test:llm:record
+bun run test:providers:live -- --all
 ```
+
+### 真实 Provider 矩阵冒烟
+
+`bun run test:providers:live` 默认验证 Chrona Debug、Oh My Pi、Claude Code 和 Codex。Hermes 实现暂时保留，但未通过发布认证，不出现在生产 Provider 列表或默认矩阵中；开发者仍可用 `--provider hermes` 显式诊断。每个可用 provider 依次执行：
+
+1. capability schema 与 `providerCapabilityMatrix` 一致性检查；
+2. adapter 的真实 health check；
+3. 在临时空目录中执行一次无工具、只读、固定 marker 的真实 provider turn；
+4. 校验事件 schema、provider identity、sequence 单调递增、恰好一个终态、终态位于事件流末尾和 marker 返回；
+5. 写入不含 prompt、模型输出、raw event 或凭据的权限为 `0600` 的 JSON 报告。
+
+发布矩阵覆盖产品可选的三种执行 provider：`omp`、`claude_code`、`codex`，并附带本地确定性的 `debug` 基线。`llm` 是遗留非执行类型，ACP 是 Codex 的内部 transport，不作为用户可配置 provider 单独测试。用户可配置任意兼容上游，但协议边界保持明确：OMP 支持四种可选 wire API，Claude Code 需要 Anthropic Messages 兼容端点，Codex 需要 OpenAI Responses 兼容端点。
+
+`bun run test:providers:compat` 不访问真实上游：它使用真实 OMP SDK、真实 Claude Agent SDK/Claude binary、真实 Codex ACP/Codex binary，并通过本地 AIMock 分别验证 OMP 的 `openai-responses`、`openai-completions`、`anthropic-messages`、`openrouter`，Claude Messages，以及 Codex Responses 协议。该命令是任意兼容上游支持的确定性发布门禁；真实 Provider 矩阵是外部服务漂移和凭据的补充验证。
+
+配置解析顺序：优先读取当前 `DATABASE_URL` 对应数据库中的已启用同类型 AI client（同类型优先 default）；没有记录时，OMP、Claude Code、Codex 使用本机已有登录状态。仅在开发机允许不完整矩阵时传 `--allow-missing`。共享 gateway 兼容性诊断必须显式启用：`--reuse-omp-for-claude` 通过 Anthropic-compatible endpoint 测 Claude，`--reuse-omp-for-codex` 通过 OpenAI Responses endpoint 测 Codex；凭据复用绝不默认发生。任一共享 gateway 失败只表示该 gateway 与目标 wire protocol 不兼容，不能静默回退到 OMP。
+
+Codex/ACP health 会同时验证 Chrona HTTP MCP 和一次真实模型 prompt，因此运行全矩阵前需启动 Chrona API，或通过 `--chrona-base-url` 指向已启动实例：
+
+```bash
+bun run dev
+bun run test:providers:live -- --all --chrona-base-url http://127.0.0.1:3101
+bun run test:providers:compat
+bun run test:providers:live -- --provider omp,claude_code
+bun run test:providers:live -- --provider claude_code --reuse-omp-for-claude
+bun run test:providers:live -- --provider codex --reuse-omp-for-codex
+bun run test:providers:live -- --list
+```
+
+默认脱敏报告：`.chrona/provider-smoke/latest.json`。可用 `--report <path>` 改写位置。不要把该报告、开发数据库或 provider 配置提交到仓库。
 
 完整覆盖率交付前必须记录以下命令结果：
 

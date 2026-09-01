@@ -11,6 +11,7 @@
  * Plan:   specs/017-provider-claude-code/plan.md §0.1–§0.6
  */
 
+import { createLogger, serializeSafeError } from "@chrona/logging";
 import {
 	appendProviderReplayRecord,
 	assertProviderStartSupported,
@@ -46,6 +47,8 @@ import {
 	type ClaudeCodeRunnerConfig,
 } from "./runner";
 import { ClaudeCodeProviderError } from "./types";
+
+const log = createLogger("providers.claude_code");
 
 export interface ClaudeCodeProviderOptions {
 	config: ClaudeCodeProviderConfig;
@@ -748,7 +751,7 @@ export class ClaudeCodeProviderClient implements AgentProviderClient {
 		try {
 			await this.ensureRunner().then((runner) => runner.dispose(handle));
 		} catch (error) {
-			console.error("Claude Code run disposal failed", error);
+			log.warn("run_disposal_failed", { error: serializeSafeError(error) });
 		}
 		if (handle.recordPath) {
 			await appendProviderReplayRecord(handle.recordPath, {

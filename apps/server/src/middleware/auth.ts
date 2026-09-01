@@ -5,6 +5,14 @@ import { readEnv } from "../config/env";
 
 const SKIP_PATHS = ["/api/health", "/health"];
 
+type ApiKeyAuthOptions = {
+  /**
+   * Exempts an endpoint that owns a distinct, narrower authentication contract.
+   * The caller must mount its endpoint-specific authentication after this middleware.
+   */
+  isExempt?: (path: string, method: string) => boolean;
+};
+
 function matchesApiKey(providedKey: string | null, expectedKey: string) {
   if (!providedKey) return false;
   const provided = Buffer.from(providedKey);
@@ -12,7 +20,9 @@ function matchesApiKey(providedKey: string | null, expectedKey: string) {
   return provided.byteLength === expected.byteLength && timingSafeEqual(provided, expected);
 }
 
-export function apiKeyAuth(): MiddlewareHandler {
+export function apiKeyAuth(
+  options: ApiKeyAuthOptions = {},
+): MiddlewareHandler {
   const expectedKey = readEnv().API_KEY;
 
   if (!expectedKey) {
@@ -20,7 +30,10 @@ export function apiKeyAuth(): MiddlewareHandler {
   }
 
   return async (c, next) => {
-    if (SKIP_PATHS.some((p) => c.req.path === p || c.req.path.startsWith(p))) {
+    if (
+      SKIP_PATHS.some((p) => c.req.path === p || c.req.path.startsWith(p))
+      || options.isExempt?.(c.req.path, c.req.method)
+    ) {
       return next();
     }
 
@@ -33,11 +46,9 @@ export function apiKeyAuth(): MiddlewareHandler {
       ? authHeader.slice(7)
       : null;
 
-    if (!matchesApiKey(providedKey, expectedKey)) {
-      const messages = getApiMessages(getPreferredLocale(c.req.header("accept-language")));
-      return c.json({ error: messages.unauthorized }, 401);
-    }
+    if (matchesApiKey(providedKey, expectedKey)) return next();
 
-    return next();
+    const messages = getApiMessages(getPreferredLocale(c.req.header("accept-language")));
+    return c.json({ error: messages.unauthorized }, 401);
   };
 }

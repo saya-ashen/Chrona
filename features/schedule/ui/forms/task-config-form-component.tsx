@@ -10,7 +10,7 @@ import type { RecurrencePreset } from "../recurrence-presets";
 
 const DEFAULT_COPY = {
   moreOptions: "More options", starterPresets: "Starter presets", title: "Title", basics: "Basics", titlePlaceholder: "Add the next task to execute", priority: "Priority", dueDate: "Due date", schedule: "Schedule", scheduleHint: "Adjust when this block should run.", scheduleDate: "Date", scheduleStart: "Start", scheduleEnd: "End", scheduleDuration: "Duration",
-  priorities: { Low: "Low", Medium: "Medium", High: "High", Urgent: "Urgent" }, recurrence: "Repeat", recurrenceDescription: "Create independent task occurrences from this schedule.", recurrencePresets: { none: "Does not repeat", daily: "Daily", weekly: "Weekly", monthly: "Monthly", custom: "Custom RRULE" }, recurrenceCustomLabel: "RRULE", recurrenceCustomPlaceholder: "e.g. FREQ=WEEKLY;BYDAY=MO,WE,FR", adapter: "Adapter", aiProvider: "AI provider", defaultAiProvider: "Default provider", aiProviderHint: "Override provider for this task.", advancedFields: "Advanced fields", description: "Description", chronaNotes: "Chrona notes", chronaNotesPlaceholder: "Add local context, instructions, or desired outcome", chronaNotesHelp: "Stored only in Chrona. It does not update the calendar source.", chronaNotesEmpty: "No Chrona notes yet.", calendarDescription: "Calendar description", descriptionPlaceholder: "Optional execution context or desired outcome", runtimeParams: "Additional runtime params (JSON)", runtimeParamsPlaceholder: '{"customFlag": true}', automation: "Automation", autoPlanGeneration: "Auto-generate plan", autoPlanGenerationDescription: "Create a draft execution plan automatically. You can turn this off unless auto-execute is enabled.", autoExecute: "Auto-execute at scheduled time", autoExecuteDescription: "Force plan generation on, accept the generated plan, then start execution at the scheduled time.", automationTimingLabel: "Start timing", automationTiming: { immediate: "Immediately", at_start: "At scheduled start", before_30m: "30 minutes before start", before_1h: "1 hour before start", before_2h: "2 hours before start", before_1d: "1 day before start" }, errorInvalidJson: "Runtime params must be valid JSON", errorJsonObject: "Runtime params must be a JSON object", errorIncompleteSchedule: "Set date, start, and end time together", errorInvalidScheduleRange: "End time must be after start time", actionFailed: "Action failed",
+  priorities: { Low: "Low", Medium: "Medium", High: "High", Urgent: "Urgent" }, recurrence: "Repeat", recurrenceDescription: "Create independent task occurrences from this schedule.", recurrencePresets: { none: "Does not repeat", daily: "Daily", weekly: "Weekly", monthly: "Monthly", custom: "Custom RRULE" }, recurrenceCustomLabel: "RRULE", recurrenceCustomPlaceholder: "e.g. FREQ=WEEKLY;BYDAY=MO,WE,FR", aiProvider: "AI provider", defaultAiProvider: "Default provider", aiProviderHint: "Override provider for this task.", advancedFields: "Advanced fields", description: "Description", chronaNotes: "Chrona notes", chronaNotesPlaceholder: "Add local context, instructions, or desired outcome", chronaNotesHelp: "Stored only in Chrona. It does not update the calendar source.", chronaNotesEmpty: "No Chrona notes yet.", calendarDescription: "Calendar description", descriptionPlaceholder: "Optional execution context or desired outcome", runtimeParams: "Additional runtime params (JSON)", runtimeParamsPlaceholder: '{"customFlag": true}', automation: "Automation", autoPlanGeneration: "Auto-generate plan", autoPlanGenerationDescription: "Create a draft execution plan automatically. You can turn this off unless auto-execute is enabled.", autoExecute: "Auto-execute at scheduled time", autoExecuteDescription: "Force plan generation on, accept the generated plan, then start execution at the scheduled time.", automationTimingLabel: "Start timing", automationTiming: { immediate: "Immediately", at_start: "At scheduled start", before_30m: "30 minutes before start", before_1h: "1 hour before start", before_2h: "2 hours before start", before_1d: "1 day before start" }, errorInvalidJson: "Runtime params must be valid JSON", errorJsonObject: "Runtime params must be a JSON object", errorIncompleteSchedule: "Set date, start, and end time together", errorInvalidScheduleRange: "End time must be after start time", actionFailed: "Action failed",
 } as const satisfies TaskConfigCopy;
 
 function useTaskConfigCopy() {
@@ -29,8 +29,6 @@ function useTaskConfigCopy() {
 }
 
 export function TaskConfigForm({
-  executionRuntimes,
-  defaultExecutionRuntime,
   compact = false,
   initialValues,
   lockedFields = [],
@@ -52,8 +50,6 @@ export function TaskConfigForm({
 }: TaskConfigFormProps) {
   const copy = useTaskConfigCopy();
   const form = useTaskConfigFormState({
-    executionRuntimes,
-    defaultExecutionRuntime,
     initialValues,
     onDraftStateChange,
     onSubmitAction,
@@ -63,7 +59,7 @@ export function TaskConfigForm({
   const isTitleLocked = lockedFieldSet.has("title");
   const isScheduleLocked = lockedFieldSet.has("scheduledStartAt") || lockedFieldSet.has("scheduledEndAt");
   const applyPreset = (preset: NonNullable<typeof presets>[number]) => {
-    form.replaceFormState(applyPresetValues(form.getValues(), preset.values, executionRuntimes, defaultExecutionRuntime));
+    form.replaceFormState(applyPresetValues(form.getValues(), preset.values));
   };
 
   return (
@@ -82,7 +78,6 @@ export function TaskConfigForm({
             lockedFieldsHint={lockedFieldsHint}
             sourceDescription={sourceDescription}
             sourceDescriptionLabel={sourceDescriptionLabel}
-            executionRuntimes={executionRuntimes}
             availableAiClients={availableAiClients}
             disableAiClientSelection={disableAiClientSelection}
             aiClientSelectionDisabledHint={aiClientSelectionDisabledHint}

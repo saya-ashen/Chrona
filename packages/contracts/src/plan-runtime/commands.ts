@@ -80,6 +80,8 @@ export type ExecutionActionInput =
       runtimeRunRef?: string;
       providerRunId?: string;
       nodeId?: string;
+      formRevision?: string;
+      inputFields?: CheckpointInputFields;
       summary?: string;
       output?: unknown;
       deliverables?: NodeDeliverableDeclaration[];
@@ -152,7 +154,6 @@ export type TaskUpdatePatch = {
   scheduledStartAt?: string | null;
   scheduledEndAt?: string | null;
   scheduleStatus?: string | null;
-  executionRuntime?: string | null;
   executionConfig?: Record<string, unknown> | null;
 };
 

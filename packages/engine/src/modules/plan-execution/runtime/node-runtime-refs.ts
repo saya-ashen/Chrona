@@ -44,6 +44,8 @@ type RuntimeGoalContext = {
 };
 
 export type NodeRuntimePlanContext = NodeRuntimeInput["context"]["plan"] & {
+  taskTitle?: string;
+  taskDescription?: string;
   goalContext?: RuntimeGoalContext;
 };
 export type NodeRuntimeRunContext = NonNullable<NodeRuntimeInput["context"]["run"]>;
@@ -231,9 +233,16 @@ function compactPreviousResults(input: {
       return summary ? `${node.title}: ${summary}` : node.title;
     })
     .filter((item) => item.trim().length > 0);
-  const { goalContext, ...planContext } = input.planContext ?? defaultPlanContext();
+  const {
+    goalContext,
+    taskTitle,
+    taskDescription,
+    ...planContext
+  } = input.planContext ?? defaultPlanContext();
 
   return {
+    ...(taskTitle ? { taskTitle } : {}),
+    ...(taskDescription ? { taskDescription } : {}),
     plan: planContext,
     ...(input.runContext ? { run: input.runContext } : {}),
     ...(goalContext

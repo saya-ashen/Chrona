@@ -126,6 +126,11 @@ export const chronaToolContextSchema = z.object({
 
 const readPayloadSchema = z.object({}).passthrough().optional().default({});
 const publicReadPayloadSchema = z.object({}).passthrough();
+export const nodeReadPayloadSchema = z.object({
+  ref: z.string().trim().regex(/^N\d{8}-\d{2,}$/).optional(),
+  offset: z.number().int().nonnegative().default(0),
+  maxChars: z.number().int().min(1).max(12_000).default(12_000),
+}).strict();
 export const goalResultsReadPayloadSchema = z.object({
   query: z.string().trim().min(1).max(500).optional(),
   ref: z.string().trim().regex(/^(?:GR|GA)[0-9A-F]{12}$/).optional(),
@@ -256,7 +261,7 @@ export const chronaToolPayloadSchemas = {
   "chrona.schedule.clear": readPayloadSchema,
   "chrona.execution.read": readPayloadSchema,
   "chrona.execution.dispatch": executionActionBodySchema,
-  "chrona.node.read": readPayloadSchema,
+  "chrona.node.read": nodeReadPayloadSchema,
   "chrona.node.complete": taskCompletePayloadSchema,
   "chrona.node.condition_select": conditionSelectPayloadSchema,
   "chrona.node.block": blockPayloadSchema,
@@ -272,7 +277,7 @@ export const chronaPublicToolPayloadSchemas = {
   "chrona.plan.read": publicReadPayloadSchema,
   "chrona.schedule.read": publicReadPayloadSchema,
   "chrona.execution.read": publicReadPayloadSchema,
-  "chrona.node.read": publicReadPayloadSchema,
+  "chrona.node.read": nodeReadPayloadSchema,
   "chrona.node.complete": taskCompletePayloadSchema,
   "chrona.node.condition_select": conditionSelectPayloadSchema.omit({ evidence: true }).strict(),
   "chrona.node.block": blockPayloadSchema.omit({ evidence: true }).strict(),

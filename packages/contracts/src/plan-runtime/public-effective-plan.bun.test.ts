@@ -114,4 +114,46 @@ describe("projectPublicEffectivePlanGraph", () => {
     expect(json).toContain("Continue");
     expect(json).toContain("Node execution failed.");
   });
+
+  it("exposes only allowlisted manual form diagnostics", () => {
+    const projected = projectPublicEffectivePlanGraph(graph({
+      nodes: [{
+        id: "node-1",
+        nodeId: "node-1",
+        activeLayerId: "layer-1",
+        semanticKey: "manual.one",
+        definition: { title: "Manual", objective: "Manual", semantics: { type: "task" } },
+        invalidated: false,
+        localId: "manual",
+        type: "task",
+        title: "Manual",
+        config: {},
+        dependencies: [],
+        dependents: [],
+        status: "failed",
+        attempts: 1,
+        result: {
+          error: "raw provider failure",
+          errorDetails: {
+            code: "MANUAL_FORM_REVIEW_RESULT_INVALID",
+            traceId: "feature-run-1",
+            rawRequest: "never expose",
+          },
+        },
+        metadata: {},
+        dependenciesSatisfied: true,
+        ready: false,
+        reachable: true,
+      }],
+    }));
+
+    expect(projected.nodes[0]?.result?.error).toEqual({
+      present: true,
+      message: "Node execution failed.",
+      code: "MANUAL_FORM_REVIEW_RESULT_INVALID",
+      traceId: "feature-run-1",
+    });
+    expect(JSON.stringify(projected)).not.toContain("never expose");
+    expect(JSON.stringify(projected)).not.toContain("raw provider failure");
+  });
 });

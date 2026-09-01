@@ -218,8 +218,6 @@ export function SchedulePageMainPanel({
   conflictTaskIds,
   ghostPreview,
   externalEvents,
-  executionRuntimes,
-  defaultExecutionRuntime,
   availableAiClients,
   readyCount,
   onScheduleTask,
@@ -239,8 +237,6 @@ export function SchedulePageMainPanel({
   conflictTaskIds: Set<string>;
   ghostPreview: ScheduleGhostBlockPreview | null;
   externalEvents: PlanningBusyBlock[];
-  executionRuntimes: SchedulePageData["executionRuntimes"];
-  defaultExecutionRuntime: string;
   availableAiClients?: SchedulePageData["availableAiClients"];
   readyCount: number;
   onScheduleTask: () => void;
@@ -283,8 +279,6 @@ export function SchedulePageMainPanel({
                 ghostPreview={ghostPreview}
                 externalEvents={externalEvents}
                 draggedItem={draggedItem}
-                executionRuntimes={executionRuntimes}
-                defaultExecutionRuntime={defaultExecutionRuntime}
                 availableAiClients={availableAiClients}
                 isPending={isPending}
                 onScheduleDrop={onScheduleDrop}

@@ -4,7 +4,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { deriveWorkStateView } from "@chrona/domain";
 import { DEFAULT_SCHEDULE_PAGE_COPY } from "../../schedule-page-copy";
 import type { ScheduleRecord } from "../../schedule-page-types";
-import type { TaskConfigExecutionRuntime } from "../../forms/task-config-form";
 import { SelectedBlockMainColumn } from "./selected-block-main-column";
 
 vi.mock("../../forms/task-config-form", () => ({
@@ -15,17 +14,6 @@ vi.mock("@features/task-workspace", () => ({
   TaskAiPlanPanel: () => <section aria-label="Task plan" />,
   TaskEditPanel: ({ children }: { children: React.ReactNode }) => <section aria-label="Task edit">{children}</section>,
 }));
-
-const runtimes: TaskConfigExecutionRuntime[] = [{
-  key: "hermes",
-  label: "Hermes runtime",
-  spec: {
-    runtime: "hermes",
-    version: "hermes-v1",
-    fields: [],
-    runnability: { requiredPaths: [] },
-  },
-}];
 
 function item(overrides: Partial<ScheduleRecord> = {}): ScheduleRecord {
   return {
@@ -53,7 +41,6 @@ function item(overrides: Partial<ScheduleRecord> = {}): ScheduleRecord {
     autoExecuteTiming: "at_start",
     aiClientId: "client-1",
     parentTaskId: null,
-    executionRuntime: "hermes",
     executionConfig: {},
     isRunnable: false,
     runnabilityState: "blocked",
@@ -73,9 +60,15 @@ function renderMainColumn(record: ScheduleRecord) {
       initialTab="execution"
       item={record}
       copy={DEFAULT_SCHEDULE_PAGE_COPY}
-      executionRuntimes={runtimes}
-      defaultExecutionRuntime="hermes"
-      availableAiClients={[{ id: "client-1", name: "Local Hermes", enabled: true }]}
+      availableAiClients={[
+        {
+          id: "client-1",
+          name: "Local Hermes",
+          type: "hermes",
+          isDefault: true,
+          enabled: true,
+        },
+      ]}
       isPending={false}
       planningTaskDraft={{
         title: record.title,

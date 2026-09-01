@@ -3,7 +3,6 @@ import { X } from "lucide-react";
 import { useI18n } from "@chrona/i18n";
 import {
 	TaskConfigForm,
-	type TaskConfigExecutionRuntime,
 	type TaskConfigFormInput,
 	type TaskConfigDraftState,
 } from "@features/schedule/ui";
@@ -24,8 +23,6 @@ import {
 import type { TaskWorkspaceUpdateProposal } from "@chrona/contracts";
 
 type TaskWorkspaceEditSectionProps = {
-	executionRuntimes: TaskConfigExecutionRuntime[];
-	defaultExecutionRuntime: string;
 	isSaving: boolean;
 	taskConfigInitialValues: ComponentProps<
 		typeof TaskConfigForm
@@ -38,7 +35,6 @@ type TaskWorkspaceEditSectionProps = {
 	sourceManaged?: TaskData["sourceManaged"];
 	saveSuccess: boolean;
 	saveError: string | null;
-	editSummary: { description: string; schedule: string; model: string };
 	hasUnsavedConfigChanges: boolean;
 	isEditExpanded: boolean;
 	currentProposal: CurrentProposalState | null;
@@ -51,8 +47,6 @@ type TaskWorkspaceEditSectionProps = {
 };
 
 export function TaskWorkspaceEditSection({
-	executionRuntimes,
-	defaultExecutionRuntime,
 	isSaving,
 	taskConfigInitialValues,
 	availableAiClients,
@@ -120,8 +114,6 @@ export function TaskWorkspaceEditSection({
 
 					<div className="min-h-0 flex-1 overflow-y-auto px-4 py-4 sm:px-5">
 						<TaskConfigForm
-							executionRuntimes={executionRuntimes}
-							defaultExecutionRuntime={defaultExecutionRuntime}
 							isPending={isSaving}
 							initialValues={taskConfigInitialValues}
 							availableAiClients={availableAiClients}

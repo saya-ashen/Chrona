@@ -9,7 +9,7 @@ import {
   Wrench,
   X,
 } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   Badge,
   Button,
@@ -51,7 +51,6 @@ import {
   TaskConfigField,
   TaskConfigSelect,
   type TaskConfigAiClient,
-  type TaskConfigExecutionRuntime,
 } from "../forms/task-config-form";
 
 import {
@@ -153,7 +152,6 @@ const DEFAULT_DIALOG_COPY = {
   description: "Description (optional)",
   descriptionPlaceholder: "Add description",
   dueDate: "Due date (optional)",
-  executionRuntime: "Execution runtime",
   priority: "Priority",
   cancel: "Cancel",
   save: "Save",
@@ -186,7 +184,6 @@ type TaskCreateDialogProps = {
     autoPlanGenerationTiming: AutomationTimingPreset;
     autoExecuteTiming: AutomationTimingPreset;
     dueAt: Date | null;
-    executionRuntime: string;
     scheduledStartAt: Date;
     scheduledEndAt: Date;
     recurrenceRule: string | null;
@@ -199,73 +196,57 @@ type TaskCreateDialogProps = {
   }) => Promise<void>;
   autoSuggestionsEnabled?: boolean;
   availableAiClients?: TaskConfigAiClient[];
-  executionRuntimes?: TaskConfigExecutionRuntime[];
-  defaultExecutionRuntime?: string;
 };
 
 function parseDateTimeInput(value: string) {
   return value ? new Date(value) : null;
 }
 
-function useTaskCreateFields(isOpen: boolean, defaultExecutionRuntime: string) {
-  const [fields, setFields] = useState({
-    dueAt: "",
-    executionRuntime: defaultExecutionRuntime,
-  });
+function useTaskCreateFields(isOpen: boolean) {
+  const [fields, setFields] = useState({ aiClientId: "", dueAt: "" });
+  const wasOpenRef = useRef(false);
 
-  useEffect(() => {
-    if (isOpen)
-      setFields({ dueAt: "", executionRuntime: defaultExecutionRuntime });
-  }, [defaultExecutionRuntime, isOpen]);
+  useLayoutEffect(() => {
+    if (!isOpen) {
+      wasOpenRef.current = false;
+      return;
+    }
+    const isOpening = !wasOpenRef.current;
+    wasOpenRef.current = true;
+    if (isOpening) setFields({ aiClientId: "", dueAt: "" });
+  }, [isOpen]);
 
-  return [fields, setFields] as const;
+  return {
+    ...fields,
+    selectAiClient: (aiClientId: string) =>
+      setFields((current) => ({ ...current, aiClientId })),
+    setDueAt: (dueAt: string) =>
+      setFields((current) => ({ ...current, dueAt })),
+  };
 }
 
 function TaskCreateSchedulingFields({
   dialogCopy,
   dueAt,
   onDueAtChange,
-  executionRuntime,
-  executionRuntimes,
-  onExecutionRuntimeChange,
   isPending,
 }: {
-  dialogCopy: Pick<typeof DEFAULT_DIALOG_COPY, "dueDate" | "executionRuntime">;
+  dialogCopy: Pick<typeof DEFAULT_DIALOG_COPY, "dueDate">;
   dueAt: string;
   onDueAtChange: (value: string) => void;
-  executionRuntime: string;
-  executionRuntimes: TaskConfigExecutionRuntime[];
-  onExecutionRuntimeChange: (value: string) => void;
   isPending: boolean;
 }) {
   return (
-    <>
-      <TaskConfigSection title={dialogCopy.dueDate}>
-        <Input
-          type="datetime-local"
-          value={dueAt}
-          onChange={(event) => onDueAtChange(event.target.value)}
-          disabled={isPending}
-          aria-label={dialogCopy.dueDate}
-          className="bg-background"
-        />
-      </TaskConfigSection>
-
-      {executionRuntimes.length > 0 ? (
-        <TaskConfigSection title={dialogCopy.executionRuntime}>
-          <TaskConfigSelect
-            name="executionRuntime"
-            value={executionRuntime}
-            options={executionRuntimes.map((runtime) => ({
-              value: runtime.key,
-              label: runtime.label,
-            }))}
-            disabled={isPending}
-            onValueChange={onExecutionRuntimeChange}
-          />
-        </TaskConfigSection>
-      ) : null}
-    </>
+    <TaskConfigSection title={dialogCopy.dueDate}>
+      <Input
+        type="datetime-local"
+        value={dueAt}
+        onChange={(event) => onDueAtChange(event.target.value)}
+        disabled={isPending}
+        aria-label={dialogCopy.dueDate}
+        className="bg-background"
+      />
+    </TaskConfigSection>
   );
 }
 
@@ -283,8 +264,6 @@ export function TaskCreateDialog({
   autoSuggestionsEnabled,
   allowGoalMode = false,
   availableAiClients = [],
-  executionRuntimes = [],
-  defaultExecutionRuntime = "hermes",
 }: TaskCreateDialogProps) {
   const aiPreferences = useScheduleAiPreferences();
   const resolvedAutoSuggestionsEnabled =
@@ -316,9 +295,13 @@ export function TaskCreateDialog({
     initialAutoExecute ?? defaultAutoExecuteEnabled;
   const resolvedInitialAutoPlanGeneration =
     initialAutoPlanGenerationEnabled ?? defaultAutoPlanGenerationEnabled;
+  const {
+    aiClientId,
+    dueAt,
+    selectAiClient,
+    setDueAt,
+  } = useTaskCreateFields(isOpen);
   const [description, setDescription] = useState(initialDescription);
-  const [{ dueAt, executionRuntime }, setTaskCreateFields] =
-    useTaskCreateFields(isOpen, defaultExecutionRuntime);
   const [priority, setPriority] = useState<
     "Low" | "Medium" | "High" | "Urgent"
   >("Medium");
@@ -337,7 +320,6 @@ export function TaskCreateDialog({
     useState<RecurrencePreset>("daily");
   const [customRRULE, setCustomRRULE] = useState("");
   const [repeatEnabled, setRepeatEnabled] = useState(false);
-  const [aiClientId, setAiClientId] = useState("");
 
   /* ---- Auto-complete state ---- */
   const [showAutoComplete, setShowAutoComplete] = useState(false);
@@ -345,6 +327,13 @@ export function TaskCreateDialog({
   const blurTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** Suppress auto-complete after applying a suggestion until next manual input */
   const suppressRef = useRef(false);
+
+  useEffect(() => () => {
+    if (blurTimeoutRef.current) {
+      clearTimeout(blurTimeoutRef.current);
+      blurTimeoutRef.current = null;
+    }
+  }, []);
 
   /* ---- AI hooks ---- */
   const {
@@ -406,12 +395,10 @@ export function TaskCreateDialog({
       setRecurrenceMode("daily");
       setCustomRRULE("");
       setRepeatEnabled(false);
-      setAiClientId("");
       setShowAutoComplete(false);
       suppressRef.current = false;
     }
   }, [
-    defaultExecutionRuntime,
     isOpen,
     initialStartAt,
     initialEndAt,
@@ -448,7 +435,6 @@ export function TaskCreateDialog({
       autoPlanGenerationTiming,
       autoExecuteTiming,
       dueAt: parseDateTimeInput(dueAt),
-      executionRuntime,
       scheduledStartAt,
       scheduledEndAt,
       recurrenceRule,
@@ -663,6 +649,7 @@ export function TaskCreateDialog({
                     }
                   }}
                   onBlur={() => {
+                    if (blurTimeoutRef.current) clearTimeout(blurTimeoutRef.current);
                     blurTimeoutRef.current = setTimeout(() => {
                       setShowAutoComplete(false);
                     }, 200);
@@ -928,20 +915,7 @@ export function TaskCreateDialog({
               <TaskCreateSchedulingFields
                 dialogCopy={dialogCopy}
                 dueAt={dueAt}
-                onDueAtChange={(value) =>
-                  setTaskCreateFields((current) => ({
-                    ...current,
-                    dueAt: value,
-                  }))
-                }
-                executionRuntime={executionRuntime}
-                executionRuntimes={executionRuntimes}
-                onExecutionRuntimeChange={(value) =>
-                  setTaskCreateFields((current) => ({
-                    ...current,
-                    executionRuntime: value,
-                  }))
-                }
+                onDueAtChange={setDueAt}
                 isPending={isPending}
               />
 
@@ -1014,23 +988,25 @@ export function TaskCreateDialog({
                     )}
                   </TaskConfigSection>
 
-                  {aiClientOptions.length > 1 ? (
-                    <TaskConfigSection title={dialogCopy.aiProvider}>
-                      <TaskConfigField
-                        label={dialogCopy.aiProvider}
-                        hint={dialogCopy.aiProviderHint}
-                      >
-                        <TaskConfigSelect
-                          name="aiClientId"
-                          value={aiClientId}
-                          options={aiClientOptions}
-                          disabled={isPending}
-                          onValueChange={setAiClientId}
-                        />
-                      </TaskConfigField>
-                    </TaskConfigSection>
-                  ) : null}
                 </>
+              ) : null}
+              {aiClientOptions.length > 1 ? (
+                <TaskConfigSection title={dialogCopy.aiProvider}>
+                  <TaskConfigField
+                    label={dialogCopy.aiProvider}
+                    htmlFor="task-create-ai-client"
+                    hint={dialogCopy.aiProviderHint}
+                  >
+                    <TaskConfigSelect
+                      id="task-create-ai-client"
+                      name="aiClientId"
+                      value={aiClientId}
+                      options={aiClientOptions}
+                      disabled={isPending}
+                      onValueChange={selectAiClient}
+                    />
+                  </TaskConfigField>
+                </TaskConfigSection>
               ) : null}
               {!autoExecute && autoPlanGenerationEnabled ? (
                 <TaskConfigSection title={dialogCopy.automationPreview}>

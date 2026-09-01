@@ -15,7 +15,6 @@
     "@chrona/logging": "workspace:*",
     "@chrona/providers-debug": "workspace:*",
     "@chrona/providers-foundation": "workspace:*",
-    "@chrona/runtime-core": "workspace:*",
     "@chrona/shared": "workspace:*",
     "@chrona/ui-protocol": "workspace:*"
   },

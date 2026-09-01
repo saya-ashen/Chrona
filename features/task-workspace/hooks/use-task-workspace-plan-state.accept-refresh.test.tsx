@@ -43,6 +43,7 @@ const mocks = vi.hoisted(() => ({
     generationSession: { generationId: "generation-1", taskId: "task-1", headStateVersion: 3, status: "completed" as const, phase: null, statusMessage: null, error: null, startedAt: "2026-06-10T00:00:00.000Z", finishedAt: "2026-06-10T00:00:01.000Z" },
   },
   commandCalls: [] as Array<{ taskId: string; body: Record<string, unknown> }>,
+  settleAcceptPlan: true,
 }));
 
 vi.mock("@shared/http", async (importOriginal) => ({
@@ -52,7 +53,7 @@ vi.mock("@shared/http", async (importOriginal) => ({
     if (path === "/api/tasks/task-1/plan/generations/active") {
       return { generationSession: null };
     }
-    if (path === "/api/tasks/task-1/plan") return mocks.planStateResponse;
+    if (path === "/api/tasks/task-1/plan") return structuredClone(mocks.planStateResponse);
     if (path === "/api/tasks/task-1/execution/current") return {};
     if (path === "/api/work/task-1/commands" && method === "POST") {
       const parsedBody: unknown = JSON.parse(String(init?.body ?? "{}"));
@@ -61,7 +62,9 @@ vi.mock("@shared/http", async (importOriginal) => ({
       }
       const body = parsedBody as Record<string, unknown>;
       mocks.commandCalls.push({ taskId: "task-1", body });
-      mocks.planStateResponse = mocks.acceptedPlanResponse;
+      if (mocks.settleAcceptPlan) {
+        mocks.planStateResponse = mocks.acceptedPlanResponse;
+      }
       return {
         commandId: "c-1",
         taskId: "task-1",
@@ -84,6 +87,7 @@ function wrapper({ children }: PropsWithChildren) {
 
 beforeEach(() => {
   mocks.commandCalls = [];
+  mocks.settleAcceptPlan = true;
   mocks.planStateResponse = {
     taskId: "task-1",
     aiPlanGenerationStatus: "waiting_acceptance",
@@ -113,7 +117,7 @@ afterEach(async () => {
 });
 
 describe("useTaskWorkspacePlanState — accept plan", () => {
-  it("flips canAcceptPlan to false after acceptPlanById resolves", async () => {
+  it("settles plan acceptance when the post-ACK durable refresh is accepted", async () => {
     initialPageForTest = taskWorkspaceStateFixtures.idle.pageData;
     const { result } = renderHook(() => {
       const workspace = useTaskWorkspacePageState(initialPageForTest);
@@ -133,14 +137,57 @@ describe("useTaskWorkspacePlanState — accept plan", () => {
       await result.current.plan.acceptPlanById("plan-1");
     });
 
-    // Optimistic update: the flow should already be 'accepted' by the
-    // time the command POST resolves, because the local plan flow
-    // machine flips to 'completed' state synchronously after the 202
-    // returns. The plan state query is not yet refetched (the SSE
-    // task_projection_updated event would normally trigger that), so
-    // the status shown is the optimistic 'accepted'.
-    await waitFor(() => expect(result.current.plan.canAcceptPlan).toBe(false));
+    await waitFor(() => expect(result.current.plan.planFlowStatus).toBe("accepted"));
+    expect(result.current.plan.canAcceptPlan).toBe(false);
     expect(result.current.plan.planGenerationStatus).toBe("accepted");
+    expect(result.current.plan.pendingCommand).toBeNull();
     expect(mocks.commandCalls[0]?.body).toMatchObject({ type: "plan.accept", planId: "plan-1" });
+  });
+
+  it("fails a missed asynchronous acceptance after an SSE reconnect snapshot remains draft", async () => {
+    mocks.settleAcceptPlan = false;
+    initialPageForTest = taskWorkspaceStateFixtures.idle.pageData;
+    const { result, rerender } = renderHook(
+      ({ workspaceEvents }) => {
+        const workspace = useTaskWorkspacePageState(initialPageForTest);
+        const plan = useTaskWorkspacePlanState(
+          workspace.pageData.task,
+          workspace.refreshWorkspace,
+          workspaceEvents,
+        );
+        return { workspace, plan };
+      },
+      {
+        initialProps: {
+          workspaceEvents: [] as Array<{
+            type: string;
+            sequence: number;
+            workBlockId?: string | null;
+          }>,
+        },
+        wrapper,
+      },
+    );
+
+    await waitFor(() => expect(result.current.plan.planGenerationStatus).toBe("waiting_acceptance"));
+    await act(async () => {
+      await result.current.plan.acceptPlanById("plan-1");
+    });
+    expect(result.current.plan.planFlowStatus).toBe("accepting");
+
+    rerender({
+      workspaceEvents: [{
+        type: "state.snapshot",
+        sequence: 999,
+        workBlockId: result.current.workspace.pageData.task.currentWorkBlock?.id ?? null,
+      }],
+    });
+
+    await waitFor(() => {
+      expect(result.current.plan.planFlowStatus).toBe("failed");
+      expect(result.current.plan.acceptPlanError).toBe(
+        "Plan acceptance did not complete. Review and try again.",
+      );
+    });
   });
 });

@@ -28,7 +28,6 @@ async function seedTask(title = "Orchestrated task") {
 		data: {
 			name: `${title} Workspace`,
 			status: "Active",
-			defaultRuntime: "hermes",
 		},
 	});
 	const task = await db.task.create({
@@ -37,7 +36,6 @@ async function seedTask(title = "Orchestrated task") {
 			title,
 			status: "Ready",
 			priority: "Medium",
-			executionRuntime: "hermes",
 			executionConfig: { prompt: "Run orchestrated task" },
 		},
 	});
@@ -402,7 +400,6 @@ describe("getTaskPage orchestrator read model", () => {
 				title: task.title,
 				status: "Ready",
 				priority: "Medium",
-				executionRuntime: "hermes",
 				executionConfig: { prompt: "Run recurring task" },
 				recurrenceRule: "FREQ=DAILY",
 				seriesExternalUid: task.id,

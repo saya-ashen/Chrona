@@ -1,10 +1,10 @@
-import { db } from "@/lib/db";
-import { HERMES_EXECUTION_RUNTIME } from "@chrona/hermes";
+import { getAiClientForTask } from "@/modules/ai";
 
+/** Resolve runtime provenance from the authoritative task execution AI client. */
 export async function getRuntimeName(taskId: string): Promise<string> {
-  const task = await db.task.findUniqueOrThrow({
-    where: { id: taskId },
-    select: { executionRuntime: true },
+  const client = await getAiClientForTask({
+    taskId,
+    purpose: "task.execution",
   });
-  return task.executionRuntime ?? HERMES_EXECUTION_RUNTIME;
+  return client?.providerClient?.provider ?? client?.record.type ?? "unconfigured";
 }

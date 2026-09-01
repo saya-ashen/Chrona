@@ -46,10 +46,7 @@ import {
 	getTodayKey,
 	snapMinuteToGrid,
 } from "../schedule-page-utils";
-import {
-	type TaskConfigAiClient,
-	type TaskConfigExecutionRuntime,
-} from "../forms/task-config-form";
+import { type TaskConfigAiClient } from "../forms/task-config-form";
 import { CalendarDays } from "lucide-react";
 import { Badge } from "@shared/ui";
 import { useI18n, useLocale } from "@chrona/i18n";
@@ -125,16 +122,12 @@ function buildDragItem(
 
 function TimelineComposer({
 	draft,
-	executionRuntimes,
-	defaultExecutionRuntime,
 	availableAiClients,
 	isPending,
 	onClose,
 	onCreate,
 }: {
 	draft: TimelinePlacementPreview;
-	executionRuntimes: TaskConfigExecutionRuntime[];
-	defaultExecutionRuntime: string;
 	availableAiClients?: TaskConfigAiClient[];
 	isPending: boolean;
 	onClose: () => void;
@@ -147,8 +140,6 @@ function TimelineComposer({
 			initialEndAt={draft.endAt}
 			isPending={isPending}
 			availableAiClients={availableAiClients}
-			executionRuntimes={executionRuntimes}
-			defaultExecutionRuntime={defaultExecutionRuntime}
 			onClose={onClose}
 			onSubmit={async (input) => {
 				await onCreate({
@@ -160,7 +151,6 @@ function TimelineComposer({
 					autoPlanGenerationTiming: input.autoPlanGenerationTiming,
 					autoExecuteTiming: input.autoExecuteTiming,
 					dueAt: input.dueAt,
-					executionRuntime: input.executionRuntime,
 					executionConfig: {},
 					scheduledStartAt: input.scheduledStartAt,
 					scheduledEndAt: input.scheduledEndAt,
@@ -183,8 +173,6 @@ export function DayTimeline({
 	ghostPreview = null,
 	draggedItem,
 	externalEvents = [],
-	executionRuntimes,
-	defaultExecutionRuntime,
 	availableAiClients,
 	isPending,
 	onScheduleDrop,
@@ -201,8 +189,6 @@ export function DayTimeline({
 	ghostPreview?: ScheduleGhostBlockPreview | null;
 	draggedItem: TimelineDragItem | null;
 	externalEvents?: PlanningBusyBlock[];
-	executionRuntimes: TaskConfigExecutionRuntime[];
-	defaultExecutionRuntime: string;
 	availableAiClients?: TaskConfigAiClient[];
 	isPending: boolean;
 	onScheduleDrop: (
@@ -968,8 +954,6 @@ export function DayTimeline({
 				{composerDraft ? (
 					<TimelineComposer
 						draft={composerDraft}
-						executionRuntimes={executionRuntimes}
-						defaultExecutionRuntime={defaultExecutionRuntime}
 						availableAiClients={availableAiClients}
 						isPending={isPending}
 						onClose={closeComposer}

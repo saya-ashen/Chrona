@@ -1,3 +1,4 @@
+import { validateHermesEndpoint } from "@chrona/providers-foundation";
 import { HermesProviderError, type HermesProviderConfig } from "./types";
 
 function trimTrailingSlashes(value: string) {
@@ -14,7 +15,8 @@ export type HermesHttpClient = {
 };
 
 export function createHermesHttpClient(config: HermesProviderConfig): HermesHttpClient {
-  const baseUrl = normalizeBaseUrl(config.baseUrl);
+  // Validate endpoint before entering request() so an invalid remote URL never receives Authorization.
+  const baseUrl = normalizeHermesBaseUrl(config.baseUrl);
   const timeoutMs = config.timeoutMs ?? 30_000;
 
   return {
@@ -109,11 +111,12 @@ export async function ensureHermesOk(response: Response, operation: string): Pro
   });
 }
 
-function normalizeBaseUrl(baseUrl: string | undefined): string {
-  const normalized = trimTrailingSlashes(baseUrl?.trim() ?? "");
-  if (!normalized) return "http://127.0.0.1:8642";
-  if (/^https?:\/\//i.test(normalized)) return normalized;
-  return `http://${normalized}`;
+export function normalizeHermesBaseUrl(baseUrl: string | undefined): string {
+  const endpoint = validateHermesEndpoint(baseUrl);
+  if (!endpoint.ok) {
+    throw new HermesProviderError({ message: endpoint.reason, code: "invalid_endpoint", retryable: false });
+  }
+  return trimTrailingSlashes(endpoint.url.toString());
 }
 
 function mergeSignals(primary: AbortSignal, secondary?: AbortSignal): AbortSignal {

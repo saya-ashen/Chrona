@@ -134,7 +134,7 @@ export type PlanExecutionSSEEvent =
 	  }
 	| {
 			type: "error";
-			code: "INTERNAL_ERROR";
+			code: "INTERNAL_ERROR" | "VALIDATION_ERROR" | "CONFLICT";
 			message: string;
 	  }
 	| {

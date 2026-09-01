@@ -41,7 +41,6 @@ import {
   toTimestamp,
   hydrateSchedulePageData,
 } from "./schedule-page-utils";
-import { getQuickCreateDefaults } from "./schedule-page-actions";
 import type { ScheduledItem } from "./schedule-page-types";
 
 function createScheduledItem(overrides: Partial<ScheduledItem> = {}): ScheduledItem {
@@ -63,7 +62,6 @@ function createScheduledItem(overrides: Partial<ScheduledItem> = {}): ScheduledI
     latestRunStatus: overrides.latestRunStatus ?? null,
     scheduleProposalCount: overrides.scheduleProposalCount ?? 0,
     lastActivityAt: overrides.lastActivityAt ?? null,
-    executionRuntime: overrides.executionRuntime ?? "hermes",
     executionConfig: overrides.executionConfig ?? {},
     autoPlanGeneration: overrides.autoPlanGeneration ?? false,
     autoExecute: overrides.autoExecute ?? false,
@@ -215,8 +213,6 @@ describe("sortScheduledItems – with string dates", () => {
 
   it("hydrates schedule page data so string scheduled dates become real Date objects", () => {
     const hydrated = hydrateSchedulePageData({
-      defaultExecutionRuntime: "hermes",
-      executionRuntimes: [],
       summary: {
         scheduledCount: 1,
         unscheduledCount: 0,
@@ -799,7 +795,7 @@ describe("toTaskConfigInitialValues", () => {
     expect(result.title).toBe("My Task");
     expect(result.priority).toBe("High");
     expect(result.description).toBeNull();
-    expect(result.executionRuntime).toBeNull();
+    expect(result).not.toHaveProperty("executionRuntime");
     expect(result.executionConfig).toBeUndefined();
     expect(result.dueAt).toBeNull();
   });
@@ -810,44 +806,13 @@ describe("toTaskConfigInitialValues", () => {
       title: "Task",
       description: "Desc",
       priority: "Low",
-      executionRuntime: "hermes",
       executionConfig: { prompt: "Do stuff" },
       dueAt: due,
     });
     expect(result.description).toBe("Desc");
-    expect(result.executionRuntime).toBe("hermes");
+    expect(result).not.toHaveProperty("executionRuntime");
     expect(result.dueAt).toBe(due);
     expect(result.executionConfig).toEqual({ prompt: "Do stuff" });
-  });
-});
-
-describe("getQuickCreateDefaults", () => {
-  it("uses the first supported runtime when workspace default is stale", () => {
-    const data = {
-      scheduled: [],
-      unscheduled: [],
-      proposals: [],
-      risks: [],
-      defaultExecutionRuntime: "openclaw",
-      executionRuntimes: [{
-        key: "hermes",
-        label: "Hermes",
-        spec: {
-          runtime: "hermes",
-          version: "1",
-          fields: [],
-          runnability: { requiredPaths: [] },
-        },
-      }],
-      summary: {} as any,
-      planningSummary: {} as any,
-      focusZones: [],
-      automationCandidates: [],
-      listItems: [],
-      workBlocks: [],
-    };
-
-    expect(getQuickCreateDefaults(data).executionRuntime).toBe("hermes");
   });
 });
 
@@ -954,7 +919,6 @@ describe("buildTodayFocusItems", () => {
       latestRunStatus: overrides.latestRunStatus ?? null,
       scheduleProposalCount: 0,
       lastActivityAt: null,
-      executionRuntime: "hermes",
       executionConfig: {},
       autoPlanGeneration: false,
       autoExecute: false,
@@ -968,14 +932,14 @@ describe("buildTodayFocusItems", () => {
   }
 
   it("returns empty for no risks and no group", () => {
-    const data = { scheduled: [], unscheduled: [], proposals: [], risks: [], defaultExecutionRuntime: "hermes", executionRuntimes: [], summary: {} as any, planningSummary: {} as any, focusZones: [], automationCandidates: [], listItems: [], conflicts: [], suggestions: [], workBlocks: [] };
+    const data = { scheduled: [], unscheduled: [], proposals: [], risks: [], summary: {} as any, planningSummary: {} as any, focusZones: [], automationCandidates: [], listItems: [], conflicts: [], suggestions: [], workBlocks: [] };
     const items = buildTodayFocusItems(data, null, copy);
     expect(items).toEqual([]);
   });
 
   it("includes overdue risks", () => {
     const risk = makeRisk({ taskId: "t1", scheduleStatus: "Overdue" });
-    const data = { scheduled: [], unscheduled: [], proposals: [], risks: [risk], defaultExecutionRuntime: "hermes", executionRuntimes: [], summary: {} as any, planningSummary: {} as any, focusZones: [], automationCandidates: [], listItems: [], conflicts: [], suggestions: [], workBlocks: [] };
+    const data = { scheduled: [], unscheduled: [], proposals: [], risks: [risk], summary: {} as any, planningSummary: {} as any, focusZones: [], automationCandidates: [], listItems: [], conflicts: [], suggestions: [], workBlocks: [] };
     const items = buildTodayFocusItems(data, null, copy);
     expect(items.length).toBe(1);
     expect(items[0].reason).toBe("Overdue");
@@ -983,7 +947,7 @@ describe("buildTodayFocusItems", () => {
   });
 
   it("includes high-priority unstarted items from active group", () => {
-    const data = { scheduled: [], unscheduled: [], proposals: [], risks: [], defaultExecutionRuntime: "hermes", executionRuntimes: [], summary: {} as any, planningSummary: {} as any, focusZones: [], automationCandidates: [], listItems: [], conflicts: [], suggestions: [], workBlocks: [] };
+    const data = { scheduled: [], unscheduled: [], proposals: [], risks: [], summary: {} as any, planningSummary: {} as any, focusZones: [], automationCandidates: [], listItems: [], conflicts: [], suggestions: [], workBlocks: [] };
     const group = {
       key: "2026-04-15",
       date: new Date(2026, 3, 15),
@@ -1001,7 +965,7 @@ describe("buildTodayFocusItems", () => {
     const risks = Array.from({ length: 8 }, (_, i) =>
       makeRisk({ taskId: `risk-${i}`, scheduleStatus: "Overdue" }),
     );
-    const data = { scheduled: [], unscheduled: [], proposals: [], risks, defaultExecutionRuntime: "hermes", executionRuntimes: [], summary: {} as any, planningSummary: {} as any, focusZones: [], automationCandidates: [], listItems: [], conflicts: [], suggestions: [], workBlocks: [] };
+    const data = { scheduled: [], unscheduled: [], proposals: [], risks, summary: {} as any, planningSummary: {} as any, focusZones: [], automationCandidates: [], listItems: [], conflicts: [], suggestions: [], workBlocks: [] };
     const items = buildTodayFocusItems(data, null, copy);
     expect(items.length).toBe(5);
   });

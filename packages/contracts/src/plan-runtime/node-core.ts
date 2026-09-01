@@ -2,6 +2,7 @@ import type {
   ConditionEvaluator,
   TaskExecutor,
   TaskMode,
+  ManualCompletionForm,
 } from "../ai-plan-blueprint";
 
 export type TaskPriority = "Low" | "Medium" | "High" | "Urgent";
@@ -17,6 +18,7 @@ export type CheckpointInteraction =
 export interface TaskConfig {
   expectedOutput?: string;
   completionCriteria?: string;
+  completionForm?: ManualCompletionForm;
   userInteraction?: TaskUserInteractionExpectation;
 }
 
@@ -69,6 +71,7 @@ export type NodeActionFormField =
       name: string;
       label: string;
       description?: string;
+      required?: boolean;
       defaultValue?: boolean;
     }
   | {
@@ -83,6 +86,9 @@ export interface NodeActionForm {
   instructions: string;
   submitLabel?: string;
   inputFields: NodeActionFormField[];
+  revision?: string;
+  source?: "plan" | "runtime_ai";
+  validated?: boolean;
 }
 
 export interface ConditionConfig {
@@ -116,6 +122,7 @@ export type WaitKind =
   | "approval"
   | "review"
   | "replan_required"
+  | "manual_completion"
   | "manual_action"
   | "external_dependency"
   | "capability_unavailable";

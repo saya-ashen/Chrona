@@ -21,6 +21,8 @@ import { areE2eTestRoutesEnabled, createTestSupportRoutes } from "./test-support
 
 export type ApiRouterOptions = {
   calendarSources?: CalendarSourceRouteOptions;
+  /** Passed from the server composition root; MCP owns scoped run-token auth. */
+  mcpApiKey?: string;
 };
 
 export type ApiRouter = Hono;
@@ -45,7 +47,7 @@ export function createApiRouter(engine: ChronaEngine, options: ApiRouterOptions 
     .route("/", createCalendarSourceRoutes(options.calendarSources))
     .route("/", createRuntimeRoutes(engine))
     .route("/", createAssistantSurfaceRoutes(engine))
-    .route("/", createMcpRoutes(engine))
+    .route("/", createMcpRoutes(engine, { apiKey: options.mcpApiKey }))
     .route("/", createAgentControlRoutes());
 
   // Env-gated E2E test seam — only ever mounted when the Playwright webServer

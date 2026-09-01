@@ -197,15 +197,20 @@ export function createTaskWorkspaceFixturePageData(
 	const { task: taskOverrides = {}, ...pageOverrides } = overrides;
 
 	return {
-		defaultExecutionRuntime: "local",
-		executionRuntimes: [],
-		availableAiClients: [{ id: "ai-1", name: "Debug provider", enabled: true }],
+		availableAiClients: [
+			{
+				id: "ai-1",
+				name: "Debug provider",
+				type: "debug",
+				isDefault: true,
+				enabled: true,
+			},
+		],
 		task: {
 			id: "task-1",
 			workspaceId: "workspace-1",
 			title: "Launch task",
 			description: null,
-			executionRuntime: "local",
 			executionConfig: null,
 			autoPlanGeneration: false,
 			autoExecute: false,

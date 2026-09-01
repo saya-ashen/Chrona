@@ -58,7 +58,7 @@ import {
 	snapshotFromRef,
 	stripTrailingSlash,
 } from "./runner-helpers";
-import { createLogger, type ChronaLogger } from "@chrona/logging";
+import { createLogger, redactSensitiveText, type ChronaLogger } from "@chrona/logging";
 import { ClaudeCodeProviderError } from "./types";
 import {
 	createRunToolsMcpServer,
@@ -470,7 +470,11 @@ function healthProbeResult(message: SDKMessage): string | null | undefined {
 		"errors" in message && Array.isArray(message.errors)
 			? message.errors.join("; ")
 			: undefined;
-	return `${HEALTH_PROBE_FAILURE}: ${errors || message.subtype}`;
+	const result =
+		"result" in message && typeof message.result === "string"
+			? redactSensitiveText(message.result, 300)
+			: undefined;
+	return `${HEALTH_PROBE_FAILURE}: ${result || errors || message.subtype}`;
 }
 
 export async function probeClaudeCodeSdk(input: {
@@ -610,7 +614,7 @@ export async function probeMcpServer(input: {
 			baseUrl,
 			reason: "auth_rejected",
 			status,
-			bodyExcerpt: body.slice(0, 200),
+			bodyExcerpt: redactSensitiveText(body, 200),
 		});
 		throw new McpProbeError({
 			message:
@@ -628,10 +632,10 @@ export async function probeMcpServer(input: {
 			baseUrl,
 			reason: "non_2xx",
 			status,
-			bodyExcerpt: body.slice(0, 200),
+			bodyExcerpt: redactSensitiveText(body, 200),
 		});
 		throw new McpProbeError({
-			message: `MCP server returned HTTP ${status} for initialize: ${body.slice(0, 200)}`,
+			message: `MCP server returned HTTP ${status} for initialize: ${redactSensitiveText(body, 200)}`,
 
 			mcpBaseUrl: baseUrl,
 			status,
@@ -734,14 +738,17 @@ async function probeMcpToolsList(input: {
 export function mcpUrlForSession(
 	baseUrl: string,
 	sessionId?: string | null,
+	terminalOnly = false,
 ): string {
 	try {
-		const url = new URL(`${stripTrailingSlash(baseUrl)}/api/mcp`);
+		const base = stripTrailingSlash(baseUrl);
+		const url = new URL(base.endsWith("/api") ? `${base}/mcp` : `${base}/api/mcp`);
 		const trimmedSessionId =
 			typeof sessionId === "string" ? sessionId.trim() : "";
 		if (trimmedSessionId) {
 			url.searchParams.set("session_id", trimmedSessionId);
 		}
+		if (terminalOnly) url.searchParams.set("terminal_only", "1");
 		return url.toString();
 	} catch (cause) {
 		throw new Error(`Invalid Claude Code MCP base URL: ${baseUrl}`, { cause });
@@ -860,9 +867,10 @@ function updateHandleSdkSession(
 ): void {
 	handle.ref = {
 		...handle.ref,
+		nativeSessionId: sdkSessionId,
 		nativeRunId: sdkSessionId,
 		providerRunId: sdkSessionId,
-		sessionId: sdkSessionId,
+		providerResumeRef: sdkSessionId,
 	};
 }
 
@@ -923,20 +931,39 @@ class SdkRunner implements ClaudeCodeRunner {
 		const tools = readOnly ? [] : (input.tools ?? []);
 		const abortController = new AbortController();
 		const sdkHandle = {} as SdkHandle;
-		const mcpServers =
-			tools.length > 0
-				? {
-						[RUN_TOOLS_MCP_SERVER_NAME]: createRunToolsMcpServer({
-							tools,
-							onToolAccepted: (toolName) => {
-								if (toolName === input.terminalToolName) {
-									if (sdkHandle) sdkHandle.terminalToolAccepted = true;
-									queueMicrotask(() => abortController.abort());
-								}
-							},
-						}),
-					}
-				: undefined;
+		const runToolsServer = tools.length > 0
+			? createRunToolsMcpServer({
+					tools,
+					onToolAccepted: (toolName) => {
+						if (toolName === input.terminalToolName) {
+							if (sdkHandle) sdkHandle.terminalToolAccepted = true;
+							// Let the SDK serialize the MCP result before stopping the post-terminal turn.
+							setTimeout(() => abortController.abort(), 0);
+						}
+					},
+				})
+			: undefined;
+		const chronaControlServer = input.control
+			? {
+					type: "http" as const,
+					url: mcpUrlForSession(
+						input.control.baseUrl,
+						input.sessionId,
+						input.toolPolicy === "terminal_only",
+					),
+					headers: {
+						Authorization: `Bearer ${input.control.runToken}`,
+					},
+				}
+			: undefined;
+		const mcpServers = runToolsServer || chronaControlServer
+			? {
+					...(runToolsServer
+						? { [RUN_TOOLS_MCP_SERVER_NAME]: runToolsServer }
+						: {}),
+					...(chronaControlServer ? { chrona: chronaControlServer } : {}),
+				}
+			: undefined;
 		const runId = `claude-sdk-${crypto.randomUUID()}`;
 		// Prefer the live in-process capture (same process, mid-conversation);
 		// fall back to the engine-supplied `resumeSessionRef` so a restarted
@@ -989,7 +1016,11 @@ class SdkRunner implements ClaudeCodeRunner {
 
 		const prompt = renderPrompt(input) ?? "";
 		log.info("claude_code.run_start", {
-			controlPlane: mcpServers ? "declared_tools" : "none",
+			controlPlane: chronaControlServer
+				? "chrona_mcp"
+				: runToolsServer
+					? "declared_tools"
+					: "none",
 			hasDebugFile: Boolean(debugFile),
 			resumedSdkSessionId: resumedSdkSessionId ?? null,
 		});
@@ -1126,7 +1157,9 @@ class SdkRunner implements ClaudeCodeRunner {
 				[result.value],
 				handle.normalizer,
 				{
+					baseRef: handle.ref,
 					cancelRequested: handle.internal.cancelRequested,
+					provider: handle.ref.provider,
 					strictUnknownEvents: handle.normalizer.strictUnknownEvents,
 				} satisfies NormalizerOptions,
 			);
@@ -1163,7 +1196,9 @@ class SdkRunner implements ClaudeCodeRunner {
 			runId: handle.runId,
 			nativeRunId: handle.ref.nativeRunId,
 			providerRunId: handle.ref.providerRunId,
+			providerResumeRef: handle.ref.providerResumeRef,
 			sessionId: handle.ref.sessionId,
+			nativeSessionId: handle.ref.nativeSessionId,
 			status:
 				handle.internal.kind === "sdk" && handle.internal.cancelRequested
 					? "cancelled"

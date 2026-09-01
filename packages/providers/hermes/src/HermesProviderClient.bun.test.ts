@@ -3,6 +3,7 @@ import { mkdtemp, readFile, rm } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { HermesProviderClient, type HermesProviderError } from "./index";
+import { normalizeHermesBaseUrl } from "./http";
 import type { ProviderRunEvent } from "@chrona/providers-foundation";
 
 const realFetch = globalThis.fetch;
@@ -24,6 +25,23 @@ afterEach(async () => {
 });
 
 describe("HermesProviderClient", () => {
+	it("permits cleartext only for exact loopback endpoints", () => {
+		expect(normalizeHermesBaseUrl("http://localhost:8642/")).toBe("http://localhost:8642");
+		expect(normalizeHermesBaseUrl("http://127.12.0.1:8642/")).toBe("http://127.12.0.1:8642");
+		expect(normalizeHermesBaseUrl("http://[::1]:8642/")).toBe("http://[::1]:8642");
+		for (const endpoint of ["http://192.168.1.20:8642", "http://[::]:8642", "http://hermes.example.test:8642", "hermes.example.test:8642", "https://user:password@hermes.example.test"]) {
+			expect(() => normalizeHermesBaseUrl(endpoint)).toThrow();
+		}
+		expect(normalizeHermesBaseUrl("https://hermes.example.test/v1/")).toBe("https://hermes.example.test/v1");
+	});
+
+	it("rejects an invalid endpoint before a bearer header can be sent", async () => {
+		let requests = 0;
+		globalThis.fetch = mockFetch(async () => { requests++; return jsonResponse({ ok: true }); });
+		expect(() => new HermesProviderClient({ baseUrl: "http://lan.example.test", apiKey: "test-token" })).toThrow("Remote Hermes endpoints must use HTTPS");
+		expect(requests).toBe(0);
+	});
+
 	it("maps capabilities from /v1/capabilities", async () => {
 		globalThis.fetch = mockFetch(async (url) => {
 			expect(String(url)).toBe("http://127.0.0.1:8642/v1/capabilities");
@@ -155,14 +173,14 @@ describe("HermesProviderClient", () => {
 		let seenBody: unknown;
 		let seenHeaders: Headers | undefined;
 		globalThis.fetch = mockFetch(async (url, init) => {
-			expect(String(url)).toBe("http://hermes.local/v1/runs");
+			expect(String(url)).toBe("https://hermes.local/v1/runs");
 			seenBody = JSON.parse(String(init?.body));
 			seenHeaders = new Headers(init?.headers);
 			return jsonResponse({ run_id: "run-1", status: "started" });
 		});
 
 		const client = new HermesProviderClient({
-			baseUrl: "http://hermes.local/",
+			baseUrl: "https://hermes.local/",
 			apiKey: "secret",
 		});
 		const run = await client.startRun({

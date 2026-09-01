@@ -4,7 +4,6 @@ import {
 	getCurrentExecution,
 	headerExecutionStateToStatePaths,
 	publishTaskStateUpdate,
-	publishTaskWorkspaceUpdatedEvent,
 	resolveHeaderExecutionState,
 	type ChronaEngine,
 } from "@chrona/engine";
@@ -340,6 +339,7 @@ export async function dispatchTaskWorkspaceCommand(
 				taskId,
 				workspaceId,
 				workBlockId,
+				commandId,
 				reason: "plan_generation.completed",
 				updatedAt: new Date().toISOString(),
 			});
@@ -383,11 +383,14 @@ export async function dispatchTaskWorkspaceCommand(
 					updates: headerStateUpdate,
 				});
 			}
-			publishTaskWorkspaceUpdatedEvent({
+			appendTaskWorkspaceEvent({
+				type: "task_workspace_updated",
 				taskId,
 				workspaceId,
 				workBlockId: commandWorkBlockId(command),
+				commandId,
 				reason: "plan.accepted",
+				updatedAt: new Date().toISOString(),
 			});
 			return;
 		}

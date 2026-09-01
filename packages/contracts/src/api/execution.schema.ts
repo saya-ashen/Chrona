@@ -5,6 +5,10 @@ import { nodeDeliverableSchema, resultContributionSchema, resultEvidenceSchema }
 const nodeIdSchema = z.string().min(1, "nodeId is required");
 const workBlockIdSchema = z.string().min(1, "workBlockId is required");
 const idempotencyKeySchema = z.string().min(1, "idempotencyKey is required");
+const checkpointInputFieldsSchema = z.record(
+  z.string().min(1),
+  z.union([z.string().max(20_000), z.boolean(), z.array(z.string().max(2_000)).max(32)]),
+);
 const nodeActionFormFieldSchema = z
   .object({
     name: z.string().min(1, "field name is required"),
@@ -162,6 +166,8 @@ export const executionActionBodySchema = z.discriminatedUnion("action", [
   z.object({
     action: z.literal("complete_manual_node"),
     nodeId: nodeIdSchema.optional(),
+    formRevision: z.string().min(1).max(128).optional(),
+    inputFields: checkpointInputFieldsSchema.optional(),
     summary: z.string().optional(),
     output: z.unknown().optional(),
     deliverables: z.array(nodeDeliverableSchema).optional(),

@@ -64,7 +64,7 @@ function decide(overrides: Partial<EffectivePlanNode> & { id: string }) {
 
 describe("execution state invariants", () => {
   it("manual executor nodes never auto-enter approval sessions", () => {
-    expect(decide({ id: "manual", executor: "user" })).toMatchObject({ kind: "wait_for_user" });
+    expect(decide({ id: "manual", executor: "user" })).toMatchObject({ kind: "manual_only" });
   });
 
   it("checkpoint approve nodes wait for approval independent of estimates", () => {

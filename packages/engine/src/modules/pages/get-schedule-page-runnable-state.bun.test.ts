@@ -32,7 +32,6 @@ describe("getSchedulePage runnable state", () => {
       data: {
         name: "Schedule Runnable State",
         status: "Active",
-        defaultRuntime: "hermes",
       },
     });
 
@@ -47,7 +46,6 @@ describe("getSchedulePage runnable state", () => {
         description: "Has the minimum runnable config",
         status: "Ready",
         priority: "High",
-        executionRuntime: "hermes",
         executionConfig: { prompt: "Execute the configured task", temperature: 0.2, sessionStrategy: "per_subtask" },
       },
     });
@@ -59,7 +57,6 @@ describe("getSchedulePage runnable state", () => {
         description: "Still needs instructions",
         status: "Draft",
         priority: "Medium",
-        executionRuntime: "hermes",
         executionConfig: {},
       },
     });
@@ -72,7 +69,6 @@ describe("getSchedulePage runnable state", () => {
         description: "Inherited from decomposition",
         status: "Draft",
         priority: "Low",
-        executionRuntime: "hermes",
         executionConfig: {},
       },
     });
@@ -126,7 +122,6 @@ describe("getSchedulePage runnable state", () => {
 
     expect(page.scheduled[0]).toMatchObject({
       taskId: readyTask.id,
-      executionRuntime: "hermes",
       executionConfig: expect.objectContaining({ prompt: "Execute the configured task" }),
       isRunnable: true,
       runnabilityState: "ready_to_run",
@@ -136,7 +131,6 @@ describe("getSchedulePage runnable state", () => {
     expect(page.unscheduled).toHaveLength(1);
     expect(page.unscheduled[0]).toMatchObject({
       taskId: draftTask.id,
-      executionRuntime: "hermes",
       executionConfig: {},
       isRunnable: true,
       runnabilityState: "ready_to_run",

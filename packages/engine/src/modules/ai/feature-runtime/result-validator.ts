@@ -41,12 +41,22 @@ function pointerValue(value: unknown, pointer: string): { found: boolean; value?
   return { found: true, value: current };
 }
 
+function evidenceTarget(data: unknown, path: string | undefined) {
+  if (path === undefined) return { found: true, value: data };
+  const direct = pointerValue(data, path);
+  if (direct.found || (path !== "/data" && !path.startsWith("/data/"))) return direct;
+  // Providers occasionally address the full observation envelope even though
+  // the contract defines paths relative to observation.data. `/data/...` is
+  // an unambiguous alias for the same frozen value and cannot escape it.
+  return pointerValue(data, path === "/data" ? "" : path.slice("/data".length));
+}
+
 function evidenceIsFrozen(evidence: readonly EvidenceReference[], observations: readonly AiObservationEnvelope[]): boolean {
   const byId = new Map(observations.map((observation) => [observation.observationId, observation]));
   return evidence.every((reference) => {
     const observation = byId.get(reference.observationId);
     if (!observation) return false;
-    const target = reference.path === undefined ? { found: true, value: observation.data } : pointerValue(observation.data, reference.path);
+    const target = evidenceTarget(observation.data, reference.path);
     return target.found && (!reference.quoteHash || stableJsonHash(target.value) === reference.quoteHash);
   });
 }

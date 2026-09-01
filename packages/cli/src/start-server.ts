@@ -1,8 +1,8 @@
-import { copyFileSync, existsSync, mkdirSync } from "node:fs";
+import { copyFileSync, existsSync } from "node:fs";
 import { homedir } from "node:os";
 import { dirname, join, resolve } from "node:path";
+import { assertPrivateStorageSupported, ensurePrivateDirectory, secureGeneratedPrivateFile } from "@chrona/db/sqlite-url";
 
-import { ensureSqliteDatabase } from "@chrona/db/sqlite-migrations";
 
 export type ChronaStartOptions = {
   host?: string;
@@ -37,7 +37,7 @@ function findResourceDir(): string {
 }
 
 function getHome(): string {
-  return process.env.HOME ?? process.env.USERPROFILE ?? homedir() ?? "/tmp";
+  return process.env.HOME ?? process.env.USERPROFILE ?? homedir();
 }
 
 export function getChronaDataDir(): string {
@@ -50,7 +50,7 @@ export function getChronaDataDir(): string {
     : join(home, ".local", "share", "chrona");
 }
 
-function getConfigDir(): string {
+export function getChronaConfigDir(): string {
   if (process.env.CHRONA_CONFIG_DIR) return process.env.CHRONA_CONFIG_DIR;
   const home = getHome();
   if (process.platform === "darwin") return join(home, "Library", "Preferences", "chrona");
@@ -61,16 +61,23 @@ function getConfigDir(): string {
 }
 
 function ensureDirs() {
-  mkdirSync(getChronaDataDir(), { recursive: true });
-  mkdirSync(getConfigDir(), { recursive: true });
+  assertPrivateStorageSupported();
+  for (const path of [getChronaDataDir(), getChronaConfigDir()]) {
+    // Existing selected paths are audited, never rewritten. Newly-created
+    // Chrona roots receive private POSIX modes or a verified Windows ACL.
+    ensurePrivateDirectory(path);
+  }
 }
 
 function ensureEnv(resourceDir: string) {
-  const envPath = join(getConfigDir(), ".env");
-  if (existsSync(envPath)) return;
-  const examplePath = join(resourceDir, ".env.example");
-  if (existsSync(examplePath)) {
-    copyFileSync(examplePath, envPath);
+  const envPath = join(getChronaConfigDir(), ".env");
+  if (!existsSync(envPath)) {
+    const examplePath = join(resourceDir, ".env.example");
+    if (existsSync(examplePath)) {
+      copyFileSync(examplePath, envPath, 0);
+      // Secure only the generated config file, never an existing user file.
+      secureGeneratedPrivateFile(envPath);
+    }
   }
 }
 
@@ -122,19 +129,13 @@ export async function startChronaServer(bootServer: BootChronaServer, options: C
   banner();
 
   const dataDir = getChronaDataDir();
-  const configDir = getConfigDir();
+  const configDir = getChronaConfigDir();
   console.log(`  Data:  ${dataDir}`);
   console.log(`  Config: ${configDir}`);
   console.log("");
 
-  console.log("🗄️  Preparing database...");
-  ensureSqliteDatabase({
-    databaseUrl: process.env.DATABASE_URL,
-    migrationsDir,
-    log: (message) => console.log(message),
-  });
-  console.log("✅ Database ready.");
-  console.log("");
+  // The server entrypoint owns the runtime lock and migration lifecycle. Keeping
+  // this launcher side-effect free prevents a packaged start from acquiring twice.
 
   const host = process.env.HOST ?? "127.0.0.1";
   const port = Number.parseInt(process.env.PORT ?? "3101", 10);

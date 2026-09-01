@@ -16,7 +16,7 @@ const DUE_SOON_WINDOW_MS = 24 * 60 * 60 * 1000;
 const OVERDUE_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 const RECENT_NOTIFICATION_WINDOW_MS = 24 * 60 * 60 * 1000;
 
-const CLOSED_DUE_STATUSES = [
+const CLOSED_DUE_STATUSES: TaskStatus[] = [
   TaskStatus.Completed,
   TaskStatus.Done,
   TaskStatus.Cancelled,
@@ -151,7 +151,7 @@ type WaitingPlanRunRecord = {
   workBlockId: string | null;
   planRun: unknown;
   updatedAt: Date;
-  task: { title: string; workspaceId: string };
+  task: { title: string; workspaceId: string; status: TaskStatus };
 };
 
 function failedNodeIdFromPlanRun(value: unknown): string | null {
@@ -165,8 +165,24 @@ function failedNodeIdFromPlanRun(value: unknown): string | null {
   return null;
 }
 
+function completedResultPlanRun(value: unknown): boolean {
+  const envelope = recordFromUnknown(value);
+  const planRun = recordFromUnknown(envelope?.planRun);
+  const mutableGraph = recordFromUnknown(envelope?.mutableGraph);
+  const planOutput = recordFromUnknown(mutableGraph?.planOutput);
+  const finalization = recordFromUnknown(planOutput?.finalization);
+  return planRun?.status === "completed" && finalization?.status === "Ready";
+}
+
 function executionScopeKey(taskId: string, workBlockId: string | null) {
   return `${taskId}:${workBlockId ?? "task"}`;
+}
+
+function resultWasAcceptedAfterRun(
+  acceptedAt: Date | undefined,
+  run: { endedAt: Date | null; updatedAt: Date },
+) {
+  return (acceptedAt?.getTime() ?? 0) >= (run.endedAt ?? run.updatedAt).getTime();
 }
 
 function failedNodeIdsByExecutionScope(runs: WaitingPlanRunRecord[]) {
@@ -186,6 +202,7 @@ function buildPlanRunItems(
 ): SortableActionCenterItem[] {
   const items: SortableActionCenterItem[] = [];
   for (const run of runs) {
+    if (CLOSED_DUE_STATUSES.includes(run.task.status)) continue;
     const scopeKey = executionScopeKey(run.taskId, run.workBlockId);
     if (coveredExecutionScopes.has(scopeKey)) continue;
     const checkpoint = waitingCheckpointFromPlanRun(run.planRun);
@@ -215,7 +232,7 @@ function buildPlanRunItems(
   return items;
 }
 
-const LEGACY_NON_ACTIONABLE_SCHEDULER_REASONS: Record<string, true> = {
+const LEGACY_NON_ACTIONABLE_SCHEDULER_REASONS: Partial<Record<string, true>> = {
   "Automatic execution will start at the configured schedule time.": true,
   "A run is already active for this task.": true,
   not_due: true,
@@ -246,10 +263,7 @@ function isActionableSchedulerSkip(event: {
 }): boolean {
   const payload = readSchedulerPayload(event.payload);
   if (payload.actionable !== undefined) return payload.actionable;
-  if (
-    payload.reasonCode &&
-    LEGACY_NON_ACTIONABLE_SCHEDULER_REASONS[payload.reasonCode]
-  ) {
+  if (LEGACY_NON_ACTIONABLE_SCHEDULER_REASONS[payload.reasonCode ?? ""]) {
     return false;
   }
   return (
@@ -428,17 +442,48 @@ export async function getActionCenter(
       where: {
         workspaceId,
         updatedAt: { gte: recentWindowStartsAt },
-        task: { status: { notIn: CLOSED_DUE_STATUSES } },
+        task: { status: { notIn: [TaskStatus.Done, TaskStatus.Cancelled] } },
       },
       include: {
         task: {
-          select: { id: true, title: true, workspaceId: true },
+          select: { id: true, title: true, workspaceId: true, status: true },
         },
       },
       orderBy: { updatedAt: "desc" },
       take: 100,
     }),
   ]);
+
+  const acceptedResultEvents = completedRuns.length > 0 || waitingPlanRuns.length > 0
+    ? await db.event.findMany({
+        where: {
+          eventType: "task.result_accepted",
+          OR: [
+            ...(completedRuns.length > 0 ? [{ runId: { in: completedRuns.map((run) => run.id) } }] : []),
+            ...(waitingPlanRuns.length > 0 ? [{ planRunId: { in: waitingPlanRuns.map((run) => run.id) } }] : []),
+          ],
+        },
+        select: { taskId: true, runId: true, planRunId: true, createdAt: true },
+      })
+    : [];
+  const acceptedCompletedRunIds = new Set(
+    acceptedResultEvents
+      .map((event) => event.runId)
+      .filter((runId): runId is string => Boolean(runId)),
+  );
+  const acceptedPlanRunIds = new Set(
+    acceptedResultEvents
+      .map((event) => event.planRunId)
+      .filter((planRunId): planRunId is string => Boolean(planRunId)),
+  );
+  const latestAcceptedResultAtByTask = new Map<string, Date>();
+  for (const event of acceptedResultEvents) {
+    if (!event.taskId) continue;
+    const previous = latestAcceptedResultAtByTask.get(event.taskId);
+    if (!previous || previous < event.createdAt) {
+      latestAcceptedResultAtByTask.set(event.taskId, event.createdAt);
+    }
+  }
 
   const latestRunIds = tasksWithLatestRuns
     .map((task) => task.latestRunId)
@@ -719,7 +764,9 @@ export async function getActionCenter(
   for (const run of completedRuns) {
     if (
       run.task.latestRunId !== run.id ||
-      run.task.status !== TaskStatus.Completed
+      run.task.status !== TaskStatus.Completed ||
+      acceptedCompletedRunIds.has(run.id) ||
+      resultWasAcceptedAfterRun(latestAcceptedResultAtByTask.get(run.taskId), run)
     )
       continue;
     if (!latestCompletedRunByTask.has(run.taskId))
@@ -744,6 +791,34 @@ export async function getActionCenter(
       sortAt: run.endedAt ?? run.updatedAt,
     }),
   );
+
+  const completedExecutionScopes = new Set(
+    completedItems.map((item) =>
+      executionScopeKey(item.sourceTaskId, item.workBlockId ?? null),
+    ),
+  );
+  const graphCompletedItems = waitingPlanRuns
+    .filter((run) =>
+      run.task.status === TaskStatus.Completed
+      && completedResultPlanRun(run.planRun)
+      && !acceptedPlanRunIds.has(run.id)
+      && !completedExecutionScopes.has(executionScopeKey(run.taskId, run.workBlockId)),
+    )
+    .map((run) => ({
+      id: `execution-completed:${run.id}`,
+      kind: "execution_completed" as const,
+      actionType: "Execution completed",
+      riskLevel: "low",
+      sourceTaskTitle: run.task.title,
+      sourceTaskId: run.taskId,
+      workspaceId: run.task.workspaceId,
+      currentRunLabel: run.id,
+      workBlockId: run.workBlockId,
+      detail: "Latest plan execution completed",
+      summary: "Task execution completed recently.",
+      consequence: "Open the task to review results or mark follow-up complete.",
+      sortAt: run.updatedAt,
+    }));
 
   const infoItems = infoNotifications.map((notification) => ({
     id: `notification-info:${notification.id}`,
@@ -796,6 +871,7 @@ export async function getActionCenter(
     ...dueItems,
     ...schedulerItems,
     ...completedItems,
+    ...graphCompletedItems,
     ...infoItems,
     ...blockedItems,
   ]

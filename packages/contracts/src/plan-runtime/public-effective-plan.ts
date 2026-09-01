@@ -45,7 +45,12 @@ export type PublicEffectivePlanNodeResult = {
   caveats?: PublicResultContribution[];
   nextActions?: PublicResultContribution[];
   resultEvidence?: PublicResultEvidence[];
-  error?: { present: true; message: "Node execution failed." };
+  error?: {
+    present: true;
+    message: "Node execution failed.";
+    code?: string;
+    traceId?: string;
+  };
   actionForm?: NonNullable<NodeResult["actionForm"]>;
   waitKind?: NonNullable<NodeResult["waitKind"]>;
   review?: PublicNodeReview;
@@ -124,6 +129,34 @@ function projectContribution(item: NonNullable<NodeResult["findings"]>[number]):
   };
 }
 
+function errorDetailRecord(value: unknown): Record<string, unknown> | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  return value as Record<string, unknown>;
+}
+
+function publicManualErrorCode(value: unknown) {
+  if (typeof value !== "string") return undefined;
+  return /^MANUAL_FORM_[A-Z_]+$/.test(value) ? value : undefined;
+}
+
+function publicTraceId(value: unknown) {
+  if (typeof value !== "string") return undefined;
+  return value.length <= 128 ? value : undefined;
+}
+
+function publicNodeError(result: NodeResult) {
+  if (result.error === undefined) return undefined;
+  const details = errorDetailRecord(result.errorDetails);
+  const code = publicManualErrorCode(details?.code);
+  const traceId = publicTraceId(details?.traceId);
+  return {
+    present: true as const,
+    message: "Node execution failed." as const,
+    ...(code ? { code } : {}),
+    ...(traceId ? { traceId } : {}),
+  };
+}
+
 // eslint-disable-next-line complexity -- The public projection explicitly allowlists each optional result field.
 export function projectPublicEffectivePlanNodeResult(
   result: NodeResult | null | undefined,
@@ -152,7 +185,7 @@ export function projectPublicEffectivePlanNodeResult(
     ...(result.resultEvidence !== undefined
       ? { resultEvidence: result.resultEvidence.map((item) => ({ key: item.key, summary: item.summary })) }
       : {}),
-    ...(result.error !== undefined ? { error: { present: true as const, message: "Node execution failed." as const } } : {}),
+    ...(publicNodeError(result) ? { error: publicNodeError(result) } : {}),
     ...(result.actionForm !== undefined ? { actionForm: result.actionForm } : {}),
     ...(result.waitKind !== undefined ? { waitKind: result.waitKind } : {}),
     ...(result.review !== undefined

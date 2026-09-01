@@ -16,6 +16,7 @@ import {
 	type ProviderConfigInput,
 } from "@oh-my-pi/pi-coding-agent";
 import { MCPManager } from "@oh-my-pi/pi-coding-agent/mcp";
+import { createLogger, serializeSafeError } from "@chrona/logging";
 import {
 	BoundedTerminalRunSnapshots,
 	assertProviderStartSupported,
@@ -47,6 +48,7 @@ import type { OmpProviderConfig } from "./types";
 
 const PROVIDER = "omp";
 const SDK_RUN_PREFIX = "omp-sdk";
+const log = createLogger("providers.omp");
 
 type Timer = Parameters<typeof clearTimeout>[0];
 type QueueItem = ProviderRunEvent | { type: "end" };
@@ -862,9 +864,82 @@ function assertExpectedModel(
 }
 
 function sdkReadOnlyToolOptions(toolPolicy: StartRunInput["toolPolicy"]) {
-	return toolPolicy === "read_only"
+	return toolPolicy === "read_only" || toolPolicy === "terminal_only"
 		? { toolNames: [] as string[], enableMCP: false, enableLsp: false }
 		: {};
+}
+
+type SdkHealthSession = Pick<AgentSession, "abort" | "prompt" | "subscribe">;
+type SdkHealthProbeResult =
+	| { ok: true }
+	| { ok: false; reason: string };
+
+async function probeSdkSessionHealth(
+	session: SdkHealthSession,
+	input: HealthCheckInput | undefined,
+): Promise<SdkHealthProbeResult> {
+	if (input?.signal?.aborted) {
+		return { ok: false, reason: "Oh My Pi health check was aborted" };
+	}
+	const timeoutMs = input?.timeoutMs ?? 60_000;
+	const { promise, resolve } = Promise.withResolvers<SdkHealthProbeResult>();
+	let settled = false;
+	const settle = (result: SdkHealthProbeResult) => {
+		if (settled) return;
+		settled = true;
+		resolve(result);
+	};
+	const unsubscribe = session.subscribe((event) => {
+		if (
+			event.type === "message_update" &&
+			event.assistantMessageEvent.type === "error"
+		) {
+			settle({ ok: false, reason: event.assistantMessageEvent.reason });
+			return;
+		}
+		if (event.type !== "agent_end") return;
+		const outcome = agentEndOutcome(event, false);
+		settle(
+			outcome.status === "completed"
+				? { ok: true }
+				: { ok: false, reason: outcome.error },
+		);
+	});
+	const abort = () => {
+		settle({ ok: false, reason: "Oh My Pi health check was aborted" });
+		void session.abort();
+	};
+	input?.signal?.addEventListener("abort", abort, { once: true });
+	const timer = setTimeout(() => {
+		settle({
+			ok: false,
+			reason: `Oh My Pi health check timed out after ${timeoutMs}ms`,
+		});
+		void session.abort();
+	}, timeoutMs);
+	const prompt = session
+		.prompt("Connectivity check. Reply with the single word pong.", {
+			expandPromptTemplates: false,
+		})
+		.then((ran) => {
+			if (!ran) {
+				settle({ ok: false, reason: "Oh My Pi health probe did not run" });
+			}
+		})
+		.catch((error: unknown) => {
+			settle({
+				ok: false,
+				reason: error instanceof Error ? error.message : String(error),
+			});
+		});
+	try {
+		return await promise;
+	} finally {
+		clearTimeout(timer);
+		input?.signal?.removeEventListener("abort", abort);
+		unsubscribe();
+		await prompt;
+	}
 }
 
 export const __ompSdkProviderTestHooks = {
@@ -880,6 +955,7 @@ export const __ompSdkProviderTestHooks = {
 	chronaAgentControlUrl,
 	invokeChronaTerminalControl,
 	sdkReadOnlyToolOptions,
+	probeSdkSessionHealth,
 	sdkToolErrorMessage,
 	isDeclaredTerminalTool,
 	agentEndFailure,
@@ -1078,17 +1154,75 @@ export class OmpSdkProviderClient implements AgentProviderClient {
 		};
 	}
 
-	async checkHealth(_input?: HealthCheckInput) {
+	async checkHealth(input?: HealthCheckInput) {
 		const started = Date.now();
 		try {
-			applySdkEnvironment(this.config);
-			return {
-				provider: PROVIDER,
-				ok: true,
-				checkedAt: now(),
-				latencyMs: Date.now() - started,
-				message: "Oh My Pi SDK package loaded",
-			};
+			// Health must exercise the same SDK model resolution path as a real run.
+			// A non-empty selector only proves that configuration was typed; it does
+			// not prove that OMP can restore credentials and an executable model.
+			const environment = applySdkEnvironment(this.config, "health");
+			const setup = await createSdkModelSetup(this.config, environment);
+			if (!setup.modelPattern) {
+				return {
+					provider: PROVIDER,
+					ok: false,
+					checkedAt: now(),
+					latencyMs: Date.now() - started,
+					reason: "No OMP model could be resolved from this configuration.",
+				};
+			}
+			const cwd = nonEmpty(this.config.cwd) ?? process.cwd();
+			const agentDir =
+				nonEmpty(this.config.codingAgentDirectory) ??
+				nonEmpty(this.config.configDirectory);
+			const settings = await loadSdkSettings(environment, cwd);
+			const { session, mcpManager } = await createAgentSession({
+				cwd,
+				agentDir,
+				modelPattern: setup.modelPattern,
+				...(setup.authStorage ? { authStorage: setup.authStorage } : {}),
+				...(setup.modelRegistry ? { modelRegistry: setup.modelRegistry } : {}),
+				settings,
+				sessionManager: SessionManager.inMemory(cwd),
+				toolNames: [],
+				enableMCP: false,
+				enableLsp: false,
+				skipPythonPreflight: true,
+				hasUI: false,
+			});
+			try {
+				const model = session.model;
+				if (!model) {
+					return {
+						provider: PROVIDER,
+						ok: false,
+						checkedAt: now(),
+						latencyMs: Date.now() - started,
+						reason:
+							"OMP could not resolve an executable model. Check OMP login, model selection, and agent directory.",
+					};
+				}
+				const probe = await probeSdkSessionHealth(session, input);
+				if (!probe.ok) {
+					return {
+						provider: PROVIDER,
+						ok: false,
+						checkedAt: now(),
+						latencyMs: Date.now() - started,
+						reason: probe.reason,
+					};
+				}
+				return {
+					provider: PROVIDER,
+					ok: true,
+					checkedAt: now(),
+					latencyMs: Date.now() - started,
+					message: `Oh My Pi SDK reached model ${model.provider}/${model.id}`,
+				};
+			} finally {
+				await session.dispose();
+				await mcpManager?.disconnectAll();
+			}
 		} catch (error) {
 			return {
 				provider: PROVIDER,
@@ -1687,12 +1821,12 @@ export class OmpSdkProviderClient implements AgentProviderClient {
 		try {
 			await handle.session?.dispose();
 		} catch (error) {
-			console.error("OMP SDK session disposal failed", error);
+			log.warn("sdk.session_disposal_failed", { error: serializeSafeError(error) });
 		}
 		try {
 			await handle.mcpManager?.disconnectAll();
 		} catch (error) {
-			console.error("OMP SDK Chrona MCP disposal failed", error);
+			log.warn("sdk.mcp_disposal_failed", { error: serializeSafeError(error) });
 		}
 		queue.push({ type: "end" });
 	}

@@ -66,6 +66,22 @@ describe("OMP client configuration", () => {
     });
   });
 
+  it("serializes a cleared base URL as an explicit deletion", () => {
+    const values = getInitialFormValues(
+      ompClient({
+        provider: "nrouter",
+        model: "cx/gpt-5.6-sol",
+        baseUrl: "https://old.example.test/v1",
+      }),
+      providers,
+      false,
+    );
+
+    expect(buildClientPayload({ ...values, baseUrl: "" }).config).toMatchObject({
+      baseUrl: null,
+    });
+  });
+
   it("keeps legacy selector models and defaults unknown API values safely", () => {
     const values = getInitialFormValues(
       ompClient({ model: "nrouter/cx/gpt-5.6-sol", api: "unknown" }),

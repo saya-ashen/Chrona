@@ -1,9 +1,9 @@
 import type { GraphDispatchOutcome } from "@chrona/graph-runtime";
 import type { PlanExecutionResult, PlanExecutionStatus, PlanOutputState, WaitKind } from "@chrona/contracts/ai";
-import type { Prisma } from "@/generated/prisma/client";
+import { RunStatus, type Prisma } from "@/generated/prisma/client";
 import { rebuildTaskProjectionInTransaction } from "@/modules/projections/rebuild-task-projection";
 import { executionStatusFromGraphOutcome, executionTransition, planRunStatusForExecutionStatus } from "../execution-state-machine";
-import { completeActiveRunsForExecutionScope, cancelActiveRunsForExecutionScope } from "../persistence/task-execution-store";
+import { completeActiveRunsForExecutionScope, cancelActiveRunsForExecutionScope, ensurePlanExecutionRun } from "../persistence/task-execution-store";
 import { setExecutionSessionState, type ExecutionSessionRow } from "../persistence/execution-session-store";
 import { completeWorkBlock, releaseWorkBlock } from "../persistence/work-block-store";
 import { appendMainSessionEvent } from "../persistence/plan-state-store";
@@ -24,7 +24,7 @@ type FinalizeOutcomeInput = {
 };
 
 function pausedStatus(status: PlanExecutionStatus): boolean {
-  return ["waiting_for_user", "waiting_for_approval", "blocked", "failed"].includes(status);
+  return ["waiting_for_user", "waiting_for_approval", "blocked"].includes(status);
 }
 
 function outcomeCurrentNodeId(
@@ -63,7 +63,17 @@ async function finalizeTerminalStatus(
   status: PlanExecutionStatus,
   tx: Prisma.TransactionClient,
 ): Promise<void> {
+  if (!["completed", "cancelled", "failed"].includes(status)) return;
   if (status === "completed") {
+    await ensurePlanExecutionRun({
+      taskId: input.taskId,
+      planRunId: input.runtime.persisted.id,
+      workBlockId: input.session.workBlockId,
+      occurrenceId: input.session.occurrenceId,
+      taskSessionId: input.taskSessionId,
+      status: RunStatus.Completed,
+      triggeredBy: "plan-execution",
+    }, tx);
     await completeActiveRunsForExecutionScope({
       taskId: input.taskId,
       taskSessionId: input.taskSessionId,

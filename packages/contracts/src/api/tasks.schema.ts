@@ -8,18 +8,6 @@ import {
 import { automationTimingSchema } from "../automation-timing";
 import type { TaskStatus } from "../task";
 
-function executionRuntimeSchema(supportedRuntimes?: readonly string[]) {
-  const schema = z.string().trim().min(1, "executionRuntime is required");
-
-  if (!supportedRuntimes) {
-    return schema;
-  }
-
-  return schema.refine((runtime) => supportedRuntimes.includes(runtime), {
-    message: `Unsupported executionRuntime. Supported runtimes: ${supportedRuntimes.join(", ")}`,
-  });
-}
-
 const contextStrategySchema = z.enum([
   "provider_default",
   "auto_compact",
@@ -38,24 +26,6 @@ const taskExecutionConfigSchema = z.record(z.string(), z.unknown()).superRefine(
     context.addIssue({ code: "custom", path: ["allowSubAgents"], message: "allowSubAgents must be a boolean" });
   }
 });
-
-export function createTaskBodySchemaForSupportedRuntimes(
-  supportedRuntimes: readonly string[],
-) {
-  return refineRecurrenceAnchors(
-    createTaskBodySchema.extend({
-      executionRuntime: executionRuntimeSchema(supportedRuntimes).optional(),
-    }),
-  );
-}
-
-export function updateTaskBodySchemaForSupportedRuntimes(
-  supportedRuntimes: readonly string[],
-) {
-  return updateTaskBodySchema.extend({
-    executionRuntime: executionRuntimeSchema(supportedRuntimes).optional(),
-  });
-}
 
 // ── GET /tasks ──
 /** Semantic filter tabs surfaced in the task list UI. */
@@ -141,7 +111,6 @@ export const createTaskBodySchema = z.object({
   autoExecute: z.boolean().optional(),
   autoPlanGenerationTiming: automationTimingSchema.optional(),
   autoExecuteTiming: automationTimingSchema.optional(),
-  executionRuntime: executionRuntimeSchema().optional(),
   executionConfig: taskExecutionConfigSchema.optional(),
   aiClientId: z.string().trim().min(1).nullable().optional(),
   parentTaskId: z.string().nullable().optional(),
@@ -201,7 +170,6 @@ export const updateTaskBodySchema = z.object({
   autoPlanGenerationTiming: automationTimingSchema.optional(),
   autoExecuteTiming: automationTimingSchema.optional(),
   status: taskStatusEnum.optional(),
-  executionRuntime: executionRuntimeSchema().optional(),
   executionConfig: taskExecutionConfigSchema.optional(),
   aiClientId: z.string().trim().min(1).nullable().optional(),
   recurrenceRule: z

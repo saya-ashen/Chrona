@@ -197,9 +197,38 @@ describe("OmpSdkProviderClient direct config", () => {
 
     const health = await client.checkHealth();
 
-    expect(health.ok).toBe(true);
+    expect(health.ok).toBe(false);
+    expect(health.reason).toBeTruthy();
     expect(process.env.CHRONA_OMP_API_KEY_HEALTH).toBe("sk-direct-omp");
     expect(process.env.CHRONA_OMP_BASE_URL_HEALTH).toBe("https://llm.example.test/v1");
+  });
+
+  it("does not report a selector as healthy when the SDK cannot resolve a runtime model", async () => {
+    const agentDir = await mkdtemp(join(tmpdir(), "chrona-omp-health-no-model-"));
+    try {
+      const health = await new OmpSdkProviderClient({
+        config: {
+          codingAgentDirectory: agentDir,
+          provider: "openai-codex",
+          model: "gpt-5.6-sol",
+        },
+      }).checkHealth();
+
+      expect(health.ok).toBe(false);
+      expect(health.reason).toMatch(/runtime model|model/i);
+    } finally {
+      await rm(agentDir, { recursive: true, force: true });
+    }
+  });
+
+  it("requires an actual SDK provider turn before reporting health", async () => {
+    const failed = await __ompSdkProviderTestHooks.probeSdkSessionHealth({
+      subscribe: () => () => undefined,
+      prompt: () => Promise.reject(new Error("401 API key required")),
+      abort: () => Promise.resolve(),
+    } as never, { timeoutMs: 100 });
+
+    expect(failed).toEqual({ ok: false, reason: "401 API key required" });
   });
 });
 
@@ -243,12 +272,18 @@ describe("OmpSdkProviderClient declared runtime tools", () => {
     expect(__ompSdkProviderTestHooks.isDeclaredTerminalTool("runtime_complete", undefined, "runtime_complete")).toBe(false);
   });
 
-  it("disables built-in tools, MCP, and LSP for read-only runs", () => {
-    expect(__ompSdkProviderTestHooks.sdkReadOnlyToolOptions("read_only")).toEqual({
+  it("disables built-in tools, MCP, and LSP for read-only and terminal-only runs", () => {
+    const isolatedToolOptions = {
       toolNames: [],
       enableMCP: false,
       enableLsp: false,
-    });
+    };
+    expect(__ompSdkProviderTestHooks.sdkReadOnlyToolOptions("read_only")).toEqual(
+      isolatedToolOptions,
+    );
+    expect(__ompSdkProviderTestHooks.sdkReadOnlyToolOptions("terminal_only")).toEqual(
+      isolatedToolOptions,
+    );
     expect(__ompSdkProviderTestHooks.sdkReadOnlyToolOptions("full")).toEqual({});
   });
 

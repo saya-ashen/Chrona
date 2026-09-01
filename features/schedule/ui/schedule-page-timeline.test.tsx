@@ -53,7 +53,6 @@ function createScheduledItem(
 		latestRunStatus: overrides.latestRunStatus ?? null,
 		scheduleProposalCount: overrides.scheduleProposalCount ?? 0,
 		lastActivityAt: overrides.lastActivityAt ?? null,
-		executionRuntime: overrides.executionRuntime ?? "hermes",
 		executionConfig: overrides.executionConfig ?? {},
 		autoPlanGeneration: overrides.autoPlanGeneration ?? false,
 		autoExecute: overrides.autoExecute ?? false,
@@ -88,8 +87,6 @@ describe("DayTimeline", () => {
 					dueAt: null,
 					durationMinutes: 60,
 				}}
-				executionRuntimes={[]}
-				defaultExecutionRuntime="hermes"
 				isPending={false}
 				onScheduleDrop={vi.fn().mockResolvedValue(undefined)}
 				onCreateTaskBlock={vi.fn().mockResolvedValue(undefined)}
@@ -122,8 +119,6 @@ describe("DayTimeline", () => {
 				dayDate={new Date(2026, 3, 15, 0, 0, 0, 0)}
 				selectedDay="2026-04-15"
 				draggedItem={null}
-				executionRuntimes={[]}
-				defaultExecutionRuntime="hermes"
 				isPending={false}
 				onScheduleDrop={vi.fn().mockResolvedValue(undefined)}
 				onCreateTaskBlock={vi.fn().mockResolvedValue(undefined)}
@@ -147,8 +142,6 @@ describe("DayTimeline", () => {
 				dayDate={new Date(2026, 3, 16, 0, 0, 0, 0)}
 				selectedDay="2026-04-16"
 				draggedItem={null}
-				executionRuntimes={[]}
-				defaultExecutionRuntime="hermes"
 				isPending={false}
 				onScheduleDrop={vi.fn().mockResolvedValue(undefined)}
 				onCreateTaskBlock={vi.fn().mockResolvedValue(undefined)}
@@ -179,8 +172,6 @@ describe("DayTimeline", () => {
 				dayDate={new Date(2026, 3, 15, 0, 0, 0, 0)}
 				selectedDay="2026-04-15"
 				draggedItem={null}
-				executionRuntimes={[]}
-				defaultExecutionRuntime="hermes"
 				isPending={false}
 				onScheduleDrop={vi.fn().mockResolvedValue(undefined)}
 				onCreateTaskBlock={vi.fn().mockResolvedValue(undefined)}
@@ -215,8 +206,6 @@ describe("DayTimeline", () => {
 				dayDate={new Date(2026, 3, 15, 0, 0, 0, 0)}
 				selectedDay="2026-04-15"
 				draggedItem={null}
-				executionRuntimes={[]}
-				defaultExecutionRuntime="hermes"
 				isPending={false}
 				onScheduleDrop={onScheduleDrop}
 				onCreateTaskBlock={vi.fn().mockResolvedValue(undefined)}
@@ -264,8 +253,6 @@ describe("DayTimeline", () => {
 				selectedDay="2026-04-15"
 				selectedTaskId="task-1"
 				draggedItem={null}
-				executionRuntimes={[]}
-				defaultExecutionRuntime="hermes"
 				isPending={false}
 				onScheduleDrop={onScheduleDrop}
 				onCreateTaskBlock={vi.fn().mockResolvedValue(undefined)}
@@ -307,8 +294,6 @@ describe("DayTimeline", () => {
 				selectedDay="2026-04-15"
 				selectedTaskId="task-1"
 				draggedItem={null}
-				executionRuntimes={[]}
-				defaultExecutionRuntime="hermes"
 				isPending={false}
 				onScheduleDrop={onScheduleDrop}
 				onCreateTaskBlock={vi.fn().mockResolvedValue(undefined)}
@@ -329,7 +314,7 @@ describe("DayTimeline", () => {
 
 	const autoStartReasonCases: Array<{ reason: string; copy: RegExp }> = [
 		{ reason: "no_accepted_plan", copy: /Review and approve a plan/i },
-		{ reason: "no_runtime_config", copy: /Connect an execution runtime/i },
+		{ reason: "no_provider_config", copy: /Connect an AI provider/i },
 		{
 			reason: "invalid_task_status",
 			copy: /Prepare this task before it can start/i,
@@ -364,8 +349,6 @@ describe("DayTimeline", () => {
 					dayDate={new Date(2026, 3, 15, 0, 0, 0, 0)}
 					selectedDay="2026-04-15"
 					draggedItem={null}
-					executionRuntimes={[]}
-					defaultExecutionRuntime="hermes"
 					isPending={false}
 					onScheduleDrop={vi.fn().mockResolvedValue(undefined)}
 					onCreateTaskBlock={vi.fn().mockResolvedValue(undefined)}
@@ -393,8 +376,6 @@ describe("DayTimeline", () => {
 				dayDate={new Date(2026, 3, 15, 0, 0, 0, 0)}
 				selectedDay="2026-04-15"
 				draggedItem={null}
-				executionRuntimes={[]}
-				defaultExecutionRuntime="hermes"
 				isPending={false}
 				onScheduleDrop={vi.fn().mockResolvedValue(undefined)}
 				onCreateTaskBlock={vi.fn().mockResolvedValue(undefined)}
@@ -424,8 +405,6 @@ describe("DayTimeline", () => {
 				dayDate={new Date(2026, 3, 15, 0, 0, 0, 0)}
 				selectedDay="2026-04-15"
 				draggedItem={null}
-				executionRuntimes={[]}
-				defaultExecutionRuntime="hermes"
 				isPending={false}
 				onScheduleDrop={vi.fn().mockResolvedValue(undefined)}
 				onCreateTaskBlock={vi.fn().mockResolvedValue(undefined)}

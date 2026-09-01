@@ -186,70 +186,89 @@ describe("TaskCreateDialog – Core functionality", () => {
         {...defaultProps}
         onSubmit={onSubmit}
         onClose={onClose}
-        executionRuntimes={[
-          {
-            key: "hermes",
-            label: "Hermes",
-            spec: {
-              runtime: "hermes",
-              version: "hermes-v1",
-              fields: [],
-              runnability: { requiredPaths: [] },
-            },
-          },
-          {
-            key: "local",
-            label: "Local runtime",
-            spec: {
-              runtime: "local",
-              version: "local-v1",
-              fields: [],
-              runnability: { requiredPaths: [] },
-            },
-          },
-        ]}
-        defaultExecutionRuntime="hermes"
       />,
     );
 
-    const titleInput = screen.getByPlaceholderText("Add title");
-    await user.type(titleInput, "My task");
-
-    const descInput = screen.getByPlaceholderText("Add description");
-    await user.type(descInput, "Some description");
-
-    // Click High priority
+    await user.type(screen.getByPlaceholderText("Add title"), "My task");
+    await user.type(screen.getByPlaceholderText("Add description"), "Some description");
     await user.click(screen.getByRole("button", { name: "High" }));
     fireEvent.change(screen.getByLabelText("Due date (optional)"), {
       target: { value: "2026-04-20T17:30" },
     });
-    await user.click(screen.getByRole("combobox"));
-    await user.click(screen.getByRole("option", { name: "Local runtime" }));
     await user.click(screen.getByRole("radio", { name: /run on a schedule/i }));
+    await user.click(screen.getByText("Save"));
 
-    const saveButton = screen.getByText("Save");
-    expect(saveButton).not.toBeDisabled();
-    await user.click(saveButton);
-
-    await waitFor(() => {
-      expect(onSubmit).toHaveBeenCalledTimes(1);
-    });
-
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
     const call = onSubmit.mock.calls[0][0];
-    expect(call.title).toBe("My task");
-    expect(call.description).toBe("Some description");
-    expect(call.priority).toBe("High");
-    expect(call.autoExecute).toBe(true);
-    expect(call.autoPlanGenerationEnabled).toBe(true);
+    expect(call).toMatchObject({
+      title: "My task",
+      description: "Some description",
+      priority: "High",
+      autoExecute: true,
+      autoPlanGenerationEnabled: true,
+    });
+    expect(call).not.toHaveProperty("executionRuntime");
     expect(call.dueAt).toEqual(new Date(2026, 3, 20, 17, 30));
-    expect(call.executionRuntime).toBe("local");
     expect(call.scheduledStartAt).toBeInstanceOf(Date);
     expect(call.scheduledEndAt).toBeInstanceOf(Date);
+    await waitFor(() => expect(onClose).toHaveBeenCalled());
+  });
 
-    // onClose called after successful submit
-    await waitFor(() => {
-      expect(onClose).toHaveBeenCalled();
-    });
+  it("offers the configured OMP provider without a separate adapter selector", async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    render(
+      <TaskCreateDialog
+        {...defaultProps}
+        onSubmit={onSubmit}
+        availableAiClients={[{
+          id: "omp-client",
+          name: "OMP",
+          type: "omp",
+          isDefault: true,
+          enabled: true,
+        }]}
+      />,
+    );
+
+    const providerSelect = screen.getByRole("combobox", { name: "AI provider" });
+    expect(providerSelect).toHaveTextContent("Default provider");
+    await user.click(providerSelect);
+    expect(screen.getByRole("option", { name: "OMP" })).toBeInTheDocument();
+    expect(screen.queryByRole("option", { name: "Hermes" })).not.toBeInTheDocument();
+    await user.keyboard("{Escape}");
+
+    await user.type(screen.getByPlaceholderText("Add title"), "OMP task");
+    await user.click(screen.getByText("Save"));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    expect(onSubmit.mock.calls[0][0]).toEqual(expect.objectContaining({ aiClientId: null }));
+    expect(onSubmit.mock.calls[0][0]).not.toHaveProperty("executionRuntime");
+  });
+
+  it("preserves entered fields when provider configuration arrives after the dialog opens", async () => {
+    const { rerender } = render(<TaskCreateDialog {...defaultProps} />);
+    const dueAt = "2026-12-18T17:30";
+
+    fireEvent.change(screen.getByLabelText("Due date (optional)"), { target: { value: dueAt } });
+    fireEvent.change(screen.getByPlaceholderText("Add title"), { target: { value: "Keep this title" } });
+    fireEvent.change(screen.getByPlaceholderText("Add description"), { target: { value: "Keep this description" } });
+    rerender(
+      <TaskCreateDialog
+        {...defaultProps}
+        availableAiClients={[{
+          id: "omp-client",
+          name: "OMP",
+          type: "omp",
+          isDefault: true,
+          enabled: true,
+        }]}
+      />,
+    );
+
+    await waitFor(() => expect(screen.getByRole("combobox", { name: "AI provider" })).toBeInTheDocument());
+    expect(screen.getByLabelText("Due date (optional)")).toHaveValue(dueAt);
+    expect(screen.getByPlaceholderText("Add title")).toHaveValue("Keep this title");
+    expect(screen.getByPlaceholderText("Add description")).toHaveValue("Keep this description");
   });
 
   it("shows 'Saving...' when isPending", () => {
@@ -280,7 +299,15 @@ describe("TaskCreateDialog – Core functionality", () => {
     render(
       <TaskCreateDialog
         {...defaultProps}
-        availableAiClients={[{ id: "ai-1", name: "Hermes", enabled: true }]}
+        availableAiClients={[
+          {
+            id: "ai-1",
+            name: "Hermes",
+            type: "hermes",
+            isDefault: true,
+            enabled: true,
+          },
+        ]}
       />,
     );
 

@@ -3,10 +3,11 @@ import { randomUUID } from "node:crypto";
 import type { AiFeatureDefinition } from "../../feature-runtime/define-feature";
 import { AiFeatureDefinitionRegistry } from "../../feature-runtime/definition-registry";
 import { executeAiFeatureRunById, startOrAttachAiFeatureRun, type RunAiFeatureInput } from "../../feature-runtime/feature-runner";
+import { classifyAiFeatureProviderError } from "../../feature-runtime/feature-compiler";
 import type { AiFeatureRunRecord } from "../../feature-runtime/run-repository";
 import { FoundationProviderRuntime, type FoundationProviderBinding } from "./foundation-provider-runtime";
 import { PrismaAiFeatureRunStore } from "./prisma-run-store";
-import type { Prisma } from "@chrona/db";
+import { db, type Prisma } from "@chrona/db";
 
 const activeStatuses = new Set(["queued", "preparing_observations", "starting_provider", "running", "validating", "committing_result"]);
 export type DefaultAiFeatureRunInput = Omit<RunAiFeatureInput, "definition"> & { definition: AiFeatureDefinition };
@@ -26,19 +27,48 @@ export async function startAiFeatureWithRuntime(
 
 export async function runAiFeatureWithRuntime(
   input: DefaultAiFeatureRunInput,
-  options: { signal?: AbortSignal } = {},
+  options: { signal?: AbortSignal; providerBinding?: FoundationProviderBinding } = {},
 ): Promise<AiFeatureRunRecord> {
-  const { runId } = await startAiFeatureWithRuntime(input);
+  const runId = options.providerBinding
+    ? await db.$transaction(async (tx) => {
+        const started = await startAiFeatureWithRuntime(input, tx);
+        await new PrismaAiFeatureRunStore(tx).pinProviderBinding({
+          runId: started.runId,
+          ...options.providerBinding!,
+        });
+        return started.runId;
+      })
+    : (await startAiFeatureWithRuntime(input)).runId;
   const runs = new PrismaAiFeatureRunStore();
   const persisted = await runs.getById(runId);
   if (!persisted) throw new Error(`AI Feature Run '${runId}' does not exist.`);
-  const provider = await new FoundationProviderRuntime(
-    input.definition.providerBindingFeature,
-    undefined,
-    options.signal,
-  ).initialize(persistedProviderBinding(persisted) ?? undefined);
-  await runs.pinProviderBinding({ runId, ...provider.providerBinding() });
-  return executeAiFeatureRunById({ definition: input.definition, runId }, { runs, provider, ids: { next: randomUUID } });
+  const persistedBinding = persistedProviderBinding(persisted);
+  let provider: FoundationProviderRuntime;
+  try {
+    provider = await new FoundationProviderRuntime(
+      input.definition.providerBindingFeature,
+      undefined,
+      options.signal,
+    ).initialize(persistedBinding ?? options.providerBinding);
+    await runs.pinProviderBinding({ runId, ...provider.providerBinding() });
+  } catch (cause) {
+    const errorMessage = cause instanceof Error ? cause.message : "AI Provider initialization failed.";
+    const failed = await runs.update({
+      runId,
+      expectedStateVersion: persisted.stateVersion,
+      status: "failed",
+      error: {
+        code: classifyAiFeatureProviderError(errorMessage),
+        message: errorMessage,
+      },
+      finishedAt: new Date().toISOString(),
+    });
+    return failed ?? (await runs.getById(runId)) ?? persisted;
+  }
+  return executeAiFeatureRunById(
+    { definition: input.definition, runId },
+    { runs, provider, ids: { next: randomUUID } },
+  );
 }
 
 

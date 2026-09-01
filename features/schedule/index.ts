@@ -5,7 +5,6 @@ export { useAutoComplete, type AutoCompleteSuggestion } from "./ui/use-auto-comp
 export {
   TaskConfigForm,
   type TaskConfigAiClient,
-  type TaskConfigExecutionRuntime,
   type TaskConfigFormDraft,
   type TaskConfigFormInput,
 } from "./ui/forms/task-config-form";

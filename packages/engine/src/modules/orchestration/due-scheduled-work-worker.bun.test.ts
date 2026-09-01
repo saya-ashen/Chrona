@@ -36,7 +36,7 @@ async function resetDb() {
 
 async function createTask() {
   const workspace = await db.workspace.create({
-    data: { name: "Due Worker", status: "Active", defaultRuntime: "hermes" },
+    data: { name: "Due Worker", status: "Active" },
   });
   const task = await db.task.create({
     data: {
@@ -44,7 +44,6 @@ async function createTask() {
       title: "Due task",
       status: "Ready",
       priority: "High",
-      executionRuntime: "hermes",
       executionConfig: { prompt: "Run" },
     },
   });

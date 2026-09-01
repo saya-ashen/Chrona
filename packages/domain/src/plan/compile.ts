@@ -46,6 +46,7 @@ function buildNodeConfig(
       return {
         expectedOutput: node.expectedOutput,
         completionCriteria: node.completionCriteria,
+        completionForm: node.completionForm,
         userInteraction: node.userInteraction,
       } satisfies TaskConfig;
     case "checkpoint":

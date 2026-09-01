@@ -12,6 +12,7 @@ import {
 } from "@chrona/contracts/api";
 
 import { VALID_AI_FEATURES } from "../helpers";
+import { validateHermesEndpoint } from "@chrona/providers-foundation";
 import { error, internalServerError, json, toHttpError } from "../../lib/http";
 
 type AiClientRouteRecord = {
@@ -34,6 +35,15 @@ const PUBLIC_CONFIG_KEYS: Record<string, Record<string, true>> = {
   omp: { model: true, provider: true, baseUrl: true, api: true, timeoutMs: true, homeDirectory: true, configDirectory: true, codingAgentDirectory: true, cwd: true },
 };
 
+function publicConfigValue(type: string, key: string, value: unknown): unknown {
+  if (type !== "hermes" || key !== "baseUrl") return value;
+  // Historical records may predate endpoint validation. Never reflect an
+  // unsafe configured URL (which could contain query credentials) through the
+  // localhost-unprotected settings API.
+  const endpoint = typeof value === "string" ? validateHermesEndpoint(value) : { ok: false as const };
+  return endpoint.ok ? value : undefined;
+}
+
 function redactClientConfig(type: string, config: unknown): Record<string, unknown> {
   if (!config || typeof config !== "object" || Array.isArray(config)) return {};
   const allowedKeys = PUBLIC_CONFIG_KEYS[type] ?? {};
@@ -42,7 +52,8 @@ function redactClientConfig(type: string, config: unknown): Record<string, unkno
     if (key === "env" && value && typeof value === "object" && !Array.isArray(value)) {
       publicConfig.env = Object.fromEntries(Object.keys(value).map((name) => [name, true]));
     } else if (Object.hasOwn(allowedKeys, key)) {
-      publicConfig[key] = value;
+      const publicValue = publicConfigValue(type, key, value);
+      if (publicValue !== undefined) publicConfig[key] = publicValue;
     }
   }
   return publicConfig;
@@ -163,6 +174,26 @@ function registerClientMutationRoutes(app: Hono, engine: ChronaEngine) {
           return json(c, { client: serializeClient(updated) });
         } catch (cause) {
           return mutationFailure(c, cause, "PATCH /api/ai/clients/:clientId", "Failed to update AI client");
+        }
+      },
+    )
+    .post(
+      "/ai/clients/:clientId/test",
+      zValidator("param", updateAiClientParamSchema),
+      async (c) => {
+        try {
+          const { clientId } = c.req.valid("param");
+          return json(c, {
+            ok: true,
+            ...await engine.aiClients.testExisting({ clientId }),
+          });
+        } catch (cause) {
+          return mutationFailure(
+            c,
+            cause,
+            "POST /api/ai/clients/:clientId/test",
+            "Failed to test AI client",
+          );
         }
       },
     )

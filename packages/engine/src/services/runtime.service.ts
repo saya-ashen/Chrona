@@ -1,9 +1,9 @@
 import { getTaskOrchestrator, startTaskOrchestrator } from "../modules/orchestration";
-import { listExecutionRuntimes } from "../modules/execution-runtime";
 import { db } from "@/lib/db";
 import { AiFeatureDefinitionRegistry, startAiFeatureRecoveryWorker, type AiFeatureRecoveryWorker } from "../modules/ai";
 import { goalReviewFeature } from "../modules/goals/ai/goal.review";
 import { taskPlanGenerateFeature } from "../modules/plans/ai/task.plan.generate";
+import { manualCompletionFormReviewFeature } from "../modules/plan-execution/manual-completion-form-review";
 
 export type RuntimeReadiness = {
   status: "ready" | "not_ready";
@@ -15,11 +15,14 @@ export type RuntimeReadiness = {
 };
 
 export function createRuntimeService() {
-  const featureDefinitions = new AiFeatureDefinitionRegistry([goalReviewFeature, taskPlanGenerateFeature]);
+  const featureDefinitions = new AiFeatureDefinitionRegistry([
+    goalReviewFeature,
+    taskPlanGenerateFeature,
+    manualCompletionFormReviewFeature,
+  ]);
   let featureRecoveryWorker: AiFeatureRecoveryWorker | null = null;
   let featureRecoveryFailed = false;
   return {
-    listExecutionRuntimes: () => listExecutionRuntimes(),
     startTaskOrchestrator: () => startTaskOrchestrator(),
     stopTaskOrchestrator: () => getTaskOrchestrator().stop(),
     startAiFeatureRecoveryWorker() {

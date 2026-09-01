@@ -35,7 +35,7 @@ async function resetDb() {
 
 async function seedPlan() {
   const workspace = await db.workspace.create({
-    data: { name: "Plan Ops Test", status: "Active", defaultRuntime: "hermes" },
+    data: { name: "Plan Ops Test", status: "Active" },
   });
   const task = await db.task.create({
     data: {
@@ -43,7 +43,6 @@ async function seedPlan() {
       title: "Test flow graph task",
       status: "Ready",
       priority: "High",
-      executionRuntime: "hermes",
       executionConfig: {},
     },
   });
@@ -255,7 +254,7 @@ describe("plan mutation routes", () => {
 
   it("returns 404 when task has no persisted plan", async () => {
     const workspace = await db.workspace.create({
-      data: { name: "No Plan", status: "Active", defaultRuntime: "hermes" },
+      data: { name: "No Plan", status: "Active" },
     });
     const task = await db.task.create({
       data: {
@@ -263,7 +262,6 @@ describe("plan mutation routes", () => {
         title: "Task without plan",
         status: "Ready",
         priority: "Medium",
-        executionRuntime: "hermes",
         executionConfig: {},
       },
     });

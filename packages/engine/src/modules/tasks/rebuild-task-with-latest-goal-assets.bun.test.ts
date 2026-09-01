@@ -26,7 +26,7 @@ describe("rebuildTaskWithLatestGoalAssets", () => {
 
   it("atomically replaces a Goal Task with a fresh latest-version asset snapshot", async () => {
     const workspace = await db.workspace.create({
-      data: { name: "Rebuild task", status: "Active", defaultRuntime: "hermes" },
+      data: { name: "Rebuild task", status: "Active" },
     });
     const goal = await db.goal.create({
       data: {
@@ -40,7 +40,6 @@ describe("rebuildTaskWithLatestGoalAssets", () => {
       data: {
         workspaceId: workspace.id,
         title: "Asset source",
-        executionRuntime: "hermes",
         executionConfig: {},
         status: "Completed",
         priority: "Medium",
@@ -95,7 +94,6 @@ describe("rebuildTaskWithLatestGoalAssets", () => {
       title: "Use current knowledge",
       description: "Keep this definition",
       priority: "High",
-      executionRuntime: "hermes",
       goalContext: { expectedOutcome: "Current answer" },
     });
     await db.goalAssetVersion.create({
@@ -133,7 +131,7 @@ describe("rebuildTaskWithLatestGoalAssets", () => {
 
   it("rejects standalone Tasks without deleting them", async () => {
     const workspace = await db.workspace.create({
-      data: { name: "Standalone", status: "Active", defaultRuntime: "hermes" },
+      data: { name: "Standalone", status: "Active" },
     });
     const source = await createTask({ workspaceId: workspace.id, title: "Standalone" });
 

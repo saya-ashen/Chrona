@@ -1,6 +1,7 @@
 import type { AiFeature, AiJsonObject } from "@chrona/contracts";
 import {
 	supportsDurableFeatureRuntime,
+	supportsSafeTerminalOnlyFeatureRuntime,
 	type AgentProviderClient,
 	type ProviderRunEvent,
 	type ProviderRunRef,
@@ -26,7 +27,7 @@ function providerCapabilities(
 	return {
 		startRecovery: supportsDurableFeatureRuntime(capabilities)
 			? "durable_attach"
-			: capabilities.readOnlySingleAttempt === true
+			: supportsSafeTerminalOnlyFeatureRuntime(capabilities)
 				? "single_attempt_read_only"
 				: "unsupported",
 		actionInvocation: capabilities.actionInvocation ?? "unsupported",

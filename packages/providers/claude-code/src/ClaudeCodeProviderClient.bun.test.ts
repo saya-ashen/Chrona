@@ -175,6 +175,27 @@ describe("Claude Code normalizer — streamed tool inputs", () => {
       status: "pending",
     });
   });
+
+  test("removes the Claude MCP namespace from Chrona control tools", () => {
+    const events = mapClaudeCodeStreamItems([
+      {
+        type: "assistant",
+        message: {
+          content: [{
+            type: "tool_use",
+            id: "toolu_chrona_complete",
+            name: "mcp__chrona__chrona_node_complete",
+            input: { summary: "Done" },
+          }],
+        },
+      },
+    ], createNormalizerContext(), { cancelRequested: false });
+
+    expect(events.find((event) => event.type === "tool_call")).toMatchObject({
+      tool: "chrona_node_complete",
+      input: { summary: "Done" },
+    });
+  });
 });
 
 describe("ClaudeCodeProviderClient — tool round-trip", () => {

@@ -173,8 +173,8 @@ test.describe("Task list operations", () => {
 		const token = crypto.randomUUID();
 		const selected = `Bulk delete selected ${token}`;
 		const retained = `Bulk delete retained ${token}`;
-		await createTask(request, selected);
-		await createTask(request, retained);
+		const selectedTaskId = await createTask(request, selected);
+		const retainedTaskId = await createTask(request, retained);
 
 		await page.goto("/en/tasks");
 		await expectTaskHeadingVisible(page, selected);
@@ -184,7 +184,9 @@ test.describe("Task list operations", () => {
 			name: `Select ${retained}`,
 		});
 		await expect(retainedCheckbox).toBeVisible();
-		await retainedCheckbox.click({ force: true });
+		await expect(retainedCheckbox).toBeChecked();
+		await retainedCheckbox.press("Space");
+		await expect(retainedCheckbox).not.toBeChecked();
 		await expect(
 			page.getByRole("button", { name: /delete selected/i }),
 		).toBeEnabled();
@@ -193,6 +195,10 @@ test.describe("Task list operations", () => {
 			.getByRole("dialog")
 			.getByRole("button", { name: /delete/i })
 			.click();
+		await expect
+			.poll(async () => (await request.get(`/api/tasks/${selectedTaskId}`)).status())
+			.toBe(404);
+		expect((await request.get(`/api/tasks/${retainedTaskId}`)).status()).toBe(200);
 		await expect(taskHeading(page, selected)).toHaveCount(0);
 		await expect(taskHeading(page, retained)).toHaveCount(1);
 	});

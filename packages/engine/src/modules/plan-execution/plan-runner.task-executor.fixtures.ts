@@ -10,6 +10,7 @@ import type {
 import { db, TaskStatus } from "@chrona/db";
 import { saveCompiledPlan } from "./persistence/compiled-plan-store";
 import { runTaskNodeFeature } from "./runtime/node-ai-capabilities";
+import { aiClientRegistry } from "@/modules/ai";
 import type { NodeAiCapabilityInput } from "./runtime/node-ai-capabilities";
 import type { NodeExecutionResult } from "./node-executors/types";
 
@@ -44,6 +45,8 @@ export function setupPlanRunnerTaskExecutorTest() {
 }
 
 export async function resetDb() {
+  await db.aiFeatureRun.deleteMany();
+  await db.aiFeatureBinding.deleteMany();
   await db.taskAssistantMessage.deleteMany();
   await db.scheduleProposal.deleteMany();
   await db.toolInvocation.deleteMany();
@@ -71,7 +74,9 @@ export async function resetDb() {
   await db.taskDependency.deleteMany();
   await db.memory.deleteMany();
   await db.task.deleteMany();
+  await db.aiClient.deleteMany();
   await db.workspace.deleteMany();
+  await aiClientRegistry.refresh();
 }
 
 export async function seedWorkspaceAndTask(title: string) {
@@ -79,7 +84,6 @@ export async function seedWorkspaceAndTask(title: string) {
     data: {
       name: `${title} Workspace`,
       status: "Active",
-      defaultRuntime: "hermes",
     },
   });
 
@@ -89,7 +93,6 @@ export async function seedWorkspaceAndTask(title: string) {
       title,
       status: TaskStatus.Ready,
       priority: "Medium",
-      executionRuntime: "hermes",
       executionConfig: {},
     },
   });

@@ -14,7 +14,6 @@ export type CreateTaskFromScheduleInput = {
   autoExecute?: boolean;
   autoPlanGenerationTiming?: AutomationTimingPreset;
   autoExecuteTiming?: AutomationTimingPreset;
-  executionRuntime?: string;
   executionConfig?: Record<string, unknown>;
   aiClientId?: string | null;
   parentTaskId?: string | null;
@@ -35,7 +34,6 @@ function taskPayload(input: CreateTaskFromScheduleInput) {
     autoExecute: input.autoExecute,
     autoPlanGenerationTiming: input.autoPlanGenerationTiming,
     autoExecuteTiming: input.autoExecuteTiming,
-    executionRuntime: input.executionRuntime,
     executionConfig: input.executionConfig,
     aiClientId: input.aiClientId ?? null,
     parentTaskId: input.parentTaskId,
@@ -75,7 +73,6 @@ export function updateTaskConfigFromSchedule(input: {
   title?: string;
   description?: string | null;
   priority?: string;
-  executionRuntime?: string;
   executionConfig?: Record<string, unknown>;
   aiClientId?: string | null;
   autoPlanGeneration?: boolean;

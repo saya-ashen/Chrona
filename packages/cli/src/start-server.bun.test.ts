@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "bun:test";
-import { mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdtempSync, rmSync, statSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { getChronaDataDir, startChronaServer } from "./start-server";
@@ -43,8 +43,14 @@ describe("startChronaServer", () => {
       }, { host: "0.0.0.0", port: "4310", open: false });
 
       expect(booted).toBe(true);
+      // Packaged launch delegates the sole lock/migration ownership to startBunServer.
+      expect(existsSync(join(getChronaDataDir(), "chrona.db"))).toBe(false);
       expect(output).toContain("🚀 Starting Chrona on http://localhost:4310");
       expect(output).toContain("🔌 Chrona MCP: http://127.0.0.1:4310/api/mcp");
+      if (process.platform !== "win32") {
+        expect(statSync(getChronaDataDir()).mode & 0o777).toBe(0o700);
+        expect(statSync(join(process.env.CHRONA_CONFIG_DIR!, ".env")).mode & 0o777).toBe(0o600);
+      }
     } finally {
       console.log = originalLog;
       rmSync(directory, { recursive: true, force: true });

@@ -84,6 +84,17 @@ describe.skipIf(!HAS_CLAUDE)("ClaudeCodeProviderClient — live SDK", () => {
       terminalToolName: "fixture_echo",
     }));
 
+    const runStarted = events.find((event) => event.type === "run_started");
+    expect(runStarted?.type).toBe("run_started");
+    if (runStarted?.type === "run_started") {
+      for (const event of events) {
+        expect(event).toMatchObject({
+          provider: runStarted.run.provider,
+          runId: runStarted.run.runId,
+          sessionId: runStarted.run.sessionId,
+        });
+      }
+    }
     expect(events.map((event) => event.type)).toContain("tool_call");
     const call = events.find((event) => event.type === "tool_call");
     expect(call).toMatchObject({ tool: "mcp__run_tools__fixture_echo", input: { value: "protocol payload" } });

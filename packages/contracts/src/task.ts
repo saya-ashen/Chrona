@@ -25,8 +25,6 @@ export const TASK_KINDS = ["single", "recurring"] as const;
 
 export type TaskKind = (typeof TASK_KINDS)[number];
 
-export type ExecutionRuntime = string;
-
 export type TaskExecutionConfig = {
   prompt?: string;
   temperature?: number;
@@ -38,8 +36,7 @@ export type TaskExecutionConfig = {
   allowSubAgents?: boolean;
 };
 
-export type TaskRuntimeFields = {
-  executionRuntime: ExecutionRuntime;
+export type TaskExecutionFields = {
   executionConfig: TaskExecutionConfig;
 };
 
@@ -64,7 +61,7 @@ export type TaskCore = {
 };
 
 export type TaskReadModel = TaskCore &
-  TaskRuntimeFields &
+  TaskExecutionFields &
   TaskScheduleFields & {
     isRunnable: boolean;
     runnabilitySummary: string;
@@ -87,7 +84,7 @@ export type CreateTaskInput = {
   recurrenceRule?: string | null;
   recurrenceAnchorStartAt?: string | null;
   recurrenceAnchorEndAt?: string | null;
-} & Partial<TaskRuntimeFields>;
+} & Partial<TaskExecutionFields>;
 
 export type UpdateTaskInput = {
   taskId: string;
@@ -103,4 +100,4 @@ export type UpdateTaskInput = {
   recurrenceRule?: string | null;
   recurrenceAnchorStartAt?: string | null;
   recurrenceAnchorEndAt?: string | null;
-} & Partial<TaskRuntimeFields>;
+} & Partial<TaskExecutionFields>;

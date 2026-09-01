@@ -5,7 +5,6 @@ export { TaskConfigForm } from "./task-config-form-component";
 export type {
   TaskConfigAiClient,
   TaskConfigDraftState,
-  TaskConfigExecutionRuntime,
   TaskConfigFormDraft,
   TaskConfigFormInput,
   TaskConfigFormProps,

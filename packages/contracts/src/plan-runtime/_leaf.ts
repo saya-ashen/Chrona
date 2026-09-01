@@ -77,6 +77,7 @@ export type ExecutionCheckpointKind =
   | "approval"
   | "review"
   | "replan_required"
+  | "manual_completion"
   | "blocked"
   | "failed"
   | "manual_recovery"
@@ -105,6 +106,9 @@ export interface CheckpointForm {
   instructions: string;
   submitLabel?: string;
   inputFields: CheckpointFormField[];
+  revision?: string;
+  source?: "plan" | "runtime_ai";
+  validated?: boolean;
 }
 
 export interface CheckpointAction {

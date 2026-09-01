@@ -5,6 +5,8 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 import { buildArtifacts, buildTargets, parseBuildTarget, type BuildTargetName } from "./manifest";
+import { assertElfInterpreterFile } from "./portable-elf";
+import { smokePackagedUpgrade } from "../scripts/release-upgrade-smoke";
 
 const ROOT = resolve(import.meta.dirname, "..");
 const RUNTIME_TIMEOUT_MS = 20_000;
@@ -32,9 +34,9 @@ async function assertExecutable(path: string) {
   }
 }
 
-function releasePaths(target: BuildTargetName) {
+function releasePaths(target: BuildTargetName, releaseRoot = resolve(ROOT, "dist", "releases")) {
   const manifestTarget = buildTargets[target];
-  const releaseDir = resolve(ROOT, "dist", "releases", manifestTarget.releaseName);
+  const releaseDir = resolve(releaseRoot, manifestTarget.releaseName);
   return {
     manifestTarget,
     releaseDir,
@@ -47,6 +49,21 @@ async function freePort() {
   const port = server.port;
   server.stop(true);
   return port;
+}
+
+export function releaseSmokeEnvironment(
+  dataDir: string,
+  configDir: string,
+  inheritedEnvironment: NodeJS.ProcessEnv = process.env,
+): NodeJS.ProcessEnv {
+  return {
+    ...inheritedEnvironment,
+    CHRONA_DATA_DIR: dataDir,
+    CHRONA_CONFIG_DIR: configDir,
+    DATABASE_URL: `file:${join(dataDir, "chrona.db")}`,
+    CHRONA_NO_OPEN: "1",
+    CHRONA_EXPERIMENTAL_DASHBOARD_AI_SUMMARY: "0",
+  };
 }
 
 async function waitForJson(url: string, label: string) {
@@ -92,13 +109,7 @@ async function assertRuntimeStarts(binaryPath: string) {
 
   const proc = Bun.spawn([binaryPath, "start", "--host", "127.0.0.1", "--port", String(port), "--no-open"], {
     cwd: ROOT,
-    env: {
-      ...process.env,
-      CHRONA_DATA_DIR: dataDir,
-      CHRONA_CONFIG_DIR: configDir,
-      CHRONA_NO_OPEN: "1",
-      CHRONA_EXPERIMENTAL_DASHBOARD_AI_SUMMARY: "0",
-    },
+    env: releaseSmokeEnvironment(dataDir, configDir),
     stdout: "pipe",
     stderr: "pipe",
   });
@@ -118,7 +129,10 @@ async function assertRuntimeStarts(binaryPath: string) {
     proc.kill();
     await proc.exited.catch(() => undefined);
     const [stdout, stderr] = await Promise.all([new Response(proc.stdout).text(), new Response(proc.stderr).text()]);
-    throw new Error(`Runtime smoke failed: ${error instanceof Error ? error.message : String(error)}\nstdout:\n${stdout}\nstderr:\n${stderr}`);
+    throw new Error(
+      `Runtime smoke failed: ${error instanceof Error ? error.message : String(error)}\nstdout:\n${stdout}\nstderr:\n${stderr}`,
+      { cause: error },
+    );
   } finally {
     proc.kill();
     await proc.exited.catch(() => undefined);
@@ -128,15 +142,19 @@ async function assertRuntimeStarts(binaryPath: string) {
 
 export type SmokeReleaseOptions = {
   pluginSource?: string;
+  releaseRoot?: string;
   runtime?: boolean;
 };
 
 export async function smokeRelease(target: BuildTargetName, options: SmokeReleaseOptions = {}) {
-  const { manifestTarget, releaseDir, binaryPath } = releasePaths(target);
+  const { manifestTarget, releaseDir, binaryPath } = releasePaths(target, options.releaseRoot);
 
   await assertExists(binaryPath, "Binary");
   if (manifestTarget.executable) {
     await assertExecutable(binaryPath);
+  }
+  if ("linuxInterpreter" in manifestTarget) {
+    await assertElfInterpreterFile(binaryPath, manifestTarget.linuxInterpreter);
   }
 
   await assertExists(resolve(releaseDir, buildArtifacts.resourcesRoot, buildArtifacts.webDist, "index.html"), "Web index");
@@ -164,6 +182,7 @@ export async function smokeRelease(target: BuildTargetName, options: SmokeReleas
 
   if (options.runtime !== false) {
     await assertRuntimeStarts(binaryPath);
+    await smokePackagedUpgrade(target);
   }
 
   console.log(`✓ Release smoke passed for ${target}`);

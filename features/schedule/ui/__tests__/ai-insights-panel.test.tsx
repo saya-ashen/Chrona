@@ -39,7 +39,6 @@ const mockItem: ScheduledItem = {
 	latestRunStatus: null,
 	scheduleProposalCount: 0,
 	lastActivityAt: null,
-	executionRuntime: "hermes",
 	executionConfig: {},
 	autoPlanGeneration: false,
 	autoExecute: false,

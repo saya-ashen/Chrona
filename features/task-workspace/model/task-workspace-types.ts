@@ -7,17 +7,13 @@ import type {
   TaskPlanReadModel,
   TaskWorkspaceUpdateProposal,
 } from "@chrona/contracts";
-import type { RuntimeTaskConfigSpec } from "@chrona/runtime-core";
 import type { UiDocument } from "@chrona/ui-protocol";
 import type { PlanNodeDataModel, TaskPlanGraphPlan } from "./plan-node-view-model";
 
-export type TaskConfigExecutionRuntime = {
-  key: string;
-  label: string;
-  spec: RuntimeTaskConfigSpec;
-};
-
-export type TaskConfigAiClient = Pick<AiClientRecord, "id" | "name" | "enabled">;
+export type TaskConfigAiClient = Pick<
+  AiClientRecord,
+  "id" | "name" | "type" | "isDefault" | "enabled"
+>;
 
 
 export type TaskPlanGenerationStatus = "idle" | "generating" | "waiting_acceptance" | "accepted";
@@ -41,7 +37,6 @@ export type TaskData = {
   };
   title: string;
   description: string | null;
-  executionRuntime: string;
   executionConfig: unknown;
   aiClientId?: string | null;
   autoPlanGeneration: boolean;
@@ -106,8 +101,6 @@ export type TaskData = {
 };
 
 export type TaskPageData = {
-  defaultExecutionRuntime: string;
-  executionRuntimes: TaskConfigExecutionRuntime[];
   availableAiClients?: TaskConfigAiClient[];
   task: TaskData;
   reconciliation?: ReconciliationResult | null;
@@ -164,10 +157,10 @@ export type TaskPageData = {
 };
 
 export type TaskWorkspaceBootstrapData = Omit<TaskPageData,
-  "defaultExecutionRuntime" | "executionRuntimes" | "latestRunSummary" | "scheduleProposals" | "approvals" | "artifacts" | "activityTimeline" | "commandCenter" | "header"
+  "availableAiClients" | "latestRunSummary" | "scheduleProposals" | "approvals" | "artifacts" | "activityTimeline" | "commandCenter" | "header"
 >;
 
-export type TaskWorkspaceRuntimeContextData = Pick<TaskPageData, "defaultExecutionRuntime" | "executionRuntimes" | "availableAiClients">;
+export type TaskWorkspaceRuntimeContextData = Pick<TaskPageData, "availableAiClients">;
 
 export type TaskWorkspaceReviewContextData = Pick<TaskPageData, "latestRunSummary" | "resultReview" | "scheduleProposals" | "approvals" | "artifacts">;
 
@@ -183,7 +176,6 @@ export type EditableTask = {
   scheduledStartAt: string | null;
   scheduledEndAt: string | null;
   scheduleStatus: string;
-  executionRuntime: string;
   executionConfig: unknown;
   aiClientId: string | null;
   autoPlanGeneration: boolean;

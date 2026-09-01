@@ -15,8 +15,6 @@ import {
 } from "./date";
 
 function deriveLocalRunnability(input: {
-  executionRuntime?: string | null;
-  executionConfig?: unknown;
   hasAcceptedPlan: boolean;
 }) {
   if (!input.hasAcceptedPlan) {
@@ -96,7 +94,6 @@ export function createScheduledItemFromQueueItem(
     scheduleProposalCount: item.scheduleProposalCount,
     lastActivityAt: item.lastActivityAt,
     description: item.description,
-    executionRuntime: item.executionRuntime,
     executionConfig: item.executionConfig,
     autoPlanGeneration: item.autoPlanGeneration,
     autoExecute: item.autoExecute,
@@ -132,7 +129,6 @@ export function createScheduledItemFromCreateInput(
     latestRunStatus: null,
     scheduleProposalCount: 0,
     lastActivityAt: new Date(),
-    executionRuntime: input.executionRuntime,
     executionConfig: input.executionConfig,
     autoPlanGeneration: input.autoExecute || input.autoPlanGenerationEnabled,
     autoExecute: input.autoExecute,
@@ -174,11 +170,7 @@ export function applyTaskConfigToItem<
   T extends ScheduledItem | UnscheduledItem | ListItem | ScheduleRecord,
 >(item: T, input: TaskConfigFormInput): T {
   const hasAcceptedPlan = hasAcceptedSavedPlan(item);
-  const runnability = deriveLocalRunnability({
-    executionRuntime: input.executionRuntime,
-    executionConfig: input.executionConfig,
-    hasAcceptedPlan,
-  });
+  const runnability = deriveLocalRunnability({ hasAcceptedPlan });
 
   return {
     ...item,
@@ -188,7 +180,6 @@ export function applyTaskConfigToItem<
     dueAt: input.dueAt,
     scheduledStartAt: input.scheduledStartAt,
     scheduledEndAt: input.scheduledEndAt,
-    executionRuntime: input.executionRuntime,
     executionConfig: input.executionConfig,
     aiClientId: input.aiClientId,
     autoPlanGeneration: input.autoPlanGeneration,
@@ -210,7 +201,6 @@ export function toTaskConfigInitialValues(item: {
   title: string;
   description?: string | null;
   priority: string;
-  executionRuntime?: string | null;
   executionConfig?: unknown;
   aiClientId?: string | null;
   dueAt?: Date | null;
@@ -225,7 +215,6 @@ export function toTaskConfigInitialValues(item: {
     priority: item.priority as TaskConfigFormInput["priority"],
     scheduledStartAt: item.scheduledStartAt ?? null,
     scheduledEndAt: item.scheduledEndAt ?? null,
-    executionRuntime: item.executionRuntime ?? null,
     executionConfig: item.executionConfig,
     aiClientId: item.aiClientId ?? null,
     dueAt: item.dueAt ?? null,

@@ -67,7 +67,7 @@ export interface SeedWorkspaceResult {
 
 export async function seedWorkspace(name?: string): Promise<SeedWorkspaceResult> {
   const workspace = await db.workspace.create({
-    data: { name: name ?? "Test Workspace", status: "Active", defaultRuntime: "hermes" },
+    data: { name: name ?? "Test Workspace", status: "Active" },
   });
   return { workspaceId: workspace.id };
 }
@@ -95,7 +95,6 @@ export async function seedTask(
       priority: overrides?.priority ?? "Medium",
       parentTaskId: overrides?.parentTaskId ?? null,
       dueAt: overrides?.dueAt ?? null,
-      executionRuntime: "hermes",
       executionConfig: {},
     },
   });

@@ -77,17 +77,16 @@ function seedRestartState() {
 	const runId = "restart-run";
 	db.exec("PRAGMA foreign_keys = ON");
 	db.query(
-		"INSERT INTO Workspace (id, name, status, defaultRuntime, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)",
-	).run(workspaceId, "Restart workspace", "Active", "debug", now, now);
+		"INSERT INTO Workspace (id, name, status, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?)",
+	).run(workspaceId, "Restart workspace", "Active", now, now);
 	db.query(
-		"INSERT INTO Task (id, workspaceId, title, status, priority, executionRuntime, executionConfig, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		"INSERT INTO Task (id, workspaceId, title, status, priority, executionConfig, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
 	).run(
 		taskId,
 		workspaceId,
 		"Waiting across restart",
 		"Running",
 		"High",
-		"debug",
 		"{}",
 		now,
 		now,
@@ -106,9 +105,10 @@ function seedRestartState() {
 		now,
 	);
 	db.query(
-		"INSERT INTO TaskPlanRun (id, workspaceId, taskId, planId, planRun, executionOwnerId, executionEpoch, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+		"INSERT INTO TaskPlanRun (id, executionScopeId, workspaceId, taskId, planId, planRun, executionOwnerId, executionEpoch, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
 	).run(
 		"restart-plan-run",
+		"restart-execution-scope",
 		workspaceId,
 		taskId,
 		"restart-plan",

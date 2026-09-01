@@ -6,7 +6,7 @@ import {
 	resetAgentToolMutationFlightsForTest,
 } from "./operations";
 
-function service() {
+function service(taskPage?: unknown) {
 	const calls = {
 		planPatch: 0,
 		taskUpdate: 0,
@@ -28,7 +28,7 @@ function service() {
 				return { task: { ...task, title: "Updated" } };
 			},
 			delete: async () => ({}),
-			getPage: async () => ({ task }),
+			getPage: async () => taskPage ?? ({ task }),
 			list: async () => ({ tasks: [task] }),
 		},
 		goals: {
@@ -164,7 +164,6 @@ async function seedTerminalToolCapability() {
 			id: "workspace-1",
 			name: "Terminal tool workspace",
 			status: "Active",
-			defaultRuntime: "hermes",
 		},
 	});
 	await db.task.create({
@@ -174,7 +173,6 @@ async function seedTerminalToolCapability() {
 			title: "Build MCP tools",
 			status: "Running",
 			priority: "High",
-			executionRuntime: "hermes",
 			executionConfig: {},
 		},
 	});
@@ -284,7 +282,6 @@ async function seedNodeToolAuditFixture() {
 			id: "workspace-audit",
 			name: "Audit Workspace",
 			status: "Active",
-			defaultRuntime: "hermes",
 		},
 	});
 	const task = await db.task.create({
@@ -294,7 +291,6 @@ async function seedNodeToolAuditFixture() {
 			title: "Audit task",
 			status: "Ready",
 			priority: "Medium",
-			executionRuntime: "hermes",
 			executionConfig: {},
 		},
 	});
@@ -389,6 +385,25 @@ describe("agent tool operations service", () => {
 
 		await expect(
 			service().execute({
+				toolName: "chrona.node.read",
+				input: {
+					workspaceId: "workspace-1",
+					taskId: "task-1",
+					actorType: "agent",
+					payload: {},
+				},
+			}),
+		).resolves.toMatchObject({
+			status: "accepted",
+			state: {
+				result: {
+					task: { title: "Build MCP tools", status: "Ready" },
+				},
+			},
+		});
+
+		await expect(
+			service().execute({
 				toolName: "chrona.goal.results.read",
 				input: {
 					workspaceId: "workspace-1",
@@ -440,12 +455,99 @@ describe("agent tool operations service", () => {
 		});
 	});
 
+	it("[RUN-003] recovers a completed node's bounded semantic result through the real read-tool wrapper", async () => {
+		const completedNode = {
+			id: "backend-node-1",
+			nodeId: "backend-node-1",
+			semanticKey: "menu",
+			invalidated: false,
+			localId: "menu",
+			type: "task",
+			title: "Prepare menu",
+			config: {},
+			dependencies: [],
+			dependents: [],
+			status: "completed",
+			attempts: 1,
+			dependenciesSatisfied: true,
+			ready: false,
+			reachable: true,
+			result: {
+				outputSummary: "Menu prepared",
+				findings: [
+					{
+						key: "dinner.menu",
+						content: "Four cans of chickpeas for six guests.",
+					},
+				],
+			},
+		};
+		const effectivePlan = {
+			graphId: "backend-graph",
+			basePlanId: "backend-plan",
+			resolvedAt: "2026-08-20T00:00:00.000Z",
+			resolvedVersion: 1,
+			nodes: [completedNode],
+			edges: [],
+			entryNodeIds: [completedNode.id],
+			terminalNodeIds: [completedNode.id],
+			readyNodeIds: [],
+			blockedNodeIds: [],
+			waitingNodeIds: [],
+			waitingForUserNodeIds: [],
+			waitingForApprovalNodeIds: [],
+			degradedNodeIds: [],
+			skippedNodeIds: [],
+			cancelledNodeIds: [],
+			completedNodeIds: [completedNode.id],
+			runningNodeIds: [],
+			invalidatedNodeIds: [],
+			failedNodeIds: [],
+			pendingNodeIds: [],
+		};
+		const agentTools = service({
+			task: {
+				id: "task-1",
+				title: "Dinner",
+				status: "Running",
+				priority: "Medium",
+				savedPlan: {
+					status: "accepted",
+					revision: 1,
+					effectivePlan,
+				},
+			},
+		});
+
+		const result = await agentTools.execute({
+			toolName: "chrona.node.read",
+			input: {
+				workspaceId: "workspace-1",
+				taskId: "task-1",
+				actorType: "agent",
+				payload: { ref: "N20260820-01" },
+			},
+		});
+		const content = (
+			result.state.result as { result: { content: string } }
+		).result.content;
+		expect(JSON.parse(content)).toMatchObject({
+			summary: "Menu prepared",
+			findings: [
+				{
+					key: "dinner.menu",
+					content: "Four cans of chickpeas for six guests.",
+				},
+			],
+		});
+		expect(JSON.stringify(result)).not.toContain("backend-node-1");
+	});
+
 	it("resolves Hermes-injected sessionId to task and workspace context", async () => {
 		const workspace = await db.workspace.create({
 			data: {
 				name: "MCP Session Workspace",
 				status: "Active",
-				defaultRuntime: "hermes",
 			},
 		});
 		const task = await db.task.create({
@@ -454,7 +556,6 @@ describe("agent tool operations service", () => {
 				title: "Session mapped task",
 				status: "Ready",
 				priority: "Medium",
-				executionRuntime: "hermes",
 				executionConfig: {},
 			},
 		});
@@ -497,7 +598,6 @@ describe("agent tool operations service", () => {
 			data: {
 				name: "Runtime Ref Workspace",
 				status: "Active",
-				defaultRuntime: "hermes",
 			},
 		});
 		const task = await db.task.create({
@@ -506,7 +606,6 @@ describe("agent tool operations service", () => {
 				title: "Runtime mapped task",
 				status: "Ready",
 				priority: "Medium",
-				executionRuntime: "hermes",
 				executionConfig: {},
 			},
 		});
@@ -538,7 +637,6 @@ describe("agent tool operations service", () => {
 			data: {
 				name: "Default MCP Workspace",
 				status: "Active",
-				defaultRuntime: "hermes",
 			},
 		});
 
@@ -824,7 +922,6 @@ describe("agent tool operations service", () => {
 				id: "workspace-capability",
 				name: "Capability Workspace",
 				status: "Active",
-				defaultRuntime: "hermes",
 			},
 		});
 		const task = await db.task.create({
@@ -834,7 +931,6 @@ describe("agent tool operations service", () => {
 				title: "Capability task",
 				status: "Running",
 				priority: "Medium",
-				executionRuntime: "hermes",
 				executionConfig: {},
 			},
 		});
@@ -935,7 +1031,6 @@ describe("agent tool operations service", () => {
 				id: "workspace-replay",
 				name: "Replay Workspace",
 				status: "Active",
-				defaultRuntime: "hermes",
 			},
 		});
 		const task = await db.task.create({
@@ -945,7 +1040,6 @@ describe("agent tool operations service", () => {
 				title: "Replay task",
 				status: "Running",
 				priority: "Medium",
-				executionRuntime: "hermes",
 				executionConfig: {},
 			},
 		});
@@ -1021,7 +1115,6 @@ describe("agent tool operations service", () => {
 				id: "workspace-stuck",
 				name: "Stuck Workspace",
 				status: "Active",
-				defaultRuntime: "hermes",
 			},
 		});
 		const task = await db.task.create({
@@ -1031,7 +1124,6 @@ describe("agent tool operations service", () => {
 				title: "Stuck task",
 				status: "Running",
 				priority: "Medium",
-				executionRuntime: "hermes",
 				executionConfig: {},
 			},
 		});

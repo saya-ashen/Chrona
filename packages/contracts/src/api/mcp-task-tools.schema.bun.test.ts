@@ -79,6 +79,27 @@ describe("result submission contracts", () => {
   });
 });
 
+describe("Node result read contract", () => {
+  it("accepts only AI-visible node refs and bounded pagination", () => {
+    expect(parseChronaToolPayload("chrona.node.read", {
+      ref: "N20260820-01",
+      offset: 12_000,
+      maxChars: 4_000,
+    })).toEqual({ ref: "N20260820-01", offset: 12_000, maxChars: 4_000 });
+    expect(parseChronaToolPayload("chrona.node.read", {})).toEqual({
+      offset: 0,
+      maxChars: 12_000,
+    });
+    expect(() => parseChronaToolPayload("chrona.node.read", {
+      ref: "backend-node-id",
+    })).toThrow();
+    expect(() => parseChronaToolPayload("chrona.node.read", {
+      ref: "N20260820-01",
+      maxChars: 12_001,
+    })).toThrow();
+  });
+});
+
 describe("Goal result read contract", () => {
   it("accepts an opaque exact ref and rejects backend identities", () => {
     expect(parseChronaToolPayload("chrona.goal.results.read", {

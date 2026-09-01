@@ -5,6 +5,7 @@ import { dirname, resolve } from "node:path";
 import { Database } from "bun:sqlite";
 
 import { ensureSqliteDatabase } from "@chrona/db/sqlite-migrations";
+import { acquireSqliteRuntimeLock } from "@chrona/db/sqlite-runtime-lock";
 
 const args = process.argv.slice(2);
 const reset = args.includes("--reset");
@@ -18,26 +19,36 @@ if (!dbArg) {
 }
 
 const dbPath = resolve(dbArg);
+const databaseUrl = `file:${dbPath}`;
 const templatePath = templateArg ? resolve(templateArg) : undefined;
 const migrationsDir = resolve(dirname(import.meta.dirname), "prisma", "migrations");
 
-if (reset && existsSync(dbPath)) {
-  rmSync(dbPath, { force: true });
-}
+initializeDatabase();
 
-if (templatePath && existsSync(templatePath)) {
-  mkdirSync(dirname(dbPath), { recursive: true });
-  if (templateHasCurrentSchema(templatePath)) {
-    copyFileSync(templatePath, dbPath);
-    process.exit(0);
+function initializeDatabase(): void {
+  const lock = acquireSqliteRuntimeLock(databaseUrl);
+  try {
+    if (reset && existsSync(dbPath)) {
+      rmSync(dbPath, { force: true });
+    }
+
+    if (templatePath && existsSync(templatePath)) {
+      mkdirSync(dirname(dbPath), { recursive: true });
+      if (templateHasCurrentSchema(templatePath)) {
+        copyFileSync(templatePath, dbPath);
+        return;
+      }
+    }
+
+    ensureSqliteDatabase({
+      databaseUrl,
+      migrationsDir,
+      reset,
+    });
+  } finally {
+    lock.release();
   }
 }
-
-ensureSqliteDatabase({
-  databaseUrl: `file:${dbPath}`,
-  migrationsDir,
-  reset,
-});
 
 function templateHasCurrentSchema(path: string): boolean {
   try {

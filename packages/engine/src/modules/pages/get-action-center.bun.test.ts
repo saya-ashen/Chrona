@@ -34,7 +34,6 @@ async function seedTask(
       title,
       status: status as never,
       priority: "Medium",
-      executionRuntime: "hermes",
       executionConfig: {},
       ...extra,
     },
@@ -71,7 +70,6 @@ describe("getActionCenter actionable states", () => {
       data: {
         name: "Action Center WS",
         status: "Active",
-        defaultRuntime: "hermes",
       },
     });
 
@@ -201,7 +199,6 @@ describe("getActionCenter actionable states", () => {
       data: {
         name: "Action Center plan-run approval",
         status: "Active",
-        defaultRuntime: "hermes",
       },
     });
     const task = await seedTask(
@@ -263,12 +260,54 @@ describe("getActionCenter actionable states", () => {
     });
   });
 
+  it("surfaces a completed graph result when no legacy Run row exists", async () => {
+    const workspace = await db.workspace.create({
+      data: { name: "Action Center graph result", status: "Active" },
+    });
+    const task = await seedTask(workspace.id, "Graph-only completed task", "Completed");
+    const planId = "plan-action-center-graph-result";
+    await db.taskPlan.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        planId,
+        revision: 1,
+        status: "Accepted",
+        compiledPlan: {},
+      },
+    });
+    const planRun = await db.taskPlanRun.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        planId,
+        planRun: {
+          planRun: { status: "completed" },
+          mutableGraph: {
+            planOutput: {
+              finalization: { status: "Ready" },
+            },
+          },
+        },
+      },
+    });
+
+    const taskItems = (await getActionCenter(workspace.id)).filter(
+      (item) => item.sourceTaskId === task.id,
+    );
+    expect(taskItems).toHaveLength(1);
+    expect(taskItems[0]).toMatchObject({
+      id: `execution-completed:${planRun.id}`,
+      kind: "execution_completed",
+      currentRunLabel: planRun.id,
+    });
+  });
+
   it("does not resurrect waiting plan-run actions for Completed, Done, or Cancelled tasks", async () => {
     const workspace = await db.workspace.create({
       data: {
         name: "Action Center closed task plan runs",
         status: "Active",
-        defaultRuntime: "hermes",
       },
     });
 
@@ -343,7 +382,6 @@ describe("getActionCenter actionable states", () => {
       data: {
         name: "Action Center dedup WS",
         status: "Active",
-        defaultRuntime: "hermes",
       },
     });
 
@@ -407,7 +445,6 @@ describe("getActionCenter actionable states", () => {
       data: {
         name: "Action Center recurring scopes",
         status: "Active",
-        defaultRuntime: "hermes",
       },
     });
     const task = await seedTask(workspace.id, "Recurring task", "Blocked", {
@@ -538,7 +575,6 @@ describe("getActionCenter actionable states", () => {
       data: {
         name: "Action Center fallback WS",
         status: "Active",
-        defaultRuntime: "hermes",
       },
     });
 
@@ -553,6 +589,127 @@ describe("getActionCenter actionable states", () => {
     expect(blocked?.summary).toBeTruthy();
   });
 
+  it("removes a completed-result review item after the latest result is accepted", async () => {
+    const workspace = await db.workspace.create({
+      data: { name: "Accepted result Action Center", status: "Active" },
+    });
+    const task = await seedTask(
+      workspace.id,
+      "Accepted result task",
+      "Completed",
+    );
+    const run = await seedRun(task.id, "Completed", {
+      runtimeRunRef: "accepted-result-run",
+      endedAt: new Date(),
+      updatedAt: new Date(),
+    });
+    await db.task.update({
+      where: { id: task.id },
+      data: { latestRunId: run.id },
+    });
+
+    expect(
+      (await getActionCenter(workspace.id)).some(
+        (item) =>
+          item.sourceTaskId === task.id && item.kind === "execution_completed",
+      ),
+    ).toBe(true);
+
+    await db.event.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        runId: run.id,
+        eventType: "task.result_accepted",
+        actorType: "user",
+        source: "ui",
+        payload: { accepted_run_id: run.id },
+        ingestSequence: 1,
+      },
+    });
+
+    expect(
+      (await getActionCenter(workspace.id)).some(
+        (item) =>
+          item.sourceTaskId === task.id && item.kind === "execution_completed",
+      ),
+    ).toBe(false);
+  });
+
+  it("removes a node-run review item when the canonical plan result is accepted", async () => {
+    const workspace = await db.workspace.create({
+      data: { name: "Accepted plan result Action Center", status: "Active" },
+    });
+    const task = await seedTask(
+      workspace.id,
+      "Accepted plan result task",
+      "Completed",
+    );
+    const nodeRun = await seedRun(task.id, "Completed", {
+      runtimeRunRef: "accepted-node-run",
+      endedAt: new Date(Date.now() - 60_000),
+      updatedAt: new Date(Date.now() - 60_000),
+    });
+    await db.task.update({
+      where: { id: task.id },
+      data: { latestRunId: nodeRun.id },
+    });
+    const planId = "plan-action-center-accepted-result";
+    await db.taskPlan.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        planId,
+        revision: 1,
+        status: "Accepted",
+        compiledPlan: {},
+      },
+    });
+    const planRun = await db.taskPlanRun.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        planId,
+        planRun: {
+          planRun: { status: "completed" },
+          mutableGraph: {
+            planOutput: { finalization: { status: "Ready" } },
+          },
+        },
+      },
+    });
+    const planExecutionRun = await seedRun(task.id, "Completed", {
+      id: `plan_execution_${planRun.id}`,
+      runtimeName: "chrona-plan",
+      runtimeRunRef: `chrona-plan:${planRun.id}`,
+      endedAt: new Date(),
+    });
+
+    await db.event.create({
+      data: {
+        workspaceId: workspace.id,
+        taskId: task.id,
+        runId: planExecutionRun.id,
+        planRunId: planRun.id,
+        eventType: "task.result_accepted",
+        actorType: "user",
+        source: "ui",
+        payload: {
+          accepted_run_id: planExecutionRun.id,
+          accepted_plan_run_id: planRun.id,
+        },
+        ingestSequence: 1,
+      },
+    });
+
+    expect(
+      (await getActionCenter(workspace.id)).some(
+        (item) =>
+          item.sourceTaskId === task.id && item.kind === "execution_completed",
+      ),
+    ).toBe(false);
+  });
+
   it("emits bounded notification items for due tasks, scheduler events, completed runs, and info timeline", async () => {
     const now = new Date();
     const minutesFromNow = (minutes: number) =>
@@ -561,7 +718,6 @@ describe("getActionCenter actionable states", () => {
       data: {
         name: "Action Center notification WS",
         status: "Active",
-        defaultRuntime: "hermes",
       },
     });
 

@@ -34,6 +34,8 @@ async function resetDb() {
   await db.taskDependency.deleteMany();
   await db.memory.deleteMany();
   await db.task.deleteMany();
+  await db.aiFeatureBinding.deleteMany();
+  await db.aiClient.deleteMany();
   await db.workspace.deleteMany();
 }
 
@@ -42,7 +44,6 @@ async function createWorkspace() {
     data: {
       name: "Auto Start Workspace",
       status: "Active",
-      defaultRuntime: "hermes",
     },
   });
 }
@@ -71,7 +72,6 @@ async function createDueTask(
       status: "Ready",
       priority: "High",
       autoExecute: true,
-      executionRuntime: "hermes",
       executionConfig: { prompt: "Run task", sessionStrategy: "per_subtask" },
       ...taskOverrides,
     },
@@ -121,6 +121,15 @@ describe("auto-start-scheduled-plan", () => {
   beforeEach(async () => {
     startMock.mockReset();
     await resetDb();
+    await db.aiClient.create({
+      data: {
+        name: "Debug provider",
+        type: "debug",
+        config: {},
+        isDefault: true,
+        enabled: true,
+      },
+    });
   });
 
   afterAll(async () => {
@@ -143,11 +152,10 @@ describe("auto-start-scheduled-plan", () => {
     expect(startMock).not.toHaveBeenCalled();
   });
 
-  it("skips due auto-execute tasks without runtime config", async () => {
+  it("skips due auto-execute tasks without an AI provider", async () => {
+    await db.aiClient.deleteMany();
     const workspace = await createWorkspace();
-    const { task } = await createDueTask(workspace.id, {
-      executionRuntime: "",
-    });
+    const { task } = await createDueTask(workspace.id, {});
 
     const result = await autoStartScheduledPlanTasks({ now: new Date() });
 
@@ -155,7 +163,8 @@ describe("auto-start-scheduled-plan", () => {
     expect(result.skipped).toHaveLength(1);
     expect(result.skipped[0]).toMatchObject({
       taskId: task.id,
-      reason: "Choose an execution runtime before automatic execution can start.",
+      reasonCode: "no_provider_config",
+      reason: "Connect an AI before enabling automation.",
     });
     expect(startMock).not.toHaveBeenCalled();
   });
@@ -599,7 +608,6 @@ describe("auto-start-scheduled-plan", () => {
       title: "Scheduled from create flow",
       priority: "High",
       autoExecute: true,
-      executionRuntime: "hermes",
       executionConfig: { prompt: "Run task", sessionStrategy: "per_subtask" },
     });
 
@@ -673,7 +681,6 @@ describe("auto-start-scheduled-plan", () => {
         title: "No work block task",
         status: "Ready",
         priority: "Medium",
-        executionRuntime: "hermes",
         executionConfig: { prompt: "Run", sessionStrategy: "per_subtask" },
       },
     });
@@ -692,7 +699,6 @@ describe("auto-start-scheduled-plan", () => {
         title: "Running task",
         status: "Running",
         priority: "High",
-        executionRuntime: "hermes",
         executionConfig: { prompt: "Run", sessionStrategy: "per_subtask" },
       },
     });

@@ -1,6 +1,6 @@
 import type { WorkStateView } from "@chrona/domain";
 import type { ScheduleTaskListItem } from "./schedule-task-list";
-import type { TaskConfigAiClient, TaskConfigExecutionRuntime } from "./forms/task-config-form";
+import type { TaskConfigAiClient } from "./forms/task-config-form";
 import type { TaskPlanReadModel } from "@chrona/contracts"
 import type { AutomationTimingPreset } from "@chrona/contracts";
 
@@ -48,9 +48,8 @@ type ScheduleAutomationCandidate = {
   readyNodeIds?: string[];
 };
 
-type ScheduleRuntimeFields = {
+type ScheduleExecutionFields = {
   parentTaskId: string | null;
-  executionRuntime: string;
   executionConfig: unknown;
   isRunnable: boolean;
   runnabilityState: string;
@@ -96,7 +95,6 @@ export type ScheduleRecord = {
   autoExecuteTiming: string;
   aiClientName?: string | null;
   aiClientId?: string | null;
-  executionRuntimeLabel?: string | null;
   sourceManaged?: {
     source: "external_calendar";
     eventId: string;
@@ -110,7 +108,7 @@ export type ScheduleRecord = {
   autoStartEligible?: boolean;
   autoStartReason?: string | null;
   stateView?: WorkStateView;
-} & ScheduleRuntimeFields;
+} & ScheduleExecutionFields;
 
 type ScheduleProposal = {
   proposalId: string;
@@ -139,8 +137,6 @@ type WorkBlockInfo = {
 };
 
 export type SchedulePageData = {
-  defaultExecutionRuntime: string;
-  executionRuntimes: TaskConfigExecutionRuntime[];
   availableAiClients?: TaskConfigAiClient[];
   summary: SchedulePageSummary;
   planningSummary: SchedulePlanningSummary;
@@ -175,7 +171,6 @@ export type ScheduleCardItem = {
   dueAt?: Date | null;
   scheduledStartAt?: Date | null;
   scheduledEndAt?: Date | null;
-  executionRuntime?: string;
   executionConfig?: unknown;
   aiClientId?: string | null;
   isRunnable?: boolean;
@@ -326,8 +321,7 @@ export type TimelineCreateInput = {
   title: string;
   description: string;
   priority: "Low" | "Medium" | "High" | "Urgent";
-  executionRuntime: string;
-  executionConfig: RuntimeInput;
+  executionConfig: Record<string, unknown>;
   aiClientId?: string | null;
   autoExecute: boolean;
   autoPlanGenerationEnabled: boolean;
@@ -348,5 +342,3 @@ export type QuickCreateDraft = {
   scheduledEndAt: Date | null;
   priority: "Low" | "Medium" | "High" | "Urgent";
 };
-
-import type { RuntimeInput } from "@chrona/runtime-core";

@@ -11,13 +11,20 @@ vi.mock("react-router-dom", () => ({
 afterEach(cleanup);
 
 const pageData = {
-  availableAiClients: [{ id: "ai-1", name: "Claude Code", enabled: true }],
+  availableAiClients: [
+    {
+      id: "ai-1",
+      name: "Claude Code",
+      type: "claude_code",
+      isDefault: true,
+      enabled: true,
+    },
+  ],
   task: {
     id: "task-1",
     title: "Research developer tools",
     description: "Compare current tools",
     aiClientId: "ai-1",
-    executionRuntime: "claude_code",
     dueAt: null,
     scheduledStartAt: null,
     currentWorkBlock: null,
@@ -52,7 +59,7 @@ describe("PlanSetupPanel", () => {
     const noProvider = {
       ...pageData,
       availableAiClients: [],
-      task: { ...pageData.task, aiClientId: null, executionRuntime: undefined },
+      task: { ...pageData.task, aiClientId: null },
     } as unknown as TaskPageData;
     render(
       <PlanSetupPanel

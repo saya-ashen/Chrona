@@ -43,7 +43,6 @@ async function seedImportedEvent(input: {
     data: {
       workspaceId: input.workspaceId,
       title: input.title,
-      executionRuntime: "debug",
       executionConfig: {},
       status: "Ready",
       priority: "Medium",

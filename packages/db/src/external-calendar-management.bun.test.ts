@@ -20,7 +20,7 @@ describe("external calendar management repository", () => {
   beforeEach(reset);
 
   it("updates refresh metadata and clears stale errors on success", async () => {
-    const workspace = await db.workspace.create({ data: { name: "Refresh DB", defaultRuntime: "debug", status: "Active" } });
+    const workspace = await db.workspace.create({ data: { name: "Refresh DB", status: "Active" } });
     const source = await createCalendarSource({
       workspaceId: workspace.id,
       name: "Work",
@@ -55,7 +55,7 @@ describe("external calendar management repository", () => {
   });
 
   it("excludes removed sources and hides disabled source events", async () => {
-    const workspace = await db.workspace.create({ data: { name: "Lifecycle DB", defaultRuntime: "debug", status: "Active" } });
+    const workspace = await db.workspace.create({ data: { name: "Lifecycle DB", status: "Active" } });
     const source = await createCalendarSource({
       workspaceId: workspace.id,
       name: "Busy",

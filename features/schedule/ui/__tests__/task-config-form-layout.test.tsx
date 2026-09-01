@@ -20,40 +20,7 @@ import { TaskConfigForm } from "../forms/task-config-form";
 /*  Helpers                                                            */
 /* ------------------------------------------------------------------ */
 
-const baseAdapter = {
-  key: "hermes",
-      label: "Hermes",
-      spec: {
-        runtime: "hermes",
-        version: "hermes-v1",
-    fields: [
-      {
-        key: "prompt",
-        path: "prompt",
-        kind: "textarea" as const,
-        label: "Prompt / instructions",
-        description: "Describe the task",
-        advanced: true,
-        constraints: { maxLength: 20000 },
-      },
-      {
-        key: "temperature",
-        path: "temperature",
-        kind: "number" as const,
-        label: "Temperature",
-        description: "Controls sampling randomness",
-        advanced: true,
-        defaultValue: 0.2,
-        constraints: { min: 0, max: 2, step: 0.1 },
-      },
-    ],
-    runnability: { requiredPaths: [] },
-  },
-};
-
 const defaultProps = {
-  executionRuntimes: [baseAdapter],
-  defaultExecutionRuntime: "hermes",
   submitLabel: "Save",
   pendingLabel: "Saving...",
   onSubmitAction: vi.fn(),
@@ -100,23 +67,19 @@ describe("TaskConfigForm – field layout", () => {
     expect(screen.queryByText(/does not update the calendar source/i)).not.toBeInTheDocument();
   });
 
-  it("renders and restores priority, due date, and execution runtime", () => {
+  it("renders priority and due date without an adapter selector", () => {
     const dueAt = new Date(2026, 3, 15, 17, 30);
     render(
       <TaskConfigForm
         {...defaultProps}
-        initialValues={{ dueAt, executionRuntime: "hermes" }}
+        initialValues={{ dueAt }}
       />,
     );
 
     expect(screen.getByRole("combobox", { name: /priority/i })).toBeInTheDocument();
     expect(screen.getByLabelText("Due date")).toHaveValue("2026-04-15T17:30");
-    expect(screen.getByRole("combobox", { name: "Adapter" })).toHaveTextContent(
-      "Hermes",
-    );
-    expect(document.querySelector('input[name="executionRuntime"]')).toHaveValue(
-      "hermes",
-    );
+    expect(screen.queryByRole("combobox", { name: "Adapter" })).not.toBeInTheDocument();
+    expect(document.querySelector('input[name="executionRuntime"]')).toBeNull();
   });
 
   it("hides advanced fields in non-compact mode", () => {

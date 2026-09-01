@@ -16,7 +16,7 @@ describe("event retention", () => {
 
   it("archives and deletes a bounded batch with a deterministic audit checksum", async () => {
     await db.workspace.create({
-      data: { id: "ws_retention", name: "Retention", defaultRuntime: "debug", status: "Active" },
+      data: { id: "ws_retention", name: "Retention", status: "Active" },
     });
     const old = new Date("2026-01-01T00:00:00.000Z");
     await db.rawEventLog.createMany({

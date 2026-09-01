@@ -145,11 +145,12 @@ function StageBarCard({
 }) {
 	const visibleStage =
 		displayMode === "reviewing_plan" ? "review" : stage.stage;
-	const resultStage = visibleStage === "result";
-	const statusLabel = resultStage
+	const resultAwaitingReview =
+		visibleStage === "result" && displayMode !== "done";
+	const statusLabel = resultAwaitingReview
 		? (copy.resultReadyTitle ?? stage.statusLabel)
 		: stage.statusLabel;
-	const nextActionLabel = resultStage
+	const nextActionLabel = resultAwaitingReview
 		? (copy.resultReadyDescription ?? stage.nextActionLabel)
 		: stage.nextActionLabel;
 	const stages: Array<{ id: typeof stage.stage; label: string }> = [

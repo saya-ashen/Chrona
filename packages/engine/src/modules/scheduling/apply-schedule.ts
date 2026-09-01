@@ -6,6 +6,10 @@ import { validateScheduleWindow } from "@chrona/domain";
 import { getAcceptedCompiledPlanForTask } from "@/modules/plan-execution/persistence/execution-scope";
 import { ensureWorkBlockTaskSession } from "@/modules/execution-runtime";
 import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
+import {
+  resolveTaskExecutionProviderSelection,
+  unresolvedTaskProviderName,
+} from "@/modules/ai";
 
 export async function applySchedule(input: {
   taskId: string;
@@ -19,7 +23,10 @@ export async function applySchedule(input: {
 
   const task = await db.task.findUniqueOrThrow({
     where: { id: input.taskId },
-    select: { id: true, workspaceId: true, title: true, executionRuntime: true, updatedAt: true },
+    select: { id: true, workspaceId: true, title: true, aiClientId: true, updatedAt: true },
+  });
+  const provider = await resolveTaskExecutionProviderSelection({
+    aiClientId: task.aiClientId,
   });
   const isExternallyManaged =
     (await db.importedCalendarEvent.count({ where: { taskId: input.taskId } })) > 0;
@@ -83,7 +90,10 @@ export async function applySchedule(input: {
       await ensureWorkBlockTaskSession({
         taskId: task.id,
         taskTitle: task.title,
-        runtimeName: task.executionRuntime,
+        runtimeName: provider?.providerName ?? unresolvedTaskProviderName(),
+        providerClientId: provider?.clientId,
+        providerName: provider?.providerName,
+        providerConfigFingerprint: provider?.configFingerprint,
         workBlockId: workBlock.id,
         sessionId: workBlock.sessionId,
         label: `${task.title} · Work block session`,
@@ -104,7 +114,10 @@ export async function applySchedule(input: {
       await ensureWorkBlockTaskSession({
         taskId: task.id,
         taskTitle: task.title,
-        runtimeName: task.executionRuntime,
+        runtimeName: provider?.providerName ?? unresolvedTaskProviderName(),
+        providerClientId: provider?.clientId,
+        providerName: provider?.providerName,
+        providerConfigFingerprint: provider?.configFingerprint,
         workBlockId: workBlock.id,
         label: `${task.title} · Work block session`,
       });

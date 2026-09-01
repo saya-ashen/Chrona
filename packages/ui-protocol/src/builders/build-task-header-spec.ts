@@ -220,7 +220,7 @@ export function buildTaskHeaderSpec(input: TaskHeaderSpecInput): UiDocument {
   elements.identity = { type: "Stack", props: { gap: "xs", className: "min-w-0 flex-1 basis-0 w-auto" }, children: ["title-row", "detail-row"] };
   elements["title-row"] = { type: "Stack", props: { className: "min-w-0" }, children: ["title"] };
   elements.title = { type: "Heading", props: { text: input.title, level: "h1" } };
-  elements["detail-row"] = { type: "Stack", props: { direction: "horizontal", gap: "sm", align: "center", className: "no-scrollbar min-w-0 flex-nowrap overflow-x-auto" }, children: [...statusChildren, ...detailChildren] };
+  elements["detail-row"] = { type: "Stack", props: { direction: "horizontal", gap: "sm", align: "center", className: "children-intrinsic no-scrollbar min-w-0 flex-nowrap overflow-x-auto" }, children: [...statusChildren, ...detailChildren] };
   elements.actions = { type: "Stack", props: { direction: "horizontal", gap: "sm", align: "center", justify: "end", className: "children-intrinsic ml-auto w-auto shrink-0 flex-nowrap [&_[data-variant=destructive]]:border-destructive/35 [&_[data-variant=destructive]]:bg-destructive/10 [&_[data-variant=destructive]]:text-destructive [&_[data-variant=destructive]]:shadow-none [&_[data-variant=destructive]:hover]:bg-destructive/15" }, children: actionChildren };
 
   // Inline error banner. Visibility + content are driven by `state.update`

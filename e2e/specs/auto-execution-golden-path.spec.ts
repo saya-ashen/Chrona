@@ -1,13 +1,13 @@
 /**
  * Auto-execution golden path — §1.3 (Chrona v0.2 hardening, Action A3)
  *
- * Positive case: task with autoExecute=true + autoPlanGeneration=true +
- * executionRuntime="debug" → orchestrator tick drives auto-plan-gen →
+ * Positive case: task with autoExecute=true + autoPlanGeneration=true and a
+ * bound debug AI provider → orchestrator tick drives auto-plan-gen →
  * plan auto-accepted → execution auto-started → deterministic execution gates resolved
  * deterministically → task reaches Completed → Work page Badge shows "completed".
  *
- * Negative case: task with autoExecute=true, executionRuntime="debug", NO
- * accepted plan → tick → execution NOT started → schedule UI shows
+ * Negative case: task with autoExecute=true and a bound debug AI provider, but
+ * NO accepted plan → tick → execution NOT started → schedule UI shows
  * "No accepted plan".
  *
  * Hard rules (§1.3):
@@ -29,6 +29,7 @@ import { expect, test, type APIRequestContext } from "@playwright/test";
 import {
 	createTaskWorkspaceTask,
 	triggerOrchestratorTick,
+	removeWorkspaceE2eAiClients,
 } from "./task-workspace-test-helpers";
 import {
 	bindTaskPlanProvider,
@@ -42,6 +43,8 @@ type ExecutionCurrentBody = {
 	checkpoint?: {
 		id?: string;
 		type?: string;
+		kind?: string;
+		form?: { revision?: string } | null;
 	} | null;
 };
 
@@ -88,6 +91,7 @@ async function setupDebugAiClient(
 	const bindRes = await request.put(`/api/ai/clients/${clientId}/bindings`, {
 		data: {
 			features: [
+				"task.execution",
 				"execute_task_node",
 				"evaluate_condition_node",
 				"review_checkpoint_node",
@@ -95,11 +99,15 @@ async function setupDebugAiClient(
 		},
 	});
 	expect(bindRes.ok()).toBeTruthy();
+	const taskBinding = await request.patch(`/api/tasks/${taskId}`, {
+		data: { aiClientId: clientId },
+	});
+	expect(taskBinding.ok()).toBeTruthy();
 	return clientId!;
 }
 
 /**
- * Enable autoExecute + autoPlanGeneration + executionRuntime on the task.
+ * Enable autoExecute + autoPlanGeneration on the provider-bound task.
  */
 async function enableAutoExecution(
 	request: APIRequestContext,
@@ -109,7 +117,6 @@ async function enableAutoExecution(
 		data: {
 			autoExecute: true,
 			autoPlanGeneration: true,
-			executionRuntime: "debug",
 		},
 	});
 	expect(patchRes.ok()).toBeTruthy();
@@ -349,7 +356,7 @@ async function resolveExecutionGates(
 			request,
 			taskId,
 			workBlockId,
-			(body) => body.status === "blocked" && !!body.checkpoint?.id,
+			(body) => body.status === "waiting_for_user" && body.checkpoint?.kind === "manual_completion" && !!body.checkpoint.form?.revision,
 			30_000,
 		);
 		await postCheckpointAction(
@@ -358,12 +365,9 @@ async function resolveExecutionGates(
 			exec.checkpoint!.id!,
 			"mark_node_completed",
 			{
-				root: "root",
-				elements: {
-					root: {
-						type: "Text",
-						props: { value: "Manual review completed by e2e golden path" },
-					},
+				formRevision: exec.checkpoint!.form!.revision,
+				inputFields: {
+					reviewSummary: "Manual review completed by e2e golden path",
 				},
 			},
 		);
@@ -373,6 +377,10 @@ async function resolveExecutionGates(
 // ─── tests ────────────────────────────────────────────────────────────────────
 
 test.describe("Auto-execution golden path (§1.3)", () => {
+	test.afterEach(async ({ request }) => {
+		await removeWorkspaceE2eAiClients(request);
+	});
+
 	test("[AUTO-001/AUTO-006] auto execution completes and stays visible across projections", async ({
 		page,
 		request,
@@ -396,7 +404,7 @@ test.describe("Auto-execution golden path (§1.3)", () => {
 				"task.result_finalization",
 			]);
 			await setupDebugAiClient(request, taskId);
-			// ── 3. Enable autoExecute + autoPlanGeneration + executionRuntime=debug ─
+			// ── 3. Enable autoExecute + autoPlanGeneration for the bound debug provider ─
 			await enableAutoExecution(request, taskId);
 
 			// ── 4. Schedule the task (already due) ─────────────────────────────────
@@ -528,7 +536,6 @@ test.describe("Auto-execution golden path (§1.3)", () => {
 			data: {
 				autoExecute: true,
 				autoPlanGeneration: false,
-				executionRuntime: "debug",
 			},
 		});
 		expect(patchRes.ok()).toBeTruthy();

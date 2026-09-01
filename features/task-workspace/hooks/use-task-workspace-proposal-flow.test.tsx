@@ -20,7 +20,6 @@ const editableTask: EditableTask = {
 	scheduledStartAt: null,
 	scheduledEndAt: null,
 	scheduleStatus: "Unscheduled",
-	executionRuntime: "hermes",
 	executionConfig: {},
 	aiClientId: null,
 	autoPlanGeneration: false,

@@ -65,6 +65,8 @@ export function TaskWorkspacePlanSectionView({
 				stateMessage={stateMessage}
 				recoveryIssue={recoveryIssue}
 				recoveryActions={recoveryActions}
+				pendingCommand={props.pendingCommand}
+				copy={copy}
 				onRecoveryAction={() => runtime.focusNodeActions(recoveryCurrentNodeId)}
 			/>
 			{displayState.panels.stageBar ? (
@@ -83,13 +85,20 @@ function PlanSectionAlerts({
 	stateMessage,
 	recoveryIssue,
 	recoveryActions,
+	pendingCommand,
+	copy,
 	onRecoveryAction,
 }: Pick<
 	TaskWorkspacePlanSectionRuntime,
 	"stateMessage" | "recoveryIssue" | "recoveryActions"
-> & { onRecoveryAction: () => void }) {
+> & {
+	pendingCommand?: TaskWorkspacePlanSectionProps["pendingCommand"];
+	copy: Record<string, string | undefined>;
+	onRecoveryAction: () => void;
+}) {
 	return (
 		<>
+			<PendingCommandNotice pendingCommand={pendingCommand} copy={copy} />
 			{stateMessage ? (
 				<div
 					className="mx-4 mt-4 rounded-xl border border-warning/40 bg-warning/15 px-4 py-3 text-sm text-warning-foreground"
@@ -123,6 +132,36 @@ function PlanSectionAlerts({
 				</div>
 			) : null}
 		</>
+	);
+}
+
+function PendingCommandNotice({
+	pendingCommand,
+	copy,
+}: {
+	pendingCommand?: TaskWorkspacePlanSectionProps["pendingCommand"];
+	copy: Record<string, string | undefined>;
+}) {
+	if (!pendingCommand) return null;
+	const failed = pendingCommand.status === "failed";
+	return (
+		<div
+			className={`mx-4 mt-4 rounded-xl border px-4 py-3 text-sm ${failed ? "border-destructive/40 bg-destructive/10 text-destructive" : "border-primary/40 bg-primary/10 text-foreground"}`}
+			role={failed ? "alert" : "status"}
+			aria-live="polite"
+			data-ui-surface-kind="runtime-control"
+		>
+			<p className="font-semibold">
+				{failed
+					? copy.commandFailedTitle ?? "Command did not complete"
+					: copy.commandPendingTitle ?? "Command accepted"}
+			</p>
+			<p>{failed ? pendingCommand.failureMessage : pendingCommand.message}</p>
+			{pendingCommand.instruction ? (
+				<p className="mt-1 text-xs opacity-90">{copy.commandInstructionLabel ?? "Your instruction"}: {pendingCommand.instruction}</p>
+			) : null}
+			<p className="mt-1 text-xs opacity-80">{copy.commandReceiptLabel ?? "Receipt"}: {pendingCommand.commandId}</p>
+		</div>
 	);
 }
 

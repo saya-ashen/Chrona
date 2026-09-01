@@ -15,7 +15,7 @@ import type {
 } from "./ai-client-types";
 import {
 	normalizeRuntimeProviders,
-	testClientAvailability,
+	testExistingClientAvailability,
 } from "./ai-client-view-model";
 
 type StoredTestState = TestResult & { checkedAt: number };
@@ -93,8 +93,6 @@ const DEFAULTS: Record<string, string> = {
 	emptyState:
 		"No AI client is connected yet. Connect one to unlock planning, suggestions, and execution previews.",
 	emptyStateCta: "Connect AI Client",
-	hermesIntro:
-		"Hermes is Chrona's local AI runtime. It generates task plans, proposes schedule changes, and only executes after your approval.",
 	loading: "Loading...",
 	defaultBadge: "Default",
 	enabled: "Enabled",
@@ -160,6 +158,8 @@ const DEFAULTS: Record<string, string> = {
 	recoverySessionHistory:
 		"Session context is saved; if execution is interrupted, retry this step to continue.",
 	recoveryUnavailable: "Interrupted runs cannot be recovered automatically.",
+	ompRecoveryLimit:
+		"Terminal-only read-only starts run once. If interrupted, Chrona does not replay them; start a new operation explicitly.",
 	advancedSettings: "Advanced settings",
 	advancedSettingsHelp:
 		"Provider endpoints, model overrides, directories, timeouts, and capability assignment.",
@@ -249,12 +249,7 @@ export function AiClientsManager() {
 			[client.id]: { status: "testing", reason: null },
 		}));
 		try {
-			const result = await testClientAvailability({
-				name: client.name,
-				type: client.type,
-				config: client.config,
-				isDefault: client.isDefault,
-			});
+			const result = await testExistingClientAvailability(client.id);
 			storeTestState(client.id, result);
 			setCardTestStates((current) => ({ ...current, [client.id]: result }));
 		} catch (error) {
@@ -291,7 +286,6 @@ export function AiClientsManager() {
 				<div className="flex flex-col gap-1">
 					<h2 className="text-xl font-semibold tracking-tight">{copy.title}</h2>
 					<p className="text-sm text-muted-foreground">{copy.subtitle}</p>
-					<p className="text-sm text-muted-foreground">{copy.hermesIntro}</p>
 				</div>
 				<Button
 					type="button"

@@ -221,6 +221,36 @@ describe("AcpProviderClient", () => {
 		).toEqual({ methodId: "agent" });
 	});
 
+	it("keeps an existing local agent profile without starting a new login", async () => {
+		stubMcpTools(["terminal_result", "plan_context"]);
+		const transport = new FakeAcpTransport({
+			init: {
+				protocolVersion: 1,
+				agentCapabilities: {
+					loadSession: true,
+					mcpCapabilities: { http: true },
+				},
+				authMethods: [{ id: "api-key" }, { id: "chat-gpt" }],
+			},
+		});
+		const client = new AcpProviderClient({
+			config: config({
+				auth: { useExisting: true },
+				healthCheck: "session",
+				mcpBaseUrl: "http://chrona.test",
+			}),
+			transport,
+		});
+
+		await expect(client.checkHealth()).resolves.toMatchObject({ ok: true });
+		expect(
+			transport.requests.some((request) => request.method === "authenticate"),
+		).toBe(false);
+		expect(
+			transport.requests.some((request) => request.method === "session/new"),
+		).toBe(true);
+	});
+
 	it("opens a provider session when session health is requested", async () => {
 		stubMcpTools(["terminal_result", "plan_context"]);
 		const transport = new FakeAcpTransport();
@@ -251,6 +281,76 @@ describe("AcpProviderClient", () => {
 		});
 	});
 
+	it("runs a model prompt when prompt health is requested", async () => {
+		stubMcpTools(["terminal_result", "plan_context"]);
+		const transport = new FakeAcpTransport({
+			updates: [
+				{
+					kind: "session_update",
+					update: {
+						sessionUpdate: "agent_message_chunk",
+						content: { type: "text", text: "CHRONA_ACP_HEALTH_OK" },
+					},
+				},
+				{
+					kind: "stop",
+					stopReason: "end_turn",
+					response: { stopReason: "end_turn" },
+				},
+			],
+		});
+		const client = new AcpProviderClient({
+			config: config({
+				healthCheck: "prompt",
+				mcpBaseUrl: "http://chrona.test",
+			}),
+			transport,
+		});
+
+		await expect(client.checkHealth()).resolves.toMatchObject({
+			ok: true,
+			reason: "test_acp model endpoint completed a prompt",
+		});
+		expect(transport.session.promptBlocks).toEqual([
+			{ type: "text", text: "Return only CHRONA_ACP_HEALTH_OK" },
+		]);
+	});
+
+	it("rejects transport diagnostics returned as prompt health text", async () => {
+		stubMcpTools(["terminal_result", "plan_context"]);
+		const transport = new FakeAcpTransport({
+			updates: [
+				{
+					kind: "session_update",
+					update: {
+						sessionUpdate: "agent_message_chunk",
+						content: {
+							type: "text",
+							text: "unexpected status 401 Unauthorized: invalid API key",
+						},
+					},
+				},
+				{
+					kind: "stop",
+					stopReason: "end_turn",
+					response: { stopReason: "end_turn" },
+				},
+			],
+		});
+		const client = new AcpProviderClient({
+			config: config({
+				healthCheck: "prompt",
+				mcpBaseUrl: "http://chrona.test",
+			}),
+			transport,
+		});
+
+		await expect(client.checkHealth()).resolves.toMatchObject({
+			ok: false,
+			reason: "ACP provider transport failed with HTTP 401 Unauthorized",
+		});
+	});
+
 	it("sends Chrona HTTP MCP server through ACP session setup", async () => {
 		const transport = new FakeAcpTransport({
 			updates: [
@@ -274,6 +374,10 @@ describe("AcpProviderClient", () => {
 				sessionId: "chrona-session",
 				sessionKey: "chrona:task:task-1:plan-generation",
 				terminalToolName: "terminal_result",
+				control: {
+					baseUrl: "http://chrona.test/api",
+					runToken: "run-token",
+				},
 			}),
 		);
 		const streamed = [];
@@ -294,9 +398,17 @@ describe("AcpProviderClient", () => {
 				},
 			],
 		});
+		for (const event of streamed) {
+			expect(event).toMatchObject({
+				provider: "test_acp",
+				runId: run.runId,
+				sessionId: "chrona-session",
+			});
+		}
 		expect(streamed.at(-1)).toMatchObject({
 			type: "run_completed",
 			provider: "test_acp",
+			nativeSessionId: "native-acp-session-1",
 		});
 	});
 
@@ -381,10 +493,14 @@ describe("AcpProviderClient", () => {
 				},
 			],
 		});
-		expect(run.sessionId).toBe("native-acp-session-prior");
+		expect(run).toMatchObject({
+			sessionId: "chrona-session",
+			nativeSessionId: "native-acp-session-prior",
+		});
 		expect(streamed.at(-1)).toMatchObject({
 			type: "run_completed",
-			sessionId: "native-acp-session-prior",
+			sessionId: "chrona-session",
+			nativeSessionId: "native-acp-session-prior",
 		});
 	});
 
@@ -428,10 +544,14 @@ describe("AcpProviderClient", () => {
 		).toMatchObject({
 			sessionId: syntheticClaudeRef,
 		});
-		expect(run.sessionId).toBe(syntheticClaudeRef);
+		expect(run).toMatchObject({
+			sessionId: "chrona-session",
+			nativeSessionId: syntheticClaudeRef,
+		});
 		expect(streamed.at(-1)).toMatchObject({
 			type: "run_completed",
-			sessionId: syntheticClaudeRef,
+			sessionId: "chrona-session",
+			nativeSessionId: syntheticClaudeRef,
 		});
 	});
 
@@ -541,6 +661,60 @@ describe("AcpProviderClient", () => {
 					event.type === "tool_completed" && event.toolName === terminalTool,
 			),
 		).toBe(true);
+	});
+
+	it("completes when Chrona records the terminal action before aborting ACP", async () => {
+		const terminalTool = "chrona_node_complete";
+		const controller = new AbortController();
+		const transport = new FakeAcpTransport({
+			updates: [
+				{
+					kind: "session_update",
+					update: {
+						sessionUpdate: "tool_call_update",
+						toolCallId: "call-terminal",
+						title: terminalTool,
+						rawInput: {
+							server: "chrona",
+							tool: terminalTool,
+							arguments: { summary: "Done" },
+						},
+						status: "completed",
+					},
+				},
+				{
+					kind: "stop",
+					stopReason: "cancelled",
+					response: { stopReason: "cancelled" },
+				},
+			],
+		});
+		const client = new AcpProviderClient({ config: config(), transport });
+		const run = await client.startRun(
+			baseInput({ terminalToolName: terminalTool, signal: controller.signal }),
+		);
+		const streamed: ProviderRunEvent[] = [];
+
+		for await (const event of client.streamRun({ runId: run.runId })) {
+			streamed.push(event);
+			if (event.type === "tool_call" && event.tool === terminalTool) {
+				controller.abort("Chrona terminal action recorded");
+			}
+		}
+
+		expect(streamed.map((event) => event.type)).toEqual([
+			"run_started",
+			"tool_call",
+			"tool_completed",
+			"run_completed",
+		]);
+		expect(streamed.at(-1)).toMatchObject({
+			type: "run_completed",
+			terminalToolCall: {
+				name: terminalTool,
+				input: { summary: "Done" },
+			},
+		});
 	});
 
 	it("cancels known runs through ACP session cancel", async () => {
@@ -739,6 +913,85 @@ describe("AcpProviderClient", () => {
 			outputText: "hello",
 			usage: { inputTokens: 7, outputTokens: 0, totalTokens: 7 },
 		});
+	});
+
+	it("fails closed when Codex reports a disconnected provider stream as assistant text", async () => {
+		const transport = new FakeAcpTransport({
+			updates: [
+				{
+					kind: "session_update",
+					update: {
+						sessionUpdate: "agent_message_chunk",
+						content: {
+							type: "text",
+							text: "stream disconnected before completion: upstream request rejected",
+						},
+					},
+				},
+				{
+					kind: "stop",
+					stopReason: "end_turn",
+					response: { stopReason: "end_turn" },
+				},
+			],
+		});
+		const client = new AcpProviderClient({ config: config(), transport });
+		const run = await client.startRun(baseInput());
+		const streamed: ProviderRunEvent[] = [];
+
+		for await (const event of client.streamRun({ runId: run.runId }))
+			streamed.push(event);
+
+		expect(streamed.map((event) => event.type)).toEqual([
+			"run_started",
+			"text_delta",
+			"run_failed",
+		]);
+		expect(streamed.at(-1)).toMatchObject({
+			type: "run_failed",
+			error: expect.stringContaining("stream disconnected before completion"),
+		});
+		await expect(client.getRun({ runId: run.runId })).resolves.toMatchObject({
+			status: "failed",
+			error: expect.stringContaining("stream disconnected before completion"),
+		});
+	});
+
+	it("fails closed when Codex returns transport authentication diagnostics as assistant text", async () => {
+		const transport = new FakeAcpTransport({
+			updates: [
+				{
+					kind: "session_update",
+					update: {
+						sessionUpdate: "agent_message_chunk",
+						content: {
+							type: "text",
+							text: "Warning: Falling back from WebSockets to HTTPS transport. unexpected status 401 Unauthorized: invalid API key sk-sensitive-value",
+						},
+					},
+				},
+				{
+					kind: "stop",
+					stopReason: "end_turn",
+					response: { stopReason: "end_turn" },
+				},
+			],
+		});
+		const client = new AcpProviderClient({ config: config(), transport });
+		const run = await client.startRun(baseInput());
+		const streamed: ProviderRunEvent[] = [];
+
+		for await (const event of client.streamRun({ runId: run.runId }))
+			streamed.push(event);
+
+		const terminal = streamed.at(-1);
+		expect(terminal).toMatchObject({
+			type: "run_failed",
+			error: expect.stringContaining("401 Unauthorized"),
+		});
+		if (terminal?.type !== "run_failed")
+			throw new Error("Expected run_failed terminal event");
+		expect(String(terminal.error)).not.toContain("sk-sensitive-value");
 	});
 
 	it("surfaces upstream auth status from ACP process diagnostics", async () => {

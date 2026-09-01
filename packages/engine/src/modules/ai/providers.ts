@@ -205,7 +205,7 @@ async function checkClientHealth(
 				reason:
 					health.reason ??
 					health.message ??
-					"Oh My Pi connectivity check passed",
+					"Oh My Pi completed a provider connectivity request.",
 			};
 		}
 

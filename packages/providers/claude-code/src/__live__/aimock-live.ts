@@ -180,6 +180,7 @@ export interface LiveClient {
 export async function makeLiveClient(opts: {
   mockUrl: string;
   model?: string;
+  timeoutMs?: number;
 }): Promise<LiveClient> {
   const claudeExecutable = findClaudeBinary();
   if (!claudeExecutable) {
@@ -205,6 +206,7 @@ export async function makeLiveClient(opts: {
 
   const cfg: ClaudeCodeRunnerConfig = {
     model: opts.model ?? "claude-opus-4-8",
+    ...(opts.timeoutMs === undefined ? {} : { timeoutMs: opts.timeoutMs }),
     mcpBaseUrl: "http://unused.test",
     mcpRunToken: "",
     env,

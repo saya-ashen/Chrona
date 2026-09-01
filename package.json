@@ -25,7 +25,7 @@
   "scripts": {
     "chrona": "bun run scripts/chrona.ts",
     "dev": "bun run scripts/dev.ts",
-    "server:start": "bun run --cwd apps/server start",
+    "server:start": "bun run apps/server/src/index.bun.ts",
     "dev:web": "bun run --cwd apps/web dev",
     "build": "bun run chrona build",
     "start": "bun run server:start",
@@ -44,6 +44,7 @@
     "smoke:entrypoints": "bun run scripts/smoke-entrypoints.ts",
     "map:check": "bun run scripts/build-feature-test-map.ts --check",
     "check:ui-foundation": "bun run scripts/check-ui-foundation.mjs",
+    "check:release-consistency": "bun run scripts/check-release-consistency.ts",
     "analyze": "bun run chrona check all",
     "test": "bun run chrona test all",
     "test:ci": "bun run chrona test ci",
@@ -57,6 +58,8 @@
     "test:e2e:tablet": "playwright test --project=tablet",
     "test:e2e:mobile": "playwright test --project=mobile",
     "test:llm:replay": "bun run chrona test llm:replay",
+    "test:providers:compat": "CHRONA_RUN_LIVE_OMP_TESTS=1 CHRONA_RUN_LIVE_CLAUDE_TESTS=1 CHRONA_RUN_LIVE_CODEX_TESTS=1 bun test packages/providers/omp/src/omp-aimock-live.bun.test.ts packages/providers/claude-code/src/claude-code-aimock-live.bun.test.ts packages/providers/claude-code/src/claude-code-aimock-extra-live.bun.test.ts packages/providers/codex/src/codex-aimock-live.bun.test.ts",
+    "test:providers:live": "bun run scripts/live-provider-smoke.ts",
     "db:generate": "prisma generate",
     "postinstall": "prisma generate && bun run scripts/install-git-hooks.ts",
     "setup": "bun run db:generate && bun run db:seed",
@@ -67,6 +70,8 @@
     "ci:local": "bun run scripts/local-ci.ts",
     "hooks:install": "bun run scripts/install-git-hooks.ts",
     "build:smoke": "bun run chrona build smoke",
+    "release:upgrade-smoke": "bun run scripts/release-upgrade-smoke.ts",
+    "release:windows-acl-smoke": "bun run scripts/windows-private-storage-smoke.ts",
     "audit:security": "bun run scripts/audit-security.ts"
   },
   "dependencies": {
@@ -118,6 +123,7 @@
     "eslint": "^10.8.0",
     "eslint-plugin-unused-imports": "^4.4.1",
     "fast-check": "^4.9.0",
+    "globals": "^17.11.0",
     "jsdom": "^30.0.1",
     "knip": "^6.32.0",
     "lefthook": "^2.1.10",

@@ -161,7 +161,8 @@ function pushSystem(
       buildEvent(ctx, options, {
         type: "run_started",
         run: ref,
-        sessionId: typeof rec.session_id === "string" ? rec.session_id : ref.sessionId,
+        sessionId: options.baseRef?.sessionId
+          ?? (typeof rec.session_id === "string" ? rec.session_id : ref.sessionId),
       }),
     );
     return;
@@ -224,7 +225,10 @@ function registerToolUse(
   block: Record<string, unknown>,
 ): void {
   const callId = String(block.id);
-  const toolName = typeof block.name === "string" ? block.name : "unknown_tool";
+  const rawToolName = typeof block.name === "string" ? block.name : "unknown_tool";
+  const toolName = rawToolName.startsWith("mcp__chrona__")
+    ? rawToolName.slice("mcp__chrona__".length)
+    : rawToolName;
   ctx.toolNames.set(callId, toolName);
   ctx.toolInputBuffers.set(callId, "");
 }

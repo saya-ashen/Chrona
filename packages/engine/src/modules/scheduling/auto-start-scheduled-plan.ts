@@ -14,6 +14,7 @@ import {
 } from "@chrona/contracts";
 import { assertSchedulerWorkOwnership, withSchedulerWorkOwnership, type SchedulerWorkContext } from "@/modules/orchestration/scheduler-lease-repository";
 import { automationOccurrenceKey } from "@chrona/domain";
+import { resolveTaskExecutionProviderSelection } from "@/modules/ai";
 
 const MAX_AUTOMATION_TIMING_OFFSET_MS = Math.max(
   ...AUTOMATION_TIMING_PRESETS.map((preset) =>
@@ -59,7 +60,7 @@ export async function autoStartScheduledPlanTasks(input?: {
           status: true,
           autoExecute: true,
           autoExecuteTiming: true,
-          executionRuntime: true,
+          aiClientId: true,
           taskPlans: {
             where: { status: TaskPlanStatus.Accepted },
             select: { id: true },
@@ -92,12 +93,17 @@ export async function autoStartScheduledPlanTasks(input?: {
         orderBy: { createdAt: "desc" },
       });
 
+      const provider = await resolveTaskExecutionProviderSelection({
+        aiClientId: task.aiClientId,
+      });
       const eligibility = deriveAutoStartEligibility({
         task: {
           status: task.status,
-          executionRuntime: task.executionRuntime,
           hasAcceptedPlan: task.taskPlans.length > 0,
           autoExecuteTiming: task.autoExecuteTiming,
+          providerId: provider?.clientId,
+          providerName: provider?.providerName,
+          providerConfigured: provider !== null,
         },
         workBlock: { scheduledStartAt: block.scheduledStartAt },
         now,

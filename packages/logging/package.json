@@ -7,6 +7,7 @@
     "pino": "^10.3.1"
   },
   "exports": {
-    ".": "./src/index.ts"
+    ".": "./src/index.ts",
+    "./redaction": "./src/redaction.ts"
   }
 }

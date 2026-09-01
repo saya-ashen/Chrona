@@ -10,6 +10,7 @@ vi.mock("@shared/http", () => ({ apiJson: mocks.apiJson }));
 import {
 	bindTaskPlanSessionToStateStore,
 	startTaskPlanGenerationSession,
+	stopTaskPlanGenerationSession,
 	useTaskPlanGenerationSession,
 } from "./task-plan-generation-session-store";
 
@@ -93,6 +94,35 @@ describe("task plan generation session store", () => {
 		expect(result.current.sessionStatus).toBe("completed");
 		expect(result.current.isLoading).toBe(false);
 
+		unmount();
+		unbind();
+	});
+
+	it("clears the bound header generation action immediately when stopped", async () => {
+		const taskId = "task-stop-generation";
+		const store = createSessionStateStore();
+		const unbind = bindTaskPlanSessionToStateStore(taskId, null, store);
+		const { result, unmount } = renderHook(() =>
+			useTaskPlanGenerationSession(taskId, { hydrate: false }),
+		);
+		act(() => {
+			store.update({
+				"/plan/status": "generating",
+				"/plan/generation/status": "running",
+				"/plan/generation/is-running": true,
+				"/plan/generation/header-action-disabled": true,
+			});
+		});
+
+		await act(async () => stopTaskPlanGenerationSession(taskId));
+
+		expect(mocks.apiJson).toHaveBeenCalledWith(
+			"/api/tasks/task-stop-generation/plan/generations/stop",
+			{ method: "POST" },
+		);
+		expect(store.get("/plan/generation/is-running")).toBe(false);
+		expect(store.get("/plan/generation/header-action-disabled")).toBe(false);
+		expect(result.current.sessionStatus).toBe("cancelled");
 		unmount();
 		unbind();
 	});
