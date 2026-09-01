@@ -30,7 +30,7 @@
     "path": "fixtures/v0.2.0-linux-x64.sqlite",
     "sha256": "62d74fcba6e430e295f1cb913d0c3086711d18ca88112c9cd9805833b44f9c63",
     "provenancePath": "fixtures/v0.2.0-linux-x64.provenance.json",
-    "provenanceSha256": "18d4515da43e5a7511eef537530b75201308f512d9dc7758a94b5bc0e1887443"
+    "provenanceSha256": "a7a0e7b0dc64f64184819d0d4684eeb11b63775869f71c6933c6869c91b49a04"
   },
   "legacyHistoryNormalizations": {
     "52535a31dda359b8e54648726cb870ac7d2569349e37738e9f58704782b8abbb": {

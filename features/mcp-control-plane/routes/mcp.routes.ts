@@ -14,7 +14,7 @@ import {
 	type ChronaEngine,
 	type RunTokenScope,
 } from "@chrona/engine";
-import { createHash, randomUUID, timingSafeEqual } from "node:crypto";
+import { createHash, createHmac, randomBytes, randomUUID, timingSafeEqual } from "node:crypto";
 import { createLogger } from "@chrona/logging";
 import { z } from "zod";
 import {
@@ -28,6 +28,7 @@ import {
 
 const MAX_MCP_TRANSPORT_SESSIONS = 100;
 const MCP_TRANSPORT_IDLE_TTL_MS = 10 * 60 * 1_000;
+const MCP_CREDENTIAL_FINGERPRINT_KEY = randomBytes(32);
 type McpRunTokenScope = Pick<
 	RunTokenScope,
 	"taskId" | "workspaceId" | "taskSessionId" | "runId" | "runtimeSessionKey"
@@ -84,7 +85,7 @@ function bearerToken(authorization: string | undefined): string | undefined {
 }
 
 function credentialDigest(value: string): string {
-	return createHash("sha256").update(value).digest("hex");
+	return createHmac("sha256", MCP_CREDENTIAL_FINGERPRINT_KEY).update(value).digest("hex");
 }
 
 function sameMcpRunTokenScope(left: McpRunTokenScope, right: McpRunTokenScope): boolean {

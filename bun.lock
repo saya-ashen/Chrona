@@ -53,6 +53,7 @@
         "eslint": "^10.8.0",
         "eslint-plugin-unused-imports": "^4.4.1",
         "fast-check": "^4.9.0",
+        "globals": "^17.11.0",
         "jsdom": "^30.0.1",
         "knip": "^6.32.0",
         "lefthook": "^2.1.10",
@@ -135,6 +136,7 @@
       },
       "dependencies": {
         "@chrona-org/agent-cli": "workspace:*",
+        "@chrona/db": "workspace:*",
         "@chrona/integrations": "workspace:*",
         "@chrona/providers-foundation": "workspace:*",
         "chalk": "^6.0.0",
@@ -2266,6 +2268,8 @@
     "global-agent": ["global-agent@3.0.0", "", { "dependencies": { "boolean": "^3.0.1", "es6-error": "^4.1.1", "matcher": "^3.0.0", "roarr": "^2.15.3", "semver": "^7.3.2", "serialize-error": "^7.0.1" } }, "sha512-PT6XReJ+D07JvGoxQMkT6qji/jVNfX/h364XHZOWeRzy64sSFr+xJ5OX7LI3b4MPQzdL4H8Y8M0xzPpsVMwA8Q=="],
 
     "global-directory": ["global-directory@4.0.1", "", { "dependencies": { "ini": "4.1.1" } }, "sha512-wHTUcDUoZ1H5/0iVqEudYW4/kAlN5cZ3j/bXn0Dpbizl9iaUVeWSHqiOjsgk6OW2bkLclbBjzewBz6weQ1zA2Q=="],
+
+    "globals": ["globals@17.11.0", "", {}, "sha512-Z2I8hM+PbJDXQDq3Icgpzv+mPdwr68iZUU9d5WW4FuXfDUQfkZaZuvjMv42/5crNyw154+9+VWXbYrUgDXbxNw=="],
 
     "globalthis": ["globalthis@1.0.4", "", { "dependencies": { "define-properties": "^1.2.1", "gopd": "^1.0.1" } }, "sha512-DpLKbNU4WylpxJykQujfCcwYWiV/Jhm50Goo0wrVILAv5jOr9d+H+UR3PhSCD2rCCEIg0uc+G+muBTwD54JhDQ=="],
 

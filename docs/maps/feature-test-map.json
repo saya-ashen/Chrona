@@ -2,13 +2,13 @@
   "generatedAt": "(regenerable; see git history)",
   "granularity": "function",
   "totals": {
-    "sourceFiles": 574,
-    "testFiles": 291,
-    "directCovered": 224,
-    "transitiveCovered": 506,
-    "uncovered": 68,
-    "exportedSymbols": 1578,
-    "symbolsWithTest": 386
+    "sourceFiles": 579,
+    "testFiles": 298,
+    "directCovered": 231,
+    "transitiveCovered": 509,
+    "uncovered": 70,
+    "exportedSymbols": 1596,
+    "symbolsWithTest": 395
   },
   "files": [
     {
@@ -3806,6 +3806,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -3886,10 +3887,14 @@
         "packages/providers/claude-code/src/runner.mcp-url.bun.test.ts",
         "packages/providers/claude-code/src/runner.skill-env.bun.test.ts",
         "packages/providers/codex/src/CodexProviderClient.bun.test.ts",
+        "packages/providers/codex/src/codex-aimock-live.bun.test.ts",
         "packages/providers/debug/src/ChronaDebugProviderClient.bun.test.ts",
+        "packages/providers/foundation/src/live-provider-smoke.bun.test.ts",
         "packages/providers/foundation/src/provider-capability-matrix.bun.test.ts",
         "packages/providers/hermes/src/HermesProviderClient.bun.test.ts",
-        "packages/providers/omp/src/OmpProviderClient.bun.test.ts"
+        "packages/providers/omp/src/OmpProviderClient.bun.test.ts",
+        "packages/providers/omp/src/omp-aimock-live.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -4055,6 +4060,7 @@
         "packages/engine/src/modules/ai/feature-runtime/feature-runner.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/prisma-run-store.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
@@ -4134,10 +4140,14 @@
         "packages/providers/claude-code/src/runner.mcp-url.bun.test.ts",
         "packages/providers/claude-code/src/runner.skill-env.bun.test.ts",
         "packages/providers/codex/src/CodexProviderClient.bun.test.ts",
+        "packages/providers/codex/src/codex-aimock-live.bun.test.ts",
         "packages/providers/debug/src/ChronaDebugProviderClient.bun.test.ts",
+        "packages/providers/foundation/src/live-provider-smoke.bun.test.ts",
         "packages/providers/foundation/src/provider-capability-matrix.bun.test.ts",
         "packages/providers/hermes/src/HermesProviderClient.bun.test.ts",
-        "packages/providers/omp/src/OmpProviderClient.bun.test.ts"
+        "packages/providers/omp/src/OmpProviderClient.bun.test.ts",
+        "packages/providers/omp/src/omp-aimock-live.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -4668,6 +4678,7 @@
         "packages/engine/src/modules/ai/feature-runtime/feature-runner.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/prisma-run-store.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
@@ -4749,10 +4760,14 @@
         "packages/providers/claude-code/src/runner.mcp-url.bun.test.ts",
         "packages/providers/claude-code/src/runner.skill-env.bun.test.ts",
         "packages/providers/codex/src/CodexProviderClient.bun.test.ts",
+        "packages/providers/codex/src/codex-aimock-live.bun.test.ts",
         "packages/providers/debug/src/ChronaDebugProviderClient.bun.test.ts",
+        "packages/providers/foundation/src/live-provider-smoke.bun.test.ts",
         "packages/providers/foundation/src/provider-capability-matrix.bun.test.ts",
         "packages/providers/hermes/src/HermesProviderClient.bun.test.ts",
-        "packages/providers/omp/src/OmpProviderClient.bun.test.ts"
+        "packages/providers/omp/src/OmpProviderClient.bun.test.ts",
+        "packages/providers/omp/src/omp-aimock-live.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -5314,6 +5329,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -5394,10 +5410,14 @@
         "packages/providers/claude-code/src/runner.mcp-url.bun.test.ts",
         "packages/providers/claude-code/src/runner.skill-env.bun.test.ts",
         "packages/providers/codex/src/CodexProviderClient.bun.test.ts",
+        "packages/providers/codex/src/codex-aimock-live.bun.test.ts",
         "packages/providers/debug/src/ChronaDebugProviderClient.bun.test.ts",
+        "packages/providers/foundation/src/live-provider-smoke.bun.test.ts",
         "packages/providers/foundation/src/provider-capability-matrix.bun.test.ts",
         "packages/providers/hermes/src/HermesProviderClient.bun.test.ts",
-        "packages/providers/omp/src/OmpProviderClient.bun.test.ts"
+        "packages/providers/omp/src/OmpProviderClient.bun.test.ts",
+        "packages/providers/omp/src/omp-aimock-live.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -5719,6 +5739,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -5821,10 +5842,14 @@
         "packages/providers/claude-code/src/runner.mcp-url.bun.test.ts",
         "packages/providers/claude-code/src/runner.skill-env.bun.test.ts",
         "packages/providers/codex/src/CodexProviderClient.bun.test.ts",
+        "packages/providers/codex/src/codex-aimock-live.bun.test.ts",
         "packages/providers/debug/src/ChronaDebugProviderClient.bun.test.ts",
+        "packages/providers/foundation/src/live-provider-smoke.bun.test.ts",
         "packages/providers/foundation/src/provider-capability-matrix.bun.test.ts",
         "packages/providers/hermes/src/HermesProviderClient.bun.test.ts",
-        "packages/providers/omp/src/OmpProviderClient.bun.test.ts"
+        "packages/providers/omp/src/OmpProviderClient.bun.test.ts",
+        "packages/providers/omp/src/omp-aimock-live.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -6246,6 +6271,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -6348,10 +6374,14 @@
         "packages/providers/claude-code/src/runner.mcp-url.bun.test.ts",
         "packages/providers/claude-code/src/runner.skill-env.bun.test.ts",
         "packages/providers/codex/src/CodexProviderClient.bun.test.ts",
+        "packages/providers/codex/src/codex-aimock-live.bun.test.ts",
         "packages/providers/debug/src/ChronaDebugProviderClient.bun.test.ts",
+        "packages/providers/foundation/src/live-provider-smoke.bun.test.ts",
         "packages/providers/foundation/src/provider-capability-matrix.bun.test.ts",
         "packages/providers/hermes/src/HermesProviderClient.bun.test.ts",
-        "packages/providers/omp/src/OmpProviderClient.bun.test.ts"
+        "packages/providers/omp/src/OmpProviderClient.bun.test.ts",
+        "packages/providers/omp/src/omp-aimock-live.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -6566,6 +6596,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -6646,10 +6677,14 @@
         "packages/providers/claude-code/src/runner.mcp-url.bun.test.ts",
         "packages/providers/claude-code/src/runner.skill-env.bun.test.ts",
         "packages/providers/codex/src/CodexProviderClient.bun.test.ts",
+        "packages/providers/codex/src/codex-aimock-live.bun.test.ts",
         "packages/providers/debug/src/ChronaDebugProviderClient.bun.test.ts",
+        "packages/providers/foundation/src/live-provider-smoke.bun.test.ts",
         "packages/providers/foundation/src/provider-capability-matrix.bun.test.ts",
         "packages/providers/hermes/src/HermesProviderClient.bun.test.ts",
-        "packages/providers/omp/src/OmpProviderClient.bun.test.ts"
+        "packages/providers/omp/src/OmpProviderClient.bun.test.ts",
+        "packages/providers/omp/src/omp-aimock-live.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -7048,6 +7083,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -7128,10 +7164,14 @@
         "packages/providers/claude-code/src/runner.mcp-url.bun.test.ts",
         "packages/providers/claude-code/src/runner.skill-env.bun.test.ts",
         "packages/providers/codex/src/CodexProviderClient.bun.test.ts",
+        "packages/providers/codex/src/codex-aimock-live.bun.test.ts",
         "packages/providers/debug/src/ChronaDebugProviderClient.bun.test.ts",
+        "packages/providers/foundation/src/live-provider-smoke.bun.test.ts",
         "packages/providers/foundation/src/provider-capability-matrix.bun.test.ts",
         "packages/providers/hermes/src/HermesProviderClient.bun.test.ts",
-        "packages/providers/omp/src/OmpProviderClient.bun.test.ts"
+        "packages/providers/omp/src/OmpProviderClient.bun.test.ts",
+        "packages/providers/omp/src/omp-aimock-live.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -7284,6 +7324,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -7362,10 +7403,14 @@
         "packages/providers/claude-code/src/runner.mcp-url.bun.test.ts",
         "packages/providers/claude-code/src/runner.skill-env.bun.test.ts",
         "packages/providers/codex/src/CodexProviderClient.bun.test.ts",
+        "packages/providers/codex/src/codex-aimock-live.bun.test.ts",
         "packages/providers/debug/src/ChronaDebugProviderClient.bun.test.ts",
+        "packages/providers/foundation/src/live-provider-smoke.bun.test.ts",
         "packages/providers/foundation/src/provider-capability-matrix.bun.test.ts",
         "packages/providers/hermes/src/HermesProviderClient.bun.test.ts",
-        "packages/providers/omp/src/OmpProviderClient.bun.test.ts"
+        "packages/providers/omp/src/OmpProviderClient.bun.test.ts",
+        "packages/providers/omp/src/omp-aimock-live.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -7518,6 +7563,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -7598,10 +7644,14 @@
         "packages/providers/claude-code/src/runner.mcp-url.bun.test.ts",
         "packages/providers/claude-code/src/runner.skill-env.bun.test.ts",
         "packages/providers/codex/src/CodexProviderClient.bun.test.ts",
+        "packages/providers/codex/src/codex-aimock-live.bun.test.ts",
         "packages/providers/debug/src/ChronaDebugProviderClient.bun.test.ts",
+        "packages/providers/foundation/src/live-provider-smoke.bun.test.ts",
         "packages/providers/foundation/src/provider-capability-matrix.bun.test.ts",
         "packages/providers/hermes/src/HermesProviderClient.bun.test.ts",
-        "packages/providers/omp/src/OmpProviderClient.bun.test.ts"
+        "packages/providers/omp/src/OmpProviderClient.bun.test.ts",
+        "packages/providers/omp/src/omp-aimock-live.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -7902,6 +7952,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -7982,10 +8033,14 @@
         "packages/providers/claude-code/src/runner.mcp-url.bun.test.ts",
         "packages/providers/claude-code/src/runner.skill-env.bun.test.ts",
         "packages/providers/codex/src/CodexProviderClient.bun.test.ts",
+        "packages/providers/codex/src/codex-aimock-live.bun.test.ts",
         "packages/providers/debug/src/ChronaDebugProviderClient.bun.test.ts",
+        "packages/providers/foundation/src/live-provider-smoke.bun.test.ts",
         "packages/providers/foundation/src/provider-capability-matrix.bun.test.ts",
         "packages/providers/hermes/src/HermesProviderClient.bun.test.ts",
-        "packages/providers/omp/src/OmpProviderClient.bun.test.ts"
+        "packages/providers/omp/src/OmpProviderClient.bun.test.ts",
+        "packages/providers/omp/src/omp-aimock-live.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -8324,6 +8379,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -8404,10 +8460,14 @@
         "packages/providers/claude-code/src/runner.mcp-url.bun.test.ts",
         "packages/providers/claude-code/src/runner.skill-env.bun.test.ts",
         "packages/providers/codex/src/CodexProviderClient.bun.test.ts",
+        "packages/providers/codex/src/codex-aimock-live.bun.test.ts",
         "packages/providers/debug/src/ChronaDebugProviderClient.bun.test.ts",
+        "packages/providers/foundation/src/live-provider-smoke.bun.test.ts",
         "packages/providers/foundation/src/provider-capability-matrix.bun.test.ts",
         "packages/providers/hermes/src/HermesProviderClient.bun.test.ts",
-        "packages/providers/omp/src/OmpProviderClient.bun.test.ts"
+        "packages/providers/omp/src/OmpProviderClient.bun.test.ts",
+        "packages/providers/omp/src/omp-aimock-live.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -8979,6 +9039,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -9059,10 +9120,14 @@
         "packages/providers/claude-code/src/runner.mcp-url.bun.test.ts",
         "packages/providers/claude-code/src/runner.skill-env.bun.test.ts",
         "packages/providers/codex/src/CodexProviderClient.bun.test.ts",
+        "packages/providers/codex/src/codex-aimock-live.bun.test.ts",
         "packages/providers/debug/src/ChronaDebugProviderClient.bun.test.ts",
+        "packages/providers/foundation/src/live-provider-smoke.bun.test.ts",
         "packages/providers/foundation/src/provider-capability-matrix.bun.test.ts",
         "packages/providers/hermes/src/HermesProviderClient.bun.test.ts",
-        "packages/providers/omp/src/OmpProviderClient.bun.test.ts"
+        "packages/providers/omp/src/OmpProviderClient.bun.test.ts",
+        "packages/providers/omp/src/omp-aimock-live.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -9591,6 +9656,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -9671,10 +9737,14 @@
         "packages/providers/claude-code/src/runner.mcp-url.bun.test.ts",
         "packages/providers/claude-code/src/runner.skill-env.bun.test.ts",
         "packages/providers/codex/src/CodexProviderClient.bun.test.ts",
+        "packages/providers/codex/src/codex-aimock-live.bun.test.ts",
         "packages/providers/debug/src/ChronaDebugProviderClient.bun.test.ts",
+        "packages/providers/foundation/src/live-provider-smoke.bun.test.ts",
         "packages/providers/foundation/src/provider-capability-matrix.bun.test.ts",
         "packages/providers/hermes/src/HermesProviderClient.bun.test.ts",
-        "packages/providers/omp/src/OmpProviderClient.bun.test.ts"
+        "packages/providers/omp/src/OmpProviderClient.bun.test.ts",
+        "packages/providers/omp/src/omp-aimock-live.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -9857,6 +9927,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -9935,10 +10006,14 @@
         "packages/providers/claude-code/src/runner.mcp-url.bun.test.ts",
         "packages/providers/claude-code/src/runner.skill-env.bun.test.ts",
         "packages/providers/codex/src/CodexProviderClient.bun.test.ts",
+        "packages/providers/codex/src/codex-aimock-live.bun.test.ts",
         "packages/providers/debug/src/ChronaDebugProviderClient.bun.test.ts",
+        "packages/providers/foundation/src/live-provider-smoke.bun.test.ts",
         "packages/providers/foundation/src/provider-capability-matrix.bun.test.ts",
         "packages/providers/hermes/src/HermesProviderClient.bun.test.ts",
-        "packages/providers/omp/src/OmpProviderClient.bun.test.ts"
+        "packages/providers/omp/src/OmpProviderClient.bun.test.ts",
+        "packages/providers/omp/src/omp-aimock-live.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -10308,6 +10383,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -10388,10 +10464,14 @@
         "packages/providers/claude-code/src/runner.mcp-url.bun.test.ts",
         "packages/providers/claude-code/src/runner.skill-env.bun.test.ts",
         "packages/providers/codex/src/CodexProviderClient.bun.test.ts",
+        "packages/providers/codex/src/codex-aimock-live.bun.test.ts",
         "packages/providers/debug/src/ChronaDebugProviderClient.bun.test.ts",
+        "packages/providers/foundation/src/live-provider-smoke.bun.test.ts",
         "packages/providers/foundation/src/provider-capability-matrix.bun.test.ts",
         "packages/providers/hermes/src/HermesProviderClient.bun.test.ts",
-        "packages/providers/omp/src/OmpProviderClient.bun.test.ts"
+        "packages/providers/omp/src/OmpProviderClient.bun.test.ts",
+        "packages/providers/omp/src/omp-aimock-live.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -10653,6 +10733,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -10733,10 +10814,14 @@
         "packages/providers/claude-code/src/runner.mcp-url.bun.test.ts",
         "packages/providers/claude-code/src/runner.skill-env.bun.test.ts",
         "packages/providers/codex/src/CodexProviderClient.bun.test.ts",
+        "packages/providers/codex/src/codex-aimock-live.bun.test.ts",
         "packages/providers/debug/src/ChronaDebugProviderClient.bun.test.ts",
+        "packages/providers/foundation/src/live-provider-smoke.bun.test.ts",
         "packages/providers/foundation/src/provider-capability-matrix.bun.test.ts",
         "packages/providers/hermes/src/HermesProviderClient.bun.test.ts",
-        "packages/providers/omp/src/OmpProviderClient.bun.test.ts"
+        "packages/providers/omp/src/OmpProviderClient.bun.test.ts",
+        "packages/providers/omp/src/omp-aimock-live.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -10903,6 +10988,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -10983,10 +11069,14 @@
         "packages/providers/claude-code/src/runner.mcp-url.bun.test.ts",
         "packages/providers/claude-code/src/runner.skill-env.bun.test.ts",
         "packages/providers/codex/src/CodexProviderClient.bun.test.ts",
+        "packages/providers/codex/src/codex-aimock-live.bun.test.ts",
         "packages/providers/debug/src/ChronaDebugProviderClient.bun.test.ts",
+        "packages/providers/foundation/src/live-provider-smoke.bun.test.ts",
         "packages/providers/foundation/src/provider-capability-matrix.bun.test.ts",
         "packages/providers/hermes/src/HermesProviderClient.bun.test.ts",
-        "packages/providers/omp/src/OmpProviderClient.bun.test.ts"
+        "packages/providers/omp/src/OmpProviderClient.bun.test.ts",
+        "packages/providers/omp/src/omp-aimock-live.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -11124,6 +11214,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -11204,10 +11295,14 @@
         "packages/providers/claude-code/src/runner.mcp-url.bun.test.ts",
         "packages/providers/claude-code/src/runner.skill-env.bun.test.ts",
         "packages/providers/codex/src/CodexProviderClient.bun.test.ts",
+        "packages/providers/codex/src/codex-aimock-live.bun.test.ts",
         "packages/providers/debug/src/ChronaDebugProviderClient.bun.test.ts",
+        "packages/providers/foundation/src/live-provider-smoke.bun.test.ts",
         "packages/providers/foundation/src/provider-capability-matrix.bun.test.ts",
         "packages/providers/hermes/src/HermesProviderClient.bun.test.ts",
-        "packages/providers/omp/src/OmpProviderClient.bun.test.ts"
+        "packages/providers/omp/src/OmpProviderClient.bun.test.ts",
+        "packages/providers/omp/src/omp-aimock-live.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -11493,6 +11588,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -11573,10 +11669,14 @@
         "packages/providers/claude-code/src/runner.mcp-url.bun.test.ts",
         "packages/providers/claude-code/src/runner.skill-env.bun.test.ts",
         "packages/providers/codex/src/CodexProviderClient.bun.test.ts",
+        "packages/providers/codex/src/codex-aimock-live.bun.test.ts",
         "packages/providers/debug/src/ChronaDebugProviderClient.bun.test.ts",
+        "packages/providers/foundation/src/live-provider-smoke.bun.test.ts",
         "packages/providers/foundation/src/provider-capability-matrix.bun.test.ts",
         "packages/providers/hermes/src/HermesProviderClient.bun.test.ts",
-        "packages/providers/omp/src/OmpProviderClient.bun.test.ts"
+        "packages/providers/omp/src/OmpProviderClient.bun.test.ts",
+        "packages/providers/omp/src/omp-aimock-live.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -11712,6 +11812,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -11792,10 +11893,14 @@
         "packages/providers/claude-code/src/runner.mcp-url.bun.test.ts",
         "packages/providers/claude-code/src/runner.skill-env.bun.test.ts",
         "packages/providers/codex/src/CodexProviderClient.bun.test.ts",
+        "packages/providers/codex/src/codex-aimock-live.bun.test.ts",
         "packages/providers/debug/src/ChronaDebugProviderClient.bun.test.ts",
+        "packages/providers/foundation/src/live-provider-smoke.bun.test.ts",
         "packages/providers/foundation/src/provider-capability-matrix.bun.test.ts",
         "packages/providers/hermes/src/HermesProviderClient.bun.test.ts",
-        "packages/providers/omp/src/OmpProviderClient.bun.test.ts"
+        "packages/providers/omp/src/OmpProviderClient.bun.test.ts",
+        "packages/providers/omp/src/omp-aimock-live.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -14146,6 +14251,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -14248,10 +14354,14 @@
         "packages/providers/claude-code/src/runner.mcp-url.bun.test.ts",
         "packages/providers/claude-code/src/runner.skill-env.bun.test.ts",
         "packages/providers/codex/src/CodexProviderClient.bun.test.ts",
+        "packages/providers/codex/src/codex-aimock-live.bun.test.ts",
         "packages/providers/debug/src/ChronaDebugProviderClient.bun.test.ts",
+        "packages/providers/foundation/src/live-provider-smoke.bun.test.ts",
         "packages/providers/foundation/src/provider-capability-matrix.bun.test.ts",
         "packages/providers/hermes/src/HermesProviderClient.bun.test.ts",
-        "packages/providers/omp/src/OmpProviderClient.bun.test.ts"
+        "packages/providers/omp/src/OmpProviderClient.bun.test.ts",
+        "packages/providers/omp/src/omp-aimock-live.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -14382,6 +14492,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -14484,10 +14595,14 @@
         "packages/providers/claude-code/src/runner.mcp-url.bun.test.ts",
         "packages/providers/claude-code/src/runner.skill-env.bun.test.ts",
         "packages/providers/codex/src/CodexProviderClient.bun.test.ts",
+        "packages/providers/codex/src/codex-aimock-live.bun.test.ts",
         "packages/providers/debug/src/ChronaDebugProviderClient.bun.test.ts",
+        "packages/providers/foundation/src/live-provider-smoke.bun.test.ts",
         "packages/providers/foundation/src/provider-capability-matrix.bun.test.ts",
         "packages/providers/hermes/src/HermesProviderClient.bun.test.ts",
-        "packages/providers/omp/src/OmpProviderClient.bun.test.ts"
+        "packages/providers/omp/src/OmpProviderClient.bun.test.ts",
+        "packages/providers/omp/src/omp-aimock-live.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -14722,6 +14837,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -14824,10 +14940,14 @@
         "packages/providers/claude-code/src/runner.mcp-url.bun.test.ts",
         "packages/providers/claude-code/src/runner.skill-env.bun.test.ts",
         "packages/providers/codex/src/CodexProviderClient.bun.test.ts",
+        "packages/providers/codex/src/codex-aimock-live.bun.test.ts",
         "packages/providers/debug/src/ChronaDebugProviderClient.bun.test.ts",
+        "packages/providers/foundation/src/live-provider-smoke.bun.test.ts",
         "packages/providers/foundation/src/provider-capability-matrix.bun.test.ts",
         "packages/providers/hermes/src/HermesProviderClient.bun.test.ts",
-        "packages/providers/omp/src/OmpProviderClient.bun.test.ts"
+        "packages/providers/omp/src/OmpProviderClient.bun.test.ts",
+        "packages/providers/omp/src/omp-aimock-live.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -14950,6 +15070,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -15052,10 +15173,14 @@
         "packages/providers/claude-code/src/runner.mcp-url.bun.test.ts",
         "packages/providers/claude-code/src/runner.skill-env.bun.test.ts",
         "packages/providers/codex/src/CodexProviderClient.bun.test.ts",
+        "packages/providers/codex/src/codex-aimock-live.bun.test.ts",
         "packages/providers/debug/src/ChronaDebugProviderClient.bun.test.ts",
+        "packages/providers/foundation/src/live-provider-smoke.bun.test.ts",
         "packages/providers/foundation/src/provider-capability-matrix.bun.test.ts",
         "packages/providers/hermes/src/HermesProviderClient.bun.test.ts",
-        "packages/providers/omp/src/OmpProviderClient.bun.test.ts"
+        "packages/providers/omp/src/OmpProviderClient.bun.test.ts",
+        "packages/providers/omp/src/omp-aimock-live.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -15223,6 +15348,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -15325,10 +15451,14 @@
         "packages/providers/claude-code/src/runner.mcp-url.bun.test.ts",
         "packages/providers/claude-code/src/runner.skill-env.bun.test.ts",
         "packages/providers/codex/src/CodexProviderClient.bun.test.ts",
+        "packages/providers/codex/src/codex-aimock-live.bun.test.ts",
         "packages/providers/debug/src/ChronaDebugProviderClient.bun.test.ts",
+        "packages/providers/foundation/src/live-provider-smoke.bun.test.ts",
         "packages/providers/foundation/src/provider-capability-matrix.bun.test.ts",
         "packages/providers/hermes/src/HermesProviderClient.bun.test.ts",
-        "packages/providers/omp/src/OmpProviderClient.bun.test.ts"
+        "packages/providers/omp/src/OmpProviderClient.bun.test.ts",
+        "packages/providers/omp/src/omp-aimock-live.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -15466,6 +15596,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -15568,10 +15699,14 @@
         "packages/providers/claude-code/src/runner.mcp-url.bun.test.ts",
         "packages/providers/claude-code/src/runner.skill-env.bun.test.ts",
         "packages/providers/codex/src/CodexProviderClient.bun.test.ts",
+        "packages/providers/codex/src/codex-aimock-live.bun.test.ts",
         "packages/providers/debug/src/ChronaDebugProviderClient.bun.test.ts",
+        "packages/providers/foundation/src/live-provider-smoke.bun.test.ts",
         "packages/providers/foundation/src/provider-capability-matrix.bun.test.ts",
         "packages/providers/hermes/src/HermesProviderClient.bun.test.ts",
-        "packages/providers/omp/src/OmpProviderClient.bun.test.ts"
+        "packages/providers/omp/src/OmpProviderClient.bun.test.ts",
+        "packages/providers/omp/src/omp-aimock-live.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -15704,6 +15839,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -15806,10 +15942,14 @@
         "packages/providers/claude-code/src/runner.mcp-url.bun.test.ts",
         "packages/providers/claude-code/src/runner.skill-env.bun.test.ts",
         "packages/providers/codex/src/CodexProviderClient.bun.test.ts",
+        "packages/providers/codex/src/codex-aimock-live.bun.test.ts",
         "packages/providers/debug/src/ChronaDebugProviderClient.bun.test.ts",
+        "packages/providers/foundation/src/live-provider-smoke.bun.test.ts",
         "packages/providers/foundation/src/provider-capability-matrix.bun.test.ts",
         "packages/providers/hermes/src/HermesProviderClient.bun.test.ts",
-        "packages/providers/omp/src/OmpProviderClient.bun.test.ts"
+        "packages/providers/omp/src/OmpProviderClient.bun.test.ts",
+        "packages/providers/omp/src/omp-aimock-live.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -15987,6 +16127,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -16089,10 +16230,14 @@
         "packages/providers/claude-code/src/runner.mcp-url.bun.test.ts",
         "packages/providers/claude-code/src/runner.skill-env.bun.test.ts",
         "packages/providers/codex/src/CodexProviderClient.bun.test.ts",
+        "packages/providers/codex/src/codex-aimock-live.bun.test.ts",
         "packages/providers/debug/src/ChronaDebugProviderClient.bun.test.ts",
+        "packages/providers/foundation/src/live-provider-smoke.bun.test.ts",
         "packages/providers/foundation/src/provider-capability-matrix.bun.test.ts",
         "packages/providers/hermes/src/HermesProviderClient.bun.test.ts",
-        "packages/providers/omp/src/OmpProviderClient.bun.test.ts"
+        "packages/providers/omp/src/OmpProviderClient.bun.test.ts",
+        "packages/providers/omp/src/omp-aimock-live.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -16240,6 +16385,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -16342,10 +16488,14 @@
         "packages/providers/claude-code/src/runner.mcp-url.bun.test.ts",
         "packages/providers/claude-code/src/runner.skill-env.bun.test.ts",
         "packages/providers/codex/src/CodexProviderClient.bun.test.ts",
+        "packages/providers/codex/src/codex-aimock-live.bun.test.ts",
         "packages/providers/debug/src/ChronaDebugProviderClient.bun.test.ts",
+        "packages/providers/foundation/src/live-provider-smoke.bun.test.ts",
         "packages/providers/foundation/src/provider-capability-matrix.bun.test.ts",
         "packages/providers/hermes/src/HermesProviderClient.bun.test.ts",
-        "packages/providers/omp/src/OmpProviderClient.bun.test.ts"
+        "packages/providers/omp/src/OmpProviderClient.bun.test.ts",
+        "packages/providers/omp/src/omp-aimock-live.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -16583,6 +16733,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -16685,10 +16836,14 @@
         "packages/providers/claude-code/src/runner.mcp-url.bun.test.ts",
         "packages/providers/claude-code/src/runner.skill-env.bun.test.ts",
         "packages/providers/codex/src/CodexProviderClient.bun.test.ts",
+        "packages/providers/codex/src/codex-aimock-live.bun.test.ts",
         "packages/providers/debug/src/ChronaDebugProviderClient.bun.test.ts",
+        "packages/providers/foundation/src/live-provider-smoke.bun.test.ts",
         "packages/providers/foundation/src/provider-capability-matrix.bun.test.ts",
         "packages/providers/hermes/src/HermesProviderClient.bun.test.ts",
-        "packages/providers/omp/src/OmpProviderClient.bun.test.ts"
+        "packages/providers/omp/src/OmpProviderClient.bun.test.ts",
+        "packages/providers/omp/src/omp-aimock-live.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -16918,6 +17073,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -17020,10 +17176,14 @@
         "packages/providers/claude-code/src/runner.mcp-url.bun.test.ts",
         "packages/providers/claude-code/src/runner.skill-env.bun.test.ts",
         "packages/providers/codex/src/CodexProviderClient.bun.test.ts",
+        "packages/providers/codex/src/codex-aimock-live.bun.test.ts",
         "packages/providers/debug/src/ChronaDebugProviderClient.bun.test.ts",
+        "packages/providers/foundation/src/live-provider-smoke.bun.test.ts",
         "packages/providers/foundation/src/provider-capability-matrix.bun.test.ts",
         "packages/providers/hermes/src/HermesProviderClient.bun.test.ts",
-        "packages/providers/omp/src/OmpProviderClient.bun.test.ts"
+        "packages/providers/omp/src/OmpProviderClient.bun.test.ts",
+        "packages/providers/omp/src/omp-aimock-live.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": []
     },
@@ -17131,6 +17291,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -17233,10 +17394,14 @@
         "packages/providers/claude-code/src/runner.mcp-url.bun.test.ts",
         "packages/providers/claude-code/src/runner.skill-env.bun.test.ts",
         "packages/providers/codex/src/CodexProviderClient.bun.test.ts",
+        "packages/providers/codex/src/codex-aimock-live.bun.test.ts",
         "packages/providers/debug/src/ChronaDebugProviderClient.bun.test.ts",
+        "packages/providers/foundation/src/live-provider-smoke.bun.test.ts",
         "packages/providers/foundation/src/provider-capability-matrix.bun.test.ts",
         "packages/providers/hermes/src/HermesProviderClient.bun.test.ts",
-        "packages/providers/omp/src/OmpProviderClient.bun.test.ts"
+        "packages/providers/omp/src/OmpProviderClient.bun.test.ts",
+        "packages/providers/omp/src/omp-aimock-live.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -17415,6 +17580,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -17517,10 +17683,14 @@
         "packages/providers/claude-code/src/runner.mcp-url.bun.test.ts",
         "packages/providers/claude-code/src/runner.skill-env.bun.test.ts",
         "packages/providers/codex/src/CodexProviderClient.bun.test.ts",
+        "packages/providers/codex/src/codex-aimock-live.bun.test.ts",
         "packages/providers/debug/src/ChronaDebugProviderClient.bun.test.ts",
+        "packages/providers/foundation/src/live-provider-smoke.bun.test.ts",
         "packages/providers/foundation/src/provider-capability-matrix.bun.test.ts",
         "packages/providers/hermes/src/HermesProviderClient.bun.test.ts",
-        "packages/providers/omp/src/OmpProviderClient.bun.test.ts"
+        "packages/providers/omp/src/OmpProviderClient.bun.test.ts",
+        "packages/providers/omp/src/omp-aimock-live.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -17703,6 +17873,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -17805,10 +17976,14 @@
         "packages/providers/claude-code/src/runner.mcp-url.bun.test.ts",
         "packages/providers/claude-code/src/runner.skill-env.bun.test.ts",
         "packages/providers/codex/src/CodexProviderClient.bun.test.ts",
+        "packages/providers/codex/src/codex-aimock-live.bun.test.ts",
         "packages/providers/debug/src/ChronaDebugProviderClient.bun.test.ts",
+        "packages/providers/foundation/src/live-provider-smoke.bun.test.ts",
         "packages/providers/foundation/src/provider-capability-matrix.bun.test.ts",
         "packages/providers/hermes/src/HermesProviderClient.bun.test.ts",
-        "packages/providers/omp/src/OmpProviderClient.bun.test.ts"
+        "packages/providers/omp/src/OmpProviderClient.bun.test.ts",
+        "packages/providers/omp/src/omp-aimock-live.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -18026,6 +18201,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -18128,10 +18304,14 @@
         "packages/providers/claude-code/src/runner.mcp-url.bun.test.ts",
         "packages/providers/claude-code/src/runner.skill-env.bun.test.ts",
         "packages/providers/codex/src/CodexProviderClient.bun.test.ts",
+        "packages/providers/codex/src/codex-aimock-live.bun.test.ts",
         "packages/providers/debug/src/ChronaDebugProviderClient.bun.test.ts",
+        "packages/providers/foundation/src/live-provider-smoke.bun.test.ts",
         "packages/providers/foundation/src/provider-capability-matrix.bun.test.ts",
         "packages/providers/hermes/src/HermesProviderClient.bun.test.ts",
-        "packages/providers/omp/src/OmpProviderClient.bun.test.ts"
+        "packages/providers/omp/src/OmpProviderClient.bun.test.ts",
+        "packages/providers/omp/src/omp-aimock-live.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -18257,6 +18437,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -18359,10 +18540,14 @@
         "packages/providers/claude-code/src/runner.mcp-url.bun.test.ts",
         "packages/providers/claude-code/src/runner.skill-env.bun.test.ts",
         "packages/providers/codex/src/CodexProviderClient.bun.test.ts",
+        "packages/providers/codex/src/codex-aimock-live.bun.test.ts",
         "packages/providers/debug/src/ChronaDebugProviderClient.bun.test.ts",
+        "packages/providers/foundation/src/live-provider-smoke.bun.test.ts",
         "packages/providers/foundation/src/provider-capability-matrix.bun.test.ts",
         "packages/providers/hermes/src/HermesProviderClient.bun.test.ts",
-        "packages/providers/omp/src/OmpProviderClient.bun.test.ts"
+        "packages/providers/omp/src/OmpProviderClient.bun.test.ts",
+        "packages/providers/omp/src/omp-aimock-live.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -18532,6 +18717,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -18634,10 +18820,14 @@
         "packages/providers/claude-code/src/runner.mcp-url.bun.test.ts",
         "packages/providers/claude-code/src/runner.skill-env.bun.test.ts",
         "packages/providers/codex/src/CodexProviderClient.bun.test.ts",
+        "packages/providers/codex/src/codex-aimock-live.bun.test.ts",
         "packages/providers/debug/src/ChronaDebugProviderClient.bun.test.ts",
+        "packages/providers/foundation/src/live-provider-smoke.bun.test.ts",
         "packages/providers/foundation/src/provider-capability-matrix.bun.test.ts",
         "packages/providers/hermes/src/HermesProviderClient.bun.test.ts",
-        "packages/providers/omp/src/OmpProviderClient.bun.test.ts"
+        "packages/providers/omp/src/OmpProviderClient.bun.test.ts",
+        "packages/providers/omp/src/omp-aimock-live.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -18752,6 +18942,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -18832,10 +19023,14 @@
         "packages/providers/claude-code/src/runner.mcp-url.bun.test.ts",
         "packages/providers/claude-code/src/runner.skill-env.bun.test.ts",
         "packages/providers/codex/src/CodexProviderClient.bun.test.ts",
+        "packages/providers/codex/src/codex-aimock-live.bun.test.ts",
         "packages/providers/debug/src/ChronaDebugProviderClient.bun.test.ts",
+        "packages/providers/foundation/src/live-provider-smoke.bun.test.ts",
         "packages/providers/foundation/src/provider-capability-matrix.bun.test.ts",
         "packages/providers/hermes/src/HermesProviderClient.bun.test.ts",
-        "packages/providers/omp/src/OmpProviderClient.bun.test.ts"
+        "packages/providers/omp/src/OmpProviderClient.bun.test.ts",
+        "packages/providers/omp/src/omp-aimock-live.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -18861,6 +19056,11 @@
         {
           "name": "ProviderCapabilityMatrixEntry",
           "kind": "type",
+          "tests": []
+        },
+        {
+          "name": "releasedProviderTypes",
+          "kind": "const",
           "tests": []
         },
         {
@@ -18968,6 +19168,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -19048,10 +19249,14 @@
         "packages/providers/claude-code/src/runner.mcp-url.bun.test.ts",
         "packages/providers/claude-code/src/runner.skill-env.bun.test.ts",
         "packages/providers/codex/src/CodexProviderClient.bun.test.ts",
+        "packages/providers/codex/src/codex-aimock-live.bun.test.ts",
         "packages/providers/debug/src/ChronaDebugProviderClient.bun.test.ts",
+        "packages/providers/foundation/src/live-provider-smoke.bun.test.ts",
         "packages/providers/foundation/src/provider-capability-matrix.bun.test.ts",
         "packages/providers/hermes/src/HermesProviderClient.bun.test.ts",
-        "packages/providers/omp/src/OmpProviderClient.bun.test.ts"
+        "packages/providers/omp/src/OmpProviderClient.bun.test.ts",
+        "packages/providers/omp/src/omp-aimock-live.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -19272,6 +19477,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -19352,10 +19558,14 @@
         "packages/providers/claude-code/src/runner.mcp-url.bun.test.ts",
         "packages/providers/claude-code/src/runner.skill-env.bun.test.ts",
         "packages/providers/codex/src/CodexProviderClient.bun.test.ts",
+        "packages/providers/codex/src/codex-aimock-live.bun.test.ts",
         "packages/providers/debug/src/ChronaDebugProviderClient.bun.test.ts",
+        "packages/providers/foundation/src/live-provider-smoke.bun.test.ts",
         "packages/providers/foundation/src/provider-capability-matrix.bun.test.ts",
         "packages/providers/hermes/src/HermesProviderClient.bun.test.ts",
-        "packages/providers/omp/src/OmpProviderClient.bun.test.ts"
+        "packages/providers/omp/src/OmpProviderClient.bun.test.ts",
+        "packages/providers/omp/src/omp-aimock-live.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -19478,6 +19688,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -19558,10 +19769,14 @@
         "packages/providers/claude-code/src/runner.mcp-url.bun.test.ts",
         "packages/providers/claude-code/src/runner.skill-env.bun.test.ts",
         "packages/providers/codex/src/CodexProviderClient.bun.test.ts",
+        "packages/providers/codex/src/codex-aimock-live.bun.test.ts",
         "packages/providers/debug/src/ChronaDebugProviderClient.bun.test.ts",
+        "packages/providers/foundation/src/live-provider-smoke.bun.test.ts",
         "packages/providers/foundation/src/provider-capability-matrix.bun.test.ts",
         "packages/providers/hermes/src/HermesProviderClient.bun.test.ts",
-        "packages/providers/omp/src/OmpProviderClient.bun.test.ts"
+        "packages/providers/omp/src/OmpProviderClient.bun.test.ts",
+        "packages/providers/omp/src/omp-aimock-live.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -19639,6 +19854,7 @@
       "directTests": [
         "packages/db/src/external-calendar-management.bun.test.ts",
         "packages/db/src/external-calendar.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
         "packages/engine/src/modules/events/event-retention.bun.test.ts",
@@ -19756,6 +19972,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/prisma-run-store.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
@@ -19822,7 +20039,8 @@
         "packages/engine/src/modules/tasks/open-task-result-file.bun.test.ts",
         "packages/engine/src/modules/tasks/rebuild-task-with-latest-goal-assets.bun.test.ts",
         "packages/engine/src/modules/tasks/task-activity.bun.test.ts",
-        "packages/engine/src/modules/workspaces/__tests__/get-default-workspace.bun.test.ts"
+        "packages/engine/src/modules/workspaces/__tests__/get-default-workspace.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -19831,6 +20049,7 @@
           "tests": [
             "packages/db/src/external-calendar-management.bun.test.ts",
             "packages/db/src/external-calendar.bun.test.ts",
+            "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
             "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
             "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
             "packages/engine/src/modules/events/event-retention.bun.test.ts",
@@ -19955,6 +20174,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/prisma-run-store.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
@@ -20016,7 +20236,8 @@
         "packages/engine/src/modules/tasks/get-task-page-orchestrator.bun.test.ts",
         "packages/engine/src/modules/tasks/open-task-result-file.bun.test.ts",
         "packages/engine/src/modules/tasks/rebuild-task-with-latest-goal-assets.bun.test.ts",
-        "packages/engine/src/modules/workspaces/__tests__/get-default-workspace.bun.test.ts"
+        "packages/engine/src/modules/workspaces/__tests__/get-default-workspace.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -20120,6 +20341,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/prisma-run-store.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
@@ -20181,7 +20403,8 @@
         "packages/engine/src/modules/tasks/get-task-page-orchestrator.bun.test.ts",
         "packages/engine/src/modules/tasks/open-task-result-file.bun.test.ts",
         "packages/engine/src/modules/tasks/rebuild-task-with-latest-goal-assets.bun.test.ts",
-        "packages/engine/src/modules/workspaces/__tests__/get-default-workspace.bun.test.ts"
+        "packages/engine/src/modules/workspaces/__tests__/get-default-workspace.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -20405,6 +20628,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/prisma-run-store.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
@@ -20466,7 +20690,8 @@
         "packages/engine/src/modules/tasks/get-task-page-orchestrator.bun.test.ts",
         "packages/engine/src/modules/tasks/open-task-result-file.bun.test.ts",
         "packages/engine/src/modules/tasks/rebuild-task-with-latest-goal-assets.bun.test.ts",
-        "packages/engine/src/modules/workspaces/__tests__/get-default-workspace.bun.test.ts"
+        "packages/engine/src/modules/workspaces/__tests__/get-default-workspace.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -20874,6 +21099,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/prisma-run-store.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
@@ -20941,7 +21167,8 @@
         "packages/engine/src/modules/tasks/rebuild-task-with-latest-goal-assets.bun.test.ts",
         "packages/engine/src/modules/tasks/task-activity.bun.test.ts",
         "packages/engine/src/modules/workspaces/__tests__/get-default-workspace.bun.test.ts",
-        "scripts/check-release-consistency.bun.test.ts"
+        "scripts/check-release-consistency.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -21067,6 +21294,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/prisma-run-store.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
@@ -21134,7 +21362,8 @@
         "packages/engine/src/modules/tasks/rebuild-task-with-latest-goal-assets.bun.test.ts",
         "packages/engine/src/modules/tasks/task-activity.bun.test.ts",
         "packages/engine/src/modules/workspaces/__tests__/get-default-workspace.bun.test.ts",
-        "scripts/check-release-consistency.bun.test.ts"
+        "scripts/check-release-consistency.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -21253,6 +21482,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/prisma-run-store.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
@@ -21320,7 +21550,8 @@
         "packages/engine/src/modules/tasks/rebuild-task-with-latest-goal-assets.bun.test.ts",
         "packages/engine/src/modules/tasks/task-activity.bun.test.ts",
         "packages/engine/src/modules/workspaces/__tests__/get-default-workspace.bun.test.ts",
-        "scripts/check-release-consistency.bun.test.ts"
+        "scripts/check-release-consistency.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -21453,6 +21684,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/prisma-run-store.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
@@ -21521,7 +21753,8 @@
         "packages/engine/src/modules/tasks/task-activity.bun.test.ts",
         "packages/engine/src/modules/workspaces/__tests__/get-default-workspace.bun.test.ts",
         "scripts/check-release-consistency.bun.test.ts",
-        "scripts/init-sqlite-db.bun.test.ts"
+        "scripts/init-sqlite-db.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -21658,6 +21891,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/prisma-run-store.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
@@ -21725,7 +21959,8 @@
         "packages/engine/src/modules/tasks/rebuild-task-with-latest-goal-assets.bun.test.ts",
         "packages/engine/src/modules/tasks/task-activity.bun.test.ts",
         "packages/engine/src/modules/workspaces/__tests__/get-default-workspace.bun.test.ts",
-        "scripts/check-release-consistency.bun.test.ts"
+        "scripts/check-release-consistency.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -21831,6 +22066,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/prisma-run-store.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
@@ -21899,7 +22135,8 @@
         "packages/engine/src/modules/tasks/task-activity.bun.test.ts",
         "packages/engine/src/modules/workspaces/__tests__/get-default-workspace.bun.test.ts",
         "scripts/check-release-consistency.bun.test.ts",
-        "scripts/init-sqlite-db.bun.test.ts"
+        "scripts/init-sqlite-db.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -21956,6 +22193,21 @@
         },
         {
           "name": "assertPrivateStorageSupported",
+          "kind": "function",
+          "tests": []
+        },
+        {
+          "name": "secureGeneratedPrivateFile",
+          "kind": "function",
+          "tests": []
+        },
+        {
+          "name": "ensurePrivateDirectory",
+          "kind": "function",
+          "tests": []
+        },
+        {
+          "name": "assertPrivateStoragePath",
           "kind": "function",
           "tests": []
         },
@@ -22050,6 +22302,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/prisma-run-store.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
@@ -22111,7 +22364,8 @@
         "packages/engine/src/modules/tasks/get-task-page-orchestrator.bun.test.ts",
         "packages/engine/src/modules/tasks/open-task-result-file.bun.test.ts",
         "packages/engine/src/modules/tasks/rebuild-task-with-latest-goal-assets.bun.test.ts",
-        "packages/engine/src/modules/workspaces/__tests__/get-default-workspace.bun.test.ts"
+        "packages/engine/src/modules/workspaces/__tests__/get-default-workspace.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -22147,6 +22401,223 @@
             "packages/engine/src/modules/tasks/continue-from-task-result.bun.test.ts",
             "packages/engine/src/modules/tasks/open-task-result-file.bun.test.ts"
           ]
+        }
+      ]
+    },
+    {
+      "file": "packages/db/src/windows-private-storage.ts",
+      "pkg": "db",
+      "module": "windows-private-storage.ts",
+      "workflow": "platform",
+      "directTests": [
+        "packages/db/src/sqlite-url.bun.test.ts"
+      ],
+      "transitiveTests": [
+        "apps/server/src/__tests__/api/accept-task-result.bun.test.ts",
+        "apps/server/src/__tests__/api/action-center-memory-schedule-pages.bun.test.ts",
+        "apps/server/src/__tests__/api/activity-timeline.bun.test.ts",
+        "apps/server/src/__tests__/api/agent-tools-input-guards.bun.test.ts",
+        "apps/server/src/__tests__/api/ai-client-crud.bun.test.ts",
+        "apps/server/src/__tests__/api/ai-client-safety.bun.test.ts",
+        "apps/server/src/__tests__/api/ai-feature-binding.bun.test.ts",
+        "apps/server/src/__tests__/api/ai-suggestions.bun.test.ts",
+        "apps/server/src/__tests__/api/apply-schedule.bun.test.ts",
+        "apps/server/src/__tests__/api/assistant-surface-actions.bun.test.ts",
+        "apps/server/src/__tests__/api/clear-schedule.bun.test.ts",
+        "apps/server/src/__tests__/api/dashboard-ai-brief-generate.bun.test.ts",
+        "apps/server/src/__tests__/api/dashboard-page.bun.test.ts",
+        "apps/server/src/__tests__/api/decide-schedule-proposal.bun.test.ts",
+        "apps/server/src/__tests__/api/execution-checkpoint.bun.test.ts",
+        "apps/server/src/__tests__/api/external-calendar-events.bun.test.ts",
+        "apps/server/src/__tests__/api/external-calendar-source-management.bun.test.ts",
+        "apps/server/src/__tests__/api/external-calendar-sources.bun.test.ts",
+        "apps/server/src/__tests__/api/external-task-edit-roundtrip.bun.test.ts",
+        "apps/server/src/__tests__/api/get-action-center.bun.test.ts",
+        "apps/server/src/__tests__/api/get-memory-console.bun.test.ts",
+        "apps/server/src/__tests__/api/goal-review-v2.bun.test.ts",
+        "apps/server/src/__tests__/api/goal-workbench.bun.test.ts",
+        "apps/server/src/__tests__/api/goals.bun.test.ts",
+        "apps/server/src/__tests__/api/header-and-readmodels-ssr.bun.test.ts",
+        "apps/server/src/__tests__/api/mark-task-done.bun.test.ts",
+        "apps/server/src/__tests__/api/plan-acceptance-edges.bun.test.ts",
+        "apps/server/src/__tests__/api/plan-execution-checkpoint-regression.bun.test.ts",
+        "apps/server/src/__tests__/api/plan-execution-module.bun.test.ts",
+        "apps/server/src/__tests__/api/plan-execution-output.bun.test.ts",
+        "apps/server/src/__tests__/api/plan-lifecycle-edge-workflow.bun.test.ts",
+        "apps/server/src/__tests__/api/plan-lifecycle-workflow.bun.test.ts",
+        "apps/server/src/__tests__/api/propose-schedule.bun.test.ts",
+        "apps/server/src/__tests__/api/provider-approval-resolve.bun.test.ts",
+        "apps/server/src/__tests__/api/provider-bridge-malformed-workflow.bun.test.ts",
+        "apps/server/src/__tests__/api/real-router-smoke.bun.test.ts",
+        "apps/server/src/__tests__/api/recurring-task-edge-cases.bun.test.ts",
+        "apps/server/src/__tests__/api/recurring-task-lifecycle.bun.test.ts",
+        "apps/server/src/__tests__/api/reopen-task.bun.test.ts",
+        "apps/server/src/__tests__/api/runtime-providers.bun.test.ts",
+        "apps/server/src/__tests__/api/schedule-proposal-accept-reject.bun.test.ts",
+        "apps/server/src/__tests__/api/schedule-proposal-conflict-workflow.bun.test.ts",
+        "apps/server/src/__tests__/api/schedule-proposal-regression.bun.test.ts",
+        "apps/server/src/__tests__/api/schedule-proposal-workflow.bun.test.ts",
+        "apps/server/src/__tests__/api/task-assistant-message.bun.test.ts",
+        "apps/server/src/__tests__/api/task-triggers.bun.test.ts",
+        "apps/server/src/__tests__/api/task-validation-workflow.bun.test.ts",
+        "apps/server/src/__tests__/api/task-workflow.bun.test.ts",
+        "apps/server/src/__tests__/api/task-workspace-activity.bun.test.ts",
+        "apps/server/src/__tests__/api/task-workspace-console.bun.test.ts",
+        "apps/server/src/__tests__/api/work-block-schedule.bun.test.ts",
+        "apps/server/src/__tests__/api/workspace-overview.bun.test.ts",
+        "apps/server/src/__tests__/api/workspace-preferences.bun.test.ts",
+        "apps/server/src/__tests__/bootstrap-runtime.bun.test.ts",
+        "apps/server/src/__tests__/test-database-safety.bun.test.ts",
+        "apps/server/src/app.bun.test.ts",
+        "apps/server/src/routes/__tests__/agent-control-routes.bun.test.ts",
+        "apps/server/src/routes/__tests__/mcp-routes.bun.test.ts",
+        "apps/server/src/routes/__tests__/plan-operations.bun.test.ts",
+        "apps/server/src/routes/__tests__/task-execution-closure.bun.test.ts",
+        "apps/server/src/routes/__tests__/work-commands-spec-patch.bun.test.ts",
+        "apps/server/src/routes/__tests__/work-events-state.bun.test.ts",
+        "apps/server/src/routes/pages/work.routes.bun.test.ts",
+        "apps/server/src/routes/tasks/__tests__/plan-accept-route.bun.test.ts",
+        "apps/server/src/routes/tasks/result-finalization-retry.bun.test.ts",
+        "packages/cli/src/doctor.bun.test.ts",
+        "packages/cli/src/program.bun.test.ts",
+        "packages/cli/src/start-server.bun.test.ts",
+        "packages/db/src/external-calendar-management.bun.test.ts",
+        "packages/db/src/external-calendar.bun.test.ts",
+        "packages/db/src/sqlite-backup.bun.test.ts",
+        "packages/db/src/sqlite-migrations.bun.test.ts",
+        "packages/db/src/sqlite-runtime-lock.bun.test.ts",
+        "packages/db/src/sqlite-url.bun.test.ts",
+        "packages/engine/src/modules/agent-tools/agent-control.bun.test.ts",
+        "packages/engine/src/modules/agent-tools/operations.bun.test.ts",
+        "packages/engine/src/modules/ai/__tests__/conflict-analyzer-smart.bun.test.ts",
+        "packages/engine/src/modules/ai/__tests__/conflict-detector.bun.test.ts",
+        "packages/engine/src/modules/ai/__tests__/provider-response-parsing.bun.test.ts",
+        "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
+        "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
+        "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/feature-runtime/prisma-run-store.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
+        "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
+        "packages/engine/src/modules/events/event-retention.bun.test.ts",
+        "packages/engine/src/modules/goals/ai/goal.review.bun.test.ts",
+        "packages/engine/src/modules/goals/goal-asset-ownership.bun.test.ts",
+        "packages/engine/src/modules/orchestration/due-scheduled-work-worker.bun.test.ts",
+        "packages/engine/src/modules/orchestration/graph-advancement-worker.bun.test.ts",
+        "packages/engine/src/modules/orchestration/graph-mutation-repository.bun.test.ts",
+        "packages/engine/src/modules/orchestration/orchestrator-restart-recovery.bun.test.ts",
+        "packages/engine/src/modules/orchestration/recurring-work-block-expansion-worker.bun.test.ts",
+        "packages/engine/src/modules/orchestration/scheduler-event-repository.bun.test.ts",
+        "packages/engine/src/modules/orchestration/scheduler-lease-repository.bun.test.ts",
+        "packages/engine/src/modules/orchestration/scheduler-ownership.integration.bun.test.ts",
+        "packages/engine/src/modules/orchestration/task-orchestrator.bun.test.ts",
+        "packages/engine/src/modules/pages/dashboard-ai-surface.bun.test.ts",
+        "packages/engine/src/modules/pages/get-action-center.bun.test.ts",
+        "packages/engine/src/modules/pages/get-schedule-page-auto-start-reason.bun.test.ts",
+        "packages/engine/src/modules/pages/get-schedule-page-runnable-state.bun.test.ts",
+        "packages/engine/src/modules/pages/get-schedule-page.bun.test.ts",
+        "packages/engine/src/modules/plan-execution/__tests__/duplicate-execution-regression.bun.test.ts",
+        "packages/engine/src/modules/plan-execution/__tests__/serial-branch-result-regression.bun.test.ts",
+        "packages/engine/src/modules/plan-execution/__tests__/stop-pause-regression.bun.test.ts",
+        "packages/engine/src/modules/plan-execution/ai-runtime-invoker.bun.test.ts",
+        "packages/engine/src/modules/plan-execution/kernel/execute-command-receipts.focused.bun.test.ts",
+        "packages/engine/src/modules/plan-execution/kernel/execute-command.smoke.bun.test.ts",
+        "packages/engine/src/modules/plan-execution/manual-completion-form-review.bun.test.ts",
+        "packages/engine/src/modules/plan-execution/node-ai-capabilities.bun.test.ts",
+        "packages/engine/src/modules/plan-execution/node-executors/condition-executor.bun.test.ts",
+        "packages/engine/src/modules/plan-execution/node-executors/task-executor.manual.bun.test.ts",
+        "packages/engine/src/modules/plan-execution/persistence/execution-scope.bun.test.ts",
+        "packages/engine/src/modules/plan-execution/persistence/plan-run-terminalizer.bun.test.ts",
+        "packages/engine/src/modules/plan-execution/persistence/task-execution-store.bun.test.ts",
+        "packages/engine/src/modules/plan-execution/plan-runner.bun.test.ts",
+        "packages/engine/src/modules/plan-execution/plan-runner.task-executor.approval.bun.test.ts",
+        "packages/engine/src/modules/plan-execution/plan-runner.task-executor.concurrency.bun.test.ts",
+        "packages/engine/src/modules/plan-execution/plan-runner.task-executor.continuation.bun.test.ts",
+        "packages/engine/src/modules/plan-execution/plan-runner.task-executor.external-results.bun.test.ts",
+        "packages/engine/src/modules/plan-execution/plan-runner.task-executor.full-chain.bun.test.ts",
+        "packages/engine/src/modules/plan-execution/plan-runner.task-executor.interruption.bun.test.ts",
+        "packages/engine/src/modules/plan-execution/plan-runner.task-executor.runtime-events.bun.test.ts",
+        "packages/engine/src/modules/plan-execution/results/finalize-task-result-recovery.bun.test.ts",
+        "packages/engine/src/modules/plan-execution/results/finalize-task-result.bun.test.ts",
+        "packages/engine/src/modules/plan-execution/use-cases/get-current-execution.bun.test.ts",
+        "packages/engine/src/modules/plan-execution/use-cases/register-generated-plan-output-artifacts.bun.test.ts",
+        "packages/engine/src/modules/plan-execution/use-cases/resolve-provider-approval.bun.test.ts",
+        "packages/engine/src/modules/plan-execution/use-cases/sync-runtime-result/sync-runtime-result.bun.test.ts",
+        "packages/engine/src/modules/plans/apply-plan-patch-command.bun.test.ts",
+        "packages/engine/src/modules/plans/start-task-plan-generation.bun.test.ts",
+        "packages/engine/src/modules/projections/__tests__/rebuild-task-projection.occurrence-isolation.bun.test.ts",
+        "packages/engine/src/modules/scheduling/__tests__/schedule-commands.bun.test.ts",
+        "packages/engine/src/modules/scheduling/auto-generate-scheduled-plan.bun.test.ts",
+        "packages/engine/src/modules/scheduling/auto-start-runner.bun.test.ts",
+        "packages/engine/src/modules/scheduling/auto-start-scheduled-plan.bun.test.ts",
+        "packages/engine/src/modules/tasks/__tests__/command-chain.bun.test.ts",
+        "packages/engine/src/modules/tasks/__tests__/external-task-description-echo.bun.test.ts",
+        "packages/engine/src/modules/tasks/accepted-result-context.bun.test.ts",
+        "packages/engine/src/modules/tasks/continue-from-task-result.bun.test.ts",
+        "packages/engine/src/modules/tasks/create-task-no-auto-plan.bun.test.ts",
+        "packages/engine/src/modules/tasks/delete-task.bun.test.ts",
+        "packages/engine/src/modules/tasks/get-task-header.bun.test.ts",
+        "packages/engine/src/modules/tasks/get-task-page-orchestrator.bun.test.ts",
+        "packages/engine/src/modules/tasks/open-task-result-file.bun.test.ts",
+        "packages/engine/src/modules/tasks/rebuild-task-with-latest-goal-assets.bun.test.ts",
+        "packages/engine/src/modules/tasks/task-activity.bun.test.ts",
+        "packages/engine/src/modules/workspaces/__tests__/get-default-workspace.bun.test.ts",
+        "scripts/check-release-consistency.bun.test.ts",
+        "scripts/init-sqlite-db.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
+      ],
+      "symbols": [
+        {
+          "name": "WindowsAclRule",
+          "kind": "type",
+          "tests": []
+        },
+        {
+          "name": "WindowsAclAudit",
+          "kind": "type",
+          "tests": []
+        },
+        {
+          "name": "WindowsAclCommand",
+          "kind": "type",
+          "tests": []
+        },
+        {
+          "name": "buildWindowsPrivateAclCommand",
+          "kind": "function",
+          "tests": [
+            "packages/db/src/sqlite-url.bun.test.ts"
+          ]
+        },
+        {
+          "name": "parseWindowsAclAudit",
+          "kind": "function",
+          "tests": [
+            "packages/db/src/sqlite-url.bun.test.ts"
+          ]
+        },
+        {
+          "name": "windowsAclIsPrivate",
+          "kind": "function",
+          "tests": [
+            "packages/db/src/sqlite-url.bun.test.ts"
+          ]
+        },
+        {
+          "name": "assertWindowsPrivateStorage",
+          "kind": "function",
+          "tests": []
+        },
+        {
+          "name": "secureWindowsGeneratedStorage",
+          "kind": "function",
+          "tests": []
+        },
+        {
+          "name": "ensureWindowsPrivateDirectory",
+          "kind": "function",
+          "tests": []
         }
       ]
     },
@@ -22229,6 +22700,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/prisma-run-store.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
@@ -22290,7 +22762,8 @@
         "packages/engine/src/modules/tasks/get-task-page-orchestrator.bun.test.ts",
         "packages/engine/src/modules/tasks/open-task-result-file.bun.test.ts",
         "packages/engine/src/modules/tasks/rebuild-task-with-latest-goal-assets.bun.test.ts",
-        "packages/engine/src/modules/workspaces/__tests__/get-default-workspace.bun.test.ts"
+        "packages/engine/src/modules/workspaces/__tests__/get-default-workspace.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -27283,7 +27756,8 @@
           "kind": "reexport",
           "tests": [
             "apps/server/src/app.bun.test.ts",
-            "apps/server/src/routes/__tests__/agent-control-routes.bun.test.ts"
+            "apps/server/src/routes/__tests__/agent-control-routes.bun.test.ts",
+            "apps/server/src/routes/__tests__/mcp-routes.bun.test.ts"
           ]
         },
         {
@@ -32425,7 +32899,8 @@
       "module": "ai",
       "workflow": "plan-generation",
       "directTests": [
-        "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts"
+        "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts"
       ],
       "transitiveTests": [
         "apps/server/src/__tests__/api/accept-task-result.bun.test.ts",
@@ -32497,6 +32972,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -32611,7 +33087,8 @@
           "name": "aiClientRegistry",
           "kind": "const",
           "tests": [
-            "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts"
+            "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
+            "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts"
           ]
         }
       ]
@@ -32622,7 +33099,8 @@
       "module": "ai",
       "workflow": "plan-generation",
       "directTests": [
-        "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts"
+        "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts"
       ],
       "transitiveTests": [
         "apps/server/src/__tests__/api/accept-task-result.bun.test.ts",
@@ -32694,6 +33172,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -32763,7 +33242,8 @@
           "name": "getAiClientForTask",
           "kind": "function",
           "tests": [
-            "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts"
+            "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
+            "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts"
           ]
         },
         {
@@ -34868,6 +35348,7 @@
         "packages/engine/src/modules/goals/goal-asset-export.bun.test.ts",
         "packages/engine/src/modules/goals/goal-asset-ownership.bun.test.ts",
         "packages/engine/src/modules/pages/get-action-center.bun.test.ts",
+        "packages/engine/src/modules/plan-execution/plan-runner.task-executor.continuation.bun.test.ts",
         "packages/engine/src/modules/workspaces/__tests__/get-default-workspace.bun.test.ts"
       ],
       "symbols": [
@@ -35150,6 +35631,7 @@
         "packages/engine/src/modules/orchestration/scheduler-ownership.integration.bun.test.ts",
         "packages/engine/src/modules/orchestration/task-orchestrator.bun.test.ts",
         "packages/engine/src/modules/pages/get-action-center.bun.test.ts",
+        "packages/engine/src/modules/plan-execution/plan-runner.task-executor.continuation.bun.test.ts",
         "packages/engine/src/modules/plans/apply-plan-patch-command.bun.test.ts",
         "packages/engine/src/modules/plans/start-task-plan-generation.bun.test.ts",
         "packages/engine/src/modules/scheduling/auto-generate-scheduled-plan.bun.test.ts",
@@ -35277,6 +35759,7 @@
         "packages/engine/src/modules/events/event-retention.bun.test.ts",
         "packages/engine/src/modules/goals/goal-asset-ownership.bun.test.ts",
         "packages/engine/src/modules/pages/get-action-center.bun.test.ts",
+        "packages/engine/src/modules/plan-execution/plan-runner.task-executor.continuation.bun.test.ts",
         "packages/engine/src/modules/workspaces/__tests__/get-default-workspace.bun.test.ts"
       ],
       "symbols": [
@@ -44107,6 +44590,11 @@
           "tests": []
         },
         {
+          "name": "ensurePlanExecutionRun",
+          "kind": "function",
+          "tests": []
+        },
+        {
           "name": "completeActiveRunsForExecutionScope",
           "kind": "function",
           "tests": [
@@ -51773,7 +52261,9 @@
       "pkg": "engine",
       "module": "tasks",
       "workflow": "task-management",
-      "directTests": [],
+      "directTests": [
+        "packages/engine/src/modules/plan-execution/plan-runner.task-executor.continuation.bun.test.ts"
+      ],
       "transitiveTests": [
         "apps/server/src/__tests__/api/accept-task-result.bun.test.ts",
         "apps/server/src/__tests__/api/action-center-memory-schedule-pages.bun.test.ts",
@@ -51844,13 +52334,16 @@
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
         "packages/engine/src/modules/events/event-retention.bun.test.ts",
         "packages/engine/src/modules/pages/get-action-center.bun.test.ts",
+        "packages/engine/src/modules/plan-execution/plan-runner.task-executor.continuation.bun.test.ts",
         "packages/engine/src/modules/workspaces/__tests__/get-default-workspace.bun.test.ts"
       ],
       "symbols": [
         {
           "name": "acceptTaskResult",
           "kind": "function",
-          "tests": []
+          "tests": [
+            "packages/engine/src/modules/plan-execution/plan-runner.task-executor.continuation.bun.test.ts"
+          ]
         }
       ]
     },
@@ -51933,6 +52426,7 @@
         "packages/engine/src/modules/events/event-retention.bun.test.ts",
         "packages/engine/src/modules/goals/goal-asset-ownership.bun.test.ts",
         "packages/engine/src/modules/pages/get-action-center.bun.test.ts",
+        "packages/engine/src/modules/plan-execution/plan-runner.task-executor.continuation.bun.test.ts",
         "packages/engine/src/modules/plans/apply-plan-patch-command.bun.test.ts",
         "packages/engine/src/modules/plans/start-task-plan-generation.bun.test.ts",
         "packages/engine/src/modules/scheduling/auto-generate-scheduled-plan.bun.test.ts",
@@ -52152,6 +52646,7 @@
         "packages/engine/src/modules/events/event-retention.bun.test.ts",
         "packages/engine/src/modules/goals/goal-asset-ownership.bun.test.ts",
         "packages/engine/src/modules/pages/get-action-center.bun.test.ts",
+        "packages/engine/src/modules/plan-execution/plan-runner.task-executor.continuation.bun.test.ts",
         "packages/engine/src/modules/scheduling/auto-start-scheduled-plan.bun.test.ts",
         "packages/engine/src/modules/tasks/__tests__/command-chain.bun.test.ts",
         "packages/engine/src/modules/tasks/continue-from-task-result.bun.test.ts",
@@ -54598,6 +55093,7 @@
         "packages/engine/src/modules/orchestration/scheduler-ownership.integration.bun.test.ts",
         "packages/engine/src/modules/orchestration/task-orchestrator.bun.test.ts",
         "packages/engine/src/modules/pages/get-action-center.bun.test.ts",
+        "packages/engine/src/modules/plan-execution/plan-runner.task-executor.continuation.bun.test.ts",
         "packages/engine/src/modules/scheduling/auto-start-runner.bun.test.ts",
         "packages/engine/src/modules/scheduling/auto-start-scheduled-plan.bun.test.ts",
         "packages/engine/src/modules/workspaces/__tests__/get-default-workspace.bun.test.ts"
@@ -63800,6 +64296,7 @@
         "packages/engine/src/modules/orchestration/scheduler-ownership.integration.bun.test.ts",
         "packages/engine/src/modules/orchestration/task-orchestrator.bun.test.ts",
         "packages/engine/src/modules/pages/get-action-center.bun.test.ts",
+        "packages/engine/src/modules/plan-execution/plan-runner.task-executor.continuation.bun.test.ts",
         "packages/engine/src/modules/scheduling/auto-start-runner.bun.test.ts",
         "packages/engine/src/modules/scheduling/auto-start-scheduled-plan.bun.test.ts",
         "packages/engine/src/modules/tasks/__tests__/command-chain.bun.test.ts",
@@ -63921,6 +64418,7 @@
         "packages/engine/src/modules/orchestration/scheduler-ownership.integration.bun.test.ts",
         "packages/engine/src/modules/orchestration/task-orchestrator.bun.test.ts",
         "packages/engine/src/modules/pages/get-action-center.bun.test.ts",
+        "packages/engine/src/modules/plan-execution/plan-runner.task-executor.continuation.bun.test.ts",
         "packages/engine/src/modules/scheduling/auto-start-runner.bun.test.ts",
         "packages/engine/src/modules/scheduling/auto-start-scheduled-plan.bun.test.ts",
         "packages/engine/src/modules/tasks/__tests__/command-chain.bun.test.ts",
@@ -64036,6 +64534,7 @@
         "packages/engine/src/modules/orchestration/scheduler-ownership.integration.bun.test.ts",
         "packages/engine/src/modules/orchestration/task-orchestrator.bun.test.ts",
         "packages/engine/src/modules/pages/get-action-center.bun.test.ts",
+        "packages/engine/src/modules/plan-execution/plan-runner.task-executor.continuation.bun.test.ts",
         "packages/engine/src/modules/scheduling/auto-start-runner.bun.test.ts",
         "packages/engine/src/modules/scheduling/auto-start-scheduled-plan.bun.test.ts",
         "packages/engine/src/modules/tasks/__tests__/command-chain.bun.test.ts",
@@ -64144,6 +64643,7 @@
         "packages/engine/src/modules/orchestration/scheduler-ownership.integration.bun.test.ts",
         "packages/engine/src/modules/orchestration/task-orchestrator.bun.test.ts",
         "packages/engine/src/modules/pages/get-action-center.bun.test.ts",
+        "packages/engine/src/modules/plan-execution/plan-runner.task-executor.continuation.bun.test.ts",
         "packages/engine/src/modules/scheduling/auto-start-runner.bun.test.ts",
         "packages/engine/src/modules/scheduling/auto-start-scheduled-plan.bun.test.ts",
         "packages/engine/src/modules/tasks/__tests__/command-chain.bun.test.ts",
@@ -64776,6 +65276,7 @@
         "packages/engine/src/modules/orchestration/scheduler-ownership.integration.bun.test.ts",
         "packages/engine/src/modules/orchestration/task-orchestrator.bun.test.ts",
         "packages/engine/src/modules/pages/get-action-center.bun.test.ts",
+        "packages/engine/src/modules/plan-execution/plan-runner.task-executor.continuation.bun.test.ts",
         "packages/engine/src/modules/scheduling/auto-start-runner.bun.test.ts",
         "packages/engine/src/modules/scheduling/auto-start-scheduled-plan.bun.test.ts",
         "packages/engine/src/modules/tasks/__tests__/command-chain.bun.test.ts",
@@ -64861,6 +65362,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -64923,7 +65425,10 @@
         "packages/providers/claude-code/src/runner.mcp-url.bun.test.ts",
         "packages/providers/claude-code/src/runner.skill-env.bun.test.ts",
         "packages/providers/codex/src/CodexProviderClient.bun.test.ts",
-        "packages/providers/omp/src/OmpProviderClient.bun.test.ts"
+        "packages/providers/codex/src/codex-aimock-live.bun.test.ts",
+        "packages/providers/omp/src/OmpProviderClient.bun.test.ts",
+        "packages/providers/omp/src/omp-aimock-live.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -65068,6 +65573,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -65130,7 +65636,10 @@
         "packages/providers/claude-code/src/runner.mcp-url.bun.test.ts",
         "packages/providers/claude-code/src/runner.skill-env.bun.test.ts",
         "packages/providers/codex/src/CodexProviderClient.bun.test.ts",
-        "packages/providers/omp/src/OmpProviderClient.bun.test.ts"
+        "packages/providers/codex/src/codex-aimock-live.bun.test.ts",
+        "packages/providers/omp/src/OmpProviderClient.bun.test.ts",
+        "packages/providers/omp/src/omp-aimock-live.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -65240,6 +65749,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -65282,7 +65792,9 @@
         "packages/engine/src/modules/tasks/rebuild-task-with-latest-goal-assets.bun.test.ts",
         "packages/engine/src/modules/workspaces/__tests__/get-default-workspace.bun.test.ts",
         "packages/providers/acp/src/AcpProviderClient.bun.test.ts",
-        "packages/providers/codex/src/CodexProviderClient.bun.test.ts"
+        "packages/providers/codex/src/CodexProviderClient.bun.test.ts",
+        "packages/providers/codex/src/codex-aimock-live.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -65405,6 +65917,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -65455,7 +65968,9 @@
         "packages/engine/src/modules/tasks/get-task-page-orchestrator.bun.test.ts",
         "packages/engine/src/modules/tasks/rebuild-task-with-latest-goal-assets.bun.test.ts",
         "packages/engine/src/modules/workspaces/__tests__/get-default-workspace.bun.test.ts",
-        "packages/providers/codex/src/CodexProviderClient.bun.test.ts"
+        "packages/providers/codex/src/CodexProviderClient.bun.test.ts",
+        "packages/providers/codex/src/codex-aimock-live.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -65591,6 +66106,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -65633,7 +66149,9 @@
         "packages/engine/src/modules/tasks/rebuild-task-with-latest-goal-assets.bun.test.ts",
         "packages/engine/src/modules/workspaces/__tests__/get-default-workspace.bun.test.ts",
         "packages/providers/acp/src/AcpProviderClient.bun.test.ts",
-        "packages/providers/codex/src/CodexProviderClient.bun.test.ts"
+        "packages/providers/codex/src/CodexProviderClient.bun.test.ts",
+        "packages/providers/codex/src/codex-aimock-live.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -65829,6 +66347,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -65882,7 +66401,8 @@
         "packages/engine/src/modules/workspaces/__tests__/get-default-workspace.bun.test.ts",
         "packages/providers/claude-code/src/ClaudeCodeProviderClient.bun.test.ts",
         "packages/providers/claude-code/src/claude-code-aimock-extra-live.bun.test.ts",
-        "packages/providers/claude-code/src/claude-code-aimock-live.bun.test.ts"
+        "packages/providers/claude-code/src/claude-code-aimock-live.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -65979,6 +66499,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -66031,7 +66552,8 @@
         "packages/engine/src/modules/tasks/create-task-no-auto-plan.bun.test.ts",
         "packages/engine/src/modules/tasks/get-task-page-orchestrator.bun.test.ts",
         "packages/engine/src/modules/tasks/rebuild-task-with-latest-goal-assets.bun.test.ts",
-        "packages/engine/src/modules/workspaces/__tests__/get-default-workspace.bun.test.ts"
+        "packages/engine/src/modules/workspaces/__tests__/get-default-workspace.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -66166,6 +66688,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -66221,7 +66744,8 @@
         "packages/providers/claude-code/src/claude-code-aimock-live.bun.test.ts",
         "packages/providers/claude-code/src/runner.mcp-probe.bun.test.ts",
         "packages/providers/claude-code/src/runner.mcp-url.bun.test.ts",
-        "packages/providers/claude-code/src/runner.skill-env.bun.test.ts"
+        "packages/providers/claude-code/src/runner.skill-env.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -66340,6 +66864,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -66387,7 +66912,8 @@
         "packages/providers/claude-code/src/normalizers.result.bun.test.ts",
         "packages/providers/claude-code/src/runner.mcp-probe.bun.test.ts",
         "packages/providers/claude-code/src/runner.mcp-url.bun.test.ts",
-        "packages/providers/claude-code/src/runner.skill-env.bun.test.ts"
+        "packages/providers/claude-code/src/runner.skill-env.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -66505,6 +67031,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -66561,7 +67088,8 @@
         "packages/providers/claude-code/src/normalizers.result.bun.test.ts",
         "packages/providers/claude-code/src/runner.mcp-probe.bun.test.ts",
         "packages/providers/claude-code/src/runner.mcp-url.bun.test.ts",
-        "packages/providers/claude-code/src/runner.skill-env.bun.test.ts"
+        "packages/providers/claude-code/src/runner.skill-env.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -66671,6 +67199,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -66727,7 +67256,8 @@
         "packages/providers/claude-code/src/runner-helpers.bun.test.ts",
         "packages/providers/claude-code/src/runner.mcp-probe.bun.test.ts",
         "packages/providers/claude-code/src/runner.mcp-url.bun.test.ts",
-        "packages/providers/claude-code/src/runner.skill-env.bun.test.ts"
+        "packages/providers/claude-code/src/runner.skill-env.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -66839,6 +67369,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -66895,7 +67426,8 @@
         "packages/providers/claude-code/src/claude-code-aimock-live.bun.test.ts",
         "packages/providers/claude-code/src/runner.mcp-probe.bun.test.ts",
         "packages/providers/claude-code/src/runner.mcp-url.bun.test.ts",
-        "packages/providers/claude-code/src/runner.skill-env.bun.test.ts"
+        "packages/providers/claude-code/src/runner.skill-env.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -67066,6 +67598,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -67122,7 +67655,8 @@
         "packages/providers/claude-code/src/claude-code-aimock-live.bun.test.ts",
         "packages/providers/claude-code/src/runner.mcp-probe.bun.test.ts",
         "packages/providers/claude-code/src/runner.mcp-url.bun.test.ts",
-        "packages/providers/claude-code/src/runner.skill-env.bun.test.ts"
+        "packages/providers/claude-code/src/runner.skill-env.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -67219,6 +67753,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -67270,7 +67805,9 @@
         "packages/engine/src/modules/tasks/get-task-page-orchestrator.bun.test.ts",
         "packages/engine/src/modules/tasks/rebuild-task-with-latest-goal-assets.bun.test.ts",
         "packages/engine/src/modules/workspaces/__tests__/get-default-workspace.bun.test.ts",
-        "packages/providers/codex/src/CodexProviderClient.bun.test.ts"
+        "packages/providers/codex/src/CodexProviderClient.bun.test.ts",
+        "packages/providers/codex/src/codex-aimock-live.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -67292,7 +67829,9 @@
       "pkg": "providers/codex",
       "module": "index.ts",
       "workflow": "providers-runtime",
-      "directTests": [],
+      "directTests": [
+        "packages/providers/codex/src/codex-aimock-live.bun.test.ts"
+      ],
       "transitiveTests": [
         "apps/server/src/__tests__/api/accept-task-result.bun.test.ts",
         "apps/server/src/__tests__/api/action-center-memory-schedule-pages.bun.test.ts",
@@ -67362,6 +67901,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -67414,7 +67954,9 @@
         "packages/engine/src/modules/tasks/create-task-no-auto-plan.bun.test.ts",
         "packages/engine/src/modules/tasks/get-task-page-orchestrator.bun.test.ts",
         "packages/engine/src/modules/tasks/rebuild-task-with-latest-goal-assets.bun.test.ts",
-        "packages/engine/src/modules/workspaces/__tests__/get-default-workspace.bun.test.ts"
+        "packages/engine/src/modules/workspaces/__tests__/get-default-workspace.bun.test.ts",
+        "packages/providers/codex/src/codex-aimock-live.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -67425,7 +67967,9 @@
         {
           "name": "CodexProviderClient",
           "kind": "reexport",
-          "tests": []
+          "tests": [
+            "packages/providers/codex/src/codex-aimock-live.bun.test.ts"
+          ]
         },
         {
           "name": "CodexProviderOptions",
@@ -67516,6 +68060,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -67567,7 +68112,9 @@
         "packages/engine/src/modules/tasks/get-task-page-orchestrator.bun.test.ts",
         "packages/engine/src/modules/tasks/rebuild-task-with-latest-goal-assets.bun.test.ts",
         "packages/engine/src/modules/workspaces/__tests__/get-default-workspace.bun.test.ts",
-        "packages/providers/codex/src/CodexProviderClient.bun.test.ts"
+        "packages/providers/codex/src/CodexProviderClient.bun.test.ts",
+        "packages/providers/codex/src/codex-aimock-live.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -67673,6 +68220,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -67724,7 +68272,8 @@
         "packages/engine/src/modules/tasks/get-task-page-orchestrator.bun.test.ts",
         "packages/engine/src/modules/tasks/rebuild-task-with-latest-goal-assets.bun.test.ts",
         "packages/engine/src/modules/workspaces/__tests__/get-default-workspace.bun.test.ts",
-        "packages/providers/debug/src/ChronaDebugProviderClient.bun.test.ts"
+        "packages/providers/debug/src/ChronaDebugProviderClient.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -67838,6 +68387,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -67890,7 +68440,8 @@
         "packages/engine/src/modules/tasks/create-task-no-auto-plan.bun.test.ts",
         "packages/engine/src/modules/tasks/get-task-page-orchestrator.bun.test.ts",
         "packages/engine/src/modules/tasks/rebuild-task-with-latest-goal-assets.bun.test.ts",
-        "packages/engine/src/modules/workspaces/__tests__/get-default-workspace.bun.test.ts"
+        "packages/engine/src/modules/workspaces/__tests__/get-default-workspace.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -68006,6 +68557,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -68076,9 +68628,12 @@
         "packages/providers/claude-code/src/runner.mcp-url.bun.test.ts",
         "packages/providers/claude-code/src/runner.skill-env.bun.test.ts",
         "packages/providers/codex/src/CodexProviderClient.bun.test.ts",
+        "packages/providers/codex/src/codex-aimock-live.bun.test.ts",
         "packages/providers/debug/src/ChronaDebugProviderClient.bun.test.ts",
         "packages/providers/hermes/src/HermesProviderClient.bun.test.ts",
-        "packages/providers/omp/src/OmpProviderClient.bun.test.ts"
+        "packages/providers/omp/src/OmpProviderClient.bun.test.ts",
+        "packages/providers/omp/src/omp-aimock-live.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -68171,6 +68726,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -68240,11 +68796,15 @@
         "packages/providers/claude-code/src/runner.mcp-url.bun.test.ts",
         "packages/providers/claude-code/src/runner.skill-env.bun.test.ts",
         "packages/providers/codex/src/CodexProviderClient.bun.test.ts",
+        "packages/providers/codex/src/codex-aimock-live.bun.test.ts",
         "packages/providers/debug/src/ChronaDebugProviderClient.bun.test.ts",
+        "packages/providers/foundation/src/live-provider-smoke.bun.test.ts",
         "packages/providers/foundation/src/provider-capability-matrix.bun.test.ts",
         "packages/providers/foundation/src/provider-session-identity.bun.test.ts",
         "packages/providers/hermes/src/HermesProviderClient.bun.test.ts",
-        "packages/providers/omp/src/OmpProviderClient.bun.test.ts"
+        "packages/providers/omp/src/OmpProviderClient.bun.test.ts",
+        "packages/providers/omp/src/omp-aimock-live.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -68743,8 +69303,10 @@
         "packages/providers/claude-code/src/claude-code-aimock-live.bun.test.ts",
         "packages/providers/claude-code/src/runner.mcp-url.bun.test.ts",
         "packages/providers/codex/src/CodexProviderClient.bun.test.ts",
+        "packages/providers/codex/src/codex-aimock-live.bun.test.ts",
         "packages/providers/hermes/src/HermesProviderClient.bun.test.ts",
-        "packages/providers/omp/src/OmpProviderClient.bun.test.ts"
+        "packages/providers/omp/src/OmpProviderClient.bun.test.ts",
+        "packages/providers/omp/src/omp-aimock-live.bun.test.ts"
       ],
       "transitiveTests": [
         "apps/server/src/__tests__/api/accept-task-result.bun.test.ts",
@@ -68821,6 +69383,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -68891,9 +69454,12 @@
         "packages/providers/claude-code/src/runner.mcp-url.bun.test.ts",
         "packages/providers/claude-code/src/runner.skill-env.bun.test.ts",
         "packages/providers/codex/src/CodexProviderClient.bun.test.ts",
+        "packages/providers/codex/src/codex-aimock-live.bun.test.ts",
         "packages/providers/debug/src/ChronaDebugProviderClient.bun.test.ts",
         "packages/providers/hermes/src/HermesProviderClient.bun.test.ts",
-        "packages/providers/omp/src/OmpProviderClient.bun.test.ts"
+        "packages/providers/omp/src/OmpProviderClient.bun.test.ts",
+        "packages/providers/omp/src/omp-aimock-live.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -69499,6 +70065,37 @@
           "tests": []
         },
         {
+          "name": "LIVE_PROVIDER_SMOKE_MARKER",
+          "kind": "reexport",
+          "tests": [
+            "packages/providers/codex/src/codex-aimock-live.bun.test.ts",
+            "packages/providers/omp/src/omp-aimock-live.bun.test.ts"
+          ]
+        },
+        {
+          "name": "runLiveProviderSmoke",
+          "kind": "reexport",
+          "tests": [
+            "packages/providers/codex/src/codex-aimock-live.bun.test.ts",
+            "packages/providers/omp/src/omp-aimock-live.bun.test.ts"
+          ]
+        },
+        {
+          "name": "LiveProviderSmokeOptions",
+          "kind": "reexport",
+          "tests": []
+        },
+        {
+          "name": "LiveProviderSmokeResult",
+          "kind": "reexport",
+          "tests": []
+        },
+        {
+          "name": "LiveProviderSmokeStatus",
+          "kind": "reexport",
+          "tests": []
+        },
+        {
           "name": "isExactLoopbackHost",
           "kind": "reexport",
           "tests": []
@@ -69517,6 +70114,200 @@
           "name": "HermesEndpointValidation",
           "kind": "reexport",
           "tests": []
+        }
+      ]
+    },
+    {
+      "file": "packages/providers/foundation/src/live-provider-smoke.ts",
+      "pkg": "providers/foundation",
+      "module": "live-provider-smoke.ts",
+      "workflow": "providers-runtime",
+      "directTests": [
+        "packages/providers/foundation/src/live-provider-smoke.bun.test.ts"
+      ],
+      "transitiveTests": [
+        "apps/server/src/__tests__/api/accept-task-result.bun.test.ts",
+        "apps/server/src/__tests__/api/action-center-memory-schedule-pages.bun.test.ts",
+        "apps/server/src/__tests__/api/activity-timeline.bun.test.ts",
+        "apps/server/src/__tests__/api/agent-tools-input-guards.bun.test.ts",
+        "apps/server/src/__tests__/api/ai-client-safety.bun.test.ts",
+        "apps/server/src/__tests__/api/ai-suggestions.bun.test.ts",
+        "apps/server/src/__tests__/api/apply-schedule.bun.test.ts",
+        "apps/server/src/__tests__/api/assistant-surface-actions.bun.test.ts",
+        "apps/server/src/__tests__/api/clear-schedule.bun.test.ts",
+        "apps/server/src/__tests__/api/dashboard-ai-brief-generate.bun.test.ts",
+        "apps/server/src/__tests__/api/dashboard-page.bun.test.ts",
+        "apps/server/src/__tests__/api/decide-schedule-proposal.bun.test.ts",
+        "apps/server/src/__tests__/api/execution-checkpoint.bun.test.ts",
+        "apps/server/src/__tests__/api/external-calendar-events.bun.test.ts",
+        "apps/server/src/__tests__/api/external-calendar-source-management.bun.test.ts",
+        "apps/server/src/__tests__/api/external-calendar-sources.bun.test.ts",
+        "apps/server/src/__tests__/api/external-task-edit-roundtrip.bun.test.ts",
+        "apps/server/src/__tests__/api/get-action-center.bun.test.ts",
+        "apps/server/src/__tests__/api/get-memory-console.bun.test.ts",
+        "apps/server/src/__tests__/api/goal-review-v2.bun.test.ts",
+        "apps/server/src/__tests__/api/goal-workbench.bun.test.ts",
+        "apps/server/src/__tests__/api/goals.bun.test.ts",
+        "apps/server/src/__tests__/api/header-and-readmodels-ssr.bun.test.ts",
+        "apps/server/src/__tests__/api/mark-task-done.bun.test.ts",
+        "apps/server/src/__tests__/api/plan-acceptance-edges.bun.test.ts",
+        "apps/server/src/__tests__/api/plan-execution-checkpoint-regression.bun.test.ts",
+        "apps/server/src/__tests__/api/plan-execution-module.bun.test.ts",
+        "apps/server/src/__tests__/api/plan-execution-output.bun.test.ts",
+        "apps/server/src/__tests__/api/plan-lifecycle-edge-workflow.bun.test.ts",
+        "apps/server/src/__tests__/api/plan-lifecycle-workflow.bun.test.ts",
+        "apps/server/src/__tests__/api/propose-schedule.bun.test.ts",
+        "apps/server/src/__tests__/api/provider-approval-resolve.bun.test.ts",
+        "apps/server/src/__tests__/api/provider-bridge-malformed-workflow.bun.test.ts",
+        "apps/server/src/__tests__/api/real-router-smoke.bun.test.ts",
+        "apps/server/src/__tests__/api/recurring-task-edge-cases.bun.test.ts",
+        "apps/server/src/__tests__/api/recurring-task-lifecycle.bun.test.ts",
+        "apps/server/src/__tests__/api/reopen-task.bun.test.ts",
+        "apps/server/src/__tests__/api/runtime-providers.bun.test.ts",
+        "apps/server/src/__tests__/api/schedule-proposal-accept-reject.bun.test.ts",
+        "apps/server/src/__tests__/api/schedule-proposal-conflict-workflow.bun.test.ts",
+        "apps/server/src/__tests__/api/schedule-proposal-regression.bun.test.ts",
+        "apps/server/src/__tests__/api/schedule-proposal-workflow.bun.test.ts",
+        "apps/server/src/__tests__/api/task-triggers.bun.test.ts",
+        "apps/server/src/__tests__/api/task-validation-workflow.bun.test.ts",
+        "apps/server/src/__tests__/api/task-workflow.bun.test.ts",
+        "apps/server/src/__tests__/api/task-workspace-activity.bun.test.ts",
+        "apps/server/src/__tests__/api/task-workspace-console.bun.test.ts",
+        "apps/server/src/__tests__/api/work-block-schedule.bun.test.ts",
+        "apps/server/src/__tests__/api/workspace-overview.bun.test.ts",
+        "apps/server/src/__tests__/api/workspace-preferences.bun.test.ts",
+        "apps/server/src/__tests__/bootstrap-runtime.bun.test.ts",
+        "apps/server/src/app.bun.test.ts",
+        "apps/server/src/config/env.bun.test.ts",
+        "apps/server/src/middleware/auth.bun.test.ts",
+        "apps/server/src/routes/__tests__/agent-control-routes.bun.test.ts",
+        "apps/server/src/routes/__tests__/mcp-routes.bun.test.ts",
+        "apps/server/src/routes/__tests__/plan-operations.bun.test.ts",
+        "apps/server/src/routes/__tests__/task-execution-closure.bun.test.ts",
+        "apps/server/src/routes/__tests__/work-commands-spec-patch.bun.test.ts",
+        "apps/server/src/routes/__tests__/work-events-state.bun.test.ts",
+        "apps/server/src/routes/pages/work.routes.bun.test.ts",
+        "apps/server/src/routes/tasks/__tests__/plan-accept-route.bun.test.ts",
+        "apps/server/src/routes/tasks/result-finalization-retry.bun.test.ts",
+        "packages/cli/src/doctor.bun.test.ts",
+        "packages/engine/src/modules/agent-tools/agent-control.bun.test.ts",
+        "packages/engine/src/modules/agent-tools/node-result-action.bun.test.ts",
+        "packages/engine/src/modules/agent-tools/operations.bun.test.ts",
+        "packages/engine/src/modules/ai/__tests__/conflict-analyzer-smart.bun.test.ts",
+        "packages/engine/src/modules/ai/__tests__/conflict-detector.bun.test.ts",
+        "packages/engine/src/modules/ai/__tests__/provider-fixture-replay-regression.bun.test.ts",
+        "packages/engine/src/modules/ai/__tests__/provider-response-parsing.bun.test.ts",
+        "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
+        "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
+        "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
+        "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
+        "packages/engine/src/modules/events/event-retention.bun.test.ts",
+        "packages/engine/src/modules/goals/ai/goal.review.bun.test.ts",
+        "packages/engine/src/modules/goals/goal-asset-ownership.bun.test.ts",
+        "packages/engine/src/modules/orchestration/due-scheduled-work-worker.bun.test.ts",
+        "packages/engine/src/modules/orchestration/graph-advancement-worker.bun.test.ts",
+        "packages/engine/src/modules/orchestration/orchestrator-restart-recovery.bun.test.ts",
+        "packages/engine/src/modules/orchestration/recurring-work-block-expansion-worker.bun.test.ts",
+        "packages/engine/src/modules/orchestration/scheduler-ownership.integration.bun.test.ts",
+        "packages/engine/src/modules/orchestration/task-orchestrator.bun.test.ts",
+        "packages/engine/src/modules/pages/dashboard-ai-surface.bun.test.ts",
+        "packages/engine/src/modules/pages/get-action-center.bun.test.ts",
+        "packages/engine/src/modules/pages/get-schedule-page-auto-start-reason.bun.test.ts",
+        "packages/engine/src/modules/pages/get-schedule-page-runnable-state.bun.test.ts",
+        "packages/engine/src/modules/pages/get-schedule-page.bun.test.ts",
+        "packages/engine/src/modules/plan-execution/__tests__/duplicate-execution-regression.bun.test.ts",
+        "packages/engine/src/modules/plan-execution/__tests__/serial-branch-result-regression.bun.test.ts",
+        "packages/engine/src/modules/plan-execution/__tests__/stop-pause-regression.bun.test.ts",
+        "packages/engine/src/modules/plan-execution/ai-runtime-invoker.bun.test.ts",
+        "packages/engine/src/modules/plan-execution/kernel/execute-command-receipts.focused.bun.test.ts",
+        "packages/engine/src/modules/plan-execution/kernel/execute-command.smoke.bun.test.ts",
+        "packages/engine/src/modules/plan-execution/manual-completion-form-review.bun.test.ts",
+        "packages/engine/src/modules/plan-execution/node-ai-capabilities.bun.test.ts",
+        "packages/engine/src/modules/plan-execution/node-executors/condition-executor.bun.test.ts",
+        "packages/engine/src/modules/plan-execution/node-executors/task-executor.manual.bun.test.ts",
+        "packages/engine/src/modules/plan-execution/node-executors/wait-executor.bun.test.ts",
+        "packages/engine/src/modules/plan-execution/persistence/execution-scope.bun.test.ts",
+        "packages/engine/src/modules/plan-execution/persistence/task-execution-store.bun.test.ts",
+        "packages/engine/src/modules/plan-execution/plan-runner.bun.test.ts",
+        "packages/engine/src/modules/plan-execution/plan-runner.task-executor.approval.bun.test.ts",
+        "packages/engine/src/modules/plan-execution/plan-runner.task-executor.concurrency.bun.test.ts",
+        "packages/engine/src/modules/plan-execution/plan-runner.task-executor.continuation.bun.test.ts",
+        "packages/engine/src/modules/plan-execution/plan-runner.task-executor.external-results.bun.test.ts",
+        "packages/engine/src/modules/plan-execution/plan-runner.task-executor.full-chain.bun.test.ts",
+        "packages/engine/src/modules/plan-execution/plan-runner.task-executor.interruption.bun.test.ts",
+        "packages/engine/src/modules/plan-execution/plan-runner.task-executor.runtime-events.bun.test.ts",
+        "packages/engine/src/modules/plan-execution/results/finalize-task-result-recovery.bun.test.ts",
+        "packages/engine/src/modules/plan-execution/results/finalize-task-result.bun.test.ts",
+        "packages/engine/src/modules/plan-execution/runtime/terminal-command.bun.test.ts",
+        "packages/engine/src/modules/plan-execution/use-cases/get-current-execution.bun.test.ts",
+        "packages/engine/src/modules/plan-execution/use-cases/resolve-provider-approval.bun.test.ts",
+        "packages/engine/src/modules/plan-execution/use-cases/sync-runtime-result/sync-runtime-result.bun.test.ts",
+        "packages/engine/src/modules/plans/apply-plan-patch-command.bun.test.ts",
+        "packages/engine/src/modules/plans/start-task-plan-generation.bun.test.ts",
+        "packages/engine/src/modules/scheduling/__tests__/schedule-commands.bun.test.ts",
+        "packages/engine/src/modules/scheduling/auto-generate-scheduled-plan.bun.test.ts",
+        "packages/engine/src/modules/scheduling/auto-start-runner.bun.test.ts",
+        "packages/engine/src/modules/scheduling/auto-start-scheduled-plan.bun.test.ts",
+        "packages/engine/src/modules/tasks/__tests__/command-chain.bun.test.ts",
+        "packages/engine/src/modules/tasks/__tests__/external-task-description-echo.bun.test.ts",
+        "packages/engine/src/modules/tasks/continue-from-task-result.bun.test.ts",
+        "packages/engine/src/modules/tasks/create-task-no-auto-plan.bun.test.ts",
+        "packages/engine/src/modules/tasks/get-task-header.bun.test.ts",
+        "packages/engine/src/modules/tasks/get-task-page-orchestrator.bun.test.ts",
+        "packages/engine/src/modules/tasks/rebuild-task-with-latest-goal-assets.bun.test.ts",
+        "packages/engine/src/modules/workspaces/__tests__/get-default-workspace.bun.test.ts",
+        "packages/engine/src/test/llm-fixture-recorder.bun.test.ts",
+        "packages/engine/src/test/llm-fixtures.bun.test.ts",
+        "packages/providers/acp/src/AcpProviderClient.bun.test.ts",
+        "packages/providers/claude-code/src/ClaudeCodeProviderClient.bun.test.ts",
+        "packages/providers/claude-code/src/claude-code-aimock-extra-live.bun.test.ts",
+        "packages/providers/claude-code/src/claude-code-aimock-live.bun.test.ts",
+        "packages/providers/claude-code/src/normalizers.result.bun.test.ts",
+        "packages/providers/claude-code/src/runner-helpers.bun.test.ts",
+        "packages/providers/claude-code/src/runner.mcp-probe.bun.test.ts",
+        "packages/providers/claude-code/src/runner.mcp-url.bun.test.ts",
+        "packages/providers/claude-code/src/runner.skill-env.bun.test.ts",
+        "packages/providers/codex/src/CodexProviderClient.bun.test.ts",
+        "packages/providers/codex/src/codex-aimock-live.bun.test.ts",
+        "packages/providers/debug/src/ChronaDebugProviderClient.bun.test.ts",
+        "packages/providers/foundation/src/live-provider-smoke.bun.test.ts",
+        "packages/providers/hermes/src/HermesProviderClient.bun.test.ts",
+        "packages/providers/omp/src/OmpProviderClient.bun.test.ts",
+        "packages/providers/omp/src/omp-aimock-live.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
+      ],
+      "symbols": [
+        {
+          "name": "LIVE_PROVIDER_SMOKE_MARKER",
+          "kind": "const",
+          "tests": [
+            "packages/providers/foundation/src/live-provider-smoke.bun.test.ts"
+          ]
+        },
+        {
+          "name": "LiveProviderSmokeStatus",
+          "kind": "type",
+          "tests": []
+        },
+        {
+          "name": "LiveProviderSmokeResult",
+          "kind": "type",
+          "tests": []
+        },
+        {
+          "name": "LiveProviderSmokeOptions",
+          "kind": "type",
+          "tests": []
+        },
+        {
+          "name": "runLiveProviderSmoke",
+          "kind": "function",
+          "tests": [
+            "packages/providers/foundation/src/live-provider-smoke.bun.test.ts"
+          ]
         }
       ]
     },
@@ -69601,6 +70392,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -69671,9 +70463,12 @@
         "packages/providers/claude-code/src/runner.mcp-url.bun.test.ts",
         "packages/providers/claude-code/src/runner.skill-env.bun.test.ts",
         "packages/providers/codex/src/CodexProviderClient.bun.test.ts",
+        "packages/providers/codex/src/codex-aimock-live.bun.test.ts",
         "packages/providers/debug/src/ChronaDebugProviderClient.bun.test.ts",
         "packages/providers/hermes/src/HermesProviderClient.bun.test.ts",
-        "packages/providers/omp/src/OmpProviderClient.bun.test.ts"
+        "packages/providers/omp/src/OmpProviderClient.bun.test.ts",
+        "packages/providers/omp/src/omp-aimock-live.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -69781,6 +70576,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -69851,10 +70647,14 @@
         "packages/providers/claude-code/src/runner.mcp-url.bun.test.ts",
         "packages/providers/claude-code/src/runner.skill-env.bun.test.ts",
         "packages/providers/codex/src/CodexProviderClient.bun.test.ts",
+        "packages/providers/codex/src/codex-aimock-live.bun.test.ts",
         "packages/providers/debug/src/ChronaDebugProviderClient.bun.test.ts",
+        "packages/providers/foundation/src/live-provider-smoke.bun.test.ts",
         "packages/providers/foundation/src/provider-capability-matrix.bun.test.ts",
         "packages/providers/hermes/src/HermesProviderClient.bun.test.ts",
-        "packages/providers/omp/src/OmpProviderClient.bun.test.ts"
+        "packages/providers/omp/src/OmpProviderClient.bun.test.ts",
+        "packages/providers/omp/src/omp-aimock-live.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -69904,6 +70704,7 @@
       "module": "ProviderClient.ts",
       "workflow": "providers-runtime",
       "directTests": [
+        "packages/providers/foundation/src/live-provider-smoke.bun.test.ts",
         "packages/providers/foundation/src/provider-capability-matrix.bun.test.ts"
       ],
       "transitiveTests": [
@@ -69981,6 +70782,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -70051,16 +70853,22 @@
         "packages/providers/claude-code/src/runner.mcp-url.bun.test.ts",
         "packages/providers/claude-code/src/runner.skill-env.bun.test.ts",
         "packages/providers/codex/src/CodexProviderClient.bun.test.ts",
+        "packages/providers/codex/src/codex-aimock-live.bun.test.ts",
         "packages/providers/debug/src/ChronaDebugProviderClient.bun.test.ts",
+        "packages/providers/foundation/src/live-provider-smoke.bun.test.ts",
         "packages/providers/foundation/src/provider-capability-matrix.bun.test.ts",
         "packages/providers/hermes/src/HermesProviderClient.bun.test.ts",
-        "packages/providers/omp/src/OmpProviderClient.bun.test.ts"
+        "packages/providers/omp/src/OmpProviderClient.bun.test.ts",
+        "packages/providers/omp/src/omp-aimock-live.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
           "name": "AgentProviderClient",
           "kind": "reexport",
-          "tests": []
+          "tests": [
+            "packages/providers/foundation/src/live-provider-smoke.bun.test.ts"
+          ]
         },
         {
           "name": "CancelRunInput",
@@ -70130,7 +70938,9 @@
         {
           "name": "ProviderCapabilities",
           "kind": "reexport",
-          "tests": []
+          "tests": [
+            "packages/providers/foundation/src/live-provider-smoke.bun.test.ts"
+          ]
         },
         {
           "name": "ProviderActionInvocationMode",
@@ -70185,7 +70995,9 @@
         {
           "name": "ProviderRunEvent",
           "kind": "reexport",
-          "tests": []
+          "tests": [
+            "packages/providers/foundation/src/live-provider-smoke.bun.test.ts"
+          ]
         },
         {
           "name": "ProviderRunRef",
@@ -70290,7 +71102,9 @@
         {
           "name": "StreamRunInput",
           "kind": "reexport",
-          "tests": []
+          "tests": [
+            "packages/providers/foundation/src/live-provider-smoke.bun.test.ts"
+          ]
         },
         {
           "name": "assertProviderStartSupported",
@@ -70634,6 +71448,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -70703,10 +71518,14 @@
         "packages/providers/claude-code/src/runner.mcp-url.bun.test.ts",
         "packages/providers/claude-code/src/runner.skill-env.bun.test.ts",
         "packages/providers/codex/src/CodexProviderClient.bun.test.ts",
+        "packages/providers/codex/src/codex-aimock-live.bun.test.ts",
         "packages/providers/debug/src/ChronaDebugProviderClient.bun.test.ts",
+        "packages/providers/foundation/src/live-provider-smoke.bun.test.ts",
         "packages/providers/foundation/src/provider-capability-matrix.bun.test.ts",
         "packages/providers/hermes/src/HermesProviderClient.bun.test.ts",
-        "packages/providers/omp/src/OmpProviderClient.bun.test.ts"
+        "packages/providers/omp/src/OmpProviderClient.bun.test.ts",
+        "packages/providers/omp/src/omp-aimock-live.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -70842,6 +71661,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -70912,9 +71732,12 @@
         "packages/providers/claude-code/src/runner.mcp-url.bun.test.ts",
         "packages/providers/claude-code/src/runner.skill-env.bun.test.ts",
         "packages/providers/codex/src/CodexProviderClient.bun.test.ts",
+        "packages/providers/codex/src/codex-aimock-live.bun.test.ts",
         "packages/providers/debug/src/ChronaDebugProviderClient.bun.test.ts",
         "packages/providers/hermes/src/HermesProviderClient.bun.test.ts",
-        "packages/providers/omp/src/OmpProviderClient.bun.test.ts"
+        "packages/providers/omp/src/OmpProviderClient.bun.test.ts",
+        "packages/providers/omp/src/omp-aimock-live.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -71024,6 +71847,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -71075,7 +71899,8 @@
         "packages/engine/src/modules/tasks/get-task-page-orchestrator.bun.test.ts",
         "packages/engine/src/modules/tasks/rebuild-task-with-latest-goal-assets.bun.test.ts",
         "packages/engine/src/modules/workspaces/__tests__/get-default-workspace.bun.test.ts",
-        "packages/providers/hermes/src/HermesProviderClient.bun.test.ts"
+        "packages/providers/hermes/src/HermesProviderClient.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -71162,6 +71987,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -71212,7 +72038,8 @@
         "packages/engine/src/modules/tasks/get-task-page-orchestrator.bun.test.ts",
         "packages/engine/src/modules/tasks/rebuild-task-with-latest-goal-assets.bun.test.ts",
         "packages/engine/src/modules/workspaces/__tests__/get-default-workspace.bun.test.ts",
-        "packages/providers/hermes/src/HermesProviderClient.bun.test.ts"
+        "packages/providers/hermes/src/HermesProviderClient.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -71321,6 +72148,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -71374,7 +72202,8 @@
         "packages/engine/src/modules/tasks/get-task-page-orchestrator.bun.test.ts",
         "packages/engine/src/modules/tasks/rebuild-task-with-latest-goal-assets.bun.test.ts",
         "packages/engine/src/modules/workspaces/__tests__/get-default-workspace.bun.test.ts",
-        "packages/providers/hermes/src/HermesProviderClient.bun.test.ts"
+        "packages/providers/hermes/src/HermesProviderClient.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -71478,6 +72307,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -71528,7 +72358,8 @@
         "packages/engine/src/modules/tasks/get-task-page-orchestrator.bun.test.ts",
         "packages/engine/src/modules/tasks/rebuild-task-with-latest-goal-assets.bun.test.ts",
         "packages/engine/src/modules/workspaces/__tests__/get-default-workspace.bun.test.ts",
-        "packages/providers/hermes/src/HermesProviderClient.bun.test.ts"
+        "packages/providers/hermes/src/HermesProviderClient.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -71643,6 +72474,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -71693,7 +72525,8 @@
         "packages/engine/src/modules/tasks/get-task-page-orchestrator.bun.test.ts",
         "packages/engine/src/modules/tasks/rebuild-task-with-latest-goal-assets.bun.test.ts",
         "packages/engine/src/modules/workspaces/__tests__/get-default-workspace.bun.test.ts",
-        "packages/providers/hermes/src/HermesProviderClient.bun.test.ts"
+        "packages/providers/hermes/src/HermesProviderClient.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -71778,6 +72611,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -71829,7 +72663,8 @@
         "packages/engine/src/modules/tasks/get-task-page-orchestrator.bun.test.ts",
         "packages/engine/src/modules/tasks/rebuild-task-with-latest-goal-assets.bun.test.ts",
         "packages/engine/src/modules/workspaces/__tests__/get-default-workspace.bun.test.ts",
-        "packages/providers/hermes/src/HermesProviderClient.bun.test.ts"
+        "packages/providers/hermes/src/HermesProviderClient.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -71849,7 +72684,9 @@
       "pkg": "providers/omp",
       "module": "index.ts",
       "workflow": "providers-runtime",
-      "directTests": [],
+      "directTests": [
+        "packages/providers/omp/src/omp-aimock-live.bun.test.ts"
+      ],
       "transitiveTests": [
         "apps/server/src/__tests__/api/accept-task-result.bun.test.ts",
         "apps/server/src/__tests__/api/action-center-memory-schedule-pages.bun.test.ts",
@@ -71919,6 +72756,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -71971,7 +72809,9 @@
         "packages/engine/src/modules/tasks/create-task-no-auto-plan.bun.test.ts",
         "packages/engine/src/modules/tasks/get-task-page-orchestrator.bun.test.ts",
         "packages/engine/src/modules/tasks/rebuild-task-with-latest-goal-assets.bun.test.ts",
-        "packages/engine/src/modules/workspaces/__tests__/get-default-workspace.bun.test.ts"
+        "packages/engine/src/modules/workspaces/__tests__/get-default-workspace.bun.test.ts",
+        "packages/providers/omp/src/omp-aimock-live.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -71982,7 +72822,9 @@
         {
           "name": "OmpProviderClient",
           "kind": "reexport",
-          "tests": []
+          "tests": [
+            "packages/providers/omp/src/omp-aimock-live.bun.test.ts"
+          ]
         },
         {
           "name": "OmpProviderOptions",
@@ -72002,7 +72844,9 @@
         {
           "name": "OmpProviderConfig",
           "kind": "reexport",
-          "tests": []
+          "tests": [
+            "packages/providers/omp/src/omp-aimock-live.bun.test.ts"
+          ]
         }
       ]
     },
@@ -72083,6 +72927,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -72134,7 +72979,9 @@
         "packages/engine/src/modules/tasks/get-task-page-orchestrator.bun.test.ts",
         "packages/engine/src/modules/tasks/rebuild-task-with-latest-goal-assets.bun.test.ts",
         "packages/engine/src/modules/workspaces/__tests__/get-default-workspace.bun.test.ts",
-        "packages/providers/omp/src/OmpProviderClient.bun.test.ts"
+        "packages/providers/omp/src/OmpProviderClient.bun.test.ts",
+        "packages/providers/omp/src/omp-aimock-live.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -72228,6 +73075,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -72279,7 +73127,9 @@
         "packages/engine/src/modules/tasks/get-task-page-orchestrator.bun.test.ts",
         "packages/engine/src/modules/tasks/rebuild-task-with-latest-goal-assets.bun.test.ts",
         "packages/engine/src/modules/workspaces/__tests__/get-default-workspace.bun.test.ts",
-        "packages/providers/omp/src/OmpProviderClient.bun.test.ts"
+        "packages/providers/omp/src/OmpProviderClient.bun.test.ts",
+        "packages/providers/omp/src/omp-aimock-live.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -72308,7 +73158,9 @@
       "pkg": "providers/omp",
       "module": "types.ts",
       "workflow": "providers-runtime",
-      "directTests": [],
+      "directTests": [
+        "packages/providers/omp/src/omp-aimock-live.bun.test.ts"
+      ],
       "transitiveTests": [
         "apps/server/src/__tests__/api/accept-task-result.bun.test.ts",
         "apps/server/src/__tests__/api/action-center-memory-schedule-pages.bun.test.ts",
@@ -72378,6 +73230,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -72429,13 +73282,17 @@
         "packages/engine/src/modules/tasks/get-task-page-orchestrator.bun.test.ts",
         "packages/engine/src/modules/tasks/rebuild-task-with-latest-goal-assets.bun.test.ts",
         "packages/engine/src/modules/workspaces/__tests__/get-default-workspace.bun.test.ts",
-        "packages/providers/omp/src/OmpProviderClient.bun.test.ts"
+        "packages/providers/omp/src/OmpProviderClient.bun.test.ts",
+        "packages/providers/omp/src/omp-aimock-live.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
           "name": "OmpProviderConfig",
           "kind": "type",
-          "tests": []
+          "tests": [
+            "packages/providers/omp/src/omp-aimock-live.bun.test.ts"
+          ]
         }
       ]
     },
@@ -72674,6 +73531,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/prisma-run-store.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
@@ -72741,7 +73599,8 @@
         "packages/engine/src/modules/tasks/rebuild-task-with-latest-goal-assets.bun.test.ts",
         "packages/engine/src/modules/tasks/task-activity.bun.test.ts",
         "packages/engine/src/modules/workspaces/__tests__/get-default-workspace.bun.test.ts",
-        "packages/shared/src/runtime-config.bun.test.ts"
+        "packages/shared/src/runtime-config.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -72883,6 +73742,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -72986,16 +73846,20 @@
         "packages/providers/claude-code/src/runner.mcp-url.bun.test.ts",
         "packages/providers/claude-code/src/runner.skill-env.bun.test.ts",
         "packages/providers/codex/src/CodexProviderClient.bun.test.ts",
+        "packages/providers/codex/src/codex-aimock-live.bun.test.ts",
         "packages/providers/debug/src/ChronaDebugProviderClient.bun.test.ts",
+        "packages/providers/foundation/src/live-provider-smoke.bun.test.ts",
         "packages/providers/foundation/src/provider-capability-matrix.bun.test.ts",
         "packages/providers/hermes/src/HermesProviderClient.bun.test.ts",
         "packages/providers/omp/src/OmpProviderClient.bun.test.ts",
+        "packages/providers/omp/src/omp-aimock-live.bun.test.ts",
         "packages/ui-protocol/src/builders/build-action-spec.bun.test.ts",
         "packages/ui-protocol/src/builders/build-activity-spec.bun.test.ts",
         "packages/ui-protocol/src/builders/build-command-center-spec.bun.test.ts",
         "packages/ui-protocol/src/builders/build-result-spec.bun.test.ts",
         "packages/ui-protocol/src/builders/build-task-header-spec.bun.test.ts",
-        "packages/ui-protocol/src/document/validate.bun.test.ts"
+        "packages/ui-protocol/src/document/validate.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -73218,6 +74082,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -73321,12 +74186,16 @@
         "packages/providers/claude-code/src/runner.mcp-url.bun.test.ts",
         "packages/providers/claude-code/src/runner.skill-env.bun.test.ts",
         "packages/providers/codex/src/CodexProviderClient.bun.test.ts",
+        "packages/providers/codex/src/codex-aimock-live.bun.test.ts",
         "packages/providers/debug/src/ChronaDebugProviderClient.bun.test.ts",
+        "packages/providers/foundation/src/live-provider-smoke.bun.test.ts",
         "packages/providers/foundation/src/provider-capability-matrix.bun.test.ts",
         "packages/providers/hermes/src/HermesProviderClient.bun.test.ts",
         "packages/providers/omp/src/OmpProviderClient.bun.test.ts",
+        "packages/providers/omp/src/omp-aimock-live.bun.test.ts",
         "packages/ui-protocol/src/builders/build-action-spec.bun.test.ts",
-        "packages/ui-protocol/src/document/validate.bun.test.ts"
+        "packages/ui-protocol/src/document/validate.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -73456,6 +74325,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -73559,13 +74429,17 @@
         "packages/providers/claude-code/src/runner.mcp-url.bun.test.ts",
         "packages/providers/claude-code/src/runner.skill-env.bun.test.ts",
         "packages/providers/codex/src/CodexProviderClient.bun.test.ts",
+        "packages/providers/codex/src/codex-aimock-live.bun.test.ts",
         "packages/providers/debug/src/ChronaDebugProviderClient.bun.test.ts",
+        "packages/providers/foundation/src/live-provider-smoke.bun.test.ts",
         "packages/providers/foundation/src/provider-capability-matrix.bun.test.ts",
         "packages/providers/hermes/src/HermesProviderClient.bun.test.ts",
         "packages/providers/omp/src/OmpProviderClient.bun.test.ts",
+        "packages/providers/omp/src/omp-aimock-live.bun.test.ts",
         "packages/ui-protocol/src/builders/build-activity-spec.bun.test.ts",
         "packages/ui-protocol/src/builders/build-command-center-spec.bun.test.ts",
-        "packages/ui-protocol/src/document/validate.bun.test.ts"
+        "packages/ui-protocol/src/document/validate.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -73709,6 +74583,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -73812,12 +74687,16 @@
         "packages/providers/claude-code/src/runner.mcp-url.bun.test.ts",
         "packages/providers/claude-code/src/runner.skill-env.bun.test.ts",
         "packages/providers/codex/src/CodexProviderClient.bun.test.ts",
+        "packages/providers/codex/src/codex-aimock-live.bun.test.ts",
         "packages/providers/debug/src/ChronaDebugProviderClient.bun.test.ts",
+        "packages/providers/foundation/src/live-provider-smoke.bun.test.ts",
         "packages/providers/foundation/src/provider-capability-matrix.bun.test.ts",
         "packages/providers/hermes/src/HermesProviderClient.bun.test.ts",
         "packages/providers/omp/src/OmpProviderClient.bun.test.ts",
+        "packages/providers/omp/src/omp-aimock-live.bun.test.ts",
         "packages/ui-protocol/src/builders/build-command-center-spec.bun.test.ts",
-        "packages/ui-protocol/src/document/validate.bun.test.ts"
+        "packages/ui-protocol/src/document/validate.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -73976,6 +74855,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -74079,12 +74959,16 @@
         "packages/providers/claude-code/src/runner.mcp-url.bun.test.ts",
         "packages/providers/claude-code/src/runner.skill-env.bun.test.ts",
         "packages/providers/codex/src/CodexProviderClient.bun.test.ts",
+        "packages/providers/codex/src/codex-aimock-live.bun.test.ts",
         "packages/providers/debug/src/ChronaDebugProviderClient.bun.test.ts",
+        "packages/providers/foundation/src/live-provider-smoke.bun.test.ts",
         "packages/providers/foundation/src/provider-capability-matrix.bun.test.ts",
         "packages/providers/hermes/src/HermesProviderClient.bun.test.ts",
         "packages/providers/omp/src/OmpProviderClient.bun.test.ts",
+        "packages/providers/omp/src/omp-aimock-live.bun.test.ts",
         "packages/ui-protocol/src/builders/build-result-spec.bun.test.ts",
-        "packages/ui-protocol/src/document/validate.bun.test.ts"
+        "packages/ui-protocol/src/document/validate.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -74209,6 +75093,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -74312,12 +75197,16 @@
         "packages/providers/claude-code/src/runner.mcp-url.bun.test.ts",
         "packages/providers/claude-code/src/runner.skill-env.bun.test.ts",
         "packages/providers/codex/src/CodexProviderClient.bun.test.ts",
+        "packages/providers/codex/src/codex-aimock-live.bun.test.ts",
         "packages/providers/debug/src/ChronaDebugProviderClient.bun.test.ts",
+        "packages/providers/foundation/src/live-provider-smoke.bun.test.ts",
         "packages/providers/foundation/src/provider-capability-matrix.bun.test.ts",
         "packages/providers/hermes/src/HermesProviderClient.bun.test.ts",
         "packages/providers/omp/src/OmpProviderClient.bun.test.ts",
+        "packages/providers/omp/src/omp-aimock-live.bun.test.ts",
         "packages/ui-protocol/src/builders/build-task-header-spec.bun.test.ts",
-        "packages/ui-protocol/src/document/validate.bun.test.ts"
+        "packages/ui-protocol/src/document/validate.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -74565,6 +75454,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -74668,11 +75558,15 @@
         "packages/providers/claude-code/src/runner.mcp-url.bun.test.ts",
         "packages/providers/claude-code/src/runner.skill-env.bun.test.ts",
         "packages/providers/codex/src/CodexProviderClient.bun.test.ts",
+        "packages/providers/codex/src/codex-aimock-live.bun.test.ts",
         "packages/providers/debug/src/ChronaDebugProviderClient.bun.test.ts",
+        "packages/providers/foundation/src/live-provider-smoke.bun.test.ts",
         "packages/providers/foundation/src/provider-capability-matrix.bun.test.ts",
         "packages/providers/hermes/src/HermesProviderClient.bun.test.ts",
         "packages/providers/omp/src/OmpProviderClient.bun.test.ts",
-        "packages/ui-protocol/src/document/validate.bun.test.ts"
+        "packages/providers/omp/src/omp-aimock-live.bun.test.ts",
+        "packages/ui-protocol/src/document/validate.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -74788,6 +75682,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -74891,16 +75786,20 @@
         "packages/providers/claude-code/src/runner.mcp-url.bun.test.ts",
         "packages/providers/claude-code/src/runner.skill-env.bun.test.ts",
         "packages/providers/codex/src/CodexProviderClient.bun.test.ts",
+        "packages/providers/codex/src/codex-aimock-live.bun.test.ts",
         "packages/providers/debug/src/ChronaDebugProviderClient.bun.test.ts",
+        "packages/providers/foundation/src/live-provider-smoke.bun.test.ts",
         "packages/providers/foundation/src/provider-capability-matrix.bun.test.ts",
         "packages/providers/hermes/src/HermesProviderClient.bun.test.ts",
         "packages/providers/omp/src/OmpProviderClient.bun.test.ts",
+        "packages/providers/omp/src/omp-aimock-live.bun.test.ts",
         "packages/ui-protocol/src/builders/build-action-spec.bun.test.ts",
         "packages/ui-protocol/src/builders/build-activity-spec.bun.test.ts",
         "packages/ui-protocol/src/builders/build-command-center-spec.bun.test.ts",
         "packages/ui-protocol/src/builders/build-result-spec.bun.test.ts",
         "packages/ui-protocol/src/builders/build-task-header-spec.bun.test.ts",
-        "packages/ui-protocol/src/document/validate.bun.test.ts"
+        "packages/ui-protocol/src/document/validate.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -75111,6 +76010,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -75214,11 +76114,15 @@
         "packages/providers/claude-code/src/runner.mcp-url.bun.test.ts",
         "packages/providers/claude-code/src/runner.skill-env.bun.test.ts",
         "packages/providers/codex/src/CodexProviderClient.bun.test.ts",
+        "packages/providers/codex/src/codex-aimock-live.bun.test.ts",
         "packages/providers/debug/src/ChronaDebugProviderClient.bun.test.ts",
+        "packages/providers/foundation/src/live-provider-smoke.bun.test.ts",
         "packages/providers/foundation/src/provider-capability-matrix.bun.test.ts",
         "packages/providers/hermes/src/HermesProviderClient.bun.test.ts",
         "packages/providers/omp/src/OmpProviderClient.bun.test.ts",
-        "packages/ui-protocol/src/document/validate.bun.test.ts"
+        "packages/providers/omp/src/omp-aimock-live.bun.test.ts",
+        "packages/ui-protocol/src/document/validate.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -75336,6 +76240,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -75439,16 +76344,20 @@
         "packages/providers/claude-code/src/runner.mcp-url.bun.test.ts",
         "packages/providers/claude-code/src/runner.skill-env.bun.test.ts",
         "packages/providers/codex/src/CodexProviderClient.bun.test.ts",
+        "packages/providers/codex/src/codex-aimock-live.bun.test.ts",
         "packages/providers/debug/src/ChronaDebugProviderClient.bun.test.ts",
+        "packages/providers/foundation/src/live-provider-smoke.bun.test.ts",
         "packages/providers/foundation/src/provider-capability-matrix.bun.test.ts",
         "packages/providers/hermes/src/HermesProviderClient.bun.test.ts",
         "packages/providers/omp/src/OmpProviderClient.bun.test.ts",
+        "packages/providers/omp/src/omp-aimock-live.bun.test.ts",
         "packages/ui-protocol/src/builders/build-action-spec.bun.test.ts",
         "packages/ui-protocol/src/builders/build-activity-spec.bun.test.ts",
         "packages/ui-protocol/src/builders/build-command-center-spec.bun.test.ts",
         "packages/ui-protocol/src/builders/build-result-spec.bun.test.ts",
         "packages/ui-protocol/src/builders/build-task-header-spec.bun.test.ts",
-        "packages/ui-protocol/src/document/validate.bun.test.ts"
+        "packages/ui-protocol/src/document/validate.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -75575,6 +76484,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -75678,14 +76588,18 @@
         "packages/providers/claude-code/src/runner.mcp-url.bun.test.ts",
         "packages/providers/claude-code/src/runner.skill-env.bun.test.ts",
         "packages/providers/codex/src/CodexProviderClient.bun.test.ts",
+        "packages/providers/codex/src/codex-aimock-live.bun.test.ts",
         "packages/providers/debug/src/ChronaDebugProviderClient.bun.test.ts",
+        "packages/providers/foundation/src/live-provider-smoke.bun.test.ts",
         "packages/providers/foundation/src/provider-capability-matrix.bun.test.ts",
         "packages/providers/hermes/src/HermesProviderClient.bun.test.ts",
         "packages/providers/omp/src/OmpProviderClient.bun.test.ts",
+        "packages/providers/omp/src/omp-aimock-live.bun.test.ts",
         "packages/ui-protocol/src/builders/build-action-spec.bun.test.ts",
         "packages/ui-protocol/src/builders/build-activity-spec.bun.test.ts",
         "packages/ui-protocol/src/builders/build-result-spec.bun.test.ts",
-        "packages/ui-protocol/src/document/validate.bun.test.ts"
+        "packages/ui-protocol/src/document/validate.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -75820,6 +76734,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -75923,11 +76838,15 @@
         "packages/providers/claude-code/src/runner.mcp-url.bun.test.ts",
         "packages/providers/claude-code/src/runner.skill-env.bun.test.ts",
         "packages/providers/codex/src/CodexProviderClient.bun.test.ts",
+        "packages/providers/codex/src/codex-aimock-live.bun.test.ts",
         "packages/providers/debug/src/ChronaDebugProviderClient.bun.test.ts",
+        "packages/providers/foundation/src/live-provider-smoke.bun.test.ts",
         "packages/providers/foundation/src/provider-capability-matrix.bun.test.ts",
         "packages/providers/hermes/src/HermesProviderClient.bun.test.ts",
         "packages/providers/omp/src/OmpProviderClient.bun.test.ts",
-        "packages/ui-protocol/src/document/validate.bun.test.ts"
+        "packages/providers/omp/src/omp-aimock-live.bun.test.ts",
+        "packages/ui-protocol/src/document/validate.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -76384,6 +77303,7 @@
         "packages/engine/src/modules/ai/__tests__/streaming.bun.test.ts",
         "packages/engine/src/modules/ai/management/ai-client-management.bun.test.ts",
         "packages/engine/src/modules/ai/providers.bun.test.ts",
+        "packages/engine/src/modules/ai/runtime/client-resolution.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/feature-runtime/foundation-provider-runtime.bun.test.ts",
         "packages/engine/src/modules/ai/runtime/task-provider-selection.bun.test.ts",
         "packages/engine/src/modules/events/append-canonical-event.bun.test.ts",
@@ -76487,16 +77407,20 @@
         "packages/providers/claude-code/src/runner.mcp-url.bun.test.ts",
         "packages/providers/claude-code/src/runner.skill-env.bun.test.ts",
         "packages/providers/codex/src/CodexProviderClient.bun.test.ts",
+        "packages/providers/codex/src/codex-aimock-live.bun.test.ts",
         "packages/providers/debug/src/ChronaDebugProviderClient.bun.test.ts",
+        "packages/providers/foundation/src/live-provider-smoke.bun.test.ts",
         "packages/providers/foundation/src/provider-capability-matrix.bun.test.ts",
         "packages/providers/hermes/src/HermesProviderClient.bun.test.ts",
         "packages/providers/omp/src/OmpProviderClient.bun.test.ts",
+        "packages/providers/omp/src/omp-aimock-live.bun.test.ts",
         "packages/ui-protocol/src/builders/build-action-spec.bun.test.ts",
         "packages/ui-protocol/src/builders/build-activity-spec.bun.test.ts",
         "packages/ui-protocol/src/builders/build-command-center-spec.bun.test.ts",
         "packages/ui-protocol/src/builders/build-result-spec.bun.test.ts",
         "packages/ui-protocol/src/builders/build-task-header-spec.bun.test.ts",
-        "packages/ui-protocol/src/document/validate.bun.test.ts"
+        "packages/ui-protocol/src/document/validate.bun.test.ts",
+        "scripts/live-provider-smoke.bun.test.ts"
       ],
       "symbols": [
         {
@@ -76776,6 +77700,56 @@
       "symbols": []
     },
     {
+      "file": "scripts/live-provider-smoke.ts",
+      "pkg": "scripts",
+      "module": "(root)",
+      "workflow": "unmapped",
+      "directTests": [
+        "scripts/live-provider-smoke.bun.test.ts"
+      ],
+      "transitiveTests": [
+        "scripts/live-provider-smoke.bun.test.ts"
+      ],
+      "symbols": [
+        {
+          "name": "LiveProviderType",
+          "kind": "type",
+          "tests": []
+        },
+        {
+          "name": "LiveProviderSmokeCliOptions",
+          "kind": "type",
+          "tests": []
+        },
+        {
+          "name": "parseLiveProviderSmokeArgs",
+          "kind": "function",
+          "tests": [
+            "scripts/live-provider-smoke.bun.test.ts"
+          ]
+        },
+        {
+          "name": "sharedClaudeConfigFromOmp",
+          "kind": "function",
+          "tests": [
+            "scripts/live-provider-smoke.bun.test.ts"
+          ]
+        },
+        {
+          "name": "sharedCodexConfigFromOmp",
+          "kind": "function",
+          "tests": [
+            "scripts/live-provider-smoke.bun.test.ts"
+          ]
+        },
+        {
+          "name": "runLiveProviderSmokeCli",
+          "kind": "function",
+          "tests": []
+        }
+      ]
+    },
+    {
       "file": "scripts/local-ci.ts",
       "pkg": "scripts",
       "module": "(root)",
@@ -76814,6 +77788,21 @@
       "directTests": [],
       "transitiveTests": [],
       "symbols": []
+    },
+    {
+      "file": "scripts/release-upgrade-smoke.ts",
+      "pkg": "scripts",
+      "module": "(root)",
+      "workflow": "unmapped",
+      "directTests": [],
+      "transitiveTests": [],
+      "symbols": [
+        {
+          "name": "smokePackagedUpgrade",
+          "kind": "function",
+          "tests": []
+        }
+      ]
     },
     {
       "file": "scripts/run-api-tests.ts",
@@ -76882,6 +77871,15 @@
     },
     {
       "file": "scripts/test-feature.ts",
+      "pkg": "scripts",
+      "module": "(root)",
+      "workflow": "unmapped",
+      "directTests": [],
+      "transitiveTests": [],
+      "symbols": []
+    },
+    {
+      "file": "scripts/windows-private-storage-smoke.ts",
       "pkg": "scripts",
       "module": "(root)",
       "workflow": "unmapped",

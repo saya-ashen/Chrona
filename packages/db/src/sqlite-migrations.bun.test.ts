@@ -358,7 +358,7 @@ describe("ensureSqliteDatabase", () => {
         sha256: "4f5933d3b64aad7696d9b1509e6f2dfcfc3efb49b89770cafa9f7c426b988ddf",
       },
       database: {
-        path: "/tmp/chrona-v020-baseline/data/chrona.db",
+        path: "data/chrona.db",
         sha256: metadata.previousReleaseFixture.sha256,
         schemaFingerprint: metadata.lastReleasedSchemaFingerprint,
       },
