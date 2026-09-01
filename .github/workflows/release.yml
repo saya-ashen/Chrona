@@ -116,12 +116,17 @@ jobs:
       - name: Download all artifacts
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
-          path: artifacts
+          path: .release-artifacts
           merge-multiple: false
 
       - name: Generate SHA-256 checksums
-        working-directory: artifacts
-        run: find . -type f -print0 | sort -z | xargs -0 sha256sum > SHA256SUMS
+        working-directory: .release-artifacts
+        shell: bash
+        run: |
+          while IFS= read -r -d '' file; do
+            digest="$(sha256sum "$file" | cut -d ' ' -f 1)"
+            printf '%s  %s\n' "$digest" "$(basename "$file")"
+          done < <(find . -mindepth 2 -maxdepth 2 -type f -print0 | sort -z) > SHA256SUMS
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@3d0d9888cb7fd7b750713d6e236d1fcb99157228
@@ -130,9 +135,9 @@ jobs:
           generate_release_notes: true
           prerelease: ${{ contains(github.ref_name, '-') }}
           files: |
-            artifacts/chrona-linux-x64/*
-            artifacts/chrona-linux-arm64/*
-            artifacts/chrona-darwin-x64/*
-            artifacts/chrona-darwin-arm64/*
-            artifacts/chrona-windows-x64/*
-            artifacts/SHA256SUMS
+            .release-artifacts/chrona-linux-x64/*
+            .release-artifacts/chrona-linux-arm64/*
+            .release-artifacts/chrona-darwin-x64/*
+            .release-artifacts/chrona-darwin-arm64/*
+            .release-artifacts/chrona-windows-x64/*
+            .release-artifacts/SHA256SUMS

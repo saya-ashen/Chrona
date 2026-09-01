@@ -125,6 +125,8 @@ progress.txt
 
 # local agent, dogfood, and generated review artifacts
 /.pi/
+/artifacts/
+/.release-artifacts/
 /dogfood-output/
 /final_runs/
 /logs/
