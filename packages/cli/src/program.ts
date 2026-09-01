@@ -2,6 +2,7 @@ import { Command } from "commander";
 import { buildControlPayload, sendControlAction, UsageError, ConfigError } from "@chrona-org/agent-cli";
 import { join, resolve } from "node:path";
 import { backupSqliteDatabase, restoreSqliteDatabase } from "@chrona/db/sqlite-backup";
+import cliPackage from "../package.json" with { type: "json" };
 import { getChronaDataDir } from "./start-server.js";
 import { inspectLocalChrona, repairStaleRuntimeLock } from "./doctor.js";
 import { installHermesPlugin, type InstallHermesPluginOptions } from "./hermes-plugin.js";
@@ -102,7 +103,7 @@ export function createProgram(options: CreateProgramOptions = {}): Command {
   program
     .name("chrona")
     .description("Chrona CLI: starts the Chrona app server.")
-    .version("0.2.0");
+    .version(cliPackage.version);
 
   program
     .command("start")

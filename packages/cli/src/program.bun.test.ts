@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { Database } from "bun:sqlite";
+import cliPackage from "../package.json" with { type: "json" };
 import { createProgram, dispatchNodeCommand } from "./program";
 
 const ORIGINAL_ENV = { ...process.env };
@@ -10,6 +11,12 @@ const ORIGINAL_ENV = { ...process.env };
 function makeFetchMock(impl: (input: string, init: RequestInit) => Promise<Response> | Response) {
   return impl as unknown as typeof fetch;
 }
+
+describe("chrona CLI release identity", () => {
+  it("reports the package version", () => {
+    expect(createProgram().version()).toBe(cliPackage.version);
+  });
+});
 
 describe("chrona CLI: `chrona node <verb>` skill-mode dispatcher", () => {
   let originalFetch: typeof fetch;
