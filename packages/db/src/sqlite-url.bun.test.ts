@@ -12,7 +12,7 @@ import {
   resolveSqliteAdapterUrl,
   sqlitePathFromFileUrl,
 } from "./sqlite-url";
-import { buildWindowsPrivateAclCommand, parseWindowsAclAudit, windowsAclIsPrivate } from "./windows-private-storage";
+import { buildWindowsAclAuditCommand, buildWindowsPrivateAclCommand, parseWindowsAclAudit, windowsAclIsPrivate } from "./windows-private-storage";
 
 describe("sqlite url helpers", () => {
   it("uses explicit DATABASE_URL first", () => {
@@ -76,10 +76,16 @@ describe("sqlite url helpers", () => {
   });
 
   it("builds and validates locale-independent Windows owner-only ACL commands", () => {
+    const path = "C:\\Chrona data\\user-selected";
     expect(buildWindowsPrivateAclCommand("C:\\Chrona\\data", "S-1-5-21-100", true)).toEqual({
       command: "icacls.exe",
       args: ["C:\\Chrona\\data", "/inheritance:r", "/setowner", "*S-1-5-21-100", "/grant:r", "*S-1-5-21-100:(OI)(CI)(F)", "*S-1-5-18:(OI)(CI)(F)"],
     });
+    const auditCommand = buildWindowsAclAuditCommand(path);
+    expect(auditCommand.command).toBe("powershell.exe");
+    expect(auditCommand.args).not.toContain(path);
+    expect(auditCommand.args.at(-2)).toBe("-Command");
+    expect(Object.values(auditCommand.env ?? {})).toEqual([path]);
     const audit = parseWindowsAclAudit('{"owner":"S-1-5-21-100","currentUser":"S-1-5-21-100","rules":[{"sid":"S-1-5-21-100","accessType":"Allow","rights":2032127,"inherited":false},{"sid":"S-1-5-18","accessType":"Allow","rights":2032127,"inherited":false}]}');
     expect(windowsAclIsPrivate(audit)).toBe(true);
     expect(windowsAclIsPrivate({ ...audit, rules: [...audit.rules, { sid: "S-1-1-0", accessType: "Allow", rights: 1, inherited: false }] })).toBe(false);
