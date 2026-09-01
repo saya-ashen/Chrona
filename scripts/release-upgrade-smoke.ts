@@ -8,6 +8,8 @@ import { Database } from "bun:sqlite";
 import { buildTargets, parseBuildTarget, type BuildTargetName } from "../build/manifest";
 import { schemaFingerprint } from "../packages/db/src/sqlite-schema-fingerprint";
 import { verifyMigrationReleaseMetadata } from "../packages/db/src/sqlite-migrations";
+import { sqliteRuntimeLockPath } from "../packages/db/src/sqlite-runtime-lock";
+import { secureWindowsGeneratedStorage } from "../packages/db/src/windows-private-storage";
 
 const ROOT = resolve(import.meta.dirname, "..");
 const TIMEOUT_MS = 25_000;
@@ -109,21 +111,25 @@ async function runCommand(binary: string, args: string[], env: NodeJS.ProcessEnv
   }
 }
 
+async function stopSmokeProcess(process: Bun.Subprocess, env: NodeJS.ProcessEnv): Promise<void> {
+  process.kill();
+  await process.exited.catch(() => undefined);
+  if (env.DATABASE_URL) rmSync(sqliteRuntimeLockPath(env.DATABASE_URL), { force: true });
+}
+
 async function startAndStop(binary: string, env: NodeJS.ProcessEnv): Promise<void> {
   const port = await freePort();
   const process = Bun.spawn([binary, "start", "--host", "127.0.0.1", "--port", String(port), "--no-open"], { cwd: ROOT, env, stdout: "pipe", stderr: "pipe" });
   try {
     await waitForHealth(port);
   } catch (error) {
-    process.kill();
-    await process.exited.catch(() => undefined);
+    await stopSmokeProcess(process, env);
     throw new Error(
       `${error instanceof Error ? error.message : String(error)}\n${await new Response(process.stdout).text()}\n${await new Response(process.stderr).text()}`,
       { cause: error },
     );
   }
-  process.kill();
-  await process.exited.catch(() => undefined);
+  await stopSmokeProcess(process, env);
 }
 
 export async function smokePackagedUpgrade(target: BuildTargetName): Promise<void> {
@@ -133,11 +139,16 @@ export async function smokePackagedUpgrade(target: BuildTargetName): Promise<voi
   const dataDir = join(root, "data");
   const configDir = join(root, "config");
   const databasePath = join(dataDir, "chrona.db");
-  const backupPath = join(root, "upgrade-backup.sqlite");
+  const backupPath = join(dataDir, "upgrade-backup.sqlite");
   try {
     mkdirSync(dataDir, { recursive: true });
     mkdirSync(configDir, { recursive: true });
+    if (process.platform === "win32") {
+      secureWindowsGeneratedStorage(dataDir, true);
+      secureWindowsGeneratedStorage(configDir, true);
+    }
     copyFileSync(resolve(MIGRATIONS_DIR, metadata.previousReleaseFixture.path), databasePath);
+    if (process.platform === "win32") secureWindowsGeneratedStorage(databasePath, false);
     seedRepresentativeLegacyRows(databasePath);
     const env = releaseEnvironment(dataDir, configDir, databasePath);
     await startAndStop(binary, env);

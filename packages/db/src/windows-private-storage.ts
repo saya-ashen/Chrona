@@ -23,7 +23,23 @@ export type WindowsAclCommand = {
   env?: Record<string, string>;
 };
 
-/** Build the locale-independent icacls invocation used for Chrona-owned paths. */
+/** Build the locale-independent owner invocation used for Chrona-generated paths. */
+export function buildWindowsOwnerAclCommand(path: string, currentUserSid: string): WindowsAclCommand {
+  return {
+    command: "icacls.exe",
+    args: [path, "/setowner", `*${currentUserSid}`],
+  };
+}
+
+/** Build the locale-independent explicit-rule removal used for Chrona-owned paths. */
+export function buildWindowsRemoveAclCommand(path: string, sid: string): WindowsAclCommand {
+  return {
+    command: "icacls.exe",
+    args: [path, "/remove", `*${sid}`],
+  };
+}
+
+/** Build the locale-independent grant invocation used for Chrona-owned paths. */
 export function buildWindowsPrivateAclCommand(path: string, currentUserSid: string, directory: boolean): WindowsAclCommand {
   const inheritance = directory ? "(OI)(CI)(F)" : "(F)";
   return {
@@ -31,7 +47,6 @@ export function buildWindowsPrivateAclCommand(path: string, currentUserSid: stri
     args: [
       path,
       "/inheritance:r",
-      "/setowner", `*${currentUserSid}`,
       "/grant:r",
       `*${currentUserSid}:${inheritance}`,
       `*${SYSTEM_SID}:${inheritance}`,
@@ -80,19 +95,20 @@ export function windowsAclIsPrivate(audit: WindowsAclAudit): boolean {
   return audit.owner === audit.currentUser
     && userHasFullControl
     && audit.rules.length > 0
-    && audit.rules.every((rule) => !rule.inherited && rule.accessType === "Allow" && allowed.has(rule.sid));
+    && audit.rules.every((rule) => rule.accessType === "Allow" && allowed.has(rule.sid) && (rule.rights & FULL_CONTROL) === FULL_CONTROL);
 }
 
 const ACL_AUDIT_PATH_ENV = "CHRONA_WINDOWS_ACL_AUDIT_PATH";
 
 const ACL_AUDIT_SCRIPT = [
+  "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8",
   `$p = $env:${ACL_AUDIT_PATH_ENV}`,
   "if ([string]::IsNullOrWhiteSpace($p)) { throw 'Missing Chrona ACL audit path.' }",
   "$identity = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value",
-  "$acl = Get-Acl -LiteralPath $p -ErrorAction Stop",
+  "if ([System.IO.Directory]::Exists($p)) { $acl = [System.IO.Directory]::GetAccessControl($p) } elseif ([System.IO.File]::Exists($p)) { $acl = [System.IO.File]::GetAccessControl($p) } else { throw 'Chrona ACL audit path does not exist.' }",
   "$rules = @($acl.GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier]) | ForEach-Object { [pscustomobject]@{ sid = $_.IdentityReference.Value; accessType = $_.AccessControlType.ToString(); rights = [int]$_.FileSystemRights; inherited = $_.IsInherited } })",
   "$result = [pscustomobject]@{ owner = $acl.GetOwner([Security.Principal.SecurityIdentifier]).Value; currentUser = $identity; rules = $rules }",
-  "[Console]::Out.Write(($result | ConvertTo-Json -Compress -Depth 3))",
+  "$result | ConvertTo-Json -Compress -Depth 3",
 ].join("; ");
 
 export function buildWindowsAclAuditCommand(path: string): WindowsAclCommand {
@@ -117,6 +133,13 @@ function execute(command: string, args: string[], env?: Record<string, string>):
   };
 }
 
+function executeRequired(command: WindowsAclCommand, failure: string): void {
+  const result = execute(command.command, command.args, command.env);
+  if (result.error || result.status !== 0) {
+    throw new Error(`${failure}: ${result.stderr || result.error?.message || `${command.command} failed`}`);
+  }
+}
+
 function windowsAclAudit(path: string): WindowsAclAudit {
   const command = buildWindowsAclAuditCommand(path);
   const result = execute(command.command, command.args, command.env);
@@ -130,17 +153,18 @@ function windowsAclAudit(path: string): WindowsAclAudit {
 export function assertWindowsPrivateStorage(path: string): void {
   const audit = windowsAclAudit(path);
   if (!windowsAclIsPrivate(audit)) {
-    throw new Error(`Chrona requires owner-only Windows ACLs for ${path}. Existing custom paths are never rewritten; choose an empty Chrona directory or secure it for the current user and SYSTEM.`);
+    throw new Error(`Chrona requires owner-only Windows ACLs for ${path}. Existing custom paths are never rewritten; choose an empty Chrona directory or secure it for the current user and SYSTEM. Audit: ${JSON.stringify(audit)}`);
   }
 }
 
 /** Applies and verifies a private ACL for a path Chrona itself generated. */
 export function secureWindowsGeneratedStorage(path: string, directory: boolean): void {
   const before = windowsAclAudit(path);
-  const command = buildWindowsPrivateAclCommand(path, before.currentUser, directory);
-  const result = execute(command.command, command.args);
-  if (result.error || result.status !== 0) {
-    throw new Error(`Chrona could not secure Windows owner-only ACLs for ${path}: ${result.stderr || result.error?.message || "icacls failed"}`);
+  executeRequired(buildWindowsOwnerAclCommand(path, before.currentUser), `Chrona could not set the Windows owner for ${path}`);
+  executeRequired(buildWindowsPrivateAclCommand(path, before.currentUser, directory), `Chrona could not secure Windows owner-only ACLs for ${path}`);
+  const allowed = new Set([before.currentUser, SYSTEM_SID]);
+  for (const sid of new Set(before.rules.map((rule) => rule.sid).filter((sid) => !allowed.has(sid)))) {
+    executeRequired(buildWindowsRemoveAclCommand(path, sid), `Chrona could not remove an extra Windows ACL for ${path}`);
   }
   assertWindowsPrivateStorage(path);
 }

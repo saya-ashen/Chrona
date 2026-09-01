@@ -107,6 +107,16 @@ export function secureGeneratedPrivateFile(path: string): void {
   }
 }
 
+/** Secure SQLite WAL/SHM files generated after the runtime adapter opens. */
+export function secureGeneratedSqliteSidecars(databaseUrl: string): void {
+  const sqlitePath = sqlitePathFromFileUrl(databaseUrl);
+  if (!sqlitePath || sqlitePath === ":memory:") return;
+  for (const suffix of ["-wal", "-shm"]) {
+    const artifactPath = `${resolve(sqlitePath)}${suffix}`;
+    if (existsSync(artifactPath)) secureGeneratedPrivateFile(artifactPath);
+  }
+}
+
 /** Create a Chrona-owned directory, or audit an existing selected directory. */
 export function ensurePrivateDirectory(path: string): void {
   if (process.platform === "win32") {

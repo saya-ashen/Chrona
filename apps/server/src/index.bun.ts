@@ -1,9 +1,8 @@
-import { bootstrapServerRuntime } from "./bootstrap";
-import { createServerApp } from "./app";
 import { resolve } from "node:path";
 import { ensureSqliteDatabase } from "@chrona/db/sqlite-migrations";
 import { recoverInterruptedSqliteRestore } from "@chrona/db/sqlite-backup";
 import { acquireSqliteRuntimeLock } from "@chrona/db/sqlite-runtime-lock";
+import { secureGeneratedSqliteSidecars } from "@chrona/db/sqlite-url";
 import { createLogger } from "@chrona/logging";
 import { assertSafeBind, isUnsafePublicBindOverride, readEnv, resolveAllowedOrigins, resolvePort } from "./config/env";
 
@@ -11,6 +10,18 @@ const log = createLogger("apps.server");
 const SSE_REQUEST_TIMEOUT_SECONDS = 120;
 
 let isShuttingDown = false;
+
+async function loadApplicationGraph(databaseUrl: string) {
+  const [{ db }, { bootstrapServerRuntime }, { createServerApp }] = await Promise.all([
+    import("@chrona/db/db"),
+    import("./bootstrap"),
+    import("./app"),
+  ]);
+  await db.$executeRawUnsafe("PRAGMA foreign_keys = ON");
+  await db.$queryRawUnsafe("SELECT 1");
+  secureGeneratedSqliteSidecars(databaseUrl);
+  return { bootstrapServerRuntime, createServerApp };
+}
 
 export async function startBunServer() {
   const env = readEnv();
@@ -32,6 +43,15 @@ export async function startBunServer() {
     databaseLock.release();
     throw error;
   }
+  // Load the Prisma-backed app graph only after migrations and storage permissions settle.
+  let applicationGraph: Awaited<ReturnType<typeof loadApplicationGraph>>;
+  try {
+    applicationGraph = await loadApplicationGraph(env.DATABASE_URL);
+  } catch (error) {
+    databaseLock.release();
+    throw error;
+  }
+  const { bootstrapServerRuntime, createServerApp } = applicationGraph;
   const runtimeLifecycle = bootstrapServerRuntime();
   let app: Awaited<ReturnType<typeof createServerApp>>;
   try {
