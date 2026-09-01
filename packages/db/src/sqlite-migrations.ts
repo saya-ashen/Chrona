@@ -352,12 +352,13 @@ function verifyPreviousReleaseFixture(
 	) {
 		throw new Error(`Previous-release fixture provenance does not attest the recorded release: ${provenancePath}`);
 	}
-	// SQLite may materialize WAL sidecars even for a read-only handle. Verify a
-	// disposable copy so the published fixture remains byte-for-byte immutable.
+	// WAL-mode fixtures may need to create sidecars before they can be queried on
+	// macOS. Open only a disposable writable copy so the published fixture stays
+	// byte-for-byte immutable while every platform can verify its schema/history.
 	const fixtureVerificationDir = mkdtempSync(join(tmpdir(), "chrona-release-fixture-"));
 	const fixtureCopy = join(fixtureVerificationDir, "fixture.sqlite");
 	cpSync(fixturePath, fixtureCopy);
-	const fixture = new Database(fixtureCopy, { readonly: true });
+	const fixture = new Database(fixtureCopy);
 	try {
 		if (schemaFingerprint(fixture) !== metadata.lastReleasedSchemaFingerprint) {
 			throw new Error(

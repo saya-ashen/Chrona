@@ -1,0 +1,4 @@
+# Release metadata records byte-stable checksums for these text artifacts.
+# Keep checkout line endings identical on Windows, macOS, and Linux.
+prisma/migrations/**/*.sql text eol=lf
+prisma/migrations/**/*.json text eol=lf
