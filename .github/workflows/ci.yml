@@ -41,8 +41,11 @@ jobs:
       - name: Smoke documented development entrypoints
         run: bun run smoke:entrypoints
       - run: bun run analyze
-      - name: Install Chromium for result export tests
-        run: sudo apt-get update && sudo apt-get install --yes chromium-browser
+      - name: Install Chromium and ImageMagick for export and README asset checks
+        run: sudo apt-get update && sudo apt-get install --yes chromium-browser imagemagick
+
+      - name: Verify README media
+        run: bun run assets:check
 
       - name: Run CI tests
         run: bun run test:ci

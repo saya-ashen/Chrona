@@ -155,7 +155,10 @@ export const COMMANDS: Record<string, CommandGroup> = {
     replay: TEST_COMMANDS["llm:replay"],
   },
   demo: {
-    "readme-gif": { description: "Record README demo GIF", steps: [bunStep("readme gif", ["scripts/demo/readme-gif.ts"], true)] },
+    "readme-gif": {
+      description: "Record deterministic English README demo GIFs",
+      steps: [bunStep("readme gifs", ["run", "scripts/assets.ts", "capture-motion"], true)],
+    },
   },
   plugin: {
     hermes: { description: "Install Hermes plugin", steps: [{ label: "install Hermes plugin", acceptsExtraArgs: true, run: async (extraArgs) => { await $`bash ${["external-plugins/hermes/install.sh", ...extraArgs]}`.cwd(ROOT); } }] },
