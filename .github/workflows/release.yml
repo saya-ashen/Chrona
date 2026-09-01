@@ -28,7 +28,7 @@ jobs:
           bun-version: 1.3.11
 
       - name: Require tag matches package version
-        run: test "$GITHUB_REF_NAME" = "v$(bun -p 'require(\"./package.json\").version')"
+        run: test "$GITHUB_REF_NAME" = "v$(bun -p 'require("./package.json").version')"
 
       - run: bun install --frozen-lockfile
 
