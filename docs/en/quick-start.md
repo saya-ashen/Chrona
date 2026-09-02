@@ -17,6 +17,7 @@ Use this path when you want to run Chrona without cloning the repository.
 | Linux x64 | `chrona-linux-x64.tar.gz` |
 | Linux ARM64 | `chrona-linux-arm64.tar.gz` |
 | macOS Apple Silicon | `chrona-darwin-arm64.tar.gz` |
+| macOS Intel | `chrona-darwin-x64.tar.gz` |
 | Windows x64 | `chrona-windows-x64.tar.gz` |
 3. Extract the archive and start Chrona:
 
@@ -133,7 +134,6 @@ Common fields:
 | Model | Claude model passed to Claude Code | Defaults to Chrona's provider default if left empty |
 | API key | Anthropic API key for Claude Code | Optional; leave empty to use the user's existing Claude Code auth/config |
 | Config directory | Claude Code config/state directory | Optional; empty means Claude Code's default user-level config |
-| Working directory | Filesystem scope for the run | Optional; defaults to the Chrona process working directory |
 | MCP base URL | Chrona `/api/mcp` server URL | Defaults to the current Chrona server |
 | MCP bearer token | Bearer token for Chrona MCP requests | Usually leave empty; use `CHRONA_API_KEY` or `CHRONA_MCP_BEARER_TOKEN` when API auth is enabled |
 | Timeout | Maximum provider run time | Optional |
@@ -150,10 +150,11 @@ Common fields:
 | API key | OpenAI/Codex API key | Optional; also passed as `CODEX_API_KEY` and `OPENAI_API_KEY` for the provider process |
 | Base URL | OpenAI Responses-compatible gateway URL | Optional |
 | Config directory | Codex home directory | Optional; empty means default user-level `CODEX_HOME` (`~/.codex`) |
-| Working directory | Filesystem scope for the run | Optional; defaults to the Chrona process working directory |
 | MCP base URL | Chrona `/api/mcp` server URL | Defaults to the current Chrona server |
 | MCP bearer token | Bearer token for Chrona MCP requests | Usually leave empty; use `CHRONA_API_KEY` or `CHRONA_MCP_BEARER_TOKEN` when API auth is enabled |
 | Timeout | Maximum provider run time | Optional |
+
+Chrona v0.3.1 does not expose a per-client working-directory field in Settings. When no directory is supplied through a lower-level integration, provider runs use the Chrona process working directory. Treat that directory as execution context, not as a security sandbox; start Chrona from an appropriate non-sensitive directory for filesystem-oriented tasks.
 
 ## Task workspace execution basics
 

@@ -16,6 +16,7 @@
 
 <p align="center">
   <a href="https://github.com/saya-ashen/Chrona/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/saya-ashen/Chrona/actions/workflows/ci.yml/badge.svg" /></a>
+  <a href="https://github.com/saya-ashen/Chrona/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/saya-ashen/Chrona" /></a>
   <a href="./LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue.svg" /></a>
   <a href="./package.json"><img alt="Bun >= 1.3.11" src="https://img.shields.io/badge/bun-%3E%3D1.3.11-black" /></a>
 </p>
@@ -67,8 +68,8 @@ Task -> Plan -> Schedule -> Inspectable Execution
 
 ## 快速开始
 
-Chrona 目前只支持 Bun。源码仓库使用 Bun 运行；开发时暂不支持通过 npm
-安装依赖。
+发行版是独立可执行程序，不需要安装 Bun。只有从源码构建或运行 Chrona
+时才需要 Bun；仓库开发暂不支持 npm。
 
 ### 下载发行版
 
@@ -82,6 +83,7 @@ Chrona 目前只支持 Bun。源码仓库使用 Bun 运行；开发时暂不支�
 | Linux x64           | `chrona-linux-x64.tar.gz`    |
 | Linux ARM64         | `chrona-linux-arm64.tar.gz`  |
 | macOS Apple Silicon | `chrona-darwin-arm64.tar.gz` |
+| macOS Intel         | `chrona-darwin-x64.tar.gz`   |
 | Windows x64         | `chrona-windows-x64.tar.gz`  |
 
 3. 解压并启动 Chrona：
@@ -132,6 +134,11 @@ Web 应用。
 4. 从任务工作区手动启动执行；配置自动执行后，也可以让 Chrona 推进到期任务。
 
 数据目录、AI client 细节和排障说明见[完整快速开始](./docs/zh/quick-start.md)。
+
+如果你正在试用公开 Alpha，请通过[早期用户反馈表](https://github.com/saya-ashen/Chrona/issues/new?template=early_adopter_feedback.yml)
+告诉我们首次使用体验；安装或 Provider 问题使用[设置问题模板](https://github.com/saya-ashen/Chrona/issues/new?template=setup_provider_issue.yml)，
+可复现错误使用[Bug 模板](https://github.com/saya-ashen/Chrona/issues/new?template=bug_report.yml)。
+请勿提交 API key、token、私有 URL、数据库内容或原始 Provider payload。
 
 ## 核心工作流
 
@@ -191,10 +198,10 @@ Chrona 默认从本机运行和显式配置开始。
 ## 项目状态
 
 > [!WARNING]
-> Chrona 仍处于 alpha 阶段：local-first、Bun-only，并且在快速迭代。
+> Chrona 是面向本地、非关键工作流的公开 Alpha。发行版可独立运行；源码开发使用 Bun。
 
-Chrona 目前适合本地开发和产品探索，还不是稳定软件。代码库已包含任务、计划、日程、执行、Dashboard、Settings、外部日历和
-AI-client 流程；下一步重点是让“日程到自动执行”的闭环可靠到可以日常使用。
+0.3.1 已适合早期用户测试完整本地流程：任务、计划、日程、执行、恢复和结果验收。
+目前仍标记为 Alpha，因为工作流体验和运维契约可能变化。请勿将 Chrona 用于无人值守的关键任务，也不要直接暴露到公网。
 
 ## 路线图
 
@@ -210,7 +217,7 @@ AI-client 流程；下一步重点是让“日程到自动执行”的闭环可�
 | 外部日历        | 已可用 | 早期         | 只读日历订阅、忙碌事件导入、来源管理、刷新状态和日程上下文。                          |
 | 完善现有流程    | 进行中 | 活跃         | 让 Dashboard、Schedule、Task Workspace 和执行记录更可靠、更容易理解。                 |
 | 可靠自动执行    | 进行中 | 尚不稳定     | 仅在配置允许且安全时启动到期任务，并在执行阻塞或失败时提供清晰恢复路径。              |
-| 更多 provider   | 进行中 | 实验性       | 在保持 provider 边界清晰的前提下接入更多执行/provider 集成。                          |
+| 已发布 Provider 一致性 | 已可用 | 稳定 Adapter | Codex、OMP 和 Claude Code 提供相同产品功能；未来 Adapter 仍需通过发布门禁。          |
 | 多会话执行      | 已计划 | 尚不可用     | 增加多会话的隔离、复用、恢复和诊断能力。                                              |
 | 生产可用性      | 已计划 | 未就绪       | 认证、备份/恢复、部署文档、迁移安全、可观测性和运维手册。                             |
 
@@ -265,7 +272,7 @@ AI client 在 Web 应用的 `Settings -> AI Clients` 中配置。Provider 类型
 
 ### Chrona 生产可用了吗？
 
-还没有。Chrona 目前适合本地开发和产品探索，但 runtime contracts、provider 行为和 auto-execution 流程仍在变化。
+还没有。0.3.1 面向运行本地、非关键工作流的早期用户。核心闭环已可使用，但工作流体验、运维契约和自动执行可靠性仍在持续完善。
 
 ### Chrona 数据存在哪里？
 
@@ -319,7 +326,7 @@ bun run analyze
 
 ## 贡献
 
-欢迎贡献。请从 [CONTRIBUTING.md](./CONTRIBUTING.md) 开始，运行相关检查；修改任务、日程、执行或导航流程时，请用测试覆盖行为。
+欢迎贡献。请从 [CONTRIBUTING.md](./CONTRIBUTING.md) 开始，运行相关检查；修改任务、日程、执行或导航流程时，请用测试覆盖行为。使用和设置问题请查看 [SUPPORT.md](./SUPPORT.md)。
 
 ## License
 

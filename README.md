@@ -16,6 +16,7 @@ English | [中文](./README.zh.md)
 
 <p align="center">
   <a href="https://github.com/saya-ashen/Chrona/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/saya-ashen/Chrona/actions/workflows/ci.yml/badge.svg" /></a>
+  <a href="https://github.com/saya-ashen/Chrona/releases/latest"><img alt="Latest release" src="https://img.shields.io/github/v/release/saya-ashen/Chrona" /></a>
   <a href="./LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue.svg" /></a>
   <a href="./package.json"><img alt="Bun >= 1.3.11" src="https://img.shields.io/badge/bun-%3E%3D1.3.11-black" /></a>
 </p>
@@ -70,8 +71,9 @@ Chrona combines those loops without pretending they are the same thing.
 
 ## Quick Start
 
-Chrona is Bun-only today. The source repository uses Bun as the runtime; npm
-package installation is not currently supported for repository development.
+Packaged releases are standalone and do not require Bun. Building or running
+Chrona from source requires Bun; npm-based repository development is not
+currently supported.
 
 ### Download a release
 
@@ -86,6 +88,7 @@ Use this path if you want to run Chrona without cloning the repository.
 | Linux x64           | `chrona-linux-x64.tar.gz`    |
 | Linux ARM64         | `chrona-linux-arm64.tar.gz`  |
 | macOS Apple Silicon | `chrona-darwin-arm64.tar.gz` |
+| macOS Intel         | `chrona-darwin-x64.tar.gz`   |
 | Windows x64         | `chrona-windows-x64.tar.gz`  |
 
 3. Extract the archive and start Chrona:
@@ -139,6 +142,13 @@ Enable AI execution when you are ready:
 
 See the [full quick start](./docs/en/quick-start.md) for data directories, AI
 client details, and troubleshooting.
+
+Trying the public alpha? Share your first-run experience through the
+[early-adopter feedback form](https://github.com/saya-ashen/Chrona/issues/new?template=early_adopter_feedback.yml),
+report a [setup/provider problem](https://github.com/saya-ashen/Chrona/issues/new?template=setup_provider_issue.yml),
+or open a [bug report](https://github.com/saya-ashen/Chrona/issues/new?template=bug_report.yml).
+Never include API keys, tokens, private URLs, database contents, or raw provider
+payloads.
 
 ## Core Workflow
 
@@ -208,13 +218,13 @@ Chrona is designed to start local and explicit.
 ## Project Status
 
 > [!WARNING]
-> Chrona is alpha software: local-first, Bun-only, and under active development.
+> Chrona is a public alpha for local, non-critical workflows. Packaged releases
+> are standalone; source development uses Bun.
 
-Chrona is usable for local development and product exploration, but it is not
-stable software yet. Task, plan, schedule, execution, recovery, result review,
-and AI-client flows work locally. Provider replay/resume, complete cross-run
-result history, production authentication, and operational hardening remain
-experimental or incomplete.
+Version 0.3.1 is ready for early adopters to exercise the complete local flow:
+task, plan, schedule, execution, recovery, and result review. It remains alpha
+because workflow UX and operational contracts may change. Do not rely on Chrona
+for unattended critical work or expose it directly to the public internet.
 
 ## Roadmap
 
@@ -231,7 +241,7 @@ This is a short maturity summary. See the full
 | External calendars | Available | Early | Read-only calendar subscriptions, imported busy events, source management, refresh status, and schedule context. |
 | Polish existing flows | In progress | Active | Make Dashboard, Schedule, Task Workspace, and execution records more reliable and easier to understand. |
 | Reliable auto execution | In progress | Not stable | Start due scheduled work only when configured and safe, with clear recovery when execution blocks or fails. |
-| More providers | In progress | Experimental | Add provider integrations while keeping provider boundaries explicit. |
+| Released provider parity | Available | Stable adapters | Codex, OMP, and Claude Code expose the same product feature surface; future adapters remain gated. |
 | Multi-session execution | Planned | Not available | Add isolation, reuse, recovery, and diagnostics across multiple sessions. |
 | Production readiness | Planned | Not ready | Authentication, backup/restore, deployment docs, migration safety, observability, and operational runbooks. |
 
@@ -292,8 +302,9 @@ require a configured AI client. Codex, OMP, and Claude Code are stable supported
 
 ### Is Chrona production-ready?
 
-No. Chrona is usable for local development and product exploration, but runtime
-contracts, provider behavior, and auto-execution flows are still changing.
+Not yet. Version 0.3.1 is intended for early adopters running local,
+non-critical workflows. Core flows are usable, but workflow UX, operational
+contracts, and auto-execution hardening are still evolving.
 
 ### Where does Chrona store data?
 
@@ -353,7 +364,8 @@ schema-first contract rules, and testing expectations.
 
 Contributions are welcome. Start with [CONTRIBUTING.md](./CONTRIBUTING.md), run
 the relevant checks, and keep behavior covered by tests when changing task,
-schedule, execution, or navigation flows.
+schedule, execution, or navigation flows. For usage and setup questions, see
+[SUPPORT.md](./SUPPORT.md).
 
 ## License
 

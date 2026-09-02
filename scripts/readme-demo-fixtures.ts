@@ -262,32 +262,32 @@ function trendingResultSpec() {
       summary: {
         type: "ResultSummary",
         props: {
-          text: "GitHub Trending brief complete: AI agents, MCP tooling, and self-hosted apps dominate today’s developer attention.",
-          copyText: "Top signals: AI coding workflows, MCP integrations, browser automation, security testing, and local-first self-hosted tools.",
+          text: "Documentation fixture complete: AI agents, MCP tooling, and local-first apps are the sample’s leading themes.",
+          copyText: "Fixture themes: AI coding workflows, MCP integrations, browser automation, security testing, and local-first tools.",
         },
         children: [],
       },
       overviewCard: {
         type: "Card",
-        props: { title: "Research snapshot", description: "Daily GitHub Trending sample", maxWidth: "full" },
+        props: { title: "Research snapshot", description: "Deterministic documentation fixture", maxWidth: "full" },
         children: ["overviewMarkdown"],
       },
       overviewMarkdown: {
         type: "RichMarkdown",
         props: {
-          content: "- Reviewed **21 trending repositories** from the daily all-language feed.\n- Highest single-day growth: **AIDC-AI/codex-plugin-cc** with 1,532 stars today.\n- Strongest total-star signal: **immich-app/immich** with 82k+ stars.",
+          content: "- Reviewed a **21-project fixture dataset**.\n- Strongest recent-activity signal: **agent workflow tooling**.\n- Strongest durable-adoption signal: **local-first and self-hosted infrastructure**.",
         },
         children: [],
       },
       rankingCard: {
         type: "Card",
-        props: { title: "Representative projects", description: "Condensed from the dev database sample", maxWidth: "full" },
+        props: { title: "Representative categories", description: "Illustrative fixture output", maxWidth: "full" },
         children: ["rankingMarkdown"],
       },
       rankingMarkdown: {
         type: "RichMarkdown",
         props: {
-          content: "| Project | Signal | Why it matters |\n| --- | --- | --- |\n| Zackriya-Solutions/meeting-minutes | 1,409 stars today | Local AI meeting notes and workflow automation. |\n| AIDC-AI/codex-plugin-cc | 1,532 stars today | Codex/Claude skill bridge for agentic coding. |\n| immich-app/immich | 82k+ total stars | Self-hosted photo management keeps broad developer demand. |",
+          content: "| Sample area | Signal | Why it matters |\n| --- | --- | --- |\n| Agent workflows | High recent activity | Teams are connecting models to repeatable work. |\n| MCP integrations | Broad integration coverage | Tool access is moving into more engineering workflows. |\n| Local-first apps | Durable adoption signal | Users continue to value control over data and runtime. |",
         },
         children: [],
       },
@@ -299,7 +299,7 @@ function trendingResultSpec() {
       themesMarkdown: {
         type: "RichMarkdown",
         props: {
-          content: "- AI coding workflows are moving from one-off prompts to plugin ecosystems and multi-agent handoffs.\n- MCP integrations are spreading into Unity, Kubernetes, browser automation, and other vertical engineering loops.\n- Local-first and self-hosted tools remain durable developer demand signals.",
+          content: "- The fixture groups AI coding workflows around reusable tools and handoffs.\n- MCP integrations appear across several engineering categories.\n- Local-first and self-hosted tools form a distinct product theme.",
         },
         children: [],
       },

@@ -6,15 +6,16 @@ Chrona is alpha software. Support is best-effort and focused on reproducible bug
 
 - Bug: open a GitHub issue with reproduction steps.
 - Feature idea: open a GitHub issue describing the workflow and expected outcome.
-- Hermes/provider setup: use the provider setup issue template and include diagnosis output with secrets removed.
+- Provider setup: use the provider setup issue template and include the availability result or diagnosis output with secrets removed.
 - Security issue: follow `SECURITY.md`; do not post exploit details or secrets publicly.
 
 ## Before opening an issue
 
 1. Check `README.md`, `docs/en/quick-start.md`, and `docs/en/privacy.md`.
-2. Run `chrona doctor` for local database, lock, permissions, and bind safety; run `chrona hermes doctor` for Hermes setup problems.
-3. Confirm Bun version satisfies `package.json`.
-4. Remove secrets from logs and screenshots.
+2. Run `chrona doctor` for local database, lock, permissions, and bind safety.
+3. In `Settings -> AI Clients`, run the configured client's availability check. Codex, OMP, and Claude Code are the released providers; Hermes remains hidden.
+4. If running from source, confirm Bun satisfies the version in `package.json`. Packaged releases do not require Bun.
+5. Remove secrets from logs and screenshots.
 
 ## Useful details
 
@@ -22,7 +23,7 @@ Include when relevant:
 
 - Chrona version or commit
 - OS and architecture
-- Bun version
+- Bun version when running from source
 - launch command
 - whether running packaged release or source checkout
 - browser and viewport for UI bugs
@@ -30,4 +31,4 @@ Include when relevant:
 
 ## Scope
 
-Maintainers prioritize current `main`, latest release, local-first usage, and documented Hermes/debug provider flows. Production deployment, custom network exposure, and unsupported provider integrations may need community help.
+Maintainers prioritize current `main`, the latest release, local-first usage, and the released Codex, OMP, and Claude Code provider flows. Production deployment, custom network exposure, hidden/internal providers, and unsupported integrations may need community help.
