@@ -1,0 +1,81 @@
+name: Early-adopter feedback
+description: Share your first install, provider setup, and completed-workflow experience
+title: "feedback: "
+labels: [feedback]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for testing Chrona's public alpha. Do not include API keys, tokens, private URLs, database contents, raw provider payloads, or sensitive task data.
+  - type: input
+    id: version
+    attributes:
+      label: Chrona version
+      placeholder: "0.3.1"
+    validations:
+      required: true
+  - type: dropdown
+    id: install
+    attributes:
+      label: Install method
+      options:
+        - Packaged release
+        - Source checkout
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: OS and architecture
+      placeholder: "Windows x64, macOS arm64, or Linux x64"
+    validations:
+      required: true
+  - type: dropdown
+    id: provider
+    attributes:
+      label: Provider used
+      options:
+        - Codex
+        - OMP
+        - Claude Code
+        - No provider
+        - More than one provider
+    validations:
+      required: true
+  - type: dropdown
+    id: outcome
+    attributes:
+      label: Furthest completed step
+      options:
+        - Started Chrona
+        - Configured and tested a provider
+        - Created a task
+        - Generated and accepted a plan
+        - Completed execution
+        - Reviewed and accepted the result
+    validations:
+      required: true
+  - type: textarea
+    id: workflow
+    attributes:
+      label: Workflow you tried
+      description: Describe the task and expected outcome without private data.
+    validations:
+      required: true
+  - type: textarea
+    id: friction
+    attributes:
+      label: Biggest point of friction
+      description: What was confusing, slow, or blocked you?
+    validations:
+      required: true
+  - type: textarea
+    id: value
+    attributes:
+      label: Most valuable part
+      description: What would make you use Chrona again?
+  - type: textarea
+    id: notes
+    attributes:
+      label: Additional notes
+      description: Redacted screenshots are welcome.

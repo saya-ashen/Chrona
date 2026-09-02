@@ -191,7 +191,11 @@ async function captureTaskWorkflow(page: Page, baseUrl: string) {
   await page.waitForTimeout(1_200);
 
   await setDemoCaption(page, "Inspect dependencies at a readable scale");
-  await demoClick(page, fullGraph.getByRole("button", { name: /Analyze technology themes/ }));
+  const zoomIn = fullGraph.getByRole("button", { name: "Zoom in" });
+  await demoClick(page, zoomIn);
+  await demoClick(page, zoomIn);
+  await waitForRenderedPlanGraph(page, "task-plan-graph-full-dialog", 3, 120);
+  await moveDemoCursor(page, fullGraph.getByRole("button", { name: /Analyze technology themes/ }));
   await page.waitForTimeout(2_000);
 }
 
@@ -205,7 +209,7 @@ async function captureResultReview(page: Page, baseUrl: string) {
   await setDemoCaption(page, "Review the generated result");
   await page.waitForTimeout(1_400);
 
-  const representativeProjects = page.getByText("Representative projects", { exact: true });
+  const representativeProjects = page.getByText("Representative categories", { exact: true });
   await setDemoCaption(page, "Inspect evidence and recommendations");
   await moveDemoCursor(page, representativeProjects);
   await page.waitForTimeout(1_500);

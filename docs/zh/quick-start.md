@@ -17,6 +17,7 @@
 | Linux x64 | `chrona-linux-x64.tar.gz` |
 | Linux ARM64 | `chrona-linux-arm64.tar.gz` |
 | macOS Apple Silicon | `chrona-darwin-arm64.tar.gz` |
+| macOS Intel | `chrona-darwin-x64.tar.gz` |
 | Windows x64 | `chrona-windows-x64.tar.gz` |
 3. 解压并启动 Chrona：
 
@@ -105,7 +106,6 @@ Feature binding 决定哪个 client 处理哪个能力。产品功能包括 `tas
 | Model | 传给 Claude Code 的模型 | 留空则使用 Chrona provider 默认值 |
 | API key | Claude Code 使用的 Anthropic API key | 可选；留空则使用用户已有 Claude Code auth/config |
 | Config directory | Claude Code 配置/状态目录 | 可选；留空表示使用 Claude Code 默认用户级配置 |
-| Working directory | 本次运行的文件系统作用域 | 可选；默认使用 Chrona 进程工作目录 |
 | MCP base URL | Chrona `/api/mcp` server URL | 默认使用当前 Chrona server |
 | MCP bearer token | Chrona MCP 请求使用的 bearer token | 通常留空；启用 API auth 时使用 `CHRONA_API_KEY` 或 `CHRONA_MCP_BEARER_TOKEN` |
 | Timeout | provider run 最大时长 | 可选 |
@@ -122,10 +122,11 @@ Feature binding 决定哪个 client 处理哪个能力。产品功能包括 `tas
 | API key | OpenAI/Codex API key | 可选；也会作为 `CODEX_API_KEY` 和 `OPENAI_API_KEY` 传给 provider 进程 |
 | Base URL | OpenAI Responses 兼容 gateway URL | 可选 |
 | Config directory | Codex home directory | 可选；留空表示使用默认用户级 `CODEX_HOME`（`~/.codex`） |
-| Working directory | 本次运行的文件系统作用域 | 可选；默认使用 Chrona 进程工作目录 |
 | MCP base URL | Chrona `/api/mcp` server URL | 默认使用当前 Chrona server |
 | MCP bearer token | Chrona MCP 请求使用的 bearer token | 通常留空；启用 API auth 时使用 `CHRONA_API_KEY` 或 `CHRONA_MCP_BEARER_TOKEN` |
 | Timeout | provider run 最大时长 | 可选 |
+
+Chrona v0.3.1 的 Settings 尚未提供每个 client 独立的工作目录字段。未通过底层集成指定目录时，provider run 会使用 Chrona 进程的工作目录。该目录只是执行上下文，不是安全沙箱；涉及文件系统的任务应从合适的非敏感目录启动 Chrona。
 
 ## 任务工作区执行基础
 
