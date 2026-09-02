@@ -135,6 +135,49 @@ test.describe("AI Client Settings", () => {
 		}
 	});
 
+	test("recommends Codex and exposes the complete stable feature set", async ({
+		page,
+		request,
+	}) => {
+		const response = await request.get("/api/runtime/providers");
+		expect(response.ok()).toBeTruthy();
+		const body = (await response.json()) as {
+			providers: Array<{
+				key: string;
+				tier: string;
+				recommended: boolean;
+				features: string[];
+			}>;
+		};
+		const releasedProviders = body.providers.filter((provider) => provider.key !== "debug");
+		expect(releasedProviders.map((provider) => provider.key)).toEqual([
+			"codex",
+			"omp",
+			"claude_code",
+		]);
+		for (const provider of releasedProviders) {
+			expect(provider.tier).toBe("stable");
+			expect(provider.features).toEqual(expect.arrayContaining([
+				"task.plan",
+				"goal.review",
+				"task.execution",
+				"dashboard.brief",
+			]));
+		}
+		expect(releasedProviders.filter((provider) => provider.recommended)).toEqual([
+			expect.objectContaining({ key: "codex" }),
+		]);
+
+		await page.goto(SETTINGS_URL);
+		await page.getByRole("button", { name: /add client/i }).click();
+		await expect(page.getByRole("combobox", { name: "Type" })).toContainText("Codex");
+		await expect(page.getByText("Support tier: stable · Recommended")).toBeVisible();
+		await page.getByText("Advanced settings").click();
+		for (const feature of ["Task Planning", "Goal Review", "Task Execution", "Dashboard Brief"]) {
+			await expect(page.getByText(feature, { exact: true })).toBeVisible();
+		}
+	});
+
 	test("[AISET-010/015] create, edit, test, and delete an AI client through the UI", async ({
 		page,
 	}) => {

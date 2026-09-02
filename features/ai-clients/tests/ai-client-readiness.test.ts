@@ -9,10 +9,10 @@ const copy = new Proxy<Record<string, string>>({}, {
 });
 
 describe("AI client readiness", () => {
-  it("treats an available default OMP client as planning-ready", () => {
+  it("treats the available default Codex client as planning-ready", () => {
     const items = readinessItems({
       copy,
-      type: "omp",
+      type: "codex",
       configured: true,
       enabled: true,
       testStatus: "available",
@@ -86,13 +86,16 @@ describe("AI client readiness", () => {
     expect(overall?.detail).not.toContain("unreachable");
   });
 
-  it("offers proposal-only bindings for single-attempt OMP", () => {
-    const features = getProviderFeatures([{
-      key: "omp",
-      label: "Oh My Pi",
-      features: ["goal.review", "task.plan", "task.execution"],
-    }], "omp");
+  it("offers the complete product feature set for every released provider", () => {
+    const expected = ["goal.review", "task.plan", "dashboard.brief", "task.execution"];
+    const providers = [
+      { key: "codex" as const, label: "Codex", features: expected },
+      { key: "omp" as const, label: "Oh My Pi", features: expected },
+      { key: "claude_code" as const, label: "Claude Code", features: expected },
+    ];
 
-    expect(features).toEqual(["goal.review", "task.plan", "task.execution"]);
+    for (const provider of providers) {
+      expect(getProviderFeatures(providers, provider.key)).toEqual(expected);
+    }
   });
 });

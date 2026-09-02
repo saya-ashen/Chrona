@@ -91,8 +91,8 @@ bun run test:api
 
 1. Open `http://localhost:3101`.
 2. Open Settings / AI Clients.
-3. Add the default OMP AI client and run its configuration check. The check resolves configured local SDK/model settings; it is not a remote credential or model-access probe. The five-minute demo provider request is the remote credential/model proof.
-4. Bind only the feature slots shown for that provider. `task.plan` and `goal.review` accept either authoritative cross-process recovery or OMP's terminal-only read-only single-attempt contract. OMP fails closed after an uncertain interrupted start and requires an explicit new operation; lower-level feature slots such as `generate_plan`, `suggest`, `chat`, and `dispatch_task` may also appear in developer-facing contexts.
+3. Add Codex, the default recommended AI client, and run its availability check.
+4. Bind the product features the client should own. Codex, OMP, and Claude Code support `task.plan`, `goal.review`, `task.execution`, and `dashboard.brief`; side-effect-free planning/review attempts fail closed after an uncertain interrupted start. Lower-level feature slots such as `generate_plan`, `suggest`, `chat`, and `dispatch_task` may also appear in developer-facing contexts.
 5. Create a task with enough context to execute.
 6. Place the task on the schedule.
 7. Generate a plan from the task workspace.
@@ -104,16 +104,17 @@ bun run test:api
 
 Chrona stores AI clients and feature bindings in the database. Chrona does not ship a built-in model provider today; configure an external provider client before using AI-backed features.
 
-- `omp`: Stable / Tier-1 in-process SDK adapter and default first-run provider. It supports `task.plan`, `task.execution`, `dashboard.brief`, and `goal.review`, plus local result finalization. Session history resumes where available. Its terminal-only read-only starts run once; an uncertain interruption is never auto-replayed and requires an explicit new operation. Its configuration check resolves SDK/model setup only; use the five-minute demo provider request to prove remote credentials and model access.
-- `claude_code`: Beta adapter; do not rely on it for the stable five-minute first-run path yet.
-- `codex`: Beta ACP adapter; do not rely on it for the stable five-minute first-run path yet.
-- `hermes`: Implemented internally but hidden from production Settings until its setup and conformance flow is release-certified.
+- `codex`: Stable and recommended by default. Its ACP adapter supports `task.plan`, `goal.review`, `task.execution`, and `dashboard.brief`, including structured terminal results, approvals, and session-history recovery.
+- `omp`: Stable in-process SDK adapter with the same product feature surface, plus local result finalization and session-history recovery. Its configuration check resolves SDK/model setup only; use a real provider request to prove remote credentials and model access.
+- `claude_code`: Stable Claude Agent SDK adapter with the same product feature surface, tool-isolated planning/review, and provider session recovery.
+
+The three released providers share the same supported product features, while the capability matrix records protocol-specific approval, reconnect, and recovery behavior. Hermes remains implemented internally but hidden from production Settings.
 
 Feature bindings decide which client handles which capability. Product-oriented bindings include `task.plan`, `task.execution`, and `dashboard.brief`; lower-level feature slots such as `suggest`, `generate_plan`, `conflicts`, `timeslots`, `chat`, and `dispatch_task` remain available where needed.
 
-### OMP (Stable Tier-1 SDK adapter)
+### OMP
 
-1. Open **Settings → AI Clients → Add Client → OMP**. OMP is listed first and is the default first-run client type.
+1. Open **Settings → AI Clients → Add Client → OMP** and select OMP instead of the default recommended Codex option.
 2. Enter a model and credentials, or leave credentials empty to use local `~/.omp` credentials; save and run the configuration check.
 3. Bind the displayed product features: `task.plan`, `task.execution`, `dashboard.brief`, and `goal.review`.
 4. Use **Start with Chrona → Use safe demo** as the five-minute provider request. It proves remote credentials and model access without granting external tools or side effects.
@@ -137,7 +138,7 @@ Common fields:
 | MCP bearer token | Bearer token for Chrona MCP requests | Usually leave empty; use `CHRONA_API_KEY` or `CHRONA_MCP_BEARER_TOKEN` when API auth is enabled |
 | Timeout | Maximum provider run time | Optional |
 
-### Codex
+### Codex (recommended)
 
 Use `Settings -> AI Clients -> Add Client -> Codex`.
 

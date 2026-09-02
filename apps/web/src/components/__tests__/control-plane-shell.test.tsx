@@ -152,9 +152,9 @@ beforeEach(() => {
 		if (path === "/api/schedule?workspaceId=ws-1")
 			return Promise.resolve({
 				availableAiClients: [{
-					id: "omp-client",
-					name: "OMP",
-					type: "omp",
+					id: "codex-client",
+					name: "Codex",
+					type: "codex",
 					isDefault: true,
 					enabled: true,
 				}],
@@ -217,7 +217,7 @@ describe("ControlPlaneShell", () => {
 		).not.toBeInTheDocument();
 	});
 
-	it("does not dispatch initial plan generation without an enabled OMP client", async () => {
+	it("does not dispatch initial plan generation without an enabled released provider", async () => {
 		mocks.createScheduledTask.mockResolvedValue({ taskId: "manual-task" });
 		mocks.apiJson.mockImplementation((path: string) => {
 			if (path === "/api/workspaces/ws-1/preferences/start-with-chrona")

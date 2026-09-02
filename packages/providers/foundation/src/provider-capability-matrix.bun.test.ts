@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import { recommendedProviderType, releasedProviderTypes } from "@chrona/contracts";
 import { providerCapabilityMatrix, summarizeProviderCapabilities } from "./provider-capability-matrix";
 import {
   supportsDurableFeatureRuntime,
@@ -21,10 +22,11 @@ describe("providerCapabilityMatrix", () => {
       activeRunLookup: false,
       streamReconnect: false,
       mode: "session_history",
+      readOnlySingleAttempt: true,
     });
   });
 
-  it("models Oh My Pi as a stable SDK session-history provider with fail-closed single-attempt recovery", () => {
+  it("models Oh My Pi as an SDK session-history provider with fail-closed single-attempt recovery", () => {
     const omp = providerCapabilityMatrix.find((entry) => entry.provider === "omp");
 
     expect(omp?.label).toBe("Oh My Pi");
@@ -42,6 +44,15 @@ describe("providerCapabilityMatrix", () => {
       mode: "session_history",
       readOnlySingleAttempt: true,
     });
+  });
+
+  it("gives every released provider safe terminal-only feature support and recommends Codex", () => {
+    expect(releasedProviderTypes[0]).toBe(recommendedProviderType);
+    expect(recommendedProviderType).toBe("codex");
+    for (const provider of releasedProviderTypes) {
+      const entry = providerCapabilityMatrix.find((candidate) => candidate.provider === provider);
+      expect(entry?.recovery.readOnlySingleAttempt).toBe(true);
+    }
   });
 
   it("summarizes provider recovery independently from run lookup", () => {

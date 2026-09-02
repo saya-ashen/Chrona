@@ -25,6 +25,10 @@ type RequestRecord = { method: string; params: unknown };
 
 type FakeSession = {
 	sessionId: string;
+	modes?: {
+		currentModeId: string;
+		availableModes: Array<{ id: string; name: string }>;
+	} | null;
 	promptBlocks?: unknown;
 	updates: Array<
 		| { kind: "session_update"; update: unknown }
@@ -47,6 +51,7 @@ class FakeAcpTransport implements AcpTransport {
 			init?: unknown;
 			updates?: FakeSession["updates"];
 			stderr?: string;
+			modes?: FakeSession["modes"];
 		} = {},
 	) {
 		this.init = input.init ?? {
@@ -56,6 +61,7 @@ class FakeAcpTransport implements AcpTransport {
 		this.stderr = input.stderr ?? "";
 		this.session = {
 			sessionId: "native-acp-session-1",
+			modes: input.modes,
 			updates: input.updates ?? [],
 			async prompt(promptInput) {
 				this.promptBlocks = promptInput;
@@ -82,6 +88,7 @@ class FakeAcpTransport implements AcpTransport {
 				if (method === "initialize") return this.init;
 				if (method === "authenticate") return {};
 				if (method === "session/load") return { modes: null };
+				if (method === "session/set_mode") return {};
 				throw new Error(`unexpected request ${method}`);
 			},
 			buildSession: (params: unknown) => {
@@ -446,6 +453,59 @@ describe("AcpProviderClient", () => {
 			mcpServers: [],
 		});
 	});
+
+	it("switches safe feature runs into the configured read-only session mode", async () => {
+		const transport = new FakeAcpTransport({
+			modes: {
+				currentModeId: "agent",
+				availableModes: [
+					{ id: "read-only", name: "Read only" },
+					{ id: "agent", name: "Agent" },
+				],
+			},
+			updates: [
+				{
+					kind: "stop",
+					stopReason: "end_turn",
+					response: { stopReason: "end_turn" },
+				},
+			],
+		});
+		const client = new AcpProviderClient({
+			config: config({ readOnlyModeId: "read-only" }),
+			transport,
+		});
+
+		const run = await client.startRun(baseInput({ toolPolicy: "read_only" }));
+		await Array.fromAsync(client.streamRun({ runId: run.runId }));
+
+		expect(
+			transport.requests.find((request) => request.method === "session/set_mode")
+				?.params,
+		).toEqual({
+			sessionId: "native-acp-session-1",
+			modeId: "read-only",
+		});
+	});
+
+	it("fails closed when the required read-only session mode is unavailable", async () => {
+		const transport = new FakeAcpTransport({
+			modes: {
+				currentModeId: "agent",
+				availableModes: [{ id: "agent", name: "Agent" }],
+			},
+		});
+		const client = new AcpProviderClient({
+			config: config({ readOnlyModeId: "read-only" }),
+			transport,
+		});
+
+		const run = await client.startRun(baseInput({ toolPolicy: "terminal_only" }));
+		await expect(
+			Array.fromAsync(client.streamRun({ runId: run.runId })),
+		).rejects.toThrow('does not advertise required read-only session mode "read-only"');
+	});
+
 	it("loads the prior ACP session when resumeSessionRef is present", async () => {
 		const transport = new FakeAcpTransport({
 			updates: [

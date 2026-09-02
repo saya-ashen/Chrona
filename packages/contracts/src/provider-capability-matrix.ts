@@ -41,7 +41,8 @@ export type ProviderCapabilityMatrixEntry = {
 };
 
 /** Provider adapters exposed in production settings. Hermes remains implemented but is hidden until certified. */
-export const releasedProviderTypes = ["omp", "claude_code", "codex"] as const;
+export const recommendedProviderType = "codex" as const;
+export const releasedProviderTypes = [recommendedProviderType, "omp", "claude_code"] as const;
 
 const UI_BEHAVIOR: Record<ProviderCapabilityName, string> = {
 	healthCheck: "Settings shows provider readiness.",
@@ -148,7 +149,7 @@ export const providerCapabilityMatrix = [
 			crossProcessDurable: false,
 			mode: "local_stream_only",
 			clientOperationLookup: false,
-			readOnlySingleAttempt: false,
+			readOnlySingleAttempt: true,
 			providerResumeRef: true,
 			runEventReplay: true,
 		},
@@ -175,7 +176,7 @@ export const providerCapabilityMatrix = [
 			crossProcessDurable: false,
 			mode: "session_history",
 			clientOperationLookup: false,
-			readOnlySingleAttempt: false,
+			readOnlySingleAttempt: true,
 			providerResumeRef: true,
 			runEventReplay: false,
 		},

@@ -41,7 +41,7 @@ Chrona's durable value should grow with AI capability:
 1. **Task capture**: capture work, structure it, prioritize it, and keep status clear.
 2. **Plan generation/review**: use AI to create and revise executable plans, but keep review and acceptance explicit.
 3. **Schedule placement**: bind work to time, conflicts, due windows, and automation policy.
-4. **Provider execution**: run AI/runtime-backed work through Hermes, Claude Code, Codex, and future providers without leaking provider quirks into product behavior.
+4. **Provider execution**: run AI/runtime-backed work through Codex, OMP, Claude Code, and future released providers without leaking provider quirks into product behavior.
 5. **Result review/recovery**: make outputs, failures, cancellations, approvals, and waiting states inspectable from Dashboard and task workspace.
 6. **Trusted AI surfaces**: use json-render for validated AI-authored results and insights while keeping runtime controls product-authored.
 
@@ -59,7 +59,7 @@ These capabilities exist in the current codebase and should be treated as produc
 | Schedule | Timeline, task list, AI insights, conflicts, schedule proposals, task creation, configuration surfaces, and external-calendar busy context. |
 | Dashboard | Today's focus, attention items, active runs, recent results, and recovery links for failed/cancelled/waiting work. |
 | Task Workspace | Task editing, plan generation/acceptance, execution overview, latest result, plan graph, execution records, and node detail inspection. |
-| Settings / AI Clients | Database-backed AI clients and feature bindings for Hermes, Claude Code, Codex, and development/debug flows. |
+| Settings / AI Clients | Database-backed AI clients and feature bindings for stable Codex, OMP, and Claude Code providers plus development/debug flows. Hermes remains internal and hidden. |
 | Backend API | Task CRUD/lifecycle routes, plan generation/acceptance routes, task-scoped execution routes, workspace command/event transport, schedule projections, runtime provider routes, and AI client routes. |
 | MCP / provider bridge | Streamable HTTP MCP tools and provider integrations that let external AI runtimes advance Chrona work through safe contracts. |
 | External calendars | Read-only subscription sources, source validation/management, imported busy events, refresh status, and schedule context. |
@@ -137,7 +137,7 @@ User can answer: what is running, why it stopped, what AI did, what result exist
 
 ### 4. Normalize provider capabilities and recovery behavior
 
-Hermes, Claude Code, Codex, and future providers should feel like different engines behind the same schedule execution product.
+Codex, OMP, Claude Code, and future released providers should feel like different engines behind the same schedule execution product.
 
 Focus:
 

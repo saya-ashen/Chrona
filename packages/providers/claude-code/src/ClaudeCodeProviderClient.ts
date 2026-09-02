@@ -245,6 +245,7 @@ export class ClaudeCodeProviderClient implements AgentProviderClient {
 			actionInvocation: "external_control_plane",
 			startIdempotency: "unsupported",
 			lookupByClientOperationId: false,
+			readOnlySingleAttempt: true,
 			approval: {
 				supported: false,
 				choices: [],

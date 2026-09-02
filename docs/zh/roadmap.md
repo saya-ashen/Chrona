@@ -41,7 +41,7 @@ Chrona 的长期价值应随 AI 能力增强而增强：
 1. **任务捕获**：捕获工作、结构化、排序，并保持状态清晰。
 2. **计划生成/审查**：用 AI 创建和修订可执行计划，但审查与接受必须显式。
 3. **排期安排**：把工作绑定到时间、冲突、到期窗口和自动化策略。
-4. **Provider 执行**：通过 Hermes、Claude Code、Codex 和未来 Provider 执行 AI/运行时工作，同时不把 Provider 差异泄漏到产品行为。
+4. **Provider 执行**：通过 Codex、OMP、Claude Code 和未来正式 Provider 执行 AI/运行时工作，同时不把 Provider 差异泄漏到产品行为。
 5. **结果审查/恢复**：让输出、失败、取消、审批和等待状态可在 Dashboard 与任务工作区中检查。
 6. **可信 AI 表面**：用 json-render 展示经过验证的 AI-authored 结果与洞察，同时保持 runtime controls 由产品控制。
 
@@ -59,7 +59,7 @@ Chrona 的长期价值应随 AI 能力增强而增强：
 | Schedule | 时间线、任务列表、AI insights、冲突、排期建议、任务创建、配置表面和外部日历 busy context。 |
 | Dashboard | 今日关注、attention items、活动 runs、最近结果，以及失败/取消/等待工作的恢复入口。 |
 | Task Workspace | 任务编辑、计划生成/接受、执行概览、最新结果、计划图、执行记录和节点详情检查。 |
-| Settings / AI Clients | 数据库驱动的 AI clients 与 feature bindings，覆盖 Hermes、Claude Code、Codex 和开发/debug flows。 |
+| Settings / AI Clients | 数据库驱动的 AI clients 与 feature bindings，覆盖稳定支持的 Codex、OMP、Claude Code 和开发/debug flows；Hermes 保留为内部隐藏实现。 |
 | 后端 API | 任务 CRUD/lifecycle routes、计划生成/接受 routes、task-scoped execution routes、workspace command/event transport、schedule projections、runtime provider routes 和 AI client routes。 |
 | MCP / Provider bridge | Streamable HTTP MCP tools 和 Provider 集成，让外部 AI runtime 通过安全契约推进 Chrona 工作。 |
 | 外部日历 | 只读订阅来源、来源校验/管理、导入忙碌事件、刷新状态和日程上下文。 |
@@ -137,7 +137,7 @@ same task + same execution facts -> same label, same severity, same primary acti
 
 ### 4. 统一 Provider capability 和恢复行为
 
-Hermes、Claude Code、Codex 和未来 Provider 应该像同一个日程执行产品背后的不同引擎。
+Codex、OMP、Claude Code 和未来正式 Provider 应该像同一个日程执行产品背后的不同引擎。
 
 重点：
 

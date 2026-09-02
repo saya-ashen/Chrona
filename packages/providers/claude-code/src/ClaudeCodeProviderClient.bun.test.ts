@@ -93,6 +93,7 @@ describe("ClaudeCodeProviderClient — happy path", () => {
     expect(caps.supportsCancellation).toBe(true);
     expect(caps.supportsToolCalls).toBe(true);
     expect(caps.supportsPreviousResponse).toBe(false);
+    expect(caps.readOnlySingleAttempt).toBe(true);
 
     // When a runner is injected, health is reported ok with no reason.
     const health = await client.checkHealth();

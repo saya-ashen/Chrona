@@ -82,6 +82,7 @@ describe.skipIf(!HAS_CLAUDE)("ClaudeCodeProviderClient — live SDK", () => {
       input: { type: "text", text: "Echo protocol payload." },
       tools: fixtureTools,
       terminalToolName: "fixture_echo",
+      toolPolicy: "terminal_only",
     }));
 
     const runStarted = events.find((event) => event.type === "run_started");

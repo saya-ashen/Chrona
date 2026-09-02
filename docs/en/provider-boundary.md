@@ -27,14 +27,14 @@ Those decisions belong in `packages/engine`.
 
 ## Stable local provider support matrix
 
-For the first stable local release, **OMP is the only Tier-1 provider**. This is limited to the evidence currently available: packaged OMP native assets and real local dogfood through planning, execution, manual completion, and result review. It is not a claim that every provider-native feature is universally supported.
+Codex, OMP, and Claude Code are stable released providers with the same product feature surface: planning, Goal review, execution, and dashboard briefs. Codex is the default recommendation. Stable support does not imply identical provider-native protocols; capability-specific approval, reconnect, and recovery behavior remains explicit in the capability matrix.
 
 | Provider | Support level | Release claim |
 | --- | --- | --- |
-| `omp` | Tier-1 / Stable | Default local SDK path for planning, Goal review, result finalization, execution, dashboard briefs, and the documented five-minute golden path. Session history resumes where available; an uncertain terminal-only read-only start fails closed and requires explicit retry. |
-| `claude_code` | Beta | Execution adapter validated through the real Claude Agent SDK/binary; task planning remains owned by the separate `task.plan` binding. |
-| `codex` | Beta | Real Codex ACP/binary validated against a strict OpenAI Responses-compatible endpoint; task planning remains owned by the separate `task.plan` binding. |
-| `hermes` | Experimental / hidden | Existing gateway adapter remains internal and is omitted from production Settings until setup and conformance evidence is complete. |
+| `codex` | Stable · Recommended | ACP adapter validated against OpenAI Responses-compatible endpoints, with tool-isolated planning/review, structured results, approvals, execution, and session-history recovery. |
+| `omp` | Stable | In-process SDK adapter with tool-isolated planning/review, structured results, execution, local result finalization, and session-history recovery. |
+| `claude_code` | Stable | Claude Agent SDK adapter with tool-isolated planning/review, structured results, execution, and provider session recovery. |
+| `hermes` | Internal / hidden | Existing gateway adapter remains internal and is omitted from production Settings until explicitly restored to the released provider set. |
 
 ## Current provider packages
 
@@ -43,7 +43,7 @@ For the first stable local release, **OMP is the only Tier-1 provider**. This is
 | `packages/providers/foundation` | Provider-neutral contracts and shared adapter shapes |
 | `packages/providers/hermes` | Hermes-specific transport, session, event, and tool-call adaptation |
 | `packages/providers/debug` | Development/debug execution runtime, hidden unless explicitly enabled |
-| `packages/providers/omp` | Tier-1 in-process OMP SDK transport across the supported selectable wire protocols |
+| `packages/providers/omp` | In-process OMP SDK transport across the supported selectable wire protocols |
 | `packages/providers/claude-code` | Claude Code CLI transport, session, stream, and tool-call adaptation |
 | `packages/providers/codex` | OpenAI Codex via ACP (`codex-acp`), session, stream, MCP, and tool-call adaptation. Codex is the first ACP-backed provider; future provider work may migrate other providers toward ACP where it fits. |
 
@@ -76,10 +76,10 @@ Feature Runtime bindings for side-effect-free, terminal-only AI features such as
 
 The second contract is bounded to terminal-only work. It does not permit
 engine-managed actions, and it does not weaken the authoritative attach
-requirements for action-invoking Feature Runtime work. OMP is Tier-1 within
-this bounded contract; its local SDK/model configuration check is not proof of
-remote credentials or model access. The five-minute demo provider request is
-that proof.
+requirements for action-invoking Feature Runtime work. Codex, OMP, and Claude
+Code implement this bounded contract with provider-specific tool isolation; a
+local SDK/model configuration check alone is not proof of remote credentials or
+model access. A real provider request is that proof.
 
 ## Session ownership
 

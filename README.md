@@ -130,8 +130,8 @@ Explore Chrona without connecting a real provider:
 
 Enable AI execution when you are ready:
 
-1. Go to `Settings -> AI Clients`, add the default OMP client, and run its configuration check. The check validates local SDK/model resolution only; the five-minute demo provider request is the proof of remote credentials and model access.
-2. Bind only the feature slots shown for that provider. OMP supports planning and Goal review through one terminal-only read-only attempt; an uncertain interrupted start fails closed and needs an explicit new operation.
+1. Go to `Settings -> AI Clients`, add Codex—the default recommended provider—and run its availability check.
+2. Bind the client to the product features you want it to own. Codex, OMP, and Claude Code all support planning, Goal review, execution, and dashboard briefs.
 3. Generate a plan from the task workspace, review or edit the generated graph,
    then accept it.
 4. Start execution manually from the task workspace, or let Chrona move
@@ -165,13 +165,12 @@ providers as AI clients, then bind those clients to Chrona features.
 
 | Provider type | Status | Best for |
 | --- | --- | --- |
-| `omp` | Stable / Tier-1 | Default local SDK path for planning, Goal review, result finalization, execution, and dashboard briefs. Session history resumes where available; an uncertain terminal-only read-only start is never replayed automatically. |
-| `claude_code` | Beta | CLI adapter; stable first-run conformance evidence is not yet complete |
-| `codex` | Beta | ACP adapter; stable first-run conformance evidence is not yet complete |
-| `hermes` | Experimental | Existing gateway adapter; setup and stable conformance remain incomplete |
+| `codex` | Stable · Recommended | Default first-run ACP adapter. Supports planning, Goal review, execution, dashboard briefs, structured results, approvals, and session-history recovery. |
+| `omp` | Stable | In-process SDK adapter supporting planning, Goal review, execution, dashboard briefs, structured results, and session-history recovery. |
+| `claude_code` | Stable | Claude Agent SDK adapter supporting planning, Goal review, execution, dashboard briefs, structured results, and session recovery. |
 
 Configure providers in `Settings -> AI Clients`, then bind the client only to
-its displayed Chrona features. Planning/review accepts authoritative cross-process recovery or OMP's explicit terminal-only read-only single attempt; the latter fails closed instead of replaying an uncertain start.
+its displayed Chrona features. All released providers run side-effect-free planning and review through an explicit terminal-only read-only attempt that fails closed instead of replaying an uncertain start. Provider-specific recovery details remain visible in Settings.
 
 For provider fields, defaults, and troubleshooting, use the
 [full quick start](./docs/en/quick-start.md).
@@ -289,7 +288,7 @@ AI clients are configured in the web app under `Settings -> AI Clients`. See
 
 Yes. You can create tasks, schedule work, inspect the dashboard, and use task
 workspaces without an AI provider. Real AI plan generation and agent execution
-require a configured AI client. Use OMP for the primary stable local planning and execution path; Claude Code and Codex remain Beta.
+require a configured AI client. Codex, OMP, and Claude Code are stable supported providers; Codex is the default recommendation.
 
 ### Is Chrona production-ready?
 
