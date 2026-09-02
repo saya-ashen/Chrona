@@ -241,7 +241,7 @@ export function TaskPlanGraphFrame({
       aria-label={graphCopy.ariaLabel}
       className={cn(
         "relative min-w-0 max-w-full overflow-hidden rounded-[28px] border border-border bg-[linear-gradient(180deg,var(--background),var(--canvas))] text-card-foreground shadow-sm",
-        fillHeight && "flex h-full min-h-0 flex-col",
+        fillHeight && "flex min-h-0 flex-1 flex-col",
       )}
       data-canvas-pan="true"
       data-edge-style="orthogonal"
@@ -261,8 +261,8 @@ export function TaskPlanGraphFrame({
         </div>
         <div
           className={cn(
-            "w-full min-w-0 max-w-full overflow-hidden px-0 pb-3 pt-3",
-            fillHeight && "h-full min-h-0 flex-1",
+            "flex w-full min-w-0 max-w-full flex-col overflow-hidden px-0 pb-3 pt-3",
+            fillHeight && "min-h-0 flex-1",
           )}
           data-testid="task-plan-graph-scroll"
           data-wheel-pan="scroll"
@@ -272,7 +272,7 @@ export function TaskPlanGraphFrame({
           style={fillHeight ? undefined : { height: `${Math.max(layout.viewportHeight, 280)}px` }}
         >
           <div
-            className="min-w-full"
+            className="!h-auto flex min-h-0 min-w-full flex-1 flex-col"
             data-testid="task-plan-graph-canvas"
             style={{
               height: "100%",
@@ -309,7 +309,8 @@ export function TaskPlanGraphFrame({
               attributionPosition="bottom-left"
               proOptions={REACT_FLOW_PRO_OPTIONS}
               defaultEdgeOptions={DEFAULT_EDGE_OPTIONS}
-              className="bg-transparent"
+              className="!h-auto min-h-0 flex-1 bg-transparent"
+              style={{ flex: "1 1 0%", minHeight: 0 }}
             />
           </div>
         </div>

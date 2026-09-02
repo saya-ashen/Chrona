@@ -49,6 +49,7 @@ vi.mock("../panels/task-plan-graph-panel", () => ({
 		plan,
 		mode,
 		fillHeight,
+		className,
 		onSelectedNodeChange,
 	}: {
 		plan: {
@@ -61,6 +62,7 @@ vi.mock("../panels/task-plan-graph-panel", () => ({
 		};
 		mode?: "full" | "compact";
 		fillHeight?: boolean;
+		className?: string;
 		onSelectedNodeChange?: (
 			node: { id: string; title: string; objective?: string; status?: string },
 			nodes: Array<{
@@ -72,6 +74,7 @@ vi.mock("../panels/task-plan-graph-panel", () => ({
 		) => void;
 	}) => (
 		<div
+			className={className}
 			data-testid="task-plan-graph-panel"
 			data-graph-mode={mode ?? "full"}
 			data-fill-height={fillHeight ? "true" : "false"}
@@ -559,7 +562,26 @@ describe("TaskWorkspacePlanSection", () => {
 		expect(
 			screen.queryByRole("region", { name: "Stage results" }),
 		).not.toBeInTheDocument();
-		expect(screen.getByTestId("task-plan-graph-panel")).toBeInTheDocument();
+		const executionFlows = screen.getAllByRole("region", {
+			name: "Execution flow",
+		});
+		const executionFlow = executionFlows.at(-1) as HTMLElement;
+		fireEvent.click(
+			within(executionFlow).getByRole("button", {
+				name: /^Full/,
+			}),
+		);
+		const fullGraphRegion = within(executionFlow).getByRole("region", {
+			name: "Execution graph",
+		});
+		expect(fullGraphRegion).toHaveClass("min-h-[30rem]");
+		expect(fullGraphRegion).not.toHaveClass("xl:min-h-0");
+		const fullGraph = within(executionFlow).getByTestId(
+			"task-plan-graph-panel",
+		);
+		expect(fullGraph).toHaveAttribute("data-graph-mode", "full");
+		expect(fullGraph).toHaveClass("min-h-[28rem]", "md:min-h-[36rem]");
+		expect(fullGraph).not.toHaveClass("xl:min-h-0");
 	});
 
 	it("separates the inspected step from the current execution step", () => {
