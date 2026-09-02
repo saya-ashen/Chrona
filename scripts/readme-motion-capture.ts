@@ -126,6 +126,37 @@ async function demoClick(page: Page, target: Locator) {
   });
 }
 
+async function waitForRenderedPlanGraph(
+  page: Page,
+  testId: string,
+  minimumVisibleNodes = 1,
+  minimumNodeWidth = 0,
+) {
+  const graph = page.getByTestId(testId);
+  await graph.waitFor({ state: "visible", timeout: 20_000 });
+  await page.waitForFunction(({ graphTestId, requiredVisibleNodes, requiredNodeWidth }) => {
+    const frame = document.querySelector<HTMLElement>(`[data-testid="${graphTestId}"]`);
+    const flow = frame?.querySelector<HTMLElement>(".react-flow");
+    const nodes = Array.from(frame?.querySelectorAll<HTMLElement>(".react-flow__node") ?? []);
+    if (!frame || !flow || nodes.length === 0) return false;
+    const frameRect = frame.getBoundingClientRect();
+    const flowRect = flow.getBoundingClientRect();
+    const visibleNodeCount = nodes.filter((node) => {
+      const rect = node.getBoundingClientRect();
+      return rect.width >= requiredNodeWidth && rect.height > 0
+        && rect.right > frameRect.left && rect.left < frameRect.right
+        && rect.bottom > frameRect.top && rect.top < frameRect.bottom;
+    }).length;
+    return frameRect.width >= 400 && frameRect.height >= 280
+      && flowRect.width >= 360 && flowRect.height >= 240
+      && visibleNodeCount >= requiredVisibleNodes;
+  }, {
+    graphTestId: testId,
+    requiredVisibleNodes: minimumVisibleNodes,
+    requiredNodeWidth: minimumNodeWidth,
+  }, { timeout: 20_000 });
+}
+
 async function captureTaskWorkflow(page: Page, baseUrl: string) {
   await page.goto(`${baseUrl}/en/tasks`, { waitUntil: "domcontentloaded", timeout: 60_000 });
   const search = page.getByRole("searchbox", { name: "Search by title or description" });
@@ -146,14 +177,22 @@ async function captureTaskWorkflow(page: Page, baseUrl: string) {
 
   await setDemoCaption(page, "Track completed, waiting, and upcoming steps");
   await demoClick(page, page.getByRole("button", { name: "Full Dependencies and all paths" }));
+  await waitForRenderedPlanGraph(page, "task-plan-graph");
   await page.waitForTimeout(1_100);
-  await demoClick(page, page.getByRole("button", { name: /Analyze technology themes/ }));
-  await page.waitForTimeout(1_300);
 
-  await setDemoCaption(page, "Inspect the durable execution state");
-  const transcript = page.getByRole("button", { name: /Open Agent transcript/ });
-  if (await transcript.isVisible()) await demoClick(page, transcript);
-  await page.waitForTimeout(1_800);
+  await setDemoCaption(page, "Open the full plan graph");
+  const inlineGraph = page.getByTestId("task-plan-graph");
+  await demoClick(page, inlineGraph.getByRole("button", { name: "Expand graph" }));
+  await page.getByRole("heading", { name: "Full execution graph" }).waitFor({ state: "visible", timeout: 20_000 });
+  await waitForRenderedPlanGraph(page, "task-plan-graph-full-dialog");
+  const fullGraph = page.getByTestId("task-plan-graph-full-dialog");
+  await demoClick(page, fullGraph.getByRole("button", { name: "Fit graph" }));
+  await waitForRenderedPlanGraph(page, "task-plan-graph-full-dialog", 4, 80);
+  await page.waitForTimeout(1_200);
+
+  await setDemoCaption(page, "Inspect dependencies at a readable scale");
+  await demoClick(page, fullGraph.getByRole("button", { name: /Analyze technology themes/ }));
+  await page.waitForTimeout(2_000);
 }
 
 async function captureResultReview(page: Page, baseUrl: string) {

@@ -146,7 +146,7 @@ function GraphShell({
 			ref={shellRef}
 			className={cn(
 				"relative min-w-0 max-w-full",
-				fillHeight && "min-h-0 flex-1",
+				fillHeight && "flex min-h-0 flex-1 flex-col",
 			)}
 		>
 			<TaskPlanGraphFrame
@@ -405,7 +405,7 @@ export function TaskPlanGraph({
 		<Dialog open={isFullDialogOpen} onOpenChange={setIsFullDialogOpen}>
 			<DialogContent
 				showCloseButton={false}
-				className="flex h-[min(90vh,980px)] w-[min(1320px,calc(100vw-32px))] max-w-none flex-col overflow-hidden rounded-[32px] border border-border bg-background p-0 text-foreground shadow-xl"
+				className="flex h-[min(90vh,980px)] w-[min(1320px,calc(100vw-32px))] max-w-none flex-col overflow-hidden rounded-[32px] border border-border bg-background p-0 text-foreground shadow-xl sm:max-w-none"
 			>
 				<DialogHeader className="flex-row items-start justify-between gap-4 border-b border-border/70 bg-card px-6 py-4">
 					<div className="flex min-w-0 flex-col gap-1">
@@ -428,13 +428,14 @@ export function TaskPlanGraph({
 						<X className="size-4" />
 					</DialogClose>
 				</DialogHeader>
-				<div className="min-h-0 flex-1 overflow-auto p-5">
+				<div className="flex min-h-0 flex-1 flex-col overflow-hidden p-5">
 					{layout ? (
 						<GraphShell
 							graphCopy={graphCopy}
 							layout={layout}
 							nodes={nodes}
 							edges={edges}
+							fillHeight
 							planNodes={graphPlan.nodes}
 							currentStepId={graphPlan.currentStepId}
 							edgeLegend={edgeLegend}
@@ -500,7 +501,7 @@ export function TaskPlanGraph({
 				ref={containerRef}
 				className={cn(
 					"min-w-0 w-full max-w-full space-y-3",
-					fillHeight && "flex h-full min-h-0 flex-col",
+					fillHeight && "flex min-h-0 flex-1 flex-col",
 					className,
 				)}
 			>

@@ -31,7 +31,7 @@ export function TaskPlanGraphPanel({
     <div
       className={cn(
         "relative flex min-w-0 flex-col overflow-hidden text-foreground",
-        fillHeight && "h-full min-h-0",
+        fillHeight && "min-h-0 flex-1",
         className,
       )}
     >

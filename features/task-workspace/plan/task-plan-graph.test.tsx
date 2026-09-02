@@ -573,6 +573,59 @@ describe("TaskPlanGraph", () => {
     expect(childNode.getAttribute("data-node-display-type")).toBe("task");
   });
 
+  it("keeps a definite flex height chain when filling a workspace panel", async () => {
+    render(
+      <div style={{ height: 640 }}>
+        <TaskPlanGraph
+          fillHeight
+          mode="full"
+          plan={testPlan({
+            state: "ready",
+            currentStepId: "node-current",
+            steps: [
+              {
+                id: "node-current",
+                title: "Current node",
+                objective: "Currently running",
+                phase: "execution",
+                status: "active",
+                type: "task",
+                displayType: "task",
+              },
+            ],
+            edges: [],
+          })}
+        />
+      </div>,
+    );
+
+    const graph = await screen.findByTestId("task-plan-graph");
+    expect(graph).toHaveClass("flex", "min-h-0", "flex-1");
+    expect(graph.parentElement).toHaveClass(
+      "flex",
+      "min-h-0",
+      "flex-1",
+      "flex-col",
+    );
+
+    const scrollShell = within(graph).getByTestId("task-plan-graph-scroll");
+    expect(scrollShell).toHaveClass("flex", "min-h-0", "flex-1", "flex-col");
+    const canvas = within(graph).getByTestId("task-plan-graph-canvas");
+    expect(canvas).toHaveClass(
+      "!h-auto",
+      "flex",
+      "min-h-0",
+      "flex-1",
+      "flex-col",
+    );
+    expect(canvas.style.height).toBe("100%");
+
+    const flow = canvas.querySelector<HTMLElement>(".react-flow");
+    expect(flow).not.toBeNull();
+    expect(flow).toHaveClass("!h-auto", "min-h-0", "flex-1");
+    expect(flow?.style.flex).toBe("1 1 0%");
+  });
+
   it("exposes graph flow controls and preserves selected node while controls are used", async () => {
     render(
       <TaskPlanGraph
@@ -649,6 +702,14 @@ describe("TaskPlanGraph", () => {
       within(controls).getByRole("button", { name: "Expand graph" }),
     );
     const dialog = screen.getByRole("dialog", { name: "Full execution graph" });
+    expect(dialog).toHaveClass(
+      "w-[min(1320px,calc(100vw-32px))]",
+      "max-w-none",
+      "sm:max-w-none",
+    );
+    expect(
+      within(dialog).getByTestId("task-plan-graph-full-dialog"),
+    ).toHaveClass("flex", "min-h-0", "flex-1", "flex-col");
     expect(
       within(dialog).getByTestId("task-plan-node-node-next"),
     ).toHaveAttribute("data-node-selected", "true");

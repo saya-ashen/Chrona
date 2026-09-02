@@ -296,7 +296,7 @@ function StandardPlanGraph({
 	const graphClass =
 		graphMode === "compact"
 			? "min-h-0 min-w-0 w-full flex-1"
-			: "min-h-[28rem] min-w-0 w-full md:min-h-[36rem] xl:h-full xl:min-h-0";
+			: "min-h-[28rem] min-w-0 w-full md:min-h-[36rem]";
 	return (
 		<>
 			<div className="flex min-w-0 flex-col gap-2 border-b border-border/55 bg-muted/35 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
@@ -321,8 +321,8 @@ function StandardPlanGraph({
 			<div
 				className={
 					required
-						? "min-h-[30rem] flex-1 p-2 xl:min-h-0"
-						: "min-h-[30rem] flex-1 border-t border-border/40 bg-muted/15 p-2 opacity-75 xl:min-h-0"
+						? "min-h-[30rem] flex-1 p-2"
+						: "min-h-[30rem] flex-1 border-t border-border/40 bg-muted/15 p-2 opacity-75"
 				}
 				aria-label={
 					required ? "Execution graph" : "Execution graph diagnostics"
