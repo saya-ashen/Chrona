@@ -52,6 +52,7 @@ export type RuntimeProviderInput = {
   label?: string;
   features?: unknown;
   tier?: unknown;
+  recommended?: unknown;
 };
 
 export type RuntimeProviderSupportTier = "stable" | "beta" | "experimental";
@@ -61,6 +62,7 @@ export type RuntimeProviderOption = {
   label: string;
   features: string[];
   tier?: RuntimeProviderSupportTier;
+  recommended?: boolean;
 };
 
 export type HermesCheck = {

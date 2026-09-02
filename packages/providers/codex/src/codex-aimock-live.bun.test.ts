@@ -91,6 +91,21 @@ describe.skipIf(!RUN_LIVE_CODEX_TESTS)("Codex custom upstream protocol conforman
 			expect(result.capabilities.matched).toBe(true);
 			expect(result.run?.terminalType).toBe("run_completed");
 			expect(result.run?.outputMarkerMatched).toBe(true);
+
+			mock.onMessage(/SAFE_FEATURE_REQUEST/, { content: "SAFE_FEATURE_OK" });
+			const safeRun = await client.startRun({
+				clientOperationId: "codex-safe-feature",
+				sessionId: "codex-safe-feature-session",
+				instructions: "Return SAFE_FEATURE_OK without side effects.",
+				input: { type: "text", text: "SAFE_FEATURE_REQUEST" },
+				toolPolicy: "terminal_only",
+				stream: true,
+			});
+			const safeEvents = await Array.fromAsync(client.streamRun({ runId: safeRun.runId }));
+			expect(safeEvents.at(-1)).toMatchObject({
+				type: "run_completed",
+				outputText: expect.stringContaining("SAFE_FEATURE_OK"),
+			});
 		} finally {
 			await mock.stop();
 			await mcp.stop();

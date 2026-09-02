@@ -10,9 +10,9 @@ describe("live provider smoke CLI", () => {
 	it("selects released providers by default and keeps Hermes hidden", () => {
 		expect(parseLiveProviderSmokeArgs([]).providers).toEqual([
 			"debug",
+			"codex",
 			"omp",
 			"claude_code",
-			"codex",
 		]);
 	});
 

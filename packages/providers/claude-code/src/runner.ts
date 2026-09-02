@@ -928,7 +928,13 @@ class SdkRunner implements ClaudeCodeRunner {
 		const model = cfg.model ?? DEFAULT_MODEL;
 		const readOnly = input.toolPolicy === "read_only";
 		const terminalOnly = input.toolPolicy === "terminal_only";
-		const tools = readOnly ? [] : (input.tools ?? []);
+		const tools = readOnly
+			? []
+			: terminalOnly
+				? (input.tools ?? []).filter(
+						(tool) => tool.name === input.terminalToolName,
+					)
+				: (input.tools ?? []);
 		const abortController = new AbortController();
 		const sdkHandle = {} as SdkHandle;
 		const runToolsServer = tools.length > 0
@@ -983,6 +989,16 @@ class SdkRunner implements ClaudeCodeRunner {
 					`chrona-claude-${runId}.log`,
 				)
 			: undefined;
+		const allowedTerminalTools = terminalOnly
+			? [
+					...tools.map(
+						(tool) => `mcp__${RUN_TOOLS_MCP_SERVER_NAME}__${tool.name}`,
+					),
+					...(chronaControlServer && input.terminalToolName
+						? [`mcp__chrona__${input.terminalToolName}`]
+						: []),
+				]
+			: [];
 		const options = {
 			...(cfg.sdkOptions ?? {}),
 			model,
@@ -991,7 +1007,7 @@ class SdkRunner implements ClaudeCodeRunner {
 				readOnly || terminalOnly ? "dontAsk" : "bypassPermissions",
 			...(readOnly || terminalOnly
 				? {
-						allowedTools: [],
+						allowedTools: allowedTerminalTools,
 						disallowedTools: [
 							"Bash",
 							"Edit",

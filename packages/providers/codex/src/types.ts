@@ -54,6 +54,7 @@ export function codexAcpConfig(config: CodexProviderConfig): AcpProviderConfig {
     cwd: config.cwd,
     env: codexAcpEnv(config),
     additionalDirectories: config.additionalDirectories,
+    readOnlyModeId: "read-only",
     mcpBaseUrl: config.mcpBaseUrl,
     mcpRunToken: config.mcpRunToken,
   };

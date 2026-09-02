@@ -1,5 +1,5 @@
 import { aiClientsApi } from "../browser-api";
-import { providerCapabilityMatrix } from "@chrona/contracts";
+import { providerCapabilityMatrix, recommendedProviderType } from "@chrona/contracts";
 import type {
   AiClientInfo,
   AiClientType,
@@ -27,9 +27,9 @@ const OMP_API_TYPES: OmpApiType[] = [
   "openrouter",
 ];
 const PROVIDER_SORT_RANK: Record<string, number> = {
-  omp: 0,
-  claude_code: 1,
-  codex: 2,
+  codex: 0,
+  omp: 1,
+  claude_code: 2,
   llm: 3,
   debug: 4,
   hermes: 99,
@@ -143,6 +143,7 @@ export function normalizeRuntimeProviders(input: unknown): RuntimeProviderOption
       label: typeof provider.label === "string" ? provider.label : provider.key,
       features: Array.isArray(provider.features) ? provider.features.filter((feature): feature is string => typeof feature === "string") : [],
       tier: (provider.tier === "stable" || provider.tier === "beta" || provider.tier === "experimental" ? provider.tier : "experimental") as RuntimeProviderSupportTier,
+      recommended: provider.recommended === true || provider.key === recommendedProviderType,
     }))
     .sort((left, right) => (PROVIDER_SORT_RANK[left.key] ?? 50) - (PROVIDER_SORT_RANK[right.key] ?? 50));
 }
@@ -238,7 +239,10 @@ function configValue(config: StoredClientConfig, key: keyof StoredClientConfig, 
 }
 
 function initialClientType(initial: AiClientInfo | undefined, providers: RuntimeProviderOption[]): AiClientType {
-  const fallback = providers.find((provider) => provider.key === "omp")?.key ?? providers[0]?.key ?? "omp";
+  const fallback = providers.find((provider) => provider.recommended)?.key
+    ?? providers.find((provider) => provider.key === recommendedProviderType)?.key
+    ?? providers[0]?.key
+    ?? recommendedProviderType;
   return initial && providers.some((provider) => provider.key === initial.type) ? initial.type : fallback;
 }
 

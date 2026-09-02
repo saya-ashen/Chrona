@@ -139,6 +139,44 @@ describe("Claude Code declared-tool registration", () => {
       "Bash", "Edit", "Write", "NotebookEdit", "WebFetch", "WebSearch", "Task",
     ]);
   });
+
+  test("keeps terminal-only runs tool-isolated while exposing only the result tool", async () => {
+    const runner = await createClaudeCodeRunner({
+      mcpBaseUrl: "http://unused.test",
+      mcpRunToken: "token",
+      cwd: "/tmp/provider",
+    });
+    await runner.start({
+      clientOperationId: "claude-code-terminal-only",
+      sessionId: "session-terminal-only",
+      sessionKey: "feature:task-plan",
+      instructions: "Return the structured plan without side effects.",
+      input: { type: "text", text: "Plan this task." },
+      tools: [
+        ...declaredTools(),
+        {
+          name: "fixture_action",
+          description: "Perform a side effect that terminal-only runs must reject.",
+          inputSchema: { type: "object", properties: {} },
+        },
+      ],
+      terminalToolName: "fixture_echo",
+      toolPolicy: "terminal_only",
+    } satisfies StartRunInput);
+
+    const mcpServers = capturedOptions?.["mcpServers"] as
+      | { run_tools?: { name?: string } }
+      | undefined;
+    expect(mcpServers?.run_tools?.name).toBe("run_tools");
+    expect(capturedOptions?.["permissionMode"]).toBe("dontAsk");
+    expect(capturedOptions?.["allowedTools"]).toEqual([
+      "mcp__run_tools__fixture_echo",
+    ]);
+    expect(capturedOptions?.["disallowedTools"]).toEqual([
+      "Bash", "Edit", "Write", "NotebookEdit", "WebFetch", "WebSearch", "Task",
+    ]);
+  });
+
   test("passes native Claude session ids to SDK resume", async () => {
     const runner = await createClaudeCodeRunner({
       mcpBaseUrl: "http://unused.test/",

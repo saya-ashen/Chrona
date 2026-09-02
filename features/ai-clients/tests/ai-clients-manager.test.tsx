@@ -20,6 +20,7 @@ const messages = {
       delete: "Delete",
       nameLabel: "Name",
       typeLabel: "Type",
+      recommendedProvider: "Recommended",
       llmCompatible: "LLM (OpenAI Compatible)",
       hermes: "Hermes",
       debug: "Debug Provider",
@@ -79,14 +80,15 @@ const providersResponse = {
     {
       key: "claude_code",
       label: "Claude Code",
-      tier: "beta",
-      features: ["chat", "task.plan", "task.execution"],
+      tier: "stable",
+      features: ["chat", "dashboard.brief", "goal.review", "task.plan", "task.execution"],
     },
     {
       key: "codex",
       label: "Codex",
-      tier: "beta",
-      features: ["chat", "task.plan", "task.execution"],
+      tier: "stable",
+      recommended: true,
+      features: ["chat", "dashboard.brief", "goal.review", "task.plan", "task.execution"],
     },
     {
       key: "omp",
@@ -133,13 +135,14 @@ describe("AiClientsManager", () => {
     fireEvent.click(screen.getByRole("button", { name: "+ Add Client" }));
     fireEvent.click(screen.getByText("Advanced settings"));
 
-    fireEvent.change(screen.getByPlaceholderText("My Oh My Pi Client"), {
-      target: { value: "Hermes Client" },
+    fireEvent.change(screen.getByPlaceholderText("My Codex Client"), {
+      target: { value: "Codex Client" },
     });
 
     const testButton = screen.getByRole("button", { name: "Test availability" });
     expect(screen.getByText("Not tested")).toBeInTheDocument();
-    expect(screen.getByRole("combobox", { name: "Type" })).toHaveTextContent("Oh My Pi");
+    expect(screen.getByRole("combobox", { name: "Type" })).toHaveTextContent("Codex");
+    expect(screen.getByText("Support tier: stable · Recommended")).toBeInTheDocument();
 
     fetchMock.mockResolvedValueOnce({ ok: true, headers: new Headers({ "content-type": "application/json" }), json: async () => ({ ok: true, available: true }) });
 
@@ -223,7 +226,7 @@ describe("AiClientsManager", () => {
     fireEvent.click(screen.getByRole("button", { name: "+ Add Client" }));
     fireEvent.click(screen.getByText("Advanced settings"));
 
-    fireEvent.change(screen.getByPlaceholderText("My Oh My Pi Client"), {
+    fireEvent.change(screen.getByPlaceholderText("My Codex Client"), {
       target: { value: "Local Hermes" },
     });
     await user.click(screen.getByRole("combobox", { name: "Type" }));
@@ -286,7 +289,7 @@ describe("AiClientsManager", () => {
     fireEvent.click(screen.getByRole("button", { name: "+ Add Client" }));
     fireEvent.click(screen.getByText("Advanced settings"));
 
-    fireEvent.change(screen.getByPlaceholderText("My Oh My Pi Client"), {
+    fireEvent.change(screen.getByPlaceholderText("My Codex Client"), {
       target: { value: "Claude Code via 9router" },
     });
     await user.click(screen.getByRole("combobox", { name: "Type" }));
@@ -342,7 +345,7 @@ describe("AiClientsManager", () => {
     fireEvent.click(screen.getByRole("button", { name: "+ Add Client" }));
     fireEvent.click(screen.getByText("Advanced settings"));
 
-    fireEvent.change(screen.getByPlaceholderText("My Oh My Pi Client"), {
+    fireEvent.change(screen.getByPlaceholderText("My Codex Client"), {
       target: { value: "Codex" },
     });
     await user.click(screen.getByRole("combobox", { name: "Type" }));
@@ -384,7 +387,7 @@ describe("AiClientsManager", () => {
     expect(payload.config).not.toHaveProperty("binaryPath");
 
     const bindingsCall = fetchMock.mock.calls.find((call) => call[0] === "/api/ai/clients/client_codex/bindings" && call[1]?.method === "PUT");
-    expect(JSON.parse(bindingsCall?.[1]?.body as string)).toEqual({ features: ["task.execution"] });
+    expect(JSON.parse(bindingsCall?.[1]?.body as string)).toEqual({ features: ["task.execution", "dashboard.brief"] });
   });
 
 
@@ -399,7 +402,7 @@ describe("AiClientsManager", () => {
     fireEvent.click(screen.getByRole("button", { name: "+ Add Client" }));
     fireEvent.click(screen.getByText("Advanced settings"));
 
-    fireEvent.change(screen.getByPlaceholderText("My Oh My Pi Client"), {
+    fireEvent.change(screen.getByPlaceholderText("My Codex Client"), {
       target: { value: "Local OMP" },
     });
     await user.click(screen.getByRole("combobox", { name: "Type" }));
@@ -469,7 +472,7 @@ describe("AiClientsManager", () => {
     await screen.findByText("No AI client is connected yet. Connect one to unlock planning, suggestions, and execution previews.");
     fireEvent.click(screen.getByRole("button", { name: "+ Add Client" }));
 
-    fireEvent.change(screen.getByPlaceholderText("My Oh My Pi Client"), {
+    fireEvent.change(screen.getByPlaceholderText("My Codex Client"), {
       target: { value: "Local Debug" },
     });
     await user.click(screen.getByRole("combobox", { name: "Type" }));
@@ -511,7 +514,7 @@ describe("AiClientsManager", () => {
     await screen.findByText("No AI client is connected yet. Connect one to unlock planning, suggestions, and execution previews.");
     fireEvent.click(screen.getByRole("button", { name: "+ Add Client" }));
 
-    fireEvent.change(screen.getByPlaceholderText("My Oh My Pi Client"), {
+    fireEvent.change(screen.getByPlaceholderText("My Codex Client"), {
       target: { value: "Hermes-like Debug" },
     });
     await user.click(screen.getByRole("combobox", { name: "Type" }));
@@ -625,7 +628,7 @@ describe("AiClientsManager", () => {
 
     await screen.findByText("No AI client is connected yet. Connect one to unlock planning, suggestions, and execution previews.");
     fireEvent.click(screen.getByRole("button", { name: "+ Add Client" }));
-    fireEvent.change(screen.getByPlaceholderText("My Oh My Pi Client"), {
+    fireEvent.change(screen.getByPlaceholderText("My Codex Client"), {
       target: { value: "Auto Hermes" },
     });
     await userEvent.click(screen.getByRole("combobox", { name: "Type" }));

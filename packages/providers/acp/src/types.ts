@@ -21,6 +21,8 @@ export type AcpProviderConfig = {
   env?: Record<string, string>;
   /** Extra workspace roots passed to ACP session setup. */
   additionalDirectories?: string[];
+  /** ACP session mode required for read-only and terminal-only feature runs. */
+  readOnlyModeId?: string;
   /** Chrona /api/mcp base URL. */
   mcpBaseUrl?: string;
   /** Chrona /api/mcp bearer token. */

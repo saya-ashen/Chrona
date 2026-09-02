@@ -136,17 +136,23 @@ describe("AI Feature Runtime client bindings", () => {
     ).rejects.toMatchObject({ code: ENGINE_ERROR_CODES.AI_CLIENT_NOT_FOUND });
   });
 
-  it("accepts OMP only through terminal-only single-attempt recovery", async () => {
-    const omp = await createClient("omp", { model: "test-model" });
+  it("accepts safe terminal-only planning and Goal review for every released provider", async () => {
+    const clients = [
+      await createClient("codex", { model: "test-model" }),
+      await createClient("omp", { model: "test-model" }),
+      await createClient("claude_code", { model: "test-model" }),
+    ];
 
-    await expect(aiClientManagement.updateBindings({
-      clientId: omp.id,
-      features: ["goal.review", "task.plan"],
-      validFeatureSet,
-    })).resolves.toEqual(["goal.review", "task.plan"]);
+    for (const client of clients) {
+      await expect(aiClientManagement.updateBindings({
+        clientId: client.id,
+        features: ["goal.review", "task.plan"],
+        validFeatureSet,
+      })).resolves.toEqual(["goal.review", "task.plan"]);
 
-    expect(await db.aiFeatureBinding.findMany({ where: { clientId: omp.id }, orderBy: { feature: "asc" }, select: { feature: true } }))
-      .toEqual([{ feature: "goal.review" }, { feature: "task.plan" }]);
+      expect(await db.aiFeatureBinding.findMany({ where: { clientId: client.id }, orderBy: { feature: "asc" }, select: { feature: true } }))
+        .toEqual([{ feature: "goal.review" }, { feature: "task.plan" }]);
+    }
   });
 
   it("accepts durable Hermes capabilities and stores canonical bindings", async () => {

@@ -950,6 +950,33 @@ function attachActiveSession(
 	).attachSession(response);
 }
 
+async function enforceReadOnlySessionMode(input: {
+	config: AcpProviderConfig;
+	context: ClientContext;
+	runInput: StartRunInput;
+	session: ActiveSession;
+}): Promise<void> {
+	if (
+		input.runInput.toolPolicy !== "read_only" &&
+		input.runInput.toolPolicy !== "terminal_only"
+	) return;
+	const modeId = input.config.readOnlyModeId?.trim();
+	if (!modeId) return;
+	const modes = input.session.modes;
+	if (!modes?.availableModes.some((mode) => mode.id === modeId)) {
+		throw new AcpProviderError(
+			`${input.config.displayName ?? input.config.provider} does not advertise required read-only session mode "${modeId}"`,
+			{ retryable: false, provider: input.config.provider },
+		);
+	}
+	if (modes.currentModeId !== modeId) {
+		await input.context.request(acp.methods.agent.session.setMode, {
+			sessionId: input.session.sessionId,
+			modeId,
+		});
+	}
+}
+
 async function startAcpSession(input: {
 	config: AcpProviderConfig;
 	context: ClientContext;
@@ -959,32 +986,41 @@ async function startAcpSession(input: {
 }): Promise<ActiveSession> {
 	const request = newSessionRequest(input.config, input.runInput);
 	const resumeSessionRef = input.runInput.resumeSessionRef?.trim();
+	let session: ActiveSession;
 
 	if (!resumeSessionRef) {
-		return input.context
+		session = await input.context
 			.buildSession(request)
 			.start({ cancellationSignal: input.signal });
-	}
+	} else {
+		if (input.init.agentCapabilities?.loadSession !== true) {
+			throw new AcpProviderError(
+				`ACP provider cannot resume session "${resumeSessionRef}": agent does not advertise loadSession`,
+				{
+					retryable: false,
+					provider: input.config.provider,
+				},
+			);
+		}
 
-	if (input.init.agentCapabilities?.loadSession !== true) {
-		throw new AcpProviderError(
-			`ACP provider cannot resume session "${resumeSessionRef}": agent does not advertise loadSession`,
-			{
-				retryable: false,
-				provider: input.config.provider,
-			},
+		const response = await input.context.request(
+			acp.methods.agent.session.load,
+			{ ...request, sessionId: resumeSessionRef },
+			{ cancellationSignal: input.signal },
 		);
+		session = attachActiveSession(input.context, {
+			sessionId: resumeSessionRef,
+			...response,
+		});
 	}
 
-	const response = await input.context.request(
-		acp.methods.agent.session.load,
-		{ ...request, sessionId: resumeSessionRef },
-		{ cancellationSignal: input.signal },
-	);
-	return attachActiveSession(input.context, {
-		sessionId: resumeSessionRef,
-		...response,
+	await enforceReadOnlySessionMode({
+		config: input.config,
+		context: input.context,
+		runInput: input.runInput,
+		session,
 	});
+	return session;
 }
 
 function newSessionRequest(
@@ -1049,6 +1085,7 @@ export class AcpProviderClient implements AgentProviderClient {
 			actionInvocation: "external_control_plane",
 			startIdempotency: "unsupported",
 			lookupByClientOperationId: false,
+			readOnlySingleAttempt: Boolean(this.config.readOnlyModeId?.trim()),
 			approval: {
 				supported: true,
 				choices: ["approve_once", "approve_always", "deny"],

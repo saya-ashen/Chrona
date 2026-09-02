@@ -31,7 +31,7 @@
   <a href="./CONTRIBUTING.md">贡献</a>
 </p>
 <p align="center">
-  <img src="docs/assets/generated/task-workflow.gif" width="85%" alt="Chrona 英文界面动图：查找任务、查看执行进度与追踪记录" />
+  <img src="docs/assets/generated/task-workflow.gif" width="100%" alt="Chrona 英文界面动图：查找任务、查看执行进度与追踪记录" />
   <br />
   <em>查找可由 AI 执行的任务，沿计划图查看进度，并检查可追溯的执行记录。</em>
 </p>
@@ -126,8 +126,8 @@ Web 应用。
 
 准备接入 AI 执行时：
 
-1. 进入 `Settings -> AI Clients`，添加 `Claude Code` 或 `Codex` client。
-2. 绑定 `task.plan`、`task.execution`、`dashboard.brief` 等功能。
+1. 进入 `Settings -> AI Clients`，添加默认推荐的 `Codex` client，并运行可用性检查。
+2. 按需要绑定 `task.plan`、`goal.review`、`task.execution`、`dashboard.brief` 等产品功能。Codex、OMP 和 Claude Code 均支持这些完整流程。
 3. 在任务工作区生成计划，审查或编辑图结构，然后接受计划。
 4. 从任务工作区手动启动执行；配置自动执行后，也可以让 Chrona 推进到期任务。
 
@@ -143,7 +143,7 @@ Web 应用。
 5. **检查和恢复** — 从工作区查看审批、工具活动、失败、阻塞、持久化输出和下一步动作。
 
 <p align="center">
-  <img src="docs/assets/generated/result-review.gif" width="80%" alt="Chrona 英文界面动图：检查证据并验收任务结果" />
+  <img src="docs/assets/generated/result-review.gif" width="100%" alt="Chrona 英文界面动图：检查证据并验收任务结果" />
   <br />
   <em>检查结果中的证据和建议，确认后将验收记录保留在任务中。</em>
 </p>
@@ -155,9 +155,9 @@ client，再把 client 绑定到 Chrona 功能。
 
 | Provider 类型 | 状态 | 适合 |
 | --- | --- | --- |
-| `claude_code` | 主要支持 | Claude Code 计划生成和本地任务执行 |
-| `codex` | 主要支持 | Codex 计划生成和本地任务执行 |
-| `hermes` | 待更新 | 已有 Hermes gateway 的本地或远程 agent 执行 |
+| `codex` | 稳定 · 推荐 | 默认首次使用的 ACP adapter，支持计划、Goal 审查、执行、Dashboard 简报、结构化结果、审批和 session-history 恢复。 |
+| `omp` | 稳定 | 进程内 SDK adapter，支持计划、Goal 审查、执行、Dashboard 简报、结构化结果和 session-history 恢复。 |
+| `claude_code` | 稳定 | Claude Agent SDK adapter，支持计划、Goal 审查、执行、Dashboard 简报、结构化结果和 session 恢复。 |
 
 在 `Settings -> AI Clients` 中配置 provider，然后绑定到
 `task.plan`、`task.execution`、`dashboard.brief` 等 Chrona 功能。
@@ -255,14 +255,13 @@ React SPA
 | `ALLOWED_ORIGINS`   | 逗号分隔的 CORS 允许来源     | 本地开发可省略                                                             |
 | `VITE_API_BASE_URL` | 前端 API base URL 覆盖       | Web 和 API 分离时使用                                                      |
 
-AI client 在 Web 应用的 `Settings -> AI Clients` 中配置。Provider 类型和 Claude Code/Codex
-配置方式见 [Providers](#providers)。
+AI client 在 Web 应用的 `Settings -> AI Clients` 中配置。Provider 类型以及 Codex、OMP 和 Claude Code 的配置方式见 [Providers](#providers)。
 
 ## FAQ
 
 ### 不配置 AI provider 可以使用 Chrona 吗？
 
-可以。即使没有 AI provider，也可以创建任务、安排日程、查看 Dashboard、使用任务工作区。真实的 AI 计划生成和 agent 执行需要配置 AI client。主要本地 agent 执行路径是 Claude Code 和 Codex。
+可以。即使没有 AI provider，也可以创建任务、安排日程、查看 Dashboard、使用任务工作区。真实的 AI 计划生成和 agent 执行需要配置 AI client。Codex、OMP 和 Claude Code 均为稳定支持项，默认推荐 Codex。
 
 ### Chrona 生产可用了吗？
 

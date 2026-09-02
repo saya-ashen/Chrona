@@ -38,6 +38,7 @@ import {
 	SidebarMenuItem,
 	SidebarProvider,
 } from "@shared/ui";
+import { releasedProviderTypes } from "@chrona/contracts";
 import { localizeHref, useI18n, useLocale } from "@chrona/i18n";
 import { LocalizedLink } from "./localized-link";
 import { LocaleSwitcher } from "./locale-switcher";
@@ -71,6 +72,7 @@ type TaskCreateConfig = Pick<SchedulePageData, "availableAiClients">;
 const EMPTY_TASK_CREATE_CONFIG: TaskCreateConfig = {
 	availableAiClients: [],
 };
+const RELEASED_PROVIDER_TYPES = new Set<string>(releasedProviderTypes);
 
 function startWithChronaPreferencePath(workspaceId: string) {
 	return `/api/workspaces/${encodeURIComponent(workspaceId)}/preferences/start-with-chrona`;
@@ -86,7 +88,7 @@ function completedAtFromPreference(
 
 function hasEnabledPlanningClient(config: TaskCreateConfig): boolean {
 	return config.availableAiClients?.some(
-		(client) => client.enabled && client.type === "omp",
+		(client) => client.enabled && RELEASED_PROVIDER_TYPES.has(client.type),
 	) === true;
 }
 

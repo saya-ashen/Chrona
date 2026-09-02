@@ -13,7 +13,7 @@ vi.mock("@chrona/i18n", async (importOriginal) => {
         "components.schedulePage.firstRunDescription":
           "Connect AI, capture a real task, then review the plan before anything runs.",
         "components.schedulePage.firstRunStepConnectAiTitle": "Connect AI",
-        "components.schedulePage.firstRunStepConnectAi": "Add Claude Code or Codex as the AI client Chrona will use.",
+        "components.schedulePage.firstRunStepConnectAi": "Add Codex, Chrona's recommended provider, then run its availability check.",
         "components.schedulePage.firstRunStepConnectAiDone": "AI client connected. Next, create a real task.",
         "components.schedulePage.firstRunStepCreateTaskTitle": "Create a task",
         "components.schedulePage.firstRunStepCreateTask": "Describe the goal, constraints, and context in one task.",

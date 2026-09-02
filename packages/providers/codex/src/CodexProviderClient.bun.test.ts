@@ -207,6 +207,7 @@ describe("codexAcpConfig", () => {
       mcpBaseUrl: "http://chrona.test",
       mcpRunToken: "token",
       healthCheck: "prompt",
+      readOnlyModeId: "read-only",
       auth: { useExisting: true },
     });
   });
@@ -254,6 +255,7 @@ describe("CodexProviderClient", () => {
       supportsSessions: true,
       supportsStreaming: true,
       supportsToolCalls: true,
+      readOnlySingleAttempt: true,
       approval: { supported: true },
       recovery: { mode: "session_history", sessionResume: true, historyReplay: true, activeRunLookup: false },
       reason: "OpenAI Codex ACP provider",

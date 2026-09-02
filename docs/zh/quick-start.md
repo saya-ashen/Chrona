@@ -73,8 +73,8 @@ bun run test:api
 
 1. 打开 `http://localhost:3101`。
 2. 打开 Settings / AI Clients。
-3. 添加默认的 `OMP` AI client，并先运行可用性检查。OMP 是首个稳定版中唯一的 Tier-1 首次使用路径。
-4. 将 OMP 绑定到 `task.plan`；需要时可另配 `Claude Code` 或 `Codex` 负责 `task.execution`。任务选择的执行 client 不会替代独立的 Plan provider。
+3. 添加默认推荐的 `Codex` AI client，并运行可用性检查。
+4. 按需要绑定产品功能。Codex、OMP 和 Claude Code 均支持 `task.plan`、`goal.review`、`task.execution` 与 `dashboard.brief`；无副作用的计划/审查请求在结果不确定时会失败关闭，不会自动重放。
 5. 创建任务，并补充足够的执行上下文。
 6. 把任务放入日程。
 7. 在任务工作区生成计划。
@@ -86,10 +86,11 @@ bun run test:api
 
 Chrona 将 AI clients 与 feature bindings 存在数据库中。Chrona 当前没有内置模型 provider；使用 AI 功能前，需要先配置外部 provider client。
 
-- `omp`：Tier-1 / 稳定。负责文档中的首次使用路径、`task.plan`、`task.execution`、Goal review 与结果整理。
-- `claude_code`：Beta。当前作为 `task.execution` client 使用；Plan 仍由 `task.plan` 绑定的 provider 生成。
-- `codex`：Beta。当前作为 `task.execution` client 使用，要求 OpenAI Responses 兼容上游；Plan 仍由 `task.plan` 绑定的 provider 生成。
-- `hermes`：实现仍保留，但在生产 Settings 中隐藏，等待配置与一致性流程通过发布认证。
+- `codex`：稳定，默认推荐。ACP adapter 支持 `task.plan`、`goal.review`、`task.execution` 与 `dashboard.brief`，包括结构化终态结果、审批和 session-history 恢复。
+- `omp`：稳定。进程内 SDK adapter 支持相同的产品功能，以及本地结果整理和 session-history 恢复。
+- `claude_code`：稳定。Claude Agent SDK adapter 支持相同的产品功能、工具隔离的计划/审查与 provider session 恢复。
+
+三个正式 Provider 支持相同的产品功能；协议特有的审批、重连和恢复行为仍由 capability matrix 分别描述。Hermes 实现保留在内部，但继续从生产 Settings 隐藏。
 
 Feature binding 决定哪个 client 处理哪个能力。产品功能包括 `task.plan`、`task.execution`、`dashboard.brief`；`suggest`、`generate_plan`、`conflicts`、`timeslots`、`chat`、`dispatch_task` 等较底层 feature slot 仍可在需要时使用。
 
@@ -109,7 +110,7 @@ Feature binding 决定哪个 client 处理哪个能力。产品功能包括 `tas
 | MCP bearer token | Chrona MCP 请求使用的 bearer token | 通常留空；启用 API auth 时使用 `CHRONA_API_KEY` 或 `CHRONA_MCP_BEARER_TOKEN` |
 | Timeout | provider run 最大时长 | 可选 |
 
-### Codex
+### Codex（默认推荐）
 
 进入 `Settings -> AI Clients -> Add Client -> Codex`。
 

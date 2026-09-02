@@ -2,6 +2,17 @@
 
 ## Unreleased
 
+## 0.3.1 — Provider parity and product demo polish
+
+Date: 2026-09-02
+
+### Highlights
+- Promoted Codex, OMP, and Claude Code to the same Stable product support level across task planning, Goal review, task execution, and dashboard briefing, with Codex as the default recommendation and Hermes kept hidden.
+- Hardened safe single-attempt execution: Codex ACP sessions now fail closed unless read-only mode is available, while Claude Code terminal-only runs expose only the scoped result/control tool.
+- Added provider parity API, UI, browser, capability, and real SDK/CLI compatibility coverage.
+- Replaced static README workflow screenshots with English motion demos and fixed the expanded Full Plan Graph layout and caption readability.
+- Removed generated dogfood, visualization, and local tool artifacts from the repository and tightened ignore rules and release asset checks.
+
 ## 0.3.0 — Public release
 
 Date: 2026-09-01

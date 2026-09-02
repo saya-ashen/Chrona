@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import type { ChronaEngine } from "@chrona/engine";
-import { AI_FEATURES, releasedProviderTypes } from "@chrona/contracts";
+import { AI_FEATURES, recommendedProviderType, releasedProviderTypes } from "@chrona/contracts";
 
 import { json } from "../lib/http";
 
@@ -24,21 +24,12 @@ const AI_PROVIDER_TYPES = [...releasedProviderTypes, "debug"] as const;
 const BINDABLE_PRODUCT_FEATURES = AI_FEATURES.filter((feature) =>
   ["goal.review", "dashboard.brief", "task.plan", "task.execution"].includes(feature),
 );
-const NON_DURABLE_PRODUCT_FEATURES = BINDABLE_PRODUCT_FEATURES.filter(
-  (feature) => feature !== "goal.review" && feature !== "task.plan",
-);
-/** Matches binding validation: planning/review need durable attach or terminal-only single-attempt recovery. */
+/** Released providers share the complete product feature surface; capability details still describe recovery differences. */
 const PROVIDER_BINDABLE_FEATURES = {
+  codex: BINDABLE_PRODUCT_FEATURES,
   omp: BINDABLE_PRODUCT_FEATURES,
-  claude_code: NON_DURABLE_PRODUCT_FEATURES,
-  codex: NON_DURABLE_PRODUCT_FEATURES,
+  claude_code: BINDABLE_PRODUCT_FEATURES,
   debug: BINDABLE_PRODUCT_FEATURES,
-} as const;
-const PROVIDER_SUPPORT_TIERS = {
-  omp: "stable",
-  claude_code: "beta",
-  codex: "beta",
-  debug: "experimental",
 } as const;
 
 export function createRuntimeRoutes(_engine: ChronaEngine) {
@@ -49,7 +40,8 @@ export function createRuntimeRoutes(_engine: ChronaEngine) {
         .map((key) => ({
           key,
           label: getRuntimeLabel(key),
-          tier: PROVIDER_SUPPORT_TIERS[key],
+          tier: key === "debug" ? "experimental" : "stable",
+          recommended: key === recommendedProviderType,
           features: PROVIDER_BINDABLE_FEATURES[key],
         })),
     }),
