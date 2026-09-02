@@ -31,7 +31,7 @@
   <a href="./CONTRIBUTING.md">贡献</a>
 </p>
 <p align="center">
-  <img src="docs/assets/generated/task-workflow.gif" width="85%" alt="Chrona 英文界面动图：查找任务、查看执行进度与追踪记录" />
+  <img src="docs/assets/generated/task-workflow.gif" width="100%" alt="Chrona 英文界面动图：查找任务、查看执行进度与追踪记录" />
   <br />
   <em>查找可由 AI 执行的任务，沿计划图查看进度，并检查可追溯的执行记录。</em>
 </p>
@@ -143,7 +143,7 @@ Web 应用。
 5. **检查和恢复** — 从工作区查看审批、工具活动、失败、阻塞、持久化输出和下一步动作。
 
 <p align="center">
-  <img src="docs/assets/generated/result-review.gif" width="80%" alt="Chrona 英文界面动图：检查证据并验收任务结果" />
+  <img src="docs/assets/generated/result-review.gif" width="100%" alt="Chrona 英文界面动图：检查证据并验收任务结果" />
   <br />
   <em>检查结果中的证据和建议，确认后将验收记录保留在任务中。</em>
 </p>

@@ -31,7 +31,7 @@ English | [中文](./README.zh.md)
   <a href="./CONTRIBUTING.md">Contributing</a>
 </p>
 <p align="center">
-  <img src="docs/assets/generated/task-workflow.gif" width="85%" alt="Animated Chrona workflow showing task discovery, execution progress, and trace inspection" />
+  <img src="docs/assets/generated/task-workflow.gif" width="100%" alt="Animated Chrona workflow showing task discovery, execution progress, and trace inspection" />
   <br />
   <em>Find an AI-executable task, follow its plan graph, and inspect the durable execution trace.</em>
 </p>
@@ -153,7 +153,7 @@ client details, and troubleshooting.
    blockers, persisted outputs, and next actions from the workspace.
 
 <p align="center">
-  <img src="docs/assets/generated/result-review.gif" width="80%" alt="Animated Chrona result review showing evidence inspection and result acceptance" />
+  <img src="docs/assets/generated/result-review.gif" width="100%" alt="Animated Chrona result review showing evidence inspection and result acceptance" />
   <br />
   <em>Review evidence and recommendations, then accept the result and keep it with the task.</em>
 </p>
