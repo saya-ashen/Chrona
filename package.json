@@ -1,6 +1,6 @@
 {
   "name": "@chrona-org/cli",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "private": true,
   "description": "Chrona — local AI work executor for governed planning, scheduling, recovery, and results",
   "license": "MIT",
