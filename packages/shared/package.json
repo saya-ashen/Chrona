@@ -6,7 +6,7 @@
   "dependencies": {
     "@chrona/contracts": "workspace:*",
     "@chrona/providers-foundation": "workspace:*",
-    "zod": "^4.4.3"
+    "zod": "^4.5.4"
   },
   "exports": {
     ".": "./src/index.ts",
