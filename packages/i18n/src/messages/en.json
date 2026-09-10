@@ -1131,6 +1131,10 @@
       "completed": "Completed"
     },
     "taskCreateDialog": {
+      "automaticRunImmediate": "After saving, Chrona will prepare a valid plan and execute as soon as it is ready.",
+      "automaticRunNow": "After saving (once the plan is ready)",
+      "automaticRunPast": "This trigger time has passed. The run becomes due on the next scheduler scan, once its plan is ready.",
+      "automaticRunPlanTime": "Plan generation timing",
       "title": "Add task",
       "close": "Close",
       "titlePlaceholder": "Add title",
@@ -1211,6 +1215,28 @@
       "generatingSuggestions": "Generating suggestions..."
     },
     "taskWorkspace": {
+      "resultStructureValidated": "Structure validated",
+      "resultReviewCompleted": "AI layout review completed",
+      "resultReviewFallback": "Published validated draft",
+      "resultReviewPending": "AI layout review pending",
+      "resultReviewUnknown": "No review record (historical result)",
+      "resultReviewTimeout": "Layout review timed out; review the content before accepting.",
+      "resultReviewUnavailable": "Layout review did not complete; review the content before accepting.",
+      "resultReviewNotFactCheck": "Structural and layout checks do not verify facts or replace your acceptance.",
+      "resultViewTabs": "Task result and history",
+      "resultTab": "Result",
+      "briefTab": "Brief",
+      "planTab": "Plan",
+      "historyTab": "History",
+      "historyScope": "Read-only task history, including previous runs.",
+      "historyLoading": "Loading history…",
+      "historyEmpty": "No recorded activity yet.",
+      "historyError": "Could not load history.",
+      "historyRetry": "Retry",
+      "historyMore": "Load older activity",
+      "resultPlanMissing": "No saved plan is available.",
+      "resultPlanReadOnly": "Read-only plan. Viewing it does not restart execution.",
+      "resultQuickFiles": "Result files",
       "approvalNeeded": "Approval needed",
       "planSetupLabel": "Plan setup",
       "planSetupBriefTitle": "Task brief",
@@ -1748,12 +1774,12 @@
       "newTask": "New task",
       "openTask": "Open",
       "headline": {
-        "both": "Today Chrona auto-completed {completed} {completedTaskLabel}, and {attentionSubject}.",
-        "completedOnly": "Today Chrona auto-completed {completed} {completedTaskLabel}. No task needs you right now.",
+        "both": "Today {completed} {completedTaskLabel} finished execution; {attentionSubject}.",
+        "completedOnly": "Today {completed} {completedTaskLabel} finished execution. No task needs you right now.",
         "attentionOnly": "Nothing auto-completed yet today. {attentionSubject}.",
         "completedTask": "task",
         "completedTasks": "tasks",
-        "completedToday": "Completed today",
+        "completedToday": "Execution finished today",
         "attentionTask": "1 task needs you",
         "attentionTasks": "{attention} tasks need you",
         "idle": "Chrona is ready. Add a task, start work, or review recent activity here."
@@ -1785,7 +1811,8 @@
           "input": "Waiting for your input",
           "blocked": "Blocked",
           "failed": "Run failed",
-          "schedule_risk": "At schedule risk"
+          "schedule_risk": "At schedule risk",
+        "result_review": "Awaiting acceptance"
         }
       },
       "upcomingToday": {
@@ -1800,7 +1827,7 @@
         "empty": "Nothing is running. Start a task from the schedule or create a new one when you want Chrona to move."
       },
       "completed": {
-        "title": "Recent completions",
+        "title": "Recent results",
         "totalLabel": "{n} recent completions shown",
         "empty": "Completed task outputs will collect here once Chrona finishes work."
       },
@@ -2434,9 +2461,16 @@
       "needs_me": "Needs Me",
       "ready": "Ready",
       "running": "Running",
-      "completed": "Completed",
-      "failed": "Failed",
+      "completed": "Execution finished",
+      "failed": "Blocked / failed",
       "filterNeedsMe": "Needs Me",
+      "advancedFilters": "More filters",
+      "workStateLabels": {
+        "no_plan": "Needs plan", "planning": "Planning", "plan_review": "Plan ready", "ready_to_run": "Ready to run", "queued": "Queued", "running": "Running", "waiting_for_input": "Input needed", "waiting_for_approval": "Approval needed", "blocked": "Blocked", "failed": "Failed", "cancelled": "Cancelled", "result_ready": "Awaiting acceptance", "done": "Accepted"
+      },
+      "workStateActions": {
+        "no_plan": "Generate a plan before execution", "planning": "Wait for plan generation", "plan_review": "Review and accept the plan", "ready_to_run": "Review the run settings and start", "queued": "Waiting for execution", "running": "Monitor progress", "waiting_for_input": "Provide the requested input", "waiting_for_approval": "Review the approval request", "blocked": "Inspect and resolve the blocker", "failed": "Inspect the failure before retrying", "cancelled": "Inspect the history", "result_ready": "Accept the result or request changes", "done": "Ask a follow-up or create the next task"
+      },
       "listDescription": "Review task state and open work that needs attention.",
       "statTotal": "Total",
       "statNeeds": "Needs",

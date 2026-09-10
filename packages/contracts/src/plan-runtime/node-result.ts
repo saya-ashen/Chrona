@@ -77,7 +77,7 @@ export type ResultManifest = {
 
 export type ResultFinalizationState =
   | { status: "Pending"; sourceRevision: number }
-  | { status: "Running"; sourceRevision: number; attempt: number; startedAt: string }
+  | { status: "Running"; sourceRevision: number; attempt: number; startedAt: string; phase?: "compose" | "review" }
   | { status: "Ready"; sourceRevision: number; attempt: number; finalizedAt: string }
   | {
       status: "Failed";
@@ -93,6 +93,12 @@ export type FinalizedResult = {
   manifest: ResultManifest;
   spec: UiDocument;
   finalizedAt: string;
+  /** Editorial review is not factual verification or human acceptance.
+   * Absent on historical results: never infer that review completed. */
+  review?: {
+    status: "pending" | "completed" | "fallback";
+    reason?: "timeout" | "interrupted" | "provider_error" | "invalid_output";
+  };
 };
 
 

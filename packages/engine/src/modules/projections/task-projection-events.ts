@@ -1,3 +1,5 @@
+import { afterDatabaseCommit } from "@/lib/db";
+
 type WorkspaceEventBase = {
   taskId: string;
   workspaceId: string;
@@ -105,12 +107,11 @@ export function appendTaskWorkspaceEvent<T extends Omit<TaskProjectionEvent, "se
 }
 
 export function publishTaskProjectionEvent(event: TaskProjectionEvent) {
-  const listeners = listenersByTask.get(event.taskId);
-  if (!listeners?.size) return;
-
-  for (const listener of [...listeners]) {
-    listener(event);
-  }
+  afterDatabaseCommit(() => {
+    const listeners = listenersByTask.get(event.taskId);
+    if (!listeners?.size) return;
+    for (const listener of [...listeners]) listener(event);
+  });
 }
 
 export function publishTaskWorkspaceUpdatedEvent(input: {

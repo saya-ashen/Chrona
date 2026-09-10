@@ -4,7 +4,7 @@ import { appendCanonicalEvent } from "@/modules/events";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
 import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
 
-export async function markTaskDone(input: { taskId: string }) {
+export async function markTaskDone(input: { taskId: string; expectedRunId?: string }) {
   const task = await db.task.findUniqueOrThrow({
     where: { id: input.taskId },
     include: {
@@ -15,7 +15,10 @@ export async function markTaskDone(input: { taskId: string }) {
     },
   });
 
-  const latestRun = task.runs[0] ?? null;
+  const latestRun = task.runs.at(0) ?? null;
+  if (input.expectedRunId && latestRun?.id !== input.expectedRunId) {
+    throw new EngineError(ENGINE_ERROR_CODES.CONFLICT, "The completed run is no longer current.");
+  }
 
   if (!latestRun || latestRun.status !== "Completed") {
     throw new EngineError(

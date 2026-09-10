@@ -97,8 +97,19 @@ describe("plan-runner task executor continuation", () => {
     };
     await db.taskPlanRun.update({ where: { id: completedPlanRun.id }, data: { planRun: completedPlanEnvelope } });
 
+    // A Ready flag without matching finalized content is not acceptance proof.
+    await expect(acceptTaskResult({ taskId: task.id })).rejects.toThrow("successfully finalized");
+    const sourceRevision = completedMutableGraph.planOutput.manifest.sourceRevision;
+    const finalizedAt = new Date().toISOString();
+    completedMutableGraph.planOutput.finalization = { status: "Ready", sourceRevision, attempt: 1, finalizedAt };
+    completedMutableGraph.planOutput.finalizedResult = {
+      sourceRevision, finalizedAt, manifest: completedMutableGraph.planOutput.manifest,
+      spec: { root: "root", elements: { root: { type: "ResultOverview", props: { title: "Complete", summary: "Specification task complete" } } } },
+    };
+    await db.taskPlanRun.update({ where: { id: completedPlanRun.id }, data: { planRun: completedPlanEnvelope } });
+
     const accepted = await acceptTaskResult({ taskId: task.id });
-    expect(accepted.runId).toBeTruthy();
+    expect(accepted.runId).toBe(`plan_execution_${completedPlanRun.id}`);
     expect(await db.run.findUnique({ where: { id: accepted.runId } })).toMatchObject({
       taskId: task.id,
       status: TaskStatus.Completed,

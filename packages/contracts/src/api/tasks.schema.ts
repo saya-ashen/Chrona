@@ -45,11 +45,11 @@ export const TASK_FILTER_STATUS_MAP: Record<
   Exclude<TaskListFilter, "all">,
   readonly TaskStatus[]
 > = {
-  needs_me: ["WaitingForInput", "WaitingForApproval", "Blocked"],
-  ready: ["Ready", "Queued", "Draft"],
+  needs_me: ["WaitingForInput", "WaitingForApproval", "Blocked", "Failed", "Completed"],
+  ready: ["Ready"],
   running: ["Running"],
   completed: ["Completed", "Done"],
-  failed: ["Failed"],
+  failed: ["Failed", "Blocked"],
 };
 
 export const TASK_LIST_SORT_FIELDS = [

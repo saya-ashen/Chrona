@@ -13,7 +13,7 @@ import { createEmailTriggerAdapterRoutes } from "./email-trigger-adapter.routes"
 import { createClientsRoutes } from "./ai/clients.routes";
 import { createAiSuggestionRoutes } from "./ai/suggestions.routes";
 import { createAssistantSurfaceRoutes } from "./assistant-surface.routes";
-import { createMcpRoutes, createAgentControlRoutes } from "../../../../features/mcp-control-plane/server";
+import { createMcpRoutes, createManagementMcpRoutes, createAgentControlRoutes } from "../../../../features/mcp-control-plane/server";
 import { createRuntimeRoutes } from "./runtime.routes";
 import { createHermesIntegrationRoutes } from "./integrations/hermes.routes";
 import { createCalendarSourceRoutes, type CalendarSourceRouteOptions } from "../../../../features/external-calendar/server";
@@ -48,6 +48,7 @@ export function createApiRouter(engine: ChronaEngine, options: ApiRouterOptions 
     .route("/", createRuntimeRoutes(engine))
     .route("/", createAssistantSurfaceRoutes(engine))
     .route("/", createMcpRoutes(engine, { apiKey: options.mcpApiKey }))
+    .route("/", createManagementMcpRoutes(engine))
     .route("/", createAgentControlRoutes());
 
   // Env-gated E2E test seam — only ever mounted when the Playwright webServer

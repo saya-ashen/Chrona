@@ -33,6 +33,8 @@ Use this directory as the stable product and developer documentation set. Time-p
 | 复用本机官方 Pi CLI | [Pi Provider（实验性）](./zh/pi-provider.md) |
 | 理解 Goal Workbench 资产使用区的目标设计 | [Goal Workbench 产品设计](./zh/goal-workbench-product-design.md) |
 | 设计 AI Feature 的 Observation、Action、Result 与 Completion | [AI Feature Runtime 架构与实施规范](./zh/ai-feature-runtime-architecture.md) |
+| 从外部 Agent 管理 Chrona 任务 | [管理 MCP 接入与当前能力](./zh/management-mcp.md) |
+| 理解外部 Agent 管理 MCP 的目标设计 | [网页能力对等设计](./zh/external-agent-task-mcp-design.md) |
 
 ## Shared/generated docs
 

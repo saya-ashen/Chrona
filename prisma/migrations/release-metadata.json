@@ -25,7 +25,7 @@
     }
   },
   "mutableReleaseLineMigration": "20260822000000_repair_release_line",
-  "releaseLineSchemaFingerprint": "091f4c6197416c1803bfa42c969cd39becb1577a815739ca58071d8f662068a0",
+  "releaseLineSchemaFingerprint": "d41a93b82bf9eaeb265ec2f813950b41c909fadbc36b2f6c8ba212eb62df8c9d",
   "previousReleaseFixture": {
     "path": "fixtures/v0.2.0-linux-x64.sqlite",
     "sha256": "62d74fcba6e430e295f1cb913d0c3086711d18ca88112c9cd9805833b44f9c63",
@@ -36,34 +36,95 @@
     "52535a31dda359b8e54648726cb870ac7d2569349e37738e9f58704782b8abbb": {
       "fromSchemaFingerprint": "81f756b0af4ebd66ad87f14eb758f870831a0c31cb60050dc016b9f0bd92484c",
       "path": "20260822000000_repair_release_line/normalizers/52535a31dda359b8e54648726cb870ac7d2569349e37738e9f58704782b8abbb.sql",
-      "sha256": "578b830fec553bacb53c8b1d17373d2c9266beefae9d5321144e3de38cf7e706",
+      "sha256": "2b8e08c2f6a5270b114fc222cdc2c02d5c62ab572d2bb246fe985e182c690f12",
       "expectedHistory": {
-        "0001_initial": { "checksum": "f86136e580c85369d11e86b4f8a8fd4b3f0d96e5d974ae2855b4da1819d3f924", "appliedStepsCount": 1 },
-        "20260707000000_add_workspace_user_preferences": { "checksum": "7bdfe139de488f5bfabced9cd0d4954209bc9d6b3bc5b5b08615e4802b921c32", "appliedStepsCount": 1 },
-        "20260719000000_add_long_horizon_goals": { "checksum": "567675f0a461de764e74345a0eb9bed785444b6eb7286019c352afd105731e68", "appliedStepsCount": 1 },
-        "20260720000000_add_goal_achievement_confirmation": { "checksum": "155efbb74e9ff4b08a4edf48e45056d68fa4573f7f40fa5e639d95445d03df6f", "appliedStepsCount": 1 },
-        "20260720010000_add_goal_workbench": { "checksum": "a87d20868d1f0bd5c1623f323f09c562e072abd74de69f401ec0fe68246342fe", "appliedStepsCount": 1 },
-        "20260722000000_add_goal_review_proposals": { "checksum": "a4feeab7c6d0e20ff6eb5f2ba8a1cedb0ec3fe5002cc0967a1c726f99dedcb64", "appliedStepsCount": 1 },
-        "20260723000000_automatic_goal_context": { "checksum": "d640cc335cbbbed0e6695189507a4fa38f0689f3cdc67df76dd4248ab1ca00d8", "appliedStepsCount": 1 },
-        "20260728000000_pin_task_execution_model": { "checksum": "2580614aab6a5d46a58eb11639f8a2ceead297f781754eff8c734290cddb7c9b", "appliedStepsCount": 1 },
-        "20260729000000_add_ai_feature_runtime_persistence": { "checksum": "52535a31dda359b8e54648726cb870ac7d2569349e37738e9f58704782b8abbb", "appliedStepsCount": 1 }
+        "0001_initial": {
+          "checksum": "f86136e580c85369d11e86b4f8a8fd4b3f0d96e5d974ae2855b4da1819d3f924",
+          "appliedStepsCount": 1
+        },
+        "20260707000000_add_workspace_user_preferences": {
+          "checksum": "7bdfe139de488f5bfabced9cd0d4954209bc9d6b3bc5b5b08615e4802b921c32",
+          "appliedStepsCount": 1
+        },
+        "20260719000000_add_long_horizon_goals": {
+          "checksum": "567675f0a461de764e74345a0eb9bed785444b6eb7286019c352afd105731e68",
+          "appliedStepsCount": 1
+        },
+        "20260720000000_add_goal_achievement_confirmation": {
+          "checksum": "155efbb74e9ff4b08a4edf48e45056d68fa4573f7f40fa5e639d95445d03df6f",
+          "appliedStepsCount": 1
+        },
+        "20260720010000_add_goal_workbench": {
+          "checksum": "a87d20868d1f0bd5c1623f323f09c562e072abd74de69f401ec0fe68246342fe",
+          "appliedStepsCount": 1
+        },
+        "20260722000000_add_goal_review_proposals": {
+          "checksum": "a4feeab7c6d0e20ff6eb5f2ba8a1cedb0ec3fe5002cc0967a1c726f99dedcb64",
+          "appliedStepsCount": 1
+        },
+        "20260723000000_automatic_goal_context": {
+          "checksum": "d640cc335cbbbed0e6695189507a4fa38f0689f3cdc67df76dd4248ab1ca00d8",
+          "appliedStepsCount": 1
+        },
+        "20260728000000_pin_task_execution_model": {
+          "checksum": "2580614aab6a5d46a58eb11639f8a2ceead297f781754eff8c734290cddb7c9b",
+          "appliedStepsCount": 1
+        },
+        "20260729000000_add_ai_feature_runtime_persistence": {
+          "checksum": "52535a31dda359b8e54648726cb870ac7d2569349e37738e9f58704782b8abbb",
+          "appliedStepsCount": 1
+        }
       }
     },
     "b46d742fdacdc001f371f6ce361ff29b0fd15b8cac25a85bbf40692a1964927b": {
       "fromSchemaFingerprint": "c82b15773ed3b863dea88bfbe15c84f9fc95e30b99647884c474b6386c38ad67",
       "path": "20260822000000_repair_release_line/normalizers/b46d742fdacdc001f371f6ce361ff29b0fd15b8cac25a85bbf40692a1964927b.sql",
-      "sha256": "1c8fade2aa88c506989ab0138f7da669f00b22e3a2a125b7ced3393b370eaf1f",
+      "sha256": "749950e7ae4fd163d6282d2c8328e85bb15c5e7b1503c2dad5b2a68c7e7357e9",
       "expectedHistory": {
-        "0001_initial": { "checksum": "f86136e580c85369d11e86b4f8a8fd4b3f0d96e5d974ae2855b4da1819d3f924", "appliedStepsCount": 1 },
-        "20260707000000_add_workspace_user_preferences": { "checksum": "7bdfe139de488f5bfabced9cd0d4954209bc9d6b3bc5b5b08615e4802b921c32", "appliedStepsCount": 1 },
-        "20260719000000_add_long_horizon_goals": { "checksum": "567675f0a461de764e74345a0eb9bed785444b6eb7286019c352afd105731e68", "appliedStepsCount": 1 },
-        "20260720000000_add_goal_achievement_confirmation": { "checksum": "155efbb74e9ff4b08a4edf48e45056d68fa4573f7f40fa5e639d95445d03df6f", "appliedStepsCount": 1 },
-        "20260720010000_add_goal_workbench": { "checksum": "a87d20868d1f0bd5c1623f323f09c562e072abd74de69f401ec0fe68246342fe", "appliedStepsCount": 1 },
-        "20260722000000_add_goal_review_proposals": { "checksum": "a4feeab7c6d0e20ff6eb5f2ba8a1cedb0ec3fe5002cc0967a1c726f99dedcb64", "appliedStepsCount": 1 },
-        "20260723000000_automatic_goal_context": { "checksum": "d640cc335cbbbed0e6695189507a4fa38f0689f3cdc67df76dd4248ab1ca00d8", "appliedStepsCount": 1 },
-        "20260728000000_pin_task_execution_model": { "checksum": "2580614aab6a5d46a58eb11639f8a2ceead297f781754eff8c734290cddb7c9b", "appliedStepsCount": 1 },
-        "20260729000000_add_ai_feature_runtime_persistence": { "checksum": "b46d742fdacdc001f371f6ce361ff29b0fd15b8cac25a85bbf40692a1964927b", "appliedStepsCount": 2 }
+        "0001_initial": {
+          "checksum": "f86136e580c85369d11e86b4f8a8fd4b3f0d96e5d974ae2855b4da1819d3f924",
+          "appliedStepsCount": 1
+        },
+        "20260707000000_add_workspace_user_preferences": {
+          "checksum": "7bdfe139de488f5bfabced9cd0d4954209bc9d6b3bc5b5b08615e4802b921c32",
+          "appliedStepsCount": 1
+        },
+        "20260719000000_add_long_horizon_goals": {
+          "checksum": "567675f0a461de764e74345a0eb9bed785444b6eb7286019c352afd105731e68",
+          "appliedStepsCount": 1
+        },
+        "20260720000000_add_goal_achievement_confirmation": {
+          "checksum": "155efbb74e9ff4b08a4edf48e45056d68fa4573f7f40fa5e639d95445d03df6f",
+          "appliedStepsCount": 1
+        },
+        "20260720010000_add_goal_workbench": {
+          "checksum": "a87d20868d1f0bd5c1623f323f09c562e072abd74de69f401ec0fe68246342fe",
+          "appliedStepsCount": 1
+        },
+        "20260722000000_add_goal_review_proposals": {
+          "checksum": "a4feeab7c6d0e20ff6eb5f2ba8a1cedb0ec3fe5002cc0967a1c726f99dedcb64",
+          "appliedStepsCount": 1
+        },
+        "20260723000000_automatic_goal_context": {
+          "checksum": "d640cc335cbbbed0e6695189507a4fa38f0689f3cdc67df76dd4248ab1ca00d8",
+          "appliedStepsCount": 1
+        },
+        "20260728000000_pin_task_execution_model": {
+          "checksum": "2580614aab6a5d46a58eb11639f8a2ceead297f781754eff8c734290cddb7c9b",
+          "appliedStepsCount": 1
+        },
+        "20260729000000_add_ai_feature_runtime_persistence": {
+          "checksum": "b46d742fdacdc001f371f6ce361ff29b0fd15b8cac25a85bbf40692a1964927b",
+          "appliedStepsCount": 2
+        }
       }
+    }
+  },
+  "mutableReleaseLineAmendments": {
+    "641aa4b5907177ca6857c659a3ddb8fa8b7ed3d14c975f026ba250296e36675e": {
+      "fromSchemaFingerprint": "091f4c6197416c1803bfa42c969cd39becb1577a815739ca58071d8f662068a0",
+      "path": "20260822000000_repair_release_line/amendments/641aa4b5907177ca6857c659a3ddb8fa8b7ed3d14c975f026ba250296e36675e.sql",
+      "sha256": "feb5d8089b572874f7dd60d77705482db86df7188c659b77afa44b1c743fadc8"
     }
   }
 }

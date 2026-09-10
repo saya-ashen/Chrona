@@ -42,9 +42,25 @@ export class PiRun {
   }
 
   async start(bridge: string, sessionFile: string, model?: string, prompt = true) {
-    if (this.input.signal?.aborted) { this.cancel(); return; }
+    if (this.input.signal?.aborted) this.cancel();
+    const signal = this.abort.signal;
+    let interrupt = () => {};
+    try {
+      signal.throwIfAborted();
+      await Promise.race([
+        this.initialize(bridge, sessionFile, model, prompt),
+        new Promise<never>((_resolve, reject) => {
+          interrupt = () => reject(new Error(this.error ?? "Pi startup was cancelled"));
+          if (signal.aborted) interrupt();
+          else signal.addEventListener("abort", interrupt, { once: true });
+        }),
+      ]);
+    } finally { signal.removeEventListener("abort", interrupt); }
+  }
+
+  private async initialize(bridge: string, sessionFile: string, model?: string, prompt = true) {
     this.release = await this.state.lockSession(sessionFile);
-    if (this.isDone()) { await this.release(); return; }
+    if (this.isDone()) { await this.releaseSession(); return; }
     await this.tools.initialize();
     if (this.isDone()) { await this.tools.close(); return; }
     const isolated = this.input.toolPolicy !== "full";
@@ -65,12 +81,14 @@ export class PiRun {
     this.effectiveModel = actualModel;
     if (!prompt) return;
     await this.state.saveSession(current.sessionId, sessionFile, actualModel);
+    if (this.isDone()) return;
     this.ref.nativeSessionId = current.sessionId;
     this.ref.providerResumeRef = current.sessionId;
     if (isolated) {
       await this.rpc.request("set_auto_retry", { enabled: false });
       await this.rpc.request("set_auto_compaction", { enabled: false });
     }
+    if (this.isDone()) return;
     this.emit({ type: "run_started", run: { ...this.ref } });
     const text = typeof this.input.input === "string" ? this.input.input : JSON.stringify(this.input.input);
     // Prefix prevents task data beginning with '/' from dispatching an extension command.
@@ -241,8 +259,29 @@ export class PiRun {
     if (this.approval?.timer) clearTimeout(this.approval.timer);
     this.input.signal?.removeEventListener("abort", this.abortListener);
     this.abort.abort();
-    this.cleanup = Promise.all([this.tools.close(), this.rpc?.close()]).then(() => this.release?.());
+    this.cleanup = this.closeResources();
     this.wake?.();
+  }
+
+  private async releaseSession() {
+    const release = this.release;
+    this.release = undefined;
+    await release?.();
+  }
+
+  private async closeResources() {
+    // Cleanup must not withhold a terminal event indefinitely. RPC close has its
+    // own kill deadline; an unresponsive MCP close must not retain the session lock.
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    try {
+      await Promise.race([
+        Promise.allSettled([this.tools.close(), this.rpc?.close()]),
+        new Promise<void>((resolve) => { timer = setTimeout(resolve, 3000); }),
+      ]);
+    } finally {
+      if (timer) clearTimeout(timer);
+      await this.releaseSession();
+    }
   }
 
   snapshot(): ProviderRunSnapshot {

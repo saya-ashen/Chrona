@@ -1,6 +1,6 @@
 /* eslint-disable max-lines-per-function, complexity -- Task updates keep recurrence authority and task mutation in one transaction. */
 import { Prisma, TaskPriority, TaskStatus } from "@/generated/prisma/client";
-import { db } from "@/lib/db";
+import { db, afterDatabaseCommit } from "@/lib/db";
 import { appendCanonicalEvent } from "@/modules/events";
 import { getAcceptedCompiledPlanForTask } from "@/modules/plan-execution/persistence/execution-scope";
 import { startAutoPlanGenerationForTask } from "@/modules/plans/auto-generate-task-plan";
@@ -203,6 +203,7 @@ export async function updateTask(
   input: UpdateTaskInput & {
     sessionStrategy?: "shared" | "per_subtask" | null;
   },
+  options: { deferAutomation?: boolean } = {},
 ) {
   const title = normalizeRequiredUpdateTextField(input.title, "title");
   const description =
@@ -452,14 +453,14 @@ export async function updateTask(
   await rebuildTaskProjection(task.id);
 
   if (
-    nextAutoPlanGeneration &&
+    !options.deferAutomation && nextAutoPlanGeneration &&
     nextAutoPlanGenerationTiming === "immediate" &&
     (
       (input.autoPlanGeneration === true && currentTask.autoPlanGeneration !== true) ||
       (input.autoExecute === true && currentTask.autoExecute !== true)
     )
   ) {
-    startAutoPlanGenerationForTask({ taskId: task.id, accept: nextAutoExecute });
+    afterDatabaseCommit(() => startAutoPlanGenerationForTask({ taskId: task.id, accept: nextAutoExecute }));
   }
 
   return {

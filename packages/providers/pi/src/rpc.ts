@@ -10,7 +10,7 @@ export function record(value: unknown): RecordValue {
 const MAX_FRAME_BYTES = 8 * 1024 * 1024;
 
 /** Pi RPC is LF-delimited JSONL, NOT readline's Unicode line protocol. */
-export function readJsonl(stream: Readable, onRecord: (value: RecordValue) => void, onError: (error: Error) => void) {
+export function readJsonl(stream: Readable, onRecord: (value: RecordValue) => void, onError: (error: Error) => void, onEnd?: () => void) {
   const decoder = new StringDecoder("utf8");
   let buffer = "";
   const consume = (text: string) => {
@@ -30,7 +30,7 @@ export function readJsonl(stream: Readable, onRecord: (value: RecordValue) => vo
     catch { onError(new Error("Pi emitted invalid or oversized JSONL")); }
   });
   stream.on("end", () => {
-    try { consume(decoder.end()); if (buffer.trim()) throw new Error("incomplete frame"); }
+    try { consume(decoder.end()); if (buffer.trim()) throw new Error("incomplete frame"); else onEnd?.(); }
     catch { onError(new Error("Pi closed an incomplete JSONL frame")); }
   });
   stream.on("error", () => onError(new Error("Pi RPC pipe failed")));
@@ -70,15 +70,20 @@ export class PiRpc {
       windowsHide: true,
     });
     const fail = (error: Error) => this.fail(error);
-    readJsonl(this.child.stdout!, (event) => this.receive(event), fail);
-    readJsonl(this.child.stdio[4] as Readable, launch.onBridge, fail);
+    // Neither a clean EOF nor exit code 0 proves agent_settled was received.
+    // Do not wait for the model deadline when an IPC channel is already gone.
+    const ended = () => fail(new Error("Pi RPC closed before completion; no fallback was attempted."));
+    readJsonl(this.child.stdout!, (event) => this.receive(event), fail, ended);
+    readJsonl(this.child.stdio[4] as Readable, launch.onBridge, fail, ended);
     // Drain without retaining/logging private extension diagnostics or credentials.
     this.child.stderr!.resume();
     for (const stream of [this.child.stdin!, this.child.stdio[3]!]) stream.on("error", () => fail(new Error("Pi input pipe failed")));
     this.child.on("error", () => fail(new Error("Cannot start Pi. Install Pi >= 0.85.0 and check the executable and working directory.")));
-    this.child.on("exit", (code, signal) => {
+    const exited = (code: number | null, signal: string | null) => {
       if (!this.closed) fail(new Error(`Pi exited before completion (code ${code}, signal ${signal}). Check its configuration and extension compatibility; no fallback was attempted.`));
-    });
+    };
+    this.child.on("exit", exited);
+
   }
 
   private fail(error: Error) {
@@ -130,12 +135,13 @@ export class PiRpc {
     this.closed = true;
     this.rejectPending(new Error("Pi RPC closed"));
     this.closing = new Promise<void>((resolve) => {
-      if (!this.child.pid || this.child.exitCode !== null || this.child.signalCode !== null) { this.signal("SIGKILL"); resolve(); return; }
+      if (!this.child.pid || this.child.exitCode !== null || this.child.signalCode !== null) { this.signal("SIGKILL"); this.destroyPipes(); resolve(); return; }
       const finish = () => {
         clearTimeout(timer);
         this.child.removeListener("exit", finish);
         // Also stop descendants that outlived the Pi parent in its process group.
         this.signal("SIGKILL");
+        this.destroyPipes();
         resolve();
       };
       const timer = setTimeout(finish, 1500);
@@ -145,6 +151,12 @@ export class PiRpc {
       this.signal("SIGTERM");
     });
     return this.closing;
+  }
+
+  private destroyPipes() {
+    // Closing only writable stdin leaves read ends (including bridge fd4) alive
+    // on runtimes that defer child cleanup until every stdio handle is closed.
+    for (const stream of this.child.stdio) stream?.destroy();
   }
 
   private signal(signal: NodeJS.Signals) {

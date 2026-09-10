@@ -1,6 +1,7 @@
 /* eslint-disable max-statements -- Task creation atomically establishes recurrence, provider provenance, sessions, and projections. */
 import { Prisma, TaskPriority, TaskStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
+import { currentCommandActor } from "@/modules/events";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
 import {
   resolveTaskExecutionProviderSelection,
@@ -275,7 +276,7 @@ export async function createTask(input: CreateTaskInput, client: Prisma.Transact
         workspaceId: task.workspaceId,
         taskId: task.id,
         occurrenceKey: `manual:${task.id}`,
-        source: { kind: "manual", actor: { type: "user", id: "server-action" } },
+        source: { kind: "manual", actor: { type: currentCommandActor()?.actorType ?? "user", id: currentCommandActor()?.actorId ?? "server-action" } },
         status: status === "Draft" ? "Scheduled" : "Ready",
         eligibleAt: new Date(),
       },
@@ -288,9 +289,9 @@ export async function createTask(input: CreateTaskInput, client: Prisma.Transact
       workspaceId: task.workspaceId,
       taskId: task.id,
       workBlockId: firstWorkBlockId,
-      actorType: "user",
-      actorId: "server-action",
-      source: "ui",
+      actorType: currentCommandActor()?.actorType ?? "user",
+      actorId: currentCommandActor()?.actorId ?? "server-action",
+      source: currentCommandActor()?.source ?? "ui",
       payload: { title: task.title, description: task.description, priority: task.priority, aiClientId: task.aiClientId, autoPlanGeneration: task.autoPlanGeneration, autoExecute: task.autoExecute, autoPlanGenerationTiming: task.autoPlanGenerationTiming, autoExecuteTiming: task.autoExecuteTiming, status: task.status, parentTaskId: task.parentTaskId },
       summary: `Created task: ${task.title}`,
       dedupeKey: `task.created:${task.id}`,

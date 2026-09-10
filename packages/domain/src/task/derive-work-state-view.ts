@@ -291,6 +291,8 @@ function deriveState(input: DeriveWorkStateViewInput): WorkStateCanonical {
   )
     return "result_ready";
 
+  // A recorded failed node/run explains the task-level Blocked envelope.
+  if (blockerState === "failed") return "failed";
   if (blockerState === "blocked") return "blocked";
   if (
     isOneOf(input.executionStatus, ["blocked", "degraded"]) ||
@@ -298,7 +300,6 @@ function deriveState(input: DeriveWorkStateViewInput): WorkStateCanonical {
   )
     return "blocked";
   if (
-    blockerState === "failed" ||
     isOneOf(input.executionStatus, ["failed"]) ||
     isOneOf(input.taskStatus, ["failed"])
   )
@@ -333,7 +334,8 @@ function deriveState(input: DeriveWorkStateViewInput): WorkStateCanonical {
   if (
     isOneOf(input.operationStatus, ["plan_ready_to_run"]) ||
     input.hasAcceptedPlan === true ||
-    isOneOf(input.planStatus, ["accepted"])
+    isOneOf(input.planStatus, ["accepted"]) ||
+    isOneOf(input.taskStatus, ["ready"])
   )
     return "ready_to_run";
   return "no_plan";

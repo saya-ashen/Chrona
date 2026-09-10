@@ -6,6 +6,8 @@ import type { TaskPriority, TaskStatus } from "./generated/prisma/client";
 export async function resetTestDb() {
   await db.$executeRawUnsafe("PRAGMA foreign_keys = OFF");
   try {
+    await db.managementCommand.deleteMany();
+    await db.managementClient.deleteMany();
     await db.aiFeatureBinding.deleteMany();
     await db.workspaceAiSurface.deleteMany();
     await db.workspaceUserPreference.deleteMany();

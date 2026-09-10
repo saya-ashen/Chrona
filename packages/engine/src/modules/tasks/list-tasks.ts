@@ -50,8 +50,9 @@ function buildWhere(input: ListTasksInput): Prisma.TaskWhereInput {
   return where;
 }
 
-async function computeCounts(workspaceId: string, baseSearch?: string) {
+async function computeCounts(workspaceId: string, baseSearch?: string, priority?: string) {
   const where: Prisma.TaskWhereInput = { workspaceId };
+  if (priority) where.priority = priority as Prisma.TaskWhereInput["priority"];
   if (baseSearch) {
     where.OR = [
       { title: { contains: baseSearch } },
@@ -124,7 +125,7 @@ export async function listTasksByWorkspace(input: ListTasksInput) {
     db.task.count({ where }),
     // Counts reflect the current search scope but ignore the active tab/status
     // so every filter tab shows its own total.
-    computeCounts(input.workspaceId, input.search),
+    computeCounts(input.workspaceId, input.search, input.priority),
   ]);
 
   // Derive the task source from a linked imported calendar event so the UI can
@@ -139,6 +140,12 @@ export async function listTasksByWorkspace(input: ListTasksInput) {
       executionStatus:
         task.projection?.displayState ?? task.projection?.latestRunStatus,
       disabledReason: task.projection?.actionRequired,
+      blockReason: task.projection?.blockType ? {
+        blockType: task.projection.blockType,
+        detail: task.projection.blockDetail,
+        scope: task.projection.blockScope,
+        actionRequired: task.projection.actionRequired,
+      } : null,
     });
     return {
       ...task,

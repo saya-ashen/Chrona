@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { deriveAttentionDescriptor } from "@chrona/domain";
 
-import type { Messages } from "@chrona/i18n";
+import { useI18n, type Messages } from "@chrona/i18n";
 import { useRevalidator } from "react-router-dom";
 import { LocalizedLink } from "./localized-link";
 import { apiJson } from "@shared/http";
@@ -272,6 +272,7 @@ function NeedsYouCard({
 	copy: DashboardCopy;
 	items: DashboardAttentionItem[];
 }) {
+	const { messages } = useI18n();
 	const visibleItems = items.slice(0, 5);
 	const hasItems = visibleItems.length > 0;
 
@@ -318,7 +319,7 @@ function NeedsYouCard({
 					<ul className="divide-y">
 						{visibleItems.map((item) => {
 							const actionLabel =
-								item.kind === "approval"
+								item.kind === "result_review" ? copy.nextStep.review_result : item.kind === "approval"
 									? copy.nextStep.approve_or_edit
 									: item.kind === "input"
 										? copy.nextStep.provide_input
@@ -347,12 +348,12 @@ function NeedsYouCard({
 													{item.title}
 												</span>
 												<Badge variant="outline" className="shrink-0">
-													{descriptor.label}
+													{copy.attention.kind[item.kind]}
 												</Badge>
 											</div>
 											{item.reason ? (
 												<p className="line-clamp-2 max-w-3xl break-words text-sm leading-5 text-muted-foreground">
-													{item.reason}
+													{item.reason === item.stateView.nextActionLabel ? messages.pages.tasks.workStateActions[item.stateView.state] : item.reason}
 												</p>
 											) : null}
 											{item.latestOutput ? (
@@ -726,6 +727,7 @@ function RecentCompletionsCard({
 									</p>
 								) : null}
 								{item.output ? <OutputLink output={item.output} /> : null}
+								<Button asChild variant="ghost" size="sm"><LocalizedLink href={`/tasks/${item.taskId}`}>{copy.nextStep.review_result}</LocalizedLink></Button>
 							</li>
 						))}
 					</ul>

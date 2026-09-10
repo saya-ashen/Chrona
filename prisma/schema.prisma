@@ -619,6 +619,51 @@ model GoalReviewProposalItem {
 }
 
 
+// External management credentials never double as execution run tokens.
+model ManagementClient {
+  id           String   @id @default(cuid())
+  workspaceId  String
+  name         String
+  tokenDigest  String   @unique
+  scopes       Json
+  publicUrl    String
+  timezone     String   @default("UTC")
+  defaultMode  String   @default("plan")
+  revokedAt    DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  commands     ManagementCommand[]
+
+  @@index([workspaceId])
+}
+
+// Durable request receipt + local command outbox. Task ID intentionally survives deletion.
+model ManagementCommand {
+  id            String   @id @default(cuid())
+  clientId      String
+  workspaceId   String
+  toolName      String
+  requestId     String
+  payloadHash   String
+  input         Json
+  taskId        String?
+  workBlockId   String?
+  phase         String   @default("pending")
+  state         String   @default("queued")
+  stageData     Json?
+  result        Json?
+  errorCode     String?
+  leaseOwner    String?
+  leaseUntil    DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  client        ManagementClient @relation(fields: [clientId], references: [id], onDelete: Restrict)
+
+  @@unique([clientId, toolName, requestId])
+  @@index([state, leaseUntil, createdAt])
+  @@index([workspaceId, taskId, createdAt])
+}
+
 model Task {
   id                        String                     @id @default(cuid())
   workspaceId               String
@@ -645,6 +690,7 @@ model Task {
   blockReason               Json?
   goalContext               Json?
   definitionStatus          TaskDefinitionStatus       @default(Active)
+  configRevision            Int                        @default(0)
   defaultSessionId          String?
   aiClientId                String?
   latestRunId               String?

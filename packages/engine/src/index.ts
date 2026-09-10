@@ -1,4 +1,5 @@
 export { createChronaEngine } from "./engine";
+export { createManagementClient, listManagementClients, revokeManagementClient } from "./modules/management/clients";
 export type { ChronaEngine } from "./engine";
 export {
 	appendTaskWorkspaceEvent,

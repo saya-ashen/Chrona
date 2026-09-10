@@ -13,6 +13,7 @@ import {
 } from "./sqlite-migration-history-normalizers";
 import { createPreUpgradeBackup, type PreUpgradeBackupResult } from "./sqlite-backup";
 import { checksumSql, schemaFingerprint } from "./sqlite-schema-fingerprint";
+import { applyMutableAmendment, recognizedMutableHistory, verifyMutableAmendments, type MutableAmendments } from "./sqlite-mutable-amendments";
 import { assertPrivateStoragePath, ensureSqliteParentDir, secureGeneratedPrivateFile, sqlitePathFromFileUrl } from "./sqlite-url";
 export { checksumSql, schemaFingerprint } from "./sqlite-schema-fingerprint";
 
@@ -48,6 +49,7 @@ export type MigrationReleaseMetadata = {
 	/** Registered complete legacy histories that may be normalized into this release line. */
 	legacyHistoryNormalizations?: Record<string, LegacyHistoryNormalization>;
 	mutableReleaseLineMigration: string;
+	mutableReleaseLineAmendments?: MutableAmendments;
 	previousReleaseFixture: PreviousReleaseFixture;
 	/** Fingerprint of a fresh install through the sole mutable migration. */
 	releaseLineSchemaFingerprint: string;
@@ -426,6 +428,7 @@ export function verifyMigrationReleaseMetadata(
 	}
 	verifyPreviousReleaseFixture(value, released, migrationsDir);
 	verifyLegacyHistoryNormalizations(value, migrationsDir);
+	verifyMutableAmendments(value, migrationsDir);
 	verifyReleaseLineSchema(value, migrations);
 	return value;
 }
@@ -522,7 +525,7 @@ function assertAppliedHistoryRecognized(
 		const applied = actual.get(migration.name);
 		return Boolean(expected) && applied?.checksum === expected.checksum && applied.applied_steps_count === expected.appliedStepsCount;
 	});
-	if (isCurrentPrefix) return;
+	if (isCurrentPrefix || recognizedMutableHistory(actual, metadata)) return;
 	if (Object.values(metadata.legacyHistoryNormalizations ?? {}).some(
 		(normalization) => historiesMatch(actual, normalization.expectedHistory),
 	)) return;
@@ -734,6 +737,7 @@ function applyLoadedMigrations(
 ): void {
 	createMigrationsTable(db);
 	assertAppliedHistoryRecognized(db, migrations, metadata);
+	if (metadata) applyMutableAmendment(db, metadata, options.migrationsDir, migrations.at(-1)?.checksum ?? "");
 	if (readAppliedMigrations(db).size > 0) {
 		normalizeLegacyMigrationHistory({
 			db,

@@ -1,4 +1,4 @@
-export type { TaskDeleteImpact } from "./api/tasks.schema";
+export { managementTools, type ManagementToolName, type TaskDeleteImpact } from "./api";
 
 export {
   STRUCTURED_RESULT_FORMAT,

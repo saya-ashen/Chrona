@@ -162,16 +162,16 @@ export function StartWithChrona({ className = "", createdTaskId = null, workspac
         <div className="min-w-0 flex-1 space-y-3">
           <div className="space-y-2">
             <h2 className="text-base font-semibold text-foreground">{t("components.schedulePage.firstRunTitle")}</h2>
-            <p className="max-w-3xl text-muted-foreground">{t("components.schedulePage.firstRunDescription")}</p>
+            <p className="hidden max-w-3xl text-muted-foreground sm:block">{t("components.schedulePage.firstRunDescription")}</p>
           </div>
-          <ol className="grid gap-2 sm:grid-cols-3" aria-label={t("components.schedulePage.firstRunTitle")}>
+          <ol className="grid grid-cols-3 gap-2" aria-label={t("components.schedulePage.firstRunTitle")}>
             {steps.map((step, index) => (
-              <li key={step.title} aria-current={step.state === "current" ? "step" : undefined} className={`rounded-2xl border p-3 ${stepClasses(step.state)}`}>
-                <div className="flex items-start gap-2.5">
+              <li key={step.title} aria-current={step.state === "current" ? "step" : undefined} className={`rounded-2xl border p-2 sm:p-3 ${stepClasses(step.state)}`}>
+                <div className="flex flex-col items-start gap-2 sm:flex-row sm:gap-2.5">
                   <span className={`flex size-6 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${stepBadgeClasses(step.state)}`}>{step.state === "done" ? "✓" : index + 1}</span>
                   <div className="min-w-0 space-y-1">
                     <p className="font-medium leading-snug text-foreground">{step.title}</p>
-                    <p className="text-xs leading-relaxed text-muted-foreground">{step.description}</p>
+                    <p className="hidden text-xs leading-relaxed text-muted-foreground sm:block">{step.description}</p>
                   </div>
                 </div>
               </li>

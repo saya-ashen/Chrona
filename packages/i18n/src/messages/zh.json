@@ -1107,6 +1107,10 @@
       "completed": "已完成"
     },
     "taskCreateDialog": {
+      "automaticRunImmediate": "保存后，Chrona 将准备有效计划，并在计划就绪后尽快执行。",
+      "automaticRunNow": "保存后（等待计划就绪）",
+      "automaticRunPast": "此触发时间已过去。计划就绪后，任务将在下一次调度检查时启动。",
+      "automaticRunPlanTime": "计划生成时机",
       "title": "新建任务",
       "close": "关闭",
       "titlePlaceholder": "添加标题",
@@ -1211,6 +1215,28 @@
       "acceptedNoAutoRerun": "已接受，除非重新规划否则不会自动重跑"
     },
     "taskWorkspace": {
+      "resultStructureValidated": "结构校验通过",
+      "resultReviewCompleted": "AI 版式复核已完成",
+      "resultReviewFallback": "已发布校验后的初稿",
+      "resultReviewPending": "AI 版式复核进行中",
+      "resultReviewUnknown": "历史结果未记录复核状态",
+      "resultReviewTimeout": "版式复核超时，请检查内容后再验收。",
+      "resultReviewUnavailable": "版式复核未完成，请检查内容后再验收。",
+      "resultReviewNotFactCheck": "结构和版式检查不代表事实核验，也不替代你的验收。",
+      "resultViewTabs": "任务结果与历史",
+      "resultTab": "结果",
+      "briefTab": "需求",
+      "planTab": "计划",
+      "historyTab": "记录",
+      "historyScope": "只读任务历史，包含之前的运行。",
+      "historyLoading": "正在加载记录…",
+      "historyEmpty": "暂无已记录的活动。",
+      "historyError": "记录加载失败。",
+      "historyRetry": "重试",
+      "historyMore": "加载更早的记录",
+      "resultPlanMissing": "暂无可查看的已保存计划。",
+      "resultPlanReadOnly": "只读计划，查看不会重新执行任务。",
+      "resultQuickFiles": "结果文件",
       "approvalNeeded": "等待审批",
       "planSetupLabel": "计划设置",
       "planSetupBriefTitle": "任务简述",
@@ -1748,12 +1774,12 @@
       "newTask": "新建任务",
       "openTask": "打开任务",
       "headline": {
-        "both": "今天 Chrona 已自动完成 {completed}{completedTaskLabel}，{attentionSubject}。",
-        "completedOnly": "今天 Chrona 已自动完成 {completed}{completedTaskLabel}。现在没有任务需要你处理。",
+        "both": "今天有 {completed}{completedTaskLabel}执行结束，{attentionSubject}。",
+        "completedOnly": "今天有 {completed}{completedTaskLabel}执行结束。现在没有任务需要你处理。",
         "attentionOnly": "今天还没有自动完成的任务。{attentionSubject}。",
         "completedTask": "项任务",
         "completedTasks": "项任务",
-        "completedToday": "今日完成",
+        "completedToday": "今日执行结束",
         "attentionTask": "1 项任务需要你处理",
         "attentionTasks": "{attention} 项任务需要你处理",
         "idle": "Chrona 已就绪。你可以新建任务、启动工作，或在这里查看最近动态。"
@@ -1785,7 +1811,8 @@
           "input": "等待你的输入",
           "blocked": "已阻塞",
           "failed": "运行失败",
-          "schedule_risk": "排程有风险"
+          "schedule_risk": "排程有风险",
+        "result_review": "结果待验收"
         }
       },
       "upcomingToday": {
@@ -1800,7 +1827,7 @@
         "empty": "当前没有正在运行的任务。你可以从日程启动任务，或新建一个交给 Chrona 推进。"
       },
       "completed": {
-        "title": "最近完成",
+        "title": "最近结果",
         "totalLabel": "展示最近 {n} 个完成项",
         "empty": "Chrona 完成任务后，产出会汇总在这里。"
       },
@@ -2434,9 +2461,16 @@
       "needs_me": "需要我处理",
       "ready": "可执行",
       "running": "运行中",
-      "completed": "已完成",
-      "failed": "失败",
+      "completed": "执行结束",
+      "failed": "阻塞 / 失败",
       "filterNeedsMe": "需要我处理",
+      "advancedFilters": "更多筛选",
+      "workStateLabels": {
+        "no_plan": "待生成计划", "planning": "正在规划", "plan_review": "计划待确认", "ready_to_run": "可执行", "queued": "排队中", "running": "运行中", "waiting_for_input": "等待输入", "waiting_for_approval": "等待审批", "blocked": "已阻塞", "failed": "执行失败", "cancelled": "已取消", "result_ready": "结果待验收", "done": "已验收"
+      },
+      "workStateActions": {
+        "no_plan": "先生成计划，再开始执行", "planning": "等待计划生成", "plan_review": "查看并确认计划", "ready_to_run": "检查运行设置后开始执行", "queued": "等待开始执行", "running": "查看执行进度", "waiting_for_input": "补充所需信息", "waiting_for_approval": "查看并处理审批请求", "blocked": "检查并解除阻塞", "failed": "检查失败原因后重试", "cancelled": "查看历史记录", "result_ready": "验收结果或要求修改", "done": "继续追问或创建后续任务"
+      },
       "listDescription": "查看任务状态，并打开需要处理的工作。",
       "statTotal": "总数",
       "statNeeds": "待处理",

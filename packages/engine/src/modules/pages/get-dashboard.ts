@@ -33,12 +33,12 @@ const ATTENTION_STATES: ReadonlySet<WorkStateView["state"]> = new Set([
   "failed",
   "waiting_for_approval",
   "waiting_for_input",
+  "result_ready",
 ]);
 const RUNNING_STATES: ReadonlySet<WorkStateView["state"]> = new Set([
   "running",
 ]);
 const TERMINAL_STATES: ReadonlySet<WorkStateView["state"]> = new Set([
-  "result_ready",
   "done",
   "cancelled",
 ]);
@@ -64,7 +64,8 @@ export type DashboardAttentionKind =
   | "input"
   | "blocked"
   | "failed"
-  | "schedule_risk";
+  | "schedule_risk"
+  | "result_review";
 
 /**
  * Editorial buckets for the "auto-completed" digest. Derived from the task's
@@ -232,12 +233,17 @@ function stateViewFor(item: ProjectionWithTask): WorkStateView {
     taskStatus: item.persistedStatus,
     executionStatus: item.displayState ?? item.latestRunStatus,
     isRunnable: item.actionRequired ? false : undefined,
+    blockReason: item.blockType ? {
+      blockType: item.blockType, detail: item.blockDetail,
+      scope: item.blockScope, actionRequired: item.actionRequired,
+    } : null,
   });
 }
 
 function attentionKind(
   stateView: WorkStateView,
 ): DashboardAttentionKind | null {
+  if (stateView.state === "result_ready") return "result_review";
   if (stateView.state === "failed") return "failed";
   if (stateView.state === "waiting_for_approval") return "approval";
   if (stateView.state === "waiting_for_input") return "input";
@@ -249,6 +255,8 @@ function nextStepFor(
   kind: DashboardAttentionKind | "running" | "ready",
 ): DashboardNextStep {
   switch (kind) {
+    case "result_review":
+      return "review_result";
     case "approval":
       return "approve_or_edit";
     case "input":
@@ -282,9 +290,10 @@ function focusScore(item: ProjectionWithTask, now: number): number {
   if (TERMINAL_STATES.has(stateView.state)) return -1;
   let score = PRIORITY_WEIGHT[item.task.priority] ?? 0;
   const kind = attentionKind(stateView);
-  if (kind === "failed" || kind === "blocked" || kind === "approval")
-    score += 100;
-  else if (kind === "input") score += 90;
+  const attentionWeight: Record<DashboardAttentionKind, number> = {
+    failed: 100, blocked: 100, approval: 100, input: 90, result_review: 70, schedule_risk: 0,
+  };
+  if (kind) score += attentionWeight[kind];
   if (stateView.state === "failed") score += 60;
   else if (stateView.state === "blocked") score += 40;
   if (item.dueAt && item.dueAt.getTime() - now < 24 * 60 * 60 * 1000)

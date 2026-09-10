@@ -30,6 +30,7 @@ const DEFAULT_COPY = {
 
 type TaskWorkspacePlanContentProps = {
   label: string;
+  readOnly?: boolean;
   graphPlan: TaskPlanGraphPlan | null;
   isGraphPlanPending: boolean;
   plan: TaskPlanReadModel | null;
@@ -43,8 +44,13 @@ type TaskWorkspacePlanContentProps = {
 };
 
 
+function canOfferPlanGeneration(readOnly: boolean, pending: boolean, generating: boolean) {
+  return !readOnly && !pending && !generating;
+}
+
 export function TaskWorkspacePlanContent({
   label,
+  readOnly = false,
   graphPlan,
   isGraphPlanPending,
   plan,
@@ -92,7 +98,7 @@ export function TaskWorkspacePlanContent({
         <div className="flex h-[520px] min-w-0 max-w-full flex-col md:h-[640px] xl:h-full">
           <div className="flex min-w-0 flex-col gap-2 border-b border-border/55 bg-muted/35 px-3 py-2.5 sm:flex-row sm:items-center sm:justify-between">
             <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-primary">{label}</p>
-            {isGraphPlanPending || isGeneratingPlan ? null : <Button type="button" onClick={onGeneratePlan} variant="secondary" size="sm" className="rounded-xl"><Sparkles className="size-4" />{plan ? copy.regeneratePlan : copy.generatePlan}</Button>}
+            {canOfferPlanGeneration(readOnly, isGraphPlanPending, isGeneratingPlan) ? <Button type="button" onClick={onGeneratePlan} variant="secondary" size="sm" className="rounded-xl"><Sparkles className="size-4" />{plan ? copy.regeneratePlan : copy.generatePlan}</Button> : null}
           </div>
           <div className="m-2 flex min-h-0 min-w-0 flex-1 items-center justify-center rounded-[1.1rem] border border-dashed border-border bg-background/70 px-5 text-center text-sm text-muted-foreground">
             {isGraphPlanPending ? copy.preparingPlanGraph : copy.planGraphPlaceholder}

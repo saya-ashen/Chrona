@@ -12,7 +12,7 @@ export type DashboardAiBriefState = {
 };
 
 export type DashboardAttentionKind =
-  "approval" | "input" | "blocked" | "failed" | "schedule_risk";
+  "approval" | "input" | "blocked" | "failed" | "schedule_risk" | "result_review";
 
 export type DashboardCompletionCategory =
   "report" | "research" | "code" | "automation";

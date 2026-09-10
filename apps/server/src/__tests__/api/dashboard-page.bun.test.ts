@@ -269,7 +269,7 @@ describe("GET /api/dashboard", () => {
 		expect(body.totalAutoCompleted).toBe(2);
 	});
 
-	it("treats failed latest run as diagnostic for completed task projections", async () => {
+	it("keeps completed results in the review queue, not failure recovery, despite a late run failure", async () => {
 		const { workspaceId } = await seedWorkspace(
 			"Completed with late run failure",
 		);
@@ -285,10 +285,8 @@ describe("GET /api/dashboard", () => {
 
 		const body = await fetchDashboard(workspaceId);
 
-		expect(body.needsAttention.some((item) => item.taskId === taskId)).toBe(
-			false,
-		);
-		expect(body.focusTask?.taskId).not.toBe(taskId);
+		expect(body.needsAttention.find((item) => item.taskId === taskId)?.kind).toBe("result_review");
+		expect(body.focusTask?.taskId).toBe(taskId);
 		expect(body.autoCompleted.map((item) => item.taskId)).toContain(taskId);
 	});
 

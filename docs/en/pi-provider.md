@@ -53,7 +53,16 @@ adapter keeps run-scoped credentials and communicates with `/api/mcp` and
 source, tool catalog or model prompt. Terminal execution submissions require a
 durable engine acknowledgement; assistant text is not completion evidence.
 The adapter waits for Pi's **`agent_settled`**, not `agent_end` (which can precede
-retries, compaction and extension follow-ups).
+retries, compaction and extension follow-ups). EOF or process exit before that
+boundary, including exit code zero, is failure rather than successful completion.
+Extra stdio bridge descriptors use nonblocking sockets, not filesystem streams
+whose pending reads can block Node shutdown. Startup is abortable; subprocess
+and tool cleanup are bounded.
+
+Result publication has separate deadlines: five minutes for composition and one
+minute for optional editorial review. A validated candidate is persisted before
+review (still not acceptable while Running). Failed, invalid or timed-out review
+falls back to that candidate; late responses cannot overwrite a newer revision.
 
 Sessions and operation claims live under
 `<Chrona data directory>/providers/pi`. Only Chrona-owned session IDs can resume;
@@ -80,7 +89,9 @@ CHRONA_RUN_LIVE_PI_TESTS=1 bun test packages/providers/pi/src/pi-aimock-live.bun
 ```
 
 The real CLI suite verifies extension tool execution, isolated result tools,
-termination and persisted-session resume. Linux Pi 0.85.0 is the validated
+termination, consecutive compose/review sessions with 20KB requests, and
+persisted-session resume. A separate bridge test checks exit while the parent
+keeps its IPC input open. Linux Pi 0.85.0 is the validated
 baseline; macOS/Windows and arbitrary extension stacks are not certified.
 On POSIX cancellation terminates the child process group; Windows currently
 terminates Pi itself and does not guarantee descendant cleanup. Detached work

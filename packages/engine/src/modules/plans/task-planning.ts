@@ -18,6 +18,7 @@ import {
 import { getLatestTaskPlanReadModel } from "./task-plan-read-model";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
 import { TaskPlanHeadConflictError } from "./task-plan-generation-persistence";
+import { currentCommandActor } from "../events";
 import { withSchedulerWorkOwnership, type SchedulerWorkContext } from "@/modules/orchestration/scheduler-lease-repository";
 
 type PlanAcceptanceReceipt = {
@@ -92,6 +93,7 @@ export class TaskPlanning {
       await ensurePlanInWorkspace(input.planId, input.taskId, input.workspaceId);
     }
     const dedupeKey = `task_plan.accept:${input.idempotencyKey}`;
+    const actor = { actorType: "user", actorId: null, source: "task_plan", correlationId: null, ...currentCommandActor() };
     const accepted = await withSchedulerWorkOwnership(input.workContext, async (tx) => {
       const existingReceipt = await tx.event.findUnique({ where: { dedupeKey }, select: { payload: true } });
       if (existingReceipt) {
@@ -141,9 +143,10 @@ export class TaskPlanning {
           taskId: input.taskId,
           workBlockId: scope,
           planId: input.planId,
-          actorType: "user",
-          actorId: null,
-          source: "task_plan",
+          actorType: actor.actorType,
+          actorId: actor.actorId,
+          source: actor.source,
+          correlationId: actor.correlationId,
           payload: {
             task_id: input.taskId,
             work_block_id: scope,

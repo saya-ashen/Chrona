@@ -1,11 +1,14 @@
 /** Loaded only by Chrona's Pi subprocess. No installation or user-config mutation. */
 export const PI_BRIDGE_SOURCE = String.raw`
-import { createReadStream, createWriteStream } from "node:fs";
+import { Socket } from "node:net";
 import { StringDecoder } from "node:string_decoder";
 
 export default async function (pi) {
-  const input = createReadStream("", { fd: 3, autoClose: false });
-  const output = createWriteStream("", { fd: 4, autoClose: false });
+  // Extra stdio descriptors are IPC pipes/sockets, not files. fs.ReadStream
+  // performs blocking thread-pool reads and can prevent Node from exiting while
+  // the parent keeps fd3 open. Socket uses cancellable event-loop I/O instead.
+  const input = new Socket({ fd: 3, readable: true, writable: false });
+  const output = new Socket({ fd: 4, readable: false, writable: true });
   const decoder = new StringDecoder("utf8");
   let buffer = "";
   let initialize;

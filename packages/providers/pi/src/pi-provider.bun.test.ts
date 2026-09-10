@@ -122,6 +122,31 @@ describe.skipIf(process.platform === "win32")("Pi provider lifecycle", () => {
     expect((await collect(client, request("hang", { timeoutMs: 2000 }))).snapshot.status).toBe("failed");
   });
 
+  it.each(["eof", "exit"])("fails promptly when Pi closes before agent_settled (%s)", async (scenario) => {
+    const { client } = await fixture();
+    const result = await collect(client, request(scenario, { timeoutMs: 2000 }));
+    expect(result.snapshot.status).toBe("failed");
+    expect(result.snapshot.error).toMatch(/closed.*completion|exited before completion/);
+  });
+
+  it("rejects clean EOF during isolated startup instead of waiting for the model timeout", async () => {
+    const { client } = await fixture();
+    await expect(client.startRun(request("terminal", { ...terminal, instructions: "startup-eof", timeoutMs: 2000 }))).rejects.toThrow("closed before completion");
+  });
+
+  it("aborts startup and can run compose then review with a 20KB request", async () => {
+    const { client } = await fixture();
+    const controller = new AbortController();
+    const start = client.startRun(request("terminal", { ...terminal, instructions: "startup-hang", signal: controller.signal }));
+    const timer = setTimeout(() => controller.abort(), 300);
+    try { await expect(start).rejects.toThrow(); } finally { clearTimeout(timer); }
+    for (const phase of ["compose", "review"]) {
+      const result = await collect(client, request("terminal", { ...terminal, instructions: phase, input: "x".repeat(20_000) }));
+      expect(result.snapshot.status).toBe("completed");
+      expect(result.snapshot.terminalToolCall?.name).toBe("chrona_feature_complete");
+    }
+  });
+
   it("resumes only Chrona-owned sessions across client instances", async () => {
     const { client, config, root } = await fixture(); const first = await collect(client, request("text"));
     const restarted = new PiProviderClient({ config, stateDirectory: root });

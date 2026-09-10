@@ -3,7 +3,7 @@
 Base URL: `http://localhost:3101/api`
 
 - Content type: `application/json` unless the endpoint is an SSE stream.
-- Auth: optional `Authorization: Bearer <token>` when `API_KEY` is configured.
+- Auth: optional `Authorization: Bearer <token>` when `API_KEY` is configured, except independently authenticated endpoints. `/api/mcp/management` always requires its own management credential.
 - Default bind: `127.0.0.1`. Use `HOST=0.0.0.0` only intentionally and protect it with `API_KEY`; unsafe public bind without `API_KEY` requires `CHRONA_UNSAFE_PUBLIC_BIND=1`.
 - IDs shown here are examples. Agents should use AI-visible refs from MCP tool results, not backend IDs.
 
@@ -524,9 +524,17 @@ Internal agent-control command endpoint. Use explicit API contracts and feature 
 
 ## MCP integration
 
+### POST /api/mcp/management
+
+Independent, stateless Streamable HTTP endpoint for personal agents managing Chrona tasks outside an execution. Always requires a revocable, workspace-bound management Bearer credential, even without a global API_KEY. No run-token or API-key substitution and no HTTP enrollment endpoint.
+
+Tools: `chrona_context_read`, `chrona_task_search`, `chrona_task_read`, `chrona_task_create`, `chrona_task_update`, `chrona_task_action`, `chrona_task_delete`. Read the advertised schemas through `tools/list`. Mutations use UUID request IDs, persisted receipts, configuration revisions and existing domain commands. A queued/completed **command** is not a completed **task**. Execution uncertainty is reported rather than blindly redispatched.
+
+Local setup: `chrona mcp enroll`, `chrona mcp list`, `chrona mcp revoke`. See [setup, capabilities and current limitations](../zh/management-mcp.md).
+
 ### POST /api/mcp
 
-Streamable HTTP MCP endpoint exposing Chrona tools to external agents.
+Existing execution-scoped Streamable HTTP MCP endpoint for provider-injected Chrona tools; not the external task-management entrypoint.
 
 Public tool names:
 

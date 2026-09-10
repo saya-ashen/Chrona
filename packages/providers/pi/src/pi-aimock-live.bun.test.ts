@@ -57,7 +57,7 @@ describe.skipIf(process.env.CHRONA_RUN_LIVE_PI_TESTS !== "1")("official Pi CLI w
     } finally { await f.close(); }
   }, 60_000);
 
-  it("isolates features and executes a terminating structured-result tool", async () => {
+  it("isolates consecutive compose/review sessions and terminates structured-result tools", async () => {
     const mock = new LLMock({ port: 0 });
     const catalogs: string[][] = [];
     mock.on({}, (req) => {
@@ -66,13 +66,18 @@ describe.skipIf(process.env.CHRONA_RUN_LIVE_PI_TESTS !== "1")("official Pi CLI w
     });
     const f = await fixture(mock);
     try {
-      const result = await turn(f.client, { toolPolicy: "terminal_only", terminalToolName: "chrona_feature_complete",
-        tools: [{ name: "chrona_feature_complete", description: "Submit result", inputSchema: {
-          type: "object", properties: { result: { type: "object", properties: { ok: { type: "boolean" } }, required: ["ok"] } }, required: ["result"],
-        } }] });
-      expect(result.status, result.error ?? undefined).toBe("completed");
-      expect(result.terminalToolCall?.input).toEqual({ result: { ok: true } });
-      expect(catalogs).toEqual([["chrona_feature_complete"]]);
+      const sessions: string[] = [];
+      for (const phase of ["compose", "review"]) {
+        const result = await turn(f.client, { instructions: phase, input: "x".repeat(20_000), toolPolicy: "terminal_only", terminalToolName: "chrona_feature_complete",
+          tools: [{ name: "chrona_feature_complete", description: "Submit result", inputSchema: {
+            type: "object", properties: { result: { type: "object", properties: { ok: { type: "boolean" } }, required: ["ok"] } }, required: ["result"],
+          } }] });
+        expect(result.status, result.error ?? undefined).toBe("completed");
+        expect(result.terminalToolCall?.input).toEqual({ result: { ok: true } });
+        sessions.push(result.nativeSessionId!);
+      }
+      expect(new Set(sessions).size).toBe(2);
+      expect(catalogs).toEqual([["chrona_feature_complete"], ["chrona_feature_complete"]]);
     } finally { await f.close(); }
   }, 60_000);
 });

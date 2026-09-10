@@ -136,6 +136,9 @@ const DEFAULT_DIALOG_COPY = {
     "Chrona will generate and accept a valid plan, then execute it at the scheduled time.",
   defaultProviderSummary: "Use the workspace default AI",
   automaticRunTitle: "Automatic run",
+  automaticRunImmediate: "After saving, Chrona will prepare a valid plan and execute as soon as it is ready.",
+  automaticRunNow: "After saving (once the plan is ready)",
+  automaticRunPast: "This trigger time has passed. The run becomes due on the next scheduler scan, once its plan is ready.",
   automaticRunSummary:
     "Chrona will prepare a valid plan and run this task automatically.",
   automaticRunReady: "Ready",
@@ -413,14 +416,9 @@ export function TaskCreateDialog({
     if (productMode === "goal" && (!goalTitle.trim() || !firstTaskTitle.trim()))
       return;
 
-    const [startHours, startMinutes] = startTime.split(":").map(Number);
-    const [endHours, endMinutes] = endTime.split(":").map(Number);
-
-    const scheduledStartAt = new Date(startDate);
-    scheduledStartAt.setHours(startHours, startMinutes, 0, 0);
-
-    const scheduledEndAt = new Date(startDate);
-    scheduledEndAt.setHours(endHours, endMinutes, 0, 0);
+    // Same local-time interpretation as the preview (date-only parsing is UTC).
+    const scheduledStartAt = new Date(`${startDate}T${startTime}:00`);
+    const scheduledEndAt = new Date(`${startDate}T${endTime}:00`);
 
     const recurrenceRule = !repeatEnabled
       ? null
@@ -1035,11 +1033,15 @@ export function TaskCreateDialog({
                     <Select
                       value={autoExecuteTiming}
                       disabled={isPending}
-                      onValueChange={(value) =>
-                        setAutoExecuteTiming(normalizeAutomationTiming(value))
-                      }
+                      onValueChange={(value) => {
+                        const timing = normalizeAutomationTiming(value);
+                        setAutoExecuteTiming(timing);
+                        // A single start-timing control governs this automatic
+                        // creation flow: never defer planning behind an immediate run.
+                        setAutoPlanGenerationTiming(timing);
+                      }}
                     >
-                      <SelectTrigger className="w-full">
+                      <SelectTrigger className="w-full" aria-label={dialogCopy.automationTimingLabel}>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -1061,7 +1063,9 @@ export function TaskCreateDialog({
                           {dialogCopy.automaticRunTitle}
                         </p>
                         <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                          {dialogCopy.automaticRunSummary}
+                          {policyPreview.executionTrigger === "immediate"
+                            ? dialogCopy.automaticRunImmediate
+                            : dialogCopy.automaticRunSummary}
                         </p>
                       </div>
                       <Badge
@@ -1084,12 +1088,14 @@ export function TaskCreateDialog({
                           {dialogCopy.automaticRunTime}
                         </dt>
                         <dd className="mt-0.5 text-foreground">
-                          {policyPreview.nextOccurrenceAt
+                          {policyPreview.executionTrigger === "immediate"
+                            ? dialogCopy.automaticRunNow
+                            : policyPreview.nextOccurrenceAt
                             ? new Intl.DateTimeFormat(
                                 locale === "zh" ? "zh-CN" : "en",
                                 {
-                                  dateStyle: "medium",
-                                  timeStyle: "short",
+                                  year: "numeric", month: "short", day: "numeric",
+                                  hour: "2-digit", minute: "2-digit", timeZoneName: "short",
                                 },
                               ).format(new Date(policyPreview.nextOccurrenceAt))
                             : "—"}
@@ -1105,6 +1111,9 @@ export function TaskCreateDialog({
                         </dd>
                       </div>
                     </dl>
+                    {policyPreview.nextOccurrenceAt && new Date(policyPreview.nextOccurrenceAt).getTime() < Date.now() ? (
+                      <p className="mt-2 text-xs text-warning-foreground" role="note">{dialogCopy.automaticRunPast}</p>
+                    ) : null}
 
                     <button
                       type="button"

@@ -50,6 +50,17 @@ afterEach(() => {
 });
 
 describe("TaskCreateDialog – Core functionality", () => {
+  it("confirms immediate execution and submits matching planning timing instead of a stale scheduled time", async () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    render(<TaskCreateDialog {...defaultProps} initialTitle="Immediate regression" initialAutoExecute onSubmit={onSubmit} />);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("combobox", { name: "Start timing" }));
+    await user.click(screen.getByRole("option", { name: "Immediately" }));
+    expect(screen.getByText("After saving (once the plan is ready)")).toBeInTheDocument();
+    expect(screen.queryByText(/This trigger time has passed/)).toBeNull();
+    await user.click(screen.getByText("Save"));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ autoExecuteTiming: "immediate", autoPlanGenerationTiming: "immediate" })));
+  });
   it("returns null when not open", () => {
     const { container } = render(<TaskCreateDialog {...defaultProps} isOpen={false} />);
     expect(container.innerHTML).toBe("");

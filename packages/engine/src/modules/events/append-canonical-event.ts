@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { Prisma } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
+import { currentCommandActor } from "./command-actor";
 
 type EventContext = {
   workspaceId: string;
@@ -175,10 +176,10 @@ async function appendCanonicalEventInTransaction(input: AppendCanonicalEventInpu
     rawEventId: contextRefs.rawEventId,
     parentEventId: input.parentEventId ?? null,
     causationEventId: input.causationEventId ?? null,
-    correlationId: input.correlationId ?? null,
-    actorType: input.actorType,
-    actorId: input.actorId ?? null,
-    source: input.source,
+    correlationId: input.correlationId ?? currentCommandActor()?.correlationId ?? null,
+    actorType: input.source === "ui" ? (currentCommandActor()?.actorType ?? input.actorType) : input.actorType,
+    actorId: input.source === "ui" ? (currentCommandActor()?.actorId ?? input.actorId ?? null) : (input.actorId ?? null),
+    source: input.source === "ui" ? (currentCommandActor()?.source ?? input.source) : input.source,
     payload: toJsonInput(input.payload) ?? Prisma.JsonNull,
     summary: input.summary ?? null,
     severity: input.severity ?? null,

@@ -1,0 +1,138 @@
+# 外部 Agent 管理 Chrona
+
+首版管理入口：`POST /api/mcp/management`，标准无状态 Streamable HTTP MCP。
+原 `/api/mcp` 保留：它服务于 Chrona 执行期间注入的工具，不用于外部个人 Agent 管理整个任务列表。
+
+## 连接与权限
+
+在 **Chrona 服务所在机器**、使用同一 OS 用户和同一 `DATABASE_URL` / `CHRONA_DATA_DIR`，运行新版本的 CLI：
+
+```sh
+chrona mcp enroll \
+  --name personal-agent \
+  --public-url https://chrona.example.com \
+  --timezone Asia/Shanghai \
+  --access full \
+  --token-file "$HOME/.config/chrona/credentials/personal-agent.token"
+chrona mcp list
+chrona mcp revoke CLIENT_ID
+```
+
+- `--access` 必填：`read` 或 `full`。full 包括启动付费执行、批准 provider 操作、删除任务；只授予可信个人 Agent。
+- token 仅写入新建私密文件，POSIX 权限 `0600`、父目录必须私密；不输出 token，不覆盖已有文件。数据库只存 SHA-256 摘要。
+- 凭据绑定当前默认工作区；工具不提供 workspace 选择或枚举。
+- enrollment 是本机管理命令，不存在免鉴权的 HTTP enrollment 路由。CLI 不迁移运行中的数据库；必须先按正常升级流程启动匹配版本的服务。
+- 轮换流程：enroll 新凭据 → 更新客户端 → revoke 旧凭据。
+- MCP 客户端连接上述 endpoint，使用 `Authorization: Bearer <私密文件中的 token>`。不要把 token 放入对话、URL、Git 或日志。
+- 管理凭据独立于全局 API_KEY 和 execution run token。即使服务未设置 API_KEY，管理入口仍拒绝匿名访问；管理凭据不能访问其他受 API_KEY 保护的 API。
+- Pi 通过其 MCP 适配扩展连接；Codex 使用其远程 MCP 客户端配置。此实现不自动修改本机 Pi/Codex 配置，不自动部署 Chino。
+- 服务端对每次 HTTP 请求、每次工具调用、后台命令后续阶段重新检查撤销和 scope；撤销不是对已发起 provider 操作的自动取消。
+
+## 工具能力
+
+实际参数以 `tools/list` 返回的 JSON Schema 为准；源码：`packages/contracts/src/api/management.schema.ts`。
+
+| 工具 | 能力 |
+| --- | --- |
+| `chrona_context_read` | 当前时间、时区、默认 provider、可用客户端、安全权限及支持的时间策略 |
+| `chrona_task_search` | 标题/描述搜索，状态/过滤器、优先级、排序、分页 |
+| `chrona_task_read` | summary / description / config / plan / activity / result；配置 revision、执行 scope、checkpoint 表单、待处理 provider approvals、最近命令 |
+| `chrona_task_create` | todo / plan / automatic；立即执行或排期，独立截止时间、重复任务、provider、执行参数；dryRun |
+| `chrona_task_update` | 标题、描述替换/追加/清空、优先级、排期、截止时间、重复规则、自动化、provider 和执行参数；revision CAS、dryRun |
+| `chrona_task_action` | 生成/停止/接受/修改计划；执行开始、重启、暂停、取消、重试、输入/审阅；checkpoint；provider approval；结果验收/重试生成；完成/重开；结果追问/创建后续任务；排期提案接受/拒绝 |
+| `chrona_task_delete` | preview 影响范围，随后提交精确 task/asset 集合及配置 revision 删除 |
+
+不是仅创建草稿的收件箱。示例：
+
+```json
+{
+  "requestId": "94fe9488-7c57-4342-997e-3e1efc06d3bf",
+  "title": "整理本周发布变更并生成发布说明",
+  "description": "检查已合并变更、标注破坏性变更，输出 Markdown。",
+  "mode": "automatic",
+  "start": "now"
+}
+```
+
+`mode` 必填；automatic 还必须明确 `start: now | scheduled`。没有可用 provider 时显式拒绝，不偷偷退化成 todo。scheduled 必须带 `{startsAt, endsAt, timezone}` 时间窗口。相对窗口时间策略只在有排期时有效。
+
+更新必须带 `expectedRevision`，从 task_read 获取。描述追加形如：
+
+```json
+{
+  "requestId": "73e3ab4b-f1ad-49ef-b9e2-f9dcbf09a165",
+  "taskId": "TASK_ID",
+  "expectedRevision": "config-v1:3",
+  "patch": { "description": { "mode": "append", "text": "补充：也要检查迁移说明。" } }
+}
+```
+
+执行动作在 `action.input.action` 中使用已有 HTTP 领域动作名，例如 `start_manual`、`pause_session`、`cancel_session`。`expectedExecutionScope` 对应 task_read 的 executionScope；尚无 execution 时为 null。checkpoint 使用返回的 checkpoint ID、formRevision 和 availableActions，不猜测输入结构。`accept_plan` 必须携带 planId 与 expectedHeadStateVersion。结果验收/完成绑定具体 runId；不允许任意写 status。
+
+## 命令、幂等与失败
+
+- 每个新写入意图使用新 UUID `requestId`。传输失败时重发**完全相同**的 requestId 和参数；同 ID 不同参数返回 `IDEMPOTENCY_CONFLICT`。
+- create/update 的本地写入、审计、命令回执同事务提交。独立 deadline 不被清除排期顺便删除。日历来源拥有的标题/排期/重复规则不可修改。
+- 配置 revision 由数据库跟踪，包括网页、日历、其他 Agent 的修改；A→B→A 也使旧 revision 失效。冲突时重新读取并重新决定，不盲目覆盖。
+- 立即自动化通过持久化命令推进：规划 →（automatic）接受计划 → 恢复请求的自动化配置 →（now）执行。规划期间自动化开关暂时关闭，避免 scheduler 抢先执行半完成命令。规划失败或配置冲突时保留任务与失败命令，不声称已启用执行；用户重新修改配置可提交新意图。
+- 长操作返回 `queued` 回执，不占用 MCP SSE 会话。通过 task_read 的 commands，或同参数重放原请求查看回执进度。
+- `completed` 是**管理命令完成**，不是任务一定成功；任务可能 running / blocked / waiting。以 task_read 的执行状态判断。
+- worker 使用租约、心跳及有界并发；规划复用现有 durable feature 的幂等键。进程在执行 dispatch 后失联，命令标为 `uncertain / EXECUTION_OUTCOME_UNKNOWN`，不重复启动 provider。先读取实际任务执行状态或网页核对，再决定是否发起新的动作。
+- 原始 provider 请求、工具载荷、run context、会话凭据不会出现在管理读取中。结果返回脱敏的语义/最终摘要与 artifact 元数据，不返回原始路径/正文。
+
+## 执行完成与结果就绪
+
+`Task.status=Completed` 只表示执行完成，不代表结果已经可验收。task_read 返回 `resultFinalization`；result 视图另返回该结果所属 Run 的 `finalization`，读取历史 accepted 结果时不会误用当前计划的附件。
+
+- `Pending / Unavailable`：结果尚未就绪；管理状态为 `result_pending`，不提供验收动作。
+- `Running`：管理状态为 `finalizing`。新记录的 `phase` 区分 `compose / review`；`hasCandidate` 表示已有同版本的候选排版，但不能据此验收。
+- `Failed`：管理状态为 `result_failed`，有权限时可用 `retry_result` 重新整理结果，不必重跑执行节点。
+- `Ready`：只有最终内容和 finalization 都匹配当前 manifest revision，才返回 `canAccept: true` 并提供验收动作。结果读取和验收使用相同的任务级 canonical Run，不会被较新的节点 Run 替代。
+
+compose 最长 5 分钟，额外 review 最长 1 分钟；超时会发送取消信号，调用方不会无限等待 provider 的启动/清理。有效 compose 会先持久化候选，review 失败、无效或超时均回退候选；晚到的旧 review 不得覆盖新结果。显式重试可复用被中断 review 留下的同版本候选。
+
+整理期间仍返回当前 manifest 声明且通过任务/occurrence/work-block 检查的附件。`artifactRef` 是可用于已有附件引用的 `AF...`；`ref` 保留数据库附件 ID。分页在引用过滤后进行，不混入未声明的历史附件。摘要的 `summarySource` 为 `manifest` 或 `finalized_result`，前者不代表最终排版完成。search 不读取完整 finalization，因此不会仅凭 Completed 宣称结果可验收；请再用 task_read 核实。
+
+管理命令的 `dispatching` 可能持续覆盖执行及结果收尾；正常心跳不证明 provider 有进展。不要因为拿到 queued 回执或看到 Completed 就自动验收。
+
+## 当前边界（未声称完整交付）
+
+- 重复规则沿用现有 UTC recurrence 语义；非 UTC / DST 墙钟重复规则显式拒绝。单次排期支持带 UTC offset 的绝对时间和 IANA timezone。
+- 网页 localStorage 中的用户创建默认值尚未迁移为服务端共享偏好。context 标记 `defaults.source: explicit_client_setup`，不假装读取到了浏览器配置。
+- 结果正文/附件下载、完整执行图编辑面板的全部扩展命令、网页凭据管理 UI 尚未提供；已有计划 patch 和执行领域动作可用。
+- uncertain 回执需核对实际执行状态；未实现自动对账后把所有未知回执转换为成功/失败。
+- 命令输入和审计随幂等回执保留，删除任务不会同时清除这些回执；本版本尚无保留周期管理。旧 graph-only、尚未物化 Run 的结果读取/验收兼容性仍需补齐。
+- 已部署到 Chino，并通过本机 Pi 所用 MCP 适配器的真实 HTTPS 联调；当前已打开的 Pi 会话需 `/reload` 或重启后加载新配置。尚未进行 Codex 客户端联调，也未在部署验证中调用真实模型。
+
+## 数据库与验证
+
+本发布线仅修改 `20260822000000_repair_release_line`；已发布迁移不变。
+对旧 mutable checksum `641aa4b5…` 注册带源 schema 指纹和文件校验的 amendment，升级前自动备份；未知 drift 拒绝。
+
+配置 revision 使用 SQLite trigger。Bun adapter 的 `run().changes` 包含 trigger 写入，不能直接作为 Prisma 的 affected-row 数；新增 adapter guard 返回顶层 `changes()`，并隔离同连接的普通查询与其他调用方事务。相关事务、外键 relation connect、跨调用方回滚测试位于 `packages/db/src/transaction-context.bun.test.ts`。
+
+新增管理测试分布在 engine management、server management MCP、CLI management 和 DB amendment/transaction 测试文件。
+### 本次验证记录（2026-09-10）
+
+- 通过：`bun run typecheck`、`bun run lint`（ratchet，原有警告保留）、`bun run check:boundaries`。
+- 通过：Vitest 102 文件 / 757 测试；管理 MCP、CLI、worker、迁移及事务专项测试。
+- 通过：`bun run chrona build linux-x64`、`bun run build:smoke`（含 packaged upgrade / backup / restore）。
+- 通过：全量 `bun run test:bun`。首次的两项 PDF 失败在未修改 HEAD 同样出现；设置 `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` 指向已有 Nix Chromium 后，全量回归通过。
+- 通过：Desktop E2E 的 task list / lifecycle / recurring 三个 spec，共 16 项。最初缺少默认 Playwright 浏览器，改用已有 Nix Chromium；随后修复测试启动竞争，将 `webServer.url` 改为经过 Vite 代理的 `/api/ready`，完整重跑通过。未执行全部 E2E 或 tablet/mobile 全量回归。
+- worker 阶段编排使用注入式领域命令替身验证；另有真实本地 debug provider 的无效计划失败测试。未调用真实 Pi/Codex provider。
+- 部署联调通过：Pi 实际 MCP 适配器加载全局配置、7 工具发现、独立 Bearer 鉴权、context、automatic dryRun、todo 创建/幂等重放/查询/读取、revision 更新及旧版本拒绝、清除排期保留 deadline、无效 run 拒绝、删除影响预览。测试待办保留供用户检查；原有任务、计划、Run、ExecutionSession、AIClient 均保持不变。
+
+最终日志：`/tmp/chrona-management-bun-browser-final.log`、`/tmp/chrona-management-e2e-final.log`、`/tmp/chrona-management-new-tests-final.log`、`/tmp/chrona-final-*`。基线对照日志 `/tmp/chrona-baseline-pdf-tests.log`。
+本机使用已有 Nix Chromium 151；设置 `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH` 即可，无需下载浏览器或修改系统配置。
+
+### 结果收尾修复回归（2026-09-10；尚未部署）
+
+- `bun run typecheck`、lint ratchet、边界检查通过；本轮修改的源码和测试另跑 ESLint，零警告。
+- 全量 `bun run test:bun`：296 文件，2007 passed / 11 skipped / 0 failed。
+- Vitest：102 文件，757 passed。Desktop 的 task-lifecycle-execution 与 auto-execution-golden-path：10 passed，包含结果重试不重跑 Plan。
+- 官方 Pi 0.85.0 + 临时 profile + 本地假模型：2 passed，覆盖连续 compose/review 与 20KB 请求，没有使用个人模型凭据。
+- 新回归覆盖：干净 EOF、提前退出、启动取消、桥接输入保持打开时 Node 退出；review 失败/无效/超时/迟到，候选持久化和恢复、epoch 竞争；MCP finalizing/ready/failed 状态、ResultOverview 摘要、附件引用过滤及分页、历史 accepted scope、验收 Run 一致性。
+- 对照 HEAD 的旧桥接运行新退出测试会失败：文件流的阻塞读取使 Node 无法及时退出；新 Socket 桥接通过。此为本地可重复证据，不等同已完成 Chino 线上故障复测。
+- 旧 continuation 测试仅写 Ready 标记、缺最终内容；现先断言拒绝这种不完整状态，再用匹配 revision 的最终内容验证验收，未放松生产前置条件。
+
+日志：`/tmp/chrona-repair-bun-all-final.log`、`/tmp/chrona-repair-vitest.log`、`/tmp/chrona-repair-e2e-desktop.log`、`/tmp/chrona-repair-targeted-final.log`、`/tmp/chrona-repair-old-bridge-proof.log`。本轮未部署、未重启 Chino、未重跑或验收线上任务。
