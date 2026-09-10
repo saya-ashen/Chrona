@@ -68,7 +68,7 @@ export type AiRuntimeInvocation = {
   providerName: string;
 };
 export function usesChronaControlPlane(providerName: string) {
-  return ["claude_code", "codex", "omp"].includes(providerName);
+  return ["claude_code", "codex", "omp", "pi"].includes(providerName);
 }
 
 export class AiRuntimeInvoker {

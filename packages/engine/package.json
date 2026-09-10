@@ -13,6 +13,7 @@
     "@chrona/hermes": "workspace:*",
     "@chrona/integrations": "workspace:*",
     "@chrona/logging": "workspace:*",
+    "@chrona/pi": "workspace:*",
     "@chrona/providers-debug": "workspace:*",
     "@chrona/providers-foundation": "workspace:*",
     "@chrona/shared": "workspace:*",

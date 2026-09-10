@@ -19,6 +19,7 @@ Use this directory as the stable product and developer documentation set. Time-p
 | Place code in the right package | [Package Boundaries](./en/package-boundaries.md) |
 | Understand the frontend (`apps/web`) | [Frontend Structure](./en/frontend-structure.md) |
 | Extend AI/runtime providers | [Provider Boundary](./en/provider-boundary.md) |
+| Reuse the official local Pi CLI | [Pi Provider (experimental)](./en/pi-provider.md) |
 | Understand the accepted Goal, trigger, and occurrence target design | [Long-Horizon Goals and Triggers](./en/long-horizon-goals-and-triggers.md) |
 
 ## 中文文档
@@ -29,6 +30,7 @@ Use this directory as the stable product and developer documentation set. Time-p
 | 理解当前产品界面 | [中文指南](./zh/README.md) |
 | 查看已发布与计划中的产品区域 | [路线图](./zh/roadmap.md) |
 | 运行测试 | [测试指南](./zh/testing.md) |
+| 复用本机官方 Pi CLI | [Pi Provider（实验性）](./zh/pi-provider.md) |
 | 理解 Goal Workbench 资产使用区的目标设计 | [Goal Workbench 产品设计](./zh/goal-workbench-product-design.md) |
 | 设计 AI Feature 的 Observation、Action、Result 与 Completion | [AI Feature Runtime 架构与实施规范](./zh/ai-feature-runtime-architecture.md) |
 

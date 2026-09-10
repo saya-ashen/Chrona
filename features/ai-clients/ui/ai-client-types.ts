@@ -1,4 +1,4 @@
-export type AiClientType = "llm" | "hermes" | "debug" | "claude_code" | "codex" | "omp" | (string & {});
+export type AiClientType = "llm" | "hermes" | "debug" | "claude_code" | "codex" | "omp" | "pi" | (string & {});
 
 export interface AiClientInfo {
   id: string;
@@ -31,6 +31,7 @@ export type ClientFormValues = {
   configDirectory: string;
   homeDirectory: string;
   codingAgentDirectory: string;
+  cwd?: string;
   profileName: string;
   hermesScope: HermesClientScope;
   debugProfile: DebugProviderProfile;

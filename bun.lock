@@ -129,7 +129,7 @@
     },
     "packages/cli": {
       "name": "@chrona/cli",
-      "version": "0.3.0",
+      "version": "0.3.1",
       "bin": {
         "chrona": "./src/index.ts",
         "agentdash": "./src/index.ts",
@@ -177,6 +177,7 @@
         "@chrona/hermes": "workspace:*",
         "@chrona/integrations": "workspace:*",
         "@chrona/logging": "workspace:*",
+        "@chrona/pi": "workspace:*",
         "@chrona/providers-debug": "workspace:*",
         "@chrona/providers-foundation": "workspace:*",
         "@chrona/shared": "workspace:*",
@@ -270,6 +271,17 @@
         "@chrona/logging": "workspace:*",
         "@chrona/providers-foundation": "workspace:*",
         "@oh-my-pi/pi-coding-agent": "^16.3.12",
+      },
+    },
+    "packages/providers/pi": {
+      "name": "@chrona/pi",
+      "version": "0.1.0",
+      "dependencies": {
+        "@chrona/contracts": "workspace:*",
+        "@chrona/logging": "workspace:*",
+        "@chrona/providers-foundation": "workspace:*",
+        "@chrona/shared": "workspace:*",
+        "@modelcontextprotocol/sdk": "^1.30.0",
       },
     },
     "packages/shared": {
@@ -464,6 +476,8 @@
     "@chrona/logging": ["@chrona/logging@workspace:packages/logging"],
 
     "@chrona/omp": ["@chrona/omp@workspace:packages/providers/omp"],
+
+    "@chrona/pi": ["@chrona/pi@workspace:packages/providers/pi"],
 
     "@chrona/providers-debug": ["@chrona/providers-debug@workspace:packages/providers/debug"],
 
@@ -3379,7 +3393,7 @@
 
     "wsl-utils": ["wsl-utils@0.3.1", "", { "dependencies": { "is-wsl": "^3.1.0", "powershell-utils": "^0.1.0" } }, "sha512-g/eziiSUNBSsdDJtCLB8bdYEUMj4jR7AGeUo96p/3dTafgjHhpF4RiCFPiRILwjQoDXx5MqkBr4fwWtR3Ky4Wg=="],
 
-    "xlsx": ["xlsx@https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz", { "bin": { "xlsx": "./bin/xlsx.njs" } }],
+    "xlsx": ["xlsx@https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz", { "bin": { "xlsx": "./bin/xlsx.njs" } }, "sha512-oLDq3jw7AcLqKWH2AhCpVTZl8mf6X2YReP+Neh0SJUzV/BdZYjth94tG5toiMB1PPrYtxOCfaoUCkvtuH+3AJA=="],
 
     "xml-name-validator": ["xml-name-validator@5.0.0", "", {}, "sha512-EvGK8EJ3DhaHfbRlETOWAS5pO9MZITeauHKJyb8wyajUfQUenkIg2MvLDTZ4T/TgIcm3HU0TFBgWWboAZ30UHg=="],
 

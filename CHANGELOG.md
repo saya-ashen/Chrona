@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+### Added
+- Added experimental official Pi CLI provider alongside OMP, with local Pi resource reuse for execution, isolated planning/review/result tools, scoped execution control, yes/no approvals and Chrona-owned session-history resume. Requires separately installed Pi ≥ 0.85.0; Codex remains the recommended stable default. See [setup and compatibility limits](docs/en/pi-provider.md).
+
 ## 0.3.1 — Provider parity and product demo polish
 
 Date: 2026-09-02

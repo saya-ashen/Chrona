@@ -5,6 +5,7 @@ import {
 } from "@chrona/claude-code";
 import { CHRONA_CODEX_PROVIDER_TYPE, CodexProviderClient } from "@chrona/codex";
 import { CHRONA_OMP_PROVIDER_TYPE, OmpProviderClient } from "@chrona/omp";
+import { CHRONA_PI_PROVIDER_TYPE, PiProviderClient } from "@chrona/pi";
 import {
 	CHRONA_DEBUG_PROVIDER_TYPE,
 	ChronaDebugProviderClient,
@@ -23,6 +24,7 @@ import type {
 	ClaudeCodeClientConfig,
 	CodexClientConfig,
 	OmpClientConfig,
+	PiClientConfig,
 	HermesClientConfig,
 	LLMClientConfig,
 	DebugClientConfig,
@@ -156,6 +158,10 @@ function createProviderClient(
 
 	if (record.type === CHRONA_OMP_PROVIDER_TYPE) {
 		return new OmpProviderClient({ config: record.config as OmpClientConfig });
+	}
+
+	if (record.type === CHRONA_PI_PROVIDER_TYPE) {
+		return new PiProviderClient({ config: record.config as PiClientConfig });
 	}
 
 	if (record.type === CHRONA_DEBUG_PROVIDER_TYPE) {

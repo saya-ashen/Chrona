@@ -37,6 +37,7 @@ type TextFieldProps = {
 		| "configDirectory"
 		| "homeDirectory"
 		| "codingAgentDirectory"
+		| "cwd"
 		| "timeoutSeconds";
 	id: string;
 	label: string;
@@ -339,6 +340,20 @@ function OmpSettings({
 	);
 }
 
+function PiSettings({ form, copy }: Pick<AdvancedSettingsProps, "form" | "copy">) {
+	return <>
+		<p className="text-xs text-muted-foreground">{copy.piEnvironmentHelp}</p>
+		<div className="grid gap-4 md:grid-cols-2">
+			<TextField form={form} name="provider" id="ai-client-provider" label={copy.piProviderLabel} placeholder={copy.piProviderPlaceholder} />
+			<TextField form={form} name="model" id="ai-client-model" label={copy.piModelLabel} placeholder={copy.piModelPlaceholder} />
+		</div>
+		<TextField form={form} name="codingAgentDirectory" id="ai-client-coding-agent-directory" label={copy.piAgentDirectoryLabel} placeholder="~/.pi/agent" />
+		<TextField form={form} name="cwd" id="ai-client-cwd" label={copy.piWorkingDirectoryLabel} placeholder={copy.piWorkingDirectoryPlaceholder} />
+		<TextField form={form} name="timeoutSeconds" id="ai-client-timeout" label={copy.timeoutSeconds} placeholder="" required={copy.timeoutSeconds} />
+		<p className="text-xs text-muted-foreground">{copy.piCompatibilityHelp}</p>
+	</>;
+}
+
 function DebugSettings({
 	form,
 	copy,
@@ -430,7 +445,8 @@ export function AdvancedSettings(props: AdvancedSettingsProps) {
 		type !== "debug" &&
 		type !== "claude_code" &&
 		type !== "codex" &&
-		type !== "omp";
+		type !== "omp" &&
+		type !== "pi";
 	return (
 		<details className="rounded-lg border border-border/70 bg-muted/15 p-3">
 			<summary className="cursor-pointer font-medium text-foreground">
@@ -446,6 +462,7 @@ export function AdvancedSettings(props: AdvancedSettingsProps) {
 				) : null}
 				{type === "codex" ? <CodexSettings form={form} copy={copy} /> : null}
 				{type === "omp" ? <OmpSettings form={form} copy={copy} /> : null}
+				{type === "pi" ? <PiSettings form={form} copy={copy} /> : null}
 				{type === "debug" ? <DebugSettings form={form} copy={copy} /> : null}
 				<FeatureBindings form={form} providers={providers} type={type} />
 			</div>

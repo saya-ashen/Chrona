@@ -30,8 +30,9 @@ const PROVIDER_SORT_RANK: Record<string, number> = {
   codex: 0,
   omp: 1,
   claude_code: 2,
-  llm: 3,
-  debug: 4,
+  pi: 3,
+  llm: 4,
+  debug: 5,
   hermes: 99,
 };
 // Durable bindings require a live capability inspection on save, so never
@@ -115,11 +116,20 @@ function buildOmpConfig(input: ClientFormValues): Record<string, unknown> {
   };
 }
 
+function buildPiConfig(input: ClientFormValues): Record<string, unknown> {
+  return {
+    provider: clearable(input.provider), model: clearable(input.model),
+    codingAgentDirectory: clearable(input.codingAgentDirectory), cwd: clearable(input.cwd ?? ""),
+    timeoutMs: timeoutMs(input.timeoutSeconds),
+  };
+}
+
 export function buildClientPayload(input: ClientFormValues): ClientFormPayload {
   const config = input.type === "debug" ? { profile: input.debugProfile }
     : input.type === "claude_code" ? buildClaudeCodeConfig(input)
     : input.type === "codex" ? buildCodexConfig(input)
     : input.type === "omp" ? buildOmpConfig(input)
+    : input.type === "pi" ? buildPiConfig(input)
     : { baseUrl: input.baseUrl || (input.hermesScope === "local" ? LOCAL_HERMES_BASE_URL : ""), apiKey: input.apiKey, timeoutMs: timeoutMs(input.timeoutSeconds), scope: input.type === "hermes" ? input.hermesScope : undefined };
   return { name: input.name, type: input.type, config, isDefault: input.isDefault };
 }
@@ -226,6 +236,7 @@ type StoredClientConfig = {
   configDirectory?: string;
   homeDirectory?: string;
   codingAgentDirectory?: string;
+  cwd?: string;
   profileName?: string;
   scope?: HermesClientScope;
   profile?: unknown;
@@ -271,6 +282,7 @@ export function getInitialFormValues(initial: AiClientInfo | undefined, provider
   const config = (initial?.config ?? {}) as StoredClientConfig;
   return {
     ...defaultFormConfig(config),
+    ...(type === "pi" ? { cwd: configValue(config, "cwd") } : {}),
     name: initial?.name ?? "", type, isDefault: forceDefault || initial?.isDefault || false,
     bindings: initial?.bindings ?? recommendedFeatureBindings(getProviderFeatures(providers, type)),
   };

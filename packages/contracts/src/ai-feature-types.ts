@@ -5,7 +5,7 @@
 import type { PlanBlueprint } from "./ai-plan-blueprint";
 import type { GenerateTaskPlanRequest as RuntimeGenerateTaskPlanRequest } from "./plan-runtime";
 
-export type AiClientType = "llm" | "hermes" | "debug" | "claude_code" | "codex" | "omp" | (string & {});
+export type AiClientType = "llm" | "hermes" | "debug" | "claude_code" | "codex" | "omp" | "pi" | (string & {});
 export const AI_FEATURES = [
   "suggest",
   "conflicts",
@@ -29,7 +29,7 @@ export interface AiClientRecord {
   id: string;
   name: string;
   type: AiClientType;
-  config: AgentProviderClientConfig | LLMClientConfig | HermesClientConfig | DebugClientConfig | ClaudeCodeClientConfig | CodexClientConfig | OmpClientConfig;
+  config: AgentProviderClientConfig | LLMClientConfig | HermesClientConfig | DebugClientConfig | ClaudeCodeClientConfig | CodexClientConfig | OmpClientConfig | PiClientConfig;
   isDefault: boolean;
   enabled: boolean;
 }
@@ -119,6 +119,21 @@ export interface CodexClientConfig {
   mcpBaseUrl?: string;
   /** Static Bearer token presented to the MCP server at `/api/mcp`. */
   mcpRunToken?: string;
+}
+
+/** Official local Pi CLI. Authentication/resources remain owned by Pi. */
+export interface PiClientConfig {
+  /** Optional exact Pi provider/model selector; no fuzzy fallback. */
+  model?: string;
+  /** Optional namespace when model is an opaque model ID. */
+  provider?: string;
+  timeoutMs?: number;
+  /** Execution cwd controls Pi project resource discovery and tool paths. */
+  cwd?: string;
+  /** PI_CODING_AGENT_DIR override; defaults to the user's existing Pi profile. */
+  codingAgentDirectory?: string;
+  /** Operator-only executable override; never a shell command. */
+  binaryPath?: string;
 }
 
 export interface OmpClientConfig {

@@ -439,7 +439,7 @@ export type {
   DebugClientConfig,
   ClaudeCodeClientConfig,
   CodexClientConfig,
-  OmpClientConfig,
+  OmpClientConfig, PiClientConfig,
   LLMClientConfig,
   AgentProviderClientConfig,
   SmartSuggestRequest,

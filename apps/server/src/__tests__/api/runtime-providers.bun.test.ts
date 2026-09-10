@@ -5,7 +5,7 @@ import { createApiRouter } from "../../routes/api";
 
 // GET /api/runtime/providers — execution runtime catalog.
 // Coverage audit gap: zero L1 coverage. The route returns the
-// list of released runtimes (optionally Debug) with display labels.
+// list of released/experimental runtimes (optionally Debug) with display labels.
 // Pinned cases:
 //   - Hermes remains implemented but is hidden until certified
 //   - debug is hidden unless CHRONA_ENABLE_DEBUG_PROVIDER=true
@@ -53,7 +53,7 @@ describe("GET /api/runtime/providers", () => {
       tier: "stable",
       recommended: true,
     });
-    for (const provider of body.providers.filter((entry) => entry.key !== "debug")) {
+    for (const provider of body.providers.filter((entry) => ["codex", "omp", "claude_code"].includes(entry.key))) {
       expect(provider.tier).toBe("stable");
       expect(provider.features).toEqual(expect.arrayContaining([
         "task.plan",
@@ -62,6 +62,10 @@ describe("GET /api/runtime/providers", () => {
         "goal.review",
       ]));
     }
+    expect(body.providers.find((provider) => provider.key === "pi")).toMatchObject({
+      label: "Pi", tier: "experimental", recommended: false,
+      features: expect.arrayContaining(["task.plan", "goal.review", "task.execution", "dashboard.brief"]),
+    });
     expect(body.providers.filter((provider) => provider.recommended)).toHaveLength(1);
   });
 
