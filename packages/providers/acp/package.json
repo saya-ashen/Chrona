@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@agentclientprotocol/sdk": "^1.3.0",
+    "@agentclientprotocol/sdk": "^1.4.0",
     "@chrona/logging": "workspace:*",
     "@chrona/providers-foundation": "workspace:*"
   },
