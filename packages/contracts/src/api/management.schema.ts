@@ -9,7 +9,7 @@ import { planPatchBodySchema } from "./plans.schema";
 export const MANAGEMENT_SCOPES = ["tasks:read", "tasks:write", "schedule:write", "plans:write", "executions:control", "results:accept", "tasks:delete"] as const;
 export const managementScopeSchema = z.enum(MANAGEMENT_SCOPES);
 export type ManagementScope = z.infer<typeof managementScopeSchema>;
-export const managementModeSchema = z.enum(["todo", "plan", "automatic"]);
+export const managementModeSchema = z.enum(["todo", "plan", "automatic"]).describe("todo creates a task without automatic planning/execution; it is not an independent manual-todo lifecycle or a notification. plan enables planning only. automatic enables planning and execution; on create it requires start, on update start may be inferred from existing configuration.");
 const id = z.string().trim().min(1).max(128);
 const title = z.string().trim().min(1).max(TASK_TITLE_MAX);
 const description = z.string().max(TASK_DESCRIPTION_MAX).transform((text) => text.replace(/\r\n?/g, "\n").trim());
@@ -40,7 +40,7 @@ export const managementSearchSchema = z.object({
   order: z.enum(["asc", "desc"]).default("desc"), ...paging,
 }).strict().refine((input) => !(input.filter && input.status), "filter and status are mutually exclusive");
 export const managementReadSchema = z.object({
-  taskId: id, view: z.enum(["summary", "description", "config", "plan", "activity", "result"]).default("summary"),
+  taskId: id, view: z.enum(["compact", "summary", "description", "config", "plan", "activity", "result"]).default("summary").describe("compact returns task identity, revision, deadline, projected schedule and automation only (plus the requested work block, if any). Use summary/config before execution or checkpoint actions; compact does not read runtime state."),
   workBlockId: id.optional(), planSource: z.enum(["saved", "execution"]).optional(),
   resultSource: z.enum(["current", "accepted"]).optional(),
   page: z.number().int().min(1).max(1_000).optional(), pageSize: z.number().int().min(1).max(20).optional(),
@@ -51,11 +51,18 @@ export const managementReadSchema = z.object({
 });
 const creationFields = {
   title, description: description.optional(), priority: z.enum(TASK_PRIORITIES).default("Medium"),
-  mode: managementModeSchema, start: z.enum(["now", "scheduled"]).optional(),
-  timing: timing.optional(), dueAt: date.nullable().optional(), schedule: schedule.optional(), recurrence: recurrence.optional(),
+  mode: managementModeSchema, start: z.enum(["now", "scheduled"]).optional().describe("Only for automatic mode; omit for todo/plan. scheduled requires schedule. now forbids schedule, recurrence and timing. On update, omitted mode uses the task's existing automation settings."),
+  timing: timing.optional().describe("AI automation timing, not reminder offsets. Forbidden for todo; execution timing requires automatic. Relative timing requires schedule."),
+  dueAt: date.nullable().optional().describe("Independent deadline. Drives fixed in-app due indicators, not a push/email notification. Clearing schedule does not clear this deadline."),
+  schedule: schedule.optional().describe("Calendar placement only; does not send notifications. Allowed for todo/plan without start. Use offset-bearing timestamps and an IANA timezone; endsAt must follow startsAt."), recurrence: recurrence.optional(),
   aiClientId: id.nullable().optional(), executionConfig: managementExecutionConfigSchema.optional(),
   goalId: id.optional(), parentTaskId: id.optional(),
 };
+const managementCreateExamples = [
+  { requestId: "94fe9488-7c57-4342-997e-3e1efc06d3bf", title: "Check application portal", mode: "todo", schedule: { startsAt: "2030-10-01T09:00:00+08:00", endsAt: "2030-10-01T09:15:00+08:00", timezone: "Asia/Shanghai" }, dryRun: true },
+  { requestId: "73e3ab4b-f1ad-49ef-b9e2-f9dcbf09a165", title: "Draft application preparation plan", mode: "plan", dryRun: true },
+  { requestId: "79b978b7-80b6-4217-a195-c122e925a15b", title: "Prepare application checklist", mode: "automatic", start: "scheduled", schedule: { startsAt: "2030-10-01T09:00:00+08:00", endsAt: "2030-10-01T09:30:00+08:00", timezone: "Asia/Shanghai" }, dryRun: true },
+];
 export const managementCreateSchema = z.object({
   requestId: z.string().uuid(), ...creationFields, dryRun: z.boolean().default(false),
 }).strict().superRefine((input, ctx) => {
@@ -69,6 +76,22 @@ export const managementCreateSchema = z.object({
   if (!input.schedule && Object.values(input.timing ?? {}).some((value) => value !== "immediate")) issue("timing", "Relative timing requires a schedule");
   if (input.recurrence && !input.schedule) issue("recurrence", "Recurrence requires the first schedule window");
   if (input.recurrence && input.schedule && input.recurrence.timezone !== input.schedule.timezone) issue("recurrence", "Recurrence and schedule timezone must match");
+}).meta({
+  // superRefine is runtime-only. Mirror structural constraints in tools/list
+  // while retaining an object root (the MCP SDK hides root union schemas).
+  // Protocol tests check this projection against the runtime validation matrix.
+  allOf: [
+    { if: { properties: { mode: { const: "automatic" } }, required: ["mode"] }, then: { required: ["start"] }, else: { not: { required: ["start"] } } },
+    { if: { properties: { start: { const: "scheduled" } }, required: ["start"] }, then: { required: ["schedule"] } },
+    { if: { properties: { start: { const: "now" } }, required: ["start"] }, then: { not: { anyOf: [{ required: ["schedule"] }, { required: ["recurrence"] }, { required: ["timing"] }] } } },
+    { if: { properties: { mode: { const: "todo" } }, required: ["mode"] }, then: { not: { required: ["timing"] } } },
+    { if: { properties: { mode: { enum: ["todo", "plan"] } }, required: ["mode"] }, then: { properties: { timing: { not: { required: ["execution"] } } } } },
+    { if: { not: { required: ["schedule"] } }, then: { not: { required: ["recurrence"] }, properties: { timing: { properties: { plan: { const: "immediate" }, execution: { const: "immediate" } } } } } },
+  ],
+  // Zod removes standard examples from transforming input schemas. Also put
+  // these input examples in the description so SDK tools/list preserves them.
+  examples: managementCreateExamples,
+  description: `Input examples (dry runs; use a new requestId for each write intent): ${JSON.stringify(managementCreateExamples)}`,
 });
 const descriptionPatch = z.discriminatedUnion("mode", [
   z.object({ mode: z.literal("replace"), text: description.pipe(z.string().min(1)) }).strict(),
@@ -79,8 +102,8 @@ export const managementUpdateSchema = z.object({
   requestId: z.string().uuid(), taskId: id, expectedRevision: z.string().min(1).max(512), dryRun: z.boolean().default(false),
   patch: z.object({
     title: title.optional(), description: descriptionPatch.optional(), priority: z.enum(TASK_PRIORITIES).optional(),
-    mode: managementModeSchema.optional(), start: creationFields.start, timing: timing.optional(),
-    dueAt: date.nullable().optional(), schedule: schedule.nullable().optional(), recurrence: recurrence.nullable().optional(),
+    mode: managementModeSchema.optional(), start: creationFields.start, timing: creationFields.timing,
+    dueAt: creationFields.dueAt, schedule: schedule.nullable().optional().describe("Replace calendar placement, or null to clear it without clearing dueAt. This does not configure a notification. Source-owned calendar windows cannot be edited."), recurrence: recurrence.nullable().optional(),
     aiClientId: creationFields.aiClientId, executionConfig: managementExecutionConfigSchema.optional(),
   }).strict().refine((patch) => Object.keys(patch).length > 0, "patch must not be empty"),
 }).strict();

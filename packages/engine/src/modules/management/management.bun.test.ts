@@ -40,6 +40,91 @@ describe("external management MCP service", () => {
     expect(await db.event.findFirst({ where: { eventType: "task.created" } })).toMatchObject({ actorType: "agent", actorId: identity.id, source: "management_mcp" });
   });
 
+  it("advertises scheduling separately from unsupported reminder delivery and manual-todo lifecycle", async () => {
+    const result = data(await engine.management.call(await client(), "chrona_context_read", {}));
+    expect(result.data.capabilities).toMatchObject({
+      modes: ["todo", "plan", "automatic"], independentManualTodos: false,
+      scheduling: { timeBlocks: true, independentDeadlines: true },
+      reminders: {
+        customRules: false, deliveryChannels: [],
+        inAppDueIndicators: { available: true, basis: "dueAt", configurable: false, readableViaManagementMcp: false },
+      },
+    });
+  });
+
+  it("returns consistent deadline, schedule and automation in receipts, search and compact reads", async () => {
+    const identity = await client();
+    const input = { requestId: requestId(), title: "Application deadline", mode: "todo",
+      dueAt: "2030-01-02T19:59:00+08:00",
+      schedule: { startsAt: "2030-01-01T19:59:00+08:00", endsAt: "2030-01-01T20:00:00+08:00", timezone: "Asia/Shanghai" } };
+    const created = data(await engine.management.call(identity, "chrona_task_create", input));
+    const taskId = created.data.taskId;
+    const projection = await db.taskProjection.findUniqueOrThrow({ where: { taskId } });
+    const expected = {
+      dueAt: "2030-01-02T11:59:00.000Z",
+      schedule: { status: projection.scheduleStatus, startsAt: "2030-01-01T11:59:00.000Z", endsAt: "2030-01-01T12:00:00.000Z" },
+      automation: { autoPlanGeneration: false, autoExecute: false, timing: { plan: "at_start", execution: "at_start" } },
+    };
+    const compact = data(await engine.management.call(identity, "chrona_task_read", { taskId, view: "compact" }));
+    const search = data(await engine.management.call(identity, "chrona_task_search", { query: "Application deadline" }));
+    const summary = data(await engine.management.call(identity, "chrona_task_read", { taskId }));
+    const config = data(await engine.management.call(identity, "chrona_task_read", { taskId, view: "config" }));
+    for (const snapshot of [created.data.result, search.data.items[0], compact.data, summary.data, config.data]) {
+      expect(JSON.parse(JSON.stringify(snapshot))).toMatchObject(expected);
+    }
+    expect(compact.data.task.status).toBe("Draft");
+    expect(summary.data.state.state).toBe("no_plan"); // Do not hide the existing domain semantics.
+    expect(Object.keys(compact.data).sort()).toEqual(["automation", "dueAt", "revision", "schedule", "task"]);
+    expect(config.data.autoExecute).toBe(false); // Existing config fields remain available.
+    const retry = data(await engine.management.call(identity, "chrona_task_create", input));
+    expect(retry.data.result).toEqual(created.data.result);
+    expect(await db.task.count()).toBe(1);
+    expect(await db.taskPlan.count()).toBe(0);
+    expect(await db.run.count()).toBe(0);
+
+    const moved = data(await engine.management.call(identity, "chrona_task_update", {
+      requestId: requestId(), taskId, expectedRevision: compact.data.revision,
+      patch: { schedule: { ...input.schedule, startsAt: "2030-01-01T18:00:00+08:00", endsAt: "2030-01-01T18:15:00+08:00" } },
+    }));
+    expect(moved.ok).toBe(true);
+    expect(moved.data.result.schedule.startsAt).toBe("2030-01-01T10:00:00.000Z");
+    const cleared = data(await engine.management.call(identity, "chrona_task_update", {
+      requestId: requestId(), taskId, expectedRevision: moved.data.result.revision, patch: { schedule: null },
+    }));
+    expect(cleared.ok).toBe(true);
+    expect(cleared.data.result.dueAt).toBe(expected.dueAt);
+    expect(cleared.data.result.schedule).toMatchObject({ startsAt: null, endsAt: null });
+    // A receipt is immutable historical evidence, not a live task snapshot.
+    expect(data(await engine.management.call(identity, "chrona_task_create", input)).data.result).toEqual(created.data.result);
+  });
+
+  it("keeps compact reads bounded and enforces requested work-block ownership", async () => {
+    const identity = await client();
+    const own = await seedTask(identity.workspaceId);
+    await db.task.update({ where: { id: own.taskId }, data: {
+      description: "private description", executionConfig: { prompt: "private prompt", apiKey: "test-only-secret" },
+    } });
+    const compact = data(await engine.management.call(identity, "chrona_task_read", { taskId: own.taskId, view: "compact" }));
+    expect(compact.data.schedule).toBeNull(); // No projection: do not invent a schedule state.
+    expect(compact.data.dueAt).toBeNull();
+    expect(JSON.stringify(compact)).not.toMatch(/private description|private prompt|test-only-secret/);
+    expect(compact.data).not.toHaveProperty("execution");
+    expect(compact.data).not.toHaveProperty("savedPlan");
+    expect(compact.data).not.toHaveProperty("availableActions");
+    const block = await db.workBlock.create({ data: {
+      workspaceId: identity.workspaceId, taskId: own.taskId, title: "Selected occurrence", status: "Scheduled",
+      scheduledStartAt: new Date("2030-02-01T00:00:00Z"), scheduledEndAt: new Date("2030-02-01T01:00:00Z"),
+    } });
+    const selected = data(await engine.management.call(identity, "chrona_task_read", { taskId: own.taskId, view: "compact", workBlockId: block.id }));
+    expect(selected.data.workBlock).toEqual({ id: block.id, status: "Scheduled", scheduledStartAt: block.scheduledStartAt, scheduledEndAt: block.scheduledEndAt });
+    expect(selected.data.schedule).toBeNull(); // Task projection and selected block are distinct.
+    const other = await seedTask(identity.workspaceId);
+    const denied = data(await engine.management.call(identity, "chrona_task_read", { taskId: other.taskId, view: "compact", workBlockId: block.id }));
+    expect(denied.error.code).toBe("NOT_FOUND");
+    const foreign = await seedTask((await seedWorkspace("Foreign compact scope")).workspaceId);
+    expect(data(await engine.management.call(identity, "chrona_task_read", { taskId: foreign.taskId, view: "compact" })).error.code).toBe("NOT_FOUND");
+  });
+
   it("requires explicit mode and real automation prerequisites; never downgrades automatic to draft", async () => {
     expect(managementCreateSchema.safeParse({ requestId: requestId(), title: "Task" }).success).toBe(false);
     expect(managementCreateSchema.safeParse({ requestId: requestId(), title: "Task", mode: "automatic" }).success).toBe(false);

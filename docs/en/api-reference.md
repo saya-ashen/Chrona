@@ -530,6 +530,10 @@ Independent, stateless Streamable HTTP endpoint for personal agents managing Chr
 
 Tools: `chrona_context_read`, `chrona_task_search`, `chrona_task_read`, `chrona_task_create`, `chrona_task_update`, `chrona_task_action`, `chrona_task_delete`. Read the advertised schemas through `tools/list`. Mutations use UUID request IDs, persisted receipts, configuration revisions and existing domain commands. A queued/completed **command** is not a completed **task**. Execution uncertainty is reported rather than blindly redispatched.
 
+Scheduling is calendar placement, not notification delivery. Context capabilities explicitly distinguish fixed `dueAt`-based in-app indicators from unsupported custom reminders and push/email delivery. `todo` means no automatic planning/execution, not an independent manual-todo lifecycle. On create, only `automatic` accepts/requires `start`; `todo` and `plan` may supply `schedule` without it. The object-root create schema advertises structural mode/start constraints via `allOf` and input examples in its description; runtime validation still checks dates and timezones.
+
+Use `chrona_task_read` with `view: "compact"` for identity, revision, deadline, projected schedule and automation without plan/runtime reads. An explicit `workBlockId` adds that ownership-checked block separately. Search rows and mutation receipts also include schedule/automation summaries; default summary and existing config fields remain compatible. `task.status`, `schedule.status` and automation settings are distinct. Timestamps serialize as UTC, not the original single-window timezone. Receipt snapshots are historical; reread the task for current state. Use a full read before execution/checkpoint actions.
+
 Local setup: `chrona mcp enroll`, `chrona mcp list`, `chrona mcp revoke`. See [setup, capabilities and current limitations](../zh/management-mcp.md).
 
 ### POST /api/mcp

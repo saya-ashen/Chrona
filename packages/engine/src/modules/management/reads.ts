@@ -34,6 +34,21 @@ export function assertRevision(task: { configRevision: number }, expected: strin
 function pageInfo(total: number, page = 1, pageSize = 10) {
   return { total, page, pageSize, hasMore: page * pageSize < total && page < 1_000, paginationLimitReached: page === 1_000 && page * pageSize < total };
 }
+function scheduleSummary(projection: { scheduleStatus: string | null; scheduledStartAt: Date | null; scheduledEndAt: Date | null } | null) {
+  // Projection status is not Task.status or a WorkBlock's execution status.
+  // Dates serialize as UTC; the original single-window timezone is not stored.
+  return projection ? { status: projection.scheduleStatus, startsAt: projection.scheduledStartAt, endsAt: projection.scheduledEndAt } : null;
+}
+function automationSummary(task: { autoPlanGeneration: boolean; autoExecute: boolean; autoPlanGenerationTiming: string; autoExecuteTiming: string }) {
+  return { autoPlanGeneration: task.autoPlanGeneration, autoExecute: task.autoExecute, timing: { plan: task.autoPlanGenerationTiming, execution: task.autoExecuteTiming } };
+}
+function taskSnapshot(client: ManagementIdentity, task: Awaited<ReturnType<typeof scopedTask>>) {
+  return {
+    task: { taskId: task.id, title: task.title, status: task.status, priority: task.priority, url: taskUrl(client, task.id) },
+    revision: configRevision(task.configRevision), dueAt: task.dueAt,
+    schedule: scheduleSummary(task.projection), automation: automationSummary(task),
+  };
+}
 export async function readManagementContext(client: ManagementIdentity) {
   const clients = await db.aiClient.findMany({ select: { id: true, name: true, type: true, enabled: true, isDefault: true }, orderBy: { createdAt: "asc" }, take: 100 });
   const selected = await resolveTaskExecutionProviderSelection({});
@@ -41,7 +56,15 @@ export async function readManagementContext(client: ManagementIdentity) {
     now: new Date().toISOString(), timezone: client.timezone,
     defaults: { mode: client.defaultMode, source: "explicit_client_setup", aiClientId: selected?.clientId ?? null },
     scopes: client.scopes, aiClients: clients, timing: AUTOMATION_TIMING_PRESETS,
-    capabilities: { modes: ["todo", "plan", "automatic"], immediateExecution: true, scheduledExecution: true, recurrenceTimezones: ["UTC"], rawProviderConfig: false },
+    capabilities: {
+      modes: ["todo", "plan", "automatic"], immediateExecution: true, scheduledExecution: true, recurrenceTimezones: ["UTC"], rawProviderConfig: false,
+      independentManualTodos: false,
+      scheduling: { timeBlocks: true, independentDeadlines: true },
+      reminders: {
+        customRules: false, deliveryChannels: [],
+        inAppDueIndicators: { available: true, basis: "dueAt", configurable: false, readableViaManagementMcp: false },
+      },
+    },
   };
 }
 export async function searchManagementTasks(client: ManagementIdentity, input: ManagementSearch) {
@@ -52,22 +75,30 @@ export async function searchManagementTasks(client: ManagementIdentity, input: M
   const [rows, total] = await Promise.all([
     db.task.findMany({ where, orderBy: [order, { id: "asc" }], take: input.pageSize, skip: (input.page - 1) * input.pageSize,
       select: { id: true, title: true, description: true, status: true, priority: true, kind: true, dueAt: true, updatedAt: true,
-        projection: { select: { displayState: true, actionRequired: true } } } }), db.task.count({ where }),
+        autoPlanGeneration: true, autoExecute: true, autoPlanGenerationTiming: true, autoExecuteTiming: true,
+        projection: { select: { displayState: true, actionRequired: true, scheduleStatus: true, scheduledStartAt: true, scheduledEndAt: true } } } }), db.task.count({ where }),
   ]);
   return { ...pageInfo(total, input.page, input.pageSize), items: rows.map((task) => ({
     taskId: task.id, title: text(task.title, 200), titleTruncated: task.title.length > 200,
     descriptionPreview: text(task.description, 200), descriptionTruncated: (task.description?.length ?? 0) > 200,
     status: task.status, priority: task.priority, kind: task.kind, dueAt: task.dueAt, updatedAt: task.updatedAt,
+    schedule: scheduleSummary(task.projection), automation: automationSummary(task),
     state: deriveManagementWorkState({ taskStatus: task.status, executionStatus: task.projection?.displayState }), url: taskUrl(client, task.id),
   })) };
 }
 export async function managementTaskSnapshot(client: ManagementIdentity, taskId: string) {
-  const task = await scopedTask(client, taskId);
-  return { task: { taskId: task.id, title: task.title, status: task.status, priority: task.priority, url: taskUrl(client, task.id) }, revision: configRevision(task.configRevision) };
+  return taskSnapshot(client, await scopedTask(client, taskId));
 }
 
 export async function readManagementTask(client: ManagementIdentity, input: ManagementRead) {
   const task = await scopedTask(client, input.taskId, input.workBlockId);
+  if (input.view === "compact") {
+    const snapshot = taskSnapshot(client, task);
+    if (!input.workBlockId) return snapshot;
+    const workBlock = await db.workBlock.findFirst({ where: { id: input.workBlockId, taskId: task.id }, select: { id: true, status: true, scheduledStartAt: true, scheduledEndAt: true } });
+    if (!workBlock) throw new ManagementError("NOT_FOUND", "Work block not found");
+    return { ...snapshot, workBlock };
+  }
   const scope = await resolveExecutionScope(task.id, { workBlockId: input.workBlockId });
   const workBlockId = scope.workBlockId;
   const [savedCandidate, planRun, head, session, commands] = await Promise.all([
@@ -87,6 +118,7 @@ export async function readManagementTask(client: ManagementIdentity, input: Mana
   const common = {
     task: { taskId: task.id, title: task.title, status: task.status, priority: task.priority, kind: task.kind, createdAt: task.createdAt, updatedAt: task.updatedAt, url: taskUrl(client, task.id) },
     revision: configRevision(task.configRevision), state, resultFinalization,
+    dueAt: task.dueAt, schedule: scheduleSummary(task.projection), automation: automationSummary(task),
     savedPlan: savedPlan ? { planId: savedPlan.planId, revision: savedPlan.revision, status: savedPlan.status, expectedHeadStateVersion: head?.stateVersion ?? null } : null,
     execution: planRun ? { executionScope: planRun.executionScopeId, planId: planRun.planId, occurrenceId: planRun.occurrenceId, workBlockId, status: execution?.status ?? session?.status ?? "not_started", currentNodeId: execution?.currentNodeId ?? session?.currentNodeId ?? null, checkpoint: execution?.checkpoint ? safeCheckpoint(execution.checkpoint) : null } : null,
     commands,
@@ -101,7 +133,7 @@ export async function readManagementTask(client: ManagementIdentity, input: Mana
       { type: "retry_result", permitted: client.scopes.includes("executions:control") && resultFinalization.status === "Failed", expectedExecutionScope: planRun?.executionScopeId ?? null },
     ],
   };
-  if (input.view === "summary") return { ...common, descriptionPreview: text(task.description, 500), descriptionTruncated: (task.description?.length ?? 0) > 500, dueAt: task.dueAt, schedule: task.projection ? { startsAt: task.projection.scheduledStartAt, endsAt: task.projection.scheduledEndAt } : null };
+  if (input.view === "summary") return { ...common, descriptionPreview: text(task.description, 500), descriptionTruncated: (task.description?.length ?? 0) > 500 };
   if (input.view === "description") return { ...common, description: task.description, goalId: task.goalId, parentTaskId: task.parentTaskId };
   if (input.view === "config") {
     const config = record(task.executionConfig);

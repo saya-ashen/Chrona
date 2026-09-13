@@ -34,10 +34,10 @@ chrona mcp revoke CLIENT_ID
 
 | 工具 | 能力 |
 | --- | --- |
-| `chrona_context_read` | 当前时间、时区、默认 provider、可用客户端、安全权限及支持的时间策略 |
-| `chrona_task_search` | 标题/描述搜索，状态/过滤器、优先级、排序、分页 |
-| `chrona_task_read` | summary / description / config / plan / activity / result；配置 revision、执行 scope、checkpoint 表单、待处理 provider approvals、最近命令 |
-| `chrona_task_create` | todo / plan / automatic；立即执行或排期，独立截止时间、重复任务、provider、执行参数；dryRun |
+| `chrona_context_read` | 当前时间、时区、默认 provider、可用客户端、安全权限、时间策略及提醒能力边界 |
+| `chrona_task_search` | 标题/描述搜索，状态/过滤器、优先级、排序、分页；独立返回 deadline、排期摘要和自动化设置 |
+| `chrona_task_read` | compact / summary / description / config / plan / activity / result；compact 只核对任务与排期，其他视图保留执行上下文 |
+| `chrona_task_create` | todo / plan / automatic；立即执行或排期，独立截止时间、重复任务、provider、执行参数；dryRun；回执包含 deadline、排期摘要和自动化设置 |
 | `chrona_task_update` | 标题、描述替换/追加/清空、优先级、排期、截止时间、重复规则、自动化、provider 和执行参数；revision CAS、dryRun |
 | `chrona_task_action` | 生成/停止/接受/修改计划；执行开始、重启、暂停、取消、重试、输入/审阅；checkpoint；provider approval；结果验收/重试生成；完成/重开；结果追问/创建后续任务；排期提案接受/拒绝 |
 | `chrona_task_delete` | preview 影响范围，随后提交精确 task/asset 集合及配置 revision 删除 |
@@ -54,7 +54,41 @@ chrona mcp revoke CLIENT_ID
 }
 ```
 
-`mode` 必填；automatic 还必须明确 `start: now | scheduled`。没有可用 provider 时显式拒绝，不偷偷退化成 todo。scheduled 必须带 `{startsAt, endsAt, timezone}` 时间窗口。相对窗口时间策略只在有排期时有效。
+创建时 `mode` 必填；automatic 还必须明确 `start: now | scheduled`。没有可用 provider 时显式拒绝，不偷偷退化成 todo。`start: scheduled` 必须带 `{startsAt, endsAt, timezone}` 时间窗口；`start: now` 不能同时带 schedule / recurrence / timing。todo / plan **不传 start**，但可以直接传 schedule。相对窗口时间策略只在有排期时有效，todo 不启用 timing。
+
+`tools/list` 的 create schema 以 object 为根，通过 `allOf` 公布上述结构性条件。日期先后、IANA 时区及重复规则等仍需运行时校验，复杂请求先用 dryRun。三种模式的完整 dryRun 示例也写在 schema description 中（Zod 会移除含 transform 的输入 schema 的标准 examples）。
+
+### 日程不等于通知
+
+- `todo` 只关闭自动规划和执行，仍是现有 Task，不是独立的人工待办生命周期；没有计划时仍可能显示 `Draft / Needs plan`。不能把所有关闭自动执行的任务都归类为人工待办。
+- `schedule` 是日历时间块，`dueAt` 是独立截止时间。两者均不配置提醒通知；`timing` 是 AI 规划/执行时间，**不是提醒提前量**。
+- `context.capabilities.scheduling` 声明时间块与独立截止时间可用；`independentManualTodos: false` 声明当前生命周期边界。
+- `context.capabilities.reminders` 明确返回 `customRules: false`、`deliveryChannels: []`。现有 `inAppDueIndicators` 根据 dueAt 生成固定的站内到期提示，不可配置，也没有管理 MCP 读取入口。它们不是邮件、系统推送或具有送达保证的通知。
+- 不应声称创建几个提前时间块就完成了多次通知配置。
+
+模式示例（每行是一次独立调用的参数片段，均需补充新 UUID requestId 和 title；先用 dryRun）：
+
+```jsonl
+{"mode":"todo","schedule":{"startsAt":"2030-10-01T09:00:00+08:00","endsAt":"2030-10-01T09:15:00+08:00","timezone":"Asia/Shanghai"},"dryRun":true}
+{"mode":"plan","dryRun":true}
+{"mode":"automatic","start":"scheduled","schedule":{"startsAt":"2030-10-01T09:00:00+08:00","endsAt":"2030-10-01T09:30:00+08:00","timezone":"Asia/Shanghai"},"dryRun":true}
+```
+
+### 精简核对与状态分离
+
+```json
+{"taskId":"TASK_ID","view":"compact"}
+```
+
+compact 在读取 Plan/Run/执行会话之前返回：`task`、`revision`、`dueAt`、`schedule`、`automation`，不包含描述、provider 配置、执行 payload 或动作权限。需要修改配置可使用 revision；执行、checkpoint 或查看长命令进度前，仍应读取默认 summary / config 等完整视图。
+
+- `task.status` 保留任务生命周期；`schedule.status` 来自 TaskProjection，不能互相覆盖。
+- `schedule.startsAt / endsAt` 是投影时间窗口；缺少投影时 schedule 为 null，没有窗口时两个时间为 null，不猜测状态。
+- 如传 workBlockId，compact 额外返回经过归属校验的 `workBlock`（id、status、scheduledStartAt、scheduledEndAt）。它是所选时间块，不替换任务级投影摘要，也不赋予执行权限。
+- `automation` 明确列出 autoPlanGeneration / autoExecute 及 timing，不根据这两个开关推断人工待办身份。
+- 时间戳以 UTC ISO 格式返回；展示时用 context.timezone 换算。单次排期的原始 IANA 时区没有持久化，不假装读回原时区。
+- 搜索、创建/更新回执和各读取视图也包含 schedule / automation。旧字段与默认 summary 保留；summary 仍提供运行时上下文，不是精简视图。
+- 命令回执中的摘要属于命令完成时的历史快照，幂等重放不会刷新它。核对当前排期请重新读取 compact / summary。
 
 更新必须带 `expectedRevision`，从 task_read 获取。描述追加形如：
 
