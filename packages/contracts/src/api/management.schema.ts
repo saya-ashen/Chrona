@@ -51,6 +51,8 @@ export const managementReadSchema = z.object({
 });
 const creationFields = {
   title, description: description.optional(), priority: z.enum(TASK_PRIORITIES).default("Medium"),
+  /** Manual lifecycle is explicit; omitted remains the existing AI task lifecycle. */
+  taskExecutionMode: z.enum(["ai", "manual"]).optional(),
   mode: managementModeSchema, start: z.enum(["now", "scheduled"]).optional().describe("Only for automatic mode; omit for todo/plan. scheduled requires schedule. now forbids schedule, recurrence and timing. On update, omitted mode uses the task's existing automation settings."),
   timing: timing.optional().describe("AI automation timing, not reminder offsets. Forbidden for todo; execution timing requires automatic. Relative timing requires schedule."),
   dueAt: date.nullable().optional().describe("Independent deadline. Drives fixed in-app due indicators, not a push/email notification. Clearing schedule does not clear this deadline."),
@@ -67,6 +69,10 @@ export const managementCreateSchema = z.object({
   requestId: z.string().uuid(), ...creationFields, dryRun: z.boolean().default(false),
 }).strict().superRefine((input, ctx) => {
   const issue = (path: string, message: string) => ctx.addIssue({ code: "custom", path: [path], message });
+  if (input.taskExecutionMode === "manual") {
+    if (input.mode !== "todo") issue("mode", "Manual tasks require todo mode");
+    if (input.start || input.timing || input.recurrence || input.aiClientId !== undefined || input.executionConfig) issue("taskExecutionMode", "Manual tasks cannot configure AI automation, providers, execution settings, or recurrence");
+  }
   if (input.mode === "automatic" && !input.start) issue("start", "automatic requires now or scheduled");
   if (input.mode !== "automatic" && input.start) issue("start", "start is only valid for automatic");
   if (input.start === "scheduled" && !input.schedule) issue("schedule", "Scheduled execution requires a time window");
@@ -134,6 +140,8 @@ const action = z.discriminatedUnion("type", [
   z.object({ type: z.literal("accept_result"), runId: id }).strict(),
   z.object({ type: z.literal("complete"), runId: id }).strict(),
   z.object({ type: z.literal("reopen") }).strict(),
+  z.object({ type: z.literal("manual_complete"), expectedRevision: z.string().min(1).max(512) }).strict(),
+  z.object({ type: z.literal("manual_reopen"), expectedRevision: z.string().min(1).max(512) }).strict(),
   z.object({ type: z.literal("schedule_proposal"), proposalId: id, decision: z.enum(["Accepted", "Rejected"]), note: z.string().max(2_000).optional() }).strict(),
 ]);
 export const managementActionSchema = z.object({ requestId: z.string().uuid(), taskId: id, workBlockId: id.optional(), action }).strict();

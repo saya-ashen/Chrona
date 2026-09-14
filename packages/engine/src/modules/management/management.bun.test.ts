@@ -40,16 +40,42 @@ describe("external management MCP service", () => {
     expect(await db.event.findFirst({ where: { eventType: "task.created" } })).toMatchObject({ actorType: "agent", actorId: identity.id, source: "management_mcp" });
   });
 
-  it("advertises scheduling separately from unsupported reminder delivery and manual-todo lifecycle", async () => {
+  it("advertises delivered manual lifecycle separately from unsupported reminders", async () => {
     const result = data(await engine.management.call(await client(), "chrona_context_read", {}));
     expect(result.data.capabilities).toMatchObject({
-      modes: ["todo", "plan", "automatic"], independentManualTodos: false,
+      modes: ["todo", "plan", "automatic"], independentManualTodos: true,
+      manualTasks: { available: true, lifecycle: ["complete", "reopen"], recurrence: false, conversion: false },
       scheduling: { timeBlocks: true, independentDeadlines: true },
       reminders: {
         customRules: false, deliveryChannels: [],
         inAppDueIndicators: { available: true, basis: "dueAt", configurable: false, readableViaManagementMcp: false },
       },
     });
+  });
+
+  it("creates a no-provider manual task and applies its direct idempotent lifecycle", async () => {
+    const identity = await client();
+    const created = data(await engine.management.call(identity, "chrona_task_create", {
+      requestId: requestId(), title: "Pay rent", mode: "todo", taskExecutionMode: "manual",
+      dueAt: "2030-01-02T19:59:00+08:00",
+      schedule: { startsAt: "2030-01-01T19:59:00+08:00", endsAt: "2030-01-01T20:00:00+08:00", timezone: "Asia/Shanghai" },
+    }));
+    expect(created.ok).toBe(true);
+    const taskId = created.data.taskId;
+    expect(created.data.result.task.taskExecutionMode).toBe("manual");
+    expect(await db.task.findUniqueOrThrow({ where: { id: taskId }, select: { taskExecutionMode: true, status: true } })).toEqual({ taskExecutionMode: "manual", status: "Ready" });
+    expect(await db.taskSession.count({ where: { taskId } })).toBe(0);
+    expect(await db.taskPlan.count({ where: { taskId } })).toBe(0);
+    expect(await db.run.count({ where: { taskId } })).toBe(0);
+    const completed = data(await engine.management.call(identity, "chrona_task_action", { requestId: requestId(), taskId, action: { type: "manual_complete", expectedRevision: created.data.result.revision } }));
+    expect(completed.ok).toBe(true);
+    const done = await db.task.findUniqueOrThrow({ where: { id: taskId } });
+    expect(done.status).toBe("Done");
+    const reopened = data(await engine.management.call(identity, "chrona_task_action", { requestId: requestId(), taskId, action: { type: "manual_reopen", expectedRevision: `config-v1:${done.configRevision}` } }));
+    expect(reopened.ok).toBe(true);
+    expect((await db.task.findUniqueOrThrow({ where: { id: taskId } })).status).toBe("Ready");
+    const invalid = data(await engine.management.call(identity, "chrona_task_create", { requestId: requestId(), title: "Bad manual", mode: "todo", taskExecutionMode: "manual", autoPlanGeneration: true }));
+    expect(invalid.error.code).toBe("VALIDATION_ERROR");
   });
 
   it("returns consistent deadline, schedule and automation in receipts, search and compact reads", async () => {

@@ -40,7 +40,9 @@ import {
   TaskActionsMenu,
   type TaskActionsMenuItem,
   deleteTask,
+  completeManualTask,
   markTaskDone,
+  reopenManualTask,
   reopenTask,
   startExecution,
 } from "@features/task-workspace";
@@ -58,11 +60,14 @@ function LocalizedLink({ href, ...props }: LocalizedLinkProps) {
 type TaskItem = {
   id: string;
   workspaceId: string;
+  /** Present on list reads; used as the observed manual lifecycle CAS token. */
+  configRevision?: number;
   title: string;
   description: string | null;
   status: string;
   priority: string;
   kind: string;
+  taskExecutionMode?: "ai" | "manual";
   recurrenceRule: string | null;
   dueAt: string | null;
   updatedAt: string;
@@ -152,9 +157,10 @@ function priorityTone(priority: string) {
 }
 
 export function taskAutomationLabel(
-  task: Pick<TaskItem, "autoPlanGeneration" | "autoExecute">,
+  task: Pick<TaskItem, "autoPlanGeneration" | "autoExecute"> & Pick<TaskItem, "taskExecutionMode">,
   copy: TaskListCopy,
 ) {
+  if (task.taskExecutionMode === "manual") return copy.workStateLabels.manual_open;
   if (task.autoExecute) return copy.automationAutoComplete;
   if (task.autoPlanGeneration) return copy.automationAutoPlan;
   return copy.automationManual;
@@ -209,6 +215,7 @@ function canStartTask(task: TaskItem): boolean {
 }
 
 export function canCompleteTask(task: TaskItem): boolean {
+  if (task.taskExecutionMode === "manual") return task.status !== "Done" && task.status !== "Cancelled";
   if (["result_ready", "done", "cancelled"].includes(task.stateView.state)) {
     return false;
   }
@@ -222,7 +229,9 @@ export function canCompleteTask(task: TaskItem): boolean {
 }
 
 function canReopenTask(task: TaskItem): boolean {
-  return ["done", "cancelled"].includes(task.stateView.state);
+  return task.taskExecutionMode === "manual"
+    ? task.status === "Done" || task.status === "Cancelled"
+    : ["done", "cancelled"].includes(task.stateView.state);
 }
 
 function TaskListHero({
@@ -660,8 +669,20 @@ export function TaskListPage({
     setActionMessage(null);
     try {
       if (action === "start") await startExecution({ taskId: task.id });
-      if (action === "complete") await markTaskDone({ taskId: task.id });
-      if (action === "reopen") await reopenTask({ taskId: task.id });
+      if (action === "complete") {
+        if (task.taskExecutionMode === "manual") {
+          if (task.configRevision === undefined) throw new Error(taskCopy.actionFailed);
+          await completeManualTask({ taskId: task.id, expectedRevision: `config-v1:${task.configRevision}`, requestId: crypto.randomUUID() });
+        }
+        else await markTaskDone({ taskId: task.id });
+      }
+      if (action === "reopen") {
+        if (task.taskExecutionMode === "manual") {
+          if (task.configRevision === undefined) throw new Error(taskCopy.actionFailed);
+          await reopenManualTask({ taskId: task.id, expectedRevision: `config-v1:${task.configRevision}`, requestId: crypto.randomUUID() });
+        }
+        else await reopenTask({ taskId: task.id });
+      }
       refreshTasks();
     } catch (error) {
       setActionMessage(

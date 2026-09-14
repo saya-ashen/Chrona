@@ -34,7 +34,7 @@ export async function validateCreation(client: ManagementIdentity, input: Manage
   if ((input.mode !== "todo" || input.aiClientId) && !selected) throw new ManagementError("PRECONDITION_FAILED", "Configure an enabled AI client before planning or execution");
   if (input.parentTaskId) await scopedTask(client, input.parentTaskId);
   if (input.goalId && !await db.goal.findFirst({ where: { id: input.goalId, workspaceId: client.workspaceId }, select: { id: true } })) throw new ManagementError("NOT_FOUND", "Goal not found");
-  return { mode: input.mode, start: input.start ?? null, provider: selected ? { id: selected.clientId, name: selected.clientName, type: selected.providerName } : null, automation: automation(input), schedule: input.schedule ?? null, dueAt: input.dueAt ?? null, recurrence: input.recurrence ?? null };
+  return { taskExecutionMode: input.taskExecutionMode ?? "ai", mode: input.mode, start: input.start ?? null, provider: selected ? { id: selected.clientId, name: selected.clientName, type: selected.providerName } : null, automation: automation(input), schedule: input.schedule ?? null, dueAt: input.dueAt ?? null, recurrence: input.recurrence ?? null };
 }
 
 /** Called inside the management command transaction; all core writes join it. */
@@ -42,6 +42,7 @@ export async function createManagedTask(client: ManagementIdentity, input: Manag
   const desired = automation(input), immediate = requiresImmediatePlanning(input);
   const core: CreateTaskInput = {
     workspaceId: client.workspaceId, title: input.title, description: input.description, priority: input.priority,
+    taskExecutionMode: input.taskExecutionMode,
     aiClientId: input.aiClientId, executionConfig: input.executionConfig, goalId: input.goalId, parentTaskId: input.parentTaskId,
     ...desired,
     // Persistent command owns immediate planning. Do not let scheduler race its
@@ -64,6 +65,16 @@ export async function prepareManagedUpdate(client: ManagementIdentity, input: Ma
   const task = await scopedTask(client, input.taskId);
   assertRevision(task, input.expectedRevision);
   const patch = input.patch;
+  if (task.taskExecutionMode === "manual" && (
+    patch.executionConfig !== undefined ||
+    (patch.aiClientId !== undefined && patch.aiClientId !== null) ||
+    patch.mode !== undefined ||
+    patch.start !== undefined ||
+    patch.timing !== undefined ||
+    patch.recurrence !== undefined
+  )) {
+    throw new ManagementError("VALIDATION_ERROR", "Manual tasks cannot configure AI providers, automation, execution settings, or recurrence");
+  }
   if (patch.executionConfig || patch.aiClientId !== undefined) requireScopes(client, ["executions:control"]);
   if (patch.schedule !== undefined || patch.dueAt !== undefined || patch.recurrence !== undefined) requireScopes(client, ["schedule:write"]);
   if (patch.mode !== undefined || patch.timing !== undefined || patch.start !== undefined) {
@@ -80,9 +91,10 @@ export async function prepareManagedUpdate(client: ManagementIdentity, input: Ma
   const mode = hasAutomationRequest ? patch.mode ?? (task.autoExecute ? "automatic" : task.autoPlanGeneration ? "plan" : "todo") : "todo";
   const merged = managementCreateSchema.parse({
     requestId: input.requestId, title: patch.title ?? task.title, description: task.description ?? undefined, priority: patch.priority ?? task.priority,
+    taskExecutionMode: task.taskExecutionMode,
     mode, start: mode === "automatic" ? patch.start ?? (selectedSchedule ? "scheduled" : "now") : undefined,
     timing: mode === "todo" || (mode === "automatic" && (patch.start === "now" || !selectedSchedule)) ? undefined : patch.timing ?? { plan: task.autoPlanGenerationTiming, ...(mode === "automatic" ? { execution: task.autoExecuteTiming } : {}) },
-    aiClientId: patch.aiClientId === undefined ? task.aiClientId : patch.aiClientId,
+    aiClientId: task.taskExecutionMode === "manual" ? undefined : patch.aiClientId === undefined ? task.aiClientId : patch.aiClientId,
     schedule: patch.start === "now" ? undefined : selectedSchedule,
     recurrence: patch.recurrence === null ? undefined : patch.recurrence ?? (task.recurrenceRule ? { rule: task.recurrenceRule, timezone: "UTC" } : undefined),
     dueAt: patch.dueAt === undefined ? task.dueAt?.toISOString() : patch.dueAt,

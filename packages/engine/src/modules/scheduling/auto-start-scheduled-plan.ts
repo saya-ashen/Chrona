@@ -49,6 +49,7 @@ export async function autoStartScheduledPlanTasks(input?: {
       scheduledStartAt: { lte: windowUpperBound },
       task: {
         status: { in: ["Draft", "Ready", "Scheduled", "Queued"] },
+        taskExecutionMode: "ai",
         autoExecute: true,
       },
     },

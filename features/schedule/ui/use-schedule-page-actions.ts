@@ -4,6 +4,7 @@ import type { Locale } from "@chrona/i18n";
 import type { Dispatch, DragEvent, SetStateAction } from "react";
 import type {
 	SchedulePageData,
+	ScheduleRecord,
 	ScheduleViewMode,
 	ScheduledItem,
 	TimelineCreateInput,
@@ -19,6 +20,7 @@ import {
 	runSchedulePageAction,
 } from "./schedule-page-actions";
 import type { SchedulePageCopy } from "./schedule-page-copy";
+import type { ScheduleTaskListItem } from "./schedule-task-list";
 import type { TaskConfigFormInput } from "./forms/task-config-form";
 import { deleteTask } from "@features/task-workspace/public/workspace-integration";
 
@@ -167,11 +169,11 @@ export function useSchedulePageActions({
 	}
 
 	async function handleTaskConfigSave(
-		taskId: string,
+		task: ScheduleRecord | ScheduleTaskListItem,
 		input: TaskConfigFormInput,
 	) {
 		await handleTaskConfigSaveAction({
-			taskId,
+			task,
 			input,
 			applyOptimisticViewData: (updater) => setViewData(updater),
 			setIsPending,

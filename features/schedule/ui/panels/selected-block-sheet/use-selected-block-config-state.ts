@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { ScheduledItem } from "../../schedule-page-types";
+import type { ScheduleRecord } from "../../schedule-page-types";
 import type {
   TaskConfigDraftState,
   TaskConfigFormDraft,
@@ -21,7 +21,7 @@ function normalizePriority(value: string): TaskConfigFormDraft["priority"] {
 }
 
 function toPlanningTaskDraft(
-  item: Pick<ScheduledItem, "title" | "description" | "priority" | "dueAt" | "scheduledStartAt" | "scheduledEndAt">,
+  item: Pick<ScheduleRecord, "title" | "description" | "priority" | "dueAt" | "scheduledStartAt" | "scheduledEndAt">,
 ): TaskConfigFormDraft {
   return {
     title: item.title,
@@ -47,8 +47,8 @@ export function useSelectedBlockConfigState({
   item,
   onSaveTaskConfigAction,
 }: {
-  item: ScheduledItem;
-  onSaveTaskConfigAction: (taskId: string, input: TaskConfigFormInput) => Promise<void>;
+  item: ScheduleRecord;
+  onSaveTaskConfigAction: (item: ScheduleRecord, input: TaskConfigFormInput) => Promise<void>;
 }) {
   const [planningTaskDraft, setPlanningTaskDraft] = useState<TaskConfigFormDraft>(() => toPlanningTaskDraft(item));
   const [taskConfigDraftState, setTaskConfigDraftState] = useState<TaskConfigDraftState | null>(null);
@@ -72,7 +72,7 @@ export function useSelectedBlockConfigState({
   }, []);
 
   const saveTaskConfig = useCallback(async (input: TaskConfigFormInput) => {
-    await onSaveTaskConfigAction(item.taskId, input);
+    await onSaveTaskConfigAction(item, input);
     setPlanningTaskDraft({
       title: input.title,
       description: input.description,

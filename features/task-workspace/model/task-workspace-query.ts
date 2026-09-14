@@ -26,6 +26,7 @@ import type {
 	TaskWorkspaceReviewContextData,
 	TaskWorkspaceRuntimeContextData,
 	TaskWorkspaceExecutionConsoleView,
+	TaskWorkspaceHeaderData,
 	WorkspaceActivityItem,
 	WorkspaceArtifactItem,
 } from "./task-workspace-types";
@@ -104,6 +105,8 @@ export type TaskWorkspaceExecutionConsoleCopy = WorkspaceStateTreatmentCopy & {
 	pause: string;
 	stop: string;
 	moreActions: string;
+	manualTaskComplete: string;
+	manualTaskReopen: string;
 };
 
 export const DEFAULT_TASK_WORKSPACE_EXECUTION_CONSOLE_COPY: TaskWorkspaceExecutionConsoleCopy =
@@ -167,6 +170,8 @@ export const DEFAULT_TASK_WORKSPACE_EXECUTION_CONSOLE_COPY: TaskWorkspaceExecuti
 		pause: "Pause",
 		stop: "Stop",
 		moreActions: "More actions",
+		manualTaskComplete: "Complete task",
+		manualTaskReopen: "Reopen task",
 	};
 
 function resolveExecutionConsoleCopy(
@@ -695,6 +700,16 @@ export async function fetchTaskWorkspacePage(
  * trail) for a task. Kept separate from {@link fetchTaskWorkspacePage} so
  * that the heavy page metadata query does not embed spec blobs.
  */
+export async function fetchTaskHeader(
+	taskId: string,
+	workBlockId?: string | null,
+): Promise<TaskWorkspaceHeaderData> {
+	const query = taskScopedQuery(workBlockId);
+	return apiJson<TaskWorkspaceHeaderData>(
+		`/api/tasks/${encodeURIComponent(taskId)}/workspace/header${query}`,
+	);
+}
+
 export async function fetchTaskCommandCenter(
 	taskId: string,
 	workBlockId?: string | null,

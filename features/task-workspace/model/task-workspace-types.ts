@@ -21,6 +21,8 @@ export type TaskPlanGenerationStatus = "idle" | "generating" | "waiting_acceptan
 export type TaskData = {
   id: string;
   workspaceId: string;
+  /** Optimistic-concurrency token observed with this task state. */
+  revision?: string;
   goalId?: string | null;
   goal?: { id: string; title: string } | null;
   goalKnowledge?: {
@@ -38,6 +40,7 @@ export type TaskData = {
   title: string;
   description: string | null;
   executionConfig: unknown;
+  taskExecutionMode?: "ai" | "manual";
   aiClientId?: string | null;
   autoPlanGeneration: boolean;
   autoExecute: boolean;
@@ -204,7 +207,7 @@ export type WorkspaceStateTreatment = {
 };
 
 export type TaskHeaderAction = {
-  id: "start" | "pause" | "stop" | "restart" | "more";
+  id: "start" | "pause" | "stop" | "restart" | "more" | "manual_complete" | "manual_reopen";
   label: string;
   disabled?: boolean;
   disabledReason?: string;

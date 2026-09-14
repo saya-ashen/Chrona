@@ -12,6 +12,7 @@ import { fetchJsonEventSource, createLogger } from "@shared/http";
 import {
 	commandCenterQueryKeys,
 	fetchTaskCommandCenter,
+	fetchTaskHeader,
 	fetchTaskWorkspacePage,
 	taskWorkspaceQueryKeys,
 } from "../model/task-workspace-query";
@@ -469,9 +470,9 @@ export function useTaskWorkspacePageState(initialData: TaskPageData) {
 			taskId,
 		],
 	);
-	const refreshPersistedActivity = useCallback(async () => {
-		await commandCenterQuery.refetch();
-	}, [commandCenterQuery.refetch]);
+	const refreshPersistedActivity = useCallback(async () => { await commandCenterQuery.refetch(); }, [commandCenterQuery.refetch]);
+	// Direct lifecycle changes its canonical header action without execution SSE.
+	const refreshHeaderSpec = useCallback(async () => setHeaderSpec((await fetchTaskHeader(taskId, selectedWorkBlockId)).spec), [selectedWorkBlockId, taskId]);
 
 	const setTask = useCallback(
 		(value: React.SetStateAction<TaskData>) => {
@@ -572,6 +573,7 @@ export function useTaskWorkspacePageState(initialData: TaskPageData) {
 		commandCenter,
 		setTask,
 		refreshWorkspace,
+		refreshHeaderSpec,
 		isRefreshing: pageQuery.isFetching,
 		workspaceEvents,
 		headerSpec,

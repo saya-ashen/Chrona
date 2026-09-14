@@ -95,6 +95,17 @@ describe("TaskConfigForm – field layout", () => {
     expect(screen.queryByText("Temperature")).not.toBeInTheDocument();
   });
 
+  it("renders a manual variant without AI, automation, or recurrence controls", () => {
+    render(<TaskConfigForm {...defaultProps} variant="manual" />);
+
+    expect(screen.getByRole("textbox", { name: /title/i })).toBeInTheDocument();
+    expect(screen.getByLabelText("Due date")).toBeInTheDocument();
+    expect(screen.queryByText("Repeat")).not.toBeInTheDocument();
+    expect(screen.queryByText("Automation")).not.toBeInTheDocument();
+    expect(screen.queryByText("AI provider")).not.toBeInTheDocument();
+    expect(screen.queryByText("Execution preferences")).not.toBeInTheDocument();
+  });
+
   it("submit button is present", () => {
     render(<TaskConfigForm {...defaultProps} />);
 

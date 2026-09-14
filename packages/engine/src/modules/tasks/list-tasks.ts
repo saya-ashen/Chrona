@@ -136,6 +136,7 @@ export async function listTasksByWorkspace(input: ListTasksInput) {
     const latestRun = runs[0] ?? null;
     const latestArtifact = artifacts[0] ?? null;
     const stateView = deriveWorkStateView({
+      taskExecutionMode: task.taskExecutionMode,
       taskStatus: task.projection?.persistedStatus ?? task.status,
       executionStatus:
         task.projection?.displayState ?? task.projection?.latestRunStatus,

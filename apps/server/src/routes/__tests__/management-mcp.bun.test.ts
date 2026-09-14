@@ -5,6 +5,7 @@ import { AjvJsonSchemaValidator } from "@modelcontextprotocol/sdk/validation/ajv
 import type { JsonSchemaType } from "@modelcontextprotocol/sdk/validation/types.js";
 import { managementCreateSchema } from "@chrona/contracts/api";
 import { createChronaEngine, createManagementClient, revokeManagementClient } from "@chrona/engine";
+import { db } from "@chrona/db";
 import { resetTestDb } from "@chrona/db/test-support";
 import { createManagementMcpRoutes } from "../../../../../features/mcp-control-plane/server";
 
@@ -29,6 +30,7 @@ describe("management MCP protocol", () => {
     expect(create.inputSchema.allOf).toBeArray();
     expect(create.inputSchema.properties?.start).toMatchObject({ description: expect.stringContaining("Only for automatic") });
     expect(create.inputSchema.properties?.mode).toMatchObject({ description: expect.stringContaining("not an independent manual-todo") });
+    expect(create.inputSchema.properties?.taskExecutionMode).toMatchObject({ enum: ["ai", "manual"] });
     expect(tools.find((tool) => tool.name === "chrona_task_read")!.inputSchema.properties?.view).toMatchObject({ enum: expect.arrayContaining(["compact", "summary", "config"]) });
     const validate = new AjvJsonSchemaValidator().getValidator(create.inputSchema as JsonSchemaType);
     const examples = managementCreateSchema.meta()!.examples as unknown[];
@@ -76,6 +78,47 @@ describe("management MCP protocol", () => {
     expect(Object.keys(compact).sort()).toEqual(["automation", "dueAt", "revision", "schedule", "task"]);
     const invalidRead = await call(client.token, "tools/call", { name: "chrona_task_read", arguments: { taskId: receipt.taskId, view: "compact", planSource: "saved" } });
     expect(invalidRead.body.result.isError).toBe(true);
+  });
+
+  it("creates and completes a manual task through actual tools/call", async () => {
+    const client = await createManagementClient({ name: "Manual MCP", publicUrl: "http://localhost:3101" });
+    const created = await call(client.token, "tools/call", { name: "chrona_task_create", arguments: { requestId: crypto.randomUUID(), title: "Manual protocol task", mode: "todo", taskExecutionMode: "manual" } });
+    expect(created.body.result.isError).toBe(false);
+    const taskId = created.body.result.structuredContent.data.taskId;
+    const compact = await call(client.token, "tools/call", { name: "chrona_task_read", arguments: { taskId, view: "compact" } });
+    const expectedRevision = compact.body.result.structuredContent.data.revision;
+    const requestId = crypto.randomUUID();
+    const args = { requestId, taskId, action: { type: "manual_complete", expectedRevision } };
+    const completed = await call(client.token, "tools/call", { name: "chrona_task_action", arguments: args });
+    const replay = await call(client.token, "tools/call", { name: "chrona_task_action", arguments: args });
+    expect(completed.body.result.isError).toBe(false);
+    expect(replay.body.result.structuredContent.data).toMatchObject({ commandId: completed.body.result.structuredContent.data.commandId, replayed: true });
+    expect(await db.event.count({ where: { taskId, eventType: "task.done" } })).toBe(1);
+    const read = await call(client.token, "tools/call", { name: "chrona_task_read", arguments: { taskId } });
+    expect(read.body.result.structuredContent.data.task).toMatchObject({ taskExecutionMode: "manual", status: "Done" });
+    expect(read.body.result.structuredContent.data.availableActions).toContainEqual(expect.objectContaining({ type: "manual_reopen", expectedRevision: read.body.result.structuredContent.data.revision }));
+    const stale = await call(client.token, "tools/call", { name: "chrona_task_action", arguments: { requestId: crypto.randomUUID(), taskId, action: { type: "manual_reopen", expectedRevision } } });
+    const collision = await call(client.token, "tools/call", { name: "chrona_task_action", arguments: { requestId, taskId, action: { type: "manual_reopen", expectedRevision } } });
+    const foreign = await createManagementClient({ name: "Foreign manual MCP", publicUrl: "http://localhost:3101" });
+    const foreignWorkspace = await db.workspace.create({ data: { name: "Foreign management workspace", status: "Active" } });
+    await db.managementClient.update({ where: { id: foreign.clientId }, data: { workspaceId: foreignWorkspace.id } });
+    const foreignAction = await call(foreign.token, "tools/call", { name: "chrona_task_action", arguments: { requestId: crypto.randomUUID(), taskId, action: { type: "manual_reopen", expectedRevision: read.body.result.structuredContent.data.revision } } });
+    expect(stale.body.result.isError).toBe(true);
+    expect(collision.body.result.isError).toBe(true);
+    expect(foreignAction.body.result.isError).toBe(true);
+    expect(await db.task.findUniqueOrThrow({ where: { id: taskId }, select: { status: true } })).toEqual({ status: "Done" });
+  });
+
+  it("rejects manual MCP AI updates and actions before a command can create AI records", async () => {
+    const client = await createManagementClient({ name: "Manual MCP guards", publicUrl: "http://localhost:3101" });
+    const created = await call(client.token, "tools/call", { name: "chrona_task_create", arguments: { requestId: crypto.randomUUID(), title: "Manual guard task", mode: "todo", taskExecutionMode: "manual" } });
+    const taskId = created.body.result.structuredContent.data.taskId;
+    const read = await call(client.token, "tools/call", { name: "chrona_task_read", arguments: { taskId, view: "compact" } });
+    const revision = read.body.result.structuredContent.data.revision;
+    const update = await call(client.token, "tools/call", { name: "chrona_task_update", arguments: { requestId: crypto.randomUUID(), taskId, expectedRevision: revision, patch: { mode: "plan" } } });
+    expect(update.body.result.isError).toBe(true);
+    const generate = await call(client.token, "tools/call", { name: "chrona_task_action", arguments: { requestId: crypto.randomUUID(), taskId, action: { type: "generate_plan" } } });
+    expect(generate.body.result.isError).toBe(true);
   });
 
   it("initializes statelessly, lists seven actual tools, calls through the protocol and revokes immediately", async () => {

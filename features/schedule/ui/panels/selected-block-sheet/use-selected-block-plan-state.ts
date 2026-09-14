@@ -49,11 +49,13 @@ function deriveGenerationStatus(
 export function useSelectedBlockPlanState({
   item,
   onMutatedAction,
+  enabled = true,
 }: {
   item: ScheduledItem;
   onMutatedAction: () => Promise<void>;
+  enabled?: boolean;
 }) {
-  const generationSession = useTaskPlanGenerationSession(item.taskId, item.workBlockId ?? null);
+  const generationSession = useTaskPlanGenerationSession(item.taskId, item.workBlockId ?? null, { hydrate: enabled });
   const [displayedSavedPlan, setDisplayedSavedPlan] = useState<SavedTaskPlan | null>(() => hasFullPlan(item.savedPlan) ? item.savedPlan : null);
   const [generationStatus, setGenerationStatus] = useState(item.aiPlanGenerationStatus ?? "idle");
   const [acceptedPlan, setAcceptedPlan] = useState<TaskPlanReadModel | null>(() => hasFullPlan(item.savedPlan) ? acceptedResponseFromSavedPlan(item.savedPlan) : null);
@@ -115,6 +117,9 @@ export function useSelectedBlockPlanState({
   }, [item.taskId, item.workBlockId, item.savedPlan]);
 
   useEffect(() => {
+    if (!enabled) {
+      return;
+    }
     const snapshot = item.savedPlan ?? null;
     if (
       !snapshot
@@ -144,7 +149,7 @@ export function useSelectedBlockPlanState({
       });
     })();
 
-  }, [applyPlanStateSnapshot, generationSession.sessionStatus, item.savedPlan, item.taskId, item.workBlockId, item.aiPlanGenerationStatus]);
+  }, [applyPlanStateSnapshot, enabled, generationSession.sessionStatus, item.savedPlan, item.taskId, item.workBlockId, item.aiPlanGenerationStatus]);
 
   useEffect(() => {
     const nextSavedPlan = displayedSavedPlan?.status === "accepted"

@@ -1,4 +1,5 @@
 "use client";
+/* eslint-disable complexity -- Creation branches include Goal and manual-task payload boundaries. */
 
 import {
 	Bell,
@@ -476,18 +477,19 @@ export function ControlPlaneShell({
 							title: input.title,
 							description: input.description || null,
 							priority: input.priority,
+							taskExecutionMode: input.taskExecutionMode,
 							autoPlanGeneration: input.autoPlanGenerationEnabled || input.autoExecute,
 							autoExecute: input.autoExecute,
 							autoPlanGenerationTiming: input.autoPlanGenerationTiming,
 							autoExecuteTiming: input.autoExecuteTiming,
-							executionConfig: {},
+							executionConfig: input.taskExecutionMode === "manual" ? undefined : {},
 							aiClientId: input.aiClientId,
 							dueAt: input.dueAt,
 							scheduledStartAt: input.scheduledStartAt,
 							scheduledEndAt: input.scheduledEndAt,
-							recurrenceRule: input.recurrenceRule,
-							recurrenceAnchorStartAt: input.recurrenceAnchorStartAt,
-							recurrenceAnchorEndAt: input.recurrenceAnchorEndAt,
+							recurrenceRule: input.taskExecutionMode === "manual" ? null : input.recurrenceRule,
+							recurrenceAnchorStartAt: input.taskExecutionMode === "manual" ? null : input.recurrenceAnchorStartAt,
+							recurrenceAnchorEndAt: input.taskExecutionMode === "manual" ? null : input.recurrenceAnchorEndAt,
 						});
 						if (typeof created.taskId === "string") {
 							setCreatedOnboardingTaskId(created.taskId);

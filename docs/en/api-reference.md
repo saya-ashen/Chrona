@@ -174,7 +174,7 @@ Returns lightweight task workspace header state.
 
 ### POST /api/tasks
 
-Creates a task. Important fields include `workspaceId`, `title`, `description`, `priority`, `aiClientId`, `executionConfig`, and `parentTaskId`. `aiClientId` is the only task-level provider override; when omitted, Chrona resolves the `task.execution` feature binding and then the enabled default AI client.
+Creates a task. Important fields include `workspaceId`, `title`, `description`, `priority`, `aiClientId`, `executionConfig`, and `parentTaskId`. Omitted `taskExecutionMode` preserves the AI plan/run lifecycle; explicit `taskExecutionMode: "manual"` creates direct human-managed work and rejects AI provider, execution configuration, automation, and recurrence fields. `aiClientId` is the only task-level provider override; when omitted, Chrona resolves the `task.execution` feature binding and then the enabled default AI client.
 
 ### GET /api/tasks/:taskId
 
@@ -196,7 +196,15 @@ Marks a task complete.
 
 ### POST /api/tasks/:taskId/reopen
 
-Reopens a completed task.
+Reopens a completed AI task according to its accepted-plan state.
+
+### POST /api/tasks/:taskId/manual/complete
+
+Directly completes an explicit manual task without a Plan, Run, or provider session. Body requires `{ expectedRevision, requestId }`; the server derives the task workspace from task metadata. `expectedRevision` is the observed `config-v1:N` token from the task read. The request ID is durable: retry identical payloads to receive the original receipt; a stale revision or reused request ID with different payload conflicts.
+
+### POST /api/tasks/:taskId/manual/reopen
+
+Reopens an explicit manual task to Ready without creating AI execution records. Uses the same server-derived CAS/request-receipt body as `manual/complete`. The legacy `/complete` and `/reopen` endpoints reject manual tasks.
 
 ### POST /api/tasks/:taskId/result/accept
 

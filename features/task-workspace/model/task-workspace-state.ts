@@ -168,6 +168,8 @@ export type HeaderActionCopy = {
   pause: string;
   stop: string;
   moreActions: string;
+  manualTaskComplete: string;
+  manualTaskReopen: string;
 };
 
 export function deriveWorkspacePresentationState(input: {
@@ -187,6 +189,7 @@ export function deriveWorkspaceWorkStateView(input: {
   const executionStatus = input.task.executionSummary?.executionState ?? input.currentNode?.status ?? null;
   const currentNodeIsRunning = input.currentNode?.status === "active" || input.currentNode?.status === "in_progress";
   return deriveWorkStateView({
+    taskExecutionMode: input.task.taskExecutionMode,
     taskStatus: input.task.status,
     executionStatus,
     planStatus,
@@ -210,6 +213,15 @@ export function deriveHeaderActions(input: {
   workState: WorkStateView;
   copy: HeaderActionCopy;
 }): TaskHeaderAction[] {
+  if (input.task.taskExecutionMode === "manual") {
+    if (input.task.status === "Cancelled") return [];
+    const isDone = input.task.status === "Done";
+    return [{
+      id: isDone ? "manual_reopen" : "manual_complete",
+      label: isDone ? input.copy.manualTaskReopen : input.copy.manualTaskComplete,
+      disabled: false,
+    }];
+  }
   const hasPlan =
     input.progress.totalSteps > 0 || Boolean(input.task.savedPlan);
   const hasUnacceptedSavedPlan = Boolean(

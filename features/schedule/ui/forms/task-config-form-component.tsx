@@ -29,6 +29,7 @@ function useTaskConfigCopy() {
 }
 
 export function TaskConfigForm({
+  variant = "ai",
   compact = false,
   initialValues,
   lockedFields = [],
@@ -81,6 +82,7 @@ export function TaskConfigForm({
             availableAiClients={availableAiClients}
             disableAiClientSelection={disableAiClientSelection}
             aiClientSelectionDisabledHint={aiClientSelectionDisabledHint}
+            variant={variant}
           />
           <TaskConfigFormFooter footerActions={footerActions} hideFooter={hideFooter} isPending={isPending} pendingLabel={pendingLabel} submitLabel={submitLabel} />
         </div>

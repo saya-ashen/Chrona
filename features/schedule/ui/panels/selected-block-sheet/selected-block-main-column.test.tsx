@@ -6,8 +6,12 @@ import { DEFAULT_SCHEDULE_PAGE_COPY } from "../../schedule-page-copy";
 import type { ScheduleRecord } from "../../schedule-page-types";
 import { SelectedBlockMainColumn } from "./selected-block-main-column";
 
+const taskConfigFormProps: Array<{ variant?: "ai" | "manual" }> = [];
 vi.mock("../../forms/task-config-form", () => ({
-  TaskConfigForm: () => <form aria-label="Task config" />,
+  TaskConfigForm: (props: { variant?: "ai" | "manual" }) => {
+    taskConfigFormProps.push(props);
+    return <form aria-label="Task config" data-variant={props.variant} />;
+  },
 }));
 
 vi.mock("@features/task-workspace", () => ({
@@ -54,10 +58,10 @@ function item(overrides: Partial<ScheduleRecord> = {}): ScheduleRecord {
   };
 }
 
-function renderMainColumn(record: ScheduleRecord) {
+function renderMainColumn(record: ScheduleRecord, initialTab: "details" | "execution" | "plan" = "execution") {
   return render(
     <SelectedBlockMainColumn
-      initialTab="execution"
+      initialTab={initialTab}
       item={record}
       copy={DEFAULT_SCHEDULE_PAGE_COPY}
       availableAiClients={[
@@ -92,9 +96,29 @@ function renderMainColumn(record: ScheduleRecord) {
   );
 }
 
-afterEach(() => cleanup());
+afterEach(() => {
+  cleanup();
+  taskConfigFormProps.length = 0;
+});
 
 describe("SelectedBlockMainColumn", () => {
+  it.each([
+    ["manual", "manual"],
+    ["AI", "ai"],
+  ] as const)("uses %s form variant in selected-block edit", (mode, expectedVariant) => {
+    renderMainColumn(item({ taskExecutionMode: expectedVariant }), "details");
+
+    expect(screen.getByRole("form", { name: "Task config" })).toHaveAttribute("data-variant", expectedVariant);
+  });
+
+  it("keeps a manual selected block on details and hides execution and plan controls", () => {
+    renderMainColumn(item({ taskExecutionMode: "manual" }));
+
+    expect(screen.queryByRole("tab", { name: "Execution status" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("tab", { name: "Current plan" })).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Task plan")).not.toBeInTheDocument();
+  });
+
   it("shows provider, execution status, automation, and recovery without runtime adapter", () => {
     renderMainColumn(item());
 

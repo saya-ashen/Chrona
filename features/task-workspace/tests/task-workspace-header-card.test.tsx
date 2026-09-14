@@ -159,6 +159,27 @@ describe("TaskWorkspaceHeaderCard", () => {
 		expect(screen.getByText(/May 27/)).toBeInTheDocument();
 	});
 
+	it.each([
+		["manual_complete", "Complete task"],
+		["manual_reopen", "Reopen task"],
+	] as const)("renders and dispatches canonical %s header action", async (id, label) => {
+		const onAction = vi.fn().mockResolvedValue(undefined);
+		renderHeader(
+			createHeaderSpecFixture({
+				title: task.title,
+				status: id === "manual_reopen" ? "completed" : "waiting",
+				progressLabel: "Manual task",
+				actions: [{ id, label }],
+			}),
+			{},
+			onAction,
+		);
+
+		expect(screen.queryByRole("button", { name: "Generate plan" })).not.toBeInTheDocument();
+		fireEvent.click(screen.getByRole("button", { name: label }));
+		await waitFor(() => expect(onAction).toHaveBeenCalledWith({ id, label }));
+	});
+
 	it("shows Accept plan while header state marks generated plan unaccepted", () => {
 		renderHeader(undefined, {
 			"/execution/show-accept-plan": true,

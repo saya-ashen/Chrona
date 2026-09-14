@@ -25,6 +25,9 @@ export const TASK_KINDS = ["single", "recurring"] as const;
 
 export type TaskKind = (typeof TASK_KINDS)[number];
 
+/** Explicit lifecycle discriminator; omitted tasks retain AI plan/run semantics. */
+export type TaskExecutionMode = "ai" | "manual";
+
 export type TaskExecutionConfig = {
   prompt?: string;
   temperature?: number;
@@ -57,6 +60,7 @@ export type TaskCore = {
   status: TaskStatus;
   priority: TaskPriority;
   kind: TaskKind;
+  taskExecutionMode: TaskExecutionMode;
   recurrenceRule: string | null;
 };
 
@@ -73,6 +77,7 @@ export type CreateTaskInput = {
   title: string;
   description?: string | null;
   priority?: TaskPriority;
+  taskExecutionMode?: TaskExecutionMode;
   autoPlanGeneration?: boolean;
   autoExecute?: boolean;
   autoPlanGenerationTiming?: AutomationTimingPreset;

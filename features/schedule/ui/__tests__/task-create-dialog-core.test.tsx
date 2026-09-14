@@ -61,6 +61,17 @@ describe("TaskCreateDialog – Core functionality", () => {
     await user.click(screen.getByText("Save"));
     await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ autoExecuteTiming: "immediate", autoPlanGenerationTiming: "immediate" })));
   });
+  it("submits manual creation with the null provider wire value and no AI automation", async () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    const user = userEvent.setup();
+    render(<TaskCreateDialog {...defaultProps} initialTitle="Pay rent" onSubmit={onSubmit} />);
+    await user.click(screen.getByRole("radio", { name: "Manual task" }));
+    await user.click(screen.getByText("Save"));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
+      taskExecutionMode: "manual", aiClientId: null, autoExecute: false, autoPlanGenerationEnabled: false,
+    })));
+  });
+
   it("returns null when not open", () => {
     const { container } = render(<TaskCreateDialog {...defaultProps} isOpen={false} />);
     expect(container.innerHTML).toBe("");

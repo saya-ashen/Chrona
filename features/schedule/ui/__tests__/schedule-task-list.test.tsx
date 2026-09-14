@@ -24,8 +24,12 @@ vi.mock("@shared/ui", async (importOriginal) => ({
   CardTitle: ({ children }: React.PropsWithChildren) => <h3>{children}</h3>,
 }));
 vi.mock("@features/task-workspace/public/workspace-integration", () => ({ TaskContextLinks: () => null }));
+const taskConfigFormProps: Array<{ variant?: "ai" | "manual" }> = [];
 vi.mock("../forms/task-config-form", () => ({
-  TaskConfigForm: () => <div data-testid="task-config-form" />,
+  TaskConfigForm: (props: { variant?: "ai" | "manual" }) => {
+    taskConfigFormProps.push(props);
+    return <div data-testid="task-config-form" data-variant={props.variant} />;
+  },
 }));
 
 function makeItem(overrides: Partial<ScheduleTaskListItem> & { taskId: string; title: string }): ScheduleTaskListItem {
@@ -105,6 +109,7 @@ function renderScheduleTaskList(props: ComponentProps<typeof ScheduleTaskList>) 
 describe("ScheduleTaskList", () => {
   afterEach(() => {
     cleanup();
+    taskConfigFormProps.length = 0;
   });
 
   function clickFilter(label: string) {
@@ -199,6 +204,17 @@ describe("ScheduleTaskList", () => {
     const editButtons = screen.getAllByText("components.scheduleTaskList.quickEdit");
     await user.click(editButtons[0]);
     expect(screen.getByTestId("task-config-form")).toBeInTheDocument();
+  });
+
+  it.each([
+    ["manual", "manual"],
+    ["AI", "ai"],
+  ] as const)("uses the %s form variant for quick edit", async (mode, expectedVariant) => {
+    const user = userEvent.setup();
+    renderScheduleTaskList({ ...defaultProps, items: [makeItem({ taskId: `t-${mode}`, title: `${mode} task`, taskExecutionMode: expectedVariant })] });
+
+    await user.click(screen.getByText("components.scheduleTaskList.quickEdit"));
+    expect(screen.getByTestId("task-config-form")).toHaveAttribute("data-variant", expectedVariant);
   });
 
   it("clicking quick edit again collapses it", async () => {

@@ -37,9 +37,9 @@ chrona mcp revoke CLIENT_ID
 | `chrona_context_read` | 当前时间、时区、默认 provider、可用客户端、安全权限、时间策略及提醒能力边界 |
 | `chrona_task_search` | 标题/描述搜索，状态/过滤器、优先级、排序、分页；独立返回 deadline、排期摘要和自动化设置 |
 | `chrona_task_read` | compact / summary / description / config / plan / activity / result；compact 只核对任务与排期，其他视图保留执行上下文 |
-| `chrona_task_create` | todo / plan / automatic；立即执行或排期，独立截止时间、重复任务、provider、执行参数；dryRun；回执包含 deadline、排期摘要和自动化设置 |
+| `chrona_task_create` | todo / plan / automatic；显式 `taskExecutionMode: manual` 创建不依赖 provider 的手动任务；立即执行或排期，独立截止时间、重复任务、provider、执行参数；dryRun；回执包含 deadline、排期摘要和自动化设置 |
 | `chrona_task_update` | 标题、描述替换/追加/清空、优先级、排期、截止时间、重复规则、自动化、provider 和执行参数；revision CAS、dryRun |
-| `chrona_task_action` | 生成/停止/接受/修改计划；执行开始、重启、暂停、取消、重试、输入/审阅；checkpoint；provider approval；结果验收/重试生成；完成/重开；结果追问/创建后续任务；排期提案接受/拒绝 |
+| `chrona_task_action` | 生成/停止/接受/修改计划；执行开始、重启、暂停、取消、重试、输入/审阅；checkpoint；provider approval；结果验收/重试生成；AI 完成/重开；手动任务使用带 `expectedRevision` 的 `manual_complete` / `manual_reopen`；结果追问/创建后续任务；排期提案接受/拒绝 |
 | `chrona_task_delete` | preview 影响范围，随后提交精确 task/asset 集合及配置 revision 删除 |
 
 不是仅创建草稿的收件箱。示例：
@@ -60,9 +60,10 @@ chrona mcp revoke CLIENT_ID
 
 ### 日程不等于通知
 
-- `todo` 只关闭自动规划和执行，仍是现有 Task，不是独立的人工待办生命周期；没有计划时仍可能显示 `Draft / Needs plan`。不能把所有关闭自动执行的任务都归类为人工待办。
+- `todo` 只关闭自动规划和执行，仍是现有 AI Task；没有计划时仍可能显示 `Draft / Needs plan`。不能把所有关闭自动执行的任务都归类为人工待办。
+- 手动任务必须显式传 `taskExecutionMode: "manual"` 且仅可用 `mode: "todo"`；不能传 provider、执行配置、自动化、重复规则或 `start`。它可有单次排期和独立 dueAt，并直接完成/重开，不创建 Plan、Run 或 provider session。完成/重开必须提交 task_read 返回的 `expectedRevision`；同一 `requestId` 只可重试相同参数。
 - `schedule` 是日历时间块，`dueAt` 是独立截止时间。两者均不配置提醒通知；`timing` 是 AI 规划/执行时间，**不是提醒提前量**。
-- `context.capabilities.scheduling` 声明时间块与独立截止时间可用；`independentManualTodos: false` 声明当前生命周期边界。
+- `context.capabilities.scheduling` 声明时间块与独立截止时间可用；`manualTasks` 声明已交付的完成/重开支持，重复与手动/AI 转换仍不支持。
 - `context.capabilities.reminders` 明确返回 `customRules: false`、`deliveryChannels: []`。现有 `inAppDueIndicators` 根据 dueAt 生成固定的站内到期提示，不可配置，也没有管理 MCP 读取入口。它们不是邮件、系统推送或具有送达保证的通知。
 - 不应声称创建几个提前时间块就完成了多次通知配置。
 

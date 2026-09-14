@@ -44,7 +44,7 @@ function automationSummary(task: { autoPlanGeneration: boolean; autoExecute: boo
 }
 function taskSnapshot(client: ManagementIdentity, task: Awaited<ReturnType<typeof scopedTask>>) {
   return {
-    task: { taskId: task.id, title: task.title, status: task.status, priority: task.priority, url: taskUrl(client, task.id) },
+    task: { taskId: task.id, title: task.title, status: task.status, priority: task.priority, taskExecutionMode: task.taskExecutionMode, url: taskUrl(client, task.id) },
     revision: configRevision(task.configRevision), dueAt: task.dueAt,
     schedule: scheduleSummary(task.projection), automation: automationSummary(task),
   };
@@ -58,7 +58,8 @@ export async function readManagementContext(client: ManagementIdentity) {
     scopes: client.scopes, aiClients: clients, timing: AUTOMATION_TIMING_PRESETS,
     capabilities: {
       modes: ["todo", "plan", "automatic"], immediateExecution: true, scheduledExecution: true, recurrenceTimezones: ["UTC"], rawProviderConfig: false,
-      independentManualTodos: false,
+      manualTasks: { available: true, lifecycle: ["complete", "reopen"], recurrence: false, conversion: false },
+      independentManualTodos: true,
       scheduling: { timeBlocks: true, independentDeadlines: true },
       reminders: {
         customRules: false, deliveryChannels: [],
@@ -74,16 +75,16 @@ export async function searchManagementTasks(client: ManagementIdentity, input: M
   const order: Prisma.TaskOrderByWithRelationInput = input.sort === "dueAt" ? { dueAt: { sort: input.order, nulls: "last" } } : { [input.sort]: input.order };
   const [rows, total] = await Promise.all([
     db.task.findMany({ where, orderBy: [order, { id: "asc" }], take: input.pageSize, skip: (input.page - 1) * input.pageSize,
-      select: { id: true, title: true, description: true, status: true, priority: true, kind: true, dueAt: true, updatedAt: true,
+      select: { id: true, title: true, description: true, status: true, priority: true, kind: true, taskExecutionMode: true, dueAt: true, updatedAt: true,
         autoPlanGeneration: true, autoExecute: true, autoPlanGenerationTiming: true, autoExecuteTiming: true,
         projection: { select: { displayState: true, actionRequired: true, scheduleStatus: true, scheduledStartAt: true, scheduledEndAt: true } } } }), db.task.count({ where }),
   ]);
   return { ...pageInfo(total, input.page, input.pageSize), items: rows.map((task) => ({
     taskId: task.id, title: text(task.title, 200), titleTruncated: task.title.length > 200,
     descriptionPreview: text(task.description, 200), descriptionTruncated: (task.description?.length ?? 0) > 200,
-    status: task.status, priority: task.priority, kind: task.kind, dueAt: task.dueAt, updatedAt: task.updatedAt,
+    status: task.status, priority: task.priority, kind: task.kind, taskExecutionMode: task.taskExecutionMode, dueAt: task.dueAt, updatedAt: task.updatedAt,
     schedule: scheduleSummary(task.projection), automation: automationSummary(task),
-    state: deriveManagementWorkState({ taskStatus: task.status, executionStatus: task.projection?.displayState }), url: taskUrl(client, task.id),
+    state: deriveManagementWorkState({ taskExecutionMode: task.taskExecutionMode, taskStatus: task.status, executionStatus: task.projection?.displayState }), url: taskUrl(client, task.id),
   })) };
 }
 export async function managementTaskSnapshot(client: ManagementIdentity, taskId: string) {
@@ -113,10 +114,10 @@ export async function readManagementTask(client: ManagementIdentity, input: Mana
   const approvals = planRun ? await db.taskPlanProviderApproval.findMany({ where: { taskId: task.id, workBlockId, planRunId: planRun.id, status: "pending" }, take: 20, orderBy: { requestedAt: "desc" }, select: { id: true, title: true, summary: true, riskLevel: true, choices: true, requestedAt: true } }) : [];
   const planOutput = record(record(record(planRun?.planRun).mutableGraph).planOutput);
   const resultFinalization = managementResultFinalization(planOutput);
-  const state = deriveManagementWorkState({ taskStatus: task.status, executionStatus: execution?.status ?? task.projection?.displayState, planStatus: savedPlan?.status, hasPlan: Boolean(savedPlan), hasAcceptedPlan: savedPlan?.status === "Accepted" }, resultFinalization);
+  const state = deriveManagementWorkState({ taskExecutionMode: task.taskExecutionMode, taskStatus: task.status, executionStatus: execution?.status ?? task.projection?.displayState, planStatus: savedPlan?.status, hasPlan: Boolean(savedPlan), hasAcceptedPlan: savedPlan?.status === "Accepted" }, resultFinalization);
   const canAcceptResult = state.state === "result_ready" && resultFinalization.canAccept;
   const common = {
-    task: { taskId: task.id, title: task.title, status: task.status, priority: task.priority, kind: task.kind, createdAt: task.createdAt, updatedAt: task.updatedAt, url: taskUrl(client, task.id) },
+    task: { taskId: task.id, title: task.title, status: task.status, priority: task.priority, kind: task.kind, taskExecutionMode: task.taskExecutionMode, createdAt: task.createdAt, updatedAt: task.updatedAt, url: taskUrl(client, task.id) },
     revision: configRevision(task.configRevision), state, resultFinalization,
     dueAt: task.dueAt, schedule: scheduleSummary(task.projection), automation: automationSummary(task),
     savedPlan: savedPlan ? { planId: savedPlan.planId, revision: savedPlan.revision, status: savedPlan.status, expectedHeadStateVersion: head?.stateVersion ?? null } : null,
@@ -124,7 +125,10 @@ export async function readManagementTask(client: ManagementIdentity, input: Mana
     commands,
     providerApprovals: approvals.map((approval) => ({ ...approval, title: text(approval.title, 200), summary: text(approval.summary, 1_000), executionScope: planRun?.executionScopeId })),
     editability: { canUpdate: client.scopes.includes("tasks:write"), sourceManaged: task.importedCalendarEvents.length > 0, sourceLockedFields: task.importedCalendarEvents.length ? ["title", "schedule", "recurrence"] : [] },
-    availableActions: [
+    availableActions: task.taskExecutionMode === "manual" ? [
+      { type: "manual_complete", expectedRevision: configRevision(task.configRevision), permitted: client.scopes.includes("tasks:write") && task.status !== "Done", disabledReason: task.status === "Done" ? "Task is already complete" : null },
+      { type: "manual_reopen", expectedRevision: configRevision(task.configRevision), permitted: client.scopes.includes("tasks:write") && task.status === "Done", disabledReason: task.status === "Done" ? null : "Task is not complete" },
+    ] : [
       { type: "generate_plan", permitted: client.scopes.includes("plans:write") },
       { type: "accept_plan", permitted: client.scopes.includes("plans:write"), planId: savedPlan?.planId ?? null, expectedHeadStateVersion: head?.stateVersion ?? null },
       { type: "execution", permitted: client.scopes.includes("executions:control"), expectedExecutionScope: planRun?.executionScopeId ?? null },

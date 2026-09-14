@@ -6,6 +6,7 @@ import type {
 import { TaskPlanGenerationHeadStatus, TaskPlanStatus } from "@/generated/prisma/client";
 import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
 import { ensureTaskInWorkspace } from "@/modules/tasks/task-by-id";
+import { assertAiTaskExecution } from "@/modules/tasks/assert-ai-task-execution";
 import { applyPlanMutationCommand, applyPlanPatchCommand } from "./apply-plan-patch-command";
 import { generateTaskPlanManualStream } from "./generate-task-plan-manual-stream";
 import { startTaskPlanGenerationDurably } from "./start-task-plan-generation";
@@ -88,6 +89,7 @@ export class TaskPlanning {
 
 
   async accept(input: { taskId: string; planId: string; workspaceId?: string; workBlockId?: string | null; expectedHeadStateVersion: number; idempotencyKey: string; workContext?: SchedulerWorkContext }) {
+    await assertAiTaskExecution(input.taskId);
     if (input.workspaceId) {
       await ensureTaskInWorkspace(input.taskId, input.workspaceId);
       await ensurePlanInWorkspace(input.planId, input.taskId, input.workspaceId);
@@ -165,6 +167,7 @@ export class TaskPlanning {
   }
 
   async generate(input: { taskId: string; workBlockId?: string | null; forceRefresh?: boolean; userInstruction?: string | null; selectedNodeId?: string | null; idempotencyKey: string; workContext?: SchedulerWorkContext }) {
+    await assertAiTaskExecution(input.taskId);
     const started = await startTaskPlanGenerationDurably(input);
     const events = generateTaskPlanManualStream({
       ...input,
@@ -182,17 +185,20 @@ export class TaskPlanning {
   }
 
   async stopGeneration(input: { taskId: string; workBlockId?: string | null }) {
+    await assertAiTaskExecution(input.taskId);
     return {
       taskId: input.taskId,
       stopped: await stopTaskPlanGeneration({ taskId: input.taskId, workBlockId: input.workBlockId ?? null }),
     };
   }
 
-  patch(input: Parameters<typeof applyPlanPatchCommand>[0]) {
+  async patch(input: Parameters<typeof applyPlanPatchCommand>[0]) {
+    await assertAiTaskExecution(input.taskId);
     return applyPlanPatchCommand(input);
   }
 
-  mutate(input: Parameters<typeof applyPlanMutationCommand>[0]) {
+  async mutate(input: Parameters<typeof applyPlanMutationCommand>[0]) {
+    await assertAiTaskExecution(input.taskId);
     return applyPlanMutationCommand(input);
   }
 }

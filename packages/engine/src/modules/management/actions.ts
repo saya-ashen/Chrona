@@ -4,7 +4,7 @@ import { executionActionBodySchema, type ManagementAction } from "@chrona/contra
 import type { ManagementIdentity } from "./clients";
 import type { ManagementDeps } from "./types";
 import { ManagementError } from "./errors";
-import { record, requireScopes, scopedTask } from "./reads";
+import { assertRevision, record, requireScopes, scopedTask } from "./reads";
 import { resolveExecutionScope } from "../plan-execution/persistence/execution-scope";
 
 export function actionScopes(input: ManagementAction): string[] {
@@ -14,7 +14,7 @@ export function actionScopes(input: ManagementAction): string[] {
     case "follow_up": return ["executions:control", ...(input.action.intent === "create_task" ? ["tasks:write"] : [])];
     case "accept_result": case "complete": return ["results:accept"];
     case "schedule_proposal": return ["schedule:write"];
-    case "reopen": return ["tasks:write"];
+    case "reopen": case "manual_complete": case "manual_reopen": return ["tasks:write"];
   }
 }
 export function isManagementControlAction(input: ManagementAction) {
@@ -28,6 +28,16 @@ export async function validateManagementAction(client: ManagementIdentity, input
   await scopedTask(client, input.taskId, input.workBlockId);
   const scope = await resolveExecutionScope(input.taskId, { workBlockId: input.workBlockId });
   const action = input.action;
+  const task = await db.task.findUniqueOrThrow({ where: { id: input.taskId }, select: { taskExecutionMode: true, configRevision: true } });
+  if (task.taskExecutionMode === "manual" && !["manual_complete", "manual_reopen", "schedule_proposal"].includes(action.type)) {
+    throw new ManagementError("VALIDATION_ERROR", "Manual tasks cannot use AI planning or execution actions");
+  }
+  if ((action.type === "manual_complete" || action.type === "manual_reopen") && task.taskExecutionMode !== "manual") {
+    throw new ManagementError("VALIDATION_ERROR", "Manual lifecycle actions require a manual task");
+  }
+  if (action.type === "manual_complete" || action.type === "manual_reopen") {
+    assertRevision(task, action.expectedRevision);
+  }
   if (action.type === "execution" || action.type === "checkpoint" || action.type === "retry_result") {
     const current = await db.taskPlanRun.findFirst({ where: { taskId: input.taskId, workBlockId: scope.workBlockId, ...(scope.planId ? { planId: scope.planId } : {}) }, orderBy: [{ updatedAt: "desc" }, { id: "desc" }] });
     if ((current?.executionScopeId ?? null) !== action.expectedExecutionScope) throw new ManagementError("REVISION_CONFLICT", "Execution scope changed; read the task before acting");
@@ -68,6 +78,8 @@ export async function runManagementAction(client: ManagementIdentity, input: Man
     case "accept_result": return deps.result.accept({ taskId: input.taskId, expectedRunId: action.runId });
     case "complete": return deps.lifecycle.complete({ taskId: input.taskId, expectedRunId: action.runId });
     case "reopen": return deps.lifecycle.reopen({ taskId: input.taskId });
+    case "manual_complete": return deps.tasks.completeManual({ taskId: input.taskId, workspaceId: client.workspaceId, expectedRevision: action.expectedRevision, requestId: key });
+    case "manual_reopen": return deps.tasks.reopenManual({ taskId: input.taskId, workspaceId: client.workspaceId, expectedRevision: action.expectedRevision, requestId: key });
     case "schedule_proposal": return deps.schedule.decideProposal({ proposalId: action.proposalId, decision: action.decision, resolutionNote: action.note });
     case "execution": {
       const session = await db.executionSession.findFirst({ where: { taskId: input.taskId, workBlockId: scope.workBlockId, status: { in: ["Active", "Paused"] } }, orderBy: { updatedAt: "desc" }, select: { id: true } });

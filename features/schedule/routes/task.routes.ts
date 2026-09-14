@@ -53,8 +53,12 @@ export function createTaskScheduleRoutes(engine: ChronaEngine) {
           const result = await engine.tasks.schedule.apply({
             taskId,
             dueAt: body.dueAt ? new Date(body.dueAt) : null,
-            scheduledStartAt: new Date(body.scheduledStartAt),
-            scheduledEndAt: new Date(body.scheduledEndAt),
+            scheduledStartAt: body.scheduledStartAt
+              ? new Date(body.scheduledStartAt)
+              : null,
+            scheduledEndAt: body.scheduledEndAt
+              ? new Date(body.scheduledEndAt)
+              : null,
             scheduleSource: body.scheduleSource,
           });
 

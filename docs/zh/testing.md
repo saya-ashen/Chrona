@@ -270,7 +270,11 @@ Headful 浏览器测试，覆盖关键用户路径：
 - `schedule.spec.ts` — 排期页面操作
 - `demo.readme.spec.ts` — README 演示录制
 
-Playwright 配置自动启动 dev server（`DATABASE_URL` + `db:seed` → `bun run dev`），测试运行在 Chromium 上。
+Playwright 配置自动启动 dev server（`DATABASE_URL` + `db:seed` → `bun run dev`），测试运行在 Chromium 上。若机器没有 Playwright 下载的浏览器，可将已有隔离浏览器的可执行文件传给 Playwright 和 Goal PDF 导出测试；不需要下载浏览器或修改系统配置：
+
+```bash
+PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/path/to/chromium bun run test
+```
 
 ## 共享测试工具
 

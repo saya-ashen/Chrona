@@ -1,6 +1,7 @@
 /* eslint-disable max-lines-per-function, complexity -- Plan generation coordinates durable feature runs and plan-head CAS explicitly. */
 import { AiFeatureRunStatus, TaskPlanGenerationHeadStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
+import { assertAiTaskExecution } from "@/modules/tasks/assert-ai-task-execution";
 import { AiFeatureRuntimeError } from "@/modules/ai";
 import { taskPlanGenerateInputSchema } from "./ai/task.plan.generate";
 import { startTaskPlanGenerateFeature } from "./ai/task-plan-generate-run";
@@ -31,6 +32,7 @@ export async function startTaskPlanGenerationDurably(input: {
   selectedNodeId?: string | null;
   workContext?: SchedulerWorkContext;
 }): Promise<StartedTaskPlanGeneration> {
+  await assertAiTaskExecution(input.taskId);
   const priorRun = await db.aiFeatureRun.findFirst({
     where: {
       featureId: "task.plan.generate",

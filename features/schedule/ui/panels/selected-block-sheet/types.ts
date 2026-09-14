@@ -11,7 +11,7 @@ export interface SelectedBlockSheetProps {
   isPending: boolean;
   onClose: () => void;
   onSaveTaskConfigAction: (
-    taskId: string,
+    item: ScheduleRecord,
     input: TaskConfigFormInput,
   ) => Promise<void>;
   onMutatedAction: () => Promise<void>;

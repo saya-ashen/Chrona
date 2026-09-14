@@ -16,6 +16,7 @@ import { useTaskWorkspacePageState } from "../hooks/use-task-workspace-page-stat
 import { useTaskWorkspacePlanState } from "../hooks/use-task-workspace-plan-state";
 import { useTaskWorkspaceProposalFlow } from "../hooks/use-task-workspace-proposal-flow";
 import { createTaskAiSidebarContext } from "../adapters/task-ai-sidebar-adapter";
+import { completeManualTask, reopenManualTask } from "../model/task-actions-client";
 
 function getLatestPersistedActivitySummary(pageData: TaskPageData) {
 	const latestActivity = pageData.activityTimeline?.at(-1);
@@ -205,11 +206,13 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
 		commandCenter,
 		setTask,
 		refreshWorkspace,
+		refreshHeaderSpec,
 		workspaceEvents,
 		headerSpec,
 		headerStore,
 	} = useTaskWorkspacePageState(data);
 	const task = pageData.task;
+	const isManualTask = task.taskExecutionMode === "manual";
 	const [isEditExpanded, setIsEditExpanded] = useState(false);
 	const toggleEditExpanded = useCallback(() => {
 		setIsEditExpanded((current) => !current);
@@ -225,7 +228,7 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
 		draftEditableTask,
 		handleTaskConfigDraftStateChange,
 		persistTaskConfig,
-	} = useTaskWorkspaceEditorState(task, setTask);
+	} = useTaskWorkspaceEditorState(task, setTask, refreshWorkspace);
 
 	const {
 		plan,
@@ -275,6 +278,19 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
 				copy={messages.pages.goals}
 			/>
 		) : null;
+	const completeOrReopenManualTask = useCallback(async (action: "manual_complete" | "manual_reopen") => {
+		if (!task.revision) {
+			throw new Error(messages.components.taskWorkspace.manualTaskActionFailed);
+		}
+		const input = {
+			taskId: task.id,
+			expectedRevision: task.revision,
+			requestId: crypto.randomUUID(),
+		};
+		if (action === "manual_reopen") await reopenManualTask(input);
+		else await completeManualTask(input);
+		await Promise.all([refreshWorkspace(), refreshHeaderSpec()]);
+	}, [messages.components.taskWorkspace.manualTaskActionFailed, refreshHeaderSpec, refreshWorkspace, task.id, task.revision]);
 	const isTaskRunning =
 		task.status === "Running" ||
 		currentExecution?.status === "running" ||
@@ -375,8 +391,8 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
 					}
 					onGeneratePlan={handleGeneratePlanFromHeader}
 					onStopPlanGeneration={handleStopPlanGeneration}
-					hideGeneratePlan={planGenerationStatus === "idle" && !plan}
-					hideAcceptPlan={false}
+					hideGeneratePlan={isManualTask || (planGenerationStatus === "idle" && !plan)}
+					hideAcceptPlan={isManualTask}
 					onRestartPlan={async () => {
 						await dispatchExecutionAction({
 							action: "restart_from_beginning",
@@ -384,7 +400,9 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
 						});
 					}}
 					onAction={async (action) => {
-						if (action.id === "start") {
+						if (action.id === "manual_complete" || action.id === "manual_reopen") {
+							await completeOrReopenManualTask(action.id);
+						} else if (action.id === "start") {
 							await dispatchExecutionAction({ action: "start_manual" });
 						}
 						if (action.id === "pause") {
@@ -465,6 +483,7 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
 							? "AI provider cannot be changed while task is running."
 							: undefined,
 						sourceManaged: consoleView.task.sourceManaged,
+						taskExecutionMode: task.taskExecutionMode,
 						saveSuccess,
 						saveError,
 						hasUnsavedConfigChanges,
@@ -477,7 +496,7 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
 					}}
 				/>
 			</div>
-			<TaskWorkspacePlanSection
+			{isManualTask ? null : <TaskWorkspacePlanSection
 				label={copy.planPanelTitle ?? "Plan"}
 				commandCenterCopy={{
 					nowTab: copy.commandCenterNowTab,
@@ -514,6 +533,7 @@ export function TaskWorkspacePage({ data, copy: copyProp }: Props) {
 				pendingCommand={pendingCommand}
 				createGoalAction={goalPromotionAction}
 			/>
+			}
 		</div>
 	);
 }

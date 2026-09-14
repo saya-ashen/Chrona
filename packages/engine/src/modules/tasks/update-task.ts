@@ -216,6 +216,22 @@ export async function updateTask(
   const currentTask = await db.task.findUniqueOrThrow({
     where: { id: input.taskId },
   });
+  if (currentTask.taskExecutionMode === "manual" && (
+    (input.aiClientId !== undefined && input.aiClientId !== null) ||
+    input.executionConfig !== undefined ||
+    input.sessionStrategy !== undefined ||
+    input.autoPlanGeneration !== undefined ||
+    input.autoExecute !== undefined ||
+    input.autoPlanGenerationTiming !== undefined ||
+    input.autoExecuteTiming !== undefined ||
+    input.recurrenceRule !== undefined ||
+    input.status !== undefined
+  )) {
+    throw new EngineError(
+      ENGINE_ERROR_CODES.VALIDATION_FAILED,
+      "Manual tasks cannot configure AI providers, automation, execution settings, recurrence, or status through update.",
+    );
+  }
   const importedCalendarEvent = await db.importedCalendarEvent.findFirst({
     where: { taskId: input.taskId },
     select: { title: true },
@@ -244,9 +260,11 @@ export async function updateTask(
     ? nextExecutionConfigRecord.model.trim()
     : "";
   const nextAiClientId = input.aiClientId === undefined ? currentTask.aiClientId : input.aiClientId;
-  const providerSelection = await resolveTaskExecutionProviderSelection({
-    aiClientId: nextAiClientId,
-  });
+  const providerSelection = currentTask.taskExecutionMode === "manual"
+    ? null
+    : await resolveTaskExecutionProviderSelection({
+      aiClientId: nextAiClientId,
+    });
   if (nextAiClientId && !providerSelection) {
     throw new EngineError(
       ENGINE_ERROR_CODES.VALIDATION_FAILED,
@@ -273,6 +291,7 @@ export async function updateTask(
 
     const staticState = deriveTaskStaticState({
       hasAcceptedPlan: acceptedPlan !== null,
+      taskExecutionMode: currentTask.taskExecutionMode,
     });
 
     return TaskStatus[staticState.persistedStatus];

@@ -1136,6 +1136,10 @@
       "automaticRunPast": "This trigger time has passed. The run becomes due on the next scheduler scan, once its plan is ready.",
       "automaticRunPlanTime": "Plan generation timing",
       "title": "Add task",
+      "taskType": "Task type",
+      "aiTask": "AI task",
+      "manualTask": "Manual task",
+      "manualTaskDescription": "Complete this task directly. Chrona will not create a plan or use an AI provider.",
       "close": "Close",
       "titlePlaceholder": "Add title",
       "titleLabel": "Title",
@@ -1238,6 +1242,12 @@
       "resultPlanReadOnly": "Read-only plan. Viewing it does not restart execution.",
       "resultQuickFiles": "Result files",
       "approvalNeeded": "Approval needed",
+      "manualTaskTitle": "Manual task",
+      "manualTaskOpenDescription": "This task is managed directly. Complete it when your work is finished.",
+      "manualTaskDoneDescription": "This manual task is complete. Reopen it to continue working.",
+      "manualTaskComplete": "Complete task",
+      "manualTaskReopen": "Reopen task",
+      "manualTaskActionFailed": "Could not update manual task status.",
       "planSetupLabel": "Plan setup",
       "planSetupBriefTitle": "Task brief",
       "planSetupEditBrief": "Edit task brief",
@@ -2466,10 +2476,10 @@
       "filterNeedsMe": "Needs Me",
       "advancedFilters": "More filters",
       "workStateLabels": {
-        "no_plan": "Needs plan", "planning": "Planning", "plan_review": "Plan ready", "ready_to_run": "Ready to run", "queued": "Queued", "running": "Running", "waiting_for_input": "Input needed", "waiting_for_approval": "Approval needed", "blocked": "Blocked", "failed": "Failed", "cancelled": "Cancelled", "result_ready": "Awaiting acceptance", "done": "Accepted"
+        "manual_open": "Manual task", "no_plan": "Needs plan", "planning": "Planning", "plan_review": "Plan ready", "ready_to_run": "Ready to run", "queued": "Queued", "running": "Running", "waiting_for_input": "Input needed", "waiting_for_approval": "Approval needed", "blocked": "Blocked", "failed": "Failed", "cancelled": "Cancelled", "result_ready": "Awaiting acceptance", "done": "Accepted"
       },
       "workStateActions": {
-        "no_plan": "Generate a plan before execution", "planning": "Wait for plan generation", "plan_review": "Review and accept the plan", "ready_to_run": "Review the run settings and start", "queued": "Waiting for execution", "running": "Monitor progress", "waiting_for_input": "Provide the requested input", "waiting_for_approval": "Review the approval request", "blocked": "Inspect and resolve the blocker", "failed": "Inspect the failure before retrying", "cancelled": "Inspect the history", "result_ready": "Accept the result or request changes", "done": "Ask a follow-up or create the next task"
+        "manual_open": "Complete this task when finished", "no_plan": "Generate a plan before execution", "planning": "Wait for plan generation", "plan_review": "Review and accept the plan", "ready_to_run": "Review the run settings and start", "queued": "Waiting for execution", "running": "Monitor progress", "waiting_for_input": "Provide the requested input", "waiting_for_approval": "Review the approval request", "blocked": "Inspect and resolve the blocker", "failed": "Inspect the failure before retrying", "cancelled": "Inspect the history", "result_ready": "Accept the result or request changes", "done": "Ask a follow-up or create the next task"
       },
       "listDescription": "Review task state and open work that needs attention.",
       "statTotal": "Total",

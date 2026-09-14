@@ -1,5 +1,9 @@
 import { describe, expect, it } from "bun:test";
-import { taskResultFollowUpBodySchema } from "./execution.schema";
+import {
+  manualTaskLifecycleBodySchema,
+  scheduleBodySchema,
+  taskResultFollowUpBodySchema,
+} from "./execution.schema";
 import { workCommandBodySchema } from "./projections.schema";
 
 const baseRequest = {
@@ -22,6 +26,23 @@ describe("workCommandBodySchema", () => {
         ...action,
       }).workBlockId,
     ).toBe("block_1");
+  });
+});
+
+describe("manual task lifecycle and one-off schedule schemas", () => {
+  it("rejects caller-selected manual workspace fields", () => {
+    expect(manualTaskLifecycleBodySchema.safeParse({
+      expectedRevision: "config-v1:3",
+      requestId: "00000000-0000-4000-8000-000000000000",
+      workspaceId: "injected-workspace",
+    }).success).toBe(false);
+  });
+
+  it("allows an unscheduled deadline but rejects an empty schedule mutation", () => {
+    expect(scheduleBodySchema.parse({ dueAt: "2030-01-02T10:00:00.000Z" })).toMatchObject({
+      dueAt: "2030-01-02T10:00:00.000Z",
+    });
+    expect(scheduleBodySchema.safeParse({}).success).toBe(false);
   });
 });
 

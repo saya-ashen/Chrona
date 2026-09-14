@@ -192,6 +192,12 @@ enum TaskKind {
   recurring
 }
 
+/// Separates direct human-managed work from AI plan/run lifecycle; automation flags never imply this mode.
+enum TaskExecutionMode {
+  ai
+  manual
+}
+
 enum ScheduleStatus {
   Unscheduled
   Scheduled
@@ -671,6 +677,7 @@ model Task {
   title                     String
   description               String?
   kind                      TaskKind                   @default(single)
+  taskExecutionMode         TaskExecutionMode          @default(ai)
   recurrenceRule            String?
   seriesExternalUid         String?
   recurrenceAnchorStartAt   DateTime?

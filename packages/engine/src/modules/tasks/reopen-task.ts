@@ -4,14 +4,19 @@ import { appendCanonicalEvent } from "@/modules/events";
 import { getAcceptedCompiledPlanForTask } from "@/modules/plan-execution/persistence/execution-scope";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
 import { deriveTaskStaticState } from "@chrona/domain";
+import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
 
 export async function reopenTask(input: { taskId: string }) {
   const task = await db.task.findUniqueOrThrow({
     where: { id: input.taskId },
   });
+  if (task.taskExecutionMode === "manual") {
+    throw new EngineError(ENGINE_ERROR_CODES.INVALID_TASK_STATE, "Manual tasks must use the direct manual lifecycle command.");
+  }
   const acceptedPlan = await getAcceptedCompiledPlanForTask(task.id);
   const staticState = deriveTaskStaticState({
     hasAcceptedPlan: acceptedPlan !== null,
+    taskExecutionMode: task.taskExecutionMode,
   });
   const nextStatus = TaskStatus[staticState.persistedStatus];
 
@@ -35,6 +40,7 @@ export async function reopenTask(input: { taskId: string }) {
     payload: {
       previous_status: task.status,
       next_status: nextStatus,
+      task_execution_mode: task.taskExecutionMode,
     },
     dedupeKey: `task.reopened:${task.id}:${Date.now()}`,
   });

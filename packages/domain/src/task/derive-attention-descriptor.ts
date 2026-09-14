@@ -60,6 +60,7 @@ function groupForState(state: WorkStateCanonical): AttentionGroup {
     case "waiting_for_input":
       return "waiting";
     case "result_ready":
+    case "manual_open":
     case "no_plan":
     case "planning":
     case "plan_review":

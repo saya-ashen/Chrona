@@ -107,6 +107,7 @@ export const createTaskBodySchema = z.object({
   title: z.string().min(1, "title is required").max(TASK_TITLE_MAX),
   description: z.string().max(TASK_DESCRIPTION_MAX).optional(),
   priority: taskPriorityEnum.optional(),
+  taskExecutionMode: z.enum(["ai", "manual"]).optional(),
   autoPlanGeneration: z.boolean().optional(),
   autoExecute: z.boolean().optional(),
   autoPlanGenerationTiming: automationTimingSchema.optional(),
@@ -163,7 +164,7 @@ export const updateTaskParamSchema = z.object({
 export const updateTaskBodySchema = z.object({
   workspaceId: z.string().optional(),
   title: z.string().min(1).max(TASK_TITLE_MAX).optional(),
-  description: z.string().max(TASK_DESCRIPTION_MAX).optional(),
+  description: z.string().max(TASK_DESCRIPTION_MAX).nullable().optional(),
   priority: taskPriorityEnum.optional(),
   autoPlanGeneration: z.boolean().optional(),
   autoExecute: z.boolean().optional(),

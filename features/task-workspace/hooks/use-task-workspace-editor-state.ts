@@ -16,9 +16,82 @@ type TaskConfigDraftState = {
 	values: TaskConfigFormInput;
 };
 
+type TaskScheduleSaveCommand =
+	| { type: "clear" }
+	| {
+			type: "apply";
+			dueAt: Date | null;
+			scheduledStartAt: Date | null;
+			scheduledEndAt: Date | null;
+		};
+
+function sameDateOrNull(value: Date | null, original: string | null) {
+	return value?.getTime() === (original ? new Date(original).getTime() : undefined);
+}
+
+/** Converts the shared form value into a mode-safe task and schedule save. */
+// eslint-disable-next-line complexity -- Mode and schedule transitions must remain one ordered save contract.
+export function buildTaskConfigSaveRequest(
+	task: TaskData,
+	input: TaskConfigFormInput,
+): { taskBody: Record<string, unknown>; scheduleCommands: TaskScheduleSaveCommand[] } {
+	const taskBody: Record<string, unknown> = {
+		title: input.title,
+		description: input.description.trim() || null,
+		priority: input.priority,
+	};
+	if (task.taskExecutionMode !== "manual") {
+		Object.assign(taskBody, {
+			executionConfig: input.executionConfig,
+			aiClientId: input.aiClientId,
+			autoPlanGeneration: input.autoPlanGeneration,
+			autoExecute: input.autoExecute,
+			recurrenceRule: input.recurrenceRule,
+			recurrenceAnchorStartAt:
+				input.recurrenceAnchorStartAt?.toISOString() ?? null,
+			recurrenceAnchorEndAt:
+				input.recurrenceAnchorEndAt?.toISOString() ?? null,
+		});
+	}
+
+	if (task.taskExecutionMode !== "manual") {
+		return {
+			taskBody,
+			scheduleCommands:
+				input.scheduledStartAt && input.scheduledEndAt
+					? [{ type: "apply", dueAt: input.dueAt, scheduledStartAt: input.scheduledStartAt, scheduledEndAt: input.scheduledEndAt }]
+					: [],
+		};
+	}
+
+	const hadSchedule = Boolean(task.scheduledStartAt && task.scheduledEndAt);
+	if (input.scheduledStartAt && input.scheduledEndAt) {
+		return {
+			taskBody,
+			scheduleCommands: [{ type: "apply", dueAt: input.dueAt, scheduledStartAt: input.scheduledStartAt, scheduledEndAt: input.scheduledEndAt }],
+		};
+	}
+	if (hadSchedule) {
+		return {
+			taskBody,
+			scheduleCommands: [
+				{ type: "clear" },
+				...(input.dueAt ? [{ type: "apply" as const, dueAt: input.dueAt, scheduledStartAt: null, scheduledEndAt: null }] : []),
+			],
+		};
+	}
+	return {
+		taskBody,
+		scheduleCommands: sameDateOrNull(input.dueAt, task.dueAt)
+			? []
+			: [{ type: "apply", dueAt: input.dueAt, scheduledStartAt: null, scheduledEndAt: null }],
+	};
+}
+
 export function useTaskWorkspaceEditorState(
 	task: TaskData,
 	setTask: (value: SetStateAction<TaskData>) => void,
+	refreshTask?: () => Promise<unknown>,
 ) {
 	const [taskConfigDraft, setTaskConfigDraft] =
 		useState<TaskConfigFormInput | null>(null);
@@ -90,37 +163,28 @@ export function useTaskWorkspaceEditorState(
 
 	const saveTaskMutation = useMutation({
 		mutationFn: async (input: TaskConfigFormInput) => {
-			const taskBody: Record<string, unknown> = {
-				title: input.title,
-				description: input.description || undefined,
-				priority: input.priority,
-				executionConfig: input.executionConfig,
-				aiClientId: input.aiClientId,
-				autoPlanGeneration: input.autoPlanGeneration,
-				autoExecute: input.autoExecute,
-				recurrenceRule: input.recurrenceRule,
-				recurrenceAnchorStartAt:
-					input.recurrenceAnchorStartAt?.toISOString() ?? null,
-				recurrenceAnchorEndAt:
-					input.recurrenceAnchorEndAt?.toISOString() ?? null,
-			};
+			const save = buildTaskConfigSaveRequest(task, input);
 			await apiJson(`/api/tasks/${encodeURIComponent(task.id)}`, {
 				method: "PATCH",
-				body: JSON.stringify(taskBody),
+				body: JSON.stringify(save.taskBody),
 			});
-
-			if (input.scheduledStartAt && input.scheduledEndAt) {
+			for (const command of save.scheduleCommands) {
+				if (command.type === "clear") {
+					await apiJson(`/api/tasks/${encodeURIComponent(task.id)}/schedule`, {
+						method: "DELETE",
+					});
+					continue;
+				}
 				await apiJson(`/api/tasks/${encodeURIComponent(task.id)}/schedule`, {
 					method: "PUT",
 					body: JSON.stringify({
-						dueAt: input.dueAt?.toISOString() ?? null,
-						scheduledStartAt: input.scheduledStartAt.toISOString(),
-						scheduledEndAt: input.scheduledEndAt.toISOString(),
+						dueAt: command.dueAt?.toISOString() ?? null,
+						scheduledStartAt: command.scheduledStartAt?.toISOString() ?? null,
+						scheduledEndAt: command.scheduledEndAt?.toISOString() ?? null,
 						scheduleSource: "human",
 					}),
 				});
 			}
-
 			return input;
 		},
 	});
@@ -132,21 +196,25 @@ export function useTaskWorkspaceEditorState(
 
 			try {
 				await saveTaskMutation.mutateAsync(input);
-				setTask((prev) => ({
-					...prev,
-					title: input.title,
-					description: input.description || null,
-					priority: input.priority,
-					dueAt: dateToIsoStringOrNull(input.dueAt),
-					scheduledStartAt: dateToIsoStringOrNull(input.scheduledStartAt),
-					scheduledEndAt: dateToIsoStringOrNull(input.scheduledEndAt),
-					scheduleStatus: prev.scheduleStatus,
-					executionConfig: input.executionConfig,
-					aiClientId: input.aiClientId,
-					autoPlanGeneration: input.autoPlanGeneration,
-					autoExecute: input.autoExecute,
-					recurrenceRule: input.recurrenceRule,
-				}));
+				if (refreshTask) {
+					await refreshTask();
+				} else {
+					setTask((prev) => ({
+						...prev,
+						title: input.title,
+						description: input.description || null,
+						priority: input.priority,
+						dueAt: dateToIsoStringOrNull(input.dueAt),
+						scheduledStartAt: dateToIsoStringOrNull(input.scheduledStartAt),
+						scheduledEndAt: dateToIsoStringOrNull(input.scheduledEndAt),
+						scheduleStatus: prev.scheduleStatus,
+						executionConfig: input.executionConfig,
+						aiClientId: input.aiClientId,
+						autoPlanGeneration: input.autoPlanGeneration,
+						autoExecute: input.autoExecute,
+						recurrenceRule: input.recurrenceRule,
+					}));
+				}
 				setTaskConfigDraft(input);
 				setHasUnsavedConfigChanges(false);
 				setSaveSuccess(true);

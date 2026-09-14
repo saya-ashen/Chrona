@@ -251,6 +251,8 @@ export function TaskWorkspaceHeaderCard({
 					actionId !== "start" &&
 					actionId !== "pause" &&
 					actionId !== "stop" &&
+					actionId !== "manual_complete" &&
+					actionId !== "manual_reopen" &&
 					actionId !== "more"
 				)
 					return;

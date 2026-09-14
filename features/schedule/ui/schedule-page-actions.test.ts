@@ -2,10 +2,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const moveWorkBlock = vi.fn();
 const applySchedule = vi.fn();
+const clearSchedule = vi.fn();
 const updateTaskConfigFromSchedule = vi.fn();
 
 vi.mock("./schedule-actions", () => ({
 	applySchedule: (...args: unknown[]) => applySchedule(...args),
+	clearSchedule: (...args: unknown[]) => clearSchedule(...args),
 	createScheduledTask: vi.fn(),
 	moveWorkBlock: (...args: unknown[]) => moveWorkBlock(...args),
 	updateTaskConfigFromSchedule: (...args: unknown[]) =>
@@ -45,6 +47,7 @@ beforeEach(() => {
 	vi.clearAllMocks();
 	moveWorkBlock.mockResolvedValue(undefined);
 	applySchedule.mockResolvedValue(undefined);
+	clearSchedule.mockResolvedValue(undefined);
 	updateTaskConfigFromSchedule.mockResolvedValue(undefined);
 });
 
@@ -147,7 +150,13 @@ describe("handleScheduleDropAction", () => {
 		const scheduledEndAt = new Date("2026-04-15T12:00:00.000Z");
 
 		await handleTaskConfigSaveAction({
-			taskId: "task-1",
+			task: {
+				taskId: "task-1",
+				taskExecutionMode: "ai",
+				dueAt: null,
+				scheduledStartAt: null,
+				scheduledEndAt: null,
+			},
 			input: {
 				title: "Updated task",
 				description: "Updated description",
@@ -185,6 +194,45 @@ describe("handleScheduleDropAction", () => {
 		);
 		expect(callbacks.applyOptimisticViewData).toHaveBeenCalledOnce();
 		expect(callbacks.refreshProjection).toHaveBeenCalledOnce();
+	});
+
+	it("[SCHED-009] persists a manual deadline-only update without AI keys", async () => {
+		const callbacks = harness();
+		const dueAt = new Date("2026-07-01T17:00:00.000Z");
+
+		await handleTaskConfigSaveAction({
+			task: { taskId: "task-1", taskExecutionMode: "manual", dueAt: null, scheduledStartAt: null, scheduledEndAt: null },
+			input: {
+				title: "Manual task", description: "", priority: "Medium", dueAt,
+				scheduledStartAt: null, scheduledEndAt: null, executionConfig: { hidden: true }, aiClientId: "client-1",
+				autoPlanGeneration: true, autoExecute: true, autoPlanGenerationTiming: "at_start", autoExecuteTiming: "at_start",
+				recurrenceRule: "FREQ=DAILY", recurrenceAnchorStartAt: null, recurrenceAnchorEndAt: null,
+			},
+			applyOptimisticViewData: callbacks.applyOptimisticViewData, setIsPending: callbacks.setIsPending,
+			setErrorMessage: callbacks.setErrorMessage, refreshProjection: callbacks.refreshProjection,
+			resetViewData: callbacks.resetViewData, actionFailedMessage: "Schedule action failed",
+		});
+
+		expect(updateTaskConfigFromSchedule).toHaveBeenCalledWith({ taskId: "task-1", title: "Manual task", description: null, priority: "Medium" });
+		expect(applySchedule).toHaveBeenCalledWith({ taskId: "task-1", dueAt, scheduledStartAt: null, scheduledEndAt: null, scheduleSource: "human" });
+		expect(callbacks.refreshProjection).toHaveBeenCalledOnce();
+	});
+
+	it("[SCHED-010] restores projection and rejects a failed save so the editor stays open", async () => {
+		const callbacks = harness();
+		updateTaskConfigFromSchedule.mockRejectedValueOnce(new Error("Manual save rejected"));
+
+		await expect(handleTaskConfigSaveAction({
+			task: { taskId: "task-1", taskExecutionMode: "manual", dueAt: null, scheduledStartAt: null, scheduledEndAt: null },
+			input: { title: "Manual task", description: "", priority: "Medium", dueAt: null, scheduledStartAt: null, scheduledEndAt: null, executionConfig: {}, aiClientId: null, autoPlanGeneration: false, autoExecute: false, autoPlanGenerationTiming: "at_start", autoExecuteTiming: "at_start", recurrenceRule: null, recurrenceAnchorStartAt: null, recurrenceAnchorEndAt: null },
+			applyOptimisticViewData: callbacks.applyOptimisticViewData, setIsPending: callbacks.setIsPending,
+			setErrorMessage: callbacks.setErrorMessage, refreshProjection: callbacks.refreshProjection,
+			resetViewData: callbacks.resetViewData, actionFailedMessage: "Schedule action failed",
+		})).rejects.toThrow("Manual save rejected");
+
+		expect(callbacks.setErrorMessage).toHaveBeenCalledWith("Manual save rejected");
+		expect(callbacks.resetViewData).toHaveBeenCalledOnce();
+		expect(callbacks.refreshProjection).not.toHaveBeenCalled();
 	});
 
 	it("[SCHED-012] resets optimistic state and reports an API failure", async () => {

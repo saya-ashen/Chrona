@@ -1112,6 +1112,10 @@
       "automaticRunPast": "此触发时间已过去。计划就绪后，任务将在下一次调度检查时启动。",
       "automaticRunPlanTime": "计划生成时机",
       "title": "新建任务",
+      "taskType": "任务类型",
+      "aiTask": "AI 任务",
+      "manualTask": "手动任务",
+      "manualTaskDescription": "直接完成此任务。Chrona 不会创建计划或使用 AI 提供商。",
       "close": "关闭",
       "titlePlaceholder": "添加标题",
       "titleLabel": "标题",
@@ -1238,6 +1242,12 @@
       "resultPlanReadOnly": "只读计划，查看不会重新执行任务。",
       "resultQuickFiles": "结果文件",
       "approvalNeeded": "等待审批",
+      "manualTaskTitle": "手动任务",
+      "manualTaskOpenDescription": "此任务由你直接管理。完成工作后将其标记为完成。",
+      "manualTaskDoneDescription": "此手动任务已完成。重新打开即可继续处理。",
+      "manualTaskComplete": "完成任务",
+      "manualTaskReopen": "重新打开任务",
+      "manualTaskActionFailed": "无法更新手动任务状态。",
       "planSetupLabel": "计划设置",
       "planSetupBriefTitle": "任务简述",
       "planSetupEditBrief": "编辑任务简述",
@@ -2466,10 +2476,10 @@
       "filterNeedsMe": "需要我处理",
       "advancedFilters": "更多筛选",
       "workStateLabels": {
-        "no_plan": "待生成计划", "planning": "正在规划", "plan_review": "计划待确认", "ready_to_run": "可执行", "queued": "排队中", "running": "运行中", "waiting_for_input": "等待输入", "waiting_for_approval": "等待审批", "blocked": "已阻塞", "failed": "执行失败", "cancelled": "已取消", "result_ready": "结果待验收", "done": "已验收"
+        "manual_open": "手动任务", "no_plan": "待生成计划", "planning": "正在规划", "plan_review": "计划待确认", "ready_to_run": "可执行", "queued": "排队中", "running": "运行中", "waiting_for_input": "等待输入", "waiting_for_approval": "等待审批", "blocked": "已阻塞", "failed": "执行失败", "cancelled": "已取消", "result_ready": "结果待验收", "done": "已验收"
       },
       "workStateActions": {
-        "no_plan": "先生成计划，再开始执行", "planning": "等待计划生成", "plan_review": "查看并确认计划", "ready_to_run": "检查运行设置后开始执行", "queued": "等待开始执行", "running": "查看执行进度", "waiting_for_input": "补充所需信息", "waiting_for_approval": "查看并处理审批请求", "blocked": "检查并解除阻塞", "failed": "检查失败原因后重试", "cancelled": "查看历史记录", "result_ready": "验收结果或要求修改", "done": "继续追问或创建后续任务"
+        "manual_open": "完成后将此任务标记为完成", "no_plan": "先生成计划，再开始执行", "planning": "等待计划生成", "plan_review": "查看并确认计划", "ready_to_run": "检查运行设置后开始执行", "queued": "等待开始执行", "running": "查看执行进度", "waiting_for_input": "补充所需信息", "waiting_for_approval": "查看并处理审批请求", "blocked": "检查并解除阻塞", "failed": "检查失败原因后重试", "cancelled": "查看历史记录", "result_ready": "验收结果或要求修改", "done": "继续追问或创建后续任务"
       },
       "listDescription": "查看任务状态，并打开需要处理的工作。",
       "statTotal": "总数",

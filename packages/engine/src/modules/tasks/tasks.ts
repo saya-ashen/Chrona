@@ -22,6 +22,7 @@ import { resolveFilePreview } from "./file-preview";
 import { openTaskResultFile } from "./open-task-result-file";
 import { markTaskDone } from "./mark-task-done";
 import { reopenTask } from "./reopen-task";
+import { completeManualTask, reopenManualTask } from "./manual-task-lifecycle";
 import { ensureTaskInWorkspace } from "./task-by-id";
 import { updateTask } from "./update-task";
 export class Tasks {
@@ -118,6 +119,14 @@ export class Tasks {
 
   reopen(input: Parameters<typeof reopenTask>[0]) {
     return reopenTask(input);
+  }
+
+  completeManual(input: Parameters<typeof completeManualTask>[0]) {
+    return completeManualTask(input);
+  }
+
+  reopenManual(input: Parameters<typeof reopenManualTask>[0]) {
+    return reopenManualTask(input);
   }
 
   acceptResult(input: Parameters<typeof acceptTaskResult>[0]) {

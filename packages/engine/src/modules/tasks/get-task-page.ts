@@ -314,6 +314,7 @@ export async function getTaskPage(input: { taskId: string; workBlockId?: string 
       description: task.description,
       sourceManaged,
       executionConfig: task.executionConfig,
+      taskExecutionMode: task.taskExecutionMode,
       aiClientId: task.aiClientId,
       autoPlanGeneration: task.autoPlanGeneration,
       autoExecute: task.autoExecute,

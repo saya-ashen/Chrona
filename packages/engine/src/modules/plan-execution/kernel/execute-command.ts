@@ -12,6 +12,7 @@ import { completePlanRunCommandReceipt, renewPlanRunCommandReceipt, type Claimed
 import { isAuthoritativeExecutionResult } from "./command-receipts";
 import type { SchedulerWorkContext } from "@/modules/orchestration/scheduler-lease-repository";
 import { getCurrentExecution } from "../use-cases/get-current-execution";
+import { assertAiTaskExecution } from "@/modules/tasks/assert-ai-task-execution";
 
 
 
@@ -62,6 +63,7 @@ async function completeCommandReceipt(receipt: ClaimedPlanRunCommand, result: Pl
 export async function executeCommand(
   input: ExecutionCommandEnvelope & PlanExecutionObserver & { workContext?: SchedulerWorkContext },
 ): Promise<PlanExecutionResult> {
+  await assertAiTaskExecution(input.taskId);
   const activeTaskIds = activeTaskCommands.getStore();
   if (activeTaskIds?.has(input.taskId)) {
     return executeCommandUnlocked(input);
