@@ -14,6 +14,69 @@ type BridgePhase =
   | "terminal_submission_pending"
   | "terminal_submission_acknowledged";
 
+type NonterminalInvocation = {
+  start: boolean;
+  end: boolean;
+  bridgeCall: boolean;
+  resultProduced: boolean;
+  bridgeReplySent: boolean;
+  correlated: boolean;
+};
+
+/**
+ * Bounded aggregate facts for bridge tools only. The first 24 distinct call IDs
+ * stay in-memory solely for correlation and never appear in an error, event,
+ * snapshot, or log; later or invalid IDs mark the aggregate incomplete.
+ */
+class NonterminalToolLifecycle {
+  private readonly calls = new Map<string, NonterminalInvocation>();
+  private starts = 0;
+  private ends = 0;
+  private bridgeCalls = 0;
+  private resultsProduced = 0;
+  private bridgeRepliesSent = 0;
+  private correlated = 0;
+  private correlationIncomplete = false;
+  private readonly limit = 24;
+
+  executionStart(id: unknown) { this.mark(id, "start", "starts"); }
+  executionEnd(id: unknown) { this.mark(id, "end", "ends"); }
+  bridgeCall(id: unknown) { this.mark(id, "bridgeCall", "bridgeCalls"); }
+  resultProduced(id: unknown) { this.mark(id, "resultProduced", "resultsProduced"); }
+  bridgeReplySent(id: unknown) { this.mark(id, "bridgeReplySent", "bridgeRepliesSent"); }
+
+  summary() {
+    let open = 0;
+    for (const call of this.calls.values()) if (call.start && !call.end) open++;
+    const counts = `pi_start=${this.starts},pi_end=${this.ends},bridge_call_received=${this.bridgeCalls},result_produced=${this.resultsProduced},bridge_reply_written=${this.bridgeRepliesSent},correlated=${this.correlated},unended=${open}`;
+    return this.correlationIncomplete ? `${counts}; counts_tracked_subset=true,correlation_incomplete=true` : counts;
+  }
+
+  private mark(id: unknown, fact: keyof Omit<NonterminalInvocation, "correlated">, counter: "starts" | "ends" | "bridgeCalls" | "resultsProduced" | "bridgeRepliesSent") {
+    if (typeof id !== "string" || id.length === 0 || id.length > 128) {
+      this.correlationIncomplete = true;
+      return;
+    }
+    let call = this.calls.get(id);
+    if (!call) {
+      if (this.calls.size >= this.limit) {
+        this.correlationIncomplete = true;
+        return;
+      }
+      call = { start: false, end: false, bridgeCall: false, resultProduced: false, bridgeReplySent: false, correlated: false };
+      this.calls.set(id, call);
+    }
+    if (!call[fact]) {
+      call[fact] = true;
+      this[counter]++;
+    }
+    if (!call.correlated && call.start && call.bridgeCall) {
+      call.correlated = true;
+      this.correlated++;
+    }
+  }
+}
+
 export class PiRun {
   readonly ref: ProviderRunRef;
   readonly abort = new AbortController();
@@ -37,6 +100,7 @@ export class PiRun {
   private error?: string;
   private cleanup?: Promise<void>;
   private bridgePhase: BridgePhase = "before_terminal_call";
+  private readonly nonterminalTools = new NonterminalToolLifecycle();
   private ready!: () => void;
   private readonly bridgeReady = new Promise<void>((resolve) => { this.ready = resolve; });
 
@@ -147,17 +211,28 @@ export class PiRun {
     if (this.done) return;
     if (event.type === "ready") { this.ready(); return; }
     if (event.type !== "call" || typeof event.id !== "string" || typeof event.name !== "string") throw new Error("Invalid bridge message");
-    const args = record(event.input);
-    const terminal = this.beginBridgeCall(event.name);
+    await this.onBridgeCall(event.id, event.name, record(event.input));
+  }
+
+  private async onBridgeCall(callId: string, name: string, args: RecordValue) {
+    const terminal = this.beginBridgeCall(name);
+    const nonterminal = !terminal && this.isDeclaredBridgeTool(name);
+    if (nonterminal) this.nonterminalTools.bridgeCall(callId);
     try {
       this.beginTerminalSubmission(terminal);
-      const result = await this.tools.call(event.name, args);
-      this.recordTerminalSubmission(terminal, event.name, event.id, args);
-      this.rpc?.bridge({ type: "result", id: event.id, result });
+      const result = await this.tools.call(name, args);
+      if (nonterminal) this.nonterminalTools.resultProduced(callId);
+      this.recordTerminalSubmission(terminal, name, callId, args);
+      this.replyToBridge(callId, { result }, nonterminal);
     } catch {
-      this.rpc?.bridge({ type: "result", id: event.id, error: "Chrona rejected this tool call. Do not repeat an uncertain terminal submission." });
+      this.replyToBridge(callId, { error: "Chrona rejected this tool call. Do not repeat an uncertain terminal submission." }, nonterminal);
       this.rejectTerminalSubmission(terminal);
     }
+  }
+
+  private replyToBridge(callId: string, response: RecordValue, nonterminal: boolean) {
+    const replied = this.rpc?.bridge({ type: "result", id: callId, ...response }) === true;
+    if (nonterminal && replied) this.nonterminalTools.bridgeReplySent(callId);
   }
 
   private beginBridgeCall(name: string) {
@@ -182,9 +257,14 @@ export class PiRun {
     if (terminal) this.fail("Pi terminal submission failed or was duplicated. Review execution evidence before retrying.");
   }
 
+  private isDeclaredBridgeTool(name: string) {
+    return this.tools.tools.some((tool) => tool.name === name);
+  }
+
   private describeRpcFailure(error: Error) {
     if (error instanceof PiRpcClosedBeforeCompletionError) {
-      return `${error.message} (phase ${this.bridgePhase}); no fallback was attempted.`;
+      const stderr = this.rpc?.stderrDiagnostics() ?? "stderr_class=none";
+      return `${error.message} (phase ${this.bridgePhase}; nonterminal_tools ${this.nonterminalTools.summary()}; ${stderr}); no fallback was attempted.`;
     }
     return error.message;
   }
@@ -226,9 +306,15 @@ export class PiRun {
   }
 
   private toolEvent(event: RecordValue, completed: boolean) {
-    if (typeof event.toolName !== "string" || typeof event.toolCallId !== "string") return;
-    if (completed) this.emit({ type: "tool_completed", toolName: event.toolName, callId: event.toolCallId, ...(event.isError ? { error: { message: "Pi tool failed" } } : {}) });
-    else this.emit({ type: "tool_started", toolName: event.toolName, callId: event.toolCallId });
+    const toolName = typeof event.toolName === "string" ? event.toolName : undefined;
+    const toolCallId = event.toolCallId;
+    if (toolName && this.isDeclaredBridgeTool(toolName) && !this.tools.isTerminal(toolName)) {
+      if (completed) this.nonterminalTools.executionEnd(toolCallId);
+      else this.nonterminalTools.executionStart(toolCallId);
+    }
+    if (!toolName || typeof toolCallId !== "string") return;
+    if (completed) this.emit({ type: "tool_completed", toolName, callId: toolCallId, ...(event.isError ? { error: { message: "Pi tool failed" } } : {}) });
+    else this.emit({ type: "tool_started", toolName, callId: toolCallId });
   }
 
   private dialog(event: RecordValue) {

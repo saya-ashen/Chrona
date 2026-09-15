@@ -7,7 +7,7 @@ import { randomUUID } from "node:crypto";
 import { supportsSafeTerminalOnlyFeatureRuntime, type ProviderRunEvent, type StartRunInput } from "@chrona/providers-foundation";
 import { experimentalProviderTypes, providerCapabilityMatrix, releasedProviderTypes } from "@chrona/contracts";
 import { PiProviderClient } from "./PiProviderClient";
-import { readJsonl } from "./rpc";
+import { PiStderrClassifier, readJsonl } from "./rpc";
 import { FAKE_PI_SOURCE } from "./fake-pi-fixture";
 
 const cleanups: Array<() => Promise<void>> = [];
@@ -30,6 +30,24 @@ const terminal = {
   terminalToolName: "chrona_feature_complete",
   tools: [{ name: "chrona_feature_complete", inputSchema: { type: "object", properties: { result: { type: "object" } }, required: ["result"] } }],
 };
+async function nonterminalRequest(scenario: string, delayMs = 0): Promise<StartRunInput> {
+  const token = "synthetic-control-token";
+  const server = Bun.serve({ hostname: "127.0.0.1", port: 0, async fetch(request) {
+    if (request.headers.get("authorization") !== `Bearer ${token}`) return new Response(null, { status: 401 });
+    if (request.method !== "POST") return new Response(null, { status: 405 });
+    const body = await request.json() as Record<string, unknown>;
+    if (body.method === "notifications/initialized") return new Response(null, { status: 202 });
+    if (body.method === "initialize") return Response.json({ jsonrpc: "2.0", id: body.id, result: { protocolVersion: "2025-03-26", capabilities: { tools: {} }, serverInfo: { name: "fixture", version: "1" } } });
+    if (body.method === "tools/list") return Response.json({ jsonrpc: "2.0", id: body.id, result: { tools: [{ name: "chrona.context.read", description: "read", inputSchema: { type: "object" } }] } });
+    if (body.method === "tools/call") {
+      if (delayMs) await new Promise((resolve) => setTimeout(resolve, delayMs));
+      return Response.json({ jsonrpc: "2.0", id: body.id, result: { content: [{ type: "text", text: "synthetic bounded response" }] } });
+    }
+    return new Response(null, { status: 400 });
+  } });
+  cleanups.push(async () => { await server.stop(true); });
+  return request(scenario, { control: { baseUrl: `${server.url}api`, runToken: token } });
+}
 async function collect(client: PiProviderClient, input: StartRunInput) {
   const run = await client.startRun(input);
   const events: ProviderRunEvent[] = [];
@@ -51,6 +69,37 @@ describe("Pi JSONL protocol", () => {
     readJsonl(pipe, () => {}, (error) => errors.push(error));
     pipe.write("PRIVATE_SECRET\n"); pipe.end();
     expect(errors[0]?.message).toBe("Pi emitted invalid or oversized JSONL");
+  });
+
+  it("classifies standard JavaScript error headers without retaining their messages", () => {
+    const cases = [
+      ["AggregateError", "aggregate_error"], ["EvalError", "eval_error"],
+      ["RangeError", "range_error"], ["ReferenceError", "reference_error"],
+      ["SyntaxError", "syntax_error"], ["TypeError", "type_error"], ["URIError", "uri_error"],
+    ] as const;
+    for (const [header, label] of cases) {
+      const classifier = new PiStderrClassifier();
+      for (const byte of Buffer.from(`${header}: synthetic-private-message\n`)) classifier.push(Buffer.from([byte]));
+      classifier.finish();
+      expect(classifier.summary()).toBe(`stderr_classes=${label}`);
+      expect(JSON.stringify(classifier)).not.toContain("synthetic-private-message");
+    }
+  });
+
+  it("classifies only bounded allowlisted stderr evidence", () => {
+    const classifier = new PiStderrClassifier();
+    classifier.push(Buffer.from(`synthetic-credential=not-a-secret ${String.fromCharCode(27)}[31mEP`));
+    classifier.push(Buffer.from(`IPE${String.fromCharCode(27)}[0m`));
+    classifier.push(Buffer.from(" " + "x".repeat(20_000) + " ENOENT"));
+    classifier.finish();
+    expect(classifier.summary()).toBe("stderr_classes=broken_pipe,missing_resource");
+    expect(classifier.summary()).not.toContain("synthetic-credential");
+    expect(JSON.stringify(classifier)).not.toContain("synthetic-credential");
+
+    const unknown = new PiStderrClassifier();
+    unknown.push("synthetic-credential=not-a-secret");
+    expect(unknown.summary()).toBe("stderr_class=unknown");
+    expect(JSON.stringify(unknown)).not.toContain("synthetic-credential");
   });
 });
 
@@ -151,6 +200,59 @@ describe.skipIf(process.platform === "win32")("Pi provider lifecycle", () => {
     const naturalExit = await collect(client, request("exit", { timeoutMs: 2000 }));
     expect(naturalExit.snapshot.error).toContain("Pi exited before completion (code 0, signal none)");
     expect(naturalExit.snapshot.error).toContain("phase before_terminal_call");
+  });
+
+  it("persists only fixed stderr classes on a failed Pi closure", async () => {
+    const { client } = await fixture();
+    const known = await collect(client, request("stderr-class", { timeoutMs: 2000 }));
+    expect(known.snapshot.error).toContain("stderr_classes=broken_pipe");
+    expect(known.snapshot.error).not.toContain("synthetic-credential");
+    expect(known.snapshot.error).not.toContain("not-a-secret");
+
+    const exception = await collect(client, request("stderr-type-error", { timeoutMs: 2000 }));
+    expect(exception.snapshot.status).toBe("failed");
+    expect(exception.snapshot.error).toContain("stderr_classes=type_error");
+    expect(exception.snapshot.error).not.toContain("synthetic-credential");
+    expect(exception.snapshot.error).not.toContain("not-a-secret");
+    expect(exception.snapshot.error).not.toContain("synthetic-path");
+
+    const unknown = await collect(client, request("stderr-unknown", { timeoutMs: 2000 }));
+    expect(unknown.snapshot.error).toContain("stderr_class=unknown");
+    expect(unknown.snapshot.error).not.toContain("synthetic-credential");
+  });
+
+  it("records bounded, correlated nonterminal bridge facts without retaining identifiers", async () => {
+    const { client } = await fixture();
+    const before = await collect(client, await nonterminalRequest("nonterminal-before-bridge"));
+    expect(before.snapshot.error).toContain("nonterminal_tools pi_start=1,pi_end=0,bridge_call_received=0,result_produced=0,bridge_reply_written=0,correlated=0,unended=1");
+    expect(before.snapshot.error).not.toContain("nonterminal-1");
+
+    const ended = await collect(client, await nonterminalRequest("nonterminal-end"));
+    expect(ended.snapshot.error).toContain("nonterminal_tools pi_start=1,pi_end=1,bridge_call_received=0,result_produced=0,bridge_reply_written=0,correlated=0,unended=0");
+
+    const afterBridge = await collect(client, await nonterminalRequest("nonterminal-after-bridge", 100));
+    expect(afterBridge.snapshot.error).toContain("nonterminal_tools pi_start=1,pi_end=0,bridge_call_received=1,result_produced=0,bridge_reply_written=0,correlated=1,unended=1");
+
+    const afterResult = await collect(client, await nonterminalRequest("nonterminal-after-result"));
+    expect(afterResult.snapshot.error).toContain("nonterminal_tools pi_start=1,pi_end=0,bridge_call_received=1,result_produced=1,bridge_reply_written=1,correlated=1,unended=1");
+
+    const overlap = await collect(client, await nonterminalRequest("nonterminal-overlap"));
+    expect(overlap.snapshot.error).toContain("nonterminal_tools pi_start=2,pi_end=0,bridge_call_received=2,result_produced=2,bridge_reply_written=2,correlated=2,unended=2");
+    expect(overlap.snapshot.error).not.toContain("correlation_incomplete");
+  });
+
+  it("marks nonterminal lifecycle counts as a tracked subset after bounded correlation omissions", async () => {
+    const { client } = await fixture();
+    const overflow = await collect(client, await nonterminalRequest("nonterminal-overflow"));
+    expect(overflow.snapshot.error).toContain("nonterminal_tools pi_start=24,pi_end=0,bridge_call_received=24,result_produced=24,bridge_reply_written=24,correlated=24,unended=24; counts_tracked_subset=true,correlation_incomplete=true");
+    expect(overflow.snapshot.error).not.toContain("nonterminal-overflow-24");
+
+    const overlong = await collect(client, await nonterminalRequest("nonterminal-overlong-id"));
+    expect(overlong.snapshot.error).toContain("nonterminal_tools pi_start=0,pi_end=0,bridge_call_received=0,result_produced=0,bridge_reply_written=0,correlated=0,unended=0; counts_tracked_subset=true,correlation_incomplete=true");
+    expect(JSON.stringify(overlong)).not.toContain("synthetic-secret-shaped-id");
+
+    const missing = await collect(client, await nonterminalRequest("nonterminal-missing-id"));
+    expect(missing.snapshot.error).toContain("counts_tracked_subset=true,correlation_incomplete=true");
   });
 
   it("rejects clean EOF during isolated startup instead of waiting for the model timeout", async () => {

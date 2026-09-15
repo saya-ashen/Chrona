@@ -25,6 +25,156 @@ export function record(value: unknown): RecordValue {
 }
 
 const MAX_FRAME_BYTES = 8 * 1024 * 1024;
+const MAX_STDERR_CHUNK_BYTES = 4096;
+const MAX_STDERR_CHUNKS = 128;
+const MAX_STDERR_CLASSES = 4;
+const ANSI_ESCAPE = 0x1b;
+
+type StderrMatcher = {
+  readonly label: PiStderrClass;
+  readonly token: string;
+  progress: number;
+  pendingBoundary: boolean;
+};
+
+export type PiStderrClass =
+  | "aggregate_error"
+  | "eval_error"
+  | "range_error"
+  | "reference_error"
+  | "syntax_error"
+  | "type_error"
+  | "uri_error"
+  | "broken_pipe"
+  | "memory_exhausted"
+  | "missing_resource"
+  | "native_signal"
+  | "permission_denied"
+  | "resource_exhausted"
+  | "uncaught_exception"
+  | "unhandled_rejection";
+
+const STDERR_TOKENS: ReadonlyArray<readonly [PiStderrClass, string]> = [
+  ["aggregate_error", "aggregateerror"],
+  ["eval_error", "evalerror"],
+  ["range_error", "rangeerror"],
+  ["reference_error", "referenceerror"],
+  ["syntax_error", "syntaxerror"],
+  ["type_error", "typeerror"],
+  ["uri_error", "urierror"],
+  ["memory_exhausted", "javascript heap out of memory"],
+  ["memory_exhausted", "reached heap limit"],
+  ["memory_exhausted", "call_and_retry_last"],
+  ["unhandled_rejection", "unhandledpromiserejection"],
+  ["unhandled_rejection", "unhandled rejection"],
+  ["uncaught_exception", "uncaught exception"],
+  ["uncaught_exception", "uncaughtexception"],
+  ["permission_denied", "eacces"],
+  ["missing_resource", "enoent"],
+  ["broken_pipe", "epipe"],
+  ["resource_exhausted", "emfile"],
+  ["resource_exhausted", "enfile"],
+  ["native_signal", "sigabrt"],
+  ["native_signal", "sigsegv"],
+  ["native_signal", "sigill"],
+  ["native_signal", "sigbus"],
+];
+
+/**
+ * Inspects bounded stderr samples with numeric matcher state only; it never
+ * retains decoded stderr or arbitrary text. Labels are observations, not cause
+ * or provenance claims.
+ */
+export class PiStderrClassifier {
+  private readonly classes: PiStderrClass[] = [];
+  private readonly matchers: StderrMatcher[] = STDERR_TOKENS.map(([label, token]) => ({ label, token, progress: 0, pendingBoundary: false }));
+  private sawStderr = false;
+  private chunks = 0;
+  private previousIsWord = false;
+  private ansiState: "none" | "escape" | "csi" = "none";
+  private ansiBytes = 0;
+
+  push(chunk: Buffer | string) {
+    this.sawStderr = true;
+    if (this.chunks >= MAX_STDERR_CHUNKS || this.classes.length >= MAX_STDERR_CLASSES) return;
+    this.chunks++;
+    const length = chunk.length;
+    if (length <= MAX_STDERR_CHUNK_BYTES) {
+      this.inspect(chunk, 0, length);
+      return;
+    }
+    // Inspect independent bounded samples. Never bridge an omitted middle span.
+    const sample = MAX_STDERR_CHUNK_BYTES / 2;
+    this.inspect(chunk, 0, sample);
+    this.resetMatchers();
+    this.inspect(chunk, length - sample, length);
+  }
+
+  finish() {
+    for (const matcher of this.matchers) if (matcher.pendingBoundary) this.record(matcher.label);
+    this.resetMatchers();
+  }
+
+  summary() {
+    if (this.classes.length) return `stderr_classes=${this.classes.join(",")}`;
+    return `stderr_class=${this.sawStderr ? "unknown" : "none"}`;
+  }
+
+  private inspect(chunk: Buffer | string, start: number, end: number) {
+    for (let index = start; index < end; index++) this.inspectCode(typeof chunk === "string" ? chunk.charCodeAt(index) : chunk[index]!);
+  }
+
+  private inspectCode(code: number) {
+    if (this.consumeAnsi(code)) return;
+    if (code === ANSI_ESCAPE) { this.ansiState = "escape"; return; }
+
+    const normalized = code >= 0x41 && code <= 0x5a ? code + 0x20 : code;
+    const isWord = (normalized >= 0x61 && normalized <= 0x7a) || (normalized >= 0x30 && normalized <= 0x39) || normalized === 0x5f;
+    for (const matcher of this.matchers) this.inspectMatcher(matcher, normalized, isWord);
+    this.previousIsWord = isWord;
+  }
+
+  private consumeAnsi(code: number) {
+    if (this.ansiState === "escape") {
+      this.ansiState = code === 0x5b ? "csi" : "none";
+      this.ansiBytes = 0;
+      return code === 0x5b;
+    }
+    if (this.ansiState !== "csi") return false;
+    if (++this.ansiBytes <= 32 && code >= 0x20 && code <= 0x3f) return true;
+    this.ansiState = "none";
+    this.ansiBytes = 0;
+    return code >= 0x40 && code <= 0x7e;
+  }
+
+  private inspectMatcher(matcher: StderrMatcher, normalized: number, isWord: boolean) {
+    if (matcher.pendingBoundary) {
+      if (!isWord) this.record(matcher.label);
+      matcher.pendingBoundary = false;
+    }
+    const expected = matcher.token.charCodeAt(matcher.progress);
+    if (normalized === expected && (matcher.progress > 0 || !this.previousIsWord)) {
+      matcher.progress++;
+      if (matcher.progress === matcher.token.length) {
+        matcher.progress = 0;
+        matcher.pendingBoundary = true;
+      }
+      return;
+    }
+    matcher.progress = normalized === matcher.token.charCodeAt(0) && !this.previousIsWord ? 1 : 0;
+  }
+
+  private record(label: PiStderrClass) {
+    if (this.classes.length < MAX_STDERR_CLASSES && !this.classes.includes(label)) this.classes.push(label);
+  }
+
+  private resetMatchers() {
+    for (const matcher of this.matchers) { matcher.progress = 0; matcher.pendingBoundary = false; }
+    this.previousIsWord = false;
+    this.ansiState = "none";
+    this.ansiBytes = 0;
+  }
+}
 
 /** Pi RPC is LF-delimited JSONL, NOT readline's Unicode line protocol. */
 export function readJsonl(stream: Readable, onRecord: (value: RecordValue) => void, onError: (error: Error) => void, onEnd?: () => void) {
@@ -74,6 +224,7 @@ type Pending = {
 export class PiRpc {
   readonly child: ChildProcess;
   private readonly pending = new Map<string, Pending>();
+  private readonly stderrClassifier = new PiStderrClassifier();
   private nextId = 0;
   private closed = false;
   private failed = false;
@@ -94,8 +245,9 @@ export class PiRpc {
     const ended = (source: "stdout" | "bridge_fd4") => this.failAfterPipeEnd(source);
     readJsonl(this.child.stdout!, (event) => this.receive(event), fail, () => ended("stdout"));
     readJsonl(this.child.stdio[4] as Readable, launch.onBridge, fail, () => ended("bridge_fd4"));
-    // Drain without retaining/logging private extension diagnostics or credentials.
-    this.child.stderr!.resume();
+    // Classify bounded stderr evidence into fixed labels without retaining or logging text.
+    this.child.stderr!.on("data", (chunk: Buffer | string) => this.stderrClassifier.push(chunk));
+    this.child.stderr!.on("end", () => this.stderrClassifier.finish());
     for (const stream of [this.child.stdin!, this.child.stdio[3]!]) stream.on("error", () => fail(new Error("Pi input pipe failed")));
     this.child.on("error", () => fail(new Error("Cannot start Pi. Install Pi >= 0.85.0 and check the executable and working directory.")));
     const exited = (code: number | null, signal: string | null) => {
@@ -142,6 +294,8 @@ export class PiRpc {
     else pending.reject(new Error(`Pi rejected ${pending.type}. Check the selected model, login and extension compatibility.`));
   }
 
+  stderrDiagnostics() { this.stderrClassifier.finish(); return this.stderrClassifier.summary(); }
+
   request(type: string, values: RecordValue = {}): Promise<RecordValue> {
     if (this.closed || this.failed) return Promise.reject(new Error("Pi RPC is unavailable"));
     const id = `chrona-${++this.nextId}`;
@@ -160,7 +314,9 @@ export class PiRpc {
   }
 
   bridge(value: RecordValue) {
-    if (!this.closed) (this.child.stdio[3] as Writable).write(`${JSON.stringify(value)}\n`);
+    if (this.closed || this.failed) return false;
+    (this.child.stdio[3] as Writable).write(`${JSON.stringify(value)}\n`);
+    return true;
   }
 
   private rejectPending(error: Error) {
