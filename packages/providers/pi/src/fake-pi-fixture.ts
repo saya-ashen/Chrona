@@ -30,6 +30,7 @@ read(new Socket({ fd: 3, readable: true, writable: false }), (message) => {
   if (message.type === "init") { config = message; send({ type: "ready" }); if (pendingPrompt) pendingPrompt(); }
   if (message.type === "result") {
     if (scenario === "duplicate" && !message.error) { send({ type: "call", id: "call-2", name: config.tools[0].name, input: { result: { ok: true } } }); return; }
+    if (scenario === "terminal-eof") { process.stdout.end(); return; }
     output({ type: "tool_execution_end", toolName: config.tools[0].name, toolCallId: "call-1", isError: Boolean(message.error) });
     if (!message.error) answer("result submitted");
   }
@@ -45,12 +46,17 @@ read(process.stdin, (request) => {
     scenario = request.message.split("scenario:")[1]?.trim();
     if (scenario === "hang") return;
     if (scenario === "eof") { process.stdout.end(); return; }
+    if (scenario === "bridge-eof") { bridgeOutput.end(); return; }
     if (scenario === "exit") { process.exit(0); }
     if (scenario === "extension-error") { output({ type: "extension_error", error: "PRIVATE_SECRET" }); return; }
     if (scenario === "confirm" || scenario === "input") { output({ type: "extension_ui_request", id: "approval-1", method: scenario, title: "Allow fixture action?" }); return; }
     if (scenario === "fail") { output({ type: "message_end", message: { role: "assistant", stopReason: "error", errorMessage: "PRIVATE_SECRET" } }); output({ type: "agent_settled" }); return; }
     if (scenario === "retry") { output({ type: "agent_end", willRetry: true }); setTimeout(() => answer("after retry"), 100); return; }
-    if (config.tools.length && scenario !== "missing") { send({ type: "call", id: "call-1", name: config.tools[0].name, input: { result: { ok: true } } }); return; }
+    if (config.tools.length && scenario !== "missing") {
+      send({ type: "call", id: "call-1", name: config.tools[0].name, input: { result: { ok: true } } });
+      if (scenario === "control-pending-eof") process.stdout.end();
+      return;
+    }
     answer(scenario === "health" ? "CHRONA_PI_READY" : "turn " + state.turns + " 中文\u2028line");
   } else if (request.type === "extension_ui_response") { if (request.confirmed) answer("approved"); else answer("denied"); }
   else if (request.type === "set_auto_retry" && config.instructions === "startup-eof") { process.stdout.end(); }

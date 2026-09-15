@@ -100,6 +100,43 @@ function makeSingleUserConditionPlan(): CompiledPlan {
   };
 }
 
+function makeWaitThenUserConditionPlan(): CompiledPlan {
+  const conditionPlan = makeSingleUserConditionPlan();
+  const condition = conditionPlan.nodes[0]!;
+  return {
+    ...conditionPlan,
+    id: "compiled_wait_then_user_condition",
+    editablePlanId: "graph_wait_then_user_condition",
+    title: "Wait then user condition",
+    goal: "Confirm an external dependency before selecting a branch",
+    nodes: [
+      {
+        id: "wait_external",
+        localId: "wait_external",
+        type: "wait",
+        title: "Wait for external confirmation",
+        description: "An external owner must confirm completion",
+        config: { waitFor: "the deployment owner confirms completion" },
+        dependencies: [],
+        dependents: ["cond_user"],
+      },
+      {
+        ...condition,
+        dependencies: ["wait_external"],
+        dependents: [],
+      },
+    ],
+    edges: [{
+      id: "edge_wait_to_condition",
+      from: "wait_external",
+      to: "cond_user",
+    }],
+    entryNodeIds: ["wait_external"],
+    terminalNodeIds: ["cond_user"],
+    topologicalOrder: ["wait_external", "cond_user"],
+  };
+}
+
 function makeUserThenBlockedTaskPlan(): CompiledPlan {
   return {
     id: "compiled_user_then_blocked_task",
@@ -400,6 +437,40 @@ describe("plan-runner native execution actions", () => {
       blockType: "human_input_required",
       scope: "plan_node",
     });
+  });
+
+  it("resumes a confirmed external wait through the checkpoint lifecycle", async () => {
+    const { workspace, task } = await seedWorkspaceAndTask("Runner external wait");
+    const compiledPlan = makeWaitThenUserConditionPlan();
+    await seedAcceptedCompiledPlan(workspace.id, task.id, compiledPlan);
+
+    const initial = await taskPlanExecution.dispatch({
+      taskId: task.id,
+      action: { action: "start_manual" },
+    });
+    expect(initial.checkpoint).toMatchObject({
+      nodeId: "wait_external",
+      form: {
+        submitLabel: "Confirm and continue",
+        instructions: expect.stringContaining("does not automatically resume"),
+      },
+    });
+
+    const resumed = await taskPlanExecution.submitCheckpointAction({
+      taskId: task.id,
+      action: {
+        checkpointId: initial.checkpoint!.id,
+        action: "submit_input",
+        payload: { inputFields: { confirmation: "Deployment owner confirmed completion." } },
+      },
+    });
+
+    expect(resumed.transition.type).toBe("resume_current_node");
+    expect(resumed.execution).toMatchObject({
+      status: "waiting_for_user",
+      currentNodeId: "cond_user",
+    });
+    expect(resumed.execution.executedNodeIds).toContain("wait_external");
   });
 
   it("resumes waiting node with input and fails when the downstream manual form provider is unavailable", async () => {

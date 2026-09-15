@@ -40,6 +40,22 @@ const frozenGoalTaskContextSchema = z
 		acceptedResults: z.array(frozenGoalAcceptedResultSchema).max(8),
 	})
 	.strict();
+const taskActivationSchema = z
+	.object({
+		executionScope: z.literal("one_authorized_execution"),
+		activationOwner: z.enum(["scheduler", "explicit_start"]),
+		schedule: z
+			.object({
+				state: z.enum(["scheduled", "unscheduled"]),
+				taskKind: z.enum(["single", "recurring"]),
+				recurrenceRule: z.string().max(2_048).nullable(),
+				scheduledStartAt: z.string().datetime({ offset: true }).nullable(),
+				scheduledEndAt: z.string().datetime({ offset: true }).nullable(),
+			})
+			.strict(),
+	})
+	.strict();
+
 const taskSnapshotSchema = createAiJsonObjectSchema({
 	id: z.string().min(1).max(128),
 	title: z.string().trim().min(1).max(512),
@@ -47,6 +63,8 @@ const taskSnapshotSchema = createAiJsonObjectSchema({
 	goalContext: frozenGoalTaskContextSchema.nullable(),
 	workBlockId: z.string().min(1).max(128).nullable(),
 	estimatedMinutes: z.number().int().positive().nullable(),
+	// Optional so frozen version-1 feature inputs remain valid without changing their hash.
+	activation: taskActivationSchema.optional(),
 });
 
 const headSnapshotSchema = createAiJsonObjectSchema({
@@ -163,6 +181,8 @@ export const taskPlanGenerateFeature = defineAiFeature({
 			"Use only the frozen observations below.",
 			"Return a completed terminal result whose output is { blueprint }, and exactly one task.plan.blueprint.propose action whose input is exactly { blueprint } with no taskId, expectedStateVersion, or other fields.",
 			'Use proposalId "task-plan-proposal" exactly. proposalId is an internal ASCII runtime ID; never translate or localize it.',
+			"Generate the graph for exactly one authorized execution occurrence. Chrona scheduler or an explicit manual start owns activation, recurrence, and start-time waiting outside this graph. Do not infer authorization or scheduling from task description text.",
+			"Do not add recurring loops, start-time waits, sleeps, or wait nodes intended to resume automatically from a clock or external event. Use a wait node only for a legitimate external dependency that requires an explicit, meaningful human confirmation; Chrona does not implement timed in-plan waits or automatic event resumption.",
 			"Use only task, checkpoint, condition, or wait nodes with their required configuration. A plan may have multiple task exits for mutually exclusive condition branches or parallel work, but every possible terminal path must end at a task.",
 			"Every task node with executor=user or mode=manual must include a complete completionForm whose fields collect the evidence needed by expectedOutput and completionCriteria. Automatic task nodes must not include completionForm.",
 			"Manual completion forms must never request passwords, API keys, tokens, credentials, permission decisions, or authorization decisions.",

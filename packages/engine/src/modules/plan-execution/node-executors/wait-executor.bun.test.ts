@@ -59,17 +59,46 @@ describe("WaitNodeExecutor", () => {
       summary: "Wait condition completed: 用户确认",
       output: {
         inputFields: { response: "approved" },
-        userInput: "response: approved",
       },
     });
   });
 
-  it("continues to wait when no resume input is supplied", async () => {
-    const result = await new WaitNodeExecutor().execute(input());
+  it("completes a wait from a direct meaningful confirmation", async () => {
+    const result = await new WaitNodeExecutor().execute(input({
+      userInput: "The external review is complete.",
+    }));
+
+    expect(result).toMatchObject({
+      status: "done",
+      output: { userInput: "The external review is complete." },
+    });
+  });
+
+  it("requires a meaningful confirmation and exposes an actionable form", async () => {
+    const result = await new WaitNodeExecutor().execute(input({
+      inputFields: { confirmation: "   " },
+      userInput: "confirmation:    ",
+    }));
 
     expect(result).toMatchObject({
       status: "waiting_for_user",
-      reason: "Wait node wait-1 requires external completion",
+      reason: "Confirm the external condition before continuing: 用户确认. This pause does not automatically resume when a clock or external event fires.",
+      actionForm: {
+        submitLabel: "Confirm and continue",
+        inputFields: [{ name: "confirmation", required: true }],
+      },
+    });
+  });
+
+  it("does not treat a continue timeout as elapsed without confirmation", async () => {
+    const node = input().node;
+    node.config = { waitFor: "external report", timeout: { minutes: 5, onTimeout: "continue" } } as never;
+
+    const result = await new WaitNodeExecutor().execute(input({ node }));
+
+    expect(result).toMatchObject({
+      status: "waiting_for_user",
+      actionForm: { submitLabel: "Confirm and continue" },
     });
   });
 });

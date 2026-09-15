@@ -3,11 +3,17 @@ import type {
   ProviderUsage, ResolveProviderApprovalInput, StartRunInput,
 } from "@chrona/providers-foundation";
 import { redactSensitiveText } from "@chrona/logging";
-import { PiRpc, record, type RecordValue } from "./rpc";
+import { PiRpc, PiRpcClosedBeforeCompletionError, record, type RecordValue } from "./rpc";
 import { PiRunTools } from "./run-tools";
 import type { PiState } from "./state";
 
 const MAX_OUTPUT = 1024 * 1024;
+type BridgePhase =
+  | "before_terminal_call"
+  | "terminal_call_received"
+  | "terminal_submission_pending"
+  | "terminal_submission_acknowledged";
+
 export class PiRun {
   readonly ref: ProviderRunRef;
   readonly abort = new AbortController();
@@ -30,6 +36,7 @@ export class PiRun {
   private release?: () => Promise<void>;
   private error?: string;
   private cleanup?: Promise<void>;
+  private bridgePhase: BridgePhase = "before_terminal_call";
   private ready!: () => void;
   private readonly bridgeReady = new Promise<void>((resolve) => { this.ready = resolve; });
 
@@ -71,7 +78,7 @@ export class PiRun {
       timeoutMs: 30_000,
       onEvent: (event) => this.onEvent(event),
       onBridge: (event) => { void this.onBridge(event).catch(() => this.fail("Pi bridge failed. No fallback was attempted.")); },
-      onFailure: (error) => this.fail(error.message),
+      onFailure: (error) => this.fail(this.describeRpcFailure(error)),
     });
     this.rpc.bridge({ type: "init", tools: this.tools.tools, isolated, instructions: this.input.instructions });
     const current = await this.rpc.request("get_state");
@@ -141,18 +148,45 @@ export class PiRun {
     if (event.type === "ready") { this.ready(); return; }
     if (event.type !== "call" || typeof event.id !== "string" || typeof event.name !== "string") throw new Error("Invalid bridge message");
     const args = record(event.input);
+    const terminal = this.beginBridgeCall(event.name);
     try {
+      this.beginTerminalSubmission(terminal);
       const result = await this.tools.call(event.name, args);
-      if (this.tools.isTerminal(event.name)) {
-        if (this.terminal) throw new Error("Duplicate terminal result");
-        this.terminal = { name: event.name, callId: event.id, input: args };
-        this.emit({ type: "tool_call", tool: event.name, callId: event.id, input: args, status: "completed" });
-      }
+      this.recordTerminalSubmission(terminal, event.name, event.id, args);
       this.rpc?.bridge({ type: "result", id: event.id, result });
     } catch {
       this.rpc?.bridge({ type: "result", id: event.id, error: "Chrona rejected this tool call. Do not repeat an uncertain terminal submission." });
-      if (this.tools.isTerminal(event.name)) this.fail("Pi terminal submission failed or was duplicated. Review execution evidence before retrying.");
+      this.rejectTerminalSubmission(terminal);
     }
+  }
+
+  private beginBridgeCall(name: string) {
+    const terminal = this.tools.isTerminal(name);
+    if (terminal) this.bridgePhase = "terminal_call_received";
+    return terminal;
+  }
+
+  private beginTerminalSubmission(terminal: boolean) {
+    if (terminal) this.bridgePhase = "terminal_submission_pending";
+  }
+
+  private recordTerminalSubmission(terminal: boolean, name: string, callId: string, input: RecordValue) {
+    if (!terminal) return;
+    this.bridgePhase = "terminal_submission_acknowledged";
+    if (this.terminal) throw new Error("Duplicate terminal result");
+    this.terminal = { name, callId, input };
+    this.emit({ type: "tool_call", tool: name, callId, input, status: "completed" });
+  }
+
+  private rejectTerminalSubmission(terminal: boolean) {
+    if (terminal) this.fail("Pi terminal submission failed or was duplicated. Review execution evidence before retrying.");
+  }
+
+  private describeRpcFailure(error: Error) {
+    if (error instanceof PiRpcClosedBeforeCompletionError) {
+      return `${error.message} (phase ${this.bridgePhase}); no fallback was attempted.`;
+    }
+    return error.message;
   }
 
   private onEvent(event: RecordValue) {

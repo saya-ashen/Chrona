@@ -6,8 +6,10 @@ import type {
   ExecutionCheckpoint,
   ExecutionCheckpointKind,
   PlanExecutionStatus,
+  WaitConfig,
   WaitKind,
 } from "@chrona/contracts/ai";
+import { waitActionForm } from "./node-executors/wait-executor";
 
 type DeriveExecutionCheckpointInput = {
   taskId: string;
@@ -206,18 +208,26 @@ function checkpointTitle(kind: ExecutionCheckpointKind, node: EffectivePlanNode 
   }
 }
 
+function waitCheckpointMessage(node: EffectivePlanNode | null) {
+  if (node?.type !== "wait") return null;
+  if (node.result?.error?.trim()) return node.result.error;
+  const config = node.config as WaitConfig;
+  return `Confirm the external condition before continuing: ${config.waitFor}. This pause does not automatically resume when a clock or external event fires.`;
+}
+
 function checkpointMessage(input: {
   message: string;
   kind: ExecutionCheckpointKind;
   node: EffectivePlanNode | null;
 }) {
-  if (input.message.trim()) return input.message;
-  const result = input.node?.result;
-  if (result?.error) return result.error;
-  if (input.node?.blockedReason) return input.node.blockedReason;
-  return input.kind === "failed"
-    ? "Node failed. Choose a recovery action."
-    : "Execution paused. Choose the next action.";
+  const waitMessage = waitCheckpointMessage(input.node);
+  if (waitMessage) return waitMessage;
+  return input.message.trim()
+    || input.node?.result?.error
+    || input.node?.blockedReason
+    || (input.kind === "failed"
+      ? "Node failed. Choose a recovery action."
+      : "Execution paused. Choose the next action.");
 }
 
 function checkpointSeverity(kind: ExecutionCheckpointKind): ExecutionCheckpoint["severity"] {
@@ -229,7 +239,9 @@ function checkpointSeverity(kind: ExecutionCheckpointKind): ExecutionCheckpoint[
 }
 
 function checkpointForm(node: EffectivePlanNode | null): CheckpointForm | undefined {
-  const actionForm = node?.result?.actionForm;
+  const actionForm = node?.result?.actionForm ?? (
+    node?.type === "wait" ? waitActionForm(node.config as WaitConfig) : undefined
+  );
   if (!actionForm) return undefined;
   return {
     instructions: actionForm.instructions,

@@ -29,6 +29,18 @@ type HeadSnapshot = {
   baselineHash: string | null;
 };
 
+export type TaskPlanActivation = {
+  executionScope: "one_authorized_execution";
+  activationOwner: "scheduler" | "explicit_start";
+  schedule: {
+    state: "scheduled" | "unscheduled";
+    taskKind: "single" | "recurring";
+    recurrenceRule: string | null;
+    scheduledStartAt: string | null;
+    scheduledEndAt: string | null;
+  };
+};
+
 export type TaskPlanGenerationSnapshot = {
   task: {
     id: string;
@@ -38,6 +50,8 @@ export type TaskPlanGenerationSnapshot = {
     goalContext: FrozenGoalTaskContext | null;
     workBlockId: string | null;
     estimatedMinutes: number | null;
+    /** Absent only on persisted version-1 feature inputs created before activation context existed. */
+    activation?: TaskPlanActivation;
   };
   head: HeadSnapshot;
   workBlockId: string | null;
@@ -202,6 +216,27 @@ export async function terminalizeOrphanedTaskPlanGeneration(input: {
   });
 }
 
+export function taskPlanActivationSnapshot(input: {
+  task: { kind: "single" | "recurring"; recurrenceRule: string | null };
+  workBlock: {
+    trigger: "scheduled" | "manual";
+    scheduledStartAt: Date;
+    scheduledEndAt: Date;
+  } | null;
+}): TaskPlanActivation {
+  return {
+    executionScope: "one_authorized_execution",
+    activationOwner: input.workBlock?.trigger === "scheduled" ? "scheduler" : "explicit_start",
+    schedule: {
+      state: input.workBlock ? "scheduled" : "unscheduled",
+      taskKind: input.task.kind,
+      recurrenceRule: input.task.recurrenceRule,
+      scheduledStartAt: input.workBlock?.scheduledStartAt.toISOString() ?? null,
+      scheduledEndAt: input.workBlock?.scheduledEndAt.toISOString() ?? null,
+    },
+  };
+}
+
 /** Captures the task/head baseline once. Runtime-owned observations are frozen separately with the feature run. */
 export async function captureTaskPlanGenerationSnapshot(input: {
   taskId: string;
@@ -237,6 +272,7 @@ export async function captureTaskPlanGenerationSnapshot(input: {
       goalContext,
       workBlockId,
       estimatedMinutes: estimatedMinutes && estimatedMinutes > 0 ? estimatedMinutes : null,
+      activation: taskPlanActivationSnapshot({ task, workBlock }),
     },
     workBlockId,
     head: {

@@ -3,6 +3,23 @@ import { StringDecoder } from "node:string_decoder";
 import type { Readable, Writable } from "node:stream";
 
 export type RecordValue = Record<string, unknown>;
+export type PiRpcClosureSource = "stdout" | "bridge_fd4" | "process_exit";
+
+export class PiRpcClosedBeforeCompletionError extends Error {
+  constructor(
+    readonly source: PiRpcClosureSource,
+    readonly exitCode: number | null = null,
+    readonly exitSignal: string | null = null,
+  ) {
+    const exit = source === "process_exit" || exitCode !== null || exitSignal !== null
+      ? ` (code ${exitCode}, signal ${exitSignal ?? "none"})`
+      : "";
+    super(source === "process_exit"
+      ? `Pi exited before completion${exit}`
+      : `Pi RPC ${source.replace("_", " ")} closed before completion${exit}`);
+  }
+}
+
 export function record(value: unknown): RecordValue {
   return value && typeof value === "object" && !Array.isArray(value) ? value as RecordValue : {};
 }
@@ -60,6 +77,7 @@ export class PiRpc {
   private nextId = 0;
   private closed = false;
   private failed = false;
+  private pendingPipeEnd?: ReturnType<typeof setTimeout>;
   private closing?: Promise<void>;
 
   constructor(private readonly launch: RpcLaunch) {
@@ -72,22 +90,42 @@ export class PiRpc {
     const fail = (error: Error) => this.fail(error);
     // Neither a clean EOF nor exit code 0 proves agent_settled was received.
     // Do not wait for the model deadline when an IPC channel is already gone.
-    const ended = () => fail(new Error("Pi RPC closed before completion; no fallback was attempted."));
-    readJsonl(this.child.stdout!, (event) => this.receive(event), fail, ended);
-    readJsonl(this.child.stdio[4] as Readable, launch.onBridge, fail, ended);
+    // Keep only bounded transport facts; stderr may contain private extension data.
+    const ended = (source: "stdout" | "bridge_fd4") => this.failAfterPipeEnd(source);
+    readJsonl(this.child.stdout!, (event) => this.receive(event), fail, () => ended("stdout"));
+    readJsonl(this.child.stdio[4] as Readable, launch.onBridge, fail, () => ended("bridge_fd4"));
     // Drain without retaining/logging private extension diagnostics or credentials.
     this.child.stderr!.resume();
     for (const stream of [this.child.stdin!, this.child.stdio[3]!]) stream.on("error", () => fail(new Error("Pi input pipe failed")));
     this.child.on("error", () => fail(new Error("Cannot start Pi. Install Pi >= 0.85.0 and check the executable and working directory.")));
     const exited = (code: number | null, signal: string | null) => {
-      if (!this.closed) fail(new Error(`Pi exited before completion (code ${code}, signal ${signal}). Check its configuration and extension compatibility; no fallback was attempted.`));
+      // A later SIGTERM/SIGKILL after close() is Chrona cleanup, not a cause.
+      if (this.closed) return;
+      this.clearPendingPipeEnd();
+      fail(new PiRpcClosedBeforeCompletionError("process_exit", code, signal));
     };
     this.child.on("exit", exited);
 
   }
 
+  private failAfterPipeEnd(source: "stdout" | "bridge_fd4") {
+    if (this.closed || this.failed || this.pendingPipeEnd) return;
+    // Give an already-exiting child one event-loop turn to report its real exit
+    // code/signal before cleanup can send its own termination signal.
+    this.pendingPipeEnd = setTimeout(() => {
+      this.pendingPipeEnd = undefined;
+      this.fail(new PiRpcClosedBeforeCompletionError(source, this.child.exitCode, this.child.signalCode));
+    }, 0);
+  }
+
+  private clearPendingPipeEnd() {
+    if (this.pendingPipeEnd) clearTimeout(this.pendingPipeEnd);
+    this.pendingPipeEnd = undefined;
+  }
+
   private fail(error: Error) {
     if (this.closed || this.failed) return;
+    this.clearPendingPipeEnd();
     this.failed = true;
     this.rejectPending(error);
     this.launch.onFailure(error);
@@ -133,6 +171,7 @@ export class PiRpc {
   close(): Promise<void> {
     if (this.closing) return this.closing;
     this.closed = true;
+    this.clearPendingPipeEnd();
     this.rejectPending(new Error("Pi RPC closed"));
     this.closing = new Promise<void>((resolve) => {
       if (!this.child.pid || this.child.exitCode !== null || this.child.signalCode !== null) { this.signal("SIGKILL"); this.destroyPipes(); resolve(); return; }

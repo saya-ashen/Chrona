@@ -122,6 +122,8 @@ Source anchors:
 
 ## Node outcomes
 
+A `wait` node is a human-confirmed external-dependency checkpoint, not a timer or event subscription. It shows an actionable confirmation form and does not resume automatically when a clock or external event fires; timed in-plan waits are not implemented. Scheduler or explicit manual start owns activation, recurrence, and scheduled start-time waiting outside the graph, and each generated plan covers one authorized execution occurrence.
+
 Node outcomes never write `Task.status`/`blockReason` directly. The runner
 persists *facts* — the node result/attempt, the `ExecutionSession` state, and
 (for provider work) the `Run` status + `errorSummary` — then calls the single

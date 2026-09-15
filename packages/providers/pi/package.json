@@ -10,5 +10,8 @@
     "@chrona/shared": "workspace:*",
     "@modelcontextprotocol/sdk": "^1.30.0"
   },
-  "exports": { ".": "./src/index.ts" }
+  "exports": {
+    ".": "./src/index.ts",
+    "./test-support": "./src/fake-pi-fixture.ts"
+  }
 }

@@ -129,6 +129,30 @@ describe.skipIf(process.platform === "win32")("Pi provider lifecycle", () => {
     expect(result.snapshot.error).toMatch(/closed.*completion|exited before completion/);
   });
 
+  it("classifies Pi EOF source and bridge phase without mistaking cleanup for the original exit", async () => {
+    const { client } = await fixture();
+    const stdout = await collect(client, request("eof", { timeoutMs: 2000 }));
+    expect(stdout.snapshot.error).toContain("Pi RPC stdout closed before completion");
+    expect(stdout.snapshot.error).toContain("phase before_terminal_call");
+    // The fixture stays alive until PiRun cleanup terminates it. That cleanup
+    // signal is not evidence about why its stdout closed.
+    expect(stdout.snapshot.error).not.toContain("SIGTERM");
+    expect(stdout.snapshot.error).not.toContain("SIGKILL");
+
+    const bridge = await collect(client, request("bridge-eof", { timeoutMs: 2000 }));
+    expect(bridge.snapshot.error).toContain("Pi RPC bridge fd4 closed before completion");
+    expect(bridge.snapshot.error).toContain("phase before_terminal_call");
+
+    const acknowledged = await collect(client, request("terminal-eof", terminal));
+    expect(acknowledged.snapshot.status).toBe("failed");
+    expect(acknowledged.snapshot.error).toContain("Pi RPC stdout closed before completion");
+    expect(acknowledged.snapshot.error).toContain("phase terminal_submission_acknowledged");
+
+    const naturalExit = await collect(client, request("exit", { timeoutMs: 2000 }));
+    expect(naturalExit.snapshot.error).toContain("Pi exited before completion (code 0, signal none)");
+    expect(naturalExit.snapshot.error).toContain("phase before_terminal_call");
+  });
+
   it("rejects clean EOF during isolated startup instead of waiting for the model timeout", async () => {
     const { client } = await fixture();
     await expect(client.startRun(request("terminal", { ...terminal, instructions: "startup-eof", timeoutMs: 2000 }))).rejects.toThrow("closed before completion");

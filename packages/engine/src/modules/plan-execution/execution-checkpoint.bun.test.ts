@@ -63,6 +63,45 @@ describe("deriveExecutionCheckpoint", () => {
     expect(execution.ui?.currentOperationSpec).not.toBeNull();
   });
 
+  it("derives the real reason and form for a persisted legacy wait result", () => {
+    const execution = buildExecutionResponse({
+      taskId: "task-1",
+      planId: "plan-1",
+      mainSessionId: "main-session-1",
+      planRunId: "plan-run-1",
+      status: "waiting_for_user",
+      currentNodeId: "wait-1",
+      executedNodeIds: [],
+      message: "Current execution state.",
+      effective: {
+        nodes: [{
+          id: "wait-1",
+          type: "wait",
+          title: "Wait for deployment",
+          status: "waiting_for_user",
+          config: { waitFor: "the deployment owner confirms completion" },
+          result: {
+            waitKind: "user_input",
+            error: "Wait node wait-1 requires external completion",
+          },
+        }],
+        waitingNodeIds: ["wait-1"],
+        blockedNodeIds: [],
+      } as never,
+    });
+
+    expect(execution.checkpoint).toMatchObject({
+      nodeId: "wait-1",
+      message: "Wait node wait-1 requires external completion",
+      form: {
+        submitLabel: "Confirm and continue",
+        instructions: expect.stringContaining("does not automatically resume"),
+        inputFields: [{ name: "confirmation", required: true }],
+      },
+    });
+    expect(execution.ui?.currentOperationSpec).not.toBeNull();
+  });
+
   it("separates normal manual completion from recovery", () => {
     const checkpoint = deriveExecutionCheckpoint({
       taskId: "task-1",
