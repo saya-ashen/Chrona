@@ -163,7 +163,7 @@ export const taskPlanGenerateFeature = defineAiFeature({
 			"Use only the frozen observations below.",
 			"Return a completed terminal result whose output is { blueprint }, and exactly one task.plan.blueprint.propose action whose input is exactly { blueprint } with no taskId, expectedStateVersion, or other fields.",
 			'Use proposalId "task-plan-proposal" exactly. proposalId is an internal ASCII runtime ID; never translate or localize it.',
-			"Every node must be reachable from an entry node; use only task, checkpoint, condition, or wait nodes with their required configuration.",
+			"Use only task, checkpoint, condition, or wait nodes with their required configuration. A plan may have multiple task exits for mutually exclusive condition branches or parallel work, but every possible terminal path must end at a task.",
 			"Every task node with executor=user or mode=manual must include a complete completionForm whose fields collect the evidence needed by expectedOutput and completionCriteria. Automatic task nodes must not include completionForm.",
 			"Manual completion forms must never request passwords, API keys, tokens, credentials, permission decisions, or authorization decisions.",
 			JSON.stringify(observations),

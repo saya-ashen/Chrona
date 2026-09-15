@@ -1,10 +1,12 @@
-import type {
-  EditablePlan,
-  EditableNode,
-  EditableConditionNode,
-  ValidationResult,
-  ValidationError,
-  ValidationWarning,
+import {
+  upgradeBlueprintToEditable,
+  type EditablePlan,
+  type EditableNode,
+  type EditableConditionNode,
+  type PlanBlueprint,
+  type ValidationResult,
+  type ValidationError,
+  type ValidationWarning,
 } from "@chrona/contracts/ai";
 
 const STABLE_NODE_ID = /^[a-z][a-z0-9_]*$/;
@@ -181,8 +183,8 @@ export function validateEditablePlan(plan: EditablePlan): ValidationResult {
     }
   });
   // 5. Check DAG and terminal shape over the semantic graph. Condition branches
-  // are execution edges even when omitted from edges[]. Multiple entry nodes are
-  // allowed for real parallel starts; plans must still converge to one final task.
+  // are execution edges even when omitted from edges[]. Multiple task exits are
+  // valid: each execution can select one condition path or complete parallel paths.
   if (errors.length === 0) {
     const allNodeIds = [...nodeIds.keys()];
     const graphEdges = semanticEdges(plan, new Set(allNodeIds));
@@ -193,18 +195,12 @@ export function validateEditablePlan(plan: EditablePlan): ValidationResult {
       });
     }
 
-    const terminals = terminalNodeIds(allNodeIds, graphEdges);
-    if (terminals.length !== 1) {
-      errors.push({
-        path: "nodes",
-        message: `Plan must have exactly one terminal node; found ${terminals.length}: ${terminals.join(", ")}`,
-      });
-    } else {
-      const terminalNode = plan.nodes.find((node) => node.id === terminals[0]);
+    for (const terminalId of terminalNodeIds(allNodeIds, graphEdges)) {
+      const terminalNode = plan.nodes.find((node) => node.id === terminalId);
       if (terminalNode?.type !== "task") {
         errors.push({
-          path: `nodes.${nodeIds.get(terminals[0]!)}`,
-          message: "Plan terminal node must be a task that delivers the result",
+          path: `nodes.${nodeIds.get(terminalId)}`,
+          message: "Plan terminal nodes must be tasks that deliver results",
         });
       }
     }
@@ -215,6 +211,14 @@ export function validateEditablePlan(plan: EditablePlan): ValidationResult {
     errors,
     warnings,
   };
+}
+
+/**
+ * Validates an AI blueprint after applying the same defaults used for compilation.
+ * This keeps generation-time structural checks aligned with editable-plan compilation.
+ */
+export function validatePlanBlueprint(blueprint: PlanBlueprint): ValidationResult {
+  return validateEditablePlan(upgradeBlueprintToEditable(blueprint, "blueprint_validation"));
 }
 
 function validateNodeSpecific(

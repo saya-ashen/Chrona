@@ -6,9 +6,11 @@ import type {
 } from "@chrona/contracts";
 import {
   PlanCompileError,
+  planBlueprintSchema,
   upgradeBlueprintToEditable,
 } from "@chrona/contracts";
 import { compileEditablePlan } from "./compile";
+import { validatePlanBlueprint } from "./validate";
 
 
 const STABLE_NODE_ID = /^[a-z][a-z0-9_]*$/;
@@ -61,6 +63,18 @@ function assertDag(nodeIds: string[], edges: PlanBlueprintEdge[]) {
   }
 
   return visited === nodeIds.length;
+}
+
+function parseBlueprint(blueprint: PlanBlueprint): PlanBlueprint {
+  const parsed = planBlueprintSchema.safeParse(blueprint);
+  if (parsed.success) return parsed.data;
+
+  throw new PlanCompileError(
+    "Plan blueprint compilation failed",
+    parsed.error.issues.map((issue) =>
+      compileIssue(issue.path.join(".") || "blueprint", issue.message),
+    ),
+  );
 }
 
 function validateBlueprint(input: { blueprint: PlanBlueprint }) {
@@ -130,6 +144,11 @@ function validateBlueprint(input: { blueprint: PlanBlueprint }) {
     issues.push(compileIssue("edges", "Plan graph must be a DAG"));
   }
 
+  if (issues.length === 0) {
+    const semanticValidation = validatePlanBlueprint(input.blueprint);
+    issues.push(...semanticValidation.errors.map(({ path, message }) => compileIssue(path, message)));
+  }
+
   if (issues.length > 0) {
     throw new PlanCompileError("Plan blueprint compilation failed", issues);
   }
@@ -145,10 +164,11 @@ export function compilePlanBlueprint(input: {
   generatedBy?: string | null;
   source?: LayerSource;
 }): { compiledPlan: CompiledPlan; planId: string } {
-  validateBlueprint({ blueprint: input.blueprint });
+  const blueprint = parseBlueprint(input.blueprint);
+  validateBlueprint({ blueprint });
 
   const planId = input.planId ?? crypto.randomUUID().replaceAll("-", "").slice(0, 12);
-  const editable = upgradeBlueprintToEditable(input.blueprint, planId, 1);
+  const editable = upgradeBlueprintToEditable(blueprint, planId, 1);
   const compiledPlan = compileEditablePlan(editable);
 
   return { compiledPlan, planId };

@@ -313,18 +313,36 @@ describe("validateEditablePlan", () => {
     expect(result.ok).toBe(true);
   });
 
-  it("10c. rejects dangling extra terminal nodes", () => {
+  it("10c. accepts parallel task exits", () => {
     const plan = makePlan(
-      "plan_dangling",
+      "plan_parallel_exits",
       [makeTask("fetch_data"), makeTask("summarize_data"), makeTask("report_empty")],
       [{ from: "fetch_data", to: "summarize_data" }],
     );
     const result = validateEditablePlan(plan);
-    expect(result.ok).toBe(false);
-    expect(result.errors.some((e) => e.message.includes("exactly one terminal node"))).toBe(true);
+    expect(result.ok).toBe(true);
   });
 
-  it("10d. rejects plans ending on a checkpoint", () => {
+  it("10d. accepts XOR branches with distinct task exits", () => {
+    const plan = makePlan(
+      "plan_preview_exits",
+      [
+        makeTask("analyze"),
+        makeCondition("preview_available", [
+          { label: "blocked", nextNodeId: "report_blocked_preview" },
+          { label: "ready", nextNodeId: "publish_preview_report" },
+        ]),
+        makeTask("report_blocked_preview"),
+        makeTask("publish_preview_report"),
+      ],
+      [{ from: "analyze", to: "preview_available" }],
+    );
+    const result = validateEditablePlan(plan);
+    expect(result.ok).toBe(true);
+    expect(compileEditablePlan(plan).terminalNodeIds).toHaveLength(2);
+  });
+
+  it("10e. rejects plans ending on a checkpoint", () => {
     const plan = makePlan(
       "plan_checkpoint_terminal",
       [makeTask("fetch_data"), makeCheckpoint("choose_empty")],
@@ -332,10 +350,10 @@ describe("validateEditablePlan", () => {
     );
     const result = validateEditablePlan(plan);
     expect(result.ok).toBe(false);
-    expect(result.errors.some((e) => e.message.includes("terminal node must be a task"))).toBe(true);
+    expect(result.errors.some((e) => e.message.includes("terminal nodes must be tasks"))).toBe(true);
   });
 
-  it("10e. rejects condition branch cycles even without explicit edges", () => {
+  it("10f. rejects condition branch cycles even without explicit edges", () => {
     const plan = makePlan(
       "plan_branch_cycle",
       [
@@ -349,7 +367,7 @@ describe("validateEditablePlan", () => {
     expect(result.errors.some((e) => e.message.includes("DAG"))).toBe(true);
   });
 
-  it("10f. rejects generated empty-result fallback nodes left unconnected", () => {
+  it("10g. rejects generated empty-result fallback nodes that end at a checkpoint", () => {
     const plan = makePlan(
       "plan_generated_orphan",
       [
@@ -376,7 +394,7 @@ describe("validateEditablePlan", () => {
     );
     const result = validateEditablePlan(plan);
     expect(result.ok).toBe(false);
-    expect(result.errors.some((e) => e.message.includes("exactly one terminal node"))).toBe(true);
+    expect(result.errors.some((e) => e.message.includes("terminal nodes must be tasks"))).toBe(true);
   });
 
   it("11. rejects empty plan", () => {

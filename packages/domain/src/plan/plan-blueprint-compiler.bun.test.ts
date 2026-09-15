@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test";
 
-import { PlanCompileError } from "@chrona/contracts";
+import { PlanCompileError, type PlanBlueprint } from "@chrona/contracts";
 
 import { compilePlanBlueprint } from "./plan-blueprint-compiler";
 
@@ -39,6 +39,27 @@ describe("compilePlanBlueprint", () => {
       "book_trip",
     ]);
     expect(result.compiledPlan.edges).toHaveLength(1);
+  });
+
+  it("applies blueprint schema defaults before compilation", () => {
+    const result = compilePlanBlueprint({
+      taskId: "task-1",
+      blueprint: {
+        title: "Default edges",
+        goal: "Compile a single task without explicit edges",
+        nodes: [
+          {
+            id: "deliver_result",
+            type: "task",
+            title: "Deliver result",
+            executor: "ai",
+            mode: "auto",
+          },
+        ],
+      } as unknown as PlanBlueprint,
+    });
+
+    expect(result.compiledPlan.edges).toEqual([]);
   });
 
   it("fails on invalid edge references", () => {

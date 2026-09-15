@@ -6,7 +6,7 @@ import { publishTaskWorkspaceUpdatedEvent } from "@/modules/projections/task-pro
 import { createPlanGraphFromCompiledPlan, createEmptyPlanOutput } from "@/modules/plan-execution/persistence/plan-run-store";
 import { createPlanRunFromCompiledPlan } from "@/modules/plan-execution/persistence/plan-runtime-store";
 import { compilePlanBlueprint } from "@chrona/domain";
-import { upgradeBlueprintToEditable, type AiRunResult, type CompletionValidation, type CompiledPlan, type PlanBlueprint, type TaskPlanReadModel } from "@chrona/contracts";
+import { PlanCompileError, upgradeBlueprintToEditable, type AiRunResult, type CompletionValidation, type CompiledPlan, type PlanBlueprint, type TaskPlanReadModel } from "@chrona/contracts";
 import { resolveEffectivePlanGraph } from "@chrona/graph-runtime";
 import { buildTaskPlanReadModel } from "./task-plan-read-model";
 import { parseFrozenGoalTaskContext, type FrozenGoalTaskContext } from "@/modules/goals/goal-task-context";
@@ -264,15 +264,32 @@ export async function commitTaskPlanGeneration(input: {
   generatedBy?: string;
 }): Promise<CommittedTaskPlanGeneration> {
   const validation = validateTaskPlanBlueprint(input.candidate.blueprint);
-  if (!validation.ok) throw new Error(validation.issues.map((issue) => issue.message).join(" "));
+  if (!validation.ok) {
+    throw new AiFeatureRuntimeError({
+      code: "completion_invalid",
+      message: "Generated plan did not satisfy required graph rules.",
+    });
+  }
 
-  const { compiledPlan, planId } = compilePlanBlueprint({
-    taskId: input.candidate.snapshot.task.id,
-    blueprint: input.candidate.blueprint,
-    planId: `plan_${input.candidate.runId}`,
-    generatedBy: input.generatedBy ?? "ai",
-    source: "ai",
-  });
+  let compiledPlan: CompiledPlan;
+  let planId: string;
+  try {
+    ({ compiledPlan, planId } = compilePlanBlueprint({
+      taskId: input.candidate.snapshot.task.id,
+      blueprint: input.candidate.blueprint,
+      planId: `plan_${input.candidate.runId}`,
+      generatedBy: input.generatedBy ?? "ai",
+      source: "ai",
+    }));
+  } catch (cause) {
+    if (cause instanceof PlanCompileError) {
+      throw new AiFeatureRuntimeError({
+        code: "completion_invalid",
+        message: "Generated plan did not satisfy required graph rules.",
+      });
+    }
+    throw cause;
+  }
   const editablePlan = upgradeBlueprintToEditable(input.candidate.blueprint, planId, 1);
   const contentHash = stableJsonHash(editablePlan);
   const run = createPlanRunFromCompiledPlan(compiledPlan);
