@@ -1,6 +1,6 @@
 # Proactive Personal Assistant: Development Plan
 
-Status: first Goal-capture slice deployed with explicit approval; scoped Pi connection and skill installed. Live automation, permission grants and real notification sends remain unapproved.
+Status: Goal capture deployed with explicit approval; existing-Goal editing implemented locally, not deployed or installed into Pi yet. Live automation, permission grants and real notification sends remain unapproved.
 
 This is the canonical development plan for making Chrona the durable, governed
 backing service for a user's everyday AI assistant. It records the agreed scope,
@@ -26,10 +26,17 @@ docs rather than accumulating dated phase reports.
   Pi's actual adapter verified separate task/Goal credentials and the no-write
   proposal contract; its skill loader verified discovery inside/outside the repo.
   Already-open Pi sessions require `/reload` to load the new connection and skill.
+- **Phase 1 follow-up: existing-Goal editing implemented locally.** The optional
+  `assistant-edit` profile enables title/description/partial brief/ID-based criteria
+  edits and attributed progress/finding/decision notes. Read-only previews,
+  persisted `editRevision`, conflict reconciliation, atomic audit/brief history,
+  and idempotent receipts preserve existing Task context. Explicit user requests
+  need no redundant confirmation; inferred material edits require skill-mediated
+  review. This is not server-authenticated consent or a policy-grant mechanism.
+  Existing credentials remain unchanged; deployment and Pi installation are pending.
 - **Phase 1 remaining gates:** user-trial intent/consent quality, real saved-Draft
-  trial, and subsequent existing-Goal change proposal/consent work. This slice
-  does not expose Draft activation or treat a permission request as a grant.
-  Phase 1 is not marked complete.
+  and existing-Goal edit trials, plus explicit rollout of the editing version.
+  No Draft activation or permission grant is exposed. Phase 1 is not marked complete.
 - **Phases 2–6: not implemented.** No policies enforced from natural language,
   recurring searches started, delivery adapters configured, or user data migrated.
 
@@ -59,6 +66,54 @@ Current capture contracts and setup are documented in the
 - No live Goal/task was created and no model invoked for acceptance. These checks
   do not certify automatic intent recognition, provider enforcement, notification
   delivery or unattended execution.
+
+### Existing-Goal editing milestone
+
+Source contracts: `chrona_goal_update`, additive `capabilities.goals.editing`,
+`chrona_goal_read` editability/editRevision/history. See the
+[API contract](api-reference.md#post-apimcpmanagement) and
+[skill walkthrough](../../packages/skills/chrona-assistant/README.md).
+
+- Scope: Draft/Active/Paused only. Archived outcomes stay immutable through MCP.
+  No Goal lifecycle, trigger, schedule, provider or permission-grant changes.
+- Partial updates preserve omitted/unknown metadata; revised criterion meaning
+  resets prior confirmation/evidence. Notes are attributed text, not accepted
+  Results or verified evidence. History is management edits only, not all activity.
+- `goals:write` is workspace-wide content authority; natural-language constraints
+  and conversational confirmation are not per-Goal enforced permissions.
+- DB: `Goal.configRevision` plus SQLite trigger covers canonical/UI edits and
+  A→B→A. Current mutable release-line migration and known amendments/normalizers
+  converge to the new schema; released migrations remain unchanged. Registered
+  amendment `5d2fdbd1…` upgrades the currently deployed schema with backup.
+- No existing Task context is rewritten or execution started; future associated
+  Tasks capture the new brief. No unrelated functionality removed: only local
+  helper extraction reduced complexity introduced by editing.
+- Rollout is separate: upgrade/backup, explicit `assistant-edit` enrollment,
+  assistant connection allowlist/credential and installed skill update, read-only
+  capability check, then a user-approved real edit trial. Do not rotate task
+  credentials or migrate the live database as part of development tests.
+
+**Local verification (editing slice):**
+
+- Typecheck passed. Targeted ESLint has no new warnings/errors; the existing CLI
+  function-length warning remains. Boundaries: 0 errors, 10 existing warnings.
+- 73 focused contract/engine/CLI/wire/migration tests passed. Dedicated DB
+  regression: 45 passed, 1 skipped; MCP feature: 50 Bun + 5 Vitest passed.
+- Broad run completed all 786 Vitest tests and 2,106 Bun tests (11 skipped), then
+  hit the 420-second limit during API tests. Separate API run passed all 423 with
+  `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/run/current-system/sw/bin/google-chrome`;
+  without that override two PDF export tests failed for missing usable Chromium.
+- Desktop route audit: 6 passed with that browser override and isolated test
+  ports 48120/48121 after the default API port was occupied. Full E2E was not run
+  to completion; no claim of an all-green `bun run test` invocation.
+- Linux build and packaged fresh-start/upgrade/backup/restore smoke passed in a
+  HEAD-plus-milestone snapshot excluding seven unrelated Pi-provider/docs edits.
+  Build emitted existing asset-size warnings and a nonfatal Bun directory-mismatch
+  diagnostic; packaged runtime smoke succeeded. No live data or deployment changed.
+- Global lint still fails the pre-existing warning ratchet in
+  `task-config-save.ts` and `manual-task-lifecycle.ts`; no new lint debt was added.
+- Protocol/skill checks do not prove natural-language intent recognition or consent
+  quality. The installed capture skill/MCP and actual user-data trial remain unchanged.
 
 ## 1. Product objective
 
@@ -251,7 +306,8 @@ Prefer a small closed set of Goal-oriented operations over one generic executor:
 | Extend `chrona_context_read` | Contract version, Goal/routine capabilities, effective client authority, recurrence limits, provider enforcement readiness, delivery capabilities |
 | `chrona_goal_search` / `chrona_goal_read` | Bounded Goal lookup, revision, brief, routine/policy summaries, next run, current attention and result/delivery references |
 | `chrona_goal_propose` | Preview/create a bounded draft or change proposal with rationale and provenance; no implicit authorization or execution |
-| `chrona_goal_action` | Closed actions for review, applying confirmed changes, configuring approved routines, feedback, pause/resume/stop; permission-sensitive actions require trusted consent evidence |
+| `chrona_goal_update` | Implemented locally: partial content edits/notes with persisted editRevision, read-only preview and atomic audit; no lifecycle or grant authority |
+| `chrona_goal_action` | Future closed actions for review, applying confirmed changes, configuring approved routines, feedback, pause/resume/stop; permission-sensitive actions require trusted consent evidence |
 | Existing Task operations | Reuse canonical Task/occurrence execution and result reads; extend narrowly rather than duplicating them under Goals |
 
 Finalize exact schemas and tool grouping in phase 1. All writes need operation
@@ -578,8 +634,13 @@ a decision; estimate effort only after these spikes.
 versioning, idempotent draft/change receipts, and the repository-owned skill.
 
 - Reuse engine Goal use cases and existing review surfaces.
-- Add least-privilege read/proposal enrollment; do not expose grant approval to
-  the delegated client.
+- Add least-privilege read/proposal enrollment; opt-in `assistant-edit` additionally
+  grants content edits, not execution or grant approval. Existing presets remain
+  unchanged.
+- Maintain existing Goals, not just a capture inbox: explicit user-requested edits,
+  preview/confirmation for inferred material edits, revision conflicts, attributed
+  progress/decision history and frozen existing Task context. Content-edit consent
+  is conversational in this milestone; trusted permission grants belong to Phase 2.
 - Provide positive and negative examples, offline handling, duplicate lookup,
   explicit invocation and safe retry behavior in the skill.
 - Verify a real reference host's discovery and MCP calls without automatically

@@ -1,7 +1,3 @@
--- Phase 2A amendment for databases already on the management-MCP release-line checksum.
--- Existing records intentionally retain the AI default; no task is inferred as manual.
-ALTER TABLE "Task" ADD COLUMN "taskExecutionMode" TEXT NOT NULL DEFAULT 'ai';
-
 -- Goal editing: persistent CAS across MCP, UI and all canonical writers.
 ALTER TABLE "Goal" ADD COLUMN "configRevision" INTEGER NOT NULL DEFAULT 1;
 CREATE TRIGGER "Goal_config_update" AFTER UPDATE OF

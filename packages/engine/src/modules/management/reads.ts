@@ -64,6 +64,13 @@ export async function readManagementContext(client: ManagementIdentity) {
         canRead: client.scopes.includes("goals:read"),
         canPropose: client.scopes.includes("goals:read") && client.scopes.includes("goals:propose"),
         proposalModes: ["new_draft"], activation: false, policyGrants: false,
+        editing: {
+          available: true, contractVersion: 1,
+          canUpdate: client.scopes.includes("goals:read") && client.scopes.includes("goals:write"),
+          statuses: ["Draft", "Active", "Paused"], revisionField: "editRevision",
+          preview: "dryRun", historyView: "history", notes: ["progress", "finding", "decision"],
+          existingTaskContextsChanged: false, criterionConfirmation: false,
+        },
       },
       manualTasks: { available: true, lifecycle: ["complete", "reopen"], recurrence: false, conversion: false },
       independentManualTodos: true,

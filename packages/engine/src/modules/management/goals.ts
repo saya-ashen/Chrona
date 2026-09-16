@@ -4,9 +4,10 @@ import { stableJsonHash } from "../ai";
 import type { ManagementIdentity } from "./clients";
 import { ManagementError } from "./errors";
 import { record, requireScopes, text } from "./reads";
+import { editableGoalStatuses, goalEditRevision, readGoalUpdateHistory } from "./goal-updates";
 
 const goalSelect = {
-  id: true, title: true, description: true, status: true,
+  id: true, title: true, description: true, status: true, configRevision: true,
   operationalBrief: true, successCriteria: true, nextReviewAt: true,
   createdAt: true, updatedAt: true,
   _count: { select: { tasks: true, assets: true } },
@@ -40,6 +41,11 @@ export async function searchManagementGoals(client: ManagementIdentity, input: M
   };
 }
 
+function goalEditability(client: ManagementIdentity, status: string) {
+  const disabledReason = !client.scopes.includes("goals:write") ? "Requires goals:write" : !editableGoalStatuses.includes(status) ? "Archived Goal" : null;
+  return { canUpdate: disabledReason === null, disabledReason };
+}
+
 export async function readManagementGoal(client: ManagementIdentity, input: ManagementGoalRead) {
   requireScopes(client, ["goals:read"]);
   const goal = await db.goal.findFirst({ where: { id: input.goalId, workspaceId: client.workspaceId }, select: goalSelect });
@@ -48,10 +54,13 @@ export async function readManagementGoal(client: ManagementIdentity, input: Mana
     goal: { goalId: goal.id, title: text(goal.title, 200), titleTruncated: goal.title.length > 200, status: goal.status, url: goalUrl(client, goal.id), createdAt: goal.createdAt, updatedAt: goal.updatedAt },
     // An observational fingerprint, not a permission grant or a mutation token.
     revision: `goal-snapshot-v1:${stableJsonHash(goal)}`,
+    editRevision: goalEditRevision(goal.configRevision),
+    editability: goalEditability(client, goal.status),
     nextReviewAt: goal.nextReviewAt, taskCount: goal._count.tasks, assetCount: goal._count.assets,
     activationAvailable: false, permissionGrantsAvailable: false,
   };
   if (input.view === "compact") return common;
+  if (input.view === "history") return { ...common, history: await readGoalUpdateHistory(client, goal.id, input.page, input.pageSize) };
   if (input.view === "brief") {
     const brief = record(goal.operationalBrief);
     const constraints = Array.isArray(brief.constraints) ? brief.constraints : [];

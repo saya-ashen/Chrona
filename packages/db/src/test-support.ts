@@ -54,6 +54,7 @@ export async function resetTestDb() {
     await db.taskSession.deleteMany();
     await db.taskDependency.deleteMany();
     await db.memory.deleteMany();
+    await db.goalBriefRevision.deleteMany();
     await db.goal.deleteMany();
     await db.task.deleteMany();
     await db.schedulerLease.deleteMany();

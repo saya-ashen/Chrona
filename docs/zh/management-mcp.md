@@ -20,6 +20,7 @@ chrona mcp revoke CLIENT_ID
 
 - `--access` 必填。原有 `read`（任务读取）和 `full`（原有任务管理全部权限）保持原语义；**不会自动获得新增 Goal 权限**。full 包括启动付费执行、批准 provider 操作、删除任务，只授予可信管理 Agent。
 - 新增 `assistant-read` 仅授予 `goals:read`；`assistant` 仅授予 `goals:read` + `goals:propose`。日常助理捕获使用这两种最小权限预设，不能创建任务、运行 AI、批准 provider、删除任务或授予权限。新增能力需使用匹配版本并显式 enrollment；Goal 捕获试用已另建最小权限凭据，原有任务凭据未扩大或轮换。
+- 源码新增 `assistant-edit`：`goals:read` + `goals:propose` + `goals:write`。仅允许目标内容维护，不含执行、审批、生命周期切换。`goals:write` 覆盖凭据所属工作区，不是逐 Goal 的自然语言权限隔离。原 `assistant` 与已有凭据不自动扩大；编辑版本尚未部署。
 - token 仅写入新建私密文件，POSIX 权限 `0600`、父目录必须私密；不输出 token，不覆盖已有文件。数据库只存 SHA-256 摘要。
 - 凭据绑定当前默认工作区；工具不提供 workspace 选择或枚举。
 - enrollment 是本机管理命令，不存在免鉴权的 HTTP enrollment 路由。CLI 不迁移运行中的数据库；必须先按正常升级流程启动匹配版本的服务。
@@ -37,8 +38,9 @@ chrona mcp revoke CLIENT_ID
 | --- | --- |
 | `chrona_context_read` | 当前时间、时区、权限、Goal 捕获契约版本、时间策略及提醒能力边界；仅具有任务读取权限时返回 provider 列表及默认 provider |
 | `chrona_goal_search` | 需要 `goals:read`；工作区隔离的标题/描述检索，生命周期过滤，每页最多20项 |
-| `chrona_goal_read` | 需要 `goals:read`；compact / brief / criteria 有界读取，不返回原始资产、provider 或运行上下文 |
+| `chrona_goal_read` | 需要 `goals:read`；compact / brief / criteria / history 有界读取，不返回原始资产、provider 或运行上下文 |
 | `chrona_goal_propose` | 需要 `goals:read` + `goals:propose`；幂等捕获新 Draft Goal，含依据、第一步、未确认标准及自然语言权限请求；不会授权或启动任何工作 |
+| `chrona_goal_update` | 需要 `goals:read` + `goals:write`；修改已有 Draft/Active/Paused 的标题、描述、简报、标准，追加进展/发现/决定；revision CAS、dryRun、原子审计与幂等回执，不授权或启动工作 |
 | `chrona_task_search` | 标题/描述搜索，状态/过滤器、优先级、排序、分页；独立返回 deadline、排期摘要和自动化设置 |
 | `chrona_task_read` | compact / summary / description / config / plan / activity / result；compact 只核对任务与排期，其他视图保留执行上下文 |
 | `chrona_task_create` | todo / plan / automatic；显式 `taskExecutionMode: manual` 创建不依赖 provider 的手动任务；立即执行或排期，独立截止时间、重复任务、provider、执行参数；dryRun；回执包含 deadline、排期摘要和自动化设置 |
@@ -60,8 +62,24 @@ Pi 保留原 `chrona` 任务连接，另用 `chrona-assistant` 及独立 Goal-on
 - 持久化 Goal 为 Draft，`nextReviewAt` 为空，标准为 proposed/未确认。简报中的约束仅是请求，不是已授予或已执行的权限。不会生成 Task、触发器、计划、复查或模型会话。
 - dryRun 不写库、不保留来源摘要、不调用模型。真实写入前由日常 Agent 获得用户对最小摘要保存的确认；本工具不是可信权限授予界面。
 - 回执 `completed` 只表示草稿已记录；读取 Goal 回执中的链接/ID 再核对当前状态。Goal `revision` 是只读快照指纹，不是授权或变更 CAS 凭据。
-- 当前未提供 Draft 激活、已有 Goal 修改、权限授予或结果送达工具；不要用原有任务自动化接口绕过这些边界。任务列表读取需要独立的 `tasks:read`。
+- 已部署捕获版本不支持已有 Goal 修改；源码新增编辑能力见下节。仍未提供 Draft 激活、权限授予或结果送达工具，不要用原有任务自动化接口绕过这些边界。任务列表读取需要独立的 `tasks:read`。
 - Goal、命令回执和 actor=agent/source=management_mcp 事件原子提交；来源摘要保存在审计事件中。不存完整聊天、密钥或无关私人资料。现有回执保留语义不变，删除 Goal 不等于清除所有回执。
+
+### 维护已有 Goal（源码已实现，待独立部署）
+
+先查 `capabilities.goals.editing.contractVersion: 1` 与 `canUpdate: true`，并确认连接暴露 `chrona_goal_update`；字段缺失或旧凭据均不得假定可写。检索并读取同一 Goal，不建重复目标绕过限制。
+
+- `chrona_goal_read` 新增持久化 `editRevision: goal-config-v1:N` 及 `editability`。更新的 `expectedRevision` 必须取 **editRevision**，不是旧的只读 `revision` 指纹。
+- 更新输入：新 UUID `requestId`、`goalId`、`expectedRevision`、说明依据的 `reason`，以及 `patch` / `note` 至少一个。可加 `dryRun: true`，只返回有界差异，不保存提案、事件或回执。
+- `patch` 只含实际改动：title、description（null 清空）、局部 brief（outcome/currentFocus/strategy/constraints）、按 ID 的 criteria add/revise/remove。不传字段保持原值；不要从截断读结果重建整个简报或标准列表。constraints 为整数组替换，但只是文字边界，不会授予权限。
+- 标准变更语义后重置 satisfied/confirmedAt/evidence，仍为 proposed；未改标准保留证明和确认。至少保留一项，编辑后的标准不超过20项。Goal 只允许 Draft/Active/Paused，Achieved/Stopped 拒绝改写。
+- `note: {kind: progress | finding | decision, text}` 追加 agent 归属记录，不是已验证证据、正式结果或完成确认。下一步工作重点可写 brief.currentFocus。
+- 明确用户指令直接应用，无需重复确认；AI 推断的实质变化先预览并确认。`reason` 是审计来源，不是服务端验证的用户同意证明；skill 不能把内容编辑凭据变成逐目标的安全策略。
+- Goal 内容、revision、简报版本、审计和命令回执原子提交。同请求重试重放历史回执；冲突必须重读、协调新旧变化，不允许只换 revision 重放旧 patch。无实质变化且无 note 时返回 unchanged。
+- history 仅列管理端编辑/笔记，可分页；显式返回 reasonTruncated/noteTruncated/changesTruncated 及单值截断标记。缩小 pageSize 可看更多细节，但仍不是完整审计导出。现有网页活动面板未增加专用编辑历史 UI。
+- 已有 Task.goalContext 保持冻结；后续新建关联 Task 使用更新后的简报。本操作不重排/暂停已有任务，不激活 Goal，不启动模型或监控。
+
+部署步骤须另获授权：升级并应用已登记 amendment → 显式 enroll `assistant-edit` 新凭据 → 仅更新 Pi 的 `chrona-assistant` 连接及其 `chrona_goal_update` allowlist → 更新安装的 skill 并 `/reload` → 验证能力后撤销旧 assistant 凭据。任务连接不变。本次开发未执行这些步骤，也未新建真实 Goal。
 
 ### 原有任务管理能力
 
@@ -165,7 +183,7 @@ compose 最长 5 分钟，额外 review 最长 1 分钟；超时会发送取消�
 ## 数据库与验证
 
 本发布线仅修改 `20260822000000_repair_release_line`；已发布迁移不变。
-对旧 mutable checksum `641aa4b5…` 注册带源 schema 指纹和文件校验的 amendment，升级前自动备份；未知 drift 拒绝。
+已注册各已知 mutable checksum 的源 schema 指纹和 amendment 文件校验，升级前自动备份；未知 drift 拒绝。Goal 编辑新增 `Goal.configRevision` 和 SQLite trigger，并登记当前已部署 checksum `5d2fdbd1…` 的 amendment；已有 amendment/normalizer 同步收敛到新 schema。新建、历史发布快照升级与当前部署结构升级均用隔离数据库验证，不对在线库执行开发迁移。
 
 配置 revision 使用 SQLite trigger。Bun adapter 的 `run().changes` 包含 trigger 写入，不能直接作为 Prisma 的 affected-row 数；新增 adapter guard 返回顶层 `changes()`，并隔离同连接的普通查询与其他调用方事务。相关事务、外键 relation connect、跨调用方回滚测试位于 `packages/db/src/transaction-context.bun.test.ts`。
 

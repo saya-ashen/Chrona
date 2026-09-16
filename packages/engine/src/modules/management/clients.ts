@@ -23,7 +23,7 @@ export const managementTokenDigest = (token: string) => createHash("sha256").upd
 export async function createManagementClient(raw: z.input<typeof managementClientInputSchema>) {
   const input = managementClientInputSchema.parse(raw);
   if (!input.scopes.includes("tasks:read") && !input.scopes.includes("goals:read")) throw new ManagementError("VALIDATION_ERROR", "Clients require tasks:read or goals:read");
-  if (input.scopes.includes("goals:propose") && !input.scopes.includes("goals:read")) throw new ManagementError("VALIDATION_ERROR", "Goal proposals require goals:read");
+  if ((input.scopes.includes("goals:propose") || input.scopes.includes("goals:write")) && !input.scopes.includes("goals:read")) throw new ManagementError("VALIDATION_ERROR", "Goal writes require goals:read");
   const workspace = await getDefaultWorkspace();
   const token = `chrona_mgmt_${randomBytes(32).toString("base64url")}`;
   const client = await db.managementClient.create({ data: { ...input, scopes: [...new Set(input.scopes)], workspaceId: workspace.id, tokenDigest: managementTokenDigest(token) } });

@@ -6,16 +6,17 @@ import { TASK_LIST_FILTERS, TASK_LIST_SORT_FIELDS, TASK_TITLE_MAX, TASK_DESCRIPT
 import { checkpointActionBodySchema, executionActionBodySchema, providerApprovalResolveBodySchema } from "./execution.schema";
 import { planPatchBodySchema } from "./plans.schema";
 
-import { managementGoalSearchSchema, managementGoalReadSchema, managementGoalProposeSchema } from "./management-goals.schema";
+import { managementGoalSearchSchema, managementGoalReadSchema, managementGoalProposeSchema, managementGoalUpdateSchema } from "./management-goals.schema";
 
 // Preserve the historical full preset. New authority requires explicit enrollment.
 export const MANAGEMENT_LEGACY_SCOPES = ["tasks:read", "tasks:write", "schedule:write", "plans:write", "executions:control", "results:accept", "tasks:delete"] as const;
-export const MANAGEMENT_SCOPES = [...MANAGEMENT_LEGACY_SCOPES, "goals:read", "goals:propose"] as const;
+export const MANAGEMENT_SCOPES = [...MANAGEMENT_LEGACY_SCOPES, "goals:read", "goals:propose", "goals:write"] as const;
 export const MANAGEMENT_ACCESS_PRESETS = {
   read: ["tasks:read"],
   full: MANAGEMENT_LEGACY_SCOPES,
   "assistant-read": ["goals:read"],
   assistant: ["goals:read", "goals:propose"],
+  "assistant-edit": ["goals:read", "goals:propose", "goals:write"],
 } as const;
 export type ManagementAccessPreset = keyof typeof MANAGEMENT_ACCESS_PRESETS;
 export const managementScopeSchema = z.enum(MANAGEMENT_SCOPES);
@@ -165,7 +166,7 @@ export const managementTools = {
   chrona_task_create: managementCreateSchema, chrona_task_update: managementUpdateSchema,
   chrona_task_action: managementActionSchema, chrona_task_delete: managementDeleteSchema,
   chrona_goal_search: managementGoalSearchSchema, chrona_goal_read: managementGoalReadSchema,
-  chrona_goal_propose: managementGoalProposeSchema,
+  chrona_goal_propose: managementGoalProposeSchema, chrona_goal_update: managementGoalUpdateSchema,
 };
 export type ManagementToolName = keyof typeof managementTools;
 export type ManagementCreate = z.infer<typeof managementCreateSchema>;

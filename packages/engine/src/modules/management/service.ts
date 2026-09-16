@@ -1,7 +1,7 @@
 /* eslint-disable complexity -- Idempotency and all local mutation branches share one atomic command boundary. */
 import { db, withDatabaseTransaction } from "@/lib/db";
 import type { Prisma, ManagementCommand } from "@/generated/prisma/client";
-import { managementTools, managementCreateSchema, managementUpdateSchema, managementActionSchema, managementDeleteSchema, managementSearchSchema, managementReadSchema, managementGoalSearchSchema, managementGoalReadSchema, managementGoalProposeSchema, type ManagementToolName } from "@chrona/contracts/api";
+import { managementTools, managementCreateSchema, managementUpdateSchema, managementActionSchema, managementDeleteSchema, managementSearchSchema, managementReadSchema, managementGoalSearchSchema, managementGoalReadSchema, managementGoalProposeSchema, managementGoalUpdateSchema, type ManagementToolName } from "@chrona/contracts/api";
 import { stableJsonHash } from "../ai";
 import { appendCanonicalEvent, withCommandActor } from "../events";
 import { refreshManagementClient, requireManagementClient, type ManagementIdentity } from "./clients";
@@ -13,6 +13,7 @@ import { startManagementWorker } from "./worker";
 import type { ManagementDeps } from "./types";
 import { readManagementGoal, searchManagementGoals } from "./goals";
 import { proposeGoalDraft } from "../goals/goal-draft-proposal";
+import { applyGoalUpdate, goalUpdatePreview, prepareGoalUpdate } from "./goal-updates";
 
 export const managementJson = (value: unknown): Prisma.InputJsonValue => JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
 export function commandReceipt(command: ManagementCommand, replayed = false) {
@@ -39,6 +40,13 @@ export function createManagementService(deps: ManagementDeps) {
           requireScopes(client, ["goals:read", "goals:propose"]);
           const proposal = managementGoalProposeSchema.parse(raw);
           if (proposal.dryRun) return managementSuccess({ dryRun: true, normalized: proposal, proposedStatus: "Draft", executionStarted: false, permissionsGranted: false });
+        } else if (name === "chrona_goal_update") {
+          requireScopes(client, ["goals:read", "goals:write"]);
+          const update = managementGoalUpdateSchema.parse(raw);
+          if (update.dryRun) return managementSuccess(await withDatabaseTransaction(async () => {
+            const current = await refreshManagementClient(client);
+            return { dryRun: true, ...goalUpdatePreview(await prepareGoalUpdate(current, update), update) };
+          }));
         } else requireScopes(client, ["tasks:read"]);
         if (name === "chrona_task_search") return managementSuccess(await searchManagementTasks(client, managementSearchSchema.parse(raw)));
         if (name === "chrona_task_read") return managementSuccess(await readManagementTask(client, managementReadSchema.parse(raw)));
@@ -57,7 +65,7 @@ export function createManagementService(deps: ManagementDeps) {
         }
         return managementSuccess(await withDatabaseTransaction(async () => {
           const authorized = await refreshManagementClient(client);
-          requireScopes(authorized, name === "chrona_goal_propose" ? ["goals:read", "goals:propose"] : ["tasks:read"]);
+          requireScopes(authorized, name === "chrona_goal_propose" ? ["goals:read", "goals:propose"] : name === "chrona_goal_update" ? ["goals:read", "goals:write"] : ["tasks:read"]);
           if (!("requestId" in input) || typeof input.requestId !== "string") throw new ManagementError("VALIDATION_ERROR", "requestId is required");
           const payloadHash = stableJsonHash(input);
           const prior = await db.managementCommand.findUnique({ where: { clientId_toolName_requestId: { clientId: authorized.id, toolName: name, requestId: input.requestId } } });
@@ -69,16 +77,7 @@ export function createManagementService(deps: ManagementDeps) {
           }
           const command = await db.managementCommand.create({ data: { clientId: authorized.id, workspaceId: authorized.workspaceId, toolName: name, requestId: input.requestId, payloadHash, input: managementJson(input) } });
           return withCommandActor({ actorType: "agent", actorId: authorized.id, source: "management_mcp", correlationId: command.id }, async () => {
-            if (name === "chrona_goal_propose") {
-              const { requestId: _requestId, dryRun: _dryRun, ...proposal } = managementGoalProposeSchema.parse(raw);
-              const goalId = await proposeGoalDraft({ workspaceId: authorized.workspaceId, proposal, actorId: authorized.id, commandId: command.id });
-              const snapshot = await readManagementGoal(authorized, { goalId, view: "compact" });
-              const updated = await db.managementCommand.update({ where: { id: command.id }, data: {
-                state: "completed", phase: "completed",
-                result: managementJson({ outcome: "goal_proposed", ...snapshot, requiresHumanReview: true, executionStarted: false, permissionsGranted: false }),
-              } });
-              return commandReceipt(updated);
-            }
+            if (name === "chrona_goal_propose" || name === "chrona_goal_update") return completeGoalCommand(authorized, name, raw, command.id);
             let taskId: string, workBlockId: string | null = null, phase = "completed", state = "completed";
             let stageData: unknown = {}, outcome: string;
             if (name === "chrona_task_create") {
@@ -117,6 +116,25 @@ export function createManagementService(deps: ManagementDeps) {
     },
   };
 }
+async function completeGoalCommand(client: ManagementIdentity, name: "chrona_goal_propose" | "chrona_goal_update", raw: unknown, commandId: string) {
+  let goalId: string, result: Record<string, unknown>;
+  if (name === "chrona_goal_propose") {
+    const { requestId: _requestId, dryRun: _dryRun, ...proposal } = managementGoalProposeSchema.parse(raw);
+    goalId = await proposeGoalDraft({ workspaceId: client.workspaceId, proposal, actorId: client.id, commandId });
+    result = { outcome: "goal_proposed", requiresHumanReview: true, executionStarted: false, permissionsGranted: false };
+  } else {
+    const input = managementGoalUpdateSchema.parse(raw);
+    const preview = await applyGoalUpdate(client, input, commandId);
+    goalId = input.goalId;
+    result = { outcome: preview.changed ? "goal_updated" : "unchanged", ...preview };
+  }
+  const snapshot = await readManagementGoal(client, { goalId, view: "compact" });
+  const updated = await db.managementCommand.update({ where: { id: commandId }, data: {
+    state: "completed", phase: "completed", result: managementJson({ ...result, ...snapshot }),
+  } });
+  return commandReceipt(updated);
+}
+
 async function assertDeleteScope(client: ManagementIdentity, taskIds: string[], assetIds: string[]) {
   const assets = await db.goalAsset.count({ where: { id: { in: assetIds }, goal: { workspaceId: client.workspaceId } } });
   if (assets !== new Set(assetIds).size) throw new ManagementError("NOT_FOUND", "Deletion impact contains an unavailable asset");
@@ -126,6 +144,7 @@ async function assertDeleteScope(client: ManagementIdentity, taskIds: string[], 
 async function requireWriteScopes(client: ManagementIdentity, name: ManagementToolName, raw: unknown) {
   // Replay validates capability, not mutable task state/provider availability.
   if (name === "chrona_goal_propose") return requireScopes(client, ["goals:read", "goals:propose"]);
+  if (name === "chrona_goal_update") return requireScopes(client, ["goals:read", "goals:write"]);
   if (name === "chrona_task_delete") return requireScopes(client, ["tasks:delete"]);
   if (name === "chrona_task_action") {
     const { actionScopes } = await import("./actions");

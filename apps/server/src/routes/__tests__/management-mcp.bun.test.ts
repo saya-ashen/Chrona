@@ -83,6 +83,33 @@ describe("management MCP protocol", () => {
     expect(await db.task.count()).toBe(0);
   });
 
+  it("previews and edits an existing Goal through tools/call with scoped CAS and history", async () => {
+    const client = await createManagementClient({ name: "Edit agent", publicUrl: "http://localhost:3101", scopes: ["goals:read", "goals:write"] });
+    const workspace = await db.workspace.findFirstOrThrow();
+    const goal = await db.goal.create({ data: { workspaceId: workspace.id, title: "Existing Goal", status: "Active", successCriteria: [{ id: "fit", description: "Find a fit", kind: "user_confirmed", satisfied: false }] } });
+    const tools = ListToolsResultSchema.parse((await call(client.token, "tools/list", {})).body.result).tools;
+    const update = tools.find((tool) => tool.name === "chrona_goal_update")!;
+    expect(update.inputSchema.type).toBe("object");
+    expect(update.inputSchema.additionalProperties).toBe(false);
+    expect(update.annotations?.readOnlyHint).toBe(false);
+    const read = await call(client.token, "tools/call", { name: "chrona_goal_read", arguments: { goalId: goal.id } });
+    const input = { requestId: crypto.randomUUID(), goalId: goal.id, expectedRevision: read.body.result.structuredContent.data.editRevision, reason: "User changed region", patch: { title: "European Goal" } };
+    const validate = new AjvJsonSchemaValidator().getValidator(update.inputSchema as JsonSchemaType);
+    expect(validate(input).valid).toBe(true);
+    expect(validate({ ...input, approved: true }).valid).toBe(false);
+    const preview = await call(client.token, "tools/call", { name: "chrona_goal_update", arguments: { ...input, dryRun: true } });
+    expect(preview.body.result.structuredContent.data).toMatchObject({ dryRun: true, changes: [{ field: "title", before: '"Existing Goal"', after: '"European Goal"' }] });
+    expect(await db.managementCommand.count()).toBe(0);
+    const edited = await call(client.token, "tools/call", { name: "chrona_goal_update", arguments: input });
+    expect(edited.body.result.structuredContent.data.result).toMatchObject({ goal: { title: "European Goal", status: "Active" }, editRevision: "goal-config-v1:2", permissionsGranted: false });
+    const history = await call(client.token, "tools/call", { name: "chrona_goal_read", arguments: { goalId: goal.id, view: "history" } });
+    expect(history.body.result.structuredContent.data.history.total).toBe(1);
+    const conflict = await call(client.token, "tools/call", { name: "chrona_goal_update", arguments: { ...input, requestId: crypto.randomUUID() } });
+    expect(conflict.body.result.structuredContent.error.code).toBe("REVISION_CONFLICT");
+    expect(await db.goal.count()).toBe(1);
+    expect(await db.task.count()).toBe(0);
+  });
+
   it("returns schedule receipts and compact reads without claiming notification delivery", async () => {
     const client = await createManagementClient({ name: "Schedule protocol", publicUrl: "http://localhost:3101", timezone: "Asia/Shanghai" });
     const context = await call(client.token, "tools/call", { name: "chrona_context_read", arguments: {} });
@@ -146,12 +173,12 @@ describe("management MCP protocol", () => {
     expect(generate.body.result.isError).toBe(true);
   });
 
-  it("initializes statelessly, lists ten actual tools, calls through the protocol and revokes immediately", async () => {
+  it("initializes statelessly, lists eleven actual tools, calls through the protocol and revokes immediately", async () => {
     const client = await createManagementClient({ name: "MCP test", publicUrl: "http://localhost:3101" });
     const initialize = await call(client.token, "initialize", { protocolVersion: LATEST_PROTOCOL_VERSION, clientInfo: { name: "test", version: "1" }, capabilities: {} });
     expect(initialize.status).toBe(200);
     const tools = await call(client.token, "tools/list", {});
-    expect(ListToolsResultSchema.parse(tools.body.result).tools).toHaveLength(10);
+    expect(ListToolsResultSchema.parse(tools.body.result).tools).toHaveLength(11);
     const create = await call(client.token, "tools/call", { name: "chrona_task_create", arguments: { requestId: crypto.randomUUID(), title: "From external agent", mode: "todo" } });
     expect(create.body.result.isError).toBe(false);
     expect(create.body.result.structuredContent.data.state).toBe("completed");

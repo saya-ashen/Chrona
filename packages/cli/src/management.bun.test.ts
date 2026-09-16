@@ -28,9 +28,9 @@ it("enrolls into a private new file, lists no secret, refuses overwrite and revo
 });
 
 it("enrolls Goal-only assistant presets without task, execution or approval authority", async () => {
-  for (const access of ["assistant-read", "assistant"]) {
+  for (const access of ["assistant-read", "assistant", "assistant-edit"]) {
     const result = await enrollLocalManagementClient({ name: access, publicUrl: "http://localhost:3101", timezone: "UTC", access, tokenFile: join(directory, `${access}.token`) });
     const identity = await requireManagementClient(readFileSync(result.tokenFile, "utf8").trim());
-    expect(identity.scopes).toEqual(access === "assistant-read" ? ["goals:read"] : ["goals:read", "goals:propose"]);
+    expect(identity.scopes).toEqual(access === "assistant-read" ? ["goals:read"] : access === "assistant" ? ["goals:read", "goals:propose"] : ["goals:read", "goals:propose", "goals:write"]);
   }
 });

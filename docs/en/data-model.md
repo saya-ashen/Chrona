@@ -76,6 +76,18 @@ audit record. `GoalAsset` records source and current Artifact references without
 mutating source execution evidence. Accepted Task results remain immutable and
 separate from these Goal-scoped references.
 
+`Goal.configRevision` is a persisted monotonic edit token, starting at 1. A SQLite
+trigger increments it for changes to title, description, brief, criteria,
+lifecycle, review time, achievement confirmation or workspace, covering every
+canonical writer and A→B→A even when timestamps match. Management note-only writes
+increment it explicitly. MCP exposes `editRevision: goal-config-v1:N`; the older
+snapshot `revision` remains observational. A management edit atomically stores
+content, an agent-attributed brief revision when changed, `goal.management_updated`
+audit and command receipt. Notes are not formal evidence. Revised criterion
+meaning resets confirmation/evidence rather than inheriting proof of old meaning.
+The registered release-line amendment upgrades existing Goals without changing
+content or lifecycle; released migrations are unchanged.
+
 `Goal.operationalBrief` stores the current intended outcome, current focus,
 strategy, and constraints. Every save appends `GoalBriefRevision` with actor and
 time. When any Goal-linked Task is created, Chrona automatically freezes the
