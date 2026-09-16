@@ -20,7 +20,7 @@ chrona mcp revoke CLIENT_ID
 
 - `--access` 必填。原有 `read`（任务读取）和 `full`（原有任务管理全部权限）保持原语义；**不会自动获得新增 Goal 权限**。full 包括启动付费执行、批准 provider 操作、删除任务，只授予可信管理 Agent。
 - 新增 `assistant-read` 仅授予 `goals:read`；`assistant` 仅授予 `goals:read` + `goals:propose`。日常助理捕获使用这两种最小权限预设，不能创建任务、运行 AI、批准 provider、删除任务或授予权限。新增能力需使用匹配版本并显式 enrollment；Goal 捕获试用已另建最小权限凭据，原有任务凭据未扩大或轮换。
-- 源码新增 `assistant-edit`：`goals:read` + `goals:propose` + `goals:write`。仅允许目标内容维护，不含执行、审批、生命周期切换。`goals:write` 覆盖凭据所属工作区，不是逐 Goal 的自然语言权限隔离。原 `assistant` 与已有凭据不自动扩大；编辑版本尚未部署。
+- 源码新增 `assistant-edit`：`goals:read` + `goals:propose` + `goals:write`。仅允许目标内容维护，不含执行、审批、生命周期切换。`goals:write` 覆盖凭据所属工作区，不是逐 Goal 的自然语言权限隔离。原 `assistant` 与已有凭据不自动扩大；编辑版本已于 2026-09-16 经明确批准部署，另建编辑凭据并撤销旧捕获凭据，任务凭据不变。
 - token 仅写入新建私密文件，POSIX 权限 `0600`、父目录必须私密；不输出 token，不覆盖已有文件。数据库只存 SHA-256 摘要。
 - 凭据绑定当前默认工作区；工具不提供 workspace 选择或枚举。
 - enrollment 是本机管理命令，不存在免鉴权的 HTTP enrollment 路由。CLI 不迁移运行中的数据库；必须先按正常升级流程启动匹配版本的服务。
@@ -52,7 +52,7 @@ chrona mcp revoke CLIENT_ID
 
 仓库 skill：[chrona-assistant](../../packages/skills/chrona-assistant/README.md)。包本身不自动安装；本次经用户批准已部署并安装到用户级 Pi。
 
-Pi 保留原 `chrona` 任务连接，另用 `chrona-assistant` 及独立 Goal-only 凭据。后者仅暴露 context 和三个 Goal 工具，使用 server 前缀避免名称冲突。读取 Goal 能力时必须使用同一连接的 context，不要误用原任务连接。已有会话执行 `/reload`，随后可显式调用 `/skill:chrona-assistant`。
+Pi 保留原 `chrona` 任务连接，另用 `chrona-assistant` 及独立 Goal-only 凭据。后者在首个捕获版本暴露 context 和三个 Goal 工具，现已加入 `chrona_goal_update`，共5个；使用 server 前缀避免名称冲突。读取 Goal 能力时必须使用同一连接的 context，不要误用原任务连接。已有会话执行 `/reload`，随后可显式调用 `/skill:chrona-assistant`。
 
 已通过实际适配器 HTTPS 发现、context、proposal dryRun、Goal-only 凭据拒绝任务读取，以及 Pi 0.85.1 跨项目技能发现；未为验收创建真实 Goal/任务、运行模型或启用自动化。自动识别和确认质量仍需日常试用。
 
@@ -62,10 +62,10 @@ Pi 保留原 `chrona` 任务连接，另用 `chrona-assistant` 及独立 Goal-on
 - 持久化 Goal 为 Draft，`nextReviewAt` 为空，标准为 proposed/未确认。简报中的约束仅是请求，不是已授予或已执行的权限。不会生成 Task、触发器、计划、复查或模型会话。
 - dryRun 不写库、不保留来源摘要、不调用模型。真实写入前由日常 Agent 获得用户对最小摘要保存的确认；本工具不是可信权限授予界面。
 - 回执 `completed` 只表示草稿已记录；读取 Goal 回执中的链接/ID 再核对当前状态。Goal `revision` 是只读快照指纹，不是授权或变更 CAS 凭据。
-- 已部署捕获版本不支持已有 Goal 修改；源码新增编辑能力见下节。仍未提供 Draft 激活、权限授予或结果送达工具，不要用原有任务自动化接口绕过这些边界。任务列表读取需要独立的 `tasks:read`。
+- 已部署编辑版本支持已有 Goal 修改，旧捕获凭据不会自动获得权限；见下节。仍未提供 Draft 激活、权限授予或结果送达工具，不要用原有任务自动化接口绕过这些边界。任务列表读取需要独立的 `tasks:read`。
 - Goal、命令回执和 actor=agent/source=management_mcp 事件原子提交；来源摘要保存在审计事件中。不存完整聊天、密钥或无关私人资料。现有回执保留语义不变，删除 Goal 不等于清除所有回执。
 
-### 维护已有 Goal（源码已实现，待独立部署）
+### 维护已有 Goal（2026-09-16 已部署）
 
 先查 `capabilities.goals.editing.contractVersion: 1` 与 `canUpdate: true`，并确认连接暴露 `chrona_goal_update`；字段缺失或旧凭据均不得假定可写。检索并读取同一 Goal，不建重复目标绕过限制。
 
@@ -79,7 +79,9 @@ Pi 保留原 `chrona` 任务连接，另用 `chrona-assistant` 及独立 Goal-on
 - history 仅列管理端编辑/笔记，可分页；显式返回 reasonTruncated/noteTruncated/changesTruncated 及单值截断标记。缩小 pageSize 可看更多细节，但仍不是完整审计导出。现有网页活动面板未增加专用编辑历史 UI。
 - 已有 Task.goalContext 保持冻结；后续新建关联 Task 使用更新后的简报。本操作不重排/暂停已有任务，不激活 Goal，不启动模型或监控。
 
-部署步骤须另获授权：升级并应用已登记 amendment → 显式 enroll `assistant-edit` 新凭据 → 仅更新 Pi 的 `chrona-assistant` 连接及其 `chrona_goal_update` allowlist → 更新安装的 skill 并 `/reload` → 验证能力后撤销旧 assistant 凭据。任务连接不变。本次开发未执行这些步骤，也未新建真实 Goal。
+本次经用户明确批准完成：升级并应用已登记 amendment → 显式 enroll `assistant-edit` 新凭据 → 仅更新 Pi 的 `chrona-assistant` 连接及其 `chrona_goal_update` allowlist → 更新安装的 skill → 实际适配器验证后撤销旧 assistant 凭据。已有 Pi 会话需 `/reload`，任务连接不变。真实 Goal 仅执行 edit dryRun 并核对未变化，未保存目标/任务内容，也未启动模型或自动化。
+
+部署提交 `0df01261`；在线/停机备份、真实数据库副本迁移演练、67张表旧列值比较及完整性/外键检查通过，保留19个任务和1个 Goal。只重启 Chrona 并安装下次启动版本，没有全系统切换或 TLS 改动。数据库结构已变更，不能按旧捕获版本做纯代码回滚；恢复前必须停服务并明确选择兼容方案，不自动用旧备份覆盖新数据。
 
 ### 原有任务管理能力
 

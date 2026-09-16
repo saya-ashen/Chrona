@@ -1,6 +1,6 @@
 # Proactive Personal Assistant: Development Plan
 
-Status: Goal capture deployed with explicit approval; existing-Goal editing implemented locally, not deployed or installed into Pi yet. Live automation, permission grants and real notification sends remain unapproved.
+Status: Goal capture and existing-Goal editing deployed with explicit approval; scoped Pi assistant connection and skill updated. Live automation, permission grants and real notification sends remain unapproved.
 
 This is the canonical development plan for making Chrona the durable, governed
 backing service for a user's everyday AI assistant. It records the agreed scope,
@@ -26,19 +26,21 @@ docs rather than accumulating dated phase reports.
   Pi's actual adapter verified separate task/Goal credentials and the no-write
   proposal contract; its skill loader verified discovery inside/outside the repo.
   Already-open Pi sessions require `/reload` to load the new connection and skill.
-- **Phase 1 follow-up: existing-Goal editing implemented locally.** The optional
+- **Phase 1 follow-up: existing-Goal editing deployed.** The optional
   `assistant-edit` profile enables title/description/partial brief/ID-based criteria
   edits and attributed progress/finding/decision notes. Read-only previews,
   persisted `editRevision`, conflict reconciliation, atomic audit/brief history,
   and idempotent receipts preserve existing Task context. Explicit user requests
   need no redundant confirmation; inferred material edits require skill-mediated
   review. This is not server-authenticated consent or a policy-grant mechanism.
-  Existing credentials remain unchanged; deployment and Pi installation are pending.
+  A new Goal-only editing credential was explicitly enrolled; the superseded
+  capture credential was revoked after verification. Task credentials are unchanged.
 - **Phase 1 remaining gates:** user-trial intent/consent quality, real saved-Draft
-  and existing-Goal edit trials, plus explicit rollout of the editing version.
+  and existing-Goal edit trials.
   No Draft activation or permission grant is exposed. Phase 1 is not marked complete.
 - **Phases 2–6: not implemented.** No policies enforced from natural language,
-  recurring searches started, delivery adapters configured, or user data migrated.
+  recurring searches started or delivery adapters configured. The Goal-editing
+  schema upgrade does not implement those standing-assistant capabilities.
 
 This is an implementation status, not permission to bypass the gates below.
 Current capture contracts and setup are documented in the
@@ -113,7 +115,29 @@ Source contracts: `chrona_goal_update`, additive `capabilities.goals.editing`,
 - Global lint still fails the pre-existing warning ratchet in
   `task-config-save.ts` and `manual-task-lifecycle.ts`; no new lint debt was added.
 - Protocol/skill checks do not prove natural-language intent recognition or consent
-  quality. The installed capture skill/MCP and actual user-data trial remain unchanged.
+  quality. The actual user-data write trial remains pending.
+
+**Approved rollout (2026-09-16):**
+
+- Source commit `0df012616b00a7ad91c7dfe4bf8d9feb116c12a9`; clean committed-source
+  build and packaged smoke passed. Seven unrelated Pi-provider/docs edits excluded.
+- Chrona-only deployment on Chino, with next-boot generation installed; no full
+  NixOS switch, reboot, TLS/certificate changes or unrelated service restarts.
+- Online/stopped backups plus migration-only rehearsal on a real DB copy passed.
+  Registered amendment applied; all 67 tables' old column data preserved apart
+  from migration history. All 19 tasks and the existing Goal retained.
+- Pi's separate assistant connection now exposes 5 tools including Goal update,
+  using `assistant-edit` scopes only. Original 7-tool task connection unchanged;
+  superseded capture credential revoked. Installed skill updated, loader verified
+  in/outside this repo. Existing sessions require `/reload`.
+- Actual adapter verified HTTPS capabilities, proposal/edit dry runs, unchanged
+  existing Goal state, bounded history and denied assistant task access. No live
+  Goal/task content saved, provider invoked, automation enabled or notification sent.
+- Private receipts/backups: Nikki `~/.local/share/chrona-deploy/20260916-goal-editing/`,
+  Chino `/var/lib/chrona-pi/deployment/20260916-goal-editing/`.
+- Schema changed: rollback is not code-only. Preserve current DB and backups,
+  stop the service and choose a compatible recovery explicitly; never restore an
+  old backup over newer user work automatically.
 
 ## 1. Product objective
 
@@ -306,7 +330,7 @@ Prefer a small closed set of Goal-oriented operations over one generic executor:
 | Extend `chrona_context_read` | Contract version, Goal/routine capabilities, effective client authority, recurrence limits, provider enforcement readiness, delivery capabilities |
 | `chrona_goal_search` / `chrona_goal_read` | Bounded Goal lookup, revision, brief, routine/policy summaries, next run, current attention and result/delivery references |
 | `chrona_goal_propose` | Preview/create a bounded draft or change proposal with rationale and provenance; no implicit authorization or execution |
-| `chrona_goal_update` | Implemented locally: partial content edits/notes with persisted editRevision, read-only preview and atomic audit; no lifecycle or grant authority |
+| `chrona_goal_update` | Implemented and deployed: partial content edits/notes with persisted editRevision, read-only preview and atomic audit; no lifecycle or grant authority |
 | `chrona_goal_action` | Future closed actions for review, applying confirmed changes, configuring approved routines, feedback, pause/resume/stop; permission-sensitive actions require trusted consent evidence |
 | Existing Task operations | Reuse canonical Task/occurrence execution and result reads; extend narrowly rather than duplicating them under Goals |
 

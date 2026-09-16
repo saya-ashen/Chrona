@@ -3,8 +3,9 @@
 Portable, capability-aware instructions for an everyday agent using Chrona's
 external management MCP. Source scope: Goal lookup, new Draft capture, and opt-in
 editing of existing Goal details/notes. No daemon, installation side effects,
-model dependency, or execution permission. Existing live Pi installation is still
-capture-only; the editing milestone requires a separate upgrade/enrollment.
+model dependency, or execution permission. The editing milestone was deployed and
+installed into Pi with explicit upgrade/enrollment approval on 2026-09-16.
+Already-open sessions require `/reload`; other deployments must check capabilities.
 
 ## Setup
 
@@ -24,8 +25,10 @@ capture-only; the editing milestone requires a separate upgrade/enrollment.
 An explicit invocation can compensate for a host not discovering the skill.
 Pi 0.85.1's actual loader has verified one prompt-visible installation both inside
 and outside this repository. Its installed MCP adapter has verified the deployed
-contract and no-write proposal validation. This is not evidence of reliable model
-intent recognition, universal portability or a completed real saved-Goal trial.
+contract, no-write proposal and existing-Goal edit previews, history reads and
+scope denial. The assistant credential now uses `assistant-edit`; the superseded
+capture credential was revoked, task credentials unchanged. This is not evidence
+of reliable intent recognition, universal portability or a real saved-Goal/edit trial.
 
 ### Pi: keep assistant access separate from task management
 

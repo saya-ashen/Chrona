@@ -554,7 +554,7 @@ Goal lookup requires `goals:read`; proposals also require `goals:propose`; edits
 - Write: atomic content/configRevision, brief version when changed, audit and idempotent command receipt. Canonical/UI writes invalidate CAS, including A→B→A. Revision conflict means reread/reconcile, never blindly refresh the token. Identical retries replay the original receipt after refreshing scopes.
 - Existing Task contexts are immutable; future Goal-linked Tasks see updated brief content. No Task/plan/review/trigger starts, lifecycle transitions, permission grants or notifications occur. Constraints remain natural-language requests, not enforced policy. `goals:write` authorizes content editing across its workspace, not per-Goal grants.
 
-Source editing capability requires the registered database amendment and explicit enrollment on upgrade. The existing live capture-only Pi credential is unchanged; source capability is not deployment evidence. Draft activation and an always-on assistant remain outside this milestone.
+Editing requires the registered database amendment and explicit enrollment on upgrade; existing capture-only credentials never gain write scope automatically. The approved Pi rollout now uses a separately enrolled `assistant-edit` credential. Other deployments must verify advertised capabilities rather than infer support from source docs. Draft activation and an always-on assistant remain outside this milestone.
 
 Local setup: `chrona mcp enroll`, `chrona mcp list`, `chrona mcp revoke`. See [setup, capabilities and current limitations](../zh/management-mcp.md) and the portable [assistant skill](../../packages/skills/chrona-assistant/README.md).
 
