@@ -123,8 +123,8 @@ approvals from the currently approved Goal-capture implementation.
 
 ## Remaining phase-0 blockers
 
-- Live Chrona management connection currently fails with `fetch failed`; no live
-  workspace/client/provider inventory or deployed version has been verified.
+- The Goal-capture deployment and Pi's scoped HTTPS management connection now
+  verify. This does not certify the execution environment or a delivery path.
 - The execution provider and its enforceable read/search surface are not yet
   selected/certified. Existing source-level provider labels are insufficient.
 - Recipient channel/device, hosting/privacy choice and permitted content remain

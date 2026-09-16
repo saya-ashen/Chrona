@@ -1,6 +1,6 @@
 # Proactive Personal Assistant: Development Plan
 
-Status: implementation started; phase-1 Goal-capture code and least-privilege scope changes explicitly approved. Deployment, live automation, permission grants and real notification sends remain unapproved.
+Status: first Goal-capture slice deployed with explicit approval; scoped Pi connection and skill installed. Live automation, permission grants and real notification sends remain unapproved.
 
 This is the canonical development plan for making Chrona the durable, governed
 backing service for a user's everyday AI assistant. It records the agreed scope,
@@ -15,17 +15,21 @@ docs rather than accumulating dated phase reports.
 
 ## Implementation status
 
-- **Phase 0: partial.** Live Chrona management still fails with `fetch failed`.
-  Source-based [delivery comparison and recommendation](assistant-delivery.md)
-  is available; provider enforcement, recipient setup and pilot limits remain open.
-- **Phase 1: first capture slice implemented locally.** Goal search/read/new-Draft
-  proposal tools, explicit Goal-only enrollment, durable idempotent receipts,
-  bounded provenance and a portable [skill](../../packages/skills/chrona-assistant/README.md).
+- **Phase 0: partial.** Live HTTPS management access now verifies after the user
+  repaired the expired certificate. Source-based [delivery comparison and
+  recommendation](assistant-delivery.md) is available; provider enforcement,
+  recipient setup and pilot limits remain open.
+- **Phase 1: first capture slice deployed.** Goal search/read/new-Draft proposal
+  tools, explicit Goal-only enrollment, durable idempotent receipts, bounded
+  provenance and a portable [skill](../../packages/skills/chrona-assistant/README.md).
   Existing `read`/`full` scopes are not widened. No database migration was needed.
-- **Phase 1 remaining gates:** real reference-host loading and discovery, deployed
-  contract validation, and any subsequent existing-Goal change proposal/consent
-  work. This slice does not expose Draft activation or pretend that a recorded
-  permission request is a grant. Phase 1 is not marked complete.
+  Pi's actual adapter verified separate task/Goal credentials and the no-write
+  proposal contract; its skill loader verified discovery inside/outside the repo.
+  Already-open Pi sessions require `/reload` to load the new connection and skill.
+- **Phase 1 remaining gates:** user-trial intent/consent quality, real saved-Draft
+  trial, and subsequent existing-Goal change proposal/consent work. This slice
+  does not expose Draft activation or treat a permission request as a grant.
+  Phase 1 is not marked complete.
 - **Phases 2–6: not implemented.** No policies enforced from natural language,
   recurring searches started, delivery adapters configured, or user data migrated.
 
@@ -45,8 +49,16 @@ Current capture contracts and setup are documented in the
   A separate desktop route audit passed all 6 tests.
 - Global lint remains blocked by pre-existing warning-ratchet debt in
   `task-config-save.ts` and `manual-task-lifecycle.ts`, also verified at HEAD.
-- These are isolated local checks, not deployed MCP, real-host skill, provider,
-  migration, notification or unattended-execution acceptance.
+- A clean committed-source Linux build and packaged upgrade/backup/restore smoke
+  also passed. Deployment preserved all 19 tasks; comparison of 67 database tables
+  before explicit enrollment found only the expected scheduler-lease change.
+- Deployed checks used the installed Pi adapter: 7 task tools and 4 Goal-scoped
+  tools without name collisions, context, no-write proposal validation and denied
+  task access for the assistant credential. Pi 0.85.1 discovers one installed
+  prompt-visible skill in both the project and an unrelated directory.
+- No live Goal/task was created and no model invoked for acceptance. These checks
+  do not certify automatic intent recognition, provider enforcement, notification
+  delivery or unattended execution.
 
 ## 1. Product objective
 

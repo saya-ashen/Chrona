@@ -19,8 +19,32 @@ No daemon, installation side effects, model dependency, or execution permission.
    availability is not proof of reliable automatic intent recognition.
 
 An explicit invocation can compensate for a host not discovering the skill.
-There is no claim yet of verified real-host loading or universal portability.
-The HTTP/MCP tests validate Chrona's protocol, not a particular agent's judgment.
+Pi 0.85.1's actual loader has verified one prompt-visible installation both inside
+and outside this repository. Its installed MCP adapter has verified the deployed
+contract and no-write proposal validation. This is not evidence of reliable model
+intent recognition, universal portability or a completed real saved-Goal trial.
+
+### Pi: keep assistant access separate from task management
+
+If an existing `chrona` connection manages tasks, retain its credential and expose
+only `chrona_context_read` plus `chrona_task_*` there. Add `chrona-assistant` with
+its own `assistant` credential and these tools:
+
+- `chrona_context_read`
+- `chrona_goal_search`
+- `chrona_goal_read`
+- `chrona_goal_propose`
+
+Use the adapter's `toolPrefix: "server"` for the new connection to avoid duplicate
+context-tool names. The Goal-scoped context tool may therefore be named
+`chrona-assistant_chrona_context_read`; discover names from the host instead of
+using the task-only context response to assess Goal permissions. Keep credentials
+in private files or the host's credential store, never in repository config.
+
+Install `SKILL.md` under `~/.pi/agent/skills/chrona-assistant/`, then run `/reload`
+in existing Pi sessions. Explicit invocation: `/skill:chrona-assistant`. Describe
+an ongoing goal naturally; the assistant should check existing Goals and ask
+before saving a Draft. Saving does not start monitoring or notifications.
 
 ## Capture example (data, not an execution command)
 

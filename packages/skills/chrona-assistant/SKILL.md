@@ -30,6 +30,11 @@ provider approval, or a run-scoped control endpoint to bypass that boundary.
 
 - Discover the host's available management MCP tools. Call `chrona_context_read`
   before relying on a capability, and refresh after errors or configuration changes.
+- If the host has multiple Chrona connections, use the Goal-scoped connection
+  for both capabilities and Goal calls. A task-only connection's `canRead: false`
+  does not establish that every connection lacks Goal access. In Pi, the optional
+  separate server is named `chrona-assistant`; discover its prefixed tools rather
+  than assuming the unprefixed context tool uses the same credential.
 - Require `capabilities.goals.contractVersion === 1` and
   `capabilities.goals.canRead === true` for lookup. For writing, also require
   `canPropose === true` and `proposalModes` containing `new_draft`.

@@ -19,7 +19,7 @@ chrona mcp revoke CLIENT_ID
 ```
 
 - `--access` 必填。原有 `read`（任务读取）和 `full`（原有任务管理全部权限）保持原语义；**不会自动获得新增 Goal 权限**。full 包括启动付费执行、批准 provider 操作、删除任务，只授予可信管理 Agent。
-- 新增 `assistant-read` 仅授予 `goals:read`；`assistant` 仅授予 `goals:read` + `goals:propose`。日常助理捕获使用这两种最小权限预设，不能创建任务、运行 AI、批准 provider、删除任务或授予权限。新增能力需使用匹配源码版本并显式 enrollment；本轮未部署或轮换现有凭据。
+- 新增 `assistant-read` 仅授予 `goals:read`；`assistant` 仅授予 `goals:read` + `goals:propose`。日常助理捕获使用这两种最小权限预设，不能创建任务、运行 AI、批准 provider、删除任务或授予权限。新增能力需使用匹配版本并显式 enrollment；Goal 捕获试用已另建最小权限凭据，原有任务凭据未扩大或轮换。
 - token 仅写入新建私密文件，POSIX 权限 `0600`、父目录必须私密；不输出 token，不覆盖已有文件。数据库只存 SHA-256 摘要。
 - 凭据绑定当前默认工作区；工具不提供 workspace 选择或枚举。
 - enrollment 是本机管理命令，不存在免鉴权的 HTTP enrollment 路由。CLI 不迁移运行中的数据库；必须先按正常升级流程启动匹配版本的服务。
@@ -46,9 +46,13 @@ chrona mcp revoke CLIENT_ID
 | `chrona_task_action` | 生成/停止/接受/修改计划；执行开始、重启、暂停、取消、重试、输入/审阅；checkpoint；provider approval；结果验收/重试生成；AI 完成/重开；手动任务使用带 `expectedRevision` 的 `manual_complete` / `manual_reopen`；结果追问/创建后续任务；排期提案接受/拒绝 |
 | `chrona_task_delete` | preview 影响范围，随后提交精确 task/asset 集合及配置 revision 删除 |
 
-### 日常 Agent 的 Goal 捕获（新增源码能力，尚未部署验证）
+### 日常 Agent 的 Goal 捕获
 
-仓库 skill：[chrona-assistant](../../packages/skills/chrona-assistant/README.md)。它不自动安装到用户级 Agent 配置。
+仓库 skill：[chrona-assistant](../../packages/skills/chrona-assistant/README.md)。包本身不自动安装；本次经用户批准已部署并安装到用户级 Pi。
+
+Pi 保留原 `chrona` 任务连接，另用 `chrona-assistant` 及独立 Goal-only 凭据。后者仅暴露 context 和三个 Goal 工具，使用 server 前缀避免名称冲突。读取 Goal 能力时必须使用同一连接的 context，不要误用原任务连接。已有会话执行 `/reload`，随后可显式调用 `/skill:chrona-assistant`。
+
+已通过实际适配器 HTTPS 发现、context、proposal dryRun、Goal-only 凭据拒绝任务读取，以及 Pi 0.85.1 跨项目技能发现；未为验收创建真实 Goal/任务、运行模型或启用自动化。自动识别和确认质量仍需日常试用。
 
 - 先读取 `capabilities.goals`：`contractVersion: 1`，`canRead` / `canPropose` 是当前凭据权限；`proposalModes: ["new_draft"]`；`activation: false`、`policyGrants: false`。
 - 先检索已有 Goal，避免把同一目标重复保存。相同 client/tool/requestId 的重试在同一事务中重放回执；不同 Agent 的相似文本不会自动合并。
