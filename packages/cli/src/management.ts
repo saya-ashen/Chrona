@@ -3,6 +3,7 @@ import { lstatSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { Database } from "bun:sqlite";
 import { applyChronaRuntimeConfigToEnv } from "@chrona/shared/runtime-config";
+import { MANAGEMENT_ACCESS_PRESETS, type ManagementAccessPreset } from "@chrona/contracts/api";
 import { verifyMigrationReleaseMetadata, schemaFingerprint } from "@chrona/db/sqlite-migrations";
 import { ensurePrivateDirectory, secureGeneratedPrivateFile, sqlitePathFromFileUrl } from "@chrona/db/sqlite-url";
 import { findResourceDir, getChronaDataDir } from "./start-server";
@@ -30,7 +31,8 @@ export async function revokeLocalManagementClient(clientId: string) {
   await (await managementAdmin()).revokeManagementClient(clientId);
 }
 export async function enrollLocalManagementClient(input: { name: string; publicUrl: string; timezone: string; tokenFile: string; access: string }) {
-  if (!["read", "full"].includes(input.access)) throw new Error("--access must be read or full");
+  if (!Object.hasOwn(MANAGEMENT_ACCESS_PRESETS, input.access)) throw new Error("--access must be read, full, assistant-read or assistant");
+  const scopes = [...MANAGEMENT_ACCESS_PRESETS[input.access as ManagementAccessPreset]];
   const admin = await managementAdmin();
   const path = resolve(input.tokenFile), parent = dirname(path);
   ensurePrivateDirectory(parent);
@@ -39,7 +41,7 @@ export async function enrollLocalManagementClient(input: { name: string; publicU
   let clientId: string | undefined;
   try {
     secureGeneratedPrivateFile(path);
-    const result = await admin.createManagementClient({ name: input.name, publicUrl: input.publicUrl, timezone: input.timezone, ...(input.access === "read" ? { scopes: ["tasks:read"] } : {}) });
+    const result = await admin.createManagementClient({ name: input.name, publicUrl: input.publicUrl, timezone: input.timezone, scopes });
     clientId = result.clientId;
     await file.writeFile(`${result.token}\n`, "utf8");
     await file.sync();

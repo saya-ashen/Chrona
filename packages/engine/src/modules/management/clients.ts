@@ -1,7 +1,7 @@
 import { createHash, randomBytes } from "node:crypto";
 import { z } from "zod";
 import { db } from "@/lib/db";
-import { MANAGEMENT_SCOPES, managementScopeSchema, managementModeSchema, managementTimezoneSchema } from "@chrona/contracts/api";
+import { MANAGEMENT_LEGACY_SCOPES, managementScopeSchema, managementModeSchema, managementTimezoneSchema } from "@chrona/contracts/api";
 import { getDefaultWorkspace } from "../workspaces";
 import { ManagementError } from "./errors";
 
@@ -14,7 +14,7 @@ export const managementClientInputSchema = z.object({
   }, "Use an HTTPS origin (or local HTTP origin), without credentials or path"),
   timezone: managementTimezoneSchema.default("UTC"),
   defaultMode: managementModeSchema.default("plan"),
-  scopes: z.array(managementScopeSchema).min(1).default([...MANAGEMENT_SCOPES]),
+  scopes: z.array(managementScopeSchema).min(1).default([...MANAGEMENT_LEGACY_SCOPES]),
 }).strict();
 export type ManagementIdentity = Awaited<ReturnType<typeof requireManagementClient>>;
 export const managementTokenDigest = (token: string) => createHash("sha256").update(token).digest("hex");
@@ -22,7 +22,8 @@ export const managementTokenDigest = (token: string) => createHash("sha256").upd
 /** Local administration only; never expose this via a management MCP tool. */
 export async function createManagementClient(raw: z.input<typeof managementClientInputSchema>) {
   const input = managementClientInputSchema.parse(raw);
-  if (!input.scopes.includes("tasks:read")) throw new ManagementError("VALIDATION_ERROR", "All clients require tasks:read");
+  if (!input.scopes.includes("tasks:read") && !input.scopes.includes("goals:read")) throw new ManagementError("VALIDATION_ERROR", "Clients require tasks:read or goals:read");
+  if (input.scopes.includes("goals:propose") && !input.scopes.includes("goals:read")) throw new ManagementError("VALIDATION_ERROR", "Goal proposals require goals:read");
   const workspace = await getDefaultWorkspace();
   const token = `chrona_mgmt_${randomBytes(32).toString("base64url")}`;
   const client = await db.managementClient.create({ data: { ...input, scopes: [...new Set(input.scopes)], workspaceId: workspace.id, tokenDigest: managementTokenDigest(token) } });

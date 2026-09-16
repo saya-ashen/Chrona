@@ -164,7 +164,7 @@ export function createProgram(options: CreateProgramOptions = {}): Command {
     .requiredOption("--name <name>", "Agent/client label")
     .requiredOption("--public-url <origin>", "Trusted HTTPS Chrona origin, or localhost HTTP")
     .requiredOption("--timezone <zone>", "IANA timezone, e.g. Asia/Shanghai")
-    .requiredOption("--access <read|full>", "Explicit permission preset")
+    .requiredOption("--access <read|full|assistant-read|assistant>", "Explicit permission preset; assistant captures Goal drafts without execution authority")
     .requiredOption("--token-file <path>", "New private file; token is never printed")
     .action(async (input: { name: string; publicUrl: string; timezone: string; access: string; tokenFile: string }) => {
       const { enrollLocalManagementClient } = await import("./management");

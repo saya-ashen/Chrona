@@ -4,6 +4,7 @@ export * from "./plans.schema";
 export * from "./execution.schema";
 export * from "./mcp-task-tools.schema";
 export * from "./management.schema";
+export * from "./management-goals.schema";
 export * from "./ai.schema";
 export * from "./projections.schema";
 export * from "./goals.schema";

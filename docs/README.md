@@ -12,6 +12,9 @@ Use this directory as the stable product and developer documentation set. Time-p
 | Understand local data, external providers, and deletion | [Privacy](./en/privacy.md) |
 | Understand the product surface | [Product Guide](./en/README.md) |
 | See shipped and planned product areas | [Roadmap](./en/roadmap.md) |
+| Build a proactive assistant through everyday-agent skills + MCP | [Proactive Personal Assistant Plan](./en/proactive-personal-assistant-plan.md) — first capture slice implemented locally, not deployed |
+| Compare reuse options for assistant result delivery | [Assistant Delivery](./en/assistant-delivery.md) — recommendation, not configured |
+| Capture Goals from an everyday agent | [Chrona Assistant Skill](../packages/skills/chrona-assistant/README.md) — repository-owned, not auto-installed |
 | Integrate over HTTP or MCP | [API Reference](./en/api-reference.md) |
 | Understand system architecture | [Architecture](./en/architecture.md) |
 | Trace execution internals | [Backend Execution Flow](./en/backend-execution-flow.md) |
@@ -29,6 +32,7 @@ Use this directory as the stable product and developer documentation set. Time-p
 | 安装并运行 Chrona | [快速开始](./zh/quick-start.md) |
 | 理解当前产品界面 | [中文指南](./zh/README.md) |
 | 查看已发布与计划中的产品区域 | [路线图](./zh/roadmap.md) |
+| 通过日常 Agent 的 skills + MCP 实现主动型个人助理 | [完整开发计划（英文）](./en/proactive-personal-assistant-plan.md) — 首个捕获切片已本地实现，未部署 |
 | 运行测试 | [测试指南](./zh/testing.md) |
 | 复用本机官方 Pi CLI | [Pi Provider（实验性）](./zh/pi-provider.md) |
 | 理解 Goal Workbench 资产使用区的目标设计 | [Goal Workbench 产品设计](./zh/goal-workbench-product-design.md) |

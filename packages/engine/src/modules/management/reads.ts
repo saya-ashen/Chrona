@@ -50,14 +50,21 @@ function taskSnapshot(client: ManagementIdentity, task: Awaited<ReturnType<typeo
   };
 }
 export async function readManagementContext(client: ManagementIdentity) {
-  const clients = await db.aiClient.findMany({ select: { id: true, name: true, type: true, enabled: true, isDefault: true }, orderBy: { createdAt: "asc" }, take: 100 });
-  const selected = await resolveTaskExecutionProviderSelection({});
+  const canReadTasks = client.scopes.includes("tasks:read");
+  const clients = canReadTasks ? await db.aiClient.findMany({ select: { id: true, name: true, type: true, enabled: true, isDefault: true }, orderBy: { createdAt: "asc" }, take: 100 }) : [];
+  const selected = canReadTasks ? await resolveTaskExecutionProviderSelection({}) : null;
   return {
     now: new Date().toISOString(), timezone: client.timezone,
     defaults: { mode: client.defaultMode, source: "explicit_client_setup", aiClientId: selected?.clientId ?? null },
     scopes: client.scopes, aiClients: clients, timing: AUTOMATION_TIMING_PRESETS,
     capabilities: {
       modes: ["todo", "plan", "automatic"], immediateExecution: true, scheduledExecution: true, recurrenceTimezones: ["UTC"], rawProviderConfig: false,
+      goals: {
+        available: true, contractVersion: 1,
+        canRead: client.scopes.includes("goals:read"),
+        canPropose: client.scopes.includes("goals:read") && client.scopes.includes("goals:propose"),
+        proposalModes: ["new_draft"], activation: false, policyGrants: false,
+      },
       manualTasks: { available: true, lifecycle: ["complete", "reopen"], recurrence: false, conversion: false },
       independentManualTodos: true,
       scheduling: { timeBlocks: true, independentDeadlines: true },

@@ -18,7 +18,8 @@ chrona mcp list
 chrona mcp revoke CLIENT_ID
 ```
 
-- `--access` 必填：`read` 或 `full`。full 包括启动付费执行、批准 provider 操作、删除任务；只授予可信个人 Agent。
+- `--access` 必填。原有 `read`（任务读取）和 `full`（原有任务管理全部权限）保持原语义；**不会自动获得新增 Goal 权限**。full 包括启动付费执行、批准 provider 操作、删除任务，只授予可信管理 Agent。
+- 新增 `assistant-read` 仅授予 `goals:read`；`assistant` 仅授予 `goals:read` + `goals:propose`。日常助理捕获使用这两种最小权限预设，不能创建任务、运行 AI、批准 provider、删除任务或授予权限。新增能力需使用匹配源码版本并显式 enrollment；本轮未部署或轮换现有凭据。
 - token 仅写入新建私密文件，POSIX 权限 `0600`、父目录必须私密；不输出 token，不覆盖已有文件。数据库只存 SHA-256 摘要。
 - 凭据绑定当前默认工作区；工具不提供 workspace 选择或枚举。
 - enrollment 是本机管理命令，不存在免鉴权的 HTTP enrollment 路由。CLI 不迁移运行中的数据库；必须先按正常升级流程启动匹配版本的服务。
@@ -30,11 +31,14 @@ chrona mcp revoke CLIENT_ID
 
 ## 工具能力
 
-实际参数以 `tools/list` 返回的 JSON Schema 为准；源码：`packages/contracts/src/api/management.schema.ts`。
+实际参数以 `tools/list` 返回的 JSON Schema 为准；源码：`packages/contracts/src/api/management.schema.ts`、`management-goals.schema.ts`。服务器暴露工具不代表当前凭据具备调用权限；每次调用仍重新验证 scopes。
 
 | 工具 | 能力 |
 | --- | --- |
-| `chrona_context_read` | 当前时间、时区、默认 provider、可用客户端、安全权限、时间策略及提醒能力边界 |
+| `chrona_context_read` | 当前时间、时区、权限、Goal 捕获契约版本、时间策略及提醒能力边界；仅具有任务读取权限时返回 provider 列表及默认 provider |
+| `chrona_goal_search` | 需要 `goals:read`；工作区隔离的标题/描述检索，生命周期过滤，每页最多20项 |
+| `chrona_goal_read` | 需要 `goals:read`；compact / brief / criteria 有界读取，不返回原始资产、provider 或运行上下文 |
+| `chrona_goal_propose` | 需要 `goals:read` + `goals:propose`；幂等捕获新 Draft Goal，含依据、第一步、未确认标准及自然语言权限请求；不会授权或启动任何工作 |
 | `chrona_task_search` | 标题/描述搜索，状态/过滤器、优先级、排序、分页；独立返回 deadline、排期摘要和自动化设置 |
 | `chrona_task_read` | compact / summary / description / config / plan / activity / result；compact 只核对任务与排期，其他视图保留执行上下文 |
 | `chrona_task_create` | todo / plan / automatic；显式 `taskExecutionMode: manual` 创建不依赖 provider 的手动任务；立即执行或排期，独立截止时间、重复任务、provider、执行参数；dryRun；回执包含 deadline、排期摘要和自动化设置 |
@@ -42,7 +46,22 @@ chrona mcp revoke CLIENT_ID
 | `chrona_task_action` | 生成/停止/接受/修改计划；执行开始、重启、暂停、取消、重试、输入/审阅；checkpoint；provider approval；结果验收/重试生成；AI 完成/重开；手动任务使用带 `expectedRevision` 的 `manual_complete` / `manual_reopen`；结果追问/创建后续任务；排期提案接受/拒绝 |
 | `chrona_task_delete` | preview 影响范围，随后提交精确 task/asset 集合及配置 revision 删除 |
 
-不是仅创建草稿的收件箱。示例：
+### 日常 Agent 的 Goal 捕获（新增源码能力，尚未部署验证）
+
+仓库 skill：[chrona-assistant](../../packages/skills/chrona-assistant/README.md)。它不自动安装到用户级 Agent 配置。
+
+- 先读取 `capabilities.goals`：`contractVersion: 1`，`canRead` / `canPropose` 是当前凭据权限；`proposalModes: ["new_draft"]`；`activation: false`、`policyGrants: false`。
+- 先检索已有 Goal，避免把同一目标重复保存。相同 client/tool/requestId 的重试在同一事务中重放回执；不同 Agent 的相似文本不会自动合并。
+- `chrona_goal_propose` 只接收新草稿：`requestId`、`title`、可选 `description`、`rationale`、`firstStep`、`expectedOutcome`、`permissionRequest`、`sourceSummary` 和可选 `dryRun`。不接受 workspaceId、已有 goalId、状态、排期、provider、审批或执行字段。
+- 持久化 Goal 为 Draft，`nextReviewAt` 为空，标准为 proposed/未确认。简报中的约束仅是请求，不是已授予或已执行的权限。不会生成 Task、触发器、计划、复查或模型会话。
+- dryRun 不写库、不保留来源摘要、不调用模型。真实写入前由日常 Agent 获得用户对最小摘要保存的确认；本工具不是可信权限授予界面。
+- 回执 `completed` 只表示草稿已记录；读取 Goal 回执中的链接/ID 再核对当前状态。Goal `revision` 是只读快照指纹，不是授权或变更 CAS 凭据。
+- 当前未提供 Draft 激活、已有 Goal 修改、权限授予或结果送达工具；不要用原有任务自动化接口绕过这些边界。任务列表读取需要独立的 `tasks:read`。
+- Goal、命令回执和 actor=agent/source=management_mcp 事件原子提交；来源摘要保存在审计事件中。不存完整聊天、密钥或无关私人资料。现有回执保留语义不变，删除 Goal 不等于清除所有回执。
+
+### 原有任务管理能力
+
+具有相应任务权限的客户端不是仅创建草稿的收件箱。示例：
 
 ```json
 {

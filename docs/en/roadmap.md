@@ -2,6 +2,24 @@
 
 Current version: 0.3.1
 
+## Proactive personal-assistant development direction
+
+The [Proactive Personal Assistant Plan](proactive-personal-assistant-plan.md)
+defines the next goal-driven development initiative: everyday-agent skills +
+management MCP for capture, Chrona for durable authorized work, natural-language
+permission review backed by enforceable policy, and reuse-first result delivery.
+It includes phased implementation, acceptance, and rollout gates. It is a plan,
+not a claim of shipped functionality or permission to deploy.
+
+For that initiative, its priorities supersede the schedule-first sequencing below.
+Existing contracts and safety boundaries remain authoritative. There is no
+pre-emptive redesign or deletion program: simplify existing functionality only
+when a concrete development conflict warrants it, except for safety/correctness
+issues. The remaining sections describe the existing baseline and broader roadmap;
+they are not prerequisites to complete before the assistant pilot.
+
+## Existing product framing
+
 Chrona is a local AI work executor. Users decide what should happen, when it may run, and which boundaries must not be crossed; Chrona plans, schedules, pauses for decisions, preserves evidence, and delivers results. It does not compete with models at raw planning, summarization, or tool choice. Those capabilities will keep moving into the model layer. Chrona should compound around what stronger AI makes more important: time-bound execution, human control, provider governance, observable state, recoverable failures, and trusted results.
 
 The product loop is:

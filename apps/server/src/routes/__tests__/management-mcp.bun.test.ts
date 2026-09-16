@@ -58,6 +58,31 @@ describe("management MCP protocol", () => {
     }
   });
 
+  it("advertises and captures a Goal draft through the actual protocol without task authority", async () => {
+    const client = await createManagementClient({ name: "Capture agent", publicUrl: "http://localhost:3101", scopes: ["goals:read", "goals:propose"] });
+    const response = await call(client.token, "tools/list", {});
+    const tools = ListToolsResultSchema.parse(response.body.result).tools;
+    const tool = tools.find((entry) => entry.name === "chrona_goal_propose")!;
+    expect(tool.inputSchema.type).toBe("object");
+    expect(tool.inputSchema.additionalProperties).toBe(false);
+    expect(tool.description).toContain("never starts");
+    expect(tools.find((entry) => entry.name === "chrona_goal_read")?.annotations?.readOnlyHint).toBe(true);
+    const input = { requestId: crypto.randomUUID(), title: "Watch opportunities", rationale: "New opportunities appear", firstStep: "Review the source list", expectedOutcome: "Relevant verified findings", permissionRequest: "Public research only; ask before contacting anyone", sourceSummary: "The user asked for a continuing search" };
+    const validate = new AjvJsonSchemaValidator().getValidator(tool.inputSchema as JsonSchemaType);
+    expect(validate(input).valid).toBe(true);
+    expect(validate({ ...input, approved: true }).valid).toBe(false);
+    const created = await call(client.token, "tools/call", { name: "chrona_goal_propose", arguments: input });
+    expect(created.body.result.isError).toBe(false);
+    const receipt = created.body.result.structuredContent.data;
+    expect(receipt.result).toMatchObject({ outcome: "goal_proposed", executionStarted: false, permissionsGranted: false });
+    const goalId = receipt.result.goal.goalId;
+    const read = await call(client.token, "tools/call", { name: "chrona_goal_read", arguments: { goalId, view: "brief" } });
+    expect(read.body.result.structuredContent.data).toMatchObject({ goal: { status: "Draft" }, constraintsAreNotPermissionGrants: true });
+    const forbidden = await call(client.token, "tools/call", { name: "chrona_task_create", arguments: { requestId: crypto.randomUUID(), title: "Must not run", mode: "automatic", start: "now" } });
+    expect(forbidden.body.result.structuredContent.error.code).toBe("FORBIDDEN");
+    expect(await db.task.count()).toBe(0);
+  });
+
   it("returns schedule receipts and compact reads without claiming notification delivery", async () => {
     const client = await createManagementClient({ name: "Schedule protocol", publicUrl: "http://localhost:3101", timezone: "Asia/Shanghai" });
     const context = await call(client.token, "tools/call", { name: "chrona_context_read", arguments: {} });
@@ -121,12 +146,12 @@ describe("management MCP protocol", () => {
     expect(generate.body.result.isError).toBe(true);
   });
 
-  it("initializes statelessly, lists seven actual tools, calls through the protocol and revokes immediately", async () => {
+  it("initializes statelessly, lists ten actual tools, calls through the protocol and revokes immediately", async () => {
     const client = await createManagementClient({ name: "MCP test", publicUrl: "http://localhost:3101" });
     const initialize = await call(client.token, "initialize", { protocolVersion: LATEST_PROTOCOL_VERSION, clientInfo: { name: "test", version: "1" }, capabilities: {} });
     expect(initialize.status).toBe(200);
     const tools = await call(client.token, "tools/list", {});
-    expect(ListToolsResultSchema.parse(tools.body.result).tools).toHaveLength(7);
+    expect(ListToolsResultSchema.parse(tools.body.result).tools).toHaveLength(10);
     const create = await call(client.token, "tools/call", { name: "chrona_task_create", arguments: { requestId: crypto.randomUUID(), title: "From external agent", mode: "todo" } });
     expect(create.body.result.isError).toBe(false);
     expect(create.body.result.structuredContent.data.state).toBe("completed");
