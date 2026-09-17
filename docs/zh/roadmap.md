@@ -2,13 +2,26 @@
 
 当前版本：0.3.1
 
-## 主动型个人助理开发方向
+## 首要方向：独立于执行者的任务与成果工作台
 
-[完整开发计划（英文）](../en/proactive-personal-assistant-plan.md) 定义下一项以目标为中心的开发方向：通过用户日常 Agent 的 skills + 管理 MCP 捕获需求，由 Chrona 持久保存并执行获授权的持续工作；权限使用自然语言审阅、确定性规则约束执行，结果送达优先复用现有项目。计划包含实施阶段、验收和发布门槛，**不代表功能已交付，也不构成实施或部署授权**。
+[产品架构](./product-architecture.md) 是后续开发的方向基线：人、外部 Agent、可选的 Chrona 托管执行器都能贡献工作；Chrona 负责持久任务、进展、成果版本、审阅和复用。
 
-本方向的开发优先级以该计划为准，覆盖下文原有的日程优先顺序；现有生命周期、安全和接口契约继续有效。不预先启动整体改版或删减：遇到实际开发冲突时才减少相关复杂度，安全与正确性问题除外。下文保留现有产品基线和更广的路线图，不是助理试点必须先完成的前置清单。
+```text
+捕获/关联任务 → 在合适的地方完成工作 → 提交成果 → 审阅 → 修订/验收 → 复用/继续
+```
 
-## 现有产品定位
+下一项交付目标是**无需 Provider、Plan、Run 或托管执行的完整外部成果闭环**。它尚未交付；已有管理 MCP 和手动任务只是基础，不等于闭环已存在。
+
+1. 设计成果归属、来源身份、权限与历史数据兼容；不制造假 Run 或第二套结果系统。
+2. 交付外部文本/受控附件提交、确定性展示与人工审阅；禁用托管执行后仍须通过验收。
+3. 加入修订、接续、Goal Workbench 复用，让托管成果使用相同产品契约并保留历史。
+4. 按真实需求改进可选托管执行和 AI 展示增强，不使其成为基本记录和审阅的依赖。
+
+该顺序覆盖下文旧的日程优先战略，以及[个人助理领域计划](../en/proactive-personal-assistant-plan.md)尚未实施的阶段顺序；已部署的捕获/编辑契约保持。安全、兼容和迁移要求不放松，本文不授权编码、数据库修改、全量 UI 改版或部署。
+
+## 托管执行分支：保留的定位
+
+下文执行导向的战略只适用于可选托管分支，不再要求每个任务、贡献者或成果都经过它。
 
 Chrona 是开源 AI 日程软件。它不应该在“原始计划生成、摘要、工具选择”这些能力上和模型本身竞争，因为这些能力会持续下沉到模型层。Chrona 应该围绕 AI 越强反而越重要的部分复利：有时间约束的执行、人的控制、Provider 治理、可观察状态、可恢复失败，以及可信结果。
 
@@ -74,20 +87,20 @@ Chrona 的长期价值应随 AI 能力增强而增强：
 | json-render | 经过验证的 AI-authored 结果表面和产品控制的 runtime 边界。 |
 | 发布模式 | Bun-first 开发和打包二进制分发。 |
 
-## AI-first 执行原则
+## 托管执行原则
 
 1. **已排期工作是当前产品中心。** 已接受的目标设计会把日程推广为 Trigger 创建的任务实例，同时保持时间约束、审批和用户控制为权威。
-2. **AI 可以提出建议，Chrona 拥有状态。** 模型可以建议计划、patch、摘要和结果，但 task、schedule、execution、approval、recovery 状态由 Chrona 拥有。
+2. **AI 可以提出建议，Chrona 管理自身记录和托管状态。** 模型可以建议计划、patch、摘要和结果；Chrona 管理任务/日程记录及托管执行、审批、恢复，独立外部进程的状态仍由外部宿主拥有。
 3. **每个非 happy path 都要有一个清晰下一步动作。** waiting、blocked、failed、cancelled、review 状态必须告诉用户下一步做什么。
 4. **Provider 差异停留在产品层以下。** 产品 UI 依赖 capability 和归一化事件，而不是 Provider 名称。
 5. **AI-authored UI 永远不是 runtime authority。** json-render 可以展示结果和洞察；cancel、retry、approve、configure 和 destructive action 必须是 product-authored controls。
 6. **Local-first 应该简单。** Release 用户不应该为了运行产品理解 Bun、schema generation 或 Provider 内部机制。
 
-## 近期战略主线
+## 托管执行改进待办
 
-近期工作应先让现有 AI 日程闭环可靠，再扩展新的产品表面。
+这份保留待办用于维护现有能力，不是上方外部成果交付目标的前置条件；安全与正确性修复可在迁移期间持续进行。
 
-### 1. 让 Schedule-to-Execution 成为主闭环
+### 1. 保持明确委派工作的 Schedule-to-Execution 可靠
 
 Chrona 应清晰展示：计划如何变成排期工作、排期工作何时变成 AI 执行、执行停止时用户如何恢复。
 
@@ -196,9 +209,9 @@ Bun-first 适合开发和打包；release 用户应该体验到 Chrona 是本地
 Download release -> start binary -> configure provider -> run demo schedule task -> inspect result
 ```
 
-## 中期演进
+## 有条件的托管执行演进
 
-中期工作应在近期状态、Provider 和 cockpit 基础稳定后，继续深化 AI 日程闭环。
+以下是验证核心工作/成果闭环后的托管分支候选，不要求外部 Agent 交出自身执行生命周期。
 
 | 主题 | 方向 |
 | --- | --- |
@@ -224,7 +237,7 @@ Download release -> start binary -> configure provider -> run demo schedule task
 | 主动激活 | Chrona 根据 Goal/任务状态、用户策略和 Provider capability 判断何时应规划、排期、触发、执行、审查或延后工作。 |
 | 外部输入与 Trigger | 将对话、邮件、笔记和外部系统转换为经过验证的 Trigger Delivery 或结构化任务，不允许外部 payload 拥有权限或运行时状态。 |
 | 人类治理的自动化 | 支持更强的日程/事件自动化，同时保留审批边界、幂等、审计轨迹、恢复路径和用户拥有的策略。 |
-| Agent 生态 | 让更多 Agent、Trigger 和工具通过显式、可检查契约参与工作，同时 Chrona 对 Goal、任务、任务实例和执行状态保持权威。 |
+| Agent 生态 | 人与 Agent 通过显式契约贡献工作；Chrona 管理 Goal、工作记录、成果和审阅，独立外部执行仍归其宿主。 |
 | 协作 | 在单用户执行治理稳定后，加入更强的多人审查、审批、审计轨迹和共享执行上下文。 |
 | 生产强化 | 改进认证、备份/恢复、可观测性、迁移安全、部署文档和运维 runbooks，同时不放弃 local-first 简洁性。 |
 | 组织级规划 | 将个人任务、日程、依赖和执行历史连接成项目/组合级可见性。 |
@@ -233,8 +246,9 @@ Download release -> start binary -> configure provider -> run demo schedule task
 
 适合现在投入的方向：
 
-- 保持文档和示例与当前 AI 日程产品一致。
-- 强化 Task -> Plan -> Schedule -> Execute -> Review/Recover 闭环。
+- 将目标产品方向与当前 API/运行时能力分别说明。
+- 交付并测试无需 Provider 的外部工作 -> 成果 -> 审阅闭环。
+- 保留可选的 Task -> Plan -> Schedule -> Execute -> Review/Recover 路径。
 - 围绕用户态工作状态、执行动作、Provider contracts、投影、排期决策和 json-render fallback 增加窄测试。
 - 改进 Dashboard、Schedule、Task Workspace、Settings / AI Clients 的 UI 清晰度。
 - 当代码漂移到错误层时，收紧 Provider/package boundaries。
@@ -242,4 +256,4 @@ Download release -> start binary -> configure provider -> run demo schedule task
 
 ## 指导句
 
-Chrona 不应该靠比未来模型更会“思考”取胜。Chrona 应该靠让更强的 AI 按用户的日程可靠工作取胜：可见、有边界、可恢复、可信。
+Chrona 不应该靠比模型更会思考或控制所有 Agent 取胜；它应让工作不论由谁完成，都能持久保存、有来源、可审阅、可修订、可复用，并在用户选择时提供托管执行。

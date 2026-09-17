@@ -184,8 +184,8 @@ compose 最长 5 分钟，额外 review 最长 1 分钟；超时会发送取消�
 
 ## 数据库与验证
 
-本发布线仅修改 `20260822000000_repair_release_line`；已发布迁移不变。
-已注册各已知 mutable checksum 的源 schema 指纹和 amendment 文件校验，升级前自动备份；未知 drift 拒绝。Goal 编辑新增 `Goal.configRevision` 和 SQLite trigger，并登记当前已部署 checksum `5d2fdbd1…` 的 amendment；已有 amendment/normalizer 同步收敛到新 schema。新建、历史发布快照升级与当前部署结构升级均用隔离数据库验证，不对在线库执行开发迁移。
+2026-09-17 已核实 `20260822000000_repair_release_line` 随 v0.3.1 发布，不能继续视为 mutable。已恢复发布 SQL 字节，并将其后管理 MCP、手动任务及 Goal revision 变更移至唯一未发布目录 `20260917000000_add_work_management`；最终应用 schema 不变。
+已知旧开发 checksum（含 Goal 编辑之前的 `5d2fdbd1…`）改用新目录内完整历史 + 源 schema 指纹约束的 normalizer；发布 checksum 走普通新迁移，不作为 amendment 来源。升级前自动备份，未知 drift 拒绝。空库、历史发布及已知开发结构升级均用隔离数据库验证，未对在线库执行本次修复。详见[发布迁移与升级规范](../en/migrations.md)。
 
 配置 revision 使用 SQLite trigger。Bun adapter 的 `run().changes` 包含 trigger 写入，不能直接作为 Prisma 的 affected-row 数；新增 adapter guard 返回顶层 `changes()`，并隔离同连接的普通查询与其他调用方事务。相关事务、外键 relation connect、跨调用方回滚测试位于 `packages/db/src/transaction-context.bun.test.ts`。
 

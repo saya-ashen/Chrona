@@ -1,4 +1,5 @@
 import type { NodeActionForm, WaitKind } from "./node-core";
+import type { ResultContributionContent } from "../results/content";
 type CheckpointInputFields = Record<string, string | boolean | string[]>;
 type CheckpointResponse = { response: unknown };
 import type { UiDocument } from "@chrona/ui-protocol";
@@ -45,11 +46,8 @@ export type NodeDeliverable = {
   placement: "primary" | "supporting" | "evidence";
 };
 
-export type ResultContribution = {
-  key: string;
-  title?: string;
-  content: string;
-  importance?: "primary" | "supporting";
+// Node provenance extends shared content; it is not required by the content schema.
+export type ResultContribution = ResultContributionContent & {
   sourceNodeRef?: string;
 };
 

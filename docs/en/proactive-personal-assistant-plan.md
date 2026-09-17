@@ -2,16 +2,25 @@
 
 Status: Goal capture and existing-Goal editing deployed with explicit approval; scoped Pi assistant connection and skill updated. Live automation, permission grants and real notification sends remain unapproved.
 
-This is the canonical development plan for making Chrona the durable, governed
-backing service for a user's everyday AI assistant. It records the agreed scope,
-architecture, implementation sequence, and acceptance gates. It does not claim
-that proposed tools, permissions, or notification channels already exist.
+## Scope update: executor-independent product direction
 
-For this initiative, this plan governs priorities where the older schedule-first
-roadmap differs. Existing lifecycle, security, provider, and migration contracts
-remain authoritative until explicitly reviewed changes are implemented. Maintain
-this document as work proceeds; move lasting shipped contracts into their owning
-docs rather than accumulating dated phase reports.
+The canonical [Product Architecture](../zh/product-architecture.md) now governs
+product ownership and development priorities. This document is a **domain plan
+for an optional proactive-assistant workflow**, not the product constitution.
+Its deployed capture/edit history remains valid; its unimplemented sequence is
+superseded by the external-work/result/review loop in that architecture.
+
+Chrona owns durable records and review, but does not have to own execution in the
+user's everyday agent. The external host owns its tools and process lifecycle.
+Standing automation described below applies only when explicitly delegated to
+Chrona-managed execution; MCP capture alone does not activate it. Do not build
+policy engines, monitoring, or delivery infrastructure as prerequisites for
+independent external result submission.
+
+Rebase Phases 2–6 against that direction before implementing them. Retain their
+safety requirements where applicable; no existing scope or grant is widened.
+Existing lifecycle, security, provider, and migration contracts remain in force.
+Move lasting shipped contracts into their owning docs as work proceeds.
 
 ## Implementation status
 
@@ -139,7 +148,10 @@ Source contracts: `chrona_goal_update`, additive `capabilities.goals.editing`,
   stop the service and choose a compatible recovery explicitly; never restore an
   old backup over newer user work automatically.
 
-## 1. Product objective
+## 1. Optional proactive-workflow objective
+
+This objective describes the explicitly delegated managed-automation branch,
+not a requirement that every external agent hand execution to Chrona.
 
 > The user's everyday agent understands their work and proposes useful ongoing
 > assistance. Chrona remembers the confirmed commitment and reliably advances it
@@ -172,8 +184,10 @@ Tasks or runs labelled Completed.
 
 1. **Skills + management MCP are the primary conversational entry.** Integrate
    into the user's existing agent; do not build another mandatory chat surface.
-2. **Chrona owns durable state and execution.** A skill can suggest work but cannot
-   guarantee activation, scheduling, persistence, or permission enforcement.
+2. **Chrona owns durable records and review; execution ownership is explicit.**
+   Independent external work stays with its host. Chrona owns activation and
+   execution only for work delegated to its managed executor. A skill/MCP
+   connection alone guarantees neither background execution nor delivery.
 3. **Reuse delivery infrastructure first.** Investigate existing projects and the
    user's current channels before selecting one integration. Do not build a
    messaging platform or assume a transport has delivery guarantees.
@@ -623,7 +637,12 @@ approval covers local Goal-capture management scopes and isolated tests, not
 standing grants, provider enforcement changes, deployment or migration of the
 user's database. Obtain the remaining approvals at their implementation gates.
 
-## 11. Development sequence and exit gates
+## 11. Original initiative sequence and exit gates
+
+**Rebase required before Phases 2–6.** The product's next delivery gate is the
+provider-free external result/review loop, not completion of all phases below.
+Keep deployed Phase 1 contracts and applicable safety checks; remaining phases
+are conditional backlog for explicitly requested proactive automation.
 
 Progress is recorded in the implementation-status section above. The phases below
 are acceptance targets, not a background execution queue. Each implementation slice should be independently reviewable, with a

@@ -6,6 +6,13 @@ import type { TaskPriority, TaskStatus } from "./generated/prisma/client";
 export async function resetTestDb() {
   await db.$executeRawUnsafe("PRAGMA foreign_keys = OFF");
   try {
+    // Result children are append-only; remove their owning aggregate so cascades
+    // also respect the same deletion boundary used by real task deletion.
+    await db.taskResult.deleteMany();
+    await db.resultVersionArtifact.deleteMany();
+    await db.taskResultReview.deleteMany();
+    await db.resultCommand.deleteMany();
+    await db.taskResultVersion.deleteMany();
     await db.managementCommand.deleteMany();
     await db.managementClient.deleteMany();
     await db.aiFeatureBinding.deleteMany();

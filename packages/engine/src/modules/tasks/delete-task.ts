@@ -114,6 +114,9 @@ export async function deleteTaskTreeRecords(
 		await tx.conversationEntry.deleteMany({ where: { runId: { in: runIds } } });
 	}
 
+	// Delete the owning result aggregate first: immutable versions/reviews/links
+	// cascade together, before removing the task's existing Run-owned artifacts.
+	await tx.taskResult.deleteMany({ where: { taskId: currentTaskId } });
 	await tx.schedulerEvent.deleteMany({ where: { taskId: currentTaskId } });
 	await tx.reconciliationEvent.deleteMany({ where: { taskId: currentTaskId } });
 	await tx.graphMutationRecord.deleteMany({ where: { taskId: currentTaskId } });

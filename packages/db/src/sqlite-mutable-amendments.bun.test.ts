@@ -1,63 +1,73 @@
 import { describe, expect, it } from "bun:test";
 import { Database } from "bun:sqlite";
-import { cpSync, mkdtempSync, readFileSync, rmSync } from "node:fs";
-import { join, resolve } from "node:path";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { tmpdir } from "node:os";
-import { checksumSql, ensureSqliteDatabase, schemaFingerprint, verifyMigrationReleaseMetadata } from "./sqlite-migrations";
-import { verifyMutableAmendments } from "./sqlite-mutable-amendments";
+import { checksumSql, schemaFingerprint } from "./sqlite-schema-fingerprint";
+import { applyMutableAmendment, recognizedMutableHistory, verifyMutableAmendments } from "./sqlite-mutable-amendments";
 
-const migrationsDir = resolve(import.meta.dir, "../../../prisma/migrations");
-const metadata = verifyMigrationReleaseMetadata(migrationsDir)!;
-const previousChecksum = "641aa4b5907177ca6857c659a3ddb8fa8b7ed3d14c975f026ba250296e36675e";
-const currentSql = readFileSync(join(migrationsDir, metadata.mutableReleaseLineMigration, "migration.sql"), "utf8");
-// Keep the source fixture reproducible without duplicating the 80 KB migration.
-// The checksum prevents this prefix fixture from silently changing with future edits.
-const previousSql = currentSql.slice(0, currentSql.indexOf("\n-- Management MCP:"));
-function priorDatabase(path: string) {
-  expect(checksumSql(previousSql)).toBe(previousChecksum);
-  cpSync(join(migrationsDir, metadata.previousReleaseFixture.path), path);
-  const db = new Database(path);
-  db.run(previousSql);
-  db.run("INSERT INTO _prisma_migrations (id,checksum,finished_at,migration_name,started_at,applied_steps_count) VALUES (?,?,?,?,?,1)", ["previous-line", previousChecksum, new Date().toISOString(), metadata.mutableReleaseLineMigration, new Date().toISOString()]);
-  db.run(`INSERT INTO "Workspace" (id,name,status,createdAt,updatedAt) VALUES ('amendment-preserve','Preserve','Active',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP)`);
-  return db;
+function withAmendment(test: (fixture: ReturnType<typeof createAmendment>) => void) {
+  const fixture = createAmendment();
+  try { test(fixture); } finally {
+    fixture.db.close();
+    rmSync(fixture.root, { recursive: true, force: true });
+  }
+}
+
+// Synthetic, unpublished line: a shipped checksum must never be treated as mutable.
+function createAmendment() {
+  const root = mkdtempSync(join(tmpdir(), "chrona-mutable-amendment-"));
+  const db = new Database(":memory:");
+  const sourceSql = 'CREATE TABLE Example (id TEXT PRIMARY KEY);';
+  const sql = 'ALTER TABLE Example ADD COLUMN title TEXT;';
+  const previousChecksum = checksumSql(sourceSql);
+  const currentChecksum = checksumSql(sourceSql + sql);
+  const migration = "20300101000000_unreleased";
+  const path = `${migration}/amendments/${previousChecksum}.sql`;
+  mkdirSync(dirname(join(root, path)), { recursive: true });
+  writeFileSync(join(root, path), sql);
+  db.run(sourceSql);
+  const fromSchemaFingerprint = schemaFingerprint(db);
+  db.run("CREATE TABLE _prisma_migrations (migration_name TEXT, checksum TEXT, applied_steps_count INTEGER)");
+  db.run("INSERT INTO _prisma_migrations VALUES (?, ?, 1)", [migration, previousChecksum]);
+  db.run("INSERT INTO Example (id) VALUES ('preserve')");
+  const target = new Database(":memory:");
+  target.run(sourceSql + sql);
+  const releaseLineSchemaFingerprint = schemaFingerprint(target);
+  target.close();
+  const entry = { fromSchemaFingerprint, path, sha256: checksumSql(sql) };
+  const metadata = {
+    mutableReleaseLineMigration: migration, releaseLineSchemaFingerprint,
+    releasedMigrationHistory: {}, mutableReleaseLineAmendments: { [previousChecksum]: entry },
+  };
+  return { root, db, previousChecksum, currentChecksum, metadata, entry };
 }
 
 describe("registered mutable release amendments", () => {
-  it("upgrades known unreleased history, preserves data and backs up before touching schema", () => {
-    const root = mkdtempSync(join(tmpdir(), "chrona-amendment-"));
-    const path = join(root, "chrona.db");
-    try {
-      priorDatabase(path).close();
-      const result = ensureSqliteDatabase({ databaseUrl: `file:${path}`, migrationsDir });
-      expect(result.preUpgradeBackup).toBeTruthy();
-      const db = new Database(path);
-      try {
-        expect(schemaFingerprint(db)).toBe(metadata.releaseLineSchemaFingerprint);
-        expect(db.query('SELECT name FROM "Workspace" WHERE id = ?').get("amendment-preserve")).toEqual({ name: "Preserve" });
-        expect(db.query("SELECT checksum FROM _prisma_migrations WHERE migration_name = ?").get(metadata.mutableReleaseLineMigration)).toEqual({ checksum: checksumSql(currentSql) });
-      } finally { db.close(); }
-      expect(ensureSqliteDatabase({ databaseUrl: `file:${path}`, migrationsDir }).preUpgradeBackup).toBeNull();
-    } finally { rmSync(root, { recursive: true, force: true }); }
-  });
+  it("amends only exact unpublished history and preserves data", () => withAmendment((f) => {
+    const history = new Map([[f.metadata.mutableReleaseLineMigration, { checksum: f.previousChecksum, applied_steps_count: 1 }]]);
+    expect(recognizedMutableHistory(history, f.metadata)).toBe(true);
+    expect(recognizedMutableHistory(new Map([...history, ["unknown", { checksum: f.previousChecksum, applied_steps_count: 1 }]]), f.metadata)).toBe(false);
+    applyMutableAmendment(f.db, f.metadata, f.root, f.currentChecksum);
+    expect(schemaFingerprint(f.db)).toBe(f.metadata.releaseLineSchemaFingerprint);
+    expect(f.db.query("SELECT * FROM Example").all()).toEqual([{ id: "preserve", title: null }]);
+    expect(f.db.query("SELECT checksum FROM _prisma_migrations").get()).toEqual({ checksum: f.currentChecksum });
+    applyMutableAmendment(f.db, f.metadata, f.root, f.currentChecksum);
+  }));
 
-  it("rejects schema drift even with a registered old checksum, without partial amendment", () => {
-    const root = mkdtempSync(join(tmpdir(), "chrona-amendment-drift-"));
-    const path = join(root, "chrona.db");
-    try {
-      const before = priorDatabase(path);
-      before.run("CREATE TABLE Unregistered (id TEXT)");
-      before.close();
-      expect(() => ensureSqliteDatabase({ databaseUrl: `file:${path}`, migrationsDir })).toThrow("source schema mismatch");
-      const after = new Database(path);
-      try { expect(after.query("SELECT name FROM sqlite_master WHERE name = 'ManagementClient'").get()).toBeNull(); }
-      finally { after.close(); }
-    } finally { rmSync(root, { recursive: true, force: true }); }
-  });
+  it("rejects source drift before SQL and rolls back a wrong target", () => withAmendment((f) => {
+    f.db.run("CREATE TABLE Unregistered (id TEXT)");
+    expect(() => applyMutableAmendment(f.db, f.metadata, f.root, f.currentChecksum)).toThrow("source schema mismatch");
+    f.db.run("DROP TABLE Unregistered");
+    expect(() => applyMutableAmendment(f.db, { ...f.metadata, releaseLineSchemaFingerprint: "0".repeat(64) }, f.root, f.currentChecksum)).toThrow("target schema mismatch");
+    expect(f.db.query("SELECT name FROM pragma_table_info('Example') WHERE name = 'title'").get()).toBeNull();
+    expect(f.db.query("SELECT checksum FROM _prisma_migrations").get()).toEqual({ checksum: f.previousChecksum });
+  }));
 
-  it("rejects altered amendment paths and hashes", () => {
-    const entry = metadata.mutableReleaseLineAmendments![previousChecksum];
-    expect(() => verifyMutableAmendments({ ...metadata, mutableReleaseLineAmendments: { [previousChecksum]: { ...entry, path: "../../elsewhere.sql" } } }, migrationsDir)).toThrow();
-    expect(() => verifyMutableAmendments({ ...metadata, mutableReleaseLineAmendments: { [previousChecksum]: { ...entry, sha256: "0".repeat(64) } } }, migrationsDir)).toThrow();
-  });
+  it("rejects altered paths, hashes, and any published checksum as an amendment source", () => withAmendment((f) => {
+    const changed = (patch: Partial<typeof f.entry>) => ({ ...f.metadata, mutableReleaseLineAmendments: { [f.previousChecksum]: { ...f.entry, ...patch } } });
+    expect(() => verifyMutableAmendments(changed({ path: "../../elsewhere.sql" }), f.root)).toThrow();
+    expect(() => verifyMutableAmendments(changed({ sha256: "0".repeat(64) }), f.root)).toThrow();
+    expect(() => verifyMutableAmendments({ ...f.metadata, releasedMigrationHistory: { published: { checksum: f.previousChecksum, appliedStepsCount: 1 } } }, f.root)).toThrow("released migration checksum cannot be a mutable amendment source");
+  }));
 });

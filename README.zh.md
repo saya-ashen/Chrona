@@ -7,11 +7,11 @@
 <h1 align="center">Chrona</h1>
 
 <p align="center">
-  <strong>把待办事项变成 AI 可以协助推进的工作流。</strong>
+  <strong>让工作与成果有一个持续存在的地方。</strong>
 </p>
 
 <p align="center">
-  规划工作，安排时间，让 AI 协助执行，全程可追踪。
+  保存任务、进展、证据与成果；需要时，再交给 AI 托管执行。
 </p>
 
 <p align="center">
@@ -39,9 +39,11 @@
 
 ---
 
-Chrona 是一个 local-first 的 AI 任务管理器，用来处理那些不该只停留在提醒里的工作。你可以创建任务、安排日程、审查 AI 生成的计划，再手动或自动执行；每个 checkpoint、审批、失败、工具动作和输出都会留下记录。
+Chrona 正在演进为 local-first、**独立于执行者的任务与成果工作台**：工作可以由人、外部 Agent 或可选的 Chrona 托管执行器完成；产品中心是持久记录、成果、审阅与复用，而不是控制所有 Agent。
 
-Chrona 把原本分散在不同工具里的四个环节串起来：
+> **这是方向，不是已交付能力声明：** 不依赖 Chrona Run 的外部正式成果提交与审阅闭环尚待实现。后续开发先读[产品架构](./docs/zh/product-architecture.md)，再读[当前系统架构](./docs/en/architecture.md)。
+
+当前已支持的托管路径仍保留：创建任务、安排日程、审查 AI 生成的计划，再手动或自动执行，并记录 checkpoint、审批、失败、工具动作和输出：
 
 ```text
 Task -> Plan -> Schedule -> Inspectable Execution

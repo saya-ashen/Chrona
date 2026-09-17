@@ -20,6 +20,9 @@ export function verifyMutableAmendments(metadata: Metadata, root: string) {
         checksumSql(readFileSync(join(root, entry.path))) !== entry.sha256) {
       throw new Error("Invalid mutable release-line amendment");
     }
+    if (Object.values(metadata.releasedMigrationHistory).some((released) => released.checksum === checksum)) {
+      throw new Error("A released migration checksum cannot be a mutable amendment source");
+    }
   }
 }
 

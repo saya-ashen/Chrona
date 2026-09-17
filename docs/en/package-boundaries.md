@@ -2,6 +2,31 @@
 
 This document explains where code belongs in Chrona's monorepo.
 
+## Product direction and target dependency boundary
+
+Read the canonical [Product Architecture](../zh/product-architecture.md) before
+adding capabilities. Chrona is moving toward executor-independent work records,
+results, and review. The external-result path is a target, not shipped merely
+because these packages exist.
+
+- `packages/engine` remains the application layer, not a synonym for an AI
+  executor. Record, result, artifact, review, and projection use cases belong
+  here; they must not require a Provider or graph session for external work.
+- Managed execution adapts real node/run output into shared result use cases.
+  Do not build a parallel external-result service with different review rules.
+- `packages/contracts` owns shared schemas; `packages/domain` owns pure source,
+  version, review, and status rules; `packages/db` owns approved persistence.
+- Web/MCP transports call the same product use cases. External reporting is not
+  a Provider protocol and must not borrow an internal run token.
+- `packages/graph-runtime` and `packages/providers/*` remain managed-execution
+  infrastructure. No core external-result path may require them to be active.
+- Evolve existing feature ownership for work/results/review; do not move or
+  rename directories, introduce microservices, or relax import checks solely
+  to illustrate the target diagram.
+
+These are design constraints for new work. They do not claim the present engine
+is already fully decoupled, and do not authorize broad cleanup or schema changes.
+
 ## Quick map
 
 | Path | Responsibility |

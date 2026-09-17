@@ -1,3 +1,4 @@
+
 -- Management MCP: credentials, durable commands and configuration CAS.
 ALTER TABLE "Task" ADD COLUMN "configRevision" INTEGER NOT NULL DEFAULT 0;
 CREATE TABLE "ManagementClient" (
@@ -50,7 +51,8 @@ BEGIN UPDATE "Task" SET "configRevision" = "configRevision" + 1 WHERE "id" = OLD
 CREATE TRIGGER "WorkBlock_config_update" AFTER UPDATE OF "scheduledStartAt", "scheduledEndAt", "taskId" ON "WorkBlock"
 WHEN OLD."scheduledStartAt" IS NOT NEW."scheduledStartAt" OR OLD."scheduledEndAt" IS NOT NEW."scheduledEndAt" OR OLD."taskId" IS NOT NEW."taskId"
 BEGIN UPDATE "Task" SET "configRevision" = "configRevision" + 1 WHERE "id" IN (NEW."taskId", OLD."taskId"); END;
--- Phase 2A: existing tasks retain the AI default when this known checksum upgrades.
+
+-- Phase 2A: explicit manual lifecycle discriminator. Existing rows retain AI semantics.
 ALTER TABLE "Task" ADD COLUMN "taskExecutionMode" TEXT NOT NULL DEFAULT 'ai';
 
 -- Goal editing: persistent CAS across MCP, UI and all canonical writers.

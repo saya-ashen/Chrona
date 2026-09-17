@@ -1,11 +1,12 @@
 {
   "formatVersion": 1,
-  "lastReleasedVersion": "0.2.0",
-  "lastReleasedMigration": "20260707000000_add_workspace_user_preferences",
-  "lastReleasedSchemaFingerprint": "8c2375e5c72c2f101d8ca843649656f9bf0114717f9d672e378ca86371250419",
+  "lastReleasedVersion": "0.3.1",
+  "lastReleasedMigration": "20260822000000_repair_release_line",
+  "lastReleasedSchemaFingerprint": "091f4c6197416c1803bfa42c969cd39becb1577a815739ca58071d8f662068a0",
   "releasedMigrationChecksums": {
     "0001_initial": "15b1e8b07ba6dbbd351d5e43cedebefd7ce2d0bf2ef5b465bfd241357969971d",
-    "20260707000000_add_workspace_user_preferences": "d4a4a0ef0ec277b4ecfe94e1840d7120076e18d55dfc4901febc724dbf1bc849"
+    "20260707000000_add_workspace_user_preferences": "d4a4a0ef0ec277b4ecfe94e1840d7120076e18d55dfc4901febc724dbf1bc849",
+    "20260822000000_repair_release_line": "641aa4b5907177ca6857c659a3ddb8fa8b7ed3d14c975f026ba250296e36675e"
   },
   "releasedMigrationHistory": {
     "0001_initial": {
@@ -15,6 +16,10 @@
     "20260707000000_add_workspace_user_preferences": {
       "checksum": "d4a4a0ef0ec277b4ecfe94e1840d7120076e18d55dfc4901febc724dbf1bc849",
       "appliedStepsCount": 0
+    },
+    "20260822000000_repair_release_line": {
+      "checksum": "641aa4b5907177ca6857c659a3ddb8fa8b7ed3d14c975f026ba250296e36675e",
+      "appliedStepsCount": 1
     }
   },
   "historicalNoOpMigrations": {
@@ -24,19 +29,19 @@
       "rule": "v0.2.0-duplicate-workspace-user-preference"
     }
   },
-  "mutableReleaseLineMigration": "20260822000000_repair_release_line",
-  "releaseLineSchemaFingerprint": "41bb15e4b06797f37c0d59ee08998d41353ac9f4404cd75777b8f5993bf7e37d",
+  "mutableReleaseLineMigration": "20260917000000_add_work_management",
+  "releaseLineSchemaFingerprint": "314b2595f83d7e7257d3bda9c8bbbf14e30d8d672261f12ba4ed7b67abf0bc11",
   "previousReleaseFixture": {
-    "path": "fixtures/v0.2.0-linux-x64.sqlite",
-    "sha256": "62d74fcba6e430e295f1cb913d0c3086711d18ca88112c9cd9805833b44f9c63",
-    "provenancePath": "fixtures/v0.2.0-linux-x64.provenance.json",
-    "provenanceSha256": "a7a0e7b0dc64f64184819d0d4684eeb11b63775869f71c6933c6869c91b49a04"
+    "path": "fixtures/v0.3.1-linux-x64.sqlite",
+    "sha256": "f6bb771c2ff974a08a7e71ab3530468ae0b0adeb92a07643d5450f749ee364bc",
+    "provenancePath": "fixtures/v0.3.1-linux-x64.provenance.json",
+    "provenanceSha256": "987b26ff27def9246bdab4994aadf3eda403c4ac980c4025c2f9e320eb8d8a18"
   },
   "legacyHistoryNormalizations": {
     "52535a31dda359b8e54648726cb870ac7d2569349e37738e9f58704782b8abbb": {
       "fromSchemaFingerprint": "81f756b0af4ebd66ad87f14eb758f870831a0c31cb60050dc016b9f0bd92484c",
-      "path": "20260822000000_repair_release_line/normalizers/52535a31dda359b8e54648726cb870ac7d2569349e37738e9f58704782b8abbb.sql",
-      "sha256": "1d84411e94ab97f499ef945ec900cf837b48b9992c54807630454b276a0b18c4",
+      "path": "20260917000000_add_work_management/normalizers/52535a31dda359b8e54648726cb870ac7d2569349e37738e9f58704782b8abbb.sql",
+      "sha256": "0f2b4081a567be9b026fcbd4291434091bd43239ba69db0e75b54cf90df466ab",
       "expectedHistory": {
         "0001_initial": {
           "checksum": "f86136e580c85369d11e86b4f8a8fd4b3f0d96e5d974ae2855b4da1819d3f924",
@@ -78,8 +83,8 @@
     },
     "b46d742fdacdc001f371f6ce361ff29b0fd15b8cac25a85bbf40692a1964927b": {
       "fromSchemaFingerprint": "c82b15773ed3b863dea88bfbe15c84f9fc95e30b99647884c474b6386c38ad67",
-      "path": "20260822000000_repair_release_line/normalizers/b46d742fdacdc001f371f6ce361ff29b0fd15b8cac25a85bbf40692a1964927b.sql",
-      "sha256": "86ff022a417823c893016726ca5c48095f91d6277abb3f5ae7e63110ac041bfc",
+      "path": "20260917000000_add_work_management/normalizers/b46d742fdacdc001f371f6ce361ff29b0fd15b8cac25a85bbf40692a1964927b.sql",
+      "sha256": "53cfcb76c7e574924508d25fe14fa62d3e8bdf429a6a89d05880f1feffae6bd7",
       "expectedHistory": {
         "0001_initial": {
           "checksum": "f86136e580c85369d11e86b4f8a8fd4b3f0d96e5d974ae2855b4da1819d3f924",
@@ -118,23 +123,80 @@
           "appliedStepsCount": 2
         }
       }
-    }
-  },
-  "mutableReleaseLineAmendments": {
-    "641aa4b5907177ca6857c659a3ddb8fa8b7ed3d14c975f026ba250296e36675e": {
-      "fromSchemaFingerprint": "091f4c6197416c1803bfa42c969cd39becb1577a815739ca58071d8f662068a0",
-      "path": "20260822000000_repair_release_line/amendments/641aa4b5907177ca6857c659a3ddb8fa8b7ed3d14c975f026ba250296e36675e.sql",
-      "sha256": "6a64640078ea9a40442dba985f373087b06b1ab229b345de4fe9533f9d59cfb3"
     },
     "54c4449d8a6e186e3c3029f8e611937aa72f36e3309ac04e7d08e6cf6124f6fd": {
       "fromSchemaFingerprint": "d41a93b82bf9eaeb265ec2f813950b41c909fadbc36b2f6c8ba212eb62df8c9d",
-      "path": "20260822000000_repair_release_line/amendments/54c4449d8a6e186e3c3029f8e611937aa72f36e3309ac04e7d08e6cf6124f6fd.sql",
-      "sha256": "99e63c7f52ef5474824a376af45128f3bb56eb8c2e233dc3f0c684b9a8dc340f"
+      "path": "20260917000000_add_work_management/normalizers/54c4449d8a6e186e3c3029f8e611937aa72f36e3309ac04e7d08e6cf6124f6fd.sql",
+      "sha256": "51dd97bbb9545b4251c3255679f09216d2c3dea100a9f2bae41449c917ff034e",
+      "expectedHistory": {
+        "0001_initial": {
+          "checksum": "15b1e8b07ba6dbbd351d5e43cedebefd7ce2d0bf2ef5b465bfd241357969971d",
+          "appliedStepsCount": 1
+        },
+        "20260707000000_add_workspace_user_preferences": {
+          "checksum": "d4a4a0ef0ec277b4ecfe94e1840d7120076e18d55dfc4901febc724dbf1bc849",
+          "appliedStepsCount": 0
+        },
+        "20260822000000_repair_release_line": {
+          "checksum": "54c4449d8a6e186e3c3029f8e611937aa72f36e3309ac04e7d08e6cf6124f6fd",
+          "appliedStepsCount": 1
+        }
+      }
     },
     "5d2fdbd183363bc9d069efc0936ff8584b70c8bc06e4b3f1e89b9728fff4544a": {
       "fromSchemaFingerprint": "25e0bdbe03234171f9adb4c6c1d14af23f4a23161a84d1c81875d09d707f700b",
-      "path": "20260822000000_repair_release_line/amendments/5d2fdbd183363bc9d069efc0936ff8584b70c8bc06e4b3f1e89b9728fff4544a.sql",
-      "sha256": "cf3480422306ec3279d32710342ea98e3307819663723b7691e93548ed5fb6e6"
+      "path": "20260917000000_add_work_management/normalizers/5d2fdbd183363bc9d069efc0936ff8584b70c8bc06e4b3f1e89b9728fff4544a.sql",
+      "sha256": "03d8b92ddfdc7406d502fcf77082edae686a911dbed25ed73abd3e1a2addf4af",
+      "expectedHistory": {
+        "0001_initial": {
+          "checksum": "15b1e8b07ba6dbbd351d5e43cedebefd7ce2d0bf2ef5b465bfd241357969971d",
+          "appliedStepsCount": 1
+        },
+        "20260707000000_add_workspace_user_preferences": {
+          "checksum": "d4a4a0ef0ec277b4ecfe94e1840d7120076e18d55dfc4901febc724dbf1bc849",
+          "appliedStepsCount": 0
+        },
+        "20260822000000_repair_release_line": {
+          "checksum": "5d2fdbd183363bc9d069efc0936ff8584b70c8bc06e4b3f1e89b9728fff4544a",
+          "appliedStepsCount": 1
+        }
+      }
+    },
+    "7ae6d8acce6c79fa383ade0b1f766ab276920c9f752d886d2a6b4be8136bd55c": {
+      "fromSchemaFingerprint": "41bb15e4b06797f37c0d59ee08998d41353ac9f4404cd75777b8f5993bf7e37d",
+      "path": "20260917000000_add_work_management/normalizers/7ae6d8acce6c79fa383ade0b1f766ab276920c9f752d886d2a6b4be8136bd55c.sql",
+      "sha256": "66245c5df400cac0618b29abe7c631e54d775f0d271dd86e3178f9594aa23c42",
+      "expectedHistory": {
+        "0001_initial": {
+          "checksum": "15b1e8b07ba6dbbd351d5e43cedebefd7ce2d0bf2ef5b465bfd241357969971d",
+          "appliedStepsCount": 1
+        },
+        "20260707000000_add_workspace_user_preferences": {
+          "checksum": "d4a4a0ef0ec277b4ecfe94e1840d7120076e18d55dfc4901febc724dbf1bc849",
+          "appliedStepsCount": 0
+        },
+        "20260822000000_repair_release_line": {
+          "checksum": "7ae6d8acce6c79fa383ade0b1f766ab276920c9f752d886d2a6b4be8136bd55c",
+          "appliedStepsCount": 1
+        }
+      }
+    }
+  },
+  "mutableReleaseLineAmendments": {
+    "6a64640078ea9a40442dba985f373087b06b1ab229b345de4fe9533f9d59cfb3": {
+      "fromSchemaFingerprint": "41bb15e4b06797f37c0d59ee08998d41353ac9f4404cd75777b8f5993bf7e37d",
+      "path": "20260917000000_add_work_management/amendments/6a64640078ea9a40442dba985f373087b06b1ab229b345de4fe9533f9d59cfb3.sql",
+      "sha256": "f3724eac77be31ed464e6f5fd9b34f9eea9744cdce3a10e8ef8d0e9f3651f540"
+    }
+  },
+  "migrationSchemaTransitions": {
+    "20260822000000_repair_release_line": {
+      "fromSchemaFingerprint": "8c2375e5c72c2f101d8ca843649656f9bf0114717f9d672e378ca86371250419",
+      "toSchemaFingerprint": "091f4c6197416c1803bfa42c969cd39becb1577a815739ca58071d8f662068a0"
+    },
+    "20260917000000_add_work_management": {
+      "fromSchemaFingerprint": "091f4c6197416c1803bfa42c969cd39becb1577a815739ca58071d8f662068a0",
+      "toSchemaFingerprint": "314b2595f83d7e7257d3bda9c8bbbf14e30d8d672261f12ba4ed7b67abf0bc11"
     }
   }
 }

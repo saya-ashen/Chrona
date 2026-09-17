@@ -3,6 +3,31 @@
 This is a Vite + Hono monorepo. There is NO Next.js — do not generate Next.js
 patterns.
 
+## Product direction — read before designing changes
+
+Canonical target: [Executor-independent work and results workspace](docs/zh/product-architecture.md).
+Chrona owns durable work records, result versions, review, and reuse. Humans,
+external agents, and the optional Chrona-managed executor can contribute work;
+Chrona is not required to control every contributor's execution.
+
+- New core record/result paths must work without a Provider, Plan, Run, or
+  execution graph. Do not invent execution records to admit external results.
+- Reuse one semantic result/review model across execution sources; do not build
+  a parallel external-task or external-result system.
+- Keep source-reported progress, actual observability, result readiness, user
+  acceptance, and Goal achievement distinct. No report is not proof of failure.
+- Deterministic result display and review must not depend on AI finalization.
+  Managed execution and AI presentation are optional capabilities.
+- Preserve auth, scoped identities, idempotency, revisions, artifact safety, and
+  current managed-execution behavior. The target does not itself authorize
+  schema, provider, execution, or deployment changes.
+- Label current implementation versus target design. The external result loop
+  is not shipped merely because management MCP or manual Tasks exist.
+- Follow the phase gates in the product architecture. For work/result decoupling,
+  read [Phase A contracts and compatibility](docs/zh/work-results-phase-a.md)
+  before implementing persistence or new MCP authority. Design documentation
+  does not substitute for the explicit approvals required below.
+
 ## Tech stack
 
 - **Frontend:** Vite + React 19 + React Router 7 (SPA under `apps/web/`)
@@ -13,6 +38,11 @@ patterns.
 - **AI runtime:** Provider bridge via structured-result contracts
 
 ## Database migration policy
+
+Current verified boundary and recovery rules: [Migration Release Lines](docs/en/migrations.md).
+Public v0.3.1 SQL is frozen; the sole next-release mutable directory is
+`20260917000000_add_work_management`. Read its metadata/normalizer requirements
+before adding work-result persistence.
 
 - Database schema changes do not require a separate human approval gate by
   default; follow the release-line migration policy below. Still get explicit
@@ -64,7 +94,8 @@ cheaper than reading files):
 
 | To understand…                                                                  | Read                                                                     |
 | ------------------------------------------------------------------------------- | ------------------------------------------------------------------------ |
-| System: layers, workflows, data/projection model, architecture rules            | [`docs/en/architecture.md`](docs/en/architecture.md)                     |
+| Product destination, ownership, non-goals, and acceptance gates                  | [`docs/zh/product-architecture.md`](docs/zh/product-architecture.md)       |
+| Current system and target transition: layers, workflows, architecture rules      | [`docs/en/architecture.md`](docs/en/architecture.md)                     |
 | Where code belongs: per-package responsibilities, dependency rules, enforcement | [`docs/en/package-boundaries.md`](docs/en/package-boundaries.md)         |
 | Frontend `apps/web`: routing, components, hooks, lib, conventions               | [`docs/en/frontend-structure.md`](docs/en/frontend-structure.md)         |
 | Execution internals                                                             | [`docs/en/backend-execution-flow.md`](docs/en/backend-execution-flow.md) |
@@ -236,8 +267,11 @@ Descriptive source labels for `search(source: "label")`.
 
 ## Chrona task workspace / AI auto-edit rules
 
-Chrona task execution monitoring workspace. Core UX goal: user always sees task
-state, plan state, current execution state, current node state, and next action.
+Target task workspace: work context, known progress and its source, results and
+versions, review needs, and next action come first. Plan, execution, and current
+node details are shown when real managed execution exists; their absence is a
+valid work shape, not an error. Preserve current runtime visibility while
+migrating; do not perform an unattended broad UI redesign.
 
 ### Prohibited unattended changes
 

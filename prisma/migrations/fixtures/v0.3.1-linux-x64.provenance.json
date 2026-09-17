@@ -1,0 +1,48 @@
+{
+  "formatVersion": 1,
+  "releaseTag": "v0.3.1",
+  "releaseAsset": {
+    "url": "https://github.com/saya-ashen/Chrona/releases/download/v0.3.1/chrona-linux-x64.tar.gz",
+    "sha256": "04ebf9c781929d868a39de08db2f783229374fccbdce0e2e20a90f4076084fb0",
+    "size": 102546643,
+    "verifiedAgainst": [
+      "GitHub release asset digest",
+      "SHA256SUMS"
+    ]
+  },
+  "generation": {
+    "method": "Fresh isolated SQLite initialized from the verified release archive's migration resources; no release executable or user database used",
+    "observedAt": "2026-09-17T04:08:49.906Z"
+  },
+  "resources": [
+    {
+      "path": "prisma/schema.prisma",
+      "sha256": "8817142c9de7c84387ea19c6f5fd38515ece4c344caae3cc6e106f64d1802be5"
+    },
+    {
+      "path": "prisma/migrations/0001_initial/migration.sql",
+      "sha256": "15b1e8b07ba6dbbd351d5e43cedebefd7ce2d0bf2ef5b465bfd241357969971d"
+    },
+    {
+      "path": "prisma/migrations/20260822000000_repair_release_line/migration.sql",
+      "sha256": "641aa4b5907177ca6857c659a3ddb8fa8b7ed3d14c975f026ba250296e36675e"
+    },
+    {
+      "path": "prisma/migrations/20260822000000_repair_release_line/normalizers/52535a31dda359b8e54648726cb870ac7d2569349e37738e9f58704782b8abbb.sql",
+      "sha256": "578b830fec553bacb53c8b1d17373d2c9266beefae9d5321144e3de38cf7e706"
+    },
+    {
+      "path": "prisma/migrations/20260822000000_repair_release_line/normalizers/b46d742fdacdc001f371f6ce361ff29b0fd15b8cac25a85bbf40692a1964927b.sql",
+      "sha256": "1c8fade2aa88c506989ab0138f7da669f00b22e3a2a125b7ced3393b370eaf1f"
+    },
+    {
+      "path": "prisma/migrations/20260707000000_add_workspace_user_preferences/migration.sql",
+      "sha256": "d4a4a0ef0ec277b4ecfe94e1840d7120076e18d55dfc4901febc724dbf1bc849"
+    }
+  ],
+  "database": {
+    "path": "derived/chrona.db",
+    "sha256": "f6bb771c2ff974a08a7e71ab3530468ae0b0adeb92a07643d5450f749ee364bc",
+    "schemaFingerprint": "091f4c6197416c1803bfa42c969cd39becb1577a815739ca58071d8f662068a0"
+  }
+}

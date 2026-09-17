@@ -1,4 +1,8 @@
 export { createChronaEngine } from "./engine";
+export { createTaskResultsService } from "./modules/results/service";
+export type { TaskResultsService } from "./modules/results/service";
+export { WorkResultError } from "./modules/results/access";
+export type { ResultPrincipal, ResultPermission, TaskResultsPorts, WorkResultErrorCode } from "./modules/results/access";
 export { createManagementClient, listManagementClients, revokeManagementClient } from "./modules/management/clients";
 export type { ChronaEngine } from "./engine";
 export {

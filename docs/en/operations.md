@@ -44,6 +44,14 @@ Recommended upgrade procedure:
 5. Verify `/api/health`, Tasks, Schedule, and the latest Task Workspace result.
 6. If verification fails, stop Chrona and restore either your manual backup or the newest automatic recovery point with `--force`.
 
+## Migration compatibility
+
+The verified latest release baseline is v0.3.1. Its SQL is frozen; subsequent
+management changes live in a separate unreleased migration. Exact registered
+development histories can normalize after a verified backup, but arbitrary
+checksum edits and schema drift cannot. See [Migration Release Lines](./migrations.md)
+for fixture provenance, recognized histories, and developer requirements.
+
 ## Diagnostics
 
 - Server does not start: inspect the startup error before retrying. A running-process/maintenance-lock error means another Chrona instance still owns the database; stop it before retrying. Migration checksum mismatch means the database was created with different migration SQL and should not be forced forward. The public v0.2.0 baseline contains the exact historical `20260707000000_add_workspace_user_preferences` no-op history row (`applied_steps_count = 0`); Chrona recognizes only that registered checksum/rule and rejects all other duplicate-object or history drift.

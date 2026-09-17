@@ -405,6 +405,7 @@ model Workspace {
   goalAssetReviews          GoalAssetReview[]
   assetOwnershipProposals    GoalAssetOwnershipProposal[]
   taskOccurrences           TaskOccurrence[]
+  taskResults               TaskResult[]
   taskTriggers              TaskTrigger[]
   triggerDeliveries         TriggerDelivery[]
   aiFeatureRuns             AiFeatureRun[]
@@ -736,6 +737,7 @@ model Task {
   scheduleProposals         ScheduleProposal[]
   assistantMessages         TaskAssistantMessage[]
   resultContinuations       TaskResultContinuation[]
+  results                   TaskResult[]
   workBlocks                WorkBlock[]
   executionSessions         ExecutionSession[]
   taskPlans                 TaskPlan[]
@@ -1340,6 +1342,7 @@ model Artifact {
   workspace         Workspace            @relation(fields: [workspaceId], references: [id])
   task              Task                 @relation(fields: [taskId], references: [id])
   run               Run                  @relation(fields: [runId], references: [id])
+  resultVersions    ResultVersionArtifact[]
   sourceGoalAssets  GoalAsset[]          @relation("GoalAssetSourceArtifact")
   occurrence        TaskOccurrence?      @relation(fields: [occurrenceId], references: [id], onDelete: SetNull)
   assetVersions     GoalAssetVersion[]
@@ -1890,6 +1893,111 @@ model TaskAssistantMessage {
   @@index([taskId, sequence])
 }
 
+// Work-owned results. Managed execution is optional provenance, never identity.
+model TaskResult {
+  id                String   @id @default(cuid())
+  workspaceId       String
+  taskId            String
+  occurrenceId      String?
+  scopeKey          String
+  headVersionId     String?
+  acceptedVersionId String?
+  editRevision      Int      @default(0)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  workspace         Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  task              Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  occurrence        TaskOccurrence? @relation(fields: [occurrenceId], references: [id], onDelete: NoAction)
+  versions          TaskResultVersion[] @relation("ResultVersions")
+  headVersion       TaskResultVersion? @relation("ResultHead", fields: [headVersionId, id], references: [id, resultId], onDelete: NoAction, onUpdate: NoAction)
+  acceptedVersion   TaskResultVersion? @relation("ResultAccepted", fields: [acceptedVersionId, id], references: [id, resultId], onDelete: NoAction, onUpdate: NoAction)
+  reviews           TaskResultReview[]
+  commands          ResultCommand[]
+
+  @@unique([taskId, scopeKey])
+  @@index([workspaceId, updatedAt])
+  @@index([occurrenceId])
+}
+
+model TaskResultVersion {
+  id             String   @id @default(cuid())
+  resultId       String
+  version        Int
+  parentVersionId String?
+  content        Json
+  contentHash    String
+  sourceKind     String
+  actorKey       String
+  sourceLabel    String?
+  sourceWorkId   String?
+  sourceReportedAt DateTime?
+  publishedAt    DateTime @default(now())
+  result         TaskResult @relation("ResultVersions", fields: [resultId], references: [id], onDelete: Cascade)
+  parent         TaskResultVersion? @relation("ResultParent", fields: [parentVersionId, resultId], references: [id, resultId], onDelete: NoAction, onUpdate: NoAction)
+  children       TaskResultVersion[] @relation("ResultParent")
+  headFor        TaskResult[] @relation("ResultHead")
+  acceptedFor    TaskResult[] @relation("ResultAccepted")
+  reviews        TaskResultReview[]
+  artifacts      ResultVersionArtifact[]
+  commands       ResultCommand[]
+
+  @@unique([resultId, version])
+  @@unique([id, resultId])
+}
+
+model ResultCommand {
+  id          String   @id @default(cuid())
+  workspaceId String
+  actorKey    String
+  operation   String
+  requestId   String
+  payloadHash String
+  resultId    String
+  versionId   String
+  receipt     Json
+  createdAt   DateTime @default(now())
+  result      TaskResult @relation(fields: [resultId], references: [id], onDelete: Cascade)
+  version     TaskResultVersion @relation(fields: [versionId, resultId], references: [id, resultId], onDelete: NoAction, onUpdate: NoAction)
+  review      TaskResultReview?
+
+  @@unique([workspaceId, actorKey, operation, requestId])
+  @@index([resultId, createdAt])
+}
+
+model TaskResultReview {
+  id          String   @id @default(cuid())
+  resultId    String
+  versionId   String
+  commandId   String   @unique
+  revision    Int
+  decision    String
+  feedback    String?
+  actorKey    String
+  createdAt   DateTime @default(now())
+  result      TaskResult @relation(fields: [resultId], references: [id], onDelete: Cascade)
+  version     TaskResultVersion @relation(fields: [versionId, resultId], references: [id, resultId], onDelete: Cascade, onUpdate: NoAction)
+  command     ResultCommand @relation(fields: [commandId], references: [id], onDelete: Cascade)
+
+  @@unique([resultId, revision])
+  @@index([versionId, revision])
+}
+
+model ResultVersionArtifact {
+  id          String  @id @default(cuid())
+  versionId   String
+  artifactId  String
+  key         String
+  role        String
+  required    Boolean @default(true)
+  artifactRef String
+  artifactFingerprint String
+  version     TaskResultVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  artifact    Artifact @relation(fields: [artifactId], references: [id], onDelete: Restrict)
+
+  @@unique([versionId, role, key])
+  @@index([artifactId])
+}
+
 model TaskResultContinuation {
   id                       String    @id @default(cuid())
   taskId                   String
@@ -2187,6 +2295,7 @@ model TaskOccurrence {
   trigger           TaskTrigger?         @relation(fields: [triggerId], references: [id], onDelete: SetNull)
   delivery          TriggerDelivery?     @relation(fields: [deliveryId], references: [id], onDelete: SetNull)
   workBlock         WorkBlock?           @relation(fields: [workBlockId], references: [id], onDelete: SetNull)
+  taskResults       TaskResult[]
   taskPlans         TaskPlan[]
   taskPlanRuns      TaskPlanRun[]
   executionSessions ExecutionSession[]

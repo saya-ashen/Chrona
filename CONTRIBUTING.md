@@ -1,5 +1,25 @@
 # Contributing to Chrona
 
+## Start with product direction
+
+Read the canonical [Product Architecture](./docs/zh/product-architecture.md)
+and the [English architecture summary](./docs/en/architecture.md). Chrona is
+moving toward executor-independent work records, results, and review; managed
+AI execution remains optional. External result intake is not yet shipped.
+
+For feature/design PRs, explain:
+
+- Which work/result/review/continuation problem, or explicitly optional managed
+  execution need, the change solves.
+- Whether core record/result behavior works without a Provider or execution
+  graph; never create fake runs or a second external-result lifecycle.
+- How source claims, observable state, result readiness, review, and permissions
+  remain distinct, and which compatibility/negative tests cover them.
+- What is currently implemented versus target-only or deployment-verified.
+
+See the product architecture's acceptance matrix before writing a detailed plan.
+Existing security, migration, and execution approval gates still apply.
+
 ## Development Setup
 
 Chrona development requires **Bun**:
