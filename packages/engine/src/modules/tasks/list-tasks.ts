@@ -107,6 +107,7 @@ export async function listTasksByWorkspace(input: ListTasksInput) {
           select: { id: true, status: true, runtimeName: true, occurrenceId: true, workBlockId: true, createdAt: true },
         },
         artifacts: {
+          where: { ownerKind: "run" },
           orderBy: { createdAt: "desc" },
           take: 1,
           select: { id: true, title: true, type: true, uri: true, runId: true, createdAt: true },

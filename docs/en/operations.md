@@ -14,6 +14,22 @@ Configuration is separate from the database: Linux uses `$XDG_CONFIG_HOME/chrona
 
 On Windows, Chrona creates its own data/config/backup directories with inheritance removed and grants full control only to the current user SID and `SYSTEM`; generated `.env`, SQLite, WAL/SHM, lock, backup, and restore files receive the same verified ACL. `chrona doctor` audits those ACLs. Chrona never rewrites an existing custom directory or database ACL: an existing `CHRONA_DATA_DIR`, `CHRONA_CONFIG_DIR`, or `DATABASE_URL` path must already be private to the current user and `SYSTEM`, otherwise startup fails closed. Use an empty directory for a new custom path or secure the existing one before use.
 
+## Independent result write entries
+
+Independent text/file transport writes are default-off. Only the exact server-process
+value `CHRONA_RESULT_WRITES_ENABLED=true` enables new publication, review and uploads;
+this is not a permission grant. Disabling the flag preserves stored results and
+reads, and does not alter legacy managed-result actions. New management scopes
+require separately approved local enrollment; no existing token is widened.
+Independent files use bounded private SQLite BLOB storage; backups include those
+bytes. The deterministic task results UI reads existing records with writes off.
+Own-upload status/cancel remain available for cleanup. Nullable Artifact.runId
+means old-binary downgrade is unsafe: use a compatible read-only version or an
+approved pre-upgrade snapshot restore, never fake Runs. See
+[Work Result Entries](./work-results.md) before enabling this feature, and follow
+[the deployment/integration guide](./work-results-integration.md) for a separately
+scoped everyday Agent connection and a bounded real verification task.
+
 ## Create a backup
 
 Chrona uses SQLite `VACUUM INTO` so the backup is consistent even when the live database uses WAL mode:

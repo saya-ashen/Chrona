@@ -1,4 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
+import { openAdvancedTaskCreation } from "./advanced-navigation-helpers";
 
 async function expectNoHorizontalScroll(page: Page) {
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
@@ -27,7 +28,7 @@ async function clearOneOffSchedule(page: Page, sheet: Locator) {
 test.describe("Manual Schedule selected-block editor", () => {
   test("edits a manual scheduled task without AI controls or AI PATCH fields", async ({ page }, testInfo) => {
     await page.goto("/en/schedule");
-    await page.getByRole("button", { name: "New Task" }).click();
+    await openAdvancedTaskCreation(page);
     const dialog = page.getByRole("dialog");
     const title = `Manual selected block ${testInfo.project.name}`;
     await dialog.getByPlaceholder("Add title").fill(title);

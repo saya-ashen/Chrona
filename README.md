@@ -44,8 +44,12 @@ workspace**: work may be performed by a person, an external agent, or the option
 Chrona-managed executor. Durable records, results, review, and reuse are the
 product center—not control over every agent.
 
-> **Direction, not shipped capability:** direct external result submission and
-> review without a Chrona Run remains to be implemented. Read the canonical
+> **Implemented; one authorized instance deployed and integrated:** independent
+> text/file results and version/review UI were verified with an external Pi Agent.
+> Human acceptance is pending; other installs still default writes off. See
+> [Agent integration](./docs/en/work-results-integration.md). Managed-result and
+> Goal Inbox convergence remain next-stage work.
+> Read the canonical
 > [Product Architecture](./docs/zh/product-architecture.md) and its
 > [English technical summary](./docs/en/architecture.md) before designing changes.
 

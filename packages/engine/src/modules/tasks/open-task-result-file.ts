@@ -126,7 +126,7 @@ export async function openTaskResultFile(input: {
   }
 
   const artifact = await db.artifact.findFirst({
-    where: { taskId: input.taskId, uri: input.requestedPath, type: "file" },
+    where: { taskId: input.taskId, uri: input.requestedPath, type: "file", ownerKind: "run" },
     orderBy: { createdAt: "desc" },
     select: { id: true, runId: true, metadata: true },
   });

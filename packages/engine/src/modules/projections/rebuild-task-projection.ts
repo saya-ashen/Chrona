@@ -127,7 +127,7 @@ async function rebuildTaskProjectionWithClient(
         where: { status: "pending", workBlockId: scopeWorkBlockId },
         orderBy: { requestedAt: "desc" },
       },
-      artifacts: { orderBy: { createdAt: "desc" }, take: 1 },
+      artifacts: { where: { ownerKind: "run" }, orderBy: { createdAt: "desc" }, take: 1 },
       scheduleProposals: { where: { status: "Pending" } },
       executionSessions: {
         where: { workBlockId: scopeWorkBlockId },

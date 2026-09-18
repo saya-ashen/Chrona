@@ -1,9 +1,10 @@
 import { db, type TaskResult } from "@chrona/db";
-import { workResultContentSchema, type ReadWorkResult } from "@chrona/contracts/results";
+import { type ReadWorkResult } from "@chrona/contracts/results";
 import { deriveWorkResultState, workResultRevision } from "@chrona/domain/task/work-results";
 import { authorizeResult, WorkResultError, type TaskResultsPorts } from "./access";
 import { unavailableVersionArtifacts } from "./artifacts";
 import { findWorkResult, scopeOf } from "./commands";
+import { readableResultContent } from "./readable-content";
 
 const versionSelect = { id: true, resultId: true, version: true, parentVersionId: true, contentHash: true, sourceKind: true, actorKey: true, sourceLabel: true, sourceWorkId: true, sourceReportedAt: true, publishedAt: true } as const;
 function resultInfo(result: TaskResult) {
@@ -40,8 +41,9 @@ export async function readWorkResult(ports: TaskResultsPorts, input: ReadWorkRes
     const rows = await db.taskResultReview.findMany({ where, select: { id: true, versionId: true, revision: true, decision: true, feedback: true, actorKey: true, createdAt: true }, orderBy: { revision: "desc" }, skip: input.offset, take: input.limit });
     return { result: resultInfo(result), versionId: version.id, reviews: pageWithinBudget(rows, await db.taskResultReview.count({ where }), input) };
   }
-  const content = workResultContentSchema.parse(version.content);
+  const { content, pageUnavailable } = readableResultContent(version.content, principal.permissions.includes("pages:read"));
   const unavailable = await unavailableVersionArtifacts(ports, principal, scope, version.id);
+  const state = deriveWorkResultState({ ...result, selectedVersionId: version.id, readiness: content.readiness.status, unavailableRequiredArtifacts: unavailable.length });
   return { result: resultInfo(result), version: { ...version, content }, unavailableRequiredArtifacts: unavailable,
-    state: deriveWorkResultState({ ...result, selectedVersionId: version.id, readiness: content.readiness.status, unavailableRequiredArtifacts: unavailable.length }) };
+    pageUnavailable, state: { ...state, canAcceptContent: state.canAcceptContent && !pageUnavailable } };
 }

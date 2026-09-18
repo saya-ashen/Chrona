@@ -4,6 +4,7 @@ import {
 	type APIRequestContext,
 	type Page,
 } from "@playwright/test";
+import { openMoreTools } from "./advanced-navigation-helpers";
 
 async function getWorkspaceId(request: APIRequestContext) {
 	const response = await request.get("/api/workspaces/default");
@@ -36,7 +37,7 @@ test.describe("Common user route audit", () => {
 		page,
 	}) => {
 		await page.goto("/?source=e2e#route-audit");
-		await expect(page).toHaveURL(/\/en\/dashboard\?source=e2e#route-audit$/);
+		await expect(page).toHaveURL(/\/en\/home\?source=e2e#route-audit$/);
 
 		await page.goto("/invalid-locale/tasks?source=e2e");
 		await expect(page).toHaveURL(/\/en\/tasks\?source=e2e$/);
@@ -46,7 +47,7 @@ test.describe("Common user route audit", () => {
 			page.getByRole("heading", { name: "Page not found" }),
 		).toBeVisible();
 		await page.getByRole("link", { name: "Go home" }).click();
-		await expect(page).toHaveURL(/\/en\/dashboard$/);
+		await expect(page).toHaveURL(/\/en\/home$/);
 	});
 
 	test("[BOOT-002] switches locale without losing route state", async ({
@@ -56,12 +57,9 @@ test.describe("Common user route audit", () => {
 		await page.getByRole("link", { name: "中文" }).click();
 
 		await expect(page).toHaveURL(/\/zh\/tasks\?source=locale#task-list$/);
-		await expect(
-			page.getByRole("link", { name: "任务" }).first(),
-		).toHaveAttribute("aria-current", "page");
-		await expect(
-			page.getByRole("button", { name: "新建任务" }).first(),
-		).toBeVisible();
+		await openMoreTools(page, "更多功能");
+		await expect(page.getByRole("link", { name: "任务", exact: true }).or(page.getByRole("menuitem", { name: "任务", exact: true })).first()).toHaveAttribute("aria-current", "page");
+		await expect(page.getByRole("button", { name: "新建任务", exact: true }).or(page.getByRole("menuitem", { name: "新建任务", exact: true })).first()).toBeVisible();
 	});
 
 	test("[WORK-004] shows Not Found for an unknown task workspace", async ({
@@ -121,23 +119,20 @@ test.describe("Common user route audit", () => {
 	test("[BOOT-011] keeps primary navigation highlight and browser back state", async ({
 		page,
 	}) => {
-		await page.goto("/en/dashboard");
-		await expect(
-			page.getByRole("link", { name: "Dashboard", exact: true }).first(),
-		).toHaveAttribute("aria-current", "page");
-		await page
-			.getByRole("link", { name: "Schedule", exact: true })
-			.first()
-			.click();
+		await page.goto("/en/home");
+		// Home now also has an All content breadcrumb. Check the actual primary
+		// navigation, not whichever matching link happens to occur first in DOM.
+		const primary = page.getByRole("list", { name: "Primary", exact: true })
+			.or(page.getByRole("navigation", { name: "Primary", exact: true }));
+		const home = primary.getByRole("link", { name: "All content", exact: true });
+		const schedule = primary.getByRole("link", { name: "Schedule", exact: true });
+		await expect(home).toHaveAttribute("aria-current", "page");
+		await schedule.click();
 		await expect(page).toHaveURL(/\/en\/schedule$/);
-		await expect(
-			page.getByRole("link", { name: "Schedule", exact: true }).first(),
-		).toHaveAttribute("aria-current", "page");
+		await expect(schedule).toHaveAttribute("aria-current", "page");
 		await page.goBack();
-		await expect(page).toHaveURL(/\/en\/dashboard$/);
-		await expect(
-			page.getByRole("link", { name: "Dashboard", exact: true }).first(),
-		).toHaveAttribute("aria-current", "page");
+		await expect(page).toHaveURL(/\/en\/home$/);
+		await expect(home).toHaveAttribute("aria-current", "page");
 	});
 
 	test("opens every primary route without overflow or browser errors", async ({
@@ -156,6 +151,7 @@ test.describe("Common user route audit", () => {
 		});
 
 		for (const route of [
+			"/en/home",
 			"/en/dashboard",
 			"/en/schedule",
 			"/en/tasks",

@@ -20,6 +20,14 @@ function matchesApiKey(providedKey: string | null, expectedKey: string) {
   return provided.byteLength === expected.byteLength && timingSafeEqual(provided, expected);
 }
 
+/** New owner-only surfaces must not reinterpret a scoped bearer as anonymous
+ * local authority when API_KEY is unset. The ordinary API middleware is unchanged. */
+export function isLocalOwnerAuthorized(authorization: string | undefined) {
+  const expected = readEnv().API_KEY;
+  if (!expected) return authorization === undefined;
+  return matchesApiKey(authorization?.startsWith("Bearer ") ? authorization.slice(7) : null, expected);
+}
+
 export function apiKeyAuth(
   options: ApiKeyAuthOptions = {},
 ): MiddlewareHandler {

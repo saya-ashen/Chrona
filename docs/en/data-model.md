@@ -7,9 +7,10 @@ Schema source: `prisma/schema.prisma`.
 ## Target evolution: work-owned results
 
 The [Product Architecture](../zh/product-architecture.md) requires results and
-version-bound review to exist independently of managed execution. B1 now provides
-that storage and shared application foundation. **External intake routes, uploads,
-and the review UI are not yet implemented.**
+version-bound review to exist independently of managed execution. B1–B3 provide
+that storage, shared application foundation, external intake routes, uploads,
+and deterministic review UI. The separately implemented work-record slice adds
+manual-work continuity and is deployed on the authorized instance with separate opt-in writes.
 
 | Current coupling | Required target property |
 | --- | --- |
@@ -18,9 +19,9 @@ and the review UI are not yet implemented.**
 | Acceptance event scoped to a completed Run | Review bound to the exact result version, with compatible reads of historical acceptance |
 | Goal Inbox and formal GoalAsset versions | Reuse the existing promotion/review concepts; no parallel external asset lifecycle |
 
-The work-owned B1 models described below reuse Task identity and preserve
-occurrence isolation. Report ingestion, independent uploads and the managed
-adapter remain later implementation work. Do not
+The work-owned result models described below reuse Task identity and preserve
+occurrence isolation. The managed-result adapter and Goal asset reuse remain
+later implementation work. Do not
 create fake Run/ExecutionSession rows, make all ownership fields nullable without
 replacement invariants, or copy a second external-results database.
 
@@ -41,7 +42,10 @@ Keep shipped migration checksums and existing data compatibility intact.
 | Workspace | `Workspace` | Scope for tasks, memory, schedule, calendar sources, and configuration. |
 | Goal | `Goal`, `GoalAsset`, `GoalAssetVersion`, `GoalAssetDraft`, `GoalInboxCandidate`, `GoalFormSubmission`, `GoalAssetJob`, `GoalBriefRevision` | Durable outcome lifecycle, versioned Workbench assets, result intake, form submissions, export jobs, automatic accepted-result context, and immutable artifact provenance. |
 | Task | `Task`, `TaskDependency`, `TaskProjection`, `TaskSession`, `TaskTimelineItem` | Core work item, relationships, projection-backed read shape, scoped work sessions, and timeline rows. |
-| Work results (B1, not transport-mounted) | `TaskResult`, `TaskResultVersion`, `TaskResultReview`, `ResultCommand`, `ResultVersionArtifact` | Source-independent identity, immutable semantic versions, exact-version review, durable receipts and scoped artifact bindings. |
+| Work records (opt-in, Web/MCP) | `WorkRecord`, `WorkSource`, `WorkEntry`, `WorkCommand` | One optional extension per manual Task; stable source links, independent attributed signals, append-only progress/change history, CAS and durable command receipts. No parallel Task or Run. |
+| Work results (B1–B3, Web/MCP) | `TaskResult`, `TaskResultVersion`, `TaskResultReview`, `ResultCommand`, `ResultVersionArtifact`, `ResultFileUpload`, `ResultFileChunk`, `ResultArtifactBytes` | Source-independent identity, immutable semantic versions, exact-version review, durable receipts and scoped artifact bindings. |
+| Work-page input (opt-in, local implementation) | `WorkPageInput`, `WorkPageCommand`, `TaskResult.inputRevision` | Append-only notes and exact-result-version form answers; separate input CAS/replay receipts. Authored definitions stay in existing result content. |
+| Content library (opt-in, local implementation) | `LibraryState`, `LibraryGroup`, `LibraryFolder`, `LibraryAssignment`, `LibraryCommand` | Workspace classification revision; one folder per Task/group, multiple groups per Task; protected manual choices, immutable actor-bound receipts. No content copies. |
 | Plan | `TaskPlan`, `TaskPlanLayer`, `GraphVersion`, `GraphMutationRecord`, `ReconciliationEvent`, `TaskPlanNodeAttempt`, `TaskPlanTerminalAction` | Generated/accepted executable graph plan, node-attempt history, terminal actions, and graph-change history. |
 | Execution | `TaskPlanRun`, `Run`, `ExecutionSession`, `RuntimeCursor`, `Approval`, `Artifact`, `TaskPlanProviderRun`, `TaskPlanProviderApproval`, `RunToken` | Plan/run/session state, runtime cursoring, provider continuity, approvals, tokens, and outputs. |
 | Schedule/activation | `TaskTrigger`, `TriggerDelivery`, `TaskOccurrence`, `WorkBlock`, `ScheduleProposal`, `SchedulerLease`, `SchedulerEvent` | Versioned activation definitions and deliveries, neutral execution occurrences, optional time placement, schedule suggestions, and scheduler automation. |
@@ -50,6 +54,10 @@ Keep shipped migration checksums and existing data compatibility intact.
 | Memory | `Memory` | Workspace/task memory entries used by internal projections and AI context-building flows. |
 | AI configuration | `AiClient`, `AiFeatureBinding` | Database-backed AI clients and feature-to-client bindings. |
 | Event log | `Event` | Durable event records used by projections/integration flows. |
+
+Work-record identity, native calendar adoption constraints, source/report trust,
+quotas and compatible migration behavior are specified in [Work records](./work-records.md).
+Meeting cancellation does not change Task status, and reports do not grant authority.
 
 ## Entity relationship overview
 
@@ -82,7 +90,11 @@ erDiagram
   WorkBlock ||--o{ ExecutionSession : occurrence_sessions
   WorkBlock ||--o{ Run : occurrence_provider_runs
   Run ||--o{ Approval : approvals
-  Run ||--o{ Artifact : artifacts
+  Run |o--o{ Artifact : run_owned
+  TaskResult |o--o{ Artifact : result_owned
+  Artifact ||--o| ResultArtifactBytes : private_bytes
+  TaskResult ||--o{ ResultFileUpload : uploads
+  ResultFileUpload ||--o{ ResultFileChunk : pending_chunks
 
   AiClient ||--o{ AiFeatureBinding : bound_to
   WorkBlock ||--o{ ScheduleProposal : proposal_source
@@ -211,6 +223,29 @@ runs/sessions/approvals to the focused occurrence, so a failed or cancelled
 occurrence never contaminates a sibling occurrence. See
 [Backend Execution Flow](./backend-execution-flow.md) → "Task state authority".
 
+### Work-page definitions and owner input
+
+`TaskResultVersion.content.page` optionally contains the restricted versioned
+content tree, inline data and form definitions. `WorkPageInput` belongs to that
+same result: note UUIDs persist across versions, while answers bind exact
+versionId/formKey. Edits append; they do not alter result snapshots. Independent
+`inputRevision` and `WorkPageCommand` give input CAS and actor-bound idempotency.
+The DB rejects cross-scope/rewritten history, and events omit note/answer bodies.
+See [work-page authority, quotas and migration](./work-pages.md). This slice is
+local, not deployed, and does not merge with GoalFormSubmission or legacy Runs.
+
+### Grouped content classification (local implementation)
+
+`LibraryAssignment` is keyed by `(taskId, groupId)` and points to an optional
+folder in that group. Missing/null folder is unclassified; a protected null row
+preserves a manual decision against later Agent changes. Folder removal uses
+`SET NULL`, group removal deletes only its classifications, and all views reuse
+the existing Task/results/page. `LibraryState` provides workspace CAS;
+`LibraryCommand` retains the actual paths/new folders and actor-bound replay
+receipt. SQL scope guards reject cross-group/workspace links. The library does
+not change Task status, results, acceptance, calendar placement or execution.
+See [contracts, permissions and limits](./content-library.md).
+
 ### Work-owned results (B1 foundation)
 
 `TaskResult` is unique by `(taskId, scopeKey)`, where scopeKey is `task` or
@@ -241,13 +276,21 @@ not dispatch the managed `task.result.accepted` trigger.
 existing authorized Artifact. Its identity/URI/type/metadata fingerprint detects
 later source-row changes. Links are sealed when the version becomes head.
 Actual bytes must be verified by a trusted local adapter; missing adapters fail
-closed. B1 retains `Artifact.runId` as required and creates no fake Runs.
-Result-owned Artifact storage, uploads, download authorization and cleanup are B2.
+closed. B2b adds explicit `ownerKind=run|result` with exactly one real owner:
+nullable `runId` or `resultId`, enforced by SQLite triggers. Result-owned artifacts
+and `ResultArtifactBytes` are immutable and cascade from the owning TaskResult.
+`ResultFileUpload` stores actor-scoped request identity, size/hash, progress,
+expiry and terminal receipt; `ResultFileChunk` stores contiguous immutable chunks.
+Finish commits the artifact, verified BLOB and receipt in one transaction, then
+removes chunks. There is no arbitrary disk-path/URL ingestion or fake Run.
+Download requires a version binding and fresh file hash validation. Legacy Run
+fingerprints and AF identifiers remain unchanged; old readers filter Run owners.
+See [file limits and cleanup policy](./work-results.md#private-file-protocol).
 
 Use `createTaskResultsService` from `@chrona/engine`; see the
 [B1 implementation contract](../zh/work-results-phase-a.md#10-b1已实现的存储与共享用例)
-for composition requirements. No new Web/MCP endpoint or credential scope preset
-is mounted by this foundation. Explicit task deletion removes the owning
+for foundation composition requirements; [current entries](./work-results.md)
+cover authenticated Web/MCP, explicit scopes and deterministic UI. Explicit task deletion removes the owning
 result aggregates before deleting existing Run artifacts; individual versions,
 reviews and receipts cannot be edited or deleted independently.
 

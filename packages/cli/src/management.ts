@@ -31,7 +31,7 @@ export async function revokeLocalManagementClient(clientId: string) {
   await (await managementAdmin()).revokeManagementClient(clientId);
 }
 export async function enrollLocalManagementClient(input: { name: string; publicUrl: string; timezone: string; tokenFile: string; access: string }) {
-  if (!Object.hasOwn(MANAGEMENT_ACCESS_PRESETS, input.access)) throw new Error("--access must be read, full, assistant-read, assistant or assistant-edit");
+  if (!Object.hasOwn(MANAGEMENT_ACCESS_PRESETS, input.access)) throw new Error(`--access must be one of: ${Object.keys(MANAGEMENT_ACCESS_PRESETS).join(", ")}`);
   const scopes = [...MANAGEMENT_ACCESS_PRESETS[input.access as ManagementAccessPreset]];
   const admin = await managementAdmin();
   const path = resolve(input.tokenFile), parent = dirname(path);

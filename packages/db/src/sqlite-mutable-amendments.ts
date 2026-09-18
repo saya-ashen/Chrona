@@ -43,11 +43,14 @@ export function applyMutableAmendment(db: Database, metadata: Metadata, root: st
   const entry = metadata.mutableReleaseLineAmendments?.[applied.checksum];
   if (!entry) return;
   verifyMutableAmendments(metadata, root);
-  db.transaction(() => {
+  // Mutable amendments may rebuild referenced parent tables. Never toggle inside BEGIN.
+  const foreignKeys = (db.query("PRAGMA foreign_keys").get() as { foreign_keys: number }).foreign_keys;
+  db.run("PRAGMA foreign_keys = OFF");
+  try { db.transaction(() => {
     if (schemaFingerprint(db) !== entry.fromSchemaFingerprint) throw new Error("Mutable amendment source schema mismatch");
     db.run(readFileSync(join(root, entry.path), "utf8"));
     if (db.query("PRAGMA foreign_key_check").get()) throw new Error("Mutable amendment foreign key violation");
     if (schemaFingerprint(db) !== metadata.releaseLineSchemaFingerprint) throw new Error("Mutable amendment target schema mismatch");
     db.run("UPDATE _prisma_migrations SET checksum = ? WHERE migration_name = ?", [targetChecksum, metadata.mutableReleaseLineMigration]);
-  })();
+  })(); } finally { db.run(`PRAGMA foreign_keys = ${foreignKeys ? "ON" : "OFF"}`); }
 }

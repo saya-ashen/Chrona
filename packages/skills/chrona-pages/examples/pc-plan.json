@@ -1,0 +1,207 @@
+{
+  "schemaVersion": 1,
+  "root": "page",
+  "elements": {
+    "page": {
+      "type": "Section",
+      "props": {
+        "collapsed": false,
+        "layout": "stack"
+      },
+      "children": [
+        "next",
+        "summary",
+        "total",
+        "parts",
+        "buying",
+        "decision"
+      ]
+    },
+    "next": {
+      "type": "Callout",
+      "props": {
+        "title": "不用急着下单",
+        "text": "配置和购买方案已经整理好了，下一步是和家里商量购买时间。",
+        "tone": "attention"
+      }
+    },
+    "summary": {
+      "type": "Text",
+      "props": {
+        "text": "演示页面：全部价格与配件均为虚构样例，并非实时电商报价。",
+        "tone": "muted"
+      }
+    },
+    "total": {
+      "type": "Metric",
+      "props": {
+        "label": "示例预算合计",
+        "dataset": "parts",
+        "column": "price",
+        "calculation": "sum",
+        "suffix": "元"
+      }
+    },
+    "parts": {
+      "type": "Table",
+      "props": {
+        "dataset": "parts",
+        "title": "配件清单",
+        "searchable": true
+      }
+    },
+    "buying": {
+      "type": "Section",
+      "props": {
+        "title": "怎么买更合适",
+        "summary": "展开比较省钱和省心两种方案",
+        "collapsed": true,
+        "layout": "stack"
+      },
+      "children": [
+        "comparison",
+        "reference"
+      ]
+    },
+    "comparison": {
+      "type": "Comparison",
+      "props": {
+        "dataset": "options"
+      }
+    },
+    "reference": {
+      "type": "Link",
+      "props": {
+        "label": "示例来源（非商家链接）",
+        "href": "https://example.com"
+      }
+    },
+    "decision": {
+      "type": "Form",
+      "props": {
+        "form": "decision"
+      }
+    }
+  },
+  "datasets": {
+    "parts": {
+      "columns": [
+        {
+          "key": "part",
+          "label": "配件",
+          "kind": "text"
+        },
+        {
+          "key": "choice",
+          "label": "选择",
+          "kind": "text"
+        },
+        {
+          "key": "price",
+          "label": "示例价格",
+          "kind": "number"
+        }
+      ],
+      "rows": [
+        {
+          "part": "处理器",
+          "choice": "示例 CPU",
+          "price": 1600
+        },
+        {
+          "part": "显卡",
+          "choice": "示例 GPU",
+          "price": 3500
+        },
+        {
+          "part": "其他配件",
+          "choice": "内存 / 主板 / 电源 / 存储 / 机箱",
+          "price": 4160
+        }
+      ]
+    },
+    "options": {
+      "columns": [
+        {
+          "key": "option",
+          "label": "方案",
+          "kind": "text"
+        },
+        {
+          "key": "cost",
+          "label": "示例总价",
+          "kind": "number"
+        },
+        {
+          "key": "tradeoff",
+          "label": "取舍",
+          "kind": "text"
+        }
+      ],
+      "rows": [
+        {
+          "option": "少花钱",
+          "cost": 9260,
+          "tradeoff": "分两家购买"
+        },
+        {
+          "option": "少下单",
+          "cost": 9680,
+          "tradeoff": "一家购买，售后集中"
+        }
+      ]
+    }
+  },
+  "forms": {
+    "decision": {
+      "title": "和家里商量后，记在这里",
+      "description": "这只保存你的想法，不会下单或创建日程。",
+      "fields": [
+        {
+          "key": "timing",
+          "label": "你倾向于？",
+          "type": "select",
+          "required": true,
+          "options": [
+            {
+              "value": "now",
+              "label": "近期购买"
+            },
+            {
+              "value": "wait",
+              "label": "再等等"
+            },
+            {
+              "value": "undecided",
+              "label": "还没想好"
+            }
+          ]
+        },
+        {
+          "key": "budget",
+          "label": "调整后的预算",
+          "type": "number",
+          "required": false,
+          "min": 0,
+          "max": 100000
+        },
+        {
+          "key": "date",
+          "label": "什么时候再看看？",
+          "type": "date",
+          "required": false,
+          "when": {
+            "field": "timing",
+            "equals": "wait"
+          }
+        },
+        {
+          "key": "thoughts",
+          "label": "还有什么想法？",
+          "type": "textarea",
+          "required": false
+        }
+      ]
+    }
+  }
+}

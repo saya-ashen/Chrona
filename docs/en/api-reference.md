@@ -530,13 +530,71 @@ Requests an assistant action for the current surface.
 
 Internal agent-control command endpoint. Use explicit API contracts and feature bindings instead of treating this as a generic chat route.
 
+## Executor-independent work results (B1–B3)
+
+`GET /api/results/capabilities` and `POST /api/results/read|submit|review|file|context`
+expose shared text/file result use cases through owner HTTP. POST bodies use exactly the
+schemas exported from `@chrona/contracts/results`, including `taskId`; no
+caller-supplied identity is accepted. Writes require
+`CHRONA_RESULT_WRITES_ENABLED=true` (default off). Reads remain available when
+writes are disabled. Owner authentication is the existing single-owner/API-key
+model, with trusted Origin checks and no scoped-bearer fallback.
+
+These are separate from legacy `/tasks/:taskId/result/*` managed-result routes.
+Private SQLite-backed uploads/downloads require explicit artifact authority and
+exact result/version scope. No execution lifecycle change or Goal achievement
+is provided here. See [Work Result Entries](./work-results.md) for schemas,
+receipts, permissions, HTTP errors, budgets and deliberate limitations.
+
+## Work pages (local implementation, not deployed)
+
+`POST /api/results/page/catalog|validate|read|input` uses the existing owner
+results boundary. Publication remains `/api/results/submit` with optional
+`content.page`. Inputs use independent `page-input-v1` CAS, UUID replay and
+exact-head form binding. External MCP can catalog/validate/read, not write owner
+answers. Page writes require explicit `CHRONA_WORK_PAGES_WRITES_ENABLED=true`;
+result publication and work capture retain their separate flags. See
+[work pages](./work-pages.md) for schemas, scope, limits and interaction semantics.
+
+## Organized content library (local implementation)
+
+- `POST /api/library/read`: complete classification catalog, paginated/searchable
+  content, exact Task placements or paginated organization history.
+- `POST /api/library/update`: UUID + `library-v1:<workspaceId>:<revision>` + group,
+  folder or placement command. Owner checks and trusted origin are rechecked in
+  the transaction. Writes require `CHRONA_LIBRARY_WRITES_ENABLED=true`.
+- `chrona_library_read` / `chrona_library_update` expose the same scoped semantics
+  through management MCP. New `library-read`, `library-organize` and
+  `library-configure` presets do not expand existing credentials. Configure is
+  required for group rules/deletion and folder rename/deletion; organize may
+  assign content or create a folder only where group policy permits.
+
+One folder per Task/group, multiple groups per Task; manual choices are protected
+by default. Commands atomically classify all requested groups and return actual
+placement/new-folder receipts. Publishing content and organizing it are separate
+operations. Read `capabilities.library` and [the full contracts](./content-library.md)
+before writing. No lifecycle, result review, scheduling or execution authority.
+
+## Manual work records and meeting follow-through
+
+Deployed on the explicitly authorized instance; opt-in elsewhere.
+`GET /api/work-records/capabilities` and JSON
+`POST /api/work-records/search|read|capture|update` expose bounded work recording
+through existing owner authorization and trusted-Origin checks. Writes require
+`CHRONA_WORK_WRITES_ENABLED=true`; reads remain available when disabled.
+Capture creates manual, non-automatic Tasks or explicitly enrolls eligible
+existing ones. Updates record sources/reports and propose meeting changes;
+only owner authority can resolve proposals. No mail/calendar writes, execution,
+result acceptance, or Task completion occurs. See [Work records](./work-records.md)
+for exact identity, CAS/idempotency, limits, and native calendar constraints.
+
 ## MCP integration
 
 ### POST /api/mcp/management
 
 Independent, stateless Streamable HTTP endpoint for personal agents managing Chrona tasks outside an execution. Always requires a revocable, workspace-bound management Bearer credential, even without a global API_KEY. No run-token or API-key substitution and no HTTP enrollment endpoint.
 
-Tools: `chrona_context_read`, `chrona_task_search`, `chrona_task_read`, `chrona_task_create`, `chrona_task_update`, `chrona_task_action`, `chrona_task_delete`, `chrona_goal_search`, `chrona_goal_read`, `chrona_goal_propose`, `chrona_goal_update`. Read the advertised schemas through `tools/list`. Mutations use UUID request IDs, persisted receipts, configuration revisions and existing domain commands. A queued/completed **command** is not a completed **task**. Execution uncertainty is reported rather than blindly redispatched.
+Tools: `chrona_context_read`, `chrona_task_search`, `chrona_task_read`, `chrona_task_create`, `chrona_task_update`, `chrona_task_action`, `chrona_task_delete`, `chrona_goal_search`, `chrona_goal_read`, `chrona_goal_propose`, `chrona_goal_update`, `chrona_result_read`, `chrona_result_submit`, `chrona_result_review`, `chrona_result_file`, `chrona_work_search`, `chrona_work_read`, `chrona_work_capture`, `chrona_work_update`, `chrona_page_catalog`, `chrona_page_validate`, `chrona_page_read`. Read the advertised schemas through `tools/list`. Mutations use UUID request IDs, persisted receipts, configuration revisions and existing domain commands. A queued/completed **command** is not a completed **task**. Execution uncertainty is reported rather than blindly redispatched.
 
 Scheduling is calendar placement, not notification delivery. Context capabilities explicitly distinguish fixed `dueAt`-based in-app indicators from unsupported custom reminders and push/email delivery. `todo` means no automatic planning/execution, not an independent manual-todo lifecycle. On create, only `automatic` accepts/requires `start`; `todo` and `plan` may supply `schedule` without it. The object-root create schema advertises structural mode/start constraints via `allOf` and input examples in its description; runtime validation still checks dates and timezones.
 
@@ -555,6 +613,27 @@ Goal lookup requires `goals:read`; proposals also require `goals:propose`; edits
 - Existing Task contexts are immutable; future Goal-linked Tasks see updated brief content. No Task/plan/review/trigger starts, lifecycle transitions, permission grants or notifications occur. Constraints remain natural-language requests, not enforced policy. `goals:write` authorizes content editing across its workspace, not per-Goal grants.
 
 Editing requires the registered database amendment and explicit enrollment on upgrade; existing capture-only credentials never gain write scope automatically. The approved Pi rollout now uses a separately enrolled `assistant-edit` credential. Other deployments must verify advertised capabilities rather than infer support from source docs. Draft activation and an always-on assistant remain outside this milestone.
+
+Independent text results require the new `results:read` / `results:write` /
+`results:review` scopes and explicit `results-read`, `results-submit` or
+`results-review` enrollment. They never inherit legacy `results:accept` or full
+permissions. Check `capabilities.workResults`; write enablement is separate from
+scope. The shared `ResultCommand` receipt lives directly under `data.receipt`,
+not inside a second management-command receipt. File actions use separate
+`artifacts:read`/`artifacts:write` authority and `results-files-*` presets; upload
+receipts are stable and actor-scoped. Legacy Run import remains unavailable. [Detailed contract](./work-results.md).
+
+Work recording uses separate `work:read` / `work:write` scopes and opt-in
+`work-read` / `work-record` presets; both require `tasks:read`. Check
+`capabilities.workRecords` on the intended connection. MCP can report/propose,
+never resolve meeting changes. Existing credentials and legacy `full` are not
+expanded. [Work-record contract and skill](./work-records.md).
+
+Work pages add explicit `pages:read` / `pages:write` and `pages-read` /
+`pages-author` presets. Neither preset creates Tasks, answers user forms, reviews
+results or starts execution. Existing presets/credentials do not expand.
+`capabilities.workPages` describes actual effective authority; legacy result
+readers receive semantic content without the authored page or human inputs.
 
 Local setup: `chrona mcp enroll`, `chrona mcp list`, `chrona mcp revoke`. See [setup, capabilities and current limitations](../zh/management-mcp.md) and the portable [assistant skill](../../packages/skills/chrona-assistant/README.md).
 

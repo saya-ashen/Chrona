@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="color-scheme" content="light">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'none'; base-uri 'none'; form-action 'none'">
+  <title>配一台新电脑 · Chrona 参考页面</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="style.css">
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <a href="#content" class="skip">跳到内容</a>
+  <div class="preview-bar"><span>参考原型 · 配置、店铺和报价均为虚构示例</span><button data-action="about" type="button">说明</button></div>
+  <div class="shell">
+    <aside class="sidebar" aria-label="页面导航" id="sidebar"></aside>
+    <div class="workspace">
+      <header class="topbar" id="topbar"></header>
+      <main id="content" tabindex="-1"></main>
+    </div>
+  </div>
+  <dialog id="modal" aria-labelledby="modal-title"><div id="modal-body"></div></dialog>
+  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+</body>
+</html>

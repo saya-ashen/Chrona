@@ -21,14 +21,53 @@ configuration revisions, the manual task discriminator, Goal revision, and the
 B1 work-result foundation (`TaskResult`, immutable versions, reviews, receipts,
 and version-artifact links). The earlier release-boundary repair alone did not
 change the application schema; B1 subsequently added those five models. The
-shared application API is implemented but not mounted to Web/MCP. Independent
-uploads, production auth/file adapters, and review UI remain B2/B3 work.
+shared application API is now mounted to authenticated Web/MCP. B2b adds nullable
+Artifact Run ownership plus explicit result ownership and three private-file
+models: ResultArtifactBytes, ResultFileUpload and ResultFileChunk. B3 supplies the
+review UI; see [current scope](./work-results.md).
+
+B2b also registers the B1 checksum `201a64cf…` amendment, preserving old Artifact
+IDs/AF references, version bindings, acceptance and GoalAsset references across
+the parent-table rebuild. `fixtures/pre-result-files.sqlite` is a pristine B1
+regression fixture, pinned by `result-files-migration.bun.test.ts`, not a user DB.
+All earlier known-development amendments/normalizers target the current schema.
+The runner disables FK enforcement before beginning a supported parent-table
+rebuild transaction, then checks all FKs and the exact target fingerprint before
+commit and restores FK enforcement. Unknown schema drift still fails closed.
 
 `migrationSchemaTransitions` pins source and target fingerprints per migration.
 The historical repair remains **v0.2.0 → v0.3.1**, even after `lastReleasedVersion`
 advances. The new line starts at the v0.3.1 fingerprint. Startup checks the final
 fingerprint even when all migrations are already recorded; history alone does
 not authorize schema drift.
+
+### Work-page development amendment (not deployed)
+
+The current work-page slice adds `TaskResult.inputRevision`, `WorkPageInput` and
+`WorkPageCommand` without rebuilding the result parent. The exact pre-page mutable
+checksum `6ade2bf65d2ee94c5ecb3cefafec9f69b4831eb66d72b5729836b044717a01a0`
+has a registered additive amendment. `fixtures/pre-work-pages.sqlite` is a
+pristine disposable development fixture, not live data; its checksum is pinned
+by `work-pages-migration.bun.test.ts`. The pre-library work-page fingerprint is
+`8184e4892c3d7dc7edff5a6f62117e34954d1b5fcae76176948e639c3c6ec4fd`.
+The test preserves existing result versions, review, attachment bytes/bindings
+and work records, verifies new immutable/scope guards and repeated startup.
+No published migration checksum or source fingerprint is changed. See
+[work-page contracts](./work-pages.md); live upgrade remains separately authorized.
+
+### Content-library development amendment (not deployed)
+
+The grouped-classification slice adds `LibraryState`, `LibraryGroup`,
+`LibraryFolder`, `LibraryAssignment` and `LibraryCommand`. Its checksum-keyed
+`3c2eeb4f…` amendment starts from the exact pre-library schema above;
+`fixtures/pre-library.sqlite` is pinned by `library-migration.bun.test.ts`.
+All active amendments/normalizers now target
+`ed14c227f83ab0247a6b269c13bb32ae95c61b2c6981a77fd66e432b7fd82f8f`.
+Released SQL, source fingerprints and earlier development fixtures remain frozen.
+Tests preserve all old columns and page/result/work data, enforce group/workspace
+scope and exclusivity, and verify that deleting a folder preserves content and
+other classifications. Receipt guards also allow owning-workspace deletion
+without relying on child-cascade order. See [content library](./content-library.md).
 
 ## Release evidence and fixtures
 

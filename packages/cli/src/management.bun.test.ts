@@ -6,7 +6,7 @@ import { resetTestDb } from "@chrona/db/test-support";
 import { createChronaEngine } from "@chrona/engine";
 const requireManagementClient = createChronaEngine().management.authorize;
 import { enrollLocalManagementClient, listLocalManagementClients, revokeLocalManagementClient } from "./management";
-import { MANAGEMENT_LEGACY_SCOPES } from "@chrona/contracts/api";
+import { MANAGEMENT_ACCESS_PRESETS, MANAGEMENT_LEGACY_SCOPES } from "@chrona/contracts/api";
 
 const previousMigrations = process.env.CHRONA_MIGRATIONS_DIR;
 let directory: string;
@@ -25,6 +25,27 @@ it("enrolls into a private new file, lists no secret, refuses overwrite and revo
   expect(await listLocalManagementClients()).toHaveLength(1);
   await revokeLocalManagementClient(result.clientId);
   await expect(requireManagementClient(token)).rejects.toThrow();
+});
+
+it("enrolls explicitly scoped result presets without widening legacy full or granting execution", async () => {
+  for (const access of ["results-read", "results-submit", "results-review", "results-files-read", "results-files-submit", "results-files-review"] as const) {
+    const result = await enrollLocalManagementClient({ name: access, publicUrl: "http://localhost:3101", timezone: "UTC", access, tokenFile: join(directory, `${access}.token`) });
+    const identity = await requireManagementClient(readFileSync(result.tokenFile, "utf8").trim());
+    expect(identity.scopes).toEqual([...MANAGEMENT_ACCESS_PRESETS[access]]);
+    expect(identity.scopes).not.toContain("executions:control");
+    expect(identity.scopes).not.toContain("results:accept");
+    if (access.endsWith("submit")) expect(identity.scopes).not.toContain("results:review");
+    if (access.endsWith("review")) expect(identity.scopes).not.toContain("results:write");
+  }
+});
+
+it("enrolls work recording without general task write, lifecycle, result review or Provider authority", async () => {
+  for (const access of ["work-read", "work-record"] as const) {
+    const result = await enrollLocalManagementClient({ name: access, publicUrl: "http://localhost:3101", timezone: "UTC", access, tokenFile: join(directory, `${access}.token`) });
+    const identity = await requireManagementClient(readFileSync(result.tokenFile, "utf8").trim());
+    expect(identity.scopes).toEqual([...MANAGEMENT_ACCESS_PRESETS[access]]);
+    for (const forbidden of ["tasks:write", "executions:control", "results:review", "results:accept", "schedule:write"]) expect(identity.scopes).not.toContain(forbidden);
+  }
 });
 
 it("enrolls Goal-only assistant presets without task, execution or approval authority", async () => {

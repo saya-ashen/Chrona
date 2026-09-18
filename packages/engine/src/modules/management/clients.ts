@@ -2,6 +2,7 @@ import { createHash, randomBytes } from "node:crypto";
 import { z } from "zod";
 import { db } from "@/lib/db";
 import { MANAGEMENT_LEGACY_SCOPES, managementScopeSchema, managementModeSchema, managementTimezoneSchema } from "@chrona/contracts/api";
+import { RESULT_SCOPES, ARTIFACT_SCOPES, PAGE_SCOPES } from "@chrona/contracts/results";
 import { getDefaultWorkspace } from "../workspaces";
 import { ManagementError } from "./errors";
 
@@ -19,11 +20,22 @@ export const managementClientInputSchema = z.object({
 export type ManagementIdentity = Awaited<ReturnType<typeof requireManagementClient>>;
 export const managementTokenDigest = (token: string) => createHash("sha256").update(token).digest("hex");
 
+function validateWorkScopes(scopes: z.infer<typeof managementClientInputSchema>["scopes"]) {
+  if ([...RESULT_SCOPES, ...ARTIFACT_SCOPES, ...PAGE_SCOPES].some((scope) => scopes.includes(scope)) && (!scopes.includes("tasks:read") || !scopes.includes("results:read"))) {
+    throw new ManagementError("VALIDATION_ERROR", "Result capabilities require tasks:read and results:read");
+  }
+  if (scopes.some((s) => s.startsWith("library:")) && (!scopes.includes("tasks:read") || !scopes.includes("library:read"))) throw new ManagementError("VALIDATION_ERROR", "Library capabilities require tasks:read and library:read");
+  if (scopes.includes("pages:write") && !scopes.includes("pages:read")) throw new ManagementError("VALIDATION_ERROR", "Page authoring requires pages:read");
+  if (scopes.some(scope => scope === "work:read" || scope === "work:write") && (!scopes.includes("tasks:read") || !scopes.includes("work:read"))) {
+    throw new ManagementError("VALIDATION_ERROR", "Work recording requires tasks:read and work:read");
+  }
+}
 /** Local administration only; never expose this via a management MCP tool. */
 export async function createManagementClient(raw: z.input<typeof managementClientInputSchema>) {
   const input = managementClientInputSchema.parse(raw);
   if (!input.scopes.includes("tasks:read") && !input.scopes.includes("goals:read")) throw new ManagementError("VALIDATION_ERROR", "Clients require tasks:read or goals:read");
   if ((input.scopes.includes("goals:propose") || input.scopes.includes("goals:write")) && !input.scopes.includes("goals:read")) throw new ManagementError("VALIDATION_ERROR", "Goal writes require goals:read");
+  validateWorkScopes(input.scopes);
   const workspace = await getDefaultWorkspace();
   const token = `chrona_mgmt_${randomBytes(32).toString("base64url")}`;
   const client = await db.managementClient.create({ data: { ...input, scopes: [...new Set(input.scopes)], workspaceId: workspace.id, tokenDigest: managementTokenDigest(token) } });

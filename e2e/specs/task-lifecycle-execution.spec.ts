@@ -5,6 +5,7 @@ import {
 	type Locator,
 	type Page,
 } from "@playwright/test";
+import { openAdvancedTaskCreation } from "./advanced-navigation-helpers";
 import {
 	createTaskWorkspaceTask,
 	dispatchWorkspaceCommand,
@@ -448,7 +449,7 @@ test.describe("Task create → plan → run → result", () => {
 		const taskId =
 			await test.step("Create a task through the Tasks UI", async () => {
 				await page.goto("/en/tasks");
-				await page.getByRole("button", { name: "New Task" }).click();
+				await openAdvancedTaskCreation(page);
 				const dialog = page.getByRole("dialog", { name: "Add task" });
 				await dialog.getByRole("textbox", { name: "Title" }).fill(taskTitle);
 				await dialog.getByRole("radio", { name: /Save as task/ }).check();

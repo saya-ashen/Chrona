@@ -1,4 +1,5 @@
 export * from "./common";
+export { RESULT_REQUEST_BYTES } from "../results";
 export * from "./tasks.schema";
 export * from "./plans.schema";
 export * from "./execution.schema";

@@ -1,5 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
-import { getPrimaryTaskWorkspaceAction } from "./task-workspace-test-helpers";
+import { openAdvancedTaskCreation } from "./advanced-navigation-helpers";
 
 async function expectNoHorizontalScroll(page: Page) {
   await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
@@ -18,7 +18,7 @@ async function openTaskEditor(page: Page) {
 test.describe("Manual task workspace", () => {
   test("edits ordinary fields then completes and reopens with the refreshed revision", async ({ page }, testInfo) => {
     await page.goto("/en/schedule");
-    await getPrimaryTaskWorkspaceAction(page, "New Task").click();
+    await openAdvancedTaskCreation(page);
     const dialog = page.getByRole("dialog");
     await dialog.getByPlaceholder("Add title").fill(`Manual browser task ${testInfo.project.name}`);
     await dialog.getByRole("radio", { name: "Manual task" }).click();
@@ -36,6 +36,10 @@ test.describe("Manual task workspace", () => {
     await page.goto(`/en/tasks/${created.taskId}`);
 
     await expect(page).toHaveURL(new RegExp(`/en/tasks/${created.taskId}$`));
+    await expect(page.locator('[data-domain="work-pages"]')).toBeVisible();
+    await page.getByRole("main").getByRole("button", { name: "More", exact: true }).click();
+    await page.getByRole("menuitem", { name: "Execution and task settings" }).click();
+    await expect(page).toHaveURL(new RegExp(`/en/tasks/${created.taskId}\\?view=execution$`));
     await expect(page.getByText("Manual task", { exact: true })).toBeVisible();
     await expect(page.getByRole("button", { name: "Complete task" })).toBeVisible();
     await expect(page.getByText(/Needs plan|Start AI/)).toHaveCount(0);

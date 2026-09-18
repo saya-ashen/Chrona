@@ -1,11 +1,16 @@
 import type { z } from "zod";
 import { Prisma } from "@chrona/db";
 import { withDatabaseTransaction } from "@chrona/db/db";
-import { publishWorkResultSchema, readWorkResultSchema, reviewWorkResultSchema, RESULT_REQUEST_BYTES, RESULT_RESPONSE_BYTES } from "@chrona/contracts/results";
+import { publishWorkResultSchema, readWorkResultSchema, reviewWorkResultSchema, resultFileSchema, resultScopeSchema, pageReadSchema, pageWriteSchema, pageValidateSchema, RESULT_REQUEST_BYTES, RESULT_RESPONSE_BYTES } from "@chrona/contracts/results";
 import { WorkResultError, type TaskResultsPorts } from "./access";
 import { publishWorkResult } from "./publish";
 import { readWorkResult } from "./read";
 import { reviewWorkResult } from "./review";
+import { resultFile } from "./files";
+import { resultContext } from "./context";
+import { authorizeResult, requireResultPermission } from "./access";
+import { describeWorkPageCatalog, workPageSchema } from "@chrona/ui-protocol/work-pages";
+import { readPageInputs, writePageInput } from "./page-inputs";
 
 function parseRequest<T>(schema: z.ZodType<T>, raw: unknown): T {
   try {
@@ -34,9 +39,37 @@ async function runResultTransaction<T>(work: () => Promise<T>): Promise<T> {
 }
 
 /** Executor-independent application API. Trusted auth/local-file adapters required;
- * not mounted to Web/MCP or attached to any automation by this B1 foundation. */
+ * owner HTTP and scoped MCP share this writer without attaching any automation. */
 export function createTaskResultsService(ports: TaskResultsPorts) {
   return {
+    pageCatalog(raw: unknown) {
+      const input = parseRequest(resultScopeSchema, raw);
+      return runResultTransaction(async () => { await authorizeResult(ports, input, "pages:read"); return describeWorkPageCatalog(); });
+    },
+    pageValidate(raw: unknown) {
+      const input = parseRequest(pageValidateSchema, raw);
+      return runResultTransaction(async () => {
+        const principal = await authorizeResult(ports, input, "pages:read"); requireResultPermission(principal, "pages:write");
+        const result = workPageSchema.safeParse(input.page);
+        return result.success ? { valid: true, issues: [] } : { valid: false, issues: result.error.issues.slice(0, 20).map((i) => ({ path: i.path.join(".").slice(0, 300), message: i.message.slice(0, 300) })) };
+      });
+    },
+    pageRead(raw: unknown) {
+      const input = parseRequest(pageReadSchema, raw);
+      return runResultTransaction(() => readPageInputs(ports, input));
+    },
+    pageWrite(raw: unknown) {
+      const input = parseRequest(pageWriteSchema, raw);
+      return runResultTransaction(() => writePageInput(ports, input));
+    },
+    context(raw: unknown) {
+      const input = parseRequest(resultScopeSchema, raw);
+      return runResultTransaction(() => resultContext(ports, input));
+    },
+    file(raw: unknown) {
+      const input = parseRequest(resultFileSchema, raw);
+      return runResultTransaction(() => resultFile(ports, input));
+    },
     publish(raw: unknown) {
       const input = parseRequest(publishWorkResultSchema, raw);
       return runResultTransaction(() => publishWorkResult(ports, input));

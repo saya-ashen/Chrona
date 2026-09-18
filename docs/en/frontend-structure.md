@@ -17,12 +17,43 @@ of browser-safe feature public entrypoints. For backend placement, see
 | `src/pages.tsx` | Route-level composition of feature public APIs; it does not own product UI |
 | `src/app-shell.tsx` | `AppShell` layout (nav/chrome) wrapping locale routes |
 
-Routes today: `/:lang` landing, `dashboard`, `schedule`, `tasks`,
-`tasks/:taskId` (task workspace), `action-center`, and `settings`. Routing is
+Working-tree routes: `/:lang` → `home`, `dashboard`, `schedule`, `tasks`,
+`tasks/:taskId` (manual content page or managed task workspace),
+`tasks/:taskId/page` (explicit content page), `tasks/:taskId/work` (follow-through),
+`tasks/:taskId/results` (independent results),
+`action-center`, and `settings`. Routing is
 locale-prefixed; the default locale redirects from `/`. Action Center owns the
 explicit attention queue for approvals, input requests, schedule proposals,
 recovery work, and notifications. Memory remains hidden until it has actionable
 product value.
+
+## Content-first work pages (local, not deployed)
+
+`features/work-pages/` owns the organized content-library Home/sidebar,
+classification dialogs/history, isolated json-render registry, forms/notes,
+draft navigation protection and explicit retry/conflict UI. Home lists all
+content through mutually exclusive folder groups rather than a recent-items feed.
+The same Task may appear in multiple groups without duplication; classification
+is independent of result versions, schedule and execution. Strict
+schemas and deterministic value rules come from `@chrona/ui-protocol`'s work-page
+catalog, not the runtime-control registry. Input persistence uses existing owner
+results routes; frontend components cannot grant authority. Product-owned work
+context is composed by `apps/web/pages.tsx` using the work-record public entrypoint.
+Calendar remains primary navigation; advanced tools live behind More tools.
+See [page contracts and demo](./work-pages.md) and [content-library contracts](./content-library.md).
+
+## Independent results
+
+`features/work-results/` owns the deterministic text/file/version/review UI,
+request/recovery hooks and pure permission/disabled-reason helpers. It composes
+`@shared/ui` primitives and public `@chrona/contracts` result contracts, not
+engine/provider modules. `apps/web` adds route composition only. Task workspace
+links to it without changing managed execution navigation. Default task-level
+scope is explicit; `?occurrenceId=` selects an exact instance. Content is rendered
+as text; attachments download after digest validation, never inline HTML/SVG.
+
+`playwright.results.config.ts` verifies desktop/tablet/mobile against a disposable
+DB with the execution orchestrator/debug Provider disabled and loopback servers.
 
 ## Directories
 

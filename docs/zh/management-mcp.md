@@ -18,9 +18,10 @@ chrona mcp list
 chrona mcp revoke CLIENT_ID
 ```
 
-- `--access` 必填。原有 `read`（任务读取）和 `full`（原有任务管理全部权限）保持原语义；**不会自动获得新增 Goal 权限**。full 包括启动付费执行、批准 provider 操作、删除任务，只授予可信管理 Agent。
+- `--access` 必填。原有 `read`（任务读取）和 `full`（原有任务管理全部权限）保持原语义；**不会自动获得新增 Goal 或独立成果权限**。full 包括启动付费执行、批准 provider 操作、删除任务，只授予可信管理 Agent。
 - 新增 `assistant-read` 仅授予 `goals:read`；`assistant` 仅授予 `goals:read` + `goals:propose`。日常助理捕获使用这两种最小权限预设，不能创建任务、运行 AI、批准 provider、删除任务或授予权限。新增能力需使用匹配版本并显式 enrollment；Goal 捕获试用已另建最小权限凭据，原有任务凭据未扩大或轮换。
 - 源码新增 `assistant-edit`：`goals:read` + `goals:propose` + `goals:write`。仅允许目标内容维护，不含执行、审批、生命周期切换。`goals:write` 覆盖凭据所属工作区，不是逐 Goal 的自然语言权限隔离。原 `assistant` 与已有凭据不自动扩大；编辑版本已于 2026-09-16 经明确批准部署，另建编辑凭据并撤销旧捕获凭据，任务凭据不变。
+- B2a 本地源码新增 `results-read`（任务/成果读取）、`results-submit`（额外 `results:write`）、`results-review`（额外 `results:review`）。提交不含审阅、任务创建或执行权限，旧 `results:accept` 不等价于新审阅权限。新写入口还需显式设置 `CHRONA_RESULT_WRITES_ENABLED=true`；当前未部署或签发这些真实凭据。B2b 另提供 `results-files-read`、`results-files-submit`、`results-files-review` 显式附件预设；不扩大原文字预设。文件采用私有 SQLite 分块存储、同作用域版本绑定下载。见[完整接口与边界](../en/work-results.md)。
 - token 仅写入新建私密文件，POSIX 权限 `0600`、父目录必须私密；不输出 token，不覆盖已有文件。数据库只存 SHA-256 摘要。
 - 凭据绑定当前默认工作区；工具不提供 workspace 选择或枚举。
 - enrollment 是本机管理命令，不存在免鉴权的 HTTP enrollment 路由。CLI 不迁移运行中的数据库；必须先按正常升级流程启动匹配版本的服务。
@@ -36,7 +37,11 @@ chrona mcp revoke CLIENT_ID
 
 | 工具 | 能力 |
 | --- | --- |
-| `chrona_context_read` | 当前时间、时区、权限、Goal 捕获契约版本、时间策略及提醒能力边界；仅具有任务读取权限时返回 provider 列表及默认 provider |
+| `chrona_context_read` | 当前时间、时区、权限、Goal 与独立成果能力、时间策略及提醒边界；仅具有任务读取权限时返回 provider 列表及默认 provider |
+| `chrona_result_read` | 新 `results:read`；latest/accepted/确切版本，内容、版本列表及版本审阅；不是旧 Run 结果读取 |
+| `chrona_result_submit` | 新 `results:write` 且新入口开关启用；CAS 发布文字／附件成果版本，关联附件另需 `artifacts:read`；不启动执行 |
+| `chrona_result_file` | 显式附件权限；begin/write/finish/status/cancel/read。32 KiB 分块、SHA-256 校验，8 MiB 单文件；读取必须绑定确切版本，不能传任意路径 |
+| `chrona_result_review` | 独立 `results:review` 且新入口开关启用；绑定当前 head 和 revision 接受/要求修改/拒绝；不关闭 Task 或确认 Goal |
 | `chrona_goal_search` | 需要 `goals:read`；工作区隔离的标题/描述检索，生命周期过滤，每页最多20项 |
 | `chrona_goal_read` | 需要 `goals:read`；compact / brief / criteria / history 有界读取，不返回原始资产、provider 或运行上下文 |
 | `chrona_goal_propose` | 需要 `goals:read` + `goals:propose`；幂等捕获新 Draft Goal，含依据、第一步、未确认标准及自然语言权限请求；不会授权或启动任何工作 |

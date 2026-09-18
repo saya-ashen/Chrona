@@ -256,8 +256,11 @@ async function linkedAssetsForStructuredResult(asset: {
   workspaceId: string;
   goalId: string;
   versions: Array<{ content: unknown }>;
-  sourceArtifact: { taskId: string; runId: string };
+  sourceArtifact: { taskId: string; runId: string | null };
 }) {
+  // This legacy Goal projection only resolves Run-owned sources; independent results
+  // are not imported into Goal assets until an explicit promotion flow exists.
+  if (!asset.sourceArtifact.runId) return [];
   const content = asset.versions[0]?.content;
   if (!isStructuredResultAssetContent(content)) return [];
   const refs = new Set(content.artifactRefs.map((artifact) => artifact.ref));

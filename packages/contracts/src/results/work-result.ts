@@ -1,8 +1,10 @@
 import { z } from "zod";
+import { workPageSchema } from "@chrona/ui-protocol/work-pages";
 import { deliverableKindSchema, deliverablePresentationSchema, resultContributionSchema, resultEvidenceSchema } from "./content";
 
 export const RESULT_REQUEST_BYTES = 96 * 1024;
 export const RESULT_RESPONSE_BYTES = 128 * 1024;
+export const RESULT_SCOPES = ["results:read", "results:write", "results:review"] as const;
 export const resultIdSchema = z.string().min(1).max(128);
 export const resultRevisionSchema = z.string().max(200).regex(/^result-v1:[A-Za-z0-9_-]+:[0-9]+$/);
 const key = z.string().regex(/^[a-z0-9][a-z0-9._-]{0,127}$/);
@@ -13,6 +15,7 @@ const evidence = resultEvidenceSchema.extend({ key, summary: body });
 
 export const workResultContentSchema = z.object({
   schemaVersion: z.literal(1),
+  page: workPageSchema.optional(),
   outcome: z.object({ title: z.string().min(1).max(256), summary: body }).strict(),
   readiness: z.object({ status: z.enum(["ready", "ready_with_caveats", "partial", "blocked"]), summary: body }).strict(),
   findings: z.array(contribution).max(100).default([]),
@@ -37,7 +40,7 @@ export const workResultContentSchema = z.object({
 
 const scope = { taskId: resultIdSchema, occurrenceId: resultIdSchema.nullable().default(null) };
 export const publishWorkResultSchema = z.object({
-  ...scope, requestId: z.uuid(), expectedRevision: resultRevisionSchema.nullable(), content: workResultContentSchema,
+  ...scope, requestId: z.uuid(), expectedRevision: resultRevisionSchema.nullable().describe("Use editRevision from result_read; null only when no result container exists. On conflict, read and reconcile, never blindly retry with a new revision."), content: workResultContentSchema,
   source: z.object({ label: z.string().min(1).max(200).optional(), workId: z.string().min(1).max(200).optional(), reportedAt: z.iso.datetime({ offset: true }).optional() }).strict().optional(),
 }).strict();
 export const reviewWorkResultSchema = z.object({
@@ -49,7 +52,13 @@ export const readWorkResultSchema = z.object({
   view: z.enum(["content", "versions", "reviews"]).default("content"),
   offset: z.number().int().min(0).max(1_000_000).default(0), limit: z.number().int().min(1).max(20).default(10),
 }).strict().refine((v) => (v.selection === "version") === (v.versionId !== undefined), { message: "An exact version selector requires versionId; other selectors forbid it" })
-  .refine((v) => v.view !== "versions" || v.selection === "latest", { message: "Version listings use the latest selector" });
+  .refine((v) => v.view !== "versions" || v.selection === "latest", { message: "Version listings use the latest selector" }).meta({
+    // Mirror cross-field selectors in the actual MCP object-root JSON schema.
+    allOf: [
+      { if: { properties: { selection: { const: "version" } }, required: ["selection"] }, then: { required: ["versionId"] }, else: { not: { required: ["versionId"] } } },
+      { if: { properties: { view: { const: "versions" } }, required: ["view"] }, then: { properties: { selection: { const: "latest" } } } },
+    ],
+  });
 
 export const resultReceiptSchema = z.object({
   commandId: resultIdSchema, operation: z.enum(["publish", "review"]), resultId: resultIdSchema,

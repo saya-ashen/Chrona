@@ -1,5 +1,6 @@
 /* eslint-disable complexity -- Keep the cross-field mode/timing validation matrix together. */
 import { z } from "zod";
+import { LIBRARY_SCOPES, libraryReadSchema, libraryWriteSchema } from "../library";
 import { TASK_PRIORITIES, TASK_STATUSES } from "../task";
 import { automationTimingSchema } from "../automation-timing";
 import { TASK_LIST_FILTERS, TASK_LIST_SORT_FIELDS, TASK_TITLE_MAX, TASK_DESCRIPTION_MAX } from "./tasks.schema";
@@ -7,16 +8,34 @@ import { checkpointActionBodySchema, executionActionBodySchema, providerApproval
 import { planPatchBodySchema } from "./plans.schema";
 
 import { managementGoalSearchSchema, managementGoalReadSchema, managementGoalProposeSchema, managementGoalUpdateSchema } from "./management-goals.schema";
+import { RESULT_SCOPES, publishWorkResultSchema, readWorkResultSchema, reviewWorkResultSchema } from "../results/work-result";
+import { PAGE_SCOPES, pageReadSchema, pageValidateSchema } from "../results/pages";
+import { resultScopeSchema } from "../results/files";
+import { ARTIFACT_SCOPES, resultFileSchema } from "../results/files";
+import { WORK_SCOPES, workCaptureSchema, workReadSchema, workSearchSchema, workUpdateSchema } from "../work";
 
 // Preserve the historical full preset. New authority requires explicit enrollment.
 export const MANAGEMENT_LEGACY_SCOPES = ["tasks:read", "tasks:write", "schedule:write", "plans:write", "executions:control", "results:accept", "tasks:delete"] as const;
-export const MANAGEMENT_SCOPES = [...MANAGEMENT_LEGACY_SCOPES, "goals:read", "goals:propose", "goals:write"] as const;
+export const MANAGEMENT_SCOPES = [...MANAGEMENT_LEGACY_SCOPES, "goals:read", "goals:propose", "goals:write", ...RESULT_SCOPES, ...ARTIFACT_SCOPES, ...WORK_SCOPES, ...PAGE_SCOPES, ...LIBRARY_SCOPES] as const;
 export const MANAGEMENT_ACCESS_PRESETS = {
   read: ["tasks:read"],
   full: MANAGEMENT_LEGACY_SCOPES,
   "assistant-read": ["goals:read"],
   assistant: ["goals:read", "goals:propose"],
   "assistant-edit": ["goals:read", "goals:propose", "goals:write"],
+  "work-read": ["tasks:read", "work:read"],
+  "work-record": ["tasks:read", "work:read", "work:write"],
+  "library-read": ["tasks:read", "library:read"],
+  "library-organize": ["tasks:read", "library:read", "library:organize"],
+  "library-configure": ["tasks:read", "library:read", "library:organize", "library:configure"],
+  "pages-read": ["tasks:read", "results:read", "pages:read"],
+  "pages-author": ["tasks:read", "results:read", "results:write", "pages:read", "pages:write"],
+  "results-read": ["tasks:read", "results:read"],
+  "results-submit": ["tasks:read", "results:read", "results:write"],
+  "results-review": ["tasks:read", "results:read", "results:review"],
+  "results-files-read": ["tasks:read", "results:read", "artifacts:read"],
+  "results-files-submit": ["tasks:read", "results:read", "results:write", "artifacts:read", "artifacts:write"],
+  "results-files-review": ["tasks:read", "results:read", "results:review", "artifacts:read"],
 } as const;
 export type ManagementAccessPreset = keyof typeof MANAGEMENT_ACCESS_PRESETS;
 export const managementScopeSchema = z.enum(MANAGEMENT_SCOPES);
@@ -162,11 +181,16 @@ export const managementDeleteSchema = z.discriminatedUnion("mode", [
   z.object({ mode: z.literal("delete"), requestId: z.string().uuid(), taskId: id, expectedRevision: z.string().min(1).max(512), expectedTaskIds: z.array(id).min(1).max(1_000), expectedAssetIds: z.array(id).max(1_000) }).strict(),
 ]);
 export const managementTools = {
+  chrona_library_read: libraryReadSchema, chrona_library_update: libraryWriteSchema,
+  chrona_page_catalog: resultScopeSchema, chrona_page_validate: pageValidateSchema, chrona_page_read: pageReadSchema,
+  chrona_work_search: workSearchSchema, chrona_work_read: workReadSchema,
+  chrona_work_capture: workCaptureSchema, chrona_work_update: workUpdateSchema,
   chrona_context_read: z.object({}).strict(), chrona_task_search: managementSearchSchema, chrona_task_read: managementReadSchema,
   chrona_task_create: managementCreateSchema, chrona_task_update: managementUpdateSchema,
   chrona_task_action: managementActionSchema, chrona_task_delete: managementDeleteSchema,
   chrona_goal_search: managementGoalSearchSchema, chrona_goal_read: managementGoalReadSchema,
   chrona_goal_propose: managementGoalProposeSchema, chrona_goal_update: managementGoalUpdateSchema,
+  chrona_result_read: readWorkResultSchema, chrona_result_submit: publishWorkResultSchema, chrona_result_review: reviewWorkResultSchema, chrona_result_file: resultFileSchema,
 };
 export type ManagementToolName = keyof typeof managementTools;
 export type ManagementCreate = z.infer<typeof managementCreateSchema>;

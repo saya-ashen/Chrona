@@ -14,6 +14,9 @@ import type { ManagementDeps } from "./types";
 import { readManagementGoal, searchManagementGoals } from "./goals";
 import { proposeGoalDraft } from "../goals/goal-draft-proposal";
 import { applyGoalUpdate, goalUpdatePreview, prepareGoalUpdate } from "./goal-updates";
+import { callManagementWorkResult, isWorkResultTool, managementRequestLimit } from "./work-results";
+import { callManagementWorkRecord, isWorkRecordTool } from "./work-records";
+import { callManagementLibrary, isLibraryTool } from "./library";
 
 export const managementJson = (value: unknown): Prisma.InputJsonValue => JSON.parse(JSON.stringify(value)) as Prisma.InputJsonValue;
 export function commandReceipt(command: ManagementCommand, replayed = false) {
@@ -27,8 +30,12 @@ export function createManagementService(deps: ManagementDeps) {
       try {
         const client = await refreshManagementClient(identity);
         if (!Object.hasOwn(managementTools, tool)) throw new ManagementError("VALIDATION_ERROR", "Unknown management tool");
-        if (Buffer.byteLength(JSON.stringify(raw)) > 65_536) throw new ManagementError("VALIDATION_ERROR", "Management input exceeds 64 KiB");
+        if (Buffer.byteLength(JSON.stringify(raw)) > managementRequestLimit(tool)) throw new ManagementError("VALIDATION_ERROR", "Management input exceeds this tool's request budget");
         const name = tool as ManagementToolName;
+        // Result service owns validation, fresh authorization, CAS and durable receipts.
+        if (isWorkResultTool(name)) return managementSuccess(await callManagementWorkResult(client, name, raw));
+        if (isWorkRecordTool(name)) return managementSuccess(await callManagementWorkRecord(client, name, raw));
+        if (isLibraryTool(name)) return managementSuccess(await callManagementLibrary(client, name, raw));
         const input = managementTools[name].parse(raw);
         if (name === "chrona_context_read") {
           requireScopes(client, [client.scopes.includes("goals:read") ? "goals:read" : "tasks:read"]);

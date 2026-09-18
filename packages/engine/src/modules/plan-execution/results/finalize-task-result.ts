@@ -109,6 +109,7 @@ async function finalizationArtifactContext(
 		where: { id: taskId },
 		select: {
 			artifacts: {
+				where: { ownerKind: "run" },
 				select: { id: true, title: true, type: true, uri: true },
 			},
 		},

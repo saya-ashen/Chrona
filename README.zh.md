@@ -41,7 +41,7 @@
 
 Chrona 正在演进为 local-first、**独立于执行者的任务与成果工作台**：工作可以由人、外部 Agent 或可选的 Chrona 托管执行器完成；产品中心是持久记录、成果、审阅与复用，而不是控制所有 Agent。
 
-> **这是方向，不是已交付能力声明：** 不依赖 Chrona Run 的外部正式成果提交与审阅闭环尚待实现。后续开发先读[产品架构](./docs/zh/product-architecture.md)，再读[当前系统架构](./docs/en/architecture.md)。
+> **已实现；一个授权实例已部署接入：** 不依赖 Chrona Run 的文字／附件成果、版本与审阅界面已通过真实外部 Pi 联调，待用户验收；其他安装仍默认关闭新写入。参见[日常 Agent 接入](./docs/en/work-results-integration.md)。托管成果收敛及 Goal Inbox 接续仍属下一阶段。后续开发先读[产品架构](./docs/zh/product-architecture.md)，再读[当前系统架构](./docs/en/architecture.md)。
 
 当前已支持的托管路径仍保留：创建任务、安排日程、审查 AI 生成的计划，再手动或自动执行，并记录 checkpoint、审批、失败、工具动作和输出：
 

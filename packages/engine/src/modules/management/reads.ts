@@ -11,6 +11,10 @@ import { readExistingExecution } from "./execution-read";
 import { deriveManagementWorkState, managementResultFinalization } from "./result-state";
 import { managementResultArtifacts } from "./result-artifacts";
 import { aiArtifactRef } from "../plan-execution/use-cases/register-generated-plan-output-artifacts";
+import { workPageCapabilities } from "../results/page-policy";
+import { readWorkResultCapabilities } from "../results/entry-policy";
+import { workCapabilities } from "../work-records/access";
+import { libraryCapabilities } from "../library/access";
 
 export function record(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? value as Record<string, unknown> : {};
@@ -58,6 +62,10 @@ export async function readManagementContext(client: ManagementIdentity) {
     defaults: { mode: client.defaultMode, source: "explicit_client_setup", aiClientId: selected?.clientId ?? null },
     scopes: client.scopes, aiClients: clients, timing: AUTOMATION_TIMING_PRESETS,
     capabilities: {
+      workResults: readWorkResultCapabilities(client.scopes),
+      workPages: workPageCapabilities(client.scopes),
+      workRecords: workCapabilities(client.scopes),
+      library: libraryCapabilities(client.scopes),
       modes: ["todo", "plan", "automatic"], immediateExecution: true, scheduledExecution: true, recurrenceTimezones: ["UTC"], rawProviderConfig: false,
       goals: {
         available: true, contractVersion: 1,

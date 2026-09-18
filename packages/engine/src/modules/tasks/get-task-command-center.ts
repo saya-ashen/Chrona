@@ -119,6 +119,7 @@ export async function getTaskCommandCenter(input: {
     select: {
       id: true,
       artifacts: {
+        where: { ownerKind: "run" },
         orderBy: { createdAt: "desc" },
         ...(currentExecution.planOutput?.finalizedResult ? {} : { take: 5 }),
       },

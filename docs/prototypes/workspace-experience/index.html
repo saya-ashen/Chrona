@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'none'; font-src 'self'; base-uri 'none'; form-action 'none'">
+  <meta name="color-scheme" content="light">
+  <title>Chrona · 工作总览 · 设计原型</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="styles.css">
+  <script defer src="prototype.js"></script>
+</head>
+<body>
+  <a class="skip-link" href="#main">跳到内容</a>
+  <div class="prototype-banner"><span><strong>设计原型</strong> · 虚构数据，不连接真实系统</span><button type="button" data-action="scenes">场景与说明</button></div>
+  <div class="app-shell">
+    <aside class="sidebar">
+      <a class="brand" href="#overview" aria-label="Chrona 总览"><span class="brand-mark" aria-hidden="true">c</span>chrona<span class="brand-dot">.</span></a>
+      <p class="workspace-label">个人工作空间</p>
+      <nav aria-label="主导航" id="navigation"></nav>
+      <div class="sidebar-foot"><div class="avatar">S</div><div>我的空间<small>设计提案 · v1</small></div></div>
+    </aside>
+    <main id="main" tabindex="-1"></main>
+  </div>
+  <dialog id="dialog" aria-labelledby="dialog-title"><div id="dialog-content"></div></dialog>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div>
+</body>
+</html>

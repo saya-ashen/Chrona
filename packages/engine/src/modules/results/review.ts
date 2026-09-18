@@ -6,11 +6,14 @@ import { authorizeResult, requireResultPermission, resultActorKey, WorkResultErr
 import { unavailableVersionArtifacts } from "./artifacts";
 import { assertResultRevision, findWorkResult, newResultReceipt, recordResultEvent, replayResultCommand, saveResultCommand, scopeOf } from "./commands";
 import { resultPayloadHash } from "./content-hash";
+import { contentHasPage } from "./page-policy";
 
 export async function reviewWorkResult(ports: TaskResultsPorts, input: ReviewWorkResult) {
   const scope = scopeOf(input);
   const principal = await authorizeResult(ports, scope, "results:review");
   requireResultPermission(principal, "results:read");
+  const target = await db.taskResultVersion.findFirst({ where: { id: input.versionId, result: { taskId: scope.taskId, workspaceId: principal.workspaceId, occurrenceId: scope.occurrenceId } }, select: { content: true } });
+  if (contentHasPage(target?.content)) requireResultPermission(principal, "pages:read");
   const payloadHash = resultPayloadHash(input);
   const replay = await replayResultCommand(principal, "review", input.requestId, payloadHash);
   if (replay) return replay;

@@ -2,7 +2,7 @@ import { db } from "@chrona/db";
 import { workResultWritesAllowed } from "@chrona/domain/task/work-results";
 import type { WorkResultContent } from "@chrona/contracts/results";
 
-export type ResultPermission = "results:read" | "results:write" | "results:review" | "artifacts:read";
+export type ResultPermission = "results:read" | "results:write" | "results:review" | "artifacts:read" | "artifacts:write" | "pages:read" | "pages:write" | "pages:respond";
 export type ResultPrincipal = {
   workspaceId: string; actorKind: "human" | "external"; actorId: string;
   permissions: readonly ResultPermission[];
@@ -11,10 +11,10 @@ export type ResultScope = { taskId: string; occurrenceId: string | null };
 export type TaskResultsPorts = {
   /** Trusted composition only. Re-read current identity, revocation and scopes on EVERY call,
    * inside the DB transaction. DB/local-only: never call providers or network services here.
-   * Request JSON cannot set this principal. No mounted transport exists until B2. */
+   * Request JSON cannot set this principal. Each transport owns its trusted adapter. */
   authorize(scope: ResultScope, permission: ResultPermission): Promise<ResultPrincipal | null>;
   /** Verify accessible, finalized local bytes, not just a stored URI. Missing adapter = unavailable.
-   * No paths/URIs from the submitting agent are accepted. B2 owns the production adapter. */
+   * No paths/URIs from the submitting agent are accepted. B2b owns the production adapter. */
   artifactAvailable?(artifactId: string, scope: ResultScope & { workspaceId: string }): Promise<boolean>;
 };
 
@@ -38,7 +38,7 @@ export async function authorizeResult(ports: TaskResultsPorts, scope: ResultScop
   if (scope.occurrenceId !== null && !await db.taskOccurrence.findFirst({ where: { id: scope.occurrenceId, taskId: task.id, workspaceId: principal.workspaceId }, select: { id: true } })) {
     throw new WorkResultError("NOT_FOUND", "Task occurrence not found");
   }
-  if (permission !== "results:read" && !workResultWritesAllowed(task, task.workspace.status)) {
+  if (permission !== "results:read" && permission !== "artifacts:read" && permission !== "pages:read" && !workResultWritesAllowed(task, task.workspace.status)) {
     throw new WorkResultError("PRECONDITION_FAILED", "Closed work does not accept result writes");
   }
   return principal;

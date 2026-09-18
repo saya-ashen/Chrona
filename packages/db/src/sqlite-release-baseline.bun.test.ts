@@ -95,7 +95,9 @@ describe("published v0.3.1 migration baseline", () => {
       const db = new Database(path, { readonly: true });
       let upgradedHistory: ReturnType<typeof history>;
       try {
-        expect(snapshot(db)).toEqual({ ManagementClient: [], ManagementCommand: [], ...before });
+        expect(snapshot(db)).toEqual({ ManagementClient: [], ManagementCommand: [], ...before,
+          Artifact: (before.Artifact as object[]).map((artifact) => ({ ...artifact, ownerKind: "run", resultId: null })),
+        });
         expect(schemaFingerprint(db)).toBe(metadata.releaseLineSchemaFingerprint);
         expect(db.query("PRAGMA integrity_check").get()).toEqual({ integrity_check: "ok" });
         expect(db.query("PRAGMA foreign_key_check").all()).toEqual([]);

@@ -44,6 +44,8 @@ const CHROMIUM_EXECUTABLE_PATH = findChromiumExecutable();
  */
 export default defineConfig({
 	testDir: "./e2e/specs",
+	// Independent results require their own writes-on, execution-off test profile.
+	testIgnore: /(?:work-(?:results|records|pages)|content-library)\.spec\.ts/,
 	globalTeardown: "./e2e/cleanup-e2e-db.ts",
 	fullyParallel: false,
 	workers: 1,

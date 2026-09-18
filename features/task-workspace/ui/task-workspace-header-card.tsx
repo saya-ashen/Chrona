@@ -15,6 +15,7 @@ import {
 import { UI_ACTION, type UiDocument } from "@chrona/ui-protocol";
 import { SpecRenderer } from "./catalog/spec-renderer";
 import { LocalizedLink } from "./localized-link";
+import { WorkResultsLink } from "@features/work-results";
 import type { TaskData, TaskHeaderAction } from "../model/task-workspace-types";
 import type { TaskDeleteImpact } from "@chrona/contracts";
 
@@ -92,7 +93,7 @@ function localizeHeaderResultStatus(
 type HeaderActionId = TaskHeaderAction["id"];
 
 type TaskWorkspaceHeaderCardProps = {
-	task: Pick<TaskData, "title" | "goal" | "goalKnowledge">;
+	task: Pick<TaskData, "id" | "title" | "goal" | "goalKnowledge">;
 	resultAccepted?: boolean;
 	spec: UiDocument;
 	store: StateStore;
@@ -296,13 +297,13 @@ export function TaskWorkspaceHeaderCard({
 							? messages.components.taskWorkspace.owningGoal
 							: messages.components.taskWorkspace.backToTasks
 					}
-					className="mb-0.5"
+					className="mb-0.5 flex min-w-0 items-center justify-between gap-2"
 				>
 					<Button
 						asChild
 						variant="ghost"
 						size="sm"
-						className="-ml-2 h-7 max-w-full justify-start px-2 text-xs text-muted-foreground hover:text-foreground"
+						className="-ml-2 h-7 min-w-0 max-w-full shrink justify-start px-2 text-xs text-muted-foreground hover:text-foreground"
 					>
 						{task.goal ? (
 							<LocalizedLink
@@ -327,6 +328,8 @@ export function TaskWorkspaceHeaderCard({
 							</LocalizedLink>
 						)}
 					</Button>
+					<WorkResultsLink taskId={task.id} />
+					<Button variant="ghost" size="sm" asChild><LocalizedLink href={`/tasks/${task.id}/page`}>{messages.workPages.viewPage}</LocalizedLink></Button>
 				</nav>
 				{task.goalKnowledge ? (
 					<p

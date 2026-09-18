@@ -25,8 +25,19 @@ Chrona is not required to control every contributor's execution.
   is not shipped merely because management MCP or manual Tasks exist.
 - Follow the phase gates in the product architecture. For work/result decoupling,
   read [Phase A contracts and compatibility](docs/zh/work-results-phase-a.md)
-  before implementing persistence or new MCP authority. Design documentation
+  before implementing persistence or new MCP authority. Current B1–B3
+  contracts and limits: [Work Result Entries](docs/en/work-results.md); rollout and
+  daily Agent setup: [Integration](docs/en/work-results-integration.md). One
+  authorized instance is integrated, not all installations or phase C. The
+  deterministic UI lives in `features/work-results/`. Do not widen old credentials
+  or route new result-owned files through legacy Run readers. Design documentation
   does not substitute for the explicit approvals required below.
+- Content-first pages and grouped classification are local working-tree additions,
+  not deployed capabilities: [Work pages](docs/en/work-pages.md) and
+  [Content library](docs/en/content-library.md). Library placements reference the
+  existing Task; one folder per group, multiple groups per Task, no content copies.
+  Preserve protected manual choices and independent calendar/execution semantics.
+  Agent organization requires explicit library scopes; do not expand old presets.
 
 ## Tech stack
 

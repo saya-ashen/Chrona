@@ -4,6 +4,7 @@ import {
 	type APIRequestContext,
 	type Page,
 } from "@playwright/test";
+import { openAdvancedTaskCreation, openMoreTools } from "./advanced-navigation-helpers";
 
 async function workspaceId(request: APIRequestContext) {
 	let id: string | undefined;
@@ -87,7 +88,8 @@ test.describe("P0 scenario gaps", () => {
 	}) => {
 		await page.goto("/en/dashboard");
 		await expectApp(page);
-		await expect(page.getByRole("link", { name: "Tasks" }).first()).toBeVisible();
+		await openMoreTools(page);
+		await expect(page.getByRole("link", { name: "Tasks", exact: true }).or(page.getByRole("menuitem", { name: "Tasks", exact: true })).first()).toBeVisible();
 		for (const route of [
 			"/en/schedule",
 			"/en/tasks",
@@ -107,7 +109,7 @@ test.describe("P0 scenario gaps", () => {
 		const title = `P0 schedule quick create ${crypto.randomUUID()}`;
 		await page.goto("/en/schedule");
 		await expectApp(page);
-		await page.getByRole("button", { name: "New Task" }).click();
+		await openAdvancedTaskCreation(page);
 		await page.getByPlaceholder("Add title").fill(title);
 		const createdResponse = page.waitForResponse(
 			(response) =>
@@ -140,7 +142,7 @@ test.describe("P0 scenario gaps", () => {
 
 		await page.goto("/en/tasks");
 		await expectApp(page);
-		await page.getByRole("button", { name: /new task/i }).click();
+		await openAdvancedTaskCreation(page);
 		const dialog = page.getByRole("dialog");
 		await expect(dialog).toBeVisible();
 		await dialog.getByPlaceholder("Add title").fill(title);
@@ -304,7 +306,7 @@ test.describe("P0 scenario gaps", () => {
 		).toBeVisible();
 
 		await page.getByRole("tab", { name: "Work", exact: true }).click();
-		await expect(page.getByText(taskTitle, { exact: true })).toBeVisible();
+		await expect(page.getByRole("main").getByText(taskTitle, { exact: true })).toBeVisible();
 		await page.getByRole("tab", { name: "Success criteria" }).click();
 		await expect(page.getByText(criterion, { exact: true })).toBeVisible();
 		await page.getByRole("tab", { name: "History" }).click();

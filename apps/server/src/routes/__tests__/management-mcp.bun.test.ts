@@ -173,12 +173,35 @@ describe("management MCP protocol", () => {
     expect(generate.body.result.isError).toBe(true);
   });
 
-  it("initializes statelessly, lists eleven actual tools, calls through the protocol and revokes immediately", async () => {
+  it("advertises and captures manual work through the protocol with independent non-execution authority", async () => {
+    const previous = process.env.CHRONA_WORK_WRITES_ENABLED; process.env.CHRONA_WORK_WRITES_ENABLED = "true";
+    try {
+      const client = await createManagementClient({ name: "Work recorder", publicUrl: "http://localhost:3101", scopes: ["tasks:read", "work:read", "work:write"] });
+      const listed = await call(client.token, "tools/list", {}), tools = ListToolsResultSchema.parse(listed.body.result).tools;
+      const capture = tools.find(tool => tool.name === "chrona_work_capture")!;
+      expect(capture.inputSchema.additionalProperties).toBe(false);
+      expect(tools.find(tool => tool.name === "chrona_work_read")?.annotations?.readOnlyHint).toBe(true);
+      expect(tools.find(tool => tool.name === "chrona_work_search")?.annotations?.readOnlyHint).toBe(true);
+      const input = { requestId: crypto.randomUUID(), title: "External meeting preparation", context: { kind: "general" } };
+      const validate = new AjvJsonSchemaValidator().getValidator(capture.inputSchema as JsonSchemaType);
+      expect(validate(input).valid).toBe(true); expect(validate({ ...input, autoExecute: true }).valid).toBe(false);
+      expect(validate({ ...input, context: { kind: "meeting" } }).valid).toBe(false);
+      const result = await call(client.token, "tools/call", { name: "chrona_work_capture", arguments: input });
+      expect(result.body.result.isError).toBe(false);
+      const receipt = result.body.result.structuredContent.data.receipt;
+      expect(receipt).toMatchObject({ outcome: "created", executionStarted: false, taskStatusChanged: false });
+      const read = await call(client.token, "tools/call", { name: "chrona_work_read", arguments: { taskId: receipt.taskId } });
+      expect(read.body.result.structuredContent.data).toMatchObject({ canWrite: true, canResolve: false, record: { taskStatus: "Ready" } });
+      expect(await Promise.all([db.run.count(), db.taskPlan.count(), db.executionSession.count()])).toEqual([0, 0, 0]);
+    } finally { if (previous === undefined) delete process.env.CHRONA_WORK_WRITES_ENABLED; else process.env.CHRONA_WORK_WRITES_ENABLED = previous; }
+  });
+
+  it("initializes statelessly, lists twenty-two actual tools, calls through the protocol and revokes immediately", async () => {
     const client = await createManagementClient({ name: "MCP test", publicUrl: "http://localhost:3101" });
     const initialize = await call(client.token, "initialize", { protocolVersion: LATEST_PROTOCOL_VERSION, clientInfo: { name: "test", version: "1" }, capabilities: {} });
     expect(initialize.status).toBe(200);
     const tools = await call(client.token, "tools/list", {});
-    expect(ListToolsResultSchema.parse(tools.body.result).tools).toHaveLength(11);
+    expect(ListToolsResultSchema.parse(tools.body.result).tools).toHaveLength(24);
     const create = await call(client.token, "tools/call", { name: "chrona_task_create", arguments: { requestId: crypto.randomUUID(), title: "From external agent", mode: "todo" } });
     expect(create.body.result.isError).toBe(false);
     expect(create.body.result.structuredContent.data.state).toBe("completed");

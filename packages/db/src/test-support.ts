@@ -8,13 +8,31 @@ export async function resetTestDb() {
   try {
     // Result children are append-only; remove their owning aggregate so cascades
     // also respect the same deletion boundary used by real task deletion.
+    await db.libraryState.deleteMany();
+    await db.libraryCommand.deleteMany();
+    await db.libraryAssignment.deleteMany();
+    await db.libraryFolder.deleteMany();
+    await db.libraryGroup.deleteMany();
+    await db.workRecord.deleteMany();
+    await db.workCommand.deleteMany();
+    await db.workEntry.deleteMany();
+    await db.workSource.deleteMany();
     await db.taskResult.deleteMany();
+    await db.workPageInput.deleteMany();
+    await db.workPageCommand.deleteMany();
     await db.resultVersionArtifact.deleteMany();
     await db.taskResultReview.deleteMany();
     await db.resultCommand.deleteMany();
     await db.taskResultVersion.deleteMany();
+    await db.resultFileUpload.deleteMany();
+    await db.resultFileChunk.deleteMany();
     await db.managementCommand.deleteMany();
     await db.managementClient.deleteMany();
+    // FK cascades are disabled during reset: feature-run ledgers must be cleared
+    // explicitly or managed-planning suites contaminate no-execution assertions.
+    await db.aiFeatureRunObservation.deleteMany();
+    await db.aiFeatureRunAction.deleteMany();
+    await db.aiFeatureRun.deleteMany();
     await db.aiFeatureBinding.deleteMany();
     await db.workspaceAiSurface.deleteMany();
     await db.workspaceUserPreference.deleteMany();
@@ -51,6 +69,7 @@ export async function resetTestDb() {
     await db.rawEventLog.deleteMany();
     await db.approval.deleteMany();
     await db.artifact.deleteMany();
+    await db.resultArtifactBytes.deleteMany();
     await db.taskOccurrence.deleteMany();
     await db.triggerDelivery.deleteMany();
     await db.taskTrigger.deleteMany();

@@ -7,10 +7,16 @@ contribute work; Chrona owns durable records, result versions, review, and reuse
 The canonical [Product Architecture](../zh/product-architecture.md) defines
 product direction and acceptance gates. This document describes the current
 Bun/TypeScript system and its transition boundaries. External management MCP is
-available; a first-class external result submission/review loop without managed
-execution is **not yet implemented**. B1 now supplies work-owned result storage
-and deterministic publish/read/review application use cases. They require trusted
-auth/file adapters and are not yet mounted to Web/MCP; uploads and UI remain B2/B3.
+available. B1–B3 provide work-owned versions/reviews, authenticated text/file
+MCP and owner HTTP entries, and a deterministic task results page. New writes
+remain default-off. These are local implementations, not a deployment claim.
+Managed-result convergence and Goal Inbox reuse remain phase C; the optional
+executor still uses its existing managed-result pipeline.
+See [Work Result Entries](./work-results.md) for exact authority and limits.
+The local [work-pages slice](./work-pages.md) adds restricted json-render content
+inside result versions and independent append-only owner input. It uses no managed
+execution records. Home/manual work is content-first; calendar and advanced
+execution/Goal/review surfaces remain. This newer slice is not deployed.
 
 ## Target dependency direction
 
@@ -101,11 +107,14 @@ feature's internals.
 
 ### Task workspace
 
-The task workspace is the planning and editing surface. It supports task detail editing, AI plan generation, generated-plan review, plan acceptance, and execution overview.
+Manual Tasks default to their content-first work page with persistent notes and
+version-bound forms. Managed Tasks retain the planning/editing workspace: task
+detail editing, AI plan generation, review, acceptance and execution overview.
+Both can open an explicit `/tasks/:taskId/page`; advanced details remain reachable.
 
 ### Task workspace execution
 
-Task execution now lives inside the task workspace. Runtime commands use `/api/work/:taskId/commands` and live updates use `/api/work/:taskId/events`; there is no separate Work page route.
+Task execution now lives inside the task workspace. Runtime commands use `/api/work/:taskId/commands` and live updates use `/api/work/:taskId/events`; there is no separate managed-execution Work page. `/tasks/:taskId/work` is instead the independent source/follow-through record, not an execution route.
 
 ### Schedule page
 

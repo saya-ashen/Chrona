@@ -656,10 +656,9 @@ function applyMigration(
 			],
 		);
 	});
-	// The folded v0.2.0 upgrade rebuilds parent tables. SQLite ignores PRAGMA
-	// foreign_keys changes inside a transaction, so run this one registered line
-	// with enforcement disabled before BEGIN and prove every relation afterward.
-	const rebuildsParentTables = migration.name === RELEASE_LINE_REPAIR_MIGRATION;
+	// Registered release-line rebuilds need FK enforcement disabled before BEGIN.
+	// Exact source/target fingerprints and every relation are checked in the transaction.
+	const rebuildsParentTables = migration.name === RELEASE_LINE_REPAIR_MIGRATION || migration.name === metadata?.mutableReleaseLineMigration;
 	if (rebuildsParentTables) db.run("PRAGMA foreign_keys = OFF");
 	try {
 		// DDL and its history row are atomic. Never swallow duplicate-object errors.

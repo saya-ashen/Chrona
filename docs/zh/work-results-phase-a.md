@@ -1,8 +1,8 @@
 # 工作成果解耦：阶段 A 契约与兼容设计
 
-状态：**阶段 A 与发布迁移基线修复已验证；B1 存储和共享用例已完成本地实现与验证。下一步 B2：正式鉴权接入、受控上传及 MCP/HTTP 入口。B1–B3 本地实施已获批准，但外部成果闭环尚未交付。**
+状态：**A 与 B1–B3 已实现；用户另于 2026-09-17 授权部署和接入，实际实例已升级并通过外部 Pi 提交／附件回读验证。人类验收待进行，阶段 C 未交付。其他安装仍默认关闭写入；非公开发布声明。**
 
-授权记录：用户选择“批准本地实施阶段 B”，允许本地存储、权限契约、成果接入与审阅界面及隔离测试；不允许线上数据修改、实际凭据签发、部署、启动实际 Agent 或改动 Provider 协议。该授权不因发布基线修复而丢失；用户另已授权执行本地基线修复。
+授权记录：用户最初选择“批准本地实施阶段 B”，允许本地存储、权限契约、成果接入与审阅界面及隔离测试，当时不包含部署或真实凭据。之后明确要求“行，那进行部署和接入”，授权现有实例升级、独立成果凭据、日常 Agent 技能及有界真实验证（第 13 节）。不扩大为 Provider 协议修改、整机切换或无关任务执行。
 
 依据：[产品架构](./product-architecture.md)。本文是该架构阶段 A 的技术交付，不是另一份产品路线图。
 
@@ -109,7 +109,7 @@ Goal 衔接在 C 阶段完成：
 
 ## 6. 拟议 MCP/HTTP 接口与权限
 
-下列是**B2 待注册的接口设计名，不加入 B1 工具注册表**。本地实施已获批准；正式 Web 和 MCP 接入必须复用 B1 应用用例，并实现当前鉴权与文件校验适配器。
+下列是阶段 B 接口设计。**B2a 已注册前三个文字成果接口；文件接口及附件读写仍待 B2b**。Web/MCP 共用 B1 用例和真实鉴权适配器；未实现文件适配器前不开放附件关联或字节访问。
 
 | 接口职责（建议 MCP 名） | 请求要点 | 权限边界 |
 | --- | --- | --- |
@@ -127,7 +127,7 @@ Goal 衔接在 C 阶段完成：
 
 新成果请求 JSON（UTF-8）最大 96 KiB、单项正文最多 8,000 字符、每类语义项最多 100、每版附件最多 20。总字节上限优先；严格检查重复 key、引用缺失和越权。超限明确拒绝，不静默截断待持久化内容。服务端错误不得回显私有文件正文或凭据。
 
-读取沿用 128 KiB 响应预算，返回明确的分页/截断标志，ID、revision、状态和回执不得截断。
+共享读取响应封套沿用 128 KiB 预算，返回明确的分页/截断标志，ID、revision、状态和回执不得截断。当前 MCP 为客户端兼容同时镜像 text 与 structuredContent，线上总字节可能接近两份封套，不能把 128 KiB 宣传为整个 MCP wire 上限。
 
 ### 文件传输选择与成本
 
@@ -185,7 +185,8 @@ Goal 衔接在 C 阶段完成：
 | --- | --- | --- |
 | A0：本轮已做 | 共享内容 schema；原 API 组合复用；来源类型分层 | 旧 wire schema 不变、边界负例、typecheck |
 | B1：存储/共享用例 | 结果身份、版本 CAS、审阅、持久幂等、来源隔离 | 无 Plan/Run 写入；并发/重试；鉴权失败无写入；内容/附件/回执事务一致 |
-| B2：附件与入口 | 新显式 scopes、MCP schema、分块上传/受控读取 | 旧凭据能力不扩大；同请求不同内容冲突；越权/路径/配额/未完成上传/恢复 |
+| B2a：文字成果入口 | 新显式 scopes、真实鉴权、MCP/HTTP 共享用例、独立写开关 | 旧凭据能力不扩大；当前鉴权/重放、CAS、跨界负例、协议预算；无执行副作用 |
+| B2b：独立附件 | Artifact 归属、分块上传/受控读取、生产文件校验 | 越权/路径/配额/未完成上传/恢复；发布线升级与历史附件回归 |
 | B3：确定性成果 UI | 独立任务的文本/附件/反馈/验收闭环 | 无 Provider、执行服务禁用；刷新/重启后仍可用；错误可恢复；三种屏幕无溢出 |
 | C：托管兼容/Goal 接续 | 历史读取、统一来源、版本反馈、Goal Inbox 复用 | 已接受结果/AF/旧生命周期不回归；迟到消息不污染其他实例；无隐式触发执行 |
 
@@ -202,7 +203,7 @@ B1/B2/B3 合起来才是产品架构所说的阶段 B；只实现文字记账不
 - 外部成果验收不调用 Provider、不触发旧自动执行、也不完成 Goal。
 - 旧 schema fixture 升级后，原结果/附件/接受与 GoalAsset 的事实保持。
 
-**已批准的 B 本地范围：** 新持久化模型及兼容迁移、Artifact 所有权分支、新成果/附件权限与 API、独立结果审阅和相应 UI。此批准不包含线上迁移、凭据重新签发、部署、启动实际 Agent、改动 Provider 协议或全量界面重构。第 7 节发布线兼容前置问题已修复，B1 核心实现见第 10 节。下一切片是 B2；不要求用户再次批准同一 B 本地范围。
+**已批准的 B 本地范围：** 新持久化模型及兼容迁移、Artifact 所有权分支、新成果/附件权限与 API、独立结果审阅和相应 UI。此批准不包含线上迁移、凭据重新签发、部署、启动实际 Agent、改动 Provider 协议或全量界面重构。第 7 节发布线兼容前置问题已修复，B1 核心实现见第 10 节，B2a 入口见第 11 节。B2b 与 B3 本地交付见第 12 节；不要求用户再次批准同一 B 本地范围。
 
 ## 9. 本轮验证记录
 
@@ -261,4 +262,70 @@ B2 接入不得直接信任传入 principal：必须在可信路由组合中从�
 - 全仓 `bun run lint` 仍被两个未修改文件的既有 ratchet 告警阻塞（见第 9 节），本切片没有新增 lint 告警。
 - 未接入新工具、未签发凭据、未运行真实 Agent、未执行线上迁移或部署。无外部成果 UI/E2E 交付声明。
 
-日志：`/tmp/chrona-work-results-b1/`。下一步 B2，随后 B3 完成人可见的成果闭环。
+日志：`/tmp/chrona-work-results-b1/`。上述为 B1 时点记录；用户随后授权提交并继续，已提交为 `cca19a55`（未推送，原有 Pi-provider 改动未纳入）。
+
+## 11. B2a：正式文字成果入口
+
+本节为 B2a 时点记录；后续附件与界面交付以第 12 节及现行接口文档为准。
+
+接口与权限详见 [Work Result Entries](../en/work-results.md)。本切片不改 schema、迁移、Provider 或执行引擎。
+
+- 实际 MCP 注册 `chrona_result_read` / `chrona_result_submit` / `chrona_result_review`。object-root 严格 schema 与运行时选择器一致；工具发现不代表有权调用。
+- 新 `results-read` / `results-submit` / `results-review` CLI 预设显式授予读取、提交或审阅权限，普通提交者没有审阅权；旧 full/read/assistant 预设及已签发凭据保持原能力。新预设也不隐含任务创建、执行或文件权限。
+- MCP 在共享事务内重新验证真实客户、撤销、权限和绑定，不信任请求 principal；只写共享 ResultCommand，无第二套 ManagementCommand 作者。回执重放同样重新鉴权、检查任务及写入口开关。
+- Owner HTTP：`GET /api/results/capabilities`，`POST /api/results/read|submit|review`；使用与 MCP 相同的请求与应用用例。按现有单本地主人/API key 边界授权，事务内复查；不把管理凭据伪装成本地主人，也不为 Web 创建 ManagementClient。
+- `CHRONA_RESULT_WRITES_ENABLED=true` 才开放新提交和审阅，默认关闭；关闭后已有成果仍可读。该开关不会授予 scope、启动执行或改变旧托管结果接口。
+- `capabilities.workResults` 明示阶段 `text_entries`，上传、附件关联、文件字节、历史 Run 导入和 Goal Inbox 均不可用。无文件适配器时保持拒绝，不以已有 Artifact 行或 allowDownload 替代验证。
+- 96 KiB 成果请求／128 KiB 共享响应封套；旧工具 64 KiB 输入不扩大。原始 MCP 请求在 SDK 解析前有 112 KiB 上限，允许 JSON-RPC framing；Owner HTTP 原始正文上限 96 KiB。
+- 未部署、未签发真实凭据、未改变 Pi 连接、未启动 Agent、未操作用户数据库。B2a 不是 B2b 上传或 B3 UI 的交付证明。
+
+### B2a 验证记录
+
+- 合并新入口、共享用例、管理/Goal、旧结果接受、鉴权、CLI、契约及迁移回归：203 passed、0 failed（22 文件）；同一隔离库重复运行通过。
+- 回归暴露测试 reset 在关闭 FK cascade 时漏清 AI feature-run 账本，已补显式清理观察、动作及运行行；没有通过放宽“无执行副作用”断言来掩盖残留。
+- `bun run typecheck`、`bun run check:release-consistency` 通过；`bun run check:boundaries` 为 0 errors、10 项既有告警。
+- 25 个本切片 TypeScript 文件 ESLint `--max-warnings 0` 通过；CLI `program.ts` 修改仅帮助文字，其既有函数长度告警已对照 HEAD，仍为 1 → 1。全仓 lint 仍被第 9 节两个未修改文件的 ratchet 债务阻塞，本轮无新增。
+- `bun run chrona build linux-x64`、`bun run build:smoke` 通过，含隔离升级/备份/恢复。未修改 UI/导航，未声明浏览器成果 E2E。
+- `git diff --check` 通过；原有 Pi-provider 差异哈希保持 `a6fc01fa068ef02a71d227517a7e3ecd55f97b68`。B2a 尚未提交；B1 提交不包含它。
+
+日志：`/tmp/chrona-work-results-b2a/`。后续 B2b/B3 沿用既定本地授权和发布线迁移规则，见下节。
+
+## 12. B2b + B3：独立附件与确定性成果界面
+
+### 本地交付
+
+- **Artifact 所有权分支**：`ownerKind=run|result`，恰有真实 Run 或 TaskResult 所有者；新增成果不伪造 Run。旧 AF 算法、Run-owned 指纹、既有 GoalAsset 引用与接受记录保持。旧执行投影／附件入口显式筛选 Run 所有者，避免混入未发布的独立文件。
+- **私有文件存储决策**：SQLite BLOB。`ResultFileUpload`、`ResultFileChunk`、`ResultArtifactBytes` 与 Artifact 完成回执同事务提交；断线重试不会出现“完成回执成功但文件尚未落地”。不开放磁盘路径、URL 或内联 HTML/SVG 预览。备份包含字节；这是有界小文件方案，不是通用文件仓库。
+- **完整协议**：`chrona_result_file` / `POST /api/results/file` 支持 begin/write/status/finish/cancel/read。32 KiB 顺序分块、块及整文件 SHA-256、原样重放、上传者隔离、版本绑定下载、取消及过期清理。上传完成不等于发布或验收。单文件 8 MiB、单版本 32 MiB、工作区逻辑字节 256 MiB、1024 条持久上传回执、未完成上传 24h TTL。
+- **保留边界**：过期清理是惰性的；终态回执保留，不回收 requestId。已完成但未发布文件随所属 Task 删除回收，首期无单独删除附件接口。SQLite/WAL 物理占用可能大于逻辑配额。
+- **权限**：新增 `artifacts:read` / `artifacts:write` 与 `results-files-*` 显式预设；原文字预设、legacy full/read/assistant 不扩权。默认关闭新写入；关闭或工作结束后仍可读成果／文件、查询和取消自己的未完成上传。无当前权限时，包括重放在内均拒绝。
+- **B3 入口**：任务头部现有导航行 →「工作成果」→ `/:lang/tasks/:taskId/results`。默认任务级作用域明确显示，`?occurrenceId=` 显式选择实例；不要求 Provider、Plan 或执行服务。MCP 与 Web 共享同一服务与持久化作者。
+- **B3 闭环**：文本／附件发布、最新／已接受／历史版本、来源自报完成度、反馈／要求修改／拒绝／接受、审阅历史及安全下载。任务状态与成果状态分开；接受不完成 Task/Goal、不启动 Agent。基础字段使用普通控件，辅助语义数组首期使用验证过的 JSON 编辑器，不丢弃原 key／元数据。
+- **恢复**：并发冲突保留草稿，刷新对照后明确确认；网络响应丢失原样重试 requestId。上传恢复只在浏览器保存元数据，重选相同文件后续传。未提交文本仅保存在页面内存，浏览器离开时提示；已保存版本及字节跨进程重启保留。
+- **迁移**：仅累积现有可变发布线；新增 B1 checksum `201a64cf…` amendment，旧开发 normalizer 同步，已发布 SQL 字节不变。`pre-result-files.sqlite` 为隔离回归 fixture。父表重建在事务前关闭 FK，提交前验证全部 FK 和精确目标指纹，最终恢复 FK。旧二进制直接降级仍不安全，须兼容读取或明确批准的备份恢复。
+
+### 验证与修复记录
+
+- 全仓单元测试：106 文件、795 passed；Bun/API 分项均无失败（Bun 318 文件；API 65 文件，合计 2673 passed、11 skipped，API 与 Bun 存在覆盖重复，不能按独立测试数宣传）。
+- 新成果浏览器独立配置：12 passed、0 failed，桌面 1440×900、平板 1024×768、手机 390×844；执行 orchestrator 和 debug Provider 关闭。覆盖上传／发布／反馈／验收／历史文件下载、无横向溢出、关闭工作、加载／读取错误／只读、上传断线刷新恢复、CAS 冲突和丢响应原样重试。
+- 既有全量 E2E 复测：161 passed、16 skipped、0 failed。首次发现新增独立入口行挤压手机布局、遮挡「编辑任务」；去掉该行的对照测试通过，入口移至现有导航行后两项及全套回归通过。未把本次引入的问题误报为既有失败。
+- 首次 PDF 测试因机器未安装 Playwright 默认 Chromium 失败；指定已安装的 `/run/current-system/sw/bin/google-chrome` 后 Bun/API 全量通过，不修改生产 PDF 行为。
+- `typecheck`、UI foundation、发布一致性、边界检查通过；边界仍有 10 项既有 engine 测试告警。新增成果代码 ESLint 零告警。全仓 lint 仍只被第 9 节两个未修改文件的 ratchet 债务阻塞。
+- Linux x64 构建及打包后的升级／备份／恢复 smoke 通过。原有 Pi-provider 差异哈希保持 `a6fc01fa068ef02a71d227517a7e3ecd55f97b68`。
+- `bun run test` 首次全量运行发现上述移动端回归；修复后分项重跑全量 E2E，全部分项已验证，不把首次失败日志改写成成功。
+
+测试命令：`bun run test:e2e:results`；本机需前置 `PLAYWRIGHT_CHROMIUM_EXECUTABLE_PATH=/run/current-system/sw/bin/google-chrome`。默认 E2E 配置不混跑这个写入开启／执行关闭的独立配置。日志：`/tmp/chrona-b2b-b3/`。
+
+**第 12 节完成时状态：本地 B1–B3 闭环已实现；B2a/B2b/B3 尚未提交。** 此时未部署、未签发真实凭据、未启动真实 Agent、未升级用户数据库、未推送。后续单独授权的部署见第 13 节。下一阶段 C：托管结果兼容读取／统一提交适配、真正执行来源归属、Goal Inbox 显式接续；不包含在本次交付声明中。
+
+## 13. 已授权实例部署与日常 Agent 接入（2026-09-17）
+
+- 冻结 `cca19a55` 加 101 个成果／技能文件的 1,648 文件快照；7 个原有 Pi-provider/docs 改动完全排除。B2/B3 尚未 Git 提交，不宣称是干净提交或公开发布；没有 push。
+- 独立快照 typecheck、34 项针对性测试及 Linux 打包 fresh/upgrade/backup/restore smoke 通过。
+- 真实数据库在线／停机备份均验证；副本演练、正式迁移均保留原 67 表旧列数据、19 个任务和 1 个 Goal。增加 8 表，schema 指纹为 `b3747cb9fd515ce4651e44df3396439ddd14e5da671cc274f1e96bcafc58b726`；完整性和外键通过。
+- 只重启 Chrona，运行及下次启动配置均启用成果写入；没有整机 switch、重启、TLS／网络／Provider 配置更改。
+- 新 `results-files-submit` 凭据仅授 tasks:read、results:read/write、artifacts:read/write；旧凭据未扩权。Pi 独立 `chrona-results` 连接暴露 6 个工具，项目内外技能加载均通过，当前会话需 `/reload`。
+- 新增一个明确的本次部署手动验收任务，无排期、自动规划或执行；真实外部 Pi 发布一版成果和 1,829 字节报告，重复 requestId 返回同一回执，附件字节／SHA-256 回读一致。任务状态未变，Run／TaskPlan／TaskPlanRun／ExecutionSession 均为 0。
+- 真实浏览器显示外部来源、版本、附件下载及人工审阅入口；未代替用户接受或写入反馈，审阅数为 0。真实人类反馈／外部修订周期仍待验证。线上已有托管服务保留，验证未调用它；执行关闭的证据来自隔离 E2E，不声称线上关闭全部托管功能。
+- 私有部署证据在 `~/.local/share/chrona-deploy/20260917-work-results/`，实例备份在服务机专用部署目录；不提交凭据或用户数据库。旧二进制直接降级不安全，禁止自动恢复旧备份覆盖新工作。
+- [日常接入说明](../en/work-results-integration.md)与[可安装技能](../../packages/skills/chrona-results/SKILL.md)为后续使用基线。技能不是后台监听、自动聊天归档或全局权限授予；原 owner Web 网络信任边界也不是 Agent 安全沙箱。
