@@ -1,7 +1,10 @@
 # Organized content library
 
-**Working-tree implementation verified; not deployed or enrolled into everyday Pi.** Approved
-2026-09-18 after feedback that a recent-items feed was not an organized workspace.
+**Deployed to the authorized Chino instance and connected to everyday Pi on 2026-09-18.**
+A separate `library-configure` credential preserves existing scopes; real adapter
+reads passed. No default taxonomy was created. Classification writes were tested
+in isolation, not by reorganizing the user's live content during deployment.
+Approved after feedback that a recent-items feed was not an organized workspace.
 This replaces that feed as the primary home, while preserving Calendar and advanced
 work/execution/result controls. It is not an unrestricted filesystem or a second
 Task/result hierarchy.

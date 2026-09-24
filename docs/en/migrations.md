@@ -41,7 +41,7 @@ advances. The new line starts at the v0.3.1 fingerprint. Startup checks the fina
 fingerprint even when all migrations are already recorded; history alone does
 not authorize schema drift.
 
-### Work-page development amendment (not deployed)
+### Work-page development amendment
 
 The current work-page slice adds `TaskResult.inputRevision`, `WorkPageInput` and
 `WorkPageCommand` without rebuilding the result parent. The exact pre-page mutable
@@ -55,19 +55,36 @@ and work records, verifies new immutable/scope guards and repeated startup.
 No published migration checksum or source fingerprint is changed. See
 [work-page contracts](./work-pages.md); live upgrade remains separately authorized.
 
-### Content-library development amendment (not deployed)
+### Content-library development amendment
 
 The grouped-classification slice adds `LibraryState`, `LibraryGroup`,
 `LibraryFolder`, `LibraryAssignment` and `LibraryCommand`. Its checksum-keyed
 `3c2eeb4f…` amendment starts from the exact pre-library schema above;
 `fixtures/pre-library.sqlite` is pinned by `library-migration.bun.test.ts`.
-All active amendments/normalizers now target
+The pre-continuation library fingerprint is
 `ed14c227f83ab0247a6b269c13bb32ae95c61b2c6981a77fd66e432b7fd82f8f`.
 Released SQL, source fingerprints and earlier development fixtures remain frozen.
 Tests preserve all old columns and page/result/work data, enforce group/workspace
 scope and exclusivity, and verify that deleting a folder preserves content and
 other classifications. Receipt guards also allow owning-workspace deletion
 without relying on child-cascade order. See [content library](./content-library.md).
+
+### Page-continuation development amendment
+
+The `98f67418…` checksum-keyed amendment updates only `WorkPageInput_insert`
+to admit version-bound owner continuation snapshots; no table rebuild or new
+execution records. `fixtures/pre-page-continuation.sqlite` is a pristine baseline
+from commit `00ecc457`, pinned by `page-continuation-migration.bun.test.ts`.
+All active amendments/normalizers target
+`0fc1ed47d9e241ed3331db0d3c9da37afe0ba0665389f50ba242b3203dbb9f70`.
+Fresh/upgrade tests compare all old rows, including notes, versions and library
+placements, and reject invalid snapshot boundaries and mutable input history.
+Source fingerprints, earlier fixtures and released SQL are unchanged.
+
+Deployment is instance-specific; see [integration](./work-results-integration.md)
+for recorded authorized rollout evidence. These amendments remain part of the
+unreleased release line, not a public release or authorization to migrate another
+installation.
 
 ## Release evidence and fixtures
 

@@ -66,6 +66,7 @@ their scope and status instead of silently redefining the whole product.
 | 确定 Chrona 要成为什么、职责边界与验收标准 | [产品架构](./zh/product-architecture.md) — 后续开发基线，非已交付能力 |
 | 开始实施不依赖执行者的成果闭环 | [契约、兼容设计与实现](./zh/work-results-phase-a.md) — B1–B3 已实现且授权实例已接入，人工验收与阶段 C 待完成 |
 | 使用内容优先的页面、笔记与版本绑定表单 | [页面契约与本地演示（英文）](./en/work-pages.md) · [本版实施记录](./zh/work-pages-v1-implementation.md) — 未部署 |
+| 把保存的意见交给 Agent，并查看更新说明 | [页面反馈与接续](./zh/page-continuation.md) · [Agent 技能](../packages/skills/chrona-pages/SKILL.md) — 未部署 |
 | 用互斥分类组和文件夹组织全部内容 | [内容目录契约（英文）](./en/content-library.md) · [本版实施记录](./zh/content-library-implementation.md) · [Agent 整理技能](../packages/skills/chrona-library/SKILL.md) — 未部署 |
 | 记录会议事项、独立状态与操作回执 | [事项工作台与验证记录](./zh/work-records-meetings.md) — 已授权部署／接入，人工验收待完成 |
 | 查看已发布与计划中的产品区域 | [路线图](./zh/roadmap.md) |

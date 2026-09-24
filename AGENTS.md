@@ -32,8 +32,9 @@ Chrona is not required to control every contributor's execution.
   deterministic UI lives in `features/work-results/`. Do not widen old credentials
   or route new result-owned files through legacy Run readers. Design documentation
   does not substitute for the explicit approvals required below.
-- Content-first pages and grouped classification are local working-tree additions,
-  not deployed capabilities: [Work pages](docs/en/work-pages.md) and
+- Content-first pages and grouped classification are implemented; authorized
+  single-instance rollout is recorded in `docs/en/work-results-integration.md`,
+  not a public release or authorization for other installations: [Work pages](docs/en/work-pages.md) and
   [Content library](docs/en/content-library.md). Library placements reference the
   existing Task; one folder per group, multiple groups per Task, no content copies.
   Preserve protected manual choices and independent calendar/execution semantics.

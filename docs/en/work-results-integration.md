@@ -6,14 +6,29 @@ replay, attachment byte/hash readback and the Web review surface. **Human review
 is still pending.** This is instance-specific evidence, not a public release or
 a claim that every installation has result writes enabled.
 
-## Newer work-page slice is not deployed
+## Authorized workspace rollout (2026-09-18)
 
-The working tree additionally supports Agent-authored declarative pages and
-persistent owner notes/forms. It requires **new explicit** page capabilities;
-this document's deployed `results-files-submit` token has not been widened.
-See [work-page contract and isolated demo](./work-pages.md) and the repository
-[page skill](../../packages/skills/chrona-pages/SKILL.md). Do not install/enroll or
-migrate the live instance merely because the local implementation exists.
+The Chino instance now includes content-first pages, persisted notes/forms,
+organized content and explicit feedback handoffs. Separate `pages-author` and
+`library-configure` credentials were enrolled with user approval; existing
+credentials were not widened. Pi connections `chrona-pages`, `chrona-library`,
+`chrona-work` and `chrona-results` separate these capabilities. Reviewed page and
+library skills are installed alongside work/result skills. Run `/reload` or open
+a new Pi session before using them.
+
+Actual HTTPS adapter connections and skill discovery passed inside/outside the
+repository. The live home displays the existing 21 content records; no default
+classification scheme was created. Page publication and continuation are covered
+by isolated tests; this rollout did not impersonate human feedback or acceptance.
+This is one authorized deployment, not a public release or automatic enrollment
+for other installations.
+
+Ask the Agent to save useful conclusions to Chrona and organize them according to
+your preferred classification scheme. Add notes or answer questions on the page;
+use **Hand back to Agent** and give the resulting handoff to your Agent to continue.
+This is explicit handoff, not automatic Agent wake. Calendar and advanced controls
+remain available. See [work pages](./work-pages.md), [content library](./content-library.md)
+and the [page skill](../../packages/skills/chrona-pages/SKILL.md).
 
 ## Deploy safely
 

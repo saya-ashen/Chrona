@@ -1,9 +1,10 @@
 # Content-first work pages
 
-**Status: implemented in the working tree, not deployed.** The separately deployed
-work-record/result integrations do not yet include this page capability. Existing
-credentials are unchanged. Installation, credential enrollment and live database
-migration require a separate rollout decision.
+**Status: deployed to the user-authorized Chino instance on 2026-09-18.**
+Page authoring uses a separately enrolled credential; existing credentials remain
+unchanged. Real Pi connection and skill discovery are verified. Human feedback and
+acceptance remain user actions, not deployment checks. Other installations still
+require explicit rollout/enrollment; see [integration](./work-results-integration.md).
 
 ## User experience
 
@@ -19,6 +20,13 @@ execution workspace and can also open `/:lang/tasks/:taskId/page`. The page show
 useful conclusions, optional tables/comparisons, questions and **My notes**. Detail
 is progressively disclosed, rather than making the user decode a status console.
 
+Follow-up fix deployed to the authorized Chino instance on 2026-09-19: when no result version exists, both the
+default manual page and explicit `/page` route show the existing task description
+as labeled, escaped task context. Only an empty/whitespace-only description gets
+the blank-page prompt. Published results remain primary; loading or failed result
+reads are not mistaken for absence. This display fallback creates no result,
+changes no lifecycle state, and leaves notes and review independent.
+
 - **Calendar remains primary navigation.** A product-owned calendar button opens
   scheduling. A date or preference inside an authored form is only content; it
   never creates a time block, reminder, payment or execution.
@@ -33,6 +41,20 @@ is progressively disclosed, rather than making the user decode a status console.
   revision conflicts require explicit comparison and reconciliation.
 - Updating an authored page preserves notes. Previous-version form answers remain
   in history; the new form does not inherit old answers without a new submission.
+
+### Content proportions
+
+Home and content pages share a 1360px maximum content width, using all remaining
+host width below that cap. The shell owns the outer gutters (32px desktop, 24px
+tablet, 16px phone); pages do not add a second horizontal padding layer. The
+240px desktop sidebar and existing calendar/execution layouts are unchanged.
+At 1440px this gives 1136px of usable content; at 1920px it caps at 1360px rather
+than the former 896px frame. Long summaries/text remain capped at 75ch, while
+tables, comparisons and forms use the broad canvas. Form fields use two columns
+only when their actual container has at least 640px; long answers span both.
+Narrow or nested forms remain single-column. Content ordering and save semantics
+are unchanged. Geometry and usable controls are tested at desktop, tablet, phone
+and a 1920px wide viewport; no horizontal page overflow.
 
 This is a bounded compositional page system, not an unrestricted Notion editor.
 Users write notes and answer forms; Agents compose the versioned page. Advanced
@@ -92,11 +114,12 @@ flags. New tools share the same workspace/Task/occurrence checks as results:
 | --- | --- |
 | `chrona_page_catalog` | Task scope; returns the current machine-readable catalog |
 | `chrona_page_validate` | Scope + candidate page; bounded issues, no writes |
-| `chrona_page_read` | Scope; current/history, optional exact version and kind, pagination |
+| `chrona_page_read` | Scope; current/history or immutable handoff snapshot; optional exact request ID, bounded pagination |
 | `chrona_result_submit` | Existing result publication, now with optional page |
 
-Adding **or removing** a page requires pages:read/write. Legacy result readers
-receive semantic content without the page or user inputs. Reviewing a page-bearing
+Adding **or removing** a page or continuation report requires pages:read/write.
+Legacy result readers receive semantic content without pages, private continuation
+metadata or user inputs. Reviewing a page-bearing
 version also requires pages:read; old review authority does not authorize reviewing
 content that credential cannot read. Idempotent replay rechecks current authority.
 
@@ -118,6 +141,42 @@ Turning flags off does not delete saved data or revert schema. These flags do no
 grant capabilities to a credential. Page input authority is internal owner-only
 `pages:respond`; it is deliberately absent from enrollable MCP scopes.
 
+## Feedback → continuation → update report
+
+The product-owned **Ask your Agent to continue** control saves an immutable
+request after notes/forms are saved. It snapshots the latest saved notes and
+answers belonging to the current version. Copying the handoff transfers only a
+page locator and request ID, not note contents or credentials. The user pastes it
+into their own Agent; Chrona does not dispatch a job or imply work has started.
+Unsaved drafts block snapshot creation; unknown writes retain the same UUID.
+
+`page_read(view: "handoff", requestId?)` defaults to the latest request; pin its
+returned entry ID across subsequent pages. `entries` are frozen snapshot inputs,
+`handoff.baseVersionId` identifies original forms, `newInputCount` counts distinct
+note/answer keys changed since the request, and `latestReport` is the latest
+immutable version explicitly reporting on that exact request. Read the current
+result separately before reconciling. Responses preserve the original form key
+and version; read that version to interpret the fields. No silent migration.
+
+`content.continuation` contains requestId, baseVersionId, summary, changes and
+feedback `{entryId, disposition, explanation}`. References must be exact members
+of the same request snapshot; cross-scope, later and superseded input IDs fail
+atomically. Dispositions are `incorporated`, `deferred`, `needs_clarification`.
+Publication remains a result CAS operation; responding to an old request does
+not authorize overwriting new content. The report is a contributor claim, not
+proof or human acceptance. Unlisted feedback remains unaddressed; a plain new
+version does not resolve anything. Coverage reflects the latest report for that
+request (not cumulative inference). Other requests remain independent.
+
+The page shows **What changed in this update**, expandable feedback explanations,
+and the latest request with later-input and unaddressed counts. Older requests
+remain in input history; exact reports remain in immutable result versions.
+Limits: 100 feedback references, 20 change lines, 24 KiB/report; snapshot entries
+use a 48 KiB page budget with nextOffset, preserving the 128 KiB response cap.
+Existing permissions/flags apply to writing, removal and replay; owner requests
+are not exposed as MCP writes. No Run, Plan, schedule, acceptance, Task or Goal
+transition follows. See the [Agent recipe](../../packages/skills/chrona-pages/SKILL.md).
+
 ## Owner HTTP and persistence
 
 Under existing authenticated `/api/results` owner routes:
@@ -126,7 +185,9 @@ Under existing authenticated `/api/results` owner routes:
 - `POST /page/input` takes `taskId`, optional `occurrenceId`, UUID `requestId`,
   nullable `expectedRevision`, and one action:
   - `{type: "note", noteId: UUID, text}`;
-  - `{type: "respond", versionId, formKey, answers}`.
+  - `{type: "respond", versionId, formKey, answers}`;
+  - `{type: "handoff", versionId, text}`: owner-only continuation request, 1–2,000
+    characters, bound to the exact current head and input revision.
 
 Existing API-key/local-owner and origin checks, JSON/body limits and in-transaction
 reauthorization remain in place. “Owner” is authority, not proof a human personally
