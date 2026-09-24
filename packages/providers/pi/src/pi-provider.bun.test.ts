@@ -189,7 +189,7 @@ describe.skipIf(process.platform === "win32")("Pi provider lifecycle", () => {
     expect(stdout.snapshot.error).not.toContain("SIGKILL");
 
     const bridge = await collect(client, request("bridge-eof", { timeoutMs: 2000 }));
-    expect(bridge.snapshot.error).toContain("Pi RPC bridge fd4 closed before completion");
+    expect(bridge.snapshot.error).toContain("Pi RPC bridge ipc closed before completion");
     expect(bridge.snapshot.error).toContain("phase before_terminal_call");
 
     const acknowledged = await collect(client, request("terminal-eof", terminal));

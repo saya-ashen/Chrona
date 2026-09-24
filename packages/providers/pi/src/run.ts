@@ -101,6 +101,9 @@ export class PiRun {
   private cleanup?: Promise<void>;
   private bridgePhase: BridgePhase = "before_terminal_call";
   private readonly nonterminalTools = new NonterminalToolLifecycle();
+  private initialized!: () => void;
+  private readonly bridgeInitialized = new Promise<void>((resolve) => { this.initialized = resolve; });
+  private bridgeIsInitialized = false;
   private ready!: () => void;
   private readonly bridgeReady = new Promise<void>((resolve) => { this.ready = resolve; });
 
@@ -144,7 +147,10 @@ export class PiRun {
       onBridge: (event) => { void this.onBridge(event).catch(() => this.fail("Pi bridge failed. No fallback was attempted.")); },
       onFailure: (error) => this.fail(this.describeRpcFailure(error)),
     });
-    this.rpc.bridge({ type: "init", tools: this.tools.tools, isolated, instructions: this.input.instructions });
+    if (!await this.rpc.bridge({ type: "init", tools: this.tools.tools, isolated, instructions: this.input.instructions })) {
+      throw new Error("Pi bridge initialization failed");
+    }
+    await this.waitForBridgeInitialized();
     const current = await this.rpc.request("get_state");
     await this.waitForBridge();
     const actualModel = this.verifyModel(current.model, model);
@@ -183,11 +189,19 @@ export class PiRun {
     return model;
   }
 
+  private async waitForBridgeInitialized() {
+    await this.waitForBridgeSignal(this.bridgeInitialized);
+  }
+
   private async waitForBridge() {
+    await this.waitForBridgeSignal(this.bridgeReady);
+  }
+
+  private async waitForBridgeSignal(signalPromise: Promise<void>) {
     const signal = AbortSignal.any([this.abort.signal, AbortSignal.timeout(30_000)]);
     let interrupt: () => void = () => {};
     try {
-      await Promise.race([this.bridgeReady, new Promise<never>((_resolve, reject) => {
+      await Promise.race([signalPromise, new Promise<never>((_resolve, reject) => {
         interrupt = () => reject(new Error("Pi bridge startup timed out or was interrupted"));
         if (signal.aborted) interrupt();
         else signal.addEventListener("abort", interrupt, { once: true });
@@ -209,7 +223,17 @@ export class PiRun {
 
   private async onBridge(event: RecordValue) {
     if (this.done) return;
-    if (event.type === "ready") { this.ready(); return; }
+    if (event.type === "initialized") {
+      if (this.bridgeIsInitialized) throw new Error("Invalid bridge message");
+      this.bridgeIsInitialized = true;
+      this.initialized();
+      return;
+    }
+    if (event.type === "ready") {
+      if (!this.bridgeIsInitialized) throw new Error("Invalid bridge message");
+      this.ready();
+      return;
+    }
     if (event.type !== "call" || typeof event.id !== "string" || typeof event.name !== "string") throw new Error("Invalid bridge message");
     await this.onBridgeCall(event.id, event.name, record(event.input));
   }
@@ -223,16 +247,20 @@ export class PiRun {
       const result = await this.tools.call(name, args);
       if (nonterminal) this.nonterminalTools.resultProduced(callId);
       this.recordTerminalSubmission(terminal, name, callId, args);
-      this.replyToBridge(callId, { result }, nonterminal);
+      if (!await this.replyToBridge(callId, { result }, nonterminal)) throw new Error("Pi bridge reply failed");
     } catch {
-      this.replyToBridge(callId, { error: "Chrona rejected this tool call. Do not repeat an uncertain terminal submission." }, nonterminal);
+      // A durable terminal acknowledgement remains authoritative even if the
+      // subsequent bridge reply disconnects; no terminal action is replayed.
+      if (!this.terminal) await this.replyToBridge(callId, { error: "Chrona rejected this tool call. Do not repeat an uncertain terminal submission." }, nonterminal);
       this.rejectTerminalSubmission(terminal);
     }
   }
 
-  private replyToBridge(callId: string, response: RecordValue, nonterminal: boolean) {
-    const replied = this.rpc?.bridge({ type: "result", id: callId, ...response }) === true;
-    if (nonterminal && replied) this.nonterminalTools.bridgeReplySent(callId);
+  private async replyToBridge(callId: string, response: RecordValue, nonterminal: boolean) {
+    const callbackAccepted = await this.rpc?.bridge({ type: "result", id: callId, ...response }) === true;
+    // Callback acceptance is a bounded write fact, not proof Pi consumed it.
+    if (nonterminal && callbackAccepted) this.nonterminalTools.bridgeReplySent(callId);
+    return callbackAccepted;
   }
 
   private beginBridgeCall(name: string) {

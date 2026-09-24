@@ -55,9 +55,14 @@ durable engine acknowledgement; assistant text is not completion evidence.
 The adapter waits for Pi's **`agent_settled`**, not `agent_end` (which can precede
 retries, compaction and extension follow-ups). EOF or process exit before that
 boundary, including exit code zero, is failure rather than successful completion.
-Extra stdio bridge descriptors use nonblocking sockets, not filesystem streams
-whose pending reads can block Node shutdown. Startup is abortable; subprocess
-and tool cleanup are bounded.
+The injected bridge uses Node's public namespaced JSON child-process IPC
+(`stdio: ["pipe", "pipe", "pipe", "ipc"]`, JSON serialization), while Pi's
+official stdin/stdout LF JSONL RPC remains unchanged. The parent waits for the
+bridge's application-level `initialized` acknowledgement (complete catalog
+registration) before requesting Pi state; `ready` follows only after both that
+boundary and Pi session start. Native IPC callback acceptance is only a bounded
+write fact, not proof Pi consumed a bridge reply. Startup is abortable;
+subprocess and tool cleanup are bounded.
 
 Result publication has separate deadlines: five minutes for composition and one
 minute for optional editorial review. A validated candidate is persisted before

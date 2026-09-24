@@ -2,7 +2,6 @@
 export const FAKE_PI_SOURCE = String.raw`#!/usr/bin/env node
 import fs from "node:fs";
 import { randomUUID } from "node:crypto";
-import { Socket } from "node:net";
 import { StringDecoder } from "node:string_decoder";
 if (process.argv.includes("--version")) { console.log("0.85.0"); process.exit(0); }
 const args = process.argv.slice(2);
@@ -11,8 +10,8 @@ let sessionId;
 try { sessionId = JSON.parse(fs.readFileSync(file, "utf8")).id; }
 catch { sessionId = randomUUID(); fs.writeFileSync(file, JSON.stringify({ id: sessionId, turns: 0 })); }
 const output = (event) => process.stdout.write(JSON.stringify(event) + "\n");
-const bridgeOutput = new Socket({ fd: 4, readable: false, writable: true });
-const send = (event) => bridgeOutput.write(JSON.stringify(event) + "\n");
+const NAMESPACE = "chrona.pi.bridge";
+const send = (event) => process.send?.({ namespace: NAMESPACE, version: 1, message: event });
 let config;
 let pendingPrompt;
 let scenario;
@@ -27,8 +26,10 @@ function answer(text) {
   output({ type: "agent_end", messages: [] });
   setTimeout(() => output({ type: "agent_settled" }), 20);
 }
-read(new Socket({ fd: 3, readable: true, writable: false }), (message) => {
-  if (message.type === "init") { config = message; send({ type: "ready" }); if (pendingPrompt) pendingPrompt(); }
+process.on("message", (envelope) => {
+  if (!envelope || envelope.namespace !== NAMESPACE || envelope.version !== 1 || !envelope.message) return;
+  const message = envelope.message;
+  if (message.type === "init") { config = message; send({ type: "initialized" }); send({ type: "ready" }); if (pendingPrompt) pendingPrompt(); }
   if (message.type === "result") {
     if (scenario === "duplicate" && !message.error) { send({ type: "call", id: "call-2", name: config.tools[0].name, input: { result: { ok: true } } }); return; }
     if (scenario === "terminal-eof") { process.stdout.end(); return; }
@@ -51,7 +52,7 @@ read(process.stdin, (request) => {
     scenario = request.message.split("scenario:")[1]?.trim();
     if (scenario === "hang") return;
     if (scenario === "eof") { process.stdout.end(); return; }
-    if (scenario === "bridge-eof") { bridgeOutput.end(); return; }
+    if (scenario === "bridge-eof") { process.disconnect?.(); return; }
     if (scenario === "exit") { process.exit(0); }
     if (scenario === "extension-error") { output({ type: "extension_error", error: "PRIVATE_SECRET" }); return; }
     if (scenario === "stderr-type-error") { process.stderr.write("TypeError: synthetic-credential=not-a-secret\n    at /private/synthetic-path.ts:1:1\n", () => process.exit(1)); return; }

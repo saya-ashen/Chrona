@@ -1,9 +1,10 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { StringDecoder } from "node:string_decoder";
-import type { Readable, Writable } from "node:stream";
+import type { Readable } from "node:stream";
+import { PI_BRIDGE_MAX_MESSAGE_BYTES, PI_BRIDGE_NAMESPACE, PI_BRIDGE_VERSION } from "./bridge-source";
 
 export type RecordValue = Record<string, unknown>;
-export type PiRpcClosureSource = "stdout" | "bridge_fd4" | "process_exit";
+export type PiRpcClosureSource = "stdout" | "bridge_ipc" | "process_exit";
 
 export class PiRpcClosedBeforeCompletionError extends Error {
   constructor(
@@ -24,7 +25,7 @@ export function record(value: unknown): RecordValue {
   return value && typeof value === "object" && !Array.isArray(value) ? value as RecordValue : {};
 }
 
-const MAX_FRAME_BYTES = 8 * 1024 * 1024;
+const MAX_FRAME_BYTES = PI_BRIDGE_MAX_MESSAGE_BYTES;
 const MAX_STDERR_CHUNK_BYTES = 4096;
 const MAX_STDERR_CHUNKS = 128;
 const MAX_STDERR_CLASSES = 4;
@@ -229,26 +230,31 @@ export class PiRpc {
   private closed = false;
   private failed = false;
   private pendingPipeEnd?: ReturnType<typeof setTimeout>;
+  private readonly bridgeSendResolutions = new Set<(sent: boolean) => void>();
   private closing?: Promise<void>;
 
   constructor(private readonly launch: RpcLaunch) {
     this.child = spawn(launch.command, launch.args, {
       cwd: launch.cwd, env: launch.env, shell: false,
       detached: process.platform !== "win32",
-      stdio: ["pipe", "pipe", "pipe", "pipe", "pipe"],
+      // Public JSON IPC gives the Node child one owned bidirectional channel.
+      // Pi's stdin/stdout remain its official LF JSONL RPC transport.
+      stdio: ["pipe", "pipe", "pipe", "ipc"],
+      serialization: "json",
       windowsHide: true,
     });
     const fail = (error: Error) => this.fail(error);
     // Neither a clean EOF nor exit code 0 proves agent_settled was received.
     // Do not wait for the model deadline when an IPC channel is already gone.
     // Keep only bounded transport facts; stderr may contain private extension data.
-    const ended = (source: "stdout" | "bridge_fd4") => this.failAfterPipeEnd(source);
+    const ended = (source: "stdout" | "bridge_ipc") => this.failAfterPipeEnd(source);
     readJsonl(this.child.stdout!, (event) => this.receive(event), fail, () => ended("stdout"));
-    readJsonl(this.child.stdio[4] as Readable, launch.onBridge, fail, () => ended("bridge_fd4"));
+    this.child.on("message", (value) => this.receiveBridge(value));
+    this.child.on("disconnect", () => ended("bridge_ipc"));
     // Classify bounded stderr evidence into fixed labels without retaining or logging text.
     this.child.stderr!.on("data", (chunk: Buffer | string) => this.stderrClassifier.push(chunk));
     this.child.stderr!.on("end", () => this.stderrClassifier.finish());
-    for (const stream of [this.child.stdin!, this.child.stdio[3]!]) stream.on("error", () => fail(new Error("Pi input pipe failed")));
+    this.child.stdin!.on("error", () => fail(new Error("Pi input pipe failed")));
     this.child.on("error", () => fail(new Error("Cannot start Pi. Install Pi >= 0.85.0 and check the executable and working directory.")));
     const exited = (code: number | null, signal: string | null) => {
       // A later SIGTERM/SIGKILL after close() is Chrona cleanup, not a cause.
@@ -260,7 +266,7 @@ export class PiRpc {
 
   }
 
-  private failAfterPipeEnd(source: "stdout" | "bridge_fd4") {
+  private failAfterPipeEnd(source: "stdout" | "bridge_ipc") {
     if (this.closed || this.failed || this.pendingPipeEnd) return;
     // Give an already-exiting child one event-loop turn to report its real exit
     // code/signal before cleanup can send its own termination signal.
@@ -280,7 +286,17 @@ export class PiRpc {
     this.clearPendingPipeEnd();
     this.failed = true;
     this.rejectPending(error);
+    this.resolveBridgeSends(false);
     this.launch.onFailure(error);
+  }
+
+  private receiveBridge(value: unknown) {
+    const envelope = record(value);
+    if (envelope.namespace !== PI_BRIDGE_NAMESPACE || envelope.version !== PI_BRIDGE_VERSION) return;
+    if (this.serializedBytes(envelope) > MAX_FRAME_BYTES) { this.fail(new Error("Pi bridge emitted an invalid or oversized message")); return; }
+    const message = record(envelope.message);
+    if (!Object.keys(message).length) { this.fail(new Error("Pi bridge emitted an invalid message")); return; }
+    this.launch.onBridge(message);
   }
 
   private receive(event: RecordValue) {
@@ -310,13 +326,43 @@ export class PiRpc {
   }
 
   send(value: RecordValue) {
-    if (!this.closed) this.child.stdin!.write(`${JSON.stringify(value)}\n`);
+    if (this.closed || this.failed || this.serializedBytes(value) > MAX_FRAME_BYTES) { this.fail(new Error("Pi input is unavailable")); return; }
+    try {
+      // A false return is stream backpressure, not failure. The callback reports
+      // only write failure; request completion still requires Pi's response.
+      this.child.stdin!.write(`${JSON.stringify(value)}\n`, (error) => { if (error) this.fail(new Error("Pi input pipe failed")); });
+    } catch { this.fail(new Error("Pi input pipe failed")); }
   }
 
-  bridge(value: RecordValue) {
-    if (this.closed || this.failed) return false;
-    (this.child.stdio[3] as Writable).write(`${JSON.stringify(value)}\n`);
-    return true;
+  bridge(value: RecordValue): Promise<boolean> {
+    // Bound the serialized public IPC envelope, not only its nested payload.
+    const envelope = { namespace: PI_BRIDGE_NAMESPACE, version: PI_BRIDGE_VERSION, message: value };
+    if (this.closed || this.failed || this.serializedBytes(envelope) > MAX_FRAME_BYTES) return Promise.resolve(false);
+    return new Promise((resolve) => {
+      const finish = (sent: boolean) => {
+        if (!this.bridgeSendResolutions.delete(finish)) return;
+        resolve(sent);
+      };
+      this.bridgeSendResolutions.add(finish);
+      if (!this.child.connected) { finish(false); this.fail(new Error("Pi bridge IPC disconnected")); return; }
+      try {
+        // send() returning false signals backpressure only. Its callback confirms
+        // Node accepted the message, never that Pi consumed a bridge result.
+        this.child.send(envelope, (error) => {
+          if (error) { finish(false); this.fail(new Error("Pi bridge IPC failed")); }
+          else finish(true);
+        });
+      } catch { finish(false); this.fail(new Error("Pi bridge IPC failed")); }
+    });
+  }
+
+  private serializedBytes(value: unknown) {
+    try { return Buffer.byteLength(JSON.stringify(value)); }
+    catch { return MAX_FRAME_BYTES + 1; }
+  }
+
+  private resolveBridgeSends(sent: boolean) {
+    for (const resolve of [...this.bridgeSendResolutions]) resolve(sent);
   }
 
   private rejectPending(error: Error) {
@@ -329,6 +375,7 @@ export class PiRpc {
     this.closed = true;
     this.clearPendingPipeEnd();
     this.rejectPending(new Error("Pi RPC closed"));
+    this.resolveBridgeSends(false);
     this.closing = new Promise<void>((resolve) => {
       if (!this.child.pid || this.child.exitCode !== null || this.child.signalCode !== null) { this.signal("SIGKILL"); this.destroyPipes(); resolve(); return; }
       const finish = () => {
@@ -342,15 +389,14 @@ export class PiRpc {
       const timer = setTimeout(finish, 1500);
       this.child.once("exit", finish);
       this.child.stdin?.end();
-      (this.child.stdio[3] as Writable | null)?.end();
       this.signal("SIGTERM");
     });
     return this.closing;
   }
 
   private destroyPipes() {
-    // Closing only writable stdin leaves read ends (including bridge fd4) alive
-    // on runtimes that defer child cleanup until every stdio handle is closed.
+    // Child IPC is owned by child_process; there are no raw extra-fd wrappers.
+    try { this.child.disconnect(); } catch { /* IPC is already disconnected. */ }
     for (const stream of this.child.stdio) stream?.destroy();
   }
 
