@@ -5,6 +5,7 @@ import type { PropsWithChildren } from "react";
 
 import { useTaskWorkspacePageState, type TaskWorkspaceSseEvent } from "./use-task-workspace-page-state";
 import { taskWorkspaceStateFixtures } from "@features/task-workspace/test";
+import { taskWorkspaceQueryKeys } from "../model/task-workspace-query";
 import type { TaskPageData } from "@features/task-workspace"
 
 type JsonEventHandler = (event: { event: string; data: Record<string, unknown>; message: unknown }) => void;
@@ -110,6 +111,31 @@ afterEach(() => {
 });
 
 describe("useTaskWorkspacePageState — state.snapshot / state.update dispatch", () => {
+  it("reconciles execution and plan snapshots on the first SSE ready, closing the load-subscribe gap", async () => {
+    initialPageForTest = taskWorkspaceStateFixtures.idle.pageData;
+    const taskId = initialPageForTest.task.id;
+    const workBlockId = initialPageForTest.task.currentWorkBlock?.id ?? null;
+    const client = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const executionKey = taskWorkspaceQueryKeys.currentExecution(taskId, workBlockId);
+    const planKey = taskWorkspaceQueryKeys.planState(taskId, workBlockId);
+    client.setQueryData(executionKey, { status: "running", checkpoint: null });
+    client.setQueryData(planKey, { savedPlan: null });
+    const { unmount } = renderHook(() => useTaskWorkspacePageState(initialPageForTest), {
+      wrapper: ({ children }: PropsWithChildren) => <QueryClientProvider client={client}>{children}</QueryClientProvider>,
+    });
+    await waitFor(() => expect(mocks.streamOpened).toBe(true));
+    expect(client.getQueryState(executionKey)?.isInvalidated).toBe(false);
+
+    // The server reached manual_completion after the initial GET, before
+    // this subscription. No execution delta will be replayed on first ready.
+    await act(async () => { pushEvent("ready", {}); });
+    await waitFor(() => {
+      expect(client.getQueryState(executionKey)?.isInvalidated).toBe(true);
+      expect(client.getQueryState(planKey)?.isInvalidated).toBe(true);
+    });
+    unmount();
+    client.clear();
+  });
   it("writes state.update events into the workspace stateStore", async () => {
     initialPageForTest = taskWorkspaceStateFixtures.idle.pageData;
     const { result } = renderHook(() => useTaskWorkspacePageState(initialPageForTest), { wrapper });

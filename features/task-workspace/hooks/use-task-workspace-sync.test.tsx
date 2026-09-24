@@ -31,6 +31,7 @@ const mocks = vi.hoisted(() => ({
   fetchCalls: [] as Array<{ input: string; init?: RequestInit }>,
   currentExecutionResponse: null as PublicPlanExecutionResult | null,
   currentExecutionFetchCount: 0,
+  pendingExecutionOnce: null as Promise<PublicPlanExecutionResult> | null,
   eventHandlers: new Map<string, JsonEventHandler>(),
   eventStreamAttempts: 0,
   eventStreamMode: "open" as "open" | "reject",
@@ -85,7 +86,9 @@ vi.mock("@shared/http", async (importOriginal) => ({
     }
     if (/\/execution\/current(?:\?|$)/.test(path)) {
       mocks.currentExecutionFetchCount += 1;
-      return mocks.currentExecutionResponse;
+      const pending = mocks.pendingExecutionOnce;
+      mocks.pendingExecutionOnce = null;
+      return pending ?? mocks.currentExecutionResponse;
     }
     if (/\/result\/accept(?:\?|$)/.test(path) && method === "POST") {
       return { taskId: "task-1", workspaceId: "workspace-1", runId: "run-1" };
@@ -353,6 +356,7 @@ afterEach(() => {
   mocks.fetchCalls = [];
   mocks.currentExecutionResponse = null;
   mocks.currentExecutionFetchCount = 0;
+  mocks.pendingExecutionOnce = null;
   mocks.eventHandlers.clear();
   mocks.eventStreamAttempts = 0;
   mocks.eventStreamMode = "open";
@@ -813,7 +817,37 @@ describe("task workspace page synchronization", () => {
   });
 
 
-  it("does not refresh the workspace page for ready or heartbeat events", async () => {
+  it.each(["ready", "task_workspace_updated"])("does not lose %s invalidation while the first execution GET is in flight", async (event) => {
+    const initialPlan = planReadModel({ id: "plan-1", status: "running", title: "Manual review" });
+    const initialPage = pageData({ taskStatus: "Running", plan: initialPlan });
+    const pending = Promise.withResolvers<PublicPlanExecutionResult>();
+    mocks.pendingExecutionOnce = pending.promise;
+    mocks.planResponses = [{ taskId: "task-1", aiPlanGenerationStatus: "accepted", savedPlan: initialPlan }];
+    const { result } = renderHook(() => {
+      const workspace = useTaskWorkspacePageState(initialPage);
+      const plan = useTaskWorkspacePlanState(workspace.pageData.task, workspace.refreshWorkspace, workspace.workspaceEvents);
+      return { workspace, plan };
+    }, { wrapper: createQueryWrapper() });
+    await waitFor(() => expect(mocks.currentExecutionFetchCount).toBe(1));
+    mocks.currentExecutionResponse = executionResult({ status: "waiting_for_user", checkpoint: {
+      id: "scope-1:node-1:manual_completion", taskId: "task-1", nodeId: "node-1",
+      kind: "manual_completion", title: "Manual review", message: "Provide review summary",
+      severity: "info", availableActions: [], createdAt: "2026-09-24T00:00:00Z",
+    } });
+    await act(async () => {
+      mocks.eventHandlers.get("/api/work/task-1/events")?.({ event, data: {
+        sequence: 1, reason: "plan_execution.node_waiting_for_user",
+      }, message: {} });
+    });
+    // The old GET finishes after the one and only readiness notification.
+    await act(async () => { pending.resolve(executionResult({ status: "running" })); });
+    await waitFor(() => {
+      expect(result.current.plan.currentExecution?.status).toBe("waiting_for_user");
+      expect(result.current.plan.currentExecution?.checkpoint?.kind).toBe("manual_completion");
+    });
+  });
+
+  it("does not refresh the workspace page for heartbeat events", async () => {
     const initialPlan = planReadModel({ id: "plan-1", status: "running", title: "Execute launch" });
     const initialPage = pageData({ taskStatus: "Running", plan: initialPlan, runStatus: "Running" });
     mocks.pageResponses = [pageData({ taskStatus: "Blocked", plan: initialPlan, runStatus: "Blocked" })];
@@ -822,7 +856,6 @@ describe("task workspace page synchronization", () => {
 
     await waitFor(() => expect(mocks.eventHandlers.has("/api/work/task-1/events")).toBe(true));
     await act(async () => {
-      mocks.eventHandlers.get("/api/work/task-1/events")?.({ event: "ready", data: {}, message: {} });
       mocks.eventHandlers.get("/api/work/task-1/events")?.({ event: "heartbeat", data: {}, message: {} });
     });
 
