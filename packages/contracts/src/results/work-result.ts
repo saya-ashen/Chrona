@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { workPageSchema } from "@chrona/ui-protocol/work-pages";
+import { pageContinuationSchema } from "./continuation";
 import { deliverableKindSchema, deliverablePresentationSchema, resultContributionSchema, resultEvidenceSchema } from "./content";
 
 export const RESULT_REQUEST_BYTES = 96 * 1024;
@@ -16,6 +17,7 @@ const evidence = resultEvidenceSchema.extend({ key, summary: body });
 export const workResultContentSchema = z.object({
   schemaVersion: z.literal(1),
   page: workPageSchema.optional(),
+  continuation: pageContinuationSchema.optional(),
   outcome: z.object({ title: z.string().min(1).max(256), summary: body }).strict(),
   readiness: z.object({ status: z.enum(["ready", "ready_with_caveats", "partial", "blocked"]), summary: body }).strict(),
   findings: z.array(contribution).max(100).default([]),

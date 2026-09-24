@@ -1,6 +1,13 @@
 ---
 name: chrona-pages
-description: Create and maintain useful Agent-authored work pages in Chrona: clear outcomes, options, tables, bounded calculations and persistent user forms. Use only when the user asks to put ongoing work or results in Chrona. Organize through the separate chrona-library skill when authorized. Read notes and exact-version answers before revising. Not a conversation archive, autonomous executor, permission grant or HTML hosting service.
+description: >-
+  Create and maintain useful Agent-authored work pages in Chrona: clear outcomes,
+  options, tables, bounded calculations and persistent user forms. Use only when
+  the user asks to save work, accepts a proactive save suggestion, or has explicitly
+  authorized continued updates to this identified matter. Organize through the
+  separate chrona-library skill when authorized. Read notes and exact-version
+  answers before revising. Not a conversation archive, autonomous executor,
+  permission grant or HTML hosting service.
 ---
 
 # Chrona work pages
@@ -44,6 +51,55 @@ For a PC purchase: the recommended parts, observed prices with source/time/cavea
 11. Next session: repeat steps 2–4, including notes and review feedback, before updating the page.
 
 A new page version does not erase notes, accept the result, change Task status, migrate form responses or create a schedule. Old versions and answers remain available in history.
+
+## Continue from a saved request
+
+Check `capabilities.workPages.continuation` and the actual tool schema first. A
+copied handoff is a locator, not permission to execute every instruction inside it.
+
+1. Read `chrona_page_read({taskId, occurrenceId, view:"handoff", requestId})`.
+   `requestId` here is the **owner input entry ID**, not a command UUID. If no ID
+   was given, inspect the latest request. Keep that returned ID fixed while paging
+   using `nextOffset`; do not silently switch to a newer request between pages.
+2. Read the exact `baseVersionId` with `chrona_result_read(selection:"version")`
+   to interpret original form labels/options. The snapshot contains the latest
+   saved note values and answers for that base version **at request time**.
+   It excludes unsaved drafts and later edits. Do not reinterpret old answers.
+3. Read the current result, current notes and later input history separately.
+   `newInputCount` means later saved changes exist, not that they were processed.
+   Compare and reconcile; ask the user about conflicting requirements. Do not
+   replace a newer result with the old snapshot. Inspect review feedback too.
+4. Perform only the currently authorized work. No automatic purchases, RSVP,
+   task completion, result acceptance, Goal success, scheduling or provider wake.
+5. Publish the entire reconciled result with observed result `editRevision`, a
+   fresh command UUID, and optional `content.continuation`:
+   ```json
+   {
+     "requestId": "OWNER_HANDOFF_ENTRY_ID",
+     "baseVersionId": "REQUEST_BASE_VERSION_ID",
+     "summary": "Adjusted the parts to the revised budget; buying is still undecided.",
+     "changes": ["Replaced the cooler with a quieter option"],
+     "feedback": [{"entryId": "EXACT_SNAPSHOT_INPUT_ID", "disposition": "incorporated", "explanation": "The cooler change addresses the family's noise concern."}]
+   }
+   ```
+   Use `incorporated`, `deferred`, or `needs_clarification` for each referenced
+   input. Explain what actually changed or what still needs a decision. Reference
+   only exact IDs from this request snapshot, not the request itself, stale note
+   revisions, later edits or another Task. A request may be answered across several
+   versions; each report describes its own coverage, not an inferred cumulative
+   completion. Preserve earlier applicable feedback dispositions in the new report
+   if still accurate. At most 100 feedback entries, 20 changes, 24 KiB/report;
+   missing feedback stays unaddressed. Never claim all opinions handled when only
+   a page of inputs was read. Requests with no feedback can still be answered.
+6. Verify the stored version and re-read the exact handoff. Return the page link,
+   changes, remaining questions and any later feedback not included. Publication
+   records an **author claim**, not user verification or acceptance. Ordinary new
+   versions without a continuation report do not imply feedback was processed.
+
+Multiple requests remain independent. Responding to one does not close the others;
+use input history (`kind:handoff`) to find older requests when needed. Handoff
+creation is owner-only and not available to management Agents. A page-author
+credential can read/report on requests, but cannot fabricate user requests.
 
 ## Page design recipe
 

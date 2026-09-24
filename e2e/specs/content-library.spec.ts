@@ -1,4 +1,5 @@
-import { test, expect, type APIRequestContext, type Page } from "@playwright/test";
+import { test, expect, type APIRequestContext } from "@playwright/test";
+import { expectContentLayout as noOverflow } from "../helpers/content-layout";
 async function read(request: APIRequestContext, data: object = {}) { const r = await request.post("/api/library/read", { data }); expect(r.ok()).toBeTruthy(); return r.json(); }
 async function command(request: APIRequestContext, action: object) {
   const view = await read(request, { view: "catalog" });
@@ -7,7 +8,6 @@ async function command(request: APIRequestContext, action: object) {
 async function task(request: APIRequestContext, title: string) {
   const r = await request.post("/api/work-records/capture", { data: { title, requestId: crypto.randomUUID(), context: { kind: "general" } } }); expect(r.ok()).toBeTruthy(); return (await r.json()).receipt.taskId as string;
 }
-async function noOverflow(page: Page) { await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth && document.body.scrollWidth <= innerWidth)).toBe(true); }
 
 test("header creation uses the selected folder; classification conflicts retain the created content without duplication", async ({ page, request }, info) => {
   const name = `Header ${info.project.name}`;

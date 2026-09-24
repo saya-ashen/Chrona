@@ -142,7 +142,7 @@ export function WorkPagesHomeRoutePage() {
 export function WorkPageRoutePage() {
   const { task } = useLoaderData() as TaskPageRouteData;
   const [search] = useSearchParams();
-  return <WorkPageWorkspace key={`${task.task.id}:${search.get("occurrenceId") ?? "task"}`} taskId={task.task.id} title={task.task.title} occurrenceId={search.get("occurrenceId")} context={!search.get("occurrenceId") ? <WorkRecordSummary taskId={task.task.id} /> : null} />;
+  return <WorkPageWorkspace key={`${task.task.id}:${search.get("occurrenceId") ?? "task"}`} taskId={task.task.id} title={task.task.title} description={task.task.description} occurrenceId={search.get("occurrenceId")} context={!search.get("occurrenceId") ? <WorkRecordSummary taskId={task.task.id} /> : null} />;
 }
 export function LocaleLandingPage() {
   const params = useParams();
@@ -314,7 +314,7 @@ export function TaskDetailRoutePage() {
     <TaskWorkspacePage data={task} copy={dictionary.components.taskPage} />
   </PageFrame>;
   if (task.task.taskExecutionMode === "manual" && search.get("view") !== "execution") {
-    return <WorkPageWorkspace key={task.task.id} taskId={task.task.id} title={task.task.title} context={<WorkRecordSummary taskId={task.task.id} />} />;
+    return <WorkPageWorkspace key={task.task.id} taskId={task.task.id} title={task.task.title} description={task.task.description} context={<WorkRecordSummary taskId={task.task.id} />} />;
   }
   return legacy;
 }

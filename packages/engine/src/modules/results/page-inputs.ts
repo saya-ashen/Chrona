@@ -7,6 +7,7 @@ import { authorizeResult, resultActorKey, WorkResultError, type TaskResultsPorts
 import { findWorkResult, scopeOf } from "./commands";
 import { resultPayloadHash } from "./content-hash";
 import { pageWritesEnabled } from "./page-policy";
+import { readPageHandoff } from "./page-continuation";
 import { appendCanonicalEvent } from "../events";
 
 function revision(result: TaskResult | null) { return result ? `page-input-v1:${result.id}:${result.inputRevision}` : null; }
@@ -17,7 +18,11 @@ export async function readPageInputs(ports: TaskResultsPorts, input: PageRead): 
   const task = await db.task.findUniqueOrThrow({ where: { id: input.taskId }, include: { workspace: { select: { status: true } } } });
   const canRespond = principal.actorKind === "human" && principal.permissions.includes("pages:respond") && pageWritesEnabled() && workResultWritesAllowed(task, task.workspace.status);
   const base = { revision: revision(result), headVersionId: result?.headVersionId ?? null, canRespond, view: input.view };
-  if (!result) return { ...base, entries: [], total: 0, nextOffset: null };
+  if (!result) {
+    if (input.requestId) throw new WorkResultError("NOT_FOUND", "Continuation request not found in this scope");
+    return { ...base, entries: [], total: 0, nextOffset: null, handoff: null };
+  }
+  if (input.view === "handoff") return { ...base, ...await readPageHandoff(input, result) };
   if (input.versionId && !await db.taskResultVersion.findFirst({ where: { id: input.versionId, resultId: result.id }, select: { id: true } })) throw new WorkResultError("NOT_FOUND", "Page version not found in this scope");
   return { ...base, ...await pageEntries(input, result) };
 }
@@ -37,7 +42,8 @@ async function pageEntries(input: PageRead, result: TaskResult) {
 
 async function inputContent(action: PageWrite["action"], result: TaskResult | null) {
   if (action.type === "note") return { text: action.text };
-  if (!result || result.headVersionId !== action.versionId) throw new WorkResultError("REVISION_CONFLICT", "The page changed. Read the new form before answering");
+  if (!result || result.headVersionId !== action.versionId) throw new WorkResultError("REVISION_CONFLICT", "The page changed. Read it again before saving");
+  if (action.type === "handoff") return { text: action.text, snapshotRevision: result.inputRevision };
   const version = await db.taskResultVersion.findFirstOrThrow({ where: { id: action.versionId, resultId: result.id } });
   const form = workResultContentSchema.parse(version.content).page?.forms[action.formKey];
   if (!form) throw new WorkResultError("NOT_FOUND", "Form not found in this version");
@@ -47,6 +53,7 @@ async function inputContent(action: PageWrite["action"], result: TaskResult | nu
 }
 function inputIdentity(action: PageWrite["action"]) {
   if (action.type === "note") return { kind: "note", entryKey: `note:${action.noteId}`, versionId: null, formKey: null };
+  if (action.type === "handoff") return { kind: "handoff", entryKey: `handoff:${randomUUID()}`, versionId: action.versionId, formKey: null };
   return { kind: "response", entryKey: `form:${action.versionId}:${action.formKey}`, versionId: action.versionId, formKey: action.formKey };
 }
 async function assertInputCapacity(result: TaskResult | null, workspaceId: string) {

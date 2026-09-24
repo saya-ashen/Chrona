@@ -52,4 +52,5 @@ export function useUnsavedPage(dirty: boolean) {
     window.addEventListener("beforeunload", warn);
     return () => window.removeEventListener("beforeunload", warn);
   }, [dirty]);
+  return id;
 }

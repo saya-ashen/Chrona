@@ -30,9 +30,9 @@ export function WorkPagesHome({ workspaceId: _workspaceId }: { workspaceId: stri
     else if(value.receipt.changes.some(v=>v.kind==="folder_deleted")) chooseGroup(location.groupId ?? "all");
   }
   const ready = !state.loading && !state.error && state.data;
-  return <PageFrame mode="main" data-domain="content-library" className="mx-auto w-full max-w-5xl space-y-7 px-1 py-6 sm:px-6">
+  return <PageFrame mode="main" data-domain="content-library" className="mx-auto w-full max-w-[1360px] space-y-7 px-0 py-2 sm:py-4">
     <LibraryHeader data={state.data} location={location} create={()=>setCreate(true)} />
-    <p className="text-muted-foreground">{messages.library.intro}</p>
+    <p className="max-w-[75ch] text-muted-foreground">{messages.library.intro}</p>
     <LibraryToolbar data={state.data} location={location} search={search} chooseGroup={chooseGroup} edit={setEditor} />
     {state.data && !state.data.writesEnabled && <p className="text-sm text-muted-foreground">{messages.library.readOnly}</p>}
     {receipt && <LibraryReceiptNotice receipt={receipt} />}<LibraryReadFeedback state={state} />

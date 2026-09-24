@@ -40,18 +40,18 @@ export function PageNotes({ scope, onSaved }: { scope: PageScope; onSaved?: () =
     </>}
   </section>;
 }
-export function PageInputHistory({ scope }: { scope: PageScope }) {
+export function PageInputHistory({ scope, refreshKey = 0 }: { scope: PageScope; refreshKey?: number }) {
   const c = useI18n().messages.workPages, [open, setOpen] = useState(false), [offset, setOffset] = useState(0), [data, setData] = useState<PageInputsView | null>(null), [error, setError] = useState(false);
   useEffect(() => {
     if (!open) return;
     const controller = new AbortController(); setData(null); setError(false);
     void pageRequest<PageInputsView>("read", { ...scope, view: "history", offset }, controller.signal).then(setData).catch(() => { if (!controller.signal.aborted) setError(true); });
     return () => controller.abort();
-  }, [open, offset, scope.taskId, scope.occurrenceId]);
+  }, [open, offset, scope.taskId, scope.occurrenceId, refreshKey]);
   return <details className="border-t pt-5" onToggle={(e) => setOpen(e.currentTarget.open)}><summary className="cursor-pointer text-sm text-muted-foreground">{c.history}</summary>
     {open && <div className="mt-4 space-y-4">{error ? <p role="alert">{c.error}</p> : !data ? <p>{c.loading}</p> : <>
       {!data.entries.length && <p>{c.historyEmpty}</p>}
-      {data.entries.map((entry) => <div key={entry.id} className="space-y-2 border-l pl-3 text-sm"><p className="text-xs text-muted-foreground">{c[entry.kind]} · {new Date(entry.createdAt).toLocaleString()}{entry.formKey ? ` · ${entry.formKey}` : ""}</p>{entry.kind === "note" ? <p className="whitespace-pre-wrap">{entry.content.text || "—"}</p> : <dl>{Object.entries(entry.content.answers ?? {}).map(([key, value]) => <div key={key}><dt className="text-muted-foreground">{key}</dt><dd className="whitespace-pre-wrap break-words">{Array.isArray(value) ? value.join(", ") : String(value)}</dd></div>)}</dl>}</div>)}
+      {data.entries.map((entry) => <div key={entry.id} className="space-y-2 border-l pl-3 text-sm"><p className="text-xs text-muted-foreground">{c[entry.kind]} · {new Date(entry.createdAt).toLocaleString()}{entry.formKey ? ` · ${entry.formKey}` : ""}</p>{entry.kind !== "response" ? <p className="whitespace-pre-wrap">{entry.content.text || "—"}</p> : <dl>{Object.entries(entry.content.answers ?? {}).map(([key, value]) => <div key={key}><dt className="text-muted-foreground">{key}</dt><dd className="whitespace-pre-wrap break-words">{Array.isArray(value) ? value.join(", ") : String(value)}</dd></div>)}</dl>}</div>)}
       <div className="flex gap-2">{offset > 0 && <Button size="sm" variant="ghost" onClick={() => setOffset(0)}>{c.recent}</Button>}{data.nextOffset !== null && <Button size="sm" variant="ghost" onClick={() => setOffset(data.nextOffset!)}>{c.loadMore}</Button>}</div>
     </>}</div>}
   </details>;

@@ -49,6 +49,31 @@ test("real MCP author → owner HTTP answers → fresh MCP reader → next immut
   await revokeManagementClient(author.clientId); expect((await mcp(author.token, "chrona_result_submit", args)).status).toBe(401);
 });
 
+test("owner handoff is readable by a fresh MCP session; scoped author reports updates without execution", async () => {
+  const author = await createManagementClient({ name: "Continuation author", publicUrl: "http://localhost:3101", scopes: [...MANAGEMENT_ACCESS_PRESETS["pages-author"]] });
+  const identity = await engine.management.authorize(author.token), { taskId } = await seedTask(identity.workspaceId);
+  const content = { schemaVersion: 1, outcome: { title: "Computer", summary: "No purchase" }, readiness: { status: "partial", summary: "Waiting" }, page: exampleWorkPage };
+  const first = (await mcp(author.token, "chrona_result_submit", { taskId, requestId: crypto.randomUUID(), expectedRevision: null, content })).result.data.receipt;
+  const read = await owner("page/read", { taskId });
+  const note = await owner("page/input", { taskId, requestId: crypto.randomUUID(), expectedRevision: read.body.revision, action: { type: "note", noteId: crypto.randomUUID(), text: "Prefer quiet parts" } });
+  const input = { taskId, requestId: crypto.randomUUID(), expectedRevision: note.body.receipt.revision, action: { type: "handoff", versionId: first.versionId, text: "Revise without purchasing" } };
+  expect((await owner("page/input", input, author.token)).status).toBe(401);
+  expect((await owner("page/input", input)).status).toBe(200);
+  const fresh = await createManagementClient({ name: "Fresh reader", publicUrl: "http://localhost:3101", scopes: [...MANAGEMENT_ACCESS_PRESETS["pages-read"]] });
+  const snapshot = (await mcp(fresh.token, "chrona_page_read", { taskId, view: "handoff" })).result.data;
+  expect(snapshot.handoff.request.content.text).toBe("Revise without purchasing");
+  const continuation = { requestId: snapshot.handoff.request.id, baseVersionId: first.versionId, summary: "Quieter plan", changes: ["Replaced cooler"], feedback: [{ entryId: snapshot.entries[0].id, disposition: "incorporated", explanation: "Used a quieter cooler" }] };
+  const args = { taskId, requestId: crypto.randomUUID(), expectedRevision: first.editRevision, content: { ...content, continuation } };
+  expect((await mcp(fresh.token, "chrona_result_submit", args)).result.error.code).toBe("FORBIDDEN");
+  const published = (await mcp(author.token, "chrona_result_submit", args)).result.data.receipt;
+  expect(published.version).toBe(2);
+  expect((await mcp(fresh.token, "chrona_page_read", { taskId, view: "handoff", requestId: continuation.requestId })).result.data.handoff).toMatchObject({ unaddressedCount: 0, latestReport: { version: 2 } });
+  process.env.CHRONA_WORK_PAGES_WRITES_ENABLED = "false";
+  expect((await mcp(author.token, "chrona_result_submit", args)).result.error.code).toBe("PRECONDITION_FAILED");
+  expect((await mcp(fresh.token, "chrona_page_read", { taskId, view: "handoff" })).result.data.handoff.latestReport.version).toBe(2);
+  expect(await Promise.all([db.run.count(), db.taskPlan.count(), db.taskResultReview.count(), db.executionSession.count(), db.workBlock.count()])).toEqual([0, 0, 0, 0, 0]);
+});
+
 test("default-off page gate preserves reads/validation and never broadens old presets", async () => {
   const author = await createManagementClient({ name: "Author", publicUrl: "http://localhost:3101", scopes: [...MANAGEMENT_ACCESS_PRESETS["pages-author"]] });
   const identity = await engine.management.authorize(author.token), { taskId } = await seedTask(identity.workspaceId);
