@@ -35,6 +35,20 @@ function sameDateOrNull(value: Date | null, original: Date | null) {
   return value?.getTime() === original?.getTime();
 }
 
+function aiTaskConfigPatch(input: TaskConfigFormInput): Partial<ScheduleTaskConfigPatch> {
+  return {
+    executionConfig: input.executionConfig,
+    aiClientId: input.aiClientId,
+    autoPlanGeneration: input.autoPlanGeneration,
+    autoExecute: input.autoExecute,
+    autoPlanGenerationTiming: input.autoPlanGenerationTiming,
+    autoExecuteTiming: input.autoExecuteTiming,
+    recurrenceRule: input.recurrenceRule,
+    recurrenceAnchorStartAt: input.recurrenceAnchorStartAt?.toISOString() ?? null,
+    recurrenceAnchorEndAt: input.recurrenceAnchorEndAt?.toISOString() ?? null,
+  };
+}
+
 /**
  * Converts shared task-config form data into the Schedule feature's ordered
  * persistence contract. Manual mode never serializes hidden AI fields.
@@ -53,17 +67,7 @@ export function buildScheduleTaskConfigSaveRequest(
   };
 
   if (task.taskExecutionMode !== "manual") {
-    Object.assign(taskBody, {
-      executionConfig: input.executionConfig,
-      aiClientId: input.aiClientId,
-      autoPlanGeneration: input.autoPlanGeneration,
-      autoExecute: input.autoExecute,
-      autoPlanGenerationTiming: input.autoPlanGenerationTiming,
-      autoExecuteTiming: input.autoExecuteTiming,
-      recurrenceRule: input.recurrenceRule,
-      recurrenceAnchorStartAt: input.recurrenceAnchorStartAt?.toISOString() ?? null,
-      recurrenceAnchorEndAt: input.recurrenceAnchorEndAt?.toISOString() ?? null,
-    });
+    Object.assign(taskBody, aiTaskConfigPatch(input));
 
     return {
       taskBody,

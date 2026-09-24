@@ -6,6 +6,11 @@ import { resultWritesEnabled } from "./entry-policy";
 import { contentHasPage, pageWritesEnabled } from "./page-policy";
 import { findWorkResult } from "./commands";
 
+async function headHasPage(headVersionId: string | null | undefined) {
+  const head = headVersionId ? await db.taskResultVersion.findUnique({ where: { id: headVersionId }, select: { content: true } }) : null;
+  return contentHasPage(head?.content);
+}
+
 export async function resultContext(ports: TaskResultsPorts, scope: ResultScope): Promise<WorkResultContext> {
   const principal = await authorizeResult(ports, scope, "results:read");
   const task = await db.task.findUniqueOrThrow({ where: { id: scope.taskId }, select: { id: true, title: true, status: true, definitionStatus: true, workspace: { select: { status: true } } } });
@@ -13,8 +18,7 @@ export async function resultContext(ports: TaskResultsPorts, scope: ResultScope)
   const writesEnabled = resultWritesEnabled();
   const writable = writesEnabled && workOpen;
   const result = await findWorkResult(principal, scope);
-  const head = result?.headVersionId ? await db.taskResultVersion.findUnique({ where: { id: result.headVersionId }, select: { content: true } }) : null;
-  const hasPage = contentHasPage(head?.content);
+  const hasPage = await headHasPage(result?.headVersionId);
   const pageReadable = principal.permissions.includes("pages:read");
   const pageWritable = pageReadable && principal.permissions.includes("pages:write") && pageWritesEnabled();
   return { task: { id: task.id, title: task.title, status: task.status, definitionStatus: task.definitionStatus }, occurrenceId: scope.occurrenceId,

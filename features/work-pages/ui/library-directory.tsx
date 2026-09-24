@@ -6,11 +6,10 @@ import type { LibraryFolder, LibraryGroup, LibraryItem, LibraryView } from "@chr
 import type { LibraryLocation } from "../model/library-location";
 import type { LibraryEditor } from "../model/library-editor";
 import { libraryHref } from "../model/library-client";
+import { libraryHeading } from "../model/library-heading";
 export function LibraryHeader({ data, location, create }: { data: LibraryView | null; location: LibraryLocation; create: () => void }) {
   const { messages, locale } = useI18n(), c = messages.library;
-  const group = data?.groups.find(g=>g.id===location.groupId), folder = data?.folders.find(f=>f.id===location.folderId);
-  const title = folder?.name ?? (location.unclassified ? c.unclassified : group?.name ?? c.all);
-  const count = folder?.count ?? (location.unclassified ? group?.unclassifiedCount : data?.totalItems);
+  const { group, folder, title, count } = libraryHeading(data, location, c);
   return <header className="space-y-4"><nav aria-label={c.location} className="flex flex-wrap gap-2 text-sm text-muted-foreground"><Link to={localizeHref(locale,"/home")}>{c.all}</Link>{group && <><span>/</span><Link to={localizeHref(locale,libraryHref(group.id))}>{group.name}</Link></>}{(folder || location.unclassified) && <><span>/</span><span>{title}</span></>}</nav><div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0 space-y-2"><h1 className="break-words text-3xl font-semibold tracking-tight">{title}</h1><p className="text-sm text-muted-foreground">{c.total}：{count ?? "—"}</p></div><Button onClick={create}><Plus className="size-4" />{messages.workPages.newPage}</Button></div></header>;
 }
 export function LibraryToolbar({ data, location, search, chooseGroup, edit }: { data: LibraryView | null; location: LibraryLocation; search: (v: string) => void; chooseGroup: (id: string) => void; edit: (e: LibraryEditor) => void }) {

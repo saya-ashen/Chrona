@@ -44,6 +44,29 @@ function sameRequest(receipt: ManualLifecycleReceipt, input: ManualLifecycleInpu
     receipt.expectedRevision === input.expectedRevision;
 }
 
+function lifecycleTransition(
+  task: { id: string; workspaceId: string; status: TaskStatus; completedAt: Date | null; configRevision: number },
+  input: ManualLifecycleInput,
+  action: ManualLifecycleAction,
+) {
+  const nextStatus = action === "complete" ? TaskStatus.Done : TaskStatus.Ready;
+  const isNoop = task.status === nextStatus;
+  const completedAt = action === "complete" ? (task.completedAt ?? new Date()) : null;
+  const nextRevision = isNoop ? task.configRevision : task.configRevision + 1;
+  const receipt: ManualLifecycleReceipt = {
+    taskId: task.id,
+    workspaceId: task.workspaceId,
+    action,
+    requestId: input.requestId,
+    expectedRevision: input.expectedRevision,
+    applied: !isNoop,
+    status: nextStatus,
+    completedAt: completedAt?.toISOString() ?? null,
+    revision: revisionFor(nextRevision),
+  };
+  return { nextStatus, isNoop, completedAt, receipt };
+}
+
 /**
  * Direct manual lifecycle command. The canonical event is also the durable
  * request receipt: it is written in the same transaction as the CAS update.
@@ -51,7 +74,7 @@ function sameRequest(receipt: ManualLifecycleReceipt, input: ManualLifecycleInpu
  */
 async function runManualLifecycle(input: ManualLifecycleInput, action: ManualLifecycleAction) {
   const key = receiptKey(input.workspaceId, input.requestId);
-  let shouldRebuildProjection = false;
+  const projection = { shouldRebuild: false };
   const receipt = await db.$transaction(async (tx) => {
     const prior = await tx.event.findUnique({ where: { dedupeKey: key } });
     if (prior) {
@@ -74,23 +97,7 @@ async function runManualLifecycle(input: ManualLifecycleInput, action: ManualLif
       throw new EngineError(ENGINE_ERROR_CODES.CONFLICT, "Task changed. Read it before deciding how to retry.");
     }
 
-    const nextStatus = action === "complete" ? TaskStatus.Done : TaskStatus.Ready;
-    const isNoop = task.status === nextStatus;
-    const completedAt = action === "complete"
-      ? (task.completedAt ?? new Date())
-      : null;
-    const nextRevision = isNoop ? task.configRevision : task.configRevision + 1;
-    const receipt: ManualLifecycleReceipt = {
-      taskId: task.id,
-      workspaceId: task.workspaceId,
-      action,
-      requestId: input.requestId,
-      expectedRevision: input.expectedRevision,
-      applied: !isNoop,
-      status: nextStatus,
-      completedAt: completedAt?.toISOString() ?? null,
-      revision: revisionFor(nextRevision),
-    };
+    const { nextStatus, isNoop, completedAt, receipt } = lifecycleTransition(task, input, action);
 
     if (!isNoop) {
       const updated = await tx.task.updateMany({
@@ -105,7 +112,7 @@ async function runManualLifecycle(input: ManualLifecycleInput, action: ManualLif
       if (updated.count !== 1) {
         throw new EngineError(ENGINE_ERROR_CODES.CONFLICT, "Task changed. Read it before deciding how to retry.");
       }
-      shouldRebuildProjection = true;
+      projection.shouldRebuild = true;
     }
 
     await appendCanonicalEvent({
@@ -129,7 +136,7 @@ async function runManualLifecycle(input: ManualLifecycleInput, action: ManualLif
 
   // Projection rebuilding is recoverable from the durable task/event command;
   // retrying the identical request reaches this point without reapplying state.
-  if (shouldRebuildProjection) await rebuildTaskProjection(input.taskId);
+  if (projection.shouldRebuild) await rebuildTaskProjection(input.taskId);
   return receipt;
 }
 
