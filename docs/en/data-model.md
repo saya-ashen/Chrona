@@ -4,7 +4,33 @@ Chrona persists goal, task, schedule, execution, memory, and AI-client state in 
 
 Schema source: `prisma/schema.prisma`.
 
-Current schema inventory:
+## Target evolution: work-owned results
+
+The [Product Architecture](../zh/product-architecture.md) requires results and
+version-bound review to exist independently of managed execution. B1–B3 provide
+that storage, shared application foundation, external intake routes, uploads,
+and deterministic review UI. The separately implemented work-record slice adds
+manual-work continuity and is deployed on the authorized instance with separate opt-in writes.
+
+| Current coupling | Required target property |
+| --- | --- |
+| Canonical result container in `TaskPlanRun.planRun.mutableGraph.planOutput` | Stable work-owned result identity/version that does not require a plan run |
+| NodeResult aggregation and Run-owned Artifact provenance | One semantic result/artifact model accepting manual, external, or managed origins; genuine Run/node links retained when present |
+| Acceptance event scoped to a completed Run | Review bound to the exact result version, with compatible reads of historical acceptance |
+| Goal Inbox and formal GoalAsset versions | Reuse the existing promotion/review concepts; no parallel external asset lifecycle |
+
+The work-owned result models described below reuse Task identity and preserve
+occurrence isolation. The managed-result adapter and Goal asset reuse remain
+later implementation work. Do not
+create fake Run/ExecutionSession rows, make all ownership fields nullable without
+replacement invariants, or copy a second external-results database.
+
+Before persistence changes: specify identity and scope constraints, source
+attribution, version/concurrency rules, artifact ownership, historical result
+and acceptance mapping, migration/rollback, and fresh-install/upgrade tests.
+Keep shipped migration checksums and existing data compatibility intact.
+
+## Current schema inventory
 
 - Models: see `prisma/schema.prisma` as the authoritative current inventory.
 - Enums: see `prisma/schema.prisma` as the authoritative current inventory.
@@ -16,6 +42,10 @@ Current schema inventory:
 | Workspace | `Workspace` | Scope for tasks, memory, schedule, calendar sources, and configuration. |
 | Goal | `Goal`, `GoalAsset`, `GoalAssetVersion`, `GoalAssetDraft`, `GoalInboxCandidate`, `GoalFormSubmission`, `GoalAssetJob`, `GoalBriefRevision` | Durable outcome lifecycle, versioned Workbench assets, result intake, form submissions, export jobs, automatic accepted-result context, and immutable artifact provenance. |
 | Task | `Task`, `TaskDependency`, `TaskProjection`, `TaskSession`, `TaskTimelineItem` | Core work item, relationships, projection-backed read shape, scoped work sessions, and timeline rows. |
+| Work records (opt-in, Web/MCP) | `WorkRecord`, `WorkSource`, `WorkEntry`, `WorkCommand` | One optional extension per manual Task; stable source links, independent attributed signals, append-only progress/change history, CAS and durable command receipts. No parallel Task or Run. |
+| Work results (B1–B3, Web/MCP) | `TaskResult`, `TaskResultVersion`, `TaskResultReview`, `ResultCommand`, `ResultVersionArtifact`, `ResultFileUpload`, `ResultFileChunk`, `ResultArtifactBytes` | Source-independent identity, immutable semantic versions, exact-version review, durable receipts and scoped artifact bindings. |
+| Work-page input (opt-in, local implementation) | `WorkPageInput`, `WorkPageCommand`, `TaskResult.inputRevision` | Append-only notes and exact-result-version form answers; separate input CAS/replay receipts. Authored definitions stay in existing result content. |
+| Content library (opt-in, local implementation) | `LibraryState`, `LibraryGroup`, `LibraryFolder`, `LibraryAssignment`, `LibraryCommand` | Workspace classification revision; one folder per Task/group, multiple groups per Task; protected manual choices, immutable actor-bound receipts. No content copies. |
 | Plan | `TaskPlan`, `TaskPlanLayer`, `GraphVersion`, `GraphMutationRecord`, `ReconciliationEvent`, `TaskPlanNodeAttempt`, `TaskPlanTerminalAction` | Generated/accepted executable graph plan, node-attempt history, terminal actions, and graph-change history. |
 | Execution | `TaskPlanRun`, `Run`, `ExecutionSession`, `RuntimeCursor`, `Approval`, `Artifact`, `TaskPlanProviderRun`, `TaskPlanProviderApproval`, `RunToken` | Plan/run/session state, runtime cursoring, provider continuity, approvals, tokens, and outputs. |
 | Schedule/activation | `TaskTrigger`, `TriggerDelivery`, `TaskOccurrence`, `WorkBlock`, `ScheduleProposal`, `SchedulerLease`, `SchedulerEvent` | Versioned activation definitions and deliveries, neutral execution occurrences, optional time placement, schedule suggestions, and scheduler automation. |
@@ -24,6 +54,10 @@ Current schema inventory:
 | Memory | `Memory` | Workspace/task memory entries used by internal projections and AI context-building flows. |
 | AI configuration | `AiClient`, `AiFeatureBinding` | Database-backed AI clients and feature-to-client bindings. |
 | Event log | `Event` | Durable event records used by projections/integration flows. |
+
+Work-record identity, native calendar adoption constraints, source/report trust,
+quotas and compatible migration behavior are specified in [Work records](./work-records.md).
+Meeting cancellation does not change Task status, and reports do not grant authority.
 
 ## Entity relationship overview
 
@@ -56,7 +90,11 @@ erDiagram
   WorkBlock ||--o{ ExecutionSession : occurrence_sessions
   WorkBlock ||--o{ Run : occurrence_provider_runs
   Run ||--o{ Approval : approvals
-  Run ||--o{ Artifact : artifacts
+  Run |o--o{ Artifact : run_owned
+  TaskResult |o--o{ Artifact : result_owned
+  Artifact ||--o| ResultArtifactBytes : private_bytes
+  TaskResult ||--o{ ResultFileUpload : uploads
+  ResultFileUpload ||--o{ ResultFileChunk : pending_chunks
 
   AiClient ||--o{ AiFeatureBinding : bound_to
   WorkBlock ||--o{ ScheduleProposal : proposal_source
@@ -75,6 +113,18 @@ timestamp, and Goal-owned evidence Artifact IDs in
 audit record. `GoalAsset` records source and current Artifact references without
 mutating source execution evidence. Accepted Task results remain immutable and
 separate from these Goal-scoped references.
+
+`Goal.configRevision` is a persisted monotonic edit token, starting at 1. A SQLite
+trigger increments it for changes to title, description, brief, criteria,
+lifecycle, review time, achievement confirmation or workspace, covering every
+canonical writer and A→B→A even when timestamps match. Management note-only writes
+increment it explicitly. MCP exposes `editRevision: goal-config-v1:N`; the older
+snapshot `revision` remains observational. A management edit atomically stores
+content, an agent-attributed brief revision when changed, `goal.management_updated`
+audit and command receipt. Notes are not formal evidence. Revised criterion
+meaning resets confirmation/evidence rather than inheriting proof of old meaning.
+The registered release-line amendment upgrades existing Goals without changing
+content or lifecycle; released migrations are unchanged.
 
 `Goal.operationalBrief` stores the current intended outcome, current focus,
 strategy, and constraints. Every save appends `GoalBriefRevision` with actor and
@@ -173,7 +223,78 @@ runs/sessions/approvals to the focused occurrence, so a failed or cancelled
 occurrence never contaminates a sibling occurrence. See
 [Backend Execution Flow](./backend-execution-flow.md) → "Task state authority".
 
-### Canonical result state
+### Work-page definitions and owner input
+
+`TaskResultVersion.content.page` optionally contains the restricted versioned
+content tree, inline data and form definitions. `WorkPageInput` belongs to that
+same result: note UUIDs persist across versions, while answers bind exact
+versionId/formKey. Edits append; they do not alter result snapshots. Independent
+`inputRevision` and `WorkPageCommand` give input CAS and actor-bound idempotency.
+The DB rejects cross-scope/rewritten history, and events omit note/answer bodies.
+See [work-page authority, quotas and migration](./work-pages.md). This slice is
+local, not deployed, and does not merge with GoalFormSubmission or legacy Runs.
+
+### Grouped content classification (local implementation)
+
+`LibraryAssignment` is keyed by `(taskId, groupId)` and points to an optional
+folder in that group. Missing/null folder is unclassified; a protected null row
+preserves a manual decision against later Agent changes. Folder removal uses
+`SET NULL`, group removal deletes only its classifications, and all views reuse
+the existing Task/results/page. `LibraryState` provides workspace CAS;
+`LibraryCommand` retains the actual paths/new folders and actor-bound replay
+receipt. SQL scope guards reject cross-group/workspace links. The library does
+not change Task status, results, acceptance, calendar placement or execution.
+See [contracts, permissions and limits](./content-library.md).
+
+### Work-owned results (B1 foundation)
+
+`TaskResult` is unique by `(taskId, scopeKey)`, where scopeKey is `task` or
+`occurrence:<id>`. SQLite validates workspace/task/occurrence consistency.
+Composite foreign keys keep head, accepted, parent and review/command version
+references inside the same result. `editRevision` advances for both publication
+and review; the application token `result-v1:<resultId>:<revision>` also binds
+identity, preventing a sibling result's revision from authorizing a write.
+
+`TaskResultVersion` stores bounded semantic content, its deterministic hash,
+server publication time, trusted source kind/actor key, and explicitly
+source-reported label/work ID/time. Versions are append-only. B1 application
+principals can be human or external; the managed storage kind is reserved for
+the later genuine-execution adapter, not caller-supplied provenance.
+
+`TaskResultReview` binds an accept/request-changes/reject fact to the current
+head and a unique result revision. History orders by that revision, not by
+wall-clock or random ID ties. Acceptance changes only the accepted-version
+pointer, not Task, Run or Goal state. Publishing a new version preserves an older accepted pointer;
+subsequent feedback does not erase prior acceptance facts. `ResultCommand`
+persists a bounded receipt and payload hash with unique
+`(workspaceId, actorKey, operation, requestId)` identity. All writes, current
+authorization checks, CAS, bindings, receipts and `result.version_published` /
+`result.version_reviewed` audit events share one transaction. These topics do
+not dispatch the managed `task.result.accepted` trigger.
+
+`ResultVersionArtifact` binds a version's declared semantic key/role to an
+existing authorized Artifact. Its identity/URI/type/metadata fingerprint detects
+later source-row changes. Links are sealed when the version becomes head.
+Actual bytes must be verified by a trusted local adapter; missing adapters fail
+closed. B2b adds explicit `ownerKind=run|result` with exactly one real owner:
+nullable `runId` or `resultId`, enforced by SQLite triggers. Result-owned artifacts
+and `ResultArtifactBytes` are immutable and cascade from the owning TaskResult.
+`ResultFileUpload` stores actor-scoped request identity, size/hash, progress,
+expiry and terminal receipt; `ResultFileChunk` stores contiguous immutable chunks.
+Finish commits the artifact, verified BLOB and receipt in one transaction, then
+removes chunks. There is no arbitrary disk-path/URL ingestion or fake Run.
+Download requires a version binding and fresh file hash validation. Legacy Run
+fingerprints and AF identifiers remain unchanged; old readers filter Run owners.
+See [file limits and cleanup policy](./work-results.md#private-file-protocol).
+
+Use `createTaskResultsService` from `@chrona/engine`; see the
+[B1 implementation contract](../zh/work-results-phase-a.md#10-b1已实现的存储与共享用例)
+for foundation composition requirements; [current entries](./work-results.md)
+cover authenticated Web/MCP, explicit scopes and deterministic UI. Explicit task deletion removes the owning
+result aggregates before deleting existing Run artifacts; individual versions,
+reviews and receipts cannot be edited or deleted independently.
+
+### Canonical managed result state
 
 `TaskPlanRun.planRun.mutableGraph.planOutput` is the persisted result container. Its name remains tied to the existing JSON envelope, but its contents are canonical result state rather than a mutable page:
 

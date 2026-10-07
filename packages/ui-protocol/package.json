@@ -6,7 +6,9 @@
   "exports": {
     ".": "./src/index.ts",
     "./catalog": "./src/catalog/index.ts",
-    "./builders": "./src/builders/index.ts"
+    "./builders": "./src/builders/index.ts",
+    "./work-pages": "./src/work-pages/index.ts",
+    "./work-pages/example": "./src/work-pages/example.ts"
   },
   "dependencies": {
     "@json-render/core": "^0.19.0",

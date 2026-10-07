@@ -23,6 +23,7 @@ import {
 } from "@shared/ui";
 import { formatFileSize, stringProp } from "./workspace-registry-utilities";
 import { WorkspaceTable } from "./workspace-table";
+import { MarkdownContent } from "../../../../shared/ui/markdown-content";
 
 type DeliverableProps = Record<string, unknown>;
 
@@ -104,12 +105,10 @@ function ContentPreview({
         props={{ contentKind: kind, contentPreview: content, wide: true }}
       />
     );
-  const heading =
-    content.split("\n").find(Boolean)?.replace(/^#\s*/, "") ?? title;
   return (
-    <article className="text-base leading-7 text-foreground/85">
-      <h2 className="font-heading">{heading}</h2>
-      <pre className="whitespace-pre-wrap break-words">{content}</pre>
+    <article aria-label={title} className="min-w-0 max-w-full overflow-x-auto text-base leading-7 text-foreground/85">
+      {kind === "markdown" ? <MarkdownContent className="text-base leading-7">{content}</MarkdownContent>
+        : <pre className="whitespace-pre-wrap break-words">{content}</pre>}
     </article>
   );
 }

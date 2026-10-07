@@ -6,6 +6,9 @@
   "exports": {
     ".": "./src/index.ts",
     "./ai": "./src/ai.ts",
+    "./results": "./src/results/index.ts",
+    "./work": "./src/work/index.ts",
+    "./library": "./src/library/index.ts",
     "./api": "./src/api/index.ts",
     "./ai-feature-runtime": "./src/ai-feature-runtime/index.ts"
   },

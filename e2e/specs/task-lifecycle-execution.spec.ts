@@ -5,6 +5,7 @@ import {
 	type Locator,
 	type Page,
 } from "@playwright/test";
+import { openAdvancedTaskCreation } from "./advanced-navigation-helpers";
 import {
 	createTaskWorkspaceTask,
 	dispatchWorkspaceCommand,
@@ -448,7 +449,7 @@ test.describe("Task create → plan → run → result", () => {
 		const taskId =
 			await test.step("Create a task through the Tasks UI", async () => {
 				await page.goto("/en/tasks");
-				await page.getByRole("button", { name: "New Task" }).click();
+				await openAdvancedTaskCreation(page);
 				const dialog = page.getByRole("dialog", { name: "Add task" });
 				await dialog.getByRole("textbox", { name: "Title" }).fill(taskTitle);
 				await dialog.getByRole("radio", { name: /Save as task/ }).check();
@@ -672,6 +673,24 @@ test.describe("Task create → plan → run → result", () => {
 					}),
 				).toBeVisible();
 			});
+
+      await test.step("Read completed plan and persisted history at desktop, tablet and mobile sizes", async () => {
+        for (const [width, height] of [[1440, 900], [1024, 768], [390, 844]]) {
+          await page.setViewportSize({ width, height });
+          await expectNoHorizontalScroll(page);
+          await page.screenshot({ path: testInfo.outputPath(`result-${width}.png`), fullPage: true });
+          await page.getByRole("tab", { name: "Plan", exact: true }).click();
+          await expect(page.getByText("Read-only plan. Viewing it does not restart execution.")).toBeVisible();
+          await expect(page.getByRole("tabpanel").getByRole("button", { name: /Generate plan|Start execution/ })).toHaveCount(0);
+          await expectNoHorizontalScroll(page);
+          await page.getByRole("tab", { name: "History", exact: true }).click();
+          await expect(page.getByText("Read-only task history, including previous runs.")).toBeVisible();
+          await expect(page.getByText("Could not load history.")).toHaveCount(0);
+          await page.getByRole("tab", { name: "Result", exact: true }).click();
+        }
+        await setTaskWorkspaceViewport(page, "desktop");
+        expect((await getCurrentExecution(request, taskId)).status).toBe("completed");
+      });
 
 			let acceptedRunId: string | undefined;
 			await test.step("Accept the final result through the workspace UI", async () => {

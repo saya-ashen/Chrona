@@ -6,10 +6,12 @@ import { act, render, waitFor } from "@testing-library/react";
 import { AppShell } from "../app-shell";
 import { LocaleLandingPage } from "../pages";
 import type { AppBootData } from "../pages";
+import en from "@chrona/i18n/messages/en.json";
 
 const bootData: AppBootData = {
   locale: "en",
   dictionary: ({
+    ...en,
     common: {},
     navigation: {},
     pages: {
@@ -37,7 +39,7 @@ const bootData: AppBootData = {
 
 
 describe("localized root index route", () => {
-  it("navigates from /:lang to /:lang/dashboard", async () => {
+  it("navigates from /:lang to the content-first home",  async () => {
     const router = createMemoryRouter(
       [
         {
@@ -46,7 +48,7 @@ describe("localized root index route", () => {
           element: <AppShell />,
           children: [
             { index: true, element: <LocaleLandingPage /> },
-            { path: "dashboard", element: <div>Dashboard</div> },
+            { path: "home", element: <div>My pages</div> },
           ],
         },
       ],
@@ -56,7 +58,7 @@ describe("localized root index route", () => {
     const view = render(<RouterProvider router={router} />);
 
     await waitFor(() => {
-      expect(router.state.location.pathname).toBe("/en/dashboard");
+      expect(router.state.location.pathname).toBe("/en/home");
     });
 
     await act(async () => {

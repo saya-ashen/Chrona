@@ -6,6 +6,9 @@ import { createExecutionRoutes } from "./execution.routes";
 import { createTaskLifecycleRoutes } from "./lifecycle.routes";
 import { createPlansRoutes } from "./plan.routes";
 import { createTaskResultRoutes } from "./result.routes";
+import { createWorkResultRoutes } from "./work-results.routes";
+import { createWorkRecordRoutes } from "./work-records.routes";
+import { createLibraryRoutes } from "./library.routes";
 import { createTaskScheduleRoutes } from "../../../../../features/schedule/server";
 
 export function createTaskRoutes(engine: ChronaEngine) {
@@ -15,5 +18,8 @@ export function createTaskRoutes(engine: ChronaEngine) {
     .route("/", createPlansRoutes(engine))
     .route("/", createExecutionRoutes(engine))
     .route("/", createTaskLifecycleRoutes(engine))
-    .route("/", createTaskResultRoutes(engine));
+    .route("/", createTaskResultRoutes(engine))
+    .route("/", createWorkResultRoutes())
+    .route("/", createWorkRecordRoutes())
+    .route("/", createLibraryRoutes());
 }

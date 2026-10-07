@@ -23,11 +23,11 @@ export async function applySchedule(input: {
 
   const task = await db.task.findUniqueOrThrow({
     where: { id: input.taskId },
-    select: { id: true, workspaceId: true, title: true, aiClientId: true, updatedAt: true },
+    select: { id: true, workspaceId: true, title: true, taskExecutionMode: true, aiClientId: true, updatedAt: true },
   });
-  const provider = await resolveTaskExecutionProviderSelection({
-    aiClientId: task.aiClientId,
-  });
+  const provider = task.taskExecutionMode === "manual"
+    ? null
+    : await resolveTaskExecutionProviderSelection({ aiClientId: task.aiClientId });
   const isExternallyManaged =
     (await db.importedCalendarEvent.count({ where: { taskId: input.taskId } })) > 0;
 
@@ -87,17 +87,19 @@ export async function applySchedule(input: {
         },
         select: { id: true, sessionId: true },
       });
-      await ensureWorkBlockTaskSession({
-        taskId: task.id,
-        taskTitle: task.title,
-        runtimeName: provider?.providerName ?? unresolvedTaskProviderName(),
-        providerClientId: provider?.clientId,
-        providerName: provider?.providerName,
-        providerConfigFingerprint: provider?.configFingerprint,
-        workBlockId: workBlock.id,
-        sessionId: workBlock.sessionId,
-        label: `${task.title} · Work block session`,
-      });
+      if (task.taskExecutionMode !== "manual") {
+        await ensureWorkBlockTaskSession({
+          taskId: task.id,
+          taskTitle: task.title,
+          runtimeName: provider?.providerName ?? unresolvedTaskProviderName(),
+          providerClientId: provider?.clientId,
+          providerName: provider?.providerName,
+          providerConfigFingerprint: provider?.configFingerprint,
+          workBlockId: workBlock.id,
+          sessionId: workBlock.sessionId,
+          label: `${task.title} · Work block session`,
+        });
+      }
     } else {
       const workBlock = await db.workBlock.create({
         data: {
@@ -111,16 +113,18 @@ export async function applySchedule(input: {
         },
         select: { id: true },
       });
-      await ensureWorkBlockTaskSession({
-        taskId: task.id,
-        taskTitle: task.title,
-        runtimeName: provider?.providerName ?? unresolvedTaskProviderName(),
-        providerClientId: provider?.clientId,
-        providerName: provider?.providerName,
-        providerConfigFingerprint: provider?.configFingerprint,
-        workBlockId: workBlock.id,
-        label: `${task.title} · Work block session`,
-      });
+      if (task.taskExecutionMode !== "manual") {
+        await ensureWorkBlockTaskSession({
+          taskId: task.id,
+          taskTitle: task.title,
+          runtimeName: provider?.providerName ?? unresolvedTaskProviderName(),
+          providerClientId: provider?.clientId,
+          providerName: provider?.providerName,
+          providerConfigFingerprint: provider?.configFingerprint,
+          workBlockId: workBlock.id,
+          label: `${task.title} · Work block session`,
+        });
+      }
     }
   }
 

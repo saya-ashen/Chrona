@@ -65,6 +65,8 @@ export type TaskConfigInitialValues = {
 };
 
 export type TaskConfigFormProps = {
+  /** Manual tasks expose only fields that persist without AI execution. */
+  variant?: "ai" | "manual";
   compact?: boolean;
   formId?: string;
   hideFooter?: boolean;

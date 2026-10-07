@@ -40,7 +40,9 @@ import {
   TaskActionsMenu,
   type TaskActionsMenuItem,
   deleteTask,
+  completeManualTask,
   markTaskDone,
+  reopenManualTask,
   reopenTask,
   startExecution,
 } from "@features/task-workspace";
@@ -58,11 +60,14 @@ function LocalizedLink({ href, ...props }: LocalizedLinkProps) {
 type TaskItem = {
   id: string;
   workspaceId: string;
+  /** Present on list reads; used as the observed manual lifecycle CAS token. */
+  configRevision?: number;
   title: string;
   description: string | null;
   status: string;
   priority: string;
   kind: string;
+  taskExecutionMode?: "ai" | "manual";
   recurrenceRule: string | null;
   dueAt: string | null;
   updatedAt: string;
@@ -152,9 +157,10 @@ function priorityTone(priority: string) {
 }
 
 export function taskAutomationLabel(
-  task: Pick<TaskItem, "autoPlanGeneration" | "autoExecute">,
+  task: Pick<TaskItem, "autoPlanGeneration" | "autoExecute"> & Pick<TaskItem, "taskExecutionMode">,
   copy: TaskListCopy,
 ) {
+  if (task.taskExecutionMode === "manual") return copy.workStateLabels.manual_open;
   if (task.autoExecute) return copy.automationAutoComplete;
   if (task.autoPlanGeneration) return copy.automationAutoPlan;
   return copy.automationManual;
@@ -209,6 +215,7 @@ function canStartTask(task: TaskItem): boolean {
 }
 
 export function canCompleteTask(task: TaskItem): boolean {
+  if (task.taskExecutionMode === "manual") return task.status !== "Done" && task.status !== "Cancelled";
   if (["result_ready", "done", "cancelled"].includes(task.stateView.state)) {
     return false;
   }
@@ -222,7 +229,9 @@ export function canCompleteTask(task: TaskItem): boolean {
 }
 
 function canReopenTask(task: TaskItem): boolean {
-  return ["done", "cancelled"].includes(task.stateView.state);
+  return task.taskExecutionMode === "manual"
+    ? task.status === "Done" || task.status === "Cancelled"
+    : ["done", "cancelled"].includes(task.stateView.state);
 }
 
 function TaskListHero({
@@ -241,7 +250,7 @@ function TaskListHero({
   const [showStatusGuide, setShowStatusGuide] = useState(false);
   return (
     <PageHeader
-      className="-mx-3 -mt-3 sm:-mx-4 sm:-mt-4"
+      className="-mx-3 -mt-3 sm:-mx-4 sm:-mt-4 max-sm:[&_[data-slot=page-header-description]]:hidden max-sm:[&_[data-slot=page-header-actions]]:hidden"
       title={title}
       description={copy.listDescription}
       meta={
@@ -328,12 +337,13 @@ function TaskFilterBar({
   onFilterChange: (filter: FilterKey) => void;
 }) {
   return (
-    <div className="flex flex-wrap items-center gap-1.5 rounded-2xl border border-border/70 bg-card p-1.5 shadow-xs">
+    <div className="flex min-w-0 max-w-full items-center gap-1.5 overflow-x-auto rounded-2xl border border-border/70 bg-card p-1.5 shadow-xs sm:flex-wrap" role="group" aria-label={copy.viewLabel}>
       {FILTERS.map((f) => (
         <Button
           key={f.key}
           type="button"
           onClick={() => onFilterChange(f.key)}
+          aria-pressed={filter === f.key}
           variant={filter === f.key ? "default" : "ghost"}
           size="sm"
           className={
@@ -443,11 +453,11 @@ function TaskRow({
               {task.title}
             </h3>
             <Badge variant={statusTone(task.stateView)}>
-              {task.stateView.label}
+              {copy.workStateLabels[task.stateView.state]}
             </Badge>
           </div>
           <p className="mt-1 text-xs font-medium text-foreground/80">
-            {task.stateView.nextActionLabel}
+            {copy.workStateActions[task.stateView.state]}
           </p>
           {task.description && (
             <p className="mt-1 line-clamp-2 text-xs leading-5 text-muted-foreground">
@@ -533,6 +543,7 @@ export function TaskListPage({
   const [pendingDelete, setPendingDelete] = useState<PendingDelete>(null);
   const [isPending, setIsPending] = useState(false);
   const [actionMessage, setActionMessage] = useState<string | null>(null);
+  const [showAdvanced, setShowAdvanced] = useState(false);
   const navigate = useNavigate();
   const view = searchParams.get("view") === "results" ? "results" : "tasks";
   const resultDate = searchParams.get("resultDate") ?? "all";
@@ -658,8 +669,20 @@ export function TaskListPage({
     setActionMessage(null);
     try {
       if (action === "start") await startExecution({ taskId: task.id });
-      if (action === "complete") await markTaskDone({ taskId: task.id });
-      if (action === "reopen") await reopenTask({ taskId: task.id });
+      if (action === "complete") {
+        if (task.taskExecutionMode === "manual") {
+          if (task.configRevision === undefined) throw new Error(taskCopy.actionFailed);
+          await completeManualTask({ taskId: task.id, expectedRevision: `config-v1:${task.configRevision}`, requestId: crypto.randomUUID() });
+        }
+        else await markTaskDone({ taskId: task.id });
+      }
+      if (action === "reopen") {
+        if (task.taskExecutionMode === "manual") {
+          if (task.configRevision === undefined) throw new Error(taskCopy.actionFailed);
+          await reopenManualTask({ taskId: task.id, expectedRevision: `config-v1:${task.configRevision}`, requestId: crypto.randomUUID() });
+        }
+        else await reopenTask({ taskId: task.id });
+      }
       refreshTasks();
     } catch (error) {
       setActionMessage(
@@ -720,32 +743,6 @@ export function TaskListPage({
           <Button
             type="button"
             size="sm"
-            variant={
-              view === "tasks" && filter === "needs_me" ? "default" : "ghost"
-            }
-            onClick={() => {
-              setParam("view", "");
-              setFilter("needs_me");
-            }}
-          >
-            {taskCopy.viewNeedsAttention}
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant={
-              view === "tasks" && filter === "running" ? "default" : "ghost"
-            }
-            onClick={() => {
-              setParam("view", "");
-              setFilter("running");
-            }}
-          >
-            {taskCopy.viewInProgress}
-          </Button>
-          <Button
-            type="button"
-            size="sm"
             variant={view === "results" ? "default" : "ghost"}
             onClick={() => setParam("view", "results")}
           >
@@ -754,7 +751,7 @@ export function TaskListPage({
           <Button
             type="button"
             size="sm"
-            variant={view === "tasks" && filter === "all" ? "default" : "ghost"}
+            variant={view === "tasks" ? "default" : "ghost"}
             onClick={() => {
               setParam("view", "");
               setFilter("all");
@@ -855,6 +852,8 @@ export function TaskListPage({
               </Button>
             ) : null}
           </form>
+          <Button type="button" variant="ghost" size="sm" className="sm:hidden" aria-expanded={showAdvanced} onClick={() => setShowAdvanced(value => !value)}>{taskCopy.advancedFilters}</Button>
+          <div className={showAdvanced ? "contents" : "hidden sm:contents"}>
           <Select
             value={priority || "all"}
             onValueChange={(value) =>
@@ -921,6 +920,7 @@ export function TaskListPage({
           >
             {order === "asc" ? taskCopy.sortAscending : taskCopy.sortDescending}
           </Button>
+          </div>
         </div>
         {hasSelection || actionMessage ? (
           <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-border bg-background px-3 py-2 text-xs">

@@ -3,6 +3,7 @@ import { z } from "zod";
 import { db, type Prisma } from "@chrona/db";
 import { resolveEffectivePlanGraph } from "@chrona/graph-runtime";
 import type {
+	FinalizedResult,
 	NodeDeliverableDeclaration,
 	NodeResult,
 	PlanOutputState,
@@ -37,6 +38,20 @@ import {
 import { resolveFilePreview } from "../../tasks/file-preview";
 import { aggregateResultManifest } from "./result-manifest";
 import { buildSemanticRefHistory } from "../runtime/node-runtime-refs";
+import { boundedFinalizationRequest, FinalizationDeadlineError } from "./bounded-finalization-request";
+
+type FinalizationDependencies = {
+	getClient: typeof getAiClientForTask;
+	request: typeof runProviderRequest;
+	composeTimeoutMs: number;
+	reviewTimeoutMs: number;
+};
+const finalizationDependencies: FinalizationDependencies = {
+	getClient: getAiClientForTask,
+	request: runProviderRequest,
+	composeTimeoutMs: 300_000,
+	reviewTimeoutMs: 60_000,
+};
 
 type LoadedPlanRun = NonNullable<Awaited<ReturnType<typeof getPlanRun>>>;
 
@@ -94,6 +109,7 @@ async function finalizationArtifactContext(
 		where: { id: taskId },
 		select: {
 			artifacts: {
+				where: { ownerKind: "run" },
 				select: { id: true, title: true, type: true, uri: true },
 			},
 		},
@@ -602,13 +618,15 @@ export const __resultFinalizationTestHooks = {
 	restoreRecordedTerminalResults,
 	validateSemanticComposition,
 	createProviderRequest: finalizationProviderRequest,
+	finalize: finalizeTaskResultWithDependencies,
 };
 
-export async function finalizeTaskResult(input: {
-	taskId: string;
-	workBlockId?: string | null;
-	force?: boolean;
-}): Promise<PlanOutputState> {
+type FinalizationInput = { taskId: string; workBlockId?: string | null; force?: boolean };
+export function finalizeTaskResult(input: FinalizationInput): Promise<PlanOutputState> {
+	return finalizeTaskResultWithDependencies(input, finalizationDependencies);
+}
+
+async function finalizeTaskResultWithDependencies(input: FinalizationInput, dependencies: FinalizationDependencies): Promise<PlanOutputState> {
 	const accepted = await getAcceptedCompiledPlanForTask(input.taskId, {
 		workBlockId: input.workBlockId,
 	});
@@ -634,6 +652,7 @@ export async function finalizeTaskResult(input: {
 	if (
 		persisted.planOutput.finalization.status === "Ready" &&
 		persisted.planOutput.finalizedResult?.sourceRevision === sourceRevision &&
+		persisted.planOutput.finalization.sourceRevision === sourceRevision &&
 		!input.force
 	)
 		return persisted.planOutput;
@@ -645,6 +664,7 @@ export async function finalizeTaskResult(input: {
 		...persisted.planOutput,
 		finalization: {
 			status: "Running",
+			phase: "compose",
 			sourceRevision,
 			attempt,
 			startedAt: new Date().toISOString(),
@@ -666,10 +686,10 @@ export async function finalizeTaskResult(input: {
 	});
 	if (!runningSave.committed)
 		throw new Error("Result finalization changed concurrently");
-	const claimedExecutionEpoch = persisted.executionEpoch + 1;
+	let claimedExecutionEpoch = persisted.executionEpoch + 1;
 
 	try {
-		const client = await getAiClientForTask({
+		const client = await dependencies.getClient({
 			taskId: input.taskId,
 			purpose: "task.result_finalization",
 		});
@@ -686,32 +706,67 @@ export async function finalizeTaskResult(input: {
 			// Artifact previews enrich composition but never block finalization.
 			artifactContext = [];
 		}
-		const response = await runProviderRequest(client.providerClient, {
-			...finalizationProviderRequest({
-				taskId: input.taskId,
-				planRunId: persisted.id,
-				workBlockId: accepted.workBlockId,
-				executionEpoch: claimedExecutionEpoch,
-				sourceRevision,
-				attempt,
+		let composedSpec: UiDocument;
+		const savedCandidate = persisted.planOutput.finalization.status !== "Ready" &&
+			persisted.planOutput.finalizedResult?.sourceRevision === sourceRevision
+			? persisted.planOutput.finalizedResult : null;
+		if (savedCandidate) {
+			composedSpec = validateFinalizedResultSpec({ manifest: running.manifest, payload: providerJsonValueSchema.parse(savedCandidate.spec) });
+		} else {
+			const response = await boundedFinalizationRequest(client.providerClient, {
+				...finalizationProviderRequest({
+					taskId: input.taskId,
+					planRunId: persisted.id,
+					workBlockId: accepted.workBlockId,
+					executionEpoch: claimedExecutionEpoch,
+					sourceRevision,
+					attempt,
+					manifest: running.manifest,
+					artifactContext,
+				}),
+				signal: schedulerWorkSignal(),
+			}, dependencies.composeTimeoutMs, dependencies.request);
+			if (response.error || response.status !== "completed") {
+				throw new Error(
+					response.error ??
+						`Result finalization provider ended with status ${response.status}`,
+				);
+			}
+			composedSpec = validateFinalizedResultSpec({
 				manifest: running.manifest,
-				artifactContext,
-			}),
-			signal: schedulerWorkSignal(),
-		});
-		if (response.error || response.status !== "completed") {
-			throw new Error(
-				response.error ??
-					`Result finalization provider ended with status ${response.status}`,
-			);
+				payload: parsedProviderPayload(response.structuredPayload),
+			});
 		}
-		const composedSpec = validateFinalizedResultSpec({
-			manifest: running.manifest,
-			payload: parsedProviderPayload(response.structuredPayload),
+		// Retain a validated candidate before optional review, but keep Running:
+		// acceptance must still wait for publication. A retry can recover this
+		// candidate without repeating the task's actual execution.
+		const candidate = await getPlanRun(input.taskId, accepted.compiledPlan.editablePlanId, accepted.workBlockId);
+		if (!candidate?.graph || candidate.executionEpoch !== claimedExecutionEpoch ||
+			candidate.planOutput.manifest.sourceRevision !== sourceRevision ||
+			candidate.planOutput.finalization.status !== "Running" ||
+			candidate.planOutput.finalization.attempt !== attempt) {
+			throw new Error("Result finalization changed before candidate persistence");
+		}
+		const candidateSave = await savePlanRunGuarded({
+			workspaceId: accepted.workspaceId, taskId: input.taskId,
+			planId: accepted.compiledPlan.editablePlanId, workBlockId: accepted.workBlockId,
+			expectedEpoch: claimedExecutionEpoch, run: candidate.planRun,
+			compiledPlan: accepted.compiledPlan, graph: candidate.graph,
+			attempts: candidate.attempts, results: candidate.results,
+			executionContextSnapshots: candidate.executionContextSnapshots,
+			planOutput: { ...candidate.planOutput, finalization: { ...candidate.planOutput.finalization, phase: "review" }, finalizedResult: {
+				sourceRevision, manifest: candidate.planOutput.manifest, spec: composedSpec,
+				review: { status: "pending" },
+				finalizedAt: new Date().toISOString(),
+			} },
 		});
+		if (!candidateSave.committed) throw new Error("Result finalization changed concurrently");
+		claimedExecutionEpoch += 1;
 		let spec = composedSpec;
+		let review: FinalizedResult["review"] = { status: "fallback", reason: "provider_error" };
+		let validatingReview = false;
 		try {
-			const reviewResponse = await runProviderRequest(client.providerClient, {
+			const reviewResponse = await boundedFinalizationRequest(client.providerClient, {
 				...finalizationProviderRequest({
 					taskId: input.taskId,
 					planRunId: persisted.id,
@@ -725,14 +780,18 @@ export async function finalizeTaskResult(input: {
 					candidateSpec: composedSpec,
 				}),
 				signal: schedulerWorkSignal(),
-			});
+			}, dependencies.reviewTimeoutMs, dependencies.request);
 			if (!reviewResponse.error && reviewResponse.status === "completed") {
+				validatingReview = true;
 				spec = validateFinalizedResultSpec({
 					manifest: running.manifest,
 					payload: parsedProviderPayload(reviewResponse.structuredPayload),
 				});
+				review = { status: "completed" };
 			}
-		} catch {
+		} catch (error) {
+			review = { status: "fallback", reason: error instanceof FinalizationDeadlineError
+				? error.reason : validatingReview ? "invalid_output" : "provider_error" };
 			// Composition review is an editorial enhancement. A valid composed Spec
 			// remains authoritative when the reviewer is unavailable or invalid.
 			spec = composedSpec;
@@ -763,6 +822,7 @@ export async function finalizeTaskResult(input: {
 				manifest: latest.planOutput.manifest,
 				spec,
 				finalizedAt,
+				review,
 			},
 			finalization: { status: "Ready", sourceRevision, attempt, finalizedAt },
 		};
@@ -816,9 +876,12 @@ export async function finalizeTaskResult(input: {
 				break;
 			}
 			const failedAt = new Date().toISOString();
-			const failureOutput: PlanOutputState = latest.planOutput.finalizedResult
+			const failureOutput: PlanOutputState = latest.planOutput.finalizedResult?.sourceRevision === sourceRevision
 				? {
 						...latest.planOutput,
+						finalizedResult: { ...latest.planOutput.finalizedResult,
+							review: { status: "fallback", reason: "interrupted" },
+						},
 						finalization: {
 							status: "Ready",
 							sourceRevision,

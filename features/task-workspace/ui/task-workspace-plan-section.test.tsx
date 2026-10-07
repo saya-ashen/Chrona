@@ -187,6 +187,25 @@ afterEach(() => {
 	cleanup();
 });
 
+it("keeps completed task brief, plan, and durable history accessible without restart controls", async () => {
+  const onGeneratePlan = vi.fn();
+  const onDispatchExecutionAction = vi.fn();
+  renderWithQueryClient(<TaskWorkspacePlanSection label="Plan" graphPlan={null} isGraphPlanPending={false}
+    pageData={createTaskWorkspaceFixturePageData({ task: { status: "Completed", description: "Read-only requirement" } })}
+    plan={null} planGenerationStatus="idle" acceptPlanError={null} runtimeEvents={[]}
+    onGeneratePlan={onGeneratePlan} onApplyPlan={vi.fn()} onDispatchExecutionAction={onDispatchExecutionAction} />);
+  const planTab = screen.getByRole("tab", { name: "Plan" });
+  fireEvent.mouseDown(planTab, { button: 0, ctrlKey: false });
+  expect(await screen.findByText("No saved plan is available.")).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Generate plan" })).toBeNull();
+  fireEvent.mouseDown(screen.getByRole("tab", { name: "Brief" }), { button: 0, ctrlKey: false });
+  expect(await screen.findByText("Read-only requirement")).toBeInTheDocument();
+  fireEvent.mouseDown(screen.getByRole("tab", { name: "History" }), { button: 0, ctrlKey: false });
+  expect(await screen.findByText("Read-only task history, including previous runs.")).toBeInTheDocument();
+  expect(onGeneratePlan).not.toHaveBeenCalled();
+  expect(onDispatchExecutionAction).not.toHaveBeenCalled();
+});
+
 describe("derivePreferredGraphMode", () => {
 	it.each([
 		{
@@ -2018,12 +2037,9 @@ describe("TaskWorkspacePlanSection", () => {
 
 		const lifecyclePanel = screen.getByTestId("result-lifecycle-panel");
 		expect(lifecyclePanel).toHaveTextContent("Result accepted");
-		expect(screen.getByText("Task done", { exact: true })).toBeVisible();
-		expect(
-			screen.getByText("Ask a follow-up or create a next task", {
-				exact: true,
-			}),
-		).toBeVisible();
+		// The redundant static stage bar is replaced by accessible read-only views.
+		expect(screen.getByRole("tab", { name: "Result" })).toHaveAttribute("aria-selected", "true");
+		expect(screen.getByRole("tab", { name: "History" })).toBeVisible();
 		expect(
 			screen.queryByText("Execution complete, awaiting review", { exact: true }),
 		).not.toBeInTheDocument();

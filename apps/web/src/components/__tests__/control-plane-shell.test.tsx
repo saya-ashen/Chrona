@@ -1,4 +1,5 @@
 import type { ReactNode } from "react";
+import en from "@chrona/i18n/messages/en.json";
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -20,6 +21,7 @@ vi.mock("react-router-dom", () => ({
 		hash: "#current",
 	}),
 	useNavigate: () => vi.fn(),
+	useSearchParams: () => [new URLSearchParams("filter=active"), vi.fn()],
 	useRevalidator: () => ({ revalidate: vi.fn() }),
 }));
 
@@ -32,7 +34,8 @@ vi.mock("@shared/http", () => ({
 		warn: vi.fn(),
 	}),
 }));
-vi.mock("@shared/ui", () => ({
+vi.mock("@shared/ui", async () => ({
+	...await vi.importActual<typeof import("@shared/ui")>("@shared/ui"),
 	Button: ({ children, ...props }: { children: ReactNode }) => (
 		<button {...props}>{children}</button>
 	),
@@ -116,6 +119,8 @@ vi.mock("@features/schedule", () => ({
 }));
 vi.mock("@chrona/i18n", () => ({
 	useI18n: () => ({
+		messages: en,
+		locale: "en",
 		t: (key: string) =>
 			({
 				"nav.brandTitle": "Chrona",
@@ -145,8 +150,15 @@ vi.mock("@chrona/i18n", () => ({
 
 import { ControlPlaneShell } from "@features/mcp-control-plane";
 
+const emptyLibrary = {
+	revision: "library-v1:ws-1:0", groups: [], folders: [], items: [], history: [],
+	totalItems: 0, total: 0, nextOffset: null, canOrganize: false,
+	canConfigure: false, writesEnabled: false, isOwner: true,
+};
+
 beforeEach(() => {
 	mocks.apiJson.mockImplementation((path: string) => {
+		if (path === "/api/library/read") return Promise.resolve(emptyLibrary);
 		if (path === "/api/workspaces/ws-1/preferences/start-with-chrona")
 			return Promise.resolve({ completedAt: "2026-01-01T00:00:00.000Z" });
 		if (path === "/api/schedule?workspaceId=ws-1")
@@ -169,7 +181,7 @@ afterEach(() => {
 });
 
 describe("ControlPlaneShell", () => {
-	it("keeps localized navigation and disabled assistant display", () => {
+	it("keeps localized navigation and disabled assistant display", async () => {
 		render(
 			<ControlPlaneShell
 				defaultWorkspace={{ id: "ws-1", name: "Default" }}
@@ -180,12 +192,15 @@ describe("ControlPlaneShell", () => {
 		);
 		expect(screen.getAllByRole("link", { name: "Chrona" })[0]).toHaveAttribute(
 			"href",
-			"/en/schedule",
+			"/en/home",
 		);
+		await userEvent.click(screen.getByText("More tools", { selector: "summary" }));
 		expect(screen.getByRole("link", { name: "Tasks" })).toHaveAttribute(
 			"href",
 			"/en/tasks",
 		);
+		expect(screen.getByRole("region", { name: "Classification groups" })).toBeInTheDocument();
+		expect(screen.getByRole("combobox", { name: "Organize by" })).toBeInTheDocument();
 		expect(screen.getByRole("button", { name: "Assistant" })).toBeDisabled();
 		expect(screen.getByText("Task ready")).toBeInTheDocument();
 	});
@@ -220,6 +235,7 @@ describe("ControlPlaneShell", () => {
 	it("does not dispatch initial plan generation without an enabled released provider", async () => {
 		mocks.createScheduledTask.mockResolvedValue({ taskId: "manual-task" });
 		mocks.apiJson.mockImplementation((path: string) => {
+			if (path === "/api/library/read") return Promise.resolve(emptyLibrary);
 			if (path === "/api/workspaces/ws-1/preferences/start-with-chrona")
 				return Promise.resolve({ completedAt: "2026-01-01T00:00:00.000Z" });
 			if (path === "/api/schedule?workspaceId=ws-1")
@@ -232,6 +248,7 @@ describe("ControlPlaneShell", () => {
 				<div>Workspace body</div>
 			</ControlPlaneShell>,
 		);
+		await user.click(screen.getByText("More tools", { selector: "summary" }));
 		await user.click(screen.getByRole("button", { name: "New Task" }));
 		await user.click(screen.getByRole("button", { name: "Submit task" }));
 		await waitFor(() => expect(mocks.createScheduledTask).toHaveBeenCalled());
@@ -249,6 +266,7 @@ describe("ControlPlaneShell", () => {
 				<div>Workspace body</div>
 			</ControlPlaneShell>,
 		);
+		await user.click(screen.getByText("More tools", { selector: "summary" }));
 		await user.click(screen.getByRole("button", { name: "New Task" }));
 		await user.click(screen.getByRole("button", { name: "Submit task" }));
 		await waitFor(() =>

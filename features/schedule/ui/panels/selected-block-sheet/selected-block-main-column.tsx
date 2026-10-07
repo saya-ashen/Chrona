@@ -72,7 +72,10 @@ export function SelectedBlockMainColumn({
   formId?: string;
   initialTab?: "details" | "execution" | "plan";
 }) {
-  const [activeTab, setActiveTab] = useState(initialTab ?? "details");
+  const isManual = item.taskExecutionMode === "manual";
+  const [activeTab, setActiveTab] = useState(
+    isManual ? "details" : (initialTab ?? "details"),
+  );
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const providerName = item.aiClientName ?? availableAiClients?.find((client) => client.id === item.aiClientId)?.name ?? null;
   const providerLabel = providerName ?? (availableAiClients?.some((client) => client.enabled)
@@ -88,20 +91,23 @@ export function SelectedBlockMainColumn({
       className="min-w-0 px-4 py-4 text-sm text-muted-foreground sm:px-6"
     >
       <Tabs value={activeTab} onValueChange={(value) => setActiveTab(value as "details" | "execution" | "plan")} className="min-h-0">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="details">{copy.taskDetails}</TabsTrigger>
-          <TabsTrigger value="execution">{copy.selectedBlockExecutionStatus}</TabsTrigger>
-          <TabsTrigger value="plan">{copy.currentPlan}</TabsTrigger>
-        </TabsList>
+        {!isManual ? (
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="details">{copy.taskDetails}</TabsTrigger>
+            <TabsTrigger value="execution">{copy.selectedBlockExecutionStatus}</TabsTrigger>
+            <TabsTrigger value="plan">{copy.currentPlan}</TabsTrigger>
+          </TabsList>
+        ) : null}
 
         <TabsContent value="details" className="mt-4">
           <TaskEditPanel>
             <TaskConfigForm
               formId={formId}
               hideFooter
-              compact
+              compact={!isManual}
               isPending={isPending}
               initialValues={toTaskConfigInitialValues(item)}
+              variant={isManual ? "manual" : "ai"}
               lockedFields={item.sourceManaged?.immutableFields}
               lockedFieldsHint={item.sourceManaged ? `Synced from ${item.sourceManaged.sourceName}. Title and time are managed by the calendar source.` : undefined}
               sourceDescription={item.sourceManaged?.description ?? null}
@@ -114,7 +120,7 @@ export function SelectedBlockMainColumn({
           </TaskEditPanel>
         </TabsContent>
 
-        <TabsContent value="execution" className="mt-4 space-y-4">
+        {!isManual ? <TabsContent value="execution" className="mt-4 space-y-4">
           <section className="rounded-2xl border border-border/70 bg-muted/20 p-4" aria-label={copy.selectedBlockOverview}>
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div>
@@ -132,9 +138,9 @@ export function SelectedBlockMainColumn({
             {item.autoStartReason ? <p className="mt-3 inline-flex items-center gap-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-3 py-1 text-xs text-amber-700 dark:text-amber-200"><AlertCircle className="size-3.5" />{copy.autoStartReasonLabel}: {item.autoStartReason}</p> : null}
             {needsRecovery(item) ? <a className="mt-3 flex items-center gap-2 text-xs font-medium text-primary hover:underline" href={recoveryHref}><ExternalLink className="size-3.5" />{copy.selectedBlockOpenWorkspace}</a> : null}
           </section>
-        </TabsContent>
+        </TabsContent> : null}
 
-        <TabsContent value="plan" className="mt-4">
+        {!isManual ? <TabsContent value="plan" className="mt-4">
           <TaskAiPlanPanel
             taskId={item.taskId}
             planningTaskDraft={planningTaskDraft}
@@ -148,7 +154,7 @@ export function SelectedBlockMainColumn({
             onApplyPlan={onApplyPlan}
             onSaveConfigBeforeRegenerate={onSaveConfigBeforeRegenerate}
           />
-        </TabsContent>
+        </TabsContent> : null}
 
         {onDeleteTask ? (
           <div className="mt-4 border-t border-border/60 pt-4">

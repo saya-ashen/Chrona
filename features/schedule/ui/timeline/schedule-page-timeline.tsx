@@ -146,6 +146,7 @@ function TimelineComposer({
 					title: input.title,
 					description: input.description,
 					priority: input.priority,
+					taskExecutionMode: input.taskExecutionMode,
 					autoExecute: input.autoExecute,
 					autoPlanGenerationEnabled: input.autoPlanGenerationEnabled,
 					autoPlanGenerationTiming: input.autoPlanGenerationTiming,

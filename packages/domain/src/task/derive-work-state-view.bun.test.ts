@@ -9,6 +9,7 @@ const cases: Array<{
   label: string;
   primaryActionId: ReturnType<typeof deriveWorkStateView>["primaryActionId"];
 }> = [
+  { name: "manual open", input: { taskExecutionMode: "manual", taskStatus: "Ready" }, state: "manual_open", label: "Manual task", primaryActionId: "complete_manual" },
   { name: "no plan", input: { taskStatus: "Draft", hasPlan: false }, state: "no_plan", label: "Needs plan", primaryActionId: "generate_plan" },
   { name: "planning", input: { taskStatus: "Draft", planGenerationStatus: "generating" }, state: "planning", label: "Planning", primaryActionId: "stop_generation" },
   { name: "plan review", input: { hasPlan: true, hasAcceptedPlan: false }, state: "plan_review", label: "Plan ready", primaryActionId: "accept_plan" },
@@ -33,6 +34,12 @@ describe("deriveWorkStateView", () => {
       expect(view.primaryActionId).toBe(stateCase.primaryActionId);
     });
   }
+
+  it("keeps manual completion distinct from AI result acceptance", () => {
+    expect(deriveWorkStateView({ taskExecutionMode: "manual", taskStatus: "Ready", hasPlan: false }).state).toBe("manual_open");
+    expect(deriveWorkStateView({ taskExecutionMode: "manual", taskStatus: "Done" }).state).toBe("done");
+    expect(deriveWorkStateView({ taskStatus: "Draft", hasPlan: false }).state).toBe("no_plan");
+  });
 
   it("keeps completed result review distinct from accepted done", () => {
     expect(deriveWorkStateView({ taskStatus: "Completed", executionStatus: "completed" }).state).toBe("result_ready");

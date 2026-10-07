@@ -93,6 +93,8 @@ export type ScheduleRecord = {
   autoExecute: boolean;
   autoPlanGenerationTiming: string;
   autoExecuteTiming: string;
+  /** Backward-compatible optionality; Schedule page projections always emit it. */
+  taskExecutionMode?: "ai" | "manual";
   aiClientName?: string | null;
   aiClientId?: string | null;
   sourceManaged?: {
@@ -321,6 +323,7 @@ export type TimelineCreateInput = {
   title: string;
   description: string;
   priority: "Low" | "Medium" | "High" | "Urgent";
+  taskExecutionMode: "ai" | "manual";
   executionConfig: Record<string, unknown>;
   aiClientId?: string | null;
   autoExecute: boolean;

@@ -496,8 +496,10 @@ test.describe("Auto-execution golden path (§1.3)", () => {
 			await test.step("[AUTO-006] completed task stays visible across projections", async () => {
 				await page.goto("/en");
 				await expect(
-					page.getByText(taskTitle, { exact: true }).first(),
+					page.getByRole("main").getByRole("heading", { name: taskTitle, exact: true }),
 				).toBeVisible();
+				await page.goto("/en/dashboard");
+				await expect(page.getByRole("main").getByText(taskTitle, { exact: true }).first()).toBeVisible();
 
 				await page.goto("/en/tasks");
 				await page.getByRole("button", { name: "Results" }).click();
@@ -507,7 +509,7 @@ test.describe("Auto-execution golden path (§1.3)", () => {
 
 				await page.goto("/en/schedule");
 				await expect(
-					page.getByText(taskTitle, { exact: true }).first(),
+					page.getByRole("main").getByText(taskTitle, { exact: true }).first(),
 				).toBeVisible();
 			});
 		} finally {

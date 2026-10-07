@@ -33,6 +33,7 @@ type TaskWorkspaceEditSectionProps = {
 	disableAiClientSelection?: boolean;
 	aiClientSelectionDisabledHint?: string;
 	sourceManaged?: TaskData["sourceManaged"];
+	taskExecutionMode?: TaskData["taskExecutionMode"];
 	saveSuccess: boolean;
 	saveError: string | null;
 	hasUnsavedConfigChanges: boolean;
@@ -53,6 +54,7 @@ export function TaskWorkspaceEditSection({
 	disableAiClientSelection,
 	aiClientSelectionDisabledHint,
 	sourceManaged,
+	taskExecutionMode,
 	saveSuccess,
 	saveError,
 	hasUnsavedConfigChanges,
@@ -116,6 +118,7 @@ export function TaskWorkspaceEditSection({
 						<TaskConfigForm
 							isPending={isSaving}
 							initialValues={taskConfigInitialValues}
+							variant={taskExecutionMode === "manual" ? "manual" : "ai"}
 							availableAiClients={availableAiClients}
 							disableAiClientSelection={disableAiClientSelection}
 							aiClientSelectionDisabledHint={aiClientSelectionDisabledHint}

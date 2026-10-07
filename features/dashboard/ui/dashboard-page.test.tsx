@@ -170,6 +170,7 @@ const COPY = {
 			blocked: "Blocked",
 			failed: "Run failed",
 			schedule_risk: "At schedule risk",
+			result_review: "Awaiting acceptance",
 		},
 	},
 	upcomingToday: {
@@ -511,7 +512,7 @@ describe("DashboardPage", () => {
 			/>,
 		);
 		expect(screen.getByText("1 pending")).toBeTruthy();
-		expect(screen.getByText("Approval needed")).toBeTruthy();
+		expect(screen.getByText(COPY.attention.kind.approval)).toBeTruthy();
 	});
 
 	it("shows running task state, stage, and task link in In Progress", () => {

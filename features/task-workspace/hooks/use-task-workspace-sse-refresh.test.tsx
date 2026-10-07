@@ -209,7 +209,7 @@ describe("SSE-driven refetch of dependent queries", () => {
     });
   });
 
-  it("refetches persisted activity when an SSE connection becomes ready", async () => {
+  it("refetches persisted activity and workspace state on first SSE ready", async () => {
     const pageData = buildPageData("block-A");
 
     renderHook(() => useTaskWorkspacePageState(pageData), { wrapper });
@@ -223,7 +223,9 @@ describe("SSE-driven refetch of dependent queries", () => {
     await waitFor(() => {
       expect(fetchCallCount(/\/api\/tasks\/task-1\/command-center(\?|$)/)).toBeGreaterThan(commandCenterBefore);
     });
-    expect(fetchCallCount(/\/api\/tasks\/task-1(\?|$)/)).toBe(pageBefore);
+    await waitFor(() => {
+      expect(fetchCallCount(/\/api\/tasks\/task-1(\?|$)/)).toBeGreaterThan(pageBefore);
+    });
   });
 
   it("refetches authoritative workspace state when an SSE connection reconnects", async () => {

@@ -1,6 +1,7 @@
 /* eslint-disable max-statements -- Task creation atomically establishes recurrence, provider provenance, sessions, and projections. */
 import { Prisma, TaskPriority, TaskStatus } from "@/generated/prisma/client";
 import { db } from "@/lib/db";
+import { currentCommandActor } from "@/modules/events";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
 import {
   resolveTaskExecutionProviderSelection,
@@ -66,7 +67,21 @@ export async function createTask(input: CreateTaskInput, client: Prisma.Transact
     }
   }
 
-  const providerSelection = await resolveTaskExecutionProviderSelection({
+  const taskExecutionMode = input.taskExecutionMode ?? "ai";
+  const isManual = taskExecutionMode === "manual";
+  if (isManual && (
+    (input.aiClientId !== undefined && input.aiClientId !== null) ||
+    executionConfig !== undefined ||
+    input.autoExecute === true ||
+    input.autoPlanGeneration === true ||
+    input.recurrenceRule
+  )) {
+    throw new EngineError(
+      ENGINE_ERROR_CODES.VALIDATION_FAILED,
+      "Manual tasks cannot configure AI providers, automation, execution settings, or recurrence.",
+    );
+  }
+  const providerSelection = isManual ? null : await resolveTaskExecutionProviderSelection({
     aiClientId: input.aiClientId,
     client,
   });
@@ -78,14 +93,17 @@ export async function createTask(input: CreateTaskInput, client: Prisma.Transact
   }
   const runtimeName = providerSelection?.providerName ?? unresolvedTaskProviderName();
   const validatedExecutionConfig = executionConfig ?? {};
-  const autoExecute = input.autoExecute ?? false;
-  const autoPlanGeneration = autoExecute || (input.autoPlanGeneration ?? false);
+  const autoExecute = isManual ? false : input.autoExecute ?? false;
+  const autoPlanGeneration = isManual ? false : autoExecute || (input.autoPlanGeneration ?? false);
   const autoPlanGenerationTiming = normalizeAutomationTiming(
     input.autoPlanGenerationTiming,
   );
   const autoExecuteTiming = normalizeAutomationTiming(input.autoExecuteTiming);
 
-  const staticState = deriveTaskStaticState({ hasAcceptedPlan: false });
+  const staticState = deriveTaskStaticState({
+    hasAcceptedPlan: false,
+    taskExecutionMode,
+  });
   const status = TaskStatus[staticState.persistedStatus];
 
   const recurrenceRule = input.recurrenceRule?.trim() || null;
@@ -131,6 +149,7 @@ export async function createTask(input: CreateTaskInput, client: Prisma.Transact
       title,
       description,
       kind: recurrenceRule ? "recurring" : "single",
+      taskExecutionMode,
       recurrenceRule,
       seriesExternalUid: null,
       recurrenceAnchorStartAt,
@@ -193,22 +212,24 @@ export async function createTask(input: CreateTaskInput, client: Prisma.Transact
     });
   }
 
-  const defaultSession = await client.taskSession.create({
-    data: {
-      taskId: task.id,
-      runtimeName,
-      providerClientId: providerSelection?.clientId ?? null,
-      providerName: providerSelection?.providerName ?? null,
-      providerConfigFingerprint: providerSelection?.configFingerprint ?? null,
-      sessionKey: `chrona:task:${task.id}:default`,
-      label: `${task.title} · Default session`,
-      createdByFramework: true,
-    },
-  });
-  await client.task.update({ where: { id: task.id }, data: { defaultSessionId: defaultSession.id } });
+  if (!isManual) {
+    const defaultSession = await client.taskSession.create({
+      data: {
+        taskId: task.id,
+        runtimeName,
+        providerClientId: providerSelection?.clientId ?? null,
+        providerName: providerSelection?.providerName ?? null,
+        providerConfigFingerprint: providerSelection?.configFingerprint ?? null,
+        sessionKey: `chrona:task:${task.id}:default`,
+        label: `${task.title} · Default session`,
+        createdByFramework: true,
+      },
+    });
+    await client.task.update({ where: { id: task.id }, data: { defaultSessionId: defaultSession.id } });
+  }
 
   let firstWorkBlockId: string | null = null;
-  if (recurrenceRule && recurrenceAnchorStartAt && recurrenceAnchorEndAt) {
+  if (!isManual && recurrenceRule && recurrenceAnchorStartAt && recurrenceAnchorEndAt) {
     const durationMs =
       recurrenceAnchorEndAt.getTime() - recurrenceAnchorStartAt.getTime();
     const windowTo = new Date(
@@ -275,7 +296,7 @@ export async function createTask(input: CreateTaskInput, client: Prisma.Transact
         workspaceId: task.workspaceId,
         taskId: task.id,
         occurrenceKey: `manual:${task.id}`,
-        source: { kind: "manual", actor: { type: "user", id: "server-action" } },
+        source: { kind: "manual", actor: { type: currentCommandActor()?.actorType ?? "user", id: currentCommandActor()?.actorId ?? "server-action" } },
         status: status === "Draft" ? "Scheduled" : "Ready",
         eligibleAt: new Date(),
       },
@@ -288,10 +309,10 @@ export async function createTask(input: CreateTaskInput, client: Prisma.Transact
       workspaceId: task.workspaceId,
       taskId: task.id,
       workBlockId: firstWorkBlockId,
-      actorType: "user",
-      actorId: "server-action",
-      source: "ui",
-      payload: { title: task.title, description: task.description, priority: task.priority, aiClientId: task.aiClientId, autoPlanGeneration: task.autoPlanGeneration, autoExecute: task.autoExecute, autoPlanGenerationTiming: task.autoPlanGenerationTiming, autoExecuteTiming: task.autoExecuteTiming, status: task.status, parentTaskId: task.parentTaskId },
+      actorType: currentCommandActor()?.actorType ?? "user",
+      actorId: currentCommandActor()?.actorId ?? "server-action",
+      source: currentCommandActor()?.source ?? "ui",
+      payload: { title: task.title, description: task.description, priority: task.priority, taskExecutionMode: task.taskExecutionMode, aiClientId: task.aiClientId, autoPlanGeneration: task.autoPlanGeneration, autoExecute: task.autoExecute, autoPlanGenerationTiming: task.autoPlanGenerationTiming, autoExecuteTiming: task.autoExecuteTiming, status: task.status, parentTaskId: task.parentTaskId },
       summary: `Created task: ${task.title}`,
       dedupeKey: `task.created:${task.id}`,
       ingestSequence: 0,
@@ -304,6 +325,7 @@ export async function createTask(input: CreateTaskInput, client: Prisma.Transact
   return {
     taskId: task.id,
     workspaceId: task.workspaceId,
+    taskExecutionMode: task.taskExecutionMode,
     autoPlanGeneration: task.autoPlanGeneration,
     autoExecute: task.autoExecute,
     autoPlanGenerationTiming: task.autoPlanGenerationTiming,

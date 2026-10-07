@@ -3,6 +3,7 @@ import type { TaskOrchestrator } from "@chrona/engine";
 type RuntimeBootstrapPort = {
   startTaskOrchestrator: () => TaskOrchestrator;
   startAiFeatureRecoveryWorker: () => { stop(): Promise<void> };
+  startManagementWorker?: () => { stop(): Promise<void> };
 };
 
 export type ServerRuntimeLifecycle = {
@@ -17,9 +18,10 @@ export function createServerRuntimeBootstrap(runtime: RuntimeBootstrapPort) {
 
     const orchestrator = runtime.startTaskOrchestrator();
     const featureRecovery = runtime.startAiFeatureRecoveryWorker();
+    const management = runtime.startManagementWorker?.();
     lifecycle = {
       async stop() {
-        await Promise.all([orchestrator.stop(), featureRecovery.stop()]);
+        await Promise.all([orchestrator.stop(), featureRecovery.stop(), management?.stop()]);
       },
     };
     return lifecycle;

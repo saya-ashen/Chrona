@@ -1,4 +1,4 @@
-import type { AutomationTimingPreset } from "@chrona/contracts";
+import { resolveAutomationTriggerAt, type AutomationTimingPreset } from "@chrona/contracts";
 
 export const AUTOMATION_READINESS_STATES = [
   "ready",
@@ -22,6 +22,7 @@ export type AutomationMode =
 export type AutomationPolicyPreview = {
   mode: AutomationMode;
   nextOccurrenceAt: string | null;
+  executionTrigger: "immediate" | "scheduled" | "none";
   willGeneratePlan: boolean;
   requiresPlanAcceptance: boolean;
   willAutoExecute: boolean;
@@ -65,9 +66,7 @@ export function automationOccurrenceKey(input: {
   workBlockId?: string | null;
   scheduledStartAt?: string | Date | null;
 }): string | null {
-  const scheduledAt = input.scheduledStartAt
-    ? new Date(input.scheduledStartAt).toISOString()
-    : null;
+  const scheduledAt = validSchedule(input.scheduledStartAt)?.toISOString() ?? null;
   if (!input.taskId || !scheduledAt) return null;
   return `${input.taskId}:${input.workBlockId ?? scheduledAt}`;
 }
@@ -84,6 +83,7 @@ export type AutomationReadinessInput = Pick<
   | "hasAcceptedPlan"
   | "scheduledStartAt"
   | "autoExecute"
+  | "autoExecuteTiming"
 > & { requiresPlanning: boolean };
 
 export function deriveAutomationReadiness(input: AutomationReadinessInput): {
@@ -96,15 +96,29 @@ export function deriveAutomationReadiness(input: AutomationReadinessInput): {
   if (input.providerReachable === false) return { readiness: "provider_unreachable", disabledReason: "The selected AI is unreachable. Test the connection again." };
   if (input.requiresPlanning && input.planningCapable === false) return { readiness: "planning_capability_missing", disabledReason: "The selected AI cannot generate plans." };
   if (input.autoExecute && input.executionCapable === false) return { readiness: "execution_capability_missing", disabledReason: "The selected AI cannot execute tasks." };
-  if (input.autoExecute && !input.scheduledStartAt) return { readiness: "schedule_time_missing", disabledReason: "Choose a schedule time before enabling automatic execution." };
-  if (input.autoExecute && !input.hasAcceptedPlan) return { readiness: "plan_acceptance_required", disabledReason: "Chrona will generate and accept a valid plan before the scheduled start." };
+  if (input.autoExecute && input.autoExecuteTiming !== "immediate" && !input.scheduledStartAt) return { readiness: "schedule_time_missing", disabledReason: "Choose a schedule time before enabling automatic execution." };
+  if (input.autoExecute && !input.hasAcceptedPlan) return { readiness: "plan_acceptance_required", disabledReason: "Chrona will generate and accept a valid plan before execution." };
   return { readiness: "ready", disabledReason: null };
 }
 
-export function deriveAutomationPolicyPreview(input: AutomationPolicyInput): AutomationPolicyPreview {
-  const scheduledAt = input.scheduledStartAt
-    ? new Date(input.scheduledStartAt).toISOString()
+function validSchedule(value: AutomationPolicyInput["scheduledStartAt"]): Date | null {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isFinite(date.getTime()) ? date : null;
+}
+
+function previewTiming(input: AutomationPolicyInput) {
+  const date = validSchedule(input.scheduledStartAt);
+  const trigger = input.autoExecute
+    ? resolveAutomationTriggerAt(input.autoExecuteTiming ?? "at_start", date)
     : null;
+  const executionTrigger: AutomationPolicyPreview["executionTrigger"] = trigger === "immediate" ? "immediate" : trigger ? "scheduled" : "none";
+  return { scheduledAt: date?.toISOString() ?? null, executionTrigger,
+    nextOccurrenceAt: trigger instanceof Date ? trigger.toISOString() : null };
+}
+
+export function deriveAutomationPolicyPreview(input: AutomationPolicyInput): AutomationPolicyPreview {
+  const { scheduledAt, ...timing } = previewTiming(input);
   const willGeneratePlan = input.autoPlanGeneration || input.autoExecute;
   const willAutoExecute = input.autoExecute;
   const mode: AutomationMode = willAutoExecute
@@ -124,7 +138,7 @@ export function deriveAutomationPolicyPreview(input: AutomationPolicyInput): Aut
   const { readiness, disabledReason } = readinessDecision;
   return {
     mode,
-    nextOccurrenceAt: scheduledAt,
+    ...timing,
     willGeneratePlan,
     requiresPlanAcceptance: willGeneratePlan && !willAutoExecute,
     willAutoExecute,

@@ -6,6 +6,7 @@ export type CreateTaskFromScheduleInput = {
   title: string;
   description?: string | null;
   priority?: string;
+  taskExecutionMode?: "ai" | "manual";
   autoPlanGeneration?: boolean;
   autoExecute?: boolean;
   autoPlanGenerationTiming?: AutomationTimingPreset;
@@ -33,6 +34,7 @@ export function createTaskFromSchedule(input: CreateTaskFromScheduleInput) {
         | "High"
         | "Urgent"
         | undefined,
+      taskExecutionMode: input.taskExecutionMode,
       autoPlanGeneration: input.autoPlanGeneration,
       autoExecute: input.autoExecute,
       autoPlanGenerationTiming: input.autoPlanGenerationTiming,
@@ -80,43 +82,25 @@ export function updateTaskConfigFromSchedule(input: {
   recurrenceAnchorStartAt?: string | null;
   recurrenceAnchorEndAt?: string | null;
 }) {
-  return apiJson(`/api/tasks/${encodeURIComponent(input.taskId)}`, {
+  const { taskId, ...body } = input;
+  return apiJson(`/api/tasks/${encodeURIComponent(taskId)}`, {
     method: "PATCH",
-    body: JSON.stringify({
-      title: input.title,
-      description: input.description ?? undefined,
-      priority: input.priority as
-        | "Low"
-        | "Medium"
-        | "High"
-        | "Urgent"
-        | undefined,
-      aiClientId: input.aiClientId ?? null,
-      executionConfig: input.executionConfig,
-      autoPlanGeneration: input.autoPlanGeneration,
-      autoExecute: input.autoExecute,
-      autoPlanGenerationTiming: input.autoPlanGenerationTiming,
-      autoExecuteTiming: input.autoExecuteTiming,
-      recurrenceRule: input.recurrenceRule ?? undefined,
-      recurrenceAnchorStartAt: input.recurrenceAnchorStartAt ?? undefined,
-      recurrenceAnchorEndAt: input.recurrenceAnchorEndAt ?? undefined,
-    }),
+    body: JSON.stringify(body),
   });
 }
 
-
 export function applySchedule(input: {
   taskId: string;
-  scheduledStartAt: Date;
-  scheduledEndAt: Date;
+  scheduledStartAt: Date | null;
+  scheduledEndAt: Date | null;
   dueAt?: Date | null;
   scheduleSource?: "human" | "ai" | "system";
 }) {
   return apiJson(`/api/tasks/${encodeURIComponent(input.taskId)}/schedule`, {
     method: "PUT",
     body: JSON.stringify({
-      scheduledStartAt: input.scheduledStartAt.toISOString(),
-      scheduledEndAt: input.scheduledEndAt.toISOString(),
+      scheduledStartAt: input.scheduledStartAt?.toISOString() ?? null,
+      scheduledEndAt: input.scheduledEndAt?.toISOString() ?? null,
       dueAt: input.dueAt?.toISOString() ?? null,
       scheduleSource: input.scheduleSource ?? "system",
     }),

@@ -15,6 +15,8 @@ import {
   resolveGeneratedFileReference,
 } from "../../tasks/result-file-access";
 import { ENGINE_ERROR_CODES, EngineError } from "../../../errors";
+import { aiArtifactRef } from "../../results/artifact-ref";
+export { aiArtifactRef } from "../../results/artifact-ref";
 
 const PREVIEW_BYTES = 64 * 1024;
 const TEXT_EXTENSIONS = new Set([".md", ".markdown", ".txt", ".json", ".csv"]);
@@ -35,14 +37,6 @@ const MIME_TYPES: Readonly<Record<string, string>> = {
 function isWithinGeneratedRoot(path: string) {
   const root = resolve(generatedFilesRoot());
   return path === root || path.startsWith(`${root}${sep}`);
-}
-
-export function aiArtifactRef(artifactId: string): AiArtifactRef {
-  return `AF${createHash("sha256")
-    .update(artifactId)
-    .digest("hex")
-    .slice(0, 12)
-    .toUpperCase()}`;
 }
 
 async function inspectGeneratedFile(uri: string, runId: string) {

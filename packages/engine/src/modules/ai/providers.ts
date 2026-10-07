@@ -5,6 +5,7 @@ import {
 } from "@chrona/claude-code";
 import { CHRONA_CODEX_PROVIDER_TYPE, CodexProviderClient } from "@chrona/codex";
 import { CHRONA_OMP_PROVIDER_TYPE, OmpProviderClient } from "@chrona/omp";
+import { CHRONA_PI_PROVIDER_TYPE, PiProviderClient } from "@chrona/pi";
 import {
 	CHRONA_DEBUG_PROVIDER_TYPE,
 	normalizeDebugProviderProfile,
@@ -23,6 +24,7 @@ import type {
 	ClaudeCodeClientConfig,
 	CodexClientConfig,
 	OmpClientConfig,
+	PiClientConfig,
 	HermesClientConfig,
 	LLMClientConfig,
 	DebugClientConfig,
@@ -188,6 +190,11 @@ async function checkClientHealth(
 				reason:
 					health.reason ?? health.message ?? "Codex connectivity check passed",
 			};
+		}
+
+		if (client.type === CHRONA_PI_PROVIDER_TYPE) {
+			const health = await new PiProviderClient({ config: client.config as PiClientConfig }).checkHealth();
+			return { available: health.ok, reason: health.reason ?? health.message };
 		}
 
 		if (client.type === CHRONA_OMP_PROVIDER_TYPE) {

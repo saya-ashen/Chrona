@@ -6,7 +6,7 @@ import { publishTaskWorkspaceUpdatedEvent } from "@/modules/projections/task-pro
 import { createPlanGraphFromCompiledPlan, createEmptyPlanOutput } from "@/modules/plan-execution/persistence/plan-run-store";
 import { createPlanRunFromCompiledPlan } from "@/modules/plan-execution/persistence/plan-runtime-store";
 import { compilePlanBlueprint } from "@chrona/domain";
-import { upgradeBlueprintToEditable, type AiRunResult, type CompletionValidation, type CompiledPlan, type PlanBlueprint, type TaskPlanReadModel } from "@chrona/contracts";
+import { PlanCompileError, upgradeBlueprintToEditable, type AiRunResult, type CompletionValidation, type CompiledPlan, type PlanBlueprint, type TaskPlanReadModel } from "@chrona/contracts";
 import { resolveEffectivePlanGraph } from "@chrona/graph-runtime";
 import { buildTaskPlanReadModel } from "./task-plan-read-model";
 import { parseFrozenGoalTaskContext, type FrozenGoalTaskContext } from "@/modules/goals/goal-task-context";
@@ -29,6 +29,18 @@ type HeadSnapshot = {
   baselineHash: string | null;
 };
 
+export type TaskPlanActivation = {
+  executionScope: "one_authorized_execution";
+  activationOwner: "scheduler" | "explicit_start";
+  schedule: {
+    state: "scheduled" | "unscheduled";
+    taskKind: "single" | "recurring";
+    recurrenceRule: string | null;
+    scheduledStartAt: string | null;
+    scheduledEndAt: string | null;
+  };
+};
+
 export type TaskPlanGenerationSnapshot = {
   task: {
     id: string;
@@ -38,6 +50,8 @@ export type TaskPlanGenerationSnapshot = {
     goalContext: FrozenGoalTaskContext | null;
     workBlockId: string | null;
     estimatedMinutes: number | null;
+    /** Absent only on persisted version-1 feature inputs created before activation context existed. */
+    activation?: TaskPlanActivation;
   };
   head: HeadSnapshot;
   workBlockId: string | null;
@@ -202,6 +216,27 @@ export async function terminalizeOrphanedTaskPlanGeneration(input: {
   });
 }
 
+export function taskPlanActivationSnapshot(input: {
+  task: { kind: "single" | "recurring"; recurrenceRule: string | null };
+  workBlock: {
+    trigger: "scheduled" | "manual";
+    scheduledStartAt: Date;
+    scheduledEndAt: Date;
+  } | null;
+}): TaskPlanActivation {
+  return {
+    executionScope: "one_authorized_execution",
+    activationOwner: input.workBlock?.trigger === "scheduled" ? "scheduler" : "explicit_start",
+    schedule: {
+      state: input.workBlock ? "scheduled" : "unscheduled",
+      taskKind: input.task.kind,
+      recurrenceRule: input.task.recurrenceRule,
+      scheduledStartAt: input.workBlock?.scheduledStartAt.toISOString() ?? null,
+      scheduledEndAt: input.workBlock?.scheduledEndAt.toISOString() ?? null,
+    },
+  };
+}
+
 /** Captures the task/head baseline once. Runtime-owned observations are frozen separately with the feature run. */
 export async function captureTaskPlanGenerationSnapshot(input: {
   taskId: string;
@@ -237,6 +272,7 @@ export async function captureTaskPlanGenerationSnapshot(input: {
       goalContext,
       workBlockId,
       estimatedMinutes: estimatedMinutes && estimatedMinutes > 0 ? estimatedMinutes : null,
+      activation: taskPlanActivationSnapshot({ task, workBlock }),
     },
     workBlockId,
     head: {
@@ -264,15 +300,32 @@ export async function commitTaskPlanGeneration(input: {
   generatedBy?: string;
 }): Promise<CommittedTaskPlanGeneration> {
   const validation = validateTaskPlanBlueprint(input.candidate.blueprint);
-  if (!validation.ok) throw new Error(validation.issues.map((issue) => issue.message).join(" "));
+  if (!validation.ok) {
+    throw new AiFeatureRuntimeError({
+      code: "completion_invalid",
+      message: "Generated plan did not satisfy required graph rules.",
+    });
+  }
 
-  const { compiledPlan, planId } = compilePlanBlueprint({
-    taskId: input.candidate.snapshot.task.id,
-    blueprint: input.candidate.blueprint,
-    planId: `plan_${input.candidate.runId}`,
-    generatedBy: input.generatedBy ?? "ai",
-    source: "ai",
-  });
+  let compiledPlan: CompiledPlan;
+  let planId: string;
+  try {
+    ({ compiledPlan, planId } = compilePlanBlueprint({
+      taskId: input.candidate.snapshot.task.id,
+      blueprint: input.candidate.blueprint,
+      planId: `plan_${input.candidate.runId}`,
+      generatedBy: input.generatedBy ?? "ai",
+      source: "ai",
+    }));
+  } catch (cause) {
+    if (cause instanceof PlanCompileError) {
+      throw new AiFeatureRuntimeError({
+        code: "completion_invalid",
+        message: "Generated plan did not satisfy required graph rules.",
+      });
+    }
+    throw cause;
+  }
   const editablePlan = upgradeBlueprintToEditable(input.candidate.blueprint, planId, 1);
   const contentHash = stableJsonHash(editablePlan);
   const run = createPlanRunFromCompiledPlan(compiledPlan);

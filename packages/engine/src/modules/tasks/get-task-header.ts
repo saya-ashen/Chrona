@@ -27,6 +27,7 @@ async function loadHeaderTaskView(taskId: string) {
 			title: true,
 			status: true,
 			priority: true,
+			taskExecutionMode: true,
 			dueAt: true,
 			projection: { select: { scheduledStartAt: true, scheduledEndAt: true } },
 			workBlocks: {
@@ -331,6 +332,7 @@ export type BuildHeaderSpecInput = {
 	workBlockId: string | null;
 };
 
+/* eslint-disable @typescript-eslint/no-unnecessary-condition -- Prisma relation reads retain nullable runtime values across selected projections. */
 /**
  * Pure aggregation: task view + execution + plan → `TaskHeaderSpecInput` (ViewModel).
  * Accepts an optional `now` for deterministic testing; defaults to `new Date()`.
@@ -428,6 +430,37 @@ export function resolveTaskHeaderViewModel(
 		currentWorkBlock?.scheduledEndAt ?? task.projection?.scheduledEndAt ?? null,
 	);
 	const source = task.importedCalendarEvents[0] ?? null;
+	if (task.taskExecutionMode === "manual") {
+		const isDone = task.status === "Done";
+		const isCancelled = task.status === "Cancelled";
+		return {
+			title: task.title,
+			workspaceStateGuidance: isDone
+				? "Reopen this task to continue tracking it."
+				: isCancelled
+					? "This task is cancelled."
+					: "Complete this task when the work is finished.",
+			status: isCancelled ? "cancelled" : isDone ? "completed" : "waiting",
+			statusLabel: isCancelled ? "Cancelled" : isDone ? "Done" : "Ready",
+			progressLabel: "Manual task",
+			priorityLabel: task.priority,
+			priorityTone: priorityTone(task.priority),
+			occurrenceLabel: occurrenceWindow ? `Occurrence · ${occurrenceWindow}` : null,
+			sourceLabel: source?.calendarSource.name ?? null,
+			occurrenceValue: occurrenceValueCurrent,
+			occurrenceOptions,
+			actions: [
+				...(isCancelled
+					? []
+					: [{
+						id: isDone ? "manual_reopen" as const : "manual_complete" as const,
+						label: isDone ? "Reopen task" : "Complete task",
+					}]),
+				{ id: "edit", label: "Edit" },
+				{ id: "delete", label: "Delete Task" },
+			],
+		};
+	}
 	const hasPlan = Boolean(savedPlan);
 	const hasAcceptedPlan = savedPlan?.status === "accepted";
 	const actions = headerActions({
@@ -476,6 +509,7 @@ export function resolveTaskHeaderViewModel(
 	};
 }
 
+/* eslint-enable @typescript-eslint/no-unnecessary-condition */
 /** Pure transformer: raw inputs → header `UiDocument`. */
 export function buildHeaderSpecFromTask(
 	input: BuildHeaderSpecInput,

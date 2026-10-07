@@ -1,4 +1,15 @@
 export { createChronaEngine } from "./engine";
+export { createWorkRecordsService } from "./modules/work-records/service";
+export { createLocalWorkRecordsService } from "./modules/work-records/local-owner";
+export { workCapabilities } from "./modules/work-records/access";
+export type { WorkActor, WorkPorts } from "./modules/work-records/access";
+export { createTaskResultsService } from "./modules/results/service";
+export { createLocalTaskResultsService } from "./modules/results/local-owner";
+export { readWorkResultCapabilities } from "./modules/results/entry-policy";
+export type { TaskResultsService } from "./modules/results/service";
+export { WorkResultError } from "./modules/results/access";
+export type { ResultPrincipal, ResultPermission, TaskResultsPorts, WorkResultErrorCode } from "./modules/results/access";
+export { createManagementClient, listManagementClients, revokeManagementClient } from "./modules/management/clients";
 export type { ChronaEngine } from "./engine";
 export {
 	appendTaskWorkspaceEvent,
@@ -113,5 +124,7 @@ export type {
 	ProviderRunRequestOptions,
 	EngineProviderClient,
 } from "./modules/ai";
+export { createLocalLibraryService } from "./modules/library/local-owner";
+export { createLibraryService } from "./modules/library/service";
 export { waitForGoalReviewGeneration } from "./modules/goals/goals";
 export { waitForGoalAssetOwnershipGeneration } from "./modules/goals/goal-asset-ownership";

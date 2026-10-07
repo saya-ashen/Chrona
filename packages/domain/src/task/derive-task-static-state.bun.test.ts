@@ -11,6 +11,15 @@ describe("deriveTaskStaticState", () => {
     });
   });
 
+  it("keeps manual tasks ready without a plan", () => {
+    expect(deriveTaskStaticState({ hasAcceptedPlan: false, taskExecutionMode: "manual" })).toEqual({
+      persistedStatus: "Ready",
+      runnabilityState: "ready_to_run",
+      runnabilitySummary: "Ready to complete",
+      missingPaths: [],
+    });
+  });
+
   it("marks tasks ready after plan acceptance", () => {
     expect(deriveTaskStaticState({ hasAcceptedPlan: true })).toEqual({
       persistedStatus: "Ready",

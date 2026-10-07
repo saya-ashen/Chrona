@@ -6,6 +6,7 @@ import type {
 import { TaskPlanGenerationHeadStatus, TaskPlanStatus } from "@/generated/prisma/client";
 import { ENGINE_ERROR_CODES, EngineError } from "../../errors";
 import { ensureTaskInWorkspace } from "@/modules/tasks/task-by-id";
+import { assertAiTaskExecution } from "@/modules/tasks/assert-ai-task-execution";
 import { applyPlanMutationCommand, applyPlanPatchCommand } from "./apply-plan-patch-command";
 import { generateTaskPlanManualStream } from "./generate-task-plan-manual-stream";
 import { startTaskPlanGenerationDurably } from "./start-task-plan-generation";
@@ -18,6 +19,7 @@ import {
 import { getLatestTaskPlanReadModel } from "./task-plan-read-model";
 import { rebuildTaskProjection } from "@/modules/projections/rebuild-task-projection";
 import { TaskPlanHeadConflictError } from "./task-plan-generation-persistence";
+import { currentCommandActor } from "../events";
 import { withSchedulerWorkOwnership, type SchedulerWorkContext } from "@/modules/orchestration/scheduler-lease-repository";
 
 type PlanAcceptanceReceipt = {
@@ -87,11 +89,13 @@ export class TaskPlanning {
 
 
   async accept(input: { taskId: string; planId: string; workspaceId?: string; workBlockId?: string | null; expectedHeadStateVersion: number; idempotencyKey: string; workContext?: SchedulerWorkContext }) {
+    await assertAiTaskExecution(input.taskId);
     if (input.workspaceId) {
       await ensureTaskInWorkspace(input.taskId, input.workspaceId);
       await ensurePlanInWorkspace(input.planId, input.taskId, input.workspaceId);
     }
     const dedupeKey = `task_plan.accept:${input.idempotencyKey}`;
+    const actor = { actorType: "user", actorId: null, source: "task_plan", correlationId: null, ...currentCommandActor() };
     const accepted = await withSchedulerWorkOwnership(input.workContext, async (tx) => {
       const existingReceipt = await tx.event.findUnique({ where: { dedupeKey }, select: { payload: true } });
       if (existingReceipt) {
@@ -141,9 +145,10 @@ export class TaskPlanning {
           taskId: input.taskId,
           workBlockId: scope,
           planId: input.planId,
-          actorType: "user",
-          actorId: null,
-          source: "task_plan",
+          actorType: actor.actorType,
+          actorId: actor.actorId,
+          source: actor.source,
+          correlationId: actor.correlationId,
           payload: {
             task_id: input.taskId,
             work_block_id: scope,
@@ -162,6 +167,7 @@ export class TaskPlanning {
   }
 
   async generate(input: { taskId: string; workBlockId?: string | null; forceRefresh?: boolean; userInstruction?: string | null; selectedNodeId?: string | null; idempotencyKey: string; workContext?: SchedulerWorkContext }) {
+    await assertAiTaskExecution(input.taskId);
     const started = await startTaskPlanGenerationDurably(input);
     const events = generateTaskPlanManualStream({
       ...input,
@@ -179,17 +185,20 @@ export class TaskPlanning {
   }
 
   async stopGeneration(input: { taskId: string; workBlockId?: string | null }) {
+    await assertAiTaskExecution(input.taskId);
     return {
       taskId: input.taskId,
       stopped: await stopTaskPlanGeneration({ taskId: input.taskId, workBlockId: input.workBlockId ?? null }),
     };
   }
 
-  patch(input: Parameters<typeof applyPlanPatchCommand>[0]) {
+  async patch(input: Parameters<typeof applyPlanPatchCommand>[0]) {
+    await assertAiTaskExecution(input.taskId);
     return applyPlanPatchCommand(input);
   }
 
-  mutate(input: Parameters<typeof applyPlanMutationCommand>[0]) {
+  async mutate(input: Parameters<typeof applyPlanMutationCommand>[0]) {
+    await assertAiTaskExecution(input.taskId);
     return applyPlanMutationCommand(input);
   }
 }

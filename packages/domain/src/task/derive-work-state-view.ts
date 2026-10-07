@@ -1,4 +1,5 @@
 export type WorkStateCanonical =
+  | "manual_open"
   | "no_plan"
   | "planning"
   | "plan_review"
@@ -18,6 +19,7 @@ export type WorkStateTone =
   "neutral" | "info" | "success" | "warning" | "danger";
 
 export type WorkStatePrimaryActionId =
+  | "complete_manual"
   | "generate_plan"
   | "stop_generation"
   | "accept_plan"
@@ -64,6 +66,7 @@ export type WorkStateView = {
 
 export type DeriveWorkStateViewInput = {
   taskStatus?: string | null;
+  taskExecutionMode?: "ai" | "manual" | null;
   executionStatus?: string | null;
   operationStatus?: string | null;
   planStatus?: string | null;
@@ -97,6 +100,14 @@ type WorkStatePresentation = Omit<
 >;
 
 const PRESENTATION: Record<WorkStateCanonical, WorkStatePresentation> = {
+  manual_open: {
+    state: "manual_open",
+    stage: "brief",
+    label: "Manual task",
+    tone: "neutral",
+    nextActionLabel: "Mark this task complete when you finish it",
+    primaryActionId: "complete_manual",
+  },
   no_plan: {
     state: "no_plan",
     stage: "brief",
@@ -263,6 +274,11 @@ function stateFromBlocker(
 }
 
 function deriveState(input: DeriveWorkStateViewInput): WorkStateCanonical {
+  if (input.taskExecutionMode === "manual") {
+    if (isOneOf(input.taskStatus, ["done"])) return "done";
+    if (isOneOf(input.taskStatus, ["cancelled", "canceled"])) return "cancelled";
+    return "manual_open";
+  }
   // A task-level decision is authoritative. Runtime summaries can lag behind
   // the current checkpoint, so normal human waits must outrank stale completed
   // execution metadata until the task itself is accepted as Done.
@@ -291,6 +307,8 @@ function deriveState(input: DeriveWorkStateViewInput): WorkStateCanonical {
   )
     return "result_ready";
 
+  // A recorded failed node/run explains the task-level Blocked envelope.
+  if (blockerState === "failed") return "failed";
   if (blockerState === "blocked") return "blocked";
   if (
     isOneOf(input.executionStatus, ["blocked", "degraded"]) ||
@@ -298,7 +316,6 @@ function deriveState(input: DeriveWorkStateViewInput): WorkStateCanonical {
   )
     return "blocked";
   if (
-    blockerState === "failed" ||
     isOneOf(input.executionStatus, ["failed"]) ||
     isOneOf(input.taskStatus, ["failed"])
   )
@@ -333,7 +350,8 @@ function deriveState(input: DeriveWorkStateViewInput): WorkStateCanonical {
   if (
     isOneOf(input.operationStatus, ["plan_ready_to_run"]) ||
     input.hasAcceptedPlan === true ||
-    isOneOf(input.planStatus, ["accepted"])
+    isOneOf(input.planStatus, ["accepted"]) ||
+    isOneOf(input.taskStatus, ["ready"])
   )
     return "ready_to_run";
   return "no_plan";

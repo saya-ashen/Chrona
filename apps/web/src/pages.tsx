@@ -10,6 +10,9 @@ import {
 import { DashboardPage, type DashboardData } from "@features/dashboard";
 import { SchedulePage } from "@features/schedule";
 import { TaskListPage } from "@features/task-management";
+import { WorkResultsPage } from "@features/work-results";
+import { WorkPageWorkspace, WorkPagesHome } from "@features/work-pages";
+import { WorkInboxPage, WorkInboxPanel, WorkRecordPage, WorkRecordSummary } from "@features/work-records";
 import { AiClientsDialog } from "@features/ai-clients/ui";
 import { TaskWorkspacePage, type TaskPageData } from "@features/task-workspace";
 import { GoalAssetWorkbench, GoalListPage, GoalWorkspacePage, type GoalAssetWorkbenchData, type GoalData, type GoalInboxCandidateData } from "@features/goals";
@@ -119,12 +122,34 @@ export type TaskListRouteData = {
   };
 };
 
+export function WorkInboxRoutePage() { return <WorkInboxPage />; }
+export function WorkRecordRoutePage() {
+  const { task } = useLoaderData() as TaskPageRouteData;
+  return <WorkRecordPage key={task.task.id} taskId={task.task.id} initialTitle={task.task.title} />;
+}
+
+export function WorkResultsRoutePage() {
+  const { taskId } = useParams();
+  const [search] = useSearchParams();
+  const occurrenceId = search.get("occurrenceId");
+  return <WorkResultsPage key={`${taskId}:${occurrenceId ?? "task"}`} taskId={taskId!} occurrenceId={occurrenceId} />;
+}
+
+export function WorkPagesHomeRoutePage() {
+  const { defaultWorkspace } = useAppBootOutletData();
+  return <WorkPagesHome workspaceId={defaultWorkspace.id} />;
+}
+export function WorkPageRoutePage() {
+  const { task } = useLoaderData() as TaskPageRouteData;
+  const [search] = useSearchParams();
+  return <WorkPageWorkspace key={`${task.task.id}:${search.get("occurrenceId") ?? "task"}`} taskId={task.task.id} title={task.task.title} description={task.task.description} occurrenceId={search.get("occurrenceId")} context={!search.get("occurrenceId") ? <WorkRecordSummary taskId={task.task.id} /> : null} />;
+}
 export function LocaleLandingPage() {
   const params = useParams();
   const { search, hash } = useLocation();
   return (
     <Navigate
-      to={`${localizeHref(resolveLocale(params.lang), "/dashboard")}${search}${hash}`}
+      to={`${localizeHref(resolveLocale(params.lang), "/home")}${search}${hash}`}
       replace
     />
   );
@@ -175,6 +200,7 @@ export function ActionCenterRoutePage() {
           title={dictionary.pages.actionCenter.title}
           description={dictionary.pages.actionCenter.subtitle}
         />
+        <WorkInboxPanel embedded />
         <ActionCenterPageClient
           workspaceId={defaultWorkspace.id}
           initialData={actionCenter}
@@ -283,10 +309,12 @@ export function TaskListRoutePage() {
 
 export function TaskDetailRoutePage() {
   const { task, dictionary } = useLoaderData() as TaskPageRouteData;
-
-  return (
-    <PageFrame mode="workspace" data-domain="tasks" className="p-1 sm:p-2">
-      <TaskWorkspacePage data={task} copy={dictionary.components.taskPage} />
-    </PageFrame>
-  );
+  const [search] = useSearchParams();
+  const legacy = <PageFrame mode="workspace" data-domain="tasks" className="p-1 sm:p-2">
+    <TaskWorkspacePage data={task} copy={dictionary.components.taskPage} />
+  </PageFrame>;
+  if (task.task.taskExecutionMode === "manual" && search.get("view") !== "execution") {
+    return <WorkPageWorkspace key={task.task.id} taskId={task.task.id} title={task.task.title} description={task.task.description} context={<WorkRecordSummary taskId={task.task.id} />} />;
+  }
+  return legacy;
 }

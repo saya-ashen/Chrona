@@ -159,6 +159,27 @@ export function createProgram(options: CreateProgramOptions = {}): Command {
       }
     });
 
+  const management = program.command("mcp").description("External-agent management MCP credentials (local administration)");
+  management.command("enroll")
+    .requiredOption("--name <name>", "Agent/client label")
+    .requiredOption("--public-url <origin>", "Trusted HTTPS Chrona origin, or localhost HTTP")
+    .requiredOption("--timezone <zone>", "IANA timezone, e.g. Asia/Shanghai")
+    .requiredOption("--access <preset>", "Explicit preset: read, full, assistant-read, assistant, assistant-edit, results-read, results-submit, results-review, results-files-read, results-files-submit, results-files-review, work-read, work-record, pages-read, pages-author, library-read, library-organize or library-configure; submission/recording never grants review or execution authority")
+    .requiredOption("--token-file <path>", "New private file; token is never printed")
+    .action(async (input: { name: string; publicUrl: string; timezone: string; access: string; tokenFile: string }) => {
+      const { enrollLocalManagementClient } = await import("./management");
+      console.log(JSON.stringify(await enrollLocalManagementClient(input)));
+    });
+  management.command("list").action(async () => {
+    const { listLocalManagementClients } = await import("./management");
+    console.log(JSON.stringify(await listLocalManagementClients()));
+  });
+  management.command("revoke").argument("<client-id>").action(async (clientId: string) => {
+    const { revokeLocalManagementClient } = await import("./management");
+    await revokeLocalManagementClient(clientId);
+    console.log("Management client revoked.");
+  });
+
   const hermes = program
     .command("hermes")
     .description("Hermes integration commands");

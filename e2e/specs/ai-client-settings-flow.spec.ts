@@ -149,7 +149,7 @@ test.describe("AI Client Settings", () => {
 				features: string[];
 			}>;
 		};
-		const releasedProviders = body.providers.filter((provider) => provider.key !== "debug");
+		const releasedProviders = body.providers.filter((provider) => provider.tier === "stable");
 		expect(releasedProviders.map((provider) => provider.key)).toEqual([
 			"codex",
 			"omp",
@@ -175,6 +175,24 @@ test.describe("AI Client Settings", () => {
 		await page.getByText("Advanced settings").click();
 		for (const feature of ["Task Planning", "Goal Review", "Task Execution", "Dashboard Brief"]) {
 			await expect(page.getByText(feature, { exact: true })).toBeVisible();
+		}
+	});
+
+	test("shows experimental Pi settings without copying local credentials", async ({ page }) => {
+		for (const viewport of [{ width: 1440, height: 900 }, { width: 1024, height: 768 }, { width: 390, height: 844 }]) {
+			await page.setViewportSize(viewport);
+			await page.goto(SETTINGS_URL);
+			await page.getByRole("button", { name: /add client/i }).click();
+			await page.getByRole("combobox", { name: "Type" }).click();
+			await page.getByRole("option", { name: /^Pi/ }).click();
+			await expect(page.getByText("Support tier: experimental")).toBeVisible();
+			await page.getByText("Advanced settings").click();
+			await expect(page.getByRole("textbox", { name: "Pi model", exact: true })).toBeVisible();
+			await expect(page.getByRole("textbox", { name: "Pi working directory", exact: true })).toBeVisible();
+			await expect(page.getByRole("textbox", { name: /API Key/ })).toHaveCount(0);
+			expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+			const dialog = page.getByRole("dialog");
+			expect(await dialog.evaluate((element) => element.scrollWidth <= element.clientWidth)).toBe(true);
 		}
 	});
 

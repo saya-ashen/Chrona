@@ -79,6 +79,7 @@ async function runScheduledPass({ now, result, fired, workContext }: PassContext
       scheduledStartAt: { lte: windowUpperBound },
       task: {
         status: { in: [...PLAN_GENERATION_TASK_STATUSES] },
+        taskExecutionMode: "ai",
         autoPlanGeneration: true,
       },
     },
@@ -156,6 +157,7 @@ async function runNoScheduleFallbackPass({ now, result, fired, workContext }: Pa
   const unscheduledTasks = await db.task.findMany({
     where: {
       status: { in: [...PLAN_GENERATION_TASK_STATUSES] },
+      taskExecutionMode: "ai",
       autoPlanGeneration: true,
       createdAt: { lte: graceCutoff },
       workBlocks: { none: {} },

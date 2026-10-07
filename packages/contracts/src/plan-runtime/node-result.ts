@@ -1,4 +1,5 @@
 import type { NodeActionForm, WaitKind } from "./node-core";
+import type { ResultContributionContent } from "../results/content";
 type CheckpointInputFields = Record<string, string | boolean | string[]>;
 type CheckpointResponse = { response: unknown };
 import type { UiDocument } from "@chrona/ui-protocol";
@@ -45,11 +46,8 @@ export type NodeDeliverable = {
   placement: "primary" | "supporting" | "evidence";
 };
 
-export type ResultContribution = {
-  key: string;
-  title?: string;
-  content: string;
-  importance?: "primary" | "supporting";
+// Node provenance extends shared content; it is not required by the content schema.
+export type ResultContribution = ResultContributionContent & {
   sourceNodeRef?: string;
 };
 
@@ -77,7 +75,7 @@ export type ResultManifest = {
 
 export type ResultFinalizationState =
   | { status: "Pending"; sourceRevision: number }
-  | { status: "Running"; sourceRevision: number; attempt: number; startedAt: string }
+  | { status: "Running"; sourceRevision: number; attempt: number; startedAt: string; phase?: "compose" | "review" }
   | { status: "Ready"; sourceRevision: number; attempt: number; finalizedAt: string }
   | {
       status: "Failed";
@@ -93,6 +91,12 @@ export type FinalizedResult = {
   manifest: ResultManifest;
   spec: UiDocument;
   finalizedAt: string;
+  /** Editorial review is not factual verification or human acceptance.
+   * Absent on historical results: never infer that review completed. */
+  review?: {
+    status: "pending" | "completed" | "fallback";
+    reason?: "timeout" | "interrupted" | "provider_error" | "invalid_output";
+  };
 };
 
 

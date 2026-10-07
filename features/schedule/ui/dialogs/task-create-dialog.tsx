@@ -73,6 +73,10 @@ const priorityBadgeColors: Record<string, string> = {
 
 const DEFAULT_DIALOG_COPY = {
   title: "Add task",
+  taskType: "Task type",
+  aiTask: "AI task",
+  manualTask: "Manual task",
+  manualTaskDescription: "Complete this task directly. Chrona will not create a plan or use an AI provider.",
   close: "Close",
   titlePlaceholder: "Add title",
   titleLabel: "Title",
@@ -136,6 +140,9 @@ const DEFAULT_DIALOG_COPY = {
     "Chrona will generate and accept a valid plan, then execute it at the scheduled time.",
   defaultProviderSummary: "Use the workspace default AI",
   automaticRunTitle: "Automatic run",
+  automaticRunImmediate: "After saving, Chrona will prepare a valid plan and execute as soon as it is ready.",
+  automaticRunNow: "After saving (once the plan is ready)",
+  automaticRunPast: "This trigger time has passed. The run becomes due on the next scheduler scan, once its plan is ready.",
   automaticRunSummary:
     "Chrona will prepare a valid plan and run this task automatically.",
   automaticRunReady: "Ready",
@@ -179,6 +186,7 @@ type TaskCreateDialogProps = {
     title: string;
     description: string;
     priority: "Low" | "Medium" | "High" | "Urgent";
+    taskExecutionMode: "ai" | "manual";
     autoExecute: boolean;
     autoPlanGenerationEnabled: boolean;
     autoPlanGenerationTiming: AutomationTimingPreset;
@@ -250,6 +258,7 @@ function TaskCreateSchedulingFields({
   );
 }
 
+// eslint-disable-next-line max-statements -- Task type selection shares the existing creation form state.
 export function TaskCreateDialog({
   isOpen,
   initialTitle = "",
@@ -273,6 +282,7 @@ export function TaskCreateDialog({
     defaultAutoPlanGenerationEnabled = aiPreferences.autoPlanGenerationEnabled;
   const [title, setTitle] = useState(initialTitle);
   const [productMode, setProductMode] = useState<"task" | "goal">("task");
+  const [taskExecutionMode, setTaskExecutionMode] = useState<"ai" | "manual">("ai");
   const [goalTitle, setGoalTitle] = useState("");
   const [firstTaskTitle, setFirstTaskTitle] = useState("");
   const { messages } = useI18n();
@@ -385,6 +395,7 @@ export function TaskCreateDialog({
       setEndTime(formatTime(initialEndAt));
       setTitle(initialTitle);
       setDescription(initialDescription);
+      setTaskExecutionMode("ai");
       setGoalTitle("");
       setFirstTaskTitle("");
       setPriority("Medium");
@@ -413,14 +424,9 @@ export function TaskCreateDialog({
     if (productMode === "goal" && (!goalTitle.trim() || !firstTaskTitle.trim()))
       return;
 
-    const [startHours, startMinutes] = startTime.split(":").map(Number);
-    const [endHours, endMinutes] = endTime.split(":").map(Number);
-
-    const scheduledStartAt = new Date(startDate);
-    scheduledStartAt.setHours(startHours, startMinutes, 0, 0);
-
-    const scheduledEndAt = new Date(startDate);
-    scheduledEndAt.setHours(endHours, endMinutes, 0, 0);
+    // Same local-time interpretation as the preview (date-only parsing is UTC).
+    const scheduledStartAt = new Date(`${startDate}T${startTime}:00`);
+    const scheduledEndAt = new Date(`${startDate}T${endTime}:00`);
 
     const recurrenceRule = !repeatEnabled
       ? null
@@ -430,8 +436,9 @@ export function TaskCreateDialog({
       title: productMode === "goal" ? firstTaskTitle.trim() : title.trim(),
       description: description.trim(),
       priority,
-      autoExecute,
-      autoPlanGenerationEnabled: autoExecute || autoPlanGenerationEnabled,
+      taskExecutionMode,
+      autoExecute: taskExecutionMode === "manual" ? false : autoExecute,
+      autoPlanGenerationEnabled: taskExecutionMode === "manual" ? false : autoExecute || autoPlanGenerationEnabled,
       autoPlanGenerationTiming,
       autoExecuteTiming,
       dueAt: parseDateTimeInput(dueAt),
@@ -444,7 +451,7 @@ export function TaskCreateDialog({
       recurrenceAnchorEndAt: recurrenceRule
         ? scheduledEndAt.toISOString()
         : null,
-      aiClientId: aiClientId || null,
+      aiClientId: taskExecutionMode === "manual" ? null : aiClientId || null,
       mode: productMode,
       goalTitle: productMode === "goal" ? goalTitle.trim() : undefined,
       firstTaskTitle:
@@ -757,7 +764,14 @@ export function TaskCreateDialog({
 
           <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px] xl:items-start">
             <div className="flex flex-col gap-4">
-              <TaskConfigSection title={dialogCopy.mode}>
+              <TaskConfigSection title={dialogCopy.taskType}>
+                <div className="grid gap-2 sm:grid-cols-2" role="radiogroup" aria-label={dialogCopy.taskType}>
+                  <Button type="button" variant={taskExecutionMode === "ai" ? "default" : "outline"} role="radio" aria-checked={taskExecutionMode === "ai"} disabled={isPending} onClick={() => setTaskExecutionMode("ai")}>{dialogCopy.aiTask}</Button>
+                  <Button type="button" variant={taskExecutionMode === "manual" ? "default" : "outline"} role="radio" aria-checked={taskExecutionMode === "manual"} disabled={isPending} onClick={() => setTaskExecutionMode("manual")}>{dialogCopy.manualTask}</Button>
+                </div>
+                {taskExecutionMode === "manual" ? <p className="mt-2 text-xs text-muted-foreground">{dialogCopy.manualTaskDescription}</p> : null}
+              </TaskConfigSection>
+              {taskExecutionMode === "ai" ? <TaskConfigSection title={dialogCopy.mode}>
                 <div
                   className="grid gap-2 sm:grid-cols-3"
                   role="radiogroup"
@@ -806,7 +820,7 @@ export function TaskCreateDialog({
                     </Button>
                   ))}
                 </div>
-              </TaskConfigSection>
+              </TaskConfigSection> : null}
 
               <TaskConfigSection
                 title={
@@ -990,7 +1004,7 @@ export function TaskCreateDialog({
 
                 </>
               ) : null}
-              {aiClientOptions.length > 1 ? (
+              {taskExecutionMode === "ai" && aiClientOptions.length > 1 ? (
                 <TaskConfigSection title={dialogCopy.aiProvider}>
                   <TaskConfigField
                     label={dialogCopy.aiProvider}
@@ -1008,7 +1022,7 @@ export function TaskCreateDialog({
                   </TaskConfigField>
                 </TaskConfigSection>
               ) : null}
-              {!autoExecute && autoPlanGenerationEnabled ? (
+              {taskExecutionMode === "ai" && !autoExecute && autoPlanGenerationEnabled ? (
                 <TaskConfigSection title={dialogCopy.automationPreview}>
                   <div
                     aria-label={dialogCopy.automationPreview}
@@ -1026,7 +1040,7 @@ export function TaskCreateDialog({
                 </TaskConfigSection>
               ) : null}
 
-              {autoExecute ? (
+              {taskExecutionMode === "ai" && autoExecute ? (
                 <TaskConfigSection title={dialogCopy.automationPreview}>
                   <div className="mb-3 grid gap-1.5">
                     <span className="text-xs font-medium text-muted-foreground">
@@ -1035,11 +1049,15 @@ export function TaskCreateDialog({
                     <Select
                       value={autoExecuteTiming}
                       disabled={isPending}
-                      onValueChange={(value) =>
-                        setAutoExecuteTiming(normalizeAutomationTiming(value))
-                      }
+                      onValueChange={(value) => {
+                        const timing = normalizeAutomationTiming(value);
+                        setAutoExecuteTiming(timing);
+                        // A single start-timing control governs this automatic
+                        // creation flow: never defer planning behind an immediate run.
+                        setAutoPlanGenerationTiming(timing);
+                      }}
                     >
-                      <SelectTrigger className="w-full">
+                      <SelectTrigger className="w-full" aria-label={dialogCopy.automationTimingLabel}>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
@@ -1061,7 +1079,9 @@ export function TaskCreateDialog({
                           {dialogCopy.automaticRunTitle}
                         </p>
                         <p className="mt-1 text-xs leading-5 text-muted-foreground">
-                          {dialogCopy.automaticRunSummary}
+                          {policyPreview.executionTrigger === "immediate"
+                            ? dialogCopy.automaticRunImmediate
+                            : dialogCopy.automaticRunSummary}
                         </p>
                       </div>
                       <Badge
@@ -1084,12 +1104,14 @@ export function TaskCreateDialog({
                           {dialogCopy.automaticRunTime}
                         </dt>
                         <dd className="mt-0.5 text-foreground">
-                          {policyPreview.nextOccurrenceAt
+                          {policyPreview.executionTrigger === "immediate"
+                            ? dialogCopy.automaticRunNow
+                            : policyPreview.nextOccurrenceAt
                             ? new Intl.DateTimeFormat(
                                 locale === "zh" ? "zh-CN" : "en",
                                 {
-                                  dateStyle: "medium",
-                                  timeStyle: "short",
+                                  year: "numeric", month: "short", day: "numeric",
+                                  hour: "2-digit", minute: "2-digit", timeZoneName: "short",
                                 },
                               ).format(new Date(policyPreview.nextOccurrenceAt))
                             : "—"}
@@ -1105,6 +1127,9 @@ export function TaskCreateDialog({
                         </dd>
                       </div>
                     </dl>
+                    {policyPreview.nextOccurrenceAt && new Date(policyPreview.nextOccurrenceAt).getTime() < Date.now() ? (
+                      <p className="mt-2 text-xs text-warning-foreground" role="note">{dialogCopy.automaticRunPast}</p>
+                    ) : null}
 
                     <button
                       type="button"

@@ -9,6 +9,7 @@ import {
   resolveEffectivePlanGraph,
   selectReadyNodeIds,
 } from "./index";
+import type { CompiledPlan } from "./index";
 import {
   activeDefinitionLayerId,
   makeBranchingPlan,
@@ -65,6 +66,75 @@ describe("graph-runtime selection", () => {
     expect(effective.readyNodeIds).toEqual(["build"]);
     expect(effective.pendingNodeIds).not.toContain("configure");
     expect(effective.completedNodeIds).toContain("configure");
+  });
+
+  it("activates only the selected task exit for either XOR branch", () => {
+    const compiledPlan: CompiledPlan = {
+      id: "compiled_preview_exits",
+      editablePlanId: "preview_exits",
+      sourceVersion: 1,
+      nodes: [
+        {
+          id: "preview_available",
+          localId: "preview_available",
+          type: "condition" as const,
+          title: "Preview available",
+          config: {
+            condition: "Preview generated",
+            evaluationBy: "ai" as const,
+            branches: [
+              { label: "blocked", nextNodeId: "report_blocked_preview" },
+              { label: "ready", nextNodeId: "publish_preview_report" },
+            ],
+          },
+          dependencies: [],
+          dependents: ["report_blocked_preview", "publish_preview_report"],
+        },
+        {
+          id: "report_blocked_preview",
+          localId: "report_blocked_preview",
+          type: "task" as const,
+          title: "Report blocked preview",
+          config: {},
+          dependencies: ["preview_available"],
+          dependents: [],
+        },
+        {
+          id: "publish_preview_report",
+          localId: "publish_preview_report",
+          type: "task" as const,
+          title: "Publish preview report",
+          config: {},
+          dependencies: ["preview_available"],
+          dependents: [],
+        },
+      ],
+      edges: [
+        { id: "preview_blocked", from: "preview_available", to: "report_blocked_preview", label: "blocked" },
+        { id: "preview_ready", from: "preview_available", to: "publish_preview_report", label: "ready" },
+      ],
+      entryNodeIds: ["preview_available"],
+    };
+
+    for (const [label, selected, skipped] of [
+      ["blocked", "report_blocked_preview", "publish_preview_report"],
+      ["ready", "publish_preview_report", "report_blocked_preview"],
+    ] as const) {
+      const graph = createPlanGraphFromCompiledPlan({ taskId: `task_${label}`, compiledPlan });
+      const effective = resolveEffectivePlanGraph({
+        graph,
+        results: [{
+          nodeId: "preview_available",
+          nodeLayerId: activeDefinitionLayerId(graph, "preview_available"),
+          status: "current",
+          selectedBranch: { label, nextNodeId: selected, source: "system" },
+        }],
+      });
+
+      expect(effective.readyNodeIds).toEqual([selected]);
+      expect(effective.terminalNodeIds).toEqual([selected]);
+      expect(effective.nodes.find((node) => node.id === skipped)?.status).toBe("skipped");
+    }
   });
 
   it("does not expose all branch targets when a completed condition result lacks selectedBranch", () => {

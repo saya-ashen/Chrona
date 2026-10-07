@@ -2,6 +2,13 @@
 
 This document traces the current backend path from task creation to plan execution. The HTTP entrypoint is `apps/server/src/routes/**`; application logic lives primarily in `packages/engine/src/modules/**`; graph mechanics live in `packages/graph-runtime`.
 
+**Scope:** this is the Chrona-managed execution path. The canonical
+[Product Architecture](../zh/product-architecture.md) makes it optional, rather
+than the mandatory admission path for all work. Independent external result
+intake remains to be implemented; do not route it through synthetic plans,
+nodes, Runs, or internal execution tokens. Current lifecycle and recovery rules
+below remain authoritative for managed work.
+
 ## Route map for execution-related work
 
 | Area | Endpoint |
@@ -122,6 +129,8 @@ Source anchors:
 
 ## Node outcomes
 
+A `wait` node is a human-confirmed external-dependency checkpoint, not a timer or event subscription. It shows an actionable confirmation form and does not resume automatically when a clock or external event fires; timed in-plan waits are not implemented. Scheduler or explicit manual start owns activation, recurrence, and scheduled start-time waiting outside the graph, and each generated plan covers one authorized execution occurrence.
+
 Node outcomes never write `Task.status`/`blockReason` directly. The runner
 persists *facts* — the node result/attempt, the `ExecutionSession` state, and
 (for provider work) the `Run` status + `errorSummary` — then calls the single
@@ -188,6 +197,12 @@ External agents use `POST /api/mcp` tools. Chrona injects hidden context such as
 Important rule: agents must not invent backend IDs. They should call read tools only when state is missing or stale, and submit final node outcomes with the appropriate Chrona tool. `chrona.node.read` without a ref reads bounded execution/node state; with an AI-visible node ref it reads paginated semantic result content from that node. This is a recovery path for lost or compacted provider context, not the default cross-node transport.
 
 ## Canonical task-result flow
+
+The following is the **current managed-result implementation**, including its
+Run ownership and AI-finalization gate. The target extracts shared work-owned
+result/review use cases and permits deterministic basic rendering without AI;
+that target is not yet this path's behavior. See the
+[data-model transition](./data-model.md#target-evolution-work-owned-results).
 
 Task nodes do not co-author a shared json-render page. A task node submits one terminal semantic result containing its summary, keyed findings, decisions, caveats, next actions, evidence, and generated-file deliverable declarations.
 

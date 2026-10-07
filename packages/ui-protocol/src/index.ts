@@ -1,3 +1,4 @@
+export * from "./work-pages";
 export type { Spec, ChronaSpec, UiDocument } from "./document/document";
 export {
 	validateChronaSpec,

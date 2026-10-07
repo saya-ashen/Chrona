@@ -15,7 +15,7 @@ export type BootChronaServer = () => Promise<void>;
 const packageDir = process.env.CHRONA_PACKAGE_DIR
   ?? resolve(dirname(import.meta.dirname), "..");
 
-function findResourceDir(): string {
+export function findResourceDir(): string {
   const binaryPath = Bun.argv[0] ?? process.execPath;
   const binaryDir = resolve(dirname(binaryPath));
   const executableDir = resolve(dirname(process.execPath));

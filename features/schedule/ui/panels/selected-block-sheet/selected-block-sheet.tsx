@@ -35,7 +35,11 @@ export function SelectedBlockSheet({
     acceptedPlan,
     handlePlanLoaded,
     handleApplyPlan,
-  } = useSelectedBlockPlanState({ item, onMutatedAction });
+  } = useSelectedBlockPlanState({
+    item,
+    onMutatedAction,
+    enabled: item.taskExecutionMode !== "manual",
+  });
   const {
     planningTaskDraft,
     taskConfigDraftState,

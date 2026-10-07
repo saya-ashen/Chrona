@@ -50,6 +50,28 @@ afterEach(() => {
 });
 
 describe("TaskCreateDialog – Core functionality", () => {
+  it("confirms immediate execution and submits matching planning timing instead of a stale scheduled time", async () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    render(<TaskCreateDialog {...defaultProps} initialTitle="Immediate regression" initialAutoExecute onSubmit={onSubmit} />);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("combobox", { name: "Start timing" }));
+    await user.click(screen.getByRole("option", { name: "Immediately" }));
+    expect(screen.getByText("After saving (once the plan is ready)")).toBeInTheDocument();
+    expect(screen.queryByText(/This trigger time has passed/)).toBeNull();
+    await user.click(screen.getByText("Save"));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ autoExecuteTiming: "immediate", autoPlanGenerationTiming: "immediate" })));
+  });
+  it("submits manual creation with the null provider wire value and no AI automation", async () => {
+    const onSubmit = vi.fn().mockResolvedValue(undefined);
+    const user = userEvent.setup();
+    render(<TaskCreateDialog {...defaultProps} initialTitle="Pay rent" onSubmit={onSubmit} />);
+    await user.click(screen.getByRole("radio", { name: "Manual task" }));
+    await user.click(screen.getByText("Save"));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({
+      taskExecutionMode: "manual", aiClientId: null, autoExecute: false, autoPlanGenerationEnabled: false,
+    })));
+  });
+
   it("returns null when not open", () => {
     const { container } = render(<TaskCreateDialog {...defaultProps} isOpen={false} />);
     expect(container.innerHTML).toBe("");

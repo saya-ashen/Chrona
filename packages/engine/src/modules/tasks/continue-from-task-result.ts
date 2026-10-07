@@ -11,6 +11,7 @@ import {
 
 type ContinueFromTaskResultInput = {
   taskId: string;
+  expectedAcceptedRunId?: string;
   requestId?: string;
   instruction: string;
   intent: "ask" | "create_task";
@@ -356,6 +357,9 @@ export async function continueFromTaskResult(
   if (existing) return existing;
 
   const context = await deps.getAcceptedResultContext(input.taskId);
+  if (input.expectedAcceptedRunId && context.acceptance.runId !== input.expectedAcceptedRunId) {
+    throw new EngineError(ENGINE_ERROR_CODES.CONFLICT, "The accepted result changed before follow-up.");
+  }
   const sessionStrategy =
     input.intent === "create_task"
       ? input.sessionStrategy ?? "handoff_compact"

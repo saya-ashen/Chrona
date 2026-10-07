@@ -1,10 +1,17 @@
 import { afterAll, beforeEach, describe, expect, it, mock } from "bun:test";
+import { randomUUID } from "node:crypto";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { PiProviderClient } from "@chrona/pi";
+import { FAKE_PI_SOURCE } from "@chrona/pi/test-support";
 import type {
   AgentProviderClient,
   ProviderRunEvent,
   ProviderRunRef,
   ProviderRunSnapshot,
 } from "@chrona/providers-foundation";
+import type { AgentControlActionBody } from "@chrona/contracts";
 import type { NodeAttempt } from "@chrona/contracts/ai";
 import {
   db,
@@ -26,6 +33,9 @@ import {
   withContextContinuity,
 } from "./runtime/runtime-context-continuity";
 import { ensureProviderRunRecord } from "./ai-runtime-persistence";
+import { handleControlAction } from "../agent-tools/control-route";
+import { mintRunToken } from "./runtime/agent-control-store";
+import { registerActiveRuntimeInvocation } from "./runtime/active-runtime-invocations";
 import type { ExecutionProviderRequest } from "./ai-runtime-request";
 
 const request: ExecutionProviderRequest = {
@@ -157,7 +167,7 @@ async function seedRunPair() {
   return { first, second };
 }
 
-async function seedProviderRunChain() {
+async function seedProviderRunChain(planId = "plan-1") {
   const workspace = await db.workspace.create({
     data: {
       name: "Provider audit workspace",
@@ -177,7 +187,7 @@ async function seedProviderRunChain() {
     data: {
       workspaceId: workspace.id,
       taskId: task.id,
-      planId: "plan-1",
+      planId,
       revision: 1,
       status: TaskPlanStatus.Accepted,
       compiledPlan: {},
@@ -199,7 +209,7 @@ async function seedProviderRunChain() {
       planRunId: planRun.id,
       nodeId: "node-1",
       nodeLayerId: "layer-1",
-      idempotencyKey: "attempt-key-1",
+      idempotencyKey: `attempt-key-${planId}`,
       attemptNumber: 1,
       status: "running",
       executionEpoch: 0,
@@ -216,7 +226,7 @@ async function seedProviderRunChain() {
       aiClientConfigDigest: "config-digest",
       providerName: "hermes",
       runtimeName: "hermes",
-      idempotencyKey: "provider-run-key-1",
+      idempotencyKey: `provider-run-key-${planId}`,
       status: "running",
     },
   });
@@ -227,7 +237,7 @@ async function seedProviderRunChain() {
       providerClientId: "ai-client-test",
       providerName: "hermes",
       providerConfigFingerprint: "config-digest",
-      sessionKey: "provider-audit-session",
+      sessionKey: `provider-audit-session-${planId}`,
     },
   });
   await db.executionSession.create({
@@ -1912,6 +1922,148 @@ describe("runProviderRequest Chrona control handoff", () => {
         },
       }),
     );
+  });
+});
+
+describe("Pi full control terminal interruption", () => {
+  it.skipIf(process.platform === "win32")("keeps the durable terminal receipt authoritative when its control route immediately aborts Pi", async () => {
+    const root = await mkdtemp(join(tmpdir(), "chrona-pi-control-test-"));
+    const binaryPath = join(root, "pi");
+    await writeFile(binaryPath, FAKE_PI_SOURCE, { mode: 0o700 });
+    const client = new PiProviderClient({
+      config: { binaryPath, cwd: root, codingAgentDirectory: root, timeoutMs: 5_000 },
+      stateDirectory: root,
+    });
+    const first = await seedProviderRunChain();
+    const pending = await seedProviderRunChain("pi-pending-plan");
+    const active = registerActiveRuntimeInvocation({ runId: first.run.id, nodeAttemptId: first.attempt.id });
+    const pendingActive = registerActiveRuntimeInvocation({ runId: pending.run.id, nodeAttemptId: pending.attempt.id });
+    const firstToken = await mintRunToken({
+      taskId: first.task.id,
+      workspaceId: first.workspace.id,
+      taskSessionId: first.taskSession.id,
+      runId: first.run.id,
+      runtimeSessionKey: "pi-control-session",
+      nodeId: first.attempt.nodeId,
+      nodeAttemptId: first.attempt.id,
+      providerRunId: first.providerRun.id,
+    });
+    const pendingToken = await mintRunToken({
+      taskId: pending.task.id,
+      workspaceId: pending.workspace.id,
+      taskSessionId: pending.taskSession.id,
+      runId: pending.run.id,
+      runtimeSessionKey: "pi-pending-session",
+      nodeId: pending.attempt.nodeId,
+      nodeAttemptId: pending.attempt.id,
+      providerRunId: pending.providerRun.id,
+    });
+    let controlPosts = 0;
+    let pendingPosts = 0;
+    const server = Bun.serve({
+      hostname: "127.0.0.1",
+      port: 0,
+      async fetch(request) {
+        const url = new URL(request.url);
+        const authorization = request.headers.get("authorization");
+        if (url.pathname === "/api/agent/control") {
+          controlPosts += 1;
+          if (authorization === `Bearer ${pendingToken}`) {
+            pendingPosts += 1;
+            await new Promise<void>((resolve) => request.signal.addEventListener("abort", () => resolve(), { once: true }));
+            return new Response(null, { status: 499 });
+          }
+          if (authorization !== `Bearer ${firstToken}`) return new Response(null, { status: 401 });
+          const value = await request.json() as { body: AgentControlActionBody };
+          return Response.json(await handleControlAction({
+            token: firstToken,
+            workspaceId: first.workspace.id,
+            body: value.body,
+          }));
+        }
+        if (url.pathname !== "/api/mcp" || request.method !== "POST") return new Response(null, { status: 404 });
+        if (authorization !== `Bearer ${firstToken}` && authorization !== `Bearer ${pendingToken}`) return new Response(null, { status: 401 });
+        const body = await request.json() as { id?: string | number; method?: string };
+        if (body.method === "notifications/initialized") return new Response(null, { status: 202 });
+        const result = body.method === "initialize"
+          ? { protocolVersion: "2025-03-26", capabilities: { tools: {} }, serverInfo: { name: "fixture", version: "1" } }
+          : body.method === "tools/list"
+            ? { tools: [{ name: "chrona.node.complete", description: "complete", inputSchema: { type: "object" } }] }
+            : { content: [{ type: "text", text: "bounded context" }] };
+        return Response.json({ jsonrpc: "2.0", id: body.id, result });
+      },
+    });
+    const previousBaseUrl = process.env.CHRONA_BASE_URL;
+    process.env.CHRONA_BASE_URL = server.url.toString();
+    const providerRequest = (sessionId: string, scenario: string) => ({
+      provider: "pi",
+      clientOperationId: randomUUID(),
+      sessionId,
+      sessionKey: sessionId,
+      instructions: "offline Pi control fixture",
+      input: `scenario:${scenario}`,
+      toolPolicy: "full" as const,
+      terminalToolName: "chrona_node_complete",
+    });
+    const optionsFor = (
+      chain: Awaited<ReturnType<typeof seedProviderRunChain>>,
+      token: string,
+      signal: AbortSignal,
+    ) => ({
+      runId: chain.run.id,
+      providerRunRecordId: chain.providerRun.id,
+      terminalToolName: "chrona_node_complete",
+      controlRunToken: token,
+      signal,
+      eventPersistence: {
+        workspaceId: chain.workspace.id,
+        taskId: chain.task.id,
+        workBlockId: null,
+        occurrenceId: null,
+        runId: chain.run.id,
+        runtimeName: "pi",
+        taskSessionId: chain.taskSession.id,
+        executionSessionId: `execution-session-${chain.task.id}`,
+        nodeAttemptId: chain.providerRun.nodeAttemptId,
+        providerRunId: chain.providerRun.id,
+        planId: chain.plan.planId,
+        planRunId: chain.providerRun.planRunId,
+        executionScope: chain.planRun.executionScopeId,
+      },
+    });
+    try {
+      const completed = await runProviderRequest(
+        client,
+        providerRequest("pi-control-session", "control"),
+        optionsFor(first, firstToken, active.controller.signal),
+      );
+      expect(completed).toMatchObject({
+        status: "completed",
+        raw: { terminalActionRecorded: true, terminalTool: { name: "chrona_node_complete" } },
+      });
+      expect(active.controller.signal).toMatchObject({ aborted: true, reason: "Chrona terminal action recorded" });
+      expect(controlPosts).toBe(1);
+      expect(await db.taskPlanTerminalAction.findUnique({ where: { nodeAttemptId: first.attempt.id } })).toMatchObject({ kind: "complete" });
+
+      const failed = await runProviderRequest(
+        client,
+        providerRequest("pi-pending-session", "control-pending-eof"),
+        optionsFor(pending, pendingToken, pendingActive.controller.signal),
+      );
+      expect(failed.status).toBe("failed");
+      expect(failed.error).toContain("Pi RPC stdout closed before completion");
+      expect(failed.error).toContain("phase terminal_submission_pending");
+      expect(pendingPosts).toBe(1);
+      expect(controlPosts).toBe(2);
+      expect(await db.taskPlanTerminalAction.findUnique({ where: { nodeAttemptId: pending.attempt.id } })).toBeNull();
+    } finally {
+      active.dispose();
+      pendingActive.dispose();
+      await server.stop(true);
+      if (previousBaseUrl === undefined) delete process.env.CHRONA_BASE_URL;
+      else process.env.CHRONA_BASE_URL = previousBaseUrl;
+      await rm(root, { recursive: true, force: true });
+    }
   });
 });
 

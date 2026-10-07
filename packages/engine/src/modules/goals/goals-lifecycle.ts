@@ -39,6 +39,7 @@ export async function actOnGoal(input: { goalId: string; command: GoalActionRequ
     const evidence = await db.artifact.findMany({
       where: {
         id: { in: evidenceIds },
+        ownerKind: "run",
         workspaceId: goal.workspaceId,
         OR: [
           { task: { goalId: goal.id } },
@@ -203,6 +204,7 @@ export async function confirmGoalCriterion(input: {
   const artifacts = await db.artifact.findMany({
     where: {
       id: { in: [...new Set(input.command.artifactIds)] },
+      ownerKind: "run",
       workspaceId: goal.workspaceId,
       OR: [
         { task: { goalId: goal.id } },

@@ -17,6 +17,7 @@ import { isTaskPlanGenerationRunning } from "@/modules/plans/task-plan-generatio
 import { deriveAutoStartEligibility } from "@/modules/scheduling/derive-auto-start-eligibility";
 
 function stateViewFor(item: {
+  taskExecutionMode?: "ai" | "manual";
   persistedStatus: string;
   displayState: string | null;
   scheduleStatus: string | null;
@@ -29,6 +30,7 @@ function stateViewFor(item: {
     "idle" | "generating" | "waiting_acceptance" | "accepted";
 }) {
   return deriveWorkStateView({
+    taskExecutionMode: item.taskExecutionMode,
     taskStatus: item.persistedStatus,
     executionStatus: item.displayState ?? item.latestRunStatus,
     planStatus: item.aiPlanGenerationStatus,
@@ -58,6 +60,7 @@ function mapProjectionItem(
       autoPlanGenerationTiming: string;
       autoExecuteTiming: string;
       kind: string;
+      taskExecutionMode: "ai" | "manual";
       recurrenceRule: string | null;
       importedCalendarEvents: Array<{
         id: string;
@@ -92,6 +95,7 @@ function mapProjectionItem(
     autoPlanGenerationTiming: item.task.autoPlanGenerationTiming,
     autoExecuteTiming: item.task.autoExecuteTiming,
     aiClientId: item.task.aiClientId,
+    taskExecutionMode: item.task.taskExecutionMode,
     kind: item.task.kind,
     recurrenceRule: item.task.recurrenceRule,
     sourceManaged: importedEvent
@@ -130,6 +134,7 @@ function mapWorkBlockItem(
       autoPlanGenerationTiming: string;
       autoExecuteTiming: string;
       kind: string;
+      taskExecutionMode: "ai" | "manual";
       recurrenceRule: string | null;
       aiClient?: { name: string } | null;
       importedCalendarEvents: Array<{
@@ -179,6 +184,7 @@ function mapWorkBlockItem(
     autoExecuteTiming: block.task.autoExecuteTiming,
     aiClientId: block.task.aiClientId,
     aiClientName: block.task.aiClient?.name ?? null,
+    taskExecutionMode: block.task.taskExecutionMode,
     kind: block.task.kind,
     recurrenceRule: block.task.recurrenceRule,
     sourceManaged: importedEvent
@@ -586,6 +592,7 @@ export async function getSchedulePage(workspaceId: string) {
           autoExecute: true,
           autoPlanGenerationTiming: true,
           autoExecuteTiming: true,
+          taskExecutionMode: true,
           recurrenceRule: true,
           aiClient: { select: { name: true } },
           parentTaskId: true,

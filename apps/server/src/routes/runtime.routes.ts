@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import type { ChronaEngine } from "@chrona/engine";
-import { AI_FEATURES, recommendedProviderType, releasedProviderTypes } from "@chrona/contracts";
+import { AI_FEATURES, recommendedProviderType, releasedProviderTypes, experimentalProviderTypes } from "@chrona/contracts";
 
 import { json } from "../lib/http";
 
@@ -16,11 +16,12 @@ function getRuntimeLabel(key: string) {
   if (key === "claude_code") return "Claude Code";
   if (key === "codex") return "Codex";
   if (key === "omp") return "Oh My Pi";
+  if (key === "pi") return "Pi";
   if (key === "debug") return "Debug Provider";
   return key;
 }
 
-const AI_PROVIDER_TYPES = [...releasedProviderTypes, "debug"] as const;
+const AI_PROVIDER_TYPES = [...releasedProviderTypes, ...experimentalProviderTypes, "debug"] as const;
 const BINDABLE_PRODUCT_FEATURES = AI_FEATURES.filter((feature) =>
   ["goal.review", "dashboard.brief", "task.plan", "task.execution"].includes(feature),
 );
@@ -29,6 +30,7 @@ const PROVIDER_BINDABLE_FEATURES = {
   codex: BINDABLE_PRODUCT_FEATURES,
   omp: BINDABLE_PRODUCT_FEATURES,
   claude_code: BINDABLE_PRODUCT_FEATURES,
+  pi: BINDABLE_PRODUCT_FEATURES,
   debug: BINDABLE_PRODUCT_FEATURES,
 } as const;
 
@@ -40,7 +42,7 @@ export function createRuntimeRoutes(_engine: ChronaEngine) {
         .map((key) => ({
           key,
           label: getRuntimeLabel(key),
-          tier: key === "debug" ? "experimental" : "stable",
+          tier: key === "debug" || key === "pi" ? "experimental" : "stable",
           recommended: key === recommendedProviderType,
           features: PROVIDER_BINDABLE_FEATURES[key],
         })),

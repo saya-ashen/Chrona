@@ -1,5 +1,6 @@
 type DeriveTaskStaticStateInput = {
   hasAcceptedPlan: boolean;
+  taskExecutionMode?: "ai" | "manual";
 };
 
 type DeriveTaskStaticStateResult = {
@@ -13,6 +14,15 @@ type DeriveTaskStaticStateResult = {
 export function deriveTaskStaticState(
   input: DeriveTaskStaticStateInput,
 ): DeriveTaskStaticStateResult {
+  if (input.taskExecutionMode === "manual") {
+    return {
+      persistedStatus: "Ready",
+      runnabilityState: "ready_to_run",
+      runnabilitySummary: "Ready to complete",
+      missingPaths: [],
+    };
+  }
+
   if (!input.hasAcceptedPlan) {
     return {
       persistedStatus: "Draft",

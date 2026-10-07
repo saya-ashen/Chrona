@@ -235,6 +235,7 @@ describe("resolveTaskHeaderViewModel — header status follows the selected occu
 			title: "Recurring task",
 			status: "Blocked", // task-row status is shared across the series
 			priority: "Medium",
+			taskExecutionMode: "ai",
 			dueAt: null,
 			projection: null,
 			workBlocks: [
@@ -276,6 +277,7 @@ describe("resolveTaskHeaderViewModel — header status follows the selected occu
 			title: "Cancelled task",
 			status: "Cancelled",
 			priority: "Medium",
+			taskExecutionMode: "ai",
 			dueAt: null,
 			projection: null,
 			workBlocks: [
@@ -328,6 +330,7 @@ describe("resolveTaskHeaderViewModel — header status follows the selected occu
 			title: "Single-shot task",
 			status: "Blocked",
 			priority: "Medium",
+			taskExecutionMode: "ai",
 			dueAt: null,
 			projection: null,
 			workBlocks: [] as unknown as HeaderTaskView["workBlocks"],
@@ -360,6 +363,33 @@ describe("resolveTaskHeaderViewModel — header status follows the selected occu
 		// occurrence test used but flip the workBlockId off.
 		expect(headerView.status).toBe("waiting");
 	});
+	it("derives direct Ready and Done manual headers without plan controls", () => {
+		const baseTask = {
+			id: "manual-task",
+			workspaceId: "ws-1",
+			goalId: null,
+			seriesExternalUid: null,
+			title: "Call landlord",
+			priority: "Medium",
+			taskExecutionMode: "manual",
+			dueAt: null,
+			projection: null,
+			workBlocks: [],
+			importedCalendarEvents: [],
+		} as unknown as HeaderTaskView;
+		const execution = {
+			taskId: "manual-task", planId: null, mainSessionId: null, status: "no_plan" as const,
+			currentNodeId: null, executedNodeIds: [], waitingNodeIds: [], blockedNodeIds: [], message: "", checkpoint: null,
+		};
+		const ready = resolveTaskHeaderViewModel({ task: { ...baseTask, status: "Ready" }, recurrenceSeriesTasks: [], currentExecution: execution, savedPlan: null, workBlockId: null });
+		const done = resolveTaskHeaderViewModel({ task: { ...baseTask, status: "Done" }, recurrenceSeriesTasks: [], currentExecution: execution, savedPlan: null, workBlockId: null });
+
+		expect(ready).toMatchObject({ status: "waiting", statusLabel: "Ready", progressLabel: "Manual task" });
+		expect(ready.actions.map((action) => action.id)).toEqual(["manual_complete", "edit", "delete"]);
+		expect(done).toMatchObject({ status: "completed", statusLabel: "Done", progressLabel: "Manual task" });
+		expect(done.actions.map((action) => action.id)).toEqual(["manual_reopen", "edit", "delete"]);
+	});
+
 	it("labels completed executions as result review instead of no-action completion", () => {
 		const task: HeaderTaskView = {
 			id: "task-1",
@@ -369,6 +399,7 @@ describe("resolveTaskHeaderViewModel — header status follows the selected occu
 			title: "Completed task",
 			status: "Completed",
 			priority: "Medium",
+			taskExecutionMode: "ai",
 			dueAt: null,
 			projection: null,
 			workBlocks: [] as unknown as HeaderTaskView["workBlocks"],

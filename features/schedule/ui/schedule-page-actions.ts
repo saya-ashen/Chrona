@@ -1,5 +1,6 @@
 import {
   applySchedule,
+  clearSchedule,
   createScheduledTask,
   moveWorkBlock,
   updateTaskConfigFromSchedule,
@@ -30,6 +31,10 @@ import {
 } from "./schedule-page-utils";
 import type { Locale } from "@chrona/i18n";
 import { apiJson } from "@shared/http";
+import {
+  buildScheduleTaskConfigSaveRequest,
+  type ScheduleTaskConfigSaveContext,
+} from "./forms/task-config-save";
 import type { TaskConfigFormInput } from "./forms/task-config-form";
 
 function getSuggestedDurationMinutes(
@@ -374,18 +379,19 @@ export async function handleCreateTaskBlockAction({
       title: input.title,
       description: input.description || null,
       priority: input.priority,
+      taskExecutionMode: input.taskExecutionMode,
       autoPlanGeneration: autoPlanGenerationEnabled || input.autoExecute,
       autoExecute: input.autoExecute,
       autoPlanGenerationTiming: input.autoPlanGenerationTiming,
       autoExecuteTiming: input.autoExecuteTiming,
-      executionConfig: input.executionConfig,
+      executionConfig: input.taskExecutionMode === "manual" ? undefined : input.executionConfig,
       aiClientId: input.aiClientId,
       dueAt: input.dueAt,
       scheduledStartAt: input.scheduledStartAt,
       scheduledEndAt: input.scheduledEndAt,
-      recurrenceRule: input.recurrenceRule ?? null,
-      recurrenceAnchorStartAt: input.recurrenceAnchorStartAt ?? null,
-      recurrenceAnchorEndAt: input.recurrenceAnchorEndAt ?? null,
+      recurrenceRule: input.taskExecutionMode === "manual" ? null : input.recurrenceRule ?? null,
+      recurrenceAnchorStartAt: input.taskExecutionMode === "manual" ? null : input.recurrenceAnchorStartAt ?? null,
+      recurrenceAnchorEndAt: input.taskExecutionMode === "manual" ? null : input.recurrenceAnchorEndAt ?? null,
     });
 
     const createdItem = createScheduledItemFromCreateInput(
@@ -425,7 +431,7 @@ export async function handleCreateTaskBlockAction({
 }
 
 export async function handleTaskConfigSaveAction({
-  taskId,
+  task,
   input,
   applyOptimisticViewData,
   setIsPending,
@@ -434,7 +440,7 @@ export async function handleTaskConfigSaveAction({
   resetViewData,
   actionFailedMessage,
 }: {
-  taskId: string;
+  task: ScheduleTaskConfigSaveContext & { taskId: string };
   input: TaskConfigFormInput;
   applyOptimisticViewData: (
     updater: (current: SchedulePageData) => SchedulePageData,
@@ -448,55 +454,46 @@ export async function handleTaskConfigSaveAction({
   try {
     setIsPending(true);
     setErrorMessage(null);
+    const save = buildScheduleTaskConfigSaveRequest(task, input);
 
     applyOptimisticViewData((current) => ({
       ...current,
       scheduled: current.scheduled.map((item) =>
-        item.taskId === taskId ? applyTaskConfigToItem(item, input) : item,
+        item.taskId === task.taskId ? applyTaskConfigToItem(item, input) : item,
       ),
       unscheduled: current.unscheduled.map((item) =>
-        item.taskId === taskId ? applyTaskConfigToItem(item, input) : item,
+        item.taskId === task.taskId ? applyTaskConfigToItem(item, input) : item,
       ),
       risks: current.risks.map((item) =>
-        item.taskId === taskId ? applyTaskConfigToItem(item, input) : item,
+        item.taskId === task.taskId ? applyTaskConfigToItem(item, input) : item,
       ),
       listItems: current.listItems.map((item) =>
-        item.taskId === taskId ? applyTaskConfigToItem(item, input) : item,
+        item.taskId === task.taskId ? applyTaskConfigToItem(item, input) : item,
       ),
     }));
 
-    await updateTaskConfigFromSchedule({
-      taskId,
-      title: input.title,
-      description: input.description || null,
-      priority: input.priority,
-      executionConfig: input.executionConfig,
-      aiClientId: input.aiClientId,
-      autoPlanGeneration: input.autoPlanGeneration,
-      autoExecute: input.autoExecute,
-      autoPlanGenerationTiming: input.autoPlanGenerationTiming,
-      autoExecuteTiming: input.autoExecuteTiming,
-      recurrenceRule: input.recurrenceRule,
-      recurrenceAnchorStartAt: input.recurrenceAnchorStartAt?.toISOString() ?? null,
-      recurrenceAnchorEndAt: input.recurrenceAnchorEndAt?.toISOString() ?? null,
-    });
-
-    if (input.scheduledStartAt && input.scheduledEndAt) {
-      await applySchedule({
-        taskId,
-        dueAt: input.dueAt ?? null,
-        scheduledStartAt: input.scheduledStartAt,
-        scheduledEndAt: input.scheduledEndAt,
-        scheduleSource: "human",
-      });
+    await updateTaskConfigFromSchedule({ taskId: task.taskId, ...save.taskBody });
+    for (const command of save.scheduleCommands) {
+      if (command.type === "clear") {
+        await clearSchedule({ taskId: task.taskId });
+      } else {
+        await applySchedule({
+          taskId: task.taskId,
+          dueAt: command.dueAt,
+          scheduledStartAt: command.scheduledStartAt,
+          scheduledEndAt: command.scheduledEndAt,
+          scheduleSource: "human",
+        });
+      }
     }
 
     await refreshProjection();
   } catch (error) {
-    setErrorMessage(
-      error instanceof Error ? error.message : actionFailedMessage,
-    );
+    const message = error instanceof Error ? error.message : actionFailedMessage;
+    setErrorMessage(message);
     resetViewData();
+    // Let the shared form retain the editor and render its validation error.
+    throw error instanceof Error ? error : new Error(message);
   } finally {
     setIsPending(false);
   }

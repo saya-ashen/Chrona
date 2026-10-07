@@ -34,6 +34,7 @@ Codex, OMP, and Claude Code are stable released providers with the same product 
 | `codex` | Stable · Recommended | ACP adapter validated against OpenAI Responses-compatible endpoints, with tool-isolated planning/review, structured results, approvals, execution, and session-history recovery. |
 | `omp` | Stable | In-process SDK adapter with tool-isolated planning/review, structured results, execution, local result finalization, and session-history recovery. |
 | `claude_code` | Stable | Claude Agent SDK adapter with tool-isolated planning/review, structured results, execution, and provider session recovery. |
+| `pi` | Experimental | Official Pi ≥ 0.85.0 via RPC; local-resource execution, isolated features, scoped control tools and Chrona-owned session resume. See [Pi setup and limits](pi-provider.md). |
 | `hermes` | Internal / hidden | Existing gateway adapter remains internal and is omitted from production Settings until explicitly restored to the released provider set. |
 
 ## Current provider packages
@@ -43,6 +44,7 @@ Codex, OMP, and Claude Code are stable released providers with the same product 
 | `packages/providers/foundation` | Provider-neutral contracts and shared adapter shapes |
 | `packages/providers/hermes` | Hermes-specific transport, session, event, and tool-call adaptation |
 | `packages/providers/debug` | Development/debug execution runtime, hidden unless explicitly enabled |
+| `packages/providers/pi` | Official installed Pi CLI via RPC; runtime bridge, isolated features, local-resource execution and owned session history |
 | `packages/providers/omp` | In-process OMP SDK transport across the supported selectable wire protocols |
 | `packages/providers/claude-code` | Claude Code CLI transport, session, stream, and tool-call adaptation |
 | `packages/providers/codex` | OpenAI Codex via ACP (`codex-acp`), session, stream, MCP, and tool-call adaptation. Codex is the first ACP-backed provider; future provider work may migrate other providers toward ACP where it fits. |

@@ -10,6 +10,7 @@ export type CreateTaskFromScheduleInput = {
   title: string;
   description?: string | null;
   priority?: string;
+  taskExecutionMode?: "ai" | "manual";
   autoPlanGeneration?: boolean;
   autoExecute?: boolean;
   autoPlanGenerationTiming?: AutomationTimingPreset;
@@ -30,6 +31,7 @@ function taskPayload(input: CreateTaskFromScheduleInput) {
     title: input.title,
     description: input.description ?? undefined,
     priority: input.priority as TaskPriority | undefined,
+    taskExecutionMode: input.taskExecutionMode,
     autoPlanGeneration: input.autoPlanGeneration,
     autoExecute: input.autoExecute,
     autoPlanGenerationTiming: input.autoPlanGenerationTiming,
@@ -246,6 +248,26 @@ export function sendExecutionMessage(input: {
     action: "resume_after_unblock",
     note: input.message,
   });
+}
+
+export type ManualTaskLifecycleInput = {
+  taskId: string;
+  expectedRevision: string;
+  requestId: string;
+};
+
+export function completeManualTask(input: ManualTaskLifecycleInput) {
+  return apiJson<unknown>(
+    `/api/tasks/${encodeURIComponent(input.taskId)}/manual/complete`,
+    { method: "POST", body: JSON.stringify({ expectedRevision: input.expectedRevision, requestId: input.requestId }) },
+  );
+}
+
+export function reopenManualTask(input: ManualTaskLifecycleInput) {
+  return apiJson<unknown>(
+    `/api/tasks/${encodeURIComponent(input.taskId)}/manual/reopen`,
+    { method: "POST", body: JSON.stringify({ expectedRevision: input.expectedRevision, requestId: input.requestId }) },
+  );
 }
 
 export function markTaskDone(input: { taskId: string }) {

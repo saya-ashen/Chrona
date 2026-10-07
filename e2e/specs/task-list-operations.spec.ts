@@ -45,6 +45,12 @@ async function createTask(
 	return body.taskId as string;
 }
 
+async function revealListFilters(page: Page) {
+  if ((page.viewportSize()?.width ?? 1440) < 640) {
+    await page.getByRole("button", { name: "More filters" }).click();
+  }
+}
+
 function taskHeading(page: Page, title: string) {
 	return page.getByRole("heading", { name: title, exact: true });
 }
@@ -56,11 +62,26 @@ async function expectTaskHeadingVisible(page: Page, title: string) {
 test.describe("Task list operations", () => {
 	test.setTimeout(60_000);
 
+  test("keeps a draft visible on mobile without calling it ready", async ({ page, request }, testInfo) => {
+    const title = `界面回归 ${crypto.randomUUID()}`;
+    await createTask(request, title);
+    await page.goto(`/zh/tasks?search=${encodeURIComponent(title)}`);
+    const heading = page.getByRole("heading", { name: title, exact: true });
+    await expect(heading).toBeVisible();
+    await expect(page.getByText("待生成计划", { exact: true })).toBeVisible();
+    const viewport = page.viewportSize()!;
+    expect((await heading.boundingBox())!.y).toBeLessThan(viewport.height - 100);
+    expect(await page.evaluate(() => document.documentElement.scrollWidth)).toBeLessThanOrEqual(viewport.width);
+    await page.screenshot({ path: testInfo.outputPath(`task-list-${viewport.width}.png`) });
+    await page.getByRole("button", { name: /^可执行\s/ }).click();
+    await expect(heading).toHaveCount(0);
+  });
+
 	test("[TASK-021] switches task views and persists URL state", async ({
 		page,
 	}) => {
 		await page.goto("/en/tasks");
-		await page.getByRole("button", { name: "In progress" }).click();
+		await page.getByRole("button", { name: /^Running\s/ }).click();
 		await expect(page).toHaveURL(/filter=running/);
 		await page.getByRole("button", { name: "Results" }).click();
 		await expect(page).toHaveURL(/view=results/);
@@ -72,7 +93,7 @@ test.describe("Task list operations", () => {
 		page,
 	}) => {
 		await page.goto("/en/tasks");
-		await page.getByRole("button", { name: "Needs attention" }).click();
+		await page.getByRole("button", { name: /^Needs Me\s/ }).click();
 		await expect(page).toHaveURL(/filter=needs_me/);
 		await expect(page.locator(".chrona-app-main")).toBeVisible();
 		await page.getByRole("button", { name: "All tasks" }).click();
@@ -81,6 +102,7 @@ test.describe("Task list operations", () => {
 
 	test("[TASK-025] changes sort field and direction", async ({ page }) => {
 		await page.goto("/en/tasks");
+    await revealListFilters(page);
 		const sort = page.getByRole("combobox", { name: /sort/i });
 		await sort.click();
 		await page.getByRole("option").nth(1).click();
@@ -133,6 +155,7 @@ test.describe("Task list operations", () => {
 		await expect(page).not.toHaveURL(/search=/);
 		await expectTaskHeadingVisible(page, normalTitle);
 
+    await revealListFilters(page);
 		await page.getByRole("combobox", { name: /priority/i }).click();
 		await page.getByRole("option", { name: "Urgent", exact: true }).click();
 		await expect(page).toHaveURL(/priority=Urgent/);
@@ -153,6 +176,7 @@ test.describe("Task list operations", () => {
 		await page.goto("/en/tasks");
 		await expectTaskHeadingVisible(page, first);
 		await expectTaskHeadingVisible(page, second);
+    await revealListFilters(page);
 		await page.getByRole("button", { name: /select visible/i }).click();
 		await expect(
 			page.getByRole("button", { name: /delete selected/i }),
@@ -179,6 +203,7 @@ test.describe("Task list operations", () => {
 		await page.goto("/en/tasks");
 		await expectTaskHeadingVisible(page, selected);
 		await expectTaskHeadingVisible(page, retained);
+    await revealListFilters(page);
 		await page.getByRole("button", { name: /select visible/i }).click();
 		const retainedCheckbox = page.getByRole("checkbox", {
 			name: `Select ${retained}`,

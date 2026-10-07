@@ -116,7 +116,7 @@ export async function getTaskPage(input: { taskId: string; workBlockId?: string 
       goal: { select: { id: true, title: true } },
       projection: true,
       approvals: { orderBy: { requestedAt: "desc" }, take: 5 },
-      artifacts: { orderBy: { createdAt: "desc" }, take: 5 },
+      artifacts: { where: { ownerKind: "run" }, orderBy: { createdAt: "desc" }, take: 5 },
       timelineItems: {
         where: selectedWorkBlockId !== null ? { workBlockId: selectedWorkBlockId } : {},
         orderBy: [{ sortTime: "desc" }, { createdAt: "desc" }],
@@ -314,6 +314,7 @@ export async function getTaskPage(input: { taskId: string; workBlockId?: string 
       description: task.description,
       sourceManaged,
       executionConfig: task.executionConfig,
+      taskExecutionMode: task.taskExecutionMode,
       aiClientId: task.aiClientId,
       autoPlanGeneration: task.autoPlanGeneration,
       autoExecute: task.autoExecute,

@@ -8,6 +8,11 @@ const eslintConfig = defineConfig([
   js.configs.recommended,
   ...tseslint.configs.recommended,
   {
+    // Standalone HTML prototypes execute in a browser, including their checks.
+    files: ["docs/prototypes/**/*.js"],
+    languageOptions: { globals: globals.browser },
+  },
+  {
     // TypeScript files: the compiler already checks for undefined identifiers
     // and redeclarations, so the JS-oriented core rules here only produce
     // false positives (e.g. `no-undef` on `window`/`fetch`/`setTimeout`).

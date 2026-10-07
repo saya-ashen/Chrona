@@ -1,4 +1,7 @@
 import { PrismaClient } from "@/generated/prisma/client";
+import { inDatabaseTransaction, transactionAwareClient } from "./transaction-context";
+import { guardSqliteAdapter } from "./sqlite-adapter-guards";
+export { afterDatabaseCommit } from "./transaction-context";
 import { applyChronaRuntimeConfigToEnv } from "@chrona/shared/runtime-config";
 import { resolve } from "node:path";
 import { PrismaBunSqlite } from "prisma-adapter-bun-sqlite";
@@ -18,9 +21,9 @@ if (typeof globalThis.Bun === "undefined") {
 }
 
 function createAdapter() {
-  return new PrismaBunSqlite({
+  return guardSqliteAdapter(new PrismaBunSqlite({
     url: resolveSqliteAdapterUrl(DATABASE_URL),
-  });
+  }));
 }
 
 function createDbClient() {
@@ -71,8 +74,12 @@ const globalForPrisma = globalThis as typeof globalThis & {
   prisma?: PrismaClient;
 };
 
-export const db = resolveCachedClient(globalForPrisma) ?? createDbClient();
+const rootDb = resolveCachedClient(globalForPrisma) ?? createDbClient();
+export const db = transactionAwareClient(rootDb);
+export function withDatabaseTransaction<T>(work: () => Promise<T>): Promise<T> {
+  return inDatabaseTransaction(rootDb, work);
+}
 
 if (process.env.NODE_ENV !== "production") {
-  globalForPrisma.prisma = db;
+  globalForPrisma.prisma = rootDb;
 }

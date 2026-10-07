@@ -13,6 +13,8 @@ import {
 } from "./sqlite-migration-history-normalizers";
 import { createPreUpgradeBackup, type PreUpgradeBackupResult } from "./sqlite-backup";
 import { checksumSql, schemaFingerprint } from "./sqlite-schema-fingerprint";
+import { applyMutableAmendment, recognizedMutableHistory, verifyMutableAmendments, type MutableAmendments } from "./sqlite-mutable-amendments";
+import { assertMigrationSchemaTransition, isMigrationSchemaTransitions, type MigrationSchemaTransitions } from "./sqlite-migration-schema-transitions";
 import { assertPrivateStoragePath, ensureSqliteParentDir, secureGeneratedPrivateFile, sqlitePathFromFileUrl } from "./sqlite-url";
 export { checksumSql, schemaFingerprint } from "./sqlite-schema-fingerprint";
 
@@ -48,6 +50,9 @@ export type MigrationReleaseMetadata = {
 	/** Registered complete legacy histories that may be normalized into this release line. */
 	legacyHistoryNormalizations?: Record<string, LegacyHistoryNormalization>;
 	mutableReleaseLineMigration: string;
+	mutableReleaseLineAmendments?: MutableAmendments;
+	/** Per-migration boundaries remain fixed when a newer release becomes current. */
+	migrationSchemaTransitions?: MigrationSchemaTransitions;
 	previousReleaseFixture: PreviousReleaseFixture;
 	/** Fingerprint of a fresh install through the sole mutable migration. */
 	releaseLineSchemaFingerprint: string;
@@ -256,6 +261,7 @@ function isMigrationReleaseMetadata(
 		typeof value.releaseLineSchemaFingerprint === "string" &&
 		SHA256.test(value.releaseLineSchemaFingerprint) &&
 		isLegacyHistoryNormalizations(value.legacyHistoryNormalizations) &&
+		isMigrationSchemaTransitions(value.migrationSchemaTransitions) &&
 		isHistoricalNoOpMigrations(value.historicalNoOpMigrations) &&
 		isPreviousReleaseFixture(value.previousReleaseFixture) &&
 		isReleasedMigrationChecksums(value.releasedMigrationChecksums) &&
@@ -392,7 +398,9 @@ function verifyReleaseLineSchema(
 		createMigrationsTable(fresh);
 		for (const migration of migrations) {
 			if (recordHistoricalNoOpMigration(fresh, metadata, migration)) continue;
+			assertMigrationSchemaTransition(fresh, metadata, migration.name, "source");
 			if (hasExecutableStatement(migration.sql)) fresh.run(migration.sql);
+			assertMigrationSchemaTransition(fresh, metadata, migration.name, "target");
 		}
 		if (schemaFingerprint(fresh) !== metadata.releaseLineSchemaFingerprint) {
 			throw new Error("Fresh release-line schema fingerprint mismatch");
@@ -415,6 +423,11 @@ export function verifyMigrationReleaseMetadata(
 	}
 	const migrations = loadMigrations(migrationsDir);
 	const released = releasedMigrations(value, migrations);
+	for (const name of Object.keys(value.migrationSchemaTransitions ?? {})) {
+		if (!migrations.some((migration) => migration.name === name)) {
+			throw new Error(`Schema transition names missing migration ${name}`);
+		}
+	}
 	const mutable = migrations.slice(released.length);
 	if (
 		mutable.length !== 1 ||
@@ -426,6 +439,7 @@ export function verifyMigrationReleaseMetadata(
 	}
 	verifyPreviousReleaseFixture(value, released, migrationsDir);
 	verifyLegacyHistoryNormalizations(value, migrationsDir);
+	verifyMutableAmendments(value, migrationsDir);
 	verifyReleaseLineSchema(value, migrations);
 	return value;
 }
@@ -522,7 +536,7 @@ function assertAppliedHistoryRecognized(
 		const applied = actual.get(migration.name);
 		return Boolean(expected) && applied?.checksum === expected.checksum && applied.applied_steps_count === expected.appliedStepsCount;
 	});
-	if (isCurrentPrefix) return;
+	if (isCurrentPrefix || recognizedMutableHistory(actual, metadata)) return;
 	if (Object.values(metadata.legacyHistoryNormalizations ?? {}).some(
 		(normalization) => historiesMatch(actual, normalization.expectedHistory),
 	)) return;
@@ -531,32 +545,6 @@ function assertAppliedHistoryRecognized(
 
 const PIN_TASK_EXECUTION_MIGRATION = "20260728000000_pin_task_execution_model";
 const RELEASE_LINE_REPAIR_MIGRATION = "20260822000000_repair_release_line";
-
-function assertReleaseLineRepairSource(
-	db: Database,
-	metadata: MigrationReleaseMetadata | undefined,
-	migration: Migration,
-): void {
-	if (migration.name !== RELEASE_LINE_REPAIR_MIGRATION || !metadata) return;
-	if (schemaFingerprint(db) !== metadata.lastReleasedSchemaFingerprint) {
-		throw new Error(
-			`Cannot apply ${RELEASE_LINE_REPAIR_MIGRATION}: source schema fingerprint is not the recorded ${metadata.lastReleasedVersion} release.`,
-		);
-	}
-}
-
-function assertReleaseLineRepairTarget(
-	db: Database,
-	metadata: MigrationReleaseMetadata | undefined,
-	migration: Migration,
-): void {
-	if (migration.name !== RELEASE_LINE_REPAIR_MIGRATION || !metadata) return;
-	if (schemaFingerprint(db) !== metadata.releaseLineSchemaFingerprint) {
-		throw new Error(
-			`Cannot apply ${RELEASE_LINE_REPAIR_MIGRATION}: resulting schema fingerprint does not match the current release line.`,
-		);
-	}
-}
 
 function assertReleaseLineRepairUpgradeReady(db: Database, migration: Migration): void {
 	if (migration.name !== RELEASE_LINE_REPAIR_MIGRATION) return;
@@ -650,12 +638,12 @@ function applyMigration(
 ): void {
 	if (recordHistoricalNoOpMigration(db, metadata, migration)) return;
 	const apply = db.transaction(() => {
-		assertReleaseLineRepairSource(db, metadata, migration);
+		assertMigrationSchemaTransition(db, metadata, migration.name, "source");
 		assertReleaseLineRepairUpgradeReady(db, migration);
 		assertPinTaskExecutionUpgradeReady(db, migration);
 		if (hasExecutableStatement(migration.sql)) db.run(migration.sql);
 		assertNoForeignKeyViolations(db, migration);
-		assertReleaseLineRepairTarget(db, metadata, migration);
+		assertMigrationSchemaTransition(db, metadata, migration.name, "target");
 		db.run(
 			`INSERT INTO "_prisma_migrations" (id, checksum, migration_name, finished_at, applied_steps_count)
        VALUES (?, ?, ?, ?, ?)`,
@@ -668,10 +656,9 @@ function applyMigration(
 			],
 		);
 	});
-	// The folded v0.2.0 upgrade rebuilds parent tables. SQLite ignores PRAGMA
-	// foreign_keys changes inside a transaction, so run this one registered line
-	// with enforcement disabled before BEGIN and prove every relation afterward.
-	const rebuildsParentTables = migration.name === RELEASE_LINE_REPAIR_MIGRATION;
+	// Registered release-line rebuilds need FK enforcement disabled before BEGIN.
+	// Exact source/target fingerprints and every relation are checked in the transaction.
+	const rebuildsParentTables = migration.name === RELEASE_LINE_REPAIR_MIGRATION || migration.name === metadata?.mutableReleaseLineMigration;
 	if (rebuildsParentTables) db.run("PRAGMA foreign_keys = OFF");
 	try {
 		// DDL and its history row are atomic. Never swallow duplicate-object errors.
@@ -726,6 +713,12 @@ function resetSqliteDatabaseWhenRequested(sqlitePath: string, reset: boolean | u
 	if (sqlitePath !== ":memory:" && reset && existsSync(sqlitePath)) rmSync(sqlitePath, { force: true });
 }
 
+function assertCurrentReleaseLineSchema(db: Database, metadata: MigrationReleaseMetadata | undefined): void {
+	if (metadata && schemaFingerprint(db) !== metadata.releaseLineSchemaFingerprint) {
+		throw new Error("Applied migration history matches but current database schema fingerprint does not match the release line.");
+	}
+}
+
 function applyLoadedMigrations(
 	db: Database,
 	migrations: Migration[],
@@ -734,6 +727,7 @@ function applyLoadedMigrations(
 ): void {
 	createMigrationsTable(db);
 	assertAppliedHistoryRecognized(db, migrations, metadata);
+	if (metadata) applyMutableAmendment(db, metadata, options.migrationsDir, migrations.at(-1)?.checksum ?? "");
 	if (readAppliedMigrations(db).size > 0) {
 		normalizeLegacyMigrationHistory({
 			db,
@@ -755,6 +749,7 @@ function applyLoadedMigrations(
 		options.log?.(`  Running migration: ${migration.name}`);
 		applyMigration(db, metadata, migration);
 	}
+	assertCurrentReleaseLineSchema(db, metadata);
 }
 
 export function ensureSqliteDatabase(

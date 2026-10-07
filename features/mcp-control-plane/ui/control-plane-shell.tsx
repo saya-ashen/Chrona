@@ -1,14 +1,8 @@
 "use client";
+/* eslint-disable complexity -- Creation branches include Goal and manual-task payload boundaries. */
 
-import {
-	Bell,
-	CalendarDays,
-	ClipboardList,
-	LayoutDashboard,
-	Plus,
-	Target,
-	Settings,
-} from "lucide-react";
+import { Plus, MoreHorizontal } from "lucide-react";
+import { controlPlaneNavigation } from "./control-plane-navigation";
 import {
 	useEffect,
 	useMemo,
@@ -23,10 +17,12 @@ import {
 	TaskCreateDialog,
 	type SchedulePageData,
 } from "@features/schedule";
+import { NewPageDialog, LibraryNavigation } from "@features/work-pages";
 import { createGoalWithFirstTask } from "@features/goals";
 import { apiJson } from "@shared/http";
 import {
 	Button,
+	DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 	cn,
 	Sidebar,
 	SidebarContent,
@@ -54,13 +50,6 @@ export type ControlPlaneShellProps = {
 		label: string;
 		value: string;
 	};
-};
-
-type NavEntry = {
-	href: string;
-	label: string;
-	icon: typeof CalendarDays;
-	active: boolean;
 };
 
 type StartWithChronaPreferenceResponse = {
@@ -111,7 +100,9 @@ export function ControlPlaneShell({
 	defaultWorkspace: _defaultWorkspace,
 	assistantSummary,
 }: ControlPlaneShellProps) {
-	const { t } = useI18n();
+	const { t, messages } = useI18n();
+	const pagesCopy = messages.workPages;
+	const [showNewPage, setShowNewPage] = useState(false);
 	const locale = useLocale();
 	const navigate = useNavigate();
 	const { revalidate } = useRevalidator();
@@ -189,56 +180,22 @@ export function ControlPlaneShell({
 		.split("/")
 		.filter(Boolean)
 		.flatMap((segment) => {
+			if (segment === "home" || segment === "page") return [pagesCopy.home];
 			if (segment === "dashboard") return [t("nav.dashboard")];
 			if (segment === "schedule") return [t("nav.schedule")];
 			if (segment === "tasks") return [t("nav.tasks")];
 			if (segment === "goals") return [t("nav.goals")];
 			if (segment === "settings") return [t("nav.settings")];
 			if (segment === "action-center") return [t("nav.actionCenter")];
-			if (segment === "work") return [t("common.work")];
+			if (segment === "work") return [t("workRecords.title")];
 			if (/^(?:goal_|task_|cm[a-z0-9]{8,})/i.test(segment)) return [];
 			return [segment];
 		});
-	const navItems: NavEntry[] = [
-		{
-			href: "/dashboard",
-			label: t("nav.dashboard"),
-			icon: LayoutDashboard,
-			active: pathname.startsWith("/dashboard"),
-		},
-		{
-			href: "/schedule",
-			label: t("nav.schedule"),
-			icon: CalendarDays,
-			active: pathname.startsWith("/schedule"),
-		},
-		{
-			href: "/goals",
-			label: t("nav.goals"),
-			icon: Target,
-			active: pathname.startsWith("/goals"),
-		},
-		{
-			href: "/tasks",
-			label: t("nav.tasks"),
-			icon: ClipboardList,
-			active: pathname.startsWith("/tasks"),
-		},
-		{
-			href: "/action-center",
-			label: t("nav.actionCenter"),
-			icon: Bell,
-			active: pathname.startsWith("/action-center"),
-		},
-		// Memory intentionally stays out of primary navigation until it has clear,
-		// actionable product value beyond Dashboard and task workspace context.
-		{
-			href: "/settings",
-			label: t("nav.settings"),
-			icon: Settings,
-			active: pathname.startsWith("/settings"),
-		},
-	];
+	const { navItems, advancedNavItems } = controlPlaneNavigation(pathname, messages);
+	const advancedMenu = <DropdownMenu><DropdownMenuTrigger render={<Button variant="ghost" size="sm" aria-label={pagesCopy.advanced} />}><MoreHorizontal className="size-5" /><span className="sr-only">{pagesCopy.advanced}</span></DropdownMenuTrigger><DropdownMenuContent align="end">
+		{advancedNavItems.map((item) => <DropdownMenuItem key={item.href} render={<LocalizedLink href={item.href} aria-current={item.active ? "page" : undefined} />}>{item.label}</DropdownMenuItem>)}
+		<DropdownMenuItem onClick={() => setShowCreateTaskDialog(true)}>{t("nav.newTask")}</DropdownMenuItem>
+	</DropdownMenuContent></DropdownMenu>;
 	const shouldShowStartWithChrona =
 		[
 			"/dashboard",
@@ -261,7 +218,7 @@ export function ControlPlaneShell({
 			>
 				<SidebarHeader className="border-b border-sidebar-border bg-sidebar px-4 py-4">
 					<LocalizedLink
-						href="/schedule"
+						href="/home"
 						aria-label={t("nav.brandTitle")}
 						className="group flex min-w-0 items-center gap-2.5"
 					>
@@ -315,6 +272,8 @@ export function ControlPlaneShell({
 							</SidebarMenu>
 						</SidebarGroupContent>
 					</SidebarGroup>
+					<LibraryNavigation />
+					<details className="mx-5 mb-5 text-sm"><summary className="cursor-pointer text-muted-foreground">{pagesCopy.advanced}</summary><div className="mt-2 flex flex-col gap-1">{advancedNavItems.map((item) => <LocalizedLink key={item.href} href={item.href} aria-current={item.active ? "page" : undefined} className={cn("rounded-lg px-2 py-2 hover:bg-muted", item.active && "bg-primary-soft text-primary")}>{item.label}</LocalizedLink>)}<Button variant="ghost" className="justify-start" onClick={() => setShowCreateTaskDialog(true)}>{t("nav.newTask")}</Button></div></details>
 				</SidebarContent>
 			</Sidebar>
 
@@ -323,7 +282,7 @@ export function ControlPlaneShell({
 					<div className="relative mx-auto flex h-16 w-full max-w-[1600px] items-center gap-2 px-4 sm:gap-3 sm:px-6 xl:px-8">
 						<div className="flex min-w-0 shrink items-center gap-3">
 							<LocalizedLink
-								href="/schedule"
+								href="/home"
 								aria-label={t("nav.brandTitle")}
 								className="flex shrink-0 items-center gap-2 xl:hidden"
 							>
@@ -369,14 +328,14 @@ export function ControlPlaneShell({
 						<div className="flex shrink-0 items-center gap-1.5 sm:gap-2">
 							<Button
 								type="button"
-								onClick={() => setShowCreateTaskDialog(true)}
+								onClick={() => setShowNewPage(true)}
 								variant="default"
 								size="sm"
-								aria-label={t("nav.newTask")}
+								aria-label={pagesCopy.newPage}
 								className="h-9 gap-1.5 px-3.5 sm:px-4"
 							>
 								<Plus className="size-4" />
-								<span className="hidden sm:inline">{t("nav.newTask")}</span>
+								<span className="hidden sm:inline">{pagesCopy.newPage}</span>
 							</Button>
 							<LocaleSwitcher />
 						</div>
@@ -411,26 +370,28 @@ export function ControlPlaneShell({
 						{navItems.map((item) => {
 							const Icon = item.icon;
 							return (
-								<li key={`mobile-${item.href}`} className="flex-1">
+								<li key={`mobile-${item.href}`} className="min-w-0 flex-1">
 									<LocalizedLink
 										href={item.href}
 										aria-current={item.active ? "page" : undefined}
 										className={cn(
-											"flex min-h-14 flex-col items-center gap-1 px-1 py-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] text-[11px] font-medium transition-colors",
+											"flex min-h-14 min-w-0 flex-col items-center gap-1 px-1 py-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] text-[11px] font-medium transition-colors",
 											item.active
 												? "text-primary"
 												: "text-muted-foreground hover:text-foreground",
 										)}
 									>
 										<Icon className="size-5" />
-										<span className="truncate">{item.label}</span>
+										<span className="max-w-full truncate">{item.label}</span>
 									</LocalizedLink>
 								</li>
 							);
 						})}
+						<li className="flex min-w-0 flex-1 flex-col items-center justify-center text-[11px] text-muted-foreground">{advancedMenu}<span>{pagesCopy.more}</span></li>
 					</ul>
 				</nav>
 			</div>
+			{showNewPage && <NewPageDialog open close={() => setShowNewPage(false)} onCreated={() => { void revalidate(); }} />}
 			<TaskCreateDialog
 				initialTitle={
 					useSafeDemoDefaults
@@ -476,18 +437,19 @@ export function ControlPlaneShell({
 							title: input.title,
 							description: input.description || null,
 							priority: input.priority,
+							taskExecutionMode: input.taskExecutionMode,
 							autoPlanGeneration: input.autoPlanGenerationEnabled || input.autoExecute,
 							autoExecute: input.autoExecute,
 							autoPlanGenerationTiming: input.autoPlanGenerationTiming,
 							autoExecuteTiming: input.autoExecuteTiming,
-							executionConfig: {},
+							executionConfig: input.taskExecutionMode === "manual" ? undefined : {},
 							aiClientId: input.aiClientId,
 							dueAt: input.dueAt,
 							scheduledStartAt: input.scheduledStartAt,
 							scheduledEndAt: input.scheduledEndAt,
-							recurrenceRule: input.recurrenceRule,
-							recurrenceAnchorStartAt: input.recurrenceAnchorStartAt,
-							recurrenceAnchorEndAt: input.recurrenceAnchorEndAt,
+							recurrenceRule: input.taskExecutionMode === "manual" ? null : input.recurrenceRule,
+							recurrenceAnchorStartAt: input.taskExecutionMode === "manual" ? null : input.recurrenceAnchorStartAt,
+							recurrenceAnchorEndAt: input.taskExecutionMode === "manual" ? null : input.recurrenceAnchorEndAt,
 						});
 						if (typeof created.taskId === "string") {
 							setCreatedOnboardingTaskId(created.taskId);

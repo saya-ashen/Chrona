@@ -25,6 +25,18 @@ function releaseFixturePath(migrationsDir: string, fixturePath: string): string 
   return join(migrationsDir, fixturePath);
 }
 
+const runtimeArchiveMigration = "20260822000000_repair_release_line";
+
+function expectedReleaseHistory(migrationsDir: string, metadata: NonNullable<ReturnType<typeof verifyMigrationReleaseMetadata>>) {
+  return Object.entries({
+    ...metadata.releasedMigrationHistory,
+    [metadata.mutableReleaseLineMigration]: {
+      checksum: checksumSql(readFileSync(join(migrationsDir, metadata.mutableReleaseLineMigration, "migration.sql"))),
+      appliedStepsCount: 1,
+    },
+  }).map(([migration_name, entry]) => ({ migration_name, checksum: entry.checksum, applied_steps_count: entry.appliedStepsCount }));
+}
+
 describe("ensureSqliteDatabase", () => {
   it("creates a verified pre-upgrade backup only before pending migrations", () => {
     const dir = mkdtempSync(join(tmpdir(), "chrona-pre-upgrade-backup-"));
@@ -262,19 +274,15 @@ describe("ensureSqliteDatabase", () => {
         .toEqual({ title: "Preserve legacy task" });
       expect(normalized.query('SELECT "entityType", "entityId", "workspaceId", "legacyRuntime", "sourceMigration" FROM "LegacyRuntimeSelectorArchive" ORDER BY "entityType"').all())
         .toEqual([
-          { entityType: "task", entityId: "legacy-task", workspaceId: "legacy-workspace", legacyRuntime: "hermes", sourceMigration: metadata.mutableReleaseLineMigration },
-          { entityType: "workspace", entityId: "legacy-workspace", workspaceId: "legacy-workspace", legacyRuntime: "hermes", sourceMigration: metadata.mutableReleaseLineMigration },
+          { entityType: "task", entityId: "legacy-task", workspaceId: "legacy-workspace", legacyRuntime: "hermes", sourceMigration: runtimeArchiveMigration },
+          { entityType: "workspace", entityId: "legacy-workspace", workspaceId: "legacy-workspace", legacyRuntime: "hermes", sourceMigration: runtimeArchiveMigration },
         ]);
       expect(normalized.query('SELECT name FROM pragma_table_info(\'Task\') WHERE name = \'executionRuntime\'').get()).toBeNull();
       expect(normalized.query('SELECT name FROM pragma_table_info(\'Run\') WHERE name = \'providerConfigFingerprint\'').get()).toBeTruthy();
       expect(normalized.query("PRAGMA integrity_check").get()).toEqual({ integrity_check: "ok" });
       expect(normalized.query("PRAGMA foreign_key_check").all()).toEqual([]);
       expect(normalized.query('SELECT "migration_name", "checksum", "applied_steps_count" FROM "_prisma_migrations" ORDER BY "migration_name"').all())
-        .toEqual([
-          { migration_name: "0001_initial", checksum: metadata.releasedMigrationHistory["0001_initial"]?.checksum, applied_steps_count: 1 },
-          { migration_name: "20260707000000_add_workspace_user_preferences", checksum: metadata.releasedMigrationHistory["20260707000000_add_workspace_user_preferences"]?.checksum, applied_steps_count: 0 },
-          { migration_name: metadata.mutableReleaseLineMigration, checksum: checksumSql(readFileSync(join(migrationsDir, metadata.mutableReleaseLineMigration, "migration.sql"), "utf8")), applied_steps_count: 1 },
-        ]);
+        .toEqual(expectedReleaseHistory(migrationsDir, metadata));
     } finally {
       normalized.close();
       rmSync(dir, { recursive: true, force: true });
@@ -324,11 +332,7 @@ describe("ensureSqliteDatabase", () => {
         });
       expect(normalized.query('SELECT 1 FROM "LegacyRuntimeSelectorArchive"').all()).toEqual([]);
       expect(normalized.query('SELECT "migration_name", "checksum", "applied_steps_count" FROM "_prisma_migrations" ORDER BY "migration_name"').all())
-        .toEqual([
-          { migration_name: "0001_initial", checksum: metadata.releasedMigrationHistory["0001_initial"]?.checksum, applied_steps_count: 1 },
-          { migration_name: "20260707000000_add_workspace_user_preferences", checksum: metadata.releasedMigrationHistory["20260707000000_add_workspace_user_preferences"]?.checksum, applied_steps_count: 0 },
-          { migration_name: metadata.mutableReleaseLineMigration, checksum: checksumSql(readFileSync(join(migrationsDir, metadata.mutableReleaseLineMigration, "migration.sql"), "utf8")), applied_steps_count: 1 },
-        ]);
+        .toEqual(expectedReleaseHistory(migrationsDir, metadata));
       expect(normalized.query("PRAGMA integrity_check").get()).toEqual({ integrity_check: "ok" });
       expect(normalized.query("PRAGMA foreign_key_check").all()).toEqual([]);
     } finally {
@@ -346,11 +350,11 @@ describe("ensureSqliteDatabase", () => {
       .toBe("15b1e8b07ba6dbbd351d5e43cedebefd7ce2d0bf2ef5b465bfd241357969971d");
     expect(checksumSql(readFileSync(join(migrationsDir, "20260707000000_add_workspace_user_preferences", "migration.sql"), "utf8")))
       .toBe("d4a4a0ef0ec277b4ecfe94e1840d7120076e18d55dfc4901febc724dbf1bc849");
-    expect(checksumSql(readFileSync(releaseFixturePath(migrationsDir, metadata.previousReleaseFixture.path))))
-      .toBe(metadata.previousReleaseFixture.sha256);
-    const provenance = JSON.parse(readFileSync(releaseFixturePath(migrationsDir, metadata.previousReleaseFixture.provenancePath), "utf8"));
-    expect(checksumSql(readFileSync(releaseFixturePath(migrationsDir, metadata.previousReleaseFixture.provenancePath))))
-      .toBe(metadata.previousReleaseFixture.provenanceSha256);
+    const v02Fixture = releaseFixturePath(migrationsDir, "fixtures/v0.2.0-linux-x64.sqlite");
+    const v02Sha = "62d74fcba6e430e295f1cb913d0c3086711d18ca88112c9cd9805833b44f9c63";
+    const v02Fingerprint = "8c2375e5c72c2f101d8ca843649656f9bf0114717f9d672e378ca86371250419";
+    expect(checksumSql(readFileSync(v02Fixture))).toBe(v02Sha);
+    const provenance = JSON.parse(readFileSync(releaseFixturePath(migrationsDir, "fixtures/v0.2.0-linux-x64.provenance.json"), "utf8"));
     expect(provenance).toMatchObject({
       releaseTag: "v0.2.0",
       releaseAsset: {
@@ -359,8 +363,8 @@ describe("ensureSqliteDatabase", () => {
       },
       database: {
         path: "data/chrona.db",
-        sha256: metadata.previousReleaseFixture.sha256,
-        schemaFingerprint: metadata.lastReleasedSchemaFingerprint,
+        sha256: v02Sha,
+        schemaFingerprint: v02Fingerprint,
       },
     });
 
@@ -381,10 +385,10 @@ describe("ensureSqliteDatabase", () => {
     }
 
     const upgradePath = join(dir, "upgrade.db");
-    cpSync(releaseFixturePath(migrationsDir, metadata.previousReleaseFixture.path), upgradePath);
+    cpSync(v02Fixture, upgradePath);
     const prior = new Database(upgradePath);
     try {
-      expect(schemaFingerprint(prior)).toBe(metadata.lastReleasedSchemaFingerprint);
+      expect(schemaFingerprint(prior)).toBe(v02Fingerprint);
       prior.exec(`
         INSERT INTO "Workspace" ("id", "name", "defaultRuntime", "status", "updatedAt")
         VALUES ('fixture-workspace', 'Fixture workspace', 'hermes', 'Active', '2026-08-22T00:00:00.000Z');
@@ -408,18 +412,14 @@ describe("ensureSqliteDatabase", () => {
         .toEqual({ title: "Preserve fixture task" });
       expect(upgraded.query('SELECT "entityType", "entityId", "workspaceId", "legacyRuntime", "sourceMigration" FROM "LegacyRuntimeSelectorArchive" ORDER BY "entityType"').all())
         .toEqual([
-          { entityType: "task", entityId: "fixture-task", workspaceId: "fixture-workspace", legacyRuntime: "hermes", sourceMigration: metadata.mutableReleaseLineMigration },
-          { entityType: "workspace", entityId: "fixture-workspace", workspaceId: "fixture-workspace", legacyRuntime: "hermes", sourceMigration: metadata.mutableReleaseLineMigration },
+          { entityType: "task", entityId: "fixture-task", workspaceId: "fixture-workspace", legacyRuntime: "hermes", sourceMigration: runtimeArchiveMigration },
+          { entityType: "workspace", entityId: "fixture-workspace", workspaceId: "fixture-workspace", legacyRuntime: "hermes", sourceMigration: runtimeArchiveMigration },
         ]);
       expect(upgraded.query('SELECT "recurrenceKey" FROM "WorkBlock" WHERE "id" = ?').get("fixture-legacy-recurrence-block"))
         .toEqual({ recurrenceKey: "2031-01-02T09:00:00.000Z" });
       expect(upgraded.query('SELECT 1 FROM "TaskResultContinuation"').all()).toEqual([]);
       expect(upgraded.query('SELECT "migration_name", "checksum", "applied_steps_count" FROM "_prisma_migrations" ORDER BY "migration_name"').all())
-        .toEqual([
-          { migration_name: "0001_initial", checksum: metadata.releasedMigrationHistory["0001_initial"]?.checksum, applied_steps_count: 1 },
-          { migration_name: "20260707000000_add_workspace_user_preferences", checksum: metadata.releasedMigrationHistory["20260707000000_add_workspace_user_preferences"]?.checksum, applied_steps_count: 0 },
-          { migration_name: metadata.mutableReleaseLineMigration, checksum: checksumSql(readFileSync(join(migrationsDir, metadata.mutableReleaseLineMigration, "migration.sql"), "utf8")), applied_steps_count: 1 },
-        ]);
+        .toEqual(expectedReleaseHistory(migrationsDir, metadata));
     } finally {
       upgraded.close();
       rmSync(dir, { recursive: true, force: true });
@@ -449,11 +449,7 @@ describe("ensureSqliteDatabase", () => {
     const upgraded = new Database(databasePath, { readonly: true });
     try {
       expect(upgraded.query('SELECT "migration_name", "applied_steps_count" FROM "_prisma_migrations" ORDER BY "migration_name"').all())
-        .toEqual([
-          { migration_name: "0001_initial", applied_steps_count: 1 },
-          { migration_name: "20260707000000_add_workspace_user_preferences", applied_steps_count: 0 },
-          { migration_name: metadata.mutableReleaseLineMigration, applied_steps_count: 1 },
-        ]);
+        .toEqual(expectedReleaseHistory(migrationsDir, metadata).map(({ migration_name, applied_steps_count }) => ({ migration_name, applied_steps_count })));
       expect(schemaFingerprint(upgraded)).toBe(metadata.releaseLineSchemaFingerprint);
     } finally {
       upgraded.close();
@@ -503,7 +499,7 @@ describe("ensureSqliteDatabase", () => {
     currentDrift.run('CREATE TABLE "UnknownCurrentSchemaDrift" ("id" TEXT NOT NULL PRIMARY KEY)');
     currentDrift.close();
     expect(() => ensureSqliteDatabase({ databaseUrl: `file:${currentDriftPath}`, migrationsDir }))
-      .toThrow("source schema fingerprint is not the recorded 0.2.0 release");
+      .toThrow("source schema fingerprint mismatch");
 
     const driftPath = join(dir, "schema-drift.db");
     cpSync(join(migrationsDir, "fixtures", "legacy-525-pre-amendment.sqlite"), driftPath);

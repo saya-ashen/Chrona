@@ -645,6 +645,27 @@ describe("task workspace interaction model", () => {
 		expect(completedState.panels.resultLifecycle).toBe(true);
 	});
 
+	it.each([
+		["waiting_for_user", "waiting_for_input"],
+		["waiting_for_approval", "waiting_for_approval"],
+		["running", "running"],
+	] as const)("keeps plan %s authoritative over a completed provider node Run", (executionState, expected) => {
+		const data = pageData();
+		data.task.status = "Running";
+		data.task.executionSummary = {
+			taskId: data.task.id, executionState, stateLabel: executionState,
+			stateReason: null, graphVersion: 0, currentNodeId: "n2",
+			primaryAction: { type: "none", enabled: false, label: "No action" },
+			progress: { completed: 1, total: 3, percent: 33 },
+			readiness: { runnable: true, reason: "Ready" },
+			degraded: null, blocking: null, waiting: null, recoveryActions: [],
+		};
+		data.latestRunSummary = { id: "node-run", status: "Completed", startedAt: null, syncStatus: "healthy" };
+		const state = deriveTaskWorkStateView({ pageData: data, graphPlan: graphPlan(), operationState: operationState() });
+		expect(state.state).toBe(expected);
+		expect(state.stage).toBe("run");
+	});
+
 	it("routes workspace state through the shared canonical work-state model", () => {
 		const inputWait = deriveTaskWorkStateView({
 			pageData: pageData({

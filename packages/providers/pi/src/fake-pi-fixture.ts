@@ -1,0 +1,94 @@
+/** Local deterministic CLI fixture; never contacts a model or reads user config. */
+export const FAKE_PI_SOURCE = String.raw`#!/usr/bin/env node
+import fs from "node:fs";
+import { randomUUID } from "node:crypto";
+import { StringDecoder } from "node:string_decoder";
+if (process.argv.includes("--version")) { console.log("0.85.0"); process.exit(0); }
+const args = process.argv.slice(2);
+const file = args[args.indexOf("--session") + 1];
+let sessionId;
+try { sessionId = JSON.parse(fs.readFileSync(file, "utf8")).id; }
+catch { sessionId = randomUUID(); fs.writeFileSync(file, JSON.stringify({ id: sessionId, turns: 0 })); }
+const output = (event) => process.stdout.write(JSON.stringify(event) + "\n");
+const NAMESPACE = "chrona.pi.bridge";
+const send = (event) => process.send?.({ namespace: NAMESPACE, version: 1, message: event });
+let config;
+let pendingPrompt;
+let scenario;
+let nonterminalReplies = 0;
+function read(stream, receive) {
+  const decoder = new StringDecoder("utf8"); let text = "";
+  stream.on("data", (chunk) => { text += decoder.write(chunk); let i; while ((i = text.indexOf("\n")) >= 0) { const item = text.slice(0, i); text = text.slice(i + 1); receive(JSON.parse(item)); } });
+}
+function answer(text) {
+  output({ type: "message_update", assistantMessageEvent: { type: "text_delta", delta: text } });
+  output({ type: "message_end", message: { role: "assistant", stopReason: "stop", usage: { input: 10, output: 4 } } });
+  output({ type: "agent_end", messages: [] });
+  setTimeout(() => output({ type: "agent_settled" }), 20);
+}
+process.on("message", (envelope) => {
+  if (!envelope || envelope.namespace !== NAMESPACE || envelope.version !== 1 || !envelope.message) return;
+  const message = envelope.message;
+  if (message.type === "init") { config = message; send({ type: "initialized" }); send({ type: "ready" }); if (pendingPrompt) pendingPrompt(); }
+  if (message.type === "result") {
+    if (scenario === "duplicate" && !message.error) { send({ type: "call", id: "call-2", name: config.tools[0].name, input: { result: { ok: true } } }); return; }
+    if (scenario === "terminal-eof") { process.stdout.end(); return; }
+    if (scenario === "nonterminal-after-result" || scenario === "nonterminal-overlap" || scenario === "nonterminal-overflow" || scenario === "nonterminal-overlong-id") {
+      if (--nonterminalReplies === 0) process.stdout.end();
+      return;
+    }
+    output({ type: "tool_execution_end", toolName: config.tools[0].name, toolCallId: "call-1", isError: Boolean(message.error) });
+    if (!message.error) answer("result submitted");
+  }
+});
+read(process.stdin, (request) => {
+  const response = (data = {}) => output({ id: request.id, type: "response", command: request.type, success: true, data });
+  if (request.type === "get_state") {
+    const ready = () => setTimeout(() => response({ sessionId, sessionFile: file, model: { provider: "fixture", id: "model" } }), 10);
+    if (config) ready(); else pendingPrompt = ready;
+  } else if (request.type === "prompt") {
+    response();
+    const state = JSON.parse(fs.readFileSync(file, "utf8")); state.turns++; fs.writeFileSync(file, JSON.stringify(state));
+    scenario = request.message.split("scenario:")[1]?.trim();
+    if (scenario === "hang") return;
+    if (scenario === "eof") { process.stdout.end(); return; }
+    if (scenario === "bridge-eof") { process.disconnect?.(); return; }
+    if (scenario === "exit") { process.exit(0); }
+    if (scenario === "extension-error") { output({ type: "extension_error", error: "PRIVATE_SECRET" }); return; }
+    if (scenario === "stderr-type-error") { process.stderr.write("TypeError: synthetic-credential=not-a-secret\n    at /private/synthetic-path.ts:1:1\n", () => process.exit(1)); return; }
+    if (scenario === "stderr-unknown") { process.stderr.write("synthetic-credential=not-a-secret\\n"); process.stdout.end(); return; }
+    if (scenario === "stderr-class") { process.stderr.write("synthetic-credential=not-a-secret \x1b[31mEP"); process.stderr.write("IPE\x1b[0m\n"); process.stdout.end(); return; }
+    if (scenario === "nonterminal-before-bridge") { output({ type: "tool_execution_start", toolName: "chrona_context_read", toolCallId: "nonterminal-1" }); process.stdout.end(); return; }
+    if (scenario === "nonterminal-end") { output({ type: "tool_execution_start", toolName: "chrona_context_read", toolCallId: "nonterminal-1" }); output({ type: "tool_execution_end", toolName: "chrona_context_read", toolCallId: "nonterminal-1", isError: false }); process.stdout.end(); return; }
+    if (scenario === "nonterminal-after-bridge") { output({ type: "tool_execution_start", toolName: "chrona_context_read", toolCallId: "nonterminal-1" }); send({ type: "call", id: "nonterminal-1", name: "chrona_context_read", input: {} }); setTimeout(() => process.stdout.end(), 20); return; }
+    if (scenario === "nonterminal-missing-id") { output({ type: "tool_execution_start", toolName: "chrona_context_read" }); process.stdout.end(); return; }
+    if (scenario === "nonterminal-overlong-id") {
+      const id = "synthetic-secret-shaped-id-" + "x".repeat(129);
+      nonterminalReplies = 1;
+      send({ type: "call", id, name: "chrona_context_read", input: {} });
+      return;
+    }
+    if (scenario === "nonterminal-after-result" || scenario === "nonterminal-overlap" || scenario === "nonterminal-overflow") {
+      const ids = scenario === "nonterminal-overlap" ? ["nonterminal-2", "nonterminal-1"]
+        : scenario === "nonterminal-overflow" ? Array.from({ length: 25 }, (_value, index) => "nonterminal-overflow-" + index)
+        : ["nonterminal-1"];
+      nonterminalReplies = ids.length;
+      for (const id of ids) output({ type: "tool_execution_start", toolName: "chrona_context_read", toolCallId: id });
+      for (const id of ids) send({ type: "call", id, name: "chrona_context_read", input: {} });
+      return;
+    }
+    if (scenario === "confirm" || scenario === "input") { output({ type: "extension_ui_request", id: "approval-1", method: scenario, title: "Allow fixture action?" }); return; }
+    if (scenario === "fail") { output({ type: "message_end", message: { role: "assistant", stopReason: "error", errorMessage: "PRIVATE_SECRET" } }); output({ type: "agent_settled" }); return; }
+    if (scenario === "retry") { output({ type: "agent_end", willRetry: true }); setTimeout(() => answer("after retry"), 100); return; }
+    if (config.tools.length && scenario !== "missing") {
+      send({ type: "call", id: "call-1", name: config.tools[0].name, input: { result: { ok: true } } });
+      if (scenario === "control-pending-eof") process.stdout.end();
+      return;
+    }
+    answer(scenario === "health" ? "CHRONA_PI_READY" : "turn " + state.turns + " 中文\u2028line");
+  } else if (request.type === "extension_ui_response") { if (request.confirmed) answer("approved"); else answer("denied"); }
+  else if (request.type === "set_auto_retry" && config.instructions === "startup-eof") { process.stdout.end(); }
+  else if (request.type === "set_auto_retry" && config.instructions === "startup-hang") { /* no response */ }
+  else response();
+});
+`;

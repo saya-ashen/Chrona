@@ -78,7 +78,7 @@ describe("markTaskDone (engine)", () => {
     expect(payload.previous_status).toBe("Blocked");
     expect(payload.next_status).toBe("Done");
     expect(payload.completed_at).toBe(endedAt.toISOString());
-    expect(events[0].dedupeKey).toBe(`task.done:${taskId}:${endedAt.toISOString()}`);
+    expect(events[0].dedupeKey).toBe(`task.done:${taskId}:${endedAt.toISOString()}:manual=false`);
   });
 
   it("throws when there is no run for the task", async () => {

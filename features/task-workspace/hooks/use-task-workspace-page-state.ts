@@ -12,6 +12,7 @@ import { fetchJsonEventSource, createLogger } from "@shared/http";
 import {
 	commandCenterQueryKeys,
 	fetchTaskCommandCenter,
+	fetchTaskHeader,
 	fetchTaskWorkspacePage,
 	taskWorkspaceQueryKeys,
 } from "../model/task-workspace-query";
@@ -228,7 +229,6 @@ function useTaskWorkspaceEventStream(
 	const staleTimerRef = useRef<number | null>(null);
 	const reconnectTimerRef = useRef<number | null>(null);
 	const abortControllerRef = useRef<AbortController | null>(null);
-	const hasOpenedStreamRef = useRef(false);
 
 	const clearStaleTimer = useCallback(() => {
 		if (staleTimerRef.current === null) return;
@@ -278,13 +278,9 @@ function useTaskWorkspaceEventStream(
 			onEvent({ event, data }) {
 				markStreamHealthy();
 				if (event === "ready") {
-					const isReconnect = hasOpenedStreamRef.current;
-					hasOpenedStreamRef.current = true;
-					if (isReconnect) {
-						void Promise.all([refreshPersistedActivity(), refreshQueries()]);
-					} else {
-						void refreshPersistedActivity();
-					}
+					// Reconcile on first connect too: a checkpoint may have become
+					// ready after the initial GET but before this subscription.
+					void Promise.all([refreshPersistedActivity(), refreshQueries()]);
 					return;
 				}
 				if (STREAM_NOOP_EVENTS.has(event)) return;
@@ -439,15 +435,18 @@ export function useTaskWorkspacePageState(initialData: TaskPageData) {
 	}, [initialData, pageQueryKey, queryClient]);
 	const refreshWorkspace = useCallback(
 		async (options: RefreshOptions = {}) => {
+			const executionKey = taskWorkspaceQueryKeys.currentExecution(taskId, selectedWorkBlockId);
+			const execution = queryClient.getQueryState(executionKey);
+			// TanStack deduplicates refetches onto a pending first GET (no cached
+			// data), even after invalidation. Cancel that stale read so a readiness
+			// event cannot be consumed without fetching the newly ready checkpoint.
+			if (execution?.data === undefined && execution?.fetchStatus === "fetching") {
+				await queryClient.cancelQueries({ queryKey: executionKey, exact: true });
+			}
 			const refreshes = [
 				queryClient.invalidateQueries({ queryKey: pageQueryKey }),
 				queryClient.invalidateQueries({ queryKey: commandCenterQueryKey }),
-				queryClient.invalidateQueries({
-					queryKey: taskWorkspaceQueryKeys.currentExecution(
-						taskId,
-						selectedWorkBlockId,
-					),
-				}),
+				queryClient.invalidateQueries({ queryKey: executionKey }),
 			];
 			if (!options.skipPlanState) {
 				refreshes.push(
@@ -469,9 +468,9 @@ export function useTaskWorkspacePageState(initialData: TaskPageData) {
 			taskId,
 		],
 	);
-	const refreshPersistedActivity = useCallback(async () => {
-		await commandCenterQuery.refetch();
-	}, [commandCenterQuery.refetch]);
+	const refreshPersistedActivity = useCallback(async () => { await commandCenterQuery.refetch(); }, [commandCenterQuery.refetch]);
+	// Direct lifecycle changes its canonical header action without execution SSE.
+	const refreshHeaderSpec = useCallback(async () => setHeaderSpec((await fetchTaskHeader(taskId, selectedWorkBlockId)).spec), [selectedWorkBlockId, taskId]);
 
 	const setTask = useCallback(
 		(value: React.SetStateAction<TaskData>) => {
@@ -572,6 +571,7 @@ export function useTaskWorkspacePageState(initialData: TaskPageData) {
 		commandCenter,
 		setTask,
 		refreshWorkspace,
+		refreshHeaderSpec,
 		isRefreshing: pageQuery.isFetching,
 		workspaceEvents,
 		headerSpec,

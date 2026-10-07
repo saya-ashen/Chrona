@@ -20,7 +20,7 @@ const MAX_HTTP_BODY_BYTES = 1_048_576;
 
 function isRunTokenProtectedApiPath(path: string, method: string) {
   // These exact endpoints validate their own narrower credentials. Prefixes stay API-key protected.
-  return (method === "POST" && path === "/api/agent/control") || path === "/api/mcp";
+  return (method === "POST" && path === "/api/agent/control") || path === "/api/mcp" || path === "/api/mcp/management";
 }
 
 function getAllowedOrigins() {

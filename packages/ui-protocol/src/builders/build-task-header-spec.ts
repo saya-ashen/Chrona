@@ -4,7 +4,7 @@ import type { UiDocument } from "../document/document";
 export type TaskHeaderTaskStatus = "completed" | "running" | "waiting" | "approval-needed" | "blocked" | "cancelled";
 
 export type TaskHeaderActionInput = {
-  id: "start" | "pause" | "stop" | "restart" | "accept-plan" | "generate-plan" | "rebuild" | "edit" | "delete";
+  id: "start" | "pause" | "stop" | "restart" | "accept-plan" | "generate-plan" | "manual_complete" | "manual_reopen" | "rebuild" | "edit" | "delete";
   label: string;
   disabled?: boolean;
   disabledReason?: string;
@@ -51,7 +51,7 @@ function badgeVariant(tone: TaskHeaderBadgeInput["tone"]) {
 
 function buttonVariant(actionId: TaskHeaderActionInput["id"]) {
   if (actionId === "stop" || actionId === "delete") return "danger";
-  if (actionId === "start" || actionId === "accept-plan" || actionId === "generate-plan") return "primary";
+  if (actionId === "start" || actionId === "accept-plan" || actionId === "generate-plan" || actionId === "manual_complete" || actionId === "manual_reopen") return "primary";
   return "secondary";
 }
 
@@ -191,20 +191,23 @@ export function buildTaskHeaderSpec(input: TaskHeaderSpecInput): UiDocument {
   appendBadge(elements, detailChildren, input.sourceLabel ? { id: "source", label: input.sourceLabel, tone: "neutral" } : null);
   appendSummary(elements, detailChildren, input.progressLabel);
 
-  // Always materialise the five execution-flow action elements so the
-  // server can toggle their visibility/disabled through the
-  // `/execution/can-*` and `/execution/start-disabled*` state paths on
-  // every state transition (no spec rebuild required). The
-  // `input.actions` array is still accepted so existing call sites
-  // and tests can describe the action surface; it is intentionally
-  // unused here — visibility is driven by the live state store, not
-  // by the spec build.
-  appendAction(elements, actionChildren, "start", "Start");
-  appendAction(elements, actionChildren, "pause", "Pause");
-  appendAction(elements, actionChildren, "stop", "Stop");
-  appendAction(elements, actionChildren, "accept-plan", "Accept plan");
-  appendAction(elements, actionChildren, "generate-plan", "Generate plan");
-  appendStopPlanGenerationAction(elements, actionChildren);
+  const manualAction = input.actions.find(
+    (action) => action.id === "manual_complete" || action.id === "manual_reopen",
+  );
+  if (manualAction) {
+    // Manual lifecycle is a server-owned direct state transition. Do not
+    // materialise plan/generation controls that would imply AI execution.
+    appendAction(elements, actionChildren, manualAction.id, manualAction.label);
+  } else {
+    // AI headers retain their live execution state bindings so SSE updates do
+    // not need a full document rebuild for every execution transition.
+    appendAction(elements, actionChildren, "start", "Start");
+    appendAction(elements, actionChildren, "pause", "Pause");
+    appendAction(elements, actionChildren, "stop", "Stop");
+    appendAction(elements, actionChildren, "accept-plan", "Accept plan");
+    appendAction(elements, actionChildren, "generate-plan", "Generate plan");
+    appendStopPlanGenerationAction(elements, actionChildren);
+  }
   appendOverflowMenu(elements, actionChildren, input.actions.filter((action) => action.id === "restart" || action.id === "rebuild" || action.id === "edit" || action.id === "delete"));
 
   elements.root = {
@@ -217,7 +220,7 @@ export function buildTaskHeaderSpec(input: TaskHeaderSpecInput): UiDocument {
     props: { direction: "horizontal", gap: "sm", align: "center", justify: "between", className: "children-intrinsic min-w-0 flex-wrap sm:flex-nowrap" },
     children: ["identity", "actions"],
   };
-  elements.identity = { type: "Stack", props: { gap: "xs", className: "min-w-0 flex-1 basis-0 w-auto" }, children: ["title-row", "detail-row"] };
+  elements.identity = { type: "Stack", props: { gap: "sm", className: "min-w-0 flex-1 basis-0 w-auto" }, children: ["title-row", "detail-row"] };
   elements["title-row"] = { type: "Stack", props: { className: "min-w-0" }, children: ["title"] };
   elements.title = { type: "Heading", props: { text: input.title, level: "h1" } };
   elements["detail-row"] = { type: "Stack", props: { direction: "horizontal", gap: "sm", align: "center", className: "children-intrinsic no-scrollbar min-w-0 flex-nowrap overflow-x-auto" }, children: [...statusChildren, ...detailChildren] };
@@ -279,7 +282,7 @@ function appendErrorRegion(elements: MutableElements) {
   };
   elements["error-action-cancel"] = {
     type: "Button",
-    props: { label: "Dismiss", variant: "outline", size: "sm" },
+    props: { label: "Dismiss", variant: "secondary", size: "sm" },
     visible: { $state: "/plan/generation/error/buttonCancel" },
     on: { press: { action: UI_ACTION.recoveryCancel, params: {} } },
   };

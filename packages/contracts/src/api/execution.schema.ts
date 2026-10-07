@@ -378,6 +378,13 @@ export const taskDoneParamSchema = z.object({ taskId: taskIdParam });
 // ── POST /tasks/:taskId/reopen ──
 export const taskReopenParamSchema = z.object({ taskId: taskIdParam });
 
+// ── POST /tasks/:taskId/manual/(complete|reopen) ──
+// The server derives the task workspace; callers provide only the observed CAS
+// revision and durable request ID. Strictness rejects caller-selected scope.
+export const manualTaskLifecycleBodySchema = z.object({
+  expectedRevision: z.string().regex(/^config-v1:\d+$/), requestId: z.string().uuid(),
+}).strict();
+
 // ── POST /tasks/:taskId/result/accept ──
 export const taskResultAcceptParamSchema = z.object({ taskId: taskIdParam });
 
@@ -454,15 +461,34 @@ export const taskResultFollowUpStateSchema = z.object({
 
 // ── PUT /tasks/:taskId/schedule ──
 export const scheduleParamSchema = z.object({ taskId: taskIdParam });
-export const scheduleBodySchema = z.object({
-  scheduledStartAt: z.string().min(1, "scheduledStartAt is required"),
-  scheduledEndAt: z.string().min(1, "scheduledEndAt is required"),
-  dueAt: z.string().nullable().optional(),
-  scheduleSource: z
-    .enum(["human", "ai", "system"])
-    .optional()
-    .default("system"),
-});
+export const scheduleBodySchema = z
+  .object({
+    scheduledStartAt: z.string().min(1).nullable().optional(),
+    scheduledEndAt: z.string().min(1).nullable().optional(),
+    dueAt: z.string().nullable().optional(),
+    scheduleSource: z
+      .enum(["human", "ai", "system"])
+      .optional()
+      .default("system"),
+  })
+  .refine(
+    (body) =>
+      (body.scheduledStartAt === undefined || body.scheduledStartAt === null) ===
+      (body.scheduledEndAt === undefined || body.scheduledEndAt === null),
+    {
+      message: "scheduledStartAt and scheduledEndAt must be set or cleared together",
+      path: ["scheduledEndAt"],
+    },
+  )
+  .refine(
+    (body) =>
+      body.dueAt !== undefined ||
+      (body.scheduledStartAt !== undefined && body.scheduledStartAt !== null),
+    {
+      message: "dueAt or a schedule window is required",
+      path: ["dueAt"],
+    },
+  );
 
 // ── DELETE /tasks/:taskId/schedule ──
 export const clearScheduleParamSchema = z.object({ taskId: taskIdParam });

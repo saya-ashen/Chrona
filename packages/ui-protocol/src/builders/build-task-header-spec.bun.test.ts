@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import { buildTaskHeaderSpec } from "./build-task-header-spec";
+import { validateChronaSpec } from "../document/validate";
 
 describe("buildTaskHeaderSpec", () => {
   it("materializes header metadata nodes in returned spec", () => {
@@ -91,6 +92,27 @@ describe("buildTaskHeaderSpec", () => {
       disabled: { $state: "/plan/generation/header-action-disabled" },
     });
   });
+  it("renders a direct manual lifecycle action without AI plan controls", () => {
+    const spec = buildTaskHeaderSpec({
+      title: "Call landlord",
+      status: "waiting",
+      statusLabel: "Ready",
+      progressLabel: "Manual task",
+      actions: [{ id: "manual_complete", label: "Complete task" }],
+    });
+
+    expect(spec.elements["action:manual_complete"]).toMatchObject({
+      type: "Button",
+      props: { label: "Complete task", variant: "primary" },
+      on: { press: { action: "dispatch-execution", params: { actionId: "manual_complete" } } },
+    });
+    expect(spec.elements.actions?.children).not.toEqual(expect.arrayContaining([
+      "action:start", "action:generate-plan", "action:accept-plan", "action:stop-plan-generation",
+    ]));
+    const validation = validateChronaSpec(spec);
+    expect(validation).toMatchObject({ ok: true });
+  });
+
   it("places run-from-beginning in the overflow menu", () => {
     const spec = buildTaskHeaderSpec({
       title: "Launch task",

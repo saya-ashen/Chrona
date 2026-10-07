@@ -9,6 +9,8 @@ mock.module("@/modules/plans/auto-generate-task-plan", () => ({
 
 import { createTask } from "@/modules/tasks/create-task";
 import { updateTask } from "@/modules/tasks/update-task";
+import { completeManualTask, reopenManualTask } from "@/modules/tasks/manual-task-lifecycle";
+import { applySchedule } from "@/modules/scheduling/apply-schedule";
 
 async function resetDb() {
   await db.scheduleProposal.deleteMany();
@@ -36,6 +38,50 @@ describe("createTask auto plan generation", () => {
   afterAll(async () => {
     await resetDb();
     await db.$disconnect();
+  });
+
+  it("creates, schedules, completes, and reopens a manual task without AI records", async () => {
+    const workspace = await db.workspace.create({ data: { name: "Manual task workspace", status: "Active" } });
+    const created = await createTask({ workspaceId: workspace.id, title: "Call landlord", taskExecutionMode: "manual" });
+    await applySchedule({ taskId: created.taskId, dueAt: new Date("2030-01-01T10:00:00.000Z"), scheduledStartAt: new Date("2030-01-01T09:00:00.000Z"), scheduledEndAt: new Date("2030-01-01T09:15:00.000Z"), scheduleSource: "human" });
+    const beforeCompletion = await db.task.findUniqueOrThrow({ where: { id: created.taskId }, include: { taskPlans: true, runs: true, sessions: true, workBlocks: true } });
+    expect(beforeCompletion).toMatchObject({ taskExecutionMode: "manual", status: "Ready" });
+    expect(beforeCompletion.taskPlans).toHaveLength(0);
+    expect(beforeCompletion.runs).toHaveLength(0);
+    expect(beforeCompletion.sessions).toHaveLength(0);
+    expect(beforeCompletion.workBlocks).toHaveLength(1);
+    await completeManualTask({ taskId: created.taskId, workspaceId: workspace.id, expectedRevision: `config-v1:${beforeCompletion.configRevision}`, requestId: crypto.randomUUID() });
+    const done = await db.task.findUniqueOrThrow({ where: { id: created.taskId } });
+    expect(done.status).toBe("Done");
+    await reopenManualTask({ taskId: created.taskId, workspaceId: workspace.id, expectedRevision: `config-v1:${done.configRevision}`, requestId: crypto.randomUUID() });
+    expect((await db.task.findUniqueOrThrow({ where: { id: created.taskId } })).status).toBe("Ready");
+  });
+
+  it("accepts a null provider wire value as absent for manual creation", async () => {
+    const workspace = await db.workspace.create({ data: { name: "Manual null provider", status: "Active" } });
+    const created = await createTask({ workspaceId: workspace.id, title: "Manual", taskExecutionMode: "manual", aiClientId: null });
+    expect(await db.task.findUniqueOrThrow({ where: { id: created.taskId }, select: { aiClientId: true, taskExecutionMode: true } })).toEqual({ aiClientId: null, taskExecutionMode: "manual" });
+  });
+
+  it("rejects manual AI automation combinations", async () => {
+    const workspace = await db.workspace.create({ data: { name: "Invalid manual task", status: "Active" } });
+    await expect(createTask({ workspaceId: workspace.id, title: "Invalid", taskExecutionMode: "manual", autoPlanGeneration: true })).rejects.toThrow(/Manual tasks/);
+  });
+
+  it("allows ordinary manual updates but rejects AI, recurrence, and status mutation before automation", async () => {
+    const workspace = await db.workspace.create({ data: { name: "Manual update", status: "Active" } });
+    const created = await createTask({ workspaceId: workspace.id, title: "Before", taskExecutionMode: "manual" });
+    await updateTask({ taskId: created.taskId, title: "After", description: "Scheduled by a person", aiClientId: null });
+    expect(await db.task.findUniqueOrThrow({ where: { id: created.taskId }, select: { title: true, description: true } })).toEqual({ title: "After", description: "Scheduled by a person" });
+    for (const patch of [
+      { autoPlanGeneration: true },
+      { executionConfig: { model: "not-allowed" } },
+      { recurrenceRule: "FREQ=DAILY", recurrenceAnchorStartAt: "2030-01-01T09:00:00.000Z", recurrenceAnchorEndAt: "2030-01-01T10:00:00.000Z" },
+      { status: "Done" as const },
+    ]) {
+      await expect(updateTask({ taskId: created.taskId, ...patch })).rejects.toThrow(/Manual tasks/);
+    }
+    expect(autoPlanGenerationMock).not.toHaveBeenCalled();
   });
 
   it("does not trigger plan generation when automation is disabled", async () => {

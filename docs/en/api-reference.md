@@ -3,7 +3,7 @@
 Base URL: `http://localhost:3101/api`
 
 - Content type: `application/json` unless the endpoint is an SSE stream.
-- Auth: optional `Authorization: Bearer <token>` when `API_KEY` is configured.
+- Auth: optional `Authorization: Bearer <token>` when `API_KEY` is configured, except independently authenticated endpoints. `/api/mcp/management` always requires its own management credential.
 - Default bind: `127.0.0.1`. Use `HOST=0.0.0.0` only intentionally and protect it with `API_KEY`; unsafe public bind without `API_KEY` requires `CHRONA_UNSAFE_PUBLIC_BIND=1`.
 - IDs shown here are examples. Agents should use AI-visible refs from MCP tool results, not backend IDs.
 
@@ -174,7 +174,7 @@ Returns lightweight task workspace header state.
 
 ### POST /api/tasks
 
-Creates a task. Important fields include `workspaceId`, `title`, `description`, `priority`, `aiClientId`, `executionConfig`, and `parentTaskId`. `aiClientId` is the only task-level provider override; when omitted, Chrona resolves the `task.execution` feature binding and then the enabled default AI client.
+Creates a task. Important fields include `workspaceId`, `title`, `description`, `priority`, `aiClientId`, `executionConfig`, and `parentTaskId`. Omitted `taskExecutionMode` preserves the AI plan/run lifecycle; explicit `taskExecutionMode: "manual"` creates direct human-managed work and rejects AI provider, execution configuration, automation, and recurrence fields. `aiClientId` is the only task-level provider override; when omitted, Chrona resolves the `task.execution` feature binding and then the enabled default AI client.
 
 ### GET /api/tasks/:taskId
 
@@ -196,7 +196,15 @@ Marks a task complete.
 
 ### POST /api/tasks/:taskId/reopen
 
-Reopens a completed task.
+Reopens a completed AI task according to its accepted-plan state.
+
+### POST /api/tasks/:taskId/manual/complete
+
+Directly completes an explicit manual task without a Plan, Run, or provider session. Body requires `{ expectedRevision, requestId }`; the server derives the task workspace from task metadata. `expectedRevision` is the observed `config-v1:N` token from the task read. The request ID is durable: retry identical payloads to receive the original receipt; a stale revision or reused request ID with different payload conflicts.
+
+### POST /api/tasks/:taskId/manual/reopen
+
+Reopens an explicit manual task to Ready without creating AI execution records. Uses the same server-derived CAS/request-receipt body as `manual/complete`. The legacy `/complete` and `/reopen` endpoints reject manual tasks.
 
 ### POST /api/tasks/:taskId/result/accept
 
@@ -522,11 +530,116 @@ Requests an assistant action for the current surface.
 
 Internal agent-control command endpoint. Use explicit API contracts and feature bindings instead of treating this as a generic chat route.
 
+## Executor-independent work results (B1–B3)
+
+`GET /api/results/capabilities` and `POST /api/results/read|submit|review|file|context`
+expose shared text/file result use cases through owner HTTP. POST bodies use exactly the
+schemas exported from `@chrona/contracts/results`, including `taskId`; no
+caller-supplied identity is accepted. Writes require
+`CHRONA_RESULT_WRITES_ENABLED=true` (default off). Reads remain available when
+writes are disabled. Owner authentication is the existing single-owner/API-key
+model, with trusted Origin checks and no scoped-bearer fallback.
+
+These are separate from legacy `/tasks/:taskId/result/*` managed-result routes.
+Private SQLite-backed uploads/downloads require explicit artifact authority and
+exact result/version scope. No execution lifecycle change or Goal achievement
+is provided here. See [Work Result Entries](./work-results.md) for schemas,
+receipts, permissions, HTTP errors, budgets and deliberate limitations.
+
+## Work pages (local implementation, not deployed)
+
+`POST /api/results/page/catalog|validate|read|input` uses the existing owner
+results boundary. Publication remains `/api/results/submit` with optional
+`content.page`. Inputs use independent `page-input-v1` CAS, UUID replay and
+exact-head form binding. External MCP can catalog/validate/read, not write owner
+answers. Page writes require explicit `CHRONA_WORK_PAGES_WRITES_ENABLED=true`;
+result publication and work capture retain their separate flags. See
+[work pages](./work-pages.md) for schemas, scope, limits and interaction semantics.
+
+## Organized content library (local implementation)
+
+- `POST /api/library/read`: complete classification catalog, paginated/searchable
+  content, exact Task placements or paginated organization history.
+- `POST /api/library/update`: UUID + `library-v1:<workspaceId>:<revision>` + group,
+  folder or placement command. Owner checks and trusted origin are rechecked in
+  the transaction. Writes require `CHRONA_LIBRARY_WRITES_ENABLED=true`.
+- `chrona_library_read` / `chrona_library_update` expose the same scoped semantics
+  through management MCP. New `library-read`, `library-organize` and
+  `library-configure` presets do not expand existing credentials. Configure is
+  required for group rules/deletion and folder rename/deletion; organize may
+  assign content or create a folder only where group policy permits.
+
+One folder per Task/group, multiple groups per Task; manual choices are protected
+by default. Commands atomically classify all requested groups and return actual
+placement/new-folder receipts. Publishing content and organizing it are separate
+operations. Read `capabilities.library` and [the full contracts](./content-library.md)
+before writing. No lifecycle, result review, scheduling or execution authority.
+
+## Manual work records and meeting follow-through
+
+Deployed on the explicitly authorized instance; opt-in elsewhere.
+`GET /api/work-records/capabilities` and JSON
+`POST /api/work-records/search|read|capture|update` expose bounded work recording
+through existing owner authorization and trusted-Origin checks. Writes require
+`CHRONA_WORK_WRITES_ENABLED=true`; reads remain available when disabled.
+Capture creates manual, non-automatic Tasks or explicitly enrolls eligible
+existing ones. Updates record sources/reports and propose meeting changes;
+only owner authority can resolve proposals. No mail/calendar writes, execution,
+result acceptance, or Task completion occurs. See [Work records](./work-records.md)
+for exact identity, CAS/idempotency, limits, and native calendar constraints.
+
 ## MCP integration
+
+### POST /api/mcp/management
+
+Independent, stateless Streamable HTTP endpoint for personal agents managing Chrona tasks outside an execution. Always requires a revocable, workspace-bound management Bearer credential, even without a global API_KEY. No run-token or API-key substitution and no HTTP enrollment endpoint.
+
+Tools: `chrona_context_read`, `chrona_task_search`, `chrona_task_read`, `chrona_task_create`, `chrona_task_update`, `chrona_task_action`, `chrona_task_delete`, `chrona_goal_search`, `chrona_goal_read`, `chrona_goal_propose`, `chrona_goal_update`, `chrona_result_read`, `chrona_result_submit`, `chrona_result_review`, `chrona_result_file`, `chrona_work_search`, `chrona_work_read`, `chrona_work_capture`, `chrona_work_update`, `chrona_page_catalog`, `chrona_page_validate`, `chrona_page_read`. Read the advertised schemas through `tools/list`. Mutations use UUID request IDs, persisted receipts, configuration revisions and existing domain commands. A queued/completed **command** is not a completed **task**. Execution uncertainty is reported rather than blindly redispatched.
+
+Scheduling is calendar placement, not notification delivery. Context capabilities explicitly distinguish fixed `dueAt`-based in-app indicators from unsupported custom reminders and push/email delivery. `todo` means no automatic planning/execution, not an independent manual-todo lifecycle. On create, only `automatic` accepts/requires `start`; `todo` and `plan` may supply `schedule` without it. The object-root create schema advertises structural mode/start constraints via `allOf` and input examples in its description; runtime validation still checks dates and timezones.
+
+Use `chrona_task_read` with `view: "compact"` for identity, revision, deadline, projected schedule and automation without plan/runtime reads. An explicit `workBlockId` adds that ownership-checked block separately. Search rows and mutation receipts also include schedule/automation summaries; default summary and existing config fields remain compatible. `task.status`, `schedule.status` and automation settings are distinct. Timestamps serialize as UTC, not the original single-window timezone. Receipt snapshots are historical; reread the task for current state. Use a full read before execution/checkpoint actions.
+
+Goal lookup requires `goals:read`; proposals also require `goals:propose`; edits require `goals:read` + `goals:write`. Goal-only presets are `assistant-read` (lookup), `assistant` (lookup/capture), and opt-in `assistant-edit` (lookup/capture/edit). Historical presets and existing credentials are not widened. Goal-only context reads omit provider listings. Check `capabilities.goals.contractVersion` (1), `canRead`, `canPropose` and `proposalModes`. Editing separately advertises `editing.contractVersion` (1), `canUpdate`, editable statuses and `revisionField: "editRevision"`.
+
+`chrona_goal_search` bounds results to 20 per page and the credential's workspace. `chrona_goal_read` provides `compact`, `brief`, `criteria` or `history`, not raw assets/runtime data. `revision` remains an observational snapshot fingerprint; **`editRevision`** is the persisted configuration CAS token used for editing. History contains management updates/notes only, with page/pageSize bounds (1–1,000 / 1–20), explicit text/diff truncation flags, and smaller-page detail. It is not a full Goal activity export.
+
+`chrona_goal_propose` captures a **new Draft only**, with proposed criteria, rationale, source summary and natural-language permission requests. `chrona_goal_update` accepts a UUID `requestId`, `goalId`, `expectedRevision` from `editRevision`, a `reason`, optional partial `patch`, optional `note`, and `dryRun`. At least one patch/note is required. Editable states: Draft, Active, Paused; archived Goals reject edits.
+
+- Patch fields: title, nullable description, partial brief (outcome/currentFocus/strategy/constraints), and ID-based criterion add/revise/remove operations. Omitted content is preserved, never rebuilt from bounded reads. Changed criterion meaning resets satisfaction/confirmation/evidence; untouched criteria retain them. At least one criterion must remain; edits support at most 20 criteria.
+- Notes: progress/finding/decision, attributed to the management client; not verified evidence, accepted results or criterion confirmation. `reason` is provenance, not trusted consent evidence.
+- Dry run: read-only validation and bounded before/after preview, no receipt, audit write or model call. Inferred material edits require conversational review; a preview is not a persisted approval proposal. The tool does not verify conversation consent.
+- Write: atomic content/configRevision, brief version when changed, audit and idempotent command receipt. Canonical/UI writes invalidate CAS, including A→B→A. Revision conflict means reread/reconcile, never blindly refresh the token. Identical retries replay the original receipt after refreshing scopes.
+- Existing Task contexts are immutable; future Goal-linked Tasks see updated brief content. No Task/plan/review/trigger starts, lifecycle transitions, permission grants or notifications occur. Constraints remain natural-language requests, not enforced policy. `goals:write` authorizes content editing across its workspace, not per-Goal grants.
+
+Editing requires the registered database amendment and explicit enrollment on upgrade; existing capture-only credentials never gain write scope automatically. The approved Pi rollout now uses a separately enrolled `assistant-edit` credential. Other deployments must verify advertised capabilities rather than infer support from source docs. Draft activation and an always-on assistant remain outside this milestone.
+
+Independent text results require the new `results:read` / `results:write` /
+`results:review` scopes and explicit `results-read`, `results-submit` or
+`results-review` enrollment. They never inherit legacy `results:accept` or full
+permissions. Check `capabilities.workResults`; write enablement is separate from
+scope. The shared `ResultCommand` receipt lives directly under `data.receipt`,
+not inside a second management-command receipt. File actions use separate
+`artifacts:read`/`artifacts:write` authority and `results-files-*` presets; upload
+receipts are stable and actor-scoped. Legacy Run import remains unavailable. [Detailed contract](./work-results.md).
+
+Work recording uses separate `work:read` / `work:write` scopes and opt-in
+`work-read` / `work-record` presets; both require `tasks:read`. Check
+`capabilities.workRecords` on the intended connection. MCP can report/propose,
+never resolve meeting changes. Existing credentials and legacy `full` are not
+expanded. [Work-record contract and skill](./work-records.md).
+
+Work pages add explicit `pages:read` / `pages:write` and `pages-read` /
+`pages-author` presets. Neither preset creates Tasks, answers user forms, reviews
+results or starts execution. Existing presets/credentials do not expand.
+`capabilities.workPages` describes actual effective authority; legacy result
+readers receive semantic content without the authored page or human inputs.
+
+Local setup: `chrona mcp enroll`, `chrona mcp list`, `chrona mcp revoke`. See [setup, capabilities and current limitations](../zh/management-mcp.md) and the portable [assistant skill](../../packages/skills/chrona-assistant/README.md).
 
 ### POST /api/mcp
 
-Streamable HTTP MCP endpoint exposing Chrona tools to external agents.
+Existing execution-scoped Streamable HTTP MCP endpoint for provider-injected Chrona tools; not the external task-management entrypoint.
 
 Public tool names:
 

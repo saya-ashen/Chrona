@@ -2,6 +2,42 @@
 
 Current version: 0.3.1
 
+## Primary direction: executor-independent work and results
+
+The canonical [Product Architecture](../zh/product-architecture.md) defines the
+product destination: durable tasks, contributions, result versions, review, and
+reuse across human, external-agent, and optional managed execution.
+
+```text
+Capture/link work -> work in the appropriate host -> submit results
+                  -> review -> revise/accept -> reuse/continue
+```
+
+The next delivery target is a complete external result/review loop with **no
+Provider, Plan, Run, or managed execution required**. It is not yet shipped.
+Existing management MCP and manual Tasks are useful foundations, not proof that
+this loop exists. The implementation sequence is:
+
+1. Specify result ownership, source identity, permissions, and historical-data
+   compatibility without fake runs or a second result system.
+2. Deliver external text/artifact submission, deterministic display, and human
+   review, tested with managed execution disabled.
+3. Add revision/continuation and Goal Workbench reuse; converge managed results
+   on the same product contracts while preserving existing history.
+4. Improve optional managed execution and AI presentation where actual work
+   needs them; neither becomes a dependency of basic records or review.
+
+These priorities supersede the older schedule-first strategy below and the
+unimplemented sequence in the [Proactive Personal Assistant Plan](proactive-personal-assistant-plan.md).
+That plan remains an optional domain workflow; its deployed capture/edit
+contracts remain valid. No safety or compatibility requirement is relaxed, and
+no schema, execution, broad UI rewrite, or deployment is authorized by this roadmap.
+
+## Managed-execution branch: retained framing
+
+The execution-oriented strategy below is retained for the optional managed
+branch, not a requirement for every task, contributor, or result.
+
 Chrona is a local AI work executor. Users decide what should happen, when it may run, and which boundaries must not be crossed; Chrona plans, schedules, pauses for decisions, preserves evidence, and delivers results. It does not compete with models at raw planning, summarization, or tool choice. Those capabilities will keep moving into the model layer. Chrona should compound around what stronger AI makes more important: time-bound execution, human control, provider governance, observable state, recoverable failures, and trusted results.
 
 The product loop is:
@@ -66,20 +102,22 @@ These capabilities exist in the current codebase and should be treated as produc
 | json-render | Validated AI-authored result surfaces and product-controlled runtime boundaries. |
 | Release model | Bun-first development and packaged binary distribution. |
 
-## AI-first operating principles
+## Managed-execution principles
 
 1. **Scheduled work is the current product center.** The accepted target generalizes schedule into trigger-created task occurrences while keeping time constraints, approval, and user control authoritative.
-2. **AI may propose; Chrona owns state.** Models can suggest plans, patches, summaries, and results, but Chrona owns task, schedule, execution, approval, and recovery state.
+2. **AI may propose; Chrona owns its records and managed state.** Models can suggest plans, patches, summaries, and results. Chrona governs its task/schedule records and its managed execution, approvals, and recovery; independent external process state remains with the external host.
 3. **Every non-happy path needs one clear next action.** Waiting, blocked, failed, cancelled, and review states must tell the user what to do next.
 4. **Provider differences stay below the product layer.** Product UI should depend on capabilities and normalized events, not provider names.
 5. **AI-authored UI is never runtime authority.** json-render can present results and insights; cancel, retry, approve, configure, and destructive actions remain product-authored controls.
 6. **Local-first should feel simple.** Release users should not need to know Bun, schema generation, or provider internals to run the product.
 
-## Near-term strategic arcs
+## Managed-execution improvement backlog
 
-Near-term work should make the existing AI schedule loop dependable before expanding product surface area.
+This retained backlog improves existing behavior; it is not a prerequisite to
+the primary external-result delivery target above. Safety/correctness fixes
+remain eligible throughout the transition.
 
-### 1. Make Schedule-to-Execution the primary loop
+### 1. Keep Schedule-to-Execution reliable for delegated work
 
 Chrona should make it obvious how planned work becomes scheduled work, when scheduled work becomes AI execution, and how users recover when execution stops.
 
@@ -188,9 +226,11 @@ Success looks like:
 Download release -> start binary -> configure provider -> run demo schedule task -> inspect result
 ```
 
-## Mid-term evolution
+## Conditional managed-execution evolution
 
-Mid-term work should deepen the AI schedule loop after near-term state, provider, and cockpit foundations are stable.
+These themes remain candidates for the managed branch after the primary
+work/result loop is validated. They do not require external agents to surrender
+their execution lifecycle.
 
 | Theme | Direction |
 | --- | --- |
@@ -216,7 +256,7 @@ Long-term direction is strategic intent, not a near-term promise.
 | Proactive activation | Let Chrona identify when work should be planned, scheduled, triggered, executed, reviewed, or deferred based on goal/task state, user policy, and provider capability. |
 | External ingestion and triggers | Turn conversations, email, notes, and external systems into validated trigger deliveries or structured Chrona tasks without allowing incoming payloads to own permissions or runtime state. |
 | Human-governed automation | Support stronger schedule/event automation while preserving approval boundaries, idempotency, audit trails, recovery paths, and user-owned policy. |
-| Agent ecosystem | Let more agents, triggers, and tools participate through explicit, inspectable contracts while Chrona remains authoritative for Goals, tasks, occurrences, and execution state. |
+| Agent ecosystem | Let humans and agents contribute through explicit contracts. Chrona owns Goals, work records, results, and review; independent external execution remains with its host. |
 | Collaboration | Add stronger multi-user review, approvals, audit trails, and shared execution context when single-user execution governance is solid. |
 | Production hardening | Improve authentication, backup/restore, observability, migration safety, deployment docs, and operational runbooks without abandoning local-first simplicity. |
 | Organization-scale planning | Connect individual tasks, schedules, dependencies, and execution history into project/portfolio visibility. |
@@ -225,8 +265,9 @@ Long-term direction is strategic intent, not a near-term promise.
 
 Good areas to improve now:
 
-- Keep documentation and examples aligned with the current AI schedule product.
-- Strengthen the Task -> Plan -> Schedule -> Execute -> Review/Recover loop.
+- Keep target product direction separate from current API/runtime capabilities.
+- Deliver and test the provider-free external work -> result -> review loop.
+- Preserve the optional Task -> Plan -> Schedule -> Execute -> Review/Recover path.
 - Add narrow tests around user-facing work state, execution actions, provider contracts, projections, schedule decisions, and json-render fallback.
 - Improve UI clarity in Dashboard, Schedule, Task Workspace, and Settings / AI Clients.
 - Tighten provider/package boundaries when code drifts into the wrong layer.
@@ -234,4 +275,6 @@ Good areas to improve now:
 
 ## Guiding sentence
 
-Chrona should not win by being better than future models at thinking. Chrona should win by making stronger AI useful on the user's schedule: visible, bounded, recoverable, and trusted.
+Chrona should not win by thinking better than models or controlling every agent.
+It should make work durable and useful regardless of who performs it: attributable,
+reviewable, revisable, and reusable, with managed execution available when chosen.

@@ -552,10 +552,12 @@ export function deriveTaskWorkStateView(input: {
 		firstActionableNode(input.graphPlan);
 	const derived = deriveWorkStateView({
 		taskStatus: input.pageData.task.status,
+		// A provider Run may finish while the plan waits at a later manual node.
+		// Plan-level execution state owns the next action, not that node's Run.
 		executionStatus:
+			input.pageData.task.executionSummary?.executionState ??
 			input.pageData.latestRunSummary?.executionState ??
 			input.pageData.latestRunSummary?.status ??
-			input.pageData.task.executionSummary?.executionState ??
 			currentNode?.status ??
 			null,
 		planStatus,

@@ -1,4 +1,5 @@
 import type { ChronaEnginePorts } from "./ports";
+import { createManagementService } from "./modules/management/service";
 import { createAiClientsService } from "./services/ai-clients.service";
 import { createGoalsService } from "./services/goals.service";
 import { createGoalWorkbenchService } from "./services/goal-workbench.service";
@@ -21,6 +22,9 @@ export function createChronaEngine(_ports: ChronaEnginePorts = {}) {
   const plan = createTaskPlanService();
   const execution = createTaskExecutionService();
   const goals = createGoalsService();
+  const lifecycle = createTaskLifecycleService();
+  const result = createTaskResultService();
+  const management = createManagementService({ tasks, schedule, plan, execution, lifecycle, result });
 
   return {
     tasks: {
@@ -28,9 +32,10 @@ export function createChronaEngine(_ports: ChronaEnginePorts = {}) {
       schedule,
       plan,
       execution,
-      lifecycle: createTaskLifecycleService(),
-      result: createTaskResultService(),
+      lifecycle,
+      result,
     },
+    management,
     agentTools: createAgentToolOperationsService({ tasks, schedule, plan, execution, goals }),
     pages: createPagesService(),
     goals: {
@@ -42,6 +47,7 @@ export function createChronaEngine(_ports: ChronaEnginePorts = {}) {
     aiClients: createAiClientsService(),
     runtime: {
       ...createRuntimeService(),
+      startManagementWorker: management.startWorker,
       aiClients: {
         get: (clientId?: string | null) => getAiClient(clientId),
         list: () => aiClientRegistry.list(),

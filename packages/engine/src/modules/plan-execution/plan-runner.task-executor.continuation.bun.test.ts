@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { createPlanGraphFromCompiledPlan, getPlanRun } from "@/modules/plan-execution/persistence/plan-run-store";
 import { derivePlanRunFromRuntime } from "@/modules/plan-execution/persistence/plan-runtime-store";
 import { acceptTaskResult } from "@/modules/tasks/accept-task-result";
+import { getCurrentExecution } from "./use-cases/get-current-execution";
 import {
   executeTaskNodeCapabilityMock,
   makeInputCheckpointThenTaskPlan,
@@ -20,7 +21,7 @@ import {
 describe("plan-runner task executor continuation", () => {
   setupPlanRunnerTaskExecutorTest();
 
-  it("continues to the downstream task run after submitting checkpoint input", async () => {
+  it.each([false, true])("retains execution identity through checkpoint and result acceptance (work-block scoped: %s)", async (scoped) => {
     executeTaskNodeCapabilityMock.mockResolvedValueOnce({
         status: "done",
         summary: "Specification task complete",
@@ -30,13 +31,27 @@ describe("plan-runner task executor continuation", () => {
 
     const { workspace, task } = await seedWorkspaceAndTask("Runner checkpoint input handoff");
     const compiledPlan = makeInputCheckpointThenTaskPlan("graph_checkpoint_input_handoff");
-    await seedAcceptedCompiledPlan(workspace.id, task.id, compiledPlan);
+    const workBlock = scoped ? await db.workBlock.create({ data: {
+      workspaceId: workspace.id, taskId: task.id, title: "Scoped review", status: "Scheduled",
+      scheduledStartAt: new Date(), scheduledEndAt: new Date(Date.now() + 3_600_000),
+    } }) : null;
+    await seedAcceptedCompiledPlan(workspace.id, task.id, compiledPlan, workBlock?.id);
+    const unstarted = await getCurrentExecution({ taskId: task.id, workBlockId: workBlock?.id });
+    expect(unstarted.status).toBe("started");
+    expect(unstarted.planRunId).toBeNull();
 
     const waiting = await taskPlanExecution.dispatch({
       taskId: task.id,
-      action: { action: "start_manual" },
+      action: { action: "start_manual", workBlockId: workBlock?.id },
     });
 
+    const reloaded = await getCurrentExecution({ taskId: task.id });
+    expect(reloaded.executionSessionId).toBe(waiting.executionSessionId);
+    expect(reloaded.planRunId).toBe(waiting.planRunId);
+    expect(reloaded.checkpoint?.id).toBe(waiting.checkpoint?.id);
+    const explicitScope = await getCurrentExecution({ taskId: task.id, workBlockId: workBlock?.id });
+    expect(explicitScope.executionSessionId).toBe(reloaded.executionSessionId);
+    expect(explicitScope.checkpoint?.id).toBe(reloaded.checkpoint?.id);
     expect(waiting.status).toBe("waiting_for_user");
     expect(waiting.currentNodeId).toBe("requirements_checkpoint");
     expect(waiting.checkpoint?.kind).toBe("user_input");
@@ -46,6 +61,7 @@ describe("plan-runner task executor continuation", () => {
       taskId: task.id,
       action: {
         checkpointId: waiting.checkpoint?.id ?? "",
+        workBlockId: workBlock?.id,
         action: "submit_input",
         payload: {
           inputFields: {
@@ -67,7 +83,7 @@ describe("plan-runner task executor continuation", () => {
       inputFields: undefined,
     });
 
-    const persisted = await getPlanRun(task.id, compiledPlan.editablePlanId);
+    const persisted = await getPlanRun(task.id, compiledPlan.editablePlanId, workBlock?.id);
     expect(persisted?.results.map((result) => [result.nodeId, result.status, result.outputSummary])).toEqual([
       ["requirements_checkpoint", "obsolete", undefined],
       ["requirements_checkpoint", "current", "Checkpoint completed: Confirm requirements"],
@@ -97,14 +113,31 @@ describe("plan-runner task executor continuation", () => {
     };
     await db.taskPlanRun.update({ where: { id: completedPlanRun.id }, data: { planRun: completedPlanEnvelope } });
 
+    // A Ready flag without matching finalized content is not acceptance proof.
+    await expect(acceptTaskResult({ taskId: task.id })).rejects.toThrow("successfully finalized");
+    const sourceRevision = completedMutableGraph.planOutput.manifest.sourceRevision;
+    const finalizedAt = new Date().toISOString();
+    completedMutableGraph.planOutput.finalization = { status: "Ready", sourceRevision, attempt: 1, finalizedAt };
+    completedMutableGraph.planOutput.finalizedResult = {
+      sourceRevision, finalizedAt, manifest: completedMutableGraph.planOutput.manifest,
+      spec: { root: "root", elements: { root: { type: "ResultOverview", props: { title: "Complete", summary: "Specification task complete" } } } },
+    };
+    await db.taskPlanRun.update({ where: { id: completedPlanRun.id }, data: { planRun: completedPlanEnvelope } });
+
+    const completedSnapshot = await getCurrentExecution({ taskId: task.id });
+    expect(completedSnapshot.status).toBe("completed");
+    expect(completedSnapshot.executionSessionId).toBeNull();
+    expect(completedSnapshot.planRunId).toBe(completedPlanRun.id);
     const accepted = await acceptTaskResult({ taskId: task.id });
-    expect(accepted.runId).toBeTruthy();
+    expect(accepted.runId).toBe(`plan_execution_${completedPlanRun.id}`);
     expect(await db.run.findUnique({ where: { id: accepted.runId } })).toMatchObject({
       taskId: task.id,
       status: TaskStatus.Completed,
     });
     expect(await db.event.findFirst({ where: { taskId: task.id, eventType: "task.result_accepted" } })).toMatchObject({
       runId: accepted.runId,
+      planRunId: completedPlanRun.id,
+      workBlockId: workBlock?.id ?? null,
     });
   });
   it("resumes the same dynamic task node with typed input and persists one response", async () => {

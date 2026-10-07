@@ -55,6 +55,26 @@ const cases = [
 ] as const;
 
 describe("deriveAutomationPolicyPreview", () => {
+  test.each([
+    ["immediate", "immediate", null],
+    ["at_start", "scheduled", scheduledStartAt],
+    ["before_30m", "scheduled", "2026-07-15T08:30:00.000Z"],
+    ["before_1d", "scheduled", "2026-07-14T09:00:00.000Z"],
+  ] as const)("shows the actual %s execution trigger", (timing, trigger, at) => {
+    expect(deriveAutomationPolicyPreview({
+      autoExecute: true, autoPlanGeneration: true, scheduledStartAt,
+      autoExecuteTiming: timing, providerId: "ai-1",
+    })).toMatchObject({ executionTrigger: trigger, nextOccurrenceAt: at });
+  });
+
+  test("immediate execution needs no schedule; invalid dates do not crash preview", () => {
+    expect(deriveAutomationPolicyPreview({ autoExecute: true, autoPlanGeneration: true,
+      autoExecuteTiming: "immediate", providerId: "ai-1", hasAcceptedPlan: true,
+    }).readiness).toBe("ready");
+    expect(deriveAutomationPolicyPreview({ autoExecute: true, autoPlanGeneration: true,
+      scheduledStartAt: "invalid", providerId: "ai-1",
+    }).readiness).toBe("schedule_time_missing");
+  });
   for (const entry of cases) {
     test(entry.name, () => {
       expect(deriveAutomationPolicyPreview(entry.input)).toMatchObject(entry.expected);

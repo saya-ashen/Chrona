@@ -1,11 +1,10 @@
-export type { TaskDeleteImpact } from "./api/tasks.schema";
+export { managementTools, RESULT_REQUEST_BYTES, type ManagementToolName, type TaskDeleteImpact } from "./api";
+export * as workResults from "./results";
+export type { PageEntry, PageInputsView, PageWrite, WorkResultView } from "./results";
+export * from "./work";
 
-export {
-  STRUCTURED_RESULT_FORMAT,
-  STRUCTURED_RESULT_SCHEMA_VERSION,
-  isStructuredResultAssetContent,
-  type StructuredResultArtifactRef,
-  type StructuredResultAssetContent,
+export { STRUCTURED_RESULT_FORMAT, STRUCTURED_RESULT_SCHEMA_VERSION,
+  isStructuredResultAssetContent, type StructuredResultArtifactRef, type StructuredResultAssetContent,
 } from "./goal-structured-result";
 
 // AI plan contracts — new architecture
@@ -439,7 +438,7 @@ export type {
   DebugClientConfig,
   ClaudeCodeClientConfig,
   CodexClientConfig,
-  OmpClientConfig,
+  OmpClientConfig, PiClientConfig,
   LLMClientConfig,
   AgentProviderClientConfig,
   SmartSuggestRequest,
@@ -533,6 +532,8 @@ export {
   createGoalAssetReviewBodySchema,
   goalDataTableContentSchema,
 } from "./api/goal-workbench.schema";
+
+export * from "./library";
 
 // AI feature runtime contracts
 export * from "./ai-feature-runtime";

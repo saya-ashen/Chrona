@@ -67,17 +67,26 @@ function releaseEnvironment(dataDir: string, configDir: string, databasePath: st
   };
 }
 
-function seedRepresentativeLegacyRows(path: string): void {
+function seedRepresentativeReleaseRows(path: string): void {
   const db = new Database(path);
   const now = new Date().toISOString();
   try {
     db.exec("PRAGMA foreign_keys = ON");
-    db.query("INSERT INTO Workspace (id, name, description, defaultRuntime, status, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?)")
-      .run("upgrade-workspace", "Packaged upgrade workspace", "v0.2.0 representative", "debug", "Active", now, now);
-    db.query("INSERT INTO Task (id, workspaceId, title, executionRuntime, executionConfig, status, priority, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
-      .run("upgrade-task", "upgrade-workspace", "Packaged upgrade representative", "debug", "{}", "Inbox", "Medium", now, now);
+    db.query("INSERT INTO Workspace (id, name, description, status, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?)")
+      .run("upgrade-workspace", "Packaged upgrade workspace", `v${metadata.lastReleasedVersion} representative`, "Active", now, now);
+    db.query("INSERT INTO Task (id, workspaceId, title, executionConfig, status, priority, createdAt, updatedAt) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
+      .run("upgrade-task", "upgrade-workspace", "Packaged upgrade representative", "{}", "Draft", "Medium", now, now);
   } finally {
     db.close();
+  }
+}
+
+function assertRepresentativeTask(db: Database, expectedTitle: string): void {
+  const task = db.query<{ title: string }, []>("SELECT title FROM Task WHERE id = 'upgrade-task'").get();
+  if (task?.title !== expectedTitle) throw new Error(`Representative task mismatch: expected ${expectedTitle}, got ${task?.title ?? "missing"}.`);
+  const config = db.query<{ taskExecutionMode: string; status: string; executionConfig: string }, []>("SELECT taskExecutionMode, status, executionConfig FROM Task WHERE id = 'upgrade-task'").get();
+  if (config?.taskExecutionMode !== "ai" || config.status !== "Draft" || config.executionConfig !== "{}") {
+    throw new Error("Packaged upgrade changed representative task semantics.");
   }
 }
 
@@ -94,10 +103,7 @@ function assertUpgradedDatabase(path: string, expectedTitle: string): void {
     const integrity = db.query<{ quick_check: string }, []>("PRAGMA quick_check").get();
     const foreignKeys = db.query<{ foreign_key_check: string }, []>("PRAGMA foreign_key_check").all();
     if (integrity?.quick_check !== "ok" || foreignKeys.length !== 0) throw new Error("Packaged upgraded database failed integrity or foreign-key checks.");
-    const task = db.query<{ title: string }, []>("SELECT title FROM Task WHERE id = 'upgrade-task'").get();
-    if (task?.title !== expectedTitle) throw new Error(`Representative task mismatch: expected ${expectedTitle}, got ${task?.title ?? "missing"}.`);
-    const archived = db.query<{ legacyRuntime: string }, []>("SELECT legacyRuntime FROM LegacyRuntimeSelectorArchive WHERE entityType = 'task' AND entityId = 'upgrade-task'").get();
-    if (archived?.legacyRuntime !== "debug") throw new Error("LegacyRuntimeSelectorArchive did not preserve representative task runtime.");
+    assertRepresentativeTask(db, expectedTitle);
   } finally {
     db.close();
   }
@@ -149,7 +155,7 @@ export async function smokePackagedUpgrade(target: BuildTargetName): Promise<voi
     }
     copyFileSync(resolve(MIGRATIONS_DIR, metadata.previousReleaseFixture.path), databasePath);
     if (process.platform === "win32") secureWindowsGeneratedStorage(databasePath, false);
-    seedRepresentativeLegacyRows(databasePath);
+    seedRepresentativeReleaseRows(databasePath);
     const env = releaseEnvironment(dataDir, configDir, databasePath);
     await startAndStop(binary, env);
     assertUpgradedDatabase(databasePath, "Packaged upgrade representative");

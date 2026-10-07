@@ -146,10 +146,12 @@ vi.mock("../ui/task-workspace-header-card", () => ({
 		task,
 		spec,
 		store,
+		hideGeneratePlan,
 	}: {
 		task: TaskPageData["task"];
 		spec: UiDocument;
 		store?: { get: (path: string) => unknown };
+		hideGeneratePlan?: boolean;
 	}) => {
 		const elements = spec.elements;
 		const statusText = elements["badge:primary-state"]?.props?.text;
@@ -169,8 +171,8 @@ vi.mock("../ui/task-workspace-header-card", () => ({
 			if (!ref) return true;
 			return Boolean(store?.get(ref));
 		};
-		const visibleActions = actionEntries.filter(([, element]) =>
-			isActionVisible(element),
+		const visibleActions = actionEntries.filter(([key, element]) =>
+			(!hideGeneratePlan || key !== "action:generate-plan") && isActionVisible(element),
 		);
 		const firstVisibleLabel =
 			visibleActions
@@ -438,6 +440,37 @@ describe("TaskWorkspacePage", () => {
 		expect(
 			screen.getAllByRole("button", { name: "Generate plan" }).length,
 		).toBeGreaterThan(0);
+	});
+
+	it("renders open and done manual tasks without AI plan controls", () => {
+		const openManual = taskData();
+		openManual.task.taskExecutionMode = "manual";
+		openManual.task.revision = "config-v1:0";
+		openManual.header!.spec = createHeaderSpecFixture({
+			title: openManual.task.title,
+			progressLabel: "Manual task",
+			actions: [{ id: "manual_complete", label: "Complete task" }],
+		});
+		render(<TaskWorkspacePage data={openManual} />);
+		expect(screen.getByText("primary-action:Complete task")).toBeInTheDocument();
+		expect(screen.getByRole("button", { name: "Complete task" })).toBeInTheDocument();
+		expect(screen.queryByLabelText("workspace plan section")).not.toBeInTheDocument();
+		expect(screen.queryByRole("button", { name: "Generate plan" })).not.toBeInTheDocument();
+		cleanup();
+
+		const doneManual = taskData();
+		doneManual.task.taskExecutionMode = "manual";
+		doneManual.task.status = "Done";
+		doneManual.task.revision = "config-v1:1";
+		doneManual.header!.spec = createHeaderSpecFixture({
+			title: doneManual.task.title,
+			status: "completed",
+			progressLabel: "Manual task",
+			actions: [{ id: "manual_reopen", label: "Reopen task" }],
+		});
+		render(<TaskWorkspacePage data={doneManual} />);
+		expect(screen.getByRole("button", { name: "Reopen task" })).toBeInTheDocument();
+		expect(screen.queryByLabelText("workspace plan section")).not.toBeInTheDocument();
 	});
 
 	it("links Goal tasks to their corresponding Goal instead of the Goal list", () => {

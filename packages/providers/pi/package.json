@@ -1,0 +1,17 @@
+{
+  "name": "@chrona/pi",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@chrona/contracts": "workspace:*",
+    "@chrona/logging": "workspace:*",
+    "@chrona/providers-foundation": "workspace:*",
+    "@chrona/shared": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.30.0"
+  },
+  "exports": {
+    ".": "./src/index.ts",
+    "./test-support": "./src/fake-pi-fixture.ts"
+  }
+}

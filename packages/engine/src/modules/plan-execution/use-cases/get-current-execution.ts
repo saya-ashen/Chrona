@@ -76,7 +76,7 @@ export async function getCurrentExecution(input: { taskId: string; workBlockId?:
   const executionSession = await db.executionSession.findFirst({
     where: {
       taskId: input.taskId,
-      workBlockId: input.workBlockId ?? null,
+      workBlockId: runtime.workBlockId,
       planId: runtime.planId,
       status: { in: ["Active", "Paused"] },
     },
@@ -91,7 +91,7 @@ export async function getCurrentExecution(input: { taskId: string; workBlockId?:
         where: {
           id: latestRunPointer.latestRunId,
           taskId: input.taskId,
-          workBlockId: input.workBlockId ?? null,
+          workBlockId: runtime.workBlockId,
           status: { in: [...ACTIVE_RUN_STATUSES] },
         },
       })
@@ -123,7 +123,9 @@ export async function getCurrentExecution(input: { taskId: string; workBlockId?:
     planId: runtime.planId,
     mainSessionId: mainSession.id,
     executionSessionId: executionSession?.id,
-    planRunId: executionSession || activeRun ? runtime.persisted.id : undefined,
+    // Closing the active session must not erase the durable result identity.
+    // Accepted-but-unstarted plans still have no execution identity.
+    planRunId: executionSession || activeRun || hasExecutionEvidence(effective) ? runtime.persisted.id : undefined,
     status,
     effective,
     currentNodeId,

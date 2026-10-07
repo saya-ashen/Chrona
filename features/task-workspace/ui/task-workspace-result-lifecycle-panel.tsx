@@ -78,7 +78,7 @@ function ResultLifecyclePanel({
 	return (
 		<header
 			id="result-follow-up-composer"
-			className={`sticky top-0 z-20 scroll-mt-24 rounded-2xl border border-primary/25 bg-card px-4 shadow-sm sm:px-5 ${isAccepted && !isAcceptedExpanded ? "py-3" : "py-4"}`}
+			className={`sm:sticky top-0 z-20 scroll-mt-24 rounded-2xl border border-primary/25 bg-card px-4 shadow-sm sm:px-5 ${isAccepted && !isAcceptedExpanded ? "py-3" : "py-3 sm:py-4"}`}
 			data-ui-surface-kind="runtime-control"
 			data-testid="result-lifecycle-panel"
 			data-state={
@@ -98,10 +98,10 @@ function ResultLifecyclePanel({
 						: "flex flex-col gap-4"
 				}
 			>
-				<div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+				<div className="flex flex-col gap-2 sm:gap-4 lg:flex-row lg:items-center lg:justify-between">
 					<div className="min-w-0 space-y-2">
 						<div>
-							<h2 className="flex items-center gap-2 font-heading text-xl font-semibold tracking-[-0.025em] text-foreground">
+							<h2 className="flex items-center gap-2 font-heading text-base sm:text-xl font-semibold tracking-[-0.025em] text-foreground">
 								{isAccepted ? (
 									<CheckCircle2 className="size-5 text-success" aria-hidden />
 								) : null}
@@ -110,7 +110,7 @@ function ResultLifecyclePanel({
 									: (copy.resultReadyTitle ?? "Result ready")}
 							</h2>
 							{!isAccepted || isAcceptedExpanded ? (
-								<p className="mt-1 max-w-3xl text-sm leading-6 text-muted-foreground">
+								<p className="mt-1 hidden max-w-3xl text-sm leading-6 text-muted-foreground sm:block">
 									{isAccepted
 										? (copy.resultAcceptedDescription ??
 											"Task closed. Ask about this result or create the next task without losing context.")
@@ -143,7 +143,7 @@ function ResultLifecyclePanel({
 						) : null}
 						{!isAccepted || isAcceptedExpanded ? (
 							<div
-								className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground"
+								className={`${completion.hasDiagnostics ? "flex" : "hidden sm:flex"} flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground`}
 								role="group"
 								aria-label={
 									copy.resultCompletionSummaryLabel ??
@@ -242,7 +242,7 @@ function ResultLifecyclePanel({
 						</div>
 					) : (
 						<div
-							className="flex shrink-0 flex-col-reverse gap-2 sm:flex-row"
+							className="flex shrink-0 flex-wrap items-center gap-2"
 							role="group"
 							aria-label={
 								copy.resultReviewActionsLabel ?? "Result review actions"

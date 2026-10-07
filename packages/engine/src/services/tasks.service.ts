@@ -109,6 +109,12 @@ export function createTasksService() {
     ) {
       return tasks.previewResultFile(input);
     },
+    async completeManual(input: Parameters<typeof tasks.completeManual>[0]) {
+      return tasks.completeManual(input);
+    },
+    async reopenManual(input: Parameters<typeof tasks.reopenManual>[0]) {
+      return tasks.reopenManual(input);
+    },
     async list(input: Parameters<typeof tasks.list>[0]) {
       try {
         return await tasks.list(input);

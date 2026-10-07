@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { openMoreTools } from "./advanced-navigation-helpers";
 import {
 	formatAccessibilityViolations,
 	scanPageAccessibility,
@@ -29,12 +30,13 @@ test.describe("Task workspace accessibility", () => {
 		await removeWorkspaceE2eAiClients(request);
 	});
 
-	test("reaches primary schedule actions by keyboard and restores dialog focus", async ({
+	test("reaches advanced task creation from Schedule by keyboard and restores dialog focus", async ({
 		page,
 	}) => {
 		await setTaskWorkspaceViewport(page, "desktop");
 		await page.goto("/en/schedule");
 
+		await openMoreTools(page);
 		const newTask = getPrimaryTaskWorkspaceAction(page, "New Task");
 		await expect(newTask).toBeVisible();
 		await newTask.focus();
@@ -152,6 +154,7 @@ test.describe("Task workspace accessibility", () => {
 
 		const title = `Keyboard lifecycle ${Date.now()}`;
 		await page.goto("/en/tasks");
+		await openMoreTools(page);
 		const newTask = page.getByRole("button", { name: "New Task" }).first();
 		await newTask.focus();
 		await page.keyboard.press("Enter");

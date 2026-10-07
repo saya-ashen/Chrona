@@ -8,7 +8,7 @@ import { splitAcceptedResultIntoCandidates } from "../goals/goal-workbench";
 import { getCurrentExecution } from "../plan-execution/use-cases/get-current-execution";
 import { ensurePlanExecutionRun } from "../plan-execution/persistence/task-execution-store";
 
-export async function acceptTaskResult(input: { taskId: string }) {
+export async function acceptTaskResult(input: { taskId: string; expectedRunId?: string }) {
   const task = await db.task.findUniqueOrThrow({
     where: { id: input.taskId },
     select: { id: true, workspaceId: true, goalId: true, status: true },
@@ -30,10 +30,10 @@ export async function acceptTaskResult(input: { taskId: string }) {
     orderBy: [{ createdAt: "desc" }, { id: "desc" }],
   });
 
-  // Graph execution is authoritative for plan-backed tasks. Older graph-only
-  // executions may not have a legacy Run row, so materialize the compatibility
-  // identity once before recording result review.
-  if ((!latestRun || latestRun.status !== "Completed") && currentExecution.status === "completed" && canonicalPlanRun) {
+  // Graph execution is authoritative for plan-backed tasks. A newer completed
+  // node Run is not the identity of the whole result. Select/materialize the
+  // same canonical Run used by result reads before recording acceptance.
+  if (currentExecution.status === "completed" && canonicalPlanRun) {
     latestRun = await ensurePlanExecutionRun({
       taskId: task.id,
       planRunId: canonicalPlanRun.id,
@@ -45,6 +45,9 @@ export async function acceptTaskResult(input: { taskId: string }) {
     });
   }
 
+  if (input.expectedRunId && latestRun?.id !== input.expectedRunId) {
+    throw new EngineError(ENGINE_ERROR_CODES.CONFLICT, "The result to accept is no longer current.");
+  }
   if (!latestRun || latestRun.status !== "Completed") {
     throw new EngineError(
       ENGINE_ERROR_CODES.INVALID_TASK_STATE,
@@ -54,7 +57,9 @@ export async function acceptTaskResult(input: { taskId: string }) {
 
   if (
     currentExecution.planOutput &&
-    currentExecution.planOutput.finalization.status !== "Ready"
+    (currentExecution.planOutput.finalization.status !== "Ready" ||
+      currentExecution.planOutput.finalizedResult?.sourceRevision !== currentExecution.planOutput.manifest.sourceRevision ||
+      currentExecution.planOutput.finalization.sourceRevision !== currentExecution.planOutput.manifest.sourceRevision)
   ) {
     throw new EngineError(
       ENGINE_ERROR_CODES.INVALID_TASK_STATE,

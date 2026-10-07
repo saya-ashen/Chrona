@@ -113,6 +113,8 @@ const HEADER_ACTION_COPY = {
   pause: "Pause",
   stop: "Stop",
   moreActions: "More actions",
+  manualTaskComplete: "Complete task",
+  manualTaskReopen: "Reopen task",
 };
 
 describe("task workspace execution console view model", () => {
@@ -923,6 +925,16 @@ describe("task workspace execution console view model", () => {
 
     expect(view.nodeDetail.disabledActionReason).toBeUndefined();
     expect(view.nodeDetail.autoRefreshEnabled).toBe(true);
+  });
+
+  it("derives direct manual lifecycle header actions", () => {
+    const task = { ...pageData().task, taskExecutionMode: "manual" as const, status: "Ready" };
+    const progress = { completedSteps: 0, totalSteps: 0, percentComplete: 0, label: "0 steps" };
+    const workState = deriveWorkspaceWorkStateView({ task, progress, currentNode: null });
+    expect(deriveHeaderActions({ task, progress, workState, copy: HEADER_ACTION_COPY })).toEqual([{ id: "manual_complete", label: "Complete task", disabled: false }]);
+    const doneTask = { ...task, status: "Done" };
+    const doneState = deriveWorkspaceWorkStateView({ task: doneTask, progress, currentNode: null });
+    expect(deriveHeaderActions({ task: doneTask, progress, workState: doneState, copy: HEADER_ACTION_COPY })).toEqual([{ id: "manual_reopen", label: "Reopen task", disabled: false }]);
   });
 
   it.each([

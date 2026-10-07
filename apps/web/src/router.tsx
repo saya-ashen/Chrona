@@ -15,6 +15,11 @@ import {
   SettingsRoutePage,
   TaskDetailRoutePage,
   TaskListRoutePage,
+  WorkResultsRoutePage,
+  WorkInboxRoutePage,
+  WorkRecordRoutePage,
+  WorkPagesHomeRoutePage,
+  WorkPageRoutePage,
 } from "./pages";
 import { NotFoundPage } from "@/components/not-found-page";
 import {
@@ -71,6 +76,10 @@ export function createAppRouter() {
           element: <LocaleLandingPage />,
         },
         {
+          path: "home",
+          element: <WorkPagesHomeRoutePage />,
+        },
+        {
           path: "dashboard",
           loader: loadDashboardRouteData,
           element: <DashboardRoutePage />,
@@ -108,6 +117,24 @@ export function createAppRouter() {
         {
           path: "settings",
           element: <SettingsRoutePage />,
+        },
+        {
+          path: "work",
+          element: <WorkInboxRoutePage />,
+        },
+        {
+          path: "tasks/:taskId/work",
+          loader: loadTaskPageData,
+          element: <WorkRecordRoutePage />,
+        },
+        {
+          path: "tasks/:taskId/page",
+          loader: loadTaskPageData,
+          element: <WorkPageRoutePage />,
+        },
+        {
+          path: "tasks/:taskId/results",
+          element: <WorkResultsRoutePage />,
         },
         {
           path: "tasks/:taskId",

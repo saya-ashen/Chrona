@@ -1,11 +1,15 @@
 "use client";
 
-import { Badge, Button } from "@shared/ui";
+import { Badge, Button, Tabs, TabsList, TabsTrigger, TabsContent } from "@shared/ui";
+import { MarkdownContent } from "../../../shared/ui/markdown-content";
+import { TaskHistoryPanel } from "./task-history-panel";
+import { TaskResultPublicationNotice } from "./task-result-publication-notice";
 import {
 	TaskWorkspaceExecutionEvidence,
 	TaskWorkspaceInspector,
 } from "@features/execution-monitoring/ui";
 import { SpecRenderer } from "@features/task-workspace/public/workspace-integration";
+import { resultFileShortcuts } from "../model/result-file-shortcuts";
 import { finalizedResultDeliverableCount } from "../model/task-workspace-interaction";
 import { TaskWorkspacePlanContent } from "./task-workspace-plan-content";
 import { TaskWorkspaceOperationPanel } from "./task-workspace-operation-panel";
@@ -69,7 +73,7 @@ export function TaskWorkspacePlanSectionView({
 				copy={copy}
 				onRecoveryAction={() => runtime.focusNodeActions(recoveryCurrentNodeId)}
 			/>
-			{displayState.panels.stageBar ? (
+			{displayState.panels.stageBar && displayState.layout !== "result_focus" ? (
 				<StageBarCard
 					stage={displayState.stage}
 					displayMode={displayState.mode}
@@ -203,11 +207,35 @@ function PlanBriefFocus({ props, runtime }: PlanSectionViewProps) {
 
 function PlanResultFocus({ props, runtime }: PlanSectionViewProps) {
 	return (
-		<div className="flex min-h-0 flex-1 flex-col gap-3 p-3 pb-8">
-			<ResultLifecycle props={props} runtime={runtime} />
-			<ResultChanges props={props} runtime={runtime} />
-			<ResultInspector props={props} runtime={runtime} />
-		</div>
+		<Tabs defaultValue="result" className="min-w-0 flex-1 p-2 sm:p-3">
+			<TabsList aria-label={runtime.copy.resultViewTabs} className="w-full sm:w-fit">
+				<TabsTrigger value="result">{runtime.copy.resultTab}</TabsTrigger>
+				<TabsTrigger value="brief">{runtime.copy.briefTab}</TabsTrigger>
+				<TabsTrigger value="plan">{runtime.copy.planTab}</TabsTrigger>
+				<TabsTrigger value="history">{runtime.copy.historyTab}</TabsTrigger>
+			</TabsList>
+			<TabsContent value="result" className="min-w-0 space-y-3 pb-8">
+				<ResultLifecycle props={props} runtime={runtime} />
+				<ResultChanges props={props} runtime={runtime} />
+				{props.currentExecution?.planOutput?.finalizedResult && props.currentExecution.planOutput.finalization.status === "Ready" ? <TaskResultPublicationNotice review={props.currentExecution.planOutput.finalizedResult.review} /> : null}
+				<ResultInspector props={props} runtime={runtime} />
+			</TabsContent>
+			<TabsContent value="brief" className="min-w-0 p-3">
+				<h2 className="font-semibold">{props.pageData.task.title}</h2>
+				<MarkdownContent>{props.pageData.task.description ?? ""}</MarkdownContent>
+			</TabsContent>
+			<TabsContent value="plan" className="min-w-0">
+				<p className="p-3 text-xs text-muted-foreground">{runtime.copy.resultPlanReadOnly}</p>
+				{props.graphPlan && props.plan ? <TaskWorkspacePlanContent
+					label={props.label} readOnly graphPlan={props.graphPlan} plan={props.plan}
+					isGraphPlanPending={props.isGraphPlanPending} acceptPlanError={null}
+					planWorkbenchMode="accepted" planGenerationStatus="idle"
+					graphMode={runtime.graphMode} onGraphModeChange={runtime.setGraphMode}
+					onGeneratePlan={() => {}}
+				/> : <p role="status" className="p-3">{props.isGraphPlanPending ? runtime.copy.preparingPlanGraph : runtime.copy.resultPlanMissing}</p>}
+			</TabsContent>
+			<TabsContent value="history" className="min-w-0"><TaskHistoryPanel taskId={props.pageData.task.id} /></TabsContent>
+		</Tabs>
 	);
 }
 
@@ -306,6 +334,13 @@ function ResultInspector({ props, runtime }: PlanSectionViewProps) {
 			data-ui-surface-kind="ai-authored"
 			data-testid="final-result-surface"
 		>
+			{resultFileShortcuts(finalizedSpec).length > 0 ? (
+				<nav aria-label={runtime.copy.resultQuickFiles} className="mb-3 flex flex-wrap items-center gap-2 border-b border-border/60 pb-3">
+					{resultFileShortcuts(finalizedSpec).map(file => <Button asChild key={file.key} size="sm" variant="outline" className="max-w-full">
+						<a href={file.href} download className="min-w-0"><span className="truncate">{runtime.copy.downloadArtifact}: {file.title}</span></a>
+					</Button>)}
+				</nav>
+			) : null}
 			<SpecRenderer
 				spec={finalizedSpec}
 				handlers={runtime.commandCenterActionHandlers}

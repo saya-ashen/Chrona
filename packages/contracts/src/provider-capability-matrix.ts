@@ -30,7 +30,7 @@ export type ProviderRecoveryMode =
 	| "local_stream_only";
 
 export type ProviderCapabilityMatrixEntry = {
-	provider: "debug" | "hermes" | "claude_code" | "codex" | "omp";
+	provider: "debug" | "hermes" | "claude_code" | "codex" | "omp" | "pi";
 	label: string;
 	execution: Record<ProviderExecutionCapabilityName, boolean>;
 	recovery: Record<ProviderRecoveryCapabilityName, boolean> & {
@@ -43,6 +43,8 @@ export type ProviderCapabilityMatrixEntry = {
 /** Provider adapters exposed in production settings. Hermes remains implemented but is hidden until certified. */
 export const recommendedProviderType = "codex" as const;
 export const releasedProviderTypes = [recommendedProviderType, "omp", "claude_code"] as const;
+/** Visible opt-in adapters that have not passed the stable release certification matrix. */
+export const experimentalProviderTypes = ["pi"] as const;
 
 const UI_BEHAVIOR: Record<ProviderCapabilityName, string> = {
 	healthCheck: "Settings shows provider readiness.",
@@ -206,6 +208,21 @@ export const providerCapabilityMatrix = [
 			readOnlySingleAttempt: true,
 			providerResumeRef: true,
 			runEventReplay: false,
+		},
+	}),
+	matrixEntry({
+		provider: "pi",
+		label: "Pi",
+		execution: {
+			healthCheck: true, startRun: true, streamEvents: true, cancelActiveRun: true,
+			approvalBridge: true, toolTraces: true, structuredOutput: true,
+			engineManagedToolResults: false, externalControlPlaneActions: true,
+		},
+		recovery: {
+			sessionResume: true, historyReplay: false, activeRunLookup: false,
+			streamReconnect: false, crossProcessDurable: false, clientOperationLookup: false,
+			readOnlySingleAttempt: true, providerResumeRef: true, runEventReplay: false,
+			mode: "session_history",
 		},
 	}),
 	matrixEntry({

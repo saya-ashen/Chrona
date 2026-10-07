@@ -50,6 +50,10 @@ vi.mock("@shared/http", async (importOriginal) => ({
   },
 }));
 
+vi.mock("@features/work-results", () => ({
+  WorkResultsLink: ({ taskId }: { taskId: string }) => <a href={`/en/tasks/${taskId}/results`}>Work results</a>,
+}));
+
 vi.mock("@features/assistant-surface", () => ({
   useAssistantSurface: () => ({
     registerHandlers: vi.fn(() => vi.fn()),
@@ -58,7 +62,7 @@ vi.mock("@features/assistant-surface", () => ({
 }));
 
 vi.mock("@chrona/i18n/react", () => ({
-  useI18n: () => ({ messages: { components: { taskWorkspace: {} } } }),
+  useI18n: () => ({ messages: { components: { taskWorkspace: {} }, workPages: { viewPage: "Open page" } } }),
   useLocale: () => "en",
 }));
 vi.mock("../ui/localized-link", () => ({

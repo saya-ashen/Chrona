@@ -192,6 +192,12 @@ enum TaskKind {
   recurring
 }
 
+/// Separates direct human-managed work from AI plan/run lifecycle; automation flags never imply this mode.
+enum TaskExecutionMode {
+  ai
+  manual
+}
+
 enum ScheduleStatus {
   Unscheduled
   Scheduled
@@ -348,6 +354,65 @@ enum TaskDependencyType {
   child_of
 }
 
+// Organizational metadata only: all folder views point to the existing Task.
+model LibraryState {
+  workspaceId String @id
+  revision Int @default(0)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
+model LibraryGroup {
+  id String @id @default(uuid())
+  workspaceId String
+  name String
+  nameKey String
+  instructions String @default("")
+  allowAgentFolders Boolean @default(true)
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  folders LibraryFolder[]
+  assignments LibraryAssignment[]
+  @@unique([workspaceId, nameKey])
+}
+
+model LibraryFolder {
+  id String @id @default(uuid())
+  groupId String
+  name String
+  nameKey String
+  description String @default("")
+  group LibraryGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  assignments LibraryAssignment[]
+  @@unique([groupId, nameKey])
+}
+
+model LibraryAssignment {
+  taskId String
+  groupId String
+  folderId String?
+  protected Boolean @default(false)
+  actorKey String
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  group LibraryGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  folder LibraryFolder? @relation(fields: [folderId], references: [id], onDelete: SetNull)
+  @@id([taskId, groupId])
+  @@index([folderId])
+  @@index([groupId])
+}
+
+model LibraryCommand {
+  id String @id @default(uuid())
+  workspaceId String
+  actorKey String
+  requestId String
+  payloadHash String
+  taskId String?
+  receipt Json
+  createdAt DateTime @default(now())
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  @@unique([workspaceId, actorKey, requestId])
+  @@index([workspaceId, taskId, createdAt])
+}
+
 model Workspace {
   id                        String                     @id @default(cuid())
   name                      String
@@ -399,6 +464,11 @@ model Workspace {
   goalAssetReviews          GoalAssetReview[]
   assetOwnershipProposals    GoalAssetOwnershipProposal[]
   taskOccurrences           TaskOccurrence[]
+  taskResults               TaskResult[]
+  workRecords               WorkRecord[]
+  libraryState              LibraryState?
+  libraryGroups             LibraryGroup[]
+  libraryCommands           LibraryCommand[]
   taskTriggers              TaskTrigger[]
   triggerDeliveries         TriggerDelivery[]
   aiFeatureRuns             AiFeatureRun[]
@@ -465,6 +535,7 @@ model ImportedCalendarEvent {
 
 model Goal {
   id                      String               @id @default(cuid())
+  configRevision          Int                  @default(1)
   workspaceId             String
   title                   String
   titleSource             String               @default("user")
@@ -619,6 +690,51 @@ model GoalReviewProposalItem {
 }
 
 
+// External management credentials never double as execution run tokens.
+model ManagementClient {
+  id           String   @id @default(cuid())
+  workspaceId  String
+  name         String
+  tokenDigest  String   @unique
+  scopes       Json
+  publicUrl    String
+  timezone     String   @default("UTC")
+  defaultMode  String   @default("plan")
+  revokedAt    DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  commands     ManagementCommand[]
+
+  @@index([workspaceId])
+}
+
+// Durable request receipt + local command outbox. Task ID intentionally survives deletion.
+model ManagementCommand {
+  id            String   @id @default(cuid())
+  clientId      String
+  workspaceId   String
+  toolName      String
+  requestId     String
+  payloadHash   String
+  input         Json
+  taskId        String?
+  workBlockId   String?
+  phase         String   @default("pending")
+  state         String   @default("queued")
+  stageData     Json?
+  result        Json?
+  errorCode     String?
+  leaseOwner    String?
+  leaseUntil    DateTime?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  client        ManagementClient @relation(fields: [clientId], references: [id], onDelete: Restrict)
+
+  @@unique([clientId, toolName, requestId])
+  @@index([state, leaseUntil, createdAt])
+  @@index([workspaceId, taskId, createdAt])
+}
+
 model Task {
   id                        String                     @id @default(cuid())
   workspaceId               String
@@ -626,6 +742,7 @@ model Task {
   title                     String
   description               String?
   kind                      TaskKind                   @default(single)
+  taskExecutionMode         TaskExecutionMode          @default(ai)
   recurrenceRule            String?
   seriesExternalUid         String?
   recurrenceAnchorStartAt   DateTime?
@@ -645,6 +762,7 @@ model Task {
   blockReason               Json?
   goalContext               Json?
   definitionStatus          TaskDefinitionStatus       @default(Active)
+  configRevision            Int                        @default(0)
   defaultSessionId          String?
   aiClientId                String?
   latestRunId               String?
@@ -682,6 +800,9 @@ model Task {
   scheduleProposals         ScheduleProposal[]
   assistantMessages         TaskAssistantMessage[]
   resultContinuations       TaskResultContinuation[]
+  results                   TaskResult[]
+  workRecord                WorkRecord?
+  libraryAssignments        LibraryAssignment[]
   workBlocks                WorkBlock[]
   executionSessions         ExecutionSession[]
   taskPlans                 TaskPlan[]
@@ -1275,7 +1396,9 @@ model Artifact {
   id                String               @id @default(cuid())
   workspaceId       String
   taskId            String
-  runId             String
+  runId             String?
+  ownerKind         String               @default("run")
+  resultId          String?
   type              ArtifactType
   title             String
   uri               String
@@ -1285,7 +1408,10 @@ model Artifact {
   createdAt         DateTime             @default(now())
   workspace         Workspace            @relation(fields: [workspaceId], references: [id])
   task              Task                 @relation(fields: [taskId], references: [id])
-  run               Run                  @relation(fields: [runId], references: [id])
+  run               Run?                 @relation(fields: [runId], references: [id], onDelete: Restrict)
+  result            TaskResult?          @relation(fields: [resultId], references: [id], onDelete: Cascade)
+  resultBytes       ResultArtifactBytes?
+  resultVersions    ResultVersionArtifact[]
   sourceGoalAssets  GoalAsset[]          @relation("GoalAssetSourceArtifact")
   occurrence        TaskOccurrence?      @relation(fields: [occurrenceId], references: [id], onDelete: SetNull)
   assetVersions     GoalAssetVersion[]
@@ -1836,6 +1962,261 @@ model TaskAssistantMessage {
   @@index([taskId, sequence])
 }
 
+// Work-owned results. Managed execution is optional provenance, never identity.
+model WorkRecord {
+  taskId         String @id
+  workspaceId    String
+  revision       Int @default(0)
+  context        Json
+  signals        Json
+  cancelled      Boolean @default(false)
+  nextAction     String @default("")
+  needsAttention Boolean @default(true)
+  lastActorKey   String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  task           Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  sources        WorkSource[]
+  entries        WorkEntry[]
+  commands       WorkCommand[]
+
+  @@index([workspaceId, needsAttention, updatedAt])
+}
+
+model WorkSource {
+  id          String @id @default(cuid())
+  taskId      String
+  workspaceId String
+  sourceKey   String
+  data        Json
+  actorKey    String
+  createdAt   DateTime @default(now())
+  record      WorkRecord @relation(fields: [taskId], references: [taskId], onDelete: Cascade)
+
+  @@unique([workspaceId, sourceKey])
+  @@index([taskId])
+}
+
+model WorkEntry {
+  id          String @id @default(cuid())
+  taskId      String
+  kind        String
+  actorKey    String
+  summary     String
+  details     Json
+  resolvesId  String? @unique
+  createdAt   DateTime @default(now())
+  record      WorkRecord @relation(fields: [taskId], references: [taskId], onDelete: Cascade)
+
+  @@index([taskId, createdAt])
+}
+
+model WorkCommand {
+  id          String @id @default(cuid())
+  taskId      String
+  workspaceId String
+  actorKey    String
+  operation   String
+  requestId   String
+  payloadHash String
+  receipt     Json
+  createdAt   DateTime @default(now())
+  record      WorkRecord @relation(fields: [taskId], references: [taskId], onDelete: Cascade)
+
+  @@unique([workspaceId, actorKey, operation, requestId])
+}
+
+model TaskResult {
+  id                String   @id @default(cuid())
+  workspaceId       String
+  taskId            String
+  occurrenceId      String?
+  scopeKey          String
+  headVersionId     String?
+  acceptedVersionId String?
+  editRevision      Int      @default(0)
+  inputRevision     Int      @default(0)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  workspace         Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  task              Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  occurrence        TaskOccurrence? @relation(fields: [occurrenceId], references: [id], onDelete: NoAction)
+  versions          TaskResultVersion[] @relation("ResultVersions")
+  headVersion       TaskResultVersion? @relation("ResultHead", fields: [headVersionId, id], references: [id, resultId], onDelete: NoAction, onUpdate: NoAction)
+  acceptedVersion   TaskResultVersion? @relation("ResultAccepted", fields: [acceptedVersionId, id], references: [id, resultId], onDelete: NoAction, onUpdate: NoAction)
+  reviews           TaskResultReview[]
+  commands          ResultCommand[]
+  artifacts         Artifact[]
+  uploads           ResultFileUpload[]
+  pageInputs        WorkPageInput[]
+  pageCommands      WorkPageCommand[]
+
+  @@unique([taskId, scopeKey])
+  @@index([workspaceId, updatedAt])
+  @@index([occurrenceId])
+}
+
+model TaskResultVersion {
+  id             String   @id @default(cuid())
+  resultId       String
+  version        Int
+  parentVersionId String?
+  content        Json
+  contentHash    String
+  sourceKind     String
+  actorKey       String
+  sourceLabel    String?
+  sourceWorkId   String?
+  sourceReportedAt DateTime?
+  publishedAt    DateTime @default(now())
+  result         TaskResult @relation("ResultVersions", fields: [resultId], references: [id], onDelete: Cascade)
+  parent         TaskResultVersion? @relation("ResultParent", fields: [parentVersionId, resultId], references: [id, resultId], onDelete: NoAction, onUpdate: NoAction)
+  children       TaskResultVersion[] @relation("ResultParent")
+  headFor        TaskResult[] @relation("ResultHead")
+  acceptedFor    TaskResult[] @relation("ResultAccepted")
+  reviews        TaskResultReview[]
+  artifacts      ResultVersionArtifact[]
+  commands       ResultCommand[]
+  pageInputs     WorkPageInput[]
+
+  @@unique([resultId, version])
+  @@unique([id, resultId])
+}
+
+// Immutable user-content revisions, independent of Agent-authored result versions.
+model WorkPageInput {
+  id          String   @id @default(cuid())
+  resultId    String
+  revision    Int
+  kind        String
+  entryKey    String
+  versionId   String?
+  formKey     String?
+  content     Json
+  actorKey    String
+  createdAt   DateTime @default(now())
+  result      TaskResult @relation(fields: [resultId], references: [id], onDelete: Cascade)
+  version     TaskResultVersion? @relation(fields: [versionId, resultId], references: [id, resultId], onDelete: NoAction, onUpdate: NoAction)
+
+  @@unique([resultId, revision])
+  @@index([resultId, entryKey, revision])
+}
+
+model WorkPageCommand {
+  id          String   @id @default(cuid())
+  workspaceId String
+  resultId    String
+  actorKey    String
+  requestId   String
+  payloadHash String
+  receipt     Json
+  createdAt   DateTime @default(now())
+  result      TaskResult @relation(fields: [resultId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, actorKey, requestId])
+}
+
+model ResultCommand {
+  id          String   @id @default(cuid())
+  workspaceId String
+  actorKey    String
+  operation   String
+  requestId   String
+  payloadHash String
+  resultId    String
+  versionId   String
+  receipt     Json
+  createdAt   DateTime @default(now())
+  result      TaskResult @relation(fields: [resultId], references: [id], onDelete: Cascade)
+  version     TaskResultVersion @relation(fields: [versionId, resultId], references: [id, resultId], onDelete: NoAction, onUpdate: NoAction)
+  review      TaskResultReview?
+
+  @@unique([workspaceId, actorKey, operation, requestId])
+  @@index([resultId, createdAt])
+}
+
+model TaskResultReview {
+  id          String   @id @default(cuid())
+  resultId    String
+  versionId   String
+  commandId   String   @unique
+  revision    Int
+  decision    String
+  feedback    String?
+  actorKey    String
+  createdAt   DateTime @default(now())
+  result      TaskResult @relation(fields: [resultId], references: [id], onDelete: Cascade)
+  version     TaskResultVersion @relation(fields: [versionId, resultId], references: [id, resultId], onDelete: Cascade, onUpdate: NoAction)
+  command     ResultCommand @relation(fields: [commandId], references: [id], onDelete: Cascade)
+
+  @@unique([resultId, revision])
+  @@index([versionId, revision])
+}
+
+// Controlled small-file storage: binary data never enters command receipts or JSON projections.
+model ResultArtifactBytes {
+  artifactId String @id
+  sizeBytes  Int
+  sha256     String
+  filename   String
+  mimeType   String
+  data       Bytes
+  artifact   Artifact @relation(fields: [artifactId], references: [id], onDelete: Cascade)
+}
+
+model ResultFileUpload {
+  id              String @id
+  workspaceId     String
+  taskId          String
+  occurrenceId    String?
+  resultId        String
+  actorKey        String
+  requestId       String
+  payloadHash     String
+  filename        String
+  mimeType        String
+  sizeBytes       Int
+  sha256          String
+  receivedBytes   Int @default(0)
+  status          String @default("open")
+  finalArtifactId String? @unique
+  createdAt       DateTime @default(now())
+  expiresAt       DateTime
+  result          TaskResult @relation(fields: [resultId], references: [id], onDelete: Cascade)
+  chunks          ResultFileChunk[]
+
+  @@unique([workspaceId, actorKey, requestId])
+  @@index([workspaceId, status, expiresAt])
+}
+
+model ResultFileChunk {
+  uploadId String
+  offset   Int
+  sizeBytes Int
+  sha256   String
+  data     Bytes
+  upload   ResultFileUpload @relation(fields: [uploadId], references: [id], onDelete: Cascade)
+
+  @@id([uploadId, offset])
+}
+
+model ResultVersionArtifact {
+  id          String  @id @default(cuid())
+  versionId   String
+  artifactId  String
+  key         String
+  role        String
+  required    Boolean @default(true)
+  artifactRef String
+  artifactFingerprint String
+  version     TaskResultVersion @relation(fields: [versionId], references: [id], onDelete: Cascade)
+  artifact    Artifact @relation(fields: [artifactId], references: [id], onDelete: NoAction)
+
+  @@unique([versionId, role, key])
+  @@index([artifactId])
+}
+
 model TaskResultContinuation {
   id                       String    @id @default(cuid())
   taskId                   String
@@ -2133,6 +2514,7 @@ model TaskOccurrence {
   trigger           TaskTrigger?         @relation(fields: [triggerId], references: [id], onDelete: SetNull)
   delivery          TriggerDelivery?     @relation(fields: [deliveryId], references: [id], onDelete: SetNull)
   workBlock         WorkBlock?           @relation(fields: [workBlockId], references: [id], onDelete: SetNull)
+  taskResults       TaskResult[]
   taskPlans         TaskPlan[]
   taskPlanRuns      TaskPlanRun[]
   executionSessions ExecutionSession[]

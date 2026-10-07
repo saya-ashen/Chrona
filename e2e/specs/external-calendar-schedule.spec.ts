@@ -20,7 +20,7 @@ test.describe("external calendar events on schedule", () => {
     await expect(page.getByRole("listitem").filter({ hasText: sourceName })).toBeVisible();
     await page.goto(`/en/schedule?day=${EVENT_DAY}`);
 
-    await expect(page.getByText(eventTitle).first()).toBeVisible();
+    await expect(page.getByRole("main").getByText(eventTitle).first()).toBeVisible();
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth > document.documentElement.clientWidth);
     expect(overflow).toBe(false);
   });

@@ -1,3 +1,5 @@
+export { withCommandActor, currentCommandActor } from "./command-actor";
+export type { CommandActor } from "./command-actor";
 export type {
   AppendRawEventLogInput,
   AppendCanonicalEventInput,

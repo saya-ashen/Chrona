@@ -323,7 +323,7 @@ function sanitizeStartRunInputForProvider(provider: string, input: StartRunInput
 }
 
 function usesChronaControlPlane(providerName: string): boolean {
-  return providerName === "claude_code" || providerName === "codex" || providerName === "omp";
+  return providerName === "claude_code" || providerName === "codex" || providerName === "omp" || providerName === "pi";
 }
 
 function resolveChronaControlBaseUrl(): string {

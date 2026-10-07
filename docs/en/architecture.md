@@ -1,16 +1,59 @@
 # System Architecture
 
-Chrona is a Bun/TypeScript monorepo for local-first AI task planning, scheduling, execution, and observation.
+Chrona's target is a **local-first, executor-independent work and results
+workspace**. People, external agents, and the optional Chrona-managed executor
+contribute work; Chrona owns durable records, result versions, review, and reuse.
 
-## Runtime overview
+The canonical [Product Architecture](../zh/product-architecture.md) defines
+product direction and acceptance gates. This document describes the current
+Bun/TypeScript system and its transition boundaries. External management MCP is
+available. B1–B3 provide work-owned versions/reviews, authenticated text/file
+MCP and owner HTTP entries, and a deterministic task results page. New writes
+remain default-off. These are local implementations, not a deployment claim.
+Managed-result convergence and Goal Inbox reuse remain phase C; the optional
+executor still uses its existing managed-result pipeline.
+See [Work Result Entries](./work-results.md) for exact authority and limits.
+The local [work-pages slice](./work-pages.md) adds restricted json-render content
+inside result versions and independent append-only owner input. It uses no managed
+execution records. Home/manual work is content-first; calendar and advanced
+execution/Goal/review surfaces remain. This newer slice is not deployed.
+
+## Target dependency direction
+
+```text
+Human / external agent -> Web or MCP -> deterministic work/result/review use cases
+                                           -> persistence and projections
+Optional managed executor ----------------> same result/review use cases
+          -> graph runtime + providers
+```
+
+- A Task and its results must not require a Plan, Run, provider session, or
+  calendar placement. Preserve genuine execution provenance when it exists.
+- Record/result use cases must work with managed execution disabled; do not
+  synthesize runs to satisfy legacy result ownership.
+- Result content and human review need deterministic, model-free presentation.
+  AI finalization may enhance it, not gate access to persisted semantic content.
+- Chrona validates identity, scope, versions, artifacts, and review authority.
+  It does not claim to control external processes or verify their reported work.
+- Scheduling, activation, external-host availability, and notification delivery
+  remain separate capabilities. Existing managed automation is retained, not
+  implicitly applied to external work.
+
+This is a logical boundary inside the existing monorepo, not a new microservice
+or a package-renaming program. Concrete schema/API changes require their own
+compatibility and security review; current contracts remain in force until then.
+
+## Current runtime overview
 
 ```mermaid
 flowchart TB
   User[User] --> Web[apps/web React SPA]
   User --> CLI[packages/cli]
-  Agent[External agent / Hermes] --> MCP[/api/mcp]
+  Agent[Everyday external agent] --> Management[/api/mcp/management]
+  Worker[Chrona-scoped provider worker] --> MCP[/api/mcp]
 
   Web --> API[apps/server Hono API]
+  Management --> API
   MCP --> API
   CLI --> Integrations[packages/integrations/*]
   API --> Integrations
@@ -64,11 +107,14 @@ feature's internals.
 
 ### Task workspace
 
-The task workspace is the planning and editing surface. It supports task detail editing, AI plan generation, generated-plan review, plan acceptance, and execution overview.
+Manual Tasks default to their content-first work page with persistent notes and
+version-bound forms. Managed Tasks retain the planning/editing workspace: task
+detail editing, AI plan generation, review, acceptance and execution overview.
+Both can open an explicit `/tasks/:taskId/page`; advanced details remain reachable.
 
 ### Task workspace execution
 
-Task execution now lives inside the task workspace. Runtime commands use `/api/work/:taskId/commands` and live updates use `/api/work/:taskId/events`; there is no separate Work page route.
+Task execution now lives inside the task workspace. Runtime commands use `/api/work/:taskId/commands` and live updates use `/api/work/:taskId/events`; there is no separate managed-execution Work page. `/tasks/:taskId/work` is instead the independent source/follow-through record, not an execution route.
 
 ### Schedule page
 
@@ -122,7 +168,12 @@ AI clients and feature bindings are database-backed. The old fallback-chain styl
 
 Hermes setup remains implemented through the integrations layer, but Hermes is hidden from the production provider catalog until its runtime is release-certified. Internal diagnostics can still inspect local or remote Hermes clients. Provider runtime code stays responsible for Hermes protocol calls; integration code owns local plugin/config/env/restart side effects.
 
-## Core workflows
+## Current core workflows
+
+The flows below describe the managed-execution path, not required prerequisites
+for every future work record. Target external flow:
+`associate task -> submit semantic result/artifacts -> review -> revise/reuse`.
+It must not manufacture an accepted plan or call an AI finalizer to admit work.
 
 ### Task creation
 
@@ -191,11 +242,26 @@ The public HTTP API is grouped by tasks, plans, execution, schedule, pages, work
 
 ### MCP / agent tools
 
-Chrona exposes MCP tools that operate on the active execution session. Agents receive AI-visible node refs and branch refs and submit outcomes through tool calls. This prevents agents from depending on private backend node IDs.
+Two current surfaces have separate authority:
+
+- `/api/mcp/management`: workspace-bound external management of supported Goal,
+  Task, schedule, and lifecycle operations, subject to credential scopes.
+- `/api/mcp`: execution-scoped provider tools. Agents receive AI-visible node
+  and branch refs and submit outcomes within the injected execution session.
+
+Neither surface currently provides the target's complete independent external
+result intake. Add that capability through explicit product contracts and scoped
+identity, not by giving everyday agents internal run tokens. Tool names and
+artifact transport for that addition remain to be designed.
 
 ### Provider boundary
 
-Provider packages adapt external protocols. They may know provider sessions, responses, transport quirks, streaming formats, tool calls, and approvals. They must not own Chrona business semantics such as task lifecycle, plan progression, retries, or projection state. Those decisions stay in `packages/engine`.
+Provider packages adapt protocols used by Chrona-managed execution. They may know
+provider sessions, responses, transport quirks, streaming formats, tool calls,
+and approvals. They must not own Chrona business semantics such as task
+lifecycle, plan progression, retries, or projection state. Those decisions stay
+in `packages/engine`. An independent external agent submitting work is a product
+client, not necessarily a Provider adapter; Chrona does not own its lifecycle.
 
 ## Data and projection model
 

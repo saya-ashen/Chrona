@@ -7,11 +7,11 @@ English | [中文](./README.zh.md)
 <h1 align="center">Chrona</h1>
 
 <p align="center">
-  <strong>Your to-do list, upgraded into AI-executable workflows.</strong>
+  <strong>A lasting home for your work and results.</strong>
 </p>
 
 <p align="center">
-  Plan your work, schedule it, let AI help execute it, and inspect every step.
+  Keep tasks, progress, evidence, and results together. Use managed AI execution when needed.
 </p>
 
 <p align="center">
@@ -39,12 +39,23 @@ English | [中文](./README.zh.md)
 
 ---
 
-Chrona is a local AI work executor. You decide what should happen, when it may
-run, and which boundaries must not be crossed. Chrona creates a reviewable plan,
-runs it manually or on a schedule, pauses when your input or approval is needed,
-and preserves evidence and results with the task.
+Chrona is evolving into a local-first, **executor-independent work and results
+workspace**: work may be performed by a person, an external agent, or the optional
+Chrona-managed executor. Durable records, results, review, and reuse are the
+product center—not control over every agent.
 
-Chrona connects four loops that usually live in separate tools:
+> **Implemented; one authorized instance deployed and integrated:** independent
+> text/file results and version/review UI were verified with an external Pi Agent.
+> Human acceptance is pending; other installs still default writes off. See
+> [Agent integration](./docs/en/work-results-integration.md). Managed-result and
+> Goal Inbox convergence remain next-stage work.
+> Read the canonical
+> [Product Architecture](./docs/zh/product-architecture.md) and its
+> [English technical summary](./docs/en/architecture.md) before designing changes.
+
+The current managed-execution path creates reviewable plans, runs them manually
+or on a schedule, pauses for input/approval, and preserves evidence and results.
+That supported path remains available during the transition:
 
 ```text
 Task -> Plan -> Schedule -> Inspectable Execution
@@ -270,7 +281,8 @@ React SPA
 | Plan graph runtime                   | `packages/graph-runtime/` |
 | Provider adapters                    | `packages/providers/`     |
 
-Read the [architecture guide](./docs/en/architecture.md),
+Start with the [product direction](./docs/zh/product-architecture.md), then read
+the [architecture guide](./docs/en/architecture.md),
 [data model](./docs/en/data-model.md), and
 [backend execution flow](./docs/en/backend-execution-flow.md) for deeper design
 notes.
@@ -349,6 +361,7 @@ schema-first contract rules, and testing expectations.
 | ---------------------- | ---------------------------------------------------------------------- |
 | Documentation index    | [docs/README.md](./docs/README.md)                                     |
 | Quick start            | [English](./docs/en/quick-start.md) / [中文](./docs/zh/quick-start.md) |
+| Product direction      | [Product Architecture](./docs/zh/product-architecture.md) — canonical target |
 | Architecture           | [docs/en/architecture.md](./docs/en/architecture.md)                         |
 | API reference          | [docs/en/api-reference.md](./docs/en/api-reference.md)                       |
 | Data model             | [docs/en/data-model.md](./docs/en/data-model.md)                             |

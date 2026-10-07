@@ -43,6 +43,8 @@ export type ScheduleTaskListItem = {
   autoExecute: boolean;
   autoPlanGenerationTiming: string;
   autoExecuteTiming: string;
+  /** Backward-compatible optionality; Schedule page projections always emit it. */
+  taskExecutionMode?: "ai" | "manual";
   sourceManaged?: {
     source: "external_calendar";
     eventId: string;
@@ -65,7 +67,7 @@ type ScheduleTaskListProps = {
   >[0]["availableAiClients"];
   isPending: boolean;
   onSaveTaskConfigAction: (
-    taskId: string,
+    task: ScheduleTaskListItem,
     input: TaskConfigFormInput,
   ) => Promise<void>;
 };
@@ -454,6 +456,7 @@ export function ScheduleTaskList({
                   <div className="mt-4 rounded-2xl border border-border/60 bg-background/75 p-4">
                     <TaskConfigForm
                       initialValues={toTaskConfigInitialValues(item)}
+                      variant={item.taskExecutionMode === "manual" ? "manual" : "ai"}
                       availableAiClients={availableAiClients}
                       isPending={isPending}
                       lockedFields={item.sourceManaged?.immutableFields}
@@ -473,7 +476,7 @@ export function ScheduleTaskList({
                       submitLabel={copy.saveTaskConfig}
                       pendingLabel={copy.saving}
                       onSubmitAction={async (input) => {
-                        await onSaveTaskConfigAction(item.taskId, input);
+                        await onSaveTaskConfigAction(item, input);
                         setExpandedTaskId(null);
                       }}
                     />
