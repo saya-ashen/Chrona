@@ -14,6 +14,7 @@ const seed = [
   { id: 'waiting', title: '供应商资料核对', kind: '资料', symbol: '↗', group: 'continue' },
   { id: 'closed', title: '试点问题清单', kind: '整理', symbol: '✓', group: 'closed' }
 ];
+/** @returns {{ meeting: string, conflict: boolean, latest: number, accepted: number, selected: number, incoming: boolean, feedback: string, feedbackVersion: number | null, feedbackDraft: string, runtime: string, scope: string, filter: string, query: string, mode: string, readonly: boolean, extra: Array<object>, events: Array<object>, createDraft: { title: string, context: string } }} */
 const initial = () => ({
   meeting: 'pending', conflict: false, latest: 2, accepted: 1, selected: 2, incoming: false,
   feedback: '', feedbackVersion: null, feedbackDraft: '', runtime: 'input', scope: 'pilot',
@@ -147,11 +148,12 @@ function records(work) {
 function workDetail(id, history) {
   const work = findWork(id);
   if (!work) return `<div class="empty"><h1>这件工作不在原型中</h1><p>可能是重置后失效的本地临时链接。</p><a class="button" href="#overview">返回总览</a></div>`;
-  currentId = id;
+  currentId = work.id;
+  const workId = escape(work.id);
   let body = history ? records(work) : id === 'meeting' ? meetingContent() : id === 'report' ? reportContent() : id === 'waiting' ? waitingContent() : id === 'managed' ? runtimeContent() : id === 'closed'
     ? '<article class="document"><span class="document-kicker">已结束 · 虚构示例</span><h2>试点前，先回答这三个问题</h2><ol><li>是否可以完整导出原始资料？</li><li>两位实际使用者能否独立找到材料？</li><li>退出试点时，是否可以恢复原流程？</li></ol><p>这份清单已经确认。工作结束是单独的用户决定，不是收到结果后的自动动作。</p></article>'
     : `<section class="focus-panel"><span class="decision-tag">已记录</span><h2>可以从这里继续</h2><p>${escape(work.context || '暂未填写背景。')}</p><div class="boundary">这只是本地原型记录。没有创建真实任务、日程或自动化。</div>${button('获取继续工作信息', 'handoff', 'primary')}</section>`;
-  return `<a class="back" href="#work">← 所有工作</a><header class="detail-heading"><div class="breadcrumbs"><span>${escape(work.kind)}</span><span>／</span><span>${id === 'managed' ? 'Chrona 托管' : '由人或外部 Agent 推进'}</span></div><h1>${escape(work.title)}</h1><p class="status-sentence">${description(id).text}</p></header><nav class="tabs" aria-label="工作内容"><a class="tab" href="#work/${id}"${!history ? ' aria-current="page"' : ''}>当前</a><a class="tab" href="#work/${id}/history"${history ? ' aria-current="page"' : ''}>记录</a></nav>${state.readonly ? '<div class="warning">只读视角：可以阅读内容，但不能提交决定或修改记录。</div>' : ''}<div class="detail-layout"><div class="detail-main">${body}</div>${contextPanel(work)}</div>`;
+  return `<a class="back" href="#work">← 所有工作</a><header class="detail-heading"><div class="breadcrumbs"><span>${escape(work.kind)}</span><span>／</span><span>${id === 'managed' ? 'Chrona 托管' : '由人或外部 Agent 推进'}</span></div><h1>${escape(work.title)}</h1><p class="status-sentence">${description(id).text}</p></header><nav class="tabs" aria-label="工作内容"><a class="tab" href="#work/${workId}"${!history ? ' aria-current="page"' : ''}>当前</a><a class="tab" href="#work/${workId}/history"${history ? ' aria-current="page"' : ''}>记录</a></nav>${state.readonly ? '<div class="warning">只读视角：可以阅读内容，但不能提交决定或修改记录。</div>' : ''}<div class="detail-layout"><div class="detail-main">${body}</div>${contextPanel(work)}</div>`;
 }
 function schedulePage() {
   return `${titleHeader('日程', '时间安排和待确认建议分开显示，不把它们当作通知。', false)}<div class="schedule-day"><div class="date-label">周五<strong>18</strong>9 月</div><a class="schedule-event" href="#work/meeting"><small class="muted">${state.meeting === 'applied' ? '15:00–15:30' : '14:00–14:30'} · Asia/Shanghai</small><h2>产品评审会</h2><p>${state.meeting === 'pending' ? '另有改至 15:00 的建议，尚未应用。' : state.meeting === 'applied' ? '仅 Chrona 时间已更新，外部邀请仍需跟进。' : '维持原安排；改期建议已忽略。'}</p></a></div><p class="control-note">原型只展示局部日程汇总；完整周视图、来源日历和时区切换继续沿用正式产品设计，不在这里做假控件。</p>`;

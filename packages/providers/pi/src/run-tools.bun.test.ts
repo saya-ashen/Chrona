@@ -5,7 +5,7 @@ import { PiRunTools } from "./run-tools";
 const cleanups: Array<() => Promise<void>> = [];
 afterEach(async () => { for (const cleanup of cleanups.splice(0)) await cleanup(); });
 
-async function fixture(ack: Record<string, unknown> = { ok: true, kind: "complete", recorded: true }) {
+async function fixture(ack: Record<string, unknown> = { ok: true, kind: "complete", recorded: true }, basePath = "api") {
   const calls: string[] = [];
   const payloads: unknown[] = [];
   const token = "local-fixture-token";
@@ -26,7 +26,7 @@ async function fixture(ack: Record<string, unknown> = { ok: true, kind: "complet
     return Response.json({ jsonrpc: "2.0", id: body.id, result });
   } });
   const input: StartRunInput = { clientOperationId: "fixture", sessionId: "fixture", instructions: "fixture", input: "fixture", toolPolicy: "full",
-    control: { baseUrl: `${server.url}api`, runToken: token }, terminalToolName: "chrona_node_complete" };
+    control: { baseUrl: `${server.url}${basePath}`, runToken: token }, terminalToolName: "chrona_node_complete" };
   const tools = new PiRunTools(input, AbortSignal.timeout(5000));
   cleanups.push(async () => { await tools.close(); await server.stop(true); });
   await tools.initialize();
@@ -50,6 +50,12 @@ describe("Pi scoped execution tool bridge", () => {
     await expect(f.tools.call("chrona_node_complete", {})).rejects.toThrow("acknowledge");
     await expect(f.tools.call("chrona_node_complete", {})).rejects.toThrow("already submitted");
     expect(f.calls.filter((call) => call === "control")).toHaveLength(1);
+  });
+  it.each(["", "api/", "api" + "/".repeat(100_000)])("normalizes trailing slashes without changing the scoped endpoints (%#)", async (basePath) => {
+    const f = await fixture(undefined, basePath);
+    expect((await f.tools.call("chrona_node_complete", {})).terminate).toBe(true);
+    expect(f.calls).toContain("tools/list");
+    expect(f.payloads).toEqual([{ body: { kind: "complete", payload: {} } }]);
   });
   it("accepts a same-kind alreadyAccepted acknowledgement", async () => {
     const f = await fixture({ ok: true, kind: "complete", alreadyAccepted: true });

@@ -12,7 +12,7 @@ window.checkPcReference = async function checkPcReference() {
   const choice=value=>{const el=document.querySelector('#buy-timing');el.value=value;el.dispatchEvent(new Event('change',{bubbles:true}));};
   const reset=async()=>{await action('about');await action('reset');};
   const routePrices=()=>[...document.querySelectorAll('.buy-price')].map(el=>Number(el.textContent.replace(/[^\d]/g,'')));
-  const rowModels=()=>[...document.querySelectorAll('.buy-row strong')].map(el=>el.textContent).sort().join('|');
+  const rowModels=()=>[...document.querySelectorAll('.buy-row strong')].map(el=>el.textContent).sort((a,b)=>a.localeCompare(b)).join('|');
   const summaryPrice=()=>Number(document.querySelector('.purchase-summary .price').textContent.replace(/[^\d]/g,''));
   try{
     await reset();

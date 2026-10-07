@@ -10,12 +10,19 @@ const TERMINAL_KINDS: Record<string, string> = {
 };
 export type ToolReply = { content: Array<{ type: "text"; text: string }>; details?: unknown; terminate?: boolean };
 
+function trimTrailingSlashes(value: string) {
+  let end = value.length;
+  while (end > 0 && value.charCodeAt(end - 1) === 47) end--;
+  return value.slice(0, end);
+}
+
 function apiUrl(base: string) {
-  const url = new URL(base.replace(/\/+$/, ""));
+  const url = new URL(trimTrailingSlashes(base));
   if (!isExactLoopbackHost(url.hostname) || !["http:", "https:"].includes(url.protocol) || url.username || url.password || url.search || url.hash) {
     throw new Error("Pi requires a credential-free loopback Chrona control URL");
   }
-  url.pathname = `${url.pathname.replace(/\/+$/, "").replace(/\/api$/, "")}/api`;
+  const pathname = trimTrailingSlashes(url.pathname);
+  url.pathname = `${pathname.endsWith("/api") ? pathname.slice(0, -4) : pathname}/api`;
   return url;
 }
 function toolName(name: string) { return name.replace(/[^a-zA-Z0-9_-]/g, "_"); }
