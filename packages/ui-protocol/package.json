@@ -11,8 +11,8 @@
     "./work-pages/example": "./src/work-pages/example.ts"
   },
   "dependencies": {
-    "@json-render/core": "^0.19.0",
-    "@json-render/shadcn": "^0.19.0",
-    "zod": "^4.3.6"
+    "@json-render/core": "^0.21.0",
+    "@json-render/shadcn": "^0.21.0",
+    "zod": "^4.6.5"
   }
 }
