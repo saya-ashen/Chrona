@@ -68,7 +68,11 @@ export async function callManagementSteward(client: ManagementIdentity, name: st
       tools: (await db.managedTool.findMany({ where, take: 20, orderBy: { createdAt: "desc" } })).map(toolView),
     };
   }
-  if (name === "chrona_steward_today") {
+  if (name === "chrona_steward_today") return readStewardToday(workspaceId, raw);
+  return writeManagementSteward(client, name, raw, scopes);
+}
+
+async function readStewardToday(workspaceId: string, raw: unknown) {
     managementStewardTodaySchema.parse(raw);
     const now = new Date();
     const section = async (kinds: string[]) => (await db.attentionItem.findMany({ where: { workspaceId, kind: { in: kinds }, OR: [{ status: "open" }, { status: "snoozed", snoozedUntil: { lte: now } }] }, take: 10, orderBy: { createdAt: "desc" }, include: { affair: true } })).map(row => attentionView(Object.assign({}, row, { status: "open" })));
@@ -78,7 +82,10 @@ export async function callManagementSteward(client: ManagementIdentity, name: st
       upcoming: (await db.followUp.findMany({ where: { workspaceId, status: "pending" }, take: 10, orderBy: { dueAt: "asc" } })).map(row => ({ id: row.id, kind: "follow_up", title: row.note.slice(0, 200), startsAt: row.dueAt, endsAt: null, affairId: row.affairId, sourceRef: row.id, confirmed: true })),
       health: { assessor: { available: state?.assessorAvailable ?? false, name: (state?.assessorName ?? "Unavailable").slice(0, 200), lastError: state?.assessorLastError ? "Assessor reported an error; review in Chrona" : null }, pendingEvents: await db.inboundEvent.count({ where: { workspaceId, status: "pending" } }), failedEvents: await db.inboundEvent.count({ where: { workspaceId, status: "failed" } }), oldestPendingAt: oldest?.receivedAt ?? null, queuedNotifications: await db.stewardNotification.count({ where: { workspaceId, status: "queued" } }), failedNotifications: await db.stewardNotification.count({ where: { workspaceId, status: { in: ["failed", "uncertain"] } } }), failingConnections: await db.sourceConnection.count({ where: { workspaceId, status: "failing" } }), lastTickAt: state?.lastTickAt ?? null },
     };
-  }
+}
+
+async function writeManagementSteward(client: ManagementIdentity, name: string, raw: unknown, scopes: string[]) {
+  const workspaceId = client.workspaceId;
   const input = name === "chrona_steward_capture" ? managementStewardCaptureSchema.parse(raw) : managementStewardDelegationSchema.parse(raw);
   try {
     return await withDatabaseTransaction(async () => {

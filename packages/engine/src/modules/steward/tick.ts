@@ -7,6 +7,14 @@ import { decidePermission } from "@chrona/domain/steward/permission";
 import { raiseDigests } from "./digest";
 import { raiseSuggestions } from "./suggest";
 
+function nextCadenceCheck(covering: ReturnType<typeof delegationView>[]) {
+  const cadence = covering.filter(d => d.cadenceSeconds !== null)
+    .sort((a, b) => a.cadenceSeconds! - b.cadenceSeconds!).at(0);
+  return cadence?.lastCheckAt
+    ? new Date(cadence.lastCheckAt).getTime() + cadence.cadenceSeconds! * 1000
+    : 0;
+}
+
 /** Chrona owns polling, assessment retries, follow-ups and delivery retries. */
 export async function tick(ctx: Context) {
   const workspaceId = ctx.actor.workspaceId;
@@ -28,8 +36,7 @@ export async function tick(ctx: Context) {
       continue;
     }
     limits.push(...covering.map(d => d.limits.maxEventsPerCheck));
-    const cadence = covering.filter(d => d.cadenceSeconds !== null).sort((a, b) => a.cadenceSeconds! - b.cadenceSeconds!)[0];
-    const cadenceDue = cadence?.lastCheckAt ? new Date(cadence.lastCheckAt).getTime() + cadence.cadenceSeconds! * 1000 : 0;
+    const cadenceDue = nextCadenceCheck(covering);
     const dueAt = Math.max(connection.nextCheckAt?.getTime() ?? 0, cadenceDue);
     await ctx.db.sourceConnection.update({ where: { id: connection.id }, data: { coverageNote, ...(dueAt > now.getTime() ? { nextCheckAt: new Date(dueAt) } : {}) } });
     if (dueAt > now.getTime()) continue;
