@@ -5,9 +5,12 @@ import { Badge, Button, Card, CardContent, Label, Select, SelectTrigger, SelectV
 import { LocalizedLink } from "./localized-link";
 import { useAttentionDecision, useStewardClient, useStewardResource } from "../hooks/use-steward";
 import { useStewardMutation } from "../hooks/use-steward-mutation";
-import { affairStatusOptions, deriveAffair, isNotFound, toolStateLabel } from "../model/affairs";
+import { affairStatusOptions, deriveAffair, isNotFound } from "../model/affairs";
 import { evidenceHref } from "../model/today";
 import { AttentionCard } from "./today-page";
+import { ToolGenerator } from "./tool-generator";
+import { ToolRow } from "./tool-row";
+import { canFinishFollowUp } from "../model/controls";
 
 export function AffairDetailPage({ workspaceId, affairId }: { workspaceId: string; affairId: string }) {
   const { messages } = useI18n(), c = messages.steward;
@@ -36,8 +39,8 @@ export function AffairDetailPage({ workspaceId, affairId }: { workspaceId: strin
       {view.showSuggestions && <AffairSection title={c.possiblyRelated}><p>{c.unconfirmedMessages}</p>{view.suggestedEvents.map(event => <EventCard key={event.id} event={event}><div className="flex flex-wrap gap-2"><Button disabled={blocked} onClick={() => void mutation.run(() => client.linkEvent(event.id, { decision: "confirm", affairId }))}>{c.confirmLink}</Button><Button variant="outline" disabled={blocked} onClick={() => void mutation.run(() => client.linkEvent(event.id, { decision: "reject", affairId }))}>{c.rejectLink}</Button></div></EventCard>)}</AffairSection>}
       <AffairSection title={c.messages} empty={view.events.length === 0}>{view.events.map(event => <EventCard key={event.id} event={event} />)}</AffairSection>
       <AffairSection title={c.delegations} empty={detail.delegations.length === 0}>{detail.delegations.map(item => <div key={item.id}><LocalizedLink className="underline" href="/delegations">{item.purpose}</LocalizedLink> <Badge variant="outline">{c.statuses[item.status]}</Badge></div>)}</AffairSection>
-      <AffairSection title={c.followUps} empty={detail.followUps.length === 0}>{detail.followUps.map(item => <div key={item.id}><p>{item.note}</p><p>{c.dueAt}: <time dateTime={item.dueAt}>{item.dueAt}</time></p><Badge variant="outline">{c.followUpStatuses[item.status]}</Badge></div>)}</AffairSection>
-      <AffairSection title={c.tools} empty={detail.tools.length === 0}>{detail.tools.map(tool => <Card key={tool.id}><CardContent className="space-y-2 pt-4"><h3 className="font-semibold">{tool.name}</h3><p>{tool.purpose}</p><Badge variant="outline">{toolStateLabel(tool.state, c.toolStates)}</Badge><p>{c.handlingMode}: {c.handlingModes[tool.handlingMode]}</p><p>{c.whyTool}: {tool.selectionRationale || c.notProvided}</p></CardContent></Card>)}</AffairSection>
+      <AffairSection title={c.followUps} empty={detail.followUps.length === 0}>{detail.followUps.map(item => <div key={item.id}><p>{item.note}</p><p>{c.dueAt}: <time dateTime={item.dueAt}>{item.dueAt}</time></p><Badge variant="outline">{c.followUpStatuses[item.status]}</Badge>{canFinishFollowUp(item.status) && <div className="flex flex-wrap gap-2"><Button disabled={blocked} onClick={() => void mutation.run(() => client.completeFollowUp(item.id))}>{c.done}</Button><Button variant="outline" disabled={blocked} onClick={() => void mutation.run(() => client.cancelFollowUp(item.id))}>{c.controls.cancel}</Button></div>}</div>)}</AffairSection>
+      <AffairSection title={c.tools}><ToolGenerator affairId={affairId} client={client} refresh={resource.refresh} />{detail.tools.length === 0 && <p>{c.empty}</p>}{detail.tools.map(tool => <ToolRow key={tool.id} tool={tool} events={view.events} client={client} refresh={resource.refresh} />)}</AffairSection>
     </>}
   </div>;
 }
