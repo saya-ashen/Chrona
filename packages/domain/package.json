@@ -9,6 +9,7 @@
   },
   "exports": {
     ".": "./src/index.ts",
-    "./task/*": "./src/task/*.ts"
+    "./task/*": "./src/task/*.ts",
+    "./steward/*": "./src/steward/*.ts"
   }
 }

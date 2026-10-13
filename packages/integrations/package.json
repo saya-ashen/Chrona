@@ -4,7 +4,8 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@chrona/hermes": "workspace:*"
+    "@chrona/hermes": "workspace:*",
+    "@chrona/contracts": "workspace:*"
   },
   "exports": {
     ".": "./src/index.ts",
@@ -14,6 +15,7 @@
     "./calendar/recurrence": "./src/calendar/recurrence.ts",
     "./calendar/source-url": "./src/calendar/source-url.ts",
     "./calendar/test-fixtures": "./src/calendar/test-fixtures.ts",
-    "./hermes": "./src/hermes/index.ts"
+    "./hermes": "./src/hermes/index.ts",
+    "./steward": "./src/steward/index.ts"
   }
 }

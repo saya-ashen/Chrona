@@ -5,6 +5,21 @@ patterns.
 
 ## Product direction — read before designing changes
 
+**Current direction (2026-10-13, user-authorized rebuild):**
+[Personal steward](docs/zh/personal-steward.md). Chrona is a proactive personal
+steward: Today / Affairs / Schedule / Delegations / Connections over a durable
+event loop. Where that document conflicts with anything below or with older
+docs, it wins. Within its scope, internal architecture, pages, domain model,
+APIs and the development schema may be rebuilt without compatibility shims, and
+the "unsafe without human approval" items for schema, engine and large UI
+redesign are pre-approved. Never pre-approved: deleting or migrating real user
+data, deploy/push, live databases, real accounts or external sends, disabling
+auth, approvals or secret redaction. The shared contract
+`packages/contracts/src/steward/index.ts` is supervisor-owned.
+
+The executor-independent work/results design below now describes the result
+layer the steward reuses, not the product centre.
+
 Canonical target: [Executor-independent work and results workspace](docs/zh/product-architecture.md).
 Chrona owns durable work records, result versions, review, and reuse. Humans,
 external agents, and the optional Chrona-managed executor can contribute work;

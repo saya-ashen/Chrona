@@ -10,7 +10,8 @@
     "./work": "./src/work/index.ts",
     "./library": "./src/library/index.ts",
     "./api": "./src/api/index.ts",
-    "./ai-feature-runtime": "./src/ai-feature-runtime/index.ts"
+    "./ai-feature-runtime": "./src/ai-feature-runtime/index.ts",
+    "./steward": "./src/steward/index.ts"
   },
   "dependencies": {
     "@chrona/ui-protocol": "workspace:*",
