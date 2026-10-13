@@ -5,6 +5,8 @@ import { defaultLocale, hasLocale } from "@chrona/i18n";
 import { AppShell } from "./app-shell";
 import { AccessKeyRouteError } from "@/components/access-key-route-error";
 import {
+  TodayRoutePage,
+  StewardListRoutePage,
   ActionCenterRoutePage,
   DashboardRoutePage,
   LocaleLandingPage,
@@ -75,6 +77,10 @@ export function createAppRouter() {
           index: true,
           element: <LocaleLandingPage />,
         },
+        { path: "today", element: <TodayRoutePage /> },
+        { path: "affairs", element: <StewardListRoutePage kind="affairs" /> },
+        { path: "delegations", element: <StewardListRoutePage kind="delegations" /> },
+        { path: "connections", element: <StewardListRoutePage kind="connections" /> },
         {
           path: "home",
           element: <WorkPagesHomeRoutePage />,
