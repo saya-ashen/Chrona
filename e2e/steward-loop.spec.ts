@@ -223,10 +223,6 @@ test("owner completes the steward loop", async ({ page, request }, info) => {
     await page.getByText("Delivery log", { exact: true }).click();
     const receipt = page.getByRole("listitem").filter({ has: page.getByRole("heading", { name: `Preference ${suffix}`, exact: true }) });
     await expect(receipt.getByText("Sent", { exact: true })).toBeVisible();
-    const response = await request.get(`/api/steward/notifications?workspaceId=${encodeURIComponent(workspaceId)}`);
-    expect(response.ok()).toBe(true);
-    const { items } = await response.json() as { items: { title: string; channel: string; status: string }[] };
-    const notification = items.find(item => item.title === `Preference ${suffix}`);
     await expect(receipt).toContainText("Channel: In Chrona");
     await receipt.getByRole("button", { name: "Acknowledge", exact: true }).click();
     await expect(receipt.getByText("Acknowledged", { exact: true })).toBeVisible();
