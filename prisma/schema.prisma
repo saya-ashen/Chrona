@@ -355,6 +355,264 @@ enum TaskDependencyType {
 }
 
 // Organizational metadata only: all folder views point to the existing Task.
+// Personal steward. String vocabularies follow packages/contracts/src/steward.
+model Affair {
+  id String @id @default(uuid())
+  workspaceId String
+  title String
+  summary String @default("")
+  goal String @default("")
+  status String @default("active")
+  keywords Json @default("[]")
+  taskId String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  events InboundEvent[]
+  delegations Delegation[]
+  attentionItems AttentionItem[]
+  followUps FollowUp[]
+  tools ManagedTool[]
+  @@index([workspaceId, status, updatedAt])
+  @@index([taskId])
+}
+
+model SourceConnection {
+  id String @id @default(uuid())
+  workspaceId String
+  kind String
+  label String
+  mode String @default("poll")
+  status String @default("needs_authorization")
+  config Json @default("{}")
+  cursor String?
+  readScopes Json @default("[]")
+  writeScopes Json @default("[]")
+  pollIntervalSeconds Int?
+  baselineAt DateTime?
+  lastSuccessAt DateTime?
+  lastFailureAt DateTime?
+  lastError String?
+  nextCheckAt DateTime?
+  coverageNote String @default("")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  events InboundEvent[]
+  delegations Delegation[]
+  @@index([workspaceId, status, mode, nextCheckAt])
+  @@index([status, mode, nextCheckAt])
+}
+
+model InboundEvent {
+  id String @id @default(uuid())
+  workspaceId String
+  connectionId String
+  externalId String
+  status String @default("pending")
+  title String
+  body String
+  author String
+  url String?
+  occurredAt DateTime
+  receivedAt DateTime @default(now())
+  affairId String?
+  linkStatus String @default("unlinked")
+  threadId String?
+  attempts Int @default(0)
+  nextAttemptAt DateTime?
+  lastError String?
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  connection SourceConnection @relation(fields: [connectionId], references: [id], onDelete: Cascade)
+  affair Affair? @relation(fields: [affairId], references: [id], onDelete: SetNull)
+  assessments EventAssessment[]
+  attentionItems AttentionItem[]
+  @@unique([connectionId, externalId])
+  @@index([workspaceId, status, nextAttemptAt])
+  @@index([status, nextAttemptAt])
+  @@index([workspaceId, affairId, linkStatus])
+  @@index([connectionId, threadId])
+}
+
+model EventAssessment {
+  id String @id @default(uuid())
+  workspaceId String
+  eventId String
+  assessor String
+  disposition String
+  whatHappened String
+  whyItMatters String
+  nextStep String
+  proposedAction String?
+  permission Json?
+  createdAt DateTime @default(now())
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  event InboundEvent @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  @@index([workspaceId, eventId, createdAt])
+  @@index([eventId])
+}
+
+model Delegation {
+  id String @id @default(uuid())
+  workspaceId String
+  revision Int @default(1)
+  status String @default("proposed")
+  affairId String?
+  connectionId String?
+  purpose String
+  originalWording String @default("")
+  cadenceSeconds Int?
+  allowedActions Json @default("[]")
+  askFirstActions Json @default("[]")
+  notification Json @default("{\"mode\":\"digest\",\"cooldownMinutes\":60,\"quietHours\":null,\"channel\":\"local_test\"}")
+  limits Json @default("{\"maxEventsPerCheck\":50,\"maxNotificationsPerDay\":10}")
+  grantedAt DateTime?
+  expiresAt DateTime?
+  lastCheckAt DateTime?
+  lastSuccessAt DateTime?
+  lastFailureAt DateTime?
+  lastError String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  affair Affair? @relation(fields: [affairId], references: [id], onDelete: SetNull)
+  connection SourceConnection? @relation(fields: [connectionId], references: [id], onDelete: SetNull)
+  attentionItems AttentionItem[]
+  notifications StewardNotification[]
+  @@index([workspaceId, status, lastCheckAt])
+  @@index([affairId])
+  @@index([connectionId])
+}
+
+model AttentionItem {
+  id String @id @default(uuid())
+  workspaceId String
+  dedupeKey String
+  kind String
+  status String @default("open")
+  affairId String?
+  eventId String?
+  delegationId String?
+  title String
+  whatHappened String
+  whyItMatters String
+  nextStep String
+  evidence Json @default("[]")
+  dueAt DateTime?
+  snoozedUntil DateTime?
+  cooldownUntil DateTime?
+  decision String?
+  decidedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  affair Affair? @relation(fields: [affairId], references: [id], onDelete: SetNull)
+  event InboundEvent? @relation(fields: [eventId], references: [id], onDelete: SetNull)
+  delegation Delegation? @relation(fields: [delegationId], references: [id], onDelete: SetNull)
+  notifications StewardNotification[]
+  followUps FollowUp[]
+  @@unique([workspaceId, dedupeKey])
+  @@index([workspaceId, status, snoozedUntil])
+  @@index([workspaceId, kind, dueAt])
+  @@index([affairId])
+  @@index([eventId])
+  @@index([delegationId])
+}
+
+model StewardNotification {
+  id String @id @default(uuid())
+  workspaceId String
+  attentionItemId String?
+  delegationId String?
+  idempotencyKey String @unique
+  channel String
+  status String @default("generated")
+  title String
+  body String
+  link String?
+  attempts Int @default(0)
+  lastError String?
+  nextAttemptAt DateTime?
+  receiptRef String?
+  generatedAt DateTime @default(now())
+  sentAt DateTime?
+  acknowledgedAt DateTime?
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  attentionItem AttentionItem? @relation(fields: [attentionItemId], references: [id], onDelete: SetNull)
+  delegation Delegation? @relation(fields: [delegationId], references: [id], onDelete: SetNull)
+  @@index([workspaceId, status, nextAttemptAt])
+  @@index([status, nextAttemptAt])
+  @@index([attentionItemId])
+  @@index([delegationId])
+}
+
+model FollowUp {
+  id String @id @default(uuid())
+  workspaceId String
+  affairId String?
+  attentionItemId String?
+  note String
+  dueAt DateTime
+  status String @default("pending")
+  createdAt DateTime @default(now())
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  affair Affair? @relation(fields: [affairId], references: [id], onDelete: SetNull)
+  attentionItem AttentionItem? @relation(fields: [attentionItemId], references: [id], onDelete: SetNull)
+  @@index([workspaceId, status, dueAt])
+  @@index([affairId])
+  @@index([attentionItemId])
+}
+
+model ManagedTool {
+  id String @id @default(uuid())
+  workspaceId String
+  affairId String?
+  kind String
+  name String
+  purpose String
+  handlingMode String
+  selectionRationale String
+  dataScopes Json @default("[]")
+  version Int @default(1)
+  state String @default("generated")
+  validationSummary String?
+  validatedVersion Int?
+  authorizedAt DateTime?
+  enabledAt DateTime?
+  lastRunAt DateTime?
+  lastSuccessAt DateTime?
+  lastFailureAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  affair Affair? @relation(fields: [affairId], references: [id], onDelete: SetNull)
+  @@index([workspaceId, state])
+  @@index([affairId])
+}
+
+// SQL guards reject updates and direct deletes; owning-workspace deletion may cascade.
+model StewardAudit {
+  id String @id @default(uuid())
+  workspaceId String
+  kind String
+  subjectId String?
+  actorKey String
+  details Json
+  createdAt DateTime @default(now())
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  @@index([workspaceId, createdAt])
+  @@index([workspaceId, subjectId, createdAt])
+}
+
+model StewardState {
+  workspaceId String @id
+  lastTickAt DateTime?
+  assessorName String @default("unconfigured")
+  assessorAvailable Boolean @default(false)
+  assessorLastError String?
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+}
+
 model LibraryState {
   workspaceId String @id
   revision Int @default(0)
@@ -466,6 +724,17 @@ model Workspace {
   taskOccurrences           TaskOccurrence[]
   taskResults               TaskResult[]
   workRecords               WorkRecord[]
+  affairs                   Affair[]
+  sourceConnections         SourceConnection[]
+  inboundEvents             InboundEvent[]
+  eventAssessments          EventAssessment[]
+  delegations               Delegation[]
+  attentionItems            AttentionItem[]
+  stewardNotifications      StewardNotification[]
+  followUps                 FollowUp[]
+  managedTools              ManagedTool[]
+  stewardAudits             StewardAudit[]
+  stewardState              StewardState?
   libraryState              LibraryState?
   libraryGroups             LibraryGroup[]
   libraryCommands           LibraryCommand[]
