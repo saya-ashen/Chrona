@@ -39,7 +39,7 @@ const bootData: AppBootData = {
 
 
 describe("localized child pages under /:lang", () => {
-  it("navigates from /:lang to the content-first home without crashing", async () => {
+  it("navigates from /:lang to Today without crashing", async () => {
     const router = createMemoryRouter(
       [
         {
@@ -48,7 +48,7 @@ describe("localized child pages under /:lang", () => {
           element: <AppShell />,
           children: [
             { index: true, element: <LocaleLandingPage /> },
-            { path: "home", element: <div>My pages</div> },
+            { path: "today", element: <div>Today</div> },
           ],
         },
       ],
@@ -58,7 +58,7 @@ describe("localized child pages under /:lang", () => {
     const view = render(<RouterProvider router={router} />);
 
     await waitFor(() => {
-      expect(router.state.location.pathname).toBe("/en/home");
+      expect(router.state.location.pathname).toBe("/en/today");
     });
 
     await act(async () => {

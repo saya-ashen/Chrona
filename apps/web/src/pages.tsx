@@ -7,6 +7,7 @@ import {
   useSearchParams,
 } from "react-router-dom";
 
+import { TodayPage, StewardListPage, type StewardListKind } from "@features/steward";
 import { DashboardPage, type DashboardData } from "@features/dashboard";
 import { SchedulePage } from "@features/schedule";
 import { TaskListPage } from "@features/task-management";
@@ -122,6 +123,15 @@ export type TaskListRouteData = {
   };
 };
 
+export function TodayRoutePage() {
+  const { defaultWorkspace } = useAppBootOutletData();
+  return <TodayPage key={defaultWorkspace.id} workspaceId={defaultWorkspace.id} />;
+}
+export function StewardListRoutePage({ kind }: { kind: StewardListKind }) {
+  const { defaultWorkspace } = useAppBootOutletData();
+  return <StewardListPage key={`${defaultWorkspace.id}:${kind}`} workspaceId={defaultWorkspace.id} kind={kind} />;
+}
+
 export function WorkInboxRoutePage() { return <WorkInboxPage />; }
 export function WorkRecordRoutePage() {
   const { task } = useLoaderData() as TaskPageRouteData;
@@ -149,7 +159,7 @@ export function LocaleLandingPage() {
   const { search, hash } = useLocation();
   return (
     <Navigate
-      to={`${localizeHref(resolveLocale(params.lang), "/home")}${search}${hash}`}
+      to={`${localizeHref(resolveLocale(params.lang), "/today")}${search}${hash}`}
       replace
     />
   );

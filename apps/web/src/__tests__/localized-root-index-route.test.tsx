@@ -39,7 +39,7 @@ const bootData: AppBootData = {
 
 
 describe("localized root index route", () => {
-  it("navigates from /:lang to the content-first home",  async () => {
+  it("navigates from /:lang to Today, preserving query and hash", async () => {
     const router = createMemoryRouter(
       [
         {
@@ -48,17 +48,19 @@ describe("localized root index route", () => {
           element: <AppShell />,
           children: [
             { index: true, element: <LocaleLandingPage /> },
-            { path: "home", element: <div>My pages</div> },
+            { path: "today", element: <div>Today</div> },
           ],
         },
       ],
-      { initialEntries: ["/en"] },
+      { initialEntries: ["/en?filter=active#attention"] },
     );
 
     const view = render(<RouterProvider router={router} />);
 
     await waitFor(() => {
-      expect(router.state.location.pathname).toBe("/en/home");
+      expect(router.state.location.pathname).toBe("/en/today");
+      expect(router.state.location.search).toBe("?filter=active");
+      expect(router.state.location.hash).toBe("#attention");
     });
 
     await act(async () => {
