@@ -224,8 +224,9 @@ export const toolRunResultSchema = z.object({
 
 // ------------------------------------------------------------ HTTP map -----
 /**
- * All under /api/steward. Every request carries `?workspaceId=`; the server
- * verifies membership. List endpoints return `{ items: T[] }`.
+ * All under /api/steward. Owner-only (single local owner, same check as
+ * work-records). Every request carries `?workspaceId=` naming an existing
+ * workspace; all rows are scoped to it. List endpoints return `{ items: T[] }`.
  *
  *   GET  /today                         -> TodayView
  *   GET  /health                        -> StewardHealth
