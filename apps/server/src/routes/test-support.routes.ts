@@ -2,20 +2,31 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { db } from "@chrona/db";
 import { getChronaGeneratedFilesDir } from "@chrona/shared/data-paths";
-import type { ChronaEngine } from "@chrona/engine";
+import type { ChronaEngine, StewardService, StewardPorts } from "@chrona/engine";
+import type { createLocalTestSource, createTestDelivery } from "@chrona/integrations/steward";
 import { Hono } from "hono";
 import { z } from "zod";
-import type { StewardRuntime } from "../steward-runtime";
 import { isLocalOwnerAuthorized } from "../middleware/auth";
 import { internalServerError, json } from "../lib/http";
+
+// Describe the seam here rather than importing its runtime composition (a cycle).
+type StewardTestRuntime = {
+  ports: Pick<StewardPorts, "db">;
+  localSource?: ReturnType<typeof createLocalTestSource>;
+  delivery?: ReturnType<typeof createTestDelivery>;
+  service(workspaceId: string): StewardService;
+  setAvailable(value: boolean): void;
+};
 
 /**
  * Returns true only when the E2E test-support routes are explicitly enabled
  * via `CHRONA_E2E_TEST_ROUTES=1`. This flag is set ONLY by the Playwright
  * webServer command — never in production or normal dev.
  */
-function createStewardTestRoutes(runtime: StewardRuntime) {
+function createStewardTestRoutes(runtime: StewardTestRuntime) {
   const router = new Hono();
+  const { localSource, delivery } = runtime;
+  if (!areE2eTestRoutesEnabled() || !localSource || !delivery) return router;
   router.use("*", async (c, next) => {
     c.header("Cache-Control", "no-store");
     if (!isLocalOwnerAuthorized(c.req.header("authorization"))) return c.json({ code: "UNAUTHORIZED" }, 401);
@@ -24,14 +35,14 @@ function createStewardTestRoutes(runtime: StewardRuntime) {
   router.onError((error, c) => c.json({ code: error instanceof z.ZodError || error instanceof SyntaxError ? "INVALID_REQUEST" : "TEST_SEAM_FAILED" }, error instanceof z.ZodError || error instanceof SyntaxError ? 400 : 500));
   router.post("/local-source/push", async c => {
     const { items } = z.object({ items: z.array(z.object({ externalId: z.string().min(1).max(500), title: z.string().max(500), body: z.string().max(8000), author: z.string().max(200), url: z.string().url().max(2048).nullable(), occurredAt: z.string().datetime({ offset: true }), threadId: z.string().optional() }).strict()).max(500) }).strict().parse(await c.req.json());
-    runtime.localSource.push(items); return c.json({ ok: true });
+    localSource.push(items); return c.json({ ok: true });
   });
   router.post("/assessor", async c => { const input = z.object({ available: z.boolean() }).strict().parse(await c.req.json()); runtime.setAvailable(input.available); return c.json({ ok: true }); });
   router.post("/delivery/script", async c => {
     const { outcomes } = z.object({ outcomes: z.array(z.discriminatedUnion("outcome", [z.object({ outcome: z.literal("accepted"), receiptRef: z.string().nullable().optional() }).strict(), z.object({ outcome: z.literal("rejected"), error: z.string().max(500), retryable: z.boolean() }).strict(), z.object({ outcome: z.literal("uncertain"), error: z.string().max(500) }).strict()])).max(100) }).strict().parse(await c.req.json());
-    runtime.delivery.script(outcomes); return c.json({ ok: true });
+    delivery.script(outcomes); return c.json({ ok: true });
   });
-  router.get("/delivery/sent", c => c.json({ items: runtime.delivery.sent }));
+  router.get("/delivery/sent", c => c.json({ items: delivery.sent }));
   router.post("/tick", async c => {
     const workspaceId = c.req.query("workspaceId")?.trim();
     if (!workspaceId) return c.json({ code: "WORKSPACE_REQUIRED" }, 400);
@@ -47,7 +58,7 @@ export function areE2eTestRoutesEnabled(): boolean {
 }
 
 /** Test-only routes mounted only when {@link areE2eTestRoutesEnabled} is true. */
-export function createTestSupportRoutes(engine: ChronaEngine, steward?: StewardRuntime) {
+export function createTestSupportRoutes(engine: ChronaEngine, steward?: StewardTestRuntime) {
 	const router = new Hono();
 	if (steward && areE2eTestRoutesEnabled()) router.route("/test/steward", createStewardTestRoutes(steward));
 	return router

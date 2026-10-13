@@ -49,10 +49,10 @@ export function createStewardService(ports: Ports) {
     tools: {
       list: (filters: Parameters<Tools["list"]>[1] = {}) => run(false, ctx => tools(ctx).list(ctx.actor.workspaceId, filters)),
       recommend: (input: Parameters<Tools["recommend"]>[1]) => run(false, async ctx => tools(ctx).recommend(ctx.actor.workspaceId, input)),
-      generate: (input: Parameters<Tools["generate"]>[1]) => run(true, ctx => tools(ctx).generate(ctx.actor.workspaceId, input)),
+      generate: (input: Omit<Parameters<Tools["generate"]>[1], "actorKey">) => run(true, ctx => tools(ctx).generate(ctx.actor.workspaceId, { ...input, actorKey: ctx.actor.actorKey })),
       transition: (id: string, input: Omit<Parameters<Tools["transition"]>[2], "actorKey">) => run(true, ctx => tools(ctx).transition(ctx.actor.workspaceId, id, { ...input, actorKey: ctx.actor.actorKey })),
-      edit: (id: string, input: Parameters<Tools["edit"]>[2]) => run(true, ctx => tools(ctx).edit(ctx.actor.workspaceId, id, input)),
-      run: (id: string, input: Parameters<Tools["run"]>[2]) => run(true, ctx => tools(ctx).run(ctx.actor.workspaceId, id, input)),
+      edit: (id: string, input: Omit<Parameters<Tools["edit"]>[2], "actorKey">) => run(true, ctx => tools(ctx).edit(ctx.actor.workspaceId, id, { ...input, actorKey: ctx.actor.actorKey })),
+      run: (id: string, input: Omit<Parameters<Tools["run"]>[2], "actorKey">) => run(true, ctx => tools(ctx).run(ctx.actor.workspaceId, id, { ...input, actorKey: ctx.actor.actorKey })),
     },
     schedule: (from: string, to: string) => run(false, ctx => schedule(ctx, from, to)),
     tick: () => run(true, tick),

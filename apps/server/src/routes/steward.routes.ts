@@ -2,18 +2,10 @@ import { Hono } from "hono";
 import { z } from "zod";
 import * as s from "@chrona/contracts/steward";
 import { createStewardService, type StewardPorts, type StewardService } from "@chrona/engine";
+import { toolSpecSchema } from "@chrona/domain/steward/tool-spec";
 import { isLocalOwnerAuthorized } from "../middleware/auth";
 
 export type StewardRoutePorts = Omit<StewardPorts, "authorize">;
-// Supplemental transport schemas until these endpoints join the shared contract.
-const generateSchema = s.managedToolSchema.pick({ name: true, purpose: true, dataScopes: true }).extend({
-  affairId: z.string().trim().min(1).max(128).optional(), spec: z.unknown(),
-  signals: z.object({ repeatsExpected: z.enum(["once", "few", "recurring"]), rulesStable: z.boolean(), needsOngoingObservation: z.boolean(), needsUserInteraction: z.enum(["none", "read", "compare_or_fill"]), ambiguity: z.enum(["clear", "fuzzy"]), existingToolFits: z.boolean(), risk: z.enum(["low", "high"]), valueWorthKeeping: z.boolean() }).strict(),
-}).strict();
-const runSchema = z.object({ events: z.array(z.object({ title: z.string().max(500), body: z.string().max(8000), author: z.string().max(200), connectionKind: z.enum(s.CONNECTION_KINDS).optional() }).strict()).max(500) }).strict();
-const choiceSchema = z.object({ mode: z.enum(s.HANDLING_MODES), rationale: z.string(), escalatesFrom: z.enum(s.HANDLING_MODES).optional() }).strict();
-const generatedSchema = z.object({ created: z.boolean(), choice: choiceSchema, tool: s.managedToolSchema.optional() }).strict();
-const runResultSchema = z.object({ matches: z.array(z.object({ index: z.number().int(), matched: z.boolean(), disposition: z.string().optional(), note: z.string().optional() })), rows: z.array(z.record(z.string(), z.string())) }).strict();
 
 export function createStewardRoutes(ports: StewardRoutePorts) {
   const router = new Hono<{ Variables: { steward: StewardService } }>();
@@ -56,9 +48,14 @@ export function createStewardRoutes(ports: StewardRoutePorts) {
   router.post("/follow-ups/:id/complete", async c => c.json(s.followUpSchema.parse(await c.get("steward").followUps.complete(c.req.param("id")))));
   router.post("/follow-ups/:id/cancel", async c => c.json(s.followUpSchema.parse(await c.get("steward").followUps.cancel(c.req.param("id")))));
   router.get("/tools", async c => c.json(items(s.managedToolSchema).parse({ items: await c.get("steward").tools.list() })));
-  router.post("/tools", async c => c.json(generatedSchema.parse(await c.get("steward").tools.generate(generateSchema.parse(await c.req.json())))));
+  router.post("/tools", async c => {
+    const input = s.generateToolSchema.parse(await c.req.json());
+    const spec = toolSpecSchema.safeParse(input.spec);
+    if (!spec.success) return c.json({ code: "INVALID_REQUEST", message: `Invalid tool spec: ${spec.error.issues.map(issue => `${issue.path.join(".") || "spec"}: ${issue.message}`).join("; ")}` }, 400);
+    return c.json(s.generatedToolSchema.parse(await c.get("steward").tools.generate({ ...input, spec: spec.data })));
+  });
   router.post("/tools/:id/transition", async c => c.json(s.managedToolSchema.parse(await c.get("steward").tools.transition(c.req.param("id"), s.toolTransitionSchema.parse(await c.req.json())))));
-  router.post("/tools/:id/run", async c => c.json(runResultSchema.parse(await c.get("steward").tools.run(c.req.param("id"), runSchema.parse(await c.req.json())))));
+  router.post("/tools/:id/run", async c => c.json(s.toolRunResultSchema.parse(await c.get("steward").tools.run(c.req.param("id"), s.runToolSchema.parse(await c.req.json())))));
   router.get("/schedule", async c => {
     const from = z.string().datetime({ offset: true }).parse(c.req.query("from"));
     const to = z.string().datetime({ offset: true }).parse(c.req.query("to"));

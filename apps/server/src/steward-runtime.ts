@@ -1,18 +1,24 @@
 import type { PrismaClient } from "@chrona/db";
 import { createStewardService } from "@chrona/engine";
-import { createLocalTestSource, createRedditInboxSource, createRuleAssessor, createTestDelivery } from "@chrona/integrations/steward";
+import { createInAppDelivery, createLocalTestSource, createRedditInboxSource, createRuleAssessor, createTestDelivery } from "@chrona/integrations/steward";
 import type { StewardRoutePorts } from "./routes/steward.routes";
+import { areE2eTestRoutesEnabled } from "./routes/test-support.routes";
 
 /** One composition per server, shared by HTTP, the test seam and the worker. */
 export function createStewardRuntime(db: PrismaClient, options: { now?: () => Date; onError?: () => void } = {}) {
   const localSource = createLocalTestSource();
-  const delivery = createTestDelivery();
+  const testRoutesEnabled = areE2eTestRoutesEnabled();
+  const delivery = testRoutesEnabled ? createTestDelivery() : undefined;
+  // Channel names are user data; inherited Object keys are not adapters.
+  const deliveryAdapters: NonNullable<StewardRoutePorts["deliveryAdapters"]> = Object.create(null);
+  deliveryAdapters.in_app = createInAppDelivery();
+  if (delivery) deliveryAdapters.local_test = { ...delivery.adapter, idempotent: true };
   let available = true;
   const ports: StewardRoutePorts = {
     db, now: options.now,
     sources: { local_test: localSource.adapter, reddit_inbox: createRedditInboxSource() },
     assessor: createRuleAssessor({ available: () => available }),
-    deliveryAdapters: { local_test: { ...delivery.adapter, idempotent: true } },
+    deliveryAdapters,
   };
   const service = (workspaceId: string) => createStewardService({ ...ports, authorize: async () => ({ workspaceId, actorKey: "owner:local", canWrite: true }) });
   let timer: ReturnType<typeof setInterval> | undefined;
@@ -30,7 +36,7 @@ export function createStewardRuntime(db: PrismaClient, options: { now?: () => Da
       })().catch(() => options.onError?.()).finally(() => { running = undefined; });
     }, seconds * 1000);
   }
-  return { ports, localSource, delivery, service, setAvailable(value: boolean) { available = value; }, start,
+  return { ports, localSource: testRoutesEnabled ? localSource : undefined, delivery, service, setAvailable(value: boolean) { available = value; }, start,
     async stop() { if (timer) clearInterval(timer); timer = undefined; await running; },
   };
 }
