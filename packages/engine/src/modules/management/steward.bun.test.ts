@@ -27,7 +27,7 @@ describe("least-privilege steward MCP", () => {
     expect(MANAGEMENT_ACCESS_PRESETS["assistant-read"]).toEqual(["goals:read"]);
     expect(MANAGEMENT_ACCESS_PRESETS.assistant).toEqual(["goals:read", "goals:propose"]);
     expect(MANAGEMENT_ACCESS_PRESETS["assistant-edit"]).toEqual(["goals:read", "goals:propose", "goals:write"]);
-    for (const [name, scopes] of Object.entries(MANAGEMENT_ACCESS_PRESETS)) if (name !== "steward") expect(scopes.some(s => s.startsWith("steward:"))).toBe(false);
+    for (const [name, scopes] of Object.entries(MANAGEMENT_ACCESS_PRESETS)) if (name !== "steward" && name !== "steward-assessor") expect(scopes.some(s => s.startsWith("steward:"))).toBe(false);
     for (const preset of ["read", "full", "assistant-edit"] as const) {
       const identity = await client(preset);
       for (const [tool, input] of [["chrona_steward_today", {}], ["chrona_steward_capture", capture()], ["chrona_steward_delegation_propose", proposal()]] as const) expect((await call(identity, tool, input)).error.code).toBe("FORBIDDEN");
@@ -39,7 +39,7 @@ describe("least-privilege steward MCP", () => {
     expect(result.ok).toBe(true);
     expect(result.data.capabilities.steward).toMatchObject({ canRead: true, canPropose: true, granting: false, attentionApproval: false, connectionChanges: false });
     expect(result.data.aiClients).toEqual([]);
-    expect(Object.keys(managementTools).filter(n => n.startsWith("chrona_steward_"))).toHaveLength(5);
+    expect(Object.keys(managementTools).filter(n => n.startsWith("chrona_steward_"))).toHaveLength(7);
     for (const name of ["chrona_steward_delegation_grant", "chrona_steward_attention_approve", "chrona_steward_tool_run", "chrona_steward_connection_update"]) expect((await call(identity, name, {})).error.code).toBe("VALIDATION_ERROR");
   });
   it("atomically captures and replays once, rejects changed intent, preserves provenance", async () => {

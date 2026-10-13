@@ -16,7 +16,7 @@ import { applyGoalUpdate, goalUpdatePreview, prepareGoalUpdate } from "./goal-up
 import { callManagementWorkResult, isWorkResultTool, managementRequestLimit } from "./work-results";
 import { callManagementWorkRecord, isWorkRecordTool } from "./work-records";
 import { callManagementLibrary, isLibraryTool } from "./library";
-import { callManagementSteward, isStewardTool } from "./steward";
+import { callManagementAssessment, callManagementSteward, isStewardTool } from "./steward";
 
 import { commandReceipt, managementJson } from "./receipts";
 export { commandReceipt, managementJson } from "./receipts";
@@ -34,6 +34,7 @@ export function createManagementService(deps: ManagementDeps) {
         if (isWorkResultTool(name)) return managementSuccess(await callManagementWorkResult(client, name, raw));
         if (isWorkRecordTool(name)) return managementSuccess(await callManagementWorkRecord(client, name, raw));
         if (isLibraryTool(name)) return managementSuccess(await callManagementLibrary(client, name, raw));
+        if (name === "chrona_steward_events_pending" || name === "chrona_steward_assessment_submit") return managementSuccess(await callManagementAssessment(client, name, raw));
         if (isStewardTool(name)) return managementSuccess(await callManagementSteward(client, name, raw));
         const input = managementTools[name].parse(raw);
         if (name === "chrona_context_read") {
