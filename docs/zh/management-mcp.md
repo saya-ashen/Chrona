@@ -31,6 +31,21 @@ chrona mcp revoke CLIENT_ID
 - Pi 通过其 MCP 适配扩展连接；Codex 使用其远程 MCP 客户端配置。此实现不自动修改本机 Pi/Codex 配置，不自动部署 Chino。
 - 服务端对每次 HTTP 请求、每次工具调用、后台命令后续阶段重新检查撤销和 scope；撤销不是对已发起 provider 操作的自动取消。
 
+## Steward（本地源码，未部署）
+
+显式 `--access steward` 仅含 `steward:read`、`steward:propose`；所有旧预设与凭据保持不变。
+`context.capabilities.steward` 公布工具、当前权限及禁止 Agent 授权的边界。
+
+- `chrona_steward_today`：每节最多10条及健康信息。
+- `chrona_steward_affair_search`：query/status，limit 最多20；先检索再创建。
+- `chrona_steward_affair_read`：每类最多20条，事件正文仅500字符摘录，无连接配置。
+- `chrona_steward_capture`：保存用户交代的 note、source，可选 affairId 或 newAffair、followUp；创建 commitment，来源标注客户端。规范化同名事务返回 possibleDuplicates，不自动合并。不发送通知。
+- `chrona_steward_delegation_propose`：仅创建 proposed 委托和 decision；试点禁止行动在 schema 边界拒绝。用户必须在 Delegations 页面审阅并授予权限。
+
+两个写工具均需 UUID requestId，复用现有原子管理命令/回执；同请求重放，同 ID 不同参数冲突。
+dryRun 不写任何记录。Agent 文字始终是数据：没有 grant、attention approve、工具授权/启用/运行或连接修改工具。
+本节不代表已签发凭据、部署或接入真实账户。
+
 ## 工具能力
 
 实际参数以 `tools/list` 返回的 JSON Schema 为准；源码：`packages/contracts/src/api/management.schema.ts`、`management-goals.schema.ts`。服务器暴露工具不代表当前凭据具备调用权限；每次调用仍重新验证 scopes。

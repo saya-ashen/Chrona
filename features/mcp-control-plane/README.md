@@ -21,6 +21,14 @@ migration and separate rollout. The portable
 and not automatically installed. Draft activation, standing permission enforcement
 and delivery remain outside this milestone.
 
+Steward tools add bounded Today/affair reads and durable idempotent capture /
+delegation proposals. Only the explicit `steward` enrollment profile includes
+`steward:read` and `steward:propose`; every older profile remains unchanged.
+Capture stores evidence and provenance without notifying. Delegations remain
+`proposed` until a human grants them on the Delegations page. There are no MCP
+steward grant, attention approval, tool execution or connection mutation tools.
+Agent text is data, never authority; dry runs persist nothing.
+
 Existing execution route behavior stays unchanged: `/api/mcp` uses existing API auth middleware and MCP session handling; `/agent/control` keeps Bearer run-token validation and control payload schema validation.
 
 Feature tests:

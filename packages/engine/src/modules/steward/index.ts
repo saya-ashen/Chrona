@@ -13,6 +13,7 @@ import { tick } from "./tick";
 import { createStewardTools } from "./tools";
 type Tools = ReturnType<typeof createStewardTools>;
 export { StewardError } from "./mappers";
+export { captureSteward } from "./capture";
 export type { Ports as StewardPorts, Actor as StewardActor } from "./mappers";
 export function createStewardService(ports: Ports) {
   async function run<T>(write: boolean, fn: (ctx: Context) => Promise<T>) {

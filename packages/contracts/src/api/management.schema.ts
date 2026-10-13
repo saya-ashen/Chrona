@@ -14,10 +14,13 @@ import { resultScopeSchema } from "../results/files";
 import { ARTIFACT_SCOPES, resultFileSchema } from "../results/files";
 import { WORK_SCOPES, workCaptureSchema, workReadSchema, workSearchSchema, workUpdateSchema } from "../work";
 
+import { managementStewardTodaySchema, managementStewardSearchSchema, managementStewardReadSchema, managementStewardCaptureSchema, managementStewardDelegationSchema } from "./management-steward.schema";
+
 // Preserve the historical full preset. New authority requires explicit enrollment.
 export const MANAGEMENT_LEGACY_SCOPES = ["tasks:read", "tasks:write", "schedule:write", "plans:write", "executions:control", "results:accept", "tasks:delete"] as const;
-export const MANAGEMENT_SCOPES = [...MANAGEMENT_LEGACY_SCOPES, "goals:read", "goals:propose", "goals:write", ...RESULT_SCOPES, ...ARTIFACT_SCOPES, ...WORK_SCOPES, ...PAGE_SCOPES, ...LIBRARY_SCOPES] as const;
+export const MANAGEMENT_SCOPES = [...MANAGEMENT_LEGACY_SCOPES, "steward:read", "steward:propose", "goals:read", "goals:propose", "goals:write", ...RESULT_SCOPES, ...ARTIFACT_SCOPES, ...WORK_SCOPES, ...PAGE_SCOPES, ...LIBRARY_SCOPES] as const;
 export const MANAGEMENT_ACCESS_PRESETS = {
+  steward: ["steward:read", "steward:propose"],
   read: ["tasks:read"],
   full: MANAGEMENT_LEGACY_SCOPES,
   "assistant-read": ["goals:read"],
@@ -181,6 +184,11 @@ export const managementDeleteSchema = z.discriminatedUnion("mode", [
   z.object({ mode: z.literal("delete"), requestId: z.string().uuid(), taskId: id, expectedRevision: z.string().min(1).max(512), expectedTaskIds: z.array(id).min(1).max(1_000), expectedAssetIds: z.array(id).max(1_000) }).strict(),
 ]);
 export const managementTools = {
+  chrona_steward_today: managementStewardTodaySchema,
+  chrona_steward_affair_search: managementStewardSearchSchema,
+  chrona_steward_affair_read: managementStewardReadSchema,
+  chrona_steward_capture: managementStewardCaptureSchema,
+  chrona_steward_delegation_propose: managementStewardDelegationSchema,
   chrona_library_read: libraryReadSchema, chrona_library_update: libraryWriteSchema,
   chrona_page_catalog: resultScopeSchema, chrona_page_validate: pageValidateSchema, chrona_page_read: pageReadSchema,
   chrona_work_search: workSearchSchema, chrona_work_read: workReadSchema,
