@@ -3,6 +3,7 @@ import { processPendingEvents } from "./process";
 import { createStewardDelivery } from "./delivery";
 import { createStewardFollowUps } from "./follow-ups";
 import type { Context } from "./mappers";
+import { raiseSuggestions } from "./suggest";
 
 /** Chrona owns polling, assessment retries, follow-ups and delivery retries. */
 export async function tick(ctx: Context) {
@@ -26,8 +27,11 @@ export async function tick(ctx: Context) {
   }
   const { assessed } = await processPendingEvents(ctx);
   const { raised } = await createStewardFollowUps({ db: ctx.db, workspaceId, now: ctx.now }).raiseDueFollowUps();
+  let suggested = 0, suggestionFailed = 0;
+  try { suggested = (await raiseSuggestions(ctx)).raised; }
+  catch { suggestionFailed++; }
   const { attempted } = await createStewardDelivery({ db: ctx.db, workspaceId, adapters: ctx.deliveryAdapters ?? {}, now: ctx.now }).deliverDue();
   const lastTickAt = ctx.now();
   await ctx.db.stewardState.upsert({ where: { workspaceId }, create: { workspaceId, lastTickAt, assessorName: ctx.assessor.name }, update: { lastTickAt } });
-  return { synced, syncFailed, assessed, raised, attempted, lastTickAt: lastTickAt.toISOString() };
+  return { synced, syncFailed, assessed, raised, suggested, suggestionFailed, attempted, lastTickAt: lastTickAt.toISOString() };
 }
