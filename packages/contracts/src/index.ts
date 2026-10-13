@@ -3,6 +3,7 @@ export * as workResults from "./results";
 export type { PageEntry, PageInputsView, PageWrite, WorkResultView } from "./results";
 export * from "./work";
 export * as steward from "./steward";
+export * from "./steward";
 
 export { STRUCTURED_RESULT_FORMAT, STRUCTURED_RESULT_SCHEMA_VERSION,
   isStructuredResultAssetContent, type StructuredResultArtifactRef, type StructuredResultAssetContent,

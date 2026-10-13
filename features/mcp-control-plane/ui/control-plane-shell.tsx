@@ -22,7 +22,7 @@ import { createGoalWithFirstTask } from "@features/goals";
 import { apiJson } from "@shared/http";
 import {
 	Button,
-	DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
+	DropdownMenu, DropdownMenuContent, DropdownMenuGroup, DropdownMenuLabel, DropdownMenuItem, DropdownMenuTrigger,
 	cn,
 	Sidebar,
 	SidebarContent,
@@ -181,6 +181,7 @@ export function ControlPlaneShell({
 		.filter(Boolean)
 		.flatMap((segment) => {
 			if (segment === "home" || segment === "page") return [pagesCopy.home];
+			if (segment === "today" || segment === "affairs" || segment === "delegations" || segment === "connections") return [messages.steward[segment]];
 			if (segment === "dashboard") return [t("nav.dashboard")];
 			if (segment === "schedule") return [t("nav.schedule")];
 			if (segment === "tasks") return [t("nav.tasks")];
@@ -192,10 +193,10 @@ export function ControlPlaneShell({
 			return [segment];
 		});
 	const { navItems, advancedNavItems } = controlPlaneNavigation(pathname, messages);
-	const advancedMenu = <DropdownMenu><DropdownMenuTrigger render={<Button variant="ghost" size="sm" aria-label={pagesCopy.advanced} />}><MoreHorizontal className="size-5" /><span className="sr-only">{pagesCopy.advanced}</span></DropdownMenuTrigger><DropdownMenuContent align="end">
+	const advancedMenu = <DropdownMenu><DropdownMenuTrigger render={<Button variant="ghost" size="sm" aria-label={messages.steward.legacyWorkspace} />}><MoreHorizontal className="size-5" /><span className="sr-only">{messages.steward.legacyWorkspace}</span></DropdownMenuTrigger><DropdownMenuContent align="end"><DropdownMenuGroup><DropdownMenuLabel>{messages.steward.legacyWorkspace}</DropdownMenuLabel>
 		{advancedNavItems.map((item) => <DropdownMenuItem key={item.href} render={<LocalizedLink href={item.href} aria-current={item.active ? "page" : undefined} />}>{item.label}</DropdownMenuItem>)}
 		<DropdownMenuItem onClick={() => setShowCreateTaskDialog(true)}>{t("nav.newTask")}</DropdownMenuItem>
-	</DropdownMenuContent></DropdownMenu>;
+	</DropdownMenuGroup></DropdownMenuContent></DropdownMenu>;
 	const shouldShowStartWithChrona =
 		[
 			"/dashboard",
@@ -218,7 +219,7 @@ export function ControlPlaneShell({
 			>
 				<SidebarHeader className="border-b border-sidebar-border bg-sidebar px-4 py-4">
 					<LocalizedLink
-						href="/home"
+						href="/today"
 						aria-label={t("nav.brandTitle")}
 						className="group flex min-w-0 items-center gap-2.5"
 					>
@@ -242,7 +243,7 @@ export function ControlPlaneShell({
 				<SidebarContent>
 					<SidebarGroup className="px-3 py-4">
 						<SidebarGroupContent>
-							<SidebarMenu aria-label="Primary" className="gap-1.5">
+							<SidebarMenu aria-label={messages.steward.primaryNavigation} className="gap-1.5">
 								{navItems.map((item) => {
 									const Icon = item.icon;
 
@@ -272,8 +273,7 @@ export function ControlPlaneShell({
 							</SidebarMenu>
 						</SidebarGroupContent>
 					</SidebarGroup>
-					<LibraryNavigation />
-					<details className="mx-5 mb-5 text-sm"><summary className="cursor-pointer text-muted-foreground">{pagesCopy.advanced}</summary><div className="mt-2 flex flex-col gap-1">{advancedNavItems.map((item) => <LocalizedLink key={item.href} href={item.href} aria-current={item.active ? "page" : undefined} className={cn("rounded-lg px-2 py-2 hover:bg-muted", item.active && "bg-primary-soft text-primary")}>{item.label}</LocalizedLink>)}<Button variant="ghost" className="justify-start" onClick={() => setShowCreateTaskDialog(true)}>{t("nav.newTask")}</Button></div></details>
+					<details className="mx-5 mb-5 text-sm"><summary className="cursor-pointer text-muted-foreground">{messages.steward.legacyWorkspace}</summary><LibraryNavigation /><div className="mt-2 flex flex-col gap-1">{advancedNavItems.map((item) => <LocalizedLink key={item.href} href={item.href} aria-current={item.active ? "page" : undefined} className={cn("rounded-lg px-2 py-2 hover:bg-muted", item.active && "bg-primary-soft text-primary")}>{item.label}</LocalizedLink>)}<Button variant="ghost" className="justify-start" onClick={() => setShowCreateTaskDialog(true)}>{t("nav.newTask")}</Button></div></details>
 				</SidebarContent>
 			</Sidebar>
 
@@ -282,7 +282,7 @@ export function ControlPlaneShell({
 					<div className="relative mx-auto flex h-16 w-full max-w-[1600px] items-center gap-2 px-4 sm:gap-3 sm:px-6 xl:px-8">
 						<div className="flex min-w-0 shrink items-center gap-3">
 							<LocalizedLink
-								href="/home"
+								href="/today"
 								aria-label={t("nav.brandTitle")}
 								className="flex shrink-0 items-center gap-2 xl:hidden"
 							>
@@ -363,7 +363,7 @@ export function ControlPlaneShell({
 				</main>
 
 				<nav
-					aria-label="Primary"
+					aria-label={messages.steward.primaryNavigation}
 					className="fixed inset-x-0 bottom-0 z-40 border-t border-panel-border bg-panel/94 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_24px_rgb(31_32_45/0.08)] backdrop-blur-md xl:hidden"
 				>
 					<ul className="mx-auto flex max-w-lg items-stretch justify-around">
@@ -382,7 +382,7 @@ export function ControlPlaneShell({
 										)}
 									>
 										<Icon className="size-5" />
-										<span className="max-w-full truncate">{item.label}</span>
+										<span className="max-w-full break-words text-center leading-tight">{item.label}</span>
 									</LocalizedLink>
 								</li>
 							);
