@@ -1,4 +1,4 @@
-import { proposeDelegationSchema, delegationTransitionSchema } from "@chrona/contracts/steward";
+import { proposeDelegationSchema, delegationTransitionSchema, notificationPolicySchema } from "@chrona/contracts/steward";
 import { nextDelegationStatus } from "@chrona/domain/steward/permission";
 import { audit, delegationView, requireAffair, StewardError, type Context } from "./mappers";
 import { connection } from "./connections";
@@ -6,7 +6,7 @@ export async function proposeDelegation(ctx: Context, raw: unknown) {
   const input = proposeDelegationSchema.parse(raw);
   if (input.affairId) await requireAffair(ctx, input.affairId);
   if (input.connectionId) await connection(ctx, input.connectionId);
-  return delegationView(await ctx.db.delegation.create({ data: { ...input, workspaceId: ctx.actor.workspaceId, expiresAt: input.expiresAt ? new Date(input.expiresAt) : null, status: "proposed", revision: 1 } }));
+  return delegationView(await ctx.db.delegation.create({ data: { ...input, notification: input.notification ?? notificationPolicySchema.parse({}), workspaceId: ctx.actor.workspaceId, expiresAt: input.expiresAt ? new Date(input.expiresAt) : null, status: "proposed", revision: 1 } }));
 }
 export async function transitionDelegation(ctx: Context, id: string, raw: unknown) {
   const input = delegationTransitionSchema.parse(raw);

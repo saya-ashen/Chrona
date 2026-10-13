@@ -6,7 +6,7 @@ export async function connection(ctx: Context, id: string, tx: Tx = ctx.db) {
 }
 export async function mappedConnection(ctx: Context, id: string) {
   const row = await connection(ctx, id), where = { workspaceId: ctx.actor.workspaceId, connectionId: id };
-  return connectionView(row, await ctx.db.inboundEvent.count({ where: { ...where, status: "pending" } }), await ctx.db.inboundEvent.count({ where: { ...where, status: "failed" } }), ctx.sources[row.kind as ConnectionKind].coverageNote);
+  return connectionView(row, await ctx.db.inboundEvent.count({ where: { ...where, status: "pending" } }), await ctx.db.inboundEvent.count({ where: { ...where, status: "failed" } }), row.coverageNote || ctx.sources[row.kind as ConnectionKind].coverageNote);
 }
 export async function createConnection(ctx: Context, raw: unknown) {
   const input = createConnectionSchema.parse(raw), adapter = ctx.sources[input.kind], id = crypto.randomUUID();

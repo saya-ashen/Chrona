@@ -118,7 +118,11 @@ Reddit/QQ。Reddit 收件箱只实现只读适配边界；未获账号授权时�
 - 持久接收、首次基线、事件去重、重启后读取同一库、评估积压/退避、权限拒绝、连接暂停/撤销、通知重试与幂等、用户决定、工作区隔离：`apps/server/src/__tests__/api/steward-loop.bun.test.ts` 和 `packages/engine/src/modules/steward/*.bun.test.ts`。
 - 今日/事务/委托/连接页面与日程投影；证据、错误、加载、未确认状态和明确的下一步：`features/steward` 的模型及 UI 测试。旧 Plan/Run/托管执行代码和数据保留，仍从次级导航可达；没有将旧入口改成只读。
 - 确定性内置 `rule-assessor-v1`；权限纯函数；生成→验证→授权→启用的声明式工具；建议检测与克制策略：`packages/domain/src/steward`、`packages/integrations/src/steward`、engine steward 测试。
-- `in_app` 本地通知回执、显式确认及失败可见；发送不等于已读，也不关闭待处理事项。单个 steward tick 串联轮询、评估、跟进、建议与投递；旧执行调度器仍保留。
+- `in_app` 本地通知回执、显式确认及失败可见；发送不等于已读，也不关闭待处理事项。单个 steward tick 串联轮询、评估、跟进、建议、摘要与投递；旧执行调度器仍保留。
+- 自动轮询要求覆盖连接（或工作区范围）的 active、未过期委托，且 `read_source` 为 allowed；暂停/撤销最后一条此类委托后，下次 tick 清空 nextCheckAt，通过 coverage 显示空闲原因，不记为失败。手动 Sync now 不要求委托。连接到期时间与委托 cadence 共同约束轮询；覆盖委托记录最近检查/成功/脱敏失败，工作区评估批次采用覆盖委托最小 `maxEventsPerCheck`。
+- 直接提议、建议批准及管理工具创建委托时，省略 policy 也显式保存契约默认 `digest` / `in_app`，不依赖 Prisma 的测试通道默认值。
+- `digest.ts` 每个获准通知的委托每本地日最多创建一条摘要，汇总上次摘要后创建的开放变化（最多列出 10 个标题）；时区取 quietHours 或 UTC，无变化则静默，正常投递仍检查权限与策略。
+- 批准带 dueAt 的 decision 时，幂等创建一条关联 FollowUp；note 使用 nextStep 或 title。拒绝不创建，消息中的日期本身不是承诺。以上新增闭环由 `digest.bun.test.ts` 覆盖。
 
 ### 已实现但仅测试适配器
 
@@ -131,9 +135,8 @@ Reddit/QQ。Reddit 收件箱只实现只读适配边界；未获账号授权时�
 - Reddit 真实读取：阻塞于**明确账号授权**，连接显示 `needs_authorization`；没有接入私人账号、没有 live verification。
 - 真实外部通知通道未实现；非测试通道只有 `in_app`。外部 Agent 的 `Assessor` 端口存在，但未接线；当前并非模型在理解消息。日常聊天接入不是本 steward 已实现能力。
 - 未迁移真实用户数据；本次 steward 重构没有部署或发布。旧成果层的历史部署记录不代表管家已上线。
-- 方向与实现差距：委托暂停/撤销阻止其动作与发送，但不停止仍 active 的连接轮询；轮询本身没有 active 委托或 `read_source` 权限检查；tick 按连接间隔而非委托 cadence/`maxEventsPerCheck` 调度。`digest` 目前生成待处理变化，并无定时聚合摘要投递。
-- 共享契约中的 membership 注释并非实际多用户权限：路由是单一本地 owner + workspace 数据范围。通知契约的 policy channel 默认 `in_app`，但省略整个 policy 时 Prisma 默认仍是 `local_test`（建议创建的委托亦如此）；需显式提供 `in_app` policy。
-- 内置规则的日期是建议；批准该决定不会自动创建 FollowUp。Today 的成果分组尚未接上旧成果版本；工具是声明式规则/表格，不是任意脚本执行环境。
+- 共享契约中的 membership 注释并非实际多用户权限：路由是单一本地 owner + workspace 数据范围。
+- Today 的成果分组尚未接上旧成果版本；工具是声明式规则/表格，不是任意脚本执行环境。
 
 ## 如何运行
 

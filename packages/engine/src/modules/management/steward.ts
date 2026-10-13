@@ -1,3 +1,4 @@
+import { notificationPolicySchema } from "@chrona/contracts/steward";
 import { db, withDatabaseTransaction } from "@/lib/db";
 import { managementStewardCaptureSchema, managementStewardDelegationSchema, managementStewardReadSchema, managementStewardSearchSchema, managementStewardTodaySchema } from "@chrona/contracts/api";
 import { captureSteward, StewardError } from "../steward";
@@ -67,7 +68,7 @@ export async function callManagementSteward(client: ManagementIdentity, name: st
       if (name === "chrona_steward_capture") result = await captureSteward(db, workspaceId, authorized.id, authorized.name, managementStewardCaptureSchema.parse(raw));
       else {
         const { requestId: _requestId, dryRun: _dryRun, ...proposal } = managementStewardDelegationSchema.parse(raw);
-        const delegation = await db.delegation.create({ data: { ...proposal, workspaceId, status: "proposed", expiresAt: proposal.expiresAt ? new Date(proposal.expiresAt) : null } });
+        const delegation = await db.delegation.create({ data: { ...proposal, notification: proposal.notification ?? notificationPolicySchema.parse({}), workspaceId, status: "proposed", expiresAt: proposal.expiresAt ? new Date(proposal.expiresAt) : null } });
         const nextStep = "Not granted. Review and grant this proposal on the Delegations page in Chrona.";
         await db.attentionItem.create({ data: { workspaceId, affairId: delegation.affairId, delegationId: delegation.id, kind: "decision", dedupeKey: `delegation-proposal:${delegation.id}`, title: "Review proposed delegation", whatHappened: proposal.purpose, whyItMatters: `Proposed by ${authorized.name}`, nextStep } });
         await db.stewardAudit.create({ data: { workspaceId, actorKey: authorized.id, kind: "management_delegation_proposed", subjectId: delegation.id, details: { commandId: command.id } } });

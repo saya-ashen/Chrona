@@ -59,7 +59,7 @@ test("repeated pattern raises one evidenced proposal with rationale; ticks and a
   await service.attention.decide(row.id, { decision: "approve" });
   await service.attention.decide(row.id, { decision: "approve" });
   const delegation = await db.delegation.findFirstOrThrow();
-  expect(delegation).toMatchObject({ status: "proposed", affairId: "affair", grantedAt: null, allowedActions: ["read_source", "summarize"], askFirstActions: ["notify_user"] });
+  expect(delegation).toMatchObject({ status: "proposed", affairId: "affair", grantedAt: null, allowedActions: ["read_source", "summarize"], askFirstActions: ["notify_user"], notification: { mode: "digest", channel: "in_app" } });
   expect((await suggestion()).delegationId).toBe(delegation.id);
   expect(await db.delegation.count()).toBe(1);
   expect(await db.stewardNotification.count()).toBe(0);
