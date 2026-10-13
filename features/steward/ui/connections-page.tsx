@@ -6,6 +6,8 @@ import { useStewardClient, useStewardResource } from "../hooks/use-steward";
 import { useStewardMutation } from "../hooks/use-steward-mutation";
 import { canAcknowledge, canSync, connectionTransitions, connectionWarning } from "../model/management";
 
+import { canRetryNotification } from "../model/controls";
+
 export function ConnectionsPage({ workspaceId }: { workspaceId: string }) {
   const { messages } = useI18n(), c = messages.steward;
   const client = useStewardClient(workspaceId), resource = useStewardResource(client.connections);
@@ -39,9 +41,9 @@ export function ConnectionsPage({ workspaceId }: { workspaceId: string }) {
       {events.loading && <p role="status">{c.loading}</p>}{events.error && <p role="alert">{c.error}<Button onClick={events.refresh}>{c.retry}</Button></p>}{events.data?.items.length === 0 && <p>{c.empty}</p>}
       <ul className="space-y-3">{events.data?.items.map(item => <li key={item.id}><Card><CardContent className="space-y-2 pt-4"><h3>{item.title}</h3><Badge variant="outline">{c.eventStatuses[item.status]}</Badge><p>{c.linkStatus}: {c.linkStatuses[item.linkStatus]}</p><p>{c.attempts}: {item.attempts}</p><p>{c.lastError}: {item.lastError ?? c.notProvided}</p></CardContent></Card></li>)}</ul>
     </details>
-    <details className="space-y-3"><summary className="cursor-pointer font-semibold">{c.deliveryLog}</summary>
+    <details className="space-y-3"><summary className="cursor-pointer font-semibold">{c.deliveryLog}</summary><p>{c.controls.sentMeaning}</p>
       {notifications.loading && <p role="status">{c.loading}</p>}{notifications.error && <p role="alert">{c.error}<Button onClick={notifications.refresh}>{c.retry}</Button></p>}{notifications.data?.items.length === 0 && <p>{c.empty}</p>}
-      <ul className="space-y-3">{notifications.data?.items.map(item => <li key={item.id}><Card><CardContent className="space-y-2 pt-4"><h3>{item.title}</h3><Badge variant="outline">{c.notificationStatuses[item.status]}</Badge><p className="whitespace-pre-wrap">{item.body}</p><p>{c.attempts}: {item.attempts}</p><p>{c.lastError}: {item.lastError ?? c.notProvided}</p>{canAcknowledge(item.status) && <Button disabled={disabled} onClick={() => void mutation.run(() => client.acknowledgeNotification(item.id))}>{c.acknowledge}</Button>}</CardContent></Card></li>)}</ul>
+      <ul className="space-y-3">{notifications.data?.items.map(item => <li key={item.id}><Card><CardContent className="space-y-2 pt-4"><h3>{item.title}</h3><Badge variant="outline">{c.notificationStatuses[item.status]}</Badge><p>{c.controls.channel}: {item.channel === "in_app" || item.channel === "local_test" ? c.controls[item.channel] : item.channel}</p><p className="whitespace-pre-wrap">{item.body}</p><p>{c.attempts}: {item.attempts}</p><p>{c.lastError}: {item.lastError ?? c.notProvided}</p>{canRetryNotification(item.status) && <Button disabled={disabled} onClick={() => void mutation.run(() => client.retryNotification(item.id))}>{c.controls.retryDelivery}</Button>}{canAcknowledge(item.status) && <Button disabled={disabled} onClick={() => void mutation.run(() => client.acknowledgeNotification(item.id))}>{c.acknowledge}</Button>}</CardContent></Card></li>)}</ul>
     </details>
   </div>;
 }

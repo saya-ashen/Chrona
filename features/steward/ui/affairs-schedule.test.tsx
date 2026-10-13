@@ -10,7 +10,7 @@ import { decisionItem } from "../model/fixtures";
 import { AffairsPage } from "./affairs-page";
 import { AffairDetailPage } from "./affair-detail-page";
 import { StewardSchedulePanel } from "./steward-schedule-panel";
-const mocks = vi.hoisted(() => ({ affairs: vi.fn(), affair: vi.fn(), createAffair: vi.fn(), updateAffair: vi.fn(), linkEvent: vi.fn(), decideAttention: vi.fn(), schedule: vi.fn() }));
+const mocks = vi.hoisted(() => ({ affairs: vi.fn(), affair: vi.fn(), createAffair: vi.fn(), updateAffair: vi.fn(), linkEvent: vi.fn(), decideAttention: vi.fn(), schedule: vi.fn(), completeFollowUp: vi.fn(), cancelFollowUp: vi.fn(), generateTool: vi.fn(), runTool: vi.fn(), transitionTool: vi.fn() }));
 vi.mock("../model/client", () => ({ createStewardClient: () => mocks }));
 const now = "2026-10-13T00:00:00.000Z";
 const affair = affairSchema.parse({ id: "a1", title: "Travel plans", summary: "Family trip", goal: "Arrive safely", status: "active", keywords: [], taskId: null, openAttentionCount: 2, createdAt: now, updatedAt: now });
@@ -40,6 +40,22 @@ it.each(TOOL_STATES)("renders the distinct %s tool label and rationale", async s
   const tool = managedToolSchema.parse({ id: "tool1", affairId: "a1", kind: "script", name: "Travel watcher", purpose: "Check travel updates", handlingMode: "reuse_tool", selectionRationale: "Existing tool fits", dataScopes: [], version: 1, state, validationSummary: null, validatedVersion: null, authorizedAt: null, enabledAt: null, lastRunAt: null, lastSuccessAt: null, lastFailureAt: null, createdAt: now, updatedAt: now });
   mocks.affair.mockResolvedValue({ ...detail, tools: [tool] }); showDetail();
   const tools = await screen.findByRole("region", { name: "Tools" }); expect(within(tools).getByText(en.steward.toolStates[state])).toBeVisible(); expect(within(tools).getByText("Handling mode: Reuse tool")).toBeVisible(); expect(within(tools).getByText("Why this tool: Existing tool fits")).toBeVisible();
+});
+it("keeps the no-tool answer visible after the affair refetch", async () => {
+  mocks.generateTool.mockResolvedValue({ created: false, choice: { mode: "direct_answer", rationale: "One answer is enough" } });
+  showDetail(); await userEvent.click(await screen.findByText(en.steward.controls.needTool));
+  await userEvent.type(screen.getByLabelText("Name"), "Question"); await userEvent.type(screen.getByLabelText("Purpose"), "Answer");
+  await userEvent.click(screen.getByRole("combobox", { name: "Specification" })); await userEvent.click(screen.getByRole("option", { name: "Table panel" }));
+  await userEvent.click(screen.getByRole("button", { name: "Choose handling" }));
+  await waitFor(() => expect(mocks.affair).toHaveBeenCalledTimes(2));
+  expect(await screen.findByText("Direct answer — No tool needed: One answer is enough")).toBeVisible();
+});
+it.each([["Done", "completeFollowUp"], ["Cancel", "cancelFollowUp"]] as const)("%s completes only pending follow-ups", async (label, method) => {
+  mocks.affair.mockResolvedValue({ ...detail, followUps: ["pending", "done", "cancelled"].map(status => ({ id: status, affairId: "a1", attentionItemId: null, note: `Follow ${status}`, dueAt: now, status, createdAt: now })) });
+  showDetail(); const section = await screen.findByRole("region", { name: "Follow-ups" });
+  expect(within(section).getAllByRole("button")).toHaveLength(2);
+  await userEvent.click(within(section).getByRole("button", { name: label })); expect(mocks[method]).toHaveBeenCalledWith("pending");
+  await waitFor(() => expect(mocks.affair).toHaveBeenCalledTimes(2));
 });
 it("shows not-found separately from errors", async () => { mocks.affair.mockRejectedValue({ status: 404 }); showDetail(); expect(await screen.findByRole("heading", { name: en.steward.affairNotFound })).toBeVisible(); expect(screen.queryByRole("alert")).toBeNull(); });
 it("shows loading, error and successful retry", async () => { mocks.affair.mockRejectedValueOnce({ status: 500 }).mockResolvedValue(detail); showDetail(); expect(screen.getByRole("status")).toHaveTextContent(en.steward.loading); expect(await screen.findByRole("alert")).toHaveTextContent(en.steward.error); await userEvent.click(screen.getByRole("button", { name: "Reload" })); expect(await screen.findByRole("heading", { name: "Travel plans" })).toBeVisible(); });

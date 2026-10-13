@@ -5,6 +5,8 @@ import { Alert, AlertTitle, AlertDescription } from "@shared/ui";
 import { useAttentionDecision, useStewardClient, useStewardResource } from "../hooks/use-steward";
 import { attentionDecisions, deriveToday, evidenceHref } from "../model/today";
 
+import { StewardStatus } from "./steward-status";
+
 export function TodayPage({ workspaceId }: { workspaceId: string }) {
   const { messages } = useI18n(), copy = messages.steward;
   const client = useStewardClient(workspaceId);
@@ -13,6 +15,7 @@ export function TodayPage({ workspaceId }: { workspaceId: string }) {
   const view = resource.data ? deriveToday(resource.data) : null;
   return <div className="mx-auto w-full min-w-0 max-w-4xl space-y-6 p-4 [overflow-wrap:anywhere]" data-ui-surface-kind="product-authored">
     <h1 className="text-2xl font-semibold">{copy.today}</h1>
+    <StewardStatus health={resource.data?.health} />
     {resource.loading && <p role="status">{copy.loading}</p>}
     {resource.error && <Alert variant="destructive"><AlertTitle>{copy.error}</AlertTitle><AlertDescription><Button onClick={resource.refresh}>{copy.retry}</Button></AlertDescription></Alert>}
     {mutation.error && <Alert variant="destructive"><AlertTitle>{copy.decisionError}</AlertTitle><AlertDescription><Button onClick={() => { mutation.clearError(); resource.refresh(); }}>{copy.retry}</Button></AlertDescription></Alert>}

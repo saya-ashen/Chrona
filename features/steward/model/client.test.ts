@@ -1,11 +1,37 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { createStewardClient } from "./client";
 import { decisionItem, emptyToday } from "./fixtures";
+import { initialSignals } from "./tool-form";
 import { parseKeywords } from "./affairs";
 import { apiJson } from "@shared/http";
 vi.mock("@shared/http", () => ({ apiJson: vi.fn() }));
 afterEach(() => vi.resetAllMocks());
 describe("steward HTTP client", () => {
+  it("generates tools and accepts created=false with a rationale", async () => {
+    const response = { created: false, choice: { mode: "direct_answer", rationale: "One question" } };
+    vi.mocked(apiJson).mockResolvedValue(response);
+    const input = { name: "Question", purpose: "Answer", signals: initialSignals, spec: {} };
+    expect(await createStewardClient("ws").generateTool(input)).toEqual(response);
+    expect(apiJson).toHaveBeenCalledWith("/api/steward/tools?workspaceId=ws", expect.objectContaining({ method: "POST", body: JSON.stringify({ name: input.name, purpose: input.purpose, dataScopes: [], signals: input.signals, spec: input.spec }) }));
+  });
+  it("runs a tool with encoded id and validated result", async () => {
+    vi.mocked(apiJson).mockResolvedValue({ matches: [], rows: [] });
+    expect(await createStewardClient("ws").runTool("t/1", {})).toEqual({ matches: [], rows: [] });
+    expect(apiJson).toHaveBeenCalledWith("/api/steward/tools/t%2F1/run?workspaceId=ws", expect.objectContaining({ method: "POST", body: '{"events":[]}' }));
+  });
+  it.each(["complete", "cancel"] as const)("posts follow-up %s and validates response", async action => {
+    const followUp = { id: "f/1", affairId: null, attentionItemId: null, note: "Check", dueAt: "2026-10-13T00:00:00Z", status: action === "complete" ? "done" : "cancelled", createdAt: "2026-10-13T00:00:00Z" };
+    vi.mocked(apiJson).mockResolvedValue(followUp);
+    const client = createStewardClient("ws");
+    expect(await (action === "complete" ? client.completeFollowUp("f/1") : client.cancelFollowUp("f/1"))).toEqual(followUp);
+    expect(apiJson).toHaveBeenCalledWith(`/api/steward/follow-ups/f%2F1/${action}?workspaceId=ws`, expect.objectContaining({ method: "POST" }));
+  });
+  it("retries a notification without reassessment payload", async () => {
+    const notification = { id: "n/1", attentionItemId: null, channel: "in_app", status: "queued", title: "Notice", body: "Body", link: null, attempts: 1, lastError: null, nextAttemptAt: null, generatedAt: "2026-10-13T00:00:00Z", sentAt: null, acknowledgedAt: null };
+    vi.mocked(apiJson).mockResolvedValue(notification);
+    expect(await createStewardClient("ws").retryNotification("n/1")).toEqual(notification);
+    expect(apiJson).toHaveBeenCalledWith("/api/steward/notifications/n%2F1/retry?workspaceId=ws", expect.objectContaining({ method: "POST" }));
+  });
   it("uses the shared authenticated client and explicit workspace scope", async () => {
     vi.mocked(apiJson).mockResolvedValue(emptyToday());
     const signal = new AbortController().signal;

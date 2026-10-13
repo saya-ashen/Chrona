@@ -6,7 +6,7 @@ import en from "@chrona/i18n/messages/en.json";
 import { delegationSchema, connectionSchema, notificationSchema, NOTIFICATION_STATUSES, PILOT_DENIED_ACTIONS } from "@chrona/contracts";
 import { DelegationsPage } from "./delegations-page";
 import { ConnectionsPage } from "./connections-page";
-const mocks = vi.hoisted(() => ({ delegations: vi.fn(), connections: vi.fn(), events: vi.fn(), notifications: vi.fn(), transitionDelegation: vi.fn(), proposeDelegation: vi.fn(), transitionConnection: vi.fn(), syncConnection: vi.fn(), createConnection: vi.fn(), acknowledgeNotification: vi.fn() }));
+const mocks = vi.hoisted(() => ({ delegations: vi.fn(), connections: vi.fn(), events: vi.fn(), notifications: vi.fn(), transitionDelegation: vi.fn(), proposeDelegation: vi.fn(), transitionConnection: vi.fn(), syncConnection: vi.fn(), createConnection: vi.fn(), acknowledgeNotification: vi.fn(), retryNotification: vi.fn() }));
 vi.mock("../model/client", () => ({ createStewardClient: () => mocks }));
 const now = "2026-10-13T00:00:00.000Z";
 const delegation = delegationSchema.parse({ id: "d1", revision: 7, status: "proposed", affairId: null, connectionId: "c1", purpose: "Watch updates", originalWording: "Tell me when this changes", cadenceSeconds: 300, allowedActions: ["read_source"], askFirstActions: ["run_tool"], notification: {}, limits: {}, grantedAt: null, expiresAt: null, lastCheckAt: now, lastSuccessAt: now, lastFailureAt: null, lastError: null, createdAt: now, updatedAt: now });
@@ -40,7 +40,9 @@ it.each(["needs_authorization", "failing"] as const)("shows %s honestly", async 
 it("offers acknowledgment only for sent and uncertain, preserving distinct delivery labels", async () => {
   mocks.notifications.mockResolvedValue({ items: NOTIFICATION_STATUSES.map(status => notificationSchema.parse({ id: status, attentionItemId: null, channel: "local_test", status, title: `Notice ${status}`, body: "Test notice", link: null, attempts: 1, lastError: null, nextAttemptAt: null, generatedAt: now, sentAt: null, acknowledgedAt: null })) });
   show("connections"); await screen.findByText("Test source"); await userEvent.click(screen.getByText("Delivery log"));
-  for (const status of NOTIFICATION_STATUSES) { const row = screen.getByText(`Notice ${status}`).closest("li")!; expect(within(row).getByText(en.steward.notificationStatuses[status])).toBeVisible(); expect(within(row).queryByRole("button", { name: "Acknowledge" }) !== null).toBe(status === "sent" || status === "uncertain"); }
+  for (const status of NOTIFICATION_STATUSES) { const row = screen.getByText(`Notice ${status}`).closest("li")!; expect(within(row).getByText(en.steward.notificationStatuses[status])).toBeVisible(); expect(within(row).queryByRole("button", { name: "Acknowledge" }) !== null).toBe(status === "sent" || status === "uncertain"); expect(within(row).queryByRole("button", { name: "Retry" }) !== null).toBe(status === "failed"); expect(within(row).getByText("Channel: Test sink")).toBeVisible(); }
+  expect(screen.getByText(en.steward.controls.sentMeaning)).toBeVisible();
+  await userEvent.click(screen.getByRole("button", { name: "Retry" })); expect(mocks.retryNotification).toHaveBeenCalledWith("failed");
   await userEvent.click(screen.getAllByRole("button", { name: "Acknowledge" })[0]); expect(mocks.acknowledgeNotification).toHaveBeenCalledWith("sent");
 });
 it.each(["delegations", "connections"] as const)("%s loading, error and retry", async page => { mocks[page].mockRejectedValueOnce(new Error("offline")).mockResolvedValue({ items: [] }); show(page); expect(screen.getAllByRole("status")[0]).toHaveTextContent(en.steward.loading); await screen.findByRole("alert"); await userEvent.click(screen.getByRole("button", { name: "Reload" })); await waitFor(() => expect(screen.getByRole("status")).toHaveTextContent(en.steward.empty)); });
