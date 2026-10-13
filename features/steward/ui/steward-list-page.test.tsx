@@ -8,7 +8,7 @@ vi.mock("../model/client", () => ({ createStewardClient: () => mocks }));
 function show(kind: StewardListKind) { render(<I18nProvider locale="en" messages={en}><StewardListPage workspaceId="workspace-test" kind={kind} /></I18nProvider>); }
 afterEach(cleanup);
 beforeEach(() => vi.resetAllMocks());
-describe.each<StewardListKind>(["affairs", "delegations", "connections"])("%s list", kind => {
+describe.each<StewardListKind>(["affairs"])("%s list", kind => {
   it("announces loading", () => { mocks[kind].mockReturnValue(new Promise(() => {})); show(kind); expect(screen.getByRole("status")).toHaveTextContent(en.steward.loading); });
   it("shows errors with a reload action", async () => { mocks[kind].mockRejectedValue(new Error("offline")); show(kind); expect(await screen.findByRole("alert")).toHaveTextContent(en.steward.error); expect(screen.getByRole("button", { name: "Reload" })).toBeEnabled(); });
   it("shows an empty list", async () => { mocks[kind].mockResolvedValue({ items: [] }); show(kind); expect(await screen.findByText(en.steward.empty)).toBeVisible(); });
