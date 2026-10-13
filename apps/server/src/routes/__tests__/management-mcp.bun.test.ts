@@ -201,7 +201,7 @@ describe("management MCP protocol", () => {
     const initialize = await call(client.token, "initialize", { protocolVersion: LATEST_PROTOCOL_VERSION, clientInfo: { name: "test", version: "1" }, capabilities: {} });
     expect(initialize.status).toBe(200);
     const tools = await call(client.token, "tools/list", {});
-    expect(ListToolsResultSchema.parse(tools.body.result).tools).toHaveLength(24);
+    expect(ListToolsResultSchema.parse(tools.body.result).tools).toHaveLength(31);
     const create = await call(client.token, "tools/call", { name: "chrona_task_create", arguments: { requestId: crypto.randomUUID(), title: "From external agent", mode: "todo" } });
     expect(create.body.result.isError).toBe(false);
     expect(create.body.result.structuredContent.data.state).toBe("completed");
